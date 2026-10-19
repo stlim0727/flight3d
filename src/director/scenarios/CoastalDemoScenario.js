@@ -30,6 +30,9 @@ export class CoastalDemoScenario {
           '🎬 [1/8] 비행 전 드론 서클 점검 (Pre-Flight Drone Inspection)',
           '보잉 737 기체 외관 360° 드론 조망 • 플랩 5 전개 • 황금빛 일출 해안 전경 [Esc: 직접 조종]'
         );
+        if (this.sim.setPreset) {
+          this.sim.setPreset('runway', true);
+        }
         this.sim.cameraSystem.setMode(CameraSystem.MODES.DRONE);
         this.sim.cameraSystem.resetDroneOrbit?.(-Math.PI * 0.45, 36.0, 9.5);
         this.sim.sky.setTimeOfDay(6.5);

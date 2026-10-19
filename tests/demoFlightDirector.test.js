@@ -143,4 +143,81 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
     assert.strictEqual(director.isActive, false);
     assert.strictEqual(sim.controls.getVirtualInput('throttle'), undefined);
   });
+
+  it('should bind #btn-demo click and toggle active class', () => {
+    const listeners = {};
+    const classList = new Set();
+    const mockBtn = {
+      classList: {
+        add: (cls) => classList.add(cls),
+        remove: (cls) => classList.delete(cls),
+        contains: (cls) => classList.has(cls)
+      },
+      addEventListener: (type, fn) => { listeners[type] = fn; }
+    };
+
+    globalThis.document = {
+      getElementById: (id) => (id === 'btn-demo' ? mockBtn : null)
+    };
+
+    const sim = createMockSimulator('lukla');
+    const director = new DemoFlightDirector(sim);
+    director.initUI();
+
+    assert.strictEqual(director.demoBtn, mockBtn);
+    assert.strictEqual(typeof listeners['click'], 'function');
+
+    // Clicking btn-demo should start demo flight
+    listeners['click']();
+    assert.strictEqual(director.isActive, true);
+    assert.strictEqual(classList.has('active'), true);
+
+    // Stopping demo flight should remove active class
+    director.stop('Stopped');
+    assert.strictEqual(director.isActive, false);
+    assert.strictEqual(classList.has('active'), false);
+
+    delete globalThis.document;
+  });
+
+  it('should trigger demo flight with P keyboard shortcut', () => {
+    const windowListeners = {};
+    globalThis.window = {
+      addEventListener: (type, fn) => { windowListeners[type] = fn; }
+    };
+    globalThis.document = {
+      getElementById: () => null
+    };
+
+    const sim = createMockSimulator('lukla');
+    const director = new DemoFlightDirector(sim);
+    director.initUI();
+
+    assert.strictEqual(typeof windowListeners['keydown'], 'function');
+
+    // Pressing 'p' starts demo
+    windowListeners['keydown']({
+      key: 'p',
+      target: { matches: () => false }
+    });
+    assert.strictEqual(director.isActive, true);
+
+    // Pressing Escape stops demo
+    windowListeners['keydown']({
+      key: 'Escape',
+      target: { matches: () => false }
+    });
+    assert.strictEqual(director.isActive, false);
+
+    // Pressing 'P' starts demo
+    windowListeners['keydown']({
+      key: 'P',
+      target: { matches: () => false }
+    });
+    assert.strictEqual(director.isActive, true);
+
+    delete globalThis.window;
+    delete globalThis.document;
+  });
 });
+

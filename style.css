@@ -282,6 +282,13 @@ body, html {
   box-shadow: 0 0 14px rgba(45, 212, 191, 0.5) !important;
 }
 
+.btn-demo-toggle.active {
+  background: linear-gradient(135deg, #0284c7, #0369a1) !important;
+  border-color: #38bdf8 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.6) !important;
+}
+
 /* Toast Message */
 .toast {
   position: absolute;

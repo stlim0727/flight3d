@@ -73,8 +73,15 @@ export class DemoFlightDirector {
     this.skipBtn = document.getElementById('btn-skip-demo');
     this.closeBtn = document.getElementById('btn-demo-close');
     this.openBtn = document.getElementById('btn-demo-open');
+    this.demoBtn = document.getElementById('btn-demo');
     this.badgeEl = this.bannerEl?.querySelector('.demo-badge');
     this.pillTextEl = document.getElementById('demo-pill-text');
+
+    if (this.demoBtn) {
+      this.demoBtn.addEventListener('click', () => {
+        this.start();
+      });
+    }
 
     if (this.skipBtn) {
       this.skipBtn.addEventListener('click', () => {
@@ -105,14 +112,16 @@ export class DemoFlightDirector {
       });
     }
 
-    // Keyboard shortcut for cancelling demo (ESC) or restarting demo (D)
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.isActive) {
-        this.stop('직접 조종 모드로 전환되었습니다.');
-      } else if ((e.key === 'd' || e.key === 'D') && !this.isActive && !e.target.matches('input, textarea')) {
-        this.start();
-      }
-    });
+    // Keyboard shortcut for cancelling demo (ESC) or starting/restarting demo (P)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && this.isActive) {
+          this.stop('직접 조종 모드로 전환되었습니다.');
+        } else if ((e.key === 'p' || e.key === 'P') && !e.target?.matches?.('input, textarea')) {
+          this.start();
+        }
+      });
+    }
   }
 
   closeBanner() {
@@ -162,6 +171,9 @@ export class DemoFlightDirector {
     if (this.openBtn) {
       this.openBtn.style.display = 'none';
     }
+    if (this.demoBtn) {
+      this.demoBtn.classList.add('active');
+    }
 
     // Ensure audio starts on first user interaction or when allowed
     if (!this.audioInitiated && this.sim.audio) {
@@ -174,6 +186,11 @@ export class DemoFlightDirector {
       this.setStage(DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
     } else {
       this.setStage(DemoFlightDirector.COASTAL_STAGES.PREFLIGHT_ORBIT);
+    }
+
+    if (this.sim.showToast) {
+      const airportName = this.activeDemoAirport === 'lukla' ? '루클라 (VNLK)' : '국제공항 (09L)';
+      this.sim.showToast(`🎬 ${airportName} 자율 시네마틱 데모 비행 시작`);
     }
   }
 
@@ -207,6 +224,9 @@ export class DemoFlightDirector {
     }
     if (this.openBtn) {
       this.openBtn.style.display = 'none';
+    }
+    if (this.demoBtn) {
+      this.demoBtn.classList.remove('active');
     }
 
     if (message && this.sim.showToast) {
