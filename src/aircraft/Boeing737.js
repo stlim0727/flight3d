@@ -346,12 +346,12 @@ export class Boeing737 {
 
     const makeTurbofan = (xPos) => {
       const eng = new THREE.Group();
-      eng.position.set(xPos, -1.35, -2.5); // Underwing pylon mount
+      eng.position.set(xPos, -1.95, -5.22); // Underwing pylon mount aligned with B737 CFM56 nacelle probes
 
       // Pylon
-      const pylonGeo = new THREE.BoxGeometry(0.32, 0.95, 3.2);
+      const pylonGeo = new THREE.BoxGeometry(0.32, 1.8, 3.2);
       const pylon = new THREE.Mesh(pylonGeo, blueMat);
-      pylon.position.set(0, 0.55, 0.2);
+      pylon.position.set(0, 1.1, 0.2);
       eng.add(pylon);
 
       // Nacelle Outer Cowl (Length ~4.2m, Diameter ~2.1m)
@@ -398,8 +398,8 @@ export class Boeing737 {
       return { root: eng, fan: fanGroup };
     };
 
-    const leftEngine = makeTurbofan(-5.2);
-    const rightEngine = makeTurbofan(5.2);
+    const leftEngine = makeTurbofan(-5.06);
+    const rightEngine = makeTurbofan(5.06);
 
     this.fanL = leftEngine.fan;
     this.fanR = rightEngine.fan;

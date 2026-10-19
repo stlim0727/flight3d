@@ -284,8 +284,8 @@ class FlightTestAgent {
         await this.eval(`window.simulator.controls.setVirtualInput('elevator', 0.65);`);
       }
 
-      // Detect liftoff
-      if (rotated && !liftoffDetected && (!state.onGround || state.radioAltFt > 10.5)) {
+      // Detect liftoff (require actual wheel separation from runway)
+      if (rotated && !liftoffDetected && !state.onGround && state.radioAltFt > 14.0) {
         liftoffDetected = true;
         this.log(`Positive Rate of Climb confirmed! Radio Alt: ${Math.round(state.radioAltFt)} FT, VSI: +${Math.round(state.vsiFpm)} FPM`, '✈️');
         // Retract gear and stabilize climb attitude
