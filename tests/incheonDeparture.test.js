@@ -102,3 +102,17 @@ test('restarting directly from pushback hides the tug without requiring stop', (
   assert.equal(director.currentStage,1);
   assert.equal(sim.incheonAirport.tug.visible,false);
 });
+
+test('bridge stays outside the fuselage throughout detachment and reset', () => {
+  const airport = new TestAirport();
+  for (const progress of [0, .25, .5, .75, 1, 0]) {
+    airport.setBridgeRetraction(progress);
+    const bounds = new THREE.Box3().setFromObject(airport.jetBridges[1]);
+    assert.ok(bounds.min.z >= 242.09, 'rigid bridge must stop outside the port skin');
+    assert.ok(bounds.max.x < -99, 'bridge must remain ahead of the wing');
+    airport.setBoardingProgress(progress);
+    for (const person of airport.passengers.children) {
+      assert.ok(person.position.z >= 244 && person.position.z <= 274);
+    }
+  }
+});

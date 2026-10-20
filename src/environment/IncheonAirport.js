@@ -61,18 +61,20 @@ export class IncheonAirport extends Airport {
       sign.position.set(-80, 23, 304.8);
       this.group.add(sign);
     }
+    // Aircraft at (-90, 240), heading west: port skin is at z=241.88.
+    // The cabin stops at z=242.1, ahead of the wing at the forward door.
     this.jetBridges = [];
-    for (const x of [-200, -100, 0]) {
+    for (const x of [-200, -102, 0]) {
       box(7, 7, 26, x, 23, 292, glass);
       const bridge = new THREE.Group();
       bridge.position.set(x, 0, 278);
       this.group.add(bridge);
-      box(5, .3, 42, 0, 15, -21, white, bridge);
-      box(5, .3, 42, 0, 19, -21, white, bridge);
-      box(.15, 4, 42, -2.5, 17, -21, glass, bridge);
-      box(.15, 4, 42, 2.5, 17, -21, glass, bridge);
-      box(7, 5, 6, 0, 17, -44, floor, bridge);
-      box(1, 4, 1, 0, 14, -35, white, bridge);
+      box(5, .3, 30, 0, 15, -15, white, bridge);
+      box(5, .3, 30, 0, 19, -15, white, bridge);
+      box(.15, 4, 30, -2.5, 17, -15, glass, bridge);
+      box(.15, 4, 30, 2.5, 17, -15, glass, bridge);
+      box(5, 4, 5.8, 0, 17, -33, floor, bridge);
+      box(1, 4, 1, 0, 13.5, -27, white, bridge);
       this.jetBridges.push(bridge);
     }
     this.passengers = new THREE.Group();
@@ -84,7 +86,7 @@ export class IncheonAirport extends Airport {
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5), white);
       head.position.y = 1.65;
       person.add(head);
-      person.position.set(-100, 15, 274 - i * 3);
+      person.position.set(-102, 15.15, 274 - i * 2.5);
       this.passengers.add(person);
     }
     this.tug = new THREE.Group();
@@ -96,7 +98,7 @@ export class IncheonAirport extends Airport {
 
   setBoardingProgress(progress) {
     this.passengers.children.forEach((p, i) => {
-      p.position.z = 274 - ((i * 3 + progress * 40) % 40);
+      p.position.z = 274 - ((i * 2.5 + progress * 30) % 30);
       p.visible = progress < 1;
     });
   }
