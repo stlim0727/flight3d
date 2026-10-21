@@ -23,29 +23,29 @@
   {
     "selector": ".touch-throttle-card",
     "left": 18,
-    "right": 126,
-    "top": 278,
-    "bottom": 458
+    "right": 74,
+    "top": 409,
+    "bottom": 536
   },
   {
     "selector": ".touch-stick-card",
-    "left": 168,
+    "left": 202,
     "right": 302,
-    "top": 290,
-    "bottom": 458
+    "top": 436,
+    "bottom": 536
   },
   {
     "selector": ".touch-rudder-card",
-    "left": 120,
-    "right": 260,
-    "top": 464,
+    "left": 86,
+    "right": 190,
+    "top": 469,
     "bottom": 534
   },
   {
     "selector": "#touch-btn-brake",
-    "left": 60,
-    "right": 112,
-    "top": 473,
-    "bottom": 525
+    "left": 116,
+    "right": 160,
+    "top": 421,
+    "bottom": 465
   }
 ]

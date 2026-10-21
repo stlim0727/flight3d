@@ -1159,12 +1159,6 @@ class FlightSimulator {
       if (state.muted) {
         btnSound.className = 'btn btn-preset btn-sound-toggle muted';
         bindText(btnSound, () => t('muted'));
-      } else if (state.mode === 'bluetooth') {
-        btnSound.className = 'btn btn-preset btn-sound-toggle active-bt';
-        bindText(btnSound, () => t('bluetooth.200'));
-      } else if (state.mode === 'mobile') {
-        btnSound.className = 'btn btn-preset btn-sound-toggle active-boost';
-        bindText(btnSound, () => t('boost.150'));
       } else {
         btnSound.className = 'btn btn-preset btn-sound-toggle';
         bindText(btnSound, () => t('sound.100'));
@@ -1173,7 +1167,7 @@ class FlightSimulator {
 
     const btnSoundAction = document.getElementById('btn-sound-action');
     if (btnSoundAction) {
-      bindText(btnSoundAction, () => state.muted ? t('muted') : (state.mode === 'bluetooth' ? '🎧⚡ 200%' : (state.mode === 'mobile' ? '🔊⚡ 150%' : t('volume.m'))));
+      bindText(btnSoundAction, () => state.muted ? t('muted') : t('volume.m'));
     }
 
     if (this.touchControls && typeof this.touchControls.updateAudioUI === 'function') {

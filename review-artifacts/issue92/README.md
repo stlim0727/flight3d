@@ -7,8 +7,14 @@ buttons remain outside the scrolling content. Repeated adjustments retain the
 panel; airport/scenario selection closes Flight settings. Core telemetry stays
 visible, with a separate Instruments disclosure for details. In touch-control
 mode the primary toolbar keeps Camera directly accessible and adds a 44px
-one-tap mute/unmute button. Unmuting restores the selected volume/boost level;
-Environment (Settings on compact screens) retains volume-level adjustment.
+one-tap mute/unmute button. Sound now has only normal-volume and muted states. Mobile auto-boost,
+the 150%/200% modes, and the extra output amplification have been removed.
+The toolbar speaker, Settings sound button, and M key all toggle sound.
+
+On small phones the throttle, brake/rudder, and stick share one shallow row.
+The 320px portrait control band shrank from 266px to 135px. Throttle presets
+and the extra stick telemetry header are hidden on these screens; camera and
+mute remain directly accessible, with 44px minimum button/slider targets.
 
 ## Verification
 
@@ -17,7 +23,7 @@ Environment (Settings on compact screens) retains volume-level adjustment.
 - `npm run build`: passed (Vite reports its large-bundle advisory).
 - `node scripts/verify-responsive-ui.mjs`: checks bounds and pairwise overlap of
   telemetry, toolbar, throttle, stick, rudder, and brake; tests repeated volume
-  adjustments and accessible close buttons in ten viewport/input combinations.
+  adjustments and accessible close buttons in eleven viewport/input combinations.
   Visible settings controls are hit-tested at their center and both sides. On
   wide screens, native touch and mouse clicks must open Flight guide above the yoke.
 - Live interaction assertions cover repeated flaps, direct camera selection,
@@ -26,13 +32,17 @@ Environment (Settings on compact screens) retains volume-level adjustment.
   open Aircraft panel. Additional assertions verify the secondary Instruments
   panel stays clear of the toolbar on compact and wide screens. Native input
   also verifies direct toolbar camera access, one-tap mute/unmute, synchronized
-  Settings state, and restoration of the previous 150% boost level.
+  Settings state, and normal-volume restoration. Small-screen control bands
+  must remain within the bottom 150px. Native drags/holds verify the compact
+  throttle, both stick axes, rudder auto-centering, and brake release in portrait
+  and landscape; `compact-input-results.json` records the results.
 
 | Capture prefix | Viewport | Input |
 | --- | --- | --- |
 | portrait-small | 320 × 568 | Touch |
 | portrait | 390 × 844 | Touch |
 | portrait-short | 320 × 480 | Touch; reduced available height |
+| portrait-tiny | 320 × 400 | Touch; very short viewport |
 | landscape-small | 568 × 320 | Touch |
 | landscape | 844 × 390 | Touch |
 | desktop | 1440 × 900 | Mouse / keyboard |

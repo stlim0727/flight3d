@@ -447,17 +447,6 @@ body, html {
   border-left: 3px solid #10b981;
 }
 
-.btn-sound-toggle.active-boost {
-  border-left: 3px solid #f59e0b;
-  color: #fbbf24;
-}
-
-.btn-sound-toggle.active-bt {
-  border-left: 3px solid #38bdf8;
-  color: #38bdf8;
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
-}
-
 .btn-sound-toggle.muted {
   border-left: 3px solid #ef4444;
   color: #94a3b8;
@@ -1999,3 +1988,48 @@ body.compact-ui {
   grid-template-columns: repeat(4, minmax(0, 1fr)) 44px;
 }
 .compact-ui.touch-mode .quick-mute { font-size: 18px; }
+
+/* Small phones use a single shallow row instead of stacked control cards. */
+@media (max-width: 600px), (max-width: 1024px) and (max-height: 500px) {
+  .compact-ui.touch-mode .touch-controls-overlay {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .compact-ui .touch-throttle-card {
+    width: 56px;
+    padding: 5px;
+    gap: 4px;
+  }
+  .compact-ui .touch-throttle-card .touch-card-header {
+    flex-direction: column;
+    gap: 2px;
+    padding-bottom: 2px;
+  }
+  .compact-ui .touch-throttle-card .touch-label { font-size: 0; }
+  .compact-ui .touch-throttle-card .touch-label::after { content: 'THR'; font-size: 8px; }
+  .compact-ui .touch-throttle-card .touch-value { font-size: 8px; white-space: nowrap; }
+  .compact-ui .touch-throttle-presets { display: none; }
+  .compact-ui .touch-throttle-track { width: 44px; height: 88px; }
+  .compact-ui .touch-stick-card { padding: 5px; gap: 0; }
+  .compact-ui .touch-stick-card .touch-card-header { display: none; }
+  .compact-ui .touch-stick-zone { width: 88px; height: 88px; }
+  .compact-ui .touch-stick-knob { width: 36px; height: 36px; border-width: 2px; }
+  .compact-ui .knob-ring { width: 18px; height: 18px; }
+  .compact-ui .stick-boundary { width: 64px; height: 64px; }
+  .compact-ui .touch-center { flex-direction: column; gap: 4px; }
+  .compact-ui .touch-rudder-card { width: 104px; padding: 4px; gap: 2px; }
+  .compact-ui .touch-rudder-track { height: 44px; }
+  .compact-ui .rudder-label-strip { font-size: 8px; }
+  .compact-ui .rudder-label-strip span:first-child,
+  .compact-ui .rudder-label-strip span:last-child { font-size: 0; }
+  .compact-ui .rudder-label-strip span:first-child::after { content: '◄ L'; font-size: 8px; }
+  .compact-ui .rudder-label-strip span:last-child::after { content: 'R ►'; font-size: 8px; }
+  .compact-ui .touch-center .btn-touch-brake { width: 44px; height: 44px; }
+  .compact-ui .brake-label { font-size: 8px; }
+  .compact-ui .brake-sub { display: none; }
+  .compact-ui .touch-throttle-card,
+  .compact-ui .touch-stick-card,
+  .compact-ui .touch-rudder-card { background: rgba(15, 23, 42, .72); }
+}

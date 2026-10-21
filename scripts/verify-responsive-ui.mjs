@@ -73,6 +73,7 @@ const layouts = [
   ['portrait-small', 320, 568, true],
   ['portrait', 390, 844, true],
   ['portrait-short', 320, 480, true],
+  ['portrait-tiny', 320, 400, true],
   ['landscape-small', 568, 320, true],
   ['landscape', 844, 390, true],
   ['desktop', 1440, 900, false],
@@ -130,6 +131,11 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
       assert.equal(overlap, false, `${name}: ${x.id} overlaps ${y.id}`);
     }
   }
+  if (showTouch && (width <= 600 || (width <= 1024 && height <= 500))) {
+    const controlsTop = Math.min(...bounds.filter(b => ['touch-throttle-card', 'touch-stick-card', 'touch-rudder-card', 'touch-btn-brake'].includes(b.id)).map(b => b.y));
+    assert.ok(height - controlsTop <= 150, `${name}: compact controls occupy at most the bottom 150px`);
+    panel.controlBandHeight = height - controlsTop;
+  }
   assert.ok(bounds.every(b => !b.bad), `${name}: primary controls are in bounds`);
   assert.ok(panel.open && panel.closeVisible && panel.bodyTouch === 'pan-y', `${name}: volume panel remains open with reachable close`);
   assert.ok(panel.hitTargets.length > 0, `${name}: visible settings controls were hit-tested`);
@@ -143,16 +149,17 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     await ev(`document.querySelector('#panel-environment .panel-close').click()`);
   }
   if (showTouch) {
+    assert.ok(await ev(`window.simulator.audio.volume <= 1 && window.simulator.audio.getVolumeState().level <= 1`), `${name}: audio has no boost modes`);
     await nativeClick('#open-camera', touch);
     assert.ok(await ev(`!document.querySelector('#panel-camera').hidden`), `${name}: camera is directly reachable from toolbar`);
-    await ev(`document.querySelector('#panel-camera .panel-close').click(); window.simulator.audio.setVolume(1.5); window.simulator.updateAudioUI()`);
+    await ev(`document.querySelector('#panel-camera .panel-close').click(); window.simulator.audio.setVolume(1.0); window.simulator.updateAudioUI()`);
     const muteTarget = await ev(`(()=>{const node=document.querySelector('#btn-mute'),r=node.getBoundingClientRect();return {width:r.width,height:r.height,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}})()`);
     assert.ok(muteTarget.width >= 44 && muteTarget.height >= 44 && muteTarget.reachable, `${name}: mute has a reachable 44px touch target`);
     await nativeClick('#btn-mute', touch);
     assert.ok(await ev(`window.simulator.audio.isMuted && window.simulator.audio.effectiveVolume === 0 && document.querySelector('#btn-mute').getAttribute('aria-pressed') === 'true' && document.querySelector('#btn-sound').classList.contains('muted')`), `${name}: one tap mutes and synchronizes settings`);
     if (name === 'portrait-small') await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-small-muted.png`, Buffer.from(r.data, 'base64')));
     await nativeClick('#btn-mute', touch);
-    assert.ok(await ev(`!window.simulator.audio.isMuted && window.simulator.audio.volume === 1.5 && document.querySelector('#btn-mute').getAttribute('aria-pressed') === 'false'`), `${name}: one tap unmutes and preserves boost`);
+    assert.ok(await ev(`!window.simulator.audio.isMuted && window.simulator.audio.volume === 1.0 && document.querySelector('#btn-mute').getAttribute('aria-pressed') === 'false'`), `${name}: one tap unmutes and restores normal volume`);
     panel.quickCamera = true;
     panel.oneTapMute = true;
     panel.restoresVolume = true;
@@ -216,6 +223,39 @@ assert.ok(await ev(`document.querySelector('#hud-cam').scrollWidth <= document.q
 assert.ok(await ev(`(()=>{const panel=document.querySelector('#panel-instruments').getBoundingClientRect();const toolbar=document.querySelector('.flight-toolbar').getBoundingClientRect();return panel.top >= toolbar.bottom && panel.bottom <= innerHeight})()`), 'compact instruments do not overlap toolbar or leave viewport');
 await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-instruments.png`, Buffer.from(r.data, 'base64')));
 await ev(`document.querySelector('#panel-instruments .panel-close').click()`);
+// Verify the smaller controls still accept real pointer input in both phone orientations.
+const compactInputs = [];
+for (const [width, height] of [[320, 568], [568, 320]]) {
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+  await ev(`window.simulator.setPreset('runway'); window.simulator.controls.throttle = 0`);
+  await new Promise(resolve => setTimeout(resolve, 150));
+  async function drag(selector, from, to, expression) {
+    const r = await ev(`document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect().toJSON()`);
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: r.left + r.width * from[0], y: r.top + r.height * from[1] }] });
+    await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: r.left + r.width * to[0], y: r.top + r.height * to[1] }] });
+    const held = await ev(expression);
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    return { held, released: await ev(expression) };
+  }
+  const throttle = await drag('#touch-throttle-track', [.5, .9], [.5, .1], 'window.simulator.controls.throttle');
+  assert.ok(throttle.held > .8 && throttle.released > .8, 'small throttle responds and retains setting');
+  const stick = await drag('#touch-stick-zone', [.5, .5], [.8, .2], '[window.simulator.controls.touchElevator, window.simulator.controls.touchAileron]');
+  assert.ok(stick.held[0] < -.2 && stick.held[1] > .2, 'small stick responds on both axes');
+  assert.deepEqual(stick.released, [0, 0], 'small stick centers after release');
+  const rudder = await drag('#touch-rudder-track', [.5, .5], [.8, .5], 'window.simulator.controls.touchRudder');
+  assert.ok(rudder.held > .2, 'small rudder responds');
+  assert.equal(rudder.released, 0, 'rudder centers after release');
+  const brake = await drag('#touch-btn-brake', [.5, .5], [.5, .5], 'window.simulator.controls.touchBrakes');
+  assert.equal(brake.held, 1, 'small brake engages while held');
+  assert.equal(brake.released, 0, 'small brake releases');
+  compactInputs.push({ width, height, throttle, stick, rudder, brake });
+}
+fs.writeFileSync(`${out}/compact-input-results.json`, JSON.stringify(compactInputs, null, 2));
+await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 1, mobile: true });
+await ev('window.simulator.controls.throttle = 0');
+await new Promise(resolve => setTimeout(resolve, 150));
+console.log('Compact throttle, stick, rudder, and brake input passed');
+
 // Simulate reserved notch/home-indicator space; physical browser chrome still needs device testing.
 await ev(`document.body.style.setProperty('--edge-left', '18px'); document.body.style.setProperty('--edge-right', '18px'); document.body.style.setProperty('--edge-top', '24px'); document.body.style.setProperty('--edge-bottom', '32px')`);
 await new Promise(r => setTimeout(r, 100));

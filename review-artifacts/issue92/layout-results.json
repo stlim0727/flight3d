@@ -65,33 +65,33 @@
       {
         "id": "touch-throttle-card",
         "x": 8,
-        "y": 302,
-        "w": 108,
-        "h": 180,
+        "y": 433,
+        "w": 56,
+        "h": 127,
         "bad": false
       },
       {
         "id": "touch-btn-brake",
-        "x": 60,
-        "y": 497,
-        "w": 52,
-        "h": 52,
+        "x": 116,
+        "y": 445,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "touch-rudder-card",
-        "x": 120,
-        "y": 488,
-        "w": 140,
-        "h": 70,
+        "x": 86,
+        "y": 493,
+        "w": 104,
+        "h": 65,
         "bad": false
       },
       {
         "id": "touch-stick-card",
-        "x": 178,
-        "y": 314,
-        "w": 134,
-        "h": 168,
+        "x": 212,
+        "y": 460,
+        "w": 100,
+        "h": 100,
         "bad": false
       }
     ],
@@ -272,6 +272,7 @@
           "hit": "btn-help"
         }
       ],
+      "controlBandHeight": 135,
       "quickCamera": true,
       "oneTapMute": true,
       "restoresVolume": true
@@ -343,33 +344,33 @@
       {
         "id": "touch-throttle-card",
         "x": 8,
-        "y": 578,
-        "w": 108,
-        "h": 180,
+        "y": 709,
+        "w": 56,
+        "h": 127,
         "bad": false
       },
       {
         "id": "touch-btn-brake",
-        "x": 95,
-        "y": 773,
-        "w": 52,
-        "h": 52,
+        "x": 151,
+        "y": 721,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "touch-rudder-card",
-        "x": 155,
-        "y": 764,
-        "w": 140,
-        "h": 70,
+        "x": 121,
+        "y": 769,
+        "w": 104,
+        "h": 65,
         "bad": false
       },
       {
         "id": "touch-stick-card",
-        "x": 248,
-        "y": 590,
-        "w": 134,
-        "h": 168,
+        "x": 282,
+        "y": 736,
+        "w": 100,
+        "h": 100,
         "bad": false
       }
     ],
@@ -550,6 +551,7 @@
           "hit": "btn-help"
         }
       ],
+      "controlBandHeight": 135,
       "quickCamera": true,
       "oneTapMute": true,
       "restoresVolume": true
@@ -621,33 +623,33 @@
       {
         "id": "touch-throttle-card",
         "x": 8,
-        "y": 214,
-        "w": 108,
-        "h": 180,
+        "y": 345,
+        "w": 56,
+        "h": 127,
         "bad": false
       },
       {
         "id": "touch-btn-brake",
-        "x": 60,
-        "y": 409,
-        "w": 52,
-        "h": 52,
+        "x": 116,
+        "y": 357,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "touch-rudder-card",
-        "x": 120,
-        "y": 400,
-        "w": 140,
-        "h": 70,
+        "x": 86,
+        "y": 405,
+        "w": 104,
+        "h": 65,
         "bad": false
       },
       {
         "id": "touch-stick-card",
-        "x": 178,
-        "y": 226,
-        "w": 134,
-        "h": 168,
+        "x": 212,
+        "y": 372,
+        "w": 100,
+        "h": 100,
         "bad": false
       }
     ],
@@ -786,6 +788,223 @@
           "hit": "btn-help"
         }
       ],
+      "controlBandHeight": 135,
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
+    }
+  },
+  {
+    "name": "portrait-tiny",
+    "width": 320,
+    "height": 400,
+    "touch": true,
+    "showTouch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 224,
+        "h": 48,
+        "bad": false
+      },
+      {
+        "id": "open-aircraft",
+        "x": 8,
+        "y": 62,
+        "w": 61,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-flight",
+        "x": 73,
+        "y": 62,
+        "w": 61,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 138,
+        "y": 62,
+        "w": 61,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-environment",
+        "x": 203,
+        "y": 62,
+        "w": 61,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 268,
+        "y": 61,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-instruments",
+        "x": 236,
+        "y": 8,
+        "w": 76,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 265,
+        "w": 56,
+        "h": 127,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 116,
+        "y": 277,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 86,
+        "y": 325,
+        "w": 104,
+        "h": 65,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 212,
+        "y": 292,
+        "w": 100,
+        "h": 100,
+        "bad": false
+      }
+    ],
+    "panel": {
+      "open": true,
+      "scroll": 171,
+      "scrollable": true,
+      "closeVisible": true,
+      "panelBottom": 384,
+      "bodyTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "btn panel-close",
+          "x": 263,
+          "y": 143,
+          "reachable": true,
+          "hit": "btn panel-close"
+        },
+        {
+          "id": "btn panel-close",
+          "x": 277,
+          "y": 143,
+          "reachable": true,
+          "hit": "btn panel-close"
+        },
+        {
+          "id": "btn panel-close",
+          "x": 291,
+          "y": 143,
+          "reachable": true,
+          "hit": "btn panel-close"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 29,
+          "y": 193,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 160,
+          "y": 193,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 291,
+          "y": 193,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 29,
+          "y": 245,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 160,
+          "y": 245,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 291,
+          "y": 245,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-diag",
+          "x": 29,
+          "y": 297,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 160,
+          "y": 297,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 291,
+          "y": 297,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 29,
+          "y": 349,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 160,
+          "y": 349,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 291,
+          "y": 349,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ],
+      "controlBandHeight": 135,
       "quickCamera": true,
       "oneTapMute": true,
       "restoresVolume": true
@@ -857,33 +1076,33 @@
       {
         "id": "touch-throttle-card",
         "x": 8,
-        "y": 132,
-        "w": 108,
-        "h": 180,
+        "y": 185,
+        "w": 56,
+        "h": 127,
         "bad": false
       },
       {
         "id": "touch-btn-brake",
-        "x": 187,
-        "y": 249,
-        "w": 52,
-        "h": 52,
+        "x": 240,
+        "y": 197,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "touch-rudder-card",
-        "x": 245,
-        "y": 240,
-        "w": 130,
-        "h": 70,
+        "x": 210,
+        "y": 245,
+        "w": 104,
+        "h": 65,
         "bad": false
       },
       {
         "id": "touch-stick-card",
-        "x": 446,
-        "y": 164,
-        "w": 114,
-        "h": 148,
+        "x": 460,
+        "y": 212,
+        "w": 100,
+        "h": 100,
         "bad": false
       }
     ],
@@ -959,6 +1178,7 @@
           "hit": "btn-help"
         }
       ],
+      "controlBandHeight": 135,
       "quickCamera": true,
       "oneTapMute": true,
       "restoresVolume": true
@@ -1030,33 +1250,33 @@
       {
         "id": "touch-throttle-card",
         "x": 8,
-        "y": 202,
-        "w": 108,
-        "h": 180,
+        "y": 255,
+        "w": 56,
+        "h": 127,
         "bad": false
       },
       {
         "id": "touch-btn-brake",
-        "x": 325,
-        "y": 319,
-        "w": 52,
-        "h": 52,
+        "x": 378,
+        "y": 267,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "touch-rudder-card",
-        "x": 383,
-        "y": 310,
-        "w": 130,
-        "h": 70,
+        "x": 348,
+        "y": 315,
+        "w": 104,
+        "h": 65,
         "bad": false
       },
       {
         "id": "touch-stick-card",
-        "x": 722,
-        "y": 234,
-        "w": 114,
-        "h": 148,
+        "x": 736,
+        "y": 282,
+        "w": 100,
+        "h": 100,
         "bad": false
       }
     ],
@@ -1174,6 +1394,7 @@
           "hit": "btn-help"
         }
       ],
+      "controlBandHeight": 135,
       "quickCamera": true,
       "oneTapMute": true,
       "restoresVolume": true
@@ -1877,9 +2098,9 @@
     "bounds": [
       {
         "id": "hud-strip",
-        "x": 483.015625,
+        "x": 487.21875,
         "y": 14,
-        "w": 313.96875,
+        "w": 305.5625,
         "h": 46,
         "bad": false
       },
