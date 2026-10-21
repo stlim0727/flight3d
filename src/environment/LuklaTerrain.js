@@ -109,7 +109,7 @@ export class LuklaTerrain {
     try {
       if (typeof window !== 'undefined' && window.fetch) {
         // Browser environment: fetch binary DEM
-        const res = await fetch('/terrain/lukla_dem.bin');
+        const res = await fetch(`${import.meta.env?.BASE_URL ?? '/'}terrain/lukla_dem.bin`);
         if (!res.ok) throw new Error(`Lukla DEM request failed (HTTP ${res.status})`);
         const buf = await res.arrayBuffer();
         const data = new Float32Array(buf);
@@ -122,7 +122,7 @@ export class LuklaTerrain {
         if (this.onLoaded) this.onLoaded();
 
         // Load satellite texture
-        this.textureLoader.load('/terrain/lukla_satellite.jpg', (tex) => {
+        this.textureLoader.load(`${import.meta.env?.BASE_URL ?? '/'}terrain/lukla_satellite.jpg`, (tex) => {
           tex.colorSpace = THREE.SRGBColorSpace;
           tex.wrapS = THREE.ClampToEdgeWrapping;
           tex.wrapT = THREE.ClampToEdgeWrapping;

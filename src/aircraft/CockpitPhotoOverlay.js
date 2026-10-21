@@ -112,7 +112,7 @@ export class CockpitPhotoOverlay {
     this.group.add(this.eicasMesh);
 
     // 2. High-Resolution Real-Photo Cockpit Panel (Render Order 2: in front of screen displays)
-    this.panelTexture = loadTextureSafe('/textures/cockpit/b737_cockpit_panel_overlay.png');
+    this.panelTexture = loadTextureSafe(`${import.meta.env?.BASE_URL ?? '/'}textures/cockpit/b737_cockpit_panel_overlay.png`);
     this.panelGeo = new THREE.PlaneGeometry(2.0 * aspect, 2.0);
     this.panelMat = new THREE.MeshBasicMaterial({
       map: this.panelTexture,

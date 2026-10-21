@@ -174,7 +174,7 @@ export class Boeing737 {
     cutGearBays(this.proceduralShadowProxy, this.group, this.gearBayVolumes);
 
     // 7. Asynchronous High-Detail GLTF PBR Model Loading with Procedural Fallback
-    this.loadGltfModel('/models/b737-800.glb');
+    this.loadGltfModel(`${import.meta.env?.BASE_URL ?? '/'}models/b737-800.glb`);
   }
 
   buildFuselage(whiteMat, blueMat, winMat) {

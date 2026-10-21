@@ -65,7 +65,7 @@ export class SkyAtmosphere {
     try {
       const loader = new RGBELoader();
       loader.load(
-        '/textures/environment/sky_1k.hdr',
+        `${import.meta.env?.BASE_URL ?? '/'}textures/environment/sky_1k.hdr`,
         (texture) => {
           texture.mapping = THREE.EquirectangularReflectionMapping;
           this.scene.environment = texture;

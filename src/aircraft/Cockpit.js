@@ -81,11 +81,11 @@ export class Cockpit {
 
   initCockpit() {
     // 1. High-Resolution Photorealistic PBR Textures
-    this.overheadTex = loadTextureSafe('/textures/cockpit/b737_overhead.jpg');
-    this.mipTex = loadTextureSafe('/textures/cockpit/b737_mip.jpg');
-    this.pedestalTex = loadTextureSafe('/textures/cockpit/b737_pedestal.jpg');
-    this.yokeTex = loadTextureSafe('/textures/cockpit/b737_yoke.jpg');
-    this.mcpTex = loadTextureSafe('/textures/cockpit/b737_mcp.jpg');
+    this.overheadTex = loadTextureSafe(`${import.meta.env?.BASE_URL ?? '/'}textures/cockpit/b737_overhead.jpg`);
+    this.mipTex = loadTextureSafe(`${import.meta.env?.BASE_URL ?? '/'}textures/cockpit/b737_mip.jpg`);
+    this.pedestalTex = loadTextureSafe(`${import.meta.env?.BASE_URL ?? '/'}textures/cockpit/b737_pedestal.jpg`);
+    this.yokeTex = loadTextureSafe(`${import.meta.env?.BASE_URL ?? '/'}textures/cockpit/b737_yoke.jpg`);
+    this.mcpTex = loadTextureSafe(`${import.meta.env?.BASE_URL ?? '/'}textures/cockpit/b737_mcp.jpg`);
 
     // 2. High-Fidelity PBR Materials
     const darkInteriorMat = new THREE.MeshStandardMaterial({
@@ -966,7 +966,7 @@ export class Cockpit {
    * Asynchronously loads the high-detail 3D Boeing 737 cockpit GLTF model
    * and mounts live glass-cockpit flight displays.
    */
-  loadCockpitModel(url = '/models/b737-cockpit-medium.glb') {
+  loadCockpitModel(url = `${import.meta.env?.BASE_URL ?? '/'}models/b737-cockpit-medium.glb`) {
     if (typeof window === 'undefined') {
       // In non-browser / Node.js test environment, keep procedural cockpit active
       return;
@@ -974,7 +974,7 @@ export class Cockpit {
 
     try {
       const dracoLoader = new DRACOLoader();
-      dracoLoader.setDecoderPath('/draco/gltf/');
+      dracoLoader.setDecoderPath(`${import.meta.env?.BASE_URL ?? '/'}draco/gltf/`);
 
       const gltfLoader = new GLTFLoader();
       gltfLoader.setDRACOLoader(dracoLoader);
@@ -1058,9 +1058,9 @@ export class Cockpit {
         },
         undefined,
         (error) => {
-          if (url !== '/models/b737-cockpit-draco.glb') {
+          if (url !== `${import.meta.env?.BASE_URL ?? '/'}models/b737-cockpit-draco.glb`) {
             console.warn('Falling back to lite draco cockpit model:', error);
-            this.loadCockpitModel('/models/b737-cockpit-draco.glb');
+            this.loadCockpitModel(`${import.meta.env?.BASE_URL ?? '/'}models/b737-cockpit-draco.glb`);
             return;
           }
           console.warn('Failed to load 3D GLTF Cockpit model, keeping procedural cockpit:', error);

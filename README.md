@@ -9,6 +9,8 @@
 
 IL-2 슈투르모빅(IL-2 Sturmovik) 및 정밀 비행 시뮬레이터(MSFS / X-Plane) 수준의 현실적인 6-DOF 항공역학 물리 모델과 실제 보잉 737 실사 사진을 정밀 반영한 글래스 콕핏 계기판, 절차적 굴곡 지형, 햇빛이 반사되는 거스트너 파도 수면, 해상 선박 및 공항 관제탑 시스템을 모두 갖춘 고성능 웹 3D 비행 시뮬레이터입니다.
 
+**[브라우저에서 실행](https://stlim0727.github.io/flight3d/)** · [GitHub Pages 배포 안내](docs/development/github-pages-deployment.md)
+
 ---
 
 ## 📸 스크린샷 갤러리 (Screenshots)
