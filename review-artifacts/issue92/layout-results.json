@@ -46,7 +46,7 @@
         "bad": false
       },
       {
-        "id": "btn hud-details",
+        "id": "open-instruments",
         "x": 236,
         "y": 8,
         "w": 76,
@@ -142,7 +142,7 @@
         "bad": false
       },
       {
-        "id": "btn hud-details",
+        "id": "open-instruments",
         "x": 306,
         "y": 8,
         "w": 76,
@@ -238,7 +238,7 @@
         "bad": false
       },
       {
-        "id": "btn hud-details",
+        "id": "open-instruments",
         "x": 236,
         "y": 8,
         "w": 76,
@@ -334,7 +334,7 @@
         "bad": false
       },
       {
-        "id": "btn hud-details",
+        "id": "open-instruments",
         "x": 484,
         "y": 8,
         "w": 76,
@@ -430,7 +430,7 @@
         "bad": false
       },
       {
-        "id": "btn hud-details",
+        "id": "open-instruments",
         "x": 760,
         "y": 8,
         "w": 76,
@@ -518,7 +518,7 @@
         "bad": false
       },
       {
-        "id": "btn hud-details",
+        "id": "open-instruments",
         "x": 1335.3125,
         "y": 8,
         "w": 96.6875,
@@ -582,7 +582,7 @@
         "bad": false
       },
       {
-        "id": "btn hud-details",
+        "id": "open-instruments",
         "x": 716,
         "y": 8,
         "w": 76,
@@ -638,7 +638,7 @@
         "bad": false
       },
       {
-        "id": "btn hud-details",
+        "id": "open-instruments",
         "x": 920.3125,
         "y": 8,
         "w": 96.6875,
@@ -702,7 +702,7 @@
         "bad": false
       },
       {
-        "id": "btn hud-details",
+        "id": "open-instruments",
         "x": 1175.3125,
         "y": 8,
         "w": 96.6875,

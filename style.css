@@ -1811,12 +1811,6 @@ body.compact-ui {
 .hud-strip .hud-item:nth-child(n+5) {
   display: none;
 }
-.show-instruments .hud-strip {
-  flex-wrap: wrap;
-}
-.show-instruments .hud-strip .hud-item {
-  display: flex;
-}
 .compact-ui .hud-strip {
   left: var(--edge-left);
   right: calc(var(--edge-right) + 80px);
@@ -1835,12 +1829,6 @@ body.compact-ui {
 .compact-ui .hud-item .hud-val {
   font-size: 12px;
   white-space: nowrap;
-}
-.compact-ui.show-instruments .hud-strip {
-  flex-wrap: wrap;
-}
-.compact-ui.show-instruments .hud-item {
-  flex: 1 0 22%;
 }
 .compact-ui .flight-toolbar {
   bottom: auto;
@@ -1977,4 +1965,15 @@ body.compact-ui {
 }
 #panel-aircraft #btn-gear {
   grid-column: 1 / -1;
+}
+
+#panel-instruments .flight-panel-body {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+#panel-instruments .hud-item {
+  min-width: 0;
+  align-items: flex-start;
+}
+#panel-instruments .hud-val {
+  font-size: 14px;
 }

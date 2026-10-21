@@ -114,6 +114,10 @@ for (const [name, width, height, touch] of layouts) {
 console.log(`${results.length} viewport/input layouts passed`);
 fs.writeFileSync(`${out}/layout-results.json`, JSON.stringify(results, null, 2));
 
+await ev(`document.querySelector('#open-instruments').click()`);
+assert.equal(await ev(`!document.querySelector('#panel-instruments').hidden && [...document.querySelectorAll('#panel-instruments .hud-item')].length === 6`), true, 'secondary instruments use a separate panel');
+assert.ok(await ev(`(()=>{const panel=document.querySelector('#panel-instruments').getBoundingClientRect();const toolbar=document.querySelector('.flight-toolbar').getBoundingClientRect();return panel.bottom <= toolbar.top || panel.top >= toolbar.bottom})()`), 'instruments do not crowd toolbar');
+await ev(`document.querySelector('#panel-instruments .panel-close').click()`);
 // Exercise the same live controls after resizing, using native input for gestures and keys.
 await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
 await send('Emulation.setDeviceMetricsOverride', { width: 568, height: 320, deviceScaleFactor: 1, mobile: true });
@@ -158,6 +162,10 @@ await ev(`document.querySelector('#panel-aircraft .panel-close').click(); const 
 fs.writeFileSync(`${out}/interaction-results.json`, JSON.stringify({ repeatedFlaps: true, directCamera: true, keyboardCamera: true, presetClosesPanel: true, nativeTouchScroll: after, cameraBefore: before, touchModeToggle: true, languageChange: true, rotation: true }, null, 2));
 console.log('Interaction scenarios passed');
 
+await ev(`document.querySelector('#open-instruments').click()`);
+assert.ok(await ev(`(()=>{const panel=document.querySelector('#panel-instruments').getBoundingClientRect();const toolbar=document.querySelector('.flight-toolbar').getBoundingClientRect();return panel.top >= toolbar.bottom && panel.bottom <= innerHeight})()`), 'compact instruments do not overlap toolbar or leave viewport');
+await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-instruments.png`, Buffer.from(r.data, 'base64')));
+await ev(`document.querySelector('#panel-instruments .panel-close').click()`);
 // Simulate reserved notch/home-indicator space; physical browser chrome still needs device testing.
 await ev(`document.body.style.setProperty('--edge-left', '18px'); document.body.style.setProperty('--edge-right', '18px'); document.body.style.setProperty('--edge-top', '24px'); document.body.style.setProperty('--edge-bottom', '32px')`);
 await new Promise(r => setTimeout(r, 100));

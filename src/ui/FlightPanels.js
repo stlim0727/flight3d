@@ -23,7 +23,7 @@ export function initFlightPanels({ onSelectCamera }) {
     if (restoreFocus) trigger.focus();
     active = null;
   }
-  function makePanel(name, selectors) {
+  function makePanel(name, selectors, inToolbar = true) {
     const trigger = document.createElement('button');
     trigger.className = 'btn';
     trigger.type = 'button';
@@ -50,11 +50,15 @@ export function initFlightPanels({ onSelectCamera }) {
     body.className = 'flight-panel-body';
     for (const selector of selectors) {
       const node = document.querySelector(selector);
-      if (node) body.append(node);
+      if (node) body.append(name === 'instruments' ? node.closest('.hud-item') : node);
     }
     panel.append(header, body);
     hud.append(panel);
-    bar.append(trigger);
+    if (inToolbar) bar.append(trigger);
+    else {
+      trigger.classList.add('hud-details');
+      hud.append(trigger);
+    }
     panels.set(name, { panel, trigger, body });
     trigger.addEventListener('click', () => {
       const same = active === name;
@@ -120,15 +124,7 @@ export function initFlightPanels({ onSelectCamera }) {
   touch.addEventListener('change', layout);
   layout();
 
-  const details = document.createElement('button');
-  details.className = 'btn hud-details';
-  details.setAttribute('aria-expanded', 'false');
-  bindText(details, () => t('ui.instruments'));
-  details.addEventListener('click', () => {
-    const expanded = hud.classList.toggle('show-instruments');
-    details.setAttribute('aria-expanded', String(expanded));
-  });
-  hud.append(details);
+  makePanel('instruments', [...document.querySelectorAll('.hud-strip .hud-item:nth-child(n+5)')].map(node => `#${node.querySelector('[id]').id}`), false);
 }
 
 /** Called from telemetry refresh, including keyboard, demo, reset and resize paths. */

@@ -18,7 +18,8 @@ visible, with a separate Instruments disclosure for details.
 - Live interaction assertions cover repeated flaps, direct camera selection,
   keyboard camera changes, preset dismissal, native CDP touch scrolling without
   camera rotation, touch-mode changes, Korean localization, and rotation with an
-  open Aircraft panel.
+  open Aircraft panel. Additional assertions verify the secondary Instruments
+  panel stays clear of the toolbar on compact and wide screens.
 
 | Capture prefix | Viewport | Input |
 | --- | --- | --- |
@@ -33,7 +34,8 @@ visible, with a separate Instruments disclosure for details.
 | tablet-touch | 1280 × 800 | Touch |
 
 Each prefix has a `.png` capture and a `-settings.png` capture with Environment
-open. `portrait-aircraft-ko.png` shows Korean Aircraft controls after rotation.
+open. `portrait-instruments.png` shows the secondary instrument panel.
+`portrait-aircraft-ko.png` shows Korean Aircraft controls after rotation.
 Machine-readable bounds and interactions are in `layout-results.json` and
 `interaction-results.json`. `safe-area-portrait.png` and
 `safe-area-results.json` verify reserved left/right/top/bottom space of
