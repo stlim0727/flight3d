@@ -420,7 +420,10 @@ export class CameraSystem {
   // Grab the scenery: mouse and touch move it with the gesture. Pointer lock
   // retains directional head movement through applyMouseDelta.
   applyDragDelta(dx, dy) {
-    this.applyMouseDelta(-dx, -dy);
+    // Gear yaw offsets the look target along +X, unlike the head/orbit yaw
+    // rotations. Its original horizontal mapping already grabs the scenery.
+    const lookDx = this.mode === CameraSystem.MODES.GEAR ? dx : -dx;
+    this.applyMouseDelta(lookDx, -dy);
   }
 
   applyMouseDelta(dx, dy) {

@@ -2,7 +2,9 @@
 
 UX review selected the issue's mouse/touch drag option: grab the scenery and move
 it with the gesture. Mouse and touch reverse the old drag mapping in cockpit,
-chase, wing, gear and drone views. Pointer lock keeps directional mouse looking.
+chase, wing and drone views. Gear view preserves its original horizontal mapping
+and reverses only vertical movement because its look target uses a different yaw
+convention. Pointer lock keeps directional mouse looking.
 Passive cursor tracking and continuous edge panning default to off, so hovering,
 holding a stationary finger at an edge, and releasing a drag do not rotate the view.
 Shift looking is not added. English and Korean flight-guide text explains dragging,
@@ -26,3 +28,19 @@ release, reset and zoom.
 
 Browser evidence uses touch emulation, not a physical device. Pointer lock direction
 is covered by unit event handling; native pointer-lock acquisition was not exercised.
+
+## Review correction: gear-view direction
+
+The first browser check above asserted angle signs, which missed that gear yaw
+moves the look target directly along X. Its horizontal scene movement was wrong.
+The corrected conversion preserves gear horizontal input while inverting vertical
+input. Four new projection regressions failed before the fix and pass afterward,
+covering mouse and touch in both right/down and left/up directions. The full
+294-test suite, syntax/action-reference checks and production build passed.
+
+Native Chrome CDP mouse and touch input now also verifies that a fixed point in
+the gear scene moves with each gesture in screen space. Physics integration was
+held still for this check. See [corrected numeric results](gear-review-results.json),
+[gear before](gear-review-before.png) and [gear after](gear-review-after.png).
+The original results.json is retained as the earlier angle-only check; the gear
+projection results supersede its direction claim.

@@ -59,6 +59,37 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     }
   });
 
+  for (const input of ['mouse', 'touch']) {
+    for (const direction of [-1, 1]) {
+      it(`gear scenery follows ${input} dragging ${direction > 0 ? 'right/down' : 'left/up'} on screen`, () => {
+        const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.25, 1000);
+        const cam = new CameraSystem(camera, mockDom);
+        const aircraft = new THREE.Object3D();
+        aircraft.updateMatrixWorld(true);
+        cam.setMode(CameraSystem.MODES.GEAR, true);
+        const point = cam.gearLookTarget.clone();
+        const project = () => {
+          cam.update(0.016, aircraft, { onGround: true });
+          camera.updateMatrixWorld(true);
+          return point.clone().project(camera);
+        };
+        const before = project();
+        if (input === 'mouse') {
+          cam.applyDragDelta(direction * 40, direction * 30);
+        } else {
+          const target = { closest: () => null };
+          cam.handleTouchStart({ touches: [{ identifier: 1, clientX: 600, clientY: 400, target }] });
+          cam.handleTouchMove({ touches: [{ identifier: 1, clientX: 600 + direction * 40, clientY: 400 + direction * 30, target }] });
+          cam.handleTouchEnd({ touches: [] });
+        }
+        const after = project();
+        assert.ok((after.x - before.x) * direction > 0, 'scenery follows horizontal drag on screen');
+        assert.ok((after.y - before.y) * direction < 0, 'scenery follows vertical drag (screen down is negative NDC Y)');
+        assert.equal(cam.isDragging, false);
+      });
+    }
+  }
+
   it('should initialize default mouse look parameters and states', () => {
     const camera = new THREE.PerspectiveCamera();
     const camSys = new CameraSystem(camera, mockDom);
