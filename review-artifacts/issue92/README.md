@@ -5,7 +5,10 @@ compact menu containing duplicate desktop and touch actions. The desktop aircraf
 bar stays visible; compact screens use the Aircraft button. Panel titles and close
 buttons remain outside the scrolling content. Repeated adjustments retain the
 panel; airport/scenario selection closes Flight settings. Core telemetry stays
-visible, with a separate Instruments disclosure for details.
+visible, with a separate Instruments disclosure for details. In touch-control
+mode the primary toolbar keeps Camera directly accessible and adds a 44px
+one-tap mute/unmute button. Unmuting restores the selected volume/boost level;
+Environment (Settings on compact screens) retains volume-level adjustment.
 
 ## Verification
 
@@ -21,7 +24,9 @@ visible, with a separate Instruments disclosure for details.
   keyboard camera changes, preset dismissal, native CDP touch scrolling without
   camera rotation, touch-mode changes, Korean localization, and rotation with an
   open Aircraft panel. Additional assertions verify the secondary Instruments
-  panel stays clear of the toolbar on compact and wide screens.
+  panel stays clear of the toolbar on compact and wide screens. Native input
+  also verifies direct toolbar camera access, one-tap mute/unmute, synchronized
+  Settings state, and restoration of the previous 150% boost level.
 
 | Capture prefix | Viewport | Input |
 | --- | --- | --- |
@@ -37,7 +42,8 @@ visible, with a separate Instruments disclosure for details.
 | desktop-touch-enabled | 1440 × 900 | Mouse / keyboard; on-screen controls enabled |
 
 Each prefix has a `.png` capture and a `-settings.png` capture with Environment
-open. `portrait-instruments.png` shows the secondary instrument panel.
+open. `portrait-small-muted.png` shows the accessible camera and mute controls
+on a 320px screen. `portrait-instruments.png` shows the secondary instrument panel.
 `portrait-aircraft-ko.png` shows Korean Aircraft controls after rotation.
 Machine-readable bounds and interactions are in `layout-results.json` and
 `interaction-results.json`. `safe-area-portrait.png` and

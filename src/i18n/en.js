@@ -1,4 +1,7 @@
 export default {
+  "ui.mute": "Mute sound",
+  "ui.unmute": "Unmute sound",
+  "ui.settings.short": "Settings",
   "ui.camera.current": "Camera: {name}",
   "ui.time": "Time · {hour}",
   "ui.controls": "Flight controls",

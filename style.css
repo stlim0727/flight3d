@@ -1986,3 +1986,16 @@ body.compact-ui {
   white-space: normal;
   overflow-wrap: anywhere;
 }
+/* Keep camera selection and one-tap mute on the primary touch toolbar. */
+.quick-mute { display: none; }
+.touch-mode .quick-mute {
+  display: block;
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 18px;
+  padding: 4px;
+}
+.compact-ui.touch-mode .flight-toolbar {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) 44px;
+}
+.compact-ui.touch-mode .quick-mute { font-size: 18px; }

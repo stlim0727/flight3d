@@ -1147,6 +1147,13 @@ class FlightSimulator {
     if (!state && this.audio) state = this.audio.getVolumeState();
     if (!state) return;
 
+    const btnMute = document.getElementById('btn-mute');
+    if (btnMute) {
+      btnMute.textContent = state.muted ? '🔇' : '🔊';
+      btnMute.setAttribute('aria-pressed', String(state.muted));
+      bindText(btnMute, () => t(state.muted ? 'ui.unmute' : 'ui.mute'), 'aria-label');
+      bindText(btnMute, () => t(state.muted ? 'ui.unmute' : 'ui.mute'), 'title');
+    }
     const btnSound = document.getElementById('btn-sound');
     if (btnSound) {
       if (state.muted) {
@@ -1207,6 +1214,14 @@ class FlightSimulator {
       this.showToast(() => t('camera.view.centered'));
     });
     document.getElementById('btn-time')?.addEventListener('click', () => this.controls.onCycleTimeOfDay(3.0));
+    document.getElementById('btn-mute')?.addEventListener('click', () => {
+      this.audio.setMuted(!this.audio.isMuted);
+      if (!this.audio.isMuted) {
+        this.audio.init();
+        this.audio.ensureContextRunning();
+      }
+      this.updateAudioUI();
+    });
     document.getElementById('btn-sound')?.addEventListener('click', () => this.controls.onToggleAudio());
     document.getElementById('btn-sound-action')?.addEventListener('click', () => this.controls.onToggleAudio());
     document.getElementById('btn-diag')?.addEventListener('click', () => this.diagnostics.toggle());

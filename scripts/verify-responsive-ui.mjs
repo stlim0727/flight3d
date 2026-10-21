@@ -43,6 +43,17 @@ async function ev(expression) {
   if (result.exceptionDetails) throw result.exceptionDetails;
   return result.result.value;
 }
+async function nativeClick(selector, touch) {
+  const point = await ev(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`);
+  if (touch) {
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else {
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
+  }
+  await new Promise(resolve => setTimeout(resolve, 150));
+}
 await send('Page.enable');
 await send('Runtime.enable');
 await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
@@ -124,20 +135,27 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   assert.ok(panel.hitTargets.length > 0, `${name}: visible settings controls were hit-tested`);
   assert.ok(panel.hitTargets.every(hit => hit.reachable), `${name}: settings obscured: ${JSON.stringify(panel.hitTargets.filter(hit => !hit.reachable))}`);
   if (showTouch && width > 1024) {
-    const point = await ev(`(()=>{const r=document.querySelector('#btn-help').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`);
-    if (touch) {
-      await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
-      await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    } else {
-      await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
-      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
-    }
-    await new Promise(resolve => setTimeout(resolve, 150));
+    await nativeClick('#btn-help', touch);
     assert.ok(await ev(`document.querySelector('#help-modal').classList.contains('visible')`), `${name}: native input reaches Flight guide above the yoke`);
     panel.nativeGuideClick = true;
     await ev(`document.querySelector('#btn-help-close').click()`);
   } else {
     await ev(`document.querySelector('#panel-environment .panel-close').click()`);
+  }
+  if (showTouch) {
+    await nativeClick('#open-camera', touch);
+    assert.ok(await ev(`!document.querySelector('#panel-camera').hidden`), `${name}: camera is directly reachable from toolbar`);
+    await ev(`document.querySelector('#panel-camera .panel-close').click(); window.simulator.audio.setVolume(1.5); window.simulator.updateAudioUI()`);
+    const muteTarget = await ev(`(()=>{const node=document.querySelector('#btn-mute'),r=node.getBoundingClientRect();return {width:r.width,height:r.height,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}})()`);
+    assert.ok(muteTarget.width >= 44 && muteTarget.height >= 44 && muteTarget.reachable, `${name}: mute has a reachable 44px touch target`);
+    await nativeClick('#btn-mute', touch);
+    assert.ok(await ev(`window.simulator.audio.isMuted && window.simulator.audio.effectiveVolume === 0 && document.querySelector('#btn-mute').getAttribute('aria-pressed') === 'true' && document.querySelector('#btn-sound').classList.contains('muted')`), `${name}: one tap mutes and synchronizes settings`);
+    if (name === 'portrait-small') await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-small-muted.png`, Buffer.from(r.data, 'base64')));
+    await nativeClick('#btn-mute', touch);
+    assert.ok(await ev(`!window.simulator.audio.isMuted && window.simulator.audio.volume === 1.5 && document.querySelector('#btn-mute').getAttribute('aria-pressed') === 'false'`), `${name}: one tap unmutes and preserves boost`);
+    panel.quickCamera = true;
+    panel.oneTapMute = true;
+    panel.restoresVolume = true;
   }
   results.push({ name, width, height, touch, showTouch, bounds, panel });
 }
@@ -181,7 +199,7 @@ await ev(`document.querySelector('#btn-touch-toggle').click()`);
 assert.equal(await ev('window.simulator.touchControls.enabled'), false, 'touch mode can be disabled from shared settings');
 await ev(`document.querySelector('#btn-touch-toggle').click(); const language = document.querySelector('#language-select'); language.value = 'ko'; language.dispatchEvent(new Event('change'))`);
 await new Promise(r => setTimeout(r, 100));
-assert.equal(await ev(`document.querySelector('#open-environment').textContent`), '환경 설정', 'language change refreshes panel labels');
+assert.equal(await ev(`document.querySelector('#open-environment').textContent`), '설정', 'language change refreshes panel labels');
 assert.equal(await ev(`!document.querySelector('#panel-environment').hidden`), true, 'language change retains open panel');
 await ev(`document.querySelector('#panel-environment .panel-close').click(); document.querySelector('#open-aircraft').click()`);
 await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 1, mobile: true });

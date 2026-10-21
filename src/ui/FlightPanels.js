@@ -30,7 +30,8 @@ export function initFlightPanels({ onSelectCamera }) {
     trigger.id = `open-${name}`;
     trigger.setAttribute('aria-controls', `panel-${name}`);
     trigger.setAttribute('aria-expanded', 'false');
-    bindText(trigger, () => t(`ui.${name}`));
+    bindText(trigger, () => t(name === 'environment' && window.matchMedia('(max-width: 1024px)').matches ? 'ui.settings.short' : `ui.${name}`));
+    bindText(trigger, () => t(`ui.${name}`), 'aria-label');
     const panel = document.createElement('section');
     panel.id = `panel-${name}`;
     panel.className = 'flight-panel';
@@ -90,6 +91,14 @@ export function initFlightPanels({ onSelectCamera }) {
   select.addEventListener('change', () => onSelectCamera(Number(select.value)));
   camera.prepend(select);
   makePanel('environment', ['.language-control', '#btn-sound', '#btn-time', '#btn-touch-toggle', '#touch-btn-gyro', '#btn-diag', '#btn-help']);
+  const mute = document.createElement('button');
+  mute.id = 'btn-mute';
+  mute.className = 'btn quick-mute';
+  mute.type = 'button';
+  mute.setAttribute('aria-pressed', 'false');
+  bindText(mute, () => t('ui.mute'), 'aria-label');
+  mute.textContent = '🔊';
+  bar.append(mute);
 
   for (const [id, key] of Object.entries({
     'btn-demo': 'demo.flight.p.40', 'btn-cam-reset': 'center.view.o',

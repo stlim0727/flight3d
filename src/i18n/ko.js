@@ -1,4 +1,7 @@
 export default {
+  "ui.mute": "소리 끄기",
+  "ui.unmute": "소리 켜기",
+  "ui.settings.short": "설정",
   "ui.camera.current": "카메라: {name}",
   "ui.time": "시간 · {hour}",
   "ui.controls": "비행 조작",

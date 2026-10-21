@@ -18,31 +18,39 @@
         "id": "open-aircraft",
         "x": 8,
         "y": 62,
-        "w": 73,
+        "w": 61,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-flight",
-        "x": 85,
+        "x": 73,
         "y": 62,
-        "w": 73,
+        "w": 61,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-camera",
-        "x": 162,
+        "x": 138,
         "y": 62,
-        "w": 73,
+        "w": 61,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-environment",
-        "x": 239,
+        "x": 203,
         "y": 62,
-        "w": 73,
+        "w": 61,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 268,
+        "y": 62,
+        "w": 44,
         "h": 44,
         "bad": false
       },
@@ -263,7 +271,10 @@
           "reachable": true,
           "hit": "btn-help"
         }
-      ]
+      ],
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
     }
   },
   {
@@ -285,31 +296,39 @@
         "id": "open-aircraft",
         "x": 8,
         "y": 62,
-        "w": 90.5,
+        "w": 78.5,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-flight",
-        "x": 102.5,
+        "x": 90.5,
         "y": 62,
-        "w": 90.5,
+        "w": 78.5,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-camera",
-        "x": 197,
+        "x": 173,
         "y": 62,
-        "w": 90.5,
+        "w": 78.5,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-environment",
-        "x": 291.5,
+        "x": 255.5,
         "y": 62,
-        "w": 90.5,
+        "w": 78.5,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 338,
+        "y": 61,
+        "w": 44,
         "h": 44,
         "bad": false
       },
@@ -530,7 +549,10 @@
           "reachable": true,
           "hit": "btn-help"
         }
-      ]
+      ],
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
     }
   },
   {
@@ -552,31 +574,39 @@
         "id": "open-aircraft",
         "x": 8,
         "y": 62,
-        "w": 73,
+        "w": 61,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-flight",
-        "x": 85,
+        "x": 73,
         "y": 62,
-        "w": 73,
+        "w": 61,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-camera",
-        "x": 162,
+        "x": 138,
         "y": 62,
-        "w": 73,
+        "w": 61,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-environment",
-        "x": 239,
+        "x": 203,
         "y": 62,
-        "w": 73,
+        "w": 61,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 268,
+        "y": 61,
+        "w": 44,
         "h": 44,
         "bad": false
       },
@@ -755,7 +785,10 @@
           "reachable": true,
           "hit": "btn-help"
         }
-      ]
+      ],
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
     }
   },
   {
@@ -777,31 +810,39 @@
         "id": "open-aircraft",
         "x": 8,
         "y": 62,
-        "w": 135,
+        "w": 123,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-flight",
-        "x": 147,
+        "x": 135,
         "y": 62,
-        "w": 135,
+        "w": 123,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-camera",
-        "x": 286,
+        "x": 262,
         "y": 62,
-        "w": 135,
+        "w": 123,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-environment",
-        "x": 425,
+        "x": 389,
         "y": 62,
-        "w": 135,
+        "w": 123,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 516,
+        "y": 61,
+        "w": 44,
         "h": 44,
         "bad": false
       },
@@ -917,7 +958,10 @@
           "reachable": true,
           "hit": "btn-help"
         }
-      ]
+      ],
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
     }
   },
   {
@@ -939,31 +983,39 @@
         "id": "open-aircraft",
         "x": 8,
         "y": 62,
-        "w": 204,
+        "w": 192,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-flight",
-        "x": 216,
+        "x": 204,
         "y": 62,
-        "w": 204,
+        "w": 192,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-camera",
-        "x": 424,
+        "x": 400,
         "y": 62,
-        "w": 204,
+        "w": 192,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-environment",
-        "x": 632,
+        "x": 596,
         "y": 62,
-        "w": 204,
+        "w": 192,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 792,
+        "y": 61,
+        "w": 44,
         "h": 44,
         "bad": false
       },
@@ -1121,7 +1173,10 @@
           "reachable": true,
           "hit": "btn-help"
         }
-      ]
+      ],
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
     }
   },
   {
@@ -1133,15 +1188,15 @@
     "bounds": [
       {
         "id": "hud-strip",
-        "x": 567.21875,
+        "x": 563.015625,
         "y": 14,
-        "w": 305.5625,
+        "w": 313.96875,
         "h": 46,
         "bad": false
       },
       {
         "id": "open-flight",
-        "x": 546.640625,
+        "x": 550.640625,
         "y": 848,
         "w": 110,
         "h": 44,
@@ -1149,15 +1204,15 @@
       },
       {
         "id": "open-camera",
-        "x": 662.640625,
+        "x": 666.640625,
         "y": 848,
-        "w": 123.375,
+        "w": 115.375,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-environment",
-        "x": 792.015625,
+        "x": 788.015625,
         "y": 848,
         "w": 101.34375,
         "h": 44,
@@ -1603,7 +1658,7 @@
       },
       {
         "id": "open-flight",
-        "x": 339.140625,
+        "x": 343.140625,
         "y": 648,
         "w": 110,
         "h": 44,
@@ -1611,15 +1666,15 @@
       },
       {
         "id": "open-camera",
-        "x": 455.140625,
+        "x": 459.140625,
         "y": 648,
-        "w": 123.375,
+        "w": 115.375,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-environment",
-        "x": 584.515625,
+        "x": 580.515625,
         "y": 648,
         "w": 101.34375,
         "h": 44,
@@ -1830,7 +1885,7 @@
       },
       {
         "id": "open-aircraft",
-        "x": 432.296875,
+        "x": 407.296875,
         "y": 748,
         "w": 70.6875,
         "h": 44,
@@ -1838,7 +1893,7 @@
       },
       {
         "id": "open-flight",
-        "x": 508.984375,
+        "x": 483.984375,
         "y": 748,
         "w": 110,
         "h": 44,
@@ -1846,7 +1901,7 @@
       },
       {
         "id": "open-camera",
-        "x": 624.984375,
+        "x": 599.984375,
         "y": 748,
         "w": 115.375,
         "h": 44,
@@ -1854,9 +1909,17 @@
       },
       {
         "id": "open-environment",
-        "x": 746.359375,
+        "x": 721.359375,
         "y": 748,
         "w": 101.34375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 828.703125,
+        "y": 747,
+        "w": 44,
         "h": 44,
         "bad": false
       },
@@ -2078,7 +2141,10 @@
           "hit": "btn-help"
         }
       ],
-      "nativeGuideClick": true
+      "nativeGuideClick": true,
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
     }
   },
   {
@@ -2090,15 +2156,15 @@
     "bounds": [
       {
         "id": "hud-strip",
-        "x": 563.015625,
+        "x": 568.3203125,
         "y": 14,
-        "w": 313.96875,
+        "w": 303.359375,
         "h": 46,
         "bad": false
       },
       {
         "id": "open-aircraft",
-        "x": 512.296875,
+        "x": 490.6953125,
         "y": 848,
         "w": 70.6875,
         "h": 44,
@@ -2106,7 +2172,7 @@
       },
       {
         "id": "open-flight",
-        "x": 588.984375,
+        "x": 567.3828125,
         "y": 848,
         "w": 110,
         "h": 44,
@@ -2114,17 +2180,25 @@
       },
       {
         "id": "open-camera",
-        "x": 704.984375,
+        "x": 683.3828125,
         "y": 848,
-        "w": 115.375,
+        "w": 108.578125,
         "h": 44,
         "bad": false
       },
       {
         "id": "open-environment",
-        "x": 826.359375,
+        "x": 797.9609375,
         "y": 848,
         "w": 101.34375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 905.3046875,
+        "y": 847,
+        "w": 44,
         "h": 44,
         "bad": false
       },
@@ -2346,7 +2420,10 @@
           "hit": "btn-help"
         }
       ],
-      "nativeGuideClick": true
+      "nativeGuideClick": true,
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
     }
   }
 ]
