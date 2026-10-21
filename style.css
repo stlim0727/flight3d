@@ -1877,6 +1877,10 @@ body.compact-ui {
 .compact-ui .touch-controls-overlay {
   z-index: 20;
 }
+/* Raise the parent stacking context; child panel z-index cannot outrank the yoke alone. */
+.touch-mode #hud-overlay {
+  z-index: 30;
+}
 .touch-mode:not(.compact-ui) .touch-controls-overlay {
   padding-bottom: 70px;
 }

@@ -68,11 +68,12 @@ const layouts = [
   ['desktop-narrow', 800, 700, false],
   ['desktop-small', 1025, 700, false],
   ['tablet-touch', 1280, 800, true],
+  ['desktop-touch-enabled', 1440, 900, false, true],
 ];
-for (const [name, width, height, touch] of layouts) {
+for (const [name, width, height, touch, showTouch = touch] of layouts) {
   await send('Emulation.setTouchEmulationEnabled', { enabled: touch, maxTouchPoints: touch ? 5 : 1 });
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch });
-  await ev(`window.simulator.touchControls.${touch ? 'enable' : 'disable'}()`);
+  await ev(`window.simulator.touchControls.${showTouch ? 'enable' : 'disable'}()`);
   await new Promise(resolve => setTimeout(resolve, 400));
   const bounds = await ev(`(() => {
     const selectors = '.flight-toolbar button,.hud-strip,.hud-details,.touch-throttle-card,.touch-stick-card,.touch-rudder-card,#touch-btn-brake';
@@ -95,10 +96,21 @@ for (const [name, width, height, touch] of layouts) {
     const close = p.querySelector('.panel-close').getBoundingClientRect();
     return { open: !p.hidden, scroll: body.scrollTop, scrollable: body.scrollHeight > body.clientHeight,
       closeVisible: close.y >= 0 && close.bottom <= innerHeight, panelBottom: p.getBoundingClientRect().bottom,
-      bodyTouch: getComputedStyle(body).touchAction };
+      bodyTouch: getComputedStyle(body).touchAction,
+      hitTargets: [...p.querySelectorAll('button, select')].flatMap(node => {
+        const r = node.getBoundingClientRect();
+        const clip = node.closest('.flight-panel-body')?.getBoundingClientRect() || p.getBoundingClientRect();
+        const y = r.top + r.height / 2;
+        if (!r.width || !r.height || y <= clip.top || y >= clip.bottom) return [];
+        return [r.left + 8, r.left + r.width / 2, r.right - 8].map(x => {
+          const hit = document.elementFromPoint(x, y);
+          return { id: node.id || node.className, x, y, reachable: node.contains(hit),
+            hit: hit?.id || hit?.className || hit?.tagName };
+        });
+      }) };
+
   })()`);
   await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}-settings.png`, Buffer.from(r.data, 'base64')));
-  await ev(`document.querySelector('#panel-environment .panel-close').click()`);
   for (let a = 0; a < bounds.length; a++) {
     for (let b = a + 1; b < bounds.length; b++) {
       const x = bounds[a], y = bounds[b];
@@ -109,7 +121,25 @@ for (const [name, width, height, touch] of layouts) {
   }
   assert.ok(bounds.every(b => !b.bad), `${name}: primary controls are in bounds`);
   assert.ok(panel.open && panel.closeVisible && panel.bodyTouch === 'pan-y', `${name}: volume panel remains open with reachable close`);
-  results.push({ name, width, height, touch, bounds, panel });
+  assert.ok(panel.hitTargets.length > 0, `${name}: visible settings controls were hit-tested`);
+  assert.ok(panel.hitTargets.every(hit => hit.reachable), `${name}: settings obscured: ${JSON.stringify(panel.hitTargets.filter(hit => !hit.reachable))}`);
+  if (showTouch && width > 1024) {
+    const point = await ev(`(()=>{const r=document.querySelector('#btn-help').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`);
+    if (touch) {
+      await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+      await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    } else {
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
+    }
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.ok(await ev(`document.querySelector('#help-modal').classList.contains('visible')`), `${name}: native input reaches Flight guide above the yoke`);
+    panel.nativeGuideClick = true;
+    await ev(`document.querySelector('#btn-help-close').click()`);
+  } else {
+    await ev(`document.querySelector('#panel-environment .panel-close').click()`);
+  }
+  results.push({ name, width, height, touch, showTouch, bounds, panel });
 }
 console.log(`${results.length} viewport/input layouts passed`);
 fs.writeFileSync(`${out}/layout-results.json`, JSON.stringify(results, null, 2));

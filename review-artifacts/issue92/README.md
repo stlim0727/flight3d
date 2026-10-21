@@ -14,7 +14,9 @@ visible, with a separate Instruments disclosure for details.
 - `npm run build`: passed (Vite reports its large-bundle advisory).
 - `node scripts/verify-responsive-ui.mjs`: checks bounds and pairwise overlap of
   telemetry, toolbar, throttle, stick, rudder, and brake; tests repeated volume
-  adjustments and accessible close buttons in nine viewport/input combinations.
+  adjustments and accessible close buttons in ten viewport/input combinations.
+  Visible settings controls are hit-tested at their center and both sides. On
+  wide screens, native touch and mouse clicks must open Flight guide above the yoke.
 - Live interaction assertions cover repeated flaps, direct camera selection,
   keyboard camera changes, preset dismissal, native CDP touch scrolling without
   camera rotation, touch-mode changes, Korean localization, and rotation with an
@@ -32,6 +34,7 @@ visible, with a separate Instruments disclosure for details.
 | desktop-narrow | 800 × 700 | Mouse / keyboard |
 | desktop-small | 1025 × 700 | Mouse / keyboard |
 | tablet-touch | 1280 × 800 | Touch |
+| desktop-touch-enabled | 1440 × 900 | Mouse / keyboard; on-screen controls enabled |
 
 Each prefix has a `.png` capture and a `-settings.png` capture with Environment
 open. `portrait-instruments.png` shows the secondary instrument panel.
@@ -46,6 +49,18 @@ Browser evidence uses isolated Linux headless Chrome with Vulkan, a live Vite
 server and real WebGL rendering. Device input/viewport emulation and simulated
 reserved insets do not establish physical iOS Safari/Android browser behavior,
 actual notches, address-bar animation, or hardware gyro permission handling.
+
+## Review regression
+
+The expanded-HUD finding is addressed by the separate Instruments panel (commits
+`9f0a954` and `78e735c`), with compact toolbar separation and long-readout checks.
+
+Before the stacking fix, the browser hit tests failed at 1280 × 800: Touch
+controls, Gyro, Physics, and Flight guide hit the touch stick instead of their
+settings buttons. Raising `#hud-overlay` whenever `touch-mode` is active keeps
+panels above the yoke for both coarse-pointer tablets and desktop users who
+enable on-screen controls. Updated screenshots and per-control hit results are
+included alongside these notes.
 
 ## Reproduce
 
