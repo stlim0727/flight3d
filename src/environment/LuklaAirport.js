@@ -263,7 +263,8 @@ export class LuklaAirport {
       metalness: 0.05
     });
     const apronSkirtMesh = new THREE.Mesh(apronSkirtGeom, apronSkirtMat);
-    apronSkirtMesh.position.y = -8.0;
+    // As on the runway, keep the foundation below the textured surface.
+    apronSkirtMesh.position.y = -8.1;
     apronSkirtMesh.receiveShadow = true;
 
     // Aligned with runway heading and uphill slope using runway-local YXZ order

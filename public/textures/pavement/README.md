@@ -18,7 +18,14 @@ No displacement changes geometry or collision heights. Normal strength is 0.35,
 with mipmaps and 4x anisotropy. Metalness is zero.
 
 Rubber streaks are original deterministic Canvas artwork in `Pavement.js`.
+Sealed branching cracks are original 512px Canvas artwork in the same module,
+shared by both airports and placed as two 8m × 12m overlays per runway. They
+inherit the runway heading/grade, use mipmaps and 4x anisotropy, and do not write
+depth. No downloaded image was modified or added for these decals.
 Repair overlays reuse the asphalt maps with a darker tint. Neither needs another
 download. Maps are shared by the two airports and remain allocated with those
 airports; airport and preset changes reuse them. A failed map leaves that slot
 unset, retaining the base material. Refreshing the page retries failed requests.
+
+See [pavement acceptance](../../../docs/development/pavement.md) for repeatable
+browser checks and the recorded comparison.

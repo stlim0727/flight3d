@@ -3,6 +3,7 @@ import * as THREE from 'three';
 // Airports stay allocated for the lifetime of the simulator. Share maps across
 // both airports; preset changes never allocate another texture set.
 const textureLoads = new Map();
+let crackMaterial;
 
 // One 3m scan tile, independent of slab dimensions or airport orientation.
 export function setPavementUVs(geometry) {
@@ -87,6 +88,7 @@ export function createRunwayWearMaterial() {
 
 export function createRunwayRepairs(width, length) {
   const group = new THREE.Group();
+  group.name = 'runway-repairs';
   const material = createPavementMaterial('asphalt', -3);
   material.name = 'runway-repair';
   material.color.multiplyScalar(0.7);
@@ -97,5 +99,55 @@ export function createRunwayRepairs(width, length) {
     patch.receiveShadow = true;
     group.add(patch);
   }
+  // Sparse sealed cracks, in runway-local metres. Keep them inside the edge
+  // markings and inherit the parent's heading/grade, including at Lukla.
+  const cracks = getCrackMaterial();
+  if (cracks) {
+    const crackGeometry = new THREE.PlaneGeometry(8, 12).rotateX(-Math.PI / 2);
+    for (const side of [-1, 1]) {
+      const crack = new THREE.Mesh(crackGeometry, cracks);
+      crack.name = 'runway-cracks';
+      crack.position.set(side * width * 0.28, 0.018, side * length * 0.3);
+      crack.rotation.y = side * 0.3;
+      crack.receiveShadow = true;
+      group.add(crack);
+    }
+  }
   return group;
+}
+
+function getCrackMaterial() {
+  if (crackMaterial) return crackMaterial;
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  // Original artwork, no external asset. Transparent margins avoid hard decal
+  // edges; filtered mipmaps fade the centimetre-scale sealant at a distance.
+  const paths = [
+    [[54, 100], [130, 145], [188, 139], [251, 207], [295, 284], [379, 330], [460, 415]],
+    [[188, 139], [211, 85], [259, 49]],
+    [[295, 284], [238, 345], [224, 450]],
+    [[379, 330], [423, 278], [465, 261]]
+  ];
+  ctx.lineCap = ctx.lineJoin = 'round';
+  for (const [lineWidth, strokeStyle] of [[4, 'rgba(34,31,27,0.25)'], [1.5, 'rgba(19,18,16,0.7)']]) {
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = strokeStyle;
+    for (const path of paths) {
+      ctx.beginPath();
+      path.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+      ctx.stroke();
+    }
+  }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
+  crackMaterial = new THREE.MeshStandardMaterial({
+    map, transparent: true, depthWrite: false, roughness: 1, metalness: 0,
+    polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3
+  });
+  crackMaterial.name = 'runway-cracks';
+  return crackMaterial;
 }

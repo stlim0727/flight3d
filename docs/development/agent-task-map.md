@@ -13,7 +13,7 @@ context, while the current implementation defines actual behavior.
 | Cameras and framing | src/cameras/CameraSystem.js | tests/gearCamAndTouchdown.test.js; browser screenshots |
 | Autonomous flight and stage transitions | src/director/DemoFlightDirector.js | npm run test:demo; npm run test:flight |
 | Aircraft geometry and cockpit displays | src/aircraft/ | npm run build; cockpit browser screenshots |
-| Terrain, airport, ocean, sky | src/environment/; [Lukla data provenance](lukla-terrain.md); [airport exterior assets](airport-buildings.md) | npm run build; relevant scene screenshots |
+| Terrain, airport, ocean, sky | src/environment/; [Lukla data provenance](lukla-terrain.md); [airport exterior assets](airport-buildings.md); [pavement](pavement.md) | npm run build; relevant scene screenshots |
 | City buildings and foliage | src/environment/FoliageAndCities.js; CityBuildingAssets.js; [city evidence](city-buildings.md) | tests/cityBuildings.test.js; tests/collision.test.js; browser city review |
 | Sound | src/audio/FlightAudio.js | browser interaction and listening |
 | Crash and tire effects | src/effects/ | npm run test:crash; screenshots |

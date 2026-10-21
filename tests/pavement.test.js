@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { setPavementUVs } from '../src/environment/Pavement.js';
+import { setPavementUVs, createRunwayRepairs } from '../src/environment/Pavement.js';
 import { LuklaAirport } from '../src/environment/LuklaAirport.js';
 
 test('pavement retains a three metre tile across different slabs and subdivisions', () => {
@@ -16,6 +16,45 @@ test('pavement retains a three metre tile across different slabs and subdivision
       assert.ok(Math.abs((uv.getY(i) - uv.getY(0)) * 3 + (pos.getZ(i) - pos.getZ(0))) < 0.001);
     }
   }
+});
+
+test('repair and crack overlays stay inside both runways and share crack artwork', () => {
+  const context = new Proxy({}, { get: () => () => {} });
+  const originalDocument = globalThis.document;
+  globalThis.document = { createElement: () => ({ getContext: () => context }) };
+  try {
+    const materials = new Set();
+    for (const [width, length] of [[60, 3200], [30, 527]]) {
+      const group = createRunwayRepairs(width, length);
+      assert.equal(group.children.length, 4);
+      group.updateMatrixWorld(true);
+      for (const mesh of group.children) {
+        const bounds = new THREE.Box3().setFromObject(mesh);
+        assert.ok(bounds.min.x > -width / 2 && bounds.max.x < width / 2);
+        assert.ok(bounds.min.z > -length / 2 && bounds.max.z < length / 2);
+        assert.ok(bounds.min.y > 0 && bounds.max.y < 0.02);
+        assert.ok(mesh.material.polygonOffsetFactor < 0);
+        if (mesh.name === 'runway-cracks') {
+          materials.add(mesh.material);
+          assert.equal(mesh.material.depthWrite, false);
+          assert.equal(mesh.material.map.image.width, 512);
+          assert.equal(mesh.material.map.colorSpace, THREE.SRGBColorSpace);
+        }
+      }
+    }
+    assert.equal(materials.size, 1);
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+  }
+});
+
+test('Lukla apron foundation cannot coincide with the pavement', () => {
+  const airport = new LuklaAirport();
+  const apron = airport.group.children.find(g => g.children.some(o => o.material?.name === 'pavement-concrete'));
+  assert.ok(apron);
+  const foundation = apron.children.find(o => o.geometry?.type === 'BoxGeometry');
+  assert.ok(foundation.position.y + foundation.geometry.parameters.height / 2 < 0);
 });
 
 test('Lukla runway retains dimensions, shadows and depth offset with headless fallback', () => {
