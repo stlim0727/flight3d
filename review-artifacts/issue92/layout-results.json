@@ -1,0 +1,754 @@
+[
+  {
+    "name": "portrait-small",
+    "width": 320,
+    "height": 568,
+    "touch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 224,
+        "h": 48,
+        "bad": false
+      },
+      {
+        "id": "open-aircraft",
+        "x": 8,
+        "y": 62,
+        "w": 73,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-flight",
+        "x": 85,
+        "y": 62,
+        "w": 73,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 162,
+        "y": 62,
+        "w": 73,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-environment",
+        "x": 239,
+        "y": 62,
+        "w": 73,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn hud-details",
+        "x": 236,
+        "y": 8,
+        "w": 76,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 302,
+        "w": 108,
+        "h": 180,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 60,
+        "y": 497,
+        "w": 52,
+        "h": 52,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 120,
+        "y": 488,
+        "w": 140,
+        "h": 70,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 178,
+        "y": 314,
+        "w": 134,
+        "h": 168,
+        "bad": false
+      }
+    ],
+    "panel": {
+      "open": true,
+      "scroll": 3,
+      "scrollable": true,
+      "closeVisible": true,
+      "panelBottom": 552,
+      "bodyTouch": "pan-y"
+    }
+  },
+  {
+    "name": "portrait",
+    "width": 390,
+    "height": 844,
+    "touch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 294,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-aircraft",
+        "x": 8,
+        "y": 62,
+        "w": 90.5,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-flight",
+        "x": 102.5,
+        "y": 62,
+        "w": 90.5,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 197,
+        "y": 62,
+        "w": 90.5,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-environment",
+        "x": 291.5,
+        "y": 62,
+        "w": 90.5,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn hud-details",
+        "x": 306,
+        "y": 8,
+        "w": 76,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 578,
+        "w": 108,
+        "h": 180,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 95,
+        "y": 773,
+        "w": 52,
+        "h": 52,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 155,
+        "y": 764,
+        "w": 140,
+        "h": 70,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 248,
+        "y": 590,
+        "w": 134,
+        "h": 168,
+        "bad": false
+      }
+    ],
+    "panel": {
+      "open": true,
+      "scroll": 0,
+      "scrollable": false,
+      "closeVisible": true,
+      "panelBottom": 555,
+      "bodyTouch": "pan-y"
+    }
+  },
+  {
+    "name": "portrait-short",
+    "width": 320,
+    "height": 480,
+    "touch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 224,
+        "h": 48,
+        "bad": false
+      },
+      {
+        "id": "open-aircraft",
+        "x": 8,
+        "y": 62,
+        "w": 73,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-flight",
+        "x": 85,
+        "y": 62,
+        "w": 73,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 162,
+        "y": 62,
+        "w": 73,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-environment",
+        "x": 239,
+        "y": 62,
+        "w": 73,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn hud-details",
+        "x": 236,
+        "y": 8,
+        "w": 76,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 214,
+        "w": 108,
+        "h": 180,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 60,
+        "y": 409,
+        "w": 52,
+        "h": 52,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 120,
+        "y": 400,
+        "w": 140,
+        "h": 70,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 178,
+        "y": 226,
+        "w": 134,
+        "h": 168,
+        "bad": false
+      }
+    ],
+    "panel": {
+      "open": true,
+      "scroll": 91,
+      "scrollable": true,
+      "closeVisible": true,
+      "panelBottom": 464,
+      "bodyTouch": "pan-y"
+    }
+  },
+  {
+    "name": "landscape-small",
+    "width": 568,
+    "height": 320,
+    "touch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 472,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-aircraft",
+        "x": 8,
+        "y": 62,
+        "w": 135,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-flight",
+        "x": 147,
+        "y": 62,
+        "w": 135,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 286,
+        "y": 62,
+        "w": 135,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-environment",
+        "x": 425,
+        "y": 62,
+        "w": 135,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn hud-details",
+        "x": 484,
+        "y": 8,
+        "w": 76,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 132,
+        "w": 108,
+        "h": 180,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 187,
+        "y": 249,
+        "w": 52,
+        "h": 52,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 245,
+        "y": 240,
+        "w": 130,
+        "h": 70,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 446,
+        "y": 164,
+        "w": 114,
+        "h": 148,
+        "bad": false
+      }
+    ],
+    "panel": {
+      "open": true,
+      "scroll": 251,
+      "scrollable": true,
+      "closeVisible": true,
+      "panelBottom": 304,
+      "bodyTouch": "pan-y"
+    }
+  },
+  {
+    "name": "landscape",
+    "width": 844,
+    "height": 390,
+    "touch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 748,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-aircraft",
+        "x": 8,
+        "y": 62,
+        "w": 204,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-flight",
+        "x": 216,
+        "y": 62,
+        "w": 204,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 424,
+        "y": 62,
+        "w": 204,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-environment",
+        "x": 632,
+        "y": 62,
+        "w": 204,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn hud-details",
+        "x": 760,
+        "y": 8,
+        "w": 76,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 202,
+        "w": 108,
+        "h": 180,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 325,
+        "y": 319,
+        "w": 52,
+        "h": 52,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 383,
+        "y": 310,
+        "w": 130,
+        "h": 70,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 722,
+        "y": 234,
+        "w": 114,
+        "h": 148,
+        "bad": false
+      }
+    ],
+    "panel": {
+      "open": true,
+      "scroll": 181,
+      "scrollable": true,
+      "closeVisible": true,
+      "panelBottom": 374,
+      "bodyTouch": "pan-y"
+    }
+  },
+  {
+    "name": "desktop",
+    "width": 1440,
+    "height": 900,
+    "touch": false,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 567.21875,
+        "y": 14,
+        "w": 305.5625,
+        "h": 46,
+        "bad": false
+      },
+      {
+        "id": "open-flight",
+        "x": 546.640625,
+        "y": 848,
+        "w": 110,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 662.640625,
+        "y": 848,
+        "w": 123.375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-environment",
+        "x": 792.015625,
+        "y": 848,
+        "w": 101.34375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn hud-details",
+        "x": 1335.3125,
+        "y": 8,
+        "w": 96.6875,
+        "h": 44,
+        "bad": false
+      }
+    ],
+    "panel": {
+      "open": true,
+      "scroll": 0,
+      "scrollable": false,
+      "closeVisible": true,
+      "panelBottom": 770,
+      "bodyTouch": "pan-y"
+    }
+  },
+  {
+    "name": "desktop-narrow",
+    "width": 800,
+    "height": 700,
+    "touch": false,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 704,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-aircraft",
+        "x": 8,
+        "y": 62,
+        "w": 193,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-flight",
+        "x": 205,
+        "y": 62,
+        "w": 193,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 402,
+        "y": 62,
+        "w": 193,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-environment",
+        "x": 599,
+        "y": 62,
+        "w": 193,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn hud-details",
+        "x": 716,
+        "y": 8,
+        "w": 76,
+        "h": 44,
+        "bad": false
+      }
+    ],
+    "panel": {
+      "open": true,
+      "scroll": 0,
+      "scrollable": false,
+      "closeVisible": true,
+      "panelBottom": 555,
+      "bodyTouch": "pan-y"
+    }
+  },
+  {
+    "name": "desktop-small",
+    "width": 1025,
+    "height": 700,
+    "touch": false,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 355.515625,
+        "y": 14,
+        "w": 313.96875,
+        "h": 46,
+        "bad": false
+      },
+      {
+        "id": "open-flight",
+        "x": 339.140625,
+        "y": 648,
+        "w": 110,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 455.140625,
+        "y": 648,
+        "w": 123.375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-environment",
+        "x": 584.515625,
+        "y": 648,
+        "w": 101.34375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn hud-details",
+        "x": 920.3125,
+        "y": 8,
+        "w": 96.6875,
+        "h": 44,
+        "bad": false
+      }
+    ],
+    "panel": {
+      "open": true,
+      "scroll": 0,
+      "scrollable": false,
+      "closeVisible": true,
+      "panelBottom": 570,
+      "bodyTouch": "pan-y"
+    }
+  },
+  {
+    "name": "tablet-touch",
+    "width": 1280,
+    "height": 800,
+    "touch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 483.015625,
+        "y": 14,
+        "w": 313.96875,
+        "h": 46,
+        "bad": false
+      },
+      {
+        "id": "open-aircraft",
+        "x": 432.296875,
+        "y": 748,
+        "w": 70.6875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-flight",
+        "x": 508.984375,
+        "y": 748,
+        "w": 110,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 624.984375,
+        "y": 748,
+        "w": 115.375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "open-environment",
+        "x": 746.359375,
+        "y": 748,
+        "w": 101.34375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn hud-details",
+        "x": 1175.3125,
+        "y": 8,
+        "w": 96.6875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 20,
+        "y": 529,
+        "w": 108,
+        "h": 201,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 565.359375,
+        "y": 592,
+        "w": 68,
+        "h": 68,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 514.359375,
+        "y": 668,
+        "w": 170,
+        "h": 60,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 1070.71875,
+        "y": 529,
+        "w": 189.28125,
+        "h": 201,
+        "bad": false
+      }
+    ],
+    "panel": {
+      "open": true,
+      "scroll": 0,
+      "scrollable": false,
+      "closeVisible": true,
+      "panelBottom": 738,
+      "bodyTouch": "pan-y"
+    }
+  }
+]

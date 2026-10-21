@@ -1701,3 +1701,280 @@ body.compact-ui {
 }
 .language-control select { cursor: pointer; min-width: 110px; }
 .language-control option { background: #142030; color: #fff; }
+
+/* Shared flight controls. Panels keep their header outside the scrolling body. */ body {
+  --edge-left: max(8px, env(safe-area-inset-left));
+  --edge-right: max(8px, env(safe-area-inset-right));
+  --edge-top: max(8px, env(safe-area-inset-top));
+  --edge-bottom: max(8px, env(safe-area-inset-bottom));
+}
+.flight-toolbar {
+  position: absolute;
+  bottom: var(--edge-bottom);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+  z-index: 65;
+}
+.flight-toolbar .btn, .flight-panel .btn, .hud-details {
+  min-height: 44px;
+  box-shadow: none;
+  text-shadow: none;
+}
+.flight-toolbar .btn {
+  white-space: nowrap;
+}
+.btn[aria-expanded="true"], .btn[aria-pressed="true"] {
+  background: #164e63;
+  border-color: #67e8f9;
+  color: #ecfeff;
+}
+.btn:disabled {
+  opacity: .45;
+  cursor: default;
+  transform: none;
+}
+.btn:focus-visible, select:focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 2px;
+}
+.flight-panel {
+  position: absolute;
+  bottom: calc(var(--edge-bottom) + 54px);
+  right: var(--edge-right);
+  width: min(380px, calc(100% - var(--edge-left) - var(--edge-right)));
+  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 124px);
+  display: flex;
+  flex-direction: column;
+  background: #101c2bee;
+  border: 1px solid #64748b;
+  border-radius: 10px;
+  pointer-events: auto;
+  z-index: 64;
+  overflow: hidden;
+}
+.flight-panel[hidden] {
+  display: none;
+}
+.flight-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  flex-shrink: 0;
+  border-bottom: 1px solid #334155;
+}
+.flight-panel h2 {
+  margin: 0;
+  font: 600 16px system-ui;
+  color: #f1f5f9;
+}
+.panel-close {
+  min-width: 44px;
+  font-size: 22px;
+}
+.flight-panel-body {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+.flight-panel-body .btn {
+  white-space: normal;
+  text-align: left;
+  margin: 0;
+}
+.flight-panel .airport-group {
+  flex-wrap: wrap;
+  box-shadow: none;
+}
+.flight-panel option {
+  background: #101c2b;
+  color: #f1f5f9;
+}
+.hud-strip {
+  max-width: calc(100% - 140px);
+  box-shadow: none;
+  gap: 14px;
+}
+.hud-details {
+  position: absolute;
+  top: var(--edge-top);
+  right: var(--edge-right);
+  pointer-events: auto;
+}
+.hud-strip .hud-item:nth-child(n+5) {
+  display: none;
+}
+.show-instruments .hud-strip {
+  flex-wrap: wrap;
+}
+.show-instruments .hud-strip .hud-item {
+  display: flex;
+}
+.compact-ui .hud-strip {
+  left: var(--edge-left);
+  right: calc(var(--edge-right) + 80px);
+  gap: 8px;
+  padding: 6px;
+  justify-content: space-around;
+  overflow: hidden;
+}
+.compact-ui .hud-item {
+  min-width: 0;
+  flex: 1 1 0;
+}
+.compact-ui .hud-item .hud-label {
+  font-size: 8px;
+}
+.compact-ui .hud-item .hud-val {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.compact-ui.show-instruments .hud-strip {
+  flex-wrap: wrap;
+}
+.compact-ui.show-instruments .hud-item {
+  flex: 1 0 22%;
+}
+.compact-ui .flight-toolbar {
+  bottom: auto;
+  top: calc(var(--edge-top) + 54px);
+  left: var(--edge-left);
+  right: var(--edge-right);
+  transform: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+.compact-ui .flight-toolbar .btn {
+  font-size: 11px;
+  padding: 5px 2px;
+  white-space: normal;
+}
+.compact-ui .flight-panel {
+  top: calc(var(--edge-top) + 104px);
+  bottom: auto;
+  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 112px);
+}
+.compact-ui .demo-banner, .compact-ui .demo-pill-btn {
+  top: calc(var(--edge-top) + 106px);
+}
+.compact-ui .demo-banner {
+  max-height: min(135px, 28dvh);
+  padding: 8px;
+  gap: 6px;
+}
+.compact-ui .demo-stage-desc {
+  display: none;
+}
+.compact-ui .demo-stage-title {
+  font-size: 11px;
+}
+.compact-ui .demo-badge {
+  font-size: 10px;
+  padding: 4px;
+}
+.compact-ui .demo-actions .btn {
+  min-height: 36px;
+}
+.compact-ui .demo-pill-btn {
+  max-width: calc(100% - 16px);
+}
+.compact-ui .touch-controls-overlay {
+  z-index: 20;
+}
+.touch-mode:not(.compact-ui) .touch-controls-overlay {
+  padding-bottom: 70px;
+}
+@media (min-width: 1025px) {
+  body:not(.touch-mode) #panel-aircraft {
+    display: block;
+    bottom: 68px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100% - 24px);
+  }
+  body:not(.touch-mode) #panel-aircraft > header {
+    display: none;
+  }
+  body:not(.touch-mode) #panel-aircraft .flight-panel-body {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  body:not(.touch-mode) #open-aircraft {
+    display: none;
+  }
+}
+@media (max-height: 450px) and (min-width: 541px) {
+  .compact-ui .touch-throttle-track {
+    height: 88px;
+  }
+  .compact-ui .touch-stick-zone {
+    width: 100px;
+    height: 100px;
+  }
+  .compact-ui .touch-throttle-card {
+    padding: 6px;
+  }
+  .compact-ui .touch-center {
+    flex-direction: row;
+    gap: 6px;
+  }
+  .compact-ui .touch-rudder-card {
+    width: 130px;
+  }
+  .compact-ui .btn-touch-brake {
+    width: 52px;
+    height: 52px;
+  }
+  .compact-ui .demo-banner {
+    width: min(360px, calc(100% - 280px));
+  }
+}
+@media (min-width: 1025px) {
+  body:not(.touch-mode) .flight-panel:not(#panel-aircraft) {
+    bottom: 130px;
+    max-height: calc(100dvh - 210px);
+  }
+}
+.flight-panel, .flight-panel-body, .flight-panel-body button, .flight-panel-body select {
+  touch-action: pan-y;
+}
+.compact-ui .hud-details {
+  width: 76px;
+  font-size: 10px;
+  padding: 4px;
+}
+.compact-ui #open-camera {
+  height: 44px;
+  padding: 2px;
+  font-size: 10px;
+  line-height: 12px;
+}
+.compact-ui .touch-throttle-card, .compact-ui .touch-stick-card, .compact-ui .touch-rudder-card, .btn-touch-brake {
+  box-shadow: none;
+}
+.panel-open .demo-banner, .panel-open .demo-pill-btn {
+  visibility: hidden;
+}
+.flight-panel {
+  background: #101c2bfa;
+}
+/* Inset changes must take effect immediately when browser chrome or orientation changes. */
+.flight-toolbar .btn, .flight-panel .btn, .hud-details {
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+#panel-aircraft .flight-panel-body {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+#panel-aircraft #btn-gear {
+  grid-column: 1 / -1;
+}

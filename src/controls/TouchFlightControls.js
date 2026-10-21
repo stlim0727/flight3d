@@ -57,7 +57,7 @@ export class TouchFlightControls {
     this.gyroBtn = null;
 
     // Auto-detect touchscreen environment or allow explicit toggle
-    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 1024);
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     
     this.initDOM();
     this.bindEvents();

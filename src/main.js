@@ -29,7 +29,7 @@ import { DemoFlightDirector } from './director/DemoFlightDirector.js';
 import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
-import { initMobileMenu } from './ui/MobileMenu.js';
+import { initFlightPanels, updateControlState, touchLabel } from './ui/FlightPanels.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 
@@ -152,7 +152,7 @@ class FlightSimulator {
     this.audio = new FlightAudio();
     this.controls = new FlightControls(this.renderer.domElement);
     this.touchControls = new TouchFlightControls(this.controls);
-    initMobileMenu();
+    initFlightPanels({ onSelectCamera: mode => this.controls.onSelectCamera(mode) });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
     this.cameraSystem.onResetLook = () => {
@@ -1140,6 +1140,7 @@ class FlightSimulator {
       elStall.style.display = this.telemetry.isStalled ? 'block' : 'none';
     }
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
+    updateControlState(this.telemetry, this.cameraSystem, this.sky.timeOfDay);
   }
 
   updateAudioUI(state) {
@@ -1150,7 +1151,7 @@ class FlightSimulator {
     if (btnSound) {
       if (state.muted) {
         btnSound.className = 'btn btn-preset btn-sound-toggle muted';
-        bindText(btnSound, () => t('muted.m'));
+        bindText(btnSound, () => t('muted'));
       } else if (state.mode === 'bluetooth') {
         btnSound.className = 'btn btn-preset btn-sound-toggle active-bt';
         bindText(btnSound, () => t('bluetooth.200'));
@@ -1159,7 +1160,7 @@ class FlightSimulator {
         bindText(btnSound, () => t('boost.150'));
       } else {
         btnSound.className = 'btn btn-preset btn-sound-toggle';
-        bindText(btnSound, () => t('sound.100.m'));
+        bindText(btnSound, () => t('sound.100'));
       }
     }
 
@@ -1243,7 +1244,7 @@ class FlightSimulator {
       const visible = this.aircraft.cockpit.toggleYokes();
       const button = document.getElementById('btn-yokes');
       if (button) {
-        bindText(button, () => visible ? t('hide.yokes.j') : t('show.yokes.j'));
+        bindText(button, () => touchLabel(visible ? t('hide.yokes.j') : t('show.yokes.j')));
         button.setAttribute('aria-pressed', String(!visible));
       }
     };
