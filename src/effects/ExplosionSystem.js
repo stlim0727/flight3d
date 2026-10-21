@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createEffectAtlas, createFlipbookMaterial, updateFlipbook } from './EffectFlipbook.js';
 
 /**
  * Cinematic High-Fidelity Explosion & Crash Effects System
@@ -31,50 +32,10 @@ export class ExplosionSystem {
     this.initLightPool();
 
     // Procedural Particle Textures
-    this.fireTexture = this.createRadialGradientTexture('#ffffff', '#ffaa00', '#d92600', '#000000');
-    this.smokeTexture = this.createSmokeTexture();
-    this.waterTexture = this.createRadialGradientTexture('#ffffff', '#bae6fd', '#38bdf8', '#000000');
+    this.fireTexture = createEffectAtlas('fire');
+    this.smokeTexture = createEffectAtlas('smoke');
+    this.waterTexture = createEffectAtlas('water');
     this.sparkTexture = this.createSparkTexture();
-  }
-
-  createRadialGradientTexture(c0, c1, c2, c3) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-
-    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    grad.addColorStop(0.0, c0);
-    grad.addColorStop(0.3, c1);
-    grad.addColorStop(0.7, c2);
-    grad.addColorStop(1.0, c3);
-
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 64, 64);
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.needsUpdate = true;
-    return tex;
-  }
-
-  createSmokeTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-
-    const grad = ctx.createRadialGradient(32, 32, 4, 32, 32, 32);
-    grad.addColorStop(0.0, 'rgba(40, 42, 48, 1.0)');
-    grad.addColorStop(0.4, 'rgba(30, 32, 36, 0.85)');
-    grad.addColorStop(0.8, 'rgba(20, 22, 24, 0.4)');
-    grad.addColorStop(1.0, 'rgba(15, 15, 15, 0.0)');
-
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 64, 64);
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.needsUpdate = true;
-    return tex;
   }
 
   createSparkTexture() {
@@ -160,6 +121,7 @@ export class ExplosionSystem {
   }
 
   spawnShockwave(pos, isWater) {
+    if (this.shockwaves.length >= 4) return;
     const geo = new THREE.RingGeometry(1.0, 2.5, 32);
     geo.rotateX(-Math.PI * 0.5);
 
@@ -187,12 +149,11 @@ export class ExplosionSystem {
   }
 
   spawnFireballCore(pos, count, isWater) {
-    for (let i = 0; i < count; i++) {
-      const spriteMat = new THREE.SpriteMaterial({
-        map: isWater ? this.waterTexture : this.fireTexture,
+    for (let i = 0; i < count && this.fireballs.length < 60; i++) {
+      const spriteMat = createFlipbookMaterial(isWater ? this.waterTexture : this.fireTexture, {
         transparent: true,
         opacity: 0.95,
-        blending: THREE.AdditiveBlending,
+        blending: isWater ? THREE.NormalBlending : THREE.AdditiveBlending,
         depthWrite: false
       });
 
@@ -227,9 +188,8 @@ export class ExplosionSystem {
   }
 
   spawnSmokePlume(pos, count, isWater) {
-    for (let i = 0; i < count; i++) {
-      const spriteMat = new THREE.SpriteMaterial({
-        map: this.smokeTexture,
+    for (let i = 0; i < count && this.smokePuffs.length < 120; i++) {
+      const spriteMat = createFlipbookMaterial(this.smokeTexture, {
         transparent: true,
         opacity: 0.85,
         depthWrite: false
@@ -265,7 +225,7 @@ export class ExplosionSystem {
   }
 
   spawnShrapnel(pos, count, isWater) {
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < count && this.debrisParticles.length < 70; i++) {
       const spriteMat = new THREE.SpriteMaterial({
         map: this.sparkTexture,
         transparent: true,
@@ -303,12 +263,11 @@ export class ExplosionSystem {
   }
 
   spawnWaterGeyser(pos, count) {
-    for (let i = 0; i < count; i++) {
-      const spriteMat = new THREE.SpriteMaterial({
-        map: this.waterTexture,
+    for (let i = 0; i < count && this.waterPlumes.length < 90; i++) {
+      const spriteMat = createFlipbookMaterial(this.waterTexture, {
         transparent: true,
         opacity: 0.9,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.NormalBlending,
         depthWrite: false
       });
 
@@ -381,6 +340,7 @@ export class ExplosionSystem {
     for (let i = this.fireballs.length - 1; i >= 0; i--) {
       const f = this.fireballs[i];
       f.life += dt;
+      updateFlipbook(f);
       const t = f.life / f.maxLife;
       if (t >= 1.0) {
         this.group.remove(f.sprite);
@@ -399,6 +359,7 @@ export class ExplosionSystem {
     for (let i = this.smokePuffs.length - 1; i >= 0; i--) {
       const s = this.smokePuffs[i];
       s.life += dt;
+      updateFlipbook(s);
       const t = s.life / s.maxLife;
       if (t >= 1.0) {
         this.group.remove(s.sprite);
@@ -445,6 +406,7 @@ export class ExplosionSystem {
     for (let i = this.waterPlumes.length - 1; i >= 0; i--) {
       const w = this.waterPlumes[i];
       w.life += dt;
+      updateFlipbook(w);
       const t = w.life / w.maxLife;
       if (t >= 1.0) {
         this.group.remove(w.sprite);
@@ -473,9 +435,8 @@ export class ExplosionSystem {
   }
 
   spawnWreckageSmoke(pos) {
-    if (this.smokePuffs.length > 120) return; // Particle budget cap
-    const spriteMat = new THREE.SpriteMaterial({
-      map: this.smokeTexture,
+    if (this.smokePuffs.length >= 120) return; // Particle budget cap
+    const spriteMat = createFlipbookMaterial(this.smokeTexture, {
       transparent: true,
       opacity: 0.75,
       depthWrite: false
@@ -511,6 +472,12 @@ export class ExplosionSystem {
   /**
    * Resets and clears all explosion particles and wreckage
    */
+  dispose() {
+    this.clear();
+    for (const texture of [this.fireTexture, this.smokeTexture, this.waterTexture, this.sparkTexture]) texture.dispose();
+    this.scene.remove(this.group);
+  }
+
   clear() {
     for (const f of this.fireballs) {
       this.group.remove(f.sprite);

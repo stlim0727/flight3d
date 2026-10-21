@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createEffectAtlas, createFlipbookMaterial, updateFlipbook } from './EffectFlipbook.js';
 
 /**
  * Realistic Aviation Tire Touchdown Smoke & Friction System
@@ -20,35 +21,10 @@ export class TireSmokeSystem {
     this.activeSpinUpEmitters = [];
 
     // Realistic soft feathered smoke texture
-    this.smokeTexture = this.createSmokeTexture();
+    this.smokeTexture = createEffectAtlas('tire');
 
     // Reusable vectors for performance
     this._tempVec = new THREE.Vector3();
-  }
-
-  createSmokeTexture() {
-    if (typeof document === 'undefined') {
-      return new THREE.Texture();
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-
-    // Multi-stop radial gradient creating a soft, billowing smoke puff
-    const grad = ctx.createRadialGradient(32, 32, 2, 32, 32, 32);
-    grad.addColorStop(0.0, 'rgba(242, 244, 248, 0.95)');
-    grad.addColorStop(0.25, 'rgba(230, 234, 240, 0.85)');
-    grad.addColorStop(0.55, 'rgba(215, 220, 228, 0.50)');
-    grad.addColorStop(0.85, 'rgba(200, 205, 212, 0.15)');
-    grad.addColorStop(1.0, 'rgba(190, 195, 200, 0.0)');
-
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 64, 64);
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.needsUpdate = true;
-    return tex;
   }
 
   /**
@@ -76,6 +52,7 @@ export class TireSmokeSystem {
       this.emitSmokeBurst(pos, linearVelocity, groundSpeed, count);
 
       // Brief spin-up trailing scrub (~0.12s)
+      if (this.activeSpinUpEmitters.length >= 16) continue;
       this.activeSpinUpEmitters.push({
         worldPos: pos.clone(),
         linearVelocity: linearVelocity.clone(),
@@ -103,10 +80,9 @@ export class TireSmokeSystem {
     const groundY = this.terrain ? this.terrain.getHeight(origin.x, origin.z) : origin.y;
 
     for (let i = 0; i < count; i++) {
-      if (this.particles.length > 200) break; // Particle budget cap
+      if (this.particles.length >= 200) break; // Particle budget cap
 
-      const spriteMat = new THREE.SpriteMaterial({
-        map: this.smokeTexture,
+      const spriteMat = createFlipbookMaterial(this.smokeTexture, {
         transparent: true,
         opacity: 0.60 + Math.random() * 0.15,
         depthWrite: false
@@ -181,6 +157,7 @@ export class TireSmokeSystem {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life += dt;
+      updateFlipbook(p);
       const t = p.life / p.maxLife;
 
       if (t >= 1.0) {
@@ -211,6 +188,12 @@ export class TireSmokeSystem {
         p.sprite.material.opacity = p.baseOpacity * Math.max(0.0, (1.0 - t * t));
       }
     }
+  }
+
+  dispose() {
+    this.clear();
+    for (const texture of [this.smokeTexture]) texture.dispose();
+    this.scene.remove(this.group);
   }
 
   clear() {

@@ -150,3 +150,8 @@ See [presets, reproduction and measurements](../../review-artifacts/issue97/READ
 `node scripts/verify-render-quality.mjs` uses the same CDP port to check selection,
 saved preferences, three rabbit cycles without program growth, and mobile layout.
 Run it separately from timed benchmarks to avoid disturbing the camera or GPU.
+
+### Effect flipbooks (issue #15)
+
+See [effect flipbooks](effect-flipbooks.md) for atlas provenance, resource budgets,
+Node lifecycle tests and the Windows/Linux browser comparison harness.
