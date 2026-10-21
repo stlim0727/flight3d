@@ -1977,3 +1977,8 @@ body.compact-ui {
 #panel-instruments .hud-val {
   font-size: 14px;
 }
+#panel-instruments .hud-val {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

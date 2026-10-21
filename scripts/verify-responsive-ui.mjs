@@ -162,7 +162,9 @@ await ev(`document.querySelector('#panel-aircraft .panel-close').click(); const 
 fs.writeFileSync(`${out}/interaction-results.json`, JSON.stringify({ repeatedFlaps: true, directCamera: true, keyboardCamera: true, presetClosesPanel: true, nativeTouchScroll: after, cameraBefore: before, touchModeToggle: true, languageChange: true, rotation: true }, null, 2));
 console.log('Interaction scenarios passed');
 
-await ev(`document.querySelector('#open-instruments').click()`);
+await ev(`window.simulator.controls.onSelectCamera(7); document.querySelector('#open-instruments').click()`);
+await new Promise(r => setTimeout(r, 100));
+assert.ok(await ev(`document.querySelector('#hud-cam').scrollWidth <= document.querySelector('#hud-cam').clientWidth + 1`), 'long auto-camera readout wraps inside compact panel');
 assert.ok(await ev(`(()=>{const panel=document.querySelector('#panel-instruments').getBoundingClientRect();const toolbar=document.querySelector('.flight-toolbar').getBoundingClientRect();return panel.top >= toolbar.bottom && panel.bottom <= innerHeight})()`), 'compact instruments do not overlap toolbar or leave viewport');
 await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-instruments.png`, Buffer.from(r.data, 'base64')));
 await ev(`document.querySelector('#panel-instruments .panel-close').click()`);
