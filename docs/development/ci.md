@@ -128,3 +128,12 @@ See [gear fit evidence](../../review-artifacts/gear-fit/README.md).
 
 See [material surface acceptance](material-surfaces.md) for controlled water,
 terrain high/low, sunset and night captures with shader/error checks.
+
+### Cockpit stutter mitigation (issue #101)
+
+`node scripts/verify-cockpit-stutter.mjs` checks the loaded model's batch count,
+control reset/yoke visibility, alternating display redraws, dirty MCP/CDU updates,
+and forced refresh during deterministic stepping. Start Vite and open it in Chrome
+with CDP on port 9451 (`CDP_PORT` overrides). Set `FALLBACK=1` to block the medium
+GLB and test Draco. `ARTIFACT_DIR` overrides the capture directory. See
+[results and limitations](../../review-artifacts/issue101/README.md).

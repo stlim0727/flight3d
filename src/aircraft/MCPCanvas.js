@@ -50,7 +50,14 @@ export class MCPCanvas {
     if (state.isStalled) this.masterCaution = true;
     else this.masterCaution = false;
 
-    this.render();
+    const key = JSON.stringify([this.fdLeft, this.fdRight, this.atArm, this.speed,
+      this.heading, this.altitude, this.vsi, this.courseLeft, this.courseRight,
+      this.apCmdA, this.apCmdB, this.lnav, this.vnav, this.app, this.altHold,
+      this.masterCaution, this.fireWarning]);
+    if (key !== this.renderKey) {
+      this.renderKey = key;
+      this.render();
+    }
   }
 
   render() {

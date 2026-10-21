@@ -1,0 +1,60 @@
+{
+  "loaded": true,
+  "saved": 2372,
+  "meshes": 123,
+  "visible": 123,
+  "controls": [
+    {
+      "name": "GLTF_Captain_Yoke",
+      "children": 4
+    },
+    {
+      "name": "GLTF_FO_Yoke",
+      "children": 4
+    },
+    {
+      "name": "GLTF_Throttle_1",
+      "children": 7
+    },
+    {
+      "name": "GLTF_Throttle_2",
+      "children": 7
+    },
+    {
+      "name": "GLTF_Rudder_Pedal_1",
+      "children": 1
+    },
+    {
+      "name": "GLTF_Rudder_Pedal_2",
+      "children": 1
+    },
+    {
+      "name": "GLTF_Rudder_Pedal_3",
+      "children": 1
+    },
+    {
+      "name": "GLTF_Rudder_Pedal_4",
+      "children": 1
+    }
+  ],
+  "displayRenders": {
+    "pfd": 10,
+    "nd": 5,
+    "eicas": 5,
+    "mcp": 0,
+    "isfd": 10,
+    "cdu": 0
+  },
+  "mcpChangedRenders": 1,
+  "forcedDisplayRefresh": true,
+  "controlsReset": true,
+  "yokesHide": true,
+  "yokesShow": true,
+  "cockpitDrawCalls": 337,
+  "gear": {
+    "near": 0.25,
+    "y": 2811.568502001396,
+    "offset": -2.4
+  },
+  "errors": []
+}

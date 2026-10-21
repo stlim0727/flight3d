@@ -40,7 +40,7 @@ export class CameraSystem {
     this.lookPitch = -0.25; // Natural pilot head tilt showing MCP, instruments & runway horizon
 
     // Landing Gear Belly View Parameters (Oblique angle looking at nose and main gear under fuselage)
-    this.gearCamOffset = new THREE.Vector3(2.2, -2.6, 6.2);
+    this.gearCamOffset = new THREE.Vector3(2.2, -2.4, 6.2);
     this.gearLookTarget = new THREE.Vector3(-0.5, -1.9, -2.5);
     this.gearLookYaw = 0;
     this.gearLookPitch = 0;

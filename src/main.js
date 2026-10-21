@@ -84,6 +84,20 @@ class FlightSimulator {
       this.cduCanvas
     );
     this.scene.add(this.aircraft.group);
+    this.aircraft.cockpit.onModelReady = () => {
+      const cockpit = this.aircraft.cockpit;
+      const visible = cockpit.group.visible;
+      // Include cabin lights even if the user is currently in an exterior view.
+      // compileAsync gathers lights synchronously, then polls program readiness.
+      cockpit.group.visible = true;
+      try {
+        cockpit.shaderWarmup = this.renderer.compileAsync(
+          cockpit.gltfCockpitGroup, this.camera, this.scene
+        ).catch(error => console.warn('Cockpit shader warmup failed:', error));
+      } finally {
+        cockpit.group.visible = visible;
+      }
+    };
 
     // 3b. Boeing 737 2D Real-Photo Cockpit Overlay
     this.cockpitPhotoOverlay = new CockpitPhotoOverlay(
@@ -962,7 +976,7 @@ class FlightSimulator {
     // Discard render history before the real-time loop resumes.
     this.physicsAccumulator = 0;
     this.renderPose.reset(this.position, this.quaternion);
-    this.updateFlightDisplays();
+    this.updateFlightDisplays(true);
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
@@ -989,15 +1003,20 @@ class FlightSimulator {
     return this.telemetry;
   }
 
-  updateFlightDisplays() {
-    for (const display of [this.pfdCanvas, this.ndCanvas, this.eicasCanvas]) {
+  updateFlightDisplays(force = false) {
+    const frame = this.displayFrame ?? 0;
+    this.displayFrame = frame + 1;
+    this.pfdCanvas.updateData(this.telemetry);
+    this.pfdCanvas.render();
+    this.isfdCanvas.updateData(this.telemetry);
+    // Initialize both screens; then spread their uploads over alternate frames.
+    for (const display of (force || frame === 0 ? [this.ndCanvas, this.eicasCanvas]
+      : [frame % 2 === 0 ? this.ndCanvas : this.eicasCanvas])) {
       display.updateData(this.telemetry);
       display.render();
     }
-    // These instruments render as part of updateData.
-    for (const display of [this.mcpCanvas, this.isfdCanvas, this.cduCanvas]) {
-      display.updateData(this.telemetry);
-    }
+    this.mcpCanvas.updateData(this.telemetry);
+    this.cduCanvas.updateData(this.telemetry);
   }
 
   /**
