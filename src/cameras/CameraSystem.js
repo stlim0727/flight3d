@@ -125,7 +125,7 @@ export class CameraSystem {
   isInteractiveUI(target) {
     if (!target || typeof target.closest !== 'function') return false;
     return !!target.closest(
-      '.flight-panel, .flight-toolbar, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .crash-overlay, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #help-modal, #diagnostics-overlay'
+      'button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .crash-overlay, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #help-modal, #diagnostics-overlay'
     );
   }
 

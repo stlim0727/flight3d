@@ -92,8 +92,8 @@ function createMockAudioContext() {
   };
 }
 
-describe('FlightAudio (Web Audio Engine)', () => {
-  it('should construct with normal volume', () => {
+describe('FlightAudio (Web Audio Engine & Mobile/Bluetooth Loudness Optimization)', () => {
+  it('should construct with default audio state and detect mobile environment', () => {
     const audio = new FlightAudio();
     assert.strictEqual(audio.isMuted, false);
     assert.strictEqual(audio.isInitialized, false);
@@ -113,7 +113,7 @@ describe('FlightAudio (Web Audio Engine)', () => {
       assert.ok(audio.ctx, 'AudioContext should be created');
       assert.ok(audio.masterGain, 'Master gain node should be created');
       assert.ok(audio.compressor, 'Master DynamicsCompressorNode should be created for loudness mastering');
-      assert.ok(audio.makeupGain, 'Output stage should be created');
+      assert.ok(audio.makeupGain, 'Makeup gain booster node should be created for headphones/Bluetooth');
 
       // Check signal chain: masterGain -> compressor -> makeupGain -> destination
       assert.ok(audio.masterGain.connectedTo.includes(audio.compressor), 'Master gain should feed into compressor');
@@ -122,8 +122,8 @@ describe('FlightAudio (Web Audio Engine)', () => {
 
       // Check master gain value: should be >= 1.0 when unmuted
       assert.ok(audio.masterGain.gain.value >= 1.0, `Master gain should be >= 1.0, got ${audio.masterGain.gain.value}`);
-      // Output stage must not add a boost.
-      assert.strictEqual(audio.makeupGain.gain.value, 1.0);
+      // Check makeup gain booster: should be > 1.0 (+4dB makeup)
+      assert.ok(audio.makeupGain.gain.value > 1.2, `Makeup gain should be > 1.2, got ${audio.makeupGain.gain.value}`);
     } finally {
       if (prevWindow === undefined) {
         delete globalThis.window;
@@ -133,33 +133,55 @@ describe('FlightAudio (Web Audio Engine)', () => {
     }
   });
 
-  it('toggles normal volume and mute without boost, including mobile defaults', () => {
-    const previous = globalThis.window;
-    globalThis.window = { AudioContext: createMockAudioContext(), ontouchstart: null, innerWidth: 320 };
+  it('should cycle volume states between 100% -> 150% Mobile -> 200% Bluetooth Boost -> Mute -> 100%', () => {
+    const prevWindow = globalThis.window;
+    const MockAudioContext = createMockAudioContext();
+    globalThis.window = { AudioContext: MockAudioContext };
+
     try {
       const audio = new FlightAudio();
-      assert.strictEqual(audio.volume, 1);
+      audio.volume = 1.0;
       audio.init();
-      for (const muted of [true, false, true, false]) {
-        const state = audio.cycleVolume();
-        assert.strictEqual(state.muted, muted);
-        assert.strictEqual(state.mode, muted ? 'muted' : 'normal');
-        assert.strictEqual(state.level, muted ? 0 : 1);
-        assert.strictEqual(audio.effectiveVolume, muted ? 0 : 1);
-        assert.strictEqual(audio.masterGain.gain.value, muted ? 0 : 1);
-      }
-      for (const requested of [1.5, 2, 3]) {
-        audio.setVolume(requested);
-        assert.strictEqual(audio.volume, 1);
-        assert.strictEqual(audio.masterGain.gain.value, 1);
-      }
-      audio.setMuted(true);
-      assert.strictEqual(audio.masterGain.gain.value, 0);
-      audio.setMuted(false);
-      assert.strictEqual(audio.masterGain.gain.value, 1);
+
+      // State 1: Default 100%
+      let state = audio.getVolumeState();
+      assert.strictEqual(state.muted, false);
+      assert.strictEqual(state.mode, 'normal');
+      assert.strictEqual(audio.effectiveVolume, 1.0);
+
+      // Cycle to State 2: 150% Mobile Boost
+      state = audio.cycleVolume();
+      assert.strictEqual(state.muted, false);
+      assert.strictEqual(state.mode, 'mobile');
+      assert.strictEqual(audio.effectiveVolume, 1.5);
+      assert.strictEqual(audio.masterGain.gain.value, 1.5);
+
+      // Cycle to State 3: 200% Bluetooth Max Boost
+      state = audio.cycleVolume();
+      assert.strictEqual(state.muted, false);
+      assert.strictEqual(state.mode, 'bluetooth');
+      assert.strictEqual(audio.effectiveVolume, 2.0);
+      assert.strictEqual(audio.masterGain.gain.value, 2.0);
+
+      // Cycle to State 4: Muted
+      state = audio.cycleVolume();
+      assert.strictEqual(state.muted, true);
+      assert.strictEqual(state.mode, 'muted');
+      assert.strictEqual(audio.effectiveVolume, 0.0);
+      assert.strictEqual(audio.masterGain.gain.value, 0.0);
+
+      // Cycle to State 5: Unmuted back to 100%
+      state = audio.cycleVolume();
+      assert.strictEqual(state.muted, false);
+      assert.strictEqual(state.mode, 'normal');
+      assert.strictEqual(audio.effectiveVolume, 1.0);
+      assert.strictEqual(audio.masterGain.gain.value, 1.0);
     } finally {
-      if (previous === undefined) delete globalThis.window;
-      else globalThis.window = previous;
+      if (prevWindow === undefined) {
+        delete globalThis.window;
+      } else {
+        globalThis.window = prevWindow;
+      }
     }
   });
 

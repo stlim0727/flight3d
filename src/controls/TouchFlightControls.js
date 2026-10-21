@@ -57,7 +57,7 @@ export class TouchFlightControls {
     this.gyroBtn = null;
 
     // Auto-detect touchscreen environment or allow explicit toggle
-    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 1024);
     
     this.initDOM();
     this.bindEvents();
@@ -105,7 +105,7 @@ export class TouchFlightControls {
 
           <!-- Quick Action Buttons Column on Left -->
           <div class="touch-left-actions">
-            <button type="button" id="touch-btn-sound" class="btn-touch-pill active" title="소리 켜기 / 끄기 (M)" data-i18n-title="audio.volume.tooltip">
+            <button type="button" id="touch-btn-sound" class="btn-touch-pill active" title="사운드 볼륨 / 모바일 부스트 (M)" data-i18n-title="audio.volume.tooltip">
               <span class="pill-icon">🔊</span> VOL
             </button>
             <button type="button" id="touch-btn-reverser" class="btn-touch-pill" title="역추진 (Reverse Thrust)" data-i18n-title="reverse.thrust">
@@ -604,6 +604,12 @@ export class TouchFlightControls {
     if (state.muted) {
       soundBtn.className = 'btn-touch-pill muted';
       soundBtn.innerHTML = '<span class="pill-icon">🔇</span> OFF';
+    } else if (state.mode === 'bluetooth') {
+      soundBtn.className = 'btn-touch-pill active-cyan';
+      soundBtn.innerHTML = '<span class="pill-icon">🎧⚡</span> 200%';
+    } else if (state.mode === 'mobile') {
+      soundBtn.className = 'btn-touch-pill active-amber';
+      soundBtn.innerHTML = '<span class="pill-icon">🔊⚡</span> 150%';
     } else {
       soundBtn.className = 'btn-touch-pill active';
       soundBtn.innerHTML = '<span class="pill-icon">🔊</span> 100%';

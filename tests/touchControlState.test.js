@@ -44,6 +44,8 @@ describe('Reparented mobile action state', () => {
     const controls = movedControls();
     for (const [state, className, text] of [
       [{ mode: 'normal' }, 'active', /100%/],
+      [{ mode: 'mobile' }, 'active-amber', /150%/],
+      [{ mode: 'bluetooth' }, 'active-cyan', /200%/],
       [{ muted: true }, 'muted', /OFF/],
       [{ muted: false, mode: 'normal' }, 'active', /100%/],
     ]) {
