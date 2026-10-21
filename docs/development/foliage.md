@@ -8,8 +8,8 @@ This is a lightweight stylized selection, not a photorealistic tree pack.
 ## Provenance and distribution
 
 Author: Flight3d contributors, 2026. Original editable source:
-https://github.com/stlim0727/flight3d/blob/codex/issue-10-foliage-lod/src/environment/TreeModels.js
-(the same path on main after merge). The geometries and vertex colors are created
+https://github.com/yt7good/flight3d/blob/codex/issue-10-foliage-lod/src/environment/TreeModels.js
+(the same path on stlim0727/flight3d main after merge). The geometries and vertex colors are created
 entirely by that source. There are no downloaded models, photos, textures,
 purchases or derivatives of the candidate marketplace packs. Fab, Poly Haven and
 Quaternius were acquisition candidates in the issue, not required dependencies.
