@@ -44,28 +44,83 @@ export class IncheonAirport extends Airport {
       parent.add(mesh);
       return mesh;
     };
-    // Visible arrivals level and elevated departures / boarding level.
-    box(350, 5, 70, -80, 14.5, 340, floor);
-    box(350, 9, 70, -80, 21.5, 340, glass);
-    box(365, 2, 80, -80, 27, 340, white);
-    box(350, 0.5, 72, -80, 17, 340, white);
-    if (typeof document !== 'undefined') {
+    const roof = new THREE.MeshStandardMaterial({ color: 0x9bbfc5, metalness: .35, roughness: .5 });
+    const frame = new THREE.MeshStandardMaterial({ color: 0x566d79, metalness: .4, roughness: .5 });
+    const darkGlass = new THREE.MeshStandardMaterial({ color: 0x294b5d, metalness: .5, roughness: .25 });
+    this.terminal = new THREE.Group();
+    this.terminal.name = 'incheon-terminal';
+    this.group.add(this.terminal);
+    const terminalBox = (w, h, d, x, y, z, material) => box(w, h, d, x, y, z, material, this.terminal);
+    // Ground service level, boarding floor and recessed departure lounge.
+    // Boarding slab top (15.15) continues through the fixed piers to the bridges.
+    terminalBox(350, 3, 70, -80, 13.5, 340, floor);
+    terminalBox(350, .3, 70, -80, 15, 340, white);
+    terminalBox(348, 7, 68, -80, 18.65, 340, darkGlass);
+    terminalBox(352, .5, 72, -80, 22.4, 340, white);
+    for (let x = -250; x <= 90; x += 10) {
+      for (const z of [305.7, 374.3]) {
+        terminalBox(.3, 7.2, .45, x, 18.7, z, white);
+        terminalBox(1, 3, 1, x, 13.5, z, white);
+      }
+      // Recessed service doors and clerestory glazing on the apron facade.
+      terminalBox(5, 2.2, .15, x + 4, 13.2, 304.9, frame);
+    }
+    for (const z of [305.5, 374.5]) {
+      terminalBox(350, .2, .4, -80, 18, z, frame);
+      terminalBox(350, .2, .4, -80, 20.8, z, frame);
+    }
+    // Shallow barrel roof with visible standing seams, inspired by the reference.
+    const roofHeight = z => 23 + 3.5 * (1 - ((z - 340) / 40) ** 2);
+    const roofStrip = (x, width, za, zb, material, thickness = .35, lift = 0) => {
+      const ya = roofHeight(za), yb = roofHeight(zb);
+      const panel = terminalBox(width, thickness, Math.hypot(zb - za, yb - ya), x,
+        (ya + yb) / 2 + lift, (za + zb) / 2, material);
+      panel.rotation.x = -Math.atan2(yb - ya, zb - za);
+    };
+    for (let z = 300; z < 380; z += 5) {
+      roofStrip(-80, 365, z, z + 5, roof);
+      for (let x = -260; x <= 100; x += 20) roofStrip(x, .18, z, z + 5, white, .18, .23);
+    }
+    for (const x of [-220, -160, -100, -40, 20, 80]) {
+      terminalBox(8, .6, 11, x, 26.8, 340, frame);
+      terminalBox(7, .2, 10, x, 27.2, 340, glass);
+      terminalBox(4, 1, 3, x, roofHeight(365) + .7, 365, white);
+    }
+    const sign = (label, width, height, x, y, z, parent = this.terminal) => {
+      if (typeof document === 'undefined') return;
       const canvas = document.createElement('canvas');
       canvas.width = 1024; canvas.height = 128;
       const ctx = canvas.getContext('2d');
       ctx.fillStyle = '#12364d'; ctx.fillRect(0, 0, 1024, 128);
-      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 48px sans-serif';
-      ctx.textAlign = 'center'; ctx.fillText('INCHEON · 인천  |  DEPARTURES  출발', 512, 82);
-      const sign = new THREE.Mesh(new THREE.PlaneGeometry(90, 11.25), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide }));
-      sign.rotation.y = Math.PI;
-      sign.position.set(-80, 23, 304.8);
-      this.group.add(sign);
-    }
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 56px sans-serif';
+      ctx.textAlign = 'center'; ctx.fillText(label, 512, 84);
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide }));
+      mesh.rotation.y = Math.PI;
+      mesh.position.set(x, y, z);
+      parent.add(mesh);
+    };
+    sign('INCHEON · 인천  |  DEPARTURES  출발', 48, 3, -80, 20, 305.1);
+    this.gatePiers = [];
     // Aircraft at (-90, 240), heading west: port skin is at z=241.88.
     // The cabin stops at z=242.1, ahead of the wing at the forward door.
     this.jetBridges = [];
     for (const x of [-200, -102, 0]) {
-      box(7, 7, 26, x, 23, 292, glass);
+      const pier = new THREE.Group();
+      pier.name = `gate-pier-${this.gatePiers.length + 100}`;
+      this.terminal.add(pier);
+      this.gatePiers.push(pier);
+      // Enclosed, level passage from the departure lounge to the bridge pivot.
+      box(7, .3, 28, x, 15, 292, white, pier);
+      box(8, .45, 29, x, 19.4, 292, roof, pier);
+      for (const side of [-1, 1]) {
+        box(.15, 4.1, 28, x + side * 3.5, 17.2, 292, glass, pier);
+        for (let z = 280; z <= 304; z += 4) {
+          box(.25, 4.2, .25, x + side * 3.5, 17.2, z, frame, pier);
+        }
+        for (const z of [281, 299]) box(.6, 3, .6, x + side * 2.8, 13.5, z, white, pier);
+      }
+      box(8, .3, 1, x, 15, 278, frame, pier);
+      sign(`GATE ${this.gatePiers.length + 99}`, 6, .75, x, 18.5, 277.4, pier);
       const bridge = new THREE.Group();
       bridge.position.set(x, 0, 278);
       this.group.add(bridge);
