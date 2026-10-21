@@ -373,6 +373,11 @@ export class Airport {
     this.approachStrobes = [];
     const steadyWhiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const crossbarLightGeo = new THREE.SphereGeometry(0.25, 8, 8);
+    // Keep one light in the shader throughout the sequence. Zero-intensity
+    // PointLights still contribute to Three.js's compiled light count.
+    this.approachLight = new THREE.PointLight(0xffffff, 8.0, 45);
+    this.approachLight.position.set(-halfL - 750, this.elevation + 2.6, 0);
+    this.lightingGroup.add(this.approachLight);
 
     for (let i = 1; i <= 15; i++) {
       const sx = -halfL - i * 50;
@@ -382,11 +387,7 @@ export class Airport {
       mast.position.set(sx, this.elevation + 1.25, 0);
       this.lightingGroup.add(mast);
 
-      // Flashing Strobe Light
-      const strobe = new THREE.PointLight(0xffffff, 5.0, 45);
-      strobe.position.set(sx, this.elevation + 2.6, 0);
-      this.lightingGroup.add(strobe);
-      this.approachStrobes.push({ light: strobe, station: i });
+      this.approachStrobes.push(new THREE.Vector3(sx, this.elevation + 2.6, 0));
 
       // MALSR Standard Horizontal Crossbars at 150m (i=3) and 300m (i=6) from threshold
       if (i === 3 || i === 6) {
@@ -570,10 +571,7 @@ export class Airport {
     const rabbitCycle = (now * 1.6) % 1.0; // 1.6 cycles per second
     const activeIndex = 15 - Math.floor(rabbitCycle * 15);
 
-    this.approachStrobes.forEach(s => {
-      const isActive = s.station === activeIndex;
-      s.light.intensity = isActive ? 8.0 : 0.0;
-    });
+    this.approachLight.position.copy(this.approachStrobes[activeIndex - 1]);
 
     // 3. Obstruction Beacon Flashing
     const beaconActive = (now % 1.0) < 0.2;

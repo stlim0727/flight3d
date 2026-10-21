@@ -13,6 +13,7 @@ import { ISFDCanvas } from './aircraft/ISFDCanvas.js';
 import { CDUCanvas } from './aircraft/CDUCanvas.js';
 import { Boeing737 } from './aircraft/Boeing737.js';
 import { Terrain } from './environment/Terrain.js';
+import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality } from './config/renderQuality.js';
 import { WaterOcean } from './environment/WaterOcean.js';
 import { Airport } from './environment/Airport.js';
 import { FoliageAndCities } from './environment/FoliageAndCities.js';
@@ -59,7 +60,10 @@ class FlightSimulator {
       powerPreference: 'high-performance'
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    let savedQuality;
+    try { savedQuality = localStorage.getItem(RENDER_QUALITY_KEY); } catch { /* Use default. */ }
+    this.renderQuality = resolveRenderQuality(savedQuality);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, RENDER_QUALITY[this.renderQuality].maxDpr));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
@@ -116,7 +120,7 @@ class FlightSimulator {
     this.gear = new LandingGear();
 
     // 5. Procedural World & Real-World Environments
-    this.terrain = new Terrain(22000, 256);
+    this.terrain = new Terrain(22000, 256, { quality: RENDER_QUALITY[this.renderQuality].terrain });
     this.scene.add(this.terrain.mesh);
 
     this.water = new WaterOcean(36000);
@@ -1184,7 +1188,19 @@ class FlightSimulator {
     }, 2500);
   }
 
+  setRenderQuality(value) {
+    this.renderQuality = resolveRenderQuality(value);
+    const preset = RENDER_QUALITY[this.renderQuality];
+    if (this.terrain.getQuality() !== preset.terrain) this.terrain.setQuality(preset.terrain);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, preset.maxDpr));
+    document.getElementById('render-quality').value = this.renderQuality;
+    try { localStorage.setItem(RENDER_QUALITY_KEY, this.renderQuality); } catch { /* Session-only setting. */ }
+  }
+
   initUI() {
+    const qualitySelect = document.getElementById('render-quality');
+    qualitySelect.value = this.renderQuality;
+    qualitySelect.addEventListener('change', () => this.setRenderQuality(qualitySelect.value));
     // Airport Selector UI buttons
     document.getElementById('btn-airport-coastal')?.addEventListener('click', () => this.setAirport('coastal'));
     document.getElementById('btn-airport-lukla')?.addEventListener('click', () => this.setAirport('lukla'));
