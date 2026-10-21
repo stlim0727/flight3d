@@ -1,0 +1,74 @@
+{
+  "cargo": {
+    "url": "models/ships/cargo.glb",
+    "bounds": {
+      "min": [
+        -17.065000534057617,
+        -6,
+        -110
+      ],
+      "max": [
+        17.065000534057617,
+        46,
+        110
+      ]
+    },
+    "bytes": 520960,
+    "triangles": 8584,
+    "drawCalls": 8
+  },
+  "cruise": {
+    "url": "models/ships/cruise.glb",
+    "bounds": {
+      "min": [
+        -15,
+        -5,
+        -95
+      ],
+      "max": [
+        15,
+        39.5,
+        95
+      ]
+    },
+    "bytes": 525300,
+    "triangles": 8668,
+    "drawCalls": 7
+  },
+  "tanker": {
+    "url": "models/ships/tanker.glb",
+    "bounds": {
+      "min": [
+        -14,
+        -5,
+        -90
+      ],
+      "max": [
+        14,
+        37,
+        90
+      ]
+    },
+    "bytes": 69968,
+    "triangles": 1200,
+    "drawCalls": 7
+  },
+  "speedboat": {
+    "url": "models/ships/speedboat.glb",
+    "bounds": {
+      "min": [
+        -2.5,
+        -1,
+        -11
+      ],
+      "max": [
+        2.5,
+        3.7750000953674316,
+        11
+      ]
+    },
+    "bytes": 22480,
+    "triangles": 284,
+    "drawCalls": 6
+  }
+}

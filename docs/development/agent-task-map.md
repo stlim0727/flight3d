@@ -14,6 +14,7 @@ context, while the current implementation defines actual behavior.
 | Autonomous flight and stage transitions | src/director/DemoFlightDirector.js | npm run test:demo; npm run test:flight |
 | Aircraft geometry and cockpit displays | src/aircraft/ | npm run build; cockpit browser screenshots |
 | Terrain, airport, ocean, sky, vegetation | src/environment/; [Lukla data provenance](lukla-terrain.md); [airport exterior assets](airport-buildings.md); [vegetation](foliage.md) | npm run build; relevant scene screenshots; node scripts/verify-foliage.mjs |
+| Ship exteriors, buoyancy and wakes | src/environment/Ships.js; ShipAssets.js; [ship assets](ships.md) | tests/ships.test.js; tests/collision.test.js; node scripts/verify-ships.mjs |
 | City buildings and foliage | src/environment/FoliageAndCities.js; CityBuildingAssets.js; [city evidence](city-buildings.md) | tests/cityBuildings.test.js; tests/collision.test.js; browser city review |
 | Sound | src/audio/FlightAudio.js | browser interaction and listening |
 | Crash and tire effects | src/effects/ | npm run test:crash; screenshots |
