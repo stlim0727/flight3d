@@ -83,5 +83,27 @@ screenshots; the unit test covers every station and wrap deterministically.
   and on-/above-/below-glideslope PAPI colors.
 
 Preliminary timing runs were discarded after other GPU browser tasks started.
-The reported final run uses the exclusive GPU guard; preliminary contended
-samples are not included in `performance.json`.
+The exclusive GPU repeat could not start because another Vulkan browser task
+remained active for more than ten minutes. No contended samples are published
+as final measurements. **Repeated before/after FPS acceptance is outstanding.**
+Run the guarded benchmark on a quiet GPU before treating issue #97 as fully
+validated. `performance.json` will be produced by that run; it is intentionally
+absent from this commit.
+
+## Visual review
+
+Fixed-pose runway, approach and coast captures at noon/night show the expected
+resolution softness in Balanced/Performance. High retains the existing terrain
+biomes and cockpit detail. Low terrain loses sand/snow variation and repeats
+planar ground patterns more visibly, as described above. No failed shader
+programs were observed. The captures are bounded visual checks, not a complete
+flight or a mobile hardware performance test.
+
+## Outstanding acceptance
+
+- Repeat before/after native frame-loop comparisons with exclusive GPU access.
+- Inspect frame-time tails for flash-related stalls in those repeated runs.
+  Constant program count across every flash station is already verified, but
+  does not by itself prove all runtime frame latency is unchanged.
+
+The implementation should remain in review until those measurements are done.
