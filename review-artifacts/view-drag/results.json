@@ -1,0 +1,163 @@
+{
+  "results": [
+    {
+      "mode": "cockpit",
+      "before": {
+        "yaw": 0,
+        "pitch": -0.25,
+        "chase": 0,
+        "chasePitch": 0,
+        "wing": 0,
+        "wingPitch": 0,
+        "gear": 0,
+        "gearPitch": 0,
+        "drone": 1.8,
+        "height": 11.5,
+        "drag": false
+      },
+      "after": {
+        "yaw": 0.28,
+        "pitch": -0.07499999999999998,
+        "chase": 0,
+        "chasePitch": 0,
+        "wing": 0,
+        "wingPitch": 0,
+        "gear": 0,
+        "gearPitch": 0,
+        "drone": 1.8,
+        "height": 11.5,
+        "drag": false
+      }
+    },
+    {
+      "mode": "chase",
+      "before": {
+        "yaw": 0,
+        "pitch": -0.25,
+        "chase": 0,
+        "chasePitch": 0,
+        "wing": 0,
+        "wingPitch": 0,
+        "gear": 0,
+        "gearPitch": 0,
+        "drone": 1.8,
+        "height": 11.5,
+        "drag": false
+      },
+      "after": {
+        "yaw": 0,
+        "pitch": -0.25,
+        "chase": 0.4,
+        "chasePitch": -0.25,
+        "wing": 0,
+        "wingPitch": 0,
+        "gear": 0,
+        "gearPitch": 0,
+        "drone": 1.8,
+        "height": 11.5,
+        "drag": false
+      }
+    },
+    {
+      "mode": "wing",
+      "before": {
+        "yaw": 0,
+        "pitch": -0.25,
+        "chase": 0,
+        "chasePitch": 0,
+        "wing": 0,
+        "wingPitch": 0,
+        "gear": 0,
+        "gearPitch": 0,
+        "drone": 1.8,
+        "height": 11.5,
+        "drag": false
+      },
+      "after": {
+        "yaw": 0,
+        "pitch": -0.25,
+        "chase": 0,
+        "chasePitch": 0,
+        "wing": 0.28,
+        "wingPitch": 0.17500000000000002,
+        "gear": 0,
+        "gearPitch": 0,
+        "drone": 1.8,
+        "height": 11.5,
+        "drag": false
+      }
+    },
+    {
+      "mode": "gear",
+      "before": {
+        "yaw": 0,
+        "pitch": -0.25,
+        "chase": 0,
+        "chasePitch": 0,
+        "wing": 0,
+        "wingPitch": 0,
+        "gear": 0,
+        "gearPitch": 0,
+        "drone": 1.8,
+        "height": 11.5,
+        "drag": false
+      },
+      "after": {
+        "yaw": 0,
+        "pitch": -0.25,
+        "chase": 0,
+        "chasePitch": 0,
+        "wing": 0,
+        "wingPitch": 0,
+        "gear": 0.28,
+        "gearPitch": 0.17500000000000002,
+        "drone": 1.8,
+        "height": 11.5,
+        "drag": false
+      }
+    },
+    {
+      "mode": "drone",
+      "before": {
+        "yaw": 0,
+        "pitch": -0.25,
+        "chase": 0,
+        "chasePitch": 0,
+        "wing": 0,
+        "wingPitch": 0,
+        "gear": 0,
+        "gearPitch": 0,
+        "drone": 1.828,
+        "height": 11.5,
+        "drag": false
+      },
+      "after": {
+        "yaw": 0,
+        "pitch": -0.25,
+        "chase": 0,
+        "chasePitch": 0,
+        "wing": 0,
+        "wingPitch": 0,
+        "gear": 0,
+        "gearPitch": 0,
+        "drone": 2.427023999994993,
+        "height": 9,
+        "drag": false
+      }
+    }
+  ],
+  "touchState": {
+    "yaw": 0.28,
+    "pitch": -0.07499999999999998,
+    "chase": 0,
+    "chasePitch": 0,
+    "wing": 0,
+    "wingPitch": 0,
+    "gear": 0,
+    "gearPitch": 0,
+    "drone": 2.427023999994993,
+    "height": 9,
+    "drag": true
+  },
+  "errors": []
+}

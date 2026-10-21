@@ -72,7 +72,7 @@ export class CameraSystem {
     this.cursorNormY = 0;
     this.targetCursorNormX = 0;
     this.targetCursorNormY = 0;
-    this.enableCursorTrack = true;
+    this.enableCursorTrack = false; // Looking requires an explicit drag or pointer lock.
 
     // Tower Camera Location (Inside Control Tower Cab at 66m height)
     this.towerPos = new THREE.Vector3(120, 78, 280);
@@ -103,7 +103,7 @@ export class CameraSystem {
     this.userLookOverridden = false;
 
     // Continuous Edge Pan / Edge Look state (화면 끝 도달 시 시선 지속 회전)
-    this.enableEdgePan = true;
+    this.enableEdgePan = false; // Grab gestures stop when the pointer/finger stops.
     this.edgePanMargin = 30; // Threshold distance in pixels from screen boundary
     this.edgePanSpeedX = 280; // Virtual px/s equivalent for horizontal pan (~0.98 rad/s in cockpit, ~1.4 rad/s in chase)
     this.edgePanSpeedY = 220; // Virtual px/s equivalent for vertical tilt (~0.77 rad/s)
@@ -203,7 +203,8 @@ export class CameraSystem {
           this.prevMouse.x = e.clientX;
           this.prevMouse.y = e.clientY;
 
-          this.applyMouseDelta(dx, dy);
+          if (this.pointerLocked) this.applyMouseDelta(dx, dy);
+          else this.applyDragDelta(dx, dy);
         } else {
           this.prevMouse.x = e.clientX;
           this.prevMouse.y = e.clientY;
@@ -353,7 +354,7 @@ export class CameraSystem {
         this.prevMouse.x = touch.clientX;
         this.prevMouse.y = touch.clientY;
 
-        this.applyMouseDelta(dx, dy);
+        this.applyDragDelta(dx, dy);
         this.setCursorPosition(touch.clientX, touch.clientY);
 
         if (typeof e.preventDefault === 'function' && e.cancelable) {
@@ -414,6 +415,12 @@ export class CameraSystem {
     } else if (this.mode === CameraSystem.MODES.DRONE) {
       this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance - deltaDist * 0.12));
     }
+  }
+
+  // Grab the scenery: mouse and touch move it with the gesture. Pointer lock
+  // retains directional head movement through applyMouseDelta.
+  applyDragDelta(dx, dy) {
+    this.applyMouseDelta(-dx, -dy);
   }
 
   applyMouseDelta(dx, dy) {

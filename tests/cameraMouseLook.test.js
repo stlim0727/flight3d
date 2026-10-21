@@ -9,6 +9,56 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     style: {}
   };
 
+  it('grabs scenery only while dragging, stops at edges and release, and preserves pointer-lock direction', () => {
+    const previousWindow = globalThis.window;
+    const listeners = new Map();
+    const domListeners = new Map();
+    globalThis.window = {
+      innerWidth: 1200, innerHeight: 800,
+      addEventListener: (name, fn) => listeners.set(name, fn)
+    };
+    try {
+      const dom = { style: {}, addEventListener: (name, fn) => domListeners.set(name, fn) };
+      const cam = new CameraSystem(new THREE.PerspectiveCamera(), dom);
+      const aircraft = new THREE.Object3D();
+      const move = (x, y) => listeners.get('mousemove')({ clientX: x, clientY: y });
+      move(600, 400);
+      cam.update(0.1, aircraft);
+      assert.equal(cam.lookYaw, 0, 'ordinary hover must not rotate the view');
+      assert.equal(Math.abs(cam.camera.getWorldDirection(new THREE.Vector3()).x), 0, 'hover has no rendered yaw offset');
+      const ui = { closest: () => ({}) };
+      domListeners.get('mousedown')({ button: 0, clientX: 600, clientY: 400, target: ui });
+      move(650, 400);
+      assert.equal(cam.lookYaw, 0, 'UI cannot start dragging');
+      domListeners.get('mousedown')({ button: 0, clientX: 600, clientY: 400, target: dom });
+      move(700, 480);
+      assert.ok(cam.lookYaw > 0, 'right drag moves scenery right');
+      assert.ok(cam.lookPitch > -0.25, 'down drag moves scenery down');
+      move(1200, 800);
+      const held = [cam.lookYaw, cam.lookPitch];
+      cam.update(0.1, aircraft);
+      cam.update(0.1, aircraft);
+      assert.deepEqual([cam.lookYaw, cam.lookPitch], held, 'stationary edge hold cannot keep panning');
+      listeners.get('mouseup')();
+      move(500, 400);
+      assert.deepEqual([cam.lookYaw, cam.lookPitch], held, 'release retains orientation');
+      cam.resetLook();
+      cam.pointerLocked = true;
+      listeners.get('mousemove')({ clientX: 500, clientY: 400, movementX: 100, movementY: 80 });
+      assert.ok(cam.lookYaw < 0, 'pointer lock still looks toward mouse movement');
+      assert.ok(cam.lookPitch < -0.25);
+      cam.pointerLocked = false;
+      domListeners.get('mousedown')({ button: 2, clientX: 500, clientY: 400, target: dom });
+      listeners.get('blur')();
+      const blurred = cam.lookYaw;
+      move(800, 400);
+      assert.equal(cam.lookYaw, blurred, 'blur cancels dragging');
+    } finally {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
+    }
+  });
+
   it('should initialize default mouse look parameters and states', () => {
     const camera = new THREE.PerspectiveCamera();
     const camSys = new CameraSystem(camera, mockDom);
@@ -22,7 +72,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     assert.strictEqual(camSys.wingLookPitch, 0);
     assert.strictEqual(camSys.isDragging, false);
     assert.strictEqual(camSys.pointerLocked, false);
-    assert.strictEqual(camSys.enableCursorTrack, true);
+    assert.strictEqual(camSys.enableCursorTrack, false);
     assert.strictEqual(camera.near, 0.08, 'Default cockpit mode should configure near clipping plane to 0.08m');
   });
 
@@ -160,6 +210,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     camSys.setCursorPosition(1920, 540, 1920, 1080);
     assert.ok(camSys.targetCursorNormX > 0.9, 'targetCursorNormX should be near 1.0');
 
+    camSys.enableCursorTrack = true;
     // Run frame update to interpolate
     camSys.update(0.05, aircraft, { onGround: false });
     assert.ok(camSys.cursorNormX > 0, 'cursorNormX should smoothly advance towards target');
@@ -203,7 +254,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       const camera = new THREE.PerspectiveCamera();
       const camSys = new CameraSystem(camera, mockDom);
 
-      assert.strictEqual(camSys.enableEdgePan, true);
+      assert.strictEqual(camSys.enableEdgePan, false);
       assert.strictEqual(camSys.edgePanMargin, 30);
       assert.strictEqual(camSys.edgePanSpeedX, 280);
       assert.strictEqual(camSys.edgePanSpeedY, 220);
@@ -214,6 +265,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       const camSys = new CameraSystem(camera, mockDom);
       camSys.setMode(CameraSystem.MODES.COCKPIT);
 
+      camSys.enableEdgePan = true; // Legacy opt-in only.
       camSys.isDragging = true;
       camSys.prevMouse = { x: 1920, y: 540 }; // Exactly at right edge (1920x1080)
       const initialYaw = camSys.lookYaw;
@@ -235,6 +287,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       const camSys = new CameraSystem(camera, mockDom);
       camSys.setMode(CameraSystem.MODES.COCKPIT);
 
+      camSys.enableEdgePan = true; // Legacy opt-in only.
       camSys.isDragging = true;
       camSys.prevMouse = { x: 0, y: 540 }; // Exactly at left edge
       const initialYaw = camSys.lookYaw;
@@ -250,6 +303,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       const camSys = new CameraSystem(camera, mockDom);
       camSys.setMode(CameraSystem.MODES.COCKPIT);
 
+      camSys.enableEdgePan = true; // Legacy opt-in only.
       camSys.isDragging = true;
       camSys.prevMouse = { x: 960, y: 0 }; // Top edge -> pitch up
       const initialPitch = camSys.lookPitch;
@@ -276,6 +330,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       const camSys = new CameraSystem(camera, mockDom);
       camSys.setMode(CameraSystem.MODES.CHASE);
 
+      camSys.enableEdgePan = true; // Legacy opt-in only.
       camSys.isDragging = true;
       camSys.prevMouse = { x: 1920, y: 540 }; // Right edge
       const initialChaseYaw = camSys.chaseYaw;
@@ -302,6 +357,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       const camSys = new CameraSystem(camera, mockDom);
       camSys.setMode(CameraSystem.MODES.COCKPIT);
 
+      camSys.enableEdgePan = true; // Legacy opt-in only.
       camSys.isDragging = true;
       camSys.pointerLocked = true;
       camSys.prevMouse = { x: 1920, y: 540 };
@@ -316,6 +372,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       const camSys = new CameraSystem(camera, mockDom);
       camSys.setMode(CameraSystem.MODES.COCKPIT);
 
+      camSys.enableEdgePan = true; // Legacy opt-in only.
       camSys.isDragging = true;
       camSys.prevMouse = { x: 960, y: 540 }; // Center of 1920x1080 screen
       const initialYaw = camSys.lookYaw;
@@ -333,6 +390,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       aircraft.position.set(0, 50, 0);
       aircraft.updateMatrixWorld(true);
 
+      camSys.enableEdgePan = true; // Legacy opt-in only.
       camSys.isDragging = true;
       camSys.prevMouse = { x: 1920, y: 540 };
       const initialYaw = camSys.lookYaw;
@@ -383,8 +441,8 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
         preventDefault: () => {}
       });
 
-      assert.ok(camSys.lookYaw < initialYaw, 'lookYaw should decrease (turn head right) on right drag');
-      assert.ok(camSys.lookPitch < initialPitch, 'lookPitch should decrease (tilt head down) on downward drag');
+      assert.ok(camSys.lookYaw > initialYaw, 'lookYaw should increase (grab scenery right) on right drag');
+      assert.ok(camSys.lookPitch > initialPitch, 'lookPitch should increase (grab scenery down) on downward drag');
       assert.strictEqual(camSys.prevMouse.x, 600);
       assert.strictEqual(camSys.prevMouse.y, 380);
 
@@ -416,14 +474,14 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       assert.strictEqual(camSys.chaseYaw, 0);
       assert.strictEqual(camSys.chasePitch, 0);
 
-      // Drag left by 120px (clientX: 280) -> chaseYaw increases
+      // Grab left by 120px (clientX: 280) -> chaseYaw decreases
       camSys.handleTouchMove({
         touches: [{ identifier: 202, clientX: 280, clientY: 200, target: canvasTarget }],
         cancelable: true,
         preventDefault: () => {}
       });
 
-      assert.ok(camSys.chaseYaw > 0, `chaseYaw (${camSys.chaseYaw}) should increase on dragging left`);
+      assert.ok(camSys.chaseYaw < 0, `chaseYaw (${camSys.chaseYaw}) should decrease on dragging left`);
 
       camSys.handleTouchEnd({ touches: [] });
       assert.strictEqual(camSys.isDragging, false);
@@ -444,8 +502,8 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       camSys.handleTouchMove({
         touches: [{ identifier: 301, clientX: 350, clientY: 260, target: canvasTarget }]
       });
-      assert.ok(camSys.wingLookYaw < 0, 'wingLookYaw should adjust on touch drag');
-      assert.ok(camSys.wingLookPitch > 0, 'wingLookPitch should adjust on touch drag');
+      assert.ok(camSys.wingLookYaw > 0, 'wingLookYaw should adjust on touch drag');
+      assert.ok(camSys.wingLookPitch < 0, 'wingLookPitch should adjust on touch drag');
       camSys.handleTouchEnd({ touches: [] });
 
       // DRONE mode
@@ -460,8 +518,8 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       camSys.handleTouchMove({
         touches: [{ identifier: 302, clientX: 250, clientY: 340, target: canvasTarget }]
       });
-      assert.ok(camSys.droneOrbitAngle > initialDroneAngle, 'droneOrbitAngle should increase on left touch drag');
-      assert.ok(camSys.droneHeight > initialDroneHeight, 'droneHeight should increase on downward touch drag');
+      assert.ok(camSys.droneOrbitAngle < initialDroneAngle, 'droneOrbitAngle should decrease on left touch drag');
+      assert.ok(camSys.droneHeight < initialDroneHeight, 'droneHeight should decrease on downward touch drag');
       camSys.handleTouchEnd({ touches: [] });
     });
 
@@ -522,7 +580,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
         preventDefault: () => {}
       });
 
-      assert.ok(camSys.lookYaw < initialYaw, 'lookYaw should turn right with multi-touch camera finger');
+      assert.ok(camSys.lookYaw > initialYaw, 'lookYaw should grab scenery right with multi-touch camera finger');
 
       // Finger 2 lifts up while stick touch 501 remains
       camSys.handleTouchEnd({
