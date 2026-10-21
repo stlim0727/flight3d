@@ -30,7 +30,7 @@ import { DemoFlightDirector } from './director/DemoFlightDirector.js';
 import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
-import { initMobileMenu } from './ui/MobileMenu.js';
+import { initFlightPanels, updateControlState, touchLabel } from './ui/FlightPanels.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 
@@ -156,7 +156,7 @@ class FlightSimulator {
     this.audio = new FlightAudio();
     this.controls = new FlightControls(this.renderer.domElement);
     this.touchControls = new TouchFlightControls(this.controls);
-    initMobileMenu();
+    initFlightPanels({ onSelectCamera: mode => this.controls.onSelectCamera(mode) });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
     this.cameraSystem.onResetLook = () => {
@@ -1147,32 +1147,34 @@ class FlightSimulator {
       elStall.style.display = this.telemetry.isStalled ? 'block' : 'none';
     }
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
+    updateControlState(this.telemetry, this.cameraSystem, this.sky.timeOfDay);
   }
 
   updateAudioUI(state) {
     if (!state && this.audio) state = this.audio.getVolumeState();
     if (!state) return;
 
+    const btnMute = document.getElementById('btn-mute');
+    if (btnMute) {
+      btnMute.textContent = state.muted ? '🔇' : '🔊';
+      btnMute.setAttribute('aria-pressed', String(state.muted));
+      bindText(btnMute, () => t(state.muted ? 'ui.unmute' : 'ui.mute'), 'aria-label');
+      bindText(btnMute, () => t(state.muted ? 'ui.unmute' : 'ui.mute'), 'title');
+    }
     const btnSound = document.getElementById('btn-sound');
     if (btnSound) {
       if (state.muted) {
         btnSound.className = 'btn btn-preset btn-sound-toggle muted';
-        bindText(btnSound, () => t('muted.m'));
-      } else if (state.mode === 'bluetooth') {
-        btnSound.className = 'btn btn-preset btn-sound-toggle active-bt';
-        bindText(btnSound, () => t('bluetooth.200'));
-      } else if (state.mode === 'mobile') {
-        btnSound.className = 'btn btn-preset btn-sound-toggle active-boost';
-        bindText(btnSound, () => t('boost.150'));
+        bindText(btnSound, () => t('muted'));
       } else {
         btnSound.className = 'btn btn-preset btn-sound-toggle';
-        bindText(btnSound, () => t('sound.100.m'));
+        bindText(btnSound, () => t('sound.100'));
       }
     }
 
     const btnSoundAction = document.getElementById('btn-sound-action');
     if (btnSoundAction) {
-      bindText(btnSoundAction, () => state.muted ? t('muted') : (state.mode === 'bluetooth' ? '🎧⚡ 200%' : (state.mode === 'mobile' ? '🔊⚡ 150%' : t('volume.m'))));
+      bindText(btnSoundAction, () => state.muted ? t('muted') : t('volume.m'));
     }
 
     if (this.touchControls && typeof this.touchControls.updateAudioUI === 'function') {
@@ -1225,6 +1227,14 @@ class FlightSimulator {
       this.showToast(() => t('camera.view.centered'));
     });
     document.getElementById('btn-time')?.addEventListener('click', () => this.controls.onCycleTimeOfDay(3.0));
+    document.getElementById('btn-mute')?.addEventListener('click', () => {
+      this.audio.setMuted(!this.audio.isMuted);
+      if (!this.audio.isMuted) {
+        this.audio.init();
+        this.audio.ensureContextRunning();
+      }
+      this.updateAudioUI();
+    });
     document.getElementById('btn-sound')?.addEventListener('click', () => this.controls.onToggleAudio());
     document.getElementById('btn-sound-action')?.addEventListener('click', () => this.controls.onToggleAudio());
     document.getElementById('btn-diag')?.addEventListener('click', () => this.diagnostics.toggle());
@@ -1262,7 +1272,7 @@ class FlightSimulator {
       const visible = this.aircraft.cockpit.toggleYokes();
       const button = document.getElementById('btn-yokes');
       if (button) {
-        bindText(button, () => visible ? t('hide.yokes.j') : t('show.yokes.j'));
+        bindText(button, () => touchLabel(visible ? t('hide.yokes.j') : t('show.yokes.j')));
         button.setAttribute('aria-pressed', String(!visible));
       }
     };

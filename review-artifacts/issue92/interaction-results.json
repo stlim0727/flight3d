@@ -1,0 +1,20 @@
+{
+  "repeatedFlaps": true,
+  "directCamera": true,
+  "keyboardCamera": true,
+  "presetClosesPanel": true,
+  "nativeTouchScroll": {
+    "scroll": 65,
+    "yaw": 0,
+    "pitch": 0
+  },
+  "cameraBefore": {
+    "x": 187,
+    "y": 291,
+    "yaw": 0,
+    "pitch": 0
+  },
+  "touchModeToggle": true,
+  "languageChange": true,
+  "rotation": true
+}
