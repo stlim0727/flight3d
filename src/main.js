@@ -147,7 +147,7 @@ class FlightSimulator {
     this.luklaAirport.group.visible = false;
     this.scene.add(this.luklaAirport.group);
 
-    this.activeAirport = 'coastal'; // 'coastal' | 'lukla'
+    this.activeAirport = 'lukla'; // 'coastal' | 'lukla'; initControls flips to coastal below
     this.currentTerrain = this.terrain;
     this.currentAirport = this.airport;
 
@@ -174,7 +174,7 @@ class FlightSimulator {
       isDemoWaiting: () => this.demoDirector.waitingForTerrain === true,
       onStateChange: () => this.syncFlowUi(),
     });
-    this.lobby = { airport: 'lukla', preset: 'runway' };
+    this.lobby = { airport: 'coastal', preset: 'runway' };
     this.lastPresetType = 'runway';
 
     // 7. Collision Detection & Explosion & Tire Smoke Particle Systems
@@ -253,7 +253,7 @@ class FlightSimulator {
 
     this.initControls();
     this.initUI();
-    this.setAirport('lukla');
+    this.setAirport('coastal');
 
     // Resize handler
     window.addEventListener('resize', () => this.handleResize());
