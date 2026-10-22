@@ -552,7 +552,7 @@ kbd {
   border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: 10px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
-  z-index: 50;
+  z-index: 90;
   overflow-y: auto;
   pointer-events: auto;
 }
@@ -1687,7 +1687,15 @@ body.compact-ui {
   max-width: calc(100% - 24px);
   box-shadow: none;
   gap: 14px;
+  overflow-x: auto;
+  pointer-events: auto;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
+.hud-strip::-webkit-scrollbar { display: none; }
+.hud-strip .hud-item { flex: 0 0 auto; }
+.hud-strip .hud-label, .hud-strip .hud-val { white-space: nowrap; }
 /* The camera readout was clickable inside the removed drawer; keep it live. */
 .hud-strip #hud-cam {
   pointer-events: auto;
@@ -1697,12 +1705,12 @@ body.compact-ui {
   right: var(--edge-right);
   gap: 8px;
   padding: 6px;
-  justify-content: space-around;
-  overflow: hidden;
+  justify-content: flex-start;
+  overflow-x: auto;
 }
 .compact-ui .hud-item {
-  min-width: 0;
-  flex: 1 1 0;
+  min-width: 50px;
+  flex: 0 0 auto;
 }
 .compact-ui .hud-item .hud-label {
   font-size: 8px;

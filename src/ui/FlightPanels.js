@@ -8,6 +8,17 @@ export function touchLabel(text) {
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
 export function initFlightPanels({ onCycleCamera }) {
   const hud = document.getElementById('hud-overlay');
+  // Let keyboard users scroll the full telemetry row as well as touch users.
+  const strip = document.querySelector('.hud-strip');
+  strip.tabIndex = 0;
+  strip.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === 'Home') strip.scrollLeft = 0;
+    else if (event.key === 'End') strip.scrollLeft = strip.scrollWidth;
+    else strip.scrollLeft += event.key === 'ArrowRight' ? 80 : -80;
+  });
   const bar = document.createElement('nav');
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');

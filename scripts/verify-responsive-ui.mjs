@@ -124,6 +124,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     return { rows: new Set(items.map(i => Math.round(i.getBoundingClientRect().top))).size, clipped };
   })()`);
   assert.equal(cells.rows, 1, `${name}: the flattened strip renders on one row`);
+  assert.deepEqual(cells.clipped, [], `${name}: telemetry text fits each cell`);
   await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}.png`, Buffer.from(r.data, 'base64')));
   await ev(`document.querySelector('#menu-toggle').click()`);
   const panel = await ev(`(() => {
@@ -173,6 +174,16 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     panel.nativeGuideClick = true;
     await ev(`document.querySelector('#btn-help-close').click()`);
   }
+  await ev(`document.querySelector('#btn-diag').scrollIntoView({block: 'center'})`);
+  await nativeClick('#btn-diag', touch);
+  assert.ok(await ev(`document.querySelector('#diagnostics-panel').classList.contains('visible') && document.body.dataset.flow === 'lobby'`), `${name}: Physics opens over the menu`);
+  assert.ok(await ev(`(() => {
+    const node = document.querySelector('#diag-close');
+    const r = node.getBoundingClientRect();
+    return node.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+  })()`), `${name}: inspector close is reachable above menu`);
+  await nativeClick('#diag-close', touch);
+  assert.equal(await ev(`document.querySelector('#diagnostics-panel').classList.contains('visible')`), false, `${name}: native input closes inspector`);
   await ev(`document.querySelector('#menu-toggle').click()`);
   if (showTouch) {
     assert.ok(await ev(`window.simulator.audio.volume <= 1 && window.simulator.audio.getVolumeState().level <= 1`), `${name}: audio has no boost modes`);
@@ -192,6 +203,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     panel.oneTapMute = true;
     panel.restoresVolume = true;
   }
+  console.log(`${name}: layout, telemetry and inspector passed`);
   results.push({ name, width, height, touch, showTouch, bounds, cells, panel });
 }
 console.log(`${results.length} viewport/input layouts passed`);
@@ -310,6 +322,60 @@ await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSy
 fs.writeFileSync(`${out}/safe-area-results.json`, JSON.stringify(safeArea, null, 2));
 await ev(`for (const edge of ['left','right','top','bottom']) document.body.style.removeProperty('--edge-'+edge)`);
 console.log('Simulated safe-area bounds passed');
+
+// Review regressions: every readout remains reachable, and the inspector accepts
+// tuning input while the main menu stays open.
+const reviewResults = [];
+for (const [width, height, touch] of [[320, 568, true], [568, 320, true], [1025, 700, false], [1440, 900, false]]) {
+  await send('Emulation.setTouchEmulationEnabled', { enabled: touch, maxTouchPoints: touch ? 5 : 1 });
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch });
+  await ev(`window.simulator.gameFlow.enterFlight(); document.querySelector('.hud-strip').scrollLeft = 0`);
+  await new Promise(r => setTimeout(r, 200));
+  const before = await ev(`(() => {
+    const strip = document.querySelector('.hud-strip');
+    const r = strip.getBoundingClientRect();
+    const camera = window.simulator.cameraSystem;
+    return { x: r.right - 20, y: r.top + r.height / 2, overflow: strip.scrollWidth > strip.clientWidth,
+      yaw: camera.chaseYaw, pitch: camera.chasePitch };
+  })()`);
+  if (before.overflow && touch) {
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: before.x, y: before.y }] });
+    for (let n = 1; n <= 8; n++) {
+      await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: before.x - n * 22, y: before.y }] });
+      await new Promise(r => setTimeout(r, 30));
+    }
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    assert.ok(await ev(`document.querySelector('.hud-strip').scrollLeft > 0`), 'native swipe scrolls telemetry');
+    assert.equal(await ev('window.simulator.cameraSystem.chaseYaw'), before.yaw, 'telemetry swipe preserves camera yaw');
+    assert.equal(await ev('window.simulator.cameraSystem.chasePitch'), before.pitch, 'telemetry swipe preserves camera pitch');
+  }
+  await ev(`document.querySelector('.hud-strip').focus()`);
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'End', code: 'End', windowsVirtualKeyCode: 35 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'End', code: 'End', windowsVirtualKeyCode: 35 });
+  await new Promise(r => setTimeout(r, 400));
+  const camera = await ev(`(() => {
+    const strip = document.querySelector('.hud-strip');
+    const s = strip.getBoundingClientRect(), c = document.querySelector('#hud-cam').getBoundingClientRect();
+    return { end: strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 1,
+      visible: c.left >= s.left && c.right <= s.right, scrollLeft: strip.scrollLeft };
+  })()`);
+  assert.ok(camera.end && camera.visible, `keyboard End reaches the final camera readout: ${JSON.stringify(camera)}`);
+  await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('#btn-diag').scrollIntoView({block: 'center'})`);
+  await nativeClick('#btn-diag', touch);
+  await ev(`document.querySelector('#tune-elev').scrollIntoView({block: 'center'})`);
+  const tuningBefore = await ev('window.simulator.aero.tuning.elevatorSensitivity');
+  await nativeClick('#tune-elev', touch);
+  const tuningAfter = await ev('window.simulator.aero.tuning.elevatorSensitivity');
+  assert.notEqual(tuningAfter, tuningBefore, 'native input adjusts inspector tuning above the menu');
+  await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/inspector-${width}.png`, Buffer.from(r.data, 'base64')));
+  await ev(`const slider = document.querySelector('#tune-elev'); slider.value = ${tuningBefore}; slider.dispatchEvent(new Event('input')); document.querySelector('#diag-close').scrollIntoView({block: 'center'})`);
+  await nativeClick('#diag-close', touch);
+  assert.equal(await ev(`document.querySelector('#diagnostics-panel').classList.contains('visible')`), false, 'scrolled inspector closes above the menu');
+  await ev(`document.querySelector('#menu-toggle').click()`);
+  reviewResults.push({ width, height, touch, overflow: before.overflow, camera, tuningBefore, tuningAfter });
+}
+fs.writeFileSync(`${out}/review-regressions.json`, JSON.stringify(reviewResults, null, 2));
+console.log('Telemetry swipe/keyboard and inspector tuning regressions passed');
 
 assert.deepEqual(exceptions, [], 'no uncaught browser exceptions');
 ws.close();
