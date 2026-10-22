@@ -412,12 +412,12 @@ export class Cockpit {
 
     // 3. Subtle Tinted Aviation Windshield Glass Panels, laid out from the shared
     // windshield aperture definition the deck sun rig also projects through.
-    const glassMat = new THREE.MeshStandardMaterial({
+    // This thin tint overlay transmits the exterior; opaque diffuse lighting
+    // would veil the outside view when the localized deck sun is strengthened.
+    const glassMat = new THREE.MeshBasicMaterial({
       color: 0x88b0cc,
       transparent: true,
       opacity: 0.05,
-      roughness: 0.06,
-      metalness: 0.30,
       depthWrite: false
     });
 

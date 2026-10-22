@@ -122,6 +122,8 @@ describe('Cockpit GLTF Interior System', () => {
     assert.ok(cockpit.gltfCeilingTrim instanceof THREE.Group, 'Ceiling eyebrow trim must exist');
     assert.ok(cockpit.gltfCompassBracket instanceof THREE.Mesh, 'Compass center post bracket must exist');
     assert.strictEqual(cockpit.gltfGlassPanels[0].material.transparent, true);
+    assert.strictEqual(cockpit.gltfGlassPanels[0].material.isMeshBasicMaterial, true,
+      'Tint overlay must not diffusely veil the exterior under the deck sun');
     assert.strictEqual(cockpit.gltfGlassPanels[0].material.depthWrite, false);
   });
 

@@ -332,7 +332,7 @@ const perf = await evaluate(`(() => {
   return { frozen: +frozen.toFixed(2), forced: +forced.toFixed(2) };
 })()`);
 
-// Independently remove frame casting and AO from one frozen frame. Removing
+// Independently remove local-sun frame casting and AO from one frozen frame. Removing
 // sunlight alone cannot establish that a pillar casts, or that contact AO works.
 await stage({ ...cells.golden, frames: 12 });
 const contrast = {};
@@ -369,14 +369,24 @@ await evaluate(`(() => {
   const sim = window.simulator;
   const frame = sim.aircraft.cockpit.gltfCockpitModel.getObjectByName('Body020_Material008_0');
   if (!frame) throw new Error('Native window frame missing');
-  frame.castShadow = false;
+  window.frameShadowHooks = [frame.onBeforeShadow, frame.onAfterShadow];
+  frame.onBeforeShadow = function (...args) {
+    window.frameShadowHooks[0].apply(this, args);
+    if (args[3].userData.cockpitSun) args[4].setDrawRange(0, 0);
+  };
+  frame.onAfterShadow = function (...args) {
+    args[4].setDrawRange(0, Infinity);
+    window.frameShadowHooks[1].apply(this, args);
+  };
   sim.sky.cockpitSun.light.shadow.needsUpdate = true;
 })()`);
 contrast.frameOff = await readDeck();
 await snapshot('contrast-frame-casting-off');
 await evaluate(`(() => {
   const sim = window.simulator;
-  sim.aircraft.cockpit.gltfCockpitModel.getObjectByName('Body020_Material008_0').castShadow = true;
+  const frame = sim.aircraft.cockpit.gltfCockpitModel.getObjectByName('Body020_Material008_0');
+  [frame.onBeforeShadow, frame.onAfterShadow] = window.frameShadowHooks;
+  delete window.frameShadowHooks;
   sim.sky.cockpitSun.light.shadow.needsUpdate = true;
   sim.cockpitOcclusion.enabled = false;
 })()`);
@@ -460,12 +470,12 @@ check(spread(results.bankLeft, results.bankRight) > 0.02,
 check(spread(results.morning, results.golden) > 0.02,
   `Morning and golden-hour sun must land in different places: ${JSON.stringify(offset(results.morning))} vs ${JSON.stringify(offset(results.golden))}`);
 for (const name of Object.keys(results)) {
-  check(results[name].deckSunOverSun <= 1.61, `${name}: deck sun over its share of ambient`);
+  check(results[name].deckSunOverSun <= 3.21, `${name}: deck sun over its share of ambient`);
 }
 check(contrast.noise.deck.moved < 16 && contrast.noise.deck.mean < 0.001,
   'Repeated static cockpit renders must have negligible pixel noise');
 check(contrast.frameOff.deck.moved > 1000 && contrast.frameOff.deck.peak > 12,
-  'Window frame itself must cast measurable bands on the deck');
+  'Window frame must cast measurable bands through the localized sun alone');
 check(contrast.aoOff.deck.moved > 1000 && contrast.aoOff.deck.peak > 6,
   'Contact AO must shade a visible set of deck pixels');
 for (const name of ['frameOff', 'aoOff']) {

@@ -9,7 +9,7 @@ import {
 } from '../aircraft/CockpitAperture.js';
 
 /** Localized direct sun, balanced against the enclosed deck's reduced sky fill. */
-export const COCKPIT_SUN_GAIN = 1.6;
+export const COCKPIT_SUN_GAIN = 3.2;
 
 /** Sun intensity that saturates the cockpit flood dimming. */
 export const COCKPIT_DAYLIGHT_REFERENCE = 3.5;
@@ -18,7 +18,7 @@ export const COCKPIT_DAYLIGHT_REFERENCE = 3.5;
 export const COOKIE_SIZE = 256;
 
 /** Sunlight that leaks around the window frames, as a fraction of direct sun. */
-export const COOKIE_LEAK = 0.02;
+export const COOKIE_LEAK = 0.01;
 
 /** Radians the deck-local sun may move before the cookie is repainted. */
 export const COOKIE_REDRAW_ANGLE = 0.008;

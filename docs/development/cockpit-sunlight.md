@@ -39,7 +39,7 @@ Pending invalidation survives multiple simulation substeps before a render;
 the world-to-shadow matrix still follows the aircraft when the image is frozen.
 
 The deck's PBR materials use reduced, directional sky fill instead of receiving
-the full outdoor ambient and HDR environment. The localized sun gain is 1.6;
+the full outdoor ambient and HDR environment. The localized sun gain is 3.2;
 other surfaces are outside its cone. Instrument floods dim to 8% in full sun,
 with a 0.06 floor. Front-to-aft sunlight puts the yoke's cast shadow behind the
 pilot; AO makes its contact with nearby surfaces readable even when that cast
@@ -49,7 +49,8 @@ shadow is out of view.
 (three-quarter resolution in high, capped at 960 px wide). It renders only opaque
 cockpit geometry with an 8 m AO depth range. A depth mask protects the exterior,
 and unlit instrument surfaces are redrawn after the multiply composite. Glass
-is excluded. Performance quality and exterior/photo views skip AO entirely;
+is excluded. Its thin tint overlay is unlit, so increasing deck sunlight does not
+add an opaque diffuse veil over the exterior. Performance quality and exterior/photo views skip AO entirely;
 render targets are allocated only on the first eligible cockpit render.
 The SSAO and depth-display shader ranges track that 8 m camera on every render,
 including near-plane changes; metre-based rejection bounds use the same range.
@@ -132,3 +133,30 @@ receivers, facing continuity through a 1° azimuth sweep, cookie projection boun
 the body-fixed shadow image, repaint-only-on-movement, the cloud gate, and the
 flood/daylight trade. Required checks are `npm run check`, `npm test` and
 `npm run build`.
+
+
+## Projection depth with logarithmic exterior rendering
+
+The beauty renderer uses logarithmic depth for the 45 km scene. Perspective
+spot-shadow lookups and SSAO, however, reconstruct ordinary projection depth.
+`CockpitDepth` removes the logarithmic fragment-depth write from the actual
+renderer-selected aircraft shadow depth variants and the AO normal material.
+It preserves shader customizations and the renderer's alpha/clipping/displacement
+variants, and registers asynchronously loaded or rebuilt aircraft meshes before
+rendering. Point-light distance materials keep their radial encoding. The
+exterior beauty depth remains logarithmic.
+
+At a receiver 40 m from the spot, near/far 37.8/45.2 m, regular projection depth
+is approximately 0.336 whereas logarithmic depth is approximately 0.969. Mixing
+these encodings falsely marks pillar-shadowed receivers as lit. Increasing map
+resolution does not fix this. The acceptance ablation now removes frame geometry
+only from the tagged cockpit sun pass; the external directional shadow remains
+unchanged, so it cannot hide this regression.
+
+Clear sunlight gain is 3.2 to emphasize lit/shaded separation, with cookie
+leak reduced to 1% to retain the previous outside-aperture light budget; daylight/flood
+normalization remains unchanged. The native 737 glareshield shades much of the
+vertical instrument panel. Pillar bands are clearest on the left sidewall and
+lower console at 16:48, heading 000 degrees, clear weather; this model does not
+put the same pattern on the panel as a fighter canopy. Screenshots capture the
+actual model and its cast shadows without adding substitute shadow geometry.

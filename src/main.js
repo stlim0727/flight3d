@@ -2,6 +2,7 @@ import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
 import { cockpitCasterState } from './aircraft/CockpitLighting.js';
 import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
+import { prepareCockpitShadowDepth } from './aircraft/CockpitDepth.js';
 import { Atmosphere } from './physics/Atmosphere.js';
 import { BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics } from './physics/Aerodynamics.js';
@@ -1526,6 +1527,7 @@ class FlightSimulator {
   }
 
   renderScene() {
+    prepareCockpitShadowDepth(this.aircraft.group);
     this.sky.prepareRender(this.camera);
     this.renderer.render(this.scene, this.camera);
     if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT &&

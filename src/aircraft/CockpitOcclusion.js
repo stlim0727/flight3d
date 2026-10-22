@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { useProjectionDepth } from './CockpitDepth.js';
 
 // Layer zero remains the beauty view. These layers isolate the AO geometry and
 // the emissive instruments, which are redrawn unchanged after the AO composite.
@@ -31,6 +32,7 @@ export class CockpitOcclusion {
     this.pass = new SSAOPass(this.scene, this.aoCamera, 1, 1, 16);
     this.pass.renderToScreen = true;
     this.pass.normalMaterial.side = THREE.DoubleSide;
+    useProjectionDepth(this.pass.normalMaterial);
     this.pass.kernelRadius = 0.3;
     // SSAOPass expresses its depth rejection bounds in normalized linear depth.
     this.pass.minDistance = 0.003 / (AO_FAR - this.aoCamera.near);
