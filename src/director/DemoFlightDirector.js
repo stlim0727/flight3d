@@ -123,8 +123,10 @@ export class DemoFlightDirector {
     if (typeof window !== 'undefined') {
       window.addEventListener('keydown', (e) => {
         if (e.target?.closest?.('select')) return;
+        if (this.sim.gameFlow?.blocksFlightInput?.()) return;
         if (e.key === 'Escape' && this.isActive) {
           this.stop(() => t('manual.control.engaged'));
+          e.preventDefault?.();
         } else if ((e.key === 'p' || e.key === 'P') && !e.target?.matches?.('input, textarea')) {
           this.start();
         }

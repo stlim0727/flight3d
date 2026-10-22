@@ -35,6 +35,9 @@ export class FlightControls {
     // Keys pressed state
     this.keys = {};
 
+    // Set by the game-flow layer while lobby/pause menus are up.
+    this.inputBlocked = false;
+
     // Mouse yoke tracking
     this.mouseX = 0;
     this.mouseY = 0;
@@ -78,6 +81,7 @@ export class FlightControls {
 
   handleKeyDown(e) {
     if (e.target?.closest?.('select')) return;
+    if (this.inputBlocked) return;
     const cameraDigit = /^(?:Digit|Numpad)([1-8])$/.exec(e.code);
     if (cameraDigit || e.code === 'KeyC') {
       if (e.repeat || e.ctrlKey || e.altKey || e.metaKey ||
@@ -129,6 +133,12 @@ export class FlightControls {
 
   handleKeyUp(e) {
     this.keys[e.code] = false;
+  }
+
+  /** Drop all held-key state, e.g. when a menu takes over mid-input. */
+  releaseAllKeys() {
+    this.keys = {};
+    this.pitchTrimRate = 0.0;
   }
 
   update(dt, iasKnots = 140) {

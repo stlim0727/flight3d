@@ -196,3 +196,62 @@ it('throttle responds to held Equal/Minus, stops on release, and clamps output',
     else globalThis.window = previousWindow;
   }
 });
+
+it('inputBlocked gates keydown state and one-shot callbacks; keyup still clears', () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { addEventListener() {} };
+  try {
+    const controls = new FlightControls({ addEventListener() {} });
+    let gearToggles = 0;
+    controls.onToggleGear = () => gearToggles++;
+    let cameras = 0;
+    controls.onCycleCamera = () => cameras++;
+
+    controls.inputBlocked = true;
+    controls.handleKeyDown({ code: 'Equal' });
+    controls.handleKeyDown({ code: 'KeyG' });
+    controls.handleKeyDown({ code: 'KeyC' });
+    assert.deepStrictEqual(controls.keys['Equal'], undefined);
+    assert.strictEqual(gearToggles, 0);
+    assert.strictEqual(cameras, 0);
+
+    // A key released while blocked must still clear its held state.
+    controls.inputBlocked = false;
+    controls.handleKeyDown({ code: 'Minus' });
+    assert.strictEqual(controls.keys['Minus'], true);
+    controls.inputBlocked = true;
+    controls.handleKeyUp({ code: 'Minus' });
+    assert.strictEqual(controls.keys['Minus'], false);
+
+    controls.inputBlocked = false;
+    controls.handleKeyDown({ code: 'KeyG' });
+    assert.strictEqual(gearToggles, 1);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
+
+it('releaseAllKeys drops held inputs so update() returns to neutral', () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { addEventListener() {} };
+  try {
+    const controls = new FlightControls({ addEventListener() {} });
+    controls.handleKeyDown({ code: 'KeyW' });
+    controls.handleKeyDown({ code: 'KeyT' });
+    controls.update(1);
+    assert.notStrictEqual(controls.pitchTrimRate, 0);
+
+    controls.inputBlocked = true;
+    controls.releaseAllKeys();
+    controls.inputBlocked = false;
+    controls.update(1);
+    assert.strictEqual(controls.elevator, 0);
+    assert.strictEqual(controls.aileron, 0);
+    assert.strictEqual(controls.brakes, 0);
+    assert.strictEqual(controls.pitchTrimRate, 0);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
