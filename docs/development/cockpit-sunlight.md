@@ -45,9 +45,9 @@ cockpit camera mode, which ramps over ~0.3 s rather than switching.
   un-cookied sun. With a steeply raked windshield this is the copilot console with
   the sun abeam right; no single radial clip can exclude skin that is 0.51 m above
   but 1.05 m to the side of the aperture.
-- A high sun barely enters: at 12:30 the sun is 68° up and the facing term falls to
-  0.16, so the deck keeps its flood lighting. That is the windshield doing its job,
-  but it means noon is the weakest frame for this feature.
+- A high sun barely enters: at 12:30 the sun is 64° up and the facing term falls to
+  0.35, so the deck keeps most of its flood lighting. That is the windshield doing its
+  job, but it means noon is the weakest frame for this feature.
 - The instrument floods follow the *admitted* sun, not general skylight, so a bright
   overcast day leaves them brighter than a clear one.
 - Exterior airframe self-shadow (fuselage onto wing, tail onto tailplane, gear onto
@@ -73,7 +73,8 @@ google-chrome-stable --headless=new \
   http://127.0.0.1:5196/
 ```
 
-Then run `CDP_PORT=9471 node scripts/verify-cockpit-shadows.mjs`. It pauses the
+Then run `CDP_PORT=9471 node scripts/verify-cockpit-shadows.mjs`. It reloads the page
+so the frames come from the source on disk, waits for the interior GLB, pauses the
 animation loop, enters the 3D cockpit, and stages ten deterministic frames
 (07:00/12:30/16:48/21:00, sun abeam left and right, ±35° bank, 0.8 cloud cover, sun
 astern), reporting the deck-local sun bearing, spot intensity, cookie coverage and
@@ -82,21 +83,21 @@ each. Screenshots and `deck-sun-report.json` land in `review-artifacts/issue90/`
 
 The ablation stage renders the same frame with the deck sun multiplied out and
 diffs it, restricted to pixels that repeat-render stable. On this machine (Intel
-Graphics ADL-N through ANGLE Vulkan) it moves 7.2% of the frame, with the centroid
-at 65%/70% of the width and height, i.e. on the deck:
+Graphics ADL-N through ANGLE Vulkan) it moves 6.1% of the frame, with the centroid
+at 64%/72% of the width and height, i.e. on the deck:
 
 | Region | Mean luma delta | Pixels moved | Peak delta |
 | --- | ---: | ---: | ---: |
-| World outside the windshield | 0.18 | 0.0% | 1.0 |
-| Glareshield top | 3.80 | 11.8% | 29.1 |
-| Panel face | 2.19 | 10.0% | 27.0 |
-| Pedestal | 5.00 | 30.3% | 21.1 |
+| World outside the windshield | 0.10 | 0.0% | 1.0 |
+| Glareshield top | 2.37 | 16.0% | 19.9 |
+| Panel face | 1.32 | 7.0% | 22.1 |
+| Pedestal | 4.43 | 26.5% | 19.9 |
 
-Cookie centroids mirror across the deck as expected: sun abeam left 0.462/0.478,
-abeam right 0.538/0.504; bank left 0.491/0.464, bank right 0.478/0.515.
+Cookie centroids mirror across the deck as expected: sun abeam left 0.461/0.483,
+abeam right 0.536/0.509; bank left 0.486/0.462, bank right 0.483/0.519.
 
 Frame cost on the same integrated GPU, cockpit view, frozen shadow map versus
-forcing a repaint every frame: 217.6 ms versus 355.7 ms per frame. These are
+forcing a repaint every frame: 122.8 ms versus 199.8 ms per frame. These are
 contended headless measurements, not frame-rate claims; they only establish that
 freezing the map is the cheaper of the two and that the rig does not force a
 repaint while the deck-local sun is steady.

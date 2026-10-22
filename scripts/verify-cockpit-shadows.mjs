@@ -50,6 +50,14 @@ const evaluate = async (expression) => {
 await call('Runtime.enable');
 await call('Log.enable');
 await call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+// Reload so the page under test is the source on disk, then wait for the interior GLB.
+await call('Page.enable');
+await call('Page.reload', { ignoreCache: true });
+await new Promise((resolve) => setTimeout(resolve, 3000));
+for (let attempt = 0; attempt < 120; attempt++) {
+  if (await evaluate('Boolean(window.simulator?.aircraft?.cockpit?.gltfCockpitLoaded)')) break;
+  await new Promise((resolve) => setTimeout(resolve, 500));
+}
 
 const gpu = await evaluate(`(() => {
   const gl = window.simulator.renderer.getContext();
