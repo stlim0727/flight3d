@@ -135,6 +135,7 @@ class MobileTouchTestRunner {
     await this.evaluate(`
       if (window.simulator) {
         if (window.simulator.demoDirector) window.simulator.demoDirector.stop();
+        window.simulator.gameFlow?.enterFlight();
         if (typeof window.simulator.setAirport === 'function') window.simulator.setAirport('coastal');
       }
     `);
@@ -389,7 +390,7 @@ class MobileTouchTestRunner {
     }
 
     // Stop demo if running so test exits cleanly
-    await this.evaluate('window.simulator.demoDirector.stop()');
+    await this.evaluate('window.simulator.demoDirector.stop(); window.simulator.gameFlow.enterFlight();');
 
     this.log('🎉 ALL MOBILE & TOUCHSCREEN TESTS PASSED SUCCESSFULLY! ✅', '🏆');
   }

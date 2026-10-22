@@ -86,6 +86,7 @@ const metadata = await evaluate(`(async () => {
   const { SkyAtmosphere: Baseline } = await import('/src/environment/.cloud-baseline.js');
   const sim = window.simulator;
   sim.demoDirector.stop();
+  sim.gameFlow.enterFlight();
   // Let the one already queued frame schedule a no-op, then stop the main loop.
   const savedAnimate = sim.animate;
   sim.animate = () => {};

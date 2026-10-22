@@ -114,6 +114,7 @@ async function main() {
         if (window.simulator.demoDirector) {
           window.simulator.demoDirector.stop();
         }
+        window.simulator.gameFlow?.enterFlight();
         if (typeof window.simulator.setAirport === 'function') {
           window.simulator.setAirport('coastal');
         }

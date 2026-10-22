@@ -63,7 +63,7 @@ async function testDemo() {
   }
 
   // Ensure demo flight is active
-  await evaluate('window.simulator.demoDirector.start()');
+  await evaluate('window.simulator.demoDirector.start(); window.simulator.gameFlow.enterFlight();');
 
   // Step simulation in 0.25s slices for 125 seconds of simulation time
   const totalSimSeconds = 125;

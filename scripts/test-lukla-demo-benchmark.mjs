@@ -99,6 +99,7 @@ async function main() {
       const sim = window.simulator;
       sim.clock.getDelta = () => 0;
       sim.physicsAccumulator = 0;
+      sim.gameFlow.enterFlight();
       return ['escape', 'preset', 'airport'].map(action => {
         sim.demoDirector.start('lukla');
         const before = sim.demoDirector.luklaScenario.result.status;

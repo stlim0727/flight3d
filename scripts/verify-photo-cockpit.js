@@ -116,6 +116,7 @@ class CockpitVerifier {
         if (window.simulator) {
           if (window.simulator.demoDirector && window.simulator.demoDirector.isActive) {
             window.simulator.demoDirector.stop();
+            window.simulator.gameFlow?.enterFlight();
           }
           window.simulator.cameraSystem.setMode(window.simulator.cameraSystem.constructor.MODES.COCKPIT);
           window.simulator.cameraSystem.setCockpitPhoto(true);

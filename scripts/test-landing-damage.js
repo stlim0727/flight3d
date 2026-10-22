@@ -68,6 +68,7 @@ try {
   await evaluate(`(() => {
     const sim = window.simulator;
     sim.demoDirector.stop();
+    sim.gameFlow.enterFlight();
     sim.setAirport('coastal');
     sim.clock.getDelta = () => 0;
     sim.physicsAccumulator = 0;

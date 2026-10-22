@@ -58,7 +58,7 @@ for (let i=0;i<120;i++) {
 const results = await evaluate(`(async()=>{
  const s=window.simulator,c=s.aircraft.cockpit;
  await c.shaderWarmup;
- s.demoDirector.stop(); s.setPreset('runway'); s.cameraSystem.photoCockpit=false;
+ s.demoDirector.stop(); s.gameFlow.enterFlight(); s.setPreset('runway'); s.cameraSystem.photoCockpit=false;
  s.cameraSystem.setMode(0); s.stepSimulation(0);
  const meshes=[]; c.gltfCockpitModel.traverse(n=>{if(n.isMesh && n.geometry.attributes.position?.count)meshes.push(n)});
  let visible=0;c.gltfCockpitModel.traverseVisible(n=>{if(n.isMesh&&n.geometry.attributes.position?.count)visible++});

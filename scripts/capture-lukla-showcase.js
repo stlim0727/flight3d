@@ -105,6 +105,7 @@ async function main() {
     await evalJs(`
       if (window.simulator.demoDirector && window.simulator.demoDirector.isActive) {
         window.simulator.demoDirector.stop();
+        window.simulator.gameFlow?.enterFlight();
       }
     `);
 

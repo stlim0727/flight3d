@@ -101,6 +101,7 @@ async function main() {
     // Stop demo flight director to take programmatic control
     await evalJs(`
       if (window.simulator.demoDirector) window.simulator.demoDirector.stop();
+      window.simulator.gameFlow?.enterFlight();
       window.simulator.cameraSystem.setMode(1); // Chase mode
     `);
     await new Promise(r => setTimeout(r, 600));

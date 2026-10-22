@@ -193,7 +193,7 @@ await ev(`document.querySelector('#panel-instruments .panel-close').click()`);
 // Exercise the same live controls after resizing, using native input for gestures and keys.
 await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
 await send('Emulation.setDeviceMetricsOverride', { width: 568, height: 320, deviceScaleFactor: 1, mobile: true });
-await ev(`window.simulator.demoDirector.stop(); window.simulator.setPreset('runway'); window.simulator.touchControls.enable(); document.activeElement?.blur()`);
+await ev(`window.simulator.demoDirector.stop(); window.simulator.gameFlow.enterFlight(); window.simulator.setPreset('runway'); window.simulator.touchControls.enable(); document.activeElement?.blur()`);
 await new Promise(r => setTimeout(r, 200));
 await ev(`document.querySelector('#open-aircraft').click(); document.querySelector('#btn-flaps-ext').click(); document.querySelector('#btn-flaps-ext').click()`);
 assert.equal(await ev(`!document.querySelector('#panel-aircraft').hidden && window.simulator.aero.flapsIndex === 4`), true, 'repeated flap changes keep Aircraft open');

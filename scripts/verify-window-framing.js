@@ -96,6 +96,7 @@ async function main() {
     await evalCode(`(() => {
       const s = window.simulator;
       s.demoDirector?.stop();
+      s.gameFlow?.enterFlight();
       s.integratePhysics = () => {};
       s.cameraSystem.setMode(0);
       s.cameraSystem.enableCursorTrack = false;

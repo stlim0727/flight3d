@@ -47,7 +47,7 @@ for (let repeat=0;repeat<2;repeat++) {
       await new Promise(r=>setTimeout(r,500));
     }
     assert.ok(ready,'all models loaded');
-    await ev(`(async()=>{const s=window.simulator;await s.aircraft.cockpit.shaderWarmup;s.demoDirector.stop();s.setAirport('coastal');${variant==='baseline' ? '' : `s.setRenderQuality('${variant}');`}return true;})()`);
+    await ev(`(async()=>{const s=window.simulator;await s.aircraft.cockpit.shaderWarmup;s.demoDirector.stop();s.gameFlow.enterFlight();s.setAirport('coastal');${variant==='baseline' ? '' : `s.setRenderQuality('${variant}');`}return true;})()`);
     // At DPR 1 isolates lighting/terrain. DPR 2 compares resolution presets.
     for (const deviceDpr of [1,2]) {
       await call('Emulation.setDeviceMetricsOverride', {width:780,height:437,deviceScaleFactor:deviceDpr,mobile:false});

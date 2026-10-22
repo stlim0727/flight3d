@@ -132,6 +132,7 @@ class FlightTestAgent {
     await this.eval(`
       if (window.simulator) {
         if (window.simulator.demoDirector) window.simulator.demoDirector.stop();
+        window.simulator.gameFlow?.enterFlight();
         if (typeof window.simulator.setAirport === 'function') window.simulator.setAirport('coastal');
       }
     `);
@@ -727,7 +728,7 @@ class FlightTestAgent {
     }
 
     // 3. Test user takeover (stop demo cleanly)
-    await this.eval(`window.simulator.demoDirector.stop('수동 직접 조종으로 전환');`);
+    await this.eval(`window.simulator.demoDirector.stop('수동 직접 조종으로 전환'); window.simulator.gameFlow.enterFlight();`);
     await new Promise(r => setTimeout(r, 300));
 
     const stoppedCheck = await this.eval(`!window.simulator.demoDirector.isActive`);

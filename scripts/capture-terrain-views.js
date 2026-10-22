@@ -101,6 +101,7 @@ async function main() {
     expression: `
       if (window.simulator.demoDirector) {
         window.simulator.demoDirector.stop();
+        window.simulator.gameFlow?.enterFlight();
       }
       if (window.simulator.cameraSystem) {
         window.simulator.cameraSystem.update = () => {};

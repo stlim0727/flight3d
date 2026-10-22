@@ -60,7 +60,7 @@ console.log(
   await evaluate("window.simulator.aircraft.gltfControlSurfaces.length"),
 );
 await evaluate(
-  "window.simulator.demoDirector.stop(); window.simulator.cameraSystem.setMode(1);",
+  "window.simulator.demoDirector.stop(); window.simulator.gameFlow.enterFlight(); window.simulator.cameraSystem.setMode(1);",
 );
 await call("Input.dispatchKeyEvent", {
   type: "keyDown",

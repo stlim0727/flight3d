@@ -108,6 +108,7 @@ async function testLuklaDemo() {
     if (!state.demoActive) {
       throw new Error('Expected demoDirector.isActive to be true');
     }
+    await evalJs('window.simulator.gameFlow.enterFlight();');
     if (state.demoAirport !== 'lukla') {
       throw new Error(`Expected demoDirector.activeDemoAirport to be 'lukla', got '${state.demoAirport}'`);
     }

@@ -12,7 +12,7 @@ const ev=async expression=>{const r=await call('Runtime.evaluate',{expression,re
 const wait=async()=>{await new Promise(r=>setTimeout(r,1000));for(let i=0;i<120;i++){if(await ev('!!window.simulator?.aircraft?.cockpit?.gltfCockpitLoaded && !!window.simulator?.airport?.buildings'))return;await new Promise(r=>setTimeout(r,500))}throw Error('Models not ready')};
 await call('Page.navigate',{url:process.env.APP_URL || 'http://127.0.0.1:5197/'});await wait();
 const results=await ev(`(async()=>{
- const s=window.simulator;s.demoDirector.stop();s.setAirport('coastal');s.setPreset('approach');s.stepSimulation(0);
+ const s=window.simulator;s.demoDirector.stop();s.gameFlow.enterFlight();s.setAirport('coastal');s.setPreset('approach');s.stepSimulation(0);
  const select=document.getElementById('render-quality');const rows=[];
  for(const quality of ['high','balanced','performance','high']){select.value=quality;select.dispatchEvent(new Event('change'));s.renderer.render(s.scene,s.camera);rows.push({quality:s.renderQuality,terrain:s.terrain.getQuality(),dpr:s.renderer.getPixelRatio(),stored:localStorage.getItem('flight3d.renderQuality')})}
  const programs=[];const phases=[];
