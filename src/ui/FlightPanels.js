@@ -23,64 +23,13 @@ export function initFlightPanels({ onCycleCamera }) {
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
   hud.append(bar);
-  let active;
-  const panels = new Map();
-  function close(restoreFocus = false) {
-    if (!active) return;
-    const { panel, trigger } = panels.get(active);
-    panel.hidden = true;
-    trigger.setAttribute('aria-expanded', 'false');
-    hud.classList.remove('panel-open');
-    if (restoreFocus) trigger.focus();
-    active = null;
+  const aircraft = document.createElement('nav');
+  aircraft.className = 'aircraft-controls';
+  bindText(aircraft, () => t('ui.aircraft'), 'aria-label');
+  for (const id of ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']) {
+    aircraft.append(document.getElementById(id));
   }
-  function makePanel(name, selectors) {
-    const trigger = document.createElement('button');
-    trigger.className = 'btn';
-    trigger.type = 'button';
-    trigger.id = `open-${name}`;
-    trigger.setAttribute('aria-controls', `panel-${name}`);
-    trigger.setAttribute('aria-expanded', 'false');
-    bindText(trigger, () => t(`ui.${name}`));
-    const panel = document.createElement('section');
-    panel.id = `panel-${name}`;
-    panel.className = 'flight-panel';
-    panel.hidden = true;
-    panel.setAttribute('aria-labelledby', `title-${name}`);
-    const header = document.createElement('header');
-    const title = document.createElement('h2');
-    title.id = `title-${name}`;
-    bindText(title, () => t(`ui.${name}`));
-    const dismiss = document.createElement('button');
-    dismiss.className = 'btn panel-close';
-    dismiss.textContent = '×';
-    bindText(dismiss, () => t('ui.close'), 'aria-label');
-    dismiss.addEventListener('click', () => close(true));
-    header.append(title, dismiss);
-    const body = document.createElement('div');
-    body.className = 'flight-panel-body';
-    for (const selector of selectors) {
-      const node = document.querySelector(selector);
-      if (node) body.append(node);
-    }
-    panel.append(header, body);
-    hud.append(panel);
-    bar.append(trigger);
-    panels.set(name, { panel, trigger, body });
-    trigger.addEventListener('click', () => {
-      const same = active === name;
-      close();
-      if (!same) {
-        active = name;
-        hud.classList.add('panel-open');
-        panel.hidden = false;
-        trigger.setAttribute('aria-expanded', 'true');
-        dismiss.focus({ preventScroll: true });
-      }
-    });
-    return body;
-  }
-  makePanel('aircraft', ['#btn-gear', '#btn-flaps-ret', '#btn-flaps-ext', '#btn-spoilers', '#btn-reverser']);
+  hud.append(aircraft);
   const cameraButton = document.createElement('button');
   cameraButton.id = 'open-camera';
   cameraButton.className = 'btn';
@@ -111,14 +60,8 @@ export function initFlightPanels({ onCycleCamera }) {
     bindText(document.getElementById(id), () => touchLabel(t(key)));
   }
 
-  // Remove the legacy markup the toolbar panels have replaced.
+  // Remove the legacy containers after moving their controls.
   document.querySelectorAll('.presets-bar, .action-panel').forEach(node => node.remove());
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') close(true);
-  });
-  document.addEventListener('pointerdown', event => {
-    if (!event.target.closest('.flight-panel, .flight-toolbar')) close();
-  });
   const compact = window.matchMedia('(max-width: 1024px)');
   const touch = window.matchMedia('(pointer: coarse)');
   function layout() {

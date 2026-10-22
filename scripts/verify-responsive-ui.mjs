@@ -103,7 +103,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   await ev(`window.simulator.touchControls.${showTouch ? 'enable' : 'disable'}()`);
   await new Promise(resolve => setTimeout(resolve, 400));
   const bounds = await ev(`(() => {
-    const selectors = '.flight-toolbar button,.hud-strip,.touch-throttle-card,.touch-stick-card,.touch-rudder-card,#touch-btn-brake,#menu-toggle,.ap-bar';
+    const selectors = '.flight-toolbar button,.aircraft-controls button,.hud-strip,.touch-throttle-card,.touch-stick-card,.touch-rudder-card,#touch-btn-brake,#menu-toggle,.ap-bar';
     return [...document.querySelectorAll(selectors)]
       .filter(node => node.getBoundingClientRect().width && getComputedStyle(node).visibility !== 'hidden')
       .map(node => {
@@ -125,6 +125,22 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   })()`);
   assert.equal(cells.rows, 1, `${name}: the flattened strip renders on one row`);
   assert.deepEqual(cells.clipped, [], `${name}: telemetry text fits each cell`);
+  const direct = await ev(`(() => {
+    const strip = document.querySelector('.hud-strip').getBoundingClientRect();
+    const ap = document.querySelector('.ap-bar').getBoundingClientRect();
+    return { buttons: [...document.querySelectorAll('.aircraft-controls button')].map(node => {
+      const r = node.getBoundingClientRect();
+      return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2, r.top+r.height/2)), height: r.height };
+    }), collapsed: document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded') === 'false',
+      apBelowStrip: ap.top >= strip.bottom, apRight: Math.abs(ap.right - (innerWidth - parseFloat(getComputedStyle(document.querySelector('.ap-bar')).right))) < 1 };
+  })()`);
+  assert.equal(direct.buttons.length, 5, `${name}: all Aircraft controls are flattened`);
+  assert.ok(direct.buttons.every(b => b.reachable && b.height >= 44), `${name}: all Aircraft controls have reachable 44px targets`);
+  assert.ok(direct.collapsed && direct.apBelowStrip && direct.apRight, `${name}: collapsed AP is below strip at top-right`);
+  await nativeClick('#btn-ap-toggle', touch);
+  assert.equal(await ev(`document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded')`), 'true', `${name}: native tap expands AP`);
+  await nativeClick('#btn-ap-toggle', touch);
+  assert.equal(await ev(`document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded')`), 'false', `${name}: native tap collapses AP`);
   await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}.png`, Buffer.from(r.data, 'base64')));
   await ev(`document.querySelector('#menu-toggle').click()`);
   const panel = await ev(`(() => {
@@ -204,7 +220,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     panel.restoresVolume = true;
   }
   console.log(`${name}: layout, telemetry and inspector passed`);
-  results.push({ name, width, height, touch, showTouch, bounds, cells, panel });
+  results.push({ name, width, height, touch, showTouch, bounds, cells, direct, panel });
 }
 console.log(`${results.length} viewport/input layouts passed`);
 fs.writeFileSync(`${out}/layout-results.json`, JSON.stringify(results, null, 2));
@@ -224,10 +240,11 @@ await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints
 await send('Emulation.setDeviceMetricsOverride', { width: 568, height: 320, deviceScaleFactor: 1, mobile: true });
 await ev(`window.simulator.demoDirector.stop(); window.simulator.gameFlow.enterFlight(); window.simulator.setPreset('runway'); window.simulator.touchControls.enable(); document.activeElement?.blur()`);
 await new Promise(r => setTimeout(r, 200));
-await ev(`document.querySelector('#open-aircraft').click(); document.querySelector('#btn-flaps-ext').click(); document.querySelector('#btn-flaps-ext').click()`);
-assert.equal(await ev(`!document.querySelector('#panel-aircraft').hidden && window.simulator.aero.flapsIndex === 4`), true, 'repeated flap changes keep Aircraft open');
+await nativeClick('#btn-flaps-ext', true);
+await nativeClick('#btn-flaps-ext', true);
+assert.equal(await ev(`!document.querySelector('#panel-aircraft') && !document.querySelector('#open-aircraft') && window.simulator.aero.flapsIndex === 4`), true, 'repeated native flap changes work directly without a drawer');
 const cycleFrom = await ev(`window.simulator.cameraSystem.mode`);
-await ev(`document.querySelector('#panel-aircraft .panel-close').click(); document.querySelector('#open-camera').click(); document.querySelector('#open-camera').click()`);
+await ev(`document.querySelector('#open-camera').click(); document.querySelector('#open-camera').click()`);
 assert.equal(await ev(`window.simulator.cameraSystem.mode`), (cycleFrom + 2) % 8, 'repeated toolbar taps keep cycling cameras');
 await ev('document.activeElement?.blur()');
 await send('Input.dispatchKeyEvent', { type: 'keyDown', key: '2', code: 'Digit2', windowsVirtualKeyCode: 50 });
@@ -254,12 +271,12 @@ await ev(`document.querySelector('#btn-touch-toggle').click(); document.querySel
 await new Promise(r => setTimeout(r, 100));
 assert.equal(await ev(`document.querySelector('.lobby-settings .lobby-label').textContent`), '설정', 'language change refreshes menu settings labels');
 assert.equal(await ev(`document.body.dataset.flow`), 'lobby', 'language change keeps the menu open');
-await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('#open-aircraft').click()`);
+await ev(`document.querySelector('#menu-toggle').click()`);
 await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 1, mobile: true });
 await new Promise(r => setTimeout(r, 150));
-assert.equal(await ev(`!document.querySelector('#panel-aircraft').hidden`), true, 'rotation retains Aircraft panel');
+assert.equal(await ev(`document.querySelectorAll('.aircraft-controls button').length`), 5, 'rotation retains the five direct Aircraft controls');
 await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-aircraft-ko.png`, Buffer.from(r.data, 'base64')));
-await ev(`document.querySelector('#panel-aircraft .panel-close').click(); document.querySelector('#lobby-lang-en').click()`);
+await ev(`document.querySelector('#lobby-lang-en').click()`);
 fs.writeFileSync(`${out}/interaction-results.json`, JSON.stringify({ repeatedFlaps: true, directCamera: true, keyboardCamera: true, demoClosesPanel: true, nativeTouchScroll: after, cameraBefore: before, touchModeToggle: true, languageChange: true, rotation: true }, null, 2));
 console.log('Interaction scenarios passed');
 
@@ -316,7 +333,7 @@ console.log('Compact throttle, stick, rudder, and brake input passed');
 // Simulate reserved notch/home-indicator space; physical browser chrome still needs device testing.
 await ev(`document.body.style.setProperty('--edge-left', '18px'); document.body.style.setProperty('--edge-right', '18px'); document.body.style.setProperty('--edge-top', '24px'); document.body.style.setProperty('--edge-bottom', '32px')`);
 await new Promise(r => setTimeout(r, 100));
-const safeArea = await ev(`(()=>{const ids = ['.flight-toolbar', '.hud-strip', '.touch-throttle-card', '.touch-stick-card', '.touch-rudder-card', '#touch-btn-brake'];return ids.map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {selector,left:r.left,right:r.right,top:r.top,bottom:r.bottom}})})()`);
+const safeArea = await ev(`(()=>{const ids = ['.flight-toolbar', '.aircraft-controls', '.hud-strip', '.touch-throttle-card', '.touch-stick-card', '.touch-rudder-card', '#touch-btn-brake'];return ids.map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {selector,left:r.left,right:r.right,top:r.top,bottom:r.bottom}})})()`);
 assert.ok(safeArea.every(r => r.left >= 17.5 && r.right <= 302.5 && r.top >= 23.5 && r.bottom <= 536.5), `controls respect simulated safe-area edges: ${JSON.stringify(safeArea)}`);
 await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/safe-area-portrait.png`, Buffer.from(r.data, 'base64')));
 fs.writeFileSync(`${out}/safe-area-results.json`, JSON.stringify(safeArea, null, 2));

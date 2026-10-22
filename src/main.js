@@ -1481,7 +1481,7 @@ class FlightSimulator {
     if (!bar || !btn) return;
     const collapsed = bar.classList.contains('ap-collapsed');
     btn.setAttribute('aria-expanded', String(!collapsed));
-    btn.textContent = collapsed ? '▸' : '▾';
+    btn.textContent = collapsed ? 'AP' : '▾';
     bindText(btn, () => t(collapsed ? 'ap.expand' : 'ap.collapse'), 'aria-label');
     bindText(btn, () => t(collapsed ? 'ap.expand.tip' : 'ap.collapse.tip'), 'title');
     btn.classList.toggle('ap-active', collapsed && this.autopilot.master);

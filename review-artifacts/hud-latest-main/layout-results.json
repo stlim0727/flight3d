@@ -1,0 +1,3494 @@
+[
+  {
+    "name": "portrait-small",
+    "width": 320,
+    "height": 568,
+    "touch": true,
+    "showTouch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 304,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "ap-bar",
+        "x": 250,
+        "y": 62,
+        "w": 62,
+        "h": 54,
+        "bad": false
+      },
+      {
+        "id": "menu-toggle",
+        "x": 8,
+        "y": 56,
+        "w": 40,
+        "h": 40,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 56,
+        "y": 62,
+        "w": 132,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 192,
+        "y": 62,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-gear",
+        "x": 8,
+        "y": 116,
+        "w": 98.65625,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ret",
+        "x": 110.65625,
+        "y": 116,
+        "w": 98.671875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ext",
+        "x": 213.328125,
+        "y": 116,
+        "w": 98.65625,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-spoilers",
+        "x": 8,
+        "y": 164,
+        "w": 98.65625,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-reverser",
+        "x": 110.65625,
+        "y": 164,
+        "w": 98.671875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 433,
+        "w": 56,
+        "h": 127,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 116,
+        "y": 445,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 86,
+        "y": 493,
+        "w": 104,
+        "h": 65,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 212,
+        "y": 460,
+        "w": 100,
+        "h": 100,
+        "bad": false
+      }
+    ],
+    "cells": {
+      "rows": 1,
+      "clipped": []
+    },
+    "direct": {
+      "buttons": [
+        {
+          "id": "btn-gear",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ret",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ext",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-spoilers",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-reverser",
+          "reachable": true,
+          "height": 44
+        }
+      ],
+      "collapsed": true,
+      "apBelowStrip": true,
+      "apRight": true
+    },
+    "panel": {
+      "open": true,
+      "scroll": 580,
+      "scrollable": true,
+      "flyVisible": true,
+      "settingsBottom": 444.765625,
+      "cardTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "render-quality",
+          "x": 102.609375,
+          "y": 222.765625,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 155.609375,
+          "y": 222.765625,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 208.609375,
+          "y": 222.765625,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "btn-sound",
+          "x": 37,
+          "y": 272.765625,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 90.828125,
+          "y": 272.765625,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 144.65625,
+          "y": 272.765625,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 37,
+          "y": 322.765625,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 96.046875,
+          "y": 322.765625,
+          "reachable": true,
+          "hit": "SPAN"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 155.09375,
+          "y": 322.765625,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 177.09375,
+          "y": 322.765625,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 205.6640625,
+          "y": 322.765625,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 234.234375,
+          "y": 322.765625,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 37,
+          "y": 372.765625,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 76.6796875,
+          "y": 372.765625,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 116.359375,
+          "y": 372.765625,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 138.359375,
+          "y": 372.765625,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 176.046875,
+          "y": 372.765625,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 213.734375,
+          "y": 372.765625,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-diag",
+          "x": 37,
+          "y": 422.765625,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 74.8359375,
+          "y": 422.765625,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 112.671875,
+          "y": 422.765625,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 134.671875,
+          "y": 422.765625,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 174.671875,
+          "y": 422.765625,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 214.671875,
+          "y": 422.765625,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ],
+      "controlBandHeight": 135,
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
+    }
+  },
+  {
+    "name": "portrait",
+    "width": 390,
+    "height": 844,
+    "touch": true,
+    "showTouch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 374,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "ap-bar",
+        "x": 320,
+        "y": 62,
+        "w": 62,
+        "h": 54,
+        "bad": false
+      },
+      {
+        "id": "menu-toggle",
+        "x": 8,
+        "y": 56,
+        "w": 40,
+        "h": 40,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 56,
+        "y": 62,
+        "w": 202,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 262,
+        "y": 61,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-gear",
+        "x": 8,
+        "y": 116,
+        "w": 122,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ret",
+        "x": 134,
+        "y": 116,
+        "w": 122,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ext",
+        "x": 260,
+        "y": 116,
+        "w": 122,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-spoilers",
+        "x": 8,
+        "y": 164,
+        "w": 122,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-reverser",
+        "x": 134,
+        "y": 164,
+        "w": 122,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 709,
+        "w": 56,
+        "h": 127,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 151,
+        "y": 721,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 121,
+        "y": 769,
+        "w": 104,
+        "h": 65,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 282,
+        "y": 736,
+        "w": 100,
+        "h": 100,
+        "bad": false
+      }
+    ],
+    "cells": {
+      "rows": 1,
+      "clipped": []
+    },
+    "direct": {
+      "buttons": [
+        {
+          "id": "btn-gear",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ret",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ext",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-spoilers",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-reverser",
+          "reachable": true,
+          "height": 44
+        }
+      ],
+      "collapsed": true,
+      "apBelowStrip": true,
+      "apRight": true
+    },
+    "panel": {
+      "open": true,
+      "scroll": 223,
+      "scrollable": true,
+      "flyVisible": true,
+      "settingsBottom": 720.59375,
+      "cardTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "render-quality",
+          "x": 102.609375,
+          "y": 598.59375,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 155.609375,
+          "y": 598.59375,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 208.609375,
+          "y": 598.59375,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "btn-sound",
+          "x": 230.609375,
+          "y": 598.59375,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 284.4375,
+          "y": 598.59375,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 338.265625,
+          "y": 598.59375,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 37,
+          "y": 648.59375,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 96.046875,
+          "y": 648.59375,
+          "reachable": true,
+          "hit": "SPAN"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 155.09375,
+          "y": 648.59375,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 177.09375,
+          "y": 648.59375,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 205.6640625,
+          "y": 648.59375,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 234.234375,
+          "y": 648.59375,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 256.234375,
+          "y": 648.59375,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 295.9140625,
+          "y": 648.59375,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 335.59375,
+          "y": 648.59375,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 37,
+          "y": 698.59375,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 74.6875,
+          "y": 698.59375,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 112.375,
+          "y": 698.59375,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-diag",
+          "x": 134.375,
+          "y": 698.59375,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 172.2109375,
+          "y": 698.59375,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 210.046875,
+          "y": 698.59375,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 232.046875,
+          "y": 698.59375,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 272.046875,
+          "y": 698.59375,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 312.046875,
+          "y": 698.59375,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ],
+      "controlBandHeight": 135,
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
+    }
+  },
+  {
+    "name": "portrait-short",
+    "width": 320,
+    "height": 480,
+    "touch": true,
+    "showTouch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 304,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "ap-bar",
+        "x": 250,
+        "y": 62,
+        "w": 62,
+        "h": 54,
+        "bad": false
+      },
+      {
+        "id": "menu-toggle",
+        "x": 8,
+        "y": 56,
+        "w": 40,
+        "h": 40,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 56,
+        "y": 62,
+        "w": 132,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 192,
+        "y": 61,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-gear",
+        "x": 8,
+        "y": 116,
+        "w": 98.65625,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ret",
+        "x": 110.65625,
+        "y": 116,
+        "w": 98.671875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ext",
+        "x": 213.328125,
+        "y": 116,
+        "w": 98.65625,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-spoilers",
+        "x": 8,
+        "y": 164,
+        "w": 98.65625,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-reverser",
+        "x": 110.65625,
+        "y": 164,
+        "w": 98.671875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 345,
+        "w": 56,
+        "h": 127,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 116,
+        "y": 357,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 86,
+        "y": 405,
+        "w": 104,
+        "h": 65,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 212,
+        "y": 372,
+        "w": 100,
+        "h": 100,
+        "bad": false
+      }
+    ],
+    "cells": {
+      "rows": 1,
+      "clipped": []
+    },
+    "direct": {
+      "buttons": [
+        {
+          "id": "btn-gear",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ret",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ext",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-spoilers",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-reverser",
+          "reachable": true,
+          "height": 44
+        }
+      ],
+      "collapsed": true,
+      "apBelowStrip": true,
+      "apRight": true
+    },
+    "panel": {
+      "open": true,
+      "scroll": 640,
+      "scrollable": true,
+      "flyVisible": true,
+      "settingsBottom": 356.609375,
+      "cardTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "btn-sound",
+          "x": 37,
+          "y": 184.609375,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 90.828125,
+          "y": 184.609375,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 144.65625,
+          "y": 184.609375,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 37,
+          "y": 234.609375,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 96.046875,
+          "y": 234.609375,
+          "reachable": true,
+          "hit": "SPAN"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 155.09375,
+          "y": 234.609375,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 177.09375,
+          "y": 234.609375,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 205.6640625,
+          "y": 234.609375,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 234.234375,
+          "y": 234.609375,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 37,
+          "y": 284.609375,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 76.6796875,
+          "y": 284.609375,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 116.359375,
+          "y": 284.609375,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 138.359375,
+          "y": 284.609375,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 176.046875,
+          "y": 284.609375,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 213.734375,
+          "y": 284.609375,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-diag",
+          "x": 37,
+          "y": 334.609375,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 74.8359375,
+          "y": 334.609375,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 112.671875,
+          "y": 334.609375,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 134.671875,
+          "y": 334.609375,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 174.671875,
+          "y": 334.609375,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 214.671875,
+          "y": 334.609375,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ],
+      "controlBandHeight": 135,
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
+    }
+  },
+  {
+    "name": "portrait-tiny",
+    "width": 320,
+    "height": 400,
+    "touch": true,
+    "showTouch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 304,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "ap-bar",
+        "x": 250,
+        "y": 62,
+        "w": 62,
+        "h": 54,
+        "bad": false
+      },
+      {
+        "id": "menu-toggle",
+        "x": 8,
+        "y": 56,
+        "w": 40,
+        "h": 40,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 56,
+        "y": 62,
+        "w": 132,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 192,
+        "y": 61,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-gear",
+        "x": 8,
+        "y": 116,
+        "w": 98.65625,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ret",
+        "x": 110.65625,
+        "y": 116,
+        "w": 98.671875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ext",
+        "x": 213.328125,
+        "y": 116,
+        "w": 98.65625,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-spoilers",
+        "x": 8,
+        "y": 164,
+        "w": 98.65625,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-reverser",
+        "x": 110.65625,
+        "y": 164,
+        "w": 98.671875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 265,
+        "w": 56,
+        "h": 127,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 116,
+        "y": 277,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 86,
+        "y": 325,
+        "w": 104,
+        "h": 65,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 212,
+        "y": 292,
+        "w": 100,
+        "h": 100,
+        "bad": false
+      }
+    ],
+    "cells": {
+      "rows": 1,
+      "clipped": []
+    },
+    "direct": {
+      "buttons": [
+        {
+          "id": "btn-gear",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ret",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ext",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-spoilers",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-reverser",
+          "reachable": true,
+          "height": 44
+        }
+      ],
+      "collapsed": true,
+      "apBelowStrip": true,
+      "apRight": true
+    },
+    "panel": {
+      "open": true,
+      "scroll": 694,
+      "scrollable": true,
+      "flyVisible": true,
+      "settingsBottom": 277,
+      "cardTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "btn-touch-toggle",
+          "x": 37,
+          "y": 155,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 96.046875,
+          "y": 155,
+          "reachable": true,
+          "hit": "SPAN"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 155.09375,
+          "y": 155,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 177.09375,
+          "y": 155,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 205.6640625,
+          "y": 155,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 234.234375,
+          "y": 155,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 37,
+          "y": 205,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 76.6796875,
+          "y": 205,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 116.359375,
+          "y": 205,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 138.359375,
+          "y": 205,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 176.046875,
+          "y": 205,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 213.734375,
+          "y": 205,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-diag",
+          "x": 37,
+          "y": 255,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 74.8359375,
+          "y": 255,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 112.671875,
+          "y": 255,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 134.671875,
+          "y": 255,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 174.671875,
+          "y": 255,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 214.671875,
+          "y": 255,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ],
+      "controlBandHeight": 135,
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
+    }
+  },
+  {
+    "name": "landscape-small",
+    "width": 568,
+    "height": 320,
+    "touch": true,
+    "showTouch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 552,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "ap-bar",
+        "x": 498,
+        "y": 62,
+        "w": 62,
+        "h": 54,
+        "bad": false
+      },
+      {
+        "id": "menu-toggle",
+        "x": 8,
+        "y": 56,
+        "w": 40,
+        "h": 40,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 56,
+        "y": 62,
+        "w": 380,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 440,
+        "y": 61,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-gear",
+        "x": 8,
+        "y": 116,
+        "w": 107.1875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ret",
+        "x": 119.1875,
+        "y": 116,
+        "w": 107.203125,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ext",
+        "x": 230.390625,
+        "y": 116,
+        "w": 107.203125,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-spoilers",
+        "x": 341.59375,
+        "y": 116,
+        "w": 107.203125,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-reverser",
+        "x": 452.796875,
+        "y": 116,
+        "w": 107.1875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 185,
+        "w": 56,
+        "h": 127,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 240,
+        "y": 197,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 210,
+        "y": 245,
+        "w": 104,
+        "h": 65,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 460,
+        "y": 212,
+        "w": 100,
+        "h": 100,
+        "bad": false
+      }
+    ],
+    "cells": {
+      "rows": 1,
+      "clipped": []
+    },
+    "direct": {
+      "buttons": [
+        {
+          "id": "btn-gear",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ret",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ext",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-spoilers",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-reverser",
+          "reachable": true,
+          "height": 44
+        }
+      ],
+      "collapsed": true,
+      "apBelowStrip": true,
+      "apRight": true
+    },
+    "panel": {
+      "open": true,
+      "scroll": 529,
+      "scrollable": true,
+      "flyVisible": true,
+      "settingsBottom": 196.90625,
+      "cardTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "btn-touch-toggle",
+          "x": 73,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 132.046875,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "SPAN"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 191.09375,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 213.09375,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 241.6640625,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 270.234375,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 292.234375,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 331.9140625,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 371.59375,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 393.59375,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 431.28125,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 468.96875,
+          "y": 124.90625,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-diag",
+          "x": 73,
+          "y": 174.90625,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 110.8359375,
+          "y": 174.90625,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 148.671875,
+          "y": 174.90625,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 170.671875,
+          "y": 174.90625,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 210.671875,
+          "y": 174.90625,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 250.671875,
+          "y": 174.90625,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ],
+      "controlBandHeight": 135,
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
+    }
+  },
+  {
+    "name": "landscape",
+    "width": 844,
+    "height": 390,
+    "touch": true,
+    "showTouch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 828,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "ap-bar",
+        "x": 774,
+        "y": 62,
+        "w": 62,
+        "h": 54,
+        "bad": false
+      },
+      {
+        "id": "menu-toggle",
+        "x": 8,
+        "y": 56,
+        "w": 40,
+        "h": 40,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 56,
+        "y": 62,
+        "w": 656,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 716,
+        "y": 61,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-gear",
+        "x": 8,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ret",
+        "x": 128.796875,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ext",
+        "x": 249.59375,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-spoilers",
+        "x": 370.390625,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-reverser",
+        "x": 491.1875,
+        "y": 116,
+        "w": 116.8125,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 8,
+        "y": 255,
+        "w": 56,
+        "h": 127,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 378,
+        "y": 267,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 348,
+        "y": 315,
+        "w": 104,
+        "h": 65,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 736,
+        "y": 282,
+        "w": 100,
+        "h": 100,
+        "bad": false
+      }
+    ],
+    "cells": {
+      "rows": 1,
+      "clipped": []
+    },
+    "direct": {
+      "buttons": [
+        {
+          "id": "btn-gear",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ret",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ext",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-spoilers",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-reverser",
+          "reachable": true,
+          "height": 44
+        }
+      ],
+      "collapsed": true,
+      "apBelowStrip": true,
+      "apRight": true
+    },
+    "panel": {
+      "open": true,
+      "scroll": 482,
+      "scrollable": true,
+      "flyVisible": true,
+      "settingsBottom": 266.3125,
+      "cardTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "render-quality",
+          "x": 276.609375,
+          "y": 144.3125,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 329.609375,
+          "y": 144.3125,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 382.609375,
+          "y": 144.3125,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "btn-sound",
+          "x": 404.609375,
+          "y": 144.3125,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 458.4375,
+          "y": 144.3125,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 512.265625,
+          "y": 144.3125,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 211,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 270.046875,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "SPAN"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 329.09375,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 351.09375,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 379.6640625,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 408.234375,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 430.234375,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 469.9140625,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 509.59375,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 531.59375,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 569.28125,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 606.96875,
+          "y": 194.3125,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-diag",
+          "x": 211,
+          "y": 244.3125,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 248.8359375,
+          "y": 244.3125,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 286.671875,
+          "y": 244.3125,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 308.671875,
+          "y": 244.3125,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 348.671875,
+          "y": 244.3125,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 388.671875,
+          "y": 244.3125,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ],
+      "controlBandHeight": 135,
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
+    }
+  },
+  {
+    "name": "desktop",
+    "width": 1440,
+    "height": 900,
+    "touch": false,
+    "showTouch": false,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 342.2265625,
+        "y": 14,
+        "w": 755.546875,
+        "h": 48,
+        "bad": false
+      },
+      {
+        "id": "ap-bar",
+        "x": 1374,
+        "y": 62,
+        "w": 58,
+        "h": 54,
+        "bad": false
+      },
+      {
+        "id": "menu-toggle",
+        "x": 12,
+        "y": 12,
+        "w": 40,
+        "h": 40,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 658.3125,
+        "y": 848,
+        "w": 123.375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-gear",
+        "x": 420,
+        "y": 794,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ret",
+        "x": 540.796875,
+        "y": 794,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ext",
+        "x": 661.59375,
+        "y": 794,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-spoilers",
+        "x": 782.390625,
+        "y": 794,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-reverser",
+        "x": 903.1875,
+        "y": 794,
+        "w": 116.8125,
+        "h": 44,
+        "bad": false
+      }
+    ],
+    "cells": {
+      "rows": 1,
+      "clipped": []
+    },
+    "direct": {
+      "buttons": [
+        {
+          "id": "btn-gear",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ret",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ext",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-spoilers",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-reverser",
+          "reachable": true,
+          "height": 44
+        }
+      ],
+      "collapsed": true,
+      "apBelowStrip": true,
+      "apRight": true
+    },
+    "panel": {
+      "open": true,
+      "scroll": 0,
+      "scrollable": false,
+      "flyVisible": true,
+      "settingsBottom": 676.75,
+      "cardTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "render-quality",
+          "x": 110.609375,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 163.609375,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 216.609375,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "btn-sound",
+          "x": 238.609375,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 292.4375,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 346.265625,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 45,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 104.046875,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "SPAN"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 163.09375,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 185.09375,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 213.6640625,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 242.234375,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 264.234375,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 314.25,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 364.265625,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 45,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 91.6875,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 138.375,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-diag",
+          "x": 160.375,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 205.875,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 251.375,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 273.375,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 323.3671875,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 373.359375,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ]
+    }
+  },
+  {
+    "name": "desktop-narrow",
+    "width": 800,
+    "height": 700,
+    "touch": false,
+    "showTouch": false,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 8,
+        "y": 8,
+        "w": 784,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "ap-bar",
+        "x": 730,
+        "y": 62,
+        "w": 62,
+        "h": 54,
+        "bad": false
+      },
+      {
+        "id": "menu-toggle",
+        "x": 8,
+        "y": 56,
+        "w": 40,
+        "h": 40,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 56,
+        "y": 62,
+        "w": 660,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-gear",
+        "x": 8,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ret",
+        "x": 128.796875,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ext",
+        "x": 249.59375,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-spoilers",
+        "x": 370.390625,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-reverser",
+        "x": 491.1875,
+        "y": 116,
+        "w": 116.8125,
+        "h": 44,
+        "bad": false
+      }
+    ],
+    "cells": {
+      "rows": 1,
+      "clipped": []
+    },
+    "direct": {
+      "buttons": [
+        {
+          "id": "btn-gear",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ret",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ext",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-spoilers",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-reverser",
+          "reachable": true,
+          "height": 44
+        }
+      ],
+      "collapsed": true,
+      "apBelowStrip": true,
+      "apRight": true
+    },
+    "panel": {
+      "open": true,
+      "scroll": 271,
+      "scrollable": true,
+      "flyVisible": true,
+      "settingsBottom": 576.5,
+      "cardTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "render-quality",
+          "x": 254.609375,
+          "y": 454.5,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 307.609375,
+          "y": 454.5,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 360.609375,
+          "y": 454.5,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "btn-sound",
+          "x": 382.609375,
+          "y": 454.5,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 436.4375,
+          "y": 454.5,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 490.265625,
+          "y": 454.5,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 189,
+          "y": 504.5,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 248.046875,
+          "y": 504.5,
+          "reachable": true,
+          "hit": "SPAN"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 307.09375,
+          "y": 504.5,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 329.09375,
+          "y": 504.5,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 357.6640625,
+          "y": 504.5,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 386.234375,
+          "y": 504.5,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 408.234375,
+          "y": 504.5,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 458.25,
+          "y": 504.5,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 508.265625,
+          "y": 504.5,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 189,
+          "y": 554.5,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 235.6875,
+          "y": 554.5,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 282.375,
+          "y": 554.5,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-diag",
+          "x": 304.375,
+          "y": 554.5,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 349.875,
+          "y": 554.5,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 395.375,
+          "y": 554.5,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 417.375,
+          "y": 554.5,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 467.3671875,
+          "y": 554.5,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 517.359375,
+          "y": 554.5,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ]
+    }
+  },
+  {
+    "name": "desktop-small",
+    "width": 1025,
+    "height": 700,
+    "touch": false,
+    "showTouch": false,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 134.7265625,
+        "y": 14,
+        "w": 755.546875,
+        "h": 48,
+        "bad": false
+      },
+      {
+        "id": "ap-bar",
+        "x": 959,
+        "y": 62,
+        "w": 58,
+        "h": 54,
+        "bad": false
+      },
+      {
+        "id": "menu-toggle",
+        "x": 12,
+        "y": 12,
+        "w": 40,
+        "h": 40,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 450.8125,
+        "y": 648,
+        "w": 123.375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-gear",
+        "x": 212.5,
+        "y": 594,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ret",
+        "x": 333.296875,
+        "y": 594,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ext",
+        "x": 454.09375,
+        "y": 594,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-spoilers",
+        "x": 574.890625,
+        "y": 594,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-reverser",
+        "x": 695.6875,
+        "y": 594,
+        "w": 116.8125,
+        "h": 44,
+        "bad": false
+      }
+    ],
+    "cells": {
+      "rows": 1,
+      "clipped": []
+    },
+    "direct": {
+      "buttons": [
+        {
+          "id": "btn-gear",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ret",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ext",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-spoilers",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-reverser",
+          "reachable": true,
+          "height": 44
+        }
+      ],
+      "collapsed": true,
+      "apBelowStrip": true,
+      "apRight": true
+    },
+    "panel": {
+      "open": true,
+      "scroll": 24,
+      "scrollable": true,
+      "flyVisible": true,
+      "settingsBottom": 564.5,
+      "cardTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "render-quality",
+          "x": 110.609375,
+          "y": 462.5,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 163.609375,
+          "y": 462.5,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 216.609375,
+          "y": 462.5,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "btn-sound",
+          "x": 238.609375,
+          "y": 462.5,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 292.4375,
+          "y": 462.5,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 346.265625,
+          "y": 462.5,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 45,
+          "y": 506.5,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 104.046875,
+          "y": 506.5,
+          "reachable": true,
+          "hit": "SPAN"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 163.09375,
+          "y": 506.5,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 185.09375,
+          "y": 506.5,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 213.6640625,
+          "y": 506.5,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 242.234375,
+          "y": 506.5,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 264.234375,
+          "y": 506.5,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 314.25,
+          "y": 506.5,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 364.265625,
+          "y": 506.5,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 45,
+          "y": 549.5,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 91.6875,
+          "y": 549.5,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 138.375,
+          "y": 549.5,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-diag",
+          "x": 160.375,
+          "y": 549.5,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 205.875,
+          "y": 549.5,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 251.375,
+          "y": 549.5,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 273.375,
+          "y": 549.5,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 323.3671875,
+          "y": 549.5,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 373.359375,
+          "y": 549.5,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ]
+    }
+  },
+  {
+    "name": "tablet-touch",
+    "width": 1280,
+    "height": 800,
+    "touch": true,
+    "showTouch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 262.2265625,
+        "y": 14,
+        "w": 755.546875,
+        "h": 48,
+        "bad": false
+      },
+      {
+        "id": "ap-bar",
+        "x": 1214,
+        "y": 62,
+        "w": 58,
+        "h": 54,
+        "bad": false
+      },
+      {
+        "id": "menu-toggle",
+        "x": 12,
+        "y": 12,
+        "w": 40,
+        "h": 40,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 553.3125,
+        "y": 748,
+        "w": 123.375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 682.6875,
+        "y": 748,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-gear",
+        "x": 8,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ret",
+        "x": 128.796875,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ext",
+        "x": 249.59375,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-spoilers",
+        "x": 370.390625,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-reverser",
+        "x": 491.1875,
+        "y": 116,
+        "w": 116.8125,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 20,
+        "y": 529,
+        "w": 108,
+        "h": 201,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 565.359375,
+        "y": 592,
+        "w": 68,
+        "h": 68,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 514.359375,
+        "y": 668,
+        "w": 170,
+        "h": 60,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 1070.71875,
+        "y": 529,
+        "w": 189.28125,
+        "h": 201,
+        "bad": false
+      }
+    ],
+    "cells": {
+      "rows": 1,
+      "clipped": []
+    },
+    "direct": {
+      "buttons": [
+        {
+          "id": "btn-gear",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ret",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ext",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-spoilers",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-reverser",
+          "reachable": true,
+          "height": 44
+        }
+      ],
+      "collapsed": true,
+      "apBelowStrip": true,
+      "apRight": true
+    },
+    "panel": {
+      "open": true,
+      "scroll": 0,
+      "scrollable": false,
+      "flyVisible": true,
+      "settingsBottom": 626.75,
+      "cardTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "render-quality",
+          "x": 110.609375,
+          "y": 524.75,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 163.609375,
+          "y": 524.75,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 216.609375,
+          "y": 524.75,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "btn-sound",
+          "x": 238.609375,
+          "y": 524.75,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 292.4375,
+          "y": 524.75,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 346.265625,
+          "y": 524.75,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 45,
+          "y": 568.75,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 104.046875,
+          "y": 568.75,
+          "reachable": true,
+          "hit": "SPAN"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 163.09375,
+          "y": 568.75,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 185.09375,
+          "y": 568.75,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 213.6640625,
+          "y": 568.75,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 242.234375,
+          "y": 568.75,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 264.234375,
+          "y": 568.75,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 303.9140625,
+          "y": 568.75,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 343.59375,
+          "y": 568.75,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 45,
+          "y": 611.75,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 82.6875,
+          "y": 611.75,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 120.375,
+          "y": 611.75,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-diag",
+          "x": 142.375,
+          "y": 611.75,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 180.2109375,
+          "y": 611.75,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 218.046875,
+          "y": 611.75,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 240.046875,
+          "y": 611.75,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 280.046875,
+          "y": 611.75,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 320.046875,
+          "y": 611.75,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ],
+      "nativeGuideClick": true,
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
+    }
+  },
+  {
+    "name": "desktop-touch-enabled",
+    "width": 1440,
+    "height": 900,
+    "touch": false,
+    "showTouch": true,
+    "bounds": [
+      {
+        "id": "hud-strip",
+        "x": 342.2265625,
+        "y": 14,
+        "w": 755.546875,
+        "h": 48,
+        "bad": false
+      },
+      {
+        "id": "ap-bar",
+        "x": 1374,
+        "y": 62,
+        "w": 58,
+        "h": 54,
+        "bad": false
+      },
+      {
+        "id": "menu-toggle",
+        "x": 12,
+        "y": 12,
+        "w": 40,
+        "h": 40,
+        "bad": false
+      },
+      {
+        "id": "open-camera",
+        "x": 633.3125,
+        "y": 848,
+        "w": 123.375,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-mute",
+        "x": 762.6875,
+        "y": 848,
+        "w": 44,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-gear",
+        "x": 8,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ret",
+        "x": 128.796875,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-flaps-ext",
+        "x": 249.59375,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-spoilers",
+        "x": 370.390625,
+        "y": 116,
+        "w": 116.796875,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "btn-reverser",
+        "x": 491.1875,
+        "y": 116,
+        "w": 116.8125,
+        "h": 44,
+        "bad": false
+      },
+      {
+        "id": "touch-throttle-card",
+        "x": 20,
+        "y": 629,
+        "w": 108,
+        "h": 201,
+        "bad": false
+      },
+      {
+        "id": "touch-btn-brake",
+        "x": 645.359375,
+        "y": 692,
+        "w": 68,
+        "h": 68,
+        "bad": false
+      },
+      {
+        "id": "touch-rudder-card",
+        "x": 594.359375,
+        "y": 768,
+        "w": 170,
+        "h": 60,
+        "bad": false
+      },
+      {
+        "id": "touch-stick-card",
+        "x": 1230.71875,
+        "y": 629,
+        "w": 189.28125,
+        "h": 201,
+        "bad": false
+      }
+    ],
+    "cells": {
+      "rows": 1,
+      "clipped": []
+    },
+    "direct": {
+      "buttons": [
+        {
+          "id": "btn-gear",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ret",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-flaps-ext",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-spoilers",
+          "reachable": true,
+          "height": 44
+        },
+        {
+          "id": "btn-reverser",
+          "reachable": true,
+          "height": 44
+        }
+      ],
+      "collapsed": true,
+      "apBelowStrip": true,
+      "apRight": true
+    },
+    "panel": {
+      "open": true,
+      "scroll": 0,
+      "scrollable": false,
+      "flyVisible": true,
+      "settingsBottom": 676.75,
+      "cardTouch": "pan-y",
+      "hitTargets": [
+        {
+          "id": "render-quality",
+          "x": 110.609375,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 163.609375,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "render-quality",
+          "x": 216.609375,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "render-quality"
+        },
+        {
+          "id": "btn-sound",
+          "x": 238.609375,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 292.4375,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-sound",
+          "x": 346.265625,
+          "y": 574.75,
+          "reachable": true,
+          "hit": "btn-sound"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 45,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 104.046875,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "SPAN"
+        },
+        {
+          "id": "btn-touch-toggle",
+          "x": 163.09375,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "btn-touch-toggle"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 185.09375,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 213.6640625,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "touch-btn-gyro",
+          "x": 242.234375,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "touch-btn-gyro"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 264.234375,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 314.25,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-cam-reset",
+          "x": 364.265625,
+          "y": 618.75,
+          "reachable": true,
+          "hit": "btn-cam-reset"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 45,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 91.6875,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-yokes",
+          "x": 138.375,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-yokes"
+        },
+        {
+          "id": "btn-diag",
+          "x": 160.375,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 205.875,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-diag",
+          "x": 251.375,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-diag"
+        },
+        {
+          "id": "btn-help",
+          "x": 273.375,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 323.3671875,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-help"
+        },
+        {
+          "id": "btn-help",
+          "x": 373.359375,
+          "y": 661.75,
+          "reachable": true,
+          "hit": "btn-help"
+        }
+      ],
+      "nativeGuideClick": true,
+      "quickCamera": true,
+      "oneTapMute": true,
+      "restoresVolume": true
+    }
+  }
+]

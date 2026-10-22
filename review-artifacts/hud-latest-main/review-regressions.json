@@ -1,0 +1,54 @@
+[
+  {
+    "width": 320,
+    "height": 568,
+    "touch": true,
+    "overflow": true,
+    "camera": {
+      "end": true,
+      "visible": true,
+      "scrollLeft": 406
+    },
+    "tuningBefore": 1,
+    "tuningAfter": 1.4
+  },
+  {
+    "width": 568,
+    "height": 320,
+    "touch": true,
+    "overflow": true,
+    "camera": {
+      "end": true,
+      "visible": true,
+      "scrollLeft": 158
+    },
+    "tuningBefore": 1,
+    "tuningAfter": 1.4
+  },
+  {
+    "width": 1025,
+    "height": 700,
+    "touch": false,
+    "overflow": false,
+    "camera": {
+      "end": true,
+      "visible": true,
+      "scrollLeft": 0
+    },
+    "tuningBefore": 1,
+    "tuningAfter": 1.4
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "touch": false,
+    "overflow": false,
+    "camera": {
+      "end": true,
+      "visible": true,
+      "scrollLeft": 0
+    },
+    "tuningBefore": 1,
+    "tuningAfter": 1.4
+  }
+]
