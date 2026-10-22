@@ -53,9 +53,13 @@ cockpit camera mode, which ramps over ~0.3 s rather than switching.
 - Exterior airframe self-shadow (fuselage onto wing, tail onto tailplane, gear onto
   fuselage) is not part of this change; it needs main-sun frustum and texel tuning,
   tracked separately.
-- `WINDSHIELD_PANES`, `DECK_SUN_ANCHOR` and the standoff/clip constants are measured
-  from the shipped 737 GLBs. The rig itself is model-agnostic and takes them as
-  parameters, but another cockpit needs its own aperture profile.
+- The mechanism is model-agnostic; the numbers are not. `computeDeckSunPose()` and
+  `projectPanesForCookie()` accept panes, anchor, standoff and clip distance as parameters,
+  but `CockpitSunShadow` calls them with the `CockpitAperture.js` defaults, which are
+  measured from the shipped 737 GLBs. Another cockpit needs its own aperture profile — by
+  swapping that module, or by threading a per-instance profile into `update()` and
+  `repaintCookie()`. A model whose skin has real windshield openings can drop the cookie and
+  the near-plane clip, which only exist because this one does not.
 
 ## Reproduce visual evidence
 
