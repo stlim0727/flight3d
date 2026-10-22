@@ -17,8 +17,8 @@ control changes.
 ## Verification
 
 - `npm run check`: 150 files, zero failures.
-- `npm test`: 358 passed, zero failures (including i18n key parity after the
-  catalog deletions).
+- `npm test`: 360 passed, zero failures (including i18n key parity after the
+  catalog deletions), on the rebased tree.
 - `npm run build`: passed.
 - Focused live check (`dead-controls-results.json`, `environment-rows.png`,
   `flight-toolbar.png`, `environment-korean.png`, `phone-touch.png`) in headless
@@ -31,7 +31,8 @@ control changes.
   following; `M` restored the previous state; touch mode at 390 × 844 keeps the
   stick, throttle, rudder and brake with the camera button 79 × 44 px, reachable
   and inside the toolbar; switching to Korean re-rendered the surviving labels;
-  no uncaught page exceptions.
+  no uncaught page exceptions. The check was re-run from a clean profile after
+  rebasing onto `1ca0367` with identical results.
 
 ## Finding, not fixed here
 
