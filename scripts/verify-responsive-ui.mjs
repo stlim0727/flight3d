@@ -68,7 +68,7 @@ for (let n = 0; n < 120; n++) {
 assert.ok(await ev(`window.__responsiveVerificationToken === ${JSON.stringify(token)} && !!window.simulator`), 'new simulator initialized');
 // Integration regression: the merged #104 removed the quality select before initUI.
 assert.deepEqual(exceptions, [], 'startup has no uncaught exceptions');
-assert.ok(await ev(`document.querySelector('#panel-environment #language-select') && document.querySelector('#panel-environment #render-quality')`), 'both settings selects survive panel initialization');
+assert.ok(await ev(`document.querySelector('#lobby-settings #render-quality') && !document.querySelector('#open-environment')`), 'settings initialize inside the main menu, not the flight toolbar');
 const frameBefore = await ev('window.simulator.renderer.info.render.frame');
 for (let n = 0; n < 60; n++) {
   if (await ev('window.simulator.renderer.info.render.frame') > frameBefore) break;
@@ -115,20 +115,20 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
       });
   })()`);
   await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}.png`, Buffer.from(r.data, 'base64')));
-  await ev(`document.querySelector('#open-environment').click()`);
+  await ev(`document.querySelector('#menu-toggle').click()`);
   const panel = await ev(`(() => {
-    const p = document.querySelector('#panel-environment');
-    const body = p.querySelector('.flight-panel-body');
+    const card = document.querySelector('.lobby-card');
+    const settings = document.querySelector('#lobby-settings');
     document.querySelector('#btn-sound').click();
     document.querySelector('#btn-sound').click();
-    body.scrollTop = 999;
-    const close = p.querySelector('.panel-close').getBoundingClientRect();
-    return { open: !p.hidden, scroll: body.scrollTop, scrollable: body.scrollHeight > body.clientHeight,
-      closeVisible: close.y >= 0 && close.bottom <= innerHeight, panelBottom: p.getBoundingClientRect().bottom,
-      bodyTouch: getComputedStyle(body).touchAction,
-      hitTargets: [...p.querySelectorAll('button, select')].flatMap(node => {
+    card.scrollTop = 999;
+    const fly = document.querySelector('#btn-fly').getBoundingClientRect();
+    return { open: document.body.dataset.flow === 'lobby', scroll: card.scrollTop, scrollable: card.scrollHeight > card.clientHeight,
+      flyVisible: fly.y >= 0 && fly.bottom <= innerHeight, settingsBottom: settings.getBoundingClientRect().bottom,
+      cardTouch: getComputedStyle(card).touchAction,
+      hitTargets: [...settings.querySelectorAll('button, select')].flatMap(node => {
         const r = node.getBoundingClientRect();
-        const clip = node.closest('.flight-panel-body')?.getBoundingClientRect() || p.getBoundingClientRect();
+        const clip = card.getBoundingClientRect();
         const y = r.top + r.height / 2;
         if (!r.width || !r.height || y <= clip.top || y >= clip.bottom) return [];
         return [r.left + 8, r.left + r.width / 2, r.right - 8].map(x => {
@@ -154,17 +154,16 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     panel.controlBandHeight = height - controlsTop;
   }
   assert.ok(bounds.every(b => !b.bad), `${name}: primary controls are in bounds`);
-  assert.ok(panel.open && panel.closeVisible && panel.bodyTouch === 'pan-y', `${name}: volume panel remains open with reachable close`);
+  assert.ok(panel.open && panel.flyVisible && panel.cardTouch === 'pan-y', `${name}: settings menu stays open with a scrollable card`);
   assert.ok(panel.hitTargets.length > 0, `${name}: visible settings controls were hit-tested`);
   assert.ok(panel.hitTargets.every(hit => hit.reachable), `${name}: settings obscured: ${JSON.stringify(panel.hitTargets.filter(hit => !hit.reachable))}`);
   if (showTouch && width > 1024) {
     await nativeClick('#btn-help', touch);
-    assert.ok(await ev(`document.querySelector('#help-modal').classList.contains('visible')`), `${name}: native input reaches Flight guide above the yoke`);
+    assert.ok(await ev(`document.querySelector('#help-modal').classList.contains('visible')`), `${name}: native input reaches Flight guide from the menu`);
     panel.nativeGuideClick = true;
     await ev(`document.querySelector('#btn-help-close').click()`);
-  } else {
-    await ev(`document.querySelector('#panel-environment .panel-close').click()`);
   }
+  await ev(`document.querySelector('#menu-toggle').click()`);
   if (showTouch) {
     assert.ok(await ev(`window.simulator.audio.volume <= 1 && window.simulator.audio.getVolumeState().level <= 1`), `${name}: audio has no boost modes`);
     const nextCamera = await ev(`(()=>{const c=window.simulator.cameraSystem;return ((c.autoSwitch ? 7 : (c.savedMode ?? c.mode)) + 1) % 8})()`);
@@ -208,8 +207,8 @@ await send('Input.dispatchKeyEvent', { type: 'keyUp', key: '2', code: 'Digit2', 
 await new Promise(r => setTimeout(r, 150));
 assert.equal(await ev(`window.simulator.cameraSystem.mode`), 1, 'digit keys still select a camera directly');
 assert.match(await ev(`document.querySelector('#open-camera').textContent`), /Chase/, 'keyboard camera state appears on the toolbar button');
-await ev(`document.querySelector('#open-environment').click(); document.querySelector('#panel-environment .flight-panel-body').scrollTop = 0`);
-const before = await ev(`(()=>{const r=document.querySelector('#panel-environment .flight-panel-body').getBoundingClientRect();const c=window.simulator.cameraSystem;return {x:r.x+6,y:r.bottom-12,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
+await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('.lobby-card').scrollTop = 0`);
+const before = await ev(`(()=>{const r=document.querySelector('.lobby-card').getBoundingClientRect();const c=window.simulator.cameraSystem;return {x:r.x+6,y:r.bottom-12,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
 await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: before.x, y: before.y }] });
 for (let n = 1; n <= 8; n++) {
   await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: before.x, y: before.y - n * 10 }] });
@@ -217,22 +216,22 @@ for (let n = 1; n <= 8; n++) {
 }
 await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 await new Promise(r => setTimeout(r, 200));
-const after = await ev(`(()=>{const c=window.simulator.cameraSystem;return {scroll:document.querySelector('#panel-environment .flight-panel-body').scrollTop,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
-assert.ok(after.scroll > 0, 'native touch gesture scrolls panel');
-assert.equal(after.yaw, before.yaw, 'panel scroll leaves camera yaw unchanged');
-assert.equal(after.pitch, before.pitch, 'panel scroll leaves camera pitch unchanged');
+const after = await ev(`(()=>{const c=window.simulator.cameraSystem;return {scroll:document.querySelector('.lobby-card').scrollTop,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
+assert.ok(after.scroll > 0, 'native touch gesture scrolls the menu card');
+assert.equal(after.yaw, before.yaw, 'menu scroll leaves camera yaw unchanged');
+assert.equal(after.pitch, before.pitch, 'menu scroll leaves camera pitch unchanged');
 await ev(`document.querySelector('#btn-touch-toggle').click()`);
 assert.equal(await ev('window.simulator.touchControls.enabled'), false, 'touch mode can be disabled from shared settings');
-await ev(`document.querySelector('#btn-touch-toggle').click(); const language = document.querySelector('#language-select'); language.value = 'ko'; language.dispatchEvent(new Event('change'))`);
+await ev(`document.querySelector('#btn-touch-toggle').click(); document.querySelector('#lobby-lang-ko').click()`);
 await new Promise(r => setTimeout(r, 100));
-assert.equal(await ev(`document.querySelector('#open-environment').textContent`), '설정', 'language change refreshes panel labels');
-assert.equal(await ev(`!document.querySelector('#panel-environment').hidden`), true, 'language change retains open panel');
-await ev(`document.querySelector('#panel-environment .panel-close').click(); document.querySelector('#open-aircraft').click()`);
+assert.equal(await ev(`document.querySelector('.lobby-settings .lobby-label').textContent`), '설정', 'language change refreshes menu settings labels');
+assert.equal(await ev(`document.body.dataset.flow`), 'lobby', 'language change keeps the menu open');
+await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('#open-aircraft').click()`);
 await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 1, mobile: true });
 await new Promise(r => setTimeout(r, 150));
 assert.equal(await ev(`!document.querySelector('#panel-aircraft').hidden`), true, 'rotation retains Aircraft panel');
 await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-aircraft-ko.png`, Buffer.from(r.data, 'base64')));
-await ev(`document.querySelector('#panel-aircraft .panel-close').click(); const language = document.querySelector('#language-select'); language.value = 'en'; language.dispatchEvent(new Event('change'))`);
+await ev(`document.querySelector('#panel-aircraft .panel-close').click(); document.querySelector('#lobby-lang-en').click()`);
 fs.writeFileSync(`${out}/interaction-results.json`, JSON.stringify({ repeatedFlaps: true, directCamera: true, keyboardCamera: true, demoClosesPanel: true, nativeTouchScroll: after, cameraBefore: before, touchModeToggle: true, languageChange: true, rotation: true }, null, 2));
 console.log('Interaction scenarios passed');
 

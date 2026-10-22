@@ -30,8 +30,7 @@ export function initFlightPanels({ onCycleCamera }) {
     trigger.id = `open-${name}`;
     trigger.setAttribute('aria-controls', `panel-${name}`);
     trigger.setAttribute('aria-expanded', 'false');
-    bindText(trigger, () => t(name === 'environment' && window.matchMedia('(max-width: 1024px)').matches ? 'ui.settings.short' : `ui.${name}`));
-    bindText(trigger, () => t(`ui.${name}`), 'aria-label');
+    bindText(trigger, () => t(`ui.${name}`));
     const panel = document.createElement('section');
     panel.id = `panel-${name}`;
     panel.className = 'flight-panel';
@@ -82,7 +81,12 @@ export function initFlightPanels({ onCycleCamera }) {
   bindText(cameraButton, () => t('change.camera.c'), 'title');
   cameraButton.addEventListener('click', () => onCycleCamera());
   bar.append(cameraButton);
-  makePanel('environment', ['.language-control[for="language-select"]', '.language-control[for="render-quality"]', '#btn-sound', '#btn-touch-toggle', '#touch-btn-gyro', '#btn-cam-reset', '#btn-yokes', '#btn-diag', '#btn-help']);
+  // Settings belong to the main menu, not the in-flight HUD.
+  const settings = document.getElementById('lobby-settings');
+  for (const selector of ['.language-control[for="render-quality"]', '#btn-sound', '#btn-touch-toggle', '#touch-btn-gyro', '#btn-cam-reset', '#btn-yokes', '#btn-diag', '#btn-help']) {
+    const node = document.querySelector(selector);
+    if (node) settings.append(node);
+  }
   const mute = document.createElement('button');
   mute.id = 'btn-mute';
   mute.className = 'btn quick-mute';
@@ -102,9 +106,6 @@ export function initFlightPanels({ onCycleCamera }) {
 
   // Remove the legacy markup the toolbar panels have replaced.
   document.querySelectorAll('.presets-bar, .action-panel').forEach(node => node.remove());
-  panels.get('environment').body.addEventListener('click', event => {
-    if (event.target.closest('#btn-help, #btn-diag')) close();
-  });
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') close(true);
   });

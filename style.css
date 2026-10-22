@@ -1588,7 +1588,7 @@ body.compact-ui {
 #canvas-container, #hud-overlay, .touch-controls-overlay { overflow: hidden; }
 #canvas-container canvas { max-width: 100%; max-height: 100%; }
 
-/* Language and quality live in the environment panel, including the compact mobile menu. */
+/* Quality row and settings buttons are relocated into the menu card at boot; language lives with the lobby's own buttons. */
 .language-control {
   display: flex;
   align-items: center;
@@ -1731,7 +1731,7 @@ body.compact-ui {
   right: var(--edge-right);
   transform: none;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
 }
 .compact-ui .flight-toolbar .btn {
@@ -1890,7 +1890,7 @@ body.compact-ui {
   padding: 4px;
 }
 .compact-ui.touch-mode .flight-toolbar {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) 44px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) 44px;
 }
 .compact-ui.touch-mode .quick-mute { font-size: 18px; }
 
@@ -2049,6 +2049,8 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 .lobby-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
 .lobby-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
 .lobby-buttons .btn { font-size: 12px; }
+/* The menu card is the settings scroll container: vertical panning only. */
+.lobby-card, .lobby-card button, .lobby-card select { touch-action: pan-y; }
 .lobby-buttons .btn.active, #lobby-time-select { border-color: #38bdf8; }
 #lobby-time-select { width: 100%; }
 .btn-fly {

@@ -54,11 +54,7 @@ export function setLanguage(next, storage) {
   if (!Object.hasOwn(locales, next)) return false;
   language = next;
   try { (storage ?? globalThis.localStorage)?.setItem(STORAGE_KEY, next); } catch { /* Storage may be unavailable. */ }
-  if (typeof document !== 'undefined') {
-    document.documentElement.lang = next;
-    const select = document.getElementById('language-select');
-    if (select) select.value = next;
-  }
+  if (typeof document !== 'undefined') document.documentElement.lang = next;
   for (const [element, properties] of bindings) {
     if (element.isConnected === false) { bindings.delete(element); continue; }
     for (const [attribute, render] of properties) {
@@ -75,15 +71,5 @@ export function initLocalization() {
   try { saved = globalThis.localStorage?.getItem(STORAGE_KEY); } catch { /* Use browser preferences. */ }
   language = resolveLanguage(saved, globalThis.navigator?.languages);
   translateDOM(document);
-  const select = document.getElementById('language-select');
-  for (const [code, locale] of Object.entries(locales)) {
-    const option = document.createElement('option');
-    option.value = code;
-    option.textContent = locale.label;
-    option.lang = code;
-    select.append(option);
-  }
-  select.value = language;
-  select.addEventListener('change', () => setLanguage(select.value));
   document.documentElement.lang = language;
 }
