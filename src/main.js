@@ -645,6 +645,8 @@ class FlightSimulator {
       }
     }
 
+    if (type === 'approach' || type === 'cruise') this.applyComputedTrim();
+
     this.controls.clearVirtualInputs();
     this.controls.setParkingBrake?.(false);
     this.controls.brakes = 0.0;
@@ -656,6 +658,38 @@ class FlightSimulator {
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.snapToTarget(this.aircraft.group);
+  }
+
+  /**
+   * Derive the spawn trim state for airborne presets from the steady-state
+   * solver instead of hand-tuned constants: sets the trim wheel, throttle and
+   * pitch attitude to the equilibrium solution for the just-assigned velocity,
+   * altitude and configuration. Falls back to the preset's literal values
+   * when no solution exists (near-stagnant or beyond-envelope spawns).
+   */
+  applyComputedTrim() {
+    const tas = this.linearVelocity.length();
+    if (tas < 20) return;
+    const altitudeMeters = Math.max(0, this.position.y);
+    const atmos = Atmosphere.getConditions(altitudeMeters);
+    const gammaRad = Math.asin(THREE.MathUtils.clamp(this.linearVelocity.y / tas, -1, 1));
+    const solution = solveTrim(this.aero, this.engines, {
+      iasKnots: Atmosphere.msToKnots(Atmosphere.tasToIas(tas, atmos.densityRatio)),
+      altitudeMeters,
+      flightPathAngleDeg: THREE.MathUtils.radToDeg(gammaRad),
+      flapsIndex: this.aero.flapsIndex,
+      gearState: this.gear.gearState,
+      spoilers: this.aero.spoilers,
+    });
+    if (!solution.feasible) return;
+    this.controls.throttle = solution.throttle;
+    this.engines.setThrottle(solution.throttle);
+    this.controls.pitchTrim = solution.handsOffTrimDeg;
+    this.aero.pitchTrim = solution.handsOffTrimDeg;
+    // Pitch attitude = alpha + gamma; keep the preset's heading and roll.
+    const euler = new THREE.Euler().setFromQuaternion(this.quaternion, 'YXZ');
+    euler.x = THREE.MathUtils.degToRad(solution.alphaDeg) + gammaRad;
+    this.quaternion.setFromEuler(euler);
   }
 
   /**

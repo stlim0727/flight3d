@@ -119,6 +119,10 @@ export function solveTrim(aero, engines, state = {}) {
   // Trim wheel that centers the elevator: (elevatorRad + trimRad) = elevatorEffectiveRad
   const pitchTrimDeg = ((elevatorEffectiveRad -
     elevator * MAX_ELEVATOR_RAD * sensitivity) / TRIM_AUTHORITY) * 180 / Math.PI;
+  // Full wheel setting for hands-off flight (elevator neutral); the wheel
+  // limits are Aerodynamics.setTrim's ±(−5..12).
+  const handsOffTrimDeg = clamp(
+    (elevatorEffectiveRad / TRIM_AUTHORITY) * 180 / Math.PI, -5, 12);
 
   return {
     feasible: true,
@@ -129,6 +133,7 @@ export function solveTrim(aero, engines, state = {}) {
     cd,
     elevator,
     pitchTrimDeg: clamp(pitchTrimDeg, -5, 12), // Aerodynamics.setTrim wheel limits
+    handsOffTrimDeg,
     surfaceLimited: Math.abs(elevatorEffectiveRad) > MAX_ELEVATOR_RAD * sensitivity,
     throttle,
     thrustN: effectiveThrust,
