@@ -2103,18 +2103,23 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 .pause-card h2 { color: #7dd3fc; font-size: 18px; margin: 0 0 4px; text-align: center; }
 .pause-card .btn { min-height: 44px; }
 
-/* The lobby owns airport/spawn/time: park the in-game chrome meanwhile. */
-body[data-flow="lobby"] .hud-strip,
-body[data-flow="lobby"] .ap-bar,
-body[data-flow="lobby"] .flight-toolbar,
-body[data-flow="lobby"] .flight-panel,
-body[data-flow="lobby"] .hud-details,
-body[data-flow="lobby"] .quick-mute,
-body[data-flow="lobby"] .presets-bar,
-body[data-flow="lobby"] .action-panel,
-body[data-flow="lobby"] #demo-banner,
-body[data-flow="lobby"] .demo-pill-btn,
-body[data-flow="lobby"] .touch-controls-overlay { display: none !important; }
+/* The lobby owns airport/spawn/time: park the in-game chrome meanwhile.
+   The same park applies while booting (.booting, removed after the first
+   rendered frame) so the HUD does not flash over the black canvas. */
+body:is([data-flow="lobby"], .booting) .hud-strip,
+body:is([data-flow="lobby"], .booting) .ap-bar,
+body:is([data-flow="lobby"], .booting) .flight-toolbar,
+body:is([data-flow="lobby"], .booting) .flight-panel,
+body:is([data-flow="lobby"], .booting) .hud-details,
+body:is([data-flow="lobby"], .booting) .quick-mute,
+body:is([data-flow="lobby"], .booting) .presets-bar,
+body:is([data-flow="lobby"], .booting) .action-panel,
+body:is([data-flow="lobby"], .booting) #demo-banner,
+body:is([data-flow="lobby"], .booting) .demo-pill-btn,
+body:is([data-flow="lobby"], .booting) .touch-controls-overlay { display: none !important; }
+/* The toggle is the lobby's close affordance, so it stays up there; while
+   booting there is nothing to toggle back to yet, so it waits too. */
+body.booting .menu-toggle { display: none !important; }
 
 .toast { z-index: 96; }
 

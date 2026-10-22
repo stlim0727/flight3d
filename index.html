@@ -6,8 +6,10 @@
   <title>Boeing 737 Flight Simulator 3D - Realistic Aerodynamics & Cockpit</title>
   <link rel="stylesheet" href="./style.css">
 </head>
-<!-- Open on the flight HUD; the main menu is reached via the "back to main menu" button. -->
-<body data-flow="flight">
+<!-- Open on the flight HUD; the main menu is reached via the "back to main menu" button.
+     .booting keeps all flight chrome hidden until the first rendered frame, so the HUD
+     does not flash over the black canvas while the scene is still being built. -->
+<body data-flow="flight" class="booting">
   <!-- 3D WebGL Canvas Container -->
   <div id="canvas-container"></div>
 

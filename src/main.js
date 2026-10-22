@@ -286,6 +286,7 @@ class FlightSimulator {
     });
 
     // Begin Animation Loop
+    this.hasRenderedFirstFrame = false;
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
 
@@ -1284,6 +1285,10 @@ class FlightSimulator {
     // 8. Render 3D Scene
     this.sky.prepareRender(this.camera);
     this.renderer.render(this.scene, this.camera);
+    if (!this.hasRenderedFirstFrame) {
+      this.hasRenderedFirstFrame = true;
+      document.body.classList.remove('booting');
+    }
 
     // 9. Render 2D Photorealistic Cockpit Overlay (when in photo cockpit mode)
     if (isPhotoCockpit && this.cockpitPhotoOverlay) {
