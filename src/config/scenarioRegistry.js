@@ -8,7 +8,7 @@
 export const SPAWN_SCENARIOS = {
   runway: {
     airports: ['coastal', 'lukla'],
-    labelKeys: { coastal: 'runway.takeoff.09l', lukla: 'lukla.06.ready' },
+    labelKeys: { coastal: 'runway.takeoff.09l', lukla: 'lukla.24.ready' },
     briefingKey: 'lobby.briefing.scenario.runway',
     lobbyButtonId: 'lobby-preset-rwy',
   },

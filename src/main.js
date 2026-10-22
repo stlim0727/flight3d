@@ -431,16 +431,19 @@ class FlightSimulator {
       const cos58 = 0.529919;
 
       if (type === 'runway') {
-        // Aligned on Lukla Runway 06 Threshold (Elevation 2,805m, Heading 058°, 11.7% uphill slope)
+        // Lukla takeoffs line up at the upper Runway 24 threshold (2,867m) and
+        // accelerate downhill toward the cliff on heading 238°; Runway 06 is the
+        // landing-only direction. Same spawn as the 'cliff' preset: the 5m lateral
+        // offset keeps the wide wing clear of the raised apron.
         // Spawn above the current wheel geometry, allowing suspension settling.
-        this.position.set(-210.0 * sin58, 2814.8, 210.0 * cos58);
+        this.position.set(240.0 * sin58 - 5 * cos58, 2867.72, -240.0 * cos58 - 5 * sin58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
 
-        // Pitch 6.71° nose-up aligned with 11.7% gradient, Heading 058° (yaw -58°)
+        // Pitch -6.71° nose-down along the 11.7% downhill gradient, Heading 238° (yaw -238°)
         const euler = new THREE.Euler(
-          THREE.MathUtils.degToRad(6.71),
-          -THREE.MathUtils.degToRad(58.0),
+          THREE.MathUtils.degToRad(-6.71),
+          -THREE.MathUtils.degToRad(238.0),
           0,
           'YXZ'
         );
@@ -455,7 +458,7 @@ class FlightSimulator {
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 5.5;
 
-        this.showToast(() => t('preset.lukla.runway.06.2.805.m'));
+        this.showToast(() => t('preset.lukla.runway.24.takeoff.roll'));
       } else if (type === 'approach') {
         // Final Approach 2.0 NM out in Dudh Kosi Canyon (Alt 3,070m / 10,070ft)
         // Distance to threshold 06 (s = -263.5m) is 3,536.5m
@@ -671,7 +674,7 @@ class FlightSimulator {
     this.setPreset('runway');
 
     const airportKey = isLukla
-      ? 'tenzing.hillary.airport.nepal.vnlk.runway.06'
+      ? 'tenzing.hillary.airport.nepal.vnlk.runway.24'
       : 'pacific.coastal.international.airport.runway.09l.elevation';
     this.showToast(() => t('airport.changed.value', { value: t(airportKey) }));
   }

@@ -1,0 +1,82 @@
+{
+ "lobby": {
+  "rwy": "🛫 Runway takeoff (09L)",
+  "cliffVisible": false,
+  "briefing": "🌊 Coastal airport\nRwy 090 · threshold elev 39 ft · glideslope 3°\nHolding short, ready for takeoff."
+ },
+ "flight": {
+  "s": 240,
+  "w": -5,
+  "y": 2867.72,
+  "abovePavement": 3.5,
+  "hdg": 238,
+  "pitch": -6.71,
+  "gs": 0,
+  "ias": 0,
+  "onGround": true,
+  "gearDamage": [],
+  "crashed": false,
+  "airport": "lukla",
+  "toast": "Airport changed: Tenzing–Hillary Airport, Nepal (VNLK runway 24, elevation 2,867 m, 11.7% slope)"
+ },
+ "spawnSettled": {
+  "s": 240,
+  "w": -5,
+  "y": 2867.72,
+  "abovePavement": 3.5,
+  "hdg": 238,
+  "pitch": -6.71,
+  "gs": 0,
+  "ias": 3,
+  "onGround": true,
+  "gearDamage": [],
+  "crashed": false,
+  "airport": "lukla",
+  "toast": "Preset: Lukla runway 24 takeoff roll (2,867 m, 11.7% downhill)"
+ },
+ "hold10s": {
+  "s": 239.6,
+  "w": -5,
+  "y": 2867.65,
+  "abovePavement": 3.47,
+  "hdg": 238,
+  "pitch": -6.66,
+  "gs": 0,
+  "ias": 0,
+  "onGround": true,
+  "gearDamage": [],
+  "crashed": false,
+  "airport": "lukla",
+  "toast": "Preset: Lukla runway 24 takeoff roll (2,867 m, 11.7% downhill)"
+ },
+ "roll8s": {
+  "s": 151.7,
+  "w": -5,
+  "y": 2857.32,
+  "abovePavement": 3.48,
+  "hdg": 238,
+  "pitch": -6.66,
+  "gs": 25.48,
+  "ias": 43,
+  "onGround": true,
+  "gearDamage": [],
+  "crashed": false,
+  "airport": "lukla",
+  "toast": "Preset: Lukla runway 24 takeoff roll (2,867 m, 11.7% downhill)"
+ },
+ "roll20s": {
+  "s": -607.6,
+  "w": -5,
+  "y": 2692.63,
+  "abovePavement": -71.92,
+  "hdg": 238,
+  "pitch": -17.87,
+  "gs": 80.47,
+  "ias": 150,
+  "onGround": false,
+  "gearDamage": [],
+  "crashed": false,
+  "airport": "lukla",
+  "toast": "Preset: Lukla runway 24 takeoff roll (2,867 m, 11.7% downhill)"
+ }
+}
