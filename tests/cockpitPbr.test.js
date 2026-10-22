@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 if (typeof document === 'undefined') {
   const noop = () => {};
@@ -235,6 +236,46 @@ describe('Cockpit PBR & Real-Photo Texture Enhancement System', () => {
     for (const df of dracoFiles) {
       const dfPath = path.resolve(process.cwd(), 'public/draco/gltf', df);
       assert.ok(fs.existsSync(dfPath), `Draco decoder file ${df} must exist in public/draco/gltf/`);
+    }
+  });
+
+  it('suppresses the procedural cockpit while the GLTF interior downloads and restores it only on failure', (t) => {
+    const pfd = new PFDCanvas(256, 256);
+    const nd = new NDCanvas(256, 256);
+    const eicas = new EICASCanvas(256, 256);
+    const mcp = new MCPCanvas(512, 64);
+    const isfd = new ISFDCanvas(128, 128);
+    const cdu = new CDUCanvas(256, 256);
+    const cockpit = new Cockpit(pfd, nd, eicas, mcp, isfd, cdu);
+
+    assert.strictEqual(cockpit.cockpitModelLoading, false);
+    assert.strictEqual(cockpit.proceduralCockpitGroup.visible, true);
+
+    let loadError;
+    t.mock.method(GLTFLoader.prototype, 'load', (_url, _onLoad, _onProgress, onError) => { loadError = onError; });
+    t.mock.method(console, 'warn', () => {});
+    const previousWindow = globalThis.window;
+    globalThis.window = {};
+    try {
+      cockpit.loadCockpitModel('/models/b737-cockpit-medium.glb');
+      assert.strictEqual(cockpit.cockpitModelLoading, true);
+      assert.strictEqual(cockpit.proceduralCockpitGroup.visible, false,
+        'Vector cockpit must not render while the real interior is still downloading');
+
+      // Medium asset failure retries the Draco lite asset: still suppressing.
+      loadError(new Error('medium asset unavailable'));
+      assert.strictEqual(cockpit.cockpitModelLoading, true);
+      assert.strictEqual(cockpit.proceduralCockpitGroup.visible, false);
+
+      // Draco retry fails too: the fallback cockpit returns.
+      loadError(new Error('draco asset unavailable'));
+      assert.strictEqual(cockpit.cockpitModelLoading, false);
+      assert.strictEqual(cockpit.gltfCockpitLoaded, false);
+      assert.strictEqual(cockpit.proceduralCockpitGroup.visible, true,
+        'Procedural cockpit must return when no GLTF interior exists');
+    } finally {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
     }
   });
 });

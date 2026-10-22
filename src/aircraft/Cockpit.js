@@ -45,6 +45,7 @@ export class Cockpit {
     this.group.add(this.gltfCockpitGroup);
     this.gltfCockpitModel = null;
     this.gltfCockpitLoaded = false;
+    this.cockpitModelLoading = false;
     this.gltfDisplays = null;
     this.gltfCockpitFraming = null;
     this.gltfGlassPanels = [];
@@ -974,6 +975,11 @@ export class Cockpit {
     }
 
     try {
+      this.cockpitModelLoading = true;
+      // The procedural cockpit is a load-failure fallback only. Leaving it
+      // visible swaps interiors mid-view instead of waiting for the real one.
+      this.proceduralCockpitGroup.visible = false;
+
       const dracoLoader = new DRACOLoader();
       dracoLoader.setDecoderPath(`${import.meta.env?.BASE_URL ?? '/'}draco/gltf/`);
 
@@ -1063,6 +1069,7 @@ export class Cockpit {
           this.proceduralCockpitGroup.visible = false;
           this.gltfCockpitGroup.visible = true;
           this.gltfCockpitLoaded = true;
+          this.cockpitModelLoading = false;
           this.onModelReady?.();
         },
         undefined,
@@ -1076,6 +1083,7 @@ export class Cockpit {
           this.proceduralCockpitGroup.visible = true;
           this.gltfCockpitGroup.visible = false;
           this.gltfCockpitLoaded = false;
+          this.cockpitModelLoading = false;
         }
       );
     } catch (err) {
@@ -1083,6 +1091,7 @@ export class Cockpit {
       this.proceduralCockpitGroup.visible = true;
       this.gltfCockpitGroup.visible = false;
       this.gltfCockpitLoaded = false;
+      this.cockpitModelLoading = false;
     }
   }
 

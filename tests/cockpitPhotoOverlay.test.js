@@ -140,6 +140,7 @@ describe('CockpitPhotoOverlay & Photorealistic 2D Cockpit System', () => {
   it('should integrate seamlessly with CameraSystem photoCockpit toggle', () => {
     const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
     const camSys = new CameraSystem(camera, null);
+    camSys.setMode(CameraSystem.MODES.COCKPIT, true);
 
     assert.strictEqual(camSys.photoCockpit, false, 'CameraSystem must default to photoCockpit=false (3D Virtual Cockpit)');
     assert.strictEqual(camSys.getModeName(), 'COCKPIT (CAPTAIN)');

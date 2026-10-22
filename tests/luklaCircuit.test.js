@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { LuklaCircuitScenario } from '../src/director/scenarios/LuklaCircuitScenario.js';
+import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { LandingGear } from '../src/physics/LandingGear.js';
 import { EngineModel } from '../src/physics/EngineModel.js';
 
 const STAGES = LuklaCircuitScenario.STAGES;
-function setup() {
+function setup({ cockpitModelLoading = false } = {}) {
   const inputs = {};
+  const modes = [];
   const sim = {
     activeAirport: 'lukla', position: new THREE.Vector3(),
     linearVelocity: new THREE.Vector3(), angularVelocity: new THREE.Vector3(),
@@ -18,13 +20,15 @@ function setup() {
     aero: new Aerodynamics(), gear: new LandingGear(), engines: new EngineModel(),
     controls: { setVirtualInput: (k, v) => { assert.ok(Number.isFinite(v)); inputs[k] = v; },
       clearVirtualInputs: () => {}, setParkingBrake(v) { this.parkingBrake = v; } },
-    cameraSystem: { setMode() {} }, sky: { setTimeOfDay() {} }, showToast() {},
+    aircraft: { cockpit: { cockpitModelLoading } },
+    cameraSystem: { setMode(m) { modes.push(m); }, userLookOverridden: false },
+    sky: { setTimeOfDay() {} }, showToast() {},
     setPreset() { this.presetCalls = (this.presetCalls || 0) + 1; }
   };
   const director = new DemoFlightDirector(sim);
   director.start('lukla');
   const place = (s, y = 2950, w = 0) => sim.position.set(s * 0.848048 + w * 0.529919, y, -s * 0.529919 + w * 0.848048);
-  return { sim, director, scenario: director.luklaScenario, inputs, place };
+  return { sim, director, scenario: director.luklaScenario, inputs, place, modes };
 }
 
 describe('Lukla continuous circuit and truthful completion', () => {
@@ -213,5 +217,40 @@ describe('Lukla continuous circuit and truthful completion', () => {
     // A demanded push-over is never limited
     assert.equal(scenario.alphaGuarded(-0.6, 9.0), -0.6);
     assert.equal(scenario.alphaGuarded(-0.6, 14.5), -0.6);
+  });
+});
+
+describe('Lukla takeoff view waits for the streamed cockpit interior', () => {
+  it('opens on the exterior and cuts into the cockpit once the model resolves', () => {
+    const { sim, director, scenario, modes } = setup({ cockpitModelLoading: true });
+    assert.equal(modes.at(-1), CameraSystem.MODES.CHASE);
+    assert.equal(scenario.pendingCockpitCut, true);
+
+    director.update(0.1);
+    assert.equal(modes.at(-1), CameraSystem.MODES.CHASE, 'No interior view while the GLB is still downloading');
+    assert.equal(scenario.pendingCockpitCut, true);
+
+    sim.aircraft.cockpit.cockpitModelLoading = false;
+    director.stageTimer = 1.0;
+    director.update(0.1);
+    assert.equal(modes.at(-1), CameraSystem.MODES.COCKPIT);
+    assert.equal(scenario.pendingCockpitCut, false);
+    assert.equal(scenario.stageCameraCutDone, true,
+      'The opening exterior shot replaces the later chase cut instead of flapping between views');
+  });
+
+  it('enters the cockpit immediately when the interior model is already available', () => {
+    const { scenario, modes } = setup();
+    assert.equal(modes.at(-1), CameraSystem.MODES.COCKPIT);
+    assert.equal(scenario.pendingCockpitCut, false);
+  });
+
+  it('honours a user camera choice instead of cutting into the cockpit', () => {
+    const { sim, director, scenario, modes } = setup({ cockpitModelLoading: true });
+    director.onUserCameraChange();
+    sim.aircraft.cockpit.cockpitModelLoading = false;
+    director.update(0.1);
+    assert.equal(modes.at(-1), CameraSystem.MODES.CHASE, 'User-selected view must not be overridden');
+    assert.equal(scenario.pendingCockpitCut, false);
   });
 });
