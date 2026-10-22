@@ -43,6 +43,8 @@ are opt-in via `--screenshots` (`npm run test:flight:visual`).
 
 ## Simulation changes
 
+- Derive visible behavior from continuous physics state, not behavior-switch
+  conditionals; see [modeling principles](docs/development/physics-modeling-principles.md).
 - Check coordinate frames, units, force/moment signs, and timestep assumptions in
   ARCHITECTURE.md against current source before changing physics or cameras.
 - Keep pure physics behavior testable independently of DOM, WebGL, and audio.
