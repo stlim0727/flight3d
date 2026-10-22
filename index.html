@@ -6,7 +6,8 @@
   <title>Boeing 737 Flight Simulator 3D - Realistic Aerodynamics & Cockpit</title>
   <link rel="stylesheet" href="./style.css">
 </head>
-<body>
+<!-- Mirrors GameFlowController's initial state so the first paint shows the lobby, not the HUD. -->
+<body data-flow="lobby">
   <!-- 3D WebGL Canvas Container -->
   <div id="canvas-container"></div>
 
@@ -139,18 +140,24 @@
       <p id="lobby-loading" class="lobby-loading" data-i18n="loading.lukla.terrain" hidden></p>
       <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
       <div class="lobby-group" role="group">
+        <span class="lobby-label" data-i18n="language.label">Language</span>
+        <div class="lobby-buttons">
+          <button id="lobby-lang-en" class="btn btn-lang"><span lang="en">English</span></button>
+          <button id="lobby-lang-ko" class="btn btn-lang"><span lang="ko">한국어</span></button>
+        </div>
+      </div>
+      <div class="lobby-group" role="group">
         <span class="lobby-label" data-i18n="lobby.airport">공항</span>
         <div class="lobby-buttons">
           <button id="lobby-airport-coastal" class="btn btn-airport active"><span data-i18n="coastal.airport">🌊 국제공항</span></button>
-          <button id="lobby-airport-lukla" class="btn btn-airport"><span data-i18n="lukla.vnlk">🏔️ 루클라 (VNLK)</span></button>
         </div>
       </div>
       <div class="lobby-group" role="group">
         <span class="lobby-label" data-i18n="lobby.spawn">시나리오</span>
         <div class="lobby-buttons">
-          <button id="lobby-preset-rwy" class="btn btn-preset"><span>🛫 루클라 06 대기</span></button>
-          <button id="lobby-preset-app" class="btn btn-preset"><span>🛬 협곡 착륙 챌린지</span></button>
-          <button id="lobby-preset-cru" class="btn btn-preset"><span>✈️ 히말라야 순항 (13,000 FT)</span></button>
+          <button id="lobby-preset-rwy" class="btn btn-preset"><span>🛫 활주로 이륙 (09L)</span></button>
+          <button id="lobby-preset-app" class="btn btn-preset"><span>🛬 착륙 접근 (3 NM)</span></button>
+          <button id="lobby-preset-cru" class="btn btn-preset"><span>✈️ 순항 비행 (6,000 FT)</span></button>
           <button id="lobby-preset-cliff" class="btn btn-preset btn-cliff"><span>⚡ 내리막 이륙 (Rwy 24)</span></button>
         </div>
       </div>
@@ -160,6 +167,7 @@
           <option value="6.5">06:30</option>
           <option value="9.5">09:30</option>
           <option value="12.5">12:30</option>
+          <option value="16.8">16:48</option>
           <option value="17.6">17:36</option>
           <option value="19.5">19:30</option>
           <option value="22.5">22:30</option>

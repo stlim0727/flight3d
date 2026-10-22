@@ -105,8 +105,8 @@ async function testLobbyFlow() {
     if (boot.flow !== 'lobby' || boot.lobbyDisplay === 'none') throw new Error('Lobby must be visible at boot');
     if (boot.hudStripVisible) throw new Error('HUD must be hidden in the lobby');
     if (!boot.demoActive) throw new Error('Cinematic demo must be playing behind the lobby');
-    if (!/058/.test(boot.briefing)) throw new Error(`Lukla briefing missing runway data: ${boot.briefing}`);
-    await screenshot('01-lobby-lukla');
+    if (!/090/.test(boot.briefing)) throw new Error(`Coastal briefing missing runway data: ${boot.briefing}`);
+    await screenshot('01-lobby-coastal');
 
     // 2. Keyboard input must not steer the sim while the lobby is up.
     const gated = await evalJs(`(() => {
@@ -120,7 +120,8 @@ async function testLobbyFlow() {
     console.log('🔍 input gating:', JSON.stringify(gated));
     if (!gated.blocked || gated.after !== gated.before) throw new Error('Throttle key must be blocked in lobby');
 
-    // 3. Airport switch re-scopes the lobby and the backdrop.
+    // 3. The lobby only offers the coastal airport; clicking it must keep the
+    // lobby and backdrop scoped to coastal.
     await evalJs(`document.getElementById('lobby-airport-coastal').click()`);
     await sleep(1200);
     const coastal = await evalJs(`(() => {
