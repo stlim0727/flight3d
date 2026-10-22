@@ -19,6 +19,9 @@ export class CollisionDetector {
     this.foliage = foliageAndCities;
     this.ships = ships;
     this.water = water;
+    this.shipInverse = new THREE.Matrix4();
+    this.shipProbe = new THREE.Vector3();
+    this.shipClosest = new THREE.Vector3();
 
     // Aircraft collision probe points in aircraft local body coordinates (meters)
     // Nose forward (-Z), Right (+X), Up (+Y), Wingtip span ~34.4m, Length ~35m
@@ -414,7 +417,21 @@ export class CollisionDetector {
   checkShips(aircraftPos, worldProbes) {
     if (!this.ships || !this.ships.vessels) return null;
 
-    for (const v of this.ships.vessels) {
+    for (const v of [...this.ships.vessels, ...(this.ships.speedboats || [])]) {
+      if (v.bounds && v.mesh.isObject3D) {
+        // Bounds belong to the visual, not the wake. Follow all motion axes and
+        // wave elevation; yaw-only world boxes miss bows, masts and moving boats.
+        v.mesh.updateWorldMatrix(true, false);
+        this.shipInverse.copy(v.mesh.matrixWorld).invert();
+        for (const probe of worldProbes) {
+          this.shipProbe.copy(probe.pos).applyMatrix4(this.shipInverse);
+          v.bounds.clampPoint(this.shipProbe, this.shipClosest);
+          if (this.shipClosest.distanceToSquared(this.shipProbe) <= probe.radius * probe.radius) {
+            return { point: probe.pos.clone(), get part() { return probe.desc; } };
+          }
+        }
+        continue;
+      }
       const vPos = v.mesh.position;
       const vRotY = v.mesh.rotation.y;
       const halfL = v.length * 0.5;

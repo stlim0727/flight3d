@@ -13,6 +13,7 @@ import { ISFDCanvas } from './aircraft/ISFDCanvas.js';
 import { CDUCanvas } from './aircraft/CDUCanvas.js';
 import { Boeing737 } from './aircraft/Boeing737.js';
 import { Terrain } from './environment/Terrain.js';
+import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality } from './config/renderQuality.js';
 import { WaterOcean } from './environment/WaterOcean.js';
 import { Airport } from './environment/Airport.js';
 import { FoliageAndCities } from './environment/FoliageAndCities.js';
@@ -29,7 +30,7 @@ import { DemoFlightDirector } from './director/DemoFlightDirector.js';
 import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
-import { initMobileMenu } from './ui/MobileMenu.js';
+import { initFlightPanels, updateControlState, touchLabel } from './ui/FlightPanels.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 
@@ -59,7 +60,10 @@ class FlightSimulator {
       powerPreference: 'high-performance'
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    let savedQuality;
+    try { savedQuality = localStorage.getItem(RENDER_QUALITY_KEY); } catch { /* Use default. */ }
+    this.renderQuality = resolveRenderQuality(savedQuality);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, RENDER_QUALITY[this.renderQuality].maxDpr));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
@@ -84,6 +88,20 @@ class FlightSimulator {
       this.cduCanvas
     );
     this.scene.add(this.aircraft.group);
+    this.aircraft.cockpit.onModelReady = () => {
+      const cockpit = this.aircraft.cockpit;
+      const visible = cockpit.group.visible;
+      // Include cabin lights even if the user is currently in an exterior view.
+      // compileAsync gathers lights synchronously, then polls program readiness.
+      cockpit.group.visible = true;
+      try {
+        cockpit.shaderWarmup = this.renderer.compileAsync(
+          cockpit.gltfCockpitGroup, this.camera, this.scene
+        ).catch(error => console.warn('Cockpit shader warmup failed:', error));
+      } finally {
+        cockpit.group.visible = visible;
+      }
+    };
 
     // 3b. Boeing 737 2D Real-Photo Cockpit Overlay
     this.cockpitPhotoOverlay = new CockpitPhotoOverlay(
@@ -102,7 +120,7 @@ class FlightSimulator {
     this.gear = new LandingGear();
 
     // 5. Procedural World & Real-World Environments
-    this.terrain = new Terrain(22000, 256);
+    this.terrain = new Terrain(22000, 256, { quality: RENDER_QUALITY[this.renderQuality].terrain });
     this.scene.add(this.terrain.mesh);
 
     this.water = new WaterOcean(36000);
@@ -138,7 +156,7 @@ class FlightSimulator {
     this.audio = new FlightAudio();
     this.controls = new FlightControls(this.renderer.domElement);
     this.touchControls = new TouchFlightControls(this.controls);
-    initMobileMenu();
+    initFlightPanels({ onSelectCamera: mode => this.controls.onSelectCamera(mode) });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
     this.cameraSystem.onResetLook = () => {
@@ -962,7 +980,7 @@ class FlightSimulator {
     // Discard render history before the real-time loop resumes.
     this.physicsAccumulator = 0;
     this.renderPose.reset(this.position, this.quaternion);
-    this.updateFlightDisplays();
+    this.updateFlightDisplays(true);
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
@@ -979,6 +997,7 @@ class FlightSimulator {
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry, (x, z) => this.currentTerrain.getHeight(x, z));
     this.foliage.updateCityLod(this.camera.position);
+    this.foliage.update(this.camera.position);
     this.sky.updateSun(this.position, this.camera.position);
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
@@ -989,15 +1008,20 @@ class FlightSimulator {
     return this.telemetry;
   }
 
-  updateFlightDisplays() {
-    for (const display of [this.pfdCanvas, this.ndCanvas, this.eicasCanvas]) {
+  updateFlightDisplays(force = false) {
+    const frame = this.displayFrame ?? 0;
+    this.displayFrame = frame + 1;
+    this.pfdCanvas.updateData(this.telemetry);
+    this.pfdCanvas.render();
+    this.isfdCanvas.updateData(this.telemetry);
+    // Initialize both screens; then spread their uploads over alternate frames.
+    for (const display of (force || frame === 0 ? [this.ndCanvas, this.eicasCanvas]
+      : [frame % 2 === 0 ? this.ndCanvas : this.eicasCanvas])) {
       display.updateData(this.telemetry);
       display.render();
     }
-    // These instruments render as part of updateData.
-    for (const display of [this.mcpCanvas, this.isfdCanvas, this.cduCanvas]) {
-      display.updateData(this.telemetry);
-    }
+    this.mcpCanvas.updateData(this.telemetry);
+    this.cduCanvas.updateData(this.telemetry);
   }
 
   /**
@@ -1076,6 +1100,8 @@ class FlightSimulator {
     this.touchControls.updateUI(this.telemetry);
     this.diagnostics.update(frameDelta, this.telemetry);
 
+    this.foliage.update(this.camera.position);
+
     // 8. Render 3D Scene
     this.sky.prepareRender(this.camera);
     this.renderer.render(this.scene, this.camera);
@@ -1121,32 +1147,34 @@ class FlightSimulator {
       elStall.style.display = this.telemetry.isStalled ? 'block' : 'none';
     }
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
+    updateControlState(this.telemetry, this.cameraSystem, this.sky.timeOfDay);
   }
 
   updateAudioUI(state) {
     if (!state && this.audio) state = this.audio.getVolumeState();
     if (!state) return;
 
+    const btnMute = document.getElementById('btn-mute');
+    if (btnMute) {
+      btnMute.textContent = state.muted ? '🔇' : '🔊';
+      btnMute.setAttribute('aria-pressed', String(state.muted));
+      bindText(btnMute, () => t(state.muted ? 'ui.unmute' : 'ui.mute'), 'aria-label');
+      bindText(btnMute, () => t(state.muted ? 'ui.unmute' : 'ui.mute'), 'title');
+    }
     const btnSound = document.getElementById('btn-sound');
     if (btnSound) {
       if (state.muted) {
         btnSound.className = 'btn btn-preset btn-sound-toggle muted';
-        bindText(btnSound, () => t('muted.m'));
-      } else if (state.mode === 'bluetooth') {
-        btnSound.className = 'btn btn-preset btn-sound-toggle active-bt';
-        bindText(btnSound, () => t('bluetooth.200'));
-      } else if (state.mode === 'mobile') {
-        btnSound.className = 'btn btn-preset btn-sound-toggle active-boost';
-        bindText(btnSound, () => t('boost.150'));
+        bindText(btnSound, () => t('muted'));
       } else {
         btnSound.className = 'btn btn-preset btn-sound-toggle';
-        bindText(btnSound, () => t('sound.100.m'));
+        bindText(btnSound, () => t('sound.100'));
       }
     }
 
     const btnSoundAction = document.getElementById('btn-sound-action');
     if (btnSoundAction) {
-      bindText(btnSoundAction, () => state.muted ? t('muted') : (state.mode === 'bluetooth' ? '🎧⚡ 200%' : (state.mode === 'mobile' ? '🔊⚡ 150%' : t('volume.m'))));
+      bindText(btnSoundAction, () => state.muted ? t('muted') : t('volume.m'));
     }
 
     if (this.touchControls && typeof this.touchControls.updateAudioUI === 'function') {
@@ -1165,7 +1193,19 @@ class FlightSimulator {
     }, 2500);
   }
 
+  setRenderQuality(value) {
+    this.renderQuality = resolveRenderQuality(value);
+    const preset = RENDER_QUALITY[this.renderQuality];
+    if (this.terrain.getQuality() !== preset.terrain) this.terrain.setQuality(preset.terrain);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, preset.maxDpr));
+    document.getElementById('render-quality').value = this.renderQuality;
+    try { localStorage.setItem(RENDER_QUALITY_KEY, this.renderQuality); } catch { /* Session-only setting. */ }
+  }
+
   initUI() {
+    const qualitySelect = document.getElementById('render-quality');
+    qualitySelect.value = this.renderQuality;
+    qualitySelect.addEventListener('change', () => this.setRenderQuality(qualitySelect.value));
     // Airport Selector UI buttons
     document.getElementById('btn-airport-coastal')?.addEventListener('click', () => this.setAirport('coastal'));
     document.getElementById('btn-airport-lukla')?.addEventListener('click', () => this.setAirport('lukla'));
@@ -1187,6 +1227,14 @@ class FlightSimulator {
       this.showToast(() => t('camera.view.centered'));
     });
     document.getElementById('btn-time')?.addEventListener('click', () => this.controls.onCycleTimeOfDay(3.0));
+    document.getElementById('btn-mute')?.addEventListener('click', () => {
+      this.audio.setMuted(!this.audio.isMuted);
+      if (!this.audio.isMuted) {
+        this.audio.init();
+        this.audio.ensureContextRunning();
+      }
+      this.updateAudioUI();
+    });
     document.getElementById('btn-sound')?.addEventListener('click', () => this.controls.onToggleAudio());
     document.getElementById('btn-sound-action')?.addEventListener('click', () => this.controls.onToggleAudio());
     document.getElementById('btn-diag')?.addEventListener('click', () => this.diagnostics.toggle());
@@ -1224,7 +1272,7 @@ class FlightSimulator {
       const visible = this.aircraft.cockpit.toggleYokes();
       const button = document.getElementById('btn-yokes');
       if (button) {
-        bindText(button, () => visible ? t('hide.yokes.j') : t('show.yokes.j'));
+        bindText(button, () => touchLabel(visible ? t('hide.yokes.j') : t('show.yokes.j')));
         button.setAttribute('aria-pressed', String(!visible));
       }
     };

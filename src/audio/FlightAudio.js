@@ -4,8 +4,7 @@ import { t } from '../i18n/index.js';
  * Synthesizes twin turbofan engines (combustion roar + N1/N2 turbine whine), aerodynamic airflow slipstream,
  * cockpit air conditioning & avionics cooling pack blower, runway rumble, touchdown tire screech & oleo thump,
  * stall horn, and Boeing GPWS voice callouts.
- * Features mobile & Bluetooth headphone loudness optimization, dynamic range compression with makeup gain,
- * and multi-stage boost (100% -> 150% Mobile -> 200% Bluetooth Max Boost).
+ * Uses dynamic range compression with normal-volume and muted output states.
  */
 export class FlightAudio {
   constructor() {
@@ -13,18 +12,7 @@ export class FlightAudio {
     this.isMuted = false;
     this.isInitialized = false;
 
-    // Volume level: 1.0 = 100%, 1.5 = Mobile Boost 150%, 2.0 = Bluetooth Max Boost 200%
     this.volume = 1.0;
-
-    // Auto-detect mobile / small-screen environment for loudness boost
-    if (typeof window !== 'undefined') {
-      const isMobile = ('ontouchstart' in window) ||
-        (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) ||
-        (window.innerWidth <= 1024);
-      if (isMobile) {
-        this.volume = 1.5; // Start in Mobile Boost (150%) on mobile devices
-      }
-    }
 
     // Callout tracking
     this.lastRadioAlt = 9999;
@@ -62,9 +50,9 @@ export class FlightAudio {
       this.compressor.attack.setValueAtTime(0.002, this.ctx.currentTime);
       this.compressor.release.setValueAtTime(0.18, this.ctx.currentTime);
 
-      // 2. Output Makeup Booster (Post-compressor makeup gain for headphones & Bluetooth)
+      // 2. Unity output stage (no volume boost)
       this.makeupGain = this.ctx.createGain();
-      this.makeupGain.gain.setValueAtTime(1.6, this.ctx.currentTime); // +4.1 dB makeup boost
+      this.makeupGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
 
       // 3. Master Gain Node (user volume control)
       this.masterGain = this.ctx.createGain();
@@ -359,7 +347,7 @@ export class FlightAudio {
   }
 
   setVolume(vol) {
-    this.volume = Math.max(0.0, Math.min(3.0, vol));
+    this.volume = Math.max(0.0, Math.min(1.0, vol));
     if (this.volume > 0.0) {
       this.isMuted = false;
     }
@@ -383,17 +371,8 @@ export class FlightAudio {
   }
 
   cycleVolume() {
-    // 4-stage cycle: 100% -> 150% (Mobile) -> 200% (Bluetooth Max Boost) -> Muted -> 100%
-    if (this.isMuted) {
-      this.isMuted = false;
-      this.volume = 1.0;
-    } else if (Math.abs(this.volume - 1.0) < 0.1) {
-      this.volume = 1.5;
-    } else if (Math.abs(this.volume - 1.5) < 0.1) {
-      this.volume = 2.0;
-    } else {
-      this.isMuted = true;
-    }
+    this.isMuted = !this.isMuted;
+    this.volume = 1.0;
     this.applyMasterGain();
     return this.getVolumeState();
   }
@@ -401,12 +380,6 @@ export class FlightAudio {
   getVolumeState() {
     if (this.isMuted) {
       return { muted: true, level: 0, mode: 'muted', text: t('audio.muted'), icon: '🔇' };
-    }
-    if (this.volume >= 1.9) {
-      return { muted: false, level: 2.0, mode: 'bluetooth', text: t('bluetooth.maximum.boost.200'), icon: '🎧⚡' };
-    }
-    if (this.volume >= 1.4) {
-      return { muted: false, level: 1.5, mode: 'mobile', text: t('mobile.boost.150'), icon: '🔊⚡' };
     }
     return { muted: false, level: 1.0, mode: 'normal', text: t('normal.volume.100'), icon: '🔊' };
   }

@@ -40,7 +40,7 @@ export class CameraSystem {
     this.lookPitch = -0.25; // Natural pilot head tilt showing MCP, instruments & runway horizon
 
     // Landing Gear Belly View Parameters (Oblique angle looking at nose and main gear under fuselage)
-    this.gearCamOffset = new THREE.Vector3(2.2, -2.6, 6.2);
+    this.gearCamOffset = new THREE.Vector3(2.2, -2.4, 6.2);
     this.gearLookTarget = new THREE.Vector3(-0.5, -1.9, -2.5);
     this.gearLookYaw = 0;
     this.gearLookPitch = 0;
@@ -72,7 +72,7 @@ export class CameraSystem {
     this.cursorNormY = 0;
     this.targetCursorNormX = 0;
     this.targetCursorNormY = 0;
-    this.enableCursorTrack = true;
+    this.enableCursorTrack = false; // Looking requires an explicit drag or pointer lock.
 
     // Tower Camera Location (Inside Control Tower Cab at 66m height)
     this.towerPos = new THREE.Vector3(120, 78, 280);
@@ -103,7 +103,7 @@ export class CameraSystem {
     this.userLookOverridden = false;
 
     // Continuous Edge Pan / Edge Look state (화면 끝 도달 시 시선 지속 회전)
-    this.enableEdgePan = true;
+    this.enableEdgePan = false; // Grab gestures stop when the pointer/finger stops.
     this.edgePanMargin = 30; // Threshold distance in pixels from screen boundary
     this.edgePanSpeedX = 280; // Virtual px/s equivalent for horizontal pan (~0.98 rad/s in cockpit, ~1.4 rad/s in chase)
     this.edgePanSpeedY = 220; // Virtual px/s equivalent for vertical tilt (~0.77 rad/s)
@@ -125,7 +125,7 @@ export class CameraSystem {
   isInteractiveUI(target) {
     if (!target || typeof target.closest !== 'function') return false;
     return !!target.closest(
-      'button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .crash-overlay, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #help-modal, #diagnostics-overlay'
+      '.flight-panel, .flight-toolbar, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .crash-overlay, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #help-modal, #diagnostics-overlay'
     );
   }
 
@@ -203,7 +203,8 @@ export class CameraSystem {
           this.prevMouse.x = e.clientX;
           this.prevMouse.y = e.clientY;
 
-          this.applyMouseDelta(dx, dy);
+          if (this.pointerLocked) this.applyMouseDelta(dx, dy);
+          else this.applyDragDelta(dx, dy);
         } else {
           this.prevMouse.x = e.clientX;
           this.prevMouse.y = e.clientY;
@@ -353,7 +354,7 @@ export class CameraSystem {
         this.prevMouse.x = touch.clientX;
         this.prevMouse.y = touch.clientY;
 
-        this.applyMouseDelta(dx, dy);
+        this.applyDragDelta(dx, dy);
         this.setCursorPosition(touch.clientX, touch.clientY);
 
         if (typeof e.preventDefault === 'function' && e.cancelable) {
@@ -414,6 +415,15 @@ export class CameraSystem {
     } else if (this.mode === CameraSystem.MODES.DRONE) {
       this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance - deltaDist * 0.12));
     }
+  }
+
+  // Grab the scenery: mouse and touch move it with the gesture. Pointer lock
+  // retains directional head movement through applyMouseDelta.
+  applyDragDelta(dx, dy) {
+    // Gear yaw offsets the look target along +X, unlike the head/orbit yaw
+    // rotations. Its original horizontal mapping already grabs the scenery.
+    const lookDx = this.mode === CameraSystem.MODES.GEAR ? dx : -dx;
+    this.applyMouseDelta(lookDx, -dy);
   }
 
   applyMouseDelta(dx, dy) {

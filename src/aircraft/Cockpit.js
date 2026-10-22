@@ -1,3 +1,4 @@
+import { batchStaticCockpit } from './StaticCockpitBatch.js';
 import { bindGltfYokes, updateGltfYokes, bindGltfEngineControls, updateGltfEngineControls } from './GltfCockpitControls.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -1042,6 +1043,13 @@ export class Cockpit {
 
           this.gltfYokes = bindGltfYokes(model);
           this.gltfEngineControls = bindGltfEngineControls(model);
+          const movingParts = [
+            ...this.gltfYokes, ...this.gltfEngineControls.throttles, ...this.gltfEngineControls.pedals
+          ];
+          // Each pivot can also batch its own surfaces without losing articulation.
+          this.staticDrawCallsSaved = movingParts.reduce(
+            (saved, pivot) => saved + batchStaticCockpit(pivot), 0
+          ) + batchStaticCockpit(model, movingParts);
           for (const yoke of this.gltfYokes) yoke.visible = this.yokesVisible;
           this.gltfCockpitGroup.add(model);
 
@@ -1055,6 +1063,7 @@ export class Cockpit {
           this.proceduralCockpitGroup.visible = false;
           this.gltfCockpitGroup.visible = true;
           this.gltfCockpitLoaded = true;
+          this.onModelReady?.();
         },
         undefined,
         (error) => {

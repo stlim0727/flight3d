@@ -128,3 +128,30 @@ See [gear fit evidence](../../review-artifacts/gear-fit/README.md).
 
 See [material surface acceptance](material-surfaces.md) for controlled water,
 terrain high/low, sunset and night captures with shader/error checks.
+
+### Cockpit stutter mitigation (issue #101)
+
+`node scripts/verify-cockpit-stutter.mjs` checks the loaded model's batch count,
+control reset/yoke visibility, alternating display redraws, dirty MCP/CDU updates,
+and forced refresh during deterministic stepping. Start Vite and open it in Chrome
+with CDP on port 9451 (`CDP_PORT` overrides). Set `FALLBACK=1` to block the medium
+GLB and test Draco. `ARTIFACT_DIR` overrides the capture directory. See
+[results and limitations](../../review-artifacts/issue101/README.md).
+
+### Airport rendering quality (issue #97)
+
+`node scripts/verify-airport-performance.mjs` compares an unchanged main server
+on 5198 with this branch on 5197 using a dedicated GPU Chrome on CDP 9497.
+It samples the native animation loop twice in reversed variant order at device
+DPR 1/2 on the noon runway, and captures fixed-pose noon/night visual evidence
+for runway, approach and cruise.
+See [presets, reproduction and measurements](../../review-artifacts/issue97/README.md).
+`APP_URL`, `BASELINE_URL`, `CDP_PORT`, and `ARTIFACT_DIR` override defaults.
+`node scripts/verify-render-quality.mjs` uses the same CDP port to check selection,
+saved preferences, three rabbit cycles without program growth, and mobile layout.
+Run it separately from timed benchmarks to avoid disturbing the camera or GPU.
+
+### Effect flipbooks (issue #15)
+
+See [effect flipbooks](effect-flipbooks.md) for atlas provenance, resource budgets,
+Node lifecycle tests and the Windows/Linux browser comparison harness.

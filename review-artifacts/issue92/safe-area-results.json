@@ -1,0 +1,51 @@
+[
+  {
+    "selector": ".flight-toolbar",
+    "left": 18,
+    "right": 302,
+    "top": 78,
+    "bottom": 122
+  },
+  {
+    "selector": ".hud-strip",
+    "left": 18,
+    "right": 222,
+    "top": 24,
+    "bottom": 72
+  },
+  {
+    "selector": ".hud-details",
+    "left": 226,
+    "right": 302,
+    "top": 24,
+    "bottom": 68
+  },
+  {
+    "selector": ".touch-throttle-card",
+    "left": 18,
+    "right": 74,
+    "top": 409,
+    "bottom": 536
+  },
+  {
+    "selector": ".touch-stick-card",
+    "left": 202,
+    "right": 302,
+    "top": 436,
+    "bottom": 536
+  },
+  {
+    "selector": ".touch-rudder-card",
+    "left": 86,
+    "right": 190,
+    "top": 469,
+    "bottom": 534
+  },
+  {
+    "selector": "#touch-btn-brake",
+    "left": 116,
+    "right": 160,
+    "top": 421,
+    "bottom": 465
+  }
+]

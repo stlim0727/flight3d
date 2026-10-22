@@ -1,10 +1,8 @@
 import * as THREE from 'three';
+import { createTreeGeometry, TREE_SPECIES, TREE_LOD_DISTANCE, TREE_LOD_HYSTERESIS } from './TreeModels.js';
 import { cityWindowIntensity, createCityBuildingAssets } from './CityBuildingAssets.js';
 
-/**
- * High-Performance Instanced Foliage (3,500+ Trees) & Urban City Buildings (500+ Structures)
- * Uses THREE.InstancedMesh for optimal 60+ FPS rendering while guaranteeing clear airport flight paths.
- */
+/** Instanced vegetation and cities; collision metadata is independent of visual LOD. */
 export class FoliageAndCities {
   constructor(terrain, random = Math.random) {
     this.terrain = terrain;
@@ -21,26 +19,38 @@ export class FoliageAndCities {
   initFoliage() {
     const treeCount = 3500;
 
-    // Compound geometry for pine tree: brown trunk + tiered green cone foliage
-    const trunkGeo = new THREE.CylinderGeometry(0.35, 0.55, 3.5, 6);
-    trunkGeo.translate(0, 1.75, 0);
-
-    const foliageGeo = new THREE.ConeGeometry(3.2, 8.5, 7);
-    foliageGeo.translate(0, 6.5, 0);
-
-    // Merge or instantiate separate meshes
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x422d1d, roughness: 0.9 });
-    const foliageMat = new THREE.MeshStandardMaterial({ color: 0x1f4724, roughness: 0.8 });
-
-    const trunkInst = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
-    const foliageInst = new THREE.InstancedMesh(foliageGeo, foliageMat, treeCount);
+    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+    this.treeBatches = TREE_SPECIES.map(species => {
+      const geometries = [createTreeGeometry(species, true), createTreeGeometry(species, false)];
+      const meshes = geometries.map((geometry, level) => {
+        const mesh = new THREE.InstancedMesh(geometry, material, treeCount);
+        mesh.name = 'tree-' + species + (level === 0 ? '-near' : '-far');
+        mesh.count = 0;
+        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        // Closed opaque crowns avoid alpha sorting and leaf-card overdraw.
+        mesh.castShadow = level === 0;
+        mesh.receiveShadow = true;
+        this.group.add(mesh);
+        return mesh;
+      });
+      const box = geometries[0].boundingBox.clone().union(geometries[1].boundingBox);
+      let radius = 0;
+      for (const geometry of geometries) {
+        const vertices = geometry.attributes.position;
+        for (let i = 0; i < vertices.count; i++) {
+          radius = Math.max(radius, Math.hypot(vertices.getX(i), vertices.getZ(i)));
+        }
+      }
+      return { species, meshes, box, radius };
+    });
+    this.treeInstances = [];
+    this.lastTreeCamera = new THREE.Vector3(Infinity, Infinity, Infinity);
 
     const dummy = new THREE.Object3D();
     let placed = 0;
 
     // Distribute trees across landscape
     const areaRadius = 9000;
-    const seedPoints = [];
 
     for (let i = 0; i < treeCount * 2 && placed < treeCount; i++) {
       const angle = this.random() * Math.PI * 2;
@@ -70,27 +80,44 @@ export class FoliageAndCities {
       dummy.rotation.y = this.random() * Math.PI * 2;
       dummy.updateMatrix();
 
-      trunkInst.setMatrixAt(placed, dummy.matrix);
-      foliageInst.setMatrixAt(placed, dummy.matrix);
-
+      const speciesIndex = placed % TREE_SPECIES.length;
+      const { box, radius } = this.treeBatches[speciesIndex];
+      this.treeInstances.push({
+        speciesIndex, matrix: dummy.matrix.clone(), position: dummy.position.clone(), near: false,
+        color: new THREE.Color().setScalar(0.86 + Math.abs(Math.sin(x * 7 + z)) * 0.24)
+      });
       this.treeData.push({
-        x,
-        y,
-        z,
-        height: 10.5 * scale,
-        radius: 3.5 * scale
+        x, y, z,
+        height: box.max.y * dummy.scale.y,
+        radius: radius * scale
       });
 
       placed++;
     }
 
-    trunkInst.count = placed;
-    foliageInst.count = placed;
+    this.update(new THREE.Vector3());
+  }
 
-    trunkInst.instanceMatrix.needsUpdate = true;
-    foliageInst.instanceMatrix.needsUpdate = true;
-
-    this.group.add(trunkInst, foliageInst);
+  update(cameraPosition) {
+    if (!this.group.visible || this.lastTreeCamera.distanceToSquared(cameraPosition) < 25 * 25) return;
+    this.lastTreeCamera.copy(cameraPosition);
+    for (const batch of this.treeBatches) for (const mesh of batch.meshes) mesh.count = 0;
+    for (const tree of this.treeInstances) {
+      const threshold = TREE_LOD_DISTANCE + (tree.near ? TREE_LOD_HYSTERESIS : 0);
+      tree.near = tree.position.distanceToSquared(cameraPosition) < threshold * threshold;
+      const mesh = this.treeBatches[tree.speciesIndex].meshes[tree.near ? 0 : 1];
+      mesh.setMatrixAt(mesh.count, tree.matrix);
+      mesh.setColorAt(mesh.count, tree.color);
+      mesh.count++;
+    }
+    for (const batch of this.treeBatches) {
+      for (const mesh of batch.meshes) {
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+        // Repacking changes world bounds, including after an airport teleport.
+        mesh.computeBoundingSphere();
+      }
+    }
   }
 
   initCities() {

@@ -33,11 +33,12 @@ export class CDUCanvas {
     this.render();
   }
 
-  updateData(telemetry) {
-    if (telemetry.iasKnots) {
-      // Keep CDU dynamic based on flight progress
+  updateData() {
+    const key = JSON.stringify([this.airportId, this.activeWpt, this.distNm, this.v2Speed]);
+    if (key !== this.renderKey) {
+      this.renderKey = key;
+      this.render();
     }
-    this.render();
   }
 
   render() {
