@@ -69,8 +69,9 @@ export class GameFlowController {
     return true;
   }
 
+  /** Allowed from FLIGHT (HUD button) as well as PAUSED (pause menu). */
   returnToLobby() {
-    if (this.state !== FLOW.PAUSED) return false;
+    if (this.state === FLOW.LOBBY) return false;
     this._setState(FLOW.LOBBY);
     this._resetLoopCap();
     this._armRestart();

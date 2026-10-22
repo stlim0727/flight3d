@@ -324,6 +324,7 @@ export default {
   "pause.resume": "Resume",
   "pause.restart": "Restart scenario",
   "pause.lobby": "Return to main menu",
+  "hud.menu": "🏠 Main menu",
   "state.on": "ON",
   "state.off": "OFF",
   "preset.coastal.runway": "Preset: Runway 09L (ready for takeoff)",

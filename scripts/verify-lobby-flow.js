@@ -2,8 +2,9 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 // Browser acceptance for the lobby/pause flow (issue #112 part 3).
-// Boots the page, verifies menu gating, Fly handoff, ESC pause, lobby return,
-// demo loop-restart, and airport switching — plus desktop + mobile screenshots.
+// Boots the page, verifies menu gating, Fly handoff, ESC pause, lobby return
+// (pause menu and HUD toolbar button), demo loop-restart, airport switching —
+// plus desktop + mobile screenshots.
 
 const PORT = 5179;
 const CDP_PORT = 9469;
@@ -268,7 +269,45 @@ async function testLobbyFlow() {
     await sleep(150);
     if (await evalJs(`document.body.dataset.flow`) !== 'lobby') throw new Error('ESC must be ignored in lobby');
 
-    // 10. Mobile portrait: lobby renders as a bottom sheet.
+    // 10. HUD toolbar "Main menu" button returns to the lobby directly from flight.
+    await evalJs(`document.getElementById('btn-fly').click()`);
+    await sleep(600);
+    const hudMenu = await evalJs(`(() => {
+      const btn = document.getElementById('btn-hud-menu');
+      return {
+        flow: document.body.dataset.flow,
+        toolbarVisible: btn ? getComputedStyle(btn).display !== 'none' : false,
+        label: btn ? btn.textContent : '',
+      };
+    })()`);
+    console.log('🔍 hud menu in flight:', JSON.stringify(hudMenu));
+    if (hudMenu.flow !== 'flight' || !hudMenu.toolbarVisible || !hudMenu.label.includes('🏠')) {
+      throw new Error('Main menu button must be visible in the flight toolbar');
+    }
+    await evalJs(`document.getElementById('btn-hud-menu').click()`);
+    const hudLobby = await evalJs(`(() => {
+      const sim = window.simulator;
+      return {
+        flow: document.body.dataset.flow,
+        blocked: sim.controls.inputBlocked,
+        lobbyVisible: getComputedStyle(document.getElementById('lobby-screen')).display !== 'none',
+        toolbarHidden: getComputedStyle(document.querySelector('.flight-toolbar')).display === 'none',
+      };
+    })()`);
+    console.log('🔍 hud return:', JSON.stringify(hudLobby));
+    if (hudLobby.flow !== 'lobby' || !hudLobby.blocked || !hudLobby.lobbyVisible || !hudLobby.toolbarHidden) {
+      throw new Error('HUD main-menu button did not return to the lobby');
+    }
+    let hudRestarted = false;
+    for (let i = 0; i < 60 && !hudRestarted; i++) {
+      await sleep(500);
+      hudRestarted = await evalJs(`window.simulator.demoDirector.isActive`);
+    }
+    if (!hudRestarted) throw new Error('Demo did not restart after HUD return to lobby within 30s');
+    console.log('🔍 HUD lobby return + loop restart OK');
+    await screenshot('06-hud-return-lobby');
+
+    // 11. Mobile portrait: lobby renders as a bottom sheet.
     await send('Emulation.setDeviceMetricsOverride', {
       width: 390, height: 844, deviceScaleFactor: 2, mobile: true,
       screenOrientation: { type: 'portraitPrimary', angle: 0 },
@@ -283,7 +322,7 @@ async function testLobbyFlow() {
     console.log('🔍 mobile lobby:', JSON.stringify(mobile));
     if (!mobile.cardVisible) throw new Error('Lobby card not rendered on mobile');
     if (mobile.flyH < 40) throw new Error('Fly button too small for touch');
-    await screenshot('06-lobby-mobile');
+    await screenshot('07-lobby-mobile');
 
     console.log('✅ ALL LOBBY/PAUSE FLOW CHECKS PASSED');
     ws.close();

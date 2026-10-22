@@ -324,6 +324,7 @@ export default {
   "pause.resume": "계속 비행",
   "pause.restart": "시나리오 재시작",
   "pause.lobby": "메인 메뉴로 이동",
+  "hud.menu": "🏠 메인 메뉴",
   "state.on": "켜짐",
   "state.off": "꺼짐",
   "preset.coastal.runway": "프리셋: 활주로 09L (이륙 준비)",

@@ -87,6 +87,19 @@ test('enterFlight cancels armed countdown; lobby return re-arms', () => {
   assert.equal(c.consumeDemoRestart(), true);
 });
 
+test('HUD returnToLobby works directly from flight and re-arms the cinematic', () => {
+  const { c, changes } = makeController();
+  c.enterFlight();
+  assert.equal(c.returnToLobby(), true);
+  assert.equal(c.state, FLOW.LOBBY);
+  assert.equal(c.blocksFlightInput(), true);
+  assert.equal(c.isPhysicsFrozen(), false);
+  run(c, 1.6);
+  assert.equal(c.consumeDemoRestart(), true);
+  assert.equal(c.consumeDemoRestart(), false);
+  assert.deepEqual(changes, ['flight', 'lobby']);
+});
+
 test('repeated end/restart cycles re-arm each time', () => {
   const { c, flags } = makeController({ loopCapCount: 10 });
   for (let i = 0; i < 3; i++) {
