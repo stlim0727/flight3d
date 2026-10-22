@@ -1978,6 +1978,10 @@ body.compact-ui {
   letter-spacing: 0.5px;
 }
 .ap-phase-item { margin-right: 4px; }
+.ap-toggle-btn { min-width: 32px; padding: 4px 6px; }
+.ap-bar.ap-collapsed > :not(.ap-toggle-btn) { display: none; }
+.ap-bar.ap-collapsed { padding: 4px 6px; }
+.ap-toggle-btn.ap-active { color: #02110a; background: #10b981; border-color: #34d399; }
 .compact-ui .ap-bar {
   top: auto;
   right: auto;

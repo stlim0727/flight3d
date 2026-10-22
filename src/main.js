@@ -1395,6 +1395,24 @@ class FlightSimulator {
       btn.classList.toggle('ap-armed', id === 'btn-ap-app' && this.autopilot.appArmed);
       btn.setAttribute('aria-pressed', String(on));
     }
+    const btnToggle = document.getElementById('btn-ap-toggle');
+    const apBar = document.getElementById('ap-bar');
+    if (btnToggle) {
+      const collapsed = Boolean(apBar && apBar.classList.contains('ap-collapsed'));
+      btnToggle.classList.toggle('ap-active', collapsed && this.autopilot.master);
+    }
+  }
+
+  updateApToggleUI() {
+    const bar = document.getElementById('ap-bar');
+    const btn = document.getElementById('btn-ap-toggle');
+    if (!bar || !btn) return;
+    const collapsed = bar.classList.contains('ap-collapsed');
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    btn.textContent = collapsed ? '▸' : '▾';
+    bindText(btn, () => t(collapsed ? 'ap.expand' : 'ap.collapse'), 'aria-label');
+    bindText(btn, () => t(collapsed ? 'ap.expand.tip' : 'ap.collapse.tip'), 'title');
+    btn.classList.toggle('ap-active', collapsed && this.autopilot.master);
   }
 
   updateAudioUI(state) {
@@ -1482,6 +1500,11 @@ class FlightSimulator {
         this.updateAutopilotUI();
       });
     }
+    document.getElementById('btn-ap-toggle')?.addEventListener('click', () => {
+      document.getElementById('ap-bar')?.classList.toggle('ap-collapsed');
+      this.updateApToggleUI();
+    });
+    this.updateApToggleUI();
 
     // Initialize Demo Director UI bindings
     this.demoDirector.initUI();
