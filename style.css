@@ -2085,3 +2085,111 @@ body.compact-ui {
 .compact-ui .ap-btn { min-height: 44px; min-width: 44px; padding: 4px 6px; }
 .compact-ui .ap-modes { min-width: 56px; }
 .panel-open .ap-bar { visibility: hidden; }
+
+/* ===== Lobby / pause flow overlays ===== */
+.flow-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 85;
+  pointer-events: auto;
+}
+body[data-flow="lobby"] #lobby-screen { display: flex; }
+body[data-flow="paused"] #pause-menu { display: flex; }
+
+/* Lobby: side card so the cinematic stays visible on the right. */
+#lobby-screen {
+  align-items: center;
+  background: linear-gradient(90deg,
+    rgba(6, 10, 18, 0.94) 0%,
+    rgba(6, 10, 18, 0.86) 34%,
+    rgba(6, 10, 18, 0.35) 55%,
+    rgba(6, 10, 18, 0) 72%);
+}
+.lobby-card, .pause-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(10, 16, 26, 0.82);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 12px;
+  color: #e2e8f0;
+  padding: 18px 20px;
+}
+.lobby-card {
+  margin-left: max(16px, env(safe-area-inset-left));
+  max-height: min(92dvh, 720px);
+  overflow-y: auto;
+  width: min(420px, 86vw);
+}
+.lobby-title { color: #7dd3fc; font-size: 22px; letter-spacing: 1px; margin: 0; }
+.lobby-loading { color: #f59e0b; font-size: 12px; margin: 0; }
+.lobby-briefing {
+  white-space: pre-line;
+  background: rgba(148, 163, 184, 0.08);
+  border-left: 3px solid #38bdf8;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 8px 12px;
+}
+.lobby-group { display: flex; flex-direction: column; gap: 6px; }
+.lobby-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+.lobby-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.lobby-buttons .btn { font-size: 12px; }
+.lobby-buttons .btn.active, #lobby-time-select { border-color: #38bdf8; }
+#lobby-time-select { width: 100%; }
+.btn-fly {
+  background: #065f46;
+  border: 1px solid #10b981;
+  color: #ecfdf5;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  min-height: 48px;
+  margin-top: 4px;
+}
+.btn-fly:hover { background: #047857; }
+.lobby-hint { color: #64748b; font-size: 11px; margin: 0; }
+
+/* Pause: dim the frozen scene lightly. */
+#pause-menu {
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 10, 18, 0.55);
+  backdrop-filter: blur(2px);
+}
+.pause-card { align-items: stretch; min-width: min(320px, 84vw); }
+.pause-card h2 { color: #7dd3fc; font-size: 18px; margin: 0 0 4px; text-align: center; }
+.pause-card .btn { min-height: 44px; }
+
+/* The lobby owns airport/spawn/time: park the in-game chrome meanwhile. */
+body[data-flow="lobby"] .hud-strip,
+body[data-flow="lobby"] .ap-bar,
+body[data-flow="lobby"] .flight-toolbar,
+body[data-flow="lobby"] .flight-panel,
+body[data-flow="lobby"] .hud-details,
+body[data-flow="lobby"] .quick-mute,
+body[data-flow="lobby"] .presets-bar,
+body[data-flow="lobby"] .action-panel,
+body[data-flow="lobby"] #demo-banner,
+body[data-flow="lobby"] .demo-pill-btn,
+body[data-flow="lobby"] .touch-controls-overlay { display: none !important; }
+
+.toast { z-index: 96; }
+
+/* Compact/touch: lobby becomes a scrollable bottom sheet. */
+.compact-ui #lobby-screen {
+  align-items: flex-end;
+  background: linear-gradient(0deg,
+    rgba(6, 10, 18, 0.95) 0%,
+    rgba(6, 10, 18, 0.78) 52%,
+    rgba(6, 10, 18, 0) 100%);
+}
+.compact-ui .lobby-card {
+  margin: 0 auto calc(var(--edge-bottom, 8px) + 8px);
+  max-height: 68dvh;
+  width: min(480px, 100% - 16px);
+}
+.compact-ui .lobby-buttons .btn { min-height: 44px; }

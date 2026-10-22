@@ -130,7 +130,55 @@
     </div>
 
     <!-- Toast Notification -->
-    <div id="toast-msg" class="toast">Runway 09L Ready</div>
+  <div id="toast-msg" class="toast">Runway 09L Ready</div>
+
+  <!-- Lobby / main menu over the live cinematic -->
+  <div id="lobby-screen" class="menu-backdrop flow-overlay">
+    <div class="lobby-card">
+      <h1 class="lobby-title">Flight3d <span data-i18n="lobby.title">메인 메뉴</span></h1>
+      <p id="lobby-loading" class="lobby-loading" data-i18n="loading.lukla.terrain" hidden></p>
+      <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
+      <div class="lobby-group" role="group">
+        <span class="lobby-label" data-i18n="lobby.airport">공항</span>
+        <div class="lobby-buttons">
+          <button id="lobby-airport-coastal" class="btn btn-airport"><span data-i18n="coastal.airport">🌊 국제공항</span></button>
+          <button id="lobby-airport-lukla" class="btn btn-airport active"><span data-i18n="lukla.vnlk">🏔️ 루클라 (VNLK)</span></button>
+        </div>
+      </div>
+      <div class="lobby-group" role="group">
+        <span class="lobby-label" data-i18n="lobby.spawn">시나리오</span>
+        <div class="lobby-buttons">
+          <button id="lobby-preset-rwy" class="btn btn-preset"><span>🛫 루클라 06 대기</span></button>
+          <button id="lobby-preset-app" class="btn btn-preset"><span>🛬 협곡 착륙 챌린지</span></button>
+          <button id="lobby-preset-cru" class="btn btn-preset"><span>✈️ 히말라야 순항 (13,000 FT)</span></button>
+          <button id="lobby-preset-cliff" class="btn btn-preset btn-cliff"><span>⚡ 내리막 이륙 (Rwy 24)</span></button>
+        </div>
+      </div>
+      <label class="lobby-group" for="lobby-time-select">
+        <span class="lobby-label" data-i18n="lobby.time">시간대</span>
+        <select id="lobby-time-select" class="btn">
+          <option value="6.5">06:30</option>
+          <option value="9.5">09:30</option>
+          <option value="12.5">12:30</option>
+          <option value="17.6">17:36</option>
+          <option value="19.5">19:30</option>
+          <option value="22.5">22:30</option>
+        </select>
+      </label>
+      <button id="btn-fly" class="btn btn-fly"><span data-i18n="lobby.fly">비행 시작</span></button>
+      <p class="lobby-hint" data-i18n="lobby.hint.esc">비행 중 ESC를 누르면 일시정지 메뉴가 열립니다.</p>
+    </div>
+  </div>
+
+  <!-- Pause menu (ESC during flight) -->
+  <div id="pause-menu" class="menu-backdrop flow-overlay" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <div class="pause-card">
+      <h2 id="pause-title"><span data-i18n="pause.title">일시정지</span></h2>
+      <button id="btn-pause-resume" class="btn"><span data-i18n="pause.resume">계속 비행</span></button>
+      <button id="btn-pause-restart" class="btn"><span data-i18n="pause.restart">시나리오 재시작</span></button>
+      <button id="btn-pause-lobby" class="btn"><span data-i18n="pause.lobby">메인 메뉴로 이동</span></button>
+    </div>
+  </div>
 
     <!-- Quick Flight Presets & Airport Selector (Top Left) -->
     <div class="presets-bar">
