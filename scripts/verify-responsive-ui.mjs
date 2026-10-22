@@ -79,10 +79,8 @@ const originalQuality = await ev('window.simulator.renderQuality');
 await ev(`const select = document.querySelector('#render-quality'); select.value = 'performance'; select.dispatchEvent(new Event('change'))`);
 assert.equal(await ev('window.simulator.renderQuality'), 'performance', 'quality control remains wired');
 await ev(`window.simulator.setRenderQuality(${JSON.stringify(originalQuality)})`);
-await nativeClick('#open-instruments', true);
-assert.ok(await ev(`!document.querySelector('#panel-instruments').hidden`), 'instruments opens');
-await nativeClick('#open-instruments', true);
-assert.ok(await ev(`document.querySelector('#panel-instruments').hidden`), 'instruments closes on second tap');
+assert.equal(await ev(`document.querySelectorAll('.hud-strip .hud-item').length`), 10, 'every readout lives in the top strip');
+assert.equal(await ev(`!document.querySelector('.hud-details') && !document.querySelector('#panel-instruments')`), true, 'the instruments trigger and drawer are gone');
 const out = path.resolve(process.env.ARTIFACT_DIR || 'review-artifacts/issue92');
 fs.mkdirSync(out, { recursive: true });
 const results = [];
@@ -105,7 +103,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   await ev(`window.simulator.touchControls.${showTouch ? 'enable' : 'disable'}()`);
   await new Promise(resolve => setTimeout(resolve, 400));
   const bounds = await ev(`(() => {
-    const selectors = '.flight-toolbar button,.hud-strip,.hud-details,.touch-throttle-card,.touch-stick-card,.touch-rudder-card,#touch-btn-brake,#menu-toggle,.ap-bar';
+    const selectors = '.flight-toolbar button,.hud-strip,.touch-throttle-card,.touch-stick-card,.touch-rudder-card,#touch-btn-brake,#menu-toggle,.ap-bar';
     return [...document.querySelectorAll(selectors)]
       .filter(node => node.getBoundingClientRect().width && getComputedStyle(node).visibility !== 'hidden')
       .map(node => {
@@ -114,6 +112,18 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
           bad: r.x < -.5 || r.y < -.5 || r.right > innerWidth + .5 || r.bottom > innerHeight + .5 };
       });
   })()`);
+  const cells = await ev(`(() => {
+    const items = [...document.querySelectorAll('.hud-strip .hud-item')];
+    const clipped = items.map(item => {
+      const box = item.getBoundingClientRect();
+      const text = [...item.querySelectorAll('.hud-label, .hud-val')].map(n => n.getBoundingClientRect());
+      return { id: item.querySelector('[id]').id, cell: +box.width.toFixed(1),
+        text: +Math.max(...text.map(r => r.width)).toFixed(1),
+        bad: text.some(r => r.left < box.left - .5 || r.right > box.right + .5) };
+    }).filter(c => c.bad);
+    return { rows: new Set(items.map(i => Math.round(i.getBoundingClientRect().top))).size, clipped };
+  })()`);
+  assert.equal(cells.rows, 1, `${name}: the flattened strip renders on one row`);
   await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}.png`, Buffer.from(r.data, 'base64')));
   await ev(`document.querySelector('#menu-toggle').click()`);
   const panel = await ev(`(() => {
@@ -182,15 +192,21 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     panel.oneTapMute = true;
     panel.restoresVolume = true;
   }
-  results.push({ name, width, height, touch, showTouch, bounds, panel });
+  results.push({ name, width, height, touch, showTouch, bounds, cells, panel });
 }
 console.log(`${results.length} viewport/input layouts passed`);
 fs.writeFileSync(`${out}/layout-results.json`, JSON.stringify(results, null, 2));
 
-await ev(`document.querySelector('#open-instruments').click()`);
-assert.equal(await ev(`!document.querySelector('#panel-instruments').hidden && [...document.querySelectorAll('#panel-instruments .hud-item')].length === 6`), true, 'secondary instruments use a separate panel');
-assert.ok(await ev(`(()=>{const panel=document.querySelector('#panel-instruments').getBoundingClientRect();const toolbar=document.querySelector('.flight-toolbar').getBoundingClientRect();return panel.bottom <= toolbar.top || panel.top >= toolbar.bottom})()`), 'instruments do not crowd toolbar');
-await ev(`document.querySelector('#panel-instruments .panel-close').click()`);
+const strip = await ev(`(() => {
+  const items = [...document.querySelectorAll('.hud-strip .hud-item')];
+  const s = document.querySelector('.hud-strip').getBoundingClientRect();
+  const t = document.querySelector('.flight-toolbar').getBoundingClientRect();
+  return { items: items.length, rows: new Set(items.map(i => Math.round(i.getBoundingClientRect().top))).size,
+    crowdsToolbar: !(s.bottom <= t.top + .5 || s.top >= t.bottom - .5) };
+})()`);
+assert.equal(strip.items, 10, 'all ten readouts render in the top strip');
+assert.equal(strip.rows, 1, 'the flattened readouts stay on one row');
+assert.equal(strip.crowdsToolbar, false, 'the strip does not crowd the toolbar');
 // Exercise the same live controls after resizing, using native input for gestures and keys.
 await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
 await send('Emulation.setDeviceMetricsOverride', { width: 568, height: 320, deviceScaleFactor: 1, mobile: true });
@@ -235,12 +251,23 @@ await ev(`document.querySelector('#panel-aircraft .panel-close').click(); docume
 fs.writeFileSync(`${out}/interaction-results.json`, JSON.stringify({ repeatedFlaps: true, directCamera: true, keyboardCamera: true, demoClosesPanel: true, nativeTouchScroll: after, cameraBefore: before, touchModeToggle: true, languageChange: true, rotation: true }, null, 2));
 console.log('Interaction scenarios passed');
 
-await ev(`window.simulator.controls.onSelectCamera(7); document.querySelector('#open-instruments').click()`);
+await ev(`window.simulator.controls.onSelectCamera(7)`);
 await new Promise(r => setTimeout(r, 100));
-assert.ok(await ev(`document.querySelector('#hud-cam').scrollWidth <= document.querySelector('#hud-cam').clientWidth + 1`), 'long auto-camera readout wraps inside compact panel');
-assert.ok(await ev(`(()=>{const panel=document.querySelector('#panel-instruments').getBoundingClientRect();const toolbar=document.querySelector('.flight-toolbar').getBoundingClientRect();return panel.top >= toolbar.bottom && panel.bottom <= innerHeight})()`), 'compact instruments do not overlap toolbar or leave viewport');
-await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-instruments.png`, Buffer.from(r.data, 'base64')));
-await ev(`document.querySelector('#panel-instruments .panel-close').click()`);
+const hudRow = await ev(`(() => {
+  const strip = document.querySelector('.hud-strip').getBoundingClientRect();
+  const toolbar = document.querySelector('.flight-toolbar').getBoundingClientRect();
+  const cam = document.querySelector('#hud-cam');
+  const cell = cam.closest('.hud-item').getBoundingClientRect();
+  return { rows: new Set([...document.querySelectorAll('.hud-strip .hud-item')].map(i => Math.round(i.getBoundingClientRect().top))).size,
+    cameraText: cam.textContent, cellWidth: +cell.width.toFixed(1), textWidth: +cam.getBoundingClientRect().width.toFixed(1),
+    inViewport: strip.left >= -.5 && strip.right <= innerWidth + .5,
+    coversToolbar: !(strip.bottom <= toolbar.top + .5 || strip.top >= toolbar.bottom - .5) };
+})()`);
+fs.writeFileSync(`${out}/flattened-strip.json`, JSON.stringify(hudRow, null, 2));
+assert.equal(hudRow.rows, 1, 'the compact strip keeps every readout on one row');
+assert.equal(hudRow.inViewport, true, 'the compact strip stays inside the viewport');
+assert.equal(hudRow.coversToolbar, false, 'the compact strip does not overlap the toolbar');
+await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-hud-strip.png`, Buffer.from(r.data, 'base64')));
 // Verify the smaller controls still accept real pointer input in both phone orientations.
 const compactInputs = [];
 for (const [width, height] of [[320, 568], [568, 320]]) {
@@ -277,7 +304,7 @@ console.log('Compact throttle, stick, rudder, and brake input passed');
 // Simulate reserved notch/home-indicator space; physical browser chrome still needs device testing.
 await ev(`document.body.style.setProperty('--edge-left', '18px'); document.body.style.setProperty('--edge-right', '18px'); document.body.style.setProperty('--edge-top', '24px'); document.body.style.setProperty('--edge-bottom', '32px')`);
 await new Promise(r => setTimeout(r, 100));
-const safeArea = await ev(`(()=>{const ids = ['.flight-toolbar', '.hud-strip', '.hud-details', '.touch-throttle-card', '.touch-stick-card', '.touch-rudder-card', '#touch-btn-brake'];return ids.map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {selector,left:r.left,right:r.right,top:r.top,bottom:r.bottom}})})()`);
+const safeArea = await ev(`(()=>{const ids = ['.flight-toolbar', '.hud-strip', '.touch-throttle-card', '.touch-stick-card', '.touch-rudder-card', '#touch-btn-brake'];return ids.map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {selector,left:r.left,right:r.right,top:r.top,bottom:r.bottom}})})()`);
 assert.ok(safeArea.every(r => r.left >= 17.5 && r.right <= 302.5 && r.top >= 23.5 && r.bottom <= 536.5), `controls respect simulated safe-area edges: ${JSON.stringify(safeArea)}`);
 await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/safe-area-portrait.png`, Buffer.from(r.data, 'base64')));
 fs.writeFileSync(`${out}/safe-area-results.json`, JSON.stringify(safeArea, null, 2));

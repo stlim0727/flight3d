@@ -23,7 +23,7 @@ export function initFlightPanels({ onCycleCamera }) {
     if (restoreFocus) trigger.focus();
     active = null;
   }
-  function makePanel(name, selectors, inToolbar = true) {
+  function makePanel(name, selectors) {
     const trigger = document.createElement('button');
     trigger.className = 'btn';
     trigger.type = 'button';
@@ -50,15 +50,11 @@ export function initFlightPanels({ onCycleCamera }) {
     body.className = 'flight-panel-body';
     for (const selector of selectors) {
       const node = document.querySelector(selector);
-      if (node) body.append(name === 'instruments' ? node.closest('.hud-item') : node);
+      if (node) body.append(node);
     }
     panel.append(header, body);
     hud.append(panel);
-    if (inToolbar) bar.append(trigger);
-    else {
-      trigger.classList.add('hud-details');
-      hud.append(trigger);
-    }
+    bar.append(trigger);
     panels.set(name, { panel, trigger, body });
     trigger.addEventListener('click', () => {
       const same = active === name;
@@ -110,7 +106,7 @@ export function initFlightPanels({ onCycleCamera }) {
     if (event.key === 'Escape') close(true);
   });
   document.addEventListener('pointerdown', event => {
-    if (!event.target.closest('.flight-panel, .flight-toolbar, .hud-details')) close();
+    if (!event.target.closest('.flight-panel, .flight-toolbar')) close();
   });
   const compact = window.matchMedia('(max-width: 1024px)');
   const touch = window.matchMedia('(pointer: coarse)');
@@ -122,8 +118,6 @@ export function initFlightPanels({ onCycleCamera }) {
   compact.addEventListener('change', layout);
   touch.addEventListener('change', layout);
   layout();
-
-  makePanel('instruments', [...document.querySelectorAll('.hud-strip .hud-item:nth-child(n+5)')].map(node => `#${node.querySelector('[id]').id}`), false);
 }
 
 /** Called from telemetry refresh, including keyboard, demo, reset and resize paths. */

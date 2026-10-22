@@ -171,6 +171,24 @@ describe('solveTrim against the live force model', () => {
     const r = evaluateResidual({ iasKnots: 260, altitudeMeters: 400 });
     assert.ok(Math.abs(r.acrossPathN) < 0.03 * r.weight);
   });
+
+  it('hands-off trim wheel zeroes the moment with a neutral elevator', () => {
+    const { aero, engines } = trimmedAero();
+    const trim = solveTrim(aero, engines, { iasKnots: 240, altitudeMeters: 10000 });
+    assert.equal(trim.feasible, true);
+    assert.ok(trim.handsOffTrimDeg >= -5 && trim.handsOffTrimDeg <= 12);
+    const mesh = new THREE.Object3D();
+    mesh.quaternion.setFromEuler(
+      new THREE.Euler(THREE.MathUtils.degToRad(trim.alphaDeg), 0, 0));
+    aero.pitchTrim = trim.handsOffTrimDeg;
+    aero.elevator = 0;
+    const res = aero.computeAero(1 / 120, mesh,
+      new THREE.Vector3(0, 0, -trim.tas), new THREE.Vector3(0, 0, 0),
+      10000, 5000, trim.thrustN, 0);
+    const qSc = res.qDyn * aero.wingArea * aero.meanChord;
+    assert.ok(Math.abs(res.momentBody.x) < 0.005 * qSc,
+      `wheel ${trim.handsOffTrimDeg}° leaves moment ${res.momentBody.x} vs qSc ${qSc}`);
+  });
 });
 
 describe('AutopilotController trim feedforward', () => {

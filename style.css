@@ -1415,14 +1415,6 @@ body.touch-mode .action-panel {
   .hud-item .hud-val {
     font-size: 11px;
   }
-  /* On compact landscape mobile, hide items already shown on touch buttons */
-  .hud-item:nth-child(5),
-  .hud-item:nth-child(7),
-  .hud-item:nth-child(8),
-  .hud-item:nth-child(9),
-  .hud-item:nth-child(10) {
-    display: none;
-  }
   .presets-bar {
     top: 4px;
     left: 8px;
@@ -1616,7 +1608,7 @@ body.compact-ui {
   pointer-events: auto;
   z-index: 65;
 }
-.flight-toolbar .btn, .flight-panel .btn, .hud-details {
+.flight-toolbar .btn, .flight-panel .btn {
   min-height: 44px;
   box-shadow: none;
   text-shadow: none;
@@ -1692,22 +1684,17 @@ body.compact-ui {
   color: #f1f5f9;
 }
 .hud-strip {
-  max-width: calc(100% - 140px);
+  max-width: calc(100% - 24px);
   box-shadow: none;
   gap: 14px;
 }
-.hud-details {
-  position: absolute;
-  top: var(--edge-top);
-  right: var(--edge-right);
+/* The camera readout was clickable inside the removed drawer; keep it live. */
+.hud-strip #hud-cam {
   pointer-events: auto;
-}
-.hud-strip .hud-item:nth-child(n+5) {
-  display: none;
 }
 .compact-ui .hud-strip {
   left: var(--edge-left);
-  right: calc(var(--edge-right) + 80px);
+  right: var(--edge-right);
   gap: 8px;
   padding: 6px;
   justify-content: space-around;
@@ -1834,11 +1821,6 @@ body.compact-ui {
 .flight-panel, .flight-panel-body, .flight-panel-body button, .flight-panel-body select {
   touch-action: pan-y;
 }
-.compact-ui .hud-details {
-  width: 76px;
-  font-size: 10px;
-  padding: 4px;
-}
 .compact-ui #open-camera {
   height: 44px;
   padding: 2px;
@@ -1855,7 +1837,7 @@ body.compact-ui {
   background: #101c2bfa;
 }
 /* Inset changes must take effect immediately when browser chrome or orientation changes. */
-.flight-toolbar .btn, .flight-panel .btn, .hud-details {
+.flight-toolbar .btn, .flight-panel .btn {
   transition: background-color .15s, border-color .15s, color .15s;
 }
 #panel-aircraft .flight-panel-body {
@@ -1865,21 +1847,6 @@ body.compact-ui {
   grid-column: 1 / -1;
 }
 
-#panel-instruments .flight-panel-body {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-#panel-instruments .hud-item {
-  min-width: 0;
-  align-items: flex-start;
-}
-#panel-instruments .hud-val {
-  font-size: 14px;
-}
-#panel-instruments .hud-val {
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
 /* Keep camera selection and one-tap mute on the primary touch toolbar. */
 .quick-mute { display: none; }
 .touch-mode .quick-mute {
@@ -1978,6 +1945,10 @@ body.compact-ui {
   letter-spacing: 0.5px;
 }
 .ap-phase-item { margin-right: 4px; }
+.ap-toggle-btn { min-width: 32px; padding: 4px 6px; }
+.ap-bar.ap-collapsed > :not(.ap-toggle-btn) { display: none; }
+.ap-bar.ap-collapsed { padding: 4px 6px; }
+.ap-toggle-btn.ap-active { color: #02110a; background: #10b981; border-color: #34d399; }
 .compact-ui .ap-bar {
   top: auto;
   right: auto;
@@ -2084,7 +2055,6 @@ body:is([data-flow="lobby"], .booting) .hud-strip,
 body:is([data-flow="lobby"], .booting) .ap-bar,
 body:is([data-flow="lobby"], .booting) .flight-toolbar,
 body:is([data-flow="lobby"], .booting) .flight-panel,
-body:is([data-flow="lobby"], .booting) .hud-details,
 body:is([data-flow="lobby"], .booting) .quick-mute,
 body:is([data-flow="lobby"], .booting) .presets-bar,
 body:is([data-flow="lobby"], .booting) .action-panel,
