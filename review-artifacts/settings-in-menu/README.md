@@ -30,6 +30,13 @@ touch stick or the menu backdrop. It also re-verified the in-flight toolbar: no
 overlap with the HUD strip, throttle, stick, rudder or brake, a reachable 44px
 mute target, camera cycling from the toolbar, and safe-area insets.
 
+`scripts/verify-lobby-flow.js` passed end to end (`FORCE_GPU=1`, its own
+ports): direct-HUD boot, menu toggle holding and resuming the same aircraft,
+abandon-on-airport-switch, ESC pause, the demo scenario, and the mobile lobby
+card with the settings group below the time-of-day select. Run it without
+`FORCE_GPU=1` only with a generous budget — under swiftshader the Lukla backdrop
+wait alone can take eight minutes.
+
 Screenshots: `<layout>.png` is the flight HUD, `<layout>-settings.png` the menu
 with the settings group. `layout-results.json` holds the measured bounds and
 hit targets, `interaction-results.json` the language/rotation scenarios.
