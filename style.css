@@ -1994,6 +1994,15 @@ body.compact-ui {
 }
 .compact-ui .ap-btn { min-height: 44px; min-width: 44px; padding: 4px 6px; }
 .compact-ui .ap-modes { min-width: 56px; }
+/* Collapsed chip docks top-right under the HUD strip instead of mid-screen. */
+.compact-ui .ap-bar.ap-collapsed {
+  top: calc(var(--edge-top) + 56px);
+  bottom: auto;
+  left: auto;
+  right: var(--edge-right);
+  transform: none;
+  max-width: none;
+}
 .ap-modes:empty { display: none; }
 .panel-open .ap-bar { visibility: hidden; }
 /* Small phones use the shallow single-row touch cards, so the bar sits lower. */
