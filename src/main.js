@@ -277,9 +277,11 @@ class FlightSimulator {
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
 
-    // Auto-launch showcase demo flight on startup (it doubles as the lobby backdrop)
-    this.demoDirector.start();
-    this.gameFlow.enterLobby();
+    // Open straight into the flight HUD (with its "back to main menu" button)
+    // rather than the main menu. The menu and its cinematic backdrop stay
+    // reachable via that button (or ESC > pause). #123 hardcoded the markup to
+    // boot at the lobby, so that first-paint attribute is flipped to flight too.
+    this.fly();
     this.syncFlowUi();
   }
 
