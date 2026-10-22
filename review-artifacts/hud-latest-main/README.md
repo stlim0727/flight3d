@@ -22,6 +22,10 @@ The relocated demo guide and reopen pill sit below the flight toolbar. The stall
 alert sits below both the toolbar and AP dropdown; on very short screens it uses
 the open warning area below the toolbar.
 
+On short landscape touch screens, the AP dropdown narrows against the right safe
+edge and scrolls within the space above the yoke. This leaves the brake and the
+touch stick, rudder and throttle hit points clear while AP stays expanded.
+
 ## Verification
 
 - `npm run check`: 156 JavaScript files and pinned workflow actions pass.
@@ -36,6 +40,8 @@ the open warning area below the toolbar.
   state. Native collapse and Escape dismissal pass, including no accidental pause.
 - The desktop regression scenario checks that the minimized demo pill reopens
   its guide below the toolbar and that the stall alert remains clear of it.
+- The 568×320 landscape scenario hit-tests the brake, stick, rudder and throttle
+  both before and after engaging AP, and scroll-tests the dropdown's mode buttons.
 - Existing interaction, compact input, safe-area, telemetry swipe/keyboard and
   inspector tuning checks pass. A native camera tap closes AP from outside
   and the camera remains usable.

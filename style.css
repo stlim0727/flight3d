@@ -1997,6 +1997,15 @@ body.compact-ui {
   overflow-wrap: anywhere;
 }
 .ap-modes:empty { display: none; }
+@media (max-height: 400px) and (min-width: 541px) {
+  /* In phone landscape, keep the brake and central touch controls outside the
+     dropdown. Align its narrower panel to the right safe edge. */
+  .compact-ui.touch-mode .ap-panel {
+    right: calc(240px + var(--edge-right) - 50vw);
+    width: min(268px, calc(100vw - var(--edge-left) - var(--edge-right)));
+    max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 210px);
+  }
+}
 
 /* ===== Lobby / pause flow overlays ===== */
 .flow-overlay {

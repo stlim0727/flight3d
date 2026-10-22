@@ -44,7 +44,7 @@ async function ev(expression) {
   return result.result.value;
 }
 async function nativeClick(selector, touch) {
-  const point = await ev(`(()=>{const node=document.querySelector(${JSON.stringify(selector)}); if(node.closest('.flight-toolbar')) node.scrollIntoView({block:'nearest',inline:'nearest'}); const r=node.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`);
+  const point = await ev(`(()=>{const node=document.querySelector(${JSON.stringify(selector)}); if(node.closest('.flight-toolbar, .ap-panel')) node.scrollIntoView({block:'nearest',inline:'nearest'}); const r=node.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`);
   if (touch) {
     await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
     await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
@@ -147,23 +147,37 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   const expanded = await ev(`(() => {
     const trigger = document.querySelector('#btn-ap-toggle').getBoundingClientRect();
     const panel = document.querySelector('#ap-panel').getBoundingClientRect();
-    return { trigger: trigger.toJSON(), panel: panel.toJSON(), visible: !document.querySelector('#ap-panel').hidden,
-      toolbarTargets: [...document.querySelectorAll('.flight-toolbar button')].map(node => {
-        const r = node.getBoundingClientRect();
-        return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)) };
-      }),
-      targets: [...document.querySelectorAll('#ap-panel button')].map(node => {
-        const r = node.getBoundingClientRect();
-        return { id: node.id, width: r.width, height: r.height,
-          reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)) };
-      }) };
+    const toolbarTargets = [...document.querySelectorAll('.flight-toolbar button')].map(node => {
+      const r = node.getBoundingClientRect();
+      return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)) };
+    });
+    const touchTargets = ['#touch-btn-brake', '.touch-stick-zone', '.touch-rudder-track', '.touch-throttle-track'].map(selector => {
+      const node = document.querySelector(selector), r = node.getBoundingClientRect();
+      return { selector, reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)) };
+    });
+    const targets = [...document.querySelectorAll('#ap-panel button')].map(node => {
+      node.scrollIntoView({block:'nearest'});
+      const r = node.getBoundingClientRect();
+      return { id: node.id, width: r.width, height: r.height,
+        reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)) };
+    });
+    document.querySelector('#ap-panel').scrollTop = 0;
+    return { trigger: trigger.toJSON(), panel: panel.toJSON(), visible: !document.querySelector('#ap-panel').hidden, toolbarTargets, touchTargets, targets };
   })()`);
   assert.ok(expanded.visible && Math.abs(expanded.trigger.x - direct.anchor.x) < 1 && Math.abs(expanded.trigger.y - direct.anchor.y) < 1, `${name}: AP trigger stays fixed when expanded`);
-  assert.ok(Math.abs(expanded.panel.right - expanded.trigger.right) < 1 && Math.abs(expanded.panel.top - expanded.trigger.bottom - 4) < 1, `${name}: AP panel opens 4px below, right-aligned`);
+  const panelRightAligned = name === 'landscape-small'
+    ? Math.abs(expanded.panel.right - (width - 8)) < 1
+    : Math.abs(expanded.panel.right - expanded.trigger.right) < 1;
+  assert.ok(panelRightAligned && Math.abs(expanded.panel.top - expanded.trigger.bottom - 4) < 1, `${name}: AP panel opens 4px below in its safe-area alignment`);
   assert.ok(expanded.toolbarTargets.every(b => b.reachable), `${name}: toolbar controls remain reachable while AP is expanded: ${JSON.stringify(expanded.toolbarTargets)}`);
+  if (name === 'landscape-small') assert.ok(expanded.touchTargets.every(target => target.reachable), `${name}: touch brake, stick, rudder and throttle remain reachable while AP is expanded: ${JSON.stringify(expanded.touchTargets)}`);
   assert.ok(expanded.panel.left >= 0 && expanded.panel.bottom <= height && expanded.targets.length === 5 && expanded.targets.every(b => b.reachable && b.width >= 44 && b.height >= 44), `${name}: all expanded AP controls fit and are reachable`);
   await nativeClick('#btn-ap', touch);
   assert.ok(await ev(`window.simulator.autopilot.master && document.querySelector('#btn-ap-toggle').classList.contains('ap-active') && !document.querySelector('#ap-panel').hidden`), `${name}: native master toggle keeps panel open and trigger green`);
+  if (name === 'landscape-small') {
+    const activeTouchTargets = await ev(`['#touch-btn-brake', '.touch-stick-zone', '.touch-rudder-track', '.touch-throttle-track'].map(selector => { const node=document.querySelector(selector),r=node.getBoundingClientRect();return {selector,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))} })`);
+    assert.ok(activeTouchTargets.every(target => target.reachable), `${name}: touch flight controls remain reachable with active AP modes: ${JSON.stringify(activeTouchTargets)}`);
+  }
   await nativeClick('#btn-ap-hdg', touch);
   assert.equal(await ev('window.simulator.autopilot.lateralMode'), 'HDG', `${name}: native heading mode works from dropdown`);
   await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}-ap-expanded.png`, Buffer.from(r.data, 'base64')));
