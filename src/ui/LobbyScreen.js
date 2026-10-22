@@ -5,9 +5,9 @@ import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../confi
 const AIRPORT_BUTTONS = { coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla' };
 
 /**
- * Wire the lobby overlay (markup lives in index.html). Renders its own copies
- * of the airport/spawn/time controls so the in-game panels keep theirs; all
- * dynamic labels go through bindText so a language switch re-renders them.
+ * Wire the lobby overlay (markup lives in index.html); it is the only place
+ * spawn scenarios and airports are chosen. All dynamic labels go through
+ * bindText so a language switch re-renders them.
  */
 export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onPreset, onTime, onFly }) {
   const briefingEl = document.getElementById('lobby-briefing');

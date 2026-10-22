@@ -27,6 +27,15 @@ test('cliff scenario only briefed for lukla', () => {
   assert.equal(coastalCliff.length, 2);
 });
 
+test('demo scenario is briefed for both airports', () => {
+  setLanguage('en');
+  for (const airport of ['lukla', 'coastal']) {
+    const demo = lobbyBriefing(airport, 'demo');
+    assert.equal(demo.length, 3);
+    assert.match(demo[2], /demo flight/);
+  }
+});
+
 test('unknown airport or preset degrades without leaking raw keys', () => {
   setLanguage('en');
   assert.deepEqual(lobbyBriefing('incheon', 'runway'), []);

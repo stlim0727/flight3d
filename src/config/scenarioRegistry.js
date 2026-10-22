@@ -1,9 +1,9 @@
 /**
  * Single source of truth for lobby spawn scenarios. Each scenario declares
  * which airports offer it, per-airport button labels, its briefing line, and
- * the DOM ids of its lobby/in-game buttons. Consumers (LobbyScreen,
- * lobbyBriefing, Simulator.setPreset/setAirport) derive availability from
- * this table instead of duplicating airport conditionals.
+ * the DOM id of its lobby button. Consumers (LobbyScreen, lobbyBriefing,
+ * Simulator.setPreset/setAirport) derive availability from this table instead
+ * of duplicating airport conditionals.
  */
 export const SPAWN_SCENARIOS = {
   runway: {
@@ -11,28 +11,30 @@ export const SPAWN_SCENARIOS = {
     labelKeys: { coastal: 'runway.takeoff.09l', lukla: 'lukla.06.ready' },
     briefingKey: 'lobby.briefing.scenario.runway',
     lobbyButtonId: 'lobby-preset-rwy',
-    barButtonId: 'btn-preset-rwy',
   },
   approach: {
     airports: ['coastal', 'lukla'],
     labelKeys: { coastal: 'final.approach.3.nm', lukla: 'canyon.landing' },
     briefingKey: 'lobby.briefing.scenario.approach',
     lobbyButtonId: 'lobby-preset-app',
-    barButtonId: 'btn-preset-app',
   },
   cruise: {
     airports: ['coastal', 'lukla'],
     labelKeys: { coastal: 'cruise.6.000.ft', lukla: 'himalayan.cruise.13.000.ft' },
     briefingKey: 'lobby.briefing.scenario.cruise',
     lobbyButtonId: 'lobby-preset-cru',
-    barButtonId: 'btn-preset-cru',
   },
   cliff: {
     airports: ['lukla'],
     labelKeys: { lukla: 'downhill.takeoff.rwy.24' },
     briefingKey: 'lobby.briefing.scenario.cliff',
     lobbyButtonId: 'lobby-preset-cliff',
-    barButtonId: 'btn-preset-cliff',
+  },
+  demo: {
+    airports: ['coastal', 'lukla'],
+    labelKeys: { coastal: 'lobby.preset.demo', lukla: 'lobby.preset.demo' },
+    briefingKey: 'lobby.briefing.scenario.demo',
+    lobbyButtonId: 'lobby-preset-demo',
   },
 };
 

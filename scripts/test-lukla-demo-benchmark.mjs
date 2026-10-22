@@ -104,8 +104,8 @@ async function main() {
         sim.demoDirector.start('lukla');
         const before = sim.demoDirector.luklaScenario.result.status;
         if (action === 'escape') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-        if (action === 'preset') document.getElementById('btn-preset-rwy').click();
-        if (action === 'airport') document.getElementById('btn-airport-coastal').click();
+        if (action === 'preset') sim.setPreset('runway');
+        if (action === 'airport') sim.setAirport('coastal');
         return { action, before, active: sim.demoDirector.isActive,
           outcome: sim.demoDirector.luklaScenario.result.status };
       });

@@ -75,7 +75,7 @@ export function initFlightPanels({ onSelectCamera }) {
     return body;
   }
   makePanel('aircraft', ['#btn-gear', '#btn-flaps-ret', '#btn-flaps-ext', '#btn-spoilers', '#btn-reverser']);
-  makePanel('flight', ['.airport-group', '#btn-preset-rwy', '#btn-preset-app', '#btn-preset-cru', '#btn-preset-cliff', '#btn-demo']);
+  makePanel('flight', ['#btn-demo']);
   const camera = makePanel('camera', ['#btn-cam-reset', '#btn-yokes']);
   const select = document.createElement('select');
   select.id = 'camera-select';
@@ -111,7 +111,7 @@ export function initFlightPanels({ onSelectCamera }) {
   // Remove the obsolete duplicate action surface after touch handlers are bound.
   document.querySelectorAll('.presets-bar, .action-panel, .touch-left-actions, .touch-right-actions').forEach(node => node.remove());
   panels.get('flight').body.addEventListener('click', event => {
-    if (event.target.closest('[id^="btn-preset-"], [id^="btn-airport-"], #btn-demo')) close(true);
+    if (event.target.closest('#btn-demo')) close(true);
   });
   panels.get('environment').body.addEventListener('click', event => {
     if (event.target.closest('#btn-help, #btn-diag')) close();

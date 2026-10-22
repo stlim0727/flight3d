@@ -263,6 +263,39 @@ async function testLobbyFlow() {
     console.log('🔍 lobby loop restart OK (coastal)');
     await screenshot('05-lobby-loop');
 
+    // 8b. Demo flight behaves like a lobby scenario: pick it, Fly starts it
+    // in-flight with the banner up; ESC hands control back.
+    await evalJs(`document.getElementById('lobby-preset-demo').click()`);
+    const demoPending = await evalJs(`(() => ({
+      pending: window.simulator.lobby.preset,
+      active: document.getElementById('lobby-preset-demo').classList.contains('active'),
+      briefing: document.getElementById('lobby-briefing').textContent,
+    }))()`);
+    if (demoPending.pending !== 'demo' || !demoPending.active || !/demo flight/i.test(demoPending.briefing)) {
+      throw new Error('Demo scenario not selectable in lobby: ' + JSON.stringify(demoPending));
+    }
+    await evalJs(`document.getElementById('btn-fly').click()`);
+    await sleep(800);
+    const demoFlight = await evalJs(`(() => {
+      const sim = window.simulator;
+      return {
+        flow: document.body.dataset.flow,
+        active: sim.demoDirector.isActive,
+        bannerVisible: getComputedStyle(document.getElementById('demo-banner')).display !== 'none',
+      };
+    })()`);
+    console.log('🔍 demo scenario:', JSON.stringify(demoFlight));
+    if (demoFlight.flow !== 'flight' || !demoFlight.active || !demoFlight.bannerVisible) {
+      throw new Error('Demo scenario did not start a demo flight');
+    }
+    await screenshot('05b-demo-flight');
+    await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+    await sleep(200);
+    await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+    await sleep(200);
+    await evalJs(`document.getElementById('btn-pause-lobby').click()`);
+    await sleep(200);
+
     // 9. ESC inside the lobby is a no-op.
     await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
     await sleep(150);

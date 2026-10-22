@@ -35,10 +35,8 @@ import { initFlightPanels, updateControlState, touchLabel } from './ui/FlightPan
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
 import { initLobbyScreen } from './ui/LobbyScreen.js';
 import {
-  SPAWN_SCENARIOS,
   DEFAULT_SCENARIO,
   isScenarioAvailable,
-  scenarioLabelKey,
 } from './config/scenarioRegistry.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
@@ -372,11 +370,16 @@ class FlightSimulator {
 
   /** Leave the lobby: stop the cinematic and spawn the player at their choice. */
   fly() {
+    const wantsDemo = this.lobby.preset === 'demo';
     if (this.demoDirector?.isActive || this.demoDirector?.waitingForTerrain) {
-      this.demoDirector.stop(() => t('manual.control.engaged'));
+      this.demoDirector.stop(wantsDemo ? null : () => t('manual.control.engaged'));
     }
     this.gameFlow.enterFlight();
-    this.setPreset(this.lobby.preset);
+    if (wantsDemo) {
+      this.demoDirector.start();
+    } else {
+      this.setPreset(this.lobby.preset);
+    }
   }
 
   setTimeOfDay(hours) {
@@ -662,21 +665,6 @@ class FlightSimulator {
       this.cduCanvas.setAirport(id);
     }
 
-    // Re-scope the in-game preset bar to the scenarios this airport offers.
-    for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
-      const button = document.getElementById(scenario.barButtonId);
-      if (!button) continue;
-      if (isScenarioAvailable(id, type)) {
-        const labelKey = scenarioLabelKey(id, type);
-        button.style.display = 'block';
-        bindText(button, () => t(labelKey));
-      } else {
-        button.style.display = 'none';
-      }
-    }
-
-    document.getElementById('btn-airport-coastal')?.classList.toggle('active', id === 'coastal');
-    document.getElementById('btn-airport-lukla')?.classList.toggle('active', isLukla);
     this.lobby.airport = id;
     if (!isScenarioAvailable(id, this.lobby.preset)) this.lobby.preset = DEFAULT_SCENARIO;
     this.lobbyScreen?.refresh();
@@ -1371,16 +1359,6 @@ class FlightSimulator {
     const qualitySelect = document.getElementById('render-quality');
     qualitySelect.value = this.renderQuality;
     qualitySelect.addEventListener('change', () => this.setRenderQuality(qualitySelect.value));
-    // Airport Selector UI buttons
-    document.getElementById('btn-airport-coastal')?.addEventListener('click', () => this.setAirport('coastal'));
-    document.getElementById('btn-airport-lukla')?.addEventListener('click', () => this.setAirport('lukla'));
-
-    // Quick clickable UI buttons
-    document.getElementById('btn-preset-rwy')?.addEventListener('click', () => this.setPreset('runway'));
-    document.getElementById('btn-preset-app')?.addEventListener('click', () => this.setPreset('approach'));
-    document.getElementById('btn-preset-cru')?.addEventListener('click', () => this.setPreset('cruise'));
-    document.getElementById('btn-preset-cliff')?.addEventListener('click', () => this.setPreset('cliff'));
-
     document.getElementById('btn-flaps-ext')?.addEventListener('click', () => this.controls.onCycleFlaps(1));
     document.getElementById('btn-flaps-ret')?.addEventListener('click', () => this.controls.onCycleFlaps(-1));
     document.getElementById('btn-gear')?.addEventListener('click', () => this.controls.onToggleGear());
