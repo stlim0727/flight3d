@@ -72,6 +72,10 @@ export class Aerodynamics {
     const mass = config.massProperties || {};
 
     this.mass = mass.currentMassKg || 66000.0;
+    // The mass this aircraft was configured with, before any fuel is burned.
+    // Live burn moves `mass` only, so a fresh segment can return to this
+    // baseline instead of re-adding weight a scenario just loaded itself.
+    this.massBaselineKg = this.mass;
     this.wingspan = aero.wingspanM || 35.8;
     this.wingArea = aero.wingAreaM2 || 124.6;
     this.meanChord = aero.meanChordM || 3.99;

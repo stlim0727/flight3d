@@ -41,10 +41,30 @@ export class EngineModel {
 
     this.fuelCapacityKg = 14200;  // Matches the EICAS total fuel readout
     this.fuelKg = this.fuelCapacityKg;
+    this.appliedFuelLoadKg = 0;   // Burn already shed from aero.mass; see shedBurnedFuelMass
   }
 
   setThrottle(val) {
     this.throttleCommand = Math.max(0.0, Math.min(1.0, val));
+  }
+
+  /**
+   * Shed the fuel burned since the previous call from the airframe mass.
+   * Accounted as a delta against the fuel load so a scenario that replaces
+   * `aero.mass` with its own configured value mid-flight keeps that baseline
+   * instead of being fought by absolute accounting.
+   */
+  shedBurnedFuelMass(aero) {
+    const fuelLoadKg = this.fuelCapacityKg - this.fuelKg;
+    aero.mass += this.appliedFuelLoadKg - fuelLoadKg;
+    this.appliedFuelLoadKg = fuelLoadKg;
+  }
+
+  /** Start a fresh segment with full tanks at the aircraft's configured mass. */
+  refuel(aero) {
+    this.fuelKg = this.fuelCapacityKg;
+    this.appliedFuelLoadKg = 0;
+    aero.mass = aero.massBaselineKg;
   }
 
   setEngineFailure(index, on) {

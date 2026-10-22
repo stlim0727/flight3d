@@ -111,9 +111,11 @@ export class FlightControls {
       case 'KeyR':
         if (this.onToggleReverser) this.onToggleReverser();
         break;
-      case 'KeyP':
-        // Cycle simulated engine failure; repeat-guarded so holding the key
-        // does not spin through the cycle.
+      case 'KeyK':
+        // Cycle simulated engine failure. Deliberately not P: the demo director
+        // restarts the demo on P, which would reload the preset and clear the
+        // failure just injected. Repeat-guarded so holding the key cannot spin
+        // through the cycle.
         if (!e.repeat && this.onCycleEngineFailure) this.onCycleEngineFailure();
         break;
       case 'KeyL':

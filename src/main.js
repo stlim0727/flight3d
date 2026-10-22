@@ -125,10 +125,6 @@ class FlightSimulator {
     // 4. Physics Engines
     this.aero = new Aerodynamics();
     this.engines = new EngineModel();
-    // Fuel already burned against aero.mass via the live-mass delta (see
-    // integratePhysics). Kept as a delta so scenario loadConfig overrides of
-    // currentMassKg are not fought by the burn accounting.
-    this.lastFuelLoadKg = 0;
     this.gear = new LandingGear();
 
     // 5. Procedural World & Real-World Environments
@@ -667,13 +663,11 @@ class FlightSimulator {
       }
     }
 
-    // A preset marks a fresh segment: refuel, clear any engine failures, and
-    // re-zero the burn accounting. A normal preset already reloaded the mass
-    // baseline via loadConfig; demo-internal ones keep the live mass, so the
-    // burned weight must be handed back explicitly.
-    this.engines.fuelKg = this.engines.fuelCapacityKg;
-    if (isDemoInternal) this.aero.mass += this.lastFuelLoadKg;
-    this.lastFuelLoadKg = 0;
+    // A preset marks a fresh segment: full tanks at the configured mass and no
+    // engine failures. Restoring from aero.massBaselineKg rather than adding the
+    // previous burn back means a demo-internal preset whose scenario just loaded
+    // its own mass (Lukla's 43 t) starts at that mass, not at it plus the burn.
+    this.engines.refuel(this.aero);
     this.engines.failed[0] = false;
     this.engines.failed[1] = false;
 
@@ -877,12 +871,10 @@ class FlightSimulator {
     const tas = this.linearVelocity.length();
     const engineData = this.engines.update(dt, altitudeMeters, tas, atmos.densityRatio);
 
-    // Live mass: hand the fuel burned since the last substep to the aero/
-    // gravity models as a delta, so a scenario that replaces currentMassKg
-    // mid-flight keeps its baseline and still sheds the weight it burns.
-    const fuelLoadKg = this.engines.fuelCapacityKg - this.engines.fuelKg;
-    this.aero.mass += this.lastFuelLoadKg - fuelLoadKg;
-    this.lastFuelLoadKg = fuelLoadKg;
+    // Live mass: the airframe sheds exactly the fuel burned since the last
+    // substep, so a scenario that replaces currentMassKg mid-flight keeps its
+    // baseline and still loses the weight it burns.
+    this.engines.shedBurnedFuelMass(this.aero);
 
     // 3. Terrain Height & Ground Clearance
     const groundHeight = this.currentTerrain.getHeight(this.position.x, this.position.z);

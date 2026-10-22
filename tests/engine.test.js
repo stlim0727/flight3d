@@ -1,7 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { EngineModel, asymmetricThrustYawMoment } from '../src/physics/EngineModel.js';
+import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { Atmosphere } from '../src/physics/Atmosphere.js';
+import { FlightControls } from '../src/controls/FlightControls.js';
 
 describe('EngineModel (Twin CFM56-7B Turbofan Simulation)', () => {
   it('should initialize at ground idle (22% N1, 62% N2)', () => {
@@ -180,5 +182,63 @@ describe('asymmetricThrustYawMoment', () => {
     assert.strictEqual(asymmetricThrustYawMoment(100000, 0), -450000);
     assert.strictEqual(asymmetricThrustYawMoment(80000, 80000), 0);
     assert.strictEqual(asymmetricThrustYawMoment(0, 50000, 2.0), 100000, 'custom moment arm');
+  });
+});
+
+describe('live mass from fuel burn', () => {
+  it('sheds each burned kilogram and restores the configured mass on refuel', () => {
+    const aero = new Aerodynamics();
+    const engines = new EngineModel();
+    assert.strictEqual(aero.mass, 66000);
+    assert.strictEqual(aero.massBaselineKg, 66000);
+
+    engines.fuelKg = engines.fuelCapacityKg - 1200;
+    engines.shedBurnedFuelMass(aero);
+    assert.strictEqual(aero.mass, 64800);
+    engines.shedBurnedFuelMass(aero);
+    assert.strictEqual(aero.mass, 64800, 'a step with no new burn changes nothing');
+
+    engines.refuel(aero);
+    assert.strictEqual(engines.fuelKg, engines.fuelCapacityKg);
+    assert.strictEqual(aero.mass, 66000, 'a fresh segment starts at the configured mass');
+  });
+
+  it('keeps a mass a scenario loaded mid-flight instead of restoring the old burn onto it', () => {
+    const aero = new Aerodynamics();
+    const engines = new EngineModel();
+
+    // Cruise at 66 t, burning ~5 t of the tanks.
+    engines.fuelKg = engines.fuelCapacityKg - 5000;
+    engines.shedBurnedFuelMass(aero);
+    assert.strictEqual(aero.mass, 61000);
+
+    // The Lukla circuit loads its own 43 t light-aircraft config, then enters a
+    // demo-internal preset, which refuels. The loaded baseline must win.
+    aero.loadConfig({ massProperties: { currentMassKg: 43000 } });
+    assert.strictEqual(aero.mass, 43000);
+    engines.refuel(aero);
+    assert.strictEqual(aero.mass, 43000, 'no re-added burn on top of a freshly loaded mass');
+    assert.strictEqual(engines.fuelKg, engines.fuelCapacityKg);
+
+    // The remaining flight keeps shedding from the scenario baseline.
+    engines.fuelKg = engines.fuelCapacityKg - 1000;
+    engines.shedBurnedFuelMass(aero);
+    assert.strictEqual(aero.mass, 42000);
+  });
+});
+
+describe('engine-failure shortcut routing', () => {
+  it('cycles the failure on K and leaves P to the demo director', () => {
+    const controls = Object.create(FlightControls.prototype);
+    controls.keys = {};
+    let cycles = 0;
+    controls.onCycleEngineFailure = () => { cycles += 1; };
+
+    controls.handleKeyDown({ code: 'KeyK' });
+    assert.strictEqual(cycles, 1, 'K injects the failure');
+    controls.handleKeyDown({ code: 'KeyK', repeat: true });
+    assert.strictEqual(cycles, 1, 'holding K does not spin through the cycle');
+    controls.handleKeyDown({ code: 'KeyP' });
+    assert.strictEqual(cycles, 1, 'P stays the demo start/restart shortcut');
   });
 });
