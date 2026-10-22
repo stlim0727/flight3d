@@ -80,15 +80,8 @@ export class DemoFlightDirector {
     this.skipBtn = document.getElementById('btn-skip-demo');
     this.closeBtn = document.getElementById('btn-demo-close');
     this.openBtn = document.getElementById('btn-demo-open');
-    this.demoBtn = document.getElementById('btn-demo');
     this.badgeEl = this.bannerEl?.querySelector('.demo-badge');
     this.pillTextEl = document.getElementById('demo-pill-text');
-
-    if (this.demoBtn) {
-      this.demoBtn.addEventListener('click', () => {
-        this.start();
-      });
-    }
 
     if (this.skipBtn) {
       this.skipBtn.addEventListener('click', () => {
@@ -187,9 +180,6 @@ export class DemoFlightDirector {
     if (this.openBtn) {
       this.openBtn.style.display = 'none';
     }
-    if (this.demoBtn) {
-      this.demoBtn.classList.add('active');
-    }
 
     // Keep the constructor's auto-start request alive while the asynchronous
     // DEM loads. isActive lets Esc, presets and airport changes cancel it.
@@ -279,9 +269,6 @@ export class DemoFlightDirector {
     }
     if (this.openBtn) {
       this.openBtn.style.display = 'none';
-    }
-    if (this.demoBtn) {
-      this.demoBtn.classList.remove('active');
     }
 
     this.userCameraOverridden = false;

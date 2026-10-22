@@ -204,8 +204,7 @@ await send('Input.dispatchKeyEvent', { type: 'keyDown', key: '2', code: 'Digit2'
 await send('Input.dispatchKeyEvent', { type: 'keyUp', key: '2', code: 'Digit2', windowsVirtualKeyCode: 50 });
 await new Promise(r => setTimeout(r, 150));
 assert.equal(await ev(`document.querySelector('#camera-select').value`), '1', 'keyboard camera state appears in selector');
-await ev(`document.querySelector('#panel-camera .panel-close').click(); document.querySelector('#open-flight').click(); document.querySelector('#btn-demo').click(); window.simulator.demoDirector.stop()`);
-assert.equal(await ev(`document.querySelector('#panel-flight').hidden`), true, 'demo button closes Flight settings');
+await ev(`document.querySelector('#panel-camera .panel-close').click()`);
 await ev(`document.querySelector('#open-environment').click(); document.querySelector('#panel-environment .flight-panel-body').scrollTop = 0`);
 const before = await ev(`(()=>{const r=document.querySelector('#panel-environment .flight-panel-body').getBoundingClientRect();const c=window.simulator.cameraSystem;return {x:r.x+6,y:r.bottom-12,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
 await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: before.x, y: before.y }] });

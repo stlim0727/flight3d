@@ -1,8 +1,9 @@
 # UI localization
 
-Flight settings contain a Language / 언어 selector, also available in the mobile
-menu. Changes take effect immediately without restarting a flight, demo, or
-camera. The choice is saved under `flight3d.language` in localStorage. On first
+Environment settings contain a Language / 언어 selector, and the main menu offers
+English and 한국어 buttons directly. Changes take effect immediately without
+restarting a flight, demo, or camera. The choice is saved under
+`flight3d.language` in localStorage. On first
 visit, the first supported browser language is used (`ko-KR` → `ko`, `en-US` →
 `en`); unsupported browser languages fall back to English. Storage failures do
 not prevent switching languages.

@@ -281,25 +281,6 @@ body, html {
   transform: translateX(-50%) translateY(1px);
 }
 
-.btn-demo-toggle {
-  background: linear-gradient(135deg, #0f766e, #115e59) !important;
-  border-color: #2dd4bf !important;
-  color: #ccfbf1 !important;
-  font-weight: 700 !important;
-}
-
-.btn-demo-toggle:hover {
-  background: linear-gradient(135deg, #14b8a6, #0d9488) !important;
-  box-shadow: 0 0 14px rgba(45, 212, 191, 0.5) !important;
-}
-
-.btn-demo-toggle.active {
-  background: linear-gradient(135deg, #0284c7, #0369a1) !important;
-  border-color: #38bdf8 !important;
-  color: #ffffff !important;
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.6) !important;
-}
-
 /* Toast Message */
 .toast {
   position: absolute;
@@ -1641,7 +1622,7 @@ body.compact-ui {
 #canvas-container, #hud-overlay, .touch-controls-overlay { overflow: hidden; }
 #canvas-container canvas { max-width: 100%; max-height: 100%; }
 
-/* Language lives with flight settings, including the compact mobile menu. */
+/* Language and quality live in the environment panel, including the compact mobile menu. */
 .language-control {
   display: flex;
   align-items: center;

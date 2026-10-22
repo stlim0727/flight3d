@@ -47,11 +47,11 @@ test('language changes persist and refresh existing text and accessible labels w
   let visible = false;
   setLanguage('ko', storage);
   bindText(element, () => visible ? t('hide.yokes.j') : t('show.yokes.j'));
-  bindText(element, () => t('flight.settings.and.additional.controls'), 'aria-label');
+  bindText(element, () => t('ui.environment'), 'aria-label');
   assert.equal(element.textContent, '조종간 표시 [J]');
   setLanguage('en', store);
   assert.equal(element.textContent, 'Show yokes [J]');
-  assert.equal(element['aria-label'], 'Flight settings and additional controls');
+  assert.equal(element['aria-label'], 'Environment');
   assert.deepEqual(saved, [STORAGE_KEY, 'en']);
   visible = true;
   setLanguage('ko', storage);
