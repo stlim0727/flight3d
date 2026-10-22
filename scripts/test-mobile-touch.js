@@ -254,16 +254,14 @@ class MobileTouchTestRunner {
     }
     this.log(`Saved mobile touch controls showcase: ${outPathWorkspace} (${(buffer.length / 1024).toFixed(1)} KB)`, '🎉');
 
-    // 6. Test Quick Action Buttons (Gear cycle, Camera cycle)
-    this.log('Testing Touch Quick Action buttons (Gear & Camera cycle)...', '🎥');
-    await this.evaluate(`
-      (() => {
-        const camBtn = document.getElementById('touch-btn-cam');
-        if (camBtn) camBtn.click();
-      })()
-    `);
-    const newCamMode = await this.evaluate('window.simulator.cameraSystem.getModeName()');
-    this.log(`Camera mode after touch button: ${newCamMode}`, '✨');
+    // 6. Test toolbar and panel actions (Camera cycle, Gear toggle)
+    this.log('Testing toolbar camera cycle and aircraft panel gear toggle...', '🎥');
+    const cameraBefore = await this.evaluate('window.simulator.cameraSystem.mode');
+    await this.evaluate(`document.getElementById('open-camera')?.click()`);
+    const cameraAfter = await this.evaluate('window.simulator.cameraSystem.mode');
+    this.log(`Camera mode after toolbar button: ${await this.evaluate('window.simulator.cameraSystem.getModeName()')} (${cameraBefore} -> ${cameraAfter})`, '✨');
+    await this.evaluate(`document.getElementById('btn-gear')?.click()`);
+    this.log(`Gear state after aircraft panel button: ${await this.evaluate('window.simulator.telemetry.gearState')}`, '🛞');
 
     // 7. Test Mobile Touch Drag Look & Gestures (모바일 터치 시선 드래그 변경 및 리셋 검증)
     this.log('Testing Mobile Touch Drag Look (Cockpit Look Drag & Double-Tap Reset)...', '👁️');
@@ -271,7 +269,7 @@ class MobileTouchTestRunner {
       (() => {
         const sim = window.simulator;
         const cam = sim.cameraSystem;
-        cam.setMode(0); // COCKPIT
+        cam.setMode(0, true); // COCKPIT (user-flagged: a scripted change must override a selected view)
         cam.resetLook();
         const initialYaw = cam.lookYaw;
         const initialPitch = cam.lookPitch;
@@ -322,7 +320,7 @@ class MobileTouchTestRunner {
       (() => {
         const sim = window.simulator;
         const cam = sim.cameraSystem;
-        cam.setMode(1); // CHASE
+        cam.setMode(1, true); // CHASE
         cam.resetLook();
         const initialChaseYaw = cam.chaseYaw;
 

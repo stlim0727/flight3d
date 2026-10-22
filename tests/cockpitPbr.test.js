@@ -52,6 +52,32 @@ describe('Cockpit GLTF Interior System', () => {
     assert.strictEqual(cockpit.cockpitModelFailed, false);
   });
 
+  it('trades instrument flood light for daylight without a mode switch', () => {
+    const cockpit = new Cockpit(...createCanvases());
+    const base = cockpit.floodBaseIntensity.slice();
+    assert.equal(cockpit.floods.length, base.length, 'Every cockpit flood must be registered');
+
+    cockpit.syncDaylight(0);
+    cockpit.floods.forEach((flood, i) => assert.equal(flood.intensity, base[i],
+      'Night keeps the shipped flood glow'));
+
+    let previous = base.map(() => Infinity);
+    for (const daylight of [0.1, 0.25, 0.5, 0.75, 0.9, 1, 3]) {
+      cockpit.syncDaylight(daylight);
+      cockpit.floods.forEach((flood, i) => {
+        assert.ok(flood.intensity <= previous[i], `daylight ${daylight} must not brighten a flood`);
+        assert.ok(flood.intensity >= 0.15, 'Floods keep a floor so the deck never goes dark');
+        previous[i] = flood.intensity;
+      });
+    }
+    cockpit.floods.forEach((flood, i) => assert.equal(flood.intensity, Math.max(base[i] * 0.25, 0.15),
+      'Full sun settles a quarter dimmed or at the floor'));
+
+    cockpit.syncDaylight(0);
+    cockpit.floods.forEach((flood, i) => assert.equal(flood.intensity, base[i],
+      'Setting the sun returns the floods'));
+  });
+
   it('can hide yokes for instrument inspection without stopping their animation', () => {
     const cockpit = new Cockpit(...createCanvases());
     cockpit.gltfYokes = [new THREE.Group(), new THREE.Group()];

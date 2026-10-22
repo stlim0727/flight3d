@@ -6,6 +6,7 @@ import { Aerodynamics } from './physics/Aerodynamics.js';
 import { EngineModel } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
 import { AutopilotController } from './physics/Autopilot.js';
+import { solveTrim } from './physics/TrimSolver.js';
 import { PFDCanvas } from './aircraft/PFDCanvas.js';
 import { NDCanvas } from './aircraft/NDCanvas.js';
 import { EICASCanvas } from './aircraft/EICASCanvas.js';
@@ -243,8 +244,19 @@ class FlightSimulator {
       parkBrake: false
     };
 
-    // Autopilot (pure control laws in src/physics/Autopilot.js)
-    this.autopilot = new AutopilotController();
+    // Autopilot (pure control laws in src/physics/Autopilot.js). The trim
+    // solver runs only on mode/target capture, so its allocation is off the
+    // 120 Hz path.
+    this.autopilot = new AutopilotController({
+      trimSolver: (telemetry, flightPathAngleDeg) => solveTrim(this.aero, this.engines, {
+        iasKnots: telemetry.iasKnots,
+        altitudeMeters: Atmosphere.feetToMeters(telemetry.altitudeFt),
+        flightPathAngleDeg,
+        flapsIndex: this.aero.flapsIndex,
+        gearState: this.telemetry.gearState,
+        spoilers: this.aero.spoilers,
+      }),
+    });
     // Reusable objects so 120 Hz substeps do not allocate for the AP snapshot.
     this._apEuler = new THREE.Euler();
     this._apForward = new THREE.Vector3();
@@ -290,9 +302,9 @@ class FlightSimulator {
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
 
-    // Open straight into the flight HUD (with its "back to main menu" button)
-    // rather than the main menu. The menu and its cinematic backdrop stay
-    // reachable via that button (or ESC > pause). #123 hardcoded the markup to
+    // Open straight into the flight HUD rather than the main menu. The menu
+    // and its cinematic backdrop stay reachable via the persistent top-left
+    // toggle (or ESC > pause). #123 hardcoded the markup to
     // boot at the lobby, so that first-paint attribute is flipped to flight too.
     this.fly();
     this.syncFlowUi();
@@ -1154,10 +1166,17 @@ class FlightSimulator {
     this.foliage.updateCityLod(this.camera.position);
     this.foliage.update(this.camera.position);
     this.sky.updateSun(this.position, this.camera.position);
+    const stepDaylight = this.sky.updateCockpitSun({
+      position: this.aircraft.group.position,
+      quaternion: this.aircraft.group.quaternion,
+      cockpitActive: isCockpit && !isPhotoCockpit,
+      dt: simSeconds,
+    });
+    this.aircraft.cockpit.syncDaylight(stepDaylight);
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
     this.tireSmokeSystem.update(simSeconds);
-    this.touchControls.updateUI(this.telemetry);
+    this.touchControls.updateUI();
     this.diagnostics.update(simSeconds, this.telemetry);
     this.updateHUD();
     return this.telemetry;
@@ -1249,6 +1268,13 @@ class FlightSimulator {
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
+    const daylight = this.sky.updateCockpitSun({
+      position: this.aircraft.group.position,
+      quaternion: this.aircraft.group.quaternion,
+      cockpitActive: isCockpit && !isPhotoCockpit,
+      dt: frameDelta,
+    });
+    this.aircraft.cockpit.syncDaylight(daylight);
     if (this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.enabled = isPhotoCockpit;
       if (isPhotoCockpit) {
@@ -1277,7 +1303,7 @@ class FlightSimulator {
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();
-    this.touchControls.updateUI(this.telemetry);
+    this.touchControls.updateUI();
     this.diagnostics.update(frameDelta, this.telemetry);
 
     this.foliage.update(this.camera.position);
@@ -1392,10 +1418,6 @@ class FlightSimulator {
         bindText(btnSound, () => t('sound.100'));
       }
     }
-
-    if (this.touchControls && typeof this.touchControls.updateAudioUI === 'function') {
-      this.touchControls.updateAudioUI(state);
-    }
   }
 
   showToast(msg) {
@@ -1483,10 +1505,6 @@ class FlightSimulator {
       this.setPreset(this.lastPresetType || 'runway');
     });
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
-    document.getElementById('btn-hud-menu')?.addEventListener('click', () => {
-      if (this.isCrashed) this.clearCrashState();
-      this.gameFlow.returnToLobby(true);
-    });
     document.getElementById('menu-toggle')?.addEventListener('click', () => this.toggleMainMenu());
 
     // ESC chain: the demo director consumes ESC first (take manual control);

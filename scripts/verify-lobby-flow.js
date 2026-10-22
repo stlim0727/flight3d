@@ -432,23 +432,11 @@ async function testLobbyFlow() {
     await sleep(150);
     if (await evalJs(`document.body.dataset.flow`) !== 'lobby') throw new Error('ESC must be ignored in the menu');
 
-    // 10. HUD "Main menu" holds the flight; switching airport abandons the hold so
-    //     the toggle falls back to launching the newly selected scenario.
+    // 10. The top-left toggle holds the flight; switching airport abandons the
+    //     hold so the toggle falls back to launching the newly selected scenario.
     await evalJs(`document.getElementById('menu-toggle').click()`);   // resume demo flight
     await sleep(300);
-    const hudMenu = await evalJs(`(() => {
-      const btn = document.getElementById('btn-hud-menu');
-      return {
-        flow: document.body.dataset.flow,
-        toolbarVisible: btn ? getComputedStyle(btn).display !== 'none' : false,
-        label: btn ? btn.textContent : '',
-      };
-    })()`);
-    console.log('🔍 hud menu in flight:', JSON.stringify(hudMenu));
-    if (hudMenu.flow !== 'flight' || !hudMenu.toolbarVisible || !hudMenu.label.includes('🏠')) {
-      throw new Error('Main menu button must be visible in the flight toolbar');
-    }
-    await evalJs(`document.getElementById('btn-hud-menu').click()`);
+    await evalJs(`document.getElementById('menu-toggle').click()`);   // flight -> held menu
     await sleep(300);
     const hudHeld = await evalJs(`(() => {
       const sim = window.simulator, gf = sim.gameFlow;
@@ -461,7 +449,7 @@ async function testLobbyFlow() {
     })()`);
     console.log('🔍 hud return (held):', JSON.stringify(hudHeld));
     if (hudHeld.flow !== 'lobby' || !hudHeld.blocked || !hudHeld.resumable) {
-      throw new Error('HUD main-menu button must return to the menu holding the flight');
+      throw new Error('Menu toggle must return to the menu holding the flight');
     }
     if (!hudHeld.toolbarHidden) throw new Error('Toolbar must be hidden in the menu');
 

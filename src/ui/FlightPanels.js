@@ -91,12 +91,6 @@ export function initFlightPanels({ onCycleCamera }) {
   bindText(mute, () => t('ui.mute'), 'aria-label');
   mute.textContent = '🔊';
   bar.append(mute);
-  const backToMenu = document.createElement('button');
-  backToMenu.id = 'btn-hud-menu';
-  backToMenu.className = 'btn';
-  backToMenu.type = 'button';
-  bindText(backToMenu, () => touchLabel(t('hud.menu')));
-  bar.append(backToMenu);
 
   for (const [id, key] of Object.entries({
     'btn-cam-reset': 'center.view.o',
@@ -106,8 +100,8 @@ export function initFlightPanels({ onCycleCamera }) {
     bindText(document.getElementById(id), () => touchLabel(t(key)));
   }
 
-  // Remove the obsolete duplicate action surface after touch handlers are bound.
-  document.querySelectorAll('.presets-bar, .action-panel, .touch-left-actions, .touch-right-actions').forEach(node => node.remove());
+  // Remove the legacy markup the toolbar panels have replaced.
+  document.querySelectorAll('.presets-bar, .action-panel').forEach(node => node.remove());
   panels.get('environment').body.addEventListener('click', event => {
     if (event.target.closest('#btn-help, #btn-diag')) close();
   });
