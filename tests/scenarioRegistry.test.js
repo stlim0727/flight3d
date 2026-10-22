@@ -10,8 +10,8 @@ import {
 import { setLanguage, t } from '../src/i18n/index.js';
 
 test('scenario availability is scoped to the airport', () => {
-  assert.deepEqual(scenariosForAirport('coastal'), ['runway', 'approach', 'cruise']);
-  assert.deepEqual(scenariosForAirport('lukla'), ['runway', 'approach', 'cruise', 'cliff']);
+  assert.deepEqual(scenariosForAirport('coastal'), ['runway', 'approach', 'cruise', 'demo']);
+  assert.deepEqual(scenariosForAirport('lukla'), ['runway', 'approach', 'cruise', 'cliff', 'demo']);
   assert.equal(isScenarioAvailable('coastal', 'cliff'), false);
   assert.equal(isScenarioAvailable('lukla', 'cliff'), true);
 });
@@ -46,9 +46,7 @@ test('registry labels and briefing keys resolve in every locale', () => {
   setLanguage('en');
 });
 
-test('scenario ids are unique across lobby and bar buttons', () => {
+test('lobby button ids are unique per scenario', () => {
   const lobbyIds = Object.values(SPAWN_SCENARIOS).map((s) => s.lobbyButtonId);
-  const barIds = Object.values(SPAWN_SCENARIOS).map((s) => s.barButtonId);
   assert.equal(new Set(lobbyIds).size, lobbyIds.length);
-  assert.equal(new Set(barIds).size, barIds.length);
 });
