@@ -67,7 +67,6 @@ export default {
   "aircraft.damage": "Aircraft damage",
   "destroyed": "DESTROYED",
   "collision.target": "Collision target",
-  "restart.on.runway.09l.space.r": "Restart on runway 09L [Space / R]",
   "airport": "Airport",
   "coastal.airport": "🌊 Coastal airport",
   "lukla.vnlk": "🏔️ Lukla (VNLK)",

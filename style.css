@@ -857,16 +857,16 @@ kbd {
   justify-content: center;
 }
 
-.btn-crash-restart {
+.btn-crash-lobby {
   width: 100%;
   padding: 12px 20px;
   font-size: 14px;
   font-weight: 700;
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  border: 1px solid #ef4444;
-  color: #ffffff;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #e2e8f0;
   border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(220, 38, 38, 0.45);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -875,10 +875,11 @@ kbd {
   gap: 8px;
 }
 
-.btn-crash-restart:hover {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+.btn-crash-lobby:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(255, 255, 255, 0.4);
   transform: translateY(-1px);
-  box-shadow: 0 6px 22px rgba(239, 68, 68, 0.6);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
 }
 
 /* ==========================================================================

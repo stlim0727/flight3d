@@ -1045,6 +1045,12 @@ class FlightSimulator {
     this.showToast(() => t('aircraft.repaired.restarted.on.runway.09l'));
   }
 
+  exitCrashToLobby() {
+    if (!this.isCrashed) return;
+    this.clearCrashState();
+    this.gameFlow.returnToLobby();
+  }
+
   showCrashUI(crashResult) {
     // Crashes during the lobby cinematic are part of the show: the loop
     // restarts the scenario without a hull-loss UI. Only interrupt the player.
@@ -1467,9 +1473,9 @@ class FlightSimulator {
       helpModal?.classList.remove('visible');
     });
 
-    // Crash Restart Button & Keyboard Shortcuts [Space / R / Enter]
-    document.getElementById('btn-crash-restart')?.addEventListener('click', () => {
-      this.resetCrash();
+    // Crash dialog: the only action is back to the main menu [Space / R / Enter]
+    document.getElementById('btn-crash-lobby')?.addEventListener('click', () => {
+      this.exitCrashToLobby();
     });
 
     const toggleYokes = () => {
@@ -1500,7 +1506,7 @@ class FlightSimulator {
       if (e.target?.closest?.('select')) return;
       if (this.gameFlow.blocksFlightInput()) return;
       if (this.isCrashed && (e.code === 'Space' || e.code === 'KeyR' || e.code === 'Enter')) {
-        this.resetCrash();
+        this.exitCrashToLobby();
       }
       if (e.code === 'F2') {
         if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) {

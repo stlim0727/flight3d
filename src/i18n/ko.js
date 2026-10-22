@@ -67,7 +67,6 @@ export default {
   "aircraft.damage": "기체 피해 상태",
   "destroyed": "전파 손실 (DESTROYED)",
   "collision.target": "충돌 대상 분류",
-  "restart.on.runway.09l.space.r": "활주로 09L에서 즉시 재시작 [Space / R]",
   "airport": "공항",
   "coastal.airport": "🌊 국제공항",
   "lukla.vnlk": "🏔️ 루클라 (VNLK)",
