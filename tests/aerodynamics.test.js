@@ -55,6 +55,82 @@ describe('Aerodynamics (6-DOF Flight Physics Model)', () => {
     assert.ok(res.buffetVibration > 0.0, 'Buffet vibration must be triggered');
   });
 
+  it('should set the pre-stall flag within the shaker margin and clear it outside', () => {
+    const aero = new Aerodynamics();
+    const aircraft = createTestAircraft();
+    const angVel = new THREE.Vector3(0, 0, 0);
+
+    // ~13.9 deg AoA: inside the 2-degree shaker margin below the 15.5 deg stall
+    const nearStall = aero.computeAero(0.01, aircraft, new THREE.Vector3(0, -19.6, -80), angVel, 0, 500, 0, 0.0);
+    assert.strictEqual(nearStall.isStalled, false);
+    assert.strictEqual(nearStall.isPreStall, true, 'Shaker margin must activate before the stall');
+
+    // ~5 deg AoA: normal cruise AoA, no warning
+    const cruise = aero.computeAero(0.01, aircraft, new THREE.Vector3(0, -7, -80), angVel, 0, 500, 0, 0.0);
+    assert.strictEqual(cruise.isPreStall, false);
+
+    // Deep stall: the stalled flag owns the annunciation, not the pre-stall flag
+    const stalled = aero.computeAero(0.01, aircraft, new THREE.Vector3(0, -32, -80), angVel, 0, 500, 0, 0.0);
+    assert.strictEqual(stalled.isPreStall, false);
+  });
+
+  it('should inhibit the stall annunciation when there is too little relative airflow', () => {
+    const aero = new Aerodynamics();
+    const aircraft = createTestAircraft();
+    const angVel = new THREE.Vector3(0, 0, 0);
+    // ~4 kt sliding with a steep body-down velocity component: AoA is meaningless here
+    const res = aero.computeAero(0.01, aircraft, new THREE.Vector3(0, -1.2, -2.0), angVel, 0, 0, 0, 1.0);
+    assert.ok(Math.abs(res.alphaDeg) > 15.5, 'Raw AoA geometry exceeds the stall angle');
+    assert.strictEqual(res.isStalled, false, 'Stall flag must be inhibited below the airflow threshold');
+    assert.strictEqual(res.isPreStall, false, 'Shaker must be inhibited below the airflow threshold');
+  });
+
+  it('should break nose-down in the stall even with the stick held fully aft', () => {
+    const aero = new Aerodynamics();
+    const aircraft = createTestAircraft();
+    const angVel = new THREE.Vector3(0, 0, 0);
+    // ~20 deg AoA, full aft stick, ~155 knots
+    aero.elevator = 1.0;
+    const res = aero.computeAero(0.01, aircraft, new THREE.Vector3(0, -32, -80), angVel, 0, 5000, 100000, 0.0);
+    assert.strictEqual(res.isStalled, true);
+    assert.ok(res.momentBody.x < 0, `Post-stall pitch moment must be nose-down with full aft stick, got ${res.momentBody.x}`);
+  });
+
+  it('should lose elevator pitch authority after the stall', () => {
+    const aircraft = createTestAircraft();
+    const angVel = new THREE.Vector3(0, 0, 0);
+    const measure = (alphaVertical) => {
+      const aero = new Aerodynamics();
+      aero.elevator = 0.0;
+      const neutral = aero.computeAero(0.01, aircraft, new THREE.Vector3(0, -alphaVertical, -80), angVel, 0, 5000, 0, 0.0);
+      aero.elevator = 1.0;
+      const aft = aero.computeAero(0.01, aircraft, new THREE.Vector3(0, -alphaVertical, -80), angVel, 0, 5000, 0, 0.0);
+      // Compare non-dimensional effectiveness (moment gain per Pa of dynamic pressure)
+      return { neutral, aft, gain: (aft.momentBody.x - neutral.momentBody.x) / aft.qDyn };
+    };
+    // ~5 deg AoA: unstalled, elevator is fully effective
+    const clean = measure(7);
+    // ~24 deg AoA: deep stall, tail is in the separated wake
+    const deep = measure(35.6);
+    assert.strictEqual(deep.neutral.isStalled, true);
+    assert.ok(deep.gain > 0, 'Aft stick still unloads the tail partially');
+    assert.ok(deep.gain < clean.gain * 0.5, 'Post-stall elevator must be far less effective than unstalled');
+  });
+
+  it('should reverse roll stability with sideslip after the stall (wing drop)', () => {
+    const aircraft = createTestAircraft();
+    const angVel = new THREE.Vector3(0, 0, 0);
+    const atBeta = (vertical) => {
+      const aero = new Aerodynamics();
+      // rightward lateral velocity = right sideslip
+      return aero.computeAero(0.01, aircraft, new THREE.Vector3(2.5, -vertical, -80), angVel, 0, 500, 0, 0.0);
+    };
+    const unstalled = atBeta(7); // ~5 deg AoA, same sideslip
+    const stalled = atBeta(32); // ~20 deg AoA, same sideslip
+    assert.strictEqual(stalled.isStalled, true);
+    assert.ok(unstalled.momentBody.z * stalled.momentBody.z < 0, 'Sideslip must roll the wing down after stall, opposite to unstalled dihedral response');
+  });
+
   it('should model ground effect (reduced induced drag near surface)', () => {
     const aero1 = new Aerodynamics();
     const aero2 = new Aerodynamics();

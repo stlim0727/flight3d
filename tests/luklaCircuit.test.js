@@ -197,4 +197,21 @@ describe('Lukla continuous circuit and truthful completion', () => {
     assert.equal(director.isActive, false);
     assert.equal(scenario.result.status, 'failed');
   });
+
+  it('caps nose-up elevator and commands push-out as AoA approaches the stall (alphaGuarded)', () => {
+    const { scenario } = setup();
+    // Below the 11 deg guard threshold the demand passes through untouched
+    assert.equal(scenario.alphaGuarded(0.5, 10.9), 0.5);
+    // Inside the margin the demand shrinks toward zero
+    const near = scenario.alphaGuarded(0.5, 12.5);
+    assert.ok(near > 0 && near < 0.5, 'Demand must shrink before the stall');
+    // At the protection threshold (~13.2 deg) the demand is neutral
+    const atLimit = scenario.alphaGuarded(0.5, 13.2);
+    assert.ok(Math.abs(atLimit) < 0.05, 'Command must be ~neutral at the protection threshold');
+    // Beyond it the limiter pushes the nose out even while the law still wants +0.5
+    assert.ok(scenario.alphaGuarded(0.5, 14.5) < -0.2, 'Limiter must command nose-down past the margin');
+    // A demanded push-over is never limited
+    assert.equal(scenario.alphaGuarded(-0.6, 9.0), -0.6);
+    assert.equal(scenario.alphaGuarded(-0.6, 14.5), -0.6);
+  });
 });
