@@ -335,29 +335,6 @@ body, html {
   pointer-events: auto;
 }
 
-.airport-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  padding: 5px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
-  margin-bottom: 2px;
-}
-
-.airport-tag {
-  font-size: 10px;
-  font-weight: 800;
-  color: #38bdf8;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  padding: 0 4px;
-}
-
 .btn-airport {
   font-size: 11px;
   font-weight: 700;
@@ -382,16 +359,6 @@ body, html {
   border-color: #38bdf8;
   color: #ffffff;
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
-}
-
-.btn-cliff {
-  border-left-color: #f97316 !important;
-  color: #fdba74 !important;
-}
-
-.btn-cliff:hover {
-  border-color: #f97316 !important;
-  color: #ffedd5 !important;
 }
 
 /* Action Panel (Bottom Right) */
@@ -1389,11 +1356,6 @@ body.touch-mode .action-panel {
   .presets-bar::-webkit-scrollbar {
     display: none;
   }
-  .presets-bar .airport-group {
-    flex-shrink: 0;
-    margin-bottom: 0;
-    padding: 3px 6px;
-  }
   .presets-bar .btn-preset {
     padding: 5px 8px;
     font-size: 10px;
@@ -1611,8 +1573,7 @@ body.compact-ui {
   overflow: visible;
   padding: 0;
 }
-.compact-ui .mobile-menu .btn-group,
-.compact-ui .mobile-menu .airport-group { flex-wrap: wrap; }
+.compact-ui .mobile-menu .btn-group { flex-wrap: wrap; }
 .compact-ui .mobile-menu .btn { min-height: 44px; white-space: normal; }
 .compact-ui .mobile-menu .touch-left-actions,
 .compact-ui .mobile-menu .touch-right-actions {
@@ -1777,10 +1738,6 @@ body.compact-ui {
   white-space: normal;
   text-align: left;
   margin: 0;
-}
-.flight-panel .airport-group {
-  flex-wrap: wrap;
-  box-shadow: none;
 }
 .flight-panel option {
   background: #101c2b;

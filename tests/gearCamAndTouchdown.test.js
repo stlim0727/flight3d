@@ -30,6 +30,7 @@ describe('Landing Gear View & Touchdown Effects', () => {
 
       assert.strictEqual(CameraSystem.MODES.GEAR, 5, 'GEAR mode index should be 5');
       assert.strictEqual(CameraSystem.MODES.DRONE, 6, 'DRONE mode index should be 6');
+      camSystem.setMode(CameraSystem.MODES.COCKPIT, true);
       assert.strictEqual(camSystem.mode, CameraSystem.MODES.COCKPIT);
 
       // Cycle through all modes: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> AUTO -> 0

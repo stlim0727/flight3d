@@ -20,7 +20,9 @@ export class CameraSystem {
   constructor(camera, domElement) {
     this.camera = camera;
     this.domElement = domElement;
-    this.mode = CameraSystem.MODES.COCKPIT;
+    // Open outside the aircraft: the 3D cockpit interior is a separate
+    // asynchronous GLB, so starting in the cockpit shows an unfinished interior.
+    this.mode = CameraSystem.MODES.CHASE;
     this.autoSwitch = false;
     // Explicit view choices persist across demo stages, presets and look resets.
     this.userModeSelected = false;

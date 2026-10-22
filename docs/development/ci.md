@@ -138,6 +138,18 @@ with CDP on port 9451 (`CDP_PORT` overrides). Set `FALLBACK=1` to block the medi
 GLB and test Draco. `ARTIFACT_DIR` overrides the capture directory. See
 [results and limitations](../../review-artifacts/issue101/README.md).
 
+### Cockpit interior startup sequencing
+
+`npm run test:cockpit` (`scripts/verify-cockpit-startup.js`, which starts its own
+Vite server and Chrome) samples the camera mode and interior load state on every
+animation frame from page load. It asserts the first frame is exterior, that no
+frame sits in cockpit mode before the interior GLB resolves, and that the demo
+cuts into the cockpit afterwards. It then fails both interior assets at the
+network layer and asserts cockpit mode falls back to chase with a toast, because
+the GLTF interior is the only cockpit geometry. `PORT`, `CDP_PORT`, `ARTIFACT_DIR`
+and `FORCE_GPU=0` (SwiftShader) override the defaults. See
+[evidence](../../review-artifacts/cockpit-startup/README.md).
+
 ### Airport rendering quality (issue #97)
 
 `node scripts/verify-airport-performance.mjs` compares an unchanged main server

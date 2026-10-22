@@ -34,6 +34,10 @@ import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
 import { initFlightPanels, updateControlState, touchLabel } from './ui/FlightPanels.js';
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
 import { initLobbyScreen } from './ui/LobbyScreen.js';
+import {
+  DEFAULT_SCENARIO,
+  isScenarioAvailable,
+} from './config/scenarioRegistry.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 
@@ -366,11 +370,16 @@ class FlightSimulator {
 
   /** Leave the lobby: stop the cinematic and spawn the player at their choice. */
   fly() {
+    const wantsDemo = this.lobby.preset === 'demo';
     if (this.demoDirector?.isActive || this.demoDirector?.waitingForTerrain) {
-      this.demoDirector.stop(() => t('manual.control.engaged'));
+      this.demoDirector.stop(wantsDemo ? null : () => t('manual.control.engaged'));
     }
     this.gameFlow.enterFlight();
-    this.setPreset(this.lobby.preset);
+    if (wantsDemo) {
+      this.demoDirector.start();
+    } else {
+      this.setPreset(this.lobby.preset);
+    }
   }
 
   setTimeOfDay(hours) {
@@ -385,6 +394,9 @@ class FlightSimulator {
   }
 
   setPreset(type, isDemoInternal = false) {
+    // Scenario availability depends on the active airport; an unavailable
+    // pick (e.g. cliff at coastal) falls back instead of leaving a stale pose.
+    if (!isScenarioAvailable(this.activeAirport, type)) type = DEFAULT_SCENARIO;
     this.lastPresetType = type;
     if (!isDemoInternal) this.aero.loadConfig(BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
@@ -648,27 +660,8 @@ class FlightSimulator {
       this.cduCanvas.setAirport(id);
     }
 
-    // Update UI preset button labels
-    const btnRwy = document.getElementById('btn-preset-rwy');
-    const btnApp = document.getElementById('btn-preset-app');
-    const btnCru = document.getElementById('btn-preset-cru');
-    const btnCliff = document.getElementById('btn-preset-cliff');
-
-    if (isLukla) {
-      if (btnRwy) bindText(btnRwy, () => t('lukla.06.ready'));
-      if (btnApp) bindText(btnApp, () => t('canyon.landing'));
-      if (btnCru) bindText(btnCru, () => t('himalayan.cruise.13.000.ft'));
-      if (btnCliff) btnCliff.style.display = 'block';
-    } else {
-      if (btnRwy) bindText(btnRwy, () => t('runway.takeoff.09l'));
-      if (btnApp) bindText(btnApp, () => t('final.approach.3.nm'));
-      if (btnCru) bindText(btnCru, () => t('cruise.6.000.ft'));
-      if (btnCliff) btnCliff.style.display = 'none';
-    }
-
-    document.getElementById('btn-airport-coastal')?.classList.toggle('active', id === 'coastal');
-    document.getElementById('btn-airport-lukla')?.classList.toggle('active', isLukla);
     this.lobby.airport = id;
+    if (!isScenarioAvailable(id, this.lobby.preset)) this.lobby.preset = DEFAULT_SCENARIO;
     this.lobbyScreen?.refresh();
 
     if (this.demoDirector && this.demoDirector.isActive) {
@@ -1186,7 +1179,17 @@ class FlightSimulator {
     this.tireSmokeSystem.update(frameDelta);
 
     // 4. Update Cockpit Visibility & Audio
-    const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
+    let isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
+    if (isCockpit && !this.cameraSystem.photoCockpit && this.aircraft.cockpit.cockpitModelFailed) {
+      // The GLTF interior is the only 3D cockpit geometry, and it never arrived.
+      // The exterior groups are hidden in this mode, so pull the view out.
+      this.cameraSystem.setMode(CameraSystem.MODES.CHASE, true);
+      isCockpit = false;
+      if (!this.interiorUnavailableWarned) {
+        this.interiorUnavailableWarned = true;
+        this.showToast(() => t('notice.cockpit.unavailable'));
+      }
+    }
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
@@ -1364,16 +1367,6 @@ class FlightSimulator {
     const qualitySelect = document.getElementById('render-quality');
     qualitySelect.value = this.renderQuality;
     qualitySelect.addEventListener('change', () => this.setRenderQuality(qualitySelect.value));
-    // Airport Selector UI buttons
-    document.getElementById('btn-airport-coastal')?.addEventListener('click', () => this.setAirport('coastal'));
-    document.getElementById('btn-airport-lukla')?.addEventListener('click', () => this.setAirport('lukla'));
-
-    // Quick clickable UI buttons
-    document.getElementById('btn-preset-rwy')?.addEventListener('click', () => this.setPreset('runway'));
-    document.getElementById('btn-preset-app')?.addEventListener('click', () => this.setPreset('approach'));
-    document.getElementById('btn-preset-cru')?.addEventListener('click', () => this.setPreset('cruise'));
-    document.getElementById('btn-preset-cliff')?.addEventListener('click', () => this.setPreset('cliff'));
-
     document.getElementById('btn-flaps-ext')?.addEventListener('click', () => this.controls.onCycleFlaps(1));
     document.getElementById('btn-flaps-ret')?.addEventListener('click', () => this.controls.onCycleFlaps(-1));
     document.getElementById('btn-gear')?.addEventListener('click', () => this.controls.onToggleGear());

@@ -1,8 +1,13 @@
 # GLB cockpit controls and instruments
 
-The default cockpit must request `b737-cockpit-medium.glb`. Call
+The GLTF interior is the only cockpit geometry; the vector cockpit and its photo
+textures were removed. `Cockpit.cockpitModelLoading` and
+`cockpitModelFailed` report the download state. The default cockpit must request
+`b737-cockpit-medium.glb`. Call
 `loadCockpitModel()` without a URL at initialization; explicitly passing the lite
 URL bypasses the medium default. The lite Draco asset remains the load fallback.
+If neither asset resolves, `main.js` leaves the cockpit view for chase and toasts
+that the interior is unavailable, because cockpit mode hides the exterior groups.
 
 ## Preserve the enclosure
 
@@ -30,7 +35,7 @@ intersection at approximately 0.268 m.
 The GLBs share asset coordinates: forward +Z, panel LCDs at approximately
 Z=1.458, and captain yoke at X=0.302. The model root rotates by PI around Y and
 translates by (0, -1.31, -11.43) into aircraft coordinates. Display apertures are
-measured from geometry, not from the procedural cockpit. MCP and CDU canvas UVs
+measured from the GLB geometry. MCP and CDU canvas UVs
 crop to LCD content so the model's switches and keypad remain visible.
 
 The medium asset has nested transforms and shared geometry; the lite asset
@@ -38,7 +43,7 @@ batches unrelated geometry by material. `GltfCockpitControls.js` extracts only
 yoke triangles in model coordinates, retaining UVs and normals. Keep both paths
 working when replacing an asset. Never animate a whole material batch.
 
-`J` or the action-panel button hides the yoke handles and checklists for reading
+`J` or the action-panel button hides the yoke handles for reading
 the instruments. Controls continue to animate while hidden. `D` is right roll;
 the demo restart shortcut is `P`, matching the displayed help.
 

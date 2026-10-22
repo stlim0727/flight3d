@@ -34,11 +34,13 @@ export class LuklaCircuitScenario {
     this.sin58 = 0.848048;
     this.cos58 = 0.529919;
     this.stageCameraCutDone = false;
+    this.pendingCockpitCut = false;
     this.result = { status: 'idle', airborne: false };
   }
 
   enterStage(stage) {
     this.stageCameraCutDone = false;
+    this.pendingCockpitCut = false;
     switch (stage) {
       case LuklaCircuitScenario.STAGES.CLIFF_TAKEOFF:
         this.result = { status: 'running', massKg: 43000, airborne: false };
@@ -62,11 +64,14 @@ export class LuklaCircuitScenario {
         if (this.sim.setPreset) {
           this.sim.setPreset('cliff', true);
         }
-        this.sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
-        if (!this.sim.cameraSystem.userLookOverridden) {
-          this.sim.cameraSystem.lookPitch = -0.06;
-          this.sim.cameraSystem.lookYaw = 0.0;
-        }
+        // The interior is a separate asynchronous GLB. Entering it before that
+        // download settles would show an unfinished cockpit, so open on the
+        // exterior and cut in from update() once the model has resolved.
+        this.pendingCockpitCut = this.sim.aircraft?.cockpit?.cockpitModelLoading === true;
+        this.sim.cameraSystem.setMode(this.pendingCockpitCut
+          ? CameraSystem.MODES.CHASE
+          : CameraSystem.MODES.COCKPIT);
+        if (!this.pendingCockpitCut) this.applyCockpitLook();
         this.director.setTimeOfDay(8.5); // Morning Himalayan sun
         if (this.sim.water && this.sim.water.setSunDirection) {
           this.sim.water.setSunDirection(this.sim.sky.getSunDirection());
@@ -133,6 +138,25 @@ export class LuklaCircuitScenario {
 
         break;
     }
+  }
+
+  /** Default pilot scan angle, unless the user is already looking elsewhere. */
+  applyCockpitLook() {
+    if (!this.sim.cameraSystem.userLookOverridden) {
+      this.sim.cameraSystem.lookPitch = -0.06;
+      this.sim.cameraSystem.lookYaw = 0.0;
+    }
+  }
+
+  /** Cut into the cockpit once its GLB has loaded or definitively failed. */
+  resolveCockpitCut() {
+    if (this.sim.aircraft?.cockpit?.cockpitModelLoading) return;
+    this.pendingCockpitCut = false;
+    if (this.director.userCameraOverridden) return;
+    // The deferred exterior shot already served as this stage's showcase cut.
+    this.stageCameraCutDone = true;
+    this.sim.cameraSystem.setMode(CameraSystem.MODES.COCKPIT);
+    this.applyCockpitLook();
   }
 
   flyBank(targetRollDeg, tel) {
@@ -202,6 +226,8 @@ export class LuklaCircuitScenario {
       // STAGE 0: Runway 24 Downhill Cliff Takeoff Roll
       // -------------------------------------------------------------
       case LuklaCircuitScenario.STAGES.CLIFF_TAKEOFF: {
+        if (this.pendingCockpitCut) this.resolveCockpitCut();
+
         // Runway 24 heading 238°; track the same 5m offset as the takeoff preset.
         // Keep centerline: if w > 0, steer left (negative rudder)
         const rudderCmd = Math.max(-0.25, Math.min(0.25, -(w + 5) * 0.05));

@@ -20,6 +20,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     try {
       const dom = { style: {}, addEventListener: (name, fn) => domListeners.set(name, fn) };
       const cam = new CameraSystem(new THREE.PerspectiveCamera(), dom);
+      cam.setMode(CameraSystem.MODES.COCKPIT, true);
       const aircraft = new THREE.Object3D();
       const move = (x, y) => listeners.get('mousemove')({ clientX: x, clientY: y });
       move(600, 400);
@@ -104,7 +105,12 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     assert.strictEqual(camSys.isDragging, false);
     assert.strictEqual(camSys.pointerLocked, false);
     assert.strictEqual(camSys.enableCursorTrack, false);
-    assert.strictEqual(camera.near, 0.08, 'Default cockpit mode should configure near clipping plane to 0.08m');
+    assert.strictEqual(camSys.mode, CameraSystem.MODES.CHASE,
+      'The opening view is exterior while the cockpit interior GLB streams in');
+    assert.strictEqual(camera.near, 0.25, 'Exterior default should configure near clipping plane to 0.25m');
+
+    camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+    assert.strictEqual(camera.near, 0.08, 'Cockpit mode should configure near clipping plane to 0.08m');
   });
 
   it('should update chase orbit angles and clamp pitch on mouse delta in CHASE mode', () => {

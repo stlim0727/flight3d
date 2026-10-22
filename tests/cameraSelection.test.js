@@ -103,3 +103,10 @@ for (let mode = 0; mode < 7; mode++) {
     assert.equal(system.mode, CameraSystem.MODES.COCKPIT);
   });
 }
+
+test('opens on an exterior view because the cockpit interior streams in separately', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const system = new CameraSystem(camera, null);
+  assert.equal(system.mode, CameraSystem.MODES.CHASE);
+  assert.equal(camera.near, 0.25, 'Exterior near plane must be used before any cockpit entry');
+});

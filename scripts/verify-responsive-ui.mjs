@@ -204,8 +204,8 @@ await send('Input.dispatchKeyEvent', { type: 'keyDown', key: '2', code: 'Digit2'
 await send('Input.dispatchKeyEvent', { type: 'keyUp', key: '2', code: 'Digit2', windowsVirtualKeyCode: 50 });
 await new Promise(r => setTimeout(r, 150));
 assert.equal(await ev(`document.querySelector('#camera-select').value`), '1', 'keyboard camera state appears in selector');
-await ev(`document.querySelector('#panel-camera .panel-close').click(); document.querySelector('#open-flight').click(); document.querySelector('#btn-preset-rwy').click()`);
-assert.equal(await ev(`document.querySelector('#panel-flight').hidden`), true, 'preset closes Flight settings');
+await ev(`document.querySelector('#panel-camera .panel-close').click(); document.querySelector('#open-flight').click(); document.querySelector('#btn-demo').click(); window.simulator.demoDirector.stop()`);
+assert.equal(await ev(`document.querySelector('#panel-flight').hidden`), true, 'demo button closes Flight settings');
 await ev(`document.querySelector('#open-environment').click(); document.querySelector('#panel-environment .flight-panel-body').scrollTop = 0`);
 const before = await ev(`(()=>{const r=document.querySelector('#panel-environment .flight-panel-body').getBoundingClientRect();const c=window.simulator.cameraSystem;return {x:r.x+6,y:r.bottom-12,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
 await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: before.x, y: before.y }] });
@@ -231,7 +231,7 @@ await new Promise(r => setTimeout(r, 150));
 assert.equal(await ev(`!document.querySelector('#panel-aircraft').hidden`), true, 'rotation retains Aircraft panel');
 await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-aircraft-ko.png`, Buffer.from(r.data, 'base64')));
 await ev(`document.querySelector('#panel-aircraft .panel-close').click(); const language = document.querySelector('#language-select'); language.value = 'en'; language.dispatchEvent(new Event('change'))`);
-fs.writeFileSync(`${out}/interaction-results.json`, JSON.stringify({ repeatedFlaps: true, directCamera: true, keyboardCamera: true, presetClosesPanel: true, nativeTouchScroll: after, cameraBefore: before, touchModeToggle: true, languageChange: true, rotation: true }, null, 2));
+fs.writeFileSync(`${out}/interaction-results.json`, JSON.stringify({ repeatedFlaps: true, directCamera: true, keyboardCamera: true, demoClosesPanel: true, nativeTouchScroll: after, cameraBefore: before, touchModeToggle: true, languageChange: true, rotation: true }, null, 2));
 console.log('Interaction scenarios passed');
 
 await ev(`window.simulator.controls.onSelectCamera(7); document.querySelector('#open-instruments').click()`);

@@ -14,6 +14,7 @@
     "test:mobile": "node scripts/test-mobile-touch.js",
     "test:demo": "node scripts/test-demo-stepping.js",
     "test:lukla": "node scripts/test-lukla-demo-benchmark.mjs",
+    "test:cockpit": "node scripts/verify-cockpit-startup.js",
     "check": "node scripts/check-syntax.mjs && node scripts/check-workflow-actions.mjs"
   },
   "dependencies": {
