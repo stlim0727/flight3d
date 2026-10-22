@@ -5,7 +5,6 @@ export default {
   "ui.camera.current": "Camera: {name}",
   "ui.controls": "Flight controls",
   "ui.aircraft": "Aircraft",
-  "ui.camera": "Camera",
   "ui.environment": "Environment",
   "ui.close": "Close panel",
   "ui.instruments": "Instruments",

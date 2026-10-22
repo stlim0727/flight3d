@@ -6,7 +6,7 @@ export function touchLabel(text) {
 }
 
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
-export function initFlightPanels({ onSelectCamera }) {
+export function initFlightPanels({ onCycleCamera }) {
   const hud = document.getElementById('hud-overlay');
   const bar = document.createElement('nav');
   bar.className = 'flight-toolbar';
@@ -75,21 +75,14 @@ export function initFlightPanels({ onSelectCamera }) {
     return body;
   }
   makePanel('aircraft', ['#btn-gear', '#btn-flaps-ret', '#btn-flaps-ext', '#btn-spoilers', '#btn-reverser']);
-  const camera = makePanel('camera', ['#btn-cam-reset', '#btn-yokes']);
-  const select = document.createElement('select');
-  select.id = 'camera-select';
-  select.className = 'btn';
-  bindText(select, () => t('ui.camera'), 'aria-label');
-  const names = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto'];
-  names.forEach((name, i) => {
-    const option = document.createElement('option');
-    option.value = i;
-    bindText(option, () => window.matchMedia('(pointer: coarse)').matches ? t(`ui.camera.${name}`).replace(/ · [1-8]$/, '') : t(`ui.camera.${name}`));
-    select.append(option);
-  });
-  select.addEventListener('change', () => onSelectCamera(Number(select.value)));
-  camera.prepend(select);
-  makePanel('environment', ['.language-control[for="language-select"]', '.language-control[for="render-quality"]', '#btn-sound', '#btn-touch-toggle', '#touch-btn-gyro', '#btn-diag', '#btn-help']);
+  const cameraButton = document.createElement('button');
+  cameraButton.id = 'open-camera';
+  cameraButton.className = 'btn';
+  cameraButton.type = 'button';
+  bindText(cameraButton, () => t('change.camera.c'), 'title');
+  cameraButton.addEventListener('click', () => onCycleCamera());
+  bar.append(cameraButton);
+  makePanel('environment', ['.language-control[for="language-select"]', '.language-control[for="render-quality"]', '#btn-sound', '#btn-touch-toggle', '#touch-btn-gyro', '#btn-cam-reset', '#btn-yokes', '#btn-diag', '#btn-help']);
   const mute = document.createElement('button');
   mute.id = 'btn-mute';
   mute.className = 'btn quick-mute';
@@ -157,9 +150,7 @@ export function updateControlState(telemetry, camera) {
   document.getElementById('btn-flaps-ext').disabled = telemetry.flapIndex >= 6;
   set('btn-spoilers', telemetry.spoilers > .1 ? 'ui.spoilers.on' : 'ui.spoilers.off', {}, telemetry.spoilers > .1);
   set('btn-reverser', telemetry.reverserActive ? 'ui.reverse.on' : 'ui.reverse.off', {}, !!telemetry.reverserActive);
-  const select = document.getElementById('camera-select');
   const mode = camera.autoSwitch ? 7 : camera.mode;
-  if (select) select.value = String(mode);
   const cameraName = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto'][mode];
   set('open-camera', 'ui.camera.current', { name: t(`ui.camera.${cameraName}`).replace(/ · [1-8]$/, '') });
   const toggle = document.getElementById('btn-touch-toggle');

@@ -163,7 +163,7 @@ class FlightSimulator {
     this.audio = new FlightAudio();
     this.controls = new FlightControls(this.renderer.domElement);
     this.touchControls = new TouchFlightControls(this.controls);
-    initFlightPanels({ onSelectCamera: mode => this.controls.onSelectCamera(mode) });
+    initFlightPanels({ onCycleCamera: () => this.controls.onCycleCamera() });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
     this.cameraSystem.onResetLook = () => {

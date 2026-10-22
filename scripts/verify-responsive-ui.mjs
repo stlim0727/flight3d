@@ -167,9 +167,11 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   }
   if (showTouch) {
     assert.ok(await ev(`window.simulator.audio.volume <= 1 && window.simulator.audio.getVolumeState().level <= 1`), `${name}: audio has no boost modes`);
+    const nextCamera = await ev(`(()=>{const c=window.simulator.cameraSystem;return ((c.autoSwitch ? 7 : (c.savedMode ?? c.mode)) + 1) % 8})()`);
     await nativeClick('#open-camera', touch);
-    assert.ok(await ev(`!document.querySelector('#panel-camera').hidden`), `${name}: camera is directly reachable from toolbar`);
-    await ev(`document.querySelector('#panel-camera .panel-close').click(); window.simulator.audio.setVolume(1.0); window.simulator.updateAudioUI()`);
+    assert.equal(await ev(`window.simulator.cameraSystem.mode`), nextCamera, `${name}: toolbar camera button cycles views`);
+    assert.equal(await ev(`!document.querySelector('#panel-camera')`), true, `${name}: no camera panel opens`);
+    await ev(`window.simulator.cameraSystem.setMode(0, true); window.simulator.audio.setVolume(1.0); window.simulator.updateAudioUI()`);
     const muteTarget = await ev(`(()=>{const node=document.querySelector('#btn-mute'),r=node.getBoundingClientRect();return {width:r.width,height:r.height,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}})()`);
     assert.ok(muteTarget.width >= 44 && muteTarget.height >= 44 && muteTarget.reachable, `${name}: mute has a reachable 44px touch target`);
     await nativeClick('#btn-mute', touch);
@@ -197,14 +199,15 @@ await ev(`window.simulator.demoDirector.stop(); window.simulator.gameFlow.enterF
 await new Promise(r => setTimeout(r, 200));
 await ev(`document.querySelector('#open-aircraft').click(); document.querySelector('#btn-flaps-ext').click(); document.querySelector('#btn-flaps-ext').click()`);
 assert.equal(await ev(`!document.querySelector('#panel-aircraft').hidden && window.simulator.aero.flapsIndex === 4`), true, 'repeated flap changes keep Aircraft open');
-await ev(`document.querySelector('#panel-aircraft .panel-close').click(); document.querySelector('#open-camera').click(); const select = document.querySelector('#camera-select'); select.value = '6'; select.dispatchEvent(new Event('change'))`);
-assert.equal(await ev('window.simulator.cameraSystem.mode'), 6, 'direct camera selection');
+const cycleFrom = await ev(`window.simulator.cameraSystem.mode`);
+await ev(`document.querySelector('#panel-aircraft .panel-close').click(); document.querySelector('#open-camera').click(); document.querySelector('#open-camera').click()`);
+assert.equal(await ev(`window.simulator.cameraSystem.mode`), (cycleFrom + 2) % 8, 'repeated toolbar taps keep cycling cameras');
 await ev('document.activeElement?.blur()');
 await send('Input.dispatchKeyEvent', { type: 'keyDown', key: '2', code: 'Digit2', windowsVirtualKeyCode: 50 });
 await send('Input.dispatchKeyEvent', { type: 'keyUp', key: '2', code: 'Digit2', windowsVirtualKeyCode: 50 });
 await new Promise(r => setTimeout(r, 150));
-assert.equal(await ev(`document.querySelector('#camera-select').value`), '1', 'keyboard camera state appears in selector');
-await ev(`document.querySelector('#panel-camera .panel-close').click()`);
+assert.equal(await ev(`window.simulator.cameraSystem.mode`), 1, 'digit keys still select a camera directly');
+assert.match(await ev(`document.querySelector('#open-camera').textContent`), /Chase/, 'keyboard camera state appears on the toolbar button');
 await ev(`document.querySelector('#open-environment').click(); document.querySelector('#panel-environment .flight-panel-body').scrollTop = 0`);
 const before = await ev(`(()=>{const r=document.querySelector('#panel-environment .flight-panel-body').getBoundingClientRect();const c=window.simulator.cameraSystem;return {x:r.x+6,y:r.bottom-12,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
 await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: before.x, y: before.y }] });

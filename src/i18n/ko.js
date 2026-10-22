@@ -5,7 +5,6 @@ export default {
   "ui.camera.current": "카메라: {name}",
   "ui.controls": "비행 조작",
   "ui.aircraft": "기체 조작",
-  "ui.camera": "카메라",
   "ui.environment": "환경 설정",
   "ui.close": "패널 닫기",
   "ui.instruments": "상세 계기",

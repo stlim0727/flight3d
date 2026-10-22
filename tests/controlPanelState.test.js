@@ -5,7 +5,7 @@ import { setLanguage } from '../src/i18n/index.js';
 
 test('shared controls track deployment, damage, keyboard changes and input mode switches', () => {
   const previous = globalThis.document;
-  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'camera-select', 'btn-touch-toggle', 'open-camera'];
+  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'open-camera'];
   const nodes = Object.fromEntries(ids.map(id => [id, { textContent: '', setAttribute(key, value) { this[key] = value; } }]));
   let touch = true;
   globalThis.document = {
@@ -21,7 +21,7 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-gear'].textContent, 'Gear down');
     assert.equal(nodes['btn-gear']['aria-pressed'], 'true');
     assert.equal(nodes['btn-flaps-ret'].disabled, false);
-    assert.equal(nodes['camera-select'].value, '0');
+    assert.equal(nodes['open-camera'].textContent, 'Camera: Cockpit');
     Object.assign(telemetry, { gearState: .5, flapDegree: 12, flapIndex: 6, spoilers: 1, reverserActive: true, engine1: {} });
     camera.autoSwitch = true;
     updateControlState(telemetry, camera);
@@ -30,7 +30,7 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.match(nodes['btn-flaps-ext'].textContent, /12°/);
     assert.equal(nodes['btn-spoilers']['aria-pressed'], 'true');
     assert.equal(nodes['btn-reverser']['aria-pressed'], 'true');
-    assert.equal(nodes['camera-select'].value, '7');
+    assert.equal(nodes['open-camera'].textContent, 'Camera: Auto');
     Object.assign(telemetry, { gearState: 0, gearDamage: { left: 'collapsed' }, flapIndex: 0, spoilers: 0, reverserActive: false, engine1: {} });
     camera.autoSwitch = false;
     camera.mode = 6;
@@ -41,7 +41,7 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-spoilers']['aria-pressed'], 'false');
     assert.equal(nodes['btn-reverser']['aria-pressed'], 'false');
     assert.equal(nodes['btn-touch-toggle']['aria-pressed'], 'false');
-    assert.equal(nodes['camera-select'].value, '6');
+    assert.equal(nodes['open-camera'].textContent, 'Camera: Drone');
     delete telemetry.gearDamage;
     telemetry.gearState = 1;
     updateControlState(telemetry, camera);
