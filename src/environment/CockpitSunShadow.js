@@ -8,8 +8,8 @@ import {
   DECK_SUN_CLIP_T,
 } from '../aircraft/CockpitAperture.js';
 
-/** Deck sun relative to the ambient sun: below 1 because the panel floods still contribute. */
-export const COCKPIT_SUN_GAIN = 0.55;
+/** Localized direct sun, balanced against the enclosed deck's reduced sky fill. */
+export const COCKPIT_SUN_GAIN = 1.6;
 
 /** Sun intensity that saturates the cockpit flood dimming. */
 export const COCKPIT_DAYLIGHT_REFERENCE = 3.5;
@@ -18,7 +18,7 @@ export const COCKPIT_DAYLIGHT_REFERENCE = 3.5;
 export const COOKIE_SIZE = 256;
 
 /** Sunlight that leaks around the window frames, as a fraction of direct sun. */
-export const COOKIE_LEAK = 0.06;
+export const COOKIE_LEAK = 0.02;
 
 /** Radians the deck-local sun may move before the cookie is repainted. */
 export const COOKIE_REDRAW_ANGLE = 0.008;
@@ -144,7 +144,7 @@ export function drawCockpitCookie(ctx, quads, size = COOKIE_SIZE, leak = COOKIE_
     ctx.closePath();
     ctx.fill();
     // Feathered edge: a point source is not a slide projector.
-    for (const [width, alpha] of [[5, 0.14], [2.5, 0.3]]) {
+    for (const [width, alpha] of [[1.5, 0.15]]) {
       ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
       ctx.lineWidth = width;
       ctx.stroke();
@@ -157,9 +157,8 @@ export function drawCockpitCookie(ctx, quads, size = COOKIE_SIZE, leak = COOKIE_
  *
  * `t(P) = sunDir · (P - anchor)` measures how far along the sun vector a point sits, so a
  * light standing `standOff` along it sees that point at depth `standOff - t(P)`. The near
- * plane goes just aft of the windshield so the closed airframe skin, which would otherwise
- * fill the deck with its own shadow, never enters this map; the interior shell, framing and
- * panels are all aft of it and still cast.
+ * plane includes the entire window frame. Closed exterior shadow proxies are excluded
+ * specifically from this light's depth pass, so no pillar needs to be clipped away.
  *
  * Returns a shared object; the vectors are overwritten by the next call.
  */
@@ -229,6 +228,7 @@ export class CockpitSunShadow {
     this.light.shadow.mapSize.set(mapSize, mapSize);
     this.light.shadow.bias = -0.00008;
     this.light.shadow.normalBias = 0.005;
+    this.light.shadow.camera.userData.cockpitSun = true;
     // The rig is always in the scene: adding or removing a shadow light would change
     // the compiled shader defines, and the pass is skipped by freezing the map instead.
     this.light.shadow.autoUpdate = false;
@@ -299,7 +299,7 @@ export class CockpitSunShadow {
    * @param {number} state.dt Elapsed seconds for the mode ramp.
    * @returns {number} Daylight factor 0..1 for cockpit flood dimming.
    */
-  update({ position, quaternion, sunDir, sunColor, sunIntensity, cockpitActive, dt }) {
+  update({ position, quaternion, sunDir, sunColor, sunIntensity, cockpitActive, dt, casterState }) {
     computeDeckSunPose({ position, quaternion, sunDir, pose: this.pose });
 
     const sunDirLocal = this.pose.sunDirLocal;
@@ -323,6 +323,7 @@ export class CockpitSunShadow {
     this.light.angle = this.pose.angle;
     this.light.color.copy(sunColor);
     this.light.intensity = sunIntensity * this.pose.facing * this.modeFactor * COCKPIT_SUN_GAIN;
+    this.light.intensity *= smoothstep(-0.03, 0.08, sunDir.y);
 
     const shadowCamera = this.light.shadow.camera;
     shadowCamera.near = this.pose.near;
@@ -333,10 +334,17 @@ export class CockpitSunShadow {
     // SpotLightShadow.updateMatrices only rebuilds the projection when its own fov, aspect
     // or far change, so the slab we just set needs an explicit rebuild.
     shadowCamera.updateProjectionMatrix();
+    // A frozen body-fixed depth image still needs a new world-to-shadow matrix
+    // when the aircraft translates or rotates with the same local sun bearing.
+    this.light.updateMatrixWorld();
+    this.light.target.updateMatrixWorld();
+    this.light.shadow.updateMatrices(this.light);
 
-    // The rig rides with the aircraft, so the map contents only change with the sun's
-    // deck bearing; freezing it elsewhere costs a shadow pass per repaint, not per frame.
-    this.light.shadow.needsUpdate = sunMoved || this.mapPending;
+    // Keep pending changes until the renderer consumes them. Simulation substeps,
+    // a model finishing its load, or moving controls can all precede one render.
+    const castersMoved = casterState !== this._casterState;
+    this._casterState = casterState;
+    this.light.shadow.needsUpdate ||= sunMoved || this.mapPending || (cockpitActive && castersMoved);
     this.mapPending = false;
 
     return this.daylight;

@@ -26,10 +26,8 @@ export const DECK_SUN_AFT_REACH = 5.2;
 export const DECK_SUN_RADIUS = 2.9;
 
 /**
- * Distance ahead of the anchor at which the outside world stops casting into the deck.
- * The shipped airframe skin is a closed low-poly tube with no windshield openings, so the
- * deck sun's shadow pass must drop it and let the light's own cookie describe the apertures.
- * 0.45 m sits between the glareshield lip (~0.28 m ahead of the anchor) and the nearest
- * skin over the deck (~0.51 m), so interior detail keeps casting and the skin does not.
+ * Sunward reach of the interior shadow slab. Include the complete window frame
+ * from every admitted sun bearing; exterior proxies opt out of this light's pass
+ * explicitly instead of clipping the pillars along with the airframe skin.
  */
-export const DECK_SUN_CLIP_T = 0.45;
+export const DECK_SUN_CLIP_T = 2.2;

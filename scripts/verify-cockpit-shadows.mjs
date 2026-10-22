@@ -94,14 +94,19 @@ const stage = async ({ hour, heading, bank = 0, cloud = 0, frames = 4 }) => awai
   sky.setCloudCover(${cloud});
   sky.setTimeOfDay(${hour}, sim.position, sim.camera.position);
   for (let i = 0; i < ${frames}; i++) {
-    sim.stepSimulation(1 / 60);
-    sim.sky.updateCockpitSun({
+    sim.aircraft.setCockpitMode(true, true);
+    sim.aircraft.group.updateMatrixWorld(true);
+    sim.cameraSystem.update(1 / 60, sim.aircraft.group, sim.telemetry,
+      (x, z) => sim.currentTerrain.getHeight(x, z));
+    const daylight = sim.sky.updateCockpitSun({
       position: sim.aircraft.group.position,
       quaternion: sim.aircraft.group.quaternion,
       cockpitActive: true,
       dt: 1 / 60,
+      casterState: 'static-review',
     });
-    sim.renderer.render(sim.scene, sim.camera);
+    sim.aircraft.cockpit.syncDaylight(daylight);
+    sim.renderScene();
   }
   const rig = sky.cockpitSun;
   const stats = (() => {
@@ -222,7 +227,7 @@ const ablation = await evaluate(`(() => {
   const gl = sim.renderer.getContext();
   const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight;
   const grab = () => {
-    sim.renderer.render(sim.scene, sim.camera);
+    sim.renderScene();
     const buf = new Uint8Array(W * H * 4);
     gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
     return buf;
@@ -301,7 +306,7 @@ const repeat = await evaluate(`(() => {
   const sim = window.simulator;
   const rig = sim.sky.cockpitSun;
   sim.stepSimulation(1 / 60);
-  sim.renderer.render(sim.scene, sim.camera);
+  sim.renderScene();
   const settled = rig.light.shadow.needsUpdate;
   sim.sky.setTimeOfDay(9.4, sim.position, sim.camera.position);
   sim.stepSimulation(1 / 60);
@@ -315,7 +320,7 @@ const perf = await evaluate(`(() => {
   const rig = sim.sky.cockpitSun;
   const time = (n) => {
     const t0 = performance.now();
-    for (let i = 0; i < n; i++) { sim.stepSimulation(1 / 60); sim.renderer.render(sim.scene, sim.camera); }
+    for (let i = 0; i < n; i++) { sim.stepSimulation(1 / 60); sim.renderScene(); }
     sim.renderer.getContext().finish();
     return (performance.now() - t0) / n;
   };
@@ -327,10 +332,63 @@ const perf = await evaluate(`(() => {
   return { frozen: +frozen.toFixed(2), forced: +forced.toFixed(2) };
 })()`);
 
+// Independently remove frame casting and AO from one frozen frame. Removing
+// sunlight alone cannot establish that a pillar casts, or that contact AO works.
+await stage({ ...cells.golden, frames: 12 });
+const contrast = {};
+const readDeck = async () => evaluate(`(() => {
+  const sim = window.simulator;
+  sim.renderScene();
+  const gl = sim.renderer.getContext(), w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+  const bytes = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+  window.contrastPixels ??= bytes;
+  const boxes = { deck: [0.25, 0.4, 0.75, 0.6], outside: [0.33, 0.18, 0.16, 0.17],
+    display: [0.547, 0.682, 0.025, 0.035] };
+  const result = {};
+  for (const [name, [x, y, width, height]] of Object.entries(boxes)) {
+    let moved = 0, sum = 0, peak = 0, count = 0;
+    for (let py = Math.floor(y * h); py < Math.floor((y + height) * h); py++) {
+      for (let px = Math.floor(x * w); px < Math.floor((x + width) * w); px++) {
+        const i = ((h - 1 - py) * w + px) * 4;
+        let delta = 0;
+        for (let k = 0; k < 3; k++) delta += Math.abs(bytes[i + k] - window.contrastPixels[i + k]) / 3;
+        if (delta > 3) moved++;
+        sum += delta; peak = Math.max(peak, delta); count++;
+      }
+    }
+    result[name] = { moved, mean: +(sum / count).toFixed(4), peak: +peak.toFixed(2) };
+  }
+  return result;
+})()`);
+await evaluate('delete window.contrastPixels');
+await readDeck();
+contrast.noise = await readDeck();
+await snapshot('contrast-final');
+await evaluate(`(() => {
+  const sim = window.simulator;
+  const frame = sim.aircraft.cockpit.gltfCockpitModel.getObjectByName('Body020_Material008_0');
+  if (!frame) throw new Error('Native window frame missing');
+  frame.castShadow = false;
+  sim.sky.cockpitSun.light.shadow.needsUpdate = true;
+})()`);
+contrast.frameOff = await readDeck();
+await snapshot('contrast-frame-casting-off');
+await evaluate(`(() => {
+  const sim = window.simulator;
+  sim.aircraft.cockpit.gltfCockpitModel.getObjectByName('Body020_Material008_0').castShadow = true;
+  sim.sky.cockpitSun.light.shadow.needsUpdate = true;
+  sim.cockpitOcclusion.enabled = false;
+})()`);
+contrast.aoOff = await readDeck();
+await snapshot('contrast-ao-off');
+await evaluate('window.simulator.cockpitOcclusion.enabled = true; delete window.contrastPixels;');
+console.log('contrast', JSON.stringify(contrast));
+
 await evaluate('window.simulator.animate = window.deckSunReview.savedAnimate;');
 ws.close();
 
-const report = { gpu, rigFacts, results, repeat, perf, pageErrors, resourceErrors,
+const report = { gpu, rigFacts, results, repeat, perf, contrast, pageErrors, resourceErrors,
   ablation: { ...ablation, png: undefined } };
 fs.writeFileSync(path.join(dir, 'deck-sun-report.json'), JSON.stringify(report, null, 2));
 
@@ -384,7 +442,17 @@ check(spread(results.bankLeft, results.bankRight) > 0.02,
 check(spread(results.morning, results.golden) > 0.02,
   `Morning and golden-hour sun must land in different places: ${JSON.stringify(offset(results.morning))} vs ${JSON.stringify(offset(results.golden))}`);
 for (const name of Object.keys(results)) {
-  check(results[name].deckSunOverSun <= 0.56, `${name}: deck sun over its share of ambient`);
+  check(results[name].deckSunOverSun <= 1.61, `${name}: deck sun over its share of ambient`);
+}
+check(contrast.noise.deck.moved < 16 && contrast.noise.deck.mean < 0.001,
+  'Repeated static cockpit renders must have negligible pixel noise');
+check(contrast.frameOff.deck.moved > 1000 && contrast.frameOff.deck.peak > 12,
+  'Window frame itself must cast measurable bands on the deck');
+check(contrast.aoOff.deck.moved > 1000 && contrast.aoOff.deck.peak > 6,
+  'Contact AO must shade a visible set of deck pixels');
+for (const name of ['frameOff', 'aoOff']) {
+  check(contrast[name].outside.peak <= 1, `${name}: cockpit effect must leave the exterior alone`);
+  check(contrast[name].display.peak <= 1, `${name}: instrument display must stay readable`);
 }
 check(repeat.settled === false, 'Frozen shadow map must stay clean across identical frames');
 check(repeat.moved === true, 'A moved sun must mark the shadow map dirty');

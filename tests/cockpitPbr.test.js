@@ -66,12 +66,12 @@ describe('Cockpit GLTF Interior System', () => {
       cockpit.syncDaylight(daylight);
       cockpit.floods.forEach((flood, i) => {
         assert.ok(flood.intensity <= previous[i], `daylight ${daylight} must not brighten a flood`);
-        assert.ok(flood.intensity >= 0.15, 'Floods keep a floor so the deck never goes dark');
+        assert.ok(flood.intensity >= 0.06, 'Floods keep a floor so the deck never goes dark');
         previous[i] = flood.intensity;
       });
     }
-    cockpit.floods.forEach((flood, i) => assert.equal(flood.intensity, Math.max(base[i] * 0.25, 0.15),
-      'Full sun settles a quarter dimmed or at the floor'));
+    cockpit.floods.forEach((flood, i) => assert.ok(Math.abs(flood.intensity - Math.max(base[i] * 0.08, 0.06)) < 1e-9,
+      'Full sun leaves a small instrument fill'));
 
     cockpit.syncDaylight(0);
     cockpit.floods.forEach((flood, i) => assert.equal(flood.intensity, base[i],

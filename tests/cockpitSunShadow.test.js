@@ -89,7 +89,7 @@ describe('Cockpit deck sun rig (issue #90)', () => {
     for (const sunDir of admittedSuns()) {
       const pose = computeDeckSunPose({ position: origin, quaternion: identity, sunDir });
       assert.ok(Math.abs(pose.near - (DECK_SUN_STANDOFF - DECK_SUN_CLIP_T)) < 1e-9,
-        'Near plane must sit just aft of the windshield regardless of the sun');
+        'Near plane must include the complete frame regardless of sun bearing');
       assert.ok(Math.abs((pose.far - pose.near) - (DECK_SUN_CLIP_T + DECK_SUN_AFT_REACH)) < 1e-9,
         'Slab depth is the deck depth only; texel density depends on it');
       assert.ok(pose.far - pose.near < 8, 'Deck sun must not reach the rest of the airframe');
@@ -97,34 +97,25 @@ describe('Cockpit deck sun rig (issue #90)', () => {
     }
   });
 
-  it('clips the closed airframe skin but keeps the deck behind it in the slab', () => {
-    // Measured in the browser against the shipped GLBs: the forward-most interior caster,
-    // the glareshield lip, is 0.28 m ahead of the deck anchor and the nearest airframe
-    // skin over it is 0.51 m ahead. The clip between them is what lets sun in at all.
-    assert.ok(DECK_SUN_CLIP_T > 0.28 && DECK_SUN_CLIP_T < 0.51,
-      `clip ${DECK_SUN_CLIP_T} must fall between the glareshield lip and the skin`);
-
+  it('includes window corners, side consoles and the interior in the shadow slab', () => {
     const receivers = [
       new THREE.Vector3(0, 0.95, -12.9),   // panel face, ahead of the anchor
       new THREE.Vector3(0, 0.66, -12.12),  // floor
       new THREE.Vector3(-0.4, 0.9, -11.9), // captain seat back
       new THREE.Vector3(0, 1.25, -12.5),   // overhead panel
       new THREE.Vector3(0.85, 0.6, -12.2), // copilot console
+      new THREE.Vector3(-1.05, 1.25, -13), // left window frame
+      new THREE.Vector3(1.05, 1.25, -13),  // right window frame
     ];
     const pose = {};
     for (const sunDir of admittedSuns()) {
       for (const point of receivers) {
         computeDeckSunPose({ position: origin, quaternion: identity, sunDir, pose });
         const depth = DECK_SUN_STANDOFF - point.clone().sub(pose.anchorWorld).dot(sunDir);
-        // Nothing aft of the clip may fall behind the slab, or it would be lit unshadowed
-        // and unmasked; surfaces closer to the sun than the clip are outside by design.
         assert.ok(depth <= pose.far,
           `receiver ${point.toArray()} at depth ${depth.toFixed(2)} leaves the slab at ${pose.far.toFixed(2)}`);
-        const sunward = point.clone().sub(DECK_SUN_ANCHOR).dot(sunDir);
-        if (sunward < DECK_SUN_CLIP_T) {
-          assert.ok(depth >= pose.near,
+        assert.ok(depth >= pose.near,
             `interior point ${point.toArray()} at depth ${depth.toFixed(2)} must stay shadow-tested`);
-        }
       }
     }
   });
@@ -197,6 +188,7 @@ describe('Cockpit deck sun rig (issue #90)', () => {
     };
 
     rig.update({ ...state, sunDir: deckSun, quaternion: identity });
+    rig.light.shadow.needsUpdate = false; // A renderer consumes the pending depth pass.
     const pattern = projectPanesForCookie({
       sunDirLocal: rig.pose.sunDirLocal, axes: rig.axes, angle: rig.pose.angle,
     }).map((quad) => quad.slice());
@@ -260,6 +252,7 @@ describe('Cockpit deck sun rig (issue #90)', () => {
       'Deck sun must never exceed its share of the ambient sun');
 
     let previous = rig.light.intensity;
+    rig.light.shadow.needsUpdate = false;
     for (let frame = 0; frame < 240; frame++) {
       rig.update({ ...base, cockpitActive: false });
       assert.ok(rig.light.intensity <= previous + 1e-9, 'Ramp-down must be monotonic');
@@ -277,6 +270,7 @@ describe('Cockpit deck sun rig (issue #90)', () => {
       cockpitActive: true, dt: 1 / 60, quaternion: identity,
     };
     rig.update({ ...base, sunDir: sunDirectionAt(30, 180) });
+    rig.light.shadow.needsUpdate = false;
     rig.update({ ...base, sunDir: sunDirectionAt(30, 180) });
     assert.equal(rig.light.shadow.needsUpdate, false, 'The map drawn on entry stays frozen');
 
@@ -286,8 +280,40 @@ describe('Cockpit deck sun rig (issue #90)', () => {
     rig.update({ ...base, sunDir: sunDirectionAt(30, 186) });
     assert.equal(rig.light.shadow.needsUpdate, true, 'A 6 degree turn of the sun must repaint');
 
+    rig.light.shadow.needsUpdate = false;
     rig.update({ ...base, sunDir: sunDirectionAt(30, 186) });
     assert.equal(rig.light.shadow.needsUpdate, false, 'The map stays frozen once repainted');
+  });
+
+  it('retains pending caster changes through substeps until a render consumes them', () => {
+    const rig = new CockpitSunShadow(new THREE.Scene());
+    const state = { position: origin, quaternion: identity, sunDir: sunDirectionAt(30),
+      sunColor: new THREE.Color(1, 1, 1), sunIntensity: 3.5, cockpitActive: true, dt: 1 / 60 };
+    rig.update({ ...state, casterState: 'loaded,neutral' });
+    rig.light.shadow.needsUpdate = false;
+    rig.update({ ...state, casterState: 'loaded,banked-yoke' });
+    rig.update({ ...state, casterState: 'loaded,banked-yoke' });
+    assert.equal(rig.light.shadow.needsUpdate, true);
+    rig.light.shadow.needsUpdate = false;
+    rig.update({ ...state, casterState: 'loaded,banked-yoke' });
+    assert.equal(rig.light.shadow.needsUpdate, false);
+    rig.update({ ...state, casterState: 'hidden-yoke' });
+    assert.equal(rig.light.shadow.needsUpdate, true);
+  });
+
+  it('moves a frozen shadow projection with the aircraft without repainting', () => {
+    const rig = new CockpitSunShadow(new THREE.Scene());
+    const state = { position: origin, quaternion: identity, sunDir: sunDirectionAt(30),
+      sunColor: new THREE.Color(1, 1, 1), sunIntensity: 3.5, cockpitActive: true, dt: 1 };
+    rig.update(state);
+    rig.light.shadow.needsUpdate = false;
+    const localPoint = new THREE.Vector3(0, 0.6, -12.5);
+    const before = localPoint.clone().applyMatrix4(rig.light.shadow.matrix);
+    const position = new THREE.Vector3(300, 900, -100);
+    rig.update({ ...state, position });
+    const after = localPoint.clone().add(position).applyMatrix4(rig.light.shadow.matrix);
+    assert.ok(before.distanceTo(after) < 1e-6, 'Same deck point retains its shadow UV/depth');
+    assert.equal(rig.light.shadow.needsUpdate, false);
   });
 });
 

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { cutGearBays } from './gearGeometry.js';
 import { Cockpit } from './Cockpit.js';
+import { excludeFromDeckShadow } from './CockpitLighting.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
 
@@ -168,6 +169,7 @@ export class Boeing737 {
     this.proceduralShadowProxy = new THREE.Mesh(procCabinGeo, procShadowMat);
     this.proceduralShadowProxy.name = 'Procedural_Shadow_Proxy';
     this.proceduralShadowProxy.castShadow = true;
+    excludeFromDeckShadow(this.proceduralShadowProxy);
     this.proceduralShadowProxy.receiveShadow = false;
     this.proceduralShadowProxy.visible = false;
     this.group.add(this.proceduralShadowProxy);
@@ -1011,6 +1013,7 @@ export class Boeing737 {
             shadowProxy.position.copy(this.gltfModel.position);
             shadowProxy.scale.copy(this.gltfModel.scale);
             shadowProxy.castShadow = true;
+            excludeFromDeckShadow(shadowProxy);
             shadowProxy.receiveShadow = false;
             shadowProxy.visible = this.isCockpit;
             this.gltfShadowProxy = shadowProxy;

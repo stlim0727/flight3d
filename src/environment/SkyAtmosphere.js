@@ -133,7 +133,7 @@ export class SkyAtmosphere {
    * Aim the flight deck sun at the windshield for this frame and return the daylight
    * factor used to dim the instrument floods.
    */
-  updateCockpitSun({ position, quaternion, cockpitActive = false, dt = 0 }) {
+  updateCockpitSun({ position, quaternion, cockpitActive = false, dt = 0, casterState }) {
     return this.cockpitSun.update({
       position,
       quaternion,
@@ -142,6 +142,7 @@ export class SkyAtmosphere {
       sunIntensity: this.sunLight.intensity,
       cockpitActive,
       dt,
+      casterState,
     });
   }
 
