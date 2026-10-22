@@ -1388,11 +1388,6 @@ class FlightSimulator {
       }
     }
 
-    const btnSoundAction = document.getElementById('btn-sound-action');
-    if (btnSoundAction) {
-      bindText(btnSoundAction, () => state.muted ? t('muted') : t('volume.m'));
-    }
-
     if (this.touchControls && typeof this.touchControls.updateAudioUI === 'function') {
       this.touchControls.updateAudioUI(state);
     }
@@ -1427,7 +1422,6 @@ class FlightSimulator {
     document.getElementById('btn-gear')?.addEventListener('click', () => this.controls.onToggleGear());
     document.getElementById('btn-spoilers')?.addEventListener('click', () => this.controls.onToggleSpoilers());
     document.getElementById('btn-reverser')?.addEventListener('click', () => this.controls.onToggleReverser());
-    document.getElementById('btn-cam')?.addEventListener('click', () => this.controls.onCycleCamera());
     document.getElementById('btn-cam-reset')?.addEventListener('click', () => {
       this.cameraSystem.resetLook();
       this.showToast(() => t('camera.view.centered'));
@@ -1441,7 +1435,6 @@ class FlightSimulator {
       this.updateAudioUI();
     });
     document.getElementById('btn-sound')?.addEventListener('click', () => this.controls.onToggleAudio());
-    document.getElementById('btn-sound-action')?.addEventListener('click', () => this.controls.onToggleAudio());
     document.getElementById('btn-diag')?.addEventListener('click', () => this.diagnostics.toggle());
     document.getElementById('btn-touch-toggle')?.addEventListener('click', () => {
       this.touchControls.toggle();
