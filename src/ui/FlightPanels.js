@@ -89,7 +89,7 @@ export function initFlightPanels({ onSelectCamera }) {
   });
   select.addEventListener('change', () => onSelectCamera(Number(select.value)));
   camera.prepend(select);
-  makePanel('environment', ['.language-control[for="language-select"]', '.language-control[for="render-quality"]', '#btn-sound', '#btn-time', '#btn-touch-toggle', '#touch-btn-gyro', '#btn-diag', '#btn-help']);
+  makePanel('environment', ['.language-control[for="language-select"]', '.language-control[for="render-quality"]', '#btn-sound', '#btn-touch-toggle', '#touch-btn-gyro', '#btn-diag', '#btn-help']);
   const mute = document.createElement('button');
   mute.id = 'btn-mute';
   mute.className = 'btn quick-mute';
@@ -107,7 +107,7 @@ export function initFlightPanels({ onSelectCamera }) {
 
   for (const [id, key] of Object.entries({
     'btn-cam-reset': 'center.view.o',
-    'btn-yokes': 'hide.yokes.j', 'btn-time': 'time', 'btn-diag': 'physics',
+    'btn-yokes': 'hide.yokes.j', 'btn-diag': 'physics',
     'btn-help': 'flight.guide.h.53', 'btn-skip-demo': 'take.control.esc',
   })) {
     bindText(document.getElementById(id), () => touchLabel(t(key)));
@@ -139,7 +139,7 @@ export function initFlightPanels({ onSelectCamera }) {
 }
 
 /** Called from telemetry refresh, including keyboard, demo, reset and resize paths. */
-export function updateControlState(telemetry, camera, timeOfDay) {
+export function updateControlState(telemetry, camera) {
   const set = (id, key, values, pressed) => {
     const button = document.getElementById(id);
     if (!button) return;
@@ -162,7 +162,6 @@ export function updateControlState(telemetry, camera, timeOfDay) {
   if (select) select.value = String(mode);
   const cameraName = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto'][mode];
   set('open-camera', 'ui.camera.current', { name: t(`ui.camera.${cameraName}`).replace(/ · [1-8]$/, '') });
-  if (Number.isFinite(timeOfDay)) set('btn-time', 'ui.time', { hour: `${Math.floor(timeOfDay).toString().padStart(2, '0')}:${Math.floor((timeOfDay % 1) * 60).toString().padStart(2, '0')}` });
   const toggle = document.getElementById('btn-touch-toggle');
   toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('touch-mode')));
 }

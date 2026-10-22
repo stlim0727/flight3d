@@ -1,0 +1,35 @@
+{
+  "panel": {
+    "open": true,
+    "ids": [
+      "btn-sound",
+      "btn-touch-toggle",
+      "touch-btn-gyro",
+      "btn-diag",
+      "btn-help"
+    ],
+    "selects": [
+      "language-select",
+      "render-quality"
+    ],
+    "labels": [
+      "language-control",
+      "language-control",
+      "btn-sound",
+      "btn-touch-toggle",
+      "touch-btn-gyro",
+      "btn-diag",
+      "btn-help"
+    ]
+  },
+  "timeOfDay": {
+    "before": 16.8,
+    "earlier": 15.299999999999997,
+    "later": 18.299999999999997
+  },
+  "lobby": {
+    "present": true,
+    "options": 7
+  },
+  "exceptions": []
+}

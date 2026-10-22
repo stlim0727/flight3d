@@ -1283,7 +1283,7 @@ class FlightSimulator {
     }
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
     this.updateAutopilotUI();
-    updateControlState(this.telemetry, this.cameraSystem, this.sky.timeOfDay);
+    updateControlState(this.telemetry, this.cameraSystem);
   }
 
   flightPhase() {
@@ -1388,7 +1388,6 @@ class FlightSimulator {
       this.cameraSystem.resetLook();
       this.showToast(() => t('camera.view.centered'));
     });
-    document.getElementById('btn-time')?.addEventListener('click', () => this.controls.onCycleTimeOfDay(3.0));
     document.getElementById('btn-mute')?.addEventListener('click', () => {
       this.audio.setMuted(!this.audio.isMuted);
       if (!this.audio.isMuted) {
