@@ -6,7 +6,8 @@
   <title>Boeing 737 Flight Simulator 3D - Realistic Aerodynamics & Cockpit</title>
   <link rel="stylesheet" href="./style.css">
 </head>
-<body>
+<!-- Mirrors GameFlowController's initial state so the first paint shows the lobby, not the HUD. -->
+<body data-flow="lobby">
   <!-- 3D WebGL Canvas Container -->
   <div id="canvas-container"></div>
 
