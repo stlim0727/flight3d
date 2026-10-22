@@ -385,10 +385,22 @@ await snapshot('contrast-ao-off');
 await evaluate('window.simulator.cockpitOcclusion.enabled = true; delete window.contrastPixels;');
 console.log('contrast', JSON.stringify(contrast));
 
+const aoDepth = await evaluate(`(() => {
+  const ao = window.simulator.cockpitOcclusion;
+  return {
+    near: ao.aoCamera.near, far: ao.aoCamera.far,
+    ssaoNear: ao.pass.ssaoMaterial.uniforms.cameraNear.value,
+    ssaoFar: ao.pass.ssaoMaterial.uniforms.cameraFar.value,
+    depthNear: ao.pass.depthRenderMaterial.uniforms.cameraNear.value,
+    depthFar: ao.pass.depthRenderMaterial.uniforms.cameraFar.value,
+    minDistance: ao.pass.minDistance, maxDistance: ao.pass.maxDistance,
+  };
+})()`);
+
 await evaluate('window.simulator.animate = window.deckSunReview.savedAnimate;');
 ws.close();
 
-const report = { gpu, rigFacts, results, repeat, perf, contrast, pageErrors, resourceErrors,
+const report = { gpu, rigFacts, results, repeat, perf, contrast, aoDepth, pageErrors, resourceErrors,
   ablation: { ...ablation, png: undefined } };
 fs.writeFileSync(path.join(dir, 'deck-sun-report.json'), JSON.stringify(report, null, 2));
 
@@ -401,6 +413,12 @@ check(rigFacts.shadowMapSize.join() === '1024,1024', `Deck sun map must be 1024Â
 check(rigFacts.mainSunMapSize.join() === '2048,2048' && rigFacts.mainSunCasts && rigFacts.exteriorShadowProxy === true,
   'The exterior sun and airframe shadow proxy must be untouched');
 check(!pageErrors.length, `Page errors: ${pageErrors.join(' | ')}`);
+check(aoDepth.far === 8 && aoDepth.ssaoFar === aoDepth.far && aoDepth.depthFar === aoDepth.far &&
+  aoDepth.ssaoNear === aoDepth.near && aoDepth.depthNear === aoDepth.near,
+  'AO depth linearization uniforms must match the cockpit camera range');
+check(Math.abs(aoDepth.minDistance * (aoDepth.far - aoDepth.near) - 0.003) < 1e-9 &&
+  Math.abs(aoDepth.maxDistance * (aoDepth.far - aoDepth.near) - 0.45) < 1e-9,
+  'AO rejection distances must remain in cockpit metres');
 if (resourceErrors.length) console.log('resource errors (not lighting):', resourceErrors.join(' | '));
 
 for (const name of ['morning', 'golden', 'leftSun', 'rightSun']) {

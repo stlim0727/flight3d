@@ -51,6 +51,9 @@ cockpit geometry with an 8 m AO depth range. A depth mask protects the exterior,
 and unlit instrument surfaces are redrawn after the multiply composite. Glass
 is excluded. Performance quality and exterior/photo views skip AO entirely;
 render targets are allocated only on the first eligible cockpit render.
+The SSAO and depth-display shader ranges track that 8 m camera on every render,
+including near-plane changes; metre-based rejection bounds use the same range.
+AO darkening is capped at 25% so it cannot wash out the cast-sunlight bands.
 This is contact/crease shading, not a replacement for directional cast shadows.
 
 `SkyAtmosphere` owns the weather gate: `setCloudCover(0..1)` attenuates direct sun

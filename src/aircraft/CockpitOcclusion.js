@@ -5,6 +5,7 @@ import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 // the emissive instruments, which are redrawn unchanged after the AO composite.
 const DECK_LAYER = 1;
 const DISPLAY_LAYER = 2;
+const AO_FAR = 8;
 
 export class CockpitOcclusion {
   constructor(scene, camera, cockpit) {
@@ -12,6 +13,9 @@ export class CockpitOcclusion {
     this.camera = camera;
     this.cockpit = cockpit;
     this.aoCamera = camera.clone();
+    // SSAOPass snapshots this range when it constructs its depth uniforms.
+    this.aoCamera.far = AO_FAR;
+    this.aoCamera.updateProjectionMatrix();
     this.pass = null;
     this.size = new THREE.Vector2();
     this.enabled = true;
@@ -29,14 +33,16 @@ export class CockpitOcclusion {
     this.pass.normalMaterial.side = THREE.DoubleSide;
     this.pass.kernelRadius = 0.3;
     // SSAOPass expresses its depth rejection bounds in normalized linear depth.
-    this.pass.minDistance = 0.003 / (8 - this.camera.near);
-    this.pass.maxDistance = 0.45 / (8 - this.camera.near);
+    this.pass.minDistance = 0.003 / (AO_FAR - this.aoCamera.near);
+    this.pass.maxDistance = 0.45 / (AO_FAR - this.aoCamera.near);
     const copy = this.pass.copyMaterial;
     copy.uniforms.deckDepth = { value: this.pass.normalRenderTarget.depthTexture };
     copy.fragmentShader = copy.fragmentShader.replace('uniform float opacity;',
       'uniform float opacity;\nuniform sampler2D deckDepth;').replace(
       'gl_FragColor = opacity * texel;',
-      `float ao = texture2D( deckDepth, vUv ).r >= 1.0 ? 1.0 : max( 0.45, pow( texel.r, 2.4 ) );
+      // Correct metre-based depth produces substantially more occlusion. Keep
+      // contact shading from overpowering the independent cast-sunlight bands.
+      `float ao = texture2D( deckDepth, vUv ).r >= 1.0 ? 1.0 : max( 0.75, pow( texel.r, 1.2 ) );
       gl_FragColor = vec4( vec3( ao ), 1.0 );`
     );
   }
@@ -46,7 +52,7 @@ export class CockpitOcclusion {
     if (!this.pass) this.init();
     const camera = this.aoCamera;
     camera.copy(this.camera);
-    camera.far = 8; // Cockpit metres, independent of the 45 km exterior depth range.
+    camera.far = AO_FAR; // Cockpit metres, independent of the 45 km exterior depth range.
     camera.layers.set(DECK_LAYER);
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
@@ -55,7 +61,14 @@ export class CockpitOcclusion {
     const w = Math.max(1, Math.round(this.size.x * scale));
     const h = Math.max(1, Math.round(this.size.y * scale));
     if (this.pass.width !== w || this.pass.height !== h) this.pass.setSize(w, h);
-    // Projection also changes with cockpit look/portrait FOV without a resize.
+    // Keep linearization and metre-based rejection consistent with the camera,
+    // including near-plane and FOV changes that happen without resizing targets.
+    for (const material of [this.pass.ssaoMaterial, this.pass.depthRenderMaterial]) {
+      material.uniforms.cameraNear.value = camera.near;
+      material.uniforms.cameraFar.value = camera.far;
+    }
+    this.pass.minDistance = 0.003 / (camera.far - camera.near);
+    this.pass.maxDistance = 0.45 / (camera.far - camera.near);
     this.pass.ssaoMaterial.uniforms.cameraProjectionMatrix.value.copy(camera.projectionMatrix);
     this.pass.ssaoMaterial.uniforms.cameraInverseProjectionMatrix.value.copy(camera.projectionMatrixInverse);
 

@@ -30,8 +30,8 @@
   "results": {
     "morning": {
       "stats": {
-        "mean": 74.9,
-        "std": 53.7
+        "mean": 67.38,
+        "std": 54.12
       },
       "cookie": {
         "lit": 0.0205841064453125,
@@ -42,26 +42,26 @@
         "elevDeg": 16.8,
         "bearingDeg": -23.5
       },
-      "intensity": 4.3345291061766895,
-      "daylight": 0.7740230546744088,
+      "intensity": 4.334395133475218,
+      "daylight": 0.7739991309777174,
       "facing": 1,
-      "modeFactor": 0.9998842602783253,
+      "modeFactor": 0.9998533556074308,
       "sunIntensity": 2.7093942758998306,
       "sunAttenuation": 1,
       "shadowIntensity": 1,
       "floods": [
         0.3455,
-        0.4606,
+        0.4607,
         0.2303
       ],
       "mapDirty": false,
       "angleDeg": 3.818,
-      "deckSunOverSun": 1.5998148164453205
+      "deckSunOverSun": 1.5997653689718896
     },
     "noon": {
       "stats": {
-        "mean": 89.3,
-        "std": 47.73
+        "mean": 78.74,
+        "std": 47.92
       },
       "cookie": {
         "lit": 0.0040283203125,
@@ -72,10 +72,10 @@
         "elevDeg": 64.4,
         "bearingDeg": -0.1
       },
-      "intensity": 1.963741437045081,
-      "daylight": 0.3506681137580501,
+      "intensity": 1.963741427428256,
+      "daylight": 0.35066811204076,
       "facing": 0.3506681201893981,
-      "modeFactor": 0.9999999816597304,
+      "modeFactor": 0.9999999767625353,
       "sunIntensity": 3.5,
       "sunAttenuation": 1,
       "shadowIntensity": 1,
@@ -86,12 +86,12 @@
       ],
       "mapDirty": false,
       "angleDeg": 3.818,
-      "deckSunOverSun": 0.5610689820128802
+      "deckSunOverSun": 0.561068979265216
     },
     "golden": {
       "stats": {
-        "mean": 71.68,
-        "std": 48.76
+        "mean": 63.78,
+        "std": 49.04
       },
       "cookie": {
         "lit": 0.0213470458984375,
@@ -102,10 +102,10 @@
         "elevDeg": 20.1,
         "bearingDeg": 42.8
       },
-      "intensity": 4.648266044886166,
-      "daylight": 0.8300475080153867,
+      "intensity": 4.64826604488256,
+      "daylight": 0.8300475080147428,
       "facing": 1,
-      "modeFactor": 0.9999999999970937,
+      "modeFactor": 0.9999999999963178,
       "sunIntensity": 2.905166278062297,
       "sunAttenuation": 1,
       "shadowIntensity": 1,
@@ -116,12 +116,12 @@
       ],
       "mapDirty": false,
       "angleDeg": 3.818,
-      "deckSunOverSun": 1.59999999999535
+      "deckSunOverSun": 1.5999999999941088
     },
     "night": {
       "stats": {
-        "mean": 95.84,
-        "std": 43.65
+        "mean": 83.85,
+        "std": 42.45
       },
       "cookie": {
         "lit": 0.0237274169921875,
@@ -135,7 +135,7 @@
       "intensity": 0,
       "daylight": 0,
       "facing": 1,
-      "modeFactor": 0.9999999999999997,
+      "modeFactor": 0.9999999999999994,
       "sunIntensity": 0.06,
       "sunAttenuation": 1,
       "shadowIntensity": 1,
@@ -150,8 +150,8 @@
     },
     "leftSun": {
       "stats": {
-        "mean": 59.63,
-        "std": 55.11
+        "mean": 53.76,
+        "std": 53
       },
       "cookie": {
         "lit": 0.02020263671875,
@@ -180,8 +180,8 @@
     },
     "rightSun": {
       "stats": {
-        "mean": 73.6,
-        "std": 59.49
+        "mean": 65.74,
+        "std": 58.86
       },
       "cookie": {
         "lit": 0.02044677734375,
@@ -210,8 +210,8 @@
     },
     "bankLeft": {
       "stats": {
-        "mean": 89.23,
-        "std": 60.55
+        "mean": 79.19,
+        "std": 55.56
       },
       "cookie": {
         "lit": 0.024139404296875,
@@ -240,8 +240,8 @@
     },
     "bankRight": {
       "stats": {
-        "mean": 63.05,
-        "std": 70.78
+        "mean": 57.97,
+        "std": 70.12
       },
       "cookie": {
         "lit": 0.017364501953125,
@@ -270,8 +270,8 @@
     },
     "overcast": {
       "stats": {
-        "mean": 92.53,
-        "std": 44.54
+        "mean": 81.2,
+        "std": 44.6
       },
       "cookie": {
         "lit": 0.0038909912109375,
@@ -300,8 +300,8 @@
     },
     "astern": {
       "stats": {
-        "mean": 99.61,
-        "std": 53.96
+        "mean": 88.17,
+        "std": 55.11
       },
       "cookie": {
         "lit": 0.0280609130859375,
@@ -334,15 +334,15 @@
     "moved": true
   },
   "perf": {
-    "frozen": 124.26,
-    "forced": 187.71
+    "frozen": 124.66,
+    "forced": 188.36
   },
   "contrast": {
     "noise": {
       "deck": {
-        "moved": 0,
+        "moved": 1,
         "mean": 0,
-        "peak": 0
+        "peak": 17
       },
       "outside": {
         "moved": 0,
@@ -357,9 +357,9 @@
     },
     "frameOff": {
       "deck": {
-        "moved": 6994,
-        "mean": 0.1873,
-        "peak": 21.67
+        "moved": 5664,
+        "mean": 0.1421,
+        "peak": 17
       },
       "outside": {
         "moved": 0,
@@ -374,9 +374,9 @@
     },
     "aoOff": {
       "deck": {
-        "moved": 7250,
-        "mean": 0.0981,
-        "peak": 8
+        "moved": 297275,
+        "mean": 10.7165,
+        "peak": 61.33
       },
       "outside": {
         "moved": 0,
@@ -390,18 +390,27 @@
       }
     }
   },
+  "aoDepth": {
+    "near": 0.08,
+    "far": 8,
+    "ssaoNear": 0.08,
+    "ssaoFar": 8,
+    "depthNear": 0.08,
+    "depthFar": 8,
+    "minDistance": 0.0003787878787878788,
+    "maxDistance": 0.05681818181818182
+  },
   "pageErrors": [],
   "resourceErrors": [
-    "Failed to load resource: the server responded with a status of 404 (Not Found) <- http://127.0.0.1:5288/favicon.ico",
-    "Failed to load resource: the server responded with a status of 404 (Not Found) <- http://127.0.0.1:5288/favicon.ico"
+    "Failed to load resource: the server responded with a status of 404 (Not Found) <- http://127.0.0.1:5289/favicon.ico"
   ],
   "ablation": {
-    "changed": 0.0939,
+    "changed": 0.0902,
     "staticShare": 1,
-    "meanDelta": 3.83,
-    "maxDelta": 75,
+    "meanDelta": 3.11,
+    "maxDelta": 67.1,
     "centroid": {
-      "x": 0.667,
+      "x": 0.663,
       "y": 0.722
     },
     "zones": {
@@ -411,19 +420,19 @@
         "maxDelta": 2
       },
       "glareshield": {
-        "meanDelta": 7.05,
-        "movedShare": 0.143,
-        "maxDelta": 65.1
+        "meanDelta": 5.83,
+        "movedShare": 0.139,
+        "maxDelta": 58.1
       },
       "panel": {
-        "meanDelta": 5.21,
-        "movedShare": 0.166,
-        "maxDelta": 75
+        "meanDelta": 4.16,
+        "movedShare": 0.159,
+        "maxDelta": 57
       },
       "pedestal": {
-        "meanDelta": 14.79,
-        "movedShare": 0.51,
-        "maxDelta": 65.9
+        "meanDelta": 11.17,
+        "movedShare": 0.472,
+        "maxDelta": 49
       }
     }
   }

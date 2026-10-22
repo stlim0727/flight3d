@@ -66,3 +66,47 @@ it('AO excludes glass and preserves renderer/camera state even if compositing fa
   assert.equal(scene.overrideMaterial, null);
   ao.dispose();
 });
+
+it('AO linearizes nearby contacts with its own range on initialization and camera changes', () => {
+  const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.08, 45000);
+  const ao = new CockpitOcclusion(new THREE.Scene(), camera, {
+    gltfCockpitGroup: new THREE.Group(), gltfCockpitLoaded: true,
+  });
+  ao.init();
+  const renderer = { shadowMap: { autoUpdate: true, needsUpdate: false }, autoClear: true,
+    getDrawingBufferSize: v => v.set(1280, 720), getRenderTarget: () => null,
+    setRenderTarget() {}, render() {} };
+  const checkContact = () => {
+    const uniforms = ao.pass.ssaoMaterial.uniforms;
+    const near = uniforms.cameraNear.value, far = uniforms.cameraFar.value;
+    assert.equal(near, camera.near);
+    assert.equal(far, 8, 'SSAO must not retain the exterior 45 km depth range');
+    assert.equal(ao.pass.depthRenderMaterial.uniforms.cameraNear.value, near);
+    assert.equal(ao.pass.depthRenderMaterial.uniforms.cameraFar.value, far);
+    // Project two surfaces 10 cm apart, then linearize with the SSAO shader's
+    // perspectiveDepthToViewZ / viewZToOrthographicDepth equations.
+    const linearDepth = distance => {
+      const ndc = new THREE.Vector3(0, 0, -distance).applyMatrix4(ao.aoCamera.projectionMatrix);
+      const depth = ndc.z * 0.5 + 0.5;
+      const viewZ = near * far / ((far - near) * depth - far);
+      return (viewZ + near) / (near - far);
+    };
+    const delta = linearDepth(1.1) - linearDepth(1);
+    assert.ok(Math.abs(delta - 0.1 / (8 - camera.near)) < 1e-10);
+    assert.ok(delta > ao.pass.minDistance && delta < ao.pass.maxDistance,
+      'Nearby surfaces must remain inside the metre-based occlusion interval');
+    assert.ok(Math.abs(ao.pass.minDistance - 0.003 / (8 - camera.near)) < 1e-12);
+    assert.ok(Math.abs(ao.pass.maxDistance - 0.45 / (8 - camera.near)) < 1e-12);
+  };
+  checkContact();
+  ao.pass.render = () => { checkContact(); };
+  for (const [quality, near, aspect] of [['balanced', 0.08, 16 / 9], ['high', 0.16, 9 / 16],
+    ['balanced', 0.05, 16 / 9]]) {
+    camera.near = near;
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+    ao.render(renderer, quality);
+    assert.equal(camera.far, 45000, 'AO must leave the exterior camera range unchanged');
+  }
+  ao.dispose();
+});
