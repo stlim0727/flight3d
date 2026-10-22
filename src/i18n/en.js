@@ -289,6 +289,7 @@ export default {
   "quality.performance": "Performance",
   "help.close": "Close flight guide",
   "notice.camera": "Camera: {name}",
+  "notice.cockpit.unavailable": "Cockpit interior unavailable — showing exterior view",
   "notice.lights": "Lights: {state}",
   "notice.time": "Time of day: {time}",
   "notice.autopilot": "Autopilot: {state}",

@@ -289,6 +289,7 @@ export default {
   "quality.performance": "성능 우선",
   "help.close": "도움말 닫기",
   "notice.camera": "카메라: {name}",
+  "notice.cockpit.unavailable": "기내 환경을 불러올 수 없어 외부 시점을 표시합니다",
   "notice.lights": "조명: {state}",
   "notice.time": "시간대: {time}",
   "notice.autopilot": "자동조종: {state}",

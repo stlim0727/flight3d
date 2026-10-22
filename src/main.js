@@ -1188,7 +1188,17 @@ class FlightSimulator {
     this.tireSmokeSystem.update(frameDelta);
 
     // 4. Update Cockpit Visibility & Audio
-    const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
+    let isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
+    if (isCockpit && !this.cameraSystem.photoCockpit && this.aircraft.cockpit.cockpitModelFailed) {
+      // The GLTF interior is the only 3D cockpit geometry, and it never arrived.
+      // The exterior groups are hidden in this mode, so pull the view out.
+      this.cameraSystem.setMode(CameraSystem.MODES.CHASE, true);
+      isCockpit = false;
+      if (!this.interiorUnavailableWarned) {
+        this.interiorUnavailableWarned = true;
+        this.showToast(() => t('notice.cockpit.unavailable'));
+      }
+    }
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
