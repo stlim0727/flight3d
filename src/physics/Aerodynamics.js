@@ -40,6 +40,7 @@ export class Aerodynamics {
     this.mach = 0.0;
     this.qDyn = 0.0;  // Dynamic pressure (Pa)
     this.isStalled = false;
+    this.isPreStall = false; // Within shaker margin of the critical AoA
     this.stallSeverity = 0.0; // 0.0 to 1.0
     this.buffetVibration = 0.0; // For cockpit shaking
 
@@ -167,6 +168,9 @@ export class Aerodynamics {
     const alphaStall = this.alphaStallClean + THREE.MathUtils.degToRad(2.0 * flapFraction);
 
     // --- Nonlinear Lift Model with Stall & Hysteresis ---
+    // AoA vanes need meaningful relative airflow before a stall can be declared;
+    // below ~30 kt TAS (e.g. taxiing or sliding on the ground) the flag is inhibited.
+    const stallAnnunciationValid = tas > 15.0;
     let cl;
     const absAlpha = Math.abs(this.alpha);
     if (absAlpha <= alphaStall) {
@@ -175,9 +179,12 @@ export class Aerodynamics {
       this.isStalled = false;
       this.stallSeverity = 0.0;
       this.buffetVibration = 0.0;
+      // Stick-shaker margin: within ~2 degrees of the critical AoA
+      this.isPreStall = stallAnnunciationValid && absAlpha >= alphaStall - THREE.MathUtils.degToRad(2.0);
     } else {
       // Post-stall separation region
-      this.isStalled = true;
+      this.isStalled = stallAnnunciationValid;
+      this.isPreStall = false;
       const stallExcess = (absAlpha - alphaStall) / THREE.MathUtils.degToRad(12.0);
       this.stallSeverity = Math.min(1.0, stallExcess);
       this.buffetVibration = Math.min(1.0, this.stallSeverity * 1.5) * (qDyn > 500 ? 1.0 : qDyn / 500.0);
@@ -290,13 +297,16 @@ export class Aerodynamics {
     // Includes static stability (Cma), elevator input, pitch trim, pitch damping (Cmq)
     const elevatorRad = this.elevator * maxElevatorRad * this.tuning.elevatorSensitivity;
     const trimRad = THREE.MathUtils.degToRad(this.pitchTrim) * 0.35;
-    const elevatorEffective = elevatorRad + trimRad;
+    // Post-stall the horizontal tail sits in the separated wake and loses authority,
+    // so the elevator can no longer hold the nose at deep stall AoA.
+    const elevatorEffectiveness = 1.0 - 0.8 * this.stallSeverity;
+    const elevatorEffective = (elevatorRad + trimRad) * elevatorEffectiveness;
     // In Three.js body frame, positive Mx lifts nose UP, so stick back (-Cm_de > 0) creates positive pitch moment
     let cm = this.Cm0 + this.Cma * this.alpha - this.Cm_de * elevatorEffective + this.Cmq * qHat;
 
-    // Stall pitch tuck (swept wing airliners pitch down in stall due to outboard flow separation)
+    // Stall pitch break (swept wing airliners pitch down sharply as outboard lift collapses)
     if (this.isStalled) {
-      cm -= 0.35 * this.stallSeverity * Math.sign(this.alpha);
+      cm -= this.stallSeverity * (0.55 + 0.5 * this.stallSeverity) * Math.sign(this.alpha);
     }
 
     // Engine thrust pitch coupling: engines slung below CG with 2.5° upward cant (~0.32m effective moment arm)
@@ -306,7 +316,10 @@ export class Aerodynamics {
     // Includes dihedral effect (Cl_b), aileron input, roll damping (Cl_p), and differential spoiler roll
     const aileronRad = this.aileron * maxAileronRad * this.tuning.aileronSensitivity;
     const spoilerRoll = aileronRad > 0.02 ? aileronRad * 0.05 : (aileronRad < -0.02 ? aileronRad * 0.05 : 0);
-    const cl_roll = this.Cl_b * this.beta + this.Cl_da * (aileronRad + spoilerRoll) + Math.abs(this.Cl_p) * pHat;
+    // Past the stall the swept wing loses dihedral weathervane stability: sideslip feeds a
+    // wing drop instead of damping it, so an asymmetric stall rolls the aircraft over.
+    const stallRollDivergence = this.stallSeverity * 0.8 * this.beta;
+    const cl_roll = this.Cl_b * this.beta + this.Cl_da * (aileronRad + spoilerRoll) + Math.abs(this.Cl_p) * pHat + stallRollDivergence;
 
     // Yawing moment coefficient Cn:
     // Directional stability (Cn_b), rudder input, yaw damping (Cn_r), and adverse yaw from ailerons
@@ -343,6 +356,7 @@ export class Aerodynamics {
       lift: this.lift,
       drag: this.drag,
       isStalled: this.isStalled,
+      isPreStall: this.isPreStall,
       stallSeverity: this.stallSeverity,
       buffetVibration: this.buffetVibration,
       gForce: this.gForce

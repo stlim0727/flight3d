@@ -147,13 +147,21 @@ export class LuklaCircuitScenario {
     this.sim.controls.setVirtualInput('aileron', THREE.MathUtils.clamp(aileron, -1, 1));
   }
 
+  // Autoflight alpha protection, like a real flight-director limiter: caps nose-up
+  // elevator as AoA climbs and commands an uncommanded-pitch-down recovery above the margin.
+  alphaGuarded(elevatorCmd, alphaDeg) {
+    if (alphaDeg <= 11.0) return elevatorCmd;
+    const cap = THREE.MathUtils.clamp(0.8 - (alphaDeg - 11.0) * 0.37, -0.35, 0.8);
+    return Math.min(elevatorCmd, cap);
+  }
+
   flyVerticalPath(targetVz, targetIas, tel, pathAcceleration = 0, groundPitch = null) {
     const aero = this.sim.aero;
     const speed = Math.max(30, Math.hypot(this.sim.linearVelocity.x, this.sim.linearVelocity.z));
     const flapCl0 = aero.CL0_clean + 0.95 * aero.currentFlapAngle / 40;
     const bank = THREE.MathUtils.degToRad(tel.rollDeg);
     const requiredCl = aero.mass * (9.80665 + THREE.MathUtils.clamp(pathAcceleration + (targetVz - this.sim.linearVelocity.y) * 1.2, -3, 4)) / Math.max(1, aero.qDyn * aero.wingArea * Math.cos(bank));
-    const alpha = THREE.MathUtils.clamp((requiredCl - flapCl0) / aero.CLa, 0.02, 0.28);
+    const alpha = THREE.MathUtils.clamp((requiredCl - flapCl0) / aero.CLa, 0.02, THREE.MathUtils.degToRad(13.5));
     const targetPitch = groundPitch === null ? Math.atan2(this.sim.linearVelocity.y, speed) + alpha : THREE.MathUtils.degToRad(groundPitch);
     const pitch = THREE.MathUtils.degToRad(tel.pitchDeg);
     const q = this.sim.angularVelocity.x;
@@ -166,7 +174,7 @@ export class LuklaCircuitScenario {
     const qHat = q * aero.meanChord / (2 * Math.max(10, aero.tas));
     const effectiveElevator = (requiredCm - aero.Cm0 - aero.Cma * aero.alpha - aero.Cmq * qHat) / -aero.Cm_de;
     const elevator = (effectiveElevator - THREE.MathUtils.degToRad(aero.pitchTrim) * 0.35) / THREE.MathUtils.degToRad(20);
-    this.sim.controls.setVirtualInput('elevator', THREE.MathUtils.clamp(elevator, -0.8, 0.8));
+    this.sim.controls.setVirtualInput('elevator', this.alphaGuarded(THREE.MathUtils.clamp(elevator, -0.8, 0.8), THREE.MathUtils.radToDeg(aero.alpha)));
     if (groundPitch === null) this.sim.controls.setVirtualInput('throttle', THREE.MathUtils.clamp(0.50 + (targetIas - tel.iasKnots) * 0.035 + targetVz * 0.02, 0.05, 0.95));
   }
 
@@ -214,12 +222,10 @@ export class LuklaCircuitScenario {
           const pitchErr = targetPitch - tel.pitchDeg;
           let elevatorCmd = 0.26 + pitchErr * 0.035 - pitchRateDeg * 0.02;
 
-          // Alpha limiter to prevent stall during cliff drop (stall is 15.5°, allow healthy lift up to 13.0°)
+          // Alpha protection shared with the flight-path law: can override the
+          // rotation floor and command nose-down once the AoA margin is exceeded.
           const alphaDeg = THREE.MathUtils.radToDeg(this.sim.aero ? this.sim.aero.alpha : 0);
-          if (alphaDeg > 13.0) {
-            elevatorCmd -= (alphaDeg - 13.0) * 0.10;
-          }
-          this.sim.controls.setVirtualInput('elevator', Math.max(0.12, Math.min(0.50, elevatorCmd)));
+          this.sim.controls.setVirtualInput('elevator', this.alphaGuarded(Math.max(0.12, Math.min(0.50, elevatorCmd)), alphaDeg));
 
           // Retract gear once safely airborne over the valley
           if (!tel.onGround && tel.radioAltFt > 15.0 && tel.gearState > 0.1 && !tel.isTransit) {

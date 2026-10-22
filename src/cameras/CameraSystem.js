@@ -823,13 +823,17 @@ export class CameraSystem {
         const targetGOffset = Math.max(-0.02, Math.min(0.02, -(gForce - 1.0) * 0.015));
         this.headGForceOffset.y += (targetGOffset - this.headGForceOffset.y) * Math.min(1.0, dt * 4.0);
 
-        // Stall Buffeting Shake (airborne only, restrained amplitude)
+        // Stall Buffeting Shake (airborne only) + pre-stall stick shaker buzz
         let buffetX = 0, buffetY = 0;
         if (flightState.isStalled && !flightState.onGround) {
           const t = performance.now() * 0.03;
           const severity = flightState.buffetVibration || 0.5;
-          buffetX = (Math.sin(t * 1.7) + Math.cos(t * 3.1)) * 0.005 * severity;
-          buffetY = (Math.cos(t * 2.3) + Math.sin(t * 4.2)) * 0.005 * severity;
+          buffetX = (Math.sin(t * 1.7) + Math.cos(t * 3.1)) * 0.015 * severity;
+          buffetY = (Math.cos(t * 2.3) + Math.sin(t * 4.2)) * 0.015 * severity;
+        } else if (flightState.isPreStall && !flightState.onGround) {
+          // Control-column shaker: tight high-frequency buzz, no vertical component
+          const t = performance.now() * 0.09;
+          buffetX = Math.sin(t) * 0.0035;
         }
 
         const eyeLocal = this.cockpitHeadOffset.clone();
