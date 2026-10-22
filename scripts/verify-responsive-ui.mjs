@@ -105,7 +105,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   await ev(`window.simulator.touchControls.${showTouch ? 'enable' : 'disable'}()`);
   await new Promise(resolve => setTimeout(resolve, 400));
   const bounds = await ev(`(() => {
-    const selectors = '.flight-toolbar button,.hud-strip,.hud-details,.touch-throttle-card,.touch-stick-card,.touch-rudder-card,#touch-btn-brake';
+    const selectors = '.flight-toolbar button,.hud-strip,.hud-details,.touch-throttle-card,.touch-stick-card,.touch-rudder-card,#touch-btn-brake,#menu-toggle,.ap-bar';
     return [...document.querySelectorAll(selectors)]
       .filter(node => node.getBoundingClientRect().width && getComputedStyle(node).visibility !== 'hidden')
       .map(node => {

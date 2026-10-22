@@ -289,9 +289,9 @@ class FlightSimulator {
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
 
-    // Open straight into the flight HUD (with its "back to main menu" button)
-    // rather than the main menu. The menu and its cinematic backdrop stay
-    // reachable via that button (or ESC > pause). #123 hardcoded the markup to
+    // Open straight into the flight HUD rather than the main menu. The menu
+    // and its cinematic backdrop stay reachable via the persistent top-left
+    // toggle (or ESC > pause). #123 hardcoded the markup to
     // boot at the lobby, so that first-paint attribute is flipped to flight too.
     this.fly();
     this.syncFlowUi();
@@ -1492,10 +1492,6 @@ class FlightSimulator {
       this.setPreset(this.lastPresetType || 'runway');
     });
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
-    document.getElementById('btn-hud-menu')?.addEventListener('click', () => {
-      if (this.isCrashed) this.clearCrashState();
-      this.gameFlow.returnToLobby(true);
-    });
     document.getElementById('menu-toggle')?.addEventListener('click', () => this.toggleMainMenu());
 
     // ESC chain: the demo director consumes ESC first (take manual control);

@@ -91,12 +91,6 @@ export function initFlightPanels({ onCycleCamera }) {
   bindText(mute, () => t('ui.mute'), 'aria-label');
   mute.textContent = '🔊';
   bar.append(mute);
-  const backToMenu = document.createElement('button');
-  backToMenu.id = 'btn-hud-menu';
-  backToMenu.className = 'btn';
-  backToMenu.type = 'button';
-  bindText(backToMenu, () => touchLabel(t('hud.menu')));
-  bar.append(backToMenu);
 
   for (const [id, key] of Object.entries({
     'btn-cam-reset': 'center.view.o',

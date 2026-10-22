@@ -315,7 +315,6 @@ export default {
   "pause.resume": "계속 비행",
   "pause.restart": "시나리오 재시작",
   "pause.lobby": "메인 메뉴로 이동",
-  "hud.menu": "🏠 메인 메뉴",
   "menu.open": "메인 메뉴 열기",
   "menu.close": "메인 메뉴 닫기",
   "state.on": "켜짐",
