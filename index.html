@@ -156,16 +156,17 @@
   <!-- Lobby / main menu over the live cinematic -->
   <div id="lobby-screen" class="menu-backdrop flow-overlay">
     <div class="lobby-card">
-      <h1 class="lobby-title">Flight3d <span data-i18n="lobby.title">메인 메뉴</span></h1>
-      <p id="lobby-loading" class="lobby-loading" data-i18n="loading.lukla.terrain" hidden></p>
-      <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
-      <div class="lobby-group" role="group">
-        <span class="lobby-label" data-i18n="language.label">Language</span>
-        <div class="lobby-buttons">
-          <button id="lobby-lang-en" class="btn btn-lang"><span lang="en">English</span></button>
-          <button id="lobby-lang-ko" class="btn btn-lang"><span lang="ko">한국어</span></button>
+      <header class="lobby-header">
+        <h1 class="lobby-title">Flight3d <span data-i18n="lobby.title">메인 메뉴</span></h1>
+        <div class="lobby-language" role="group" aria-labelledby="lobby-language-label">
+          <span id="lobby-language-label" class="lobby-label" data-i18n="language.label">Language</span>
+          <div class="lobby-buttons">
+            <button id="lobby-lang-en" class="btn btn-lang"><span lang="en">English</span></button>
+            <button id="lobby-lang-ko" class="btn btn-lang"><span lang="ko">한국어</span></button>
+          </div>
         </div>
-      </div>
+      </header>
+      <p id="lobby-loading" class="lobby-loading" data-i18n="loading.lukla.terrain" hidden></p>
       <div class="lobby-group" role="group">
         <span class="lobby-label" data-i18n="lobby.airport">공항</span>
         <div class="lobby-buttons">
@@ -173,7 +174,7 @@
           <button id="lobby-airport-lukla" class="btn btn-airport"><span data-i18n="lukla.vnlk">🏔️ 루클라 (VNLK)</span></button>
         </div>
       </div>
-      <div class="lobby-group" role="group">
+      <div class="lobby-group lobby-scenarios" role="group">
         <span class="lobby-label" data-i18n="lobby.spawn">시나리오</span>
         <div class="lobby-buttons">
           <button id="lobby-preset-rwy" class="btn btn-preset"><span>🛫 활주로 이륙 (09L)</span></button>
@@ -196,10 +197,11 @@
           <option value="22.5">22:30</option>
         </select>
       </label>
-      <div class="lobby-group lobby-settings" role="group">
-        <span class="lobby-label" data-i18n="ui.settings.short">Settings</span>
+      <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
+      <details class="lobby-settings">
+        <summary class="lobby-label" data-i18n="ui.settings.short">Settings</summary>
         <div class="lobby-buttons" id="lobby-settings"></div>
-      </div>
+      </details>
       <button id="btn-fly" class="btn btn-fly"><span data-i18n="lobby.fly">비행 시작</span></button>
       <p class="lobby-hint" data-i18n="lobby.hint.esc">비행 중 ESC를 누르면 일시정지 메뉴가 열립니다.</p>
     </div>

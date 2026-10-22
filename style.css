@@ -2065,42 +2065,77 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   padding: 18px 20px;
 }
 .lobby-card {
-  margin-left: max(16px, env(safe-area-inset-left));
-  max-height: min(92dvh, 720px);
+  margin-left: max(64px, calc(env(safe-area-inset-left) + 16px));
+  max-height: calc(100dvh - 96px);
   overflow-y: auto;
-  width: min(420px, 86vw);
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  width: 360px;
+  padding: 20px;
+  gap: 16px;
+  background: rgba(16, 28, 43, .94);
+  border-color: rgba(148, 163, 184, .18);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .24);
+  flex-shrink: 0;
 }
-.lobby-title { color: #7dd3fc; font-size: 22px; letter-spacing: 1px; margin: 0; }
-.lobby-loading { color: #f59e0b; font-size: 12px; margin: 0; }
+.lobby-card > * { flex-shrink: 0; }
+.lobby-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.lobby-title { color: #e2e8f0; font-size: 18px; font-weight: 600; letter-spacing: -.4px; margin: 0; }
+.lobby-title > span { display: block; color: #94a3b8; font-size: 11px; font-weight: 400; letter-spacing: 0; margin-top: 4px; }
+.lobby-language { display: flex; flex-direction: column; gap: 4px; }
+.lobby-language > .lobby-label { font-size: 9px; }
+.lobby-loading { color: #fbbf24; font-size: 11px; line-height: 1.5; margin: 0; }
 .lobby-briefing {
   white-space: pre-line;
-  background: rgba(148, 163, 184, 0.08);
-  border-left: 3px solid #38bdf8;
-  border-radius: 6px;
-  font-size: 13px;
-  line-height: 1.5;
-  padding: 8px 12px;
+  color: #a6b5c8;
+  border-top: 1px solid rgba(148, 163, 184, .14);
+  font-size: 11px;
+  line-height: 1.65;
+  padding-top: 12px;
 }
-.lobby-group { display: flex; flex-direction: column; gap: 6px; }
-.lobby-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+.lobby-group { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.lobby-label { color: #94a3b8; font-size: 10px; font-weight: 500; letter-spacing: .3px; }
 .lobby-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
-.lobby-buttons .btn { font-size: 12px; }
+.lobby-card .btn {
+  min-width: 0;
+  min-height: 34px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 7px;
+  background: rgba(148, 163, 184, .05);
+  box-shadow: none;
+  transform: none;
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+.lobby-card .btn:hover { background: rgba(148, 163, 184, .12); color: #e2e8f0; border-color: rgba(148, 163, 184, .35); }
+.lobby-card .btn.active { background: rgba(56, 189, 248, .12); color: #bae6fd; border-color: rgba(56, 189, 248, .45); }
+.lobby-card .btn-airport { flex: 1; }
+.lobby-scenarios .btn-preset { flex: 1 1 100%; text-align: left; }
+.lobby-language .btn { min-height: 28px; padding: 4px 7px; font-size: 10px; }
 /* The menu card is the settings scroll container: vertical panning only. */
 .lobby-card, .lobby-card button, .lobby-card select { touch-action: pan-y; }
-.lobby-buttons .btn.active, #lobby-time-select { border-color: #38bdf8; }
-#lobby-time-select { width: 100%; }
-.btn-fly {
-  background: #065f46;
-  border: 1px solid #10b981;
-  color: #ecfdf5;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  min-height: 48px;
-  margin-top: 4px;
+#lobby-time-select { width: 100%; font-variant-numeric: tabular-nums; color-scheme: dark; }
+.lobby-settings { padding-top: 12px; border-top: 1px solid rgba(148, 163, 184, .14); }
+.lobby-settings summary { cursor: pointer; padding: 4px 0; }
+.lobby-settings summary:focus-visible { outline: 2px solid #67e8f9; outline-offset: 3px; border-radius: 3px; }
+.lobby-settings[open] > .lobby-buttons { margin-top: 10px; }
+.lobby-settings .language-control { flex: 1 1 100%; min-width: 0; justify-content: space-between; font-size: 11px; }
+.lobby-card .btn-fly {
+  background: #157598;
+  border-color: rgba(125, 211, 252, .35);
+  color: #f0f9ff;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 40px;
 }
-.btn-fly:hover { background: #047857; }
-.lobby-hint { color: #64748b; font-size: 11px; margin: 0; }
+.lobby-card .btn-fly:hover { background: #1986ac; color: #fff; }
+.lobby-hint { color: #94a3b8; font-size: 10px; line-height: 1.5; margin: -6px 0 0; text-align: center; }
 
 /* Pause: dim the frozen scene lightly. */
 #pause-menu {
@@ -2186,21 +2221,27 @@ body[data-flow="lobby"] .menu-toggle {
   }
 }
 
-/* Compact/touch: lobby becomes a scrollable bottom sheet. */
+/* Compact menus keep the scene visible and every control reachable by scrolling. */
 .compact-ui #lobby-screen {
   align-items: flex-end;
-  background: linear-gradient(0deg,
-    rgba(6, 10, 18, 0.95) 0%,
-    rgba(6, 10, 18, 0.78) 52%,
-    rgba(6, 10, 18, 0) 100%);
+  background: linear-gradient(0deg, rgba(6, 10, 18, .8), rgba(6, 10, 18, 0) 100%);
 }
 .compact-ui .lobby-card {
-  margin: 0 auto calc(var(--edge-bottom, 8px) + 8px);
-  max-height: 68dvh;
-  width: min(480px, 100% - 16px);
+  margin: 0 auto calc(var(--edge-bottom) + 8px);
+  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 72px);
+  width: min(360px, calc(100% - var(--edge-left) - var(--edge-right) - 16px));
+  padding: 16px;
+  gap: 12px;
 }
-.compact-ui .lobby-buttons .btn { min-height: 44px; }
-
+.compact-ui .lobby-card .btn { min-height: 44px; }
+.compact-ui .lobby-settings summary { min-height: 44px; padding: 14px 0; }
+@media (max-height: 500px) and (min-width: 541px) {
+  .compact-ui #lobby-screen { align-items: center; }
+  .compact-ui .lobby-card {
+    margin: 0 0 0 calc(var(--edge-left) + 56px);
+    max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 16px);
+  }
+}
 /* Keep the comparison controls below the HUD without covering the panel face. */
 .shadow-demo {
   position: fixed;
