@@ -1,0 +1,51 @@
+{
+  "toolbar": [
+    "open-aircraft",
+    "open-camera",
+    "open-environment",
+    "btn-mute",
+    "btn-hud-menu"
+  ],
+  "firstTap": {
+    "before": 1,
+    "after": 2,
+    "label": "Camera: Wing",
+    "panelOpen": false
+  },
+  "modesLabels": [
+    "Camera: Tower",
+    "Camera: Flyby",
+    "Camera: Landing gear",
+    "Camera: Drone",
+    "Camera: Auto",
+    "Camera: Cockpit",
+    "Camera: Chase"
+  ],
+  "envPanel": {
+    "open": true,
+    "ids": [
+      "language-select",
+      "render-quality",
+      "btn-sound",
+      "btn-touch-toggle",
+      "touch-btn-gyro",
+      "btn-cam-reset",
+      "btn-yokes",
+      "btn-diag",
+      "btn-help"
+    ]
+  },
+  "touchButton": {
+    "w": 91,
+    "h": 44,
+    "text": "Camera: Tower",
+    "reachable": true
+  },
+  "touchTap": {
+    "before": 3,
+    "after": 4,
+    "label": "Camera: Flyby",
+    "panelOpen": false
+  },
+  "exceptions": []
+}
