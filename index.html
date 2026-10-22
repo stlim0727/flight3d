@@ -61,17 +61,19 @@
 
     <!-- Compact Autopilot & Flight Phase Bar (issue #112) -->
     <div id="ap-bar" class="ap-bar ap-collapsed" role="group" aria-label="Autopilot">
-      <button id="btn-ap-toggle" class="btn ap-btn ap-toggle-btn" type="button" aria-expanded="false" aria-controls="ap-bar" title="Expand autopilot bar" data-i18n-title="ap.expand.tip">AP</button>
-      <div class="hud-item ap-phase-item">
-        <span class="hud-label" data-i18n="ui.ap.phase">PHASE</span>
-        <span id="hud-phase" class="hud-val cyan">GND</span>
+      <button id="btn-ap-toggle" class="btn ap-btn ap-toggle-btn" type="button" aria-expanded="false" aria-controls="ap-panel" title="Expand autopilot bar" data-i18n-title="ap.expand.tip">AP</button>
+      <div id="ap-panel" class="ap-panel" hidden>
+        <div class="hud-item ap-phase-item">
+          <span class="hud-label" data-i18n="ui.ap.phase">PHASE</span>
+          <span id="hud-phase" class="hud-val cyan">GND</span>
+        </div>
+        <button id="btn-ap" class="btn ap-btn" type="button" aria-pressed="false" title="Autopilot master (one-click engage/disengage)" data-i18n="ap.master" data-i18n-title="ap.master.tip">AP</button>
+        <button id="btn-ap-hdg" class="btn ap-btn" type="button" aria-pressed="false" title="Hold current heading (HDG)" data-i18n="ap.hdg" data-i18n-title="ap.hdg.tip">HDG</button>
+        <button id="btn-ap-alt" class="btn ap-btn" type="button" aria-pressed="false" title="Hold current altitude (ALT)" data-i18n="ap.alt" data-i18n-title="ap.alt.tip">ALT</button>
+        <button id="btn-ap-spd" class="btn ap-btn" type="button" aria-pressed="false" title="Hold current speed (SPD)" data-i18n="ap.spd" data-i18n-title="ap.spd.tip">SPD</button>
+        <button id="btn-ap-app" class="btn ap-btn" type="button" aria-pressed="false" title="Capture localizer & glideslope (APP)" data-i18n="ap.app" data-i18n-title="ap.app.tip">APP</button>
+        <span id="hud-ap-modes" class="ap-modes"></span>
       </div>
-      <button id="btn-ap" class="btn ap-btn" type="button" aria-pressed="false" title="Autopilot master (one-click engage/disengage)" data-i18n="ap.master" data-i18n-title="ap.master.tip">AP</button>
-      <button id="btn-ap-hdg" class="btn ap-btn" type="button" aria-pressed="false" title="Hold current heading (HDG)" data-i18n="ap.hdg" data-i18n-title="ap.hdg.tip">HDG</button>
-      <button id="btn-ap-alt" class="btn ap-btn" type="button" aria-pressed="false" title="Hold current altitude (ALT)" data-i18n="ap.alt" data-i18n-title="ap.alt.tip">ALT</button>
-      <button id="btn-ap-spd" class="btn ap-btn" type="button" aria-pressed="false" title="Hold current speed (SPD)" data-i18n="ap.spd" data-i18n-title="ap.spd.tip">SPD</button>
-      <button id="btn-ap-app" class="btn ap-btn" type="button" aria-pressed="false" title="Capture localizer & glideslope (APP)" data-i18n="ap.app" data-i18n-title="ap.app.tip">APP</button>
-      <span id="hud-ap-modes" class="ap-modes"></span>
     </div>
 
     <!-- Minimized Demo Flight Showcase Pill (Tap to Reopen) -->

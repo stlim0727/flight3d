@@ -1,0 +1,92 @@
+[
+  {
+    "name": "portrait-small",
+    "width": 320,
+    "height": 568,
+    "before": {
+      "x": 268,
+      "y": 104,
+      "width": 44,
+      "height": 44,
+      "top": 104,
+      "right": 312,
+      "bottom": 148,
+      "left": 268
+    },
+    "collapsed": {
+      "box": {
+        "x": 268,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 312,
+        "bottom": 148,
+        "left": 268
+      },
+      "hidden": true,
+      "master": true,
+      "green": true
+    }
+  },
+  {
+    "name": "landscape",
+    "width": 844,
+    "height": 390,
+    "before": {
+      "x": 618,
+      "y": 104,
+      "width": 44,
+      "height": 44,
+      "top": 104,
+      "right": 662,
+      "bottom": 148,
+      "left": 618
+    },
+    "collapsed": {
+      "box": {
+        "x": 618,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 662,
+        "bottom": 148,
+        "left": 618
+      },
+      "hidden": true,
+      "master": true,
+      "green": true
+    }
+  },
+  {
+    "name": "desktop",
+    "width": 1440,
+    "height": 900,
+    "before": {
+      "x": 916,
+      "y": 104,
+      "width": 44,
+      "height": 44,
+      "top": 104,
+      "right": 960,
+      "bottom": 148,
+      "left": 916
+    },
+    "collapsed": {
+      "box": {
+        "x": 916,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 960,
+        "bottom": 148,
+        "left": 916
+      },
+      "hidden": true,
+      "master": true,
+      "green": true
+    }
+  }
+]

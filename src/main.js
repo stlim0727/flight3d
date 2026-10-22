@@ -1468,11 +1468,7 @@ class FlightSimulator {
       btn.setAttribute('aria-pressed', String(on));
     }
     const btnToggle = document.getElementById('btn-ap-toggle');
-    const apBar = document.getElementById('ap-bar');
-    if (btnToggle) {
-      const collapsed = Boolean(apBar && apBar.classList.contains('ap-collapsed'));
-      btnToggle.classList.toggle('ap-active', collapsed && this.autopilot.master);
-    }
+    if (btnToggle) btnToggle.classList.toggle('ap-active', this.autopilot.master);
   }
 
   updateApToggleUI() {
@@ -1481,10 +1477,11 @@ class FlightSimulator {
     if (!bar || !btn) return;
     const collapsed = bar.classList.contains('ap-collapsed');
     btn.setAttribute('aria-expanded', String(!collapsed));
-    btn.textContent = collapsed ? 'AP' : '▾';
+    btn.textContent = 'AP';
+    document.getElementById('ap-panel').hidden = collapsed;
     bindText(btn, () => t(collapsed ? 'ap.expand' : 'ap.collapse'), 'aria-label');
     bindText(btn, () => t(collapsed ? 'ap.expand.tip' : 'ap.collapse.tip'), 'title');
-    btn.classList.toggle('ap-active', collapsed && this.autopilot.master);
+    btn.classList.toggle('ap-active', this.autopilot.master);
   }
 
   updateAudioUI(state) {
@@ -1575,6 +1572,22 @@ class FlightSimulator {
     document.getElementById('btn-ap-toggle')?.addEventListener('click', () => {
       document.getElementById('ap-bar')?.classList.toggle('ap-collapsed');
       this.updateApToggleUI();
+    });
+    const closeApPanel = () => {
+      const bar = document.getElementById('ap-bar');
+      if (bar.classList.contains('ap-collapsed')) return;
+      bar.classList.add('ap-collapsed');
+      this.updateApToggleUI();
+    };
+    document.addEventListener('pointerdown', event => {
+      if (!event.target.closest('#ap-bar')) closeApPanel();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape' || document.getElementById('ap-panel').hidden) return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeApPanel();
+      document.getElementById('btn-ap-toggle').focus({ preventScroll: true });
     });
     this.updateApToggleUI();
 

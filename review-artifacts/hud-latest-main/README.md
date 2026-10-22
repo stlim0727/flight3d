@@ -1,35 +1,39 @@
-# One concise flight-control strip
+# Compact flight strip with an anchored AP dropdown
 
 Baseline: main `f94296b394819460f9371e7c0871991713d6c9e5` (merged #153 and #154).
 
-One horizontal strip now contains camera, sound, gear, flaps decrement/increment,
-spoilers and reverse, in that order. A divider separates camera/sound from the
-mechanical controls. Short localized labels keep it compact; gear direction,
-flap angle, pressed states and mute icon retain visible state. Full localized
-state descriptions remain in accessible names and tooltips.
+One horizontal strip contains camera, sound | gear, flaps decrement/increment,
+spoilers and reverse. Short localized labels retain visible state; accessible
+names and tooltips retain full descriptions. Sound is available on desktop and
+touch layouts. The Aircraft drawer and separate Aircraft row are removed.
 
-The strip stays on one row, with 44px targets and horizontal scrolling if the
-viewport cannot fit them. Sound is directly available on desktop as well as
-phones. The Aircraft drawer and separate Aircraft row are gone. Home and the
-collapsed AP button sit 8px below the strip, aligned with its
-left and right ends. Both have 44px touch targets. When the menu is open, Home
-moves to the upper corner so it does not cover settings on short phones.
-Expanded AP controls render above the strip and remain tappable.
+Telemetry and the control strip occupy 44px bands with a 4px vertical gap. Home
+and AP sit 4px below the control strip, aligned with its ends, with 44px touch
+targets. In the menu, Home moves to the upper corner to leave settings reachable.
+
+The AP trigger keeps its position, label and master-state tint when expanded.
+A right-aligned panel opens 4px below it. Its three-column layout exposes phase,
+master, HDG, ALT, SPD, APP and live mode annunciation without moving the trigger.
+It fits within the viewport and scrolls if height is limited. Clicking the trigger,
+pressing Escape or tapping outside closes it. Escape closes AP without pausing
+flight; outside input still reaches its intended control.
 
 ## Verification
 
 - `npm run check`: 156 JavaScript files and pinned workflow actions pass.
-- `npm test`: 400 tests across 49 suites pass, including localization parity.
+- `npm test`: 400 tests across 49 suites pass.
 - `npm run build`: pass; existing large-chunk warning remains.
 - `scripts/verify-responsive-ui.mjs`: all 11 viewport/input layouts pass bounds,
-  non-overlap, telemetry fit, requested seven-button order, single control row,
-  direct Aircraft hit targets, 8px Home/AP gaps and aligned edges, 44px Home
-  target, AP docking and native AP expand/collapse.
-- Existing interaction, compact touch-control, safe-area, telemetry swipe/keyboard
-  and inspector tuning checks pass. Repeated flap changes use native taps on the
-  strip; rotation retains the controls without a drawer.
+  non-overlap, telemetry fit, strip order and row count, direct hit targets,
+  4px gaps, aligned Home/AP edges and stationary AP trigger when expanded.
+- Each layout verifies panel alignment, viewport fit and all five mode-button
+  hit targets; native master and HDG input keep the panel open and update state.
+  Native collapse and Escape dismissal pass, including no accidental pause.
+- Existing interaction, compact input, safe-area, telemetry swipe/keyboard and
+  inspector tuning checks pass. A native camera tap closes AP from outside
+  and the camera remains usable.
 
-Start Vite on 5272 and isolated hardware-accelerated Chrome using
+Start Vite on 5272 and isolated hardware-accelerated Chrome with
 `--use-gl=angle --use-angle=vulkan`, CDP 9498 and a writable profile, then run:
 
 ```sh
@@ -37,7 +41,12 @@ CDP_URL=http://127.0.0.1:9498 SIM_URL=http://127.0.0.1:5272 \
   ARTIFACT_DIR=review-artifacts/hud-latest-main node scripts/verify-responsive-ui.mjs
 ```
 
-`layout-results.json` contains measured bounds, strip order, row count and AP
-assertions. Other JSON files cover interaction and safe-area results. Selected
-screenshots show phone portrait, phone landscape and desktop. Evidence uses
-Chrome device emulation, not physical phone browser chrome or audio listening.
+`layout-results.json` records bounds, gaps, trigger/panel positions and mode hit
+targets. Other JSON covers interactions and safe areas. Selected screenshots show
+collapsed and expanded AP on phone portrait, landscape and desktop. Expanded
+captures show master and HDG engaged. `ap-state-results.json` additionally
+records that collapsing on portrait, landscape and desktop preserves master
+engagement, green tint and exact trigger coordinates. Selected captures wait
+2.8 seconds for transient mode notices to disappear, then restore AP off.
+Evidence uses Chrome device emulation, not physical phone browser chrome or audio
+listening.

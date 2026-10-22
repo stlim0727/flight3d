@@ -135,17 +135,42 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
       const r = node.getBoundingClientRect();
       return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2, r.top+r.height/2)), height: r.height };
     }), collapsed: document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded') === 'false',
-      apGap: ap.top - strip.bottom, homeGap: home.top - strip.bottom, homeTarget: home.width >= 44 && home.height >= 44, alignedEdges: Math.abs(home.left - strip.left) < 1 && Math.abs(ap.right - strip.right) < 1 };
+      anchor: ap.toJSON(), telemetryGap: strip.top - document.querySelector('.hud-strip').getBoundingClientRect().bottom, apGap: ap.top - strip.bottom, homeGap: home.top - strip.bottom, homeTarget: home.width >= 44 && home.height >= 44, alignedEdges: Math.abs(home.left - strip.left) < 1 && Math.abs(ap.right - strip.right) < 1 };
   })()`);
   assert.deepEqual(direct.stripButtons, ['open-camera', 'btn-mute', 'btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser'], `${name}: one strip in the requested order`);
   assert.equal(direct.rows, 1, `${name}: controls stay on one concise row`);
   assert.equal(direct.buttons.length, 5, `${name}: all Aircraft controls are flattened`);
   assert.ok(direct.buttons.every(b => b.reachable && b.height >= 44), `${name}: all Aircraft controls have reachable 44px targets`);
-  assert.ok(direct.collapsed && direct.homeTarget && direct.alignedEdges && Math.abs(direct.apGap - 8) < 1 && Math.abs(direct.homeGap - 8) < 1, `${name}: Home and AP align 8px below the control strip: ${JSON.stringify(direct)}`);
+  assert.ok(direct.collapsed && direct.homeTarget && direct.alignedEdges && Math.abs(direct.telemetryGap - 4) < 1 && Math.abs(direct.apGap - 4) < 1 && Math.abs(direct.homeGap - 4) < 1, `${name}: upper strips and Home/AP use 4px gaps: ${JSON.stringify(direct)}`);
   await nativeClick('#btn-ap-toggle', touch);
   assert.equal(await ev(`document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded')`), 'true', `${name}: native tap expands AP`);
+  const expanded = await ev(`(() => {
+    const trigger = document.querySelector('#btn-ap-toggle').getBoundingClientRect();
+    const panel = document.querySelector('#ap-panel').getBoundingClientRect();
+    return { trigger: trigger.toJSON(), panel: panel.toJSON(), visible: !document.querySelector('#ap-panel').hidden,
+      targets: [...document.querySelectorAll('#ap-panel button')].map(node => {
+        const r = node.getBoundingClientRect();
+        return { id: node.id, width: r.width, height: r.height,
+          reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)) };
+      }) };
+  })()`);
+  assert.ok(expanded.visible && Math.abs(expanded.trigger.x - direct.anchor.x) < 1 && Math.abs(expanded.trigger.y - direct.anchor.y) < 1, `${name}: AP trigger stays fixed when expanded`);
+  assert.ok(Math.abs(expanded.panel.right - expanded.trigger.right) < 1 && Math.abs(expanded.panel.top - expanded.trigger.bottom - 4) < 1, `${name}: AP panel opens 4px below, right-aligned`);
+  assert.ok(expanded.panel.left >= 0 && expanded.panel.bottom <= height && expanded.targets.length === 5 && expanded.targets.every(b => b.reachable && b.width >= 44 && b.height >= 44), `${name}: all expanded AP controls fit and are reachable`);
+  await nativeClick('#btn-ap', touch);
+  assert.ok(await ev(`window.simulator.autopilot.master && document.querySelector('#btn-ap-toggle').classList.contains('ap-active') && !document.querySelector('#ap-panel').hidden`), `${name}: native master toggle keeps panel open and trigger green`);
+  await nativeClick('#btn-ap-hdg', touch);
+  assert.equal(await ev('window.simulator.autopilot.lateralMode'), 'HDG', `${name}: native heading mode works from dropdown`);
+  await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}-ap-expanded.png`, Buffer.from(r.data, 'base64')));
+  await nativeClick('#btn-ap', touch);
+  assert.equal(await ev('window.simulator.autopilot.master'), false, `${name}: native master toggle disengages AP`);
+  direct.expanded = expanded;
   await nativeClick('#btn-ap-toggle', touch);
   assert.equal(await ev(`document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded')`), 'false', `${name}: native tap collapses AP`);
+  await nativeClick('#btn-ap-toggle', touch);
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  assert.ok(await ev(`document.querySelector('#ap-panel').hidden && document.body.dataset.flow === 'flight'`), `${name}: Escape closes AP without pausing flight`);
   await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}.png`, Buffer.from(r.data, 'base64')));
   await ev(`document.querySelector('#menu-toggle').click()`);
   const panel = await ev(`(() => {
@@ -248,6 +273,9 @@ await new Promise(r => setTimeout(r, 200));
 await nativeClick('#btn-flaps-ext', true);
 await nativeClick('#btn-flaps-ext', true);
 assert.equal(await ev(`!document.querySelector('#panel-aircraft') && !document.querySelector('#open-aircraft') && window.simulator.aero.flapsIndex === 4`), true, 'repeated native flap changes work directly without a drawer');
+await nativeClick('#btn-ap-toggle', true);
+await nativeClick('#open-camera', true);
+assert.ok(await ev(`document.querySelector('#ap-panel').hidden`), 'native outside tap closes AP while camera remains usable');
 const cycleFrom = await ev(`window.simulator.cameraSystem.mode`);
 await ev(`document.querySelector('#open-camera').click(); document.querySelector('#open-camera').click()`);
 assert.equal(await ev(`window.simulator.cameraSystem.mode`), (cycleFrom + 2) % 8, 'repeated toolbar taps keep cycling cameras');

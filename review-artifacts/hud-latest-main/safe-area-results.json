@@ -3,8 +3,8 @@
     "selector": ".flight-toolbar",
     "left": 18,
     "right": 302,
-    "top": 78,
-    "bottom": 122
+    "top": 72,
+    "bottom": 116
   },
   {
     "selector": ".hud-strip",

@@ -17,7 +17,7 @@
       {
         "id": "ap-bar",
         "x": 268,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -25,7 +25,7 @@
       {
         "id": "menu-toggle",
         "x": 8,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -33,7 +33,7 @@
       {
         "id": "flight-toolbar",
         "x": 8,
-        "y": 62,
+        "y": 56,
         "w": 304,
         "h": 44,
         "bad": false
@@ -114,10 +114,76 @@
         }
       ],
       "collapsed": true,
-      "apGap": 8,
-      "homeGap": 8,
+      "anchor": {
+        "x": 268,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 312,
+        "bottom": 148,
+        "left": 268
+      },
+      "telemetryGap": 4,
+      "apGap": 4,
+      "homeGap": 4,
       "homeTarget": true,
-      "alignedEdges": true
+      "alignedEdges": true,
+      "expanded": {
+        "trigger": {
+          "x": 268,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "top": 104,
+          "right": 312,
+          "bottom": 148,
+          "left": 268
+        },
+        "panel": {
+          "x": 16,
+          "y": 152,
+          "width": 296,
+          "height": 110,
+          "top": 152,
+          "right": 312,
+          "bottom": 262,
+          "left": 16
+        },
+        "visible": true,
+        "targets": [
+          {
+            "id": "btn-ap",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-hdg",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-alt",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-spd",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-app",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          }
+        ]
+      }
     },
     "panel": {
       "open": true,
@@ -320,7 +386,7 @@
       {
         "id": "ap-bar",
         "x": 338,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -328,7 +394,7 @@
       {
         "id": "menu-toggle",
         "x": 8,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -336,7 +402,7 @@
       {
         "id": "flight-toolbar",
         "x": 8,
-        "y": 62,
+        "y": 56,
         "w": 374,
         "h": 44,
         "bad": false
@@ -417,10 +483,76 @@
         }
       ],
       "collapsed": true,
-      "apGap": 8,
-      "homeGap": 8,
+      "anchor": {
+        "x": 338,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 382,
+        "bottom": 148,
+        "left": 338
+      },
+      "telemetryGap": 4,
+      "apGap": 4,
+      "homeGap": 4,
       "homeTarget": true,
-      "alignedEdges": true
+      "alignedEdges": true,
+      "expanded": {
+        "trigger": {
+          "x": 338,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "top": 104,
+          "right": 382,
+          "bottom": 148,
+          "left": 338
+        },
+        "panel": {
+          "x": 86,
+          "y": 152,
+          "width": 296,
+          "height": 110,
+          "top": 152,
+          "right": 382,
+          "bottom": 262,
+          "left": 86
+        },
+        "visible": true,
+        "targets": [
+          {
+            "id": "btn-ap",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-hdg",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-alt",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-spd",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-app",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          }
+        ]
+      }
     },
     "panel": {
       "open": true,
@@ -623,7 +755,7 @@
       {
         "id": "ap-bar",
         "x": 268,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -631,7 +763,7 @@
       {
         "id": "menu-toggle",
         "x": 8,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -639,7 +771,7 @@
       {
         "id": "flight-toolbar",
         "x": 8,
-        "y": 62,
+        "y": 56,
         "w": 304,
         "h": 44,
         "bad": false
@@ -720,10 +852,76 @@
         }
       ],
       "collapsed": true,
-      "apGap": 8,
-      "homeGap": 8,
+      "anchor": {
+        "x": 268,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 312,
+        "bottom": 148,
+        "left": 268
+      },
+      "telemetryGap": 4,
+      "apGap": 4,
+      "homeGap": 4,
       "homeTarget": true,
-      "alignedEdges": true
+      "alignedEdges": true,
+      "expanded": {
+        "trigger": {
+          "x": 268,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "top": 104,
+          "right": 312,
+          "bottom": 148,
+          "left": 268
+        },
+        "panel": {
+          "x": 16,
+          "y": 152,
+          "width": 296,
+          "height": 110,
+          "top": 152,
+          "right": 312,
+          "bottom": 262,
+          "left": 16
+        },
+        "visible": true,
+        "targets": [
+          {
+            "id": "btn-ap",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-hdg",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-alt",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-spd",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-app",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          }
+        ]
+      }
     },
     "panel": {
       "open": true,
@@ -905,7 +1103,7 @@
       {
         "id": "ap-bar",
         "x": 268,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -913,7 +1111,7 @@
       {
         "id": "menu-toggle",
         "x": 8,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -921,7 +1119,7 @@
       {
         "id": "flight-toolbar",
         "x": 8,
-        "y": 62,
+        "y": 56,
         "w": 304,
         "h": 44,
         "bad": false
@@ -1002,10 +1200,76 @@
         }
       ],
       "collapsed": true,
-      "apGap": 8,
-      "homeGap": 8,
+      "anchor": {
+        "x": 268,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 312,
+        "bottom": 148,
+        "left": 268
+      },
+      "telemetryGap": 4,
+      "apGap": 4,
+      "homeGap": 4,
       "homeTarget": true,
-      "alignedEdges": true
+      "alignedEdges": true,
+      "expanded": {
+        "trigger": {
+          "x": 268,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "top": 104,
+          "right": 312,
+          "bottom": 148,
+          "left": 268
+        },
+        "panel": {
+          "x": 16,
+          "y": 152,
+          "width": 296,
+          "height": 110,
+          "top": 152,
+          "right": 312,
+          "bottom": 262,
+          "left": 16
+        },
+        "visible": true,
+        "targets": [
+          {
+            "id": "btn-ap",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-hdg",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-alt",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-spd",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-app",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          }
+        ]
+      }
     },
     "panel": {
       "open": true,
@@ -1166,7 +1430,7 @@
       {
         "id": "ap-bar",
         "x": 480,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -1174,7 +1438,7 @@
       {
         "id": "menu-toggle",
         "x": 44,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -1182,7 +1446,7 @@
       {
         "id": "flight-toolbar",
         "x": 44,
-        "y": 62,
+        "y": 56,
         "w": 480,
         "h": 44,
         "bad": false
@@ -1263,10 +1527,76 @@
         }
       ],
       "collapsed": true,
-      "apGap": 8,
-      "homeGap": 8,
+      "anchor": {
+        "x": 480,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 524,
+        "bottom": 148,
+        "left": 480
+      },
+      "telemetryGap": 4,
+      "apGap": 4,
+      "homeGap": 4,
       "homeTarget": true,
-      "alignedEdges": true
+      "alignedEdges": true,
+      "expanded": {
+        "trigger": {
+          "x": 480,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "top": 104,
+          "right": 524,
+          "bottom": 148,
+          "left": 480
+        },
+        "panel": {
+          "x": 228,
+          "y": 152,
+          "width": 296,
+          "height": 110,
+          "top": 152,
+          "right": 524,
+          "bottom": 262,
+          "left": 228
+        },
+        "visible": true,
+        "targets": [
+          {
+            "id": "btn-ap",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-hdg",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-alt",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-spd",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-app",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          }
+        ]
+      }
     },
     "panel": {
       "open": true,
@@ -1427,7 +1757,7 @@
       {
         "id": "ap-bar",
         "x": 618,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -1435,7 +1765,7 @@
       {
         "id": "menu-toggle",
         "x": 182,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -1443,7 +1773,7 @@
       {
         "id": "flight-toolbar",
         "x": 182,
-        "y": 62,
+        "y": 56,
         "w": 480,
         "h": 44,
         "bad": false
@@ -1524,10 +1854,76 @@
         }
       ],
       "collapsed": true,
-      "apGap": 8,
-      "homeGap": 8,
+      "anchor": {
+        "x": 618,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 662,
+        "bottom": 148,
+        "left": 618
+      },
+      "telemetryGap": 4,
+      "apGap": 4,
+      "homeGap": 4,
       "homeTarget": true,
-      "alignedEdges": true
+      "alignedEdges": true,
+      "expanded": {
+        "trigger": {
+          "x": 618,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "top": 104,
+          "right": 662,
+          "bottom": 148,
+          "left": 618
+        },
+        "panel": {
+          "x": 366,
+          "y": 152,
+          "width": 296,
+          "height": 110,
+          "top": 152,
+          "right": 662,
+          "bottom": 262,
+          "left": 366
+        },
+        "visible": true,
+        "targets": [
+          {
+            "id": "btn-ap",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-hdg",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-alt",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-spd",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-app",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          }
+        ]
+      }
     },
     "panel": {
       "open": true,
@@ -1721,16 +2117,16 @@
     "bounds": [
       {
         "id": "hud-strip",
-        "x": 342.2265625,
-        "y": 14,
-        "w": 755.546875,
-        "h": 48,
+        "x": 350.2265625,
+        "y": 8,
+        "w": 739.546875,
+        "h": 44,
         "bad": false
       },
       {
         "id": "ap-bar",
         "x": 916,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -1738,7 +2134,7 @@
       {
         "id": "menu-toggle",
         "x": 480,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -1746,7 +2142,7 @@
       {
         "id": "flight-toolbar",
         "x": 480,
-        "y": 62,
+        "y": 56,
         "w": 480,
         "h": 44,
         "bad": false
@@ -1795,10 +2191,76 @@
         }
       ],
       "collapsed": true,
-      "apGap": 8,
-      "homeGap": 8,
+      "anchor": {
+        "x": 916,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 960,
+        "bottom": 148,
+        "left": 916
+      },
+      "telemetryGap": 4,
+      "apGap": 4,
+      "homeGap": 4,
       "homeTarget": true,
-      "alignedEdges": true
+      "alignedEdges": true,
+      "expanded": {
+        "trigger": {
+          "x": 916,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "top": 104,
+          "right": 960,
+          "bottom": 148,
+          "left": 916
+        },
+        "panel": {
+          "x": 664,
+          "y": 152,
+          "width": 296,
+          "height": 110,
+          "top": 152,
+          "right": 960,
+          "bottom": 262,
+          "left": 664
+        },
+        "visible": true,
+        "targets": [
+          {
+            "id": "btn-ap",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-hdg",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-alt",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-spd",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-app",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          }
+        ]
+      }
     },
     "panel": {
       "open": true,
@@ -1997,7 +2459,7 @@
       {
         "id": "ap-bar",
         "x": 596,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -2005,7 +2467,7 @@
       {
         "id": "menu-toggle",
         "x": 160,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -2013,7 +2475,7 @@
       {
         "id": "flight-toolbar",
         "x": 160,
-        "y": 62,
+        "y": 56,
         "w": 480,
         "h": 44,
         "bad": false
@@ -2062,10 +2524,76 @@
         }
       ],
       "collapsed": true,
-      "apGap": 8,
-      "homeGap": 8,
+      "anchor": {
+        "x": 596,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 640,
+        "bottom": 148,
+        "left": 596
+      },
+      "telemetryGap": 4,
+      "apGap": 4,
+      "homeGap": 4,
       "homeTarget": true,
-      "alignedEdges": true
+      "alignedEdges": true,
+      "expanded": {
+        "trigger": {
+          "x": 596,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "top": 104,
+          "right": 640,
+          "bottom": 148,
+          "left": 596
+        },
+        "panel": {
+          "x": 344,
+          "y": 152,
+          "width": 296,
+          "height": 110,
+          "top": 152,
+          "right": 640,
+          "bottom": 262,
+          "left": 344
+        },
+        "visible": true,
+        "targets": [
+          {
+            "id": "btn-ap",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-hdg",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-alt",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-spd",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-app",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          }
+        ]
+      }
     },
     "panel": {
       "open": true,
@@ -2255,16 +2783,16 @@
     "bounds": [
       {
         "id": "hud-strip",
-        "x": 134.7265625,
-        "y": 14,
-        "w": 755.546875,
-        "h": 48,
+        "x": 142.7265625,
+        "y": 8,
+        "w": 739.546875,
+        "h": 44,
         "bad": false
       },
       {
         "id": "ap-bar",
         "x": 708.5,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -2272,7 +2800,7 @@
       {
         "id": "menu-toggle",
         "x": 272.5,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -2280,7 +2808,7 @@
       {
         "id": "flight-toolbar",
         "x": 272.5,
-        "y": 62,
+        "y": 56,
         "w": 480,
         "h": 44,
         "bad": false
@@ -2329,10 +2857,76 @@
         }
       ],
       "collapsed": true,
-      "apGap": 8,
-      "homeGap": 8,
+      "anchor": {
+        "x": 708.5,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 752.5,
+        "bottom": 148,
+        "left": 708.5
+      },
+      "telemetryGap": 4,
+      "apGap": 4,
+      "homeGap": 4,
       "homeTarget": true,
-      "alignedEdges": true
+      "alignedEdges": true,
+      "expanded": {
+        "trigger": {
+          "x": 708.5,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "top": 104,
+          "right": 752.5,
+          "bottom": 148,
+          "left": 708.5
+        },
+        "panel": {
+          "x": 456.5,
+          "y": 152,
+          "width": 296,
+          "height": 110,
+          "top": 152,
+          "right": 752.5,
+          "bottom": 262,
+          "left": 456.5
+        },
+        "visible": true,
+        "targets": [
+          {
+            "id": "btn-ap",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-hdg",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-alt",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-spd",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-app",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          }
+        ]
+      }
     },
     "panel": {
       "open": true,
@@ -2522,16 +3116,16 @@
     "bounds": [
       {
         "id": "hud-strip",
-        "x": 262.2265625,
-        "y": 14,
-        "w": 755.546875,
-        "h": 48,
+        "x": 270.2265625,
+        "y": 8,
+        "w": 739.546875,
+        "h": 44,
         "bad": false
       },
       {
         "id": "ap-bar",
         "x": 836,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -2539,7 +3133,7 @@
       {
         "id": "menu-toggle",
         "x": 400,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -2547,7 +3141,7 @@
       {
         "id": "flight-toolbar",
         "x": 400,
-        "y": 62,
+        "y": 56,
         "w": 480,
         "h": 44,
         "bad": false
@@ -2628,10 +3222,76 @@
         }
       ],
       "collapsed": true,
-      "apGap": 8,
-      "homeGap": 8,
+      "anchor": {
+        "x": 836,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 880,
+        "bottom": 148,
+        "left": 836
+      },
+      "telemetryGap": 4,
+      "apGap": 4,
+      "homeGap": 4,
       "homeTarget": true,
-      "alignedEdges": true
+      "alignedEdges": true,
+      "expanded": {
+        "trigger": {
+          "x": 836,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "top": 104,
+          "right": 880,
+          "bottom": 148,
+          "left": 836
+        },
+        "panel": {
+          "x": 584,
+          "y": 152,
+          "width": 296,
+          "height": 110,
+          "top": 152,
+          "right": 880,
+          "bottom": 262,
+          "left": 584
+        },
+        "visible": true,
+        "targets": [
+          {
+            "id": "btn-ap",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-hdg",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-alt",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-spd",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-app",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          }
+        ]
+      }
     },
     "panel": {
       "open": true,
@@ -2825,16 +3485,16 @@
     "bounds": [
       {
         "id": "hud-strip",
-        "x": 342.2265625,
-        "y": 14,
-        "w": 755.546875,
-        "h": 48,
+        "x": 350.2265625,
+        "y": 8,
+        "w": 739.546875,
+        "h": 44,
         "bad": false
       },
       {
         "id": "ap-bar",
         "x": 916,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -2842,7 +3502,7 @@
       {
         "id": "menu-toggle",
         "x": 480,
-        "y": 114,
+        "y": 104,
         "w": 44,
         "h": 44,
         "bad": false
@@ -2850,7 +3510,7 @@
       {
         "id": "flight-toolbar",
         "x": 480,
-        "y": 62,
+        "y": 56,
         "w": 480,
         "h": 44,
         "bad": false
@@ -2931,10 +3591,76 @@
         }
       ],
       "collapsed": true,
-      "apGap": 8,
-      "homeGap": 8,
+      "anchor": {
+        "x": 916,
+        "y": 104,
+        "width": 44,
+        "height": 44,
+        "top": 104,
+        "right": 960,
+        "bottom": 148,
+        "left": 916
+      },
+      "telemetryGap": 4,
+      "apGap": 4,
+      "homeGap": 4,
       "homeTarget": true,
-      "alignedEdges": true
+      "alignedEdges": true,
+      "expanded": {
+        "trigger": {
+          "x": 916,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "top": 104,
+          "right": 960,
+          "bottom": 148,
+          "left": 916
+        },
+        "panel": {
+          "x": 664,
+          "y": 152,
+          "width": 296,
+          "height": 110,
+          "top": 152,
+          "right": 960,
+          "bottom": 262,
+          "left": 664
+        },
+        "visible": true,
+        "targets": [
+          {
+            "id": "btn-ap",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-hdg",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-alt",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-spd",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          },
+          {
+            "id": "btn-ap-app",
+            "width": 90,
+            "height": 44,
+            "reachable": true
+          }
+        ]
+      }
     },
     "panel": {
       "open": true,
