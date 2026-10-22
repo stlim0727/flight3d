@@ -30,9 +30,10 @@ the user flag, matching the existing step 9 call.
 
 ## Verification
 
-- `npm run check`: 150 files, zero failures.
-- `npm test`: 358 passed, zero failures. `tests/touchControlState.test.js` lost
-  its two pill-state cases and keeps the gyro stick-sizing case.
+- `npm run check`: 154 files, zero failures.
+- `npm test`: 373 passed, zero failures, on the rebased tree (`6ca5955`).
+  `tests/touchControlState.test.js` lost its two pill-state cases and keeps the
+  gyro stick-sizing case.
 - `npm run build`: passed.
 - `npm run test:mobile` on this branch: full pass, including the rewritten
   step 6 (camera 1 → 2 from the toolbar button, gear toggle from the Aircraft
@@ -48,7 +49,8 @@ the user flag, matching the existing step 9 call.
   relocated gyro pill still flips `gyroActive` and its `active` class; at
   390 × 844 the overlay keeps stick, throttle, rudder and brake with only the
   gyro pill elsewhere, the toolbar fits, and the throttle readout tracks
-  `controls.throttle` at 80%; no uncaught page exceptions.
+  `controls.throttle` at 80%; no uncaught page exceptions. The check was re-run
+  after rebasing onto `6ca5955` with identical results.
 
 Simulated viewports and emulated input only; no physical-device claims. No
 `deviceorientation` samples were delivered, so gyro steering angles are covered
