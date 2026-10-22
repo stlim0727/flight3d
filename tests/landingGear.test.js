@@ -130,3 +130,53 @@ describe('Landing gear impact and failure envelope', () => {
     assert.equal(result.failure.reason, 'bottom-out');
   });
 });
+
+describe('Oleo rebound damping (asymmetric compression vs extension)', () => {
+  const pose = y => {
+    const mesh = new THREE.Object3D();
+    mesh.position.set(0, y, 0);
+    mesh.updateMatrixWorld(true);
+    return mesh;
+  };
+  const verticalStrutForce = (y, vy) => {
+    const gear = new LandingGear();
+    return gear.update(1 / 120, pose(y), new THREE.Vector3(0, vy, 0), new THREE.Vector3(), () => 0).forces.y;
+  };
+
+  it('brakes strut extension three times harder than compression at equal rate', () => {
+    // All three struts compressed, no body contact: damping force isolates cleanly.
+    const y = 3.4;
+    const rate = 0.5;
+    const staticForce = verticalStrutForce(y, 0);
+    const compressionDamping = verticalStrutForce(y, -rate) - staticForce;
+    const reboundDamping = staticForce - verticalStrutForce(y, rate);
+    assert.ok(compressionDamping > 10000, 'Compression must add damping force');
+    const ratio = reboundDamping / compressionDamping;
+    assert.ok(Math.abs(ratio - 3) < 0.01, `Rebound damping must be 3x compression damping, got ${ratio.toFixed(3)}`);
+  });
+
+  it('suppresses the first bounce after a 1 m/s sink touchdown and settles', () => {
+    const gear = new LandingGear();
+    const mesh = pose(3.78);
+    const v = new THREE.Vector3(0, -1, 0);
+    const mass = 66000;
+    const dt = 1 / 120;
+    let touched = false;
+    let reboundPeak = 0;
+    for (let i = 0; i < 1200; i++) {
+      mesh.updateMatrixWorld(true);
+      const res = gear.update(dt, mesh, v, new THREE.Vector3(), () => 0);
+      if (res.onGround) {
+        touched = true;
+        if (v.y > reboundPeak) reboundPeak = v.y;
+      }
+      v.y += ((res.forces.y - mass * 9.80665) / mass) * dt;
+      mesh.position.y += v.y * dt;
+    }
+    assert.ok(touched, 'Aircraft must land on the struts');
+    assert.ok(reboundPeak > 0.05, 'Struts must still return energy, not act as hard stops');
+    // Symmetric damping allowed ~0.7 of the impact speed back as rebound.
+    assert.ok(reboundPeak < 0.55, `First rebound peak must stay under 55% of impact speed, got ${reboundPeak.toFixed(2)} m/s`);
+    assert.ok(Math.abs(v.y) < 0.1, `Aircraft must settle within 10 s, got ${v.y.toFixed(3)} m/s`);
+  });
+});

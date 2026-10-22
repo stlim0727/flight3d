@@ -248,6 +248,18 @@ class FlightSimulator {
     // Reusable objects so 120 Hz substeps do not allocate for the AP snapshot.
     this._apEuler = new THREE.Euler();
     this._apForward = new THREE.Vector3();
+    // Reusable objects for integratePhysics force/moment math and its telemetry
+    // extraction; every one is consumed before the next substep.
+    this._intThrust = new THREE.Vector3();
+    this._intGravity = new THREE.Vector3();
+    this._intNetForce = new THREE.Vector3();
+    this._intNetMoment = new THREE.Vector3();
+    this._intAngAcc = new THREE.Vector3();
+    this._intDeltaRot = new THREE.Quaternion();
+    this._intEuler = new THREE.Euler();
+    this._intForward = new THREE.Vector3();
+    this._intNonGrav = new THREE.Vector3();
+    this._intCabinUp = new THREE.Vector3();
     this._apState = {
       airportKey: 'coastal',
       headingDeg: 0, rollDeg: 0, pitchDeg: 0,
@@ -803,13 +815,13 @@ class FlightSimulator {
 
     // 6. Thrust Force in World Space
     // Engine thrust acts along forward longitudinal axis (-Z in Three.js aircraft space)
-    const thrustWorld = new THREE.Vector3(0, 0, -engineData.totalThrust).applyQuaternion(this.quaternion);
+    const thrustWorld = this._intThrust.set(0, 0, -engineData.totalThrust).applyQuaternion(this.quaternion);
 
     // 7. Gravity Force
-    const gravityWorld = new THREE.Vector3(0, -this.aero.mass * Atmosphere.G0, 0);
+    const gravityWorld = this._intGravity.set(0, -this.aero.mass * Atmosphere.G0, 0);
 
     // 8. Total Forces Integration: F = m * a
-    const netForceWorld = new THREE.Vector3()
+    const netForceWorld = this._intNetForce.set(0, 0, 0)
       .add(gravityWorld)
       .add(thrustWorld)
       .add(aeroResult.forceWorld)
@@ -827,12 +839,12 @@ class FlightSimulator {
 
     // 9. Total Moments Integration: M = I * alpha
     // Moment in body frame: aero moment + landing gear moment
-    const netMomentBody = new THREE.Vector3()
+    const netMomentBody = this._intNetMoment.set(0, 0, 0)
       .add(aeroResult.momentBody)
       .add(gearResult.moments);
 
     // Angular acceleration: [p_dot, q_dot, r_dot] = [Mx/Ixx, My/Iyy, Mz/Izz]
-    const angAccBody = new THREE.Vector3(
+    const angAccBody = this._intAngAcc.set(
       netMomentBody.x * this.aero.invIyy, // Pitch (around X)
       netMomentBody.y * this.aero.invIzz, // Yaw (around Y)
       netMomentBody.z * this.aero.invIxx  // Roll (around Z)
@@ -845,7 +857,7 @@ class FlightSimulator {
 
     // Update Aircraft Orientation Quaternion
     // Delta rotation from body angular velocity: omega x dt
-    const deltaRot = new THREE.Quaternion(
+    const deltaRot = this._intDeltaRot.set(
       this.angularVelocity.x * dt * 0.5,
       this.angularVelocity.y * dt * 0.5,
       this.angularVelocity.z * dt * 0.5,
@@ -859,22 +871,22 @@ class FlightSimulator {
     this.aircraft.group.quaternion.copy(this.quaternion);
 
     // 10. Update Telemetry State
-    const euler = new THREE.Euler().setFromQuaternion(this.quaternion, 'YXZ');
+    const euler = this._intEuler.setFromQuaternion(this.quaternion, 'YXZ');
     const pitchDeg = THREE.MathUtils.radToDeg(euler.x);
     const rollDeg = THREE.MathUtils.radToDeg(-euler.z);
     // Heading: forward vector (-Z in aircraft local space) projected to horizontal XZ plane
-    const forwardVec = new THREE.Vector3(0, 0, -1).applyQuaternion(this.quaternion);
+    const forwardVec = this._intForward.set(0, 0, -1).applyQuaternion(this.quaternion);
     const headingDeg = (THREE.MathUtils.radToDeg(Math.atan2(forwardVec.x, -forwardVec.z)) + 360) % 360;
 
     // Track
     const trackDeg = (THREE.MathUtils.radToDeg(Math.atan2(this.linearVelocity.x, -this.linearVelocity.z)) + 360) % 360;
 
     // Compute authentic load factor Nz (accelerometer along body cabin vertical axis +Y)
-    const nonGravForceWorld = new THREE.Vector3()
+    const nonGravForceWorld = this._intNonGrav.set(0, 0, 0)
       .add(thrustWorld)
       .add(aeroResult.forceWorld)
       .add(gearResult.forces);
-    const cabinCeilingWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(this.quaternion);
+    const cabinCeilingWorld = this._intCabinUp.set(0, 1, 0).applyQuaternion(this.quaternion);
     const measuredGForce = nonGravForceWorld.dot(cabinCeilingWorld) / (this.aero.mass * Atmosphere.G0);
 
     this.telemetry = {

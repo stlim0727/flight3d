@@ -2,6 +2,14 @@ import * as THREE from 'three';
 import { Atmosphere } from './Atmosphere.js';
 import { BOEING_737_800 } from '../config/aircraftConfigs.js';
 
+// Scratch vectors reused by every 120 Hz computeAero() call to keep the physics
+// loop allocation-free. They never escape computeAero: the returned
+// forceWorld/momentBody stay freshly allocated because callers and tests hold
+// them across calls.
+const scratchAirVelocity = new THREE.Vector3();
+const scratchBodyVelocity = new THREE.Vector3();
+const scratchInvQuat = new THREE.Quaternion();
+
 /**
  * 6-DOF Aerodynamic Physics Simulation Engine
  * Implements full rigid body equations of motion, nonlinear lift & stall hysteresis,
@@ -132,15 +140,15 @@ export class Aerodynamics {
     const atmos = Atmosphere.getConditions(altitudeMeters);
 
     // Compute relative airflow velocity in world frame: v_rel = v_aircraft - v_wind
-    const vAirWorld = linearVelocityWorld.clone().sub(this.windWorld);
+    const vAirWorld = scratchAirVelocity.copy(linearVelocityWorld).sub(this.windWorld);
 
     // Transform relative airspeed vector into aircraft body frame
     // Three.js local axes:
     // +X: Right wing
     // +Y: Upward through cabin ceiling
     // -Z: Forward through nose
-    const invQuat = aircraftMesh.quaternion.clone().invert();
-    const vBody = vAirWorld.clone().applyQuaternion(invQuat);
+    const invQuat = scratchInvQuat.copy(aircraftMesh.quaternion).invert();
+    const vBody = scratchBodyVelocity.copy(vAirWorld).applyQuaternion(invQuat);
 
     // Aeronautical body velocity convention:
     // u: Forward velocity = -vBody.z
@@ -277,17 +285,19 @@ export class Aerodynamics {
     const cosA = Math.cos(this.alpha);
     const sinA = Math.sin(this.alpha);
 
-    const aeroForceBody = new THREE.Vector3(
-      sideForce,
-      liftForce * cosA + dragForce * sinA, // Total upward force along body +Y
-      dragForce * cosA - liftForce * sinA  // Total longitudinal force along body +Z (+Z opposes forward motion)
-    );
+    // Total upward force along body +Y, kept as a scalar so the world-frame
+    // force can be allocated once instead of body vector + clone.
+    const upwardForce = liftForce * cosA + dragForce * sinA;
 
     // Transform aerodynamic force to world frame
-    const aeroForceWorld = aeroForceBody.clone().applyQuaternion(aircraftMesh.quaternion);
+    const aeroForceWorld = new THREE.Vector3(
+      sideForce,
+      upwardForce,
+      dragForce * cosA - liftForce * sinA  // Total longitudinal force along body +Z (+Z opposes forward motion)
+    ).applyQuaternion(aircraftMesh.quaternion);
 
     // Calculate aerodynamic load factor: normal force in body Y / (mass * g0)
-    this.gForce = Math.max(-3.0, Math.min(6.0, (aeroForceBody.y / (this.mass * Atmosphere.G0))));
+    this.gForce = Math.max(-3.0, Math.min(6.0, (upwardForce / (this.mass * Atmosphere.G0))));
 
     // --- Aerodynamic Moments (Pitch, Roll, Yaw) in Body Frame ---
     // In Three.js body frame:

@@ -2,6 +2,35 @@ import * as THREE from 'three';
 import { GEAR_DAMAGE_LIMITS, updateGearDamage } from './gearDamage.js';
 import { BODY_CONTACTS } from './groundContacts.js';
 
+// Oleo damper is asymmetric: while the strut extends (vNormal > 0) damping is
+// multiplied, dissipating the stored spring energy that would otherwise fling
+// the airframe back off the runway (bounce/porpoise). Continuous at v = 0.
+const OLEO_REBOUND_DAMPING = 3.0;
+
+// Scratch objects reused by the per-contact math in update(). Purely internal:
+// returned force/moment vectors stay freshly allocated because callers hold
+// them across substeps.
+const scratchInvQuat = new THREE.Quaternion();
+const scratchHubWorld = new THREE.Vector3();
+const scratchGroundNormal = new THREE.Vector3();
+const scratchRWorld = new THREE.Vector3();
+const scratchAngVelWorld = new THREE.Vector3();
+const scratchContactVel = new THREE.Vector3();
+const scratchWheelForward = new THREE.Vector3();
+const scratchWheelLateral = new THREE.Vector3();
+const scratchFWheelWorld = new THREE.Vector3();
+const scratchFWheelBody = new THREE.Vector3();
+const scratchMoment = new THREE.Vector3();
+const scratchBcLocal = new THREE.Vector3();
+const scratchBcPoint = new THREE.Vector3();
+const scratchBcNormal = new THREE.Vector3();
+const scratchBcArm = new THREE.Vector3();
+const scratchBcVelocity = new THREE.Vector3();
+const scratchBcTangent = new THREE.Vector3();
+const scratchBcForce = new THREE.Vector3();
+const AXIS_Z_UP = new THREE.Vector3(0, 1, 0);
+const AXIS_FWD = new THREE.Vector3(0, 0, -1);
+
 /**
  * Multi-contact Tricycle Landing Gear Physics (Boeing 737 class)
  * Simulates steerable nose gear and dual main gear bogies with independent
@@ -156,7 +185,7 @@ export class LandingGear {
     let catastrophicImpact = false;
     // World transformation matrices
     const worldQuat = aircraftMesh.quaternion;
-    const invWorldQuat = worldQuat.clone().invert();
+    const invWorldQuat = scratchInvQuat.copy(worldQuat).invert();
     const touchdownContacts = [];
 
     for (const c of this.contacts) {
@@ -167,11 +196,11 @@ export class LandingGear {
         continue;
       }
       // Deployed position scaled by gear deployment
-      const deployedLocal = c.localPos.clone();
-      deployedLocal.y *= gearDeploy;
+      const hubWorld = scratchHubWorld.copy(c.localPos);
+      hubWorld.y *= gearDeploy;
 
       // Calculate world position of wheel hub
-      const hubWorld = deployedLocal.clone().applyMatrix4(aircraftMesh.matrixWorld);
+      hubWorld.applyMatrix4(aircraftMesh.matrixWorld);
       const groundH = getTerrainHeight(hubWorld.x, hubWorld.z);
       const wheelRadius = c.wheelRadius !== undefined ? c.wheelRadius : 0.48;
       const contactY = groundH + wheelRadius;
@@ -189,7 +218,7 @@ export class LandingGear {
         c.compression = Math.min(c.restLength, penetration);
 
         // Surface normal at contact point (defaults to vertical up)
-        const groundNormal = new THREE.Vector3(0, 1, 0);
+        const groundNormal = scratchGroundNormal.set(0, 1, 0);
         if (typeof getTerrainNormal === 'function') {
           const norm = getTerrainNormal(hubWorld.x, hubWorld.z);
           if (norm && norm.isVector3 && norm.lengthSq() > 0.0001) {
@@ -201,9 +230,9 @@ export class LandingGear {
         c.compression = Math.min(c.restLength, normalPenetration);
 
         // Contact point velocity in world space = linearVel + angularVel x r
-        const rWorld = c.worldPos.clone().sub(aircraftMesh.position);
-        const angVelWorld = angularVelocity.clone().applyQuaternion(worldQuat);
-        const contactVel = linearVelocity.clone().add(angVelWorld.clone().cross(rWorld));
+        const rWorld = scratchRWorld.copy(c.worldPos).sub(aircraftMesh.position);
+        const angVelWorld = scratchAngVelWorld.copy(angularVelocity).applyQuaternion(worldQuat);
+        const contactVel = scratchContactVel.copy(linearVelocity).add(angVelWorld.cross(rWorld));
         const groundSpeed = Math.sqrt(linearVelocity.x * linearVelocity.x + linearVelocity.z * linearVelocity.z);
         const sinkRate = Math.max(0, -contactVel.dot(groundNormal));
         if (!wasGrounded) this.maxImpactSpeed = Math.max(this.maxImpactSpeed, sinkRate);
@@ -223,19 +252,21 @@ export class LandingGear {
           c.touchdownThisFrame = false;
         }
 
-        // Suspension normal force along terrain surface normal (Hooke's spring + damping)
+        // Suspension normal force along terrain surface normal (Hooke's spring +
+        // asymmetric oleo damping: extension is braked ~3x harder than compression)
         const vNormal = contactVel.dot(groundNormal);
-        let normalForceMag = c.kSpring * c.compression - c.cDamper * vNormal;
+        let normalForceMag = c.kSpring * c.compression
+          - c.cDamper * (vNormal > 0 ? OLEO_REBOUND_DAMPING : 1.0) * vNormal;
         if (normalForceMag < 0) normalForceMag = 0; // Strut can only push away
 
         // Wheel forward and lateral vectors in world space tangent to surface
-        let wheelForwardLocal = new THREE.Vector3(0, 0, -1);
+        const wheelForwardWorld = scratchWheelForward.copy(AXIS_FWD);
         if (c.isSteerable && c.damageState === 'normal') {
-          wheelForwardLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.steerAngle);
+          wheelForwardWorld.applyAxisAngle(AXIS_Z_UP, this.steerAngle);
         }
-        const wheelForwardRaw = wheelForwardLocal.clone().applyQuaternion(worldQuat);
+        wheelForwardWorld.applyQuaternion(worldQuat);
         // Project onto terrain tangent plane: vTangent = v - (v . n) * n
-        const wheelForwardWorld = wheelForwardRaw.clone().sub(groundNormal.clone().multiplyScalar(wheelForwardRaw.dot(groundNormal)));
+        wheelForwardWorld.addScaledVector(groundNormal, -wheelForwardWorld.dot(groundNormal));
         if (wheelForwardWorld.lengthSq() > 0.0001) {
           wheelForwardWorld.normalize();
         } else {
@@ -243,7 +274,7 @@ export class LandingGear {
         }
 
         // Wheel lateral vector on the sloped surface tangent plane (Forward x Normal)
-        const wheelLateralWorld = wheelForwardWorld.clone().cross(groundNormal).normalize();
+        const wheelLateralWorld = scratchWheelLateral.copy(wheelForwardWorld).cross(groundNormal).normalize();
 
         // Decompose contact velocity onto wheel tangent plane
         const vForward = contactVel.dot(wheelForwardWorld);
@@ -275,9 +306,6 @@ export class LandingGear {
         normalForceMag *= c.damageState === 'damaged' ? 0.65 : 1;
         this.totalWeightOnWheels += normalForceMag;
 
-        // Normal force pushes perpendicular to the surface.
-        const fNormal = groundNormal.clone().multiplyScalar(normalForceMag);
-
         // Rolling resistance & Brakes along forward axis
         let muBrake = 0.02; // Baseline rolling resistance
         if (this.brakes > 0.01) {
@@ -286,20 +314,21 @@ export class LandingGear {
         // Preserve static braking on sloped taxiways/runways.
         const stoppingGain = this.brakes > 0.5 ? normalForceMag / (9.80665 * Math.max(dt, 0.001)) : 25000;
         const fForwardMag = -Math.sign(vForward) * Math.min(Math.abs(vForward) * stoppingGain, normalForceMag * muBrake);
-        const fForward = wheelForwardWorld.clone().multiplyScalar(fForwardMag);
 
         // Lateral scrub resistance (prevents skidding sideways)
         const muLateral = 0.75;
         const fLateralMag = -Math.sign(vLateral) * Math.min(Math.abs(vLateral) * 35000.0, normalForceMag * muLateral);
-        const fLateral = wheelLateralWorld.clone().multiplyScalar(fLateralMag);
 
-        // Net wheel force in world space
-        const fWheelWorld = fNormal.clone().add(fForward).add(fLateral);
+        // Net wheel force in world space: normal (pushes perpendicular to the
+        // surface) + longitudinal friction + lateral scrub.
+        const fWheelWorld = scratchFWheelWorld.copy(groundNormal).multiplyScalar(normalForceMag);
+        fWheelWorld.addScaledVector(wheelForwardWorld, fForwardMag);
+        fWheelWorld.addScaledVector(wheelLateralWorld, fLateralMag);
         netForceWorld.add(fWheelWorld);
 
         // Calculate moment produced around CG: M = r x F
-        const fWheelBody = fWheelWorld.clone().applyQuaternion(invWorldQuat);
-        const momentBody = rWorld.clone().applyQuaternion(invWorldQuat).cross(fWheelBody);
+        const fWheelBody = scratchFWheelBody.copy(fWheelWorld).applyQuaternion(invWorldQuat);
+        const momentBody = scratchMoment.copy(rWorld).applyQuaternion(invWorldQuat).cross(fWheelBody);
         netMomentBody.add(momentBody);
       } else {
         c.isGrounded = false;
@@ -311,29 +340,31 @@ export class LandingGear {
     // Body support is always active, including a single collapsed leg with gear DOWN.
     const groundedNow = new Set();
     for (const probe of BODY_CONTACTS) {
-      const local = new THREE.Vector3(...probe.position);
-      const point = local.clone().applyMatrix4(aircraftMesh.matrixWorld);
+      const local = scratchBcLocal.set(...probe.position);
+      const point = scratchBcPoint.copy(local).applyMatrix4(aircraftMesh.matrixWorld);
       const groundH = getTerrainHeight(point.x, point.z);
-      const normal = getTerrainNormal?.(point.x, point.z)?.clone() || new THREE.Vector3(0, 1, 0);
-      if (normal.lengthSq() < 0.0001) normal.set(0, 1, 0);
-      normal.normalize();
+      const normal = scratchBcNormal.set(0, 1, 0);
+      const terrainNormal = getTerrainNormal?.(point.x, point.z);
+      if (terrainNormal && terrainNormal.lengthSq() >= 0.0001) {
+        normal.copy(terrainNormal).normalize();
+      }
       const depth = (groundH - point.y) * normal.y;
       if (depth <= 0) continue;
-      const arm = point.clone().sub(aircraftMesh.position);
-      const velocity = angularVelocity.clone().applyQuaternion(worldQuat).cross(arm).add(linearVelocity);
+      const arm = scratchBcArm.copy(point).sub(aircraftMesh.position);
+      const velocity = scratchBcVelocity.copy(angularVelocity).applyQuaternion(worldQuat).cross(arm).add(linearVelocity);
       const vNormal = velocity.dot(normal);
-      const tangent = velocity.clone().addScaledVector(normal, -vNormal);
+      const tangent = scratchBcTangent.copy(velocity).addScaledVector(normal, -vNormal);
       const speed = tangent.length();
       const load = Math.max(0, 1800000 * Math.min(depth, 0.75) - 160000 * vNormal);
-      const force = normal.clone().multiplyScalar(load);
+      const force = scratchBcForce.copy(normal).multiplyScalar(load);
       if (speed > 0) force.addScaledVector(tangent, -Math.min(18000, load * 0.45 / speed));
       netForceWorld.add(force);
-      netMomentBody.add(local.clone().cross(force.clone().applyQuaternion(invWorldQuat)));
+      netMomentBody.add(scratchMoment.copy(local).cross(scratchFWheelBody.copy(force).applyQuaternion(invWorldQuat)));
       groundedNow.add(probe.id);
       this.onGround = true;
       if (!this.bodyGrounded.has(probe.id) && -vNormal > 12.5) catastrophicImpact = true;
       this.structuralDamage = Math.min(1, this.structuralDamage + speed * dt / 100000);
-      bodyContacts.push({ id: probe.id, worldPos: point, sinkRate: -vNormal, speed });
+      bodyContacts.push({ id: probe.id, worldPos: point.clone(), sinkRate: -vNormal, speed });
     }
     this.bodyGrounded = groundedNow;
     catastrophicImpact ||= this.structuralDamage >= 1;
