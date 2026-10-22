@@ -1,0 +1,19 @@
+{
+  "extra": {
+    "withAO": 5.81,
+    "withoutAO": 2.78,
+    "performanceSkipped": true,
+    "quality": "balanced"
+  },
+  "portrait": {
+    "aspect": 0.46208530805687204,
+    "aoAspect": 0.46208530805687204,
+    "fov": 100,
+    "aoFov": 100,
+    "aoSize": [
+      195,
+      422
+    ],
+    "cameraLayers": 1
+  }
+}

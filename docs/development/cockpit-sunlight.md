@@ -22,8 +22,8 @@ so real geometry cannot mask the aperture and would throw a solid shadow instead
 `WINDSHIELD_PANES` quads in `src/aircraft/CockpitAperture.js`, projected along the
 sun into the light's own shadow space. The cookie is recomputed only when the
 deck-local sun vector turns by more than 0.008 rad, and the shadow image is kept
-body-fixed by setting `shadow.camera.up` from the deck frame, so pitch and bank do
-not repaint it. Interior meshes still cast into the map at about 3 mm/texel, which
+body-fixed by setting `shadow.camera.up` from the deck frame, avoiding an extra image roll relative to the deck. Interior meshes still cast
+into the map at about 5 mm/texel, which
 is what puts the pillar and roof edges on the panel.
 
 The shadow slab reaches 2.2 m sunward of the deck anchor, including both full
@@ -41,8 +41,9 @@ the world-to-shadow matrix still follows the aircraft when the image is frozen.
 The deck's PBR materials use reduced, directional sky fill instead of receiving
 the full outdoor ambient and HDR environment. The localized sun gain is 1.6;
 other surfaces are outside its cone. Instrument floods dim to 8% in full sun,
-with a 0.06 floor. Front-to-aft sunlight puts the yoke's cast shadow behind the pilot; AO makes
-its contact with nearby surfaces readable even when that cast shadow is out of view.
+with a 0.06 floor. Front-to-aft sunlight puts the yoke's cast shadow behind the
+pilot; AO makes its contact with nearby surfaces readable even when that cast
+shadow is out of view.
 
 `CockpitOcclusion` adds half-resolution, 16-sample SSAO in balanced quality
 (three-quarter resolution in high, capped at 960 px wide). It renders only opaque
@@ -75,8 +76,8 @@ cockpit camera mode, which ramps over ~0.3 s rather than switching.
   but `CockpitSunShadow` calls them with the `CockpitAperture.js` defaults, which are
   measured from the shipped 737 GLBs. Another cockpit needs its own aperture profile — by
   swapping that module, or by threading a per-instance profile into `update()` and
-  `repaintCookie()`. A model whose skin has real windshield openings can drop the cookie and exterior-proxy exclusion, which only exist because
-  this one does not.
+  `repaintCookie()`. A model whose skin has real windshield openings can drop the
+  cookie and exterior-proxy exclusion, which only exist because this one does not.
 
 ## Reproduce visual evidence
 

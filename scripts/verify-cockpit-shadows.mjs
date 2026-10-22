@@ -102,7 +102,7 @@ const stage = async ({ hour, heading, bank = 0, cloud = 0, frames = 4 }) => awai
       position: sim.aircraft.group.position,
       quaternion: sim.aircraft.group.quaternion,
       cockpitActive: true,
-      dt: 1 / 60,
+      dt: i === 0 ? 1 : 1 / 60, // Settle camera-entry lighting before the static capture.
       casterState: 'static-review',
     });
     sim.aircraft.cockpit.syncDaylight(daylight);
