@@ -83,7 +83,16 @@ try {
             airport.update(0, new THREE.Vector3(-2250, airport.elevation + Math.tan(angle * Math.PI / 180) * 1000, 0));
             if (airport.papiLights.filter(p => p.lensMat.color.getHex() === 0xffffff).length !== white) throw new Error('PAPI transition failed');
           }
-          if (!airport.approachStrobes.some(s => s.light.intensity === 8)) throw new Error('Approach strobes inactive');
+          if (!airport.approachLight || airport.approachLight.intensity !== 8) throw new Error('Approach strobes inactive');
+          const strobeClock = performance.now.bind(performance);
+          performance.now = () => 1000;
+          airport.update(0);
+          const strobeA = airport.approachLight.position.clone();
+          performance.now = () => 1100;
+          airport.update(0);
+          const strobeB = airport.approachLight.position.clone();
+          performance.now = strobeClock;
+          if (!airport.approachStrobes.some(p => strobeA.equals(p)) || strobeA.equals(strobeB)) throw new Error('Approach strobes not sequenced');
         }
         window.review = { THREE, renderer, scene, camera, airport, hemi, sun };
       })()`);
