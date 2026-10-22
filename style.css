@@ -1038,14 +1038,6 @@ kbd {
   pointer-events: none;
 }
 
-.touch-left-actions,
-.touch-right-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
 .btn-touch-pill {
   min-width: 58px;
   height: 44px;
@@ -1074,27 +1066,6 @@ kbd {
   border-color: #10b981;
   color: #a7f3d0;
   box-shadow: 0 0 14px rgba(16, 185, 129, 0.6);
-}
-
-.btn-touch-pill.active-amber {
-  background: rgba(245, 158, 11, 0.35);
-  border-color: #f59e0b;
-  color: #fde68a;
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.6);
-}
-
-.btn-touch-pill.active-cyan {
-  background: rgba(56, 189, 248, 0.35);
-  border-color: #38bdf8;
-  color: #e0f2fe;
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.6);
-}
-
-.btn-touch-pill.muted {
-  background: rgba(239, 68, 68, 0.25);
-  border-color: rgba(239, 68, 68, 0.5);
-  color: #fca5a5;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
 }
 
 /* Center Quadrant: Rudder & Brakes */
@@ -1557,11 +1528,6 @@ body.compact-ui {
 }
 .compact-ui .mobile-menu .btn-group { flex-wrap: wrap; }
 .compact-ui .mobile-menu .btn { min-height: 44px; white-space: normal; }
-.compact-ui .mobile-menu .touch-left-actions,
-.compact-ui .mobile-menu .touch-right-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
 .compact-ui .demo-banner,
 .compact-ui .demo-pill-btn { top: calc(var(--edge-top) + 52px); }
 .compact-ui .demo-banner {

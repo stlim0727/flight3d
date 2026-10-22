@@ -106,8 +106,8 @@ export function initFlightPanels({ onCycleCamera }) {
     bindText(document.getElementById(id), () => touchLabel(t(key)));
   }
 
-  // Remove the obsolete duplicate action surface after touch handlers are bound.
-  document.querySelectorAll('.presets-bar, .action-panel, .touch-left-actions, .touch-right-actions').forEach(node => node.remove());
+  // Remove the legacy markup the toolbar panels have replaced.
+  document.querySelectorAll('.presets-bar, .action-panel').forEach(node => node.remove());
   panels.get('environment').body.addEventListener('click', event => {
     if (event.target.closest('#btn-help, #btn-diag')) close();
   });

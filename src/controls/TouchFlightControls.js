@@ -102,22 +102,6 @@ export class TouchFlightControls {
               </div>
             </div>
           </div>
-
-          <!-- Quick Action Buttons Column on Left -->
-          <div class="touch-left-actions">
-            <button type="button" id="touch-btn-sound" class="btn-touch-pill active" title="소리 켜기 / 끄기 (M)" data-i18n-title="audio.volume.tooltip">
-              <span class="pill-icon">🔊</span> VOL
-            </button>
-            <button type="button" id="touch-btn-reverser" class="btn-touch-pill" title="역추진 (Reverse Thrust)" data-i18n-title="reverse.thrust">
-              <span class="pill-icon">⚡</span> REV
-            </button>
-            <button type="button" id="touch-btn-gear" class="btn-touch-pill active" title="랜딩 기어 (Gear)" data-i18n-title="landing.gear">
-              <span class="pill-icon">🛞</span> GEAR
-            </button>
-            <button type="button" id="touch-btn-spoilers" class="btn-touch-pill" title="스포일러 (Spoilers)" data-i18n-title="spoilers">
-              <span class="pill-icon">🛡️</span> SP OIL
-            </button>
-          </div>
         </div>
 
         <!-- Center Bottom: Rudder & Brakes Bar -->
@@ -144,21 +128,10 @@ export class TouchFlightControls {
 
         <!-- Right Side: Virtual Stick & Secondary Controls -->
         <div class="touch-quadrant touch-right">
-          <!-- Flaps & Camera Bar -->
-          <div class="touch-right-actions">
-            <button type="button" id="touch-btn-cam" class="btn-touch-pill" title="시점 변경 (Camera)" data-i18n-title="change.camera">
-              <span class="pill-icon">🎥</span> CAM
-            </button>
-            <button type="button" id="touch-btn-flaps-dec" class="btn-touch-pill" title="플랩 - (Flaps Retract)" data-i18n-title="flaps.retract">
-              FLAP -
-            </button>
-            <button type="button" id="touch-btn-flaps-inc" class="btn-touch-pill" title="플랩 + (Flaps Extend)" data-i18n-title="flaps.extend">
-              FLAP +
-            </button>
-            <button type="button" id="touch-btn-gyro" class="btn-touch-pill" title="기기 기울기 자이로 센서 모드" data-i18n-title="gyroscope.device.tilt.mode">
-              <span class="pill-icon">📱</span> GYRO
-            </button>
-          </div>
+          <!-- Device tilt steering (relocated into the environment panel at boot) -->
+          <button type="button" id="touch-btn-gyro" class="btn-touch-pill" title="기기 기울기 자이로 센서 모드" data-i18n-title="gyroscope.device.tilt.mode">
+            <span class="pill-icon">📱</span> GYRO
+          </button>
 
           <!-- Virtual Flight Stick Yoke -->
           <div class="touch-stick-card">
@@ -193,11 +166,6 @@ export class TouchFlightControls {
     this.rudderThumb = el.querySelector('#touch-rudder-thumb');
     this.brakeBtn = el.querySelector('#touch-btn-brake');
     this.gyroBtn = el.querySelector('#touch-btn-gyro');
-    // Retain references when compact UI moves action groups into the menu.
-    this.gearBtn = el.querySelector('#touch-btn-gear');
-    this.spoilersBtn = el.querySelector('#touch-btn-spoilers');
-    this.reverserBtn = el.querySelector('#touch-btn-reverser');
-    this.soundBtn = el.querySelector('#touch-btn-sound');
     this.stickTelemetry = el.querySelector('#touch-stick-telemetry');
     this.rudderReadout = el.querySelector('#touch-rudder-val');
   }
@@ -252,45 +220,7 @@ export class TouchFlightControls {
     this.brakeBtn.addEventListener('pointercancel', stopBraking);
     this.brakeBtn.addEventListener('pointerleave', stopBraking);
 
-    // 5. Quick Action Buttons
-    this.overlay.querySelector('#touch-btn-sound')?.addEventListener('click', () => {
-      if (this.controls.onUserInteract) this.controls.onUserInteract();
-      if (this.controls.onToggleAudio) this.controls.onToggleAudio();
-      this.triggerHaptic(20);
-    });
-
-    this.overlay.querySelector('#touch-btn-gear')?.addEventListener('click', () => {
-      if (this.controls.onUserInteract) this.controls.onUserInteract();
-      if (this.controls.onToggleGear) this.controls.onToggleGear();
-      this.triggerHaptic(25);
-    });
-
-    this.overlay.querySelector('#touch-btn-spoilers')?.addEventListener('click', () => {
-      if (this.controls.onToggleSpoilers) this.controls.onToggleSpoilers();
-      this.triggerHaptic(20);
-    });
-
-    this.overlay.querySelector('#touch-btn-reverser')?.addEventListener('click', () => {
-      if (this.controls.onToggleReverser) this.controls.onToggleReverser();
-      this.triggerHaptic(30);
-    });
-
-    this.overlay.querySelector('#touch-btn-cam')?.addEventListener('click', () => {
-      if (this.controls.onCycleCamera) this.controls.onCycleCamera();
-      this.triggerHaptic(15);
-    });
-
-    this.overlay.querySelector('#touch-btn-flaps-inc')?.addEventListener('click', () => {
-      if (this.controls.onCycleFlaps) this.controls.onCycleFlaps(1);
-      this.triggerHaptic(20);
-    });
-
-    this.overlay.querySelector('#touch-btn-flaps-dec')?.addEventListener('click', () => {
-      if (this.controls.onCycleFlaps) this.controls.onCycleFlaps(-1);
-      this.triggerHaptic(20);
-    });
-
-    // 6. Gyroscope Toggle Button
+    // 5. Gyroscope Toggle Button
     this.gyroBtn?.addEventListener('click', () => this.toggleGyro());
   }
 
@@ -560,54 +490,14 @@ export class TouchFlightControls {
     }
   }
 
-  /* ---------------- Sync Telemetry State to Buttons ---------------- */
-  updateUI(telemetry) {
-    if (!telemetry) return;
-
-    // Sync throttle display if not actively dragging
-    if (!this.throttleActive) {
-      const currentThr = this.controls.throttle;
-      const pct = Math.round(currentThr * 100);
-      if (this.throttleFill) this.throttleFill.style.height = `${pct}%`;
-      if (this.throttleThumb) this.throttleThumb.style.top = `${(1.0 - currentThr) * 100}%`;
-      if (this.throttleReadout) this.throttleReadout.textContent = `${pct}%`;
-    }
-
-    // Sync Gear Button
-    const gearBtn = this.gearBtn;
-    if (gearBtn) {
-      const isDown = telemetry.gearState > 0.5;
-      gearBtn.className = isDown ? 'btn-touch-pill active' : 'btn-touch-pill';
-      gearBtn.innerHTML = `<span class="pill-icon">🛞</span> ${telemetry.gearState > 0.95 ? 'GEAR DN' : (telemetry.gearState < 0.05 ? 'GEAR UP' : 'TRANS')}`;
-    }
-
-    // Sync Spoilers Button
-    const spBtn = this.spoilersBtn;
-    if (spBtn) {
-      const isExt = telemetry.spoilers > 0.1;
-      spBtn.className = isExt ? 'btn-touch-pill active' : 'btn-touch-pill';
-    }
-
-    // Sync Reverser Button
-    const revBtn = this.reverserBtn;
-    if (revBtn) {
-      const isRev = telemetry.engine1?.reverserActive;
-      revBtn.className = isRev ? 'btn-touch-pill active-amber' : 'btn-touch-pill';
-    }
-  }
-
-  /* ---------------- Audio UI State ---------------- */
-  updateAudioUI(state) {
-    if (!this.overlay || !state) return;
-    const soundBtn = this.soundBtn;
-    if (!soundBtn) return;
-    if (state.muted) {
-      soundBtn.className = 'btn-touch-pill muted';
-      soundBtn.innerHTML = '<span class="pill-icon">🔇</span> OFF';
-    } else {
-      soundBtn.className = 'btn-touch-pill active';
-      soundBtn.innerHTML = '<span class="pill-icon">🔊</span> 100%';
-    }
+  /* ---------------- Sync Throttle Display ---------------- */
+  updateUI() {
+    if (this.throttleActive) return;
+    const currentThr = this.controls.throttle;
+    const pct = Math.round(currentThr * 100);
+    if (this.throttleFill) this.throttleFill.style.height = `${pct}%`;
+    if (this.throttleThumb) this.throttleThumb.style.top = `${(1.0 - currentThr) * 100}%`;
+    if (this.throttleReadout) this.throttleReadout.textContent = `${pct}%`;
   }
 
   /* ---------------- Visibility & Toggle ---------------- */

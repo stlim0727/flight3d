@@ -1163,7 +1163,7 @@ class FlightSimulator {
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
     this.tireSmokeSystem.update(simSeconds);
-    this.touchControls.updateUI(this.telemetry);
+    this.touchControls.updateUI();
     this.diagnostics.update(simSeconds, this.telemetry);
     this.updateHUD();
     return this.telemetry;
@@ -1290,7 +1290,7 @@ class FlightSimulator {
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();
-    this.touchControls.updateUI(this.telemetry);
+    this.touchControls.updateUI();
     this.diagnostics.update(frameDelta, this.telemetry);
 
     this.foliage.update(this.camera.position);
@@ -1400,10 +1400,6 @@ class FlightSimulator {
         btnSound.className = 'btn btn-preset btn-sound-toggle';
         bindText(btnSound, () => t('sound.100'));
       }
-    }
-
-    if (this.touchControls && typeof this.touchControls.updateAudioUI === 'function') {
-      this.touchControls.updateAudioUI(state);
     }
   }
 
