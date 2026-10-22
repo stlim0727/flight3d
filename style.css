@@ -2150,11 +2150,14 @@ body[data-flow="lobby"] .menu-toggle {
 
 /* Put the stall alert below the toolbar and expanded AP controls. */
 .stall-banner {
-  top: calc(var(--edge-top) + 208px);
+  top: calc(var(--edge-top) + 320px);
   z-index: 70;
 }
 @media (max-height: 400px) {
   .stall-banner { top: calc(var(--edge-top) + 104px); }
+  body:has(#ap-panel:not([hidden])) .stall-banner {
+    top: calc(100dvh - var(--edge-bottom) - 56px);
+  }
 }
 
 /* Compact/touch: lobby becomes a scrollable bottom sheet. */

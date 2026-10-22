@@ -39,7 +39,8 @@ touch stick, rudder and throttle hit points clear while AP stays expanded.
   with AP expanded. Native master and HDG input keep the panel open and update
   state. Native collapse and Escape dismissal pass, including no accidental pause.
 - The desktop regression scenario checks that the minimized demo pill reopens
-  its guide below the toolbar and that the stall alert remains clear of it.
+  its guide below the toolbar, then engages AP modes and checks the stall alert
+  remains below the full dropdown and its live mode annunciation.
 - The 568×320 landscape scenario hit-tests the brake, stick, rudder and throttle
   both before and after engaging AP, and scroll-tests the dropdown's mode buttons.
 - Existing interaction, compact input, safe-area, telemetry swipe/keyboard and

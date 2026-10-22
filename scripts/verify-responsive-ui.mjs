@@ -283,10 +283,15 @@ assert.ok(demoPill.visible && demoPill.top >= demoPill.toolbarBottom + 4 && demo
 await nativeClick('#btn-demo-open', false);
 assert.ok(await ev(`getComputedStyle(document.querySelector('#demo-banner')).display!=='none' && getComputedStyle(document.querySelector('#btn-demo-open')).display==='none'`), 'desktop: demo guide reopens from its pill');
 await ev(`window.simulator.demoDirector.stop()`);
+await nativeClick('#btn-ap-toggle', false);
+await nativeClick('#btn-ap', false);
+await nativeClick('#btn-ap-hdg', false);
 await ev(`document.querySelector('#hud-stall').style.display='block'`);
-const stallWarning = await ev(`(()=>{const node=document.querySelector('#hud-stall'),r=node.getBoundingClientRect(),t=document.querySelector('.flight-toolbar').getBoundingClientRect();return {top:r.top,toolbarBottom:t.bottom,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)),height:r.height}})()`);
-assert.ok(stallWarning.top >= 100 && stallWarning.reachable && stallWarning.height > 0, `desktop: stall warning text is not covered by toolbar: ${JSON.stringify(stallWarning)}`);
+const stallWarning = await ev(`(()=>{const node=document.querySelector('#hud-stall'),r=node.getBoundingClientRect(),t=document.querySelector('.flight-toolbar').getBoundingClientRect(),p=document.querySelector('#ap-panel').getBoundingClientRect();return {top:r.top,bottom:r.bottom,toolbarBottom:t.bottom,panelBottom:p.bottom,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)),height:r.height,modes:document.querySelector('#hud-ap-modes').textContent}})()`);
+assert.ok(stallWarning.top >= stallWarning.toolbarBottom + 4 && stallWarning.top >= stallWarning.panelBottom + 4 && stallWarning.reachable && stallWarning.height > 0 && stallWarning.modes, `desktop: stall warning sits below expanded AP modes and remains reachable: ${JSON.stringify(stallWarning)}`);
 await ev(`document.querySelector('#hud-stall').style.display='none'`);
+await nativeClick('#btn-ap', false);
+await nativeClick('#btn-ap-toggle', false);
 console.log('Desktop demo pill and stall alert reachability passed');
 
 const strip = await ev(`(() => {
