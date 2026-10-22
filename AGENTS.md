@@ -6,14 +6,21 @@ claims in README.md, ARCHITECTURE.md, or CODE_METRICS.md.
 
 ## Start here
 
+Workflow rules that apply to every agent:
+
+1. Create a new git worktree for each task; never edit directly in the shared
+   checkout. This keeps concurrent work isolated and preserves unrelated
+   in-progress changes.
+2. Open a pull request when the work is ready: commit to a focused branch,
+   push, and open a PR — unless the user explicitly requests local-only work.
+3. Multiple agents may work in this repository at the same time. Inspect git
+   status before editing, never assume exclusive access, and leave other
+   agents' and the user's edits untouched.
+
 - Read the relevant row in [the task map](docs/development/agent-task-map.md).
 - Follow [working rules](docs/development/agent-working-rules.md). Load only
   references relevant to the change; exclude node_modules, dist, browser profiles,
   and worktrees from routine searches.
-- Inspect git status before editing. Preserve existing user and concurrent edits.
-- Complete code/documentation changes by committing to a focused branch, pushing,
-  and opening a pull request unless the user explicitly requests local-only work.
-  Preserve unrelated in-progress work using a separate worktree when needed.
 - Keep this file an orientation index; put detailed procedures under docs/development.
 
 ## Commands
