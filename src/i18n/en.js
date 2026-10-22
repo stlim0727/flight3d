@@ -7,7 +7,6 @@ export default {
   "ui.aircraft": "Aircraft",
   "ui.environment": "Environment",
   "ui.close": "Close panel",
-  "ui.instruments": "Instruments",
   "ui.camera.cockpit": "Cockpit · 1",
   "ui.camera.chase": "Chase · 2",
   "ui.camera.wing": "Wing · 3",

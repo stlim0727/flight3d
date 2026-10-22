@@ -7,7 +7,6 @@ export default {
   "ui.aircraft": "기체 조작",
   "ui.environment": "환경 설정",
   "ui.close": "패널 닫기",
-  "ui.instruments": "상세 계기",
   "ui.camera.cockpit": "조종석 · 1",
   "ui.camera.chase": "외부 추적 · 2",
   "ui.camera.wing": "날개 · 3",
