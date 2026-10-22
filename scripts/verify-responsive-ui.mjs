@@ -165,7 +165,8 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     return { trigger: trigger.toJSON(), panel: panel.toJSON(), visible: !document.querySelector('#ap-panel').hidden, toolbarTargets, touchTargets, targets };
   })()`);
   assert.ok(expanded.visible && Math.abs(expanded.trigger.x - direct.anchor.x) < 1 && Math.abs(expanded.trigger.y - direct.anchor.y) < 1, `${name}: AP trigger stays fixed when expanded`);
-  const panelRightAligned = name === 'landscape-small'
+  const landscapeSafeEdgePanel = touch && width <= 1024 && width >= 541 && height <= 400;
+  const panelRightAligned = landscapeSafeEdgePanel
     ? Math.abs(expanded.panel.right - (width - 8)) < 1
     : Math.abs(expanded.panel.right - expanded.trigger.right) < 1;
   assert.ok(panelRightAligned && Math.abs(expanded.panel.top - expanded.trigger.bottom - 4) < 1, `${name}: AP panel opens 4px below in its safe-area alignment`);
