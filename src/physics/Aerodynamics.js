@@ -39,9 +39,15 @@ export class Aerodynamics {
     this.ias = 0.0;   // Indicated airspeed (m/s)
     this.mach = 0.0;
     this.qDyn = 0.0;  // Dynamic pressure (Pa)
+    // Flow-separation state 0.0 (attached) → 1.0 (fully detached). Continuously
+    // evolved per timestep: onset follows the instantaneous AoA target abruptly
+    // (airfoil separation), reattachment decays exponentially (wake hysteresis).
+    // All stall-related coefficients are continuous functions of this state;
+    // the flags below are derived from it for annunciation only.
+    this.separation = 0.0;
     this.isStalled = false;
     this.isPreStall = false; // Within shaker margin of the critical AoA
-    this.stallSeverity = 0.0; // 0.0 to 1.0
+    this.stallSeverity = 0.0; // 0.0 to 1.0 (mirrors separation for HUD/telemetry)
     this.buffetVibration = 0.0; // For cockpit shaking
 
     this.lift = 0.0;
@@ -167,34 +173,48 @@ export class Aerodynamics {
     const cl0 = this.CL0_clean + 0.95 * flapFraction;
     const alphaStall = this.alphaStallClean + THREE.MathUtils.degToRad(2.0 * flapFraction);
 
-    // --- Nonlinear Lift Model with Stall & Hysteresis ---
-    // AoA vanes need meaningful relative airflow before a stall can be declared;
-    // below ~30 kt TAS (e.g. taxiing or sliding on the ground) the flag is inhibited.
-    const stallAnnunciationValid = tas > 15.0;
-    let cl;
+    // --- Nonlinear Lift Model driven by the separation state ---
+    // Separation magnitude is weighted by airflow validity: at near-stagnant
+    // TAS the dynamic pressure is ~0 anyway, but the weight keeps the state
+    // model well-posed and prevents spurious AoA (taxi, ground slide) from
+    // accumulating a separation history.
     const absAlpha = Math.abs(this.alpha);
-    if (absAlpha <= alphaStall) {
-      // Linear unstalled region
-      cl = cl0 + this.CLa * this.alpha;
-      this.isStalled = false;
-      this.stallSeverity = 0.0;
-      this.buffetVibration = 0.0;
-      // Stick-shaker margin: within ~2 degrees of the critical AoA
-      this.isPreStall = stallAnnunciationValid && absAlpha >= alphaStall - THREE.MathUtils.degToRad(2.0);
-    } else {
-      // Post-stall separation region
-      this.isStalled = stallAnnunciationValid;
-      this.isPreStall = false;
-      const stallExcess = (absAlpha - alphaStall) / THREE.MathUtils.degToRad(12.0);
-      this.stallSeverity = Math.min(1.0, stallExcess);
-      this.buffetVibration = Math.min(1.0, this.stallSeverity * 1.5) * (qDyn > 500 ? 1.0 : qDyn / 500.0);
+    const separationWeight = THREE.MathUtils.clamp((tas - 2.0) / 13.0, 0.0, 1.0);
+    const separationTarget = THREE.MathUtils.clamp(
+      (absAlpha - alphaStall) / THREE.MathUtils.degToRad(12.0), 0.0, 1.0) * separationWeight;
+    // Onset is abrupt; reattachment lags with ~0.5 s exponential time
+    // constant (reattachment hysteresis typical of swept transport sections).
+    const reattachMix = 1.0 - Math.exp(-dt / 0.5);
+    this.separation = Math.max(separationTarget, this.separation * (1.0 - reattachMix));
 
-      // Flat plate blend at high AoA
-      const clLinear = cl0 + this.CLa * Math.sign(this.alpha) * alphaStall;
-      const clFlatPlate = 2.0 * Math.sin(this.alpha) * Math.cos(this.alpha);
-      const blend = Math.min(1.0, Math.pow(this.stallSeverity, 1.3));
-      cl = (1.0 - blend) * clLinear * 0.72 + blend * clFlatPlate;
-    }
+    // Annunciation flags derived from sensed airflow (like real AoA vane and
+    // stick-shaker logic, which genuinely is threshold-based); they never feed
+    // the force model.
+    this.stallSeverity = this.separation;
+    const stallAnnunciationValid = tas > 15.0;
+    this.isStalled = stallAnnunciationValid && this.separation > 0.1;
+    // Stick-shaker margin: sensed AoA within ~2 degrees below the break angle
+    this.isPreStall = stallAnnunciationValid && !this.isStalled &&
+      absAlpha >= alphaStall - THREE.MathUtils.degToRad(2.0);
+
+    // Lift is a continuous function of the separation state:
+    // - clCapped: linear curve truncated at the stall break (CLmax), C0-continuous
+    // - brk: the ~28% loss of peak lift at first separation; sharp (over the
+    //   first few tenths of a degree past alphaStall) but not a switch
+    // - W: progress of the separated wake toward the flat-plate limit
+    // During reattachment (state decaying below alphaStall) the same weights
+    // multiply the *current* linear curve, so lingering separation reduces
+    // lift instead of inflating it (hysteresis deficit).
+    const clCapped = cl0 + this.CLa * Math.sign(this.alpha) * Math.min(absAlpha, alphaStall);
+    const clFlatPlate = 2.0 * Math.sin(this.alpha) * Math.cos(this.alpha);
+    const brk = 1.0 - Math.exp(-this.separation / 0.01);
+    const W = Math.pow(this.separation, 1.3);
+    let cl = (1.0 - W) * (1.0 - 0.28 * brk) * clCapped + W * clFlatPlate;
+
+    // Buffet intensity scales with dynamic pressure; turbulent separated
+    // wake needs meaningful airflow to shake the airframe.
+    const qBuffetScale = Math.min(1.0, qDyn / 500.0);
+    this.buffetVibration = Math.min(1.0, this.separation * 1.5) * qBuffetScale;
 
     // Spoiler lift dump
     cl -= 0.38 * this.spoilers;
@@ -227,8 +247,8 @@ export class Aerodynamics {
 
     // Induced drag: C_Di = (C_L^2) / (pi * AR * e) * geFactor
     const cdInduced = ((cl * cl) / (Math.PI * this.aspectRatio * this.oswaldEfficiency)) * geFactor;
-    // Stall separation drag
-    const cdStall = this.stallSeverity * 1.8 * Math.pow(Math.sin(this.alpha), 2);
+    // Separation wake drag grows continuously with the separated area
+    const cdStall = this.separation * 1.8 * Math.pow(Math.sin(this.alpha), 2);
 
     const cd = cdParasitic + cdInduced + cdStall;
 
@@ -297,17 +317,16 @@ export class Aerodynamics {
     // Includes static stability (Cma), elevator input, pitch trim, pitch damping (Cmq)
     const elevatorRad = this.elevator * maxElevatorRad * this.tuning.elevatorSensitivity;
     const trimRad = THREE.MathUtils.degToRad(this.pitchTrim) * 0.35;
-    // Post-stall the horizontal tail sits in the separated wake and loses authority,
-    // so the elevator can no longer hold the nose at deep stall AoA.
-    const elevatorEffectiveness = 1.0 - 0.8 * this.stallSeverity;
+    // As separation spreads outboard the horizontal tail buries itself in the
+    // wake and progressively loses authority (continuous with the state).
+    const elevatorEffectiveness = 1.0 - 0.8 * this.separation;
     const elevatorEffective = (elevatorRad + trimRad) * elevatorEffectiveness;
     // In Three.js body frame, positive Mx lifts nose UP, so stick back (-Cm_de > 0) creates positive pitch moment
     let cm = this.Cm0 + this.Cma * this.alpha - this.Cm_de * elevatorEffective + this.Cmq * qHat;
 
-    // Stall pitch break (swept wing airliners pitch down sharply as outboard lift collapses)
-    if (this.isStalled) {
-      cm -= this.stallSeverity * (0.55 + 0.5 * this.stallSeverity) * Math.sign(this.alpha);
-    }
+    // Pitch break: outboard lift collapse pushes the nose down continuously
+    // with the separated area, stronger as the wing deepens into the stall.
+    cm -= 0.55 * this.separation * (1.0 + 0.9 * this.separation) * Math.sign(this.alpha);
 
     // Engine thrust pitch coupling: engines slung below CG with 2.5° upward cant (~0.32m effective moment arm)
     const thrustPitchMoment = (engineThrustTotal * 0.32);
@@ -316,9 +335,10 @@ export class Aerodynamics {
     // Includes dihedral effect (Cl_b), aileron input, roll damping (Cl_p), and differential spoiler roll
     const aileronRad = this.aileron * maxAileronRad * this.tuning.aileronSensitivity;
     const spoilerRoll = aileronRad > 0.02 ? aileronRad * 0.05 : (aileronRad < -0.02 ? aileronRad * 0.05 : 0);
-    // Past the stall the swept wing loses dihedral weathervane stability: sideslip feeds a
-    // wing drop instead of damping it, so an asymmetric stall rolls the aircraft over.
-    const stallRollDivergence = this.stallSeverity * 0.8 * this.beta;
+    // Separation weakens the dihedral weathervane damping progressively:
+    // a partly-separated wing feeds sideslip into a wing drop instead of
+    // correcting it.
+    const stallRollDivergence = this.separation * 0.8 * this.beta;
     const cl_roll = this.Cl_b * this.beta + this.Cl_da * (aileronRad + spoilerRoll) + Math.abs(this.Cl_p) * pHat + stallRollDivergence;
 
     // Yawing moment coefficient Cn:
@@ -358,6 +378,7 @@ export class Aerodynamics {
       isStalled: this.isStalled,
       isPreStall: this.isPreStall,
       stallSeverity: this.stallSeverity,
+      separation: this.separation,
       buffetVibration: this.buffetVibration,
       gForce: this.gForce
     };

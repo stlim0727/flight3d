@@ -131,6 +131,40 @@ describe('Aerodynamics (6-DOF Flight Physics Model)', () => {
     assert.ok(unstalled.momentBody.z * stalled.momentBody.z < 0, 'Sideslip must roll the wing down after stall, opposite to unstalled dihedral response');
   });
 
+  it('remembers flow separation: onset abrupt, reattachment lagging with a lift deficit', () => {
+    const aero = new Aerodynamics();
+    const aircraft = createTestAircraft();
+    const angVel = new THREE.Vector3(0, 0, 0);
+    const dt = 1 / 120;
+    const deep = new THREE.Vector3(0, -32, -80);   // ~21.8 deg AoA
+    const cruise = new THREE.Vector3(0, -7, -80);  // ~5 deg AoA
+
+    // One second of deep stall saturates the separation state at its static target
+    for (let i = 0; i < 120; i++) aero.computeAero(dt, aircraft, deep, angVel, 0, 500, 0, 0.0);
+    assert.ok(aero.separation > 0.5, 'Separation reaches the static target during the stall');
+
+    // Onset is fast: a single frame from attached flow already separates
+    const fresh = new Aerodynamics();
+    const firstFrame = fresh.computeAero(dt, aircraft, deep, angVel, 0, 500, 0, 0.0);
+    assert.ok(firstFrame.separation > 0.5, 'Separation onset must complete within one frame');
+
+    // Back at cruise AoA the wake does not vanish instantly: the state lags,
+    // the annunciation persists, and lift stays BELOW the linear curve (deficit,
+    // not a hump) while the flow reattaches
+    const transitional = aero.computeAero(dt, aircraft, cruise, angVel, 0, 500, 0, 0.0);
+    assert.ok(transitional.separation > 0.3, 'Separation must persist after AoA recovery');
+    assert.strictEqual(transitional.isStalled, true, 'Annunciation persists into reattachment');
+    const clLinear = aero.CL0_clean + aero.CLa * Math.atan2(7, 80);
+    assert.ok(transitional.cl < clLinear * 0.9, 'Reattaching flow must produce a lift deficit');
+
+    // After ~5 s the flow is reattached and lift follows the linear curve again
+    for (let i = 0; i < 600; i++) aero.computeAero(dt, aircraft, cruise, angVel, 0, 500, 0, 0.0);
+    assert.ok(aero.separation < 0.01, 'Separation must decay with an exponential lag');
+    assert.strictEqual(aero.isStalled, false);
+    const recovered = aero.computeAero(dt, aircraft, cruise, angVel, 0, 500, 0, 0.0);
+    assert.ok(Math.abs(recovered.cl - clLinear) < 0.02, 'Lift returns to the linear curve once attached');
+  });
+
   it('should model ground effect (reduced induced drag near surface)', () => {
     const aero1 = new Aerodynamics();
     const aero2 = new Aerodynamics();

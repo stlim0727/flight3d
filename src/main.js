@@ -348,6 +348,9 @@ class FlightSimulator {
     this.hasTouchedDownThisFlight = false;
     this.gear.resetContacts();
     this.autopilot.reset();
+    // A preset reset redoes the aircraft with clean wings: the separation
+    // state must not leak across the reset into the new flight.
+    this.aero.separation = 0.0;
     this.landingIncident = false;
     this.landingStopped = false;
     this.bodyContactStarted = false;
