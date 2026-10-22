@@ -1,8 +1,9 @@
-import { bindText, t } from '../i18n/index.js';
+import { bindText, getLanguage, setLanguage, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../config/scenarioRegistry.js';
 
 const AIRPORT_BUTTONS = { coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla' };
+const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
 
 /**
  * Wire the lobby overlay (markup lives in index.html); it is the only place
@@ -24,6 +25,11 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onP
   for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
     document.getElementById(scenario.lobbyButtonId)?.addEventListener('click', () => onPreset(type));
   }
+  for (const [code, id] of Object.entries(LANGUAGE_BUTTONS)) {
+    document.getElementById(id)?.addEventListener('click', () => {
+      if (setLanguage(code)) refresh();
+    });
+  }
   timeSelect?.addEventListener('change', () => {
     const hours = Number.parseFloat(timeSelect.value);
     if (Number.isFinite(hours)) onTime(hours);
@@ -37,6 +43,9 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onP
   }
 
   function refresh() {
+    for (const [code, id] of Object.entries(LANGUAGE_BUTTONS)) {
+      document.getElementById(id)?.classList.toggle('active', code === getLanguage());
+    }
     const airport = getAirport();
     for (const [key, id] of Object.entries(AIRPORT_BUTTONS)) {
       document.getElementById(id)?.classList.toggle('active', key === airport);
