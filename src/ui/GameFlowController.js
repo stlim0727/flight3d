@@ -10,6 +10,10 @@ export const FLOW = {
  * but keeps rendering. While in LOBBY the host must keep the demo scenario
  * running: after the demo stops on its own, the countdown in update() arms a
  * one-shot restart via consumeDemoRestart().
+ *
+ * When the menu is opened from a live flight (returnToLobby(true)) it instead
+ * holds that flight: resumableFlight freezes physics in LOBBY and update() skips
+ * the cinematic loop, so the aircraft stays put until enterFlight() resumes it.
  */
 export class GameFlowController {
   constructor({
@@ -28,6 +32,7 @@ export class GameFlowController {
     this.onStateChange = onStateChange;
 
     this.state = FLOW.LOBBY;
+    this.resumableFlight = false;  // LOBBY is holding a live flight, not the cinematic
     this._countdown = null;        // seconds until restart fires; null = not armed
     this._restartPending = false;
     this._demoWasActive = false;
@@ -42,18 +47,20 @@ export class GameFlowController {
   }
 
   isPhysicsFrozen() {
-    return this.state === FLOW.PAUSED;
+    return this.state === FLOW.PAUSED || (this.state === FLOW.LOBBY && this.resumableFlight);
   }
 
   enterLobby() {
     this._setState(FLOW.LOBBY);
+    this.resumableFlight = false;
     this._resetLoopCap();
     this._armRestart();
   }
 
-  /** Used by the Fly button and browser harnesses; pure state change. */
+  /** Used by the Fly button, the menu toggle, and browser harnesses; pure state change. */
   enterFlight() {
     this._setState(FLOW.FLIGHT);
+    this.resumableFlight = false;
     this._disarmRestart();
   }
 
@@ -69,10 +76,34 @@ export class GameFlowController {
     return true;
   }
 
-  /** Allowed from FLIGHT (HUD button) as well as PAUSED (pause menu). */
-  returnToLobby() {
+  /**
+   * Move to the main menu. With `resumable` (entered from FLIGHT/PAUSED) the live
+   * flight is held frozen behind the menu instead of re-running the cinematic, so
+   * the host can drop straight back into it. Default keeps the cinematic loop.
+   * Allowed from FLIGHT (HUD button) as well as PAUSED (pause menu).
+   */
+  returnToLobby(resumable = false) {
     if (this.state === FLOW.LOBBY) return false;
     this._setState(FLOW.LOBBY);
+    this.resumableFlight = resumable;
+    this._resetLoopCap();
+    if (resumable) {
+      this._disarmRestart();
+    } else {
+      this._armRestart();
+    }
+    return true;
+  }
+
+  /** True while the menu is holding a live flight the Back/toggle can resume. */
+  canResumeFromLobby() {
+    return this.state === FLOW.LOBBY && this.resumableFlight;
+  }
+
+  /** Drop a held flight and let the cinematic backdrop take over again. */
+  abandonResumableFlight() {
+    if (!this.canResumeFromLobby()) return false;
+    this.resumableFlight = false;
     this._resetLoopCap();
     this._armRestart();
     return true;
@@ -80,7 +111,7 @@ export class GameFlowController {
 
   update(dt) {
     this._elapsed += dt;
-    if (this.state !== FLOW.LOBBY) return;
+    if (this.state !== FLOW.LOBBY || this.resumableFlight) return;
 
     if (this.isDemoActive() || this.isDemoWaiting()) {
       this._demoWasActive = true;

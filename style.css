@@ -2118,6 +2118,37 @@ body[data-flow="lobby"] .touch-controls-overlay { display: none !important; }
 
 .toast { z-index: 96; }
 
+/* Persistent main-menu toggle. Floats above the lobby overlay (z 85) so it can
+   open the menu over a flight and hide it again, but stays under toasts (96)
+   and modals (100). Desktop keeps it in the top-left corner, with the presets
+   bar pushed below it; compact/mobile drops it under the hamburger button. */
+.menu-toggle {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 90;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: rgba(10, 16, 26, 0.82);
+  color: #e2e8f0;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.menu-toggle:hover { background: rgba(30, 41, 59, 0.95); border-color: #38bdf8; }
+.menu-toggle:focus-visible { outline: 2px solid #67e8f9; }
+.menu-toggle .menu-toggle-glyph { font-size: 19px; line-height: 1; }
+@media (min-width: 961px) {
+  .presets-bar { top: 60px; }
+}
+.compact-ui .menu-toggle { top: calc(var(--edge-top) + 48px); left: var(--edge-left); }
+
 /* Compact/touch: lobby becomes a scrollable bottom sheet. */
 .compact-ui #lobby-screen {
   align-items: flex-end;
