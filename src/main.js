@@ -5,6 +5,7 @@ import { BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics } from './physics/Aerodynamics.js';
 import { EngineModel } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
+import { AutopilotController } from './physics/Autopilot.js';
 import { PFDCanvas } from './aircraft/PFDCanvas.js';
 import { NDCanvas } from './aircraft/NDCanvas.js';
 import { EICASCanvas } from './aircraft/EICASCanvas.js';
@@ -226,8 +227,17 @@ class FlightSimulator {
       parkBrake: false
     };
 
-    // Autopilot simple leveler / heading hold
-    this.apMaster = false;
+    // Autopilot (pure control laws in src/physics/Autopilot.js)
+    this.autopilot = new AutopilotController();
+    // Reusable objects so 120 Hz substeps do not allocate for the AP snapshot.
+    this._apEuler = new THREE.Euler();
+    this._apForward = new THREE.Vector3();
+    this._apState = {
+      airportKey: 'coastal',
+      headingDeg: 0, rollDeg: 0, pitchDeg: 0,
+      altitudeFt: 0, vsiFpm: 0, iasKnots: 0, tasKnots: 0,
+      throttle: 0, x: 0, z: 0,
+    };
 
     this.initControls();
     this.initUI();
@@ -336,6 +346,7 @@ class FlightSimulator {
     this.airborneTime = (type === 'runway') ? 0.0 : 15.0;
     this.hasTouchedDownThisFlight = false;
     this.gear.resetContacts();
+    this.autopilot.reset();
     this.landingIncident = false;
     this.landingStopped = false;
     this.bodyContactStarted = false;
@@ -617,6 +628,28 @@ class FlightSimulator {
   }
 
   /**
+   * Live autopilot snapshot reusing instance scratch objects (no allocation
+   * per 120 Hz substep). Conventions match this.telemetry.
+   */
+  readAutopilotState() {
+    const euler = this._apEuler.setFromQuaternion(this.quaternion, 'YXZ');
+    const f = this._apForward.set(0, 0, -1).applyQuaternion(this.quaternion);
+    const s = this._apState;
+    s.airportKey = this.activeAirport;
+    s.pitchDeg = THREE.MathUtils.radToDeg(euler.x);
+    s.rollDeg = THREE.MathUtils.radToDeg(-euler.z);
+    s.headingDeg = (THREE.MathUtils.radToDeg(Math.atan2(f.x, -f.z)) + 360) % 360;
+    s.altitudeFt = Atmosphere.metersToFeet(this.position.y);
+    s.vsiFpm = Atmosphere.metersToFeet(this.linearVelocity.y) * 60.0;
+    s.iasKnots = this.telemetry.iasKnots;
+    s.tasKnots = this.telemetry.tasKnots;
+    s.throttle = this.controls.throttle;
+    s.x = this.position.x;
+    s.z = this.position.z;
+    return s;
+  }
+
+  /**
    * Physics Integration Substep (120 Hz)
    */
   integratePhysics(dt) {
@@ -644,12 +677,15 @@ class FlightSimulator {
     this.aero.rudder = this.controls.rudder;
     this.aero.pitchTrim = this.controls.pitchTrim;
 
-    // Autopilot simple leveler
-    if (this.apMaster && Math.abs(this.controls.elevator) < 0.05 && Math.abs(this.controls.aileron) < 0.05) {
-      const euler = new THREE.Euler().setFromQuaternion(this.quaternion, 'YXZ');
-      this.aero.aileron = -euler.z * 1.5; // Wings level
-      const targetPitchRad = THREE.MathUtils.degToRad(2.0);
-      this.aero.elevator = (targetPitchRad - euler.x) * 2.0;
+    // Autopilot control laws. Pilot yoke input above the gate overrides the
+    // axes; the AP commands surfaces directly, bypassing yoke rate limiters.
+    if (this.autopilot.master) {
+      const apCmd = this.autopilot.update(this.readAutopilotState(), dt);
+      if (Math.abs(this.controls.elevator) < 0.075 && Math.abs(this.controls.aileron) < 0.075) {
+        this.aero.elevator = apCmd.elevator;
+        this.aero.aileron = apCmd.aileron;
+        if (this.autopilot.speedMode) this.controls.throttle = apCmd.throttle;
+      }
     }
 
     // Ground steering & brakes
@@ -817,7 +853,13 @@ class FlightSimulator {
       spoilers: this.aero.spoilers,
       touchdown: gearResult.touchdown,
       onGround: gearResult.onGround,
-      apEngaged: this.apMaster,
+      apEngaged: this.autopilot.master,
+      airportKey: this.activeAirport,
+      apModes: this.autopilot.annunciation(),
+      apArmed: this.autopilot.appArmed,
+      selectedHeading: this.autopilot.master ? Math.round(this.autopilot.targets.headingDeg) : this.telemetry.selectedHeading,
+      selectedAltitude: this.autopilot.master ? Math.round(this.autopilot.targets.altitudeFt) : this.telemetry.selectedAltitude,
+      selectedSpeed: this.autopilot.master && this.autopilot.speedMode ? Math.round(this.autopilot.targets.iasKnots) : this.telemetry.selectedSpeed,
       elevator: this.controls.elevator,
       aileron: this.controls.aileron,
       rudder: this.controls.rudder,
@@ -924,6 +966,7 @@ class FlightSimulator {
     this.demoDirector?.stopForCrash(crashResult);
 
     // 6. Kill Engines and Damp Kinetic Energy
+    this.autopilot.disengage();
     this.engines.setThrottle(0.0);
     this.controls.throttle = 0.0;
     this.linearVelocity.multiplyScalar(0.25);
@@ -1147,7 +1190,44 @@ class FlightSimulator {
       elStall.style.display = this.telemetry.isStalled ? 'block' : 'none';
     }
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
+    this.updateAutopilotUI();
     updateControlState(this.telemetry, this.cameraSystem, this.sky.timeOfDay);
+  }
+
+  flightPhase() {
+    const t0 = this.telemetry;
+    if (t0.onGround) return 'GND';
+    if (this.autopilot.lateralMode === 'APP') return 'APP';
+    if (t0.vsiFpm > 300) return 'CLB';
+    if (t0.vsiFpm < -300) return 'DES';
+    return 'CRZ';
+  }
+
+  updateAutopilotUI() {
+    const elPhase = document.getElementById('hud-phase');
+    if (elPhase) {
+      const text = t(`phase.${this.flightPhase().toLowerCase()}`);
+      if (elPhase.textContent !== text) elPhase.textContent = text;
+    }
+    const elModes = document.getElementById('hud-ap-modes');
+    if (elModes) {
+      const modes = this.autopilot.annunciation();
+      if (elModes.textContent !== modes) elModes.textContent = modes;
+    }
+    const pressed = {
+      'btn-ap': this.autopilot.master,
+      'btn-ap-hdg': this.autopilot.lateralMode === 'HDG',
+      'btn-ap-alt': this.autopilot.verticalMode === 'ALT',
+      'btn-ap-spd': this.autopilot.speedMode,
+      'btn-ap-app': this.autopilot.lateralMode === 'APP' || this.autopilot.appArmed,
+    };
+    for (const [id, on] of Object.entries(pressed)) {
+      const btn = document.getElementById(id);
+      if (!btn) continue;
+      btn.classList.toggle('ap-active', on);
+      btn.classList.toggle('ap-armed', id === 'btn-ap-app' && this.autopilot.appArmed);
+      btn.setAttribute('aria-pressed', String(on));
+    }
   }
 
   updateAudioUI(state) {
@@ -1243,10 +1323,20 @@ class FlightSimulator {
       const state = this.touchControls.enabled ? 'state.on' : 'state.off';
       this.showToast(() => t('touch.controls.value', { value: t(state) }));
     });
-    document.getElementById('btn-ap')?.addEventListener('click', () => {
-      this.apMaster = !this.apMaster;
-      this.showToast(() => t('notice.autopilot', { state: t(this.apMaster ? 'state.on' : 'state.off') }));
-    });
+    for (const [id, mode] of [
+      ['btn-ap', 'MASTER'], ['btn-ap-hdg', 'HDG'], ['btn-ap-alt', 'ALT'],
+      ['btn-ap-spd', 'SPD'], ['btn-ap-app', 'APP'],
+    ]) {
+      document.getElementById(id)?.addEventListener('click', () => {
+        const on = this.autopilot.toggle(mode, this.telemetry);
+        if (mode === 'MASTER') {
+          this.showToast(() => t('notice.autopilot', { state: t(on ? 'state.on' : 'state.off') }));
+        } else {
+          this.showToast(() => t('notice.ap.modes', { modes: this.autopilot.annunciation() || t('state.off') }));
+        }
+        this.updateAutopilotUI();
+      });
+    }
 
     // Initialize Demo Director UI bindings
     this.demoDirector.initUI();

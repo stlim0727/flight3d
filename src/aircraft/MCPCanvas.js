@@ -47,6 +47,12 @@ export class MCPCanvas {
     if (state.selectedHeading !== undefined) this.heading = state.selectedHeading;
     if (state.selectedAltitude !== undefined) this.altitude = state.selectedAltitude;
     if (state.apEngaged !== undefined) this.apCmdA = state.apEngaged;
+    if (state.apModes !== undefined) {
+      this.app = state.apModes.includes('APP');
+      this.altHold = state.apModes.includes('ALT');
+      this.lnav = state.apModes.includes('HDG');
+    }
+    if (state.apArmed !== undefined) this.atArm = state.apArmed;
     if (state.isStalled) this.masterCaution = true;
     else this.masterCaution = false;
 

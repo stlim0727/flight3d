@@ -77,7 +77,7 @@ try {
       sim.controls.throttle = 0;
       sim.controls.setParkingBrake(false);
       sim.controls.virtualBrakes = 1;
-      sim.apMaster = false;
+      sim.autopilot.disengage();
       sim.gear.gearState = gear;
       sim.gear.targetGearState = gear > 0 ? 1 : 0;
       const ground = sim.currentTerrain.getHeight(-1000, 0);

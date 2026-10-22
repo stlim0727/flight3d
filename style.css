@@ -2033,3 +2033,55 @@ body.compact-ui {
   .compact-ui .touch-stick-card,
   .compact-ui .touch-rudder-card { background: rgba(15, 23, 42, .72); }
 }
+
+/* Compact autopilot & flight phase bar (issue #112) */
+.ap-bar {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(10, 16, 26, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  z-index: 64;
+}
+.ap-btn {
+  min-width: 40px;
+  padding: 4px 8px;
+  font: 700 11px "Courier New", Courier, monospace;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 6px;
+}
+.ap-btn:hover { border-color: #38bdf8; color: #e2e8f0; }
+.ap-btn.ap-active { color: #02110a; background: #10b981; border-color: #34d399; }
+.ap-btn.ap-armed { color: #1a1206; background: #f59e0b; border-color: #fbbf24; }
+.ap-modes {
+  font: 700 11px "Courier New", Courier, monospace;
+  color: #38bdf8;
+  min-width: 72px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+.ap-phase-item { margin-right: 4px; }
+.compact-ui .ap-bar {
+  top: auto;
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--edge-bottom) + 54px);
+  gap: 4px;
+  padding: 4px 8px;
+}
+.compact-ui .ap-btn { min-height: 44px; min-width: 44px; padding: 4px 6px; }
+.compact-ui .ap-modes { min-width: 56px; }
+.panel-open .ap-bar { visibility: hidden; }

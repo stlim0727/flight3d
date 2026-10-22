@@ -168,6 +168,8 @@ export class DemoFlightDirector {
 
     this.activeDemoAirport = airport;
     this.isActive = true;
+    // The demo flies via virtual inputs; an engaged AP would fight them.
+    this.sim.autopilot?.disengage();
     this.totalTimer = 0;
     this.approachFlarInitiated = false;
     this.touchdownConfirmed = false;
