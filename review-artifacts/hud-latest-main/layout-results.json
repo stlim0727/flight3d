@@ -16,24 +16,24 @@
       },
       {
         "id": "ap-bar",
-        "x": 250,
-        "y": 62,
-        "w": 62,
-        "h": 54,
+        "x": 268,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "menu-toggle",
         "x": 8,
-        "y": 56,
-        "w": 40,
-        "h": 40,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "flight-toolbar",
         "x": 8,
-        "y": 116,
+        "y": 62,
         "w": 304,
         "h": 44,
         "bad": false
@@ -114,8 +114,10 @@
         }
       ],
       "collapsed": true,
-      "apBelowStrip": true,
-      "apRight": true
+      "apGap": 8,
+      "homeGap": 8,
+      "homeTarget": true,
+      "alignedEdges": true
     },
     "panel": {
       "open": true,
@@ -317,24 +319,24 @@
       },
       {
         "id": "ap-bar",
-        "x": 320,
-        "y": 62,
-        "w": 62,
-        "h": 54,
+        "x": 338,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "menu-toggle",
         "x": 8,
-        "y": 56,
-        "w": 40,
-        "h": 40,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "flight-toolbar",
         "x": 8,
-        "y": 116,
+        "y": 62,
         "w": 374,
         "h": 44,
         "bad": false
@@ -415,8 +417,10 @@
         }
       ],
       "collapsed": true,
-      "apBelowStrip": true,
-      "apRight": true
+      "apGap": 8,
+      "homeGap": 8,
+      "homeTarget": true,
+      "alignedEdges": true
     },
     "panel": {
       "open": true,
@@ -618,24 +622,24 @@
       },
       {
         "id": "ap-bar",
-        "x": 250,
-        "y": 62,
-        "w": 62,
-        "h": 54,
+        "x": 268,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "menu-toggle",
         "x": 8,
-        "y": 56,
-        "w": 40,
-        "h": 40,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "flight-toolbar",
         "x": 8,
-        "y": 116,
+        "y": 62,
         "w": 304,
         "h": 44,
         "bad": false
@@ -716,8 +720,10 @@
         }
       ],
       "collapsed": true,
-      "apBelowStrip": true,
-      "apRight": true
+      "apGap": 8,
+      "homeGap": 8,
+      "homeTarget": true,
+      "alignedEdges": true
     },
     "panel": {
       "open": true,
@@ -898,24 +904,24 @@
       },
       {
         "id": "ap-bar",
-        "x": 250,
-        "y": 62,
-        "w": 62,
-        "h": 54,
+        "x": 268,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "menu-toggle",
         "x": 8,
-        "y": 56,
-        "w": 40,
-        "h": 40,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "flight-toolbar",
         "x": 8,
-        "y": 116,
+        "y": 62,
         "w": 304,
         "h": 44,
         "bad": false
@@ -996,8 +1002,10 @@
         }
       ],
       "collapsed": true,
-      "apBelowStrip": true,
-      "apRight": true
+      "apGap": 8,
+      "homeGap": 8,
+      "homeTarget": true,
+      "alignedEdges": true
     },
     "panel": {
       "open": true,
@@ -1157,24 +1165,24 @@
       },
       {
         "id": "ap-bar",
-        "x": 498,
-        "y": 62,
-        "w": 62,
-        "h": 54,
+        "x": 480,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "menu-toggle",
-        "x": 8,
-        "y": 56,
-        "w": 40,
-        "h": 40,
+        "x": 44,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "flight-toolbar",
         "x": 44,
-        "y": 116,
+        "y": 62,
         "w": 480,
         "h": 44,
         "bad": false
@@ -1255,8 +1263,10 @@
         }
       ],
       "collapsed": true,
-      "apBelowStrip": true,
-      "apRight": true
+      "apGap": 8,
+      "homeGap": 8,
+      "homeTarget": true,
+      "alignedEdges": true
     },
     "panel": {
       "open": true,
@@ -1416,24 +1426,24 @@
       },
       {
         "id": "ap-bar",
-        "x": 774,
-        "y": 62,
-        "w": 62,
-        "h": 54,
+        "x": 618,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "menu-toggle",
-        "x": 8,
-        "y": 56,
-        "w": 40,
-        "h": 40,
+        "x": 182,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "flight-toolbar",
         "x": 182,
-        "y": 116,
+        "y": 62,
         "w": 480,
         "h": 44,
         "bad": false
@@ -1514,8 +1524,10 @@
         }
       ],
       "collapsed": true,
-      "apBelowStrip": true,
-      "apRight": true
+      "apGap": 8,
+      "homeGap": 8,
+      "homeTarget": true,
+      "alignedEdges": true
     },
     "panel": {
       "open": true,
@@ -1717,18 +1729,18 @@
       },
       {
         "id": "ap-bar",
-        "x": 1374,
-        "y": 62,
-        "w": 58,
-        "h": 54,
+        "x": 916,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "menu-toggle",
-        "x": 12,
-        "y": 12,
-        "w": 40,
-        "h": 40,
+        "x": 480,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
@@ -1783,8 +1795,10 @@
         }
       ],
       "collapsed": true,
-      "apBelowStrip": true,
-      "apRight": true
+      "apGap": 8,
+      "homeGap": 8,
+      "homeTarget": true,
+      "alignedEdges": true
     },
     "panel": {
       "open": true,
@@ -1982,24 +1996,24 @@
       },
       {
         "id": "ap-bar",
-        "x": 730,
-        "y": 62,
-        "w": 62,
-        "h": 54,
+        "x": 596,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "menu-toggle",
-        "x": 8,
-        "y": 56,
-        "w": 40,
-        "h": 40,
+        "x": 160,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "flight-toolbar",
         "x": 160,
-        "y": 116,
+        "y": 62,
         "w": 480,
         "h": 44,
         "bad": false
@@ -2048,8 +2062,10 @@
         }
       ],
       "collapsed": true,
-      "apBelowStrip": true,
-      "apRight": true
+      "apGap": 8,
+      "homeGap": 8,
+      "homeTarget": true,
+      "alignedEdges": true
     },
     "panel": {
       "open": true,
@@ -2247,18 +2263,18 @@
       },
       {
         "id": "ap-bar",
-        "x": 959,
-        "y": 62,
-        "w": 58,
-        "h": 54,
+        "x": 708.5,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "menu-toggle",
-        "x": 12,
-        "y": 12,
-        "w": 40,
-        "h": 40,
+        "x": 272.5,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
@@ -2313,8 +2329,10 @@
         }
       ],
       "collapsed": true,
-      "apBelowStrip": true,
-      "apRight": true
+      "apGap": 8,
+      "homeGap": 8,
+      "homeTarget": true,
+      "alignedEdges": true
     },
     "panel": {
       "open": true,
@@ -2512,18 +2530,18 @@
       },
       {
         "id": "ap-bar",
-        "x": 1214,
-        "y": 62,
-        "w": 58,
-        "h": 54,
+        "x": 836,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "menu-toggle",
-        "x": 12,
-        "y": 12,
-        "w": 40,
-        "h": 40,
+        "x": 400,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
@@ -2610,8 +2628,10 @@
         }
       ],
       "collapsed": true,
-      "apBelowStrip": true,
-      "apRight": true
+      "apGap": 8,
+      "homeGap": 8,
+      "homeTarget": true,
+      "alignedEdges": true
     },
     "panel": {
       "open": true,
@@ -2813,18 +2833,18 @@
       },
       {
         "id": "ap-bar",
-        "x": 1374,
-        "y": 62,
-        "w": 58,
-        "h": 54,
+        "x": 916,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
         "id": "menu-toggle",
-        "x": 12,
-        "y": 12,
-        "w": 40,
-        "h": 40,
+        "x": 480,
+        "y": 114,
+        "w": 44,
+        "h": 44,
         "bad": false
       },
       {
@@ -2911,8 +2931,10 @@
         }
       ],
       "collapsed": true,
-      "apBelowStrip": true,
-      "apRight": true
+      "apGap": 8,
+      "homeGap": 8,
+      "homeTarget": true,
+      "alignedEdges": true
     },
     "panel": {
       "open": true,

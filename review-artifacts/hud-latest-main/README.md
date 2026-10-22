@@ -10,9 +10,11 @@ state descriptions remain in accessible names and tooltips.
 
 The strip stays on one row, with 44px targets and horizontal scrolling if the
 viewport cannot fit them. Sound is directly available on desktop as well as
-phones. The Aircraft drawer and separate Aircraft row are gone. The collapsed
-AP button stays top-right below telemetry; expanded AP controls render above
-the strip so they remain tappable on short screens.
+phones. The Aircraft drawer and separate Aircraft row are gone. Home and the
+collapsed AP button sit 8px below the strip, aligned with its
+left and right ends. Both have 44px touch targets. When the menu is open, Home
+moves to the upper corner so it does not cover settings on short phones.
+Expanded AP controls render above the strip and remain tappable.
 
 ## Verification
 
@@ -21,7 +23,8 @@ the strip so they remain tappable on short screens.
 - `npm run build`: pass; existing large-chunk warning remains.
 - `scripts/verify-responsive-ui.mjs`: all 11 viewport/input layouts pass bounds,
   non-overlap, telemetry fit, requested seven-button order, single control row,
-  direct Aircraft hit targets, AP docking and native AP expand/collapse.
+  direct Aircraft hit targets, 8px Home/AP gaps and aligned edges, 44px Home
+  target, AP docking and native AP expand/collapse.
 - Existing interaction, compact touch-control, safe-area, telemetry swipe/keyboard
   and inspector tuning checks pass. Repeated flap changes use native taps on the
   strip; rotation retains the controls without a drawer.

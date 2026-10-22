@@ -126,7 +126,8 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   assert.equal(cells.rows, 1, `${name}: the flattened strip renders on one row`);
   assert.deepEqual(cells.clipped, [], `${name}: telemetry text fits each cell`);
   const direct = await ev(`(() => {
-    const strip = document.querySelector('.hud-strip').getBoundingClientRect();
+    const strip = document.querySelector('.flight-toolbar').getBoundingClientRect();
+    const home = document.querySelector('#menu-toggle').getBoundingClientRect();
     const ap = document.querySelector('.ap-bar').getBoundingClientRect();
     return { stripButtons: [...document.querySelectorAll('.flight-toolbar button')].map(b => b.id),
       rows: new Set([...document.querySelectorAll('.flight-toolbar button')].map(b => Math.round(b.getBoundingClientRect().top))).size,
@@ -134,13 +135,13 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
       const r = node.getBoundingClientRect();
       return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2, r.top+r.height/2)), height: r.height };
     }), collapsed: document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded') === 'false',
-      apBelowStrip: ap.top >= strip.bottom, apRight: Math.abs(ap.right - (innerWidth - parseFloat(getComputedStyle(document.querySelector('.ap-bar')).right))) < 1 };
+      apGap: ap.top - strip.bottom, homeGap: home.top - strip.bottom, homeTarget: home.width >= 44 && home.height >= 44, alignedEdges: Math.abs(home.left - strip.left) < 1 && Math.abs(ap.right - strip.right) < 1 };
   })()`);
   assert.deepEqual(direct.stripButtons, ['open-camera', 'btn-mute', 'btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser'], `${name}: one strip in the requested order`);
   assert.equal(direct.rows, 1, `${name}: controls stay on one concise row`);
   assert.equal(direct.buttons.length, 5, `${name}: all Aircraft controls are flattened`);
   assert.ok(direct.buttons.every(b => b.reachable && b.height >= 44), `${name}: all Aircraft controls have reachable 44px targets`);
-  assert.ok(direct.collapsed && direct.apBelowStrip && direct.apRight, `${name}: collapsed AP is below strip at top-right`);
+  assert.ok(direct.collapsed && direct.homeTarget && direct.alignedEdges && Math.abs(direct.apGap - 8) < 1 && Math.abs(direct.homeGap - 8) < 1, `${name}: Home and AP align 8px below the control strip: ${JSON.stringify(direct)}`);
   await nativeClick('#btn-ap-toggle', touch);
   assert.equal(await ev(`document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded')`), 'true', `${name}: native tap expands AP`);
   await nativeClick('#btn-ap-toggle', touch);
