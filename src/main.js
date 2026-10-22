@@ -32,6 +32,8 @@ import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
 import { initFlightPanels, updateControlState, touchLabel } from './ui/FlightPanels.js';
+import { GameFlowController, FLOW } from './ui/GameFlowController.js';
+import { initLobbyScreen } from './ui/LobbyScreen.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 
@@ -166,6 +168,15 @@ class FlightSimulator {
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
 
+    // Game flow: lobby (cinematic menu) / flight / paused
+    this.gameFlow = new GameFlowController({
+      isDemoActive: () => this.demoDirector.isActive,
+      isDemoWaiting: () => this.demoDirector.waitingForTerrain === true,
+      onStateChange: () => this.syncFlowUi(),
+    });
+    this.lobby = { airport: 'lukla', preset: 'runway' };
+    this.lastPresetType = 'runway';
+
     // 7. Collision Detection & Explosion & Tire Smoke Particle Systems
     this.collisionDetector = new CollisionDetector(
       this.currentTerrain,
@@ -261,8 +272,10 @@ class FlightSimulator {
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
 
-    // Auto-launch showcase demo flight on startup
+    // Auto-launch showcase demo flight on startup (it doubles as the lobby backdrop)
     this.demoDirector.start();
+    this.gameFlow.enterLobby();
+    this.syncFlowUi();
   }
 
   initControls() {
@@ -329,7 +342,49 @@ class FlightSimulator {
     };
   }
 
+  /** Apply the game-flow state to the DOM: menu visibility, input blocking. */
+  syncFlowUi() {
+    const state = this.gameFlow.state;
+    document.body.dataset.flow = state;
+    this.controls.inputBlocked = this.gameFlow.blocksFlightInput();
+    if (state !== FLOW.FLIGHT) {
+      this.controls.releaseAllKeys();
+      this.controls.setTouchStick(0.0, 0.0);
+      this.controls.setTouchRudder(0.0);
+      this.controls.setTouchBrakes(0.0);
+      if (document.pointerLockElement && document.pointerLockElement === this.renderer.domElement) {
+        document.exitPointerLock();
+      }
+    }
+    if (this.lobbyScreen) {
+      this.lobbyScreen.setWaitingForTerrain(
+        state === FLOW.LOBBY && this.demoDirector?.waitingForTerrain === true);
+      if (state === FLOW.LOBBY) this.lobbyScreen.refresh();
+    }
+  }
+
+  /** Leave the lobby: stop the cinematic and spawn the player at their choice. */
+  fly() {
+    if (this.demoDirector?.isActive || this.demoDirector?.waitingForTerrain) {
+      this.demoDirector.stop(() => t('manual.control.engaged'));
+    }
+    this.gameFlow.enterFlight();
+    this.setPreset(this.lobby.preset);
+  }
+
+  setTimeOfDay(hours) {
+    this.demoDirector?.onUserTimeOfDayChange();
+    this.sky.setTimeOfDay(hours, this.position, this.camera.position);
+    this.foliage.setTimeOfDay(this.sky.timeOfDay);
+    this.water.syncWithAtmosphere(this.sky);
+    const h = Math.floor(this.sky.timeOfDay);
+    const m = Math.floor((this.sky.timeOfDay % 1) * 60);
+    const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    this.showToast(() => t('notice.time', { time: timeStr }));
+  }
+
   setPreset(type, isDemoInternal = false) {
+    this.lastPresetType = type;
     if (!isDemoInternal) this.aero.loadConfig(BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
@@ -614,6 +669,8 @@ class FlightSimulator {
 
     document.getElementById('btn-airport-coastal')?.classList.toggle('active', id === 'coastal');
     document.getElementById('btn-airport-lukla')?.classList.toggle('active', isLukla);
+    this.lobby.airport = id;
+    this.lobbyScreen?.refresh();
 
     if (this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
@@ -990,6 +1047,9 @@ class FlightSimulator {
   }
 
   showCrashUI(crashResult) {
+    // Crashes during the lobby cinematic are part of the show: the loop
+    // restarts the scenario without a hull-loss UI. Only interrupt the player.
+    if (this.gameFlow.state !== FLOW.FLIGHT) return;
     const overlay = document.getElementById('crash-overlay');
     const title = document.getElementById('crash-title');
     const desc = document.getElementById('crash-desc');
@@ -1078,13 +1138,28 @@ class FlightSimulator {
     this.totalSimTime += frameDelta;
 
     // High-rate substepping for rock-solid flight physics
-    while (this.physicsAccumulator >= this.physicsDt) {
-      if (this.demoDirector && this.demoDirector.isActive) {
-        this.demoDirector.update(this.physicsDt);
+    if (this.gameFlow.isPhysicsFrozen()) {
+      this.physicsAccumulator = 0;
+    } else {
+      while (this.physicsAccumulator >= this.physicsDt) {
+        if (this.demoDirector && this.demoDirector.isActive) {
+          this.demoDirector.update(this.physicsDt);
+        }
+        this.renderPose.reset(this.position, this.quaternion);
+        this.integratePhysics(this.physicsDt);
+        this.physicsAccumulator -= this.physicsDt;
       }
-      this.renderPose.reset(this.position, this.quaternion);
-      this.integratePhysics(this.physicsDt);
-      this.physicsAccumulator -= this.physicsDt;
+    }
+
+    // Keep the lobby backdrop alive: re-arm the demo after it ends.
+    this.gameFlow.update(frameDelta);
+    if (this.gameFlow.consumeDemoRestart()) {
+      this.demoDirector.start(this.activeAirport);
+      if (this.lobbyScreen) {
+        this.lobbyScreen.setWaitingForTerrain(this.demoDirector.waitingForTerrain === true);
+      }
+    } else if (this.gameFlow.isLoopCapTripped() && this.lobbyScreen) {
+      this.lobbyScreen.setWaitingForTerrain(true);
     }
 
     // 1. Update 3D Aircraft Model & Articulations
@@ -1341,6 +1416,42 @@ class FlightSimulator {
     // Initialize Demo Director UI bindings
     this.demoDirector.initUI();
 
+    // Lobby + pause menu bindings
+    this.lobbyScreen = initLobbyScreen({
+      getAirport: () => this.lobby.airport,
+      getPreset: () => this.lobby.preset,
+      getTime: () => this.sky.timeOfDay,
+      onAirport: id => this.setAirport(id),
+      onPreset: type => {
+        this.lobby.preset = type;
+        this.lobbyScreen.refresh();
+      },
+      onTime: hours => this.setTimeOfDay(hours),
+      onFly: () => this.fly(),
+    });
+    document.getElementById('btn-pause-resume')?.addEventListener('click', () => this.gameFlow.resume());
+    document.getElementById('btn-pause-restart')?.addEventListener('click', () => {
+      this.gameFlow.resume();
+      this.setPreset(this.lastPresetType || 'runway');
+    });
+    document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby());
+
+    // ESC chain: the demo director consumes ESC first (take manual control);
+    // otherwise panels/help modal close before the pause menu opens.
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
+      if (this.isCrashed) return;
+      if (document.getElementById('hud-overlay')?.classList.contains('panel-open')) return;
+      const helpModal = document.getElementById('help-modal');
+      if (helpModal?.classList.contains('visible')) {
+        helpModal.classList.remove('visible');
+        return;
+      }
+      if (this.gameFlow.state === FLOW.FLIGHT) this.gameFlow.pause();
+      else if (this.gameFlow.state === FLOW.PAUSED) this.gameFlow.resume();
+    });
+
     // Initialize Audio UI state
     this.updateAudioUI();
 
@@ -1368,6 +1479,7 @@ class FlightSimulator {
     };
     document.getElementById('btn-yokes')?.addEventListener('click', toggleYokes);
     window.addEventListener('keydown', e => {
+      if (this.gameFlow.blocksFlightInput()) return;
       if (e.code === 'KeyJ' && !e.repeat && !e.target?.closest?.('input, textarea, select, [contenteditable]')) {
         toggleYokes();
       }
@@ -1383,6 +1495,7 @@ class FlightSimulator {
 
     window.addEventListener('keydown', (e) => {
       if (e.target?.closest?.('select')) return;
+      if (this.gameFlow.blocksFlightInput()) return;
       if (this.isCrashed && (e.code === 'Space' || e.code === 'KeyR' || e.code === 'Enter')) {
         this.resetCrash();
       }
