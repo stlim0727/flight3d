@@ -1,4 +1,10 @@
 export default {
+  "ui.strip.flaps": "FL",
+  "ui.strip.camera": "CAM",
+  "ui.strip.gear": "GEAR",
+  "ui.strip.spoilers": "SPLR",
+  "ui.strip.reverse": "REV",
+
   "ui.mute": "Mute sound",
   "ui.unmute": "Unmute sound",
   "ui.settings.short": "Settings",

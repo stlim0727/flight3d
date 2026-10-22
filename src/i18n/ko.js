@@ -1,4 +1,10 @@
 export default {
+  "ui.strip.flaps": "플",
+  "ui.strip.camera": "카메라",
+  "ui.strip.gear": "기어",
+  "ui.strip.spoilers": "스포",
+  "ui.strip.reverse": "역추진",
+
   "ui.mute": "소리 끄기",
   "ui.unmute": "소리 켜기",
   "ui.settings.short": "설정",

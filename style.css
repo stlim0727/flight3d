@@ -1808,12 +1808,7 @@ body.compact-ui {
 .flight-panel, .flight-panel-body, .flight-panel-body button, .flight-panel-body select {
   touch-action: pan-y;
 }
-.compact-ui #open-camera {
-  height: 44px;
-  padding: 2px;
-  font-size: 10px;
-  line-height: 12px;
-}
+
 .compact-ui .touch-throttle-card, .compact-ui .touch-stick-card, .compact-ui .touch-rudder-card, .btn-touch-brake {
   box-shadow: none;
 }
@@ -1887,34 +1882,46 @@ body.compact-ui {
   .compact-ui .touch-rudder-card { background: rgba(15, 23, 42, .72); }
 }
 
-/* Aircraft controls stay directly reachable without opening a drawer. */
-.aircraft-controls {
-  position: absolute;
-  bottom: calc(var(--edge-bottom) + 54px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(600px, calc(100% - var(--edge-left) - var(--edge-right)));
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
-  pointer-events: auto;
-}
-.aircraft-controls .btn {
-  min-height: 44px;
-  padding: 5px;
-  font-size: 11px;
-  white-space: normal;
-  transition: background-color .15s, border-color .15s, color .15s;
-}
-.compact-ui .aircraft-controls, .touch-mode .aircraft-controls {
-  top: calc(var(--edge-top) + 108px);
+/* One concise control strip: camera, sound | gear, flaps, spoilers, reverse. */
+.flight-toolbar, .compact-ui .flight-toolbar, .compact-ui.touch-mode .flight-toolbar {
+  top: calc(var(--edge-top) + 54px);
   bottom: auto;
-  left: var(--edge-left);
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: min(480px, calc(100% - var(--edge-left) - var(--edge-right)));
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  border-radius: 8px;
+  background: rgba(10, 16, 26, .88);
+}
+.compact-ui .flight-toolbar, .compact-ui.touch-mode .flight-toolbar {
+  top: calc(var(--edge-top) + 108px);
+}
+.flight-toolbar .btn, .compact-ui .flight-toolbar .btn {
+  flex: 1 0 44px;
   transform: none;
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
+  padding: 2px;
+  margin: 0;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  white-space: nowrap;
 }
-@media (max-width: 500px) {
-  .aircraft-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.flight-toolbar .btn + .btn { border-left: 1px solid #334155; }
+.flight-toolbar #btn-gear { border-left: 2px solid #64748b; }
+.flight-toolbar .btn[data-short-label] { font-size: 0; }
+.flight-toolbar .btn[data-short-label]::after {
+  content: attr(data-short-label);
+  font: 600 10px system-ui;
 }
+.flight-toolbar .quick-mute { display: block; font-size: 18px; }
 
 /* Compact autopilot & flight phase bar (issue #112) */
 .ap-bar {
@@ -1977,6 +1984,9 @@ body.compact-ui {
 @media (max-width: 600px), (max-width: 1024px) and (max-height: 500px) {
   .compact-ui .ap-bar { bottom: calc(var(--edge-bottom) + 144px); }
 }
+
+/* Expanded AP controls must stay above the unified strip on short screens. */
+.ap-bar:not(.ap-collapsed) { z-index: 66; }
 
 /* A collapsed AP button sits just below the telemetry row on every layout. */
 .ap-bar.ap-collapsed, .compact-ui .ap-bar.ap-collapsed {
@@ -2074,7 +2084,6 @@ body[data-flow="paused"] #pause-menu { display: flex; }
    rendered frame) so the HUD does not flash over the black canvas. */
 body:is([data-flow="lobby"], .booting) .hud-strip,
 body:is([data-flow="lobby"], .booting) .ap-bar,
-body:is([data-flow="lobby"], .booting) .aircraft-controls,
 body:is([data-flow="lobby"], .booting) .flight-toolbar,
 body:is([data-flow="lobby"], .booting) .flight-panel,
 body:is([data-flow="lobby"], .booting) .quick-mute,

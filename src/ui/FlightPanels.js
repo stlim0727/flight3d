@@ -23,13 +23,6 @@ export function initFlightPanels({ onCycleCamera }) {
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
   hud.append(bar);
-  const aircraft = document.createElement('nav');
-  aircraft.className = 'aircraft-controls';
-  bindText(aircraft, () => t('ui.aircraft'), 'aria-label');
-  for (const id of ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']) {
-    aircraft.append(document.getElementById(id));
-  }
-  hud.append(aircraft);
   const cameraButton = document.createElement('button');
   cameraButton.id = 'open-camera';
   cameraButton.className = 'btn';
@@ -51,6 +44,9 @@ export function initFlightPanels({ onCycleCamera }) {
   bindText(mute, () => t('ui.mute'), 'aria-label');
   mute.textContent = '🔊';
   bar.append(mute);
+  for (const id of ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']) {
+    bar.append(document.getElementById(id));
+  }
 
   for (const [id, key] of Object.entries({
     'btn-cam-reset': 'center.view.o',
@@ -76,26 +72,30 @@ export function initFlightPanels({ onCycleCamera }) {
 
 /** Called from telemetry refresh, including keyboard, demo, reset and resize paths. */
 export function updateControlState(telemetry, camera) {
-  const set = (id, key, values, pressed) => {
+  const set = (id, key, values, pressed, shortLabel) => {
     const button = document.getElementById(id);
     if (!button) return;
     const text = t(key, values);
     if (button.textContent !== text) button.textContent = text;
     if (pressed !== undefined) button.setAttribute('aria-pressed', String(pressed));
+    // Keep the full localized state accessible while the strip uses short labels.
+    button.setAttribute('aria-label', text);
+    button.setAttribute('title', text);
+    if (shortLabel !== undefined) button.setAttribute('data-short-label', shortLabel);
   };
   const gear = telemetry.gearState;
   const damage = Object.values(telemetry.gearDamage || {});
   const state = damage.includes('collapsed') ? 'fail' : damage.includes('damaged') ? 'damaged' : gear > .95 ? 'down' : gear < .05 ? 'up' : 'transit';
-  set('btn-gear', `ui.gear.${state}`, {}, gear > .95);
-  set('btn-flaps-ret', 'ui.flaps.less', { angle: Math.round(telemetry.flapDegree || 0) });
-  set('btn-flaps-ext', 'ui.flaps.more', { angle: Math.round(telemetry.flapDegree || 0) });
+  set('btn-gear', `ui.gear.${state}`, {}, gear > .95, `${t('ui.strip.gear')}${({down: '↓', up: '↑', transit: '↕', fail: '!', damaged: '!'})[state]}`);
+  set('btn-flaps-ret', 'ui.flaps.less', { angle: Math.round(telemetry.flapDegree || 0) }, undefined, `${t('ui.strip.flaps')}−${Math.round(telemetry.flapDegree || 0)}°`);
+  set('btn-flaps-ext', 'ui.flaps.more', { angle: Math.round(telemetry.flapDegree || 0) }, undefined, `${t('ui.strip.flaps')}+${Math.round(telemetry.flapDegree || 0)}°`);
   document.getElementById('btn-flaps-ret').disabled = telemetry.flapIndex <= 0;
   document.getElementById('btn-flaps-ext').disabled = telemetry.flapIndex >= 6;
-  set('btn-spoilers', telemetry.spoilers > .1 ? 'ui.spoilers.on' : 'ui.spoilers.off', {}, telemetry.spoilers > .1);
-  set('btn-reverser', telemetry.reverserActive ? 'ui.reverse.on' : 'ui.reverse.off', {}, !!telemetry.reverserActive);
+  set('btn-spoilers', telemetry.spoilers > .1 ? 'ui.spoilers.on' : 'ui.spoilers.off', {}, telemetry.spoilers > .1, t('ui.strip.spoilers'));
+  set('btn-reverser', telemetry.reverserActive ? 'ui.reverse.on' : 'ui.reverse.off', {}, !!telemetry.reverserActive, t('ui.strip.reverse'));
   const mode = camera.autoSwitch ? 7 : camera.mode;
   const cameraName = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto'][mode];
-  set('open-camera', 'ui.camera.current', { name: t(`ui.camera.${cameraName}`).replace(/ · [1-8]$/, '') });
+  set('open-camera', 'ui.camera.current', { name: t(`ui.camera.${cameraName}`).replace(/ · [1-8]$/, '') }, undefined, t('ui.strip.camera'));
   const toggle = document.getElementById('btn-touch-toggle');
   toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('touch-mode')));
 }

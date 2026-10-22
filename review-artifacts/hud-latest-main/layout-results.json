@@ -31,58 +31,10 @@
         "bad": false
       },
       {
-        "id": "open-camera",
-        "x": 56,
-        "y": 62,
-        "w": 132,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-mute",
-        "x": 192,
-        "y": 62,
-        "w": 44,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-gear",
+        "id": "flight-toolbar",
         "x": 8,
         "y": 116,
-        "w": 98.65625,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ret",
-        "x": 110.65625,
-        "y": 116,
-        "w": 98.671875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ext",
-        "x": 213.328125,
-        "y": 116,
-        "w": 98.65625,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-spoilers",
-        "x": 8,
-        "y": 164,
-        "w": 98.65625,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-reverser",
-        "x": 110.65625,
-        "y": 164,
-        "w": 98.671875,
+        "w": 304,
         "h": 44,
         "bad": false
       },
@@ -124,6 +76,16 @@
       "clipped": []
     },
     "direct": {
+      "stripButtons": [
+        "open-camera",
+        "btn-mute",
+        "btn-gear",
+        "btn-flaps-ret",
+        "btn-flaps-ext",
+        "btn-spoilers",
+        "btn-reverser"
+      ],
+      "rows": 1,
       "buttons": [
         {
           "id": "btn-gear",
@@ -370,58 +332,10 @@
         "bad": false
       },
       {
-        "id": "open-camera",
-        "x": 56,
-        "y": 62,
-        "w": 202,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-mute",
-        "x": 262,
-        "y": 61,
-        "w": 44,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-gear",
+        "id": "flight-toolbar",
         "x": 8,
         "y": 116,
-        "w": 122,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ret",
-        "x": 134,
-        "y": 116,
-        "w": 122,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ext",
-        "x": 260,
-        "y": 116,
-        "w": 122,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-spoilers",
-        "x": 8,
-        "y": 164,
-        "w": 122,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-reverser",
-        "x": 134,
-        "y": 164,
-        "w": 122,
+        "w": 374,
         "h": 44,
         "bad": false
       },
@@ -463,6 +377,16 @@
       "clipped": []
     },
     "direct": {
+      "stripButtons": [
+        "open-camera",
+        "btn-mute",
+        "btn-gear",
+        "btn-flaps-ret",
+        "btn-flaps-ext",
+        "btn-spoilers",
+        "btn-reverser"
+      ],
+      "rows": 1,
       "buttons": [
         {
           "id": "btn-gear",
@@ -709,58 +633,10 @@
         "bad": false
       },
       {
-        "id": "open-camera",
-        "x": 56,
-        "y": 62,
-        "w": 132,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-mute",
-        "x": 192,
-        "y": 61,
-        "w": 44,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-gear",
+        "id": "flight-toolbar",
         "x": 8,
         "y": 116,
-        "w": 98.65625,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ret",
-        "x": 110.65625,
-        "y": 116,
-        "w": 98.671875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ext",
-        "x": 213.328125,
-        "y": 116,
-        "w": 98.65625,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-spoilers",
-        "x": 8,
-        "y": 164,
-        "w": 98.65625,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-reverser",
-        "x": 110.65625,
-        "y": 164,
-        "w": 98.671875,
+        "w": 304,
         "h": 44,
         "bad": false
       },
@@ -802,6 +678,16 @@
       "clipped": []
     },
     "direct": {
+      "stripButtons": [
+        "open-camera",
+        "btn-mute",
+        "btn-gear",
+        "btn-flaps-ret",
+        "btn-flaps-ext",
+        "btn-spoilers",
+        "btn-reverser"
+      ],
+      "rows": 1,
       "buttons": [
         {
           "id": "btn-gear",
@@ -1027,58 +913,10 @@
         "bad": false
       },
       {
-        "id": "open-camera",
-        "x": 56,
-        "y": 62,
-        "w": 132,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-mute",
-        "x": 192,
-        "y": 61,
-        "w": 44,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-gear",
+        "id": "flight-toolbar",
         "x": 8,
         "y": 116,
-        "w": 98.65625,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ret",
-        "x": 110.65625,
-        "y": 116,
-        "w": 98.671875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ext",
-        "x": 213.328125,
-        "y": 116,
-        "w": 98.65625,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-spoilers",
-        "x": 8,
-        "y": 164,
-        "w": 98.65625,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-reverser",
-        "x": 110.65625,
-        "y": 164,
-        "w": 98.671875,
+        "w": 304,
         "h": 44,
         "bad": false
       },
@@ -1120,6 +958,16 @@
       "clipped": []
     },
     "direct": {
+      "stripButtons": [
+        "open-camera",
+        "btn-mute",
+        "btn-gear",
+        "btn-flaps-ret",
+        "btn-flaps-ext",
+        "btn-spoilers",
+        "btn-reverser"
+      ],
+      "rows": 1,
       "buttons": [
         {
           "id": "btn-gear",
@@ -1324,58 +1172,10 @@
         "bad": false
       },
       {
-        "id": "open-camera",
-        "x": 56,
-        "y": 62,
-        "w": 380,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-mute",
-        "x": 440,
-        "y": 61,
-        "w": 44,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-gear",
-        "x": 8,
+        "id": "flight-toolbar",
+        "x": 44,
         "y": 116,
-        "w": 107.1875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ret",
-        "x": 119.1875,
-        "y": 116,
-        "w": 107.203125,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ext",
-        "x": 230.390625,
-        "y": 116,
-        "w": 107.203125,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-spoilers",
-        "x": 341.59375,
-        "y": 116,
-        "w": 107.203125,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-reverser",
-        "x": 452.796875,
-        "y": 116,
-        "w": 107.1875,
+        "w": 480,
         "h": 44,
         "bad": false
       },
@@ -1417,6 +1217,16 @@
       "clipped": []
     },
     "direct": {
+      "stripButtons": [
+        "open-camera",
+        "btn-mute",
+        "btn-gear",
+        "btn-flaps-ret",
+        "btn-flaps-ext",
+        "btn-spoilers",
+        "btn-reverser"
+      ],
+      "rows": 1,
       "buttons": [
         {
           "id": "btn-gear",
@@ -1621,58 +1431,10 @@
         "bad": false
       },
       {
-        "id": "open-camera",
-        "x": 56,
-        "y": 62,
-        "w": 656,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-mute",
-        "x": 716,
-        "y": 61,
-        "w": 44,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-gear",
-        "x": 8,
+        "id": "flight-toolbar",
+        "x": 182,
         "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ret",
-        "x": 128.796875,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ext",
-        "x": 249.59375,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-spoilers",
-        "x": 370.390625,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-reverser",
-        "x": 491.1875,
-        "y": 116,
-        "w": 116.8125,
+        "w": 480,
         "h": 44,
         "bad": false
       },
@@ -1714,6 +1476,16 @@
       "clipped": []
     },
     "direct": {
+      "stripButtons": [
+        "open-camera",
+        "btn-mute",
+        "btn-gear",
+        "btn-flaps-ret",
+        "btn-flaps-ext",
+        "btn-spoilers",
+        "btn-reverser"
+      ],
+      "rows": 1,
       "buttons": [
         {
           "id": "btn-gear",
@@ -1960,50 +1732,10 @@
         "bad": false
       },
       {
-        "id": "open-camera",
-        "x": 658.3125,
-        "y": 848,
-        "w": 123.375,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-gear",
-        "x": 420,
-        "y": 794,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ret",
-        "x": 540.796875,
-        "y": 794,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ext",
-        "x": 661.59375,
-        "y": 794,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-spoilers",
-        "x": 782.390625,
-        "y": 794,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-reverser",
-        "x": 903.1875,
-        "y": 794,
-        "w": 116.8125,
+        "id": "flight-toolbar",
+        "x": 480,
+        "y": 62,
+        "w": 480,
         "h": 44,
         "bad": false
       }
@@ -2013,6 +1745,16 @@
       "clipped": []
     },
     "direct": {
+      "stripButtons": [
+        "open-camera",
+        "btn-mute",
+        "btn-gear",
+        "btn-flaps-ret",
+        "btn-flaps-ext",
+        "btn-spoilers",
+        "btn-reverser"
+      ],
+      "rows": 1,
       "buttons": [
         {
           "id": "btn-gear",
@@ -2255,50 +1997,10 @@
         "bad": false
       },
       {
-        "id": "open-camera",
-        "x": 56,
-        "y": 62,
-        "w": 660,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-gear",
-        "x": 8,
+        "id": "flight-toolbar",
+        "x": 160,
         "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ret",
-        "x": 128.796875,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ext",
-        "x": 249.59375,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-spoilers",
-        "x": 370.390625,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-reverser",
-        "x": 491.1875,
-        "y": 116,
-        "w": 116.8125,
+        "w": 480,
         "h": 44,
         "bad": false
       }
@@ -2308,6 +2010,16 @@
       "clipped": []
     },
     "direct": {
+      "stripButtons": [
+        "open-camera",
+        "btn-mute",
+        "btn-gear",
+        "btn-flaps-ret",
+        "btn-flaps-ext",
+        "btn-spoilers",
+        "btn-reverser"
+      ],
+      "rows": 1,
       "buttons": [
         {
           "id": "btn-gear",
@@ -2550,50 +2262,10 @@
         "bad": false
       },
       {
-        "id": "open-camera",
-        "x": 450.8125,
-        "y": 648,
-        "w": 123.375,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-gear",
-        "x": 212.5,
-        "y": 594,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ret",
-        "x": 333.296875,
-        "y": 594,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ext",
-        "x": 454.09375,
-        "y": 594,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-spoilers",
-        "x": 574.890625,
-        "y": 594,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-reverser",
-        "x": 695.6875,
-        "y": 594,
-        "w": 116.8125,
+        "id": "flight-toolbar",
+        "x": 272.5,
+        "y": 62,
+        "w": 480,
         "h": 44,
         "bad": false
       }
@@ -2603,6 +2275,16 @@
       "clipped": []
     },
     "direct": {
+      "stripButtons": [
+        "open-camera",
+        "btn-mute",
+        "btn-gear",
+        "btn-flaps-ret",
+        "btn-flaps-ext",
+        "btn-spoilers",
+        "btn-reverser"
+      ],
+      "rows": 1,
       "buttons": [
         {
           "id": "btn-gear",
@@ -2845,58 +2527,10 @@
         "bad": false
       },
       {
-        "id": "open-camera",
-        "x": 553.3125,
-        "y": 748,
-        "w": 123.375,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-mute",
-        "x": 682.6875,
-        "y": 748,
-        "w": 44,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-gear",
-        "x": 8,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ret",
-        "x": 128.796875,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ext",
-        "x": 249.59375,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-spoilers",
-        "x": 370.390625,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-reverser",
-        "x": 491.1875,
-        "y": 116,
-        "w": 116.8125,
+        "id": "flight-toolbar",
+        "x": 400,
+        "y": 62,
+        "w": 480,
         "h": 44,
         "bad": false
       },
@@ -2938,6 +2572,16 @@
       "clipped": []
     },
     "direct": {
+      "stripButtons": [
+        "open-camera",
+        "btn-mute",
+        "btn-gear",
+        "btn-flaps-ret",
+        "btn-flaps-ext",
+        "btn-spoilers",
+        "btn-reverser"
+      ],
+      "rows": 1,
       "buttons": [
         {
           "id": "btn-gear",
@@ -3184,58 +2828,10 @@
         "bad": false
       },
       {
-        "id": "open-camera",
-        "x": 633.3125,
-        "y": 848,
-        "w": 123.375,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-mute",
-        "x": 762.6875,
-        "y": 848,
-        "w": 44,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-gear",
-        "x": 8,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ret",
-        "x": 128.796875,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-flaps-ext",
-        "x": 249.59375,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-spoilers",
-        "x": 370.390625,
-        "y": 116,
-        "w": 116.796875,
-        "h": 44,
-        "bad": false
-      },
-      {
-        "id": "btn-reverser",
-        "x": 491.1875,
-        "y": 116,
-        "w": 116.8125,
+        "id": "flight-toolbar",
+        "x": 480,
+        "y": 62,
+        "w": 480,
         "h": 44,
         "bad": false
       },
@@ -3277,6 +2873,16 @@
       "clipped": []
     },
     "direct": {
+      "stripButtons": [
+        "open-camera",
+        "btn-mute",
+        "btn-gear",
+        "btn-flaps-ret",
+        "btn-flaps-ext",
+        "btn-spoilers",
+        "btn-reverser"
+      ],
+      "rows": 1,
       "buttons": [
         {
           "id": "btn-gear",

@@ -1,17 +1,10 @@
 [
   {
     "selector": ".flight-toolbar",
-    "left": 66,
-    "right": 226,
-    "top": 78,
-    "bottom": 122
-  },
-  {
-    "selector": ".aircraft-controls",
     "left": 18,
     "right": 302,
     "top": 132,
-    "bottom": 224
+    "bottom": 176
   },
   {
     "selector": ".hud-strip",
