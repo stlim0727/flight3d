@@ -34,6 +34,12 @@ import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
 import { initFlightPanels, updateControlState, touchLabel } from './ui/FlightPanels.js';
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
 import { initLobbyScreen } from './ui/LobbyScreen.js';
+import {
+  SPAWN_SCENARIOS,
+  DEFAULT_SCENARIO,
+  isScenarioAvailable,
+  scenarioLabelKey,
+} from './config/scenarioRegistry.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 
@@ -385,6 +391,9 @@ class FlightSimulator {
   }
 
   setPreset(type, isDemoInternal = false) {
+    // Scenario availability depends on the active airport; an unavailable
+    // pick (e.g. cliff at coastal) falls back instead of leaving a stale pose.
+    if (!isScenarioAvailable(this.activeAirport, type)) type = DEFAULT_SCENARIO;
     this.lastPresetType = type;
     if (!isDemoInternal) this.aero.loadConfig(BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
@@ -653,27 +662,23 @@ class FlightSimulator {
       this.cduCanvas.setAirport(id);
     }
 
-    // Update UI preset button labels
-    const btnRwy = document.getElementById('btn-preset-rwy');
-    const btnApp = document.getElementById('btn-preset-app');
-    const btnCru = document.getElementById('btn-preset-cru');
-    const btnCliff = document.getElementById('btn-preset-cliff');
-
-    if (isLukla) {
-      if (btnRwy) bindText(btnRwy, () => t('lukla.06.ready'));
-      if (btnApp) bindText(btnApp, () => t('canyon.landing'));
-      if (btnCru) bindText(btnCru, () => t('himalayan.cruise.13.000.ft'));
-      if (btnCliff) btnCliff.style.display = 'block';
-    } else {
-      if (btnRwy) bindText(btnRwy, () => t('runway.takeoff.09l'));
-      if (btnApp) bindText(btnApp, () => t('final.approach.3.nm'));
-      if (btnCru) bindText(btnCru, () => t('cruise.6.000.ft'));
-      if (btnCliff) btnCliff.style.display = 'none';
+    // Re-scope the in-game preset bar to the scenarios this airport offers.
+    for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
+      const button = document.getElementById(scenario.barButtonId);
+      if (!button) continue;
+      if (isScenarioAvailable(id, type)) {
+        const labelKey = scenarioLabelKey(id, type);
+        button.style.display = 'block';
+        bindText(button, () => t(labelKey));
+      } else {
+        button.style.display = 'none';
+      }
     }
 
     document.getElementById('btn-airport-coastal')?.classList.toggle('active', id === 'coastal');
     document.getElementById('btn-airport-lukla')?.classList.toggle('active', isLukla);
     this.lobby.airport = id;
+    if (!isScenarioAvailable(id, this.lobby.preset)) this.lobby.preset = DEFAULT_SCENARIO;
     this.lobbyScreen?.refresh();
 
     if (this.demoDirector && this.demoDirector.isActive) {

@@ -195,6 +195,7 @@ To add an aircraft (e.g. Airbus A320, Boeing 777, F-16):
 1. Open `src/config/simConfig.js`.
 2. Define runway coordinates, elevation, threshold vectors, and lighting frequencies.
 3. In `src/environment/Airport.js`, the runway geometry and ALS strobe arrays dynamically adapt to the runway length and heading parameters.
+4. In `src/config/scenarioRegistry.js`, list the airport in every spawn scenario it offers; lobby/in-game button labels, briefing lines, and preset availability are all derived from that table.
 
 ### 4.3 Event Catalog (`src/core/EventBus.js`)
 The decoupled event bus allows external telemetry loggers, multiplayer sockets, or blackbox recorders to listen without touching simulation internals:

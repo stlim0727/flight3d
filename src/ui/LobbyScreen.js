@@ -1,20 +1,8 @@
 import { bindText, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
-
-const PRESET_LABEL_KEYS = {
-  runway: { lukla: 'lukla.06.ready', coastal: 'runway.takeoff.09l' },
-  approach: { lukla: 'canyon.landing', coastal: 'final.approach.3.nm' },
-  cruise: { lukla: 'himalayan.cruise.13.000.ft', coastal: 'cruise.6.000.ft' },
-  cliff: { lukla: 'downhill.takeoff.rwy.24', coastal: null },
-};
+import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../config/scenarioRegistry.js';
 
 const AIRPORT_BUTTONS = { coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla' };
-const PRESET_BUTTONS = {
-  runway: 'lobby-preset-rwy',
-  approach: 'lobby-preset-app',
-  cruise: 'lobby-preset-cru',
-  cliff: 'lobby-preset-cliff',
-};
 
 /**
  * Wire the lobby overlay (markup lives in index.html). Renders its own copies
@@ -33,18 +21,18 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onP
   ]) {
     document.getElementById(id)?.addEventListener('click', handler);
   }
-  for (const [type, id] of Object.entries(PRESET_BUTTONS)) {
-    document.getElementById(id)?.addEventListener('click', () => onPreset(type));
+  for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
+    document.getElementById(scenario.lobbyButtonId)?.addEventListener('click', () => onPreset(type));
   }
   timeSelect?.addEventListener('change', () => {
     const hours = Number.parseFloat(timeSelect.value);
     if (Number.isFinite(hours)) onTime(hours);
   });
 
-  for (const [type, id] of Object.entries(PRESET_BUTTONS)) {
-    const span = document.getElementById(id)?.querySelector('span');
+  for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
+    const span = document.getElementById(scenario.lobbyButtonId)?.querySelector('span');
     if (span) {
-      bindText(span, () => t(PRESET_LABEL_KEYS[type][getAirport()] ?? 'lobby.spawn'));
+      bindText(span, () => t(scenarioLabelKey(getAirport(), type) ?? 'lobby.spawn'));
     }
   }
 
@@ -54,11 +42,11 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onP
       document.getElementById(id)?.classList.toggle('active', key === airport);
     }
     const preset = getPreset();
-    for (const [type, id] of Object.entries(PRESET_BUTTONS)) {
-      const button = document.getElementById(id);
+    for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
+      const button = document.getElementById(scenario.lobbyButtonId);
       if (!button) continue;
       button.classList.toggle('active', type === preset);
-      if (type === 'cliff') button.style.display = airport === 'lukla' ? '' : 'none';
+      button.style.display = isScenarioAvailable(airport, type) ? '' : 'none';
     }
     if (briefingEl) {
       bindText(briefingEl, () => lobbyBriefing(getAirport(), getPreset()).join('\n'));

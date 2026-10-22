@@ -1,21 +1,17 @@
 import { t } from '../i18n/index.js';
 import { APPROACH_DATA } from '../config/approachData.js';
+import { SPAWN_SCENARIOS, isScenarioAvailable } from '../config/scenarioRegistry.js';
 
 const AIRPORT_NAME_KEYS = {
   coastal: 'coastal.airport',
   lukla: 'lukla.vnlk',
 };
 
-const SCENARIO_KEYS = {
-  runway: 'lobby.briefing.scenario.runway',
-  approach: 'lobby.briefing.scenario.approach',
-  cruise: 'lobby.briefing.scenario.cruise',
-  cliff: 'lobby.briefing.scenario.cliff',
-};
-
 /**
  * Plain-text briefing lines for the lobby, derived from the airport's approach
- * data and the selected spawn scenario. DOM-free so node tests can assert it.
+ * data and the selected spawn scenario. The scenario line only appears when
+ * the scenario registry offers that scenario at the selected airport.
+ * DOM-free so node tests can assert it.
  */
 export function lobbyBriefing(airportKey, presetType) {
   const data = APPROACH_DATA[airportKey];
@@ -28,9 +24,8 @@ export function lobbyBriefing(airportKey, presetType) {
       gsAngle: data.gsAngleDeg,
     }),
   ];
-  const scenarioKey = SCENARIO_KEYS[presetType];
-  if (scenarioKey && !(airportKey === 'coastal' && presetType === 'cliff')) {
-    lines.push(t(scenarioKey));
+  if (isScenarioAvailable(airportKey, presetType)) {
+    lines.push(t(SPAWN_SCENARIOS[presetType].briefingKey));
   }
   return lines;
 }
