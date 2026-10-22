@@ -1,5 +1,6 @@
 import { batchStaticCockpit } from './StaticCockpitBatch.js';
 import { bindGltfYokes, updateGltfYokes, bindGltfEngineControls, updateGltfEngineControls } from './GltfCockpitControls.js';
+import { WINDSHIELD_PANES } from './CockpitAperture.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
@@ -59,7 +60,22 @@ export class Cockpit {
     this.cockpitLight.position.set(0, 1.15, -12.1);
     this.group.add(this.cockpitLight);
 
+    this.floods = [this.glareshieldFlood, this.pedestalFlood, this.cockpitLight];
+    this.floodBaseIntensity = this.floods.map((flood) => flood.intensity);
+
     this.loadCockpitModel();
+  }
+
+  /**
+   * Trade instrument flood light for daylight in the flight deck, continuously:
+   * `daylight` 0 keeps the warm night glow, 1 dims the floods to a quarter so the
+   * sun pattern thrown through the windshield stays readable.
+   */
+  syncDaylight(daylight) {
+    const dim = 1 - 0.75 * Math.min(1, Math.max(0, daylight));
+    for (let i = 0; i < this.floods.length; i++) {
+      this.floods[i].intensity = Math.max(this.floodBaseIntensity[i] * dim, 0.15);
+    }
   }
 
   /** Temporarily clear the instrument sightline without changing control input. */
@@ -386,7 +402,8 @@ export class Cockpit {
     this.gltfCeilingTrim.add(roofFairing, centerRoofFairing);
     this.gltfCockpitFraming.add(this.gltfCeilingTrim);
 
-    // 3. Subtle Tinted Aviation Windshield Glass Panels
+    // 3. Subtle Tinted Aviation Windshield Glass Panels, laid out from the shared
+    // windshield aperture definition the deck sun rig also projects through.
     const glassMat = new THREE.MeshStandardMaterial({
       color: 0x88b0cc,
       transparent: true,
@@ -396,28 +413,28 @@ export class Cockpit {
       depthWrite: false
     });
 
-    const glass1L = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.44), glassMat);
-    glass1L.name = 'GLTF_Glass_1L';
-    glass1L.position.set(-0.25, 0.83, -12.92);
-    glass1L.rotation.set(-0.47, 0.22, -0.06);
-
-    const glass1R = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.44), glassMat);
-    glass1R.name = 'GLTF_Glass_1R';
-    glass1R.position.set(0.25, 0.83, -12.92);
-    glass1R.rotation.set(-0.47, -0.22, 0.06);
-
-    const glass2L = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.44), glassMat);
-    glass2L.name = 'GLTF_Glass_2L';
-    glass2L.position.set(-0.85, 0.95, -12.45);
-    glass2L.rotation.set(-0.12, 1.10, 0);
-
-    const glass2R = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.44), glassMat);
-    glass2R.name = 'GLTF_Glass_2R';
-    glass2R.position.set(0.85, 0.95, -12.45);
-    glass2R.rotation.set(-0.12, -1.10, 0);
-
-    this.gltfGlassPanels = [glass1L, glass1R, glass2L, glass2R];
+    this.gltfGlassPanels = WINDSHIELD_PANES.map((pane) => {
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(pane.size[0], pane.size[1]), glassMat);
+      glass.name = pane.name;
+      glass.position.set(pane.center[0], pane.center[1], pane.center[2]);
+      glass.rotation.set(pane.rotation[0], pane.rotation[1], pane.rotation[2]);
+      // Transparent materials still cast a fully solid shadow, so the tinted glass has
+      // to stay out of the depth pass or it would block the sunlight entering the deck.
+      glass.castShadow = false;
+      glass.receiveShadow = false;
+      return glass;
+    });
     this.gltfCockpitFraming.add(...this.gltfGlassPanels);
+
+    // This framing is built after the interior traverse, so it has to opt into the depth
+    // pass itself: the headers, pillars and compass bracket are what the deck sun throws
+    // bands of shadow from across the glareshield and panels.
+    const glassPanels = new Set(this.gltfGlassPanels);
+    this.gltfCockpitFraming.traverse((node) => {
+      if (!node.isMesh || glassPanels.has(node)) return;
+      node.castShadow = true;
+      node.receiveShadow = true;
+    });
 
     this.gltfCockpitGroup.add(this.gltfCockpitFraming);
   }

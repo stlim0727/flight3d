@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { CloudLayer } from './CloudLayer.js';
+import { CockpitSunShadow } from './CockpitSunShadow.js';
+
+const OVERCAST_GREY = new THREE.Color(0.55, 0.57, 0.60);
 
 /**
  * Atmospheric Sky, Sun, Dynamic Lighting & Cumulus Clouds
@@ -24,6 +27,11 @@ export class SkyAtmosphere {
     // Time of day (hours: 0.0 to 24.0, default 16.5 = Golden Hour Afternoon)
     this.timeOfDay = 16.8;
 
+    // Cloud cover 0..1: fair-weather by default, attenuates direct sun and softens shadows
+    this.cloudCover = 0;
+    this.sunAttenuation = 1;
+    this.shadowSoftening = 1;
+
     // Sunlight & Ambient lights
     this.sunLight = new THREE.DirectionalLight(0xfff4e5, 3.5);
     this.sunLight.castShadow = true;
@@ -43,6 +51,11 @@ export class SkyAtmosphere {
 
     this.ambientLight = new THREE.AmbientLight(0xdde8f5, 1.2);
     this.scene.add(this.ambientLight);
+
+    // Sunlight admitted through the windshield, so that the flight deck reads the same
+    // time of day, weather and heading as the exterior. Built here rather than on first
+    // cockpit entry: adding a shadow-casting light later recompiles every lit material.
+    this.cockpitSun = new CockpitSunShadow(this.scene);
 
     // Sky shader object
     this.sky = new Sky();
@@ -106,6 +119,30 @@ export class SkyAtmosphere {
   setTimeOfDay(hours, targetPos = null, cameraPos = null) {
     this.timeOfDay = (hours + 24) % 24;
     this.updateSun(targetPos, cameraPos);
+  }
+
+  /**
+   * Set cloud cover for the atmospheric gate: 0 is the shipped fair-weather sky, 1 is
+   * featureless overcast. Takes effect on the next updateSun.
+   */
+  setCloudCover(value) {
+    this.cloudCover = Math.min(1, Math.max(0, value));
+  }
+
+  /**
+   * Aim the flight deck sun at the windshield for this frame and return the daylight
+   * factor used to dim the instrument floods.
+   */
+  updateCockpitSun({ position, quaternion, cockpitActive = false, dt = 0 }) {
+    return this.cockpitSun.update({
+      position,
+      quaternion,
+      sunDir: this.sunPosition,
+      sunColor: this.sunLight.color,
+      sunIntensity: this.sunLight.intensity,
+      cockpitActive,
+      dt,
+    });
   }
 
   updateSun(targetPos = null, cameraPos = null) {
@@ -191,6 +228,19 @@ export class SkyAtmosphere {
       this.baseDensity = 0.00020;
       exposure = 1.15; // Preserves dark ground silhouettes and stars without muddy dark crushing
     }
+
+    // 1b. Cloud Cover: direct sun and shadow sharpness fall off continuously with
+    // overcast, skylight and haze take over. Functions of the cloudCover state scalar,
+    // never a clear/overcast mode switch.
+    const cloud = Math.min(1, Math.max(0, this.cloudCover));
+    const cloudRamp = cloud * cloud * (3 - 2 * cloud);
+    this.sunAttenuation = 1 - 0.85 * cloudRamp;
+    this.shadowSoftening = 1 - 0.65 * cloudRamp;
+    this.sunLight.intensity *= this.sunAttenuation;
+    this.sunLight.shadow.intensity = this.shadowSoftening;
+    this.cockpitSun.light.shadow.intensity = this.shadowSoftening;
+    this.ambientLight.intensity += 0.25 * cloudRamp;
+    this.fogColor.lerp(OVERCAST_GREY, 0.35 * cloudRamp);
 
     // 2. High-Altitude Rayleigh Blue Depth Cueing
     // As aircraft ascends above 400m towards stratosphere (1,500m ~ 3,000m+),

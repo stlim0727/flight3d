@@ -1153,6 +1153,13 @@ class FlightSimulator {
     this.foliage.updateCityLod(this.camera.position);
     this.foliage.update(this.camera.position);
     this.sky.updateSun(this.position, this.camera.position);
+    const stepDaylight = this.sky.updateCockpitSun({
+      position: this.aircraft.group.position,
+      quaternion: this.aircraft.group.quaternion,
+      cockpitActive: isCockpit && !isPhotoCockpit,
+      dt: simSeconds,
+    });
+    this.aircraft.cockpit.syncDaylight(stepDaylight);
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
     this.tireSmokeSystem.update(simSeconds);
@@ -1248,6 +1255,13 @@ class FlightSimulator {
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
+    const daylight = this.sky.updateCockpitSun({
+      position: this.aircraft.group.position,
+      quaternion: this.aircraft.group.quaternion,
+      cockpitActive: isCockpit && !isPhotoCockpit,
+      dt: frameDelta,
+    });
+    this.aircraft.cockpit.syncDaylight(daylight);
     if (this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.enabled = isPhotoCockpit;
       if (isPhotoCockpit) {

@@ -138,6 +138,18 @@ with CDP on port 9451 (`CDP_PORT` overrides). Set `FALLBACK=1` to block the medi
 GLB and test Draco. `ARTIFACT_DIR` overrides the capture directory. See
 [results and limitations](../../review-artifacts/issue101/README.md).
 
+### Cockpit interior sunlight (issue #90)
+
+`CDP_PORT=9471 node scripts/verify-cockpit-shadows.mjs` stages ten deterministic
+cockpit frames across time of day, heading, bank, cloud cover and a sun astern, and
+reads back the deck-local sun bearing, spot intensity, light-cookie coverage and
+centroid, daylight factor and instrument flood levels for each. An ablation pass
+diffs the same frame with the deck sun multiplied out to show which pixels the rig
+owns. Start Vite on any free port and open it in Chrome with CDP on 9471
+(`CDP_PORT`, `ARTIFACT_DIR` override). See
+[mechanism, evidence and limits](cockpit-sunlight.md) and the
+[captured frames](../../review-artifacts/issue90/README.md).
+
 ### Cockpit interior startup sequencing
 
 `npm run test:cockpit` (`scripts/verify-cockpit-startup.js`, which starts its own

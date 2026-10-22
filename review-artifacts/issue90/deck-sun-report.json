@@ -1,0 +1,376 @@
+{
+  "gpu": "ANGLE (Intel, Vulkan 1.4.335 (Intel(R) Graphics (ADL-N) (0x000046D2)), Intel open-source Mesa driver)",
+  "rigFacts": {
+    "isSpot": true,
+    "decay": 0,
+    "distance": 0,
+    "castShadow": true,
+    "autoUpdate": false,
+    "mapSize": [
+      1024,
+      1024
+    ],
+    "hasCookie": true,
+    "cookieClass": "CanvasTexture",
+    "cookieSize": 256,
+    "cookieMipmaps": false,
+    "shadowMapSize": [
+      1024,
+      1024
+    ],
+    "mainSunMapSize": [
+      2048,
+      2048
+    ],
+    "mainSunCasts": true,
+    "exteriorShadowProxy": true,
+    "sceneChildren": 17,
+    "exteriorVisible": true
+  },
+  "results": {
+    "morning": {
+      "stats": {
+        "mean": 115.96,
+        "std": 50.01
+      },
+      "cookie": {
+        "lit": 0.020782470703125,
+        "cx": 0.5169959159324523,
+        "cy": 0.53580155561674
+      },
+      "sunLocal": {
+        "elevDeg": 20,
+        "bearingDeg": -24.2
+      },
+      "intensity": 1.4901668517449065,
+      "daylight": 0.7741126502570942,
+      "facing": 1,
+      "modeFactor": 0.9999999999999997,
+      "sunIntensity": 2.7093942758998306,
+      "sunAttenuation": 1,
+      "shadowIntensity": 1,
+      "floods": [
+        0.5033,
+        0.6711,
+        0.3355
+      ],
+      "mapDirty": false,
+      "angleDeg": 3.818,
+      "deckSunOverSun": 0.5499999999999998
+    },
+    "noon": {
+      "stats": {
+        "mean": 121.8,
+        "std": 52.09
+      },
+      "cookie": {
+        "lit": 0.0059661865234375,
+        "cx": 0.4872822090792839,
+        "cy": 0.5512607896419437
+      },
+      "sunLocal": {
+        "elevDeg": 68.2,
+        "bearingDeg": -1.6
+      },
+      "intensity": 0.30369740462356526,
+      "daylight": 0.1577648855187352,
+      "facing": 0.15776488551873524,
+      "modeFactor": 0.9999999999999997,
+      "sunIntensity": 3.5,
+      "sunAttenuation": 1,
+      "shadowIntensity": 1,
+      "floods": [
+        1.058,
+        1.4107,
+        0.7053
+      ],
+      "mapDirty": false,
+      "angleDeg": 3.818,
+      "deckSunOverSun": 0.08677068703530436
+    },
+    "golden": {
+      "stats": {
+        "mean": 112.91,
+        "std": 48.95
+      },
+      "cookie": {
+        "lit": 0.021881103515625,
+        "cx": 0.4725418410041841,
+        "cy": 0.5386321042538355
+      },
+      "sunLocal": {
+        "elevDeg": 23.4,
+        "bearingDeg": 43.5
+      },
+      "intensity": 1.597841452934263,
+      "daylight": 0.8300475080177989,
+      "facing": 1,
+      "modeFactor": 0.9999999999999997,
+      "sunIntensity": 2.905166278062297,
+      "sunAttenuation": 1,
+      "shadowIntensity": 1,
+      "floods": [
+        0.453,
+        0.6039,
+        0.302
+      ],
+      "mapDirty": false,
+      "angleDeg": 3.818,
+      "deckSunOverSun": 0.5499999999999998
+    },
+    "night": {
+      "stats": {
+        "mean": 122.2,
+        "std": 48.91
+      },
+      "cookie": {
+        "lit": 0.0260467529296875,
+        "cx": 0.4995148652606913,
+        "cy": 0.4489670291446983
+      },
+      "sunLocal": {
+        "elevDeg": -42.7,
+        "bearingDeg": 49.1
+      },
+      "intensity": 0.03299999999999999,
+      "daylight": 0.017142857142857133,
+      "facing": 1,
+      "modeFactor": 0.9999999999999997,
+      "sunIntensity": 0.06,
+      "sunAttenuation": 1,
+      "shadowIntensity": 1,
+      "floods": [
+        1.1846,
+        1.5794,
+        0.7897
+      ],
+      "mapDirty": false,
+      "angleDeg": 3.818,
+      "deckSunOverSun": 0.5499999999999998
+    },
+    "leftSun": {
+      "stats": {
+        "mean": 94.91,
+        "std": 50.02
+      },
+      "cookie": {
+        "lit": 0.0225982666015625,
+        "cx": 0.4618448261309926,
+        "cy": 0.4782162601282917
+      },
+      "sunLocal": {
+        "elevDeg": 44.9,
+        "bearingDeg": -94.3
+      },
+      "intensity": 1.9249999999999994,
+      "daylight": 0.9999999999999996,
+      "facing": 1,
+      "modeFactor": 0.9999999999999997,
+      "sunIntensity": 3.5,
+      "sunAttenuation": 1,
+      "shadowIntensity": 1,
+      "floods": [
+        0.3,
+        0.4,
+        0.2
+      ],
+      "mapDirty": false,
+      "angleDeg": 3.818,
+      "deckSunOverSun": 0.5499999999999998
+    },
+    "rightSun": {
+      "stats": {
+        "mean": 102.17,
+        "std": 53.47
+      },
+      "cookie": {
+        "lit": 0.022308349609375,
+        "cx": 0.5383170528385773,
+        "cy": 0.5042936687756497
+      },
+      "sunLocal": {
+        "elevDeg": 46.6,
+        "bearingDeg": 94.5
+      },
+      "intensity": 1.9249999999999994,
+      "daylight": 0.9999999999999996,
+      "facing": 1,
+      "modeFactor": 0.9999999999999997,
+      "sunIntensity": 3.5,
+      "sunAttenuation": 1,
+      "shadowIntensity": 1,
+      "floods": [
+        0.3,
+        0.4,
+        0.2
+      ],
+      "mapDirty": false,
+      "angleDeg": 3.818,
+      "deckSunOverSun": 0.5499999999999998
+    },
+    "bankLeft": {
+      "stats": {
+        "mean": 116.52,
+        "std": 47.48
+      },
+      "cookie": {
+        "lit": 0.025848388671875,
+        "cx": 0.49061254796340026,
+        "cy": 0.464029755755608
+      },
+      "sunLocal": {
+        "elevDeg": 33.2,
+        "bearingDeg": -123.1
+      },
+      "intensity": 1.9249999999999994,
+      "daylight": 0.9999999999999996,
+      "facing": 1,
+      "modeFactor": 0.9999999999999997,
+      "sunIntensity": 3.5,
+      "sunAttenuation": 1,
+      "shadowIntensity": 1,
+      "floods": [
+        0.3,
+        0.4,
+        0.2
+      ],
+      "mapDirty": false,
+      "angleDeg": 3.818,
+      "deckSunOverSun": 0.5499999999999998
+    },
+    "bankRight": {
+      "stats": {
+        "mean": 99.11,
+        "std": 60.27
+      },
+      "cookie": {
+        "lit": 0.0191802978515625,
+        "cx": 0.47776514021479716,
+        "cy": 0.515115354017502
+      },
+      "sunLocal": {
+        "elevDeg": 37.6,
+        "bearingDeg": -62.6
+      },
+      "intensity": 1.9249999999999994,
+      "daylight": 0.9999999999999996,
+      "facing": 1,
+      "modeFactor": 0.9999999999999997,
+      "sunIntensity": 3.5,
+      "sunAttenuation": 1,
+      "shadowIntensity": 1,
+      "floods": [
+        0.3,
+        0.4,
+        0.2
+      ],
+      "mapDirty": false,
+      "angleDeg": 3.818,
+      "deckSunOverSun": 0.5499999999999998
+    },
+    "overcast": {
+      "stats": {
+        "mean": 122.38,
+        "std": 50.45
+      },
+      "cookie": {
+        "lit": 0.0060882568359375,
+        "cx": 0.48650924185463656,
+        "cy": 0.5535518483709273
+      },
+      "sunLocal": {
+        "elevDeg": 69,
+        "bearingDeg": -2.2
+      },
+      "intensity": 0.05576722604708608,
+      "daylight": 0.02896998755692783,
+      "facing": 0.12151840418174432,
+      "modeFactor": 0.9999999999999997,
+      "sunIntensity": 0.8343999999999998,
+      "sunAttenuation": 0.23839999999999995,
+      "shadowIntensity": 0.41759999999999986,
+      "floods": [
+        1.1739,
+        1.5652,
+        0.7826
+      ],
+      "mapDirty": false,
+      "angleDeg": 3.818,
+      "deckSunOverSun": 0.06683512229995936
+    },
+    "astern": {
+      "stats": {
+        "mean": 111.65,
+        "std": 53.62
+      },
+      "cookie": {
+        "lit": 0.0296478271484375,
+        "cx": 0.5149314044004117,
+        "cy": 0.4977825045033453
+      },
+      "sunLocal": {
+        "elevDeg": 12.1,
+        "bearingDeg": 179.9
+      },
+      "intensity": 0,
+      "daylight": 0,
+      "facing": 0,
+      "modeFactor": 0.9999999999999997,
+      "sunIntensity": 2.709394275899832,
+      "sunAttenuation": 1,
+      "shadowIntensity": 1,
+      "floods": [
+        1.2,
+        1.6,
+        0.8
+      ],
+      "mapDirty": false,
+      "angleDeg": 3.818,
+      "deckSunOverSun": 0
+    }
+  },
+  "repeat": {
+    "settled": false,
+    "moved": true
+  },
+  "perf": {
+    "frozen": 217.63,
+    "forced": 355.69
+  },
+  "pageErrors": [],
+  "resourceErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found) <- http://127.0.0.1:5213/favicon.ico"
+  ],
+  "ablation": {
+    "changed": 0.0719,
+    "staticShare": 1,
+    "meanDelta": 1.42,
+    "maxDelta": 29.1,
+    "centroid": {
+      "x": 0.654,
+      "y": 0.704
+    },
+    "zones": {
+      "outside": {
+        "meanDelta": 0.18,
+        "movedShare": 0,
+        "maxDelta": 1
+      },
+      "glareshield": {
+        "meanDelta": 3.8,
+        "movedShare": 0.118,
+        "maxDelta": 29.1
+      },
+      "panel": {
+        "meanDelta": 2.19,
+        "movedShare": 0.1,
+        "maxDelta": 27
+      },
+      "pedestal": {
+        "meanDelta": 5,
+        "movedShare": 0.303,
+        "maxDelta": 21.1
+      }
+    }
+  }
+}
