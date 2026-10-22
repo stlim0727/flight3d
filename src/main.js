@@ -6,6 +6,7 @@ import { Aerodynamics } from './physics/Aerodynamics.js';
 import { EngineModel } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
 import { AutopilotController } from './physics/Autopilot.js';
+import { solveTrim } from './physics/TrimSolver.js';
 import { PFDCanvas } from './aircraft/PFDCanvas.js';
 import { NDCanvas } from './aircraft/NDCanvas.js';
 import { EICASCanvas } from './aircraft/EICASCanvas.js';
@@ -243,8 +244,19 @@ class FlightSimulator {
       parkBrake: false
     };
 
-    // Autopilot (pure control laws in src/physics/Autopilot.js)
-    this.autopilot = new AutopilotController();
+    // Autopilot (pure control laws in src/physics/Autopilot.js). The trim
+    // solver runs only on mode/target capture, so its allocation is off the
+    // 120 Hz path.
+    this.autopilot = new AutopilotController({
+      trimSolver: (telemetry, flightPathAngleDeg) => solveTrim(this.aero, this.engines, {
+        iasKnots: telemetry.iasKnots,
+        altitudeMeters: Atmosphere.feetToMeters(telemetry.altitudeFt),
+        flightPathAngleDeg,
+        flapsIndex: this.aero.flapsIndex,
+        gearState: this.telemetry.gearState,
+        spoilers: this.aero.spoilers,
+      }),
+    });
     // Reusable objects so 120 Hz substeps do not allocate for the AP snapshot.
     this._apEuler = new THREE.Euler();
     this._apForward = new THREE.Vector3();

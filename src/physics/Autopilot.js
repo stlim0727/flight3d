@@ -18,11 +18,14 @@ function clamp(v, lo, hi) {
  *
  * Mode stack: lateral (HDG | APP), vertical (PITCH | ALT | VS | APP), speed (IAS).
  * Master gates everything; targets are captured from telemetry on engage.
- * The sim trims near hands-off cruise, so proportional(-plus-damping) laws
- * converge the way the previous wings-leveler did.
+ * When a trimSolver is injected (see TrimSolver.solveTrim), engage captures a
+ * steady-state trim solution and the vertical/speed laws add it as a
+ * feedforward term, so engagement is bumpless and holds no longer rely on the
+ * proportional term fighting the steady stick force by itself. Without a
+ * solver the laws behave exactly as the previous wings-leveler did.
  */
 export class AutopilotController {
-  constructor() {
+  constructor(options = {}) {
     this.master = false;
     this.lateralMode = null;   // 'HDG' | 'APP'
     this.verticalMode = null;  // 'PITCH' | 'ALT' | 'VS' | 'APP'
@@ -36,6 +39,12 @@ export class AutopilotController {
       vsFpm: 0,
       iasKnots: 0,
     };
+
+    // Steady-state feedforward captured on engage (trim elevator −1..1 and
+    // throttle 0..1). Zero means "no trim known".
+    this.trimSolver = options.trimSolver || null;
+    this.trim = { elevator: 0, throttle: 0 };
+    this._trimThrottlePending = false;
 
     this.maxBankDeg = 30;
     this.hdgDegPerDegError = 1.0;      // heading error -> bank target
@@ -67,6 +76,7 @@ export class AutopilotController {
       this.master = true;
       this.capturePitch(telemetry);
       this.captureSpeed(telemetry);
+      this.refreshTrim(telemetry);
       return;
     }
     if (!this.master) {
@@ -74,6 +84,7 @@ export class AutopilotController {
       this.capturePitch(telemetry);
       this.captureSpeed(telemetry);
     }
+    let engagedSpeed = false;
     switch (mode) {
       case 'HDG':
         this.captureHeading(telemetry);
@@ -90,11 +101,14 @@ export class AutopilotController {
       case 'SPD':
         this.captureSpeed(telemetry);
         this.speedMode = true;
+        engagedSpeed = true;
         break;
       case 'APP':
         this.evaluateAppCapture(telemetry);
         break;
     }
+    this.refreshTrim(telemetry);
+    if (engagedSpeed && this.trim.throttle > 0) this._trimThrottlePending = true;
   }
 
   disengage() {
@@ -103,6 +117,9 @@ export class AutopilotController {
     this.verticalMode = null;
     this.speedMode = false;
     this.appArmed = false;
+    this.trim.elevator = 0;
+    this.trim.throttle = 0;
+    this._trimThrottlePending = false;
   }
 
   reset() {
@@ -145,6 +162,29 @@ export class AutopilotController {
   captureVS(telemetry) { this.targets.vsFpm = telemetry.vsiFpm; }
   captureSpeed(telemetry) { this.targets.iasKnots = telemetry.iasKnots; }
 
+  /** Desired steady flight-path angle of the active vertical mode, degrees. */
+  flightPathAngleDeg(telemetry, vsOverrideFpm) {
+    const vsFpm = vsOverrideFpm !== undefined ? vsOverrideFpm
+      : (this.verticalMode === 'VS' ? this.targets.vsFpm : 0);
+    const tasMs = Math.max(1, (telemetry.tasKnots || 0) * 0.514444);
+    return Math.atan2(vsFpm / 60.0, tasMs) * 180 / Math.PI;
+  }
+
+  /**
+   * Capture the steady-state trim solution for the current targets. Called on
+   * engage/target changes only — never per substep — so the injected solver may
+   * allocate. Falls back to zero feedforward when no solver or no solution.
+   */
+  refreshTrim(telemetry, vsOverrideFpm) {
+    this.trim.elevator = 0;
+    this.trim.throttle = 0;
+    if (!this.trimSolver) return;
+    const solution = this.trimSolver(telemetry, this.flightPathAngleDeg(telemetry, vsOverrideFpm));
+    if (!solution || !solution.feasible) return;
+    if (Number.isFinite(solution.elevator)) this.trim.elevator = solution.elevator;
+    if (Number.isFinite(solution.throttle)) this.trim.throttle = solution.throttle;
+  }
+
   /**
    * APP becomes active only when established near the approach course;
    * otherwise it arms and captures automatically in update().
@@ -157,6 +197,7 @@ export class AutopilotController {
       this.verticalMode = 'APP';
       this.appArmed = false;
       this.master = true;
+      this.refreshTrim(telemetry, dev.referenceSinkFpm);
       return true;
     }
     this.appArmed = true;
@@ -209,29 +250,40 @@ export class AutopilotController {
         this.verticalMode = 'PITCH';
       } else {
         // Damping acts on sink excess vs the glideslope reference so that
-        // tracking the path exactly (elevator 0) is the steady state.
+        // tracking the path exactly (at the captured trim) is the steady state.
         out.elevator = clamp(
-          -dev.glideslopeErrorFt * this.gsElevatorPerFt -
+          this.trim.elevator -
+          dev.glideslopeErrorFt * this.gsElevatorPerFt -
           (telemetry.vsiFpm - dev.referenceSinkFpm) * this.gsElevatorPerFpmDamp, -1, 1);
       }
     } else if (this.verticalMode === 'ALT') {
       const altErrFt = this.targets.altitudeFt - telemetry.altitudeFt;
       out.elevator = clamp(
+        this.trim.elevator +
         altErrFt * this.elevatorPerFtAlt -
         telemetry.vsiFpm * this.elevatorPerFpmDamp, -1, 1);
     } else if (this.verticalMode === 'VS') {
       const vsErrFpm = this.targets.vsFpm - telemetry.vsiFpm;
-      out.elevator = clamp(vsErrFpm * this.elevatorPerFpmVs, -1, 1);
+      out.elevator = clamp(
+        this.trim.elevator + vsErrFpm * this.elevatorPerFpmVs, -1, 1);
     } else {
       // PITCH hold (also the master-only fallback): hold captured pitch.
       out.elevator = clamp(
+        this.trim.elevator +
         (this.targets.pitchDeg - telemetry.pitchDeg) * this.elevatorPerDegPitch, -1, 1);
     }
 
     if (this.speedMode) {
-      out.throttle = clamp(
-        out.throttle + (this.targets.iasKnots - telemetry.iasKnots) *
-          this.throttlePerKtPerSec * dt, 0, 1);
+      if (this._trimThrottlePending) {
+        // Bumpless SPD capture: jump to the solved trim thrust once, then
+        // integrate speed error around it.
+        out.throttle = clamp(this.trim.throttle, 0, 1);
+        this._trimThrottlePending = false;
+      } else {
+        out.throttle = clamp(
+          out.throttle + (this.targets.iasKnots - telemetry.iasKnots) *
+            this.throttlePerKtPerSec * dt, 0, 1);
+      }
     }
     return out;
   }
