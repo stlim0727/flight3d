@@ -366,6 +366,7 @@ class FlightSimulator {
         state === FLOW.LOBBY && this.demoDirector?.waitingForTerrain === true);
       if (state === FLOW.LOBBY) this.lobbyScreen.refresh();
     }
+    this.updateMenuToggle();
   }
 
   /** Leave the lobby: stop the cinematic and spawn the player at their choice. */
@@ -380,6 +381,34 @@ class FlightSimulator {
     } else {
       this.setPreset(this.lobby.preset);
     }
+  }
+
+  /**
+   * Top-left menu toggle: open the main menu over the live flight (holding it),
+   * or close it. Closing resumes the held flight; if there is no flight yet
+   * (boot / after a scenario change) it launches the current selection.
+   */
+  toggleMainMenu() {
+    const flow = this.gameFlow;
+    if (flow.state === FLOW.LOBBY) {
+      if (flow.canResumeFromLobby()) flow.enterFlight();
+      else this.fly();
+      return;
+    }
+    if (this.isCrashed) this.clearCrashState();
+    flow.returnToLobby(true);
+  }
+
+  /** Keep the toggle's icon and accessible label in sync with the flow state. */
+  updateMenuToggle() {
+    const btn = document.getElementById('menu-toggle');
+    if (!btn) return;
+    const open = this.gameFlow.state === FLOW.LOBBY;
+    btn.classList.toggle('is-open', open);
+    // Live closure: setLanguage() re-runs it, so the label follows language too.
+    bindText(btn, () => t(this.gameFlow.state === FLOW.LOBBY ? 'menu.close' : 'menu.open'), 'aria-label');
+    const glyph = btn.querySelector('.menu-toggle-glyph');
+    if (glyph) glyph.textContent = open ? '✕' : '🏠';
   }
 
   setTimeOfDay(hours) {
@@ -662,6 +691,9 @@ class FlightSimulator {
 
     this.lobby.airport = id;
     if (!isScenarioAvailable(id, this.lobby.preset)) this.lobby.preset = DEFAULT_SCENARIO;
+    // A new airport re-spawns the aircraft below, so any flight held behind the
+    // menu is no longer the one to return to: release it and let the cinematic back.
+    this.gameFlow.abandonResumableFlight();
     this.lobbyScreen?.refresh();
 
     if (this.demoDirector && this.demoDirector.isActive) {
@@ -1430,11 +1462,12 @@ class FlightSimulator {
       this.gameFlow.resume();
       this.setPreset(this.lastPresetType || 'runway');
     });
-    document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby());
+    document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
     document.getElementById('btn-hud-menu')?.addEventListener('click', () => {
       if (this.isCrashed) this.clearCrashState();
-      this.gameFlow.returnToLobby();
+      this.gameFlow.returnToLobby(true);
     });
+    document.getElementById('menu-toggle')?.addEventListener('click', () => this.toggleMainMenu());
 
     // ESC chain: the demo director consumes ESC first (take manual control);
     // otherwise panels/help modal close before the pause menu opens.

@@ -153,3 +153,69 @@ test('enterLobby with inactive demo arms countdown immediately', () => {
   run(c, 1.6);
   assert.equal(c.consumeDemoRestart(), true);
 });
+
+test('returnToLobby(true) holds the flight: frozen, resumable, no cinematic', () => {
+  const { c } = makeController();
+  c.enterFlight();
+  assert.equal(c.returnToLobby(true), true);
+  assert.equal(c.state, FLOW.LOBBY);
+  assert.equal(c.canResumeFromLobby(), true);
+  assert.equal(c.isPhysicsFrozen(), true);
+  assert.equal(c.blocksFlightInput(), true);
+  run(c, 5);
+  assert.equal(c.consumeDemoRestart(), false);   // cinematic never re-armed
+});
+
+test('enterFlight from a held lobby resumes without respawn or re-arm', () => {
+  const { c } = makeController();
+  c.enterFlight();
+  c.returnToLobby(true);
+  c.enterFlight();
+  assert.equal(c.state, FLOW.FLIGHT);
+  assert.equal(c.canResumeFromLobby(), false);
+  assert.equal(c.isPhysicsFrozen(), false);
+  run(c, 5);
+  assert.equal(c.consumeDemoRestart(), false);
+});
+
+test('held lobby survives a pause/return round-trip', () => {
+  const { c } = makeController();
+  c.enterFlight();
+  c.pause();
+  assert.equal(c.returnToLobby(true), true);     // PAUSED -> held menu
+  assert.equal(c.canResumeFromLobby(), true);
+  assert.equal(c.isPhysicsFrozen(), true);
+  c.enterFlight();
+  assert.equal(c.isPhysicsFrozen(), false);
+  c.pause();
+  assert.equal(c.resume(), true);
+});
+
+test('abandonResumableFlight reverts the menu to the cinematic loop', () => {
+  const { c } = makeController();
+  c.enterFlight();
+  c.returnToLobby(true);
+  assert.equal(c.isPhysicsFrozen(), true);
+  assert.equal(c.abandonResumableFlight(), true);
+  assert.equal(c.canResumeFromLobby(), false);
+  assert.equal(c.isPhysicsFrozen(), false);
+  run(c, 1.6);
+  assert.equal(c.consumeDemoRestart(), true);    // countdown re-armed
+});
+
+test('abandonResumableFlight is a no-op outside a held lobby', () => {
+  const { c } = makeController();
+  assert.equal(c.abandonResumableFlight(), false); // boot lobby: not resumable
+  c.enterFlight();
+  assert.equal(c.abandonResumableFlight(), false); // flight: not resumable
+});
+
+test('returnToLobby default keeps the cinematic re-arm (no resume offered)', () => {
+  const { c } = makeController();
+  c.enterFlight();
+  assert.equal(c.returnToLobby(), true);
+  assert.equal(c.canResumeFromLobby(), false);
+  assert.equal(c.isPhysicsFrozen(), false);
+  run(c, 1.6);
+  assert.equal(c.consumeDemoRestart(), true);
+});

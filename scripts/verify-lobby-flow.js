@@ -2,9 +2,11 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 // Browser acceptance for the lobby/pause flow (issue #112 part 3).
-// Boots the page, verifies menu gating, Fly handoff, ESC pause, lobby return
-// (pause menu and HUD toolbar button), demo loop-restart, airport switching —
-// plus desktop + mobile screenshots.
+// Boots the page, verifies menu gating, Fly handoff, ESC pause, and the top-left
+// menu toggle: opening it from a flight holds that flight (frozen, no cinematic)
+// and the same toggle resumes it; airport switching abandons the held flight so
+// the toggle launches the new selection. Also checks the boot-menu loop restart
+// and airport switching, plus desktop + mobile screenshots.
 
 const PORT = 5179;
 const CDP_PORT = 9469;
@@ -248,25 +250,56 @@ async function testLobbyFlow() {
     if (resumed.flow !== 'flight' || resumed.blocked) throw new Error('Resume failed');
     if (Math.abs(resumed.elev) > 0.05) throw new Error(`Elevator did not neutralize after resume: ${resumed.elev}`);
 
-    // 8. Pause → return to lobby; the cinematic must re-arm and restart.
+    // 8. Pause → main menu HOLDS the live flight (frozen, no cinematic); the
+    // top-left toggle then drops straight back into the same aircraft.
     await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
     await sleep(200);
     await evalJs(`document.getElementById('btn-pause-lobby').click()`);
-    const lobbyBack = await evalJs(`document.body.dataset.flow`);
-    if (lobbyBack !== 'lobby') throw new Error('Return to lobby failed');
-    let restarted = false;
-    for (let i = 0; i < 60 && !restarted; i++) {
-      await sleep(500);
-      restarted = await evalJs(`window.simulator.demoDirector.isActive`);
+    await sleep(400);
+    const heldMenu = await evalJs(`(() => {
+      const sim = window.simulator, gf = sim.gameFlow;
+      return {
+        flow: document.body.dataset.flow,
+        resumable: gf.canResumeFromLobby(),
+        frozen: gf.isPhysicsFrozen(),
+        demoActive: sim.demoDirector.isActive,
+        lobbyVisible: getComputedStyle(document.getElementById('lobby-screen')).display !== 'none',
+        toggleOpen: document.getElementById('menu-toggle').classList.contains('is-open'),
+        alt: sim.telemetry.altitudeFt,
+      };
+    })()`);
+    console.log('🔍 pause→menu (held):', JSON.stringify(heldMenu));
+    if (heldMenu.flow !== 'lobby' || !heldMenu.resumable || !heldMenu.frozen) {
+      throw new Error('Returning to the menu must hold the flight (resumable + frozen)');
     }
-    if (!restarted) throw new Error('Demo did not restart behind the lobby within 30s');
-    const backdropAirport = await evalJs(`window.simulator.demoDirector.activeDemoAirport`);
-    if (backdropAirport !== 'coastal') throw new Error(`Backdrop should replay coastal, got ${backdropAirport}`);
-    console.log('🔍 lobby loop restart OK (coastal)');
-    await screenshot('05-lobby-loop');
+    if (!heldMenu.lobbyVisible || !heldMenu.toggleOpen) throw new Error('Menu overlay + open-state toggle must show');
+    if (heldMenu.demoActive) throw new Error('Cinematic must not replay while a flight is held');
+    if (heldMenu.alt < 1000) throw new Error('Held aircraft fell out of cruise while in the menu');
+    await screenshot('05-lobby-held');
 
-    // 8b. Demo flight behaves like a lobby scenario: pick it, Fly starts it
-    // in-flight with the banner up; ESC hands control back.
+    // 8a. Same toggle closes the menu and resumes the held aircraft (no respawn).
+    await evalJs(`document.getElementById('menu-toggle').click()`);
+    await sleep(300);
+    const resumedFlight = await evalJs(`(() => {
+      const sim = window.simulator, gf = sim.gameFlow;
+      return {
+        flow: document.body.dataset.flow,
+        frozen: gf.isPhysicsFrozen(),
+        resumable: gf.canResumeFromLobby(),
+        toggleOpen: document.getElementById('menu-toggle').classList.contains('is-open'),
+        alt: sim.telemetry.altitudeFt,
+      };
+    })()`);
+    console.log('🔍 toggle→flight:', JSON.stringify(resumedFlight));
+    if (resumedFlight.flow !== 'flight' || resumedFlight.frozen || resumedFlight.resumable) {
+      throw new Error('Toggle did not resume the held flight');
+    }
+    if (resumedFlight.toggleOpen) throw new Error('Toggle should read as closed once flying');
+    if (resumedFlight.alt < 1000) throw new Error('Toggle respawned to the runway instead of resuming');
+
+    // 8b. Open the menu via the toggle; the demo scenario is selectable and Fly starts it.
+    await evalJs(`document.getElementById('menu-toggle').click()`);   // flight -> held menu
+    await sleep(300);
     await evalJs(`document.getElementById('lobby-preset-demo').click()`);
     const demoPending = await evalJs(`(() => ({
       pending: window.simulator.lobby.preset,
@@ -274,7 +307,7 @@ async function testLobbyFlow() {
       briefing: document.getElementById('lobby-briefing').textContent,
     }))()`);
     if (demoPending.pending !== 'demo' || !demoPending.active || !/demo flight/i.test(demoPending.briefing)) {
-      throw new Error('Demo scenario not selectable in lobby: ' + JSON.stringify(demoPending));
+      throw new Error('Demo scenario not selectable in menu: ' + JSON.stringify(demoPending));
     }
     await evalJs(`document.getElementById('btn-fly').click()`);
     await sleep(800);
@@ -291,21 +324,18 @@ async function testLobbyFlow() {
       throw new Error('Demo scenario did not start a demo flight');
     }
     await screenshot('05b-demo-flight');
-    await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
-    await sleep(200);
-    await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
-    await sleep(200);
-    await evalJs(`document.getElementById('btn-pause-lobby').click()`);
-    await sleep(200);
 
-    // 9. ESC inside the lobby is a no-op.
+    // 9. ESC inside the menu is a no-op.
+    await evalJs(`document.getElementById('menu-toggle').click()`);   // open menu (holds demo)
+    await sleep(300);
     await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
     await sleep(150);
-    if (await evalJs(`document.body.dataset.flow`) !== 'lobby') throw new Error('ESC must be ignored in lobby');
+    if (await evalJs(`document.body.dataset.flow`) !== 'lobby') throw new Error('ESC must be ignored in the menu');
 
-    // 10. HUD toolbar "Main menu" button returns to the lobby directly from flight.
-    await evalJs(`document.getElementById('btn-fly').click()`);
-    await sleep(600);
+    // 10. HUD "Main menu" holds the flight; switching airport abandons the hold so
+    //     the toggle falls back to launching the newly selected scenario.
+    await evalJs(`document.getElementById('menu-toggle').click()`);   // resume demo flight
+    await sleep(300);
     const hudMenu = await evalJs(`(() => {
       const btn = document.getElementById('btn-hud-menu');
       return {
@@ -319,29 +349,46 @@ async function testLobbyFlow() {
       throw new Error('Main menu button must be visible in the flight toolbar');
     }
     await evalJs(`document.getElementById('btn-hud-menu').click()`);
-    const hudLobby = await evalJs(`(() => {
-      const sim = window.simulator;
+    await sleep(300);
+    const hudHeld = await evalJs(`(() => {
+      const sim = window.simulator, gf = sim.gameFlow;
       return {
         flow: document.body.dataset.flow,
         blocked: sim.controls.inputBlocked,
-        lobbyVisible: getComputedStyle(document.getElementById('lobby-screen')).display !== 'none',
+        resumable: gf.canResumeFromLobby(),
         toolbarHidden: getComputedStyle(document.querySelector('.flight-toolbar')).display === 'none',
       };
     })()`);
-    console.log('🔍 hud return:', JSON.stringify(hudLobby));
-    if (hudLobby.flow !== 'lobby' || !hudLobby.blocked || !hudLobby.lobbyVisible || !hudLobby.toolbarHidden) {
-      throw new Error('HUD main-menu button did not return to the lobby');
+    console.log('🔍 hud return (held):', JSON.stringify(hudHeld));
+    if (hudHeld.flow !== 'lobby' || !hudHeld.blocked || !hudHeld.resumable) {
+      throw new Error('HUD main-menu button must return to the menu holding the flight');
     }
-    let hudRestarted = false;
-    for (let i = 0; i < 60 && !hudRestarted; i++) {
-      await sleep(500);
-      hudRestarted = await evalJs(`window.simulator.demoDirector.isActive`);
+    if (!hudHeld.toolbarHidden) throw new Error('Toolbar must be hidden in the menu');
+
+    // Changing the airport re-spawns the aircraft, so the held flight is released.
+    await evalJs(`document.getElementById('lobby-airport-lukla').click()`);
+    await sleep(600);
+    const afterSwitch = await evalJs(`(() => {
+      const sim = window.simulator, gf = sim.gameFlow;
+      return { airport: sim.activeAirport, resumable: gf.canResumeFromLobby(), frozen: gf.isPhysicsFrozen() };
+    })()`);
+    console.log('🔍 airport switch abandons hold:', JSON.stringify(afterSwitch));
+    if (afterSwitch.airport !== 'lukla' || afterSwitch.resumable || afterSwitch.frozen) {
+      throw new Error('Airport switch must abandon the held flight and unfreeze the menu');
     }
-    if (!hudRestarted) throw new Error('Demo did not restart after HUD return to lobby within 30s');
-    console.log('🔍 HUD lobby return + loop restart OK');
-    await screenshot('06-hud-return-lobby');
+    await screenshot('06-menu-abandon-on-switch');
+
+    // With no flight held, the toggle now launches the selected scenario.
+    await evalJs(`document.getElementById('menu-toggle').click()`);
+    await sleep(400);
+    if (await evalJs(`document.body.dataset.flow`) !== 'flight') {
+      throw new Error('Toggle from a non-held menu must launch the flight');
+    }
+    console.log('🔍 toggle-launch-from-fresh-menu OK');
 
     // 11. Mobile portrait: lobby renders as a bottom sheet.
+    await evalJs(`document.getElementById('menu-toggle').click()`);   // back into the menu
+    await sleep(300);
     await send('Emulation.setDeviceMetricsOverride', {
       width: 390, height: 844, deviceScaleFactor: 2, mobile: true,
       screenOrientation: { type: 'portraitPrimary', angle: 0 },
