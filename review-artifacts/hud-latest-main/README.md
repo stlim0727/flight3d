@@ -18,6 +18,10 @@ It fits within the viewport and scrolls if height is limited. Clicking the trigg
 pressing Escape or tapping outside closes it. Escape closes AP without pausing
 flight; outside input still reaches its intended control.
 
+The relocated demo guide and reopen pill sit below the flight toolbar. The stall
+alert sits below both the toolbar and AP dropdown; on very short screens it uses
+the open warning area below the toolbar.
+
 ## Verification
 
 - `npm run check`: 156 JavaScript files and pinned workflow actions pass.
@@ -27,8 +31,11 @@ flight; outside input still reaches its intended control.
   non-overlap, telemetry fit, strip order and row count, direct hit targets,
   4px gaps, aligned Home/AP edges and stationary AP trigger when expanded.
 - Each layout verifies panel alignment, viewport fit and all five mode-button
-  hit targets; native master and HDG input keep the panel open and update state.
-  Native collapse and Escape dismissal pass, including no accidental pause.
+  hit targets; it now also checks every flight-toolbar button remains reachable
+  with AP expanded. Native master and HDG input keep the panel open and update
+  state. Native collapse and Escape dismissal pass, including no accidental pause.
+- The desktop regression scenario checks that the minimized demo pill reopens
+  its guide below the toolbar and that the stall alert remains clear of it.
 - Existing interaction, compact input, safe-area, telemetry swipe/keyboard and
   inspector tuning checks pass. A native camera tap closes AP from outside
   and the camera remains usable.

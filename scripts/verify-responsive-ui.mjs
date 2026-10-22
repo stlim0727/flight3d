@@ -148,6 +148,10 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     const trigger = document.querySelector('#btn-ap-toggle').getBoundingClientRect();
     const panel = document.querySelector('#ap-panel').getBoundingClientRect();
     return { trigger: trigger.toJSON(), panel: panel.toJSON(), visible: !document.querySelector('#ap-panel').hidden,
+      toolbarTargets: [...document.querySelectorAll('.flight-toolbar button')].map(node => {
+        const r = node.getBoundingClientRect();
+        return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)) };
+      }),
       targets: [...document.querySelectorAll('#ap-panel button')].map(node => {
         const r = node.getBoundingClientRect();
         return { id: node.id, width: r.width, height: r.height,
@@ -156,6 +160,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   })()`);
   assert.ok(expanded.visible && Math.abs(expanded.trigger.x - direct.anchor.x) < 1 && Math.abs(expanded.trigger.y - direct.anchor.y) < 1, `${name}: AP trigger stays fixed when expanded`);
   assert.ok(Math.abs(expanded.panel.right - expanded.trigger.right) < 1 && Math.abs(expanded.panel.top - expanded.trigger.bottom - 4) < 1, `${name}: AP panel opens 4px below, right-aligned`);
+  assert.ok(expanded.toolbarTargets.every(b => b.reachable), `${name}: toolbar controls remain reachable while AP is expanded: ${JSON.stringify(expanded.toolbarTargets)}`);
   assert.ok(expanded.panel.left >= 0 && expanded.panel.bottom <= height && expanded.targets.length === 5 && expanded.targets.every(b => b.reachable && b.width >= 44 && b.height >= 44), `${name}: all expanded AP controls fit and are reachable`);
   await nativeClick('#btn-ap', touch);
   assert.ok(await ev(`window.simulator.autopilot.master && document.querySelector('#btn-ap-toggle').classList.contains('ap-active') && !document.querySelector('#ap-panel').hidden`), `${name}: native master toggle keeps panel open and trigger green`);
@@ -254,6 +259,21 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
 }
 console.log(`${results.length} viewport/input layouts passed`);
 fs.writeFileSync(`${out}/layout-results.json`, JSON.stringify(results, null, 2));
+
+await send('Emulation.setTouchEmulationEnabled', { enabled: false, maxTouchPoints: 1 });
+await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await ev(`window.simulator.touchControls.disable(); window.simulator.demoDirector.start(); window.simulator.demoDirector.closeBanner()`);
+await new Promise(resolve => setTimeout(resolve, 2800));
+const demoPill = await ev(`(()=>{const node=document.querySelector('#btn-demo-open'),r=node.getBoundingClientRect(),t=document.querySelector('.flight-toolbar').getBoundingClientRect();return {visible:getComputedStyle(node).display!=='none',top:r.top,toolbarBottom:t.bottom,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}})()`);
+assert.ok(demoPill.visible && demoPill.top >= demoPill.toolbarBottom + 4 && demoPill.reachable, `desktop: demo reopen pill is clear and reachable below toolbar: ${JSON.stringify(demoPill)}`);
+await nativeClick('#btn-demo-open', false);
+assert.ok(await ev(`getComputedStyle(document.querySelector('#demo-banner')).display!=='none' && getComputedStyle(document.querySelector('#btn-demo-open')).display==='none'`), 'desktop: demo guide reopens from its pill');
+await ev(`window.simulator.demoDirector.stop()`);
+await ev(`document.querySelector('#hud-stall').style.display='block'`);
+const stallWarning = await ev(`(()=>{const node=document.querySelector('#hud-stall'),r=node.getBoundingClientRect(),t=document.querySelector('.flight-toolbar').getBoundingClientRect();return {top:r.top,toolbarBottom:t.bottom,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)),height:r.height}})()`);
+assert.ok(stallWarning.top >= 100 && stallWarning.reachable && stallWarning.height > 0, `desktop: stall warning text is not covered by toolbar: ${JSON.stringify(stallWarning)}`);
+await ev(`document.querySelector('#hud-stall').style.display='none'`);
+console.log('Desktop demo pill and stall alert reachability passed');
 
 const strip = await ev(`(() => {
   const items = [...document.querySelectorAll('.hud-strip .hud-item')];

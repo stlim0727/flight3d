@@ -2131,6 +2131,23 @@ body[data-flow="lobby"] .menu-toggle {
   .presets-bar { top: 60px; }
 }
 
+/* Keep the demo guide and its reopen button below the relocated control strip. */
+.demo-banner, .demo-pill-btn {
+  top: calc(var(--edge-top) + 104px);
+}
+.compact-ui .demo-banner, .compact-ui .demo-pill-btn {
+  top: calc(var(--edge-top) + 104px);
+}
+
+/* Put the stall alert below the toolbar and expanded AP controls. */
+.stall-banner {
+  top: calc(var(--edge-top) + 208px);
+  z-index: 70;
+}
+@media (max-height: 400px) {
+  .stall-banner { top: calc(var(--edge-top) + 104px); }
+}
+
 /* Compact/touch: lobby becomes a scrollable bottom sheet. */
 .compact-ui #lobby-screen {
   align-items: flex-end;
