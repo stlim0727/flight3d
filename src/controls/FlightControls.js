@@ -48,6 +48,7 @@ export class FlightControls {
     this.onToggleSpoilers = null;
     this.onCycleFlaps = null;
     this.onToggleReverser = null;
+    this.onCycleEngineFailure = null;
     this.onCycleCamera = null;
     this.onSelectCamera = null;
     this.onToggleLights = null;
@@ -109,6 +110,11 @@ export class FlightControls {
         break;
       case 'KeyR':
         if (this.onToggleReverser) this.onToggleReverser();
+        break;
+      case 'KeyP':
+        // Cycle simulated engine failure; repeat-guarded so holding the key
+        // does not spin through the cycle.
+        if (!e.repeat && this.onCycleEngineFailure) this.onCycleEngineFailure();
         break;
       case 'KeyL':
         if (this.onToggleLights) this.onToggleLights();

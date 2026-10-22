@@ -29,6 +29,7 @@ export class EICASCanvas {
     this.parkBrake = false;
     this.reverserActive = false;
     this.isStalled = false;
+    this.fuelKg = 14200;
   }
 
   updateData(state) {
@@ -42,6 +43,7 @@ export class EICASCanvas {
     this.parkBrake = state.parkBrake || false;
     this.reverserActive = state.reverserActive || false;
     this.isStalled = state.isStalled || false;
+    if (state.fuelKg !== undefined) this.fuelKg = state.fuelKg;
   }
 
   render() {
@@ -54,11 +56,12 @@ export class EICASCanvas {
     ctx.fillRect(0, 0, w, h);
 
     // Top Engine Dial Header
-    ctx.fillStyle = '#4a5d78';
     ctx.font = 'bold 12px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('ENG 1', w * 0.28, 22);
-    ctx.fillText('ENG 2', w * 0.72, 22);
+    ctx.fillStyle = this.e1.failed ? '#ef4444' : '#4a5d78';
+    ctx.fillText(this.e1.failed ? 'ENG 1 FAIL' : 'ENG 1', w * 0.28, 22);
+    ctx.fillStyle = this.e2.failed ? '#ef4444' : '#4a5d78';
+    ctx.fillText(this.e2.failed ? 'ENG 2 FAIL' : 'ENG 2', w * 0.72, 22);
 
     // 1. Dual N1% Round Gauges
     const n1Y = 75;
@@ -92,8 +95,8 @@ export class EICASCanvas {
 
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 13px monospace';
-    ctx.fillText(Math.round(this.e1.ff).toString(), w * 0.28, rowY2);
-    ctx.fillText(Math.round(this.e2.ff).toString(), w * 0.72, rowY2);
+    ctx.fillText(Math.round(this.e1.ff ?? this.e1.fuelFlow ?? 0).toString(), w * 0.28, rowY2);
+    ctx.fillText(Math.round(this.e2.ff ?? this.e2.fuelFlow ?? 0).toString(), w * 0.72, rowY2);
 
     // Hydraulic Pressure & Total Fuel Quantity
     const rowY3 = 292;
@@ -102,8 +105,8 @@ export class EICASCanvas {
     ctx.textAlign = 'left';
     ctx.fillText('HYD A 3000', 36, rowY3);
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText('TOTAL FUEL 14,200 KG', w * 0.5, rowY3);
+    ctx.fillStyle = this.fuelKg <= 1000 ? '#ef4444' : this.fuelKg <= 3000 ? '#f59e0b' : '#ffffff';
+    ctx.fillText(`TOTAL FUEL ${Math.round(this.fuelKg).toLocaleString('en-US')} KG`, w * 0.5, rowY3);
     ctx.textAlign = 'right';
     ctx.fillStyle = '#10b981';
     ctx.fillText('HYD B 3000', w - 36, rowY3);
@@ -332,6 +335,14 @@ export class EICASCanvas {
     let alertLine = y + 16;
     ctx.font = 'bold 12px monospace';
     ctx.textAlign = 'left';
+
+    if (this.e1.failed || this.e2.failed) {
+      ctx.fillStyle = '#ef4444';
+      const both = this.e1.failed && this.e2.failed;
+      ctx.fillText(both ? 'ENG FAIL 1 AND 2 — FLAMEOUT'
+        : `ENG FAIL ${this.e1.failed ? '1' : '2'} — WINDMILLING`, x + 12, alertLine);
+      alertLine += 18;
+    }
 
     if (this.isStalled) {
       ctx.fillStyle = '#ef4444';

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Atmosphere } from './physics/Atmosphere.js';
 import { BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics } from './physics/Aerodynamics.js';
-import { EngineModel } from './physics/EngineModel.js';
+import { EngineModel, asymmetricThrustYawMoment } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
 import { AutopilotController } from './physics/Autopilot.js';
 import { solveTrim } from './physics/TrimSolver.js';
@@ -125,6 +125,10 @@ class FlightSimulator {
     // 4. Physics Engines
     this.aero = new Aerodynamics();
     this.engines = new EngineModel();
+    // Fuel already burned against aero.mass via the live-mass delta (see
+    // integratePhysics). Kept as a delta so scenario loadConfig overrides of
+    // currentMassKg are not fought by the burn accounting.
+    this.lastFuelLoadKg = 0;
     this.gear = new LandingGear();
 
     // 5. Procedural World & Real-World Environments
@@ -332,6 +336,24 @@ class FlightSimulator {
 
     this.controls.onToggleReverser = () => {
       this.engines.toggleReverser(this.telemetry.onGround);
+    };
+
+    this.controls.onCycleEngineFailure = () => {
+      // Cycle: both running → #1 out → both out → #2 out → both running
+      const failed = this.engines.failed;
+      if (!failed[0] && !failed[1]) {
+        this.engines.setEngineFailure(0, true);
+        this.showToast(() => t('notice.engineFailure', { which: '1 (L)' }));
+      } else if (failed[0] && !failed[1]) {
+        this.engines.setEngineFailure(1, true);
+        this.showToast(() => t('notice.enginesBothFailed'));
+      } else if (failed[0] && failed[1]) {
+        this.engines.setEngineFailure(0, false);
+        this.showToast(() => t('notice.engineFailure', { which: '2 (R)' }));
+      } else {
+        this.engines.setEngineFailure(1, false);
+        this.showToast(() => t('notice.enginesRecovered'));
+      }
     };
 
     this.controls.onCycleCamera = () => {
@@ -645,6 +667,16 @@ class FlightSimulator {
       }
     }
 
+    // A preset marks a fresh segment: refuel, clear any engine failures, and
+    // re-zero the burn accounting. A normal preset already reloaded the mass
+    // baseline via loadConfig; demo-internal ones keep the live mass, so the
+    // burned weight must be handed back explicitly.
+    this.engines.fuelKg = this.engines.fuelCapacityKg;
+    if (isDemoInternal) this.aero.mass += this.lastFuelLoadKg;
+    this.lastFuelLoadKg = 0;
+    this.engines.failed[0] = false;
+    this.engines.failed[1] = false;
+
     if (type === 'approach' || type === 'cruise') this.applyComputedTrim();
 
     this.controls.clearVirtualInputs();
@@ -845,6 +877,13 @@ class FlightSimulator {
     const tas = this.linearVelocity.length();
     const engineData = this.engines.update(dt, altitudeMeters, tas, atmos.densityRatio);
 
+    // Live mass: hand the fuel burned since the last substep to the aero/
+    // gravity models as a delta, so a scenario that replaces currentMassKg
+    // mid-flight keeps its baseline and still sheds the weight it burns.
+    const fuelLoadKg = this.engines.fuelCapacityKg - this.engines.fuelKg;
+    this.aero.mass += this.lastFuelLoadKg - fuelLoadKg;
+    this.lastFuelLoadKg = fuelLoadKg;
+
     // 3. Terrain Height & Ground Clearance
     const groundHeight = this.currentTerrain.getHeight(this.position.x, this.position.z);
     const heightAboveGround = Math.max(0, this.position.y - groundHeight);
@@ -891,6 +930,12 @@ class FlightSimulator {
       engineData.totalThrust,
       gearResult.gearState
     );
+
+    // Engine-out asymmetric thrust: the surviving engine's moment about the
+    // centerline yaws the nose toward the dead engine. Body +Y is positive
+    // yaw-left, so the sign follows directly from (T_right - T_left).
+    aeroResult.momentBody.y += asymmetricThrustYawMoment(
+      engineData.engine1.thrust, engineData.engine2.thrust);
 
     // 6. Thrust Force in World Space
     // Engine thrust acts along forward longitudinal axis (-Z in Three.js aircraft space)
@@ -988,6 +1033,7 @@ class FlightSimulator {
       engine1: engineData.engine1,
       engine2: engineData.engine2,
       reverserActive: engineData.reverserActive,
+      fuelKg: engineData.fuelKg,
       gearState: gearResult.gearState,
       isTransit: gearResult.isTransit,
       compressions: gearResult.compressions,
