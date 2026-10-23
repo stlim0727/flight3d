@@ -10,27 +10,59 @@ ws.addEventListener('message',({data})=>{const m=JSON.parse(data);pending.get(m.
 const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq;const timer=setTimeout(()=>reject(Error(method)),60000);pending.set(id,m=>{clearTimeout(timer);m.error?reject(Error(JSON.stringify(m.error))):resolve(m.result)});ws.send(JSON.stringify({id,method,params}))});
 const ev=async expression=>{const r=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value};
 const wait=async()=>{await new Promise(r=>setTimeout(r,1000));for(let i=0;i<120;i++){if(await ev('!!window.simulator?.aircraft?.cockpit?.gltfCockpitLoaded && !!window.simulator?.airport?.buildings'))return;await new Promise(r=>setTimeout(r,500))}throw Error('Models not ready')};
+await call('Page.enable');
+await call('Emulation.setDeviceMetricsOverride',{width:780,height:437,deviceScaleFactor:2,mobile:false});
+const seedScript=await call('Page.addScriptToEvaluateOnNewDocument',{source:`window.__qualityRAF=requestAnimationFrame.bind(window);window.requestAnimationFrame=()=>0;let seed=12345;Math.random=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);`});
 await call('Page.navigate',{url:process.env.APP_URL || 'http://127.0.0.1:5197/'});await wait();
 const results=await ev(`(async()=>{
- const s=window.simulator;s.demoDirector.stop();s.gameFlow.enterFlight();s.setAirport('coastal');s.setPreset('approach');s.stepSimulation(0);
+ const s=window.simulator;await s.aircraft.cockpit.shaderWarmup;s.demoDirector.stop();s.gameFlow.enterFlight();s.setAirport('coastal');s.setPreset('approach');s.stepSimulation(0);
  const select=document.getElementById('render-quality');const rows=[];
  for(const quality of ['high','balanced','performance','high']){select.value=quality;select.dispatchEvent(new Event('change'));s.renderer.render(s.scene,s.camera);rows.push({quality:s.renderQuality,terrain:s.terrain.getQuality(),dpr:s.renderer.getPixelRatio(),stored:localStorage.getItem('flight3d.renderQuality')})}
  const programs=[];const phases=[];
  // Advance the rabbit at every station and across wraps, using the real update.
  const nativeNow=performance.now.bind(performance);performance.now=()=>window.testTime;
  try{for(let i=0;i<45;i++){window.testTime=((i+.5)/15/1.6)*1000;s.airport.update(0,s.position);s.renderer.render(s.scene,s.camera);programs.push(s.renderer.info.programs.length);phases.push(s.airport.approachLight.position.x)}}finally{performance.now=nativeNow}
+ // Live night loop on the current app, separate from the historical benchmark.
+ s.setRenderQuality('balanced');s.setPreset('runway');s.stepSimulation(0);
+ s.sky.setTimeOfDay(0,s.position,s.camera.position);s.foliage.setTimeOfDay(0);s.water.syncWithAtmosphere(s.sky);
+ const intervals=[],nightPrograms=[],nightStations=[];let frame=0,previous;
+ await new Promise(resolve=>{const run=timestamp=>{
+   s.animate();
+   if(frame>=60){intervals.push(timestamp-previous);nightPrograms.push(s.renderer.info.programs.length);nightStations.push(s.airport.approachLight.position.x)}
+   previous=timestamp;
+   if(++frame<180)window.__qualityRAF(run);else resolve();
+ };window.__qualityRAF(run)});
  select.value='performance';select.dispatchEvent(new Event('change'));
- return {rows,programs,phases,glError:s.renderer.getContext().getError(),shaderErrors:s.renderer.info.programs.filter(p=>p.diagnostics?.runnable===false).length};
+ return {rows,programs,phases,night:{intervals,programs:nightPrograms,stations:nightStations},glError:s.renderer.getContext().getError(),shaderErrors:s.renderer.info.programs.filter(p=>p.diagnostics?.runnable===false).length};
 })()`);
 assert.deepEqual(results.rows.map(r=>r.terrain),['high','low','low','high']);
 assert.deepEqual(results.rows.map(r=>r.stored),['high','balanced','performance','high']);
+assert.deepEqual(results.rows.map(r=>r.dpr),[2,1.5,1,2]);
 assert.equal(new Set(results.programs).size,1,'no program growth during rabbit flashes');
 assert.equal(new Set(results.phases).size,15);
 assert.equal(results.glError,0);assert.equal(results.shaderErrors,0);
+assert.equal(results.night.intervals.length,120);
+assert.ok(results.night.intervals.every(ms=>Number.isFinite(ms)&&ms>0));
+assert.equal(new Set(results.night.programs).size,1,'night flashes must not compile programs');
 await call('Page.reload',{ignoreCache:true});await wait();
 results.reloaded=await ev('({quality:sim.renderQuality,terrain:sim.terrain.getQuality(),dpr:sim.renderer.getPixelRatio(),selected:document.getElementById("render-quality").value})');
 assert.equal(results.reloaded.quality,'performance');assert.equal(results.reloaded.selected,'performance');assert.equal(results.reloaded.dpr,1);
 await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:2,mobile:true});
-await ev(`sim.handleResize();document.querySelector('.mobile-menu-toggle')?.click();sim.renderer.render(sim.scene,sim.camera)`);
+results.mobile=await ev(`(async()=>{
+ await sim.aircraft.cockpit.shaderWarmup;
+ sim.animate();
+ sim.handleResize();
+ if(sim.gameFlow.state!=='lobby') document.getElementById('menu-toggle').click();
+ document.getElementById('lobby-tab-settings').click();
+ const select=document.getElementById('render-quality');
+ select.scrollIntoView({block:'center'});
+ const rect=select.getBoundingClientRect();
+ const hit=document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2);
+ sim.renderer.render(sim.scene,sim.camera);
+ return {visible:select.checkVisibility(),reachable:hit===select || select.contains(hit),
+   fits:rect.left>=0 && rect.right<=innerWidth && rect.top>=0 && rect.bottom<=innerHeight};
+})()`);
+assert.deepEqual(results.mobile,{visible:true,reachable:true,fits:true},'mobile settings must expose the selector');
 const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(`${dir}/mobile-quality.png`,Buffer.from(shot.data,'base64'));
-fs.writeFileSync(`${dir}/quality-controls.json`,JSON.stringify(results,null,2));console.log(JSON.stringify(results));ws.close();
+fs.writeFileSync(`${dir}/quality-controls.json`,JSON.stringify(results,null,2));console.log(JSON.stringify(results));
+await call('Page.removeScriptToEvaluateOnNewDocument',seedScript);ws.close();

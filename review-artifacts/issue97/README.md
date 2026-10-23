@@ -1,5 +1,9 @@
 # Airport rendering performance (issue #97)
 
+**Completed follow-up:** see [2026-10-23 repeated measurements and current-main
+checks](completed/README.md). The original #105 review record below is retained
+for provenance; its outstanding timing work has now been completed.
+
 Base: `283a36b` (main including cockpit batching from #102). This comparison
 isolates #97 from that previous improvement.
 
@@ -99,11 +103,12 @@ planar ground patterns more visibly, as described above. No failed shader
 programs were observed. The captures are bounded visual checks, not a complete
 flight or a mobile hardware performance test.
 
-## Outstanding acceptance
+## Original outstanding acceptance (completed in follow-up)
 
 - Repeat before/after native frame-loop comparisons with exclusive GPU access.
 - Inspect frame-time tails for flash-related stalls in those repeated runs.
   Constant program count across every flash station is already verified, but
   does not by itself prove all runtime frame latency is unchanged.
 
-The implementation should remain in review until those measurements are done.
+The implementation merged as #105. The [follow-up](completed/README.md) now
+provides the missing measurements and documents their device-specific limits.

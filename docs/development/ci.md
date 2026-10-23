@@ -175,15 +175,19 @@ and `FORCE_GPU=0` (SwiftShader) override the defaults. See
 
 ### Airport rendering quality (issue #97)
 
-`node scripts/verify-airport-performance.mjs` compares an unchanged main server
-on 5198 with this branch on 5197 using a dedicated GPU Chrome on CDP 9497.
+`node scripts/verify-airport-performance.mjs` compares the pre-#105 revision
+on 5198 with #105 on 5197 using a dedicated GPU Chrome on CDP 9497. Use the exact
+revisions in the evidence below; current main already contains the optimization.
 It samples the native animation loop twice in reversed variant order at device
 DPR 1/2 on the noon runway, and captures fixed-pose noon/night visual evidence
 for runway, approach and cruise.
-See [presets, reproduction and measurements](../../review-artifacts/issue97/README.md).
+See [completed measurements and reproduction](../../review-artifacts/issue97/completed/README.md)
+and [preset tradeoffs](../../review-artifacts/issue97/README.md).
 `APP_URL`, `BASELINE_URL`, `CDP_PORT`, and `ARTIFACT_DIR` override defaults.
 `node scripts/verify-render-quality.mjs` uses the same CDP port to check selection,
 saved preferences, three rabbit cycles without program growth, and mobile layout.
+It also samples a live night runway loop; point `APP_URL` at current main for
+this separate check of the current menu and renderer.
 Run it separately from timed benchmarks to avoid disturbing the camera or GPU.
 
 ### Aircraft self-shadowing (issue #143)

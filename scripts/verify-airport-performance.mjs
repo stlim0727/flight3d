@@ -11,12 +11,22 @@ const waitForGpu = async () => {
 };
 const dir = process.env.ARTIFACT_DIR || 'review-artifacts/issue97';
 fs.mkdirSync(dir, { recursive: true });
+const warmupFrames = 60;
+const sampleFrames = 120;
 const pages = await (await fetch(`http://127.0.0.1:${process.env.CDP_PORT || 9497}/json`)).json();
 const ws = new WebSocket(pages.find(p => p.type === 'page').webSocketDebuggerUrl);
 await new Promise(r => ws.addEventListener('open', r, { once: true }));
 let seq = 0;
 const pending = new Map();
-ws.addEventListener('message', ({data}) => { const m = JSON.parse(data); pending.get(m.id)?.(m); pending.delete(m.id); });
+const errors = [];
+ws.addEventListener('message', ({data}) => {
+  const m = JSON.parse(data);
+  pending.get(m.id)?.(m); pending.delete(m.id);
+  if (m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails);
+  if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') {
+    errors.push(m.params.args.map(a => a.value || a.description).join(' '));
+  }
+});
 const call = (method, params = {}) => new Promise((resolve, reject) => {
   const id = ++seq;
   const timeout = setTimeout(() => reject(Error(`Timeout: ${method}`)), 180000);
@@ -29,8 +39,9 @@ const ev = async expression => {
   return r.result.value;
 };
 await call('Page.enable');
+await call('Runtime.enable');
 await call('Emulation.setDeviceMetricsOverride', {width:780, height:437, deviceScaleFactor:2, mobile:false});
-await call('Page.addScriptToEvaluateOnNewDocument', {source:`window.__nativeRAF=requestAnimationFrame.bind(window);window.requestAnimationFrame=()=>0;let seed=12345;Math.random=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);`});
+const seedScript = await call('Page.addScriptToEvaluateOnNewDocument', {source:`window.__nativeRAF=requestAnimationFrame.bind(window);window.requestAnimationFrame=()=>0;let seed=12345;Math.random=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);localStorage.removeItem('flight3d.renderQuality');`});
 const results = [];
 // Reversed second pass reduces order/thermal bias; baseline is an untouched checkout.
 for (let repeat=0;repeat<2;repeat++) {
@@ -47,7 +58,7 @@ for (let repeat=0;repeat<2;repeat++) {
       await new Promise(r=>setTimeout(r,500));
     }
     assert.ok(ready,'all models loaded');
-    await ev(`(async()=>{const s=window.simulator;await s.aircraft.cockpit.shaderWarmup;s.demoDirector.stop();s.gameFlow.enterFlight();s.setAirport('coastal');${variant==='baseline' ? '' : `s.setRenderQuality('${variant}');`}return true;})()`);
+    await ev(`(async()=>{const s=window.simulator;await s.aircraft.cockpit.shaderWarmup;s.demoDirector.stop();s.gameFlow?.enterFlight();s.setAirport('coastal');${variant==='baseline' ? '' : `s.setRenderQuality('${variant}');`}return true;})()`);
     // At DPR 1 isolates lighting/terrain. DPR 2 compares resolution presets.
     for (const deviceDpr of [1,2]) {
       await call('Emulation.setDeviceMetricsOverride', {width:780,height:437,deviceScaleFactor:deviceDpr,mobile:false});
@@ -60,21 +71,36 @@ for (let repeat=0;repeat<2;repeat++) {
           ${variant==='baseline' ? 'r.setPixelRatio(Math.min(devicePixelRatio,2));' : `s.setRenderQuality('${variant}');`}
           s.setPreset('${view}');s.cameraSystem.setMode(0,true);s.stepSimulation(0);
           s.sky.setTimeOfDay(${time},s.position,s.camera.position);s.foliage.setTimeOfDay(${time});s.water.syncWithAtmosphere(s.sky);
-          const intervals=[];let previous=null,frame=0;
-          await new Promise(resolve=>{const run=t=>{s.animate();if(frame>=12)intervals.push(t-previous);previous=t;if(++frame<48)window.__nativeRAF(run);else resolve()};window.__nativeRAF(run)});
+          const intervals=[],stations=[],programCounts=[];let previous=null,frame=0;
+          await new Promise(resolve=>{const run=t=>{
+            s.animate();
+            if(frame>=${warmupFrames}) {
+              intervals.push(t-previous);
+              stations.push(s.airport.approachLight?.position.x ??
+                s.airport.approachStrobes.find(station=>station.light.intensity>0)?.light.position.x);
+              programCounts.push(r.info.programs.length);
+            }
+            previous=t;
+            if(++frame<${warmupFrames+sampleFrames})window.__nativeRAF(run);else resolve();
+          };window.__nativeRAF(run)});
           const g=r.getContext(),ext=g.getExtension('WEBGL_debug_renderer_info');
           const sorted=[...intervals].sort((a,b)=>a-b);
           let lights=0;s.airport.group.traverseVisible(o=>{if(o.isPointLight)lights++});
-          return {fps:1000*intervals.length/intervals.reduce((a,b)=>a+b,0),medianMs:sorted[18],p95Ms:sorted[34],intervals,lights,programs:r.info.programs.length,calls:r.info.render.calls,triangles:r.info.render.triangles,dpr:r.getPixelRatio(),buffer:[r.domElement.width,r.domElement.height],terrain:s.terrain.getQuality(),gpu:g.getParameter(ext.UNMASKED_RENDERER_WEBGL),shaderErrors:r.info.programs.filter(p=>p.diagnostics?.runnable===false).length};
+          return {fps:1000*intervals.length/intervals.reduce((a,b)=>a+b,0),medianMs:sorted[Math.ceil(sorted.length*.5)-1],p95Ms:sorted[Math.ceil(sorted.length*.95)-1],maxMs:sorted.at(-1),intervals,stations,programCounts,lights,programs:r.info.programs.length,calls:r.info.render.calls,triangles:r.info.render.triangles,dpr:r.getPixelRatio(),buffer:[r.domElement.width,r.domElement.height],terrain:s.terrain.getQuality(),gpu:ext?g.getParameter(ext.UNMASKED_RENDERER_WEBGL):null,shaderErrors:r.info.programs.filter(p=>p.diagnostics?.runnable===false).length};
         })()`);
         } while (competingGpu()); // Discard a sample if another GPU task started.
         Object.assign(row,{variant,repeat,deviceDpr,time,view});
         assert.equal(row.shaderErrors,0);
+        assert.equal(errors.length,0,JSON.stringify(errors));
+        assert.ok(row.gpu && !/swiftshader|llvmpipe|software|basic render/i.test(row.gpu),'hardware GPU required');
+        assert.equal(row.intervals.length,sampleFrames);
+        assert.ok(row.intervals.every(ms=>Number.isFinite(ms) && ms>0),'valid native rAF intervals required');
+        assert.ok(row.stations.every(Number.isFinite),'every frame must identify an active approach light');
+        assert.equal(new Set(row.programCounts).size,1,'no shader program growth while flashing');
         assert.equal(row.dpr,Math.min(deviceDpr, {baseline:2,high:2,balanced:1.5,performance:1}[variant]));
         assert.equal(row.lights, variant==='baseline'?20:6);
         results.push(row);
-        console.log(JSON.stringify({...row,intervals:undefined}));
-        fs.writeFileSync(path.join(dir,'performance.json'),JSON.stringify(results,null,2));
+        console.log(JSON.stringify({...row,intervals:undefined,stations:undefined,programCounts:undefined}));
         if(repeat===0 && deviceDpr===2) {
           for (const hour of [12,0]) for (const preset of ['runway','approach','cruise']) {
             await ev(`(()=>{const s=window.simulator;s.setPreset('${preset}');s.cameraSystem.setMode(0,true);s.stepSimulation(0);s.sky.setTimeOfDay(${hour},s.position,s.camera.position);s.foliage.setTimeOfDay(${hour});s.water.syncWithAtmosphere(s.sky);s.renderer.render(s.scene,s.camera);})()`);
@@ -86,4 +112,8 @@ for (let repeat=0;repeat<2;repeat++) {
     }
   }
 }
+assert.equal(results.length,16,'all variants, repeats and DPRs must finish');
+assert.equal(errors.length,0,JSON.stringify(errors));
+fs.writeFileSync(path.join(dir,'performance.json'),JSON.stringify(results,null,2));
+await call('Page.removeScriptToEvaluateOnNewDocument',seedScript);
 ws.close();
