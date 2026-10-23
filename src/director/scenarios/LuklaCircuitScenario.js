@@ -2,6 +2,12 @@ import { t } from '../../i18n/index.js';
 import * as THREE from 'three';
 import { BOEING_737_800 } from '../../config/aircraftConfigs.js';
 import { CameraSystem } from '../../cameras/CameraSystem.js';
+// Aliased so the thin delegating methods below do not shadow the shared laws.
+import {
+  alphaGuarded as guardAlpha,
+  flyBank as bankLaw,
+  flyVerticalPath as pathLaw,
+} from '../PilotControlLaws.js';
 
 /**
  * Autonomous Nepal Tenzing-Hillary Airport (Lukla VNLK) Continuous Circuit Scenario
@@ -160,46 +166,15 @@ export class LuklaCircuitScenario {
   }
 
   flyBank(targetRollDeg, tel) {
-    const aero = this.sim.aero;
-    const rate = this.sim.angularVelocity.z;
-    const desiredRate = -THREE.MathUtils.clamp(THREE.MathUtils.degToRad(targetRollDeg - tel.rollDeg) * 1.4, -0.35, 0.35);
-    const acceleration = (desiredRate - rate) * 3;
-    const qSb = Math.max(1, aero.qDyn * aero.wingArea * aero.wingspan);
-    const pHat = rate * aero.wingspan / (2 * Math.max(10, aero.tas));
-    const coefficient = -aero.Ixx * acceleration / qSb;
-    const aileron = (coefficient - aero.Cl_b * aero.beta - Math.abs(aero.Cl_p) * pHat) / (aero.Cl_da * 1.05 * THREE.MathUtils.degToRad(20));
-    this.sim.controls.setVirtualInput('aileron', THREE.MathUtils.clamp(aileron, -1, 1));
+    bankLaw(this.sim, targetRollDeg, tel);
   }
 
-  // Autoflight alpha protection, like a real flight-director limiter: caps nose-up
-  // elevator as AoA climbs and commands an uncommanded-pitch-down recovery above the margin.
   alphaGuarded(elevatorCmd, alphaDeg) {
-    if (alphaDeg <= 11.0) return elevatorCmd;
-    const cap = THREE.MathUtils.clamp(0.8 - (alphaDeg - 11.0) * 0.37, -0.35, 0.8);
-    return Math.min(elevatorCmd, cap);
+    return guardAlpha(elevatorCmd, alphaDeg);
   }
 
   flyVerticalPath(targetVz, targetIas, tel, pathAcceleration = 0, groundPitch = null) {
-    const aero = this.sim.aero;
-    const speed = Math.max(30, Math.hypot(this.sim.linearVelocity.x, this.sim.linearVelocity.z));
-    const flapCl0 = aero.CL0_clean + 0.95 * aero.currentFlapAngle / 40;
-    const bank = THREE.MathUtils.degToRad(tel.rollDeg);
-    const requiredCl = aero.mass * (9.80665 + THREE.MathUtils.clamp(pathAcceleration + (targetVz - this.sim.linearVelocity.y) * 1.2, -3, 4)) / Math.max(1, aero.qDyn * aero.wingArea * Math.cos(bank));
-    const alpha = THREE.MathUtils.clamp((requiredCl - flapCl0) / aero.CLa, 0.02, THREE.MathUtils.degToRad(13.5));
-    const targetPitch = groundPitch === null ? Math.atan2(this.sim.linearVelocity.y, speed) + alpha : THREE.MathUtils.degToRad(groundPitch);
-    const pitch = THREE.MathUtils.degToRad(tel.pitchDeg);
-    const q = this.sim.angularVelocity.x;
-    const desiredRate = THREE.MathUtils.clamp((targetPitch - pitch) * 1.2, -0.12, 0.12);
-    const desiredAcceleration = (desiredRate - q) * 2.5;
-    const qSc = Math.max(1, aero.qDyn * aero.wingArea * aero.meanChord);
-    const thrustMoment = (this.sim.engines.thrust[0] + this.sim.engines.thrust[1]) * 0.32;
-    const gearMoment = groundPitch === null ? 0 : this.sim.gear.lastMomentBody.x;
-    const requiredCm = (aero.Iyy * desiredAcceleration - thrustMoment - gearMoment) / qSc;
-    const qHat = q * aero.meanChord / (2 * Math.max(10, aero.tas));
-    const effectiveElevator = (requiredCm - aero.Cm0 - aero.Cma * aero.alpha - aero.Cmq * qHat) / -aero.Cm_de;
-    const elevator = (effectiveElevator - THREE.MathUtils.degToRad(aero.pitchTrim) * 0.35) / THREE.MathUtils.degToRad(20);
-    this.sim.controls.setVirtualInput('elevator', this.alphaGuarded(THREE.MathUtils.clamp(elevator, -0.8, 0.8), THREE.MathUtils.radToDeg(aero.alpha)));
-    if (groundPitch === null) this.sim.controls.setVirtualInput('throttle', THREE.MathUtils.clamp(0.50 + (targetIas - tel.iasKnots) * 0.035 + targetVz * 0.02, 0.05, 0.95));
+    pathLaw(this.sim, targetVz, targetIas, tel, pathAcceleration, groundPitch);
   }
 
   recordFailure(crashResult) {
