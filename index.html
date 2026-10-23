@@ -167,41 +167,49 @@
         </div>
       </header>
       <p id="lobby-loading" class="lobby-loading" data-i18n="loading.lukla.terrain" hidden></p>
-      <div class="lobby-group" role="group">
-        <span class="lobby-label" data-i18n="lobby.airport">공항</span>
-        <div class="lobby-buttons">
-          <button id="lobby-airport-coastal" class="btn btn-airport active"><span data-i18n="coastal.airport">🌊 국제공항</span></button>
-          <button id="lobby-airport-lukla" class="btn btn-airport"><span data-i18n="lukla.vnlk">🏔️ 루클라 (VNLK)</span></button>
-        </div>
+      <div class="lobby-tabs" role="tablist" aria-labelledby="lobby-tabs-title">
+        <span id="lobby-tabs-title" hidden data-i18n="lobby.title">메인 메뉴</span>
+        <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario" data-i18n="lobby.spawn">시나리오</button>
+        <button id="lobby-tab-settings" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-settings" tabindex="-1" data-i18n="ui.settings.short">설정</button>
       </div>
-      <div class="lobby-group lobby-scenarios" role="group">
-        <span class="lobby-label" data-i18n="lobby.spawn">시나리오</span>
-        <div class="lobby-buttons">
-          <button id="lobby-preset-rwy" class="btn btn-preset"><span>🛫 활주로 이륙 (09L)</span></button>
-          <button id="lobby-preset-app" class="btn btn-preset"><span>🛬 착륙 접근 (3 NM)</span></button>
-          <button id="lobby-preset-cru" class="btn btn-preset"><span>✈️ 순항 비행 (6,000 FT)</span></button>
-          <button id="lobby-preset-cliff" class="btn btn-preset btn-cliff"><span>⚡ 내리막 이륙 (Rwy 24)</span></button>
-          <button id="lobby-preset-shadow" class="btn btn-preset"><span data-i18n="shadow.title">☀ 콕핏 그림자 데모</span></button>
-          <button id="lobby-preset-demo" class="btn btn-preset"><span>🎬 데모 비행</span></button>
-        </div>
+      <div class="lobby-panels">
+        <section id="lobby-panel-scenario" class="lobby-tab-panel" role="tabpanel" aria-labelledby="lobby-tab-scenario" tabindex="0">
+          <div class="lobby-group" role="group">
+            <span class="lobby-label" data-i18n="lobby.airport">공항</span>
+            <div class="lobby-buttons">
+              <button id="lobby-airport-coastal" class="btn btn-airport active"><span data-i18n="coastal.airport">🌊 국제공항</span></button>
+              <button id="lobby-airport-lukla" class="btn btn-airport"><span data-i18n="lukla.vnlk">🏔️ 루클라 (VNLK)</span></button>
+            </div>
+          </div>
+          <div class="lobby-group lobby-scenarios" role="group">
+            <span class="lobby-label" data-i18n="lobby.spawn">시나리오</span>
+            <div class="lobby-buttons">
+              <button id="lobby-preset-rwy" class="btn btn-preset"><span>🛫 활주로 이륙 (09L)</span></button>
+              <button id="lobby-preset-app" class="btn btn-preset"><span>🛬 착륙 접근 (3 NM)</span></button>
+              <button id="lobby-preset-cru" class="btn btn-preset"><span>✈️ 순항 비행 (6,000 FT)</span></button>
+              <button id="lobby-preset-cliff" class="btn btn-preset btn-cliff"><span>⚡ 내리막 이륙 (Rwy 24)</span></button>
+              <button id="lobby-preset-shadow" class="btn btn-preset"><span data-i18n="shadow.title">☀ 콕핏 그림자 데모</span></button>
+              <button id="lobby-preset-demo" class="btn btn-preset"><span>🎬 데모 비행</span></button>
+            </div>
+          </div>
+          <label class="lobby-group" for="lobby-time-select">
+            <span class="lobby-label" data-i18n="lobby.time">시간대</span>
+            <select id="lobby-time-select" class="btn">
+              <option value="6.5">06:30</option>
+              <option value="9.5">09:30</option>
+              <option value="12.5">12:30</option>
+              <option value="16.8">16:48</option>
+              <option value="17.6">17:36</option>
+              <option value="19.5">19:30</option>
+              <option value="22.5">22:30</option>
+            </select>
+          </label>
+          <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
+        </section>
+        <section id="lobby-panel-settings" class="lobby-tab-panel lobby-settings" role="tabpanel" aria-labelledby="lobby-tab-settings" tabindex="0" hidden>
+          <div class="lobby-buttons" id="lobby-settings"></div>
+        </section>
       </div>
-      <label class="lobby-group" for="lobby-time-select">
-        <span class="lobby-label" data-i18n="lobby.time">시간대</span>
-        <select id="lobby-time-select" class="btn">
-          <option value="6.5">06:30</option>
-          <option value="9.5">09:30</option>
-          <option value="12.5">12:30</option>
-          <option value="16.8">16:48</option>
-          <option value="17.6">17:36</option>
-          <option value="19.5">19:30</option>
-          <option value="22.5">22:30</option>
-        </select>
-      </label>
-      <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
-      <details class="lobby-settings">
-        <summary class="lobby-label" data-i18n="ui.settings.short">Settings</summary>
-        <div class="lobby-buttons" id="lobby-settings"></div>
-      </details>
       <button id="btn-fly" class="btn btn-fly"><span data-i18n="lobby.fly">비행 시작</span></button>
       <p class="lobby-hint" data-i18n="lobby.hint.esc">비행 중 ESC를 누르면 일시정지 메뉴가 열립니다.</p>
     </div>

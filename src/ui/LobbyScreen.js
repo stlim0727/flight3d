@@ -15,6 +15,31 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onP
   const loadingEl = document.getElementById('lobby-loading');
   const timeSelect = document.getElementById('lobby-time-select');
 
+  const tabs = [...document.querySelectorAll('.lobby-tab')];
+  function selectTab(selected, focus = false) {
+    for (const tab of tabs) {
+      const active = tab === selected;
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+      document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
+    }
+    document.querySelector('.lobby-panels').scrollTop = 0;
+    if (focus) selected.focus();
+  }
+  for (const [index, tab] of tabs.entries()) {
+    tab.addEventListener('click', () => selectTab(tab));
+    tab.addEventListener('keydown', event => {
+      let next;
+      if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+      if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+      if (event.key === 'Home') next = 0;
+      if (event.key === 'End') next = tabs.length - 1;
+      if (next === undefined) return;
+      event.preventDefault();
+      selectTab(tabs[next], true);
+    });
+  }
+
   for (const [id, handler] of [
     ['btn-fly', onFly],
     ['lobby-airport-coastal', () => onAirport('coastal')],
