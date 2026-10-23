@@ -1953,7 +1953,7 @@ body.compact-ui {
 }
 .flight-toolbar .quick-mute { display: block; font-size: 18px; }
 
-/* The AP trigger stays anchored while its panel opens directly below it. */
+/* The AP trigger stays anchored; its dropdown clears both control strips. */
 .ap-bar, .compact-ui .ap-bar {
   position: absolute;
   top: var(--ap-row-top, calc(var(--edge-top) + 96px));
@@ -1994,7 +1994,7 @@ body.compact-ui {
 }
 .ap-panel {
   position: absolute;
-  top: calc(100% + 4px);
+  top: var(--ap-panel-offset, calc(100% + 4px));
   right: 0;
   width: min(296px, calc(100vw - var(--edge-left) - var(--edge-right)));
   max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 144px);

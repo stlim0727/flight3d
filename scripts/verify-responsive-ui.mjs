@@ -135,7 +135,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
       const r = node.getBoundingClientRect();
       return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2, r.top+r.height/2)), height: r.height };
     }), collapsed: document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded') === 'false',
-      anchor: ap.toJSON(), telemetryGap: strip.top - document.querySelector('.hud-strip').getBoundingClientRect().bottom, apGap: ap.top - strip.bottom, homeGap: home.top - strip.bottom, homeTarget: home.width >= 44 && home.height >= 44, edgePlacement: [home, ap].every((button, side) => {
+      anchor: ap.toJSON(), toolbarBottom: strip.bottom, telemetryGap: strip.top - document.querySelector('.hud-strip').getBoundingClientRect().bottom, apGap: ap.top - strip.bottom, homeGap: home.top - strip.bottom, homeTarget: home.width >= 44 && home.height >= 44, edgePlacement: [home, ap].every((button, side) => {
         const rows = [document.querySelector('.hud-strip').getBoundingClientRect(), strip];
         const row = rows.find(r => side ? r.right + 4 <= button.left : button.right + 4 <= r.left);
         return Math.abs(button.top - (row ? row.top : strip.bottom + 4)) < 1;
@@ -153,7 +153,8 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     const panel = document.querySelector('#ap-panel').getBoundingClientRect();
     const toolbarTargets = [...document.querySelectorAll('.flight-toolbar button')].map(node => {
       const r = node.getBoundingClientRect();
-      return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)) };
+      return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)),
+        overlapsPanel: panel.left < r.right && panel.right > r.left && panel.top < r.bottom && panel.bottom > r.top };
     });
     const touchTargets = ['#touch-btn-brake', '.touch-stick-zone', '.touch-rudder-track', '.touch-throttle-track'].map(selector => {
       const node = document.querySelector(selector), r = node.getBoundingClientRect();
@@ -173,8 +174,8 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   const panelRightAligned = landscapeSafeEdgePanel
     ? Math.abs(expanded.panel.right - (width - 8)) < 1
     : Math.abs(expanded.panel.right - expanded.trigger.right) < 1;
-  assert.ok(panelRightAligned && Math.abs(expanded.panel.top - expanded.trigger.bottom - 4) < 1, `${name}: AP panel opens 4px below in its safe-area alignment`);
-  assert.ok(expanded.toolbarTargets.every(b => b.reachable), `${name}: toolbar controls remain reachable while AP is expanded: ${JSON.stringify(expanded.toolbarTargets)}`);
+  assert.ok(panelRightAligned && Math.abs(expanded.panel.top - Math.max(expanded.trigger.bottom, direct.toolbarBottom) - 4) < 1, `${name}: AP panel opens 4px below the trigger and toolbar in its safe-area alignment`);
+  assert.ok(expanded.toolbarTargets.every(b => b.reachable && !b.overlapsPanel), `${name}: toolbar controls remain reachable while AP is expanded: ${JSON.stringify(expanded.toolbarTargets)}`);
   if (name === 'landscape-small') assert.ok(expanded.touchTargets.every(target => target.reachable), `${name}: touch brake, stick, rudder and throttle remain reachable while AP is expanded: ${JSON.stringify(expanded.touchTargets)}`);
   assert.ok(expanded.panel.left >= 0 && expanded.panel.bottom <= height && expanded.targets.length === 5 && expanded.targets.every(b => b.reachable && b.width >= 44 && b.height >= 44), `${name}: all expanded AP controls fit and are reachable`);
   await nativeClick('#btn-ap', touch);

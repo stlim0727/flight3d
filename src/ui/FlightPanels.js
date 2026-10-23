@@ -85,6 +85,11 @@ export function initFlightPanels({ onCycleCamera }) {
       const row = rows.find(fits);
       const top = row ? row.top : rows[1].bottom + 4;
       document.documentElement.style.setProperty(property, `${top}px`);
+      if (button === ap) {
+        // The dropdown is wider than its trigger; keep it below both strips.
+        const panelOffset = Math.max(ap.offsetHeight + 4, rows[1].bottom + 4 - top);
+        document.documentElement.style.setProperty('--ap-panel-offset', `${panelOffset}px`);
+      }
     }
   }
   const observer = new ResizeObserver(positionEdgeButtons);
