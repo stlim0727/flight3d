@@ -121,16 +121,18 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     }
   });
 
-  it('should articulate crash visuals and restore pristine state', () => {
+  it('keeps crash geometry aligned with physical contacts and restores state', () => {
     const pfd = new PFDCanvas(256, 256);
     const nd = new NDCanvas(256, 256);
     const eicas = new EICASCanvas(256, 256);
     const aircraft = new Boeing737(pfd, nd, eicas);
 
+    const wingRotations = aircraft.wingGroup.children.map(wing => wing.quaternion.toArray());
     aircraft.triggerCrashVisuals('TERRAIN');
     assert.strictEqual(aircraft.isCrashed, true);
-    assert.strictEqual(aircraft.gltfGroup.rotation.z, -0.18, 'GLTF group should dislocate on crash');
+    assert.strictEqual(aircraft.gltfGroup.rotation.z, 0, 'GLTF group must not rotate through the ground');
 
+    assert.deepStrictEqual(aircraft.wingGroup.children.map(wing => wing.quaternion.toArray()), wingRotations, 'Fallback surfaces retain their physical attitude');
     aircraft.resetCrashVisuals();
     assert.strictEqual(aircraft.isCrashed, false);
     assert.strictEqual(aircraft.gltfGroup.rotation.z, 0, 'GLTF group rotation should reset to 0');

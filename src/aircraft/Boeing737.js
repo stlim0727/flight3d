@@ -1076,22 +1076,8 @@ export class Boeing737 {
     this.isCrashed = true;
     if (this.lightsGroup) this.lightsGroup.visible = false;
 
-    if (this.gltfGroup) {
-      this.gltfGroup.rotation.z = -0.18;
-      this.gltfGroup.rotation.x = 0.12;
-    }
-    if (this.gltfShadowProxy) {
-      this.gltfShadowProxy.rotation.z = -0.18;
-      this.gltfShadowProxy.rotation.x = 0.12;
-    }
-
-    // Dislocate/damage wing structures upon catastrophic impact
-    if (this.wingGroup && this.wingGroup.children.length >= 2) {
-      this.wingGroup.children[0].rotation.z = -0.22;
-      this.wingGroup.children[0].rotation.x = 0.15;
-      this.wingGroup.children[1].rotation.z = 0.26;
-      this.wingGroup.children[1].rotation.x = -0.18;
-    }
+    // Keep the visible airframe aligned with the physical terrain contacts.
+    // Explosion/light effects convey the crash without rotating geometry underground.
   }
 
   resetCrashVisuals() {

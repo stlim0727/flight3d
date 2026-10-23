@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GEAR_DAMAGE_LIMITS, updateGearDamage } from './gearDamage.js';
-import { BODY_CONTACTS } from './groundContacts.js';
+import { BODY_CONTACTS, BODY_SUPPORT_POINTS } from './groundContacts.js';
+import { BODY_DAMAGE_LIMITS, bodyDamageState, updateBodyDamage } from './bodyDamage.js';
 
 // Oleo damper is asymmetric: while the strut extends (vNormal > 0) damping is
 // multiplied, dissipating the stored spring energy that would otherwise fling
@@ -39,6 +40,7 @@ const AXIS_FWD = new THREE.Vector3(0, 0, -1);
  */
 export class LandingGear {
   constructor() {
+    this.bodySupportPoints ??= BODY_SUPPORT_POINTS;
     this.failure = null;
     this.maxImpactSpeed = 0;
     this.lastMomentBody = new THREE.Vector3();
@@ -123,6 +125,7 @@ export class LandingGear {
     }
     this.bodyGrounded = new Set();
     this.structuralDamage = 0;
+    this.bodyDamage = Object.fromEntries(BODY_CONTACTS.map(p => [p.id, 0]));
     this.onGround = false;
     this.totalWeightOnWheels = 0;
     this.touchdownEvent = false;
@@ -182,6 +185,7 @@ export class LandingGear {
     const gearDeploy = this.gearState;
     const damageEvents = [];
     const bodyContacts = [];
+    const bodyDamageEvents = [];
     let catastrophicImpact = false;
     // World transformation matrices
     const worldQuat = aircraftMesh.quaternion;
@@ -339,7 +343,8 @@ export class LandingGear {
 
     // Body support is always active, including a single collapsed leg with gear DOWN.
     const groundedNow = new Set();
-    for (const probe of BODY_CONTACTS) {
+    const demands = new Map();
+    for (const probe of this.bodySupportPoints) {
       const local = scratchBcLocal.set(...probe.position);
       const point = scratchBcPoint.copy(local).applyMatrix4(aircraftMesh.matrixWorld);
       const groundH = getTerrainHeight(point.x, point.z);
@@ -349,24 +354,42 @@ export class LandingGear {
         normal.copy(terrainNormal).normalize();
       }
       const depth = (groundH - point.y) * normal.y;
-      if (depth <= 0) continue;
       const arm = scratchBcArm.copy(point).sub(aircraftMesh.position);
       const velocity = scratchBcVelocity.copy(angularVelocity).applyQuaternion(worldQuat).cross(arm).add(linearVelocity);
       const vNormal = velocity.dot(normal);
+      // Sample imminent impacts before the post-integration constraint removes
+      // closing velocity. A small skin retains contact history during settling.
+      if (depth < -0.005 && depth - vNormal * dt <= 0) continue;
       const tangent = scratchBcTangent.copy(velocity).addScaledVector(normal, -vNormal);
       const speed = tangent.length();
-      const load = Math.max(0, 1800000 * Math.min(depth, 0.75) - 160000 * vNormal);
+      const load = Math.max(0, 18000000 * Math.max(0, Math.min(depth, 0.04)) - 400000 * vNormal) * probe.weight;
       const force = scratchBcForce.copy(normal).multiplyScalar(load);
-      if (speed > 0) force.addScaledVector(tangent, -Math.min(18000, load * 0.45 / speed));
+      const friction = Math.min(speed * 18000, load * 0.45);
+      if (speed > 0) force.addScaledVector(tangent, -friction / speed);
       netForceWorld.add(force);
       netMomentBody.add(scratchMoment.copy(local).cross(scratchFWheelBody.copy(force).applyQuaternion(invWorldQuat)));
-      groundedNow.add(probe.id);
+      groundedNow.add(probe.key);
       this.onGround = true;
-      if (!this.bodyGrounded.has(probe.id) && -vNormal > 12.5) catastrophicImpact = true;
-      this.structuralDamage = Math.min(1, this.structuralDamage + speed * dt / 100000);
-      bodyContacts.push({ id: probe.id, worldPos: point.clone(), sinkRate: -vNormal, speed });
+      const firstContact = !this.bodyGrounded.has(probe.key);
+      if (firstContact && -vNormal > 12.5) catastrophicImpact = true;
+      const demand = demands.get(probe.id) || { firstContact: false, sinkRate: 0, frictionWork: 0 };
+      demand.firstContact ||= firstContact;
+      if (firstContact) demand.sinkRate = Math.max(demand.sinkRate, -vNormal);
+      demand.frictionWork += friction * speed * dt;
+      demands.set(probe.id, demand);
+      bodyContacts.push({ id: probe.id, worldPos: point.clone(), sinkRate: -vNormal, speed, load, depth,
+        frictionWork: friction * speed * dt });
+    }
+    for (const [id, demand] of demands) {
+      const previous = this.bodyDamage[id];
+      this.bodyDamage[id] = updateBodyDamage(previous, demand, BODY_DAMAGE_LIMITS[id]);
+      const state = bodyDamageState(this.bodyDamage[id]);
+      if (state !== bodyDamageState(previous)) bodyDamageEvents.push({ id, state });
     }
     this.bodyGrounded = groundedNow;
+    // Engine abrasion can shut down an engine without declaring hull loss.
+    this.structuralDamage = Math.max(...Object.entries(this.bodyDamage)
+      .filter(([id]) => !id.startsWith('engine')).map(([, damage]) => damage));
     catastrophicImpact ||= this.structuralDamage >= 1;
     // Recompute after collapse; a failed contact must not report weight on wheels.
     this.onGround = bodyContacts.length > 0 || this.contacts.some(c => c.isGrounded);
@@ -389,6 +412,8 @@ export class LandingGear {
       gearDamage: Object.fromEntries(this.contacts.map(c => [c.id, c.damageState])),
       bodyContacts,
       structuralDamage: this.structuralDamage,
+      bodyDamage: { ...this.bodyDamage },
+      bodyDamageEvents,
       catastrophicImpact,
       touchdownContacts: supportedTouchdowns,
       compressions: {

@@ -348,5 +348,16 @@ export default {
   "crash.impact": "💥 CATASTROPHIC IMPACT",
   "crash.hullLoss": "HULL LOSS",
   "crash.expand": "Expand report",
-  "crash.collapse": "Collapse report"
+  "crash.collapse": "Collapse report",
+  "notice.bodyContact": "Ground contact: {parts}",
+  "notice.bodyDamage": "{part}: {state}",
+  "body.state.damaged": "DAMAGED",
+  "body.state.failed": "FAILED",
+  "body.part.engineL": "Left engine",
+  "body.part.engineR": "Right engine",
+  "body.part.belly": "Belly",
+  "body.part.nose": "Nose",
+  "body.part.tail": "Tail",
+  "body.part.wingL": "Left wing",
+  "body.part.wingR": "Right wing",
 };

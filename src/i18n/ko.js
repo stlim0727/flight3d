@@ -348,5 +348,16 @@ export default {
   "crash.impact": "💥 치명적 충돌",
   "crash.hullLoss": "기체 전손",
   "crash.expand": "보고서 펼치기",
-  "crash.collapse": "보고서 접기"
+  "crash.collapse": "보고서 접기",
+  "notice.bodyContact": "지면 접촉: {parts}",
+  "notice.bodyDamage": "{part}: {state}",
+  "body.state.damaged": "손상",
+  "body.state.failed": "파손",
+  "body.part.engineL": "왼쪽 엔진",
+  "body.part.engineR": "오른쪽 엔진",
+  "body.part.belly": "동체 하부",
+  "body.part.nose": "기수",
+  "body.part.tail": "꼬리",
+  "body.part.wingL": "왼쪽 날개",
+  "body.part.wingR": "오른쪽 날개",
 };

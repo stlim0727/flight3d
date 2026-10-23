@@ -168,9 +168,9 @@ describe('Airport & Aircraft Runway Shadow System', () => {
       assert.strictEqual(aircraft.gltfGroup.visible, true, 'gltfGroup must be visible in exterior view');
       assert.strictEqual(aircraft.gltfShadowProxy.visible, false, 'Airframe shadow proxy must be inactive in exterior view');
 
-      // 3. Crash deformation sync
+      // 3. Crash geometry and its shadow remain aligned with physical contacts
       aircraft.triggerCrashVisuals('RUNWAY');
-      assert.strictEqual(aircraft.gltfShadowProxy.rotation.z, -0.18, 'Shadow proxy must mirror crash deformation');
+      assert.strictEqual(aircraft.gltfShadowProxy.rotation.z, 0, 'Shadow proxy must retain the physical attitude');
       aircraft.resetCrashVisuals();
       assert.strictEqual(aircraft.gltfShadowProxy.rotation.z, 0, 'Shadow proxy rotation must reset');
     } finally {

@@ -9,6 +9,8 @@ import { BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics } from './physics/Aerodynamics.js';
 import { EngineModel, asymmetricThrustYawMoment } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
+import { BODY_SUPPORT_POINTS, FALLBACK_BODY_SUPPORT_POINTS } from './physics/groundContacts.js';
+import { constrainBodyContact } from './physics/bodyContactConstraint.js';
 import { AutopilotController } from './physics/Autopilot.js';
 import { solveTrim } from './physics/TrimSolver.js';
 import { PFDCanvas } from './aircraft/PFDCanvas.js';
@@ -509,6 +511,8 @@ class FlightSimulator {
     this.landingIncident = false;
     this.landingStopped = false;
     this.bodyContactStarted = false;
+    this.bodyContactNotices = new Set();
+    this.landingRestTime = 0;
 
     if (this.isCrashed) {
       this.clearCrashState();
@@ -684,6 +688,7 @@ class FlightSimulator {
     this.engines.refuel(this.aero);
     this.engines.failed[0] = false;
     this.engines.failed[1] = false;
+    this.engines.contactDamage.fill(0);
 
     if (type === 'approach' || type === 'cruise') this.applyComputedTrim();
 
@@ -843,15 +848,13 @@ class FlightSimulator {
     // transform before physics so a rendered interpolation never feeds back.
     this.aircraft.group.position.copy(this.position);
     this.aircraft.group.quaternion.copy(this.quaternion);
+    this.gear.bodySupportPoints = this.aircraft.useGltf ? BODY_SUPPORT_POINTS : FALLBACK_BODY_SUPPORT_POINTS;
     // If crashed, damp out velocities and rest on terrain
     if (this.isCrashed) {
       this.linearVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 2.8));
       this.angularVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 3.5));
       this.position.addScaledVector(this.linearVelocity, dt);
-      const groundH = this.currentTerrain ? this.currentTerrain.getHeight(this.position.x, this.position.z) : 0.0;
-      if (this.position.y < groundH + 0.8) {
-        this.position.y = groundH + 0.8;
-      }
+      this.resolveBodyPenetration();
       this.aircraft.group.position.copy(this.position);
       return;
     }
@@ -884,6 +887,9 @@ class FlightSimulator {
     const altitudeMeters = this.position.y;
     const atmos = Atmosphere.getConditions(altitudeMeters);
     const tas = this.linearVelocity.length();
+    // Damage remains until repair, even if an engine restart is commanded.
+    this.engines.contactDamage[0] = this.gear.bodyDamage.engineL;
+    this.engines.contactDamage[1] = this.gear.bodyDamage.engineR;
     const engineData = this.engines.update(dt, altitudeMeters, tas, atmos.densityRatio);
 
     // Live mass: the airframe sheds exactly the fuel burned since the last
@@ -916,12 +922,25 @@ class FlightSimulator {
       for (const event of gearResult.damageEvents) {
         this.showToast(() => t('notice.gearDamage', { value1: t(labels[event.id]), value2: event.state === 'collapsed' ? t('gear.collapsed') : t('gear.damaged') }));
       }
-      if (gearResult.bodyContacts.length) {
-        this.bodyContactStarted = true;
-        this.showToast(() => t('aircraft.belly.contact.sliding.on.runway'));
-      }
     }
-    if (this.landingIncident && gearResult.onGround && !this.landingStopped && groundSpeed < 0.5 && Math.abs(this.linearVelocity.y) < 0.2) {
+    const newContacts = [...new Map(gearResult.bodyContacts.map(c => [c.id, c])).values()]
+      .filter(c => !this.bodyContactNotices.has(c.id));
+    for (const contact of newContacts) this.bodyContactNotices.add(contact.id);
+    if (newContacts.length) {
+      this.bodyContactStarted = true;
+      this.showToast(() => t('notice.bodyContact', {
+        parts: newContacts.map(c => t(`body.part.${c.id}`)).join(', '),
+      }));
+    }
+    for (const event of gearResult.bodyDamageEvents) {
+      this.showToast(() => t('notice.bodyDamage', {
+        part: t(`body.part.${event.id}`), state: t(`body.state.${event.state}`),
+      }));
+    }
+    const resting = gearResult.onGround && this.linearVelocity.length() < 0.5 && this.angularVelocity.length() < 0.02;
+    this.landingRestTime = resting ? this.landingRestTime + dt : 0;
+    if (!resting) this.landingStopped = false;
+    if (this.landingIncident && !this.landingStopped && this.landingRestTime >= 1) {
       this.landingStopped = true;
       this.showToast(() => t('emergency.landing.stopped.select.a.preset.to'));
     }
@@ -997,6 +1016,12 @@ class FlightSimulator {
 
     this.quaternion.multiply(deltaRot).normalize();
 
+    // Preserve the incoming pose for obstacle/off-runway collision policy; the
+    // terrain constraint must not lift an aircraft out of a fatal collision.
+    const collisionPosition = this.position.clone();
+    const collisionVelocity = this.linearVelocity.clone();
+    this.resolveBodyPenetration();
+
     // Sync Three.js aircraft mesh transform
     this.aircraft.group.position.copy(this.position);
     this.aircraft.group.quaternion.copy(this.quaternion);
@@ -1045,8 +1070,9 @@ class FlightSimulator {
       isTransit: gearResult.isTransit,
       compressions: gearResult.compressions,
       gearDamage: gearResult.gearDamage,
-      bodyContacts: gearResult.bodyContacts.map(c => c.id),
+      bodyContacts: [...new Set(gearResult.bodyContacts.map(c => c.id))],
       structuralDamage: gearResult.structuralDamage,
+      bodyDamage: gearResult.bodyDamage,
       flapDegree: this.aero.currentFlapAngle,
       flapIndex: this.aero.flapsIndex,
       spoilers: this.aero.spoilers,
@@ -1129,9 +1155,9 @@ class FlightSimulator {
     // 13. Check Multi-Obstacle Collisions (Terrain, Water, Tower, Buildings, Trees, Ships)
     if (!this.isCrashed) {
       const crash = this.collisionDetector.checkCollision(
-        this.position,
+        collisionPosition,
         this.quaternion,
-        this.linearVelocity,
+        collisionVelocity,
         gearResult.gearState,
         pitchDeg,
         rollDeg,
@@ -1142,6 +1168,13 @@ class FlightSimulator {
         this.triggerCrash(crash);
       }
     }
+  }
+
+  resolveBodyPenetration() {
+    constrainBodyContact(this.position, this.quaternion, this.linearVelocity, this.angularVelocity,
+      this.aero.mass, { x: this.aero.invIyy, y: this.aero.invIzz, z: this.aero.invIxx },
+      (x, z) => this.currentTerrain.getHeight(x, z),
+      (x, z) => this.currentTerrain.getNormal?.(x, z), this.gear.bodySupportPoints);
   }
 
   triggerCrash(crashResult) {
