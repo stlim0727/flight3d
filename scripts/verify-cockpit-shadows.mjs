@@ -147,7 +147,7 @@ const stage = async ({ hour, heading, bank = 0, cloud = 0, frames = 4 }) => awai
     },
     intensity: rig.light.intensity,
     daylight: rig.daylight,
-    facing: rig.pose.facing,
+    admittance: rig.pose.admittance,
     modeFactor: rig.modeFactor,
     sunIntensity: sky.sunLight.intensity,
     sunAttenuation: sky.sunAttenuation,
@@ -212,7 +212,7 @@ for (const [name, cell] of Object.entries(cells)) {
   const r = results[name];
   const size = await snapshot(`deck-sun-${name}`);
   console.log(`${name.padEnd(10)} sun ${String(r.sunLocal.bearingDeg).padStart(6)}deg elev ${String(r.sunLocal.elevDeg).padStart(5)}`
-    + ` | mean ${r.stats.mean.toFixed(1)} std ${r.stats.std.toFixed(1)} | I ${r.intensity.toFixed(3)} face ${r.facing.toFixed(2)}`
+    + ` | mean ${r.stats.mean.toFixed(1)} std ${r.stats.std.toFixed(1)} | I ${r.intensity.toFixed(3)} adm ${r.admittance.toFixed(2)}`
     + ` | cookie ${(r.cookie?.lit ?? 0).toFixed(3)} @${(r.cookie?.cx ?? 0).toFixed(3)},${(r.cookie?.cy ?? 0).toFixed(3)}`
     + ` | floods [${r.floods.join(', ')}] ${size}`);
 }
