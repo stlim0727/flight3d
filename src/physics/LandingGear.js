@@ -280,15 +280,28 @@ export class LandingGear {
         const vForward = contactVel.dot(wheelForwardWorld);
         const vLateral = contactVel.dot(wheelLateralWorld);
 
-        // Evaluate demand before friction saturation; a sliding tire still loads the strut.
+        // Tire forces, Coulomb-limited by the strut load. These are both what
+        // pushes the airframe around and what the leg structure has to react,
+        // so the damage model reads the same numbers the solver delivers.
+        let muBrake = 0.02; // Baseline rolling resistance
+        if (this.brakes > 0.01) {
+          muBrake += this.brakes * 0.58; // Boeing 737 anti-skid carbon brake friction
+        }
+        // Preserve static braking on sloped taxiways/runways.
+        const stoppingGain = this.brakes > 0.5 ? normalForceMag / (9.80665 * Math.max(dt, 0.001)) : 25000;
+        const fForwardMag = -Math.sign(vForward) * Math.min(Math.abs(vForward) * stoppingGain, normalForceMag * muBrake);
+
+        const muLateral = 0.75;
+        const fLateralMag = -Math.sign(vLateral) * Math.min(Math.abs(vLateral) * 35000.0, normalForceMag * muLateral);
+
         const limits = GEAR_DAMAGE_LIMITS[c.id === 'nose' ? 'nose' : 'main'];
         const stateBefore = c.damageState;
         updateGearDamage(c, {
           sinkRate,
           firstContact: !wasGrounded,
           normalLoad: normalForceMag,
-          lateralLoad: Math.abs(vLateral) * 35000,
-          longitudinalLoad: Math.min(Math.abs(vForward) * 25000, normalForceMag * (0.02 + this.brakes * 0.58)),
+          lateralLoad: Math.abs(fLateralMag),
+          longitudinalLoad: Math.abs(fForwardMag),
           overtravel: Math.max(0, normalPenetration - c.restLength),
           locked: gearDeploy >= 0.99 && this.targetGearState === 1,
         }, dt, limits);
@@ -303,27 +316,16 @@ export class LandingGear {
           c.compression = 0;
           continue;
         }
-        normalForceMag *= c.damageState === 'damaged' ? 0.65 : 1;
+        // A bent leg supports and grips less than an intact one.
+        const damageScale = c.damageState === 'damaged' ? 0.65 : 1;
+        normalForceMag *= damageScale;
         this.totalWeightOnWheels += normalForceMag;
-
-        // Rolling resistance & Brakes along forward axis
-        let muBrake = 0.02; // Baseline rolling resistance
-        if (this.brakes > 0.01) {
-          muBrake += this.brakes * 0.58; // Boeing 737 anti-skid carbon brake friction
-        }
-        // Preserve static braking on sloped taxiways/runways.
-        const stoppingGain = this.brakes > 0.5 ? normalForceMag / (9.80665 * Math.max(dt, 0.001)) : 25000;
-        const fForwardMag = -Math.sign(vForward) * Math.min(Math.abs(vForward) * stoppingGain, normalForceMag * muBrake);
-
-        // Lateral scrub resistance (prevents skidding sideways)
-        const muLateral = 0.75;
-        const fLateralMag = -Math.sign(vLateral) * Math.min(Math.abs(vLateral) * 35000.0, normalForceMag * muLateral);
 
         // Net wheel force in world space: normal (pushes perpendicular to the
         // surface) + longitudinal friction + lateral scrub.
         const fWheelWorld = scratchFWheelWorld.copy(groundNormal).multiplyScalar(normalForceMag);
-        fWheelWorld.addScaledVector(wheelForwardWorld, fForwardMag);
-        fWheelWorld.addScaledVector(wheelLateralWorld, fLateralMag);
+        fWheelWorld.addScaledVector(wheelForwardWorld, fForwardMag * damageScale);
+        fWheelWorld.addScaledVector(wheelLateralWorld, fLateralMag * damageScale);
         netForceWorld.add(fWheelWorld);
 
         // Calculate moment produced around CG: M = r x F

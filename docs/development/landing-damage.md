@@ -13,7 +13,8 @@ certification data**. Supported conditions are:
 
 - Initial contact speed along the terrain normal, including body angular velocity.
 - Sustained combined vertical, lateral-slip and longitudinal braking loads.
-  Lateral demand uses the wheel tangent frame, including nosewheel steering.
+  The loads are the Coulomb-limited tire forces the contact solver delivers in
+  the wheel tangent frame, including nosewheel steering, not a speed proxy.
 - Continued descent beyond suspension travel.
 - Loading an incompletely extended leg or commanding retraction under load.
 - Asymmetric contact and successive impacts after a bounce. Damage never decreases

@@ -26,6 +26,13 @@ describe('Independent gear damage and body support', () => {
       assert.ok(gear.contacts.every(c => c.damage === 0));
     }
   });
+  it('reacts to the tire force the surface can supply rather than to slip speed', () => {
+    const gear = new LandingGear();
+    // 60 m/s of lateral motion at taxi weight: the scrub force is capped at
+    // mu * strut load, so a sideways slide alone cannot overload the leg.
+    for (let i = 0; i < 600; i++) sample(gear, { y: 3.5, velocity: [60, 0, -30] });
+    assert.equal(gear.contacts[0].damageState, 'normal');
+  });
   it('distinguishes threshold, damaged and collapsed vertical impacts', () => {
     for (const [speed, state] of [[3.8, 'normal'], [4, 'damaged'], [10, 'collapsed']]) {
       const c = leg();
