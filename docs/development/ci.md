@@ -175,6 +175,11 @@ See [presets, reproduction and measurements](../../review-artifacts/issue97/READ
 saved preferences, three rabbit cycles without program growth, and mobile layout.
 Run it separately from timed benchmarks to avoid disturbing the camera or GPU.
 
+### Aircraft self-shadowing (issue #143)
+
+See [aircraft shadow acceptance](aircraft-shadows.md) for quality-tier GPU
+allocation, body/wing/tail/gear self-shadows and exterior/cockpit ground shadows.
+
 ### Effect flipbooks (issue #15)
 
 See [effect flipbooks](effect-flipbooks.md) for atlas provenance, resource budgets,

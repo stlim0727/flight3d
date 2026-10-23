@@ -181,6 +181,7 @@ const rigFacts = await evaluate(`(() => {
     cookieMipmaps: rig.light.map?.generateMipmaps ?? null,
     shadowMapSize: rig.light.shadow.mapSize.toArray(),
     mainSunMapSize: window.simulator.sky.sunLight.shadow.mapSize.toArray(),
+    renderQuality: window.simulator.renderQuality,
     mainSunCasts: window.simulator.sky.sunLight.castShadow,
     exteriorShadowProxy: window.simulator.aircraft.gltfShadowProxy?.castShadow ?? null,
     sceneChildren: window.simulator.scene.children.length,
@@ -420,8 +421,10 @@ check(rigFacts.isSpot && rigFacts.decay === 0 && rigFacts.distance === 0, 'Deck 
 check(rigFacts.hasCookie && rigFacts.cookieSize === 256 && rigFacts.cookieMipmaps === false, 'Deck sun must carry a 256px cookie without mipmaps');
 check(rigFacts.castShadow && rigFacts.autoUpdate === false, 'Deck sun must cast with a manually updated map');
 check(rigFacts.shadowMapSize.join() === '1024,1024', `Deck sun map must be 1024², got ${rigFacts.shadowMapSize}`);
-check(rigFacts.mainSunMapSize.join() === '2048,2048' && rigFacts.mainSunCasts && rigFacts.exteriorShadowProxy === true,
-  'The exterior sun and airframe shadow proxy must be untouched');
+const { RENDER_QUALITY } = await import('../src/config/renderQuality.js');
+const exteriorMapSize = RENDER_QUALITY[rigFacts.renderQuality].shadowMapSize;
+check(rigFacts.mainSunMapSize.every(size => size === exteriorMapSize) && rigFacts.mainSunCasts && rigFacts.exteriorShadowProxy === true,
+  'The exterior sun must follow its quality tier and retain the airframe shadow proxy');
 check(!pageErrors.length, `Page errors: ${pageErrors.join(' | ')}`);
 check(aoDepth.far === 8 && aoDepth.ssaoFar === aoDepth.far && aoDepth.depthFar === aoDepth.far &&
   aoDepth.ssaoNear === aoDepth.near && aoDepth.depthNear === aoDepth.near,

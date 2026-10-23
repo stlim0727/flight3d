@@ -39,13 +39,18 @@ export class SkyAtmosphere {
     this.sunLight.shadow.mapSize.height = 2048;
     this.sunLight.shadow.camera.near = 1.0;
     this.sunLight.shadow.camera.far = 2000;
-    this.sunLight.shadow.bias = -0.0003;
-    this.sunLight.shadow.normalBias = 0.02;
-    const sCam = 120;
+    // Depth bias is normalized by the 1999 m depth range: the previous -0.0003
+    // detached shadows by ~60 cm. Four centimetres plus a small normal offset
+    // suppress grazing-angle acne while keeping thin gear/wing shadows attached.
+    this.sunLight.shadow.bias = -0.00002;
+    this.sunLight.shadow.normalBias = 0.04;
+    // A 32 m radius encloses the whole 737 through arbitrary heading and bank.
+    const sCam = 32;
     this.sunLight.shadow.camera.left = -sCam;
     this.sunLight.shadow.camera.right = sCam;
     this.sunLight.shadow.camera.top = sCam;
     this.sunLight.shadow.camera.bottom = -sCam;
+    this.sunLight.shadow.camera.updateProjectionMatrix();
     this.scene.add(this.sunLight);
     this.scene.add(this.sunLight.target);
 
@@ -286,7 +291,32 @@ export class SkyAtmosphere {
     this.cloudsGroup.add(this.cloudLayer);
   }
 
-  prepareRender(camera) {
+  setShadowMapSize(size) {
+    const shadow = this.sunLight.shadow;
+    const supportedSize = Math.min(size, this.renderer?.capabilities?.maxTextureSize ?? size);
+    if (shadow.mapSize.x === supportedSize && shadow.mapSize.y === supportedSize) return;
+    shadow.map?.dispose();
+    shadow.mapPass?.dispose();
+    shadow.map = null;
+    shadow.mapPass = null;
+    shadow.mapSize.set(supportedSize, supportedSize);
+    shadow.needsUpdate = true;
+  }
+
+  prepareRender(camera, aircraftPosition = this.sunLight.target.position) {
+    // Use the displayed aircraft pose, including interpolation, at the final
+    // render boundary. Close views retain ~3 cm texels at balanced quality;
+    // distant tower/flyby views expand continuously up to the old world coverage.
+    const distance = camera.position.distanceTo(aircraftPosition);
+    const halfSize = THREE.MathUtils.clamp(32 + Math.max(0, distance - 60) * 0.2, 32, 120);
+    const shadowCamera = this.sunLight.shadow.camera;
+    if (shadowCamera.right !== halfSize) {
+      shadowCamera.left = shadowCamera.bottom = -halfSize;
+      shadowCamera.right = shadowCamera.top = halfSize;
+      shadowCamera.updateProjectionMatrix();
+    }
+    this.sunLight.target.position.copy(aircraftPosition);
+    this.sunLight.position.copy(aircraftPosition).addScaledVector(this.sunPosition, 600);
     // Sort before renderer.render uploads instance buffers, including camera cuts.
     this.cloudLayer.sortForCamera(camera);
   }

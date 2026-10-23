@@ -162,6 +162,7 @@ class FlightSimulator {
     this.currentAirport = this.airport;
 
     this.sky = new SkyAtmosphere(this.scene, this.renderer, this.water);
+    this.sky.setShadowMapSize(RENDER_QUALITY[this.renderQuality].shadowMapSize);
     this.foliage.setTimeOfDay(this.sky.timeOfDay);
     this.water.syncWithAtmosphere(this.sky);
 
@@ -1555,7 +1556,7 @@ class FlightSimulator {
 
   renderScene() {
     prepareCockpitShadowDepth(this.aircraft.group);
-    this.sky.prepareRender(this.camera);
+    this.sky.prepareRender(this.camera, this.aircraft.group.position);
     this.renderer.render(this.scene, this.camera);
     if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT &&
         (!this.cameraSystem.photoCockpit || this.cameraSystem.isLookingAwayFromCenter())) {
@@ -1584,6 +1585,7 @@ class FlightSimulator {
   setRenderQuality(value) {
     this.renderQuality = resolveRenderQuality(value);
     const preset = RENDER_QUALITY[this.renderQuality];
+    this.sky.setShadowMapSize(preset.shadowMapSize);
     if (this.terrain.getQuality() !== preset.terrain) this.terrain.setQuality(preset.terrain);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, preset.maxDpr));
     document.getElementById('render-quality').value = this.renderQuality;
