@@ -160,3 +160,35 @@ vertical instrument panel. Pillar bands are clearest on the left sidewall and
 lower console at 16:48, heading 000 degrees, clear weather; this model does not
 put the same pattern on the panel as a fighter canopy. Screenshots capture the
 actual model and its cast shadows without adding substitute shadow geometry.
+
+
+## Interactive shadow scenario
+
+Main menu → Scenarios → **Cockpit shadow demo** → **Fly**. Available at both
+airports. `CockpitShadowDemo` holds the runway aircraft still in the 3D cockpit;
+mouse/touch looking remains available. The sun visits six aircraft-relative
+bearings/elevations: front-left, ahead, front-right, right, high and low. Each
+six-second segment holds for 4.5 seconds and interpolates for 1.5 seconds, looping
+in 36 seconds. Previous/Next work while paused; Resume restarts automatic movement.
+The ordinary pause/menu also freezes the tour. Exit opens the main menu.
+
+`SkyAtmosphere.sunDirectionOverride` changes the actual main sun and sky direction,
+which also drives the localized cockpit sun and cached shadow invalidation. It is
+an artificial lighting inspection, independent of the time-of-day trajectory.
+Stopping or changing presets clears the override and restores time, cloud cover
+and the previous camera. Aircraft physics is held only while this demo is active;
+regular scenarios retain their normal integration.
+
+`tests/cockpitShadowDemo.test.js` covers continuous loop boundaries, pause/manual
+steps, heading-relative light, repeat entry and restoration. For browser evidence,
+start Vite and a GPU-capable Chrome under the shared Chrome lease, then run:
+
+```
+APP_URL=http://127.0.0.1:5292 CDP_PORT=9484 chrome-session node scripts/verify-shadow-demo.mjs
+```
+
+When already holding a persistent `chrome-session hold` lease, invoke the Node
+command directly within that workflow. The harness opens/closes its own tab,
+selects the scenario through the menu, captures six sun directions, checks the
+stationary pose and visible cockpit changes, pause/steps/loop, portrait layout
+and exit restoration. It does not close or restart the shared browser.

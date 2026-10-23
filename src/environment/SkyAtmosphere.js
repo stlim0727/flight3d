@@ -151,8 +151,12 @@ export class SkyAtmosphere {
     // 06:00 = Sunrise (elev 0°), 12:00 = Noon (elev 65°), 18:00 = Sunset (elev 0°), 24:00 = Midnight
     const hourRad = ((this.timeOfDay - 6.0) / 24.0) * Math.PI * 2.0;
 
-    const elevation = Math.sin(hourRad) * 65.0; // degrees
-    const azimuth = 180.0 + Math.cos(hourRad) * 45.0; // degrees
+    const elevation = this.sunDirectionOverride
+      ? THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(this.sunDirectionOverride.y, -1, 1)))
+      : Math.sin(hourRad) * 65.0; // degrees
+    const azimuth = this.sunDirectionOverride
+      ? THREE.MathUtils.radToDeg(Math.atan2(this.sunDirectionOverride.x, this.sunDirectionOverride.z))
+      : 180.0 + Math.cos(hourRad) * 45.0; // degrees
     const isMorning = Math.cos(hourRad) >= 0;
 
     const phi = THREE.MathUtils.degToRad(90 - elevation);

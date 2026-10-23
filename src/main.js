@@ -1,6 +1,7 @@
 import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
 import { cockpitCasterState } from './aircraft/CockpitLighting.js';
+import { CockpitShadowDemo, SHADOW_VIEWS } from './director/CockpitShadowDemo.js';
 import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
 import { prepareCockpitShadowDepth } from './aircraft/CockpitDepth.js';
 import { Atmosphere } from './physics/Atmosphere.js';
@@ -176,6 +177,7 @@ class FlightSimulator {
     };
     this.diagnostics = new DiagnosticsInspector(this);
     this.demoDirector = new DemoFlightDirector(this);
+    this.shadowDemo = new CockpitShadowDemo(this, () => this.updateShadowDemoUi());
 
     // Game flow: lobby (cinematic menu) / flight / paused
     this.gameFlow = new GameFlowController({
@@ -400,7 +402,7 @@ class FlightSimulator {
   syncFlowUi() {
     const state = this.gameFlow.state;
     document.body.dataset.flow = state;
-    this.controls.inputBlocked = this.gameFlow.blocksFlightInput();
+    this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active;
     if (state !== FLOW.FLIGHT) {
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0.0, 0.0);
@@ -420,6 +422,7 @@ class FlightSimulator {
 
   /** Leave the lobby: stop the cinematic and spawn the player at their choice. */
   fly() {
+    this.shadowDemo.stop();
     const wantsDemo = this.lobby.preset === 'demo';
     if (this.demoDirector?.isActive || this.demoDirector?.waitingForTerrain) {
       this.demoDirector.stop(wantsDemo ? null : () => t('manual.control.engaged'));
@@ -475,6 +478,11 @@ class FlightSimulator {
     // Scenario availability depends on the active airport; an unavailable
     // pick (e.g. cliff at coastal) falls back instead of leaving a stale pose.
     if (!isScenarioAvailable(this.activeAirport, type)) type = DEFAULT_SCENARIO;
+    if (type === 'shadow') {
+      this.shadowDemo.start();
+      return;
+    }
+    this.shadowDemo?.stop();
     this.lastPresetType = type;
     if (!isDemoInternal) this.aero.loadConfig(BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
@@ -828,6 +836,7 @@ class FlightSimulator {
    * Physics Integration Substep (120 Hz)
    */
   integratePhysics(dt) {
+    if (this.shadowDemo?.active) return;
     // Gear/contact queries consume this mesh too. Restore the authoritative
     // transform before physics so a rendered interpolation never feeds back.
     this.aircraft.group.position.copy(this.position);
@@ -1211,6 +1220,7 @@ class FlightSimulator {
    * @returns {object} updated telemetry state
    */
   stepSimulation(simSeconds) {
+    if (this.shadowDemo.active) this.shadowDemo.update(simSeconds);
     const numSubsteps = Math.max(1, Math.round(simSeconds * this.physicsHz));
     for (let i = 0; i < numSubsteps; i++) {
       if (this.demoDirector && this.demoDirector.isActive) {
@@ -1286,7 +1296,10 @@ class FlightSimulator {
     this.totalSimTime += frameDelta;
 
     // High-rate substepping for rock-solid flight physics
-    if (this.gameFlow.isPhysicsFrozen()) {
+    if (this.shadowDemo.active) {
+      this.physicsAccumulator = 0;
+      if (!this.gameFlow.isPhysicsFrozen()) this.shadowDemo.update(frameDelta);
+    } else if (this.gameFlow.isPhysicsFrozen()) {
       this.physicsAccumulator = 0;
     } else {
       while (this.physicsAccumulator >= this.physicsDt) {
@@ -1533,6 +1546,24 @@ class FlightSimulator {
     }
   }
 
+  updateShadowDemoUi() {
+    const demo = this.shadowDemo;
+    if (!demo) return;
+    const panel = document.getElementById('shadow-demo');
+    if (panel) panel.hidden = !demo.active;
+    const status = document.getElementById('shadow-status');
+    if (status) bindText(status, () => t('shadow.status', {
+      step: demo.index + 1, total: SHADOW_VIEWS.length,
+      direction: t(SHADOW_VIEWS[demo.index ?? 0].key),
+    }));
+    const pause = document.getElementById('shadow-pause');
+    if (pause) {
+      bindText(pause, () => t(demo.paused ? 'shadow.resume' : 'shadow.pause'));
+      pause.setAttribute('aria-pressed', String(demo.paused));
+    }
+    if (this.gameFlow) this.syncFlowUi();
+  }
+
   setRenderQuality(value) {
     this.renderQuality = resolveRenderQuality(value);
     const preset = RENDER_QUALITY[this.renderQuality];
@@ -1629,6 +1660,15 @@ class FlightSimulator {
     });
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
     document.getElementById('menu-toggle')?.addEventListener('click', () => this.toggleMainMenu());
+
+    document.getElementById('shadow-prev')?.addEventListener('click', () => this.shadowDemo.next(-1));
+    document.getElementById('shadow-next')?.addEventListener('click', () => this.shadowDemo.next());
+    document.getElementById('shadow-pause')?.addEventListener('click', () => this.shadowDemo.togglePause());
+    document.getElementById('shadow-exit')?.addEventListener('click', () => {
+      this.shadowDemo.stop();
+      this.lastPresetType = 'runway';
+      this.gameFlow.returnToLobby(true);
+    });
 
     // ESC chain: the demo director consumes ESC first (take manual control);
     // otherwise panels/help modal close before the pause menu opens.

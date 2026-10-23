@@ -30,6 +30,12 @@ export const SPAWN_SCENARIOS = {
     briefingKey: 'lobby.briefing.scenario.cliff',
     lobbyButtonId: 'lobby-preset-cliff',
   },
+  shadow: {
+    airports: ['coastal', 'lukla'],
+    labelKeys: { coastal: 'shadow.title', lukla: 'shadow.title' },
+    briefingKey: 'shadow.briefing',
+    lobbyButtonId: 'lobby-preset-shadow',
+  },
   demo: {
     airports: ['coastal', 'lukla'],
     labelKeys: { coastal: 'lobby.preset.demo', lukla: 'lobby.preset.demo' },

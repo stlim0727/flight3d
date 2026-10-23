@@ -83,6 +83,17 @@
     </button>
 
     <!-- Cinematic Demo Flight Showcase Banner -->
+    <section id="shadow-demo" class="shadow-demo" hidden aria-label="Cockpit shadow demo">
+      <strong id="shadow-status" aria-live="polite"></strong>
+      <span data-i18n="shadow.hint">기체 고정 · 태양 자동 이동 · 드래그로 둘러보기</span>
+      <div class="shadow-demo-actions">
+        <button id="shadow-prev" class="btn" data-i18n="shadow.prev">← 이전</button>
+        <button id="shadow-pause" class="btn" aria-pressed="false" data-i18n="shadow.pause">일시정지</button>
+        <button id="shadow-next" class="btn" data-i18n="shadow.next">다음 →</button>
+        <button id="shadow-exit" class="btn" data-i18n="shadow.exit">데모 나가기</button>
+      </div>
+    </section>
+
     <div id="demo-banner" class="demo-banner" style="display: none;">
       <div class="demo-badge" title="클릭하여 안내 팝업 접기" role="button" tabindex="0" data-i18n-title="click.to.collapse.the.guide">
         <span class="demo-dot"></span>
@@ -168,6 +179,7 @@
           <button id="lobby-preset-app" class="btn btn-preset"><span>🛬 착륙 접근 (3 NM)</span></button>
           <button id="lobby-preset-cru" class="btn btn-preset"><span>✈️ 순항 비행 (6,000 FT)</span></button>
           <button id="lobby-preset-cliff" class="btn btn-preset btn-cliff"><span>⚡ 내리막 이륙 (Rwy 24)</span></button>
+          <button id="lobby-preset-shadow" class="btn btn-preset"><span data-i18n="shadow.title">☀ 콕핏 그림자 데모</span></button>
           <button id="lobby-preset-demo" class="btn btn-preset"><span>🎬 데모 비행</span></button>
         </div>
       </div>

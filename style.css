@@ -2174,3 +2174,23 @@ body[data-flow="lobby"] .menu-toggle {
   width: min(480px, 100% - 16px);
 }
 .compact-ui .lobby-buttons .btn { min-height: 44px; }
+
+/* Keep the comparison controls below the HUD without covering the panel face. */
+.shadow-demo {
+  position: fixed;
+  top: 112px;
+  left: 12px;
+  z-index: 25;
+  max-width: min(440px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid #56758b;
+  border-radius: 10px;
+  background: rgba(15, 25, 37, .94);
+  color: #e6f0fa;
+  font-size: 12px;
+}
+.shadow-demo[hidden], body:not([data-flow="flight"]) .shadow-demo { display: none; }
+.shadow-demo strong, .shadow-demo > span { display: block; margin-bottom: 6px; }
+.shadow-demo-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.shadow-demo-actions .btn { min-height: 38px; padding: 6px 9px; }
+@media (max-width: 600px) { .shadow-demo { top: 146px; font-size: 11px; } }
