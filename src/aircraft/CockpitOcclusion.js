@@ -34,6 +34,28 @@ export class CockpitOcclusion {
     this.pass.normalMaterial.side = THREE.DoubleSide;
     useProjectionDepth(this.pass.normalMaterial);
     this.pass.kernelRadius = 0.3;
+    // three's blur is a single 3x3 box at half resolution, which leaves the
+    // SSAO blue-noise dither visible as a dot grid on broad lit surfaces
+    // (seats, floor panels). A dual-scale 3x3 averages several noise periods
+    // while the tight ring keeps contact edges.
+    this.pass.blurMaterial.fragmentShader = `
+      uniform sampler2D tDiffuse;
+      uniform vec2 resolution;
+      varying vec2 vUv;
+      void main() {
+        vec2 texel = 1.0 / resolution;
+        float sum = 0.0;
+        for (int y = -1; y <= 1; y++) {
+          for (int x = -1; x <= 1; x++) {
+            vec2 offset = vec2( float( x ), float( y ) ) * texel;
+            sum += texture2D( tDiffuse, vUv + offset ).r;
+            sum += texture2D( tDiffuse, vUv + offset * 2.5 ).r;
+          }
+        }
+        gl_FragColor = vec4( vec3( clamp( sum / 18.0, 0.0, 1.0 ) ), 1.0 );
+      }
+    `;
+    this.pass.blurMaterial.needsUpdate = true;
     // SSAOPass expresses its depth rejection bounds in normalized linear depth.
     this.pass.minDistance = 0.003 / (AO_FAR - this.aoCamera.near);
     this.pass.maxDistance = 0.45 / (AO_FAR - this.aoCamera.near);
