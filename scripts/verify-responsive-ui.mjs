@@ -193,19 +193,21 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
   assert.ok(await ev(`document.querySelector('#ap-panel').hidden && document.body.dataset.flow === 'flight'`), `${name}: Escape closes AP without pausing flight`);
   await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/${name}.png`, Buffer.from(r.data, 'base64')));
   await ev(`document.querySelector('#menu-toggle').click()`);
+  await ev(`document.querySelector('#lobby-tab-settings').click()`);
   const panel = await ev(`(() => {
     const card = document.querySelector('.lobby-card');
+    const panels = document.querySelector('.lobby-panels');
     const settings = document.querySelector('#lobby-settings');
     document.querySelector('#btn-sound').click();
     document.querySelector('#btn-sound').click();
-    card.scrollTop = 999;
+    panels.scrollTop = 999;
     const fly = document.querySelector('#btn-fly').getBoundingClientRect();
-    return { open: document.body.dataset.flow === 'lobby', scroll: card.scrollTop, scrollable: card.scrollHeight > card.clientHeight,
+    return { open: document.body.dataset.flow === 'lobby', scroll: panels.scrollTop, scrollable: panels.scrollHeight > panels.clientHeight,
       flyVisible: fly.y >= 0 && fly.bottom <= innerHeight, settingsBottom: settings.getBoundingClientRect().bottom,
       cardTouch: getComputedStyle(card).touchAction,
       hitTargets: [...settings.querySelectorAll('button, select')].flatMap(node => {
         const r = node.getBoundingClientRect();
-        const clip = card.getBoundingClientRect();
+        const clip = panels.getBoundingClientRect();
         const y = r.top + r.height / 2;
         if (!r.width || !r.height || y <= clip.top || y >= clip.bottom) return [];
         return [r.left + 8, r.left + r.width / 2, r.right - 8].map(x => {
@@ -231,7 +233,8 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     panel.controlBandHeight = height - controlsTop;
   }
   assert.ok(bounds.every(b => !b.bad), `${name}: primary controls are in bounds`);
-  assert.ok(panel.open && panel.flyVisible && panel.cardTouch === 'pan-y', `${name}: settings menu stays open with a scrollable card`);
+  assert.ok(panel.open && panel.flyVisible && panel.cardTouch === 'pan-y', `${name}: settings tab stays open with a scrollable panel and a fixed flight action`);
+  assert.ok(!panel.scrollable || panel.scroll > 0, `${name}: the active panel is the scroll container`);
   assert.ok(panel.hitTargets.length > 0, `${name}: visible settings controls were hit-tested`);
   assert.ok(panel.hitTargets.every(hit => hit.reachable), `${name}: settings obscured: ${JSON.stringify(panel.hitTargets.filter(hit => !hit.reachable))}`);
   if (showTouch && width > 1024) {
@@ -325,8 +328,8 @@ await send('Input.dispatchKeyEvent', { type: 'keyUp', key: '2', code: 'Digit2', 
 await new Promise(r => setTimeout(r, 150));
 assert.equal(await ev(`window.simulator.cameraSystem.mode`), 1, 'digit keys still select a camera directly');
 assert.match(await ev(`document.querySelector('#open-camera').textContent`), /Chase/, 'keyboard camera state appears on the toolbar button');
-await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('.lobby-card').scrollTop = 0`);
-const before = await ev(`(()=>{const r=document.querySelector('.lobby-card').getBoundingClientRect();const c=window.simulator.cameraSystem;return {x:r.x+6,y:r.bottom-12,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
+await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('#lobby-tab-scenario').click(); document.querySelector('.lobby-panels').scrollTop = 0`);
+const before = await ev(`(()=>{const r=document.querySelector('.lobby-panels').getBoundingClientRect();const c=window.simulator.cameraSystem;return {x:r.x+r.width/2,y:r.bottom-12,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
 await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: before.x, y: before.y }] });
 for (let n = 1; n <= 8; n++) {
   await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: before.x, y: before.y - n * 10 }] });
@@ -334,15 +337,15 @@ for (let n = 1; n <= 8; n++) {
 }
 await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 await new Promise(r => setTimeout(r, 200));
-const after = await ev(`(()=>{const c=window.simulator.cameraSystem;return {scroll:document.querySelector('.lobby-card').scrollTop,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
-assert.ok(after.scroll > 0, 'native touch gesture scrolls the menu card');
+const after = await ev(`(()=>{const c=window.simulator.cameraSystem;return {scroll:document.querySelector('.lobby-panels').scrollTop,yaw:c.chaseYaw,pitch:c.chasePitch}})()`);
+assert.ok(after.scroll > 0, 'native touch gesture scrolls the menu panel');
 assert.equal(after.yaw, before.yaw, 'menu scroll leaves camera yaw unchanged');
 assert.equal(after.pitch, before.pitch, 'menu scroll leaves camera pitch unchanged');
 await ev(`document.querySelector('#btn-touch-toggle').click()`);
 assert.equal(await ev('window.simulator.touchControls.enabled'), false, 'touch mode can be disabled from shared settings');
 await ev(`document.querySelector('#btn-touch-toggle').click(); document.querySelector('#lobby-lang-ko').click()`);
 await new Promise(r => setTimeout(r, 100));
-assert.equal(await ev(`document.querySelector('.lobby-settings .lobby-label').textContent`), '설정', 'language change refreshes menu settings labels');
+assert.equal(await ev(`document.querySelector('#lobby-tab-settings').textContent.trim()`), '설정', 'language change refreshes menu tab labels');
 assert.equal(await ev(`document.body.dataset.flow`), 'lobby', 'language change keeps the menu open');
 await ev(`document.querySelector('#menu-toggle').click()`);
 await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 1, mobile: true });
@@ -450,7 +453,7 @@ for (const [width, height, touch] of [[320, 568, true], [568, 320, true], [1025,
       visible: c.left >= s.left && c.right <= s.right, scrollLeft: strip.scrollLeft };
   })()`);
   assert.ok(camera.end && camera.visible, `keyboard End reaches the final camera readout: ${JSON.stringify(camera)}`);
-  await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('#btn-diag').scrollIntoView({block: 'center'})`);
+  await ev(`document.querySelector('#menu-toggle').click(); document.querySelector('#lobby-tab-settings').click(); document.querySelector('#btn-diag').scrollIntoView({block: 'center'})`);
   await nativeClick('#btn-diag', touch);
   await ev(`document.querySelector('#tune-elev').scrollIntoView({block: 'center'})`);
   const tuningBefore = await ev('window.simulator.aero.tuning.elevatorSensitivity');
