@@ -173,6 +173,17 @@ the GLTF interior is the only cockpit geometry. `PORT`, `CDP_PORT`, `ARTIFACT_DI
 and `FORCE_GPU=0` (SwiftShader) override the defaults. See
 [evidence](../../review-artifacts/cockpit-startup/README.md).
 
+### Mouse look and tower zoom (issue #180)
+
+`npm run test:camera-look` (`scripts/verify-camera-look.mjs`) starts its own Vite
+server and Chrome on ports claimed from the operating system, freezes physics at
+a known pose, and drives real DOM mouse events over the canvas instead of writing
+camera state. It asserts that a downward drag lifts the gaze in both chase and
+cockpit, that 120 px of cockpit drag stays under 20° of sweep, that the tower
+wheel reaches 8x with a fixed eye point, and that the cockpit still caps at 4x.
+`PORT`, `CDP_PORT`, `ARTIFACT_DIR` and `FORCE_GPU=0` override the defaults. See
+[evidence](../../review-artifacts/issue-180/README.md).
+
 ### Airport rendering quality (issue #97)
 
 `node scripts/verify-airport-performance.mjs` compares an unchanged main server

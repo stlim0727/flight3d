@@ -83,6 +83,10 @@ export class CameraSystem {
     this.opticalZoom = 1.0;
     this.opticalZoomMin = 1.0;
     this.opticalZoomMax = 4.0;
+    // The tower eyes a distant airfield from a cab with no interior geometry to
+    // clip against, so it magnifies further than the cockpit, whose cone is
+    // already crowded by the windscreen and the panels.
+    this.towerZoomMax = 8.0;
     // The cockpit eye point never moves: the windscreen glass starts 0.41 m ahead
     // and the roof fairing 0.32 m above, so any lean long enough to matter drives
     // the camera through the interior. The magnified cone rotates up instead, off
@@ -94,6 +98,14 @@ export class CameraSystem {
     this.flybySet = false;
     this.flybyRegime = null;
     this.getTerrainHeight = null;
+
+    // Look gain for the head views (cockpit, wing, gear): radians of head
+    // rotation per pixel of pointer travel. The gesture grabs the scenery, so
+    // the gain is set near the window's own pixels-per-radian. At 1080p with the
+    // 60° cockpit base field of view that is ~0.0011, and one screen-width drag
+    // then sweeps the head across its whole look limit rather than running past
+    // the pointer several times over.
+    this.gazeSensitivity = 0.0011;
 
     // Mouse drag & pointer look state
     this.isDragging = false;
@@ -117,8 +129,8 @@ export class CameraSystem {
     // Continuous Edge Pan / Edge Look state (화면 끝 도달 시 시선 지속 회전)
     this.enableEdgePan = false; // Grab gestures stop when the pointer/finger stops.
     this.edgePanMargin = 30; // Threshold distance in pixels from screen boundary
-    this.edgePanSpeedX = 280; // Virtual px/s equivalent for horizontal pan (~0.98 rad/s in cockpit, ~1.4 rad/s in chase)
-    this.edgePanSpeedY = 220; // Virtual px/s equivalent for vertical tilt (~0.77 rad/s)
+    this.edgePanSpeedX = 280; // Virtual px/s equivalent for horizontal pan (~0.31 rad/s in cockpit, ~1.4 rad/s in chase)
+    this.edgePanSpeedY = 220; // Virtual px/s equivalent for vertical tilt (~0.24 rad/s in cockpit, ~1.1 rad/s in chase)
 
     if (this.camera) {
       this.camera.near = (this.mode === CameraSystem.MODES.COCKPIT) ? 0.08 : 0.25;
@@ -441,12 +453,20 @@ export class CameraSystem {
   }
 
   /**
+   * Ceiling for the current view. Changing views runs resetLook(), so a zoom
+   * carried over from the tower cannot leave the cockpit above its own limit.
+   */
+  opticalZoomLimit() {
+    return this.mode === CameraSystem.MODES.TOWER ? this.towerZoomMax : this.opticalZoomMax;
+  }
+
+  /**
    * Scale the optical magnification. ratio > 1 zooms in; the result is clamped
-   * to [opticalZoomMin, opticalZoomMax] and reports whether anything changed.
+   * to [opticalZoomMin, opticalZoomLimit()] and reports whether anything changed.
    */
   zoomOpticalBy(ratio) {
     if (!Number.isFinite(ratio) || ratio === 1) return false;
-    const clamped = Math.min(this.opticalZoomMax, Math.max(this.opticalZoomMin, this.opticalZoom * ratio));
+    const clamped = Math.min(this.opticalZoomLimit(), Math.max(this.opticalZoomMin, this.opticalZoom * ratio));
     if (clamped === this.opticalZoom) return false;
     this.opticalZoom = clamped;
     this.userLookOverridden = true;
@@ -488,20 +508,24 @@ export class CameraSystem {
     }
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: {
-        this.lookYaw -= dx * 0.0035;
-        this.lookPitch -= dy * 0.0035;
+        this.lookYaw -= dx * this.gazeSensitivity;
+        this.lookPitch -= dy * this.gazeSensitivity;
         this.lookPitch = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, this.lookPitch));
         break;
       }
       case CameraSystem.MODES.CHASE: {
         this.chaseYaw -= dx * 0.005;
-        this.chasePitch += dy * 0.005; // Drag down = lower camera / look up; drag up = raise camera / look down
+        // Chase pitch is an orbit height, so its sign is the mirror of the head
+        // views: raising it sinks the camera and lifts the gaze. Both the drag
+        // and the pointer-lock path land on that reading, which makes a down
+        // gesture lift the view like it does in the cockpit.
+        this.chasePitch -= dy * 0.005;
         this.chasePitch = Math.max(-1.1, Math.min(0.28, this.chasePitch));
         break;
       }
       case CameraSystem.MODES.WING: {
-        this.wingLookYaw -= dx * 0.0035;
-        this.wingLookPitch -= dy * 0.0035;
+        this.wingLookYaw -= dx * this.gazeSensitivity;
+        this.wingLookPitch -= dy * this.gazeSensitivity;
         this.wingLookPitch = Math.max(-Math.PI * 0.35, Math.min(Math.PI * 0.35, this.wingLookPitch));
         this.wingLookYaw = Math.max(-Math.PI * 0.55, Math.min(Math.PI * 0.55, this.wingLookYaw));
         break;
@@ -512,8 +536,8 @@ export class CameraSystem {
         break;
       }
       case CameraSystem.MODES.GEAR: {
-        this.gearLookYaw -= dx * 0.0035;
-        this.gearLookPitch -= dy * 0.0035;
+        this.gearLookYaw -= dx * this.gazeSensitivity;
+        this.gearLookPitch -= dy * this.gazeSensitivity;
         this.gearLookPitch = Math.max(-0.6, Math.min(0.6, this.gearLookPitch));
         this.gearLookYaw = Math.max(-0.8, Math.min(0.8, this.gearLookYaw));
         break;
@@ -946,7 +970,7 @@ export class CameraSystem {
       case CameraSystem.MODES.CHASE: {
         // Smooth Third-Person Exterior Chase Camera with full 360° mouse look & orbit
         const cursorChaseYaw = this.enableCursorTrack ? (-this.cursorNormX * 0.18) : 0;
-        const cursorChasePitch = this.enableCursorTrack ? (this.cursorNormY * 0.12) : 0;
+        const cursorChasePitch = this.enableCursorTrack ? (-this.cursorNormY * 0.12) : 0;
 
         const totalYaw = this.chaseYaw + cursorChaseYaw;
         const totalPitch = Math.max(-1.1, Math.min(0.28, this.chasePitch + cursorChasePitch));

@@ -45,11 +45,29 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
       wheel(-100);
       assert.ok(cam.opticalZoom > 1, `${cam.getViewName()}: scroll up magnifies`);
       for (let i = 0; i < 40; i++) wheel(-100);
-      assert.equal(cam.opticalZoom, cam.opticalZoomMax, 'zoom-in saturates at the maximum');
+      assert.equal(cam.opticalZoom, cam.opticalZoomLimit(), 'zoom-in saturates at the view maximum');
 
       for (let i = 0; i < 60; i++) wheel(100);
       assert.equal(cam.opticalZoom, cam.opticalZoomMin, 'zoom-out saturates at 1x, never wider than the base field of view');
     }
+  });
+
+  it('magnifies the tower to 8x while the cockpit keeps its 4x ceiling', () => {
+    const tower = withMode(CameraSystem.MODES.TOWER);
+    assert.equal(tower.cam.opticalZoomLimit(), 8, 'the tower view allows eightfold magnification');
+    for (let i = 0; i < 60; i++) tower.wheel(-100);
+    assert.equal(tower.cam.opticalZoom, 8, 'the scroll wheel reaches the tower maximum');
+    const towerFov = tower.cam.applyBaseFov(54);
+    assert.ok(towerFov > 0 && towerFov < 8, `8x narrows the 54° tower base to ${towerFov.toFixed(2)}°`);
+
+    tower.cam.opticalZoom = 1;
+    tower.cam.applyPinchZoom(400);
+    assert.ok(tower.cam.opticalZoom > 3, 'pinch spread climbs toward the same eightfold ceiling');
+
+    const cockpit = withMode(CameraSystem.MODES.COCKPIT);
+    assert.equal(cockpit.cam.opticalZoomLimit(), 4, 'the cockpit ceiling is unchanged');
+    for (let i = 0; i < 60; i++) cockpit.wheel(-100);
+    assert.equal(cockpit.cam.opticalZoom, 4, 'the cockpit still stops at 4x');
   });
 
   it('pinch spread magnifies and pinch collapse cancels it in both fixed eye-point views', () => {

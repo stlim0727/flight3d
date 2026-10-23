@@ -131,13 +131,62 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     camSys.applyMouseDelta(-200, 0);
     assert.ok(camSys.chaseYaw > 0, `chaseYaw (${camSys.chaseYaw}) should be positive after dragging left`);
 
-    // Pitch elevation clamp: drag up (dy = -500)
-    camSys.applyMouseDelta(0, -500);
-    assert.ok(camSys.chasePitch >= -1.1, `chasePitch should be clamped to at least -1.1`);
-
-    // Pitch lower clamp: drag down (dy = 500)
+    // Pointer lock is directional aim, so pushing the mouse down (dy = 500)
+    // pitches the gaze down: the orbit climbs toward the aircraft and rests on
+    // the high-side clamp. Pulling it up drops the orbit to the low-side clamp.
     camSys.applyMouseDelta(0, 500);
-    assert.ok(camSys.chasePitch <= 0.28, `chasePitch should be clamped to at most 0.28`);
+    assert.ok(camSys.chasePitch <= -1.1 + 1e-9, `chasePitch (${camSys.chasePitch}) should reach the -1.1 aiming-down clamp`);
+
+    camSys.chasePitch = 0;
+    camSys.applyMouseDelta(0, -500);
+    assert.ok(camSys.chasePitch >= 0.28 - 1e-9, `chasePitch (${camSys.chasePitch}) should reach the 0.28 aiming-up clamp`);
+  });
+
+  it('should lift the chase gaze on a down drag so the exterior orbit grabs scenery like the head views', () => {
+    const aircraft = new THREE.Object3D();
+    aircraft.position.set(0, 60, 0);
+    aircraft.updateMatrixWorld(true);
+
+    // Rendered gaze, not the state variable: chase pitch is an orbit height whose
+    // sign is the mirror of a head rotation, so only the view direction compares.
+    const gazeShift = (mode, gesture) => {
+      const camera = new THREE.PerspectiveCamera(60, 16 / 9);
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(mode, true);
+      camSys.snapToTarget(aircraft);
+      const before = camSys.camera.getWorldDirection(new THREE.Vector3()).y;
+      gesture(camSys);
+      camSys.snapToTarget(aircraft);
+      return camSys.camera.getWorldDirection(new THREE.Vector3()).y - before;
+    };
+
+    const downDrag = (camSys) => camSys.applyDragDelta(0, 120);   // clientY grows
+    const downLock = (camSys) => camSys.applyMouseDelta(0, 120);  // movementY grows
+
+    assert.ok(gazeShift(CameraSystem.MODES.COCKPIT, downDrag) > 0, 'a down drag lifts the cockpit gaze');
+    assert.ok(gazeShift(CameraSystem.MODES.CHASE, downDrag) > 0, 'a down drag lifts the chase gaze');
+    assert.ok(gazeShift(CameraSystem.MODES.COCKPIT, downLock) < 0, 'pointer lock down drops the cockpit gaze');
+    assert.ok(gazeShift(CameraSystem.MODES.CHASE, downLock) < 0, 'pointer lock down drops the chase gaze');
+  });
+
+  it('should turn the head at about the pointer rate instead of outrunning it', () => {
+    const camera = new THREE.PerspectiveCamera();
+    const camSys = new CameraSystem(camera, mockDom);
+    camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+
+    // A thousand pixels of travel is roughly a window width. The previous
+    // 0.0035 rad/px gain swept the whole ±81° look limit within 400px and
+    // saturated here; a grab should still be following the pointer at this far.
+    camSys.applyDragDelta(1000, 0);
+    assert.ok(Math.abs(camSys.lookYaw) < Math.PI * 0.45 - 1e-9,
+      `lookYaw (${camSys.lookYaw}) should not saturate after a window-width drag`);
+    assert.ok(Math.abs(camSys.lookYaw) > 1.0,
+      `lookYaw (${camSys.lookYaw}) should still turn a useful amount`);
+
+    camSys.setMode(CameraSystem.MODES.WING, true);
+    camSys.applyDragDelta(1000, 0);
+    assert.ok(Math.abs(camSys.wingLookYaw) < Math.PI * 0.55 - 1e-9,
+      `wingLookYaw (${camSys.wingLookYaw}) shares the gentler gain`);
   });
 
   it('should orbit camera around aircraft position in CHASE mode', () => {
