@@ -346,5 +346,7 @@ export default {
   "preset.coastal.cruise": "프리셋: 해안 순항 (만과 선박)",
   "warning.stall": "⚠️ 실속 경고 - 기수를 내리세요 ⚠️",
   "crash.impact": "💥 치명적 충돌",
-  "crash.hullLoss": "기체 전손"
+  "crash.hullLoss": "기체 전손",
+  "crash.expand": "보고서 펼치기",
+  "crash.collapse": "보고서 접기"
 };

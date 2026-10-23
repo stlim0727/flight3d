@@ -346,5 +346,7 @@ export default {
   "preset.coastal.cruise": "Preset: Scenic cruise (bay & ships)",
   "warning.stall": "⚠️ STALL WARNING - LOWER THE NOSE ⚠️",
   "crash.impact": "💥 CATASTROPHIC IMPACT",
-  "crash.hullLoss": "HULL LOSS"
+  "crash.hullLoss": "HULL LOSS",
+  "crash.expand": "Expand report",
+  "crash.collapse": "Collapse report"
 };

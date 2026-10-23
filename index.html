@@ -118,28 +118,29 @@
       <div class="crash-card">
         <div class="crash-header">
           <span class="crash-badge" data-i18n="crash.impact">💥 CATASTROPHIC IMPACT</span>
-          <span class="crash-status-tag" data-i18n="crash.hullLoss">HULL LOSS</span>
-        </div>
-        <h1 id="crash-title" class="crash-title"><span data-i18n="control.tower.collision">관제탑 충돌 (CONTROL TOWER COLLISION)</span></h1>
-        <p id="crash-desc" class="crash-desc"><span data-i18n="the.nose.struck.an.airport.control.tower">공항 관제탑 시설에 기수 부위가 격돌했습니다.</span></p>
-        
-        <div class="crash-telemetry-grid">
-          <div class="crash-stat">
-            <span class="stat-label"><span data-i18n="impact.airspeed">충돌 대기속도</span></span>
-            <span id="crash-speed" class="stat-val">178 KT</span>
-          </div>
-          <div class="crash-stat">
-            <span class="stat-label"><span data-i18n="aircraft.damage">기체 피해 상태</span></span>
-            <span class="stat-val critical"><span data-i18n="destroyed">전파 손실 (DESTROYED)</span></span>
-          </div>
-          <div class="crash-stat">
-            <span class="stat-label"><span data-i18n="collision.target">충돌 대상 분류</span></span>
-            <span id="crash-type" class="stat-val">AIRPORT TOWER</span>
+          <div class="crash-header-side">
+            <span class="crash-status-tag" data-i18n="crash.hullLoss">HULL LOSS</span>
+            <button id="btn-crash-toggle" class="btn-crash-toggle" type="button" aria-expanded="false">Expand report</button>
           </div>
         </div>
+        <div class="crash-body">
+          <h1 id="crash-title" class="crash-title"><span data-i18n="control.tower.collision">관제탑 충돌 (CONTROL TOWER COLLISION)</span></h1>
+          <p id="crash-desc" class="crash-desc"><span data-i18n="the.nose.struck.an.airport.control.tower">공항 관제탑 시설에 기수 부위가 격돌했습니다.</span></p>
 
-        <div class="crash-actions">
-          <button id="btn-crash-lobby" class="btn btn-crash-lobby" data-i18n="pause.lobby">메인 메뉴로 이동</button>
+          <div class="crash-telemetry-grid">
+            <div class="crash-stat">
+              <span class="stat-label"><span data-i18n="impact.airspeed">충돌 대기속도</span></span>
+              <span id="crash-speed" class="stat-val">178 KT</span>
+            </div>
+            <div class="crash-stat">
+              <span class="stat-label"><span data-i18n="aircraft.damage">기체 피해 상태</span></span>
+              <span class="stat-val critical"><span data-i18n="destroyed">전파 손실 (DESTROYED)</span></span>
+            </div>
+            <div class="crash-stat">
+              <span class="stat-label"><span data-i18n="collision.target">충돌 대상 분류</span></span>
+              <span id="crash-type" class="stat-val">AIRPORT TOWER</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

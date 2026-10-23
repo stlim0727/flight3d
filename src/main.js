@@ -200,6 +200,7 @@ class FlightSimulator {
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
     this.isCrashed = false;
     this.crashResult = null;
+    this.isCrashReportMinimized = true;
     this.lastOnGround = true;
     this.lastGearTarget = true;
     this.airborneTime = 0.0;
@@ -1210,7 +1211,23 @@ class FlightSimulator {
     if (speed) speed.textContent = `${Math.round(crashResult.speedKnots)} KT`;
     if (type) type.textContent = crashResult.type;
 
+    // Start collapsed so the report never hides the wreckage.
+    this.setCrashReportMinimized(true);
     if (overlay) overlay.style.display = 'flex';
+  }
+
+  setCrashReportMinimized(minimized) {
+    this.isCrashReportMinimized = minimized;
+    const overlay = document.getElementById('crash-overlay');
+    if (overlay) overlay.classList.toggle('is-minimized', minimized);
+
+    const button = document.getElementById('btn-crash-toggle');
+    if (!button) return;
+    button.setAttribute('aria-expanded', String(!minimized));
+    const label = () => t(this.isCrashReportMinimized ? 'crash.expand' : 'crash.collapse');
+    bindText(button, label);
+    bindText(button, label, 'title');
+    bindText(button, label, 'aria-label');
   }
 
   /**
@@ -1698,9 +1715,10 @@ class FlightSimulator {
       helpModal?.classList.remove('visible');
     });
 
-    // Crash dialog: the only action is back to the main menu [Space / R / Enter]
-    document.getElementById('btn-crash-lobby')?.addEventListener('click', () => {
-      this.exitCrashToLobby();
+    // Crash report: header toggles the full report; the main menu button is the
+    // persistent top-left one. Back to the lobby is also [Space / R / Enter].
+    document.getElementById('btn-crash-toggle')?.addEventListener('click', () => {
+      this.setCrashReportMinimized(!this.isCrashReportMinimized);
     });
 
     const toggleYokes = () => {
