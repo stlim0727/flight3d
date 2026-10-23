@@ -131,24 +131,38 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
     assert.ok(Math.abs(camera.fov - 60) < 1e-6);
   });
 
-  it('leans the pilot toward the windscreen as the cockpit magnifies, and straightens up on reset', () => {
+  it('keeps the pilot seated while the cockpit magnifies, swinging the cone up off the glareshield', () => {
     const { cam, camera } = withMode(CameraSystem.MODES.COCKPIT);
     const aircraft = aircraftAt(0, 0, 0);
     cam.update(0.1, aircraft, {});
     const eyeAt1x = camera.position.clone();
+    const gazeAt1x = camera.getWorldDirection(new THREE.Vector3());
+    assert.ok(eyeAt1x.distanceTo(cam.cockpitHeadOffset) < 1e-6, 'the eye starts at the seat reference');
 
     cam.zoomOpticalBy(cam.opticalZoomMax);
     cam.update(0.1, aircraft, {});
-    const lean = camera.position.clone().sub(eyeAt1x);
-    const expected = (cam.opticalZoomMax - 1) * cam.cockpitZoomLean;
-    assert.ok(Math.abs(lean.length() - expected * Math.hypot(1, cam.cockpitZoomLeanRise)) < 1e-6,
-      `the eye advances ${expected.toFixed(2)} m along the fuselage axis`);
-    assert.ok(lean.dot(new THREE.Vector3(0, 0, -1)) > expected * 0.99, 'the lean is forward, not aft');
-    assert.ok(lean.y > 0, 'the head lifts to clear the glareshield');
+    assert.ok(camera.position.distanceTo(eyeAt1x) < 1e-6,
+      'zoom is optical only: the fuselage leaves the head 0.41 m forward and 0.32 m up before the glass and the roof fairing');
+
+    const gazeZoomed = camera.getWorldDirection(new THREE.Vector3());
+    const expectedLift = (cam.opticalZoomMax - 1) * cam.cockpitZoomGazeLift;
+    assert.ok(Math.abs(gazeAt1x.angleTo(gazeZoomed) - expectedLift) < 1e-6,
+      `the magnified cone rises ${expectedLift.toFixed(2)} rad as the field of view narrows`);
+    assert.ok(gazeZoomed.y > gazeAt1x.y, 'the cone swings up toward the windscreen, not down into the panel');
 
     cam.resetLook();
     cam.update(0.1, aircraft, {});
-    assert.ok(camera.position.distanceTo(eyeAt1x) < 1e-6, 'centering the view seats the pilot again');
+    assert.ok(camera.getWorldDirection(new THREE.Vector3()).angleTo(gazeAt1x) < 1e-6,
+      'centering the view aims the pilot ahead again');
+
+    // A deliberate aim belongs to the pilot: the zoom must not drag it around.
+    cam.lookPitch = -0.25 - 0.8; // past the 0.42 rad centre-aim window
+    cam.update(0.1, aircraft, {});
+    const aimed = camera.getWorldDirection(new THREE.Vector3());
+    cam.zoomOpticalBy(cam.opticalZoomMax);
+    cam.update(0.1, aircraft, {});
+    assert.ok(aimed.angleTo(camera.getWorldDirection(new THREE.Vector3())) < 1e-6,
+      'looking away from the centre suppresses the zoom gaze lift');
 
     const tower = withMode(CameraSystem.MODES.TOWER);
     tower.cam.update(0.1, aircraft, {});
@@ -159,7 +173,6 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
   });
 
   it('ignores non-finite ratios and no-op ratios without touching the view', () => {
-
     const { cam } = withMode(CameraSystem.MODES.COCKPIT);
     assert.equal(cam.zoomOpticalBy(Number.NaN), false);
     assert.equal(cam.zoomOpticalBy(1), false);

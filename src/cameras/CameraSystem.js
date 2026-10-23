@@ -83,10 +83,11 @@ export class CameraSystem {
     this.opticalZoom = 1.0;
     this.opticalZoomMin = 1.0;
     this.opticalZoomMax = 4.0;
-    // Narrowing the field of view alone leaves the glareshield and window posts
-    // filling the frame, so zooming also leans the pilot toward the windscreen.
-    this.cockpitZoomLean = 0.45; // metres forward per unit of magnification above 1x
-    this.cockpitZoomLeanRise = 0.35; // share of the lean lifted to clear the glareshield
+    // The cockpit eye point never moves: the windscreen glass starts 0.41 m ahead
+    // and the roof fairing 0.32 m above, so any lean long enough to matter drives
+    // the camera through the interior. The magnified cone rotates up instead, off
+    // the glareshield whose top edge sits 2.5 cm below the seated eye.
+    this.cockpitZoomGazeLift = 0.12; // radians of head-up rotation per unit above 1x
 
     // Flyby Camera State
     this.flybyPos = new THREE.Vector3();
@@ -899,9 +900,6 @@ export class CameraSystem {
         if (this.photoCockpit) {
           eyeLocal.set(-0.48, 0.88, -12.02);
         }
-        const zoomLean = (this.opticalZoom - 1) * this.cockpitZoomLean;
-        eyeLocal.z -= zoomLean;
-        eyeLocal.y += zoomLean * this.cockpitZoomLeanRise;
         eyeLocal.y += this.headGForceOffset.y + buffetY + this.touchJoltOffset;
         eyeLocal.x += buffetX;
 
@@ -919,7 +917,11 @@ export class CameraSystem {
 
         const effectiveYaw = this.lookYaw + cursorYaw;
         const basePitch = (this.photoCockpit && !this.isLookingAwayFromCenter()) ? (this.lookPitch * 0.2 - 0.04) : this.lookPitch;
-        const effectivePitch = basePitch + cursorPitch;
+        // A manual aim of more than ~24 degrees belongs to the pilot, not to the zoom.
+        const zoomGazeLift = this.photoCockpit || this.isLookingAwayFromCenter()
+          ? 0
+          : (this.opticalZoom - 1) * this.cockpitZoomGazeLift;
+        const effectivePitch = basePitch + zoomGazeLift + cursorPitch;
 
         const forwardLocal = new THREE.Vector3(0, 0, -100);
         forwardLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), effectivePitch);

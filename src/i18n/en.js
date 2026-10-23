@@ -116,7 +116,7 @@ export default {
   "select.cockpit.chase.wing.tower.flyby.landing": "Select cockpit / chase / wing / tower / flyby / landing gear / drone",
   "auto.camera.switch.every.10.seconds.select": "Auto camera: switch every 10 seconds. Select 1–7 to return to manual",
   "mouse.move.drag": "Mouse / touch drag",
-  "free.camera.look.continuous.edge.pan.cockpit": "Drag the scenery to move the view; release to stop. Double-click / double-tap to reset. Wheel or pinch to zoom: magnification in cockpit and tower, distance in chase and drone.",
+  "free.camera.look.continuous.edge.pan.cockpit": "Drag the scenery to move the view; release to stop. Double-click / double-tap to reset. Wheel or pinch to zoom: magnification in cockpit and tower, distance in chase and drone. Cockpit zoom leaves the head in the seat and raises the gaze toward the windscreen instead.",
   "double.click": "Double-click",
   "center.camera.view": "Center camera view",
   "middle.mouse.button": "Middle mouse button",
