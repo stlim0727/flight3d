@@ -1,5 +1,6 @@
 import { batchStaticCockpit } from './StaticCockpitBatch.js';
 import { bindGltfYokes, updateGltfYokes, bindGltfEngineControls, updateGltfEngineControls } from './GltfCockpitControls.js';
+import { bindGltfAirframeControls, updateGltfAirframeControls } from './GltfCockpitControls.js';
 import { WINDSHIELD_PANES } from './CockpitAperture.js';
 import { shadeCockpitMaterial } from './CockpitLighting.js';
 import * as THREE from 'three';
@@ -91,6 +92,7 @@ export class Cockpit {
   updateControls(flightState) {
     updateGltfYokes(this.gltfYokes, flightState);
     updateGltfEngineControls(this.gltfEngineControls, flightState);
+    updateGltfAirframeControls(this.gltfAirframeControls, flightState);
   }
 
   /**
@@ -176,8 +178,11 @@ export class Cockpit {
 
           this.gltfYokes = bindGltfYokes(model);
           this.gltfEngineControls = bindGltfEngineControls(model);
+          this.gltfAirframeControls = bindGltfAirframeControls(model);
           const movingParts = [
-            ...this.gltfYokes, ...this.gltfEngineControls.throttles, ...this.gltfEngineControls.pedals
+            ...this.gltfYokes, ...this.gltfEngineControls.throttles, ...this.gltfEngineControls.pedals,
+            this.gltfAirframeControls.gear, this.gltfAirframeControls.flaps,
+            this.gltfAirframeControls.spoilers, ...this.gltfAirframeControls.trimWheels
           ];
           // Each pivot can also batch its own surfaces without losing articulation.
           this.staticDrawCallsSaved = movingParts.reduce(

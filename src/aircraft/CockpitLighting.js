@@ -50,5 +50,9 @@ export function cockpitCasterState(cockpit) {
     yoke.rotation.z, yoke.position.z,
   ]), ...(cockpit.gltfEngineControls?.throttles ?? []).map(pivot => pivot.rotation.x),
   ...(cockpit.gltfEngineControls?.pedals ?? []).map(pivot => pivot.position.z),
+  cockpit.gltfAirframeControls?.gear.position.y,
+  cockpit.gltfAirframeControls?.flaps.rotation.x,
+  cockpit.gltfAirframeControls?.spoilers.rotation.x,
+  ...(cockpit.gltfAirframeControls?.trimWheels ?? []).map(pivot => pivot.rotation.x),
   cockpit.gltfCockpitLoaded].join(',');
 }

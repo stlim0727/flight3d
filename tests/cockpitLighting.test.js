@@ -24,13 +24,20 @@ it('excludes exterior skin from the deck depth pass and restores it for the main
 it('tracks loaded geometry, yoke visibility, yoke motion and engine controls as casters', () => {
   const cockpit = { gltfYokes: [new THREE.Group()], gltfEngineControls: {
     throttles: [new THREE.Group()], pedals: [new THREE.Group()],
-  }, yokesVisible: true, gltfCockpitLoaded: false };
+  }, gltfAirframeControls: {gear:new THREE.Group(), flaps:new THREE.Group(),
+    spoilers:new THREE.Group(), trimWheels:[new THREE.Group(),new THREE.Group()]},
+  yokesVisible: true, gltfCockpitLoaded: false };
   let before = cockpitCasterState(cockpit);
   for (const change of [() => { cockpit.gltfCockpitLoaded = true; },
     () => { cockpit.gltfYokes[0].rotation.z = 0.2; },
     () => { cockpit.yokesVisible = false; },
     () => { cockpit.gltfEngineControls.throttles[0].rotation.x = 0.3; },
-    () => { cockpit.gltfEngineControls.pedals[0].position.z = 0.02; }]) {
+    () => { cockpit.gltfEngineControls.pedals[0].position.z = 0.02; },
+    () => { cockpit.gltfAirframeControls.gear.position.y += .07; },
+    () => { cockpit.gltfAirframeControls.flaps.rotation.x = -.6; },
+    () => { cockpit.gltfAirframeControls.spoilers.rotation.x = -.6; },
+    () => { cockpit.gltfAirframeControls.trimWheels[0].rotation.x = 1; },
+    () => { cockpit.gltfAirframeControls.trimWheels[1].rotation.x = 1; }]) {
     change();
     const after = cockpitCasterState(cockpit);
     assert.notEqual(before, after);

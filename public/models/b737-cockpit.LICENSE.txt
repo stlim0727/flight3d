@@ -1,0 +1,18 @@
+Boeing 737-800 Cockpit
+Author: hakai315 (https://sketchfab.com/hakai315)
+Source: https://sketchfab.com/3d-models/boeing-737-800-cockpit-d463256f98654b36af019d2d88bd5bbe
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Applies to b737-cockpit-medium.glb and b737-cockpit-draco.glb.
+Attribution transcribed from the asset.extras metadata embedded in both GLBs.
+
+Modifications by Flight3d contributors: glTF-Transform optimization and Draco
+compression; runtime alignment, PBR material adjustments, static batching,
+live instrument overlays and articulated flight controls. Issue #9 adds runtime
+control bindings without changing the existing GLB files.
+
+CC BY 4.0 permits redistribution (including browser delivery and repository
+inclusion) and adaptation, including commercial use, subject to attribution,
+a license link, indication of changes, and no additional restrictions.
+No endorsement by the original creator is implied.
