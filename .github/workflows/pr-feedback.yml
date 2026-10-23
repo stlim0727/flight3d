@@ -1,0 +1,109 @@
+name: PR self-feedback
+
+# Run trusted base code, including for fork PRs. Never check out/run PR head code
+# with secrets. Only the explicitly configured author's PRs consume API credits.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: pr-feedback-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >-
+      vars.CODEX_PR_FEEDBACK_ENABLED == 'true' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.user.login == (vars.CODEX_REVIEW_AUTHOR || 'yt7good')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      feedback: ${{ steps.codex.outputs.final-message }}
+      publish: ${{ steps.prepare.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require API key
+        env:
+          REVIEW_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$REVIEW_API_KEY" ]; then
+            echo '::error::Configure OPENAI_API_KEY in the PR target repository.'
+            exit 1
+          fi
+      - name: Check current snapshot and duplicate feedback
+        id: prepare
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const { pathToFileURL } = await import('node:url');
+            const { mkdirSync, writeFileSync } = await import('node:fs');
+            const { prepareReview } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/pr-feedback.mjs`));
+            const snapshot = await prepareReview({ github, context, core });
+            core.setOutput('run', snapshot ? 'true' : 'false');
+            if (snapshot) {
+              mkdirSync('.review', { recursive: true });
+              writeFileSync('.review/context.json', JSON.stringify(snapshot));
+            }
+      - name: Fetch PR objects without checking out PR code
+        if: steps.prepare.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
+          test "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"
+          MERGE_BASE="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          git --no-pager diff --no-ext-diff --no-textconv "$MERGE_BASE" "$HEAD_SHA" > .review/pr.diff
+          MERGE_BASE="$MERGE_BASE" node --input-type=module -e 'import fs from "node:fs"; const p=".review/context.json"; const c=JSON.parse(fs.readFileSync(p)); c.mergeBase=process.env.MERGE_BASE; fs.writeFileSync(p,JSON.stringify(c));'
+      # Keep Codex last. The model has no GitHub token and no write permission.
+      - name: Review with Codex
+        if: steps.prepare.outputs.run == 'true'
+        id: codex
+        uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675 # v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/review.md
+          output-schema-file: .github/codex/review-schema.json
+          sandbox: read-only
+          safety-strategy: drop-sudo
+          codex-version: '0.163.0'
+          codex-args: '["--ephemeral"]'
+          model: ${{ vars.CODEX_REVIEW_MODEL }}
+          effort: medium
+          allow-users: ${{ vars.CODEX_REVIEW_AUTHOR || 'yt7good' }}
+
+  publish:
+    needs: review
+    if: needs.review.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Validate and update feedback comment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          REVIEW_OUTPUT: ${{ needs.review.outputs.feedback }}
+        with:
+          script: |
+            const { pathToFileURL } = await import('node:url');
+            const { publishReview } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/pr-feedback.mjs`));
+            await publishReview({ github, context, core, raw: process.env.REVIEW_OUTPUT });

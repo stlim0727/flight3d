@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flight3d PR Feedback"
+  short_description: "Review Flight3d PRs and post Korean feedback"
+  default_prompt: "Use $flight3d-pr-feedback to review this Flight3d PR and post Korean feedback."

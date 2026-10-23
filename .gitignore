@@ -45,6 +45,7 @@ flight-test-performance.json
 .cache/
 .worktrees/
 .chrome-profile/
+.review/
 
 # Local Cloudflare state
 .wrangler/

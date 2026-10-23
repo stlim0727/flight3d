@@ -14,7 +14,9 @@ npm run build
 Actions use full commit SHAs, the token has read-only contents permission, and
 checkout does not retain credentials. New runs cancel superseded runs for the
 same ref. Update pinned actions deliberately and keep the gate executable locally.
-No repository secrets, deployment, or external-service accounts are required.
+The default CI gate needs no repository secrets, deployment, or external-service
+accounts. The optional [PR self-feedback workflow](pr-feedback.md) uses an
+OpenAI API key and separate, narrowly scoped comment permissions.
 
 ## Browser acceptance
 
