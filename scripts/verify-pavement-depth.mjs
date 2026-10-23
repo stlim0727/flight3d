@@ -33,6 +33,20 @@ function call(method, params = {}) {
 }
 try {
   await call('Runtime.enable');
+  // A newly created CDP tab may still be about:blank when evaluation starts.
+  await call('Page.enable');
+  const reviewUrl = `${origin}/.cache/pavement-depth.html`;
+  await call('Page.navigate', { url: reviewUrl });
+  let ready = false;
+  for (let attempt = 0; attempt < 100 && !ready; attempt++) {
+    const state = await call('Runtime.evaluate', {
+      returnByValue: true,
+      expression: `location.href === ${JSON.stringify(reviewUrl)} && document.readyState === 'complete'`
+    });
+    ready = state.result?.value === true;
+    if (!ready) await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  assert.ok(ready, 'same-origin review page must load before importing modules');
   const response = await call('Runtime.evaluate', {
     awaitPromise: true, returnByValue: true,
     expression: `(${async function verify() {
@@ -59,7 +73,8 @@ try {
       let stress=false;
       terrain.material.onBeforeCompile=shader=>{
         original(shader);
-        if(stress) shader.fragmentShader=shader.fragmentShader.replace('#include <opaque_fragment>',
+        // Diagnostic color is independent of depth quantization.
+        shader.fragmentShader=shader.fragmentShader.replace('#include <opaque_fragment>',
           'outgoingLight = vec3(1.0,0.0,1.0);\n#include <opaque_fragment>');
         if(stress) shader.fragmentShader=shader.fragmentShader.replace('#include <logdepthbuf_fragment>',
           '#include <logdepthbuf_fragment>\ngl_FragDepth = floor(gl_FragDepth * 4096.0) / 4096.0;');
@@ -72,7 +87,12 @@ try {
         m.onBeforeCompile=shader=>{hook.call(m,shader);if(stress && m.depthWrite) shader.fragmentShader=shader.fragmentShader.replace(
           '#include <logdepthbuf_fragment>', '#include <logdepthbuf_fragment>\ngl_FragDepth = floor(gl_FragDepth * 4096.0) / 4096.0;');};
       }
-      for(const quality of ['low','high']) for(stress of [false,true]) for(const excluded of [false,true]) {
+      for(const quality of ['low','high']) for(const mode of ['normal','stress','control']) for(const excluded of [false,true]) {
+        stress = mode === 'stress';
+        const control = mode === 'control';
+        // Ordinary-precision positive control: terrain must be observable when
+        // depth testing is disabled, and still disappear under excluded slabs.
+        terrain.material.depthTest = !control;
         terrain.setQuality(quality);
         if(excluded) terrain.excludePavement(airport.group);
         else {terrain.material.defines.PAVEMENT_BOUNDS_COUNT=0; terrain.material.needsUpdate=true;}
@@ -90,9 +110,9 @@ try {
             const i=(y*540+x)*4;
             if(pixels[i]>200 && pixels[i+1]<20 && pixels[i+2]>200) lost++;
           }
-          if(frame===0) images[quality+'-'+(stress?'stress':'normal')+'-'+(excluded?'after':'before')]=renderer.domElement.toDataURL();
+          if(frame===0) images[quality+'-'+mode+'-'+(excluded?'after':'before')]=renderer.domElement.toDataURL();
         }
-        rows.push({quality,stress,excluded,samples,lost});
+        rows.push({quality,stress,control,excluded,samples,lost});
       }
       return {images,rows,gpu,shaderErrors:renderer.info.programs.filter(p=>p.diagnostics?.runnable===false).length};
     }.toString()})()`
@@ -105,11 +125,15 @@ try {
   fs.writeFileSync(path.join(dir, 'report.json'), JSON.stringify(report, null, 2) + '\n');
   assert.equal(errors.length, 0, 'browser errors');
   assert.equal(report.shaderErrors, 0);
-  assert.equal(report.rows.length, 8);
+  assert.equal(report.rows.length, 12);
   assert.ok(report.rows.every(r=>r.samples>1000));
   for (const quality of ['low','high']) {
     assert.ok(report.rows.find(r=>r.quality===quality&&r.stress&&!r.excluded).lost>100);
-    assert.equal(report.rows.find(r=>r.quality===quality&&r.stress&&r.excluded).lost,0);
+    assert.ok(report.rows.find(r=>r.quality===quality&&r.control&&!r.excluded).lost>100,
+      quality + ': ordinary-precision detector must see exposed terrain');
+    for (const row of report.rows.filter(r=>r.quality===quality&&r.excluded)) {
+      assert.equal(row.lost,0,JSON.stringify(row));
+    }
   }
   console.log(JSON.stringify(report));
 

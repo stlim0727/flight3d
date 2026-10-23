@@ -107,12 +107,17 @@ SIM_URL=http://127.0.0.1:5267 chrome-session --project flight3d node scripts/ver
 The script uses production terrain/pavement shaders in low and high terrain
 quality, four camera positions each, before/after exclusion and with/without
 an explicit 12-bit logarithmic-depth stress injection. Magenta identifies
-terrain fragments; raycasts select interior runway samples. Terrain deliberately
+terrain fragments independently of depth quantization in every measured case;
+raycasts select interior runway samples. Terrain deliberately
 draws last so equal-depth fragments expose the overlap. The stress injection is
 an adversarial test, **not an emulation of the S24+ GPU**. Both quality paths
 reduce 9,050 exposed-terrain samples to zero, out of 264,147 samples per case.
-At ordinary precision both versions have zero exposed-terrain samples. Shader
-and browser errors fail the check. See [evidence](../../review-artifacts/pavement-depth/README.md).
+At ordinary precision both versions have zero exposed-terrain samples. An extra
+ordinary-precision positive control disables terrain depth testing: the detector
+then counts 264,127 exposed samples before exclusion and zero after, per quality.
+All six exclusion cases (normal, stress and control × low/high) must have zero
+exposure. The 12 cases total 48 renders; shader and browser errors fail the check.
+See [evidence](../../review-artifacts/pavement-depth/README.md).
 
 Device confirmation remains necessary: removing overlap addresses a concrete
 precision vulnerability but does not establish that it caused the phone's

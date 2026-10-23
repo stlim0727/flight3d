@@ -3,6 +3,7 @@
     {
       "quality": "low",
       "stress": false,
+      "control": false,
       "excluded": false,
       "samples": 264147,
       "lost": 0
@@ -10,6 +11,7 @@
     {
       "quality": "low",
       "stress": false,
+      "control": false,
       "excluded": true,
       "samples": 264147,
       "lost": 0
@@ -17,6 +19,7 @@
     {
       "quality": "low",
       "stress": true,
+      "control": false,
       "excluded": false,
       "samples": 264147,
       "lost": 9050
@@ -24,6 +27,23 @@
     {
       "quality": "low",
       "stress": true,
+      "control": false,
+      "excluded": true,
+      "samples": 264147,
+      "lost": 0
+    },
+    {
+      "quality": "low",
+      "stress": false,
+      "control": true,
+      "excluded": false,
+      "samples": 264147,
+      "lost": 264127
+    },
+    {
+      "quality": "low",
+      "stress": false,
+      "control": true,
       "excluded": true,
       "samples": 264147,
       "lost": 0
@@ -31,6 +51,7 @@
     {
       "quality": "high",
       "stress": false,
+      "control": false,
       "excluded": false,
       "samples": 264147,
       "lost": 0
@@ -38,6 +59,7 @@
     {
       "quality": "high",
       "stress": false,
+      "control": false,
       "excluded": true,
       "samples": 264147,
       "lost": 0
@@ -45,6 +67,7 @@
     {
       "quality": "high",
       "stress": true,
+      "control": false,
       "excluded": false,
       "samples": 264147,
       "lost": 9050
@@ -52,6 +75,23 @@
     {
       "quality": "high",
       "stress": true,
+      "control": false,
+      "excluded": true,
+      "samples": 264147,
+      "lost": 0
+    },
+    {
+      "quality": "high",
+      "stress": false,
+      "control": true,
+      "excluded": false,
+      "samples": 264147,
+      "lost": 264127
+    },
+    {
+      "quality": "high",
+      "stress": false,
+      "control": true,
       "excluded": true,
       "samples": 264147,
       "lost": 0
