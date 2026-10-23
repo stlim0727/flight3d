@@ -1,4 +1,12 @@
-# Cockpit aperture solid angle — before / after
+# Cockpit aperture evidence
+
+The current implementation separates direct-beam intensity from admitted area. See
+[revised acceptance](revised/README.md) for the current results and captures.
+
+The frames and reports immediately below are historical, captured before that correction.
+Their intensity and brightness comparisons describe the superseded area-scaled light.
+
+# Historical before / after
 
 Branch `fix-cockpit-aperture-solid-angle`. The deck sun gate was replaced: the old
 `facing` heuristic (one dot product against the deck→pane-centre direction, saturating near
@@ -25,9 +33,9 @@ Mean luma is Rec.709 luma averaged over the whole frame, decoded from the PNGs i
 
 Frame 5 is the one the change was for. The old gate read a high sun as barely admitted
 (2.88 against 9.09 for a morning sun), so the instrument floods stayed near full and the
-shaded overhead panel washed out. The rig now reports the high sun as the *strongest*
-admittance of the set (4.15 against 2.14 for the abeam sun), which is the inversion that
-prompted the work.
+shaded overhead panel washed out. The high-sun intensity rose from 2.88 to 4.15, while the abeam intensity fell from
+9.09 to 2.14. The ahead frame remained stronger at 5.72; these numbers did not make the
+high sun the strongest-admitting bearing of the set.
 
 Frames 1-4 and 6 get brighter overall, and that is the expected consequence, not a
 regression in the gate: those bearings were over-reported by the saturating heuristic, so

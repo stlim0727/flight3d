@@ -206,7 +206,11 @@ describe('Cockpit deck sun rig (issue #90)', () => {
       const axes = cookieAxes(pose.sunDirLocal, null, freshAxes());
       const quads = projectPanesForCookie({ sunDirLocal: pose.sunDirLocal, axes, angle: pose.angle });
       assert.equal(quads.length, WINDSHIELD_PANES.length);
-      for (const quad of quads) {
+      for (const [i, quad] of quads.entries()) {
+        if (paneOutwardNormal(WINDSHIELD_PANES[i]).dot(sunDir) <= 0) {
+          assert.equal(quad.length, 0, 'A back-facing pane must not paint a beam');
+          continue;
+        }
         assert.equal(quad.length, 8, 'Every admitted pane must project a full quad');
         for (const value of quad) {
           assert.ok(Number.isFinite(value) && value > 0 && value < 1,
@@ -216,6 +220,54 @@ describe('Cockpit deck sun rig (issue #90)', () => {
       // A beam crossing the deck must land where the geometry is, not wrap around.
       assert.ok(quads[0][0] !== quads[1][0], 'The two front panes must not collapse together');
     }
+  });
+
+  it('projects oblique flux once while preserving the intensity of surviving rays', () => {
+    const panes = [{ center: [0, 0.95, -13], size: [2, 1], rotation: [0, 0, 0] }];
+    const rig = new CockpitSunShadow(new THREE.Scene());
+    const areas = [];
+    const intensities = [];
+    const daylights = [];
+    for (const bearing of [180, 120, 180]) {
+      const sunDir = sunDirectionAt(20, bearing);
+      rig.update({ position: origin, quaternion: identity, sunDir,
+        sunColor: new THREE.Color(1, 1, 1), sunIntensity: 3.5, cockpitActive: true, dt: 10 });
+      intensities.push(rig.light.intensity);
+      daylights.push(rig.daylight);
+      const pose = computeDeckSunPose({ position: origin, quaternion: identity, sunDir, panes });
+      const [q] = projectPanesForCookie({ sunDirLocal: sunDir,
+        axes: cookieAxes(sunDir, null, freshAxes()), angle: pose.angle, panes });
+      let twiceArea = 0;
+      for (let i = 0; i < 4; i++) {
+        const j = (i + 1) % 4;
+        twiceArea += q[2 * i] * q[2 * j + 1] - q[2 * j] * q[2 * i + 1];
+      }
+      areas.push(Math.abs(twiceArea) / 2);
+    }
+    assert.ok(areas[1] / areas[0] > 0.45 && areas[1] / areas[0] < 0.55,
+      'An oblique pane must halve the beam footprint, rather than dimming its rays');
+    assert.ok(intensities.every(i => Math.abs(i - 3.5 * COCKPIT_SUN_GAIN) < 1e-9),
+      'Clear sunlight inside an opening must retain its intensity across bearings and recovery');
+    assert.equal(areas[2], areas[0], 'Returning to the original bearing restores the footprint');
+    assert.ok(daylights[1] < daylights[0] * 0.9,
+      'A smaller admitted flux must still reduce the flood-dimming signal');
+    assert.ok(Math.abs(daylights[2] - daylights[0]) < 1e-9,
+      'Returning to the original bearing restores flood dimming');
+  });
+
+  it('removes back-facing openings and clears quads reused from a forward sun', () => {
+    const quads = [];
+    for (const bearing of [180, 0, 180]) {
+      const sunDir = sunDirectionAt(20, bearing);
+      const pose = computeDeckSunPose({ position: origin, quaternion: identity, sunDir });
+      projectPanesForCookie({ sunDirLocal: sunDir, axes: cookieAxes(sunDir, null, freshAxes()),
+        angle: pose.angle, quads });
+      assert.equal(quads.filter(q => q.length === 8).length,
+        bearing === 0 ? 0 : WINDSHIELD_PANES.length);
+    }
+    const empty = computeDeckSunPose({ position: origin, quaternion: identity,
+      sunDir: sunDirectionAt(20), panes: [] });
+    assert.equal(empty.admittance, 0, 'A closed aperture must not return NaN');
   });
 
   it('paints an opaque cookie with one opening per admitted pane', () => {
@@ -310,7 +362,7 @@ describe('Cockpit deck sun rig (issue #90)', () => {
     assert.ok(Math.abs(rig.daylight - rig.pose.admittance) < 1e-5,
       `Flood dimming must settle at the fraction the aperture admits, got ${rig.daylight}`);
     assert.equal(rig.light.intensity,
-      3.5 * rig.pose.admittance * rig.modeFactor * COCKPIT_SUN_GAIN);
+      3.5 * rig.modeFactor * COCKPIT_SUN_GAIN);
     assert.ok(rig.light.intensity <= 3.5 * COCKPIT_SUN_GAIN + 1e-9,
       'Deck sun must never exceed its share of the ambient sun');
 

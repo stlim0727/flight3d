@@ -3,18 +3,16 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 
 // Cockpit interior sunlight acceptance for issue #90.
-// Start the dev server and a headless Chrome on the page first, see docs/development/ci.md
-// (use any free port for Vite; the script only needs a Chrome already sitting on the page):
-//   npm run dev -- --host 127.0.0.1 --port 5196 --strictPort
-//   google-chrome-stable --headless=new --user-data-dir=/tmp/flight3d-deck-sun \
-//     --remote-debugging-port=9471 --window-size=1280,720 \
-//     --use-gl=angle --use-angle=vulkan --no-first-run http://127.0.0.1:5196/
+// Start Vite, then run under chrome-session (or an already-held Chrome lease):
+//   APP_URL=http://127.0.0.1:5196 CDP_PORT=9222 chrome-session node scripts/verify-cockpit-shadows.mjs
+// The harness opens and closes its own tab and pins balanced rendering quality.
 const cdpPort = process.env.CDP_PORT || 9471;
 const dir = process.env.ARTIFACT_DIR || path.resolve('review-artifacts/issue90');
 fs.mkdirSync(dir, { recursive: true });
 
-const pages = await (await fetch(`http://127.0.0.1:${cdpPort}/json`)).json();
-const ws = new WebSocket(pages.find((p) => p.type === 'page').webSocketDebuggerUrl);
+const tab = await (await fetch(`http://127.0.0.1:${cdpPort}/json/new?${encodeURIComponent(process.env.APP_URL || 'http://127.0.0.1:5173/')}`,
+  { method: 'PUT' })).json();
+const ws = new WebSocket(tab.webSocketDebuggerUrl);
 await new Promise((r) => ws.addEventListener('open', r, { once: true }));
 
 let seq = 0;
@@ -47,6 +45,7 @@ const evaluate = async (expression) => {
   return r.result.value;
 };
 
+try {
 await call('Runtime.enable');
 await call('Log.enable');
 await call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
@@ -69,10 +68,9 @@ const gpu = await evaluate(`(() => {
 // frame is a deterministic function of time of day, heading, bank and cloud cover.
 await evaluate(`(() => {
   const sim = window.simulator;
+  sim.setRenderQuality('balanced');
   sim.demoDirector.stop();
   sim.gameFlow.enterFlight();
-  const savedAnimate = sim.animate;
-  window.deckSunReview = { savedAnimate, calls: 0 };
   sim.animate = () => {};
   sim.cameraSystem.photoCockpit = false;
   sim.cameraSystem.lookYaw = 0;
@@ -84,6 +82,7 @@ await evaluate(`(() => {
 // A single staged frame: pose, sky, physics-free display update, then read the deck.
 const stage = async ({ hour, heading, bank = 0, cloud = 0, frames = 4 }) => await evaluate(`(async () => {
   const THREE = await import('/node_modules/three/build/three.module.js');
+  const { DECK_SUN_ANCHOR, DECK_SUN_STANDOFF } = await import('/src/aircraft/CockpitAperture.js');
   const sim = window.simulator;
   const sky = sim.sky;
   sim.position.set(0, 900, 0);
@@ -109,6 +108,30 @@ const stage = async ({ hour, heading, bank = 0, cloud = 0, frames = 4 }) => awai
     sim.renderScene();
   }
   const rig = sky.cockpitSun;
+  // Sample the cookie on one body-fixed horizontal receiver plane, in metres.
+  // Cookie UVs rotate with the sun and cannot be compared between bearings.
+  const footprint = (() => {
+    const nX = 48, nZ = 120;
+    const data = rig.context.getImageData(0, 0, rig.size, rig.size).data;
+    const light = DECK_SUN_ANCHOR.clone()
+      .addScaledVector(rig.pose.sunDirLocal, DECK_SUN_STANDOFF);
+    const point = new THREE.Vector3();
+    const mask = [];
+    let lit = 0;
+    for (let iz = 0; iz < nZ; iz++) {
+      for (let ix = 0; ix < nX; ix++) {
+        point.set(-1.2 + (ix + 0.5) * 2.4 / nX, 0.35, -14 + (iz + 0.5) * 7 / nZ).sub(light);
+        const depth = -point.dot(rig.pose.sunDirLocal);
+        const u = 0.5 + 0.5 * point.dot(rig.axes.x) / (depth * Math.tan(rig.pose.angle));
+        const v = 0.5 - 0.5 * point.dot(rig.axes.y) / (depth * Math.tan(rig.pose.angle));
+        const inside = depth > 0 && u >= 0 && u < 1 && v >= 0 && v < 1;
+        const value = inside && data[(Math.floor(v * rig.size) * rig.size + Math.floor(u * rig.size)) * 4] > 127 ? 1 : 0;
+        mask.push(value);
+        lit += value;
+      }
+    }
+    return { planeY: 0.35, spacing: [2.4 / nX, 7 / nZ], lit, mask: mask.join('') };
+  })();
   const stats = (() => {
     const gl = sim.renderer.getContext();
     const w = 360, h = 220;
@@ -128,19 +151,21 @@ const stage = async ({ hour, heading, bank = 0, cloud = 0, frames = 4 }) => awai
     if (!rig.canvas) return null;
     const size = rig.canvas.width;
     const data = rig.canvas.getContext('2d').getImageData(0, 0, size, size).data;
-    let lit = 0, u = 0, v = 0;
+    let lit = 0, u = 0, v = 0, max = 0;
     for (let py = 0; py < size; py++) {
       for (let px = 0; px < size; px++) {
         const p = (py * size + px) * 4;
         const level = data[p] / 255;
+        max = Math.max(max, data[p]);
         if (level > 0.5) { lit++; u += px; v += py; }
       }
     }
-    return lit ? { lit: lit / (size * size), cx: u / lit / size, cy: v / lit / size } : { lit: 0, cx: 0, cy: 0 };
+    return lit ? { lit: lit / (size * size), cx: u / lit / size, cy: v / lit / size, max } : { lit: 0, cx: 0, cy: 0, max };
   })();
   return {
     stats,
     cookie,
+    footprint,
     sunLocal: {
       elevDeg: +(Math.asin(Math.min(1, Math.max(-1, rig.pose.sunDirLocal.y))) * 180 / Math.PI).toFixed(1),
       bearingDeg: +(Math.atan2(rig.pose.sunDirLocal.x, -rig.pose.sunDirLocal.z) * 180 / Math.PI).toFixed(1),
@@ -407,10 +432,15 @@ const aoDepth = await evaluate(`(() => {
   };
 })()`);
 
-await evaluate('window.simulator.animate = window.deckSunReview.savedAnimate;');
-ws.close();
-
-const report = { gpu, rigFacts, results, repeat, perf, contrast, aoDepth, pageErrors, resourceErrors,
+const footprintComparisons = [['leftSun', 'rightSun'], ['bankLeft', 'bankRight'], ['morning', 'golden']]
+  .map(([a, b]) => {
+    const first = results[a].footprint, second = results[b].footprint;
+    const changed = [...first.mask].reduce((n, value, i) => n + Math.abs(value - second.mask[i]), 0);
+    const union = [...first.mask].reduce((n, value, i) => n + Math.max(value, second.mask[i]), 0);
+    return { a, b, firstLit: first.lit, secondLit: second.lit, changed, union,
+      changedShare: union ? changed / union : 0 };
+  });
+const report = { gpu, rigFacts, results, footprintComparisons, repeat, perf, contrast, aoDepth, pageErrors, resourceErrors,
   ablation: { ...ablation, png: undefined } };
 fs.writeFileSync(path.join(dir, 'deck-sun-report.json'), JSON.stringify(report, null, 2));
 
@@ -453,22 +483,22 @@ for (const name of ['glareshield', 'pedestal']) {
   check(ablation.zones[name].meanDelta > 1 && ablation.zones[name].maxDelta > 12,
     `Deck sun must band the ${name}, got ${JSON.stringify(ablation.zones[name])}`);
 }
-check(results.noon.intensity < results.morning.intensity,
-  `A 65-degree sun dead ahead must be raked off the deck by the windshield compared with low morning sun: ${results.noon.intensity} vs ${results.morning.intensity}`);
+for (const name of ['morning', 'noon', 'golden', 'leftSun', 'rightSun']) {
+  check(Math.abs(results[name].deckSunOverSun - 3.2 * results[name].modeFactor) < 1e-6,
+    `${name}: surviving direct rays must retain the ambient sun intensity times the deck gain`);
+}
 check(results.night.intensity < 0.05, `Night must leave no deck sun, got ${results.night.intensity}`);
 check(results.night.floods.every((f) => f >= 0.15), 'Floods must keep the night glow');
-check(results.astern.intensity < 0.05, `Sun astern must admit nothing, got ${results.astern.intensity}`);
+check(results.astern.daylight === 0 && results.astern.cookie.max === 0,
+  'Sun astern must admit nothing and leave no openings in the cookie');
 check(results.overcast.intensity < results.noon.intensity * 0.45, 'Overcast must wash the deck sun out');
 check(results.overcast.shadowIntensity < 1, 'Overcast must soften deck shadows');
 check(results.leftSun.intensity > 0.3 && results.rightSun.intensity > 0.3, 'Sun abeam must still light the deck');
-const offset = (cell) => [cell.cookie.cx - 0.5, cell.cookie.cy - 0.5];
-const spread = (a, b) => Math.hypot(offset(a)[0] - offset(b)[0], offset(a)[1] - offset(b)[1]);
-check(spread(results.leftSun, results.rightSun) > 0.02,
-  `Sun from opposite sides must move the pattern: ${JSON.stringify(offset(results.leftSun))} vs ${JSON.stringify(offset(results.rightSun))}`);
-check(spread(results.bankLeft, results.bankRight) > 0.02,
-  `Bank must slide the pattern across the deck: ${JSON.stringify(offset(results.bankLeft))} vs ${JSON.stringify(offset(results.bankRight))}`);
-check(spread(results.morning, results.golden) > 0.02,
-  `Morning and golden-hour sun must land in different places: ${JSON.stringify(offset(results.morning))} vs ${JSON.stringify(offset(results.golden))}`);
+for (const { a, b, firstLit, secondLit, changed, union, changedShare } of footprintComparisons) {
+  check(firstLit > 0 && secondLit > 0, `${a}/${b}: both beams must hit the fixed deck receiver plane`);
+  check(changedShare > 0.1,
+    `${a}/${b}: footprints on the same deck plane must differ over at least 10% of their union, got ${changed}/${union}`);
+}
 for (const name of Object.keys(results)) {
   check(results[name].deckSunOverSun <= 3.21, `${name}: deck sun over its share of ambient`);
 }
@@ -493,6 +523,10 @@ console.log('ablation', JSON.stringify({ staticShare: ablation.staticShare, chan
   meanDelta: ablation.meanDelta, maxDelta: ablation.maxDelta, centroid: ablation.centroid, zones: ablation.zones }));
 if (failures.length) {
   console.error(`\nFAILED ${failures.length} check(s):\n- ${failures.join('\n- ')}`);
-  process.exit(1);
+  process.exitCode = 1;
 }
-console.log(`\n✅ issue #90 cockpit sunlight acceptance passed (${Object.keys(cells).length} views in ${dir})`);
+if (!failures.length) console.log(`\n✅ issue #90 cockpit sunlight acceptance passed (${Object.keys(cells).length} views in ${dir})`);
+} finally {
+  ws.close();
+  await fetch(`http://127.0.0.1:${cdpPort}/json/close/${tab.id}`);
+}

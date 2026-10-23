@@ -68,25 +68,34 @@ cockpit camera mode, which ramps over ~0.3 s rather than switching.
 ## Direct admittance
 
 `directAdmittance()` in `CockpitAperture.js` is the aperture area projected normal to the
-sun, `Σ max(0, n̂·sun)·A`, in square metres — the parallel-beam flux an opening admits.
+sun, `Σ max(0, n̂·sun)·A`, in square metres — the effective area admitting parallel rays.
 `referenceDirectAdmittance()` scans the upper hemisphere for the bearing that admits the
-most, and the deck sun is scaled by the ratio, so `1.0` means "this aperture at its best"
-and editing the profile cannot silently rescale the rig.
+most. The ratio is `pose.admittance`, a 0..1 estimate used for the instrument-flood
+trade. An empty aperture returns zero.
 
-It replaced a single dot product against the deck→pane-centre direction, which discarded
-`pane.rotation` and `pane.size` and depended on where the anchor happened to sit relative
-to each pane. That read a high sun as almost not admitted (0.32 against 1.0 for a morning
-sun), which left the instrument floods near full brightness at noon and washed the shaded
-overhead panel out — the deck sun is the only thing that dims them. Admittance is also
-computed in the deck frame, so aircraft attitude no longer enters the term at all.
+**Beam intensity and admitted flux are separate.** Each ray that passes through a pane
+retains `sunIntensity * COCKPIT_SUN_GAIN`, with weather, horizon and camera-entry fading.
+The cookie already reduces the illuminated cross-section as the panes turn edge-on.
+Multiplying that intensity by projected area would count the same loss twice: a vertical
+pane at 60° incidence would halve its footprint and halve each ray again, leaving about
+one quarter of the normal-incidence flux. `daylight` instead multiplies the beam intensity
+by admittance only when computing the flood-dimming signal.
 
-The swap does not by itself make the noon deck read as intended, and the honest before/after
-is in `review-artifacts/cockpit-aperture/`: the noon frame is near-unchanged in mean luma
-while the *off-axis* frames got brighter. Lowering an over-reported `facing` of ~1.0 to a
-measured admittance drops `daylight`, and `syncDaylight` then leaves the floods closer to
-full than they were. Those bearings genuinely admit less direct sun than the heuristic
-claimed, because the profile has no openings aft of the windshield; over-brightening there is
-the measurement being right about an incomplete profile, not a reason to re-add a curve.
+Cookie projection excludes panes facing away from the sun. Its deliberate 1% background
+spill scales with admittance; a sun astern therefore produces a completely black cookie,
+while the light object's intensity still describes the unobstructed beam. Light intensity
+alone is not evidence that sunlight enters the cockpit. The current cookie is a visibility
+approximation, and the flood trade remains an artistic control rather than a light-transfer
+solution.
+
+The front pane rake is +0.47 rad so its outward normal points upward. The projected-area
+measurement replaces the old anchor-to-pane-centre heuristic. It depends on the sun's
+direction relative to the aircraft: rotating the aircraft under a fixed world sun changes
+admittance; rotating the aircraft and sun together does not.
+
+Current GPU acceptance and captures are in `review-artifacts/cockpit-aperture/revised/`.
+The earlier before/after demo frames remain historical evidence of the superseded model;
+they do not establish acceptance of the revised beam intensity.
 
 ## Known limits
 
@@ -132,27 +141,31 @@ the measurement being right about an incomplete profile, not a reason to re-add 
 
 ## Reproduce visual evidence
 
-Use Node 22.23.2. Start Vite on any free port, then a dedicated Chrome on that page:
+Use Node 22.23.2. Start Vite on a free port:
 
 ```sh
 npm run dev -- --host 127.0.0.1 --port 5196 --strictPort
 ```
 
+With a GPU-capable Chrome daemon on CDP 9222, run under the shared browser lease:
+
 ```sh
-google-chrome-stable --headless=new \
-  --user-data-dir=/tmp/flight3d-deck-sun \
-  --remote-debugging-port=9471 --window-size=1280,720 \
-  --use-gl=angle --use-angle=vulkan --no-first-run \
-  http://127.0.0.1:5196/
+APP_URL=http://127.0.0.1:5196 CDP_PORT=9222 chrome-session node scripts/verify-cockpit-shadows.mjs
 ```
 
-Then run `CDP_PORT=9471 node scripts/verify-cockpit-shadows.mjs`. It reloads the page
-so the frames come from the source on disk, waits for the interior GLB, pauses the
-animation loop, enters the 3D cockpit, and stages ten deterministic frames
-(07:00/12:30/16:48/21:00, sun abeam left and right, ±35° bank, 0.8 cloud cover, sun
-astern), reporting the deck-local sun bearing, spot intensity, cookie coverage and
-centroid, daylight factor, flood intensities and a centre-patch luma histogram for
-each. Screenshots and `deck-sun-report.json` land in `review-artifacts/issue90/`.
+When already holding a persistent `chrome-session hold` lease, run the Node command
+directly. The harness opens and closes its own tab, pins balanced quality, waits for the
+interior GLB, freezes animation, and stages ten deterministic frames: morning, noon,
+golden hour, night, sun abeam left/right, ±35° bank, overcast and sun astern. Output defaults
+to `review-artifacts/issue90/`; override with `ARTIFACT_DIR`.
+
+Pattern displacement is measured by sampling the cookie on the same body-fixed horizontal
+receiver plane at y=0.35 m, x=-1.2..1.2 m, z=-14..-7 m, on a 48×120 grid. Both compared
+footprints must be nonempty and their masks must differ over more than 10% of their union.
+This is an analytical beam-footprint check, not a claim that all samples are real deck
+surfaces. The separate rendered light/frame ablations below establish effects on actual
+cockpit geometry. Cookie UV centroids are retained as diagnostics but are not compared
+across sun bearings, because their coordinate basis rotates with the sun.
 
 The ablation stage renders the same frame with the deck sun multiplied out and
 diffs it, restricted to pixels that repeat-render stable. Before the contrast/AO update, on this machine (Intel
@@ -200,9 +213,9 @@ resolution does not fix this. The acceptance ablation now removes frame geometry
 only from the tagged cockpit sun pass; the external directional shadow remains
 unchanged, so it cannot hide this regression.
 
-Clear sunlight gain is 3.2 to emphasize lit/shaded separation, with cookie
-leak reduced to 1% to retain the previous outside-aperture light budget; daylight/flood
-normalization remains unchanged. The native 737 glareshield shades much of the
+Clear sunlight gain is 3.2 to emphasize lit/shaded separation. Cookie spill is
+1% times admittance; daylight/flood normalization uses the 3.5 clear-noon reference.
+The native 737 glareshield shades much of the
 vertical instrument panel. Pillar bands are clearest on the left sidewall and
 lower console at 16:48, heading 000 degrees, clear weather; this model does not
 put the same pattern on the panel as a fighter canopy. Screenshots capture the
