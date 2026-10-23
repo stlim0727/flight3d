@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs } from './Pavement.js';
 import { loadAirportKit, createAirportBuildings } from './AirportBuildings.js';
+import { createRunwayMarkingMaterial } from './RunwayMarkings.js';
 
 /**
  * International Airport Environment (Runway 09L/27R, Control Tower, Terminal, Hangars, Lighting)
@@ -152,17 +153,9 @@ export class Airport {
       }
     }
 
-    // Runway Markings Material (polygonOffset & depthWrite: false prevents all flickering)
-    const whiteMarkMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.8,
-      metalness: 0.1,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
-      depthWrite: false
-    });
+    const whiteMarkMat = createRunwayMarkingMaterial();
     const markingsGroup = new THREE.Group();
+    markingsGroup.name = 'runway-markings';
     markingsGroup.position.set(0, this.elevation + 0.08, 0);
 
     // A. Dashed Centerline (30m stripes with 20m gaps)
@@ -270,7 +263,7 @@ export class Airport {
       c.fillText(text, 128, 128);
 
       const tex = new THREE.CanvasTexture(can);
-      const mat = new THREE.MeshStandardMaterial({
+      const mat = createRunwayMarkingMaterial({
         map: tex,
         transparent: true,
         polygonOffset: true,

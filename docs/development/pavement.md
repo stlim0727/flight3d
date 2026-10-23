@@ -52,3 +52,32 @@ not requestAnimationFrame timing or a full-flight FPS claim. Driver allocation,
 compression and non-airport texture memory are not inferred from this estimate.
 
 See [recorded images and results](../../review-artifacts/pavement/README.md).
+
+## Runway marking depth
+
+Both airports use `RunwayMarkings.js` for painted stripes and canvas decals.
+The beauty shader biases perspective logarithmic depth by 5 cm toward the
+camera. This gives paint an explicit separation from the pavement when native
+polygon offset does not provide enough depth margin. Geometry, terrain/contact
+heights, material lighting and shadow lookup positions stay unchanged. Ordinary
+projection and orthographic rendering keep their existing native polygon offset.
+Depth testing remains enabled; depth writes remain disabled for the paint.
+
+The 5 cm displacement is in camera space, rather than a constant normalized
+depth subtraction that would grow to metres at long viewing distances.
+
+With Vite running on 5261 and an existing GPU Chrome on CDP 9222, run:
+
+```sh
+chrome-session node scripts/verify-runway-markings.mjs
+```
+
+`SIM_URL`, `CDP_URL`, and `ARTIFACT_DIR` override those defaults. The script opens
+and closes its own blank tab and uses the production airport meshes/materials.
+It compares the former shader with the explicit bias over eight small camera
+movements for each airport, both at normal separation and in a deliberately
+coplanar stress case with native polygon offset disabled. A pavement-free
+reference masks interior paint coverage; a foreground block checks occlusion.
+It also checks nonempty, identical ordinary-perspective and orthographic renders.
+Browser/shader errors, empty masks, missing cases and a baseline that does not
+fail the stress case cannot pass. See [captures and limitations](../../review-artifacts/runway-markings/README.md).

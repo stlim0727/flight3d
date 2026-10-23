@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createRunwayMarkingMaterial } from './RunwayMarkings.js';
 import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs } from './Pavement.js';
 
 /**
@@ -218,7 +219,7 @@ export class LuklaAirport {
       const markTex = new THREE.CanvasTexture(markCanvas);
       markTex.anisotropy = 4;
 
-      const markMat = new THREE.MeshStandardMaterial({
+      const markMat = createRunwayMarkingMaterial({
         map: markTex,
         transparent: true,
         polygonOffset: true,
@@ -230,6 +231,7 @@ export class LuklaAirport {
       });
 
       const markMesh = new THREE.Mesh(rwyGeom, markMat);
+      markMesh.name = 'runway-markings';
       markMesh.receiveShadow = true;
       rwyGroup.add(markMesh);
     }
