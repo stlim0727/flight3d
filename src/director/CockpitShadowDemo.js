@@ -39,7 +39,9 @@ export class CockpitShadowDemo {
       userModeSelected: sim.cameraSystem.userModeSelected, userLookOverridden: sim.cameraSystem.userLookOverridden,
       photo: sim.cameraSystem.photoCockpit,
       yaw: sim.cameraSystem.lookYaw, pitch: sim.cameraSystem.lookPitch };
+    sim.quietPresetToast = true;
     sim.setPreset('runway');
+    sim.quietPresetToast = false;
     // Settle the spawn once to produce consistent stationary flight displays.
     sim.integratePhysics(sim.physicsDt);
     sim.linearVelocity.set(0, 0, 0);

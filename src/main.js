@@ -1526,6 +1526,9 @@ class FlightSimulator {
   }
 
   showToast(msg) {
+    // The shadow demo resets through setPreset('runway'); its own status panel
+    // describes the held aircraft, so a "ready for takeoff" toast would lie.
+    if (this.quietPresetToast) return;
     const toast = document.getElementById('toast-msg');
     if (!toast) return;
     bindText(toast, () => typeof msg === 'function' ? msg() : msg);
