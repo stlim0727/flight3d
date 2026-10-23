@@ -2,8 +2,8 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const PORT = 5173;
-const CDP_PORT = 9452;
+const PORT = Number(process.env.PORT || 5173);
+const CDP_PORT = Number(process.env.CDP_PORT || 9452);
 const SIM_URL = `http://localhost:${PORT}/`;
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR || '/home/stlim/.gemini/antigravity-cli/brain/ad33c4b1-3b1c-4752-ad5e-b09f9794851b';
 
@@ -24,7 +24,7 @@ async function main() {
     SIM_URL
   ];
 
-  const chrome = spawn('google-chrome-stable', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  const chrome = spawn(process.env.CHROME_BIN || 'google-chrome-stable', args, { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
   chrome.stderr.on('data', (d) => {
     const s = d.toString();
     if (s.includes('FATAL') || s.includes('ERROR:content') || s.includes('Crash')) {

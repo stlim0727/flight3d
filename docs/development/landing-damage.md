@@ -32,13 +32,52 @@ with gear down, so one failed leg can lead to an engine/wing contact. Support,
 damping, friction and moments use local terrain normals. The old fixed gear-down
 height floor no longer holds failed aircraft above the runway.
 
-Body scraping continues through the existing rigid-body integrator. First-contact
-normal speed above 12.5 m/s or exhausted accumulated structural health still
-triggers the existing fatal crash path. Ordinary scraping produces an incident
-notification and can continue to rest. The HUD and individual EICAS gear boxes
-show `DMG`/`FAIL`; failed gear geometry folds independently. Incident-induced loss
-of ground support must not produce an automatic takeoff camera announcement.
-Presets and restart repair damage and clear contact/incident history.
+Support patches follow the loaded GLB's lower envelope (including the long
+belly, nacelle front/rear and wing sweep); the procedural fallback has a separate
+profile. Each part shares its stiffness/damping across its patches. After
+integration, a unilateral position/normal-velocity constraint limits support-point
+penetration to **4 cm**, including after a fatal crash. It uses body inertia and
+surface normals, never animates pitch/roll, and cancels only closing velocity.
+Collision classification uses the incoming pose so this correction cannot lift an
+aircraft out of a water, mountain or obstacle collision. Crash visuals no longer
+rotate the airframe independently of its physical contacts.
+
+`bodyDamage.js` separates first-contact impact energy (squared normal speed,
+including angular contact velocity) from friction work (`friction force * slip
+speed * dt`). The strongest new patch impact per part is counted once per step;
+friction work is summed. Damage never heals in the air or on gear cycling.
+Unloaded contact and stable rest do not add abrasion. Imminent impact is sampled
+before penetration correction can remove its incoming velocity.
+
+| Part | Impact onset / exhaustion (m/s) | Abrasion work for full damage (MJ) |
+| --- | --- | --- |
+| Each engine | 2 / 10 | 45 |
+| Belly | 3 / 12.5 | 300 |
+| Nose | 3 / 10 | 180 |
+| Tail / each wing | 2 / 8 | 100 |
+
+These are simulator tuning parameters, not aircraft certification data. Numeric
+damage drives engine integrity continuously: target spool, thrust, core speed,
+fuel flow and temperature approach the windmilling/offline state as integrity
+reaches zero. Existing engine-out yaw uses the resulting differential thrust.
+Engine restart commands cannot repair ground damage. Exhausted nose/belly/wing/
+tail integrity, or an initial body impact above 12.5 m/s, triggers the existing
+fatal path. Engine abrasion alone can end in a controlled stop without hull loss.
+
+Part-specific contact and `damaged` (0.3) / `failed` (1.0) transition notices are
+emitted once; telemetry retains all seven numeric part values. Ground speed below
+0.5 m/s and angular speed below 0.02 rad/s must persist for one second before the
+stopped notice. Movement clears that notice state. Presets/restart repair gear,
+body and engine damage and clear incident/contact history.
+
+| Scenario | Physical progression |
+| --- | --- |
+| Left/right main collapse | Low-side nacelle/wing contact, asymmetric drag and engine degradation |
+| Both main legs collapse | Nacelle/belly support, abrasion and deceleration |
+| Nose collapse | Nose-down rotation and forward body/engine contact; nose steering unavailable |
+| Severe wing/tail strike | Part impact damage and possible structural failure |
+| Controlled belly landing | Continued abrasion while sliding, then stable damaged rest |
+| Bounce/recontact | Existing damage retained; a new impact can add damage |
 
 `CollisionDetector.checkCollision` accepts the integrated ground-contact result
 as its final argument. Runtime runway landings use that result. Detection-only
@@ -51,12 +90,19 @@ tests do not validate the new load model.
   bottom-out, combined and lateral loads, nose/one-sided impacts, terrain-normal
   and angular contact speed, partial extension, bounce history, reset, body forces,
   and preservation of fatal obstacle/off-runway collisions.
+- `tests/bodyContact.test.js`: work/impact accumulation, 60/120/240 Hz abrasion,
+  no damage at rest, reimpact, wing/tail failure, engine integrity and restart,
+  incoming impact preservation, flat/sloped penetration and constraint energy.
 - `tests/boeing737Pbr.test.js`: per-leg indication/articulation, frame-to-frame
   stability and repair.
 - `npm run test:landing`: deterministic browser scenarios for normal, severe,
-  asymmetric, unlocked, controlled belly and catastrophic body landings, plus
-  reset. Writes sample histories to `scenarios.json`; `--screenshots` captures
-  final rendered states. A nonempty scenario result and all assertions are required.
+  asymmetric, unlocked, left/right/both main and nose collapse, controlled belly
+  and catastrophic body landings, plus reset. All controlled incidents must stop
+  and hold ten seconds without significant further abrasion (tolerance 1e-4).
+  Every sampled support point must stay within 4 cm of terrain; the final loaded
+  airframe mesh vertices must remain within 10 cm. Tests require the real GLB to
+  finish loading. Writes histories/hold states/mesh clearances to `scenarios.json`;
+  `--screenshots` captures exterior views and a 412x915 mobile viewport. A nonempty scenario result and all assertions are required.
 
 Example (start Vite on the same port separately):
 
@@ -64,7 +110,8 @@ Example (start Vite on the same port separately):
 PORT=5186 CDP_PORT=9468 ARTIFACT_DIR=/tmp/landing-damage npm run test:landing -- --screenshots
 ```
 
-Set `FORCE_GPU=1` for ANGLE/Vulkan where supported; otherwise SwiftShader is used.
+Set `CHROME_BIN` to the Chrome executable on Windows. `test:crash` also accepts
+`CHROME_BIN`, `PORT` and `CDP_PORT`. Set `FORCE_GPU=1` for ANGLE/Vulkan where supported; otherwise SwiftShader is used.
 The script owns a temporary browser profile and stops the browser after the run.
 
 ## Follow-up scope
@@ -72,6 +119,14 @@ The script owns a temporary browser profile and stops the browser after the run.
 Tire burst, wheel lock/anti-skid failures, steering jams, soft soil, ditch/curb
 geometry, aerodynamic overspeed damage, dedicated sparks/scrape audio, and
 persistent fuselage mesh deformation are not implemented by this change.
-Structural abrasion is a simple distance-based approximation. Body collision
+Structural abrasion is a friction-work approximation, with fixed part budgets. Body collision
 uses discrete support points, not a deformable mesh or continuous swept-volume
 solver. Parameters need further tuning across aircraft masses and landing attitudes.
+
+## Issue #167 evidence
+
+See [review evidence](../../review-artifacts/issue-167/README.md) for measured
+clearances, scenario summaries and desktop/mobile images. The mobile run checks
+responsive rendering in Chrome emulation; it is not a Samsung Browser device test.
+Loaded coastal scenarios and analytical slopes are covered; a full loaded-DEM
+Lukla incident campaign and arbitrary inverted attitudes remain outside this run.
