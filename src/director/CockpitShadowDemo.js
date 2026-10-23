@@ -50,7 +50,7 @@ export class CockpitShadowDemo {
     sim.cameraSystem.setMode(0, true);
     sim.cameraSystem.photoCockpit = false;
     sim.cameraSystem.lookYaw = 0;
-    sim.cameraSystem.lookPitch = -0.45;
+    sim.cameraSystem.lookPitch = -0.25; // The standard pilot tilt: glareshield, panel and horizon in frame.
     sim.cameraSystem.snapToTarget(sim.aircraft.group);
     sim.sky.setCloudCover(0);
     sim.sky.setTimeOfDay(9, sim.position, sim.camera.position);
