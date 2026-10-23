@@ -59,7 +59,18 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, onAirport, onP
     if (briefingEl) {
       bindText(briefingEl, () => lobbyBriefing(getAirport(), getPreset()).join('\n'));
     }
-    if (timeSelect) timeSelect.value = String(getTime());
+    if (timeSelect) {
+      // The clock is continuous (and float-modulo noisy after restore), so show
+      // the nearest preset option rather than requiring an exact value match.
+      const hours = getTime();
+      let nearest = null;
+      for (const option of timeSelect.options) {
+        const value = Number.parseFloat(option.value);
+        if (!Number.isFinite(value)) continue;
+        if (nearest === null || Math.abs(value - hours) < Math.abs(nearest - hours)) nearest = value;
+      }
+      if (nearest !== null) timeSelect.value = String(nearest);
+    }
   }
 
   function setWaitingForTerrain(waiting) {
