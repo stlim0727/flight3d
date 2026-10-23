@@ -6,6 +6,8 @@ import {
   DECK_SUN_AFT_REACH,
   DECK_SUN_RADIUS,
   DECK_SUN_CLIP_T,
+  directAdmittance,
+  referenceDirectAdmittance,
 } from '../aircraft/CockpitAperture.js';
 
 /** Localized direct sun, balanced against the enclosed deck's reduced sky fill. */
@@ -35,7 +37,6 @@ const _paneMatrix = new THREE.Matrix4();
 const _paneCenter = new THREE.Vector3();
 const _paneQuat = new THREE.Quaternion();
 const _paneEuler = new THREE.Euler();
-const _apertureDir = new THREE.Vector3();
 const _invQuat = new THREE.Quaternion();
 const _point = new THREE.Vector3();
 const _corner = new THREE.Vector3();
@@ -184,17 +185,11 @@ export function computeDeckSunPose({
   pose.sunDirLocal = (pose.sunDirLocal ?? new THREE.Vector3())
     .copy(sunDir).applyQuaternion(_invQuat).normalize();
 
-  let facing = 0;
-  for (const pane of panes) {
-    // An aperture admits light from the hemisphere it opens onto, which is the direction
-    // from the deck out through the glass, not the glass plane's own normal.
-    _paneCenter.set(pane.center[0], pane.center[1], pane.center[2]).sub(anchor);
-    if (_paneCenter.lengthSq() < 1e-8) continue;
-    _apertureDir.copy(_paneCenter).normalize().applyQuaternion(quaternion);
-    facing = Math.max(facing, _apertureDir.dot(sunDir));
-  }
-
-  pose.facing = smoothstep(0.05, 0.45, facing);
+  // Measured in the deck frame, where the panes are authored: no world-space round trip,
+  // and the aircraft's attitude cannot change what the windshield admits. A sun below the
+  // horizon still clears the pane normals, so the horizon gate stays in update().
+  pose.admittance = Math.min(1,
+    directAdmittance(pose.sunDirLocal, panes) / referenceDirectAdmittance(panes));
   pose.apertureClipT = clipT;
   pose.near = Math.max(0.25, standOff - clipT);
   pose.far = Math.max(pose.near + 0.5, standOff + aftReach);
@@ -322,7 +317,7 @@ export class CockpitSunShadow {
     this.light.target.position.copy(this.pose.targetPosition);
     this.light.angle = this.pose.angle;
     this.light.color.copy(sunColor);
-    this.light.intensity = sunIntensity * this.pose.facing * this.modeFactor * COCKPIT_SUN_GAIN;
+    this.light.intensity = sunIntensity * this.pose.admittance * this.modeFactor * COCKPIT_SUN_GAIN;
     this.light.intensity *= smoothstep(-0.03, 0.08, sunDir.y);
 
     const shadowCamera = this.light.shadow.camera;

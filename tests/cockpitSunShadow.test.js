@@ -17,6 +17,9 @@ import {
   DECK_SUN_STANDOFF,
   DECK_SUN_AFT_REACH,
   DECK_SUN_CLIP_T,
+  paneOutwardNormal,
+  directAdmittance,
+  referenceDirectAdmittance,
 } from '../src/aircraft/CockpitAperture.js';
 import { SkyAtmosphere } from '../src/environment/SkyAtmosphere.js';
 
@@ -40,7 +43,7 @@ function admittedSuns() {
     for (const elevation of [3, 20, 40, 60]) {
       const sunDir = sunDirectionAt(elevation, azimuth);
       computeDeckSunPose({ position: origin, quaternion: identity, sunDir, pose });
-      if (pose.facing > 0.5) suns.push(sunDir);
+      if (pose.admittance > 0.5) suns.push(sunDir);
     }
   }
   return suns;
@@ -123,18 +126,76 @@ describe('Cockpit deck sun rig (issue #90)', () => {
   it('opens on sun ahead, closes on sun astern, and never jumps', () => {
     const pose = {};
     computeDeckSunPose({ position: origin, quaternion: identity, sunDir: sunDirectionAt(30, 180), pose });
-    assert.ok(pose.facing > 0.9, `Sun ahead must open the deck, got ${pose.facing}`);
+    assert.ok(pose.admittance > 0.9, `Sun ahead must open the deck, got ${pose.admittance}`);
     computeDeckSunPose({ position: origin, quaternion: identity, sunDir: sunDirectionAt(30, 0), pose });
-    assert.equal(pose.facing, 0, 'Sun straight astern must admit nothing');
+    assert.equal(pose.admittance, 0, 'Sun straight astern must admit nothing');
 
     let previous = null;
     for (let azimuth = 180; azimuth <= 420; azimuth += 1) {
       computeDeckSunPose({ position: origin, quaternion: identity, sunDir: sunDirectionAt(12, azimuth), pose });
       if (previous !== null) {
-        assert.ok(Math.abs(pose.facing - previous) < 0.08,
-          `facing stepped from ${previous.toFixed(3)} to ${pose.facing.toFixed(3)} at azimuth ${azimuth}`);
+        assert.ok(Math.abs(pose.admittance - previous) < 0.08,
+          `admittance stepped from ${previous.toFixed(3)} to ${pose.admittance.toFixed(3)} at azimuth ${azimuth}`);
       }
-      previous = pose.facing;
+      previous = pose.admittance;
+    }
+  });
+
+  it('admits a high sun, because the front glass leans back over the nose', () => {
+    const pose = {};
+    for (const elevation of [45, 65]) {
+      computeDeckSunPose({ position: origin, quaternion: identity, sunDir: sunDirectionAt(elevation, 180), pose });
+      assert.ok(pose.admittance > 0.5,
+        `Sun ahead at ${elevation} degrees admits only ${pose.admittance.toFixed(3)} of the aperture`);
+    }
+  });
+
+  it("follows the sun's bearing in the deck, not the aircraft attitude", () => {
+    const pose = {};
+    const localSun = sunDirectionAt(30, 180);
+    computeDeckSunPose({ position: origin, quaternion: identity, sunDir: localSun, pose });
+    const level = pose.admittance;
+    for (const [pitch, yaw, roll] of [[0.3, 0.4, 0.7], [-0.4, -1.1, -1.2], [0.9, 2.0, 2.6]]) {
+      const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, roll));
+      computeDeckSunPose({
+        position: new THREE.Vector3(500, 300, -800),
+        quaternion,
+        sunDir: localSun.clone().applyQuaternion(quaternion),
+        pose,
+      });
+      assert.ok(Math.abs(pose.admittance - level) < 1e-9,
+        `Attitude changed admitted fraction from ${level.toFixed(4)} to ${pose.admittance.toFixed(4)}`);
+    }
+  });
+
+  it('measures admittance as the aperture area projected normal to the sun', () => {
+    // A vertical pane forward of the deck, in the XY plane, faces -Z out of the aircraft.
+    const panes = [{ name: 'test', center: [0, 0.83, -13.0], size: [2, 1], rotation: [0, 0, 0] }];
+    assert.ok(Math.abs(directAdmittance(sunDirectionAt(0, 180), panes) - 2) < 1e-9,
+      'A sun normal to the glass must admit its full area');
+    assert.equal(directAdmittance(sunDirectionAt(0, 0), panes), 0, 'A sun behind the glass admits nothing');
+    assert.ok(Math.abs(directAdmittance(sunDirectionAt(0, 90), panes)) < 1e-9, 'An edge-on sun admits nothing');
+
+    const reference = referenceDirectAdmittance();
+    assert.ok(reference > 0);
+    for (let azimuth = 0; azimuth < 360; azimuth += 7) {
+      for (let elevation = 0; elevation <= 90; elevation += 9) {
+        assert.ok(directAdmittance(sunDirectionAt(elevation, azimuth)) <= reference + 1e-9,
+          `Admittance exceeded its reference at ${elevation}/${azimuth}`);
+      }
+    }
+  });
+
+  it('faces every pane outward, away from the deck', () => {
+    const normal = new THREE.Vector3();
+    for (const pane of WINDSHIELD_PANES) {
+      const toPane = new THREE.Vector3(
+        pane.center[0] - DECK_SUN_ANCHOR.x,
+        pane.center[1] - DECK_SUN_ANCHOR.y,
+        pane.center[2] - DECK_SUN_ANCHOR.z,
+      );
+      assert.ok(paneOutwardNormal(pane, normal).dot(toPane) > 0,
+        `${pane.name} normal points back into the deck`);
     }
   });
 
@@ -245,9 +306,11 @@ describe('Cockpit deck sun rig (issue #90)', () => {
       assert.ok(samples[i] >= samples[i - 1], 'Ramp-up must be monotonic');
     }
     assert.ok(samples[0] < 0.2 * samples[samples.length - 1], 'Ramp must start soft to avoid a flash');
-    assert.ok(rig.daylight > 0.9, `Full sun settles at ${rig.daylight}`);
+    assert.ok(rig.modeFactor > 0.999, `Camera-mode ramp must settle, got ${rig.modeFactor}`);
+    assert.ok(Math.abs(rig.daylight - rig.pose.admittance) < 1e-5,
+      `Flood dimming must settle at the fraction the aperture admits, got ${rig.daylight}`);
     assert.equal(rig.light.intensity,
-      3.5 * rig.pose.facing * rig.modeFactor * COCKPIT_SUN_GAIN);
+      3.5 * rig.pose.admittance * rig.modeFactor * COCKPIT_SUN_GAIN);
     assert.ok(rig.light.intensity <= 3.5 * COCKPIT_SUN_GAIN + 1e-9,
       'Deck sun must never exceed its share of the ambient sun');
 

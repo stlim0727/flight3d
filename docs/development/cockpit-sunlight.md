@@ -65,11 +65,58 @@ floods against the light the deck actually admits, with a floor so the night loo
 survives. `main.js` drives both from `stepSimulation` and `animate`, gated by the
 cockpit camera mode, which ramps over ~0.3 s rather than switching.
 
+## Direct admittance
+
+`directAdmittance()` in `CockpitAperture.js` is the aperture area projected normal to the
+sun, `Σ max(0, n̂·sun)·A`, in square metres — the parallel-beam flux an opening admits.
+`referenceDirectAdmittance()` scans the upper hemisphere for the bearing that admits the
+most, and the deck sun is scaled by the ratio, so `1.0` means "this aperture at its best"
+and editing the profile cannot silently rescale the rig.
+
+It replaced a single dot product against the deck→pane-centre direction, which discarded
+`pane.rotation` and `pane.size` and depended on where the anchor happened to sit relative
+to each pane. That read a high sun as almost not admitted (0.32 against 1.0 for a morning
+sun), which left the instrument floods near full brightness at noon and washed the shaded
+overhead panel out — the deck sun is the only thing that dims them. Admittance is also
+computed in the deck frame, so aircraft attitude no longer enters the term at all.
+
+The swap does not by itself make the noon deck read as intended, and the honest before/after
+is in `review-artifacts/cockpit-aperture/`: the noon frame is near-unchanged in mean luma
+while the *off-axis* frames got brighter. Lowering an over-reported `facing` of ~1.0 to a
+measured admittance drops `daylight`, and `syncDaylight` then leaves the floods closer to
+full than they were. Those bearings genuinely admit less direct sun than the heuristic
+claimed, because the profile has no openings aft of the windshield; over-brightening there is
+the measurement being right about an incomplete profile, not a reason to re-add a curve.
+
 ## Known limits
 
-- A high sun barely enters: at 12:30 the sun is 64° up and the facing term falls to
-  0.35, so the deck keeps most of its flood lighting. That is the windshield doing its
-  job, but it means noon is the weakest frame for this feature.
+- The aperture profile is authored, not measured. No GLB in this repository carries a
+  windshield mesh (`b737-cockpit-medium.glb`, `b737-cockpit-draco.glb` and `b737-800.glb`
+  contain no node, mesh or material named for glass), so `WINDSHIELD_PANES` is a hand-built
+  approximation that the interior framing and the light cookie both draw from. It is now
+  self-consistent — the front glass leans back over the nose, as on a real 737 — but the
+  angle has not been checked against airframe data.
+- The profile is a forward fan: all four pane normals have a negative (forward) Z component,
+  so nothing aft of about 135° off the nose is admitted at all. Measured admittance as a
+  fraction of `referenceDirectAdmittance()`, by bearing off the nose:
+
+  | elevation | 0° | 45° | 90° | 135° | 180° |
+  | --- | --- | --- | --- | --- | --- |
+  | 20° | 1.00 | 0.85 | 0.44 | 0.10 | 0.00 |
+  | 40° | 0.91 | 0.80 | 0.45 | 0.08 | 0.00 |
+
+  A real 737 deck admits an afternoon sun through the No.3 and No.4 side windows, which this
+  profile does not have. Adding them is [issue #164](https://github.com/stlim0727/flight3d/issues/164);
+  it cannot be done by editing the list alone, because `Cockpit.js` renders one tint quad per
+  pane and the cookie paints one light band per pane, and the shipped skin has no opening for
+  either. Measured from the loaded scene, that is the smaller half of the problem: every mesh
+  in `gltfCockpitGroup` lies within |x| ≤ 1.0 m of the centreline, so the interior has no
+  side-window geometry at all. Completing the aperture is an asset change before it is a
+  lighting one, and until then the forward fan is faithful to what the model contains.
+- Diffuse skylight is not modelled through the aperture. The deck's indirect fill is a
+  fixed two-band scaling of the outdoor ambient, so it has the right *shape* (upward faces
+  brighter) but its coupling to the actual glass area is a constant. Integrating the sky
+  view factor per receiver is the first thing an offline bake would give us.
 - The instrument floods follow the *admitted* sun, not general skylight, so a bright
   overcast day leaves them brighter than a clear one.
 - Exterior airframe self-shadow (fuselage onto wing, tail onto tailplane, gear onto
@@ -77,11 +124,11 @@ cockpit camera mode, which ramps over ~0.3 s rather than switching.
   tracked separately.
 - The mechanism is model-agnostic; the numbers are not. `computeDeckSunPose()` and
   `projectPanesForCookie()` accept panes, anchor, standoff and clip distance as parameters,
-  but `CockpitSunShadow` calls them with the `CockpitAperture.js` defaults, which are
-  measured from the shipped 737 GLBs. Another cockpit needs its own aperture profile — by
-  swapping that module, or by threading a per-instance profile into `update()` and
-  `repaintCookie()`. A model whose skin has real windshield openings can drop the
-  cookie and exterior-proxy exclusion, which only exist because this one does not.
+  but `CockpitSunShadow` calls them with the `CockpitAperture.js` defaults. Another cockpit
+  needs its own aperture profile — by swapping that module, or by threading a per-instance
+  profile into `update()` and `repaintCookie()`. A model whose skin has real windshield
+  openings can drop the cookie and exterior-proxy exclusion, which only exist because this
+  one does not.
 
 ## Reproduce visual evidence
 
@@ -129,7 +176,7 @@ freezing the map is the cheaper of the two and that the rig does not force a
 repaint while the deck-local sun is steady.
 
 Node tests cover the rig invariants, the slab against windshield corners and deck
-receivers, facing continuity through a 1° azimuth sweep, cookie projection bounds,
+receivers, admittance continuity through a 1° azimuth sweep, cookie projection bounds,
 the body-fixed shadow image, repaint-only-on-movement, the cloud gate, and the
 flood/daylight trade. Required checks are `npm run check`, `npm test` and
 `npm run build`.

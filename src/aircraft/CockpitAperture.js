@@ -7,8 +7,8 @@ import * as THREE from 'three';
  * which must agree on where the outside world can actually reach the interior.
  */
 export const WINDSHIELD_PANES = Object.freeze([
-  Object.freeze({ name: 'GLTF_Glass_1L', center: Object.freeze([-0.25, 0.83, -12.92]), size: Object.freeze([0.68, 0.44]), rotation: Object.freeze([-0.47, 0.22, -0.06]) }),
-  Object.freeze({ name: 'GLTF_Glass_1R', center: Object.freeze([0.25, 0.83, -12.92]), size: Object.freeze([0.68, 0.44]), rotation: Object.freeze([-0.47, -0.22, 0.06]) }),
+  Object.freeze({ name: 'GLTF_Glass_1L', center: Object.freeze([-0.25, 0.83, -12.92]), size: Object.freeze([0.68, 0.44]), rotation: Object.freeze([0.47, 0.22, -0.06]) }),
+  Object.freeze({ name: 'GLTF_Glass_1R', center: Object.freeze([0.25, 0.83, -12.92]), size: Object.freeze([0.68, 0.44]), rotation: Object.freeze([0.47, -0.22, 0.06]) }),
   Object.freeze({ name: 'GLTF_Glass_2L', center: Object.freeze([-0.85, 0.95, -12.45]), size: Object.freeze([0.72, 0.44]), rotation: Object.freeze([-0.12, 1.10, 0]) }),
   Object.freeze({ name: 'GLTF_Glass_2R', center: Object.freeze([0.85, 0.95, -12.45]), size: Object.freeze([0.72, 0.44]), rotation: Object.freeze([-0.12, -1.10, 0]) }),
 ]);
@@ -31,3 +31,71 @@ export const DECK_SUN_RADIUS = 2.9;
  * explicitly instead of clipping the pillars along with the airframe skin.
  */
 export const DECK_SUN_CLIP_T = 2.2;
+
+const _paneEuler = new THREE.Euler();
+const _paneQuat = new THREE.Quaternion();
+const _paneNormal = new THREE.Vector3();
+const _deckToPane = new THREE.Vector3();
+const _scanDir = new THREE.Vector3();
+
+/**
+ * Unit normal of a pane, pointing out of the deck.
+ *
+ * A plane has two sides and the authored profile carries no convention, so the
+ * deck anchor decides: the outside is the direction away from the interior.
+ */
+export function paneOutwardNormal(pane, target = new THREE.Vector3()) {
+  _paneEuler.set(pane.rotation[0], pane.rotation[1], pane.rotation[2]);
+  target.set(0, 0, 1).applyQuaternion(_paneQuat.setFromEuler(_paneEuler));
+  _deckToPane.set(
+    pane.center[0] - DECK_SUN_ANCHOR.x,
+    pane.center[1] - DECK_SUN_ANCHOR.y,
+    pane.center[2] - DECK_SUN_ANCHOR.z,
+  );
+  if (target.dot(_deckToPane) < 0) target.negate();
+  return target;
+}
+
+/**
+ * Parallel-beam flux through the aperture, as the projected area normal to the sun
+ * in square metres. A pane edge-on to the sun contributes nothing and one facing it
+ * contributes its full area, which is what an opening does; the sum is independent of
+ * where in the deck the receiver sits.
+ */
+export function directAdmittance(sunDirLocal, panes = WINDSHIELD_PANES) {
+  let flux = 0;
+  for (const pane of panes) {
+    const cosine = paneOutwardNormal(pane, _paneNormal).dot(sunDirLocal);
+    if (cosine > 0) flux += cosine * pane.size[0] * pane.size[1];
+  }
+  return flux;
+}
+
+let _referenceAdmittance = null;
+
+/**
+ * `directAdmittance` at the sun bearing that pushes the most light through, scanned
+ * from the pane data. Dividing by it puts the deck sun on a 0..1 scale that survives a
+ * change of aperture profile, where a hand-picked constant would silently rescale it.
+ */
+export function referenceDirectAdmittance(panes = WINDSHIELD_PANES) {
+  if (panes !== WINDSHIELD_PANES) return scanReferenceAdmittance(panes);
+  _referenceAdmittance ??= scanReferenceAdmittance(panes);
+  return _referenceAdmittance;
+}
+
+function scanReferenceAdmittance(panes) {
+  let best = 0;
+  for (let elevation = 0; elevation <= 90; elevation += 2) {
+    for (let azimuth = 0; azimuth < 360; azimuth += 2) {
+      // Same spherical convention SkyAtmosphere uses for the sun.
+      _scanDir.setFromSphericalCoords(
+        1,
+        THREE.MathUtils.degToRad(90 - elevation),
+        THREE.MathUtils.degToRad(azimuth),
+      );
+      best = Math.max(best, directAdmittance(_scanDir, panes));
+    }
+  }
+  return best;
+}
