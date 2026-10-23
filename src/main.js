@@ -1402,10 +1402,7 @@ class FlightSimulator {
       const vFovRad = 2 * Math.atan(Math.tan(targetHFov / 2) / aspect);
       targetFov = Math.min(100, Math.max(54, vFovRad * (180 / Math.PI)));
     }
-    if (Math.abs(this.camera.fov - targetFov) > 0.1) {
-      this.camera.fov = targetFov;
-      this.camera.updateProjectionMatrix();
-    }
+    this.cameraSystem.applyBaseFov(targetFov);
     this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry, (x, z) => this.currentTerrain.getHeight(x, z));
     this.foliage.updateCityLod(this.camera.position);
 
@@ -1776,7 +1773,9 @@ class FlightSimulator {
       const vFovRad = 2 * Math.atan(Math.tan(targetHFov / 2) / this.camera.aspect);
       targetFov = Math.min(100, Math.max(54, vFovRad * (180 / Math.PI)));
     }
-    this.camera.fov = targetFov;
+    this.cameraSystem.applyBaseFov(targetFov);
+    // The projection must be rebuilt for the new aspect even when the zoomed
+    // vertical FOV happens to be unchanged.
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     if (this.cockpitPhotoOverlay) {

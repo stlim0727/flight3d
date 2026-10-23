@@ -95,7 +95,13 @@ export function updateControlState(telemetry, camera) {
   set('btn-reverser', telemetry.reverserActive ? 'ui.reverse.on' : 'ui.reverse.off', {}, !!telemetry.reverserActive, t('ui.strip.reverse'));
   const mode = camera.autoSwitch ? 7 : camera.mode;
   const cameraName = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto'][mode];
-  set('open-camera', 'ui.camera.current', { name: t(`ui.camera.${cameraName}`).replace(/ · [1-8]$/, '') }, undefined, t('ui.strip.camera'));
+  const viewName = t(`ui.camera.${cameraName}`).replace(/ · [1-8]$/, '');
+  // Optical zoom only exists in the fixed eye-point views, so chase and drone
+  // framing changes stay unlabelled.
+  const zoomed = camera.opticalZoom > 1.01;
+  const zoomValue = zoomed ? `${camera.opticalZoom.toFixed(1)}×` : '';
+  set('open-camera', 'ui.camera.current', { name: zoomed ? `${viewName} · ${zoomValue}` : viewName }, undefined,
+    zoomed ? `${t('ui.strip.camera')}${zoomValue}` : t('ui.strip.camera'));
   const toggle = document.getElementById('btn-touch-toggle');
   toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('touch-mode')));
 }

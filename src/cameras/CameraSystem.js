@@ -79,6 +79,15 @@ export class CameraSystem {
     // Tower Camera Location (Inside Control Tower Cab at 66m height)
     this.towerPos = new THREE.Vector3(120, 78, 280);
 
+    // Optical Zoom (magnification) for fixed eye-point views: cockpit and tower
+    this.opticalZoom = 1.0;
+    this.opticalZoomMin = 1.0;
+    this.opticalZoomMax = 4.0;
+    // Narrowing the field of view alone leaves the glareshield and window posts
+    // filling the frame, so zooming also leans the pilot toward the windscreen.
+    this.cockpitZoomLean = 0.45; // metres forward per unit of magnification above 1x
+    this.cockpitZoomLeanRise = 0.35; // share of the lean lifted to clear the glareshield
+
     // Flyby Camera State
     this.flybyPos = new THREE.Vector3();
     this.flybySet = false;
@@ -173,6 +182,9 @@ export class CameraSystem {
           this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance + e.deltaY * 0.04));
           this.userLookOverridden = true;
           this.cancelTemporaryView();
+        } else if (this.usesOpticalZoom()) {
+          // Scroll down widens the field of view (zoom out), like backing away.
+          this.zoomOpticalBy(Math.exp(-e.deltaY * 0.0015));
         }
       }, { passive: true });
     }
@@ -405,7 +417,8 @@ export class CameraSystem {
   }
 
   /**
-   * Apply two-finger pinch zoom to camera distance
+   * Apply two-finger pinch zoom to camera distance, or to the field of view
+   * where the eye point is fixed.
    */
   applyPinchZoom(deltaDist) {
     if (Math.abs(deltaDist) > 0) {
@@ -416,7 +429,46 @@ export class CameraSystem {
       this.chaseDistance = Math.max(20.0, Math.min(140.0, this.chaseDistance - deltaDist * 0.15));
     } else if (this.mode === CameraSystem.MODES.DRONE) {
       this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance - deltaDist * 0.12));
+    } else if (this.usesOpticalZoom()) {
+      // Fingers spreading apart magnifies, matching the exterior pinch direction.
+      this.zoomOpticalBy(Math.exp(deltaDist * 0.0035));
     }
+  }
+
+  usesOpticalZoom() {
+    return this.mode === CameraSystem.MODES.COCKPIT || this.mode === CameraSystem.MODES.TOWER;
+  }
+
+  /**
+   * Scale the optical magnification. ratio > 1 zooms in; the result is clamped
+   * to [opticalZoomMin, opticalZoomMax] and reports whether anything changed.
+   */
+  zoomOpticalBy(ratio) {
+    if (!Number.isFinite(ratio) || ratio === 1) return false;
+    const clamped = Math.min(this.opticalZoomMax, Math.max(this.opticalZoomMin, this.opticalZoom * ratio));
+    if (clamped === this.opticalZoom) return false;
+    this.opticalZoom = clamped;
+    this.userLookOverridden = true;
+    this.cancelTemporaryView();
+    return true;
+  }
+
+  /**
+   * Set the mode's base vertical field of view, then apply the optical zoom.
+   * Dividing the half-angle tangent keeps magnification geometric, so 2x
+   * doubles the apparent size of the subject.
+   */
+  applyBaseFov(baseFovDeg) {
+    const halfTan = Math.tan((baseFovDeg * Math.PI) / 360) / this.opticalZoom;
+    const zoomedFov = (Math.atan(halfTan) * 360) / Math.PI;
+    if (!this.camera) return zoomedFov;
+    if (Math.abs(this.camera.fov - zoomedFov) > 0.05) {
+      this.camera.fov = zoomedFov;
+      if (typeof this.camera.updateProjectionMatrix === 'function') {
+        this.camera.updateProjectionMatrix();
+      }
+    }
+    return zoomedFov;
   }
 
   // Grab the scenery: mouse and touch move it with the gesture. Pointer lock
@@ -533,6 +585,7 @@ export class CameraSystem {
     this.wingLookPitch = 0;
     this.gearLookYaw = 0;
     this.gearLookPitch = 0;
+    this.opticalZoom = this.opticalZoomMin;
     this.targetCursorNormX = 0;
     this.targetCursorNormY = 0;
     this.cursorNormX = 0;
@@ -846,6 +899,9 @@ export class CameraSystem {
         if (this.photoCockpit) {
           eyeLocal.set(-0.48, 0.88, -12.02);
         }
+        const zoomLean = (this.opticalZoom - 1) * this.cockpitZoomLean;
+        eyeLocal.z -= zoomLean;
+        eyeLocal.y += zoomLean * this.cockpitZoomLeanRise;
         eyeLocal.y += this.headGForceOffset.y + buffetY + this.touchJoltOffset;
         eyeLocal.x += buffetX;
 

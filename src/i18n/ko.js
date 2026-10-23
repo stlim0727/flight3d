@@ -116,7 +116,7 @@ export default {
   "select.cockpit.chase.wing.tower.flyby.landing": "콕핏 / 3인칭 / 윙 / 관제탑 / 플라이바이 / 랜딩 기어 / 드론 바로 선택",
   "auto.camera.switch.every.10.seconds.select": "자동 카메라: 10초마다 전환. 1–7로 수동 선택 시 해제",
   "mouse.move.drag": "마우스 / 터치 드래그",
-  "free.camera.look.continuous.edge.pan.cockpit": "풍경을 잡아 끌어 화면 이동, 놓으면 정지. 더블 클릭 / 더블 탭으로 시선 초기화. 추적·드론 시점에서 휠 / 두 손가락으로 줌.",
+  "free.camera.look.continuous.edge.pan.cockpit": "풍경을 잡아 끌어 화면 이동, 놓으면 정지. 더블 클릭 / 더블 탭으로 시선 초기화(줌도 함께 해제). 휠 / 두 손가락 줌: 조종석·관제탑은 배율, 추적·드론은 거리.",
   "double.click": "더블클릭",
   "center.camera.view": "카메라 시선 정면 초기화 (Center View)",
   "middle.mouse.button": "마우스 휠 클릭",

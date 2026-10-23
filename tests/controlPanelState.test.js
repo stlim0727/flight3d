@@ -22,6 +22,16 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-gear']['aria-pressed'], 'true');
     assert.equal(nodes['btn-flaps-ret'].disabled, false);
     assert.equal(nodes['open-camera'].textContent, 'Camera: Cockpit');
+    assert.equal(nodes['open-camera']['data-short-label'], 'CAM');
+    camera.opticalZoom = 2;
+    updateControlState(telemetry, camera);
+    assert.equal(nodes['open-camera'].textContent, 'Camera: Cockpit · 2.0×', 'magnification is readable in the camera control');
+    assert.equal(nodes['open-camera']['data-short-label'], 'CAM2.0×');
+    assert.equal(nodes['open-camera'].title, 'Camera: Cockpit · 2.0×');
+    camera.opticalZoom = 1;
+    updateControlState(telemetry, camera);
+    assert.equal(nodes['open-camera'].textContent, 'Camera: Cockpit', '1× hides the zoom badge');
+    assert.equal(nodes['open-camera']['data-short-label'], 'CAM');
     Object.assign(telemetry, { gearState: .5, flapDegree: 12, flapIndex: 6, spoilers: 1, reverserActive: true, engine1: {} });
     camera.autoSwitch = true;
     updateControlState(telemetry, camera);
