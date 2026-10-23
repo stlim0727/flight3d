@@ -329,6 +329,32 @@ describe('Airborne demo handoff', () => {
     assert.equal(sim.controls.throttle,0);
     assert.equal(engineThrottle,0);
   });
+
+  it('hands a rolling airframe over with its wheel brakes still held', () => {
+    const rolling = createMockSimulator('coastal');
+    rolling.gear.onGround = true;
+    rolling.telemetry.groundSpeedKnots = 95;
+    const director = new DemoFlightDirector(rolling);
+    director.isActive = true;
+    director.stop();
+    assert.equal(rolling.controls.parkingBrake, true);
+    assert.equal(rolling.controls.brakes, 1);
+    assert.equal(rolling.gear.brakes, 1);
+
+    for (const [label, patch] of [
+      ['stopped on the runway', { onGround: true, groundSpeedKnots: 0.2 }],
+      ['airborne', { onGround: false, groundSpeedKnots: 140 }],
+    ]) {
+      const sim = createMockSimulator('coastal');
+      sim.gear.onGround = patch.onGround;
+      sim.telemetry.groundSpeedKnots = patch.groundSpeedKnots;
+      const handedOff = new DemoFlightDirector(sim);
+      handedOff.isActive = true;
+      handedOff.stop();
+      assert.equal(sim.controls.parkingBrake, false, `brakes release when handing off ${label}`);
+      assert.equal(sim.gear.brakes, 0);
+    }
+  });
 });
 
 // Exercise each production stop path, keeping the notification alive across

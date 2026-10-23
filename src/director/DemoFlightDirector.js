@@ -238,6 +238,12 @@ export class DemoFlightDirector {
 
     const handoffThrottle = preserveThrottle ? (this.sim.controls?.throttle ?? 0) : 0;
 
+    // Wheel brakes are pilot equipment, not demo scaffolding: an airframe still
+    // rolling on the ground is handed over braked, and the parking brake releases
+    // itself once the new pilot advances the thrust levers.
+    const holdBrakes = keepParkingBrake || (this.sim.gear?.onGround === true &&
+      (this.sim.telemetry?.groundSpeedKnots ?? 0) > 1.0);
+
     // Release automation while retaining climb thrust for an airborne handoff.
     if (this.sim.engines) {
       this.sim.engines.setReverser(false, true);
@@ -245,7 +251,7 @@ export class DemoFlightDirector {
     }
     if (this.sim.controls) {
       this.sim.controls.throttle = handoffThrottle;
-      if (keepParkingBrake) {
+      if (holdBrakes) {
         if (typeof this.sim.controls.setParkingBrake === 'function') {
           this.sim.controls.setParkingBrake(true);
         }
@@ -258,7 +264,7 @@ export class DemoFlightDirector {
       }
     }
     if (this.sim.gear) {
-      this.sim.gear.setBrakes(keepParkingBrake ? 1.0 : 0.0);
+      this.sim.gear.setBrakes(holdBrakes ? 1.0 : 0.0);
     }
     if (this.sim.aero) {
       this.sim.aero.spoilers = 0.0;
