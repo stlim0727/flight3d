@@ -4,6 +4,23 @@ Flight3d is a browser flight simulator built with Three.js and Vite, using npm
 and ES modules. Source and executable configuration take precedence over dated
 claims in README.md, ARCHITECTURE.md, or CODE_METRICS.md.
 
+## User shorthand
+
+Treat these acronyms as instructions when used as commands in a task or PR context:
+
+- **`arc` — address review comments:** read the PR's current review comments,
+  validate feedback, implement actionable fixes, run relevant checks, push updates,
+  and reply to comments and resolve threads when addressed. Explain any feedback
+  that does not warrant a change. Follow the repository's review workflow.
+- **`mac` — merge (PR) and clean up (worktree and directory):** verify required
+  CI, reviews, and merge gates, merge the intended PR, then remove its completed
+  task worktree and directory and delete the merged local task branch. Preserve
+  uncommitted or unrelated work and shared checkouts. If merging is blocked, report
+  the blocker and keep the task worktree intact.
+
+Apply these commands to the current task/PR; ask which target only when ambiguous.
+These shorthands retain the repository's existing checks and approval requirements.
+
 ## Start here
 
 Workflow rules that apply to every agent:
