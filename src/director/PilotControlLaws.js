@@ -29,12 +29,13 @@ export function flyBank(sim, targetRollDeg, tel) {
  *
  * With groundPitch null it flies a flight-path-angle target: the required lift
  * carries the path acceleration plus the closed-loop correction on vertical
- * speed, and thrust is trimmed to the indicated airspeed target. With a
- * groundPitch it commands that body attitude directly and feeds in the gear's
- * pitch moment, which is how a rollout holds a decaying nose-up attitude while
- * the nose gear is lowered under control.
+ * speed, and thrust is trimmed to the indicated airspeed target, scaled by
+ * throttleScale for a power reduction that is commanded by height rather than
+ * by airspeed. With a groundPitch it commands that body attitude directly and
+ * feeds in the gear's pitch moment, which is how a rollout holds a decaying
+ * nose-up attitude while the nose gear is lowered under control.
  */
-export function flyVerticalPath(sim, targetVz, targetIas, tel, pathAcceleration = 0, groundPitch = null) {
+export function flyVerticalPath(sim, targetVz, targetIas, tel, pathAcceleration = 0, groundPitch = null, throttleScale = 1) {
   const aero = sim.aero;
   const speed = Math.max(30, Math.hypot(sim.linearVelocity.x, sim.linearVelocity.z));
   const flapCl0 = aero.CL0_clean + 0.95 * aero.currentFlapAngle / 40;
@@ -54,5 +55,5 @@ export function flyVerticalPath(sim, targetVz, targetIas, tel, pathAcceleration 
   const effectiveElevator = (requiredCm - aero.Cm0 - aero.Cma * aero.alpha - aero.Cmq * qHat) / -aero.Cm_de;
   const elevator = (effectiveElevator - THREE.MathUtils.degToRad(aero.pitchTrim) * 0.35) / THREE.MathUtils.degToRad(20);
   sim.controls.setVirtualInput('elevator', alphaGuarded(THREE.MathUtils.clamp(elevator, -0.8, 0.8), THREE.MathUtils.radToDeg(aero.alpha)));
-  if (groundPitch === null) sim.controls.setVirtualInput('throttle', THREE.MathUtils.clamp(0.50 + (targetIas - tel.iasKnots) * 0.035 + targetVz * 0.02, 0.05, 0.95));
+  if (groundPitch === null) sim.controls.setVirtualInput('throttle', THREE.MathUtils.clamp(0.50 + (targetIas - tel.iasKnots) * 0.035 + targetVz * 0.02, 0.05, 0.95) * throttleScale);
 }

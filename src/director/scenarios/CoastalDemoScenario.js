@@ -1,6 +1,20 @@
 import { t } from '../../i18n/index.js';
 import * as THREE from 'three';
 import { CameraSystem } from '../../cameras/CameraSystem.js';
+import { flyVerticalPath } from '../PilotControlLaws.js';
+
+// Runway 09L geometry, mirroring environment/Airport.js: an east-west strip
+// centered on z = 0 at the airport mesa elevation, 3,200 m long.
+const RUNWAY_ELEVATION_M = 12.0;
+const TOUCHDOWN_X_M = -1250;
+const GLIDESLOPE_TAN = Math.tan(THREE.MathUtils.degToRad(3.0));
+// Roundout law: below the knee the commanded sink is proportional to the height
+// still to be flown away, so the target reaches zero sink at the pavement.
+const FLARE_SINK_PER_METER = 0.25;
+const GLIDESLOPE_TRACKING_GAIN = 0.30;
+// Approach thrust is held until the roundout, then retarded with the last 12 m.
+const THROTTLE_RETARD_HEIGHT_M = 12.0;
+const APPROACH_IAS_KNOTS = 142;
 
 /**
  * Autonomous Pacific Coastal International Airport (Runway 09L) Scenic Demo Scenario
@@ -23,6 +37,8 @@ export class CoastalDemoScenario {
     this.director = director;
     this.sim = simulator;
     this.stageCameraCutDone = false;
+    this.rolloutPitchDeg = 0;
+    this.stoppedTime = 0;
   }
 
   enterStage(stage) {
@@ -99,6 +115,10 @@ export class CoastalDemoScenario {
       case CoastalDemoScenario.STAGES.TOUCHDOWN_ROLLOUT:
         this.director.updateBanner(() => t('7.8.touchdown.reverse.thrust.rollout'), () => t('landing.gear.view.main.nose.wheel.touchdown'));
         this.sim.cameraSystem.setMode(CameraSystem.MODES.GEAR);
+        // Carry the arrival attitude and decay it from here, so the nose gear is
+        // placed on the pavement under command instead of dropped onto it.
+        this.rolloutPitchDeg = Math.max(0, this.sim.telemetry.pitchDeg);
+        this.stoppedTime = 0;
         break;
 
       case CoastalDemoScenario.STAGES.POSTFLIGHT_ORBIT:
@@ -113,7 +133,7 @@ export class CoastalDemoScenario {
 
       case CoastalDemoScenario.STAGES.COMPLETED:
         this.director.updateBanner(() => t('demo.complete.taking.manual.control'), () => t('choose.a.preset.and.camera.view.to'));
-        this.director.stop(() => t('demo.flight.complete.enjoy.your.flight'));
+        this.director.stop(() => t('demo.flight.complete.enjoy.your.flight'), true);
         break;
     }
   }
@@ -228,61 +248,67 @@ export class CoastalDemoScenario {
       }
 
       case CoastalDemoScenario.STAGES.FINAL_APPROACH: {
-        const targetTouchdownX = -1250;
-        const distToThreshold = targetTouchdownX - this.sim.position.x;
-        const idealAltFt = Math.max(47, (distToThreshold * Math.tan(THREE.MathUtils.degToRad(3.0))) * 3.28084 + 47);
+        const elevation = this.sim.currentAirport?.elevation ?? RUNWAY_ELEVATION_M;
+        const halfLength = this.sim.currentAirport?.runwayLength ?? 3200;
+        const heightAboveRunway = this.sim.position.y - elevation;
+        const toTouchdown = Math.max(0, TOUCHDOWN_X_M - this.sim.position.x);
+        const alongSpeed = Math.hypot(this.sim.linearVelocity.x, this.sim.linearVelocity.z);
 
+        // Localizer tracking: bank toward the centerline.
         const targetRoll = Math.max(-10.0, Math.min(10.0, -this.sim.position.z * 0.15));
         const rollDiff = targetRoll - tel.rollDeg;
         const rollRateDeg = -THREE.MathUtils.radToDeg(this.sim.angularVelocity.z);
         const aileronCmd = rollDiff * 0.035 - rollRateDeg * 0.025;
         this.sim.controls.setVirtualInput('aileron', Math.max(-0.20, Math.min(0.20, aileronCmd)));
 
-        const isOverRunway = this.sim.position.x >= -1600;
-        if (!this.director.approachFlarInitiated && isOverRunway && tel.radioAltFt <= 30.0 && tel.radioAltFt > 0) {
-          this.director.approachFlarInitiated = true;
-        }
+        // The 3° path is held as a vertical-speed target with a glide-path
+        // correction, and the roundout claims the command once the remaining
+        // height can no longer absorb the glide-path sink. Approach thrust is
+        // retarded through the roundout instead of being carried to the pavement.
+        const pathVz = Math.min(1.5,
+          -GLIDESLOPE_TAN * alongSpeed
+          - GLIDESLOPE_TRACKING_GAIN * (heightAboveRunway - GLIDESLOPE_TAN * toTouchdown));
+        const flareVz = -FLARE_SINK_PER_METER * Math.max(0, heightAboveRunway);
+        const retard = THREE.MathUtils.clamp(heightAboveRunway / THROTTLE_RETARD_HEIGHT_M, 0, 1);
+        flyVerticalPath(this.sim, Math.max(flareVz, pathVz), APPROACH_IAS_KNOTS, tel, 0, null, retard);
 
-        if (this.director.approachFlarInitiated) {
-          this.sim.controls.setVirtualInput('throttle', 0.0);
-          if (this.sim.engines) this.sim.engines.setThrottle(0.0);
-          this.sim.controls.setVirtualInput('elevator', 0.14);
-        } else {
-          const altDiff = idealAltFt - tel.altitudeFt;
-          const targetPitchDeg = Math.max(-1.0, Math.min(6.5, 2.8 + altDiff * 0.035));
-          const pitchDiff = targetPitchDeg - tel.pitchDeg;
-          const pitchRateDeg = THREE.MathUtils.radToDeg(this.sim.angularVelocity.x);
-          const elevatorCmd = pitchDiff * 0.08 - pitchRateDeg * 0.03;
-          this.sim.controls.setVirtualInput('elevator', Math.max(-0.35, Math.min(0.45, elevatorCmd)));
-
-          const speedErr = 142 - tel.iasKnots;
-          const energyComp = altDiff > 25 ? 0.12 : (altDiff < -25 ? -0.08 : 0.0);
-          this.sim.controls.setVirtualInput('throttle', Math.max(0.35, Math.min(0.75, 0.48 + speedErr * 0.025 + energyComp)));
-        }
-
-        if (isOverRunway && (tel.onGround || (this.director.approachFlarInitiated && tel.radioAltFt <= 8.5))) {
+        const mainsDown = this.sim.gear.contacts.slice(1).every(c => c.isGrounded);
+        if (this.sim.position.x >= -halfLength / 2 && mainsDown) {
           this.director.setStage(CoastalDemoScenario.STAGES.TOUCHDOWN_ROLLOUT);
         }
         break;
       }
 
       case CoastalDemoScenario.STAGES.TOUCHDOWN_ROLLOUT: {
-        this.sim.controls.setVirtualInput('elevator', 0.0);
+        const noseDown = !!this.sim.gear.contacts[0].isGrounded;
+        // Hold the arrival attitude, then lower the nose at a commanded rate so
+        // the nose gear is placed on the runway instead of falling onto it.
+        this.rolloutPitchDeg = Math.max(0, this.rolloutPitchDeg - dt * 2.0);
+        flyVerticalPath(this.sim, 0, 0, tel, 0, this.rolloutPitchDeg);
+
+        const groundSpeedMs = Math.hypot(this.sim.linearVelocity.x, this.sim.linearVelocity.z);
+        const reversing = noseDown && tel.iasKnots > 25;
         this.sim.controls.setVirtualInput('aileron', 0.0);
         this.sim.controls.setVirtualInput('rudder', -this.sim.position.z * 0.02);
-        if (this.sim.aero) this.sim.aero.spoilers = 1.0;
-        this.sim.controls.setVirtualInput('brakes', 1.0);
-        if (this.sim.gear) this.sim.gear.setBrakes(1.0);
-        this.sim.controls.setVirtualInput('throttle', 0.0);
-        if (this.sim.engines) this.sim.engines.setThrottle(0.0);
+        if (this.sim.aero) this.sim.aero.spoilers = noseDown ? 1.0 : 0.0;
+        this.sim.controls.setVirtualInput('brakes', noseDown ? 1.0 : 0.0);
+        if (this.sim.gear) this.sim.gear.setBrakes(noseDown ? 1.0 : 0.0);
+        if (this.sim.engines) this.sim.engines.setReverser(reversing, tel.onGround);
+        this.sim.controls.setVirtualInput('throttle', reversing ? 1.0 : 0.0);
 
         if (!this.stageCameraCutDone && !this.director.userCameraOverridden && this.director.stageTimer > 4.5) {
           this.stageCameraCutDone = true;
           this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
         }
 
-        if (tel.iasKnots < 5.0 || this.director.stageTimer > 12.0) {
+        // Timers cannot prove a stop: require every wheel on the pavement and the
+        // wheels actually still, held for two seconds.
+        const stopped = this.sim.gear.contacts.every(c => c.isGrounded) && groundSpeedMs < 0.5;
+        this.stoppedTime = stopped ? this.stoppedTime + dt : 0;
+        if (this.stoppedTime >= 2.0 || this.director.stageTimer > 90.0) {
           if (this.sim.engines) this.sim.engines.setReverser(false, true);
+          this.sim.controls.setVirtualInput('throttle', 0.0);
+          if (this.sim.engines) this.sim.engines.setThrottle(0.0);
           if (this.sim.aero) this.sim.aero.spoilers = 0.0;
           this.director.setStage(CoastalDemoScenario.STAGES.POSTFLIGHT_ORBIT);
         }

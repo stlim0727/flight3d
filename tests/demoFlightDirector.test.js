@@ -3,12 +3,16 @@ import assert from 'node:assert';
 import * as THREE from 'three';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
+import { Aerodynamics } from '../src/physics/Aerodynamics.js';
+import { EngineModel } from '../src/physics/EngineModel.js';
+import { LandingGear } from '../src/physics/LandingGear.js';
 
 function createMockSimulator(activeAirport = 'lukla') {
   const virtualInputs = {};
   return {
     activeAirport,
     position: new THREE.Vector3(0, 2800, 0),
+    linearVelocity: new THREE.Vector3(0, 0, 0),
     angularVelocity: new THREE.Vector3(0, 0, 0),
     telemetry: {
       altitudeFt: 9300,
@@ -28,25 +32,20 @@ function createMockSimulator(activeAirport = 'lukla') {
         this.parkingBrake = Boolean(v);
         if (this.parkingBrake) this.brakes = 1.0;
       },
-      setVirtualInput: (k, v) => { virtualInputs[k] = v; },
+      setVirtualInput: (k, v) => {
+        // A control law that divides by an unstarted simulation state would fly
+        // the demo with NaN surfaces, so every command has to be a real number.
+        assert.ok(Number.isFinite(v), `virtual input ${k} is not finite`);
+        virtualInputs[k] = v;
+      },
       clearVirtualInputs: () => {
         for (const k of Object.keys(virtualInputs)) delete virtualInputs[k];
       },
       getVirtualInput: (k) => virtualInputs[k]
     },
-    engines: {
-      setThrottle: () => {},
-      setReverser: () => {}
-    },
-    gear: {
-      brakes: 0.0,
-      setBrakes: function(v) { this.brakes = v; },
-      setGearTarget: () => {}
-    },
-    aero: {
-      spoilers: 0,
-      setFlapPosition: () => {}
-    },
+    engines: new EngineModel(),
+    gear: new LandingGear(),
+    aero: new Aerodynamics(),
     sky: {
       setTimeOfDay: () => {},
       getSunDirection: () => new THREE.Vector3(0, 1, 0)

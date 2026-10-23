@@ -63,6 +63,15 @@ extension, controlled runway scraping through rest, catastrophic body impact and
 repair. See [landing damage](landing-damage.md) for conditions, limitations and
 port/artifact options. It is separate from the default Node test gate.
 
+## Autonomous demo acceptance
+
+`npm run test:demo` steps the coastal scenic demo to completion in the browser and
+asserts the landing is flown rather than announced: every touchdown below the nose
+gear impact limit, all three legs still `normal`, no landing incident, spoilers and
+reverse thrust actually deployed, the airframe stationary inside the runway, the
+wheel brakes still held and control handed back at the end. It requires a Vite
+server on port 5173 (the script's own constant) and exits non-zero on failure.
+
 ## Selection and provenance
 
 Adapted from the sibling Keepory (historically Stash) repository at commit

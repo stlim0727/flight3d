@@ -12,7 +12,7 @@ context, while the current implementation defines actual behavior.
 | Keyboard, gamepad, touch input | src/controls/FlightControls.js; TouchFlightControls.js; index.html; style.css | tests/flightControls.test.js; npm run test:mobile |
 | HUD, responsive panels, localization | index.html; style.css; src/ui/FlightPanels.js; src/i18n/ | tests/controlPanelState.test.js; scripts/verify-responsive-ui.mjs; browser screenshots |
 | Cameras and framing | src/cameras/CameraSystem.js | tests/gearCamAndTouchdown.test.js; browser screenshots |
-| Autonomous flight and stage transitions | src/director/DemoFlightDirector.js | npm run test:demo; npm run test:flight |
+| Autonomous flight and stage transitions | src/director/DemoFlightDirector.js; src/director/PilotControlLaws.js; src/director/scenarios/ | tests/demoFlightDirector.test.js; tests/demoTouchdown.test.js; npm run test:demo; npm run test:flight |
 | Aircraft geometry and cockpit displays | src/aircraft/ | npm run build; cockpit browser screenshots |
 | Cockpit sunlight, window-frame shadows, cloud dimming | src/environment/CockpitSunShadow.js; src/aircraft/CockpitAperture.js; [cockpit sunlight](cockpit-sunlight.md) | tests/cockpitSunShadow.test.js; node scripts/verify-cockpit-shadows.mjs |
 | Terrain, airport, ocean, sky, vegetation | src/environment/; [Lukla data provenance](lukla-terrain.md); [airport exterior assets](airport-buildings.md); [pavement](pavement.md); [vegetation](foliage.md) | npm run build; relevant scene screenshots; node scripts/verify-foliage.mjs |

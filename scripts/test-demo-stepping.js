@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 
@@ -64,13 +65,26 @@ async function testDemo() {
 
   // Ensure demo flight is active
   await evaluate('window.simulator.demoDirector.start(); window.simulator.gameFlow.enterFlight();');
+  await evaluate(`(() => {
+    const sim = window.simulator;
+    window.__touchdowns = [];
+    const orig = sim.gear.update.bind(sim.gear);
+    sim.gear.update = (...args) => {
+      const result = orig(...args);
+      for (const t of result.touchdownContacts || []) {
+        window.__touchdowns.push({ id: t.id, sink: Number(t.sinkRate.toFixed(2)) });
+      }
+      return result;
+    };
+  })()`);
 
-  // Step simulation in 0.25s slices for 125 seconds of simulation time
-  const totalSimSeconds = 125;
+  // Step simulation in 0.25s slices until the demo hands control back
+  const totalSimSeconds = 220;
   const sliceDt = 0.25;
   const numSlices = Math.round(totalSimSeconds / sliceDt);
   let prevHdg = null;
   let prevStage = null;
+  const samples = [];
 
   for (let i = 0; i < numSlices; i++) {
     const simTime = (i * sliceDt).toFixed(2);
@@ -98,10 +112,22 @@ async function testDemo() {
           virtAil: (sim.controls.virtualAileron || 0).toFixed(3),
           angVelZ: sim.angularVelocity.z.toFixed(4),
           isCrashed: sim.isCrashed,
-          crashDesc: sim.crashResult ? sim.crashResult.description : null
+          crashDesc: sim.crashResult ? sim.crashResult.description : null,
+          groundSpeed: Math.hypot(sim.linearVelocity.x, sim.linearVelocity.z),
+          sinkRate: sim.linearVelocity.y,
+          contactStates: sim.gear.contacts.map(c => c.damageState).join(','),
+          contactDamage: Math.max(...sim.gear.contacts.map(c => c.damage)),
+          landingIncident: sim.landingIncident,
+          reverser: Number(sim.engines.reverserDeployment.toFixed(2)),
+          brakes: Number(sim.gear.brakes.toFixed(2)),
+          spoilers: Number(sim.aero.spoilers || 0),
+          onGround: tel.onGround
         };
       })()
     `);
+
+    samples.push(data);
+    if (!data.active && samples.filter(s => !s.active).length > 4) break;
 
     let hdgDiff = 0;
     const isStageChange = prevStage !== null && prevStage !== data.stage;
@@ -123,9 +149,35 @@ async function testDemo() {
     prevStage = data.stage;
   }
 
+  const touchdowns = await evaluate('window.__touchdowns');
+  const last = samples.at(-1);
+  console.log('Touchdown sink rates:', JSON.stringify(touchdowns));
+  console.log('Final:', JSON.stringify({
+    stage: last.stage, active: last.active, x: last.pos.x, groundSpeed: last.groundSpeed.toFixed(2),
+    contactStates: last.contactStates, contactDamage: last.contactDamage,
+    landingIncident: last.landingIncident, brakes: last.brakes, reverser: last.reverser
+  }));
+
+  assert.equal(last.active, false, 'the demo must finish and hand control back to the player');
+  assert.equal(last.isCrashed, false, 'the demo must not crash');
+  assert.equal(last.landingIncident, false, 'the demo landing must not damage the gear');
+  assert.equal(last.contactStates, 'normal,normal,normal', 'every gear leg must land undamaged');
+  assert.equal(last.contactDamage, 0, 'no accumulated gear damage');
+  assert.ok(touchdowns.length >= 2, `the demo must land on the runway, saw ${JSON.stringify(touchdowns)}`);
+  assert.ok(Math.max(...touchdowns.map(t => t.sink)) < 2.8,
+    `touchdown sink ${JSON.stringify(touchdowns)} must stay under the nose gear impact limit`);
+  assert.ok(samples.some(s => s.reverser > 0.5), 'the rollout must actually deploy reverse thrust');
+  assert.ok(samples.some(s => s.spoilers > 0.5 && s.onGround), 'the rollout must deploy spoilers on the ground');
+  assert.ok(last.groundSpeed < 0.5, `the airframe must be stationary at handoff, got ${last.groundSpeed} m/s`);
+  assert.ok(Math.abs(parseFloat(last.pos.x)) <= 1600, `the airframe must stop on the runway, x=${last.pos.x}`);
+  assert.equal(last.brakes, 1, 'the demo must leave the wheel brakes held at handoff');
+
   ws.close();
   chrome.kill('SIGKILL');
   console.log('✅ Demo test finished.');
 }
 
-testDemo().catch(console.error);
+testDemo().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});

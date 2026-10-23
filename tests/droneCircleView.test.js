@@ -29,6 +29,9 @@ if (typeof document === 'undefined') {
 
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
+import { Aerodynamics } from '../src/physics/Aerodynamics.js';
+import { EngineModel } from '../src/physics/EngineModel.js';
+import { LandingGear } from '../src/physics/LandingGear.js';
 
 describe('Drone Orbit View & Demo Pre/Post-Flight Integration', () => {
   describe('CameraSystem (DRONE Orbit Mode)', () => {
@@ -164,23 +167,11 @@ describe('Drone Orbit View & Demo Pre/Post-Flight Integration', () => {
         clearVirtualInputs() { this.virtualInputs = {}; }
       };
 
-      const engines = {
-        throttle: 0,
-        setThrottle(v) { this.throttle = v; },
-        setReverser: () => {}
-      };
+      const engines = new EngineModel();
 
-      const gear = {
-        brakes: 0,
-        setBrakes(v) { this.brakes = v; },
-        setGearTarget: () => {}
-      };
+      const gear = new LandingGear();
 
-      const aero = {
-        spoilers: 0,
-        flapsIndex: 0,
-        setFlapPosition(idx) { this.flapsIndex = idx; }
-      };
+      const aero = new Aerodynamics();
 
       const sky = {
         timeOfDay: 12,
@@ -201,6 +192,7 @@ describe('Drone Orbit View & Demo Pre/Post-Flight Integration', () => {
         sky,
         water,
         position: new THREE.Vector3(-1350, 14.15, 0),
+        linearVelocity: new THREE.Vector3(0, 0, 0),
         angularVelocity: new THREE.Vector3(0, 0, 0),
         telemetry: {
           iasKnots: 0,
@@ -260,8 +252,13 @@ describe('Drone Orbit View & Demo Pre/Post-Flight Integration', () => {
       assert.strictEqual(director.currentStage, DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT);
       assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.GEAR);
 
-      // Simulate coming to safe stop (speed < 5 knots)
+      // Simulate a genuine stop: every wheel on the pavement and the airframe
+      // still, held for two seconds.
+      for (const contact of sim.gear.contacts) contact.isGrounded = true;
       sim.telemetry.iasKnots = 2.0;
+      director.update(1.0);
+      assert.strictEqual(director.currentStage, DemoFlightDirector.STAGES.TOUCHDOWN_ROLLOUT,
+        'a single still frame is not a stop');
       director.update(1.0);
 
       assert.strictEqual(director.currentStage, DemoFlightDirector.STAGES.POSTFLIGHT_ORBIT);
