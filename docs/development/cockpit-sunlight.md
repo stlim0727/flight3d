@@ -179,6 +179,12 @@ Stopping or changing presets clears the override and restores time, cloud cover
 and the previous camera. Aircraft physics is held only while this demo is active;
 regular scenarios retain their normal integration.
 
+Known limits of the demo view: the beauty renderer has MSAA, but long shallow
+silhouettes (glareshield trim seen from the side) still stair-step, and dragging
+the view to extremes exposes sliver gaps in the shipped cockpit skin where the
+GLB panels meet. Neither is shadow-demo-specific; both are model/antialiasing
+limits rather than regressions this scenario introduced.
+
 `tests/cockpitShadowDemo.test.js` covers continuous loop boundaries, pause/manual
 steps, heading-relative light, repeat entry and restoration. For browser evidence,
 start Vite and a GPU-capable Chrome under the shared Chrome lease, then run:
