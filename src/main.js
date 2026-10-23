@@ -143,6 +143,7 @@ class FlightSimulator {
 
     this.airport = new Airport();
     this.scene.add(this.airport.group);
+    this.terrain.excludePavement(this.airport.group);
 
     this.foliage = new FoliageAndCities(this.terrain);
     this.scene.add(this.foliage.group);

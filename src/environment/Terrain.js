@@ -49,6 +49,7 @@ export class Terrain {
     this.geometry = null;
     this.material = null;
     this.shaderUniforms = null;
+    this.pavementBounds = [];
 
     this.initTerrain();
   }
@@ -191,6 +192,23 @@ export class Terrain {
     }
   }
 
+  // The axis-aligned coastal slabs replace the ground underneath them. Derive their coverage
+  // from the real meshes rather than relying on centimetre-scale depth separation.
+  excludePavement(group) {
+    group.updateWorldMatrix(true, true);
+    this.pavementBounds.length = 0;
+    group.traverse(mesh => {
+      if (!mesh.isMesh || !['pavement-asphalt', 'pavement-concrete'].includes(mesh.material?.name)) return;
+      const box = new THREE.Box3().setFromObject(mesh);
+      // Retain a 1 cm fringe under the slab edges to avoid rasterization seams.
+      this.pavementBounds.push(new THREE.Vector4(
+        box.min.x + 0.01, box.min.z + 0.01, box.max.x - 0.01, box.max.z - 0.01
+      ));
+    });
+    this.material.defines.PAVEMENT_BOUNDS_COUNT = this.pavementBounds.length;
+    this.material.needsUpdate = true;
+  }
+
   initTerrain() {
     this.geometry = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
     this.geometry.rotateX(-Math.PI * 0.5); // Align to X-Z horizontal plane
@@ -258,6 +276,7 @@ export class Terrain {
     });
 
     terrainMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uPavementBounds = { value: this.pavementBounds };
       // 1. Assign PBR Texture & Parameter Uniforms
       shader.uniforms.uGrassMap = { value: this.textures.grassMap };
       shader.uniforms.uGrassNormal = { value: this.textures.grassNormal };
@@ -310,6 +329,9 @@ export class Terrain {
         `#include <common>
         varying vec3 vTerrainWorldPos;
         varying vec3 vTerrainWorldNormal;
+        #if PAVEMENT_BOUNDS_COUNT > 0
+          uniform vec4 uPavementBounds[PAVEMENT_BOUNDS_COUNT];
+        #endif
 
         uniform sampler2D uGrassMap;
         uniform sampler2D uGrassNormal;
@@ -364,6 +386,18 @@ export class Terrain {
                      smoothstep(0.2, 0.8, fract(selector)));
           #endif
         }`
+      );
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <clipping_planes_fragment>',
+        `#include <clipping_planes_fragment>
+        #if PAVEMENT_BOUNDS_COUNT > 0
+          for (int i = 0; i < PAVEMENT_BOUNDS_COUNT; i++) {
+            vec4 bounds = uPavementBounds[i];
+            if (all(greaterThan(vTerrainWorldPos.xz, bounds.xy)) &&
+                all(lessThan(vTerrainWorldPos.xz, bounds.zw))) discard;
+          }
+        #endif`
       );
 
       shader.fragmentShader = shader.fragmentShader.replace(

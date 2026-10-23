@@ -72,3 +72,28 @@ test('Lukla runway retains dimensions, shadows and depth offset with headless fa
       [airport.runwayLength, airport.runwayWidth].sort((a,b) => a-b));
   }
 });
+
+test('coastal pavement coverage follows the actual eight slabs without changing contact heights', async () => {
+  const { Airport } = await import('../src/environment/Airport.js');
+  const { Terrain } = await import('../src/environment/Terrain.js');
+  const terrain = new Terrain(22000, 16);
+  const originalDocument = globalThis.document;
+  globalThis.document = { createElement: () => ({ getContext: () => new Proxy({}, { get: () => () => {} }) }) };
+  let airport;
+  try {
+    class HeadlessAirport extends Airport { async loadBuildings() { return false; } }
+    airport = new HeadlessAirport();
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+  }
+  const geometry = terrain.geometry.attributes.position.array.slice();
+  const heights = [[-1400, 0], [0, 160], [0, 270], [1700, 350]].map(([x, z]) => terrain.getHeight(x, z));
+  terrain.excludePavement(airport.group);
+  assert.equal(terrain.pavementBounds.length, 8);
+  const covered = (x, z) => terrain.pavementBounds.some(b => x > b.x && z > b.y && x < b.z && z < b.w);
+  for (const [x, z] of [[-1400, 0], [0, 160], [0, 270], [-1200, 80], [600, 80]]) assert.ok(covered(x, z));
+  for (const [x, z] of [[1601, 0], [0, -31], [100, 80], [701, 270], [0, 361]]) assert.equal(covered(x, z), false);
+  assert.deepEqual(terrain.geometry.attributes.position.array, geometry);
+  assert.deepEqual([[-1400, 0], [0, 160], [0, 270], [1700, 350]].map(([x, z]) => terrain.getHeight(x, z)), heights);
+});

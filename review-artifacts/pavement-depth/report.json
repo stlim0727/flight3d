@@ -1,0 +1,63 @@
+{
+  "rows": [
+    {
+      "quality": "low",
+      "stress": false,
+      "excluded": false,
+      "samples": 264147,
+      "lost": 0
+    },
+    {
+      "quality": "low",
+      "stress": false,
+      "excluded": true,
+      "samples": 264147,
+      "lost": 0
+    },
+    {
+      "quality": "low",
+      "stress": true,
+      "excluded": false,
+      "samples": 264147,
+      "lost": 9050
+    },
+    {
+      "quality": "low",
+      "stress": true,
+      "excluded": true,
+      "samples": 264147,
+      "lost": 0
+    },
+    {
+      "quality": "high",
+      "stress": false,
+      "excluded": false,
+      "samples": 264147,
+      "lost": 0
+    },
+    {
+      "quality": "high",
+      "stress": false,
+      "excluded": true,
+      "samples": 264147,
+      "lost": 0
+    },
+    {
+      "quality": "high",
+      "stress": true,
+      "excluded": false,
+      "samples": 264147,
+      "lost": 9050
+    },
+    {
+      "quality": "high",
+      "stress": true,
+      "excluded": true,
+      "samples": 264147,
+      "lost": 0
+    }
+  ],
+  "gpu": "ANGLE (Intel, Vulkan 1.4.335 (Intel(R) Graphics (ADL-N) (0x000046D2)), Intel open-source Mesa driver)",
+  "shaderErrors": 0,
+  "errors": []
+}

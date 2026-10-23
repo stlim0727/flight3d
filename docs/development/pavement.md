@@ -81,3 +81,39 @@ reference masks interior paint coverage; a foreground block checks occlusion.
 It also checks nonempty, identical ordinary-perspective and orthographic renders.
 Browser/shader errors, empty masks, missing cases and a baseline that does not
 fail the stress case cannot pass. See [captures and limitations](../../review-artifacts/runway-markings/README.md).
+
+## Terrain under coastal pavement (#175 follow-up)
+
+The Galaxy S24+ recording after #175 still shows checkerboard patches across
+pavement in Performance mode; higher graphics quality reduces the symptom.
+The deployed JavaScript was verified to include #175. Desktop Intel/Vulkan does
+not reproduce the native phone symptom at ordinary depth precision.
+
+The coastal terrain previously rendered underneath every slab, only 3–6 cm
+below it. `Terrain.excludePavement(airport.group)` now derives eight axis-aligned
+world XZ rectangles from the actual asphalt/concrete meshes and discards hidden
+terrain fragments. A 1 cm fringe remains underneath slab edges to avoid seams.
+Repairs and transparent paint do not create holes. This method is specific to
+the axis-aligned coastal slabs; do not apply bounding rectangles to rotated or
+sloped airports. Lukla is unchanged. Terrain vertices and analytical contact
+heights remain intact; the pavement and aircraft still receive shadows.
+
+With Vite on 5267 and the project GPU browser available:
+
+```sh
+SIM_URL=http://127.0.0.1:5267 chrome-session --project flight3d node scripts/verify-pavement-depth.mjs
+```
+
+The script uses production terrain/pavement shaders in low and high terrain
+quality, four camera positions each, before/after exclusion and with/without
+an explicit 12-bit logarithmic-depth stress injection. Magenta identifies
+terrain fragments; raycasts select interior runway samples. Terrain deliberately
+draws last so equal-depth fragments expose the overlap. The stress injection is
+an adversarial test, **not an emulation of the S24+ GPU**. Both quality paths
+reduce 9,050 exposed-terrain samples to zero, out of 264,147 samples per case.
+At ordinary precision both versions have zero exposed-terrain samples. Shader
+and browser errors fail the check. See [evidence](../../review-artifacts/pavement-depth/README.md).
+
+Device confirmation remains necessary: removing overlap addresses a concrete
+precision vulnerability but does not establish that it caused the phone's
+checkerboard. The new capture includes terrain, unlike the isolated paint test.

@@ -1,0 +1,26 @@
+{
+  "rows": [
+    {
+      "airport": "coastal",
+      "quality": "performance",
+      "bounds": 8,
+      "programs": 35,
+      "shaderErrors": 0
+    },
+    {
+      "airport": "coastal",
+      "quality": "balanced",
+      "bounds": 8,
+      "programs": 35,
+      "shaderErrors": 0
+    },
+    {
+      "airport": "coastal",
+      "quality": "high",
+      "bounds": 8,
+      "programs": 35,
+      "shaderErrors": 0
+    }
+  ],
+  "errors": []
+}
