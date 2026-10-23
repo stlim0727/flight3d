@@ -43,6 +43,16 @@ Collision classification uses the incoming pose so this correction cannot lift a
 aircraft out of a water, mountain or obstacle collision. Crash visuals no longer
 rotate the airframe independently of its physical contacts.
 
+The penetration budget is a **vertical** distance. On a planar slope, moving a
+distance `d` along the normalized terrain normal changes vertical clearance by
+`d / normal.y`, because the sampled terrain height changes with X/Z too. The
+normal correction is therefore `excessPenetration * normal.y`. Tests require
+the minimum clearance to reach -4 cm, not just remain above that lower bound.
+Curved terrain is sampled again during the existing four correction passes;
+the bundled Lukla boundary/DEM fixtures allow a 2 mm residual because their
+normals use 2 m finite differences. This is not an exactness guarantee for every
+nonlinear surface.
+
 `bodyDamage.js` separates first-contact impact energy (squared normal speed,
 including angular contact velocity) from friction work (`friction force * slip
 speed * dt`). The strongest new patch impact per part is counted once per step;

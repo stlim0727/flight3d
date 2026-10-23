@@ -35,7 +35,10 @@ export function constrainBodyContact(position, quaternion, linearVelocity, angul
       corrected = true;
       normal.copy(terrainNormal?.(point.x, point.z) || new THREE.Vector3(0, 1, 0)).normalize();
       if (normal.y < 0.1) normal.set(0, 1, 0);
-      position.addScaledVector(normal, (penetration - BODY_PENETRATION_LIMIT) / normal.y);
+      // Penetration is vertical clearance. Along a normalized surface normal,
+      // planar clearance changes by distance / normal.y (the terrain height
+      // also changes as X/Z move). Convert the excess to normal distance.
+      position.addScaledVector(normal, (penetration - BODY_PENETRATION_LIMIT) * normal.y);
       velocity.copy(angularVelocity).applyQuaternion(quaternion).cross(arm).add(linearVelocity);
       const closing = velocity.dot(normal);
       if (closing >= 0) continue;

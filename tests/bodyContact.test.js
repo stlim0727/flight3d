@@ -1,6 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import { readFileSync } from 'node:fs';
+import { LuklaTerrain } from '../src/environment/LuklaTerrain.js';
+import { BODY_SUPPORT_POINTS } from '../src/physics/groundContacts.js';
 import { LandingGear } from '../src/physics/LandingGear.js';
 import { EngineModel, asymmetricThrustYawMoment } from '../src/physics/EngineModel.js';
 import { BODY_DAMAGE_LIMITS, updateBodyDamage } from '../src/physics/bodyDamage.js';
@@ -91,6 +94,72 @@ describe('Post-collapse body damage', () => {
 });
 
 describe('Body penetration constraint', () => {
+  // Start with a known minimum vertical clearance; test the resulting clearance,
+  // not merely a lower bound that also accepts an aircraft lifted off the ground.
+  function correctOnSurface(height, surfaceNormal, x = 0, z = 0, points = BODY_SUPPORT_POINTS) {
+    const position = new THREE.Vector3(x, 0, z);
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), surfaceNormal(x, z));
+    const minimum = () => Math.min(...bodyClearances(position, quaternion, height, points).map(p => p.clearance));
+    position.y -= minimum() + 0.24;
+    constrainBodyContact(position, quaternion, new THREE.Vector3(3, -1, 4), new THREE.Vector3(0.1, -0.05, 0.02),
+      66000, inertia, height, surfaceNormal, points);
+    return minimum();
+  }
+
+  it('lands exactly on the penetration limit on flat, signed and compound planar slopes', () => {
+    const single = [{ id: 'belly', position: [0, 0, 0] }];
+    const slopes = [[0, 0], [0, 0.1176], [0, -0.1176], [0, 0.5], [0, -0.5],
+      [0, 1], [0, -1], [1, 0], [-1, 0], [0.4, 0.8], [-0.4, -0.8]];
+    for (const [sx, sz] of slopes) for (const points of [single, BODY_SUPPORT_POINTS]) {
+      const height = (x, z) => sx * x + sz * z;
+      const normal = () => new THREE.Vector3(-sx, 1, -sz).normalize();
+      const clearance = correctOnSurface(height, normal, 3, -7, points);
+      assert.ok(Math.abs(clearance + BODY_PENETRATION_LIMIT) < 1e-8,
+        `slope (${sx}, ${sz}), ${points.length} patches: clearance ${clearance}`);
+    }
+  });
+
+  it('rechecks nonlinear surface clearance across repeated corrections', () => {
+    const height = (x, z) => 0.12 * z + 0.002 * z * z + 0.001 * x * x + 0.05 * Math.sin(x / 3);
+    const normal = (x, z) => new THREE.Vector3(-(0.002 * x + 0.05 / 3 * Math.cos(x / 3)),
+      1, -(0.12 + 0.004 * z)).normalize();
+    const single = [{ id: 'belly', position: [0, 0, 0] }];
+    for (const x of [-20, -10, 0, 10, 20]) for (const z of [-20, -10, 0, 10, 20]) {
+      for (const points of [single, BODY_SUPPORT_POINTS]) {
+        const clearance = correctOnSurface(height, normal, x, z, points);
+        assert.ok(Math.abs(clearance + BODY_PENETRATION_LIMIT) < 1e-8,
+          `curved surface (${x}, ${z}), ${points.length} patches: clearance ${clearance}`);
+      }
+    }
+  });
+
+  it('keeps loaded Lukla DEM and airport-boundary samples within 2mm of the contact limit', () => {
+    const bytes = readFileSync(new URL('../public/terrain/lukla_dem.bin', import.meta.url));
+    const elevations = new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    const terrain = new LuklaTerrain(undefined, 16, elevations);
+    assert.equal(terrain.isLoaded, true, 'Use the bundled DEM, not the flat loading fallback');
+    const sites = [];
+    for (const s of [-200, 0, 200]) for (const w of [0, 25, 50]) {
+      sites.push([s * 0.848048 + w * 0.529919, -s * 0.529919 + w * 0.848048]);
+    }
+    for (const x of [-1000, -500, 0, 500, 1000]) for (const z of [-1000, -500, 0, 500, 1000]) sites.push([x, z]);
+    try {
+      for (const [x, z] of sites) {
+        const clearance = correctOnSurface((x, z) => terrain.getHeight(x, z),
+          (x, z) => terrain.getNormal(x, z), x, z);
+        // Normals use 2m finite differences across DEM cells/graded boundaries;
+        // these fixtures permit 2mm residual, unlike the exact planar cases.
+        assert.ok(clearance >= -BODY_PENETRATION_LIMIT - 1e-8
+          && clearance <= -BODY_PENETRATION_LIMIT + 0.002,
+        `loaded DEM (${x}, ${z}): clearance ${clearance}`);
+      }
+    } finally {
+      terrain.geometry.dispose();
+      terrain.localTerraceGeometry.dispose();
+      terrain.mesh.material.dispose();
+    }
+  });
+
   it('bounds every patch on flat and sloped terrain in rolled and pitched attitudes', () => {
     for (const slope of [0, 0.12, -0.12]) for (const roll of [-0.3, 0, 0.3]) {
       const position = new THREE.Vector3(0, 1, 0);
