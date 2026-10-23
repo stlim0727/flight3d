@@ -607,6 +607,18 @@ export class CameraSystem {
     return Math.abs(this.lookYaw) > 0.38 || Math.abs(this.lookPitch - (-0.25)) > 0.42;
   }
 
+  /**
+   * Share of the zoom gaze lift that survives a manual aim: whole at the resting
+   * centre, gone at the edge of the look-away window. Fading rather than switching
+   * keeps a drag across that boundary from snapping the frame by more than the
+   * zoom's own lift.
+   */
+  zoomGazeBlend() {
+    const yawAway = Math.abs(this.lookYaw) / 0.38;
+    const pitchAway = Math.abs(this.lookPitch + 0.25) / 0.42;
+    return Math.max(0, 1 - Math.max(yawAway, pitchAway));
+  }
+
   resetDroneOrbit(angle = 1.8, distance = 38.0, height = 11.5) {
     if (this.userLookOverridden) {
       return;
@@ -917,10 +929,9 @@ export class CameraSystem {
 
         const effectiveYaw = this.lookYaw + cursorYaw;
         const basePitch = (this.photoCockpit && !this.isLookingAwayFromCenter()) ? (this.lookPitch * 0.2 - 0.04) : this.lookPitch;
-        // A manual aim of more than ~24 degrees belongs to the pilot, not to the zoom.
-        const zoomGazeLift = this.photoCockpit || this.isLookingAwayFromCenter()
-          ? 0
-          : (this.opticalZoom - 1) * this.cockpitZoomGazeLift;
+        // A manual aim fades the lift out across the look-away window.
+        const zoomGazeLift = this.photoCockpit ? 0
+          : (this.opticalZoom - 1) * this.cockpitZoomGazeLift * this.zoomGazeBlend();
         const effectivePitch = basePitch + zoomGazeLift + cursorPitch;
 
         const forwardLocal = new THREE.Vector3(0, 0, -100);

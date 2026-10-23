@@ -33,10 +33,29 @@ So the lean drove the camera through the glass and the roof structure — which 
 it looked like on screen — without magnifying anything, because a dolly only enlarges
 nearby geometry. Zoom is now purely optical, and the magnified cone *rotates* up off
 the glareshield instead: `cockpitZoomGazeLift` 0.12 rad per unit of magnification above
-1×, which moves the view axis from its resting -14.3° to +6.3° at 4×. The lift stands
-down when the pilot has aimed more than 0.42 rad away from the resting centre (the
-existing `isLookingAwayFromCenter()` window) and in the photo (2D) cockpit submode,
-whose panel is an overlay and whose view axis already rests at -5.2°.
+1×, which moves the view axis from its resting -14.3° to +6.3° at 4×. The lift fades to
+nothing as the pilot takes over the aim (`zoomGazeBlend()`, linear across the same
+0.38 rad yaw / 0.42 rad pitch window that `isLookingAwayFromCenter()` uses), and it
+never applies in the photo (2D) cockpit submode, whose panel is an overlay and whose
+view axis already rests at -5.2°.
+
+## The look-away boundary fades, it does not switch
+
+Gating the lift on `isLookingAwayFromCenter()` was the first version of the rule, and a
+review caught the consequence: at 4× a horizontal drag of one pixel — 0.0035 rad of yaw
+with no vertical input at all — would have dropped the frame by the whole 20.6° lift as
+soon as it crossed 0.38 rad, more than the 16.43° vertical field of view. Sweeping a
+real CDP drag rightward in 4 px steps while held at 4× shows the rendered elevation
+falling continuously instead:
+
+| Yaw (rad) | 0 | 0.14 | 0.28 | 0.35 | 0.364 | 0.378 | 0.392 | 0.406 | 0.476 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Gaze elevation (deg) | +6.30 | -1.30 | -8.90 | -12.70 | -13.46 | -14.22 | -14.32 | -14.32 | -14.32 |
+
+Largest single step in the sweep: **0.76°**. Crossing the boundary itself (0.378 →
+0.392) moves the frame **0.11°**, and past the window the gaze simply sits where the
+pilot put it: [just inside](cockpit-lift-fade-just-inside.png) and
+[just outside](cockpit-lift-fade-just-outside.png) are the same frame.
 
 ## Desktop wheel, 1280×720, `runway` preset, aircraft held on the brakes
 

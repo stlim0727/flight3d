@@ -164,6 +164,24 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
     assert.ok(aimed.angleTo(camera.getWorldDirection(new THREE.Vector3())) < 1e-6,
       'looking away from the centre suppresses the zoom gaze lift');
 
+    // The lift must fade, not switch: the hard gate snapped the frame by the whole
+    // 0.36 rad lift the moment a drag crossed the look-away edge.
+    const elevation = () => Math.asin(camera.getWorldDirection(new THREE.Vector3()).y);
+    cam.lookPitch = -0.25;
+    cam.lookYaw = 0.375;
+    cam.update(0.1, aircraft, {});
+    const justInside = elevation();
+    cam.lookYaw = 0.385;
+    cam.update(0.1, aircraft, {});
+    assert.ok(Math.abs(elevation() - justInside) < 0.02,
+      'crossing the look-away edge moves the view by a drag, not by the whole lift');
+
+    cam.lookYaw = 0.19; // halfway out of the window
+    cam.update(0.1, aircraft, {});
+    assert.ok(Math.abs(elevation() - (-0.25 + 0.5 * expectedLift)) < 1e-6,
+      'the lift halves halfway to the look-away edge');
+    cam.lookYaw = 0;
+
     const tower = withMode(CameraSystem.MODES.TOWER);
     tower.cam.update(0.1, aircraft, {});
     const seated = tower.camera.position.clone();
