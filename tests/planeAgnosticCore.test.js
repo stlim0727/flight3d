@@ -163,11 +163,11 @@ describe('Plane-Agnostic Core Infrastructure', () => {
       assert.strictEqual(cameraSystem.chaseHeight, 4.5);
       assert.strictEqual(cameraSystem.cockpitHeadOffset.z, -2.8);
 
-      // Switch to Cessna 172 (light trainer)
+      // Switch to Cessna 172 (light trainer with 3D cockpit)
       cameraSystem.loadAircraftConfig(CESSNA_172);
       assert.strictEqual(cameraSystem.chaseDistance, 14.0);
       assert.strictEqual(cameraSystem.chaseHeight, 3.2);
-      assert.strictEqual(cameraSystem.cockpitHeadOffset.z, -0.4);
+      assert.strictEqual(cameraSystem.cockpitHeadOffset.z, -1.18);
     });
   });
 

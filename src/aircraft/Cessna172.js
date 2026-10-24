@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 /**
  * Cessna 172 Skyhawk Single-Engine Aircraft
@@ -14,9 +14,12 @@ import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfContro
  * - PBR materials with optional GLTF model loading fallback
  */
 export class Cessna172 {
-  constructor() {
+  constructor(pfdCanvas = null, ndCanvas = null) {
     this.group = new THREE.Group();
     this.group.name = 'Aircraft_Cessna172';
+
+    this.pfdCanvas = pfdCanvas;
+    this.ndCanvas = ndCanvas;
 
     // Model and mode states
     this.useGltf = false;
@@ -52,7 +55,7 @@ export class Cessna172 {
     this.proceduralGroup.add(this.tailGroup);
     this.proceduralGroup.add(this.gearGroup);
     this.proceduralGroup.add(this.propellerGroup);
-    this.proceduralGroup.add(this.lightsGroup);
+    this.group.add(this.lightsGroup);
 
     // Control surfaces references
     this.aileronL = null;
@@ -76,15 +79,21 @@ export class Cessna172 {
     this.beaconTimer = 0;
     this.strobeTimer = 0;
 
-    // Minimal cockpit interface for main.js compatibility
+    // Cockpit interface for simulation & camera integration
     this.cockpit = {
       group: new THREE.Group(),
-      yokesVisible: false,
+      yokesVisible: true,
       gltfYokes: [],
       cockpitModelFailed: true,
       gltfCockpitGroup: new THREE.Group(),
       syncDaylight: () => {},
-      toggleYokes: () => false,
+      toggleYokes: () => {
+        this.cockpit.yokesVisible = !this.cockpit.yokesVisible;
+        for (const y of this.cockpit.gltfYokes) {
+          y.visible = this.cockpit.yokesVisible;
+        }
+        return this.cockpit.yokesVisible;
+      },
       onModelReady: null
     };
     this.group.add(this.cockpit.group);
@@ -93,7 +102,7 @@ export class Cessna172 {
     this.initProceduralModel();
 
     // Attempt to load GLTF if available
-    this.loadGltfModel('models/c172.glb');
+    this.loadGltfModel(`${import.meta.env?.BASE_URL ?? '/'}models/c172.glb`);
   }
 
   initProceduralModel() {
@@ -446,44 +455,123 @@ export class Cessna172 {
     this.lightsGroup.add(this.beaconLight);
   }
 
-  loadGltfModel(url) {
+  loadGltfModel(url = `${import.meta.env?.BASE_URL ?? '/'}models/c172.glb`) {
     if (typeof window === 'undefined') return;
     this.loadingGltf = true;
-    const loader = new GLTFLoader();
 
-    loader.load(
-      url,
-      gltf => {
-        this.gltfModel = gltf.scene;
-        this.gltfModel.scale.set(1.0, 1.0, 1.0);
-        this.gltfGroup.add(this.gltfModel);
+    try {
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath(`${import.meta.env?.BASE_URL ?? '/'}draco/gltf/`);
 
-        // Bind control surfaces
-        this.gltfControlSurfaces = bindGltfControlSurfaces(this.gltfModel);
+      const loader = new GLTFLoader();
+      loader.setDRACOLoader(dracoLoader);
 
-        // Find propeller nodes if available
-        this.gltfModel.traverse(node => {
-          if (node.isMesh && /prop|blade|spinner/i.test(node.name)) {
-            this.gltfPropellers.push(node);
+      loader.load(
+        url,
+        gltf => {
+          this.gltfModel = gltf.scene;
+          this.gltfModel.name = 'C172_Airframe_GLTF';
+
+          // Calibrated alignment transform:
+          // Raw model: Wingspan 3.68942m, Forward +Z, Height 0.90m
+          // Flight3D: Wingspan 11.0m, Forward -Z, Height 2.7m
+          // Shift in Y and Z to align tricycle landing gear with runway contact baseline & CG
+          this.gltfModel.scale.setScalar(2.9815);
+          this.gltfModel.rotation.y = Math.PI;
+          this.gltfModel.position.set(0, -1.05, 0.45);
+
+          this.gltfPropellers = [];
+          this.gltfYokes = [];
+
+          this.gltfModel.traverse(node => {
+            if (node.isMesh) {
+              node.castShadow = true;
+              node.receiveShadow = true;
+
+              const mat = node.material;
+              const matName = Array.isArray(mat) ? mat.map(m => m.name).join(' ') : (mat?.name || '');
+
+              // Occlude static ground parking / mooring artifacts
+              if (matName.includes('Concrete') || matName.includes('remove_before_flight')) {
+                node.visible = false;
+              }
+            }
+
+            // Hide ground mooring / chock bar
+            if (node.name === 'Circle.005_49' || node.name === 'Cube.010_50' ||
+                node.name === 'Circle.002_32' || node.name === 'Plane.030_34' || node.name === 'Plane.031_35') {
+              node.visible = false;
+            }
+
+            // Bind propeller components (spinner and blades)
+            if (node.name === 'Plane_16' || node.name === 'Plane.011_13') {
+              node.userData.initialRotZ = node.rotation.z;
+              this.gltfPropellers.push(node);
+            }
+          });
+
+          this.cockpit.gltfYokes = [];
+          this.cockpit.cockpitModelFailed = false;
+          this.cockpit.gltfCockpitGroup = this.gltfModel;
+
+          // Mount live real-time flight displays onto the Garmin G1000 instrument panel
+          if (this.pfdCanvas && this.ndCanvas) {
+            const createDisplayMat = (canvas) => new THREE.MeshBasicMaterial({
+              map: canvas.texture,
+              toneMapped: false,
+              polygonOffset: true,
+              polygonOffsetFactor: -1.0,
+              polygonOffsetUnits: -2.0
+            });
+
+            const screenGeo = new THREE.PlaneGeometry(0.23, 0.155);
+            const mipY = 0.420;
+            const mipZ = -1.810;
+
+            // Left Garmin G1000 PFD (Primary Flight Display)
+            const pfdMesh = new THREE.Mesh(screenGeo, createDisplayMat(this.pfdCanvas));
+            pfdMesh.name = 'C172_Live_PFD';
+            pfdMesh.position.set(-0.177, mipY, mipZ);
+            this.cockpit.group.add(pfdMesh);
+
+            // Right Garmin G1000 MFD (Multi-Function Display / Navigation)
+            const ndMesh = new THREE.Mesh(screenGeo.clone(), createDisplayMat(this.ndCanvas));
+            ndMesh.name = 'C172_Live_MFD';
+            ndMesh.position.set(0.106, mipY, mipZ);
+            this.cockpit.group.add(ndMesh);
           }
-        });
 
-        this.useGltf = true;
-        this.modelLoaded = true;
-        this.loadingGltf = false;
-        this.gltfGroup.visible = true;
-        this.proceduralGroup.visible = false;
-      },
-      undefined,
-      () => {
-        // Fallback gracefully to high-detail procedural model
-        this.useGltf = false;
-        this.loadingGltf = false;
-        this.modelLoaded = false;
-        this.gltfGroup.visible = false;
-        this.proceduralGroup.visible = true;
-      }
-    );
+          this.gltfGroup.add(this.gltfModel);
+          this.useGltf = true;
+          this.modelLoaded = true;
+          this.loadingGltf = false;
+          this.gltfGroup.visible = true;
+          this.proceduralGroup.visible = false;
+
+          if (typeof this.cockpit.onModelReady === 'function') {
+            this.cockpit.onModelReady();
+          }
+        },
+        undefined,
+        err => {
+          // Fallback gracefully to high-detail procedural model
+          console.warn('C172 GLTF model failed to load, falling back to procedural airframe:', err);
+          this.useGltf = false;
+          this.loadingGltf = false;
+          this.modelLoaded = false;
+          this.cockpit.cockpitModelFailed = true;
+          this.gltfGroup.visible = false;
+          this.proceduralGroup.visible = true;
+        }
+      );
+    } catch (err) {
+      this.useGltf = false;
+      this.loadingGltf = false;
+      this.modelLoaded = false;
+      this.cockpit.cockpitModelFailed = true;
+      this.gltfGroup.visible = false;
+      this.proceduralGroup.visible = true;
+    }
   }
 
   update(dt, flightState = {}) {
@@ -504,9 +592,8 @@ export class Cessna172 {
 
     if (this.useGltf && this.gltfPropellers.length > 0) {
       for (const prop of this.gltfPropellers) {
-        prop.rotation.z = this.propAngle;
+        prop.rotation.z = (prop.userData.initialRotZ ?? 0) + this.propAngle;
       }
-      updateGltfControlSurfaces(this.gltfControlSurfaces, flightState);
     } else {
       this.propellerGroup.rotation.z = this.propAngle;
 
@@ -566,9 +653,11 @@ export class Cessna172 {
   setCockpitMode(isCockpit, showInterior = true) {
     this.isCockpit = isCockpit;
     if (this.useGltf && this.gltfGroup) {
-      this.gltfGroup.visible = !isCockpit;
+      // The unified GLTF model contains both the exterior and 3D cockpit.
+      // Keep it visible so the pilot sees instruments, yokes, engine cowl, and wings.
+      this.gltfGroup.visible = true;
     } else {
-      // In cockpit view, hide cabin and wings if needed to prevent camera clipping
+      // In procedural model, hide fuselage outer shell to prevent camera clipping
       if (this.fuselageGroup) this.fuselageGroup.visible = !isCockpit;
     }
     if (this.cockpit && this.cockpit.group) {
@@ -586,6 +675,9 @@ export class Cessna172 {
     if (this.lightsGroup) this.lightsGroup.visible = this.lightsOn;
     if (this.proceduralGroup) {
       this.proceduralGroup.visible = !this.useGltf;
+    }
+    if (this.gltfGroup) {
+      this.gltfGroup.visible = this.useGltf;
     }
   }
 }

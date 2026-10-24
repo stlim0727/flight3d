@@ -15,6 +15,13 @@ Flight3d incorporates optimized open-source 3D models and atmospheric environmen
   - **License**: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
   - **Description**: Real-world scale (~35.8m wingspan, ~37.9m length) Boeing 737 airliner featuring swept wings, blended winglets, dual turbofan engines, and spinning turbine fan animations.
 
+- **Cessna 172SP Skyhawk (`public/models/c172.glb`)**:
+  - **Author**: [NLM](https://sketchfab.com/NLM)
+  - **Source**: [FREE Cessna 172SP](https://sketchfab.com/3d-models/free-cessna-172sp-c9cadc2f026946da8cf9715a683739e9)
+  - **License**: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+  - **Description**: Real-world scale (~11.0m wingspan, ~8.28m length) general aviation aircraft featuring high wings, fixed tricycle landing gear, articulated propeller, and detailed exterior and 3D cockpit interior with dual yokes and analog flight gauges.
+  - **Modifications**: Draco mesh compression, runtime alignment, ground mooring artifact occlusion, articulated control surfaces and yokes, and cockpit eye camera calibration. See [license notice](public/models/c172.LICENSE.txt).
+
 ## Environment Maps & Textures
 - **Kloofendal Partly Cloudy Sky HDR (`public/textures/environment/sky_1k.hdr`)**:
   - **Author**: Greg Zaal ([Poly Haven](https://polyhaven.com/a/kloofendal_48d_partly_cloudy))

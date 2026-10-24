@@ -1,0 +1,20 @@
+Cessna 172SP Skyhawk
+Author: NLM (https://sketchfab.com/NLM)
+Source: https://sketchfab.com/3d-models/free-cessna-172sp-c9cadc2f026946da8cf9715a683739e9
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Applies to c172.glb.
+Attribution transcribed from the model source metadata on Sketchfab and distribution license.
+
+Modifications by Flight3d contributors:
+- glTF-Transform Draco mesh geometry compression for fast browser delivery (~8.29 MB).
+- Runtime alignment and coordinate transformation (scaled to wingspan 11.0m, oriented -Z forward).
+- Static/ground parking artifact occlusion (concrete mooring block, tie-down ribbons, ground tow bar).
+- Control surface articulation (propeller spinner and blades, pilot yokes, rudder/flaps).
+- Camera calibration for first-person cockpit and exterior views.
+
+CC BY 4.0 permits redistribution (including browser delivery and repository
+inclusion) and adaptation, including commercial use, subject to attribution,
+a license link, indication of changes, and no additional restrictions.
+No endorsement by the original creator is implied.
