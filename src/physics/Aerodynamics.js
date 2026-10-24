@@ -2,13 +2,9 @@ import * as THREE from 'three';
 import { Atmosphere } from './Atmosphere.js';
 import { BOEING_737_800 } from '../config/aircraftConfigs.js';
 
-// Scratch vectors reused by every 120 Hz computeAero() call to keep the physics
-// loop allocation-free. They never escape computeAero: the returned
-// forceWorld/momentBody stay freshly allocated because callers and tests hold
-// them across calls.
-const scratchAirVelocity = new THREE.Vector3();
-const scratchBodyVelocity = new THREE.Vector3();
-const scratchInvQuat = new THREE.Quaternion();
+export function createAeroResult() {
+  return { forceWorld: new THREE.Vector3(), momentBody: new THREE.Vector3() };
+}
 
 /**
  * 6-DOF Aerodynamic Physics Simulation Engine
@@ -65,6 +61,9 @@ export class Aerodynamics {
 
     // Wind vector in world space (m/s)
     this.windWorld = new THREE.Vector3(0, 0, 0);
+    this._airVelocity = new THREE.Vector3();
+    this._bodyVelocity = new THREE.Vector3();
+    this._inverseQuaternion = new THREE.Quaternion();
   }
 
   loadConfig(config) {
@@ -147,7 +146,7 @@ export class Aerodynamics {
    * @param {number} engineThrustTotal (Newtons)
    * @param {number} gearState (0.0 to 1.0)
    */
-  computeAero(dt, aircraftMesh, linearVelocityWorld, angularVelocityBody, altitudeMeters, heightAboveGround, engineThrustTotal, gearState) {
+  computeAero(dt, aircraftMesh, linearVelocityWorld, angularVelocityBody, altitudeMeters, heightAboveGround, engineThrustTotal, gearState, result = createAeroResult()) {
     // Smooth flap mechanical transition
     const targetFlap = this.flapAngles[this.flapsIndex];
     this.currentFlapAngle += (targetFlap - this.currentFlapAngle) * Math.min(1.0, dt * 0.4);
@@ -156,15 +155,15 @@ export class Aerodynamics {
     const atmos = Atmosphere.getConditions(altitudeMeters);
 
     // Compute relative airflow velocity in world frame: v_rel = v_aircraft - v_wind
-    const vAirWorld = scratchAirVelocity.copy(linearVelocityWorld).sub(this.windWorld);
+    const vAirWorld = this._airVelocity.copy(linearVelocityWorld).sub(this.windWorld);
 
     // Transform relative airspeed vector into aircraft body frame
     // Three.js local axes:
     // +X: Right wing
     // +Y: Upward through cabin ceiling
     // -Z: Forward through nose
-    const invQuat = scratchInvQuat.copy(aircraftMesh.quaternion).invert();
-    const vBody = scratchBodyVelocity.copy(vAirWorld).applyQuaternion(invQuat);
+    const invQuat = this._inverseQuaternion.copy(aircraftMesh.quaternion).invert();
+    const vBody = this._bodyVelocity.copy(vAirWorld).applyQuaternion(invQuat);
 
     // Aeronautical body velocity convention:
     // u: Forward velocity = -vBody.z
@@ -306,7 +305,7 @@ export class Aerodynamics {
     const upwardForce = liftForce * cosA + dragForce * sinA;
 
     // Transform aerodynamic force to world frame
-    const aeroForceWorld = new THREE.Vector3(
+    result.forceWorld.set(
       sideForce,
       upwardForce,
       dragForce * cosA - liftForce * sinA  // Total longitudinal force along body +Z (+Z opposes forward motion)
@@ -382,31 +381,28 @@ export class Aerodynamics {
     const rollMoment = -(qDyn * this.wingArea * this.wingspan * cl_roll);
     const yawMoment = qDyn * this.wingArea * this.wingspan * cn;
 
-    const aeroMomentBody = new THREE.Vector3(
+    result.momentBody.set(
       pitchMoment, // Rotation around X (Pitch: positive pitch up)
       yawMoment,   // Rotation around Y (Yaw: negative yaw right)
       rollMoment   // Rotation around Z (Roll: negative roll right)
     );
 
-    return {
-      forceWorld: aeroForceWorld,
-      momentBody: aeroMomentBody,
-      alphaDeg: THREE.MathUtils.radToDeg(this.alpha),
-      betaDeg: THREE.MathUtils.radToDeg(this.beta),
-      iasKnots: Atmosphere.msToKnots(this.ias),
-      tasKnots: Atmosphere.msToKnots(this.tas),
-      mach: this.mach,
-      qDyn: this.qDyn,
-      cl,
-      cd,
-      lift: this.lift,
-      drag: this.drag,
-      isStalled: this.isStalled,
-      isPreStall: this.isPreStall,
-      stallSeverity: this.stallSeverity,
-      separation: this.separation,
-      buffetVibration: this.buffetVibration,
-      gForce: this.gForce
-    };
+    result.alphaDeg = THREE.MathUtils.radToDeg(this.alpha);
+    result.betaDeg = THREE.MathUtils.radToDeg(this.beta);
+    result.iasKnots = Atmosphere.msToKnots(this.ias);
+    result.tasKnots = Atmosphere.msToKnots(this.tas);
+    result.mach = this.mach;
+    result.qDyn = this.qDyn;
+    result.cl = cl;
+    result.cd = cd;
+    result.lift = this.lift;
+    result.drag = this.drag;
+    result.isStalled = this.isStalled;
+    result.isPreStall = this.isPreStall;
+    result.stallSeverity = this.stallSeverity;
+    result.separation = this.separation;
+    result.buffetVibration = this.buffetVibration;
+    result.gForce = this.gForce;
+    return result;
   }
 }
