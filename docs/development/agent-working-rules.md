@@ -8,9 +8,8 @@ Adapted from Keepory's CLAUDE.md and docs/development/agent-working-rules.md.
   abstractions, adjacent cleanup, and unrelated formatting changes.
 - Define observable success before editing. Diagnose failures with a small
   reproducer and evidence before applying another guessed fix.
-- Preserve existing edits and local conventions. Remove only unused code your
-  change introduces. Never reset a shared worktree to investigate a baseline;
-  use an isolated checkout if a baseline comparison is necessary.
+- Preserve existing edits, recent commits, and local conventions. Never copy whole files across worktrees or checkouts—apply only targeted diffs so that intermediate commits from other PRs are never clobbered. Inspect `git diff origin/main` before committing to verify zero accidental deletions of existing features.
+- Never reset a shared worktree to investigate a baseline; use an isolated checkout if a baseline comparison is necessary.
 - An untouched test can exercise changed runtime behavior. Confirm the relevant
   failure on the base before labelling it pre-existing.
 - For state machines and hysteresis, describe the invariant first and test
