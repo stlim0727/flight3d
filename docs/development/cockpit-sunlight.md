@@ -19,7 +19,7 @@ parallel sunlight.
 The shipped cockpit skin is a closed low-poly tube: it has no windshield cutouts,
 so real geometry cannot mask the aperture and would throw a solid shadow instead.
 `CockpitSunShadow` therefore paints a 256² light cookie (`SpotLight.map`) from the
-`WINDSHIELD_PANES` quads in `src/aircraft/CockpitAperture.js`, projected along the
+`APERTURE_OPENINGS` quads in `src/aircraft/CockpitAperture.js`, projected along the
 sun into the light's own shadow space. The cookie is recomputed only when the
 deck-local sun vector turns by more than 0.008 rad, and the shadow image is kept
 body-fixed by setting `shadow.camera.up` from the deck frame, avoiding an extra image roll relative to the deck. Interior meshes still cast
@@ -105,23 +105,10 @@ they do not establish acceptance of the revised beam intensity.
   approximation that the interior framing and the light cookie both draw from. It is now
   self-consistent — the front glass leans back over the nose, as on a real 737 — but the
   angle has not been checked against airframe data.
-- The profile is a forward fan: all four pane normals have a negative (forward) Z component,
-  so nothing aft of about 135° off the nose is admitted at all. Measured admittance as a
-  fraction of `referenceDirectAdmittance()`, by bearing off the nose:
-
-  | elevation | 0° | 45° | 90° | 135° | 180° |
-  | --- | --- | --- | --- | --- | --- |
-  | 20° | 1.00 | 0.85 | 0.44 | 0.10 | 0.00 |
-  | 40° | 0.91 | 0.80 | 0.45 | 0.08 | 0.00 |
-
-  A real 737 deck admits an afternoon sun through the No.3 and No.4 side windows, which this
-  profile does not have. Adding them is [issue #164](https://github.com/stlim0727/flight3d/issues/164);
-  it cannot be done by editing the list alone, because `Cockpit.js` renders one tint quad per
-  pane and the cookie paints one light band per pane, and the shipped skin has no opening for
-  either. Measured from the loaded scene, that is the smaller half of the problem: every mesh
-  in `gltfCockpitGroup` lies within |x| ≤ 1.0 m of the centreline, so the interior has no
-  side-window geometry at all. Completing the aperture is an asset change before it is a
-  lighting one, and until then the forward fan is faithful to what the model contains.
+- The profile includes fitted No.3 side panes and matching cuts in shadow-only liner proxies.
+  [Side-window provenance and measurements](cockpit-side-windows.md) documents
+  the approximation and the corrected window-number/astern assumptions in #164.
+  At 20°/40° elevation, a sun exactly astern remains blocked by the pane normals.
 - Diffuse skylight is not modelled through the aperture. The deck's indirect fill is a
   fixed two-band scaling of the outdoor ambient, so it has the right *shape* (upward faces
   brighter) but its coupling to the actual glass area is a constant. Integrating the sky

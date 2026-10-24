@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  WINDSHIELD_PANES,
+  APERTURE_OPENINGS,
   DECK_SUN_ANCHOR,
   DECK_SUN_STANDOFF,
   DECK_SUN_AFT_REACH,
@@ -86,7 +86,7 @@ export function projectPanesForCookie({
   sunDirLocal,
   axes,
   angle,
-  panes = WINDSHIELD_PANES,
+  panes = APERTURE_OPENINGS,
   anchor = DECK_SUN_ANCHOR,
   standOff = DECK_SUN_STANDOFF,
   quads = [],
@@ -171,7 +171,7 @@ export function computeDeckSunPose({
   position,
   quaternion,
   sunDir,
-  panes = WINDSHIELD_PANES,
+  panes = APERTURE_OPENINGS,
   anchor = DECK_SUN_ANCHOR,
   standOff = DECK_SUN_STANDOFF,
   aftReach = DECK_SUN_AFT_REACH,

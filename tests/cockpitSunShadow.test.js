@@ -12,7 +12,7 @@ import {
   COOKIE_SIZE,
 } from '../src/environment/CockpitSunShadow.js';
 import {
-  WINDSHIELD_PANES,
+  APERTURE_OPENINGS,
   DECK_SUN_ANCHOR,
   DECK_SUN_STANDOFF,
   DECK_SUN_AFT_REACH,
@@ -188,7 +188,7 @@ describe('Cockpit deck sun rig (issue #90)', () => {
 
   it('faces every pane outward, away from the deck', () => {
     const normal = new THREE.Vector3();
-    for (const pane of WINDSHIELD_PANES) {
+    for (const pane of APERTURE_OPENINGS) {
       const toPane = new THREE.Vector3(
         pane.center[0] - DECK_SUN_ANCHOR.x,
         pane.center[1] - DECK_SUN_ANCHOR.y,
@@ -205,9 +205,9 @@ describe('Cockpit deck sun rig (issue #90)', () => {
       computeDeckSunPose({ position: origin, quaternion: identity, sunDir, pose });
       const axes = cookieAxes(pose.sunDirLocal, null, freshAxes());
       const quads = projectPanesForCookie({ sunDirLocal: pose.sunDirLocal, axes, angle: pose.angle });
-      assert.equal(quads.length, WINDSHIELD_PANES.length);
+      assert.equal(quads.length, APERTURE_OPENINGS.length);
       for (const [i, quad] of quads.entries()) {
-        if (paneOutwardNormal(WINDSHIELD_PANES[i]).dot(sunDir) <= 0) {
+        if (paneOutwardNormal(APERTURE_OPENINGS[i]).dot(sunDir) <= 0) {
           assert.equal(quad.length, 0, 'A back-facing pane must not paint a beam');
           continue;
         }
@@ -263,7 +263,7 @@ describe('Cockpit deck sun rig (issue #90)', () => {
       projectPanesForCookie({ sunDirLocal: sunDir, axes: cookieAxes(sunDir, null, freshAxes()),
         angle: pose.angle, quads });
       assert.equal(quads.filter(q => q.length === 8).length,
-        bearing === 0 ? 0 : WINDSHIELD_PANES.length);
+        bearing === 0 ? 0 : APERTURE_OPENINGS.length);
     }
     const empty = computeDeckSunPose({ position: origin, quaternion: identity,
       sunDir: sunDirectionAt(20), panes: [] });

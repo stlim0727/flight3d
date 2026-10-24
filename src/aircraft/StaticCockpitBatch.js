@@ -9,7 +9,7 @@ export function batchStaticCockpit(model, movingRoots = []) {
   const moving = new Set(movingRoots);
   const buckets = new Map();
   model.traverse(mesh => {
-    if (!mesh.isMesh || mesh.isSkinnedMesh || mesh.isInstancedMesh ||
+    if (!mesh.isMesh || mesh.isSkinnedMesh || mesh.isInstancedMesh || mesh.userData.cockpitApertureShadow ||
         Array.isArray(mesh.material) || mesh.material.transparent ||
         Object.keys(mesh.geometry.morphAttributes).length ||
         mesh.geometry.drawRange.start !== 0 || mesh.geometry.drawRange.count !== Infinity) return;

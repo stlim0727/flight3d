@@ -1,7 +1,8 @@
+import { bindCockpitSideWindowShadows } from './CockpitSideWindows.js';
 import { batchStaticCockpit } from './StaticCockpitBatch.js';
 import { bindGltfYokes, updateGltfYokes, bindGltfEngineControls, updateGltfEngineControls } from './GltfCockpitControls.js';
 import { bindGltfAirframeControls, updateGltfAirframeControls } from './GltfCockpitControls.js';
-import { WINDSHIELD_PANES } from './CockpitAperture.js';
+import { VISIBLE_GLASS } from './CockpitAperture.js';
 import { shadeCockpitMaterial } from './CockpitLighting.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -175,6 +176,8 @@ export class Cockpit {
               }
             }
           });
+
+          bindCockpitSideWindowShadows(model);
 
           this.gltfYokes = bindGltfYokes(model);
           this.gltfEngineControls = bindGltfEngineControls(model);
@@ -426,7 +429,7 @@ export class Cockpit {
       depthWrite: false
     });
 
-    this.gltfGlassPanels = WINDSHIELD_PANES.map((pane) => {
+    this.gltfGlassPanels = VISIBLE_GLASS.map((pane) => {
       const glass = new THREE.Mesh(new THREE.PlaneGeometry(pane.size[0], pane.size[1]), glassMat);
       glass.name = pane.name;
       glass.position.set(pane.center[0], pane.center[1], pane.center[2]);

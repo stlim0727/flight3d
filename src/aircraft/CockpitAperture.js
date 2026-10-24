@@ -13,6 +13,23 @@ export const WINDSHIELD_PANES = Object.freeze([
   Object.freeze({ name: 'GLTF_Glass_2R', center: Object.freeze([0.85, 0.95, -12.45]), size: Object.freeze([0.72, 0.44]), rotation: Object.freeze([-0.12, -1.10, 0]) }),
 ]);
 
+/**
+ * No.3 fixed side windows. Dimensions/placement are a fitted approximation:
+ * see docs/development/cockpit-side-windows.md for the source and derivation.
+ * No.4/5 are optional eyebrow windows, not additional aft side windows.
+ */
+export const SIDE_WINDOW_PANES = Object.freeze([-1, 1].map(side => Object.freeze({
+  name: side < 0 ? 'GLTF_Glass_3L' : 'GLTF_Glass_3R',
+  center: Object.freeze([side * 0.70, 0.95, -11.79]),
+  size: Object.freeze([0.60, 0.44]),
+  rotation: Object.freeze([0.70, -side * 1.22, 0]),
+})));
+
+// Separate consumers without duplicating any windshield geometry. Each
+// side opening is optical-only until a matching visible asset is available.
+export const VISIBLE_GLASS = WINDSHIELD_PANES;
+export const APERTURE_OPENINGS = Object.freeze([...WINDSHIELD_PANES, ...SIDE_WINDOW_PANES]);
+
 /** Optical centre of the flight deck, between the captain eye point and the glass. */
 export const DECK_SUN_ANCHOR = new THREE.Vector3(-0.1, 0.95, -12.4);
 
@@ -62,7 +79,7 @@ export function paneOutwardNormal(pane, target = new THREE.Vector3()) {
  * contributes its full area, which is what an opening does; the sum is independent of
  * where in the deck the receiver sits.
  */
-export function directAdmittance(sunDirLocal, panes = WINDSHIELD_PANES) {
+export function directAdmittance(sunDirLocal, panes = APERTURE_OPENINGS) {
   let flux = 0;
   for (const pane of panes) {
     const cosine = paneOutwardNormal(pane, _paneNormal).dot(sunDirLocal);
@@ -78,8 +95,8 @@ let _referenceAdmittance = null;
  * from the pane data. Dividing by it puts the deck sun on a 0..1 scale that survives a
  * change of aperture profile, where a hand-picked constant would silently rescale it.
  */
-export function referenceDirectAdmittance(panes = WINDSHIELD_PANES) {
-  if (panes !== WINDSHIELD_PANES) return scanReferenceAdmittance(panes);
+export function referenceDirectAdmittance(panes = APERTURE_OPENINGS) {
+  if (panes !== APERTURE_OPENINGS) return scanReferenceAdmittance(panes);
   _referenceAdmittance ??= scanReferenceAdmittance(panes);
   return _referenceAdmittance;
 }

@@ -1,0 +1,87 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cockpit side-window A/B verification</title>
+<style>
+body{margin:16px;background:#17212d;color:#eef3fa;font:14px system-ui}button{padding:12px}pre{white-space:pre-wrap}iframe{width:1280px;height:720px;border:0}img{width:min(100%,1280px)}
+</style>
+<h1>Cockpit side-window A/B verification</h1>
+<p>Start Vite at the repository root, open this page, then run after the cockpit loads. Baseline uses the original four panes and uncut depth liners; candidate uses six panes and the side-window depth proxies. The visible GLB is identical.</p>
+<button id="run">Run six-frame comparison</button>
+<pre id="report">Ready when the cockpit has loaded.</pre>
+<div id="captures"></div><iframe src="/"></iframe>
+<script type="module">
+import { WINDSHIELD_PANES, directAdmittance, referenceDirectAdmittance } from '/src/aircraft/CockpitAperture.js';
+import { projectPanesForCookie, drawCockpitCookie, COOKIE_LEAK } from '/src/environment/CockpitSunShadow.js';
+const frame = document.querySelector('iframe');
+const assert = (condition, message) => { if (!condition) throw Error(message); };
+document.querySelector('#run').onclick = async () => {
+  const report = document.querySelector('#report'), captures = document.querySelector('#captures');
+  const s = frame.contentWindow.simulator;
+  const proxies = [];
+  try {
+    assert(s?.aircraft?.cockpit?.gltfCockpitLoaded, 'Wait for the cockpit to load, then retry.');
+    document.querySelector('#run').disabled = true;
+    s.animate = () => {};
+    s.shadowDemo.start();
+    s.setRenderQuality('balanced');
+    const c = s.aircraft.cockpit, rig = s.sky.cockpitSun;
+    c.gltfCockpitGroup.traverse(node => {
+      if (node.name.endsWith('_SideWindowShadow')) proxies.push({ node, cut: node.geometry, closed: node.parent.geometry.clone() });
+    });
+    assert(proxies.length > 0, 'The loaded model must have side-window depth proxies');
+    const rows = [];
+    captures.replaceChildren();
+    for (let i = 0; i < 6; i++) {
+      s.shadowDemo.elapsed = i * 6;
+      rig.modeFactor = 1;
+      s.stepSimulation(0);
+      const actual = rig.pose.admittance;
+      const images = [], values = [];
+      for (const candidate of [false, true]) {
+        proxies.forEach(p => { p.node.geometry = candidate ? p.cut : p.closed; });
+        rig.pose.admittance = candidate ? actual
+          : directAdmittance(rig.pose.sunDirLocal, WINDSHIELD_PANES) / referenceDirectAdmittance(WINDSHIELD_PANES);
+        if (candidate) rig.repaintCookie();
+        else {
+          const quads = projectPanesForCookie({ sunDirLocal: rig.pose.sunDirLocal, axes: rig.axes,
+            angle: rig.pose.angle, panes: WINDSHIELD_PANES });
+          drawCockpitCookie(rig.context, quads, rig.size, COOKIE_LEAK * rig.pose.admittance);
+          rig.texture.needsUpdate = true;
+        }
+        c.syncDaylight(rig.daylight);
+        rig.light.shadow.needsUpdate = true;
+        s.renderScene();
+        s.renderScene();
+        const gl = s.renderer.getContext(), w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+        const pixels = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        let luma = 0, count = 0;
+        // Fixed lower central cockpit region, excluding the sky and left window.
+        for (let y = Math.floor(h * .05); y < Math.floor(h * .45); y++) {
+          for (let x = Math.floor(w * .35); x < Math.floor(w * .9); x++) {
+            const k = (y * w + x) * 4;
+            luma += .2126 * pixels[k] + .7152 * pixels[k + 1] + .0722 * pixels[k + 2]; count++;
+          }
+        }
+        values.push({ admittance: rig.pose.admittance, daylight: rig.daylight,
+          flood: c.glareshieldFlood.intensity, meanLuma: luma / count });
+        images.push(s.renderer.domElement.toDataURL());
+      }
+      assert(values[1].admittance >= values[0].admittance - 1e-6, 'Demo acceptance must not decrease');
+      assert(values[1].flood <= values[0].flood + 1e-6, 'More admitted daylight must dim the flood');
+      rows.push({ frame: i + 1, baseline: values[0], candidate: values[1] });
+      const heading = document.createElement('h2'); heading.textContent = `Frame ${i + 1}: baseline / candidate`;
+      captures.append(heading);
+      images.forEach((src, k) => { const img = document.createElement('img'); img.src = src;
+        img.alt = `Frame ${i + 1} ${k ? 'candidate' : 'baseline'}`; captures.append(img); });
+      report.textContent = `Measured ${i + 1}/6`;
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    report.textContent = JSON.stringify({ status: 'PASS', proxyCount: proxies.length, rows }, null, 2);
+  } catch (error) {
+    report.textContent = 'FAIL: ' + error.stack;
+  } finally {
+    proxies.forEach(p => { p.node.geometry = p.cut; p.closed.dispose(); });
+  }
+};
+</script>
