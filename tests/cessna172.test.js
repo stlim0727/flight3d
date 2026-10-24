@@ -22,6 +22,7 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
     assert.ok(c172.gearGroup, 'Landing gear group must exist');
     assert.ok(c172.propellerGroup, 'Propeller group must exist');
     assert.ok(c172.lightsGroup, 'Lights group must exist');
+    assert.strictEqual(c172.lightsGroup.parent, c172.group, 'Lights group must be child of root group to persist across model changes');
     assert.ok(c172.cockpit, 'Cockpit interface must exist for engine compatibility');
   });
 

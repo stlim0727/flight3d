@@ -52,7 +52,7 @@ export class Cessna172 {
     this.proceduralGroup.add(this.tailGroup);
     this.proceduralGroup.add(this.gearGroup);
     this.proceduralGroup.add(this.propellerGroup);
-    this.proceduralGroup.add(this.lightsGroup);
+    this.group.add(this.lightsGroup);
 
     // Control surfaces references
     this.aileronL = null;
