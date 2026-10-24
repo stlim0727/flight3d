@@ -68,41 +68,11 @@ export function initFlightPanels({ onCycleCamera }) {
   compact.addEventListener('change', layout);
   touch.addEventListener('change', layout);
   layout();
-
-  // Measure each side independently: telemetry first, controls second, then below.
-  const menu = document.getElementById('menu-toggle');
-  const ap = document.getElementById('ap-bar');
-  function positionEdgeButtons() {
-    if (!strip.getClientRects().length || !bar.getClientRects().length) return;
-    // Resolve safe-area calc()/max() values through the positioned buttons.
-    const menuLeft = menu.getBoundingClientRect().left;
-    const apRight = ap.getBoundingClientRect().right;
-    const rows = [strip.getBoundingClientRect(), bar.getBoundingClientRect()];
-    for (const [button, fits, property] of [
-      [menu, row => row.left >= menuLeft + menu.offsetWidth + 4, '--menu-row-top'],
-      [ap, row => row.right <= apRight - ap.offsetWidth - 4, '--ap-row-top'],
-    ]) {
-      const row = rows.find(fits);
-      const top = row ? row.top : rows[1].bottom + 4;
-      document.documentElement.style.setProperty(property, `${top}px`);
-      if (button === ap) {
-        // The dropdown is wider than its trigger; keep it below both strips.
-        const panelOffset = Math.max(ap.offsetHeight + 4, rows[1].bottom + 4 - top);
-        document.documentElement.style.setProperty('--ap-panel-offset', `${panelOffset}px`);
-      }
-    }
-  }
-  const observer = new ResizeObserver(positionEdgeButtons);
-  for (const node of [strip, bar, menu, ap, document.documentElement]) observer.observe(node);
-  new MutationObserver(positionEdgeButtons).observe(document.body, {
-    attributes: true, attributeFilter: ['class', 'data-flow'],
-  });
-  window.addEventListener('resize', positionEdgeButtons);
-  positionEdgeButtons();
 }
 
 /** Called from telemetry refresh, including keyboard, demo, reset and resize paths. */
-export function updateControlState(telemetry, camera) {
+export function updateControlState(telemetry, camera, options = {}) {
+  const isDemo = Boolean(options.demoActive ?? telemetry?.demoActive);
   const set = (id, key, values, pressed, shortLabel) => {
     const button = document.getElementById(id);
     if (!button) return;
@@ -120,10 +90,18 @@ export function updateControlState(telemetry, camera) {
   set('btn-gear', `ui.gear.${state}`, {}, gear > .95, `${t('ui.strip.gear')}${({down: '↓', up: '↑', transit: '↕', fail: '!', damaged: '!'})[state]}`);
   set('btn-flaps-ret', 'ui.flaps.less', { angle: Math.round(telemetry.flapDegree || 0) }, undefined, `${t('ui.strip.flaps')}−${Math.round(telemetry.flapDegree || 0)}°`);
   set('btn-flaps-ext', 'ui.flaps.more', { angle: Math.round(telemetry.flapDegree || 0) }, undefined, `${t('ui.strip.flaps')}+${Math.round(telemetry.flapDegree || 0)}°`);
-  document.getElementById('btn-flaps-ret').disabled = telemetry.flapIndex <= 0;
-  document.getElementById('btn-flaps-ext').disabled = telemetry.flapIndex >= 6;
+  const gearBtn = document.getElementById('btn-gear');
+  if (gearBtn) gearBtn.disabled = isDemo;
+  const flapsRetBtn = document.getElementById('btn-flaps-ret');
+  if (flapsRetBtn) flapsRetBtn.disabled = isDemo || telemetry.flapIndex <= 0;
+  const flapsExtBtn = document.getElementById('btn-flaps-ext');
+  if (flapsExtBtn) flapsExtBtn.disabled = isDemo || telemetry.flapIndex >= 6;
   set('btn-spoilers', telemetry.spoilers > .1 ? 'ui.spoilers.on' : 'ui.spoilers.off', {}, telemetry.spoilers > .1, t('ui.strip.spoilers'));
   set('btn-reverser', telemetry.reverserActive ? 'ui.reverse.on' : 'ui.reverse.off', {}, !!telemetry.reverserActive, t('ui.strip.reverse'));
+  const spoilersBtn = document.getElementById('btn-spoilers');
+  if (spoilersBtn) spoilersBtn.disabled = isDemo;
+  const reverserBtn = document.getElementById('btn-reverser');
+  if (reverserBtn) reverserBtn.disabled = isDemo;
   const mode = camera.autoSwitch ? 7 : camera.mode;
   const cameraName = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto'][mode];
   const viewName = t(`ui.camera.${cameraName}`).replace(/ · [1-8]$/, '');

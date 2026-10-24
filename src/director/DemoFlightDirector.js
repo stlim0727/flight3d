@@ -163,6 +163,19 @@ export class DemoFlightDirector {
 
     this.activeDemoAirport = airport;
     this.isActive = true;
+    if (this.sim?.controls) {
+      if (typeof this.sim.controls.setAircraftControlsDisabled === 'function') {
+        this.sim.controls.setAircraftControlsDisabled(true);
+      } else {
+        this.sim.controls.aircraftControlsDisabled = true;
+      }
+    }
+    if (typeof document !== 'undefined') {
+      document.body?.classList?.add('demo-active');
+    }
+    if (typeof this.sim?.updateHUD === 'function') {
+      this.sim.updateHUD();
+    }
     // The demo flies via virtual inputs; an engaged AP would fight them.
     this.sim.autopilot?.disengage();
     this.totalTimer = 0;
@@ -228,6 +241,19 @@ export class DemoFlightDirector {
     }
     this.waitingForTerrain = false;
     this.isActive = false;
+    if (this.sim?.controls) {
+      if (typeof this.sim.controls.setAircraftControlsDisabled === 'function') {
+        this.sim.controls.setAircraftControlsDisabled(false);
+      } else {
+        this.sim.controls.aircraftControlsDisabled = false;
+      }
+    }
+    if (typeof document !== 'undefined') {
+      document.body?.classList?.remove('demo-active');
+    }
+    if (typeof this.sim?.updateHUD === 'function') {
+      this.sim.updateHUD();
+    }
     this.currentStage = DemoFlightDirector.STAGES.IDLE;
     this.isBannerMinimized = false;
 

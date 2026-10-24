@@ -143,7 +143,6 @@ class FlightSimulator {
 
     this.airport = new Airport();
     this.scene.add(this.airport.group);
-    this.terrain.excludePavement(this.airport.group);
 
     this.foliage = new FoliageAndCities(this.terrain);
     this.scene.add(this.foliage.group);
@@ -250,6 +249,7 @@ class FlightSimulator {
       spoilers: 0,
       touchdown: false,
       onGround: true,
+      demoActive: false,
       x: 0,
       z: 0,
       parkBrake: false
@@ -465,7 +465,7 @@ class FlightSimulator {
     // Live closure: setLanguage() re-runs it, so the label follows language too.
     bindText(btn, () => t(this.gameFlow.state === FLOW.LOBBY ? 'menu.close' : 'menu.open'), 'aria-label');
     const glyph = btn.querySelector('.menu-toggle-glyph');
-    if (glyph) glyph.textContent = open ? '✕' : '';
+    if (glyph) glyph.textContent = open ? '✕' : '🏠';
   }
 
   setTimeOfDay(hours) {
@@ -1093,6 +1093,7 @@ class FlightSimulator {
       pitchTrim: this.aero.pitchTrim,
       x: this.position.x,
       z: this.position.z,
+      demoActive: Boolean(this.demoDirector?.isActive),
       parkBrake: Boolean(this.controls.parkingBrake || (gearResult.onGround && this.controls.brakes > 0.8 && Atmosphere.msToKnots(groundSpeed) < 1.0))
     };
 
@@ -1497,7 +1498,7 @@ class FlightSimulator {
     }
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
     this.updateAutopilotUI();
-    updateControlState(this.telemetry, this.cameraSystem);
+    updateControlState(this.telemetry, this.cameraSystem, { demoActive: Boolean(this.demoDirector?.isActive) });
   }
 
   flightPhase() {
@@ -1510,6 +1511,12 @@ class FlightSimulator {
   }
 
   updateAutopilotUI() {
+    const isDemo = Boolean(this.demoDirector?.isActive);
+    const btnToggle = document.getElementById('btn-ap-toggle');
+    if (btnToggle) {
+      btnToggle.disabled = isDemo;
+      btnToggle.classList.toggle('ap-active', this.autopilot.master);
+    }
     const elPhase = document.getElementById('hud-phase');
     if (elPhase) {
       const text = t(`phase.${this.flightPhase().toLowerCase()}`);
@@ -1530,12 +1537,11 @@ class FlightSimulator {
     for (const [id, on] of Object.entries(pressed)) {
       const btn = document.getElementById(id);
       if (!btn) continue;
+      btn.disabled = isDemo;
       btn.classList.toggle('ap-active', on);
       btn.classList.toggle('ap-armed', id === 'btn-ap-app' && this.autopilot.appArmed);
       btn.setAttribute('aria-pressed', String(on));
     }
-    const btnToggle = document.getElementById('btn-ap-toggle');
-    if (btnToggle) btnToggle.classList.toggle('ap-active', this.autopilot.master);
   }
 
   updateApToggleUI() {
@@ -1630,11 +1636,26 @@ class FlightSimulator {
     const qualitySelect = document.getElementById('render-quality');
     qualitySelect.value = this.renderQuality;
     qualitySelect.addEventListener('change', () => this.setRenderQuality(qualitySelect.value));
-    document.getElementById('btn-flaps-ext')?.addEventListener('click', () => this.controls.onCycleFlaps(1));
-    document.getElementById('btn-flaps-ret')?.addEventListener('click', () => this.controls.onCycleFlaps(-1));
-    document.getElementById('btn-gear')?.addEventListener('click', () => this.controls.onToggleGear());
-    document.getElementById('btn-spoilers')?.addEventListener('click', () => this.controls.onToggleSpoilers());
-    document.getElementById('btn-reverser')?.addEventListener('click', () => this.controls.onToggleReverser());
+    document.getElementById('btn-flaps-ext')?.addEventListener('click', () => {
+      if (this.demoDirector?.isActive) return;
+      this.controls.onCycleFlaps(1);
+    });
+    document.getElementById('btn-flaps-ret')?.addEventListener('click', () => {
+      if (this.demoDirector?.isActive) return;
+      this.controls.onCycleFlaps(-1);
+    });
+    document.getElementById('btn-gear')?.addEventListener('click', () => {
+      if (this.demoDirector?.isActive) return;
+      this.controls.onToggleGear();
+    });
+    document.getElementById('btn-spoilers')?.addEventListener('click', () => {
+      if (this.demoDirector?.isActive) return;
+      this.controls.onToggleSpoilers();
+    });
+    document.getElementById('btn-reverser')?.addEventListener('click', () => {
+      if (this.demoDirector?.isActive) return;
+      this.controls.onToggleReverser();
+    });
     document.getElementById('btn-cam-reset')?.addEventListener('click', () => {
       this.cameraSystem.resetLook();
       this.showToast(() => t('camera.view.centered'));
@@ -1659,6 +1680,7 @@ class FlightSimulator {
       ['btn-ap-spd', 'SPD'], ['btn-ap-app', 'APP'],
     ]) {
       document.getElementById(id)?.addEventListener('click', () => {
+        if (this.demoDirector?.isActive) return;
         const on = this.autopilot.toggle(mode, this.telemetry);
         if (mode === 'MASTER') {
           this.showToast(() => t('notice.autopilot', { state: t(on ? 'state.on' : 'state.off') }));
@@ -1669,6 +1691,7 @@ class FlightSimulator {
       });
     }
     document.getElementById('btn-ap-toggle')?.addEventListener('click', () => {
+      if (this.demoDirector?.isActive) return;
       document.getElementById('ap-bar')?.classList.toggle('ap-collapsed');
       this.updateApToggleUI();
     });

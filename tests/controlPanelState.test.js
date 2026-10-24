@@ -56,5 +56,26 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     telemetry.gearState = 1;
     updateControlState(telemetry, camera);
     assert.equal(nodes['btn-gear'].textContent, 'Gear down');
+    assert.equal(nodes['btn-gear'].disabled, false);
+    assert.equal(nodes['btn-spoilers'].disabled, false);
+    assert.equal(nodes['btn-reverser'].disabled, false);
+
+    // During autonomous demo flight, all airplane flight controls are disabled
+    telemetry.demoActive = true;
+    updateControlState(telemetry, camera);
+    assert.equal(nodes['btn-gear'].disabled, true, 'gear disabled during demo flight');
+    assert.equal(nodes['btn-flaps-ret'].disabled, true, 'flaps retract disabled during demo flight');
+    assert.equal(nodes['btn-flaps-ext'].disabled, true, 'flaps extend disabled during demo flight');
+    assert.equal(nodes['btn-spoilers'].disabled, true, 'spoilers disabled during demo flight');
+    assert.equal(nodes['btn-reverser'].disabled, true, 'reverser disabled during demo flight');
+
+    // When manual direct control is engaged, airplane flight controls are re-enabled
+    telemetry.demoActive = false;
+    updateControlState(telemetry, camera);
+    assert.equal(nodes['btn-gear'].disabled, false, 'gear enabled upon taking manual control');
+    assert.equal(nodes['btn-flaps-ret'].disabled, true, 'flaps retract follows flap detent limit (0)');
+    assert.equal(nodes['btn-flaps-ext'].disabled, false, 'flaps extend enabled upon taking manual control');
+    assert.equal(nodes['btn-spoilers'].disabled, false, 'spoilers enabled upon taking manual control');
+    assert.equal(nodes['btn-reverser'].disabled, false, 'reverser enabled upon taking manual control');
   } finally { globalThis.document = previous; }
 });

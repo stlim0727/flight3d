@@ -38,6 +38,10 @@ export class FlightControls {
     // Set by the game-flow layer while lobby/pause menus are up.
     this.inputBlocked = false;
 
+    // Set during autonomous demo flight: airplane flight controls are disabled,
+    // while non-flight interactions (camera views, lights, time, audio) remain enabled.
+    this.aircraftControlsDisabled = false;
+
     // Mouse yoke tracking
     this.mouseX = 0;
     this.mouseY = 0;
@@ -90,6 +94,24 @@ export class FlightControls {
       if (cameraDigit) {
         if (this.onSelectCamera) this.onSelectCamera(Number(cameraDigit[1]) - 1);
       } else if (this.onCycleCamera) this.onCycleCamera();
+      return;
+    }
+
+    if (this.aircraftControlsDisabled) {
+      switch (e.code) {
+        case 'KeyL':
+          if (this.onToggleLights) this.onToggleLights();
+          break;
+        case 'BracketLeft':
+          if (this.onCycleTimeOfDay) this.onCycleTimeOfDay(-1.5);
+          break;
+        case 'BracketRight':
+          if (this.onCycleTimeOfDay) this.onCycleTimeOfDay(1.5);
+          break;
+        case 'KeyM':
+          if (this.onToggleAudio) this.onToggleAudio();
+          break;
+      }
       return;
     }
     this.keys[e.code] = true;
@@ -149,7 +171,52 @@ export class FlightControls {
     this.pitchTrimRate = 0.0;
   }
 
+  setAircraftControlsDisabled(disabled) {
+    this.aircraftControlsDisabled = Boolean(disabled);
+    if (this.aircraftControlsDisabled) {
+      this.releaseAllKeys();
+      this.setTouchStick(0.0, 0.0);
+      this.setTouchRudder(0.0);
+      this.setTouchBrakes(0.0);
+    }
+  }
+
   update(dt, iasKnots = 140) {
+    if (this.aircraftControlsDisabled) {
+      // In autonomous demo mode, user inputs are disabled.
+      // Slew control surfaces purely towards virtual commands.
+      let targetElevator = this.virtualElevator !== null ? this.virtualElevator : 0.0;
+      let targetAileron = this.virtualAileron !== null ? this.virtualAileron : 0.0;
+      let targetRudder = this.virtualRudder !== null ? this.virtualRudder : 0.0;
+
+      const stiffness = Math.max(0.40, 1.0 - Math.max(0, (iasKnots - 140) / 220.0) * 0.55);
+      targetElevator *= stiffness;
+      targetAileron *= stiffness;
+      targetRudder *= stiffness;
+
+      const maxElevatorRate = 0.55;
+      const maxAileronRate = 0.85;
+      const maxRudderRate = 0.60;
+
+      const elevDelta = targetElevator - this.elevator;
+      const aileronDelta = targetAileron - this.aileron;
+      const rudderDelta = targetRudder - this.rudder;
+
+      this.elevator += Math.sign(elevDelta) * Math.min(Math.abs(elevDelta), maxElevatorRate * dt);
+      this.aileron += Math.sign(aileronDelta) * Math.min(Math.abs(aileronDelta), maxAileronRate * dt);
+      this.rudder += Math.sign(rudderDelta) * Math.min(Math.abs(rudderDelta), maxRudderRate * dt);
+
+      this.pitchTrimRate = 0.0;
+      if (this.virtualBrakes !== null && this.virtualBrakes !== undefined) {
+        this.brakes = this.virtualBrakes;
+      } else if (this.parkingBrake) {
+        this.brakes = 1.0;
+      } else {
+        this.brakes = 0.0;
+      }
+      return;
+    }
+
     // 1. Throttle input (Equal increases, Minus decreases)
     if (this.keys['Equal']) {
       this.throttle = Math.min(1.0, this.throttle + dt * 0.35);

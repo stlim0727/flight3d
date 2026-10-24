@@ -255,3 +255,84 @@ it('releaseAllKeys drops held inputs so update() returns to neutral', () => {
     else globalThis.window = previousWindow;
   }
 });
+
+it('aircraftControlsDisabled blocks airplane controls while permitting camera, lights, time and audio', () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { addEventListener() {} };
+  try {
+    const controls = new FlightControls({ addEventListener() {} });
+    let gearToggled = 0;
+    let spoilersToggled = 0;
+    let flapsCycled = 0;
+    let reverserToggled = 0;
+    let cameraCycled = 0;
+    let cameraSelected = null;
+    let audioToggled = 0;
+    let lightsToggled = 0;
+    let timeDelta = 0;
+
+    controls.onToggleGear = () => gearToggled++;
+    controls.onToggleSpoilers = () => spoilersToggled++;
+    controls.onCycleFlaps = inc => flapsCycled += inc;
+    controls.onToggleReverser = () => reverserToggled++;
+    controls.onCycleCamera = () => cameraCycled++;
+    controls.onSelectCamera = mode => { cameraSelected = mode; };
+    controls.onToggleAudio = () => audioToggled++;
+    controls.onToggleLights = () => lightsToggled++;
+    controls.onCycleTimeOfDay = d => { timeDelta += d; };
+
+    controls.setAircraftControlsDisabled(true);
+    assert.strictEqual(controls.aircraftControlsDisabled, true);
+
+    // Flight keys should be ignored
+    controls.handleKeyDown({ code: 'KeyG' });
+    controls.handleKeyDown({ code: 'KeyB' });
+    controls.handleKeyDown({ code: 'KeyF' });
+    controls.handleKeyDown({ code: 'KeyV' });
+    controls.handleKeyDown({ code: 'KeyR' });
+    controls.handleKeyDown({ code: 'KeyZ' });
+    controls.handleKeyDown({ code: 'KeyX' });
+    controls.handleKeyDown({ code: 'KeyW' });
+    controls.handleKeyDown({ code: 'KeyS' });
+    controls.handleKeyDown({ code: 'KeyA' });
+    controls.handleKeyDown({ code: 'KeyD' });
+    controls.handleKeyDown({ code: 'KeyQ' });
+    controls.handleKeyDown({ code: 'KeyE' });
+    controls.handleKeyDown({ code: 'Space' });
+    controls.handleKeyDown({ code: 'Equal' });
+    controls.handleKeyDown({ code: 'Minus' });
+
+    assert.strictEqual(gearToggled, 0);
+    assert.strictEqual(spoilersToggled, 0);
+    assert.strictEqual(flapsCycled, 0);
+    assert.strictEqual(reverserToggled, 0);
+    assert.strictEqual(controls.keys['KeyW'], undefined);
+    assert.strictEqual(controls.keys['Space'], undefined);
+
+    // Non-flight utility actions are allowed during demo
+    controls.handleKeyDown({ code: 'KeyC' });
+    assert.strictEqual(cameraCycled, 1);
+    controls.handleKeyDown({ code: 'Digit3' });
+    assert.strictEqual(cameraSelected, 2);
+    controls.handleKeyDown({ code: 'KeyM' });
+    assert.strictEqual(audioToggled, 1);
+    controls.handleKeyDown({ code: 'KeyL' });
+    assert.strictEqual(lightsToggled, 1);
+    controls.handleKeyDown({ code: 'BracketLeft' });
+    assert.strictEqual(timeDelta, -1.5);
+
+    // Virtual inputs drive controls smoothly without interference from pilot keys
+    controls.setVirtualInput('elevator', 0.5);
+    controls.update(1.0, 140);
+    assert.ok(controls.elevator > 0.2);
+
+    // Re-enable direct control
+    controls.setAircraftControlsDisabled(false);
+    assert.strictEqual(controls.aircraftControlsDisabled, false);
+    controls.handleKeyDown({ code: 'KeyG' });
+    assert.strictEqual(gearToggled, 1);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});

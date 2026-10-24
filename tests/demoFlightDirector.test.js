@@ -28,6 +28,8 @@ function createMockSimulator(activeAirport = 'lukla') {
     controls: {
       brakes: 0.0,
       parkingBrake: false,
+      aircraftControlsDisabled: false,
+      setAircraftControlsDisabled: function(v) { this.aircraftControlsDisabled = Boolean(v); },
       setParkingBrake: function(v) {
         this.parkingBrake = Boolean(v);
         if (this.parkingBrake) this.brakes = 1.0;
@@ -88,6 +90,7 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
 
     director.start();
     assert.strictEqual(director.isActive, true);
+    assert.strictEqual(sim.controls.aircraftControlsDisabled, true);
     assert.strictEqual(director.activeDemoAirport, 'lukla');
     assert.strictEqual(director.currentStage, DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
     assert.strictEqual(sim.controls.getVirtualInput('throttle'), 1.0);
@@ -124,6 +127,7 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
 
     director.stop('Test Stop');
     assert.strictEqual(director.isActive, false);
+    assert.strictEqual(sim.controls.aircraftControlsDisabled, false);
     assert.strictEqual(sim.controls.getVirtualInput('throttle'), undefined);
     assert.strictEqual(sim.controls.brakes, 0.0);
     assert.strictEqual(sim.gear.brakes, 0.0);
