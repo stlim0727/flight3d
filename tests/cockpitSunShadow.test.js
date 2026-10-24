@@ -7,8 +7,6 @@ import {
   cookieAxes,
   projectPanesForCookie,
   drawCockpitCookie,
-  COCKPIT_SUN_GAIN,
-  COCKPIT_DAYLIGHT_REFERENCE,
   COOKIE_SIZE,
 } from '../src/environment/CockpitSunShadow.js';
 import {
@@ -246,7 +244,7 @@ describe('Cockpit deck sun rig (issue #90)', () => {
     }
     assert.ok(areas[1] / areas[0] > 0.45 && areas[1] / areas[0] < 0.55,
       'An oblique pane must halve the beam footprint, rather than dimming its rays');
-    assert.ok(intensities.every(i => Math.abs(i - 3.5 * COCKPIT_SUN_GAIN) < 1e-9),
+    assert.ok(intensities.every(i => Math.abs(i - 3.5) < 1e-9),
       'Clear sunlight inside an opening must retain its intensity across bearings and recovery');
     assert.equal(areas[2], areas[0], 'Returning to the original bearing restores the footprint');
     assert.ok(daylights[1] < daylights[0] * 0.9,
@@ -362,8 +360,8 @@ describe('Cockpit deck sun rig (issue #90)', () => {
     assert.ok(Math.abs(rig.daylight - rig.pose.admittance) < 1e-5,
       `Flood dimming must settle at the fraction the aperture admits, got ${rig.daylight}`);
     assert.equal(rig.light.intensity,
-      3.5 * rig.modeFactor * COCKPIT_SUN_GAIN);
-    assert.ok(rig.light.intensity <= 3.5 * COCKPIT_SUN_GAIN + 1e-9,
+      3.5 * rig.modeFactor);
+    assert.ok(rig.light.intensity <= 3.5 + 1e-9,
       'Deck sun must never exceed its share of the ambient sun');
 
     let previous = rig.light.intensity;
@@ -494,11 +492,10 @@ describe('Atmospheric weather gate (issue #90)', () => {
           new THREE.Euler(0, THREE.MathUtils.degToRad(heading), 0)
         );
         sky.updateCockpitSun({ position: origin, quaternion, cockpitActive: true, dt: 1 });
-        assert.ok(sky.cockpitSun.light.intensity <= sky.sunLight.intensity * COCKPIT_SUN_GAIN + 1e-9,
+        assert.ok(sky.cockpitSun.light.intensity <= sky.sunLight.intensity + 1e-9,
           `hour ${hour} heading ${heading}: deck sun ${sky.cockpitSun.light.intensity} over ambient ${sky.sunLight.intensity}`);
         assert.ok(sky.cockpitSun.daylight <= 1);
       }
     }
-    assert.ok(COCKPIT_DAYLIGHT_REFERENCE > 0);
   });
 });

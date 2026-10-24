@@ -1382,14 +1382,14 @@ class FlightSimulator {
     this.foliage.updateCityLod(this.camera.position);
     this.foliage.update(this.camera.position);
     this.sky.updateSun(this.position, this.camera.position);
-    const stepDaylight = this.sky.updateCockpitSun({
+    this.sky.updateCockpitSun({
       position: this.aircraft.group.position,
       quaternion: this.aircraft.group.quaternion,
       cockpitActive: isCockpit && !isPhotoCockpit,
       dt: simSeconds,
       casterState: cockpitCasterState(this.aircraft.cockpit),
     });
-    this.aircraft.cockpit.syncDaylight(stepDaylight);
+    this.aircraft.cockpit.syncLighting(this.sky, this.quaternion, simSeconds);
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
     this.tireSmokeSystem.update(simSeconds);
@@ -1488,14 +1488,14 @@ class FlightSimulator {
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
-    const daylight = this.sky.updateCockpitSun({
+    this.sky.updateCockpitSun({
       position: this.aircraft.group.position,
       quaternion: this.aircraft.group.quaternion,
       cockpitActive: isCockpit && !isPhotoCockpit,
       dt: frameDelta,
       casterState: cockpitCasterState(this.aircraft.cockpit),
     });
-    this.aircraft.cockpit.syncDaylight(daylight);
+    this.aircraft.cockpit.syncLighting(this.sky, this.quaternion, frameDelta);
     if (this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.enabled = isPhotoCockpit && (this.currentAircraftId !== 'C172');
       if (this.cockpitPhotoOverlay.enabled) {

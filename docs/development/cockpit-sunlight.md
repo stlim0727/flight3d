@@ -1,5 +1,9 @@
 # Cockpit interior sunlight (#90)
 
+For the current diffuse sky, bounce and flood model, see
+[offline cockpit light transfer (#163)](cockpit-light-transfer.md). Earlier
+captures below document the direct-shadow implementation at their stated revision.
+
 Sunlight that enters the windshield lights the flight deck and casts the window
 frame, pillar and roof bands across the glareshield, panel face, yokes, seats and
 pedestal. The pattern follows the sun's bearing **in the deck frame**, so time of
@@ -39,9 +43,9 @@ Pending invalidation survives multiple simulation substeps before a render;
 the world-to-shadow matrix still follows the aircraft when the image is frozen.
 
 The deck's PBR materials use reduced, directional sky fill instead of receiving
-the full outdoor ambient and HDR environment. The localized sun gain is 3.2;
-other surfaces are outside its cone. Instrument floods dim to 8% in full sun,
-with a 0.06 floor. Front-to-aft sunlight puts the yoke's cast shadow behind the
+the full outdoor ambient and HDR environment. The localized beam uses the exterior sun intensity;
+other surfaces are outside its cone. Baked receiver transfer and an illumination
+deficit solve now control instrument floods, without a fixed output floor. Front-to-aft sunlight puts the yoke's cast shadow behind the
 pilot; AO makes its contact with nearby surfaces readable even when that cast
 shadow is out of view.
 
@@ -60,9 +64,8 @@ This is contact/crease shading, not a replacement for directional cast shadows.
 `SkyAtmosphere` owns the weather gate: `setCloudCover(0..1)` attenuates direct sun
 continuously, softens both shadow maps, lifts ambient skylight and greys the fog.
 The same factor reaches the deck sun, so an overcast noon washes the pattern out
-instead of switching it off. `Cockpit.syncDaylight` trades the three instrument
-floods against the light the deck actually admits, with a floor so the night look
-survives. `main.js` drives both from `stepSimulation` and `animate`, gated by the
+instead of switching it off. `Cockpit.syncLighting` evaluates baked sky/sun/flood transport and solves
+instrument illumination deficits, including the uniform ambient on overcast days. `main.js` drives both from `stepSimulation` and `animate`, gated by the
 cockpit camera mode, which ramps over ~0.3 s rather than switching.
 
 ## Direct admittance
@@ -70,23 +73,20 @@ cockpit camera mode, which ramps over ~0.3 s rather than switching.
 `directAdmittance()` in `CockpitAperture.js` is the aperture area projected normal to the
 sun, `Σ max(0, n̂·sun)·A`, in square metres — the effective area admitting parallel rays.
 `referenceDirectAdmittance()` scans the upper hemisphere for the bearing that admits the
-most. The ratio is `pose.admittance`, a 0..1 estimate used for the instrument-flood
-trade. An empty aperture returns zero.
+most. The ratio is `pose.admittance`, a 0..1 aperture diagnostic; it no longer controls instrument floods. An empty aperture returns zero.
 
 **Beam intensity and admitted flux are separate.** Each ray that passes through a pane
-retains `sunIntensity * COCKPIT_SUN_GAIN`, with weather, horizon and camera-entry fading.
+retains `sunIntensity`, with weather, horizon and camera-entry fading.
 The cookie already reduces the illuminated cross-section as the panes turn edge-on.
 Multiplying that intensity by projected area would count the same loss twice: a vertical
 pane at 60° incidence would halve its footprint and halve each ray again, leaving about
-one quarter of the normal-incidence flux. `daylight` instead multiplies the beam intensity
-by admittance only when computing the flood-dimming signal.
+one quarter of the normal-incidence flux. `daylight` remains a legacy aperture diagnostic. The flood solver uses
+received irradiance from the bake rather than the total admitted beam area.
 
-Cookie projection excludes panes facing away from the sun. Its deliberate 1% background
-spill scales with admittance; a sun astern therefore produces a completely black cookie,
+Cookie projection excludes panes facing away from the sun. Its background spill is now zero; a sun astern therefore produces a completely black cookie,
 while the light object's intensity still describes the unobstructed beam. Light intensity
 alone is not evidence that sunlight enters the cockpit. The current cookie is a visibility
-approximation, and the flood trade remains an artistic control rather than a light-transfer
-solution.
+approximation, and diffuse bounce and flood control are handled by the offline transfer model.
 
 The front pane rake is +0.47 rad so its outward normal points upward. The projected-area
 measurement replaces the old anchor-to-pane-centre heuristic. It depends on the sun's
@@ -109,12 +109,9 @@ they do not establish acceptance of the revised beam intensity.
   [Side-window provenance and measurements](cockpit-side-windows.md) documents
   the approximation and the corrected window-number/astern assumptions in #164.
   At 20°/40° elevation, a sun exactly astern remains blocked by the pane normals.
-- Diffuse skylight is not modelled through the aperture. The deck's indirect fill is a
-  fixed two-band scaling of the outdoor ambient, so it has the right *shape* (upward faces
-  brighter) but its coupling to the actual glass area is a constant. Integrating the sky
-  view factor per receiver is the first thing an offline bake would give us.
-- The instrument floods follow the *admitted* sun, not general skylight, so a bright
-  overcast day leaves them brighter than a clear one.
+- Diffuse transport is baked at neutral controls with fitted apertures, clustered
+  receivers and a small sun basis. See the transfer document for sampling, angular
+  resolution, animation and specular limitations.
 - Exterior airframe self-shadow (fuselage onto wing, tail onto tailplane, gear onto
   fuselage) is not part of this change; it needs main-sun frustum and texel tuning,
   tracked separately.
@@ -178,7 +175,7 @@ repaint while the deck-local sun is steady.
 Node tests cover the rig invariants, the slab against windshield corners and deck
 receivers, admittance continuity through a 1° azimuth sweep, cookie projection bounds,
 the body-fixed shadow image, repaint-only-on-movement, the cloud gate, and the
-flood/daylight trade. Required checks are `npm run check`, `npm test` and
+baked flood control (in the transfer suite). Required checks are `npm run check`, `npm test` and
 `npm run build`.
 
 
@@ -200,8 +197,9 @@ resolution does not fix this. The acceptance ablation now removes frame geometry
 only from the tagged cockpit sun pass; the external directional shadow remains
 unchanged, so it cannot hide this regression.
 
-Clear sunlight gain is 3.2 to emphasize lit/shaded separation. Cookie spill is
-1% times admittance; daylight/flood normalization uses the 3.5 clear-noon reference.
+The historical captures in this section used gain 3.2, 1% cookie spill and
+the 3.5 flood reference. All three have since been removed by the offline
+transfer model; those images are not acceptance evidence for the new lighting.
 The native 737 glareshield shades much of the
 vertical instrument panel. Pillar bands are clearest on the left sidewall and
 lower console at 16:48, heading 000 degrees, clear weather; this model does not

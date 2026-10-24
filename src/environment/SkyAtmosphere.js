@@ -136,7 +136,7 @@ export class SkyAtmosphere {
 
   /**
    * Aim the flight deck sun at the windshield for this frame and return the daylight
-   * factor used to dim the instrument floods.
+   * diagnostic. Baked flood control receives sky and sun irradiance separately.
    */
   updateCockpitSun({ position, quaternion, cockpitActive = false, dt = 0, casterState }) {
     return this.cockpitSun.update({

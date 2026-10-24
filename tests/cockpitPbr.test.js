@@ -20,6 +20,7 @@ if (typeof document === 'undefined') {
 }
 
 import { Cockpit } from '../src/aircraft/Cockpit.js';
+import { CockpitLightTransfer } from '../src/aircraft/CockpitLightTransfer.js';
 import { PFDCanvas } from '../src/aircraft/PFDCanvas.js';
 import { NDCanvas } from '../src/aircraft/NDCanvas.js';
 import { EICASCanvas } from '../src/aircraft/EICASCanvas.js';
@@ -52,30 +53,24 @@ describe('Cockpit GLTF Interior System', () => {
     assert.strictEqual(cockpit.cockpitModelFailed, false);
   });
 
-  it('trades instrument flood light for daylight without a mode switch', () => {
+  it('uses external radiance in aircraft coordinates and keeps fallback floods fixed', () => {
     const cockpit = new Cockpit(...createCanvases());
     const base = cockpit.floodBaseIntensity.slice();
     assert.equal(cockpit.floods.length, base.length, 'Every cockpit flood must be registered');
-
-    cockpit.syncDaylight(0);
-    cockpit.floods.forEach((flood, i) => assert.equal(flood.intensity, base[i],
-      'Night keeps the shipped flood glow'));
-
-    let previous = base.map(() => Infinity);
-    for (const daylight of [0.1, 0.25, 0.5, 0.75, 0.9, 1, 3]) {
-      cockpit.syncDaylight(daylight);
-      cockpit.floods.forEach((flood, i) => {
-        assert.ok(flood.intensity <= previous[i], `daylight ${daylight} must not brighten a flood`);
-        assert.ok(flood.intensity >= 0.06, 'Floods keep a floor so the deck never goes dark');
-        previous[i] = flood.intensity;
-      });
-    }
-    cockpit.floods.forEach((flood, i) => assert.ok(Math.abs(flood.intensity - Math.max(base[i] * 0.08, 0.06)) < 1e-9,
-      'Full sun leaves a small instrument fill'));
-
-    cockpit.syncDaylight(0);
-    cockpit.floods.forEach((flood, i) => assert.equal(flood.intensity, base[i],
-      'Setting the sun returns the floods'));
+    const sky = { sunPosition: new THREE.Vector3(0, 1, 0), ambientLight: new THREE.AmbientLight(),
+      sunLight: new THREE.DirectionalLight() };
+    cockpit.syncLighting(sky, new THREE.Quaternion(), 1);
+    cockpit.floods.forEach((flood, i) => assert.equal(flood.intensity, base[i]));
+    let received;
+    cockpit.lightTransfer = { update: value => { received = value; } };
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), .6);
+    cockpit.syncLighting(sky, q, 1 / 60);
+    assert.ok(received.sunDirection.distanceTo(sky.sunPosition.clone().applyQuaternion(q.clone().invert())) < 1e-10);
+    assert.equal(received.ambientIntensity, sky.ambientLight.intensity);
+    assert.equal(received.dt, 1 / 60);
+    cockpit.syncLighting(sky, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI), 1);
+    assert.ok(received.sunDirection.y < -.99, 'Inverted aircraft needs lower deck-frame sun directions');
+    assert.equal(received.sunIntensity, sky.sunLight.intensity, 'Horizon gate uses world elevation');
   });
 
   it('can hide yokes for instrument inspection without stopping their animation', () => {
@@ -156,6 +151,27 @@ describe('Cockpit GLTF Interior System', () => {
       assert.strictEqual(cockpit.cockpitModelFailed, true,
         'The camera must learn that no GLTF interior will ever appear');
       assert.strictEqual(cockpit.gltfCockpitGroup.visible, false);
+    } finally {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
+    }
+  });
+
+  it('keeps the loaded cockpit usable with fixed floods if the bake cannot be loaded', async (t) => {
+    const cockpit = new Cockpit(...createCanvases());
+    let loaded;
+    t.mock.method(GLTFLoader.prototype, 'load', (_url, onLoad) => { loaded = onLoad; });
+    t.mock.method(CockpitLightTransfer, 'load', async () => { throw Error('missing bake'); });
+    t.mock.method(console, 'warn', () => {});
+    const previousWindow = globalThis.window;
+    globalThis.window = {};
+    try {
+      cockpit.loadCockpitModel();
+      await loaded({ scene: new THREE.Group() });
+      assert.equal(cockpit.lightingBakeStatus, 'fallback');
+      assert.equal(cockpit.gltfCockpitLoaded, true);
+      assert.equal(cockpit.cockpitModelLoading, false);
+      cockpit.floods.forEach((light, i) => assert.equal(light.intensity, cockpit.floodBaseIntensity[i]));
     } finally {
       if (previousWindow === undefined) delete globalThis.window;
       else globalThis.window = previousWindow;

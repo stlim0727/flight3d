@@ -4,6 +4,7 @@ import { bindGltfYokes, updateGltfYokes, bindGltfEngineControls, updateGltfEngin
 import { bindGltfAirframeControls, updateGltfAirframeControls } from './GltfCockpitControls.js';
 import { VISIBLE_GLASS } from './CockpitAperture.js';
 import { shadeCockpitMaterial } from './CockpitLighting.js';
+import { CockpitLightTransfer } from './CockpitLightTransfer.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
@@ -69,17 +70,14 @@ export class Cockpit {
     this.loadCockpitModel();
   }
 
-  /**
-   * Trade instrument flood light for daylight in the flight deck, continuously:
-   * `daylight` 0 keeps the warm night glow, 1 dims the floods so the
-   * sun pattern thrown through the windshield stays readable.
-   */
-  syncDaylight(daylight) {
-    const dim = 1 - 0.92 * Math.min(1, Math.max(0, daylight));
-    for (let i = 0; i < this.floods.length; i++) {
-      this.floods[i].intensity = Math.max(this.floodBaseIntensity[i] * dim, 0.06);
-    }
-
+  /** Actual external radiance drives baked transfer, independently of aperture area. */
+  syncLighting(sky, quaternion, dt) {
+    if (!this.lightTransfer || !this.group.visible) return;
+    const sunDirection = sky.sunPosition.clone().applyQuaternion(quaternion.clone().invert());
+    this.lightTransfer.update({ ambientColor: sky.ambientLight.color,
+      ambientIntensity: sky.ambientLight.intensity, sunColor: sky.sunLight.color,
+      sunIntensity: sky.sunLight.intensity * THREE.MathUtils.smoothstep(sky.sunPosition.y, -.03, .08),
+      sunDirection, dt });
   }
 
   /** Temporarily clear the instrument sightline without changing control input. */
@@ -94,6 +92,93 @@ export class Cockpit {
     updateGltfYokes(this.gltfYokes, flightState);
     updateGltfEngineControls(this.gltfEngineControls, flightState);
     updateGltfAirframeControls(this.gltfAirframeControls, flightState);
+  }
+
+  /** Shared scene assembly for the runtime and offline light-transfer baker. */
+  prepareModel(model) {
+    this.gltfCockpitModel = model;
+    model.name = 'B737_Cockpit_Model';
+
+    // Calibrated alignment transform:
+    // Raw model coordinates: Forward +Z, Captain -X. Eye at (-0.44, 2.25, 0.65).
+    // Flight3D local space: Forward -Z, Captain -X. Eye at (-0.45, 0.85, -12.44).
+    model.rotation.y = Math.PI;
+    model.scale.set(1, 1, 1);
+    model.position.set(0, -1.31, -11.43);
+
+    // Boeing Cockpit PBR Finishes for Window Frames, Pillars, and Interior Shell
+    const boeingFrameMat = new THREE.MeshStandardMaterial({
+      color: 0x343d49, // Authentic Boeing Cockpit Grey / Charcoal
+      roughness: 0.86,
+      metalness: 0.16,
+      side: THREE.DoubleSide
+    });
+
+    const boeingLiningMat = new THREE.MeshStandardMaterial({
+      color: 0x586270, // Boeing interior lining slate
+      roughness: 0.90,
+      metalness: 0.10,
+      side: THREE.DoubleSide
+    });
+
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        // Configure authentic Boeing cockpit materials for the native frame & fuselage meshes
+        if (child.name === 'Body020_Material008_0') {
+          child.visible = true;
+          child.material = boeingFrameMat;
+          return;
+        }
+        if (child.name.startsWith('Body006') || child.name.startsWith('Body002')) {
+          child.visible = true;
+          child.material = boeingLiningMat;
+          return;
+        }
+        if (child.material) {
+          // Single-layer shell and console surfaces must render inward too.
+          // Body018 closes the native enclosure; keep it visible as well.
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          for (const material of materials) material.side = THREE.DoubleSide;
+
+          if (child.name.includes('Cube1061') || child.name.includes('Cube1060')) {
+            // Captain and FO side consoles
+            child.material.color.setHex(0x424b57);
+            child.material.roughness = 0.85;
+          } else if (child.material.roughness !== undefined) {
+            child.material.roughness = Math.max(0.25, child.material.roughness);
+          }
+        }
+      }
+    });
+
+    bindCockpitSideWindowShadows(model);
+
+    this.gltfYokes = bindGltfYokes(model);
+    this.gltfEngineControls = bindGltfEngineControls(model);
+    this.gltfAirframeControls = bindGltfAirframeControls(model);
+    const movingParts = [
+      ...this.gltfYokes, ...this.gltfEngineControls.throttles, ...this.gltfEngineControls.pedals,
+      this.gltfAirframeControls.gear, this.gltfAirframeControls.flaps,
+      this.gltfAirframeControls.spoilers, ...this.gltfAirframeControls.trimWheels
+    ];
+    // Each pivot can also batch its own surfaces without losing articulation.
+    this.staticDrawCallsSaved = movingParts.reduce(
+      (saved, pivot) => saved + batchStaticCockpit(pivot), 0
+    ) + batchStaticCockpit(model, movingParts);
+    for (const yoke of this.gltfYokes) yoke.visible = this.yokesVisible;
+    this.gltfCockpitGroup.add(model);
+
+    // Build authentic Boeing 737 windshield glass & ceiling enclosure trims
+    this.setupGltfCockpitFraming();
+
+    this.gltfCockpitGroup.traverse(node => {
+      if (!node.isMesh) return;
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      materials.forEach(material => shadeCockpitMaterial(material, this.lightTransfer));
+    });
+
   }
 
   /**
@@ -118,90 +203,29 @@ export class Cockpit {
 
       gltfLoader.load(
         url,
-        (gltf) => {
+        async (gltf) => {
           const model = gltf.scene;
-          this.gltfCockpitModel = model;
-          model.name = 'B737_Cockpit_Model';
+          this.prepareModel(model);
 
-          // Calibrated alignment transform:
-          // Raw model coordinates: Forward +Z, Captain -X. Eye at (-0.44, 2.25, 0.65).
-          // Flight3D local space: Forward -Z, Captain -X. Eye at (-0.45, 0.85, -12.44).
-          model.rotation.y = Math.PI;
-          model.scale.set(1, 1, 1);
-          model.position.set(0, -1.31, -11.43);
-
-          // Boeing Cockpit PBR Finishes for Window Frames, Pillars, and Interior Shell
-          const boeingFrameMat = new THREE.MeshStandardMaterial({
-            color: 0x343d49, // Authentic Boeing Cockpit Grey / Charcoal
-            roughness: 0.86,
-            metalness: 0.16,
-            side: THREE.DoubleSide
-          });
-
-          const boeingLiningMat = new THREE.MeshStandardMaterial({
-            color: 0x586270, // Boeing interior lining slate
-            roughness: 0.90,
-            metalness: 0.10,
-            side: THREE.DoubleSide
-          });
-
-          model.traverse((child) => {
-            if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-              // Configure authentic Boeing cockpit materials for the native frame & fuselage meshes
-              if (child.name === 'Body020_Material008_0') {
-                child.visible = true;
-                child.material = boeingFrameMat;
-                return;
+          let transfer;
+          try {
+            transfer = await CockpitLightTransfer.load(url.includes('-medium.') ? 'medium' : 'draco');
+            transfer.bind(this.gltfCockpitGroup);
+            this.lightTransfer = transfer;
+            this.gltfCockpitGroup.traverse(node => {
+              if (node.isMesh) {
+                const materials = Array.isArray(node.material) ? node.material : [node.material];
+                materials.forEach(material => shadeCockpitMaterial(material, transfer));
               }
-              if (child.name.startsWith('Body006') || child.name.startsWith('Body002')) {
-                child.visible = true;
-                child.material = boeingLiningMat;
-                return;
-              }
-              if (child.material) {
-                // Single-layer shell and console surfaces must render inward too.
-                // Body018 closes the native enclosure; keep it visible as well.
-                const materials = Array.isArray(child.material) ? child.material : [child.material];
-                for (const material of materials) material.side = THREE.DoubleSide;
-
-                if (child.name.includes('Cube1061') || child.name.includes('Cube1060')) {
-                  // Captain and FO side consoles
-                  child.material.color.setHex(0x424b57);
-                  child.material.roughness = 0.85;
-                } else if (child.material.roughness !== undefined) {
-                  child.material.roughness = Math.max(0.25, child.material.roughness);
-                }
-              }
-            }
-          });
-
-          bindCockpitSideWindowShadows(model);
-
-          this.gltfYokes = bindGltfYokes(model);
-          this.gltfEngineControls = bindGltfEngineControls(model);
-          this.gltfAirframeControls = bindGltfAirframeControls(model);
-          const movingParts = [
-            ...this.gltfYokes, ...this.gltfEngineControls.throttles, ...this.gltfEngineControls.pedals,
-            this.gltfAirframeControls.gear, this.gltfAirframeControls.flaps,
-            this.gltfAirframeControls.spoilers, ...this.gltfAirframeControls.trimWheels
-          ];
-          // Each pivot can also batch its own surfaces without losing articulation.
-          this.staticDrawCallsSaved = movingParts.reduce(
-            (saved, pivot) => saved + batchStaticCockpit(pivot), 0
-          ) + batchStaticCockpit(model, movingParts);
-          for (const yoke of this.gltfYokes) yoke.visible = this.yokesVisible;
-          this.gltfCockpitGroup.add(model);
-
-          // Build authentic Boeing 737 windshield glass & ceiling enclosure trims
-          this.setupGltfCockpitFraming();
-
-          this.gltfCockpitGroup.traverse(node => {
-            if (!node.isMesh) return;
-            const materials = Array.isArray(node.material) ? node.material : [node.material];
-            materials.forEach(shadeCockpitMaterial);
-          });
+            });
+            // Flood irradiance, including visibility and bounce, is in the bake.
+            this.floods.forEach(flood => { flood.intensity = 0; });
+            this.lightingBakeStatus = 'ready';
+          } catch (error) {
+            transfer?.dispose();
+            this.lightingBakeStatus = 'fallback';
+            console.warn('Cockpit transfer unavailable; using fixed night floods:', error);
+          }
 
           // Mount live 60 FPS flight displays onto the GLTF MIP & Pedestal
           this.setupGltfFlightDisplays();

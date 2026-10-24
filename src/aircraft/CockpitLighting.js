@@ -21,26 +21,38 @@ export function excludeFromDeckShadow(mesh) {
   };
 }
 
-/**
- * The enclosed deck receives much less sky fill than the outdoor scene. Retain
- * directional skylight on upward faces so curves read without flattening the
- * sunlight's shadows. This changes indirect light only, never emissive displays.
- */
-export function shadeCockpitMaterial(material) {
-  if (!material.isMeshStandardMaterial || material.userData.cockpitLighting) return;
-  material.userData.cockpitLighting = true;
-  material.envMapIntensity = 0.25;
+/** Baked diffuse irradiance in the deck frame; emissive displays stay independent. */
+export function shadeCockpitMaterial(material, transfer = null) {
+  if (!material.isMeshStandardMaterial || material.userData.cockpitLighting === (transfer ?? 'fallback')) return;
+  material.userData.cockpitLighting = transfer ?? 'fallback';
+  material.envMapIntensity = 1;
   material.onBeforeCompile = shader => {
+    if (transfer) {
+      Object.assign(shader.uniforms, transfer.uniforms);
+      shader.vertexShader = `attribute vec4 deckTransferUV;
+        uniform sampler2D deckTransfer;
+        varying vec4 deckFrontIrradiance;
+        varying vec4 deckBackIrradiance;\n` + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
+        `#include <begin_vertex>
+        deckFrontIrradiance = texture2D(deckTransfer, deckTransferUV.xy);
+        deckBackIrradiance = texture2D(deckTransfer, deckTransferUV.zw);`);
+      shader.fragmentShader = `varying vec4 deckFrontIrradiance;
+        varying vec4 deckBackIrradiance;\n` + shader.fragmentShader;
+    }
     shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <aomap_fragment>',
-      `#include <aomap_fragment>
-      vec3 deckWorldNormal = inverseTransformDirection( normal, viewMatrix );
-      float deckSkyFill = mix( 0.12, 0.32, smoothstep( -0.2, 0.85, deckWorldNormal.y ) );
-      reflectedLight.indirectDiffuse *= deckSkyFill;
-      reflectedLight.indirectSpecular *= 0.35;`
+      '#include <lights_fragment_end>',
+      `irradiance = ${transfer
+    ? 'PI * (gl_FrontFacing ? deckFrontIrradiance.rgb : deckBackIrradiance.rgb)'
+    : 'vec3(0.0)'};
+      iblIrradiance = vec3(0.0);
+      #include <lights_fragment_end>
+      reflectedLight.indirectSpecular *= ${transfer
+    ? '(gl_FrontFacing ? deckFrontIrradiance.a : deckBackIrradiance.a)'
+    : '0.0'};`
     );
   };
-  material.customProgramCacheKey = () => 'cockpit-enclosed-skylight-v1';
+  material.customProgramCacheKey = () => transfer ? 'cockpit-baked-transfer-v1' : 'cockpit-transfer-fallback-v1';
   material.needsUpdate = true;
 }
 

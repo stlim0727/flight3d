@@ -11,17 +11,12 @@ import {
   paneOutwardNormal,
 } from '../aircraft/CockpitAperture.js';
 
-/** Localized direct sun, balanced against the enclosed deck's reduced sky fill. */
-export const COCKPIT_SUN_GAIN = 3.2;
-
-/** Sun intensity that saturates the cockpit flood dimming. */
-export const COCKPIT_DAYLIGHT_REFERENCE = 3.5;
 
 /** Square size of the windshield cookie texture in pixels. */
 export const COOKIE_SIZE = 256;
 
-/** Sunlight that leaks around the window frames, as a fraction of direct sun. */
-export const COOKIE_LEAK = 0.01;
+/** Bounce is baked separately; direct sun has no artificial background spill. */
+export const COOKIE_LEAK = 0;
 
 /** Radians the deck-local sun may move before the cookie is repainted. */
 export const COOKIE_REDRAW_ANGLE = 0.008;
@@ -275,8 +270,7 @@ export class CockpitSunShadow {
       angle: this.pose.angle,
       quads: this._quads,
     });
-    // Keep the deliberate soft spill proportional to admitted flux, so an
-    // entirely back-facing aperture leaves a black cookie, including its background.
+    // The opaque boundary stays black; indirect illumination comes from the bake.
     drawCockpitCookie(this.context, quads, this.size, COOKIE_LEAK * this.pose.admittance);
     this.texture.needsUpdate = true;
   }
@@ -299,7 +293,7 @@ export class CockpitSunShadow {
    * @param {number} state.sunIntensity Ambient sun intensity, weather included.
    * @param {boolean} state.cockpitActive 3D virtual cockpit is being rendered.
    * @param {number} state.dt Elapsed seconds for the mode ramp.
-   * @returns {number} Daylight factor 0..1 for cockpit flood dimming.
+   * @returns {number} Legacy aperture diagnostic in 0..1, independent of flood control.
    */
   update({ position, quaternion, sunDir, sunColor, sunIntensity, cockpitActive, dt, casterState }) {
     computeDeckSunPose({ position, quaternion, sunDir, pose: this.pose });
@@ -326,7 +320,8 @@ export class CockpitSunShadow {
     this.light.color.copy(sunColor);
     // The cookie already projects the aperture area. Multiplying beam intensity
     // by that area again would dim each surviving ray and count the loss twice.
-    this.light.intensity = sunIntensity * this.modeFactor * COCKPIT_SUN_GAIN;
+    this.sourceIntensity = sunIntensity;
+    this.light.intensity = sunIntensity * this.modeFactor;
     this.light.intensity *= smoothstep(-0.03, 0.08, sunDir.y);
 
     const shadowCamera = this.light.shadow.camera;
@@ -354,8 +349,8 @@ export class CockpitSunShadow {
     return this.daylight;
   }
 
-  /** 0 at night or in an exterior view, 1 when the deck is in full sun. */
+  /** Legacy aperture diagnostic only; never controls floods or indirect light. */
   get daylight() {
-    return Math.min(1, (this.pose.admittance ?? 0) * this.light.intensity / (COCKPIT_DAYLIGHT_REFERENCE * COCKPIT_SUN_GAIN));
+    return Math.min(1, (this.pose.admittance ?? 0) * this.light.intensity / Math.max(1e-9, this.sourceIntensity ?? 0));
   }
 }

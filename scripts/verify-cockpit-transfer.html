@@ -1,0 +1,126 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cockpit offline transfer acceptance</title>
+<style>body{font:15px system-ui;background:#17212c;color:#eee}iframe{width:1280px;height:720px}img{width:640px}pre{white-space:pre-wrap}figure{display:inline-block;margin:4px}button{padding:12px}</style>
+<h1>Cockpit offline transfer acceptance</h1>
+<label>Asset <select id="variant"><option value="medium">medium</option><option value="draco">lite</option></select></label>
+<button id="run">Run acceptance</button>
+<pre id="report">Waiting for simulator…</pre>
+<iframe src="/"></iframe>
+<div id="captures"></div>
+<script type="module">
+import * as THREE from 'three';
+import { drawCockpitCookie } from '../src/environment/CockpitSunShadow.js';
+const report = document.querySelector('#report'), captures = document.querySelector('#captures');
+const frame = document.querySelector('iframe');
+const assert = (value, message) => { if (!value) throw Error(message); };
+document.querySelector('#variant').onchange = async event => {
+  document.querySelector('#run').disabled = false;
+  report.textContent = 'Waiting for simulator…'; captures.replaceChildren();
+  const html = await (await fetch('/')).text();
+  const bootstrap = event.target.value === 'draco'
+    ? `<script type="module">import { Cockpit } from '/src/aircraft/Cockpit.js';
+      const load = Cockpit.prototype.loadCockpitModel;
+      Cockpit.prototype.loadCockpitModel = function(url = '/models/b737-cockpit-draco.glb') { return load.call(this, url); };
+      await import('/src/main.js');<` + `/script>`
+    : '<script type="module" src="/src/main.js"><' + '/script>';
+  frame.srcdoc = html.replace('<head>', '<head><base href="/">')
+    .replace(/<script type="module" src="[^\"]*src\/main.js"><\/script>/, bootstrap);
+};
+document.querySelector('#run').onclick = async () => {
+  document.querySelector('#run').disabled = true;
+  try {
+    const s = frame.contentWindow.simulator;
+    assert(s?.aircraft?.cockpit?.gltfCockpitLoaded, 'Wait for cockpit load');
+    s.animate = () => {};
+    s.shadowDemo.start(); s.setRenderQuality('balanced');
+    s.integratePhysics = () => {}; // Freeze all acceptance poses, including banked views.
+    const c = s.aircraft.cockpit, t = c.lightTransfer;
+    const initialQuaternion = s.quaternion.clone();
+    assert(c.lightingBakeStatus === 'ready', `Bake failed: ${c.lightingBakeStatus}`);
+    assert(t.coverage >= .98, 'Receiver coverage');
+    const materials = new Set();
+    c.gltfCockpitGroup.traverse(n => { if (n.isMesh && n.material.isMeshStandardMaterial) materials.add(n.material); });
+    const original = [...materials].map(m => [m, m.onBeforeCompile, m.customProgramCacheKey, m.envMapIntensity]);
+    const cases = [];
+    const capture = (name, variant) => {
+      s.renderScene();
+      const canvas = s.renderer.domElement, gl = s.renderer.getContext();
+      const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+      gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      const figure = document.createElement('figure'), img = new Image();
+      img.src = canvas.toDataURL(); img.alt = `${name} ${variant}`;
+      const caption = document.createElement('figcaption'); caption.textContent = img.alt;
+      figure.append(caption, img); captures.append(figure);
+      let luma = 0, samples = 0, saturated = 0;
+      const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+      for (let y = Math.floor(h * .45); y < h; y++) for (let x = Math.floor(w * .15); x < w * .9; x++) {
+        const i = ((h - 1 - y) * w + x) * 4;
+        luma += pixels[i] * .2126 + pixels[i + 1] * .7152 + pixels[i + 2] * .0722;
+        if (Math.max(pixels[i], pixels[i + 1], pixels[i + 2]) > 250) saturated++;
+        samples++;
+      }
+      return { luma: luma / samples, saturated: saturated / samples, glError: gl.getError() };
+    };
+    for (let i = 0; i < 12; i++) {
+      s.sky.cockpitSun.modeFactor = 1;
+      if (i < 6) { s.shadowDemo.elapsed = i * 6; s.stepSimulation(0); }
+      else {
+        s.shadowDemo.active = false;
+        s.sky.sunDirectionOverride = null;
+        s.sky.setTimeOfDay(i === 7 ? 23 : 12);
+        s.sky.setCloudCover(i === 6 ? 1 : 0);
+        if (i >= 8) {
+          s.cameraSystem.lookPitch = .6;
+          if (i >= 10) s.quaternion.copy(initialQuaternion).multiply(new THREE.Quaternion()
+            .setFromAxisAngle(new THREE.Vector3(0, 0, 1), (i === 10 ? -1 : 1) * 35 * Math.PI / 180));
+          const direction = s.sky.sunPosition.clone().set(0, Math.sin((i === 8 ? 20 : 75) * Math.PI / 180),
+            -Math.cos((i === 8 ? 20 : 75) * Math.PI / 180)).applyQuaternion(initialQuaternion);
+          s.sky.sunDirectionOverride = direction;
+        }
+        s.stepSimulation(0);
+      }
+      c.syncLighting(s.sky, s.quaternion, 10);
+      const after = capture(`case-${i}`, 'baked');
+      assert(after.glError === 0 && Number.isFinite(after.luma), 'Rendering failure');
+      const outputs = t.outputs.slice();
+      assert(outputs.every((v, j) => Number.isFinite(v) && v >= 0 && v <= c.floodBaseIntensity[j]), 'Flood output bounds');
+      // Old implementation ablation on exactly the same loaded scene and camera.
+      for (const [m] of original) {
+        m.envMapIntensity = .25;
+        m.onBeforeCompile = shader => { shader.fragmentShader = shader.fragmentShader.replace('#include <aomap_fragment>',
+          '#include <aomap_fragment>\nvec3 deckWorldNormal=inverseTransformDirection(normal,viewMatrix);\nreflectedLight.indirectDiffuse*=mix(.12,.32,smoothstep(-.2,.85,deckWorldNormal.y));\nreflectedLight.indirectSpecular*=.35;'); };
+        m.customProgramCacheKey = () => 'cockpit-transfer-before'; m.needsUpdate = true;
+      }
+      const rig = s.sky.cockpitSun, intensity = rig.light.intensity;
+      rig.light.intensity *= 3.2;
+      drawCockpitCookie(rig.context, rig._quads, rig.size, .01 * rig.pose.admittance);
+      rig.texture.needsUpdate = true;
+      const daylight = Math.min(1, (rig.pose.admittance ?? 0) * intensity / 3.5);
+      c.floods.forEach((l, j) => { l.intensity = Math.max(c.floodBaseIntensity[j] * (1 - .92 * daylight), .06); });
+      const before = capture(`case-${i}`, 'before');
+      for (const [m, compile, key, environment] of original) { m.onBeforeCompile = compile; m.customProgramCacheKey = key; m.envMapIntensity = environment; m.needsUpdate = true; }
+      c.floods.forEach(l => { l.intensity = 0; }); rig.light.intensity = intensity; rig.repaintCookie();
+      if (i >= 10) assert(Math.abs(s.quaternion.angleTo(initialQuaternion) - 35 * Math.PI / 180) < 1e-6, 'Bank must actually be staged');
+      cases.push({ i, before, after, outputs, sunIntensity: intensity, sun: rig.pose.sunDirLocal.toArray(),
+        quaternion: s.quaternion.toArray() });
+    }
+    assert(cases[6].sunIntensity > 0 && cases[6].sunIntensity < cases[4].sunIntensity * .5, 'Overcast attenuation');
+    assert(cases[7].sunIntensity < 1e-6, 'Night must actually be staged');
+    assert(cases.some(row => Math.abs(row.after.luma - row.before.luma) > 1), 'Bake must affect the rendered deck');
+    const steady = performance.now();
+    for (let i = 0; i < 100; i++) c.syncLighting(s.sky, s.quaternion, 1 / 60);
+    const unchangedUpdateMs = (performance.now() - steady) / 100;
+    const changing = performance.now();
+    for (let i = 0; i < 10; i++) { t.signature = null; c.syncLighting(s.sky, s.quaternion, 1 / 60); }
+    const changedUpdateMs = (performance.now() - changing) / 10;
+    const neutral = c.gltfYokes.map(y => y.rotation.z);
+    c.updateControls({ aileron: 1, elevator: 1 }); s.renderScene();
+    c.updateControls({ aileron: -1, elevator: -1 }); s.renderScene();
+    c.updateControls({ aileron: 0, elevator: 0 }); s.renderScene();
+    assert(c.gltfYokes.every((y, i) => y.rotation.z === neutral[i]), 'Yoke release');
+    report.textContent = JSON.stringify({ status: 'PASS', variant: t.manifest.variant,
+      receivers: t.manifest.keys.length, coverage: t.coverage, unchangedUpdateMs, changedUpdateMs, cases }, null, 2);
+  } catch (error) { report.textContent = `FAIL: ${error.stack}`; }
+};
+</script>
