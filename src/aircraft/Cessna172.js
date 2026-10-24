@@ -14,9 +14,12 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
  * - PBR materials with optional GLTF model loading fallback
  */
 export class Cessna172 {
-  constructor() {
+  constructor(pfdCanvas = null, ndCanvas = null) {
     this.group = new THREE.Group();
     this.group.name = 'Aircraft_Cessna172';
+
+    this.pfdCanvas = pfdCanvas;
+    this.ndCanvas = ndCanvas;
 
     // Model and mode states
     this.useGltf = false;
@@ -510,6 +513,33 @@ export class Cessna172 {
           this.cockpit.gltfYokes = [];
           this.cockpit.cockpitModelFailed = false;
           this.cockpit.gltfCockpitGroup = this.gltfModel;
+
+          // Mount live real-time flight displays onto the Garmin G1000 instrument panel
+          if (this.pfdCanvas && this.ndCanvas) {
+            const createDisplayMat = (canvas) => new THREE.MeshBasicMaterial({
+              map: canvas.texture,
+              toneMapped: false,
+              polygonOffset: true,
+              polygonOffsetFactor: -1.0,
+              polygonOffsetUnits: -2.0
+            });
+
+            const screenGeo = new THREE.PlaneGeometry(0.23, 0.155);
+            const mipY = 0.420;
+            const mipZ = -1.810;
+
+            // Left Garmin G1000 PFD (Primary Flight Display)
+            const pfdMesh = new THREE.Mesh(screenGeo, createDisplayMat(this.pfdCanvas));
+            pfdMesh.name = 'C172_Live_PFD';
+            pfdMesh.position.set(-0.177, mipY, mipZ);
+            this.cockpit.group.add(pfdMesh);
+
+            // Right Garmin G1000 MFD (Multi-Function Display / Navigation)
+            const ndMesh = new THREE.Mesh(screenGeo.clone(), createDisplayMat(this.ndCanvas));
+            ndMesh.name = 'C172_Live_MFD';
+            ndMesh.position.set(0.106, mipY, mipZ);
+            this.cockpit.group.add(ndMesh);
+          }
 
           this.gltfGroup.add(this.gltfModel);
           this.useGltf = true;

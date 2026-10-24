@@ -249,4 +249,12 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
     assert.strictEqual(CESSNA_172.cockpit.captainEyePos.z, -1.18, 'Captain eye seated in chair');
     assert.ok(CESSNA_172.cockpit.defaultLookPitchRad <= 0, 'Slight downward pitch to frame flight instruments');
   });
+
+  it('should accept PFD and ND canvases and store them for live glass-cockpit display', () => {
+    const fakePfd = { texture: new THREE.Texture() };
+    const fakeNd = { texture: new THREE.Texture() };
+    const c172 = new Cessna172(fakePfd, fakeNd);
+    assert.strictEqual(c172.pfdCanvas, fakePfd);
+    assert.strictEqual(c172.ndCanvas, fakeNd);
+  });
 });

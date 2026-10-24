@@ -519,7 +519,7 @@ class FlightSimulator {
     }
 
     if (aircraftId === 'C172') {
-      this.aircraft = new Cessna172();
+      this.aircraft = new Cessna172(this.pfdCanvas, this.ndCanvas);
     } else {
       this.aircraft = new Boeing737(
         this.pfdCanvas,
