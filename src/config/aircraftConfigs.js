@@ -380,9 +380,9 @@ export const CESSNA_172 = {
 
   // 5. Cockpit Camera & Instrument Layout
   cockpit: {
-    captainEyePos: { x: -0.28, y: 0.35, z: -0.4 },
-    defaultLookPitchRad: -0.15,
-    defaultFov: 70.0,
+    captainEyePos: { x: -0.53, y: 0.36, z: -1.13 },
+    defaultLookPitchRad: -0.12,
+    defaultFov: 68.0,
     exteriorFov: 55.0,
     chaseDistance: 14.0,
     chaseHeight: 3.2,

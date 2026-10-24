@@ -539,7 +539,7 @@ class FlightSimulator {
     }
 
     if (this.cameraSystem) {
-      if (aircraftId === 'C172' && this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) {
+      if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT && this.aircraft.cockpit?.cockpitModelFailed) {
         this.cameraSystem.setMode(CameraSystem.MODES.CHASE, true);
         this.showToast(() => t('notice.cockpit.unavailable'));
       }

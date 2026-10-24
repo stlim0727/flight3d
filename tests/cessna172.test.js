@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import * as THREE from 'three';
 import { Cessna172 } from '../src/aircraft/Cessna172.js';
 import { CESSNA_172, BOEING_737_800 } from '../src/config/aircraftConfigs.js';
@@ -205,5 +206,46 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
   it('should provide calibrated resting CG height for gentle runway contact', () => {
     const gear = new LandingGear(CESSNA_172);
     assert.strictEqual(gear.cgGroundHeightM, 1.35, 'C172 resting CG ground height is 1.35m');
+  });
+
+  it('should have optimized c172.glb model with valid license attribution', () => {
+    const glbPath = 'public/models/c172.glb';
+    assert.ok(fs.existsSync(glbPath), 'public/models/c172.glb must exist');
+    const stat = fs.statSync(glbPath);
+    assert.ok(stat.size > 5 * 1024 * 1024 && stat.size < 15 * 1024 * 1024, `c172.glb size ${stat.size} should be ~8.3MB Draco compressed`);
+
+    const licPath = 'public/models/c172.LICENSE.txt';
+    assert.ok(fs.existsSync(licPath), 'public/models/c172.LICENSE.txt must exist');
+    const licContent = fs.readFileSync(licPath, 'utf8');
+    assert.ok(licContent.includes('NLM'), 'License must cite author NLM');
+    assert.ok(licContent.includes('CC BY 4.0'), 'License must cite CC BY 4.0');
+  });
+
+  it('should toggle pilot yokes visibility via cockpit interface', () => {
+    const c172 = new Cessna172();
+    assert.strictEqual(c172.cockpit.yokesVisible, true);
+
+    const yoke1 = new THREE.Object3D();
+    const yoke2 = new THREE.Object3D();
+    c172.cockpit.gltfYokes = [yoke1, yoke2];
+
+    const state1 = c172.cockpit.toggleYokes();
+    assert.strictEqual(state1, false);
+    assert.strictEqual(c172.cockpit.yokesVisible, false);
+    assert.strictEqual(yoke1.visible, false);
+    assert.strictEqual(yoke2.visible, false);
+
+    const state2 = c172.cockpit.toggleYokes();
+    assert.strictEqual(state2, true);
+    assert.strictEqual(c172.cockpit.yokesVisible, true);
+    assert.strictEqual(yoke1.visible, true);
+    assert.strictEqual(yoke2.visible, true);
+  });
+
+  it('should configure authentic cockpit eye view behind left pilot yoke', () => {
+    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.x, -0.53, 'Captain eye inline with left yoke');
+    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.y, 0.36, 'Captain eye at natural seating height');
+    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.z, -1.13, 'Captain eye seated behind yoke');
+    assert.ok(CESSNA_172.cockpit.defaultLookPitchRad < 0, 'Slight downward pitch to frame six-pack flight instruments');
   });
 });
