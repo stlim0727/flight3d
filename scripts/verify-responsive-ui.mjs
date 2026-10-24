@@ -291,6 +291,27 @@ const demoPill = await ev(`(()=>{const node=document.querySelector('#btn-demo-op
 assert.ok(demoPill.visible && demoPill.top >= demoPill.toolbarBottom + 4 && demoPill.reachable, `desktop: demo reopen pill is clear and reachable below toolbar: ${JSON.stringify(demoPill)}`);
 await nativeClick('#btn-demo-open', false);
 assert.ok(await ev(`getComputedStyle(document.querySelector('#demo-banner')).display!=='none' && getComputedStyle(document.querySelector('#btn-demo-open')).display==='none'`), 'desktop: demo guide reopens from its pill');
+
+// Verify mobile portrait demo banner placement and hidden AP
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+await ev(`window.simulator.touchControls.enable(); window.simulator.demoDirector.start()`);
+await new Promise(resolve => setTimeout(resolve, 500));
+const mobileDemo = await ev(`(() => {
+  const banner = document.querySelector('#demo-banner').getBoundingClientRect();
+  const menu = document.querySelector('#menu-toggle').getBoundingClientRect();
+  const ap = document.querySelector('.ap-bar');
+  const apStyle = getComputedStyle(ap);
+  const apHidden = apStyle.visibility === 'hidden' || apStyle.display === 'none';
+  const bannerBelowMenu = banner.top >= menu.bottom + 4;
+  return { bannerTop: banner.top, menuBottom: menu.bottom, apHidden, bannerBelowMenu };
+})()`);
+assert.ok(mobileDemo.apHidden, `mobile portrait: AP is hidden during demo: ${JSON.stringify(mobileDemo)}`);
+assert.ok(mobileDemo.bannerBelowMenu, `mobile portrait: demo banner sits below menu button: ${JSON.stringify(mobileDemo)}`);
+await ev(`window.simulator.demoDirector.stop()`);
+await send('Emulation.setTouchEmulationEnabled', { enabled: false, maxTouchPoints: 1 });
+await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+
 await ev(`window.simulator.demoDirector.stop()`);
 await nativeClick('#btn-ap-toggle', false);
 await nativeClick('#btn-ap', false);

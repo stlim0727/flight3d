@@ -1546,8 +1546,6 @@ body.compact-ui {
 }
 .compact-ui .mobile-menu .btn-group { flex-wrap: wrap; }
 .compact-ui .mobile-menu .btn { min-height: 44px; white-space: normal; }
-.compact-ui .demo-banner,
-.compact-ui .demo-pill-btn { top: calc(var(--edge-top) + 52px); }
 .compact-ui .demo-banner {
   flex-wrap: wrap;
   width: calc(100% - var(--edge-left) - var(--edge-right));
@@ -1689,9 +1687,8 @@ body.compact-ui {
   cursor: not-allowed;
 }
 body.demo-active .ap-bar {
-  opacity: .5;
-  filter: grayscale(1);
-  pointer-events: none;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 body.demo-active #touch-controls-overlay {
   opacity: .4;
@@ -1810,9 +1807,6 @@ body.demo-active #touch-controls-overlay {
   top: calc(var(--edge-top) + 104px);
   bottom: auto;
   max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 112px);
-}
-.compact-ui .demo-banner, .compact-ui .demo-pill-btn {
-  top: calc(var(--edge-top) + 96px);
 }
 .compact-ui .demo-banner {
   max-height: min(135px, 28dvh);
@@ -2259,12 +2253,12 @@ body[data-flow="lobby"] .menu-toggle {
   .presets-bar { top: 60px; }
 }
 
-/* Keep the demo guide and its reopen button below the relocated control strip. */
+/* Keep the demo guide and its reopen button below the relocated control strip and edge toggles. */
 .demo-banner, .demo-pill-btn {
-  top: calc(var(--edge-top) + 104px);
+  top: max(calc(var(--edge-top) + 104px), calc(var(--menu-row-top, 0px) + 50px));
 }
 .compact-ui .demo-banner, .compact-ui .demo-pill-btn {
-  top: calc(var(--edge-top) + 104px);
+  top: max(calc(var(--edge-top) + 104px), calc(var(--menu-row-top, 0px) + 50px));
 }
 
 /* Put the stall alert below the toolbar and expanded AP controls. */
