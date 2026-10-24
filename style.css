@@ -1999,11 +1999,11 @@ body.demo-active #touch-controls-overlay {
 }
 .flight-toolbar .quick-mute { display: block; font-size: 18px; }
 
-/* The AP trigger stays anchored while its panel opens directly below it. */
+/* The AP trigger stays anchored; its dropdown clears both control strips. */
 .ap-bar, .compact-ui .ap-bar {
   position: absolute;
-  top: calc(var(--edge-top) + 96px);
-  right: max(var(--edge-right), calc(50% - 240px));
+  top: var(--ap-row-top, calc(var(--edge-top) + 96px));
+  right: var(--edge-right);
   left: auto;
   bottom: auto;
   width: 44px;
@@ -2040,7 +2040,7 @@ body.demo-active #touch-controls-overlay {
 }
 .ap-panel {
   position: absolute;
-  top: calc(100% + 4px);
+  top: var(--ap-panel-offset, calc(100% + 4px));
   right: 0;
   width: min(296px, calc(100vw - var(--edge-left) - var(--edge-right)));
   max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 144px);
@@ -2073,7 +2073,7 @@ body.demo-active #touch-controls-overlay {
   /* In phone landscape, keep the brake and central touch controls outside the
      dropdown. Align its narrower panel to the right safe edge. */
   .compact-ui.touch-mode .ap-panel {
-    right: calc(240px + var(--edge-right) - 50vw);
+    right: 0;
     width: min(268px, calc(100vw - var(--edge-left) - var(--edge-right)));
     max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 210px);
   }
@@ -2219,11 +2219,11 @@ body.booting .menu-toggle { display: none !important; }
 
 /* Persistent main-menu toggle. Floats above the lobby overlay (z 85) so it can
    open the menu over a flight and hide it again, but stays under toasts (96)
-   and modals (100). Align it with the left end of the control strip. */
+   and modals (100). Use the first strip with space at the safe screen edge. */
 .menu-toggle {
   position: fixed;
-  top: calc(var(--edge-top) + 96px);
-  left: max(var(--edge-left), calc(50% - 240px));
+  top: var(--menu-row-top, calc(var(--edge-top) + 96px));
+  left: var(--edge-left);
   z-index: 90;
   display: inline-flex;
   align-items: center;
@@ -2247,6 +2247,14 @@ body[data-flow="lobby"] .menu-toggle {
 .menu-toggle:hover { background: rgba(30, 41, 59, 0.95); border-color: #38bdf8; }
 .menu-toggle:focus-visible { outline: 2px solid #67e8f9; }
 .menu-toggle .menu-toggle-glyph { font-size: 19px; line-height: 1; }
+.menu-toggle-glyph:empty::before {
+  content: '';
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+  box-shadow: 0 -6px currentColor, 0 6px currentColor;
+}
 @media (min-width: 961px) {
   .presets-bar { top: 60px; }
 }

@@ -143,6 +143,7 @@ class FlightSimulator {
 
     this.airport = new Airport();
     this.scene.add(this.airport.group);
+    this.terrain.excludePavement(this.airport.group);
 
     this.foliage = new FoliageAndCities(this.terrain);
     this.scene.add(this.foliage.group);
@@ -465,7 +466,7 @@ class FlightSimulator {
     // Live closure: setLanguage() re-runs it, so the label follows language too.
     bindText(btn, () => t(this.gameFlow.state === FLOW.LOBBY ? 'menu.close' : 'menu.open'), 'aria-label');
     const glyph = btn.querySelector('.menu-toggle-glyph');
-    if (glyph) glyph.textContent = open ? '✕' : '🏠';
+    if (glyph) glyph.textContent = open ? '✕' : '';
   }
 
   setTimeOfDay(hours) {
