@@ -611,6 +611,16 @@ export class Airport {
    * Determine if world coordinates fall within Coastal Airport's runway tarmac area
    */
   isOnRunway(x, z) {
-    return Math.abs(x) < 1950 && Math.abs(z) < 450;
+    const halfL = this.runwayLength * 0.5 + 50; // 1650m (runway + overrun pads)
+    const halfW = this.runwayWidth * 0.5 + 6;   // 36m (runway 09L/27R + paved shoulders)
+    const onRunway = Math.abs(x) <= halfL && Math.abs(z) <= halfW;
+
+    // Paved parallel taxiway A, 5 connector taxiways, and terminal apron
+    const onParallelTaxiway = Math.abs(x) <= halfL && Math.abs(z - 160) <= 16;
+    const distToConnector = Math.min(Math.abs(x % 600), 600 - Math.abs(x % 600));
+    const onConnector = Math.abs(x) <= 1250 && distToConnector <= 15 && z >= -5 && z <= 165;
+    const onApron = Math.abs(x) <= 720 && z >= 170 && z <= 370;
+
+    return onRunway || onParallelTaxiway || onConnector || onApron;
   }
 }

@@ -208,6 +208,8 @@ export default {
   "the.aircraft.hit.the.ocean.surface.at": "바다 수면에 고속으로 격돌했습니다.",
   "catastrophic.landing.impact": "치명적 착륙 충격 (CATASTROPHIC LANDING IMPACT)",
   "excessive.belly.impact.or.accumulated.structural.damage": "기체 하부의 과도한 충격 또는 누적 구조 손상으로 기체가 파손되었습니다.",
+  "runway.excursion": "활주로 이탈 (RUNWAY EXCURSION)",
+  "the.aircraft.departed.the.runway": "기체가 활주로를 벗어나 지상으로 이동하여 사고가 발생했습니다.",
   "gear.up.belly.crash": "동체 착륙 (GEAR-UP BELLY CRASH)",
   "terrain.body.strike": "기체 지면 접촉 (TERRAIN / BODY STRIKE)",
   "the.value.made.ground.contact": "{value} 부위가 지면에 접촉했습니다.",

@@ -288,6 +288,34 @@ async function main() {
     console.log(`   Tree Collision: ${treeCrashed ? 'PASS ✅' : 'FAIL ❌'} [${treeTitle}]`);
     await takeScreenshot('crash_tree_showcase.png');
 
+    // =========================================================================
+    // TEST 6: Off-Runway Ground Excursion Collision
+    // =========================================================================
+    console.log('\n🚜 TEST 6: Off-Runway Ground Excursion...');
+    await evalJs(`
+      (() => {
+        const sim = window.simulator;
+        sim.resetCrash();
+        // Position in grass north of Runway 09L at z = 70m, rolling at 45 m/s
+        sim.position.set(-1000, 15.5, 70);
+        sim.linearVelocity.set(45, 0, 0);
+        sim.quaternion.setFromAxisAngle(new window.THREE.Vector3(0, 1, 0), -Math.PI * 0.5);
+        sim.aircraft.group.position.copy(sim.position);
+        sim.aircraft.group.quaternion.copy(sim.quaternion);
+        sim.aircraft.group.updateMatrixWorld(true);
+        sim.cameraSystem.setMode(1);
+        sim.cameraSystem.snapToTarget(sim.aircraft.group);
+      })()
+    `);
+
+    await evalJs(`window.simulator.stepSimulation(0.5);`);
+    await new Promise(r => setTimeout(r, 600));
+
+    const excursionCrashed = await evalJs(`Boolean(window.simulator.isCrashed && window.simulator.crashResult?.type === 'TERRAIN')`);
+    const excursionTitle = await evalJs(`document.getElementById('crash-title').textContent`);
+    console.log(`   Off-Runway Excursion: ${excursionCrashed ? 'PASS ✅' : 'FAIL ❌'} [${excursionTitle}]`);
+    await takeScreenshot('crash_excursion_showcase.png');
+
     // Test Quick Restart
     console.log('\n🔄 Testing Quick Restart...');
     await evalJs(`window.simulator.resetCrash();`);
@@ -297,7 +325,7 @@ async function main() {
     `);
     console.log(`   Restart Cleanliness: ${restartOk ? 'PASS ✅' : 'FAIL ❌'}`);
 
-    if (![towerCrashed, waterCrashed, terrainCrashed, bldgCrashed, treeCrashed, restartOk].every(Boolean)) {
+    if (![towerCrashed, waterCrashed, terrainCrashed, bldgCrashed, treeCrashed, excursionCrashed, restartOk].every(Boolean)) {
       throw new Error('One or more collision/restart checks failed');
     }
     console.log('\n🎉 ALL COLLISION & EXPLOSION TESTS COMPLETED SUCCESSFULLY!');

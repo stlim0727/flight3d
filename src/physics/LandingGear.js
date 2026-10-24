@@ -418,6 +418,7 @@ export class LandingGear {
       bodyDamageEvents,
       catastrophicImpact,
       touchdownContacts: supportedTouchdowns,
+      contacts: this.contacts,
       compressions: {
         nose: this.contacts[0].compression,
         mainLeft: this.contacts[1].compression,

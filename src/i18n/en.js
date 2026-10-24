@@ -208,6 +208,8 @@ export default {
   "the.aircraft.hit.the.ocean.surface.at": "The aircraft hit the ocean surface at high speed.",
   "catastrophic.landing.impact": "CATASTROPHIC LANDING IMPACT",
   "excessive.belly.impact.or.accumulated.structural.damage": "Excessive belly impact or accumulated structural damage destroyed the aircraft.",
+  "runway.excursion": "RUNWAY EXCURSION",
+  "the.aircraft.departed.the.runway": "The aircraft departed the runway surface while moving on the ground.",
   "gear.up.belly.crash": "GEAR-UP BELLY CRASH",
   "terrain.body.strike": "TERRAIN / BODY STRIKE",
   "the.value.made.ground.contact": "The {value} made ground contact.",

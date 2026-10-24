@@ -479,11 +479,17 @@ export class CollisionDetector {
     return null;
   }
 
+  isPositionOnRunway(x, z) {
+    if (this.airport && typeof this.airport.isOnRunway === 'function') {
+      return this.airport.isOnRunway(x, z);
+    }
+    return Math.abs(x) < 1650 && Math.abs(z) < 40;
+  }
+
   checkTerrain(aircraftPos, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity = null, groundContact = null) {
     if (!this.terrain) return null;
 
-    const onRunway = this.airport?.isOnRunway?.(aircraftPos.x, aircraftPos.z)
-      ?? (Math.abs(aircraftPos.x) < 1950 && Math.abs(aircraftPos.z) < 450);
+    const onRunway = this.isPositionOnRunway(aircraftPos.x, aircraftPos.z);
     if (onRunway && groundContact?.catastrophicImpact) {
       return {
         get name() { return t('catastrophic.landing.impact'); },
@@ -491,10 +497,31 @@ export class CollisionDetector {
         get description() { return t('excessive.belly.impact.or.accumulated.structural.damage'); }
       };
     }
+
+    // Evaluate off-runway ground excursion: when the aircraft moves on the ground outside the runway
+    const groundH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
+    const gearHeight = gearState >= 0.5 ? 3.85 : 1.85;
+    const isGrounded = groundContact !== null
+      ? Boolean(groundContact.onGround)
+      : (aircraftPos.y - groundH <= gearHeight && aircraftPos.y - groundH >= -2.0);
+
+    const isMoving = speedMs > 0.5;
+    const wheelOffRunway = groundContact?.contacts?.some(c =>
+      c.isGrounded && !this.isPositionOnRunway(c.worldPos.x, c.worldPos.z)
+    );
+
+    if (isGrounded && isMoving && (!onRunway || wheelOffRunway)) {
+      return {
+        get name() { return t('runway.excursion'); },
+        point: aircraftPos.clone(),
+        get description() { return t('the.aircraft.departed.the.runway'); }
+      };
+    }
+
     // Body contact is evaluated on every surface, including the runway. Gear
     // deployment and nominal attitude never exempt nacelles or wings from contact.
     for (const probe of worldProbes) {
-      const probeOnRunway = this.airport?.isOnRunway?.(probe.pos.x, probe.pos.z) ?? onRunway;
+      const probeOnRunway = this.isPositionOnRunway(probe.pos.x, probe.pos.z);
       // The contact solver owns supported lower surfaces on the runway. A fin
       // strike or any probe outside the runway still uses fatal terrain detection.
       if (groundContact && onRunway && probeOnRunway && probe.id !== 'fin') continue;
