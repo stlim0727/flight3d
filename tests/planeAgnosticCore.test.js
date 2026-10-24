@@ -167,7 +167,7 @@ describe('Plane-Agnostic Core Infrastructure', () => {
       cameraSystem.loadAircraftConfig(CESSNA_172);
       assert.strictEqual(cameraSystem.chaseDistance, 14.0);
       assert.strictEqual(cameraSystem.chaseHeight, 3.2);
-      assert.strictEqual(cameraSystem.cockpitHeadOffset.z, -1.13);
+      assert.strictEqual(cameraSystem.cockpitHeadOffset.z, -1.18);
     });
   });
 

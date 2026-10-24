@@ -505,16 +505,9 @@ export class Cessna172 {
               node.userData.initialRotZ = node.rotation.z;
               this.gltfPropellers.push(node);
             }
-
-            // Bind pilot and copilot control yokes
-            if (node.name === 'Plane.013_14' || node.name === 'Plane.014_53') {
-              node.userData.initialPosZ = node.position.z;
-              node.userData.initialRotZ = node.rotation.z;
-              this.gltfYokes.push(node);
-            }
           });
 
-          this.cockpit.gltfYokes = this.gltfYokes;
+          this.cockpit.gltfYokes = [];
           this.cockpit.cockpitModelFailed = false;
           this.cockpit.gltfCockpitGroup = this.gltfModel;
 
@@ -570,18 +563,6 @@ export class Cessna172 {
     if (this.useGltf && this.gltfPropellers.length > 0) {
       for (const prop of this.gltfPropellers) {
         prop.rotation.z = (prop.userData.initialRotZ ?? 0) + this.propAngle;
-      }
-
-      // Articulate pilot control yokes if visible
-      if (this.cockpit.yokesVisible && this.gltfYokes.length > 0) {
-        for (const yoke of this.gltfYokes) {
-          const initZ = yoke.userData.initialPosZ ?? yoke.position.z;
-          const initRotZ = yoke.userData.initialRotZ ?? yoke.rotation.z;
-          // Pitch (elevator): push forward / pull aft along column
-          yoke.position.z = initZ - elevator * 0.04;
-          // Roll (aileron): rotate left / right
-          yoke.rotation.z = initRotZ - aileron * 0.7;
-        }
       }
     } else {
       this.propellerGroup.rotation.z = this.propAngle;

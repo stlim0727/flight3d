@@ -243,9 +243,9 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
   });
 
   it('should configure authentic cockpit eye view behind left pilot yoke', () => {
-    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.x, -0.53, 'Captain eye inline with left yoke');
-    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.y, 0.36, 'Captain eye at natural seating height');
-    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.z, -1.13, 'Captain eye seated behind yoke');
-    assert.ok(CESSNA_172.cockpit.defaultLookPitchRad < 0, 'Slight downward pitch to frame six-pack flight instruments');
+    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.x, -0.22, 'Captain eye inline with left seat center');
+    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.y, 0.42, 'Captain eye at natural seating height');
+    assert.strictEqual(CESSNA_172.cockpit.captainEyePos.z, -1.18, 'Captain eye seated in chair');
+    assert.ok(CESSNA_172.cockpit.defaultLookPitchRad <= 0, 'Slight downward pitch to frame flight instruments');
   });
 });
