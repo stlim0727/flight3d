@@ -5,7 +5,7 @@ context, while the current implementation defines actual behavior.
 
 | Task | Implementation to read first | Verification |
 | --- | --- | --- |
-| Integration, reset, simulation timing | src/main.js; src/config/simConfig.js | npm test; relevant browser scenario |
+| Integration, reset, simulation timing | src/main.js; src/core/physicsTiming.js; src/config/simConfig.js; [physics core](physics-core.md) | npm test; relevant browser scenario |
 | Aircraft parameters | src/config/aircraftConfigs.js | physics tests; flight scenario |
 | Lift, drag, atmosphere, engines | src/physics/Aerodynamics.js; Atmosphere.js; EngineModel.js | tests/aerodynamics.test.js; atmosphere.test.js; engine.test.js |
 | Gear, collision, touchdown | src/physics/LandingGear.js; CollisionDetector.js | tests/landingGear.test.js; collision.test.js; gearCamAndTouchdown.test.js; npm run test:crash |

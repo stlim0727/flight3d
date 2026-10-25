@@ -7,8 +7,8 @@ export const SIM_CONFIG = {
   // Physics Timing & Integration
   physics: {
     targetHz: 120,                  // 120Hz substepping
-    fixedDt: 1.0 / 120.0,           // 0.00833s
-    maxSubstepsPerFrame: 8,         // Prevents spiral of death on low framerates
+    get fixedDt() { return 1 / this.targetHz; },
+    maxFrameDelta: 0.1,
     gravityMs2: 9.80665,
     groundClampMarginM: 0.1
   },

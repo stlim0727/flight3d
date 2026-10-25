@@ -6,7 +6,9 @@ import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
 import { prepareCockpitShadowDepth } from './aircraft/CockpitDepth.js';
 import { Atmosphere } from './physics/Atmosphere.js';
 import { AIRCRAFT_REGISTRY, BOEING_737_800 } from './config/aircraftConfigs.js';
-import { Aerodynamics } from './physics/Aerodynamics.js';
+import { Aerodynamics, createAeroResult } from './physics/Aerodynamics.js';
+import { SIM_CONFIG } from './config/simConfig.js';
+import { advancePhysicsFrame, clampFrameDelta, stepPhysics } from './core/physicsTiming.js';
 import { EngineModel, asymmetricThrustYawMoment } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
 import { BODY_SUPPORT_POINTS, FALLBACK_BODY_SUPPORT_POINTS } from './physics/groundContacts.js';
@@ -228,8 +230,8 @@ class FlightSimulator {
 
     // Simulation Timing
     this.clock = new THREE.Clock();
-    this.physicsHz = 120;
-    this.physicsDt = 1.0 / this.physicsHz;
+    this.physicsHz = SIM_CONFIG.physics.targetHz;
+    this.physicsDt = SIM_CONFIG.physics.fixedDt;
     this.physicsAccumulator = 0;
     this.totalSimTime = 0;
 
@@ -290,6 +292,7 @@ class FlightSimulator {
     this._intForward = new THREE.Vector3();
     this._intNonGrav = new THREE.Vector3();
     this._intCabinUp = new THREE.Vector3();
+    this._aeroResult = createAeroResult();
     this._apState = {
       airportKey: 'coastal',
       headingDeg: 0, rollDeg: 0, pitchDeg: 0,
@@ -1032,7 +1035,8 @@ class FlightSimulator {
       altitudeMeters,
       heightAboveGround,
       engineData.totalThrust,
-      gearResult.gearState
+      gearResult.gearState,
+      this._aeroResult
     );
 
     // Engine-out asymmetric thrust: the surviving engine's moment about the
@@ -1353,10 +1357,7 @@ class FlightSimulator {
     if (this.shadowDemo.active) this.shadowDemo.update(simSeconds);
     const numSubsteps = Math.max(1, Math.round(simSeconds * this.physicsHz));
     for (let i = 0; i < numSubsteps; i++) {
-      if (this.demoDirector && this.demoDirector.isActive) {
-        this.demoDirector.update(this.physicsDt);
-      }
-      this.integratePhysics(this.physicsDt);
+      stepPhysics(this);
       this.totalSimTime += this.physicsDt;
     }
     // Deterministic stepping displays the current state without interpolation.
@@ -1421,8 +1422,7 @@ class FlightSimulator {
   animate() {
     requestAnimationFrame(this.animate);
 
-    const frameDelta = Math.min(0.1, this.clock.getDelta());
-    this.physicsAccumulator += frameDelta;
+    const frameDelta = clampFrameDelta(this.clock.getDelta());
     this.totalSimTime += frameDelta;
 
     // High-rate substepping for rock-solid flight physics
@@ -1432,14 +1432,7 @@ class FlightSimulator {
     } else if (this.gameFlow.isPhysicsFrozen()) {
       this.physicsAccumulator = 0;
     } else {
-      while (this.physicsAccumulator >= this.physicsDt) {
-        if (this.demoDirector && this.demoDirector.isActive) {
-          this.demoDirector.update(this.physicsDt);
-        }
-        this.renderPose.reset(this.position, this.quaternion);
-        this.integratePhysics(this.physicsDt);
-        this.physicsAccumulator -= this.physicsDt;
-      }
+      advancePhysicsFrame(this, frameDelta);
     }
 
     // Keep the lobby backdrop alive: re-arm the demo after it ends.
