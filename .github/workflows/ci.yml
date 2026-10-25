@@ -29,3 +29,21 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - name: Report Preview URLs
+        if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
+        run: |
+          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
+          ALIAS=$(echo "$BRANCH_NAME" | tr '/' '-' | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+//g' | cut -c1-28)
+          COMMIT_SHORT=$(echo "${{ github.event.pull_request.head.sha || github.sha }}" | cut -c1-7)
+          BRANCH_URL="https://${ALIAS}-flight3d.stlim0727.workers.dev"
+          COMMIT_URL="https://${COMMIT_SHORT}-flight3d.stlim0727.workers.dev"
+
+          echo "::notice title=Preview URLs::Branch: $BRANCH_URL | Commit: $COMMIT_URL"
+          echo "### 🛫 Preview URLs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Target | Preview URL |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** (\`$BRANCH_NAME\`) | [$BRANCH_URL]($BRANCH_URL) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** (\`$COMMIT_SHORT\`) | [$COMMIT_URL]($COMMIT_URL) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> 💡 Preview builds are automatically deployed by Cloudflare Workers Builds (\`preview_urls = true\`)." >> $GITHUB_STEP_SUMMARY

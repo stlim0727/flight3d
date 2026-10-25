@@ -24,6 +24,11 @@ npm run preview
 Open `/flight3d/` on the preview server. For a custom domain served at its root,
 change the workflow's `VITE_BASE_PATH` to `/` before deploying.
 
-Cloudflare is no longer configured in this repository. Any previously connected
-Cloudflare Workers Builds integration must be disconnected in Cloudflare before
-retiring that deployment; removing Wrangler configuration does not remove a live Worker.
+## PR and branch preview URLs (Cloudflare Workers Builds)
+
+Like Keepory, flight3d supports automatic preview URLs for unmerged branches and PR commits:
+
+- **Config**: `wrangler.toml` at the repository root with `preview_urls = true` enables Cloudflare Workers Builds preview URLs.
+- **Preview domain**: `https://<alias>-flight3d.stlim0727.workers.dev` (where `<alias>` is the sanitized branch name or short commit SHA).
+- **CI reporting**: `.github/workflows/ci.yml` calculates and displays the preview URLs in the GitHub Step Summary and check annotations on pull requests and non-main branch pushes.
+- **Isolation**: Production remains on GitHub Pages (`https://stlim0727.github.io/flight3d/`), unaffected by preview URLs.
