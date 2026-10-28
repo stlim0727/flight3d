@@ -1,3 +1,5 @@
+import { loadSihwaRegion } from '../geospatial/SihwaRegion.js';
+import { createSihwaScenery } from './SihwaScenery.js';
 import { createDepartureJetBridge } from './DepartureJetBridge.js';
 import * as THREE from 'three';
 import { createDepartureStand } from './DepartureStand.js';
@@ -16,10 +18,12 @@ import { createCityGround, createBuildingMaterials, createTexturedBuildings, cre
 function shape(points) { return new THREE.Shape(points.slice(0,-1).map(([x,z])=>new THREE.Vector2(x,-z))); }
 export async function loadIncheonAirport(base) {
   const json=async file=> {const r=await fetch(base+file);if(!r.ok)throw new Error(`${file}: ${r.status}`);return r.json();};
-  const [source,patch,dressing,mask,trafficData]=await Promise.all([loadIncheonTerrain(base),json('patch.json'),json('dressing.json'),new THREE.TextureLoader().loadAsync(base+'land-mask.png'),json('traffic.json')]);
-  const terrain=new IncheonFlightSurface(source);
+  const [source,patch,dressing,mask,trafficData,region]=await Promise.all([loadIncheonTerrain(base),json('patch.json'),json('dressing.json'),new THREE.TextureLoader().loadAsync(base+'land-mask.png'),json('traffic.json'),loadSihwaRegion(base)]);
+  const terrain=new IncheonFlightSurface(source,region);
   terrain.mesh=new THREE.Group();
   const group=new THREE.Group();
+  const sihwa=createSihwaScenery(region);
+  terrain.mesh.add(sihwa.group);
   const height=(x,z)=>terrain.getHeight(x,z);
   group.add(createDepartureStand(INCHEON_AIRFIELD.elevationM));
   const departureBridge = createDepartureJetBridge(INCHEON_AIRFIELD.elevationM);
@@ -33,7 +37,7 @@ export async function loadIncheonAirport(base) {
   const local=terrainGeometry(2000,160,height);
   const city=new THREE.Mesh(local,new THREE.MeshLambertMaterial({map:createCityGround(patch,dressing,trees)}));
   terrain.mesh.add(city);
-  const records=[],colliders=[];
+  const records=[],colliders=[...sihwa.colliders];
   for(const feature of patch.features.filter(f=>f.kind==='building')) for(const points of feature.parts) {
     const geometry=new THREE.ExtrudeGeometry(shape(points),{depth:feature.height.meters,bevelEnabled:false,steps:1});
     geometry.rotateX(-Math.PI/2);
