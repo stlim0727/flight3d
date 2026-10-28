@@ -4,6 +4,7 @@ import { Cockpit } from './Cockpit.js';
 import { excludeFromDeckShadow } from './CockpitLighting.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
+import { applyKoreanAirLivery } from './KoreanAirLivery.js';
 
 /**
  * Boeing 737-800 Airliner 3D Model
@@ -915,7 +916,12 @@ export class Boeing737 {
     const centerZ = (volume.min.z + volume.max.z) / 2;
     const skin = skinAt(0, centerZ);
     const doorMaterial = skin.material?.clone();
-    if (doorMaterial) doorMaterial.side = THREE.DoubleSide;
+    if (doorMaterial) {
+      doorMaterial.side = THREE.DoubleSide;
+      // The classic Korean Air belly continues over the nose bay panels.
+      doorMaterial.map = null; doorMaterial.color.set(0xe9edf0);
+      doorMaterial.roughness = .35;
+    }
     for (const { obj: hinge, side } of this.gearDoors) {
       const panel = hinge.children[0];
       const positions = [], uvs = [], indices = [];
@@ -1000,6 +1006,7 @@ export class Boeing737 {
           // Preserve the complete neutral airframe for the cockpit shadow proxy.
           const originalAirframeGeometry = this.gltfModel.getObjectByName('B737')?.geometry;
           this.gltfControlSurfaces = bindGltfControlSurfaces(this.gltfModel);
+          applyKoreanAirLivery(this.gltfModel, this.group, this.gltfGroup);
 
           // Turbine fan blades
           this.gltfFans = [];

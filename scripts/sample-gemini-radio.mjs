@@ -6,8 +6,8 @@ import { execFileSync } from 'node:child_process';
 const model = process.env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
 const output = path.resolve(process.env.GEMINI_SAMPLE_DIR || '.cache/gemini-radio');
 const samples = [
-  { speaker: 'tower', voice: 'Kore', text: 'Sky one two three, runway three three left, cleared for takeoff.' },
-  { speaker: 'pilot', voice: 'Charon', text: 'Runway three three left, cleared for takeoff, Sky one two three.' },
+  { speaker: 'tower', voice: 'Kore', text: 'Korean Air one two three, runway three three left, cleared for takeoff.' },
+  { speaker: 'pilot', voice: 'Charon', text: 'Runway three three left, cleared for takeoff, Korean Air one two three.' },
 ];
 const requests = samples.map(sample => ({
   ...sample,

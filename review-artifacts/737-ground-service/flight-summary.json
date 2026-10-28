@@ -1,0 +1,37 @@
+{
+  "result": {
+    "status": "completed",
+    "airborne": true,
+    "stages": [
+      "gate",
+      "pushback",
+      "disconnect",
+      "taxi",
+      "hold",
+      "lineup",
+      "clearance",
+      "takeoff"
+    ],
+    "radio": [
+      "조종사: Incheon Apron, Korean Air 123, ready for pushback. 계류장 관제: Korean Air 123, pushback approved. 지상요원: Tug connected.",
+      "지상요원: Brakes released, commencing pushback. 조종사: Pushback acknowledged.",
+      "지상요원: Pushback complete. Set parking brake. 조종사: Brake set. 지상요원: Tug disconnected, all equipment clear.",
+      "조종사: Ground, Korean Air 123, ready to taxi. 지상 관제: Taxi via the simulation route to runway 33L. Hold short. 조종사: Taxi to 33L, hold short, Korean Air 123.",
+      "조종사: Incheon Tower, Korean Air 123, holding short runway 33L, ready for departure. 관제탑: Hold short, landing traffic. 조종사: Holding short, Korean Air 123.",
+      "관제탑: Korean Air 123, runway 33L, line up and wait. 조종사: Runway 33L, line up and wait, Korean Air 123.",
+      "관제탑: Korean Air 123, runway 33L, cleared for takeoff. 조종사: Runway 33L, cleared for takeoff, Korean Air 123.",
+      "조종사: Takeoff clearance confirmed. Accelerating, rotating and climbing."
+    ],
+    "taxiPoints": 51,
+    "elapsedSeconds": 385.37499999981384
+  },
+  "gear": [
+    "normal",
+    "normal",
+    "normal"
+  ],
+  "crashed": false,
+  "incident": false,
+  "applicationExceptions": 0,
+  "externalExceptions": 0
+}

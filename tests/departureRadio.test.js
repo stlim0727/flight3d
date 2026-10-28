@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { DepartureRadio } from '../src/audio/DepartureRadio.js';
 import { DEPARTURE_RADIO } from '../src/config/departureRadio.js';
-import { createDepartureTug, updateDepartureTug, disposeDepartureTug } from '../src/environment/DepartureTug.js';
+import { TUG, createDepartureTug, updateDepartureTug, disposeDepartureTug } from '../src/environment/DepartureTug.js';
 import * as THREE from 'three';
 
 function fixture(fetcher = async () => ({ok:true,arrayBuffer:async()=>new ArrayBuffer(2)})) {
@@ -65,17 +65,21 @@ test('every scripted stage ships a non-silent PCM voice clip with matching trans
   }
 });
 
-test('737 tractor wheels animate; coupling retracts and detached tractor drives clear',()=>{
+test('737 tractor wheels animate; fixed towbar stays on its dolly as tractor drives clear',()=>{
   const tug=createDepartureTug();
   const sim={position:new THREE.Vector3(0,10.5,0),quaternion:new THREE.Quaternion(),gear:{cgGroundHeightM:3.5}};
   updateDepartureTug(tug,sim,0,false,0);
-  assert.equal(tug.position.z,-18.5);
+  assert.equal(tug.position.z,TUG.noseGearZ-TUG.hitchZ-TUG.towbarLength);
   sim.position.z+=2;updateDepartureTug(tug,sim,1,false,1);
   const state=tug.userData.animation;
   assert.ok(Math.abs(state.wheels[0].rotation.x)>.01);
+  const wheelError=state.wheels[0].rotation.x+2/TUG.wheelRadius;
+  assert.ok(Math.abs(Math.atan2(Math.sin(wheelError),Math.cos(wheelError)))<1e-8,'reverse push rolls the wheels backward');
   const position=tug.position.clone();
-  for(let t=0;t<8;t+=.1)updateDepartureTug(tug,sim,.1,true,t);
-  assert.equal(state.towbar.visible,false);
+  for(let t=0;t<30;t+=.1)updateDepartureTug(tug,sim,.1,true,t);
+  assert.equal(state.pinReleased,true);
+  assert.equal(state.towbar.visible,true,'rigid towbar is carried on its dolly, not shrunk away');
+  assert.equal(state.towbar.scale.z,1);
   assert.ok(tug.position.distanceTo(position)>12,'vehicle departs instead of disappearing');
   disposeDepartureTug(tug);
 });

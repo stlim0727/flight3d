@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import * as THREE from 'three';
+import { MeshBVH } from 'three-mesh-bvh';
 
 // Run under chrome-session --project flight3d; reuse its browser and close only our tab.
 const endpoint = `http://127.0.0.1:${process.env.CHROME_DEBUG_PORT || 9225}`;
@@ -11,11 +13,13 @@ const target = await (await fetch(`${endpoint}/json/new?${encodeURIComponent(url
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise(resolve => ws.addEventListener('open', resolve, { once: true }));
 let sequence = 0;
+const isolatedContexts = new Set(), isolatedErrors = [];
 const pending = new Map(), errors = [], results = [];
 ws.addEventListener('message', event => {
   const message = JSON.parse(event.data);
   if (message.id) { pending.get(message.id)?.(message); pending.delete(message.id); }
-  if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
+  if (message.method === 'Runtime.executionContextCreated' && message.params.context.auxData?.isDefault === false) isolatedContexts.add(message.params.context.id);
+  if (message.method === 'Runtime.exceptionThrown') ((isolatedContexts.has(message.params.exceptionDetails.executionContextId) || message.params.exceptionDetails.url?.startsWith('chrome-extension://')) ? isolatedErrors : errors).push(message.params.exceptionDetails);
 });
 const call = (method, params = {}) => new Promise((resolve, reject) => {
   const id = ++sequence;
@@ -41,7 +45,7 @@ const capture = async name => {
   fs.writeFileSync(path.join(dir, `${name}.png`), Buffer.from(data, 'base64'));
 };
 try {
-  await call('Runtime.enable'); await call('Page.enable');
+  await call('Runtime.enable'); await call('Page.enable');await call('Page.bringToFront');
   for (let i=0;i<120;i++) { if(await evaluate('Boolean(window.simulator?.startupReady && window.simulator?.lobbyScreen)')) break; await new Promise(r=>setTimeout(r,500)); }
   assert.ok(await evaluate('Boolean(window.simulator?.startupReady && window.simulator?.lobbyScreen)'), 'simulator ready');
   await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -69,6 +73,27 @@ try {
     };
   })()`);
   await evaluate(`document.getElementById('btn-fly').click()`);
+  for(let i=0;i<100;i++){if(await evaluate('Boolean(window.simulator.aircraft.modelLoaded)'))break;await new Promise(r=>setTimeout(r,100));}
+  await evaluate(`(()=>{
+    const s=window.simulator,T=window.THREE,mesh=s.aircraft.gltfModel.getObjectByName('B737');
+    s.aircraft.group.updateMatrixWorld(true);
+    const local=s.aircraft.group.matrixWorld.clone().invert().multiply(mesh.matrixWorld);
+    window.__tugAudit={positions:Array.from(mesh.geometry.attributes.position.array),samples:[],elapsed:0};
+    const original=s.integratePhysics.bind(s);
+    s.integratePhysics=function(dt){
+      const result=original(dt),a=window.__tugAudit,tug=s.demoDirector.incheonDepartureScenario.tug;
+      a.elapsed+=dt;
+      if(tug && s.demoDirector.currentStage<=53 && a.elapsed>=.2){
+        a.elapsed=0;tug.updateMatrixWorld(true);
+        const inverse=new T.Matrix4().compose(s.position,s.quaternion,new T.Vector3(1,1,1)).multiply(local).invert();
+        for(const part of [tug.userData.animation.body,tug.userData.animation.cab]){
+          part.geometry.computeBoundingBox();const box=part.geometry.boundingBox.clone().expandByScalar(.16);
+          a.samples.push({stage:s.demoDirector.currentStage,part:part.name,box:[box.min.toArray(),box.max.toArray()],matrix:inverse.clone().multiply(part.matrixWorld).toArray()});
+        }
+      }
+      return result;
+    };
+  })()`);
   let previous;
   for (let sec=0;sec<1800;) {
     const seconds = sec < 60 ? 2 : 20;
@@ -90,6 +115,17 @@ try {
   assert.deepEqual(last.result.stages, ['gate','pushback','disconnect','taxi','hold','lineup','clearance','takeoff']);
   assert.ok(results.every(s=>!s.crashed&&!s.incident&&s.pos.every(Number.isFinite)), 'no crash, gear incident or invalid pose');
   assert.ok(last.gear.every(s=>s==='normal'), 'gear intact');
+  const tugAudit=await evaluate('window.__tugAudit');
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(tugAudit.positions,3));
+  const bvh=new MeshBVH(geometry),collisions=[];
+  for(const sample of tugAudit.samples){
+    const box=new THREE.Box3(new THREE.Vector3(...sample.box[0]),new THREE.Vector3(...sample.box[1]));
+    if(bvh.intersectsBox(box,new THREE.Matrix4().fromArray(sample.matrix)))collisions.push({stage:sample.stage,part:sample.part});
+  }
+  const collisionReport={checkedBoxes:tugAudit.samples.length,collisions:collisions.length,examples:collisions.slice(0,10)};
+  fs.writeFileSync(path.join(dir,'tug-clearance.json'),JSON.stringify(collisionReport,null,2));
+  assert.ok(collisionReport.checkedBoxes>100,'collision audit samples the physical ground sequence');
+  assert.equal(collisionReport.collisions,0,'tractor body/cab plus 16 cm clearance never intersect the loaded airframe triangles');
   assert.ok(await evaluate(`!window.simulator.controls.aircraftControlsDisabled && !window.simulator.scene.getObjectByName('departure-tug') && window.simulator.controls.throttle > .5`), 'manual handoff, climb thrust, no tug');
   await evaluate(`window.simulator.demoDirector.start('incheon','incheon-departure'); window.simulator.stepSimulation(10);`);
   assert.equal(await evaluate(`window.simulator.demoDirector.currentStage`),51, 'restart pushback');
@@ -99,6 +135,6 @@ try {
   assert.equal(errors.length,0,'no browser exceptions');
   console.log('PASS', JSON.stringify(last.result));
 } finally {
-  fs.writeFileSync(path.join(dir,'results.json'),JSON.stringify({errors,results},null,2));
+  fs.writeFileSync(path.join(dir,'results.json'),JSON.stringify({errors,isolatedErrors,results},null,2));
   ws.close(); await fetch(`${endpoint}/json/close/${target.id}`);
 }
