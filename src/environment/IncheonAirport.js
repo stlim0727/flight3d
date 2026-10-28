@@ -4,6 +4,8 @@ import { createDepartureStand } from './DepartureStand.js';
 import { createIncheonPavement } from './IncheonPavement.js';
 import { colourIncheonGround, createIncheonGroundTexture } from './IncheonGround.js';
 import { IncheonTraffic } from './IncheonTraffic.js';
+import { IncheonParkedAirliners } from './IncheonParkedAirliners.js';
+import { planParkedAirliners } from '../geospatial/incheonParking.js';
 import { createControlTower } from './IncheonControlTower.js';
 import { loadIncheonTerrain } from '../geospatial/IncheonTerrain.js';
 import { IncheonFlightSurface, INCHEON_AIRFIELD } from '../geospatial/IncheonFlightSurface.js';
@@ -71,10 +73,12 @@ export async function loadIncheonAirport(base) {
     && !colliders.some(c=>x>=c.bounds.min.x-1 && x<=c.bounds.max.x+1 && z>=c.bounds.min.z-1 && z<=c.bounds.max.z+1
       && (pointInRing(x,z,c.points) || c.points.slice(1).some((b,i)=>segmentDistance(x,z,c.points[i],b)<1))));
   group.add(traffic.mesh);
-  return {terrain,group,departureBridge,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,
+  const parked=new IncheonParkedAirliners(planParkedAirliners(INCHEON_AIRFIELD,patch),INCHEON_AIRFIELD.elevationM);
+  group.add(parked.group);parked.load(import.meta.env?.BASE_URL??'/');
+  return {terrain,group,departureBridge,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,parked,
     towerCab:tower.cab,
     resetTraffic(){traffic.reset();},
-    update(dt,position,time,options={}){traffic.update(dt,options.cameraPosition??position,options.quality,options.paused);},
+    update(dt,position,time,options={}){traffic.update(dt,options.cameraPosition??position,options.quality,options.paused);parked.update(options.cameraPosition??position,options.quality);},
     checkBuildingCollision(probes) {
       for(const p of probes) for(const c of colliders) {
         if(p.pos.y-p.radius>c.top || p.pos.y+p.radius<c.bounds.min.y
@@ -82,6 +86,6 @@ export async function loadIncheonAirport(base) {
           || p.pos.z<c.bounds.min.z-p.radius || p.pos.z>c.bounds.max.z+p.radius)continue;
         if(pointInRing(p.pos.x,p.pos.z,c.points)||c.points.slice(1).some((b,i)=>segmentDistance(p.pos.x,p.pos.z,c.points[i],b)<=p.radius))return {point:p.pos.clone(),get part(){return p.desc;}};
       }
-      return null;
+      return parked.checkCollision(probes);
     }};
 }
