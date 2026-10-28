@@ -21,8 +21,8 @@ export function longitudinalForces(aero, qDyn, alpha, cl, cd, elevatorEffective,
   out.y = lift * cos + drag * sin;
   out.z = drag * cos - lift * sin;
   const c = aero.cg;
-  // Shift aero AND legacy effective thrust moment from reference O to CG once.
-  out.pitch = qSc * (baseCm + controlCm) + thrust * 0.32
+  // Shift aero AND configured effective thrust moment from reference O to CG once.
+  out.pitch = qSc * (baseCm + controlCm) + thrust * aero.thrustPitchArmM
     + c.z * out.y - c.y * (out.z - thrust);
   out.lift = lift;
   out.drag = drag;
