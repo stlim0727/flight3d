@@ -10,7 +10,7 @@ pilot inputs. No crash, landing incident or browser application error occurred.
 | --- | --- | --- | --- | --- | --- |
 | B737-800 | 377.53s | 517.50m | 31.52° | 12.42m | −3.51° |
 | C172 | 688.95s | 222.23m | 19.64° | 14.18m | 0.68° |
-| F-16 | 341.48s | 582.29m | 32.41° | 10.85m | −0.06° |
+| F-16 | 341.48s | 582.31m | 32.43° | 10.86m | −0.06° |
 
 All three visited the seawall, tidal power station, Dal Observatory and
 Bangameori Beach and completed the offshore return and straight exit. All
@@ -32,7 +32,14 @@ Selected evidence:
 - `C172-82.png`: Bangameori Beach pass.
 - `flights.json`: five-second samples, available menu profiles and full results.
 
-All 809 Node tests, syntax checks and the production build passed. This is
+All 818 Node tests, syntax checks and the production build passed. This is
 functional flight acceptance, not an FPS or real-world aircraft performance
 benchmark. Reproduce with the commands in
 [the implementation notes](../../docs/development/sihwa-demo.md).
+
+This acceptance run includes merged PR #281. The fighter's transient thrust
+correction reads `aero.thrustPitchArmM`, matching both the live aerodynamic
+model and trim solver (0m for F-16, 0.32m by default for the other aircraft).
+The new regression failed with the old hardcoded 0.32m and passes with both
+zero and nonzero configured arms. The engine idle floor did not change in #281,
+so the low-speed airbrake trim remains necessary and is tested separately.

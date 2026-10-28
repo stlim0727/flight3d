@@ -97,7 +97,7 @@ export class SihwaTourScenario extends CessnaDemoScenario {
     const qSc=Math.max(1,aero.qDyn*aero.wingArea*aero.meanChord),qHat=sim.angularVelocity.x*aero.meanChord/(2*speed);
     const thrust=sim.engines.thrust.reduce((a,b)=>a+b,0);
     const increment=(aero.Iyy*acceleration/qSc-aero.Cma*(aero.alpha-trim.alphaDeg*Math.PI/180)
-      -aero.Cmq*qHat-(thrust-trim.thrustN)*.32/qSc)/(-aero.Cm_de);
+      -aero.Cmq*qHat-(thrust-trim.thrustN)*aero.thrustPitchArmM/qSc)/(-aero.Cm_de);
     const effective=(trim.handsOffTrimDegRaw-aero.pitchTrim)*Math.PI/180*TRIM_WHEEL_AUTHORITY+increment;
     sim.controls.setVirtualInput('elevator',clamp(effective/(Math.PI/9*stiffness),-1,1));
     sim.controls.setVirtualInput('aileron',clamp(sim.controls.virtualAileron/stiffness,-1,1));

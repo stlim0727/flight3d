@@ -57,3 +57,28 @@ test('the fighter has a feasible low-speed trim with its modeled speed brake',as
   assert.ok(trim.feasible && trim.handsOffFeasible);
   assert.ok(trim.throttle>0 && trim.throttle<1);
 });
+
+test('Sihwa fighter pitch correction uses the live configured thrust arm',async()=>{
+  const THREE=await import('three');
+  const {Aerodynamics}=await import('../src/physics/Aerodynamics.js');
+  const {EngineModel}=await import('../src/physics/EngineModel.js');
+  const {solveTrim}=await import('../src/physics/TrimSolver.js');
+  const profile=SIHWA_TOUR_PROFILES.F16;
+  for(const arm of [0,.32]) {
+    const aero=new Aerodynamics(AIRCRAFT_REGISTRY.F16),engines=new EngineModel(AIRCRAFT_REGISTRY.F16);
+    aero.thrustPitchArmM=arm;Object.assign(aero.cg,{x:0,y:0,z:0});aero.spoilers=profile.speedBrake;
+    const trim=solveTrim(aero,engines,{iasKnots:profile.ias,altitudeMeters:profile.altitude,gearState:0,flapsIndex:0,spoilers:aero.spoilers});
+    assert.ok(trim.feasible);
+    aero.computeAero(0,new THREE.Object3D(),new THREE.Vector3(0,0,-trim.tas),new THREE.Vector3(),650,650,0,0);
+    aero.alpha=trim.alphaDeg*Math.PI/180;aero.pitchTrim=trim.handsOffTrimDeg;
+    const inputs={},sim={aero,engines,position:new THREE.Vector3(0,650,0),linearVelocity:new THREE.Vector3(0,0,-trim.tas),
+      angularVelocity:new THREE.Vector3(),telemetry:{pitchDeg:trim.alphaDeg,rollDeg:0,iasKnots:profile.ias},
+      controls:{virtualAileron:0,setVirtualInput(k,v){inputs[k]=v;}},};
+    const scenario=new SihwaTourScenario({},sim);scenario.route={profile};scenario.trimTimer=0;scenario.speedIntegral=0;
+    const values=[];
+    for(const thrust of [0,65000,131000,0]){engines.thrust.fill(thrust);scenario.flyFighter(0,1/120);values.push(inputs.elevator);}
+    assert.ok(values.every(v=>Number.isFinite(v)&&Math.abs(v)<.8),'exercise unsaturated control');
+    if(arm===0)for(const v of values)assert.ok(Math.abs(v-values[0])<1e-12,'zero-arm fighter must not cancel a nonexistent thrust moment');
+    else assert.ok(values[2]<values[0]-.01,'nonzero configured arm retains nose-down compensation');
+  }
+});

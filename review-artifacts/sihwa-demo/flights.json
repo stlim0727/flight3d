@@ -13,7 +13,7 @@
       },
       "samples": [
         {
-          "simulationTime": 5.192000000000048,
+          "simulationTime": 5.000000000000038,
           "time": 5.000000000000038,
           "stage": 80,
           "active": true,
@@ -38,7 +38,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 10.818800000011917,
+          "simulationTime": 10.60490000000597,
           "time": 10.000000000000073,
           "stage": 80,
           "active": true,
@@ -63,7 +63,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 15.918800000011633,
+          "simulationTime": 15.704900000005685,
           "time": 14.999999999999789,
           "stage": 80,
           "active": true,
@@ -88,7 +88,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 21.01880000001135,
+          "simulationTime": 20.8049000000054,
           "time": 19.999999999999506,
           "stage": 80,
           "active": true,
@@ -115,7 +115,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 26.118800000011067,
+          "simulationTime": 25.904900000005117,
           "time": 24.999999999999222,
           "stage": 80,
           "active": true,
@@ -142,7 +142,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 31.218800000010784,
+          "simulationTime": 31.004900000004834,
           "time": 29.999999999998938,
           "stage": 80,
           "active": true,
@@ -169,7 +169,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 36.318800000010505,
+          "simulationTime": 36.104900000004555,
           "time": 34.99999999999866,
           "stage": 80,
           "active": true,
@@ -196,7 +196,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 41.41880000001022,
+          "simulationTime": 41.20490000000427,
           "time": 39.99999999999837,
           "stage": 80,
           "active": true,
@@ -223,7 +223,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 46.51880000000994,
+          "simulationTime": 46.30490000000399,
           "time": 44.99999999999809,
           "stage": 80,
           "active": true,
@@ -250,7 +250,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 51.61469999998582,
+          "simulationTime": 51.41349999999775,
           "time": 49.999999999997804,
           "stage": 81,
           "active": true,
@@ -279,7 +279,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 57.11890000000341,
+          "simulationTime": 57.09929999997958,
           "time": 54.99999999999752,
           "stage": 81,
           "active": true,
@@ -308,7 +308,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 62.218900000003124,
+          "simulationTime": 62.199299999979296,
           "time": 59.999999999997236,
           "stage": 81,
           "active": true,
@@ -337,7 +337,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 67.31380000001163,
+          "simulationTime": 67.29929999998183,
           "time": 64.9999999999978,
           "stage": 81,
           "active": true,
@@ -366,7 +366,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 72.4138000000156,
+          "simulationTime": 72.3992999999858,
           "time": 70.00000000000178,
           "stage": 81,
           "active": true,
@@ -395,7 +395,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 77.50680000001958,
+          "simulationTime": 77.49929999998977,
           "time": 75.00000000000576,
           "stage": 81,
           "active": true,
@@ -424,7 +424,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 82.59960000003548,
+          "simulationTime": 82.59929999999375,
           "time": 80.00000000000973,
           "stage": 81,
           "active": true,
@@ -453,7 +453,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 87.69160000003946,
+          "simulationTime": 87.69929999999772,
           "time": 85.00000000001371,
           "stage": 81,
           "active": true,
@@ -482,7 +482,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 92.79010000004344,
+          "simulationTime": 92.7993000000017,
           "time": 90.00000000001769,
           "stage": 82,
           "active": true,
@@ -512,7 +512,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 98.24870000004144,
+          "simulationTime": 98.68449999999372,
           "time": 95.00000000002167,
           "stage": 82,
           "active": true,
@@ -542,7 +542,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 103.34830000003946,
+          "simulationTime": 103.78449999999769,
           "time": 100.00000000002565,
           "stage": 82,
           "active": true,
@@ -572,7 +572,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 108.43730000004344,
+          "simulationTime": 108.88450000000167,
           "time": 105.00000000002963,
           "stage": 82,
           "active": true,
@@ -602,7 +602,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 113.52850000006529,
+          "simulationTime": 113.98450000000564,
           "time": 110.00000000003361,
           "stage": 82,
           "active": true,
@@ -632,7 +632,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 118.62090000007524,
+          "simulationTime": 119.08450000000961,
           "time": 115.00000000003759,
           "stage": 83,
           "active": true,
@@ -662,7 +662,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 124.08020000009115,
+          "simulationTime": 124.65950000001357,
           "time": 120.00000000004157,
           "stage": 83,
           "active": true,
@@ -692,7 +692,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 129.18020000009312,
+          "simulationTime": 129.75950000001453,
           "time": 125.00000000004555,
           "stage": 83,
           "active": true,
@@ -722,7 +722,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 134.28020000008857,
+          "simulationTime": 134.85950000000997,
           "time": 130.0000000000461,
           "stage": 83,
           "active": true,
@@ -752,7 +752,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 139.37330000007807,
+          "simulationTime": 139.95950000000542,
           "time": 135.00000000004155,
           "stage": 83,
           "active": true,
@@ -782,7 +782,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 144.46450000009142,
+          "simulationTime": 145.05950000000087,
           "time": 140.000000000037,
           "stage": 83,
           "active": true,
@@ -812,7 +812,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 149.56450000008687,
+          "simulationTime": 150.1594999999963,
           "time": 145.00000000003246,
           "stage": 83,
           "active": true,
@@ -842,7 +842,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 154.66030000009425,
+          "simulationTime": 155.25949999999176,
           "time": 150.0000000000279,
           "stage": 83,
           "active": true,
@@ -872,7 +872,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 159.75500000007779,
+          "simulationTime": 160.3594999999872,
           "time": 155.00000000002336,
           "stage": 83,
           "active": true,
@@ -902,7 +902,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 164.8471000000673,
+          "simulationTime": 165.45949999998265,
           "time": 160.00000000001882,
           "stage": 83,
           "active": true,
@@ -932,7 +932,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 169.9432000000866,
+          "simulationTime": 170.5594999999781,
           "time": 165.00000000001427,
           "stage": 83,
           "active": true,
@@ -962,7 +962,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 175.0378000000761,
+          "simulationTime": 175.65949999997355,
           "time": 170.00000000000972,
           "stage": 83,
           "active": true,
@@ -992,7 +992,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 180.13010000005366,
+          "simulationTime": 180.759499999969,
           "time": 175.00000000000517,
           "stage": 83,
           "active": true,
@@ -1022,7 +1022,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 185.22400000005507,
+          "simulationTime": 185.85949999996444,
           "time": 180.00000000000063,
           "stage": 83,
           "active": true,
@@ -1052,7 +1052,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 190.31430000006245,
+          "simulationTime": 190.9594999999599,
           "time": 184.99999999999608,
           "stage": 83,
           "active": true,
@@ -1082,7 +1082,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 195.4143000000579,
+          "simulationTime": 196.05949999995534,
           "time": 189.99999999999153,
           "stage": 83,
           "active": true,
@@ -1112,7 +1112,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 200.50440000004738,
+          "simulationTime": 201.15949999995078,
           "time": 194.99999999998698,
           "stage": 83,
           "active": true,
@@ -1142,7 +1142,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 205.59270000005475,
+          "simulationTime": 206.25949999994623,
           "time": 199.99999999998244,
           "stage": 83,
           "active": true,
@@ -1172,7 +1172,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 210.68050000006212,
+          "simulationTime": 211.35949999994168,
           "time": 204.9999999999779,
           "stage": 83,
           "active": true,
@@ -1202,7 +1202,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 215.77020000004566,
+          "simulationTime": 216.45949999993712,
           "time": 209.99999999997334,
           "stage": 83,
           "active": true,
@@ -1232,7 +1232,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 220.85940000002918,
+          "simulationTime": 221.55949999993257,
           "time": 214.9999999999688,
           "stage": 83,
           "active": true,
@@ -1262,7 +1262,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 225.94750000004848,
+          "simulationTime": 226.65949999992802,
           "time": 219.99999999996425,
           "stage": 83,
           "active": true,
@@ -1292,7 +1292,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 231.03350000004394,
+          "simulationTime": 231.75949999992346,
           "time": 224.9999999999597,
           "stage": 83,
           "active": true,
@@ -1322,7 +1322,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 236.12240000001555,
+          "simulationTime": 236.8594999999189,
           "time": 229.99999999995515,
           "stage": 83,
           "active": true,
@@ -1352,7 +1352,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 241.21470000002293,
+          "simulationTime": 241.95949999991436,
           "time": 234.9999999999506,
           "stage": 83,
           "active": true,
@@ -1382,7 +1382,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 246.30180000001243,
+          "simulationTime": 247.0594999999098,
           "time": 239.99999999994606,
           "stage": 83,
           "active": true,
@@ -1412,7 +1412,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 251.39200000002577,
+          "simulationTime": 252.15949999990525,
           "time": 244.9999999999415,
           "stage": 83,
           "active": true,
@@ -1442,7 +1442,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 256.4837000000093,
+          "simulationTime": 257.2594999999007,
           "time": 249.99999999993696,
           "stage": 83,
           "active": true,
@@ -1472,7 +1472,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 261.5720000000167,
+          "simulationTime": 262.3594999998962,
           "time": 254.9999999999324,
           "stage": 83,
           "active": true,
@@ -1502,7 +1502,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 266.6596000000062,
+          "simulationTime": 267.45949999989165,
           "time": 259.99999999992787,
           "stage": 83,
           "active": true,
@@ -1532,7 +1532,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 271.7501999999957,
+          "simulationTime": 272.5594999998871,
           "time": 264.9999999999233,
           "stage": 83,
           "active": true,
@@ -1562,7 +1562,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 276.8410999999971,
+          "simulationTime": 277.6594999998826,
           "time": 269.99999999991877,
           "stage": 83,
           "active": true,
@@ -1592,7 +1592,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 281.93339999997465,
+          "simulationTime": 282.7594999998781,
           "time": 274.9999999999142,
           "stage": 83,
           "active": true,
@@ -1622,7 +1622,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 287.022099999988,
+          "simulationTime": 287.85949999987355,
           "time": 279.9999999999097,
           "stage": 83,
           "active": true,
@@ -1652,7 +1652,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 292.1189999999894,
+          "simulationTime": 292.959499999869,
           "time": 284.9999999999051,
           "stage": 83,
           "active": true,
@@ -1682,7 +1682,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 297.2189999999849,
+          "simulationTime": 298.0594999998645,
           "time": 289.9999999999006,
           "stage": 83,
           "active": true,
@@ -1712,7 +1712,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 302.31899999998035,
+          "simulationTime": 303.15949999986,
           "time": 294.99999999989603,
           "stage": 83,
           "active": true,
@@ -1742,7 +1742,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 307.4189999999758,
+          "simulationTime": 308.25949999985545,
           "time": 299.9999999998915,
           "stage": 83,
           "active": true,
@@ -1772,7 +1772,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 312.5189999999713,
+          "simulationTime": 313.3594999998509,
           "time": 304.99999999988694,
           "stage": 83,
           "active": true,
@@ -1802,7 +1802,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 317.6189999999668,
+          "simulationTime": 318.4594999998464,
           "time": 309.9999999998824,
           "stage": 83,
           "active": true,
@@ -1832,7 +1832,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 322.71899999996225,
+          "simulationTime": 323.5594999998419,
           "time": 314.99999999987784,
           "stage": 83,
           "active": true,
@@ -1862,7 +1862,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 327.8189999999577,
+          "simulationTime": 328.65949999983735,
           "time": 319.9999999998733,
           "stage": 83,
           "active": true,
@@ -1892,7 +1892,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 332.9189999999532,
+          "simulationTime": 333.7594999998328,
           "time": 324.99999999986875,
           "stage": 83,
           "active": true,
@@ -1922,7 +1922,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 338.0189999999487,
+          "simulationTime": 338.8594999998283,
           "time": 329.9999999998642,
           "stage": 83,
           "active": true,
@@ -1952,7 +1952,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 343.11899999994415,
+          "simulationTime": 343.9594999998238,
           "time": 334.99999999985965,
           "stage": 83,
           "active": true,
@@ -1982,7 +1982,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 348.2189999999396,
+          "simulationTime": 349.05949999981925,
           "time": 339.9999999998551,
           "stage": 83,
           "active": true,
@@ -2012,7 +2012,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 353.3189999999351,
+          "simulationTime": 354.1594999998147,
           "time": 344.99999999985056,
           "stage": 83,
           "active": true,
@@ -2042,7 +2042,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 358.4189999999306,
+          "simulationTime": 359.2594999998102,
           "time": 349.999999999846,
           "stage": 83,
           "active": true,
@@ -2072,7 +2072,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 363.51899999992605,
+          "simulationTime": 364.3594999998057,
           "time": 354.99999999984146,
           "stage": 83,
           "active": true,
@@ -2102,7 +2102,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 368.6189999999215,
+          "simulationTime": 369.4657999998131,
           "time": 359.9999999998369,
           "stage": 83,
           "active": true,
@@ -2132,7 +2132,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 373.718999999917,
+          "simulationTime": 374.5657999998086,
           "time": 364.99999999983237,
           "stage": 83,
           "active": true,
@@ -2162,7 +2162,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 378.8189999999125,
+          "simulationTime": 379.66579999980405,
           "time": 369.9999999998278,
           "stage": 83,
           "active": true,
@@ -2192,7 +2192,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 383.91899999990795,
+          "simulationTime": 384.7657999997995,
           "time": 374.9999999998233,
           "stage": 83,
           "active": true,
@@ -2222,7 +2222,7 @@
           "aircraft": "B738"
         },
         {
-          "simulationTime": 389.0181999999213,
+          "simulationTime": 389.865799999795,
           "time": 377.5333333331543,
           "stage": -1,
           "active": false,
@@ -2268,7 +2268,7 @@
       },
       "samples": [
         {
-          "simulationTime": 540.491799999779,
+          "simulationTime": 541.7425999996702,
           "time": 5.000000000000038,
           "stage": 80,
           "active": true,
@@ -2293,7 +2293,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 546.1540999997566,
+          "simulationTime": 547.6831999996597,
           "time": 10.000000000000073,
           "stage": 80,
           "active": true,
@@ -2318,7 +2318,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 551.2213999997639,
+          "simulationTime": 552.777999999667,
           "time": 14.999999999999789,
           "stage": 80,
           "active": true,
@@ -2343,7 +2343,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 556.2757999997654,
+          "simulationTime": 557.8779999996625,
           "time": 19.999999999999506,
           "stage": 80,
           "active": true,
@@ -2368,7 +2368,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 561.3308999997548,
+          "simulationTime": 562.9713999996342,
           "time": 24.999999999999222,
           "stage": 80,
           "active": true,
@@ -2393,7 +2393,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 566.3883999997503,
+          "simulationTime": 568.0713999996296,
           "time": 29.999999999998938,
           "stage": 80,
           "active": true,
@@ -2418,7 +2418,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 571.4451999997278,
+          "simulationTime": 573.1713999996251,
           "time": 34.99999999999866,
           "stage": 80,
           "active": true,
@@ -2443,7 +2443,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 576.5009999997352,
+          "simulationTime": 578.2713999996206,
           "time": 39.99999999999837,
           "stage": 80,
           "active": true,
@@ -2470,7 +2470,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 581.5610999997247,
+          "simulationTime": 583.363599999634,
           "time": 44.99999999999809,
           "stage": 80,
           "active": true,
@@ -2497,7 +2497,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 586.6229999997261,
+          "simulationTime": 588.4308999996115,
           "time": 49.999999999997804,
           "stage": 80,
           "active": true,
@@ -2524,7 +2524,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 591.6792999997334,
+          "simulationTime": 593.530899999607,
           "time": 54.99999999999752,
           "stage": 80,
           "active": true,
@@ -2551,7 +2551,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 596.731599999711,
+          "simulationTime": 598.6060999995905,
           "time": 59.999999999997236,
           "stage": 80,
           "active": true,
@@ -2578,7 +2578,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 601.7831999997005,
+          "simulationTime": 603.6794999995918,
           "time": 64.9999999999978,
           "stage": 80,
           "active": true,
@@ -2605,7 +2605,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 606.835699999696,
+          "simulationTime": 608.7521999995754,
           "time": 70.00000000000178,
           "stage": 80,
           "active": true,
@@ -2632,7 +2632,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 611.8869999997033,
+          "simulationTime": 613.8521999995709,
           "time": 75.00000000000576,
           "stage": 80,
           "active": true,
@@ -2659,7 +2659,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 616.9382999997107,
+          "simulationTime": 618.9329999995782,
           "time": 80.00000000000973,
           "stage": 80,
           "active": true,
@@ -2686,7 +2686,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 621.9921999996823,
+          "simulationTime": 624.0329999995737,
           "time": 85.00000000001371,
           "stage": 80,
           "active": true,
@@ -2713,7 +2713,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 627.0426999996778,
+          "simulationTime": 629.1143999995453,
           "time": 90.00000000001769,
           "stage": 80,
           "active": true,
@@ -2740,7 +2740,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 632.0935999996792,
+          "simulationTime": 634.1925999995586,
           "time": 95.00000000002167,
           "stage": 80,
           "active": true,
@@ -2767,7 +2767,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 637.1462999996926,
+          "simulationTime": 639.2897999995422,
           "time": 100.00000000002565,
           "stage": 80,
           "active": true,
@@ -2794,7 +2794,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 642.1966999996642,
+          "simulationTime": 644.3755999995495,
           "time": 105.00000000002963,
           "stage": 80,
           "active": true,
@@ -2821,7 +2821,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 647.2514999996716,
+          "simulationTime": 649.4629999995509,
           "time": 110.00000000003361,
           "stage": 80,
           "active": true,
@@ -2848,7 +2848,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 652.312299999679,
+          "simulationTime": 654.5371999995344,
           "time": 115.00000000003759,
           "stage": 81,
           "active": true,
@@ -2876,7 +2876,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 657.8231999996508,
+          "simulationTime": 660.24619999953,
           "time": 120.00000000004157,
           "stage": 81,
           "active": true,
@@ -2905,7 +2905,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 662.8836999996463,
+          "simulationTime": 665.3188999995135,
           "time": 125.00000000004555,
           "stage": 81,
           "active": true,
@@ -2934,7 +2934,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 667.9363999996597,
+          "simulationTime": 670.389399999509,
           "time": 130.0000000000461,
           "stage": 81,
           "active": true,
@@ -2963,7 +2963,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 672.9916999996373,
+          "simulationTime": 675.4723999995044,
           "time": 135.00000000004155,
           "stage": 81,
           "active": true,
@@ -2992,7 +2992,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 678.0447999996566,
+          "simulationTime": 680.5555999995178,
           "time": 140.000000000037,
           "stage": 81,
           "active": true,
@@ -3021,7 +3021,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 683.1013999996461,
+          "simulationTime": 685.6430999995132,
           "time": 145.00000000003246,
           "stage": 81,
           "active": true,
@@ -3050,7 +3050,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 688.1591999996236,
+          "simulationTime": 690.7430999995087,
           "time": 150.0000000000279,
           "stage": 81,
           "active": true,
@@ -3079,7 +3079,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 693.216499999631,
+          "simulationTime": 695.8172999994922,
           "time": 155.00000000002336,
           "stage": 81,
           "active": true,
@@ -3108,7 +3108,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 698.2670999996204,
+          "simulationTime": 700.8969999995055,
           "time": 160.00000000001882,
           "stage": 81,
           "active": true,
@@ -3137,7 +3137,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 703.3163999996278,
+          "simulationTime": 705.978499999501,
           "time": 165.00000000001427,
           "stage": 81,
           "active": true,
@@ -3166,7 +3166,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 708.3696999996054,
+          "simulationTime": 711.0682999994785,
           "time": 170.00000000000972,
           "stage": 81,
           "active": true,
@@ -3195,7 +3195,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 713.4193999996187,
+          "simulationTime": 716.15619999948,
           "time": 175.00000000000517,
           "stage": 81,
           "active": true,
@@ -3224,7 +3224,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 718.4710999996022,
+          "simulationTime": 721.2539999994874,
           "time": 180.00000000000063,
           "stage": 81,
           "active": true,
@@ -3253,7 +3253,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 723.5187999996156,
+          "simulationTime": 726.3465999994769,
           "time": 184.99999999999608,
           "stage": 81,
           "active": true,
@@ -3282,7 +3282,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 728.5692999996111,
+          "simulationTime": 731.4459999994783,
           "time": 189.99999999999153,
           "stage": 81,
           "active": true,
@@ -3311,7 +3311,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 733.6190999995887,
+          "simulationTime": 736.5374999994738,
           "time": 194.99999999998698,
           "stage": 81,
           "active": true,
@@ -3340,7 +3340,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 738.6688999995961,
+          "simulationTime": 741.6237999994513,
           "time": 199.99999999998244,
           "stage": 81,
           "active": true,
@@ -3369,7 +3369,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 743.7186999995737,
+          "simulationTime": 746.7116999994528,
           "time": 204.9999999999779,
           "stage": 81,
           "active": true,
@@ -3398,7 +3398,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 748.7716999995691,
+          "simulationTime": 751.8018999994661,
           "time": 209.99999999997334,
           "stage": 82,
           "active": true,
@@ -3428,7 +3428,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 754.2595999995706,
+          "simulationTime": 757.4935999994493,
           "time": 214.9999999999688,
           "stage": 82,
           "active": true,
@@ -3458,7 +3458,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 759.32469999956,
+          "simulationTime": 762.5894999994507,
           "time": 219.99999999996425,
           "stage": 82,
           "active": true,
@@ -3488,7 +3488,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 764.3731999995555,
+          "simulationTime": 767.6594999994462,
           "time": 224.9999999999597,
           "stage": 82,
           "active": true,
@@ -3518,7 +3518,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 769.430199999551,
+          "simulationTime": 772.7281999994298,
           "time": 229.99999999995515,
           "stage": 82,
           "active": true,
@@ -3548,7 +3548,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 774.4825999995523,
+          "simulationTime": 777.7884999994371,
           "time": 234.9999999999506,
           "stage": 82,
           "active": true,
@@ -3578,7 +3578,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 779.5388999995597,
+          "simulationTime": 782.8866999994207,
           "time": 239.99999999994606,
           "stage": 82,
           "active": true,
@@ -3608,7 +3608,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 784.5919999995492,
+          "simulationTime": 787.978599999422,
           "time": 244.9999999999415,
           "stage": 82,
           "active": true,
@@ -3638,7 +3638,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 789.6410999995387,
+          "simulationTime": 793.0682999994353,
           "time": 249.99999999993696,
           "stage": 82,
           "active": true,
@@ -3668,7 +3668,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 794.6981999995282,
+          "simulationTime": 798.1412999994308,
           "time": 254.9999999999324,
           "stage": 82,
           "active": true,
@@ -3698,7 +3698,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 799.7556999995237,
+          "simulationTime": 803.2156999994024,
           "time": 259.99999999992787,
           "stage": 82,
           "active": true,
@@ -3728,7 +3728,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 804.8065999995251,
+          "simulationTime": 808.2833999994158,
           "time": 264.9999999999233,
           "stage": 82,
           "active": true,
@@ -3758,7 +3758,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 809.8644999995265,
+          "simulationTime": 813.3723999994113,
           "time": 269.99999999991877,
           "stage": 82,
           "active": true,
@@ -3788,7 +3788,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 814.9244999995219,
+          "simulationTime": 818.4623999994068,
           "time": 274.9999999999142,
           "stage": 83,
           "active": true,
@@ -3818,7 +3818,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 820.4654999995174,
+          "simulationTime": 824.2294999993962,
           "time": 279.9999999999097,
           "stage": 83,
           "active": true,
@@ -3848,7 +3848,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 825.5379999995129,
+          "simulationTime": 829.3210999993858,
           "time": 284.9999999999051,
           "stage": 83,
           "active": true,
@@ -3878,7 +3878,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 830.5998999995143,
+          "simulationTime": 834.4210999993812,
           "time": 289.9999999999006,
           "stage": 83,
           "active": true,
@@ -3908,7 +3908,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 835.6668999995097,
+          "simulationTime": 839.5024999993826,
           "time": 294.99999999989603,
           "stage": 83,
           "active": true,
@@ -3938,7 +3938,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 840.7370999994932,
+          "simulationTime": 844.6024999993781,
           "time": 299.9999999998915,
           "stage": 83,
           "active": true,
@@ -3968,7 +3968,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 845.8105999994887,
+          "simulationTime": 849.7007999993855,
           "time": 304.99999999988694,
           "stage": 83,
           "active": true,
@@ -3998,7 +3998,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 850.8769999994901,
+          "simulationTime": 854.7742999993809,
           "time": 309.9999999998824,
           "stage": 83,
           "active": true,
@@ -4028,7 +4028,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 855.9769999994855,
+          "simulationTime": 859.8742999993764,
           "time": 314.99999999987784,
           "stage": 83,
           "active": true,
@@ -4058,7 +4058,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 861.0358999994869,
+          "simulationTime": 864.9742999993719,
           "time": 319.9999999998733,
           "stage": 83,
           "active": true,
@@ -4088,7 +4088,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 866.0920999994704,
+          "simulationTime": 870.0661999993732,
           "time": 324.99999999986875,
           "stage": 83,
           "active": true,
@@ -4118,7 +4118,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 871.1487999994837,
+          "simulationTime": 875.1451999993686,
           "time": 329.9999999998642,
           "stage": 83,
           "active": true,
@@ -4148,7 +4148,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 876.2044999994672,
+          "simulationTime": 880.2268999993522,
           "time": 334.99999999985965,
           "stage": 83,
           "active": true,
@@ -4178,7 +4178,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 881.2642999994746,
+          "simulationTime": 885.2995999993358,
           "time": 339.9999999998551,
           "stage": 83,
           "active": true,
@@ -4208,7 +4208,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 886.3210999994521,
+          "simulationTime": 890.3809999993372,
           "time": 344.99999999985056,
           "stage": 83,
           "active": true,
@@ -4238,7 +4238,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 891.3806999994714,
+          "simulationTime": 895.4426999993506,
           "time": 349.999999999846,
           "stage": 83,
           "active": true,
@@ -4268,7 +4268,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 896.4397999994609,
+          "simulationTime": 900.5085999993222,
           "time": 354.99999999984146,
           "stage": 83,
           "active": true,
@@ -4298,7 +4298,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 901.4954999994444,
+          "simulationTime": 905.5810999993178,
           "time": 359.9999999998369,
           "stage": 83,
           "active": true,
@@ -4328,7 +4328,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 906.5557999994518,
+          "simulationTime": 910.650699999337,
           "time": 364.99999999983237,
           "stage": 83,
           "active": true,
@@ -4358,7 +4358,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 911.6162999994473,
+          "simulationTime": 915.7357999993264,
           "time": 369.9999999998278,
           "stage": 83,
           "active": true,
@@ -4388,7 +4388,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 916.6730999994248,
+          "simulationTime": 920.8048999993159,
           "time": 374.9999999998233,
           "stage": 83,
           "active": true,
@@ -4418,7 +4418,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 921.7303999994322,
+          "simulationTime": 925.8801999993233,
           "time": 379.9999999998187,
           "stage": 83,
           "active": true,
@@ -4448,7 +4448,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 926.7960999994157,
+          "simulationTime": 930.9501999993188,
           "time": 384.9999999998142,
           "stage": 83,
           "active": true,
@@ -4478,7 +4478,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 931.853199999435,
+          "simulationTime": 936.0125999992904,
           "time": 389.99999999980963,
           "stage": 83,
           "active": true,
@@ -4508,7 +4508,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 936.9184999994126,
+          "simulationTime": 941.0778999992978,
           "time": 394.9999999998051,
           "stage": 83,
           "active": true,
@@ -4538,7 +4538,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 941.976399999414,
+          "simulationTime": 946.1459999992873,
           "time": 399.99999999980054,
           "stage": 83,
           "active": true,
@@ -4568,7 +4568,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 947.0318999994095,
+          "simulationTime": 951.2279999992827,
           "time": 404.999999999796,
           "stage": 83,
           "active": true,
@@ -4598,7 +4598,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 952.088999999399,
+          "simulationTime": 956.2912999992901,
           "time": 409.99999999979144,
           "stage": 83,
           "active": true,
@@ -4628,7 +4628,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 957.1437999994064,
+          "simulationTime": 961.3541999992915,
           "time": 414.9999999997869,
           "stage": 83,
           "active": true,
@@ -4658,7 +4658,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 962.1998999993958,
+          "simulationTime": 966.4213999992751,
           "time": 419.99999999978235,
           "stage": 83,
           "active": true,
@@ -4688,7 +4688,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 967.2546999994032,
+          "simulationTime": 971.4827999992765,
           "time": 424.9999999997778,
           "stage": 83,
           "active": true,
@@ -4718,7 +4718,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 972.3177999993927,
+          "simulationTime": 976.5470999992541,
           "time": 429.99999999977325,
           "stage": 83,
           "active": true,
@@ -4748,7 +4748,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 977.3805999993702,
+          "simulationTime": 981.6061999992734,
           "time": 434.9999999997687,
           "stage": 83,
           "active": true,
@@ -4778,7 +4778,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 982.4401999993895,
+          "simulationTime": 986.6637999992629,
           "time": 439.99999999976416,
           "stage": 83,
           "active": true,
@@ -4808,7 +4808,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 987.494299999379,
+          "simulationTime": 991.7264999992465,
           "time": 444.9999999997596,
           "stage": 83,
           "active": true,
@@ -4838,7 +4838,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 992.5498999993684,
+          "simulationTime": 996.7881999992599,
           "time": 449.99999999975506,
           "stage": 83,
           "active": true,
@@ -4868,7 +4868,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 997.6094999993579,
+          "simulationTime": 1001.8470999992314,
           "time": 454.9999999997505,
           "stage": 83,
           "active": true,
@@ -4898,7 +4898,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1002.6725999993474,
+          "simulationTime": 1006.9046999992507,
           "time": 459.99999999974597,
           "stage": 83,
           "active": true,
@@ -4928,7 +4928,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1007.7328999993548,
+          "simulationTime": 1011.9593999992343,
           "time": 464.9999999997414,
           "stage": 83,
           "active": true,
@@ -4958,7 +4958,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1012.7890999993383,
+          "simulationTime": 1017.0147999992357,
           "time": 469.9999999997369,
           "stage": 83,
           "active": true,
@@ -4988,7 +4988,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1017.8467999993517,
+          "simulationTime": 1022.0672999992312,
           "time": 474.9999999997323,
           "stage": 83,
           "active": true,
@@ -5018,7 +5018,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1022.9008999993412,
+          "simulationTime": 1027.1213999992633,
           "time": 479.9999999997278,
           "stage": 83,
           "active": true,
@@ -5048,7 +5048,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1027.9596999994026,
+          "simulationTime": 1032.179099999315,
           "time": 484.99999999972323,
           "stage": 83,
           "active": true,
@@ -5078,7 +5078,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1033.0189999994484,
+          "simulationTime": 1037.2317999993966,
           "time": 489.9999999997187,
           "stage": 83,
           "active": true,
@@ -5108,7 +5108,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1038.0766999995299,
+          "simulationTime": 1042.2843999994543,
           "time": 494.99999999971413,
           "stage": 83,
           "active": true,
@@ -5138,7 +5138,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1043.1362999995877,
+          "simulationTime": 1047.338899999518,
           "time": 499.9999999997096,
           "stage": 83,
           "active": true,
@@ -5168,7 +5168,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1048.1939999996393,
+          "simulationTime": 1052.3946999995935,
           "time": 504.99999999970504,
           "stage": 83,
           "active": true,
@@ -5198,7 +5198,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1053.250599999697,
+          "simulationTime": 1057.4471999996572,
           "time": 509.9999999997005,
           "stage": 83,
           "active": true,
@@ -5228,7 +5228,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1058.3171999997844,
+          "simulationTime": 1062.501599999697,
           "time": 514.999999999696,
           "stage": 83,
           "active": true,
@@ -5258,7 +5258,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1063.3801999998482,
+          "simulationTime": 1067.5608999997726,
           "time": 519.9999999996915,
           "stage": 83,
           "active": true,
@@ -5288,7 +5288,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1068.443999999894,
+          "simulationTime": 1072.6197999998421,
           "time": 524.9999999996869,
           "stage": 83,
           "active": true,
@@ -5318,7 +5318,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1073.5055999999518,
+          "simulationTime": 1077.678299999906,
           "time": 529.9999999996824,
           "stage": 83,
           "active": true,
@@ -5348,7 +5348,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1078.5676000000153,
+          "simulationTime": 1082.7365999999517,
           "time": 534.9999999996778,
           "stage": 83,
           "active": true,
@@ -5378,7 +5378,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1083.6309000000908,
+          "simulationTime": 1087.7975000000213,
           "time": 539.9999999996733,
           "stage": 83,
           "active": true,
@@ -5408,7 +5408,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1088.6941000001425,
+          "simulationTime": 1092.8609000000909,
           "time": 544.9999999996687,
           "stage": 83,
           "active": true,
@@ -5438,7 +5438,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1093.756500000212,
+          "simulationTime": 1097.9198000001604,
           "time": 549.9999999996642,
           "stage": 83,
           "active": true,
@@ -5468,7 +5468,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1098.8180000002758,
+          "simulationTime": 1102.98120000023,
           "time": 554.9999999996596,
           "stage": 83,
           "active": true,
@@ -5498,7 +5498,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1103.8811000003334,
+          "simulationTime": 1108.0389000002817,
           "time": 559.9999999996551,
           "stage": 83,
           "active": true,
@@ -5528,7 +5528,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1108.946300000415,
+          "simulationTime": 1113.0966000003334,
           "time": 564.9999999996505,
           "stage": 83,
           "active": true,
@@ -5558,7 +5558,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1114.0153000004786,
+          "simulationTime": 1118.163500000403,
           "time": 569.999999999646,
           "stage": 83,
           "active": true,
@@ -5588,7 +5588,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1119.0782000005483,
+          "simulationTime": 1123.2266000004606,
           "time": 574.9999999996414,
           "stage": 83,
           "active": true,
@@ -5618,7 +5618,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1124.1371000005881,
+          "simulationTime": 1128.2815000005303,
           "time": 579.9999999996369,
           "stage": 83,
           "active": true,
@@ -5648,7 +5648,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1129.1960000006577,
+          "simulationTime": 1133.3397000006119,
           "time": 584.9999999996323,
           "stage": 83,
           "active": true,
@@ -5678,7 +5678,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1134.2606000007154,
+          "simulationTime": 1138.3988000006696,
           "time": 589.9999999996278,
           "stage": 83,
           "active": true,
@@ -5708,7 +5708,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1139.325100000779,
+          "simulationTime": 1143.4592000007392,
           "time": 594.9999999996232,
           "stage": 83,
           "active": true,
@@ -5738,7 +5738,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1144.3933000008606,
+          "simulationTime": 1148.5192000008028,
           "time": 599.9999999996187,
           "stage": 83,
           "active": true,
@@ -5768,7 +5768,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1149.4572000009302,
+          "simulationTime": 1153.5791000008426,
           "time": 604.9999999996141,
           "stage": 83,
           "active": true,
@@ -5798,7 +5798,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1154.523000000976,
+          "simulationTime": 1158.6408000009242,
           "time": 609.9999999996096,
           "stage": 83,
           "active": true,
@@ -5828,7 +5828,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1159.5887000010575,
+          "simulationTime": 1163.710300000988,
           "time": 614.999999999605,
           "stage": 83,
           "active": true,
@@ -5858,7 +5858,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1164.6541000010973,
+          "simulationTime": 1168.7694000010456,
           "time": 619.9999999996005,
           "stage": 83,
           "active": true,
@@ -5888,7 +5888,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1169.7195000011668,
+          "simulationTime": 1173.8309000011093,
           "time": 624.999999999596,
           "stage": 83,
           "active": true,
@@ -5918,7 +5918,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1174.7864000012364,
+          "simulationTime": 1178.894100001161,
           "time": 629.9999999995914,
           "stage": 83,
           "active": true,
@@ -5948,7 +5948,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1179.847500001294,
+          "simulationTime": 1183.9523000012425,
           "time": 634.9999999995869,
           "stage": 83,
           "active": true,
@@ -5978,7 +5978,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1184.9143000013696,
+          "simulationTime": 1189.0156000012882,
           "time": 639.9999999995823,
           "stage": 83,
           "active": true,
@@ -6008,7 +6008,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1189.9830000014213,
+          "simulationTime": 1194.0780000013579,
           "time": 644.9999999995778,
           "stage": 83,
           "active": true,
@@ -6038,7 +6038,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1195.044100001479,
+          "simulationTime": 1199.1372000014394,
           "time": 649.9999999995732,
           "stage": 83,
           "active": true,
@@ -6068,7 +6068,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1200.1062000015663,
+          "simulationTime": 1204.197300001497,
           "time": 654.9999999995687,
           "stage": 83,
           "active": true,
@@ -6098,7 +6098,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1205.169300001624,
+          "simulationTime": 1209.2573000015607,
           "time": 659.9999999995641,
           "stage": 83,
           "active": true,
@@ -6128,7 +6128,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1210.2346000016696,
+          "simulationTime": 1214.3219000016184,
           "time": 664.9999999995596,
           "stage": 83,
           "active": true,
@@ -6158,7 +6158,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1215.300300001751,
+          "simulationTime": 1219.383400001682,
           "time": 669.999999999555,
           "stage": 83,
           "active": true,
@@ -6188,7 +6188,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1220.363000001803,
+          "simulationTime": 1224.4432000017575,
           "time": 674.9999999995505,
           "stage": 83,
           "active": true,
@@ -6218,7 +6218,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1225.4255000018666,
+          "simulationTime": 1229.5016000017974,
           "time": 679.9999999995459,
           "stage": 83,
           "active": true,
@@ -6248,7 +6248,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1230.4891000019243,
+          "simulationTime": 1234.562900001873,
           "time": 684.9999999995414,
           "stage": 83,
           "active": true,
@@ -6278,7 +6278,7 @@
           "aircraft": "C172"
         },
         {
-          "simulationTime": 1235.546100001988,
+          "simulationTime": 1239.6175000019307,
           "time": 688.9499999995378,
           "stage": -1,
           "active": false,
@@ -6323,7 +6323,7 @@
       },
       "samples": [
         {
-          "simulationTime": 1387.145800003915,
+          "simulationTime": 1391.185200003888,
           "time": 5.000000000000038,
           "stage": 80,
           "active": true,
@@ -6332,23 +6332,23 @@
             "status": "running",
             "aircraft": "F16",
             "landmarks": [],
-            "minClearanceM": 649.464802925402,
-            "maxBankDeg": 7.05227490861656e-12,
-            "maxCrossTrackM": 0.9962031109691316
+            "minClearanceM": 649.4647422684687,
+            "maxBankDeg": 1.2446314108799668e-11,
+            "maxCrossTrackM": 0.9962104722009215
           },
           "position": [
-            17983.93638944479,
-            650.0006129660055,
-            10670.620322193068
+            17983.936379530503,
+            650.0005326131541,
+            10670.62033056474
           ],
-          "ias": 259.99977591756436,
-          "roll": -6.847301644924469e-12,
+          "ias": 259.9997853391804,
+          "roll": -1.2526716633543583e-11,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1392.7591000039904,
+          "simulationTime": 1396.73790000394,
           "time": 10.000000000000073,
           "stage": 80,
           "active": true,
@@ -6357,23 +6357,23 @@
             "status": "running",
             "aircraft": "F16",
             "landmarks": [],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 1.0390911078782657e-11,
-            "maxCrossTrackM": 0.9985239809359766
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2151682207760897e-11,
+            "maxCrossTrackM": 0.9985519555875599
           },
           "position": [
-            17456.646043458346,
-            650.0011443581095,
-            11115.868085787202
+            17456.64602160007,
+            650.00107509203,
+            11115.868104244475
           ],
-          "ias": 260.0000750972088,
-          "roll": 1.0500631752824168e-11,
+          "ias": 260.0000782384256,
+          "roll": 2.218866730521576e-11,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1397.8208000040422,
+          "simulationTime": 1401.7952000040157,
           "time": 14.999999999999789,
           "stage": 80,
           "active": true,
@@ -6384,23 +6384,23 @@
             "landmarks": [
               "seawall"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999508358727376
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9995378371932693
           },
           "position": [
-            16929.355334627297,
-            650.001255761818,
-            11561.116155769923
+            16929.355315004294,
+            650.0012508120117,
+            11561.116172339694
           ],
-          "ias": 260.0001532104804,
-          "roll": 1.46905013554454e-11,
+          "ias": 260.00014963600194,
+          "roll": 1.5682484865942823e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1402.8881000041179,
+          "simulationTime": 1406.8490000040615,
           "time": 19.999999999999506,
           "stage": 80,
           "active": true,
@@ -6411,23 +6411,23 @@
             "landmarks": [
               "seawall"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999508358727376
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9995378371932693
           },
           "position": [
-            16402.064581312537,
-            650.0012448129869,
-            12006.364263314887
+            16402.064570832066,
+            650.0012721346167,
+            12006.364272164663
           ],
-          "ias": 260.0001344369714,
-          "roll": -1.5694852453319764e-11,
+          "ias": 260.0001294251043,
+          "roll": -1.4303570613412439e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1407.9470000041576,
+          "simulationTime": 1411.8991000041192,
           "time": 24.999999999999222,
           "stage": 80,
           "active": true,
@@ -6438,23 +6438,23 @@
             "landmarks": [
               "seawall"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999508358727376
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9995378371932693
           },
           "position": [
-            15874.773901786499,
-            650.0012215236427,
-            12451.61230855215
+            15874.773899212463,
+            650.0012526506409,
+            12451.61231072571
           ],
-          "ias": 260.00008902297793,
-          "roll": -9.779985011404683e-12,
+          "ias": 260.0000857280301,
+          "roll": -7.47338762960701e-13,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1413.0061000042451,
+          "simulationTime": 1416.9458000042007,
           "time": 29.999999999998938,
           "stage": 80,
           "active": true,
@@ -6465,23 +6465,23 @@
             "landmarks": [
               "seawall"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            15347.483313120592,
-            650.0012045496063,
-            12896.860277066495
+            15347.483314137411,
+            650.0012286190844,
+            12896.860276207903
           ],
-          "ias": 260.00004820286955,
-          "roll": 5.799500950818841e-13,
+          "ias": 260.00004718817115,
+          "roll": -3.530458827351214e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1418.0617000043028,
+          "simulationTime": 1421.9921000042464,
           "time": 34.99999999999866,
           "stage": 80,
           "active": true,
@@ -6492,23 +6492,23 @@
             "landmarks": [
               "seawall"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            14820.192794232089,
-            650.0011942356427,
-            13342.108186660354
+            14820.19279503248,
+            650.0012100247885,
+            13342.108185984487
           ],
-          "ias": 260.0000208429244,
-          "roll": 5.3811121205254875e-12,
+          "ias": 260.00002140797835,
+          "roll": 2.344524808145269e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1423.1218000043605,
+          "simulationTime": 1427.03910000431,
           "time": 39.99999999999837,
           "stage": 81,
           "active": true,
@@ -6521,23 +6521,23 @@
               "plant",
               "tower"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            14292.902317836233,
-            650.0011888407454,
-            13787.356060373055
+            14292.902316356654,
+            650.0011983622128,
+            13787.356061622415
           ],
-          "ias": 260.0000058658273,
-          "roll": -4.792316282998812e-12,
+          "ias": 260.00000709734246,
+          "roll": -1.1111557915335282e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1428.5587000044302,
+          "simulationTime": 1432.4417000043977,
           "time": 44.99999999999809,
           "stage": 81,
           "active": true,
@@ -6550,23 +6550,23 @@
               "plant",
               "tower"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            13765.611862640508,
-            650.0011865749946,
-            14232.603916184213
+            13765.611858383732,
+            650.0011922190874,
+            14232.603919778674
           ],
-          "ias": 259.99999929010977,
-          "roll": -2.495828336826145e-12,
+          "ias": 260.0000005349421,
+          "roll": -1.0496472811792857e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1433.6285000044759,
+          "simulationTime": 1437.5012000044615,
           "time": 49.999999999997804,
           "stage": 81,
           "active": true,
@@ -6579,23 +6579,23 @@
               "plant",
               "tower"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            13238.321415533339,
-            650.0011859886508,
-            14677.85176516534
+            13238.321408917329,
+            650.0011895886115,
+            14677.851770751977
           ],
-          "ias": 259.99999736386593,
-          "roll": -2.0034932290460746e-12,
+          "ias": 259.9999983100449,
+          "roll": 7.634558806548918e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1438.6903000045515,
+          "simulationTime": 1442.5562000045252,
           "time": 54.99999999999752,
           "stage": 81,
           "active": true,
@@ -6608,23 +6608,23 @@
               "plant",
               "tower"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            12711.030969894999,
-            650.0011861205019,
-            15123.099612906162
+            12711.030961656157,
+            650.0011888256485,
+            15123.099619863115
           ],
-          "ias": 259.9999975092029,
-          "roll": -2.124464509918789e-12,
+          "ias": 259.9999980950674,
+          "roll": -6.3002840656377495e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1443.7463000046153,
+          "simulationTime": 1447.6032000045889,
           "time": 59.999999999997236,
           "stage": 81,
           "active": true,
@@ -6637,23 +6637,23 @@
               "plant",
               "tower"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            12183.740523148994,
-            650.0011864464167,
-            15568.347461582433
+            12183.74051397687,
+            650.0011888711832,
+            15568.347469327344
           ],
-          "ias": 259.99999828370517,
-          "roll": 1.713114215201315e-11,
+          "ias": 259.999998575891,
+          "roll": -8.211426939631407e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1448.799300004679,
+          "simulationTime": 1452.6467000046525,
           "time": 64.9999999999978,
           "stage": 81,
           "active": true,
@@ -6666,23 +6666,23 @@
               "plant",
               "tower"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            11656.450074784016,
-            650.0011867390862,
-            16013.595311625611
+            11656.450065172969,
+            650.0011891575556,
+            16013.595319741222
           ],
-          "ias": 259.9999990354468,
-          "roll": -9.188312395539791e-12,
+          "ias": 259.9999991372992,
+          "roll": 3.839580239753812e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1453.8637000047488,
+          "simulationTime": 1457.6952000047163,
           "time": 70.00000000000178,
           "stage": 82,
           "active": true,
@@ -6696,23 +6696,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            11129.159625108516,
-            650.0011869345338,
-            16458.84316277545
+            11129.159615346358,
+            650.0011894362528,
+            16458.8431710187
           ],
-          "ias": 259.9999995597076,
-          "roll": -1.4685531876453346e-12,
+          "ias": 259.99999956205176,
+          "roll": 1.530845774870751e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1459.2943000048072,
+          "simulationTime": 1463.1102000047797,
           "time": 75.00000000000576,
           "stage": 82,
           "active": true,
@@ -6726,23 +6726,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            10601.869174606132,
-            650.0011870405137,
-            16904.091014623555
+            10601.869164824462,
+            650.0011896311534,
+            16904.091022883287
           ],
-          "ias": 259.99999985671997,
-          "roll": 5.461855413467615e-12,
+          "ias": 259.99999982110666,
+          "roll": 3.132442021556277e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1464.3561000048828,
+          "simulationTime": 1468.1781000048195,
           "time": 80.00000000000973,
           "stage": 82,
           "active": true,
@@ -6756,23 +6756,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 2.7441817506761546e-11,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 2.2831081545386303e-11,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            10074.5787236758,
-            650.0011870857455,
-            17349.338866833026
+            10074.578713911187,
+            650.0011897424587,
+            17349.338875078272
           ],
-          "ias": 259.99999999309944,
-          "roll": 1.1054721005569801e-11,
+          "ias": 259.9999999531439,
+          "roll": -5.681967978102926e-12,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1469.4177000049406,
+          "simulationTime": 1473.227900004895,
           "time": 85.00000000001371,
           "stage": 82,
           "active": true,
@@ -6786,23 +6786,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 0.05553575813046432,
-            "maxCrossTrackM": 0.999897635447924
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 0.055534005911643744,
+            "maxCrossTrackM": 0.9998970206220759
           },
           "position": [
-            9547.288212589381,
-            650.0011870415941,
-            17794.586648153454
+            9547.288203334401,
+            650.001189738375,
+            17794.586656986572
           ],
-          "ias": 260.0000000524924,
-          "roll": 0.05804932085131991,
+          "ias": 260.00000002450787,
+          "roll": 0.05804751049338723,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1474.4859000049923,
+          "simulationTime": 1478.2764000049588,
           "time": 90.00000000001769,
           "stage": 82,
           "active": true,
@@ -6816,23 +6816,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 646.2483912615503,
-            "maxBankDeg": 20.032012437787255,
-            "maxCrossTrackM": 6.107709213120005
+            "minClearanceM": 646.248298359094,
+            "maxBankDeg": 20.043612140896734,
+            "maxCrossTrackM": 6.09990420474835
           },
           "position": [
-            9015.300835084254,
-            649.5965305902963,
-            18234.171482033373
+            9015.305217123678,
+            649.5981132671377,
+            18234.17801755499
           ],
-          "ias": 260.02904384842736,
-          "roll": 20.071764130111056,
+          "ias": 260.0292642402265,
+          "roll": 20.083362705543195,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1479.542400005056,
+          "simulationTime": 1483.3235000050165,
           "time": 95.00000000002167,
           "stage": 83,
           "active": true,
@@ -6846,23 +6846,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 631.2619955171093,
-            "maxBankDeg": 30.64136615822407,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 631.3241736852233,
+            "maxBankDeg": 30.639258516635724,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            8438.085882276635,
-            652.3347167885175,
-            18609.528781602014
+            8438.100558246704,
+            652.3955338251213,
+            18609.51953483456
           ],
-          "ias": 259.31873371209167,
-          "roll": 30.6437857702723,
+          "ias": 259.3063754653771,
+          "roll": 30.64173569742795,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1484.9762000051312,
+          "simulationTime": 1488.740100005074,
           "time": 100.00000000002565,
           "stage": 83,
           "active": true,
@@ -6876,23 +6876,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.241800794690725,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.280012749315254,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            7800.115391608577,
-            660.5901878825846,
-            18862.720835669228
+            7800.160770064172,
+            660.6011380994738,
+            18862.765597153855
           ],
-          "ias": 258.756708362416,
-          "roll": 32.243799696593705,
+          "ias": 258.76213278105945,
+          "roll": 32.281977993579275,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1490.037400005183,
+          "simulationTime": 1493.7956000051377,
           "time": 105.00000000002963,
           "stage": 83,
           "active": true,
@@ -6906,23 +6906,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            7124.218758892257,
-            664.7053845928068,
-            18979.582832487005
+            7124.235772729667,
+            664.6288787917981,
+            18979.60705330095
           ],
-          "ias": 258.7802278596792,
-          "roll": 31.759384280201285,
+          "ias": 258.79356677511174,
+          "roll": 31.760400503229768,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1495.0958000052526,
+          "simulationTime": 1498.8442000052253,
           "time": 110.00000000003361,
           "stage": 83,
           "active": true,
@@ -6936,23 +6936,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            6437.91868901341,
-            665.4392780230706,
-            18955.46038629696
+            6437.903793577571,
+            665.3094674415521,
+            18955.455092747747
           ],
-          "ias": 259.18897161759486,
-          "roll": 31.176912394893954,
+          "ias": 259.2003002510168,
+          "roll": 31.173004427516545,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1500.1525000053043,
+          "simulationTime": 1503.888900005277,
           "time": 115.00000000003759,
           "stage": 83,
           "active": true,
@@ -6966,23 +6966,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            5769.430172926665,
-            664.888863911831,
-            18793.229452168216
+            5769.40776675604,
+            664.7926161913161,
+            18793.204672682845
           ],
-          "ias": 259.6050608557885,
-          "roll": 30.89295111376624,
+          "ias": 259.60499113695096,
+          "roll": 30.89167168928695,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1505.20980000538,
+          "simulationTime": 1508.9368000053466,
           "time": 120.00000000004157,
           "stage": 83,
           "active": true,
@@ -6996,23 +6996,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            5146.19065008854,
-            664.4965760518992,
-            18499.938099521645
+            5146.17918057485,
+            664.4752987151725,
+            18499.930424028254
           ],
-          "ias": 259.871953223509,
-          "roll": 30.987160273813455,
+          "ias": 259.86113030434836,
+          "roll": 30.99349768117204,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1510.2675000054317,
+          "simulationTime": 1513.9830000053985,
           "time": 125.00000000004555,
           "stage": 83,
           "active": true,
@@ -7026,23 +7026,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            4594.167235078479,
-            664.4982996748338,
-            18087.17505589949
+            4594.173551455538,
+            664.547465205505,
+            18087.203211434535
           ],
-          "ias": 259.98577168710244,
-          "roll": 31.099572621086136,
+          "ias": 259.9703984561026,
+          "roll": 31.110256036461898,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1515.321700005513,
+          "simulationTime": 1519.034300005474,
           "time": 130.0000000000461,
           "stage": 83,
           "active": true,
@@ -7056,23 +7056,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            4136.4463215179885,
-            664.6342109050689,
-            17571.584884972803
+            4136.465504515055,
+            664.7233939614978,
+            17571.652165894247
           ],
-          "ias": 260.0154999218203,
-          "roll": 31.15128396567162,
+          "ias": 260.0013752545145,
+          "roll": 31.160076438788934,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1520.3754000055649,
+          "simulationTime": 1524.0809000055317,
           "time": 135.00000000004155,
           "stage": 83,
           "active": true,
@@ -7086,23 +7086,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            3792.0602812744582,
-            664.7284403119286,
-            16974.26843417845
+            3792.080626465309,
+            664.8312856485886,
+            16974.3682175789
           ],
-          "ias": 260.01582580218553,
-          "roll": 31.15006418394558,
+          "ias": 260.0059530881778,
+          "roll": 31.158355101463922,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1525.4316000056465,
+          "simulationTime": 1529.1275000055894,
           "time": 140.000000000037,
           "stage": 83,
           "active": true,
@@ -7116,23 +7116,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            3575.178692538916,
-            664.7484422361313,
-            16319.78949103723
+            3575.1898919920122,
+            664.8538854626769,
+            16319.909836191418
           ],
-          "ias": 260.0111477848884,
-          "roll": 31.13726331482356,
+          "ias": 260.0056461206174,
+          "roll": 31.14358617341705,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1530.48910000571,
+          "simulationTime": 1534.187100005647,
           "time": 145.00000000003246,
           "stage": 83,
           "active": true,
@@ -7146,23 +7146,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            3494.6732400080728,
-            664.7359159804786,
-            15635.037986955822
+            3494.6616639820168,
+            664.8397549234649,
+            15635.167619361007
           ],
-          "ias": 260.0076134028896,
-          "roll": 31.127879964186604,
+          "ias": 260.0051834673411,
+          "roll": 31.13623249906496,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1535.54850000575,
+          "simulationTime": 1539.2365000057166,
           "time": 150.0000000000279,
           "stage": 83,
           "active": true,
@@ -7176,23 +7176,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            3553.8150392571056,
-            664.7202710318869,
-            14948.119649912007
+            3553.778660886538,
+            664.8251719989659,
+            14948.247733527518
           ],
-          "ias": 260.0050903989192,
-          "roll": 31.12724322926342,
+          "ias": 260.0042864424832,
+          "roll": 31.135288226669708,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1540.6031000058374,
+          "simulationTime": 1544.2796000057742,
           "time": 155.00000000002336,
           "stage": 83,
           "active": true,
@@ -7206,23 +7206,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            3750.174453918346,
-            664.7138038407412,
-            14287.219728806831
+            3750.112734767794,
+            664.8193160767659,
+            14287.337839402233
           ],
-          "ias": 260.0031064444497,
-          "roll": 31.129894460136644,
+          "ias": 260.00293953535595,
+          "roll": 31.13649366621358,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1545.6578000058892,
+          "simulationTime": 1549.3219000058498,
           "time": 160.00000000001882,
           "stage": 83,
           "active": true,
@@ -7236,23 +7236,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            4075.6955226933164,
-            664.712721047004,
-            13679.45751643072
+            4075.6116028124616,
+            664.8186281422145,
+            13679.559682409501
           ],
-          "ias": 260.001575981895,
-          "roll": 31.130441623867338,
+          "ias": 260.00166733237916,
+          "roll": 31.13708758792097,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1550.713000005941,
+          "simulationTime": 1554.3693000059195,
           "time": 165.00000000001427,
           "stage": 83,
           "active": true,
@@ -7266,23 +7266,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 7.1791743192012785
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 7.1711532106609965
           },
           "position": [
-            4516.736493069122,
-            664.8584200112865,
-            13149.497475691238
+            4516.635990940556,
+            664.9633086059033,
+            13149.581072901667
           ],
-          "ias": 259.99737634753376,
-          "roll": 25.740221215496913,
+          "ias": 259.9973244976915,
+          "roll": 25.7493116316744,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1555.7661000060284,
+          "simulationTime": 1559.4176000059654,
           "time": 170.00000000000972,
           "stage": 83,
           "active": true,
@@ -7296,23 +7296,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            5034.73898743264,
-            662.3289243568641,
-            12691.986186712733
+            5034.647150977987,
+            662.3875695164536,
+            12692.050108626529
           ],
-          "ias": 260.7590768898585,
-          "roll": 3.976129820593949,
+          "ias": 260.77204451929697,
+          "roll": 3.9822240974519714,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1560.817100006092,
+          "simulationTime": 1564.464500006035,
           "time": 175.00000000000517,
           "stage": 83,
           "active": true,
@@ -7326,23 +7326,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            5569.7565537987575,
-            653.9191733055571,
-            12250.863074100225
+            5569.683841458986,
+            654.0294396324028,
+            12250.922099944273
           ],
-          "ias": 261.3687407732979,
-          "roll": -1.9761621588858658,
+          "ias": 261.36337688959156,
+          "roll": -1.9777875671710836,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1565.868900006138,
+          "simulationTime": 1569.5100000060986,
           "time": 180.00000000000063,
           "stage": 83,
           "active": true,
@@ -7356,23 +7356,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            6101.223038798056,
-            650.7011831564703,
-            11805.17520895787
+            6101.130728289311,
+            650.9396659830146,
+            11805.25275720272
           ],
-          "ias": 261.13651748590416,
-          "roll": -0.5118893179897995,
+          "ias": 261.12089860069153,
+          "roll": -0.512393359895998,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1570.9231000062193,
+          "simulationTime": 1574.5533000061741,
           "time": 184.99999999999608,
           "stage": 83,
           "active": true,
@@ -7386,23 +7386,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            6630.156342842597,
-            650.1728442013801,
-            11358.064351788862
+            6630.046938938464,
+            650.4237628724769,
+            11358.15734290403
           ],
-          "ias": 260.7089685806545,
-          "roll": 0.0936978470841374,
+          "ias": 260.7024705938702,
+          "roll": 0.09349382650386523,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1575.9789000062651,
+          "simulationTime": 1579.5983000062379,
           "time": 189.99999999999153,
           "stage": 83,
           "active": true,
@@ -7416,23 +7416,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            7158.375336530632,
-            650.0949462223431,
-            10911.756355096746
+            7158.271137769952,
+            650.2776390840988,
+            10911.844450728144
           ],
-          "ias": 260.3608471966644,
-          "roll": 0.0492693154670996,
+          "ias": 260.36659528029617,
+          "roll": 0.049368053995654027,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1581.0366000063466,
+          "simulationTime": 1584.6420000062897,
           "time": 194.99999999998698,
           "stage": 83,
           "active": true,
@@ -7446,23 +7446,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            7686.1616715790315,
-            650.0451563510193,
-            10466.10084943199
+            7686.080946281085,
+            650.1521689026362,
+            10466.168978500164
           ],
-          "ias": 260.1427362665218,
-          "roll": -0.0026309626860672917,
+          "ias": 260.1554519531447,
+          "roll": -0.002608882057554659,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1586.0870000063865,
+          "simulationTime": 1589.6844000063593,
           "time": 199.99999999998244,
           "stage": 83,
           "active": true,
@@ -7476,23 +7476,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            8213.62424385256,
-            650.0096132978637,
-            10020.731048519508
+            8213.57323836772,
+            650.0622298964987,
+            10020.774103056165
           ],
-          "ias": 260.02987593227743,
-          "roll": -0.004246542032394567,
+          "ias": 260.04366878940704,
+          "roll": -0.0042493186415142065,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1591.13700000645,
+          "simulationTime": 1594.727900006423,
           "time": 204.9999999999779,
           "stage": 83,
           "active": true,
@@ -7506,23 +7506,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            8740.920798068995,
-            649.9936968743106,
-            9575.479469885311
+            8740.896507722655,
+            650.0143688030668,
+            9575.499980282877
           ],
-          "ias": 259.9838818724806,
-          "roll": -0.00020868539721395296,
+          "ias": 259.9951791950734,
+          "roll": -0.00021087131812484643,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1596.1909000065198,
+          "simulationTime": 1599.7708000064927,
           "time": 209.99999999997334,
           "stage": 83,
           "active": true,
@@ -7536,23 +7536,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            9268.162615505606,
-            649.9904363381149,
-            9130.270932381716
+            9268.157824655047,
+            649.995110885246,
+            9130.274978952977
           ],
-          "ias": 259.97314619355495,
-          "roll": 0.0003231908526271458,
+          "ias": 259.9807602375193,
+          "roll": 0.0003228595093986892,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1601.2486000066012,
+          "simulationTime": 1604.8130000065444,
           "time": 214.9999999999688,
           "stage": 83,
           "active": true,
@@ -7566,23 +7566,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            9795.401002395169,
-            649.9924636135994,
-            8685.066754285725
+            9795.408118642152,
+            649.9906228457221,
+            8685.060745552846
           ],
-          "ias": 259.97718547045446,
-          "roll": 0.000048936478906497955,
+          "ias": 259.98143862471693,
+          "roll": 0.000049068783454477114,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1606.298700006659,
+          "simulationTime": 1609.85680000662,
           "time": 219.99999999996425,
           "stage": 83,
           "active": true,
@@ -7596,23 +7596,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            10322.652924129516,
-            649.9956312403069,
-            8239.851549696563
+            10322.665953586484,
+            649.9921310748299,
+            8239.840547470623
           ],
-          "ias": 259.9849980190238,
-          "roll": -0.00002134094856045987,
+          "ias": 259.98683452800987,
+          "roll": -0.00002128052971344592,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1611.3493000067167,
+          "simulationTime": 1614.9022000066896,
           "time": 224.9999999999597,
           "stage": 83,
           "active": true,
@@ -7626,23 +7626,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            10849.920220917193,
-            649.998270220328,
-            7794.623283663594
+            10849.935261910137,
+            649.9951517135131,
+            7794.610582905374
           ],
-          "ias": 259.99188666720676,
-          "roll": -0.000006079591292278099,
+          "ias": 259.99228100493053,
+          "roll": -0.000006082672216687743,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1616.4034000067745,
+          "simulationTime": 1619.9474000067412,
           "time": 229.99999999995515,
           "stage": 83,
           "active": true,
@@ -7656,23 +7656,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            11377.199254382618,
-            649.9999833186704,
-            7349.385066694898
+            11377.21424606604,
+            649.9978283622511,
+            7349.3724076098215
           ],
-          "ias": 259.9964918747408,
-          "roll": 0.00000112728255124217,
+          "ias": 259.996223309799,
+          "roll": 0.0000011209512946735054,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1621.4562000068502,
+          "simulationTime": 1624.9899000068049,
           "time": 234.9999999999506,
           "stage": 83,
           "active": true,
@@ -7686,23 +7686,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            11904.485436120674,
-            650.0008924435253,
-            6904.140816044573
+            11904.49959280489,
+            649.999640804426,
+            6904.128862041839
           ],
-          "ias": 259.9990091524708,
-          "roll": 6.043354941861568e-7,
+          "ias": 259.99855432222677,
+          "roll": 6.037317971283357e-7,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1626.507900006902,
+          "simulationTime": 1630.0333000068745,
           "time": 239.99999999994606,
           "stage": 83,
           "active": true,
@@ -7716,23 +7716,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            12431.775181378309,
-            650.0012730194377,
-            6458.893559841527
+            12431.78841608549,
+            650.0006590324202,
+            6458.882384359966
           ],
-          "ias": 260.00011347235437,
-          "roll": -3.1485460542148244e-8,
+          "ias": 259.9997050045935,
+          "roll": -3.098477486366335e-8,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1631.5685000069598,
+          "simulationTime": 1635.0786000069202,
           "time": 244.9999999999415,
           "stage": 83,
           "active": true,
@@ -7746,23 +7746,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            12959.066285175442,
-            650.0013707715805,
-            6013.645156633385
+            12959.078802398699,
+            650.0011327117774,
+            6013.634586999721
           ],
-          "ias": 260.00043722858817,
-          "roll": -5.209457428744014e-8,
+          "ias": 260.0001520206679,
+          "roll": -5.19719133239881e-8,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1636.6232000070413,
+          "simulationTime": 1640.1246000069839,
           "time": 249.99999999993696,
           "stage": 83,
           "active": true,
@@ -7776,23 +7776,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            13486.35763669714,
-            650.0013484545768,
-            5568.396543975872
+            13486.369698709528,
+            650.0012980912044,
+            5568.386358725688
           ],
-          "ias": 260.0004137112955,
-          "roll": -2.608972153538517e-9,
+          "ias": 260.00024860779894,
+          "roll": -2.6368846609542692e-9,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1641.6780000070871,
+          "simulationTime": 1645.1704000070595,
           "time": 254.9999999999324,
           "stage": 83,
           "active": true,
@@ -7806,23 +7806,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            14014.509056595985,
-            649.9229327058877,
-            5124.167184098336
+            14014.51888653109,
+            649.9228148855683,
+            5124.154518596738
           ],
-          "ias": 260.01420218670864,
-          "roll": 10.841579990581799,
+          "ias": 260.01461332059876,
+          "roll": 10.849644127561447,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1646.7346000071745,
+          "simulationTime": 1650.2171000071112,
           "time": 259.99999999992787,
           "stage": 83,
           "active": true,
@@ -7836,23 +7836,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            14570.71057788615,
-            650.1710462733071,
-            4716.8613524113025
+            14570.717075594843,
+            650.2069779082734,
+            4716.856204294132
           ],
-          "ias": 259.6772400214818,
-          "roll": 29.566545020742588,
+          "ias": 259.6674567519014,
+          "roll": 29.564122156409997,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1651.7922000072322,
+          "simulationTime": 1655.266600007175,
           "time": 264.9999999999233,
           "stage": 83,
           "active": true,
@@ -7866,23 +7866,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.40489051902271,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.431868299559525,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            15189.867821018173,
-            658.1160182950155,
-            4419.3830826956255
+            15189.840229732057,
+            658.1628014276786,
+            4419.353367632211
           ],
-          "ias": 258.8567384493793,
-          "roll": 31.6481207894157,
+          "ias": 258.85573716455184,
+          "roll": 31.684262377988183,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1656.852400007284,
+          "simulationTime": 1660.3148000072565,
           "time": 269.99999999991877,
           "stage": 83,
           "active": true,
@@ -7896,23 +7896,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            15855.620970461181,
-            663.6743659415949,
-            4254.245600670161
+            15855.606906007228,
+            663.6253963086041,
+            4254.206106882481
           ],
-          "ias": 258.7223386542718,
-          "roll": 32.14597488226691,
+          "ias": 258.73340115484564,
+          "roll": 32.15307937306931,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1661.9104000073476,
+          "simulationTime": 1665.3686000073023,
           "time": 274.9999999999142,
           "stage": 83,
           "active": true,
@@ -7926,23 +7926,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            16541.561107357607,
-            665.4511969661004,
-            4230.035380735909
+            16541.581862482886,
+            665.3315788732398,
+            4230.030040265671
           ],
-          "ias": 259.03606879874803,
-          "roll": 31.334076196532106,
+          "ias": 259.05000227425194,
+          "roll": 31.33505839918767,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1666.9708000074172,
+          "simulationTime": 1670.423400007378,
           "time": 279.9999999999097,
           "stage": 83,
           "active": true,
@@ -7956,23 +7956,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            17219.34779700898,
-            665.0643271925342,
-            4345.229599104517
+            17219.384170940797,
+            664.9509730884241,
+            4345.257550663821
           ],
-          "ias": 259.47624106995977,
-          "roll": 30.929364172285478,
+          "ias": 259.48013407080845,
+          "roll": 30.922565866664172,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1672.0685000074689,
+          "simulationTime": 1675.4750000074357,
           "time": 284.9999999999051,
           "stage": 83,
           "active": true,
@@ -7986,27 +7986,27 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 626.7561510322203,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 626.8220306401931,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            17861.206702611387,
-            664.557182471144,
-            4594.444972629526
+            17861.236951882423,
+            664.508875802595,
+            4594.467887767654
           ],
-          "ias": 259.8018980366236,
-          "roll": 30.950252047791786,
+          "ias": 259.7943064084852,
+          "roll": 30.95482770139147,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1677.1507000075503,
+          "simulationTime": 1680.5286000074934,
           "time": 289.9999999999006,
           "stage": 83,
           "active": true,
-          "progress": 40012,
+          "progress": 40014,
           "result": {
             "status": "running",
             "aircraft": "F16",
@@ -8016,23 +8016,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            18440.542099653107,
-            664.4437646006854,
-            4967.685428387322
+            18440.553543683025,
+            664.4723967406978,
+            4967.680133137519
           ],
-          "ias": 259.9596164851137,
-          "roll": 31.064471449074528,
+          "ias": 259.9451131047819,
+          "roll": 31.07418982304472,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1682.250700007614,
+          "simulationTime": 1685.578400007569,
           "time": 294.99999999989603,
           "stage": 83,
           "active": true,
@@ -8046,23 +8046,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            18933.121755685075,
-            664.5604404495443,
-            5450.028990475962
+            18933.11578130417,
+            664.6396716608236,
+            5449.986497824272
           ],
-          "ias": 260.01050324923347,
-          "roll": 31.14291933552217,
+          "ias": 259.99554779545656,
+          "roll": 31.15382707383105,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1687.3507000076775,
+          "simulationTime": 1690.6297000076445,
           "time": 299.9999999998915,
           "stage": 83,
           "active": true,
@@ -8076,23 +8076,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            19318.403238514195,
-            664.6784975252564,
-            6021.814993449731
+            19318.388228895903,
+            664.779300586377,
+            6021.739613126765
           ],
-          "ias": 260.0166425274776,
-          "roll": 31.15551947460223,
+          "ias": 260.00529509572533,
+          "roll": 31.163147516955924,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1692.4316000077472,
+          "simulationTime": 1695.6793000077023,
           "time": 304.99999999988694,
           "stage": 83,
           "active": true,
@@ -8106,23 +8106,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            19580.479523409434,
-            664.7211786362261,
-            6659.544361524084
+            19580.46961326078,
+            664.826011721496,
+            6659.444799743975
           ],
-          "ias": 260.01244937239545,
-          "roll": 31.141424112107916,
+          "ias": 260.0056315213719,
+          "roll": 31.149486939261642,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1697.5266000078109,
+          "simulationTime": 1700.728700007772,
           "time": 309.9999999998824,
           "stage": 83,
           "active": true,
@@ -8136,23 +8136,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            19708.620451282506,
-            664.7141530739935,
-            7337.0018710405275
+            19708.623968779357,
+            664.8192460341728,
+            7336.889962471979
           ],
-          "ias": 260.0085999314173,
-          "roll": 31.1330146382086,
+          "ias": 260.00525853354577,
+          "roll": 31.138706430081665,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1702.6151000078746,
+          "simulationTime": 1705.7777000078356,
           "time": 314.99999999987784,
           "stage": 83,
           "active": true,
@@ -8166,23 +8166,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            19697.596524979122,
-            664.6985045119559,
-            8026.374701417593
+            19697.62280708776,
+            664.8025719121827,
+            8026.261016567649
           ],
-          "ias": 260.0058333636771,
-          "roll": 31.12875031546528,
+          "ias": 260.0045885807729,
+          "roll": 31.13662238807186,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1707.6931000079383,
+          "simulationTime": 1710.8266000078754,
           "time": 319.9999999998733,
           "stage": 83,
           "active": true,
@@ -8196,23 +8196,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            19547.875562866557,
-            664.6887716546339,
-            8699.375898366148
+            19547.924155631597,
+            664.7940181646162,
+            8699.268936231167
           ],
-          "ias": 260.0036221247578,
-          "roll": 31.12893277169965,
+          "ias": 260.0033956459457,
+          "roll": 31.13781536997929,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1712.7936000080017,
+          "simulationTime": 1715.874700007963,
           "time": 324.99999999986875,
           "stage": 83,
           "active": true,
@@ -8226,23 +8226,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            19265.598952262717,
-            664.6862205473609,
-            9328.390596847235
+            19265.66785896031,
+            664.7921912021602,
+            9328.296432245234
           ],
-          "ias": 260.0019638449201,
-          "roll": 31.130404718700067,
+          "ias": 260.0020704873876,
+          "roll": 31.13898723273438,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1717.8745000080714,
+          "simulationTime": 1720.9261000080028,
           "time": 329.9999999998642,
           "stage": 83,
           "active": true,
@@ -8256,23 +8256,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            18862.351908392047,
-            664.6902786890292,
-            9887.61044437997
+            18862.437531931,
+            664.796349393588,
+            9887.533184632914
           ],
-          "ias": 260.0002871489899,
-          "roll": 30.54019315343428,
+          "ias": 260.0004553807903,
+          "roll": 30.549539548048486,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1722.974500008135,
+          "simulationTime": 1725.9778000080844,
           "time": 334.99999999985965,
           "stage": 83,
           "active": true,
@@ -8286,23 +8286,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85754661974988
           },
           "position": [
-            18363.15424789479,
-            664.49495202758,
-            10364.333132585925
+            18363.241685871126,
+            664.5761700670183,
+            10364.271293492271
           ],
-          "ias": 260.3658855054923,
-          "roll": 9.96982232170291,
+          "ias": 260.3752275941178,
+          "roll": 9.97726881159645,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1728.0745000081986,
+          "simulationTime": 1731.0296000081303,
           "time": 339.9999999998551,
           "stage": 83,
           "active": true,
@@ -8316,23 +8316,23 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85957649016318
           },
           "position": [
-            17829.64314820093,
-            656.384331492768,
-            10806.300876551937
+            17829.705125891694,
+            656.4539302007288,
+            10806.253528682233
           ],
-          "ias": 261.28325719613844,
-          "roll": -0.07025136885568015,
+          "ias": 261.2862044635621,
+          "roll": -0.07180767219844458,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
         },
         {
-          "simulationTime": 1733.1745000082622,
+          "simulationTime": 1736.0783000082117,
           "time": 341.4833333331871,
           "stage": -1,
           "active": false,
@@ -8346,20 +8346,20 @@
               "tower",
               "beach"
             ],
-            "minClearanceM": 582.2915998138375,
-            "maxBankDeg": 32.405741270677936,
-            "maxCrossTrackM": 10.847157746167898,
+            "minClearanceM": 582.3104883522733,
+            "maxBankDeg": 32.432949068489805,
+            "maxCrossTrackM": 10.85957649016318,
             "elapsedSeconds": 341.4833333331871,
-            "handoffBankDeg": -0.05967316358374883,
-            "handoffVerticalSpeed": -1.268552044991959
+            "handoffBankDeg": -0.059803065814722035,
+            "handoffVerticalSpeed": -1.2417669200508388
           },
           "position": [
-            17293.47683903456,
-            650.3883861290695,
-            11246.75668309492
+            17293.576714397976,
+            650.8470422916579,
+            11246.67027976735
           ],
-          "ias": 261.44566897280976,
-          "roll": -0.046937677021907605,
+          "ias": 261.36658660050296,
+          "roll": -0.0469080186551585,
           "crashed": false,
           "incident": false,
           "aircraft": "F16"
