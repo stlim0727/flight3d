@@ -10,8 +10,8 @@ import {
 import { setLanguage, t } from '../src/i18n/index.js';
 
 test('scenario availability is scoped to the airport', () => {
-  assert.deepEqual(scenariosForAirport('coastal'), ['runway', 'approach', 'cruise', 'demo']);
-  assert.deepEqual(scenariosForAirport('lukla'), ['runway', 'approach', 'cruise', 'cliff', 'demo']);
+  assert.deepEqual(scenariosForAirport('coastal'), ['runway', 'approach', 'hangang', 'cruise', 'demo']);
+  assert.deepEqual(scenariosForAirport('lukla'), ['runway', 'approach', 'hangang', 'cruise', 'cliff', 'demo']);
   assert.equal(isScenarioAvailable('coastal', 'shadow'), false);
   assert.equal(isScenarioAvailable('coastal', 'cliff'), false);
   assert.equal(isScenarioAvailable('lukla', 'cliff'), true);

@@ -20,6 +20,12 @@ export const SPAWN_SCENARIOS = {
     briefingKey: 'lobby.briefing.scenario.approach',
     lobbyButtonId: 'lobby-preset-app',
   },
+  hangang: {
+    airports: ['coastal', 'lukla', 'incheon', 'neon'],
+    labelKeys: { coastal: 'hangang.title', lukla: 'hangang.title', incheon: 'hangang.title', neon: 'hangang.title' },
+    briefingKey: 'hangang.briefing',
+    lobbyButtonId: 'lobby-preset-hangang',
+  },
   cruise: {
     airports: ['coastal', 'lukla', 'incheon', 'neon'],
     labelKeys: { incheon: 'incheon.cruise', coastal: 'cruise.6.000.ft', lukla: 'himalayan.cruise.13.000.ft', neon: 'neon.cruise' },

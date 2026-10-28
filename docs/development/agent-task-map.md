@@ -14,6 +14,7 @@ context, while the current implementation defines actual behavior.
 | HUD, responsive panels, localization | index.html; style.css; src/ui/FlightPanels.js; src/i18n/ | tests/controlPanelState.test.js; scripts/verify-responsive-ui.mjs; browser screenshots |
 | Cameras and framing | src/cameras/CameraSystem.js | tests/gearCamAndTouchdown.test.js; browser screenshots |
 | Autonomous flight and stage transitions | src/director/DemoFlightDirector.js; src/director/PilotControlLaws.js; src/director/scenarios/ | tests/demoFlightDirector.test.js; tests/demoTouchdown.test.js; npm run test:demo; npm run test:flight |
+| Han River manual bridge challenge | src/config/hangangCourse.js; src/director/HangangRun.js; HangangScenario.js; src/environment/HangangScene.js; [course contract](hangang.md) | tests/hangang.test.js; scripts/verify-hangang.mjs |
 | Aircraft geometry and cockpit displays | src/aircraft/ | npm run build; cockpit browser screenshots |
 | Cockpit sunlight, window-frame shadows, cloud dimming | src/environment/CockpitSunShadow.js; src/aircraft/CockpitAperture.js; [cockpit sunlight](cockpit-sunlight.md) | tests/cockpitSunShadow.test.js; node scripts/verify-cockpit-shadows.mjs |
 | Cockpit diffuse sky, bounce, flood control | src/aircraft/CockpitLightTransfer.js; CockpitTransferModel.js; [offline transfer](cockpit-light-transfer.md) | tests/cockpitTransfer.test.js; npm run bake:cockpit; scripts/verify-cockpit-transfer.html |

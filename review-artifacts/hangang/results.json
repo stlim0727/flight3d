@@ -1,0 +1,71 @@
+{
+  "result": {
+    "initial": {
+      "preset": "hangang",
+      "aircraft": "C172",
+      "mass": 1050,
+      "throttle": 0.5991678274179159,
+      "trim": 2.0398214710705633,
+      "position": [
+        0,
+        19,
+        850
+      ]
+    },
+    "status": "running",
+    "reason": "",
+    "position": [
+      0,
+      19.001001969245227,
+      620.0002287081214
+    ],
+    "speed": 45.999818169253395,
+    "pitch": 1.5229782932087605,
+    "crashed": false
+  },
+  "flight": {
+    "status": "complete",
+    "reason": "",
+    "index": 3,
+    "position": [
+      -127.33861810332135,
+      18.961421880181785,
+      -3722.3143424082205
+    ],
+    "gaps": [
+      12.330279817008272,
+      12.764302056793198,
+      13.227215402055364
+    ],
+    "maintenance": 100,
+    "elapsed": 103.58333333336184
+  },
+  "lifecycle": {
+    "reset": true,
+    "manual": true,
+    "hidden": true,
+    "restore": true,
+    "airport": true
+  },
+  "failure": {
+    "crashed": true,
+    "status": "failed",
+    "reason": "contact",
+    "contact": {
+      "aircraftPart": "fuselage",
+      "structure": "water",
+      "position": [
+        0,
+        2.5704421649491387,
+        -0.4130748824768765
+      ]
+    }
+  },
+  "retry": {
+    "healthy": true,
+    "trauma": 0,
+    "reset": true,
+    "altitude": 62.335960039753495
+  },
+  "exceptions": []
+}

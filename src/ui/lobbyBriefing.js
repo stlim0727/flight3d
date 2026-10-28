@@ -16,6 +16,9 @@ const AIRPORT_NAME_KEYS = {
  * DOM-free so node tests can assert it.
  */
 export function lobbyBriefing(airportKey, presetType) {
+  if (presetType === 'hangang' && isScenarioAvailable(airportKey, presetType)) {
+    return [t('hangang.title'), t('hangang.briefing'), t('hangang.provenance')];
+  }
   const data = APPROACH_DATA[airportKey];
   if (!data) return [];
   const lines = [
