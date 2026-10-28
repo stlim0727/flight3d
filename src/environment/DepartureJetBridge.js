@@ -43,12 +43,13 @@ export function createDepartureJetBridge(groundHeight) {
   rotunda.position.set(0,floorHeight,accessLength); group.add(rotunda);
   const roof = new THREE.Mesh(new THREE.CylinderGeometry(1.9,1.9,.18,32),shell);
   roof.position.set(0,floorHeight+tunnelHeight,accessLength); group.add(roof);
-  const fixedLength=distance*.54, innerStart=fixedLength*.8;
-  tunnel(arm,fixedLength,width);
-  // A fixed-length inner tunnel slides into the outer tunnel when parked.
-  const innerLength=distance-innerStart;
+  // Three overlapping tubes retract without projecting behind the rotunda.
+  tunnel(arm,9.6,width);
+  const middle=new THREE.Group();middle.name='jetbridge-middle';arm.add(middle);
+  tunnel(middle,9,width-.25);
+  const innerLength=8.7;
   const inner=new THREE.Group();inner.name='jetbridge-telescope';arm.add(inner);
-  tunnel(inner,innerLength,width-.3);
+  tunnel(inner,innerLength,width-.5);
   const cab=new THREE.Group();cab.name='jetbridge-door-cab';arm.add(cab);
   // The rotunda turns independently so the bellows face the port door,
   // rather than pointing along the terminal's telescoping tunnel.
@@ -71,9 +72,10 @@ export function createDepartureJetBridge(groundHeight) {
   for (let z=1;z<accessLength;z+=9) box(group,.5,floorHeight,.5,0,floorHeight/2,z,frame);
   box(group,1.4,floorHeight,1.4,0,floorHeight/2,accessLength,frame);
   let extension=0;
-  const bridge={group,access,arm,cab,door,distance,get extension(){return extension;},setExtension(value){
+  const bridge={group,access,arm,middle,inner,cab,door,distance,get extension(){return extension;},setExtension(value){
     extension=THREE.MathUtils.clamp(value,0,1);
     const end=distance-(1-extension)*13;
+    middle.position.z=.8+extension*6.9;
     inner.position.z=end-innerLength;
     cab.position.x=-Math.sin(cab.rotation.y)*1.05;
     cab.position.z=end-Math.cos(cab.rotation.y)*1.05;

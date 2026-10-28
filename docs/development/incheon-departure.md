@@ -10,7 +10,9 @@ with an airborne manual handoff. Bundled English radio speech includes distinct 
 
 G1 is an authored gate placement within source Apron 1, not a surveyed stand ID.
 Its L-shaped bridge has a fixed elevated access corridor, a right-angle rotunda,
-and a telescopic apron arm docking at the 737 forward port door. Only the apron
+and a three-section telescopic apron arm docking at the 737 forward port door.
+All three tubes remain overlapped from docked to parked; the inner tube does not
+protrude behind the rotunda during retraction. Only the apron
 arm retracts before pushback. The layout reproduces this gate architecture, not
 surveyed dimensions of a particular Incheon stand. The fixed access axis meets
 the frozen terminal footprint (`relation/3917466`) at aircraft-local Z=-48.227 m;

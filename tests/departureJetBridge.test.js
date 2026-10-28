@@ -19,6 +19,11 @@ test('737 bridge docks at the port door and telescopes clear without moving the 
   const parked=b.cab.localToWorld(new THREE.Vector3(0,0,1.05));
   assert.ok(dock.distanceTo(parked)>12.9);
   assert.ok(b.group.position.equals(anchor));
+  for(let extension=0;extension<=1;extension+=.05){
+    b.setExtension(extension);
+    assert.ok(b.middle.position.z>=0 && b.middle.position.z<9.6,'middle tube stays inside the outer tube');
+    assert.ok(b.inner.position.z>=b.middle.position.z && b.inner.position.z<b.middle.position.z+9,'inner tube stays overlapped and never protrudes behind the rotunda');
+  }
   b.setExtension(5);assert.equal(b.extension,1);
   b.setExtension(-1);assert.equal(b.extension,0);
 });

@@ -5,6 +5,7 @@
 - `korean-air-port.png`: classic blue-top scheme, titles and tail emblem.
 - `tug-coupled.png`: low-profile tractor, 5.1 m rigid towbar, nose pin and belly clearance.
 - `bridge-layout.png`: right-angle fixed access corridor and telescopic apron arm.
+- `bridge-clear-pushback.png`: terminal-wall connection and parked three-section arm.
 - `tug-disconnected.png`: released tractor drives clear with its towbar on the dolly.
 
 Gate layout and livery are authored interpretations, not a surveyed stand or a
@@ -14,7 +15,8 @@ or third-party vehicle model is bundled.
 
 Validation:
 
-- Complete regression suite: 780 passed. After final paint/gear refinements,
+- Complete local regression suite: 780 passed; PR CI after rebasing the latest
+  touch-control work: 790 passed. After final paint/gear refinements,
   28 gear/PBR/control-surface/bridge tests passed; 7 tow/radio tests passed after
   correcting wheel rolling direction.
 - Syntax/action-pin checks and production build passed.
