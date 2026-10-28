@@ -9,6 +9,7 @@ on port 5197 (or set SIM_URL). See `docs/development/hangang.md` for assumptions
 - `cockpit-entry.jpg`: first opening from the cockpit.
 - `failure.jpg`: actual water impact following nose-down control input.
 - `mobile.jpg`: retry, healthy aircraft and narrow-viewport layout.
+- `region-menu.jpg`: independent Han River region, its only scenario and locked conditions.
 - `results.json`: initial flight state, completion, clearances, lifecycle checks,
   failure contact, retry state and collected browser exceptions.
 

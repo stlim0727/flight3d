@@ -63,6 +63,7 @@ import { RenderDiagnostics } from './dev/RenderDiagnostics.js';
 import { RenderDiagnosticsPanel } from './ui/RenderDiagnosticsPanel.js';
 import {
   DEFAULT_SCENARIO,
+  defaultScenarioForRegion,
   isScenarioAvailable,
 } from './config/scenarioRegistry.js';
 import {
@@ -817,7 +818,7 @@ class FlightSimulator {
     this.devRunner?.stop();
     // Scenario availability depends on the active airport; an unavailable
     // pick (e.g. cliff at coastal) falls back instead of leaving a stale pose.
-    if (!isScenarioAvailable(this.activeAirport, type)) type = DEFAULT_SCENARIO;
+    if (!isScenarioAvailable(this.activeAirport, type)) type = defaultScenarioForRegion(this.activeAirport);
     this.shadowDemo?.stop();
     this.lastPresetType = type;
     if (type === 'hangang' && this.currentAircraftId !== 'C172') this.setAircraft('C172');
@@ -1216,7 +1217,8 @@ class FlightSimulator {
    */
   async setAirport(id) {
     this.renderDiagnosticsPanel?.close();
-    if (!['coastal', 'lukla', 'incheon', 'neon'].includes(id)) return;
+    if (!['coastal', 'lukla', 'incheon', 'neon', 'hangang'].includes(id)) return;
+    if (this.activeAirport === id) return;
     this.hangang?.stop();
     const request = this.airportRequest = (this.airportRequest || 0) + 1;
     this.airportLoading = false;
@@ -1259,6 +1261,7 @@ class FlightSimulator {
     const isIncheon = id === 'incheon';
     const isCoastal = id === 'coastal';
     const isNeon = id === 'neon';
+    const isHangang = id === 'hangang';
     document.getElementById('incheon-attribution').hidden = !isIncheon;
 
     // Toggle 3D mesh visibility
@@ -1327,22 +1330,23 @@ class FlightSimulator {
     }
 
     this.lobby.airport = id;
-    if (!isScenarioAvailable(id, this.lobby.preset)) this.lobby.preset = DEFAULT_SCENARIO;
+    if (!isScenarioAvailable(id, this.lobby.preset)) this.lobby.preset = defaultScenarioForRegion(id);
     saveSavedAirport(id);
     saveSavedScenario(this.lobby.preset);
     // A new airport re-spawns the aircraft below, so any flight held behind the
     // menu is no longer the one to return to: release it and let the cinematic back.
     this.gameFlow.abandonResumableFlight();
-    this.gameFlow.setCinematicAvailable(!isIncheon);
+    this.gameFlow.setCinematicAvailable(!isIncheon && !isHangang);
     this.lobbyScreen?.refresh();
 
     if (this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
     }
 
-    this.setPreset('runway');
+    this.setPreset(defaultScenarioForRegion(id));
+    this.lobbyScreen?.refresh();
 
-    const airportKey = isIncheon ? 'incheon.airport' : isLukla
+    const airportKey = isHangang ? 'hangang.region' : isIncheon ? 'incheon.airport' : isLukla
       ? 'tenzing.hillary.airport.nepal.vnlk.runway.24'
       : 'pacific.coastal.international.airport.runway.09l.elevation';
     this.showToast(() => t('airport.changed.value', { value: t(airportKey) }));
@@ -2363,6 +2367,9 @@ class FlightSimulator {
       onDemoProfile: id => { this.lobby.demoProfile = id; },
       onAirport: id => {
         this.lobby.airport = id;
+        this.lobby.preset = defaultScenarioForRegion(id);
+        if (id === 'hangang') this.lobby.aircraft = 'C172';
+        saveSavedScenario(this.lobby.preset);
         saveSavedAirport(id);
         this.lobbyScreen?.refresh();
         this.queueLobbySelection();

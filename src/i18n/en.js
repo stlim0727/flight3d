@@ -1,4 +1,5 @@
 export default {
+  "hangang.region": "Han River",
   "hangang.title": "Han River · bridge challenge",
   "hangang.briefing": "Dedicated map · automatic C172 · 3 bridges · calm/daylight\nStart at 19 m above water / 89 kt. Hold 10–28 m, 68–113 kt and vertical speed within ±3 m/s. Bank within 12° near bridges, 30° between them. 8 continuous seconds outside the envelope fails the run.",
   "hangang.provenance": "A fictional training course inspired by the Han River, not surveyed geography or real bridge dimensions. Manually fly 01 → 02 → 03, then recover stable flight.",
@@ -420,7 +421,7 @@ export default {
   "cruise.6.000.ft": "✈️ Cruise (6,000 FT)",
   "tenzing.hillary.airport.nepal.vnlk.runway.24": "Tenzing–Hillary Airport, Nepal (VNLK runway 24, elevation 2,867 m, 11.7% slope)",
   "pacific.coastal.international.airport.runway.09l.elevation": "Pacific Coastal International Airport (Runway 09L, elevation 12 m)",
-  "airport.changed.value": "Airport changed: {value}",
+  "airport.changed.value": "Flight region changed: {value}",
   "nose.gear": "Nose gear",
   "left.main.gear": "Left main gear",
   "right.main.gear": "Right main gear",
@@ -592,7 +593,7 @@ export default {
   "phase.des": "DES",
   "phase.app": "APP",
   "lobby.title": "Main Menu",
-  "lobby.airport": "Airport",
+  "lobby.airport": "Flight region",
   "lobby.aircraft": "Aircraft",
   "aircraft.b738": "✈️ Boeing 737",
   "aircraft.f16": "F-16 Fighting Falcon",

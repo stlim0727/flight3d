@@ -21,8 +21,8 @@ export const SPAWN_SCENARIOS = {
     lobbyButtonId: 'lobby-preset-app',
   },
   hangang: {
-    airports: ['coastal', 'lukla', 'incheon', 'neon'],
-    labelKeys: { coastal: 'hangang.title', lukla: 'hangang.title', incheon: 'hangang.title', neon: 'hangang.title' },
+    airports: ['hangang'],
+    labelKeys: { hangang: 'hangang.title' },
     briefingKey: 'hangang.briefing',
     lobbyButtonId: 'lobby-preset-hangang',
   },
@@ -47,6 +47,7 @@ export const SPAWN_SCENARIOS = {
 };
 
 export const DEFAULT_SCENARIO = 'runway';
+export const defaultScenarioForRegion = region => region === 'hangang' ? 'hangang' : DEFAULT_SCENARIO;
 
 export function isScenarioAvailable(airportKey, scenarioType) {
   const scenario = SPAWN_SCENARIOS[scenarioType];

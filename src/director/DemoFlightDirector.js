@@ -179,6 +179,7 @@ export class DemoFlightDirector {
   }
 
   start(targetAirport = null, requestedProfile = this.sim.lobby?.demoProfile) {
+    if ((targetAirport || this.sim.activeAirport) === 'hangang') return false;
     if ((targetAirport || this.sim.activeAirport) === 'incheon' && !['B738', 'C172'].includes(this.sim.currentAircraftId)) return false;
     if (this.sim.currentAircraftId === 'F16' && (targetAirport || this.sim.activeAirport) !== 'lukla') return false;
     this.sim.devRunner?.stop();

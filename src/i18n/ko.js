@@ -1,4 +1,5 @@
 export default {
+  "hangang.region": "한강",
   "hangang.title": "한강 연속 교량 저공 비행",
   "hangang.briefing": "전용 맵 · C172 자동 선택 · 교량 3개 · 무풍/주간\n수면 위 19 m, 89 kt로 시작합니다. 목표: 높이 10–28 m, 속도 68–113 kt, 상승·하강률 ±3 m/s. 교량 앞에서는 날개 기울기 12° 이내, 연결 구간은 30° 이내. 8초 연속 이탈 시 실패합니다.",
   "hangang.provenance": "한강을 모티브로 한 게임용 코스입니다. 교량 위치·치수와 도시는 실측 재현이 아닙니다. 조종으로 01 → 02 → 03 통과 후 안정 비행을 유지하세요.",
@@ -420,7 +421,7 @@ export default {
   "cruise.6.000.ft": "✈️ 순항 비행 (6,000 FT)",
   "tenzing.hillary.airport.nepal.vnlk.runway.24": "네팔 텐징-힐러리 공항 (VNLK 24번 활주로, 해발 2,867m, 11.7% 급경사)",
   "pacific.coastal.international.airport.runway.09l.elevation": "태평양 해안 국제공항 (Runway 09L, 해발 12m)",
-  "airport.changed.value": "공항 변경: {value}",
+  "airport.changed.value": "비행 지역 변경: {value}",
   "nose.gear": "전륜",
   "left.main.gear": "좌측 주기어",
   "right.main.gear": "우측 주기어",
@@ -592,7 +593,7 @@ export default {
   "phase.des": "하강",
   "phase.app": "접근",
   "lobby.title": "메인 메뉴",
-  "lobby.airport": "공항",
+  "lobby.airport": "비행 지역",
   "lobby.aircraft": "기체",
   "aircraft.b738": "✈️ 보잉 737",
   "aircraft.f16": "F-16 Fighting Falcon",

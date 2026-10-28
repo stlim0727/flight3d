@@ -2,7 +2,11 @@
 
 Related: #253 (scenario), #267 (detailed bridge assets).
 
-The lobby offers **Han River bridge challenge** alongside takeoff and landing.
+The lobby offers **Han River** alongside the airports under **Flight region**.
+Only this region offers **Han River bridge challenge**; existing airports do not.
+Selecting it previews its dedicated scenery and locks C172/daylight settings.
+The saved region restores on reload. Internal `airport` fields/storage keys are
+retained for compatibility but also identify this non-airport region.
 It starts a C172 in trimmed flight at 19 m above water, 46 m/s, in daylight and
 calm wind. The dedicated scenery replaces the selected airport for the run;
 leaving the scenario restores the previous environment. Retry clears progress,
@@ -72,7 +76,7 @@ performance budgets remain in #267; this scenario does not complete that issue.
 
 Node 22.23.2: `npm run check`, `npm test`, `npm run build`.
 Focused mission coverage: `node --test tests/hangang.test.js`.
-The full suite passed 797 tests. In this Windows checkout, Incheon JSON fixture
+The full suite passed 798 tests. In this Windows checkout, Incheon JSON fixture
 line endings were restored to the canonical LF bytes matching their manifest
 hashes; CRLF checkout bytes fail the existing checksum test on the base too.
 There is no semantic Incheon scenery change in this feature.

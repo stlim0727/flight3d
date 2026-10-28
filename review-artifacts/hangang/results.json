@@ -1,6 +1,7 @@
 {
   "result": {
     "initial": {
+      "region": "hangang",
       "preset": "hangang",
       "aircraft": "C172",
       "mass": 1050,
@@ -43,6 +44,7 @@
   "lifecycle": {
     "reset": true,
     "manual": true,
+    "noDemo": true,
     "hidden": true,
     "restore": true,
     "airport": true
@@ -66,6 +68,21 @@
     "trauma": 0,
     "reset": true,
     "altitude": 62.335960039753495
+  },
+  "menu": {
+    "region": "hangang",
+    "selected": true,
+    "onlyChallenge": [
+      "lobby-preset-hangang"
+    ],
+    "aircraftLocked": true,
+    "timeLocked": true
+  },
+  "restored": {
+    "region": "hangang",
+    "preset": "hangang",
+    "aircraft": "C172",
+    "active": true
   },
   "exceptions": []
 }

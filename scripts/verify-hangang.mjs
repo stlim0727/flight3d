@@ -62,9 +62,10 @@ try {
   const result = await evaluate(async () => {
     const s=window.simulator;
     s.clock.getDelta=()=>0; s.demoDirector.stop(); s.gameFlow.returnToLobby(true);
-    document.getElementById('lobby-preset-hangang').click();
+    document.getElementById('lobby-airport-hangang').click();
+    while(s.lobbySelectionPending) await new Promise(resolve=>setTimeout(resolve,50));
     document.getElementById('btn-fly').click();
-    const initial = { preset:s.lastPresetType, aircraft:s.currentAircraftId, mass:s.aero.mass, throttle:s.controls.throttle, trim:s.controls.pitchTrim, position:s.position.toArray() };
+    const initial = { region:s.activeAirport, preset:s.lastPresetType, aircraft:s.currentAircraftId, mass:s.aero.mass, throttle:s.controls.throttle, trim:s.controls.pitchTrim, position:s.position.toArray() };
     s.stepSimulation(5);
     s.hangang.render();
     return {initial,status:s.hangang.run.status,reason:s.hangang.run.reason,position:s.position.toArray(),speed:s.linearVelocity.length(),pitch:s.telemetry.pitchDeg,crashed:s.isCrashed};
@@ -95,13 +96,14 @@ try {
     const reset=s.hangang.run.index===0 && s.hangang.run.status==='running';
     s.autopilot.master=true;s.stepSimulation(0.1);
     const manual=!s.autopilot.master;
+    const noDemo=s.demoDirector.start()===false && !s.demoDirector.isActive;
     s.gameFlow.returnToLobby(true);s.hangang.render();const hidden=s.hangang.panel.hidden;
-    s.gameFlow.enterFlight();s.setPreset('runway');
+    s.gameFlow.enterFlight();await s.setAirport('coastal');s.setPreset('runway');
     const restore=!s.hangang.active && s.currentTerrain===s.terrain && !s.hangang.scene.group.visible;
-    s.setPreset('hangang');await s.setAirport('lukla');
+    await s.setAirport('hangang');await s.setAirport('lukla');
     const airport=!s.hangang.active && s.currentTerrain===s.luklaTerrain;
-    await s.setAirport('coastal');s.setPreset('hangang');
-    return {reset,manual,hidden,restore,airport};
+    await s.setAirport('hangang');
+    return {reset,manual,noDemo,hidden,restore,airport};
   });
   await evaluate(async()=>{
     const s=window.simulator;
@@ -124,8 +126,24 @@ try {
   });
   await send('Emulation.setDeviceMetricsOverride',{width:412,height:915,deviceScaleFactor:1,mobile:true});
   await delay(3500);await capture('mobile');
-  await writeFile(join(directory,'results.json'),JSON.stringify({result,flight,lifecycle,failure,retry,exceptions},null,2));
-  console.log(JSON.stringify({result,flight,lifecycle,failure,retry,exceptions}));
+  const menu = await evaluate(()=>{
+    const s=window.simulator;s.gameFlow.returnToLobby(true);s.lobbyScreen.refresh();
+    return {region:s.activeAirport, selected:document.getElementById('lobby-airport-hangang').classList.contains('active'),
+      onlyChallenge:[...document.querySelectorAll('.lobby-scenarios .btn-preset')].filter(b=>b.style.display!=='none').map(b=>b.id),
+      aircraftLocked:document.getElementById('lobby-aircraft-b738').disabled,timeLocked:document.getElementById('lobby-time-select').disabled};
+  });
+  await delay(300);await capture('region-menu');
+  await send('Page.reload');
+  let restored;
+  for(let i=0;i<240;i++) {
+    restored=await evaluate(()=>window.simulator?.startupReady ? {region:window.simulator.activeAirport,preset:window.simulator.lastPresetType,aircraft:window.simulator.currentAircraftId,active:window.simulator.hangang?.active}:null);
+    if(restored) break;await delay(500);
+  }
+  assert.deepEqual(restored,{region:'hangang',preset:'hangang',aircraft:'C172',active:true});
+  assert.ok(menu.selected && menu.aircraftLocked && menu.timeLocked);
+  assert.deepEqual(menu.onlyChallenge,['lobby-preset-hangang']);
+  await writeFile(join(directory,'results.json'),JSON.stringify({result,flight,lifecycle,failure,retry,menu,restored,exceptions},null,2));
+  console.log(JSON.stringify({result,flight,lifecycle,failure,retry,menu,restored,exceptions}));
   assert.equal(result.initial.aircraft,'C172');assert.equal(result.initial.preset,'hangang');
   assert.equal(failure.status,'failed');assert.equal(failure.crashed,true);assert.equal(flight.status,'complete');assert.equal(flight.index,3);
   assert.ok(Object.values(lifecycle).every(Boolean));assert.equal(exceptions.length,0);

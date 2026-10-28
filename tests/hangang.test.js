@@ -68,8 +68,8 @@ test('empty/duplicate courses and invalid state cannot earn a pass', () => {
 test('mission briefing overrides unrelated airport/runway instructions', () => {
   for (const lang of ['en', 'ko']) {
     setLanguage(lang);
-    assert.deepEqual(lobbyBriefing('coastal', 'hangang'), lobbyBriefing('lukla', 'hangang'));
-    assert.ok(lobbyBriefing('coastal', 'hangang').join().includes('C172'));
+    assert.ok(lobbyBriefing('hangang', 'hangang').join().includes('C172'));
+    assert.ok(!lobbyBriefing('coastal', 'hangang').join().includes('01 → 02'));
   }
   setLanguage('en');
 });
