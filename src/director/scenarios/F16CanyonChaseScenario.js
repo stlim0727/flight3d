@@ -179,6 +179,16 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
       this.result.elapsedSeconds = this.director.totalTimer;
       this.target?.dispose();
       this.target = null;
+      const forwardVec = sim.linearVelocity.clone().setY(0).normalize();
+      const speed = 300 * 0.514444 / Math.sqrt(Atmosphere.getConditions(sim.position.y).densityRatio);
+      sim.linearVelocity.copy(forwardVec).multiplyScalar(speed);
+      sim.angularVelocity.set(0, 0, 0);
+      const headingRad = Math.atan2(forwardVec.x, -forwardVec.z);
+      sim.quaternion.setFromEuler(new THREE.Euler(0, -headingRad, 0, 'YXZ'));
+      sim.renderPose?.reset(sim.position, sim.quaternion);
+      sim.aircraft.group.position.copy(sim.position);
+      sim.aircraft.group.quaternion.copy(sim.quaternion);
+      sim.applyComputedTrim();
       this.director.stop(() => t('demo.f16.chase.complete'), false, { preserveThrottle: true });
     }
   }
