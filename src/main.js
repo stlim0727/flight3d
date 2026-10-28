@@ -1188,7 +1188,7 @@ class FlightSimulator {
       gearState: this.gear.gearState,
       spoilers: this.aero.spoilers,
     });
-    if (!solution.feasible || !solution.handsOffFeasible) return;
+    if (!solution.feasible || (!solution.handsOffFeasible && solution.reason !== 'idle')) return;
     this.controls.throttle = solution.throttle;
     this.engines.setThrottle(solution.throttle);
     this.controls.pitchTrim = solution.handsOffTrimDeg;
