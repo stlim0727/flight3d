@@ -318,7 +318,7 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
     const alpha = clamp((desiredCl - aero.CL0_clean) / aero.CLa, -0.10, 0.40);
     const rate = (alpha - aero.alpha) * 3 + 9.80665 * (normalG - cosBank) / Math.max(40, aero.tas);
     const qSc = Math.max(1, aero.qDyn * aero.wingArea * aero.meanChord);
-    const thrustMoment = sim.engines.thrust.reduce((sum, thrust) => sum + thrust, 0) * 0.32;
+    const thrustMoment = sim.engines.thrust.reduce((sum, thrust) => sum + thrust, 0) * aero.thrustPitchArmM;
     const cm = (aero.Iyy * (rate - sim.angularVelocity.x) * 4 - thrustMoment) / qSc;
     const qHat = sim.angularVelocity.x * aero.meanChord / (2 * Math.max(10, aero.tas));
     const elevator = ((cm - aero.Cm0 - aero.Cma * aero.alpha - aero.Cmq * qHat) / -aero.Cm_de

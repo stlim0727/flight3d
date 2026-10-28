@@ -4,6 +4,9 @@ import * as THREE from 'three';
 import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { EngineModel } from '../src/physics/EngineModel.js';
 import { solveTrim } from '../src/physics/TrimSolver.js';
+import { F16LuklaScenario } from '../src/director/scenarios/F16LuklaScenario.js';
+import { F16CanyonChaseScenario } from '../src/director/scenarios/F16CanyonChaseScenario.js';
+import { flyVerticalPath } from '../src/director/PilotControlLaws.js';
 import { F16_FALCON } from '../src/config/aircraftConfigs.js';
 
 describe('F-16 longitudinal response', () => {
@@ -60,3 +63,34 @@ describe('F-16 longitudinal response', () => {
     });
   }
 });
+
+// Demo feedforward must invert the same thrust moment as the live model.
+for (const [name, command] of [
+  ['Lukla low pass', sim => new F16LuklaScenario({}, sim).flyVertical(0, 300)],
+  ['canyon chase', sim => new F16CanyonChaseScenario({}, sim).flyAttitude(0, 1000, 300, 1)],
+  ['shared vertical path', sim => flyVerticalPath(sim, 0, 300, sim.telemetry)],
+]) {
+  it(`keeps F-16 ${name} pitch feedforward consistent across throttle changes`, () => {
+    const aero = new Aerodynamics(F16_FALCON);
+    const mesh = new THREE.Object3D();
+    const velocity = new THREE.Vector3(0, 0, -160);
+    const angularVelocity = new THREE.Vector3();
+    aero.computeAero(0, mesh, velocity, angularVelocity, 1000, 1000, 0, 0);
+    aero.alpha = (aero.mass * 9.80665 / (aero.qDyn * aero.wingArea) - aero.CL0_clean) / aero.CLa;
+    const inputs = {};
+    const sim = { aero, engines: new EngineModel(F16_FALCON),
+      position: new THREE.Vector3(0, 1000, 0), linearVelocity: velocity, angularVelocity,
+      telemetry: { rollDeg: 0, pitchDeg: THREE.MathUtils.radToDeg(aero.alpha), iasKnots: 300 },
+      controls: { setVirtualInput: (key, value) => { inputs[key] = value; } },
+    };
+    const elevator = [];
+    for (const thrust of [0, 65000, 131000, 0]) {
+      sim.engines.thrust.fill(thrust);
+      command(sim);
+      elevator.push(inputs.elevator);
+    }
+    assert.ok(Math.abs(elevator[0]) < 0.8, 'exercise unsaturated control');
+    for (const value of elevator) assert.ok(Math.abs(value - elevator[0]) < 1e-12,
+      `${name}: extra thrust compensation changed elevator from ${elevator[0]} to ${value}`);
+  });
+}

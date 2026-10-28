@@ -49,7 +49,7 @@ export function flyVerticalPath(sim, targetVz, targetIas, tel, pathAcceleration 
   const desiredRate = THREE.MathUtils.clamp((targetPitch - pitch) * 1.2, -0.12, 0.12);
   const desiredAcceleration = (desiredRate - q) * 2.5;
   const qSc = Math.max(1, aero.qDyn * aero.wingArea * aero.meanChord);
-  const thrustMoment = sim.engines.thrust.reduce((sum, thrust) => sum + thrust, 0) * 0.32;
+  const thrustMoment = sim.engines.thrust.reduce((sum, thrust) => sum + thrust, 0) * aero.thrustPitchArmM;
   const gearMoment = groundPitch === null ? 0 : sim.gear.lastMomentBody.x;
   const requiredCm = (aero.Iyy * desiredAcceleration - thrustMoment - gearMoment) / qSc;
   const qHat = q * aero.meanChord / (2 * Math.max(10, aero.tas));
