@@ -36,3 +36,7 @@ CDP touch events in portrait and landscape. It checks off-centre grabs, fine and
 full inputs, release and cancellation, and saves screenshots/results. Physics is
 stepped only through `FlightControls.update`; this is input acceptance, not a
 full flight handling or landing test. Inspect the images separately.
+
+For the separate B738/C172 approach/cruise audit with live 120 Hz physics,
+see [aircraft control evidence](../../review-artifacts/aircraft-controls/README.md)
+and `scripts/verify-aircraft-controls.mjs`.
