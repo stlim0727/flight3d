@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Sihwa scenery review</title><style>body{margin:0;background:#a9c9df}canvas{display:block}#label{position:absolute;left:24px;top:24px;color:white;font:18px sans-serif;text-shadow:0 1px 4px #000}</style></head><body><div id="label"></div><script type="module">
+import * as THREE from 'three';
+import {loadIncheonAirport} from '/src/environment/IncheonAirport.js';
+import {WaterOcean} from '/src/environment/WaterOcean.js';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xaccddd);
+const renderer=new THREE.WebGLRenderer({antialias:true,logarithmicDepthBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(devicePixelRatio);renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.append(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,1,70000);
+scene.add(new THREE.HemisphereLight(0xc9e8ff,0x8b9273,2.5));const sun=new THREE.DirectionalLight(0xfff5de,2.2);sun.position.set(-1000,2500,-1000);scene.add(sun);
+const airport=await loadIncheonAirport('/scenery/incheon/');scene.add(airport.terrain.mesh,airport.group);
+const ocean=new WaterOcean(100000,180);scene.add(ocean.mesh);
+const lm=airport.terrain.region.features.features;const f=k=>lm.find(x=>x.kind===k).center;const p=f('plant'),b=f('beach');
+const tower=lm.find(x=>x.id==='way/1038767380').center;
+const views={plant:{at:[p[0],20,p[1]],offset:[-650,450,-450]},tower:{at:[tower[0],40,tower[1]],offset:[-160,100,-180]},beach:{at:[b[0],12,b[1]],offset:[-1000,650,-750]},seawall:{at:[p[0]+1800,0,p[1]-1000],offset:[-6500,6500,-800]}};
+window.review={airport,renderer,scene,camera,views,view(name){const v=views[name];camera.position.fromArray(v.at).add(new THREE.Vector3(...v.offset));camera.lookAt(...v.at);document.querySelector('#label').textContent=({plant:'시화호 조력발전소 · 시화나래',tower:'시화나래 달전망대',beach:'방아머리해변',seawall:'시화방조제 · 서해 / 시화호'})[name];renderer.render(scene,camera);return{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};}};
+review.view('plant');
+</script></body></html>

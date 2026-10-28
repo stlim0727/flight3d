@@ -6,8 +6,10 @@ export { airfield as INCHEON_AIRFIELD };
 
 /** Airport elevation is a modeled constant, not a surveyed pavement profile. */
 export class IncheonFlightSurface {
-  constructor(source) {
+  constructor(source, region=null) {
     this.source = source;
+    this.region = region;
+    this.isLand = (x,z)=>region ? region.isCoreLand(x,z) : source.isLand(x,z);
     this.isLoaded = true;
     this.surfaces = airfield.surfaces.map(s => ({ ...s, bounds: [
       Math.min(...s.points.map(p=>p[0])), Math.min(...s.points.map(p=>p[1])),
@@ -18,7 +20,7 @@ export class IncheonFlightSurface {
     this.elevations = new Float32Array(this.gridSize ** 2);
     this.landNodes = new Uint8Array(this.gridSize ** 2);
     this.coastCells = new Uint8Array(480 ** 2);
-    const land = source.coastline.land;
+    const land = (region?.coreCoastline ?? source.coastline).land;
     const polygons = land.type === 'Polygon' ? [land.coordinates] : land.coordinates;
     // Conservatively mark every cell in each coast segment's bounds. Interior
     // cells then have constant land/water membership; tiny islands/holes still
@@ -32,7 +34,7 @@ export class IncheonFlightSurface {
       for(let row=minZ;row<=maxZ;row++)for(let col=minX;col<=maxX;col++)this.coastCells[row*480+col]=1;
     }
     for (let row=0;row<this.gridSize;row++) for (let col=0;col<this.gridSize;col++) {
-      const x=col*25-6000,z=row*25-6000,land=source.isLand(x,z);
+      const x=col*25-6000,z=row*25-6000,land=this.isLand(x,z);
       this.landNodes[row*this.gridSize+col]=Number(land);
       this.elevations[row*this.gridSize+col] = this.gradedHeight(x,z,land);
     }
@@ -62,9 +64,9 @@ export class IncheonFlightSurface {
     return this.surfaces.some(s=>s.kind==='runway' && this.nearby(s,x,z,60) && this.distance(s,x,z)<=60);
   }
 
-  gradedHeight(x,z,land=this.source.isLand(x,z)) {
-    // Outside the finite DSM: sea-level continuation, explicitly not real scenery.
-    if (Math.max(Math.abs(x),Math.abs(z))>6000) return 0;
+  gradedHeight(x,z,land=this.isLand(x,z)) {
+    // The optional source-backed regional extension owns ground outside the core.
+    if (Math.max(Math.abs(x),Math.abs(z))>6000) return this.region?.getHeight(x,z) ?? 0;
     if (!land) return 0;
     let weight=0;
     for (const s of this.surfaces) {
@@ -79,11 +81,11 @@ export class IncheonFlightSurface {
 
   getHeight(x,z) {
     if (![x,z].every(Number.isFinite)) throw new Error('Invalid flight terrain coordinate');
-    if (Math.max(Math.abs(x),Math.abs(z))>6000) return 0;
+    if (Math.max(Math.abs(x),Math.abs(z))>6000) return this.region?.getHeight(x,z) ?? 0;
     const col=(x+6000)/25,row=(z+6000)/25;
     const ix=Math.min(Math.floor(col),480-1),iz=Math.min(Math.floor(row),480-1);
     const u=col-ix,v=row-iz,i=iz*this.gridSize+ix,g=this.elevations;
-    const isLand=this.coastCells[iz*480+ix] ? this.source.isLand(x,z) : this.landNodes[i];
+    const isLand=this.coastCells[iz*480+ix] ? this.isLand(x,z) : this.landNodes[i];
     if (!isLand) return 0;
     // PlaneGeometry's NW/SW/NE and SW/SE/NE triangles, not bilinear sampling.
     return u+v<=1 ? g[i]*(1-u-v)+g[i+1]*u+g[i+this.gridSize]*v

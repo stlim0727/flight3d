@@ -1,0 +1,8 @@
+{
+  "url": "https://overpass-api.de/api/interpreter",
+  "query": "[out:json][timeout:90];(way[\"highway\"][\"name\"=\"\ub300\ubd80\ud669\uae08\ub85c\"](37.285,126.57,37.36,126.71);way[\"waterway\"~\"dam|weir\"](37.29,126.57,37.35,126.70);nwr[\"natural\"=\"wood\"](37.28,126.56,37.30,126.59););out meta;>;out meta qt;",
+  "receivedAt": "2026-10-28T18:23:49.327460+00:00",
+  "sha256": "8e8f9f2abffa835e093f0fba3bc97a908158be57eb11ed3afa287d1632c2ce8f",
+  "bytes": 376335,
+  "license": "ODbL-1.0"
+}
