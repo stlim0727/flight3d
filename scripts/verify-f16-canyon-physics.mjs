@@ -1,4 +1,4 @@
-/** Bounded airborne physics check, without renderer, input slew or contact solver.
+/** Bounded airborne physics check, without renderer or contact solver.
  * Uses shipped DEM, aerodynamic/engine models and the production integration
  * equations. Browser acceptance remains scripts/verify-f16-lukla.mjs.
  */
@@ -43,9 +43,12 @@ const dt = 1 / 120;
 for (let i = 0; i < 180 * 120 && director.isActive; i++) {
   director.update(dt);
   const { aero, engines, position, linearVelocity: velocity, angularVelocity: omega, quaternion } = sim;
-  aero.elevator = input.elevator ?? 0;
-  aero.aileron = input.aileron ?? 0;
-  aero.rudder = input.rudder ?? 0;
+  // Match the virtual-stick attenuation and surface slew in FlightControls.
+  const stiffness = Math.max(0.40, 1 - Math.max(0, (sim.telemetry.iasKnots - 140) / 220) * 0.55);
+  for (const [axis, rate] of [['elevator', 0.55], ['aileron', 0.85], ['rudder', 0.60]]) {
+    const error = (input[axis] ?? 0) * stiffness - aero[axis];
+    aero[axis] += Math.sign(error) * Math.min(Math.abs(error), rate * dt);
+  }
   engines.setThrottle(input.throttle ?? 1);
   const engine = engines.update(dt, position.y, velocity.length(), Atmosphere.getConditions(position.y).densityRatio);
   const forces = aero.computeAero(dt, sim.aircraft.group, velocity, omega, position.y,

@@ -111,17 +111,18 @@ lateral samples. Those samples are guidance margins, not swept collision proof.
 The original straight low-pass choice remains available.
 
 `node scripts/verify-f16-canyon-physics.mjs` runs a bounded 120 Hz airborne
-integration with the shipped DEM and real aerodynamic/engine models. The final
-implementation completed in 37.78 simulated seconds, with minimum center-point
-clearance 94.41 m, maximum measured body-normal load 8.12G, and 3.66 seconds
-inverted. This check omits control-input slew, fuel/CG evolution, contact solver,
-rendering and camera acceptance; it does not establish browser completion.
+integration with the shipped DEM, real aerodynamic/engine models and virtual
+stick attenuation/slew. It completes in 37.66 simulated seconds, with minimum
+center-point clearance 101.68 m, maximum body-normal load 8.02G, and 3.63 seconds
+inverted. This check omits fuel/CG evolution, contact solver and rendering.
 Node sequence tests also cover stationary progress, recovery gating and unsafe
 clearance cleanup.
 
 For full browser acceptance, run the existing harness with
 `PROFILE=canyon-chase APP_URL=http://127.0.0.1:5188/ chrome-session --project
 flight3d node scripts/verify-f16-lukla.mjs`. It additionally requires measured
-high G, sustained inverted flight and accumulated roll. Browser verification in
-this session was blocked by repeated DevTools HTTP timeouts on port 9225;
-no screenshots or full simulator acceptance are claimed for this change.
+high G, sustained inverted flight and accumulated roll. The actual simulator
+completed in 37.67 seconds, with 100.70 m minimum clearance, 8.00G maximum cabin
+load and 3.63 seconds inverted, without sampled crashes/stalls or runtime errors.
+Roll and breakout retain the chase camera to keep the airframe visible.
+[Browser samples and screenshots](../../review-artifacts/f16-canyon/README.md).

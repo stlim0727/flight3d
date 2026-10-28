@@ -155,6 +155,7 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
       this.target = new CanyonChaseTarget(sim.scene);
     }
 
+    this.lastCutIndex = -1;
     const key = ({
       [STAGES.INGRESS]: 'ingress',
       [STAGES.SLALOM]: 'slalom',
@@ -254,7 +255,7 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
     this.flyAttitude(bankCmd, targetPos.y, stage === STAGES.BREAKOUT ? 440 : 420, load);
     sim.controls.setVirtualInput('brakes', 0);
     sim.controls.setVirtualInput('rudder', clamp(-sim.aero.beta * 2, -0.2, 0.2));
-    this.result.maxG = Math.max(this.result.maxG, sim.aero.gForce);
+    this.result.maxG = Math.max(this.result.maxG, tel.gForce ?? sim.aero.gForce);
     const rollDelta = ((tel.rollDeg - this.lastRoll + 540) % 360) - 180;
     this.rollTravel += Math.abs(rollDelta);
     this.lastRoll = tel.rollDeg;
@@ -266,7 +267,8 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
       const shot = Math.floor(this.totalElapsed / 9) % 3;
       if (shot !== this.lastCutIndex) {
         const modes = [CameraSystem.MODES.CHASE, CameraSystem.MODES.COCKPIT, CameraSystem.MODES.FLYBY];
-        sim.cameraSystem?.setMode(modes[shot]);
+        sim.cameraSystem?.setMode(stage === STAGES.SPRINT || stage === STAGES.BREAKOUT
+          ? CameraSystem.MODES.CHASE : modes[shot]);
         this.lastCutIndex = shot;
       }
     }
@@ -299,13 +301,16 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
 
   flyAttitude(bankDeg, altitude, speed, load) {
     const sim = this.sim, aero = sim.aero, tel = sim.telemetry;
+    // FlightControls attenuates virtual stick input at high indicated speed.
+    // Invert that mapping when requesting a physical surface deflection.
+    const stiffness = Math.max(0.40, 1 - Math.max(0, (tel.iasKnots - 140) / 220) * 0.55);
     const bankError = ((bankDeg - tel.rollDeg + 540) % 360) - 180;
     const rollRate = -clamp(bankError * Math.PI / 180 * 2, -1.2, 1.2);
     const qSb = Math.max(1, aero.qDyn * aero.wingArea * aero.wingspan);
     const pHat = sim.angularVelocity.z * aero.wingspan / (2 * Math.max(10, aero.tas));
     const cl = -aero.Ixx * (rollRate - sim.angularVelocity.z) * 5 / qSb;
     sim.controls.setVirtualInput('aileron', clamp((cl - aero.Cl_b * aero.beta - Math.abs(aero.Cl_p) * pHat) /
-      (aero.Cl_da * 1.05 * Math.PI / 9), -1, 1));
+      (aero.Cl_da * 1.05 * Math.PI / 9 * stiffness), -1, 1));
     const cosBank = Math.cos(tel.rollDeg * Math.PI / 180);
     const vz = clamp((altitude - sim.position.y) * 0.5, -30, 65);
     const normalG = load ?? clamp((1 + (vz - sim.linearVelocity.y) * 0.15) / Math.max(0.13, cosBank), -1, 8);
@@ -318,7 +323,7 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
     const qHat = sim.angularVelocity.x * aero.meanChord / (2 * Math.max(10, aero.tas));
     const elevator = ((cm - aero.Cm0 - aero.Cma * aero.alpha - aero.Cmq * qHat) / -aero.Cm_de
       - THREE.MathUtils.degToRad(aero.pitchTrim) * TRIM_WHEEL_AUTHORITY) / (Math.PI / 9);
-    sim.controls.setVirtualInput('elevator', clamp(elevator, -1, 1));
+    sim.controls.setVirtualInput('elevator', clamp(elevator / stiffness, -1, 1));
     sim.controls.setVirtualInput('throttle', clamp(0.65 + (speed - tel.iasKnots) * 0.03 + vz * 0.02, 0.1, 1));
   }
 

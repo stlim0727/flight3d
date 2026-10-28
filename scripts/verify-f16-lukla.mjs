@@ -63,12 +63,13 @@ try {
     const sample=await evaluate(`(() => {const s=window.simulator; s.stepSimulation(1); return {
       active:s.demoDirector.isActive,stage:s.demoDirector.currentStage, aircraft:s.currentAircraftId,
       crashed:s.isCrashed,stalled:s.telemetry.isStalled,position:s.position.toArray(),
-      ias:s.telemetry.iasKnots,pitch:s.telemetry.pitchDeg,throttle:s.controls.throttle,
+      ias:s.telemetry.iasKnots,pitch:s.telemetry.pitchDeg,roll:s.telemetry.rollDeg,
+      gForce:s.telemetry.gForce,throttle:s.controls.throttle,
       result:s.demoDirector.getActiveScenario().result,
       programs:s.renderer.info.programs.map(p=>({name:p.name,runnable:p.diagnostics?.runnable}))
     }})()`);
     results.push(sample);
-    if(i%10===0) { console.log(i,JSON.stringify(sample)); await capture('flight-'+i); }
+    if(i%10===0 || (profile === 'canyon-chase' && (i === 34 || i === 35))) { console.log(i,JSON.stringify(sample)); await capture('flight-'+i); }
     if(!sample.active) break;
   }
   fs.writeFileSync(path.join(dir,'results.json'),JSON.stringify({errors,results},null,2));
