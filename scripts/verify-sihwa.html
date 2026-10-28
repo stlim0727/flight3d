@@ -11,6 +11,8 @@ const ocean=new WaterOcean(100000,180);scene.add(ocean.mesh);
 const lm=airport.terrain.region.features.features;const f=k=>lm.find(x=>x.kind===k).center;const p=f('plant'),b=f('beach');
 const tower=lm.find(x=>x.id==='way/1038767380').center;
 const views={plant:{at:[p[0],20,p[1]],offset:[-650,450,-450]},tower:{at:[tower[0],40,tower[1]],offset:[-160,100,-180]},beach:{at:[b[0],12,b[1]],offset:[-1000,650,-750]},seawall:{at:[p[0]+1800,0,p[1]-1000],offset:[-6500,6500,-800]}};
-window.review={airport,renderer,scene,camera,views,view(name){const v=views[name];camera.position.fromArray(v.at).add(new THREE.Vector3(...v.offset));camera.lookAt(...v.at);document.querySelector('#label').textContent=({plant:'시화호 조력발전소 · 시화나래',tower:'시화나래 달전망대',beach:'방아머리해변',seawall:'시화방조제 · 서해 / 시화호'})[name];renderer.render(scene,camera);return{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};}};
+const abutment=airport.terrain.region.features.roads.find(r=>r.id==='way/550251550').points[0];
+views.bridge={at:[abutment[0],4.5,abutment[1]],offset:[-60,25,60]};
+window.review={airport,renderer,scene,camera,views,view(name){const v=views[name];camera.position.fromArray(v.at).add(new THREE.Vector3(...v.offset));camera.lookAt(...v.at);document.querySelector('#label').textContent=({plant:'시화호 조력발전소 · 시화나래',tower:'시화나래 달전망대',beach:'방아머리해변',seawall:'시화방조제 · 서해 / 시화호',bridge:'교량 · 지면 접속 경사'})[name];renderer.render(scene,camera);return{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};}};
 review.view('plant');
 </script></body></html>

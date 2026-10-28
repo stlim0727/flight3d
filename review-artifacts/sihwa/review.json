@@ -4,25 +4,33 @@
     {
       "name": "plant",
       "calls": 18,
-      "triangles": 266658
+      "triangles": 271944
     },
     {
       "name": "tower",
       "calls": 18,
-      "triangles": 266658
+      "triangles": 271944
     },
     {
       "name": "beach",
       "calls": 6,
-      "triangles": 264224
+      "triangles": 269510
     },
     {
       "name": "seawall",
       "calls": 18,
-      "triangles": 266658
+      "triangles": 271944
+    },
+    {
+      "name": "bridge",
+      "calls": 9,
+      "triangles": 270832
     }
   ],
   "contacts": {
+    "approachCount": 8,
+    "maxAbutmentJump": 0.000016735321973548878,
+    "maxBankJump": 0.001212781064907631,
     "landmarks": {
       "tower": {
         "x": 13675.1781604839,
@@ -41,8 +49,8 @@
     },
     "triangles": 195881,
     "bridges": 1,
-    "deckSamples": 14,
-    "deckError": 8.881784197001252e-16,
+    "deckSamples": 5300,
+    "deckError": 0.005638243823189448,
     "towerShaftCollision": true,
     "towerCabCollision": true,
     "clearBesideShaft": true,

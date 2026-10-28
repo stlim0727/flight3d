@@ -81,7 +81,7 @@ try {
   for(let i=0;i<200;i++){ready=await evaluate('Boolean(window.review)');if(errors.length)throw new Error(errors.join('\n'));if(ready)break;await new Promise(r=>setTimeout(r,200));}
   assert.ok(ready,'regional scene loaded');
   const stats=[];
-  for(const name of ['plant','tower','beach','seawall']){
+  for(const name of ['plant','tower','beach','seawall','bridge']){
     console.log(`Rendering ${name}`);
     await send('Page.bringToFront');
     stats.push({name,...await evaluate(`review.view('${name}')`)});
@@ -96,9 +96,19 @@ try {
       const x=(p[i]+p[i+3]+p[i+6])/3,y=(p[i+1]+p[i+4]+p[i+7])/3,z=(p[i+2]+p[i+5]+p[i+8])/3;
       deckError=Math.max(deckError,Math.abs(s.getHeight(x,z)-y));deckSamples++;
     }
-    return {landmarks:lm,triangles:r.metadata.triangleCount,bridges:r.additionalSurfaces.length,deckSamples,deckError,towerShaftCollision:hit(t.x,t.y-30,t.z),towerCabCollision:hit(t.x+9,t.y-5,t.z),clearBesideShaft:!hit(t.x+9,t.y-30,t.z),clearAboveTower:!hit(t.x,t.y+10,t.z)};
+    const approaches=review.scene.getObjectByName('Sihwa regional scenery').userData.bridgeApproaches;
+    let maxAbutmentJump=0,maxBankJump=0;
+    for(const approach of approaches)for(const path of approach.paths) {
+      const first=path[0],second=path[1],last=path.at(-1),beforeLast=path.at(-2);
+      const near=Math.hypot(second[0]-first[0],second[1]-first[1]),far=Math.hypot(last[0]-beforeLast[0],last[1]-beforeLast[1]);
+      const h=(p,q,d,t)=>r.getHeight(p[0]+(q[0]-p[0])/d*t,p[1]+(q[1]-p[1])/d*t);
+      maxAbutmentJump=Math.max(maxAbutmentJump,Math.abs(h(first,second,near,.01)-h(first,second,near,-.01)));
+      maxBankJump=Math.max(maxBankJump,Math.abs(h(last,beforeLast,far,.01)-h(last,beforeLast,far,-.01)));
+    }
+    return {approachCount:approaches.length*2,maxAbutmentJump,maxBankJump,landmarks:lm,triangles:r.metadata.triangleCount,bridges:r.additionalSurfaces.length,deckSamples,deckError,towerShaftCollision:hit(t.x,t.y-30,t.z),towerCabCollision:hit(t.x+9,t.y-5,t.z),clearBesideShaft:!hit(t.x+9,t.y-30,t.z),clearAboveTower:!hit(t.x,t.y+10,t.z)};
   })()`);
   assert.equal(contacts.bridges,1);
+  assert.equal(contacts.approachCount,8);assert.ok(contacts.maxAbutmentJump<.01);assert.ok(contacts.maxBankJump<.02);
   assert.ok(contacts.deckSamples>0 && contacts.deckError<.01);
   for(const key of ['towerShaftCollision','towerCabCollision','clearBesideShaft','clearAboveTower'])assert.equal(contacts[key],true,key);
   console.log(JSON.stringify({stage:'scenery',stats,contacts,errors,extensionErrors}));

@@ -1,3 +1,4 @@
+import { buildSihwaBridges } from '../geospatial/sihwaBridges.js';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { colourIncheonGround, createIncheonGroundTexture } from './IncheonGround.js';
@@ -70,26 +71,20 @@ export function createSihwaScenery(region) {
   }
   // Only source-tagged bridge spans cross open water. Deck contact triangles are
   // the very same geometry as the visible bridge, with gradual bank approaches.
-  const decks=[];
-  for(const road of region.features.roads.filter(r=>r.bridge)) {
-    const points=road.points;
-    const y0=Math.max(4.5,region.getHeight(...points[0])+.15),y1=Math.max(4.5,region.getHeight(...points.at(-1))+.15);
-    const lengths=points.slice(1).map((p,i)=>Math.hypot(p[0]-points[i][0],p[1]-points[i][1]));
-    const total=lengths.reduce((a,b)=>a+b,0);let distance=0;
-    for(let i=1;i<points.length;i++) {
-      const [x,z]=points[i-1],[ex,ez]=points[i],length=lengths[i-1];if(!length)continue;
-      const nx=-(ez-z)/length*road.widthM/2,nz=(ex-x)/length*road.widthM/2;
-      const ya=y0+(y1-y0)*distance/total,yb=y0+(y1-y0)*(distance+length)/total;
-      const v=[x+nx,ya,z+nz,ex+nx,yb,ez+nz,x-nx,ya,z-nz,x-nx,ya,z-nz,ex+nx,yb,ez+nz,ex-nx,yb,ez-nz];
-      decks.push(...v);
-      const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.computeVertexNormals();add(0x656b70,g);
-      if(length>15)cylinder((x+ex)/2,Math.min(ya,yb)/2,(z+ez)/2,1.3,1.6,Math.min(ya,yb),0x8c9696,8);
-      distance+=length;
-    }
-  }
-  if(decks.length) {
-    const p=new Float32Array(decks),ids=Uint32Array.from({length:p.length/3},(_,i)=>i);
+  const bridges=buildSihwaBridges(region);
+  if(bridges.positions.length) {
+    const p=bridges.positions,ids=Uint32Array.from({length:p.length/3},(_,i)=>i);
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(p,3));geometry.computeVertexNormals();
+    add(0x656b70,geometry);
     region.additionalSurfaces.push(new SihwaRegion(region.metadata,p,ids,region.coreCoastline,{features:[],roads:[]}));
+    group.userData.bridgeApproaches=bridges.approaches;
+    // Preserve the existing simple pier exteriors beneath the mapped spans.
+    for(const road of region.features.roads.filter(r=>r.bridge))for(let i=1;i<road.points.length;i++) {
+      const [x,z]=road.points[i-1],[ex,ez]=road.points[i];
+      if(Math.hypot(ex-x,ez-z)<=15)continue;
+      const y=region.additionalSurfaces.at(-1).getHeight((x+ex)/2,(z+ez)/2);
+      cylinder((x+ex)/2,y/2,(z+ez)/2,1.3,1.6,y,0x8c9696,8);
+    }
   }
   for(const [color,parts] of batches) {
     const g=mergeGeometries(parts,false);parts.forEach(p=>p.dispose());

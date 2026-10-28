@@ -67,3 +67,31 @@ test('airport grading stays unchanged and Sihwa lake remains open water',()=>{
   assert.equal(region.getHeight(30000,30000),0);
   assert.throws(()=>region.getHeight(NaN,0));
 });
+
+test('raised bridge decks join mapped bank roads without height steps',async()=>{
+  const {buildSihwaBridges}=await import('../src/geospatial/sihwaBridges.js');
+  const bridges=buildSihwaBridges(region),p=bridges.positions;
+  const contact=new SihwaRegion(meta,p,Uint32Array.from({length:p.length/3},(_,i)=>i),region.coreCoastline,features);
+  assert.equal(bridges.approaches.length,4);
+  let originalStep=0;
+  for(const a of bridges.approaches) {
+    originalStep=Math.max(originalStep,a.heights[0]-region.groundHeight(...a.start));
+    for(const path of a.paths) {
+      // Walk both ways across the abutment, ramp, and onto the native bank.
+      const far=path.at(-1),near=path.at(-2),d=Math.hypot(far[0]-near[0],far[1]-near[1]);
+      const after=[far[0]+(far[0]-near[0])/d*.02,far[1]+(far[1]-near[1])/d*.02];
+      const surface=(x,z)=>Math.max(region.groundHeight(x,z),contact.getHeight(x,z));
+      assert.ok(Math.abs(surface(...far)-region.groundHeight(...far))<.005,a.id+' bank seam');
+      assert.ok(Math.abs(surface(...far)-surface(...after))<.02,a.id+' beyond bank seam');
+      for(let i=1;i<path.length;i++) {
+        const b=path[i-1],c=path[i],len=Math.hypot(c[0]-b[0],c[1]-b[1]);
+        assert.ok(Math.abs(surface(...c)-surface(...b))/len<.3,a.id+' ramp slope');
+      }
+      const a0=path[0],a1=path[1],len=Math.hypot(a1[0]-a0[0],a1[1]-a0[1]);
+      const inside=[a0[0]-(a1[0]-a0[0])/len*.01,a0[1]-(a1[1]-a0[1])/len*.01];
+      const outside=[a0[0]+(a1[0]-a0[0])/len*.01,a0[1]+(a1[1]-a0[1])/len*.01];
+      assert.ok(Math.abs(surface(...inside)-surface(...outside))<.01,a.id+' abutment seam');
+    }
+  }
+  assert.ok(originalStep>1,'reproduces the original raised-deck discontinuity');
+});

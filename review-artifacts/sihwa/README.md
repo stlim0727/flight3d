@@ -16,18 +16,21 @@ for review; this is not an automated flight or a frame-rate benchmark.
 - `tower.png`: circular observation head and shaft, 75m above the modeled site pad.
 - `beach.png`: Bangameori sand polygon clipped and draped onto the mapped coast.
 - `seawall.png`: the complete seawall corridor and the open lake/sea on each side.
+- `bridge.png`: raised bridge abutment and the source-aligned approach ramp.
 - `review.json`: measured render counts, bridge triangle height agreement, tower
   collisions/clearances, and the main-simulator integration result. `complete`
   stays false if a run fails before all checks finish.
 
-The four regional views rendered 6–18 draw calls and 264,224–266,658 triangles
+The five regional views rendered 6–18 draw calls and 269,510–271,944 triangles
 (including water and other visible airport scenery). These are scene counters,
-not FPS measurements. Fourteen bridge triangle samples agreed with the contact
-sampler within 8.9e-16m. Shaft/head collision, empty space beside the shaft and
+not FPS measurements. The 5,300 bridge/ramp triangle samples agreed with the contact
+sampler within 0.00564m. Across all eight ramp connections, heights sampled 1cm
+on either side differed by at most 0.000017m at the abutments and 0.001213m at
+the native bank. Shaft/head collision, empty space beside the shaft and
 clearance above the tower all passed. No application, shader or extension errors
 were recorded in the regional scene.
 
-The local gate also passed `npm run check`, all 796 Node tests and `npm run build`.
+The local gate also passed `npm run check`, all 797 Node tests and `npm run build`.
 Source hashes, projected landmark coordinates, 1,000+ regional triangle samples,
 core edge heights, unchanged airport grading and open-water locations are covered
 by `tests/sihwaRegion.test.js`. Architecture, road widths/deck elevations and
