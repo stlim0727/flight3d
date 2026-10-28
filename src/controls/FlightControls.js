@@ -30,6 +30,8 @@ export class FlightControls {
     // Mobile / Touchscreen on-screen inputs
     this.touchElevator = 0.0;
     this.touchAileron = 0.0;
+    this.touchPitchReturning = false;
+    this.touchRollReturning = false;
     this.touchRudder = 0.0;
     this.touchBrakes = 0.0;
 
@@ -315,8 +317,22 @@ export class FlightControls {
     const aileronDelta = targetAileron - this.aileron;
     const rudderDelta = targetRudder - this.rudder;
 
-    this.elevator += Math.sign(elevDelta) * Math.min(Math.abs(elevDelta), maxElevatorRate * dt);
-    this.aileron += Math.sign(aileronDelta) * Math.min(Math.abs(aileronDelta), maxAileronRate * dt);
+    // A released thumb stick must not keep commanding a turn for over a second.
+    // Only speed up its return to neutral; keyboard/mouse/AI keep their own slew.
+    if (targetElevator !== 0 || this.virtualElevator !== null || this.mouseControl ||
+        this.keys['KeyS'] || this.keys['ArrowDown'] || this.keys['KeyW'] || this.keys['ArrowUp']) {
+      this.touchPitchReturning = false;
+    }
+    if (targetAileron !== 0 || this.virtualAileron !== null || this.mouseControl ||
+        this.keys['KeyD'] || this.keys['ArrowRight'] || this.keys['KeyA'] || this.keys['ArrowLeft']) {
+      this.touchRollReturning = false;
+    }
+    const elevatorRate = this.touchPitchReturning ? 4.0 : maxElevatorRate;
+    const aileronRate = this.touchRollReturning ? 4.0 : maxAileronRate;
+    this.elevator += Math.sign(elevDelta) * Math.min(Math.abs(elevDelta), elevatorRate * dt);
+    this.aileron += Math.sign(aileronDelta) * Math.min(Math.abs(aileronDelta), aileronRate * dt);
+    if (this.elevator === 0) this.touchPitchReturning = false;
+    if (this.aileron === 0) this.touchRollReturning = false;
     this.rudder += Math.sign(rudderDelta) * Math.min(Math.abs(rudderDelta), maxRudderRate * dt);
 
     // 5. Pitch Trim (T = Trim nose down, Y = Trim nose up)
@@ -358,6 +374,8 @@ export class FlightControls {
   }
 
   setTouchStick(pitch, roll) {
+    if (this.touchElevator !== 0 && pitch === 0) this.touchPitchReturning = true;
+    if (this.touchAileron !== 0 && roll === 0) this.touchRollReturning = true;
     this.touchElevator = Math.max(-1.0, Math.min(1.0, pitch));
     this.touchAileron = Math.max(-1.0, Math.min(1.0, roll));
   }

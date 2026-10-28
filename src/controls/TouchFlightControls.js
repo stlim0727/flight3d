@@ -1,4 +1,16 @@
 import { t, translateDOM } from '../i18n/index.js';
+
+// Preserve full authority while giving a short thumb stick room for fine input.
+// The radial deadzone avoids a discontinuity when crossing either axis.
+export function shapeTouchStick(pitch, roll) {
+  const magnitude = Math.hypot(pitch, roll);
+  const deadzone = 0.06;
+  if (magnitude <= deadzone) return [0, 0];
+  const travel = (Math.min(1, magnitude) - deadzone) / (1 - deadzone);
+  const response = 0.35 * travel + 0.65 * travel ** 3;
+  return [pitch / magnitude * response, roll / magnitude * response];
+}
+
 /**
  * TouchFlightControls.js
  * Comprehensive Mobile & Touchscreen Flight Control System
@@ -32,6 +44,8 @@ export class TouchFlightControls {
     this.stickRadius = 60; // Max deflection in px
     this.stickCurrentX = 0;
     this.stickCurrentY = 0;
+    this.stickGrabOffsetX = 0;
+    this.stickGrabOffsetY = 0;
 
     // Rudder State
     this.rudderActive = false;
@@ -178,6 +192,7 @@ export class TouchFlightControls {
     this.stickZone.addEventListener('pointermove', (e) => this.onStickPointerMove(e));
     this.stickZone.addEventListener('pointerup', (e) => this.onStickPointerUp(e));
     this.stickZone.addEventListener('pointercancel', (e) => this.onStickPointerUp(e));
+    this.stickZone.addEventListener('lostpointercapture', (e) => this.onStickPointerUp(e));
 
     // 2. Throttle Pointer Events
     this.throttleTrack.addEventListener('pointerdown', (e) => this.onThrottlePointerDown(e));
@@ -237,7 +252,7 @@ export class TouchFlightControls {
   }
 
   onStickPointerDown(e) {
-    if (this.controls?.aircraftControlsDisabled) return;
+    if (this.controls?.aircraftControlsDisabled || this.stickActive) return;
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     if (this.controls.onUserInteract) this.controls.onUserInteract();
     this.stickActive = true;
@@ -245,6 +260,9 @@ export class TouchFlightControls {
     this.stickZone.setPointerCapture(e.pointerId);
 
     this.updateStickGeometry();
+    // Start each gesture at neutral even when the thumb lands off centre.
+    this.stickGrabOffsetX = e.clientX - this.stickCenterX;
+    this.stickGrabOffsetY = e.clientY - this.stickCenterY;
 
     this.updateStickPosition(e.clientX, e.clientY);
   }
@@ -273,8 +291,8 @@ export class TouchFlightControls {
   }
 
   updateStickPosition(clientX, clientY) {
-    let dx = clientX - this.stickCenterX;
-    let dy = clientY - this.stickCenterY;
+    let dx = clientX - this.stickCenterX - this.stickGrabOffsetX;
+    let dy = clientY - this.stickCenterY - this.stickGrabOffsetY;
 
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist > this.stickRadius) {
@@ -295,8 +313,7 @@ export class TouchFlightControls {
     // Push stick up (dy < 0) -> Nose DOWN (Elevator < 0, dive)
     // Push stick right (dx > 0) -> Bank RIGHT (Aileron > 0)
     // Push stick left (dx < 0) -> Bank LEFT (Aileron < 0)
-    const normRoll = dx / this.stickRadius;
-    const normPitch = dy / this.stickRadius;
+    const [normPitch, normRoll] = shapeTouchStick(dy / this.stickRadius, dx / this.stickRadius);
 
     if (!this.gyroActive) {
       this.controls.setTouchStick(normPitch, normRoll);

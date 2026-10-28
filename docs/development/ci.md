@@ -293,3 +293,8 @@ and verifies neutral tire bottoms within 5 mm of the world ground plane.
 It captures ground-level views of both aircraft. This is bounded geometry and
 rendering acceptance; it does not exercise a complete taxi, landing or terrain
 slope transition.
+
+### Touch stick precision
+
+See [touch controls](touch-controls.md) for the response curve, release timing,
+sequence tests and reusable-browser portrait/landscape acceptance command.

@@ -370,3 +370,47 @@ it('integrates HOTAS One stick, throttle, and trigger inputs into FlightControls
   }
 });
 
+
+describe('Touch release response', () => {
+  function controls() {
+    const previous = globalThis.window;
+    globalThis.window = { addEventListener() {} };
+    try { return new FlightControls({ addEventListener() {} }); }
+    finally { globalThis.window = previous; }
+  }
+
+  it('returns held touch axes to neutral within 250ms at multiple timesteps and speeds', () => {
+    for (const hz of [60, 120]) for (const speed of [140, 400]) {
+      const c = controls();
+      c.setTouchStick(1, -1);
+      for (let i = 0; i < hz * 2; i++) c.update(1 / hz, speed);
+      assert.ok(c.elevator > 0 && c.aileron < 0);
+      c.setTouchStick(0, 0);
+      for (let i = 0; i < hz / 4 + 1; i++) c.update(1 / hz, speed);
+      assert.equal(c.elevator, 0);
+      assert.equal(c.aileron, 0);
+      c.setTouchStick(-1, 1);
+      c.update(1 / hz, speed);
+      assert.ok(c.elevator < 0 && c.aileron > 0);
+    }
+  });
+
+  it('does not apply touch return rates to keyboard or virtual overrides', () => {
+    for (const source of ['keyboard', 'virtual', 'mouse']) {
+      const c = controls();
+      c.setTouchStick(1, 1);
+      c.update(2, 140);
+      c.setTouchStick(0, 0);
+      if (source === 'keyboard') c.keys.KeyW = true;
+      if (source === 'virtual') c.setVirtualInput('elevator', 0);
+      if (source === 'mouse') c.mouseControl = true;
+      c.update(0.1, 140);
+      assert.ok(Math.abs(c.elevator - 0.945) < 1e-12);
+      c.keys = {};
+      c.clearVirtualInputs();
+      c.mouseControl = false;
+      c.update(0.1, 140);
+      assert.ok(Math.abs(c.elevator - 0.89) < 1e-12);
+    }
+  });
+});
