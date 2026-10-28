@@ -8,20 +8,21 @@ import { CessnaDemoScenario } from './CessnaDemoScenario.js';
 const clamp = THREE.MathUtils.clamp;
 
 export const DUDH_KOSI_CANYON_SPLINE_POINTS = [
-  new THREE.Vector3(-400, 2900, 250),   // Cliff takeoff ingress
-  new THREE.Vector3(-900, 2750, 520),   // Ridge pass
-  new THREE.Vector3(-1250, 2480, 850),  // Gorge plunge
-  new THREE.Vector3(-1500, 2260, 1300), // River entry
-  new THREE.Vector3(-1890, 2180, 2100), // S-Turn 1
-  new THREE.Vector3(-2490, 2150, 2900), // Curve apex
-  new THREE.Vector3(-2440, 2300, 3700), // Canyon contour
-  new THREE.Vector3(-2660, 2020, 4500), // Deep chasm entry
-  new THREE.Vector3(-2870, 2000, 5300), // Narrow gorge
-  new THREE.Vector3(-3130, 1880, 6100), // Chasm sprint
-  new THREE.Vector3(-3220, 1850, 6900), // Valley low run
-  new THREE.Vector3(-3300, 1780, 7700), // Ridge approach
-  new THREE.Vector3(-3400, 2800, 8800), // High-G Pull up & breakout
-  new THREE.Vector3(-3500, 3400, 10500) // Clear mountain sky cruise
+  new THREE.Vector3(-450, 2790, 300),    // Cliff ingress
+  new THREE.Vector3(-850, 2740, 600),    // Shoulder pass
+  new THREE.Vector3(-1250, 2600, 1000),  // Gorge entry
+  new THREE.Vector3(-1640, 2330, 1500),  // River valley alignment
+  new THREE.Vector3(-1900, 2260, 2100),  // Canyon descent
+  new THREE.Vector3(-2420, 2220, 2800),  // S-Turn apex 1
+  new THREE.Vector3(-2410, 2420, 3500),  // S-Turn apex 2
+  new THREE.Vector3(-2680, 2240, 4200),  // River contour
+  new THREE.Vector3(-2830, 2100, 5000),  // Chasm entry
+  new THREE.Vector3(-3100, 2040, 5900),  // Narrow gorge
+  new THREE.Vector3(-3180, 1960, 6800),  // Deep chasm sprint
+  new THREE.Vector3(-3310, 1900, 7700),  // Low canyon run
+  new THREE.Vector3(-3500, 2400, 8400),  // Breakout pullup initiation
+  new THREE.Vector3(-3750, 3100, 9300),  // High-G vertical zoom climb
+  new THREE.Vector3(-3950, 3600, 10500)  // Clear Himalayan summit cruise
 ];
 
 const STAGES = {
@@ -220,12 +221,12 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
     const cross = dx * -tangent.z + dz * tangent.x; // lateral cross-track error
 
     const pathHeading = (Math.atan2(tangent.x, -tangent.z) * 180 / Math.PI + 360) % 360;
-    const correctionHdg = clamp(-cross * 0.22, -35, 35);
+    const correctionHdg = clamp(-cross * 0.15, -25, 25);
     const targetHeading = pathHeading + correctionHdg;
 
     // Banking control
     const hdgDiff = ((targetHeading - tel.headingDeg + 540) % 360) - 180;
-    const bankCmd = clamp(hdgDiff * 1.5, -75, 75);
+    const bankCmd = clamp(hdgDiff * 1.5, -60, 60);
     flyBank(sim, bankCmd, tel);
 
     // Altitude guidance

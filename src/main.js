@@ -935,14 +935,20 @@ class FlightSimulator {
     } else if (this.activeAirport === 'lukla') {
       const sin58 = 0.848048;
       const cos58 = 0.529919;
+      const isF16 = this.currentAircraftId === 'F16';
+      const isC172 = this.currentAircraftId === 'C172';
+      const spawnS = isF16 ? 200.0 : 195.0;
+      const spawnY = 2836.0 + spawnS * (62 / 527) + groundClearance;
+      const luklaTrim = isF16 ? 0.3 : isC172 ? 0.8 : 1.9;
 
       if (type === 'runway') {
-        // Lukla takeoffs line up at the upper Runway 24 threshold (2,864m + gear geometry) and
+        // Lukla takeoffs line up at the upper Runway 24 threshold and
         // accelerate downhill toward the cliff on heading 238°; Runway 06 is the
         // landing-only direction. Same spawn as the 'cliff' preset: the 5m lateral
         // offset keeps the wide wing clear of the raised apron.
-        // Spawn above the current wheel geometry, allowing suspension settling.
-        this.position.set(240.0 * sin58 - 5 * cos58, 2864.22 + groundClearance, -240.0 * cos58 - 5 * sin58);
+        // Spawned with clearance in front of the retaining wall so chase cameras
+        // remain completely clear of the upper stone barrier.
+        this.position.set(spawnS * sin58 - 5 * cos58, spawnY, -spawnS * cos58 - 5 * sin58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
 
@@ -960,9 +966,10 @@ class FlightSimulator {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        this.aero.setFlapPosition(2); // Flaps 5
+        this.aero.setFlapPosition(isC172 ? 1 : 2); // Flaps 5 (or 10 for C172)
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 1.9;
+        this.aero.pitchTrim = luklaTrim;
+        this.controls.pitchTrim = luklaTrim;
 
         this.showToast(() => t('preset.lukla.runway.24.takeoff.roll'));
       } else if (type === 'approach') {
@@ -997,7 +1004,7 @@ class FlightSimulator {
         // Lukla Runway 24 Downhill Cliff Dive Takeoff!
         // Start near the upper threshold with wheel clearance; a 5m lateral
         // offset keeps the wide wing clear of the raised apron.
-        this.position.set(240.0 * sin58 - 5 * cos58, 2864.22 + groundClearance, -240.0 * cos58 - 5 * sin58);
+        this.position.set(spawnS * sin58 - 5 * cos58, spawnY, -spawnS * cos58 - 5 * sin58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
         // Pitch nose down -6.71° along 11.7% downhill slope, Heading 238° (yaw -238°)
@@ -1014,10 +1021,10 @@ class FlightSimulator {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        this.aero.setFlapPosition(3); // Flaps 15 (mountain short-field takeoff)
+        this.aero.setFlapPosition(isC172 ? 1 : isF16 ? 1 : 3); // Flaps 15 for B738, Flaps 1 for F16/C172
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 1.9;
-        this.controls.pitchTrim = 1.9;
+        this.aero.pitchTrim = luklaTrim;
+        this.controls.pitchTrim = luklaTrim;
 
         this.showToast(() => t('preset.lukla.runway.24.downhill.takeoff.11'));
       } else if (type === 'cruise') {
