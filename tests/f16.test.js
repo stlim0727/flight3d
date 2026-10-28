@@ -8,6 +8,9 @@ import { AircraftBreakup } from '../src/effects/AircraftBreakup.js';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { F16_FALCON } from '../src/config/aircraftConfigs.js';
 import { CollisionDetector, F16_COLLISION_PROBES } from '../src/physics/CollisionDetector.js';
+import { Aerodynamics } from '../src/physics/Aerodynamics.js';
+import { EngineModel } from '../src/physics/EngineModel.js';
+import { solveTrim } from '../src/physics/TrimSolver.js';
 
 const bytes = readFileSync(new URL('../public/models/f-16.glb', import.meta.url));
 const jsonLength = bytes.readUInt32LE(12);
@@ -172,4 +175,20 @@ test('F16 cockpit stays on its centerline through portrait resize, snap and airc
   system.loadAircraftConfig(F16_FALCON);
   system.snapToTarget(aircraft);
   assert.equal(camera.position.x, 0);
+});
+
+test('F16 trim solver yields feasible idle solution for high-speed level flight', () => {
+  const aero = new Aerodynamics(F16_FALCON);
+  const engines = new EngineModel(F16_FALCON);
+  const solution = solveTrim(aero, engines, {
+    iasKnots: 300,
+    altitudeMeters: 4500,
+    flightPathAngleDeg: 0,
+    flapsIndex: 0,
+    gearState: 0,
+    spoilers: 0
+  });
+  assert.equal(solution.feasible, true);
+  assert.equal(solution.reason, 'idle');
+  assert.ok(solution.handsOffTrimDeg >= -5 && solution.handsOffTrimDeg <= 12);
 });
