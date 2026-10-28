@@ -11,11 +11,13 @@ const target = await (await fetch(`${endpoint}/json/new?${encodeURIComponent(url
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise(resolve => ws.addEventListener('open', resolve, { once: true }));
 let sequence = 0;
+const isolatedContexts = new Set(), isolatedErrors = [];
 const pending = new Map(), errors = [], results = [];
 ws.addEventListener('message', event => {
   const message = JSON.parse(event.data);
   if (message.id) { pending.get(message.id)?.(message); pending.delete(message.id); }
-  if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
+  if (message.method === 'Runtime.executionContextCreated' && message.params.context.auxData?.isDefault === false) isolatedContexts.add(message.params.context.id);
+  if (message.method === 'Runtime.exceptionThrown') ((isolatedContexts.has(message.params.exceptionDetails.executionContextId) || message.params.exceptionDetails.url?.startsWith('chrome-extension://')) ? isolatedErrors : errors).push(message.params.exceptionDetails);
 });
 const call = (method, params = {}) => new Promise((resolve, reject) => {
   const id = ++sequence;
@@ -41,7 +43,7 @@ const capture = async name => {
   fs.writeFileSync(path.join(dir, `${name}.png`), Buffer.from(data, 'base64'));
 };
 try {
-  await call('Runtime.enable'); await call('Page.enable');
+  await call('Runtime.enable'); await call('Page.enable');await call('Page.bringToFront');
   for(let i=0;i<160;i++){if(await evaluate('Boolean(window.simulator?.startupReady && window.simulator?.lobbyScreen)'))break;await new Promise(r=>setTimeout(r,500));}
   await evaluate(`(async()=>{const s=window.simulator;s.demoDirector.stop();s.gameFlow.isPhysicsFrozen=()=>true;s.setAircraft('B738');await s.setAirport('incheon');s.gameFlow.enterLobby();s.lobby.preset='demo';s.lobby.demoProfile='incheon-departure';s.audio.setMuted(false);s.lobbyScreen.refresh();})()`);
   const rect=await evaluate(`(()=>{const r=document.getElementById('btn-fly').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
@@ -73,7 +75,7 @@ try {
   await evaluate(`window.simulator.demoDirector.stop()`);
   assert.equal(await evaluate(`window.simulator.audio.departureRadio.status`),'idle','cancel stops current call');
   assert.equal(errors.length,0);
-  const report={liveRms,pausedOffset:paused.offset,clips,browserExceptions:errors.length};
+  const report={liveRms,pausedOffset:paused.offset,clips,browserExceptions:errors.length,isolatedContextExceptions:isolatedErrors.length};
   fs.writeFileSync(path.join(dir,'audio-results.json'),JSON.stringify(report,null,2));
   console.log('PASS',JSON.stringify(report));
 } finally {ws.close();await fetch(`${endpoint}/json/close/${target.id}`);}

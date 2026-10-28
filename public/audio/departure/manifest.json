@@ -1,19 +1,19 @@
 {
   "gate": {
     "file": "gate.wav",
-    "duration": 7.541917,
+    "duration": 8.2,
     "provider": "Gemini",
-    "model": "gemini-2.5-flash-preview-tts",
+    "model": "gemini-3.1-flash-tts-preview",
     "lines": [
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Incheon Apron, Sky 123, ready for pushback."
+        "text": "Incheon Apron, Korean Air 123, ready for pushback."
       },
       {
         "speaker": "apron",
         "voice": "Kore",
-        "text": "Sky 123, pushback approved."
+        "text": "Korean Air 123, pushback approved."
       },
       {
         "speaker": "crew",
@@ -24,9 +24,9 @@
   },
   "pushback": {
     "file": "pushback.wav",
-    "duration": 3.270958,
+    "duration": 3.94,
     "provider": "Gemini",
-    "model": "gemini-2.5-flash-preview-tts",
+    "model": "gemini-3.1-flash-tts-preview",
     "lines": [
       {
         "speaker": "crew",
@@ -42,9 +42,9 @@
   },
   "disconnect": {
     "file": "disconnect.wav",
-    "duration": 5.030958,
+    "duration": 5.46,
     "provider": "Gemini",
-    "model": "gemini-2.5-flash-preview-tts",
+    "model": "gemini-3.1-flash-tts-preview",
     "lines": [
       {
         "speaker": "crew",
@@ -65,14 +65,14 @@
   },
   "taxi": {
     "file": "taxi.wav",
-    "duration": 12.150958,
+    "duration": 10.46,
     "provider": "Gemini",
-    "model": "gemini-2.5-flash-preview-tts",
+    "model": "gemini-3.1-flash-tts-preview",
     "lines": [
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Ground, Sky 123, ready to taxi."
+        "text": "Ground, Korean Air 123, ready to taxi."
       },
       {
         "speaker": "ground",
@@ -82,20 +82,20 @@
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Taxi to 33L, hold short, Sky 123."
+        "text": "Taxi to 33L, hold short, Korean Air 123."
       }
     ]
   },
   "hold": {
     "file": "hold.wav",
-    "duration": 7.630958,
+    "duration": 9.62,
     "provider": "Gemini",
-    "model": "gemini-2.5-flash-preview-tts",
+    "model": "gemini-3.1-flash-tts-preview",
     "lines": [
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Incheon Tower, Sky 123, holding short runway 33L, ready for departure."
+        "text": "Incheon Tower, Korean Air 123, holding short runway 33L, ready for departure."
       },
       {
         "speaker": "tower",
@@ -105,51 +105,51 @@
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Holding short, Sky 123."
+        "text": "Holding short, Korean Air 123."
       }
     ]
   },
   "lineup": {
     "file": "lineup.wav",
-    "duration": 7.150958,
+    "duration": 8.14,
     "provider": "Gemini",
-    "model": "gemini-2.5-flash-preview-tts",
+    "model": "gemini-3.1-flash-tts-preview",
     "lines": [
       {
         "speaker": "tower",
         "voice": "Kore",
-        "text": "Sky 123, runway 33L, line up and wait."
+        "text": "Korean Air 123, runway 33L, line up and wait."
       },
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Runway 33L, line up and wait, Sky 123."
+        "text": "Runway 33L, line up and wait, Korean Air 123."
       }
     ]
   },
   "clearance": {
     "file": "clearance.wav",
-    "duration": 8.421917,
+    "duration": 7.54,
     "provider": "Gemini",
-    "model": "gemini-2.5-flash-preview-tts",
+    "model": "gemini-3.1-flash-tts-preview",
     "lines": [
       {
         "speaker": "tower",
         "voice": "Kore",
-        "text": "Sky 123, runway 33L, cleared for takeoff."
+        "text": "Korean Air 123, runway 33L, cleared for takeoff."
       },
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Runway 33L, cleared for takeoff, Sky 123."
+        "text": "Runway 33L, cleared for takeoff, Korean Air 123."
       }
     ]
   },
   "takeoff": {
     "file": "takeoff.wav",
-    "duration": 4.830958,
+    "duration": 4.86,
     "provider": "Gemini",
-    "model": "gemini-2.5-flash-preview-tts",
+    "model": "gemini-3.1-flash-tts-preview",
     "lines": [
       {
         "speaker": "pilot",

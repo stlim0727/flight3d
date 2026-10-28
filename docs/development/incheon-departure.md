@@ -9,7 +9,21 @@ taxi, hold short / tower contact, line up and wait, takeoff clearance, and takeo
 with an airborne manual handoff. Bundled English radio speech includes distinct pilot, ground-crew and controller voices with matching captions. Stage names, speaker labels and the briefing support Korean and English. Exchanges are scripted; microphone recognition is not included. Waiting stages finish only after the current call ends. The master mute/volume controls apply to radio playback, the menu pauses and resumes at the same speech position, and cancellation/reset stops it without stale replay.
 
 G1 is an authored gate placement within source Apron 1, not a surveyed stand ID.
-Its bridge docks at the 737 forward port door and retracts before pushback.
+Its L-shaped bridge has a fixed elevated access corridor, a right-angle rotunda,
+and a telescopic apron arm docking at the 737 forward port door. Only the apron
+arm retracts before pushback. The layout reproduces this gate architecture, not
+surveyed dimensions of a particular Incheon stand. The fixed access axis meets
+the frozen terminal footprint (`relation/3917466`) at aircraft-local Z=-48.227 m;
+the corridor starts 12 cm inside that mapped wall rather than stopping on apron.
+
+The 737 exterior uses a classic Korean Air blue-top livery, KOREAN AIR titles
+on both sides and red/blue tail emblems. It retains the existing GLB, windows,
+landing gear and articulated surfaces. This is an authored interpretation of
+the classic scheme, not a particular registered airframe or the newer fleet-wide
+rebranding. The operator is listed on the [official 737 fleet page](https://www.koreanair.com/contents/plan-your-travel/in-flight-experience/fleet/b737?hl=ko).
+Captions and Gemini clips use **Korean Air 123**: the operator's
+[FAA telephony designator](https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap3_section_1.html)
+with a fictional scenario flight number, not a published scheduled flight.
 Apron 1 and Apron 2 boundaries come from complete OpenStreetMap multipolygon
 relations 3917465 and 3156115. The original bounding-box snapshot omitted member
 ways and the airfield builder ignored relations. Supplementary frozen full-relation
@@ -31,7 +45,15 @@ width tag; those defaults are not widened for this demo. Airport elevation remai
 the existing modeled 7 m. The landing-traffic call is scripted.
 
 There is one initial gate reset through the normal preset lifecycle. A visible
-737-sized tractor animates its wheels and beacon, retracts its coupling and drives clear after disconnect. It supplies bounded horizontal towing forces and a heading-restoring moment
+low-profile 6 m conventional tractor animates its wheels, steering and beacon.
+The fixed 5.1 m towbar meets the nose gear at local Z = -12.5 m; its length is
+based on the [manufacturer's B737 towbar specification](https://jms.aero/files/2193/upload/Downloads/J-TOW.pdf).
+The tractor follows a horizontal tow constraint independently of aircraft yaw,
+pitch and roll. Once the pin is released, it accelerates ahead, steers through
+an 8 m radius and brakes to a park, retaining the bar on its transport dolly.
+Taxi waits for the vehicle to stop clear. The tractor stays visible until
+scenario cleanup. Geometry is authored Three.js meshes, rather than a third-party
+GLB; the fix is in dimensions, clearance and kinematics. It supplies bounded horizontal towing forces and a heading-restoring moment
 through the normal integrator. After disconnect, all motion uses engine thrust,
 nosewheel steering, wheel brakes and flight controls. Hold-short and lineup
 completion require a physical stop. Lineup alone does not release takeoff thrust.
@@ -76,7 +98,7 @@ cancellation, and offline rendering of all eight decoded clips. Set `SCREENSHOTS
 for a physics-only run if GPU screenshot capture is slow.
 
 Voice assets are already bundled; no runtime TTS, OS voice installation or API key
-is needed. Current clips use Gemini 2.5 Flash TTS: Charon (pilot), Fenrir (crew)
+is needed. Current clips use Gemini 3.1 Flash TTS Preview: Charon (pilot), Fenrir (crew)
 and Kore (controllers). To regenerate, set `GEMINI_API_KEY` in the authoring
 environment and run `node scripts/build-gemini-departure-radio.mjs` with FFmpeg
 installed. See [Gemini authoring](gemini-radio.md). The manifest records the
