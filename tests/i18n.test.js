@@ -64,7 +64,7 @@ test('language changes persist and refresh existing text and accessible labels w
 
 test('unavailable storage is tolerated; missing messages use English and values stay plain text', () => {
   setLanguage('en', { setItem() { throw new Error('blocked'); } });
-  assert.equal(t('airport.changed.value', { value: '<b>Lukla</b>' }), 'Airport changed: <b>Lukla</b>');
+  assert.equal(t('airport.changed.value', { value: '<b>Lukla</b>' }), 'Flight region changed: <b>Lukla</b>');
   assert.equal(t('missing.key'), 'missing.key');
   delete locales.ko.messages['camera.view.centered'];
   try {
