@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { TouchFlightControls } from '../src/controls/TouchFlightControls.js';
+import { TouchFlightControls, shapeTouchStick } from '../src/controls/TouchFlightControls.js';
 
 function overlayControls() {
   const controls = Object.create(TouchFlightControls.prototype);
@@ -43,5 +43,52 @@ describe('Gyro stick sizing before pointer interaction', () => {
     assert.equal(controls.stickKnob.style.transform, 'translate(-50px, 0px)');
     controls.handleOrientation({ beta: 38, gamma: 0 });
     assert.equal(controls.stickKnob.style.transform, 'translate(0px, 0px)');
+  });
+});
+
+describe('Touch stick precision and pointer ownership', () => {
+  it('filters small drift, stays monotonic, and preserves full/diagonal authority', () => {
+    assert.deepEqual(shapeTouchStick(0.03, -0.03), [0, 0]);
+    let previous = 0;
+    for (let i = 7; i <= 100; i++) {
+      const [pitch, roll] = shapeTouchStick(0, i / 100);
+      assert.equal(pitch, 0);
+      assert.ok(roll > previous);
+      previous = roll;
+    }
+    assert.ok(shapeTouchStick(0, 0.21)[1] < 0.065);
+    assert.deepEqual(shapeTouchStick(-1, 0), [-1, 0]);
+    const diagonal = shapeTouchStick(1, -1);
+    assert.ok(Math.abs(Math.hypot(...diagonal) - 1) < 1e-12);
+  });
+
+  it('starts off-centre grabs at neutral, ignores another finger, and releases capture safely', () => {
+    const c = overlayControls();
+    let input;
+    Object.assign(c, {
+      stickActive: false, gyroActive: false,
+      stickZone: {
+        getBoundingClientRect: () => ({ left: 0, top: 0, width: 88, height: 88 }),
+        setPointerCapture: () => {},
+      },
+      stickKnob: { offsetWidth: 36, offsetHeight: 36, style: {} },
+      updateStickTelemetry: () => {},
+    });
+    c.controls.setTouchStick = (...axes) => { input = axes; };
+    c.onStickPointerDown({ pointerId: 1, clientX: 55, clientY: 50 });
+    assert.deepEqual(input, [0, 0]);
+    c.onStickPointerDown({ pointerId: 2, clientX: 0, clientY: 0 });
+    c.onStickPointerMove({ pointerId: 2, clientX: 0, clientY: 0 });
+    assert.equal(c.stickPointerId, 1);
+    c.onStickPointerMove({ pointerId: 1, clientX: 60, clientY: 50 });
+    assert.ok(input[1] > 0 && input[1] < 0.065);
+    c.onStickPointerMove({ pointerId: 1, clientX: 79, clientY: 50 });
+    assert.deepEqual(input, [0, 1]);
+    c.onStickPointerUp({ pointerId: 2 });
+    assert.equal(c.stickActive, true);
+    c.onStickPointerUp({ pointerId: 1 });
+    assert.deepEqual(input, [0, 0]);
+    c.onStickPointerUp({ pointerId: 1 });
+    assert.equal(c.stickActive, false);
   });
 });
