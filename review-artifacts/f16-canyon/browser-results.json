@@ -1,0 +1,5022 @@
+{
+  "errors": [],
+  "results": [
+    {
+      "active": true,
+      "stage": 50,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -649.5408987323088,
+        2761.2748509267158,
+        449.4861364506288
+      ],
+      "ias": 426.99939590306536,
+      "pitch": -2.0018315784045693,
+      "roll": 2.0154363038157577,
+      "gForce": 1.6499764448051715,
+      "throttle": 0.1532388120450935,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 2.3582703840692414,
+        "maxG": 1.664567097866405,
+        "rollTravelDeg": 2.680585369684536,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 50,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -851.5932379259455,
+        2744.697912974223,
+        600.5312286822051
+      ],
+      "ias": 430.35007016617595,
+      "pitch": -4.434456550005291,
+      "roll": -9.912429077608884,
+      "gForce": -0.014603851060641715,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 9.768186921404686,
+        "maxG": 1.8609294200968496,
+        "rollTravelDeg": 14.493093979666014,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 50,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -1054.9750461404258,
+        2721.2103236755197,
+        751.7559679888959
+      ],
+      "ias": 434.06489334349175,
+      "pitch": -6.496485950933951,
+      "roll": -30.799769202759343,
+      "gForce": 0.360558614013091,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 30.61277354248212,
+        "maxG": 1.8609294200968496,
+        "rollTravelDeg": 35.3376806007434,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 50,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -1257.9029300211866,
+        2690.1357846618307,
+        905.5575981363379
+      ],
+      "ias": 437.9292867880478,
+      "pitch": -5.257538203304819,
+      "roll": -48.75669499085893,
+      "gForce": 1.6344277723810754,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 48.66002662427171,
+        "maxG": 1.8609294200968496,
+        "rollTravelDeg": 53.384933682533415,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 50,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -1455.1232881772764,
+        2659.388769682154,
+        1069.338390153972
+      ],
+      "ias": 441.329907138617,
+      "pitch": -5.042313057009243,
+      "roll": -59.9202033582781,
+      "gForce": 1.8967939950123969,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 59.805264891304084,
+        "maxG": 1.8927240637526836,
+        "rollTravelDeg": 64.5301719495659,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 50,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -1642.169034934325,
+        2628.336698535722,
+        1246.5998157894119
+      ],
+      "ias": 443.8694837904425,
+      "pitch": -5.303234313579731,
+      "roll": -74.2266874092684,
+      "gForce": 3.2638347817897904,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 74.15239864839184,
+        "maxG": 3.2410533133128294,
+        "rollTravelDeg": 78.8773057066536,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 50,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -1805.514547465591,
+        2596.746609065244,
+        1445.4794314419962
+      ],
+      "ias": 442.22258350896533,
+      "pitch": -4.857022422919695,
+      "roll": -77.311571004371,
+      "gForce": 5.336921962027856,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.30729520667103,
+        "maxG": 5.335667036333425,
+        "rollTravelDeg": 82.03220226493283,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 51,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -1927.5926970215737,
+        2566.185283410179,
+        1669.7411254947538
+      ],
+      "ias": 439.49686202084547,
+      "pitch": -4.928302391929477,
+      "roll": -71.56757004163585,
+      "gForce": 4.413036723647398,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 5.33929985342615,
+        "rollTravelDeg": 87.85940658231402,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 51,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2015.6008301648806,
+        2537.665602332516,
+        1909.3204355553871
+      ],
+      "ias": 441.61442645701555,
+      "pitch": -4.977133557618426,
+      "roll": -39.90283781211775,
+      "gForce": 1.1681174564529666,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 5.33929985342615,
+        "rollTravelDeg": 119.36017714746004,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 51,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2094.7073008929447,
+        2508.8096745478388,
+        2153.724069176035
+      ],
+      "ias": 445.4902384969684,
+      "pitch": -5.776414419913035,
+      "roll": -3.7182482868047373,
+      "gForce": 0.8608148325489312,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 5.33929985342615,
+        "rollTravelDeg": 155.6453668417828,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 51,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2173.5183394682576,
+        2478.5982394712523,
+        2400.070085322569
+      ],
+      "ias": 449.42835807660447,
+      "pitch": -5.498329282406663,
+      "roll": 30.475570227051957,
+      "gForce": 1.07955032577757,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 5.33929985342615,
+        "rollTravelDeg": 189.82201130751378,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 51,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2257.701305408869,
+        2447.8301485537754,
+        2646.510251172344
+      ],
+      "ias": 453.1733956435746,
+      "pitch": -5.362427369873901,
+      "roll": 43.96237976698888,
+      "gForce": 1.5565138650306376,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 5.33929985342615,
+        "rollTravelDeg": 206.48971042768835,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 51,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2350.8350596278974,
+        2417.819148587842,
+        2891.639955517223
+      ],
+      "ias": 456.80764643484963,
+      "pitch": -5.494229297958997,
+      "roll": -3.511663163748278,
+      "gForce": 0.9430107322530363,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 5.33929985342615,
+        "rollTravelDeg": 253.55647674966565,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 51,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2445.0295984617683,
+        2387.4203282128915,
+        3138.2118849559006
+      ],
+      "ias": 460.2072929773485,
+      "pitch": -2.7418033417865444,
+      "roll": -59.56488850491962,
+      "gForce": 3.5372153459085025,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 5.33929985342615,
+        "rollTravelDeg": 309.8939941887013,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 51,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2508.2922306867517,
+        2368.2474304255425,
+        3393.129793701748
+      ],
+      "ias": 451.61717689858284,
+      "pitch": 7.694204401310254,
+      "roll": -32.999286065787494,
+      "gForce": 7.301889041215238,
+      "throttle": 0.9993982166807406,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 343.2664533724203,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 51,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2533.8259679892435,
+        2395.235437394099,
+        3648.9411336818066
+      ],
+      "ias": 444.8730302515778,
+      "pitch": 20.677547641088637,
+      "roll": 7.232648147093177,
+      "gForce": 5.51707314556964,
+      "throttle": 1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 383.96953425803076,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 51,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2561.7886557549023,
+        2460.644076377032,
+        3897.430235367634
+      ],
+      "ias": 447.51048823310623,
+      "pitch": 15.694280973209622,
+      "roll": 31.313624161999787,
+      "gForce": 0.21008714411615925,
+      "throttle": 1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 407.7567404674478,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 52,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2591.878669407108,
+        2525.260166530972,
+        4148.995142574806
+      ],
+      "ias": 450.0945872953551,
+      "pitch": 14.192255769231627,
+      "roll": 28.953133471086257,
+      "gForce": 0.9942697939637628,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 436.6481641528936,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 52,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2627.1040167728365,
+        2588.564849934439,
+        4400.728747927881
+      ],
+      "ias": 446.97763345324034,
+      "pitch": 16.398194725649624,
+      "roll": 40.60509524612009,
+      "gForce": 1.3848115201840385,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 77.44335494308903,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 456.71646551202275,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 52,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2670.3984944408253,
+        2652.513803221018,
+        4649.499117687333
+      ],
+      "ias": 442.6794972414542,
+      "pitch": 14.30716185872578,
+      "roll": 80.36719806496639,
+      "gForce": 1.4080833480977966,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 80.04006107010983,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 496.4686033385308,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 52,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2726.253859409373,
+        2709.4044257537594,
+        4895.727235291146
+      ],
+      "ias": 438.79031878842756,
+      "pitch": 10.75610198663027,
+      "roll": 120.66963006266806,
+      "gForce": 1.324697255956911,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 120.34190373515426,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 536.7704460035758,
+        "invertedSeconds": 0
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 52,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2793.3288432707213,
+        2750.7617106199414,
+        5140.886627010204
+      ],
+      "ias": 436.1996828007358,
+      "pitch": 5.240707427241418,
+      "roll": 159.78304113328284,
+      "gForce": 1.371585889773174,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 159.45367354915027,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 575.8822158175717,
+        "invertedSeconds": 0.24166666666666664
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 52,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2865.509721766995,
+        2770.4131240268102,
+        5386.67924698361
+      ],
+      "ias": 435.47277085323907,
+      "pitch": -0.09825213548569048,
+      "roll": -160.38456233152766,
+      "gForce": 1.4041282487094244,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.9566288707751,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 615.7098709778472,
+        "invertedSeconds": 1.2416666666666647
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 52,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2933.786616075355,
+        2767.7929044417724,
+        5634.631250866392
+      ],
+      "ias": 436.64445935107847,
+      "pitch": -3.9134888240682373,
+      "roll": -120.2550730506999,
+      "gForce": 1.455027841272227,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.9566288707751,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 655.839150897897,
+        "invertedSeconds": 1.5083333333333304
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 52,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -2990.6882143660655,
+        2748.3129036888186,
+        5885.753386705645
+      ],
+      "ias": 439.2585221848331,
+      "pitch": -5.320513341880582,
+      "roll": -80.1843355641703,
+      "gForce": 1.4932523704194263,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.9566288707751,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 695.9109366572698,
+        "invertedSeconds": 1.5083333333333304
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 52,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3034.109172157751,
+        2721.149276435576,
+        6140.364660312404
+      ],
+      "ias": 442.5265611858744,
+      "pitch": -4.810721162953677,
+      "roll": -40.27847101296687,
+      "gForce": 1.49309485071856,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.9566288707751,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 735.8180019703868,
+        "invertedSeconds": 1.5083333333333304
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 52,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3068.4649943896748,
+        2694.5708793999906,
+        6398.032097715379
+      ],
+      "ias": 445.74479198101704,
+      "pitch": -3.4629068336134936,
+      "roll": -5.813951994767273,
+      "gForce": 1.486949989043838,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.9566288707751,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 770.4659265685353,
+        "invertedSeconds": 1.5083333333333304
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 53,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3100.6838255014122,
+        2671.8620583529223,
+        6657.8429134196795
+      ],
+      "ias": 448.79921707944,
+      "pitch": -5.939338791512546,
+      "roll": -22.274910992110982,
+      "gForce": -0.16883739301017,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.9566288707751,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 796.1795529221714,
+        "invertedSeconds": 1.5083333333333304
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 53,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3135.0653479644575,
+        2641.6815504376036,
+        6918.292209307723
+      ],
+      "ias": 452.7091622509651,
+      "pitch": -7.609745221947647,
+      "roll": -86.08237767627092,
+      "gForce": -0.6914525844329599,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.9566288707751,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 859.952746900951,
+        "invertedSeconds": 1.5083333333333304
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 53,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3175.705986668331,
+        2601.5598183563034,
+        7178.63482268698
+      ],
+      "ias": 457.42239327766424,
+      "pitch": -7.5999351858178885,
+      "roll": -150.35205337506906,
+      "gForce": -0.6779529475315403,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.9566288707751,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 924.2353787692103,
+        "invertedSeconds": 1.5083333333333304
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 53,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3219.9024136047597,
+        2556.703028180417,
+        7440.002935269525
+      ],
+      "ias": 462.5367245233922,
+      "pitch": -8.28915597832622,
+      "roll": -178.93644059910233,
+      "gForce": -0.60636350360661,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.9566288707751,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 953.29758354674,
+        "invertedSeconds": 2.508333333333327
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 53,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3264.5952489120214,
+        2507.4201769117094,
+        7702.999376860996
+      ],
+      "ias": 468.00493602704097,
+      "pitch": -11.83867347760418,
+      "roll": 157.47179960543482,
+      "gForce": 0.6616407684189856,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.99581093692794,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 976.4311418112798,
+        "invertedSeconds": 3.5083333333333235
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 53,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3312.364605406194,
+        2445.5125857916814,
+        7965.487805369496
+      ],
+      "ias": 474.33853534129184,
+      "pitch": -14.611068643267668,
+      "roll": 93.32204509620769,
+      "gForce": 1.0119505097323467,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.99581093692794,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 1040.5430676470419,
+        "invertedSeconds": 3.633333333333323
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 53,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3368.9265060722996,
+        2372.977338862289,
+        8226.692482433638
+      ],
+      "ias": 481.51385829073433,
+      "pitch": -15.126221975412829,
+      "roll": 28.684978023999687,
+      "gForce": 0.9717192288740419,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.99581093692794,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 1105.2020685057682,
+        "invertedSeconds": 3.633333333333323
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 53,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3431.310702313576,
+        2298.765208659549,
+        8489.371603691492
+      ],
+      "ias": 487.4268487045231,
+      "pitch": -5.294990939811387,
+      "roll": 0.9452282452512294,
+      "gForce": 5.835812499229648,
+      "throttle": 0.1,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.99581093692794,
+        "maxG": 7.828804091019227,
+        "rollTravelDeg": 1133.418831371273,
+        "invertedSeconds": 3.633333333333323
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 53,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3495.809129240982,
+        2263.917916410243,
+        8757.205220326963
+      ],
+      "ias": 479.11833179855734,
+      "pitch": 11.11236495298157,
+      "roll": -0.10930099647733642,
+      "gForce": 7.735559323149248,
+      "throttle": 0.7741412166935123,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.99581093692794,
+        "maxG": 7.997006708043816,
+        "rollTravelDeg": 1134.5822601338755,
+        "invertedSeconds": 3.633333333333323
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": true,
+      "stage": 53,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3559.1185062899644,
+        2294.5794347783653,
+        9020.58551000309
+      ],
+      "ias": 471.89855012116107,
+      "pitch": 18.790646728476894,
+      "roll": 0.0004784877858214809,
+      "gForce": 4.74362579211018,
+      "throttle": 0.9928111723403437,
+      "result": {
+        "status": "running",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.99581093692794,
+        "maxG": 7.997006708043816,
+        "rollTravelDeg": 1134.6968488080415,
+        "invertedSeconds": 3.633333333333323
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    },
+    {
+      "active": false,
+      "stage": -1,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -3621.0146566603134,
+        2360.412392046731,
+        9278.097841591321
+      ],
+      "ias": 474.60960320246,
+      "pitch": 15.516160990275482,
+      "roll": -0.014879693774387727,
+      "gForce": 1.1926187458897777,
+      "throttle": 0.9478076994969377,
+      "result": {
+        "status": "completed",
+        "minClearanceM": 100.70137070929286,
+        "maxBankDeg": 179.99581093692794,
+        "maxG": 7.997006708043816,
+        "rollTravelDeg": 1134.7072174215327,
+        "invertedSeconds": 3.633333333333323,
+        "elapsedSeconds": 37.66666666666517
+      },
+      "programs": [
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "SkyShader"
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "EquirectangularToCubeUV"
+        },
+        {
+          "name": "PMREMGGXConvolution"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "pavement-asphalt"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "runway-rubber"
+        },
+        {
+          "name": "F-16-airframe"
+        },
+        {
+          "name": "F-16-hud"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "F-16-landingLights"
+        },
+        {
+          "name": "Material.478"
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": ""
+        },
+        {
+          "name": "Body"
+        },
+        {
+          "name": "Metal"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Window"
+        },
+        {
+          "name": "Screw"
+        },
+        {
+          "name": "remove_before_flight"
+        },
+        {
+          "name": "material"
+        },
+        {
+          "name": "material_20"
+        },
+        {
+          "name": "Cockpit"
+        }
+      ]
+    }
+  ]
+}

@@ -93,3 +93,36 @@ With Vite on 5186, run `chrome-session --project flight3d node
 scripts/verify-f16-lukla.mjs`. The harness checks completion, finite F-16 flight,
 no sampled crashes/stalls, clearance and control release, and captures flight
 frames and a close terrain view in `.cache/f16-lukla`.
+
+## F-16 canyon aerobatics
+
+The **Dudh Kosi canyon chase** choice adds terrain-following ingress (100 m
+commanded margin), turns with up to 78° commanded bank, a climbing 360° barrel
+roll, an inverted shoulder crossing and an upright pull-up targeting 8G. The
+roll corridor smoothly increases commanded clearance to 650 m to accommodate
+vertical excursions. The target load is a pilot command; actual load depends on
+speed, angle of attack and available elevator authority. Aircraft forces and
+collision policy remain active throughout. Completion requires wings-level,
+low-pitch recovery and preserves physical attitude and velocity for handoff.
+
+Guidance advances along the spline from measured horizontal position, rather
+than chasing a clock. Terrain queries use the loaded DEM with forward and
+lateral samples. Those samples are guidance margins, not swept collision proof.
+The original straight low-pass choice remains available.
+
+`node scripts/verify-f16-canyon-physics.mjs` runs a bounded 120 Hz airborne
+integration with the shipped DEM, real aerodynamic/engine models and virtual
+stick attenuation/slew. It completes in 37.66 simulated seconds, with minimum
+center-point clearance 101.68 m, maximum body-normal load 8.02G, and 3.63 seconds
+inverted. This check omits fuel/CG evolution, contact solver and rendering.
+Node sequence tests also cover stationary progress, recovery gating and unsafe
+clearance cleanup.
+
+For full browser acceptance, run the existing harness with
+`PROFILE=canyon-chase APP_URL=http://127.0.0.1:5188/ chrome-session --project
+flight3d node scripts/verify-f16-lukla.mjs`. It additionally requires measured
+high G, sustained inverted flight and accumulated roll. The actual simulator
+completed in 37.67 seconds, with 100.70 m minimum clearance, 8.00G maximum cabin
+load and 3.63 seconds inverted, without sampled crashes/stalls or runtime errors.
+Roll and breakout retain the chase camera to keep the airframe visible.
+[Browser samples and screenshots](../../review-artifacts/f16-canyon/README.md).

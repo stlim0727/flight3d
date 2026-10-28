@@ -1615,7 +1615,7 @@ class FlightSimulator {
       groundSpeedKnots: Atmosphere.msToKnots(groundSpeed),
       vsiFpm: Atmosphere.metersToFeet(this.linearVelocity.y) * 60.0,
       mach: aeroResult.mach,
-      gForce: Math.max(-2.5, Math.min(5.5, measuredGForce)),
+      gForce: measuredGForce,
       isStalled: aeroResult.isStalled,
       isPreStall: aeroResult.isPreStall,
       isStallWarning: aeroResult.isStallWarning,
