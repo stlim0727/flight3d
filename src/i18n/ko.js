@@ -1,4 +1,17 @@
 export default {
+  'demo.sihwa.name': '시화 해안 둘러보기',
+  'demo.sihwa.briefing': '시화방조제 인근 상공에서 시작해 조력발전소·달전망대·방아머리해변을 둘러보고 수동 조종으로 인계합니다. 기종별 속도와 선회 반경을 적용합니다.',
+  'demo.sihwa.complete': '시화 해안 관광 완료 · 수동 조종으로 인계합니다',
+  'demo.sihwa.failed': '시화 관광 비행 중단 · 수동 조종으로 인계합니다',
+  'demo.sihwa.stage.coast': '[1/4] 시화방조제',
+  'demo.sihwa.desc.coast': '방조제를 따라 조력발전소 방향으로 비행합니다. Esc로 언제든 수동 조종할 수 있습니다.',
+  'demo.sihwa.stage.station': '[2/4] 조력발전소 · 달전망대',
+  'demo.sihwa.desc.station': '왼쪽의 조력발전소와 시화나래 달전망대를 감상하세요.',
+  'demo.sihwa.stage.beach': '[3/4] 방아머리해변',
+  'demo.sihwa.desc.beach': '대부도 북쪽의 모래사장을 지나 서해 쪽으로 선회합니다.',
+  'demo.sihwa.stage.return': '[4/4] 서해 파노라마 · 귀환',
+  'demo.sihwa.desc.return': '넓은 해상 선회로 출발 지점에 돌아옵니다. 비행 종료 후 현재 상태로 수동 조종에 인계합니다.',
+
   "demo.f16.lukla": "F-16 · 루클라 계곡 로우패스",
   "demo.f16.lukla.briefing": "공중 출발 · 루클라 계곡 고속 통과 후 상승. Esc로 수동 조종.",
   "demo.f16.canyon.chase": "F-16 · 두드코시 협곡 체이스",

@@ -7,7 +7,7 @@ import { demoProfiles, resolveDemoProfile } from '../src/director/demoProfiles.j
 
 const stages = IncheonCessnaScenario.STAGES;
 test('Incheon C172 selects the circuit and rejects stale coastal route choices', () => {
-  assert.deepEqual(demoProfiles('C172', 'incheon').map(p => p.id), ['incheon-tour']);
+  assert.deepEqual(demoProfiles('C172', 'incheon').map(p => p.id), ['incheon-tour', 'sihwa-tour']);
   assert.equal(resolveDemoProfile('C172', 'incheon', 'proximity').id, 'incheon-tour');
   const d = new DemoFlightDirector({ currentAircraftId: 'C172', activeAirport: 'incheon' });
   assert.equal(d.getActiveScenario(), d.incheonCessnaScenario);

@@ -1,4 +1,17 @@
 export default {
+  'demo.sihwa.name': 'Sihwa coastal tour',
+  'demo.sihwa.briefing': 'Start airborne near Sihwa seawall, visit the tidal power station, Dal Observatory and Bangameori Beach, then return for an airborne manual handoff. Speed and turn radius suit each aircraft.',
+  'demo.sihwa.complete': 'Sihwa tour complete · manual control',
+  'demo.sihwa.failed': 'Sihwa tour stopped · manual control',
+  'demo.sihwa.stage.coast': '[1/4] Sihwa seawall',
+  'demo.sihwa.desc.coast': 'Follow the seawall toward the tidal power station. Press Esc for manual control.',
+  'demo.sihwa.stage.station': '[2/4] Tidal power station · Dal Observatory',
+  'demo.sihwa.desc.station': 'Look left for the power station and circular observation tower.',
+  'demo.sihwa.stage.beach': '[3/4] Bangameori Beach',
+  'demo.sihwa.desc.beach': 'Pass the sand beach on northern Daebudo before turning out over the sea.',
+  'demo.sihwa.stage.return': '[4/4] West Sea panorama · return',
+  'demo.sihwa.desc.return': 'Return through a broad offshore turn. The tour ends with an airborne manual handoff.',
+
   "demo.f16.lukla": "F-16 · Lukla valley low pass",
   "demo.f16.lukla.briefing": "Airborne start · Fast Lukla valley pass and climb-out. Esc takes control.",
   "demo.f16.canyon.chase": "F-16 · Dudh Kosi canyon chase",
