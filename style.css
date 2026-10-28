@@ -2341,7 +2341,9 @@ body[data-flow="lobby"] .menu-toggle {
 #lobby-demo-select { width: 100%; min-height: 44px; white-space: normal; }
 .demo-route-briefing { margin: 8px 0 0; line-height: 1.55; font-size: 13px; color: #cbd5e1; }
 
-/* Keep the active geographic scenery attribution visible during flight. */
+/* Keep the active geographic scenery attribution visible during flight.
+   ODbL requires the notice to stay displayed, so it cannot be hidden; make it
+   tap-transparent instead so it does not block the touch stick underneath. */
 #incheon-attribution {
   position: fixed;
   right: 8px;
@@ -2353,9 +2355,10 @@ body[data-flow="lobby"] .menu-toggle {
   background: #0f172acc;
   color: #e2e8f0;
   font-size: 10px;
+  pointer-events: none;
 }
 #incheon-attribution a { color: #bae6fd; }
-body[data-flow="lobby"] #incheon-attribution { z-index: 81; bottom: 4px; }
+body[data-flow="lobby"] #incheon-attribution { z-index: 81; bottom: 4px; pointer-events: auto; }
 
 .lobby-card .btn-airport span { white-space: normal; overflow-wrap: anywhere; }
 
