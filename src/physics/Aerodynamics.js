@@ -108,7 +108,8 @@ export class Aerodynamics {
     // Optional gear-handle input; standalone callers fall back to gear position.
     this.gearHandleDown = undefined;
 
-    this.Cm0 = aero.cm0 || -0.02;
+    this.Cm0 = aero.cm0 ?? -0.02;
+    this.thrustPitchArmM = config.propulsion?.pitchMomentArmMeters ?? 0.32;
     this.Cma = aero.cma || -0.85;
     this.Cm_de = aero.cmDe || -1.35;
     this.Cmq = aero.cmQ || -15.5;
@@ -367,8 +368,8 @@ export class Aerodynamics {
     // with the separated area, stronger as the wing deepens into the stall.
     cm -= 0.55 * this.separation * (1.0 + 0.9 * this.separation) * Math.sign(this.alpha);
 
-    // Engine thrust pitch coupling: engines slung below CG with 2.5° upward cant (~0.32m effective moment arm)
-    const thrustPitchMoment = (engineThrustTotal * 0.32);
+    // Effective thrust pitch arm at the structural origin; CG shift is applied below.
+    const thrustPitchMoment = engineThrustTotal * this.thrustPitchArmM;
 
     // Rolling moment coefficient Cl:
     // Includes dihedral effect (Cl_b), aileron input, roll damping (Cl_p), and differential spoiler roll

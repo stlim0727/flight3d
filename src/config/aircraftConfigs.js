@@ -213,6 +213,9 @@ export const F16_FALCON = {
   propulsion: {
     numEngines: 1,
     engineName: 'F110-GE-129',
+    // Centerline engine: no reference-origin thrust pitch moment. CG shifts
+    // are accounted for separately by the longitudinal force model.
+    pitchMomentArmMeters: 0.0,
     maxStaticThrustPerEngineN: 131000.0,
     idleN1Percent: 60.0,
     togaN1Percent: 100.0,
