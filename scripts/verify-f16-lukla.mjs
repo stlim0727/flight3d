@@ -5,7 +5,8 @@ import path from 'node:path';
 // Run under chrome-session --project flight3d; reuse its browser and close only our tab.
 const endpoint = `http://127.0.0.1:${process.env.CHROME_DEBUG_PORT || 9225}`;
 const url = process.env.APP_URL || 'http://127.0.0.1:5186/';
-const dir = process.env.ARTIFACT_DIR || '.cache/f16-lukla';
+const profile = process.env.PROFILE || 'low-pass';
+const dir = process.env.ARTIFACT_DIR || `.cache/f16-${profile}`;
 fs.mkdirSync(dir, { recursive: true });
 const target = await (await fetch(`${endpoint}/json/new?${encodeURIComponent(url)}`, { method: 'PUT' })).json();
 const ws = new WebSocket(target.webSocketDebuggerUrl);
@@ -51,13 +52,13 @@ try {
     const s=window.simulator; s.demoDirector.stop(); s.gameFlow.isPhysicsFrozen=()=>true;
     document.getElementById('lobby-airport-lukla')?.click();
     s.setAirport('lukla'); s.setAircraft('F16'); s.lobby.aircraft='F16';
-    s.lobby.preset='demo'; s.lobby.demoProfile='low-pass'; s.gameFlow.enterFlight();
+    s.lobby.preset='demo'; s.lobby.demoProfile=${JSON.stringify(profile)}; s.gameFlow.enterFlight();
   })()`);
   for (let i=0;i<120;i++) {
     if(await evaluate('window.simulator.currentTerrain.isLoaded')) break;
     await new Promise(r=>setTimeout(r,500));
   }
-  await evaluate("window.simulator.demoDirector.start('lukla','low-pass')");
+  await evaluate(`window.simulator.demoDirector.start('lukla',${JSON.stringify(profile)})`);
   for(let i=0;i<100;i++) {
     const sample=await evaluate(`(() => {const s=window.simulator; s.stepSimulation(1); return {
       active:s.demoDirector.isActive,stage:s.demoDirector.currentStage, aircraft:s.currentAircraftId,
@@ -74,6 +75,11 @@ try {
   assert.equal(results.at(-1).result.status,'completed');
   assert.ok(results.every(s=>!s.crashed&&!s.stalled&&s.aircraft==='F16'&&s.position.every(Number.isFinite)));
   assert.ok(results.at(-1).result.minClearanceM>50);
+  if (profile === 'canyon-chase') {
+    assert.ok(results.at(-1).result.maxG >= 7.5, 'measured high-G pull-up');
+    assert.ok(results.at(-1).result.invertedSeconds >= 2, 'sustained inverted flight');
+    assert.ok(results.at(-1).result.rollTravelDeg >= 700, 'roll and inverted crossing');
+  }
   assert.equal(errors.length,0);
   assert.ok(results.every(s=>s.programs.every(p=>p.runnable!==false)), 'shaders compile');
   await evaluate(`(() => {const s=window.simulator; s.demoDirector.start(); s.stepSimulation(3); s.demoDirector.stop();})()`);

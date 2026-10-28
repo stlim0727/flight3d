@@ -410,7 +410,7 @@ export class Aerodynamics {
     result.momentBody.z += this.cg.y * sideForce - this.cg.x * longitudinal.y;
     this.lift = longitudinal.lift;
     this.drag = longitudinal.drag;
-    this.gForce = Math.max(-3, Math.min(6, longitudinal.y / (this.mass * Atmosphere.G0)));
+    this.gForce = longitudinal.y / (this.mass * Atmosphere.G0);
     result.tailForce = longitudinal.tailForce;
     result.tailDragDelta = longitudinal.tailDragDelta;
 

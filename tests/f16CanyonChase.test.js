@@ -90,37 +90,44 @@ describe('F16 Canyon Chase Scenario', () => {
     assert.equal(director.f16CanyonScenario.target, null);
   });
 
-  it('progresses through canyon stages and completes cleanly', () => {
+  it('uses spatial progress and requires recovery before powered handoff', () => {
     const sim = fakeSimulator();
     const director = new DemoFlightDirector(sim);
     director.start('lukla', 'canyon-chase');
-
     const scenario = director.f16CanyonScenario;
-    assert.equal(director.currentStage, F16CanyonChaseScenario.STAGES.INGRESS);
-
-    // Advance past INGRESS (12s)
-    for (let t = 0; t < 12.5; t += 1.0) {
-      director.update(1.0);
+    const stages = F16CanyonChaseScenario.STAGES;
+    for (let i = 0; i < 15; i++) director.update(1);
+    assert.equal(director.currentStage, stages.INGRESS, 'time alone cannot advance a stationary aircraft');
+    for (let p = 0.01; p < 0.51; p += 0.01) {
+      sim.position.copy(scenario.pathPoint(p));
+      director.update(0.1);
     }
-    assert.equal(director.currentStage, F16CanyonChaseScenario.STAGES.SLALOM);
-
-    // Advance past SLALOM (16s)
-    for (let t = 0; t < 16.5; t += 1.0) {
-      director.update(1.0);
-    }
-    assert.equal(director.currentStage, F16CanyonChaseScenario.STAGES.SPRINT);
-
-    // Advance past SPRINT (16s)
-    for (let t = 0; t < 16.5; t += 1.0) {
-      director.update(1.0);
-    }
-    assert.equal(director.currentStage, F16CanyonChaseScenario.STAGES.BREAKOUT);
-
-    // Advance past BREAKOUT (11s)
-    for (let t = 0; t < 11.5; t += 1.0) {
-      director.update(1.0);
-    }
+    assert.equal(director.currentStage, stages.SPRINT);
+    sim.telemetry.rollDeg = 90;
+    for (let i = 0; i < 12; i++) director.update(1);
+    assert.equal(director.currentStage, stages.SPRINT, 'must recover from the roll');
+    sim.telemetry.rollDeg = 0;
+    director.update(0.1);
+    assert.equal(director.currentStage, stages.BREAKOUT);
+    sim.telemetry.pitchDeg = 40;
+    for (let i = 0; i < 12; i++) director.update(1);
+    assert.equal(director.currentStage, stages.BREAKOUT, 'must recover pitch before handoff');
+    sim.telemetry.pitchDeg = 0;
+    const velocity = sim.linearVelocity.clone(), attitude = sim.quaternion.clone();
+    director.update(0.1);
     assert.equal(scenario.result.status, 'completed');
     assert.equal(scenario.target, null);
+    assert.deepEqual(sim.linearVelocity, velocity);
+    assert.deepEqual(sim.quaternion, attitude);
+  });
+
+  it('fails and disposes the bandit on unsafe terrain clearance', () => {
+    const sim = fakeSimulator();
+    const director = new DemoFlightDirector(sim);
+    director.start('lukla', 'canyon-chase');
+    sim.position.y = 1805;
+    director.update(0.1);
+    assert.equal(director.f16CanyonScenario.result.status, 'failed');
+    assert.equal(director.f16CanyonScenario.target, null);
   });
 });
