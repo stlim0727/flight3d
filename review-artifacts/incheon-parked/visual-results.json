@@ -1,0 +1,171 @@
+{
+  "info": {
+    "stands": 48,
+    "terminal": 33,
+    "visible": 48,
+    "meshCount": 10,
+    "sharedBodyGeometries": 1,
+    "bodyVertices": 8013,
+    "decalVertices": 366,
+    "gpu": "ANGLE (Intel, Vulkan 1.4.335 (Intel(R) Graphics (ADL-N) (0x000046D2)), Intel open-source Mesa driver)"
+  },
+  "quality": [
+    {
+      "quality": "high",
+      "count": 48,
+      "ids": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08",
+        "P09",
+        "P12",
+        "P10",
+        "P11",
+        "P34",
+        "P16",
+        "P14",
+        "P13",
+        "P19",
+        "P15",
+        "P17",
+        "P22",
+        "P23",
+        "P20",
+        "P18",
+        "P21",
+        "P24",
+        "P26",
+        "P25",
+        "P35",
+        "P29",
+        "P28",
+        "P27",
+        "P37",
+        "P36",
+        "P38",
+        "P30",
+        "P31",
+        "P33",
+        "P32",
+        "P39",
+        "P48",
+        "P41",
+        "P40",
+        "P42",
+        "P45",
+        "P46",
+        "P44",
+        "P43",
+        "P47"
+      ]
+    },
+    {
+      "quality": "balanced",
+      "count": 32,
+      "ids": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08",
+        "P09",
+        "P12",
+        "P10",
+        "P11",
+        "P34",
+        "P16",
+        "P14",
+        "P13",
+        "P19",
+        "P15",
+        "P17",
+        "P22",
+        "P23",
+        "P20",
+        "P18",
+        "P21",
+        "P24",
+        "P26",
+        "P25",
+        "P35",
+        "P29",
+        "P28",
+        "P27",
+        "P37"
+      ]
+    },
+    {
+      "quality": "performance",
+      "count": 16,
+      "ids": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08",
+        "P09",
+        "P12",
+        "P10",
+        "P11",
+        "P34",
+        "P16",
+        "P14",
+        "P13"
+      ]
+    }
+  ],
+  "liveries": [
+    {
+      "airline": "korean",
+      "id": "P01",
+      "x": 145.5625858014438,
+      "z": -244.83482452178725,
+      "visible": 48
+    },
+    {
+      "airline": "jeju",
+      "id": "P02",
+      "x": 131.79357141309362,
+      "z": -315.16280287992765,
+      "visible": 48
+    },
+    {
+      "airline": "jin",
+      "id": "P03",
+      "x": 63.912874383555646,
+      "z": -345.3426644391038,
+      "visible": 48
+    },
+    {
+      "airline": "flydubai",
+      "id": "P04",
+      "x": 4.2449021281199695,
+      "z": -356.947479135683,
+      "visible": 48
+    }
+  ],
+  "cost": {
+    "without": {
+      "calls": 71,
+      "triangles": 594652
+    },
+    "with": {
+      "calls": 81,
+      "triangles": 768076
+    }
+  },
+  "flight": null,
+  "applicationErrors": [],
+  "externalExceptions": 1
+}
