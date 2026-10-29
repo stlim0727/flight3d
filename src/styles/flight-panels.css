@@ -100,10 +100,6 @@
   border-color: rgba(148, 163, 184, 0.2) !important;
   cursor: not-allowed;
 }
-body.demo-active .ap-bar {
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
 body.demo-active #touch-controls-overlay {
   opacity: .4;
   filter: grayscale(1);
@@ -307,20 +303,6 @@ body.demo-active #touch-controls-overlay {
   transition: background-color .15s, border-color .15s, color .15s;
 }
 
-/* Keep camera selection and one-tap mute on the primary touch toolbar. */
-.quick-mute { display: none; }
-.touch-mode .quick-mute {
-  display: block;
-  min-width: 44px;
-  min-height: 44px;
-  font-size: 18px;
-  padding: 4px;
-}
-.compact-ui.touch-mode .flight-toolbar {
-  grid-template-columns: minmax(0, 1fr) 44px;
-}
-.compact-ui.touch-mode .quick-mute { font-size: 18px; }
-
 /* Small phones use a single shallow row instead of stacked control cards. */
 @media (max-width: 600px), (max-width: 1024px) and (max-height: 500px) {
   .compact-ui.touch-mode .touch-controls-overlay {
@@ -409,29 +391,6 @@ body.demo-active #touch-controls-overlay {
   content: attr(data-short-label);
   font: 600 10px system-ui;
 }
-.flight-toolbar #btn-auto-camera { flex-basis: 64px; min-width: 64px; }
-.flight-toolbar #btn-auto-camera[aria-pressed="true"] { color: #67e8f9; background: #164e63; }
-.flight-toolbar .quick-mute { display: block; font-size: 18px; }
-.flight-toolbar #btn-fullscreen::after {
-  content: '';
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  vertical-align: middle;
-  background:
-    linear-gradient(currentColor, currentColor) left top / 7px 2px,
-    linear-gradient(currentColor, currentColor) left top / 2px 7px,
-    linear-gradient(currentColor, currentColor) right top / 7px 2px,
-    linear-gradient(currentColor, currentColor) right top / 2px 7px,
-    linear-gradient(currentColor, currentColor) left bottom / 7px 2px,
-    linear-gradient(currentColor, currentColor) left bottom / 2px 7px,
-    linear-gradient(currentColor, currentColor) right bottom / 7px 2px,
-    linear-gradient(currentColor, currentColor) right bottom / 2px 7px;
-  background-repeat: no-repeat;
-}
-.flight-toolbar #btn-fullscreen[aria-pressed="true"] { color: #67e8f9; background: #164e63; }
-
-
 /* The AP trigger stays anchored; its dropdown clears both control strips. */
 .ap-bar, .compact-ui .ap-bar {
   position: absolute;
@@ -493,17 +452,6 @@ body.demo-active #touch-controls-overlay {
   z-index: 95;
 }
 .ap-panel[hidden] { display: none !important; }
-body.hud-camera-mode .ap-panel {
-  top: max(52px, calc(15% + 44px));
-  right: calc(var(--edge-right, 8px) + 104px);
-}
-@media (max-width: 768px) {
-  body.hud-camera-mode .ap-panel {
-    top: 50px;
-    right: calc(var(--edge-right, 8px) + 96px);
-    width: min(240px, calc(100vw - 120px));
-  }
-}
 .ap-panel .ap-btn { transform: none; }
 .ap-phase-item { justify-content: center; }
 .ap-modes {
@@ -516,13 +464,3 @@ body.hud-camera-mode .ap-panel {
   overflow-wrap: anywhere;
 }
 .ap-modes:empty { display: none; }
-@media (max-height: 400px) and (min-width: 541px) {
-  /* In phone landscape, keep the brake and central touch controls outside the
-     dropdown. Align its narrower panel to the right safe edge. */
-  .compact-ui.touch-mode .ap-panel {
-    right: 0;
-    width: min(268px, calc(100vw - var(--edge-left) - var(--edge-right)));
-    max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 210px);
-  }
-}
-

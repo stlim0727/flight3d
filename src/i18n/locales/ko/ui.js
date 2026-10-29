@@ -31,6 +31,7 @@ export default {
   "ui.camera.auto.waiting.short": "자동 {seconds}초",
   "ui.camera.select": "카메라 직접 선택",
   "ui.camera.current": "카메라: {name}",
+  "ui.more": "추가 비행 조작",
   "ui.controls": "비행 조작",
   "ui.aircraft": "기체 조작",
   "ui.environment": "환경 설정",

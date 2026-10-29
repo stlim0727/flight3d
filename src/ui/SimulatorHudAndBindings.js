@@ -164,8 +164,15 @@ class SimulatorHudAndBindingsMethods {
       warning.style.color = alert?.priority >= 85 ? '#ff5555' : '#ffbe55';
     }
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
+    const fuel = document.getElementById('hud-fuel');
+    if (fuel) fuel.textContent = `${Math.round(Math.max(0, Math.min(100, 100 * (this.telemetry.fuelKg || 0) / this.engines.fuelCapacityKg)))}%`;
     this.updateAutopilotUI();
-    updateControlState(this.telemetry, this.cameraSystem, { demoActive: Boolean(this.demoDirector?.isActive) });
+    updateControlState(this.telemetry, this.cameraSystem, {
+      demoActive: Boolean(this.demoDirector?.isActive),
+      controlsDisabled: this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed,
+      pitchTrim: this.controls.pitchTrim,
+      parkingBrake: this.controls.parkingBrake,
+    });
     this.hudView.update();
   }
 
@@ -183,6 +190,7 @@ class SimulatorHudAndBindingsMethods {
     const btnToggle = document.getElementById('btn-ap-toggle');
     if (btnToggle) {
       btnToggle.disabled = isDemo;
+      btnToggle.setAttribute('data-ap-state', this.autopilot.master ? 'ON' : 'OFF');
       btnToggle.classList.toggle('ap-active', this.autopilot.master);
     }
     const elPhase = document.getElementById('hud-phase');
@@ -419,14 +427,14 @@ class SimulatorHudAndBindingsMethods {
       this.updateApToggleUI();
     };
     document.addEventListener('pointerdown', event => {
-      if (!event.target.closest('#ap-bar, #hud-autopilot')) closeApPanel();
+      if (!event.target.closest('#ap-bar, #ap-panel')) closeApPanel();
     });
     document.addEventListener('keydown', event => {
       if (event.key !== 'Escape' || document.getElementById('ap-panel').hidden) return;
       event.preventDefault();
       event.stopPropagation();
       closeApPanel();
-      document.getElementById(this.cameraSystem.mode === CameraSystem.MODES.HUD ? 'hud-autopilot' : 'btn-ap-toggle').focus({ preventScroll: true });
+      document.getElementById('btn-ap-toggle').focus({ preventScroll: true });
     });
     this.updateApToggleUI();
 

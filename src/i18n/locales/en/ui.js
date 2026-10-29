@@ -31,6 +31,7 @@ export default {
   "ui.camera.auto.waiting.short": "Auto {seconds}s",
   "ui.camera.select": "Camera view",
   "ui.camera.current": "Camera: {name}",
+  "ui.more": "More flight controls",
   "ui.controls": "Flight controls",
   "ui.aircraft": "Aircraft",
   "ui.environment": "Environment",

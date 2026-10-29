@@ -24,18 +24,16 @@ quaternion determines the roll pointer. The center symbol is aircraft boresight,
 not a flight-path marker. Units: IAS in knots, MSL altitude in feet, vertical speed
 in ft/min, trim in degrees, fuel as a percentage of current tank capacity.
 
-`HudView` owns its canvas and edge controls inside the existing inert HUD root.
-Trim uses `Aerodynamics.setTrim` and synchronizes the control state. Flaps, AP,
-gear, spoilers, reverse, sound and fullscreen reuse existing handlers. Demo
-lockout applies to flight controls. The AP button opens its existing panel;
-systems opens a small control panel. Escape closes a panel before pausing.
-Map, flight plan, ground services and simulation rate are real disabled buttons
-with a localized “Coming soon” label. The rate placeholder is disabled because
-simulation speed adjustment is not currently implemented.
+`HudView` owns only the conformal flight-instrument canvas. All camera modes
+share the same top telemetry, AP/mute header and direct CAM/gear/flaps/spoilers/
+reverse row. The ⋯ panel holds trim, parking brake, automatic camera viewing and
+fullscreen; it stays in the same place across cameras. Trim uses
+`Aerodynamics.setTrim` and synchronizes control state. Flight controls retain demo
+lockout. Escape closes an open panel before pausing. No disabled future-function
+buttons or duplicate telemetry footer occupy the flight view.
 
-Only this camera uses the new overlay and replaces the original telemetry and
-control strip. Lobby/paused/loading views hide it, and other cameras restore
-existing UI. Rendering temporarily hides the active aircraft group and restores
+Lobby/paused/loading views hide the flight-instrument canvas.
+Rendering temporarily hides the active aircraft group and restores
 its visibility in `finally`, independently of aircraft GLB loading behavior.
 The hidden airframe also does not cast its own shadow in this mode. Terrain and
 other scene objects retain their normal rendering. A crash switches back to the
@@ -52,8 +50,24 @@ chrome-session --project flight3d node scripts/verify-hud-camera.mjs
 `APP_URL` and `ARTIFACT_DIR` override the browser URL and `.cache/hud-camera` output.
 The script uses a fixed aircraft pose to check projection, native key/click
 interactions, camera/reset/menu transitions, all three aircraft, demo control
-lockout, disabled placeholders and responsive touch-control clearance. It saves
+lockout and responsive touch-control clearance. It saves
 screenshots and a JSON report, closes only its own browser tab, and does not
 claim a complete flight or landing scenario. Inspect the resulting images in
 addition to checking assertions. Unit tests check pitch/roll signs, heading wrap,
 FOV scaling, behind-eye rejection, camera persistence and crash recovery.
+
+## Shared control layout acceptance
+
+```sh
+CHROME_PATH=/home/stlim/.local/bin/chrome-headless node scripts/verify-flight-layout.mjs
+```
+
+The self-contained harness uses an isolated Chrome profile and Vulkan on Linux.
+Check render-device access in the launcher session first. It verifies a hardware
+WebGL2 renderer and shader pixel readback, then checks stable control rectangles
+across camera modes, native AP/trim/brake/mute interaction, demo lockout and
+one-tap take-control clearance across desktop and phone orientations. Artifacts
+are written to `.cache/flight-layout/` (override with `ARTIFACT_DIR`). These are
+fixed-pose browser checks, not flight or physical-device acceptance. The older
+`verify-responsive-ui.mjs` includes historical toolbar-placement expectations;
+use `verify-flight-layout.mjs` for the current shared control layout.

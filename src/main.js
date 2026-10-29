@@ -213,6 +213,15 @@ class FlightSimulator {
     initFlightPanels({
       onCycleCamera: () => this.controls.onCycleCamera(),
       onSelectCamera: mode => this.controls.onSelectCamera(mode),
+      onAdjustTrim: delta => {
+        if (this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed) return;
+        this.aero.setTrim(delta);
+        this.controls.pitchTrim = this.aero.pitchTrim;
+      },
+      onToggleParkingBrake: () => {
+        if (this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed) return;
+        this.controls.setParkingBrake(!this.controls.parkingBrake);
+      },
       onToggleAutoCamera: () => {
         this.cameraSystem.toggleAutoViewing();
         if (this.demoDirector?.isActive) this.demoDirector.onUserCameraChange();
