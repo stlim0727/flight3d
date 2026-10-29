@@ -108,13 +108,14 @@ export const ROUTES = [
       {
         contains: ['RECOVER CLEARANCE'], intermittent: true,
         note: 'RECOVER occasionally ends in the sea: 3 of 37 cold-page flights, on the '
-          + 'pre-Hangang build and on main alike, so it is not a merge regression. The route '
-          + 'dips below its 25 m clearance intent at 73.3-74.3 s (23.7 m falling to 3.9 m) and '
-          + 'then breaks the water. Unexplained by the guidance as written: `CessnaDemoScenario.js:159` '
-          + 'floors the target at terrainAhead + 55 on every stage including RECOVER, and the '
-          + 'measured sink of 865-872 fpm (4.4 m/s) exceeds the scenario\'s own -3.5 m/s command '
-          + 'clamp (:160), so the aircraft is arriving faster than the demo ever asks it to fly. '
-          + 'Tracked in https://github.com/stlim0727/flight3d/issues/292.',
+          + 'pre-Hangang build and on main alike, so it is not a merge regression. Clearance falls '
+          + 'through the 25 m intent at 73.3-74.3 s (23.7 m to 3.9 m) and then `CRASH WATER` at 86 kt. '
+          + 'The reported vertical speed during that fall is a CLIMB of 865-872 fpm, which is the '
+          + 'finding: an earlier version of this note called those numbers a sink and built a '
+          + 'mechanism on it, but the checker printed `vsiFpm` as "sink" whatever its sign '
+          + '(see vsiText in scripts/lib/abnormalityChecks.mjs), and a positive vsiFpm is a climb '
+          + '(src/systems/FlightWarnings.js:66). Gaining height and still arriving on the water '
+          + 'surface is what has to be explained, not a command that descends too fast.',
       },
       {
         contains: ['CRASH WATER'], intermittent: true,
@@ -171,8 +172,10 @@ export const ROUTES = [
     // verify-f16-lukla.mjs requires more than 50 m of clearance on this pass.
     clearanceIntentM: 50, allowedWarnings: ['terrain', 'pull-up'], shotStage: 'LOW_PASS',
     knownIssues: [
-      { contains: ['CLIMB CLEARANCE'], note: 'the pull-up still reads 47.6 m at 27.8 s with a 10,052 fpm sink' },
-      { contains: ['CLEARANCE 6.6'], note: 'the dive reaches 6.6 m agl one slice later, at 388 kt' },
+      { contains: ['CLIMB CLEARANCE'], note: 'at 27.8 s it is 47.6 m under the 50 m intent while climbing '
+        + '10,052 fpm at 389 kt with 15.3° of pitch' },
+      { contains: ['CLEARANCE 6.6'], note: 'one slice later it is at 6.6 m, still climbing (10,266 fpm) — '
+        + 'the ridge comes up faster than the airframe does' },
       { contains: ['LANDING INCIDENT'], note: 'the ridge contact raises a landing incident' },
       { contains: ['ANGULAR RATE'], note: 'and spins the airframe at 36 rad/s on impact' },
       { contains: ['CRASH TERRAIN'], note: 'the Nose radome hits the ridge at 28.0 s, ending the demo; the '

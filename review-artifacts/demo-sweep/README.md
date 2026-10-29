@@ -46,10 +46,11 @@ deleted once the guidance is fixed.
 - `b738-lukla-classic` crashes in `CANYON_APPROACH` at 126.0 s: 13 m agl at 111 kt with +15° pitch
   and a positive vertical speed. The valley climbs faster than the guidance climbs and the airframe
   reaches the wall — "Excessive belly impact or accumulated structural damage".
-- `f16-lukla-low-pass` ends at 28.0 s. The `CLIMB` stage pulls up at 389 kt with a 10,052 fpm sink
-  reading 47.6 m of clearance (the route intends 50 m), and one slice later the dive is at 6.6 m
-  when the nose radome contacts the ridge at 36 rad/s of angular rate. The scenario's own
-  `result.minClearanceM` is 7.7 m, below the 50 m `scripts/verify-f16-lukla.mjs` asserts.
+- `f16-lukla-low-pass` ends at 28.0 s in a zoom climb that cannot outrun the ridge. At 27.8 s it is
+  at 47.6 m of clearance (the route intends 50 m) at 389 kt, 15.3° of pitch and **+10,052 fpm still
+  climbing**; one slice later it is at 6.6 m, still climbing at +10,266 fpm, and the nose radome
+  contacts the ridge at 36 rad/s of angular rate. The scenario's own `result.minClearanceM` is
+  7.7 m, below the 50 m `scripts/verify-f16-lukla.mjs:79` asserts.
 
 Both reproduce byte-identically through the arming path the existing benchmark uses
 (`sim.clock.getDelta = () => 0`, `setAirport`, `demoDirector.start`), so they are demo faults, not
@@ -67,11 +68,32 @@ is not a regression from the merge that landed while this branch was open.
 It is declared `intermittent` in the route table rather than baselined, because a fault that only
 appears on some page loads cannot be proven absent by one clean flight — and the *crashing* runs
 are never folded into `demo-sweep-baseline.json`, since `--update-baseline` refuses to widen a
-baseline past a FAIL. What the measurement rules out is the obvious explanation: the guidance as
-written floors the commanded altitude at `terrainAhead + 55` on every stage including `RECOVER`
-(`src/director/scenarios/CessnaDemoScenario.js:159`) and clamps the vertical command to -3.5 m/s
-(`:160`, about 689 fpm), yet the arrival is 865-872 fpm. The airframe comes in faster than the demo
-ever asks it to fly, so why the command stopped holding is the open question.
+baseline past a FAIL.
+
+The interesting part is the direction. During that clearance collapse the reported vertical speed is
+a **climb** of 865-872 fpm, not a descent — the aircraft is gaining height and still ends up on the
+water surface, so the open question is what the sampler is measuring the clearance *against*, not
+why a command would descend too fast. An earlier draft of this note said "sink", because the
+checker printed `vsiFpm` under a "sink" label regardless of sign; that bug is fixed here (see
+below) and the mechanism claim built on it is withdrawn.
+
+## The checker bug this found in itself
+
+The first version of the clearance and stall messages was:
+
+```js
+`(sink ${round(sample.vsiFpm)} fpm, ...)`
+```
+
+`telemetry.vsiFpm` is signed like a real VSI — `src/systems/FlightWarnings.js:66` takes the sink as
+`Math.max(0, -vsi)`, and `src/main.js:2145` calls `> 300` "CLB" — so every climb in a message was
+printed as a sink. The measurements were always right: `maxSinkFpm` accumulated only negative
+`vsiFpm`, which is exactly why `f16-lukla-low-pass` correctly reported `maxSinkFpm = 0` for a route
+that never once descended before it hit the ridge. It was the prose — the FAIL text, the route-table
+notes and this document — that inherited the wrong word from the template. Messages now go through
+`vsiText()`, which prints `climb`/`sink` by sign, and
+`tests/demoSweepChecks.test.js` pins both directions plus the rule that a sink is never printed
+with a negative magnitude.
 
 All three findings are tracked together in
 [issue #292](https://github.com/stlim0727/flight3d/issues/292), which is also the measurement side

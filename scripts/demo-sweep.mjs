@@ -152,6 +152,9 @@ async function startServer() {
   try {
     await waitForUrl(url);
   } catch (error) {
+    // A server that is merely slow is still a server this process owns, and `detached`
+    // means it outlives the sweep unless it is killed here.
+    if (exited === null) { try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); } }
     throw new Error(`${error.message} (vite exited with ${exited})`);
   }
   return { url, label: preview ? 'preview' : 'dev', stop() { try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); } } };
@@ -489,7 +492,16 @@ async function main() {
   fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
   const baseline = fs.existsSync(BASELINE_FILE) ? JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8')) : {};
   const server = await startServer();
-  const browser = await startChrome();
+  // Chrome starts after the server, so a browser that never exposes a debug target exits
+  // through main().catch without ever reaching the finally below — and the detached vite
+  // child keeps serving the port long after. Hand the server over explicitly instead.
+  let browser;
+  try {
+    browser = await startChrome();
+  } catch (error) {
+    server.stop();
+    throw error;
+  }
   log(`· ${browser.version} on its own CDP port, ${selected.length} route(s) of tier ${TIER}`
     + ` · slice ${SLICE}s · ${STRICT ? 'STRICT' : 'reports advisory'}${SHOTS ? ' · screenshots on' : ''}`);
 

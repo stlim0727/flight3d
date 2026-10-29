@@ -49,6 +49,18 @@ export const MAX_ANGULAR_RATE_RAD_S = 3.0;
 /** A bank or heading rate no choreographed route produces. */
 export const MAX_SMOOTHED_RATE_DEG_PER_S = 120;
 
+/**
+ * `telemetry.vsiFpm` is signed like a real vertical speed indicator: positive is a
+ * climb (`src/systems/FlightWarnings.js:66` takes the sink as `-vsi`, and main.js
+ * labels `> 300` as CLB). Naming the number by its sign instead of assuming a
+ * descent matters, because the two readings imply opposite faults: a route losing
+ * clearance while climbing is flying into rising ground, not falling out of the sky.
+ */
+export function vsiText(vsiFpm) {
+  const value = Math.abs(Math.round(vsiFpm));
+  return vsiFpm < 0 ? `sink ${value} fpm` : `climb ${value} fpm`;
+}
+
 /** `FlightControls.setVirtualInput` names, i.e. what `clearVirtualInputs()` releases.
  *  The throttle lever and the wheel brakes a parked handoff must hold are not in this set. */
 const VIRTUAL_AXES = ['elevator', 'aileron', 'rudder', 'brakes'];
@@ -144,7 +156,7 @@ export function classifySample(sample, state) {
     state.measures.stallSamples++;
     if (!route.expectedStall && !onPavement) {
       fail(`STALL at ${round(sample.iasKnots)} kt (pitch ${round(sample.pitchDeg)}°, `
-        + `agl ${round(sample.aglM)} m, sink ${round(sample.vsiFpm)} fpm)`);
+        + `agl ${round(sample.aglM)} m, ${vsiText(sample.vsiFpm)})`);
     }
   }
 
@@ -171,7 +183,7 @@ export function classifySample(sample, state) {
     if (sample.aglM < 0) fail('FLIGHT BELOW THE GROUND PLANE');
     else if (sample.aglM < (route.clearanceIntentM ?? 0)) {
       fail(`CLEARANCE ${sample.aglM.toFixed(1)} m below the route's declared ${route.clearanceIntentM} m intent `
-        + `(sink ${round(sample.vsiFpm)} fpm, ${round(sample.iasKnots)} kt)`);
+        + `(${vsiText(sample.vsiFpm)}, ${round(sample.iasKnots)} kt)`);
     }
   }
 

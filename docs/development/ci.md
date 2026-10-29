@@ -95,7 +95,9 @@ limit, so a deep path (a nested worktree under `.cache`, for instance) kills Chr
 launch, and a full `/tmp` tmpfs does the same. Both surface as the sweep's "headless
 Chrome never exposed a debug target", which is a startup failure and not a flight
 verdict — point `TMPDIR` somewhere short and roomy (for example `TMPDIR=$HOME/.tmp`)
-and retry. The verdict is
+and retry. Both servers are owned by the process that starts them: a Chrome that never
+publishes a debug target shuts down the Vite it had already spawned rather than leaving it
+detached on a port (verified by running the sweep with `CHROME_BIN=/bin/false`). The verdict is
 always `ARTIFACT_DIR/demo-sweep-report.json` (`SLICE`-by-`SLICE` measurements, stage
 trace, warnings, touchdowns, fails, reports), and the exit code is non-zero when any
 route has a FAIL, or any REPORT under `STRICT=1`.
@@ -168,7 +170,9 @@ demo faults, and fixing the guidance is follow-up work outside this change.
 
 A third finding is intermittent: `c172-coastal-scenic` reached the water on 3 of 37 cold-page
 flights (`RECOVER CLEARANCE` down to 3.9 m, then `CRASH WATER` at 86 kt), on the pre-Hangang build
-and on `main` alike. It is declared `intermittent`, because a fault that appears on some page loads
+and on `main` alike. During that loss of clearance the vertical speed reads as a *climb* of
+865-872 fpm, so the question is what the clearance is being measured against, not why the aircraft
+would descend. It is declared `intermittent`, because a fault that appears on some page loads
 cannot be proven absent by a single clean flight, and the crashing runs never enter
 `demo-sweep-baseline.json` — `--update-baseline` refuses to widen a baseline past a FAIL. All three
 are tracked in [issue #292](https://github.com/stlim0727/flight3d/issues/292).

@@ -15,6 +15,7 @@ import {
 } from '../scripts/lib/demoSweepSpec.mjs';
 import {
   createState, classifySample, finalizeRoute, SOLVER_G_LIMIT, MAX_ROLL_DEG, STOPPED_SPEED_MS,
+  vsiText,
 } from '../scripts/lib/abnormalityChecks.mjs';
 
 const SLICE = 0.25;
@@ -286,6 +287,23 @@ test('clearance below the route intent fails; pavement contact and a declared sk
   silent(fly(routeById('c172-coastal-proximity'), fullFlight(routeById('c172-coastal-proximity'), { aglM: 2 })), 'CLEARANCE');
   silent(fly(lowpass, fullFlight(lowpass, { aglM: 62 })), 'CLEARANCE');
   fails(fly(lowpass, fullFlight(lowpass, { aglM: 41 })), "CLEARANCE 41.0 m below the route's declared 50 m intent");
+});
+
+test('a clearance fault names the vertical direction rather than assuming a descent', () => {
+  // src/systems/FlightWarnings.js:66 derives the sink as -vsi, so a positive vsiFpm is a
+  // climb. Printing every value as "sink" told the opposite story for both Lukla and the
+  // coastal Cessna: losing clearance while climbing means flying into rising ground.
+  // c172-lukla-scenic declares the same 25 m intent and carries no known issues, so the
+  // fault stays a fault instead of being absorbed.
+  const clean = routeById('c172-lukla-scenic');
+  assert.equal(vsiText(-872), 'sink 872 fpm');
+  assert.equal(vsiText(872), 'climb 872 fpm');
+  fails(fly(clean, fullFlight(clean, { aglM: 12, vsiFpm: -872 })), 'sink 872 fpm');
+  silent(fly(clean, fullFlight(clean, { aglM: 12, vsiFpm: -872 })), 'climb');
+  fails(fly(clean, fullFlight(clean, { aglM: 12, vsiFpm: 10052 })), 'climb 10052 fpm');
+  silent(fly(clean, fullFlight(clean, { aglM: 12, vsiFpm: 10052 })), 'sink');
+  // A real sink is never printed with a negative magnitude.
+  silent(fly(clean, fullFlight(clean, { aglM: 12, vsiFpm: -872 })), 'sink -');
 });
 
 test('speed beyond the simulator\'s own Vne and Mach ceilings fails', () => {
