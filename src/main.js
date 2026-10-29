@@ -361,11 +361,23 @@ class FlightSimulator {
 
     // Start with the flight when autoplay is permitted. Otherwise the browser
     // keeps the context suspended until the first flight/menu interaction.
+    const audioHint = document.getElementById('audio-start-hint');
+    const syncAudioHint = () => {
+      const state = this.audio.ctx?.state;
+      audioHint.hidden = this.audio.isMuted || !['suspended', 'interrupted'].includes(state);
+    };
+    let hintContext;
     const ensureAudio = () => {
       if (!this.audio.isInitialized) {
         this.audio.init();
       }
       this.audio.ensureContextRunning();
+      if (this.audio.ctx && hintContext !== this.audio.ctx) {
+        hintContext?.removeEventListener('statechange', syncAudioHint);
+        hintContext = this.audio.ctx;
+        hintContext.addEventListener('statechange', syncAudioHint);
+      }
+      syncAudioHint();
     };
     ['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'].forEach(evt => {
       // Controls may consume the event before it bubbles to window.

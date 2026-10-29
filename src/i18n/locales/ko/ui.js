@@ -179,6 +179,7 @@ export default {
   "photo.cockpit.panel": "실사 포토 콕핏 (Photo Panel)",
   "3d.virtual.cockpit": "3D 가상 콕핏 (3D Virtual)",
   "audio.muted": "음소거 (MUTED)",
+  "audio.startHint": "화면을 터치하거나 클릭하거나 키를 누르면 소리가 켜집니다.",
   "normal.volume.100": "기본 볼륨 (100%)",
   "nose.radome": "기수 (Nose Radome)",
   "tail.empennage": "후방 동체 (Tail Empennage)",
