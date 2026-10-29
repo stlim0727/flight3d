@@ -8,15 +8,16 @@ claims in README.md, ARCHITECTURE.md, or CODE_METRICS.md.
 
 Treat these acronyms as instructions when used as commands in a task or PR context:
 
-- **`arc` — address review comments:** read the PR's current review comments,
-  validate feedback, implement actionable fixes, run relevant checks, push updates,
-  and reply to comments and resolve threads when addressed. Explain any feedback
-  that does not warrant a change. Follow the repository's review workflow.
-- **`mac` — merge (PR) and clean up (worktree and directory):** verify required
-  CI, reviews, and merge gates, merge the intended PR, then remove its completed
-  task worktree and directory and delete the merged local task branch. Preserve
-  uncommitted or unrelated work and shared checkouts. If merging is blocked, report
-  the blocker and keep the task worktree intact.
+- **`arc` — address review comments:** run `npm run pr:arc` to inspect the PR's
+  current review comments and checks in one call, validate feedback, implement
+  actionable fixes, run relevant checks, push updates, and reply to comments and
+  resolve threads (`npm run pr:arc -- --resolve <threadId>`) when addressed. Explain
+  any feedback that does not warrant a change. Follow the repository's review workflow.
+- **`mac` — merge (PR) and clean up (worktree and directory):** run `npm run pr:mac`
+  to verify required CI, reviews, and merge gates, merge the intended PR, remove its
+  completed task worktree and directory, delete the merged branch, and fast-forward
+  the clean shared checkout in one step. Preserve uncommitted or unrelated work. If
+  merging is blocked, report the blocker and keep the task worktree intact.
 
 Apply these commands to the current task/PR; ask which target only when ambiguous.
 These shorthands retain the repository's existing checks and approval requirements.
@@ -25,7 +26,7 @@ These shorthands retain the repository's existing checks and approval requiremen
 
 Workflow rules that apply to every agent:
 
-1. Create a new git worktree for each task (`git fetch origin && git worktree add -b <branch> <path> origin/main`) BEFORE modifying any files. Never edit directly in the shared checkout and never blindly copy whole files across checkouts (apply focused edits or `git diff`/`git apply` to prevent clobbering concurrent work or recent commits).
+1. Create a new git worktree for each task (`npm run wt:new -- <branch> [path]` or `git fetch origin && git worktree add -b <branch> <path> origin/main`) BEFORE reading or modifying files so you always inspect `origin/main` rather than a stale shared checkout. Never edit directly in the shared checkout and never blindly copy whole files across checkouts (apply focused edits or `git diff`/`git apply` to prevent clobbering concurrent work or recent commits).
 2. Before committing or opening a PR, inspect `git diff origin/main` to verify that only intentional scoped changes are present and that no unrelated code or recent features from other PRs were accidentally deleted (`-` lines).
 3. Open a pull request when the work is ready: commit to a focused branch, push, and open a PR — unless the user explicitly requests local-only work.
 4. Multiple agents may work in this repository at the same time. Inspect git status before editing, never assume exclusive access, and leave other agents' and the user's edits untouched.

@@ -16,7 +16,12 @@ Adapted from Keepory's CLAUDE.md and docs/development/agent-working-rules.md.
   multi-step sequences. For pass/fail gates, check that empty output, missing
   inputs, and malformed results cannot silently earn a pass.
 - Use bounded rg searches and relevant file spans. Consult configured tools and
-  applicable skills before inventing a new operational script.
+  applicable skills (`npm run wt:new`, `npm run pr:arc`, `npm run pr:mac`,
+  `scripts/lib/browserHarness.mjs`) before inventing a new operational script or
+  polling ports/PRs in a shell loop.
+- Do not retry the same failing approach or browser script past two attempts without
+  isolating the cause in a small reproducer. Keep transient screenshots and JSON
+  dumps in ignored directories (`.tmp/`, `.cache/`, `review-artifacts/`).
 - Verify the behavior affected by the change. Reuse completed checks unless new
   edits, failures, or unresolved questions justify another run.
 - Keep commands and task routing current when moving files or changing scripts.

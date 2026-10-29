@@ -278,7 +278,7 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
     // Transition to next stage (COASTAL_BANK)
     director.setStage(DemoFlightDirector.COASTAL_STAGES.COASTAL_BANK);
     assert.strictEqual(director.userCameraOverridden, false, 'userCameraOverridden should be reset on entering new stage');
-    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.CHASE, 'Should preserve the manually selected view');
+    assert.strictEqual(sim.cameraSystem.mode, CameraSystem.MODES.HUD, 'Should preserve the manually selected HUD view');
   });
 });
 

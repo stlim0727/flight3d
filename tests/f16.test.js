@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { F16, F16_SCALE, F16_CENTER_X, splitF16Gear } from '../src/aircraft/F16.js';
+import { F16, F16_SCALE, F16_CENTER_X, splitF16Gear, createF16CanopyMaterial } from '../src/aircraft/F16.js';
 import { AircraftBreakup } from '../src/effects/AircraftBreakup.js';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { F16_FALCON } from '../src/config/aircraftConfigs.js';
@@ -191,4 +191,58 @@ test('F16 trim solver yields feasible idle solution for high-speed level flight'
   assert.equal(solution.feasible, true);
   assert.equal(solution.reason, 'idle');
   assert.ok(solution.handsOffTrimDeg >= -5 && solution.handsOffTrimDeg <= 12);
+});
+
+test('F16 canopy curved glass material has physical reflection, clearcoat, and view-dependent Fresnel', () => {
+  const exteriorMat = createF16CanopyMaterial(false);
+  assert.equal(exteriorMat.isMeshPhysicalMaterial, true);
+  assert.equal(exteriorMat.transparent, true);
+  assert.equal(exteriorMat.depthWrite, false);
+  assert.equal(exteriorMat.side, THREE.FrontSide);
+  assert.equal(exteriorMat.opacity, 0.20);
+  assert.equal(exteriorMat.roughness, 0.04);
+  assert.equal(exteriorMat.metalness, 0.08);
+  assert.equal(exteriorMat.clearcoat, 1.0);
+  assert.equal(exteriorMat.clearcoatRoughness, 0.03);
+  assert.equal(exteriorMat.ior, 1.54);
+  assert.equal(exteriorMat.envMapIntensity, 2.5);
+
+  const cockpitMat = createF16CanopyMaterial(true);
+  assert.equal(cockpitMat.side, THREE.BackSide);
+  assert.equal(cockpitMat.opacity, 0.12);
+
+  // Verify onBeforeCompile replaces opaque_fragment with curved Fresnel reflection
+  const shader = { fragmentShader: THREE.ShaderLib.physical.fragmentShader };
+  cockpitMat.onBeforeCompile(shader);
+  assert.ok(shader.fragmentShader.includes('fresnel'));
+  assert.ok(shader.fragmentShader.includes('canopyAlpha'));
+  assert.ok(shader.fragmentShader.includes('totalSpecular'));
+  assert.ok(shader.fragmentShader.includes('itoTint'));
+});
+
+test('loaded F16 configures canopy mesh and responds to cockpit mode transitions', async t => {
+  const loaded = await loadUntexturedAsset();
+  t.mock.method(GLTFLoader.prototype, 'loadAsync', async () => loaded);
+  const aircraft = new F16();
+  await aircraft.ready;
+  assert.ok(aircraft.canopyMesh, 'canopy mesh must be identified');
+  assert.ok(aircraft.canopyMaterial, 'canopy material must be assigned');
+  assert.equal(aircraft.canopyMaterial.isMeshPhysicalMaterial, true);
+  assert.equal(aircraft.canopyMesh.castShadow, false);
+  assert.equal(aircraft.canopyMesh.receiveShadow, false);
+
+  // Exterior mode initially
+  aircraft.setCockpitMode(false);
+  assert.equal(aircraft.canopyMaterial.side, THREE.FrontSide);
+  assert.equal(aircraft.canopyMaterial.opacity, 0.20);
+
+  // Switch to cockpit mode
+  aircraft.setCockpitMode(true);
+  assert.equal(aircraft.canopyMaterial.side, THREE.BackSide);
+  assert.equal(aircraft.canopyMaterial.opacity, 0.12);
+
+  // Switch back to exterior mode
+  aircraft.setCockpitMode(false);
+  assert.equal(aircraft.canopyMaterial.side, THREE.FrontSide);
+  assert.equal(aircraft.canopyMaterial.opacity, 0.20);
 });

@@ -89,6 +89,10 @@ plus mobile menu, restart, camera override and cancellation checks.
 
 ## F-16 Lukla low pass and landing
 
+Landing results reported in [PR #304](https://github.com/stlim0727/flight3d/pull/304)
+are evidence within the game model, not validation of real F16 landing feasibility;
+see [fidelity limits and validation work](f16-lukla-realism.md).
+
 Select **Lukla → F-16 → Demo flight → F-16 · Lukla low pass and landing**
 (the existing `low-pass` profile). After the 280-KIAS airborne pass, the fighter
 climbs/turns clear of the opposing ridge as before, then stays under pilot control

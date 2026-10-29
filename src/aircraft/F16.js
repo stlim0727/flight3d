@@ -8,6 +8,67 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 export const F16_SCALE = 9.96 / 93.93575286865234;
 export const F16_CENTER_X = 25.935216903686523;
 
+/**
+ * Authentic F-16 curved bubble canopy material with Indium Tin Oxide (ITO)
+ * radar-reflective golden sheen and view-dependent Fresnel light reflections.
+ */
+export function createF16CanopyMaterial(isCockpit = false) {
+  const material = new THREE.MeshPhysicalMaterial({
+    name: 'F16-canopy-glass',
+    color: new THREE.Color(0.96, 0.93, 0.84),
+    transparent: true,
+    opacity: isCockpit ? 0.12 : 0.20,
+    roughness: 0.04,
+    metalness: 0.08,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.03,
+    ior: 1.54,
+    envMapIntensity: 2.5,
+    depthWrite: false,
+    side: isCockpit ? THREE.BackSide : THREE.FrontSide
+  });
+
+  material.userData.isF16Canopy = true;
+
+  material.onBeforeCompile = shader => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      `
+      #ifdef OPAQUE
+      diffuseColor.a = 1.0;
+      #endif
+      #ifdef USE_TRANSMISSION
+      diffuseColor.a *= material.transmissionAlpha;
+      #endif
+
+      // Curved glass Fresnel reflection factor based on view angle and surface normal
+      float vDotN = clamp( dot( geometryNormal, geometryViewDir ), 0.0, 1.0 );
+      float fresnel = pow( 1.0 - vDotN, 4.0 );
+
+      // Dynamic alpha: clear at normal incidence so cockpit displays & pilot remain sharp,
+      // highly reflective at glancing angles along the curved bubble canopy rim
+      float baseAlpha = diffuseColor.a;
+      float canopyAlpha = clamp( mix( baseAlpha, 0.88, fresnel * 0.95 ), 0.0, 1.0 );
+
+      // Accumulate direct sun highlight, HDR sky reflection, and clearcoat sheen
+      vec3 totalSpecular = reflectedLight.directSpecular + reflectedLight.indirectSpecular +
+        ( clearcoatSpecularDirect + clearcoatSpecularIndirect );
+
+      // F-16 Indium Tin Oxide (ITO) subtle gold/amber sheen along reflection contours
+      vec3 itoTint = mix( vec3( 1.0 ), vec3( 1.08, 0.96, 0.82 ), fresnel );
+      totalSpecular *= itoTint;
+
+      // Compensate for WebGL alpha blending so specular reflection retains full physical brilliance
+      vec3 adjustedOutgoing = outgoingLight + totalSpecular * ( ( 1.0 / max( canopyAlpha, 0.12 ) ) - 1.0 );
+
+      gl_FragColor = vec4( adjustedOutgoing, canopyAlpha );
+      `
+    );
+  };
+
+  return material;
+}
+
 /** Partition the authored, merged deployed gear into three movable legs. */
 export function splitF16Gear(geometry) {
   const source = geometry.index ? geometry.toNonIndexed() : geometry.clone();
@@ -86,21 +147,30 @@ export class F16 {
     for (const source of meshes) {
       const name = source.parent.name;
       const geometry = source.geometry.clone().applyMatrix4(source.matrixWorld);
-      const material = source.material.clone();
-      if (material.transparent) {
-        material.depthWrite = false;
-        material.side = THREE.FrontSide;
-        material.opacity = Math.min(material.opacity, 0.18);
-      }
-      if (material.name === 'F-16-hud') {
-        material.transparent = true;
-        material.opacity = 0.3;
-        material.depthWrite = false;
+      let material;
+      if (name.startsWith('F-16-canopy_')) {
+        material = createF16CanopyMaterial(this.isCockpit);
+        this.canopyMaterial = material;
+      } else {
+        material = source.material.clone();
+        if (material.transparent) {
+          material.depthWrite = false;
+          material.side = THREE.FrontSide;
+          material.opacity = Math.min(material.opacity, 0.18);
+        }
+        if (material.name === 'F-16-hud') {
+          material.transparent = true;
+          material.opacity = 0.3;
+          material.depthWrite = false;
+        }
       }
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = name;
       mesh.castShadow = !material.transparent;
       mesh.receiveShadow = !material.transparent;
+      if (name.startsWith('F-16-canopy_')) {
+        this.canopyMesh = mesh;
+      }
       if (name.startsWith('F-16-landingOn_')) {
         this.installGear(mesh);
       } else if (name.startsWith('F-16-landingOff_')) {
@@ -159,7 +229,14 @@ export class F16 {
     if (this.landingLight) this.landingLight.visible = this.lightsOn && !this.isCrashed && extension > 0.95;
   }
 
-  setCockpitMode(isCockpit) { this.isCockpit = isCockpit; }
+  setCockpitMode(isCockpit) {
+    this.isCockpit = isCockpit;
+    if (this.canopyMaterial) {
+      this.canopyMaterial.side = isCockpit ? THREE.BackSide : THREE.FrontSide;
+      this.canopyMaterial.opacity = isCockpit ? 0.12 : 0.20;
+      this.canopyMaterial.needsUpdate = true;
+    }
+  }
   triggerCrashVisuals() { this.isCrashed = true; this.lightsGroup.visible = false; }
   resetCrashVisuals() { this.isCrashed = false; this.lightsGroup.visible = this.lightsOn; }
 }

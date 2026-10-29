@@ -1,0 +1,490 @@
+/* Diagnostics & Physics Inspector Panel */
+.diagnostics-panel {
+  display: none;
+  position: absolute;
+  top: 75px;
+  right: 18px;
+  width: 360px;
+  max-height: 82vh;
+  background: rgba(10, 16, 26, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+  z-index: 90;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.diagnostics-panel.visible {
+  display: block;
+}
+
+.diag-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(15, 23, 42, 0.85);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.diag-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.diag-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.diag-close-btn:hover {
+  color: #ffffff;
+}
+
+.diag-content {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.diag-section {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.diag-subheading {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 4px;
+}
+
+.diag-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-bottom: 5px;
+}
+
+.diag-row .k {
+  color: #cbd5e1;
+}
+
+.diag-row .v {
+  font-family: monospace;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sparkline-canvas {
+  width: 100%;
+  height: 60px;
+  border-radius: 4px;
+  border: 1px solid #1e293b;
+  display: block;
+}
+
+.sparkline-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 10px;
+  color: #94a3b8;
+  margin-top: 6px;
+}
+
+.leg-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot.green { background: #10b981; }
+.dot.cyan  { background: #38bdf8; }
+
+/* Tuning Sliders */
+.tune-control {
+  margin-bottom: 10px;
+}
+
+.tune-lbl {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #cbd5e1;
+  margin-bottom: 3px;
+}
+
+.tune-control input[type="range"] {
+  width: 100%;
+  accent-color: #38bdf8;
+  height: 4px;
+  background: #1e293b;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.btn-reset {
+  width: 100%;
+  margin-top: 6px;
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  font-size: 11px;
+}
+
+.btn-reset:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #ffffff;
+}
+
+/* Catastrophic Crash & Explosion UI */
+.crash-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 90;
+  animation: crashFadeIn 0.3s ease-out forwards;
+}
+
+.crash-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.1) 25%, rgba(185, 28, 28, 0.45) 70%, rgba(40, 5, 5, 0.92) 100%);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  animation: vignettePulse 1.8s infinite alternate ease-in-out;
+}
+
+@keyframes vignettePulse {
+  0% { opacity: 0.85; }
+  100% { opacity: 1.0; }
+}
+
+@keyframes crashFadeIn {
+  from { opacity: 0; transform: scale(1.05); }
+  to { opacity: 1; transform: scale(1.0); }
+}
+
+.crash-card {
+  position: relative;
+  width: min(460px, calc(100% - var(--edge-left) - var(--edge-right) - 104px));
+  max-height: calc(100dvh - var(--demo-row-top, calc(var(--edge-top) + 96px)) - var(--edge-bottom) - 12px);
+  margin-top: var(--demo-row-top, calc(var(--edge-top) + 96px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(239, 68, 68, 0.65);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75), 0 0 24px rgba(239, 68, 68, 0.25);
+  pointer-events: auto;
+  text-align: center;
+  color: #ffffff;
+  animation: cardSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes cardSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.crash-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px 8px;
+  margin-bottom: 10px;
+}
+
+.crash-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: rgba(239, 68, 68, 0.25);
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #fca5a5;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.crash-status-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #ef4444;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 3px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.crash-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+  line-height: 1.3;
+  text-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
+}
+
+.crash-desc {
+  font-size: 12px;
+  color: #cbd5e1;
+  margin: 0 0 12px 0;
+  line-height: 1.45;
+}
+
+.crash-telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 0;
+}
+
+.crash-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.crash-stat .stat-label {
+  font-size: 10px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.crash-stat .stat-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+
+.crash-stat .stat-val.critical {
+  color: #ef4444;
+}
+
+.crash-header-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-crash-toggle {
+  min-height: 30px;
+  padding: 4px 8px;
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  border-radius: 6px;
+  color: #fca5a5;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.btn-crash-toggle:hover {
+  background: rgba(239, 68, 68, 0.32);
+  border-color: rgba(239, 68, 68, 0.8);
+}
+
+/* Collapsed report keeps only the header and pins it to the top so the
+   wreckage stays visible. */
+.crash-overlay.is-minimized {
+  align-items: flex-start;
+}
+
+.crash-overlay.is-minimized .crash-vignette {
+  animation: none;
+  opacity: 0;
+}
+
+.crash-overlay.is-minimized .crash-card {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  max-width: calc(100% - var(--edge-left) - var(--edge-right) - 96px);
+  min-height: 44px;
+  margin-top: var(--demo-row-top, calc(var(--edge-top) + 96px));
+  padding: 5px 6px 5px 10px;
+  border-radius: 10px;
+}
+
+.crash-overlay.is-minimized .crash-header {
+  margin-bottom: 0;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.crash-overlay.is-minimized .crash-badge {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.crash-overlay.is-minimized .crash-status-tag {
+  display: none;
+}
+
+.crash-overlay.is-minimized .crash-body {
+  display: none;
+}
+
+@media (max-width: 540px) {
+  .crash-card {
+    width: min(400px, calc(100% - var(--edge-left) - var(--edge-right)));
+    max-height: calc(100dvh - max(var(--demo-row-top, calc(var(--edge-top) + 96px)), calc(var(--menu-row-top, calc(var(--edge-top) + 96px)) + 48px)) - var(--edge-bottom) - 12px);
+    margin-top: max(var(--demo-row-top, calc(var(--edge-top) + 96px)), calc(var(--menu-row-top, calc(var(--edge-top) + 96px)) + 48px));
+    padding: 12px 14px;
+  }
+  .crash-status-tag {
+    display: none;
+  }
+  .crash-title {
+    font-size: 15px;
+  }
+  .crash-desc {
+    font-size: 11px;
+    margin-bottom: 10px;
+  }
+  .crash-telemetry-grid {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .crash-stat .stat-val {
+    font-size: 11px;
+  }
+  .crash-overlay.is-minimized .crash-card {
+    padding: 4px 5px 4px 7px;
+  }
+  .crash-overlay.is-minimized .crash-header {
+    gap: 4px;
+  }
+  .crash-overlay.is-minimized .crash-badge,
+  .crash-overlay.is-minimized .btn-crash-toggle {
+    font-size: 9px;
+    letter-spacing: 0;
+  }
+  .crash-overlay.is-minimized .btn-crash-toggle {
+    padding: 4px 6px;
+  }
+}
+
+@media (max-width: 355px) {
+  .crash-card {
+    padding: 10px;
+  }
+  .crash-badge,
+  .btn-crash-toggle {
+    font-size: 9px;
+    letter-spacing: 0;
+    padding: 3px 6px;
+  }
+  .crash-overlay.is-minimized .crash-card {
+    max-width: calc(100% - var(--edge-left) - var(--edge-right));
+    margin-top: max(var(--demo-row-top, calc(var(--edge-top) + 96px)), calc(var(--menu-row-top, calc(var(--edge-top) + 96px)) + 48px));
+  }
+}
+
+@media (max-height: 450px) {
+  .crash-card {
+    padding: 8px 12px;
+  }
+  .crash-header {
+    margin-bottom: 4px;
+  }
+  .crash-title {
+    font-size: 14px;
+    margin-bottom: 2px;
+  }
+  .crash-desc {
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+  .crash-telemetry-grid {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  .crash-stat .stat-val {
+    font-size: 11px;
+  }
+}
+
+@media (max-height: 360px) {
+  .crash-card {
+    width: min(380px, calc(100% - var(--edge-left) - var(--edge-right) - 104px));
+    padding: 5px 10px;
+  }
+  .crash-header {
+    margin-bottom: 2px;
+  }
+  .crash-badge,
+  .btn-crash-toggle {
+    min-height: 24px;
+    padding: 2px 6px;
+    font-size: 9px;
+  }
+  .crash-status-tag,
+  .crash-desc {
+    display: none;
+  }
+  .crash-title {
+    font-size: 12px;
+    margin-bottom: 2px;
+  }
+  .crash-telemetry-grid {
+    padding: 3px 6px;
+    gap: 4px;
+  }
+  .crash-stat .stat-label {
+    font-size: 8px;
+  }
+  .crash-stat .stat-val {
+    font-size: 10px;
+  }
+}
+
