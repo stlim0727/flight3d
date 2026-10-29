@@ -2342,8 +2342,10 @@ body[data-flow="lobby"] .menu-toggle {
 .demo-route-briefing { margin: 8px 0 0; line-height: 1.55; font-size: 13px; color: #cbd5e1; }
 
 /* Keep the active geographic scenery attribution visible during flight.
-   ODbL requires the notice to stay displayed, so it cannot be hidden; make it
-   tap-transparent instead so it does not block the touch stick underneath. */
+   ODbL requires the notice to stay displayed, so it cannot be hidden; during
+   flight it collapses to a small © chip that expands on tap, keeping the
+   touch controls clear. The notice stays tap-transparent where it overlaps
+   the controls. */
 #incheon-attribution {
   position: fixed;
   right: 8px;
@@ -2357,8 +2359,25 @@ body[data-flow="lobby"] .menu-toggle {
   font-size: 10px;
   pointer-events: none;
 }
-#incheon-attribution a { color: #bae6fd; }
+#incheon-attribution a { color: #bae6fd; pointer-events: auto; }
+#incheon-attribution-chip {
+  pointer-events: auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #334155;
+  color: #e2e8f0;
+  font: 700 13px/24px sans-serif;
+  cursor: pointer;
+  vertical-align: middle;
+}
+#incheon-attribution-text { display: none; }
+#incheon-attribution.expanded #incheon-attribution-text { display: inline; }
 body[data-flow="lobby"] #incheon-attribution { z-index: 81; bottom: 4px; pointer-events: auto; }
+body[data-flow="lobby"] #incheon-attribution-text { display: inline; }
+body[data-flow="lobby"] #incheon-attribution-chip { display: none; }
 
 .lobby-card .btn-airport span { white-space: normal; overflow-wrap: anywhere; }
 
