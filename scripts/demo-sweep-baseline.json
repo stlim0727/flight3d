@@ -165,5 +165,21 @@
     "minAglM": 584.8,
     "warningSeconds": {},
     "elapsedSeconds": 341
+  },
+  "f16-lukla-low-pass": {
+    "maxRollDeg": 37.5,
+    "maxIasKnots": 308.3,
+    "maxMach": 0.571,
+    "maxAbsG": 1.4,
+    "maxSinkFpm": 0,
+    "maxAngularRateRadS": 0.2,
+    "maxHeadingRateDegPerS": 2.9,
+    "maxBankRateDegPerS": 6.9,
+    "minAglM": 170.7,
+    "warningSeconds": {
+      "terrain": 18,
+      "pull-up": 10.3
+    },
+    "elapsedSeconds": 42
   }
 }

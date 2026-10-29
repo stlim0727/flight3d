@@ -92,9 +92,20 @@ plus mobile menu, restart, camera override and cancellation checks.
 Select **Lukla → F-16 → Demo flight**. The demo waits for the DEM, starts
 southwest of runway 24 at 280 KIAS with gear retracted, flies a straight valley
 pass, then climbs before the opposing ridge and hands back powered controls.
-It uses normal physics and collision checks after the initial spawn. Chase,
-cockpit and flyby cuts respect a manually selected camera; P restarts and Esc
-cancels. Other airports do not offer an F-16 demo.
+The escape turn starts 1,600 m along the pass, with the heading command blended
+from 238° to 195° over six seconds and bank limited to 45°. The climb targets
+300 KIAS and at most 35 m/s vertical speed toward 4,600 m MSL. Fighter-specific
+throttle feed-forward avoids the Cessna law's full-thrust acceleration into the
+opposing ridge; pitch still comes from the inherited lift/AoA controller.
+
+Control returns only after at least 30 seconds of escape, within 5° of the exit
+heading, under 10° bank, climbing, and over 150 m clear of terrain. Completion
+preserves velocity, attitude, rates and power instead of resetting them. Initial
+spawn remains the only scripted pose. Chase, cockpit and flyby cuts respect a
+manually selected camera; P restarts and Esc cancels.
+
+[Guidance comparison](../../review-artifacts/f16-lukla-guidance/README.md) records
+the original ridge collision, tuned sweep, per-tick checks and post-handoff flight.
 
 With Vite on 5186, run `chrome-session --project flight3d node
 scripts/verify-f16-lukla.mjs`. The harness checks completion, finite F-16 flight,

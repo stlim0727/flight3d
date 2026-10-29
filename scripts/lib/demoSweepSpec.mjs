@@ -171,18 +171,6 @@ export const ROUTES = [
     groundStages: [], lands: false, handoff: 'airborne', budgetSimSeconds: 140,
     // verify-f16-lukla.mjs requires more than 50 m of clearance on this pass.
     clearanceIntentM: 50, allowedWarnings: ['terrain', 'pull-up'], shotStage: 'LOW_PASS',
-    knownIssues: [
-      { contains: ['CLIMB CLEARANCE'], note: 'at 27.8 s it is 47.6 m under the 50 m intent while climbing '
-        + '10,052 fpm at 389 kt with 15.3° of pitch' },
-      { contains: ['CLEARANCE 6.6'], note: 'one slice later it is at 6.6 m, still climbing (10,266 fpm) — '
-        + 'the ridge comes up faster than the airframe does' },
-      { contains: ['LANDING INCIDENT'], note: 'the ridge contact raises a landing incident' },
-      { contains: ['ANGULAR RATE'], note: 'and spins the airframe at 36 rad/s on impact' },
-      { contains: ['CRASH TERRAIN'], note: 'the Nose radome hits the ridge at 28.0 s, ending the demo; the '
-        + 'scenario itself records minClearanceM 7.7, so this is not a sweep-only opinion — verify-f16-lukla.mjs:79 '
-        + 'asserts minClearanceM > 50 and rejects the same flight. '
-        + 'Tracked in https://github.com/stlim0727/flight3d/issues/292.' },
-    ],
   },
   {
     id: 'f16-lukla-canyon-chase', aircraft: 'F16', airport: 'lukla', profile: 'canyon-chase',
