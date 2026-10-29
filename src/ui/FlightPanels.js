@@ -57,7 +57,7 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   cameraSelect.addEventListener('change', () => onSelectCamera(Number(cameraSelect.value)));
   cameraLabel.append(caption, cameraSelect);
   settings.append(cameraLabel);
-  for (const selector of ['.language-control[for="render-quality"]', '.language-control[for="cockpit-quality"]', '#btn-sound', '#btn-touch-toggle', '#btn-fullscreen', '#touch-btn-gyro', '#btn-cam-reset', '#btn-yokes', '#btn-diag', '#btn-help']) {
+  for (const selector of ['.language-control[for="render-quality"]', '.language-control[for="cockpit-quality"]', '#btn-sound', '#btn-touch-toggle', '#touch-btn-gyro', '#btn-cam-reset', '#btn-yokes', '#btn-diag', '#btn-help']) {
     const node = document.querySelector(selector);
     if (node) settings.append(node);
   }
@@ -69,6 +69,9 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   bindText(mute, () => t('ui.mute'), 'aria-label');
   mute.textContent = '🔊';
   bar.append(mute);
+  const fullscreen = document.getElementById('btn-fullscreen');
+  fullscreen.setAttribute('data-short-label', '');
+  bar.append(fullscreen);
   for (const id of ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']) {
     bar.append(document.getElementById(id));
   }

@@ -1959,7 +1959,7 @@ body.demo-active #touch-controls-overlay {
   align-items: stretch;
 }
 
-/* One concise control strip: camera, sound | gear, flaps, spoilers, reverse. */
+/* One concise control strip: camera, sound, fullscreen | aircraft controls. */
 .flight-toolbar, .compact-ui .flight-toolbar, .compact-ui.touch-mode .flight-toolbar {
   top: calc(var(--edge-top) + 48px);
   bottom: auto;
@@ -1998,6 +1998,25 @@ body.demo-active #touch-controls-overlay {
 .flight-toolbar #btn-auto-camera { flex-basis: 64px; min-width: 64px; }
 .flight-toolbar #btn-auto-camera[aria-pressed="true"] { color: #67e8f9; background: #164e63; }
 .flight-toolbar .quick-mute { display: block; font-size: 18px; }
+.flight-toolbar #btn-fullscreen::after {
+  content: '';
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  background:
+    linear-gradient(currentColor, currentColor) left top / 7px 2px,
+    linear-gradient(currentColor, currentColor) left top / 2px 7px,
+    linear-gradient(currentColor, currentColor) right top / 7px 2px,
+    linear-gradient(currentColor, currentColor) right top / 2px 7px,
+    linear-gradient(currentColor, currentColor) left bottom / 7px 2px,
+    linear-gradient(currentColor, currentColor) left bottom / 2px 7px,
+    linear-gradient(currentColor, currentColor) right bottom / 7px 2px,
+    linear-gradient(currentColor, currentColor) right bottom / 2px 7px;
+  background-repeat: no-repeat;
+}
+.flight-toolbar #btn-fullscreen[aria-pressed="true"] { color: #67e8f9; background: #164e63; }
+
 
 /* The AP trigger stays anchored; its dropdown clears both control strips. */
 .ap-bar, .compact-ui .ap-bar {
