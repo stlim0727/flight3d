@@ -38,7 +38,9 @@ try {
   await waitFor('Boolean(window.simulator?.hasRenderedFirstFrame) && !document.body.classList.contains("booting")');
   const initial = await evaluate(`(() => {
     const a = window.simulator.audio;
-    return { initialized: a.isInitialized, state: a.ctx?.state, engine: a.engineGain?.gain.value,
+    return { aircraft: window.simulator.currentAircraftId, profile: a.profile.engineType,
+      initialized: a.isInitialized, state: a.ctx?.state,
+      engine: (a.isPiston ? a.pistonGain : a.engineGain)?.gain.value,
       activated: navigator.userActivation.hasBeenActive };
   })()`);
   console.log('Before any interaction:', initial);
