@@ -47,6 +47,7 @@ import { NeonCity } from './environment/NeonCity.js';
 import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
+import { HudView } from './ui/HudView.js';
 import { RenderPose } from './core/RenderPose.js';
 import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
 import { DemoFlightDirector } from './director/DemoFlightDirector.js';
@@ -234,6 +235,7 @@ class FlightSimulator {
     });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
+    this.hudView = new HudView(this);
     this.cameraSystem.onResetLook = () => {
       this.showToast(() => t('camera.view.centered'));
     };
@@ -2147,6 +2149,7 @@ class FlightSimulator {
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
     this.updateAutopilotUI();
     updateControlState(this.telemetry, this.cameraSystem, { demoActive: Boolean(this.demoDirector?.isActive) });
+    this.hudView.update();
   }
 
   flightPhase() {
@@ -2244,7 +2247,13 @@ class FlightSimulator {
 
   renderScene() {
     if (this.renderDiagnostics?.active) { this.renderDiagnostics.render(); return; }
-    this.renderStandardScene();
+    // Hide only for this render, retaining visibility state across aircraft swaps,
+    // asynchronous model loads and the return to any exterior/cockpit camera.
+    const hiddenAirframe = this.cameraSystem.mode === CameraSystem.MODES.HUD && !this.isCrashed;
+    const visible = this.aircraft.group.visible;
+    if (hiddenAirframe) this.aircraft.group.visible = false;
+    try { this.renderStandardScene(); }
+    finally { this.aircraft.group.visible = visible; }
   }
 
   renderStandardScene(aoQuality = this.renderQuality) {
@@ -2393,14 +2402,14 @@ class FlightSimulator {
       this.updateApToggleUI();
     };
     document.addEventListener('pointerdown', event => {
-      if (!event.target.closest('#ap-bar')) closeApPanel();
+      if (!event.target.closest('#ap-bar, #hud-autopilot')) closeApPanel();
     });
     document.addEventListener('keydown', event => {
       if (event.key !== 'Escape' || document.getElementById('ap-panel').hidden) return;
       event.preventDefault();
       event.stopPropagation();
       closeApPanel();
-      document.getElementById('btn-ap-toggle').focus({ preventScroll: true });
+      document.getElementById(this.cameraSystem.mode === CameraSystem.MODES.HUD ? 'hud-autopilot' : 'btn-ap-toggle').focus({ preventScroll: true });
     });
     this.updateApToggleUI();
 

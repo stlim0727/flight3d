@@ -36,12 +36,12 @@ test('camera shortcuts map digits and numpad, ignoring repeats, modifiers and ed
   const selected = [];
   controls.onSelectCamera = mode => selected.push(mode);
   controls.onCycleCamera = () => selected.push('cycle');
-  for (let digit = 1; digit <= 8; digit++) {
+  for (let digit = 1; digit <= 9; digit++) {
     controls.handleKeyDown({ code: `Digit${digit}` });
   }
   controls.handleKeyDown({ code: 'Numpad8' });
   controls.handleKeyDown({ code: 'KeyC' });
-  const expected = [0, 1, 2, 3, 4, 5, 6, 7, 7, 'cycle'];
+  const expected = [0, 1, 2, 3, 4, 5, 6, 7, 8, 7, 'cycle'];
   assert.deepEqual(selected, expected);
   for (const extra of [{ repeat: true }, { ctrlKey: true }, { altKey: true },
     { metaKey: true }, { target: { isContentEditable: true } },
