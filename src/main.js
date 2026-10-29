@@ -459,7 +459,6 @@ class FlightSimulator {
       else this.fly();
       return;
     }
-    if (this.isCrashed) this.clearCrashState();
     flow.returnToLobby(true);
   }
 
@@ -692,6 +691,7 @@ class FlightSimulator {
       this.scene.remove(this.aircraft.group);
     }
     this.aircraft = instance;
+    instance.group.visible = !this.isCrashed;
     if (instance.group.parent !== this.scene) {
       this.scene.add(instance.group);
     }
@@ -766,8 +766,10 @@ class FlightSimulator {
       });
     }
     this.sky.updateSun(this.position, this.camera.position);
-    this.explosionSystem.update(frameDelta);
-    this.tireSmokeSystem.update(frameDelta);
+    if (!this.gameFlow.isPhysicsFrozen()) {
+      this.explosionSystem.update(frameDelta);
+      this.tireSmokeSystem.update(frameDelta);
+    }
 
     // 4. Update Cockpit Visibility & Audio
     let isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;

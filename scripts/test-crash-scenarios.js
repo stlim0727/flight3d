@@ -386,6 +386,29 @@ async function main() {
     console.log(`   Off-Runway Excursion: ${excursionCrashed ? 'PASS ✅' : 'FAIL ❌'} [${excursionTitle}]`);
     await takeScreenshot('crash_excursion_showcase.png');
 
+    // Menu open/close after crash must hold the post-crash scene without repeating the crash.
+    const menuRoundTrip = await evalJs(`(() => {
+      const sim = window.simulator;
+      const crashesBefore = sim.impactVelocityChecks.crashes;
+      document.getElementById('menu-toggle').click();
+      const inLobby = document.body.dataset.flow === 'lobby'
+        && sim.isCrashed
+        && sim.aircraftBreakup.pieces.length > 0
+        && getComputedStyle(document.getElementById('crash-overlay')).display === 'none';
+      document.getElementById('menu-toggle').click();
+      sim.stepSimulation(0.5);
+      const backInFlight = document.body.dataset.flow === 'flight'
+        && sim.isCrashed
+        && sim.aircraftBreakup.pieces.length > 0
+        && getComputedStyle(document.getElementById('crash-overlay')).display !== 'none'
+        && sim.impactVelocityChecks.crashes === crashesBefore;
+      return { inLobby, backInFlight, crashesBefore, crashesAfter: sim.impactVelocityChecks.crashes };
+    })()`);
+    if (!menuRoundTrip.inLobby || !menuRoundTrip.backInFlight) {
+      throw new Error('Crash menu open/close repeated or lost crash state: ' + JSON.stringify(menuRoundTrip));
+    }
+    console.log('   Crash Menu Open/Close Preservation: PASS ✅', JSON.stringify(menuRoundTrip));
+
     // Test Quick Restart
     console.log('\n🔄 Testing Quick Restart...');
     await evalJs(`window.simulator.resetCrash();`);

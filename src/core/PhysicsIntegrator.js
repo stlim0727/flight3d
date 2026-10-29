@@ -442,11 +442,13 @@ class PhysicsIntegratorMethods {
     this.isCrashed = false;
     this.crashResult = null;
     this.explosionSystem.clear();
+    this.aircraftBreakup.aircraft?.resetCrashVisuals();
     this.aircraftBreakup.clear();
     this.cameraSystem.endCrashView();
+    this.aircraft.group.visible = true;
     this.aircraft.resetCrashVisuals();
 
-    const crashEl = document.getElementById('crash-overlay');
+    const crashEl = typeof document !== 'undefined' ? document.getElementById('crash-overlay') : null;
     if (crashEl) crashEl.style.display = 'none';
   }
 
@@ -466,14 +468,13 @@ class PhysicsIntegratorMethods {
       return;
     }
     if (!this.isCrashed) return;
-    this.clearCrashState();
-    this.gameFlow.returnToLobby();
+    this.gameFlow.returnToLobby(true);
   }
 
   showCrashUI(crashResult) {
     // Crashes during the lobby cinematic are part of the show: the loop
     // restarts the scenario without a hull-loss UI. Only interrupt the player.
-    if (this.gameFlow.state !== FLOW.FLIGHT) return;
+    if (this.gameFlow.state !== FLOW.FLIGHT || typeof document === 'undefined') return;
     const overlay = document.getElementById('crash-overlay');
     const title = document.getElementById('crash-title');
     const desc = document.getElementById('crash-desc');
