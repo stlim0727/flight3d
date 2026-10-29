@@ -17,6 +17,13 @@ and collision pipeline. Mass, fuel, engine count and fixed gear remain C172
 configuration. Completion retains power for manual flight; cancellation clears
 virtual inputs. These tours do not include takeoff or landing.
 
+Every aircraft/airport/route combination above is also a row in
+`scripts/lib/demoSweepSpec.mjs`, which the demo sweep fast-plays and judges in CI
+(see [ci.md](ci.md#autonomous-demo-acceptance)). The row owns its sampling ceiling,
+its clearance and roll intent, the warnings its choreography is allowed to sound, and
+any known issue it is carrying, so a new demo route is a table edit rather than
+another single-purpose browser script.
+
 City corridors are selected against the current generated building footprints,
 including buildings tall enough to intersect the flight altitude. The proximity
 montage's skyscraper scene resolves its spawn, heading and altitude from the

@@ -1,3 +1,4 @@
+/** Flight quality for these routes is gated by scripts/demo-sweep.mjs; this harness owns the DOM, audio and camera-framing checks the sweep deliberately does not. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

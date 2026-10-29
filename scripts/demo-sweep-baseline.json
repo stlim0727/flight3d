@@ -1,0 +1,169 @@
+{
+  "b738-coastal-classic": {
+    "maxRollDeg": 21.1,
+    "maxIasKnots": 232,
+    "maxMach": 0.353,
+    "maxAbsG": 1.6,
+    "maxSinkFpm": 2008,
+    "maxAngularRateRadS": 0.2,
+    "maxHeadingRateDegPerS": 2.5,
+    "maxBankRateDegPerS": 6,
+    "minAglM": 4.1,
+    "warningSeconds": {
+      "pull-up": 1.5,
+      "sink-rate": 1.3,
+      "takeoff-config": 7.5
+    },
+    "elapsedSeconds": 161
+  },
+  "c172-coastal-scenic": {
+    "maxRollDeg": 0,
+    "maxIasKnots": 90,
+    "maxMach": 0.136,
+    "maxAbsG": 1.2,
+    "maxSinkFpm": 241,
+    "maxAngularRateRadS": 0.1,
+    "maxHeadingRateDegPerS": 0,
+    "maxBankRateDegPerS": 0,
+    "minAglM": 55.1,
+    "warningSeconds": {},
+    "elapsedSeconds": 77
+  },
+  "c172-coastal-maneuvers": {
+    "maxRollDeg": 52,
+    "maxIasKnots": 91.1,
+    "maxMach": 0.142,
+    "maxAbsG": 1.5,
+    "maxSinkFpm": 228,
+    "maxAngularRateRadS": 0.4,
+    "maxHeadingRateDegPerS": 11.7,
+    "maxBankRateDegPerS": 18,
+    "minAglM": 455.1,
+    "warningSeconds": {},
+    "elapsedSeconds": 75
+  },
+  "c172-coastal-proximity": {
+    "maxRollDeg": 25.3,
+    "maxIasKnots": 105,
+    "maxMach": 0.16,
+    "maxAbsG": 1.2,
+    "maxSinkFpm": 9,
+    "maxAngularRateRadS": 0.4,
+    "maxHeadingRateDegPerS": 5.6,
+    "maxBankRateDegPerS": 17.6,
+    "minAglM": 3.2,
+    "warningSeconds": {},
+    "elapsedSeconds": 37
+  },
+  "c172-lukla-scenic": {
+    "maxRollDeg": 36.3,
+    "maxIasKnots": 89.9,
+    "maxMach": 0.161,
+    "maxAbsG": 1.3,
+    "maxSinkFpm": 286,
+    "maxAngularRateRadS": 0.4,
+    "maxHeadingRateDegPerS": 8.5,
+    "maxBankRateDegPerS": 17.6,
+    "minAglM": 171.1,
+    "warningSeconds": {},
+    "elapsedSeconds": 73
+  },
+  "c172-lukla-maneuvers": {
+    "maxRollDeg": 51.4,
+    "maxIasKnots": 90,
+    "maxMach": 0.165,
+    "maxAbsG": 1.5,
+    "maxSinkFpm": 506,
+    "maxAngularRateRadS": 0.4,
+    "maxHeadingRateDegPerS": 10.5,
+    "maxBankRateDegPerS": 18,
+    "minAglM": 571.6,
+    "warningSeconds": {},
+    "elapsedSeconds": 75
+  },
+  "f16-lukla-canyon-chase": {
+    "maxRollDeg": 179.8,
+    "maxIasKnots": 487.5,
+    "maxMach": 0.847,
+    "maxAbsG": 8,
+    "maxSinkFpm": 14878,
+    "maxAngularRateRadS": 1.2,
+    "maxHeadingRateDegPerS": 26.9,
+    "maxBankRateDegPerS": 65.2,
+    "minAglM": 104.9,
+    "warningSeconds": {
+      "pull-up": 20.8,
+      "gear": 4,
+      "terrain": 8.5,
+      "bank": 10.3
+    },
+    "elapsedSeconds": 38
+  },
+  "b738-incheon-departure": {
+    "maxRollDeg": 0.3,
+    "maxIasKnots": 202.2,
+    "maxMach": 0.307,
+    "maxAbsG": 1.4,
+    "maxSinkFpm": 40,
+    "maxAngularRateRadS": 0.1,
+    "maxHeadingRateDegPerS": 5.3,
+    "maxBankRateDegPerS": 0.5,
+    "minAglM": 4.4,
+    "warningSeconds": {},
+    "elapsedSeconds": 385
+  },
+  "c172-incheon-tour": {
+    "maxRollDeg": 31.4,
+    "maxIasKnots": 92.6,
+    "maxMach": 0.14,
+    "maxAbsG": 4,
+    "maxSinkFpm": 559,
+    "maxAngularRateRadS": 0.4,
+    "maxHeadingRateDegPerS": 7.6,
+    "maxBankRateDegPerS": 18,
+    "minAglM": 1.4,
+    "warningSeconds": {
+      "stall": 5
+    },
+    "elapsedSeconds": 477
+  },
+  "b738-incheon-sihwa-tour": {
+    "maxRollDeg": 31.5,
+    "maxIasKnots": 208.6,
+    "maxMach": 0.326,
+    "maxAbsG": 1.2,
+    "maxSinkFpm": 42,
+    "maxAngularRateRadS": 0.1,
+    "maxHeadingRateDegPerS": 3.2,
+    "maxBankRateDegPerS": 5.2,
+    "minAglM": 519.8,
+    "warningSeconds": {},
+    "elapsedSeconds": 378
+  },
+  "c172-incheon-sihwa-tour": {
+    "maxRollDeg": 19.6,
+    "maxIasKnots": 90,
+    "maxMach": 0.138,
+    "maxAbsG": 1.1,
+    "maxSinkFpm": 66,
+    "maxAngularRateRadS": 0.1,
+    "maxHeadingRateDegPerS": 3.2,
+    "maxBankRateDegPerS": 3.6,
+    "minAglM": 222.4,
+    "warningSeconds": {},
+    "elapsedSeconds": 689
+  },
+  "f16-incheon-sihwa-tour": {
+    "maxRollDeg": 32.4,
+    "maxIasKnots": 261.4,
+    "maxMach": 0.411,
+    "maxAbsG": 1.2,
+    "maxSinkFpm": 372,
+    "maxAngularRateRadS": 0.1,
+    "maxHeadingRateDegPerS": 2.9,
+    "maxBankRateDegPerS": 5.6,
+    "minAglM": 584.8,
+    "warningSeconds": {},
+    "elapsedSeconds": 341
+  }
+}

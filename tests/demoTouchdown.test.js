@@ -19,6 +19,7 @@ test('demo waits for wheel contact before deploying rollout controls', () => {
     aero: new Aerodynamics(),
     gear: new LandingGear(),
     engines: new EngineModel(),
+    currentTerrain: { getHeight: () => 0 },
     controls: {
       throttle: 0.85,
       setVirtualInput: (name, value) => {
