@@ -8,13 +8,14 @@ import {
 
 /** Exterior GLBs live below stable motion roots; water physics stays in WaterOcean. */
 export class Ships {
-  constructor(water, { loadAsset = createShipAssetLoader(), random = Math.random } = {}) {
+  constructor(water, { loadAsset = createShipAssetLoader(), random = Math.random, deferAssets = false } = {}) {
     this.water = water;
     this.group = new THREE.Group();
     this.vessels = [];
     this.speedboats = [];
     this.assetErrors = [];
     this.pending = [];
+    this.assetsRequested = new Promise(resolve => { this.startAssets = resolve; });
     this.loadAsset = loadAsset;
     this.wakeTexture = createWakeTexture();
     this.wakeMaterial = new THREE.MeshBasicMaterial({
@@ -33,6 +34,13 @@ export class Ships {
     this.addSpeedboat(1500, 2800, 18, 900, random() * Math.PI * 2);
     this.update(0, 0);
     this.ready = Promise.all(this.pending);
+    if (!deferAssets) this.loadAssets();
+  }
+
+  /** Keep motion/collision roots usable before requesting optional GLBs. */
+  loadAssets() {
+    this.startAssets();
+    return this.ready;
   }
 
   addVisual(type, record) {
@@ -40,7 +48,7 @@ export class Ships {
     record.bounds = shipBounds(fallback);
     record.mesh.add(fallback);
     record.visual = fallback;
-    record.assetStatus = 'loading';
+    record.assetStatus = 'deferred';
     const updateDimensions = () => {
       const size = record.bounds.getSize(new THREE.Vector3());
       record.length = size.z;
@@ -50,8 +58,11 @@ export class Ships {
     updateDimensions();
     // Resolve errors per record so a failed download retains a collidable fallback.
     this.pending.push(
-      Promise.resolve()
-        .then(() => this.loadAsset(type))
+      this.assetsRequested
+        .then(() => {
+          record.assetStatus = 'loading';
+          return this.loadAsset(type);
+        })
         .then((model) => {
           const bounds = shipBounds(model);
           if (bounds.isEmpty()) throw new Error(`Empty ${type} model`);

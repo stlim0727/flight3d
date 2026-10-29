@@ -406,6 +406,15 @@ resource timings, initial aircraft, renderer and bake coverage, and captures the
 ready view. Run timed comparisons without concurrent builds/tests or GPU work.
 It asserts valid lighting and finite completion, not a universal timing budget.
 
+For deferred scenery acceptance, add `CHECK_SCENERY=1` to the production probe.
+Run with `AIRPORT=coastal`, `AIRPORT=neon`, and `AIRPORT=lukla` separately. It
+checks that unselected Lukla assets are absent, coastal ship GLBs start after
+overlay removal, noncoastal ships remain deferred, and Hangang can start before
+Lukla exists. It also checks Lukla DEM readiness, hide/reselect reuse and collision
+terrain ownership. The initial Lukla case intercepts the DEM until startup is
+ready and verifies the demo waits and resumes after release. `SCENARIO` otherwise
+defaults to `runway`; the delayed-DEM case uses `demo`.
+
 ### C172 and F-16 tire contact
 
 With Vite on port 5281, run

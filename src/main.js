@@ -198,17 +198,11 @@ class FlightSimulator {
     this.foliage = new FoliageAndCities(this.terrain);
     this.scene.add(this.foliage.group);
 
-    this.ships = new Ships(this.water);
+    this.ships = new Ships(this.water, { deferAssets: true });
     this.scene.add(this.ships.group);
 
-    // Nepal Tenzing-Hillary (Lukla VNLK) Real-World 30m DEM Terrain & Airport
-    this.luklaTerrain = new LuklaTerrain();
-    this.luklaTerrain.mesh.visible = false;
-    this.scene.add(this.luklaTerrain.mesh);
-
-    this.luklaAirport = new LuklaAirport();
-    this.luklaAirport.group.visible = false;
-    this.scene.add(this.luklaAirport.group);
+    // Construct Lukla's terrain/airport only when selected, including its DEM
+    // and satellite requests. Hidden scenery must not compete with startup.
 
     // Neon Metropolis 80s Synthwave City & Flight Canyons
     this.neonCity = new NeonCity();
@@ -765,6 +759,9 @@ class FlightSimulator {
       if (remaining.length) setTimeout(preloadNext, 1000);
     };
     setTimeout(preloadNext, 1000);
+    setTimeout(() => {
+      if (this.activeAirport === 'coastal') this.ships.loadAssets();
+    }, 0);
   }
 
   setAircraft(aircraftId = 'B738') {
@@ -1282,6 +1279,12 @@ class FlightSimulator {
     const isCoastal = id === 'coastal';
     const isNeon = id === 'neon';
     const isHangang = id === 'hangang';
+    if (isLukla && !this.luklaTerrain) {
+      this.luklaTerrain = new LuklaTerrain();
+      this.luklaAirport = new LuklaAirport();
+      this.scene.add(this.luklaTerrain.mesh, this.luklaAirport.group);
+    }
+    if (isCoastal && this.startupReady) this.ships.loadAssets();
     document.getElementById('incheon-attribution').hidden = !isIncheon;
 
     // Toggle 3D mesh visibility
@@ -1291,8 +1294,8 @@ class FlightSimulator {
     this.ships.group.visible = isCoastal;
     this.foliage.group.visible = isCoastal;
 
-    this.luklaTerrain.mesh.visible = isLukla;
-    this.luklaAirport.group.visible = isLukla;
+    if (this.luklaTerrain) this.luklaTerrain.mesh.visible = isLukla;
+    if (this.luklaAirport) this.luklaAirport.group.visible = isLukla;
 
     if (this.incheonAirport) this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = isIncheon;
     if (this.neonCity) this.neonCity.group.visible = isNeon;

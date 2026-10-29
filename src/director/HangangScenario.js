@@ -14,7 +14,7 @@ export class HangangScenario {
   start() {
     const s = this.sim;
     const objects = [s.terrain.mesh, s.airport.group, s.water.mesh, s.ships.group, s.foliage.group,
-      s.luklaTerrain.mesh, s.luklaAirport.group, s.neonCity.group, s.incheonAirport?.group, s.incheonAirport?.terrain.mesh].filter(Boolean);
+      s.luklaTerrain?.mesh, s.luklaAirport?.group, s.neonCity.group, s.incheonAirport?.group, s.incheonAirport?.terrain.mesh].filter(Boolean);
     const detector = s.collisionDetector;
     this.saved = { visibility: objects.map(o => [o, o.visible]), terrain: s.currentTerrain, airport: s.currentAirport,
       environment: [detector.terrain, detector.airport, detector.foliage, detector.ships, detector.water],
