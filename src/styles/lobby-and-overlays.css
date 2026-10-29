@@ -1,0 +1,449 @@
+/* ===== Lobby / pause flow overlays ===== */
+.flow-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 85;
+  pointer-events: auto;
+}
+body[data-flow="lobby"] #lobby-screen { display: flex; }
+body[data-flow="paused"] #pause-menu { display: flex; }
+
+/* Lobby: side card so the cinematic stays visible on the right. */
+#lobby-screen {
+  align-items: center;
+  background: linear-gradient(90deg,
+    rgba(6, 10, 18, 0.94) 0%,
+    rgba(6, 10, 18, 0.86) 34%,
+    rgba(6, 10, 18, 0.35) 55%,
+    rgba(6, 10, 18, 0) 72%);
+}
+.lobby-card, .pause-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(10, 16, 26, 0.82);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 12px;
+  color: #e2e8f0;
+  padding: 18px 20px;
+}
+.lobby-card {
+  margin-left: max(64px, calc(env(safe-area-inset-left) + 16px));
+  max-height: calc(100dvh - 96px);
+  height: min(680px, calc(100dvh - 96px));
+  overflow: hidden;
+  width: 360px;
+  padding: 20px;
+  gap: 16px;
+  background: rgba(16, 28, 43, .94);
+  border-color: rgba(148, 163, 184, .18);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .24);
+  flex-shrink: 0;
+}
+.lobby-card > * { flex-shrink: 0; }
+.lobby-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.lobby-title { color: #e2e8f0; font-size: 18px; font-weight: 600; letter-spacing: -.4px; margin: 0; }
+.lobby-title > span { display: block; color: #94a3b8; font-size: 11px; font-weight: 400; letter-spacing: 0; margin-top: 4px; }
+.lobby-language { display: flex; flex-direction: column; gap: 4px; }
+.lobby-language > .lobby-label { font-size: 9px; }
+.lobby-loading { color: #fbbf24; font-size: 11px; line-height: 1.5; margin: 0; }
+.lobby-briefing {
+  white-space: pre-line;
+  color: #a6b5c8;
+  border-top: 1px solid rgba(148, 163, 184, .14);
+  font-size: 11px;
+  line-height: 1.65;
+  padding-top: 12px;
+}
+.lobby-group { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.lobby-label { color: #94a3b8; font-size: 10px; font-weight: 500; letter-spacing: .3px; }
+.lobby-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.lobby-card .btn {
+  min-width: 0;
+  min-height: 34px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 7px;
+  background: rgba(148, 163, 184, .05);
+  box-shadow: none;
+  transform: none;
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+.lobby-card .btn:hover { background: rgba(148, 163, 184, .12); color: #e2e8f0; border-color: rgba(148, 163, 184, .35); }
+.lobby-card .btn.active { background: rgba(56, 189, 248, .12); color: #bae6fd; border-color: rgba(56, 189, 248, .45); }
+.lobby-card .btn-airport,
+.lobby-card .btn-aircraft { flex: 1; }
+.lobby-scenarios .btn-preset { flex: 1 1 100%; text-align: left; }
+.lobby-language .btn { min-height: 28px; padding: 4px 7px; font-size: 10px; }
+/* Panel content scrolls vertically; the tabs and flight action stay in place. */
+.lobby-card, .lobby-card button, .lobby-card select { touch-action: pan-y; }
+#lobby-time-select { width: 100%; font-variant-numeric: tabular-nums; color-scheme: dark; }
+.lobby-tabs { display: flex; gap: 4px; padding: 4px; background: rgba(0, 0, 0, .2); border-radius: 10px; }
+.lobby-tabs > .lobby-tab { flex: 1; }
+.lobby-tabs > [hidden] { display: none; }
+#btn-fly[hidden] { display: none; }
+.dev-enable { display: flex; gap: 12px; align-items: center; min-height: 44px; color: #bbf7d0; }
+.dev-build { overflow-wrap: anywhere; color: #94a3b8; font-size: 12px; }
+.dev-description, #dev-live-result { white-space: pre-line; line-height: 1.5; font-size: 13px; }
+.dev-live { position: fixed; right: 12px; top: 110px; z-index: 80; width: min(360px, calc(100vw - 24px)); padding: 14px; box-sizing: border-box; color: #e2e8f0; background: rgba(10, 24, 35, .94); border: 1px solid #4ade80; border-radius: 12px; }
+.dev-live[hidden], body[data-flow="paused"] .dev-live { display: none; }
+.dev-live .btn { min-height: 44px; }
+body[data-dev-scenario="true"] #ap-bar,
+body[data-dev-scenario="true"] #touch-controls-overlay { display: none !important; }
+@media (max-width: 600px) {
+  .dev-live { top: auto; bottom: 12px; max-height: 35dvh; overflow: auto; }
+}
+.lobby-card .lobby-tab { min-height: 44px; font-size: 12px; border-color: transparent; background: transparent; color: #94a3b8; }
+.lobby-card .lobby-tab[aria-selected="true"] { background: #263c51; color: #e0f2fe; border-color: rgba(125, 211, 252, .25); }
+.lobby-panels { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.lobby-tab-panel { display: flex; flex-direction: column; gap: 16px; }
+.lobby-tab-panel[hidden] { display: none; }
+.lobby-tab-panel:focus-visible { outline: 2px solid #67e8f9; outline-offset: -2px; }
+.lobby-settings > .lobby-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lobby-settings .language-control { grid-column: 1 / -1; min-width: 0; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
+.lobby-settings .btn { min-height: 44px; font-size: 12px; white-space: normal; }
+.lobby-card .btn-fly {
+  background: #157598;
+  border-color: rgba(125, 211, 252, .35);
+  color: #f0f9ff;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 40px;
+}
+.lobby-card .btn-fly:hover { background: #1986ac; color: #fff; }
+.lobby-hint { color: #94a3b8; font-size: 10px; line-height: 1.5; margin: -6px 0 0; text-align: center; }
+
+/* Pause: dim the frozen scene lightly. */
+#pause-menu {
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 10, 18, 0.55);
+  backdrop-filter: blur(2px);
+}
+.pause-card { align-items: stretch; min-width: min(320px, 84vw); }
+.pause-card h2 { color: #7dd3fc; font-size: 18px; margin: 0 0 4px; text-align: center; }
+.pause-card .btn { min-height: 44px; }
+
+/* The lobby owns airport/spawn/time: park the in-game chrome meanwhile.
+   The same park applies while booting (.booting, removed after startup)
+   so the HUD does not flash over the loading screen. */
+body:is([data-flow="lobby"], .booting) .hud-strip,
+body:is([data-flow="lobby"], .booting) .ap-bar,
+body:is([data-flow="lobby"], .booting) .flight-toolbar,
+body:is([data-flow="lobby"], .booting) .flight-panel,
+body:is([data-flow="lobby"], .booting) .quick-mute,
+body:is([data-flow="lobby"], .booting) .presets-bar,
+body:is([data-flow="lobby"], .booting) .action-panel,
+body:is([data-flow="lobby"], .booting) #demo-banner,
+body:is([data-flow="lobby"], .booting) .demo-pill-btn,
+body:is([data-flow="lobby"], .booting) .touch-controls-overlay { display: none !important; }
+/* The toggle is the lobby's close affordance, so it stays up there; while
+   booting there is nothing to toggle back to yet, so it waits too. */
+body.booting .menu-toggle { display: none !important; }
+
+.toast { z-index: 96; }
+
+/* Persistent main-menu toggle. Floats above the lobby overlay (z 85) so it can
+   open the menu over a flight and hide it again, but stays under toasts (96)
+   and modals (100). Use the first strip with space at the safe screen edge. */
+.menu-toggle {
+  position: fixed;
+  top: var(--menu-row-top, calc(var(--edge-top) + 96px));
+  left: var(--edge-left);
+  z-index: 90;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: rgba(10, 16, 26, 0.82);
+  color: #e2e8f0;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+/* With the strip hidden in the menu, keep its close affordance off the card. */
+body[data-flow="lobby"] .menu-toggle {
+  top: var(--edge-top);
+  left: var(--edge-left);
+}
+.menu-toggle:hover { background: rgba(30, 41, 59, 0.95); border-color: #38bdf8; }
+.menu-toggle:focus-visible { outline: 2px solid #67e8f9; }
+.menu-toggle .menu-toggle-glyph { font-size: 19px; line-height: 1; }
+.menu-toggle-glyph:empty::before {
+  content: '';
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+  box-shadow: 0 -6px currentColor, 0 6px currentColor;
+}
+@media (min-width: 961px) {
+  .presets-bar { top: 60px; }
+}
+
+/* Anchor demo UI beside the menu, leaving the center of the flight view clear. */
+.demo-banner, .demo-pill-btn,
+.compact-ui .demo-banner, .compact-ui .demo-pill-btn {
+  top: var(--demo-row-top, calc(var(--edge-top) + 96px));
+  left: auto;
+  right: var(--edge-right);
+  transform: none;
+}
+.demo-banner, .compact-ui .demo-banner {
+  box-sizing: border-box;
+  width: min(320px, calc(100% - var(--edge-left) - var(--edge-right) - 56px));
+  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: 8px;
+  gap: 6px;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 25%);
+}
+.demo-banner .demo-badge { order: 1; }
+.demo-banner .demo-actions { order: 2; margin-left: auto; }
+.demo-banner .demo-info { order: 3; width: 100%; min-width: 0; }
+.demo-pill-btn, .compact-ui .demo-pill-btn {
+  min-height: 44px;
+  padding: 4px 10px;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 25%);
+}
+.demo-pill-btn:hover, .demo-pill-btn:active { transform: none; }
+
+/* Put the stall alert below the toolbar and expanded AP controls. */
+.stall-banner {
+  top: calc(var(--edge-top) + 320px);
+  z-index: 70;
+}
+@media (max-height: 400px) {
+  .stall-banner { top: calc(var(--edge-top) + 104px); }
+  body:has(#ap-panel:not([hidden])) .stall-banner {
+    top: calc(100dvh - var(--edge-bottom) - 56px);
+  }
+}
+
+/* Compact menus keep the scene visible and every control reachable by scrolling. */
+.compact-ui #lobby-screen {
+  align-items: flex-end;
+  background: linear-gradient(0deg, rgba(6, 10, 18, .8), rgba(6, 10, 18, 0) 100%);
+}
+.compact-ui .lobby-card {
+  margin: 0 auto calc(var(--edge-bottom) + 8px);
+  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 72px);
+  height: min(700px, calc(100dvh - var(--edge-top) - var(--edge-bottom) - 72px));
+  width: min(360px, calc(100% - var(--edge-left) - var(--edge-right) - 16px));
+  padding: 16px;
+  gap: 12px;
+}
+.compact-ui .lobby-card .btn { min-height: 44px; }
+
+@media (max-height: 500px) and (min-width: 541px) {
+  .compact-ui #lobby-screen { align-items: center; }
+  .compact-ui .lobby-card {
+    margin: 0 0 0 calc(var(--edge-left) + 56px);
+    max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 16px);
+    height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 16px);
+  }
+}
+/* Keep the comparison controls below the HUD without covering the panel face. */
+.shadow-demo {
+  position: fixed;
+  top: 112px;
+  left: 12px;
+  z-index: 25;
+  max-width: min(440px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid #56758b;
+  border-radius: 10px;
+  background: rgba(15, 25, 37, .94);
+  color: #e6f0fa;
+  font-size: 12px;
+}
+.shadow-demo[hidden], body:not([data-flow="flight"]) .shadow-demo { display: none; }
+.shadow-demo strong, .shadow-demo > span { display: block; margin-bottom: 6px; }
+.shadow-demo-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.shadow-demo-actions .btn { min-height: 38px; padding: 6px 9px; }
+@media (max-width: 600px) { .shadow-demo { top: 146px; font-size: 11px; } }
+
+#lobby-demo-options[hidden] { display: none; }
+#lobby-demo-select { width: 100%; min-height: 44px; white-space: normal; }
+.demo-route-briefing { margin: 8px 0 0; line-height: 1.55; font-size: 13px; color: #cbd5e1; }
+
+/* Keep the active geographic scenery attribution visible during flight.
+   ODbL requires the notice to stay displayed, so it cannot be hidden; during
+   flight it collapses to a small © chip that expands on tap, keeping the
+   touch controls clear. The notice stays tap-transparent where it overlaps
+   the controls. */
+#incheon-attribution {
+  position: fixed;
+  right: 8px;
+  bottom: max(64px, env(safe-area-inset-bottom));
+  z-index: 30;
+  max-width: calc(100vw - 16px);
+  padding: 3px 5px;
+  border-radius: 3px;
+  background: #0f172acc;
+  color: #e2e8f0;
+  font-size: 10px;
+  pointer-events: none;
+}
+#incheon-attribution a { color: #bae6fd; pointer-events: auto; }
+#incheon-attribution-chip {
+  pointer-events: auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #334155;
+  color: #e2e8f0;
+  font: 700 13px/24px sans-serif;
+  cursor: pointer;
+  vertical-align: middle;
+}
+#incheon-attribution-text { display: none; }
+#incheon-attribution.expanded #incheon-attribution-text { display: inline; }
+body[data-flow="lobby"] #incheon-attribution { z-index: 81; bottom: 4px; pointer-events: auto; }
+body[data-flow="lobby"] #incheon-attribution-text { display: inline; }
+body[data-flow="lobby"] #incheon-attribution-chip { display: none; }
+
+.lobby-card .btn-airport span { white-space: normal; overflow-wrap: anywhere; }
+
+#render-trials {
+  display: flex; flex-direction: column;
+  position: fixed; top: 145px; right: 12px; z-index: 75;
+  width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 160px);
+  overflow: hidden; box-sizing: border-box; padding: 12px;
+  color: #e2e8f0; background: rgba(10, 20, 34, .97);
+  border: 1px solid #475569; border-radius: 10px; font-size: 12px;
+}
+#render-trials[hidden] { display: none; }
+#render-trials header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#render-trials > :not(details) { flex-shrink: 0; }
+#render-trials details { min-height: 0; overflow: auto; }
+#render-trials summary { cursor: pointer; padding: 10px 0; color: #7dd3fc; }
+#render-trials label { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 1.8fr); align-items: center; gap: 8px; margin: 6px 0; }
+#render-trials .btn { font-size: 11px; min-width: 0; min-height: 36px; white-space: normal; }
+#render-trials select { width: 100%; }
+#render-trials p { line-height: 1.5; color: #94a3b8; margin: 8px 0; }
+#render-trials [data-warning] { color: #fbbf24; }
+#render-trials output { display: block; white-space: pre-wrap; line-height: 1.7; font-variant-numeric: tabular-nums; }
+.render-trial-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+#render-trials .render-trial-actions .btn { flex: 1; min-width: 88px; padding: 6px; }
+.loading-panel { position: fixed; z-index: 2200; right: 18px; top: 12vh; width: min(420px, calc(100vw - 36px)); max-height: 75vh; overflow: auto; padding: 20px; border: 1px solid #56738a; border-radius: 12px; background: #101d2bf5; color: #eef6ff; font: 14px/1.5 system-ui; box-sizing: border-box; }
+.loading-panel[hidden] { display: none; }
+.loading-panel h2 { font-size: 18px; margin: 0 0 12px; }
+.loading-fields label { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 10px 0; }
+.loading-fields input { width: 110px; padding: 6px; color: #eef6ff; background: #172b40; border: 1px solid #56738a; border-radius: 5px; }
+.loading-panel [data-summary] { white-space: pre-line; color: #bce3ff; }
+.loading-panel output { display: block; margin-top: 10px; }
+
+/* Present from the HTML first paint, including while JavaScript downloads. */
+.startup-overlay { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; background: #09111f; color: #e8eef7; padding: 24px; }
+.startup-overlay[hidden] { display: none; }
+.startup-overlay.scene-ready { background: rgb(9 17 31 / 22%); }
+.startup-card { width: min(340px, 100%); box-sizing: border-box; padding: 28px; border: 1px solid rgb(148 163 184 / 25%); border-radius: 16px; background: rgb(9 17 31 / 88%); box-shadow: 0 16px 48px rgb(0 0 0 / 25%); text-align: center; }
+.startup-card h1 { margin: 0 0 24px; font-size: 28px; letter-spacing: 2px; }
+.startup-card p { min-height: 1.5em; line-height: 1.5; }
+.startup-card progress { width: 100%; height: 12px; accent-color: #60a5fa; }
+.startup-card button { padding: 10px 24px; cursor: pointer; }
+
+.build-info { margin: 10px 0; color: #94a3b8; font: 11px/1.6 system-ui, sans-serif; overflow-wrap: anywhere; }
+.build-info [data-build-branch], .build-info [data-build-commit] { font-family: ui-monospace, monospace; }
+.build-info [data-build-age] { white-space: nowrap; }
+.build-info a { color: #bae6fd; text-decoration: underline; text-underline-offset: 2px; }
+.build-info a:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
+.startup-card .build-info { min-height: 0; margin: 16px 0 0; font-size: 11px; }
+/* Mission guidance stays separate from flight controls and collapses on phones. */
+.hangang-hud { position: fixed; top: 100px; left: 16px; z-index: 12; width: min(330px, calc(100vw - 32px)); padding: 12px 15px; border: 1px solid #8ab8bb66; border-radius: 10px; background: #0c2537e8; color: #e4f1f5; font: 13px/1.4 system-ui, sans-serif; pointer-events: none; }
+.hangang-hud[hidden] { display: none; }
+.hangang-heading { display: flex; justify-content: space-between; gap: 12px; color: #ffd081; }
+.hangang-hud p { margin: 6px 0 0; }
+.hangang-hud button { pointer-events: auto; margin-top: 8px; }
+@media (max-width: 600px) { .hangang-hud { top: 160px; left: 10px; width: min(285px, calc(100vw - 20px)); font-size: 11px; padding: 8px 10px; } }
+
+/* HUD camera: fixed symbols share the real render viewport, controls stay at edges. */
+#hud-view { position: fixed; inset: 0; pointer-events: none; color: #edf5ff; z-index: 60; }
+#hud-view[hidden], #hud-view [hidden] { display: none !important; }
+.hud-flight-glass { position: absolute; inset: 0; width: 100%; height: 100%; }
+#hud-view button, .hud-control-card, .hud-camera-switch, .hud-flight-footer, .hud-systems-panel {
+  background: rgba(12, 27, 44, .80); border: 1px solid rgba(181, 211, 234, .40); border-radius: 9px;
+  box-shadow: 0 2px 8px #0002; color: #edf5ff;
+}
+#hud-view button { pointer-events: auto; min-height: 44px; padding: 10px; font: 600 12px system-ui; cursor: pointer; }
+#hud-view button:hover:not(:disabled), #hud-view button:focus-visible { background: #24465e; outline: 2px solid #a9f59a; outline-offset: 2px; }
+#hud-view button:disabled { color: #96a3b3; background: rgba(21, 33, 48, .72); border-color: #68798c80; cursor: default; box-shadow: none; }
+#hud-view button[aria-pressed="true"], #hud-view button.is-active { border-color: #b8ff9b; color: #b8ff9b; }
+.hud-camera-switch { position: absolute; top: var(--edge-top); right: var(--edge-right); display: flex; align-items: center; gap: 10px; font: 12px system-ui; pointer-events: auto; }
+#hud-view .hud-camera-switch button { border: 0; background: transparent; font-size: 25px; min-width: 44px; padding: 0; }
+.hud-camera-switch b { margin-left: 10px; }
+.hud-side { position: absolute; top: max(80px, 17%); width: 112px; display: grid; gap: 9px; pointer-events: none; }
+.hud-side-left { left: var(--edge-left); }
+.hud-side-right { right: var(--edge-right); }
+.hud-control-card { display: grid; text-align: center; padding: 10px 0 0; gap: 5px; font: 600 12px system-ui; overflow: hidden; }
+.hud-control-card output { font: 19px monospace; }
+.hud-pair { display: flex; }
+#hud-view .hud-pair button { width: 50%; border-radius: 0; border-width: 1px 0 0; font-size: 20px; background: transparent; }
+#hud-view .hud-pair button + button { border-left-width: 1px; }
+.hud-unavailable { display: grid; gap: 5px; }
+.hud-unavailable small { font-size: 10px; font-weight: 400; }
+.hud-unavailable small::before { content: '⊘ '; }
+.hud-flight-footer { position: absolute; bottom: var(--edge-bottom); left: var(--edge-left); right: var(--edge-right); display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 12px 0; }
+.hud-flight-footer > div { display: grid; text-align: center; gap: 5px; font: 11px monospace; color: #a8b8c8; }
+.hud-flight-footer > div + div { border-left: 1px solid #64748b; }
+.hud-flight-footer output { font: 600 21px monospace; color: #edf5ff; }
+.hud-systems-panel { position: absolute; top: max(133px, calc(17% + 54px)); right: calc(var(--edge-right) + 124px); width: 210px; padding: 8px; display: grid; gap: 6px; pointer-events: auto; max-height: calc(100dvh - 200px); overflow-y: auto; }
+body.hud-camera-mode .hud-strip, body.hud-camera-mode .flight-toolbar { display: none !important; }
+body.hud-camera-mode .menu-toggle { top: var(--edge-top); }
+body.hud-camera-mode .ap-bar { top: max(80px, 17%); right: var(--edge-right); width: 112px; pointer-events: none; }
+body.hud-camera-mode #btn-ap-toggle { visibility: hidden; }
+body.hud-camera-mode .ap-panel { top: 54px; right: 124px; pointer-events: auto; }
+body.hud-camera-mode #demo-banner { top: calc(var(--edge-top) + 48px); }
+body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display: none; }
+@media (max-width: 700px) {
+  .hud-side { width: 74px; top: 76px; gap: 6px; }
+  #hud-view .hud-side button { font-size: 10px; padding: 5px 3px; }
+  .hud-control-card { padding-top: 5px; font-size: 10px; gap: 2px; }
+  .hud-control-card output { font-size: 15px; }
+  #hud-view .hud-pair button { font-size: 18px; }
+  .hud-unavailable small { font-size: 9px; }
+  .hud-flight-footer { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 7px 0; row-gap: 8px; }
+  .hud-flight-footer > div { font-size: 9px; gap: 2px; }
+  .hud-flight-footer > div:nth-child(4) { border-left: 0; }
+  .hud-flight-footer output { font-size: 14px; }
+  .hud-camera-switch { gap: 0; }
+  .hud-camera-switch b { margin-left: 5px; }
+  .hud-systems-panel { right: calc(var(--edge-right) + 80px); top: 126px; width: min(210px, calc(100vw - 100px)); }
+  body.hud-camera-mode .ap-bar { top: 76px; width: 74px; }
+  body.hud-camera-mode .ap-panel { right: 80px; top: 50px; width: min(260px, calc(100vw - 100px)); }
+  body.hud-camera-mode.touch-mode .hud-flight-footer { bottom: calc(var(--edge-bottom) + 172px); }
+}
+@media (max-height: 550px) {
+  .hud-side { top: 64px; gap: 4px; width: 98px; }
+  .hud-side-right { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 174px; }
+  #hud-view .hud-side button { font-size: 9px; padding: 4px; }
+  .hud-control-card { padding-top: 3px; gap: 2px; }
+  .hud-control-card output { font-size: 14px; }
+  .hud-flight-footer { padding: 6px 0; }
+  .hud-flight-footer output { font-size: 14px; }
+  .hud-flight-footer > div { font-size: 9px; }
+  body.hud-camera-mode .ap-bar { top: 64px; width: 85px; right: calc(var(--edge-right) + 89px); }
+  body.hud-camera-mode .ap-panel { right: 0; top: 48px; max-height: calc(100dvh - 130px); }
+  .hud-systems-panel { right: var(--edge-right); top: 112px; max-height: calc(100dvh - 175px); }
+  body.hud-camera-mode.touch-mode .hud-flight-footer { top: var(--edge-top); bottom: auto; left: calc(var(--edge-left) + 52px); right: calc(var(--edge-right) + 180px); }
+}
+

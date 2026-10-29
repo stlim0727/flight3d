@@ -1,0 +1,494 @@
+/* Prevent transient wide controls/canvas from enlarging the mobile layout viewport. */
+#canvas-container, #hud-overlay, .touch-controls-overlay { overflow: hidden; }
+#canvas-container canvas { max-width: 100%; max-height: 100%; }
+
+/* Quality row and settings buttons are relocated into the menu card at boot; language lives with the lobby's own buttons. */
+.language-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e2e8f0;
+  font: 12px system-ui, sans-serif;
+  pointer-events: auto;
+}
+.language-control select { cursor: pointer; min-width: 110px; }
+.language-control option { background: #142030; color: #fff; }
+
+/* Shared flight controls. Panels keep their header outside the scrolling body. */ body {
+  --edge-left: max(8px, env(safe-area-inset-left));
+  --edge-right: max(8px, env(safe-area-inset-right));
+  --edge-top: max(8px, env(safe-area-inset-top));
+  --edge-bottom: max(8px, env(safe-area-inset-bottom));
+}
+.flight-toolbar {
+  position: absolute;
+  bottom: var(--edge-bottom);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+  z-index: 65;
+}
+.flight-toolbar .btn, .flight-panel .btn {
+  min-height: 44px;
+  box-shadow: none;
+  text-shadow: none;
+}
+.flight-toolbar .btn {
+  white-space: nowrap;
+}
+.btn[aria-expanded="true"], .btn[aria-pressed="true"] {
+  background: #164e63;
+  border-color: #67e8f9;
+  color: #ecfeff;
+}
+.btn:disabled,
+.btn[disabled],
+.ap-btn:disabled,
+.ap-btn[disabled],
+.btn-touch-preset:disabled,
+.btn-touch-preset[disabled],
+.btn-touch-brake:disabled,
+.btn-touch-brake[disabled] {
+  opacity: .45;
+  filter: grayscale(1);
+  cursor: not-allowed;
+  transform: none;
+}
+.btn:disabled:hover,
+.btn[disabled]:hover,
+.ap-btn:disabled:hover,
+.ap-btn[disabled]:hover {
+  background: inherit;
+  border-color: inherit;
+  color: inherit;
+  transform: none;
+  box-shadow: none;
+}
+.flight-toolbar .btn:disabled,
+.flight-toolbar .btn[disabled] {
+  opacity: .45;
+  filter: grayscale(1);
+  background: rgba(30, 41, 59, 0.45) !important;
+  color: #94a3b8 !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+  cursor: not-allowed;
+}
+.ap-btn:disabled,
+.ap-btn[disabled] {
+  opacity: .45;
+  filter: grayscale(1);
+  background: rgba(30, 41, 59, 0.45) !important;
+  color: #94a3b8 !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+  cursor: not-allowed;
+}
+body.demo-active .ap-bar {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+body.demo-active #touch-controls-overlay {
+  opacity: .4;
+  filter: grayscale(1);
+  pointer-events: none;
+}
+.btn:focus-visible, select:focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 2px;
+}
+.flight-panel {
+  position: absolute;
+  bottom: calc(var(--edge-bottom) + 54px);
+  right: var(--edge-right);
+  width: min(380px, calc(100% - var(--edge-left) - var(--edge-right)));
+  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 124px);
+  display: flex;
+  flex-direction: column;
+  background: #101c2bee;
+  border: 1px solid #64748b;
+  border-radius: 10px;
+  pointer-events: auto;
+  z-index: 64;
+  overflow: hidden;
+}
+.flight-panel[hidden] {
+  display: none;
+}
+.flight-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  flex-shrink: 0;
+  border-bottom: 1px solid #334155;
+}
+.flight-panel h2 {
+  margin: 0;
+  font: 600 16px system-ui;
+  color: #f1f5f9;
+}
+.panel-close {
+  min-width: 44px;
+  font-size: 22px;
+}
+.flight-panel-body {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+.flight-panel-body .btn {
+  white-space: normal;
+  text-align: left;
+  margin: 0;
+}
+.flight-panel option {
+  background: #101c2b;
+  color: #f1f5f9;
+}
+.hud-strip {
+  max-width: calc(100% - 24px);
+  box-shadow: none;
+  gap: 14px;
+  overflow-x: auto;
+  pointer-events: auto;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.hud-strip::-webkit-scrollbar { display: none; }
+.hud-strip .hud-item { flex: 0 0 auto; }
+.hud-strip .hud-label, .hud-strip .hud-val { white-space: nowrap; }
+/* The camera readout was clickable inside the removed drawer; keep it live. */
+.hud-strip #hud-cam {
+  pointer-events: auto;
+}
+.compact-ui .hud-strip {
+  left: var(--edge-left);
+  right: var(--edge-right);
+  gap: 8px;
+  padding: 6px;
+  justify-content: flex-start;
+  overflow-x: auto;
+}
+.compact-ui .hud-item {
+  min-width: 50px;
+  flex: 0 0 auto;
+}
+.compact-ui .hud-item .hud-label {
+  font-size: 8px;
+}
+.compact-ui .hud-item .hud-val {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.compact-ui .flight-toolbar {
+  bottom: auto;
+  top: calc(var(--edge-top) + 54px);
+  left: calc(var(--edge-left) + 48px);
+  right: calc(var(--edge-right) + 76px);
+  transform: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+.compact-ui .flight-toolbar .btn {
+  font-size: 11px;
+  padding: 5px 2px;
+  white-space: normal;
+}
+.compact-ui .flight-panel {
+  top: calc(var(--edge-top) + 104px);
+  bottom: auto;
+  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 112px);
+}
+.compact-ui .demo-banner {
+  max-height: min(135px, 28dvh);
+  padding: 8px;
+  gap: 6px;
+}
+.compact-ui .demo-stage-desc {
+  display: none;
+}
+.compact-ui .demo-stage-title {
+  font-size: 11px;
+}
+.compact-ui .demo-badge {
+  font-size: 10px;
+  padding: 4px;
+}
+.compact-ui .demo-actions .btn {
+  min-height: 36px;
+}
+.compact-ui .demo-pill-btn {
+  max-width: calc(100% - 16px);
+}
+.compact-ui .touch-controls-overlay {
+  z-index: 20;
+}
+/* Raise the parent stacking context; child panel z-index cannot outrank the yoke alone. */
+.touch-mode #hud-overlay {
+  z-index: 30;
+}
+.touch-mode:not(.compact-ui) .touch-controls-overlay {
+  padding-bottom: 70px;
+}
+@media (max-height: 450px) and (min-width: 541px) {
+  .compact-ui .touch-throttle-track {
+    height: 88px;
+  }
+  .compact-ui .touch-stick-zone {
+    width: 100px;
+    height: 100px;
+  }
+  .compact-ui .touch-throttle-card {
+    padding: 6px;
+  }
+  .compact-ui .touch-center {
+    flex-direction: row;
+    gap: 6px;
+  }
+  .compact-ui .touch-rudder-card {
+    width: 130px;
+  }
+  .compact-ui .btn-touch-brake {
+    width: 52px;
+    height: 52px;
+  }
+  .compact-ui .demo-banner {
+    width: min(360px, calc(100% - 280px));
+  }
+}
+@media (min-width: 1025px) {
+  body:not(.touch-mode) .flight-panel:not(#panel-aircraft) {
+    bottom: 130px;
+    max-height: calc(100dvh - 210px);
+  }
+}
+.flight-panel, .flight-panel-body, .flight-panel-body button, .flight-panel-body select {
+  touch-action: pan-y;
+}
+
+.compact-ui .touch-throttle-card, .compact-ui .touch-stick-card, .compact-ui .touch-rudder-card, .btn-touch-brake {
+  box-shadow: none;
+}
+.panel-open .demo-banner, .panel-open .demo-pill-btn {
+  visibility: hidden;
+}
+.flight-panel {
+  background: #101c2bfa;
+}
+/* Inset changes must take effect immediately when browser chrome or orientation changes. */
+.flight-toolbar .btn, .flight-panel .btn {
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+
+/* Keep camera selection and one-tap mute on the primary touch toolbar. */
+.quick-mute { display: none; }
+.touch-mode .quick-mute {
+  display: block;
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 18px;
+  padding: 4px;
+}
+.compact-ui.touch-mode .flight-toolbar {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+.compact-ui.touch-mode .quick-mute { font-size: 18px; }
+
+/* Small phones use a single shallow row instead of stacked control cards. */
+@media (max-width: 600px), (max-width: 1024px) and (max-height: 500px) {
+  .compact-ui.touch-mode .touch-controls-overlay {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .compact-ui .touch-throttle-card {
+    width: 56px;
+    padding: 5px;
+    gap: 4px;
+  }
+  .compact-ui .touch-throttle-card .touch-card-header {
+    flex-direction: column;
+    gap: 2px;
+    padding-bottom: 2px;
+  }
+  .compact-ui .touch-throttle-card .touch-label { font-size: 0; }
+  .compact-ui .touch-throttle-card .touch-label::after { content: 'THR'; font-size: 8px; }
+  .compact-ui .touch-throttle-card .touch-value { font-size: 8px; white-space: nowrap; }
+  .compact-ui .touch-throttle-presets { display: none; }
+  .compact-ui .touch-throttle-track { width: 44px; height: 88px; }
+  .compact-ui .touch-stick-card { padding: 5px; gap: 0; }
+  .compact-ui .touch-stick-card .touch-card-header { display: none; }
+  .compact-ui .touch-stick-zone { width: 88px; height: 88px; }
+  .compact-ui .touch-stick-knob { width: 36px; height: 36px; border-width: 2px; }
+  .compact-ui .knob-ring { width: 18px; height: 18px; }
+  .compact-ui .stick-boundary { width: 64px; height: 64px; }
+  .compact-ui .touch-center { flex-direction: column; gap: 4px; }
+  .compact-ui .touch-rudder-card { width: 104px; padding: 4px; gap: 2px; }
+  .compact-ui .touch-rudder-track { height: 44px; }
+  .compact-ui .rudder-label-strip { font-size: 8px; }
+  .compact-ui .rudder-label-strip span:first-child,
+  .compact-ui .rudder-label-strip span:last-child { font-size: 0; }
+  .compact-ui .rudder-label-strip span:first-child::after { content: '◄ L'; font-size: 8px; }
+  .compact-ui .rudder-label-strip span:last-child::after { content: 'R ►'; font-size: 8px; }
+  .compact-ui .touch-center .btn-touch-brake { width: 44px; height: 44px; }
+  .compact-ui .brake-label { font-size: 8px; }
+  .compact-ui .brake-sub { display: none; }
+  .compact-ui .touch-throttle-card,
+  .compact-ui .touch-stick-card,
+  .compact-ui .touch-rudder-card { background: rgba(15, 23, 42, .72); }
+}
+
+.hud-strip {
+  top: var(--edge-top);
+  height: 44px;
+  padding: 6px 10px;
+  align-items: stretch;
+}
+
+/* One concise control strip: camera, sound, fullscreen | aircraft controls. */
+.flight-toolbar, .compact-ui .flight-toolbar, .compact-ui.touch-mode .flight-toolbar {
+  top: calc(var(--edge-top) + 48px);
+  bottom: auto;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: min(480px, calc(100% - var(--edge-left) - var(--edge-right)));
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  border-radius: 8px;
+  background: rgba(10, 16, 26, .88);
+}
+.flight-toolbar .btn, .compact-ui .flight-toolbar .btn {
+  flex: 1 0 44px;
+  transform: none;
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
+  padding: 2px;
+  margin: 0;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  white-space: nowrap;
+}
+.flight-toolbar .btn + .btn { border-left: 1px solid #334155; }
+.flight-toolbar #btn-gear { border-left: 2px solid #64748b; }
+.flight-toolbar .btn[data-short-label] { font-size: 0; }
+.flight-toolbar .btn[data-short-label]::after {
+  content: attr(data-short-label);
+  font: 600 10px system-ui;
+}
+.flight-toolbar #btn-auto-camera { flex-basis: 64px; min-width: 64px; }
+.flight-toolbar #btn-auto-camera[aria-pressed="true"] { color: #67e8f9; background: #164e63; }
+.flight-toolbar .quick-mute { display: block; font-size: 18px; }
+.flight-toolbar #btn-fullscreen::after {
+  content: '';
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  background:
+    linear-gradient(currentColor, currentColor) left top / 7px 2px,
+    linear-gradient(currentColor, currentColor) left top / 2px 7px,
+    linear-gradient(currentColor, currentColor) right top / 7px 2px,
+    linear-gradient(currentColor, currentColor) right top / 2px 7px,
+    linear-gradient(currentColor, currentColor) left bottom / 7px 2px,
+    linear-gradient(currentColor, currentColor) left bottom / 2px 7px,
+    linear-gradient(currentColor, currentColor) right bottom / 7px 2px,
+    linear-gradient(currentColor, currentColor) right bottom / 2px 7px;
+  background-repeat: no-repeat;
+}
+.flight-toolbar #btn-fullscreen[aria-pressed="true"] { color: #67e8f9; background: #164e63; }
+
+
+/* The AP trigger stays anchored; its dropdown clears both control strips. */
+.ap-bar, .compact-ui .ap-bar {
+  position: absolute;
+  top: var(--ap-row-top, calc(var(--edge-top) + 96px));
+  right: var(--edge-right);
+  left: auto;
+  bottom: auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  transform: none;
+  pointer-events: auto;
+  z-index: 66;
+}
+.ap-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 6px;
+  font: 700 11px "Courier New", Courier, monospace;
+  letter-spacing: .5px;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, .08);
+  border: 1px solid rgba(148, 163, 184, .35);
+  border-radius: 6px;
+  box-shadow: none;
+}
+.ap-btn:hover { border-color: #38bdf8; color: #e2e8f0; }
+.ap-btn.ap-active { color: #02110a; background: #10b981; border-color: #34d399; }
+.ap-btn.ap-armed { color: #1a1206; background: #f59e0b; border-color: #fbbf24; }
+.ap-bar .ap-toggle-btn {
+  width: 44px;
+  height: 44px;
+  transform: none;
+  border-radius: 10px;
+}
+.ap-toggle-btn:not(.ap-active) {
+  background: rgba(10, 16, 26, .82);
+  border-color: rgba(56, 189, 248, .4);
+}
+.ap-panel {
+  position: absolute;
+  top: var(--ap-panel-offset, calc(100% + 4px));
+  right: 0;
+  width: min(296px, calc(100vw - var(--edge-left) - var(--edge-right)));
+  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 144px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  background: rgba(10, 16, 26, .96);
+  border: 1px solid rgba(56, 189, 248, .35);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+}
+.ap-panel[hidden] { display: none; }
+.ap-panel .ap-btn { transform: none; }
+.ap-phase-item { justify-content: center; }
+.ap-modes {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 4px;
+  font: 700 11px "Courier New", Courier, monospace;
+  color: #38bdf8;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.ap-modes:empty { display: none; }
+@media (max-height: 400px) and (min-width: 541px) {
+  /* In phone landscape, keep the brake and central touch controls outside the
+     dropdown. Align its narrower panel to the right safe edge. */
+  .compact-ui.touch-mode .ap-panel {
+    right: 0;
+    width: min(268px, calc(100vw - var(--edge-left) - var(--edge-right)));
+    max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 210px);
+  }
+}
+

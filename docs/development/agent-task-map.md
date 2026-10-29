@@ -5,13 +5,13 @@ context, while the current implementation defines actual behavior.
 
 | Task | Implementation to read first | Verification |
 | --- | --- | --- |
-| Integration, reset, simulation timing | src/main.js; src/core/physicsTiming.js; src/config/simConfig.js; [physics core](physics-core.md) | npm test; relevant browser scenario |
+| Integration, reset, simulation timing | src/main.js; src/core/PhysicsIntegrator.js; src/core/PresetSpawner.js; src/core/physicsTiming.js; src/config/simConfig.js; [physics core](physics-core.md) | npm test; relevant browser scenario |
 | Aircraft parameters | src/config/aircraftConfigs.js | physics tests; flight scenario |
 | Loading, fuel CG, inertia and trim | src/physics/MassProperties.js; TrimSolver.js; src/ui/LoadingPanel.js; [mass/CG model](mass-cg.md) | tests/massProperties.test.js; trimSolver.test.js; scripts/verify-mass-cg.html |
 | Lift, drag, atmosphere, engines | src/physics/Aerodynamics.js; Atmosphere.js; EngineModel.js | tests/aerodynamics.test.js; atmosphere.test.js; engine.test.js |
 | Gear, collision, touchdown | src/physics/LandingGear.js; CollisionDetector.js | tests/landingGear.test.js; collision.test.js; gearCamAndTouchdown.test.js; npm run test:crash |
-| Keyboard, HOTAS/gamepad, touch input | src/controls/FlightControls.js; HotasController.js; TouchFlightControls.js; index.html; style.css | tests/flightControls.test.js; tests/hotasController.test.js; npm run test:mobile |
-| HUD, responsive panels, localization | index.html; style.css; src/ui/FlightPanels.js; src/i18n/ | tests/controlPanelState.test.js; scripts/verify-responsive-ui.mjs; browser screenshots |
+| Keyboard, HOTAS/gamepad, touch input | src/controls/FlightControls.js; HotasController.js; TouchFlightControls.js; index.html; src/styles/touch-controls.css | tests/flightControls.test.js; tests/hotasController.test.js; npm run test:mobile |
+| HUD, responsive panels, localization | index.html; src/styles/; src/ui/SimulatorHudAndBindings.js; src/ui/FlightPanels.js; src/i18n/locales/ | tests/controlPanelState.test.js; tests/i18n.test.js; scripts/verify-responsive-ui.mjs; browser screenshots |
 | Cameras and framing | src/cameras/CameraSystem.js; src/ui/HudView.js; [HUD camera](hud-camera.md) | tests/gearCamAndTouchdown.test.js; tests/hudProjection.test.js; scripts/verify-hud-camera.mjs; browser screenshots |
 | Autonomous flight and stage transitions | src/director/DemoFlightDirector.js; src/director/PilotControlLaws.js; src/director/scenarios/ | tests/demoFlightDirector.test.js; tests/demoTouchdown.test.js; npm run test:demo; npm run test:flight |
 | Han River manual bridge challenge | src/config/hangangCourse.js; src/director/HangangRun.js; HangangScenario.js; src/environment/HangangScene.js; [course contract](hangang.md) | tests/hangang.test.js; scripts/verify-hangang.mjs |
@@ -27,7 +27,7 @@ context, while the current implementation defines actual behavior.
 | Crash and tire effects | src/effects/; [impact effects](impact-effects.md) | npm run test:crash; screenshots |
 | Events and diagnostics | src/core/EventBus.js; src/ui/DiagnosticsInspector.js | relevant Node tests and browser inspection |
 | Developer mode, scenarios, build identity, render comparisons | src/dev/; src/ui/DeveloperPanel.js; RenderDiagnosticsPanel.js; [developer mode](developer-mode.md); [render comparisons](render-diagnostics.md) | tests/developerMode.test.js; renderDiagnostics.test.js; scripts/verify-developer-mode.mjs and verify-render-diagnostics.mjs |
-| CI and agent guidance | package.json; .github/workflows/ci.yml; scripts/check-*.mjs; AGENTS.md | npm run check; npm test; npm run build |
+| CI and agent guidance | package.json; .github/workflows/ci.yml; scripts/check-*.mjs; scripts/agent-workflow.mjs; scripts/lib/browserHarness.mjs; scripts/lib/compactReporter.mjs; AGENTS.md | npm run check; npm test; npm run build |
 | PR self-feedback | .agents/skills/flight3d-pr-feedback/SKILL.md; .github/workflows/pr-feedback.yml; scripts/pr-feedback.mjs; [setup and usage](pr-feedback.md) | tests/prFeedback.test.js; npm run check; npm test; npm run build; configured PR smoke test |
 
 Paths separated by semicolons within one directory refer to that same directory.
