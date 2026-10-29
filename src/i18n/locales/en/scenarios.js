@@ -1,8 +1,8 @@
 export default {
   "hangang.region": "Han River",
   "hangang.title": "Han River · bridge challenge",
-  "hangang.briefing": "Dedicated map · automatic C172 · 3 bridges · calm/daylight\nStart at 19 m above water / 89 kt. Hold 10–28 m, 68–113 kt and vertical speed within ±3 m/s. Bank within 12° near bridges, 30° between them. 8 continuous seconds outside the envelope fails the run.",
-  "hangang.provenance": "A fictional training course inspired by the Han River, not surveyed geography or real bridge dimensions. Manually fly 01 → 02 → 03, then recover stable flight.",
+  "hangang.briefing": "Dedicated map · automatic C172 · 3 bridges · calm/twilight\nStart at 19 m above water / 89 kt. Hold 10–28 m, 68–113 kt and vertical speed within ±3 m/s. Bank within 12° near bridges, 30° between them. 8 continuous seconds outside the envelope fails the run.",
+  "hangang.provenance": "Yeouido–Yongsan corridor with illuminated bridges, expressway arteries and twilight skyline. Manually fly 01 → 02 → 03, then recover stable flight.",
   "hangang.progress": "Bridges {count} / {total}",
   "hangang.approach": "Approach",
   "hangang.passing": "Passing",

@@ -26,7 +26,7 @@ export class HangangScenario {
     this.syncTerrain();
     s.cameraSystem.trauma = 0;
     s.cameraSystem.towerPos.set(80, 70, 80);
-    s.setTimeOfDay(12); s.aero.windWorld.set(0, 0, 0);
+    s.setTimeOfDay(18.25); s.aero.windWorld.set(0, 0, 0);
     this.run.reset(); this.render();
   }
   stop() {
@@ -47,6 +47,7 @@ export class HangangScenario {
   update(dt) {
     if (!this.active) return;
     const s = this.sim;
+    this.scene.update?.(dt);
     if (s.isCrashed) this.run.fail('contact');
     this.run.update(s.position, s.quaternion, s.linearVelocity, dt, { stalled: s.aero.isStalled });
     if (this.run.contact && !s.isCrashed) {
