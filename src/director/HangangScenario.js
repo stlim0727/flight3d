@@ -1,14 +1,11 @@
 import { HangangScene } from '../environment/HangangScene.js';
 import { HangangRun } from './HangangRun.js';
-import { HANGANG_COURSE } from '../config/hangangCourse.js';
 import { t } from '../i18n/index.js';
 
 export class HangangScenario {
   constructor(sim) {
     this.sim = sim; this.scene = new HangangScene(); this.run = new HangangRun();
     sim.scene.add(this.scene.group);
-    this.panel = document.getElementById('hangang-hud');
-    document.getElementById('hangang-retry').addEventListener('click', () => { sim.gameFlow.enterFlight(); sim.setPreset('hangang'); });
   }
   get active() { return Boolean(this.saved); }
   start() {
@@ -27,7 +24,7 @@ export class HangangScenario {
     s.cameraSystem.trauma = 0;
     s.cameraSystem.towerPos.set(80, 70, 80);
     s.setTimeOfDay(18.25); s.aero.windWorld.set(0, 0, 0);
-    this.run.reset(); this.render();
+    this.run.reset();
   }
   stop() {
     if (!this.saved) return;
@@ -37,7 +34,7 @@ export class HangangScenario {
     s.collisionDetector.setEnvironment(...saved.environment);
     s.aero.windWorld.copy(saved.wind); s.setTimeOfDay(saved.time);
     s.cameraSystem.towerPos.copy(saved.tower); this.syncTerrain();
-    this.scene.group.visible = false; this.panel.hidden = true;
+    this.scene.group.visible = false;
   }
   syncTerrain() {
     const s = this.sim;
@@ -54,18 +51,5 @@ export class HangangScenario {
       s.triggerCrash({ collided: true, type: this.run.contact.structure === 'water' ? 'WATER' : 'BUILDING',
         name: t('hangang.contact'), description: t('hangang.contact'), point: s.position.clone(), speedKnots: s.linearVelocity.length() * 1.94384 });
     }
-  }
-  render() {
-    const s = this.sim; this.panel.hidden = !this.active || s.gameFlow.state !== 'flight';
-    if (!this.active) return;
-    const r = this.run, c = HANGANG_COURSE, target = c.bridges[Math.min(r.index, c.bridges.length - 1)];
-    document.getElementById('hangang-progress').textContent = t('hangang.progress', { count: r.index, total: c.bridges.length });
-    document.getElementById('hangang-phase').textContent = t(`hangang.${r.status === 'running' ? r.phase : r.status}`);
-    const distance = Math.hypot(target.x - s.position.x, target.z - s.position.z);
-    document.getElementById('hangang-guidance').textContent = t('hangang.guidance', { height: s.position.y.toFixed(1), vz: s.linearVelocity.y.toFixed(1), distance: Math.round(distance) });
-    document.getElementById('hangang-warning').textContent = r.reason ? t(`hangang.${r.reason}`) : r.warning ? t('hangang.warning') : t('hangang.target');
-    document.getElementById('hangang-result').textContent = t('hangang.result', { percent: r.maintenancePercent,
-      gaps: r.clearances.map(v => v === null ? '—' : v.toFixed(1) + 'm').join(' / ') });
-    document.getElementById('hangang-retry').hidden = r.status === 'running';
   }
 }

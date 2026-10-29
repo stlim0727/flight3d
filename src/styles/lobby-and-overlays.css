@@ -446,13 +446,6 @@ body[data-flow="lobby"] #incheon-attribution-chip { display: none; }
 .build-info a { color: #bae6fd; text-decoration: underline; text-underline-offset: 2px; }
 .build-info a:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
 .startup-card .build-info { min-height: 0; margin: 16px 0 0; font-size: 11px; }
-/* Mission guidance stays separate from flight controls and collapses on phones. */
-.hangang-hud { position: fixed; top: 100px; left: 16px; z-index: 12; width: min(330px, calc(100vw - 32px)); padding: 12px 15px; border: 1px solid #8ab8bb66; border-radius: 10px; background: #0c2537e8; color: #e4f1f5; font: 13px/1.4 system-ui, sans-serif; pointer-events: none; }
-.hangang-hud[hidden] { display: none; }
-.hangang-heading { display: flex; justify-content: space-between; gap: 12px; color: #ffd081; }
-.hangang-hud p { margin: 6px 0 0; }
-.hangang-hud button { pointer-events: auto; margin-top: 8px; }
-@media (max-width: 600px) { .hangang-hud { top: 160px; left: 10px; width: min(285px, calc(100vw - 20px)); font-size: 11px; padding: 8px 10px; } }
 
 /* HUD camera changes flight instruments, never the shared control chrome. */
 #hud-view { position: fixed; inset: 0; pointer-events: none; color: #edf5ff; z-index: 60; }
