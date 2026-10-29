@@ -60,7 +60,9 @@ try {
   })()`);
   // A control can consume its pointer event; capture must still unlock audio.
   await evaluate(`window.simulator.renderer.domElement.addEventListener('pointerdown', e => e.stopPropagation(), { once: true });
+    window.simulator.audio.ctx.onstatechange = null;
     window.simulator.audio.ctx.suspend()`);
+  assert.equal(await evaluate('window.simulator.audio.ctx.state'), 'suspended');
   for (const type of ['mousePressed', 'mouseReleased']) {
     await call('Input.dispatchMouseEvent', { type, x: 600, y: 400, button: 'left', clickCount: 1 });
     if (type === 'mousePressed') await waitFor('window.simulator.audio.ctx.state === "running"');
