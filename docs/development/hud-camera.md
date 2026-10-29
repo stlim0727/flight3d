@@ -26,8 +26,10 @@ in ft/min, trim in degrees, fuel as a percentage of current tank capacity.
 
 `HudView` owns only the conformal flight-instrument canvas. All camera modes
 share the same top telemetry, AP/mute header and direct CAM/gear/flaps/spoilers/
-reverse row. The ⋯ panel holds trim, parking brake, automatic camera viewing and
-fullscreen; it stays in the same place across cameras. Trim uses
+reverse row. During demo flight, the row replaces disabled aircraft actions with
+a persistent take-control button, independent of the collapsible guide and
+warning visibility. The ⋯ panel puts fullscreen first, followed by trim, parking
+brake and automatic camera viewing; it stays in the same place across cameras. Trim uses
 `Aerodynamics.setTrim` and synchronizes control state. Flight controls retain demo
 lockout. Escape closes an open panel before pausing. No disabled future-function
 buttons or duplicate telemetry footer occupy the flight view.

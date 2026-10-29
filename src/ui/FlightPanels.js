@@ -52,6 +52,9 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   bindText(cameraButton, () => t('change.camera.c'), 'title');
   cameraButton.addEventListener('click', () => onCycleCamera());
   bar.append(cameraButton);
+  // Taking over must remain available when the guide is collapsed or yields to
+  // warnings. Keep the existing button/handler outside the notification tree.
+  bar.append(document.getElementById('btn-skip-demo'));
   const autoCameraButton = document.createElement('button');
   autoCameraButton.id = 'btn-auto-camera';
   autoCameraButton.className = 'btn';
@@ -82,7 +85,8 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
     button.addEventListener('click', () => onAdjustTrim(sign * .2));
   }
   more.querySelector('#flight-park-brake').addEventListener('click', () => onToggleParkingBrake());
-  more.append(autoCameraButton, fullscreen);
+  more.prepend(fullscreen);
+  more.append(autoCameraButton);
   hud.append(more);
   const setMoreOpen = open => {
     more.hidden = !open;

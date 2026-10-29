@@ -77,7 +77,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       await evaluate(mode => window.simulator.controls.onSelectCamera(mode), mode);
       await delay(150);
       const bounds = await evaluate(() => {
-        const selectors = ['.menu-toggle', '.hud-strip', '#btn-ap-toggle', '#btn-mute', '.flight-toolbar', ...[...document.querySelectorAll('.flight-toolbar button')].map(n => `#${n.id}`)];
+        const selectors = ['.menu-toggle', '.hud-strip', '#btn-ap-toggle', '#btn-mute', '.flight-toolbar', ...[...document.querySelectorAll('.flight-toolbar button:not(#btn-skip-demo)')].map(n => `#${n.id}`)];
         return selectors.map(sel => { const n = document.querySelector(sel), r = n.getBoundingClientRect(); return { sel, x: r.x, y: r.y, w: r.width, h: r.height }; });
       });
       assert.ok(bounds.every(r => r.x >= 0 && r.x + r.w <= width + 1 && r.y >= 0 && r.y + r.h <= height), JSON.stringify(bounds));
@@ -109,6 +109,14 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape' });
     assert.ok(await evaluate('document.getElementById("ap-panel").hidden && document.body.dataset.flow === "flight"'), 'Escape closes AP without pausing');
     await click('#open-flight-more');
+    assert.equal(await evaluate('document.querySelector("#flight-more-panel button").id'), 'btn-fullscreen', 'fullscreen is the first overflow action');
+    await click('#btn-fullscreen');
+    await delay(150);
+    assert.ok(await evaluate('Boolean(document.fullscreenElement)'), 'native click enters fullscreen');
+    await screenshot(`${out}/${width}x${height}-fullscreen.png`);
+    await click('#btn-fullscreen');
+    await delay(150);
+    assert.ok(await evaluate('!document.fullscreenElement'), 'native click exits fullscreen');
     const trim = await evaluate('window.simulator.aero.pitchTrim');
     await click('#flight-trim-more');
     assert.ok(Math.abs(await evaluate('window.simulator.controls.pitchTrim') - trim - .2) < .001, 'trim');
@@ -144,7 +152,17 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     });
     assert.ok(demo.width && demo.top >= demo.toolbarBottom + 4 && demo.locked, `demo clearance and lockout: ${JSON.stringify(demo)}`);
     await screenshot(`${out}/${width}x${height}-demo.png`);
+    // Both the expanded and collapsed guide must yield to a warning without
+    // taking the primary takeover action with them.
+    await evaluate(() => {
+      const s = window.simulator;
+      s.telemetry.warnings = [{ text: 'BANK ANGLE', priority: 50 }];
+      s.updateHUD();
+    });
+    await evaluate(() => window.simulator.demoDirector.closeBanner());
+    await screenshot(`${out}/${width}x${height}-warning-takeover.png`);
     await click('#btn-skip-demo');
+    await evaluate(() => { window.simulator.telemetry.warnings = []; window.simulator.updateHUD(); });
     assert.ok(await evaluate('!window.simulator.demoDirector.isActive'), 'take control is reachable');
     results.push({ width, height, cameraModes: 8, bounds: baseline, demo });
     console.log(`${width}x${height}: camera parity, AP, more, trim/brake, mute and demo passed`);
