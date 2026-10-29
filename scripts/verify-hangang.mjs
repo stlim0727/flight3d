@@ -67,7 +67,6 @@ try {
     document.getElementById('btn-fly').click();
     const initial = { region:s.activeAirport, preset:s.lastPresetType, aircraft:s.currentAircraftId, mass:s.aero.mass, throttle:s.controls.throttle, trim:s.controls.pitchTrim, position:s.position.toArray() };
     s.stepSimulation(5);
-    s.hangang.render();
     return {initial,status:s.hangang.run.status,reason:s.hangang.run.reason,position:s.position.toArray(),speed:s.linearVelocity.length(),pitch:s.telemetry.pitchDeg,crashed:s.isCrashed};
   });
   await delay(500); await capture('approach');
@@ -86,42 +85,47 @@ try {
       s.controls.setVirtualInput('rudder',Math.max(-0.2,Math.min(0.2,-s.aero.beta*2)));
       s.stepSimulation(0.05);
     }
-    s.controls.clearVirtualInputs();s.hangang.render();
+    s.controls.clearVirtualInputs();
     return {status:s.hangang.run.status,reason:s.hangang.run.reason,index:s.hangang.run.index,position:s.position.toArray(),gaps:s.hangang.run.clearances,maintenance:s.hangang.run.maintenancePercent,elapsed:s.hangang.run.elapsed};
   });
   await delay(300);await capture('finish');
   const lifecycle=await evaluate(async()=>{
     const s=window.simulator;
-    document.getElementById('hangang-retry').click();
+    s.gameFlow.pause();document.getElementById('btn-pause-restart').click();
     const reset=s.hangang.run.index===0 && s.hangang.run.status==='running';
     s.autopilot.master=true;s.stepSimulation(0.1);
     const manual=!s.autopilot.master;
     const noDemo=s.demoDirector.start()===false && !s.demoDirector.isActive;
-    s.gameFlow.returnToLobby(true);s.hangang.render();const hidden=s.hangang.panel.hidden;
+    const commonHud=!document.getElementById('hangang-hud') && !document.getElementById('hangang-retry')
+      && document.getElementById('hud-overlay').getClientRects().length>0;
+    s.gameFlow.returnToLobby(true);
     s.gameFlow.enterFlight();await s.setAirport('coastal');s.setPreset('runway');
     const restore=!s.hangang.active && s.currentTerrain===s.terrain && !s.hangang.scene.group.visible;
     await s.setAirport('hangang');await s.setAirport('lukla');
     const airport=!s.hangang.active && s.currentTerrain===s.luklaTerrain;
     await s.setAirport('hangang');
-    return {reset,manual,noDemo,hidden,restore,airport};
+    return {reset,manual,noDemo,commonHud,restore,airport};
   });
   await evaluate(async()=>{
     const s=window.simulator;
     const {CameraSystem}=await import('/src/cameras/CameraSystem.js');
     s.cameraSystem.setMode(CameraSystem.MODES.COCKPIT,true);
-    s.stepSimulation(16.5);s.hangang.render();
+    s.stepSimulation(16.5);
   });
   await delay(500);await capture('cockpit-entry');
   const failure=await evaluate(()=>{
     const s=window.simulator;s.controls.setVirtualInput('elevator',-0.8);
-    s.stepSimulation(6);s.hangang.render();
+    s.stepSimulation(6);
     return {crashed:s.isCrashed,status:s.hangang.run.status,reason:s.hangang.run.reason,contact:s.hangang.run.contact};
   });
   await delay(300);await capture('failure');
   const retry = await evaluate(()=>{
-    const s=window.simulator;document.getElementById('hangang-retry').click();
-    s.stepSimulation(0.1);s.hangang.render();
-    return {healthy:!s.isCrashed && !s.aero.isStalled, trauma:s.cameraSystem.trauma,
+    const s=window.simulator;
+    window.dispatchEvent(new KeyboardEvent('keydown',{code:'Space',key:' '}));
+    const crashToMenu=s.gameFlow.state==='lobby' && !s.isCrashed;
+    document.getElementById('btn-fly').click();
+    s.stepSimulation(0.1);
+    return {crashToMenu,healthy:!s.isCrashed && !s.aero.isStalled, trauma:s.cameraSystem.trauma,
       reset:s.hangang.run.index===0, altitude:s.telemetry.radioAltFt};
   });
   await send('Emulation.setDeviceMetricsOverride',{width:412,height:915,deviceScaleFactor:1,mobile:true});
@@ -147,7 +151,7 @@ try {
   assert.equal(result.initial.aircraft,'C172');assert.equal(result.initial.preset,'hangang');
   assert.equal(failure.status,'failed');assert.equal(failure.crashed,true);assert.equal(flight.status,'complete');assert.equal(flight.index,3);
   assert.ok(Object.values(lifecycle).every(Boolean));assert.equal(exceptions.length,0);
-  assert.ok(retry.healthy && retry.reset);assert.equal(retry.trauma,0);assert.ok(retry.altitude>50);
+  assert.ok(retry.crashToMenu && retry.healthy && retry.reset);assert.equal(retry.trauma,0);assert.ok(retry.altitude>50);
 } finally {
   socket?.close();chrome.kill();
   await delay(1500);

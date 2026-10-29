@@ -18,7 +18,7 @@ Autopilot disengages while the challenge is active.
 `src/config/hangangCourse.js` defines an ordered array of three bridges with
 different positions, rotations and silhouettes. The course follows a gently
 curved river. Additional bridges require course data and route validation; the
-mission counter derives its total from the array.
+internal progress total derives from the array.
 
 - Keep reference-point height between 10 and 28 m, vertical speed within
   ±3 m/s, and speed between 35 and 58 m/s (about 68–113 kt).
@@ -33,12 +33,13 @@ mission counter derives its total from the array.
   reach at least 220 m beyond its plane. Contact fails immediately. The run has
   a 240 s limit and a 440 m lateral river corridor.
 
-The HUD shows k/n, phase, height, vertical speed, target distance, warnings,
-envelope-maintenance percentage and each opening's minimum clearance. Speed
-and attitude remain available in the existing flight instruments. Clearances
-measure the conservative aircraft envelope against the rectangular gate, not
-exact distances between rendered triangles. This release does not include a
-visual replay, persistent leaderboard or full telemetry analysis UI.
+The scenario uses the common flight HUD and controls. It does not add a bridge
+counter, phase/guidance panel, maintenance/clearance report or retry button.
+Use **Esc → Scenario restart** to restart normal flight; after a crash use the
+common report and **Space / R / Enter → main menu → Fly**. Menu selection retains
+the Han River region. The internal run still records course progress, envelope
+and clearance data for validation; removing its presentation does not change
+physical collision detection or the flight model.
 
 ## Physics and geometry contracts
 
@@ -89,7 +90,22 @@ teleport the aircraft through gates or override forces. The gameplay itself
 requires manual flight; the test pilot is only in the verification script.
 
 Evidence is in `review-artifacts/hangang/`. Checks cover the three-bridge run,
-water impact, retry, autopilot exclusion, lobby hiding and environment restore.
+water impact, common pause/restart and crash-to-menu recovery, autopilot exclusion,
+absence of a dedicated challenge HUD, and environment restore.
 Desktop/cockpit/mobile screenshots check framing. Mobile is a viewport check,
 not proof of touch handling on a physical phone. Automated piloting demonstrates
 feasibility, not human difficulty balance or a real-time FPS benchmark.
+
+### Common HUD verification (#290)
+
+`review-artifacts/hangang-common-ux/` records the panel removal on Node 22.23.2.
+Syntax/action checks and the production build passed. All 882 Node tests passed
+with the canonical LF checkout bytes for the existing Incheon checksum fixtures;
+the untouched Windows main checkout reproduced that CRLF checksum failure first.
+No Incheon data change belongs to this PR.
+
+The browser harness completed all three bridges using ordinary control inputs,
+then verified pause-menu restart, water impact, Space-to-menu recovery, Fly,
+environment restoration and saved-region reload with zero runtime exceptions.
+The desktop, cockpit, mobile and crash captures show the common HUD without a
+scenario status/score/retry panel. Mobile evidence is viewport-only.

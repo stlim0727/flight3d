@@ -1997,7 +1997,6 @@ class FlightSimulator {
     }
 
     // 1. Update 3D Aircraft Model & Articulations
-    this.hangang?.render();
     this.aircraft.update(frameDelta, this.telemetry);
     this.renderPose.apply(this.aircraft.group, this.position, this.quaternion,
       this.physicsAccumulator / this.physicsDt);
