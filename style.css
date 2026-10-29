@@ -2422,6 +2422,7 @@ body[data-flow="lobby"] #incheon-attribution-chip { display: none; }
 
 .build-info { margin: 10px 0; color: #94a3b8; font: 11px/1.6 system-ui, sans-serif; overflow-wrap: anywhere; }
 .build-info [data-build-branch], .build-info [data-build-commit] { font-family: ui-monospace, monospace; }
+.build-info [data-build-age] { white-space: nowrap; }
 .build-info a { color: #bae6fd; text-decoration: underline; text-underline-offset: 2px; }
 .build-info a:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
 .startup-card .build-info { min-height: 0; margin: 16px 0 0; font-size: 11px; }
