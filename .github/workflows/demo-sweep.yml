@@ -30,10 +30,10 @@ concurrency:
 jobs:
   sweep:
     runs-on: ubuntu-latest
-    # Measured locally on a Vulkan GPU: the 4-route core tier takes 66 s of wall
-    # clock, the full 14-route matrix 258 s with screenshots (2,960 s of simulated
-    # flight). The hosted runner has no GPU, so SwiftShader will be slower by an
-    # unknown factor; re-measure these ceilings after the first scheduled run.
+    # Measured on this runner: the core tier takes 153 s of sweep wall (177 s for
+    # the whole job) and the full matrix with screenshots 942 s, on SwiftShader
+    # because there is no GPU here. Local Vulkan is 66 s and 258 s. The ceilings
+    # below keep the ~4x headroom the first PR runs left.
     timeout-minutes: ${{ github.event_name == 'pull_request' && 25 || 45 }}
     env:
       TIER: ${{ github.event_name == 'pull_request' && 'core' || github.event.inputs.tier || 'all' }}

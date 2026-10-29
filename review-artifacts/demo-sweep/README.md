@@ -90,14 +90,26 @@ FAIL c172-coastal-proximity · 11s sim in 16.3s wall (44 slices)
 The ceiling edit was reverted before commit; `git diff` on `scripts/lib/demoSweepSpec.mjs` is the
 declared route table only.
 
-## What this costs CI
+## What this costs CI, measured on the hosted runner
 
-The core tier that blocks a pull request is 4 routes: **66 s of wall clock** on this GPU, with the
-slowest single route (`b738-coastal-classic`) at 27 s. The full matrix is 258 s with screenshots
-and roughly 200 s without. `.github/workflows/demo-sweep.yml` allows 25 minutes for a pull request
-and 45 for a scheduled or dispatched run because the hosted runner has no GPU and falls back to
-SwiftShader; those ceilings are estimates until the first scheduled run measures them, and the
-workflow comment says so.
+Pull request #289 ran the gate for real on `ubuntu-latest`, which has no GPU, so these are
+SwiftShader numbers:
+
+| run | tier | routes | result | sweep wall | job wall | ceiling |
+| --- | --- | ---: | --- | ---: | ---: | ---: |
+| [40807282232](https://github.com/stlim0727/flight3d/actions/runs/40807282232) | core (PR) | 4 | success, 0 fail / 0 report / 6 known | 152.8 s | 177 s | 25 min |
+| [40807349278](https://github.com/stlim0727/flight3d/actions/runs/40807349278) | all (dispatch, shots) | 14 | success, 0 fail / 2 reports / 6 known | 941.7 s | 969 s | 45 min |
+
+The pull-request gate costs under three minutes end to end, and the full matrix under sixteen,
+both with wide margins. The same commit's `CI` workflow also passed (run 40807282075).
+
+The physics agrees across both drivers: on SwiftShader `b738-coastal-classic` flew 161.07 s of
+simulated time and `b738-lukla-classic` crashed at 125.75 s, exactly as on the Vulkan GPU, which is
+what deterministic 120 Hz stepping is supposed to mean. Wall clock is what differs — 3 to 4 times
+slower without hardware rendering.
+
+Locally, for comparison: the core tier is 66 s and the full matrix 258 s with screenshots, driven
+by `google-chrome-stable` on Vulkan.
 
 ## Limits of this evidence
 

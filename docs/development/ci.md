@@ -93,6 +93,11 @@ always `ARTIFACT_DIR/demo-sweep-report.json` (`SLICE`-by-`SLICE` measurements, s
 trace, warnings, touchdowns, fails, reports), and the exit code is non-zero when any
 route has a FAIL, or any REPORT under `STRICT=1`.
 
+Measured cost on the hosted runner (SwiftShader, no GPU): the core tier is 153 s of sweep
+wall and the full matrix with screenshots 942 s, against 25 and 45 minute ceilings. On a
+Vulkan GPU the same routes take 66 s and 258 s; the simulated durations agree to the
+slice, because only the rendering is slower without hardware.
+
 `npm run test:demo` now delegates to `--only b738-coastal-classic`, so the coastal
 737 keeps its single-route entry point without the hardcoded 5173/9462/Chrome paths.
 The remaining `verify-*` browser harnesses stay: they cover DOM, audio and camera
