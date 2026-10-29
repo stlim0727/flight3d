@@ -87,8 +87,15 @@ scenario logic, because the demo timers advance in simulated time.
 | `node scripts/demo-sweep.mjs --update-baseline --retries 2` | rewrite `scripts/demo-sweep-baseline.json` from the worst of two flights |
 
 Environment knobs: `TIER ONLY SHOTS STRICT RETRIES APP_URL PORT CDP_PORT CHROME_BIN
-ARTIFACT_DIR DEV_SERVER FORCE_GPU SLICE KEEP_SAMPLES`. `FORCE_GPU=0` forces
-SwiftShader; a writable `/dev/dri/renderD128` selects Vulkan instead. The verdict is
+ARTIFACT_DIR DEV_SERVER FORCE_GPU SLICE KEEP_SAMPLES TMPDIR`. `FORCE_GPU=0` forces
+SwiftShader; a writable `/dev/dri/renderD128` selects Vulkan instead. `TMPDIR` is where
+Chrome puts its profile and its own scratch. Chrome needs that directory to have free
+space and a short path: its `SingletonSocket` must fit the 107-character Unix-socket
+limit, so a deep path (a nested worktree under `.cache`, for instance) kills Chrome at
+launch, and a full `/tmp` tmpfs does the same. Both surface as the sweep's "headless
+Chrome never exposed a debug target", which is a startup failure and not a flight
+verdict — point `TMPDIR` somewhere short and roomy (for example `TMPDIR=$HOME/.tmp`)
+and retry. The verdict is
 always `ARTIFACT_DIR/demo-sweep-report.json` (`SLICE`-by-`SLICE` measurements, stage
 trace, warnings, touchdowns, fails, reports), and the exit code is non-zero when any
 route has a FAIL, or any REPORT under `STRICT=1`.
@@ -158,6 +165,13 @@ was not inventing the crashes, both routes were re-flown through the benchmark's
 arming path (`sim.clock.getDelta = () => 0`, `setAirport`, `demoDirector.start`) in
 the same page: the trajectories match to the slice, including the impact. They are
 demo faults, and fixing the guidance is follow-up work outside this change.
+
+A third finding is intermittent: `c172-coastal-scenic` reached the water on 3 of 37 cold-page
+flights (`RECOVER CLEARANCE` down to 3.9 m, then `CRASH WATER` at 86 kt), on the pre-Hangang build
+and on `main` alike. It is declared `intermittent`, because a fault that appears on some page loads
+cannot be proven absent by a single clean flight, and the crashing runs never enter
+`demo-sweep-baseline.json` — `--update-baseline` refuses to widen a baseline past a FAIL. All three
+are tracked in [issue #292](https://github.com/stlim0727/flight3d/issues/292).
 
 
 ## Selection and provenance

@@ -81,7 +81,8 @@ export const ROUTES = [
       contains: ['CRASH TERRAIN'],
       note: 'CANYON_APPROACH flies into the rising valley wall at ~126 s — 13 m agl, 111 kt, +15° pitch, '
         + 'still climbing when the terrain climbs faster. Reproduced identically through the app-internal '
-        + 'arming path used by scripts/test-lukla-demo-benchmark.mjs, so it is the demo, not the sweep.',
+        + 'arming path used by scripts/test-lukla-demo-benchmark.mjs, so it is the demo, not the sweep. '
+        + 'Tracked in https://github.com/stlim0727/flight3d/issues/292.',
     }],
     allowedWarnings: ['gear', 'flaps', 'takeoff-config'],
     shotStage: 'CANYON_APPROACH',
@@ -103,6 +104,24 @@ export const ROUTES = [
     groundStages: [], lands: false, handoff: 'airborne', budgetSimSeconds: 200,
     // Documented intent: docs/development/aircraft-demos.md and verify-cessna-demos.mjs.
     clearanceIntentM: 25, allowedWarnings: [], shotStage: 'LOW_PASS',
+    knownIssues: [
+      {
+        contains: ['RECOVER CLEARANCE'], intermittent: true,
+        note: 'RECOVER occasionally ends in the sea: 3 of 37 cold-page flights, on the '
+          + 'pre-Hangang build and on main alike, so it is not a merge regression. The route '
+          + 'dips below its 25 m clearance intent at 73.3-74.3 s (23.7 m falling to 3.9 m) and '
+          + 'then breaks the water. Unexplained by the guidance as written: `CessnaDemoScenario.js:159` '
+          + 'floors the target at terrainAhead + 55 on every stage including RECOVER, and the '
+          + 'measured sink of 865-872 fpm (4.4 m/s) exceeds the scenario\'s own -3.5 m/s command '
+          + 'clamp (:160), so the aircraft is arriving faster than the demo ever asks it to fly. '
+          + 'Tracked in https://github.com/stlim0727/flight3d/issues/292.',
+      },
+      {
+        contains: ['CRASH WATER'], intermittent: true,
+        note: 'the terminal event of the same fault — "The aircraft hit the ocean surface at '
+          + 'high speed" at 86 kt, a second or two after the clearance violations above.',
+      },
+    ],
   },
   {
     id: 'c172-coastal-maneuvers', aircraft: 'C172', airport: 'coastal', profile: 'maneuvers',
@@ -157,7 +176,9 @@ export const ROUTES = [
       { contains: ['LANDING INCIDENT'], note: 'the ridge contact raises a landing incident' },
       { contains: ['ANGULAR RATE'], note: 'and spins the airframe at 36 rad/s on impact' },
       { contains: ['CRASH TERRAIN'], note: 'the Nose radome hits the ridge at 28.0 s, ending the demo; the '
-        + 'scenario itself records minClearanceM 7.7, which is also below the 50 m the old browser harness asserted' },
+        + 'scenario itself records minClearanceM 7.7, so this is not a sweep-only opinion — verify-f16-lukla.mjs:79 '
+        + 'asserts minClearanceM > 50 and rejects the same flight. '
+        + 'Tracked in https://github.com/stlim0727/flight3d/issues/292.' },
     ],
   },
   {

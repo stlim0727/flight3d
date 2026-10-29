@@ -17,11 +17,13 @@
  *   node scripts/demo-sweep.mjs [--tier core|full|all] [--only id,id] [--shots]
  *                               [--strict] [--retries N] [--update-baseline]
  *   Environment: TIER ONLY SHOTS STRICT RETRIES APP_URL PORT CDP_PORT CHROME_BIN
- *                ARTIFACT_DIR DEV_SERVER FORCE_GPU SLICE
+ *                ARTIFACT_DIR DEV_SERVER FORCE_GPU SLICE KEEP_SAMPLES TMPDIR
  *
  * Ports come from the OS and the browser is private to this process, so it runs
  * anywhere Chrome runs: no fixed 5173, no shared debug profile, no external network
- * (the Lukla DEM ships in `public/terrain/`).
+ * (the Lukla DEM ships in `public/terrain/`). Chrome needs a TMPDIR with free space
+ * and a short path (its SingletonSocket must fit 107 characters); a full /tmp or a
+ * deeply nested one kills the browser at launch.
  */
 import { spawn } from 'node:child_process';
 import net from 'node:net';
@@ -305,24 +307,32 @@ const INSTRUMENT = `() => {
   return true;
 }`;
 
-const ARM = `({ aircraft, airport, profile, slice }) => {
+const ARM = `async ({ aircraft, airport, profile, slice }) => {
   const sim = window.simulator, director = sim.demoDirector;
   window.__sweep = { stages: [], touchdowns: [], warnings: new Set(), slice };
   director.stop();
   sim.audio?.setMuted?.(true);
   sim.setAircraft(aircraft);
-  return sim.setAirport(airport).then(() => {
-    if (sim.lobby) {
-      sim.lobby.aircraft = aircraft; sim.lobby.airport = airport;
-      sim.lobby.preset = 'demo'; sim.lobby.demoProfile = profile;
-    }
-    sim.gameFlow.enterFlight();
-    // The sanctioned freeze; patching isPhysicsFrozen is the fallback only.
-    if (!sim.gameFlow.pause()) sim.gameFlow.isPhysicsFrozen = () => true;
-    const started = director.start(airport, profile);
-    return { started, active: director.isActive, aircraft: sim.currentAircraftId,
-      airport: sim.activeAirport, profile: director.profile };
-  });
+  await sim.setAirport(airport);
+  // Arm only once the app itself says the world is built. A player cannot click Fly
+  // before the startup overlay clears, and setAirport resolving is not that promise:
+  // it now returns early when the airport is already active, which used to hide the
+  // race behind a full rebuild. Building a demo route from terrain or water that is
+  // still arriving produces a flight path the app would never fly.
+  for (let attempt = 0; attempt < 600 && sim.startupReady !== true; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  if (sim.startupReady !== true) throw new Error('the app never reached startupReady');
+  if (sim.lobby) {
+    sim.lobby.aircraft = aircraft; sim.lobby.airport = airport;
+    sim.lobby.preset = 'demo'; sim.lobby.demoProfile = profile;
+  }
+  sim.gameFlow.enterFlight();
+  // The sanctioned freeze; patching isPhysicsFrozen is the fallback only.
+  if (!sim.gameFlow.pause()) sim.gameFlow.isPhysicsFrozen = () => true;
+  const started = director.start(airport, profile);
+  return { started, active: director.isActive, aircraft: sim.currentAircraftId,
+    airport: sim.activeAirport, profile: director.profile };
 }`;
 
 const WAIT = `() => {

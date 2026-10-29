@@ -205,14 +205,19 @@ test('every route declares stages its own scenario can reach', () => {
       assert.ok(entry.contains?.length && entry.contains.every(token => token.length > 3),
         `${route.id} declares a known issue that could match anything`);
       assert.ok(entry.note?.length > 30, `${route.id} states a known issue without quoting what it measured`);
+      assert.ok(entry.intermittent === undefined || typeof entry.intermittent === 'boolean',
+        `${route.id} declares a known issue whose intermittency is not a boolean`);
     }
   }
   assert.ok(routesForTier('core').length >= 4, 'the PR-blocking tier must not be emptied by accident');
   assert.equal(routesForTier('all').length, ROUTES.length);
   // A crashed route describes an accident, not a reference flight, so it must never
-  // appear in the committed soft baseline.
+  // appear in the committed soft baseline. A route whose faults are all intermittent
+  // is the exception: most of its flights are healthy, and the driver already refuses
+  // to fold a run that hit a known issue into the baseline, so the entry can only ever
+  // be built from clean flights.
   const committed = JSON.parse(readFileSync(new URL('../scripts/demo-sweep-baseline.json', import.meta.url), 'utf8'));
-  for (const route of ROUTES.filter(entry => entry.knownIssues?.length)) {
+  for (const route of ROUTES.filter(entry => entry.knownIssues?.some(issue => !issue.intermittent))) {
     assert.equal(committed[route.id], undefined, `${route.id} has a declared known issue and a baseline`);
   }
 });
@@ -523,4 +528,33 @@ test('a known issue that no longer happens asks to be removed', () => {
   clean(flown);
   reports(flown, 'KNOWN ISSUE "CRASH TERRAIN" did not reproduce');
   fails(fly(f16, fullFlight(f16), { baseline, strict: true }), 'STRICT: KNOWN ISSUE');
+});
+
+test('an intermittent known issue absorbs every line of one fault and stays quiet when it misses', () => {
+  const scenic = routeById('c172-coastal-scenic');
+  const declared = scenic.knownIssues ?? [];
+  assert.ok(declared.length && declared.every(entry => entry.intermittent),
+    'the coastal scenic route must declare its water arrival as intermittent');
+  const table = SCENARIO_STAGES.cessna;
+  const recover = { stage: table.RECOVER, aglM: 20, vsiFpm: -870, iasKnots: 86 };
+  const outcome = fly(scenic, [...fullFlight(scenic), recover, {
+    ...recover, aglM: 3.9,
+  }, {
+    stage: -1, active: false, crashed: true, crashType: 'WATER',
+    crashDescription: 'The aircraft hit the ocean surface at high speed.',
+  }]);
+  assert.deepEqual(outcome.fails, [], JSON.stringify(outcome.fails));
+  assert.equal(outcome.knownIssues.length, 3, 'the dive writes three faults and one declaration cannot absorb them all');
+  assert.ok(outcome.knownIssues.every(text => text.includes('known:')), JSON.stringify(outcome.knownIssues));
+
+  // A clean flight of a flaky route is not evidence the declaration is stale.
+  clean(fly(scenic, fullFlight(scenic), { baseline: { [scenic.id]: { warningSeconds: {} } } }));
+  const healthy = fly(scenic, fullFlight(scenic), { baseline: { [scenic.id]: { warningSeconds: {} } }, strict: true });
+  assert.equal(healthy.knownIssues.length, 0);
+  assert.deepEqual(healthy.reports, [], JSON.stringify(healthy.reports));
+
+  // The token still refuses to tolerate an unrelated fault on the same route.
+  const stalled = fly(scenic, [...fullFlight(scenic), { ...recover, stalled: true }],
+    { baseline: { [scenic.id]: { warningSeconds: {} } } });
+  fails(stalled, 'STALL');
 });

@@ -57,6 +57,26 @@ fast-play artifacts. `npm run test:lukla` never caught them: it fails earlier, a
 `scripts/test-lukla-demo-benchmark.mjs:81`, because a fresh browser profile auto-starts the coastal
 demo instead of the Lukla one. Fixing the guidance is follow-up work outside this change.
 
+## A third finding, which only shows up sometimes
+
+`c172-coastal-scenic` reached the water on 3 of 37 cold-page flights: the route dips below its 25 m
+clearance intent at 73.3-74.3 s (23.7 m down to 3.9 m) and then `CRASH WATER` at 86 kt. All three
+shared the same signature, and they happened on the pre-Hangang build and on `main` alike, so this
+is not a regression from the merge that landed while this branch was open.
+
+It is declared `intermittent` in the route table rather than baselined, because a fault that only
+appears on some page loads cannot be proven absent by one clean flight — and the *crashing* runs
+are never folded into `demo-sweep-baseline.json`, since `--update-baseline` refuses to widen a
+baseline past a FAIL. What the measurement rules out is the obvious explanation: the guidance as
+written floors the commanded altitude at `terrainAhead + 55` on every stage including `RECOVER`
+(`src/director/scenarios/CessnaDemoScenario.js:159`) and clamps the vertical command to -3.5 m/s
+(`:160`, about 689 fpm), yet the arrival is 865-872 fpm. The airframe comes in faster than the demo
+ever asks it to fly, so why the command stopped holding is the open question.
+
+All three findings are tracked together in
+[issue #292](https://github.com/stlim0727/flight3d/issues/292), which is also the measurement side
+of the shared-guidance refactor proposed in [#286](https://github.com/stlim0727/flight3d/issues/286).
+
 ## The one soft report
 
 `c172-coastal-maneuvers` peaked at 250 fpm sink against a 228 fpm baseline, and a repeat of the

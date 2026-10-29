@@ -280,24 +280,26 @@ export function finalizeRoute(state, { baseline = {}, strict = false } = {}) {
 /**
  * A route can declare the faults it is already known to produce, so a documented
  * app regression does not turn every PR on an unrelated file red while still
- * refusing anything new. The declaration is per fault, quotes the measured value,
- * and is dead weight the moment the demo is fixed — an unreproduced entry is a
- * REPORT, and a REPORT under `--strict`, so the sweep asks for its removal.
+ * refusing anything new. A declaration absorbs *every* fault carrying its tokens
+ * (one crash writes several lines), and an entry that matched nothing is a REPORT
+ * — a failure under `--strict` — asking to be deleted, unless it is declared
+ * `intermittent`: a fault that only appears on some page loads cannot be proven
+ * absent by a single clean flight, so demanding it reproduce would just be noise.
  */
 function absorbKnownIssues(state) {
   const declared = state.route.knownIssues ?? [];
   if (!declared.length) return;
-  const matched = declared.map(() => false);
-  // `fails` is deduplicated by content, not by rule, so a stage can fault twice.
+  const hits = declared.map(() => 0);
   for (const text of [...state.fails]) {
-    const index = declared.findIndex((entry, i) => !matched[i] && entry.contains.every(token => text.includes(token)));
+    const index = declared.findIndex(entry => entry.contains.every(token => text.includes(token)));
     if (index < 0) continue;
-    matched[index] = true;
+    hits[index] += 1;
     state.fails.splice(state.fails.indexOf(text), 1);
     push(state.knownIssues, `${text} (known: ${declared[index].note})`);
   }
   declared.forEach((entry, i) => {
-    if (!matched[i]) push(state.reports, `KNOWN ISSUE "${entry.contains.join(' + ')}" did not reproduce — remove it from the route table`);
+    if (hits[i] || entry.intermittent) return;
+    push(state.reports, `KNOWN ISSUE "${entry.contains.join(' + ')}" did not reproduce — remove it from the route table`);
   });
 }
 
