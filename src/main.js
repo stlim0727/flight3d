@@ -510,6 +510,11 @@ class FlightSimulator {
     const state = this.gameFlow.state;
     this.audio?.departureRadio.setPaused(state !== FLOW.FLIGHT);
     document.body.dataset.flow = state;
+    if (state === FLOW.FLIGHT) {
+      const attribution = document.getElementById('incheon-attribution');
+      attribution?.classList.remove('expanded');
+      attribution?.querySelector('#incheon-attribution-chip')?.setAttribute('aria-expanded', 'false');
+    }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
     this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active);
     if (state !== FLOW.FLIGHT) {
@@ -2290,6 +2295,11 @@ class FlightSimulator {
       this.touchControls.toggle();
       const state = this.touchControls.enabled ? 'state.on' : 'state.off';
       this.showToast(() => t('touch.controls.value', { value: t(state) }));
+    });
+    document.getElementById('incheon-attribution-chip')?.addEventListener('click', (event) => {
+      const aside = event.currentTarget.closest('#incheon-attribution');
+      const expanded = aside.classList.toggle('expanded');
+      event.currentTarget.setAttribute('aria-expanded', String(expanded));
     });
     const fullscreenButton = document.getElementById('btn-fullscreen');
     const syncFullscreenUI = () => {
