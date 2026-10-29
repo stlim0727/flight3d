@@ -112,6 +112,13 @@ slice, because only the rendering is slower without hardware.
 The remaining `verify-*` browser harnesses stay: they cover DOM, audio and camera
 layout that the sweep does not own.
 
+For audio startup, serve Vite on port 5193 and run
+`chrome-session --project flight3d node scripts/verify-audio-startup.mjs`.
+`APP_URL` overrides the URL. This checks audio initialization before any gesture,
+keyboard unlock with a nonzero output waveform, and pointer unlock even when a
+control stops event propagation. Autoplay policy may keep the initial context
+suspended until a gesture. The probe does not replace human listening.
+
 ### What the sweep refuses, and what it only reports
 
 Rules live in `scripts/lib/abnormalityChecks.mjs` (pure, no DOM or CDP, covered by
