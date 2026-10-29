@@ -16,6 +16,7 @@ export class HudView {
         <button type="button" id="hud-camera-prev">‹</button><span>CAM <b>HUD</b></span>
         <button type="button" id="hud-camera-next">›</button>
       </nav>
+      <div class="hud-center-badge"><span id="hud-badge-title">HUD CAM · 시안</span></div>
       <div class="hud-side hud-side-left">
         <div class="hud-control-card"><span data-hud-label="hud.trim"></span><output id="hud-trim-value"></output>
           <div class="hud-pair"><button type="button" id="hud-trim-less">−</button><button type="button" id="hud-trim-more">+</button></div></div>
@@ -26,7 +27,8 @@ export class HudView {
       <div class="hud-side hud-side-right">
         <button type="button" id="hud-autopilot" aria-controls="ap-panel" aria-expanded="false">AP OFF</button>
         <button type="button" id="hud-systems" data-hud-label="hud.systems" aria-controls="hud-systems-panel" aria-expanded="false"></button>
-        ${['time', 'plan', 'ground', 'map'].map(name => `<button type="button" class="hud-unavailable" disabled><span data-hud-label="hud.${name}"></span><small data-hud-label="hud.soon"></small></button>`).join('')}
+        <button type="button" id="hud-time-accel" class="hud-btn-time" disabled><span data-hud-label="hud.time"></span><small data-hud-label="hud.soon"></small></button>
+        ${['plan', 'ground', 'map'].map(name => `<button type="button" class="hud-unavailable" disabled><span data-hud-label="hud.${name}"></span><small data-hud-label="hud.soon"></small></button>`).join('')}
       </div>
       <div id="hud-systems-panel" class="hud-systems-panel" hidden></div>
       <footer class="hud-flight-footer">${[['speed','AIRSPEED'], ['altitude','ALTITUDE MSL'], ['heading','HEADING'], ['vsi','VERT SPEED'], ['fuel','FUEL'], ['camera','CAM']].map(([name,label]) => `<div><span>${label}</span><output id="hud-footer-${name}"></output></div>`).join('')}</footer>`;
