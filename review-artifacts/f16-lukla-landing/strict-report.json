@@ -1,0 +1,115 @@
+{
+  "generatedAt": "2026-10-29T09:16:29.095Z",
+  "tier": "core",
+  "strict": true,
+  "shots": false,
+  "sliceSeconds": 0.25,
+  "retries": 1,
+  "server": "external",
+  "chrome": "shared project Chrome",
+  "thresholds": {
+    "from": "src/physics/gearDamage.js + src/systems/FlightWarnings.js"
+  },
+  "routes": [
+    {
+      "id": "f16-lukla-low-pass",
+      "tier": "core",
+      "finished": true,
+      "fails": [],
+      "reports": [],
+      "knownIssues": [],
+      "visitedStages": [
+        "ESTABLISH",
+        "LOW_PASS",
+        "CLIMB",
+        "RETURN",
+        "FINAL",
+        "ROLLOUT",
+        "COMPLETED"
+      ],
+      "stageTrace": [
+        "ESTABLISH",
+        "LOW_PASS",
+        "CLIMB",
+        "RETURN",
+        "FINAL",
+        "ROLLOUT",
+        "COMPLETED"
+      ],
+      "warningSeconds": {
+        "terrain": 39,
+        "pull-up": 17,
+        "stall": 32,
+        "sink-rate": 3.25
+      },
+      "touchdowns": [
+        {
+          "id": "mainLeft",
+          "sink": 2.6
+        },
+        {
+          "id": "mainRight",
+          "sink": 2.58
+        },
+        {
+          "id": "nose",
+          "sink": 2.53
+        }
+      ],
+      "measures": {
+        "maxRollDeg": 37.5,
+        "maxIasKnots": 308.3,
+        "maxMach": 0.57,
+        "maxAbsG": 1.91,
+        "minAglM": 2.3,
+        "maxSinkFpm": 3001,
+        "maxAngularRateRadS": 0.616,
+        "maxHeadingRateDegPerS": 7.599999999999909,
+        "maxBankRateDegPerS": 18,
+        "extremeGSamples": 0,
+        "stallSamples": 0,
+        "bodyContacts": 0,
+        "rolloutDevices": {
+          "spoilers": true
+        },
+        "touchdownCount": 3
+      },
+      "simSeconds": 357.92,
+      "result": {
+        "status": "completed",
+        "minClearanceM": 1.7486643687266223,
+        "minPassClearanceM": 151.51999478873176,
+        "maxBankDeg": 37.47410884956165,
+        "touchdown": {
+          "alongRunwayM": -256.82783824481123,
+          "crossTrackM": -4.270753792992338,
+          "iasKnots": 130.57553536362528
+        },
+        "elapsedSeconds": 357.9166666665055,
+        "stopPosition": [
+          188.1522426702374,
+          2863.93368538394,
+          -117.55230529266431
+        ]
+      },
+      "samples": 1434,
+      "heapMb": 214,
+      "wallSeconds": 9.5,
+      "attempt": 1,
+      "route": {
+        "aircraft": "F16",
+        "airport": "lukla",
+        "profile": "low-pass",
+        "scenario": "f16LowPass"
+      }
+    }
+  ],
+  "summary": {
+    "tier": "core",
+    "routes": 1,
+    "fails": 0,
+    "reports": 0,
+    "known": 0,
+    "wallSeconds": 11.5
+  }
+}

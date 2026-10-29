@@ -2,7 +2,7 @@
 
 Community discussion: [#306](https://github.com/stlim0727/flight3d/discussions/306) (Korean).
 
-The experimental landing extension in [PR #304](https://github.com/stlim0727/flight3d/pull/304)
+The experimental landing extension introduced in [PR #304](https://github.com/stlim0727/flight3d/pull/304)
 shows a controllable, undamaged landing **in Flight3d's existing game model**.
 It does not validate real F-16 operation at Lukla. Keeping the physics code and
 coefficients unchanged is a statement about patch scope, not proof that those
@@ -10,8 +10,9 @@ models or coefficients match the real aircraft.
 
 This assessment refers to the landing implementation at
 [`92d978f`](https://github.com/stlim0727/flight3d/tree/92d978f514c61298a9ef03b086d4c95322036952).
-At documentation time, #304 is a proposal separate from this documentation PR;
-read its live status before assuming that the landing route is on main.
+PR #304 was merged into main in
+[`5f7b73a`](https://github.com/stlim0727/flight3d/commit/5f7b73a).
+Its availability on main does not change the fidelity limits described here.
 
 ## What was measured
 

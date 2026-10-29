@@ -1,0 +1,221 @@
+{
+  "errors": [],
+  "stages": [
+    {
+      "active": true,
+      "stage": 40,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -311.62054608578154,
+        2964.0541707537423,
+        194.72206610486066
+      ],
+      "ias": 281.88360006263474,
+      "pitch": 3.8311558648453716,
+      "roll": -0.00015477060523118137,
+      "gForce": 1.0039130052911334,
+      "throttle": 0.05320276852142853,
+      "result": {
+        "status": "running",
+        "minClearanceM": 151.51999478873176,
+        "minPassClearanceM": 151.51999478873176,
+        "maxBankDeg": 0.00018665493923794671,
+        "touchdown": null
+      }
+    },
+    {
+      "active": true,
+      "stage": 41,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -888.500102409298,
+        2965.139209320529,
+        555.1965016237415
+      ],
+      "ias": 288.3882380770031,
+      "pitch": 3.6523627148716704,
+      "roll": 1.2309374589521802e-05,
+      "gForce": 0.9923319907336644,
+      "throttle": 0,
+      "result": {
+        "status": "running",
+        "minClearanceM": 151.51999478873176,
+        "minPassClearanceM": 151.51999478873176,
+        "maxBankDeg": 0.00018665493923794671,
+        "touchdown": null
+      }
+    },
+    {
+      "active": true,
+      "stage": 42,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -1627.079733829445,
+        2966.792044685529,
+        1016.7149650249503
+      ],
+      "ias": 296.69598013451,
+      "pitch": 4.356355822407834,
+      "roll": -0.5836347778532174,
+      "gForce": 1.1796141539272262,
+      "throttle": 0.39332318761439555,
+      "result": {
+        "status": "running",
+        "minClearanceM": 151.51999478873176,
+        "minPassClearanceM": 151.51999478873176,
+        "maxBankDeg": 0.5659048016850361,
+        "touchdown": null
+      }
+    },
+    {
+      "active": true,
+      "stage": 44,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -4962.827879851073,
+        3831.1227579137685,
+        5809.973112094122
+      ],
+      "ias": 294.69369789126296,
+      "pitch": 15.484011794448994,
+      "roll": -6.272859334087295,
+      "gForce": 0.8924518905734334,
+      "throttle": 0,
+      "result": {
+        "status": "running",
+        "minClearanceM": 151.51999478873176,
+        "minPassClearanceM": 151.51999478873176,
+        "maxBankDeg": 37.473521901424085,
+        "touchdown": null
+      }
+    },
+    {
+      "active": true,
+      "stage": 45,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -4873.0654328927585,
+        3172.98408351365,
+        6714.315468524738
+      ],
+      "ias": 146.65812122069894,
+      "pitch": 8.230364520914215,
+      "roll": 20.036251187086172,
+      "gForce": 1.0868764218984397,
+      "throttle": 0,
+      "result": {
+        "status": "running",
+        "minClearanceM": 151.51999478873176,
+        "minPassClearanceM": 151.51999478873176,
+        "maxBankDeg": 37.473521901424085,
+        "touchdown": null
+      }
+    },
+    {
+      "active": true,
+      "stage": 46,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        -188.21979588684138,
+        2812.004663248712,
+        112.82780573078135
+      ],
+      "ias": 127.78335743508602,
+      "pitch": 2.686050823487355,
+      "roll": -0.24071169533922132,
+      "gForce": 1.2868024699008505,
+      "throttle": 0,
+      "result": {
+        "status": "running",
+        "minClearanceM": 1.8126847214830377,
+        "minPassClearanceM": 151.51999478873176,
+        "maxBankDeg": 37.473521901424085,
+        "touchdown": {
+          "alongRunwayM": -256.8045030622292,
+          "crossTrackM": -4.265554369688147,
+          "iasKnots": 130.57603955792885
+        }
+      }
+    },
+    {
+      "active": false,
+      "stage": -1,
+      "aircraft": "F16",
+      "crashed": false,
+      "stalled": false,
+      "position": [
+        188.16079213774094,
+        2863.9348730795855,
+        -117.55768161602049
+      ],
+      "ias": 0,
+      "pitch": 3.6660724563567566,
+      "roll": -0.0007607813713317018,
+      "gForce": 1.1473981796031023,
+      "throttle": 0,
+      "result": {
+        "status": "completed",
+        "minClearanceM": 1.748628358078804,
+        "minPassClearanceM": 151.51999478873176,
+        "maxBankDeg": 37.473521901424085,
+        "touchdown": {
+          "alongRunwayM": -256.8045030622292,
+          "crossTrackM": -4.265554369688147,
+          "iasKnots": 130.57603955792885
+        },
+        "elapsedSeconds": 357.9166666665055,
+        "stopPosition": [
+          188.16079213774094,
+          2863.9348730795855,
+          -117.55768161602049
+        ]
+      }
+    }
+  ],
+  "final": {
+    "active": false,
+    "stage": -1,
+    "aircraft": "F16",
+    "crashed": false,
+    "stalled": false,
+    "position": [
+      188.16079213774094,
+      2863.9348730795855,
+      -117.55768161602049
+    ],
+    "ias": 0,
+    "pitch": 3.6660724563567566,
+    "roll": -0.0007607813713317018,
+    "gForce": 1.1473981796031023,
+    "throttle": 0,
+    "result": {
+      "status": "completed",
+      "minClearanceM": 1.748628358078804,
+      "minPassClearanceM": 151.51999478873176,
+      "maxBankDeg": 37.473521901424085,
+      "touchdown": {
+        "alongRunwayM": -256.8045030622292,
+        "crossTrackM": -4.265554369688147,
+        "iasKnots": 130.57603955792885
+      },
+      "elapsedSeconds": 357.9166666665055,
+      "stopPosition": [
+        188.16079213774094,
+        2863.9348730795855,
+        -117.55768161602049
+      ]
+    }
+  }
+}
