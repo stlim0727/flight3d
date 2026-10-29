@@ -109,6 +109,12 @@ slice, because only the rendering is slower without hardware.
 
 `npm run test:demo` now delegates to `--only b738-coastal-classic`, so the coastal
 737 keeps its single-route entry point without the hardcoded 5173/9462/Chrome paths.
+
+A green sweep establishes behavior within the implemented model and thresholds,
+not real-aircraft performance accuracy. In particular, see the
+[F16 Lukla landing fidelity limits](f16-lukla-realism.md) before interpreting an
+experimental landing as evidence of real-world feasibility.
+
 The remaining `verify-*` browser harnesses stay: they cover DOM, audio and camera
 layout that the sweep does not own.
 
