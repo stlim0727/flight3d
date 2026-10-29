@@ -107,9 +107,38 @@ body[data-dev-scenario="true"] #touch-controls-overlay { display: none !importan
 .lobby-tab-panel { display: flex; flex-direction: column; gap: 16px; }
 .lobby-tab-panel[hidden] { display: none; }
 .lobby-tab-panel:focus-visible { outline: 2px solid #67e8f9; outline-offset: -2px; }
-.lobby-settings > .lobby-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.lobby-settings .language-control { grid-column: 1 / -1; min-width: 0; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
-.lobby-settings .btn { min-height: 44px; font-size: 12px; white-space: normal; }
+.lobby-settings > .lobby-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.lobby-settings .language-control {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .2);
+  border: 1px solid rgba(148, 163, 184, .12);
+}
+.lobby-settings .language-control select {
+  max-width: 60%;
+}
+.lobby-settings .btn {
+  min-height: 44px;
+  font-size: 11.5px;
+  white-space: normal;
+  border-radius: 8px;
+}
+#btn-diag, #btn-help {
+  border-color: rgba(56, 189, 248, .28);
+}
 .lobby-card .btn-fly {
   background: #157598;
   border-color: rgba(125, 211, 252, .35);
@@ -128,9 +157,38 @@ body[data-dev-scenario="true"] #touch-controls-overlay { display: none !importan
   background: rgba(6, 10, 18, 0.55);
   backdrop-filter: blur(2px);
 }
-.pause-card { align-items: stretch; min-width: min(320px, 84vw); }
-.pause-card h2 { color: #7dd3fc; font-size: 18px; margin: 0 0 4px; text-align: center; }
-.pause-card .btn { min-height: 44px; }
+.pause-card {
+  align-items: stretch;
+  min-width: min(340px, 86vw);
+  background: rgba(16, 28, 43, .96);
+  border: 1px solid rgba(56, 189, 248, .35);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .4);
+}
+.pause-card h2 {
+  color: #38bdf8;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  margin: 0 0 8px;
+  text-align: center;
+}
+.pause-card .btn {
+  min-height: 44px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.pause-card #btn-pause-resume {
+  background: #157598;
+  border-color: rgba(125, 211, 252, .4);
+  color: #f0f9ff;
+  font-weight: 600;
+}
+.pause-card #btn-pause-resume:hover {
+  background: #1986ac;
+  color: #fff;
+}
 
 /* The lobby owns airport/spawn/time: park the in-game chrome meanwhile.
    The same park applies while booting (.booting, removed after startup)
@@ -256,9 +314,25 @@ body[data-flow="lobby"] .menu-toggle {
   .compact-ui #lobby-screen { align-items: center; }
   .compact-ui .lobby-card {
     margin: 0 0 0 calc(var(--edge-left) + 56px);
-    max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 16px);
-    height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 16px);
+    max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 8px);
+    height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 8px);
+    padding: 8px 12px;
+    gap: 6px;
+    width: min(420px, calc(100vw - var(--edge-left) - var(--edge-right) - 72px));
   }
+  /* Short landscape: give the scrolling panel the height. The build line,
+     subtitle, language caption and ESC hint return in taller layouts. */
+  .compact-ui .lobby-card .build-info,
+  .compact-ui .lobby-card .lobby-hint,
+  .compact-ui .lobby-title > span,
+  .compact-ui .lobby-language > .lobby-label { display: none; }
+  .compact-ui .lobby-card .lobby-tabs { padding: 2px; }
+  .compact-ui .lobby-card .lobby-tab { min-height: 32px; font-size: 11px; }
+  .compact-ui .lobby-card .btn-fly { min-height: 34px; padding: 6px 12px; }
+  .compact-ui .lobby-card .lobby-header { gap: 6px; }
+  .compact-ui .lobby-card .lobby-title { font-size: 15px; }
+  .compact-ui .lobby-card .lobby-tab-panel { gap: 10px; }
+  .compact-ui .lobby-card .btn { min-height: 36px; padding: 5px 8px; }
 }
 /* Keep the comparison controls below the HUD without covering the panel face. */
 .shadow-demo {
@@ -448,3 +522,43 @@ body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display
   body.hud-camera-mode.touch-mode .hud-flight-footer { top: var(--edge-top); bottom: auto; left: calc(var(--edge-left) + 52px); right: calc(var(--edge-right) + 180px); }
 }
 
+
+/* ===== Main menu: tactical flight-deck cards (see docs/design/main-menu-redesign-concept.jpg) ===== */
+.lobby-card .btn-aircraft,
+.lobby-card .btn-airport {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  text-align: left;
+}
+.lobby-card .btn-airport { flex: 1 1 calc(50% - 3px); }
+.lobby-card .btn-aircraft { flex: 1 1 100%; }
+.spec-badge {
+  color: #7f93ab;
+  font: 500 9.5px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .2px;
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.spec-badge:empty { display: none; }
+.lobby-card .btn.active .spec-badge { color: #7dd3fc; }
+.lobby-card .btn:disabled { opacity: .45; cursor: not-allowed; }
+.lobby-link { align-self: flex-start; color: #7dd3fc; font-size: 10px; text-decoration: none; border: 1px solid rgba(125, 211, 252, .3); border-radius: 999px; padding: 3px 9px; }
+.lobby-link:hover, .lobby-link:focus-visible { background: rgba(125, 211, 252, .12); outline: none; }
+.lobby-time-chips .lobby-time-chip { flex: 1 1 calc(25% - 6px); min-height: 30px; padding: 4px 6px; font-variant-numeric: tabular-nums; }
+.lobby-scenarios .btn-preset.active { box-shadow: inset 3px 0 0 #38bdf8; }
+.lobby-briefing {
+  background: rgba(0, 0, 0, .25);
+  border: 1px solid rgba(56, 189, 248, .18);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+}
+.lobby-card .btn-fly { box-shadow: 0 0 18px rgba(56, 189, 248, .22); }
+.compact-ui .lobby-time-chips .lobby-time-chip { min-height: 44px; }
