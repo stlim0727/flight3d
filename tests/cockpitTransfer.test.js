@@ -122,20 +122,54 @@ for (const variant of ['medium', 'draco']) it(`ships a finite, current, checksum
   transfer.dispose();
 });
 
+const boundVariantCache = new Map();
+async function getBoundVariant(variant) {
+  if (!boundVariantCache.has(variant)) {
+    const manifest = JSON.parse(fs.readFileSync(`public/lighting/cockpit-${variant}.json`));
+    const transfer = new CockpitLightTransfer(manifest,
+      new Float32Array(manifest.keys.length * TRANSFER_COLUMNS));
+    const cockpit = new Cockpit({}, {}, {}, {}, {}, {});
+    cockpit.prepareModel(await loadCockpitGeometry(`public/models/b737-cockpit-${variant}.glb`));
+    cockpit.group.updateMatrixWorld(true);
+    transfer.bind(cockpit.gltfCockpitGroup);
+    const expected = [];
+    cockpit.gltfCockpitGroup.traverse(mesh => {
+      if (transfer.isReceiver(mesh)) expected.push(mesh.geometry.attributes.deckTransferUV.array.slice());
+    });
+    boundVariantCache.set(variant, { manifest, transfer, cockpit, coverage: transfer.coverage, expected });
+  }
+  return boundVariantCache.get(variant);
+}
+
+const RUN_FULL_DRACO_DECODE = Boolean(process.env.CI || process.env.FULL_BAKE_TEST);
+
+function verifyBakeAndBindingChecksums(variant) {
+  const base = `public/lighting/cockpit-${variant}`;
+  const manifest = JSON.parse(fs.readFileSync(`${base}.json`));
+  const binding = JSON.parse(fs.readFileSync(`${base}-binding.json`));
+  const compressed = fs.readFileSync(`${base}-binding.uvpack`);
+  const hash = data => createHash('sha256').update(data).digest('hex');
+  assert.equal(hash(compressed), binding.dataHash);
+  assert.equal(binding.transferHash, manifest.dataHash);
+  assert.equal(binding.assetHash, manifest.assetHash);
+  assert.equal(hash(fs.readFileSync(`public/models/b737-cockpit-${variant}.glb`)), manifest.assetHash);
+  for (const [file, expectedHash] of Object.entries(binding.sources)) {
+    assert.equal(hash(fs.readFileSync(file, 'utf8').replaceAll('\r\n', '\n')), expectedHash, file);
+  }
+  return { manifest, binding, compressed };
+}
+
 // The 98% gate in bind() tolerates a few percent of vertices sampling the black
 // sentinel row; on the 737 they all landed adjacent on the ceiling liner and read
 // as jagged black blotches. Every vertex the runtime binds must have a baked cell.
 for (const variant of ['medium', 'draco']) it(`bakes a receiver for every ${variant} cockpit vertex the runtime binds`, async () => {
-  const manifest = JSON.parse(fs.readFileSync(`public/lighting/cockpit-${variant}.json`));
-  const transfer = new CockpitLightTransfer(manifest,
-    new Float32Array(manifest.keys.length * TRANSFER_COLUMNS));
-  const cockpit = new Cockpit({}, {}, {}, {}, {}, {});
-  cockpit.prepareModel(await loadCockpitGeometry(`public/models/b737-cockpit-${variant}.glb`));
-  cockpit.group.updateMatrixWorld(true);
-  transfer.bind(cockpit.gltfCockpitGroup);
-  assert.equal(transfer.coverage, 1,
+  if (!RUN_FULL_DRACO_DECODE) {
+    verifyBakeAndBindingChecksums(variant);
+    return;
+  }
+  const { coverage } = await getBoundVariant(variant);
+  assert.equal(coverage, 1,
     'Unbaked liner vertices sample the black sentinel and blot the ceiling');
-  transfer.dispose();
 });
 
 it('smoothTransport bridges a 100x cell-to-cell cliff without inventing energy', () => {
@@ -155,27 +189,16 @@ it('smoothTransport bridges a 100x cell-to-cell cliff without inventing energy',
 // This also detects stale geometry/control/batching inputs without GPU rendering.
 for (const variant of ['medium', 'draco']) it(`precomputed ${variant} binding exactly matches runtime lookup`, async () => {
   const { gunzipSync } = await import('node:zlib');
-  const base = `public/lighting/cockpit-${variant}`;
-  const manifest = JSON.parse(fs.readFileSync(`${base}.json`));
-  const binding = JSON.parse(fs.readFileSync(`${base}-binding.json`));
-  const compressed = fs.readFileSync(`${base}-binding.uvpack`);
-  const hash = data => createHash('sha256').update(data).digest('hex');
-  assert.equal(hash(compressed), binding.dataHash);
-  assert.equal(binding.transferHash, manifest.dataHash);
-  assert.equal(binding.assetHash, manifest.assetHash);
-  for (const [file, expected] of Object.entries(binding.sources)) {
-    assert.equal(hash(fs.readFileSync(file, 'utf8').replaceAll('\r\n', '\n')), expected, file);
-  }
+  const { manifest, binding, compressed } = verifyBakeAndBindingChecksums(variant);
   const bytes = gunzipSync(compressed);
   const uv = new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-  const transfer = new CockpitLightTransfer(manifest, new Float32Array(manifest.keys.length * TRANSFER_COLUMNS));
-  const cockpit = new Cockpit({}, {}, {}, {}, {}, {});
-  cockpit.prepareModel(await loadCockpitGeometry(`public/models/b737-cockpit-${variant}.glb`));
-  transfer.bind(cockpit.gltfCockpitGroup);
-  const expected = [];
-  cockpit.gltfCockpitGroup.traverse(mesh => {
-    if (transfer.isReceiver(mesh)) expected.push(mesh.geometry.attributes.deckTransferUV.array);
-  });
+  if (!RUN_FULL_DRACO_DECODE) {
+    const totalFloats = binding.meshes.reduce((sum, m) => sum + m.count * 4, 0);
+    assert.equal(uv.length, totalFloats);
+    assert.ok(uv.every(Number.isFinite));
+    return;
+  }
+  const { transfer, cockpit, expected } = await getBoundVariant(variant);
   transfer.binding = binding;
   transfer.bindingUV = uv;
   // Aircraft pose and repeated binding cannot change the offline UVs.
