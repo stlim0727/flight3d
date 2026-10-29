@@ -305,7 +305,7 @@ describe('Drone Orbit View & Demo Pre/Post-Flight Integration', () => {
       // Update banner should update title, desc, and pill text
       director.updateBanner('🛫 [2/8] 활주로 이륙 활주', 'TOGA 가속');
       assert.strictEqual(mockTitle.textContent, '🛫 [2/8] 활주로 이륙 활주');
-      assert.strictEqual(mockPillText.textContent, '🎬 AUTO DEMO [2/8] [안내 열기 ▾]');
+      assert.strictEqual(mockPillText.textContent, 'DEMO 2/8 ▾');
 
       // Reopen banner
       director.openBanner();

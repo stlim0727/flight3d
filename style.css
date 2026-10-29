@@ -1959,7 +1959,7 @@ body.demo-active #touch-controls-overlay {
   align-items: stretch;
 }
 
-/* One concise control strip: camera, sound | gear, flaps, spoilers, reverse. */
+/* One concise control strip: camera, sound, fullscreen | aircraft controls. */
 .flight-toolbar, .compact-ui .flight-toolbar, .compact-ui.touch-mode .flight-toolbar {
   top: calc(var(--edge-top) + 48px);
   bottom: auto;
@@ -1998,6 +1998,25 @@ body.demo-active #touch-controls-overlay {
 .flight-toolbar #btn-auto-camera { flex-basis: 64px; min-width: 64px; }
 .flight-toolbar #btn-auto-camera[aria-pressed="true"] { color: #67e8f9; background: #164e63; }
 .flight-toolbar .quick-mute { display: block; font-size: 18px; }
+.flight-toolbar #btn-fullscreen::after {
+  content: '';
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  background:
+    linear-gradient(currentColor, currentColor) left top / 7px 2px,
+    linear-gradient(currentColor, currentColor) left top / 2px 7px,
+    linear-gradient(currentColor, currentColor) right top / 7px 2px,
+    linear-gradient(currentColor, currentColor) right top / 2px 7px,
+    linear-gradient(currentColor, currentColor) left bottom / 7px 2px,
+    linear-gradient(currentColor, currentColor) left bottom / 2px 7px,
+    linear-gradient(currentColor, currentColor) right bottom / 7px 2px,
+    linear-gradient(currentColor, currentColor) right bottom / 2px 7px;
+  background-repeat: no-repeat;
+}
+.flight-toolbar #btn-fullscreen[aria-pressed="true"] { color: #67e8f9; background: #164e63; }
+
 
 /* The AP trigger stays anchored; its dropdown clears both control strips. */
 .ap-bar, .compact-ui .ap-bar {
@@ -2274,13 +2293,36 @@ body[data-flow="lobby"] .menu-toggle {
   .presets-bar { top: 60px; }
 }
 
-/* Keep the demo guide and its reopen button below the relocated control strip and edge toggles. */
-.demo-banner, .demo-pill-btn {
-  top: max(calc(var(--edge-top) + 104px), calc(var(--menu-row-top, 0px) + 50px));
-}
+/* Anchor demo UI beside the menu, leaving the center of the flight view clear. */
+.demo-banner, .demo-pill-btn,
 .compact-ui .demo-banner, .compact-ui .demo-pill-btn {
-  top: max(calc(var(--edge-top) + 104px), calc(var(--menu-row-top, 0px) + 50px));
+  top: var(--demo-row-top, calc(var(--edge-top) + 96px));
+  left: auto;
+  right: var(--edge-right);
+  transform: none;
 }
+.demo-banner, .compact-ui .demo-banner {
+  box-sizing: border-box;
+  width: min(320px, calc(100% - var(--edge-left) - var(--edge-right) - 56px));
+  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: 8px;
+  gap: 6px;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 25%);
+}
+.demo-banner .demo-badge { order: 1; }
+.demo-banner .demo-actions { order: 2; margin-left: auto; }
+.demo-banner .demo-info { order: 3; width: 100%; min-width: 0; }
+.demo-pill-btn, .compact-ui .demo-pill-btn {
+  min-height: 44px;
+  padding: 4px 10px;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 25%);
+}
+.demo-pill-btn:hover, .demo-pill-btn:active { transform: none; }
 
 /* Put the stall alert below the toolbar and expanded AP controls. */
 .stall-banner {

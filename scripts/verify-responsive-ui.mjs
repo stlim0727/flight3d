@@ -131,7 +131,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
     const ap = document.querySelector('.ap-bar').getBoundingClientRect();
     return { stripButtons: [...document.querySelectorAll('.flight-toolbar button')].map(b => b.id),
       rows: new Set([...document.querySelectorAll('.flight-toolbar button')].map(b => Math.round(b.getBoundingClientRect().top))).size,
-      buttons: [...document.querySelectorAll('.flight-toolbar button:not(#open-camera):not(#btn-mute)')].map(node => {
+      buttons: [...document.querySelectorAll('.flight-toolbar button:not(#open-camera):not(#btn-auto-camera):not(#btn-mute):not(#btn-fullscreen)')].map(node => {
       const r = node.getBoundingClientRect();
       return { id: node.id, reachable: node.contains(document.elementFromPoint(r.left+r.width/2, r.top+r.height/2)), height: r.height };
     }), collapsed: document.querySelector('#btn-ap-toggle').getAttribute('aria-expanded') === 'false',
@@ -141,7 +141,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
         return Math.abs(button.top - (row ? row.top : strip.bottom + 4)) < 1;
       }) };
   })()`);
-  assert.deepEqual(direct.stripButtons, ['open-camera', 'btn-mute', 'btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser'], `${name}: one strip in the requested order`);
+  assert.deepEqual(direct.stripButtons, ['open-camera', 'btn-auto-camera', 'btn-mute', 'btn-fullscreen', 'btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser'], `${name}: one strip in the requested order`);
   assert.equal(direct.rows, 1, `${name}: controls stay on one concise row`);
   assert.equal(direct.buttons.length, 5, `${name}: all Aircraft controls are flattened`);
   assert.ok(direct.buttons.every(b => b.reachable && b.height >= 44), `${name}: all Aircraft controls have reachable 44px targets`);
@@ -287,8 +287,9 @@ await send('Emulation.setTouchEmulationEnabled', { enabled: false, maxTouchPoint
 await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await ev(`window.simulator.touchControls.disable(); window.simulator.demoDirector.start(); window.simulator.demoDirector.closeBanner()`);
 await new Promise(resolve => setTimeout(resolve, 2800));
-const demoPill = await ev(`(()=>{const node=document.querySelector('#btn-demo-open'),r=node.getBoundingClientRect(),t=document.querySelector('.flight-toolbar').getBoundingClientRect();return {visible:getComputedStyle(node).display!=='none',top:r.top,toolbarBottom:t.bottom,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}})()`);
+const demoPill = await ev(`(()=>{const node=document.querySelector('#btn-demo-open'),r=node.getBoundingClientRect(),t=document.querySelector('.flight-toolbar').getBoundingClientRect();return {visible:getComputedStyle(node).display!=='none',top:r.top,width:r.width,height:r.height,toolbarBottom:t.bottom,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}})()`);
 assert.ok(demoPill.visible && demoPill.top >= demoPill.toolbarBottom + 4 && demoPill.reachable, `desktop: demo reopen pill is clear and reachable below toolbar: ${JSON.stringify(demoPill)}`);
+assert.ok(demoPill.width < 140 && demoPill.height === 44, 'desktop: collapsed demo control stays compact with a 44px touch target');
 await nativeClick('#btn-demo-open', false);
 assert.ok(await ev(`getComputedStyle(document.querySelector('#demo-banner')).display!=='none' && getComputedStyle(document.querySelector('#btn-demo-open')).display==='none'`), 'desktop: demo guide reopens from its pill');
 
@@ -303,11 +304,11 @@ const mobileDemo = await ev(`(() => {
   const ap = document.querySelector('.ap-bar');
   const apStyle = getComputedStyle(ap);
   const apHidden = apStyle.visibility === 'hidden' || apStyle.display === 'none';
-  const bannerBelowMenu = banner.top >= menu.bottom + 4;
-  return { bannerTop: banner.top, menuBottom: menu.bottom, apHidden, bannerBelowMenu };
+  const bannerBesideMenu = banner.left >= menu.right + 4;
+  return { bannerTop: banner.top, menuBottom: menu.bottom, apHidden, bannerBesideMenu };
 })()`);
 assert.ok(mobileDemo.apHidden, `mobile portrait: AP is hidden during demo: ${JSON.stringify(mobileDemo)}`);
-assert.ok(mobileDemo.bannerBelowMenu, `mobile portrait: demo banner sits below menu button: ${JSON.stringify(mobileDemo)}`);
+assert.ok(mobileDemo.bannerBesideMenu, `mobile portrait: demo banner sits beside menu button: ${JSON.stringify(mobileDemo)}`);
 await ev(`window.simulator.demoDirector.stop()`);
 await send('Emulation.setTouchEmulationEnabled', { enabled: false, maxTouchPoints: 1 });
 await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -376,7 +377,7 @@ assert.equal(await ev(`document.body.dataset.flow`), 'lobby', 'language change k
 await ev(`document.querySelector('#menu-toggle').click()`);
 await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 1, mobile: true });
 await new Promise(r => setTimeout(r, 150));
-assert.equal(await ev(`document.querySelectorAll('.flight-toolbar button:not(#open-camera):not(#btn-mute)').length`), 5, 'rotation retains the five direct Aircraft controls');
+assert.equal(await ev(`document.querySelectorAll('.flight-toolbar button:not(#open-camera):not(#btn-auto-camera):not(#btn-mute):not(#btn-fullscreen)').length`), 5, 'rotation retains the five direct Aircraft controls');
 await send('Page.captureScreenshot', { format: 'png' }).then(r => fs.writeFileSync(`${out}/portrait-aircraft-ko.png`, Buffer.from(r.data, 'base64')));
 await ev(`document.querySelector('#lobby-lang-en').click()`);
 fs.writeFileSync(`${out}/interaction-results.json`, JSON.stringify({ repeatedFlaps: true, directCamera: true, keyboardCamera: true, demoClosesPanel: true, nativeTouchScroll: after, cameraBefore: before, touchModeToggle: true, languageChange: true, rotation: true }, null, 2));
