@@ -202,22 +202,22 @@
           <div class="lobby-group" role="group">
             <span class="lobby-label" data-i18n="lobby.aircraft">기체</span>
             <div class="lobby-buttons">
-              <button id="lobby-aircraft-b738" class="btn btn-aircraft active"><span data-i18n="aircraft.b738">✈️ Boeing 737</span></button>
-              <button id="lobby-aircraft-c172" class="btn btn-aircraft"><span data-i18n="aircraft.c172">🛩️ Cessna 172</span></button>
-              <button id="lobby-aircraft-f16" class="btn btn-aircraft"><span data-i18n="aircraft.f16">F-16 Fighting Falcon</span></button>
+              <button id="lobby-aircraft-b738" class="btn btn-aircraft active"><span data-i18n="aircraft.b738">✈️ Boeing 737</span><small class="spec-badge" data-spec-aircraft="B738"></small></button>
+              <button id="lobby-aircraft-c172" class="btn btn-aircraft"><span data-i18n="aircraft.c172">🛩️ Cessna 172</span><small class="spec-badge" data-spec-aircraft="C172"></small></button>
+              <button id="lobby-aircraft-f16" class="btn btn-aircraft"><span data-i18n="aircraft.f16">F-16 Fighting Falcon</span><small class="spec-badge" data-spec-aircraft="F16"></small></button>
             </div>
           </div>
           <div class="lobby-group" role="group">
             <span class="lobby-label" data-i18n="lobby.airport">비행 지역</span>
             <div class="lobby-buttons">
-              <button id="lobby-airport-coastal" class="btn btn-airport active"><span data-i18n="coastal.airport">🌊 국제공항</span></button>
-              <button id="lobby-airport-incheon" class="btn btn-airport"><span data-i18n="incheon.airport">인천 (RKSI)</span></button>
-              <button id="lobby-airport-lukla" class="btn btn-airport"><span data-i18n="lukla.vnlk">🏔️ 루클라 (VNLK)</span></button>
-              <button id="lobby-airport-hangang" class="btn btn-airport"><span data-i18n="hangang.region">한강</span></button>
-              <button id="lobby-airport-neon" class="btn btn-airport"><span data-i18n="neon.metropolis">🌆 네온 메트로폴리스</span></button>
+              <button id="lobby-airport-coastal" class="btn btn-airport active"><span data-i18n="coastal.airport">🌊 국제공항</span><small class="spec-badge" data-spec-airport="coastal"></small></button>
+              <button id="lobby-airport-incheon" class="btn btn-airport"><span data-i18n="incheon.airport">인천 (RKSI)</span><small class="spec-badge" data-spec-airport="incheon"></small></button>
+              <button id="lobby-airport-lukla" class="btn btn-airport"><span data-i18n="lukla.vnlk">🏔️ 루클라 (VNLK)</span><small class="spec-badge" data-spec-airport="lukla"></small></button>
+              <button id="lobby-airport-hangang" class="btn btn-airport"><span data-i18n="hangang.region">한강</span><small class="spec-badge" data-spec-airport="hangang"></small></button>
+              <button id="lobby-airport-neon" class="btn btn-airport"><span data-i18n="neon.metropolis">🌆 네온 메트로폴리스</span><small class="spec-badge" data-spec-airport="neon"></small></button>
             </div>
           </div>
-          <a href="./flights.html">모든 비행 URL · All flight URLs</a>
+          <a class="lobby-link" href="./flights.html" data-i18n="lobby.allFlights">All flight URLs</a>
           <div class="lobby-group lobby-scenarios" role="group">
             <span class="lobby-label" data-i18n="lobby.spawn">시나리오</span>
             <div class="lobby-buttons">
@@ -246,6 +246,7 @@
               <option value="22.5">22:30</option>
             </select>
           </label>
+          <span class="lobby-label" data-i18n="lobby.briefingTitle">Dispatch briefing</span>
           <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
         </section>
         <section id="lobby-panel-settings" class="lobby-tab-panel lobby-settings" role="tabpanel" aria-labelledby="lobby-tab-settings" tabindex="0" hidden>
