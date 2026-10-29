@@ -34,7 +34,7 @@ const capture = async name => {
     sim.aircraft.group.updateMatrixWorld(true);
     for (let i = 0; i < 30; i++) sim.cameraSystem.update(1/60, sim.aircraft.group, sim.telemetry, (x,z) => sim.currentTerrain.getHeight(x,z));
     sim.camera.updateProjectionMatrix();
-    sim.renderer.render(sim.scene, sim.camera);
+    sim.renderScene();
   })()`);
   const { data } = await call('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(path.join(dir, `${name}.png`), Buffer.from(data, 'base64'));
@@ -44,9 +44,10 @@ try {
   await call('Page.enable');
   await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   for (let i = 0; i < 120; i++) {
-    if (await evaluate('Boolean(window.simulator?.lobbyScreen)')) break;
+    if (await evaluate('Boolean(window.simulator?.startupReady)')) break;
     await new Promise(resolve => setTimeout(resolve, 500));
   }
+  assert.ok(await evaluate('Boolean(window.simulator?.startupReady)'), 'startup completed before camera input');
   await evaluate(`(() => {
     const s = window.simulator;
     s.demoDirector.stop();
