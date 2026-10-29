@@ -2,6 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { HangangScene } from '../src/environment/HangangScene.js';
 import { createSeoulScenery, createLightPointTexture } from '../src/environment/SeoulLandmarks.js';
+import { createHangangAssetLoader, hangangAssetManifest } from '../src/environment/HangangAssetLoader.js';
+
+test('hangangAssetManifest defines valid GLB models with bounding boxes', () => {
+  const keys = ['yeouido-landmarks', 'namsan-tower', 'lotte-tower', 'bridges-kit'];
+  for (const k of keys) {
+    assert.ok(hangangAssetManifest[k], `Manifest key ${k} must exist`);
+    assert.ok(hangangAssetManifest[k].url.endsWith('.glb'));
+    assert.ok(hangangAssetManifest[k].bytes > 0);
+    assert.ok(hangangAssetManifest[k].bounds.min.length === 3);
+    assert.ok(hangangAssetManifest[k].bounds.max.length === 3);
+  }
+});
+
+test('createHangangAssetLoader loads or falls back gracefully without throwing', async () => {
+  const loader = createHangangAssetLoader();
+  const fallback = await loader('yeouido-landmarks');
+  assert.ok(fallback);
+});
 
 test('createLightPointTexture produces a valid RGBA DataTexture without DOM', () => {
   const tex = createLightPointTexture(16);
@@ -11,17 +29,14 @@ test('createLightPointTexture produces a valid RGBA DataTexture without DOM', ()
   assert.equal(tex.image.data.length, 16 * 16 * 4);
 });
 
-test('createSeoulScenery builds Yeouido landmarks, Namsan, Lotte Tower, expressways and night lights', () => {
-  const { group, update } = createSeoulScenery();
+test('createSeoulScenery builds GLB mount group, expressways, and night lights', () => {
+  const { group, update, ready } = createSeoulScenery();
   assert.ok(group);
   assert.equal(typeof update, 'function');
+  assert.ok(ready instanceof Promise);
 
-  // Verify landmark hierarchy
-  const yeouido = group.getObjectByName('Yeouido Landmarks');
-  assert.ok(yeouido, 'Yeouido group must exist');
-
-  const namsan = group.getObjectByName('Namsan & N Seoul Tower');
-  assert.ok(namsan, 'Namsan & N Seoul Tower group must exist');
+  const modelsGroup = group.getObjectByName('Hangang GLB Models');
+  assert.ok(modelsGroup, 'Hangang GLB models container must exist');
 
   const expressways = group.getObjectByName('Han River Expressways');
   assert.ok(expressways, 'Expressways group must exist');
