@@ -1,0 +1,13 @@
+# Exclude worktrees, review captures, and large generated/minified data from routine agent searches (use rg -u when needed)
+worktrees/
+.worktrees/
+.qoder/
+.codex-attachments/
+review-artifacts/
+artifacts/
+docs/development/evidence/
+public/draco/
+public/lighting/*.json
+public/scenery/**/*.json
+src/config/incheonAirfield.json
+scripts/demo-sweep-baseline.json
