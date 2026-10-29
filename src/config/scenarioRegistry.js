@@ -50,7 +50,7 @@ export const DEFAULT_SCENARIO = 'runway';
 export const defaultScenarioForRegion = region => region === 'hangang' ? 'hangang' : DEFAULT_SCENARIO;
 
 export function isScenarioAvailable(airportKey, scenarioType) {
-  const scenario = SPAWN_SCENARIOS[scenarioType];
+  const scenario = Object.hasOwn(SPAWN_SCENARIOS, scenarioType) ? SPAWN_SCENARIOS[scenarioType] : undefined;
   return Boolean(scenario && airportKey && scenario.airports.includes(airportKey));
 }
 
@@ -59,6 +59,6 @@ export function scenariosForAirport(airportKey) {
 }
 
 export function scenarioLabelKey(airportKey, scenarioType) {
-  const scenario = SPAWN_SCENARIOS[scenarioType];
+  const scenario = Object.hasOwn(SPAWN_SCENARIOS, scenarioType) ? SPAWN_SCENARIOS[scenarioType] : undefined;
   return scenario ? scenario.labelKeys[airportKey] : undefined;
 }

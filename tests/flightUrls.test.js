@@ -22,3 +22,13 @@ test('every listed combination round trips without substitution', () => {
     assert.deepEqual(resolveFlightUrl(url.search, saved), row);
   }
 });
+
+test('inherited property names in URL scenarios fall back without throwing', () => {
+  for (const scenario of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+    for (const airport of ['coastal', 'lukla', 'incheon', 'neon', 'hangang']) {
+      const result = resolveFlightUrl(`?terrain=${airport}&scenario=${scenario}`, saved);
+      assert.equal(result.airport, airport);
+      assert.equal(result.scenario, airport === 'hangang' ? 'hangang' : 'runway');
+    }
+  }
+});

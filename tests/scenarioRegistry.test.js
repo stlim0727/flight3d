@@ -51,3 +51,10 @@ test('lobby button ids are unique per scenario', () => {
   const lobbyIds = Object.values(SPAWN_SCENARIOS).map((s) => s.lobbyButtonId);
   assert.equal(new Set(lobbyIds).size, lobbyIds.length);
 });
+
+test('inherited property names are not registered scenarios', () => {
+  for (const scenario of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+    assert.equal(isScenarioAvailable('coastal', scenario), false);
+    assert.equal(scenarioLabelKey('coastal', scenario), undefined);
+  }
+});
