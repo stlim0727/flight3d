@@ -15,9 +15,9 @@ export const F16_CENTER_X = 25.935216903686523;
 export function createF16CanopyMaterial(isCockpit = false) {
   const material = new THREE.MeshPhysicalMaterial({
     name: 'F16-canopy-glass',
-    color: new THREE.Color(0.96, 0.93, 0.84),
+    color: new THREE.Color(0.95, 0.91, 0.80),
     transparent: true,
-    opacity: isCockpit ? 0.12 : 0.20,
+    opacity: isCockpit ? 0.25 : 0.30,
     roughness: 0.04,
     metalness: 0.08,
     clearcoat: 1.0,
@@ -25,7 +25,7 @@ export function createF16CanopyMaterial(isCockpit = false) {
     ior: 1.54,
     envMapIntensity: 2.5,
     depthWrite: false,
-    side: isCockpit ? THREE.BackSide : THREE.FrontSide
+    side: THREE.DoubleSide
   });
 
   material.userData.isF16Canopy = true;
@@ -41,25 +41,34 @@ export function createF16CanopyMaterial(isCockpit = false) {
       diffuseColor.a *= material.transmissionAlpha;
       #endif
 
-      // Curved glass Fresnel reflection factor based on view angle and surface normal
-      float vDotN = clamp( dot( geometryNormal, geometryViewDir ), 0.0, 1.0 );
-      float fresnel = pow( 1.0 - vDotN, 4.0 );
+      // Ensure effective normal points toward viewing direction from both inside and outside
+      vec3 effNormal = geometryNormal;
+      if ( dot( effNormal, geometryViewDir ) < 0.0 ) {
+        effNormal = -effNormal;
+      }
 
-      // Dynamic alpha: clear at normal incidence so cockpit displays & pilot remain sharp,
-      // highly reflective at glancing angles along the curved bubble canopy rim
+      // Curved glass Fresnel reflection factor based on view angle and surface normal
+      float vDotN = clamp( dot( effNormal, geometryViewDir ), 0.0, 1.0 );
+      float fresnel = pow( 1.0 - vDotN, 2.0 );
+
+      // Dynamic alpha: clear forward view, highly reflective at glancing angles along the curved bubble
       float baseAlpha = diffuseColor.a;
       float canopyAlpha = clamp( mix( baseAlpha, 0.88, fresnel * 0.95 ), 0.0, 1.0 );
 
+      // Curved sky dome and horizon gradient reflection across the bubble canopy
+      vec3 viewReflect = reflect( -geometryViewDir, effNormal );
+      float skyGradient = smoothstep( -0.2, 0.5, viewReflect.y );
+      vec3 ambientSkyReflection = mix( vec3( 0.40, 0.38, 0.32 ), vec3( 0.75, 0.88, 1.05 ), skyGradient );
+
       // Accumulate direct sun highlight, HDR sky reflection, and clearcoat sheen
-      vec3 totalSpecular = reflectedLight.directSpecular + reflectedLight.indirectSpecular +
-        ( clearcoatSpecularDirect + clearcoatSpecularIndirect );
+      vec3 canopySpecular = totalSpecular + ambientSkyReflection * ( fresnel * 0.45 + 0.10 );
 
       // F-16 Indium Tin Oxide (ITO) subtle gold/amber sheen along reflection contours
-      vec3 itoTint = mix( vec3( 1.0 ), vec3( 1.08, 0.96, 0.82 ), fresnel );
-      totalSpecular *= itoTint;
+      vec3 itoTint = mix( vec3( 1.0 ), vec3( 1.15, 1.02, 0.80 ), fresnel );
+      canopySpecular *= itoTint;
 
       // Compensate for WebGL alpha blending so specular reflection retains full physical brilliance
-      vec3 adjustedOutgoing = outgoingLight + totalSpecular * ( ( 1.0 / max( canopyAlpha, 0.12 ) ) - 1.0 );
+      vec3 adjustedOutgoing = outgoingLight + canopySpecular * ( ( 1.0 / max( canopyAlpha, 0.15 ) ) - 1.0 );
 
       gl_FragColor = vec4( adjustedOutgoing, canopyAlpha );
       `
@@ -232,8 +241,8 @@ export class F16 {
   setCockpitMode(isCockpit) {
     this.isCockpit = isCockpit;
     if (this.canopyMaterial) {
-      this.canopyMaterial.side = isCockpit ? THREE.BackSide : THREE.FrontSide;
-      this.canopyMaterial.opacity = isCockpit ? 0.12 : 0.20;
+      this.canopyMaterial.side = THREE.DoubleSide;
+      this.canopyMaterial.opacity = isCockpit ? 0.25 : 0.30;
       this.canopyMaterial.needsUpdate = true;
     }
   }

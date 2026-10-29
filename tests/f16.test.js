@@ -198,8 +198,8 @@ test('F16 canopy curved glass material has physical reflection, clearcoat, and v
   assert.equal(exteriorMat.isMeshPhysicalMaterial, true);
   assert.equal(exteriorMat.transparent, true);
   assert.equal(exteriorMat.depthWrite, false);
-  assert.equal(exteriorMat.side, THREE.FrontSide);
-  assert.equal(exteriorMat.opacity, 0.20);
+  assert.equal(exteriorMat.side, THREE.DoubleSide);
+  assert.equal(exteriorMat.opacity, 0.30);
   assert.equal(exteriorMat.roughness, 0.04);
   assert.equal(exteriorMat.metalness, 0.08);
   assert.equal(exteriorMat.clearcoat, 1.0);
@@ -208,15 +208,15 @@ test('F16 canopy curved glass material has physical reflection, clearcoat, and v
   assert.equal(exteriorMat.envMapIntensity, 2.5);
 
   const cockpitMat = createF16CanopyMaterial(true);
-  assert.equal(cockpitMat.side, THREE.BackSide);
-  assert.equal(cockpitMat.opacity, 0.12);
+  assert.equal(cockpitMat.side, THREE.DoubleSide);
+  assert.equal(cockpitMat.opacity, 0.25);
 
   // Verify onBeforeCompile replaces opaque_fragment with curved Fresnel reflection
   const shader = { fragmentShader: THREE.ShaderLib.physical.fragmentShader };
   cockpitMat.onBeforeCompile(shader);
   assert.ok(shader.fragmentShader.includes('fresnel'));
   assert.ok(shader.fragmentShader.includes('canopyAlpha'));
-  assert.ok(shader.fragmentShader.includes('totalSpecular'));
+  assert.ok(shader.fragmentShader.includes('canopySpecular'));
   assert.ok(shader.fragmentShader.includes('itoTint'));
 });
 
@@ -233,16 +233,16 @@ test('loaded F16 configures canopy mesh and responds to cockpit mode transitions
 
   // Exterior mode initially
   aircraft.setCockpitMode(false);
-  assert.equal(aircraft.canopyMaterial.side, THREE.FrontSide);
-  assert.equal(aircraft.canopyMaterial.opacity, 0.20);
+  assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
+  assert.equal(aircraft.canopyMaterial.opacity, 0.30);
 
   // Switch to cockpit mode
   aircraft.setCockpitMode(true);
-  assert.equal(aircraft.canopyMaterial.side, THREE.BackSide);
-  assert.equal(aircraft.canopyMaterial.opacity, 0.12);
+  assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
+  assert.equal(aircraft.canopyMaterial.opacity, 0.25);
 
   // Switch back to exterior mode
   aircraft.setCockpitMode(false);
-  assert.equal(aircraft.canopyMaterial.side, THREE.FrontSide);
-  assert.equal(aircraft.canopyMaterial.opacity, 0.20);
+  assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
+  assert.equal(aircraft.canopyMaterial.opacity, 0.30);
 });
