@@ -34,7 +34,7 @@ const capture = async name => {
     sim.aircraft.group.updateMatrixWorld(true);
     for (let i = 0; i < 30; i++) sim.cameraSystem.update(1/60, sim.aircraft.group, sim.telemetry, (x,z) => sim.currentTerrain.getHeight(x,z));
     sim.camera.updateProjectionMatrix();
-    sim.renderer.render(sim.scene, sim.camera);
+    sim.renderScene();
   })()`);
   const { data } = await call('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(path.join(dir, `${name}.png`), Buffer.from(data, 'base64'));
@@ -44,9 +44,10 @@ try {
   await call('Page.enable');
   await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   for (let i = 0; i < 120; i++) {
-    if (await evaluate('Boolean(window.simulator?.lobbyScreen)')) break;
+    if (await evaluate('Boolean(window.simulator?.startupReady)')) break;
     await new Promise(resolve => setTimeout(resolve, 500));
   }
+  assert.ok(await evaluate('Boolean(window.simulator?.startupReady)'), 'startup completed before camera input');
   await evaluate(`(() => {
     const s = window.simulator;
     s.demoDirector.stop();
@@ -58,7 +59,7 @@ try {
     s.cameraSystem.setMode(0, true);
   })()`);
   await new Promise(resolve => setTimeout(resolve, 3500));
-  for (const mode of [1, 6, 4, 2, 0]) {
+  for (const mode of [8, 1, 6, 4, 2, 0]) {
     await call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'c', code: 'KeyC' });
     await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'c', code: 'KeyC' });
     assert.equal(await evaluate('window.simulator.cameraSystem.mode'), mode);
@@ -146,7 +147,7 @@ try {
   await evaluate('window.stepScenicCamera(20)');
   assert.equal(await evaluate('window.simulator.cameraSystem.autoSwitch'), false, 'manual selection cancels resume');
   assert.deepEqual(errors, [], 'no runtime exceptions');
-  fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({ passed: true, errors, quickCycle: [1, 6, 4, 2, 0], specialistSelections: [3, 5, 7], mobileAutoPauseResume: true }, null, 2));
+  fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({ passed: true, errors, quickCycle: [8, 1, 6, 4, 2, 0], specialistSelections: [3, 5, 7], mobileAutoPauseResume: true }, null, 2));
   console.log('Scenic camera browser checks passed:', dir);
 } finally {
   ws.close();

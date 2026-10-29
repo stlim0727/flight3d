@@ -49,10 +49,13 @@ try {
   assert.ok(initial.engine > 0, 'engine bus already follows live physics');
   // Autoplay policy may allow immediate playback or suspend it until a gesture.
   assert.ok(['running', 'suspended'].includes(initial.state));
+  assert.equal(await evaluate('document.getElementById("audio-start-hint").hidden'), initial.state === 'running',
+    'guidance is visible only while audio needs a gesture');
   await evaluate('window.__startupContext = window.simulator.audio.ctx; undefined');
   await call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65 });
   await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65 });
   await waitFor('window.simulator.audio.ctx.state === "running"');
+  await waitFor('document.getElementById("audio-start-hint").hidden');
   await evaluate(`window.__audioMeter = window.simulator.audio.ctx.createAnalyser();
     window.simulator.audio.makeupGain.connect(window.__audioMeter)`);
   await waitFor(`(() => {
@@ -65,11 +68,13 @@ try {
     window.simulator.audio.ctx.onstatechange = null;
     window.simulator.audio.ctx.suspend()`);
   assert.equal(await evaluate('window.simulator.audio.ctx.state'), 'suspended');
+  await waitFor('!document.getElementById("audio-start-hint").hidden');
   for (const type of ['mousePressed', 'mouseReleased']) {
     await call('Input.dispatchMouseEvent', { type, x: 600, y: 400, button: 'left', clickCount: 1 });
     if (type === 'mousePressed') await waitFor('window.simulator.audio.ctx.state === "running"');
   }
   assert.equal(await evaluate('window.simulator.audio.ctx === window.__startupContext'), true);
+  await waitFor('document.getElementById("audio-start-hint").hidden');
   console.log('PASS: startup graph, keyboard unlock, consumed pointer unlock, context reuse');
 } catch (error) {
   console.error(await evaluate('document.getElementById("startup-overlay")?.innerText'));

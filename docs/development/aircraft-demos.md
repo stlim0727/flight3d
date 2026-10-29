@@ -87,30 +87,59 @@ APP_URL=http://127.0.0.1:5189/ ARTIFACT_DIR=.cache/incheon-demo \
 records two complete 476.63-second circuits, intact gear and the runway stop,
 plus mobile menu, restart, camera override and cancellation checks.
 
-## F-16 Lukla low pass
+## F-16 Lukla low pass and landing
 
-Select **Lukla → F-16 → Demo flight**. The demo waits for the DEM, starts
-southwest of runway 24 at 280 KIAS with gear retracted, flies a straight valley
-pass, then climbs before the opposing ridge and hands back powered controls.
-The escape turn starts 1,600 m along the pass, with the heading command blended
-from 238° to 195° over six seconds and bank limited to 45°. The climb targets
-300 KIAS and at most 35 m/s vertical speed toward 4,600 m MSL. Fighter-specific
-throttle feed-forward avoids the Cessna law's full-thrust acceleration into the
-opposing ridge; pitch still comes from the inherited lift/AoA controller.
+Landing results reported in [PR #304](https://github.com/stlim0727/flight3d/pull/304)
+are evidence within the game model, not validation of real F16 landing feasibility;
+see [fidelity limits and validation work](f16-lukla-realism.md).
 
-Control returns only after at least 30 seconds of escape, within 5° of the exit
-heading, under 10° bank, climbing, and over 150 m clear of terrain. Completion
-preserves velocity, attitude, rates and power instead of resetting them. Initial
-spawn remains the only scripted pose. Chase, cockpit and flyby cuts respect a
-manually selected camera; P restarts and Esc cancels.
+Select **Lukla → F-16 → Demo flight → F-16 · Lukla low pass and landing**
+(the existing `low-pass` profile). After the 280-KIAS airborne pass, the fighter
+climbs/turns clear of the opposing ridge as before, then stays under pilot control
+through a decelerated valley turnaround, a curved approach to Runway 06, touchdown,
+braking and a parked handoff. Esc cancels; P restarts. The canyon-chase choice is
+unchanged and still hands back airborne.
 
-[Guidance comparison](../../review-artifacts/f16-lukla-guidance/README.md) records
-the original ridge collision, tuned sweep, per-tick checks and post-handoff flight.
+The escape starts at 1,600 m along the pass, targets 300 KIAS and up to 35 m/s
+climb, and blends heading 238° to 195° with a 45° bank-command limit. Return
+lowers the gear and selects the configured 20° landing flaps, uses speed brakes,
+and turns in the open valley after slowing below 190 KIAS. It approaches from
+the southeast side of the extended centerline to avoid the measured ridge that
+blocks a long, straight descent. A cosine lateral path finishes its turn 3.5 km
+before runway midpoint; terrain lookahead protects the return and outer approach.
 
-With Vite on 5186, run `chrome-session --project flight3d node
-scripts/verify-f16-lukla.mjs`. The harness checks completion, finite F-16 flight,
-no sampled crashes/stalls, clearance and control release, and captures flight
-frames and a close terrain view in `.cache/f16-lukla`.
+Final targets 132 KIAS. The 900 m curved flare turns descent into a 9% uphill
+flight path before meeting the 11.76% runway. Pitch command is capped at 18° to
+keep the configured aft engine support point clear; actual attitude still follows
+normal elevator dynamics. Landing lift guidance permits up to 20° commanded AoA
+within this F16 model's 28° clean-stall setting. Main-wheel braking and partial
+spoilers transition to full braking/spoilers once the nose gear supports the
+aircraft. No reverse thrust, mass reduction, force/coefficient changes, or pose/
+velocity corrections are used after the initial spawn.
+
+Completion requires a recorded main-wheel runway touchdown, all three legs
+supported with zero damage, no landing incident, position inside the runway's
+safe envelope, and 3D speed under 0.5 m/s for two uninterrupted seconds. The
+parking brake is retained; completion never resets position, attitude or velocity.
+`result.minPassClearanceM` measures clearance before final, while
+`result.minClearanceM` now naturally includes landing wheel height.
+
+The sweep now requires the RETURN, FINAL and ROLLOUT stages plus a parked
+handoff and actual spoiler deployment. Stage-specific clearance checks preserve
+50 m for the original pass and 150 m on return; final may descend to wheel height
+without exempting it from airborne stall, impact or damage checks.
+
+With Vite running, use:
+
+```sh
+APP_URL=http://127.0.0.1:5193/ chrome-session --project flight3d node scripts/verify-f16-lukla.mjs
+```
+
+The harness checks completed landing, all wheel impact limits, intact gear,
+runway stop, ten-second parking hold, restart/cancel and shader validity, and
+captures stage views. [Landing evidence](../../review-artifacts/f16-lukla-landing/README.md)
+records browser results. The [earlier escape-only comparison](../../review-artifacts/f16-lukla-guidance/README.md)
+remains historical evidence for the preceding version of this route.
 
 ## F-16 canyon aerobatics
 

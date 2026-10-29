@@ -219,3 +219,94 @@ test('returnToLobby default keeps the cinematic re-arm (no resume offered)', () 
   run(c, 1.6);
   assert.equal(c.consumeDemoRestart(), true);
 });
+
+test('opening and closing the menu after a crash preserves crash state without repeating the crash', async () => {
+  const THREE = await import('three');
+  const { installPhysicsIntegrator } = await import('../src/core/PhysicsIntegrator.js');
+
+  class SimHarness {
+    constructor() {
+      this.gameFlow = new GameFlowController();
+      this.gameFlow.enterFlight();
+      this.devRunner = { active: null };
+      this.position = new THREE.Vector3(0, 0, 0);
+      this.linearVelocity = new THREE.Vector3(40, -10, 0);
+      this.angularVelocity = new THREE.Vector3(0, 0, 0);
+      this.quaternion = new THREE.Quaternion();
+      this.aero = { mass: 60000, invIxx: 1e-6, invIyy: 1e-6, invIzz: 1e-6, cg: new THREE.Vector3() };
+      this.gear = { bodySupportPoints: [] };
+      this.currentTerrain = { getHeight: () => 0 };
+      this.flightWarnings = { reset() {} };
+      this.telemetry = { warnings: [] };
+      this.explosions = 0;
+      this.explosionSystem = { spawnExplosion: () => { this.explosions++; }, clear() {} };
+      this.audio = { playExplosion: () => {} };
+      this.aircraft = {
+        group: new THREE.Group(),
+        triggerCrashVisuals() { this.crashed = true; },
+        resetCrashVisuals() { this.crashed = false; },
+      };
+      this.aircraftBreakup = {
+        aircraft: null,
+        spawn: (ac) => { this.aircraftBreakup.aircraft = ac; ac.group.visible = false; },
+        clear: () => { if (this.aircraftBreakup.aircraft) this.aircraftBreakup.aircraft.group.visible = true; this.aircraftBreakup.aircraft = null; },
+      };
+      this.cameraSystem = { beginCrashView() {}, endCrashView() {}, addTrauma() {} };
+      this.autopilot = { disengage() {} };
+      this.engines = { setThrottle() {} };
+      this.controls = { throttle: 0.8 };
+      this.collisionChecks = 0;
+      this.collisionDetector = {
+        checkCollision: () => {
+          this.collisionChecks++;
+          return { type: 'TERRAIN', name: 'TERRAIN', description: 'Impact', speedKnots: 80 };
+        },
+      };
+      this.isCrashed = false;
+      this.crashResult = null;
+    }
+    toggleMainMenu() {
+      if (this.gameFlow.state === FLOW.LOBBY) {
+        if (this.gameFlow.canResumeFromLobby()) this.gameFlow.enterFlight();
+        return;
+      }
+      this.gameFlow.returnToLobby(true);
+    }
+  }
+  installPhysicsIntegrator(SimHarness);
+
+  const sim = new SimHarness();
+  sim.triggerCrash({ type: 'TERRAIN', name: 'TERRAIN', description: 'Impact', speedKnots: 80 });
+  assert.equal(sim.isCrashed, true);
+  assert.equal(sim.explosions, 1);
+  assert.equal(sim.aircraft.group.visible, false);
+
+  // Open and close menu via toggleMainMenu: crash must not repeat on resume.
+  sim.toggleMainMenu();
+  assert.equal(sim.gameFlow.state, FLOW.LOBBY);
+  assert.equal(sim.gameFlow.canResumeFromLobby(), true);
+  assert.equal(sim.isCrashed, true);
+
+  sim.toggleMainMenu();
+  assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
+  assert.equal(sim.isCrashed, true);
+  for (let i = 0; i < 10; i++) sim.integratePhysics(1 / 120);
+  assert.equal(sim.collisionChecks, 0);
+  assert.equal(sim.explosions, 1);
+
+  // Keyboard exitCrashToLobby also holds the crashed scene without re-triggering.
+  sim.exitCrashToLobby();
+  assert.equal(sim.gameFlow.state, FLOW.LOBBY);
+  assert.equal(sim.gameFlow.canResumeFromLobby(), true);
+  assert.equal(sim.isCrashed, true);
+  sim.toggleMainMenu();
+  assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
+  sim.integratePhysics(1 / 120);
+  assert.equal(sim.explosions, 1);
+
+  // Clearing crash state (when starting a new flight) restores visibility and visuals.
+  sim.clearCrashState();
+  assert.equal(sim.isCrashed, false);
+  assert.equal(sim.aircraft.group.visible, true);
+  assert.equal(sim.aircraft.crashed, false);
+});

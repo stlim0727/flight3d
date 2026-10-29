@@ -904,8 +904,10 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       // 2. User presses CAM button / 'C' key -> cycleMode()
       const nextModeName = camSys.cycleMode();
       assert.strictEqual(camSys.userLookOverridden, false, 'cycleMode should clear userLookOverridden');
+      assert.strictEqual(camSys.mode, CameraSystem.MODES.HUD);
+      assert.equal(nextModeName, 'HUD');
+      camSys.cycleMode();
       assert.strictEqual(camSys.mode, CameraSystem.MODES.CHASE);
-      assert.ok(nextModeName.includes('CHASE'));
 
       // 3. User drags in CHASE mode
       camSys.applyMouseDelta(50, 50);

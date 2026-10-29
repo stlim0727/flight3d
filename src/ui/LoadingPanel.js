@@ -10,7 +10,7 @@ export class LoadingPanel {
     this.button.textContent = '중량 / Loading';
     this.button.setAttribute('aria-expanded', 'false');
     this.button.setAttribute('aria-controls', 'loading-panel');
-    document.querySelector('.flight-toolbar').append(this.button);
+    (document.getElementById('lobby-settings') || document.querySelector('.flight-toolbar'))?.append(this.button);
     this.panel = document.createElement('section');
     this.panel.id = 'loading-panel';
     this.panel.className = 'loading-panel';

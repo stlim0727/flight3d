@@ -1,6 +1,7 @@
 import { demoProfiles, resolveDemoProfile } from '../director/demoProfiles.js';
 import { bindText, getLanguage, setLanguage, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
+import { aircraftSpec, airportSpec } from './lobbySpecs.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../config/scenarioRegistry.js';
 
 const AIRPORT_BUTTONS = { hangang: 'lobby-airport-hangang', incheon: 'lobby-airport-incheon', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla', neon: 'lobby-airport-neon' };
@@ -23,6 +24,24 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
   const demoBriefing = document.getElementById('lobby-demo-briefing');
   demoSelect?.addEventListener('change', () => { onDemoProfile?.(demoSelect.value); refresh(); });
   const timeSelect = document.getElementById('lobby-time-select');
+
+  // Quick-pick chips mirror the select, which stays the source of truth.
+  const timeChips = document.createElement('div');
+  timeChips.className = 'lobby-buttons lobby-time-chips';
+  timeChips.setAttribute('role', 'group');
+  for (const option of timeSelect?.options ?? []) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'btn lobby-time-chip';
+    chip.dataset.hours = option.value;
+    chip.textContent = option.textContent;
+    chip.addEventListener('click', () => {
+      timeSelect.value = option.value;
+      timeSelect.dispatchEvent(new Event('change'));
+    });
+    timeChips.append(chip);
+  }
+  timeSelect?.parentElement?.append(timeChips);
 
   const tabs = [...document.querySelectorAll('.lobby-tab')];
   function selectTab(selected, focus = false) {
@@ -82,6 +101,12 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
   });
 
   function refresh() {
+    for (const badge of document.querySelectorAll('[data-spec-aircraft]')) {
+      bindText(badge, () => aircraftSpec(badge.dataset.specAircraft));
+    }
+    for (const badge of document.querySelectorAll('[data-spec-airport]')) {
+      bindText(badge, () => airportSpec(badge.dataset.specAirport));
+    }
     for (const [code, id] of Object.entries(LANGUAGE_BUTTONS)) {
       document.getElementById(id)?.classList.toggle('active', code === getLanguage());
     }
@@ -139,6 +164,12 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
         if (nearest === null || Math.abs(value - hours) < Math.abs(nearest - hours)) nearest = value;
       }
       if (nearest !== null) timeSelect.value = String(nearest);
+      for (const chip of timeChips.children) {
+        const on = chip.dataset.hours === timeSelect.value;
+        chip.classList.toggle('active', on);
+        chip.setAttribute('aria-pressed', String(on));
+        chip.disabled = timeSelect.disabled;
+      }
     }
   }
 

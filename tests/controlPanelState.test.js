@@ -5,7 +5,7 @@ import { setLanguage } from '../src/i18n/index.js';
 
 test('shared controls track deployment, damage, keyboard changes and input mode switches', () => {
   const previous = globalThis.document;
-  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'open-camera', 'camera-select', 'btn-auto-camera'];
+  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'open-camera', 'camera-select', 'btn-auto-camera', 'flight-trim-less', 'flight-trim-more', 'flight-park-brake', 'flight-trim-value'];
   const nodes = Object.fromEntries(ids.map(id => [id, { textContent: '', setAttribute(key, value) { this[key] = value; } }]));
   let touch = true;
   globalThis.document = {
@@ -81,10 +81,20 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-spoilers'].disabled, false);
     assert.equal(nodes['btn-reverser'].disabled, false);
 
+    updateControlState(telemetry, camera, { pitchTrim: 3.2, parkingBrake: true });
+    assert.equal(nodes['flight-trim-value'].textContent, '3.2°');
+    assert.equal(nodes['flight-park-brake']['aria-pressed'], 'true');
+    assert.equal(nodes['flight-trim-more'].disabled, false);
+    updateControlState(telemetry, camera, { controlsDisabled: true });
+    assert.equal(nodes['flight-trim-more'].disabled, true, 'blocked flight input also locks the shared trim controls');
+    assert.equal(nodes['flight-park-brake'].disabled, true);
+
     // During autonomous demo flight, all airplane flight controls are disabled
     telemetry.demoActive = true;
     updateControlState(telemetry, camera);
     assert.equal(nodes['btn-gear'].disabled, true, 'gear disabled during demo flight');
+    assert.equal(nodes['flight-trim-more'].disabled, true);
+    assert.equal(nodes['flight-park-brake'].disabled, true);
     assert.equal(nodes['btn-flaps-ret'].disabled, true, 'flaps retract disabled during demo flight');
     assert.equal(nodes['btn-flaps-ext'].disabled, true, 'flaps extend disabled during demo flight');
     assert.equal(nodes['btn-spoilers'].disabled, true, 'spoilers disabled during demo flight');

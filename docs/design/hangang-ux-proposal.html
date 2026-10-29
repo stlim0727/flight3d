@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>한강 저공 비행 UX 수정안 · PR 301</title>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:32px;background:#0d1521;color:#e2e8f0;font:15px/1.6 system-ui,sans-serif}h1{font-size:30px;margin:0 0 8px}a{color:#7dd3fc}.notice{color:#94a3b8;max-width:1100px}.flow{display:grid;grid-template-columns:minmax(0,1fr) 170px minmax(0,1fr);align-items:center;gap:20px;margin:36px 0}figure{margin:0}figcaption{font-size:18px;font-weight:700;margin-bottom:8px}.screen{position:relative;aspect-ratio:1.44;background:#09111f;overflow:hidden;border:1px solid #334155;border-radius:8px}.screen img{width:100%;height:100%;object-fit:cover}.legacy{position:absolute;left:1.2%;top:10%;background:#0c2537ed;border:1px solid #8ab8bb66;border-radius:8px;padding:12px;color:#e4f1f5;font-size:clamp(10px,1vw,14px);max-width:50%}.legacy strong{color:#ffd081}.arrow{text-align:center;color:#38bdf8;font-weight:700}.arrow b{display:block;font-size:46px}.tag{color:#94a3b8;font-size:12px}.shade{position:absolute;inset:0;background:#060a1277;display:grid;place-items:center}.dialog{width:45%;padding:20px;background:#101c2bf5;border:1px solid #334155;border-radius:12px}.dialog h3{margin:0 0 12px}.dialog span{display:block;border:1px solid #385268;border-radius:7px;padding:8px;margin:8px 0;font-size:12px}.summary{border:1px solid #334155;border-radius:12px;padding:20px;background:#101c2b}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:10px;border-bottom:1px solid #334155}@media(max-width:850px){body{padding:16px}.flow{grid-template-columns:1fr}.arrow b{transform:rotate(90deg)}}
+</style>
+<h1>한강 저공 비행 UX 수정안</h1>
+<p class="notice">Figma 기본 화면 설명과 비교하는 PR 검토용 문서입니다. Figma Starter 도구 호출 한도가 계속되어 새 페이지 생성은 미완료입니다. 아래 캡처는 2026-10-29 검증 시점의 화면이며, 최신 main의 저녁 조명·GLB 배경을 재촬영한 결과는 아닙니다.</p>
+<p><a href="https://www.figma.com/design/XmTUnPoI13ISmLJABHx2Bo?node-id=10-49">기본 화면 설명 (Figma)</a> · <a href="https://www.figma.com/design/XmTUnPoI13ISmLJABHx2Bo?node-id=18-86">공통 Flow (Figma)</a></p>
+<div class="flow">
+<figure><figcaption>01 · 저공 비행의 기존 전용 UI</figcaption><div class="screen"><img src="../../review-artifacts/hangang-common-ux/approach.jpg" alt="한강 비행 화면"><div class="legacy"><strong>교량 0 / 3 · 접근·정렬</strong><br>수면 높이 19.0 m · 수직속도 0.0 m/s<br>목표 620 m<br>다리 번호와 개구부 표식을 따라 통과<br>유지율 100% · 최소 여유 — / — / —</div></div><p class="tag">기존 코드를 근거로 전용 패널을 재구성한 비교도. 기존 상태의 실캡처는 아닙니다.</p></figure>
+<div class="arrow">전용 패널 전체 제거<b>→</b>공통 HUD 사용</div>
+<figure><figcaption>02 · 수정안 / 공통 HUD만 표시</figcaption><div class="screen"><img src="../../review-artifacts/hangang-common-ux/approach.jpg" alt="교량 점수판 없이 공통 HUD를 사용하는 한강 비행"></div><p class="tag">교량 카운트·단계·중복 안내·유지율·최소 여유·전용 다시 도전 제거. 내부 물리·접촉 판정 유지.</p></figure>
+</div>
+<div class="flow">
+<figure><figcaption>03 · 정상 비행에서 Esc</figcaption><div class="screen"><img src="../../review-artifacts/hangang-common-ux/approach.jpg" alt="정상 비행 배경"><div class="shade"><div class="dialog"><h3>일시정지</h3><span>계속 비행</span><span>시나리오 재시작</span><span>메인 메뉴로 이동</span></div></div></div><p class="tag">공통 일시정지 UI를 배경 위에 재구성한 설명도.</p></figure>
+<div class="arrow">시나리오 재시작<b>→</b>한강 선택 유지</div>
+<figure><figcaption>04 · 코스 초기 상태로 복귀</figcaption><div class="screen"><img src="../../review-artifacts/hangang-common-ux/approach.jpg" alt="한강 비행으로 재시작"></div><p class="tag">전용 재도전 버튼 없이 공통 메뉴의 기존 기능 사용.</p></figure>
+</div>
+<div class="flow">
+<figure><figcaption>05 · 실제 접촉 / 공통 충돌 보고서</figcaption><div class="screen"><img src="../../review-artifacts/hangang-common-ux/failure.jpg" alt="공통 충돌 보고서와 기체 파손 효과"></div><p class="tag">접촉 판정·충돌 효과·보고서 펼치기/접기는 공통 동작.</p></figure>
+<div class="arrow">Space / R / Enter<br>또는 ☰<b>→</b>메뉴 → 비행 시작</div>
+<figure><figcaption>06 · 공통 메인 메뉴에서 재진입</figcaption><div class="screen"><img src="../../review-artifacts/hangang-common-ux/region-menu.jpg" alt="한강 지역이 선택된 공통 메인 메뉴"></div><p class="tag">Space / R / Enter는 즉시 재시작이 아니라 메뉴 복귀입니다.</p></figure>
+</div>
+<div class="summary"><h2>기본 화면 설명과의 비교</h2><table><tr><th>항목</th><th>수정 후</th></tr><tr><td>메뉴·계측·조작·일시정지·충돌 보고서</td><td>다른 시나리오의 공통 컴포넌트와 흐름 사용</td></tr><tr><td>교량 카운트·유지율·여유·단계 패널·전용 재도전</td><td>전부 제거</td></tr><tr><td>C172·코스·바람·조명·GLB 장면·접촉 검사</td><td>시나리오 설정과 물리 구현 유지. main의 저녁 조명·장면 갱신도 충돌 해결 시 보존.</td></tr><tr><td>Figma 저공 비행 UX 페이지</td><td>한도 문제로 생성 대기. 존재하지 않는 페이지 링크를 PR에 추가하지 않음.</td></tr></table></div>
+</html>

@@ -128,37 +128,7 @@ async function run() {
   `);
   await capture('cockpit_view.png', 1000);
 
-  // 2. Cockpit Instruments View (cockpit_instruments_view.png)
-  console.log('Capturing cockpit_instruments_view.png...');
-  await evalJs(`
-    window.simulator.cameraSystem.lookYaw = 0.04;
-    window.simulator.cameraSystem.lookPitch = -0.32;
-    window.simulator.camera.fov = 57;
-    window.simulator.camera.updateProjectionMatrix();
-  `);
-  await capture('cockpit_instruments_view.png', 1000);
-
-  // 3. Center Pedestal View (cockpit_pedestal_view.png)
-  console.log('Capturing cockpit_pedestal_view.png...');
-  await evalJs(`
-    window.simulator.cameraSystem.lookYaw = -0.42;
-    window.simulator.cameraSystem.lookPitch = -0.48;
-    window.simulator.camera.fov = 60;
-    window.simulator.camera.updateProjectionMatrix();
-  `);
-  await capture('cockpit_pedestal_view.png', 1000);
-
-  // 4. Overhead View (cockpit_overhead_view.png)
-  console.log('Capturing cockpit_overhead_view.png...');
-  await evalJs(`
-    window.simulator.cameraSystem.lookYaw = 0.0;
-    window.simulator.cameraSystem.lookPitch = 0.65;
-    window.simulator.camera.fov = 62;
-    window.simulator.camera.updateProjectionMatrix();
-  `);
-  await capture('cockpit_overhead_view.png', 1000);
-
-  // 5. Cockpit Sunlight & Shadows (cockpit_sunlight_showcase.png)
+  // 2. Cockpit Sunlight & Shadows (cockpit_sunlight_showcase.png)
   console.log('Capturing cockpit_sunlight_showcase.png...');
   await evalJs(`
     window.simulator.sky.setTimeOfDay(16.8); // Golden hour

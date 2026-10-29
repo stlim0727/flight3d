@@ -60,7 +60,18 @@ try {
     await new Promise(r=>setTimeout(r,500));
   }
   await evaluate(`window.simulator.demoDirector.start('lukla',${JSON.stringify(profile)})`);
-  for(let i=0;i<100;i++) {
+  if (profile === 'low-pass') await evaluate(`(() => {
+    const s = window.simulator;
+    window.__landingContacts = [];
+    const update = s.gear.update.bind(s.gear);
+    s.gear.update = (...args) => {
+      const result = update(...args);
+      for (const c of result.touchdownContacts || []) window.__landingContacts.push({ id:c.id, sink:c.sinkRate });
+      return result;
+    };
+  })()`);
+  let previousStage;
+  for(let i=0;i<(profile === 'low-pass' ? 1000 : 100);i++) {
     const sample=await evaluate(`(() => {const s=window.simulator; s.stepSimulation(1); return {
       active:s.demoDirector.isActive,stage:s.demoDirector.currentStage, aircraft:s.currentAircraftId,
       crashed:s.isCrashed,stalled:s.telemetry.isStalled,position:s.position.toArray(),
@@ -70,13 +81,34 @@ try {
       programs:s.renderer.info.programs.map(p=>({name:p.name,runnable:p.diagnostics?.runnable}))
     }})()`);
     results.push(sample);
-    if(i%10===0 || (profile === 'canyon-chase' && (i === 34 || i === 35))) { console.log(i,JSON.stringify(sample)); await capture('flight-'+i); }
+    if((profile === 'low-pass' ? sample.stage !== previousStage || i%90===0 : i%10===0) || (profile === 'canyon-chase' && (i === 34 || i === 35))) { console.log(i,JSON.stringify(sample)); await capture('flight-'+i); }
+    previousStage = sample.stage;
     if(!sample.active) break;
   }
   fs.writeFileSync(path.join(dir,'results.json'),JSON.stringify({errors,results},null,2));
   assert.equal(results.at(-1).result.status,'completed');
   assert.ok(results.every(s=>!s.crashed&&!s.stalled&&s.aircraft==='F16'&&s.position.every(Number.isFinite)));
-  assert.ok(results.at(-1).result.minClearanceM>50);
+  if (profile === 'low-pass') {
+    assert.ok(results.at(-1).result.minPassClearanceM > 50, 'clearance before landing approach');
+    const parked = await evaluate(`(() => {
+      const s = window.simulator, before = s.position.clone();
+      s.stepSimulation(10);
+      const along = s.position.x * .848048 - s.position.z * .529919;
+      const cross = s.position.x * .529919 + s.position.z * .848048;
+      return { onGround:s.telemetry.onGround, speed:s.linearVelocity.length(), along, cross,
+        drift:s.position.distanceTo(before), brakes:s.controls.brakes, crashed:s.isCrashed,
+        incident:s.landingIncident, contacts:window.__landingContacts,
+        gear:s.gear.contacts.map(c=>({ grounded:c.isGrounded, damage:c.damage, state:c.damageState })) };
+    })()`);
+    fs.writeFileSync(path.join(dir, 'parking.json'), JSON.stringify(parked,null,2));
+    assert.ok(parked.onGround && !parked.crashed && !parked.incident);
+    assert.ok(parked.gear.every(c=>c.grounded && c.damage === 0 && c.state === 'normal'));
+    assert.ok(parked.speed < .5 && parked.drift < .1 && parked.brakes === 1, 'ten-second parking hold');
+    assert.ok(parked.along > -245 && parked.along < 240 && Math.abs(parked.cross) < 12, 'stopped inside runway');
+    assert.ok(parked.contacts.some(c=>c.id==='mainLeft') && parked.contacts.some(c=>c.id==='mainRight'));
+    assert.ok(parked.contacts.every(c=>c.sink < (c.id==='nose' ? 2.8 : 3.8)), 'soft normal-to-surface impact');
+    await capture('parked');
+  } else assert.ok(results.at(-1).result.minClearanceM>50);
   if (profile === 'canyon-chase') {
     assert.ok(results.at(-1).result.maxG >= 7.5, 'measured high-G pull-up');
     assert.ok(results.at(-1).result.invertedSeconds >= 2, 'sustained inverted flight');

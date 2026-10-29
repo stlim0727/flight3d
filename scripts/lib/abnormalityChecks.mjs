@@ -180,9 +180,10 @@ export function classifySample(sample, state) {
 
   if (!onPavement && Number.isFinite(sample.aglM)) {
     state.measures.minAglM = Math.min(state.measures.minAglM, sample.aglM);
+    const clearanceIntent = route.clearanceIntentByStage?.[name] ?? route.clearanceIntentM ?? 0;
     if (sample.aglM < 0) fail('FLIGHT BELOW THE GROUND PLANE');
-    else if (sample.aglM < (route.clearanceIntentM ?? 0)) {
-      fail(`CLEARANCE ${sample.aglM.toFixed(1)} m below the route's declared ${route.clearanceIntentM} m intent `
+    else if (sample.aglM < clearanceIntent) {
+      fail(`CLEARANCE ${sample.aglM.toFixed(1)} m below the route's declared ${clearanceIntent} m intent `
         + `(${vsiText(sample.vsiFpm)}, ${round(sample.iasKnots)} kt)`);
     }
   }

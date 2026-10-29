@@ -40,12 +40,18 @@ fog_*.png
 lukla_*.png
 flight-test-performance.json
 
-# Temporary test and worktree directories
+# Temporary test, review artifact, and worktree directories
 .tmp/
 .cache/
 .worktrees/
+worktrees/
+.qoder/
+.codex-attachments/
 .chrome-profile/
 .review/
+review-artifacts/
+artifacts/
+docs/development/evidence/
 
 # Local Cloudflare state
 .wrangler/
