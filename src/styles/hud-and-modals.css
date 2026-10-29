@@ -542,3 +542,25 @@ kbd {
   margin-bottom: 6px;
 }
 
+.audio-start-hint {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 160px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 9px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  background: rgba(12, 20, 30, 0.9);
+  color: #fff;
+  font: 13px/1.5 system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+  z-index: 96;
+}
+
+body.booting .audio-start-hint { display: none; }
+

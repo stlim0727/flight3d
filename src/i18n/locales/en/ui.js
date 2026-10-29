@@ -179,6 +179,7 @@ export default {
   "photo.cockpit.panel": "Photo cockpit panel",
   "3d.virtual.cockpit": "3D virtual cockpit",
   "audio.muted": "MUTED",
+  "audio.startHint": "Tap, click or press a key to enable sound.",
   "normal.volume.100": "Normal volume (100%)",
   "nose.radome": "Nose radome",
   "tail.empennage": "Tail empennage",
