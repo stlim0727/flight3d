@@ -1,0 +1,336 @@
+{
+  "before": {
+    "id": "f16-lukla-low-pass",
+    "tier": "core",
+    "finished": false,
+    "fails": [],
+    "reports": [],
+    "knownIssues": [
+      "t=27.8s CLIMB CLEARANCE 47.6 m below the route's declared 50 m intent (climb 10052 fpm, 389 kt) (known: at 27.8 s it is 47.6 m under the 50 m intent while climbing 10,052 fpm at 389 kt with 15.3\u00b0 of pitch)",
+      "t=28.0s stage -1 LANDING INCIDENT (airframe contact or damage event) (known: the ridge contact raises a landing incident)",
+      "t=28.0s stage -1 CLEARANCE 6.6 m below the route's declared 50 m intent (climb 10266 fpm, 388 kt) (known: one slice later it is at 6.6 m, still climbing (10,266 fpm) \u2014 the ridge comes up faster than the airframe does)",
+      "t=28.0s stage -1 ANGULAR RATE 36.28 rad/s (roll -31\u00b0) (known: and spins the airframe at 36 rad/s on impact)",
+      "t=28.0s stage -1 CRASH TERRAIN: The Nose radome made ground contact. (known: the Nose radome hits the ridge at 28.0 s, ending the demo; the scenario itself records minClearanceM 7.7, so this is not a sweep-only opinion \u2014 verify-f16-lukla.mjs:79 asserts minClearanceM > 50 and rejects the same flight. Tracked in https://github.com/stlim0727/flight3d/issues/292.)"
+    ],
+    "visitedStages": [
+      "ESTABLISH",
+      "LOW_PASS",
+      "CLIMB"
+    ],
+    "stageTrace": [
+      "ESTABLISH",
+      "LOW_PASS",
+      "CLIMB"
+    ],
+    "warningSeconds": {
+      "terrain": 10.25,
+      "pull-up": 14.25
+    },
+    "touchdowns": [],
+    "measures": {
+      "maxRollDeg": 33.1,
+      "maxIasKnots": 388.7,
+      "maxMach": 0.719,
+      "maxAbsG": 1.65,
+      "minAglM": 6.6,
+      "maxSinkFpm": 0,
+      "maxAngularRateRadS": 36.282,
+      "maxHeadingRateDegPerS": 2.400000000000091,
+      "maxBankRateDegPerS": 6,
+      "extremeGSamples": 0,
+      "stallSamples": 0,
+      "bodyContacts": 0,
+      "rolloutDevices": {},
+      "touchdownCount": 0
+    },
+    "simSeconds": 28,
+    "result": {
+      "status": "cancelled",
+      "minClearanceM": 7.658164858384225,
+      "maxBankDeg": 33.13402408941306
+    },
+    "samples": 114,
+    "heapMb": 249,
+    "wallSeconds": 14.5,
+    "attempt": 1,
+    "route": {
+      "aircraft": "F16",
+      "airport": "lukla",
+      "profile": "low-pass",
+      "scenario": "f16LowPass"
+    },
+    "firstInactiveSample": {
+      "simTime": 28,
+      "active": false,
+      "stage": -1,
+      "stageTransitions": [],
+      "aircraft": "F16",
+      "finite": true,
+      "crashed": false,
+      "crashType": null,
+      "crashDescription": null,
+      "iasKnots": 388.4,
+      "mach": 0.719,
+      "altitudeFt": 10798,
+      "radioAltFt": 159,
+      "pitchDeg": 15.5,
+      "rollDeg": -31.2,
+      "headingDeg": 217.1,
+      "gForce": 1.63,
+      "vsiFpm": 10266,
+      "angularRates": [
+        36.282,
+        -8.525,
+        0.009
+      ],
+      "onGround": false,
+      "groundSpeedMs": 201.43,
+      "position": [
+        -4584.9,
+        3304.6,
+        3309
+      ],
+      "aglM": 6.6,
+      "onRunway": false,
+      "inSafetyArea": false,
+      "stalled": false,
+      "landingIncident": true,
+      "gearStates": [
+        "normal",
+        "normal",
+        "normal"
+      ],
+      "gearDamageMax": 0,
+      "bodyContacts": [],
+      "touchdowns": [],
+      "warningIds": [
+        "pull-up"
+      ],
+      "spoilers": 0,
+      "reverser": 0,
+      "brakes": 1,
+      "throttle": 0,
+      "controlsDisabled": false,
+      "virtualInputs": {
+        "elevator": null,
+        "aileron": null,
+        "rudder": null,
+        "brakes": null
+      },
+      "result": {
+        "status": "cancelled",
+        "minClearanceM": 7.658164858384225,
+        "maxBankDeg": 33.13402408941306
+      },
+      "heapMb": 249
+    }
+  },
+  "after": {
+    "id": "f16-lukla-low-pass",
+    "tier": "core",
+    "finished": true,
+    "fails": [],
+    "reports": [
+      "NO BASELINE for this route (run `node scripts/demo-sweep.mjs --update-baseline`)"
+    ],
+    "knownIssues": [],
+    "visitedStages": [
+      "ESTABLISH",
+      "LOW_PASS",
+      "CLIMB",
+      "COMPLETED"
+    ],
+    "stageTrace": [
+      "ESTABLISH",
+      "LOW_PASS",
+      "CLIMB",
+      "COMPLETED"
+    ],
+    "warningSeconds": {
+      "terrain": 19.5,
+      "pull-up": 10.25
+    },
+    "touchdowns": [],
+    "measures": {
+      "maxRollDeg": 37.5,
+      "maxIasKnots": 308.3,
+      "maxMach": 0.573,
+      "maxAbsG": 1.4,
+      "minAglM": 170.7,
+      "maxSinkFpm": 0,
+      "maxAngularRateRadS": 0.114,
+      "maxHeadingRateDegPerS": 2.800000000000182,
+      "maxBankRateDegPerS": 6.800000000000182,
+      "extremeGSamples": 0,
+      "stallSamples": 0,
+      "bodyContacts": 0,
+      "rolloutDevices": {},
+      "touchdownCount": 0
+    },
+    "simSeconds": 42.22,
+    "result": {
+      "status": "completed",
+      "minClearanceM": 151.51999478873176,
+      "maxBankDeg": 37.47410884956165,
+      "elapsedSeconds": 42.21666666666491
+    },
+    "samples": 247,
+    "heapMb": 239,
+    "wallSeconds": 12.2,
+    "attempt": 1,
+    "route": {
+      "aircraft": "F16",
+      "airport": "lukla",
+      "profile": "low-pass",
+      "scenario": "f16LowPass"
+    },
+    "firstInactiveSample": {
+      "simTime": 42.22,
+      "active": false,
+      "stage": -1,
+      "stageTransitions": [
+        43
+      ],
+      "aircraft": "F16",
+      "finite": true,
+      "crashed": false,
+      "crashType": null,
+      "crashDescription": null,
+      "iasKnots": 298.1,
+      "mach": 0.57,
+      "altitudeFt": 12455,
+      "radioAltFt": 3880,
+      "pitchDeg": 14.7,
+      "rollDeg": -6.7,
+      "headingDeg": 200.1,
+      "gForce": 0.97,
+      "vsiFpm": 7289,
+      "angularRates": [
+        0.004,
+        0.005,
+        -0.008
+      ],
+      "onGround": false,
+      "groundSpeedMs": 181.86,
+      "position": [
+        -4915.7,
+        3805.5,
+        5682.2
+      ],
+      "aglM": 1169.2,
+      "onRunway": false,
+      "inSafetyArea": false,
+      "stalled": false,
+      "landingIncident": false,
+      "gearStates": [
+        "normal",
+        "normal",
+        "normal"
+      ],
+      "gearDamageMax": 0,
+      "bodyContacts": [],
+      "touchdowns": [],
+      "warningIds": [
+        "terrain"
+      ],
+      "spoilers": 0,
+      "reverser": 0,
+      "brakes": 0,
+      "throttle": 0.36,
+      "controlsDisabled": false,
+      "virtualInputs": {
+        "elevator": null,
+        "aileron": null,
+        "rudder": null,
+        "brakes": null
+      },
+      "result": {
+        "status": "completed",
+        "minClearanceM": 151.51999478873176,
+        "maxBankDeg": 37.47410884956165,
+        "elapsedSeconds": 42.21666666666491
+      },
+      "tickMetrics": {
+        "minAglM": 151.68356090524458,
+        "maxIasKnots": 308.29233897792375,
+        "maxAbsG": 1.3984628263558223,
+        "stalls": 0,
+        "crashes": 0,
+        "count": 5070
+      },
+      "heapMb": 259
+    },
+    "postHandoffFinalSample": {
+      "simTime": 42.22,
+      "active": false,
+      "stage": -1,
+      "stageTransitions": [],
+      "aircraft": "F16",
+      "finite": true,
+      "crashed": false,
+      "crashType": null,
+      "crashDescription": null,
+      "iasKnots": 273.7,
+      "mach": 0.556,
+      "altitudeFt": 15433,
+      "radioAltFt": 7732,
+      "pitchDeg": 20.3,
+      "rollDeg": -5.9,
+      "headingDeg": 193.1,
+      "gForce": 0.95,
+      "vsiFpm": 9972,
+      "angularRates": [
+        0.001,
+        0.005,
+        -0.002
+      ],
+      "onGround": false,
+      "groundSpeedMs": 171.25,
+      "position": [
+        -5930.2,
+        4716.7,
+        9039.4
+      ],
+      "aglM": 2400.5,
+      "onRunway": false,
+      "inSafetyArea": false,
+      "stalled": false,
+      "landingIncident": false,
+      "gearStates": [
+        "normal",
+        "normal",
+        "normal"
+      ],
+      "gearDamageMax": 0,
+      "bodyContacts": [],
+      "touchdowns": [],
+      "warningIds": [],
+      "spoilers": 0,
+      "reverser": 0,
+      "brakes": 0,
+      "throttle": 0.36,
+      "controlsDisabled": false,
+      "virtualInputs": {
+        "elevator": null,
+        "aileron": null,
+        "rudder": null,
+        "brakes": null
+      },
+      "result": {
+        "status": "completed",
+        "minClearanceM": 151.51999478873176,
+        "maxBankDeg": 37.47410884956165,
+        "elapsedSeconds": 42.21666666666491
+      },
+      "tickMetrics": {
+        "minAglM": 151.68356090524458,
+        "maxIasKnots": 308.29233897792375,
+        "maxAbsG": 1.3984628263558223,
+        "stalls": 0,
+        "crashes": 0,
+        "count": 7440
+      },
+      "heapMb": 239
+    }
+  }
+}
