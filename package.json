@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "bake:cockpit": "node scripts/bake-cockpit-transfer.mjs",
+    "bake:cockpit": "node scripts/bake-cockpit-transfer.mjs && node scripts/bake-cockpit-binding.mjs",
+    "bake:cockpit-binding": "node scripts/bake-cockpit-binding.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

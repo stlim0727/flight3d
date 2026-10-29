@@ -210,7 +210,10 @@ frame sits in cockpit mode before the interior GLB resolves, and that the demo
 cuts into the cockpit afterwards. It then fails both interior assets at the
 network layer and asserts cockpit mode falls back to chase with a toast, because
 the GLTF interior is the only cockpit geometry. `PORT`, `CDP_PORT`, `ARTIFACT_DIR`
-and `FORCE_GPU=0` (SwiftShader) override the defaults. See
+and `FORCE_GPU=0` (SwiftShader) override the defaults. To reuse the project browser
+and a running server, run `APP_URL=http://127.0.0.1:5291/
+chrome-session --project flight3d npm run test:cockpit`; the harness opens and closes
+its own tab. See
 [evidence](../../review-artifacts/cockpit-startup/README.md).
 
 ### Mouse look and tower zoom (issue #180)
@@ -277,10 +280,21 @@ Start Vite on port 5273 (`npm run dev -- --host 127.0.0.1 --port 5273`),
 then run `chrome-session --project flight3d node scripts/verify-startup.mjs`
 against the project Chrome session. Override `SIM_URL` and `ARTIFACT_DIR` as
 needed; screenshots and a stage report default to `/tmp/startup-progress`.
-The scenario checks that the loading screen covers scene construction, aircraft
-preloading, asset processing and shader preparation; it then verifies real mouse
+The scenario checks that the loading screen covers scene construction, selected
+aircraft assets, asset processing and shader preparation; it then verifies real mouse
 camera input and the retry screen after a forced WebGL initialization failure.
 The bar counts preparation stages, not downloaded bytes or estimated time.
+Startup waits only for the selected aircraft's assets and cockpit shader warmup;
+other aircraft prebuild after the overlay has been removed.
+
+For production startup timing, run `npm run build`, start `npm run preview --
+--host 127.0.0.1 --port 5291`, then run `chrome-session --project flight3d node
+scripts/verify-startup-performance.mjs`. `APP_URL` and `ARTIFACT_DIR` override the
+URL and `.cache/startup-performance` output. The probe disables HTTP cache, resets
+saved preferences on its target origin, records overlay removal, long tasks,
+resource timings, initial aircraft, renderer and bake coverage, and captures the
+ready view. Run timed comparisons without concurrent builds/tests or GPU work.
+It asserts valid lighting and finite completion, not a universal timing budget.
 
 ### C172 and F-16 tire contact
 

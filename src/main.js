@@ -715,7 +715,7 @@ class FlightSimulator {
   }
 
   /**
-   * Finish model preparation behind the startup overlay, yielding between models.
+   * Prepare the selected model behind the startup overlay.
    */
   scheduleAircraftPreload() {
     if (this.aircraftPreloadScheduled) return;
@@ -725,22 +725,16 @@ class FlightSimulator {
 
   async finishStartup() {
     await startupStage(4, 'startup.preload');
-    for (const id of LOBBY_AIRCRAFT_IDS) {
-      if (id !== this.currentAircraftId) {
-        this.prebuildAircraftInstance(id);
-        await startupStage(4, 'startup.preload');
-      }
-    }
     await startupStage(5, 'startup.cockpit');
     const deadline = performance.now() + 60000;
-    while ([...this.aircraftInstances.values()].some(aircraft => aircraft.cockpit?.cockpitModelLoading || aircraft.loadingGltf)) {
+    while (this.aircraft.cockpit?.cockpitModelLoading || this.aircraft.loadingGltf) {
       if (performance.now() > deadline) throw new Error('Startup assets timed out');
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     let timeout;
     try {
       await Promise.race([
-        Promise.all([...this.aircraftInstances.values()].map(aircraft => aircraft.cockpit?.shaderWarmup)),
+        Promise.resolve(this.aircraft.cockpit?.shaderWarmup),
         new Promise((_, reject) => {
           timeout = setTimeout(() => reject(new Error('Startup shaders timed out')), Math.max(0, deadline - performance.now()));
         }),
@@ -757,6 +751,16 @@ class FlightSimulator {
     // Loading time must not turn into accumulated simulation time.
     this.clock.getDelta();
     inputLatency?.mark('startup-complete');
+    // Paint the usable lobby before preparing optional aircraft. Each subsequent
+    // model gets its own task so background work cannot delay overlay removal.
+    const remaining = LOBBY_AIRCRAFT_IDS.filter(id => id !== this.currentAircraftId);
+    const preloadNext = () => {
+      const id = remaining.shift();
+      if (!id) return;
+      this.prebuildAircraftInstance(id);
+      if (remaining.length) setTimeout(preloadNext, 1000);
+    };
+    setTimeout(preloadNext, 1000);
   }
 
   setAircraft(aircraftId = 'B738') {

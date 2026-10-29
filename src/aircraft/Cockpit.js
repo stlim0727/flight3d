@@ -201,6 +201,10 @@ export class Cockpit {
       const gltfLoader = new GLTFLoader();
       gltfLoader.setDRACOLoader(dracoLoader);
 
+      // Start transport and its precomputed vertex binding alongside the GLB.
+      // Handle rejection immediately, including when the GLB falls back or fails.
+      const transferReady = CockpitLightTransfer.load(url.includes('-medium.') ? 'medium' : 'draco')
+        .then(transfer => ({ transfer }), error => ({ error }));
       gltfLoader.load(
         url,
         async (gltf) => {
@@ -209,8 +213,10 @@ export class Cockpit {
 
           let transfer;
           try {
-            transfer = await CockpitLightTransfer.load(url.includes('-medium.') ? 'medium' : 'draco');
-            transfer.bind(this.gltfCockpitGroup);
+            const result = await transferReady;
+            if (result.error) throw result.error;
+            transfer = result.transfer;
+            transfer.bindPrecomputed(this.gltfCockpitGroup);
             this.lightTransfer = transfer;
             this.gltfCockpitGroup.traverse(node => {
               if (node.isMesh) {
@@ -240,6 +246,7 @@ export class Cockpit {
         },
         undefined,
         (error) => {
+          transferReady.then(result => result.transfer?.dispose());
           if (url !== `${import.meta.env?.BASE_URL ?? '/'}models/b737-cockpit-draco.glb`) {
             console.warn('Falling back to lite draco cockpit model:', error);
             this.loadCockpitModel(`${import.meta.env?.BASE_URL ?? '/'}models/b737-cockpit-draco.glb`);

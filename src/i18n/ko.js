@@ -83,7 +83,7 @@ export default {
   "startup.aircraft": "항공기 구성 중…",
   "startup.world": "풍경 구성 중…",
   "startup.controls": "조작 준비 중…",
-  "startup.preload": "추가 항공기 준비 중…",
+  "startup.preload": "선택 항공기 준비 중…",
   "startup.cockpit": "콕핏 준비 중…",
   "startup.ready": "준비 완료",
   "startup.failed": "시작을 완료하지 못했습니다. 다시 시도해 주세요.",

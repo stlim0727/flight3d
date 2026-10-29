@@ -150,3 +150,52 @@ it('smoothTransport bridges a 100x cell-to-cell cliff without inventing energy',
   const energy = out[0] + out[1] + out[2] + out[3];
   assert.ok(energy > 0 && energy <= 14, `smoothing neither deletes a cliff nor amplifies (sum ${energy})`);
 });
+
+// Compare every precomputed float with the original world-space receiver lookup.
+// This also detects stale geometry/control/batching inputs without GPU rendering.
+for (const variant of ['medium', 'draco']) it(`precomputed ${variant} binding exactly matches runtime lookup`, async () => {
+  const { gunzipSync } = await import('node:zlib');
+  const base = `public/lighting/cockpit-${variant}`;
+  const manifest = JSON.parse(fs.readFileSync(`${base}.json`));
+  const binding = JSON.parse(fs.readFileSync(`${base}-binding.json`));
+  const compressed = fs.readFileSync(`${base}-binding.uvpack`);
+  const hash = data => createHash('sha256').update(data).digest('hex');
+  assert.equal(hash(compressed), binding.dataHash);
+  assert.equal(binding.transferHash, manifest.dataHash);
+  assert.equal(binding.assetHash, manifest.assetHash);
+  for (const [file, expected] of Object.entries(binding.sources)) {
+    assert.equal(hash(fs.readFileSync(file, 'utf8').replaceAll('\r\n', '\n')), expected, file);
+  }
+  const bytes = gunzipSync(compressed);
+  const uv = new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  const transfer = new CockpitLightTransfer(manifest, new Float32Array(manifest.keys.length * TRANSFER_COLUMNS));
+  const cockpit = new Cockpit({}, {}, {}, {}, {}, {});
+  cockpit.prepareModel(await loadCockpitGeometry(`public/models/b737-cockpit-${variant}.glb`));
+  transfer.bind(cockpit.gltfCockpitGroup);
+  const expected = [];
+  cockpit.gltfCockpitGroup.traverse(mesh => {
+    if (transfer.isReceiver(mesh)) expected.push(mesh.geometry.attributes.deckTransferUV.array);
+  });
+  transfer.binding = binding;
+  transfer.bindingUV = uv;
+  // Aircraft pose and repeated binding cannot change the offline UVs.
+  cockpit.group.position.set(12, 56, -90);
+  cockpit.group.rotation.set(.4, .8, -.6);
+  for (let pass = 0; pass < 2; pass++) {
+    transfer.bindPrecomputed(cockpit.gltfCockpitGroup);
+    let i = 0;
+    cockpit.gltfCockpitGroup.traverse(mesh => {
+      if (transfer.isReceiver(mesh)) assert.deepEqual(mesh.geometry.attributes.deckTransferUV.array, expected[i++]);
+    });
+  }
+  const first = binding.meshes[0];
+  first.count++;
+  assert.throws(() => transfer.bindPrecomputed(cockpit.gltfCockpitGroup), /mismatch/);
+  first.count--;
+  transfer.bindingUV = new Float32Array(0);
+  assert.throws(() => transfer.bindPrecomputed(cockpit.gltfCockpitGroup), /Invalid/);
+  transfer.bindingUV = uv.slice();
+  transfer.bindingUV[0] = NaN;
+  assert.throws(() => transfer.bindPrecomputed(cockpit.gltfCockpitGroup), /Invalid/);
+  transfer.dispose();
+});

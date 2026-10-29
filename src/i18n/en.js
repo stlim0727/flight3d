@@ -83,7 +83,7 @@ export default {
   "startup.aircraft": "Building aircraft…",
   "startup.world": "Building scenery…",
   "startup.controls": "Preparing controls…",
-  "startup.preload": "Preparing additional aircraft…",
+  "startup.preload": "Preparing selected aircraft…",
   "startup.cockpit": "Preparing cockpit…",
   "startup.ready": "Ready",
   "startup.failed": "Startup could not finish. Please try again.",

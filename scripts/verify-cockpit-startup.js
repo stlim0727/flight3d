@@ -10,8 +10,9 @@ import path from 'node:path';
 // left for the exterior view. Artifacts land in ARTIFACT_DIR.
 
 const PORT = Number(process.env.PORT || 5196);
-const CDP_PORT = Number(process.env.CDP_PORT || 9466);
-const SIM_URL = `http://localhost:${PORT}/`;
+const REUSE_BROWSER = Boolean(process.env.CHROME_DEBUG_PORT);
+const CDP_PORT = Number(process.env.CHROME_DEBUG_PORT || process.env.CDP_PORT || 9466);
+const SIM_URL = process.env.APP_URL || `http://localhost:${PORT}/`;
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ||
   path.join(process.cwd(), 'review-artifacts', 'cockpit-startup');
 const MODES = { COCKPIT: 0, CHASE: 1 };
@@ -21,6 +22,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Runs before any page script so the first animation frames are sampled; a
 // mid-load interior swap cannot slip between CDP round-trips.
 const SAMPLER = `
+  localStorage.setItem('flight3d.airport', 'coastal');
+  localStorage.setItem('flight3d.aircraft', 'B738');
+  localStorage.setItem('flight3d.scenario', 'demo');
+  localStorage.setItem('flight3d.language', 'en');
   window.__cockpitProbe = { start: performance.now(), samples: [] };
   const sample = () => {
     const cockpit = window.simulator?.aircraft?.cockpit;
@@ -125,8 +130,8 @@ async function coldLoad(session) {
   await capture(session, '1_cold_load_view.png');
 
   assert.ok(samples.length > 15, `Expected per-frame samples, got ${samples.length}`);
-  assert.equal(samples[0].mode, MODES.CHASE,
-    `The first rendered frame must be the exterior view, got mode ${samples[0].mode}`);
+  assert.notEqual(samples[0].mode, MODES.COCKPIT,
+    `The first rendered frame must be an exterior view, got mode ${samples[0].mode}`);
 
   const blindFrames = samples.filter((s) => s.mode === MODES.COCKPIT && !s.loaded && !s.failed);
   assert.equal(blindFrames.length, 0,
@@ -196,14 +201,14 @@ async function main() {
   fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
   const useGpu = fs.existsSync('/dev/dri/renderD128') && process.env.FORCE_GPU !== '0';
 
-  console.log(`Starting Vite dev server on port ${PORT}`);
-  const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+  console.log(REUSE_BROWSER ? 'Using project Chrome session and existing server' : `Starting Vite dev server on port ${PORT}`);
+  const vite = REUSE_BROWSER ? null : spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
   for (let i = 0; i < 60; i++) {
     await sleep(250);
     try { if ((await fetch(SIM_URL)).ok) break; } catch (e) {}
   }
 
-  const chrome = spawn('google-chrome-stable', [
+  const chrome = REUSE_BROWSER ? null : spawn('google-chrome-stable', [
     '--headless=new',
     `--user-data-dir=/tmp/chrome-cockpit-startup-${Date.now()}`,
     `--remote-debugging-port=${CDP_PORT}`,
@@ -215,7 +220,9 @@ async function main() {
     '--enable-unsafe-swiftshader'
   ], { stdio: 'ignore' });
 
-  const session = await attach();
+  const tab = REUSE_BROWSER ? await (await fetch(
+    `http://localhost:${CDP_PORT}/json/new?about:blank`, { method: 'PUT' })).json() : null;
+  const session = tab ? openSession(tab.webSocketDebuggerUrl) : await attach();
   try {
     await session.ready;
     await session.send('Page.enable');
@@ -226,8 +233,9 @@ async function main() {
     console.log('Browser evidence captured in', ARTIFACT_DIR);
   } finally {
     session.ws.close();
-    chrome.kill();
-    vite.kill();
+    if (tab) await fetch(`http://localhost:${CDP_PORT}/json/close/${tab.id}`);
+    chrome?.kill();
+    vite?.kill();
   }
 }
 

@@ -32,13 +32,67 @@ export class CockpitLightTransfer {
 
   static async load(variant) {
     const base = `${import.meta.env?.BASE_URL ?? '/'}lighting/cockpit-${variant}`;
-    const [metadata, binary] = await Promise.all([fetch(`${base}.json`), fetch(`${base}.bin`)]);
-    if (!metadata.ok || !binary.ok) throw Error('Cockpit light-transfer files unavailable');
-    const manifest = await metadata.json(), bytes = await binary.arrayBuffer();
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
-    if (hash !== manifest.dataHash) throw Error('Cockpit light-transfer checksum mismatch');
-    return new CockpitLightTransfer(manifest, new Float32Array(bytes));
+    const [metadata, binary, bindingMetadata, bindingBinary] = await Promise.all([
+      fetch(`${base}.json`), fetch(`${base}.bin`),
+      fetch(`${base}-binding.json`), fetch(`${base}-binding.uvpack`),
+    ]);
+    if (![metadata, binary, bindingMetadata, bindingBinary].every(response => response.ok)) {
+      throw Error('Cockpit light-transfer files unavailable');
+    }
+    const [manifest, bytes, binding, compressed] = await Promise.all([
+      metadata.json(), binary.arrayBuffer(), bindingMetadata.json(), bindingBinary.arrayBuffer(),
+    ]);
+    const hash = async data => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)),
+      b => b.toString(16).padStart(2, '0')).join('');
+    if (await hash(bytes) !== manifest.dataHash || await hash(compressed) !== binding.dataHash ||
+        binding.transferHash !== manifest.dataHash || binding.assetHash !== manifest.assetHash) {
+      throw Error('Cockpit light-transfer checksum mismatch');
+    }
+    const decoded = await new Response(new Blob([compressed]).stream()
+      .pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    const transfer = new CockpitLightTransfer(manifest, new Float32Array(bytes));
+    transfer.binding = binding;
+    transfer.bindingUV = new Float32Array(decoded);
+    return transfer;
+  }
+
+  /** Attach offline attributes to the final batched geometry, in neutral pose. */
+  bindPrecomputed(group) {
+    const meshes = [];
+    group.traverse(mesh => {
+      if (this.isReceiver(mesh)) meshes.push(mesh);
+    });
+    const binding = this.binding, uv = this.bindingUV;
+    if (binding?.version !== 1 || binding.coverage !== 1 || !meshes.length ||
+        binding.meshes?.length !== meshes.length || uv?.length !== binding.values) {
+      throw Error('Invalid cockpit vertex binding');
+    }
+    let offset = 0;
+    // Validate the complete layout before changing any geometry.
+    meshes.forEach((mesh, i) => {
+      const count = mesh.geometry.attributes.position.count;
+      if (binding.meshes[i].name !== mesh.name || binding.meshes[i].count !== count) {
+        throw Error('Cockpit vertex binding/geometry mismatch');
+      }
+      offset += count * 4;
+    });
+    if (offset !== uv.length || !uv.every(value => Number.isFinite(value) && value >= 0 && value <= 1)) {
+      throw Error('Invalid cockpit vertex UV data');
+    }
+    offset = 0;
+    meshes.forEach(mesh => {
+      const end = offset + mesh.geometry.attributes.position.count * 4;
+      const geometry = mesh.geometry.clone();
+      geometry.setAttribute('deckTransferUV', new THREE.BufferAttribute(uv.subarray(offset, end), 4));
+      mesh.geometry = geometry;
+      offset = end;
+    });
+    this.coverage = binding.coverage;
+  }
+
+  isReceiver(mesh) {
+    return mesh.isMesh && mesh.material.isMeshStandardMaterial && !mesh.material.transparent &&
+      !(mesh.userData.cockpitApertureShadow && mesh.name.endsWith('_SideWindowShadow'));
   }
 
   bind(group) {
@@ -47,8 +101,7 @@ export class CockpitLightTransfer {
     const p = new THREE.Vector3(), n = new THREE.Vector3();
     let matched = 0, vertices = 0;
     group.traverse(mesh => {
-      if (!mesh.isMesh || !mesh.material.isMeshStandardMaterial || mesh.material.transparent ||
-          mesh.userData.cockpitApertureShadow && mesh.name.endsWith('_SideWindowShadow')) return;
+      if (!this.isReceiver(mesh)) return;
       const geometry = mesh.geometry.clone();
       if (!geometry.attributes.normal) geometry.computeVertexNormals();
       const transform = new THREE.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld);
