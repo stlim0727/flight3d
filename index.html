@@ -68,6 +68,10 @@
         <span id="hud-g" class="hud-val">1.00 G</span>
       </div>
       <div class="hud-item">
+        <span class="hud-label">FUEL</span>
+        <span id="hud-fuel" class="hud-val">100%</span>
+      </div>
+      <div class="hud-item">
         <span class="hud-label">CAMERA</span>
         <span id="hud-cam" class="hud-val cyan">COCKPIT</span>
       </div>
@@ -124,7 +128,7 @@
     </div>
 
     <!-- Stall Warning Alert Banner -->
-    <div id="hud-warning" role="alert" hidden style="position:absolute;top:22%;left:50%;transform:translateX(-50%);font:bold 24px monospace;text-shadow:0 2px 4px #000;pointer-events:none"></div>
+    <div id="hud-warning" class="flight-warning" role="alert" hidden></div>
     <div id="hud-stall" class="stall-banner" data-i18n="warning.stall">⚠️ STALL WARNING - PULL DOWN NOSE ⚠️</div>
 
     <!-- Catastrophic Crash & Explosion Overlay -->

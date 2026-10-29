@@ -75,27 +75,29 @@ try {
   })()`);
   await key('9', 'Digit9');
   assert.equal(await evaluate('window.simulator.cameraSystem.mode'), 8);
-  assert.ok(await evaluate('!document.getElementById("hud-view").hidden && getComputedStyle(document.querySelector(".hud-strip")).display === "none"'));
-  assert.equal(await evaluate('document.querySelectorAll("#hud-view .hud-unavailable:disabled").length'), 4);
+  assert.ok(await evaluate('!document.getElementById("hud-view").hidden && getComputedStyle(document.querySelector(".hud-strip")).display !== "none"'));
+  assert.equal(await evaluate('document.querySelectorAll("#hud-view .hud-unavailable:disabled").length'), 0);
   assert.ok(await evaluate('window.simulator.aircraft.group.visible'), 'render visibility restored after HUD render');
-  await capture('desktop-level'); checks.push('digit9 and disabled placeholders');
-  const trim = await evaluate('window.simulator.controls.pitchTrim');
-  await click('hud-trim-more');
+  await capture('desktop-level'); checks.push('digit9 and no disabled placeholders');
+  await click('open-flight-more');
+  const trim = await evaluate('window.simulator.aero.pitchTrim');
+  await click('flight-trim-more');
   assert.ok(Math.abs(await evaluate('window.simulator.controls.pitchTrim') - trim - .2) < .001);
-  await click('hud-park-brake');
+  await click('flight-park-brake');
   assert.equal(await evaluate('window.simulator.controls.parkingBrake'), true);
-  await click('hud-park-brake');
+  await click('flight-park-brake');
   assert.equal(await evaluate('window.simulator.controls.parkingBrake'), false);
-  await click('hud-autopilot');
+  await click('open-flight-more');
+  await click('btn-ap-toggle');
   assert.ok(await evaluate('!document.getElementById("ap-panel").hidden'));
   await capture('desktop-ap');
-  await click('hud-autopilot');
+  await click('btn-ap-toggle');
   assert.ok(await evaluate('document.getElementById("ap-panel").hidden'), 'AP trigger closes panel');
-  await click('hud-systems');
-  assert.ok(await evaluate('!document.getElementById("hud-systems-panel").hidden'));
+  await click('open-flight-more');
+  assert.ok(await evaluate('!document.getElementById("flight-more-panel").hidden'));
   await capture('desktop-systems');
   await key('Escape','Escape');
-  assert.ok(await evaluate('document.getElementById("hud-systems-panel").hidden'));
+  assert.ok(await evaluate('document.getElementById("flight-more-panel").hidden'));
   checks.push('trim brake AP and systems interactions');
   for (const [name, pitch, roll] of [['climb-bank',15,30], ['descent-bank',-12,-35]]) {
     await evaluate(`(() => {
@@ -108,11 +110,11 @@ try {
     })()`);
     await capture(`desktop-${name}`);
   }
-  await click('hud-camera-prev');
+  await evaluate('window.simulator.controls.onSelectCamera(0)');
   assert.equal(await evaluate('window.simulator.cameraSystem.mode'), 0);
   await key('c','KeyC');
   assert.equal(await evaluate('window.simulator.cameraSystem.mode'), 8);
-  await click('hud-camera-next');
+  await click('open-camera');
   assert.equal(await evaluate('window.simulator.cameraSystem.mode'), 1);
   assert.ok(await evaluate('document.getElementById("hud-view").hidden && getComputedStyle(document.querySelector(".hud-strip")).display !== "none"'));
   assert.equal(await evaluate('document.activeElement.id'),'open-camera','camera exit restores visible focus');
@@ -134,20 +136,20 @@ try {
     await evaluate(`document.body.classList.toggle('touch-mode',${touch})`);
     await wait(250);
     assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'),'no horizontal overflow');
-    assert.equal(await evaluate('getComputedStyle(document.querySelector(".flight-toolbar")).display'),'none','original toolbar stays hidden in touch mode');
+    assert.equal(await evaluate('getComputedStyle(document.querySelector(".flight-toolbar")).display'),'flex','shared toolbar stays visible in touch mode');
     const footerOverlap = await evaluate(`(() => {
-      const a = document.querySelector('.hud-flight-footer').getBoundingClientRect();
+      const a = document.querySelector('.flight-toolbar').getBoundingClientRect();
       return [...document.querySelectorAll('.touch-throttle-card,.touch-stick-card,.touch-rudder-card')].some(node => {
         if (!node.getClientRects().length) return false;
         const b = node.getBoundingClientRect();
         return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
       });
     })()`);
-    assert.equal(footerOverlap,false,'HUD footer clears touch controls');
+    assert.equal(footerOverlap,false,'shared toolbar clears touch controls');
     await capture(name);
-    await click('hud-systems');
+    await click('open-flight-more');
     await capture(`${name}-systems`);
-    await click('hud-systems');
+    await click('open-flight-more');
     checks.push(name);
   }
   await evaluate('window.simulator.gameFlow.returnToLobby(true)');
@@ -175,12 +177,12 @@ try {
     s.updateHUD();
   })()`);
   const demoTrim = await evaluate('window.simulator.controls.pitchTrim');
-  assert.ok(await evaluate('document.getElementById("hud-trim-more").disabled && document.getElementById("hud-flaps-more").disabled && document.getElementById("hud-park-brake").disabled'));
-  await evaluate('document.getElementById("hud-trim-more").click(); window.simulator.cameraSystem.setMode(0); window.simulator.cameraSystem.showTemporaryView(5,4)');
+  assert.ok(await evaluate('document.getElementById("flight-trim-more").disabled && document.getElementById("btn-flaps-ext").disabled && document.getElementById("flight-park-brake").disabled'));
+  await evaluate('document.getElementById("flight-trim-more").click(); window.simulator.cameraSystem.setMode(0); window.simulator.cameraSystem.showTemporaryView(5,4)');
   assert.equal(await evaluate('window.simulator.controls.pitchTrim'),demoTrim);
   assert.equal(await evaluate('window.simulator.cameraSystem.mode'),8);
   await evaluate('window.simulator.demoDirector.stop(); window.simulator.updateHUD()');
-  assert.ok(await evaluate('!document.getElementById("hud-trim-more").disabled'));
+  assert.ok(await evaluate('!document.getElementById("flight-trim-more").disabled'));
   checks.push('demo disables controls and cannot replace manual HUD selection; stop restores controls');
   assert.equal(errors.length,0,JSON.stringify(errors));
   checks.push('lobby hides HUD and flight restores it');

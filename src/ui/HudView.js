@@ -1,5 +1,4 @@
 import { CameraSystem } from '../cameras/CameraSystem.js';
-import { bindText, t } from '../i18n/index.js';
 import { hudDirection, projectHudDirection } from './HudProjection.js';
 
 /** HUD is a camera presentation; all commands use the existing flight controls. */
@@ -10,131 +9,22 @@ export class HudView {
     this.root.id = 'hud-view';
     this.root.hidden = true;
     this.root.setAttribute('aria-label', 'HUD');
-    this.root.innerHTML = `
-      <canvas class="hud-flight-glass" aria-hidden="true"></canvas>
-      <nav class="hud-camera-switch" aria-label="Camera">
-        <button type="button" id="hud-camera-prev">‹</button><span>CAM <b>HUD</b></span>
-        <button type="button" id="hud-camera-next">›</button>
-      </nav>
-      <div class="hud-center-badge"><span id="hud-badge-title">HUD CAM · 시안</span></div>
-      <div class="hud-side hud-side-left">
-        <div class="hud-control-card"><span data-hud-label="hud.trim"></span><output id="hud-trim-value"></output>
-          <div class="hud-pair"><button type="button" id="hud-trim-less">−</button><button type="button" id="hud-trim-more">+</button></div></div>
-        <div class="hud-control-card"><span data-hud-label="hud.flaps"></span><output id="hud-flaps-value"></output>
-          <div class="hud-pair"><button type="button" id="hud-flaps-less">−</button><button type="button" id="hud-flaps-more">+</button></div></div>
-        <button type="button" id="hud-park-brake" data-hud-label="hud.brake" aria-pressed="false"></button>
-      </div>
-      <div class="hud-side hud-side-right">
-        <button type="button" id="hud-autopilot" aria-controls="ap-panel" aria-expanded="false">AP OFF</button>
-        <button type="button" id="hud-systems" data-hud-label="hud.systems" aria-controls="hud-systems-panel" aria-expanded="false"></button>
-        <button type="button" id="hud-time-accel" class="hud-btn-time" disabled><span data-hud-label="hud.time"></span><small data-hud-label="hud.soon"></small></button>
-        ${['plan', 'ground', 'map'].map(name => `<button type="button" class="hud-unavailable" disabled><span data-hud-label="hud.${name}"></span><small data-hud-label="hud.soon"></small></button>`).join('')}
-      </div>
-      <div id="hud-systems-panel" class="hud-systems-panel" hidden></div>
-      <footer class="hud-flight-footer">${[['speed','AIRSPEED'], ['altitude','ALTITUDE MSL'], ['heading','HEADING'], ['vsi','VERT SPEED'], ['fuel','FUEL'], ['camera','CAM']].map(([name,label]) => `<div><span>${label}</span><output id="hud-footer-${name}"></output></div>`).join('')}</footer>`;
+    this.root.innerHTML = '<canvas class="hud-flight-glass" aria-hidden="true"></canvas>';
     document.getElementById('hud-overlay').append(this.root);
     this.canvas = this.root.querySelector('canvas');
     this.ctx = this.canvas.getContext('2d');
-    this.nodes = Object.fromEntries([...this.root.querySelectorAll('[id]')].map(node => [node.id, node]));
-    for (const node of this.root.querySelectorAll('[data-hud-label]')) {
-      bindText(node, () => t(node.dataset.hudLabel));
-    }
-    const on = (id, action) => this.nodes[id].addEventListener('click', action);
-    const proxy = id => document.getElementById(id)?.click();
-    const cycle = delta => {
-      const views = CameraSystem.QUICK_CYCLE;
-      const index = views.indexOf(sim.cameraSystem.mode);
-      sim.controls.onSelectCamera(views[(index + delta + views.length) % views.length]);
-    };
-    on('hud-camera-prev', () => cycle(-1));
-    on('hud-camera-next', () => cycle(1));
-    for (const [id, key] of [['hud-camera-prev','hud.previous'], ['hud-camera-next','hud.next'],
-      ['hud-trim-less','hud.trim.less'], ['hud-trim-more','hud.trim.more'],
-      ['hud-flaps-less','ui.flaps.less'], ['hud-flaps-more','ui.flaps.more']]) {
-      bindText(this.nodes[id], () => t(key, { angle: '' }), 'aria-label');
-    }
-    for (const [id, sign] of [['hud-trim-less', -1], ['hud-trim-more', 1]]) {
-      on(id, () => {
-        if (this.flightControlsDisabled()) return;
-        sim.aero.setTrim(sign * .2);
-        sim.controls.pitchTrim = sim.aero.pitchTrim;
-      });
-    }
-    on('hud-flaps-less', () => proxy('btn-flaps-ret'));
-    on('hud-flaps-more', () => proxy('btn-flaps-ext'));
-    on('hud-park-brake', () => {
-      if (!this.flightControlsDisabled()) sim.controls.setParkingBrake(!sim.controls.parkingBrake);
-    });
-    on('hud-autopilot', () => proxy('btn-ap-toggle'));
-    on('hud-systems', () => this.setSystemsOpen(this.nodes['hud-systems-panel'].hidden));
-    // Reuse existing control handlers and their disabled states, including demo lockout.
-    for (const source of ['btn-gear', 'btn-spoilers', 'btn-reverser', 'btn-mute', 'btn-fullscreen']) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.id = `hud-system-${source}`;
-      button.addEventListener('click', () => proxy(source));
-      this.nodes['hud-systems-panel'].append(button);
-    }
-    document.addEventListener('pointerdown', event => {
-      if (!event.target.closest('#hud-systems, #hud-systems-panel')) this.setSystemsOpen(false);
-    });
-    document.addEventListener('keydown', event => {
-      if (!this.root.hidden && event.key === 'Escape' && !this.nodes['hud-systems-panel'].hidden) {
-        event.preventDefault(); event.stopPropagation();
-        this.setSystemsOpen(false); this.nodes['hud-systems'].focus();
-      }
-    });
-  }
-
-  flightControlsDisabled() {
-    return this.sim.controls.aircraftControlsDisabled || this.sim.controls.inputBlocked || this.sim.isCrashed;
-  }
-
-  setSystemsOpen(open) {
-    this.nodes['hud-systems-panel'].hidden = !open;
-    this.nodes['hud-systems'].setAttribute('aria-expanded', String(open));
   }
 
   update() {
     const sim = this.sim;
     const active = sim.cameraSystem.mode === CameraSystem.MODES.HUD && !sim.isCrashed;
     if (this.root.hidden === active) {
-      // A removed mode must not leave keyboard focus inside hidden controls.
-      const restoreFocus = !active && this.root.contains(document.activeElement);
       this.root.hidden = !active;
       document.body.classList.toggle('hud-camera-mode', active);
-      if (restoreFocus) document.getElementById('open-camera')?.focus();
-      this.setSystemsOpen(false);
     }
     if (!active) return;
-    const data = sim.telemetry;
-    const set = (id, value) => { if (this.nodes[id].textContent !== value) this.nodes[id].textContent = value; };
-    const heading = ((Math.round(data.headingDeg || 0) % 360) + 360) % 360;
-    set('hud-footer-speed', `${Math.round(data.iasKnots || 0)} KT`);
-    set('hud-footer-altitude', `${Math.round(data.altitudeFt || 0).toLocaleString('en-US')} FT`);
-    set('hud-footer-heading', `${String(heading).padStart(3, '0')}°`);
-    const vsi = Math.round((data.vsiFpm || 0) / 10) * 10;
-    set('hud-footer-vsi', `${vsi > 0 ? '+' : ''}${vsi} FPM`);
-    set('hud-footer-fuel', `${Math.round(Math.max(0, Math.min(100, 100 * (data.fuelKg || 0) / sim.engines.fuelCapacityKg)))}%`);
-    set('hud-footer-camera', 'HUD');
-    set('hud-trim-value', `${sim.controls.pitchTrim.toFixed(1)}°`);
-    set('hud-flaps-value', `${Math.round(data.flapDegree || 0)}°`);
-    set('hud-autopilot', `AP ${sim.autopilot.master ? 'ON' : 'OFF'} ▾`);
-    this.nodes['hud-autopilot'].setAttribute('aria-expanded', document.getElementById('btn-ap-toggle').getAttribute('aria-expanded'));
-    this.nodes['hud-autopilot'].classList.toggle('is-active', sim.autopilot.master);
-    this.nodes['hud-park-brake'].setAttribute('aria-pressed', String(sim.controls.parkingBrake));
-    const disabled = this.flightControlsDisabled();
-    for (const id of ['hud-trim-less', 'hud-trim-more', 'hud-park-brake']) this.nodes[id].disabled = disabled;
-    for (const [target, source] of [['hud-flaps-less', 'btn-flaps-ret'], ['hud-flaps-more', 'btn-flaps-ext']]) {
-      this.nodes[target].disabled = disabled || document.getElementById(source).disabled;
-    }
-    for (const source of ['btn-gear', 'btn-spoilers', 'btn-reverser', 'btn-mute', 'btn-fullscreen']) {
-      const button = document.getElementById(`hud-system-${source}`), original = document.getElementById(source);
-      button.textContent = original.getAttribute('aria-label') || original.title || original.textContent;
-      button.disabled = original.disabled;
-      button.setAttribute('aria-pressed', original.getAttribute('aria-pressed') || 'false');
-    }
-    this.draw(data, heading);
+    const heading = ((Math.round(sim.telemetry.headingDeg || 0) % 360) + 360) % 360;
+    this.draw(sim.telemetry, heading);
   }
 
   draw(data, heading) {

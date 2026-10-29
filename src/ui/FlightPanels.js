@@ -6,7 +6,7 @@ export function touchLabel(text) {
 }
 
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
-export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCamera }) {
+export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCamera, onAdjustTrim, onToggleParkingBrake }) {
   const hud = document.getElementById('hud-overlay');
   // Let keyboard users scroll the full telemetry row as well as touch users.
   const strip = document.querySelector('.hud-strip');
@@ -34,7 +34,7 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   fullscreen.setAttribute('data-short-label', '');
   const ap = document.getElementById('ap-bar');
   const apPanel = document.getElementById('ap-panel');
-  topActions.append(mute, fullscreen, ap);
+  topActions.append(ap, mute);
   if (apPanel) hud.append(apPanel);
   const menu = document.getElementById('menu-toggle');
   if (menu) topBar.append(menu);
@@ -52,12 +52,57 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   bindText(cameraButton, () => t('change.camera.c'), 'title');
   cameraButton.addEventListener('click', () => onCycleCamera());
   bar.append(cameraButton);
+  // Taking over must remain available when the guide is collapsed or yields to
+  // warnings. Keep the existing button/handler outside the notification tree.
+  bar.append(document.getElementById('btn-skip-demo'));
   const autoCameraButton = document.createElement('button');
   autoCameraButton.id = 'btn-auto-camera';
   autoCameraButton.className = 'btn';
   autoCameraButton.type = 'button';
   autoCameraButton.addEventListener('click', () => onToggleAutoCamera());
-  bar.append(autoCameraButton);
+  const moreButton = document.createElement('button');
+  moreButton.id = 'open-flight-more';
+  moreButton.className = 'btn';
+  moreButton.type = 'button';
+  moreButton.textContent = '⋯';
+  moreButton.setAttribute('aria-controls', 'flight-more-panel');
+  moreButton.setAttribute('aria-expanded', 'false');
+  bindText(moreButton, () => t('ui.more'), 'aria-label');
+  const more = document.createElement('section');
+  more.id = 'flight-more-panel';
+  more.className = 'flight-more-panel';
+  more.hidden = true;
+  bindText(more, () => t('ui.more'), 'aria-label');
+  more.innerHTML = `<div class="flight-trim">
+    <span data-flight-label="hud.trim"></span><output id="flight-trim-value"></output>
+    <button id="flight-trim-less" class="btn" type="button">−</button>
+    <button id="flight-trim-more" class="btn" type="button">+</button>
+    </div><button id="flight-park-brake" class="btn" type="button" aria-pressed="false" data-flight-label="hud.brake"></button>`;
+  for (const node of more.querySelectorAll('[data-flight-label]')) bindText(node, () => t(node.dataset.flightLabel));
+  for (const [id, sign, key] of [['flight-trim-less', -1, 'hud.trim.less'], ['flight-trim-more', 1, 'hud.trim.more']]) {
+    const button = more.querySelector(`#${id}`);
+    bindText(button, () => t(key), 'aria-label');
+    button.addEventListener('click', () => onAdjustTrim(sign * .2));
+  }
+  more.querySelector('#flight-park-brake').addEventListener('click', () => onToggleParkingBrake());
+  more.prepend(fullscreen);
+  more.append(autoCameraButton);
+  hud.append(more);
+  const setMoreOpen = open => {
+    more.hidden = !open;
+    moreButton.setAttribute('aria-expanded', String(open));
+    if (open) more.querySelector('button').focus({ preventScroll: true });
+  };
+  moreButton.addEventListener('click', () => setMoreOpen(more.hidden));
+  document.addEventListener('pointerdown', event => {
+    if (!event.target.closest('#flight-more-panel, #open-flight-more')) setMoreOpen(false);
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || more.hidden) return;
+    event.preventDefault(); event.stopPropagation();
+    setMoreOpen(false);
+    moreButton.focus({ preventScroll: true });
+  }, true);
   // Settings belong to the main menu, not the in-flight HUD.
   const settings = document.getElementById('lobby-settings');
   const cameraLabel = document.createElement('label');
@@ -86,6 +131,7 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   for (const id of ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']) {
     bar.append(document.getElementById(id));
   }
+  bar.append(moreButton);
 
   for (const [id, key] of Object.entries({
     'btn-cam-reset': 'center.view.o',
@@ -112,17 +158,19 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   function positionEdgeButtons() {
     if (!strip.getClientRects().length || !bar.getClientRects().length) return;
     const topBarRect = topBar.getBoundingClientRect();
-    const noticeTop = topBarRect.bottom + 8;
+    const controlsBottom = bar.getBoundingClientRect().bottom;
+    const noticeTop = Math.max(topBarRect.bottom, controlsBottom) + 6;
     document.documentElement.style.setProperty('--menu-row-top', `${topBarRect.top}px`);
     document.documentElement.style.setProperty('--ap-row-top', `${topBarRect.top}px`);
     document.documentElement.style.setProperty('--demo-row-top', `${noticeTop}px`);
-    if (ap) {
-      document.documentElement.style.setProperty('--ap-panel-offset', `${ap.offsetHeight + 6}px`);
-    }
+    document.documentElement.style.setProperty('--flight-panels-top', `${noticeTop}px`);
   }
   const observer = new ResizeObserver(positionEdgeButtons);
   for (const node of [topBar, strip, bar, menu, ap, document.documentElement]) observer.observe(node);
-  new MutationObserver(positionEdgeButtons).observe(document.body, {
+  new MutationObserver(() => {
+    if (document.body.dataset.flow !== 'flight') setMoreOpen(false);
+    positionEdgeButtons();
+  }).observe(document.body, {
     attributes: true, attributeFilter: ['class', 'data-flow'],
   });
   window.addEventListener('resize', positionEdgeButtons);
@@ -143,6 +191,14 @@ export function updateControlState(telemetry, camera, options = {}) {
     button.setAttribute('title', text);
     if (shortLabel !== undefined) button.setAttribute('data-short-label', shortLabel);
   };
+  const disabled = isDemo || Boolean(options.controlsDisabled);
+  for (const id of ['flight-trim-less', 'flight-trim-more', 'flight-park-brake']) {
+    const button = document.getElementById(id);
+    if (button) button.disabled = disabled;
+  }
+  const trimValue = document.getElementById('flight-trim-value');
+  if (trimValue) trimValue.textContent = `${(options.pitchTrim || 0).toFixed(1)}°`;
+  document.getElementById('flight-park-brake')?.setAttribute('aria-pressed', String(Boolean(options.parkingBrake)));
   const gear = telemetry.gearState;
   const damage = Object.values(telemetry.gearDamage || {});
   const state = damage.includes('collapsed') ? 'fail' : damage.includes('damaged') ? 'damaged' : gear > .95 ? 'down' : gear < .05 ? 'up' : 'transit';
