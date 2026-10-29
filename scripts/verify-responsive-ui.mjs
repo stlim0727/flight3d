@@ -287,8 +287,9 @@ await send('Emulation.setTouchEmulationEnabled', { enabled: false, maxTouchPoint
 await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await ev(`window.simulator.touchControls.disable(); window.simulator.demoDirector.start(); window.simulator.demoDirector.closeBanner()`);
 await new Promise(resolve => setTimeout(resolve, 2800));
-const demoPill = await ev(`(()=>{const node=document.querySelector('#btn-demo-open'),r=node.getBoundingClientRect(),t=document.querySelector('.flight-toolbar').getBoundingClientRect();return {visible:getComputedStyle(node).display!=='none',top:r.top,toolbarBottom:t.bottom,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}})()`);
+const demoPill = await ev(`(()=>{const node=document.querySelector('#btn-demo-open'),r=node.getBoundingClientRect(),t=document.querySelector('.flight-toolbar').getBoundingClientRect();return {visible:getComputedStyle(node).display!=='none',top:r.top,width:r.width,height:r.height,toolbarBottom:t.bottom,reachable:node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}})()`);
 assert.ok(demoPill.visible && demoPill.top >= demoPill.toolbarBottom + 4 && demoPill.reachable, `desktop: demo reopen pill is clear and reachable below toolbar: ${JSON.stringify(demoPill)}`);
+assert.ok(demoPill.width < 140 && demoPill.height === 44, 'desktop: collapsed demo control stays compact with a 44px touch target');
 await nativeClick('#btn-demo-open', false);
 assert.ok(await ev(`getComputedStyle(document.querySelector('#demo-banner')).display!=='none' && getComputedStyle(document.querySelector('#btn-demo-open')).display==='none'`), 'desktop: demo guide reopens from its pill');
 
@@ -303,11 +304,11 @@ const mobileDemo = await ev(`(() => {
   const ap = document.querySelector('.ap-bar');
   const apStyle = getComputedStyle(ap);
   const apHidden = apStyle.visibility === 'hidden' || apStyle.display === 'none';
-  const bannerBelowMenu = banner.top >= menu.bottom + 4;
-  return { bannerTop: banner.top, menuBottom: menu.bottom, apHidden, bannerBelowMenu };
+  const bannerBesideMenu = banner.left >= menu.right + 4;
+  return { bannerTop: banner.top, menuBottom: menu.bottom, apHidden, bannerBesideMenu };
 })()`);
 assert.ok(mobileDemo.apHidden, `mobile portrait: AP is hidden during demo: ${JSON.stringify(mobileDemo)}`);
-assert.ok(mobileDemo.bannerBelowMenu, `mobile portrait: demo banner sits below menu button: ${JSON.stringify(mobileDemo)}`);
+assert.ok(mobileDemo.bannerBesideMenu, `mobile portrait: demo banner sits beside menu button: ${JSON.stringify(mobileDemo)}`);
 await ev(`window.simulator.demoDirector.stop()`);
 await send('Emulation.setTouchEmulationEnabled', { enabled: false, maxTouchPoints: 1 });
 await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });

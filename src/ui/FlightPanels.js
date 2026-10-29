@@ -103,6 +103,7 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
     const menuLeft = menu.getBoundingClientRect().left;
     const apRight = ap.getBoundingClientRect().right;
     const rows = [strip.getBoundingClientRect(), bar.getBoundingClientRect()];
+    document.documentElement.style.setProperty('--demo-row-top', `${rows[1].bottom + 4}px`);
     for (const [button, fits, property] of [
       [menu, row => row.left >= menuLeft + menu.offsetWidth + 4, '--menu-row-top'],
       [ap, row => row.right <= apRight - ap.offsetWidth - 4, '--ap-row-top'],
