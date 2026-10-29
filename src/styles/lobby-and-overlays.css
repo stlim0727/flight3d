@@ -194,6 +194,7 @@ body[data-dev-scenario="true"] #touch-controls-overlay { display: none !importan
    The same park applies while booting (.booting, removed after startup)
    so the HUD does not flash over the loading screen. */
 body:is([data-flow="lobby"], .booting) .hud-strip,
+body:is([data-flow="lobby"], .booting) .hud-top-actions,
 body:is([data-flow="lobby"], .booting) .ap-bar,
 body:is([data-flow="lobby"], .booting) .flight-toolbar,
 body:is([data-flow="lobby"], .booting) .flight-panel,
@@ -252,13 +253,13 @@ body[data-flow="lobby"] .menu-toggle {
   .presets-bar { top: 60px; }
 }
 
-/* Anchor demo UI beside the menu, leaving the center of the flight view clear. */
+/* Center demo notice directly below the top telemetry bar */
 .demo-banner, .demo-pill-btn,
 .compact-ui .demo-banner, .compact-ui .demo-pill-btn {
-  top: var(--demo-row-top, calc(var(--edge-top) + 96px));
-  left: auto;
-  right: var(--edge-right);
-  transform: none;
+  top: var(--demo-row-top, calc(var(--edge-top) + 54px));
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
 }
 .demo-banner, .compact-ui .demo-banner {
   box-sizing: border-box;
@@ -482,12 +483,12 @@ body[data-flow="lobby"] #incheon-attribution-chip { display: none; }
 .hud-flight-footer > div + div { border-left: 1px solid #64748b; }
 .hud-flight-footer output { font: 600 21px monospace; color: #edf5ff; }
 .hud-systems-panel { position: absolute; top: max(133px, calc(17% + 54px)); right: calc(var(--edge-right) + 124px); width: 210px; padding: 8px; display: grid; gap: 6px; pointer-events: auto; max-height: calc(100dvh - 200px); overflow-y: auto; }
-body.hud-camera-mode .hud-strip, body.hud-camera-mode .flight-toolbar { display: none !important; }
-body.hud-camera-mode .menu-toggle { top: var(--edge-top); }
-body.hud-camera-mode .ap-bar { top: max(80px, 17%); right: var(--edge-right); width: 112px; pointer-events: none; }
-body.hud-camera-mode #btn-ap-toggle { visibility: hidden; }
-body.hud-camera-mode .ap-panel { top: 54px; right: 124px; pointer-events: auto; }
-body.hud-camera-mode #demo-banner { top: calc(var(--edge-top) + 48px); }
+/* HUD camera mode: shares the exact same telemetry strip, top header, and control dock */
+#hud-view .hud-side,
+#hud-view .hud-camera-switch,
+#hud-view .hud-flight-footer {
+  display: none !important;
+}
 body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display: none; }
 @media (max-width: 700px) {
   .hud-side { width: 74px; top: 76px; gap: 6px; }

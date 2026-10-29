@@ -21,22 +21,38 @@
   --edge-bottom: max(8px, env(safe-area-inset-bottom));
 }
 .flight-toolbar {
-  position: absolute;
-  bottom: var(--edge-bottom);
+  position: fixed;
+  bottom: calc(var(--edge-bottom) + 12px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  align-items: center;
   gap: 6px;
+  padding: 6px 10px;
+  background: rgba(10, 16, 26, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   pointer-events: auto;
   z-index: 65;
+  max-width: calc(100vw - var(--edge-left) - var(--edge-right) - 16px);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 .flight-toolbar .btn, .flight-panel .btn {
-  min-height: 44px;
+  min-height: 40px;
   box-shadow: none;
   text-shadow: none;
 }
 .flight-toolbar .btn {
   white-space: nowrap;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #e2e8f0;
 }
 .btn[aria-expanded="true"], .btn[aria-pressed="true"] {
   background: #164e63;
@@ -187,19 +203,23 @@ body.demo-active #touch-controls-overlay {
   white-space: nowrap;
 }
 .compact-ui .flight-toolbar {
-  bottom: auto;
-  top: calc(var(--edge-top) + 54px);
-  left: calc(var(--edge-left) + 48px);
-  right: calc(var(--edge-right) + 76px);
-  transform: none;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  bottom: calc(var(--edge-bottom) + 8px);
+  top: auto;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   gap: 4px;
+  padding: 4px 6px;
+  border-radius: 10px;
 }
 .compact-ui .flight-toolbar .btn {
   font-size: 11px;
-  padding: 5px 2px;
-  white-space: normal;
+  padding: 4px 8px;
+  min-height: 36px;
+  white-space: nowrap;
 }
 .compact-ui .flight-panel {
   top: calc(var(--edge-top) + 104px);

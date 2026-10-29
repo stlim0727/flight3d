@@ -50,21 +50,82 @@ body, html {
   pointer-events: none;
 }
 
+/* Top Unified Header Bar */
+.hud-top-bar {
+  position: fixed;
+  top: var(--edge-top, 8px);
+  left: var(--edge-left, 8px);
+  right: var(--edge-right, 8px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  z-index: 90;
+  pointer-events: none;
+}
+
+.hud-top-bar > * {
+  pointer-events: auto;
+}
+
+.hud-top-bar .menu-toggle {
+  position: relative;
+  top: auto;
+  left: auto;
+  flex-shrink: 0;
+  margin: 0;
+}
+
 /* Top Telemetry Strip */
 .hud-strip {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
   display: flex;
-  gap: 16px;
+  align-items: center;
+  gap: 14px;
   background: rgba(10, 16, 26, 0.82);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(56, 189, 248, 0.25);
-  border-radius: 8px;
-  padding: 8px 18px;
+  border-radius: 10px;
+  padding: 6px 14px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hud-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.hud-top-actions .btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: rgba(10, 16, 26, 0.82);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #e2e8f0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+.hud-top-actions .ap-bar {
+  position: relative;
+  top: auto;
+  right: auto;
+  z-index: 92;
 }
 
 .hud-item {

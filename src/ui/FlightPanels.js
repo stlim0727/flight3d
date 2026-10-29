@@ -19,6 +19,26 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
     else if (event.key === 'End') strip.scrollLeft = strip.scrollWidth;
     else strip.scrollLeft += event.key === 'ArrowRight' ? 80 : -80;
   });
+  const topBar = document.createElement('div');
+  topBar.className = 'hud-top-bar';
+  const topActions = document.createElement('div');
+  topActions.className = 'hud-top-actions';
+  const mute = document.createElement('button');
+  mute.id = 'btn-mute';
+  mute.className = 'btn quick-mute';
+  mute.type = 'button';
+  mute.setAttribute('aria-pressed', 'false');
+  bindText(mute, () => t('ui.mute'), 'aria-label');
+  mute.textContent = '🔊';
+  const fullscreen = document.getElementById('btn-fullscreen');
+  fullscreen.setAttribute('data-short-label', '');
+  const ap = document.getElementById('ap-bar');
+  topActions.append(mute, fullscreen, ap);
+  const menu = document.getElementById('menu-toggle');
+  if (menu) topBar.append(menu);
+  topBar.append(strip, topActions);
+  hud.prepend(topBar);
+
   const bar = document.createElement('nav');
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
@@ -61,17 +81,6 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
     const node = document.querySelector(selector);
     if (node) settings.append(node);
   }
-  const mute = document.createElement('button');
-  mute.id = 'btn-mute';
-  mute.className = 'btn quick-mute';
-  mute.type = 'button';
-  mute.setAttribute('aria-pressed', 'false');
-  bindText(mute, () => t('ui.mute'), 'aria-label');
-  mute.textContent = '🔊';
-  bar.append(mute);
-  const fullscreen = document.getElementById('btn-fullscreen');
-  fullscreen.setAttribute('data-short-label', '');
-  bar.append(fullscreen);
   for (const id of ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']) {
     bar.append(document.getElementById(id));
   }
@@ -97,32 +106,20 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   touch.addEventListener('change', layout);
   layout();
 
-  // Measure each side independently: telemetry first, controls second, then below.
-  const menu = document.getElementById('menu-toggle');
-  const ap = document.getElementById('ap-bar');
+  // Keep the top header bar, control dock, AP panel, and notice slot aligned.
   function positionEdgeButtons() {
     if (!strip.getClientRects().length || !bar.getClientRects().length) return;
-    // Resolve safe-area calc()/max() values through the positioned buttons.
-    const menuLeft = menu.getBoundingClientRect().left;
-    const apRight = ap.getBoundingClientRect().right;
-    const rows = [strip.getBoundingClientRect(), bar.getBoundingClientRect()];
-    document.documentElement.style.setProperty('--demo-row-top', `${rows[1].bottom + 4}px`);
-    for (const [button, fits, property] of [
-      [menu, row => row.left >= menuLeft + menu.offsetWidth + 4, '--menu-row-top'],
-      [ap, row => row.right <= apRight - ap.offsetWidth - 4, '--ap-row-top'],
-    ]) {
-      const row = rows.find(fits);
-      const top = row ? row.top : rows[1].bottom + 4;
-      document.documentElement.style.setProperty(property, `${top}px`);
-      if (button === ap) {
-        // The dropdown is wider than its trigger; keep it below both strips.
-        const panelOffset = Math.max(ap.offsetHeight + 4, rows[1].bottom + 4 - top);
-        document.documentElement.style.setProperty('--ap-panel-offset', `${panelOffset}px`);
-      }
+    const topBarRect = topBar.getBoundingClientRect();
+    const noticeTop = topBarRect.bottom + 8;
+    document.documentElement.style.setProperty('--menu-row-top', `${topBarRect.top}px`);
+    document.documentElement.style.setProperty('--ap-row-top', `${topBarRect.top}px`);
+    document.documentElement.style.setProperty('--demo-row-top', `${noticeTop}px`);
+    if (ap) {
+      document.documentElement.style.setProperty('--ap-panel-offset', `${ap.offsetHeight + 6}px`);
     }
   }
   const observer = new ResizeObserver(positionEdgeButtons);
-  for (const node of [strip, bar, menu, ap, document.documentElement]) observer.observe(node);
+  for (const node of [topBar, strip, bar, menu, ap, document.documentElement]) observer.observe(node);
   new MutationObserver(positionEdgeButtons).observe(document.body, {
     attributes: true, attributeFilter: ['class', 'data-flow'],
   });
