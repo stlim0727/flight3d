@@ -61,6 +61,7 @@ async function run() {
       window.simulator.demoDirector.stop();
       window.simulator.gameFlow.enterFlight();
       window.simulator.integratePhysics = () => {};
+      window.simulator.cameraSystem.setMode(8);
       document.body.classList.add('touch-mode');
     })()`);
     await delay(1000);
@@ -86,6 +87,7 @@ async function run() {
       window.simulator.demoDirector.stop();
       window.simulator.gameFlow.enterFlight();
       window.simulator.integratePhysics = () => {};
+      window.simulator.cameraSystem.setMode(8);
       document.body.classList.add('touch-mode');
     })()`);
     await delay(1000);

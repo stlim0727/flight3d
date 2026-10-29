@@ -238,7 +238,15 @@ body.booting .menu-toggle { display: none !important; }
   pointer-events: auto;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
-.compact-ui .menu-toggle-title { display: none; }
+.compact-ui .menu-toggle {
+  height: 36px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+.compact-ui .menu-toggle-title {
+  display: inline;
+  font-size: 11px;
+}
 /* With the strip hidden in the menu, keep its close affordance off the card. */
 body[data-flow="lobby"] .menu-toggle {
   top: var(--edge-top);
@@ -555,26 +563,42 @@ body.hud-camera-mode .hud-top-actions {
 .hud-systems-panel { position: absolute; top: max(133px, calc(17% + 54px)); right: calc(var(--edge-right) + 124px); width: 210px; padding: 8px; display: grid; gap: 6px; pointer-events: auto; max-height: calc(100dvh - 200px); overflow-y: auto; }
 body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display: none; }
 
-/* Responsive adjustments for mobile: ensure ZERO overlapping */
+/* Responsive adjustments for mobile: keep buttons as close as desktop with ZERO overlapping */
 @media (max-width: 768px) {
-  .hud-side { width: 72px; top: 68px; gap: 6px; }
-  .hud-side-right { width: 84px; }
-  #hud-view .hud-side button { font-size: 10px; min-height: 36px; padding: 4px; }
+  .hud-center-badge {
+    padding: 4px 10px;
+    font-size: 11px;
+    height: 36px;
+    border-radius: 8px;
+  }
+  .hud-camera-switch {
+    height: 36px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+  .hud-side { width: 92px; top: 48px; gap: 6px; }
+  .hud-side-right { width: 96px; }
+  #hud-view .hud-side button { font-size: 11px; min-height: 34px; padding: 4px; }
   .hud-control-card { padding-top: 4px; font-size: 10px; gap: 2px; }
-  .hud-control-card output { font-size: 14px; }
+  .hud-control-card output { font-size: 15px; }
+  #hud-view .hud-pair button { font-size: 16px; min-height: 28px; }
   .hud-unavailable { display: none !important; }
-  .hud-flight-footer { grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 6px 0; }
+  .hud-flight-footer {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    padding: 6px 0;
+  }
   .hud-flight-footer > div { font-size: 8px; gap: 2px; }
   .hud-flight-footer output { font-size: 13px; }
 }
 
 @media (max-height: 520px) {
-  .hud-side { top: 52px; gap: 4px; width: 78px; }
-  .hud-side-right { width: 84px; }
+  .hud-side { top: 46px; gap: 4px; width: 88px; }
+  .hud-side-right { width: 92px; }
   .hud-unavailable { display: none !important; }
-  #hud-view .hud-side button { font-size: 9px; min-height: 30px; padding: 2px; }
+  #hud-view .hud-side button { font-size: 10px; min-height: 30px; padding: 2px 4px; }
   .hud-control-card { padding-top: 2px; font-size: 9px; gap: 1px; }
-  .hud-control-card output { font-size: 13px; }
+  .hud-control-card output { font-size: 14px; }
+  #hud-view .hud-pair button { font-size: 15px; min-height: 26px; }
   .hud-flight-footer { padding: 4px 0; }
   .hud-flight-footer output { font-size: 13px; }
   .hud-flight-footer > div { font-size: 8px; }
@@ -586,18 +610,37 @@ body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display
 }
 
 @media (max-width: 540px) {
-  .hud-side-left { top: 52px; width: 68px; gap: 4px; }
-  .hud-side-right { top: 52px; width: 76px; gap: 4px; }
+  .menu-toggle {
+    height: 34px;
+    padding: 0 8px;
+    font-size: 11px;
+    gap: 5px;
+  }
+  .hud-center-badge {
+    height: 34px;
+    padding: 2px 8px;
+    font-size: 10.5px;
+  }
+  .hud-camera-switch {
+    height: 34px;
+    padding: 0 4px;
+    gap: 2px;
+    font-size: 11px;
+  }
+  #hud-view .hud-camera-switch button {
+    min-width: 22px;
+    font-size: 18px;
+  }
+  .hud-side-left { top: 46px; width: 84px; gap: 4px; }
+  .hud-side-right { top: 46px; width: 88px; gap: 4px; }
   .hud-unavailable { display: none !important; }
   .touch-mode #hud-view .hud-flight-footer {
     left: var(--edge-left);
     right: var(--edge-right);
     bottom: calc(var(--edge-bottom) + 140px);
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    row-gap: 4px;
-    padding: 4px;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    padding: 6px 0;
   }
-  .touch-mode #hud-view .hud-flight-footer > div:nth-child(4) { border-left: 0; }
 }
 
 
