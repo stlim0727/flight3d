@@ -203,11 +203,12 @@
             </div>
           </div>
           <div class="lobby-group" role="group">
-            <span class="lobby-label" data-i18n="lobby.airport">공항</span>
+            <span class="lobby-label" data-i18n="lobby.airport">비행 지역</span>
             <div class="lobby-buttons">
               <button id="lobby-airport-coastal" class="btn btn-airport active"><span data-i18n="coastal.airport">🌊 국제공항</span></button>
               <button id="lobby-airport-incheon" class="btn btn-airport"><span data-i18n="incheon.airport">인천 (RKSI)</span></button>
               <button id="lobby-airport-lukla" class="btn btn-airport"><span data-i18n="lukla.vnlk">🏔️ 루클라 (VNLK)</span></button>
+              <button id="lobby-airport-hangang" class="btn btn-airport"><span data-i18n="hangang.region">한강</span></button>
               <button id="lobby-airport-neon" class="btn btn-airport"><span data-i18n="neon.metropolis">🌆 네온 메트로폴리스</span></button>
             </div>
           </div>
@@ -216,6 +217,7 @@
             <div class="lobby-buttons">
               <button id="lobby-preset-rwy" class="btn btn-preset"><span>🛫 활주로 이륙 (09L)</span></button>
               <button id="lobby-preset-app" class="btn btn-preset"><span>🛬 착륙 접근 (3 NM)</span></button>
+              <button id="lobby-preset-hangang" class="btn btn-preset"><span data-i18n="hangang.title">한강 연속 교량 저공 비행</span></button>
               <button id="lobby-preset-cru" class="btn btn-preset"><span>✈️ 순항 비행 (6,000 FT)</span></button>
               <button id="lobby-preset-cliff" class="btn btn-preset btn-cliff"><span>⚡ 내리막 이륙 (Rwy 24)</span></button>
               <button id="lobby-preset-demo" class="btn btn-preset"><span>🎬 데모 비행</span></button>
@@ -411,5 +413,12 @@
     <button id="incheon-attribution-chip" type="button" aria-expanded="false" aria-label="Map data attribution">©</button>
     <span id="incheon-attribution-text">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · Copernicus <a href="scenery/incheon/LICENSE.md" target="_blank" rel="noopener" data-i18n="data.sources.and.limitations"></a></span>
   </aside>
+  <section id="hangang-hud" class="hangang-hud" hidden aria-label="Hangang flight challenge">
+    <div class="hangang-heading"><strong id="hangang-progress"></strong><span id="hangang-phase"></span></div>
+    <p id="hangang-guidance"></p>
+    <p id="hangang-warning"></p>
+    <p id="hangang-result"></p>
+    <button id="hangang-retry" class="btn" hidden data-i18n="hangang.retry">다시 도전</button>
+  </section>
 </body>
 </html>
