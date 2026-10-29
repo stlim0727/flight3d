@@ -1,0 +1,66 @@
+{
+  "yeouido-landmarks": {
+    "url": "models/hangang/yeouido-landmarks.glb",
+    "bytes": 119884,
+    "bounds": {
+      "min": [
+        687,
+        0,
+        -462
+      ],
+      "max": [
+        1135.5,
+        338,
+        567.5
+      ]
+    }
+  },
+  "namsan-tower": {
+    "url": "models/hangang/namsan-tower.glb",
+    "bytes": 26236,
+    "bounds": {
+      "min": [
+        -2230,
+        0,
+        -2780
+      ],
+      "max": [
+        -870,
+        478,
+        -1420
+      ]
+    }
+  },
+  "lotte-tower": {
+    "url": "models/hangang/lotte-tower.glb",
+    "bytes": 8948,
+    "bounds": {
+      "min": [
+        2168,
+        0,
+        -6432
+      ],
+      "max": [
+        2232,
+        580,
+        -6368
+      ]
+    }
+  },
+  "bridges-kit": {
+    "url": "models/hangang/bridges-kit.glb",
+    "bytes": 8704,
+    "bounds": {
+      "min": [
+        125,
+        0,
+        -1880
+      ],
+      "max": [
+        275,
+        13,
+        -1520
+      ]
+    }
+  }
+}
