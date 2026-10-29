@@ -89,6 +89,9 @@ plus mobile menu, restart, camera override and cancellation checks.
 
 ## F-16 Lukla low pass
 
+Landing results reported in [PR #304](https://github.com/stlim0727/flight3d/pull/304)
+are evidence within the game model, not validation of real F16 landing feasibility; see [fidelity limits and validation work](f16-lukla-realism.md).
+
 Select **Lukla → F-16 → Demo flight**. The demo waits for the DEM, starts
 southwest of runway 24 at 280 KIAS with gear retracted, flies a straight valley
 pass, then climbs before the opposing ridge and hands back powered controls.
