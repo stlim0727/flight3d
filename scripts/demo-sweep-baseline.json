@@ -169,17 +169,19 @@
   "f16-lukla-low-pass": {
     "maxRollDeg": 37.5,
     "maxIasKnots": 308.3,
-    "maxMach": 0.571,
-    "maxAbsG": 1.4,
-    "maxSinkFpm": 0,
-    "maxAngularRateRadS": 0.2,
-    "maxHeadingRateDegPerS": 2.9,
-    "maxBankRateDegPerS": 6.9,
-    "minAglM": 170.7,
+    "maxMach": 0.57,
+    "maxAbsG": 2,
+    "maxSinkFpm": 3001.0,
+    "maxAngularRateRadS": 0.7,
+    "maxHeadingRateDegPerS": 7.6,
+    "maxBankRateDegPerS": 18,
+    "minAglM": 2.3,
     "warningSeconds": {
-      "terrain": 18,
-      "pull-up": 10.3
+      "terrain": 39,
+      "pull-up": 17,
+      "stall": 32,
+      "sink-rate": 3.3
     },
-    "elapsedSeconds": 42
+    "elapsedSeconds": 358
   }
 }
