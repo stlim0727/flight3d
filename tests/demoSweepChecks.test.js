@@ -78,6 +78,7 @@ function fullFlight(route, patch = {}, { hold = 0 } = {}) {
     };
     if (route.lands && onGround) {
       // A route that promises a landing must actually touch the pavement down.
+      for (const device of route.rolloutDevices ?? []) row[device] = 1;
       row.touchdowns = [{ id: 'mainLeft', sink: 1.6 }, { id: 'mainRight', sink: 1.6 }, { id: 'nose', sink: 0.9 }];
     }
     if (last) Object.assign(row, {
@@ -192,6 +193,11 @@ test('every route declares stages its own scenario can reach', () => {
     assert.ok(Number.isFinite(route.budgetSimSeconds) && route.budgetSimSeconds > 0, `${route.id} needs a sampling ceiling`);
     assert.equal(route.stages.at(-1), 'COMPLETED', `${route.id} must end at its COMPLETED stage`);
     assert.ok(route.clearanceIntentM >= 0, `${route.id} declares a negative clearance intent`);
+    for (const [name, clearance] of Object.entries(route.clearanceIntentByStage ?? {})) {
+      assert.ok(route.stages.includes(name), `${route.id} has clearance for an unknown stage`);
+      assert.ok(Number.isFinite(clearance) && clearance >= route.clearanceIntentM,
+        `${route.id} has an invalid stage clearance`);
+    }
     if (route.lands) assert.equal(route.handoff, 'parked', `${route.id} lands but does not park`);
     // Widening either promise is a choreography decision, so it has to be visible here.
     if (route.maxRollDeg !== undefined) {
@@ -285,8 +291,17 @@ test('clearance below the route intent fails; pavement contact and a declared sk
   fails(fly(scenic, fullFlight(scenic, { aglM: -3 })), 'FLIGHT BELOW THE GROUND PLANE');
   silent(fly(scenic, fullFlight(scenic, { aglM: 0, onGround: true })), 'BELOW THE GROUND PLANE');
   silent(fly(routeById('c172-coastal-proximity'), fullFlight(routeById('c172-coastal-proximity'), { aglM: 2 })), 'CLEARANCE');
-  silent(fly(lowpass, fullFlight(lowpass, { aglM: 62 })), 'CLEARANCE');
+  silent(fly(lowpass, fullFlight(lowpass, { aglM: 162 })), 'CLEARANCE');
   fails(fly(lowpass, fullFlight(lowpass, { aglM: 41 })), "CLEARANCE 41.0 m below the route's declared 50 m intent");
+});
+
+test('F16 final permits wheel-height clearance while retaining airborne stall checks', () => {
+  const route = routeById('f16-lukla-low-pass');
+  const lowFinal = fullFlight(route, name => name === 'FINAL' ? { aglM: 3 } : {});
+  silent(fly(route, lowFinal), 'CLEARANCE');
+  fails(fly(route, fullFlight(route, name => name === 'RETURN' ? { aglM: 100 } : {})),
+    "below the route's declared 150 m intent");
+  fails(fly(route, fullFlight(route, name => name === 'FINAL' ? { aglM: 3, stalled: true } : {})), 'STALL');
 });
 
 test('a clearance fault names the vertical direction rather than assuming a descent', () => {

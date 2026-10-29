@@ -167,10 +167,13 @@ export const ROUTES = [
   {
     id: 'f16-lukla-low-pass', aircraft: 'F16', airport: 'lukla', profile: 'low-pass',
     tier: 'core', scenario: 'f16LowPass',
-    stages: ['ESTABLISH', 'LOW_PASS', 'CLIMB', 'COMPLETED'],
-    groundStages: [], lands: false, handoff: 'airborne', budgetSimSeconds: 140,
-    // verify-f16-lukla.mjs requires more than 50 m of clearance on this pass.
-    clearanceIntentM: 50, allowedWarnings: ['terrain', 'pull-up'], shotStage: 'LOW_PASS',
+    stages: ['ESTABLISH', 'LOW_PASS', 'CLIMB', 'RETURN', 'FINAL', 'ROLLOUT', 'COMPLETED'],
+    groundStages: ['ROLLOUT'], lands: true, handoff: 'parked', budgetSimSeconds: 1000,
+    rolloutDevices: ['spoilers'],
+    // Landing clearance reaches wheel height; the route records low-pass clearance separately.
+    clearanceIntentM: 0,
+    clearanceIntentByStage: { ESTABLISH: 50, LOW_PASS: 50, CLIMB: 50, RETURN: 150 },
+    allowedWarnings: ['terrain', 'pull-up', 'gear', 'flaps', 'sink-rate', 'stall'], shotStage: 'LOW_PASS',
   },
   {
     id: 'f16-lukla-canyon-chase', aircraft: 'F16', airport: 'lukla', profile: 'canyon-chase',
