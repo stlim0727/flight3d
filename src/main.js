@@ -378,7 +378,8 @@ class FlightSimulator {
     // Resize handler
     window.addEventListener('resize', () => this.handleResize());
 
-    // Keep audio active across Bluetooth device connection & system interruptions
+    // Start with the flight when autoplay is permitted. Otherwise the browser
+    // keeps the context suspended until the first flight/menu interaction.
     const ensureAudio = () => {
       if (!this.audio.isInitialized) {
         this.audio.init();
@@ -386,8 +387,10 @@ class FlightSimulator {
       this.audio.ensureContextRunning();
     };
     ['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'].forEach(evt => {
-      window.addEventListener(evt, ensureAudio, { passive: true });
+      // Controls may consume the event before it bubbles to window.
+      window.addEventListener(evt, ensureAudio, { passive: true, capture: true });
     });
+    ensureAudio();
 
     // Begin Animation Loop
     this.hasRenderedFirstFrame = false;
