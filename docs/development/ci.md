@@ -56,9 +56,12 @@ Hardware GPU acceleration is enabled for user accounts in the `render` (991) and
 
 Environment knobs: `TIER ONLY SHOTS STRICT RETRIES APP_URL PORT CDP_PORT CHROME_BIN ARTIFACT_DIR DEV_SERVER FORCE_GPU SLICE KEEP_SAMPLES TMPDIR`. Point `TMPDIR` to a short, roomy path (e.g. `TMPDIR=$HOME/.tmp`) if `/tmp` is full or the worktree path exceeds the 107-char Unix socket limit. Rules live in `scripts/lib/abnormalityChecks.mjs` (`tests/demoSweepChecks.test.js`), and routes are derived from `src/director/demoProfiles.js` via `scripts/lib/demoSweepSpec.mjs`.
 
+A green sweep establishes behavior within the implemented model and thresholds, not real-aircraft performance accuracy. In particular, see the [F16 Lukla landing fidelity limits](f16-lukla-realism.md) before interpreting an experimental landing as evidence of real-world feasibility.
+
 ## Subsystem & per-issue verification
 
 - Landing damage acceptance (`npm run test:landing`): see [landing-damage.md](landing-damage.md).
 - Developer mode (`node scripts/verify-developer-mode.mjs`): see [developer-mode.md](developer-mode.md).
 - Lukla DEM contact and circuits (`npm run test:lukla`): see [lukla-physics.md](lukla-physics.md).
+- HUD camera (`node scripts/verify-hud-camera.mjs`): see [hud-camera.md](hud-camera.md).
 - Individual feature & regression verification commands (`test:cockpit`, `test:camera-look`, shadows, startup, gear contact, etc.): see [verification-catalog.md](verification-catalog.md).

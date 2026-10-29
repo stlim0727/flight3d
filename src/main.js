@@ -35,6 +35,7 @@ import { NeonCity } from './environment/NeonCity.js';
 import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
+import { HudView } from './ui/HudView.js';
 import { RenderPose } from './core/RenderPose.js';
 import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
 import { DemoFlightDirector } from './director/DemoFlightDirector.js';
@@ -219,6 +220,7 @@ class FlightSimulator {
     });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
+    this.hudView = new HudView(this);
     this.cameraSystem.onResetLook = () => {
       this.showToast(() => t('camera.view.centered'));
     };

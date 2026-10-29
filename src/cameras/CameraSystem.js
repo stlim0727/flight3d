@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /**
- * Seven camera views with a separate automatic scenic director
+ * Eight camera views with a separate automatic scenic director
  * Features G-force cockpit head dynamics, stall buffeting vibration, touchdown shock jolt,
  * smooth exterior damping, and automatic temporary cinematic view cuts for takeoff/landing/gear transit.
  */
@@ -14,11 +14,12 @@ export class CameraSystem {
     FLYBY: 4,
     GEAR: 5,
     DRONE: 6,
-    AUTO: 7
+    AUTO: 7,
+    HUD: 8
   };
 
   // Keep digit shortcuts stable; the quick cycle follows viewing intent instead.
-  static QUICK_CYCLE = [1, 6, 4, 2, 0];
+  static QUICK_CYCLE = [1, 6, 4, 2, 0, 8];
 
   constructor(camera, domElement) {
     this.camera = camera;
@@ -757,7 +758,9 @@ export class CameraSystem {
     this.chaseTarget.copy(aircraftMesh.position);
     this.chaseTargetInitialized = true;
 
-    if (this.mode === CameraSystem.MODES.COCKPIT) {
+    if (this.mode === CameraSystem.MODES.HUD) {
+      this.updateHudView(aircraftMesh);
+    } else if (this.mode === CameraSystem.MODES.COCKPIT) {
       const eyeLocal = this.cockpitHeadOffset.clone();
       if (this.camera && this.camera.aspect < 1.0) {
         eyeLocal.x = this.cockpitPortraitEyeX;
@@ -946,6 +949,14 @@ export class CameraSystem {
     return this.autoSwitch ? `AUTO · ${name}` : name;
   }
 
+  // Fixed boresight: HUD symbols and the landscape use the same attitude.
+  // Use each aircraft's configured eye point without cockpit gaze tilt or shake.
+  updateHudView(aircraftMesh) {
+    this.camera.position.copy(this.cockpitHeadOffset).applyMatrix4(aircraftMesh.matrixWorld);
+    this.camera.quaternion.copy(aircraftMesh.quaternion);
+    this.camera.up.set(0, 1, 0).applyQuaternion(aircraftMesh.quaternion);
+  }
+
   getViewName() {
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: return 'COCKPIT (CAPTAIN)';
@@ -955,6 +966,7 @@ export class CameraSystem {
       case CameraSystem.MODES.FLYBY: return 'CINEMATIC FLYBY';
       case CameraSystem.MODES.GEAR: return 'GEAR CAM (BELLY)';
       case CameraSystem.MODES.DRONE: return 'DRONE (ORBIT VIEW)';
+      case CameraSystem.MODES.HUD: return 'HUD';
       default: return 'CAMERA';
     }
   }
@@ -1189,6 +1201,10 @@ export class CameraSystem {
     }
 
     switch (this.mode) {
+      case CameraSystem.MODES.HUD: {
+        this.updateHudView(aircraftMesh);
+        break;
+      }
       case CameraSystem.MODES.COCKPIT: {
         // First-Person Cockpit View
         // 1. Calculate head displacement from G-forces & buffeting

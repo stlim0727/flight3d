@@ -23,16 +23,16 @@ import { Boeing737 } from '../src/aircraft/Boeing737.js';
 
 describe('Landing Gear View & Touchdown Effects', () => {
   describe('CameraSystem (GEAR View & Temporary Auto-Cut)', () => {
-    it('keeps specialist views available while the quick cycle stays scenic', () => {
+    it('keeps specialist views available while the quick cycle includes scenic and HUD views', () => {
       const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
       system.setMode(CameraSystem.MODES.COCKPIT, true);
       const modes = [];
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 6; i++) {
         system.cycleMode();
         modes.push(system.mode);
         assert.equal(system.autoSwitch, false);
       }
-      assert.deepEqual(modes, [1, 6, 4, 2, 0]);
+      assert.deepEqual(modes, [8, 1, 6, 4, 2, 0]);
       for (const mode of [CameraSystem.MODES.GEAR, CameraSystem.MODES.TOWER]) {
         system.setMode(mode, true);
         assert.equal(system.mode, mode);
