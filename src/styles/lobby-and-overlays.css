@@ -256,9 +256,25 @@ body[data-flow="lobby"] .menu-toggle {
   .compact-ui #lobby-screen { align-items: center; }
   .compact-ui .lobby-card {
     margin: 0 0 0 calc(var(--edge-left) + 56px);
-    max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 16px);
-    height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 16px);
+    max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 8px);
+    height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 8px);
+    padding: 8px 12px;
+    gap: 6px;
+    width: min(420px, calc(100vw - var(--edge-left) - var(--edge-right) - 72px));
   }
+  /* Short landscape: give the scrolling panel the height. The build line,
+     subtitle, language caption and ESC hint return in taller layouts. */
+  .compact-ui .lobby-card .build-info,
+  .compact-ui .lobby-card .lobby-hint,
+  .compact-ui .lobby-title > span,
+  .compact-ui .lobby-language > .lobby-label { display: none; }
+  .compact-ui .lobby-card .lobby-tabs { padding: 2px; }
+  .compact-ui .lobby-card .lobby-tab { min-height: 32px; font-size: 11px; }
+  .compact-ui .lobby-card .btn-fly { min-height: 34px; padding: 6px 12px; }
+  .compact-ui .lobby-card .lobby-header { gap: 6px; }
+  .compact-ui .lobby-card .lobby-title { font-size: 15px; }
+  .compact-ui .lobby-card .lobby-tab-panel { gap: 10px; }
+  .compact-ui .lobby-card .btn { min-height: 36px; padding: 5px 8px; }
 }
 /* Keep the comparison controls below the HUD without covering the panel face. */
 .shadow-demo {
