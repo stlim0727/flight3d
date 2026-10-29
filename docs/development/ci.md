@@ -20,6 +20,10 @@ OpenAI API key and separate, narrowly scoped comment permissions.
 
 ## Browser acceptance
 
+Read [browser selection and hardware GPU verification](browser-gpu.md) first.
+Local agent WebGL/3D checks require hardware GPU and a passing pixel preflight;
+legacy software defaults and historical CI results do not waive this requirement.
+
 The legacy browser scripts are separate acceptance tools, not portable CI yet.
 They expect a Vite server on port 5173, CDP ports, and WebGL support. The
 [autonomous demo sweep](#autonomous-demo-acceptance) is the exception: it starts
@@ -88,7 +92,8 @@ scenario logic, because the demo timers advance in simulated time.
 
 Environment knobs: `TIER ONLY SHOTS STRICT RETRIES APP_URL PORT CDP_PORT CHROME_BIN
 ARTIFACT_DIR DEV_SERVER FORCE_GPU SLICE KEEP_SAMPLES TMPDIR`. `FORCE_GPU=0` forces
-SwiftShader; a writable `/dev/dri/renderD128` selects Vulkan instead. `TMPDIR` is where
+SwiftShader and requires explicit task approval for local agent runs; a writable
+`/dev/dri/renderD128` selects Vulkan instead. `TMPDIR` is where
 Chrome puts its profile and its own scratch. Chrome needs that directory to have free
 space and a short path: its `SingletonSocket` must fit the 107-character Unix-socket
 limit, so a deep path (a nested worktree under `.cache`, for instance) kills Chrome at
@@ -225,8 +230,8 @@ the original neutral geometry, so its silhouette does not animate with controls.
 For rendering/input evidence, start the Vite server as above and launch Chromium:
 
 ```sh
-chromium --headless --no-sandbox --use-gl=angle --use-angle=swiftshader \
-  --enable-unsafe-swiftshader --remote-debugging-port=9447 \
+chromium --headless --no-sandbox --enable-gpu --use-gl=angle --use-angle=vulkan \
+  --disable-software-rasterizer --remote-debugging-port=9447 \
   --user-data-dir=/tmp/flight3d-controls-chromium http://127.0.0.1:5173/
 ```
 
