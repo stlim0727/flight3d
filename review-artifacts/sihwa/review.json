@@ -1,0 +1,74 @@
+{
+  "complete": true,
+  "stats": [
+    {
+      "name": "plant",
+      "calls": 18,
+      "triangles": 271944
+    },
+    {
+      "name": "tower",
+      "calls": 18,
+      "triangles": 271944
+    },
+    {
+      "name": "beach",
+      "calls": 6,
+      "triangles": 269510
+    },
+    {
+      "name": "seawall",
+      "calls": 18,
+      "triangles": 271944
+    },
+    {
+      "name": "bridge",
+      "calls": 9,
+      "triangles": 270832
+    }
+  ],
+  "contacts": {
+    "approachCount": 8,
+    "maxAbutmentJump": 0.000016735321973548878,
+    "maxBankJump": 0.001212781064907631,
+    "landmarks": {
+      "tower": {
+        "x": 13675.1781604839,
+        "y": 79.97035578732479,
+        "z": 14992.792155561678
+      },
+      "plant": {
+        "x": 13964.296859974105,
+        "y": 2.427719182538517,
+        "z": 14915.569282085333
+      },
+      "beach": [
+        10580.20802384287,
+        17773.118254032233
+      ]
+    },
+    "triangles": 195881,
+    "bridges": 1,
+    "deckSamples": 5300,
+    "deckError": 0.005638243823189448,
+    "towerShaftCollision": true,
+    "towerCabCollision": true,
+    "clearBesideShaft": true,
+    "clearAboveTower": true
+  },
+  "integration": {
+    "airport": "incheon",
+    "regionLoaded": true,
+    "meshVisible": true,
+    "crashed": false,
+    "grounded": true,
+    "position": {
+      "x": -1588.1127900121896,
+      "y": 10.448297360906734,
+      "z": -3665.5655781520677
+    },
+    "height": 7
+  },
+  "errors": [],
+  "extensionErrors": []
+}

@@ -48,3 +48,16 @@ illustrative model approximations, not surveyed or operational navigation data.
 `traffic.json` is an ODbL road-route derivative of the same frozen source. Rebuild
 with `node scripts/scenery/build-incheon-traffic.mjs`. Vehicle shapes, colors,
 speeds and density are illustrative original code, not measured traffic data.
+
+`sihwa/sources/*.osm.json.gz`, `sihwa/features.json`, and
+`sihwa/core-coastline.json` are additional OSM data and derived databases under
+ODbL 1.0, with the same OpenStreetMap attribution above. Their request URLs,
+queries, retrieval times and original response SHA-256 hashes are retained in
+`sihwa/sources/*-metadata.json` and `sihwa/metadata.json`.
+
+`sihwa/positions.bin` and `sihwa/indices.bin` combine the mapped land/lake
+boundaries with the same Copernicus GLO-30 tile; preserve both notices above.
+`sihwa/sand.bin` and `sihwa/roads.bin` are mapped footprints clipped and draped
+onto that surface. Model grading, road widths, bridge deck heights and
+procedural architecture are illustrative. Rebuild with
+`scripts/terrain/build-sihwa.py`; see `docs/development/incheon-sihwa.md`.

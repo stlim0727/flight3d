@@ -1,8 +1,8 @@
 /** Original scripted exchanges, rendered to bundled radio clips at build-authoring time. */
 export const DEPARTURE_RADIO = {
   gate: [
-    ['pilot', 'Incheon Apron, Sky 123, ready for pushback.'],
-    ['apron', 'Sky 123, pushback approved.'],
+    ['pilot', 'Incheon Apron, Korean Air 123, ready for pushback.'],
+    ['apron', 'Korean Air 123, pushback approved.'],
     ['crew', 'Tug connected.'],
   ],
   pushback: [
@@ -15,22 +15,22 @@ export const DEPARTURE_RADIO = {
     ['crew', 'Tug disconnected, all equipment clear.'],
   ],
   taxi: [
-    ['pilot', 'Ground, Sky 123, ready to taxi.'],
+    ['pilot', 'Ground, Korean Air 123, ready to taxi.'],
     ['ground', 'Taxi via the simulation route to runway 33L. Hold short.'],
-    ['pilot', 'Taxi to 33L, hold short, Sky 123.'],
+    ['pilot', 'Taxi to 33L, hold short, Korean Air 123.'],
   ],
   hold: [
-    ['pilot', 'Incheon Tower, Sky 123, holding short runway 33L, ready for departure.'],
+    ['pilot', 'Incheon Tower, Korean Air 123, holding short runway 33L, ready for departure.'],
     ['tower', 'Hold short, landing traffic.'],
-    ['pilot', 'Holding short, Sky 123.'],
+    ['pilot', 'Holding short, Korean Air 123.'],
   ],
   lineup: [
-    ['tower', 'Sky 123, runway 33L, line up and wait.'],
-    ['pilot', 'Runway 33L, line up and wait, Sky 123.'],
+    ['tower', 'Korean Air 123, runway 33L, line up and wait.'],
+    ['pilot', 'Runway 33L, line up and wait, Korean Air 123.'],
   ],
   clearance: [
-    ['tower', 'Sky 123, runway 33L, cleared for takeoff.'],
-    ['pilot', 'Runway 33L, cleared for takeoff, Sky 123.'],
+    ['tower', 'Korean Air 123, runway 33L, cleared for takeoff.'],
+    ['pilot', 'Runway 33L, cleared for takeoff, Korean Air 123.'],
   ],
   takeoff: [['pilot', 'Takeoff clearance confirmed. Accelerating, rotating and climbing.']],
 };

@@ -91,7 +91,7 @@ test('resolveScenario validates scenario availability and demo constraints', () 
   assert.equal(resolveScenario('demo', 'coastal', 'F16'), DEFAULT_SCENARIO);
   assert.equal(resolveScenario('demo', 'incheon', 'B738'), 'demo');
   assert.equal(resolveScenario('demo', 'incheon', 'C172'), 'demo');
-  assert.equal(resolveScenario('demo', 'incheon', 'F16'), DEFAULT_SCENARIO);
+  assert.equal(resolveScenario('demo', 'incheon', 'F16'), 'demo');
 
   // Missing or non-string
   assert.equal(resolveScenario(null), DEFAULT_SCENARIO);

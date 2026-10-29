@@ -327,7 +327,7 @@ export class CessnaProximityScenario {
     const desiredRate = (alpha - aero.alpha) * 2.5 + turnPitchRate;
     const desiredAcceleration = (desiredRate - q) * 3;
     const qSc = Math.max(1, aero.qDyn * aero.wingArea * aero.meanChord);
-    const thrustMoment = sim.engines.thrust.reduce((sum, thrust) => sum + thrust, 0) * 0.32;
+    const thrustMoment = sim.engines.thrust.reduce((sum, thrust) => sum + thrust, 0) * aero.thrustPitchArmM;
     const requiredCm = (aero.Iyy * desiredAcceleration - thrustMoment) / qSc;
     const qHat = q * aero.meanChord / (2 * Math.max(10, aero.tas));
     const effectiveElevator = (requiredCm - aero.Cm0 - aero.Cma * aero.alpha - aero.Cmq * qHat) / -aero.Cm_de;

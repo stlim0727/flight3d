@@ -57,7 +57,7 @@ test('tug applies bounded forces only while connected on the ground', () => {
   assert.equal(scenario.result.status,'cancelled');
 });
 
-test('pushback waits for a settled position and disconnect removes the tug before taxi', () => {
+test('pushback waits for a settled position; taxi waits for tractor clearance and leaves it parked', () => {
   const {sim,director,scenario,inputs}=fixture();
   director.stageTimer=7; scenario.update(.1);
   assert.equal(director.currentStage,S.PUSHBACK);
@@ -71,8 +71,12 @@ test('pushback waits for a settled position and disconnect removes the tug befor
   scenario.update(.6);
   assert.equal(director.currentStage,S.DISCONNECT);
   director.stageTimer=9;scenario.update(.1);
+  assert.equal(director.currentStage,S.DISCONNECT,'timer alone does not clear the tug');
+  assert.equal(inputs.brakes,1);
+  for(let elapsed=0;elapsed<30 && director.currentStage===S.DISCONNECT;elapsed+=.1)scenario.update(.1);
   assert.equal(director.currentStage,S.TAXI);
-  assert.equal(sim.scene.getObjectByName('departure-tug'),undefined);
+  assert.equal(scenario.tug.userData.animation.clear,true);
+  assert.ok(sim.scene.getObjectByName('departure-tug'),'tractor remains parked instead of vanishing');
   director.setStage(S.HOLD);scenario.update(.1);
   assert.equal(inputs.brakes,1);assert.equal(inputs.throttle,0);
 });

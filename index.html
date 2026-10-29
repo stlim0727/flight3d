@@ -302,6 +302,7 @@
       </label>
       <button id="btn-touch-toggle" class="btn btn-preset btn-touch-toggle" title="모바일 / 온스크린 터치 조작 토글" data-i18n-title="toggle.mobile.on.screen.touch.controls"><span data-i18n="touch.controls">📱 터치 조작</span></button>
       <button id="btn-sound" class="btn btn-preset btn-sound-toggle" title="소리 켜기 / 끄기 (M)" data-i18n-title="sound.toggle.m"><span data-i18n="sound.100">🔊 소리: 100%</span></button>
+      <button id="btn-fullscreen" class="btn btn-preset btn-fullscreen-toggle" aria-pressed="false" title="전체화면 토글" data-i18n-title="toggle.fullscreen"><span data-i18n="fullscreen.enter">⛶ 전체화면</span></button>
     </div>
 
     <!-- Action Controls (Bottom Right) -->
@@ -408,7 +409,10 @@
   </div>
 
   <script type="module" src="./src/main.js"></script>
-  <aside id="incheon-attribution" hidden>© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · Copernicus <a href="scenery/incheon/LICENSE.md" target="_blank" rel="noopener" data-i18n="data.sources.and.limitations"></a></aside>
+  <aside id="incheon-attribution" hidden>
+    <button id="incheon-attribution-chip" type="button" aria-expanded="false" aria-label="Map data attribution">©</button>
+    <span id="incheon-attribution-text">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · Copernicus <a href="scenery/incheon/LICENSE.md" target="_blank" rel="noopener" data-i18n="data.sources.and.limitations"></a></span>
+  </aside>
   <section id="hangang-hud" class="hangang-hud" hidden aria-label="Hangang flight challenge">
     <div class="hangang-heading"><strong id="hangang-progress"></strong><span id="hangang-phase"></span></div>
     <p id="hangang-guidance"></p>

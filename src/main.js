@@ -513,6 +513,11 @@ class FlightSimulator {
     const state = this.gameFlow.state;
     this.audio?.departureRadio.setPaused(state !== FLOW.FLIGHT);
     document.body.dataset.flow = state;
+    if (state === FLOW.FLIGHT) {
+      const attribution = document.getElementById('incheon-attribution');
+      attribution?.classList.remove('expanded');
+      attribution?.querySelector('#incheon-attribution-chip')?.setAttribute('aria-expanded', 'false');
+    }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
     this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active);
     if (state !== FLOW.FLIGHT) {
@@ -955,14 +960,20 @@ class FlightSimulator {
     } else if (this.activeAirport === 'lukla') {
       const sin58 = 0.848048;
       const cos58 = 0.529919;
+      const isF16 = this.currentAircraftId === 'F16';
+      const isC172 = this.currentAircraftId === 'C172';
+      const spawnS = isF16 ? 200.0 : 195.0;
+      const spawnY = 2836.0 + spawnS * (62 / 527) + groundClearance;
+      const luklaTrim = isF16 ? 0.3 : isC172 ? 0.8 : 1.9;
 
       if (type === 'runway') {
-        // Lukla takeoffs line up at the upper Runway 24 threshold (2,864m + gear geometry) and
+        // Lukla takeoffs line up at the upper Runway 24 threshold and
         // accelerate downhill toward the cliff on heading 238°; Runway 06 is the
         // landing-only direction. Same spawn as the 'cliff' preset: the 5m lateral
         // offset keeps the wide wing clear of the raised apron.
-        // Spawn above the current wheel geometry, allowing suspension settling.
-        this.position.set(240.0 * sin58 - 5 * cos58, 2864.22 + groundClearance, -240.0 * cos58 - 5 * sin58);
+        // Spawned with clearance in front of the retaining wall so chase cameras
+        // remain completely clear of the upper stone barrier.
+        this.position.set(spawnS * sin58 - 5 * cos58, spawnY, -spawnS * cos58 - 5 * sin58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
 
@@ -980,9 +991,10 @@ class FlightSimulator {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        this.aero.setFlapPosition(2); // Flaps 5
+        this.aero.setFlapPosition(isC172 ? 1 : 2); // Flaps 5 (or 10 for C172)
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 1.9;
+        this.aero.pitchTrim = luklaTrim;
+        this.controls.pitchTrim = luklaTrim;
 
         this.showToast(() => t('preset.lukla.runway.24.takeoff.roll'));
       } else if (type === 'approach') {
@@ -1017,7 +1029,7 @@ class FlightSimulator {
         // Lukla Runway 24 Downhill Cliff Dive Takeoff!
         // Start near the upper threshold with wheel clearance; a 5m lateral
         // offset keeps the wide wing clear of the raised apron.
-        this.position.set(240.0 * sin58 - 5 * cos58, 2864.22 + groundClearance, -240.0 * cos58 - 5 * sin58);
+        this.position.set(spawnS * sin58 - 5 * cos58, spawnY, -spawnS * cos58 - 5 * sin58);
         this.linearVelocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
         // Pitch nose down -6.71° along 11.7% downhill slope, Heading 238° (yaw -238°)
@@ -1034,10 +1046,10 @@ class FlightSimulator {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        this.aero.setFlapPosition(3); // Flaps 15 (mountain short-field takeoff)
+        this.aero.setFlapPosition(isC172 ? 1 : isF16 ? 1 : 3); // Flaps 15 for B738, Flaps 1 for F16/C172
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = 1.9;
-        this.controls.pitchTrim = 1.9;
+        this.aero.pitchTrim = luklaTrim;
+        this.controls.pitchTrim = luklaTrim;
 
         this.showToast(() => t('preset.lukla.runway.24.downhill.takeoff.11'));
       } else if (type === 'cruise') {
@@ -1201,7 +1213,7 @@ class FlightSimulator {
       gearState: this.gear.gearState,
       spoilers: this.aero.spoilers,
     });
-    if (!solution.feasible || !solution.handsOffFeasible) return;
+    if (!solution.feasible || (!solution.handsOffFeasible && solution.reason !== 'idle')) return;
     this.controls.throttle = solution.throttle;
     this.engines.setThrottle(solution.throttle);
     this.controls.pitchTrim = solution.handsOffTrimDeg;
@@ -1636,7 +1648,7 @@ class FlightSimulator {
       groundSpeedKnots: Atmosphere.msToKnots(groundSpeed),
       vsiFpm: Atmosphere.metersToFeet(this.linearVelocity.y) * 60.0,
       mach: aeroResult.mach,
-      gForce: Math.max(-2.5, Math.min(5.5, measuredGForce)),
+      gForce: measuredGForce,
       isStalled: aeroResult.isStalled,
       isPreStall: aeroResult.isPreStall,
       isStallWarning: aeroResult.isStallWarning,
@@ -2316,6 +2328,33 @@ class FlightSimulator {
       const state = this.touchControls.enabled ? 'state.on' : 'state.off';
       this.showToast(() => t('touch.controls.value', { value: t(state) }));
     });
+    document.getElementById('incheon-attribution-chip')?.addEventListener('click', (event) => {
+      const aside = event.currentTarget.closest('#incheon-attribution');
+      const expanded = aside.classList.toggle('expanded');
+      event.currentTarget.setAttribute('aria-expanded', String(expanded));
+    });
+    const fullscreenButton = document.getElementById('btn-fullscreen');
+    const syncFullscreenUI = () => {
+      if (!fullscreenButton) return;
+      const active = Boolean(document.fullscreenElement);
+      bindText(fullscreenButton, () => t(active ? 'fullscreen.exit' : 'fullscreen.enter'));
+      fullscreenButton.setAttribute('aria-pressed', String(active));
+    };
+    fullscreenButton?.addEventListener('click', async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+      } catch (err) {
+        this.showToast(() => t('fullscreen.unavailable'));
+      }
+    });
+    // Esc exits fullscreen natively without a usable keydown, so resize and
+    // the pressed state are reconciled from the fullscreenchange event.
+    document.addEventListener('fullscreenchange', () => {
+      syncFullscreenUI();
+      this.handleResize();
+    });
+    syncFullscreenUI();
     for (const [id, mode] of [
       ['btn-ap', 'MASTER'], ['btn-ap-hdg', 'HDG'], ['btn-ap-alt', 'ALT'],
       ['btn-ap-spd', 'SPD'], ['btn-ap-app', 'APP'],

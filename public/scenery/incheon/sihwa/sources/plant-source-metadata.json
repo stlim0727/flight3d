@@ -1,0 +1,7 @@
+{
+  "url": "https://api.openstreetmap.org/api/0.6/map.json?bbox=126.603,37.308,126.618,37.317",
+  "receivedAt": "2026-10-28T18:16:22.020692+00:00",
+  "sha256": "91cfc2c519b9c60f1df0dd84b373fb8037247ef697cf48a8696bc05fc43b9ba8",
+  "bytes": 625781,
+  "license": "ODbL-1.0"
+}

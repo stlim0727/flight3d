@@ -11,11 +11,13 @@ const target = await (await fetch(`${endpoint}/json/new?${encodeURIComponent(url
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise(resolve => ws.addEventListener('open', resolve, { once: true }));
 let sequence = 0;
+const isolatedContexts = new Set(), isolatedErrors = [];
 const pending = new Map(), errors = [], results = [];
 ws.addEventListener('message', event => {
   const message = JSON.parse(event.data);
   if (message.id) { pending.get(message.id)?.(message); pending.delete(message.id); }
-  if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
+  if (message.method === 'Runtime.executionContextCreated' && message.params.context.auxData?.isDefault === false) isolatedContexts.add(message.params.context.id);
+  if (message.method === 'Runtime.exceptionThrown') ((isolatedContexts.has(message.params.exceptionDetails.executionContextId) || message.params.exceptionDetails.url?.startsWith('chrome-extension://')) ? isolatedErrors : errors).push(message.params.exceptionDetails);
 });
 const call = (method, params = {}) => new Promise((resolve, reject) => {
   const id = ++sequence;
@@ -40,8 +42,20 @@ const capture = async name => {
   const { data } = await call('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(path.join(dir, `${name}.png`), Buffer.from(data, 'base64'));
 };
+const detail = async (name, offset, target) => {
+  if (process.env.SCREENSHOTS === '0') return;
+  await evaluate(`(()=>{const s=window.simulator,T=window.THREE;
+    window.__cameraUpdate=s.cameraSystem.update;s.cameraSystem.update=()=>{};
+    const point=v=>new T.Vector3(...v).applyQuaternion(s.quaternion).add(s.position);
+    s.camera.position.copy(point(${JSON.stringify(offset)}));s.camera.lookAt(point(${JSON.stringify(target)}));
+    s.camera.updateProjectionMatrix();s.renderer.render(s.scene,s.camera);
+  })()`);
+  const {data}=await call('Page.captureScreenshot',{format:'png'});
+  fs.writeFileSync(path.join(dir,name+'.png'),Buffer.from(data,'base64'));
+  await evaluate('window.simulator.cameraSystem.update=window.__cameraUpdate');
+};
 try {
-  await call('Runtime.enable');await call('Page.enable');
+  await call('Runtime.enable');await call('Page.enable');await call('Page.bringToFront');
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
   for(let i=0;i<180;i++){if(await evaluate('Boolean(window.simulator?.startupReady)'))break;await new Promise(r=>setTimeout(r,500));}
   assert.ok(await evaluate('Boolean(window.simulator?.startupReady)'),'startup ready');
@@ -55,6 +69,11 @@ try {
   await evaluate(`document.getElementById('btn-fly').click();window.simulator.stepSimulation(.1)`);
   assert.equal(await evaluate('window.simulator.currentAirport.departureBridge.extension'),1);
   await capture('bridge-docked');
+  for(let i=0;i<100;i++){if(await evaluate('Boolean(window.simulator.aircraft.modelLoaded)'))break;await new Promise(r=>setTimeout(r,100));}
+  assert.equal(await evaluate('window.simulator.aircraft.group.userData.airline'),'Korean Air');
+  await detail('korean-air-port',[-36,9,-22],[0,1,-2]);
+  await detail('tug-coupled',[-12,4,-28],[0,-1,-17]);
+  await detail('bridge-layout',[-18,48,-22],[-12,0,-17]);
   await evaluate('window.simulator.stepSimulation(6)');
   assert.equal(await evaluate('window.simulator.currentAirport.departureBridge.extension'),0);
   assert.equal(await evaluate('window.simulator.demoDirector.currentStage'),51);
@@ -62,14 +81,15 @@ try {
   for(let i=0;i<80;i++){if(await evaluate('window.simulator.demoDirector.currentStage===52'))break;await evaluate('window.simulator.stepSimulation(1)');}
   assert.equal(await evaluate('window.simulator.demoDirector.currentStage'),52);
   const initial=await evaluate('window.simulator.demoDirector.incheonDepartureScenario.tug.position.toArray()');
-  await evaluate('window.simulator.stepSimulation(5)');
-  const tug=await evaluate(`(()=>{const t=window.simulator.demoDirector.incheonDepartureScenario.tug;return {pos:t.position.toArray(),towbarVisible:t.userData.animation.towbar.visible,wheel:t.userData.animation.wheels[0].rotation.x};})()`);
+  await evaluate('window.simulator.stepSimulation(12)');
+  const tug=await evaluate(`(()=>{const t=window.simulator.demoDirector.incheonDepartureScenario.tug;return {pos:t.position.toArray(),towbarVisible:t.userData.animation.towbar.visible,pinReleased:t.userData.animation.pinReleased,wheel:t.userData.animation.wheels[0].rotation.x};})()`);
   assert.ok(Math.hypot(tug.pos[0]-initial[0],tug.pos[2]-initial[2])>5,'tractor visibly drives away');
-  assert.equal(tug.towbarVisible,false);assert.ok(Math.abs(tug.wheel)>1);
+  assert.equal(tug.towbarVisible,true);assert.equal(tug.pinReleased,true);assert.ok(Math.abs(tug.wheel)>1);
   await capture('tug-disconnected');
   await evaluate('window.simulator.demoDirector.stop()');
   assert.equal(await evaluate('window.simulator.currentAirport.departureBridge.extension'),0);
+  if(errors.length) console.error(JSON.stringify(errors));
   assert.equal(errors.length,0);
-  fs.writeFileSync(path.join(dir,'gate-results.json'),JSON.stringify({tug,initial,browserExceptions:errors.length},null,2));
+  fs.writeFileSync(path.join(dir,'gate-results.json'),JSON.stringify({tug,initial,browserExceptions:errors.length,isolatedContextExceptions:isolatedErrors.length},null,2));
   console.log('PASS',JSON.stringify({tug,initial}));
 } finally {ws.close();await fetch(`${endpoint}/json/close/${target.id}`);}

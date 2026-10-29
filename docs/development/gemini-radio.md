@@ -32,7 +32,9 @@ After approving the audition, regenerate all eight bundled stage clips with:
 node scripts/build-gemini-departure-radio.mjs
 ```
 
-The full generator uses the same model and radio processing. Charon voices the
+The full generator defaults to `gemini-3.1-flash-tts-preview`; set
+`GEMINI_TTS_MODEL=gemini-2.5-flash-preview-tts` to use the earlier model.
+Both use the same radio processing. Charon voices the
 pilot, Fenrir the ground crew, and Kore the controllers. Exchanges use at most
 two speakers per request; the three-speaker gate exchange is split into two
 requests. Requests are spaced at least 22 seconds apart. Successful clean WAVs

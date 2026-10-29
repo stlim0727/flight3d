@@ -6,7 +6,8 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { DEPARTURE_RADIO } from '../src/config/departureRadio.js';
 
-const model = 'gemini-2.5-flash-preview-tts';
+const model = process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview';
+if (!['gemini-2.5-flash-preview-tts', 'gemini-3.1-flash-tts-preview'].includes(model)) throw new Error('Unsupported authoring model');
 const voices = { pilot: 'Charon', crew: 'Fenrir', apron: 'Kore', ground: 'Kore', tower: 'Kore' };
 const output = path.resolve('public/audio/departure');
 const cache = path.resolve('.cache/gemini-departure');

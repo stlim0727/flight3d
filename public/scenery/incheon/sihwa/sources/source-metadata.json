@@ -1,0 +1,8 @@
+{
+  "url": "https://overpass-api.de/api/interpreter",
+  "query": "[out:json][timeout:120];(way[\"natural\"=\"coastline\"](37.20,126.15,37.70,126.77);nwr[\"name\"~\"\uc2dc\ud654\ud638|\uc2dc\ud654\ub098\ub798|\uc870\ub825|\ub2ec\uc804\ub9dd\ub300|\ubc29\uc544\uba38\ub9ac|\uc2dc\ud654\ubc29\uc870\uc81c\"](37.26,126.55,37.37,126.73);way[\"natural\"=\"beach\"](37.27,126.55,37.31,126.61););out meta;>;out meta qt;",
+  "receivedAt": "2026-10-28T18:13:55.219569+00:00",
+  "sha256": "1ece684bb812d545e7c7aa7d07d4b682feabb8898c0423b3246b0cae21cc755a",
+  "bytes": 6872500,
+  "license": "ODbL-1.0"
+}

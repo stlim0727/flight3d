@@ -24,8 +24,8 @@ export function resolveScenario(scenario, airport = DEFAULT_AIRPORT, aircraft = 
   if (!scenario || typeof scenario !== 'string') return DEFAULT_SCENARIO;
   if (!isScenarioAvailable(airport, scenario)) return DEFAULT_SCENARIO;
   if (scenario === 'demo') {
-    if (aircraft === 'F16' && airport !== 'lukla') return DEFAULT_SCENARIO;
-    if (airport === 'incheon' && !['B738', 'C172'].includes(aircraft)) return DEFAULT_SCENARIO;
+    if (aircraft === 'F16' && !['lukla','incheon'].includes(airport)) return DEFAULT_SCENARIO;
+    if (airport === 'incheon' && !['B738', 'C172','F16'].includes(aircraft)) return DEFAULT_SCENARIO;
   }
   return scenario;
 }

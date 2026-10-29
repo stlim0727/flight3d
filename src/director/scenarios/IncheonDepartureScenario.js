@@ -43,7 +43,7 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       sim.currentAirport?.departureBridge?.setExtension(1);
       sim.audio?.departureRadio.preload();
     }
-    if (stage === STAGES.TAXI) { this.removeTug(); this.index = 0; }
+    if (stage === STAGES.TAXI) { this.index = 0; }
     if (stage === STAGES.LINEUP) { this.index = 0; this.lineupBraking = false; }
     const name = names[stage - STAGES.GATE];
     if (name) {
@@ -162,7 +162,7 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       const stopped = Math.hypot(sim.position.x-pushbackEnd.x,sim.position.z-pushbackEnd.z)<.7 && sim.linearVelocity.length()<.3 && aligned;
       this.settleTime = stopped ? this.settleTime + dt : 0;
       if (this.settleTime > 1 && !radioBusy) d.setStage(STAGES.DISCONNECT);
-    } else if (stage === STAGES.DISCONNECT && d.stageTimer > 8 && !radioBusy) d.setStage(STAGES.TAXI);
+    } else if (stage === STAGES.DISCONNECT && this.tug?.userData.animation.clear && !radioBusy) d.setStage(STAGES.TAXI);
     else if (stage === STAGES.TAXI) {
       if (this.taxi(DEPARTURE_TAXI_ROUTE, true)) d.setStage(STAGES.HOLD);
       this.result.taxiPoints = this.index;

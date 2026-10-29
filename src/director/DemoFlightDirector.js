@@ -1,3 +1,4 @@
+import { SihwaTourScenario } from './scenarios/SihwaTourScenario.js';
 import { F16LuklaScenario } from './scenarios/F16LuklaScenario.js';
 import { F16CanyonChaseScenario } from './scenarios/F16CanyonChaseScenario.js';
 import { IncheonDepartureScenario } from './scenarios/IncheonDepartureScenario.js';
@@ -48,6 +49,7 @@ export class DemoFlightDirector {
     this.stageTimer = 0;
     this.totalTimer = 0;
 
+    this.sihwaTourScenario=new SihwaTourScenario(this,simulator);
     // Scenarios
     this.luklaScenario = new LuklaCircuitScenario(this, simulator);
     this.coastalScenario = new CoastalDemoScenario(this, simulator);
@@ -85,6 +87,7 @@ export class DemoFlightDirector {
   }
 
   getActiveScenario() {
+    if(this.activeDemoAirport==='incheon' && this.profile==='sihwa-tour')return this.sihwaTourScenario;
     if (this.activeDemoAircraft === 'F16') {
       return this.profile === 'canyon-chase' ? this.f16CanyonScenario : this.f16Scenario;
     }
@@ -180,8 +183,9 @@ export class DemoFlightDirector {
 
   start(targetAirport = null, requestedProfile = this.sim.lobby?.demoProfile) {
     if ((targetAirport || this.sim.activeAirport) === 'hangang') return false;
-    if ((targetAirport || this.sim.activeAirport) === 'incheon' && !['B738', 'C172'].includes(this.sim.currentAircraftId)) return false;
-    if (this.sim.currentAircraftId === 'F16' && (targetAirport || this.sim.activeAirport) !== 'lukla') return false;
+    const sihwa=(targetAirport || this.sim.activeAirport)==='incheon' && resolveDemoProfile(this.sim.currentAircraftId,'incheon',requestedProfile).id==='sihwa-tour';
+    if (!sihwa && (targetAirport || this.sim.activeAirport) === 'incheon' && !['B738', 'C172'].includes(this.sim.currentAircraftId)) return false;
+    if (!sihwa && this.sim.currentAircraftId === 'F16' && (targetAirport || this.sim.activeAirport) !== 'lukla') return false;
     this.sim.devRunner?.stop();
     if (this.isActive) this.stop();
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
@@ -245,7 +249,9 @@ export class DemoFlightDirector {
       this.audioInitiated = true;
     }
 
-    if (this.activeDemoAircraft === 'F16') {
+    if (this.profile==='sihwa-tour' && this.activeDemoAirport==='incheon') {
+      this.setStage(SihwaTourScenario.STAGES.COAST);
+    } else if (this.activeDemoAircraft === 'F16') {
       if (this.profile === 'canyon-chase') {
         this.setStage(F16CanyonChaseScenario.STAGES.INGRESS);
       } else {
@@ -281,6 +287,7 @@ export class DemoFlightDirector {
 
   stop(message = null, keepParkingBrake = false, { preserveThrottle = false } = {}) {
     if (!this.isActive) return;
+    const retainSpeedBrakes=this.getActiveScenario()===this.sihwaTourScenario;
     this.getActiveScenario().stop?.();
     if (this.activeDemoAircraft === 'B738' && this.activeDemoAirport === 'lukla' &&
         ['pending', 'running'].includes(this.luklaScenario.result.status)) {
@@ -339,7 +346,7 @@ export class DemoFlightDirector {
     if (this.sim.gear) {
       this.sim.gear.setBrakes(holdBrakes ? 1.0 : 0.0);
     }
-    if (this.sim.aero) {
+    if (this.sim.aero && !retainSpeedBrakes) {
       this.sim.aero.spoilers = 0.0;
     }
 
@@ -375,10 +382,10 @@ export class DemoFlightDirector {
     this.userCameraOverridden = !this.sim.cameraSystem.autoSwitch;
   }
 
-  setStage(newStage) {
+  setStage(newStage, { preserveCamera = false } = {}) {
     this.currentStage = newStage;
     this.stageTimer = 0;
-    this.userCameraOverridden = false;
+    if (!preserveCamera) this.userCameraOverridden = false;
 
     const scenario = this.getActiveScenario();
     scenario.enterStage(newStage);

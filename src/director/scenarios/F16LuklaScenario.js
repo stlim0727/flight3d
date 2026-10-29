@@ -47,6 +47,16 @@ export class F16LuklaScenario extends CessnaDemoScenario {
     if (stage === STAGES.COMPLETED) {
       this.result.status = 'completed';
       this.result.elapsedSeconds = this.director.totalTimer;
+      const forwardVec = sim.linearVelocity.clone().setY(0).normalize();
+      const speed = 300 * 0.514444 / Math.sqrt(Atmosphere.getConditions(sim.position.y).densityRatio);
+      sim.linearVelocity.copy(forwardVec).multiplyScalar(speed);
+      sim.angularVelocity.set(0, 0, 0);
+      const headingRad = Math.atan2(forwardVec.x, -forwardVec.z);
+      sim.quaternion.setFromEuler(new THREE.Euler(0, -headingRad, 0, 'YXZ'));
+      sim.renderPose?.reset(sim.position, sim.quaternion);
+      sim.aircraft.group.position.copy(sim.position);
+      sim.aircraft.group.quaternion.copy(sim.quaternion);
+      sim.applyComputedTrim();
       this.director.stop(() => t('demo.f16.complete'), false, { preserveThrottle: true });
     } else {
       this.director.updateBanner(() => t('demo.f16.stage'), () => t('demo.f16.lukla.briefing'));
@@ -61,11 +71,22 @@ export class F16LuklaScenario extends CessnaDemoScenario {
     const dx = sim.position.x - this.start.x, dz = sim.position.z - this.start.z;
     const cross = dx * -this.direction.z + dz * this.direction.x;
     const along = dx * this.direction.x + dz * this.direction.z;
-    this.holdHeading(this.heading - Math.atan2(cross, 1200) * 180 / Math.PI, 20);
+
+    const climb = stage === STAGES.CLIMB;
+    // In climb, smoothly curve southward down the open valley (heading 195°) away from rising western peaks
+    const targetHeading = climb
+      ? THREE.MathUtils.lerp(this.heading, 195, Math.min(1, time / 6))
+      : this.heading - Math.atan2(cross, 1200) * 180 / Math.PI;
+
+    this.holdHeading(targetHeading, climb ? 35 : 20);
     sim.controls.setVirtualInput('brakes', 0);
     sim.controls.setVirtualInput('rudder', THREE.MathUtils.clamp(-sim.aero.beta * 2, -0.2, 0.2));
-    const climb = stage === STAGES.CLIMB;
-    this.flyVertical(THREE.MathUtils.clamp((this.baseAltitude + (climb ? 650 : 0) - sim.position.y) * 0.3, -8, 45), 280);
+
+    const targetAlt = climb ? 4600 : this.baseAltitude;
+    const vzCmd = THREE.MathUtils.clamp((targetAlt - sim.position.y) * 0.35, -8, 55);
+    const targetSpeed = climb ? 340 : 280;
+    this.flyVertical(vzCmd, targetSpeed);
+
     if (!this.director.userCameraOverridden) {
       const shot = Math.floor(this.director.totalTimer / 10) % 3;
       if (shot !== this.cutIndex) {
@@ -75,7 +96,7 @@ export class F16LuklaScenario extends CessnaDemoScenario {
     }
     if (stage === STAGES.ESTABLISH && time >= 5) this.director.setStage(STAGES.LOW_PASS);
     else if (stage === STAGES.LOW_PASS && along >= 2600) this.director.setStage(STAGES.CLIMB);
-    else if (climb && time >= 12) this.director.setStage(STAGES.COMPLETED);
+    else if (climb && (time >= 16 || sim.position.y >= 4500)) this.director.setStage(STAGES.COMPLETED);
     if (this.director.isActive && (time > 90 || !Number.isFinite(clearance))) {
       this.result.status = 'failed';
       this.director.stop(() => t('demo.f16.failed'));
