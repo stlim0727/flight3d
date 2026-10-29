@@ -185,12 +185,13 @@ describe('Cockpit GLTF Interior System', () => {
     const cockpit = new Cockpit(...createCanvases());
     let loaded;
     t.mock.method(GLTFLoader.prototype, 'load', (_url, onLoad) => { loaded = onLoad; });
-    const transfer = { bind() {} };
+    const transfer = { bindPrecomputed() {}, dispose() {} };
     t.mock.method(CockpitLightTransfer, 'load', async () => transfer);
     const previousWindow = globalThis.window;
     globalThis.window = {};
     try {
       cockpit.loadCockpitModel();
+      assert.equal(CockpitLightTransfer.load.mock.calls.length, 1, 'Transport starts before the GLB callback');
       await loaded({ scene: new THREE.Group() });
       assert.equal(cockpit.lightingBakeStatus, 'ready');
       assert.equal(cockpit.lightTransfer, transfer);

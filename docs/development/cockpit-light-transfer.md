@@ -13,7 +13,13 @@ development-only `three-mesh-bvh` accelerator. There is no runtime ray tracing
 or BVH dependency in the application bundle. `BAKE_SAMPLES` overrides the default
 256 deterministic cosine-weighted rays per receiver (minimum 32).
 
-Outputs are `public/lighting/cockpit-{medium,draco}.{json,bin}`. Each manifest
+Outputs are `public/lighting/cockpit-{medium,draco}.{json,bin}` plus
+`cockpit-{medium,draco}-binding.{json,uvpack}`. The binding pack contains gzip
+compressed Float32 UV attributes for the final assembled/batched geometry; its
+custom extension prevents HTTP servers from transparently decompressing it before
+the application verifies the compressed checksum. `npm run bake:cockpit-binding`
+regenerates only the vertex binding from an existing transport bake (no ray tracing).
+Use the full bake when geometry, materials or transport inputs change. Each manifest
 contains source/asset/data SHA-256 hashes, sampling settings, receiver keys,
 flood control receivers and radiosity convergence diagnostics. Source text hashes
 normalise CRLF to LF. `tests/cockpitTransfer.test.js` rejects stale inputs,
@@ -63,11 +69,18 @@ instrument control receivers is retained in the manifest for flood control.
 
 ## Runtime and automatic floods
 
-After GLB assembly, baked receiver indices are attached as vertex attributes.
+Transport metadata, coefficients and vertex bindings fetch alongside the GLB.
+After GLB assembly, precomputed UVs are attached as vertex attributes; the browser
+does not reconstruct receiver keys or perform per-vertex Map lookups. Binding
+layout, finite UVs, asset/transport identity and compressed checksum are validated
+before installation. Tests compare every UV against the original receiver lookup
+for both variants and reject stale source hashes.
 The material samples a small float texture twice per vertex (front and back),
 then interpolates irradiance over each triangle. Binding happens after batching,
 in the neutral control pose. Coverage below 98% fails explicitly instead of
-silently applying an unrelated bake. The binary SHA-256 is verified at load.
+silently applying an unrelated bake. The binary SHA-256 is verified at load. The original `bind()` remains an offline
+authoring/reference path; a missing or invalid binding uses the documented fixed
+flood fallback rather than repeating the expensive lookup in the browser.
 
 `Cockpit.syncLighting()` receives actual sky ambient colour/intensity, actual
 weather-attenuated sun colour/intensity and aircraft-local sun direction.
