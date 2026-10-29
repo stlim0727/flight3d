@@ -1,5 +1,5 @@
 /** Simulator warning envelopes, not certified avionics. See docs/development/flight-warnings.md. */
-const PROFILES = {
+export const PROFILES = {
   B738: { vne: 340, mach: 0.82, bank: 35, terrain: true, landingFlap: 15 },
   C172: { vne: 163, bank: 60, terrain: false },
   F16: { vne: 800, mach: 2.05, bank: 85, terrain: true, landingFlap: 0 },

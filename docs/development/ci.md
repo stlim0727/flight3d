@@ -20,8 +20,10 @@ OpenAI API key and separate, narrowly scoped comment permissions.
 
 ## Browser acceptance
 
-The existing browser scripts are separate acceptance tools, not portable CI yet.
-They expect a Vite server on port 5173, CDP ports, and WebGL support.
+The legacy browser scripts are separate acceptance tools, not portable CI yet.
+They expect a Vite server on port 5173, CDP ports, and WebGL support. The
+[autonomous demo sweep](#autonomous-demo-acceptance) is the exception: it starts
+its own preview server and browser on OS-assigned ports and runs in CI.
 `test:flight` and `test:crash` launch `google-chrome-stable` from PATH;
 `test:mobile` and `test:demo` launch `/usr/bin/google-chrome`. Provide both
 executables (or matching symlinks) before following the commands below. Inspect the chosen script for its exact
@@ -70,12 +72,111 @@ port/artifact options. It is separate from the default Node test gate.
 
 ## Autonomous demo acceptance
 
-`npm run test:demo` steps the coastal scenic demo to completion in the browser and
-asserts the landing is flown rather than announced: every touchdown below the nose
-gear impact limit, all three legs still `normal`, no landing incident, spoilers and
-reverse thrust actually deployed, the airframe stationary inside the runway, the
-wheel brakes still held and control handed back at the end. It requires a Vite
-server on port 5173 (the script's own constant) and exits non-zero on failure.
+`npm run test:demo-sweep` fast-plays the cinematic demos and judges the *flight*:
+it claims its own free ports, starts `vite preview` on `dist/` and a private
+headless Chrome, then drives every route through deterministic 120 Hz physics with
+`sim.stepSimulation(0.25)` while the wall-clock loop is frozen with the sanctioned
+`gameFlow.pause()`. Slice size only changes the sampling resolution, never the
+scenario logic, because the demo timers advance in simulated time.
+
+| Command | Runs |
+| --- | --- |
+| `npm run test:demo-sweep` | the four `core` routes (the PR gate in `demo-sweep.yml`) |
+| `npm run test:demo-sweep:full` | every declared route, the nightly and dispatched run |
+| `node scripts/demo-sweep.mjs --tier all --only c172-lukla-scenic --shots` | one route with evidence images |
+| `node scripts/demo-sweep.mjs --update-baseline --retries 2` | rewrite `scripts/demo-sweep-baseline.json` from the worst of two flights |
+
+Environment knobs: `TIER ONLY SHOTS STRICT RETRIES APP_URL PORT CDP_PORT CHROME_BIN
+ARTIFACT_DIR DEV_SERVER FORCE_GPU SLICE KEEP_SAMPLES TMPDIR`. `FORCE_GPU=0` forces
+SwiftShader; a writable `/dev/dri/renderD128` selects Vulkan instead. `TMPDIR` is where
+Chrome puts its profile and its own scratch. Chrome needs that directory to have free
+space and a short path: its `SingletonSocket` must fit the 107-character Unix-socket
+limit, so a deep path (a nested worktree under `.cache`, for instance) kills Chrome at
+launch, and a full `/tmp` tmpfs does the same. Both surface as the sweep's "headless
+Chrome never exposed a debug target", which is a startup failure and not a flight
+verdict — point `TMPDIR` somewhere short and roomy (for example `TMPDIR=$HOME/.tmp`)
+and retry. Both servers are owned by the process that starts them: a Chrome that never
+publishes a debug target shuts down the Vite it had already spawned rather than leaving it
+detached on a port (verified by running the sweep with `CHROME_BIN=/bin/false`). The verdict is
+always `ARTIFACT_DIR/demo-sweep-report.json` (`SLICE`-by-`SLICE` measurements, stage
+trace, warnings, touchdowns, fails, reports), and the exit code is non-zero when any
+route has a FAIL, or any REPORT under `STRICT=1`.
+
+Measured cost on the hosted runner (SwiftShader, no GPU): the core tier is 153 s of sweep
+wall and the full matrix with screenshots 942 s, against 25 and 45 minute ceilings. On a
+Vulkan GPU the same routes take 66 s and 258 s; the simulated durations agree to the
+slice, because only the rendering is slower without hardware.
+
+`npm run test:demo` now delegates to `--only b738-coastal-classic`, so the coastal
+737 keeps its single-route entry point without the hardcoded 5173/9462/Chrome paths.
+The remaining `verify-*` browser harnesses stay: they cover DOM, audio and camera
+layout that the sweep does not own.
+
+### What the sweep refuses, and what it only reports
+
+Rules live in `scripts/lib/abnormalityChecks.mjs` (pure, no DOM or CDP, covered by
+`tests/demoSweepChecks.test.js`), and the route table in
+`scripts/lib/demoSweepSpec.mjs` is derived from `src/director/demoProfiles.js` so a
+new demo choice cannot be added without being swept.
+
+- **FAIL** is a physical or contractual fact: crash, non-finite state, aircraft
+  substitution, an airborne stall, gear-leg damage or a landing incident, a touchdown
+  past `src/physics/gearDamage.js`'s own impact limit, flight below the route's
+  declared clearance intent, beyond the Vne/Mach ceiling in
+  `src/systems/FlightWarnings.js`, past the route's declared roll promise, a load
+  factor no airframe flies (`SOLVER_G_LIMIT`), an out-of-order or unvisited stage, a
+  route that never completes inside its ceiling, or a handoff that leaves controls
+  disabled, virtual inputs set, a dead stick, or a 737 rollout without spoilers and
+  reverse thrust.
+- **REPORT** is a measured peak that drifted from `scripts/demo-sweep-baseline.json`:
+  bank, airspeed, sink, clearance, rates, warning seconds, elapsed time. Cinematic
+  routes are allowed to bank hard and call warnings, so those are trends to review;
+  `STRICT=1` promotes them into failures.
+- **KNOWN** is a route-table declaration (`knownIssues`) for a fault the app is
+  already known to produce. It moves matching FAILs out of the verdict and quotes
+  them in the report, so a documented demo regression does not redden every
+  unrelated pull request. Each entry names the tokens its fault must contain and a
+  note that quotes the measured value; anything the declaration does not name is
+  still a FAIL, a route with a known issue is never baselined, and a declaration
+  that stops reproducing becomes a REPORT — under `STRICT=1` a failure — so the
+  entry is deleted once the demo is fixed.
+
+Scenery uses `Math.random` seeds for foliage and ships, so soft peaks carry margin by
+design and every hard FAIL is a monotonic fact. Regenerate the baseline only from a
+run with no FAIL: the driver refuses to widen a baseline from a failed flight.
+
+### What the first sweep found broken
+
+The 2026-10-29 full-matrix run was the first time either Lukla demo flew unattended,
+and both are broken — they are the sweep's first caught regressions, declared as
+`knownIssues` rather than silently accepted:
+
+- `b738-lukla-classic` crashes inside `CANYON_APPROACH` at 126 s: 13 m agl at 111 kt
+  with +15° pitch and a *positive* vertical speed, because the valley ahead climbs
+  faster than the guidance climbs. Result: terrain collision, belly impact.
+- `f16-lukla-low-pass` ends at 28 s. The `CLIMB` stage pulls up at 389 kt into the
+  rising ridge; clearance falls to 6.6 m one slice after reading 47.6 m, the nose
+  radome contacts the ground and the airframe spins at 36 rad/s. The scenario's own
+  `result.minClearanceM` records 7.7 m, so the older
+  `scripts/verify-f16-lukla.mjs`, which asserts more than 50 m, fails on this too.
+
+Neither was caught before: `npm run test:lukla` never reaches its circuit, because it
+asserts the page auto-starts the Lukla demo while a fresh browser profile loads the
+coastal one, so `test-lukla-demo-benchmark.mjs:81` fails first. To be sure the sweep
+was not inventing the crashes, both routes were re-flown through the benchmark's own
+arming path (`sim.clock.getDelta = () => 0`, `setAirport`, `demoDirector.start`) in
+the same page: the trajectories match to the slice, including the impact. They are
+demo faults, and fixing the guidance is follow-up work outside this change.
+
+A third finding is intermittent: `c172-coastal-scenic` reached the water on 3 of 37 cold-page
+flights (`RECOVER CLEARANCE` down to 3.9 m, then `CRASH WATER` at 86 kt), on the pre-Hangang build
+and on `main` alike. During that loss of clearance the vertical speed reads as a *climb* of
+865-872 fpm, so the question is what the clearance is being measured against, not why the aircraft
+would descend. It is declared `intermittent`, because a fault that appears on some page loads
+cannot be proven absent by a single clean flight, and the crashing runs never enter
+`demo-sweep-baseline.json` — `--update-baseline` refuses to widen a baseline past a FAIL. All three
+are tracked in [issue #292](https://github.com/stlim0727/flight3d/issues/292).
+
 
 ## Selection and provenance
 
@@ -94,7 +195,9 @@ switch, and mirrored operational skills are specific to that project and omitted
 The agent-efficiency script hardcodes Keepory directories and historical line
 budgets; task routing is useful here without inheriting those arbitrary gates.
 CircleCI configuration is omitted because there is no Flight3d integration to
-preserve. Browser acceptance must be made portable before adding it to CI.
+preserve. Browser acceptance was required to be made portable before adding it to
+CI; the [autonomous demo sweep](#autonomous-demo-acceptance) closes that gap by
+claiming its own ports and browser and running in GitHub Actions.
 
 The original package.json declared Vite 6 while the existing lockfile and local
 installation used Vite 8. The declaration now matches the existing lockfile

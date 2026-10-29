@@ -39,6 +39,7 @@ export class CoastalDemoScenario {
     this.stageCameraCutDone = false;
     this.rolloutPitchDeg = 0;
     this.stoppedTime = 0;
+    this.result = { status: 'idle' };
   }
 
   enterStage(stage) {
@@ -46,6 +47,7 @@ export class CoastalDemoScenario {
     switch (stage) {
       case CoastalDemoScenario.STAGES.PREFLIGHT_ORBIT:
         this.director.updateBanner(() => t('1.8.pre.flight.drone.inspection.235'), () => t('360.boeing.737.exterior.inspection.flaps.5'));
+        this.result = { status: 'running', minClearanceM: Infinity, touchdown: null, stopPosition: null };
         if (this.sim.setPreset) {
           this.sim.setPreset('runway', true);
         }
@@ -119,6 +121,11 @@ export class CoastalDemoScenario {
         // placed on the pavement under command instead of dropped onto it.
         this.rolloutPitchDeg = Math.max(0, this.sim.telemetry.pitchDeg);
         this.stoppedTime = 0;
+        this.result.touchdown = {
+          iasKnots: this.sim.telemetry.iasKnots,
+          pitchDeg: this.sim.telemetry.pitchDeg,
+          radioAltFt: this.sim.telemetry.radioAltFt,
+        };
         break;
 
       case CoastalDemoScenario.STAGES.POSTFLIGHT_ORBIT:
@@ -133,6 +140,9 @@ export class CoastalDemoScenario {
 
       case CoastalDemoScenario.STAGES.COMPLETED:
         this.director.updateBanner(() => t('demo.complete.taking.manual.control'), () => t('choose.a.preset.and.camera.view.to'));
+        this.result.status = 'completed';
+        this.result.elapsedSeconds = this.director.totalTimer;
+        this.result.stopPosition = this.sim.position.clone();
         this.director.stop(() => t('demo.flight.complete.enjoy.your.flight'), true);
         break;
     }
@@ -140,6 +150,11 @@ export class CoastalDemoScenario {
 
   update(dt) {
     const tel = this.sim.telemetry;
+    if (!tel.onGround) {
+      // Clearance while airborne; rolling sections are pavement contact by design.
+      const clearance = this.sim.position.y - this.sim.currentTerrain.getHeight(this.sim.position.x, this.sim.position.z);
+      this.result.minClearanceM = Math.min(this.result.minClearanceM, clearance);
+    }
 
     switch (this.director.currentStage) {
       case CoastalDemoScenario.STAGES.PREFLIGHT_ORBIT: {
@@ -330,5 +345,14 @@ export class CoastalDemoScenario {
         break;
       }
     }
+  }
+
+  recordFailure(crash) {
+    this.result.status = 'failed';
+    this.result.reason = crash?.description || crash?.type || 'Aircraft damage';
+  }
+
+  stop() {
+    if (['pending', 'running'].includes(this.result.status)) this.result.status = 'cancelled';
   }
 }

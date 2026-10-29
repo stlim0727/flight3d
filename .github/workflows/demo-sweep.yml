@@ -1,0 +1,67 @@
+name: Demo sweep
+
+# Fast-plays every cinematic demo route through deterministic 120 Hz physics and
+# judges the flight, not just the code path: a crash, stall, terrain scrape, gear
+# damage, stuck stage or broken control handoff fails the run. Core routes gate a
+# pull request; the full matrix runs nightly and on demand.
+on:
+  pull_request:
+  schedule:
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Which demo routes to fast-play'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - core
+          - full
+          - all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-sweep-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    # Measured on this runner: the core tier takes 153 s of sweep wall (177 s for
+    # the whole job) and the full matrix with screenshots 942 s, on SwiftShader
+    # because there is no GPU here. Local Vulkan is 66 s and 258 s. The ceilings
+    # below keep the ~4x headroom the first PR runs left.
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 25 || 45 }}
+    env:
+      TIER: ${{ github.event_name == 'pull_request' && 'core' || github.event.inputs.tier || 'all' }}
+      # Screenshots are evidence for a human, and only worth the wall clock on a
+      # scheduled or dispatched run; a PR wants the fastest possible verdict.
+      SHOTS: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+      # No /dev/dri on the hosted runner, so the driver selects SwiftShader itself.
+      # FORCE_GPU=0 only pins that choice down for the gate.
+      FORCE_GPU: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      # The sweep serves dist/ through `vite preview`, so the bundle is part of the test.
+      - run: npm run build
+      - run: node scripts/demo-sweep.mjs
+      - name: Summarize the sweep
+        if: always()
+        run: node scripts/demo-sweep-summary.mjs .cache/demo-sweep/demo-sweep-report.json
+      - name: Upload the flight report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: demo-sweep-${{ github.run_id }}
+          path: .cache/demo-sweep
+          retention-days: 14

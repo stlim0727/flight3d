@@ -15,6 +15,8 @@
     "test:crash": "node scripts/test-crash-scenarios.js",
     "test:mobile": "node scripts/test-mobile-touch.js",
     "test:demo": "node scripts/test-demo-stepping.js",
+    "test:demo-sweep": "node scripts/demo-sweep.mjs --tier core",
+    "test:demo-sweep:full": "node scripts/demo-sweep.mjs --tier all",
     "test:lukla": "node scripts/test-lukla-demo-benchmark.mjs",
     "test:cockpit": "node scripts/verify-cockpit-startup.js",
     "test:camera-look": "node scripts/verify-camera-look.mjs",
