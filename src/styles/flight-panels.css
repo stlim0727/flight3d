@@ -472,9 +472,9 @@ body.demo-active #touch-controls-overlay {
   border-color: rgba(56, 189, 248, .4);
 }
 .ap-panel {
-  position: absolute;
-  top: var(--ap-panel-offset, calc(100% + 4px));
-  right: 0;
+  position: fixed;
+  top: calc(var(--edge-top, 8px) + 52px);
+  right: var(--edge-right, 8px);
   width: min(296px, calc(100vw - var(--edge-left) - var(--edge-right)));
   max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 144px);
   display: grid;
@@ -484,12 +484,26 @@ body.demo-active #touch-controls-overlay {
   overflow-y: auto;
   overscroll-behavior: contain;
   touch-action: pan-y;
-  background: rgba(10, 16, 26, .96);
-  border: 1px solid rgba(56, 189, 248, .35);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+  background: rgba(10, 22, 36, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(181, 211, 234, 0.25);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 95;
 }
-.ap-panel[hidden] { display: none; }
+.ap-panel[hidden] { display: none !important; }
+body.hud-camera-mode .ap-panel {
+  top: max(52px, calc(15% + 44px));
+  right: calc(var(--edge-right, 8px) + 104px);
+}
+@media (max-width: 768px) {
+  body.hud-camera-mode .ap-panel {
+    top: 50px;
+    right: calc(var(--edge-right, 8px) + 96px);
+    width: min(240px, calc(100vw - 120px));
+  }
+}
 .ap-panel .ap-btn { transform: none; }
 .ap-phase-item { justify-content: center; }
 .ap-modes {

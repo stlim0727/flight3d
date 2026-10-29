@@ -33,7 +33,9 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   const fullscreen = document.getElementById('btn-fullscreen');
   fullscreen.setAttribute('data-short-label', '');
   const ap = document.getElementById('ap-bar');
+  const apPanel = document.getElementById('ap-panel');
   topActions.append(mute, fullscreen, ap);
+  if (apPanel) hud.append(apPanel);
   const menu = document.getElementById('menu-toggle');
   if (menu) topBar.append(menu);
   topBar.append(strip, topActions);

@@ -105,27 +105,78 @@ body, html {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  pointer-events: auto;
 }
 
-.hud-top-actions .btn {
-  min-height: 44px;
-  min-width: 44px;
-  padding: 4px 8px;
-  border-radius: 10px;
-  background: rgba(10, 16, 26, 0.82);
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  color: #e2e8f0;
-  display: inline-flex;
+.hud-top-actions .btn,
+.hud-top-actions .quick-mute,
+.hud-top-actions #btn-fullscreen,
+.hud-top-actions .ap-bar,
+.compact-ui .hud-top-actions .ap-bar {
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+  min-height: 40px;
+  height: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  background: rgba(10, 22, 36, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(181, 211, 234, 0.25);
+  color: #edf5ff;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
   box-shadow: none;
+  font-size: 14px;
 }
 
-.hud-top-actions .ap-bar {
-  position: relative;
-  top: auto;
-  right: auto;
-  z-index: 92;
+.hud-top-actions #btn-fullscreen span {
+  display: none !important;
+}
+
+.hud-top-actions #btn-fullscreen::after {
+  content: '⛶';
+  font-size: 16px;
+  line-height: 1;
+}
+
+.hud-top-actions .ap-bar .ap-toggle-btn {
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  border-radius: 8px !important;
+  padding: 0 !important;
+  font: 700 12px "Courier New", Courier, monospace;
+}
+
+@media (max-width: 768px) {
+  .hud-top-actions .btn,
+  .hud-top-actions .quick-mute,
+  .hud-top-actions #btn-fullscreen,
+  .hud-top-actions .ap-bar,
+  .compact-ui .hud-top-actions .ap-bar {
+    width: 36px !important;
+    min-width: 36px !important;
+    max-width: 36px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+  }
+  .hud-top-actions .ap-bar .ap-toggle-btn {
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    font-size: 11px;
+  }
 }
 
 .hud-item {

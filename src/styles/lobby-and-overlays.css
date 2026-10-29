@@ -582,7 +582,7 @@ body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display
   .hud-control-card { padding-top: 4px; font-size: 10px; gap: 2px; }
   .hud-control-card output { font-size: 15px; }
   #hud-view .hud-pair button { font-size: 16px; min-height: 28px; }
-  .hud-unavailable { display: none !important; }
+  .hud-unavailable, .hud-btn-time { display: none !important; }
   .hud-flight-footer {
     grid-template-columns: repeat(6, minmax(0, 1fr));
     padding: 6px 0;
@@ -594,17 +594,18 @@ body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display
 @media (max-height: 520px) {
   .hud-side { top: 46px; gap: 4px; width: 88px; }
   .hud-side-right { width: 92px; }
-  .hud-unavailable { display: none !important; }
-  #hud-view .hud-side button { font-size: 10px; min-height: 30px; padding: 2px 4px; }
+  .hud-unavailable, .hud-btn-time { display: none !important; }
+  #hud-view .hud-side button { font-size: 10px; min-height: 32px; padding: 2px 4px; }
   .hud-control-card { padding-top: 2px; font-size: 9px; gap: 1px; }
   .hud-control-card output { font-size: 14px; }
-  #hud-view .hud-pair button { font-size: 15px; min-height: 26px; }
+  #hud-view .hud-pair button { font-size: 16px; min-height: 28px; }
   .hud-flight-footer { padding: 4px 0; }
   .hud-flight-footer output { font-size: 13px; }
   .hud-flight-footer > div { font-size: 8px; }
   .touch-mode #hud-view .hud-flight-footer {
     left: calc(var(--edge-left) + 80px);
     right: calc(var(--edge-right) + 110px);
+    bottom: calc(var(--edge-bottom) + 126px);
     border-radius: 8px;
   }
 }
@@ -633,7 +634,7 @@ body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display
   }
   .hud-side-left { top: 46px; width: 84px; gap: 4px; }
   .hud-side-right { top: 46px; width: 88px; gap: 4px; }
-  .hud-unavailable { display: none !important; }
+  .hud-unavailable, .hud-btn-time { display: none !important; }
   .touch-mode #hud-view .hud-flight-footer {
     left: var(--edge-left);
     right: var(--edge-right);
