@@ -163,7 +163,7 @@
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   pointer-events: none;
   z-index: 90;
@@ -191,15 +191,18 @@
 
 .crash-card {
   position: relative;
-  width: 90%;
-  max-width: 540px;
+  width: min(460px, calc(100% - var(--edge-left) - var(--edge-right) - 104px));
+  max-height: calc(100dvh - var(--demo-row-top, calc(var(--edge-top) + 96px)) - var(--edge-bottom) - 12px);
+  margin-top: var(--demo-row-top, calc(var(--edge-top) + 96px));
+  overflow-x: hidden;
+  overflow-y: auto;
   background: rgba(15, 23, 42, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1.5px solid rgba(239, 68, 68, 0.65);
-  border-radius: 14px;
-  padding: 24px 28px;
-  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.85), 0 0 35px rgba(239, 68, 68, 0.3);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75), 0 0 24px rgba(239, 68, 68, 0.25);
   pointer-events: auto;
   text-align: center;
   color: #ffffff;
@@ -207,86 +210,93 @@
 }
 
 @keyframes cardSlideUp {
-  from { opacity: 0; transform: translateY(30px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .crash-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  gap: 6px 8px;
+  margin-bottom: 10px;
 }
 
 .crash-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: 5px;
+  padding: 3px 8px;
   background: rgba(239, 68, 68, 0.25);
   border: 1px solid rgba(239, 68, 68, 0.6);
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.4px;
   color: #fca5a5;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .crash-status-tag {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   color: #ef4444;
   background: rgba(0, 0, 0, 0.4);
-  padding: 3px 8px;
+  padding: 3px 7px;
   border-radius: 4px;
+  white-space: nowrap;
 }
 
 .crash-title {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 800;
   color: #ffffff;
-  margin: 0 0 6px 0;
+  margin: 0 0 4px 0;
+  line-height: 1.3;
   text-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
 }
 
 .crash-desc {
-  font-size: 13px;
+  font-size: 12px;
   color: #cbd5e1;
-  margin: 0 0 18px 0;
-  line-height: 1.5;
+  margin: 0 0 12px 0;
+  line-height: 1.45;
 }
 
 .crash-telemetry-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 8px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  padding: 12px 14px;
-  margin-bottom: 20px;
+  padding: 10px 12px;
+  margin-bottom: 0;
 }
 
 .crash-stat {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  min-width: 0;
 }
 
 .crash-stat .stat-label {
   font-size: 10px;
   color: #94a3b8;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
 }
 
 .crash-stat .stat-val {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #f8fafc;
   font-family: monospace;
+  overflow-wrap: anywhere;
 }
 
 .crash-stat .stat-val.critical {
@@ -296,18 +306,19 @@
 .crash-header-side {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .btn-crash-toggle {
-  padding: 4px 10px;
+  min-height: 30px;
+  padding: 4px 8px;
   background: rgba(239, 68, 68, 0.18);
   border: 1px solid rgba(239, 68, 68, 0.55);
   border-radius: 6px;
   color: #fca5a5;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.4px;
   line-height: 1.2;
   text-transform: uppercase;
   white-space: nowrap;
@@ -332,20 +343,148 @@
 }
 
 .crash-overlay.is-minimized .crash-card {
+  display: inline-flex;
+  align-items: center;
   width: auto;
-  max-width: 92%;
-  margin-top: 56px;
-  padding: 10px 14px;
+  max-width: calc(100% - var(--edge-left) - var(--edge-right) - 96px);
+  min-height: 44px;
+  margin-top: var(--demo-row-top, calc(var(--edge-top) + 96px));
+  padding: 5px 6px 5px 10px;
+  border-radius: 10px;
 }
 
 .crash-overlay.is-minimized .crash-header {
   margin-bottom: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+.crash-overlay.is-minimized .crash-badge {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.crash-overlay.is-minimized .crash-status-tag {
+  display: none;
 }
 
 .crash-overlay.is-minimized .crash-body {
   display: none;
+}
+
+@media (max-width: 540px) {
+  .crash-card {
+    width: min(400px, calc(100% - var(--edge-left) - var(--edge-right)));
+    max-height: calc(100dvh - max(var(--demo-row-top, calc(var(--edge-top) + 96px)), calc(var(--menu-row-top, calc(var(--edge-top) + 96px)) + 48px)) - var(--edge-bottom) - 12px);
+    margin-top: max(var(--demo-row-top, calc(var(--edge-top) + 96px)), calc(var(--menu-row-top, calc(var(--edge-top) + 96px)) + 48px));
+    padding: 12px 14px;
+  }
+  .crash-status-tag {
+    display: none;
+  }
+  .crash-title {
+    font-size: 15px;
+  }
+  .crash-desc {
+    font-size: 11px;
+    margin-bottom: 10px;
+  }
+  .crash-telemetry-grid {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .crash-stat .stat-val {
+    font-size: 11px;
+  }
+  .crash-overlay.is-minimized .crash-card {
+    padding: 4px 5px 4px 7px;
+  }
+  .crash-overlay.is-minimized .crash-header {
+    gap: 4px;
+  }
+  .crash-overlay.is-minimized .crash-badge,
+  .crash-overlay.is-minimized .btn-crash-toggle {
+    font-size: 9px;
+    letter-spacing: 0;
+  }
+  .crash-overlay.is-minimized .btn-crash-toggle {
+    padding: 4px 6px;
+  }
+}
+
+@media (max-width: 355px) {
+  .crash-card {
+    padding: 10px;
+  }
+  .crash-badge,
+  .btn-crash-toggle {
+    font-size: 9px;
+    letter-spacing: 0;
+    padding: 3px 6px;
+  }
+  .crash-overlay.is-minimized .crash-card {
+    max-width: calc(100% - var(--edge-left) - var(--edge-right));
+    margin-top: max(var(--demo-row-top, calc(var(--edge-top) + 96px)), calc(var(--menu-row-top, calc(var(--edge-top) + 96px)) + 48px));
+  }
+}
+
+@media (max-height: 450px) {
+  .crash-card {
+    padding: 8px 12px;
+  }
+  .crash-header {
+    margin-bottom: 4px;
+  }
+  .crash-title {
+    font-size: 14px;
+    margin-bottom: 2px;
+  }
+  .crash-desc {
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+  .crash-telemetry-grid {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  .crash-stat .stat-val {
+    font-size: 11px;
+  }
+}
+
+@media (max-height: 360px) {
+  .crash-card {
+    width: min(380px, calc(100% - var(--edge-left) - var(--edge-right) - 104px));
+    padding: 5px 10px;
+  }
+  .crash-header {
+    margin-bottom: 2px;
+  }
+  .crash-badge,
+  .btn-crash-toggle {
+    min-height: 24px;
+    padding: 2px 6px;
+    font-size: 9px;
+  }
+  .crash-status-tag,
+  .crash-desc {
+    display: none;
+  }
+  .crash-title {
+    font-size: 12px;
+    margin-bottom: 2px;
+  }
+  .crash-telemetry-grid {
+    padding: 3px 6px;
+    gap: 4px;
+  }
+  .crash-stat .stat-label {
+    font-size: 8px;
+  }
+  .crash-stat .stat-val {
+    font-size: 10px;
+  }
 }
 

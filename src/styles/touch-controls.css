@@ -683,7 +683,6 @@ body.compact-ui {
 .compact-ui .modal-card { max-height: 85dvh; }
 .compact-ui .modal-header { flex-shrink: 0; }
 .compact-ui .modal-body { min-height: 0; }
-.compact-ui .crash-card { max-height: 85dvh; overflow-y: auto; }
 .compact-ui .help-grid { grid-template-columns: 1fr; }
 @media (max-width: 540px) {
   .compact-ui.touch-mode .touch-controls-overlay {
