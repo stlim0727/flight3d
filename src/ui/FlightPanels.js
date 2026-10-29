@@ -48,7 +48,7 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   cameraSelect.className = 'btn';
   // Match the quick cycle, then list specialist views and automatic viewing.
   for (const [mode, name] of [[1, 'chase'], [6, 'drone'], [4, 'flyby'],
-    [2, 'wing'], [0, 'cockpit'], [3, 'tower'], [5, 'gear'], [7, 'auto']]) {
+    [2, 'wing'], [0, 'cockpit'], [8, 'hud'], [3, 'tower'], [5, 'gear'], [7, 'auto']]) {
     const option = document.createElement('option');
     option.value = String(mode);
     bindText(option, () => touchLabel(t(`ui.camera.${name}`)));
@@ -165,8 +165,8 @@ export function updateControlState(telemetry, camera, options = {}) {
   const mode = camera.autoSwitch ? 7 : camera.mode;
   const cameraSelect = document.getElementById('camera-select');
   if (cameraSelect) cameraSelect.value = String(mode);
-  const cameraName = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto'][mode];
-  const viewName = t(`ui.camera.${cameraName}`).replace(/ · [1-8]$/, '');
+  const cameraName = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto', 'hud'][mode];
+  const viewName = t(`ui.camera.${cameraName}`).replace(/ · [1-9]$/, '');
   // Optical zoom only exists in the fixed eye-point views, so chase and drone
   // framing changes stay unlabelled.
   const zoomed = camera.opticalZoom > 1.01;

@@ -58,7 +58,7 @@ try {
     s.cameraSystem.setMode(0, true);
   })()`);
   await new Promise(resolve => setTimeout(resolve, 3500));
-  for (const mode of [1, 6, 4, 2, 0]) {
+  for (const mode of [8, 1, 6, 4, 2, 0]) {
     await call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'c', code: 'KeyC' });
     await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'c', code: 'KeyC' });
     assert.equal(await evaluate('window.simulator.cameraSystem.mode'), mode);
@@ -146,7 +146,7 @@ try {
   await evaluate('window.stepScenicCamera(20)');
   assert.equal(await evaluate('window.simulator.cameraSystem.autoSwitch'), false, 'manual selection cancels resume');
   assert.deepEqual(errors, [], 'no runtime exceptions');
-  fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({ passed: true, errors, quickCycle: [1, 6, 4, 2, 0], specialistSelections: [3, 5, 7], mobileAutoPauseResume: true }, null, 2));
+  fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({ passed: true, errors, quickCycle: [8, 1, 6, 4, 2, 0], specialistSelections: [3, 5, 7], mobileAutoPauseResume: true }, null, 2));
   console.log('Scenic camera browser checks passed:', dir);
 } finally {
   ws.close();

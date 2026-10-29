@@ -375,12 +375,12 @@ acceptance command (`scripts/verify-cessna-demos.mjs`).
 With Vite on port 5193, run
 `chrome-session --project flight3d node scripts/verify-scenic-cameras.mjs`.
 `APP_URL` and `ARTIFACT_DIR` override the URL and `.cache/scenic-cameras` output.
-It verifies real C-key quick cycling, specialist/auto selection from the mobile
+It verifies real C-key quick cycling (including HUD), specialist/auto selection from the mobile
 settings menu, automatic switching, and the HUD's return to manual viewing.
 Native mobile touch checks also cover the HUD auto button's start/pause/resume
 cycle, sticky explicit pause, hold/release with a four-second automatic resume,
 immediate resume, and cancellation on manual view selection. Camera timers are
-advanced explicitly while rendering continues. Screenshots cover all five quick
+advanced explicitly while rendering continues. Screenshots cover all six quick
 views, the 390px settings layout and paused/looking/playing states. This is a
 fixed-pose browser check, not a full flight or landing acceptance run.
 
@@ -431,3 +431,8 @@ slope transition.
 
 See [touch controls](touch-controls.md) for the response curve, release timing,
 sequence tests and reusable-browser portrait/landscape acceptance command.
+
+### HUD camera
+
+See [HUD camera](hud-camera.md) for controls, disabled placeholders, projection
+conventions and the reusable-browser acceptance command.
