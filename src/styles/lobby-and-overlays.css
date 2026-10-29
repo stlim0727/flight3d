@@ -142,6 +142,7 @@ body:is([data-flow="lobby"], .booting) .flight-panel,
 body:is([data-flow="lobby"], .booting) .quick-mute,
 body:is([data-flow="lobby"], .booting) .presets-bar,
 body:is([data-flow="lobby"], .booting) .action-panel,
+body:is([data-flow="lobby"], .booting) .crash-overlay,
 body:is([data-flow="lobby"], .booting) #demo-banner,
 body:is([data-flow="lobby"], .booting) .demo-pill-btn,
 body:is([data-flow="lobby"], .booting) .touch-controls-overlay { display: none !important; }
