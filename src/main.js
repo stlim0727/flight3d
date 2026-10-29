@@ -2291,6 +2291,28 @@ class FlightSimulator {
       const state = this.touchControls.enabled ? 'state.on' : 'state.off';
       this.showToast(() => t('touch.controls.value', { value: t(state) }));
     });
+    const fullscreenButton = document.getElementById('btn-fullscreen');
+    const syncFullscreenUI = () => {
+      if (!fullscreenButton) return;
+      const active = Boolean(document.fullscreenElement);
+      bindText(fullscreenButton, () => t(active ? 'fullscreen.exit' : 'fullscreen.enter'));
+      fullscreenButton.setAttribute('aria-pressed', String(active));
+    };
+    fullscreenButton?.addEventListener('click', async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+      } catch (err) {
+        this.showToast(() => t('fullscreen.unavailable'));
+      }
+    });
+    // Esc exits fullscreen natively without a usable keydown, so resize and
+    // the pressed state are reconciled from the fullscreenchange event.
+    document.addEventListener('fullscreenchange', () => {
+      syncFullscreenUI();
+      this.handleResize();
+    });
+    syncFullscreenUI();
     for (const [id, mode] of [
       ['btn-ap', 'MASTER'], ['btn-ap-hdg', 'HDG'], ['btn-ap-alt', 'ALT'],
       ['btn-ap-spd', 'SPD'], ['btn-ap-app', 'APP'],
