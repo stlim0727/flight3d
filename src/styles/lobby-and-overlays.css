@@ -222,23 +222,29 @@ body.booting .menu-toggle { display: none !important; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border-radius: 10px;
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  background: rgba(10, 16, 26, 0.82);
-  color: #e2e8f0;
+  gap: 8px;
+  min-width: 44px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(181, 211, 234, 0.25);
+  background: rgba(10, 22, 36, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #edf5ff;
+  font: 700 13px system-ui, sans-serif;
+  letter-spacing: 0.8px;
   cursor: pointer;
   pointer-events: auto;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
+.compact-ui .menu-toggle-title { display: none; }
 /* With the strip hidden in the menu, keep its close affordance off the card. */
 body[data-flow="lobby"] .menu-toggle {
   top: var(--edge-top);
   left: var(--edge-left);
 }
-.menu-toggle:hover { background: rgba(30, 41, 59, 0.95); border-color: #38bdf8; }
+.menu-toggle:hover { background: rgba(30, 41, 59, 0.85); border-color: #38bdf8; }
 .menu-toggle:focus-visible { outline: 2px solid #67e8f9; }
 .menu-toggle .menu-toggle-glyph { font-size: 19px; line-height: 1; }
 .menu-toggle-glyph:empty::before {
@@ -456,71 +462,142 @@ body[data-flow="lobby"] #incheon-attribution-chip { display: none; }
 #hud-view { position: fixed; inset: 0; pointer-events: none; color: #edf5ff; z-index: 60; }
 #hud-view[hidden], #hud-view [hidden] { display: none !important; }
 .hud-flight-glass { position: absolute; inset: 0; width: 100%; height: 100%; }
-#hud-view button, .hud-control-card, .hud-camera-switch, .hud-flight-footer, .hud-systems-panel {
-  background: rgba(12, 27, 44, .80); border: 1px solid rgba(181, 211, 234, .40); border-radius: 9px;
-  box-shadow: 0 2px 8px #0002; color: #edf5ff;
-}
-#hud-view button { pointer-events: auto; min-height: 44px; padding: 10px; font: 600 12px system-ui; cursor: pointer; }
-#hud-view button:hover:not(:disabled), #hud-view button:focus-visible { background: #24465e; outline: 2px solid #a9f59a; outline-offset: 2px; }
-#hud-view button:disabled { color: #96a3b3; background: rgba(21, 33, 48, .72); border-color: #68798c80; cursor: default; box-shadow: none; }
-#hud-view button[aria-pressed="true"], #hud-view button.is-active { border-color: #b8ff9b; color: #b8ff9b; }
-.hud-camera-switch { position: absolute; top: var(--edge-top); right: var(--edge-right); display: flex; align-items: center; gap: 10px; font: 12px system-ui; pointer-events: auto; }
-#hud-view .hud-camera-switch button { border: 0; background: transparent; font-size: 25px; min-width: 44px; padding: 0; }
-.hud-camera-switch b { margin-left: 10px; }
-.hud-side { position: absolute; top: max(80px, 17%); width: 112px; display: grid; gap: 9px; pointer-events: none; }
-.hud-side-left { left: var(--edge-left); }
-.hud-side-right { right: var(--edge-right); }
-.hud-control-card { display: grid; text-align: center; padding: 10px 0 0; gap: 5px; font: 600 12px system-ui; overflow: hidden; }
-.hud-control-card output { font: 19px monospace; }
-.hud-pair { display: flex; }
-#hud-view .hud-pair button { width: 50%; border-radius: 0; border-width: 1px 0 0; font-size: 20px; background: transparent; }
-#hud-view .hud-pair button + button { border-left-width: 1px; }
-.hud-unavailable { display: grid; gap: 5px; }
-.hud-unavailable small { font-size: 10px; font-weight: 400; }
-.hud-unavailable small::before { content: '⊘ '; }
-.hud-flight-footer { position: absolute; bottom: var(--edge-bottom); left: var(--edge-left); right: var(--edge-right); display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 12px 0; }
-.hud-flight-footer > div { display: grid; text-align: center; gap: 5px; font: 11px monospace; color: #a8b8c8; }
-.hud-flight-footer > div + div { border-left: 1px solid #64748b; }
-.hud-flight-footer output { font: 600 21px monospace; color: #edf5ff; }
-.hud-systems-panel { position: absolute; top: max(133px, calc(17% + 54px)); right: calc(var(--edge-right) + 124px); width: 210px; padding: 8px; display: grid; gap: 6px; pointer-events: auto; max-height: calc(100dvh - 200px); overflow-y: auto; }
-/* HUD camera mode: shares the exact same telemetry strip, top header, and control dock */
-#hud-view .hud-side,
-#hud-view .hud-camera-switch,
-#hud-view .hud-flight-footer {
+
+body.hud-camera-mode .hud-strip,
+body.hud-camera-mode .flight-toolbar,
+body.hud-camera-mode .hud-top-actions {
   display: none !important;
 }
-body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display: none; }
-@media (max-width: 700px) {
-  .hud-side { width: 74px; top: 76px; gap: 6px; }
-  #hud-view .hud-side button { font-size: 10px; padding: 5px 3px; }
-  .hud-control-card { padding-top: 5px; font-size: 10px; gap: 2px; }
-  .hud-control-card output { font-size: 15px; }
-  #hud-view .hud-pair button { font-size: 18px; }
-  .hud-unavailable small { font-size: 9px; }
-  .hud-flight-footer { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 7px 0; row-gap: 8px; }
-  .hud-flight-footer > div { font-size: 9px; gap: 2px; }
-  .hud-flight-footer > div:nth-child(4) { border-left: 0; }
-  .hud-flight-footer output { font-size: 14px; }
-  .hud-camera-switch { gap: 0; }
-  .hud-camera-switch b { margin-left: 5px; }
-  .hud-systems-panel { right: calc(var(--edge-right) + 80px); top: 126px; width: min(210px, calc(100vw - 100px)); }
-  body.hud-camera-mode .ap-bar { top: 76px; width: 74px; }
-  body.hud-camera-mode .ap-panel { right: 80px; top: 50px; width: min(260px, calc(100vw - 100px)); }
-  body.hud-camera-mode.touch-mode .hud-flight-footer { bottom: calc(var(--edge-bottom) + 172px); }
+
+/* Semi-transparent frosted glass cards and controls */
+#hud-view button, .hud-control-card, .hud-camera-switch, .hud-flight-footer, .hud-systems-panel {
+  background: rgba(10, 22, 36, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(181, 211, 234, 0.25);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  color: #edf5ff;
 }
-@media (max-height: 550px) {
-  .hud-side { top: 64px; gap: 4px; width: 98px; }
-  .hud-side-right { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 174px; }
-  #hud-view .hud-side button { font-size: 9px; padding: 4px; }
-  .hud-control-card { padding-top: 3px; gap: 2px; }
+#hud-view button { pointer-events: auto; min-height: 40px; padding: 8px; font: 600 12px system-ui; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+#hud-view button:hover:not(:disabled), #hud-view button:focus-visible { background: rgba(36, 70, 94, 0.85); border-color: #38bdf8; outline: 2px solid #38bdf8; outline-offset: 1px; }
+#hud-view button:disabled { color: #94a3b8; opacity: 0.6; cursor: default; box-shadow: none; }
+#hud-view button[aria-pressed="true"], #hud-view button.is-active { border-color: #4ade80; color: #4ade80; background: rgba(16, 50, 36, 0.75); }
+
+/* Top Center Mode / Status Pill */
+.hud-center-badge {
+  position: absolute;
+  top: var(--edge-top, 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 16px;
+  font: 600 12px system-ui, sans-serif;
+  letter-spacing: 0.6px;
+  color: #e2e8f0;
+  background: rgba(10, 22, 36, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(181, 211, 234, 0.25);
+  border-radius: 20px;
+  pointer-events: auto;
+  z-index: 65;
+}
+
+/* Top Right Camera Switch */
+.hud-camera-switch {
+  position: absolute;
+  top: var(--edge-top, 8px);
+  right: var(--edge-right, 8px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 10px;
+  font: 600 12px system-ui;
+  pointer-events: auto;
+}
+#hud-view .hud-camera-switch button { border: 0; background: transparent; font-size: 22px; min-width: 32px; padding: 0; color: #94a3b8; }
+#hud-view .hud-camera-switch button:hover { color: #edf5ff; background: transparent; }
+.hud-camera-switch b { margin-left: 6px; color: #ffffff; }
+
+/* Left & Right Side Columns */
+.hud-side { position: absolute; top: max(76px, 15%); width: 104px; display: grid; gap: 8px; pointer-events: none; }
+.hud-side-left { left: var(--edge-left, 8px); }
+.hud-side-right { right: var(--edge-right, 8px); width: 114px; }
+.hud-control-card { display: grid; text-align: center; padding: 8px 0 0; gap: 4px; font: 600 11px system-ui; overflow: hidden; }
+.hud-control-card output { font: 17px monospace; font-weight: 700; color: #ffffff; }
+.hud-pair { display: flex; }
+#hud-view .hud-pair button { width: 50%; border-radius: 0; border-width: 1px 0 0; font-size: 18px; background: transparent; min-height: 32px; padding: 0; }
+#hud-view .hud-pair button + button { border-left-width: 1px; }
+.hud-unavailable { display: grid; gap: 2px; }
+.hud-unavailable small { font-size: 9px; font-weight: 400; color: #94a3b8; }
+.hud-unavailable small::before { content: '🔒 '; }
+
+/* Bottom Full-Width Telemetry Strip */
+.hud-flight-footer {
+  position: absolute;
+  bottom: var(--edge-bottom, 8px);
+  left: var(--edge-left, 8px);
+  right: var(--edge-right, 8px);
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: center;
+  padding: 8px 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.hud-flight-footer > div { display: grid; text-align: center; gap: 4px; font: 10px monospace; color: #94a3b8; letter-spacing: 0.5px; }
+.hud-flight-footer > div + div { border-left: 1px solid rgba(148, 163, 184, 0.25); }
+.hud-flight-footer output { font: 700 18px monospace; color: #ffffff; }
+
+.hud-systems-panel { position: absolute; top: max(133px, calc(17% + 54px)); right: calc(var(--edge-right) + 124px); width: 210px; padding: 8px; display: grid; gap: 6px; pointer-events: auto; max-height: calc(100dvh - 200px); overflow-y: auto; }
+body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display: none; }
+
+/* Responsive adjustments for mobile: ensure ZERO overlapping */
+@media (max-width: 768px) {
+  .hud-side { width: 72px; top: 68px; gap: 6px; }
+  .hud-side-right { width: 84px; }
+  #hud-view .hud-side button { font-size: 10px; min-height: 36px; padding: 4px; }
+  .hud-control-card { padding-top: 4px; font-size: 10px; gap: 2px; }
   .hud-control-card output { font-size: 14px; }
-  .hud-flight-footer { padding: 6px 0; }
-  .hud-flight-footer output { font-size: 14px; }
-  .hud-flight-footer > div { font-size: 9px; }
-  body.hud-camera-mode .ap-bar { top: 64px; width: 85px; right: calc(var(--edge-right) + 89px); }
-  body.hud-camera-mode .ap-panel { right: 0; top: 48px; max-height: calc(100dvh - 130px); }
-  .hud-systems-panel { right: var(--edge-right); top: 112px; max-height: calc(100dvh - 175px); }
-  body.hud-camera-mode.touch-mode .hud-flight-footer { top: var(--edge-top); bottom: auto; left: calc(var(--edge-left) + 52px); right: calc(var(--edge-right) + 180px); }
+  .hud-unavailable { display: none !important; }
+  .hud-flight-footer { grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 6px 0; }
+  .hud-flight-footer > div { font-size: 8px; gap: 2px; }
+  .hud-flight-footer output { font-size: 13px; }
+}
+
+@media (max-height: 520px) {
+  .hud-side { top: 52px; gap: 4px; width: 78px; }
+  .hud-side-right { width: 84px; }
+  .hud-unavailable { display: none !important; }
+  #hud-view .hud-side button { font-size: 9px; min-height: 30px; padding: 2px; }
+  .hud-control-card { padding-top: 2px; font-size: 9px; gap: 1px; }
+  .hud-control-card output { font-size: 13px; }
+  .hud-flight-footer { padding: 4px 0; }
+  .hud-flight-footer output { font-size: 13px; }
+  .hud-flight-footer > div { font-size: 8px; }
+  .touch-mode #hud-view .hud-flight-footer {
+    left: calc(var(--edge-left) + 80px);
+    right: calc(var(--edge-right) + 110px);
+    border-radius: 8px;
+  }
+}
+
+@media (max-width: 540px) {
+  .hud-side-left { top: 52px; width: 68px; gap: 4px; }
+  .hud-side-right { top: 52px; width: 76px; gap: 4px; }
+  .hud-unavailable { display: none !important; }
+  .touch-mode #hud-view .hud-flight-footer {
+    left: var(--edge-left);
+    right: var(--edge-right);
+    bottom: calc(var(--edge-bottom) + 140px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: 4px;
+    padding: 4px;
+  }
+  .touch-mode #hud-view .hud-flight-footer > div:nth-child(4) { border-left: 0; }
 }
 
 

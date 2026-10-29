@@ -16,6 +16,7 @@ export class HudView {
         <button type="button" id="hud-camera-prev">‹</button><span>CAM <b>HUD</b></span>
         <button type="button" id="hud-camera-next">›</button>
       </nav>
+      <div class="hud-center-badge"><span id="hud-badge-title">HUD CAM · 시안</span></div>
       <div class="hud-side hud-side-left">
         <div class="hud-control-card"><span data-hud-label="hud.trim"></span><output id="hud-trim-value"></output>
           <div class="hud-pair"><button type="button" id="hud-trim-less">−</button><button type="button" id="hud-trim-more">+</button></div></div>
