@@ -33,13 +33,39 @@ export class HangangScenario {
     s.currentTerrain = saved.terrain; s.currentAirport = saved.airport;
     s.collisionDetector.setEnvironment(...saved.environment);
     s.aero.windWorld.copy(saved.wind); s.setTimeOfDay(saved.time);
-    s.cameraSystem.towerPos.copy(saved.tower); this.syncTerrain();
+    s.cameraSystem.towerPos.copy(saved.tower);
     this.scene.group.visible = false;
+
+    // Reconcile active airport terrain and visibility so stale saved state never hides active scenery
+    const active = s.activeAirport;
+    if (active === 'incheon' && s.incheonAirport) {
+      s.incheonAirport.group.visible = s.incheonAirport.terrain.mesh.visible = true;
+      s.currentTerrain = s.incheonAirport.terrain;
+      s.currentAirport = s.incheonAirport;
+      s.collisionDetector.setEnvironment(s.currentTerrain, s.currentAirport);
+    } else if (active === 'lukla' && s.luklaTerrain) {
+      s.luklaTerrain.mesh.visible = s.luklaAirport.group.visible = true;
+      s.currentTerrain = s.luklaTerrain;
+      s.currentAirport = s.luklaAirport;
+      s.collisionDetector.setEnvironment(s.luklaTerrain, s.luklaAirport, null, null, null);
+    } else if (active === 'neon' && s.neonCity) {
+      s.neonCity.group.visible = true;
+      s.currentTerrain = s.neonCity.terrain;
+      s.currentAirport = s.neonCity.airport;
+      s.collisionDetector.setEnvironment(s.currentTerrain, s.currentAirport, s.neonCity);
+    } else if (active === 'coastal') {
+      s.terrain.mesh.visible = s.airport.group.visible = s.ships.group.visible = s.foliage.group.visible = true;
+      s.currentTerrain = s.terrain;
+      s.currentAirport = s.airport;
+      s.collisionDetector.setEnvironment(s.terrain, s.currentAirport, s.foliage, s.ships, s.water);
+    }
+    this.syncTerrain();
   }
   syncTerrain() {
     const s = this.sim;
-    s.cameraSystem.setTerrain(s.currentTerrain);
-    s.explosionSystem.terrain = s.tireSmokeSystem.terrain = s.currentTerrain;
+    s.cameraSystem?.setTerrain?.(s.currentTerrain);
+    if (s.explosionSystem) s.explosionSystem.terrain = s.currentTerrain;
+    if (s.tireSmokeSystem) s.tireSmokeSystem.terrain = s.currentTerrain;
   }
   update(dt) {
     if (!this.active) return;

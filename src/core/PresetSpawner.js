@@ -24,6 +24,11 @@ import {
 class PresetSpawnerMethods {
   setPreset(type, isDemoInternal = false) {
     this.hangang?.stop();
+    if (this.activeAirport === 'incheon' && this.incheonAirport) {
+      this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = true;
+      this.currentTerrain = this.incheonAirport.terrain;
+      this.currentAirport = this.incheonAirport;
+    }
     if (type === 'shadow' && !this.devRunner?.changingState) {
       return this.devRunner?.start('shadow') ?? false;
     }
@@ -437,7 +442,14 @@ class PresetSpawnerMethods {
   async setAirport(id) {
     this.renderDiagnosticsPanel?.close();
     if (!['coastal', 'lukla', 'incheon', 'neon', 'hangang'].includes(id)) return;
-    if (this.activeAirport === id) return;
+    if (this.activeAirport === id) {
+      if (id === 'incheon' && this.incheonAirport) {
+        this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = true;
+        this.currentTerrain = this.incheonAirport.terrain;
+        this.currentAirport = this.incheonAirport;
+      }
+      return;
+    }
     this.hangang?.stop();
     const request = this.airportRequest = (this.airportRequest || 0) + 1;
     this.airportLoading = false;
