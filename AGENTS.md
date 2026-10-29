@@ -62,6 +62,20 @@ for accounts with `/dev/dri/renderD128` access (`render`/`video` groups), yieldi
 ~8.25x real-time simulation and sub-second screenshot capture. Routine screenshots
 are opt-in via `--screenshots` (`npm run test:flight:visual`).
 
+## Browser and GPU requirements
+
+- Use Obscura for ordinary browser work; use installed Chrome for WebGL/3D.
+- Chrome WebGL/3D tests require hardware GPU acceleration, including headless.
+  Never disable the GPU or silently select software rendering. Software requires
+  explicit user approval for that task.
+- Follow [browser GPU setup](docs/development/browser-gpu.md) before any browser
+  scenario: check device access in the actual executor, inspect the hardware
+  renderer, and verify shader drawing with readPixels using
+  `node scripts/verify-browser-gpu.mjs <CDP endpoint>`.
+- Audit browser wrappers, MCP arguments and old script defaults; a hidden device
+  in the agent sandbox is not proof that the host has no GPU. Carry these rules
+  into delegated-agent instructions and report which browser supplied evidence.
+
 ## Simulation changes
 
 - Derive visible behavior from continuous physics state, not behavior-switch

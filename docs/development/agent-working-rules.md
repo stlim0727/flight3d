@@ -27,3 +27,6 @@ Adapted from Keepory's CLAUDE.md and docs/development/agent-working-rules.md.
 - Keep commands and task routing current when moving files or changing scripts.
   Document reusable lessons in repository files, without credentials or transient
   session details. Verify live PR, CI, and deployment state before reporting it.
+- Before browser verification, follow [hardware GPU setup](browser-gpu.md).
+  Pass its browser/device/renderer/drawing requirements to delegated agents;
+  do not infer GPU absence from sandbox visibility or use silent software fallback.
