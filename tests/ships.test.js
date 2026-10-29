@@ -25,6 +25,32 @@ const water = {
   getWaveHeight: (x, z, t) => 4 + Math.sin(x * 0.004 + t) * 0.6 + Math.cos(z * 0.006 + t) * 0.3
 };
 
+test('deferred ships retain moving collision roots and request each visual only once', async () => {
+  const requests = [];
+  const ships = new Ships(water, { deferAssets: true, random: () => 0,
+    loadAsset: type => { requests.push(type); return loadAsset(type); } });
+  await Promise.resolve();
+  assert.deepEqual(requests, []);
+  const records = [...ships.vessels, ...ships.speedboats];
+  const roots = records.map(record => record.mesh);
+  ships.update(1, 1);
+  records.forEach(record => {
+    assert.equal(record.assetStatus, 'deferred');
+    assert.ok(!record.bounds.isEmpty());
+    assert.ok(Number.isFinite(record.mesh.position.y));
+  });
+  const ready = ships.loadAssets();
+  assert.equal(ships.loadAssets(), ready);
+  await ready;
+  assert.equal(requests.length, 5);
+  records.forEach((record, i) => {
+    assert.equal(record.mesh, roots[i]);
+    assert.equal(record.assetStatus, 'loaded');
+  });
+  await ships.loadAssets();
+  assert.equal(requests.length, 5);
+});
+
 test('four shipped GLBs have metre bounds, shared material batches and outward hull normals', async () => {
   for (const [type, asset] of Object.entries(shipAssetManifest)) {
     const model = await loadAsset(type),
