@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flight3d — 모든 비행 URL</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101b2b; color: #e9f1fa; }
+    body { max-width: 1100px; margin: auto; padding: 24px; }
+    a { color: #86d5ff; } h1 { font-size: 1.8rem; }
+    label { display: inline-block; margin: 8px 16px 8px 0; }
+    select { padding: 8px; font: inherit; } .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; } th, td { text-align: left; border-bottom: 1px solid #34465d; padding: 12px 8px; }
+    td:last-child { overflow-wrap: anywhere; min-width: 240px; } code { color: #b8e1fc; }
+  </style>
+</head>
+<body>
+  <a href="./">← Flight3d</a>
+  <h1>모든 비행 URL</h1>
+  <p>링크를 열면 선택한 기종·지형·시나리오로 바로 시작합니다. URL 인자: <code>aircraft</code>, <code>terrain</code>, <code>scenario</code>.</p>
+  <p>지원하는 조합만 표시합니다. 한강은 C172 전용이며 일부 기종·지형은 데모를 지원하지 않습니다. 생략한 인자는 저장된 선택을 사용하고, 잘못된 값은 기본 선택으로 대체합니다.</p>
+  <div id="filters" aria-label="비행 목록 필터"></div>
+  <p id="count" role="status"></p>
+  <div class="table-wrap"><table><thead><tr><th scope="col">기종</th><th scope="col">지형</th><th scope="col">시나리오</th><th scope="col">실행 URL</th></tr></thead><tbody id="flights"></tbody></table></div>
+  <script type="module" src="/src/flightLinks.js"></script>
+</body>
+</html>
