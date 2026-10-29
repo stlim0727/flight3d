@@ -72,6 +72,7 @@ import {
   saveSavedAircraft,
   saveSavedScenario,
 } from './config/flightSelection.js';
+import { resolveFlightUrl } from './config/flightUrls.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 import { initBuildInfo } from './ui/BuildInfo.js';
@@ -119,7 +120,7 @@ const inputLatency = installInputLatencyMonitor();
 class FlightSimulator {
   async initialize() {
     await startupStage(0, 'startup.scene');
-    const savedSelection = loadSavedFlightSelection();
+    const savedSelection = resolveFlightUrl(window.location.search, loadSavedFlightSelection());
     this.container = document.getElementById('canvas-container');
     this.inputLatency = inputLatency;
 

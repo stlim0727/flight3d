@@ -16,7 +16,7 @@ export default defineConfig({
   base: process.env.VITE_BASE_PATH || "/",
   build: {
     rolldownOptions: {
-      input: { main: 'index.html', incheon: 'incheon.html' }
+      input: { main: 'index.html', incheon: 'incheon.html', flights: 'flights.html' }
     }
   },
   server: {
