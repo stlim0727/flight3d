@@ -1,4 +1,6 @@
 import { FlightWarnings, terrainConflictSeconds } from './systems/FlightWarnings.js';
+import { HangangScenario } from './director/HangangScenario.js';
+import { HANGANG_COURSE } from './config/hangangCourse.js';
 import { AircraftBreakup } from './effects/AircraftBreakup.js';
 import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
@@ -61,6 +63,7 @@ import { RenderDiagnostics } from './dev/RenderDiagnostics.js';
 import { RenderDiagnosticsPanel } from './ui/RenderDiagnosticsPanel.js';
 import {
   DEFAULT_SCENARIO,
+  defaultScenarioForRegion,
   isScenarioAvailable,
 } from './config/scenarioRegistry.js';
 import {
@@ -759,6 +762,7 @@ class FlightSimulator {
   setAircraft(aircraftId = 'B738') {
     const config = AIRCRAFT_REGISTRY[aircraftId];
     if (!config) return;
+    this.hangang?.stop();
     this.renderDiagnosticsPanel?.close();
     this.devRunner?.stop();
 
@@ -812,15 +816,17 @@ class FlightSimulator {
   }
 
   setPreset(type, isDemoInternal = false) {
+    this.hangang?.stop();
     if (type === 'shadow' && !this.devRunner?.changingState) {
       return this.devRunner?.start('shadow') ?? false;
     }
     this.devRunner?.stop();
     // Scenario availability depends on the active airport; an unavailable
     // pick (e.g. cliff at coastal) falls back instead of leaving a stale pose.
-    if (!isScenarioAvailable(this.activeAirport, type)) type = DEFAULT_SCENARIO;
+    if (!isScenarioAvailable(this.activeAirport, type)) type = defaultScenarioForRegion(this.activeAirport);
     this.shadowDemo?.stop();
     this.lastPresetType = type;
+    if (type === 'hangang' && this.currentAircraftId !== 'C172') this.setAircraft('C172');
     this.audio?.reset();
     this.flightWarnings?.reset();
     this.telemetry.warnings = [];
@@ -856,7 +862,21 @@ class FlightSimulator {
 
     const groundClearance = this.gear?.cgGroundHeightM ?? 3.5;
 
-    if (this.activeAirport === 'neon') {
+    if (type === 'hangang') {
+      this.hangang ??= new HangangScenario(this);
+      this.hangang.start();
+      this.position.set(...HANGANG_COURSE.spawn);
+      this.linearVelocity.set(0, 0, -HANGANG_COURSE.speedMs);
+      this.angularVelocity.set(0, 0, 0);
+      this.quaternion.identity();
+      this.controls.throttle = 0.5;
+      this.engines.setThrottle(0.5);
+      this.engines.setReverser(false, false);
+      this.gear.setGearTarget(true);
+      this.gear.gearState = 1;
+      this.aero.setFlapPosition(0);
+      this.aero.spoilers = 0;
+    } else if (this.activeAirport === 'neon') {
       const isC172 = this.currentAircraftId === 'C172';
       const c172Clearance = this.gear?.cgGroundHeightM ?? 1.4;
       const clearance = isC172 ? c172Clearance : groundClearance;
@@ -1119,7 +1139,7 @@ class FlightSimulator {
     this.engines.failed.fill(false);
     this.engines.contactDamage.fill(0);
 
-    if (type === 'approach' || type === 'cruise') {
+    if (type === 'approach' || type === 'cruise' || type === 'hangang') {
       // A preset declares a settled state, not a set of control inputs, so the
       // state variables have to be where the declared configuration puts them:
       // the wing at the commanded flap angle, the fans at the commanded N1, the
@@ -1209,7 +1229,9 @@ class FlightSimulator {
    */
   async setAirport(id) {
     this.renderDiagnosticsPanel?.close();
-    if (!['coastal', 'lukla', 'incheon', 'neon'].includes(id)) return;
+    if (!['coastal', 'lukla', 'incheon', 'neon', 'hangang'].includes(id)) return;
+    if (this.activeAirport === id) return;
+    this.hangang?.stop();
     const request = this.airportRequest = (this.airportRequest || 0) + 1;
     this.airportLoading = false;
     document.getElementById('btn-fly').disabled = false;
@@ -1251,6 +1273,7 @@ class FlightSimulator {
     const isIncheon = id === 'incheon';
     const isCoastal = id === 'coastal';
     const isNeon = id === 'neon';
+    const isHangang = id === 'hangang';
     document.getElementById('incheon-attribution').hidden = !isIncheon;
 
     // Toggle 3D mesh visibility
@@ -1319,22 +1342,23 @@ class FlightSimulator {
     }
 
     this.lobby.airport = id;
-    if (!isScenarioAvailable(id, this.lobby.preset)) this.lobby.preset = DEFAULT_SCENARIO;
+    if (!isScenarioAvailable(id, this.lobby.preset)) this.lobby.preset = defaultScenarioForRegion(id);
     saveSavedAirport(id);
     saveSavedScenario(this.lobby.preset);
     // A new airport re-spawns the aircraft below, so any flight held behind the
     // menu is no longer the one to return to: release it and let the cinematic back.
     this.gameFlow.abandonResumableFlight();
-    this.gameFlow.setCinematicAvailable(!isIncheon);
+    this.gameFlow.setCinematicAvailable(!isIncheon && !isHangang);
     this.lobbyScreen?.refresh();
 
     if (this.demoDirector && this.demoDirector.isActive) {
       this.demoDirector.stop();
     }
 
-    this.setPreset('runway');
+    this.setPreset(defaultScenarioForRegion(id));
+    this.lobbyScreen?.refresh();
 
-    const airportKey = isIncheon ? 'incheon.airport' : isLukla
+    const airportKey = isHangang ? 'hangang.region' : isIncheon ? 'incheon.airport' : isLukla
       ? 'tenzing.hillary.airport.nepal.vnlk.runway.24'
       : 'pacific.coastal.international.airport.runway.09l.elevation';
     this.showToast(() => t('airport.changed.value', { value: t(airportKey) }));
@@ -1393,6 +1417,10 @@ class FlightSimulator {
 
     // Autopilot control laws. Pilot yoke input above the gate overrides the
     // axes; the AP commands surfaces directly, bypassing yoke rate limiters.
+    if (this.hangang?.active && this.autopilot.master) {
+      this.autopilot.disengage();
+      this.showToast(() => t('hangang.manual'));
+    }
     if (this.autopilot.master) {
       const apCmd = this.autopilot.update(this.readAutopilotState(), dt);
       if (Math.abs(this.controls.elevator) < 0.075 && Math.abs(this.controls.aileron) < 0.075) {
@@ -1723,6 +1751,7 @@ class FlightSimulator {
     this.lastOnGround = gearResult.onGround;
 
     // 13. Check Multi-Obstacle Collisions (Terrain, Water, Tower, Buildings, Trees, Ships)
+    this.hangang?.update(dt);
     if (!this.isCrashed) {
       const crash = this.collisionDetector.checkCollision(
         collisionPosition,
@@ -1750,6 +1779,7 @@ class FlightSimulator {
   triggerCrash(crashResult, impactVelocity = this.linearVelocity) {
     if (this.isCrashed) return;
     this.isCrashed = true;
+    if (this.hangang?.active) this.hangang.run.fail('contact');
     this.flightWarnings.reset();
     this.telemetry.warnings = [];
     this.crashResult = crashResult;
@@ -1796,6 +1826,7 @@ class FlightSimulator {
 
   resetCrash() {
     if (this.devRunner.active) { this.devRunner.restart(); return; }
+    if (this.hangang?.active) { this.setPreset('hangang'); return; }
     this.clearCrashState();
     this.setPreset('runway');
     this.showToast(() => t(this.activeAirport === 'incheon'
@@ -1955,6 +1986,7 @@ class FlightSimulator {
     }
 
     // 1. Update 3D Aircraft Model & Articulations
+    this.hangang?.render();
     this.aircraft.update(frameDelta, this.telemetry);
     this.renderPose.apply(this.aircraft.group, this.position, this.quaternion,
       this.physicsAccumulator / this.physicsDt);
@@ -2374,6 +2406,9 @@ class FlightSimulator {
       onDemoProfile: id => { this.lobby.demoProfile = id; },
       onAirport: id => {
         this.lobby.airport = id;
+        this.lobby.preset = defaultScenarioForRegion(id);
+        if (id === 'hangang') this.lobby.aircraft = 'C172';
+        saveSavedScenario(this.lobby.preset);
         saveSavedAirport(id);
         this.lobbyScreen?.refresh();
         this.queueLobbySelection();

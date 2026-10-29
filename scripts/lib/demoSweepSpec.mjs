@@ -12,6 +12,11 @@
  * docs/development/aircraft-demos.md. Anything that is an envelope peak rather
  * than intent (bank, speed, G, warning frequency) is measured into
  * `scripts/demo-sweep-baseline.json` instead of being declared here.
+ *
+ * The Hangang region is deliberately absent: `DemoFlightDirector.start()` returns
+ * false there because it is a manually flown bridge course, not an autonomous
+ * demo, so there is no choreography for the sweep to fast-play. It is covered by
+ * `tests/hangang.test.js` and `scripts/verify-hangang.mjs`.
  */
 import { CoastalDemoScenario } from '../../src/director/scenarios/CoastalDemoScenario.js';
 import { LuklaCircuitScenario } from '../../src/director/scenarios/LuklaCircuitScenario.js';

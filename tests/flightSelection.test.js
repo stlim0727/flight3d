@@ -53,7 +53,7 @@ test('default selection constants are valid', () => {
   assert.equal(DEFAULT_AIRPORT, 'coastal');
   assert.equal(DEFAULT_AIRCRAFT, 'B738');
   assert.equal(DEFAULT_SCENARIO, 'runway');
-  assert.deepEqual([...VALID_AIRPORTS], ['coastal', 'lukla', 'incheon', 'neon']);
+  assert.deepEqual([...VALID_AIRPORTS], ['coastal', 'lukla', 'incheon', 'neon', 'hangang']);
 });
 
 test('resolveAirport accepts known airports and degrades unknown ones', () => {
@@ -226,4 +226,13 @@ test('roundtrip saving and restoring matches selection across page reloads', () 
     aircraft: 'F16',
     scenario: 'cliff',
   });
+});
+
+
+test('Hangang persists as an independent region with a valid default and C172', () => {
+  const storage = createMockStorage();
+  saveFlightSelection({airport:'hangang', aircraft:'B738', scenario:'runway'}, storage);
+  assert.deepEqual(loadSavedFlightSelection(storage), {airport:'hangang', aircraft:'C172', scenario:'hangang'});
+  assert.equal(resolveScenario(null, 'hangang'), 'hangang');
+  for (const airport of ['coastal','incheon','lukla','neon']) assert.equal(resolveScenario('hangang', airport), 'runway');
 });
