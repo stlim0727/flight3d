@@ -95,6 +95,7 @@ Open a specific flight with query parameters, for example:
 [ C172 coastal approach](https://stlim0727.github.io/flight3d/?aircraft=C172&terrain=coastal&scenario=approach).
 The [flight URL directory](https://stlim0727.github.io/flight3d/flights.html)
 lists every supported aircraft/terrain/scenario combination with filters.
+For the complete Markdown list, see [all flight URLs](docs/flight-urls.md).
 
 - `aircraft`: `B738`, `C172`, `F16` (case sensitive).
 - `terrain`: `coastal`, `lukla`, `incheon`, `neon`, `hangang`.
