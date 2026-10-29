@@ -454,9 +454,10 @@ body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display
 .lobby-card .btn-airport {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: center;
   gap: 3px;
+  min-width: 0;
   text-align: left;
 }
 .lobby-card .btn-airport { flex: 1 1 calc(50% - 3px); }
@@ -466,6 +467,8 @@ body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display
   font: 500 9.5px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: .2px;
   font-variant-numeric: tabular-nums;
+  white-space: normal;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 .spec-badge:empty { display: none; }
