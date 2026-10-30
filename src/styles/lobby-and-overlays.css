@@ -148,6 +148,10 @@ body[data-dev-scenario="true"] #touch-controls-overlay { display: none !importan
   min-height: 40px;
 }
 .lobby-card .btn-fly:hover { background: #1986ac; color: #fff; }
+.lobby-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.lobby-card .lobby-actions .btn,
+.compact-ui .lobby-card .lobby-actions .btn { flex: 1 1 120px; min-height: 44px; }
+.lobby-card .lobby-actions .btn[hidden] { display: none; }
 .lobby-hint { color: #94a3b8; font-size: 10px; line-height: 1.5; margin: -6px 0 0; text-align: center; }
 
 /* Pause: dim the frozen scene lightly. */
@@ -208,14 +212,13 @@ body:is([data-flow="lobby"], .booting) .touch-controls-overlay { display: none !
 /* The pause card offers the same restart/exit choices the hull-loss card does, so the
    crash report stands down while the sortie is paused and returns with the flight. */
 body[data-flow="paused"] .crash-overlay { display: none !important; }
-/* The toggle is the lobby's close affordance, so it stays up there; while
-   booting there is nothing to toggle back to yet, so it waits too. */
+/* Keep the menu affordance available during play; hide it until startup ends. */
 body.booting .menu-toggle { display: none !important; }
 
 .toast { z-index: 96; }
 
-/* Persistent main-menu toggle. Floats above the lobby overlay (z 85) so it can
-   open the menu over a flight and hide it again, but stays under toasts (96)
+/* Persistent main-menu button. Floats above the lobby overlay (z 85) so it can
+   open the menu over a flight, but stays under toasts (96)
    and modals (100). Use the first strip with space at the safe screen edge. */
 .menu-toggle {
   position: fixed;

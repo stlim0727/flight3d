@@ -16,7 +16,7 @@ const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, onAirport, onPreset, onTime, onAircraft, onFly, getDemoProfile, onDemoProfile }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, onAirport, onPreset, onTime, onAircraft, onFly, canResume = () => false, onResume, getDemoProfile, onDemoProfile }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const selectionEl = document.getElementById('lobby-selection');
@@ -74,6 +74,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
 
   for (const [id, handler] of [
     ['btn-fly', onFly],
+    ['btn-lobby-resume', () => onResume?.()],
     ['lobby-airport-hangang', () => onAirport('hangang')],
     ['lobby-airport-coastal', () => onAirport('coastal')],
     ['lobby-airport-incheon', () => onAirport('incheon')],
@@ -152,7 +153,9 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
       if (demoBriefing) bindText(demoBriefing, () => t(resolveDemoProfile(getAircraft?.(), getAirport(), getDemoProfile?.()).briefingKey));
     }
     const flyLabel = document.getElementById('btn-fly')?.querySelector('span');
-    if (flyLabel) bindText(flyLabel, () => t(getPreset() === 'demo' ? 'demo.watch' : 'lobby.fly'));
+    if (flyLabel) bindText(flyLabel, () => t(getPreset() === 'demo' ? 'lobby.startDemo' : 'lobby.startNew'));
+    const resume = document.getElementById('btn-lobby-resume');
+    if (resume) resume.hidden = !canResume();
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
       const button = document.getElementById(scenario.lobbyButtonId);
       if (!button) continue;
@@ -192,6 +195,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     if (selectionEl) selectionEl.hidden = !busy;
     const flyBtn = document.getElementById('btn-fly');
     if (flyBtn) flyBtn.disabled = busy;
+    const resume = document.getElementById('btn-lobby-resume');
+    if (resume) resume.disabled = busy;
   }
 
   refresh();

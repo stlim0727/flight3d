@@ -51,7 +51,6 @@ import { RenderDiagnostics } from './dev/RenderDiagnostics.js';
 import { isScenarioAvailable } from './config/scenarioRegistry.js';
 import {
   loadSavedFlightSelection,
-  hasPendingFlightSelection,
   saveSavedAircraft,
   saveFlightSelection,
 } from './config/flightSelection.js';
@@ -444,28 +443,17 @@ class FlightSimulator {
     this.updateMenuToggle();
   }
 
-  /**
-   * Leave the lobby. A menu that changed nothing releases the held flight where the pilot
-   * left it; a changed airport or aircraft is rebuilt behind the loading card first, so the
-   * heavy scene work stays out of the click task and the pilot never sees the swap.
-   */
+  /** Start a fresh flight using the menu choices, rebuilding the scene if needed. */
   async fly() {
     if (this.airportLoading || this.startingFlight) return;
     const pending = {
       airport: this.lobby.airport,
       aircraft: this.lobby.aircraft ?? this.currentAircraftId,
-      scenario: this.lobby.preset,
     };
     const live = {
       airport: this.activeAirport,
       aircraft: this.currentAircraftId,
-      scenario: this.lastPresetType,
     };
-    // A wreck is not a flight worth returning to: the crash restart has to respawn.
-    if (!this.isCrashed && this.gameFlow.canResumeFromLobby() && !hasPendingFlightSelection(pending, live)) {
-      this.gameFlow.enterFlight();
-      return;
-    }
     const needsScene = pending.airport !== live.airport || pending.aircraft !== live.aircraft;
     // Only a region or model swap is slow enough to need the loading card. Everything else
     // starts inside the click task, so callers can keep sequencing steps after fly().
@@ -540,32 +528,29 @@ class FlightSimulator {
     });
   }
 
-  /**
-   * Top-left menu toggle: during a flight it pauses the sim, showing the drone view and the
-   * pause card; while paused it resumes. From the menu it closes it, and `fly()` decides
-   * whether that means releasing the held flight or starting the pilot's new selection.
-   */
+  /** The HUD menu button only opens the main menu, holding the current flight. */
   toggleMainMenu() {
-    const flow = this.gameFlow;
-    if (flow.state === FLOW.LOBBY) {
-      this.fly();
-      return;
-    }
-    if (flow.state === FLOW.PAUSED) flow.resume();
-    else flow.pause();
+    this.gameFlow.returnToLobby(true);
+  }
+
+  /** Resume the held flight without applying pending menu choices or respawning. */
+  resumeFlight() {
+    if (this.airportLoading || this.startingFlight || this.isCrashed) return;
+    if (this.gameFlow.canResumeFromLobby()) this.gameFlow.enterFlight();
   }
 
   /** Keep the toggle's icon and accessible label in sync with the flow state. */
   updateMenuToggle() {
     const btn = document.getElementById('menu-toggle');
     if (!btn) return;
-    const open = this.gameFlow.state !== FLOW.FLIGHT;
+    const open = this.gameFlow.state === FLOW.LOBBY;
     btn.classList.toggle('is-open', open);
     // Live closure: setLanguage() re-runs it, so the label follows language too.
-    bindText(btn, () => t(this.gameFlow.state === FLOW.LOBBY ? 'menu.close'
-      : this.gameFlow.state === FLOW.PAUSED ? 'pause.close' : 'pause.open'), 'aria-label');
+    bindText(btn, () => t('menu.open'), 'aria-label');
+    btn.setAttribute('aria-expanded', String(open));
+    btn.setAttribute('aria-controls', 'lobby-screen');
     const glyph = btn.querySelector('.menu-toggle-glyph');
-    if (glyph) glyph.textContent = open ? '✕' : '';
+    if (glyph) glyph.textContent = '';
   }
 
   setTimeOfDay(hours) {

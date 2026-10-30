@@ -66,7 +66,7 @@ export class GameFlowController {
     this._armRestart();
   }
 
-  /** Used by the Fly button, the menu toggle, and browser harnesses; pure state change. */
+  /** Used by start/resume actions and browser harnesses; pure state change. */
   enterFlight() {
     this.resumableFlight = false;
     this._setState(FLOW.FLIGHT);
@@ -104,7 +104,7 @@ export class GameFlowController {
     return true;
   }
 
-  /** True while the menu is holding a live flight the Back/toggle can resume. */
+  /** True while the menu is holding a live flight the Resume action can release. */
   canResumeFromLobby() {
     return this.state === FLOW.LOBBY && this.resumableFlight;
   }
