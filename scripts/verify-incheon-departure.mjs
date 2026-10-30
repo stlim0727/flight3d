@@ -113,7 +113,7 @@ try {
   assert.ok(last.result.airborne, 'physical liftoff');
   assert.ok(audit.checkedContacts>10000,'pavement audit actually inspected grounded contacts');
   assert.equal(audit.offPavementTicks,0,'all grounded wheels stay on source-mapped pavement at every physics step');
-  assert.deepEqual(last.result.stages, ['gate','pushback','disconnect','taxi','hold','lineup','clearance','takeoff']);
+  assert.deepEqual(last.result.stages, ['gate','pushback','disconnect','taxi','hold','lineup','clearance','takeoff','departure']);
   assert.ok(results.every(s=>!s.crashed&&!s.incident&&s.pos.every(Number.isFinite)), 'no crash, gear incident or invalid pose');
   assert.ok(last.gear.every(s=>s==='normal'), 'gear intact');
   const tugAudit=await evaluate('window.__tugAudit');

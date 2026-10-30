@@ -7,6 +7,9 @@ import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { resolveDemoProfile } from '../src/director/demoProfiles.js';
 
 const S = IncheonDepartureScenario.STAGES;
+function finishAtc(scenario) {
+  while (scenario.atc?.busy) scenario.atc.update(100, false);
+}
 function fixture() {
   const inputs = {};
   const sim = {
@@ -59,10 +62,11 @@ test('tug applies bounded forces only while connected on the ground', () => {
 
 test('pushback waits for a settled position; taxi waits for tractor clearance and leaves it parked', () => {
   const {sim,director,scenario,inputs}=fixture();
-  director.stageTimer=7; scenario.update(.1);
+  finishAtc(scenario); director.stageTimer=7; scenario.update(.1);
   assert.equal(director.currentStage,S.PUSHBACK);
   scenario.update(2);
   assert.equal(director.currentStage,S.PUSHBACK,'timer alone cannot complete pushback');
+  finishAtc(scenario);
   const end=departurePushbackPose(1);
   sim.position.x=end.x;sim.position.z=end.z;
   sim.quaternion.setFromEuler(new THREE.Euler(0,-end.heading,0,'YXZ'));
@@ -70,7 +74,7 @@ test('pushback waits for a settled position; taxi waits for tractor clearance an
   assert.equal(director.currentStage,S.PUSHBACK);
   scenario.update(.6);
   assert.equal(director.currentStage,S.DISCONNECT);
-  director.stageTimer=9;scenario.update(.1);
+  finishAtc(scenario); director.stageTimer=9;scenario.update(.1);
   assert.equal(director.currentStage,S.DISCONNECT,'timer alone does not clear the tug');
   assert.equal(inputs.brakes,1);
   for(let elapsed=0;elapsed<30 && director.currentStage===S.DISCONNECT;elapsed+=.1)scenario.update(.1);
@@ -89,11 +93,11 @@ test('lineup cannot authorize takeoff until aligned, stopped, and clearance has 
   sim.telemetry.headingDeg=DEPARTURE_RUNWAY.headingDeg;
   sim.linearVelocity.set(2,0,0);scenario.update(.1);
   assert.equal(director.currentStage,S.LINEUP);
-  sim.linearVelocity.set(0,0,0);scenario.update(.1);
+  finishAtc(scenario);sim.linearVelocity.set(0,0,0);scenario.update(.1);
   assert.equal(director.currentStage,S.CLEARANCE);
   director.stageTimer=5;scenario.update(.1);
   assert.equal(inputs.throttle,0);assert.equal(inputs.brakes,1);
-  director.stageTimer=7;scenario.update(.1);
+  finishAtc(scenario); director.stageTimer=7;scenario.update(.1);
   assert.equal(director.currentStage,S.TAKEOFF);
 });
 
@@ -109,6 +113,12 @@ test('restart cleans up tug resources and resets route progress; completion requ
   sim.position.y=100;scenario.update(.1);
   assert.equal(scenario.result.airborne,false,'height alone with grounded gear cannot complete');
   sim.gear.onGround=false;scenario.update(.1);
+  assert.equal(scenario.result.status,'running','initial liftoff is not the manual handoff');
+  sim.position.y=150;scenario.update(.1);
+  assert.equal(director.currentStage,S.DEPARTURE);
+  sim.position.y=500;scenario.update(.1);
+  assert.equal(scenario.result.status,'running','departure readback is required');
+  finishAtc(scenario);scenario.update(.1);
   assert.equal(scenario.result.status,'completed');
 });
 
@@ -118,12 +128,12 @@ test('waiting stages honor an active radio call, and missing audio does not trap
   sim.audio={departureRadio:{busy:true,stop(){stopped++;},preload(){}},playDepartureRadio(){}};
   director.stageTimer=10;scenario.update(.1);
   assert.equal(director.currentStage,S.GATE,'pushback waits for apron approval audio');
-  sim.audio.departureRadio.busy=false;scenario.update(.1);
+  sim.audio.departureRadio.busy=false;finishAtc(scenario);scenario.update(.1);
   assert.equal(director.currentStage,S.PUSHBACK);
   director.setStage(S.CLEARANCE);director.stageTimer=20;
   sim.audio.departureRadio.busy=true;scenario.update(.1);
   assert.equal(director.currentStage,S.CLEARANCE,'takeoff waits for the full clearance/readback');
-  sim.audio.departureRadio.busy=false;scenario.update(.1);
+  sim.audio.departureRadio.busy=false;finishAtc(scenario);scenario.update(.1);
   assert.equal(director.currentStage,S.TAKEOFF);
   scenario.stop();assert.equal(stopped,1,'cancel stops playback');
 });
@@ -144,7 +154,21 @@ test('the passenger bridge clears before pushback and cancellation retracts it',
   sim.currentAirport={departureBridge:{setExtension(value){extension=value;}}};
   director.setStage(S.GATE);assert.equal(extension,1);
   director.stageTimer=4;scenario.update(.1);assert.equal(extension,.5);
-  director.stageTimer=7;scenario.update(.1);
+  finishAtc(scenario); director.stageTimer=7;scenario.update(.1);
   assert.equal(extension,0);assert.equal(director.currentStage,S.PUSHBACK);
   director.setStage(S.GATE);scenario.stop();assert.equal(extension,0);
+});
+
+
+test('taxi and runway entry wait for instructions and readbacks even without audio', () => {
+  const {scenario,director,inputs}=fixture();
+  let moves=0;
+  scenario.taxi=()=>{moves++;return false;};
+  for (const stage of [S.TAXI,S.LINEUP]) {
+    director.setStage(stage);scenario.update(.1);
+    assert.equal(inputs.throttle,0);assert.equal(inputs.brakes,1);
+    assert.equal(moves,stage===S.TAXI?0:1);
+    finishAtc(scenario);scenario.update(.1);
+  }
+  assert.equal(moves,2);
 });
