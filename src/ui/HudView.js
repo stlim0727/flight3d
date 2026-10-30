@@ -1,6 +1,8 @@
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { hudDirection, projectHudDirection } from './HudProjection.js';
 
+const tapeWidth = (scale) => Math.max(54, 76 * scale);
+
 /** HUD is a camera presentation; all commands use the existing flight controls. */
 export class HudView {
   constructor(sim) {
@@ -91,9 +93,15 @@ export class HudView {
     const roll = Math.atan2(up.x, up.y);
     ctx.save(); ctx.translate(cx, ry); ctx.rotate(roll);
     ctx.beginPath(); ctx.moveTo(0, -radius + 5); ctx.lineTo(-5, -radius + 15); ctx.lineTo(5, -radius + 15); ctx.closePath(); ctx.stroke(); ctx.restore();
-    this.tape(width * (narrow ? .29 : .265), height * .46, Math.max(0, data.iasKnots || 0), 10, 'KT', scale);
-    this.tape(width * (narrow ? .71 : .735), height * .46, data.altitudeFt || 0, 100, 'FT', scale);
-    ctx.fillText(`${data.vsiFpm > 0 ? '+' : ''}${Math.round(data.vsiFpm || 0)} FPM`, width * (narrow ? .71 : .735), height * .46 + Math.min(145, height * .21) + 22);
+    const tapeY = height * .46;
+    // Portrait has no room to clear the conformal centre; landscape must not press into the corner controls.
+    const gutter = tapeWidth(scale) / 2 + 12;
+    const hug = narrow && height > width;
+    const speedX = hug ? gutter : width * .265;
+    const altX = hug ? width - gutter : width * .735;
+    this.tape(speedX, tapeY, Math.max(0, data.iasKnots || 0), 10, 'KT', scale);
+    this.tape(altX, tapeY, data.altitudeFt || 0, 100, 'FT', scale);
+    ctx.fillText(`${data.vsiFpm > 0 ? '+' : ''}${Math.round(data.vsiFpm || 0)} FPM`, altX, tapeY + Math.min(145, height * .21) + 22);
     const spacing = Math.max(2, Math.min(4, width / 360));
     ctx.save(); ctx.beginPath(); ctx.rect(cx - width * .18, hy - 22, width * .36, 55); ctx.clip();
     for (let delta = -60; delta <= 60; delta++) {
@@ -108,8 +116,8 @@ export class HudView {
 
   tape(x, y, value, step, unit, scale) {
     const ctx = this.ctx, half = Math.min(145, this.root.clientHeight * .21);
-    const w = Math.max(54, 76 * scale), pixels = half / (step * 3);
-    ctx.fillStyle = 'rgba(9,24,36,.45)'; ctx.fillRect(x - w / 2, y - half, w, half * 2);
+    const w = tapeWidth(scale), pixels = half / (step * 3);
+    ctx.fillStyle = 'rgba(9,24,36,.18)'; ctx.fillRect(x - w / 2, y - half, w, half * 2);
     ctx.strokeStyle = '#b8ff9b'; ctx.strokeRect(x - w / 2, y - half, w, half * 2);
     ctx.fillStyle = '#b8ff9b'; ctx.fillText(unit, x, y - half - 14);
     ctx.save(); ctx.beginPath(); ctx.rect(x - w / 2, y - half + 1, w, half * 2 - 2); ctx.clip();
@@ -121,8 +129,12 @@ export class HudView {
       ctx.fillText(String(tick), x - 3, ty);
     }
     ctx.restore();
-    ctx.fillStyle = '#102a20'; ctx.fillRect(x - w / 2 - 3, y - 17, w + 6, 34);
-    ctx.strokeRect(x - w / 2 - 3, y - 17, w + 6, 34);
+    const bx = x - w / 2 - 3, by = y - 17, bw = w + 6, bh = 34;
+    // Punch the ticks out from under the readout so the box can stay translucent without ghosting.
+    ctx.save(); ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillRect(bx, by, bw, bh); ctx.restore();
+    ctx.fillStyle = 'rgba(16,42,32,.55)'; ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeRect(bx, by, bw, bh);
     ctx.fillStyle = '#cbffb2'; ctx.font = `600 ${Math.max(16, 24 * scale)}px monospace`;
     ctx.fillText(String(Math.round(value)), x, y);
     ctx.font = `600 ${Math.max(11, 15 * scale)}px monospace`;
