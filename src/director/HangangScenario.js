@@ -23,7 +23,7 @@ export class HangangScenario {
     this.syncTerrain();
     s.cameraSystem.trauma = 0;
     s.cameraSystem.towerPos.set(80, 70, 80);
-    s.setTimeOfDay(18.25); s.aero.windWorld.set(0, 0, 0);
+    s.setTimeOfDay(18.25, { persist: false }); s.aero.windWorld.set(0, 0, 0);
     this.run.reset();
   }
   stop() {
@@ -32,7 +32,7 @@ export class HangangScenario {
     for (const [object, visible] of saved.visibility) object.visible = visible;
     s.currentTerrain = saved.terrain; s.currentAirport = saved.airport;
     s.collisionDetector.setEnvironment(...saved.environment);
-    s.aero.windWorld.copy(saved.wind); s.setTimeOfDay(saved.time);
+    s.aero.windWorld.copy(saved.wind); s.setTimeOfDay(saved.time, { persist: false });
     s.cameraSystem.towerPos.copy(saved.tower);
     this.scene.group.visible = false;
 

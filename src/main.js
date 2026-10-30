@@ -55,6 +55,7 @@ import {
   saveFlightSelection,
 } from './config/flightSelection.js';
 import { resolveFlightUrl } from './config/flightUrls.js';
+import { loadSimulatorPreferences, restoreSimulatorPreferences, saveSimulatorPreferences } from './config/simulatorPreferences.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 import { initBuildInfo } from './ui/BuildInfo.js';
@@ -362,6 +363,7 @@ class FlightSimulator {
       throttle: 0, x: 0, z: 0,
     };
 
+    restoreSimulatorPreferences(this, loadSimulatorPreferences());
     this.initControls();
     this.initUI();
     await this.setAirport(savedSelection.airport);
@@ -521,6 +523,7 @@ class FlightSimulator {
     // setAirport may have clamped the scenario to the region it loaded.
     if (wantsDemo) this.demoDirector.start();
     else this.setPreset(this.lobby.preset);
+    saveSimulatorPreferences({ demoProfile: this.lobby.demoProfile });
     saveFlightSelection({
       airport: this.lobby.airport,
       aircraft: this.lobby.aircraft ?? this.currentAircraftId,
@@ -553,9 +556,10 @@ class FlightSimulator {
     if (glyph) glyph.textContent = '';
   }
 
-  setTimeOfDay(hours) {
+  setTimeOfDay(hours, { persist = true } = {}) {
     this.demoDirector?.onUserTimeOfDayChange();
     this.sky.setTimeOfDay(hours, this.position, this.camera.position);
+    if (persist) saveSimulatorPreferences({ timeOfDay: this.sky.timeOfDay });
     this.foliage.setTimeOfDay(this.sky.timeOfDay);
     this.water.syncWithAtmosphere(this.sky);
     const h = Math.floor(this.sky.timeOfDay);

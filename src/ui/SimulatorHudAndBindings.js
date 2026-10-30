@@ -9,6 +9,7 @@ import { initLobbyScreen } from './LobbyScreen.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
 import { defaultScenarioForRegion } from '../config/scenarioRegistry.js';
+import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 
 class SimulatorHudAndBindingsMethods {
   initControls() {
@@ -85,20 +86,14 @@ class SimulatorHudAndBindingsMethods {
     };
 
     this.controls.onCycleTimeOfDay = (deltaHours) => {
-      this.demoDirector?.onUserTimeOfDayChange();
-      this.sky.setTimeOfDay(this.sky.timeOfDay + deltaHours, this.position, this.camera.position);
-      this.foliage.setTimeOfDay(this.sky.timeOfDay);
-      this.water.syncWithAtmosphere(this.sky);
-      const h = Math.floor(this.sky.timeOfDay);
-      const m = Math.floor((this.sky.timeOfDay % 1) * 60);
-      const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-      this.showToast(() => t('notice.time', { time: timeStr }));
+      this.setTimeOfDay(this.sky.timeOfDay + deltaHours);
     };
 
     this.controls.onToggleAudio = () => {
       this.audio.init();
       this.audio.ensureContextRunning();
       const state = this.audio.cycleVolume();
+      saveSimulatorPreferences({ audioMuted: this.audio.isMuted });
       this.updateAudioUI(state);
       this.showToast(() => t('sound.value', { value: this.audio.getVolumeState().text }));
     };
@@ -355,6 +350,7 @@ class SimulatorHudAndBindingsMethods {
     });
     document.getElementById('btn-mute')?.addEventListener('click', () => {
       this.audio.setMuted(!this.audio.isMuted);
+      saveSimulatorPreferences({ audioMuted: this.audio.isMuted });
       if (!this.audio.isMuted) {
         this.audio.init();
         this.audio.ensureContextRunning();
@@ -365,6 +361,7 @@ class SimulatorHudAndBindingsMethods {
     document.getElementById('btn-diag')?.addEventListener('click', () => this.diagnostics.toggle());
     document.getElementById('btn-touch-toggle')?.addEventListener('click', () => {
       this.touchControls.toggle();
+      saveSimulatorPreferences({ touchControls: this.touchControls.enabled });
       const state = this.touchControls.enabled ? 'state.on' : 'state.off';
       this.showToast(() => t('touch.controls.value', { value: t(state) }));
     });
