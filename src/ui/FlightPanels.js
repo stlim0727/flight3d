@@ -44,13 +44,6 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   const bar = document.createElement('nav');
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
-  // Two groups: the aircraft actions unfold leftwards from the primary group,
-  // which is kept whole when a narrow viewport has to break the row.
-  const actionGroup = document.createElement('div');
-  actionGroup.className = 'flight-toolbar-group flight-toolbar-actions';
-  const primaryGroup = document.createElement('div');
-  primaryGroup.className = 'flight-toolbar-group flight-toolbar-primary';
-  bar.append(actionGroup, primaryGroup);
   hud.append(bar);
   const cameraButton = document.createElement('button');
   cameraButton.id = 'open-camera';
@@ -134,11 +127,11 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
     if (node) settings.append(node);
   }
   for (const id of ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']) {
-    actionGroup.append(document.getElementById(id));
+    bar.append(document.getElementById(id));
   }
   // The row is anchored to the right edge, so the aircraft actions that follow
   // takeover unfold leftwards instead of shifting the primary group.
-  primaryGroup.append(skipDemoButton, cameraButton, fullscreen, moreButton);
+  bar.append(skipDemoButton, cameraButton, fullscreen, moreButton);
 
   for (const [id, key] of Object.entries({
     'btn-cam-reset': 'center.view.o',
@@ -164,6 +157,9 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   // Keep the top header bar, control dock, AP panel, and notice slot aligned.
   function positionEdgeButtons() {
     if (!strip.getClientRects().length || !bar.getClientRects().length) return;
+    // Keep the camera/fullscreen/overflow end pinned to the right edge; the
+    // aircraft actions that overflow are reached by swiping the row left.
+    bar.scrollLeft = bar.scrollWidth;
     const topBarRect = topBar.getBoundingClientRect();
     const controlsBottom = bar.getBoundingClientRect().bottom;
     const noticeTop = Math.max(topBarRect.bottom, controlsBottom) + 6;

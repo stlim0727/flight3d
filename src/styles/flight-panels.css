@@ -46,14 +46,19 @@
   box-shadow: none;
   text-shadow: none;
 }
+/* The row paints one translucent surface; its buttons stay clear so the scene
+   reads through them and only state changes add a tint. */
 .flight-toolbar .btn {
   white-space: nowrap;
   padding: 6px 12px;
   border-radius: 8px;
-  background: rgba(30, 41, 59, 0.7);
+  background: none;
+  backdrop-filter: none;
   border: 1px solid rgba(148, 163, 184, 0.25);
   color: #e2e8f0;
 }
+.flight-toolbar .btn:hover { background: rgba(181, 211, 234, .14); }
+.flight-toolbar .btn:is([aria-pressed="true"], [aria-expanded="true"]) { background: rgba(22, 78, 99, .62); }
 .btn[aria-expanded="true"], .btn[aria-pressed="true"] {
   background: #164e63;
   border-color: #67e8f9;
@@ -86,7 +91,7 @@
 .flight-toolbar .btn[disabled] {
   opacity: .45;
   filter: grayscale(1);
-  background: rgba(30, 41, 59, 0.45) !important;
+  background: none !important;
   color: #94a3b8 !important;
   border-color: rgba(148, 163, 184, 0.2) !important;
   cursor: not-allowed;

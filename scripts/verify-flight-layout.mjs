@@ -51,7 +51,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
   const click = async selector => {
     const point = await evaluate(sel => {
       const node = document.querySelector(sel);
-      if (node.closest('.flight-more-panel, .ap-panel')) node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      if (node.closest('.flight-more-panel, .ap-panel, .flight-toolbar')) node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       const r = node.getBoundingClientRect();
       const x = r.x + r.width / 2, y = r.y + r.height / 2;
       return { x, y, w: r.width, h: r.height, hit: node.contains(document.elementFromPoint(x, y)) };
@@ -76,18 +76,30 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     for (const mode of [1, 0, 8, 6, 4, 2, 3, 5, 0]) {
       await evaluate(mode => window.simulator.controls.onSelectCamera(mode), mode);
       await delay(150);
-      const bounds = await evaluate(() => {
-        const selectors = ['.menu-toggle', '.hud-strip', '#btn-ap-toggle', '#btn-mute', '.flight-toolbar', ...[...document.querySelectorAll('.flight-toolbar button:not(#btn-skip-demo)')].map(n => `#${n.id}`)];
-        return selectors.map(sel => { const n = document.querySelector(sel), r = n.getBoundingClientRect(); return { sel, x: r.x, y: r.y, w: r.width, h: r.height }; });
+      const layout = await evaluate(() => {
+        const bar = document.querySelector('.flight-toolbar');
+        const box = n => { const r = n.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; };
+        const chrome = ['.menu-toggle', '.hud-strip', '#btn-ap-toggle', '#btn-mute', '.flight-toolbar']
+          .map(sel => ({ sel, ...box(document.querySelector(sel)) }));
+        const buttons = [...bar.querySelectorAll('button')].filter(n => getComputedStyle(n).display !== 'none').map(n => {
+          const cs = getComputedStyle(n), r = n.getBoundingClientRect();
+          return { sel: `#${n.id}`, ...box(n), center: `${cs.display}/${cs.alignItems}/${cs.justifyContent}`,
+            hit: n.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)) };
+        });
+        return { chrome, buttons, pinned: Math.ceil(bar.scrollLeft + bar.clientWidth) >= bar.scrollWidth };
       });
-      assert.ok(bounds.every(r => r.x >= 0 && r.x + r.w <= width + 1 && r.y >= 0 && r.y + r.h <= height), JSON.stringify(bounds));
+      const bounds = [...layout.chrome, ...layout.buttons];
+      assert.ok(layout.chrome.every(r => r.x >= 0 && r.x + r.w <= width + 1 && r.y >= 0 && r.y + r.h <= height), JSON.stringify(layout.chrome));
       assert.ok(bounds.every(r => r.h >= 44 && (r.sel === '.hud-strip' || r.w >= 44)), 'minimum targets');
-      // Camera, fullscreen and overflow form one right-anchored group; the
-      // aircraft controls that takeover reveals unfold to its left.
-      const visible = await evaluate(() => [...document.querySelectorAll('.flight-toolbar button')]
-        .filter(node => getComputedStyle(node).display !== 'none').map(node => node.id));
-      assert.deepEqual(visible.slice(-3), ['open-camera', 'btn-fullscreen', 'open-flight-more'], `primary group order: ${visible}`);
-      const row = bounds.find(r => r.sel === '.flight-toolbar');
+      assert.equal(new Set(layout.buttons.map(b => Math.round(b.y))).size, 1, `toolbar stays on one row: ${JSON.stringify(layout.buttons)}`);
+      assert.ok(layout.buttons.every(b => b.center === 'flex/center/center'), `labels centred in their buttons: ${layout.buttons.map(b => b.center)}`);
+      // Camera, fullscreen and overflow stay pinned to the right edge; the
+      // aircraft actions unfold to their left and scroll into view.
+      const primary = layout.buttons.slice(-3);
+      assert.deepEqual(primary.map(b => b.sel), ['#open-camera', '#btn-fullscreen', '#open-flight-more'], `primary group order: ${layout.buttons.map(b => b.sel)}`);
+      assert.ok(layout.pinned, 'toolbar scrolled to its right end');
+      assert.ok(primary.every(b => b.x >= 0 && b.x + b.w <= width + 1 && b.hit), `primary group reachable: ${JSON.stringify(primary)}`);
+      const row = layout.chrome.find(r => r.sel === '.flight-toolbar');
       assert.ok(width - (row.x + row.w) <= 16, `toolbar hugs the right edge: ${JSON.stringify(row)}`);
       if (baseline) assert.deepEqual(bounds, baseline, `stable controls across camera ${mode}`);
       const targets = bounds.filter(r => r.sel !== '.flight-toolbar');
@@ -155,9 +167,11 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     await delay(150);
     const demo = await evaluate(() => {
       const b = document.getElementById('demo-banner').getBoundingClientRect(), t = document.querySelector('.flight-toolbar').getBoundingClientRect();
-      return { top: b.top, toolbarBottom: t.bottom, width: b.width, locked: document.getElementById('btn-gear').disabled && document.getElementById('flight-trim-more').disabled };
+      return { top: b.top, toolbarBottom: t.bottom, width: b.width, locked: document.getElementById('btn-gear').disabled && document.getElementById('flight-trim-more').disabled,
+        row: [...document.querySelectorAll('.flight-toolbar button')].filter(n => getComputedStyle(n).display !== 'none').map(n => n.id) };
     });
     assert.ok(demo.width && demo.top >= demo.toolbarBottom + 4 && demo.locked, `demo clearance and lockout: ${JSON.stringify(demo)}`);
+    assert.deepEqual(demo.row, ['btn-skip-demo', 'open-camera', 'btn-fullscreen', 'open-flight-more'], `demo row: ${demo.row}`);
     await screenshot(`${out}/${width}x${height}-demo.png`);
     // Both the expanded and collapsed guide must yield to a warning without
     // taking the primary takeover action with them.
