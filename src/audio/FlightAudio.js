@@ -58,6 +58,8 @@ export class FlightAudio {
 
   reset() {
     this.crashed = false;
+    this.lastTouchdownTime = -Infinity;
+    this.touchdownActive = false;
     this.alertId = null;
     this.alertTimer = 0;
     this.alertElapsed = 0;
@@ -383,11 +385,6 @@ export class FlightAudio {
     this.rumbleFilter.connect(this.rumbleGain);
     this.rumbleGain.connect(this.cockpitFilter);
     this.rumbleNoise.start();
-
-    // Tire Screech Synthesizer (short frequency modulated chirp)
-    this.screechGain = this.ctx.createGain();
-    this.screechGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
-    this.screechGain.connect(this.masterGain);
   }
 
   initWarningSynth() {
@@ -403,64 +400,47 @@ export class FlightAudio {
     this.warningOsc.start();
   }
 
-  playTouchdownScreech() {
-    if (!this.ctx || this.isMuted) return;
-    try {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
+  // Broadband friction/structural transients: no pitched oscillators or
+  // frequency sweeps, which sound like laser chirps rather than wheel contact.
+  playContactNoise(duration, frequency, level, type = 'lowpass') {
+    if (!this.ctx || this.effectiveVolume === 0) return;
+    const now = this.ctx.currentTime;
+    const source = this.ctx.createBufferSource();
+    const buffer = this.ctx.createBuffer(1, Math.ceil(this.ctx.sampleRate * duration), this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    const attack = 0.008;
+    for (let i = 0; i < data.length; i++) {
+      const time = i / this.ctx.sampleRate;
+      const envelope = Math.min(1, time / attack) * Math.exp(-6 * time / duration);
+      data[i] = (Math.random() * 2 - 1) * envelope;
+    }
+    source.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.setValueAtTime(frequency, now);
+    filter.Q.setValueAtTime(0.7, now);
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(level, now);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.cockpitFilter);
+    source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
+    source.start(now);
+    source.stop(now + duration);
+  }
 
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(2400, now);
-      osc.frequency.exponentialRampToValueAtTime(800, now + 0.35);
-
-      gain.gain.setValueAtTime(0.55, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-
-      osc.connect(gain);
-      gain.connect(this.masterGain);
-
-      osc.start(now);
-      osc.stop(now + 0.5);
-    } catch (e) {}
+  playTouchdownScreech(groundSpeedKnots = 100) {
+    // Wheel spin-up is a brief dry scrub; at taxi speed it is barely audible.
+    const speed = Math.min(1, Math.max(0, groundSpeedKnots) / 100);
+    if (speed === 0) return;
+    this.playContactNoise(0.12 + 0.08 * speed, 1800, 0.32 * speed, 'bandpass');
   }
 
   playTouchdownThump(sinkRate = 1.5) {
-    if (!this.ctx || this.isMuted) return;
-    try {
-      const now = this.ctx.currentTime;
-      const severity = Math.min(1.0, Math.max(0.35, sinkRate / 3.0));
-
-      // 1. Deep resonant oleo strut compression thud (for headphones / large speakers)
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(110, now);
-      osc.frequency.exponentialRampToValueAtTime(40, now + 0.28);
-
-      gain.gain.setValueAtTime(0.85 * severity, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
-
-      osc.connect(gain);
-      gain.connect(this.masterGain);
-      osc.start(now);
-      osc.stop(now + 0.4);
-
-      // 2. Mid-punch mechanical impact transient (clearly audible on mobile phone speakers: 220Hz -> 90Hz)
-      const punchOsc = this.ctx.createOscillator();
-      const punchGain = this.ctx.createGain();
-      punchOsc.type = 'triangle';
-      punchOsc.frequency.setValueAtTime(220, now);
-      punchOsc.frequency.exponentialRampToValueAtTime(90, now + 0.18);
-
-      punchGain.gain.setValueAtTime(0.50 * severity, now);
-      punchGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-
-      punchOsc.connect(punchGain);
-      punchGain.connect(this.masterGain);
-      punchOsc.start(now);
-      punchOsc.stop(now + 0.25);
-    } catch (e) {}
+    const severity = Math.min(1, Math.max(0, sinkRate) / 3);
+    if (severity === 0) return;
+    this.playContactNoise(0.28, 180, 1.2 * severity);
+    this.playContactNoise(0.09, 650, 0.35 * severity);
   }
 
   playDepartureRadio(stage) {
@@ -621,12 +601,15 @@ export class FlightAudio {
       }
     }
 
-    // 4. Touchdown Screech and Oleo Thump trigger
-    if (state.touchdown) {
-      this.playTouchdownScreech();
-      const sinkRate = Math.abs(state.vsiFpm || 400) / 196.85; // fpm to m/s
+    // Coalesce near-simultaneous gear contacts and contact chatter, while
+    // allowing a later genuine bounce to produce another impact.
+    if (state.touchdown && !this.touchdownActive && now - this.lastTouchdownTime >= 0.25) {
+      this.lastTouchdownTime = now;
+      this.playTouchdownScreech(state.groundSpeedKnots ?? state.iasKnots ?? 0);
+      const sinkRate = state.touchdownSinkRate ?? Math.abs(state.vsiFpm ?? 0) / 196.85;
       this.playTouchdownThump(sinkRate);
     }
+    this.touchdownActive = !!state.touchdown;
 
     // 5. Sensor warning is independent of the physical separation diagnostic.
     const stallWarning = state.isStallWarning ?? (state.isStalled || state.isPreStall);

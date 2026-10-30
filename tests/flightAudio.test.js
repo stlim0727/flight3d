@@ -552,3 +552,66 @@ describe('GPWS voice authenticity', () => {
     }
   });
 });
+
+describe('Touchdown contact audio', () => {
+  it('uses short broadband transients through aircraft acoustics, without pitch sweeps', () => {
+    const audio = new FlightAudio();
+    const Context = createMockAudioContext();
+    audio.ctx = new Context();
+    audio.cockpitFilter = audio.ctx.createBiquadFilter();
+    const buffers = [], gains = [];
+    const createBuffer = audio.ctx.createBuffer.bind(audio.ctx);
+    audio.ctx.createBuffer = (...args) => {
+      const buffer = createBuffer(...args), data = buffer.getChannelData(0);
+      buffer.getChannelData = () => data;
+      buffers.push(data);
+      return buffer;
+    };
+    const createGain = audio.ctx.createGain.bind(audio.ctx);
+    audio.ctx.createGain = () => { const gain = createGain(); gains.push(gain); return gain; };
+    audio.ctx.createOscillator = () => { throw Error('touchdown must not generate pitched chirps'); };
+    audio.playTouchdownScreech(100);
+    audio.playTouchdownThump(2);
+    assert.strictEqual(buffers.length, 3);
+    for (const data of buffers) {
+      assert.ok(data[0] === 0, 'soft onset avoids a digital click');
+      assert.ok(data.some(sample => sample > 0) && data.some(sample => sample < 0));
+      assert.ok(Math.abs(data.at(-1)) < 0.003, 'noise decays before source stops');
+    }
+    assert.ok(gains.every(gain => gain.connectedTo.includes(audio.cockpitFilter)));
+    const hardLevel = gains.at(-1).gain.value;
+    audio.playTouchdownThump(0.25);
+    assert.ok(gains.at(-1).gain.value < hardLevel);
+    audio.playTouchdownThump(0);
+    audio.playTouchdownScreech(0);
+    audio.setMuted(true);
+    audio.playTouchdownThump(3);
+    assert.strictEqual(buffers.length, 5, 'zero energy contacts and muted audio stay silent');
+  });
+
+  it('coalesces contact chatter, preserves later bounces and rearms on reset', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio(); audio.init();
+      const impacts = [], scrubs = [];
+      audio.playTouchdownThump = sink => impacts.push(sink);
+      audio.playTouchdownScreech = speed => scrubs.push(speed);
+      const state = { onGround: true, groundSpeedKnots: 70, touchdown: true, touchdownSinkRate: 0.4, vsiFpm: 0 };
+      const update = (time, touchdown) => {
+        audio.ctx.currentTime = time;
+        audio.update(1 / 60, { ...state, touchdown }, true);
+      };
+      update(10, true); update(10.02, true); update(10.03, false); update(10.04, true);
+      assert.deepStrictEqual(impacts, [0.4], 'sustained flag and short gear chatter do not repeat');
+      update(10.1, false); update(10.5, true);
+      assert.deepStrictEqual(impacts, [0.4, 0.4], 'later bounce remains audible');
+      assert.deepStrictEqual(scrubs, [70, 70]);
+      audio.reset(); update(10.51, true);
+      assert.strictEqual(impacts.length, 3, 'new flight can land immediately');
+    } finally {
+      if (previous === undefined) delete globalThis.window;
+      else globalThis.window = previous;
+    }
+  });
+});
