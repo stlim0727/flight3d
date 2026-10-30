@@ -9,6 +9,10 @@ export function stepPhysics(simulation) {
   if (simulation.demoDirector?.isActive) {
     simulation.demoDirector.update(simulation.physicsDt);
   }
+  // A scene swap can leave the previous airport's low-altitude pose in place
+  // while Lukla's DEM loads. Keep polling the director, but never integrate or
+  // collide that stale pose against the new terrain before its spawn is ready.
+  if (simulation.currentTerrain?.isLoaded === false || simulation.demoDirector?.waitingForTerrain) return;
   simulation.renderPose.reset(simulation.position, simulation.quaternion);
   simulation.devRunner?.beforePhysics();
   const wasCrashed = simulation.isCrashed;
