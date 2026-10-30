@@ -686,8 +686,12 @@ export class TouchFlightControls {
     const normPitch = Math.max(-1, Math.min(1, angleDelta(tilt.pitch, this.gyroCalibration.pitch) / 25));
     const normRoll = Math.max(-1, Math.min(1, angleDelta(tilt.roll, this.gyroCalibration.roll) / 30));
 
-    this.controls.setTouchStick(normPitch, normRoll);
-    this.updateStickTelemetry(normPitch, normRoll);
+    // Match the thumb stick's deadzone, fine centre response and circular travel.
+    // Raw axis tilt used to bypass shaping (and could command [1, 1] while the
+    // displayed knob was already clamped to the circular rim).
+    const [pitch, roll] = shapeTouchStick(normPitch, normRoll);
+    this.controls.setTouchStick(pitch, roll);
+    this.updateStickTelemetry(pitch, roll);
 
     // Update virtual stick graphic to match gyro deflection
     if (this.stickKnob && !this.stickActive) {
