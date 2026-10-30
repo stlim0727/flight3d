@@ -49,6 +49,12 @@ try {
   const rect=await evaluate(`(()=>{const r=document.getElementById('btn-fly').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
   await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...rect});
   await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...rect});
+  assert.equal(await evaluate(`window.simulator.audio.ctx.state`),'running','real click unlocks audio');
+  // Delivery uses captions; advance to the existing apron recording without skipping it.
+  for(let i=0;i<90;i++) {
+    if(await evaluate(`window.simulator.demoDirector.incheonDepartureScenario.atc.current?.voice==='gate'`))break;
+    await evaluate('window.simulator.stepSimulation(1)');
+  }
   for(let i=0;i<50;i++){if(await evaluate(`window.simulator.audio.departureRadio.status==='playing'`))break;await new Promise(r=>setTimeout(r,100));}
   assert.equal(await evaluate(`window.simulator.audio.departureRadio.status`),'playing','real click starts bundled speech');
   assert.equal(await evaluate(`window.simulator.audio.ctx.state`),'running');

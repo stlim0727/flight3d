@@ -4,9 +4,21 @@ Select **Incheon → Boeing 737-800 → Auto demo → Incheon gate → pushback 
 in the lobby, then watch the demo.
 The departure profile is offered only for B738. C172 keeps its original Incheon tour.
 
-The departure flies eight stages: gate preparation, tug pushback, disconnect,
-taxi, hold short / tower contact, line up and wait, takeoff clearance, and takeoff
-with an airborne manual handoff. Bundled English radio speech includes distinct pilot, ground-crew and controller voices with matching captions. Stage names, speaker labels and the briefing support Korean and English. Exchanges are scripted; microphone recognition is not included. Waiting stages finish only after the current call ends. The master mute/volume controls apply to radio playback, the menu pauses and resumes at the same speech position, and cancellation/reset stops it without stale replay.
+The departure flies nine stages: gate preparation, tug pushback, disconnect,
+taxi, hold short / tower contact, line up and wait, takeoff clearance, takeoff
+and departure contact with an airborne manual handoff. Bundled English radio speech includes distinct pilot, ground-crew and controller voices with matching captions. Stage names, speaker labels and the briefing support Korean and English. Exchanges are scripted; microphone recognition is not included. The gate now starts with a fictional local-training clearance: runway 33L,
+runway heading, altitude 3000 ft and squawk 4213, followed by the pilot readback
+and Delivery-to-Apron handoff. Apron-to-Ground, Ground-to-Tower and
+Tower-to-Departure handoffs are explicit. These additional exchanges use timed
+English captions, not new audio; existing bundled recordings remain unchanged.
+They use simulation time, so pausing does not consume reading time. The banner
+advances with each new caption exchange. Missing/muted audio retains timed
+captions rather than instantly approving movement. No real frequencies, SID,
+ATIS, destination flight plan or published RKSI clearance is implied.
+
+The equipment-clear recording waits until the tug has physically parked clear.
+Taxi and runway entry wait for the complete instruction/readback exchange.
+Waiting stages finish only after the current call ends and caption time elapses. The master mute/volume controls apply to radio playback, the menu pauses and resumes at the same speech position, and cancellation/reset stops it without stale replay.
 
 G1 is an authored gate placement within source Apron 1, not a surveyed stand ID.
 Its L-shaped bridge has a fixed elevated access corridor, a right-angle rotunda,
@@ -59,14 +71,14 @@ GLB; the fix is in dimensions, clearance and kinematics. It supplies bounded hor
 through the normal integrator. After disconnect, all motion uses engine thrust,
 nosewheel steering, wheel brakes and flight controls. Hold-short and lineup
 completion require a physical stop. Lineup alone does not release takeoff thrust.
-The 737 uses flaps 15, rotates from 140 knots and follows a 170-knot initial-climb target. Completion requires real liftoff and 80 m above airport elevation; the handoff
+The 737 uses flaps 15, rotates from 140 knots and follows a 170-knot initial-climb target. Departure contact starts at 400 ft AGL, followed by a pilot check-in, radar-contact acknowledgment and readback. Completion requires real liftoff, 1500 ft AGL and the completed departure exchange; the handoff
 retains climb thrust. Esc, preset changes, airport changes and restart remove the
 tug and release automation. P restarts the selected departure profile.
 
 ## Verification
 
 ```sh
-node --test tests/incheonDeparture.test.js tests/incheonDemo.test.js tests/departureRadio.test.js tests/departureJetBridge.test.js tests/incheonAprons.test.js
+node --test tests/incheonDeparture.test.js tests/incheonDemo.test.js tests/departureRadio.test.js tests/departureAtc.test.js tests/departureJetBridge.test.js tests/incheonAprons.test.js
 npm run check
 npm test
 npm run build
@@ -111,3 +123,8 @@ transcript, speaker voice and duration. Attribution is in
 The gate harness checks desktop/mobile selection, the 737 bridge docking and
 clearance sequence, visible tractor movement after uncoupling, wheel animation
 and cancellation cleanup, with screenshots under `.cache/departure-gate`.
+
+The takeoff-roll narration clip remains in the asset bundle for compatibility
+but is no longer played; the runway-heading/3000-ft instruction stays visible.
+The aircraft hands over below the assigned altitude and the pilot continues the
+climb. The landing-traffic delay remains scripted, not traffic separation logic.

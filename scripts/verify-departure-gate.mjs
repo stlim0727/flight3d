@@ -76,6 +76,11 @@ try {
   await detail('bridge-layout',[-18,48,-22],[-12,0,-17]);
   await evaluate('window.simulator.stepSimulation(6)');
   assert.equal(await evaluate('window.simulator.currentAirport.departureBridge.extension'),0);
+  assert.equal(await evaluate('window.simulator.demoDirector.currentStage'),50,'caption clearance still holds at the gate');
+  for(let i=0;i<90;i++) {
+    if(await evaluate('window.simulator.demoDirector.currentStage===51'))break;
+    await evaluate('window.simulator.stepSimulation(1)');
+  }
   assert.equal(await evaluate('window.simulator.demoDirector.currentStage'),51);
   await capture('bridge-clear-pushback');
   for(let i=0;i<80;i++){if(await evaluate('window.simulator.demoDirector.currentStage===52'))break;await evaluate('window.simulator.stepSimulation(1)');}

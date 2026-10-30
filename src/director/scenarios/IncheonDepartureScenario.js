@@ -6,10 +6,11 @@ import { createDepartureTug, disposeDepartureTug, updateDepartureTug } from '../
 import { flyVerticalPath } from '../PilotControlLaws.js';
 import { CameraSystem } from '../../cameras/CameraSystem.js';
 import { t } from '../../i18n/index.js';
-import { departureRadioCaption } from '../../config/departureRadio.js';
+import { DepartureAtc } from '../DepartureAtc.js';
+import { DEPARTURE_TRAINING_CLEARANCE } from '../../config/departureAtc.js';
 
 const clamp = THREE.MathUtils.clamp;
-const STAGES = { GATE: 50, PUSHBACK: 51, DISCONNECT: 52, TAXI: 53, HOLD: 54, LINEUP: 55, CLEARANCE: 56, TAKEOFF: 57, COMPLETED: 58 };
+const STAGES = { GATE: 50, PUSHBACK: 51, DISCONNECT: 52, TAXI: 53, HOLD: 54, LINEUP: 55, CLEARANCE: 56, TAKEOFF: 57, COMPLETED: 58, DEPARTURE: 59 };
 const names = ['gate', 'pushback', 'disconnect', 'taxi', 'hold', 'lineup', 'clearance', 'takeoff'];
 const pushbackEnd = departurePushbackPose(1);
 export { DEPARTURE_GATE };
@@ -45,13 +46,13 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
     }
     if (stage === STAGES.TAXI) { this.index = 0; }
     if (stage === STAGES.LINEUP) { this.index = 0; this.lineupBraking = false; }
-    const name = names[stage - STAGES.GATE];
+    const name = stage === STAGES.DEPARTURE ? 'departure' : names[stage - STAGES.GATE];
     if (name) {
       this.result.stages.push(name);
-      const caption = () => departureRadioCaption(name, speaker => t(`departure.speaker.${speaker}`));
-      this.result.radio.push(caption());
+      this.atc = new DepartureAtc(name === 'takeoff' ? null : name, voice => sim.audio?.playDepartureRadio(voice));
+      const caption = () => this.atc?.caption(speaker => t(`departure.speaker.${speaker}`)) || t('departure.climbInstruction');
+      this.result.radio.push(this.atc.blocks.flatMap(block => block.lines).map(([speaker, text]) => `${speaker}: ${text}`).join(' '));
       this.director.updateBanner(() => t(`departure.stage.${name}`), caption);
-      sim.audio?.playDepartureRadio(name);
       if (stage === STAGES.GATE && !this.director.userCameraOverridden) sim.cameraSystem?.resetDroneOrbit?.(-1.3,60,17);
       if (!this.director.userCameraOverridden) sim.cameraSystem?.setMode(stage === STAGES.GATE || stage === STAGES.PUSHBACK
         ? CameraSystem.MODES.DRONE : CameraSystem.MODES.CHASE);
@@ -65,6 +66,7 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
   removeTug() { if (this.tug) disposeDepartureTug(this.tug); this.tug = null; }
   stop() {
     this.removeTug();
+    this.atc = null;
     this.sim.audio?.departureRadio.stop();
     this.sim.currentAirport?.departureBridge?.setExtension(0);
     if (this.result.status === 'running') this.result.status = 'cancelled';
@@ -145,7 +147,14 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
     sim.controls.setVirtualInput('elevator', 0);
     sim.controls.setVirtualInput('aileron', 0);
     sim.controls.setVirtualInput('rudder', 0);
-    const radioBusy = sim.audio?.departureRadio.busy ?? false;
+    const exchange = this.atc?.index;
+    this.atc?.update(dt, sim.audio?.departureRadio.busy ?? false, this.tug?.userData.animation.clear ?? false);
+    if (exchange !== this.atc?.index) {
+      const name = stage === STAGES.DEPARTURE ? 'departure' : names[stage - STAGES.GATE];
+      this.director.updateBanner(() => t(`departure.stage.${name}`),
+        () => this.atc?.caption(speaker => t(`departure.speaker.${speaker}`)) || t('departure.climbInstruction'));
+    }
+    const radioBusy = this.atc?.busy ?? false;
     if (stage === STAGES.GATE) sim.currentAirport?.departureBridge?.setExtension(clamp(1-(d.stageTimer-2)/4,0,1));
     if (this.tug) updateDepartureTug(this.tug, sim, dt, stage === STAGES.DISCONNECT, d.stageTimer);
     if (stage === STAGES.GATE && d.stageTimer > 6 && !radioBusy) d.setStage(STAGES.PUSHBACK);
@@ -164,7 +173,7 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       if (this.settleTime > 1 && !radioBusy) d.setStage(STAGES.DISCONNECT);
     } else if (stage === STAGES.DISCONNECT && this.tug?.userData.animation.clear && !radioBusy) d.setStage(STAGES.TAXI);
     else if (stage === STAGES.TAXI) {
-      if (this.taxi(DEPARTURE_TAXI_ROUTE, true)) d.setStage(STAGES.HOLD);
+      if (!radioBusy && this.taxi(DEPARTURE_TAXI_ROUTE, true)) d.setStage(STAGES.HOLD);
       this.result.taxiPoints = this.index;
     } else if (stage === STAGES.HOLD && d.stageTimer > 8 && !radioBusy) d.setStage(STAGES.LINEUP);
     else if (stage === STAGES.LINEUP) {
@@ -178,13 +187,13 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       if (aligned && Math.abs(sim.angularVelocity.y)<.03) this.lineupBraking = true;
       if (this.lineupBraking) {
         sim.controls.setVirtualInput('rudder',clamp(error*.04,-.2,.2));
-        if (sim.linearVelocity.length()<.4) {
+        if (!radioBusy && sim.linearVelocity.length()<.4) {
           if (aligned) d.setStage(STAGES.CLEARANCE);
           else this.lineupBraking = false;
         }
-      } else this.taxi(DEPARTURE_LINEUP_ROUTE,false);
+      } else if (!radioBusy) this.taxi(DEPARTURE_LINEUP_ROUTE,false);
     } else if (stage === STAGES.CLEARANCE && d.stageTimer > 6 && !radioBusy) d.setStage(STAGES.TAKEOFF);
-    else if (stage === STAGES.TAKEOFF) {
+    else if ((stage === STAGES.TAKEOFF || stage === STAGES.DEPARTURE)) {
       const runwayHeading = DEPARTURE_RUNWAY.headingDeg;
       const error = ((runwayHeading - sim.telemetry.headingDeg + 540) % 360) - 180;
       sim.controls.setVirtualInput('brakes', 0);
@@ -198,7 +207,8 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       sim.controls.setVirtualInput('throttle', 1);
       const height = sim.position.y - INCHEON_AIRFIELD.elevationM;
       if (!sim.gear.onGround && height > 15) this.result.airborne = true;
-      if (this.result.airborne && height > 80) d.setStage(STAGES.COMPLETED);
+      if (stage === STAGES.TAKEOFF && this.result.airborne && height / .3048 >= DEPARTURE_TRAINING_CLEARANCE.contactHeightFt) d.setStage(STAGES.DEPARTURE);
+      if (stage === STAGES.DEPARTURE && !radioBusy && height / .3048 >= DEPARTURE_TRAINING_CLEARANCE.handoffHeightFt) d.setStage(STAGES.COMPLETED);
     }
     if (d.stageTimer > 1500 || d.totalTimer > 1800) {
       this.result.status = 'failed'; this.result.reason = 'Guidance timeout';
