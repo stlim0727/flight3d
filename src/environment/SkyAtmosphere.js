@@ -172,7 +172,7 @@ export class SkyAtmosphere {
     // The HDR is a daytime sky: scale its indirect illumination as the sun sets,
     // including when the texture finishes loading after a time/airport change.
     this.scene.environmentIntensity = this.activeAirport === 'neon'
-      ? 0.03 : THREE.MathUtils.lerp(0.015, 1, daylight);
+      ? 0.03 : THREE.MathUtils.lerp(0.05, 1, daylight);
 
     const phi = THREE.MathUtils.degToRad(90 - elevation);
     const theta = THREE.MathUtils.degToRad(azimuth);
@@ -261,11 +261,11 @@ export class SkyAtmosphere {
       this.sunLight.intensity = 0.025;
       this.sunLight.color.setRGB(0.2, 0.3, 0.5); // Cool lunar moonlight
       this.ambientLight.color.setRGB(0.18, 0.22, 0.35);
-      this.ambientLight.intensity = 0.12;
+      this.ambientLight.intensity = 0.22;
 
       this.fogColor.setRGB(0.03, 0.05, 0.10); // Deep midnight navy/indigo
       this.baseDensity = 0.00020;
-      exposure = 0.90; // Keep moonlit terrain, aircraft and clouds dark.
+      exposure = 1.0; // Preserve night contrast while keeping nearby surfaces readable.
     }
 
     if (this.activeAirport !== 'neon') {

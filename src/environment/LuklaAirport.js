@@ -91,11 +91,14 @@ export class LuklaAirport {
       end: [half * this.sin58, this.midElevation + half * this.gradient, -half * this.cos58],
       width: this.runwayWidth, spacing: 35,
     }], [
-      ...[-28, 0, 28].map(z => {
-        const position = new THREE.Vector3(17, 0, z).applyEuler(
+      ...[[-17, -28], [17, -28], [-17, 0], [17, 0], [-17, 28], [17, 28]].map(([x, z]) => {
+        const apronRotation = new THREE.Euler(this.pitchRad, -this.headingRad, 0, 'YXZ');
+        const target = new THREE.Vector3(0, 1.5, z).applyEuler(apronRotation)
+          .add(new THREE.Vector3(68.4, 2843.5, -4.1));
+        const position = new THREE.Vector3(x, 0, z).applyEuler(
           new THREE.Euler(this.pitchRad, -this.headingRad, 0, 'YXZ'));
         return { x: position.x + 68.4, y: position.y + 2843.5,
-          z: position.z - 4.1, height: 7 };
+          z: position.z - 4.1, height: 9, target: target.toArray() };
       }),
     ]);
     this.nightLighting.illuminateWindows(this.group);

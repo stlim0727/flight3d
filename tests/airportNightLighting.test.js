@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AirportNightLighting, nightLightLevel } from '../src/environment/AirportNightLighting.js';
 import { installInstrumentLighting } from '../src/aircraft/InstrumentLighting.js';
+import { createRoomLightTexture } from '../src/environment/WindowRoomLighting.js';
 import { createBuildingMaterials } from '../src/previews/incheonCityAssets.js';
 
 const runway = { start: [0, 2805, 0], end: [447, 2867, -279], width: 30, spacing: 35 };
@@ -94,4 +95,32 @@ test('instrument flood follows sunset, crash power loss, reset and sunrise witho
   assert.ok(light.target.position.equals(target));
   assert.equal(light.parent, cockpit.group);
   assert.ok(light.distance < 2, 'Shielded flood must not illuminate terrain outside the aircraft');
+});
+
+
+test('occupied-room palette varies brightness, colour temperature and vacancy without flickering', () => {
+  const a = createRoomLightTexture(), b = createRoomLightTexture();
+  assert.deepEqual(a.image.data, b.image.data, 'Room occupancy must be stable across reloads');
+  const rooms = Array.from({ length: a.image.width * a.image.height }, (_, i) =>
+    Array.from(a.image.data.slice(i * 4, i * 4 + 3)));
+  assert.ok(new Set(rooms.map(rgb => rgb.join(','))).size > 100);
+  assert.ok(rooms.filter(rgb => Math.max(...rgb) < 20).length > rooms.length * .05);
+  assert.ok(rooms.filter(([r, , b]) => r > b * 1.4).length > rooms.length * .2);
+  assert.ok(rooms.filter(([r, , b]) => b > r).length > rooms.length * .1);
+  assert.equal(a.minFilter, THREE.NearestFilter, 'Adjacent rooms must retain distinct light settings');
+  a.dispose(); b.dispose();
+});
+
+test('apron flood aims at aircraft height and covers the stand without shadow-map cost', () => {
+  const lights = new AirportNightLighting(new THREE.Group(), [], [{
+    x: 30, y: 12, z: 275, height: 18, target: [30, 15, 225],
+  }]);
+  const { light, maximum } = lights.lamps[0];
+  assert.deepEqual(light.target.position.toArray(), [30, 15, 225]);
+  assert.ok(light.distance > light.position.distanceTo(light.target.position));
+  assert.ok(maximum >= 18 * 18 * 10, 'Aircraft-height illumination needs more output than a downward street lamp');
+  lights.update(-.3);
+  assert.equal(light.intensity, maximum);
+  lights.update(.3);
+  assert.equal(light.intensity, 0);
 });
