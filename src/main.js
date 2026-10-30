@@ -807,6 +807,7 @@ class FlightSimulator {
       });
     }
     this.sky.updateSun(this.position, this.camera.position);
+    this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     if (!this.gameFlow.isPhysicsFrozen()) {
       this.explosionSystem.update(frameDelta);
       this.tireSmokeSystem.update(frameDelta);

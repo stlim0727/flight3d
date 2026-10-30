@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { AirportNightLighting } from './AirportNightLighting.js';
 import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs, createRunwaySurfaceWear } from './Pavement.js';
 import { loadAirportKit, createAirportBuildings } from './AirportBuildings.js';
 import { createRunwayMarkingMaterial } from './RunwayMarkings.js';
@@ -47,6 +48,11 @@ export class Airport {
     ];
 
     this.initAirport();
+    this.nightLighting = new AirportNightLighting(this.group, [{
+      start: [-this.runwayLength / 2, this.elevation, 0],
+      end: [this.runwayLength / 2, this.elevation, 0], width: this.runwayWidth,
+    }], [-210, -80, 50, 180].map(x => ({ x, y: this.elevation, z: 255, height: 14 })));
+    this.nightLighting.illuminateWindows(this.group);
     this.buildingsReady = this.loadBuildings();
   }
 
@@ -79,6 +85,7 @@ export class Airport {
       this.terminalGroup = null;
       this.buildings = buildings;
       this.group.add(buildings.group);
+      this.nightLighting?.illuminateWindows(buildings.group);
       return true;
     } catch (error) {
       // Keep the complete synchronous airport when offline or when the kit is invalid.
@@ -102,6 +109,7 @@ export class Airport {
     });
 
     const towerGlassMat = new THREE.MeshStandardMaterial({
+      name: 'tower-window-glass',
       color: 0x38bdf8,
       roughness: 0.1,
       metalness: 0.85,
@@ -519,7 +527,7 @@ export class Airport {
     termGroup.add(termMesh);
 
     // Terminal Glass Curtain Wall
-    const glassWallMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.8 });
+    const glassWallMat = new THREE.MeshStandardMaterial({ name: 'terminal-window-glass', color: 0x38bdf8, roughness: 0.2, metalness: 0.8 });
     const wallGeo = new THREE.BoxGeometry(340, 12, 2);
     const glassWall = new THREE.Mesh(wallGeo, glassWallMat);
     glassWall.position.set(0, 9, -34);

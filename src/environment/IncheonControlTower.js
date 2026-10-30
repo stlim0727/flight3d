@@ -40,7 +40,7 @@ export function createControlTower(getHeight, {
 } = {}) {
   const materials = {
     concrete: new THREE.MeshLambertMaterial({ color: 0xd9d6cf }),
-    glass: new THREE.MeshLambertMaterial({ color: 0x2d4f5f, emissive: 0x0b1c24 }),
+    glass: new THREE.MeshLambertMaterial({ name: 'tower-window-glass', color: 0x2d4f5f, emissive: 0x0b1c24 }),
   };
   const floor = getHeight(x, z) + 0.05;
   const group = new THREE.Group();
