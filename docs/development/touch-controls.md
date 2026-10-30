@@ -60,3 +60,33 @@ Run `node --test tests/gyroPermission.test.js tests/touchControlState.test.js`
 for permission, no-reading timeout, retry, cancellation, browser hints and help
 interaction sequences. These use simulated readings; real Android Brave and iOS
 permission/settings behavior still requires a physical device check.
+
+## Gyro orientation and calibration
+
+While gyro is enabled, the menu shows Follow screen / Portrait / Landscape and
+Re-center gyro. Portrait/Landscape request the browser's orientation lock. If the
+API is unavailable or rejects the request (for example, outside fullscreen), the
+menu explains how to use the device rotation lock. The app does not enter
+fullscreen automatically. Disabling gyro or selecting Follow screen releases any
+lock acquired by gyro. Selecting a mode remains safe even when locking fails:
+the gyro commands neutral while the actual screen orientation does not match.
+
+The first reading after 600 ms establishes the comfortable holding position as
+neutral. Re-center, screen orientation events, or a changed screen angle/type
+clear calibration and command neutral during another 600 ms settling period.
+Automatic recalibration on rotation prevents a portrait neutral from becoming a
+full-scale landscape input. This centers control inputs; it does not level the
+aircraft or pause flight.
+
+Mapping projects the device gravity vector into screen axes using the screen
+angle. Device beta/gamma are never directly subtracted, avoiding Euler-coordinate
+jumps at landscape boundaries. At screen angle +90 degrees, device +x points to
+screen top and device +y points to screen left: screen pitch follows -gamma and
+screen roll follows +beta near the flat pose. The opposite landscape direction
+reverses those axes. Screen orientation type, rather than angle alone, determines
+portrait/landscape matching so natural-landscape tablets are supported too.
+
+`tests/gyroOrientation.test.js` exercises both landscape directions, upside-down
+portrait, equivalent sensor representations, short angle wrapping, rotation and
+re-centering sequences, mismatched screens, rejected locks and overlapping lock
+requests. Real-phone browser/OS rotation behavior still requires device testing.

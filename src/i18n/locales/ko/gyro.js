@@ -1,4 +1,15 @@
 export default {
+  "gyro.orientation.label": "자이로 화면 방향",
+  "gyro.orientation.auto": "화면 방향 따르기",
+  "gyro.orientation.portrait": "세로",
+  "gyro.orientation.landscape": "가로",
+  "gyro.recenter": "자이로 중심 재설정",
+  "gyro.orientation.centering": "휴대폰을 편하게 잡고 잠시 움직이지 않으면 자이로 중심이 설정됩니다.",
+  "gyro.orientation.ready": "자이로 중심이 설정되었습니다. 잡는 자세를 바꾸면 중심을 다시 설정하세요.",
+  "gyro.orientation.rotate.portrait": "화면을 세로로 돌려 주세요. 방향이 일치할 때까지 자이로 입력은 중립을 유지합니다. 이후 잠시 움직이지 않으면 중심이 재설정됩니다.",
+  "gyro.orientation.rotate.landscape": "화면을 가로로 돌려 주세요. 방향이 일치할 때까지 자이로 입력은 중립을 유지합니다. 이후 잠시 움직이지 않으면 중심이 재설정됩니다.",
+  "gyro.orientation.lock.unavailable": "브라우저에서 화면 방향을 잠그지 못했습니다. 기기의 회전 잠금으로 선택한 방향을 유지하세요. 화면 방향이 일치하면 자이로가 작동합니다. 잡는 자세를 바꾼 후 중심 재설정을 누르세요.",
+
   "gyro.checking": "센서 확인 중…",
   "gyro.off": "📱 GYRO",
   "gyro.on": "📱 기울기: 켜짐",

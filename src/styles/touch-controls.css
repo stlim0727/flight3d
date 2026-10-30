@@ -737,3 +737,14 @@ body.compact-ui {
 }
 .gyro-help-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .gyro-help .gyro-retry { background: #075985; }
+
+.gyro-settings:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.gyro-settings label { flex-basis: 100%; }
+.gyro-settings select, .gyro-settings button { min-height: 44px; max-width: 100%; }
+.gyro-settings p { flex-basis: 100%; margin: 0; font-size: 12px; line-height: 1.5; }

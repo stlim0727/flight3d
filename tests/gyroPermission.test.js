@@ -9,8 +9,8 @@ function harness(t, orientation = class {}) {
   const original = globalThis.window;
   globalThis.window = {
     isSecureContext: true, DeviceOrientationEvent: orientation,
-    addEventListener: (_, fn) => listeners.add(fn),
-    removeEventListener: (_, fn) => listeners.delete(fn),
+    addEventListener: (name, fn) => { if (name === 'deviceorientation') listeners.add(fn); },
+    removeEventListener: (name, fn) => { if (name === 'deviceorientation') listeners.delete(fn); },
     setTimeout: fn => { timeout = fn; return 1; }, clearTimeout: () => { timeout = null; },
   };
   t.after(() => { globalThis.window = original; });
@@ -18,7 +18,7 @@ function harness(t, orientation = class {}) {
   const inputs = [], reasons = [];
   Object.assign(controller, {
     gyroAttempt: 0, gyroActive: false, gyroPending: false,
-    gyroZeroPitch: 38, gyroZeroRoll: 0,
+    gyroOrientation: 'auto', gyroLockAttempt: 0, gyroSettings: { hidden: true },
     controls: { setTouchStick: (...input) => inputs.push(input) },
     updateStickTelemetry() {}, triggerHaptic() {},
     setGyroLabel(key) { this.label = key; },
@@ -32,18 +32,22 @@ test('Android waits for finite readings, times out, retries and cleans up listen
   const { controller: c, reasons, listeners, expire, inputs } = harness(t);
   await c.toggleGyro();
   assert.equal(c.label, 'gyro.checking');
+  assert.equal(c.gyroSettings.hidden, false);
   assert.equal(listeners.size, 1);
   c.handleOrientation({ beta: null, gamma: null });
   c.handleOrientation({ beta: NaN, gamma: Infinity });
-  assert.equal(inputs.length, 0);
+  assert.ok(inputs.every(([pitch, roll]) => pitch === 0 && roll === 0));
   expire();
   assert.deepEqual(reasons, ['gyro.no.readings']);
   assert.equal(c.gyroActive, false);
+  assert.equal(c.gyroSettings.hidden, true);
   assert.equal(listeners.size, 0);
   await c.toggleGyro();
-  c.handleOrientation({ beta: 38, gamma: 15 });
+  c.gyroReadyAt = 0;
+  c.handleOrientation({ beta: 0, gamma: 0 }); // Capture neutral first.
+  c.handleOrientation({ beta: 0, gamma: 15 });
   assert.equal(c.label, 'gyro.on');
-  assert.deepEqual(inputs.at(-1), [0, 0.5]);
+  assert.ok(Math.abs(inputs.at(-1)[1] - 0.5) < 1e-12);
   expire();
   assert.equal(reasons.length, 1);
   await c.toggleGyro();
