@@ -2,6 +2,7 @@ import { demoProfiles, resolveDemoProfile } from '../director/demoProfiles.js';
 import { bindText, getLanguage, setLanguage, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
 import { aircraftSpec, airportSpec } from './lobbySpecs.js';
+import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../config/scenarioRegistry.js';
 
 const AIRPORT_BUTTONS = { hangang: 'lobby-airport-hangang', incheon: 'lobby-airport-incheon', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla', neon: 'lobby-airport-neon' };
@@ -127,6 +128,15 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     }
     if ((aircraft === 'F16' && !['lukla','incheon'].includes(airport)) && getPreset() === 'demo') onPreset('runway');
     const preset = getPreset();
+    // Follow the selected flight even while the menu is closed. The live
+    // binding also refreshes the browser tab when the language changes.
+    bindText(document.querySelector('title'), () => {
+      const airport = getAirport();
+      const preset = getPreset();
+      const labelKey = scenarioLabelKey(airport, preset);
+      return [...new Set(['Flight3d', AIRCRAFT_REGISTRY[getAircraft?.() ?? 'B738']?.name,
+        lobbyBriefing(airport, preset)[0], labelKey && t(labelKey)].filter(Boolean))].join(' | ');
+    });
     if (demoGroup) demoGroup.hidden = preset !== 'demo';
     if (demoSelect) {
       const choices = demoProfiles(aircraft, airport);
