@@ -227,3 +227,29 @@ body:has(#ap-panel:not([hidden]), #flight-more-panel:not([hidden])) :is(.demo-ba
   transform: translate(-50%, -50%) rotate(45deg);
 }
 .demo-actions .btn-demo-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
+
+/* Portrait notices share the strips' left inset and measured bottom edge. */
+@media (max-width: 1024px) and (orientation: portrait) {
+  .compact-ui .demo-banner,
+  .compact-ui .demo-pill-btn {
+    left: var(--edge-left);
+    right: auto;
+    transform: none;
+  }
+  .compact-ui .demo-banner {
+    width: min(440px, calc(100% - var(--edge-left) - var(--edge-right)));
+  }
+  .compact-ui .demo-stage-desc { display: block; }
+  .compact-ui .demo-pill-btn {
+    top: var(--demo-pill-top, calc(var(--edge-top) + 48px));
+    width: 112px;
+    min-height: 44px;
+    padding-inline: 8px;
+    justify-content: center;
+    max-width: calc(100% - var(--edge-left) - var(--edge-right));
+  }
+  /* Leave a slot for the folded notice beside the scrollable control strip. */
+  .compact-ui.demo-active:has(#btn-demo-open[style*="inline-flex"]) .flight-toolbar {
+    max-width: calc(100% - var(--edge-left) - var(--edge-right) - 118px);
+  }
+}

@@ -165,6 +165,7 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
     const noticeTop = Math.max(topBarRect.bottom, controlsBottom) + 6;
     document.documentElement.style.setProperty('--menu-row-top', `${topBarRect.top}px`);
     document.documentElement.style.setProperty('--ap-row-top', `${topBarRect.top}px`);
+    document.documentElement.style.setProperty('--demo-pill-top', `${topBarRect.bottom + 4}px`);
     document.documentElement.style.setProperty('--demo-row-top', `${noticeTop}px`);
     document.documentElement.style.setProperty('--flight-panels-top', `${noticeTop}px`);
   }
