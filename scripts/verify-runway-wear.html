@@ -1,0 +1,160 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Runway wear — Before / After</title>
+<style>
+  body { margin:24px; background:#141920; color:#e8edf4; font:16px system-ui }
+  article { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:28px }
+  img { width:100% } h2 { grid-column:1/-1; margin-bottom:0 } p { margin:8px 0 }
+</style>
+<h1>Runway surface wear — Before / After</h1>
+<p id="status">Rendering production airport materials…</p>
+<main></main>
+<script type="module">
+import * as THREE from 'three';
+import field from '../src/config/incheonAirfield.json';
+const errors = [];
+window.addEventListener('error', e => errors.push(e.message));
+window.addEventListener('unhandledrejection', e => errors.push(String(e.reason)));
+const status = document.querySelector('#status');
+const results = [];
+async function save(name, data) {
+  const response = await fetch('/__runway_evidence', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({name, data})
+  });
+  if (!response.ok) throw new Error(await response.text());
+}
+try {
+  for (const airportName of ['Incheon', 'Airport', 'LuklaAirport']) {
+    const shots = {};
+    const pixels = {};
+    for (const version of ['before', 'after']) {
+      const prefix = version === 'before' ? '/.cache/pavement-baseline' : '/src/environment';
+      const module = await import(`${prefix}/${airportName === 'Incheon' ? 'IncheonPavement' : airportName}.js`);
+      const AirportClass = airportName === 'Incheon' ? class {
+        constructor() { this.group = module.createIncheonPavement(field); }
+      } : module[airportName];
+      class ControlledAirport extends AirportClass { async loadBuildings() { return false; } }
+      const airport = new ControlledAirport();
+      const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true, logarithmicDepthBuffer:true});
+      renderer.setSize(1200,800);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.debug.onShaderError = () => errors.push('Shader compilation failed');
+      const gl = renderer.getContext();
+      const debug = gl.getExtension('WEBGL_debug_renderer_info');
+      const gpu = debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : '';
+      if (!/Intel|NVIDIA|AMD|ATI|Apple|Adreno|Qualcomm|Mali|PowerVR|Radeon|GeForce|ARM/i.test(gpu) ||
+          /swiftshader|llvmpipe|softpipe|lavapipe|software|basic render/i.test(gpu)) {
+        throw new Error(`Hardware renderer unavailable: ${gpu}`);
+      }
+      const probe = new THREE.Scene(); probe.background = new THREE.Color('blue');
+      const probeGeometry = new THREE.BufferGeometry();
+      probeGeometry.setAttribute('position',new THREE.Float32BufferAttribute([-1,-1,0,3,-1,0,-1,3,0],3));
+      const probeMaterial = new THREE.ShaderMaterial({
+        vertexShader:'void main(){gl_Position=vec4(position,1.);}',
+        fragmentShader:'void main(){gl_FragColor=vec4(1.,0.,0.,1.);}'
+      });
+      probe.add(new THREE.Mesh(probeGeometry,probeMaterial));
+      renderer.render(probe,new THREE.Camera());
+      const pixel = new Uint8Array(4);
+      gl.readPixels(600,400,1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixel);
+      if (String(pixel)!=='255,0,0,255' || gl.getError()!==0) throw new Error('GPU drawing probe failed');
+      probeGeometry.dispose(); probeMaterial.dispose();
+      const scene = new THREE.Scene(); scene.background = new THREE.Color(0xb5ccdc);
+      const hemi = new THREE.HemisphereLight(0xd6e8ff,0x62654a,2); scene.add(hemi);
+      const sun = new THREE.DirectionalLight(0xffffff,3); sun.position.set(-0.4,0.7,-0.3); scene.add(sun);
+      scene.add(airport.group); airport.group.updateMatrixWorld(true);
+      const materials = new Set();
+      airport.group.traverse(o => { if (o.material?.name.startsWith('pavement-')) materials.add(o.material); });
+      const start = performance.now();
+      while (![...materials].every(m=>m.map && m.normalMap && m.roughnessMap)) {
+        if (performance.now()-start>20000) throw new Error('Pavement maps missing');
+        await new Promise(resolve=>setTimeout(resolve,50));
+      }
+      const runway = airport.group.getObjectByName('runway-pavement');
+      if (version === 'after') {
+        const wear = airport.group.getObjectByName('runway-surface-wear');
+        if (!wear) throw new Error(`${airportName}: missing weathering`);
+        if (airportName !== 'Incheon' && (wear.geometry.parameters.width !== airport.runwayWidth ||
+            wear.geometry.parameters.height !== airport.runwayLength || wear.material.depthWrite)) {
+          throw new Error(`${airportName}: invalid weathering dimensions`);
+        }
+        const ctx = wear.material.map.image.getContext('2d');
+        const {width,height} = ctx.canvas;
+        for (const [x,y,w,h] of [[0,0,width,1],[0,height-1,width,1],[0,0,1,height],[width-1,0,1,height]]) {
+          const edge = ctx.getImageData(x,y,w,h).data;
+          for (let i=3;i<edge.length;i+=4) if (edge[i]) throw new Error('Nontransparent decal edge');
+        }
+        const expected = new THREE.Vector3(0,0.004,0);
+        runway?.localToWorld(expected);
+        if (runway && wear.getWorldPosition(new THREE.Vector3()).distanceTo(expected)>0.0001) {
+          throw new Error(`${airportName}: weathering lost runway transform`);
+        }
+      }
+      const camera = new THREE.PerspectiveCamera(55,1.5,0.1,30000);
+      for (const view of ['overview','close','night']) {
+        let position, target;
+        if (airportName === 'Incheon') {
+          const surface = field.surfaces.find(s=>s.kind==='runway');
+          const [ax,az] = surface.points[0], [bx,bz] = surface.points.at(-1);
+          const length = Math.hypot(bx-ax,bz-az);
+          const frame = new THREE.Object3D();
+          frame.position.set((ax+bx)/2,field.elevationM,(az+bz)/2);
+          frame.rotation.y = Math.atan2(bx-ax,bz-az); frame.updateMatrixWorld(true);
+          [position,target] = view === 'close' ? [[12,6,length/2-180],[0,0,length/2-450]] :
+            [[110,130,length/2+30],[0,0,length/2-450]];
+          camera.position.copy(frame.localToWorld(new THREE.Vector3(...position)));
+          camera.lookAt(frame.localToWorld(new THREE.Vector3(...target)));
+        } else if (airportName === 'Airport') {
+          [position,target] = view === 'close' ? [[-1230,18,12],[-1100,12.06,0]] : [[-1530,130,110],[-1150,12,0]];
+          camera.position.fromArray(position); camera.lookAt(...target);
+        } else {
+          [position,target] = view === 'close' ? [[8,3,210],[0,0,150]] : [[65,75,310],[0,0,140]];
+          camera.position.copy(runway.localToWorld(new THREE.Vector3(...position)));
+          camera.lookAt(runway.localToWorld(new THREE.Vector3(...target)));
+        }
+        hemi.intensity = view === 'night' ? 0.35 : 2;
+        sun.intensity = view === 'night' ? 0.03 : 3;
+        scene.background.set(view === 'night' ? 0x121c30 : 0xb5ccdc);
+        const clock = performance.now.bind(performance);
+        performance.now = () => 12500; airport.update?.(0,camera.position,12.5); performance.now = clock;
+        renderer.render(scene,camera);
+        const gl = renderer.getContext();
+        const buffer = new Uint8Array(1200*800*4);
+        gl.readPixels(0,0,1200,800,gl.RGBA,gl.UNSIGNED_BYTE,buffer);
+        const key = `${version}-${view}`;
+        pixels[key] = buffer;
+        shots[key] = renderer.domElement.toDataURL('image/png');
+        await save(`${version}-${airportName}-${view}.png`, shots[key].split(',')[1]);
+        results.push({airport:airportName,version,view,calls:renderer.info.render.calls,
+          triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,
+          shaderPrograms:renderer.info.programs.length,gpu,probePixel:[...pixel]});
+      }
+      renderer.dispose();
+    }
+    for (const view of ['overview','close','night']) {
+      const before = pixels[`before-${view}`], after = pixels[`after-${view}`];
+      let changed = 0;
+      for (let i=0;i<before.length;i+=4) {
+        if (Math.max(...[0,1,2].map(c=>Math.abs(before[i+c]-after[i+c])))>3) changed++;
+      }
+      if (!changed) throw new Error(`${airportName} ${view}: empty comparison`);
+      results.push({airport:airportName,view,changedPixels:changed,totalPixels:1200*800});
+      const article = document.createElement('article');
+      article.innerHTML = `<h2>${airportName} · ${view}</h2>`;
+      for (const version of ['before','after']) {
+        const figure = document.createElement('div');
+        const label = document.createElement('p'); label.textContent = version.toUpperCase();
+        const img = new Image(); img.src = shots[`${version}-${view}`];
+        figure.append(label,img); article.append(figure);
+      }
+      document.querySelector('main').append(article);
+    }
+  }
+  if (errors.length) throw new Error(errors.join('\n'));
+  await save('results.json',JSON.stringify({results,errors,browser:navigator.userAgent},null,2));
+  status.textContent = 'PASS — 18 production WebGL renders, 9 nonempty comparisons; images/results saved.';
+} catch (error) {
+  errors.push(String(error)); status.textContent = `FAIL — ${error}`;
+  await save('results.json',JSON.stringify({results,errors},null,2));
+}
+</script>

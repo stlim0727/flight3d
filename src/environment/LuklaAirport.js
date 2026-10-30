@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createRunwayMarkingMaterial } from './RunwayMarkings.js';
-import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs } from './Pavement.js';
+import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs, createRunwaySurfaceWear } from './Pavement.js';
 
 /**
  * Nepal Tenzing-Hillary Airport (Lukla, ICAO: VNLK)
@@ -145,6 +145,8 @@ export class LuklaAirport {
     rwyGroup.add(rwyMesh);
 
     rwyGroup.add(createRunwayRepairs(this.runwayWidth, this.runwayLength));
+    const surfaceWear = createRunwaySurfaceWear(this.runwayWidth, this.runwayLength);
+    if (surfaceWear) rwyGroup.add(surfaceWear);
     const wearMat = createRunwayWearMaterial();
     if (wearMat) {
       const wearGeo = new THREE.PlaneGeometry(14, 95);

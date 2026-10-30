@@ -4,6 +4,8 @@ import * as THREE from 'three';
 // both airports; preset changes never allocate another texture set.
 const textureLoads = new Map();
 let crackMaterial;
+let wearMaterial;
+let surfaceWearMaterial;
 
 // One 3m scan tile, independent of slab dimensions or airport orientation.
 export function setPavementUVs(geometry) {
@@ -53,10 +55,11 @@ export function createPavementMaterial(kind, polygonOffset = -1) {
 // Original, deterministic tire rubber artwork: no network dependency or extra
 // texture per touchdown zone. The geometry follows each runway's own transform.
 export function createRunwayWearMaterial() {
+  if (wearMaterial) return wearMaterial;
   if (typeof window === 'undefined' || typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 512;
+  canvas.width = 256;
+  canvas.height = 1024;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   let seed = 73;
@@ -64,16 +67,16 @@ export function createRunwayWearMaterial() {
     seed = (1664525 * seed + 1013904223) >>> 0;
     return seed / 4294967296;
   };
-  for (let i = 0; i < 180; i++) {
-    const x = (i % 2 ? 79 : 43) + (random() - 0.5) * 18;
-    const y = random() * 410;
-    const length = 20 + random() * 90;
+  for (let i = 0; i < 480; i++) {
+    const x = (i % 2 ? 158 : 86) + (random() - 0.5) * 48;
+    const y = 80 + random() * 720;
+    const length = 45 + random() * 180;
     const gradient = ctx.createLinearGradient(0, y, 0, y + length);
     gradient.addColorStop(0, 'rgba(10,9,8,0)');
-    gradient.addColorStop(0.3, `rgba(10,9,8,${0.08 + random() * 0.14})`);
+    gradient.addColorStop(0.3, `rgba(10,9,8,${0.18 + random() * 0.3})`);
     gradient.addColorStop(1, 'rgba(10,9,8,0)');
     ctx.fillStyle = gradient;
-    ctx.fillRect(x, y, 0.5 + random() * 1.5, length);
+    ctx.fillRect(x, y, 0.8 + random() * 3, length);
   }
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
@@ -83,7 +86,61 @@ export function createRunwayWearMaterial() {
     polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3
   });
   material.name = 'runway-rubber';
-  return material;
+  wearMaterial = material;
+  return wearMaterial;
+}
+
+// Low-frequency weathering complements the metre-scaled asphalt scan. The
+// normalized artwork runs along local Z; each airport supplies its own transform.
+// This is visual aging, not a change to tire friction or pavement contact height.
+export function createRunwaySurfaceWear(width, length) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return null;
+  if (!surfaceWearMaterial) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 2048;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    let seed = 327;
+    const random = () => {
+      seed = (1664525 * seed + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    // Overlapping soft ellipses avoid a repeating tile or rectangular decal edge.
+    // Leave transparent margins so the shoulder/threshold silhouette stays clean.
+    for (let i = 0; i < 1100; i++) {
+      const radius = 8 + random() * 25;
+      const stretch = 1.5 + random() * 3;
+      const marginX = radius + 16;
+      const marginY = radius * stretch + 32;
+      const x = marginX + random() * (canvas.width - 2 * marginX);
+      const y = marginY + random() * (canvas.height - 2 * marginY);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(1, stretch);
+      const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+      const shade = i % 3 === 0 ? '18,17,15' : '179,170,150';
+      gradient.addColorStop(0, `rgba(${shade},${0.025 + random() * 0.055})`);
+      gradient.addColorStop(1, `rgba(${shade},0)`);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(-radius, -radius, radius * 2, radius * 2);
+      ctx.restore();
+    }
+    const map = new THREE.CanvasTexture(canvas);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 4;
+    surfaceWearMaterial = new THREE.MeshStandardMaterial({
+      map, transparent: true, depthWrite: false, roughness: 1, metalness: 0,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+    });
+    surfaceWearMaterial.name = 'runway-surface-wear';
+  }
+  const geometry = new THREE.PlaneGeometry(width, length).rotateX(-Math.PI / 2);
+  const mesh = new THREE.Mesh(geometry, surfaceWearMaterial);
+  mesh.name = 'runway-surface-wear';
+  mesh.position.y = 0.004;
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 export function createRunwayRepairs(width, length) {
