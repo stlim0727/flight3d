@@ -158,6 +158,8 @@ test('the menu orientation selector and re-center button invoke gyro actions', t
   c.initGyroSettings();
   assert.equal(inserted, settings);
   assert.equal(settings.hidden, true);
+  assert.equal(select.value, 'auto');
+  select.value = 'landscape';
   select.change();
   assert.equal(mode, 'landscape');
   button.click();

@@ -1,4 +1,7 @@
 export default {
+  "gyro.resume": "📱 자이로 다시 켜기",
+  "gyro.resume.help": "저장된 자이로 설정을 불러왔습니다. 자이로 다시 켜기를 누르고 권한 창이 나타나면 허용하세요.",
+
   "gyro.orientation.label": "자이로 화면 방향",
   "gyro.orientation.auto": "화면 방향 따르기",
   "gyro.orientation.portrait": "세로",

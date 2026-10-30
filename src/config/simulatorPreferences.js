@@ -11,9 +11,10 @@ export function validateSimulatorPreferences(value) {
   const result = {};
   if (typeof value.timeOfDay === 'number' && Number.isFinite(value.timeOfDay)
       && value.timeOfDay >= 0 && value.timeOfDay < 24) result.timeOfDay = value.timeOfDay;
-  for (const key of ['audioMuted', 'touchControls']) {
+  for (const key of ['audioMuted', 'touchControls', 'gyroEnabled']) {
     if (typeof value[key] === 'boolean') result[key] = value[key];
   }
+  if (['auto', 'portrait', 'landscape'].includes(value.gyroOrientation)) result.gyroOrientation = value.gyroOrientation;
   if (typeof value.demoProfile === 'string' && /^[a-z0-9-]{1,64}$/.test(value.demoProfile)) {
     result.demoProfile = value.demoProfile;
   }
@@ -41,9 +42,11 @@ export function restoreSimulatorPreferences(sim, preferences) {
     sim.demoDirector.onUserTimeOfDayChange();
   }
   if (preferences.audioMuted !== undefined) sim.audio.setMuted(preferences.audioMuted);
-  if (preferences.touchControls !== undefined) {
+  if (preferences.touchControls !== undefined && preferences.gyroEnabled !== true) {
     if (preferences.touchControls) sim.touchControls.enable();
     else sim.touchControls.disable();
   }
+  // Gyro needs the touch-input path; restore it after all visibility preferences.
+  if (preferences.gyroEnabled === true) sim.touchControls.restoreGyroSettings();
   sim.lobby.demoProfile = preferences.demoProfile;
 }

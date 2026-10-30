@@ -90,3 +90,24 @@ portrait/landscape matching so natural-landscape tablets are supported too.
 portrait, equivalent sensor representations, short angle wrapping, rotation and
 re-centering sequences, mismatched screens, rejected locks and overlapping lock
 requests. Real-phone browser/OS rotation behavior still requires device testing.
+
+## Reloading gyro preferences
+
+The shared `flight3d.preferences.v1` record stores `gyroEnabled` and
+`gyroOrientation` alongside other simulator preferences. Turning gyro off saves
+that choice; sensor failures leave the user's preference intact. The orientation
+selector restores its saved value even when gyro is off. Gyro activation also
+remembers touch controls as enabled so visibility restoration cannot disable the
+sensor input path later in startup.
+
+Restoration runs with the other preferences before automatic flight starts.
+Browsers without a gesture-only permission API resume sensor checks automatically.
+Browsers exposing `DeviceOrientationEvent.requestPermission()` instead show Resume
+gyro and wait for a tap. Automatic restoration failures show inline status without
+opening a recovery modal; an explicit retry retains the existing recovery help.
+Every new session recalibrates from current readings; calibration and aircraft
+control inputs are never persisted. Unavailable or invalid storage keeps defaults.
+
+`tests/gyroPreferences.test.js` covers reload/on/off sequences, orientation and
+unrelated preference preservation, gesture-only permission restoration, blocked
+sensors and unavailable storage.
