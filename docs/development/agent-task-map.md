@@ -5,6 +5,7 @@ context, while the current implementation defines actual behavior.
 
 | Task | Implementation to read first | Verification |
 | --- | --- | --- |
+| Reloaded simulator preferences | src/config/simulatorPreferences.js; src/main.js; src/ui/SimulatorHudAndBindings.js; [preferences](simulator-preferences.md) | tests/simulatorPreferences.test.js; flightSelection.test.js; demoFlightDirector.test.js |
 | Integration, reset, simulation timing | src/main.js; src/core/PhysicsIntegrator.js; src/core/PresetSpawner.js; src/core/physicsTiming.js; src/config/simConfig.js; [physics core](physics-core.md) | npm test; relevant browser scenario |
 | Aircraft parameters | src/config/aircraftConfigs.js | physics tests; flight scenario |
 | Loading, fuel CG, inertia and trim | src/physics/MassProperties.js; TrimSolver.js; src/ui/LoadingPanel.js; [mass/CG model](mass-cg.md) | tests/massProperties.test.js; trimSolver.test.js; scripts/verify-mass-cg.html |
