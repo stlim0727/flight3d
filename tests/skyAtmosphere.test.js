@@ -72,9 +72,59 @@ describe('SkyAtmosphere (Aerial Perspective Height Fog & Tone Mapping)', () => {
 
     // 4. Night (23:00)
     sky.setTimeOfDay(23.0, new THREE.Vector3(0, 10, 0), new THREE.Vector3(0, 10, 0));
-    assert.equal(sky.currentExposure, 1.15, 'Night exposure should be 1.15 to preserve dark terrain silhouettes');
-    assert.equal(mockRenderer.toneMappingExposure, 1.15);
+    assert.equal(sky.currentExposure, 0.90, 'Night exposure should keep terrain silhouettes dark');
+    assert.equal(mockRenderer.toneMappingExposure, 0.90);
     assert.ok(sky.fogColor.r < 0.1 && sky.fogColor.g < 0.1 && sky.fogColor.b < 0.15, 'Night fog should be deep midnight navy');
+  });
+
+  it('keeps indirect light, clouds and overcast haze dark at night and restores daylight', () => {
+    const scene = new THREE.Scene();
+    const sky = new SkyAtmosphere(scene);
+    sky.setTimeOfDay(12);
+    const dayAmbient = sky.ambientLight.intensity;
+    const dayCloud = sky.cloudLayer.material.uniforms.ambientColor.value.r;
+    assert.equal(scene.environmentIntensity, 1);
+
+    for (const airport of ['coastal', 'lukla']) {
+      sky.setAirport(airport);
+      sky.setTimeOfDay(0);
+      const clearFog = sky.fogColor.clone();
+      sky.setCloudCover(1);
+      sky.updateSun();
+      assert.ok(scene.environmentIntensity < 0.02, 'HDR reflections must not illuminate night surfaces');
+      assert.ok(sky.ambientLight.intensity < dayAmbient * 0.1);
+      assert.ok(sky.cloudLayer.material.uniforms.ambientColor.value.r < dayCloud * 0.05);
+      assert.ok(sky.fogColor.equals(clearFog), 'Night overcast must not introduce daylight-grey haze');
+      sky.setCloudCover(0);
+    }
+
+    sky.setAirport('coastal');
+    sky.setTimeOfDay(12);
+    assert.equal(scene.environmentIntensity, 1);
+    assert.equal(sky.ambientLight.intensity, dayAmbient);
+    assert.equal(sky.cloudLayer.material.uniforms.ambientColor.value.r, dayCloud);
+    sky.cloudLayer.dispose();
+  });
+
+  it('strengthens Lukla daytime sun while retaining weather attenuation and night lighting', () => {
+    const sky = new SkyAtmosphere(new THREE.Scene());
+    sky.setAirport('coastal');
+    sky.setTimeOfDay(12);
+    const coastalSun = sky.sunLight.intensity;
+    sky.setAirport('lukla');
+    const luklaSun = sky.sunLight.intensity;
+    assert.ok(luklaSun > coastalSun * 1.7);
+    sky.setCloudCover(1);
+    sky.updateSun();
+    assert.ok(Math.abs(sky.sunLight.intensity / luklaSun - 0.15) < 1e-10);
+    sky.setCloudCover(0);
+    sky.setTimeOfDay(0);
+    const luklaNight = sky.sunLight.intensity;
+    sky.setAirport('coastal');
+    assert.equal(sky.sunLight.intensity, luklaNight);
+    sky.setTimeOfDay(12);
+    assert.equal(sky.sunLight.intensity, coastalSun);
+    sky.cloudLayer.dispose();
   });
 
   it('should apply high-altitude Rayleigh blue depth cueing during daytime ascent', () => {

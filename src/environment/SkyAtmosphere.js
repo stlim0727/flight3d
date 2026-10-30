@@ -168,6 +168,11 @@ export class SkyAtmosphere {
       ? THREE.MathUtils.radToDeg(Math.atan2(this.sunDirectionOverride.x, this.sunDirectionOverride.z))
       : 180.0 + Math.cos(hourRad) * 45.0; // degrees
     const isMorning = Math.cos(hourRad) >= 0;
+    const daylight = THREE.MathUtils.smoothstep(elevation, -12, 5);
+    // The HDR is a daytime sky: scale its indirect illumination as the sun sets,
+    // including when the texture finishes loading after a time/airport change.
+    this.scene.environmentIntensity = this.activeAirport === 'neon'
+      ? 0.03 : THREE.MathUtils.lerp(0.015, 1, daylight);
 
     const phi = THREE.MathUtils.degToRad(90 - elevation);
     const theta = THREE.MathUtils.degToRad(azimuth);
@@ -218,6 +223,9 @@ export class SkyAtmosphere {
       const t = Math.min(1.0, (elevation - 5.0) / 25.0);
       this.sunLight.color.setRGB(1.0, 0.95 + t * 0.05, 0.88 + t * 0.12);
       this.sunLight.intensity = 2.0 + t * 1.5;
+      // Clear high-altitude Himalayan air gives stronger direct illumination.
+      // Ramp from the horizon so the boost does not jump at the daylight boundary.
+      if (this.activeAirport === 'lukla') this.sunLight.intensity *= 1 + 0.8 * t;
       this.ambientLight.color.setRGB(0.85, 0.92, 1.0);
       this.ambientLight.intensity = 0.85 + t * 0.45;
 
@@ -250,14 +258,14 @@ export class SkyAtmosphere {
       }
     } else {
       // Night / Twilight (elevation < -4.0°)
-      this.sunLight.intensity = 0.06;
+      this.sunLight.intensity = 0.025;
       this.sunLight.color.setRGB(0.2, 0.3, 0.5); // Cool lunar moonlight
       this.ambientLight.color.setRGB(0.18, 0.22, 0.35);
-      this.ambientLight.intensity = 0.45;
+      this.ambientLight.intensity = 0.12;
 
       this.fogColor.setRGB(0.03, 0.05, 0.10); // Deep midnight navy/indigo
       this.baseDensity = 0.00020;
-      exposure = 1.15; // Preserves dark ground silhouettes and stars without muddy dark crushing
+      exposure = 0.90; // Keep moonlit terrain, aircraft and clouds dark.
     }
 
     if (this.activeAirport !== 'neon') {
@@ -271,8 +279,8 @@ export class SkyAtmosphere {
       this.sunLight.intensity *= this.sunAttenuation;
       this.sunLight.shadow.intensity = this.shadowSoftening;
       this.cockpitSun.light.shadow.intensity = this.shadowSoftening;
-      this.ambientLight.intensity += 0.25 * cloudRamp;
-      this.fogColor.lerp(OVERCAST_GREY, 0.35 * cloudRamp);
+      this.ambientLight.intensity += 0.25 * cloudRamp * daylight;
+      this.fogColor.lerp(OVERCAST_GREY, 0.35 * cloudRamp * daylight);
 
       // 2. High-Altitude Rayleigh Blue Depth Cueing
       // As aircraft ascends above 400m towards stratosphere (1,500m ~ 3,000m+),
