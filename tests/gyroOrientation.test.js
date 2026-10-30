@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { screenTilt, readGyroScreen, angleDelta } from '../src/controls/gyroOrientation.js';
-import { TouchFlightControls } from '../src/controls/TouchFlightControls.js';
+import { TouchFlightControls, shapeTouchStick } from '../src/controls/TouchFlightControls.js';
 
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
 
@@ -57,7 +57,7 @@ test('enable, turn, rotate, settle and re-center keep calibration transitions ne
   sample(38, 0);
   assert.deepEqual(inputs.at(-1), [0, 0]);
   sample(48, 0);
-  near(inputs.at(-1)[0], 0.4);
+  near(inputs.at(-1)[0], shapeTouchStick(0.4, 0)[0]);
   orientation.angle = 90;
   orientation.type = 'landscape-primary';
   sample(0, -38);
@@ -68,7 +68,7 @@ test('enable, turn, rotate, settle and re-center keep calibration transitions ne
   sample(0, -38);
   assert.deepEqual(inputs.at(-1), [0, 0]);
   sample(0, -48);
-  near(inputs.at(-1)[0], 0.4);
+  near(inputs.at(-1)[0], shapeTouchStick(0.4, 0)[0]);
   c.recenterGyro();
   assert.deepEqual(inputs.at(-1), [0, 0]);
   c.gyroReadyAt = 0;
@@ -91,7 +91,7 @@ test('fixed orientation holds neutral until screen matches, including unsupporte
   assert.deepEqual(inputs.at(-1), [0, 0]);
   assert.equal(c.status, 'gyro.orientation.lock.unavailable');
   sample(0, 48);
-  near(inputs.at(-1)[0], 0.4);
+  near(inputs.at(-1)[0], shapeTouchStick(0.4, 0)[0]);
 });
 
 test('orientation locks are serialized and released on disabling or follow-screen selection', async t => {
@@ -162,4 +162,24 @@ test('the menu orientation selector and re-center button invoke gyro actions', t
   assert.equal(mode, 'landscape');
   button.click();
   assert.equal(centered, true);
+});
+
+
+test('gyro sweep matches thumb-stick precision without early saturation', t => {
+  const { sample, inputs } = harness(t);
+  sample(0, 0);
+  let previous = 0;
+  for (let i = 0; i <= 100; i++) {
+    const x = i / 100;
+    sample(x * 25, 0);
+    const output = inputs.at(-1)[0];
+    near(output, shapeTouchStick(x, 0)[0]);
+    assert.ok(output >= previous - 1e-12);
+    if (x < 1) assert.ok(output < 1);
+    previous = output;
+  }
+  sample(2.5, 0);
+  assert.ok(inputs.at(-1)[0] < .02, '10% device tilt must retain central precision');
+  sample(0, 0);
+  assert.deepEqual(inputs.at(-1), [0, 0]);
 });

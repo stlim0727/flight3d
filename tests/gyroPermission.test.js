@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TouchFlightControls } from '../src/controls/TouchFlightControls.js';
+import { TouchFlightControls, shapeTouchStick } from '../src/controls/TouchFlightControls.js';
 import { detectGyroBrowser } from '../src/controls/gyroBrowser.js';
 
 function harness(t, orientation = class {}) {
@@ -47,7 +47,7 @@ test('Android waits for finite readings, times out, retries and cleans up listen
   c.handleOrientation({ beta: 0, gamma: 0 }); // Capture neutral first.
   c.handleOrientation({ beta: 0, gamma: 15 });
   assert.equal(c.label, 'gyro.on');
-  assert.ok(Math.abs(inputs.at(-1)[1] - 0.5) < 1e-12);
+  assert.ok(Math.abs(inputs.at(-1)[1] - shapeTouchStick(0, 0.5)[1]) < 1e-12);
   expire();
   assert.equal(reasons.length, 1);
   await c.toggleGyro();

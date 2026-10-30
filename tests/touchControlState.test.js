@@ -40,7 +40,8 @@ describe('Gyro stick sizing before pointer interaction', () => {
     controls.handleOrientation({ beta: 30, gamma: 45 });
     const position = controls.stickKnob.style.transform.match(/translate\(([-\d.]+)px, ([-\d.]+)px\)/);
     assert.ok(Math.hypot(Number(position[1]), Number(position[2])) <= 34.00001);
-    assert.deepEqual(input, [1, 1]);
+    assert.ok(Math.abs(Math.hypot(...input) - 1) < 1e-12);
+    assert.ok(input[0] > .7 && input[1] > .7, 'Diagonal tilt must share the circular travel budget');
 
     size = 160;
     controls.stickKnob.offsetWidth = controls.stickKnob.offsetHeight = 56;
