@@ -544,6 +544,7 @@ class PhysicsIntegratorMethods {
     this.foliage.updateCityLod(this.camera.position);
     this.foliage.update(this.camera.position);
     this.sky.updateSun(this.position, this.camera.position);
+    this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     this.sky.updateCockpitSun({
       position: this.aircraft.group.position,
       quaternion: this.aircraft.group.quaternion,

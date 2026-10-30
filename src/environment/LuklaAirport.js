@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { AirportNightLighting } from './AirportNightLighting.js';
 import { createRunwayMarkingMaterial } from './RunwayMarkings.js';
 import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs, createRunwaySurfaceWear } from './Pavement.js';
 
@@ -84,6 +85,20 @@ export class LuklaAirport {
     };
 
     this.initAirport();
+    const half = this.runwayLength / 2;
+    this.nightLighting = new AirportNightLighting(this.group, [{
+      start: [-half * this.sin58, this.midElevation - half * this.gradient, half * this.cos58],
+      end: [half * this.sin58, this.midElevation + half * this.gradient, -half * this.cos58],
+      width: this.runwayWidth, spacing: 35,
+    }], [
+      ...[-28, 0, 28].map(z => {
+        const position = new THREE.Vector3(17, 0, z).applyEuler(
+          new THREE.Euler(this.pitchRad, -this.headingRad, 0, 'YXZ'));
+        return { x: position.x + 68.4, y: position.y + 2843.5,
+          z: position.z - 4.1, height: 7 };
+      }),
+    ]);
+    this.nightLighting.illuminateWindows(this.group);
   }
 
   initAirport() {
@@ -363,12 +378,26 @@ export class LuklaAirport {
     });
 
     const towerGlassMat = new THREE.MeshStandardMaterial({
+      name: 'terminal-window-glass',
       color: 0x38bdf8,
       roughness: 0.1,
       metalness: 0.85,
       transparent: true,
       opacity: 0.8
     });
+
+    // Lit terminal rooms behind the facade, with opaque panes to avoid sorting.
+    const windowMaterial = new THREE.MeshStandardMaterial({ name: 'terminal-window-glass',
+      color: 0x34556a, roughness: .3 });
+    const pane = new THREE.PlaneGeometry(2.6, 2);
+    for (const side of [-1, 1]) for (const y of [3, 7]) {
+      for (let x = -18; x <= 18; x += 6) {
+        const window = new THREE.Mesh(pane, windowMaterial);
+        window.position.set(x, y, side * (termD / 2 + .04));
+        window.rotation.y = side < 0 ? Math.PI : 0;
+        termGroup.add(window);
+      }
+    }
 
     const cabinGeom = new THREE.CylinderGeometry(4.2, 3.8, 4.5, 8);
     const cabinMesh = new THREE.Mesh(cabinGeom, towerGlassMat);

@@ -2,6 +2,8 @@ import { loadSihwaRegion } from '../geospatial/SihwaRegion.js';
 import { createSihwaScenery } from './SihwaScenery.js';
 import { createDepartureJetBridge } from './DepartureJetBridge.js';
 import * as THREE from 'three';
+import { AirportNightLighting } from './AirportNightLighting.js';
+import { DEPARTURE_GATE } from '../config/incheonDeparture.js';
 import { createDepartureStand } from './DepartureStand.js';
 import { createIncheonPavement } from './IncheonPavement.js';
 import { colourIncheonGround, createIncheonGroundTexture } from './IncheonGround.js';
@@ -46,6 +48,12 @@ export async function loadIncheonAirport(base) {
     geometry.computeBoundingBox();
     colliders.push({points,top:floor+feature.height.meters,bounds:geometry.boundingBox.clone()});
   }
+  const nightLighting = new AirportNightLighting(group,
+    INCHEON_AIRFIELD.surfaces.filter(s => s.kind === 'runway').map(s => ({
+      start: [s.points[0][0], INCHEON_AIRFIELD.elevationM, s.points[0][1]],
+      end: [s.points.at(-1)[0], INCHEON_AIRFIELD.elevationM, s.points.at(-1)[1]], width: s.width,
+    })), [30, 55, 80, 105].map(offset => ({ x: DEPARTURE_GATE.x + offset,
+      y: INCHEON_AIRFIELD.elevationM, z: DEPARTURE_GATE.z - 45, height: 16 })));
   const tower = createControlTower(height);
   colliders.push(tower.collider);
   group.add(tower.group);
@@ -72,6 +80,7 @@ export async function loadIncheonAirport(base) {
       group.add(marking);
     }
   }
+  nightLighting.illuminateWindows(group);
   group.traverse(o=>{if(o.isMesh)o.receiveShadow=true;});
   const traffic=new IncheonTraffic(trafficData,height,(x,z)=>source.isLand(x,z) && !terrain.isOnRunway(x,z)
     && !colliders.some(c=>x>=c.bounds.min.x-1 && x<=c.bounds.max.x+1 && z>=c.bounds.min.z-1 && z<=c.bounds.max.z+1
@@ -79,7 +88,7 @@ export async function loadIncheonAirport(base) {
   group.add(traffic.mesh);
   const parked=new IncheonParkedAirliners(planParkedAirliners(INCHEON_AIRFIELD,patch),INCHEON_AIRFIELD.elevationM);
   group.add(parked.group);parked.load(import.meta.env?.BASE_URL??'/');
-  return {terrain,group,departureBridge,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,parked,
+  return {terrain,group,nightLighting,departureBridge,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,parked,
     towerCab:tower.cab,
     resetTraffic(){traffic.reset();},
     update(dt,position,time,options={}){traffic.update(dt,options.cameraPosition??position,options.quality,options.paused);parked.update(options.cameraPosition??position,options.quality);},

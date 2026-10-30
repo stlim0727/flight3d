@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { installInstrumentLighting } from './InstrumentLighting.js';
 import { CESSNA_172 } from '../config/aircraftConfigs.js';
 import { gearSupportHeight, tireContact } from './gearVisualContact.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -118,6 +119,7 @@ export class Cessna172 {
       onModelReady: null
     };
     this.group.add(this.cockpit.group);
+    this.instrumentLight = installInstrumentLighting(this.cockpit, CESSNA_172.cockpit.captainEyePos, 0xffb46b, () => !this.isCrashed);
 
     // Build the procedural 3D model
     this.initProceduralModel();

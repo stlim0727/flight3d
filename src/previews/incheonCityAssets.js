@@ -76,13 +76,13 @@ export function createCityGround(patch, dressing, trees, options = {}) {
   return texture;
 }
 
-function facade(glass) {
+function facade(glass, emission = false) {
   const size=256, pixels=new Uint8Array(size*size*4);
   for (let y=0;y<size;y++) for (let x=0;x<size;x++) {
     const u=x%64, v=y%128;
     const window = u>10 && u<55 && v>28 && v<104;
     const frame = u<4 || v<5;
-    const rgb=glass ? (frame?[139,156,158]:[72+(x%13),103+(y%9),113+(x%11)])
+    const rgb=emission ? ((glass ? !frame : window) ? [255,255,255] : [0,0,0]) : glass ? (frame?[139,156,158]:[72+(x%13),103+(y%9),113+(x%11)])
       : window?[66,86,91]:[frame?188:208,frame?188:205,frame?179:192];
     pixels.set([...rgb,255],(y*size+x)*4);
   }
@@ -95,8 +95,8 @@ function facade(glass) {
 
 export function createBuildingMaterials() {
   return {
-    glass: new THREE.MeshLambertMaterial({ map:facade(true), color:0xc5d1d0 }),
-    masonry: new THREE.MeshLambertMaterial({ map:facade(false), color:0xe6e1d6 }),
+    glass: new THREE.MeshLambertMaterial({ name:'airport-window-glass', map:facade(true), color:0xc5d1d0, emissiveMap:facade(true,true), emissiveIntensity:0 }),
+    masonry: new THREE.MeshLambertMaterial({ name:'airport-window-masonry', map:facade(false), color:0xe6e1d6, emissiveMap:facade(false,true), emissiveIntensity:0 }),
     roof: new THREE.MeshLambertMaterial({ color:0xc4c8c5 }),
   };
 }

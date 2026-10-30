@@ -15,7 +15,7 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
     const c172 = new Cessna172();
     assert.ok(c172.group instanceof THREE.Group);
     assert.strictEqual(c172.group.name, 'Aircraft_Cessna172');
-    assert.doesNotThrow(() => c172.cockpit.syncLighting({}, new THREE.Quaternion(), 1 / 60),
+    assert.doesNotThrow(() => c172.cockpit.syncLighting({ sunPosition: new THREE.Vector3(0, 1, 0) }, new THREE.Quaternion(), 1 / 60),
       'Main-loop lighting updates must remain compatible with aircraft without an interior');
 
     assert.ok(c172.fuselageGroup, 'Fuselage group must exist');

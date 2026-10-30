@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { installInstrumentLighting } from './InstrumentLighting.js';
 import { F16_FALCON } from '../config/aircraftConfigs.js';
 import { gearSupportHeight, tireContact } from './gearVisualContact.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -133,6 +134,7 @@ export class F16 {
     // The cockpit stays in the complete airframe, so exterior views also show it.
     this.gltfGroup.add(this.cockpit.group);
     this.cockpit.group.add(this.cockpit.gltfCockpitGroup);
+    this.instrumentLight = installInstrumentLighting(this.cockpit, F16_FALCON.cockpit.captainEyePos, 0x91ffb5, () => !this.isCrashed);
     this.ready = new GLTFLoader().loadAsync(`${import.meta.env?.BASE_URL ?? '/'}models/f-16.glb`)
       .then(gltf => this.installModel(gltf.scene))
       .catch(error => {
