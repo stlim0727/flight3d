@@ -371,6 +371,8 @@ class FlightSimulator {
     // Resize handler
     window.addEventListener('resize', () => this.handleResize());
 
+    this.initBrowserActivity();
+
     // Start with the flight when autoplay is permitted. Otherwise the browser
     // keeps the context suspended until the first flight/menu interaction.
     const audioHint = document.getElementById('audio-start-hint');
@@ -410,14 +412,48 @@ class FlightSimulator {
     inputLatency?.mark('fly');
     this.syncFlowUi();
   }
+  /** Browser activity is a separate hold, so returning cannot undo menu/pause state. */
+  initBrowserActivity() {
+    const sync = () => this.setBrowserActive(!document.hidden && document.hasFocus());
+    window.addEventListener('blur', () => this.setBrowserActive(false));
+    window.addEventListener('focus', sync);
+    document.addEventListener('visibilitychange', sync);
+    window.addEventListener('pagehide', () => this.setBrowserActive(false));
+    window.addEventListener('pageshow', sync);
+    sync();
+  }
+
+  setBrowserActive(active) {
+    const backgrounded = !active;
+    if (this.browserBackgrounded === backgrounded) return;
+    this.browserBackgrounded = backgrounded;
+    // Discard wall time and any fractional physics debt on both edges.
+    this.clock.getDelta();
+    this.physicsAccumulator = 0;
+    if (backgrounded) {
+      this.controls.releaseAllKeys();
+      this.controls.setTouchStick(0, 0);
+      this.controls.setTouchRudder(0);
+      this.controls.setTouchBrakes(0);
+    }
+    this.syncAudioPause();
+    if (active) this.audio?.ensureContextRunning();
+  }
+
+  syncAudioPause() {
+    const backgrounded = this.browserBackgrounded === true;
+    const held = this.gameFlow.state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
+    this.audio?.departureRadio.setPaused(backgrounded || this.gameFlow.state !== FLOW.FLIGHT);
+    this.audio?.setPaused(backgrounded || held);
+  }
+
   /** Apply the game-flow state to the DOM: menu visibility, input blocking. */
   syncFlowUi() {
     const state = this.gameFlow.state;
     // A flight parked off the sim is silent and watched from the drone rig; the lobby
     // cinematic keeps its own sound and camera, so it is deliberately not held here.
     const held = state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
-    this.audio?.departureRadio.setPaused(state !== FLOW.FLIGHT);
-    this.audio?.setPaused(held);
+    this.syncAudioPause();
     document.body.dataset.flow = state;
     if (state === FLOW.FLIGHT) {
       const attribution = document.getElementById('incheon-attribution');
@@ -765,6 +801,7 @@ class FlightSimulator {
     requestAnimationFrame(this.animate);
 
     const elapsed = this.clock.getDelta();
+    if (this.browserBackgrounded) return;
     const frameDelta = this.startupReady ? clampFrameDelta(elapsed) : 0;
     this.totalSimTime += frameDelta;
     if (!this.gameFlow.isPhysicsFrozen()) this.devRunner.updatePreparation(frameDelta);
