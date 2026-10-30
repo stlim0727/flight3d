@@ -100,13 +100,25 @@ through a decelerated valley turnaround, a curved approach to Runway 06, touchdo
 braking and a parked handoff. Esc cancels; P restarts. The canyon-chase choice is
 unchanged and still hands back airborne.
 
-The escape starts at 1,600 m along the pass, targets 300 KIAS and up to 35 m/s
-climb, and blends heading 238° to 195° with a 45° bank-command limit. Return
-lowers the gear and selects the configured 20° landing flaps, uses speed brakes,
-and turns in the open valley after slowing below 190 KIAS. It approaches from
+The pass now starts over the upper runway at 45 m clearance, with a flyby shot
+unless the pilot has selected a camera. It crosses the pavement at roughly
+45–100 m clearance instead of starting beyond its downhill end. The escape
+starts at 750 m along the pass, targets 260 KIAS and up to 35 m/s climb, and
+blends heading 238° to 195° with a 45° bank-command limit. Return keeps the
+gear retracted, selects the configured 20° landing flaps, uses speed brakes,
+and turns at 8 km down-valley after slowing below 205 KIAS. It approaches from
 the southeast side of the extended centerline to avoid the measured ridge that
-blocks a long, straight descent. A cosine lateral path finishes its turn 3.5 km
-before runway midpoint; terrain lookahead protects the return and outer approach.
+blocks a long, straight descent. A cosine lateral path joins from the actual
+final-entry position and finishes its turn 2.5 km before runway midpoint;
+terrain lookahead protects the return and outer approach. Gear extends on
+entry to final, with physical transit and approach deceleration left intact.
+
+The Node physics regression (`tests/f16LuklaFlight.test.js`) uses the production
+120 Hz integrator, controls, trim, gear, measured DEM and airport collisions.
+Its baseline comparison completed in 357.9 s; the shortened route completes in
+226.9 s, touches down at 130.3 KIAS and holds parking for ten seconds with zero
+gear damage. Gear extension moves from 300 s before touchdown to about 75 s.
+This establishes model behavior, not browser rendering or camera appearance.
 
 Final targets 132 KIAS. The 900 m curved flare turns descent into a 9% uphill
 flight path before meeting the 11.76% runway. Pitch command is capped at 18° to
