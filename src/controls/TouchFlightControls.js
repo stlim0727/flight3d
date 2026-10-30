@@ -1,4 +1,5 @@
-import { t, translateDOM } from '../i18n/index.js';
+import { detectGyroBrowser } from './gyroBrowser.js';
+import { bindText, t, translateDOM } from '../i18n/index.js';
 
 // Preserve full authority while giving a short thumb stick room for fine input.
 // The radial deadzone avoids a discontinuity when crossing either axis.
@@ -32,6 +33,10 @@ export class TouchFlightControls {
     // Active state
     this.enabled = false;
     this.gyroActive = false;
+    this.gyroAttempt = 0;
+    this.gyroPending = false;
+    this.gyroBrowser = 'other';
+    this.handleOrientation = this.handleOrientation.bind(this);
     this.gyroZeroPitch = 38.0; // Comfortable holding angle (~38° tilted towards pilot)
     this.gyroZeroRoll = 0.0;
     this.gyroSensitivity = 0.035;
@@ -441,49 +446,129 @@ export class TouchFlightControls {
       return;
     }
 
-    // Check permission for iOS 13+ devices
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      try {
-        const response = await DeviceOrientationEvent.requestPermission();
-        if (response === 'granted') {
-          this.enableGyro();
-        } else {
-          alert(t('permission.to.access.the.device.tilt.sensor'));
-        }
-      } catch (err) {
-        console.warn('DeviceOrientation permission error:', err);
+    if (this.gyroPending) return;
+    const attempt = ++this.gyroAttempt;
+    this.gyroPending = true;
+    this.gyroHelp?.close();
+    this.setGyroLabel('gyro.checking');
+    try {
+      if (window.isSecureContext === false) {
+        this.failGyro('gyro.insecure');
+        return;
       }
-    } else if (window.DeviceOrientationEvent) {
+      const orientation = window.DeviceOrientationEvent;
+      if (!orientation) {
+        this.failGyro('gyro.unsupported');
+        return;
+      }
+      // Keep permission requests in the original click gesture (especially iOS).
+      if (typeof orientation.requestPermission === 'function') {
+        const response = await orientation.requestPermission();
+        if (attempt !== this.gyroAttempt) return;
+        if (response !== 'granted') {
+          this.failGyro('gyro.denied');
+          return;
+        }
+      }
+      if (attempt !== this.gyroAttempt) return;
       this.enableGyro();
-    } else {
-      alert(t('this.device.does.not.support.gyroscope.tilt'));
+    } catch {
+      if (attempt === this.gyroAttempt) this.failGyro('gyro.error');
     }
+  }
+
+  setGyroLabel(key) {
+    bindText(this.gyroBtn, () => t(key));
+  }
+
+  failGyro(reason) {
+    this.disableGyro();
+    this.showGyroHelp(reason);
+  }
+
+  showGyroHelp(reason) {
+    if (!this.gyroHelp) {
+      const dialog = document.createElement('dialog');
+      dialog.className = 'gyro-help';
+      dialog.setAttribute('aria-labelledby', 'gyro-help-title');
+      dialog.innerHTML = `
+        <h2 id="gyro-help-title" data-i18n="gyro.help.title"></h2>
+        <p class="gyro-help-reason" role="status"></p>
+        <label for="gyro-browser" data-i18n="gyro.browser.label"></label>
+        <select id="gyro-browser">
+          <option value="brave">Android Brave</option>
+          <option value="chrome">Android Chrome</option>
+          <option value="ios">iPhone / iPad</option>
+          <option value="other" data-i18n="gyro.browser.other"></option>
+        </select>
+        <p class="gyro-help-guide"></p>
+        <p data-i18n="gyro.help.note"></p>
+        <div class="gyro-help-actions">
+          <button type="button" class="gyro-retry" data-i18n="gyro.retry"></button>
+          <button type="button" class="gyro-close" data-i18n="gyro.touch"></button>
+        </div>`;
+      document.body.appendChild(dialog);
+      translateDOM(dialog);
+      this.gyroHelp = dialog;
+      const selector = dialog.querySelector('select');
+      selector.value = this.gyroBrowser;
+      let manuallySelected = false;
+      const updateGuide = () => {
+        this.gyroBrowser = selector.value;
+        bindText(dialog.querySelector('.gyro-help-guide'), () => t(`gyro.guide.${this.gyroBrowser}`));
+      };
+      selector.addEventListener('change', () => {
+        manuallySelected = true;
+        updateGuide();
+      });
+      dialog.querySelector('.gyro-retry').addEventListener('click', () => this.toggleGyro());
+      dialog.querySelector('.gyro-close').addEventListener('click', () => dialog.close());
+      // Brave deliberately resembles Chrome; detect it when possible, allow correction.
+      detectGyroBrowser(navigator).then(browser => {
+        if (manuallySelected) return;
+        selector.value = browser;
+        updateGuide();
+      });
+      updateGuide();
+    }
+    bindText(this.gyroHelp.querySelector('.gyro-help-reason'), () => t(reason));
+    this.gyroHelp.showModal();
   }
 
   enableGyro() {
     this.gyroActive = true;
-    this.handleOrientation = this.handleOrientation.bind(this);
+    this.gyroPending = true;
     window.addEventListener('deviceorientation', this.handleOrientation);
-    if (this.gyroBtn) {
-      this.gyroBtn.classList.add('active');
-      this.gyroBtn.innerHTML = '<span class="pill-icon">📱</span> TILT: ON';
-    }
+    // API presence and permission do not prove that the browser delivers readings.
+    this.gyroTimer = window.setTimeout(() => {
+      if (this.gyroPending) this.failGyro('gyro.no.readings');
+    }, 4000);
     this.triggerHaptic([30, 50, 30]);
   }
 
   disableGyro() {
+    ++this.gyroAttempt;
     this.gyroActive = false;
+    this.gyroPending = false;
+    window.clearTimeout(this.gyroTimer);
     window.removeEventListener('deviceorientation', this.handleOrientation);
     if (this.gyroBtn) {
       this.gyroBtn.classList.remove('active');
-      this.gyroBtn.innerHTML = '<span class="pill-icon">📱</span> GYRO';
+      this.setGyroLabel('gyro.off');
     }
     this.controls.setTouchStick(0.0, 0.0);
     this.updateStickTelemetry(0.0, 0.0);
   }
 
   handleOrientation(e) {
-    if (!this.gyroActive) return;
+    if (!this.gyroActive || !Number.isFinite(e.beta) || !Number.isFinite(e.gamma)) return;
+    if (this.gyroPending) {
+      this.gyroPending = false;
+      window.clearTimeout(this.gyroTimer);
+      this.gyroBtn?.classList.add('active');
+      this.setGyroLabel('gyro.on');
+    }
+    if (this.controls?.aircraftControlsDisabled) return;
 
     // Beta: Front-to-back tilt in degrees (-180 to 180) -> Pitch
     // Gamma: Left-to-right tilt in degrees (-90 to 90) -> Roll
@@ -546,9 +631,8 @@ export class TouchFlightControls {
     if (this.overlay) {
       this.overlay.style.display = 'none';
     }
-    if (this.gyroActive) {
-      this.disableGyro();
-    }
+    this.disableGyro();
+    this.gyroHelp?.close();
     this.controls.setTouchStick(0.0, 0.0);
     this.controls.setTouchRudder(0.0);
     this.controls.setTouchBrakes(0.0);
