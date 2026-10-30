@@ -279,9 +279,9 @@ export const F16_FALCON = {
   // 5. Cockpit Camera & Instrument Layout
   cockpit: {
     hasPhotoCockpit: false,
-    captainEyePos: { x: 0.0, y: 1.2, z: -3.0 },
+    captainEyePos: { x: 0.0, y: 1.08, z: -3.35 },
     portraitEyeX: 0.0, // Single seat stays centered in narrow viewports too.
-    defaultLookPitchRad: -0.10,
+    defaultLookPitchRad: -0.06,
     defaultFov: 75.0,
     exteriorFov: 60.0,
     chaseDistance: 18.0,

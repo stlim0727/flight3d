@@ -161,7 +161,7 @@ describe('Plane-Agnostic Core Infrastructure', () => {
       cameraSystem.loadAircraftConfig(F16_FALCON);
       assert.strictEqual(cameraSystem.chaseDistance, 18.0);
       assert.strictEqual(cameraSystem.chaseHeight, 4.5);
-      assert.strictEqual(cameraSystem.cockpitHeadOffset.z, -3.0);
+      assert.strictEqual(cameraSystem.cockpitHeadOffset.z, -3.35);
 
       // Switch to Cessna 172 (light trainer with 3D cockpit)
       cameraSystem.loadAircraftConfig(CESSNA_172);
