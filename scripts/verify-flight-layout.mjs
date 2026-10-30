@@ -42,6 +42,19 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     await delay(500);
   }
   assert.ok(await evaluate('Boolean(window.simulator?.startupReady)'), 'startup');
+  assert.equal(await evaluate('document.getElementById("open-camera").tagName'), 'SELECT', 'CAM opens a native view dropdown');
+  assert.equal(await evaluate('document.querySelectorAll("#open-camera option").length'), 9, 'all views and unified Auto are selectable');
+  assert.equal(await evaluate('document.getElementById("btn-auto-camera") === null'), true, 'no duplicate Scenic Auto button');
+  await evaluate(() => {
+    const select = document.getElementById('open-camera');
+    select.value = '7'; select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  assert.ok(await evaluate('window.simulator.cameraSystem.autoSwitch'), 'dropdown Auto enables automatic framing');
+  await evaluate(() => {
+    const select = document.getElementById('open-camera');
+    select.value = '1'; select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  assert.equal(await evaluate('window.simulator.cameraSystem.autoSwitch'), false, 'explicit dropdown view returns to manual');
   await evaluate(() => {
     const s = window.simulator;
     s.demoDirector.stop(); s.gameFlow.enterFlight();
@@ -81,7 +94,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
         const box = n => { const r = n.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; };
         const chrome = ['.menu-toggle', '.hud-strip', '#btn-ap-toggle', '#btn-mute', '.flight-toolbar']
           .map(sel => ({ sel, ...box(document.querySelector(sel)) }));
-        const buttons = [...bar.querySelectorAll('button')].filter(n => getComputedStyle(n).display !== 'none').map(n => {
+        const buttons = [...bar.querySelectorAll('button, select')].filter(n => getComputedStyle(n).display !== 'none').map(n => {
           const cs = getComputedStyle(n), r = n.getBoundingClientRect();
           return { sel: `#${n.id}`, ...box(n), center: `${cs.display}/${cs.alignItems}/${cs.justifyContent}`,
             hit: n.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)) };
@@ -168,7 +181,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     const demo = await evaluate(() => {
       const b = document.getElementById('demo-banner').getBoundingClientRect(), t = document.querySelector('.flight-toolbar').getBoundingClientRect();
       return { top: b.top, toolbarBottom: t.bottom, width: b.width, locked: document.getElementById('btn-gear').disabled && document.getElementById('flight-trim-more').disabled,
-        row: [...document.querySelectorAll('.flight-toolbar button')].filter(n => getComputedStyle(n).display !== 'none').map(n => n.id) };
+        row: [...document.querySelectorAll('.flight-toolbar button, .flight-toolbar select')].filter(n => getComputedStyle(n).display !== 'none').map(n => n.id) };
     });
     assert.ok(demo.width && demo.top >= demo.toolbarBottom + 4 && demo.locked, `demo clearance and lockout: ${JSON.stringify(demo)}`);
     assert.deepEqual(demo.row, ['btn-skip-demo', 'open-camera', 'btn-fullscreen', 'open-flight-more'], `demo row: ${demo.row}`);

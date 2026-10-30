@@ -1,5 +1,14 @@
 # HUD camera
 
+The in-flight **CAM** control is a native dropdown containing all manual views
+and a single **Auto** choice. The separate Scenic Auto play/pause button has
+been removed; both previously controlled the same automatic camera state.
+Auto now holds framing while its flight context stays stable. It chooses chase
+for low terrain or steep manoeuvres, cockpit for a descending configured
+approach, flyby for a straight fast low pass, and drone for parked/cruise views.
+A six-second minimum hold and one-second context confirmation prevent rapid
+cuts. Manual view selection and touch/mouse look retain their existing priority.
+
 Issue [#300](https://github.com/stlim0727/flight3d/issues/300) and the approved
 [design discussion](https://github.com/stlim0727/flight3d/discussions/303) define
 this additional forward camera. The [concept image](../design/issue-300-hud-camera.png)

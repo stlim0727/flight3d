@@ -5,6 +5,7 @@ export function demoProfiles(aircraftId = 'B738', airport = 'coastal') {
   if (aircraftId === 'F16') return airport === 'lukla'
     ? [
         { id: 'low-pass', labelKey: 'demo.f16.lukla', briefingKey: 'demo.f16.lukla.briefing' },
+        { id: 'canyon-slalom', labelKey: 'demo.f16.slalom.name', briefingKey: 'demo.f16.slalom.briefing' },
         { id: 'canyon-chase', labelKey: 'demo.f16.canyon.chase', briefingKey: 'demo.f16.canyon.chase.briefing' },
       ] : [];
   if (aircraftId === 'B738' && airport === 'incheon') return [

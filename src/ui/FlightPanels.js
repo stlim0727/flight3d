@@ -6,7 +6,7 @@ export function touchLabel(text) {
 }
 
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
-export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCamera, onAdjustTrim, onToggleParkingBrake }) {
+export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParkingBrake }) {
   const hud = document.getElementById('hud-overlay');
   // Let keyboard users scroll the full telemetry row as well as touch users.
   const strip = document.querySelector('.hud-strip');
@@ -45,20 +45,14 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
   hud.append(bar);
-  const cameraButton = document.createElement('button');
+  const cameraButton = document.createElement('select');
   cameraButton.id = 'open-camera';
   cameraButton.className = 'btn';
-  cameraButton.type = 'button';
-  bindText(cameraButton, () => t('change.camera.c'), 'title');
-  cameraButton.addEventListener('click', () => onCycleCamera());
+  bindText(cameraButton, () => t('ui.camera.select'), 'aria-label');
+  cameraButton.addEventListener('change', () => onSelectCamera(Number(cameraButton.value)));
   // Taking over must remain available when the guide is collapsed or yields to
   // warnings. Keep the existing button/handler outside the notification tree.
   const skipDemoButton = document.getElementById('btn-skip-demo');
-  const autoCameraButton = document.createElement('button');
-  autoCameraButton.id = 'btn-auto-camera';
-  autoCameraButton.className = 'btn';
-  autoCameraButton.type = 'button';
-  autoCameraButton.addEventListener('click', () => onToggleAutoCamera());
   const moreButton = document.createElement('button');
   moreButton.id = 'open-flight-more';
   moreButton.className = 'btn';
@@ -84,7 +78,6 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
     button.addEventListener('click', () => onAdjustTrim(sign * .2));
   }
   more.querySelector('#flight-park-brake').addEventListener('click', () => onToggleParkingBrake());
-  more.append(autoCameraButton);
   hud.append(more);
   const setMoreOpen = open => {
     more.hidden = !open;
@@ -118,6 +111,10 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
     option.value = String(mode);
     bindText(option, () => touchLabel(t(`ui.camera.${name}`)));
     cameraSelect.append(option);
+    const quickOption = document.createElement('option');
+    quickOption.value = String(mode);
+    bindText(quickOption, () => `CAM · ${touchLabel(t(`ui.camera.${name}`))}`);
+    cameraButton.append(quickOption);
   }
   cameraSelect.addEventListener('change', () => onSelectCamera(Number(cameraSelect.value)));
   cameraLabel.append(caption, cameraSelect);
@@ -227,22 +224,15 @@ export function updateControlState(telemetry, camera, options = {}) {
   const mode = camera.autoSwitch ? 7 : camera.mode;
   const cameraSelect = document.getElementById('camera-select');
   if (cameraSelect) cameraSelect.value = String(mode);
+  const quickCamera = document.getElementById('open-camera');
+  if (quickCamera) quickCamera.value = String(mode);
   const cameraName = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto', 'hud'][mode];
   const viewName = t(`ui.camera.${cameraName}`).replace(/ · [1-9]$/, '');
   // Optical zoom only exists in the fixed eye-point views, so chase and drone
   // framing changes stay unlabelled.
   const zoomed = camera.opticalZoom > 1.01;
   const zoomValue = zoomed ? `${camera.opticalZoom.toFixed(1)}×` : '';
-  set('open-camera', 'ui.camera.current', { name: zoomed ? `${viewName} · ${zoomValue}` : viewName }, undefined,
-    zoomed ? `${t('ui.strip.camera')}${zoomValue}` : t('ui.strip.camera'));
-  const autoState = !camera.autoSwitch ? 'start'
-    : camera.autoPaused ? 'resume'
-    : camera.userLookOverridden ? 'looking' : 'pause';
-  const seconds = Math.ceil(camera.touchAutoResumeTimer ?? 0);
-  const autoLabel = autoState === 'looking' && seconds > 0 ? 'waiting' : autoState;
-  set('btn-auto-camera', `ui.camera.auto.${autoLabel}`, { seconds },
-    camera.autoSwitch && !camera.autoPaused && !camera.userLookOverridden,
-    t(`ui.camera.auto.${autoLabel}.short`, { seconds }));
+  quickCamera?.setAttribute('title', t('ui.camera.current', { name: zoomed ? `${viewName} · ${zoomValue}` : viewName }));
   const toggle = document.getElementById('btn-touch-toggle');
   toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('touch-mode')));
 }

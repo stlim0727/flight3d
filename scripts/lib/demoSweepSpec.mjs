@@ -25,6 +25,7 @@ import { IncheonCessnaScenario } from '../../src/director/scenarios/IncheonCessn
 import { CessnaDemoScenario } from '../../src/director/scenarios/CessnaDemoScenario.js';
 import { CessnaProximityScenario } from '../../src/director/scenarios/CessnaProximityScenario.js';
 import { F16LuklaScenario } from '../../src/director/scenarios/F16LuklaScenario.js';
+import { F16CanyonSlalomScenario } from '../../src/director/scenarios/F16CanyonSlalomScenario.js';
 import { F16CanyonChaseScenario } from '../../src/director/scenarios/F16CanyonChaseScenario.js';
 import { SihwaTourScenario } from '../../src/director/scenarios/SihwaTourScenario.js';
 import { demoProfiles } from '../../src/director/demoProfiles.js';
@@ -39,6 +40,7 @@ export const SCENARIO_STAGES = {
   cessna: CessnaDemoScenario.STAGES,
   proximity: CessnaProximityScenario.STAGES,
   f16LowPass: F16LuklaScenario.STAGES,
+  f16Slalom: F16CanyonSlalomScenario.STAGES,
   f16Canyon: F16CanyonChaseScenario.STAGES,
   sihwa: SihwaTourScenario.STAGES,
 };
@@ -55,6 +57,12 @@ export const AIRPORT_IDS = SPAWN_SCENARIOS.demo.airports;
  * that so a stuck guidance loop reports instead of running out the job.
  */
 export const ROUTES = [
+  {
+    id: 'f16-lukla-canyon-slalom', aircraft: 'F16', airport: 'lukla', profile: 'canyon-slalom',
+    tier: 'full', scenario: 'f16Slalom', stages: ['INGRESS', 'SLALOM', 'BREAKOUT', 'COMPLETED'],
+    groundStages: [], lands: false, handoff: 'airborne', budgetSimSeconds: 185,
+    clearanceIntentM: 15, allowedWarnings: ['terrain', 'pull-up', 'gear', 'bank', 'sink-rate'], shotStage: 'SLALOM',
+  },
   {
     id: 'b738-coastal-classic', aircraft: 'B738', airport: 'coastal', profile: 'classic',
     tier: 'core', scenario: 'coastal',

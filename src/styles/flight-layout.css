@@ -120,7 +120,11 @@ body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
   justify-content: center;
   line-height: 1;
 }
-.flight-toolbar #open-camera { flex-basis: 56px; width: 56px; }
+.flight-toolbar #open-camera {
+  flex-basis: 112px; width: 112px; padding: 0 6px; font-size: 11px;
+  color-scheme: dark; cursor: pointer;
+}
+.flight-toolbar #open-camera option { background: #142030; color: #f0f9ff; }
 .flight-toolbar #btn-fullscreen[data-short-label]::after { font-size: 15px; }
 .flight-toolbar #open-flight-more { font: 700 20px system-ui; }
 .flight-toolbar .btn[data-short-label]::after { font-size: 10px; line-height: 1; }

@@ -89,6 +89,22 @@ plus mobile menu, restart, camera override and cancellation checks.
 
 ## F-16 Lukla low pass and landing
 
+The additional **F-16 · Extreme canyon slalom** (`canyon-slalom`) is separate
+from the low-pass-and-landing and canyon-chase profiles. Inspired by the supplied
+Maverick reference, it alternates steep banks along the measured Dudh Kosi
+corridor, follows terrain without scripted barrel rolls, then climbs out into
+manual flight. Production-physics regression measures about 62 seconds,
+23 m minimum clearance, 78° peak bank and 7.5 G peak load, without collision,
+stall or gear damage. At least five seconds must be below 100 m AGL, and both
+left and right banks must exceed 60°. Aircraft pose and velocity remain physical
+after the initial spawn; the actual velocity corridor receives terrain lookahead.
+
+The F16 canopy uses a weaker interior tint/reflection than the exterior and
+no inverse-opacity specular amplification. The procedural aft exhaust plume
+responds to engine N1 and actual thrust, fading at shutdown and hiding on crash.
+Shader rendering still needs browser evidence; Node material/state tests alone
+do not establish visual appearance.
+
 Landing results reported in [PR #304](https://github.com/stlim0727/flight3d/pull/304)
 are evidence within the game model, not validation of real F16 landing feasibility;
 see [fidelity limits and validation work](f16-lukla-realism.md).

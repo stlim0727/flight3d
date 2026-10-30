@@ -299,7 +299,7 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
     return point;
   }
 
-  flyAttitude(bankDeg, altitude, speed, load) {
+  flyAttitude(bankDeg, altitude, speed, load, maxDescent = 30) {
     const sim = this.sim, aero = sim.aero, tel = sim.telemetry;
     // FlightControls attenuates virtual stick input at high indicated speed.
     // Invert that mapping when requesting a physical surface deflection.
@@ -312,7 +312,7 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
     sim.controls.setVirtualInput('aileron', clamp((cl - aero.Cl_b * aero.beta - Math.abs(aero.Cl_p) * pHat) /
       (aero.Cl_da * 1.05 * Math.PI / 9 * stiffness), -1, 1));
     const cosBank = Math.cos(tel.rollDeg * Math.PI / 180);
-    const vz = clamp((altitude - sim.position.y) * 0.5, -30, 65);
+    const vz = clamp((altitude - sim.position.y) * 0.5, -maxDescent, 65);
     const normalG = load ?? clamp((1 + (vz - sim.linearVelocity.y) * 0.15) / Math.max(0.13, cosBank), -1, 8);
     const desiredCl = normalG * aero.mass * 9.80665 / Math.max(1, aero.qDyn * aero.wingArea);
     const alpha = clamp((desiredCl - aero.CL0_clean) / aero.CLa, -0.10, 0.40);

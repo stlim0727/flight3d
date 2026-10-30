@@ -79,7 +79,7 @@ export function flyF16Lukla({ Scenario = F16LuklaScenario, maxSeconds = 300 } = 
   };
   sim.demoDirector = director;
   const scenario = new Scenario(director, sim);
-  director.setStage(Scenario.STAGES.ESTABLISH);
+  director.setStage(Scenario.STAGES.ESTABLISH ?? Scenario.STAGES.INGRESS);
   let gearDown = null, touchdown = null, finite = true, stallFrames = 0;
   let runwayPassMin = Infinity, runwayPassMax = -Infinity;
   for (let tick = 0; tick < maxSeconds * 120 && director.isActive; tick++) {
@@ -102,9 +102,11 @@ export function flyF16Lukla({ Scenario = F16LuklaScenario, maxSeconds = 300 } = 
   }
   const stopPosition = sim.position.clone();
   // The real director hands off parking brakes; keep integrating to detect drift.
-  sim.controls.setVirtualInput('brakes', 1);
-  sim.controls.setVirtualInput('throttle', 0);
-  for (let tick = 0; tick < 1200 && !sim.isCrashed; tick++) sim.integratePhysics(1 / 120);
+  if (Scenario.STAGES.ROLLOUT !== undefined) {
+    sim.controls.setVirtualInput('brakes', 1);
+    sim.controls.setVirtualInput('throttle', 0);
+    for (let tick = 0; tick < 1200 && !sim.isCrashed; tick++) sim.integratePhysics(1 / 120);
+  }
   return {
     result: scenario.result, stages, cameras, gearDown, touchdown, finite, stallFrames,
     runwayPassMin, runwayPassMax, final: snapshot(), crash: sim.crashResult,

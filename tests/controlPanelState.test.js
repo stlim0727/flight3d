@@ -5,7 +5,7 @@ import { setLanguage } from '../src/i18n/index.js';
 
 test('shared controls track deployment, damage, keyboard changes and input mode switches', () => {
   const previous = globalThis.document;
-  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'open-camera', 'camera-select', 'btn-auto-camera', 'flight-trim-less', 'flight-trim-more', 'flight-park-brake', 'flight-trim-value'];
+  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'open-camera', 'camera-select', 'flight-trim-less', 'flight-trim-more', 'flight-park-brake', 'flight-trim-value'];
   const nodes = Object.fromEntries(ids.map(id => [id, { textContent: '', setAttribute(key, value) { this[key] = value; } }]));
   let touch = true;
   globalThis.document = {
@@ -22,36 +22,19 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-gear']['aria-pressed'], 'true');
     assert.equal(nodes['btn-flaps-ret'].disabled, false);
     assert.equal(nodes['camera-select'].value, '0');
-    assert.equal(nodes['open-camera'].textContent, 'Camera: Cockpit');
-    assert.equal(nodes['open-camera']['data-short-label'], 'CAM');
-    assert.equal(nodes['btn-auto-camera']['data-short-label'], '▶ Auto');
+    assert.equal(nodes['open-camera'].value, '0');
+    assert.equal(nodes['open-camera'].title, 'Camera: Cockpit');
     camera.autoSwitch = true;
     updateControlState(telemetry, camera);
-    assert.equal(nodes['btn-auto-camera']['aria-pressed'], 'true');
-    assert.equal(nodes['btn-auto-camera']['data-short-label'], 'Ⅱ Auto');
-    camera.autoPaused = true;
-    updateControlState(telemetry, camera);
-    assert.equal(nodes['btn-auto-camera']['aria-pressed'], 'false');
-    assert.match(nodes['btn-auto-camera']['aria-label'], /paused.*resume/);
-    camera.autoPaused = false;
-    camera.userLookOverridden = true;
-    camera.touchAutoResumeTimer = 3.2;
-    updateControlState(telemetry, camera);
-    assert.equal(nodes['btn-auto-camera']['data-short-label'], 'Auto 4s');
-    camera.touchAutoResumeTimer = null;
-    updateControlState(telemetry, camera);
-    assert.equal(nodes['btn-auto-camera']['data-short-label'], '▶ Resume');
-    camera.userLookOverridden = false;
+    assert.equal(nodes['open-camera'].value, '7');
+    assert.equal(nodes['camera-select'].value, '7');
     camera.autoSwitch = false;
     camera.opticalZoom = 2;
     updateControlState(telemetry, camera);
-    assert.equal(nodes['open-camera'].textContent, 'Camera: Cockpit · 2.0×', 'magnification is readable in the camera control');
-    assert.equal(nodes['open-camera']['data-short-label'], 'CAM2.0×');
     assert.equal(nodes['open-camera'].title, 'Camera: Cockpit · 2.0×');
     camera.opticalZoom = 1;
     updateControlState(telemetry, camera);
-    assert.equal(nodes['open-camera'].textContent, 'Camera: Cockpit', '1× hides the zoom badge');
-    assert.equal(nodes['open-camera']['data-short-label'], 'CAM');
+    assert.equal(nodes['open-camera'].title, 'Camera: Cockpit');
     Object.assign(telemetry, { gearState: .5, flapDegree: 12, flapIndex: 6, spoilers: 1, reverserActive: true, engine1: {} });
     camera.autoSwitch = true;
     updateControlState(telemetry, camera);
@@ -61,7 +44,7 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.match(nodes['btn-flaps-ext'].textContent, /12°/);
     assert.equal(nodes['btn-spoilers']['aria-pressed'], 'true');
     assert.equal(nodes['btn-reverser']['aria-pressed'], 'true');
-    assert.equal(nodes['open-camera'].textContent, 'Camera: Scenic auto');
+    assert.equal(nodes['open-camera'].title, 'Camera: Auto');
     Object.assign(telemetry, { gearState: 0, gearDamage: { left: 'collapsed' }, flapIndex: 0, spoilers: 0, reverserActive: false, engine1: {} });
     camera.autoSwitch = false;
     camera.mode = 6;
@@ -72,7 +55,7 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-spoilers']['aria-pressed'], 'false');
     assert.equal(nodes['btn-reverser']['aria-pressed'], 'false');
     assert.equal(nodes['btn-touch-toggle']['aria-pressed'], 'false');
-    assert.equal(nodes['open-camera'].textContent, 'Camera: Drone');
+    assert.equal(nodes['open-camera'].title, 'Camera: Drone');
     delete telemetry.gearDamage;
     telemetry.gearState = 1;
     updateControlState(telemetry, camera);
