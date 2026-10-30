@@ -69,6 +69,19 @@ animation frame from page load. `PORT`, `CDP_PORT`, `ARTIFACT_DIR` and `FORCE_GP
 server and Chrome on OS-assigned ports, freezes physics at a known pose, and drives
 real DOM mouse events over the canvas.
 
+### Exterior aircraft close-up (issue #325)
+
+`node scripts/verify-exterior-closeup.mjs` starts Vite and an isolated hardware
+Chrome session. On Windows it uses D3D11 and installed Chrome; on Linux expose
+the hardware Vulkan device (see [GPU setup](browser-gpu.md)). `CHROME_PATH`,
+`GPU_ANGLE` and `ARTIFACT_DIR` override browser/backend/output.
+The script checks a WebGL2 shader draw and readback before inspecting B738,
+C172 and F16 in chase and drone views. Native wheel and two-finger gestures
+verify 0.5–6x bounds, fixed distance/height and double-click reset to 1x.
+Screenshots and JSON default to `review-artifacts/issue-325/`.
+This freezes physics to inspect framing; it does not establish moving-flight
+or physical-device touch acceptance.
+
 ### Airport rendering quality (issue #97)
 
 `node scripts/verify-render-quality.mjs` checks quality selection, saved preferences,

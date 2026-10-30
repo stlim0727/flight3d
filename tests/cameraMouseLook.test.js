@@ -710,7 +710,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       assert.strictEqual(camSys.isDragging, false);
     });
 
-    it('should perform two-finger pinch-to-zoom on camera distance in CHASE and DRONE modes', () => {
+    it('should perform two-finger optical pinch-to-zoom in CHASE mode', () => {
       const camera = new THREE.PerspectiveCamera();
       const camSys = new CameraSystem(camera, mockDom);
       camSys.setMode(CameraSystem.MODES.CHASE);
@@ -745,7 +745,8 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
         preventDefault: () => {}
       });
 
-      assert.ok(camSys.chaseDistance < 55.0, `chaseDistance (${camSys.chaseDistance}) should decrease (zoom in) on pinch out`);
+      assert.equal(camSys.chaseDistance, 55.0);
+      assert.ok(camSys.opticalZoom > 1, 'pinch spread magnifies without moving the eye');
 
       // Pinch end
       camSys.handleTouchEnd({

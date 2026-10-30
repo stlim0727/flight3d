@@ -95,6 +95,9 @@ export class CameraSystem {
     // Tower Camera Location (Inside Control Tower Cab at 66m height)
     this.towerPos = new THREE.Vector3(120, 78, 280);
 
+    // Optical magnification keeps exterior eyes outside the aircraft geometry.
+    this.exteriorZoomMin = 0.5;
+    this.exteriorZoomMax = 6.0;
     // Zoom magnification for cockpit (with a bounded head lean) and tower.
     this.opticalZoom = 1.0;
     this.opticalZoomMin = 1.0;
@@ -209,13 +212,7 @@ export class CameraSystem {
       this.domElement.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
       // Mouse wheel zoom
       this.domElement.addEventListener('wheel', (e) => {
-        if (this.mode === CameraSystem.MODES.CHASE) {
-          this.chaseDistance = Math.max(20.0, Math.min(140.0, this.chaseDistance + e.deltaY * 0.05));
-          this.holdForManualLook();
-        } else if (this.mode === CameraSystem.MODES.DRONE) {
-          this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance + e.deltaY * 0.04));
-          this.holdForManualLook();
-        } else if (this.usesOpticalZoom()) {
+        if (this.usesOpticalZoom()) {
           // Scroll down widens the field of view (zoom out), like backing away.
           this.zoomOpticalBy(Math.exp(-e.deltaY * 0.0015));
         }
@@ -450,25 +447,26 @@ export class CameraSystem {
   }
 
   /**
-   * Apply two-finger pinch zoom to camera distance, or to the field of view
-   * where the eye point is fixed.
+   * Apply two-finger pinch magnification without moving the camera eye.
    */
   applyPinchZoom(deltaDist) {
     if (Math.abs(deltaDist) > 0) {
       this.holdForManualLook(true);
     }
-    if (this.mode === CameraSystem.MODES.CHASE) {
-      this.chaseDistance = Math.max(20.0, Math.min(140.0, this.chaseDistance - deltaDist * 0.15));
-    } else if (this.mode === CameraSystem.MODES.DRONE) {
-      this.droneDistance = Math.max(16.0, Math.min(85.0, this.droneDistance - deltaDist * 0.12));
-    } else if (this.usesOpticalZoom()) {
+    if (this.usesOpticalZoom()) {
       // Fingers spreading apart magnifies, matching the exterior pinch direction.
       this.zoomOpticalBy(Math.exp(deltaDist * 0.0035), true);
     }
   }
 
   usesOpticalZoom() {
-    return this.mode === CameraSystem.MODES.COCKPIT || this.mode === CameraSystem.MODES.TOWER;
+    return [CameraSystem.MODES.COCKPIT, CameraSystem.MODES.TOWER,
+      CameraSystem.MODES.CHASE, CameraSystem.MODES.DRONE].includes(this.mode);
+  }
+
+  opticalZoomFloor() {
+    return this.mode === CameraSystem.MODES.CHASE || this.mode === CameraSystem.MODES.DRONE
+      ? this.exteriorZoomMin : this.opticalZoomMin;
   }
 
   /**
@@ -476,16 +474,19 @@ export class CameraSystem {
    * carried over from the tower cannot leave the cockpit above its own limit.
    */
   opticalZoomLimit() {
+    if (this.mode === CameraSystem.MODES.CHASE || this.mode === CameraSystem.MODES.DRONE) {
+      return this.exteriorZoomMax;
+    }
     return this.mode === CameraSystem.MODES.TOWER ? this.towerZoomMax : this.opticalZoomMax;
   }
 
   /**
    * Scale the optical magnification. ratio > 1 zooms in; the result is clamped
-   * to [opticalZoomMin, opticalZoomLimit()] and reports whether anything changed.
+   * to the current view's range and reports whether anything changed.
    */
   zoomOpticalBy(ratio, isTouch = false) {
     if (!Number.isFinite(ratio) || ratio === 1) return false;
-    const clamped = Math.min(this.opticalZoomLimit(), Math.max(this.opticalZoomMin, this.opticalZoom * ratio));
+    const clamped = Math.min(this.opticalZoomLimit(), Math.max(this.opticalZoomFloor(), this.opticalZoom * ratio));
     if (clamped === this.opticalZoom) return false;
     this.opticalZoom = clamped;
     this.holdForManualLook(isTouch);

@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
+import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
 
 const DEG = Math.PI / 180;
 
@@ -36,9 +37,40 @@ function aircraftAt(x, y, z) {
   return aircraft;
 }
 
-describe('CameraSystem optical zoom (cockpit & tower)', () => {
-  it('magnifies with scroll up and returns to 1x with scroll down, clamped at both ends', () => {
-    for (const mode of [CameraSystem.MODES.COCKPIT, CameraSystem.MODES.TOWER]) {
+describe('CameraSystem optical zoom', () => {
+  it('gives each exterior aircraft 6x framing without changing distance, height, or optical limits in other views', () => {
+    for (const config of Object.values(AIRCRAFT_REGISTRY)) {
+      for (const mode of [CameraSystem.MODES.CHASE, CameraSystem.MODES.DRONE]) {
+        const { cam, camera, wheel } = withMode(mode);
+        cam.loadAircraftConfig(config);
+        const framing = [cam.chaseDistance, cam.chaseHeight, cam.droneDistance, cam.droneHeight];
+        for (let i = 0; i < 50; i++) wheel(-100);
+        assert.equal(cam.opticalZoom, 6, config.id);
+        const fov = cam.applyBaseFov(54);
+        assert.ok(Math.abs(Math.tan(27 * DEG) / Math.tan(fov * DEG / 2) - 6) < 1e-9);
+        assert.deepEqual([cam.chaseDistance, cam.chaseHeight, cam.droneDistance, cam.droneHeight], framing);
+        assert.equal(cam.userLookOverridden, true);
+        assert.equal(cam.setMode(CameraSystem.MODES.TOWER), false);
+        cam.applyPinchZoom(-10000);
+        assert.equal(cam.opticalZoom, 0.5);
+        cam.applyPinchZoom(10000);
+        assert.equal(cam.opticalZoom, 6);
+        cam.resetLook();
+        assert.equal(cam.opticalZoom, 1);
+        assert.ok(Math.abs(cam.applyBaseFov(54) - 54) < 1e-9);
+        assert.equal(camera.fov, cam.applyBaseFov(54));
+        wheel(-100);
+        cam.setMode(CameraSystem.MODES.COCKPIT, true);
+        assert.equal(cam.opticalZoom, 1);
+        assert.equal(cam.opticalZoomLimit(), 4);
+        cam.setMode(CameraSystem.MODES.TOWER, true);
+        assert.equal(cam.opticalZoomLimit(), 8);
+      }
+    }
+  });
+
+  it('magnifies with scroll up and widens with scroll down, clamped at both ends', () => {
+    for (const mode of [CameraSystem.MODES.COCKPIT, CameraSystem.MODES.TOWER, CameraSystem.MODES.CHASE, CameraSystem.MODES.DRONE]) {
       const { cam, wheel } = withMode(mode);
       assert.equal(cam.opticalZoom, 1, 'views open unzoomed');
 
@@ -48,7 +80,7 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
       assert.equal(cam.opticalZoom, cam.opticalZoomLimit(), 'zoom-in saturates at the view maximum');
 
       for (let i = 0; i < 60; i++) wheel(100);
-      assert.equal(cam.opticalZoom, cam.opticalZoomMin, 'zoom-out saturates at 1x, never wider than the base field of view');
+      assert.equal(cam.opticalZoom, cam.opticalZoomFloor(), 'zoom-out saturates at the view minimum');
     }
   });
 
@@ -71,7 +103,7 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
   });
 
   it('pinch spread magnifies and pinch collapse cancels it in both zoomable views', () => {
-    for (const mode of [CameraSystem.MODES.COCKPIT, CameraSystem.MODES.TOWER]) {
+    for (const mode of [CameraSystem.MODES.COCKPIT, CameraSystem.MODES.TOWER, CameraSystem.MODES.CHASE, CameraSystem.MODES.DRONE]) {
       const { cam } = withMode(mode);
       cam.applyPinchZoom(200);
       assert.ok(cam.opticalZoom > 1.5, `${cam.getViewName()}: fingers spreading apart magnifies`);
@@ -114,14 +146,14 @@ describe('CameraSystem optical zoom (cockpit & tower)', () => {
     assert.ok(Math.abs((Math.tan(50 * DEG) / Math.tan((portraitFov / 2) * DEG)) - 4) < 1e-9);
   });
 
-  it('keeps chase and drone wheel zoom on distance and leaves them unzoomed optically', () => {
+  it('magnifies exterior views without moving their aircraft-specific eye distance', () => {
     for (const [mode, distanceKey] of [[CameraSystem.MODES.CHASE, 'chaseDistance'], [CameraSystem.MODES.DRONE, 'droneDistance']]) {
       const { cam, wheel } = withMode(mode);
       const before = cam[distanceKey];
       wheel(-100);
-      assert.ok(cam[distanceKey] < before, `${cam.getViewName()} pulls closer on scroll up`);
-      assert.equal(cam.opticalZoom, 1, `${cam.getViewName()} has no optical zoom`);
-      assert.equal(cam.usesOpticalZoom(), false);
+      assert.equal(cam[distanceKey], before);
+      assert.ok(cam.opticalZoom > 1);
+      assert.equal(cam.usesOpticalZoom(), true);
     }
   });
 
