@@ -173,14 +173,39 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     assert.ok(demo.width && demo.top >= demo.toolbarBottom + 4 && demo.locked, `demo clearance and lockout: ${JSON.stringify(demo)}`);
     assert.deepEqual(demo.row, ['btn-skip-demo', 'open-camera', 'btn-fullscreen', 'open-flight-more'], `demo row: ${demo.row}`);
     await screenshot(`${out}/${width}x${height}-demo.png`);
-    // Both the expanded and collapsed guide must yield to a warning without
-    // taking the primary takeover action with them.
+    // Warnings coexist with both guide states, without covering demo controls.
     await evaluate(() => {
       const s = window.simulator;
       s.telemetry.warnings = [{ text: 'BANK ANGLE', priority: 50 }];
       s.updateHUD();
     });
+    await delay(350);
+    assert.ok(await evaluate(() => {
+      const guide = document.getElementById('demo-banner');
+      const warning = document.getElementById('hud-warning');
+      return getComputedStyle(guide).visibility === 'visible'
+        && guide.getBoundingClientRect().top >= warning.getBoundingClientRect().bottom + 4;
+    }), 'expanded demo stays visible below the warning');
     await evaluate(() => window.simulator.demoDirector.closeBanner());
+    await delay(350);
+    const folded = await evaluate(() => {
+      const pill = document.getElementById('btn-demo-open');
+      const r = pill.getBoundingClientRect();
+      const header = document.querySelector('.hud-top-bar').getBoundingClientRect();
+      const toolbar = document.querySelector('.flight-toolbar').getBoundingClientRect();
+      return { visible: getComputedStyle(pill).visibility === 'visible', left: r.left,
+        top: r.top, bottom: r.bottom, right: r.right, headerLeft: header.left,
+        headerBottom: header.bottom, toolbarLeft: toolbar.left };
+    });
+    assert.ok(folded.visible, 'folded demo stays visible with a warning');
+    if (width <= 1024) {
+      assert.equal(folded.left, folded.headerLeft, 'folded demo aligns left in both mobile orientations');
+      assert.ok(Math.abs(folded.top - folded.headerBottom - 4) <= 1, 'folded demo sits below first strip');
+      assert.ok(folded.right + 4 <= folded.toolbarLeft, 'folded demo clears the second strip');
+    }
+    await click('#btn-demo-open');
+    await delay(350);
+    await click('#btn-demo-close');
     await screenshot(`${out}/${width}x${height}-warning-takeover.png`);
     await click('#btn-skip-demo');
     await evaluate(() => { window.simulator.telemetry.warnings = []; window.simulator.updateHUD(); });

@@ -157,12 +157,12 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   // Keep the top header bar, control dock, AP panel, and notice slot aligned.
   function positionEdgeButtons() {
     if (!strip.getClientRects().length || !bar.getClientRects().length) return;
-    // The folded portrait notice narrows this row. Keep takeover visible there;
+    // The folded compact notice narrows this row. Keep takeover visible there;
     // elsewhere pin the camera/fullscreen/overflow end to the right edge.
-    const foldedPortraitDemo = document.body.classList.contains('demo-active')
-      && window.matchMedia('(max-width: 1024px) and (orientation: portrait)').matches
+    const foldedCompactDemo = document.body.classList.contains('demo-active')
+      && compact.matches
       && document.getElementById('btn-demo-open')?.style.display === 'inline-flex';
-    bar.scrollLeft = foldedPortraitDemo ? 0 : bar.scrollWidth;
+    bar.scrollLeft = foldedCompactDemo ? 0 : bar.scrollWidth;
     const topBarRect = topBar.getBoundingClientRect();
     const controlsBottom = bar.getBoundingClientRect().bottom;
     const noticeTop = Math.max(topBarRect.bottom, controlsBottom) + 6;
