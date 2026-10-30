@@ -368,6 +368,21 @@ describe('C172 piston sound and lifecycle', () => {
     assert.equal(audio.propGain.gain.value, 0);
   }));
 
+  it('silences the bus while the sortie is held and restores the pilot setting on resume', () => withPiston(audio => {
+    audio.update(0.1, pistonState(100), false);
+    audio.setPaused(true);
+    assert.equal(audio.effectiveVolume, 0);
+    assert.equal(audio.masterGain.gain.value, 0);
+    assert.equal(audio.volume, 1, 'a pause is not a volume setting');
+    audio.update(0.1, pistonState(9, { engine1: { n1: 9, failed: true } }), false);
+    audio.setPaused(false);
+    assert.equal(audio.masterGain.gain.value, 1);
+    audio.setMuted(true);
+    audio.setPaused(true);
+    audio.setPaused(false);
+    assert.equal(audio.masterGain.gain.value, 0, 'unpausing must not unmute for the pilot');
+  }));
+
   it('does not restart continuous sounds after a crash, including a muted crash and preset reset', () => withPiston(audio => {
     audio.update(0.1, pistonState(100, { iasKnots: 90 }), false);
     audio.setMuted(true); audio.playExplosion(); audio.setMuted(false);

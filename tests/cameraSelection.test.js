@@ -266,3 +266,77 @@ test('pinch waits until every scenery finger lifts before automatic resume', () 
   system.update(4, aircraft);
   assert.equal(system.userLookOverridden, false);
 });
+
+test('pausing orbits the frozen airframe from the drone rig and resume restores the exact view', () => {
+  const M = CameraSystem.MODES;
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  const aircraft = new THREE.Object3D();
+  aircraft.position.y = 500;
+  aircraft.updateMatrixWorld();
+  system.setMode(M.AUTO, true);
+  system.update(10, aircraft);
+  system.setMode(M.WING, true);
+  system.applyMouseDelta(15, 0);
+  system.setCustomViewUpdater(() => false);
+
+  assert.equal(system.beginPauseView(), true);
+  assert.equal(system.mode, M.DRONE);
+  // A second sync while paused must not snapshot the drone view as the pilot's own.
+  assert.equal(system.beginPauseView(), false);
+  const before = system.camera.position.clone();
+  system.update(2, aircraft);
+  assert.notEqual(system.camera.position.distanceTo(before), 0, 'drone keeps orbiting a stopped flight');
+  assert.equal(aircraft.position.y, 500, 'the rig never touches the flown state');
+
+  assert.equal(system.endPauseView(), true);
+  assert.equal(system.mode, M.WING);
+  assert.equal(system.userModeSelected, true);
+  assert.equal(system.userLookOverridden, true);
+  assert.equal(system.autoSwitch, false);
+  assert.equal(typeof system.customViewUpdater, 'function');
+  assert.equal(system.endPauseView(), false);
+});
+
+test('pause view keeps the tour clock and hands back a clean cut when it ends', () => {
+  const M = CameraSystem.MODES;
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  const aircraft = new THREE.Object3D();
+  aircraft.position.y = 500;
+  system.setMode(M.AUTO, true);
+  system.update(9, aircraft);
+  assert.equal(system.mode, M.CHASE);
+  const timer = system.autoSwitchTimer;
+  assert.equal(system.beginPauseView(), true);
+  assert.equal(system.mode, M.DRONE);
+  assert.equal(system.autoSwitch, false);
+  system.update(20, aircraft);
+  assert.equal(system.mode, M.DRONE, 'a paused tour must not cut away from the airframe');
+  assert.equal(system.endPauseView(), true);
+  assert.equal(system.autoSwitch, true);
+  assert.equal(system.autoSwitchTimer, timer, 'the tour resumes on the clock it was stopped on');
+});
+
+test('pause view keeps the drone above terrain that rises over its orbit, and yields to the crash rig', () => {
+  const M = CameraSystem.MODES;
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  system.setTerrain({ getHeight: () => 3200 });
+  const aircraft = new THREE.Object3D();
+  aircraft.position.set(0, 2990, 0);            // tucked under a slope the orbit ring crosses
+  aircraft.updateMatrixWorld();
+  system.beginPauseView();
+  system.update(0.1, aircraft);
+  assert.equal(system.mode, M.DRONE);
+  assert.ok(system.camera.position.y >= 3200, 'the rig must not sink into the hillside it films');
+  system.endPauseView();
+
+  system.beginCrashView({ target: aircraft.position.clone(), radius: 12 });
+  assert.equal(system.beginPauseView(), false, 'the wreck rig owns the camera while it lasts');
+  system.endCrashView();
+
+  system.setMode(M.COCKPIT, true);
+  assert.equal(system.beginPauseView(), true);
+  system.update(0.1, aircraft);
+  assert.equal(system.mode, M.DRONE);
+  system.endPauseView();
+  assert.equal(system.mode, M.COCKPIT);
+});

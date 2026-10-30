@@ -58,16 +58,18 @@ export class GameFlowController {
   }
 
   enterLobby() {
-    this._setState(FLOW.LOBBY);
+    // Publish the hold before the state change: onStateChange reads both together to decide
+    // whether the menu is framing a live sortie or the cinematic.
     this.resumableFlight = false;
+    this._setState(FLOW.LOBBY);
     this._resetLoopCap();
     this._armRestart();
   }
 
   /** Used by the Fly button, the menu toggle, and browser harnesses; pure state change. */
   enterFlight() {
-    this._setState(FLOW.FLIGHT);
     this.resumableFlight = false;
+    this._setState(FLOW.FLIGHT);
     this._disarmRestart();
   }
 
@@ -91,8 +93,8 @@ export class GameFlowController {
    */
   returnToLobby(resumable = false) {
     if (this.state === FLOW.LOBBY) return false;
-    this._setState(FLOW.LOBBY);
     this.resumableFlight = resumable;
+    this._setState(FLOW.LOBBY);
     this._resetLoopCap();
     if (resumable) {
       this._disarmRestart();
@@ -113,6 +115,18 @@ export class GameFlowController {
     this.resumableFlight = false;
     this._resetLoopCap();
     this._armRestart();
+    return true;
+  }
+
+  /**
+   * Park whatever the menu is showing while the host rebuilds the scene for a pending
+   * start: physics freezes and the cinematic stays disarmed, so a scenery swap cannot
+   * drop the aircraft it is replacing before the new scenario spawns it.
+   */
+  holdForPendingStart() {
+    if (this.state !== FLOW.LOBBY) return false;
+    this.resumableFlight = true;
+    this._disarmRestart();
     return true;
   }
 

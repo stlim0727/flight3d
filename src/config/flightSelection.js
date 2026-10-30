@@ -94,3 +94,13 @@ export function saveFlightSelection({ airport, aircraft, scenario } = {}, storag
   if (aircraft) saveSavedAircraft(aircraft, storage);
   if (scenario) saveSavedScenario(scenario, storage);
 }
+
+/**
+ * The menu holds what the pilot wants, the scene holds what was last flown. A start only
+ * rebuilds the world when the two disagree; an unchanged menu releases the held flight.
+ */
+export function hasPendingFlightSelection(pending, live) {
+  return pending.airport !== live.airport
+    || pending.aircraft !== live.aircraft
+    || pending.scenario !== live.scenario;
+}

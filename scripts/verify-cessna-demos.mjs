@@ -72,11 +72,15 @@ try {
     await evaluate(`(() => {
       const sim = window.simulator;
       sim.demoDirector.stop();
-      sim.setAirport(${JSON.stringify(airport)});
+      // The menu records the wish only (#322); Fly is what rebuilds the scene.
+      sim.lobby.airport = ${JSON.stringify(airport)};
       sim.lobby.preset = 'demo'; sim.lobby.demoProfile = ${JSON.stringify(profile)};
-      sim.gameFlow.enterFlight();
       document.getElementById('btn-fly').click();
+      return true;
     })()`);
+    for (let i = 0; i < 240 && await evaluate('window.simulator.startingFlight'); i++) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
     for (let i = 0; i < 120; i++) {
       if (!(await evaluate('window.simulator.demoDirector.waitingForTerrain'))) break;
       await evaluate('window.simulator.demoDirector.update(0)');

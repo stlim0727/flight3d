@@ -63,8 +63,11 @@ try {
     const s=window.simulator;
     s.clock.getDelta=()=>0; s.demoDirector.stop(); s.gameFlow.returnToLobby(true);
     document.getElementById('lobby-airport-hangang').click();
-    while(s.lobbySelectionPending) await new Promise(resolve=>setTimeout(resolve,50));
     document.getElementById('btn-fly').click();
+    // The pick now lands on Fly (#322): the region rebuild runs behind the loading card.
+    for(let i=0;i<3600 && (s.startingFlight || !document.getElementById('startup-overlay').hidden);i++) {
+      await new Promise(resolve=>setTimeout(resolve,50));
+    }
     const initial = { region:s.activeAirport, preset:s.lastPresetType, aircraft:s.currentAircraftId, mass:s.aero.mass, throttle:s.controls.throttle, trim:s.controls.pitchTrim, position:s.position.toArray() };
     s.stepSimulation(5);
     return {initial,status:s.hangang.run.status,reason:s.hangang.run.reason,position:s.position.toArray(),speed:s.linearVelocity.length(),pitch:s.telemetry.pitchDeg,crashed:s.isCrashed};

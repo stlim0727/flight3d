@@ -48,6 +48,7 @@ const chrome = spawn('google-chrome', [
 ], { stdio: 'ignore' });
 
 let socket;
+let verificationFailed = false;
 let nextId = 1;
 const pending = new Map();
 
@@ -114,7 +115,14 @@ try {
 
   const waitForSimReady = async () => {
     for (let i = 0; i < 200; i++) {
-      const ready = await evaluate(() => Boolean(window.simulator?.startupReady));
+      // An in-flight navigation makes Runtime.evaluate reject with "Inspected target
+      // navigated or closed"; that just means the reload has not booted yet.
+      let ready = false;
+      try {
+        ready = await evaluate(() => Boolean(window.simulator?.startupReady));
+      } catch {
+        ready = false;
+      }
       if (ready) return;
       await delay(200);
     }
@@ -123,6 +131,47 @@ try {
 
   await waitForSimReady();
   console.log('Simulator booted initially');
+
+  // A menu pick is a wish, not a change (#322): nothing may touch the live scene or
+  // storage until Fly rebuilds the sortie, so a reload can never restore a flight
+  // that was only ever clicked at.
+  const pick = async (buttonIds, want) => {
+    await evaluate(`(() => {
+      for (const id of ${JSON.stringify(buttonIds)}) document.getElementById(id)?.click();
+      return true;
+    })()`);
+    await delay(200);
+    const state = await evaluate(() => ({
+      liveAirport: window.simulator.activeAirport,
+      liveAircraft: window.simulator.currentAircraftId,
+      wantAirport: window.simulator.lobby.airport,
+      wantAircraft: window.simulator.lobby.aircraft,
+      wantPreset: window.simulator.lobby.preset,
+      storedAirport: localStorage.getItem('flight3d.airport'),
+    }));
+    assert.equal(state.wantAirport, want.airport, 'The menu did not record the picked airport');
+    assert.equal(state.wantAircraft, want.aircraft, 'The menu did not record the picked aircraft');
+    assert.equal(state.wantPreset, want.preset, 'The menu did not record the picked scenario');
+    assert.notEqual(state.storedAirport, want.airport, 'An unflied pick must not be persisted');
+    return state;
+  };
+
+  const startAndSettle = async (expect) => {
+    await evaluate(`document.getElementById('btn-fly').click()`);
+    for (let i = 0; i < 200; i++) {
+      const state = await evaluate(() => ({
+        airport: window.simulator.activeAirport,
+        aircraft: window.simulator.currentAircraftId,
+        preset: window.simulator.lastPresetType,
+        starting: window.simulator.startingFlight,
+        loading: !document.getElementById('startup-overlay').hidden,
+      }));
+      if (!state.starting && !state.loading && state.airport === expect.airport
+        && state.aircraft === expect.aircraft && state.preset === expect.preset) return state;
+      await delay(200);
+    }
+    throw new Error(`Fly did not apply the pending selection ${JSON.stringify(expect)}`);
+  };
 
   // Verify initial defaults (first visit)
   const initial = await evaluate(() => ({
@@ -136,13 +185,15 @@ try {
   console.log('Initial defaults verified:', initial);
 
   // Select airport = 'lukla', aircraft = 'C172', scenario = 'approach' via Lobby UI buttons
-  await evaluate(async () => {
-    document.getElementById('lobby-airport-lukla')?.click();
-    document.getElementById('lobby-aircraft-c172')?.click();
-    document.getElementById('lobby-preset-app')?.click();
-    // Allow lobby selection drain
-    await new Promise(r => setTimeout(r, 500));
-  });
+  const pending1 = await pick(
+    ['lobby-airport-lukla', 'lobby-aircraft-c172', 'lobby-preset-app'],
+    { airport: 'lukla', aircraft: 'C172', preset: 'approach' },
+  );
+  assert.equal(pending1.liveAirport, 'coastal', 'A pick must not rebuild the live scene');
+  assert.equal(pending1.liveAircraft, 'B738', 'A pick must not swap the live aircraft');
+
+  // Fly is what applies it; only then is the selection worth persisting.
+  await startAndSettle({ airport: 'lukla', aircraft: 'C172', preset: 'approach' });
 
   // Verify localStorage contains the saved values
   const stored = await evaluate(() => ({
@@ -190,12 +241,13 @@ try {
   assert.equal(restored1.appButtonActive, true, 'Approach button has active class');
 
   // Now change selection to neon, F16, cruise
-  await evaluate(async () => {
-    document.getElementById('lobby-airport-neon')?.click();
-    document.getElementById('lobby-aircraft-f16')?.click();
-    document.getElementById('lobby-preset-cru')?.click();
-    await new Promise(r => setTimeout(r, 500));
-  });
+  const pending2 = await pick(
+    ['lobby-airport-neon', 'lobby-aircraft-f16', 'lobby-preset-cru'],
+    { airport: 'neon', aircraft: 'F16', preset: 'cruise' },
+  );
+  assert.equal(pending2.liveAirport, 'lukla', 'A pick must not rebuild the flown scene');
+  assert.equal(pending2.liveAircraft, 'C172', 'A pick must not swap the flown aircraft');
+  await startAndSettle({ airport: 'neon', aircraft: 'F16', preset: 'cruise' });
 
   const stored2 = await evaluate(() => ({
     airport: localStorage.getItem('flight3d.airport'),
@@ -237,12 +289,13 @@ try {
   assert.equal(restored2.cruButtonActive, true, 'Cruise button has active class');
 
   // Now change selection to incheon, B738, runway
-  await evaluate(async () => {
-    document.getElementById('lobby-aircraft-b738')?.click();
-    document.getElementById('lobby-airport-incheon')?.click();
-    document.getElementById('lobby-preset-rwy')?.click();
-    await new Promise(r => setTimeout(r, 800));
-  });
+  const pending3 = await pick(
+    ['lobby-airport-incheon', 'lobby-aircraft-b738', 'lobby-preset-rwy'],
+    { airport: 'incheon', aircraft: 'B738', preset: 'runway' },
+  );
+  assert.equal(pending3.liveAirport, 'neon', 'A pick must not rebuild the flown scene');
+  assert.equal(pending3.liveAircraft, 'F16', 'A pick must not swap the flown aircraft');
+  await startAndSettle({ airport: 'incheon', aircraft: 'B738', preset: 'runway' });
 
   const stored3 = await evaluate(() => ({
     airport: localStorage.getItem('flight3d.airport'),
@@ -284,6 +337,10 @@ try {
   assert.equal(restored3.rwyButtonActive, true, 'Runway button has active class');
 
   console.log('All browser verification checks PASSED successfully!');
+} catch (error) {
+  // The cleanup below force-exits, so without this the failure would vanish with it.
+  console.error('VERIFICATION FAILED:', error);
+  verificationFailed = true;
 } finally {
   if (socket) socket.close();
   chrome.kill('SIGKILL');
@@ -294,5 +351,5 @@ try {
   } catch {
     /* ignore cleanup error on tmpdir */
   }
-  process.exit(0);
+  process.exit(verificationFailed ? 1 : 0);
 }
