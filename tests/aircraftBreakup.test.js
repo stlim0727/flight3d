@@ -67,6 +67,27 @@ test('crash camera frames debris outside in portrait and rejects cockpit changes
   assert.equal(system.crashView, null);
 });
 
+test('ending a crash clears impact shake before the next flight, including repeated cleanup', async () => {
+  const { CameraSystem } = await import('../src/cameras/CameraSystem.js');
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  const aircraft = new THREE.Group();
+  const wreckage = { target: new THREE.Vector3(), radius: 15 };
+  for (let cycle = 0; cycle < 3; cycle++) {
+    system.beginCrashView(wreckage);
+    system.addTrauma(1);
+    system.update(5, aircraft);
+    assert.equal(system.trauma, 1, 'crash view bypasses normal shake decay');
+    system.endCrashView();
+    assert.equal(system.trauma, 0, 'reset must clear impact shake immediately');
+    system.endCrashView();
+    system.update(1 / 60, aircraft);
+    assert.equal(system.trauma, 0, 'new flight must not inherit impact shake');
+  }
+  system.addTrauma(0.5);
+  system.endCrashView();
+  assert.equal(system.trauma, 0, 'cleanup also clears trauma without an active crash rig');
+});
+
 test('camera reset preserves automatic and manual selection across repeated crashes', async () => {
   const { CameraSystem } = await import('../src/cameras/CameraSystem.js');
   const wreckage = { target: new THREE.Vector3(), radius: 15 };

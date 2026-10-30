@@ -1068,6 +1068,9 @@ export class CameraSystem {
   }
 
   endCrashView() {
+    // The crash rig bypasses normal update/trauma decay. A new flight must
+    // never replay the previous impact, including repeated cleanup calls.
+    this.trauma = 0;
     if (!this.crashView) return;
     this.crashView = null;
     const { mode, ...state } = this.preCrashState;
