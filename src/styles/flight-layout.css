@@ -1,5 +1,6 @@
 /* One layout owner for all camera modes. Header children use flow layout;
    notification positions are measured below both control rows. */
+body { --flight-control-surface: rgba(10, 22, 36, .5); }
 .hud-top-bar {
   position: fixed;
   top: var(--edge-top);
@@ -38,7 +39,7 @@
   scrollbar-width: none;
   touch-action: pan-x;
   overscroll-behavior-x: contain;
-  background: rgba(10, 22, 36, .72);
+  background: var(--flight-control-surface);
   border: 1px solid rgba(181, 211, 234, .25);
   border-radius: 8px;
   backdrop-filter: blur(12px);
@@ -69,14 +70,14 @@
   align-items: center;
   justify-content: center;
   transform: none;
-  background: rgba(10, 22, 36, .72);
+  background: var(--flight-control-surface);
   border: 1px solid rgba(181, 211, 234, .25);
   border-radius: 8px;
   box-shadow: none;
 }
 .hud-top-actions .ap-toggle-btn { flex-direction: column; font: 700 11px system-ui; }
 .hud-top-actions .ap-toggle-btn::after { content: attr(data-ap-state); font: 700 9px system-ui; }
-.hud-top-actions .ap-toggle-btn.ap-active { background: #10b981; color: #02110a; }
+.hud-top-actions .ap-toggle-btn.ap-active { background: rgba(16, 185, 129, .5); color: #ecfdf5; }
 .hud-top-actions .quick-mute { font-size: 18px; }
 /* Reserve the AP slot during demo to keep every other control stationary. */
 body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
@@ -99,7 +100,7 @@ body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
   padding: 0;
   border: 1px solid rgba(181, 211, 234, .25);
   border-radius: 8px;
-  background: rgba(10, 22, 36, .5);
+  background: var(--flight-control-surface);
   backdrop-filter: blur(12px);
   box-shadow: none;
   overflow-x: auto;
@@ -133,7 +134,7 @@ body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
   overscroll-behavior: contain;
   touch-action: pan-y;
   padding: 8px;
-  background: rgba(10, 22, 36, .62);
+  background: var(--flight-control-surface);
   border: 1px solid rgba(181, 211, 234, .35);
   border-radius: 8px;
   backdrop-filter: blur(12px);
@@ -155,6 +156,38 @@ body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
   box-shadow: none;
   transform: none;
 }
+/* Paint each shared surface once; opaque button fills would hide the scene. */
+.hud-top-bar .menu-toggle,
+.mobile-menu,
+.compact-ui .mobile-menu.is-open,
+.flight-panel,
+.touch-throttle-card,
+.touch-stick-card,
+.touch-rudder-card,
+.compact-ui .touch-throttle-card,
+.compact-ui .touch-stick-card,
+.compact-ui .touch-rudder-card {
+  background: var(--flight-control-surface);
+}
+.flight-more-panel .btn,
+.flight-panel-body .btn,
+.mobile-menu .btn {
+  background: transparent;
+}
+.flight-more-panel .btn:hover,
+.flight-panel-body .btn:hover,
+.mobile-menu .btn:hover,
+.hud-top-bar .btn:hover {
+  background: rgba(181, 211, 234, .14);
+}
+.flight-toolbar .btn:is([aria-pressed="true"], [aria-expanded="true"]),
+.flight-more-panel .btn:is([aria-pressed="true"], [aria-expanded="true"]),
+.flight-panel-body .btn:is([aria-pressed="true"], [aria-expanded="true"]),
+.mobile-menu .btn:is([aria-pressed="true"], [aria-expanded="true"]) {
+  background: rgba(14, 165, 233, .25);
+}
+.ap-panel .ap-btn.ap-active { background: rgba(16, 185, 129, .25); color: #ecfdf5; }
+.ap-panel .ap-btn.ap-armed { background: rgba(245, 158, 11, .25); color: #fffbeb; }
 .flight-trim { display: grid; grid-template-columns: 1fr auto 44px 44px; gap: 4px; align-items: center; font-size: 12px; }
 .flight-trim output { font: 13px monospace; }
 body:is([data-flow="lobby"], [data-flow="paused"], .booting) :is(.flight-more-panel, .ap-panel) { display: none; }
@@ -171,7 +204,7 @@ body.demo-active .flight-toolbar #btn-skip-demo {
   padding: 0 12px;
   font-size: 12px;
   color: #f0f9ff;
-  background: #157598;
+  background: rgba(21, 117, 152, .5);
 }
 body.demo-active .flight-toolbar :is(#btn-gear, #btn-flaps-ret, #btn-flaps-ext, #btn-spoilers, #btn-reverser) { display: none; }
 /* Notifications follow BOTH rows; the expandable guide is informational. */
