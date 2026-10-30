@@ -4,14 +4,14 @@ import * as THREE from 'three';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { FlightControls } from '../src/controls/FlightControls.js';
 
-test('auto cycles real views, pauses for temporary cuts, and stops on manual selection', () => {
+test('auto adapts real views, pauses for temporary cuts, and stops on manual selection', () => {
   const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
   const aircraft = new THREE.Object3D();
   aircraft.position.y = 500;
   aircraft.updateMatrixWorld();
   system.setMode(CameraSystem.MODES.AUTO);
   assert.match(system.getModeName(), /^AUTO/);
-  system.update(9, aircraft);
+  system.update(5, aircraft);
   assert.equal(system.mode, CameraSystem.MODES.CHASE);
   system.showTemporaryView(CameraSystem.MODES.GEAR, 3);
   system.update(3, aircraft);
@@ -97,7 +97,7 @@ for (let mode = 0; mode < 7; mode++) {
     system.update(3, aircraft);
     assert.equal(system.mode, CameraSystem.MODES.DRONE);
     system.update(14, aircraft);
-    assert.equal(system.mode, CameraSystem.MODES.FLYBY);
+    assert.equal(system.mode, CameraSystem.MODES.DRONE);
     system.cycleMode();
     system.showTemporaryView(CameraSystem.MODES.GEAR, 3);
     system.update(20, aircraft);
@@ -145,27 +145,26 @@ test('custom view updater receives a bound queryGroundHeight helper', () => {
 });
 
 
-test('scenic auto adapts at cut boundaries and never tours distant towers or idle gear', () => {
+test('auto holds a view until flight context changes, then respects manual look', () => {
   const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
   const aircraft = new THREE.Object3D();
   const M = CameraSystem.MODES;
   system.setTerrain(() => 400);
   aircraft.position.y = 900;
   system.setMode(M.AUTO, true);
-  for (const [seconds, mode] of [[10, M.DRONE], [13, M.DRONE], [1, M.FLYBY], [8, M.WING], [12, M.CHASE]]) {
-    system.update(seconds, aircraft, { onGround: false });
-    assert.equal(system.mode, mode);
-    assert.equal(system.autoSwitch, true);
-  }
-  aircraft.position.y = 450; // 50m above elevated terrain, not 450m AGL.
   system.update(10, aircraft, { onGround: false });
-  assert.equal(system.mode, M.FLYBY);
-  system.update(8, aircraft, { onGround: false });
+  assert.equal(system.mode, M.DRONE);
+  system.update(120, aircraft, { onGround: false });
+  assert.equal(system.mode, M.DRONE, 'cruise does not cycle modes on a timer');
+  aircraft.position.y = 450;
+  system.update(10, aircraft, { onGround: false });
+  assert.equal(system.mode, M.CHASE, 'low terrain keeps the airframe and escape visible');
+  system.update(120, aircraft, { onGround: false });
   assert.equal(system.mode, M.CHASE);
   system.update(10, aircraft, { onGround: true });
   assert.equal(system.mode, M.DRONE);
   system.applyMouseDelta(20, 0);
-  system.update(30, aircraft, { onGround: true });
+  system.update(30, aircraft, { onGround: false, rollDeg: 60 });
   assert.equal(system.mode, M.DRONE, 'manual look holds the shot');
   system.cycleMode();
   assert.equal(system.mode, M.CHASE);
@@ -178,7 +177,7 @@ test('touch look holds while touching, resumes after release, and grants a fresh
   const aircraft = new THREE.Object3D();
   aircraft.position.y = 500;
   system.setMode(CameraSystem.MODES.AUTO, true);
-  system.update(9.9, aircraft);
+  system.update(5.9, aircraft);
   system.activeTouchId = 1;
   system.isDragging = true;
   system.applyTouchDragDelta(25, 0);
@@ -225,7 +224,7 @@ test('explicit pause holds orbit and cuts until resumed, including touch and rec
   assert.equal(system.autoPaused, false);
   assert.equal(system.userLookOverridden, false);
   system.update(14, aircraft);
-  assert.equal(system.mode, CameraSystem.MODES.FLYBY);
+  assert.equal(system.mode, CameraSystem.MODES.DRONE);
 });
 
 test('manual selection cancels pending touch resume and mouse interruption stays paused', () => {
@@ -303,7 +302,7 @@ test('pause view keeps the tour clock and hands back a clean cut when it ends', 
   const aircraft = new THREE.Object3D();
   aircraft.position.y = 500;
   system.setMode(M.AUTO, true);
-  system.update(9, aircraft);
+  system.update(5, aircraft);
   assert.equal(system.mode, M.CHASE);
   const timer = system.autoSwitchTimer;
   assert.equal(system.beginPauseView(), true);

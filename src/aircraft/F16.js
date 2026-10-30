@@ -3,6 +3,7 @@ import { installInstrumentLighting } from './InstrumentLighting.js';
 import { F16_FALCON } from '../config/aircraftConfigs.js';
 import { gearSupportHeight, tireContact } from './gearVisualContact.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { JetExhaust } from '../effects/JetExhaust.js';
 
 // The supplied asset is +X forward, with a 93.94-unit wingspan. Its authored
 // hierarchy supplies the Z-up conversion; mount it in our metre/-Z-forward frame.
@@ -18,20 +19,24 @@ export function createF16CanopyMaterial(isCockpit = false) {
     name: 'F16-canopy-glass',
     color: new THREE.Color(0.95, 0.91, 0.80),
     transparent: true,
-    opacity: isCockpit ? 0.25 : 0.30,
+    opacity: isCockpit ? 0.06 : 0.22,
     roughness: 0.04,
     metalness: 0.08,
     clearcoat: 1.0,
     clearcoatRoughness: 0.03,
     ior: 1.54,
-    envMapIntensity: 2.5,
+    envMapIntensity: isCockpit ? 0.45 : 1.2,
+    forceSinglePass: true,
     depthWrite: false,
     side: THREE.DoubleSide
   });
 
   material.userData.isF16Canopy = true;
+  material.userData.cockpitUniform = { value: isCockpit ? 1 : 0 };
 
   material.onBeforeCompile = shader => {
+    shader.uniforms.uCanopyCockpit = material.userData.cockpitUniform;
+    shader.fragmentShader = 'uniform float uCanopyCockpit;\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <opaque_fragment>',
       `
@@ -54,7 +59,8 @@ export function createF16CanopyMaterial(isCockpit = false) {
 
       // Dynamic alpha: clear forward view, highly reflective at glancing angles along the curved bubble
       float baseAlpha = diffuseColor.a;
-      float canopyAlpha = clamp( mix( baseAlpha, 0.88, fresnel * 0.95 ), 0.0, 1.0 );
+      float edgeAlpha = mix(0.55, 0.16, uCanopyCockpit);
+      float canopyAlpha = mix(baseAlpha, edgeAlpha, fresnel);
 
       // Curved sky dome and horizon gradient reflection across the bubble canopy
       vec3 viewReflect = reflect( -geometryViewDir, effNormal );
@@ -68,8 +74,8 @@ export function createF16CanopyMaterial(isCockpit = false) {
       vec3 itoTint = mix( vec3( 1.0 ), vec3( 1.15, 1.02, 0.80 ), fresnel );
       canopySpecular *= itoTint;
 
-      // Compensate for WebGL alpha blending so specular reflection retains full physical brilliance
-      vec3 adjustedOutgoing = outgoingLight + canopySpecular * ( ( 1.0 / max( canopyAlpha, 0.15 ) ) - 1.0 );
+      // Keep interior reflections subtle; inverse-alpha amplification obscures terrain.
+      vec3 adjustedOutgoing = outgoingLight + canopySpecular * mix(0.35, 0.06, uCanopyCockpit);
 
       gl_FragColor = vec4( adjustedOutgoing, canopyAlpha );
       `
@@ -116,6 +122,8 @@ export class F16 {
     this.gltfGroup = new THREE.Group();
     this.gltfGroup.name = 'GLTF_F16';
     this.group.add(this.gltfGroup);
+    this.exhaust = new JetExhaust();
+    this.group.add(this.exhaust.group);
     this.lightsGroup = new THREE.Group();
     this.gltfGroup.add(this.lightsGroup);
     this.lightsOn = true;
@@ -223,6 +231,7 @@ export class F16 {
   }
 
   update(dt, state = {}) {
+    this.exhaust?.update(dt, state, this.isCrashed);
     const extension = THREE.MathUtils.clamp(state.gearState ?? this.gearExtension, 0, 1);
     this.gearExtension = extension;
     const fold = (1 - extension) * Math.PI / 2;
@@ -244,10 +253,15 @@ export class F16 {
     this.isCockpit = isCockpit;
     if (this.canopyMaterial) {
       this.canopyMaterial.side = THREE.DoubleSide;
-      this.canopyMaterial.opacity = isCockpit ? 0.25 : 0.30;
-      this.canopyMaterial.needsUpdate = true;
+      this.canopyMaterial.opacity = isCockpit ? 0.06 : 0.22;
+      this.canopyMaterial.envMapIntensity = isCockpit ? 0.45 : 1.2;
+      this.canopyMaterial.userData.cockpitUniform.value = isCockpit ? 1 : 0;
     }
   }
-  triggerCrashVisuals() { this.isCrashed = true; this.lightsGroup.visible = false; }
+  triggerCrashVisuals() {
+    this.isCrashed = true;
+    this.lightsGroup.visible = false;
+    if (this.exhaust) { this.exhaust.power = 0; this.exhaust.group.visible = false; }
+  }
   resetCrashVisuals() { this.isCrashed = false; this.lightsGroup.visible = this.lightsOn; }
 }

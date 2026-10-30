@@ -1,5 +1,6 @@
 import { SihwaTourScenario } from './scenarios/SihwaTourScenario.js';
 import { F16LuklaScenario } from './scenarios/F16LuklaScenario.js';
+import { F16CanyonSlalomScenario } from './scenarios/F16CanyonSlalomScenario.js';
 import { F16CanyonChaseScenario } from './scenarios/F16CanyonChaseScenario.js';
 import { IncheonDepartureScenario } from './scenarios/IncheonDepartureScenario.js';
 import { IncheonCessnaScenario } from './scenarios/IncheonCessnaScenario.js';
@@ -57,6 +58,7 @@ export class DemoFlightDirector {
     this.incheonDepartureScenario = new IncheonDepartureScenario(this, simulator);
     this.f16Scenario = new F16LuklaScenario(this, simulator);
     this.f16CanyonScenario = new F16CanyonChaseScenario(this, simulator);
+    this.f16SlalomScenario = new F16CanyonSlalomScenario(this, simulator);
     this.cessnaScenario = new CessnaDemoScenario(this, simulator);
     this.cessnaProximityScenario = new CessnaProximityScenario(this, simulator);
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
@@ -89,7 +91,8 @@ export class DemoFlightDirector {
   getActiveScenario() {
     if(this.activeDemoAirport==='incheon' && this.profile==='sihwa-tour')return this.sihwaTourScenario;
     if (this.activeDemoAircraft === 'F16') {
-      return this.profile === 'canyon-chase' ? this.f16CanyonScenario : this.f16Scenario;
+      return this.profile === 'canyon-slalom' ? this.f16SlalomScenario
+        : this.profile === 'canyon-chase' ? this.f16CanyonScenario : this.f16Scenario;
     }
     if (this.activeDemoAirport === 'incheon' && this.activeDemoAircraft === 'B738') return this.incheonDepartureScenario;
     if (this.activeDemoAircraft === 'C172') {
@@ -253,7 +256,9 @@ export class DemoFlightDirector {
     if (this.profile==='sihwa-tour' && this.activeDemoAirport==='incheon') {
       this.setStage(SihwaTourScenario.STAGES.COAST);
     } else if (this.activeDemoAircraft === 'F16') {
-      if (this.profile === 'canyon-chase') {
+      if (this.profile === 'canyon-slalom') {
+        this.setStage(F16CanyonSlalomScenario.STAGES.INGRESS);
+      } else if (this.profile === 'canyon-chase') {
         this.setStage(F16CanyonChaseScenario.STAGES.INGRESS);
       } else {
         this.setStage(F16LuklaScenario.STAGES.ESTABLISH);

@@ -47,7 +47,7 @@ describe('aircraft-specific demos', () => {
     const d = new DemoFlightDirector(sim); d.start();
     assert.equal(d.getActiveScenario(), d.f16Scenario);
     assert.equal(d.waitingForTerrain, true);
-    assert.deepEqual(demoProfiles('F16', 'lukla').map(p => p.id), ['low-pass', 'canyon-chase']);
+    assert.deepEqual(demoProfiles('F16', 'lukla').map(p => p.id), ['low-pass', 'canyon-slalom', 'canyon-chase']);
     assert.deepEqual(demoProfiles('F16', 'coastal'), []);
     sim.currentTerrain.isLoaded = true; d.update(0.1);
     assert.equal(d.f16Scenario.result.status, 'running');

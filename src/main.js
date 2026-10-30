@@ -211,7 +211,6 @@ class FlightSimulator {
     this.controls = new FlightControls(this.renderer.domElement);
     this.touchControls = new TouchFlightControls(this.controls);
     initFlightPanels({
-      onCycleCamera: () => this.controls.onCycleCamera(),
       onSelectCamera: mode => this.controls.onSelectCamera(mode),
       onAdjustTrim: delta => {
         if (this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed) return;
@@ -221,10 +220,6 @@ class FlightSimulator {
       onToggleParkingBrake: () => {
         if (this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed) return;
         this.controls.setParkingBrake(!this.controls.parkingBrake);
-      },
-      onToggleAutoCamera: () => {
-        this.cameraSystem.toggleAutoViewing();
-        if (this.demoDirector?.isActive) this.demoDirector.onUserCameraChange();
       },
     });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);

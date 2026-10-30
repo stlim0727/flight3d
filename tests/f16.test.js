@@ -199,20 +199,20 @@ test('F16 canopy curved glass material has physical reflection, clearcoat, and v
   assert.equal(exteriorMat.transparent, true);
   assert.equal(exteriorMat.depthWrite, false);
   assert.equal(exteriorMat.side, THREE.DoubleSide);
-  assert.equal(exteriorMat.opacity, 0.30);
+  assert.equal(exteriorMat.opacity, 0.22);
   assert.equal(exteriorMat.roughness, 0.04);
   assert.equal(exteriorMat.metalness, 0.08);
   assert.equal(exteriorMat.clearcoat, 1.0);
   assert.equal(exteriorMat.clearcoatRoughness, 0.03);
   assert.equal(exteriorMat.ior, 1.54);
-  assert.equal(exteriorMat.envMapIntensity, 2.5);
+  assert.equal(exteriorMat.envMapIntensity, 1.2);
 
   const cockpitMat = createF16CanopyMaterial(true);
   assert.equal(cockpitMat.side, THREE.DoubleSide);
-  assert.equal(cockpitMat.opacity, 0.25);
+  assert.equal(cockpitMat.opacity, 0.06);
 
   // Verify onBeforeCompile replaces opaque_fragment with curved Fresnel reflection
-  const shader = { fragmentShader: THREE.ShaderLib.physical.fragmentShader };
+  const shader = { uniforms: {}, fragmentShader: THREE.ShaderLib.physical.fragmentShader };
   cockpitMat.onBeforeCompile(shader);
   assert.ok(shader.fragmentShader.includes('fresnel'));
   assert.ok(shader.fragmentShader.includes('canopyAlpha'));
@@ -234,15 +234,15 @@ test('loaded F16 configures canopy mesh and responds to cockpit mode transitions
   // Exterior mode initially
   aircraft.setCockpitMode(false);
   assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
-  assert.equal(aircraft.canopyMaterial.opacity, 0.30);
+  assert.equal(aircraft.canopyMaterial.opacity, 0.22);
 
   // Switch to cockpit mode
   aircraft.setCockpitMode(true);
   assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
-  assert.equal(aircraft.canopyMaterial.opacity, 0.25);
+  assert.equal(aircraft.canopyMaterial.opacity, 0.06);
 
   // Switch back to exterior mode
   aircraft.setCockpitMode(false);
   assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
-  assert.equal(aircraft.canopyMaterial.opacity, 0.30);
+  assert.equal(aircraft.canopyMaterial.opacity, 0.22);
 });

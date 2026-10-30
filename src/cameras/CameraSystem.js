@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { autoCameraIntent } from './autoCameraIntent.js';
 
 /**
  * Eight camera views with a separate automatic scenic director
@@ -33,6 +34,7 @@ export class CameraSystem {
     // Explicit view choices persist across demo stages, presets and look resets.
     this.userModeSelected = false;
     this.autoSwitchTimer = 0;
+    this.autoContext = null;
     this.customViewUpdater = null;
 
     // Temporary Cinematic View Cut State (e.g. brief gear cam preview during takeoff, landing, gear transit)
@@ -902,6 +904,7 @@ export class CameraSystem {
   }
 
   #applyMode(m) {
+    if (m === CameraSystem.MODES.AUTO) this.autoContext = null;
     this.userLookOverridden = false;
     this.cancelTemporaryView();
     this.autoSwitch = m === CameraSystem.MODES.AUTO;
@@ -1145,19 +1148,18 @@ export class CameraSystem {
         && !resumedTouchLook && this.activeTouchId === null && !this.isPinching
         && !this.isDragging && this.temporaryViewTimer <= 0) {
       this.autoSwitchTimer += Math.max(0, dt);
-      const M = CameraSystem.MODES;
-      // A flyby needs a short pass; an orbit needs time to reveal the airframe.
-      const duration = this.mode === M.DRONE ? 14 : this.mode === M.WING ? 12
-        : this.mode === M.FLYBY ? 8 : 10;
-      if (this.autoSwitchTimer >= duration) {
-        const agl = aircraftMesh.position.y - this.queryGroundHeight(aircraftMesh.position.x, aircraftMesh.position.z);
-        // Keep the runway and aircraft readable near the ground. Tower and gear
-        // remain deliberate selections (gear also has event-driven close-ups).
-        const shots = flightState.onGround ? [M.CHASE, M.DRONE, M.FLYBY]
-          : agl < 120 ? [M.CHASE, M.FLYBY]
-          : [M.CHASE, M.DRONE, M.FLYBY, M.WING];
-        const next = shots[(shots.indexOf(this.mode) + 1) % shots.length];
-        this.#applyMode(next);
+      const agl = aircraftMesh.position.y - this.queryGroundHeight(aircraftMesh.position.x, aircraftMesh.position.z);
+      const intent = autoCameraIntent(flightState, agl);
+      if (intent.context !== this.autoCandidate) {
+        this.autoCandidate = intent.context;
+        this.autoCandidateSeconds = 0;
+      }
+      this.autoCandidateSeconds += Math.max(0, dt);
+      // Minimum shot duration suppresses cuts from brief telemetry fluctuations.
+      if (this.autoSwitchTimer >= 6 && this.autoCandidateSeconds >= 1 && intent.context !== this.autoContext) {
+        if (intent.mode !== this.mode) this.#applyMode(intent.mode);
+        this.autoContext = intent.context;
+        this.autoSwitchTimer = 0;
         this.autoSwitch = true;
       }
     }
