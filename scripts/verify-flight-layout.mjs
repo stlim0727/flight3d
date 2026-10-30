@@ -82,6 +82,13 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       });
       assert.ok(bounds.every(r => r.x >= 0 && r.x + r.w <= width + 1 && r.y >= 0 && r.y + r.h <= height), JSON.stringify(bounds));
       assert.ok(bounds.every(r => r.h >= 44 && (r.sel === '.hud-strip' || r.w >= 44)), 'minimum targets');
+      // Camera, fullscreen and overflow form one right-anchored group; the
+      // aircraft controls that takeover reveals unfold to its left.
+      const visible = await evaluate(() => [...document.querySelectorAll('.flight-toolbar button')]
+        .filter(node => getComputedStyle(node).display !== 'none').map(node => node.id));
+      assert.deepEqual(visible.slice(-3), ['open-camera', 'btn-fullscreen', 'open-flight-more'], `primary group order: ${visible}`);
+      const row = bounds.find(r => r.sel === '.flight-toolbar');
+      assert.ok(width - (row.x + row.w) <= 16, `toolbar hugs the right edge: ${JSON.stringify(row)}`);
       if (baseline) assert.deepEqual(bounds, baseline, `stable controls across camera ${mode}`);
       const targets = bounds.filter(r => r.sel !== '.flight-toolbar');
       for (let i = 0; i < targets.length; i++) for (let j = i + 1; j < targets.length; j++) {
@@ -108,8 +115,6 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape' });
     assert.ok(await evaluate('document.getElementById("ap-panel").hidden && document.body.dataset.flow === "flight"'), 'Escape closes AP without pausing');
-    await click('#open-flight-more');
-    assert.equal(await evaluate('document.querySelector("#flight-more-panel button").id'), 'btn-fullscreen', 'fullscreen is the first overflow action');
     await click('#btn-fullscreen');
     await delay(150);
     assert.ok(await evaluate('Boolean(document.fullscreenElement)'), 'native click enters fullscreen');
@@ -117,6 +122,8 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     await click('#btn-fullscreen');
     await delay(150);
     assert.ok(await evaluate('!document.fullscreenElement'), 'native click exits fullscreen');
+    await click('#open-flight-more');
+    assert.equal(await evaluate('document.querySelector("#flight-more-panel button").id'), 'flight-trim-less', 'trim is the first overflow action');
     const trim = await evaluate('window.simulator.aero.pitchTrim');
     await click('#flight-trim-more');
     assert.ok(Math.abs(await evaluate('window.simulator.controls.pitchTrim') - trim - .2) < .001, 'trim');

@@ -81,15 +81,20 @@
 /* Reserve the AP slot during demo to keep every other control stationary. */
 body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
 
+/* Right-anchored primary group: aircraft actions | Take control | CAM | fullscreen | ⋯.
+   Fixed bases keep the row still while labels change; wrap-reverse keeps the
+   primary group on the top row when a narrow viewport cannot fit one line. */
 .flight-toolbar, .compact-ui .flight-toolbar, .compact-ui.touch-mode .flight-toolbar {
   top: calc(var(--edge-top) + 48px);
   bottom: auto;
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
-  width: min(480px, calc(100% - var(--edge-left) - var(--edge-right)));
-  max-width: none;
+  left: auto;
+  right: var(--edge-right);
+  transform: none;
+  width: max-content;
+  max-width: calc(100% - var(--edge-left) - var(--edge-right));
   display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: flex-end;
   align-items: stretch;
   gap: 0;
   padding: 0;
@@ -98,16 +103,18 @@ body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
   background: rgba(10, 22, 36, .72);
   backdrop-filter: blur(12px);
   box-shadow: none;
-  overflow-x: auto;
-  scrollbar-width: thin;
 }
+.flight-toolbar-group { display: flex; align-items: stretch; }
 .flight-toolbar .btn, .compact-ui .flight-toolbar .btn {
-  flex: 1 0 44px;
+  flex: 0 0 44px;
+  width: 44px;
   min-width: 44px;
   height: 44px;
   min-height: 44px;
   padding: 0 2px;
 }
+.flight-toolbar #open-camera { flex-basis: 64px; width: 64px; }
+.flight-toolbar #btn-fullscreen[data-short-label]::after { font-size: 16px; }
 .flight-toolbar #open-flight-more { font: 700 22px system-ui; }
 .flight-toolbar .btn[data-short-label]::after { font-size: 10px; }
 .flight-more-panel, .ap-panel {
@@ -120,13 +127,19 @@ body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
   overscroll-behavior: contain;
   touch-action: pan-y;
   padding: 8px;
-  background: rgba(10, 22, 36, .96);
+  background: rgba(10, 22, 36, .78);
   border: 1px solid rgba(181, 211, 234, .35);
   border-radius: 8px;
+  backdrop-filter: blur(12px);
   pointer-events: auto;
   z-index: 95;
 }
-.flight-more-panel { display: grid; gap: 6px; }
+/* Overflow holds trim, brake and scenic auto only: narrower than the AP panel. */
+.flight-more-panel {
+  width: min(216px, calc(100% - var(--edge-left) - var(--edge-right)));
+  display: grid;
+  gap: 6px;
+}
 .flight-more-panel[hidden] { display: none; }
 .flight-more-panel .btn {
   min-height: 44px;
@@ -146,14 +159,15 @@ body.demo-active .flight-toolbar #btn-skip-demo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 1 0 120px;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 44px;
+  padding: 0 12px;
   font-size: 12px;
   color: #f0f9ff;
   background: #157598;
 }
 body.demo-active .flight-toolbar :is(#btn-gear, #btn-flaps-ret, #btn-flaps-ext, #btn-spoilers, #btn-reverser) { display: none; }
-body.demo-active .flight-toolbar #open-camera { flex: 0 0 64px; }
-body.demo-active .flight-toolbar #open-flight-more { flex: 0 0 44px; }
 /* Notifications follow BOTH rows; the expandable guide is informational. */
 .demo-banner, .compact-ui .demo-banner, .demo-pill-btn, .compact-ui .demo-pill-btn {
   top: var(--demo-row-top, calc(var(--edge-top) + 100px));
