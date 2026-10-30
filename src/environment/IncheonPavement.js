@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { createPavementMaterial, setPavementUVs, createRunwaySurfaceWear, createRunwayWearMaterial } from './Pavement.js';
+
+let runwaySurfaceWearMaterial;
 
 function ring(points) { return new THREE.Shape(points.slice(0,-1).map(([x,z])=>new THREE.Vector2(x,-z))); }
 
@@ -92,6 +95,48 @@ export function createIncheonPavement(field) {
     const runway=surface.kind==='runway';
     const geometry=runway?source:excludeRunways(source,masks);
     geometry.translate(0,field.elevationM+.015,0);
+    if (runway && !surface.area) {
+      const [ax, az] = surface.points[0], [bx, bz] = surface.points.at(-1);
+      const length = Math.hypot(bx - ax, bz - az);
+      const wear = length > 0 ? createRunwaySurfaceWear(surface.width, length) : null;
+      if (wear) {
+        // Source ribbons have downward winding; match their double-sided base.
+        if (!runwaySurfaceWearMaterial) {
+          runwaySurfaceWearMaterial = wear.material.clone();
+          runwaySurfaceWearMaterial.side = THREE.DoubleSide;
+        }
+        wear.material = runwaySurfaceWearMaterial;
+        // Keep the exact ribbon footprint, including every mapped bend. Project
+        // UVs along the whole runway so short OSM segments do not repeat aging.
+        wear.geometry.dispose();
+        wear.geometry = geometry.clone();
+        const p = wear.geometry.attributes.position;
+        const uv = new THREE.BufferAttribute(new Float32Array(p.count * 2), 2);
+        const dx = (bx - ax) / length, dz = (bz - az) / length;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i) - ax, z = p.getZ(i) - az;
+          uv.setXY(i, (x * dz - z * dx) / surface.width + .5, 1 - (x * dx + z * dz) / length);
+        }
+        wear.geometry.setAttribute('uv', uv);
+        group.add(wear);
+        const rubber = createRunwayWearMaterial();
+        if (rubber) {
+          const local = new THREE.Group();
+          local.position.set((ax + bx) / 2, field.elevationM + .023, (az + bz) / 2);
+          local.rotation.y = Math.atan2(bx - ax, bz - az);
+          const zoneLength = Math.min(360, length * .18);
+          const rubberGeometry = new THREE.PlaneGeometry(Math.min(18, surface.width * .45), zoneLength).rotateX(-Math.PI / 2);
+          for (const end of [-1, 1]) {
+            const mesh = new THREE.Mesh(rubberGeometry, rubber);
+            mesh.position.z = end * (length / 2 - zoneLength * 1.25);
+            mesh.rotation.y = end < 0 ? Math.PI : 0;
+            mesh.receiveShadow = true;
+            local.add(mesh);
+          }
+          group.add(local);
+        }
+      }
+    }
     batch(runway?'runway':'taxiway',runway?0x55595a:0x92968e,geometry);
     if(!surface.area) {
       const line=pavementRibbon(surface.points,runway?.7:.3,runway);
@@ -101,7 +146,15 @@ export function createIncheonPavement(field) {
   }
   for(const [name,{color,parts}] of batches) {
     const geometry=mergeGeometries(parts,false);parts.forEach(part=>part.dispose());
-    const mesh=new THREE.Mesh(geometry,new THREE.MeshLambertMaterial({color,side:THREE.DoubleSide}));
+    let material;
+    if (name === 'runway') {
+      geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geometry.attributes.position.count * 2), 2));
+      setPavementUVs(geometry);
+      material = createPavementMaterial('asphalt');
+      material.color.setHex(color);
+      material.side = THREE.DoubleSide;
+    } else material = new THREE.MeshLambertMaterial({color,side:THREE.DoubleSide});
+    const mesh=new THREE.Mesh(geometry,material);
     mesh.name=`incheon-${name}-pavement`;group.add(mesh);
   }
   return group;

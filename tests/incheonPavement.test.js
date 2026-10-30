@@ -18,6 +18,14 @@ function colors(group,x,z) {
 test('runway/taxi intersection has exactly one surface, preserving paved union and height',()=>{
   const field={elevationM:7,surfaces:[taxiway,runway]},snapshot=JSON.stringify(field);
   const pavement=createIncheonPavement(field);
+  const runwayMesh = pavement.getObjectByName('incheon-runway-pavement');
+  assert.equal(runwayMesh.material.isMeshStandardMaterial, true);
+  const positions = runwayMesh.geometry.attributes.position;
+  const uvs = runwayMesh.geometry.attributes.uv;
+  for (let i = 0; i < positions.count; i++) {
+    assert.ok(Math.abs(uvs.getX(i) * 3 - positions.getX(i)) < 1e-5);
+    assert.ok(Math.abs(uvs.getY(i) * 3 + positions.getZ(i)) < 1e-5);
+  }
   assert.equal(area(pavement.getObjectByName('incheon-runway-pavement')),160);
   assert.equal(area(pavement.getObjectByName('incheon-taxiway-pavement')),96);
   assert.deepEqual(colors(pavement,1.25,1.75),[0x55595a],'runway wins without coplanar grey triangles below it');

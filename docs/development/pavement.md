@@ -1,5 +1,43 @@
 # Airport pavement (issue #8)
 
+## Shared runway aging (#327)
+
+Incheon runway batches now use the same three-metre asphalt color/normal/roughness
+maps as Coastal and Lukla. The mapped runway/taxiway clipping, contact heights,
+markings and taxiway materials remain intact. A shared 512×2048 transparent canvas
+adds broad, deterministic surface fading; the shared 256×1024 touchdown canvas
+adds stronger rubber streaks. These are visual approximations, not a model of tire
+friction, rubber accumulation over time or structural pavement damage.
+
+Coastal and Lukla inherit their existing runway transforms. Incheon clones the
+actual multi-segment ribbon for weathering and projects UVs along the whole
+runway, avoiding repeated patches at short map segments. Its ribbon winding needs
+a double-sided material. Each Incheon runway adds one surface overlay and two
+touchdown overlays; Coastal and Lukla each add one surface overlay. The overlay
+textures use sRGB, mipmaps, 4x anisotropy and disabled depth writes. Transparent
+margins avoid rectangular edges. Paint sits above the weathering.
+
+For a controlled comparison, run with Node 22.23.2:
+
+```sh
+node scripts/serve-runway-wear-review.mjs
+```
+
+Open the printed local URL in hardware-accelerated Chrome. `BASE_REV` selects
+the comparison commit (default `origin/main`). The page renders production
+Incheon pavement and the Coastal/Lukla airport classes at 1200×800, with matching
+cameras, light and frozen airport animation in each pair. It saves 18 PNGs and
+`results.json` under ignored `review-artifacts/runway-wear/`. Nine pairs cover
+overview, close-up and dim night lighting. Nonempty differences, shader/runtime
+errors, hardware renderer identity and an actual red-triangle pixel probe are
+checked. Canvas edge alpha and Coastal/Lukla transform alignment are also checked.
+These isolated material scenes omit surrounding terrain and asynchronous building
+replacement; they do not establish full-flight FPS or native mobile acceptance.
+
+Validated on Windows Chrome 156, Intel Arc 140V via ANGLE D3D11; the hardware probe
+returned `[255,0,0,255]` with GL error 0. Relevant Node tests also cover mapped
+pavement clipping/heights and three-metre UVs.
+
 The existing implementation (main `184ec96`, pavement introduced in `141937e`)
 already supplied six 1K Poly Haven maps, three-metre UVs, rubber and repair
 overlays. This follow-up adds the missing sealed-crack decals and lowers the

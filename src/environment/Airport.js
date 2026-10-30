@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs } from './Pavement.js';
+import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs, createRunwaySurfaceWear } from './Pavement.js';
 import { loadAirportKit, createAirportBuildings } from './AirportBuildings.js';
 import { createRunwayMarkingMaterial } from './RunwayMarkings.js';
 
@@ -137,6 +137,8 @@ export class Airport {
     this.group.add(rwyMesh);
 
     const repairs = createRunwayRepairs(this.runwayWidth, this.runwayLength);
+    const surfaceWear = createRunwaySurfaceWear(this.runwayWidth, this.runwayLength);
+    if (surfaceWear) repairs.add(surfaceWear);
     repairs.rotation.y = Math.PI / 2;
     repairs.position.y = this.elevation + 0.06;
     this.group.add(repairs);
