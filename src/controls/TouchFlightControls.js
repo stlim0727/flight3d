@@ -1,3 +1,4 @@
+import { angleDelta, readGyroScreen, screenTilt } from './gyroOrientation.js';
 import { detectGyroBrowser } from './gyroBrowser.js';
 import { bindText, t, translateDOM } from '../i18n/index.js';
 
@@ -37,9 +38,12 @@ export class TouchFlightControls {
     this.gyroPending = false;
     this.gyroBrowser = 'other';
     this.handleOrientation = this.handleOrientation.bind(this);
-    this.gyroZeroPitch = 38.0; // Comfortable holding angle (~38° tilted towards pilot)
-    this.gyroZeroRoll = 0.0;
-    this.gyroSensitivity = 0.035;
+    this.gyroOrientation = 'auto';
+    this.gyroCalibration = null;
+    this.gyroLockAttempt = 0;
+    this.gyroOwnsLock = false;
+    this.gyroLockQueue = Promise.resolve();
+    this.onGyroScreenChange = () => this.recenterGyro();
 
     // Virtual Stick State
     this.stickActive = false;
@@ -80,6 +84,7 @@ export class TouchFlightControls {
     
     this.initDOM();
     this.bindEvents();
+    this.initGyroSettings();
 
     if (isTouch) {
       this.enable();
@@ -244,6 +249,85 @@ export class TouchFlightControls {
 
     // 5. Gyroscope Toggle Button
     this.gyroBtn?.addEventListener('click', () => this.toggleGyro());
+  }
+
+  initGyroSettings() {
+    const settings = document.createElement('div');
+    settings.id = 'gyro-settings';
+    settings.className = 'gyro-settings';
+    settings.hidden = true;
+    settings.innerHTML = `
+      <label for="gyro-orientation" data-i18n="gyro.orientation.label"></label>
+      <select id="gyro-orientation" class="btn" aria-describedby="gyro-orientation-status">
+        <option value="auto" data-i18n="gyro.orientation.auto"></option>
+        <option value="portrait" data-i18n="gyro.orientation.portrait"></option>
+        <option value="landscape" data-i18n="gyro.orientation.landscape"></option>
+      </select>
+      <button type="button" class="btn gyro-recenter" data-i18n="gyro.recenter"></button>
+      <p id="gyro-orientation-status" role="status"></p>`;
+    this.gyroBtn.after(settings);
+    translateDOM(settings);
+    this.gyroSettings = settings;
+    this.gyroOrientationSelect = settings.querySelector('select');
+    this.gyroOrientationStatus = settings.querySelector('[role="status"]');
+    this.gyroOrientationSelect.addEventListener('change', () => {
+      this.setGyroOrientation(this.gyroOrientationSelect.value);
+    });
+    settings.querySelector('.gyro-recenter').addEventListener('click', () => this.recenterGyro());
+  }
+
+  setGyroOrientationStatus(key) {
+    bindText(this.gyroOrientationStatus, () => t(key));
+  }
+
+  recenterGyro() {
+    if (!this.gyroActive) return;
+    this.gyroCalibration = null;
+    this.gyroScreen = readGyroScreen(window);
+    this.gyroReadyAt = performance.now() + 600;
+    this.controls.setTouchStick(0, 0);
+    this.updateStickTelemetry(0, 0);
+    if (this.stickKnob) this.stickKnob.style.transform = 'translate(0px, 0px)';
+    this.setGyroOrientationStatus('gyro.orientation.centering');
+  }
+
+  releaseGyroLock() {
+    ++this.gyroLockAttempt;
+    if (this.gyroOwnsLock) {
+      try { window.screen?.orientation?.unlock?.(); } catch { /* Browser may have released it already. */ }
+    }
+    this.gyroOwnsLock = false;
+  }
+
+  async setGyroOrientation(mode) {
+    if (!['auto', 'portrait', 'landscape'].includes(mode)) return;
+    this.gyroOrientation = mode;
+    this.gyroLockUnavailable = false;
+    this.releaseGyroLock();
+    this.recenterGyro();
+    if (mode === 'auto' || !this.gyroActive) return;
+    const attempt = this.gyroLockAttempt;
+    // Serialize requests so a slow old lock cannot override a newer selection.
+    this.gyroLockQueue = (this.gyroLockQueue ?? Promise.resolve()).then(async () => {
+      if (attempt !== this.gyroLockAttempt || !this.gyroActive) return;
+      const orientation = window.screen?.orientation;
+      try {
+        if (typeof orientation?.lock !== 'function') throw new Error('Unavailable');
+        await orientation.lock(mode);
+        if (attempt !== this.gyroLockAttempt || !this.gyroActive) {
+          orientation.unlock?.();
+          return;
+        }
+        this.gyroOwnsLock = true;
+        this.recenterGyro();
+      } catch {
+        if (attempt === this.gyroLockAttempt && this.gyroActive) {
+          this.gyroLockUnavailable = true;
+          this.setGyroOrientationStatus('gyro.orientation.lock.unavailable');
+        }
+      }
+    });
+    await this.gyroLockQueue;
   }
 
   /* ---------------- Virtual Stick Handling ---------------- */
@@ -538,6 +622,11 @@ export class TouchFlightControls {
   enableGyro() {
     this.gyroActive = true;
     this.gyroPending = true;
+    if (this.gyroSettings) this.gyroSettings.hidden = false;
+    window.screen?.orientation?.addEventListener('change', this.onGyroScreenChange);
+    window.addEventListener('orientationchange', this.onGyroScreenChange);
+    this.recenterGyro();
+    if (this.gyroOrientation !== 'auto') this.setGyroOrientation(this.gyroOrientation);
     window.addEventListener('deviceorientation', this.handleOrientation);
     // API presence and permission do not prove that the browser delivers readings.
     this.gyroTimer = window.setTimeout(() => {
@@ -552,6 +641,11 @@ export class TouchFlightControls {
     this.gyroPending = false;
     window.clearTimeout(this.gyroTimer);
     window.removeEventListener('deviceorientation', this.handleOrientation);
+    window.screen?.orientation?.removeEventListener('change', this.onGyroScreenChange);
+    window.removeEventListener('orientationchange', this.onGyroScreenChange);
+    this.releaseGyroLock();
+    if (this.gyroSettings) this.gyroSettings.hidden = true;
+    this.gyroCalibration = null;
     if (this.gyroBtn) {
       this.gyroBtn.classList.remove('active');
       this.setGyroLabel('gyro.off');
@@ -570,20 +664,27 @@ export class TouchFlightControls {
     }
     if (this.controls?.aircraftControlsDisabled) return;
 
-    // Beta: Front-to-back tilt in degrees (-180 to 180) -> Pitch
-    // Gamma: Left-to-right tilt in degrees (-90 to 90) -> Roll
-    const rawBeta = e.beta || 0;
-    const rawGamma = e.gamma || 0;
-
-    // Offset relative to comfortable resting angle (~38°)
-    const deltaPitchDeg = rawBeta - this.gyroZeroPitch;
-    const deltaRollDeg = rawGamma - this.gyroZeroRoll;
-
-    // Map to normalized range [-1.0, 1.0]
-    // Tilt forward (deltaPitchDeg < 0) -> Nose Down (Elevator < 0)
-    // Tilt backward (deltaPitchDeg > 0) -> Nose Up (Elevator > 0)
-    const normPitch = Math.max(-1.0, Math.min(1.0, (deltaPitchDeg / 25.0)));
-    const normRoll = Math.max(-1.0, Math.min(1.0, (deltaRollDeg / 30.0)));
+    const screen = readGyroScreen(window);
+    if (screen.angle !== this.gyroScreen?.angle || screen.type !== this.gyroScreen?.type) {
+      this.recenterGyro();
+    }
+    if (this.gyroOrientation !== 'auto' && screen.type !== this.gyroOrientation) {
+      this.controls.setTouchStick(0, 0);
+      this.updateStickTelemetry(0, 0);
+      this.gyroCalibration = null;
+      this.setGyroOrientationStatus(`gyro.orientation.rotate.${this.gyroOrientation}`);
+      return;
+    }
+    // Ignore transitional readings while the browser and sensors rotate.
+    if (performance.now() < this.gyroReadyAt) return;
+    const tilt = screenTilt(e.beta, e.gamma, screen.angle);
+    if (!this.gyroCalibration) {
+      this.gyroCalibration = tilt;
+      this.setGyroOrientationStatus(this.gyroLockUnavailable
+        ? 'gyro.orientation.lock.unavailable' : 'gyro.orientation.ready');
+    }
+    const normPitch = Math.max(-1, Math.min(1, angleDelta(tilt.pitch, this.gyroCalibration.pitch) / 25));
+    const normRoll = Math.max(-1, Math.min(1, angleDelta(tilt.roll, this.gyroCalibration.roll) / 30));
 
     this.controls.setTouchStick(normPitch, normRoll);
     this.updateStickTelemetry(normPitch, normRoll);

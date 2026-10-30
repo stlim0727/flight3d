@@ -1,4 +1,15 @@
 export default {
+  "gyro.orientation.label": "Gyro screen orientation",
+  "gyro.orientation.auto": "Follow screen",
+  "gyro.orientation.portrait": "Portrait",
+  "gyro.orientation.landscape": "Landscape",
+  "gyro.recenter": "Re-center gyro",
+  "gyro.orientation.centering": "Hold the phone comfortably and keep it still for a moment to center the gyro.",
+  "gyro.orientation.ready": "Gyro centered. Re-center whenever you change your holding position.",
+  "gyro.orientation.rotate.portrait": "Turn the screen to portrait. Gyro input stays neutral until it matches; then hold still to re-center.",
+  "gyro.orientation.rotate.landscape": "Turn the screen to landscape. Gyro input stays neutral until it matches; then hold still to re-center.",
+  "gyro.orientation.lock.unavailable": "This browser could not lock the screen. Use your device’s rotation lock to keep the selected orientation. Gyro works once the screen matches; tap Re-center after adjusting your grip.",
+
   "gyro.checking": "Checking sensors…",
   "gyro.off": "📱 GYRO",
   "gyro.on": "📱 TILT: ON",
