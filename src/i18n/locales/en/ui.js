@@ -308,6 +308,8 @@ export default {
   "pause.resume": "Resume",
   "pause.restart": "Restart scenario",
   "pause.lobby": "Return to main menu",
+  "pause.open": "Pause flight",
+  "pause.close": "Resume flight",
   "menu.open": "Open main menu",
   "menu.close": "Close main menu",
   "state.on": "ON",

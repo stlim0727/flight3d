@@ -14,6 +14,7 @@ export class FlightAudio {
   constructor() {
     this.ctx = null;
     this.isMuted = false;
+    this.isPaused = false;
     this.isInitialized = false;
 
     this.volume = 1.0;
@@ -77,7 +78,7 @@ export class FlightAudio {
   }
 
   get effectiveVolume() {
-    if (this.isMuted) return 0.0;
+    if (this.isMuted || this.isPaused) return 0.0;
     return this.volume;
   }
 
@@ -521,6 +522,13 @@ export class FlightAudio {
   setMuted(muted) {
     this.isMuted = !!muted;
     if (this.isMuted) { this.cancelSpeech(); this.departureRadio.stop(); }
+    this.applyMasterGain();
+  }
+
+  /** Silence the bus while the sim is held off-screen, without touching the user's setting. */
+  setPaused(paused) {
+    this.isPaused = !!paused;
+    if (this.isPaused) this.cancelSpeech();
     this.applyMasterGain();
   }
 

@@ -386,15 +386,19 @@ async function main() {
     console.log(`   Off-Runway Excursion: ${excursionCrashed ? 'PASS ✅' : 'FAIL ❌'} [${excursionTitle}]`);
     await takeScreenshot('crash_excursion_showcase.png');
 
-    // Menu open/close after crash must hold the post-crash scene without repeating the crash.
+    // Pausing after a crash (#322) must hold the post-crash scene without repeating the
+    // crash: the pause card replaces the hull-loss card, the rig yields to the crash camera,
+    // and resuming hands the wreck back untouched.
     const menuRoundTrip = await evalJs(`(() => {
       const sim = window.simulator;
       const crashesBefore = sim.impactVelocityChecks.crashes;
       document.getElementById('menu-toggle').click();
-      const inLobby = document.body.dataset.flow === 'lobby'
+      const inPause = document.body.dataset.flow === 'paused'
         && sim.isCrashed
         && sim.aircraftBreakup.pieces.length > 0
-        && getComputedStyle(document.getElementById('crash-overlay')).display === 'none';
+        && getComputedStyle(document.getElementById('crash-overlay')).display === 'none'
+        && sim.gameFlow.isPhysicsFrozen()
+        && !sim.cameraSystem.pauseView;
       document.getElementById('menu-toggle').click();
       sim.stepSimulation(0.5);
       const backInFlight = document.body.dataset.flow === 'flight'
@@ -402,12 +406,12 @@ async function main() {
         && sim.aircraftBreakup.pieces.length > 0
         && getComputedStyle(document.getElementById('crash-overlay')).display !== 'none'
         && sim.impactVelocityChecks.crashes === crashesBefore;
-      return { inLobby, backInFlight, crashesBefore, crashesAfter: sim.impactVelocityChecks.crashes };
+      return { inPause, backInFlight, crashesBefore, crashesAfter: sim.impactVelocityChecks.crashes };
     })()`);
-    if (!menuRoundTrip.inLobby || !menuRoundTrip.backInFlight) {
-      throw new Error('Crash menu open/close repeated or lost crash state: ' + JSON.stringify(menuRoundTrip));
+    if (!menuRoundTrip.inPause || !menuRoundTrip.backInFlight) {
+      throw new Error('Crash pause/resume repeated or lost crash state: ' + JSON.stringify(menuRoundTrip));
     }
-    console.log('   Crash Menu Open/Close Preservation: PASS ✅', JSON.stringify(menuRoundTrip));
+    console.log('   Crash Pause/Resume Preservation: PASS ✅', JSON.stringify(menuRoundTrip));
 
     // Test Quick Restart
     console.log('\n🔄 Testing Quick Restart...');

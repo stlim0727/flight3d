@@ -205,6 +205,9 @@ body:is([data-flow="lobby"], .booting) .crash-overlay,
 body:is([data-flow="lobby"], .booting) #demo-banner,
 body:is([data-flow="lobby"], .booting) .demo-pill-btn,
 body:is([data-flow="lobby"], .booting) .touch-controls-overlay { display: none !important; }
+/* The pause card offers the same restart/exit choices the hull-loss card does, so the
+   crash report stands down while the sortie is paused and returns with the flight. */
+body[data-flow="paused"] .crash-overlay { display: none !important; }
 /* The toggle is the lobby's close affordance, so it stays up there; while
    booting there is nothing to toggle back to yet, so it waits too. */
 body.booting .menu-toggle { display: none !important; }

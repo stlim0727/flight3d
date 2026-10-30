@@ -210,6 +210,29 @@ test('abandonResumableFlight is a no-op outside a held lobby', () => {
   assert.equal(c.abandonResumableFlight(), false); // flight: not resumable
 });
 
+test('holdForPendingStart parks a rebuilding scene: frozen, no cinematic, still startable', () => {
+  const { c, flags } = makeController();
+  flags.active = true;                          // cinematic demo is flying behind the menu
+  assert.equal(c.holdForPendingStart(), true);
+  assert.equal(c.state, FLOW.LOBBY);
+  assert.equal(c.isPhysicsFrozen(), true);
+  run(c, 5);
+  assert.equal(c.consumeDemoRestart(), false);
+  c.enterFlight();
+  assert.equal(c.canResumeFromLobby(), false);  // the new scenario owns the aircraft now
+  assert.equal(c.isPhysicsFrozen(), false);
+});
+
+test('holdForPendingStart is a no-op outside the lobby', () => {
+  const { c } = makeController();
+  assert.equal(c.state, FLOW.LOBBY);
+  c.enterFlight();
+  assert.equal(c.holdForPendingStart(), false);
+  assert.equal(c.resumableFlight, false);
+  c.pause();
+  assert.equal(c.holdForPendingStart(), false);
+});
+
 test('returnToLobby default keeps the cinematic re-arm (no resume offered)', () => {
   const { c } = makeController();
   c.enterFlight();
@@ -218,6 +241,27 @@ test('returnToLobby default keeps the cinematic re-arm (no resume offered)', () 
   assert.equal(c.isPhysicsFrozen(), false);
   run(c, 1.6);
   assert.equal(c.consumeDemoRestart(), true);
+});
+
+test('a held sortie is visible to the observer at the moment the state changes', () => {
+  // The menu's camera rig and audio duck are decided inside onStateChange, so the hold must
+  // be published with the state: an observer that still sees the previous hold frames the
+  // wreck of a paused sortie as an ordinary cinematic.
+  const held = [];
+  const { c } = makeController({
+    onStateChange: () => held.push(c.state === FLOW.PAUSED || c.canResumeFromLobby()),
+  });
+  c.enterFlight();
+  c.pause();
+  assert.deepEqual(held.at(-1), true, 'pausing frames the aircraft');
+  c.resume();
+  assert.deepEqual(held.at(-1), false, 'flying releases the rig');
+  c.pause();
+  assert.equal(c.returnToLobby(true), true);
+  assert.deepEqual(held.at(-1), true, 'the menu inherits the hold from the pause');
+  c.enterFlight();
+  c.returnToLobby();
+  assert.deepEqual(held.at(-1), false, 'a fresh menu holds nothing');
 });
 
 test('opening and closing the menu after a crash preserves crash state without repeating the crash', async () => {
@@ -266,11 +310,19 @@ test('opening and closing the menu after a crash preserves crash state without r
       this.crashResult = null;
     }
     toggleMainMenu() {
-      if (this.gameFlow.state === FLOW.LOBBY) {
-        if (this.gameFlow.canResumeFromLobby()) this.gameFlow.enterFlight();
+      const flow = this.gameFlow;
+      if (flow.state === FLOW.LOBBY) {
+        // Mirrors main.js: only an airworthy held flight is released; a wreck respawns.
+        if (flow.canResumeFromLobby() && !this.isCrashed) {
+          flow.enterFlight();
+          return;
+        }
+        flow.enterFlight();
+        this.clearCrashState();   // stand-in for the respawn setPreset() performs
         return;
       }
-      this.gameFlow.returnToLobby(true);
+      if (flow.state === FLOW.PAUSED) flow.resume();
+      else flow.pause();
     }
   }
   installPhysicsIntegrator(SimHarness);
@@ -281,10 +333,9 @@ test('opening and closing the menu after a crash preserves crash state without r
   assert.equal(sim.explosions, 1);
   assert.equal(sim.aircraft.group.visible, false);
 
-  // Open and close menu via toggleMainMenu: crash must not repeat on resume.
+  // Open and close menu via toggleMainMenu: it pauses the crashed flight, resume keeps it crashed.
   sim.toggleMainMenu();
-  assert.equal(sim.gameFlow.state, FLOW.LOBBY);
-  assert.equal(sim.gameFlow.canResumeFromLobby(), true);
+  assert.equal(sim.gameFlow.state, FLOW.PAUSED);
   assert.equal(sim.isCrashed, true);
 
   sim.toggleMainMenu();
@@ -299,14 +350,12 @@ test('opening and closing the menu after a crash preserves crash state without r
   assert.equal(sim.gameFlow.state, FLOW.LOBBY);
   assert.equal(sim.gameFlow.canResumeFromLobby(), true);
   assert.equal(sim.isCrashed, true);
+  // A wreck held behind the menu is not worth returning to: closing the menu respawns
+  // it instead of handing the pilot back a crashed airframe.
   sim.toggleMainMenu();
   assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
-  sim.integratePhysics(1 / 120);
-  assert.equal(sim.explosions, 1);
-
-  // Clearing crash state (when starting a new flight) restores visibility and visuals.
-  sim.clearCrashState();
   assert.equal(sim.isCrashed, false);
   assert.equal(sim.aircraft.group.visible, true);
   assert.equal(sim.aircraft.crashed, false);
+  assert.equal(sim.explosions, 1, 'releasing a wreck must not replay the crash rig');
 });

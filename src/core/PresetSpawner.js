@@ -572,7 +572,10 @@ class PresetSpawnerMethods {
     saveSavedScenario(this.lobby.preset);
     // A new airport re-spawns the aircraft below, so any flight held behind the
     // menu is no longer the one to return to: release it and let the cinematic back.
-    this.gameFlow.abandonResumableFlight();
+    // A pending start is the exception — it parks the scene and spawns once, itself.
+    if (!this.applyingPendingStart) {
+      this.gameFlow.abandonResumableFlight();
+    }
     this.gameFlow.setCinematicAvailable(!isIncheon && !isHangang);
     this.lobbyScreen?.refresh();
 
@@ -580,7 +583,7 @@ class PresetSpawnerMethods {
       this.demoDirector.stop();
     }
 
-    this.setPreset(defaultScenarioForRegion(id));
+    if (!this.applyingPendingStart) this.setPreset(defaultScenarioForRegion(id));
     this.lobbyScreen?.refresh();
 
     const airportKey = isHangang ? 'hangang.region' : isIncheon ? 'incheon.airport' : isLukla

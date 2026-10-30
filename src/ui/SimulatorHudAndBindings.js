@@ -9,11 +9,6 @@ import { initLobbyScreen } from './LobbyScreen.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
 import { defaultScenarioForRegion } from '../config/scenarioRegistry.js';
-import {
-  saveSavedAirport,
-  saveSavedAircraft,
-  saveSavedScenario,
-} from '../config/flightSelection.js';
 
 class SimulatorHudAndBindingsMethods {
   initControls() {
@@ -449,26 +444,22 @@ class SimulatorHudAndBindingsMethods {
       getAircraft: () => this.lobby.aircraft || this.currentAircraftId || 'B738',
       getDemoProfile: () => this.lobby.demoProfile,
       onDemoProfile: id => { this.lobby.demoProfile = id; },
+      // Pending by design: the click records the wish; the start button applies it,
+      // and only a flight actually flown is persisted.
       onAirport: id => {
         this.lobby.airport = id;
         this.lobby.preset = defaultScenarioForRegion(id);
         if (id === 'hangang') this.lobby.aircraft = 'C172';
-        saveSavedScenario(this.lobby.preset);
-        saveSavedAirport(id);
         this.lobbyScreen?.refresh();
-        this.queueLobbySelection();
       },
       onPreset: type => {
         this.lobby.preset = type;
-        saveSavedScenario(type);
         this.lobbyScreen.refresh();
       },
       onTime: hours => this.setTimeOfDay(hours),
       onAircraft: id => {
         this.lobby.aircraft = id;
-        saveSavedAircraft(id);
         this.lobbyScreen?.refresh();
-        this.queueLobbySelection();
       },
       onFly: () => this.fly(),
     });

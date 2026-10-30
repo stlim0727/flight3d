@@ -51,9 +51,9 @@ import { RenderDiagnostics } from './dev/RenderDiagnostics.js';
 import { isScenarioAvailable } from './config/scenarioRegistry.js';
 import {
   loadSavedFlightSelection,
-  saveSavedAirport,
+  hasPendingFlightSelection,
   saveSavedAircraft,
-  saveSavedScenario,
+  saveFlightSelection,
 } from './config/flightSelection.js';
 import { resolveFlightUrl } from './config/flightUrls.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
@@ -252,6 +252,8 @@ class FlightSimulator {
     this.lobby = { airport: savedSelection.airport, preset: savedSelection.scenario, aircraft: savedSelection.aircraft };
     this.currentAircraftId = savedSelection.aircraft;
     this.lastPresetType = savedSelection.scenario;
+    this.startingFlight = false;
+    this.applyingPendingStart = false;
 
     // 7. Collision Detection & Explosion & Tire Smoke Particle Systems
     this.collisionDetector = new CollisionDetector(
@@ -410,7 +412,11 @@ class FlightSimulator {
   /** Apply the game-flow state to the DOM: menu visibility, input blocking. */
   syncFlowUi() {
     const state = this.gameFlow.state;
+    // A flight parked off the sim is silent and watched from the drone rig; the lobby
+    // cinematic keeps its own sound and camera, so it is deliberately not held here.
+    const held = state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
     this.audio?.departureRadio.setPaused(state !== FLOW.FLIGHT);
+    this.audio?.setPaused(held);
     document.body.dataset.flow = state;
     if (state === FLOW.FLIGHT) {
       const attribution = document.getElementById('incheon-attribution');
@@ -433,15 +439,90 @@ class FlightSimulator {
         state === FLOW.LOBBY && this.demoDirector?.waitingForTerrain === true);
       if (state === FLOW.LOBBY) this.lobbyScreen.refresh();
     }
+    if (held) this.cameraSystem?.beginPauseView();
+    else this.cameraSystem?.endPauseView();
     this.updateMenuToggle();
   }
 
-  /** Leave the lobby: stop the cinematic and spawn the player at their choice. */
-  fly() {
-    if (this.airportLoading || this.lobbySelectionPending) return;
-    saveSavedAirport(this.activeAirport || this.lobby.airport);
-    saveSavedAircraft(this.currentAircraftId || this.lobby.aircraft);
-    saveSavedScenario(this.lobby.preset);
+  /**
+   * Leave the lobby. A menu that changed nothing releases the held flight where the pilot
+   * left it; a changed airport or aircraft is rebuilt behind the loading card first, so the
+   * heavy scene work stays out of the click task and the pilot never sees the swap.
+   */
+  async fly() {
+    if (this.airportLoading || this.startingFlight) return;
+    const pending = {
+      airport: this.lobby.airport,
+      aircraft: this.lobby.aircraft ?? this.currentAircraftId,
+      scenario: this.lobby.preset,
+    };
+    const live = {
+      airport: this.activeAirport,
+      aircraft: this.currentAircraftId,
+      scenario: this.lastPresetType,
+    };
+    // A wreck is not a flight worth returning to: the crash restart has to respawn.
+    if (!this.isCrashed && this.gameFlow.canResumeFromLobby() && !hasPendingFlightSelection(pending, live)) {
+      this.gameFlow.enterFlight();
+      return;
+    }
+    const needsScene = pending.airport !== live.airport || pending.aircraft !== live.aircraft;
+    // Only a region or model swap is slow enough to need the loading card. Everything else
+    // starts inside the click task, so callers can keep sequencing steps after fly().
+    if (needsScene) await this.applyPendingScene();
+    else this.startFlight();
+  }
+
+  /**
+   * Rebuild the world for the pending selection behind the boot overlay's loading card. The
+   * scene is parked first, so a swap never leaves the aircraft falling through scenery that
+   * is being replaced.
+   */
+  async applyPendingScene() {
+    // Each stage paints for two frames, which is only worth waiting for when the tab can paint.
+    const stage = document.hidden ? async () => {} : (value, messageKey) => startupStage(value, messageKey);
+    const overlay = document.getElementById('startup-overlay');
+    const progress = document.getElementById('startup-progress');
+    this.startingFlight = true;
+    inputLatency?.noteSelectionStart();
+    // The boot overlay fades to translucent once the scene is painted; a rebuild has to
+    // hide the swap, so the opaque card goes back on for the duration.
+    overlay.classList.remove('scene-ready');
+    overlay.hidden = false;
+    progress.hidden = false;
+    progress.max = 3;
+    progress.value = 0;
+    this.lobbyScreen?.setSelectionBusy(true);
+    try {
+      this.gameFlow.holdForPendingStart();
+      if (this.lobby.airport !== this.activeAirport) {
+        await stage(1, 'startup.world');
+        this.applyingPendingStart = true;
+        try {
+          await this.setAirport(this.lobby.airport);
+        } finally {
+          this.applyingPendingStart = false;
+        }
+      }
+      if (this.lobby.aircraft !== this.currentAircraftId) {
+        await stage(2, 'startup.aircraft');
+        this.setAircraft(this.lobby.aircraft);
+      }
+      this.startFlight();
+      await stage(3, 'startup.ready');
+    } catch (error) {
+      console.warn('Flight start failed:', error);
+      this.showToast(() => t('startup.failed'));
+    } finally {
+      overlay.hidden = true;
+      this.lobbyScreen?.setSelectionBusy(false);
+      inputLatency?.noteSelectionApplied();
+      this.startingFlight = false;
+    }
+  }
+
+  /** Spawn the chosen scenario and hand the cockpit over. Nothing here waits. */
+  startFlight() {
     this.devRunner.stop();
     this.shadowDemo.stop();
     const wantsDemo = this.lobby.preset === 'demo';
@@ -449,36 +530,40 @@ class FlightSimulator {
       this.demoDirector.stop(wantsDemo ? null : () => t('manual.control.engaged'));
     }
     this.gameFlow.enterFlight();
-    if (wantsDemo) {
-      this.demoDirector.start();
-    } else {
-      this.setPreset(this.lobby.preset);
-    }
+    // setAirport may have clamped the scenario to the region it loaded.
+    if (wantsDemo) this.demoDirector.start();
+    else this.setPreset(this.lobby.preset);
+    saveFlightSelection({
+      airport: this.lobby.airport,
+      aircraft: this.lobby.aircraft ?? this.currentAircraftId,
+      scenario: this.lobby.preset,
+    });
   }
 
   /**
-   * Top-left menu toggle: open the main menu over the live flight (holding it),
-   * or close it. Closing resumes the held flight; if there is no flight yet
-   * (boot / after a scenario change) it launches the current selection.
+   * Top-left menu toggle: during a flight it pauses the sim, showing the drone view and the
+   * pause card; while paused it resumes. From the menu it closes it, and `fly()` decides
+   * whether that means releasing the held flight or starting the pilot's new selection.
    */
   toggleMainMenu() {
     const flow = this.gameFlow;
     if (flow.state === FLOW.LOBBY) {
-      if (flow.canResumeFromLobby()) flow.enterFlight();
-      else this.fly();
+      this.fly();
       return;
     }
-    flow.returnToLobby(true);
+    if (flow.state === FLOW.PAUSED) flow.resume();
+    else flow.pause();
   }
 
   /** Keep the toggle's icon and accessible label in sync with the flow state. */
   updateMenuToggle() {
     const btn = document.getElementById('menu-toggle');
     if (!btn) return;
-    const open = this.gameFlow.state === FLOW.LOBBY;
+    const open = this.gameFlow.state !== FLOW.FLIGHT;
     btn.classList.toggle('is-open', open);
     // Live closure: setLanguage() re-runs it, so the label follows language too.
-    bindText(btn, () => t(this.gameFlow.state === FLOW.LOBBY ? 'menu.close' : 'menu.open'), 'aria-label');
+    bindText(btn, () => t(this.gameFlow.state === FLOW.LOBBY ? 'menu.close'
+      : this.gameFlow.state === FLOW.PAUSED ? 'pause.close' : 'pause.open'), 'aria-label');
     const glyph = btn.querySelector('.menu-toggle-glyph');
     if (glyph) glyph.textContent = open ? '✕' : '';
   }
@@ -532,43 +617,6 @@ class FlightSimulator {
         cockpit.group.visible = visible;
       }
     };
-  }
-
-  /**
-   * A lobby selection rebuilds scene state and uploads new GPU programs, so the work
-   * runs after the menu has painted the new choice: the click task stays short and the
-   * progress line is visible instead of the menu appearing frozen. The lobby holds the
-   * wanted airport and aircraft, so a choice made while work is running is applied by the
-   * next pass instead of cancelling the earlier one — a newer click replaces the pending
-   * work rather than dropping it, and the drain stops once the scene matches the menu.
-   */
-  queueLobbySelection() {
-    this.lobbySelectionPending = true;
-    this.lobbyScreen?.setSelectionBusy(true);
-    inputLatency?.noteSelectionStart();
-    if (this.lobbySelectionDraining) return;
-    this.lobbySelectionDraining = true;
-    const nextPaint = () => new Promise(resolve => document.hidden
-      ? setTimeout(resolve, 0)
-      : requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    nextPaint().then(async () => {
-      try {
-        while (this.lobby.airport !== this.activeAirport || this.lobby.aircraft !== this.currentAircraftId) {
-          const applied = `${this.activeAirport}|${this.currentAircraftId}`;
-          if (this.lobby.airport !== this.activeAirport) await this.setAirport(this.lobby.airport);
-          else this.setAircraft(this.lobby.aircraft);
-          // A refused choice (unknown id, failed scenery load) must not spin the drain.
-          if (`${this.activeAirport}|${this.currentAircraftId}` === applied) break;
-        }
-      } catch (error) {
-        console.warn('Lobby selection failed:', error);
-      } finally {
-        this.lobbySelectionDraining = false;
-        this.lobbySelectionPending = false;
-        this.lobbyScreen?.setSelectionBusy(false);
-        inputLatency?.noteSelectionApplied();
-      }
-    });
   }
 
   /**

@@ -119,3 +119,16 @@ With Vite on port 5281, run `chrome-session --project flight3d node scripts/veri
 
 See [touch controls](touch-controls.md) for the response curve, release timing,
 sequence tests and portrait/landscape acceptance command.
+
+### Pending selection, pause rig and start-through-loading (issue #322)
+
+`FORCE_GPU=1 LOBBY_PORT=5179 node scripts/verify-lobby-flow.js` drives the whole
+contract in one session: a menu pick leaves the live scene, the persisted selection
+and the held sortie untouched; `Fly` raises the loading card, rebuilds, then hands
+over; the toggle and ESC pause into the drone rig with the bus ducked and restore the
+pilot's exact view on resume; the menu holds the sortie (frozen, drone-framed, silent)
+with no cinematic. It also checks the demo scenario and the 390px bottom sheet.
+
+`node scripts/verify-saved-flight-selection.mjs` reloads three times and asserts that
+only a flight actually flown is restored. Both need hardware GPU per
+[browser GPU setup](browser-gpu.md); the lobby harness budgets minutes under SwiftShader.

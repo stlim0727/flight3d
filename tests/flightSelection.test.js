@@ -17,6 +17,7 @@ import {
   saveSavedAircraft,
   saveSavedScenario,
   saveFlightSelection,
+  hasPendingFlightSelection,
 } from '../src/config/flightSelection.js';
 import { DEFAULT_SCENARIO } from '../src/config/scenarioRegistry.js';
 
@@ -235,4 +236,22 @@ test('Hangang persists as an independent region with a valid default and C172', 
   assert.deepEqual(loadSavedFlightSelection(storage), {airport:'hangang', aircraft:'C172', scenario:'hangang'});
   assert.equal(resolveScenario(null, 'hangang'), 'hangang');
   for (const airport of ['coastal','incheon','lukla','neon']) assert.equal(resolveScenario('hangang', airport), 'runway');
+});
+
+test('hasPendingFlightSelection reports only real differences from the flown scene', () => {
+  const live = { airport: 'coastal', aircraft: 'B738', scenario: 'runway' };
+  assert.equal(hasPendingFlightSelection({ ...live }, live), false);
+  assert.equal(hasPendingFlightSelection({ ...live, airport: 'lukla' }, live), true);
+  assert.equal(hasPendingFlightSelection({ ...live, aircraft: 'C172' }, live), true);
+  assert.equal(hasPendingFlightSelection({ ...live, scenario: 'demo' }, live), true);
+});
+
+test('a menu choice that was never flown stays a pending difference', () => {
+  // localStorage is written at start, so a reloaded menu that was never flown still
+  // differs from the scene that booted from the last flown selection.
+  const storage = createMockStorage();
+  saveFlightSelection({ airport: 'lukla', aircraft: 'C172', scenario: 'cliff' }, storage);
+  const flown = loadSavedFlightSelection(storage);
+  assert.equal(hasPendingFlightSelection({ ...flown }, flown), false);
+  assert.equal(hasPendingFlightSelection({ ...flown, airport: 'incheon' }, flown), true);
 });

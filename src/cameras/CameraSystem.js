@@ -787,7 +787,8 @@ export class CameraSystem {
       const px = aircraftMesh.position.x + Math.sin(this.droneOrbitAngle) * this.droneDistance;
       const py = Math.max(aircraftMesh.position.y + 1.5, aircraftMesh.position.y + this.droneHeight);
       const pz = aircraftMesh.position.z + Math.cos(this.droneOrbitAngle) * this.droneDistance;
-      this.dronePos.set(px, py, pz);
+      // A paused or parked airframe sits on terrain, so the rig must not snap inside it.
+      this.dronePos.set(px, Math.max(py, this.queryGroundHeight(px, pz) + 2.5), pz);
       this.droneInitialized = true;
       this.camera.position.copy(this.dronePos);
       this.camera.up.set(0, 1, 0);
@@ -1073,6 +1074,36 @@ export class CameraSystem {
     this.#applyMode(mode);
     Object.assign(this, state);
     this.preCrashState = null;
+  }
+
+  /**
+   * Hold the paused aircraft in a slow drone orbit, then hand the pilot back the exact view
+   * they flew with. Goes through the internal mode path because setMode() refuses a
+   * programmatic switch once the pilot picked a view; idempotent, and yields to the crash rig.
+   */
+  beginPauseView() {
+    if (this.crashView || this.pauseView) return false;
+    const returnMode = this.temporaryViewTimer > 0 && this.savedMode != null ? this.savedMode : this.mode;
+    this.pauseView = {
+      mode: this.autoSwitch ? CameraSystem.MODES.AUTO : returnMode,
+      userModeSelected: this.userModeSelected,
+      userLookOverridden: this.userLookOverridden,
+      customViewUpdater: this.customViewUpdater,
+      autoPaused: this.autoPaused,
+      autoSwitchTimer: this.autoSwitchTimer,
+      touchAutoResumeTimer: this.touchAutoResumeTimer,
+    };
+    this.#applyMode(CameraSystem.MODES.DRONE);
+    return true;
+  }
+
+  endPauseView() {
+    if (!this.pauseView) return false;
+    const { mode, ...state } = this.pauseView;
+    this.pauseView = null;
+    this.#applyMode(mode);
+    Object.assign(this, state);
+    return true;
   }
 
   updateCrashView(dt, snap = false) {
@@ -1493,6 +1524,7 @@ export class CameraSystem {
         const targetZ = planePos.z + Math.cos(this.droneOrbitAngle) * this.droneDistance;
 
         const targetPos = new THREE.Vector3(targetX, currentHeight, targetZ);
+        targetPos.y = Math.max(targetPos.y, this.queryGroundHeight(targetX, targetZ) + 2.5);
         if (!this.droneInitialized) {
           this.dronePos.copy(targetPos);
           this.droneInitialized = true;

@@ -39,7 +39,8 @@ try {
   await evaluate(() => {
     const sim = window.simulator;
     sim.demoDirector.stop(); sim.gameFlow.enterFlight(); sim.gameFlow.isPhysicsFrozen = () => true;
-    document.getElementById('lobby-aircraft-c172').click(); sim.setPreset('runway');
+    // The menu records the wish only (#322), so this audio harness applies it itself.
+    document.getElementById('lobby-aircraft-c172').click(); sim.setAircraft('C172'); sim.setPreset('runway');
   });
   // Two real pointer clicks cover mute/unmute plus AudioContext's gesture gate.
   const button = await evaluate(() => { const r = document.getElementById('btn-mute').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; });
@@ -58,6 +59,7 @@ try {
   for (const aircraft of ['B738','C172','B738','C172']) {
     const switched = await evaluate(aircraft => {
       const sim = window.simulator; document.getElementById(aircraft==='C172'?'lobby-aircraft-c172':'lobby-aircraft-b738').click();
+      sim.setAircraft(aircraft);
       sim.setPreset('runway'); return {sameContext:sim.audio.ctx===window.__originalAudioContext,piston:sim.audio.isPiston};
     }, aircraft);
     assert.ok(switched.sameContext);assert.equal(switched.piston,aircraft==='C172');

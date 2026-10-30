@@ -1,13 +1,14 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
-// Browser acceptance for the main-menu flow (issue #112 part 3 + #130 + #140).
-// The app boots straight into the flight HUD; the top-left menu toggle opens the
-// menu HOLDING that flight (frozen, no cinematic, input blocked) and closes it
-// again into the same aircraft. Airport switching abandons the held flight and
-// returns the menu to its cinematic backdrop; from such a fresh menu the toggle
-// (or Fly) launches the current selection. Also checks ESC pause, the demo
-// scenario, and desktop + mobile screenshots.
+// Browser acceptance for the sortie state machine (issues #112 part 3, #130, #140, #322).
+// The app boots straight into the flight HUD. From a flight the top-left toggle (or ESC)
+// PAUSES the sortie: physics stop, the aircraft is handed to a slow drone orbit, the engine
+// bus goes silent, and the pause card offers 계속하기 / 재시작 / 메인 메뉴. Resume gives
+// back the exact camera the pilot was flying with.
+// The main menu never touches the live scene: airport, aircraft and scenario picks stay
+// pending until Fly, which rebuilds behind the loading card and then starts the sortie.
+// A pick that changed nothing just releases the held flight. Desktop + mobile screenshots.
 
 const PORT = Number(process.env.LOBBY_PORT) || 5179;
 const CDP_PORT = Number(process.env.LOBBY_CDP_PORT) || 9469;
@@ -98,6 +99,43 @@ async function testLobbyFlow() {
       writeFileSync(`${ART_DIR}/${name}.png`, Buffer.from(shot.data, 'base64'));
       console.log(`📸 ${ART_DIR}/${name}.png`);
     };
+    const look = (label, state) => console.log(`🔍 ${label}:`, JSON.stringify(state));
+    // One read covers every flow surface, so a renamed id or a moved field fails here
+    // loudly instead of quietly returning undefined and asserting against a stale value.
+    const simRead = (extra = '') => evalJs(`(() => {
+      const sim = window.simulator, cam = sim.cameraSystem, M = cam.constructor.MODES;
+      const gl = sim.renderer.getContext();
+      const gpu = gl.getExtension('WEBGL_debug_renderer_info');
+      return {
+        flow: document.body.dataset.flow,
+        gpu: gpu ? String(gl.getParameter(gpu.UNMASKED_RENDERER_WEBGL)).slice(0, 48) : 'unknown',
+        lobbyVisible: getComputedStyle(document.getElementById('lobby-screen')).display !== 'none',
+        pauseVisible: getComputedStyle(document.getElementById('pause-menu')).display !== 'none',
+        toggleOpen: document.getElementById('menu-toggle').classList.contains('is-open'),
+        toggleLabel: document.getElementById('menu-toggle').getAttribute('aria-label'),
+        loadingVisible: !document.getElementById('startup-overlay').hidden,
+        airport: sim.activeAirport, aircraft: sim.currentAircraftId, preset: sim.lastPresetType,
+        wantAirport: sim.lobby.airport, wantAircraft: sim.lobby.aircraft, wantPreset: sim.lobby.preset,
+        briefing: document.getElementById('lobby-briefing').textContent,
+        storedAirport: localStorage.getItem('flight3d.airport'),
+        storedAircraft: localStorage.getItem('flight3d.aircraft'),
+        resumable: sim.gameFlow.canResumeFromLobby(),
+        frozen: sim.gameFlow.isPhysicsFrozen(),
+        demoActive: sim.demoDirector.isActive,
+        blocked: sim.controls.inputBlocked,
+        crashed: sim.isCrashed,
+        alt: sim.telemetry.altitudeFt,
+        camMode: cam.mode, camName: cam.getModeName(),
+        camDrone: cam.mode === M.DRONE, camUserPicked: cam.userModeSelected, camAuto: cam.autoSwitch,
+        camPos: cam.camera.position.toArray().map(v => Math.round(v)),
+        audioPaused: !!sim.audio.isPaused,
+        // The bus is ramped with setTargetAtTime, so the AudioParam value only follows once
+        // the audio clock runs. Headless has no gesture-driven context; assert the target.
+        audioTarget: sim.audio.effectiveVolume,
+        audioCtx: sim.audio.ctx ? sim.audio.ctx.state : 'none',
+        ${extra}
+      };
+    })()`);
 
     await send('Page.enable');
     await send('Runtime.enable');
@@ -113,27 +151,15 @@ async function testLobbyFlow() {
     if (!booted) throw new Error('Simulator never rendered its first frame');
     await sleep(1500);
 
-    // 1. Boot lands straight in the flight HUD (#130): lobby hidden, no cinematic,
-    // the menu toggle reads as closed.
-    const boot = await evalJs(`(() => {
-      const sim = window.simulator;
-      const hudStrip = document.querySelector('.hud-strip');
-      const toggle = document.getElementById('menu-toggle');
-      return {
-        flow: document.body.dataset.flow,
-        lobbyDisplay: getComputedStyle(document.getElementById('lobby-screen')).display,
-        hudStripVisible: hudStrip ? getComputedStyle(hudStrip).display !== 'none' : false,
-        demoActive: sim.demoDirector.isActive,
-        toggleGlyph: toggle.querySelector('.menu-toggle-glyph').textContent,
-      };
-    })()`);
-    console.log('🔍 boot:', JSON.stringify(boot));
-    if (boot.flow !== 'flight' || !boot.hudStripVisible) {
-      throw new Error('App must boot directly into the flight HUD');
-    }
-    if (boot.lobbyDisplay !== 'none') throw new Error('Lobby must be hidden at boot');
-    if (boot.demoActive) throw new Error('Cinematic demo must not run at boot');
-    if (boot.toggleGlyph !== '🏠') throw new Error('Menu toggle must read as closed while flying');
+    // 1. Boot lands straight in the flight HUD (#130): menu and pause card hidden,
+    // no cinematic, the toggle reads as closed, and the sortie is not on the pause rig.
+    const boot = await simRead();
+    look('boot', boot);
+    if (boot.flow !== 'flight') throw new Error('App must boot directly into the flight HUD');
+    if (boot.lobbyVisible || boot.pauseVisible) throw new Error('Menu and pause card must be hidden at boot');
+    if (boot.demoActive || boot.frozen || boot.blocked) throw new Error('Boot flight must be live, not held');
+    if (boot.toggleOpen) throw new Error('Menu toggle must read as closed while flying');
+    if (boot.camDrone) throw new Error('A flown sortie must not be framed by the pause rig');
     await screenshot('01-boot-flight');
 
     // 2. Keyboard steers the sim while flying.
@@ -146,337 +172,220 @@ async function testLobbyFlow() {
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Equal', key: '=' }));
       return { before, after, blocked: sim.controls.inputBlocked };
     })()`);
-    console.log('🔍 flight input:', JSON.stringify(flyingKey));
+    look('flight input', flyingKey);
     if (flyingKey.blocked || !(flyingKey.after > flyingKey.before)) throw new Error('Throttle key must work in flight');
 
-    // 3. The toggle opens the menu HOLDING the live flight: coastal briefing and
-    // coastal-only scenarios show, while the aircraft freezes (no cinematic).
+    // 3. The toggle PAUSES the sortie instead of opening the menu: the pause card is up,
+    // physics stop, the aircraft goes to the drone rig and the bus goes silent.
+    const beforePause = await simRead();
     await evalJs(`document.getElementById('menu-toggle').click()`);
     await sleep(400);
-    const toggleHeld = await evalJs(`(() => {
-      const sim = window.simulator, gf = sim.gameFlow;
-      return {
-        flow: document.body.dataset.flow,
-        lobbyVisible: getComputedStyle(document.getElementById('lobby-screen')).display !== 'none',
-        airport: sim.activeAirport,
-        briefing: document.getElementById('lobby-briefing').textContent,
-        cliffHidden: document.getElementById('lobby-preset-cliff').style.display === 'none',
-        resumable: gf.canResumeFromLobby(),
-        frozen: gf.isPhysicsFrozen(),
-        demoActive: sim.demoDirector.isActive,
-        blocked: sim.controls.inputBlocked,
-      };
-    })()`);
-    console.log('🔍 held menu:', JSON.stringify(toggleHeld));
-    if (toggleHeld.flow !== 'lobby' || !toggleHeld.lobbyVisible) throw new Error('Toggle must open the menu over the flight');
-    if (toggleHeld.airport !== 'coastal' || !/090/.test(toggleHeld.briefing) || !toggleHeld.cliffHidden) {
-      throw new Error('Coastal lobby state/briefing mismatch');
+    const paused = await simRead('elev: sim.controls.elevator');
+    look('toggle→pause', paused);
+    if (paused.flow !== 'paused' || !paused.pauseVisible) throw new Error('The toggle must pause the sortie with the pause card up');
+    if (paused.lobbyVisible) throw new Error('The toggle must open the pause card, not the main menu');
+    if (!paused.frozen || !paused.blocked || paused.resumable) throw new Error('Pausing must freeze physics and block input');
+    if (!paused.camDrone) throw new Error(`A paused sortie must be watched from the drone rig (${paused.camName})`);
+    if (!paused.toggleOpen || paused.toggleLabel === beforePause.toggleLabel) {
+      throw new Error('The toggle must read as open and re-labelled while paused');
     }
-    if (!toggleHeld.resumable || !toggleHeld.frozen || toggleHeld.demoActive || !toggleHeld.blocked) {
-      throw new Error('Opening the menu must hold the flight (resumable + frozen, no cinematic, input blocked)');
+    if (!paused.audioPaused) throw new Error('Pausing must duck the audio bus');
+    if (paused.audioGain !== null && paused.audioGain > 0.001) {
+      throw new Error(`Paused audio leaked (master gain ${paused.audioGain})`);
     }
-    await screenshot('02-lobby-held');
+    await screenshot('02-pause-drone');
 
-    // 3b. Re-clicking the already-active airport button is a no-op: the held
-    // flight and the freeze must survive it.
-    await evalJs(`document.getElementById('lobby-airport-coastal').click()`);
-    await sleep(300);
-    const stillHeld = await evalJs(`(() => {
-      const gf = window.simulator.gameFlow;
-      return { resumable: gf.canResumeFromLobby(), frozen: gf.isPhysicsFrozen() };
-    })()`);
-    if (!stillHeld.resumable || !stillHeld.frozen) {
-      throw new Error('Re-clicking the active airport must not drop the held flight');
-    }
+    // 3b. The rig keeps orbiting the frozen airframe: the camera moves, the aircraft does not.
+    const orbitStart = paused.camPos;
+    await sleep(3000);
+    const orbit = await simRead();
+    const moved = Math.hypot(orbit.camPos[0] - orbitStart[0], orbit.camPos[2] - orbitStart[2]);
+    look('drone orbit', { moved, camPos: orbit.camPos, alt: [paused.alt, orbit.alt] });
+    if (moved < 1) throw new Error(`Drone rig stopped with the sim (moved ${moved} m in 3s)`);
+    if (Math.abs(orbit.alt - paused.alt) > 1.5) throw new Error('Physics not frozen while paused');
+    if (!orbit.audioPaused) throw new Error('Pause must stay silent while the rig orbits');
 
-    // 4. Switching the airport abandons the hold (a new airport re-spawns the
-    // aircraft) and returns the menu to its cinematic backdrop. setAirport stops
-    // the scenario; the flow controller re-arms it after a 1.5s countdown
-    // measured in clamped frame deltas (~0.1s/frame), and the menu holds the
-    // countdown while the new airport's terrain loads. Under swiftshader the
-    // main thread can go ~10s between frames while lukla terrain generates, so
-    // this wait budgets ~8 minutes; run with FORCE_GPU=1 (Vulkan) to make the
-    // whole scenario finish in seconds instead.
-    await evalJs(`document.getElementById('lobby-airport-lukla').click()`);
-    await sleep(600);
-    const abandoned = await evalJs(`(() => {
-      const sim = window.simulator, gf = sim.gameFlow;
-      return { airport: sim.activeAirport, resumable: gf.canResumeFromLobby(), frozen: gf.isPhysicsFrozen() };
-    })()`);
-    console.log('🔍 abandon on switch:', JSON.stringify(abandoned));
-    if (abandoned.airport !== 'lukla' || abandoned.resumable || abandoned.frozen) {
-      throw new Error('Airport switch must abandon the held flight and unfreeze the menu');
-    }
-    let backdropPlaying = false;
-    for (let i = 0; i < 960 && !backdropPlaying; i++) {
-      await sleep(500);
-      backdropPlaying = await evalJs(`window.simulator.demoDirector.isActive`);
-    }
-    if (!backdropPlaying) {
-      const diag = await evalJs(`(() => {
-        const sim = window.simulator, gf = sim.gameFlow;
-        return {
-          flow: document.body.dataset.flow,
-          gf: { state: gf.state, countdown: gf._countdown, demoWasActive: gf._demoWasActive,
-                restartPending: gf._restartPending, fastEnds: gf._fastEnds,
-                lastRestartAt: gf._lastRestartAt, elapsed: gf._elapsed, loopCap: gf.isLoopCapTripped() },
-          demo: { active: sim.demoDirector.isActive, waiting: sim.demoDirector.waitingForTerrain },
-          sim: { crashed: sim.isCrashed, airport: sim.activeAirport },
-        };
-      })()`);
-      throw new Error('Backdrop demo did not restart after airport switch: ' + JSON.stringify(diag, null, 1));
-    }
-
-    // Switch back to coastal; its briefing must show and the spawn preset pick
-    // stays pending (demo keeps playing) until Fly applies it.
-    await evalJs(`document.getElementById('lobby-airport-coastal').click()`);
-    await sleep(600);
-    const coastal = await evalJs(`(() => {
-      const sim = window.simulator;
-      return {
-        airport: sim.activeAirport,
-        lobbyAirport: sim.lobby.airport,
-        briefing: document.getElementById('lobby-briefing').textContent,
-        cliffHidden: document.getElementById('lobby-preset-cliff').style.display === 'none',
-      };
-    })()`);
-    console.log('🔍 coastal:', JSON.stringify(coastal));
-    if (coastal.airport !== 'coastal' || !/090/.test(coastal.briefing) || !coastal.cliffHidden) {
-      throw new Error('Coastal lobby state/briefing mismatch');
-    }
-    await screenshot('03-lobby-coastal');
-    backdropPlaying = false;
-    for (let i = 0; i < 360 && !backdropPlaying; i++) {
-      await sleep(500);
-      backdropPlaying = await evalJs(`window.simulator.demoDirector.isActive`);
-    }
-    if (!backdropPlaying) {
-      const diag = await evalJs(`(() => {
-        const sim = window.simulator, gf = sim.gameFlow;
-        return {
-          flow: document.body.dataset.flow,
-          gf: { state: gf.state, countdown: gf._countdown, demoWasActive: gf._demoWasActive,
-                restartPending: gf._restartPending, fastEnds: gf._fastEnds,
-                lastRestartAt: gf._lastRestartAt, elapsed: gf._elapsed, loopCap: gf.isLoopCapTripped() },
-          demo: { active: sim.demoDirector.isActive, waiting: sim.demoDirector.waitingForTerrain },
-          sim: { crashed: sim.isCrashed, airport: sim.activeAirport },
-        };
-      })()`);
-      throw new Error('Backdrop demo did not restart after returning to coastal: ' + JSON.stringify(diag, null, 1));
-    }
-    await evalJs(`document.getElementById('lobby-preset-cru').click()`);
-    const pendingCheck = await evalJs(`(() => {
-      const sim = window.simulator;
-      return { pending: sim.lobby.preset, demoActive: sim.demoDirector.isActive };
-    })()`);
-    if (pendingCheck.pending !== 'cruise' || !pendingCheck.demoActive) {
-      throw new Error('Preset pick must stay pending while the demo plays');
-    }
-    await evalJs(`document.getElementById('btn-fly').click()`);
-    await sleep(600);
-    const flight = await evalJs(`(() => {
-      const sim = window.simulator;
-      return {
-        flow: document.body.dataset.flow,
-        demoActive: sim.demoDirector.isActive,
-        hudVisible: getComputedStyle(document.querySelector('.hud-strip')).display !== 'none',
-        lobbyHidden: getComputedStyle(document.getElementById('lobby-screen')).display === 'none',
-        ias: sim.telemetry.iasKnots,
-        alt: sim.telemetry.altitudeFt,
-        gearDown: sim.gear.gearState > 0.5,
-        crashed: sim.isCrashed,
-      };
-    })()`);
-    console.log('🔍 after fly:', JSON.stringify(flight));
-    if (flight.flow !== 'flight' || flight.demoActive || flight.lobbyHidden === false) {
-      throw new Error('Fly did not hand over to flight');
-    }
-    if (flight.alt < 1000 || flight.gearDown) {
-      throw new Error(`Coastal cruise preset not applied (alt ${flight.alt}, gearDown ${flight.gearDown})`);
-    }
-    await screenshot('03-in-flight');
-
-    // 5. Keyboard works again in flight.
-    const flying = await evalJs(`(() => {
-      const sim = window.simulator;
-      const before = sim.controls.throttle;
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Equal', key: '=' }));
-      sim.integratePhysics(0.1);
-      const after = sim.controls.throttle;
-      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Equal', key: '=' }));
-      return { before, after, blocked: sim.controls.inputBlocked };
-    })()`);
-    if (flying.blocked || !(flying.after > flying.before)) throw new Error('Throttle key must work in flight');
-
-    // 6. ESC pauses: physics frozen, menu up; held keys released.
-    await evalJs(`(() => {
-      const sim = window.simulator;
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w' }));
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    })()`);
-    await sleep(300);
-    const paused = await evalJs(`(() => {
-      const sim = window.simulator;
-      const alt = sim.telemetry.altitudeFt;
-      return { flow: document.body.dataset.flow, alt, blocked: sim.controls.inputBlocked, elev: sim.controls.elevator };
-    })()`);
-    await sleep(700);
-    const stillFrozen = await evalJs(`(() => {
-      const sim = window.simulator;
-      return { alt: sim.telemetry.altitudeFt, elev: sim.controls.elevator, pitchHeld: !!sim.controls.keys['KeyW'] };
-    })()`);
-    console.log('🔍 paused:', JSON.stringify({ ...paused, ...stillFrozen }));
-    if (paused.flow !== 'paused' || !paused.blocked) throw new Error('ESC did not open the pause menu');
-    if (Math.abs(stillFrozen.alt - paused.alt) > 1.5) throw new Error('Physics not frozen while paused');
-    if (stillFrozen.pitchHeld) throw new Error('Held keys must be released on pause');
-    // Physics is frozen, so the slewed elevator cannot decay yet — but it must be
-    // stuck (no input processing) and must spring back to neutral after resume.
-    if (Math.abs(stillFrozen.elev - paused.elev) > 0.02) throw new Error('Elevator moved while paused');
-    await screenshot('04-pause');
-
-    // 7. Resume restores flight; released stick returns to center.
+    // 4. 계속하기 releases the hold, brings the sound back and hands the camera over.
     await evalJs(`document.getElementById('btn-pause-resume').click()`);
-    let resumed = { flow: 'paused', blocked: true, elev: 1 };
+    let resumed = await simRead('elev: sim.controls.elevator');
     for (let i = 0; i < 16; i++) {
       await sleep(500);
-      resumed = await evalJs(`(() => ({
-        flow: document.body.dataset.flow,
-        blocked: window.simulator.controls.inputBlocked,
-        elev: window.simulator.controls.elevator,
-      }))()`);
+      resumed = await simRead('elev: sim.controls.elevator');
       if (resumed.flow === 'flight' && !resumed.blocked && Math.abs(resumed.elev) <= 0.05) break;
     }
-    console.log('🔍 resumed:', JSON.stringify(resumed));
+    look('resume', resumed);
     if (resumed.flow !== 'flight' || resumed.blocked) throw new Error('Resume failed');
     if (Math.abs(resumed.elev) > 0.05) throw new Error(`Elevator did not neutralize after resume: ${resumed.elev}`);
+    if (resumed.camDrone) throw new Error(`Resume left the sortie on the pause rig (${resumed.camName})`);
+    if (resumed.camMode !== beforePause.camMode || resumed.camAuto !== beforePause.camAuto) {
+      throw new Error(`Resume did not restore the view (${resumed.camName} ≠ ${beforePause.camName})`);
+    }
+    if (resumed.audioPaused) throw new Error('Resume must bring the sound back');
+    if (resumed.audioGain !== null && resumed.audioGain < 0.5) {
+      throw new Error(`Resume left the bus ducked (master gain ${resumed.audioGain})`);
+    }
+    await screenshot('03-resumed-flight');
 
-    // 8. Pause → main menu HOLDS the live flight (frozen, no cinematic); the
-    // top-left toggle then drops straight back into the same aircraft.
+    // 5. ESC pauses a pilot-chosen view, and ESC again restores that exact view.
+    const picked = await evalJs(`(() => {
+      const sim = window.simulator;
+      sim.cameraSystem.setMode(sim.cameraSystem.constructor.MODES.WING, true);
+      return { mode: sim.cameraSystem.mode, user: sim.cameraSystem.userModeSelected };
+    })()`);
+    await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+    await sleep(300);
+    const escPaused = await simRead();
+    look('esc pause', escPaused);
+    if (escPaused.flow !== 'paused' || !escPaused.camDrone) throw new Error('ESC must pause onto the drone rig');
+    await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+    await sleep(300);
+    const escResumed = await simRead();
+    look('esc resume', escResumed);
+    if (escResumed.flow !== 'flight') throw new Error('ESC while paused must resume');
+    if (escResumed.camMode !== picked.mode || !escResumed.camUserPicked) {
+      throw new Error(`Resume did not restore the pilot's own view (${escResumed.camName})`);
+    }
+
+    // 6. Pause → 메인 메뉴 holds the sortie behind the menu: frozen, still framed by the
+    // drone rig, silent, and with no cinematic replaying over it.
     await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
     await sleep(200);
     await evalJs(`document.getElementById('btn-pause-lobby').click()`);
     await sleep(400);
-    const heldMenu = await evalJs(`(() => {
-      const sim = window.simulator, gf = sim.gameFlow;
-      return {
-        flow: document.body.dataset.flow,
-        resumable: gf.canResumeFromLobby(),
-        frozen: gf.isPhysicsFrozen(),
-        demoActive: sim.demoDirector.isActive,
-        lobbyVisible: getComputedStyle(document.getElementById('lobby-screen')).display !== 'none',
-        toggleOpen: document.getElementById('menu-toggle').classList.contains('is-open'),
-        alt: sim.telemetry.altitudeFt,
-      };
-    })()`);
-    console.log('🔍 pause→menu (held):', JSON.stringify(heldMenu));
+    const heldMenu = await simRead();
+    look('pause→menu (held)', heldMenu);
     if (heldMenu.flow !== 'lobby' || !heldMenu.resumable || !heldMenu.frozen) {
       throw new Error('Returning to the menu must hold the flight (resumable + frozen)');
     }
-    if (!heldMenu.lobbyVisible || !heldMenu.toggleOpen) throw new Error('Menu overlay + open-state toggle must show');
+    if (!heldMenu.lobbyVisible || heldMenu.pauseVisible || !heldMenu.toggleOpen) {
+      throw new Error('Menu overlay must show, the pause card must close, toggle must read open');
+    }
+    if (!heldMenu.camDrone) throw new Error('A held sortie must stay framed by the drone rig while the menu is up');
+    if (!heldMenu.audioPaused) throw new Error('A held sortie must be silent');
     if (heldMenu.demoActive) throw new Error('Cinematic must not replay while a flight is held');
-    if (heldMenu.alt < 1000) throw new Error('Held aircraft fell out of cruise while in the menu');
-    await screenshot('05-lobby-held');
+    await screenshot('04-lobby-held');
 
-    // 8a. Same toggle closes the menu and resumes the held aircraft (no respawn).
-    await evalJs(`document.getElementById('menu-toggle').click()`);
-    await sleep(300);
-    const resumedFlight = await evalJs(`(() => {
-      const sim = window.simulator, gf = sim.gameFlow;
-      return {
-        flow: document.body.dataset.flow,
-        frozen: gf.isPhysicsFrozen(),
-        resumable: gf.canResumeFromLobby(),
-        toggleOpen: document.getElementById('menu-toggle').classList.contains('is-open'),
-        alt: sim.telemetry.altitudeFt,
-      };
-    })()`);
-    console.log('🔍 toggle→flight:', JSON.stringify(resumedFlight));
-    if (resumedFlight.flow !== 'flight' || resumedFlight.frozen || resumedFlight.resumable) {
-      throw new Error('Toggle did not resume the held flight');
-    }
-    if (resumedFlight.toggleOpen) throw new Error('Toggle should read as closed once flying');
-    if (resumedFlight.alt < 1000) throw new Error('Toggle respawned to the runway instead of resuming');
-
-    // 8b. Open the menu via the toggle; the demo scenario is selectable and Fly starts it.
-    await evalJs(`document.getElementById('menu-toggle').click()`);   // flight -> held menu
-    await sleep(300);
-    await evalJs(`document.getElementById('lobby-preset-demo').click()`);
-    const demoPending = await evalJs(`(() => ({
-      pending: window.simulator.lobby.preset,
-      active: document.getElementById('lobby-preset-demo').classList.contains('active'),
-      briefing: document.getElementById('lobby-briefing').textContent,
-    }))()`);
-    if (demoPending.pending !== 'demo' || !demoPending.active || !/demo flight/i.test(demoPending.briefing)) {
-      throw new Error('Demo scenario not selectable in menu: ' + JSON.stringify(demoPending));
-    }
-    await evalJs(`document.getElementById('btn-fly').click()`);
-    await sleep(800);
-    const demoFlight = await evalJs(`(() => {
-      const sim = window.simulator;
-      return {
-        flow: document.body.dataset.flow,
-        active: sim.demoDirector.isActive,
-        bannerVisible: getComputedStyle(document.getElementById('demo-banner')).display !== 'none',
-      };
-    })()`);
-    console.log('🔍 demo scenario:', JSON.stringify(demoFlight));
-    if (demoFlight.flow !== 'flight' || !demoFlight.active || !demoFlight.bannerVisible) {
-      throw new Error('Demo scenario did not start a demo flight');
-    }
-    await screenshot('05b-demo-flight');
-
-    // 9. ESC inside the menu is a no-op.
-    await evalJs(`document.getElementById('menu-toggle').click()`);   // open menu (holds demo)
-    await sleep(300);
+    // 7. ESC inside the menu is a no-op.
     await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
     await sleep(150);
-    if (await evalJs(`document.body.dataset.flow`) !== 'lobby') throw new Error('ESC must be ignored in the menu');
+    if ((await simRead()).flow !== 'lobby') throw new Error('ESC must be ignored in the menu');
 
-    // 10. The top-left toggle holds the flight; switching airport abandons the
-    //     hold so the toggle falls back to launching the newly selected scenario.
-    await evalJs(`document.getElementById('menu-toggle').click()`);   // resume demo flight
-    await sleep(300);
-    await evalJs(`document.getElementById('menu-toggle').click()`);   // flight -> held menu
-    await sleep(300);
-    const hudHeld = await evalJs(`(() => {
-      const sim = window.simulator, gf = sim.gameFlow;
-      return {
-        flow: document.body.dataset.flow,
-        blocked: sim.controls.inputBlocked,
-        resumable: gf.canResumeFromLobby(),
-        toolbarHidden: getComputedStyle(document.querySelector('.flight-toolbar')).display === 'none',
-      };
-    })()`);
-    console.log('🔍 hud return (held):', JSON.stringify(hudHeld));
-    if (hudHeld.flow !== 'lobby' || !hudHeld.blocked || !hudHeld.resumable) {
-      throw new Error('Menu toggle must return to the menu holding the flight');
-    }
-    if (!hudHeld.toolbarHidden) throw new Error('Toolbar must be hidden in the menu');
-
-    // Changing the airport re-spawns the aircraft, so the held flight is released.
+    // 8. Menu picks stay PENDING: the live scene, the flown scenario and storage all keep
+    // their old values, the hold survives them, and the menu itself shows the wish.
     await evalJs(`document.getElementById('lobby-airport-lukla').click()`);
-    await sleep(600);
-    const afterSwitch = await evalJs(`(() => {
-      const sim = window.simulator, gf = sim.gameFlow;
-      return { airport: sim.activeAirport, resumable: gf.canResumeFromLobby(), frozen: gf.isPhysicsFrozen() };
-    })()`);
-    console.log('🔍 airport switch abandons hold:', JSON.stringify(afterSwitch));
-    if (afterSwitch.airport !== 'lukla' || afterSwitch.resumable || afterSwitch.frozen) {
-      throw new Error('Airport switch must abandon the held flight and unfreeze the menu');
-    }
-    await screenshot('06-menu-abandon-on-switch');
-
-    // With no flight held, the toggle now launches the selected scenario.
-    await evalJs(`document.getElementById('menu-toggle').click()`);
+    await evalJs(`document.getElementById('lobby-aircraft-c172').click()`);
     await sleep(400);
-    if (await evalJs(`document.body.dataset.flow`) !== 'flight') {
-      throw new Error('Toggle from a non-held menu must launch the flight');
+    const wanted = await simRead('demoButton: getComputedStyle(document.getElementById("lobby-preset-demo")).display');
+    look('pending picks', wanted);
+    if (wanted.wantAirport !== 'lukla' || wanted.wantAircraft !== 'C172') {
+      throw new Error('The menu did not record the requested airport and aircraft');
     }
-    console.log('🔍 toggle-launch-from-fresh-menu OK');
+    if (wanted.airport !== boot.airport || wanted.aircraft !== boot.aircraft || wanted.preset !== boot.preset) {
+      throw new Error(`A menu pick touched the live scene (${wanted.airport}/${wanted.aircraft}/${wanted.preset})`);
+    }
+    if (wanted.storedAirport === 'lukla') throw new Error('An unflied pick must not be persisted');
+    if (!wanted.resumable || !wanted.frozen || !wanted.camDrone || !wanted.audioPaused) {
+      throw new Error('Browsing the menu must keep holding the sortie (frozen, drone, silent)');
+    }
+    if (!/24|tenzing|hilla|lukla/i.test(wanted.briefing)) {
+      throw new Error('The menu briefing did not follow the pending airport: ' + wanted.briefing);
+    }
+    await screenshot('05-lobby-pending');
 
-    // 11. Mobile portrait: lobby renders as a bottom sheet.
-    await evalJs(`document.getElementById('menu-toggle').click()`);   // back into the menu
+    // 9. Fly rebuilds behind the loading card, then hands over to the new sortie.
+    // The card must be seen before the swap: under swiftshader the main thread can go
+    // ~10s between frames while lukla terrain generates, so the waits budget minutes;
+    // run with FORCE_GPU=1 (Vulkan) to make the whole scenario finish in seconds.
+    await evalJs(`document.getElementById('btn-fly').click()`);
+    const loading = await simRead();
+    look('loading', { loadingVisible: loading.loadingVisible, camDrone: loading.camDrone });
+    if (!loading.loadingVisible) throw new Error('Fly must raise the loading card before rebuilding the scene');
+    let flown = await simRead();
+    for (let i = 0; i < 960; i++) {
+      await sleep(500);
+      flown = await simRead();
+      if (flown.flow === 'flight' && flown.airport === 'lukla' && !flown.loadingVisible) break;
+    }
+    look('after fly', flown);
+    if (flown.flow !== 'flight' || flown.airport !== 'lukla' || flown.aircraft !== 'C172') {
+      throw new Error(`Fly did not rebuild the scene for the pending selection (${flown.airport}/${flown.aircraft})`);
+    }
+    if (flown.loadingVisible) throw new Error('The loading card was left up after the start');
+    if (flown.storedAirport !== 'lukla' || flown.storedAircraft !== 'C172') {
+      throw new Error('The flown selection was not persisted for the next boot');
+    }
+    if (flown.camDrone || flown.audioPaused || flown.frozen || flown.blocked) {
+      throw new Error('The new sortie did not take over camera, audio and input');
+    }
+    if (flown.crashed) throw new Error('The pending start spawned into a crash');
+    await screenshot('06-lukla-flight');
+
+    // 10. Same menu, nothing changed: Fly just releases the held sortie — no loading
+    // card and no re-spawn, because the scene already matches the menu.
+    await evalJs(`document.getElementById('menu-toggle').click()`);
     await sleep(300);
+    await evalJs(`document.getElementById('btn-pause-lobby').click()`);
+    await sleep(400);
+    const heldAgain = await simRead();
+    if (heldAgain.flow !== 'lobby' || !heldAgain.resumable) throw new Error('Menu did not hold the Lukla sortie');
+    await evalJs(`document.getElementById('btn-fly').click()`);
+    const noopStart = await simRead();
+    await sleep(400);
+    const released = await simRead();
+    look('unchanged fly', { loadingVisible: noopStart.loadingVisible, flow: released.flow, alt: [heldAgain.alt, released.alt] });
+    if (noopStart.loadingVisible) throw new Error('An unchanged menu must not raise the loading card');
+    if (released.flow !== 'flight' || released.frozen || released.resumable) {
+      throw new Error('Fly with nothing changed must resume the held flight');
+    }
+    if (Math.abs(released.alt - heldAgain.alt) > 5) throw new Error('Unchanged Fly respawned instead of resuming');
+    if (released.airport !== 'lukla') throw new Error('Unchanged Fly rebuilt the scene it was holding');
+
+    // 11. Scenario picks are pending too, and a scenario-only start needs no rebuild:
+    // the demo waits for Fly, then takes over the same airport.
+    await evalJs(`document.getElementById('menu-toggle').click()`);
+    await sleep(300);
+    await evalJs(`document.getElementById('btn-pause-lobby').click()`);
+    await sleep(400);
+    if (wanted.demoButton === 'none') throw new Error('Demo scenario is not offered at Lukla with a C172');
+    await evalJs(`document.getElementById('lobby-preset-demo').click()`);
+    const demoPending = await simRead();
+    look('demo pending', { want: demoPending.wantPreset, flown: demoPending.preset, airport: demoPending.airport });
+    if (demoPending.wantPreset !== 'demo' || demoPending.preset === 'demo') {
+      throw new Error('A scenario pick must stay pending until Fly');
+    }
+    if (!demoPending.resumable) throw new Error('A scenario pick must not drop the held sortie');
+    await evalJs(`document.getElementById('btn-fly').click()`);
+    const demoStart = await simRead();
+    if (demoStart.loadingVisible) throw new Error('A scenario-only change must not raise the scene-rebuild card');
+    let demoFlight = await simRead('banner: getComputedStyle(document.getElementById("demo-banner")).display');
+    for (let i = 0; i < 240; i++) {
+      await sleep(500);
+      demoFlight = await simRead('banner: getComputedStyle(document.getElementById("demo-banner")).display');
+      if (demoFlight.flow === 'flight' && (demoFlight.demoActive || demoFlight.banner !== 'none')) break;
+    }
+    look('demo flight', { flow: demoFlight.flow, demo: demoFlight.demoActive, banner: demoFlight.banner, airport: demoFlight.airport });
+    if (demoFlight.flow !== 'flight' || (!demoFlight.demoActive && demoFlight.banner === 'none')) {
+      throw new Error('Fly did not start the demo scenario');
+    }
+    if (demoFlight.airport !== 'lukla') throw new Error('The demo start changed the airport');
+    await screenshot('07-demo-flight');
+
+    // 12. Pausing the demo holds it the same way: frozen, silent, on the drone rig.
+    await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+    await sleep(400);
+    const demoPaused = await simRead();
+    look('demo paused', { flow: demoPaused.flow, cam: demoPaused.camName, audio: demoPaused.audioPaused });
+    if (demoPaused.flow !== 'paused' || !demoPaused.frozen || !demoPaused.camDrone || !demoPaused.audioPaused) {
+      throw new Error('ESC during a demo flight must pause it onto the drone rig');
+    }
+    await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+    await sleep(300);
+
+    // 13. Mobile portrait: the lobby renders as a bottom sheet with a touch-sized Fly.
+    await evalJs(`document.getElementById('menu-toggle').click()`);   // flight -> pause
+    await sleep(200);
+    await evalJs(`document.getElementById('btn-pause-lobby').click()`);
+    await sleep(400);
     await send('Emulation.setDeviceMetricsOverride', {
       width: 390, height: 844, deviceScaleFactor: 2, mobile: true,
       screenOrientation: { type: 'portraitPrimary', angle: 0 },
@@ -488,10 +397,10 @@ async function testLobbyFlow() {
       const btn = document.getElementById('btn-fly').getBoundingClientRect();
       return { cardVisible: card.getBoundingClientRect().height > 100, flyH: btn.height };
     })()`);
-    console.log('🔍 mobile lobby:', JSON.stringify(mobile));
+    look('mobile lobby', mobile);
     if (!mobile.cardVisible) throw new Error('Lobby card not rendered on mobile');
     if (mobile.flyH < 40) throw new Error('Fly button too small for touch');
-    await screenshot('07-lobby-mobile');
+    await screenshot('08-lobby-mobile');
 
     console.log('✅ ALL LOBBY/PAUSE FLOW CHECKS PASSED');
     ws.close();

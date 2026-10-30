@@ -44,6 +44,15 @@ async function click(selector) {
   await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
   await settle();
 }
+// A Fly that changes airport or aircraft rebuilds behind the loading card and resolves
+// asynchronously (#322), so the checks that follow a click have to wait for that start.
+async function waitApplied(tries = 240) {
+  for (let i = 0; i < tries; i++) {
+    if (await evaluate('!sim.startingFlight && document.getElementById("startup-overlay").hidden')) return;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  throw new Error('the pending flight start never settled');
+}
 async function capture(name) {
   await evaluate("document.querySelector('#pause-menu')?.style.setProperty('display','none','important');true");
   const result = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -76,9 +85,14 @@ try {
   await check('cancel pending selection',`(async()=>{const p=sim.setAirport('incheon');await sim.setAirport('coastal');await p;return {airport:sim.activeAirport,incheonVisible:sim.incheonAirport.group.visible};})()`,v=>{assert.equal(v.airport,'coastal');assert.equal(v.incheonVisible,false);});
   await evaluate("sim.gameFlow.enterLobby();true");
   await click('#lobby-airport-incheon');
-  await check('lobby selection and manual scenarios',`({airport:sim.activeAirport,city:sim.incheonAirport.group.visible,terrain:sim.incheonAirport.terrain.mesh.visible,coastal:sim.airport.group.visible,lukla:sim.luklaAirport?.group.visible ?? false,demo:getComputedStyle(document.querySelector('#lobby-preset-demo')).display,frozen:sim.gameFlow.isPhysicsFrozen(),attribution:!document.querySelector('#incheon-attribution').hidden})`,v=>{assert.equal(v.airport,'incheon');assert.ok(v.city&&v.terrain&&v.frozen&&v.attribution);assert.equal(v.coastal,false);assert.equal(v.lukla,false);assert.equal(v.demo,'none');});
+  // Picking an airport is a wish, not a rebuild (#322): the live scene and the
+  // persisted selection both stay on what was actually flown last.
+  await check('airport pick stays pending',`({want:sim.lobby.airport,airport:sim.activeAirport,city:sim.incheonAirport.group.visible,terrain:sim.incheonAirport.terrain.mesh.visible,coastal:sim.airport.group.visible,lukla:sim.luklaAirport?.group.visible ?? false,starting:sim.startingFlight,stored:localStorage.getItem('flight3d.airport')})`,v=>{assert.equal(v.want,'incheon');assert.equal(v.airport,'coastal');assert.equal(v.city,false);assert.equal(v.terrain,false);assert.equal(v.coastal,true);assert.equal(v.lukla,false);assert.equal(v.starting,false);assert.notEqual(v.stored,'incheon');});
   await capture('lobby');
-  await click('#btn-fly');await evaluate("sim.gameFlow.pause();sim.setPreset('runway');sim.setTimeOfDay(12.5);sim.cameraSystem.setMode(1,true);true");
+  await click('#btn-fly');
+  await waitApplied();
+  await check('Fly applies it: incheon scenery and manual scenarios only',`({airport:sim.activeAirport,city:sim.incheonAirport.group.visible,terrain:sim.incheonAirport.terrain.mesh.visible,coastal:sim.airport.group.visible,lukla:sim.luklaAirport?.group.visible ?? false,demo:getComputedStyle(document.querySelector('#lobby-preset-demo')).display,attribution:!document.querySelector('#incheon-attribution').hidden,stored:localStorage.getItem('flight3d.airport')})`,v=>{assert.equal(v.airport,'incheon');assert.ok(v.city&&v.terrain&&v.attribution);assert.equal(v.coastal,false);assert.equal(v.lukla,false);assert.equal(v.demo,'none');assert.equal(v.stored,'incheon');});
+  await evaluate("sim.gameFlow.pause();sim.setPreset('runway');sim.setTimeOfDay(12.5);sim.cameraSystem.setMode(1,true);true");
   // The pilot laws run as an injected source string, so their import lines are
   // dropped: splice in the same declarations the app's modules would resolve.
   const lawDeps=(await readFile('src/physics/trimWheel.js','utf8')).replace(/^export /gm,'');
