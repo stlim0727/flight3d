@@ -252,8 +252,8 @@ export class SkyAtmosphere {
       // Night / Twilight (elevation < -4.0°)
       this.sunLight.intensity = 0.06;
       this.sunLight.color.setRGB(0.2, 0.3, 0.5); // Cool lunar moonlight
-      this.ambientLight.color.setRGB(0.12, 0.16, 0.28);
-      this.ambientLight.intensity = 0.34;
+      this.ambientLight.color.setRGB(0.18, 0.22, 0.35);
+      this.ambientLight.intensity = 0.45;
 
       this.fogColor.setRGB(0.03, 0.05, 0.10); // Deep midnight navy/indigo
       this.baseDensity = 0.00020;

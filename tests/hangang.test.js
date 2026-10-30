@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Vector3, Quaternion, Euler } from 'three';
+import { Vector3, Quaternion, Euler, Scene } from 'three';
 import { HangangRun } from '../src/director/HangangRun.js';
+import { HangangScenario } from '../src/director/HangangScenario.js';
 import { HANGANG_COURSE as course, riverCenter } from '../src/config/hangangCourse.js';
 import { lobbyBriefing } from '../src/ui/lobbyBriefing.js';
 import { setLanguage } from '../src/i18n/index.js';
@@ -73,3 +74,50 @@ test('mission briefing overrides unrelated airport/runway instructions', () => {
   }
   setLanguage('en');
 });
+
+test('HangangScenario stop reconciles active airport terrain visibility', () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = {
+    getElementById: () => ({ addEventListener: () => {}, hidden: false }),
+    createElement: () => ({ getContext: () => new Proxy({}, { get: () => () => {} }) })
+  };
+  try {
+    const sim = {
+      scene: new Scene(),
+      activeAirport: 'incheon',
+      gameFlow: { state: 'flight' },
+      position: new Vector3(),
+      linearVelocity: new Vector3(),
+      terrain: { mesh: { visible: false } },
+      airport: { group: { visible: false } },
+      water: { mesh: { visible: true } },
+      ships: { group: { visible: false } },
+      foliage: { group: { visible: false } },
+      neonCity: { group: { visible: false } },
+      incheonAirport: {
+        group: { visible: false },
+        terrain: { mesh: { visible: false } }
+      },
+      collisionDetector: {
+        setEnvironment: () => {},
+        terrain: null, airport: null, foliage: null, ships: null, water: null
+      },
+      sky: { timeOfDay: 12 },
+      aero: { windWorld: new Vector3() },
+      cameraSystem: { towerPos: new Vector3() },
+      setTimeOfDay: () => {}
+    };
+
+    const hs = new HangangScenario(sim);
+    hs.start();
+    hs.stop();
+    assert.equal(sim.incheonAirport.terrain.mesh.visible, true);
+    assert.equal(sim.incheonAirport.group.visible, true);
+    assert.equal(sim.currentTerrain, sim.incheonAirport.terrain);
+    assert.equal(sim.currentAirport, sim.incheonAirport);
+  } finally {
+    if (prevDoc === undefined) delete globalThis.document;
+    else globalThis.document = prevDoc;
+  }
+});
+
