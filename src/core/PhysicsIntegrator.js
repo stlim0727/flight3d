@@ -295,6 +295,7 @@ class PhysicsIntegratorMethods {
       flapIndex: this.aero.flapsIndex,
       spoilers: this.aero.spoilers,
       touchdown: gearResult.touchdown,
+      touchdownSinkRate: Math.max(0, ...gearResult.touchdownContacts.map(contact => contact.sinkRate)),
       onGround: gearResult.onGround,
       apEngaged: this.autopilot.master,
       airportKey: this.activeAirport,
