@@ -462,6 +462,8 @@ class SimulatorHudAndBindingsMethods {
         this.lobbyScreen?.refresh();
       },
       onFly: () => this.fly(),
+      canResume: () => this.gameFlow.canResumeFromLobby() && !this.isCrashed,
+      onResume: () => this.resumeFlight(),
     });
     this.renderDiagnosticsPanel = new RenderDiagnosticsPanel(this);
     this.developerPanel = new DeveloperPanel(this);

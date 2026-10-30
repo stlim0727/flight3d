@@ -238,6 +238,28 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
   await screenshot(`${out}/390x660-f16-sihwa-demo-ko.png`);
   await click('#btn-skip-demo');
   assert.ok(await evaluate('!window.simulator.demoDirector.isActive'), 'Korean take-control in Sihwa demo');
+  const heldPosition = await evaluate('window.simulator.position.toArray()');
+  await click('#menu-toggle');
+  assert.equal(await evaluate('window.simulator.gameFlow.state'), 'lobby', 'menu button opens main menu directly');
+  assert.ok(await evaluate('!document.getElementById("btn-lobby-resume").hidden'), 'main menu offers resume');
+  await evaluate(() => document.getElementById('menu-toggle').click());
+  assert.equal(await evaluate('window.simulator.gameFlow.state'), 'lobby', 'repeated menu press cannot start or resume');
+  await click('#btn-lobby-resume');
+  assert.equal(await evaluate('window.simulator.gameFlow.state'), 'flight', 'resume returns to flight');
+  assert.deepEqual(await evaluate('window.simulator.position.toArray()'), heldPosition, 'resume preserves held position');
+  await click('#menu-toggle');
+  await evaluate(() => {
+    const s = window.simulator;
+    s.lobby.airport = s.activeAirport;
+    s.lobby.aircraft = s.currentAircraftId;
+    s.lobby.preset = 'runway';
+    s.lobbyScreen.refresh();
+    const start = s.startFlight;
+    s.startFlight = function () { this.__menuStarts = (this.__menuStarts || 0) + 1; return start.call(this); };
+  });
+  await click('#btn-fly');
+  assert.equal(await evaluate('window.simulator.gameFlow.state'), 'flight', 'start new leaves main menu');
+  assert.equal(await evaluate('window.simulator.__menuStarts'), 1, 'start new explicitly respawns');
   assert.deepEqual(exceptions, [], 'no browser exceptions');
   await writeFile(`${out}/results.json`, JSON.stringify({ gpu, results }, null, 2));
 });

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FLOW, GameFlowController } from '../src/ui/GameFlowController.js';
+import { SimulatorClass } from './helpers/simulatorClass.js';
 
 function makeController(overrides = {}) {
   const flags = { active: false, waiting: false };
@@ -264,7 +265,7 @@ test('a held sortie is visible to the observer at the moment the state changes',
   assert.deepEqual(held.at(-1), false, 'a fresh menu holds nothing');
 });
 
-test('opening and closing the menu after a crash preserves crash state without repeating the crash', async () => {
+test('menu holds a crashed flight until an explicit new start, without repeating the crash', async () => {
   const THREE = await import('three');
   const { installPhysicsIntegrator } = await import('../src/core/PhysicsIntegrator.js');
 
@@ -308,21 +309,16 @@ test('opening and closing the menu after a crash preserves crash state without r
       };
       this.isCrashed = false;
       this.crashResult = null;
+      this.lobby = { airport: 'coastal', aircraft: 'B738', preset: 'runway' };
+      this.activeAirport = 'coastal';
+      this.currentAircraftId = 'B738';
     }
     toggleMainMenu() {
-      const flow = this.gameFlow;
-      if (flow.state === FLOW.LOBBY) {
-        // Mirrors main.js: only an airworthy held flight is released; a wreck respawns.
-        if (flow.canResumeFromLobby() && !this.isCrashed) {
-          flow.enterFlight();
-          return;
-        }
-        flow.enterFlight();
-        this.clearCrashState();   // stand-in for the respawn setPreset() performs
-        return;
-      }
-      if (flow.state === FLOW.PAUSED) flow.resume();
-      else flow.pause();
+      SimulatorClass.prototype.toggleMainMenu.call(this);
+    }
+    startFlight() {
+      this.gameFlow.enterFlight();
+      this.clearCrashState(); // Stand-in for the respawn setPreset() performs.
     }
   }
   installPhysicsIntegrator(SimHarness);
@@ -333,13 +329,13 @@ test('opening and closing the menu after a crash preserves crash state without r
   assert.equal(sim.explosions, 1);
   assert.equal(sim.aircraft.group.visible, false);
 
-  // Open and close menu via toggleMainMenu: it pauses the crashed flight, resume keeps it crashed.
+  // Menu presses cannot silently resume or respawn a wreck.
   sim.toggleMainMenu();
-  assert.equal(sim.gameFlow.state, FLOW.PAUSED);
+  assert.equal(sim.gameFlow.state, FLOW.LOBBY);
   assert.equal(sim.isCrashed, true);
 
   sim.toggleMainMenu();
-  assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
+  assert.equal(sim.gameFlow.state, FLOW.LOBBY);
   assert.equal(sim.isCrashed, true);
   for (let i = 0; i < 10; i++) sim.integratePhysics(1 / 120);
   assert.equal(sim.collisionChecks, 0);
@@ -350,9 +346,8 @@ test('opening and closing the menu after a crash preserves crash state without r
   assert.equal(sim.gameFlow.state, FLOW.LOBBY);
   assert.equal(sim.gameFlow.canResumeFromLobby(), true);
   assert.equal(sim.isCrashed, true);
-  // A wreck held behind the menu is not worth returning to: closing the menu respawns
-  // it instead of handing the pilot back a crashed airframe.
-  sim.toggleMainMenu();
+  // Only an explicit new-flight action respawns the crashed airframe.
+  await SimulatorClass.prototype.fly.call(sim);
   assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
   assert.equal(sim.isCrashed, false);
   assert.equal(sim.aircraft.group.visible, true);
