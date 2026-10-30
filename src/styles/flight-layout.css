@@ -209,7 +209,7 @@ body.demo-active .flight-toolbar #btn-skip-demo {
 body.demo-active .flight-toolbar :is(#btn-gear, #btn-flaps-ret, #btn-flaps-ext, #btn-spoilers, #btn-reverser) { display: none; }
 /* Notifications follow BOTH rows; the expandable guide is informational. */
 .demo-banner, .compact-ui .demo-banner, .demo-pill-btn, .compact-ui .demo-pill-btn {
-  top: var(--demo-row-top, calc(var(--edge-top) + 100px));
+  top: calc(var(--demo-row-top, calc(var(--edge-top) + 100px)) + var(--flight-alert-space, 0px));
 }
 .demo-banner .demo-actions .btn { min-height: 44px; min-width: 44px; }
 .stall-banner { top: var(--demo-row-top, calc(var(--edge-top) + 100px)); }
@@ -225,8 +225,8 @@ body:has(#ap-panel:not([hidden]), #flight-more-panel:not([hidden])) :is(.demo-ba
 .toast { top: auto; bottom: calc(var(--edge-bottom) + 144px); max-width: calc(100vw - var(--edge-left) - var(--edge-right)); font-size: 12px; text-align: center; }
 .audio-start-hint { top: auto; bottom: calc(var(--edge-bottom) + 190px); }
 
-/* Urgent warnings own the notice slot; explanatory demo/toast messages yield.
-   Open panels move below the warning instead of covering it. */
+/* Warnings keep the first notice slot. Expanded guides and open panels move
+   below them; the compact folded pill stays beside the control strip. */
 #hud-overlay:has(#hud-warning:not([hidden]), #hud-stall[style*="block"]) { --flight-alert-space: 48px; }
 .flight-warning {
   position: fixed;
@@ -246,7 +246,7 @@ body:has(#ap-panel:not([hidden]), #flight-more-panel:not([hidden])) :is(.demo-ba
 }
 .stall-banner { max-width: calc(100vw - var(--edge-left) - var(--edge-right)); font-size: 12px; padding: 8px 12px; pointer-events: none; }
 #hud-overlay:has(#hud-warning:not([hidden])) .stall-banner { display: none !important; }
-#hud-overlay:has(#hud-warning:not([hidden]), #hud-stall[style*="block"]) :is(.demo-banner, .demo-pill-btn, .toast, .audio-start-hint) { visibility: hidden; }
+#hud-overlay:has(#hud-warning:not([hidden]), #hud-stall[style*="block"]) :is(.toast, .audio-start-hint) { visibility: hidden; }
 /* Draw the collapse glyph without relying on a device's symbol-font coverage. */
 .demo-actions .btn-demo-close { position: relative; font-size: 0; }
 .demo-actions .btn-demo-close::before, .demo-actions .btn-demo-close::after {
@@ -273,7 +273,14 @@ body:has(#ap-panel:not([hidden]), #flight-more-panel:not([hidden])) :is(.demo-ba
     width: min(440px, calc(100% - var(--edge-left) - var(--edge-right)));
   }
   .compact-ui .demo-stage-desc { display: block; }
+}
+
+/* Both mobile orientations keep the folded demo directly below the first row. */
+@media (max-width: 1024px) {
   .compact-ui .demo-pill-btn {
+    left: var(--edge-left);
+    right: auto;
+    transform: none;
     top: var(--demo-pill-top, calc(var(--edge-top) + 48px));
     width: 112px;
     min-height: 44px;
