@@ -355,28 +355,16 @@ body.demo-active #touch-controls-overlay {
   align-items: stretch;
 }
 
-/* One concise control strip: camera, sound, fullscreen | aircraft controls. */
-.flight-toolbar, .compact-ui .flight-toolbar, .compact-ui.touch-mode .flight-toolbar {
-  top: calc(var(--edge-top) + 48px);
-  bottom: auto;
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
-  width: min(480px, calc(100% - var(--edge-left) - var(--edge-right)));
+/* One concise control strip. Geometry and sizing are owned by flight-layout.css. */
+.flight-toolbar {
   display: flex;
   gap: 0;
-  overflow-x: auto;
   overscroll-behavior-x: contain;
   touch-action: pan-x;
   border-radius: 8px;
-  background: rgba(10, 16, 26, .88);
 }
-.flight-toolbar .btn, .compact-ui .flight-toolbar .btn {
-  flex: 1 0 44px;
+.flight-toolbar .btn {
   transform: none;
-  min-width: 44px;
-  min-height: 44px;
-  height: 44px;
   padding: 2px;
   margin: 0;
   border-radius: 0;
@@ -385,7 +373,8 @@ body.demo-active #touch-controls-overlay {
   white-space: nowrap;
 }
 .flight-toolbar .btn + .btn { border-left: 1px solid #334155; }
-.flight-toolbar #btn-gear { border-left: 2px solid #64748b; }
+/* Divider between the aircraft actions and the camera group. */
+.flight-toolbar #open-camera { border-left: 2px solid #64748b; }
 .flight-toolbar .btn[data-short-label] { font-size: 0; }
 .flight-toolbar .btn[data-short-label]::after {
   content: attr(data-short-label);

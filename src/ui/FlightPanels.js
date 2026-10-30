@@ -31,7 +31,7 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   bindText(mute, () => t('ui.mute'), 'aria-label');
   mute.textContent = '🔊';
   const fullscreen = document.getElementById('btn-fullscreen');
-  fullscreen.setAttribute('data-short-label', '');
+  fullscreen.setAttribute('data-short-label', '⛶');
   const ap = document.getElementById('ap-bar');
   const apPanel = document.getElementById('ap-panel');
   topActions.append(ap, mute);
@@ -44,6 +44,13 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   const bar = document.createElement('nav');
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
+  // Two groups: the aircraft actions unfold leftwards from the primary group,
+  // which is kept whole when a narrow viewport has to break the row.
+  const actionGroup = document.createElement('div');
+  actionGroup.className = 'flight-toolbar-group flight-toolbar-actions';
+  const primaryGroup = document.createElement('div');
+  primaryGroup.className = 'flight-toolbar-group flight-toolbar-primary';
+  bar.append(actionGroup, primaryGroup);
   hud.append(bar);
   const cameraButton = document.createElement('button');
   cameraButton.id = 'open-camera';
@@ -51,10 +58,9 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
   cameraButton.type = 'button';
   bindText(cameraButton, () => t('change.camera.c'), 'title');
   cameraButton.addEventListener('click', () => onCycleCamera());
-  bar.append(cameraButton);
   // Taking over must remain available when the guide is collapsed or yields to
   // warnings. Keep the existing button/handler outside the notification tree.
-  bar.append(document.getElementById('btn-skip-demo'));
+  const skipDemoButton = document.getElementById('btn-skip-demo');
   const autoCameraButton = document.createElement('button');
   autoCameraButton.id = 'btn-auto-camera';
   autoCameraButton.className = 'btn';
@@ -85,7 +91,6 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
     button.addEventListener('click', () => onAdjustTrim(sign * .2));
   }
   more.querySelector('#flight-park-brake').addEventListener('click', () => onToggleParkingBrake());
-  more.prepend(fullscreen);
   more.append(autoCameraButton);
   hud.append(more);
   const setMoreOpen = open => {
@@ -129,9 +134,11 @@ export function initFlightPanels({ onCycleCamera, onSelectCamera, onToggleAutoCa
     if (node) settings.append(node);
   }
   for (const id of ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']) {
-    bar.append(document.getElementById(id));
+    actionGroup.append(document.getElementById(id));
   }
-  bar.append(moreButton);
+  // The row is anchored to the right edge, so the aircraft actions that follow
+  // takeover unfold leftwards instead of shifting the primary group.
+  primaryGroup.append(skipDemoButton, cameraButton, fullscreen, moreButton);
 
   for (const [id, key] of Object.entries({
     'btn-cam-reset': 'center.view.o',
