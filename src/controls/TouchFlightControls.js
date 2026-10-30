@@ -1,3 +1,4 @@
+import { loadSimulatorPreferences, saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { angleDelta, readGyroScreen, screenTilt } from './gyroOrientation.js';
 import { detectGyroBrowser } from './gyroBrowser.js';
 import { bindText, t, translateDOM } from '../i18n/index.js';
@@ -38,7 +39,9 @@ export class TouchFlightControls {
     this.gyroPending = false;
     this.gyroBrowser = 'other';
     this.handleOrientation = this.handleOrientation.bind(this);
-    this.gyroOrientation = 'auto';
+    const gyroPreferences = loadSimulatorPreferences();
+    this.gyroOrientation = gyroPreferences.gyroOrientation ?? 'auto';
+    this.gyroRequested = gyroPreferences.gyroEnabled === true;
     this.gyroCalibration = null;
     this.gyroLockAttempt = 0;
     this.gyroOwnsLock = false;
@@ -269,11 +272,37 @@ export class TouchFlightControls {
     translateDOM(settings);
     this.gyroSettings = settings;
     this.gyroOrientationSelect = settings.querySelector('select');
+    this.gyroOrientationSelect.value = this.gyroOrientation;
     this.gyroOrientationStatus = settings.querySelector('[role="status"]');
     this.gyroOrientationSelect.addEventListener('change', () => {
       this.setGyroOrientation(this.gyroOrientationSelect.value);
     });
     settings.querySelector('.gyro-recenter').addEventListener('click', () => this.recenterGyro());
+  }
+
+  saveGyroSettings() {
+    saveSimulatorPreferences({
+      gyroEnabled: this.gyroRequested,
+      gyroOrientation: this.gyroOrientation,
+      ...(this.gyroRequested ? { touchControls: true } : {}),
+    });
+  }
+
+  restoreGyroSettings() {
+    if (!this.gyroRequested) return;
+    this.enable();
+    this.gyroSettings.hidden = false;
+    const orientation = window.DeviceOrientationEvent;
+    // iOS requires a new user gesture. Restore the preference without prompting.
+    if (window.isSecureContext === false || !orientation ||
+        typeof orientation.requestPermission === 'function') {
+      this.setGyroLabel('gyro.resume');
+      this.setGyroOrientationStatus('gyro.resume.help');
+      return;
+    }
+    this.gyroRestoring = true;
+    this.setGyroLabel('gyro.checking');
+    this.enableGyro();
   }
 
   setGyroOrientationStatus(key) {
@@ -302,6 +331,7 @@ export class TouchFlightControls {
   async setGyroOrientation(mode) {
     if (!['auto', 'portrait', 'landscape'].includes(mode)) return;
     this.gyroOrientation = mode;
+    this.saveGyroSettings();
     this.gyroLockUnavailable = false;
     this.releaseGyroLock();
     this.recenterGyro();
@@ -531,6 +561,7 @@ export class TouchFlightControls {
     }
 
     if (this.gyroPending) return;
+    this.gyroRestoring = false;
     const attempt = ++this.gyroAttempt;
     this.gyroPending = true;
     this.gyroHelp?.close();
@@ -566,8 +597,16 @@ export class TouchFlightControls {
   }
 
   failGyro(reason) {
-    this.disableGyro();
-    this.showGyroHelp(reason);
+    const restoring = this.gyroRestoring;
+    this.disableGyro({ remember: false });
+    if (restoring) {
+      // A blocked sensor on reload should not reopen a modal on every visit.
+      this.gyroSettings.hidden = false;
+      this.setGyroLabel('gyro.resume');
+      this.setGyroOrientationStatus(reason);
+    } else {
+      this.showGyroHelp(reason);
+    }
   }
 
   showGyroHelp(reason) {
@@ -620,6 +659,8 @@ export class TouchFlightControls {
   }
 
   enableGyro() {
+    this.gyroRequested = true;
+    this.saveGyroSettings();
     this.gyroActive = true;
     this.gyroPending = true;
     if (this.gyroSettings) this.gyroSettings.hidden = false;
@@ -635,7 +676,12 @@ export class TouchFlightControls {
     this.triggerHaptic([30, 50, 30]);
   }
 
-  disableGyro() {
+  disableGyro({ remember = true } = {}) {
+    if (remember) {
+      this.gyroRequested = false;
+      this.saveGyroSettings();
+    }
+    this.gyroRestoring = false;
     ++this.gyroAttempt;
     this.gyroActive = false;
     this.gyroPending = false;
@@ -657,6 +703,7 @@ export class TouchFlightControls {
   handleOrientation(e) {
     if (!this.gyroActive || !Number.isFinite(e.beta) || !Number.isFinite(e.gamma)) return;
     if (this.gyroPending) {
+      this.gyroRestoring = false;
       this.gyroPending = false;
       window.clearTimeout(this.gyroTimer);
       this.gyroBtn?.classList.add('active');

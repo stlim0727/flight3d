@@ -1,4 +1,7 @@
 export default {
+  "gyro.resume": "📱 Resume gyro",
+  "gyro.resume.help": "Your gyro settings are restored. Tap Resume gyro to enable sensors; allow access if prompted.",
+
   "gyro.orientation.label": "Gyro screen orientation",
   "gyro.orientation.auto": "Follow screen",
   "gyro.orientation.portrait": "Portrait",
