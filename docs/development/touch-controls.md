@@ -40,3 +40,23 @@ full flight handling or landing test. Inspect the images separately.
 For the separate B738/C172 approach/cruise audit with live 120 Hz physics,
 see [aircraft control evidence](../../review-artifacts/aircraft-controls/README.md)
 and `scripts/verify-aircraft-controls.mjs`.
+
+## Gyro access recovery
+
+GYRO requests permission in the button gesture on browsers that expose
+`DeviceOrientationEvent.requestPermission()`. It shows a checking state until a
+finite beta/gamma reading arrives; after four seconds without usable readings it
+returns the stick to neutral and opens recovery help. Denied requests, exceptions,
+insecure contexts and missing APIs use the same help dialog with distinct reasons.
+
+Help offers Android Brave, Android Chrome, iPhone/iPad and generic instructions,
+with a manual browser selector because privacy settings can conceal identity.
+Brave's optional `navigator.brave.isBrave()` is used as a best-effort hint only.
+Retry starts a fresh sensor check after returning from browser settings; Use touch
+controls closes the dialog. No browser-internal settings links are attempted.
+English and Korean labels update with the selected language.
+
+Run `node --test tests/gyroPermission.test.js tests/touchControlState.test.js`
+for permission, no-reading timeout, retry, cancellation, browser hints and help
+interaction sequences. These use simulated readings; real Android Brave and iOS
+permission/settings behavior still requires a physical device check.

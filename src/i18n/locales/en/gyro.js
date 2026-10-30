@@ -1,0 +1,20 @@
+export default {
+  "gyro.checking": "Checking sensors…",
+  "gyro.off": "📱 GYRO",
+  "gyro.on": "📱 TILT: ON",
+  "gyro.help.title": "Enable tilt controls",
+  "gyro.browser.label": "Choose your browser for instructions",
+  "gyro.browser.other": "Other browser",
+  "gyro.insecure": "Tilt controls require a secure connection. Open Flight3D using HTTPS.",
+  "gyro.unsupported": "This browser does not expose device orientation. Try a phone with motion sensors and a supported browser.",
+  "gyro.denied": "Sensor permission was denied. Check your browser settings, then retry.",
+  "gyro.error": "The browser could not enable sensor access. Check the instructions below, then retry.",
+  "gyro.no.readings": "No usable sensor readings arrived. Access may be blocked, or this device may not have motion sensors.",
+  "gyro.guide.brave": "In Android Brave, open Settings → Site settings → Motion sensors and allow access. Check whether this site is blocked. Return here and tap Retry gyro. Menu names may vary by version. If the setting is unavailable, try Android Chrome.",
+  "gyro.guide.chrome": "In Android Chrome, open Settings → Site settings → Motion sensors and allow access. Check whether this site is blocked. Return here and tap Retry gyro. Menu names may vary by version.",
+  "gyro.guide.ios": "Open Flight3D directly in Safari. Tap Retry gyro and choose Allow if a sensor permission prompt appears. If access was previously denied, check Safari’s website settings or reload the page and retry. In other iOS browsers, try Safari.",
+  "gyro.guide.other": "Open this HTTPS page directly in a browser on a phone or tablet with motion sensors. Check site permissions for motion or orientation access. If using an embedded browser, open the page in Safari or Android Chrome.",
+  "gyro.help.note": "Flight3D cannot open browser settings for you. Touch controls remain available. Browser detection may be inaccurate; choose your browser above.",
+  "gyro.retry": "Retry gyro",
+  "gyro.touch": "Use touch controls"
+};
