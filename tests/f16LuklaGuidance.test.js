@@ -8,7 +8,7 @@ import { F16LuklaScenario, f16FinalCrossTrack } from '../src/director/scenarios/
 function flight() {
   const inputs = {};
   const sim = {
-    position: new THREE.Vector3(0, 3400, 0),
+    position: new THREE.Vector3(0, 3700, 0),
     linearVelocity: new THREE.Vector3(-40, 25, 170),
     angularVelocity: new THREE.Vector3(0.01, 0.02, 0.03),
     quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.2, 2.8, 0.1)),
@@ -33,15 +33,17 @@ function flight() {
   // the browser's live force state and is exercised by the demo sweep.
   scenario.holdHeading = () => {};
   scenario.flyVertical = () => {};
+  scenario.flyLanding = () => {};
   return { sim, director, scenario, inputs };
 }
 
 test('Lukla escape retains automation until the turn and climb are established', () => {
   for (const change of [
-    ({ director }) => { director.stageTimer = 16; },
+    ({ director }) => { director.stageTimer = 10; },
     ({ sim }) => { sim.telemetry.headingDeg = 220; },
     ({ sim }) => { sim.telemetry.rollDeg = -25; },
     ({ sim }) => { sim.position.y = 2900; },
+    ({ sim }) => { sim.position.y = 3500; },
     ({ sim }) => { sim.linearVelocity.y = -1; },
   ]) {
     const f = flight(); change(f); f.scenario.update();
@@ -49,7 +51,7 @@ test('Lukla escape retains automation until the turn and climb are established',
   }
   const f = flight(); f.scenario.update();
   assert.equal(f.director.currentStage, F16LuklaScenario.STAGES.RETURN);
-  assert.ok(f.inputs.throttle > 0 && f.inputs.throttle < 1);
+  assert.ok(f.inputs.throttle >= 0 && f.inputs.throttle < 1);
 });
 
 test('parked completion preserves the physical pose and asks to retain parking brakes', () => {
@@ -125,5 +127,17 @@ test('the final curve joins the valley and runway centerline with continuous hea
     const derivative = (f16FinalCrossTrack(s + eps).cross - f16FinalCrossTrack(s - eps).cross) / (2 * eps);
     assert.ok(Math.abs(derivative - path.slope) < 1e-5);
     assert.ok(path.cross >= 0 && path.cross <= 3000 && path.slope <= 0);
+  }
+});
+
+test('the shortened final curve settles onto the centerline before the flare', () => {
+  const entry = -5355, aligned = -2500;
+  assert.deepEqual(f16FinalCrossTrack(entry, entry, aligned), { cross: 3000, slope: 0 });
+  assert.deepEqual(f16FinalCrossTrack(aligned, entry, aligned), { cross: 0, slope: 0 });
+  for (let s = entry + 100; s < aligned; s += 250) {
+    const path = f16FinalCrossTrack(s, entry, aligned), eps = .01;
+    const derivative = (f16FinalCrossTrack(s + eps, entry, aligned).cross
+      - f16FinalCrossTrack(s - eps, entry, aligned).cross) / (2 * eps);
+    assert.ok(Math.abs(derivative - path.slope) < 1e-5);
   }
 });

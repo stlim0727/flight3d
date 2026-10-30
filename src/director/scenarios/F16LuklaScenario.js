@@ -10,10 +10,11 @@ const STAGES = { ESTABLISH: 40, LOW_PASS: 41, CLIMB: 42, RETURN: 44, FINAL: 45, 
 const clamp = THREE.MathUtils.clamp;
 const SIN = 0.848048, COS = 0.529919;
 
-export function f16FinalCrossTrack(along) {
-  const phase = clamp((along + 7500) / 4000, 0, 1);
+export function f16FinalCrossTrack(along, entryAlong = -7500, alignedAlong = -3500) {
+  const length = alignedAlong - entryAlong;
+  const phase = clamp((along - entryAlong) / length, 0, 1);
   return { cross: 1500 * (1 + Math.cos(Math.PI * phase)),
-    slope: phase > 0 && phase < 1 ? -1500 * Math.PI / 4000 * Math.sin(Math.PI * phase) : 0 };
+    slope: phase > 0 && phase < 1 ? -1500 * Math.PI / length * Math.sin(Math.PI * phase) : 0 };
 }
 
 /** One airborne spawn, followed by normal flight controls and collision physics. */
@@ -28,16 +29,10 @@ export class F16LuklaScenario extends CessnaDemoScenario {
       sim.setPreset('cruise', true);
       this.heading = 238;
       this.direction = new THREE.Vector3(-0.848048, 0, 0.529919).normalize();
-      this.start = this.direction.clone().multiplyScalar(200);
-      this.baseAltitude = -Infinity;
-      // Sample the low pass, including a wingspan margin.
-      for (let along = -200; along <= 4200; along += 40) {
-        for (const side of [-50, 0, 50]) {
-          this.baseAltitude = Math.max(this.baseAltitude, sim.currentTerrain.getHeight(
-            this.start.x + this.direction.x * along - this.direction.z * side,
-            this.start.z + this.direction.z * along + this.direction.x * side) + 120);
-        }
-      }
+      // Start over the upper runway, not beyond its downhill end. Keep the
+      // pass close to the pavement instead of clearing the distant valley.
+      this.start = this.direction.clone().multiplyScalar(-200);
+      this.baseAltitude = sim.currentTerrain.getHeight(this.start.x, this.start.z) + 45;
       sim.position.set(this.start.x, this.baseAltitude, this.start.z);
       const speed = 280 * 0.514444 / Math.sqrt(Atmosphere.getConditions(this.baseAltitude).densityRatio);
       sim.linearVelocity.copy(this.direction).multiplyScalar(speed);
@@ -56,11 +51,12 @@ export class F16LuklaScenario extends CessnaDemoScenario {
     }
     if (stage === STAGES.RETURN) {
       this.returnPhase = 'decelerate';
-      sim.gear.setGearTarget(true);
       sim.aero.setFlapPosition(1);
     }
     if (stage === STAGES.FINAL) {
       sim.aero.spoilers = 0;
+      this.finalEntryAlong = sim.position.x * SIN - sim.position.z * COS;
+      sim.gear.setGearTarget(true);
     }
     if (stage === STAGES.ROLLOUT) {
       this.rolloutPitch = sim.telemetry.pitchDeg;
@@ -109,10 +105,11 @@ export class F16LuklaScenario extends CessnaDemoScenario {
     sim.controls.setVirtualInput('brakes', 0);
     sim.controls.setVirtualInput('rudder', THREE.MathUtils.clamp(-sim.aero.beta * 2, -0.2, 0.2));
 
-    const targetAlt = climb ? 4600 : this.baseAltitude;
+    const targetAlt = climb ? 3800 : this.baseAltitude;
     const vzCmd = THREE.MathUtils.clamp((targetAlt - sim.position.y) * 0.35, -8, 35);
-    const targetSpeed = climb ? 300 : 280;
-    this.flyVertical(vzCmd, targetSpeed);
+    const targetSpeed = climb ? 260 : 280;
+    if (climb) this.flyLanding(vzCmd, targetSpeed);
+    else this.flyVertical(vzCmd, targetSpeed);
     // The fighter's idle thrust and rapid spool-up need less feed-forward than
     // the Cessna controller: preserve speed margin instead of accelerating into
     // the opposing ridge while the bank is still building.
@@ -120,18 +117,18 @@ export class F16LuklaScenario extends CessnaDemoScenario {
       0.10 + (targetSpeed - sim.telemetry.iasKnots) * 0.025 + vzCmd * 0.006, 0, 1));
 
     if (!this.director.userCameraOverridden) {
-      const shot = Math.floor(this.director.totalTimer / 10) % 3;
+      const shot = stage === STAGES.LOW_PASS ? CameraSystem.MODES.FLYBY
+        : [CameraSystem.MODES.CHASE, CameraSystem.MODES.COCKPIT, CameraSystem.MODES.FLYBY][Math.floor(this.director.totalTimer / 10) % 3];
       if (shot !== this.cutIndex) {
-        sim.cameraSystem.setMode([CameraSystem.MODES.CHASE, CameraSystem.MODES.COCKPIT, CameraSystem.MODES.FLYBY][shot]);
+        sim.cameraSystem.setMode(shot);
         this.cutIndex = shot;
       }
     }
-    if (stage === STAGES.ESTABLISH && time >= 5) this.director.setStage(STAGES.LOW_PASS);
-    // Leave a kilometre more lead for surface slew and the finite turn radius.
-    else if (stage === STAGES.LOW_PASS && along >= 1600) this.director.setStage(STAGES.CLIMB);
-    else if (climb && time >= 30 && clearance > 150
-      && Math.abs(((195 - sim.telemetry.headingDeg + 540) % 360) - 180) < 5
-      && Math.abs(sim.telemetry.rollDeg) < 10 && sim.linearVelocity.y > 0) {
+    if (stage === STAGES.ESTABLISH && time >= .5) this.director.setStage(STAGES.LOW_PASS);
+    else if (stage === STAGES.LOW_PASS && along >= 750) this.director.setStage(STAGES.CLIMB);
+    else if (climb && time >= 15 && clearance > 150 && sim.position.y > 3650
+      && Math.abs(((195 - sim.telemetry.headingDeg + 540) % 360) - 180) < 8
+      && Math.abs(sim.telemetry.rollDeg) < 15 && sim.linearVelocity.y > 0) {
       this.director.setStage(STAGES.RETURN);
     }
     if (this.director.isActive && (time > 90 || !Number.isFinite(clearance))) {
@@ -181,9 +178,9 @@ export class F16LuklaScenario extends CessnaDemoScenario {
       // A long centerline final crosses a high ridge. Return on the southeast
       // valley side before curving onto the centerline at landing height.
       const bankLimit = 35;
-      let heading = 195;
+      let heading = 220;
       if (this.returnPhase === 'turn') {
-        flyBank(sim, -35, tel);
+        flyBank(sim, -45, tel);
         if (tel.headingDeg < 35) this.returnPhase = 'intercept';
       } else {
         if (this.returnPhase === 'intercept') {
@@ -197,23 +194,26 @@ export class F16LuklaScenario extends CessnaDemoScenario {
           sim.position.z + sim.linearVelocity.z * seconds + SIN * side));
       }
       const approaching = this.returnPhase === 'intercept';
-      const altitude = Math.max(approaching ? 3100 : 3800, floor + 250);
+      const altitude = Math.max(approaching ? 3100 : 3350, floor + 250);
       const targetIas = approaching ? 130 : 155;
       sim.aero.spoilers = clamp(.1 + (tel.iasKnots - targetIas) * .04, 0, .8);
       this.flyLanding(clamp((altitude - sim.position.y) * .12, -8, 12), targetIas);
-      if (this.returnPhase === 'decelerate' && tel.iasKnots < 190 && s < -13000) {
+      if (this.returnPhase === 'decelerate' && tel.iasKnots < 205 && s < -8000) {
         this.returnPhase = 'turn';
       }
       const headingError = Math.abs(((58 - tel.headingDeg + 540) % 360) - 180);
       if (this.returnPhase === 'intercept' && Math.abs(w - 3000) < 500
-        && headingError < 30 && Math.abs(tel.rollDeg) < 20 && s < -6500 && sim.position.y < 3300) {
+        && headingError < 40 && Math.abs(tel.rollDeg) < 30 && s < -4500 && sim.position.y < 3300) {
         this.director.setStage(STAGES.FINAL);
       }
     } else if (stage === STAGES.FINAL) {
-      const lateralPath = f16FinalCrossTrack(s);
-      const crossSpeed = lateralPath.slope * vS - (w - lateralPath.cross) * .08;
-      const acceleration = (clamp(crossSpeed, -70, 70) - vW) * .8;
-      const bank = clamp(THREE.MathUtils.radToDeg(Math.atan2(acceleration, 9.80665)), s > -600 ? -5 : -25, s > -600 ? 5 : 25);
+      // The shortened valley join must finish before the flare, leaving a
+      // straight segment to settle bank, heading and speed before touchdown.
+      const lateralPath = f16FinalCrossTrack(s, this.finalEntryAlong, -2500);
+      const crossSpeed = lateralPath.slope * vS - (w - lateralPath.cross) * .12;
+      const acceleration = (clamp(crossSpeed, -90, 90) - vW) * .8;
+      const bankLimit = s > -600 ? 5 : s > -1800 ? 25 : 35;
+      const bank = clamp(THREE.MathUtils.radToDeg(Math.atan2(acceleration, 9.80665)), -bankLimit, bankLimit);
       flyBank(sim, bank, tel);
       // Follow a curved path into the uphill runway; the vertical slope at
       // contact is slightly shallower than the pavement's 11.76% grade.
@@ -234,7 +234,8 @@ export class F16LuklaScenario extends CessnaDemoScenario {
         }
       }
       const targetIas = 132;
-      sim.aero.spoilers = clamp(.1 + (tel.iasKnots - targetIas) * .04, 0, .8);
+      const speedbrakeBias = THREE.MathUtils.lerp(.1, .25, clamp((distance - 1000) / 1000, 0, 1));
+      sim.aero.spoilers = clamp(speedbrakeBias + (tel.iasKnots - targetIas) * .04, 0, 1);
       this.flyLanding(clamp(pathSlope * vS + (altitude - sim.position.y) * .5, -18, 18), targetIas, null,
         distance > 0 && distance < flareLength ? curvature * vS * vS : 0, 18);
       if (tel.onGround && sim.gear.contacts.slice(1).every(c => c.isGrounded)

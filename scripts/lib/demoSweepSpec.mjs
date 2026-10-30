@@ -172,7 +172,7 @@ export const ROUTES = [
     rolloutDevices: ['spoilers'],
     // Landing clearance reaches wheel height; the route records low-pass clearance separately.
     clearanceIntentM: 0,
-    clearanceIntentByStage: { ESTABLISH: 50, LOW_PASS: 50, CLIMB: 50, RETURN: 150 },
+    clearanceIntentByStage: { ESTABLISH: 40, LOW_PASS: 40, CLIMB: 50, RETURN: 150 },
     allowedWarnings: ['terrain', 'pull-up', 'gear', 'flaps', 'sink-rate', 'stall'], shotStage: 'LOW_PASS',
   },
   {
