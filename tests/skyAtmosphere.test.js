@@ -72,8 +72,8 @@ describe('SkyAtmosphere (Aerial Perspective Height Fog & Tone Mapping)', () => {
 
     // 4. Night (23:00)
     sky.setTimeOfDay(23.0, new THREE.Vector3(0, 10, 0), new THREE.Vector3(0, 10, 0));
-    assert.equal(sky.currentExposure, 0.90, 'Night exposure should keep terrain silhouettes dark');
-    assert.equal(mockRenderer.toneMappingExposure, 0.90);
+    assert.equal(sky.currentExposure, 1.0, 'Night exposure should preserve readable surface detail');
+    assert.equal(mockRenderer.toneMappingExposure, 1.0);
     assert.ok(sky.fogColor.r < 0.1 && sky.fogColor.g < 0.1 && sky.fogColor.b < 0.15, 'Night fog should be deep midnight navy');
   });
 
@@ -91,8 +91,8 @@ describe('SkyAtmosphere (Aerial Perspective Height Fog & Tone Mapping)', () => {
       const clearFog = sky.fogColor.clone();
       sky.setCloudCover(1);
       sky.updateSun();
-      assert.ok(scene.environmentIntensity < 0.02, 'HDR reflections must not illuminate night surfaces');
-      assert.ok(sky.ambientLight.intensity < dayAmbient * 0.1);
+      assert.ok(scene.environmentIntensity >= 0.03 && scene.environmentIntensity < 0.1, 'Night reflections should reveal surfaces while staying well below daylight');
+      assert.ok(sky.ambientLight.intensity > dayAmbient * 0.1 && sky.ambientLight.intensity < dayAmbient * 0.2);
       assert.ok(sky.cloudLayer.material.uniforms.ambientColor.value.r < dayCloud * 0.05);
       assert.ok(sky.fogColor.equals(clearFog), 'Night overcast must not introduce daylight-grey haze');
       sky.setCloudCover(0);

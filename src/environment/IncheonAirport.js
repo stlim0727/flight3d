@@ -52,8 +52,9 @@ export async function loadIncheonAirport(base) {
     INCHEON_AIRFIELD.surfaces.filter(s => s.kind === 'runway').map(s => ({
       start: [s.points[0][0], INCHEON_AIRFIELD.elevationM, s.points[0][1]],
       end: [s.points.at(-1)[0], INCHEON_AIRFIELD.elevationM, s.points.at(-1)[1]], width: s.width,
-    })), [30, 55, 80, 105].map(offset => ({ x: DEPARTURE_GATE.x + offset,
-      y: INCHEON_AIRFIELD.elevationM, z: DEPARTURE_GATE.z - 45, height: 16 })));
+    })), [20, 32, 45, 58, 71, 84, 97, 110].map(offset => ({ x: DEPARTURE_GATE.x + offset,
+      y: INCHEON_AIRFIELD.elevationM, z: DEPARTURE_GATE.z - 45, height: 20,
+      target: [DEPARTURE_GATE.x + offset - 15, INCHEON_AIRFIELD.elevationM + 3, DEPARTURE_GATE.z] })));
   const tower = createControlTower(height);
   colliders.push(tower.collider);
   group.add(tower.group);

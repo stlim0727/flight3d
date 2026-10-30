@@ -51,7 +51,10 @@ export class Airport {
     this.nightLighting = new AirportNightLighting(this.group, [{
       start: [-this.runwayLength / 2, this.elevation, 0],
       end: [this.runwayLength / 2, this.elevation, 0], width: this.runwayWidth,
-    }], [-210, -80, 50, 180].map(x => ({ x, y: this.elevation, z: 255, height: 14 })));
+    }], [-400, -280, -160, -40, 80, 200, 320, 440].map(x => ({
+      x, y: this.elevation, z: 275, height: 18,
+      target: [x, this.elevation + 3, 225],
+    })));
     this.nightLighting.illuminateWindows(this.group);
     this.buildingsReady = this.loadBuildings();
   }

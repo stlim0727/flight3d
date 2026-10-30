@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import { createRoomLightTexture, shadeWindowRooms } from './WindowRoomLighting.js';
 
-const WINDOW_WARM = new THREE.Color(0xffd39a);
+const WINDOW_WARM = new THREE.Color(0xfff4e8);
 
 /** Automatic dusk switch shared by airfield, terminal and instrument lighting. */
 export function nightLightLevel(sunHeight) {
@@ -18,6 +19,8 @@ export class AirportNightLighting {
     this.lamps = [];
     this.sources = [];
     this.level = 0;
+    this.roomTexture = createRoomLightTexture();
+    this.roomLevel = { value: 0 };
     for (const runway of runways) this.addRunway(runway);
     for (const lamp of lamps) this.addLamp(lamp);
     const geometry = new THREE.BufferGeometry();
@@ -91,19 +94,19 @@ export class AirportNightLighting {
     }
   }
 
-  addLamp({ x, y, z, height = 10 }) {
+  addLamp({ x, y, z, height = 10, target = [x, y, z] }) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(.12, .22, height, 6),
       new THREE.MeshStandardMaterial({ color: 0x596574, roughness: .8 }));
     pole.position.set(x, y + height / 2, z);
     const head = new THREE.Mesh(new THREE.BoxGeometry(1.8, .25, 1),
       new THREE.MeshStandardMaterial({ color: 0xe4ddc9, emissive: 0xffd69a, emissiveIntensity: 0 }));
     head.position.set(x, y + height, z);
-    const light = new THREE.SpotLight(0xffdfb0, 0, height * 5, Math.PI / 3, .65, 2);
+    const light = new THREE.SpotLight(0xffdfb0, 0, height * 6, Math.PI / 3, .7, 2);
     light.position.copy(head.position);
-    light.target.position.set(x, y, z);
+    light.target.position.fromArray(target);
     // No shadow maps or per-runway PointLights: bounded shader/light cost.
     this.group.add(pole, head, light, light.target);
-    this.lamps.push({ light, head, maximum: height * height * 5 });
+    this.lamps.push({ light, head, maximum: height * height * 12 });
     this.source([x, y + height, z], 0xffdfb0);
   }
 
@@ -118,8 +121,9 @@ export class AirportNightLighting {
         if (this.windowCopies.has(material)) return this.windowCopies.get(material);
         const copy = material.clone();
         this.windowCopies.set(material, copy);
+        shadeWindowRooms(copy, this.roomTexture, this.roomLevel);
         this.windows.set(copy, { color: material.emissive.clone(), intensity: material.emissiveIntensity });
-        copy.emissive.set(0xffd39a); copy.emissiveIntensity = this.level * .75;
+        copy.emissive.set(0xfff4e8); copy.emissiveIntensity = this.level * .75;
         return copy;
       });
       node.material = Array.isArray(node.material) ? lit : lit[0];
@@ -129,6 +133,7 @@ export class AirportNightLighting {
   update(sunHeight) {
     this.level = nightLightLevel(sunHeight);
     this.material.uniforms.brightness.value = this.level;
+    this.roomLevel.value = this.level;
     for (const { light, head, maximum } of this.lamps) {
       light.intensity = maximum * this.level;
       head.material.emissiveIntensity = this.level * 2;
