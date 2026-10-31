@@ -39,7 +39,7 @@ export class SimulatorMissionAdapter {
     const sim = this.sim;
     if (this.acquired) this.release();
     sim.demoDirector?.stop();
-    sim.devRunner?.stop();
+    sim.devRunner?.stop({ pilotPreparation: true });
     sim.shadowDemo?.stop();
     sim.hangang?.stop();
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
