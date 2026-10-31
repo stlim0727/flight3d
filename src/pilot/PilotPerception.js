@@ -53,12 +53,17 @@ export class PilotPerception {
     this.contactCandidate = undefined;
     this.contactSince = 0;
     this.contactTick = -1;
+    this.contactValid = false;
   }
 
   updateContact(value, tick) {
     if (!Number.isSafeInteger(tick) || tick < 0 || tick < this.contactTick) throw new RangeError('Nonmonotonic contact tick');
     this.contactTick = tick;
-    if (typeof value !== 'boolean') return;
+    this.contactValid = typeof value === 'boolean';
+    if (!this.contactValid) {
+      this.contactCandidate = undefined; // A missing interval cannot count as stable contact time.
+      return;
+    }
     if (this.contact === undefined) this.contact = value; // Initial switch state is known at preparation.
     if (value !== this.contactCandidate) { this.contactCandidate = value; this.contactSince = tick; }
     if (tick - this.contactSince >= Math.ceil(0.1 * this.physicsHz)) this.contact = value;
@@ -117,7 +122,7 @@ export class PilotPerception {
       if (feedback[key].status === 'available') feedback[key].mean = Math.max(key === 'throttle' || key === 'brakes' ? 0 : -1, Math.min(1, feedback[key].mean));
     }
     if (tick >= this.contactTick) this.updateContact(snapshot.weightOnWheels, tick);
-    feedback.weightOnWheels = this.contact === undefined
+    feedback.weightOnWheels = !this.contactValid || this.contact === undefined
       ? { status: 'unavailable', value: null, sampleTick: tick, reason: 'missing-source' }
       : { status: 'available', value: this.contact, sampleTick: tick };
     const result = { instruments, navigation, feedback, visual: { contacts: [] }, capabilities: { visualContacts: false, trainingNavigation: true } };

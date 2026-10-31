@@ -65,3 +65,19 @@ test('weight-on-wheels debounces transitions over physics ticks and resets', () 
   p.reset();
   assert.equal(p.sample({ ...source, weightOnWheels: false }, 0).feedback.weightOnWheels.value, false);
 });
+
+test('lost contact source becomes unavailable and missing time cannot complete debounce', () => {
+  const p = new PilotPerception(options);
+  assert.equal(p.sample({ weightOnWheels: true }, 0).feedback.weightOnWheels.value, true);
+  for (const [tick, value] of [[24, undefined], [48, null], [72, 'true']]) {
+    const reading = p.sample({ weightOnWheels: value }, tick).feedback.weightOnWheels;
+    assert.equal(reading.status, 'unavailable');
+    assert.equal(reading.value, null);
+  }
+  p.updateContact(false, 73);
+  p.updateContact(undefined, 74);
+  p.updateContact(false, 100);
+  assert.equal(p.sample({ weightOnWheels: false }, 101).feedback.weightOnWheels.value, true);
+  p.updateContact(false, 112);
+  assert.equal(p.sample({ weightOnWheels: false }, 120).feedback.weightOnWheels.value, false);
+});
