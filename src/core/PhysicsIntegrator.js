@@ -107,6 +107,9 @@ class PhysicsIntegratorMethods {
       (x, z) => (this.currentAirport?.isOnRunway ? this.currentAirport.isOnRunway(x, z) : true),
       this.aero.cg, true
     );
+    // Preserve this substep's contact kinematics for local mission judging.
+    // This stays on the trusted host; it is never a pilot observation.
+    this.missionPhysicsFrame = { gearResult };
 
     if (gearResult.damageEvents.length || (gearResult.bodyContacts.length && !this.bodyContactStarted)) {
       this.landingIncident = true;
