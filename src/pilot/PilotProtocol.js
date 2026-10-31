@@ -51,17 +51,34 @@ export function validateCommand(payload) {
 
 const TYPES = new Set(['init', 'ready', 'reset', 'reset-complete', 'observation', 'command', 'error', 'stop', 'log']);
 export function validateEnvelope(message, expected = {}) {
+  // Source is bounded as raw UTF-8, but JSON transport can escape each byte to
+  // six characters. Structural envelope wrappers have their own depth/byte room.
+  const overheadBytes = 1024;
+  const initBytes = 6 * PILOT_LIMITS.sourceBytes + PILOT_LIMITS.observationBytes;
   const data = validatePlainData(message, {
-    maxBytes: expected.type === 'command' || expected.type === 'log' ? PILOT_LIMITS.commandBytes
-      : expected.type === 'init' || expected.type === undefined ? PILOT_LIMITS.sourceBytes + PILOT_LIMITS.observationBytes
-      : PILOT_LIMITS.observationBytes,
+    maxBytes: initBytes + overheadBytes,
+    maxDepth: PILOT_LIMITS.depth + 2,
   });
   if (!data.ok) return data;
   if (!plain(message) || !TYPES.has(message.type) || !plain(message.meta) || !plain(message.payload)) return failure('invalid-envelope');
-  const limit = message.type === 'init' ? PILOT_LIMITS.sourceBytes + PILOT_LIMITS.observationBytes
+  const limit = message.type === 'init' ? initBytes
     : message.type === 'command' || message.type === 'log' ? PILOT_LIMITS.commandBytes : PILOT_LIMITS.observationBytes;
-  const typedData = validatePlainData(message, { maxBytes: limit });
+  const typedData = validatePlainData(message, { maxBytes: limit + overheadBytes, maxDepth: PILOT_LIMITS.depth + 2 });
   if (!typedData.ok) return typedData;
+  const metadata = validatePlainData(message.meta, { maxBytes: overheadBytes / 2, maxDepth: 2 });
+  if (!metadata.ok) return metadata;
+  if (message.type === 'init') {
+    if (typeof message.payload.source !== 'string' || new TextEncoder().encode(message.payload.source).byteLength > PILOT_LIMITS.sourceBytes ||
+        !plain(message.payload.briefing)) return failure('invalid-init');
+    const briefing = validatePlainData(message.payload.briefing);
+    if (!briefing.ok) return briefing;
+  } else {
+    // reset has one extra briefing wrapper, just like init.
+    const payload = message.type === 'reset' ? message.payload.briefing : message.payload;
+    if (!plain(payload)) return failure('invalid-payload');
+    const payloadData = validatePlainData(payload, { maxBytes: limit });
+    if (!payloadData.ok) return payloadData;
+  }
   const meta = message.meta;
   if (typeof meta.protocolVersion !== 'string' || !/^1\.\d+\.\d+$/.test(meta.protocolVersion)) return failure('unsupported-protocol');
   if (typeof meta.sessionId !== 'string' || meta.sessionId.length === 0 || meta.sessionId.length > 128 ||

@@ -1,0 +1,71 @@
+/* Figma D1–D4: the existing .btn primitive on a 360px flight-result card.
+   The backdrop and chart use the live scene and recorded data, respectively. */
+body[data-flow="debrief"] #debrief-overlay { display: flex; }
+#debrief-overlay { align-items: center; background: rgba(6, 10, 18, .5); }
+.debrief-card {
+  width: 360px;
+  height: min(620px, calc(100dvh - 32px));
+  margin-left: max(64px, calc(env(safe-area-inset-left) + 16px));
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  background: #101c2b;
+  color: #e2e8f0;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+.debrief-card h2 { font-size: 18px; line-height: 27px; }
+.debrief-card h3 { font-size: 18px; line-height: 27px; }
+#debrief-record h3, #debrief-share h3 { font-size: 16px; line-height: 24px; }
+.debrief-muted { color: #94a3b8; font-size: 11px; white-space: pre-line; }
+.debrief-caption, .debrief-stats span { color: #94a3b8; font-size: 10px; }
+.debrief-tabs { display: flex; gap: 4px; flex-shrink: 0; }
+.debrief-tabs > .btn { flex: 1; }
+.debrief-card .btn {
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid #385268;
+  border-radius: 7px;
+  background: #101c2b;
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: left;
+  letter-spacing: 0;
+  box-shadow: none;
+  transform: none;
+}
+.debrief-card .btn:hover { background: #263c51; border-color: #538aa4; }
+.debrief-card .btn.debrief-primary, .debrief-card .debrief-tabs [aria-selected="true"] { background: #157598; border-color: #538aa4; }
+.debrief-card .btn:disabled { opacity: .45; cursor: default; }
+.debrief-card :focus-visible { outline: 2px solid #67e8f9; outline-offset: 2px; }
+.debrief-panels { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.debrief-panels > section, .debrief-actions { display: flex; flex-direction: column; gap: 12px; }
+.debrief-actions { margin-top: 12px; }
+.debrief-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 6px; }
+.debrief-stats > div { display: flex; flex-direction: column; gap: 3px; padding: 10px; border-radius: 7px; background: #142536; }
+.debrief-stats strong { font-size: 18px; font-variant-numeric: tabular-nums; line-height: 27px; }
+#debrief-touchdown { display: flex; flex-direction: column; gap: 4px; }
+#debrief-contact { font-size: 12px; }
+#debrief-chart { width: 100%; height: 90px; cursor: crosshair; touch-action: pan-y; }
+#debrief-axis { display: flex; justify-content: space-between; }
+#debrief-scrub { width: 100%; accent-color: #67d5a3; min-height: 24px; }
+#debrief-sample { font-size: 11px; font-variant-numeric: tabular-nums; }
+#debrief-events { list-style: none; white-space: pre-wrap; font-size: 12px; }
+#debrief-preview { background: #142536; padding: 12px; border-radius: 7px; color: #a6b5c8; font-size: 11px; white-space: pre-line; user-select: text; }
+#debrief-status { color: #67d5a3; min-height: 17px; font-size: 11px; }
+.debrief-card [hidden] { display: none !important; }
+body[data-flow="debrief"] :is(.menu-toggle, .hud-strip, .hud-top-actions, .ap-bar, .flight-toolbar, .flight-panel, .quick-mute, .presets-bar, .action-panel, .crash-overlay, #demo-banner, .demo-pill-btn, .touch-controls-overlay, .dev-live, .flight-warning, .stall-banner, .toast, .audio-start-hint) { display: none !important; }
+@media (max-width: 600px) {
+  #debrief-overlay { justify-content: center; padding: 12px; }
+  .debrief-card { width: min(360px, 100%); margin: 0; max-height: calc(100dvh - 24px); }
+  .debrief-card .btn { min-height: 44px; }
+}
+@media (max-height: 500px) and (min-width: 601px) {
+  .debrief-card { margin-left: max(16px, env(safe-area-inset-left)); }
+}
