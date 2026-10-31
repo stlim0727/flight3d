@@ -56,16 +56,20 @@ export class FlightRecorder {
     this.samples.push(sample);
   }
 
-  finish(reason = 'manual') {
+  /** `crash` is the collision result that ended the sortie; its localized text is captured once. */
+  finish(reason = 'manual', crash = null) {
     if (!this.active) return this.report;
     this.active = false;
     if (this.latest && this.samples.at(-1) !== this.latest) this._append(this.latest);
     // Snapshots own their data, so a new sortie cannot change an exported report.
-    this.report = structuredClone({ version: 1, metadata: this.metadata, reason,
+    this.report = structuredClone({ version: 2, metadata: this.metadata, reason,
       durationSec: this.elapsed, peaks: this.peaks, touchdowns: this.touchdowns, samples: this.samples,
+      crash: crash ? { type: crash.type ?? null, name: crash.name ?? null, description: crash.description ?? null,
+        speedKnots: Number.isFinite(crash.speedKnots) ? crash.speedKnots : null, timeSec: this.elapsed } : null,
       sufficient: this.validDuration + 1e-9 >= 5 && this.samples.length >= 2,
       units: { time: 's', x: 'm', z: 'm', altitude: 'ft MSL', airspeed: 'kt IAS', attitude: 'deg',
-        gForce: 'g (simulator measured load)', sinkRate: 'ft/min positive down' },
+        gForce: 'g (simulator measured load)', sinkRate: 'ft/min positive down',
+        impactSpeed: 'kt (world velocity magnitude at collision)' },
       coordinates: 'Three.js world: +Y up; x/z horizontal; altitudeFt = world Y / 0.3048',
     });
     return this.report;

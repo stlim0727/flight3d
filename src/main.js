@@ -593,7 +593,7 @@ class FlightSimulator {
     this.flightRecorder.update(dt, this.telemetry);
     if (this.isCrashed) {
       // Freeze the sortie at impact, while the exterior crash scene keeps running.
-      this.debriefReport = this.flightRecorder.finish('crash');
+      this.debriefReport = this.flightRecorder.finish('crash', this.crashResult);
       this.crashDebriefRemaining = 3;
     }
     else if (this.flightRecorder.stopped >= 3) this.endFlight('landed');
@@ -615,7 +615,8 @@ class FlightSimulator {
     if (!this.flightRecorder.active && !(this.isCrashed && this.debriefReport?.reason === 'crash')) return;
     if (![FLOW.FLIGHT, FLOW.PAUSED].includes(this.gameFlow.state) && !this.gameFlow.canResumeFromLobby()) return;
     this.crashDebriefRemaining = null;
-    this.debriefReport = this.flightRecorder.finish(this.isCrashed ? 'crash' : reason);
+    this.debriefReport = this.isCrashed ? this.flightRecorder.finish('crash', this.crashResult)
+      : this.flightRecorder.finish(reason);
     this.gameFlow.endFlight();
     this.debriefOverlay.show(this.debriefReport);
   }

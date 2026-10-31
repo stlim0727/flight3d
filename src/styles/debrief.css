@@ -51,6 +51,14 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 .debrief-stats > div { display: flex; flex-direction: column; gap: 3px; padding: 10px; border-radius: 7px; background: #142536; }
 .debrief-stats strong { font-size: 18px; font-variant-numeric: tabular-nums; line-height: 27px; }
 #debrief-touchdown { display: flex; flex-direction: column; gap: 4px; }
+/* Issue #365: collision that ended the sortie, from the crash result captured at impact. */
+#debrief-crash { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid rgba(239, 68, 68, .55); border-radius: 7px; background: #142536; }
+.debrief-crash-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; }
+.debrief-crash-header strong { color: #fca5a5; font-size: 10px; }
+#debrief-crash-name { font-size: 13px; }
+#debrief-crash-desc { color: #cbd5e1; font-size: 11px; }
+#debrief-crash-facts { font-size: 12px; font-variant-numeric: tabular-nums; white-space: pre-wrap; }
+#debrief-events .debrief-impact { color: #fca5a5; }
 #debrief-contact { font-size: 12px; }
 #debrief-chart { width: 100%; height: 90px; cursor: crosshair; touch-action: pan-y; }
 #debrief-axis { display: flex; justify-content: space-between; }
