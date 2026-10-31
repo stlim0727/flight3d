@@ -430,6 +430,7 @@ class FlightSimulator {
     this.clock.getDelta();
     this.physicsAccumulator = 0;
     if (backgrounded) {
+      if (this.pilotArena?.active) this.pilotArena.stop('browser-backgrounded');
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0, 0);
       this.controls.setTouchRudder(0);

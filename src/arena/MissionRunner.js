@@ -11,11 +11,12 @@ import { LandingMission } from './LandingMission.js';
 export class MissionRunner {
   constructor(adapter, { hostFactory = () => new PilotHost(),
     yieldFrame = () => new Promise(resolve => setTimeout(resolve, 0)),
-    onUpdate = () => {} } = {}) {
+    onUpdate = () => {}, paceTick = null } = {}) {
     this.adapter = adapter;
     this.hostFactory = hostFactory;
     this.yieldFrame = yieldFrame;
     this.onUpdate = onUpdate;
+    this.paceTick = paceTick;
     this.state = 'idle';
     this.generation = 0;
     this.record = null;
@@ -74,6 +75,7 @@ export class MissionRunner {
         if (generation !== this.generation) break;
         pending = { command, sampleTick: tick, scheduledTick: tick + period };
         for (let i = 0; i < period; i++) {
+          if (this.paceTick) await this.paceTick(tick + 1, manifest.physicsHz);
           if (generation !== this.generation) break;
           this.adapter.step();
           const snapshot = this.adapter.snapshot(++tick);

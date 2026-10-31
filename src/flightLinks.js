@@ -1,4 +1,5 @@
 import { flightCombinations, flightUrl } from './config/flightUrls.js';
+import { pilotCases, pilotCaseUrl } from './config/pilotCases.js';
 
 const rows = flightCombinations();
 const labels = {
@@ -38,3 +39,15 @@ function render() {
   }));
 }
 render();
+
+document.getElementById('pilot-cases').replaceChildren(...pilotCases().map(row => {
+  const tr = document.createElement('tr');
+  const label = document.createElement('td');
+  label.textContent = row.label;
+  const td = document.createElement('td');
+  const link = document.createElement('a');
+  link.href = pilotCaseUrl(row, new URL('./', location.href));
+  link.textContent = '게임에서 실시간으로 보기';
+  td.append(link); tr.append(label, td);
+  return tr;
+}));

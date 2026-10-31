@@ -94,3 +94,22 @@ links do not require a fallback. Browser audio permission rules still apply.
 | Aircraft | Scenario | Direct URL |
 | --- | --- | --- |
 | C172 | hangang | [https://stlim0727.github.io/flight3d/?aircraft=C172&terrain=hangang&scenario=hangang](https://stlim0727.github.io/flight3d/?aircraft=C172&terrain=hangang&scenario=hangang) |
+
+## AI pilot mission tests (12 cases)
+
+Each link loads the built-in B738/coastal pilot and automatically starts live 1× playback after the simulator is ready. Calm cases disable sensor noise; mild cases use the same wind and correlated sensor noise as the seed 1–5 sweep. The mission panel offers stop/manual takeover and fast evaluation. These links require the pilot arena changes to be merged and deployed.
+
+| Mission | Environment | Seed | Live game |
+| --- | --- | --- | --- |
+| takeoff | Calm / no noise | 1 | [takeoff-calm](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=runway&pilotArena=1&pilotCase=takeoff-calm) |
+| takeoff | Mild wind / sensor noise | 1 | [takeoff-mild-1](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=runway&pilotArena=1&pilotCase=takeoff-mild-1) |
+| takeoff | Mild wind / sensor noise | 2 | [takeoff-mild-2](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=runway&pilotArena=1&pilotCase=takeoff-mild-2) |
+| takeoff | Mild wind / sensor noise | 3 | [takeoff-mild-3](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=runway&pilotArena=1&pilotCase=takeoff-mild-3) |
+| takeoff | Mild wind / sensor noise | 4 | [takeoff-mild-4](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=runway&pilotArena=1&pilotCase=takeoff-mild-4) |
+| takeoff | Mild wind / sensor noise | 5 | [takeoff-mild-5](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=runway&pilotArena=1&pilotCase=takeoff-mild-5) |
+| landing | Calm / no noise | 1 | [landing-calm](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=approach&pilotArena=1&pilotCase=landing-calm) |
+| landing | Mild wind / sensor noise | 1 | [landing-mild-1](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=approach&pilotArena=1&pilotCase=landing-mild-1) |
+| landing | Mild wind / sensor noise | 2 | [landing-mild-2](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=approach&pilotArena=1&pilotCase=landing-mild-2) |
+| landing | Mild wind / sensor noise | 3 | [landing-mild-3](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=approach&pilotArena=1&pilotCase=landing-mild-3) |
+| landing | Mild wind / sensor noise | 4 | [landing-mild-4](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=approach&pilotArena=1&pilotCase=landing-mild-4) |
+| landing | Mild wind / sensor noise | 5 | [landing-mild-5](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=approach&pilotArena=1&pilotCase=landing-mild-5) |
