@@ -150,7 +150,7 @@ export class DevScenarioRunner {
 
   restart() { return this.active ? this.start(this.active.id) : false; }
 
-  stop() {
+  stop({ pilotPreparation = false } = {}) {
     if (!this.active || this.changingState) return;
     this.active = null; // Detach first: reset methods may also request cancellation.
     this.status = 'idle';
@@ -165,7 +165,7 @@ export class DevScenarioRunner {
       sim.controls.setTouchStick(0, 0);
       sim.controls.setTouchRudder(0);
       sim.controls.setTouchBrakes(0);
-      sim.setPreset('runway');
+      sim.setPreset('runway', false, pilotPreparation);
       sim.cameraSystem.trauma = 0;
       const saved = this.savedCamera;
       if (saved) {

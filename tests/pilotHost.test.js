@@ -180,6 +180,32 @@ describe('trusted local PilotHost lifecycle', () => {
     host.stop();
   });
 
+  it('discards logs over the serialized byte budget without faulting valid commands', async () => {
+    const logs = [];
+    const { host } = setup({ createPilot: api => ({
+      reset() {},
+      onTick() {
+        api.log('\u0001'.repeat(1024));
+        api.log('\u0001'.repeat(600) + '漢'.repeat(424));
+        api.log('漢'.repeat(1024));
+        api.log('😀'.repeat(1024));
+        return command;
+      },
+    }) }, { onLog: message => logs.push(message) });
+    try {
+      await host.start(source, {});
+      assert.deepEqual(await host.tick({}, { sampleTick: 0 }), command);
+      assert.deepEqual(await host.tick({}, { sampleTick: 24 }), command);
+      assert.equal(host.state, 'running');
+      assert.equal(logs.length, 4, 'oversized escaped logs are discarded; valid UTF-8 logs still arrive');
+      for (const message of logs) {
+        assert.ok(new TextEncoder().encode(JSON.stringify({ message })).byteLength <= PILOT_LIMITS.commandBytes);
+      }
+      assert.equal(logs[0], '漢'.repeat(1024));
+      assert.equal(logs[1], '😀'.repeat(512));
+    } finally { host.stop(); }
+  });
+
   it('rejects oversized source and invalid input before crossing the worker boundary', async () => {
     const { host, worker } = setup();
     await assert.rejects(host.start('x'.repeat(262145), {}), { code: 'invalid-source' });

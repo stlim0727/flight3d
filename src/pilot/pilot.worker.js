@@ -1,4 +1,4 @@
-import { createEnvelope, validateEnvelope, validateCommand, PILOT_LIMITS } from './PilotProtocol.js';
+import { createEnvelope, validateEnvelope, validateCommand, validatePlainData, PILOT_LIMITS } from './PilotProtocol.js';
 
 /** Native user JS is intentionally trusted-only. This wrapper is not a sandbox. */
 export function createPilotRuntime({ send, loadModule = loadSourceModule }) {
@@ -35,7 +35,11 @@ export function createPilotRuntime({ send, loadModule = loadSourceModule }) {
       if (!activeMeta || logCount >= 100 || invocationLogs >= 4 || typeof message !== 'string') return;
       logCount++;
       invocationLogs++;
-      reply('log', activeMeta, { message: message.slice(0, 1024) });
+      const payload = { message: message.slice(0, 1024) };
+      // JSON escaping can exceed the byte budget even after the character cap.
+      // Diagnostics must not fault an otherwise valid pilot invocation.
+      if (!validatePlainData(payload, { maxBytes: PILOT_LIMITS.commandBytes }).ok) return;
+      reply('log', activeMeta, payload);
     },
   });
 

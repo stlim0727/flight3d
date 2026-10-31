@@ -4,6 +4,7 @@ import takeoffSource from '../pilot/examples/takeoff.js?raw';
 import landingSource from '../pilot/examples/landing.js?raw';
 import { resolvePilotCase } from '../config/pilotCases.js';
 import { createRealtimePacer } from '../arena/realtimePacer.js';
+import { bindPilotPanelInput } from './pilotPanelInput.js';
 
 /** Opt-in local pilot lab. No remote upload and no security sandbox claims. */
 export function installPilotArena(sim) {
@@ -30,12 +31,7 @@ export function installPilotArena(sim) {
   document.head.append(style);
   document.body.append(shell);
   const find = name => shell.querySelector(`[data-${name}]`);
-  shell.addEventListener('keydown', event => {
-    if (event.target.closest('textarea,input,select')) event.stopPropagation();
-  });
-  shell.addEventListener('keyup', event => {
-    if (event.target.closest('textarea,input,select')) event.stopPropagation();
-  });
+  bindPilotPanelInput(shell, sim.controls);
   const source = find('source');
   source.value = takeoffSource;
   const runner = sim.pilotArena = new MissionRunner(new SimulatorMissionAdapter(sim), {
