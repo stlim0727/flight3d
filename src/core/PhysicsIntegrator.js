@@ -186,6 +186,7 @@ class PhysicsIntegratorMethods {
     // Clamp near-zero velocity when parked on ground with brakes
     if (gearResult.onGround && this.controls.brakes > 0.5 && this.linearVelocity.length() < 0.4 && this.controls.throttle < 0.1) {
       this.linearVelocity.set(0, 0, 0);
+      this.controls.setParkingBrake?.(true);
     }
 
     this._rotationBefore.copy(this.quaternion);

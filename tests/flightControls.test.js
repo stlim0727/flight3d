@@ -154,6 +154,17 @@ describe('FlightControls (Keyboard & Touch Inputs)', () => {
     controls.update(0.1, 0);
     assert.strictEqual(controls.brakes, 0.0);
 
+    // Period key toggles parking brake directly or calls onToggleParkingBrake
+    controls.handleKeyDown({ code: 'Period', target: mockDom });
+    assert.strictEqual(controls.parkingBrake, true);
+    controls.handleKeyDown({ code: 'Period', target: mockDom });
+    assert.strictEqual(controls.parkingBrake, false);
+
+    let callbackFired = 0;
+    controls.onToggleParkingBrake = () => { callbackFired++; };
+    controls.handleKeyDown({ code: 'Period', target: mockDom });
+    assert.strictEqual(callbackFired, 1);
+
     if (prevWindow === undefined) {
       delete globalThis.window;
     } else {

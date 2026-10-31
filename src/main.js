@@ -219,8 +219,10 @@ class FlightSimulator {
         this.controls.pitchTrim = this.aero.pitchTrim;
       },
       onToggleParkingBrake: () => {
-        if (this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed) return;
-        this.controls.setParkingBrake(!this.controls.parkingBrake);
+        if (this.controls.onToggleParkingBrake) this.controls.onToggleParkingBrake();
+        else if (!this.controls.aircraftControlsDisabled && !this.controls.inputBlocked && !this.isCrashed) {
+          this.controls.setParkingBrake(!this.controls.parkingBrake);
+        }
       },
     });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
