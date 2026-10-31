@@ -75,6 +75,32 @@ test('localized share report contains actual metrics, end reason and touchdown',
   assert.equal(flightDuration(522), '08:42'); assert.equal(flightDuration(3600), '60:00');
 });
 
+test('crash reports snapshot the collision once and include it in shared text', () => {
+  let language = 'ko';
+  const crash = { type: 'TERRAIN', speedKnots: 177.6, point: { x: 1 },
+    get name() { return language === 'ko' ? '지형 충돌' : 'Terrain collision'; },
+    get description() { return language === 'ko' ? '기체가 지면과 충돌했습니다.' : 'The aircraft hit the ground.'; } };
+  const r = new FlightRecorder(); r.start(metadata); record(5, r);
+  const report = r.finish('crash', crash);
+  assert.equal(report.version, 2);
+  assert.deepEqual(report.crash, { type: 'TERRAIN', name: '지형 충돌', description: '기체가 지면과 충돌했습니다.',
+    speedKnots: 177.6, timeSec: report.durationSec });
+  language = 'en'; crash.speedKnots = 0;
+  assert.equal(report.crash.name, '지형 충돌', 'exported reports own their collision data');
+  assert.equal(report.crash.speedKnots, 177.6);
+  const time = flightDuration(report.durationSec);
+  setLanguage('ko');
+  assert.ok(reportText(report).includes(`충돌: 지형 충돌 · 178 KT · ${time}`));
+  setLanguage('en');
+  assert.ok(reportText(report).includes(`Impact: 지형 충돌 · 178 KT · ${time}`));
+
+  const manual = new FlightRecorder(); manual.start(metadata); record(5, manual);
+  assert.equal(manual.finish('manual').crash, null);
+  assert.doesNotMatch(reportText(manual.report), /Impact:/);
+  const unknown = new FlightRecorder(); unknown.start(metadata); record(5, unknown);
+  assert.equal(unknown.finish('crash', { type: 'WATER', speedKnots: NaN }).crash.speedKnots, null);
+});
+
 test('flow sequence excludes pause/menu time, freezes completed reports, retry starts fresh', () => {
   const sim = { gameFlow: new GameFlowController(), flightRecorder: new FlightRecorder(), devRunner: {},
     telemetry, isCrashed: false, debriefOverlay: { show(report) { this.report = report; } } };
@@ -111,7 +137,9 @@ function crashSortie() {
   }
   sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata);
   for (let i = 0; i < 120; i++) sim.updateFlightRecording(1 / 120);
-  sim.isCrashed = true; sim.telemetry.gForce = 4; sim.updateFlightRecording(1 / 120);
+  sim.isCrashed = true; sim.telemetry.gForce = 4;
+  sim.crashResult = { type: 'TOWER', name: 'Tower', description: 'Hit the tower.', speedKnots: 140 };
+  sim.updateFlightRecording(1 / 120);
   return sim;
 }
 
@@ -119,6 +147,8 @@ test('crash scene waits for three rendered seconds with an immutable impact repo
   const sim = crashSortie();
   const report = structuredClone(sim.debriefReport);
   assert.equal(report.peaks.gForce.gForce, 4, 'include impact telemetry');
+  assert.equal(report.crash.type, 'TOWER', 'include the collision that ended the sortie');
+  assert.equal(report.crash.timeSec, report.durationSec);
   assert.equal(report.sufficient, false);
   sim.telemetry.gForce = 100;
   for (let i = 0; i < 1200; i++) sim.updateFlightRecording(1 / 120);

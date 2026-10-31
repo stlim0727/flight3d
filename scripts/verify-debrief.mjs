@@ -160,6 +160,13 @@ try {
   assert.equal(await ev('s.gameFlow.state'), 'debrief');
   assert.equal(await ev('JSON.stringify(s.debriefReport)'), crashReport);
   assert.equal(await ev('document.activeElement.id'), 'debrief-tab-summary');
+  // Issue #365: the debrief carries the collision that ended the sortie.
+  assert.deepEqual(await ev('[s.debriefReport.version, s.debriefReport.crash.type, s.debriefReport.crash.speedKnots]'), [2, 'TERRAIN', 100]);
+  assert.equal(await ev('getComputedStyle(document.querySelector("#debrief-crash")).display'), 'flex');
+  assert.equal(await ev('document.querySelector("#debrief-crash-name").textContent'), 'Terrain', 'short records name the collision in the block');
+  assert.equal(await ev('document.querySelector("#debrief-crash-desc").textContent'), 'Verification impact');
+  assert.equal(await ev('document.querySelector("#debrief-events li:last-child").classList.contains("debrief-impact")'), true);
+  assert.equal(await ev('getComputedStyle(document.querySelector("#debrief-impact-marker")).display'), 'inline', 'impact marker is rendered');
   await shot('crash-debrief');
 
   // Menu entry cancels the pending transition; retry starts a clean sortie.
@@ -178,7 +185,7 @@ try {
   assert.equal(await ev('s.flightRecorder.active && !s.isCrashed'), true);
   assert.deepEqual(exceptions, [], 'no browser exceptions');
   await writeFile(resolve(output, 'results.json'), JSON.stringify({ gpu, durationSec: duration,
-    scenarios: ['manual end', 'pause exclusion', 'tabs', 'scrub', 'clipboard success/failure', 'JSON download', 'responsive', 'retry', 'insufficient data', 'main menu', 'crash observation', 'moving wreckage', 'crash pause exclusion', 'immutable impact report', 'delayed debrief', 'crash menu cancellation', 'crash retry'], exceptions }, null, 2));
+    scenarios: ['manual end', 'pause exclusion', 'tabs', 'scrub', 'clipboard success/failure', 'JSON download', 'responsive', 'retry', 'insufficient data', 'main menu', 'crash observation', 'moving wreckage', 'crash pause exclusion', 'immutable impact report', 'delayed debrief', 'crash report in debrief', 'crash menu cancellation', 'crash retry'], exceptions }, null, 2));
   console.log(JSON.stringify({ passed: true, output, gpu, durationSec: duration }));
 } finally {
   ws.close();

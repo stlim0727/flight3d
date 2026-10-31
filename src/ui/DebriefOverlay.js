@@ -7,6 +7,7 @@ const airportKeys = { coastal: 'coastal.airport', incheon: 'incheon.airport', lu
   neon: 'neon.metropolis', hangang: 'hangang.title' };
 const number = value => Number.isFinite(value) ? Math.round(value).toLocaleString('en-US') : '—';
 const g = value => Number.isFinite(value) ? value.toFixed(2) : '—';
+const crashName = crash => crash.name ?? t('debrief.reason.crash');
 
 export function reportText(report) {
   const m = report.metadata;
@@ -16,6 +17,7 @@ export function reportText(report) {
     `${t('debrief.altitude')} ${number(report.peaks.altitudeFt?.altitudeFt)} FT · ${t('debrief.speed')} ${number(report.peaks.iasKnots?.iasKnots)} KT`,
     `${t('debrief.g')} ${g(report.peaks.gForce?.gForce)} G`,
     `${t('debrief.reason')}: ${t(`debrief.reason.${report.reason}`)}`,
+    ...(report.crash ? [`${t('debrief.impact')}: ${crashName(report.crash)} · ${number(report.crash.speedKnots)} KT · ${flightDuration(report.crash.timeSec)}`] : []),
     report.touchdowns.length ? `${t('debrief.sink')} ${number(report.touchdowns.at(-1).sinkRateFpm)} FPM · ${t('debrief.contactG')} ${g(report.touchdowns.at(-1).contactG)} G` : t('debrief.noTouchdown'),
   ].join('\n');
 }
@@ -33,6 +35,10 @@ export class DebriefOverlay {
         <div class="debrief-panels">
           <section id="debrief-summary" role="tabpanel" aria-labelledby="debrief-tab-summary" tabindex="0">
             <h3 id="debrief-outcome"></h3><p id="debrief-identity" class="debrief-muted"></p>
+            <div id="debrief-crash" hidden>
+              <div class="debrief-crash-header"><span class="debrief-caption" data-i18n="debrief.crashReport"></span><strong data-i18n="debrief.crashSeverity"></strong></div>
+              <strong id="debrief-crash-name"></strong><p id="debrief-crash-desc"></p><p id="debrief-crash-facts"></p>
+            </div>
             <div class="debrief-stats">
               ${['duration', 'altitude', 'speed', 'g'].map(name => `<div data-stat="${name}"><span data-debrief-label="${name}"></span><strong id="debrief-stat-${name}"></strong></div>`).join('')}
               <div data-stat="empty-touchdown" hidden><span data-i18n="debrief.touchdown"></span><strong>—</strong></div>
@@ -43,7 +49,7 @@ export class DebriefOverlay {
           </section>
           <section id="debrief-record" role="tabpanel" aria-labelledby="debrief-tab-record" tabindex="0" hidden>
             <h3 data-i18n="debrief.history"></h3><p class="debrief-caption" data-i18n="debrief.altitudeAxis"></p>
-            <svg id="debrief-chart" viewBox="0 0 320 90" role="img" data-i18n-aria-label="debrief.altitudeAxis"><path d="M0 85 H320" stroke="#385268"/><polyline fill="none" stroke="#67d5a3" stroke-width="2"/><circle r="3" fill="#e2e8f0"/></svg>
+            <svg id="debrief-chart" viewBox="0 0 320 90" role="img" data-i18n-aria-label="debrief.altitudeAxis"><path d="M0 85 H320" stroke="#385268"/><polyline fill="none" stroke="#67d5a3" stroke-width="2"/><circle id="debrief-impact-marker" r="4" fill="#ef4444" stroke="#e2e8f0" hidden/><circle id="debrief-cursor" r="3" fill="#e2e8f0"/></svg>
             <div id="debrief-axis" class="debrief-caption"></div>
             <input id="debrief-scrub" type="range" min="0" value="0" step="1" data-i18n-aria-label="debrief.inspect" />
             <output id="debrief-sample" for="debrief-scrub"></output>
@@ -131,7 +137,16 @@ export class DebriefOverlay {
   show(report) {
     this.report = report;
     const enough = report.sufficient;
-    bindText(this.el('outcome'), () => t(enough ? `debrief.outcome.${report.reason}` : 'debrief.empty'));
+    const crash = report.crash;
+    // A crash headline names the collision; short records keep their own headline, so the block names it.
+    bindText(this.el('outcome'), () => !enough ? t('debrief.empty') : crash ? crashName(crash) : t(`debrief.outcome.${report.reason}`));
+    this.el('crash').hidden = !crash;
+    this.el('crash-name').hidden = enough;
+    bindText(this.el('crash-name'), () => crash ? crashName(crash) : '');
+    this.el('crash-desc').textContent = crash?.description ?? '';
+    this.el('crash-desc').hidden = !crash?.description;
+    bindText(this.el('crash-facts'), () => crash
+      ? `${t('debrief.impactSpeed')}  ${number(crash.speedKnots)} KT     ${t('debrief.impactTime')}  ${flightDuration(crash.timeSec)}` : '');
     bindText(this.el('identity'), () => enough
       ? `${AIRCRAFT_REGISTRY[report.metadata.aircraft]?.name ?? report.metadata.aircraft} · ${t(airportKeys[report.metadata.airport] ?? 'coastal.airport')}\n${t(scenarioLabelKey(report.metadata.airport, report.metadata.scenario) ?? 'lobby.spawn')} · ${t(`debrief.reason.${report.reason}`)}`
       : t('debrief.emptyHint'));
@@ -141,8 +156,9 @@ export class DebriefOverlay {
     this.el('stat-g').textContent = `${g(report.peaks.gForce?.gForce)} G`;
     for (const key of ['altitude', 'speed', 'g']) this.root.querySelector(`[data-stat="${key}"]`).hidden = !enough;
     this.root.querySelector('[data-stat="empty-touchdown"]').hidden = enough;
-    this.el('touchdown').hidden = !enough;
     const touchdown = report.touchdowns.at(-1);
+    // After a crash the collision replaces the touchdown block unless a touchdown actually happened.
+    this.el('touchdown').hidden = !enough || Boolean(crash && !touchdown);
     bindText(this.el('contact'), () => `${t('debrief.sink')} ${number(touchdown?.sinkRateFpm)} FPM · ${t('debrief.contactG')} ${g(touchdown?.contactG)} G`);
     bindText(this.el('contact-note'), () => t(touchdown ? 'debrief.contactNote' : 'debrief.noTouchdown'));
     this.el('insufficient').hidden = enough;
@@ -156,7 +172,7 @@ export class DebriefOverlay {
   }
 
   drawChart() {
-    const { samples, peaks, durationSec, reason } = this.report;
+    const { samples, peaks, durationSec, reason, crash } = this.report;
     const low = Math.min(...samples.map(s => s.altitudeFt), 0);
     const high = Math.max(peaks.altitudeFt?.altitudeFt ?? 1, low + 1);
     this.point = s => [s.timeSec / (durationSec || 1) * 320, 80 - (s.altitudeFt - low) / (high - low) * 65];
@@ -164,12 +180,20 @@ export class DebriefOverlay {
     this.el('axis').replaceChildren(...[0, durationSec / 2, durationSec].map(time => {
       const span = document.createElement('span'); span.textContent = flightDuration(time); return span;
     }));
-    const events = [[0, 'debrief.started', ''], [peaks.altitudeFt?.timeSec, 'debrief.altitude', `${number(peaks.altitudeFt?.altitudeFt)} FT`],
-      [peaks.gForce?.timeSec, 'debrief.g', `${g(peaks.gForce?.gForce)} G`],
-      ...this.report.touchdowns.map(contact => [contact.timeSec, 'debrief.touchdown', `${number(contact.sinkRateFpm)} FPM`]),
-      [durationSec, `debrief.reason.${reason}`, '']];
-    this.el('events').replaceChildren(...events.filter(([time]) => Number.isFinite(time)).sort((a, b) => a[0] - b[0]).map(([time, key, value]) => {
-      const li = document.createElement('li'); bindText(li, () => `${flightDuration(time)}   ${t(key)} ${value}`.trim()); return li;
+    // SVG elements have no `hidden` property; toggle the attribute that the card CSS hides.
+    const impact = this.el('impact-marker');
+    impact.toggleAttribute('hidden', !crash || !samples.length);
+    if (crash && samples.length) {
+      const [x, y] = this.point(samples.at(-1));
+      impact.setAttribute('cx', Math.min(x, 316)); impact.setAttribute('cy', y);
+    }
+    const events = [[0, () => t('debrief.started')], [peaks.altitudeFt?.timeSec, () => `${t('debrief.altitude')} ${number(peaks.altitudeFt?.altitudeFt)} FT`],
+      [peaks.gForce?.timeSec, () => `${t('debrief.g')} ${g(peaks.gForce?.gForce)} G`],
+      ...this.report.touchdowns.map(contact => [contact.timeSec, () => `${t('debrief.touchdown')} ${number(contact.sinkRateFpm)} FPM`]),
+      [durationSec, () => crash ? `${crashName(crash)} · ${number(crash.speedKnots)} KT` : t(`debrief.reason.${reason}`), Boolean(crash)]];
+    this.el('events').replaceChildren(...events.filter(([time]) => Number.isFinite(time)).sort((a, b) => a[0] - b[0]).map(([time, label, isImpact]) => {
+      const li = document.createElement('li'); bindText(li, () => `${flightDuration(time)}   ${label()}`);
+      li.classList.toggle('debrief-impact', Boolean(isImpact)); return li;
     }));
     this.el('scrub').max = Math.max(0, samples.length - 1);
     this.el('scrub').disabled = !samples.length;
@@ -179,7 +203,7 @@ export class DebriefOverlay {
   inspect(index) {
     this.el('scrub').value = index;
     const sample = this.report.samples[index];
-    const circle = this.el('chart').querySelector('circle');
+    const circle = this.el('cursor');
     circle.style.display = sample ? '' : 'none';
     if (!sample) { this.el('sample').textContent = '—'; return; }
     const [x, y] = this.point(sample); circle.setAttribute('cx', x); circle.setAttribute('cy', y);
