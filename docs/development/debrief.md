@@ -52,6 +52,21 @@ Impact speed is the collision detector's world velocity magnitude in knots
 (`|v| × 1.94384`), not indicated airspeed. Opening a detailed debrief through an
 external URL is tracked separately in issue #368.
 
+## Long headlines (issue #370)
+
+The Summary headline stays on one line and ends with an ellipsis when clipped
+(Figma #370 row, D″ and D″-T). Only a clipped headline becomes focusable and
+shows a tooltip with the full text on mouse hover, keyboard focus or touch tap;
+pointer exit, blur, Escape or a tap elsewhere closes it. An open tooltip consumes
+Escape before the flight ESC chain. The `h3` keeps the full text for screen
+readers and the tooltip is `aria-hidden`. Text mutations (language changes) and
+resizes re-measure clipping.
+
+Touches on the debrief card are interactive UI for `CameraSystem`, so they no
+longer start a camera drag or cancel the browser's touch defaults behind the
+card. Chrome's CDP tap synthesis does not emit a compatibility click here, so the
+tooltip opens on touch `pointerup`; physical touch devices were not tested.
+
 ## Recording and measurement
 
 `FlightRecorder` observes telemetry after each fixed physics tick and integrates

@@ -34,7 +34,8 @@ export class DebriefOverlay {
         </div>
         <div class="debrief-panels">
           <section id="debrief-summary" role="tabpanel" aria-labelledby="debrief-tab-summary" tabindex="0">
-            <h3 id="debrief-outcome"></h3><p id="debrief-identity" class="debrief-muted"></p>
+            <div class="debrief-outcome"><h3 id="debrief-outcome"></h3><div id="debrief-outcome-tip" role="tooltip" aria-hidden="true" hidden></div></div>
+            <p id="debrief-identity" class="debrief-muted"></p>
             <div id="debrief-crash" hidden>
               <div class="debrief-crash-header"><span class="debrief-caption" data-i18n="debrief.crashReport"></span><strong data-i18n="debrief.crashSeverity"></strong></div>
               <strong id="debrief-crash-name"></strong><p id="debrief-crash-desc"></p><p id="debrief-crash-facts"></p>
@@ -112,6 +113,27 @@ export class DebriefOverlay {
       link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
       this.status('debrief.exported');
     });
+    // Issue #370: the headline stays on one line; a clipped one reveals its full text on
+    // hover, keyboard focus or tap. The h3 keeps the full text for screen readers.
+    const outcome = this.el('outcome');
+    outcome.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch') this.showOutcomeTip(true); });
+    outcome.addEventListener('pointerleave', event => {
+      if (event.pointerType !== 'touch' && document.activeElement !== outcome) this.showOutcomeTip(false);
+    });
+    outcome.addEventListener('click', () => this.showOutcomeTip(true));
+    // Open touch taps on pointerup so they do not depend on the compatibility click.
+    outcome.addEventListener('pointerup', event => { if (event.pointerType === 'touch') this.showOutcomeTip(true); });
+    outcome.addEventListener('focus', () => this.showOutcomeTip(true));
+    outcome.addEventListener('blur', () => this.showOutcomeTip(false));
+    document.addEventListener('pointerdown', event => { if (!outcome.contains(event.target)) this.showOutcomeTip(false); });
+    // Capture so an open tooltip consumes Escape before the flight ESC chain sees it.
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape' || this.el('outcome-tip').hidden) return;
+      event.preventDefault(); this.showOutcomeTip(false);
+    }, true);
+    // Text changes (language) and width changes (viewport) can both change clipping.
+    new MutationObserver(() => this.measureOutcome()).observe(outcome, { childList: true, characterData: true, subtree: true });
+    new ResizeObserver(() => this.measureOutcome()).observe(outcome);
     this.root.addEventListener('keydown', event => {
       if (event.key !== 'Tab') return;
       const nodes = [...this.root.querySelectorAll('button, input, [tabindex="0"]')].filter(el => !el.disabled && el.getClientRects().length);
@@ -124,7 +146,23 @@ export class DebriefOverlay {
   el(name) { return document.getElementById(`debrief-${name}`); }
   status(key) { bindText(this.el('status'), () => key ? t(key) : ''); }
 
+  measureOutcome() {
+    const outcome = this.el('outcome');
+    // Hidden panels report zero widths; the ResizeObserver re-measures once laid out.
+    if (!outcome.getClientRects().length) return;
+    const clipped = outcome.scrollWidth > outcome.clientWidth + 1;
+    outcome.classList.toggle('is-truncated', clipped);
+    if (clipped) outcome.tabIndex = 0; else outcome.removeAttribute('tabindex');
+    this.el('outcome-tip').textContent = outcome.textContent;
+    if (!clipped) this.showOutcomeTip(false);
+  }
+
+  showOutcomeTip(open) {
+    this.el('outcome-tip').hidden = !(open && this.el('outcome').classList.contains('is-truncated'));
+  }
+
   selectTab(name) {
+    this.showOutcomeTip(false);
     for (const tab of this.tabs) {
       const active = tab.id === `debrief-tab-${name}`;
       tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1;
@@ -168,6 +206,7 @@ export class DebriefOverlay {
     this.status(null);
     this.drawChart();
     this.selectTab('summary');
+    this.measureOutcome();
     this.el('tab-summary').focus();
   }
 

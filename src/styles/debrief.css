@@ -21,6 +21,27 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 .debrief-card h2 { font-size: 18px; line-height: 27px; }
 .debrief-card h3 { font-size: 18px; line-height: 27px; }
 #debrief-record h3, #debrief-share h3 { font-size: 16px; line-height: 24px; }
+/* Issue #370: one-line headline; the tooltip shows a clipped headline in full. */
+.debrief-outcome { position: relative; }
+#debrief-outcome { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#debrief-outcome.is-truncated { cursor: help; }
+.debrief-card #debrief-outcome:focus-visible { outline-offset: -2px; border-radius: 4px; }
+#debrief-outcome-tip {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  padding: 8px 10px;
+  border: 1px solid #538aa4;
+  border-radius: 7px;
+  background: #0b1422;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .45);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
 .debrief-muted { color: #94a3b8; font-size: 11px; white-space: pre-line; }
 .debrief-caption, .debrief-stats span { color: #94a3b8; font-size: 10px; }
 .debrief-tabs { display: flex; gap: 4px; flex-shrink: 0; }
