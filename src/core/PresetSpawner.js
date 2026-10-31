@@ -8,6 +8,7 @@ import { solveTrim } from '../physics/TrimSolver.js';
 import { rebaseCgVelocity } from '../physics/massKinematics.js';
 import { takeoffPerformance } from '../physics/TakeoffPerformance.js';
 import { stallSpeedEstimate } from '../physics/stallSpeedEstimate.js';
+import { setSimulationWind } from '../physics/WindField.js';
 import { loadIncheonAirport } from '../environment/IncheonAirport.js';
 import { incheonSpawn } from '../geospatial/IncheonFlightSurface.js';
 import { LuklaTerrain } from '../environment/LuklaTerrain.js';
@@ -23,6 +24,8 @@ import {
 
 class PresetSpawnerMethods {
   setPreset(type, isDemoInternal = false) {
+    // An arena field must not leak into a different mission or ordinary flight.
+    if (this.windField) setSimulationWind(this);
     this.hangang?.stop();
     if (this.activeAirport === 'incheon' && this.incheonAirport) {
       this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = true;
