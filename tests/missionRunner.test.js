@@ -104,3 +104,33 @@ test('stopped startup cannot revive and its promise retains the old record', asy
   assert.equal(await promise, oldRecord);
   assert.equal(adapter.tick, 0);
 });
+
+test('a stopped run completing its hashes cannot overwrite a replacement run record', async t => {
+  const { adapter, host } = fixture();
+  adapter.prepare = async ({ seed }) => ({ manifest: createMissionManifest('takeoff', { environmentSeed: seed }) });
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  let finishOldHash, finishNewTick;
+  let calls = 0;
+  t.mock.method(crypto.subtle, 'digest', (algorithm, bytes) => {
+    if (calls++ === 0) return new Promise(resolve => { finishOldHash = resolve; });
+    return digest(algorithm, bytes);
+  });
+  host.tick = () => new Promise(resolve => { finishNewTick = resolve; });
+  const runner = new MissionRunner(adapter, { hostFactory: () => host });
+  const oldPromise = runner.start('old source', { seed: 1 });
+  while (!finishOldHash) await new Promise(resolve => setImmediate(resolve));
+  const oldRecord = runner.record;
+  runner.stop();
+  const newPromise = runner.start('new source', { seed: 2 });
+  while (!finishNewTick) await new Promise(resolve => setImmediate(resolve));
+  const newRecord = runner.record;
+  const expected = newRecord.manifestHash;
+  finishOldHash(new ArrayBuffer(32));
+  assert.equal(await oldPromise, oldRecord);
+  assert.equal(runner.record, newRecord);
+  assert.equal(newRecord.manifest.environmentSeed, 2);
+  assert.equal(newRecord.manifestHash, expected);
+  assert.notEqual(oldRecord.manifestHash, newRecord.manifestHash);
+  runner.stop(); finishNewTick(command);
+  await newPromise;
+});

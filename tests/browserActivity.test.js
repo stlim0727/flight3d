@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { SimulatorClass } from './helpers/simulatorClass.js';
 import { GameFlowController, FLOW } from '../src/ui/GameFlowController.js';
 import { FlightAudio } from '../src/audio/FlightAudio.js';
+import { MissionRunner } from '../src/arena/MissionRunner.js';
+import { createMissionManifest } from '../src/arena/missionConfig.js';
 
 function fixture() {
   const audio = new FlightAudio();
@@ -95,4 +97,22 @@ test('background animation schedules its next frame but never advances simulatio
   } finally {
     if (previous === undefined) delete globalThis.requestAnimationFrame; else globalThis.requestAnimationFrame = previous;
   }
+});
+
+test('actual browser activity handling cancels a pending pilot reply before it can advance physics', async () => {
+  const { sim } = fixture();
+  let finishTick, steps = 0;
+  const adapter = { async prepare() { return { manifest: createMissionManifest('takeoff') }; },
+    acquire() {}, release() {}, apply() {}, snapshot() { return {}; }, step() { steps++; } };
+  const runner = sim.pilotArena = new MissionRunner(adapter, { hostFactory: () => ({
+    async start() {}, tick() { return new Promise(resolve => { finishTick = resolve; }); }, stop() {},
+  }) });
+  const run = runner.start('source');
+  while (!finishTick) await new Promise(resolve => setImmediate(resolve));
+  sim.setBrowserActive(false);
+  finishTick({ elevator: 0, aileron: 0, rudder: 0, throttle: 1, brakes: 0 });
+  const record = await run;
+  assert.equal(record.status, 'aborted');
+  assert.equal(record.reason, 'browser-backgrounded');
+  assert.equal(steps, 0);
 });

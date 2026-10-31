@@ -40,14 +40,14 @@ export class MissionRunner {
       if (generation !== this.generation) return record;
       const manifest = prepared.manifest;
       if (manifest.physicsHz !== 120) throw new Error('Unsupported physics rate');
-      this.record.manifest = structuredClone(manifest);
-      this.record.source = source;
-      this.record.sensorSeed = options.sensorSeed ?? options.seed ?? 1;
-      this.record.noiseEnabled = options.noise ?? options.environmentProfile !== 'calm-debug-v1';
+      record.manifest = structuredClone(manifest);
+      record.source = source;
+      record.sensorSeed = options.sensorSeed ?? options.seed ?? 1;
+      record.noiseEnabled = options.noise ?? options.environmentProfile !== 'calm-debug-v1';
       const hash = async text => Array.from(new Uint8Array(await crypto.subtle.digest(
         'SHA-256', new TextEncoder().encode(text))), b => b.toString(16).padStart(2, '0')).join('');
-      this.record.sourceHash = await hash(source);
-      this.record.manifestHash = await hash(JSON.stringify(manifest));
+      record.sourceHash = await hash(source);
+      record.manifestHash = await hash(JSON.stringify(manifest));
       if (generation !== this.generation) return record;
       this.adapter.acquire();
       const evaluator = manifest.id.startsWith('landing')
