@@ -110,11 +110,10 @@ export class F16LuklaScenario extends CessnaDemoScenario {
     const targetSpeed = climb ? 260 : 280;
     if (climb) this.flyLanding(vzCmd, targetSpeed);
     else this.flyVertical(vzCmd, targetSpeed);
-    // The fighter's idle thrust and rapid spool-up need less feed-forward than
-    // the Cessna controller: preserve speed margin instead of accelerating into
-    // the opposing ridge while the bank is still building.
+    // The fighter's corrected thrust model (idle thrust ~0) requires a higher
+    // throttle base to maintain approach energy; gains are scaled proportionally.
     sim.controls.setVirtualInput('throttle', THREE.MathUtils.clamp(
-      0.10 + (targetSpeed - sim.telemetry.iasKnots) * 0.025 + vzCmd * 0.006, 0, 1));
+      0.53 + (targetSpeed - sim.telemetry.iasKnots) * 0.013 + vzCmd * 0.003, 0, 1));
 
     if (!this.director.userCameraOverridden) {
       const shot = stage === STAGES.LOW_PASS ? CameraSystem.MODES.FLYBY
@@ -139,7 +138,7 @@ export class F16LuklaScenario extends CessnaDemoScenario {
 
   // The F-16's configured stall AoA is 28°, unlike the Cessna's conservative
   // 11° pilot limit. Landing uses up to 20° through physical elevator commands.
-  flyLanding(targetVz, targetIas, groundPitch = null, pathAcceleration = 0, maxPitchDeg = 90) {
+  flyLanding(targetVz, targetIas, groundPitch = null, pathAcceleration = 0, maxPitchDeg = 90, minThrottle = 0) {
     const sim = this.sim, aero = sim.aero, tel = sim.telemetry;
     const bank = THREE.MathUtils.degToRad(tel.rollDeg);
     const acceleration = clamp(pathAcceleration + (targetVz - sim.linearVelocity.y), -3, 4);
@@ -162,8 +161,12 @@ export class F16LuklaScenario extends CessnaDemoScenario {
     const elevator = (effective - THREE.MathUtils.degToRad(aero.pitchTrim) * TRIM_WHEEL_AUTHORITY)
       / (THREE.MathUtils.degToRad(20) * stiffness);
     sim.controls.setVirtualInput('elevator', clamp(elevator, -.8, .8));
+    // Throttle recalibrated for the corrected idle-thrust model (idle N1 → ~0 N thrust).
+    // Baseline 0.53 replaces the old 0.10, preserving equivalent energy at approach speed.
+    // minThrottle defaults to 0 (RETURN/deceleration) but the FINAL approach passes 0.30
+    // so the F-16 never drops below idle-equivalent during the glideslope intercept.
     if (groundPitch === null) sim.controls.setVirtualInput('throttle', clamp(
-      .1 + (targetIas - tel.iasKnots) * .04 + targetVz * .015, 0, 1));
+      0.53 + (targetIas - tel.iasKnots) * .021 + targetVz * .008, minThrottle, 1));
   }
 
   updateLanding(dt, stage) {
@@ -233,11 +236,11 @@ export class F16LuklaScenario extends CessnaDemoScenario {
             sim.position.z + sim.linearVelocity.z * seconds) + 100);
         }
       }
-      const targetIas = 132;
+      const targetIas = distance > 1500 ? 145 : 132;
       const speedbrakeBias = THREE.MathUtils.lerp(.1, .25, clamp((distance - 1000) / 1000, 0, 1));
       sim.aero.spoilers = clamp(speedbrakeBias + (tel.iasKnots - targetIas) * .04, 0, 1);
       this.flyLanding(clamp(pathSlope * vS + (altitude - sim.position.y) * .5, -18, 18), targetIas, null,
-        distance > 0 && distance < flareLength ? curvature * vS * vS : 0, 18);
+        distance > 0 && distance < flareLength ? curvature * vS * vS : 0, 18, 0.30);
       if (tel.onGround && sim.gear.contacts.slice(1).every(c => c.isGrounded)
         && s > -263.5 && s < 220 && Math.abs(w) < 15) {
         this.result.touchdown = { alongRunwayM: s, crossTrackM: w, iasKnots: tel.iasKnots };

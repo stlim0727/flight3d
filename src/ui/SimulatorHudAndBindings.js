@@ -41,6 +41,12 @@ class SimulatorHudAndBindingsMethods {
       this.engines.toggleReverser(this.telemetry.onGround);
     };
 
+    this.controls.onToggleParkingBrake = () => {
+      if (this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed) return;
+      this.controls.setParkingBrake(!this.controls.parkingBrake);
+      this.showToast(() => this.controls.parkingBrake ? t('notice.parkingBrakeSet') : t('notice.parkingBrakeReleased'));
+    };
+
     this.controls.onCycleEngineFailure = () => {
       if (this.devRunner?.active) return;
       if (this.engines.numEngines === 1) {

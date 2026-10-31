@@ -122,6 +122,7 @@ export default {
   "increase.decrease.engine.throttle": "스로틀 엔진 출력 증가 / 감소",
   "full.thrust.toga.100.idle.22": "최대 출력(TOGA 100%) / 아이들(Idle 22%)",
   "wheel.brakes.ground.deceleration": "휠 브레이크 (지상 감속)",
+  "parking.brake.toggle": "주차 브레이크 토글",
   "pitch.trim.nose.down.up": "피치 트림 (Trim Nose Down / Up)",
   "extend.retract.flaps.up.1.5.15": "플랩 전개 / 접기 (UP, 1°, 5°, 15°, 20°, 30°, 40°)",
   "retract.extend.landing.gear": "랜딩 기어 접기/펼치기 (Gear Up/Down)",

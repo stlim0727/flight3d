@@ -373,9 +373,17 @@ class PresetSpawnerMethods {
     }
 
     this.controls.clearVirtualInputs();
-    this.controls.setParkingBrake?.(false);
-    this.controls.brakes = 0.0;
-    this.gear.setBrakes(0.0);
+    // Runway presets spawn stationary at throttle=0; engage the parking brake so
+    // the aircraft holds still without the user having to hold the brake key.
+    // Any other preset (approach/cruise/hangang) spawns moving, so brakes off.
+    // FlightControls auto-releases the parking brake when throttle exceeds 25%.
+    const isGroundSpawn = this.controls.throttle === 0.0 &&
+      this.linearVelocity.lengthSq() < 0.01;
+    this.controls.setParkingBrake?.(isGroundSpawn);
+    if (!isGroundSpawn) {
+      this.controls.brakes = 0.0;
+      this.gear.setBrakes(0.0);
+    }
     this.physicsAccumulator = 0;
 
     this.renderPose.reset(this.position, this.quaternion);

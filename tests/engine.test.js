@@ -280,4 +280,30 @@ describe('settled spool for a declared flight state', () => {
     assert.strictEqual(engines.n1[0], engines.windmillingN1);
     assert.ok(engines.n1[1] > engines.idleN1);
   });
+
+  it('produces negligible thrust at throttle=0 regardless of idleN1 (no idle creep)', () => {
+    // Default B737 config: idleN1=22%
+    const b737 = new EngineModel();
+    b737.setThrottle(0.0);
+    for (let i = 0; i < 50; i++) b737.update(0.1, 0, 0, 1.0);
+    const b737IdleThrust = b737.thrust.reduce((a, b) => a + b, 0);
+    // Idle thrust should be a very small fraction of max static thrust (< 0.5%)
+    assert.ok(b737IdleThrust < b737.maxStaticThrustPerEngine * b737.numEngines * 0.005,
+      `B737 idle thrust ${b737IdleThrust.toFixed(0)} N must be < 0.5% of max (idle creep fix)`);
+
+    // F-16-like config: idleN1=60% — previously caused significant creep thrust
+    const f16Like = new EngineModel({ numEngines: 1, maxStaticThrustPerEngineN: 131000, idleN1Percent: 60.0, togaN1Percent: 100.0 });
+    f16Like.setThrottle(0.0);
+    for (let i = 0; i < 50; i++) f16Like.update(0.1, 0, 0, 1.0);
+    const f16IdleThrust = f16Like.thrust.reduce((a, b) => a + b, 0);
+    assert.ok(f16IdleThrust < 131000 * 0.005,
+      `F-16-like idle thrust ${f16IdleThrust.toFixed(0)} N must be < 0.5% of max — was ~30 kN before fix`);
+  });
+
+  it('still reaches full thrust at TOGA for high-idleN1 aircraft', () => {
+    const f16Like = new EngineModel({ numEngines: 1, maxStaticThrustPerEngineN: 131000, idleN1Percent: 60.0, togaN1Percent: 100.0 });
+    f16Like.setThrottle(1.0);
+    for (let i = 0; i < 80; i++) f16Like.update(0.1, 0, 0, 1.0);
+    assert.ok(f16Like.thrust[0] > 110000, `F-16-like TOGA thrust ${f16Like.thrust[0].toFixed(0)} N must be > 110 kN`);
+  });
 });
