@@ -37,6 +37,13 @@ test('takeoff contact footprint excursion, recontact and bad initial spawn fail 
   const result = recontact.result(); recontact.update(snapshot(4)); assert.deepEqual(recontact.result(), result);
   assert.equal(new TakeoffMission().update(snapshot(1)).reason, 'invalid-scenario');
 });
+test('takeoff height gate uses actual terrain clearance rather than runway elevation', () => {
+  const run = new TakeoffMission(); startTakeoff(run);
+  run.update(snapshot(2, { radioAltFt: 50, heightAboveRunwayM: 150 }));
+  assert.equal(run.metrics.stableTicks, 0, '150m above runway can still be too close to rising terrain');
+  run.update(snapshot(3, { radioAltFt: 400, heightAboveRunwayM: 250 }));
+  assert.equal(run.metrics.stableTicks, 1);
+});
 test('landing requires first touchdown then 600 uninterrupted stopped ticks', () => {
   const run = new LandingMission(); startLanding(run);
   const td = contact(snapshot(2), ['mainLeft'], 2);

@@ -9,6 +9,7 @@ export class TakeoffMission extends MissionState {
   update(s) {
     if (!this.accept(s)) return this.result();
     const m = this.manifest, grounded = s.gearContacts.some(c => c.grounded);
+    const heightM = s.radioAltFt * 0.3048;
     if (this.tick === 1 && !grounded) return this.fail('invalid-scenario');
     this.metrics.maximumRollDeg = Math.max(this.metrics.maximumRollDeg, Math.abs(s.rollDeg));
     if (!this.liftedOff && grounded) {
@@ -19,10 +20,10 @@ export class TakeoffMission extends MissionState {
       this.liftedOff = true;
       this.metrics.liftoffTick = this.tick; this.metrics.liftoffIasKnots = s.iasKnots;
     } else if (grounded) return this.fail('recontact');
-    if (s.heightAboveRunwayM >= m.minimumHeightM && this.metrics.heightReachedTick === undefined) {
+    if (!grounded && heightM >= m.minimumHeightM && this.metrics.heightReachedTick === undefined) {
       this.metrics.heightReachedTick = this.tick;
     }
-    const stable = !grounded && s.heightAboveRunwayM >= m.minimumHeightM && s.heightAboveRunwayM <= m.maximumHeightM &&
+    const stable = !grounded && heightM >= m.minimumHeightM && heightM <= m.maximumHeightM &&
       s.iasKnots >= m.minimumIasKnots && s.iasKnots <= m.maximumIasKnots && Math.abs(s.rollDeg) <= m.maximumRollDeg &&
       Math.abs(headingError(s.headingDeg, m.runwayHeadingDeg)) <= m.maximumHeadingErrorDeg &&
       s.vsiFpm * 0.3048 / 60 >= m.minimumVsiMs && s.vsiFpm * 0.3048 / 60 <= m.maximumVsiMs;

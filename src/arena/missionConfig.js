@@ -17,6 +17,7 @@ export function createMissionManifest(type, overrides = {}) {
     timeoutTicks: (takeoff ? 120 : 180) * common.physicsHz,
     ...(takeoff ? {
       stableTicks: 1200, minimumHeightM: 100, maximumHeightM: 200,
+      heightReference: 'model-origin-above-terrain',
       minimumIasKnots: 150, maximumIasKnots: 190, maximumRollDeg: 10,
       maximumHeadingErrorDeg: 10, minimumVsiMs: -0.5, maximumVsiMs: 5,
       spawn: { runwayS: 50, centerlineOffsetM: 0, groundSpeedKnots: 0 },
