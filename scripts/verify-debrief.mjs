@@ -98,6 +98,10 @@ try {
   await send('Browser.setPermission', { permission: { name: 'clipboard-write' }, setting: 'granted', origin: new URL(url).origin });
   await send('Browser.setPermission', { permission: { name: 'clipboard-read' }, setting: 'granted', origin: new URL(url).origin });
   await click('#debrief-copy');
+  // Clipboard writes resolve asynchronously; wait for the status instead of racing it.
+  for (let n = 0; n < 20 && !(await ev('document.querySelector("#debrief-status").textContent')); n++) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
   assert.match(await ev('document.querySelector("#debrief-status").textContent'), /복사했습니다/);
   assert.match(await ev('await navigator.clipboard.readText()'), /Flight3d.*\nCessna/s);
   await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: output });
@@ -131,6 +135,7 @@ try {
   await click('#btn-pause-end');
   assert.equal(await ev('s.debriefReport.sufficient'), false);
   assert.equal(await ev('document.querySelector("#debrief-copy").disabled'), true);
+  assert.deepEqual(await ev('(h => [h.classList.contains("is-truncated"), h.tabIndex])(document.querySelector("#debrief-outcome"))'), [false, -1], 'short headlines stay plain');
   assert.equal(await ev('getComputedStyle(document.querySelector("#hud-warning")).display'), 'none');
   assert.equal(await ev('getComputedStyle(document.querySelector("#toast-msg")).display'), 'none');
   await shot('insufficient');
@@ -183,9 +188,61 @@ try {
   await ev('s.gameFlow.pause()');
   assert.equal(await ev('s.crashDebriefRemaining'), null);
   assert.equal(await ev('s.flightRecorder.active && !s.isCrashed'), true);
+
+  // Issue #370: a long headline stays on one line; hover, focus and tap reveal the full text.
+  const longName = '기체 지면 접촉 (TERRAIN / BODY STRIKE)';
+  await ev(`s.gameFlow.resume();s.stepSimulation(6);s.triggerCrash({type:'TERRAIN',name:${JSON.stringify(longName)},description:'Long headline',point:s.position.clone(),speedKnots:100});s.stepSimulation(.02);`);
+  for (let n = 0; n < 100 && await ev('s.gameFlow.state !== "debrief"'); n++) await new Promise(resolve => setTimeout(resolve, 100));
+  assert.equal(await ev('s.debriefReport.sufficient'), true);
+  const headline = `document.querySelector("#debrief-outcome")`;
+  const tipShown = `getComputedStyle(document.querySelector("#debrief-outcome-tip")).display !== "none"`;
+  const headlineState = () => ev(`(h => ({ text: h.textContent, truncated: h.classList.contains("is-truncated"), overflowing: h.scrollWidth > h.clientWidth,
+    height: h.getBoundingClientRect().height, tabIndex: h.tabIndex,
+    panelOverflow: (p => p.scrollHeight - p.clientHeight)(document.querySelector(".debrief-panels")) }))(${headline})`);
+  for (const [width, height] of [[1280, 720], [390, 844], [844, 390], [320, 568]]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const state = await headlineState();
+    assert.equal(state.text, longName, 'the DOM keeps the full headline for assistive technology');
+    assert.ok(state.truncated && state.overflowing && state.tabIndex === 0, `${width}x${height} long headline is truncated and focusable`);
+    assert.ok(state.height < 30, `${width}x${height} headline is one line`);
+    if (width === 1280) assert.ok(state.panelOverflow <= 0, '1280x720 summary fits without scrolling');
+  }
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+  await new Promise(resolve => setTimeout(resolve, 150));
+  assert.equal(await ev(tipShown), false);
+  const center = await ev(`(r => ({ x: r.x + 40, y: r.y + r.height / 2 }))(${headline}.getBoundingClientRect())`);
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...center });
+  assert.equal(await ev(tipShown), true, 'hover opens the tooltip');
+  assert.deepEqual(await ev('(t => [t.textContent, t.getAttribute("aria-hidden")])(document.querySelector("#debrief-outcome-tip"))'), [longName, 'true']);
+  assert.equal(await ev(`(t => (c => t.left >= c.left && t.right <= c.right)(document.querySelector(".debrief-card").getBoundingClientRect()))(document.querySelector("#debrief-outcome-tip").getBoundingClientRect())`), true, 'tooltip stays inside the card');
+  await shot('headline-tooltip');
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 400 });
+  assert.equal(await ev(tipShown), false, 'leaving the headline closes the tooltip');
+  await ev(`${headline}.focus()`);
+  assert.equal(await ev(tipShown), true, 'keyboard focus opens the tooltip');
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  assert.equal(await ev(tipShown), false, 'Escape closes the tooltip');
+  assert.equal(await ev('s.gameFlow.state'), 'debrief', 'Escape on the tooltip does not reach the flight menu');
+  await ev(`${headline}.blur()`);
+  await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+  await ev(`window.tapTypes=[];${headline}.addEventListener('pointerdown',e=>tapTypes.push(e.pointerType));
+    window.tapPrevented=[];window.addEventListener('touchstart',e=>{if(e.target.closest?.('.debrief-card'))tapPrevented.push(e.defaultPrevented)});`);
+  const tap = async point => {
+    await send('Input.synthesizeTapGesture', { ...point, gestureSourceType: 'touch' });
+    await new Promise(resolve => setTimeout(resolve, 150));
+  };
+  await tap(center);
+  assert.deepEqual(await ev('tapTypes'), ['touch'], 'the tap arrives as a touch pointer');
+  assert.deepEqual(await ev('[tapPrevented, s.cameraSystem.isDragging]'), [[false], false], 'debrief touches are UI, not camera drags');
+  assert.equal(await ev(tipShown), true, 'tapping the headline opens the tooltip');
+  await tap({ x: 900, y: 400 });
+  assert.equal(await ev(tipShown), false, 'tapping elsewhere closes the tooltip');
+  await send('Emulation.setTouchEmulationEnabled', { enabled: false });
   assert.deepEqual(exceptions, [], 'no browser exceptions');
   await writeFile(resolve(output, 'results.json'), JSON.stringify({ gpu, durationSec: duration,
-    scenarios: ['manual end', 'pause exclusion', 'tabs', 'scrub', 'clipboard success/failure', 'JSON download', 'responsive', 'retry', 'insufficient data', 'main menu', 'crash observation', 'moving wreckage', 'crash pause exclusion', 'immutable impact report', 'delayed debrief', 'crash report in debrief', 'crash menu cancellation', 'crash retry'], exceptions }, null, 2));
+    scenarios: ['manual end', 'pause exclusion', 'tabs', 'scrub', 'clipboard success/failure', 'JSON download', 'responsive', 'retry', 'insufficient data', 'main menu', 'crash observation', 'moving wreckage', 'crash pause exclusion', 'immutable impact report', 'delayed debrief', 'crash report in debrief', 'crash menu cancellation', 'crash retry', 'long headline ellipsis and tooltip'], exceptions }, null, 2));
   console.log(JSON.stringify({ passed: true, output, gpu, durationSec: duration }));
 } finally {
   ws.close();
