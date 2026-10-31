@@ -25,11 +25,14 @@ export class SimulatorMissionAdapter {
     this.initialControls = null;
   }
 
-  async prepare({ missionId, environmentProfile = 'mild-disturbance-v1', seed = 1, signal } = {}) {
+  async prepare({ missionId, environmentProfile = 'mild-disturbance-v1', seed = 1,
+    sensorSeed = seed, noise = environmentProfile !== 'calm-debug-v1', signal } = {}) {
     const type = missionId === 'takeoff-basic-v1' ? 'takeoff'
       : missionId === 'landing-basic-v1' ? 'landing' : null;
     if (!type || !['calm-debug-v1', 'mild-disturbance-v1'].includes(environmentProfile) ||
-        !Number.isSafeInteger(seed)) throw new Error('invalid-scenario: mission/profile/seed');
+        !Number.isSafeInteger(seed) || !Number.isSafeInteger(sensorSeed) || typeof noise !== 'boolean') {
+      throw new Error('invalid-scenario: mission/profile/seed');
+    }
     if (environmentProfile !== 'calm-debug-v1' && !this.windFactory) {
       throw new Error('invalid-scenario: wind factory is required for disturbance profile');
     }
@@ -155,12 +158,13 @@ export class SimulatorMissionAdapter {
         maximumHeadingErrorDeg: m.maximumHeadingErrorDeg, maximumBounceSeconds: m.maximumBounceTicks / m.physicsHz,
         stopSpeedKnots: m.stopSpeedKnots, stopCenterlineM: m.stopCenterlineM, stopSeconds: m.stopTicks / m.physicsHz,
       },
-      sensorProfile: { id: 'training-navigation-v1', correlatedNoise: true,
+      sensorProfile: { id: 'training-navigation-v1', correlatedNoise: noise,
         physicsHz: 120, decisionPeriodTicks: 24, reactionDelayTicks: 24 },
       configuration: { gearDown: true, flapIndex: sim.aero.flapsIndex,
         pitchTrimDeg: sim.controls.pitchTrim, spoilers: 0, reverser: false },
       recommendedSpeeds: { rotationKnots: 140, climbKnots: 165, approachKnots: 145 },
       calibration: 'pending', environmentSeed: seed,
+      sensorSeed, sensorNoiseEnabled: noise, airframeVariation: 'disabled',
       sensorVersion: '1.0.0', runtimeVersion: 'trusted-worker-v1',
       fixedConfiguration: { ...m.fixedConfiguration, flapIndex: sim.aero.flapsIndex,
         pitchTrimDeg: sim.controls.pitchTrim },

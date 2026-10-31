@@ -81,7 +81,7 @@ export async function flyPilotMission({ missionId, createPilot, environmentProfi
   if (typeof createPilot !== 'function') throw new TypeError('createPilot factory required');
   const sim = createPilotMissionSimulation();
   const adapter = new SimulatorMissionAdapter(sim);
-  const prepared = await adapter.prepare({ missionId, environmentProfile, seed });
+  const prepared = await adapter.prepare({ missionId, environmentProfile, seed, noise: sensorNoise });
   const manifest = prepared.manifest;
   const mission = manifest.type === 'takeoff' ? new TakeoffMission(manifest) : new LandingMission(manifest);
   const perception = new PilotPerception({ sensorSeed: seed, noise: sensorNoise, mission: manifest.type,
