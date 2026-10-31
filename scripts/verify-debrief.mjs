@@ -137,12 +137,48 @@ try {
   await click('#debrief-lobby');
   assert.equal(await ev('s.gameFlow.canResumeFromLobby()'), false);
   // A completed sortie must never leak samples into the next one, including crash exits.
-  await ev(`s.lobby.preset='cruise';s.startFlight();s.gameFlow.pause();s.triggerCrash({type:'TERRAIN',name:'Terrain',description:'Verification impact',point:s.position.clone(),speedKnots:100});s.gameFlow.resume();s.stepSimulation(.02);`);
+  await ev(`s.lobby.preset='cruise';s.startFlight();s.triggerCrash({type:'TERRAIN',name:'Terrain',description:'Verification impact',point:s.position.clone(),speedKnots:100});s.stepSimulation(.02);`);
+  assert.equal(await ev('s.gameFlow.state'), 'flight', 'show crash scene before debrief');
+  assert.equal(await ev('s.debriefReport.reason'), 'crash');
+  const crashReport = await ev('JSON.stringify(s.debriefReport)');
+  assert.equal(await ev('!!s.cameraSystem.crashView && s.aircraftBreakup.pieces.length > 0'), true);
+  assert.equal(await ev('s.flightRecorder.active'), false);
+  assert.equal(await ev('getComputedStyle(document.querySelector("#debrief-overlay")).display'), 'none');
+  assert.equal(await ev('getComputedStyle(document.querySelector("#crash-overlay")).display'), 'flex');
+  const debrisBefore = await ev('s.aircraftBreakup.pieces[0].object.position.toArray()');
+  await shot('crash-observation');
+  await new Promise(resolve => setTimeout(resolve, 500));
+  assert.equal(await ev('s.gameFlow.state'), 'flight');
+  assert.notDeepEqual(await ev('s.aircraftBreakup.pieces[0].object.position.toArray()'), debrisBefore, 'wreckage moves during observation');
+  await ev('s.gameFlow.pause();window.crashRemaining=s.crashDebriefRemaining');
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.equal(await ev('s.crashDebriefRemaining === window.crashRemaining'), true);
+  await ev('s.gameFlow.resume()');
+  for (let n = 0; n < 100 && await ev('s.gameFlow.state !== "debrief"'); n++) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  assert.equal(await ev('s.gameFlow.state'), 'debrief');
+  assert.equal(await ev('JSON.stringify(s.debriefReport)'), crashReport);
+  assert.equal(await ev('document.activeElement.id'), 'debrief-tab-summary');
+  await shot('crash-debrief');
+
+  // Menu entry cancels the pending transition; retry starts a clean sortie.
+  await click('#debrief-retry');
+  await ev(`s.triggerCrash({type:'TERRAIN',name:'Terrain',description:'Second impact',point:s.position.clone(),speedKnots:100});s.stepSimulation(.02);s.toggleMainMenu();`);
+  assert.equal(await ev('s.crashDebriefRemaining'), null);
+  await new Promise(resolve => setTimeout(resolve, 3200));
+  assert.equal(await ev('s.gameFlow.state'), 'lobby');
+  assert.equal(await ev('document.querySelector("#btn-lobby-end").hidden'), false);
+  await click('#btn-lobby-end');
   assert.equal(await ev('s.gameFlow.state'), 'debrief');
   assert.equal(await ev('s.debriefReport.reason'), 'crash');
+  await click('#debrief-retry');
+  await ev('s.gameFlow.pause()');
+  assert.equal(await ev('s.crashDebriefRemaining'), null);
+  assert.equal(await ev('s.flightRecorder.active && !s.isCrashed'), true);
   assert.deepEqual(exceptions, [], 'no browser exceptions');
   await writeFile(resolve(output, 'results.json'), JSON.stringify({ gpu, durationSec: duration,
-    scenarios: ['manual end', 'pause exclusion', 'tabs', 'scrub', 'clipboard success/failure', 'JSON download', 'responsive', 'retry', 'insufficient data', 'main menu', 'crash'], exceptions }, null, 2));
+    scenarios: ['manual end', 'pause exclusion', 'tabs', 'scrub', 'clipboard success/failure', 'JSON download', 'responsive', 'retry', 'insufficient data', 'main menu', 'crash observation', 'moving wreckage', 'crash pause exclusion', 'immutable impact report', 'delayed debrief', 'crash menu cancellation', 'crash retry'], exceptions }, null, 2));
   console.log(JSON.stringify({ passed: true, output, gpu, durationSec: duration }));
 } finally {
   ws.close();

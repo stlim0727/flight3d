@@ -447,6 +447,7 @@ class FlightSimulator {
   /** Apply the game-flow state to the DOM: menu visibility, input blocking. */
   syncFlowUi() {
     const state = this.gameFlow.state;
+    if (state === FLOW.LOBBY) this.crashDebriefRemaining = null;
     // A flight parked off the sim is silent and watched from the drone rig; the lobby
     // cinematic keeps its own sound and camera, so it is deliberately not held here.
     const held = state === FLOW.DEBRIEF || state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
@@ -572,6 +573,8 @@ class FlightSimulator {
   }
 
   beginFlightRecording() {
+    this.crashDebriefRemaining = null;
+    this.debriefReport = null;
     this.flightRecorder?.start({ airport: this.activeAirport, aircraft: this.currentAircraftId,
       scenario: this.demoDirector?.isActive ? 'demo' : this.lastPresetType,
       demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay });
@@ -580,14 +583,31 @@ class FlightSimulator {
   updateFlightRecording(dt) {
     if (this.gameFlow.state !== FLOW.FLIGHT || !this.flightRecorder.active || this.devRunner?.active) return;
     this.flightRecorder.update(dt, this.telemetry);
-    if (this.isCrashed) this.endFlight('crash');
+    if (this.isCrashed) {
+      // Freeze the sortie at impact, while the exterior crash scene keeps running.
+      this.debriefReport = this.flightRecorder.finish('crash');
+      this.crashDebriefRemaining = 3;
+    }
     else if (this.flightRecorder.stopped >= 3) this.endFlight('landed');
   }
 
+  /** Count only visible crash frames, never deterministic physics or menu time. */
+  updateCrashDebrief(dt) {
+    if (this.crashDebriefRemaining == null) return;
+    if (!this.isCrashed || this.gameFlow.state === FLOW.LOBBY || this.devRunner?.active) {
+      this.crashDebriefRemaining = null;
+      return;
+    }
+    if (this.gameFlow.state !== FLOW.FLIGHT || this.browserBackgrounded || !Number.isFinite(dt) || dt <= 0) return;
+    this.crashDebriefRemaining = Math.max(0, this.crashDebriefRemaining - dt);
+    if (this.crashDebriefRemaining <= 1e-9) this.endFlight('crash');
+  }
+
   endFlight(reason = 'manual') {
-    if (!this.flightRecorder.active) return;
+    if (!this.flightRecorder.active && !(this.isCrashed && this.debriefReport?.reason === 'crash')) return;
     if (![FLOW.FLIGHT, FLOW.PAUSED].includes(this.gameFlow.state) && !this.gameFlow.canResumeFromLobby()) return;
-    this.debriefReport = this.flightRecorder.finish(reason);
+    this.crashDebriefRemaining = null;
+    this.debriefReport = this.flightRecorder.finish(this.isCrashed ? 'crash' : reason);
     this.gameFlow.endFlight();
     this.debriefOverlay.show(this.debriefReport);
   }
@@ -965,6 +985,7 @@ class FlightSimulator {
     if (isPhotoCockpit && this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.render(this.renderer);
     }
+    this.updateCrashDebrief(frameDelta);
   }
 }
 

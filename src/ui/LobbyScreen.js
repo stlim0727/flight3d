@@ -16,7 +16,7 @@ const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, onAirport, onPreset, onTime, onAircraft, onFly, canResume = () => false, onResume, getDemoProfile, onDemoProfile }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, onAirport, onPreset, onTime, onAircraft, onFly, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const selectionEl = document.getElementById('lobby-selection');
@@ -157,7 +157,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     const resume = document.getElementById('btn-lobby-resume');
     if (resume) resume.hidden = !canResume();
     const end = document.getElementById('btn-lobby-end');
-    if (end) end.hidden = !canResume();
+    if (end) end.hidden = !canEnd();
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
       const button = document.getElementById(scenario.lobbyButtonId);
       if (!button) continue;

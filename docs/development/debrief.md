@@ -11,6 +11,27 @@ seconds on the ground below 1 kt ground speed. Completed flights cannot resume.
 Fly again restores that sortie's metadata and respawns it. Main menu returns to
 the existing cinematic/menu flow.
 
+## Crash observation (issue #362)
+
+The [crash/recovery UX flow](https://www.figma.com/design/XmTUnPoI13ISmLJABHx2Bo/Flight3d?node-id=107-86)
+specifies **impact → three seconds of crash scene → accident debrief**. At the
+impact tick, finalize the recorded sortie, including that tick's telemetry. Keep
+the exterior crash camera, wreckage physics, explosion animation and existing
+collapsed crash report visible before opening the debrief once. Observation time
+does not extend flight duration, peaks, trajectory or sharing eligibility.
+
+Count the three seconds with foreground rendered frame deltas, not fixed physics
+ticks or a wall-clock timeout. Deterministic stepping cannot skip the scene.
+Pause/background holds the countdown. Menu entry (including Space/R/Enter),
+crash reset and a new sortie cancel the pending automatic transition. Explicit
+End flight from a held crashed sortie still opens its finalized accident report.
+Developer scenarios and unrecorded cinematic crashes retain their existing flow.
+Manual flight completion and the three-second landing-stop criterion are unchanged.
+
+This changes presentation timing, not aerodynamic forces, collision thresholds,
+debris integration or camera projection. The existing Three.js crash rig continues
+following wreckage in world space until the debrief freezes physics/effects.
+
 ## Recording and measurement
 
 `FlightRecorder` observes telemetry after each fixed physics tick and integrates
@@ -55,7 +76,8 @@ CDP_URL=http://127.0.0.1:9432 SIM_URL=http://127.0.0.1:5232/ node scripts/verify
 
 The script checks a hardware WebGL2 draw/red pixel (including Windows/D3D11),
 manual end, tabs, chart selection, clipboard success/failure, downloaded JSON,
-responsive layouts, retry, insufficient data, menu return and crash termination.
+responsive layouts, retry, insufficient data, menu return, visible moving wreckage
+before delayed debrief, pause exclusion, immutable impact data and crash-menu cancellation.
 Screenshots, GPU details and results go to `review-artifacts/debrief`. Headless
 focus emulation prevents the simulator's background-tab hold during startup.
 This is desktop Chrome evidence, not a physical mobile/native share test.
