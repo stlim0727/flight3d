@@ -9,7 +9,7 @@ export function installPilotArena(sim) {
   shell.id = 'pilot-arena';
   shell.open = true;
   shell.innerHTML = `<summary>파일럿 아레나 · 실험 기능</summary>
-    <p>본인이 신뢰하는 코드만 실행하세요. 이륙·착륙 예제는 비행 보정 중이며 결과는 로컬 비랭킹입니다.</p>
+    <p>본인이 신뢰하는 코드만 실행하세요. 예제는 제한된 물리 테스트를 통과한 실험용이며 결과는 로컬 비랭킹입니다.</p>
     <label>미션 <select data-mission><option value="takeoff-basic-v1">이륙</option><option value="landing-basic-v1">착륙</option></select></label>
     <label>환경 <select data-environment><option value="mild-disturbance-v1">약한 측풍·돌풍</option><option value="calm-debug-v1">무풍 · 디버깅</option></select></label>
     <label>시드 <input data-seed type="number" min="0" step="1" value="1"></label>

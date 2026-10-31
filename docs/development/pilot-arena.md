@@ -32,10 +32,14 @@ to sensor noise off; mild defaults to on. In addition to the sweep, `npm test`
 covers exact deadlines, first-contact anchoring, bounce, stop hold, malformed
 snapshots, lifecycle cancellation and isolated-thread watchdog behavior.
 
-The initial supplied examples are experimental and require calibration against
-the sweep. A passing logic suite/build is not a successful flight sweep.
-Every manifest records `calibration: pending` until its acceptance report is
-reviewed; this field must not be interpreted as a verified performance claim.
+The supplied examples passed both missions on mild-wind/noisy seeds 1–5 and
+the calm/no-noise baseline. See [the acceptance report](pilot-mission-acceptance.json).
+Manifests identify this limited calibration as `limited-training-suite-v1`;
+it does not certify arbitrary seeds, aircraft, weather or real-aircraft behavior.
+A separate integration test runs both missions through the actual isolated
+JavaScript-thread pilot runtime and asynchronous runner, with production physics.
+The standalone sweep evaluates synchronous SDK hooks; it does not itself test
+the Worker transport. A passing logic suite/build alone is not a flight sweep.
 
 ## Opt-in browser laboratory
 
@@ -100,6 +104,6 @@ and timeout behavior have separate tests. Following the user's direction, GPU
 rendering is not an acceptance dependency for this physics/algorithm feature.
 The browser UI remains opt-in until its interaction and layout have been checked.
 
-Future work: calibrate additional scenarios and held-out seeds, restricted guest
+Future work: validate additional scenarios and held-out seeds, restricted guest
 runtime, authoritative evaluation, configurable physiology and visual contacts.
 See [pilot wind](pilot-wind.md) for the physical-disturbance audit and model.
