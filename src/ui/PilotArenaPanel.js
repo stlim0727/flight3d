@@ -2,6 +2,8 @@ import { MissionRunner } from '../arena/MissionRunner.js';
 import { SimulatorMissionAdapter } from '../arena/SimulatorMissionAdapter.js';
 import takeoffSource from '../pilot/examples/takeoff.js?raw';
 import landingSource from '../pilot/examples/landing.js?raw';
+import { resolvePilotCase } from '../config/pilotCases.js';
+import { createRealtimePacer } from '../arena/realtimePacer.js';
 import { bindPilotPanelInput } from './pilotPanelInput.js';
 
 /** Opt-in local pilot lab. No remote upload and no security sandbox claims. */
@@ -14,6 +16,7 @@ export function installPilotArena(sim) {
     <label>미션 <select data-mission><option value="takeoff-basic-v1">이륙</option><option value="landing-basic-v1">착륙</option></select></label>
     <label>환경 <select data-environment><option value="mild-disturbance-v1">약한 측풍·돌풍</option><option value="calm-debug-v1">무풍 · 디버깅</option></select></label>
     <label>시드 <input data-seed type="number" min="0" step="1" value="1"></label>
+    <label>재생 속도 <select data-playback><option value="realtime">실시간 · 1배속</option><option value="fast">빠른 평가</option></select></label>
     <label>내 파일럿 파일 <input data-file type="file" accept=".js,.mjs,text/javascript"></label>
     <label>파일럿 코드 <textarea data-source rows="9" spellcheck="false"></textarea></label>
     <button data-example type="button">예제 불러오기</button>
@@ -36,7 +39,7 @@ export function installPilotArena(sim) {
     yieldFrame: () => new Promise(resolve => requestAnimationFrame(resolve)),
     onUpdate: record => {
       const active = runner.active;
-      for (const name of ['run', 'mission', 'environment', 'seed', 'file', 'example', 'source']) find(name).disabled = active;
+      for (const name of ['run', 'mission', 'environment', 'seed', 'playback', 'file', 'example', 'source']) find(name).disabled = active;
       find('stop').disabled = !active;
       find('save').disabled = active || !record;
       find('status').textContent = `${record.status} · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)${record.reason ? ` · ${record.reason}` : ''}`;
@@ -58,6 +61,7 @@ export function installPilotArena(sim) {
     const seed = Number(find('seed').value);
     if (!Number.isSafeInteger(seed) || seed < 0) { find('status').textContent = '시드는 0 이상의 정수여야 합니다.'; return; }
     find('result').textContent = '';
+    runner.paceTick = find('playback').value === 'realtime' ? createRealtimePacer() : null;
     sim.gameFlow.enterFlight();
     void runner.start(source.value, { missionId: find('mission').value,
       environmentProfile: find('environment').value, seed }).catch(error => {
@@ -71,5 +75,20 @@ export function installPilotArena(sim) {
     a.href = url; a.download = `pilot-${runner.record.manifest?.id ?? 'run'}.json`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
+  const selected = resolvePilotCase(location.search);
+  if (selected) {
+    find('mission').value = selected.missionId;
+    find('environment').value = selected.environmentProfile;
+    find('seed').value = String(selected.seed);
+    loadExample();
+    find('status').textContent = `${selected.label} · 준비 중`;
+    const started = performance.now();
+    const startWhenReady = () => {
+      if (sim.startupReady && !sim.browserBackgrounded) find('run').click();
+      else if (performance.now() - started < 30000) requestAnimationFrame(startWhenReady);
+      else find('status').textContent = '시뮬레이터 준비 시간이 초과되었습니다. 준비 후 미션 실행을 눌러주세요.';
+    };
+    requestAnimationFrame(startWhenReady);
+  }
   return runner;
 }

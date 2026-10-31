@@ -72,6 +72,16 @@ test('runtime failure terminates the run and releases flight control', async () 
   assert.equal(adapter.releases, 1);
 });
 
+test('manual takeover during a real-time frame wait prevents the next physics step', async () => {
+  const { adapter, host } = fixture();
+  const runner = new MissionRunner(adapter, { hostFactory: () => host,
+    paceTick: async tick => { if (tick === 4) runner.stop(); } });
+  const record = await runner.start('source');
+  assert.equal(record.status, 'aborted');
+  assert.equal(adapter.tick, 3);
+  assert.equal(adapter.releases, 1);
+});
+
 test('stop during preparation aborts the signal and prevents late acquisition', async () => {
   const { adapter, host, events } = fixture();
   let finish, signal;

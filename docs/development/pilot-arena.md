@@ -56,8 +56,7 @@ the external-change cancellation path. While active, the asynchronous runner
 owns physics advancement; the animation loop continues rendering and does not
 also integrate physics.
 
-One frame is yielded per decision interval, so this laboratory is fast-play
-rather than guaranteed real time. The displayed clock is simulation time.
+Playback defaults to 1×: unchanged 120 Hz physics steps are paced against wall time, yielding to display frames. Worker stalls can make playback slower; physics steps and reaction-delay ticks are never skipped. Fast evaluation retains one frame per decision interval. The displayed clock is simulation time.
 Worker wait consumes wall time only. Prepared controls are held during the
 initial 24-tick delay. Mission failure is terminal; subsequent visual behavior
 cannot turn it into success.
@@ -107,3 +106,7 @@ The browser UI remains opt-in until its interaction and layout have been checked
 Future work: validate additional scenarios and held-out seeds, restricted guest
 runtime, authoritative evaluation, configurable physiology and visual contacts.
 See [pilot wind](pilot-wind.md) for the physical-disturbance audit and model.
+
+## Direct live cases
+
+The [flight URL directory](../flight-urls.md#ai-pilot-mission-tests-12-cases) lists all 12 built-in cases. `pilotArena=1&pilotCase=landing-mild-3`, for example, selects the landing pilot, mild disturbances and seed 3, waits for startup readiness, then starts 1× playback. Only known built-in case IDs autostart; links cannot supply executable source. Backgrounding the browser aborts the active mission to prevent invisible simulation or catch-up bursts.
