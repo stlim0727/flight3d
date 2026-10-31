@@ -44,6 +44,8 @@ export function validateMissionManifest(m) {
       : ['touchdownStartS', 'touchdownEndS', 'maximumSinkRateMs', 'maximumRollDeg', 'maximumHeadingErrorDeg',
         'maximumBounceTicks', 'stopTicks', 'stopSpeedKnots', 'stopCenterlineM', 'approachStartS', 'approachHalfWidthM'])];
   if (!['takeoff', 'landing'].includes(m.type) || fields.some(k => !Number.isFinite(m[k])) ||
+      m.physicsHz !== 120 || m.decisionPeriodTicks !== 24 ||
+      !m.runwayThreshold || !['x', 'y', 'z'].every(k => Number.isFinite(m.runwayThreshold[k])) ||
       !Number.isInteger(m.physicsHz) || m.physicsHz <= 0 || m.runwayWidthM <= 0 || m.runwayEndS <= m.runwayStartS ||
       !Number.isInteger(m.timeoutTicks) || m.timeoutTicks <= 0 ||
       (m.type === 'takeoff' && (m.minimumHeightM > m.maximumHeightM || m.minimumIasKnots > m.maximumIasKnots ||

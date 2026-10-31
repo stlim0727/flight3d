@@ -60,7 +60,9 @@ test('takeoff preparation uses a stable new scenario and does not trust stale te
   assert.equal(sim.controls.throttle, .8);
   assert.throws(() => adapter.apply({ elevator: .4, aileron: NaN, rudder: 0, throttle: 1, brakes: 0 }), /invalid-command/);
   assert.equal(sim.controls.virtualElevator, .2, 'rejection is atomic');
+  sim.controls.throttle = .01; // A stale pointer drag cannot steal the target.
   adapter.step();
+  assert.equal(sim.controls.throttle, .8);
   const contact = sim.gear.contacts.find(c => c.id === 'mainLeft');
   contact.sinkRateMs = .17;
   assert.equal(adapter.snapshot(1).gearContacts.find(c => c.id === 'mainLeft').sinkRateMs, .17);

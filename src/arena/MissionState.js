@@ -36,7 +36,9 @@ export class MissionState {
     if (s.crashed || s.damaged || s.bodyContact) {
       this.fail(s.crashed ? 'crash' : s.bodyContact ? 'body-strike' : 'damage'); return false;
     }
-    if (this.tick > this.manifest.timeoutTicks) { this.fail('timeout'); return false; }
+    // The deadline tick is terminal; a fixed-length sweep must never return
+    // 'running' merely because its last step reached the time limit exactly.
+    if (this.tick >= this.manifest.timeoutTicks) { this.fail('timeout'); return false; }
     return true;
   }
   outside(c) {

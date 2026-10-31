@@ -40,10 +40,10 @@ export class SimulatorMissionAdapter {
     sim.shadowDemo?.stop();
     sim.hangang?.stop();
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
-    await sim.setAirport('coastal');
+    await sim.setAirport('coastal', true);
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
-    sim.setAircraft('B738');
-    sim.setPreset(type === 'takeoff' ? 'runway' : 'approach');
+    sim.setAircraft('B738', true);
+    sim.setPreset(type === 'takeoff' ? 'runway' : 'approach', false, true);
     if (sim.activeAirport !== 'coastal' || sim.currentAircraftId !== 'B738' ||
         !sim.currentTerrain || sim.currentTerrain.isLoaded === false) {
       throw new Error('invalid-scenario: terrain/aircraft not ready');
@@ -141,6 +141,12 @@ export class SimulatorMissionAdapter {
     this.manifest = {
       ...m,
       missionId: m.id,
+      runway: { id: 'coastal-09L', headingDeg: m.runwayHeadingDeg,
+        lengthM: m.runwayEndS - m.runwayStartS, widthM: m.runwayWidthM, elevationM: origin.y },
+      timeoutSeconds: m.timeoutTicks / m.physicsHz,
+      configuration: { gearDown: true, flapIndex: sim.aero.flapsIndex,
+        pitchTrimDeg: sim.controls.pitchTrim, spoilers: 0, reverser: false },
+      recommendedSpeeds: { rotationKnots: 140, climbKnots: 165, approachKnots: 145 },
       calibration: 'pending', environmentSeed: seed,
       sensorVersion: '1.0.0', runtimeVersion: 'trusted-worker-v1',
       fixedConfiguration: { ...m.fixedConfiguration, flapIndex: sim.aero.flapsIndex,
@@ -169,12 +175,17 @@ export class SimulatorMissionAdapter {
     sim.physicsAccumulator = 0;
   }
 
+  pose() {
+    return { position: this.sim.position.toArray(), quaternion: this.sim.quaternion.toArray() };
+  }
+
   acquire() {
     if (!this.manifest || this.acquired) throw new Error('pilot-owner-unavailable');
     const { controls } = this.sim;
     this.savedFlags = { disabled: controls.aircraftControlsDisabled, blocked: controls.inputBlocked };
     controls.setAircraftControlsDisabled(true);
     controls.inputBlocked = true;
+    if (this.sim.touchControls) this.sim.touchControls.throttleActive = false;
     this.sim.autopilot.disengage();
     this.acquired = true;
     this.apply(this.initialControls);
@@ -189,6 +200,7 @@ export class SimulatorMissionAdapter {
       }
     }
     for (const axis of AXES) this.sim.controls.setVirtualInput(axis, command[axis]);
+    this.command = { ...command };
   }
 
   step() {
@@ -203,6 +215,8 @@ export class SimulatorMissionAdapter {
         sim.controls.pitchTrim !== config.pitchTrimDeg || sim.aero.pitchTrim !== config.pitchTrimDeg) {
       throw new Error('pilot-fixed-configuration-changed');
     }
+    // A pointer drag or UI callback cannot steal a held throttle target.
+    this.apply(this.command);
     this.sim.integratePhysics(this.sim.physicsDt);
     this.syncPose();
   }

@@ -100,9 +100,11 @@ test('missing/nonfinite data, duplicate or skipped ticks and damage cannot earn 
 });
 test('timeout remains terminal and manifest values are checked', () => {
   const m = createMissionManifest('landing', { timeoutTicks: 2 });
-  const run = new LandingMission(m); startLanding(run); run.update(snapshot(2));
+  const run = new LandingMission(m); startLanding(run);
+  assert.equal(run.update(snapshot(2)).reason, 'timeout', 'exact deadline cannot leave a sweep running');
   assert.equal(run.update(snapshot(3)).reason, 'timeout');
-  for (const overrides of [{ stopTicks: 0 }, { maximumSinkRateMs: NaN }, { runwayWidthM: 0 }, { touchdownEndS: 5000 }]) {
+  for (const overrides of [{ stopTicks: 0 }, { maximumSinkRateMs: NaN }, { runwayWidthM: 0 }, { touchdownEndS: 5000 },
+    { runwayThreshold: { x: 0, y: NaN, z: 0 } }, { decisionPeriodTicks: 0 }]) {
     assert.throws(() => createMissionManifest('landing', overrides), /Invalid mission/);
   }
 });
