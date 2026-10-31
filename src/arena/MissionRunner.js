@@ -123,9 +123,9 @@ export class MissionRunner {
     this.abortPreparation?.abort();
     this.host?.stop(reason);
     this.host = null;
-    this.adapter.release();
     this.state = this.record.status = 'aborted';
     this.record.reason = reason;
+    this.adapter.release();
     this.notify();
   }
 

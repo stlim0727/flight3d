@@ -6,7 +6,14 @@ export function createRealtimePacer({ now = () => performance.now(),
   let start = null;
   return async (tick, physicsHz) => {
     start ??= now();
-    const target = start + tick / physicsHz * 1000;
+    let target = start + tick / physicsHz * 1000;
+    // Allow ordinary display-frame batching, but discard wall-time debt after
+    // a Worker/render stall instead of replaying it as a burst of physics.
+    const overdue = now() - target;
+    if (overdue > 50) {
+      start += overdue;
+      target += overdue;
+    }
     while (now() < target) await nextFrame();
   };
 }

@@ -41,3 +41,19 @@ test('real-time pacing yields to display frames while preserving 120 physics tic
   }
   assert.ok(frames >= 600 && frames <= 601);
 });
+
+test('worker and foreground frame stalls rebase playback instead of fast-forwarding the next interval', async () => {
+  for (const stall of ['worker', 'frame']) {
+    let wallMs = 0, frames = 0, delayFrame = false;
+    const pace = createRealtimePacer({ now: () => wallMs,
+      nextFrame: async () => { wallMs += delayFrame ? 200 : 1000 / 60; delayFrame = false; frames++; } });
+    for (let tick = 1; tick <= 24; tick++) await pace(tick, 120);
+    if (stall === 'worker') wallMs += 200;
+    else delayFrame = true;
+    await pace(25, 120);
+    const before = frames, elapsed = wallMs;
+    for (let tick = 26; tick <= 48; tick++) await pace(tick, 120);
+    assert.ok(frames - before >= 10, `${stall}: subsequent steps must yield to the display`);
+    assert.ok(wallMs - elapsed >= 175, `${stall}: no 0.2s catch-up burst`);
+  }
+});
