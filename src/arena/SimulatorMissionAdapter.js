@@ -163,7 +163,7 @@ export class SimulatorMissionAdapter {
       configuration: { gearDown: true, flapIndex: sim.aero.flapsIndex,
         pitchTrimDeg: sim.controls.pitchTrim, spoilers: 0, reverser: false },
       recommendedSpeeds: { rotationKnots: 140, climbKnots: 165, approachKnots: 145 },
-      calibration: 'pending', environmentSeed: seed,
+      calibration: 'limited-training-suite-v1', environmentSeed: seed,
       sensorSeed, sensorNoiseEnabled: noise, airframeVariation: 'disabled',
       sensorVersion: '1.0.0', runtimeVersion: 'trusted-worker-v1',
       fixedConfiguration: { ...m.fixedConfiguration, flapIndex: sim.aero.flapsIndex,

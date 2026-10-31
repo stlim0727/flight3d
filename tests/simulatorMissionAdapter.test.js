@@ -50,7 +50,7 @@ test('takeoff preparation uses a stable new scenario and does not trust stale te
   assert.equal(initialSnapshot.iasKnots, 0);
   assert.equal(initialSnapshot.headingDeg, 90);
   assert.equal(initialSnapshot.weightOnWheels, true);
-  assert.equal(manifest.calibration, 'pending');
+  assert.equal(manifest.calibration, 'limited-training-suite-v1');
   assert.ok(manifest.configuredState.massKg > 0);
   assert.equal(sim.controls.aircraftControlsDisabled, false);
   adapter.acquire();

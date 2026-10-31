@@ -6,7 +6,7 @@ const common = {
   // Existing operational threshold is 250 m inside the physical 3200 m runway.
   runwayStartS: -250, runwayEndS: 2950, runwayWidthM: 60,
   fixedConfiguration: { gearDown: true, spoilers: 0, reverser: false, parkingBrake: false },
-  calibration: 'pending',
+  calibration: 'limited-training-suite-v1',
 };
 
 export function createMissionManifest(type, overrides = {}) {
