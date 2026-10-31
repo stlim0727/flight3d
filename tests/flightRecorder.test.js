@@ -95,8 +95,76 @@ test('flow sequence excludes pause/menu time, freezes completed reports, retry s
   assert.equal(sim.flightRecorder.elapsed, 1 / 120);
   sim.isCrashed = true; tick();
   assert.equal(sim.debriefReport.reason, 'crash');
+  assert.equal(sim.gameFlow.state, FLOW.FLIGHT, 'impact must leave the crash scene visible');
+  SimulatorClass.prototype.updateCrashDebrief.call(sim, 3);
+  assert.equal(sim.gameFlow.state, FLOW.DEBRIEF);
   sim.gameFlow.returnToLobby();
   assert.equal(sim.gameFlow.canResumeFromLobby(), false);
+});
+
+function crashSortie() {
+  const sim = { gameFlow: new GameFlowController(), flightRecorder: new FlightRecorder(), devRunner: {},
+    telemetry: { ...telemetry }, isCrashed: false, shown: 0,
+    debriefOverlay: { show() { sim.shown++; } } };
+  for (const method of ['endFlight', 'updateFlightRecording', 'updateCrashDebrief', 'beginFlightRecording']) {
+    sim[method] = (...args) => SimulatorClass.prototype[method].call(sim, ...args);
+  }
+  sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata);
+  for (let i = 0; i < 120; i++) sim.updateFlightRecording(1 / 120);
+  sim.isCrashed = true; sim.telemetry.gForce = 4; sim.updateFlightRecording(1 / 120);
+  return sim;
+}
+
+test('crash scene waits for three rendered seconds with an immutable impact report', () => {
+  const sim = crashSortie();
+  const report = structuredClone(sim.debriefReport);
+  assert.equal(report.peaks.gForce.gForce, 4, 'include impact telemetry');
+  assert.equal(report.sufficient, false);
+  sim.telemetry.gForce = 100;
+  for (let i = 0; i < 1200; i++) sim.updateFlightRecording(1 / 120);
+  assert.equal(sim.gameFlow.state, FLOW.FLIGHT, 'physics stepping cannot consume the visible delay');
+  assert.equal(sim.shown, 0);
+  for (let i = 0; i < 179; i++) sim.updateCrashDebrief(1 / 60);
+  assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
+  sim.updateCrashDebrief(1 / 60);
+  assert.equal(sim.gameFlow.state, FLOW.DEBRIEF);
+  assert.deepEqual(sim.debriefReport, report, 'wreckage time cannot inflate metrics or enable sharing');
+  sim.updateCrashDebrief(10); sim.updateFlightRecording(1);
+  assert.equal(sim.shown, 1);
+});
+
+test('crash observation excludes pause/background and menu cancels automatic presentation', () => {
+  const sim = crashSortie();
+  sim.updateCrashDebrief(1);
+  sim.gameFlow.pause(); sim.updateCrashDebrief(10);
+  sim.gameFlow.resume(); sim.browserBackgrounded = true; sim.updateCrashDebrief(10);
+  sim.browserBackgrounded = false;
+  for (const dt of [NaN, Infinity, -1, 0]) sim.updateCrashDebrief(dt);
+  assert.equal(sim.crashDebriefRemaining, 2);
+  sim.gameFlow.returnToLobby(true); sim.updateCrashDebrief(10);
+  assert.equal(sim.crashDebriefRemaining, null);
+  assert.equal(sim.shown, 0);
+  sim.endFlight();
+  assert.equal(sim.gameFlow.state, FLOW.DEBRIEF, 'explicit end can show the finalized crash report from menu');
+  assert.equal(sim.debriefReport.reason, 'crash');
+});
+
+test('reset, fresh recordings and developer crashes cannot open an old accident report', () => {
+  const sim = crashSortie();
+  sim.isCrashed = false; sim.updateCrashDebrief(10);
+  assert.equal(sim.crashDebriefRemaining, null);
+  sim.lobby = {}; sim.sky = { timeOfDay: 10 };
+  sim.beginFlightRecording();
+  assert.equal(sim.debriefReport, null);
+  sim.updateCrashDebrief(10); sim.updateFlightRecording(1 / 120);
+  assert.equal(sim.shown, 0);
+  assert.equal(sim.flightRecorder.elapsed, 1 / 120);
+  sim.devRunner.active = true; sim.isCrashed = true; sim.updateFlightRecording(1 / 120);
+  assert.equal(sim.crashDebriefRemaining, null);
+  assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
+  sim.devRunner.active = false; sim.updateFlightRecording(1 / 120);
+  sim.endFlight(); sim.updateCrashDebrief(10);
+  assert.equal(sim.shown, 1, 'manual end of a pending crash must disarm later presentation');
 });
 
 test('landing completion needs a recorded airborne touchdown and a sustained stop', () => {

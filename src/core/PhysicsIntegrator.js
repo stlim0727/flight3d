@@ -448,6 +448,7 @@ class PhysicsIntegratorMethods {
   }
 
   clearCrashState() {
+    this.crashDebriefRemaining = null;
     this.isCrashed = false;
     this.crashResult = null;
     this.explosionSystem.clear();
