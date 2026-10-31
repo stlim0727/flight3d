@@ -1,0 +1,405 @@
+{
+  "suite": "limited-training-suite-v1",
+  "node": "22.23.2",
+  "physicsHz": 120,
+  "decisionHz": 5,
+  "reactionDelayTicks": 24,
+  "renderer": "none",
+  "scope": "B738 coastal; implemented game physics; not real-aircraft validation",
+  "sourceModuleSha256": {
+    "takeoff": "e1fa617c2f77fdc8db17757bed770e14e8c584e3b971c204110e816eb099f008",
+    "landing": "36e3b3f30463562a289f39a294a781b0fad1ad81124f9ffd9ee37347c2e175eb"
+  },
+  "runs": [
+    {
+      "mission": "takeoff-basic-v1",
+      "profile": "mild-disturbance-v1",
+      "seed": 1,
+      "sensorNoise": true,
+      "status": "succeeded",
+      "completionSeconds": 63.45,
+      "metrics": {
+        "stableTicks": 1200,
+        "maximumRollDeg": 2.936248668648592,
+        "centerlineRmsM": 3.6558407748098536,
+        "liftoffTick": 3767,
+        "liftoffIasKnots": 177.54060233591127,
+        "heightReachedTick": 6084
+      }
+    },
+    {
+      "mission": "takeoff-basic-v1",
+      "profile": "mild-disturbance-v1",
+      "seed": 2,
+      "sensorNoise": true,
+      "status": "succeeded",
+      "completionSeconds": 62.28333333333333,
+      "metrics": {
+        "stableTicks": 1200,
+        "maximumRollDeg": 3.13698370682454,
+        "centerlineRmsM": 4.063544267453593,
+        "liftoffTick": 3707,
+        "liftoffIasKnots": 175.84381340951512,
+        "heightReachedTick": 5973
+      }
+    },
+    {
+      "mission": "takeoff-basic-v1",
+      "profile": "mild-disturbance-v1",
+      "seed": 3,
+      "sensorNoise": true,
+      "status": "succeeded",
+      "completionSeconds": 59.43333333333333,
+      "metrics": {
+        "stableTicks": 1200,
+        "maximumRollDeg": 2.8301372698160554,
+        "centerlineRmsM": 2.3739375857533322,
+        "liftoffTick": 3728,
+        "liftoffIasKnots": 176.5050244374737,
+        "heightReachedTick": 5933
+      }
+    },
+    {
+      "mission": "takeoff-basic-v1",
+      "profile": "mild-disturbance-v1",
+      "seed": 4,
+      "sensorNoise": true,
+      "status": "succeeded",
+      "completionSeconds": 61.93333333333333,
+      "metrics": {
+        "stableTicks": 1200,
+        "maximumRollDeg": 1.900497575416175,
+        "centerlineRmsM": 2.602215177608417,
+        "liftoffTick": 3714,
+        "liftoffIasKnots": 177.21891753256747,
+        "heightReachedTick": 6016
+      }
+    },
+    {
+      "mission": "takeoff-basic-v1",
+      "profile": "mild-disturbance-v1",
+      "seed": 5,
+      "sensorNoise": true,
+      "status": "succeeded",
+      "completionSeconds": 61.1,
+      "metrics": {
+        "stableTicks": 1200,
+        "maximumRollDeg": 1.9738240846495878,
+        "centerlineRmsM": 1.0517316023586356,
+        "liftoffTick": 3705,
+        "liftoffIasKnots": 176.75981769476502,
+        "heightReachedTick": 5961
+      }
+    },
+    {
+      "mission": "landing-basic-v1",
+      "profile": "mild-disturbance-v1",
+      "seed": 1,
+      "sensorNoise": true,
+      "status": "succeeded",
+      "completionSeconds": 70.30833333333334,
+      "metrics": {
+        "bounceTicks": 0,
+        "stopTicks": 600,
+        "touchdown": {
+          "tick": 5104,
+          "runwayS": 212.6021886267963,
+          "cgRunwayS": 214.59059495088832,
+          "centerlineOffsetM": -4.448175163206726,
+          "sinkRateMs": 2.876000691302179,
+          "rollDeg": 0.05762986216756594,
+          "headingErrorDeg": 1.336933806286197
+        },
+        "stoppingDistanceM": 934.6847451953504,
+        "finalCenterlineOffsetM": 0.7779509806928078
+      }
+    },
+    {
+      "mission": "landing-basic-v1",
+      "profile": "mild-disturbance-v1",
+      "seed": 2,
+      "sensorNoise": true,
+      "status": "succeeded",
+      "completionSeconds": 70.525,
+      "metrics": {
+        "bounceTicks": 0,
+        "stopTicks": 600,
+        "touchdown": {
+          "tick": 5219,
+          "runwayS": 274.126643194993,
+          "cgRunwayS": 276.15050522534784,
+          "centerlineOffsetM": 4.201358533195807,
+          "sinkRateMs": 1.0156262307388348,
+          "rollDeg": 0.5478943486934659,
+          "headingErrorDeg": -1.3955502888857154
+        },
+        "stoppingDistanceM": 882.2212854988181,
+        "finalCenterlineOffsetM": -0.3284324230802703
+      }
+    },
+    {
+      "mission": "landing-basic-v1",
+      "profile": "mild-disturbance-v1",
+      "seed": 3,
+      "sensorNoise": true,
+      "status": "succeeded",
+      "completionSeconds": 70.65833333333333,
+      "metrics": {
+        "bounceTicks": 0,
+        "stopTicks": 600,
+        "touchdown": {
+          "tick": 5152,
+          "runwayS": 233.396424462293,
+          "cgRunwayS": 235.3846272786011,
+          "centerlineOffsetM": -3.4967317522051653,
+          "sinkRateMs": 2.5565215137949777,
+          "rollDeg": -0.28991255558827006,
+          "headingErrorDeg": 1.0955128102100389
+        },
+        "stoppingDistanceM": 925.2809487606223,
+        "finalCenterlineOffsetM": 0.5394679320556011
+      }
+    },
+    {
+      "mission": "landing-basic-v1",
+      "profile": "mild-disturbance-v1",
+      "seed": 4,
+      "sensorNoise": true,
+      "status": "succeeded",
+      "completionSeconds": 70.19166666666666,
+      "metrics": {
+        "bounceTicks": 22,
+        "stopTicks": 600,
+        "touchdown": {
+          "tick": 5098,
+          "runwayS": 203.08843469676208,
+          "cgRunwayS": 205.19406668090824,
+          "centerlineOffsetM": -3.3940552427755692,
+          "sinkRateMs": 2.608953283454791,
+          "rollDeg": -0.2503386538155715,
+          "headingErrorDeg": -1.1920989910317985
+        },
+        "stoppingDistanceM": 930.0707579071986,
+        "finalCenterlineOffsetM": 0.03857940690436398
+      }
+    },
+    {
+      "mission": "landing-basic-v1",
+      "profile": "mild-disturbance-v1",
+      "seed": 5,
+      "sensorNoise": true,
+      "status": "succeeded",
+      "completionSeconds": 71.04166666666667,
+      "metrics": {
+        "bounceTicks": 0,
+        "stopTicks": 600,
+        "touchdown": {
+          "tick": 5191,
+          "runwayS": 257.5131699919225,
+          "cgRunwayS": 259.5922058483652,
+          "centerlineOffsetM": 2.9332026708701706,
+          "sinkRateMs": 1.5657999622092975,
+          "rollDeg": 0.38854616998008756,
+          "headingErrorDeg": 1.1849799477103033
+        },
+        "stoppingDistanceM": 930.5563380725482,
+        "finalCenterlineOffsetM": -0.33242086227777196
+      }
+    },
+    {
+      "mission": "takeoff-basic-v1",
+      "profile": "calm-debug-v1",
+      "seed": 1,
+      "sensorNoise": false,
+      "status": "succeeded",
+      "completionSeconds": 61.78333333333333,
+      "metrics": {
+        "stableTicks": 1200,
+        "maximumRollDeg": 4.0284968865720645e-15,
+        "centerlineRmsM": 1.139316405080255e-14,
+        "liftoffTick": 3706,
+        "liftoffIasKnots": 176.90082990131222,
+        "heightReachedTick": 5971
+      }
+    },
+    {
+      "mission": "takeoff-basic-v1",
+      "profile": "calm-debug-v1",
+      "seed": 2,
+      "sensorNoise": false,
+      "status": "succeeded",
+      "completionSeconds": 61.78333333333333,
+      "metrics": {
+        "stableTicks": 1200,
+        "maximumRollDeg": 4.0284968865720645e-15,
+        "centerlineRmsM": 1.139316405080255e-14,
+        "liftoffTick": 3706,
+        "liftoffIasKnots": 176.90082990131222,
+        "heightReachedTick": 5971
+      }
+    },
+    {
+      "mission": "takeoff-basic-v1",
+      "profile": "calm-debug-v1",
+      "seed": 3,
+      "sensorNoise": false,
+      "status": "succeeded",
+      "completionSeconds": 61.78333333333333,
+      "metrics": {
+        "stableTicks": 1200,
+        "maximumRollDeg": 4.0284968865720645e-15,
+        "centerlineRmsM": 1.139316405080255e-14,
+        "liftoffTick": 3706,
+        "liftoffIasKnots": 176.90082990131222,
+        "heightReachedTick": 5971
+      }
+    },
+    {
+      "mission": "takeoff-basic-v1",
+      "profile": "calm-debug-v1",
+      "seed": 4,
+      "sensorNoise": false,
+      "status": "succeeded",
+      "completionSeconds": 61.78333333333333,
+      "metrics": {
+        "stableTicks": 1200,
+        "maximumRollDeg": 4.0284968865720645e-15,
+        "centerlineRmsM": 1.139316405080255e-14,
+        "liftoffTick": 3706,
+        "liftoffIasKnots": 176.90082990131222,
+        "heightReachedTick": 5971
+      }
+    },
+    {
+      "mission": "takeoff-basic-v1",
+      "profile": "calm-debug-v1",
+      "seed": 5,
+      "sensorNoise": false,
+      "status": "succeeded",
+      "completionSeconds": 61.78333333333333,
+      "metrics": {
+        "stableTicks": 1200,
+        "maximumRollDeg": 4.0284968865720645e-15,
+        "centerlineRmsM": 1.139316405080255e-14,
+        "liftoffTick": 3706,
+        "liftoffIasKnots": 176.90082990131222,
+        "heightReachedTick": 5971
+      }
+    },
+    {
+      "mission": "landing-basic-v1",
+      "profile": "calm-debug-v1",
+      "seed": 1,
+      "sensorNoise": false,
+      "status": "succeeded",
+      "completionSeconds": 70.625,
+      "metrics": {
+        "bounceTicks": 46,
+        "stopTicks": 600,
+        "touchdown": {
+          "tick": 5128,
+          "runwayS": 220.9323716996305,
+          "cgRunwayS": 222.97150053172618,
+          "centerlineOffsetM": -3.1999999999999837,
+          "sinkRateMs": 2.3410872375681304,
+          "rollDeg": -5.999308733771563e-15,
+          "headingErrorDeg": 0
+        },
+        "stoppingDistanceM": 937.3160789307963,
+        "finalCenterlineOffsetM": 1.5786424316911567e-14
+      }
+    },
+    {
+      "mission": "landing-basic-v1",
+      "profile": "calm-debug-v1",
+      "seed": 2,
+      "sensorNoise": false,
+      "status": "succeeded",
+      "completionSeconds": 70.625,
+      "metrics": {
+        "bounceTicks": 46,
+        "stopTicks": 600,
+        "touchdown": {
+          "tick": 5128,
+          "runwayS": 220.9323716996305,
+          "cgRunwayS": 222.97150053172618,
+          "centerlineOffsetM": -3.1999999999999837,
+          "sinkRateMs": 2.3410872375681304,
+          "rollDeg": -5.999308733771563e-15,
+          "headingErrorDeg": 0
+        },
+        "stoppingDistanceM": 937.3160789307963,
+        "finalCenterlineOffsetM": 1.5786424316911567e-14
+      }
+    },
+    {
+      "mission": "landing-basic-v1",
+      "profile": "calm-debug-v1",
+      "seed": 3,
+      "sensorNoise": false,
+      "status": "succeeded",
+      "completionSeconds": 70.625,
+      "metrics": {
+        "bounceTicks": 46,
+        "stopTicks": 600,
+        "touchdown": {
+          "tick": 5128,
+          "runwayS": 220.9323716996305,
+          "cgRunwayS": 222.97150053172618,
+          "centerlineOffsetM": -3.1999999999999837,
+          "sinkRateMs": 2.3410872375681304,
+          "rollDeg": -5.999308733771563e-15,
+          "headingErrorDeg": 0
+        },
+        "stoppingDistanceM": 937.3160789307963,
+        "finalCenterlineOffsetM": 1.5786424316911567e-14
+      }
+    },
+    {
+      "mission": "landing-basic-v1",
+      "profile": "calm-debug-v1",
+      "seed": 4,
+      "sensorNoise": false,
+      "status": "succeeded",
+      "completionSeconds": 70.625,
+      "metrics": {
+        "bounceTicks": 46,
+        "stopTicks": 600,
+        "touchdown": {
+          "tick": 5128,
+          "runwayS": 220.9323716996305,
+          "cgRunwayS": 222.97150053172618,
+          "centerlineOffsetM": -3.1999999999999837,
+          "sinkRateMs": 2.3410872375681304,
+          "rollDeg": -5.999308733771563e-15,
+          "headingErrorDeg": 0
+        },
+        "stoppingDistanceM": 937.3160789307963,
+        "finalCenterlineOffsetM": 1.5786424316911567e-14
+      }
+    },
+    {
+      "mission": "landing-basic-v1",
+      "profile": "calm-debug-v1",
+      "seed": 5,
+      "sensorNoise": false,
+      "status": "succeeded",
+      "completionSeconds": 70.625,
+      "metrics": {
+        "bounceTicks": 46,
+        "stopTicks": 600,
+        "touchdown": {
+          "tick": 5128,
+          "runwayS": 220.9323716996305,
+          "cgRunwayS": 222.97150053172618,
+          "centerlineOffsetM": -3.1999999999999837,
+          "sinkRateMs": 2.3410872375681304,
+          "rollDeg": -5.999308733771563e-15,
+          "headingErrorDeg": 0
+        },
+        "stoppingDistanceM": 937.3160789307963,
+        "finalCenterlineOffsetM": 1.5786424316911567e-14
+      }
+    }
+  ]
+}

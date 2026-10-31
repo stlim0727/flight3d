@@ -408,6 +408,10 @@ class FlightSimulator {
     this.fly();
     inputLatency?.mark('fly');
     this.syncFlowUi();
+    if (new URLSearchParams(location.search).get('pilotArena') === '1') {
+      const { installPilotArena } = await import('./ui/PilotArenaPanel.js');
+      installPilotArena(this);
+    }
   }
   /** Browser activity is a separate hold, so returning cannot undo menu/pause state. */
   initBrowserActivity() {
@@ -428,6 +432,7 @@ class FlightSimulator {
     this.clock.getDelta();
     this.physicsAccumulator = 0;
     if (backgrounded) {
+      if (this.pilotArena?.active) this.pilotArena.stop('browser-backgrounded');
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0, 0);
       this.controls.setTouchRudder(0);
@@ -448,6 +453,9 @@ class FlightSimulator {
   syncFlowUi() {
     const state = this.gameFlow.state;
     if (state === FLOW.LOBBY) this.crashDebriefRemaining = null;
+    // This first experimental runner aborts on pause/menu instead of retaining
+    // guest execution across an implicit user handover.
+    if (state !== FLOW.FLIGHT && this.pilotArena?.active) this.pilotArena.stop('flight-held');
     // A flight parked off the sim is silent and watched from the drone rig; the lobby
     // cinematic keeps its own sound and camera, so it is deliberately not held here.
     const held = state === FLOW.DEBRIEF || state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
@@ -459,7 +467,7 @@ class FlightSimulator {
       attribution?.querySelector('#incheon-attribution-chip')?.setAttribute('aria-expanded', 'false');
     }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
-    this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active);
+    this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active) || Boolean(this.pilotArena?.active);
     if (state !== FLOW.FLIGHT) {
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0.0, 0.0);
@@ -786,7 +794,8 @@ class FlightSimulator {
     }, 0);
   }
 
-  setAircraft(aircraftId = 'B738') {
+  setAircraft(aircraftId = 'B738', pilotPreparation = false) {
+    if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('aircraft-changed');
     const config = AIRCRAFT_REGISTRY[aircraftId];
     if (!config) return;
     this.hangang?.stop();
@@ -861,7 +870,7 @@ class FlightSimulator {
     if (this.shadowDemo.active) {
       this.physicsAccumulator = 0;
       if (!this.gameFlow.isPhysicsFrozen()) this.shadowDemo.update(frameDelta);
-    } else if (this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics) {
+    } else if (this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active) {
       this.physicsAccumulator = 0;
     } else {
       advancePhysicsFrame(this, frameDelta);
