@@ -1,5 +1,7 @@
 import { flightCombinations, flightUrl } from './config/flightUrls.js';
 import { pilotCases, pilotCaseUrl } from './config/pilotCases.js';
+import takeoffCodeUrl from './pilot/examples/takeoff.js?url';
+import landingCodeUrl from './pilot/examples/landing.js?url';
 
 const rows = flightCombinations();
 const labels = {
@@ -49,5 +51,12 @@ document.getElementById('pilot-cases').replaceChildren(...pilotCases().map(row =
   link.href = pilotCaseUrl(row, new URL('./', location.href));
   link.textContent = '게임에서 실시간으로 보기';
   td.append(link); tr.append(label, td);
+  const codeCell = document.createElement('td');
+  const codeLink = document.createElement('a');
+  codeLink.href = row.type === 'takeoff' ? takeoffCodeUrl : landingCodeUrl;
+  codeLink.textContent = `${row.type}.js`;
+  codeLink.target = '_blank';
+  codeLink.rel = 'noopener noreferrer';
+  codeCell.append(codeLink); tr.append(codeCell);
   return tr;
 }));

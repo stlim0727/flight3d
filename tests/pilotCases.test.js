@@ -17,6 +17,8 @@ test('all 12 built-in case links select the exact mission, profile and seed inde
     assert.deepEqual(resolveFlightUrl(url.search, { airport: 'lukla', aircraft: 'F16', scenario: 'cruise' }),
       { airport: 'coastal', aircraft: 'B738', scenario: row.type === 'takeoff' ? 'runway' : 'approach' });
     assert.ok(docs.includes(url.href), `missing documented case: ${row.id}`);
+    const documentedRow = docs.split('\n').find(line => line.includes(url.href));
+    assert.ok(documentedRow.includes(`/src/pilot/examples/${row.type}.js`), `wrong pilot code for ${row.id}`);
     assert.ok(pilotCaseUrl(row, 'http://localhost:5173/sub/').startsWith('http://localhost:5173/sub/?'));
   }
 });
