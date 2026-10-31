@@ -74,7 +74,8 @@ export class HangangScenario {
     if (s.isCrashed) this.run.fail('contact');
     this.run.update(s.position, s.quaternion, s.linearVelocity, dt, { stalled: s.aero.isStalled });
     if (this.run.contact && !s.isCrashed) {
-      s.triggerCrash({ collided: true, type: this.run.contact.structure === 'water' ? 'WATER' : 'BUILDING',
+      const structure = this.run.contact.structure;
+      s.triggerCrash({ collided: true, type: structure === 'water' ? 'WATER' : structure === 'island' ? 'TERRAIN' : 'BUILDING',
         name: t('hangang.contact'), description: t('hangang.contact'), point: s.position.clone(), speedKnots: s.linearVelocity.length() * 1.94384 });
     }
   }
