@@ -236,7 +236,9 @@ export class DemoFlightDirector {
     // DEM loads. isActive lets Esc, presets and airport changes cancel it.
     this.waitingForTerrain = airport === 'lukla' && this.sim.currentTerrain?.isLoaded === false;
     if (this.waitingForTerrain) {
-      if (this.sim.isCrashed) this.sim.setPreset('runway', true);
+      // Discard the previous airport's pose even when it has not crashed.
+      // Cancellation must leave a safe runway spawn rather than sea-level flight.
+      this.sim.setPreset('runway', true);
       this.currentStage = DemoFlightDirector.STAGES.IDLE;
       this.getActiveScenario().result = { status: 'pending', airborne: false };
       this.updateBanner(() => t('loading.lukla.terrain'), () => t('the.demo.will.start.when.terrain.data'));

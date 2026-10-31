@@ -106,7 +106,7 @@ describe('Lukla continuous circuit and truthful completion', () => {
     assert.equal(director.waitingForTerrain, true);
     assert.equal(scenario.result.status, 'pending');
     for (let i = 0; i < 10; i++) director.update(1);
-    assert.equal(sim.presetCalls, 1, 'No flight is spawned on the fallback');
+    assert.equal(sim.presetCalls, 2, 'Fallback only parks once at the destination runway');
     assert.equal(director.totalTimer, 0);
     sim.currentTerrain.isLoaded = true;
     director.update(0.1);
@@ -114,7 +114,7 @@ describe('Lukla continuous circuit and truthful completion', () => {
     assert.equal(director.currentStage, STAGES.CLIFF_TAKEOFF);
     assert.equal(scenario.result.status, 'running');
     director.update(0.1);
-    assert.equal(sim.presetCalls, 2, 'Loading completion must not repeatedly reset the flight');
+    assert.equal(sim.presetCalls, 3, 'Loading completion must not repeatedly reset the flight');
     assert.equal(sim.controls.parkingBrake, false);
   });
 
@@ -128,7 +128,7 @@ describe('Lukla continuous circuit and truthful completion', () => {
     assert.equal(director.isActive, false);
     assert.equal(director.waitingForTerrain, false);
     assert.equal(scenario.result.status, 'cancelled');
-    assert.equal(sim.presetCalls, 1);
+    assert.equal(sim.presetCalls, 2, 'cancelled pending demo retains only its runway parking reset');
   });
 
   it('fails and releases the pending UI and parking brake after a DEM load error', () => {
