@@ -231,7 +231,8 @@ body:has(#ap-panel:not([hidden]), #flight-more-panel:not([hidden])) :is(.demo-ba
 
 /* Warnings keep the first notice slot. Expanded guides and open panels move
    below them; the compact folded pill stays beside the control strip. */
-#hud-overlay:has(#hud-warning:not([hidden]), #hud-stall[style*="block"]) { --flight-alert-space: 48px; }
+/* Body also owns the pilot arena, which is a sibling of the HUD overlay. */
+body:has(#hud-warning:not([hidden]), #hud-stall[style*="block"]) { --flight-alert-space: 48px; }
 .flight-warning {
   position: fixed;
   top: var(--demo-row-top, calc(var(--edge-top) + 100px));
