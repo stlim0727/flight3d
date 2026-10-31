@@ -5,6 +5,7 @@ import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality } from '../con
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { updateControlState, touchLabel } from './FlightPanels.js';
 import { FLOW } from './GameFlowController.js';
+import { DebriefOverlay } from './DebriefOverlay.js';
 import { initLobbyScreen } from './LobbyScreen.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
@@ -463,6 +464,12 @@ class SimulatorHudAndBindingsMethods {
       onResume: () => this.resumeFlight(),
     });
     this.renderDiagnosticsPanel = new RenderDiagnosticsPanel(this);
+    this.debriefOverlay = new DebriefOverlay({
+      onRetry: () => this.retryDebrief(),
+      onLobby: () => { this.demoDirector.stop(); this.gameFlow.returnToLobby(false); document.getElementById('btn-fly')?.focus(); },
+    });
+    document.getElementById('btn-pause-end')?.addEventListener('click', () => this.endFlight());
+    document.getElementById('btn-lobby-end')?.addEventListener('click', () => this.endFlight());
     this.developerPanel = new DeveloperPanel(this);
     document.getElementById('btn-pause-resume')?.addEventListener('click', () => this.gameFlow.resume());
     document.getElementById('btn-pause-restart')?.addEventListener('click', () => {
