@@ -23,7 +23,8 @@ import {
 } from '../config/flightSelection.js';
 
 class PresetSpawnerMethods {
-  setPreset(type, isDemoInternal = false) {
+  setPreset(type, isDemoInternal = false, pilotPreparation = false) {
+    if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('preset-changed');
     // An arena field must not leak into a different mission or ordinary flight.
     if (this.windField) setSimulationWind(this);
     this.hangang?.stop();
@@ -442,7 +443,8 @@ class PresetSpawnerMethods {
   /**
    * Switch the active airport; Incheon assets are loaded before committing the selection.
    */
-  async setAirport(id) {
+  async setAirport(id, pilotPreparation = false) {
+    if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('airport-changed');
     this.renderDiagnosticsPanel?.close();
     if (!['coastal', 'lukla', 'incheon', 'neon', 'hangang'].includes(id)) return;
     if (this.activeAirport === id) {
@@ -586,7 +588,7 @@ class PresetSpawnerMethods {
       this.demoDirector.stop();
     }
 
-    if (!this.applyingPendingStart) this.setPreset(defaultScenarioForRegion(id));
+    if (!this.applyingPendingStart) this.setPreset(defaultScenarioForRegion(id), false, pilotPreparation);
     this.lobbyScreen?.refresh();
 
     const airportKey = isHangang ? 'hangang.region' : isIncheon ? 'incheon.airport' : isLukla
