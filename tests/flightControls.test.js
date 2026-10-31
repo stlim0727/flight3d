@@ -160,6 +160,41 @@ describe('FlightControls (Keyboard & Touch Inputs)', () => {
       globalThis.window = prevWindow;
     }
   });
+
+  it('should toggle the parking brake from the Period key, ignoring auto-repeat', () => {
+    const mockDom = { addEventListener: () => {} };
+    const prevWindow = globalThis.window;
+    if (!globalThis.window) {
+      globalThis.window = { addEventListener: () => {}, innerWidth: 1920, innerHeight: 1080 };
+    }
+
+    const controls = new FlightControls(mockDom);
+    controls.handleKeyDown({ code: 'Period' });
+    assert.strictEqual(controls.parkingBrake, true);
+    controls.update(0.1, 0);
+    assert.strictEqual(controls.brakes, 1.0);
+
+    // Holding the key must not flicker the brake on and off.
+    controls.handleKeyDown({ code: 'Period', repeat: true });
+    assert.strictEqual(controls.parkingBrake, true);
+
+    controls.handleKeyUp({ code: 'Period' });
+    controls.handleKeyDown({ code: 'Period' });
+    assert.strictEqual(controls.parkingBrake, false);
+    controls.update(0.1, 0);
+    assert.strictEqual(controls.brakes, 0.0);
+
+    // Demo flight owns the brakes.
+    controls.setAircraftControlsDisabled(true);
+    controls.handleKeyDown({ code: 'Period' });
+    assert.strictEqual(controls.parkingBrake, false);
+
+    if (prevWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = prevWindow;
+    }
+  });
 });
 
 
