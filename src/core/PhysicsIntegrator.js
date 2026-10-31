@@ -8,6 +8,7 @@ import { BODY_SUPPORT_POINTS, FALLBACK_BODY_SUPPORT_POINTS } from '../physics/gr
 import { constrainBodyContact } from '../physics/bodyContactConstraint.js';
 import { rebaseCgVelocity, translateModelOrigin } from '../physics/massKinematics.js';
 import { stallSpeedEstimate } from '../physics/stallSpeedEstimate.js';
+import { advanceSimulationWind } from '../physics/WindField.js';
 import { stepPhysics } from './physicsTiming.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { FLOW } from '../ui/GameFlowController.js';
@@ -33,6 +34,9 @@ class PhysicsIntegratorMethods {
       this.aircraft.group.position.copy(this.position);
       return;
     }
+
+    // Arena wind is opt-in and advances only with integrated physics ticks.
+    advanceSimulationWind(this, dt);
 
     // 1. Controls processing
     this.controls.update(dt, this.telemetry.iasKnots);
@@ -65,7 +69,8 @@ class PhysicsIntegratorMethods {
     this.engines.setThrottle(this.controls.throttle);
     const altitudeMeters = this.position.y;
     const atmos = Atmosphere.getConditions(altitudeMeters);
-    const tas = this.linearVelocity.length();
+    const tas = Math.hypot(this.linearVelocity.x - this.aero.windWorld.x,
+      this.linearVelocity.y - this.aero.windWorld.y, this.linearVelocity.z - this.aero.windWorld.z);
     // Damage remains until repair, even if an engine restart is commanded.
     if (this.gear.bodyDamage?.engineL !== undefined) {
       this.engines.contactDamage[0] = this.gear.bodyDamage.engineL;
