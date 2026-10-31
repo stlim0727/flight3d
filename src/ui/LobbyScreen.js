@@ -156,6 +156,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     if (flyLabel) bindText(flyLabel, () => t(getPreset() === 'demo' ? 'lobby.startDemo' : 'lobby.startNew'));
     const resume = document.getElementById('btn-lobby-resume');
     if (resume) resume.hidden = !canResume();
+    const end = document.getElementById('btn-lobby-end');
+    if (end) end.hidden = !canResume();
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
       const button = document.getElementById(scenario.lobbyButtonId);
       if (!button) continue;
