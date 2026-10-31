@@ -47,9 +47,11 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
   assert.equal(await evaluate('document.getElementById("btn-auto-camera") === null'), true, 'no duplicate Scenic Auto button');
   await evaluate(() => {
     const select = document.getElementById('open-camera');
+    select.focus();
     select.value = '7'; select.dispatchEvent(new Event('change', { bubbles: true }));
   });
   assert.ok(await evaluate('window.simulator.cameraSystem.autoSwitch'), 'dropdown Auto enables automatic framing');
+  assert.ok(await evaluate('document.activeElement !== document.getElementById("open-camera")'), 'committed CAM selection releases keyboard focus');
   await evaluate(() => {
     const select = document.getElementById('open-camera');
     select.value = '1'; select.dispatchEvent(new Event('change', { bubbles: true }));

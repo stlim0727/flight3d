@@ -5,6 +5,12 @@ export function touchLabel(text) {
     ? text.replace(/\s*\[[^\]]*\]/g, '') : text;
 }
 
+/** A committed in-flight view choice must release native select keyboard capture. */
+export function commitFlightCamera(select, onSelectCamera) {
+  onSelectCamera(Number(select.value));
+  select.blur();
+}
+
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
 export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParkingBrake }) {
   const hud = document.getElementById('hud-overlay');
@@ -49,7 +55,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   cameraButton.id = 'open-camera';
   cameraButton.className = 'btn';
   bindText(cameraButton, () => t('ui.camera.select'), 'aria-label');
-  cameraButton.addEventListener('change', () => onSelectCamera(Number(cameraButton.value)));
+  cameraButton.addEventListener('change', () => commitFlightCamera(cameraButton, onSelectCamera));
   // Taking over must remain available when the guide is collapsed or yields to
   // warnings. Keep the existing button/handler outside the notification tree.
   const skipDemoButton = document.getElementById('btn-skip-demo');
