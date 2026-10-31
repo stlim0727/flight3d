@@ -382,6 +382,7 @@ class PresetSpawnerMethods {
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.snapToTarget(this.aircraft.group);
+    if (!isDemoInternal && this.gameFlow?.state === 'flight') this.beginFlightRecording?.();
   }
 
   // One shared educational performance snapshot for CDU, PFD and loading UI.

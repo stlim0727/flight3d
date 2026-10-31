@@ -2,6 +2,7 @@ export const FLOW = {
   LOBBY: 'lobby',
   FLIGHT: 'flight',
   PAUSED: 'paused',
+  DEBRIEF: 'debrief',
 };
 
 /**
@@ -48,7 +49,7 @@ export class GameFlowController {
   }
 
   isPhysicsFrozen() {
-    return this.state === FLOW.PAUSED || (this.state === FLOW.LOBBY && (this.resumableFlight || !this.cinematicAvailable));
+    return this.state === FLOW.DEBRIEF || this.state === FLOW.PAUSED || (this.state === FLOW.LOBBY && (this.resumableFlight || !this.cinematicAvailable));
   }
 
   setCinematicAvailable(available) {
@@ -76,6 +77,14 @@ export class GameFlowController {
   pause() {
     if (this.state !== FLOW.FLIGHT) return false;
     this._setState(FLOW.PAUSED);
+    return true;
+  }
+
+  endFlight() {
+    if (this.state !== FLOW.FLIGHT && this.state !== FLOW.PAUSED && !this.canResumeFromLobby()) return false;
+    this.resumableFlight = false;
+    this._disarmRestart();
+    this._setState(FLOW.DEBRIEF);
     return true;
   }
 
