@@ -5,6 +5,7 @@ export function clampFrameDelta(delta) {
 }
 
 export function stepPhysics(simulation) {
+  if (simulation.gameFlow?.state === 'debrief') return;
   if (simulation.devRunner?.blocksPhysics) return;
   if (simulation.demoDirector?.isActive) {
     simulation.demoDirector.update(simulation.physicsDt);
@@ -17,6 +18,7 @@ export function stepPhysics(simulation) {
   simulation.devRunner?.beforePhysics();
   const wasCrashed = simulation.isCrashed;
   simulation.integratePhysics(simulation.physicsDt);
+  simulation.updateFlightRecording?.(simulation.physicsDt);
   // A collision at the end of this tick creates debris; only subsequent ticks
   // advance it. Both deterministic stepping and rendered frames share this clock.
   if (wasCrashed && simulation.isCrashed) {
@@ -31,6 +33,6 @@ export function advancePhysicsFrame(simulation, delta) {
   while (simulation.physicsAccumulator >= simulation.physicsDt) {
     stepPhysics(simulation);
     simulation.physicsAccumulator -= simulation.physicsDt;
-    if (simulation.devRunner?.blocksPhysics) { simulation.physicsAccumulator = 0; break; }
+    if (simulation.devRunner?.blocksPhysics || simulation.gameFlow?.state === 'debrief') { simulation.physicsAccumulator = 0; break; }
   }
 }

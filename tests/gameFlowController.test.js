@@ -19,6 +19,23 @@ function run(c, seconds, dt = 0.1) {
   for (let t = 0; t < seconds; t += dt) c.update(dt);
 }
 
+test('debrief accepts only a live sortie, blocks resume and disarms cinematic restart', () => {
+  const { c } = makeController();
+  assert.equal(c.endFlight(), false);
+  c.enterFlight(); c.pause();
+  assert.equal(c.endFlight(), true);
+  assert.equal(c.state, FLOW.DEBRIEF);
+  assert.equal(c.isPhysicsFrozen(), true);
+  assert.equal(c.blocksFlightInput(), true);
+  assert.equal(c.resume(), false);
+  run(c, 20); assert.equal(c.consumeDemoRestart(), false);
+  c.returnToLobby(); assert.equal(c.canResumeFromLobby(), false);
+  run(c, 2); assert.equal(c.consumeDemoRestart(), true);
+  c.enterFlight(); c.returnToLobby(true);
+  assert.equal(c.endFlight(), true);
+  assert.equal(c.resumableFlight, false);
+});
+
 test('boot state: lobby blocks input, physics keep running', () => {
   const { c } = makeController();
   assert.equal(c.state, FLOW.LOBBY);
