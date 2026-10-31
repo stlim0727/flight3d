@@ -44,6 +44,7 @@ import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
 import { initFlightPanels } from './ui/FlightPanels.js';
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
+import { FlightRecorder } from './core/FlightRecorder.js';
 import { LOBBY_AIRCRAFT_IDS } from './ui/LobbyScreen.js';
 import { DeveloperModeController } from './dev/DeveloperModeController.js';
 import { DevScenarioRunner } from './dev/DevScenarioRunner.js';
@@ -244,6 +245,7 @@ class FlightSimulator {
       isDemoWaiting: () => this.demoDirector.waitingForTerrain === true,
       onStateChange: () => this.syncFlowUi(),
     });
+    this.flightRecorder = new FlightRecorder();
     this.lobby = { airport: savedSelection.airport, preset: savedSelection.scenario, aircraft: savedSelection.aircraft };
     this.currentAircraftId = savedSelection.aircraft;
     this.lastPresetType = savedSelection.scenario;
@@ -441,7 +443,7 @@ class FlightSimulator {
 
   syncAudioPause() {
     const backgrounded = this.browserBackgrounded === true;
-    const held = this.gameFlow.state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
+    const held = this.gameFlow.state === FLOW.DEBRIEF || this.gameFlow.state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
     this.audio?.departureRadio.setPaused(backgrounded || this.gameFlow.state !== FLOW.FLIGHT);
     this.audio?.setPaused(backgrounded || held);
   }
@@ -454,7 +456,7 @@ class FlightSimulator {
     if (state !== FLOW.FLIGHT && this.pilotArena?.active) this.pilotArena.stop('flight-held');
     // A flight parked off the sim is silent and watched from the drone rig; the lobby
     // cinematic keeps its own sound and camera, so it is deliberately not held here.
-    const held = state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
+    const held = state === FLOW.DEBRIEF || state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
     this.syncAudioPause();
     document.body.dataset.flow = state;
     if (state === FLOW.FLIGHT) {
@@ -561,6 +563,7 @@ class FlightSimulator {
     // setAirport may have clamped the scenario to the region it loaded.
     if (wantsDemo) this.demoDirector.start();
     else this.setPreset(this.lobby.preset);
+    this.beginFlightRecording();
     saveSimulatorPreferences({ demoProfile: this.lobby.demoProfile });
     saveFlightSelection({
       airport: this.lobby.airport,
@@ -571,7 +574,38 @@ class FlightSimulator {
 
   /** The HUD menu button only opens the main menu, holding the current flight. */
   toggleMainMenu() {
+    if (this.gameFlow.state === FLOW.DEBRIEF) return;
     this.gameFlow.returnToLobby(true);
+  }
+
+  beginFlightRecording() {
+    this.flightRecorder?.start({ airport: this.activeAirport, aircraft: this.currentAircraftId,
+      scenario: this.demoDirector?.isActive ? 'demo' : this.lastPresetType,
+      demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay });
+  }
+
+  updateFlightRecording(dt) {
+    if (this.gameFlow.state !== FLOW.FLIGHT || !this.flightRecorder.active || this.devRunner?.active) return;
+    this.flightRecorder.update(dt, this.telemetry);
+    if (this.isCrashed) this.endFlight('crash');
+    else if (this.flightRecorder.stopped >= 3) this.endFlight('landed');
+  }
+
+  endFlight(reason = 'manual') {
+    if (!this.flightRecorder.active) return;
+    if (![FLOW.FLIGHT, FLOW.PAUSED].includes(this.gameFlow.state) && !this.gameFlow.canResumeFromLobby()) return;
+    this.debriefReport = this.flightRecorder.finish(reason);
+    this.gameFlow.endFlight();
+    this.debriefOverlay.show(this.debriefReport);
+  }
+
+  retryDebrief() {
+    if (this.gameFlow.state !== FLOW.DEBRIEF) return;
+    const metadata = this.debriefReport.metadata;
+    Object.assign(this.lobby, { airport: metadata.airport, aircraft: metadata.aircraft,
+      preset: metadata.scenario, demoProfile: metadata.demoProfile });
+    this.setTimeOfDay(metadata.timeOfDay);
+    this.startFlight();
   }
 
   /** Resume the held flight without applying pending menu choices or respawning. */

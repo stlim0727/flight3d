@@ -3,4 +3,5 @@
 @import "./src/styles/touch-controls.css";
 @import "./src/styles/flight-panels.css";
 @import "./src/styles/lobby-and-overlays.css";
+@import "./src/styles/debrief.css";
 @import "./src/styles/flight-layout.css";

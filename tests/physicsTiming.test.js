@@ -27,6 +27,18 @@ function createSimulation() {
   return simulation;
 }
 
+test('debrief transition discards queued physics and blocks later deterministic ticks', () => {
+  const sim = createSimulation();
+  sim.gameFlow = { state: 'flight' };
+  sim.updateFlightRecording = () => { sim.gameFlow.state = 'debrief'; };
+  advancePhysicsFrame(sim, 0.1);
+  assert.equal(sim.ticks, 1);
+  assert.equal(sim.physicsAccumulator, 0);
+  stepPhysics(sim);
+  assert.equal(sim.ticks, 1);
+  assert.equal(sim.inputTicks, 1);
+});
+
 test('frame grouping preserves fixed-step inputs, state and interpolation isolation', () => {
   const reference = createSimulation();
   for (let tick = 0; tick < 240; tick++) stepPhysics(reference);
