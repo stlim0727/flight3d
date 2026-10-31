@@ -157,6 +157,11 @@ export class FlightControls {
         // through the cycle.
         if (!e.repeat && this.onCycleEngineFailure) this.onCycleEngineFailure();
         break;
+      case 'Period':
+        // Parking brake toggle (P is taken by the demo restart). Repeat-guarded
+        // so holding the key cannot flicker the brake.
+        if (!e.repeat) this.setParkingBrake(!this.parkingBrake);
+        break;
       case 'KeyL':
         if (this.onToggleLights) this.onToggleLights();
         break;
