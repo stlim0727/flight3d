@@ -5,6 +5,7 @@ import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { HANGANG_COURSE } from '../src/config/hangangCourse.js';
 
 globalThis.FileReader = class {
   readAsArrayBuffer(blob) {
@@ -298,21 +299,22 @@ function buildBridgesModel() {
   const group = new THREE.Group();
   group.name = 'Bridges_Kit';
 
-  // Nodeulseom Island (at x: 200, z: -1700)
+  // Nodeulseom Island; HangangRun collides with the same course data.
+  const island = HANGANG_COURSE.nodeulseom;
   const nodeul = new THREE.Group();
-  nodeul.position.set(200, 0, -1700);
+  nodeul.position.set(island.x, 0, island.z);
 
-  const islandGeo = new THREE.CylinderGeometry(70, 75, 4, 24);
-  islandGeo.scale(1.0, 1.0, 2.4);
-  islandGeo.translate(0, 2, 0);
+  const islandGeo = new THREE.CylinderGeometry(island.topRadius, island.bottomRadius, island.height, 24);
+  islandGeo.scale(1.0, 1.0, island.zScale);
+  islandGeo.translate(0, island.height / 2, 0);
   const islandMat = new THREE.MeshStandardMaterial({ color: 0x18241b, roughness: 0.95 });
   nodeul.add(new THREE.Mesh(islandGeo, islandMat));
 
   const pavilion = new THREE.Mesh(
-    new THREE.BoxGeometry(45, 9, 80),
+    new THREE.BoxGeometry(...island.pavilion.size),
     new THREE.MeshStandardMaterial({ color: 0x262b2e, roughness: 0.7, emissive: 0x3d2914, emissiveIntensity: 0.6 })
   );
-  pavilion.position.set(0, 8.5, 0);
+  pavilion.position.set(...island.pavilion.center);
   nodeul.add(pavilion);
   group.add(nodeul);
 
