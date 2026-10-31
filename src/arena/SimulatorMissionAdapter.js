@@ -283,7 +283,10 @@ export class SimulatorMissionAdapter {
     this.sim.windField = null;
     this.sim.aero.windWorld.set(0, 0, 0);
     this.sim.windTimeSeconds = 0;
-    if (!this.acquired) return;
+    if (!this.acquired) {
+      this.sim.syncFlowUi?.();
+      return;
+    }
     const controls = this.sim.controls;
     controls.clearVirtualInputs();
     controls.virtualBrakes = null;
@@ -292,5 +295,8 @@ export class SimulatorMissionAdapter {
     controls.inputBlocked = this.savedFlags.blocked;
     this.acquired = false;
     this.savedFlags = null;
+    // Preparation/UI synchronization may have blocked inputs for this arena.
+    // Restore ownership flags, then derive blocking from the current flow.
+    this.sim.syncFlowUi?.();
   }
 }

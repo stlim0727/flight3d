@@ -56,7 +56,7 @@ the external-change cancellation path. While active, the asynchronous runner
 owns physics advancement; the animation loop continues rendering and does not
 also integrate physics.
 
-Playback defaults to 1×: unchanged 120 Hz physics steps are paced against wall time, yielding to display frames. Worker stalls can make playback slower; physics steps and reaction-delay ticks are never skipped. Fast evaluation retains one frame per decision interval. The displayed clock is simulation time.
+Playback defaults to 1×: unchanged 120 Hz physics steps are paced against wall time, yielding to display frames. Worker stalls can make playback slower; physics steps and reaction-delay ticks are never skipped. Deadlines more than 50 ms overdue are rebased so stalled wall time does not become a fast-forward burst. Fast evaluation retains one frame per decision interval. The displayed clock is simulation time.
 Worker wait consumes wall time only. Prepared controls are held during the
 initial 24-tick delay. Mission failure is terminal; subsequent visual behavior
 cannot turn it into success.
