@@ -1,7 +1,7 @@
 import { flightCombinations, flightUrl } from './config/flightUrls.js';
 import { pilotCases, pilotCaseUrl } from './config/pilotCases.js';
-import takeoffCodeUrl from './pilot/examples/takeoff.js?url';
-import landingCodeUrl from './pilot/examples/landing.js?url';
+import takeoffCodeUrl from './pilot/examples/takeoff.js?url&no-inline';
+import landingCodeUrl from './pilot/examples/landing.js?url&no-inline';
 
 const rows = flightCombinations();
 const labels = {
