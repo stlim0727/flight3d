@@ -1,4 +1,4 @@
-/** Experimental SDK-only training pilot. Not calibrated or proven to complete a mission. */
+/** Experimental B738/coastal training pilot; validated only on the fixed local calibration suite. */
 export function createPilot() {
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
   const read = sensor => sensor?.status === 'available' && Number.isFinite(sensor.mean) ? sensor.mean : null;
@@ -25,18 +25,21 @@ export function createPilot() {
       previousRoll = roll; previousPitch = pitch;
       if (phase === 'roll' && speed >= rotationSpeed) phase = 'rotate';
       if (phase === 'rotate' && height > 35) phase = 'climb';
-      let targetPitch = 0;
-      if (phase === 'rotate') targetPitch = 8;
-      if (phase === 'climb') {
-        // Stabilize near 450 ft AGL, inside the mission's 100–200 m band.
-        const targetVsi = clamp((450 - height) * 5, -50, 850);
-        targetPitch = clamp(3 + (targetVsi - vsi) * 0.006 + (speed - climbSpeed) * 0.1, -2, 10);
+      // Ground reaction initially needs substantial rotation effort. Capture pitch
+      // after the nose begins moving rather than holding full aft stick airborne.
+      let elevator = 0;
+      if (phase === 'rotate') {
+        elevator = pitch < 2 ? 1 : clamp(0.18 + (10 - pitch) * 0.035 - pitchRate * 0.08, -0.4, 0.7);
+      } else if (phase === 'climb') {
+        // AGL outer loop and vertical-speed feedback hold 100–200 m above terrain.
+        const targetVsi = clamp((450 - height) * 8, -100, 1000);
+        elevator = clamp(0.25 + (targetVsi - vsi) * 0.0003 - pitchRate * 0.05, -0.2, 0.6);
       }
       const targetBank = phase === 'roll' ? 0 : clamp(-headingError * 0.7 - centerline * 0.04, -6, 6);
       command = {
-        elevator: clamp((phase === 'roll' ? 0 : 0.05) + (targetPitch - pitch) * 0.065 - pitchRate * 0.015, -0.4, 0.55),
+        elevator,
         aileron: clamp((targetBank - roll) * 0.055 - rollRate * 0.012, -0.35, 0.35),
-        rudder: clamp(-headingError * 0.045 - centerline * 0.02, -0.35, 0.35),
+        rudder: phase === 'roll' || phase === 'rotate' ? clamp(-headingError * 0.045 - centerline * 0.02, -0.35, 0.35) : 0,
         throttle: phase === 'climb' ? clamp(0.65 + (climbSpeed - speed) * 0.025, 0.3, 1) : 1,
         brakes: 0,
       };
@@ -45,4 +48,4 @@ export function createPilot() {
   };
 }
 
-export const takeoffPilotSource = `// Experimental, uncalibrated SDK-only takeoff example.\nexport ${createPilot.toString()}\n`;
+export const takeoffPilotSource = `// Experimental B738/coastal SDK-only takeoff example; limited calibration suite.\nexport ${createPilot.toString()}\n`;

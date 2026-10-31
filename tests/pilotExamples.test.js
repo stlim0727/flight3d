@@ -21,7 +21,9 @@ test('both pilots use cross-track/heading feedback with correcting signs and bou
     const right = create().onTick(obs({ headingErrorDeg: 5, centerlineOffsetM: 10 }));
     const left = create().onTick(obs({ headingErrorDeg: -5, centerlineOffsetM: -10 }));
     assert.ok(right.aileron < left.aileron);
-    assert.ok(right.rudder < left.rudder);
+    // Airborne lateral tracking permits crab; heading/rudder correction is for ground roll.
+    assert.equal(right.rudder, 0);
+    assert.equal(left.rudder, 0);
     for (const command of [right, left, create().onTick(obs({ pitchDeg: -100, rollDeg: 150, iasKnots: 0 }))]) assert.equal(validateCommand(command).ok, true);
   }
 });
@@ -46,7 +48,8 @@ test('landing flare survives expired guidance, touchdown latches idle through bo
   const flare = p.onTick(o);
   assert.ok(flare.throttle < approach.throttle);
   assert.equal(flare.brakes, 0);
-  const rollout = p.onTick(obs({ wow: true, radioAltFt: 8, groundSpeedKnots: 100 }));
+  const rollout = p.onTick(obs({ wow: true, radioAltFt: 8, groundSpeedKnots: 100, headingErrorDeg: 5, centerlineOffsetM: 3 }));
+  assert.ok(rollout.rudder < 0);
   assert.equal(rollout.throttle, 0);
   assert.ok(rollout.brakes > 0);
   assert.equal(p.onTick(obs({ wow: false, radioAltFt: 15 })).throttle, 0);
