@@ -174,6 +174,7 @@ export class LandingGear {
       c.isGrounded = false;
       c.compression = 0;
       c.touchdownThisFrame = false;
+      c.sinkRateMs = 0;
       c.turfEngagement = 0;
     }
     this.bodyGrounded = new Set();
@@ -264,6 +265,7 @@ export class LandingGear {
 
     for (const c of this.contacts) {
       c.touchdownThisFrame = false;
+      c.sinkRateMs = 0;
       if (gearDeploy < 0.1 || c.damageState === 'collapsed') {
         c.isGrounded = false;
         c.compression = 0;
@@ -309,6 +311,7 @@ export class LandingGear {
         const contactVel = scratchContactVel.copy(linearVelocity).add(angVelWorld.cross(rWorld));
         const groundSpeed = Math.sqrt(linearVelocity.x * linearVelocity.x + linearVelocity.z * linearVelocity.z);
         const sinkRate = Math.max(0, -contactVel.dot(groundNormal));
+        c.sinkRateMs = sinkRate;
         if (!wasGrounded) this.maxImpactSpeed = Math.max(this.maxImpactSpeed, sinkRate);
 
         // Touchdown impact requires descending from the air into the runway surface (sinkRate > 0.25 m/s)
