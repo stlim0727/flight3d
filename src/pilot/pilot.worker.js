@@ -56,6 +56,7 @@ export function createPilotRuntime({ send, loadModule = loadSourceModule }) {
         invocationLogs = 0;
         pilot = synchronous(module.createPilot(api));
         if (!pilot || typeof pilot.onTick !== 'function' || typeof pilot.reset !== 'function') throw new Error('Pilot must implement reset and onTick');
+        randomState = 1; // Factory draws must not change the reset/flight RNG stream.
         synchronous(pilot.reset(immutable(payload.briefing)));
         activeMeta = null;
         sequence = meta.sequence;

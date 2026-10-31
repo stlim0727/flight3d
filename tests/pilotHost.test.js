@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { PilotHost } from '../src/pilot/PilotHost.js';
 import { createPilotRuntime } from '../src/pilot/pilot.worker.js';
-import { createEnvelope } from '../src/pilot/PilotProtocol.js';
+import { createEnvelope, PILOT_LIMITS } from '../src/pilot/PilotProtocol.js';
 
 const command = { elevator: 0.1, aileron: 0, rudder: 0, throttle: 0.7, brakes: 0 };
 const source = 'export function createPilot() {}';
@@ -30,6 +30,41 @@ function setup(module, options = {}) {
 }
 
 describe('trusted local PilotHost lifecycle', () => {
+  it('transports allowed payload depth and byte boundaries through the actual runtime', async () => {
+    let nested = 1;
+    for (let i = 0; i < PILOT_LIMITS.depth; i++) nested = { a: nested };
+    const full = { pad: 'x'.repeat(PILOT_LIMITS.observationBytes - JSON.stringify({ pad: '' }).length) };
+    const { host } = setup();
+    // Control characters have six-byte JSON escapes but one-byte raw source size.
+    const escapedSource = '//' + '\u0001'.repeat(PILOT_LIMITS.sourceBytes - 2);
+    await host.start(escapedSource, nested);
+    assert.deepEqual(await host.tick(nested, { sampleTick: 0 }), command);
+    host.stop();
+    const second = setup().host;
+    await second.start(source, full);
+    assert.deepEqual(await second.tick(full, { sampleTick: 0 }), command);
+    second.stop();
+  });
+
+  it('initial reset and later reset reproduce RNG even when the factory draws randomness', async () => {
+    const replies = [];
+    const receive = createPilotRuntime({ send: message => replies.push(message),
+      loadModule: async () => ({ createPilot(api) {
+        api.random();
+        let offset;
+        return { reset() { offset = api.random(); }, onTick() { return { ...command, elevator: (offset + api.random()) / 2 }; } };
+      } }),
+    });
+    const meta = sequence => ({ sessionId: 'rng-case', sequence, sampleTick: sequence * 24 });
+    await receive(createEnvelope('init', meta(0), { source, briefing: {} }));
+    await receive(createEnvelope('observation', meta(1), {}));
+    const initial = replies.at(-1).payload;
+    await receive(createEnvelope('reset', meta(2), { briefing: {} }));
+    assert.equal(replies.at(-1).type, 'reset-complete');
+    await receive(createEnvelope('observation', meta(3), {}));
+    assert.deepEqual(replies.at(-1).payload, initial);
+  });
+
   it('initializes the pilot once and carries state across ticks', async () => {
     let count = 0;
     const { host, worker } = setup({ createPilot: () => ({

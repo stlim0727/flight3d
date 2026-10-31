@@ -69,10 +69,13 @@ export class PilotHost {
 
   request(type, payload, meta, responseType, timeoutMs) {
     return new Promise((resolve, reject) => {
+      const message = createEnvelope(type, { sessionId: this.sessionId, ...meta }, payload);
+      const valid = validateEnvelope(message, { type });
+      if (!valid.ok) { reject(failure('invalid-pilot-message', valid.error)); return; }
       const timer = setTimeout(() => this.fault(failure('pilot-timeout')), timeoutMs);
       this.pending = { resolve, reject, timer, responseType, ...meta };
       try {
-        this.worker.postMessage(createEnvelope(type, { sessionId: this.sessionId, ...meta }, payload));
+        this.worker.postMessage(message);
       } catch {
         this.fault(failure('pilot-message-error'));
       }
