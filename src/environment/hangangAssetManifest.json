@@ -49,7 +49,7 @@
   },
   "bridges-kit": {
     "url": "models/hangang/bridges-kit.glb",
-    "bytes": 8704,
+    "bytes": 6668,
     "bounds": {
       "min": [
         125,
@@ -58,8 +58,24 @@
       ],
       "max": [
         275,
-        13,
+        4,
         -1520
+      ]
+    }
+  },
+  "nodeul-pavilion": {
+    "url": "models/hangang/nodeul-pavilion.glb",
+    "bytes": 541164,
+    "bounds": {
+      "min": [
+        175.41558307981265,
+        3.9999965295197364,
+        -1724.5844169201873
+      ],
+      "max": [
+        224.58441692018735,
+        15.315666220326676,
+        -1675.4155830798127
       ]
     }
   }

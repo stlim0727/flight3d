@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Vector3, Quaternion, Euler, Scene } from 'three';
+import { Vector3, Quaternion, Euler, Scene, Box3 } from 'three';
 import { HangangRun } from '../src/director/HangangRun.js';
 import { HangangScenario } from '../src/director/HangangScenario.js';
 import { HANGANG_COURSE as course, riverCenter } from '../src/config/hangangCourse.js';
@@ -55,6 +55,24 @@ test('Nodeulseom island and pavilion under the central bridge are solid', () => 
   for (const run of [centralPass(18), centralPass(11, 38)]) {
     assert.equal(run.contact, null); assert.equal(run.index, 2);
   }
+});
+test('pavilion collides where its mesh stands, not across its bounding box', () => {
+  const run = new HangangRun(), island = course.nodeulseom, field = island.pavilion.heights;
+  const probe = (x, z, y) => run.nodeulseomHit(new Box3().setFromCenterAndSize(
+    new Vector3(island.x + x, y, island.z + z), new Vector3(0.4, 0.4, 0.4)));
+  let roofs = 0, open = 0;
+  field.heights.forEach((top, k) => {
+    const x = field.x0 + (k % field.cols + 0.5) * field.cell, z = field.z0 + (Math.floor(k / field.cols) + 0.5) * field.cell;
+    if (top > island.height + 1) {
+      roofs++; assert.equal(probe(x, z, top - 0.3), 'pavilion'); assert.equal(probe(x, z, top + 0.3), null);
+    } else if (Math.abs(x) < 22.5 && Math.abs(z) < 40) {
+      // Inside the former 45 x 80 m box, but only plaza or bare island here.
+      open++; assert.equal(probe(x, z, 8), null);
+    }
+  });
+  assert.ok(roofs > 800, `roof cells ${roofs}`); assert.ok(open > 800, `open cells ${open}`);
+  assert.ok(field.top > 15 && field.top < 15.5, `roof top ${field.top}`);
+  assert.equal(probe(0, 0, field.top + 0.3), null);
 });
 test('above, beside, spawn-inside, missing bridge and reversed passage fail', () => {
   for (const [x, y] of [[0, 80], [620, 19]]) {

@@ -1,0 +1,25 @@
+Sejong Complex Cultural Center - Buildings
+Author: mithgarden.studio (https://sketchfab.com/mithgarden.studio)
+Source: https://sketchfab.com/3d-models/sejong-complex-cultural-center-buildings-1d706d438464449cbcd21b447a906591
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Applies to nodeul-pavilion.glb.
+Attribution transcribed from the model's glTF asset.extras and its Sketchfab page.
+The file is the Sketchfab glTF download, unchanged:
+SHA-256 36476ab1f8c2e121ccafbf907ad1aa30f0741d3e868512a7fd8f98d9b4269b4b, 541,164 bytes.
+
+Modifications by Flight3d contributors, applied at runtime (src/environment/nodeulPavilion.js):
+- Scaled 8.5x, rotated 90 degrees about the vertical axis and placed on the
+  Nodeulseom island of the Hangang training course.
+- The BLEND facade material is rendered as an opaque alpha cut-out (alphaTest 0.5).
+- A collision heightfield (src/config/nodeulPavilionHeights.json) is derived from
+  its triangles by scripts/build-hangang-assets.mjs.
+
+The model depicts the Sejong Government Complex Cultural Center. Flight3d uses it as
+a stand-in pavilion; it does not represent the real Nodeulseom buildings.
+
+CC BY 4.0 permits redistribution (including browser delivery and repository
+inclusion) and adaptation, including commercial use, subject to attribution,
+a license link, indication of changes, and no additional restrictions.
+No endorsement by the original creator is implied.

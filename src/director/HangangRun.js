@@ -16,10 +16,6 @@ export class HangangRun {
     if (!course.bridges.length || new Set(course.bridges.map(b => b.id)).size !== course.bridges.length ||
         course.bridges.some(b => ![b.x, b.z, b.yaw].every(Number.isFinite))) throw new Error('Invalid Hangang course');
     this.course = course;
-    const island = course.nodeulseom;
-    this.pavilion = island && new THREE.Box3().setFromCenterAndSize(
-      new THREE.Vector3(...island.pavilion.center).add(new THREE.Vector3(island.x, 0, island.z)),
-      new THREE.Vector3(...island.pavilion.size));
     this.bridges = course.bridges.map(b => {
       const transform = new THREE.Matrix4().compose(new THREE.Vector3(b.x, 0, b.z),
         new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.yaw), new THREE.Vector3(1, 1, 1));
@@ -40,12 +36,25 @@ export class HangangRun {
   }
   fail(reason, contact = null) { if (contact) this.contact = contact; if (this.status === 'running') { this.status = 'failed'; this.reason = reason; } }
   get maintenancePercent() { return this.elapsed ? Math.round(100 * this.goodTime / this.elapsed) : 100; }
+  // Pavilion cells store the highest surface in each square, so a box hits when it
+  // dips below any cell it overlaps.
+  pavilionHit(box) {
+    const island = this.course.nodeulseom, field = island.pavilion.heights;
+    if (box.min.y > field.top) return false;
+    const cell = v => Math.floor(v / field.cell);
+    const i0 = Math.max(0, cell(box.min.x - island.x - field.x0)), i1 = Math.min(field.cols - 1, cell(box.max.x - island.x - field.x0));
+    const j0 = Math.max(0, cell(box.min.z - island.z - field.z0)), j1 = Math.min(field.rows - 1, cell(box.max.z - island.z - field.z0));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) if (field.heights[j * field.cols + i] >= box.min.y) return true;
+    }
+    return false;
+  }
   // The island tapers upward, so test its footprint at the box's lowest point, where
   // it is widest. Its 24-sided mesh sits just inside this ellipse.
   nodeulseomHit(box) {
     const island = this.course.nodeulseom;
     if (!island) return null;
-    if (this.pavilion.intersectsBox(box)) return 'pavilion';
+    if (this.pavilionHit(box)) return 'pavilion';
     if (box.min.y > island.height) return null;
     const r = island.bottomRadius + (island.topRadius - island.bottomRadius) * Math.max(0, box.min.y) / island.height;
     const dx = Math.max(box.min.x - island.x, 0, island.x - box.max.x) / r;

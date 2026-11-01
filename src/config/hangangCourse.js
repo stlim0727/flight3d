@@ -1,5 +1,7 @@
 // Original training scenery inspired by the Han River, NOT surveyed bridges.
 // Metres, +Y up, travel generally -Z. Geometry and gates share these dimensions.
+import pavilionHeights from './nodeulPavilionHeights.json' with { type: 'json' };
+
 export const HANGANG_COURSE = {
   id: 'hangang-training-v1', waterLevel: 0,
   spawn: [0, 19, 850], speedMs: 46,
@@ -12,10 +14,12 @@ export const HANGANG_COURSE = {
     { id: 'east', x: -120, z: -3500, yaw: -0.08, style: 'tower', color: 0x7591b4 },
   ],
   // Island under the central bridge, world-aligned. The GLB builder draws it and
-  // HangangRun collides with it from these numbers. Pavilion is island-relative.
+  // HangangRun collides with it from these numbers. The pavilion model stands on the
+  // island top at `scale`, long axis along the river; its collision heightfield is
+  // island-relative and rebaked from that GLB by scripts/build-hangang-assets.mjs.
   nodeulseom: {
     x: 200, z: -1700, height: 4, bottomRadius: 75, topRadius: 70, zScale: 2.4,
-    pavilion: { center: [0, 8.5, 0], size: [45, 9, 80] },
+    pavilion: { scale: 8.5, yaw: Math.PI / 2, heights: pavilionHeights },
   },
 };
 

@@ -22,6 +22,14 @@ Flight3d incorporates optimized open-source 3D models and atmospheric environmen
   - **Description**: Real-world scale (~11.0m wingspan, ~8.28m length) general aviation aircraft featuring high wings, fixed tricycle landing gear, articulated propeller, and detailed exterior and 3D cockpit interior with dual yokes and analog flight gauges.
   - **Modifications**: Draco mesh compression, runtime alignment, ground mooring artifact occlusion, articulated control surfaces and yokes, and cockpit eye camera calibration. See [license notice](public/models/c172.LICENSE.txt).
 
+## Scenery 3D Models
+- **Sejong Complex Cultural Center - Buildings (`public/models/hangang/nodeul-pavilion.glb`)**:
+  - **Author**: [mithgarden.studio](https://sketchfab.com/mithgarden.studio)
+  - **Source**: [Sejong Complex Cultural Center - Buildings](https://sketchfab.com/3d-models/sejong-complex-cultural-center-buildings-1d706d438464449cbcd21b447a906591)
+  - **License**: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+  - **Description**: Low-rise white-panel and glass cultural centre used as the stand-in pavilion on Nodeulseom in the Hangang course. It does not depict the real Nodeulseom buildings.
+  - **Modifications**: GLB bytes unchanged. At runtime it is scaled 8.5×, rotated 90° and placed on the island, and its BLEND facade material renders as an opaque alpha cut-out. A collision heightfield is derived from its triangles. See [license notice](public/models/hangang/nodeul-pavilion.LICENSE.txt).
+
 ## Environment Maps & Textures
 - **Kloofendal Partly Cloudy Sky HDR (`public/textures/environment/sky_1k.hdr`)**:
   - **Author**: Greg Zaal ([Poly Haven](https://polyhaven.com/a/kloofendal_48d_partly_cloudy))

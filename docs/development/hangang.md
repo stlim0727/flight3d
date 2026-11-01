@@ -59,12 +59,21 @@ reduces tunneling through thin members; it is an approximation, not exact swept
 mesh collision. Malformed or excessively discontinuous samples cannot pass.
 
 Nodeulseom sits under the central bridge opening (#378). `HANGANG_COURSE.nodeulseom`
-supplies the island (tapered elliptical cylinder, 0–4 m) and pavilion (box, 4–13 m)
-to both `scripts/build-hangang-assets.mjs` and `HangangRun`, so they are solid
-obstacles, not decoration. The centre of that opening clears the pavilion from
-about 15 m reference height; either side of it clears from 10 m. They are not
-part of the terrain heightmap and do not change the ground-effect reference, and
-the recorded gate clearance still measures only the bridge members.
+supplies the island (tapered elliptical cylinder, 0–4 m) to both
+`scripts/build-hangang-assets.mjs` and `HangangRun`, so it is a solid obstacle,
+not decoration. The pavilion on it (#381) is `nodeul-pavilion.glb`, placed by
+`placeNodeulPavilion()` at 8.5× scale with its long axis along the river: a
+49 m square plaza (4.0–4.3 m) carrying a 31 × 42 m building whose roofs reach
+15.3 m. The builder bakes `src/config/nodeulPavilionHeights.json` from that GLB's
+triangles: the highest surface in each 1 m cell, island-relative. `HangangRun`
+fails a part box that dips below any cell it overlaps, so the empty corners of the
+former 45 × 80 m box no longer collide and every roof does. `tests/nodeulPavilion.test.js`
+rebakes the field from the shipped GLB and must match the committed JSON; rerun
+the builder after changing the GLB, scale, yaw or island position. The centre of
+the opening now clears the pavilion from about 17 m reference height (fixed gear
+reaches 1.8 m below it); either side still clears from 10 m. Neither is part of
+the terrain heightmap nor changes the ground-effect reference, and the recorded
+gate clearance still measures only the bridge members.
 
 The riverbanks use sampled BufferGeometry ribbons and the skyline uses one
 InstancedMesh with 160 buildings. Scenery is cached and reused on retries.
@@ -74,8 +83,14 @@ part of a valid underpass; #267 owns detailed asset/collision contracts.
 
 ## Provenance and limits
 
-All scenery here is original procedural geometry under the repository license.
-No external bridge models, textures or map data are bundled. The UI explicitly
+All scenery here is original procedural geometry under the repository license,
+except the Nodeulseom pavilion. That is mithgarden.studio's *Sejong Complex
+Cultural Center - Buildings* (CC BY 4.0, Sketchfab), shipped byte-for-byte as
+downloaded (SHA-256 `36476ab1…9b4269b4b`, 541,164 bytes, 3 × 512 px PNG
+textures); scale, rotation and an opaque alpha cut-out are applied at runtime.
+It stands in for the real Nodeulseom music lounge and does not depict it; see
+`public/models/hangang/nodeul-pavilion.LICENSE.txt`. No external bridge models
+or map data are bundled. The UI explicitly
 labels this as **Han River inspired training scenery**, not a survey-accurate
 reproduction of named Seoul bridges. Dimensions are designed for the playable
 course. Surveyed placement, detailed GLB/PBR assets, LOD, asset fallback and
