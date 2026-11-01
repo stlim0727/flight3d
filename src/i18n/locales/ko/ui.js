@@ -265,6 +265,7 @@ export default {
   "quality.high": "높음",
   "quality.balanced": "균형",
   "quality.performance": "성능 우선",
+  "quality.ultraLow": "초저사양",
   "help.close": "도움말 닫기",
   "ap.master": "AP",
   "ap.hdg": "HDG",

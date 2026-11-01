@@ -125,10 +125,11 @@ class FlightSimulator {
     let savedQuality;
     try { savedQuality = localStorage.getItem(RENDER_QUALITY_KEY); } catch { /* Use default. */ }
     this.renderQuality = resolveRenderQuality(savedQuality);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, RENDER_QUALITY[this.renderQuality].maxDpr));
+    const initialPreset = RENDER_QUALITY[this.renderQuality];
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, initialPreset.maxDpr));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = initialPreset.shadows ?? (initialPreset.shadowMapSize > 0);
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.container.appendChild(this.renderer.domElement);
 
@@ -172,10 +173,10 @@ class FlightSimulator {
     await startupStage(2, 'startup.world');
 
     // 5. Procedural World & Real-World Environments
-    this.terrain = new Terrain(22000, 256, { quality: RENDER_QUALITY[this.renderQuality].terrain });
+    this.terrain = new Terrain(22000, initialPreset.terrainSegments ?? 256, { quality: initialPreset.terrain });
     this.scene.add(this.terrain.mesh);
 
-    this.water = new WaterOcean(36000);
+    this.water = new WaterOcean(36000, initialPreset.waterSegments ?? 180, { quality: this.renderQuality });
     this.scene.add(this.water.mesh);
 
     this.airport = new Airport();
@@ -183,6 +184,7 @@ class FlightSimulator {
     this.terrain.excludePavement(this.airport.group);
 
     this.foliage = new FoliageAndCities(this.terrain);
+    this.foliage.setQuality?.(this.renderQuality);
     this.scene.add(this.foliage.group);
 
     this.ships = new Ships(this.water, { deferAssets: true });
@@ -201,7 +203,10 @@ class FlightSimulator {
     this.currentAirport = this.airport;
 
     this.sky = new SkyAtmosphere(this.scene, this.renderer, this.water);
-    this.sky.setShadowMapSize(RENDER_QUALITY[this.renderQuality].shadowMapSize);
+    this.sky.setShadowMapSize(initialPreset.shadowMapSize);
+    if (initialPreset.clouds === false && this.sky.cloudLayer?.group) {
+      this.sky.cloudLayer.group.visible = false;
+    }
     this.foliage.setTimeOfDay(this.sky.timeOfDay);
     this.water.syncWithAtmosphere(this.sky);
 
@@ -894,8 +899,24 @@ class FlightSimulator {
     this.renderPose.apply(this.aircraft.group, this.position, this.quaternion,
       this.physicsAccumulator / this.physicsDt);
 
+    // 4. Update Cockpit Visibility & Audio
+    let isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
+    if (isCockpit && !this.cameraSystem.photoCockpit && this.aircraft.cockpit.cockpitModelFailed) {
+      // The GLTF interior is the only 3D cockpit geometry, and it never arrived.
+      // The exterior groups are hidden in this mode, so pull the view out.
+      this.cameraSystem.setMode(CameraSystem.MODES.CHASE, true);
+      isCockpit = false;
+      if (!this.interiorUnavailableWarned) {
+        this.interiorUnavailableWarned = true;
+        this.showToast(() => t('notice.cockpit.unavailable'));
+      }
+    }
+
     // 2. Update Flight Instrument Canvas Displays
-    this.updateFlightDisplays();
+    // In ultraLow mode while outside cockpit, skip 2D canvas redraws to save CPU and texture uploads.
+    if (isCockpit || this.renderQuality !== 'ultraLow') {
+      this.updateFlightDisplays();
+    }
 
     // 3. Update Environment Animations & Explosion Particles
     if (this.activeAirport !== 'lukla') {
@@ -914,21 +935,12 @@ class FlightSimulator {
       this.tireSmokeSystem.update(frameDelta);
     }
 
-    // 4. Update Cockpit Visibility & Audio
-    let isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
-    if (isCockpit && !this.cameraSystem.photoCockpit && this.aircraft.cockpit.cockpitModelFailed) {
-      // The GLTF interior is the only 3D cockpit geometry, and it never arrived.
-      // The exterior groups are hidden in this mode, so pull the view out.
-      this.cameraSystem.setMode(CameraSystem.MODES.CHASE, true);
-      isCockpit = false;
-      if (!this.interiorUnavailableWarned) {
-        this.interiorUnavailableWarned = true;
-        this.showToast(() => t('notice.cockpit.unavailable'));
-      }
-    }
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && this.cameraSystem.supportsPhotoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
+    if (!isCockpit && this.renderQuality === 'ultraLow') {
+      this.aircraft.cockpit.group.visible = false;
+    }
     // Looking forward in photo mode skips the occlusion pass entirely, so build
     // and compile it now instead of on the user's first head turn. The forced
     // cockpit sun state makes warm compile the shadow-receiving deck variants
@@ -946,11 +958,13 @@ class FlightSimulator {
     this.sky.updateCockpitSun({
       position: this.aircraft.group.position,
       quaternion: this.aircraft.group.quaternion,
-      cockpitActive: isCockpit && !isPhotoCockpit,
+      cockpitActive: isCockpit && !isPhotoCockpit && this.renderQuality !== 'ultraLow',
       dt: frameDelta,
       casterState: cockpitCasterState(this.aircraft.cockpit),
     });
-    this.aircraft.cockpit.syncLighting(this.sky, this.quaternion, frameDelta);
+    if (this.renderQuality !== 'ultraLow') {
+      this.aircraft.cockpit.syncLighting(this.sky, this.quaternion, frameDelta);
+    }
     if (this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.enabled = isPhotoCockpit && this.cameraSystem.supportsPhotoCockpit;
       if (this.cockpitPhotoOverlay.enabled) {

@@ -150,7 +150,7 @@ test('Terrain & PBR Texture Splatting System', async (t) => {
     assert.ok(shader.fragmentShader.includes('normal = transformDirection(tFinalWorldNormal, viewMatrix);'), 'Fragment shader should transform world normal into view space');
   });
 
-  await t.test('Quality Presets: High and Low modes', () => {
+  await t.test('Quality Presets: High, Low, and UltraLow modes', () => {
     const terrain = new Terrain(4000, 16, { quality: 'high' });
     assert.equal(terrain.getQuality(), 'high');
     assert.equal(terrain.material.defines.QUALITY_LOW, 0);
@@ -158,10 +158,19 @@ test('Terrain & PBR Texture Splatting System', async (t) => {
     terrain.setQuality('low');
     assert.equal(terrain.getQuality(), 'low');
     assert.equal(terrain.material.defines.QUALITY_LOW, 1);
+    assert.equal(terrain.material.defines.QUALITY_ULTRALOW, 0);
+
+    terrain.setQuality('ultraLow');
+    assert.equal(terrain.getQuality(), 'ultraLow');
+    assert.equal(terrain.material.defines.QUALITY_ULTRALOW, 1);
+    assert.equal(terrain.segments, 64);
+    assert.equal(terrain.mesh.receiveShadow, false);
 
     terrain.setQuality('high');
     assert.equal(terrain.getQuality(), 'high');
     assert.equal(terrain.material.defines.QUALITY_LOW, 0);
+    assert.equal(terrain.material.defines.QUALITY_ULTRALOW, 0);
+    assert.equal(terrain.mesh.receiveShadow, true);
 
     assert.throws(() => {
       terrain.setQuality('ultra');

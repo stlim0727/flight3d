@@ -83,4 +83,19 @@ test('WaterOcean (Camera Anchoring, Grid Snapping & Gerstner Waves)', async (t) 
     assert.ok(fs.includes('uEdgeFadeEnd'), 'Fragment shader must declare uEdgeFadeEnd uniform');
     assert.ok(fs.includes('max(abs(vLocalPos.x), abs(vLocalPos.y))'), 'Fragment shader must compute edgeDist from vLocalPos');
   });
+
+  await t.test('ultraLow quality switches to single quad mesh and WATER_FLAT define', () => {
+    const ocean = new WaterOcean(36000, 180);
+    assert.equal(ocean.segments, 180);
+    assert.equal(ocean.material.defines?.WATER_FLAT, 0);
+
+    ocean.setQuality('ultraLow');
+    assert.equal(ocean.segments, 1);
+    assert.equal(ocean.material.defines.WATER_FLAT, 1);
+    assert.equal(ocean.geometry.attributes.position.count, 4);
+
+    ocean.setQuality('high');
+    assert.equal(ocean.segments, 180);
+    assert.equal(ocean.material.defines.WATER_FLAT, 0);
+  });
 });

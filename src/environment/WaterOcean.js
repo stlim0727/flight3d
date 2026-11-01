@@ -6,9 +6,10 @@ import * as THREE from 'three';
  * deep oceanic color absorption, and wave height query for floating ships.
  */
 export class WaterOcean {
-  constructor(size = 36000, segments = 180) {
+  constructor(size = 36000, segments = 180, options = {}) {
     this.size = size;
-    this.segments = segments;
+    this.quality = options.quality ?? 'high';
+    this.segments = this.quality === 'ultraLow' ? 1 : segments;
     this.snapStep = this.size / this.segments;
     this.waterLevel = 0.0;
     this.sunDirection = new THREE.Vector3(0.5, 0.6, 0.4).normalize();
@@ -17,12 +18,15 @@ export class WaterOcean {
   }
 
   initWater() {
-    // High-resolution plane geometry for wave displacement
-    const geom = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
-    geom.rotateX(-Math.PI * 0.5);
+    // Plane geometry for water
+    this.geometry = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
+    this.geometry.rotateX(-Math.PI * 0.5);
 
     // Broad geometry swell and filtered fragment detail share world-space coordinates.
     this.material = new THREE.ShaderMaterial({
+      defines: {
+        WATER_FLAT: this.quality === 'ultraLow' ? 1 : 0
+      },
       uniforms: {
         uTime: { value: 0 },
         uSunDir: { value: this.sunDirection },
@@ -66,10 +70,14 @@ export class WaterOcean {
           vec4 baseWorldPos = modelMatrix * vec4(pos, 1.0);
           vec2 worldXZ = baseWorldPos.xz;
 
-          // Only broad swell belongs on the 200m grid. Short waves are shaded per pixel.
-          vec3 totalDisplacement = gerstnerWave(normalize(vec2(1.0, 0.4)), 0.0024, 1600.0, 1.0, worldXZ, uTime)
-                                 + gerstnerWave(normalize(vec2(-0.6, 0.8)), 0.0024, 900.0, 1.2, worldXZ, uTime);
-          vec3 displacedWorld = baseWorldPos.xyz + totalDisplacement;
+          #if defined(WATER_FLAT) && WATER_FLAT == 1
+            vec3 displacedWorld = baseWorldPos.xyz;
+          #else
+            // Only broad swell belongs on the 200m grid. Short waves are shaded per pixel.
+            vec3 totalDisplacement = gerstnerWave(normalize(vec2(1.0, 0.4)), 0.0024, 1600.0, 1.0, worldXZ, uTime)
+                                   + gerstnerWave(normalize(vec2(-0.6, 0.8)), 0.0024, 900.0, 1.2, worldXZ, uTime);
+            vec3 displacedWorld = baseWorldPos.xyz + totalDisplacement;
+          #endif
 
           vWorldPos = displacedWorld;
           gl_Position = projectionMatrix * viewMatrix * vec4(displacedWorld, 1.0);
@@ -188,8 +196,29 @@ export class WaterOcean {
       depthWrite: true
     });
 
-    this.mesh = new THREE.Mesh(geom, this.material);
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.position.y = this.waterLevel;
+  }
+
+  setQuality(quality) {
+    this.quality = quality;
+    const isUltraLow = quality === 'ultraLow';
+    if (this.material?.defines) {
+      this.material.defines.WATER_FLAT = isUltraLow ? 1 : 0;
+      this.material.needsUpdate = true;
+    }
+    const targetSegments = isUltraLow ? 1 : 180;
+    if (this.segments !== targetSegments) {
+      this.segments = targetSegments;
+      this.snapStep = this.size / this.segments;
+      const oldGeom = this.geometry;
+      this.geometry = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
+      this.geometry.rotateX(-Math.PI * 0.5);
+      if (this.mesh) {
+        this.mesh.geometry = this.geometry;
+      }
+      oldGeom?.dispose();
+    }
   }
 
   /**

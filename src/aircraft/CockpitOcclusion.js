@@ -126,7 +126,7 @@ export class CockpitOcclusion {
   }
 
   canWarm(quality) {
-    return !this.pass && this.enabled && quality !== 'performance' && this.cockpit.gltfCockpitLoaded;
+    return !this.pass && this.enabled && quality !== 'performance' && quality !== 'ultraLow' && this.cockpit.gltfCockpitLoaded;
   }
 
   // Photo mode looking forward never runs render(), so a lazy init() would land
