@@ -159,6 +159,9 @@ export class TouchFlightControls {
           <button type="button" id="touch-btn-gyro" class="btn-touch-pill" title="기기 기울기 자이로 센서 모드" data-i18n-title="gyroscope.device.tilt.mode">
             <span class="pill-icon">📱</span> GYRO
           </button>
+          <button type="button" id="touch-btn-recenter" class="btn-touch-pill touch-btn-recenter" title="자이로 수평 영점 즉시 재설정" data-i18n-title="gyro.recenter" hidden>
+            <span class="pill-icon">🎯</span> <span data-i18n="gyro.recenter">영점</span>
+          </button>
 
           <!-- Virtual Flight Stick Yoke -->
           <div class="touch-stick-card">
@@ -193,6 +196,7 @@ export class TouchFlightControls {
     this.rudderThumb = el.querySelector('#touch-rudder-thumb');
     this.brakeBtn = el.querySelector('#touch-btn-brake');
     this.gyroBtn = el.querySelector('#touch-btn-gyro');
+    this.recenterBtn = el.querySelector('#touch-btn-recenter');
     this.stickTelemetry = el.querySelector('#touch-stick-telemetry');
     this.rudderReadout = el.querySelector('#touch-rudder-val');
   }
@@ -250,8 +254,21 @@ export class TouchFlightControls {
     this.brakeBtn.addEventListener('pointercancel', stopBraking);
     this.brakeBtn.addEventListener('pointerleave', stopBraking);
 
-    // 5. Gyroscope Toggle Button
+    // 5. Gyroscope Toggle Button & Quick Recenter Floating Button
     this.gyroBtn?.addEventListener('click', () => this.toggleGyro());
+    this.recenterBtn?.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      this.quickRecenterGyro();
+    });
+  }
+
+  quickRecenterGyro() {
+    this.recenterGyro();
+    this.triggerHaptic([35, 25, 35]);
+    if (this.recenterBtn) {
+      this.recenterBtn.classList.add('pulse');
+      setTimeout(() => this.recenterBtn?.classList.remove('pulse'), 350);
+    }
   }
 
   initGyroSettings() {
@@ -664,6 +681,7 @@ export class TouchFlightControls {
     this.gyroActive = true;
     this.gyroPending = true;
     if (this.gyroSettings) this.gyroSettings.hidden = false;
+    if (this.recenterBtn) this.recenterBtn.hidden = false;
     window.screen?.orientation?.addEventListener('change', this.onGyroScreenChange);
     window.addEventListener('orientationchange', this.onGyroScreenChange);
     this.recenterGyro();
@@ -691,6 +709,7 @@ export class TouchFlightControls {
     window.removeEventListener('orientationchange', this.onGyroScreenChange);
     this.releaseGyroLock();
     if (this.gyroSettings) this.gyroSettings.hidden = true;
+    if (this.recenterBtn) this.recenterBtn.hidden = true;
     this.gyroCalibration = null;
     if (this.gyroBtn) {
       this.gyroBtn.classList.remove('active');

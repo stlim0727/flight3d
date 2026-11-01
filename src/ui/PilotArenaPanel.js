@@ -68,6 +68,8 @@ export function installPilotArena(sim) {
   document.body.append(scoreOverlay);
   let shownOverlayRecord = null;
   let selectedRetryMode = 'human';
+  const scoreboard = new ValleyScoreboard(typeof window !== 'undefined' ? window.localStorage : null);
+  let savedRecord = null;
   const hideScoreOverlay = () => { scoreOverlay.hidden = true; };
   const returnToLobbyMenu = () => {
     hideScoreOverlay();
@@ -84,6 +86,18 @@ export function installPilotArena(sim) {
     }
   };
   scoreOverlay.addEventListener('click', event => {
+    if (event.target.closest('[data-save-callsign]')) {
+      const input = scoreOverlay.querySelector('[data-score-callsign]');
+      if (input && savedRecord) {
+        const newCallsign = scoreboard.saveCallsign(input.value);
+        scoreboard.updateCallsign(savedRecord.id, newCallsign);
+        renderBoard();
+        const missionLabel = find('mission').selectedOptions[0]?.textContent ?? '계곡 미션';
+        const refreshed = formatPilotScoreData(shownOverlayRecord, missionLabel, { scoreboard, callsign: newCallsign });
+        scoreOverlay.innerHTML = scoreOverlayMarkup(refreshed);
+      }
+      return;
+    }
     const modeBtn = event.target.closest('[data-score-mode]');
     if (modeBtn) {
       selectedRetryMode = modeBtn.dataset.scoreMode;
@@ -110,6 +124,11 @@ export function installPilotArena(sim) {
       returnToLobbyMenu();
     }
   });
+  scoreOverlay.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && event.target.matches('[data-score-callsign]')) {
+      scoreOverlay.querySelector('[data-save-callsign]')?.click();
+    }
+  });
   window.addEventListener('keydown', event => {
     if (event.key === 'Escape' && !scoreOverlay.hidden) {
       returnToLobbyMenu();
@@ -118,11 +137,6 @@ export function installPilotArena(sim) {
   find('score-banner').addEventListener('click', event => {
     if (event.target.closest('[data-banner-retry]')) find('run').click();
   });
-  const scoreboard = new ValleyScoreboard({
-    getItem: key => window.localStorage.getItem(key),
-    setItem: (key, value) => window.localStorage.setItem(key, value),
-  });
-  let savedRecord = null;
   const renderBoard = comparisonKey => {
     const rows = scoreboard.read().filter(r => !comparisonKey || r.comparisonKey === comparisonKey);
     rows.sort((a, b) => {
@@ -187,8 +201,17 @@ export function installPilotArena(sim) {
       const active = runner.active;
       const isHuman = record.pilotKind === 'human';
       const pilotTag = isHuman ? '사람' : 'AI';
+      const valley = record.manifest?.type === 'valley' || record.manifest?.id?.startsWith('valley-');
+
+      if (!active && savedRecord !== record && valley) {
+        savedRecord = record;
+        const attempt = scoreboard.add(record, { callsign: scoreboard.getSavedCallsign() });
+        record.id = attempt?.id;
+        renderBoard(attempt?.comparisonKey);
+      }
+
       const missionLabel = find('mission').selectedOptions[0]?.textContent ?? '계곡 미션';
-      const scoreData = !active && record ? formatPilotScoreData(record, missionLabel) : null;
+      const scoreData = !active && record ? formatPilotScoreData(record, missionLabel, { scoreboard }) : null;
 
       if (active) {
         find('compact-status').textContent = `${pilotTag} · 비행 중 · ${(record.tick / 120).toFixed(1)}초`;
@@ -234,14 +257,8 @@ export function installPilotArena(sim) {
 
       if (!active) find('result').textContent = JSON.stringify(record.result?.metrics ?? { detail: record.detail ?? record.reason }, null, 2);
       if (!active) syncMode();
-      const valley = record.manifest?.type === 'valley';
       navigationHud.hidden = !valley || !active;
       if (valley) navigationHud.textContent = valleyNavigationText(record.observations.at(-1)?.observation.navigation);
-      if (!active && savedRecord !== record && record.manifest?.type === 'valley') {
-        savedRecord = record;
-        const attempt = scoreboard.add(record);
-        renderBoard(attempt?.comparisonKey);
-      }
       const points = record.poses.map(p => `${Math.max(0, Math.min(400, (p.runwayS + (valley ? 0 : 3500)) / (valley ? record.manifest.courseLengthM : 6500) * 400))},${50 + Math.max(-45, Math.min(45, p.centerlineOffsetM * (valley ? 0.1 : 1)))}`).join(' ');
       find('plot').querySelector('polyline').setAttribute('points', points);
     },

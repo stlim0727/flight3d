@@ -203,6 +203,21 @@
   box-shadow: 0 0 14px rgba(16, 185, 129, 0.6);
 }
 
+.touch-btn-recenter {
+  background: rgba(14, 116, 144, 0.85);
+  border: 1px solid #06b6d4;
+  color: #ecfeff;
+  box-shadow: 0 0 14px rgba(6, 182, 212, 0.45);
+}
+.touch-btn-recenter:active,
+.touch-btn-recenter.pulse {
+  background: #0891b2;
+  border-color: #22d3ee;
+  color: #ffffff;
+  transform: scale(0.92);
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.8);
+}
+
 /* Center Quadrant: Rudder & Brakes */
 .touch-center {
   flex-direction: column;
