@@ -40,7 +40,7 @@ test('formatPilotScoreData handles valley slalom success with large altitude sco
   assert.equal(data.durationText, '46.5초');
   assert.match(data.badgeText, /AI.*완주/);
   assert.equal(data.stats.some(s => s.label === '조종 구분' && s.value === 'AI 파일럿'), true);
-  assert.equal(data.stats.some(s => s.label === '소요 시간' && s.value === '46.5초'), true);
+  assert.equal(data.stats.some(s => s.label === '완주 시간' && s.value === '46.5초'), true);
   assert.equal(data.stats.some(s => s.label === '평균 속도' && s.value === '278 KT'), true);
   assert.equal(data.stats.some(s => s.label === '최고 속도' && s.value === '285 KT'), true);
   assert.equal(data.stats.some(s => s.label === '경유지' && s.value === '6 / 6 완주'), true);

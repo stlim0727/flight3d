@@ -67,15 +67,15 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
       if (Number.isFinite(m.finalScore)) {
         mainValue = m.finalScore.toLocaleString('ko-KR');
         mainUnit = '점';
-        subtext = '빠를수록 고득점 · 저공 유지 및 게이트 통과율 반영';
+        subtext = '완주 시간 단축 시 고득점 · 100 m 초과 고도 페널티';
       } else {
         mainValue = m.altitudeCostM != null ? m.altitudeCostM.toFixed(2) : '완주';
         mainUnit = m.altitudeCostM != null ? 'm' : '';
-        const targetAgl = record.manifest?.course?.targetAglM ?? 35;
+        const targetAgl = record.manifest?.course?.targetAglM ?? 100;
         subtext = `낮을수록 우수 · ${targetAgl} m 초과 고도 페널티`;
       }
       stats.push({ label: '조종 구분', value: pilotRoleText });
-      stats.push({ label: '소요 시간', value: durationText });
+      stats.push({ label: '완주 시간', value: durationText });
       if (Number.isFinite(m.meanIasKnots)) stats.push({ label: '평균 속도', value: `${Math.round(m.meanIasKnots)} KT` });
       if (Number.isFinite(m.maxIasKnots)) stats.push({ label: '최고 속도', value: `${Math.round(m.maxIasKnots)} KT` });
       const cleared = m.clearedGates ?? m.completedGates ?? 6;
@@ -83,7 +83,7 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
       stats.push({ label: '경유지', value: `${cleared} / ${total} 완주` });
       if (Number.isFinite(m.medianAglM)) stats.push({ label: '중위 고도', value: `${Math.round(m.medianAglM)} m` });
       if (Number.isFinite(m.minAglM)) stats.push({ label: '최저 고도', value: `${Math.round(m.minAglM)} m` });
-      if (Number.isFinite(m.altitudeCostM)) stats.push({ label: '저공 페널티', value: `${m.altitudeCostM.toFixed(1)} m` });
+      if (Number.isFinite(m.altitudeCostM)) stats.push({ label: '100m 초과 고도', value: `${m.altitudeCostM.toFixed(1)} m` });
       if (m.totalPenalties > 0) stats.push({ label: '제약 감점', value: `-${m.totalPenalties.toLocaleString('ko-KR')}점` });
     } else if (isFailed) {
       badgeText = `${pilotPrefix} · ⚠️ 미션 실패`;

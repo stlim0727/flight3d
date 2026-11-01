@@ -53,7 +53,8 @@ export class ValleyMission {
     const c = this.manifest.course;
     const strict = Boolean(this.manifest.strictConstraints);
 
-    if (s.aglM < c.minimumAglM) {
+    const minAgl = c.minimumAglM ?? 0;
+    if (minAgl > 0 && s.aglM < minAgl) {
       if (strict) return this.finish('failed', 'clearance-floor');
       this.lowClearanceTicks++;
     }
@@ -120,18 +121,18 @@ export class ValleyMission {
     const altitudeCostM = 0.7 * meanExcessM + 0.3 * p95ExcessM;
     const durationSeconds = this.tick / this.manifest.physicsHz;
 
-    const baseScore = 5000;
+    const baseScore = 2000;
     const gateScore = this.clearedGates * 500;
-    const speedScore = meanIasKnots ? Math.round(meanIasKnots * 15) : 0;
-    const timeBonus = Math.max(0, Math.round((70 - durationSeconds) * 50));
-    const altitudeScore = Math.max(0, Math.round(3000 - altitudeCostM * 10));
+    const timeScore = Math.max(0, Math.round((90 - durationSeconds) * 250));
+    const speedScore = meanIasKnots ? Math.round(meanIasKnots * 10) : 0;
+    const altitudePenalty = Math.round(altitudeCostM * 25);
     const missedGatePenalty = this.missedGates * 500;
     const lowClearancePenalty = Math.round((this.lowClearanceTicks / this.manifest.physicsHz) * 50);
     const offCoursePenalty = Math.round((this.offCourseTicks / this.manifest.physicsHz) * 50);
     const underSpeedPenalty = Math.round((this.underSpeedTicks / this.manifest.physicsHz) * 30);
-    const totalPenalties = missedGatePenalty + lowClearancePenalty + offCoursePenalty + underSpeedPenalty;
+    const totalPenalties = altitudePenalty + missedGatePenalty + lowClearancePenalty + offCoursePenalty + underSpeedPenalty;
     const finalScore = this.status === 'succeeded'
-      ? Math.max(0, Math.round(baseScore + gateScore + speedScore + timeBonus + altitudeScore - totalPenalties))
+      ? Math.max(0, Math.round(baseScore + gateScore + timeScore + speedScore - totalPenalties))
       : null;
 
     return { status: this.status, reason: this.reason, tick: this.tick, metrics: {
@@ -145,9 +146,9 @@ export class ValleyMission {
       medianAglM: quantile(this.samples, 0.5, s => s.aglM),
       altitudeCostM: this.status === 'succeeded' ? altitudeCostM : null,
       finalScore,
+      timeScore,
       speedScore,
-      timeBonus,
-      altitudeScore,
+      altitudePenalty,
       totalPenalties,
       rulesVersion: this.manifest.rulesVersion,
       durationSeconds,

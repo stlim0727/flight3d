@@ -47,13 +47,13 @@ export function projectValleyPosition(course, position) {
 
 export function createValleyManifest(overrides = {}) {
   const manifest = {
-    id: 'valley-low-v1', type: 'valley', rulesVersion: '1.2.0',
+    id: 'valley-low-v1', type: 'valley', rulesVersion: '1.3.0',
     aircraftId: 'F16', airportId: 'lukla', physicsHz: 120, decisionPeriodTicks: 24,
     timeoutTicks: 10800, minimumIasKnots: 180, maximumIasKnots: 450,
     strictConstraints: false,
     environmentProfile: 'mild-disturbance-v1', calibration: 'pending',
     course: { points: structuredClone(POINTS), corridorHalfWidthM: 400,
-      gateHalfWidthM: 200, startRadiusM: 50, binSizeM: 25, targetAglM: 35, minimumAglM: 20 },
+      gateHalfWidthM: 200, startRadiusM: 50, binSizeM: 25, targetAglM: 100, minimumAglM: 0 },
     spawn: { x: -1700, z: 500, aglM: 70, headingDeg: 183.17983011986425,
       iasKnots: 260, flightPathAngleDeg: 0 },
     terrain: { profile: 'copernicus-lukla-1025-v1', sampleSpacingM: 42.96875,
@@ -68,17 +68,19 @@ export function createValleyManifest(overrides = {}) {
 
 export function validateValleyManifest(m) {
   const c = m?.course;
+  const minAglM = c?.minimumAglM ?? 0;
   if (m?.type !== 'valley' || m.aircraftId !== 'F16' || m.airportId !== 'lukla' ||
       m.physicsHz !== 120 || m.decisionPeriodTicks !== 24 || !Number.isSafeInteger(m.timeoutTicks) || m.timeoutTicks < 2 ||
       !Number.isFinite(m.minimumIasKnots) || !Number.isFinite(m.maximumIasKnots) ||
       m.minimumIasKnots <= 0 || m.maximumIasKnots < m.minimumIasKnots || !c ||
       !Array.isArray(c.points) || c.points.length < 2 ||
       c.points.some(p => !Number.isFinite(p?.x) || !Number.isFinite(p?.z) || Math.abs(p.x) > 21000 || Math.abs(p.z) > 21000) ||
-      !['corridorHalfWidthM', 'gateHalfWidthM', 'startRadiusM', 'binSizeM', 'targetAglM', 'minimumAglM'].every(k => Number.isFinite(c[k]) && c[k] > 0) ||
-      c.gateHalfWidthM > c.corridorHalfWidthM || c.minimumAglM >= c.targetAglM ||
+      !['corridorHalfWidthM', 'gateHalfWidthM', 'startRadiusM', 'binSizeM', 'targetAglM'].every(k => Number.isFinite(c[k]) && c[k] > 0) ||
+      !Number.isFinite(minAglM) || minAglM < 0 || minAglM >= c.targetAglM ||
+      c.gateHalfWidthM > c.corridorHalfWidthM ||
       valleyLegs(c).some(leg => leg.lengthM < 100) || !m.spawn ||
       !['x', 'z', 'aglM', 'headingDeg', 'iasKnots', 'flightPathAngleDeg'].every(k => Number.isFinite(m.spawn[k])) ||
-      m.spawn.aglM < c.minimumAglM || m.spawn.iasKnots < m.minimumIasKnots || m.spawn.iasKnots > m.maximumIasKnots ||
+      m.spawn.aglM < minAglM || m.spawn.iasKnots < m.minimumIasKnots || m.spawn.iasKnots > m.maximumIasKnots ||
       Math.hypot(m.spawn.x - c.points[0].x, m.spawn.z - c.points[0].z) > c.startRadiusM) {
     throw new TypeError('Invalid valley mission manifest');
   }
