@@ -61,7 +61,7 @@ export class HangangScene {
     const roadMat = new THREE.MeshStandardMaterial({ color: 0x1f2428, roughness: 0.9 });
     const pierLightMat = new THREE.MeshBasicMaterial({ color: 0xffb35a });
 
-    this.bridges = course.bridges.map((bridge, index) => {
+    this.bridges = course.bridges.map(bridge => {
       const group = new THREE.Group();
       group.position.set(bridge.x, 0, bridge.z);
       group.rotation.y = bridge.yaw;
@@ -140,34 +140,6 @@ export class HangangScene {
         marker.position.set(x, 31, 10.2);
         group.add(marker);
       }
-
-      // Gate number signboard
-      let signMat;
-      if (typeof document !== 'undefined') {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256; canvas.height = 128;
-        const context = canvas.getContext('2d');
-        if (context) {
-          context.fillStyle = '#0f2630';
-          context.fillRect(0, 0, 256, 128);
-          context.strokeStyle = '#ffb330';
-          context.lineWidth = 6;
-          context.strokeRect(4, 4, 248, 120);
-          context.fillStyle = '#ffe0a0';
-          context.font = 'bold 70px sans-serif';
-          context.textAlign = 'center';
-          context.fillText(String(index + 1).padStart(2, '0'), 128, 88);
-        }
-        signMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas) });
-      } else {
-        signMat = new THREE.MeshBasicMaterial({ color: 0x163642 });
-      }
-      const sign = new THREE.Mesh(
-        new THREE.PlaneGeometry(15, 7.5),
-        signMat
-      );
-      sign.position.set(0, 43, 11.4);
-      group.add(sign);
 
       this.group.add(group);
       return group;

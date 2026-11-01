@@ -415,7 +415,6 @@ class PhysicsIntegratorMethods {
   triggerCrash(crashResult, impactVelocity = this.linearVelocity) {
     if (this.isCrashed) return;
     this.isCrashed = true;
-    if (this.hangang?.active) this.hangang.run.fail('contact');
     this.flightWarnings.reset();
     this.telemetry.warnings = [];
     this.crashResult = crashResult;

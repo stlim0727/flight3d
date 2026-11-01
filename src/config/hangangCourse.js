@@ -1,20 +1,17 @@
 // Original training scenery inspired by the Han River, NOT surveyed bridges.
-// Metres, +Y up, travel generally -Z. Geometry and gates share these dimensions.
+// Metres, +Y up, travel generally -Z. Geometry and collision share these dimensions.
 import pavilionHeights from './nodeulPavilionHeights.json' with { type: 'json' };
 
 export const HANGANG_COURSE = {
   id: 'hangang-training-v1', waterLevel: 0,
   spawn: [0, 19, 850], speedMs: 46,
-  minHeight: 10, maxHeight: 28, maxVerticalSpeed: 3,
-  minSpeedMs: 35, maxSpeedMs: 58, maxBankDeg: 12,
-  excursionLimitSec: 8, recoverySec: 4, finishDistanceM: 220,
   bridges: [
     { id: 'west', x: 0, z: 0, yaw: 0, style: 'girder', color: 0x779993 },
     { id: 'central', x: 200, z: -1700, yaw: 0.10, style: 'arch', color: 0xc77153 },
     { id: 'east', x: -120, z: -3500, yaw: -0.08, style: 'tower', color: 0x7591b4 },
   ],
   // Island under the central bridge, world-aligned. The GLB builder draws it and
-  // HangangRun collides with it from these numbers. The pavilion model stands on the
+  // HangangCollision collides with it from these numbers. The pavilion model stands on the
   // island top at `scale`, long axis along the river; its collision heightfield is
   // island-relative and rebaked from that GLB by scripts/build-hangang-assets.mjs.
   nodeulseom: {
@@ -39,7 +36,7 @@ export function hangangHeight(x, z) {
   return d < 450 ? 0 : Math.min(8, (d - 450) * 0.2);
 }
 
-// Local bridge X spans the river, Z crosses the deck. Clear central gate 100 x 34 m.
+// Local bridge X spans the river, Z crosses the deck. Clear central opening 100 x 34 m.
 export function bridgeSolids(bridge) {
   const boxes = [{ part: 'deck', center: [0, 38, 0], size: [1200, 4, 22] }];
   for (const x of [-550, -350, -150, -55, 55, 150, 350, 550]) {

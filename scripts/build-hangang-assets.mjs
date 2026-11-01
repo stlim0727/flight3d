@@ -301,7 +301,7 @@ function buildBridgesModel() {
   const group = new THREE.Group();
   group.name = 'Bridges_Kit';
 
-  // Nodeulseom Island; HangangRun collides with the same course data.
+  // Nodeulseom Island; HangangCollision collides with the same course data.
   const island = HANGANG_COURSE.nodeulseom;
   const nodeul = new THREE.Group();
   nodeul.position.set(island.x, 0, island.z);

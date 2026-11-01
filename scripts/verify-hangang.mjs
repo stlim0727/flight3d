@@ -70,7 +70,7 @@ try {
     }
     const initial = { region:s.activeAirport, preset:s.lastPresetType, aircraft:s.currentAircraftId, mass:s.aero.mass, throttle:s.controls.throttle, trim:s.controls.pitchTrim, position:s.position.toArray() };
     s.stepSimulation(5);
-    return {initial,status:s.hangang.run.status,reason:s.hangang.run.reason,position:s.position.toArray(),speed:s.linearVelocity.length(),pitch:s.telemetry.pitchDeg,crashed:s.isCrashed};
+    return {initial,contact:s.hangang.collision.contact,position:s.position.toArray(),speed:s.linearVelocity.length(),pitch:s.telemetry.pitchDeg,crashed:s.isCrashed};
   });
   await delay(500); await capture('approach');
   const flight = await evaluate(async () => {
@@ -78,24 +78,32 @@ try {
     const {riverCenter}=await import('/src/config/hangangCourse.js');
     const s=window.simulator;
     // Test pilot drives only ordinary control inputs. No state teleport or force override.
-    for(let i=0;i<2400 && s.hangang.run.status==='running';i++) {
-      const tel=s.telemetry;
-      const lookZ=s.position.z-180;
-      const heading=Math.atan2(riverCenter(lookZ)-s.position.x,180)*180/Math.PI;
-      const error=((heading-tel.headingDeg+540)%360)-180;
-      flyBank(s,Math.max(-18,Math.min(18,error*1.2)),tel);
-      flyVerticalPath(s,Math.max(-1.5,Math.min(1.5,(19-s.position.y)*0.5)),89,tel);
-      s.controls.setVirtualInput('rudder',Math.max(-0.2,Math.min(0.2,-s.aero.beta*2)));
-      s.stepSimulation(0.05);
-    }
+    // Under all three bridges along the river, then a long climb far above the former
+    // 28 m ceiling: free flight (#391) must not end the run without contact.
+    const fly=(seconds,height,keepGoing=()=>true)=>{
+      for(let i=0;i<seconds/0.05 && !s.isCrashed && keepGoing();i++) {
+        const tel=s.telemetry;
+        const lookZ=s.position.z-180;
+        const heading=Math.atan2(riverCenter(lookZ)-s.position.x,180)*180/Math.PI;
+        const error=((heading-tel.headingDeg+540)%360)-180;
+        flyBank(s,Math.max(-18,Math.min(18,error*1.2)),tel);
+        flyVerticalPath(s,Math.max(-1.5,Math.min(1.5,(height-s.position.y)*0.5)),89,tel);
+        s.controls.setVirtualInput('rudder',Math.max(-0.2,Math.min(0.2,-s.aero.beta*2)));
+        s.stepSimulation(0.05);
+      }
+    };
+    fly(120,19,()=>s.position.z>-3700);
+    const bridges={contact:s.hangang.collision.contact,crashed:s.isCrashed,position:s.position.toArray()};
+    fly(30,60);
     s.controls.clearVirtualInputs();
-    return {status:s.hangang.run.status,reason:s.hangang.run.reason,index:s.hangang.run.index,position:s.position.toArray(),gaps:s.hangang.run.clearances,maintenance:s.hangang.run.maintenancePercent,elapsed:s.hangang.run.elapsed};
+    return {bridges,contact:s.hangang.collision.contact,crashed:s.isCrashed,active:s.hangang.active,
+      position:s.position.toArray(),height:s.position.y};
   });
   await delay(300);await capture('finish');
   const lifecycle=await evaluate(async()=>{
     const s=window.simulator;
     s.gameFlow.pause();document.getElementById('btn-pause-restart').click();
-    const reset=s.hangang.run.index===0 && s.hangang.run.status==='running';
+    const reset=s.hangang.collision.contact===null && !s.isCrashed;
     s.autopilot.master=true;s.stepSimulation(0.1);
     const manual=!s.autopilot.master;
     const noDemo=s.demoDirector.start()===false && !s.demoDirector.isActive;
@@ -119,7 +127,7 @@ try {
   const failure=await evaluate(()=>{
     const s=window.simulator;s.controls.setVirtualInput('elevator',-0.8);
     s.stepSimulation(6);
-    return {crashed:s.isCrashed,status:s.hangang.run.status,reason:s.hangang.run.reason,contact:s.hangang.run.contact};
+    return {crashed:s.isCrashed,contact:s.hangang.collision.contact};
   });
   await delay(300);await capture('failure');
   const retry = await evaluate(()=>{
@@ -129,7 +137,7 @@ try {
     document.getElementById('btn-fly').click();
     s.stepSimulation(0.1);
     return {crashToMenu,healthy:!s.isCrashed && !s.aero.isStalled, trauma:s.cameraSystem.trauma,
-      reset:s.hangang.run.index===0, altitude:s.telemetry.radioAltFt};
+      reset:s.hangang.collision.contact===null, altitude:s.telemetry.radioAltFt};
   });
   await send('Emulation.setDeviceMetricsOverride',{width:412,height:915,deviceScaleFactor:1,mobile:true});
   await delay(3500);await capture('mobile');
@@ -152,7 +160,9 @@ try {
   await writeFile(join(directory,'results.json'),JSON.stringify({result,flight,lifecycle,failure,retry,menu,restored,exceptions},null,2));
   console.log(JSON.stringify({result,flight,lifecycle,failure,retry,menu,restored,exceptions}));
   assert.equal(result.initial.aircraft,'C172');assert.equal(result.initial.preset,'hangang');
-  assert.equal(failure.status,'failed');assert.equal(failure.crashed,true);assert.equal(flight.status,'complete');assert.equal(flight.index,3);
+  assert.equal(failure.crashed,true);assert.equal(failure.contact?.structure,'water');
+  assert.equal(flight.bridges.contact,null);assert.equal(flight.bridges.crashed,false);assert.ok(flight.bridges.position[2]<=-3700);
+  assert.equal(flight.contact,null);assert.equal(flight.crashed,false);assert.ok(flight.active);assert.ok(flight.height>40);
   assert.ok(Object.values(lifecycle).every(Boolean));assert.equal(exceptions.length,0);
   assert.ok(retry.crashToMenu && retry.healthy && retry.reset);assert.equal(retry.trauma,0);assert.ok(retry.altitude>50);
 } finally {

@@ -8,10 +8,10 @@ export function pavilionMatrix(island) {
     new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw), new THREE.Vector3(scale, scale, scale));
 }
 
-// HangangRun collides with the island and pavilion from course data whether or not
+// HangangCollision collides with the island and pavilion from course data whether or not
 // their GLBs have loaded, so these stand-ins show the same solids until they do.
 // The island mirrors scripts/build-hangang-assets.mjs; the pavilion draws one block
-// per heightfield cell, which is exactly the surface HangangRun tests against.
+// per heightfield cell, which is exactly the surface HangangCollision tests against.
 export function createNodeulseomStandIns(island) {
   const islandGeo = new THREE.CylinderGeometry(island.topRadius, island.bottomRadius, island.height, 24);
   islandGeo.scale(1, 1, island.zScale);
