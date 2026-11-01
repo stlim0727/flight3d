@@ -1,0 +1,45 @@
+/* Share the measured dock boundary so the pilot toggle clears both control rows. */
+#pilot-arena {
+  --pilot-top: calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + 100px)) + var(--flight-alert-space, 0px));
+  position: fixed;
+  top: var(--pilot-top);
+  right: var(--edge-right, max(8px, env(safe-area-inset-right)));
+  z-index: 1200;
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - 24px));
+  max-height: calc(100dvh - var(--pilot-top) - var(--edge-bottom, 8px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 8px 12px;
+  color: #eef5fb;
+  background: #101e2bf5;
+  border: 1px solid #526879;
+  border-radius: 10px;
+  font: 13px/1.5 system-ui;
+}
+#pilot-arena:not([open]) { width: max-content; max-width: calc(100vw - 24px); }
+#pilot-arena > summary {
+  position: sticky;
+  top: -8px;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  list-style: none;
+  user-select: none;
+  background: #101e2b;
+}
+#pilot-arena summary { cursor: pointer; font-weight: 700; }
+#pilot-arena > summary::-webkit-details-marker { display: none; }
+#pilot-arena > summary > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+#pilot-arena [data-toggle-label] { color: #63e3b4; white-space: nowrap; }
+#pilot-arena label { display: block; margin: 8px 0; }
+#pilot-arena input, #pilot-arena select, #pilot-arena textarea { box-sizing: border-box; max-width: 100%; }
+#pilot-arena textarea { display: block; width: 100%; font: 11px/1.4 monospace; background: #09131c; color: #d6eefb; }
+#pilot-arena button { margin: 4px; padding: 6px; cursor: pointer; }
+#pilot-arena svg { width: 100%; height: 90px; background: #071019; }
+#pilot-arena pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+#pilot-arena [data-log], #pilot-arena [data-telemetry] { max-height: 180px; overflow: auto; background: #071019; padding: 8px; }

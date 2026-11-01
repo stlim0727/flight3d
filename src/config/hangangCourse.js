@@ -11,6 +11,12 @@ export const HANGANG_COURSE = {
     { id: 'central', x: 200, z: -1700, yaw: 0.10, style: 'arch', color: 0xc77153 },
     { id: 'east', x: -120, z: -3500, yaw: -0.08, style: 'tower', color: 0x7591b4 },
   ],
+  // Island under the central bridge, world-aligned. The GLB builder draws it and
+  // HangangRun collides with it from these numbers. Pavilion is island-relative.
+  nodeulseom: {
+    x: 200, z: -1700, height: 4, bottomRadius: 75, topRadius: 70, zScale: 2.4,
+    pavilion: { center: [0, 8.5, 0], size: [45, 9, 80] },
+  },
 };
 
 export function riverCenter(z) {

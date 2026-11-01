@@ -1,3 +1,4 @@
+import '../styles/pilot-arena.css';
 import { PilotHost } from '../pilot/PilotHost.js';
 import { MissionRunner } from '../arena/MissionRunner.js';
 import { PilotMissionAdapter } from '../arena/PilotMissionAdapter.js';
@@ -35,9 +36,6 @@ export function installPilotArena(sim) {
       <pre data-log role="log" aria-label="파일럿 실행 로그" aria-live="off"></pre>
     </details>
     <pre data-result></pre>`;
-  const style = document.createElement('style');
-  style.textContent = `#pilot-arena{position:fixed;right:12px;top:65px;z-index:1200;width:min(400px,calc(100vw - 24px));max-height:80vh;overflow:auto;padding:14px;color:#eef5fb;background:#101e2bf5;border:1px solid #526879;border-radius:10px;font:13px/1.5 system-ui}#pilot-arena>summary{display:flex;justify-content:space-between;gap:12px;align-items:center;min-height:36px;list-style:none}#pilot-arena summary{cursor:pointer;font-weight:700}#pilot-arena [data-toggle-label]{color:#63e3b4;white-space:nowrap}#pilot-arena [data-log],#pilot-arena [data-telemetry]{max-height:180px;overflow:auto;background:#071019;padding:8px}#pilot-arena{box-sizing:border-box;max-height:calc(100dvh - 90px)}@media(max-width:640px){#pilot-arena{right:8px;top:max(8px,env(safe-area-inset-top));width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:8px 12px}#pilot-arena:not([open]){width:auto;max-width:calc(100vw - 16px)}}#pilot-arena label{display:block;margin:8px 0}#pilot-arena input,#pilot-arena select,#pilot-arena textarea{box-sizing:border-box;max-width:100%}#pilot-arena textarea{display:block;width:100%;font:11px/1.4 monospace;background:#09131c;color:#d6eefb}#pilot-arena button{margin:4px;padding:6px;cursor:pointer}#pilot-arena svg{width:100%;height:90px;background:#071019}#pilot-arena pre{white-space:pre-wrap;overflow-wrap:anywhere}`;
-  document.head.append(style);
   document.body.append(shell);
   const find = name => shell.querySelector(`[data-${name}]`);
   const updateToggle = () => {

@@ -37,6 +37,25 @@ test('thin deck, wing and fin contacts are detected between frames', () => {
     assert.equal(run.status, 'failed'); assert.equal(run.reason, 'contact'); assert.ok(run.contact.aircraftPart);
   }
 });
+// Flies the central gate along its own axis, `offset` metres across the river.
+function centralPass(height, offset = 0) {
+  const run = new HangangRun(); run.index = 1;
+  const b = course.bridges[1];
+  const yaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), b.yaw);
+  const forward = new Vector3(0, 0, -1).applyQuaternion(yaw), across = new Vector3(1, 0, 0).applyQuaternion(yaw);
+  const velocity = forward.clone().multiplyScalar(46);
+  for (let s = -200; s <= 200 && !run.contact; s += 2.3) {
+    run.update(new Vector3(b.x, height, b.z).addScaledVector(across, offset).addScaledVector(forward, s), yaw, velocity, 0.05);
+  }
+  return run;
+}
+test('Nodeulseom island and pavilion under the central bridge are solid', () => {
+  for (const height of [11, 14]) assert.equal(centralPass(height).contact?.structure, 'pavilion');
+  assert.equal(centralPass(5, 38).contact?.structure, 'island');
+  for (const run of [centralPass(18), centralPass(11, 38)]) {
+    assert.equal(run.contact, null); assert.equal(run.index, 2);
+  }
+});
 test('above, beside, spawn-inside, missing bridge and reversed passage fail', () => {
   for (const [x, y] of [[0, 80], [620, 19]]) {
     const run = new HangangRun(); step(run, x, y, 30); step(run, x, y, -30); assert.equal(run.status, 'failed');

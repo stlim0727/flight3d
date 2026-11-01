@@ -58,6 +58,14 @@ at <=0.2 m and quaternion rotation at <=0.015 radians with 0.15 m padding. This
 reduces tunneling through thin members; it is an approximation, not exact swept
 mesh collision. Malformed or excessively discontinuous samples cannot pass.
 
+Nodeulseom sits under the central bridge opening (#378). `HANGANG_COURSE.nodeulseom`
+supplies the island (tapered elliptical cylinder, 0–4 m) and pavilion (box, 4–13 m)
+to both `scripts/build-hangang-assets.mjs` and `HangangRun`, so they are solid
+obstacles, not decoration. The centre of that opening clears the pavilion from
+about 15 m reference height; either side of it clears from 10 m. They are not
+part of the terrain heightmap and do not change the ground-effect reference, and
+the recorded gate clearance still measures only the bridge members.
+
 The riverbanks use sampled BufferGeometry ribbons and the skyline uses one
 InstancedMesh with 160 buildings. Scenery is cached and reused on retries.
 Above-deck arch decorations and buildings outside the allowed river corridor

@@ -658,6 +658,24 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       assert.strictEqual(camSys.isDragging, false, 'isDragging must remain false when touching flight controls');
     });
 
+    it('leaves pilot panel summary taps and content scrolling to the browser', () => {
+      const camSys = new CameraSystem(new THREE.PerspectiveCamera(), mockDom);
+      for (const surface of ['summary span', 'textarea', 'log pre', 'panel padding']) {
+        const target = { closest: selector => selector.includes('#pilot-arena') ? target : null };
+        let prevented = false;
+        camSys.handleTouchStart({
+          touches: [{ identifier: 402, clientX: 300, clientY: 140, target }],
+          cancelable: true,
+          preventDefault() { prevented = true; },
+        });
+        assert.equal(prevented, false, `${surface}: native touch activation must remain available`);
+        assert.equal(camSys.activeTouchId, null);
+        assert.equal(camSys.isDragging, false);
+        assert.equal(camSys.isPinching, false);
+        camSys.handleTouchEnd({ touches: [] });
+      }
+    });
+
     it('should allow camera touch look when another finger is holding the flight stick (multi-touch)', () => {
       const camera = new THREE.PerspectiveCamera();
       const camSys = new CameraSystem(camera, mockDom);

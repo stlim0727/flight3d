@@ -16,6 +16,10 @@ export class HangangRun {
     if (!course.bridges.length || new Set(course.bridges.map(b => b.id)).size !== course.bridges.length ||
         course.bridges.some(b => ![b.x, b.z, b.yaw].every(Number.isFinite))) throw new Error('Invalid Hangang course');
     this.course = course;
+    const island = course.nodeulseom;
+    this.pavilion = island && new THREE.Box3().setFromCenterAndSize(
+      new THREE.Vector3(...island.pavilion.center).add(new THREE.Vector3(island.x, 0, island.z)),
+      new THREE.Vector3(...island.pavilion.size));
     this.bridges = course.bridges.map(b => {
       const transform = new THREE.Matrix4().compose(new THREE.Vector3(b.x, 0, b.z),
         new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.yaw), new THREE.Vector3(1, 1, 1));
@@ -36,6 +40,18 @@ export class HangangRun {
   }
   fail(reason, contact = null) { if (contact) this.contact = contact; if (this.status === 'running') { this.status = 'failed'; this.reason = reason; } }
   get maintenancePercent() { return this.elapsed ? Math.round(100 * this.goodTime / this.elapsed) : 100; }
+  // The island tapers upward, so test its footprint at the box's lowest point, where
+  // it is widest. Its 24-sided mesh sits just inside this ellipse.
+  nodeulseomHit(box) {
+    const island = this.course.nodeulseom;
+    if (!island) return null;
+    if (this.pavilion.intersectsBox(box)) return 'pavilion';
+    if (box.min.y > island.height) return null;
+    const r = island.bottomRadius + (island.topRadius - island.bottomRadius) * Math.max(0, box.min.y) / island.height;
+    const dx = Math.max(box.min.x - island.x, 0, island.x - box.max.x) / r;
+    const dz = Math.max(box.min.z - island.z, 0, island.z - box.max.z) / (r * island.zScale);
+    return dx * dx + dz * dz <= 1 ? 'island' : null;
+  }
   update(position, quaternion, velocity, dt, { stalled = false, autopilot = false } = {}) {
     if (this.contact) return;
     if (![...position.toArray(), ...quaternion.toArray(), ...velocity.toArray(), dt].every(Number.isFinite) ||
@@ -52,9 +68,9 @@ export class HangangRun {
       this.matrix.compose(this.p, this.q, this.unit);
       for (const part of parts) {
         this.box.copy(part.box).applyMatrix4(this.matrix).expandByScalar(0.15);
-        if (this.box.min.y <= c.waterLevel || this.box.min.y <= hangangHeight(this.p.x, this.p.z)) {
-          this.fail('contact', { aircraftPart: part.name, structure: 'water', position: this.p.toArray() }); break;
-        }
+        const structure = this.box.min.y <= c.waterLevel || this.box.min.y <= hangangHeight(this.p.x, this.p.z)
+          ? 'water' : this.nodeulseomHit(this.box);
+        if (structure) { this.fail('contact', { aircraftPart: part.name, structure, position: this.p.toArray() }); break; }
       }
       for (let i = 0; i < this.bridges.length && !this.contact; i++) {
         const bridge = this.bridges[i];
