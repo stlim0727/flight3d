@@ -128,15 +128,16 @@ export class HangangScene {
         }
       }
 
-      // Navigation clearance markers (Gate opening)
+      // Navigation clearance markers on the gate piers' approach faces. They have no
+      // collision proxy, so they must stay outside the 100 x 34 m opening.
       const markerMat = new THREE.MeshStandardMaterial({
         color: 0xffd044,
         emissive: 0xff9900,
         emissiveIntensity: 0.9,
       });
-      for (const x of [-43, 43]) {
+      for (const x of [-52, 52]) {
         const marker = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 0.4), markerMat);
-        marker.position.set(x, 31, 11.3);
+        marker.position.set(x, 31, 10.2);
         group.add(marker);
       }
 

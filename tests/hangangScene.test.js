@@ -1,4 +1,7 @@
 import test from 'node:test';
+import { Box3, Matrix4, Vector3 } from 'three';
+import { HANGANG_COURSE } from '../src/config/hangangCourse.js';
+import { HangangRun } from '../src/director/HangangRun.js';
 import assert from 'node:assert/strict';
 import { HangangScene } from '../src/environment/HangangScene.js';
 import { createSeoulScenery, createLightPointTexture } from '../src/environment/SeoulLandmarks.js';
@@ -62,4 +65,49 @@ test('HangangScene constructs with river, banks, 3 bridges, and Seoul scenery', 
 
   // Verify update works
   assert.doesNotThrow(() => scene.update(0.05));
+});
+
+test('no bridge mesh intrudes into the designated gate opening', () => {
+  // Rendered bridge parts without a collision proxy must stay out of the passage
+  // HangangRun accepts (|x| < 50 m, below 34 m, through the deck).
+  const opening = new Box3(new Vector3(-49.99, 0, -12), new Vector3(49.99, 33.99, 12));
+  for (const bridge of new HangangScene().bridges) {
+    bridge.updateMatrixWorld(true);
+    const inverse = bridge.matrixWorld.clone().invert();
+    bridge.traverse(node => {
+      if (!node.isMesh) return;
+      node.geometry.computeBoundingBox();
+      const local = node.geometry.boundingBox.clone().applyMatrix4(inverse.clone().multiply(node.matrixWorld));
+      assert.ok(!local.intersectsBox(opening), `${bridge.position.toArray()} mesh at ${local.min.toArray()}`);
+    });
+  }
+});
+
+test('Nodeulseom stand-ins show the solids HangangRun collides with before GLBs load', async () => {
+  const island = HANGANG_COURSE.nodeulseom, field = island.pavilion.heights;
+  const { group, ready } = createSeoulScenery();
+  assert.equal(await ready, false);
+  const islandMesh = group.getObjectByName('Nodeulseom island stand-in');
+  const pavilion = group.getObjectByName('Nodeul pavilion stand-in');
+  assert.ok(islandMesh.visible && pavilion.visible);
+
+  islandMesh.geometry.computeBoundingBox();
+  const bounds = islandMesh.geometry.boundingBox;
+  assert.ok(Math.abs(bounds.max.y - island.height) < 1e-6 && Math.abs(bounds.min.y) < 1e-6);
+  assert.ok(Math.abs(bounds.max.x - island.x - island.bottomRadius) < 1e-6);
+
+  const run = new HangangRun(), matrix = new Matrix4(), top = new Vector3(), scale = new Vector3();
+  assert.equal(pavilion.count, field.heights.filter(h => h > island.height).length);
+  for (let n = 0; n < pavilion.count; n++) {
+    pavilion.getMatrixAt(n, matrix);
+    top.setFromMatrixPosition(matrix); scale.setFromMatrixScale(matrix);
+    top.y += scale.y / 2;
+    const probe = y => run.nodeulseomHit(new Box3().setFromCenterAndSize(new Vector3(top.x, y, top.z), new Vector3(0.2, 0.2, 0.2)));
+    assert.equal(probe(top.y - 0.15), 'pavilion');
+    assert.equal(probe(top.y + 0.15), null);
+  }
+});
+
+test('asset loader marks failed loads so stand-ins stay visible', async () => {
+  assert.equal((await createHangangAssetLoader()('nodeul-pavilion')).userData.fallback, true);
 });

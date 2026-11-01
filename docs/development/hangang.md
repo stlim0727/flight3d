@@ -75,6 +75,12 @@ reaches 1.8 m below it); either side still clears from 10 m. Neither is part of
 the terrain heightmap nor changes the ground-effect reference, and the recorded
 gate clearance still measures only the bridge members.
 
+Collision does not wait for either GLB. `createNodeulseomStandIns()` draws the
+same island and one block per pavilion heightfield cell from the start, and each
+stand-in hides only after its GLB loads; a failed load keeps it visible. Bridge
+meshes without a collision proxy, such as the gate markers on the pier faces, stay
+outside the designated opening (`tests/hangangScene.test.js`).
+
 The riverbanks use sampled BufferGeometry ribbons and the skyline uses one
 InstancedMesh with 160 buildings. Scenery is cached and reused on retries.
 Above-deck arch decorations and buildings outside the allowed river corridor
