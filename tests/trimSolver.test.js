@@ -5,7 +5,7 @@ import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { EngineModel } from '../src/physics/EngineModel.js';
 import { Atmosphere } from '../src/physics/Atmosphere.js';
 import { solveTrim } from '../src/physics/TrimSolver.js';
-import { BOEING_737_800, CESSNA_172 } from '../src/config/aircraftConfigs.js';
+import { BOEING_737_800, CESSNA_172, F16_FALCON } from '../src/config/aircraftConfigs.js';
 import { AutopilotController } from '../src/physics/Autopilot.js';
 
 function trimmedAero() {
@@ -239,6 +239,22 @@ describe('solveTrim against the live force model', () => {
     const qSc = res.qDyn * aero.wingArea * aero.meanChord;
     assert.ok(Math.abs(res.momentBody.x) < 0.005 * qSc,
       `wheel ${trim.handsOffTrimDeg}° leaves moment ${res.momentBody.x} vs qSc ${qSc}`);
+  });
+
+  it('inverts thrust curve accurately for aircraft with nonstandard idle N1 (F-16)', () => {
+    const aero = new Aerodynamics(F16_FALCON);
+    const engines = new EngineModel(F16_FALCON);
+    const state = { iasKnots: 300, altitudeMeters: 1000 };
+    const trim = solveTrim(aero, engines, state);
+    assert.equal(trim.feasible, true);
+    engines.setThrottle(trim.throttle);
+    const atmos = Atmosphere.getConditions(state.altitudeMeters);
+    let engineData;
+    for (let i = 0; i < 400; i++) {
+      engineData = engines.update(1 / 60, state.altitudeMeters, trim.tas, atmos.densityRatio);
+    }
+    const diff = Math.abs(engineData.totalThrust - trim.thrustN) / trim.thrustN;
+    assert.ok(diff < 0.02, `F-16 solved throttle ${trim.throttle} should reproduce thrust ${trim.thrustN}N (got ${engineData.totalThrust}N)`);
   });
 });
 

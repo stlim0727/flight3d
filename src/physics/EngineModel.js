@@ -13,6 +13,27 @@ export function asymmetricThrustYawMoment(thrustLeft, thrustRight, armMeters = 4
 }
 
 /**
+ * Normalized thrust factor from N1 fan speed.
+ * Normalizes N1 between idleN1 (zero net thrust floor) and togaN1 (full thrust).
+ */
+export function n1ToThrustFactor(n1, idleN1 = 22.0, togaN1 = 100.0) {
+  const thrustIdleFloor = Math.max(0.0, idleN1 - 2.0);
+  const thrustN1Range = Math.max(1.0, togaN1 - thrustIdleFloor);
+  const n1Norm = Math.max(0.0, (n1 - thrustIdleFloor) / thrustN1Range);
+  return Math.pow(n1Norm, 2.1);
+}
+
+/**
+ * Inverts n1ToThrustFactor to find the N1 fan speed that produces a desired thrustFactor.
+ */
+export function thrustFactorToN1(thrustFactor, idleN1 = 22.0, togaN1 = 100.0) {
+  const thrustIdleFloor = Math.max(0.0, idleN1 - 2.0);
+  const thrustN1Range = Math.max(1.0, togaN1 - thrustIdleFloor);
+  const n1Norm = Math.pow(Math.max(0.0, thrustFactor), 1 / 2.1);
+  return thrustIdleFloor + thrustN1Range * n1Norm;
+}
+
+/**
  * High-Bypass Turbofan and Piston Engine Simulation
  * Simulates 1, 2, or multi-engine configurations with realistic spool latency, thrust lapse with altitude/speed,
  * EGT, N1%, N2%, Fuel Flow, thrust reversers, engine failure (windmilling) and fuel burn.
@@ -169,9 +190,10 @@ export class EngineModel {
       this.fuelFlow[i] += (targetFF - this.fuelFlow[i]) * Math.min(1.0, dt * (out ? 2.0 : 12.0));
 
       // Net Thrust calculation
-      // Normalized thrust factor from N1: ~0 at 22% idle, 1.0 at 100% N1
-      const n1Norm = Math.max(0.0, (this.n1[i] - 20.0) / 80.0);
-      const thrustFactor = Math.pow(n1Norm, 2.1);
+      // Normalize N1 between idleN1 (zero thrust) and togaN1 (full thrust).
+      // Using the aircraft-specific idleN1 as the floor means throttle=0 always
+      // yields ~0 net thrust regardless of where idle N1 sits (e.g. F-16 at 60%).
+      const thrustFactor = n1ToThrustFactor(this.n1[i], this.idleN1, this.togaN1);
       let grossThrust = this.maxStaticThrustPerEngine * thrustFactor * altitudeLapse * ramLapse;
 
       // Reverse thrust effect

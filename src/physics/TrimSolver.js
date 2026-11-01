@@ -1,6 +1,7 @@
 import { Atmosphere } from './Atmosphere.js';
 import { TRIM_WHEEL_AUTHORITY } from './trimWheel.js';
 import { longitudinalForces } from './longitudinalForces.js';
+import { thrustFactorToN1 } from './EngineModel.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const MAX_ELEVATOR_RAD = Math.PI / 9;
@@ -88,7 +89,8 @@ export function solveTrim(aero, engines, state = {}) {
   const scale = Math.max(1, engines.numEngines ?? 2) * engines.maxStaticThrustPerEngine
     * Math.max(0.1, atmos.densityRatio) ** 0.75 * Math.max(0.7, 1 - tas / 300 * 0.25);
   const idleN1 = engines.idleN1 ?? 22, maxN1 = engines.togaN1 ?? 100;
-  const n1 = 20 + 80 * (Math.max(0, thrustRequired) / scale) ** (1 / 2.1);
+  const thrustFactor = Math.max(0, thrustRequired) / scale;
+  const n1 = thrustFactorToN1(thrustFactor, idleN1, maxN1);
   const rawThrottle = (n1 - idleN1) / (maxN1 - idleN1);
   if (rawThrottle > 1) return { ...reject('thrust'), throttle: 1, thrustRequiredN: thrustRequired };
   const sensitivity = aero.tuning?.elevatorSensitivity ?? 1;

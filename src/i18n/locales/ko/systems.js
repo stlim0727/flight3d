@@ -71,6 +71,8 @@ export default {
   "notice.hotasConnected": "컨트롤러 연결됨: {name}",
   "notice.hotasDisconnected": "컨트롤러 연결 해제됨: {name}",
   "notice.autopilot": "자동조종: {state}",
+  "notice.parkingBrakeSet": "주차 브레이크 설정 [.]",
+  "notice.parkingBrakeReleased": "주차 브레이크 해제 [.]",
   "notice.ap.modes": "자동조종: {modes}",
   "aircraft.b738": "✈️ 보잉 737",
   "aircraft.f16": "F-16 Fighting Falcon",

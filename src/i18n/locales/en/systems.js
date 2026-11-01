@@ -71,6 +71,8 @@ export default {
   "notice.hotasConnected": "Controller connected: {name}",
   "notice.hotasDisconnected": "Controller disconnected: {name}",
   "notice.autopilot": "Autopilot: {state}",
+  "notice.parkingBrakeSet": "Parking brake: SET (.)",
+  "notice.parkingBrakeReleased": "Parking brake: RELEASED (.)",
   "notice.ap.modes": "Autopilot: {modes}",
   "aircraft.b738": "✈️ Boeing 737",
   "aircraft.f16": "F-16 Fighting Falcon",

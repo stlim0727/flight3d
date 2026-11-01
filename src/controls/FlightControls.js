@@ -69,6 +69,7 @@ export class FlightControls {
     this.onToggleLights = null;
     this.onCycleTimeOfDay = null;
     this.onToggleAudio = null;
+    this.onToggleParkingBrake = null;
     this.onResetPosition = null;
     this.onUserInteract = null;
     this.onDeviceConnected = null;
@@ -174,6 +175,10 @@ export class FlightControls {
         break;
       case 'KeyX':
         this.throttle = 1.0; // Full TOGA
+        break;
+      case 'Period':
+        if (this.onToggleParkingBrake) this.onToggleParkingBrake();
+        else this.setParkingBrake(!this.parkingBrake);
         break;
     }
   }

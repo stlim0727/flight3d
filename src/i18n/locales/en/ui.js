@@ -122,6 +122,7 @@ export default {
   "increase.decrease.engine.throttle": "Increase / decrease engine throttle",
   "full.thrust.toga.100.idle.22": "Full thrust (TOGA 100%) / idle (22%)",
   "wheel.brakes.ground.deceleration": "Wheel brakes (ground deceleration)",
+  "parking.brake.toggle": "Parking brake toggle",
   "pitch.trim.nose.down.up": "Pitch trim (nose down / up)",
   "extend.retract.flaps.up.1.5.15": "Extend / retract flaps (UP, 1°, 5°, 15°, 20°, 30°, 40°)",
   "retract.extend.landing.gear": "Retract / extend landing gear",
