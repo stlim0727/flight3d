@@ -268,6 +268,22 @@ class PresetSpawnerMethods {
         this.controls.pitchTrim = luklaTrim;
 
         this.showToast(() => t('preset.lukla.runway.24.downhill.takeoff.11'));
+      } else if (type === 'valley') {
+        // Lukla Valley Low-Pass Slalom spawn
+        const ground = this.currentTerrain?.getHeight?.(-1700, 500) ?? 2800;
+        this.position.set(-1700, ground + 25, 500);
+        const headingRad = 183.18 * Math.PI / 180;
+        this.linearVelocity.set(Math.sin(headingRad) * 280, 0, -Math.cos(headingRad) * 280);
+        this.angularVelocity.set(0, 0, 0);
+        this.quaternion.setFromEuler(new THREE.Euler(0, -headingRad, 0, 'YXZ'));
+        this.controls.throttle = 0.9;
+        this.engines.setThrottle(0.9);
+        this.engines.setReverser(false, false);
+        this.gear.setGearTarget(false);
+        this.gear.gearState = 0;
+        this.aero.setFlapPosition(0);
+        this.aero.spoilers = 0.0;
+        this.showToast(() => t('valley.slalom.title'));
       } else if (type === 'cruise') {
         // Scenic Himalayan Valley Cruise at 13,000 FT (3,960m)
         this.position.set(-1500, 3960, -800);

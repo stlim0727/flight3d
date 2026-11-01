@@ -231,7 +231,41 @@
               <button id="lobby-preset-hangang" class="btn btn-preset"><span data-i18n="hangang.title">한강 저공 비행</span></button>
               <button id="lobby-preset-cru" class="btn btn-preset"><span>✈️ 순항 비행 (6,000 FT)</span></button>
               <button id="lobby-preset-cliff" class="btn btn-preset btn-cliff"><span>⚡ 내리막 이륙 (Rwy 24)</span></button>
+              <button id="lobby-preset-valley" class="btn btn-preset btn-valley"><span>⚡ 계곡 저공 슬라롬</span></button>
               <button id="lobby-preset-demo" class="btn btn-preset"><span>🎬 데모 비행</span></button>
+            </div>
+          </div>
+          <div id="lobby-valley-options" class="lobby-group lobby-valley-options" hidden>
+            <span class="lobby-label" data-i18n="valley.mode.label">조종 방식 선택 (사람 / AI)</span>
+            <div class="lobby-pilot-select" role="radiogroup" aria-label="조종 방식">
+              <button type="button" id="lobby-pilot-human" class="btn btn-pilot-mode active" role="radio" aria-checked="true">
+                <span class="pilot-mode-icon">👤</span>
+                <div class="pilot-mode-info">
+                  <span class="pilot-mode-title" data-i18n="valley.pilot.human.title">사람 직접 조종</span>
+                  <small class="pilot-mode-desc" data-i18n="valley.pilot.human.desc">20m 초저공 · 550~600 KT 고속 슬라롬 직접 도전</small>
+                </div>
+              </button>
+              <button type="button" id="lobby-pilot-ai" class="btn btn-pilot-mode" role="radio" aria-checked="false">
+                <span class="pilot-mode-icon">🤖</span>
+                <div class="pilot-mode-info">
+                  <span class="pilot-mode-title" data-i18n="valley.pilot.ai.title">AI 자율 비행</span>
+                  <small class="pilot-mode-desc" data-i18n="valley.pilot.ai.desc">지형 추적 알고리즘 기반 자동 비행</small>
+                </div>
+              </button>
+            </div>
+            <div id="lobby-valley-preflight" class="valley-preflight-box">
+              <div class="valley-preflight-header">
+                <span class="lobby-label" data-i18n="valley.preflight.label">비행 전 조작 설정 (자이로·조종)</span>
+              </div>
+              <div class="valley-preflight-controls">
+                <button type="button" id="lobby-valley-gyro" class="btn btn-valley-gyro">
+                  <span class="gyro-icon">📱</span> <span class="gyro-label" data-i18n="gyro.button">📱 GYRO 버튼</span>
+                </button>
+                <button type="button" id="lobby-valley-settings" class="btn btn-valley-settings">
+                  <span data-i18n="valley.preflight.openSettings">⚙️ 조작 및 자이로 상세 설정 열기</span>
+                </button>
+              </div>
+              <p class="valley-preflight-hint" data-i18n="valley.preflight.hint">모바일 기기에서 기기를 기울여 조종하려면 자이로를 켜거나 설정 탭에서 영점 및 화면 방향을 확인하세요.</p>
             </div>
           </div>
           <div id="lobby-demo-options" class="lobby-group" hidden>

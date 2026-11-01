@@ -38,6 +38,12 @@ export const SPAWN_SCENARIOS = {
     briefingKey: 'lobby.briefing.scenario.cliff',
     lobbyButtonId: 'lobby-preset-cliff',
   },
+  valley: {
+    airports: ['lukla'],
+    labelKeys: { lukla: 'valley.slalom.title' },
+    briefingKey: 'lobby.briefing.scenario.valley',
+    lobbyButtonId: 'lobby-preset-valley',
+  },
   demo: {
     airports: ['coastal', 'lukla', 'incheon'],
     labelKeys: { incheon: 'lobby.preset.demo', coastal: 'lobby.preset.demo', lukla: 'lobby.preset.demo' },
