@@ -38,8 +38,14 @@ the scenario adds collision detection only, not corrective forces.
 The bridge deck is not inserted into the terrain heightmap. Water/ground height
 therefore continues to supply the ground-effect and radio-altimeter reference.
 
-`bridgeSolids()` supplies both rendered deck/pier/girder/rail geometry and solid
-collision boxes. `HangangCollision` transforms C172 part bounds using
+`bridgeSolids()` supplies both rendered geometry and solid collision boxes: deck,
+three girders, cross beams every 20 m, and per pier a column and the cap the
+girders bear on. The gate pier caps' inner faces (|x| = 50 m) and the girder
+soffit (34 m) bound the central opening. Each rail box is the collision envelope
+of the open railing (curb, posts, mid and top rails) that `hangangBridges.js`
+draws inside it. `hangangBridges.js` merges every bridge into one mesh per
+material (steel, concrete, road, lights, markers), so a bridge costs five draw
+calls rather than about 110. `HangangCollision` transforms C172 part bounds using
 `inverse(M_bridge) * M_aircraft`. Fuselage, wings, tail, fin and fixed gear have
 separate conservative bounds. Between physics samples, translation is sampled
 at <=0.2 m and quaternion rotation at <=0.015 radians with 0.15 m padding. This
@@ -66,14 +72,15 @@ the terrain heightmap nor changes the ground-effect reference.
 Collision does not wait for either GLB. `createNodeulseomStandIns()` draws the
 same island and one block per pavilion heightfield cell from the start, and each
 stand-in hides only after its GLB loads; a failed load keeps it visible. Bridge
-meshes without a collision proxy, such as the gate markers on the pier faces, stay
-outside the designated opening (`tests/hangangScene.test.js`).
+geometry without a collision proxy, such as the gate markers on the pier caps, stays
+outside the designated opening; the test checks every rendered triangle, because
+merged meshes span the opening (`tests/hangangScene.test.js`).
 
 The riverbanks use sampled BufferGeometry ribbons and the skyline uses one
 InstancedMesh with 160 buildings. Scenery is cached and reused on retries.
 Above-deck arch decorations and buildings outside the river corridor
-are visual approximations without detailed collision proxies. #267 owns
-detailed asset/collision contracts.
+are visual approximations without detailed collision proxies; #395 tracks
+streetlights and arches on the deck, #393 the buildings.
 
 ## Provenance and limits
 
@@ -87,8 +94,16 @@ It stands in for the real Nodeulseom music lounge and does not depict it; see
 or map data are bundled. The UI explicitly
 labels this as **Han River inspired training scenery**, not a survey-accurate
 reproduction of named Seoul bridges. Dimensions are designed for the playable
-course. Surveyed placement, detailed GLB/PBR assets, LOD, asset fallback and
-performance budgets remain in #267; this scenario does not complete that issue.
+course.
+
+The bridges deliberately stay procedural rather than GLB (#396). The repository's
+GLBs are themselves exported from Three.js code by `build-hangang-assets.mjs`, so a
+bridge GLB would add no detail. It would add an asynchronous load, and with it a
+stand-in, failure handling and a second copy of the dimensions, for the scenario's
+main obstacles. Revisit this only for externally authored or licensed models, or
+when geometry becomes measurably expensive to build at runtime. Survey-accurate
+named bridges, LOD and real-world provenance are not in scope while the scenery
+remains a motif.
 
 ## Verification
 
@@ -127,3 +142,16 @@ then verified pause-menu restart, water impact, Space-to-menu recovery, Fly,
 environment restoration and saved-region reload with zero runtime exceptions.
 The desktop, cockpit, mobile and crash captures show the common HUD without a
 scenario status/score/retry panel. Mobile evidence is viewport-only.
+
+### Bridge detail and draw calls (#396)
+
+`review-artifacts/hangang-396/` holds fixed-camera captures of the same scenes on
+the base and with this change. These use headless Chrome on hardware D3D11
+(Intel Arc 140V), with the camera placed directly and the clock frozen. Visible
+bridge draw calls went from 110–331 per view to 10–15, and bridge triangles from
+about 5,000 to 36,700, mostly railing posts. Frame times there are wall-clock
+rAF intervals, not a benchmark. `verify-hangang.mjs` now enables CDP focus
+emulation, because the simulator pauses without document focus. With that, the
+C172 flies under all three bridges without contact, and the climb, water impact,
+pause restart and lifecycle checks pass. The Space-to-menu step after a crash
+fails identically on the base and with this change; that is unrelated to the bridges.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import { Box3, Matrix4, Vector3 } from 'three';
-import { HANGANG_COURSE } from '../src/config/hangangCourse.js';
+import { HANGANG_COURSE, bridgeSolids } from '../src/config/hangangCourse.js';
 import { HangangCollision } from '../src/director/HangangCollision.js';
 import assert from 'node:assert/strict';
 import { HangangScene } from '../src/environment/HangangScene.js';
@@ -67,20 +67,51 @@ test('HangangScene constructs with river, banks, 3 bridges, and Seoul scenery', 
   assert.doesNotThrow(() => scene.update(0.05));
 });
 
-test('no bridge mesh intrudes into the central opening', () => {
-  // Rendered bridge parts without a collision proxy must stay out of the passage
-  // under the deck (|x| < 50 m, below 34 m).
+// Bridge-local vertices of every rendered triangle, with the mesh they belong to.
+function bridgeTriangles(bridge) {
+  bridge.updateMatrixWorld(true);
+  const inverse = bridge.matrixWorld.clone().invert(), triangles = [];
+  bridge.traverse(node => {
+    if (!node.isMesh) return;
+    const toLocal = inverse.clone().multiply(node.matrixWorld), { index, attributes: { position } } = node.geometry;
+    const vertex = n => new Vector3().fromBufferAttribute(position, index ? index.getX(n) : n).applyMatrix4(toLocal);
+    for (let n = 0; n < (index ?? position).count; n += 3) triangles.push({ mesh: node.name, points: [vertex(n), vertex(n + 1), vertex(n + 2)] });
+  });
+  return triangles;
+}
+
+test('no bridge triangle intrudes into the central opening', () => {
+  // Merged meshes span the opening, so check each triangle: nothing drawn may enter
+  // the passage under the deck (|x| < 50 m, below 34 m).
   const opening = new Box3(new Vector3(-49.99, 0, -12), new Vector3(49.99, 33.99, 12));
   for (const bridge of new HangangScene().bridges) {
-    bridge.updateMatrixWorld(true);
-    const inverse = bridge.matrixWorld.clone().invert();
-    bridge.traverse(node => {
-      if (!node.isMesh) return;
-      node.geometry.computeBoundingBox();
-      const local = node.geometry.boundingBox.clone().applyMatrix4(inverse.clone().multiply(node.matrixWorld));
-      assert.ok(!local.intersectsBox(opening), `${bridge.position.toArray()} mesh at ${local.min.toArray()}`);
-    });
+    for (const { mesh, points } of bridgeTriangles(bridge)) {
+      assert.ok(!new Box3().setFromPoints(points).intersectsBox(opening), `${mesh} triangle at ${points[0].toArray()}`);
+    }
   }
+});
+
+test('bridges draw their collision solids in five merged meshes', () => {
+  const scene = new HangangScene();
+  HANGANG_COURSE.bridges.forEach((spec, i) => {
+    const bridge = scene.bridges[i], triangles = bridgeTriangles(bridge);
+    assert.equal(new Set(triangles.map(t => t.mesh)).size, 5, spec.id);
+    const key = p => p.toArray().map(v => v.toFixed(3)).join();
+    const drawn = new Set(triangles.flatMap(t => t.points.map(key)));
+    const solids = bridgeSolids(spec).map(s => ({ ...s, box: new Box3().setFromCenterAndSize(new Vector3(...s.center), new Vector3(...s.size)) }));
+    // Every solid except the railing envelopes is drawn as exactly that box.
+    for (const { part, box } of solids.filter(s => s.part !== 'rail')) {
+      for (let corner = 0; corner < 8; corner++) {
+        const p = new Vector3(corner & 1 ? box.max.x : box.min.x, corner & 2 ? box.max.y : box.min.y, corner & 4 ? box.max.z : box.min.z);
+        assert.ok(drawn.has(key(p)), `${spec.id} ${part} corner ${p.toArray()}`);
+      }
+    }
+    // The open railing at the deck edges stays inside its collision envelopes.
+    const rails = solids.filter(s => s.part === 'rail').map(s => s.box.clone().expandByScalar(1e-6));
+    const railing = triangles.filter(t => t.points.every(p => p.y > 40.01 && Math.abs(p.z) > 10.7));
+    assert.ok(railing.length > 0);
+    for (const { points } of railing) assert.ok(rails.some(r => points.every(p => r.containsPoint(p))), `${spec.id} railing ${points[0].toArray()}`);
+  });
 });
 
 test('Nodeulseom stand-ins show the solids HangangCollision collides with before GLBs load', async () => {

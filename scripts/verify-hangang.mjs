@@ -51,6 +51,8 @@ try {
   });
   await mkdir(directory, { recursive: true });
   await send('Runtime.enable'); await send('Page.enable');
+  // The simulator pauses without document focus, which headless Chrome never has.
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: process.env.SIM_URL || 'http://127.0.0.1:5197' });
   let ready = false;
