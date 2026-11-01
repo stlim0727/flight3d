@@ -67,6 +67,19 @@ export function installPilotArena(sim) {
   let shownOverlayRecord = null;
   const hideScoreOverlay = () => { scoreOverlay.hidden = true; };
   scoreOverlay.addEventListener('click', event => {
+    const retryBtn = event.target.closest('[data-score-retry]');
+    if (retryBtn) {
+      const mode = retryBtn.dataset.scoreRetry || (runner.record?.pilotKind === 'human' ? 'human' : 'ai');
+      hideScoreOverlay();
+      const kindSelect = shell.querySelector('[data-kind]');
+      if (kindSelect) {
+        kindSelect.value = mode;
+        kindSelect.dispatchEvent(new Event('change'));
+      }
+      if (sim.lobby) sim.lobby.pilotMode = mode;
+      find('run').click();
+      return;
+    }
     if (event.target === scoreOverlay || event.target.closest('[data-score-close]')) {
       hideScoreOverlay();
       if (new URLSearchParams(location.search).get('pilotArena') === '1') {
@@ -75,9 +88,6 @@ export function installPilotArena(sim) {
       } else {
         sim.gameFlow.returnToLobby(true);
       }
-    } else if (event.target.closest('[data-score-retry]')) {
-      hideScoreOverlay();
-      find('run').click();
     }
   });
   window.addEventListener('keydown', event => {
