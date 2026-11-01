@@ -96,7 +96,7 @@ export function createEnvelope(type, meta, payload) {
 
 /** Public configuration only: no seed, spawn state, simulator or evaluation telemetry. */
 export function createBriefing(manifest) {
-  const fields = ['missionId', 'aircraftId', 'runway', 'successConditions', 'timeoutSeconds', 'configuration', 'recommendedSpeeds', 'sensorProfile', 'course', 'navigationProfile', 'terrainSensor'];
+  const fields = ['missionId', 'aircraftId', 'runway', 'successConditions', 'timeoutSeconds', 'configuration', 'recommendedSpeeds', 'sensorProfile', 'course', 'navigationProfile', 'terrainSensor', 'departure', 'destination'];
   const briefing = { decisionPeriodSeconds: 0.2, capabilities: { visualContacts: false, trainingNavigation: true } };
   if (manifest.terrainSensor) briefing.capabilities.terrainRange = true;
   for (const field of fields) {

@@ -10,7 +10,7 @@ export class PilotMissionAdapter {
       ? new ValleyMissionAdapter(this.sim) : new SimulatorMissionAdapter(this.sim);
     return this.current.prepare(options);
   }
-  acquire() { return this.current.acquire(); }
+  acquire(options) { return this.current.acquire(options); }
   apply(command) { return this.current.apply(command); }
   step() { return this.current.step(); }
   snapshot(tick) { return this.current.snapshot(tick); }

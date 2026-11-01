@@ -196,16 +196,17 @@ export class SimulatorMissionAdapter {
     return { position: this.sim.position.toArray(), quaternion: this.sim.quaternion.toArray() };
   }
 
-  acquire() {
+  acquire({ human = false } = {}) {
     if (!this.manifest || this.acquired) throw new Error('pilot-owner-unavailable');
     const { controls } = this.sim;
     this.savedFlags = { disabled: controls.aircraftControlsDisabled, blocked: controls.inputBlocked };
-    controls.setAircraftControlsDisabled(true);
-    controls.inputBlocked = true;
+    this.human = human;
+    controls.setAircraftControlsDisabled(!human);
+    controls.inputBlocked = !human;
     if (this.sim.touchControls) this.sim.touchControls.throttleActive = false;
     this.sim.autopilot.disengage();
     this.acquired = true;
-    this.apply(this.initialControls);
+    if (!human) this.apply(this.initialControls);
   }
 
   apply(command) {
@@ -234,7 +235,7 @@ export class SimulatorMissionAdapter {
       throw new Error('pilot-fixed-configuration-changed');
     }
     // A pointer drag or UI callback cannot steal a held throttle target.
-    this.apply(this.command);
+    if (!this.human) this.apply(this.command);
     this.sim.integratePhysics(this.sim.physicsDt);
     this.syncPose();
   }

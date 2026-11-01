@@ -48,9 +48,10 @@ load an example or a trusted local `.js` file, and run it. Nothing is uploaded.
 The expandable panel includes an editor, result metrics, a 2D runway trace and
 downloadable run data. Ordinary game URLs keep their existing behavior.
 
-The first version aborts on pause/menu, external aircraft/preset/airport change
-or explicit manual takeover. It does not preserve guest state across pause.
-Starting a mission replaces the current flight with a coastal B738 scenario.
+Pause and browser background hold the attempt without advancing judged ticks
+or the wind clock. Leaving flight for the lobby, external aircraft/preset/airport
+changes, or explicit manual takeover abort the attempt. Starting a mission
+replaces the current flight with the selected B738/coastal or F16/Lukla scenario.
 Mission preparation calls explicitly identify themselves so they do not trigger
 the external-change cancellation path. While active, the asynchronous runner
 owns physics advancement; the animation loop continues rendering and does not
@@ -114,3 +115,71 @@ The [flight URL directory](../flight-urls.md#ai-pilot-mission-selector) selects 
 ## F-16 Lukla valley
 
 The [valley mission plan](f16-valley-pilot.md) defines its fixed start/finish, virtual terrain-range sensor, ordered gates and distance-weighted altitude objective. Select the valley mission in the directory or local console. `npm run test:valley` executes its real-DEM production-physics sweep without a renderer. It permits avoidance climbs and rewards returning low; it is a game-model challenge, not real F-16 terrain-following validation.
+
+## Shared F16 valley mission (#382)
+
+Open `/?pilotArena=1`, choose **F-16 루클라 계곡 저공**, and read the route
+briefing. Choose **사람** for ordinary keyboard/HOTAS/touch flight controls or
+**AI** for a trusted SDK pilot. Human mode always uses real-time pacing. The
+panel collapses when human flight starts, leaving the common navigation HUD
+visible. Expand it to abort, inspect the briefing, export the run or see results.
+
+Both modes use `ValleyMissionAdapter.prepare`, the production integrator and
+`ValleyMission`; the arena runner is the sole physics owner in either mode.
+There is no AI-to-human continuation of a scored run: stop aborts the old attempt
+and releases controls; a human scored run requires a fresh start. Fixed gear,
+flaps, trim, spoilers and reversers apply equally. Pause/background hold time,
+while reset, aircraft/airport changes and leaving flight end the attempt.
+
+The chart uses the same static course as the SDK briefing. It shows local east/
+south coordinates, ordered waypoints, departure and final crossing direction;
+it has no live truth-position marker or terrain predictions. Navigation HUD
+values come directly from the exact observation delivered to the AI: next-gate
+and final-destination absolute bearing/range plus gate index, at 5 Hz using the
+same seed and correlated errors. `gate-finish-bearing-range-v2` identifies this
+aid. The HUD is navigation equipment, not obstacle detection.
+
+The scoreboard stores the most recent 200 terminal attempts in this browser's
+localStorage. It is local/unranked, with no server or shared online ranking.
+Human/AI identity, rules/terrain versions, environment/sensor seeds and noise,
+navigation profile, fixed/spawn configuration, source hash (AI), gates,
+duration and AGL diagnostics are recorded. Failed/aborted attempts retain null
+altitude cost; only successful attempts have a comparable lower-is-better cost.
+After a run, the board filters to exactly matching conditions. On initial load
+it labels the list as all conditions, without a cross-condition rank. Storage
+failure is shown and does not stop flight; the run can still be downloaded.
+
+`tests/valleySharedMission.test.js` covers isolated Worker completion, 24-tick
+AI delay, bounded observations, human input ownership, held ticks/wind,
+abort/restart, shared navigation and local persistence. `npm run test:valley`
+runs the synchronous production-physics sweep. The exact current six-case
+results are in [f16-valley-acceptance.json](f16-valley-acceptance.json). Mild/noisy
+seeds 1–5 and calm/no-noise seed 1 complete all six gates. Costs are 263.16–279.92 m
+for mild and 263.36 m for calm; median AGL is 283–304 m. A steeper recovery descent
+slightly improves the preserved baseline, but the example remains conservative
+and does not demonstrate sustained ultra-low flight. No course, terrain or
+physics thresholds were relaxed.
+
+### Browser acceptance (2026-11-01)
+
+Chrome 156.0.8078.73 on hardware ANGLE/Vulkan Intel Graphics ADL-N passed
+`scripts/verify-browser-gpu.mjs`: accessible renderD128, WebGL2 shader center
+pixel `[255,0,0,255]`, GL error 0. The same isolated browser then verified:
+
+- Human keyboard elevator input with no virtual-input target; pause and
+  background held mission ticks; resume advanced them; preset reset recorded an
+  aborted human attempt with no score and released control.
+- AI mild/noisy seed 1 completed all six gates, cost 279.218326 m; every applied
+  command retained 24 ticks of delay. HUD text exactly matched the shared
+  navigation observation, with gate indices 1–6 across the flight.
+- Desktop 1440×900 briefing chart and mobile 390×844 flight/navigation views
+  were captured and inspected. Human start collapsed the panel and retained
+  navigation visibility. This was viewport/layout evidence, not native touch or
+  HOTAS device acceptance. A human full-course completion was not performed.
+- Human failures/aborts and AI success appeared in local storage; page reload
+  preserved the records. Obscura separately checked the ordinary URL selector,
+  Hangang's dependent C172 selection, and valley gameplay/source links.
+
+Final local gate: Node 22.23.2, `npm run check` (491 JavaScript files / 14 pinned
+action references), `npm test` (1077 passed), `npm run build` passed. These are
+local results; CI and deployment must be checked independently on the PR.

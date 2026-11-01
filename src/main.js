@@ -432,7 +432,6 @@ class FlightSimulator {
     this.clock.getDelta();
     this.physicsAccumulator = 0;
     if (backgrounded) {
-      if (this.pilotArena?.active) this.pilotArena.stop('browser-backgrounded');
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0, 0);
       this.controls.setTouchRudder(0);
@@ -453,9 +452,9 @@ class FlightSimulator {
   syncFlowUi() {
     const state = this.gameFlow.state;
     if (state === FLOW.LOBBY) this.crashDebriefRemaining = null;
-    // This first experimental runner aborts on pause/menu instead of retaining
-    // guest execution across an implicit user handover.
-    if (state !== FLOW.FLIGHT && this.pilotArena?.active) this.pilotArena.stop('flight-held');
+    // Pause retains the judged attempt; leaving flight for a menu ends it.
+    // The arena runner gates every physics step on flow/background state.
+    if (state !== FLOW.FLIGHT && state !== FLOW.PAUSED && this.pilotArena?.active) this.pilotArena.stop('flight-held');
     // A flight parked off the sim is silent and watched from the drone rig; the lobby
     // cinematic keeps its own sound and camera, so it is deliberately not held here.
     const held = state === FLOW.DEBRIEF || state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
@@ -467,7 +466,7 @@ class FlightSimulator {
       attribution?.querySelector('#incheon-attribution-chip')?.setAttribute('aria-expanded', 'false');
     }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
-    this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active) || Boolean(this.pilotArena?.active);
+    this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human');
     if (state !== FLOW.FLIGHT) {
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0.0, 0.0);

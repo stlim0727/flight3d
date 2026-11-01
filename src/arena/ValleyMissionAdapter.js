@@ -67,7 +67,15 @@ export class ValleyMissionAdapter extends SimulatorMissionAdapter {
       configuration: { gearDown: false, flapIndex: 0, pitchTrimDeg: sim.controls.pitchTrim,
         referencePitchDeg: solution.alphaDeg, trimThrottle: solution.throttle },
       recommendedSpeeds: { cruiseKnots: spawn.iasKnots }, timeoutSeconds: manifest.timeoutTicks / 120,
-      navigationProfile: 'gate-bearing-range-v1', terrainSensor: { model: 'forward-terrain-range-v1', maxRangeM: 2000 },
+      navigationProfile: 'gate-finish-bearing-range-v2', sensorNoiseEnabled: noise,
+      sensorProfile: { id: 'valley-navigation-v2', correlatedNoise: noise, physicsHz: 120,
+        decisionPeriodTicks: 24, reactionDelayTicks: 24 },
+      successConditions: { minimumAglM: manifest.course.minimumAglM, targetAglM: manifest.course.targetAglM,
+        minimumIasKnots: manifest.minimumIasKnots, maximumIasKnots: manifest.maximumIasKnots,
+        orderedGates: true, noContactOrDamage: true },
+      departure: { ...spawn }, destination: { ...manifest.course.points.at(-1),
+        headingDeg: (Math.atan2(manifest.course.points.at(-1).x - manifest.course.points.at(-2).x,
+          -(manifest.course.points.at(-1).z - manifest.course.points.at(-2).z)) * 180 / Math.PI + 360) % 360 }, terrainSensor: { model: 'forward-terrain-range-v1', maxRangeM: 2000 },
       configuredState: { massKg: sim.aero.mass, fuelKg: sim.engines.fuelKg, position: sim.position.toArray(),
         quaternion: sim.quaternion.toArray(), velocity: sim.linearVelocity.toArray() } };
     this.terrainPerception = new TerrainPerception({ sensorSeed, noise });
@@ -95,7 +103,15 @@ export class ValleyMissionAdapter extends SimulatorMissionAdapter {
     bearing.mean = (bearing.mean + 360) % 360;
     observation.navigation = { goalBearingDeg: bearing,
       goalRangeM: perception.scalar('valley.goalRangeM', Math.hypot(dx, dz), 3 + Math.hypot(dx, dz) * 0.01, tick),
-      currentGateIndex: gateIndex };
+      currentGateIndex: gateIndex, totalGates: this.manifest.course.points.length - 1 };
+    const finish = this.manifest.course.points.at(-1);
+    const fx = finish.x - snapshot.position.x, fz = finish.z - snapshot.position.z;
+    const finishBearing = perception.scalar('valley.finishBearingDeg',
+      (Math.atan2(fx, -fz) * 180 / Math.PI + 360) % 360, 0.5, tick);
+    finishBearing.mean = (finishBearing.mean + 360) % 360;
+    observation.navigation.finishBearingDeg = finishBearing;
+    observation.navigation.finishRangeM = perception.scalar('valley.finishRangeM',
+      Math.hypot(fx, fz), 3 + Math.hypot(fx, fz) * 0.01, tick);
     observation.terrain = this.terrainPerception.sample({ position: this.sim.position, quaternion: this.sim.quaternion,
       getHeight: (x, z) => this.sim.currentTerrain.getHeight(x, z) }, tick);
     return observation;

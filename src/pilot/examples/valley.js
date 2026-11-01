@@ -55,7 +55,7 @@ export function createPilot() {
       const pitchRate = clamp(measuredPitchRate, -50, 50) * radians;
       const rollRate = clamp(measuredRollRate, -80, 80) * radians;
       // A small buffer above the score's target avoids rewarding a surface skim.
-      let desiredVz = clamp((targetAgl + 15 - height) * 0.4, -30, 18);
+      let desiredVz = clamp((targetAgl + 15 - height) * 0.6, -40, 18);
       const cp = Math.cos(pitch * radians), sp = Math.sin(pitch * radians);
       const cr = Math.cos(roll * radians), sr = Math.sin(roll * radians);
       let forwardObserved = false;

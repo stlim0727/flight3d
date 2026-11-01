@@ -1,3 +1,5 @@
+> Historical WIP handover at 122bb4b. Follow-up implementation and current verification: [shared mission documentation](pilot-arena.md#shared-f16-valley-mission-382) and [current sweep results](f16-valley-acceptance.json).
+
 # Handover: F16 Lukla valley mission and shared human/AI scoring
 
 Status: work in progress, not merged or deployed. Original context:

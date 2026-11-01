@@ -7,6 +7,8 @@ import landingSource from '../pilot/examples/landing.js?raw';
 import valleySource from '../pilot/examples/valley.js?raw';
 import { resolvePilotCase } from '../config/pilotCases.js';
 import { createRealtimePacer } from '../arena/realtimePacer.js';
+import { ValleyScoreboard } from '../arena/ValleyScoreboard.js';
+import { valleyBriefingMarkup, valleyNavigationText } from './valleyNavigationView.js';
 import { bindPilotPanelInput } from './pilotPanelInput.js';
 
 /** Opt-in local pilot lab. No remote upload and no security sandbox claims. */
@@ -14,9 +16,11 @@ export function installPilotArena(sim) {
   const shell = document.createElement('details');
   shell.id = 'pilot-arena';
   shell.open = !window.matchMedia('(max-width: 640px)').matches;
-  shell.innerHTML = `<summary><span>AI pilot · <span data-compact-status>대기 중</span></span><span data-toggle-label>최소화</span></summary>
+  shell.innerHTML = `<summary><span>Pilot · <span data-compact-status>대기 중</span></span><span data-toggle-label>최소화</span></summary>
     <p>본인이 신뢰하는 코드만 실행하세요. 예제는 제한된 물리 테스트를 통과한 실험용이며 결과는 로컬 비랭킹입니다.</p>
     <label>미션 <select data-mission><option value="takeoff-basic-v1">이륙</option><option value="landing-basic-v1">착륙</option><option value="valley-low-v1">F-16 루클라 계곡 저공</option></select></label>
+    <label>조종 <select data-kind><option value="ai">AI</option><option value="human">사람 · F-16 계곡 미션</option></select></label>
+    <details data-briefing hidden><summary>미션 브리핑 · 항로 지도</summary>${valleyBriefingMarkup()}</details>
     <label>환경 <select data-environment><option value="mild-disturbance-v1">약한 측풍·돌풍</option><option value="calm-debug-v1">무풍 · 디버깅</option></select></label>
     <label>시드 <input data-seed type="number" min="0" step="1" value="1"></label>
     <label>재생 속도 <select data-playback><option value="realtime">실시간 · 1배속</option><option value="fast">빠른 평가</option></select></label>
@@ -35,7 +39,10 @@ export function installPilotArena(sim) {
       <button data-clear-log type="button">로그 지우기</button>
       <pre data-log role="log" aria-label="파일럿 실행 로그" aria-live="off"></pre>
     </details>
-    <pre data-result></pre>`;
+    <pre data-result></pre>
+    <details><summary>공통 스코어보드 · 로컬 / 비랭킹</summary>
+      <p>이 브라우저에 최근 200회 저장합니다. 동일 조건만 비교하며 실패·중단은 순위가 없습니다.</p>
+      <p data-storage-status></p><div data-board></div></details>`;
   document.body.append(shell);
   const find = name => shell.querySelector(`[data-${name}]`);
   const updateToggle = () => {
@@ -43,6 +50,37 @@ export function installPilotArena(sim) {
   };
   shell.addEventListener('toggle', updateToggle);
   updateToggle();
+  const navigationHud = document.createElement('pre');
+  navigationHud.id = 'valley-navigation';
+  navigationHud.hidden = true;
+  navigationHud.setAttribute('aria-label', '계곡 미션 공통 항법 보조');
+  document.body.append(navigationHud);
+  const scoreboard = new ValleyScoreboard({
+    getItem: key => window.localStorage.getItem(key),
+    setItem: (key, value) => window.localStorage.setItem(key, value),
+  });
+  let savedRecord = null;
+  const renderBoard = comparisonKey => {
+    const rows = scoreboard.read().filter(r => !comparisonKey || r.comparisonKey === comparisonKey);
+    rows.sort((a, b) => (a.status === 'succeeded' ? a.metrics.altitudeCostM ?? Infinity : Infinity) -
+      (b.status === 'succeeded' ? b.metrics.altitudeCostM ?? Infinity : Infinity));
+    find('board').replaceChildren();
+    for (const row of rows) {
+      const line = document.createElement('p');
+      line.textContent = `${row.pilotKind === 'human' ? '사람' : 'AI'} · ${row.status} / ${row.reason} · ` +
+        `${row.metrics.altitudeCostM == null ? '점수 없음' : row.metrics.altitudeCostM.toFixed(2) + ' m'} · ` +
+        `${row.durationSeconds.toFixed(1)}초 · 경유지 ${row.metrics.completedGates ?? 0}/${row.metrics.totalGates ?? 6} · ` +
+        `${row.conditions.environmentProfile} / seed ${row.conditions.environmentSeed} · ` +
+        `${row.conditions.navigationProfile} · ${row.recordedAt}`;
+      const detail = document.createElement('details');
+      const summary = document.createElement('summary'); summary.textContent = '조건·AGL·소스 해시';
+      const pre = document.createElement('pre'); pre.textContent = JSON.stringify(row, null, 2);
+      detail.append(summary, pre); find('board').append(line, detail);
+    }
+    find('storage-status').textContent = scoreboard.error ? `저장소 사용 불가: ${scoreboard.error}` :
+      comparisonKey ? '현재 실행과 동일한 조건의 기록' : '저장된 모든 조건의 기록 · 서로 다른 조건은 순위 비교 불가';
+  };
+  renderBoard();
   const logs = [];
   const appendLog = (message, tick = runner.record?.tick ?? 0) => {
     logs.push(`[${(tick / 120).toFixed(1)}s] ${message}`);
@@ -67,6 +105,7 @@ export function installPilotArena(sim) {
   find('debug').addEventListener('toggle', () => renderTelemetry(runner.record));
   let lastStatus = null;
   const runner = sim.pilotArena = new MissionRunner(new PilotMissionAdapter(sim), {
+    canAdvance: () => !sim.browserBackgrounded && !sim.gameFlow.isPhysicsFrozen(),
     hostFactory: () => new PilotHost({ onLog: message => appendLog(message) }),
     // One rendered frame per 0.2 simulated seconds keeps this a fast local lab.
     yieldFrame: () => new Promise(resolve => requestAnimationFrame(resolve)),
@@ -78,18 +117,34 @@ export function installPilotArena(sim) {
         lastStatus = record.status;
       }
       renderTelemetry(record);
-      for (const name of ['run', 'mission', 'environment', 'seed', 'playback', 'file', 'example', 'source']) find(name).disabled = active;
+      for (const name of ['kind', 'run', 'mission', 'environment', 'seed', 'playback', 'file', 'example', 'source']) find(name).disabled = active;
       find('stop').disabled = !active;
       find('save').disabled = active || !record;
       find('status').textContent = `${record.status} · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)${record.reason ? ` · ${record.reason}` : ''}`;
       if (!active) find('result').textContent = JSON.stringify(record.result?.metrics ?? { detail: record.detail ?? record.reason }, null, 2);
+      if (!active) syncMode();
       const valley = record.manifest?.type === 'valley';
+      navigationHud.hidden = !valley || !active;
+      if (valley) navigationHud.textContent = valleyNavigationText(record.observations.at(-1)?.observation.navigation);
+      if (!active && savedRecord !== record && record.manifest?.type === 'valley') {
+        savedRecord = record;
+        const attempt = scoreboard.add(record);
+        renderBoard(attempt?.comparisonKey);
+      }
       const points = record.poses.map(p => `${Math.max(0, Math.min(400, (p.runwayS + (valley ? 0 : 3500)) / (valley ? record.manifest.courseLengthM : 6500) * 400))},${50 + Math.max(-45, Math.min(45, p.centerlineOffsetM * (valley ? 0.1 : 1)))}`).join(' ');
-      shell.querySelector('polyline').setAttribute('points', points);
+      find('plot').querySelector('polyline').setAttribute('points', points);
     },
   });
   const loadExample = () => { source.value = find('mission').value === 'valley-low-v1' ? valleySource : find('mission').value.startsWith('landing') ? landingSource : takeoffSource; };
-  find('mission').addEventListener('change', loadExample);
+  const syncMode = () => {
+    const human = find('kind').value === 'human';
+    if (human) find('mission').value = 'valley-low-v1';
+    find('briefing').hidden = find('mission').value !== 'valley-low-v1';
+    if (human) { find('briefing').open = true; find('playback').value = 'realtime'; }
+    for (const name of ['playback', 'source', 'example', 'file']) find(name).disabled = human;
+  };
+  find('kind').addEventListener('change', () => { syncMode(); loadExample(); });
+  find('mission').addEventListener('change', () => { syncMode(); loadExample(); });
   find('example').addEventListener('click', loadExample);
   find('file').addEventListener('change', async event => {
     const file = event.target.files[0];
@@ -104,9 +159,10 @@ export function installPilotArena(sim) {
     logs.length = 0; find('log').textContent = '';
     find('telemetry').textContent = '관측 대기 중';
     lastStatus = null;
-    runner.paceTick = find('playback').value === 'realtime' ? createRealtimePacer() : null;
+    runner.paceTick = find('kind').value === 'human' || find('playback').value === 'realtime' ? createRealtimePacer() : null;
+    if (find('kind').value === 'human') shell.open = false;
     sim.gameFlow.enterFlight();
-    void runner.start(source.value, { missionId: find('mission').value,
+    void runner.start(source.value, { pilotKind: find('kind').value, missionId: find('mission').value,
       environmentProfile: find('environment').value, seed }).catch(error => {
       find('status').textContent = error.message;
     });
@@ -124,6 +180,7 @@ export function installPilotArena(sim) {
     find('environment').value = selected.environmentProfile;
     find('seed').value = String(selected.seed);
     loadExample();
+    syncMode();
     find('status').textContent = `${selected.label} · 준비 중`;
     const started = performance.now();
     const startWhenReady = () => {
