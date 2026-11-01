@@ -130,6 +130,11 @@ export const ROUTES = [
         note: 'the terminal event of the same fault — "The aircraft hit the ocean surface at '
           + 'high speed" at 86 kt, a second or two after the clearance violations above.',
       },
+      {
+        contains: ['CRASH TERRAIN'], intermittent: true,
+        note: 'the terminal event of the same fault — touching the coastal shoreline '
+          + 'or terrain at 86 kt when RECOVER falls below the clearance intent.',
+      },
     ],
   },
   {

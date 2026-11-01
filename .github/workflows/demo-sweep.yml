@@ -37,17 +37,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
-        with:
-          node-version-file: .node-version
       - id: set-matrix
         run: |
           node -e "
-            import('./scripts/lib/demoSweepSpec.mjs').then(({ routesForTier }) => {
-              const tier = process.env.TIER;
-              const routes = routesForTier(tier).map(r => r.id);
-              console.log('matrix=' + JSON.stringify(routes));
-            });
+            import fs from 'node:fs';
+            const tier = process.env.TIER;
+            const text = fs.readFileSync('./scripts/lib/demoSweepSpec.mjs', 'utf8');
+            const regex = /id:\s*'([^']+)',\s*aircraft:[^}]*?tier:\s*'([^']+)'/gs;
+            let match;
+            const routes = [];
+            while ((match = regex.exec(text)) !== null) {
+              if (tier === 'all' || match[2] === tier) {
+                routes.push(match[1]);
+              }
+            }
+            console.log('matrix=' + JSON.stringify(routes));
           " >> $GITHUB_OUTPUT
         env:
           TIER: ${{ github.event_name == 'pull_request' && 'core' || github.event.inputs.tier || 'all' }}
