@@ -67,6 +67,7 @@ export function installPilotArena(sim) {
   scoreOverlay.setAttribute('aria-label', '미션 결과 점수');
   document.body.append(scoreOverlay);
   let shownOverlayRecord = null;
+  let selectedRetryMode = 'human';
   const hideScoreOverlay = () => { scoreOverlay.hidden = true; };
   const returnToLobbyMenu = () => {
     hideScoreOverlay();
@@ -83,12 +84,29 @@ export function installPilotArena(sim) {
     }
   };
   scoreOverlay.addEventListener('click', event => {
+    const modeBtn = event.target.closest('[data-score-mode]');
+    if (modeBtn) {
+      selectedRetryMode = modeBtn.dataset.scoreMode;
+      for (const btn of scoreOverlay.querySelectorAll('[data-score-mode]')) {
+        const active = btn.dataset.scoreMode === selectedRetryMode;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-checked', String(active));
+      }
+      return;
+    }
     if (event.target.closest('[data-score-retry]')) {
       hideScoreOverlay();
+      const kindSelect = shell.querySelector('[data-kind]');
+      if (kindSelect) {
+        kindSelect.value = selectedRetryMode;
+        kindSelect.dispatchEvent(new Event('change'));
+      }
+      if (sim.lobby) sim.lobby.pilotMode = selectedRetryMode;
       find('run').click();
       return;
     }
     if (event.target === scoreOverlay || event.target.closest('[data-score-close]')) {
+      if (sim.lobby) sim.lobby.pilotMode = selectedRetryMode;
       returnToLobbyMenu();
     }
   });
@@ -206,6 +224,7 @@ export function installPilotArena(sim) {
         scoreBanner.hidden = false;
         if ((scoreData.isSucceeded || scoreData.isFailed) && shownOverlayRecord !== record) {
           shownOverlayRecord = record;
+          selectedRetryMode = record.pilotKind === 'ai' ? 'ai' : 'human';
           scoreOverlay.innerHTML = scoreOverlayMarkup(scoreData);
           scoreOverlay.hidden = false;
         }
