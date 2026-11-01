@@ -51,6 +51,8 @@ try {
   });
   await mkdir(directory, { recursive: true });
   await send('Runtime.enable'); await send('Page.enable');
+  // Headless pages are unfocused; the simulator holds its loop for a backgrounded tab.
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: process.env.SIM_URL || 'http://127.0.0.1:5197' });
   let ready = false;
@@ -132,11 +134,16 @@ try {
   await delay(300);await capture('failure');
   const retry = await evaluate(()=>{
     const s=window.simulator;
+    // The player sees the collapsed crash report during the crash scene (#362), before the debrief.
+    const reportShown=document.getElementById('crash-overlay').style.display==='flex'
+      && s.gameFlow.state==='flight' && s.crashDebriefRemaining>0;
     window.dispatchEvent(new KeyboardEvent('keydown',{code:'Space',key:' '}));
-    const crashToMenu=s.gameFlow.state==='lobby' && !s.isCrashed;
+    // Space holds the wreck behind the menu without a resume or a later debrief.
+    const crashToMenu=s.gameFlow.state==='lobby' && s.gameFlow.canResumeFromLobby() && s.isCrashed
+      && s.crashDebriefRemaining===null && document.getElementById('btn-lobby-resume').hidden;
     document.getElementById('btn-fly').click();
     s.stepSimulation(0.1);
-    return {crashToMenu,healthy:!s.isCrashed && !s.aero.isStalled, trauma:s.cameraSystem.trauma,
+    return {reportShown,crashToMenu,healthy:!s.isCrashed && !s.aero.isStalled, trauma:s.cameraSystem.trauma,
       reset:s.hangang.collision.contact===null, altitude:s.telemetry.radioAltFt};
   });
   await send('Emulation.setDeviceMetricsOverride',{width:412,height:915,deviceScaleFactor:1,mobile:true});
@@ -164,7 +171,7 @@ try {
   assert.equal(flight.bridges.contact,null);assert.equal(flight.bridges.crashed,false);assert.ok(flight.bridges.position[2]<=-3700);
   assert.equal(flight.contact,null);assert.equal(flight.crashed,false);assert.ok(flight.active);assert.ok(flight.height>40);
   assert.ok(Object.values(lifecycle).every(Boolean));assert.equal(exceptions.length,0);
-  assert.ok(retry.crashToMenu && retry.healthy && retry.reset);assert.equal(retry.trauma,0);assert.ok(retry.altitude>50);
+  assert.ok(retry.reportShown && retry.crashToMenu && retry.healthy && retry.reset);assert.equal(retry.trauma,0);assert.ok(retry.altitude>50);
 } finally {
   socket?.close();chrome.kill();
   await delay(1500);
