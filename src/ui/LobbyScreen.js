@@ -16,7 +16,7 @@ const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, onAirport, onPreset, onTime, onAircraft, onFly, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, onAirport, onPreset, onTime, onAircraft, onFly, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const selectionEl = document.getElementById('lobby-selection');
@@ -24,6 +24,27 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
   const demoSelect = document.getElementById('lobby-demo-select');
   const demoBriefing = document.getElementById('lobby-demo-briefing');
   demoSelect?.addEventListener('change', () => { onDemoProfile?.(demoSelect.value); refresh(); });
+  const valleyGroup = document.getElementById('lobby-valley-options');
+  const pilotHumanBtn = document.getElementById('lobby-pilot-human');
+  const pilotAiBtn = document.getElementById('lobby-pilot-ai');
+  const valleyGyroBtn = document.getElementById('lobby-valley-gyro');
+  const valleySettingsBtn = document.getElementById('lobby-valley-settings');
+
+  pilotHumanBtn?.addEventListener('click', () => {
+    onPilotMode('human');
+    refresh();
+  });
+  pilotAiBtn?.addEventListener('click', () => {
+    onPilotMode('ai');
+    refresh();
+  });
+  valleyGyroBtn?.addEventListener('click', async () => {
+    await onToggleGyro();
+    refresh();
+  });
+  valleySettingsBtn?.addEventListener('click', () => {
+    document.getElementById('lobby-tab-settings')?.click();
+  });
   const timeSelect = document.getElementById('lobby-time-select');
 
   // Quick-pick chips mirror the select, which stays the source of truth.
@@ -139,6 +160,28 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
         lobbyBriefing(airport, preset)[0], labelKey && t(labelKey)].filter(Boolean))].join(' | ');
     });
     if (demoGroup) demoGroup.hidden = preset !== 'demo';
+    if (valleyGroup) valleyGroup.hidden = preset !== 'valley';
+    const pilotMode = getPilotMode();
+    if (pilotHumanBtn) {
+      pilotHumanBtn.classList.toggle('active', pilotMode === 'human');
+      pilotHumanBtn.setAttribute('aria-checked', String(pilotMode === 'human'));
+    }
+    if (pilotAiBtn) {
+      pilotAiBtn.classList.toggle('active', pilotMode === 'ai');
+      pilotAiBtn.setAttribute('aria-checked', String(pilotMode === 'ai'));
+    }
+    const preflightBox = document.getElementById('lobby-valley-preflight');
+    if (preflightBox) {
+      preflightBox.hidden = pilotMode !== 'human';
+    }
+    if (valleyGyroBtn) {
+      const gyroOn = Boolean(isGyroActive());
+      valleyGyroBtn.classList.toggle('active', gyroOn);
+      const gyroLabel = valleyGyroBtn.querySelector('.gyro-label');
+      if (gyroLabel) {
+        bindText(gyroLabel, () => t(gyroOn ? 'gyro.on' : 'gyro.off'));
+      }
+    }
     if (demoSelect) {
       const choices = demoProfiles(aircraft, airport);
       const selected = resolveDemoProfile(aircraft, airport, getDemoProfile?.());

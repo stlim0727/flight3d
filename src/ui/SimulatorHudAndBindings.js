@@ -477,6 +477,10 @@ class SimulatorHudAndBindingsMethods {
       getAircraft: () => this.lobby.aircraft || this.currentAircraftId || 'B738',
       getDemoProfile: () => this.lobby.demoProfile,
       onDemoProfile: id => { this.lobby.demoProfile = id; },
+      getPilotMode: () => this.lobby.pilotMode || 'human',
+      onPilotMode: mode => { this.lobby.pilotMode = mode; },
+      onToggleGyro: () => this.touchControls?.toggleGyro(),
+      isGyroActive: () => Boolean(this.touchControls?.gyroActive || this.touchControls?.gyroRequested),
       // Pending by design: the click records the wish; the start button applies it,
       // and only a flight actually flown is persisted.
       onAirport: id => {
@@ -487,6 +491,9 @@ class SimulatorHudAndBindingsMethods {
       },
       onPreset: type => {
         this.lobby.preset = type;
+        if (type === 'valley') {
+          this.lobby.aircraft = 'F16';
+        }
         this.lobbyScreen.refresh();
       },
       onTime: hours => this.setTimeOfDay(hours),
@@ -512,6 +519,10 @@ class SimulatorHudAndBindingsMethods {
     document.getElementById('btn-pause-restart')?.addEventListener('click', () => {
       this.gameFlow.resume();
       if (this.devRunner.active) { this.devRunner.restart(); return; }
+      if (this.lastPresetType === 'valley') {
+        this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' });
+        return;
+      }
       this.setPreset(this.lastPresetType || 'runway');
     });
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));

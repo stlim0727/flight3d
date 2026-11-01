@@ -69,9 +69,11 @@ export function installPilotArena(sim) {
   scoreOverlay.addEventListener('click', event => {
     if (event.target === scoreOverlay || event.target.closest('[data-score-close]')) {
       hideScoreOverlay();
-      if (runner.record?.pilotKind === 'human') {
+      if (new URLSearchParams(location.search).get('pilotArena') === '1') {
         shell.open = true;
         updateToggle();
+      } else {
+        sim.gameFlow.returnToLobby(true);
       }
     } else if (event.target.closest('[data-score-retry]')) {
       hideScoreOverlay();
@@ -239,8 +241,9 @@ export function installPilotArena(sim) {
     find('telemetry').textContent = '관측 대기 중';
     lastStatus = null;
     runner.paceTick = find('kind').value === 'human' || find('playback').value === 'realtime' ? createRealtimePacer() : null;
-    if (find('kind').value === 'human') shell.open = false;
+    if (find('kind').value === 'human' || new URLSearchParams(location.search).get('pilotArena') !== '1') shell.open = false;
     sim.gameFlow.enterFlight();
+    if (!source.value && find('kind').value === 'ai') loadExample();
     void runner.start(source.value, { pilotKind: find('kind').value, missionId: find('mission').value,
       environmentProfile: find('environment').value, seed }).catch(error => {
       find('status').textContent = error.message;

@@ -253,7 +253,7 @@ class FlightSimulator {
       onStateChange: () => this.syncFlowUi(),
     });
     this.flightRecorder = new FlightRecorder();
-    this.lobby = { airport: savedSelection.airport, preset: savedSelection.scenario, aircraft: savedSelection.aircraft };
+    this.lobby = { airport: savedSelection.airport, preset: savedSelection.scenario, aircraft: savedSelection.aircraft, pilotMode: 'human' };
     this.currentAircraftId = savedSelection.aircraft;
     this.lastPresetType = savedSelection.scenario;
     this.startingFlight = false;
@@ -564,13 +564,19 @@ class FlightSimulator {
     this.devRunner.stop();
     this.shadowDemo.stop();
     const wantsDemo = this.lobby.preset === 'demo';
+    const wantsValley = this.lobby.preset === 'valley';
     if (this.demoDirector?.isActive || this.demoDirector?.waitingForTerrain) {
       this.demoDirector.stop(wantsDemo ? null : () => t('manual.control.engaged'));
     }
     this.gameFlow.enterFlight();
     // setAirport may have clamped the scenario to the region it loaded.
-    if (wantsDemo) this.demoDirector.start();
-    else this.setPreset(this.lobby.preset);
+    if (wantsDemo) {
+      this.demoDirector.start();
+    } else if (wantsValley) {
+      this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' });
+    } else {
+      this.setPreset(this.lobby.preset);
+    }
     this.beginFlightRecording();
     saveSimulatorPreferences({ demoProfile: this.lobby.demoProfile });
     saveFlightSelection({
@@ -578,6 +584,30 @@ class FlightSimulator {
       aircraft: this.lobby.aircraft ?? this.currentAircraftId,
       scenario: this.lobby.preset,
     });
+  }
+
+  async startValleyMission({ pilotKind = 'human' } = {}) {
+    this.lastPresetType = 'valley';
+    if (!this.pilotArena) {
+      const { installPilotArena } = await import('./ui/PilotArenaPanel.js');
+      installPilotArena(this);
+    }
+    const arenaEl = document.getElementById('pilot-arena');
+    if (arenaEl) arenaEl.open = false;
+
+    const missionSelect = arenaEl?.querySelector('[data-mission]');
+    if (missionSelect) {
+      missionSelect.value = 'valley-low-v1';
+    }
+    const kindSelect = arenaEl?.querySelector('[data-kind]');
+    if (kindSelect) {
+      kindSelect.value = pilotKind;
+      kindSelect.dispatchEvent(new Event('change'));
+    }
+    const runBtn = arenaEl?.querySelector('[data-run]');
+    if (runBtn) {
+      runBtn.click();
+    }
   }
 
   /** The HUD menu button only opens the main menu, holding the current flight. */
@@ -608,7 +638,7 @@ class FlightSimulator {
   /** Count only visible crash frames, never deterministic physics or menu time. */
   updateCrashDebrief(dt) {
     if (this.crashDebriefRemaining == null) return;
-    if (!this.isCrashed || this.gameFlow.state === FLOW.LOBBY || this.devRunner?.active) {
+    if (!this.isCrashed || this.gameFlow.state === FLOW.LOBBY || this.devRunner?.active || this.pilotArena?.active) {
       this.crashDebriefRemaining = null;
       return;
     }

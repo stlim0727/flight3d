@@ -31,6 +31,7 @@ export class ValleyMission {
     this.lowClearanceTicks = 0;
     this.offCourseTicks = 0;
     this.underSpeedTicks = 0;
+    this.overSpeedTicks = 0;
   }
 
   finish(status, reason) { this.status = status; this.reason = reason; return this.result(); }
@@ -63,6 +64,7 @@ export class ValleyMission {
       this.underSpeedTicks++;
     } else if (s.iasKnots > this.manifest.maximumIasKnots) {
       if (strict) return this.finish('failed', 'speed-envelope');
+      this.overSpeedTicks++;
     }
 
     if (!this.previous && Math.hypot(s.position.x - c.points[0].x, s.position.z - c.points[0].z) > c.startRadiusM) {
@@ -130,7 +132,8 @@ export class ValleyMission {
     const lowClearancePenalty = Math.round((this.lowClearanceTicks / this.manifest.physicsHz) * 50);
     const offCoursePenalty = Math.round((this.offCourseTicks / this.manifest.physicsHz) * 50);
     const underSpeedPenalty = Math.round((this.underSpeedTicks / this.manifest.physicsHz) * 30);
-    const totalPenalties = altitudePenalty + missedGatePenalty + lowClearancePenalty + offCoursePenalty + underSpeedPenalty;
+    const overSpeedPenalty = Math.round((this.overSpeedTicks / this.manifest.physicsHz) * 30);
+    const totalPenalties = altitudePenalty + missedGatePenalty + lowClearancePenalty + offCoursePenalty + underSpeedPenalty + overSpeedPenalty;
     const finalScore = this.status === 'succeeded'
       ? Math.max(0, Math.round(baseScore + gateScore + timeScore + speedScore - totalPenalties))
       : null;
