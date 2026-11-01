@@ -6,45 +6,45 @@
  * the game actually does. Values are the pessimistic side of both measured
  * altitudes; nothing outside the measured range is extrapolated.
  *
- * The asymmetry that shapes the whole contract: idle thrust exceeds clean drag
- * at every speed in the band, so wings-level flight at idle *gains* energy
- * (+11 to +16 m/s at held airspeed). A sustained sink only exists above ~55
- * degrees of bank and never exceeds about 10 m/s, while climb authority is
- * 27-36 m/s at a third of the throttle. Losing height is therefore either slow
- * and banked, or fast and paid for in airspeed. */
+ * With PR #384 eliminating the idle thrust creep artifact, throttle at idle
+ * produces a sustained natural sink across all speeds in the band
+ * (-10.6 to -16.2 m/s wings-level). Bank steepens the sink through induced drag,
+ * reaching -28.5 to -33.3 m/s at 60 degrees. Climb authority is 27-36 m/s
+ * at a third of the throttle. Losing height is natural and sustained even
+ * wings-level, and deepens in turns. */
 
 export const SLALOM_ENVELOPE_VERSION = 'f16-slalom-envelope-v1';
 
 /** Airspeeds at which the plant was held, each with its measured banked rows. */
 export const MEASURED_ROWS = Object.freeze([
   { iasKnots: 220, rows: [
-    { bankDeg: 0, turnRateDegS: 0, turnRadiusM: null, sustainedClimbRateMs: 11.4 },
-    { bankDeg: 20, turnRateDegS: 1.64, turnRadiusM: 4618, sustainedClimbRateMs: 10.0 },
-    { bankDeg: 30, turnRateDegS: 2.57, turnRadiusM: 2932, sustainedClimbRateMs: 8.2 },
-    { bankDeg: 40, turnRateDegS: 3.68, turnRadiusM: 2031, sustainedClimbRateMs: 5.4 },
-    { bankDeg: 50, turnRateDegS: 5.21, turnRadiusM: 1420, sustainedClimbRateMs: 0.6 },
-    { bankDeg: 60, turnRateDegS: 7.79, turnRadiusM: 928, sustainedClimbRateMs: -10.4 } ] },
+    { bankDeg: 0, turnRateDegS: 0, turnRadiusM: null, sustainedClimbRateMs: -10.6 },
+    { bankDeg: 20, turnRateDegS: 1.47, turnRadiusM: 4807, sustainedClimbRateMs: -11.8 },
+    { bankDeg: 30, turnRateDegS: 2.39, turnRadiusM: 2966, sustainedClimbRateMs: -13.2 },
+    { bankDeg: 40, turnRateDegS: 3.57, turnRadiusM: 1979, sustainedClimbRateMs: -15.8 },
+    { bankDeg: 50, turnRateDegS: 5.29, turnRadiusM: 1330, sustainedClimbRateMs: -21.0 },
+    { bankDeg: 60, turnRateDegS: 8.38, turnRadiusM: 827, sustainedClimbRateMs: -33.3 } ] },
   { iasKnots: 260, rows: [
-    { bankDeg: 0, turnRateDegS: 0, turnRadiusM: null, sustainedClimbRateMs: 13.6 },
-    { bankDeg: 20, turnRateDegS: 1.42, turnRadiusM: 6330, sustainedClimbRateMs: 12.2 },
-    { bankDeg: 30, turnRateDegS: 2.22, turnRadiusM: 4023, sustainedClimbRateMs: 10.4 },
-    { bankDeg: 40, turnRateDegS: 3.17, turnRadiusM: 2806, sustainedClimbRateMs: 7.6 },
-    { bankDeg: 50, turnRateDegS: 4.41, turnRadiusM: 1993, sustainedClimbRateMs: 3.6 },
-    { bankDeg: 60, turnRateDegS: 6.49, turnRadiusM: 1329, sustainedClimbRateMs: -5.0 } ] },
+    { bankDeg: 0, turnRateDegS: 0, turnRadiusM: null, sustainedClimbRateMs: -12.1 },
+    { bankDeg: 20, turnRateDegS: 1.23, turnRadiusM: 6842, sustainedClimbRateMs: -13.1 },
+    { bankDeg: 30, turnRateDegS: 1.99, turnRadiusM: 4214, sustainedClimbRateMs: -14.2 },
+    { bankDeg: 40, turnRateDegS: 2.98, turnRadiusM: 2809, sustainedClimbRateMs: -16.2 },
+    { bankDeg: 50, turnRateDegS: 4.40, turnRadiusM: 1895, sustainedClimbRateMs: -20.3 },
+    { bankDeg: 60, turnRateDegS: 6.78, turnRadiusM: 1214, sustainedClimbRateMs: -29.6 } ] },
   { iasKnots: 300, rows: [
-    { bankDeg: 0, turnRateDegS: 0, turnRadiusM: null, sustainedClimbRateMs: 15.4 },
-    { bankDeg: 20, turnRateDegS: 1.27, turnRadiusM: 8189, sustainedClimbRateMs: 13.9 },
-    { bankDeg: 30, turnRateDegS: 1.99, turnRadiusM: 5204, sustainedClimbRateMs: 11.9 },
-    { bankDeg: 40, turnRateDegS: 2.83, turnRadiusM: 3633, sustainedClimbRateMs: 9.0 },
-    { bankDeg: 50, turnRateDegS: 3.90, turnRadiusM: 2615, sustainedClimbRateMs: 5.0 },
-    { bankDeg: 60, turnRateDegS: 5.59, turnRadiusM: 1792, sustainedClimbRateMs: -2.0 } ] },
+    { bankDeg: 0, turnRateDegS: 0, turnRadiusM: null, sustainedClimbRateMs: -14.6 },
+    { bankDeg: 20, turnRateDegS: 1.05, turnRadiusM: 9249, sustainedClimbRateMs: -15.6 },
+    { bankDeg: 30, turnRateDegS: 1.69, turnRadiusM: 5715, sustainedClimbRateMs: -16.5 },
+    { bankDeg: 40, turnRateDegS: 2.54, turnRadiusM: 3800, sustainedClimbRateMs: -18.0 },
+    { bankDeg: 50, turnRateDegS: 3.76, turnRadiusM: 2560, sustainedClimbRateMs: -21.2 },
+    { bankDeg: 60, turnRateDegS: 5.75, turnRadiusM: 1656, sustainedClimbRateMs: -28.5 } ] },
   { iasKnots: 320, rows: [
-    { bankDeg: 0, turnRateDegS: 0, turnRadiusM: null, sustainedClimbRateMs: 16.1 },
-    { bankDeg: 20, turnRateDegS: 1.21, turnRadiusM: 9158, sustainedClimbRateMs: 14.6 },
-    { bankDeg: 30, turnRateDegS: 1.90, turnRadiusM: 5815, sustainedClimbRateMs: 12.5 },
-    { bankDeg: 40, turnRateDegS: 2.70, turnRadiusM: 4060, sustainedClimbRateMs: 9.4 },
-    { bankDeg: 50, turnRateDegS: 3.72, turnRadiusM: 2927, sustainedClimbRateMs: 5.3 },
-    { bankDeg: 60, turnRateDegS: 5.24, turnRadiusM: 2041, sustainedClimbRateMs: -1.3 } ] },
+    { bankDeg: 0, turnRateDegS: 0, turnRadiusM: null, sustainedClimbRateMs: -16.2 },
+    { bankDeg: 20, turnRateDegS: 0.97, turnRadiusM: 10592, sustainedClimbRateMs: -17.1 },
+    { bankDeg: 30, turnRateDegS: 1.56, turnRadiusM: 6581, sustainedClimbRateMs: -18.2 },
+    { bankDeg: 40, turnRateDegS: 2.35, turnRadiusM: 4369, sustainedClimbRateMs: -19.5 },
+    { bankDeg: 50, turnRateDegS: 3.49, turnRadiusM: 2938, sustainedClimbRateMs: -22.2 },
+    { bankDeg: 60, turnRateDegS: 5.34, turnRadiusM: 1901, sustainedClimbRateMs: -28.7 } ] },
 ]);
 
 /** Measured and frozen limits of the scored regime. Outside these the table has
@@ -66,8 +66,7 @@ export const SINK_MARGIN = 0.75;
 /** Fraction of the measured sustained turn rate a course may demand. */
 export const TURN_MARGIN = 0.85;
 /** Height traded for airspeed is not free: the baseline trace loses 14-16 m/s
- * while gaining 3.2-3.7 kt/s, about 0.66 of the ideal conversion, because idle
- * thrust is still feeding the airframe. */
+ * while gaining 3.2-3.7 kt/s, about 0.66 of the ideal conversion. */
 export const ENERGY_SINK_FACTOR = 0.6;
 
 const KT_TO_MS = 0.514444;
@@ -80,11 +79,6 @@ const interpolate = (x, points) => {
   const [x1, y1] = points[index - 1], [x2, y2] = points[index];
   return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
 };
-
-const rowAt = iasKnots => MEASURED_ROWS[
-  MEASURED_ROWS.reduce((best, row, index) =>
-    Math.abs(row.iasKnots - iasKnots) < Math.abs(MEASURED_ROWS[best].iasKnots - iasKnots) ? index : best, 0)
-];
 
 /** Bilinear lookup on the measured grid, clamped at the edges: an unmeasured
  * condition returns the nearest measured one instead of an invented one. */
@@ -157,7 +151,7 @@ export function assessLeg({ lengthM, headingChangeDeg, altitudeChangeM,
   const climbBudgetM = CLIMB_BUDGET_MS * legSeconds;
   const sinkBudgetM = Math.max(
     -maxSustainedSinkMs({ iasKnots: entryIasKnots }) * SINK_MARGIN * legSeconds,
-    energyDescentM({ entryIasKnots: entryIasKnots, exitIasKnots }));
+    energyDescentM({ entryIasKnots, exitIasKnots }));
   const shortfalls = [];
   if (Math.abs(headingChangeDeg) > turnBudgetDeg({ lengthM, headingIasKnots: cruiseKt })) shortfalls.push('turn');
   if (altitudeChangeM > climbBudgetM) shortfalls.push('climb');

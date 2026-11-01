@@ -59,14 +59,14 @@ measured grid:
 | Decision plus command lag | 0.4 s | 5 Hz period + 24-tick delay |
 | Bank reversal, both sides | ≈519 m at 280 kt, ≈593 m at 320 kt | `bankReversalMeters` |
 | Sustained climb authority | 27–36 m/s; budget 21.6 m/s | `energy`-hold climbs at a third of throttle |
-| Sustained sink at 60° bank | −10.4 m/s at 220 kt, only −1.3 m/s at 320 kt, and nothing at all below ~55° | `energy`-hold sink sweeps at both altitudes |
+| Sustained sink at 60° bank | −33.3 m/s at 220 kt, −28.7 m/s at 320 kt (−10.6 to −16.2 m/s wings-level) | `energy`-hold sink sweeps at both altitudes |
 | Energy sink conversion | 0.6 | baseline trace trades 14–16 m/s for 3.2–3.7 kt/s |
 
-The asymmetry that shapes the contract: idle thrust exceeds clean drag at every
-speed in the band, so wings-level flight at idle *gains* energy. Losing height is
-either slow and banked or fast and paid for in airspeed. A course that demands a
-steep descent over a short leg is asking for something this airframe does not do,
-so `assessLeg` refuses it at generation time.
+With PR #384 eliminating the idle thrust creep artifact, idle throttle produces
+sustained natural sink across all speeds in the band (−10.6 to −16.2 m/s wings-level),
+and steep bank deepens the sink via induced drag (−28.5 to −33.3 m/s at 60° bank).
+A course that demands a descent steeper than what the airframe can sustain or pay
+for in airspeed is refused by `assessLeg` at generation time.
 
 ## Course generation
 
@@ -83,7 +83,7 @@ perfect prism and stays exactly reproducible.
 | Passage half-width | 130 m | lateral band a gate is credited in |
 | Gate aim offset | 0.4–0.85 of the room left after the band, alternating | the low line runs at the wall side, not down the middle |
 | Passage band | 60 m floor + 40–90 m | a real slab of air above the ground under it |
-| Floor step | −25 m down, up to +72 m on 35% of legs | the shortest leg can sink 35 m and climb 131 m at cruise, and in this airframe descent is the scarce resource |
+| Floor step | −25 m down, up to +72 m on 35% of legs | the shortest leg can sink 143 m and climb 131 m at cruise |
 | Speed envelope | 220–320 KIAS, legs assessed at the 240 kt cruise the spawn declares | turn rate and sink ceiling are both measured, never extrapolated, at that speed |
 | Clearance floor | 20 m AGL | shared with low-v1 |
 | Chart resolution | 100 m along a 25 m sample grid | a route to read, not a terrain array |
