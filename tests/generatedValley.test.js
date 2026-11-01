@@ -32,8 +32,26 @@ test('a seed is the whole course: the same numbers reproduce terrain and gates',
   assert.notDeepEqual(generateValley({ seed: 8 }).course, first.course);
 });
 
-test('the bend a leg is judged on is the bend the centreline actually turns', () => {
+test('the centreline is a real arc: even steps, no repeated points, honest length', () => {
   for (const seed of DEV_SEEDS) {
+    const { course } = generateValley({ seed });
+    const line = course.centerline;
+    const declared = course.legs.reduce((sum, leg) => sum + leg.lengthM, 0);
+    assert.ok(Math.abs(course.lengthM - declared) < 1e-6, `seed ${seed} length drifts from its legs`);
+    assert.equal(line[0].sM, 0, `seed ${seed} does not start at zero`);
+    let walked = 0;
+    for (let index = 1; index < line.length; index++) {
+      const step = Math.hypot(line[index].x - line[index - 1].x, line[index].z - line[index - 1].z);
+      assert.ok(step > 1, `seed ${seed} repeats a centreline point at ${index}`);
+      assert.ok(Math.abs(step - (line[index].sM - line[index - 1].sM)) < 0.01,
+        `seed ${seed} step ${index} is ${step.toFixed(2)} m of ground for ${(line[index].sM - line[index - 1].sM).toFixed(2)} m of progress`);
+      walked += step;
+    }
+    assert.ok(Math.abs(walked - course.lengthM) < 1, `seed ${seed} walks ${walked.toFixed(1)} m`);
+  }
+});
+
+test('the bend a leg is judged on is the bend the centreline actually turns', () => {  for (const seed of DEV_SEEDS) {
     const { course } = generateValley({ seed });
     course.gates.slice(1).forEach((gate, index) => {
       const previous = course.gates[index];

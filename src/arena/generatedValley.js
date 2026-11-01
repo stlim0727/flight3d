@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { CLIMB_BUDGET_MS, SLALOM_IAS_MAX_KT, SLALOM_IAS_MIN_KT, assessLeg,
-  bankReversalMeters } from './slalomEnvelope.js';
+import { CLIMB_BUDGET_MS, MAX_BANK_DEG, SLALOM_ENVELOPE_VERSION, SLALOM_IAS_MAX_KT,
+  SLALOM_IAS_MIN_KT, assessLeg, bankReversalMeters } from './slalomEnvelope.js';
 
 /** Seed-reproducible valley courses for validating the slalom contract. Terrain
  * and geometry are generated together, which keeps a course honest in two
@@ -42,6 +42,9 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
    * carve the bend instead of following the middle. It is a fraction of the room
    * that is left once the passage space itself is subtracted. */
   gateOffsetFraction: [0.4, 0.85],
+  /** The ceiling a gate is credited under, and how much deeper it may be. Bands
+   * start no lower than this so every passage space is a real slab of air with
+   * the valley floor under it, not a line drawn on the ground. */
   passageMinAglM: 60,
   passageBandM: [40, 90],
   /** Between gates the valley may drop by no more than what a constant-speed leg
@@ -59,6 +62,12 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
   decisionPeriodTicks: 24,
   commandDelayTicks: 24,
   sampleStepM: 25,
+  /** Chart resolution offered to a pilot: a route to read, not a terrain array. */
+  chartSpacingM: 100,
+  /** Two minutes of flying, the same wall clock the low-v1 baseline runs with. */
+  timeoutTicks: 14400,
+  envelopeVersion: SLALOM_ENVELOPE_VERSION,
+  maximumBankDeg: MAX_BANK_DEG,
 });
 
 /** Smooth deterministic relief added to the idealised walls, so a course is not
@@ -109,7 +118,9 @@ function buildCenterline(random, rules) {
     const curvature = headingChangeDeg * RAD / lengthM;
     const steps = Math.max(2, Math.round(lengthM / rules.sampleStepM));
     const stepM = lengthM / steps;
-    for (let step = 0; step <= steps; step++) {
+    // The first sample of a leg is the last sample of the one before it; pushing
+    // it twice would freeze the position while the arc length kept counting.
+    for (let step = index === 0 ? 0 : 1; step <= steps; step++) {
       const share = step / steps;
       if (step > 0) {
         // Integrate the arc: heading changes uniformly along the leg, so the
@@ -119,8 +130,8 @@ function buildCenterline(random, rules) {
         x += Math.sin(heading) * stepM / 2; z -= Math.cos(heading) * stepM / 2;
         heading += curvature * stepM;
         x += Math.sin(heading) * stepM / 2; z -= Math.cos(heading) * stepM / 2;
+        progress += stepM;
       }
-      progress += lengthM / steps;
       samples.push({ x, z, s: progress, heading, floor: floor + (floorAt - floor) * share,
         halfWidth: leg.halfWidth, wallRiseM: leg.wallRiseM, ridgeExponent: leg.ridgeExponent,
         legIndex: index });
@@ -342,7 +353,9 @@ export function generateValley({ seed, rules = VALLEY_SLALOM_RULES } = {}) {
   const noise = valueNoise(mulberry32(seed ^ 0x5bf03635));
   const terrain = createValleyTerrain({ samples, noise, reliefAmplitudeM: rules.reliefAmplitudeM });
   const gates = buildGates({ samples, legs, rules, random, terrain });
-  const course = { version: rules.version, seed, gates, legs,
+  const centerline = samples.map(sample => ({ x: sample.x, z: sample.z, sM: sample.s,
+    halfWidthM: sample.halfWidth, headingDeg: sample.heading / RAD }));
+  const course = { version: rules.version, seed, gates, legs, centerline,
     lengthM: samples.at(-1).s, elevationReferenceM: 2100,
     clearanceFloorM: rules.clearanceFloorM, speedKnots: rules.speedKnots };
   const assessment = assessCourse({ course, terrain, rules });
