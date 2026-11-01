@@ -27,7 +27,7 @@ restart** to restart; after a crash use the common report and
 
 Leaving the river corridor is not prevented. Skyline buildings and above-deck
 arch decorations have no collision proxies (see below); boundary handling is
-tracked separately from #391.
+tracked in #393.
 
 ## Physics and geometry contracts
 
