@@ -205,22 +205,10 @@ export function scoreOverlayMarkup(data) {
         ${data.subtext ? `<div class="modal-score-sub">${data.subtext}</div>` : ''}
       </div>
       ${statsHtml ? `<div class="modal-stats-grid">${statsHtml}</div>` : ''}
-      ${data.isValley ? `
-      <div class="modal-actions modal-actions-valley">
-        <button type="button" class="btn-retry btn-retry-human${data.isHuman ? ' is-active' : ''}" data-score-retry="human">
-          <span>👤 사람으로 재도전</span>
-        </button>
-        <button type="button" class="btn-retry btn-retry-ai${!data.isHuman ? ' is-active' : ''}" data-score-retry="ai">
-          <span>🤖 AI 비행으로 재도전</span>
-        </button>
-        <button type="button" class="btn-close" data-score-close>
-          <span>메인 메뉴 (자이로·설정)</span>
-        </button>
-      </div>` : `
       <div class="modal-actions">
         <button type="button" class="btn-retry" data-score-retry>다시 도전</button>
-        <button type="button" class="btn-close" data-score-close>닫기</button>
-      </div>`}
+        <button type="button" class="btn-close" data-score-close>메인 메뉴로 이동</button>
+      </div>
     </div>
   `;
 }

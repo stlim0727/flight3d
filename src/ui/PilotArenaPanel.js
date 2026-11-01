@@ -14,9 +14,11 @@ import { formatPilotScoreData, scoreBannerMarkup, scoreOverlayMarkup, koreanReas
 
 /** Opt-in local pilot lab. No remote upload and no security sandbox claims. */
 export function installPilotArena(sim) {
+  const isDevMode = new URLSearchParams(location.search).get('pilotArena') === '1';
   const shell = document.createElement('details');
   shell.id = 'pilot-arena';
-  shell.open = !window.matchMedia('(max-width: 640px)').matches;
+  shell.hidden = !isDevMode;
+  shell.open = isDevMode && !window.matchMedia('(max-width: 640px)').matches;
   shell.innerHTML = `<summary><span>Pilot · <span data-compact-status>대기 중</span></span><span data-toggle-label>최소화</span></summary>
     <div data-score-banner class="pilot-score-banner" hidden></div>
     <p>본인이 신뢰하는 코드만 실행하세요. 예제는 제한된 물리 테스트를 통과한 실험용이며 결과는 로컬 비랭킹입니다.</p>
@@ -66,32 +68,34 @@ export function installPilotArena(sim) {
   document.body.append(scoreOverlay);
   let shownOverlayRecord = null;
   const hideScoreOverlay = () => { scoreOverlay.hidden = true; };
-  scoreOverlay.addEventListener('click', event => {
-    const retryBtn = event.target.closest('[data-score-retry]');
-    if (retryBtn) {
-      const mode = retryBtn.dataset.scoreRetry || (runner.record?.pilotKind === 'human' ? 'human' : 'ai');
-      hideScoreOverlay();
-      const kindSelect = shell.querySelector('[data-kind]');
-      if (kindSelect) {
-        kindSelect.value = mode;
-        kindSelect.dispatchEvent(new Event('change'));
+  const returnToLobbyMenu = () => {
+    hideScoreOverlay();
+    runner.stop();
+    if (isDevMode) {
+      shell.open = true;
+      updateToggle();
+    } else {
+      sim.demoDirector?.stop();
+      if (typeof sim.gameFlow?.returnToLobby === 'function') {
+        sim.gameFlow.returnToLobby(false);
       }
-      if (sim.lobby) sim.lobby.pilotMode = mode;
+      document.getElementById('btn-fly')?.focus();
+    }
+  };
+  scoreOverlay.addEventListener('click', event => {
+    if (event.target.closest('[data-score-retry]')) {
+      hideScoreOverlay();
       find('run').click();
       return;
     }
     if (event.target === scoreOverlay || event.target.closest('[data-score-close]')) {
-      hideScoreOverlay();
-      if (new URLSearchParams(location.search).get('pilotArena') === '1') {
-        shell.open = true;
-        updateToggle();
-      } else {
-        sim.gameFlow.returnToLobby(true);
-      }
+      returnToLobbyMenu();
     }
   });
   window.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !scoreOverlay.hidden) hideScoreOverlay();
+    if (event.key === 'Escape' && !scoreOverlay.hidden) {
+      returnToLobbyMenu();
+    }
   });
   find('score-banner').addEventListener('click', event => {
     if (event.target.closest('[data-banner-retry]')) find('run').click();

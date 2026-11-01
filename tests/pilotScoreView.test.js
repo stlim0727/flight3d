@@ -173,8 +173,8 @@ test('formatPilotScoreData handles takeoff success', () => {
   assert.equal(data.stats.some(s => s.label === '중심선 오차' && s.value === '1.4 m'), true);
 });
 
-test('scoreOverlayMarkup for valley mission includes human and ai retry options', () => {
-  const humanRecord = {
+test('scoreOverlayMarkup includes clear retry and return-to-lobby actions', () => {
+  const record = {
     pilotKind: 'human',
     status: 'failed',
     reason: 'crash',
@@ -182,21 +182,9 @@ test('scoreOverlayMarkup for valley mission includes human and ai retry options'
     manifest: { type: 'valley', physicsHz: 120 },
     result: { metrics: { completedGates: 2, totalGates: 6 } },
   };
-  const humanData = formatPilotScoreData(humanRecord, '계곡 저공');
-  const humanOverlay = scoreOverlayMarkup(humanData);
-  assert.match(humanOverlay, /data-score-retry="human"/);
-  assert.match(humanOverlay, /data-score-retry="ai"/);
-  assert.match(humanOverlay, /btn-retry-human is-active/);
-
-  const aiRecord = {
-    pilotKind: 'ai',
-    status: 'succeeded',
-    reason: 'completed',
-    tick: 4800,
-    manifest: { type: 'valley', physicsHz: 120 },
-    result: { metrics: { completedGates: 6, totalGates: 6, altitudeCostM: 200 } },
-  };
-  const aiData = formatPilotScoreData(aiRecord, '계곡 저공');
-  const aiOverlay = scoreOverlayMarkup(aiData);
-  assert.match(aiOverlay, /btn-retry-ai is-active/);
+  const data = formatPilotScoreData(record, '계곡 저공');
+  const overlay = scoreOverlayMarkup(data);
+  assert.match(overlay, /data-score-retry/);
+  assert.match(overlay, /data-score-close/);
+  assert.match(overlay, /메인 메뉴로 이동/);
 });
