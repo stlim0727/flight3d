@@ -336,6 +336,55 @@
   color: #fff;
 }
 
+.pilot-score-modal .modal-actions-valley {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pilot-score-modal .btn-retry-human,
+.pilot-score-modal .btn-retry-ai {
+  flex: 1 1 calc(50% - 4px);
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13.5px;
+}
+.pilot-score-modal .btn-retry-human {
+  background: #0284c7;
+  color: #ffffff;
+  border: 1px solid rgba(56, 189, 248, .35) !important;
+}
+.pilot-score-modal .btn-retry-human:hover {
+  background: #0369a1;
+}
+.pilot-score-modal .btn-retry-human.is-active {
+  box-shadow: 0 0 14px rgba(56, 189, 248, .4);
+  border-color: #38bdf8 !important;
+}
+.pilot-score-modal .btn-retry-ai {
+  background: #7e22ce;
+  color: #ffffff;
+  border: 1px solid rgba(192, 132, 252, .35) !important;
+}
+.pilot-score-modal .btn-retry-ai:hover {
+  background: #6b21a8;
+}
+.pilot-score-modal .btn-retry-ai.is-active {
+  box-shadow: 0 0 14px rgba(192, 132, 252, .4);
+  border-color: #c084fc !important;
+}
+.pilot-score-modal .modal-actions-valley .btn-close {
+  flex: 1 1 100%;
+}
+@media (max-width: 480px) {
+  .pilot-score-modal .btn-retry-human,
+  .pilot-score-modal .btn-retry-ai {
+    flex: 1 1 100%;
+  }
+}
+
 /* Screen edge turn arrow when next waypoint is off-screen horizontally */
 #valley-waypoint-arrow {
   position: fixed;
