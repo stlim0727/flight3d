@@ -15,6 +15,7 @@
     "pr:mac": "node scripts/agent-workflow.mjs pr:mac",
     "test:flight": "node scripts/test-flight-agent.js",
     "test:pilot": "node scripts/test-pilot-missions.mjs",
+    "test:valley": "node scripts/test-valley-pilot.mjs",
     "test:flight:visual": "node scripts/test-flight-agent.js --screenshots",
     "test:landing": "node scripts/test-landing-damage.js",
     "test:crash": "node scripts/test-crash-scenarios.js",

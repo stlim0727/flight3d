@@ -3,6 +3,7 @@ import { PilotPerception } from '../pilot/PilotPerception.js';
 import { createBriefing } from '../pilot/PilotProtocol.js';
 import { TakeoffMission } from './TakeoffMission.js';
 import { LandingMission } from './LandingMission.js';
+import { ValleyMission } from './ValleyMission.js';
 
 /** Local, unranked evaluator. Only this loop advances physics while active.
  * A computed command waits one full decision period before it can be applied.
@@ -51,7 +52,7 @@ export class MissionRunner {
       record.manifestHash = await hash(JSON.stringify(manifest));
       if (generation !== this.generation) return record;
       this.adapter.acquire();
-      const evaluator = manifest.id.startsWith('landing')
+      const evaluator = manifest.type === 'valley' ? new ValleyMission(manifest) : manifest.id.startsWith('landing')
         ? new LandingMission(manifest) : new TakeoffMission(manifest);
       const perception = new PilotPerception({ sensorSeed: options.sensorSeed ?? options.seed ?? 1,
         noise: options.noise ?? options.environmentProfile !== 'calm-debug-v1',
@@ -69,7 +70,9 @@ export class MissionRunner {
           this.adapter.apply(pending.command);
           this.record.commands.push({ ...pending, applyTick: tick });
         }
-        const observation = perception.sample(this.adapter.snapshot(tick), tick);
+        const snapshotAtDecision = this.adapter.snapshot(tick);
+        const observation = this.adapter.observe?.(perception, snapshotAtDecision, tick, evaluator)
+          ?? perception.sample(snapshotAtDecision, tick);
         this.record.observations.push({ sampleTick: tick, observation });
         const command = await host.tick(observation, { sampleTick: tick });
         if (generation !== this.generation) break;

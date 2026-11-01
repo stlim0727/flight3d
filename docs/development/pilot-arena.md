@@ -109,4 +109,8 @@ See [pilot wind](pilot-wind.md) for the physical-disturbance audit and model.
 
 ## Direct live cases
 
-The [flight URL directory](../flight-urls.md#ai-pilot-mission-tests-12-cases) lists all 12 built-in cases. `pilotArena=1&pilotCase=landing-mild-3`, for example, selects the landing pilot, mild disturbances and seed 3, waits for startup readiness, then starts 1× playback. Only known built-in case IDs autostart; links cannot supply executable source. Backgrounding the browser aborts the active mission to prevent invisible simulation or catch-up bursts.
+The [flight URL directory](../flight-urls.md#ai-pilot-mission-selector) selects one built-in case at a time. `pilotArena=1&pilotCase=landing-mild-3`, for example, selects the landing pilot, mild disturbances and seed 3, waits for startup readiness, then starts 1× playback. Only known built-in case IDs autostart; links cannot supply executable source. Backgrounding the browser aborts the active mission to prevent invisible simulation or catch-up bursts.
+
+## F-16 Lukla valley
+
+The [valley mission plan](f16-valley-pilot.md) defines its fixed start/finish, virtual terrain-range sensor, ordered gates and distance-weighted altitude objective. Select the valley mission in the directory or local console. `npm run test:valley` executes its real-DEM production-physics sweep without a renderer. It permits avoidance climbs and rewards returning low; it is a game-model challenge, not real F-16 terrain-following validation.

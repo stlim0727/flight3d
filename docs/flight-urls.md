@@ -46,6 +46,9 @@ Examples, rather than an exhaustive case list:
 - [Landing, calm baseline](https://stlim0727.github.io/flight3d/?aircraft=B738&terrain=coastal&scenario=approach&pilotArena=1&pilotCase=landing-calm)
   · [landing pilot source](https://github.com/stlim0727/flight3d/blob/main/src/pilot/examples/landing.js)
 
+- [F-16 Lukla valley, calm](https://stlim0727.github.io/flight3d/?aircraft=F16&terrain=lukla&scenario=cruise&pilotArena=1&pilotCase=valley-calm)
+  · [valley pilot source](https://github.com/stlim0727/flight3d/blob/main/src/pilot/examples/valley.js)
+
 Calm baseline cases disable sensor noise. Mild cases use seeded physical wind
 and correlated sensor errors. See the [pilot arena contract and verification](development/pilot-arena.md)
 for their meaning and limits. The Lukla valley course, observations and scoring

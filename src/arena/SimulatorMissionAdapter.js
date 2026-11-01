@@ -226,7 +226,8 @@ export class SimulatorMissionAdapter {
       throw new Error('pilot-control-conflict');
     }
     const sim = this.sim, config = this.manifest.fixedConfiguration;
-    if (sim.gear.targetGearState !== 1 || sim.gear.gearState !== 1 ||
+    const fixedGear = config.gearDown ? 1 : 0;
+    if (sim.gear.targetGearState !== fixedGear || sim.gear.gearState !== fixedGear ||
         sim.aero.flapsIndex !== config.flapIndex || sim.aero.spoilers !== 0 ||
         sim.engines.reverserActive || sim.controls.parkingBrake ||
         sim.controls.pitchTrim !== config.pitchTrimDeg || sim.aero.pitchTrim !== config.pitchTrimDeg) {

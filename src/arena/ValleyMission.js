@@ -24,6 +24,7 @@ export class ValleyMission {
     this.nextGateIndex = 1;
     this.status = 'running'; this.reason = null; this.tick = 0;
     this.previous = null; this.samples = []; this.maximumProgressM = 0; this.maxAglM = 0;
+    this.minAglM = null;
   }
 
   finish(status, reason) { this.status = status; this.reason = reason; return this.result(); }
@@ -37,6 +38,7 @@ export class ValleyMission {
       return this.finish('failed', 'invalid-snapshot');
     }
     this.tick = s.tick;
+    this.minAglM = Math.min(this.minAglM ?? s.aglM, s.aglM);
     if (s.crashed || s.damaged || s.bodyContact) return this.finish('failed', s.crashed ? 'crash' : s.bodyContact ? 'body-strike' : 'damage');
     if (this.tick >= this.manifest.timeoutTicks) return this.finish('failed', 'timeout');
     const c = this.manifest.course;
@@ -85,6 +87,7 @@ export class ValleyMission {
       completedGates: this.nextGateIndex - 1, totalGates: this.legs.length,
       progressM: this.maximumProgressM, courseLengthM: this.lengthM, scoredDistanceM: distanceM,
       meanExcessM, p95ExcessM, maxAglM: this.maxAglM,
+      minAglM: this.minAglM,
       medianAglM: quantile(this.samples, 0.5, s => s.aglM),
       altitudeCostM: this.status === 'succeeded' ? 0.7 * meanExcessM + 0.3 * p95ExcessM : null,
     } };

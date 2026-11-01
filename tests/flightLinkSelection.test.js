@@ -40,9 +40,9 @@ test('pilot selectors preserve exact case identity and reset a seed unavailable 
 });
 
 test('new mission kinds and aircraft work without reintroducing full-list rendering', () => {
-  const valley = { id: 'valley-calm', type: 'valley', environmentProfile: 'calm-debug-v1', seed: 1,
+  const valley = { id: 'future-calm', type: 'future', environmentProfile: 'calm-debug-v1', seed: 1,
     aircraft: 'F16', airport: 'lukla' };
-  const selected = selectFlightLink([...pilotCases(), valley], { type: 'valley' }, pilotKeys);
+  const selected = selectFlightLink([...pilotCases(), valley], { type: 'future' }, pilotKeys);
   assert.equal(selected.row, valley);
   assert.equal(selected.row.aircraft, 'F16');
   assert.deepEqual(selectFlightLink([], {}, pilotKeys).row, null);

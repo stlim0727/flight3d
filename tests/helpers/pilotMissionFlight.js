@@ -3,7 +3,7 @@ import { Aerodynamics, createAeroResult } from '../../src/physics/Aerodynamics.j
 import { EngineModel } from '../../src/physics/EngineModel.js';
 import { LandingGear } from '../../src/physics/LandingGear.js';
 import { FlightControls } from '../../src/controls/FlightControls.js';
-import { BOEING_737_800 } from '../../src/config/aircraftConfigs.js';
+import { AIRCRAFT_REGISTRY } from '../../src/config/aircraftConfigs.js';
 import { Terrain } from '../../src/environment/Terrain.js';
 import { Airport } from '../../src/environment/Airport.js';
 import { CollisionDetector } from '../../src/physics/CollisionDetector.js';
@@ -28,13 +28,16 @@ installPhysicsIntegrator(PhysicsHost);
 installPresetSpawner(PhysicsHost);
 
 /** Production forces, control response, terrain and contacts without a renderer. */
-export function createPilotMissionSimulation() {
-  const terrain = new PhysicsTerrain(20000, 16, { textures: {} });
-  const airport = new PhysicsAirport();
+export function createPilotMissionSimulation({ aircraftId = 'B738', airportId = 'coastal',
+  terrain: suppliedTerrain, airport: suppliedAirport } = {}) {
+  const config = AIRCRAFT_REGISTRY[aircraftId];
+  if (!config) throw new TypeError('Unknown test aircraft');
+  const terrain = suppliedTerrain ?? new PhysicsTerrain(20000, 16, { textures: {} });
+  const airport = suppliedAirport ?? new PhysicsAirport();
   const sim = new PhysicsHost();
   Object.assign(sim, {
-    currentTerrain: terrain, currentAirport: airport, activeAirport: 'coastal',
-    currentAircraftId: 'B738', currentAircraftConfig: BOEING_737_800,
+    currentTerrain: terrain, currentAirport: airport, activeAirport: airportId,
+    currentAircraftId: aircraftId, currentAircraftConfig: config,
     controls: new ControlsWithoutDom(null, { getGamepads: () => [] }),
     aircraft: { group: new THREE.Group(), useGltf: true },
     autopilot: { master: false, annunciation() { return ''; }, reset() { this.master = false; }, disengage() { this.master = false; } },
@@ -43,8 +46,8 @@ export function createPilotMissionSimulation() {
     tireSmokeSystem: { clear() {}, spawnTouchdownSmoke() {} },
     renderPose: { reset() {} }, demoDirector: { isActive: false, stop() {} },
     showToast() {}, refreshTakeoffPerformance() {},
-    async setAirport(id) { if (id !== 'coastal') throw new Error('Unsupported test airport'); this.activeAirport = id; },
-    setAircraft(id) { if (id !== 'B738') throw new Error('Unsupported test aircraft'); this.currentAircraftId = id; },
+    async setAirport(id) { if (id !== airportId) throw new Error('Unsupported test airport'); this.activeAirport = id; },
+    setAircraft(id) { if (id !== aircraftId) throw new Error('Unsupported test aircraft'); this.currentAircraftId = id; },
     loadAircraftConfig(config) {
       this.currentAircraftConfig = config;
       this.aero = new Aerodynamics(config);
@@ -59,7 +62,7 @@ export function createPilotMissionSimulation() {
     lastOnGround: true, lastGearTarget: true, actualTakeoffMassKg: null,
     _performanceClock: 0, totalSimTime: 0, physicsDt: 1 / 120, physicsHz: 120,
   });
-  sim.loadAircraftConfig(BOEING_737_800);
+  sim.loadAircraftConfig(config);
   for (const key of ['_cgBefore', '_intThrust', '_intGravity', '_intNetForce', '_intNetMoment',
     '_intAngAcc', '_intForward', '_intNonGrav', '_intCabinUp']) sim[key] = new THREE.Vector3();
   sim._rotationBefore = new THREE.Quaternion();
@@ -67,7 +70,7 @@ export function createPilotMissionSimulation() {
   sim._intEuler = new THREE.Euler();
   sim._aeroResult = createAeroResult();
   sim.collisionDetector = new CollisionDetector(terrain, airport, null, null, null);
-  sim.collisionDetector.loadAircraftConfig(BOEING_737_800);
+  sim.collisionDetector.loadAircraftConfig(config);
   sim.engines.refuel(sim.aero);
   return sim;
 }

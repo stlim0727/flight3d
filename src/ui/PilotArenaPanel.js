@@ -1,8 +1,9 @@
 import { PilotHost } from '../pilot/PilotHost.js';
 import { MissionRunner } from '../arena/MissionRunner.js';
-import { SimulatorMissionAdapter } from '../arena/SimulatorMissionAdapter.js';
+import { PilotMissionAdapter } from '../arena/PilotMissionAdapter.js';
 import takeoffSource from '../pilot/examples/takeoff.js?raw';
 import landingSource from '../pilot/examples/landing.js?raw';
+import valleySource from '../pilot/examples/valley.js?raw';
 import { resolvePilotCase } from '../config/pilotCases.js';
 import { createRealtimePacer } from '../arena/realtimePacer.js';
 import { bindPilotPanelInput } from './pilotPanelInput.js';
@@ -14,7 +15,7 @@ export function installPilotArena(sim) {
   shell.open = !window.matchMedia('(max-width: 640px)').matches;
   shell.innerHTML = `<summary><span>AI pilot · <span data-compact-status>대기 중</span></span><span data-toggle-label>최소화</span></summary>
     <p>본인이 신뢰하는 코드만 실행하세요. 예제는 제한된 물리 테스트를 통과한 실험용이며 결과는 로컬 비랭킹입니다.</p>
-    <label>미션 <select data-mission><option value="takeoff-basic-v1">이륙</option><option value="landing-basic-v1">착륙</option></select></label>
+    <label>미션 <select data-mission><option value="takeoff-basic-v1">이륙</option><option value="landing-basic-v1">착륙</option><option value="valley-low-v1">F-16 루클라 계곡 저공</option></select></label>
     <label>환경 <select data-environment><option value="mild-disturbance-v1">약한 측풍·돌풍</option><option value="calm-debug-v1">무풍 · 디버깅</option></select></label>
     <label>시드 <input data-seed type="number" min="0" step="1" value="1"></label>
     <label>재생 속도 <select data-playback><option value="realtime">실시간 · 1배속</option><option value="fast">빠른 평가</option></select></label>
@@ -67,7 +68,7 @@ export function installPilotArena(sim) {
   };
   find('debug').addEventListener('toggle', () => renderTelemetry(runner.record));
   let lastStatus = null;
-  const runner = sim.pilotArena = new MissionRunner(new SimulatorMissionAdapter(sim), {
+  const runner = sim.pilotArena = new MissionRunner(new PilotMissionAdapter(sim), {
     hostFactory: () => new PilotHost({ onLog: message => appendLog(message) }),
     // One rendered frame per 0.2 simulated seconds keeps this a fast local lab.
     yieldFrame: () => new Promise(resolve => requestAnimationFrame(resolve)),
@@ -84,11 +85,12 @@ export function installPilotArena(sim) {
       find('save').disabled = active || !record;
       find('status').textContent = `${record.status} · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)${record.reason ? ` · ${record.reason}` : ''}`;
       if (!active) find('result').textContent = JSON.stringify(record.result?.metrics ?? { detail: record.detail ?? record.reason }, null, 2);
-      const points = record.poses.map(p => `${Math.max(0, Math.min(400, (p.runwayS + 3500) / 6500 * 400))},${50 + Math.max(-45, Math.min(45, p.centerlineOffsetM))}`).join(' ');
+      const valley = record.manifest?.type === 'valley';
+      const points = record.poses.map(p => `${Math.max(0, Math.min(400, (p.runwayS + (valley ? 0 : 3500)) / (valley ? record.manifest.courseLengthM : 6500) * 400))},${50 + Math.max(-45, Math.min(45, p.centerlineOffsetM * (valley ? 0.1 : 1)))}`).join(' ');
       shell.querySelector('polyline').setAttribute('points', points);
     },
   });
-  const loadExample = () => { source.value = find('mission').value.startsWith('landing') ? landingSource : takeoffSource; };
+  const loadExample = () => { source.value = find('mission').value === 'valley-low-v1' ? valleySource : find('mission').value.startsWith('landing') ? landingSource : takeoffSource; };
   find('mission').addEventListener('change', loadExample);
   find('example').addEventListener('click', loadExample);
   find('file').addEventListener('change', async event => {

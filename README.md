@@ -95,8 +95,8 @@ Open a specific flight with query parameters, for example:
 [ C172 coastal approach](https://stlim0727.github.io/flight3d/?aircraft=C172&terrain=coastal&scenario=approach).
 The [flight URL directory](https://stlim0727.github.io/flight3d/flights.html)
 lists every supported aircraft/terrain/scenario combination with filters.
-For the complete Markdown list, see [all flight URLs](docs/flight-urls.md).
-The directory also includes [12 live AI pilot mission cases](docs/flight-urls.md#ai-pilot-mission-tests-12-cases), covering takeoff and landing with calm conditions or seeded wind.
+See the [flight selector reference](docs/flight-urls.md) for available choices and URL parameters.
+The directory also includes an [AI mission selector](docs/flight-urls.md#ai-pilot-mission-selector), with gameplay and readable pilot-code links for takeoff, landing and F-16 Lukla valley flight.
 
 - `aircraft`: `B738`, `C172`, `F16` (case sensitive).
 - `terrain`: `coastal`, `lukla`, `incheon`, `neon`, `hangang`.
