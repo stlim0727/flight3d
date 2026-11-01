@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { HANGANG_COURSE, bridgeSolids, riverCenter, hangangHeight } from '../config/hangangCourse.js';
+import { HANGANG_COURSE, riverCenter, hangangHeight } from '../config/hangangCourse.js';
+import { createBridge, createBridgeMaterials } from './hangangBridges.js';
 import { createSeoulScenery } from './SeoulLandmarks.js';
 
 // Realistic twilight Hangang scenery featuring the Yeouido–Yongsan Han River corridor,
@@ -57,90 +58,9 @@ export class HangangScene {
     }
 
     // Bridges with architectural night lighting & illuminated clearance gates
-    const concreteMat = new THREE.MeshStandardMaterial({ color: 0x586066, roughness: 0.85 });
-    const roadMat = new THREE.MeshStandardMaterial({ color: 0x1f2428, roughness: 0.9 });
-    const pierLightMat = new THREE.MeshBasicMaterial({ color: 0xffb35a });
-
+    const bridgeMaterials = createBridgeMaterials();
     this.bridges = course.bridges.map(bridge => {
-      const group = new THREE.Group();
-      group.position.set(bridge.x, 0, bridge.z);
-      group.rotation.y = bridge.yaw;
-
-      const isArch = bridge.style === 'arch';
-      const isTower = bridge.style === 'tower';
-
-      // Steel superstructure with emissive night glow
-      const steelMat = new THREE.MeshStandardMaterial({
-        color: bridge.color,
-        roughness: 0.5,
-        metalness: 0.45,
-        emissive: isArch ? 0xcc3300 : isTower ? 0x0055bb : 0x223344,
-        emissiveIntensity: 0.45,
-      });
-
-      for (const solid of bridgeSolids(bridge)) {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(...solid.size), solid.part === 'pier' ? concreteMat : steelMat);
-        mesh.position.set(...solid.center);
-        mesh.castShadow = mesh.receiveShadow = true;
-        group.add(mesh);
-      }
-
-      // Road deck surface
-      const surface = new THREE.Mesh(new THREE.BoxGeometry(1200, 0.05, 19), roadMat);
-      surface.position.y = 40.03;
-      group.add(surface);
-
-      // Deck Streetlights
-      for (let sx = -550; sx <= 550; sx += 55) {
-        for (const sz of [-9.5, 9.5]) {
-          const lightPole = new THREE.Mesh(
-            new THREE.BoxGeometry(0.3, 3.5, 0.3),
-            concreteMat
-          );
-          lightPole.position.set(sx, 41.8, sz);
-          group.add(lightPole);
-
-          const lantern = new THREE.Mesh(
-            new THREE.BoxGeometry(0.6, 0.4, 0.6),
-            pierLightMat
-          );
-          lantern.position.set(sx, 43.6, sz);
-          group.add(lantern);
-        }
-      }
-
-      // Pier upward floodlights
-      for (const px of [-550, -350, -150, -55, 55, 150, 350, 550]) {
-        const flood = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 3), pierLightMat);
-        flood.position.set(px, 3, 0);
-        group.add(flood);
-      }
-
-      // Above-deck decorative arches (Hangang Bridge / Central bridge)
-      if (isArch) {
-        for (const z of [-9, 9]) {
-          const curve = new THREE.CatmullRomCurve3(
-            Array.from({ length: 17 }, (_, i) => new THREE.Vector3(-150 + i * 18.75, 41 + 35 * Math.sin(i * Math.PI / 16), z))
-          );
-          const arch = new THREE.Mesh(new THREE.TubeGeometry(curve, 32, 1.4, 8, false), steelMat);
-          arch.castShadow = true;
-          group.add(arch);
-        }
-      }
-
-      // Navigation clearance markers on the gate piers' approach faces. They have no
-      // collision proxy, so they must stay outside the 100 x 34 m opening.
-      const markerMat = new THREE.MeshStandardMaterial({
-        color: 0xffd044,
-        emissive: 0xff9900,
-        emissiveIntensity: 0.9,
-      });
-      for (const x of [-52, 52]) {
-        const marker = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 0.4), markerMat);
-        marker.position.set(x, 31, 10.2);
-        group.add(marker);
-      }
-
+      const group = createBridge(bridge, bridgeMaterials);
       this.group.add(group);
       return group;
     });
