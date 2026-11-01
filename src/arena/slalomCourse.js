@@ -30,7 +30,9 @@ export function createSlalomManifest({ seed, rules = VALLEY_SLALOM_RULES,
   const anchor = (gate, distance) => ({ x: gate.x + Math.cos(gate.headingDeg * Math.PI / 180) * distance,
     z: gate.z + Math.sin(gate.headingDeg * Math.PI / 180) * distance });
   // Charted route: the pilot gets the same shape the judge measures against, at
-  // a resolution that is a chart rather than a terrain array.
+  // a resolution that is a chart rather than a terrain array. The seed that
+  // reproduces the ground underneath it stays host side, because a chart may
+  // say where the corridor is without handing over the hill generator.
   const stride = Math.max(1, Math.round(rules.chartSpacingM / rules.sampleStepM));
   const route = course.centerline
     .filter((_, index) => index % stride === 0 || index === course.centerline.length - 1)
@@ -42,9 +44,14 @@ export function createSlalomManifest({ seed, rules = VALLEY_SLALOM_RULES,
     minimumIasKnots: rules.speedKnots[0], maximumIasKnots: rules.speedKnots[1],
     environmentProfile, calibration: 'pending',
     course: {
-      version: rules.version, seed, route, lengthM: course.lengthM,
+      version: rules.version, route, lengthM: course.lengthM,
       corridorHalfWidthM: rules.corridorHalfWidthM[1],
       clearanceFloorM: rules.clearanceFloorM, sampleStepM: rules.sampleStepM,
+      // Chart waypoints: the middle of each passage space, which is also where
+      // the shared navigation solution points a pilot. `start` is the departure.
+      points: course.gates.map((gate, index) => ({
+        id: index === 0 ? 'start' : `gate-${index}`, ...anchor(gate, gate.crossOffsetM),
+      })),
       gates: course.gates.map(({ floorM, ...gate }) => ({ ...gate,
         passageAglM: [gate.minAglM, gate.maxAglM] })),
     },
@@ -67,7 +74,7 @@ export function validateSlalomManifest(manifest) {
     && manifest.physicsHz === 120 && manifest.decisionPeriodTicks === 24
     && manifest.commandDelayTicks === 24 && Number.isSafeInteger(manifest.timeoutTicks)
     && manifest.minimumIasKnots >= 160 && manifest.maximumIasKnots > manifest.minimumIasKnots
-    && Number.isSafeInteger(course?.seed) && Number.isFinite(course?.lengthM)
+    && Number.isFinite(course?.lengthM)
     && Array.isArray(course?.gates) && course.gates.length >= 2
     && Array.isArray(course?.route) && course.route.length >= course.gates.length
     && Number.isFinite(course?.clearanceFloorM) && course.clearanceFloorM > 0
@@ -80,12 +87,15 @@ export function validateSlalomManifest(manifest) {
       && gate.sM > (index ? course.gates[index - 1].sM : -1)
       && gate.maxAglM > gate.minAglM && gate.passageHalfWidthM > 0
       && Math.abs(gate.crossOffsetM) + gate.passageHalfWidthM <= gate.halfWidthM)
+    && Array.isArray(course?.points) && course.points.length === course.gates.length
+    && course.points.every((point, index) => point.id === (index ? `gate-${index}` : 'start')
+      && Number.isFinite(point.x) && Number.isFinite(point.z))
     && course.route.every(point => ['x', 'z', 'sM', 'halfWidthM'].every(key => Number.isFinite(point[key])))
     && ['x', 'z', 'headingDeg', 'aglM', 'iasKnots', 'flightPathAngleDeg']
       .every(key => Number.isFinite(spawn?.[key]))
     && spawn.aglM >= course.gates[0].minAglM && spawn.aglM <= course.gates[0].maxAglM
     && spawn.iasKnots >= manifest.minimumIasKnots && spawn.iasKnots <= manifest.maximumIasKnots
-    && manifest.terrain?.kind === 'generated-valley' && manifest.terrain.seed === course.seed
+    && manifest.terrain?.kind === 'generated-valley' && Number.isSafeInteger(manifest.terrain.seed)
     && manifest.fixedConfiguration?.gearDown === false
     && manifest.fixedConfiguration?.flapIndex === 0 && manifest.fixedConfiguration?.spoilers === 0
     && Math.abs(Math.hypot(spawn.x - course.gates[0].x, spawn.z - course.gates[0].z)

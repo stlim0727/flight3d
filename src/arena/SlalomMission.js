@@ -38,6 +38,10 @@ export class SlalomMission {
 
   finish(status, reason) { this.status = status; this.reason = reason; return this.result(); }
 
+  /** The gate the pilot is being pointed at. Shared by the HUD and the AI
+   * observation so both navigate to the same next waypoint. */
+  get nextGateIndex() { return this.gate; }
+
   update(snapshot) {
     if (this.status !== 'running') return this.result();
     const position = snapshot?.position;
