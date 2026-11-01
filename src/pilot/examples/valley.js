@@ -4,14 +4,14 @@ export function createPilot() {
   const radians = Math.PI / 180;
   const read = sensor => sensor?.status === 'available' && Number.isFinite(sensor.mean) ? sensor.mean : null;
   const signed = value => ((value + 540) % 360) - 180;
-  let cruiseKnots, targetAgl, trimDeg, dt, previousPitch, previousRoll, filteredVz, command, course;
+  let cruiseKnots, targetAgl, trimDeg, dt, previousPitch, previousRoll, previousHeight, filteredVz, command, course;
   function reset(briefing = {}) {
     cruiseKnots = briefing.recommendedSpeeds?.cruiseKnots ?? 260;
-    targetAgl = briefing.successConditions?.targetAglM ?? briefing.course?.targetAglM ?? 35;
+    targetAgl = briefing.course?.targetAglM ?? briefing.successConditions?.targetAglM ?? 35;
     trimDeg = briefing.configuration?.pitchTrimDeg ?? 0;
     course = briefing.course?.points ?? [];
     dt = briefing.decisionPeriodSeconds ?? 0.2;
-    previousPitch = previousRoll = null;
+    previousPitch = previousRoll = previousHeight = null;
     filteredVz = 0;
     command = { elevator: 0, aileron: 0, rudder: 0, throttle: 0.5, brakes: 0 };
   }
@@ -54,49 +54,55 @@ export function createPilot() {
       previousPitch = pitch; previousRoll = roll;
       const pitchRate = clamp(measuredPitchRate, -50, 50) * radians;
       const rollRate = clamp(measuredRollRate, -80, 80) * radians;
-      // A small buffer above the score's target avoids rewarding a surface skim.
-      let desiredVz = clamp((targetAgl + 15 - height) * 0.6, -40, 18);
+      const terrainClimbRate = clamp(vz - (height - (previousHeight ?? height)) / dt, -10, 15);
+      previousHeight = height;
+
+      // Safe low-level target AGL tracking with terrain slope feedforward
+      const targetFlyHeight = Math.max(targetAgl + 8, 28);
+      let desiredVz = clamp((targetFlyHeight - height) * 0.5 + 0.85 * terrainClimbRate, -24, 18);
+
       const cp = Math.cos(pitch * radians), sp = Math.sin(pitch * radians);
       const cr = Math.cos(roll * radians), sr = Math.sin(roll * radians);
-      let forwardObserved = false;
       for (const cell of observation.terrain?.cells ?? []) {
         if (Math.abs(cell.azimuthDeg - scanAzimuth) > 15) continue;
-        if (cell.status === 'available' || cell.status === 'clear-to-range') forwardObserved = true;
         if (cell.status !== 'available') continue;
-        const range = cell.rangeM?.mean, sigma = cell.rangeM?.std;
-        if (!Number.isFinite(range) || !Number.isFinite(sigma) || range <= 0 || sigma < 0) continue;
+        const range = cell.rangeM?.mean, sigma = cell.rangeM?.std ?? 0;
+        if (!Number.isFinite(range) || !Number.isFinite(sigma) || range <= 30 || sigma < 0 || range > 1500) continue;
         const az = cell.azimuthDeg * radians, el = cell.elevationDeg * radians;
         // Rotate a body-frame point ray's vertical component using observed attitude.
         const vertical = cp * (-sr * Math.sin(az) * Math.cos(el) + cr * Math.sin(el)) + sp * Math.cos(az) * Math.cos(el);
         const horizontal = range * Math.sqrt(Math.max(0, 1 - vertical * vertical));
-        if (horizontal < 70 || horizontal > 1700) continue;
-        const time = Math.max(1, (horizontal - sigma) / speed - 2.0);
-        const required = (range * vertical + targetAgl + 15 + sigma * 0.5) / time;
-        desiredVz = Math.max(desiredVz, Math.min(70, required));
+        if (horizontal < 30 || horizontal > 1500) continue;
+
+        const time = Math.max(0.6, (horizontal - sigma) / speed - 0.4);
+        const deltaY = range * vertical;
+        const neededClimbM = deltaY + targetFlyHeight + sigma * 0.2;
+        if (neededClimbM > 0) {
+          const required = neededClimbM / time;
+          desiredVz = Math.max(desiredVz, Math.min(30, required));
+        }
       }
-      // Missing forward data is not evidence of clear terrain: suspend descent.
-      if (!forwardObserved) desiredVz = Math.max(desiredVz, 5);
-      // Do not keep a stale high-climb target after the ridge has passed.
-      filteredVz += (desiredVz - filteredVz) * (1 - Math.exp(-dt / 0.5));
-      const bankTarget = clamp(signed(bearing - heading) * 2.0, -40, 40);
+      desiredVz += (Math.abs(roll) / 40) ** 2 * 3.0;
+      filteredVz += (desiredVz - filteredVz) * (1 - Math.exp(-dt / 0.4));
+      const bankTarget = clamp(signed(bearing - heading) * 2.0, -42, 42);
       // Nominal F16 game-model prior; dynamic state still comes only from SDK sensors.
       const q = Math.max(500, 0.5 * 1.225 * (ias * 0.514444) ** 2);
       const flightPath = Math.atan2(vz, speed);
-      const levelAlpha = clamp((12000 * 9.80665 / (q * 27.87 * Math.max(0.7, Math.cos(roll * radians))) - 0.05) / 4.2, 0.02, 0.23);
+      const levelAlpha = clamp((12000 * 9.80665 / (q * 27.87 * Math.max(0.65, Math.cos(roll * radians))) - 0.05) / 4.2, 0.02, 0.23);
       const pitchTarget = clamp((Math.atan2(filteredVz, speed) + levelAlpha) / radians, -20, 32) * radians;
       const desiredRate = clamp((pitchTarget - pitch * radians) * 1.8, -0.35, 0.35);
       const requiredCm = 75000 * (desiredRate - pitchRate) * 2.5 / (q * 27.87 * 3.45);
       const alphaEstimate = pitch * radians - flightPath;
       const qHat = pitchRate * 3.45 / (2 * speed);
       const elevator = ((requiredCm + 0.45 * alphaEstimate + 12 * qHat) / 1.8 - trimDeg * radians) / (20 * radians);
-      const desiredRollRate = clamp((bankTarget - roll) * 1.4, -20, 20) * radians;
+      const desiredRollRate = clamp((bankTarget - roll) * 1.4, -25, 25) * radians;
       const requiredCl = 12800 * (desiredRollRate - rollRate) * 3 / (q * 27.87 * 9.96);
       const aileron = (requiredCl + 0.45 * rollRate * 9.96 / (2 * speed)) / (0.35 * 1.05 * 20 * radians);
       command = {
-        elevator: clamp(elevator, -0.65, 0.8),
-        aileron: clamp(aileron, -0.45, 0.45),
+        elevator: clamp(elevator, -0.7, 0.8),
+        aileron: clamp(aileron, -0.5, 0.5),
         rudder: 0,
-        throttle: clamp((cruiseKnots - ias) * 0.025 + Math.max(0, filteredVz) * 0.004, 0, 0.95),
+        throttle: clamp((cruiseKnots - ias) * 0.03 + Math.max(0, filteredVz) * 0.005 + 0.35, 0, 1),
         brakes: 0,
       };
       return { ...command };

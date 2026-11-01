@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { flySlalom } from '../tests/helpers/slalomFlight.js';
-import { createPilot } from '../src/pilot/examples/valley.js';
+import { createPilot as defaultPilot } from '../src/pilot/examples/valleySlalom.js';
 import { VALLEY_SLALOM_RULES } from '../src/arena/generatedValley.js';
 
 /** Host-only runner: production physics, generated valleys, no rendering.
@@ -10,6 +10,11 @@ import { VALLEY_SLALOM_RULES } from '../src/arena/generatedValley.js';
  * cannot fly a valid valley is a result, and it stays in the report. Nothing here
  * tunes a controller and nothing here is dropped after the fact.
  */
+
+const pilotModule = process.env.PILOT
+  ? await import(process.env.PILOT.startsWith('.') ? process.env.PILOT : `../src/pilot/${process.env.PILOT}`)
+  : null;
+const createPilot = pilotModule?.createPilot ?? defaultPilot;
 
 const devSeeds = (process.env.DEV_SEEDS ?? '1,2,3,4,5,6,7,8,9,10').split(',').map(Number);
 const evalSeeds = (process.env.EVAL_SEEDS ?? '101,102,103,104,105,106,107,108').split(',').map(Number);
@@ -55,7 +60,7 @@ for (const [label, seeds] of [['dev', devSeeds], ['eval', evalSeeds]]) {
   rows.push(summary);
   reports.push(...entries);
 }
-console.log(`rules ${rules.version} envelope ${rules.envelopeVersion} pilot ${process.env.PILOT ?? 'examples/valley.js'}`);
+console.log(`rules ${rules.version} envelope ${rules.envelopeVersion} pilot ${process.env.PILOT ?? 'examples/valleySlalom.js'}`);
 for (const row of rows) console.log(JSON.stringify(row));
 if (process.env.SLALOM_REPORT) await writeFile(process.env.SLALOM_REPORT, JSON.stringify(reports, null, 2));
 if (rows.some(row => row.generationFailures)) process.exitCode = 1;
