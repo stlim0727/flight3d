@@ -173,7 +173,7 @@ test('formatPilotScoreData handles takeoff success', () => {
   assert.equal(data.stats.some(s => s.label === '중심선 오차' && s.value === '1.4 m'), true);
 });
 
-test('scoreOverlayMarkup includes clear retry and return-to-lobby actions', () => {
+test('scoreOverlayMarkup includes clear retry, pilot mode choice, and return-to-lobby actions', () => {
   const record = {
     pilotKind: 'human',
     status: 'failed',
@@ -184,7 +184,9 @@ test('scoreOverlayMarkup includes clear retry and return-to-lobby actions', () =
   };
   const data = formatPilotScoreData(record, '계곡 저공');
   const overlay = scoreOverlayMarkup(data);
+  assert.match(overlay, /data-score-mode="human"/);
+  assert.match(overlay, /data-score-mode="ai"/);
   assert.match(overlay, /data-score-retry/);
   assert.match(overlay, /data-score-close/);
-  assert.match(overlay, /메인 메뉴로 이동/);
+  assert.match(overlay, /메인 메뉴/);
 });
