@@ -177,7 +177,7 @@ test('F16 cockpit stays on its centerline through portrait resize, snap and airc
   assert.equal(camera.position.x, 0);
 });
 
-test('F16 trim solver yields feasible idle solution for high-speed level flight', () => {
+test('F16 trim solver yields feasible solution for high-speed level flight and idle clamp on steep descent', () => {
   const aero = new Aerodynamics(F16_FALCON);
   const engines = new EngineModel(F16_FALCON);
   const solution = solveTrim(aero, engines, {
@@ -189,8 +189,20 @@ test('F16 trim solver yields feasible idle solution for high-speed level flight'
     spoilers: 0
   });
   assert.equal(solution.feasible, true);
-  assert.equal(solution.reason, 'idle');
+  assert.ok(solution.throttle > 0.2 && solution.throttle < 0.6);
   assert.ok(solution.handsOffTrimDeg >= -5 && solution.handsOffTrimDeg <= 12);
+
+  const descent = solveTrim(aero, engines, {
+    iasKnots: 250,
+    altitudeMeters: 4500,
+    flightPathAngleDeg: -6,
+    flapsIndex: 0,
+    gearState: 0,
+    spoilers: 0
+  });
+  assert.equal(descent.feasible, true);
+  assert.equal(descent.reason, 'idle');
+  assert.equal(descent.throttle, 0);
 });
 
 test('F16 canopy curved glass material has physical reflection, clearcoat, and view-dependent Fresnel', () => {

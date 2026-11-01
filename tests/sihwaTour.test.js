@@ -52,9 +52,11 @@ test('the fighter has a feasible low-speed trim with its modeled speed brake',as
   const {solveTrim}=await import('../src/physics/TrimSolver.js');
   const cfg=AIRCRAFT_REGISTRY.F16,profile=SIHWA_TOUR_PROFILES.F16,aero=new Aerodynamics(cfg),engines=new EngineModel(cfg);
   const state={iasKnots:profile.ias,altitudeMeters:profile.altitude,gearState:0,flapsIndex:0};
-  assert.equal(solveTrim(aero,engines,{...state,spoilers:0}).reason,'idle');
+  const cleanTrim=solveTrim(aero,engines,{...state,spoilers:0});
+  assert.ok(cleanTrim.feasible);
   const trim=solveTrim(aero,engines,{...state,spoilers:profile.speedBrake});
   assert.ok(trim.feasible && trim.handsOffFeasible);
+  assert.ok(trim.throttle>cleanTrim.throttle);
   assert.ok(trim.throttle>0 && trim.throttle<1);
 });
 
