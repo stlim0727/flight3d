@@ -38,6 +38,7 @@ export function createHangangAssetLoader() {
       // is unavailable, return an empty group with manifest bounds
       const fallback = new THREE.Group();
       fallback.name = `${modelId}_fallback`;
+      fallback.userData.fallback = true;
       return fallback;
     }
   };

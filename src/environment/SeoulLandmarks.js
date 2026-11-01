@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { HANGANG_COURSE, riverCenter, hangangHeight } from '../config/hangangCourse.js';
 import { createHangangAssetLoader } from './HangangAssetLoader.js';
-import { placeNodeulPavilion } from './nodeulPavilion.js';
+import { createNodeulseomStandIns, placeNodeulPavilion } from './nodeulPavilion.js';
 
 /**
  * Creates a circular Gaussian soft glow sprite texture using pure DataTexture (headless-safe).
@@ -159,6 +159,11 @@ export function createSeoulScenery() {
   modelsGroup.name = 'Hangang GLB Models';
   group.add(modelsGroup);
 
+  // Solid obstacles stay visible while their GLBs load and if loading fails.
+  const standIns = createNodeulseomStandIns(HANGANG_COURSE.nodeulseom);
+  group.add(standIns.island, standIns.pavilion);
+  const loaded = model => model && !model.userData.fallback;
+
   const ready = typeof window === 'undefined'
     ? Promise.resolve(false)
     : (async () => {
@@ -176,6 +181,8 @@ export function createSeoulScenery() {
         if (lotte) modelsGroup.add(lotte);
         if (bridges) modelsGroup.add(bridges);
         if (pavilion) modelsGroup.add(placeNodeulPavilion(pavilion, HANGANG_COURSE.nodeulseom));
+        standIns.island.visible = !loaded(bridges);
+        standIns.pavilion.visible = !loaded(pavilion);
         return true;
       })().catch(err => {
         console.warn('Hangang GLB models load notice:', err);
