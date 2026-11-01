@@ -1,10 +1,10 @@
 import { HangangScene } from '../environment/HangangScene.js';
-import { HangangRun } from './HangangRun.js';
+import { HangangCollision } from './HangangCollision.js';
 import { t } from '../i18n/index.js';
 
 export class HangangScenario {
   constructor(sim) {
-    this.sim = sim; this.scene = new HangangScene(); this.run = new HangangRun();
+    this.sim = sim; this.scene = new HangangScene(); this.collision = new HangangCollision();
     sim.scene.add(this.scene.group);
   }
   get active() { return Boolean(this.saved); }
@@ -24,7 +24,7 @@ export class HangangScenario {
     s.cameraSystem.trauma = 0;
     s.cameraSystem.towerPos.set(80, 70, 80);
     s.setTimeOfDay(18.25, { persist: false }); s.aero.windWorld.set(0, 0, 0);
-    this.run.reset();
+    this.collision.reset();
   }
   stop() {
     if (!this.saved) return;
@@ -71,10 +71,10 @@ export class HangangScenario {
     if (!this.active) return;
     const s = this.sim;
     this.scene.update?.(dt);
-    if (s.isCrashed) this.run.fail('contact');
-    this.run.update(s.position, s.quaternion, s.linearVelocity, dt, { stalled: s.aero.isStalled });
-    if (this.run.contact && !s.isCrashed) {
-      const structure = this.run.contact.structure;
+    if (s.isCrashed) return;
+    const contact = this.collision.update(s.position, s.quaternion);
+    if (contact) {
+      const structure = contact.structure;
       s.triggerCrash({ collided: true, type: structure === 'water' ? 'WATER' : structure === 'island' ? 'TERRAIN' : 'BUILDING',
         name: t('hangang.contact'), description: t('hangang.contact'), point: s.position.clone(), speedKnots: s.linearVelocity.length() * 1.94384 });
     }

@@ -1,4 +1,4 @@
-// Bakes the Nodeulseom pavilion collision heightfield from the shipped GLB, so HangangRun
+// Bakes the Nodeulseom pavilion collision heightfield from the shipped GLB, so HangangCollision
 // collides with the triangles players see rather than a bounding box.
 import * as THREE from 'three';
 import { pavilionMatrix } from '../../src/environment/nodeulPavilion.js';
