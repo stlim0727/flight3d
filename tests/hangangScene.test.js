@@ -5,7 +5,7 @@ import { createSeoulScenery, createLightPointTexture } from '../src/environment/
 import { createHangangAssetLoader, hangangAssetManifest } from '../src/environment/HangangAssetLoader.js';
 
 test('hangangAssetManifest defines valid GLB models with bounding boxes', () => {
-  const keys = ['yeouido-landmarks', 'namsan-tower', 'lotte-tower', 'bridges-kit'];
+  const keys = ['yeouido-landmarks', 'namsan-tower', 'lotte-tower', 'bridges-kit', 'nodeul-pavilion'];
   for (const k of keys) {
     assert.ok(hangangAssetManifest[k], `Manifest key ${k} must exist`);
     assert.ok(hangangAssetManifest[k].url.endsWith('.glb'));

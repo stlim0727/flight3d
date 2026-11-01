@@ -3,9 +3,11 @@
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { HANGANG_COURSE } from '../src/config/hangangCourse.js';
+import { pavilionMatrix } from '../src/environment/nodeulPavilion.js';
+import { bakePavilionHeights, readGlbTriangles } from './lib/nodeul-pavilion-heights.mjs';
 
 globalThis.FileReader = class {
   readAsArrayBuffer(blob) {
@@ -309,13 +311,6 @@ function buildBridgesModel() {
   islandGeo.translate(0, island.height / 2, 0);
   const islandMat = new THREE.MeshStandardMaterial({ color: 0x18241b, roughness: 0.95 });
   nodeul.add(new THREE.Mesh(islandGeo, islandMat));
-
-  const pavilion = new THREE.Mesh(
-    new THREE.BoxGeometry(...island.pavilion.size),
-    new THREE.MeshStandardMaterial({ color: 0x262b2e, roughness: 0.7, emissive: 0x3d2914, emissiveIntensity: 0.6 })
-  );
-  pavilion.position.set(...island.pavilion.center);
-  nodeul.add(pavilion);
   group.add(nodeul);
 
   return group;
@@ -339,6 +334,20 @@ manifest['bridges-kit'] = {
   url: 'models/hangang/bridges-kit.glb',
   ...(await exportGLB(buildBridgesModel(), 'bridges-kit.glb')),
 };
+
+// 5. Nodeulseom pavilion: third-party GLB shipped unmodified (see nodeul-pavilion.LICENSE.txt).
+// Its collision heightfield is rebaked from the same bytes players see.
+const island = HANGANG_COURSE.nodeulseom;
+const pavilionBytes = await readFile(new URL('nodeul-pavilion.glb', outputDir));
+const pavilionBounds = new THREE.Box3().setFromPoints(readGlbTriangles(pavilionBytes, pavilionMatrix(island)).flat());
+manifest['nodeul-pavilion'] = {
+  url: 'models/hangang/nodeul-pavilion.glb',
+  bytes: pavilionBytes.byteLength,
+  bounds: { min: pavilionBounds.min.toArray(), max: pavilionBounds.max.toArray() },
+};
+const heightsPath = new URL('../src/config/nodeulPavilionHeights.json', import.meta.url);
+await writeFile(heightsPath, JSON.stringify(bakePavilionHeights(pavilionBytes, island)) + '\n');
+console.log('Nodeulseom pavilion heightfield written to', heightsPath.pathname);
 
 const manifestPath = new URL('../src/environment/hangangAssetManifest.json', import.meta.url);
 await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');

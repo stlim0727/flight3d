@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { riverCenter, hangangHeight } from '../config/hangangCourse.js';
+import { HANGANG_COURSE, riverCenter, hangangHeight } from '../config/hangangCourse.js';
 import { createHangangAssetLoader } from './HangangAssetLoader.js';
+import { placeNodeulPavilion } from './nodeulPavilion.js';
 
 /**
  * Creates a circular Gaussian soft glow sprite texture using pure DataTexture (headless-safe).
@@ -162,17 +163,19 @@ export function createSeoulScenery() {
     ? Promise.resolve(false)
     : (async () => {
         const load = createHangangAssetLoader();
-        const [yeouido, namsan, lotte, bridges] = await Promise.all([
+        const [yeouido, namsan, lotte, bridges, pavilion] = await Promise.all([
           load('yeouido-landmarks'),
           load('namsan-tower'),
           load('lotte-tower'),
           load('bridges-kit'),
+          load('nodeul-pavilion'),
         ]);
 
         if (yeouido) modelsGroup.add(yeouido);
         if (namsan) modelsGroup.add(namsan);
         if (lotte) modelsGroup.add(lotte);
         if (bridges) modelsGroup.add(bridges);
+        if (pavilion) modelsGroup.add(placeNodeulPavilion(pavilion, HANGANG_COURSE.nodeulseom));
         return true;
       })().catch(err => {
         console.warn('Hangang GLB models load notice:', err);
