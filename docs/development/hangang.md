@@ -125,6 +125,11 @@ Evidence is in `review-artifacts/hangang/`. Checks cover a contact-free flight
 under all three bridges, a sustained climb well above the former envelope that
 keeps flying, water impact, common pause/restart and crash-to-menu recovery,
 autopilot exclusion, absence of a dedicated scenario HUD, and environment restore.
+Crash-to-menu follows the player's flow: the collapsed crash report is visible
+during the crash scene, then Space opens the menu holding the wreck (still
+crashed, no Resume, pending debrief cancelled) and Fly starts a fresh sortie.
+Headless runs enable CDP focus emulation so the simulator loop is not held as a
+background tab.
 Desktop/cockpit/mobile screenshots check framing. Mobile is a viewport check,
 not proof of touch handling on a physical phone. Automated piloting demonstrates
 feasibility, not human difficulty balance or a real-time FPS benchmark.
@@ -150,8 +155,7 @@ the base and with this change. These use headless Chrome on hardware D3D11
 (Intel Arc 140V), with the camera placed directly and the clock frozen. Visible
 bridge draw calls went from 110–331 per view to 10–15, and bridge triangles from
 about 5,000 to 36,700, mostly railing posts. Frame times there are wall-clock
-rAF intervals, not a benchmark. `verify-hangang.mjs` now enables CDP focus
-emulation, because the simulator pauses without document focus. With that, the
-C172 flies under all three bridges without contact, and the climb, water impact,
-pause restart and lifecycle checks pass. The Space-to-menu step after a crash
-fails identically on the base and with this change; that is unrelated to the bridges.
+rAF intervals, not a benchmark. After merging #400, the full `verify-hangang.mjs`
+run passes against this change with no runtime exceptions. The C172 flies under
+all three bridges without contact, and the climb, water impact, pause restart and
+crash-to-menu checks all pass.

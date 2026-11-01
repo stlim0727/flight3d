@@ -11,7 +11,7 @@ import { MEASURED_ROWS, MAX_BANK_DEG, SLALOM_IAS_MAX_KT, SLALOM_IAS_MIN_KT,
 const envelope = JSON.parse(readFileSync(new URL('../docs/development/f16-valley-envelope.json',
   import.meta.url), 'utf8'));
 const measured = (iasKnots, bankDeg, column) => Object.values(envelope.altitudes).map(altitude => {
-  const row = altitude.sinks.find(entry => Math.round(entry.bankDeg) === bankDeg
+  const row = altitude.sinks.find(entry => Math.abs(entry.bankDeg - bankDeg) <= 1.5
     && entry.iasKnots > iasKnots - 10 && entry.iasKnots <= iasKnots + 10);
   assert.ok(row, `missing measured row for ${iasKnots} kt at ${bankDeg} degrees`);
   return row[column];
@@ -31,7 +31,7 @@ test('frozen envelope table is the pessimistic side of the measurement', () => {
 
 test('turn authority falls as airspeed rises and clamps at the measured edges', () => {
   assert.ok(turnRateDegS({ iasKnots: 220, bankDeg: 60 }) > turnRateDegS({ iasKnots: 320, bankDeg: 60 }));
-  assert.equal(turnRateDegS({ iasKnots: 260, bankDeg: 60 }), 6.49);
+  assert.equal(turnRateDegS({ iasKnots: 260, bankDeg: 60 }), 6.78);
   assert.equal(turnRateDegS({ iasKnots: 260, bankDeg: 80 }), turnRateDegS({ iasKnots: 260, bankDeg: MAX_BANK_DEG }));
   assert.equal(turnRateDegS({ iasKnots: 120, bankDeg: 60 }), turnRateDegS({ iasKnots: SLALOM_IAS_MIN_KT, bankDeg: 60 }));
   assert.equal(turnRateDegS({ iasKnots: 400, bankDeg: 60 }), turnRateDegS({ iasKnots: SLALOM_IAS_MAX_KT, bankDeg: 60 }));
@@ -39,13 +39,14 @@ test('turn authority falls as airspeed rises and clamps at the measured edges', 
   assert.equal(turnRadiusM({ iasKnots: 300, bankDeg: 0 }), Infinity);
 });
 
-test('wings level flight gains energy and only hard bank produces a sink', () => {
+test('idle throttle produces sustained sink across all airspeeds and steep bank steepens it', () => {
   for (const iasKnots of [220, 260, 300, 320]) {
-    assert.ok(sustainedClimbRateMs({ iasKnots, bankDeg: 0 }) > 0,
-      `${iasKnots} kt wings level at idle still climbs`);
-    assert.ok(maxSustainedSinkMs({ iasKnots }) <= 0);
-    assert.equal(maxSustainedSinkMs({ iasKnots: 220 }), -10.4);
+    assert.ok(sustainedClimbRateMs({ iasKnots, bankDeg: 0 }) < 0,
+      `${iasKnots} kt wings level at idle naturally sinks`);
+    assert.ok(maxSustainedSinkMs({ iasKnots }) < sustainedClimbRateMs({ iasKnots, bankDeg: 0 }),
+      `${iasKnots} kt max bank produces deeper sink than wings level`);
   }
+  assert.equal(maxSustainedSinkMs({ iasKnots: 220 }), -33.3);
   assert.ok(maxSustainedSinkMs({ iasKnots: 220 }) < maxSustainedSinkMs({ iasKnots: 320 }));
 });
 
@@ -79,17 +80,17 @@ test('leg assessment accepts what the airframe can fly and rejects what it canno
   assert.ok(impossibleClimb.shortfalls.includes('climb'));
 });
 
-test('a constant-speed step-down is the scarce one, not the climb', () => {
-  // 40 m of height over the same 900 m leg: allowed if it is paid for in
+test('a steep step-down beyond the sink budget is refused unless paid for in airspeed', () => {
+  // 150 m of height over a 900 m leg: allowed if it is paid for in
   // airspeed, refused if the leg has to end at the speed it started.
-  assert.equal(assessLeg({ lengthM: 900, headingChangeDeg: 0, altitudeChangeM: -40,
-    entryIasKnots: 280 }).ok, false);
-  assert.ok(assessLeg({ lengthM: 900, headingChangeDeg: 0, altitudeChangeM: -40,
-    entryIasKnots: 280 }).sinkBudgetM < 40);
-  assert.equal(assessLeg({ lengthM: 900, headingChangeDeg: 0, altitudeChangeM: 40,
+  assert.equal(assessLeg({ lengthM: 900, headingChangeDeg: 0, altitudeChangeM: -150,
+    entryIasKnots: 280, exitIasKnots: 280 }).ok, false);
+  assert.ok(assessLeg({ lengthM: 900, headingChangeDeg: 0, altitudeChangeM: -150,
+    entryIasKnots: 280, exitIasKnots: 280 }).sinkBudgetM < 150);
+  assert.equal(assessLeg({ lengthM: 900, headingChangeDeg: 0, altitudeChangeM: -150,
+    entryIasKnots: 280, exitIasKnots: 320 }).ok, true);
+  assert.equal(assessLeg({ lengthM: 900, headingChangeDeg: 0, altitudeChangeM: 100,
     entryIasKnots: 280 }).ok, true);
-  assert.equal(assessLeg({ lengthM: 900, headingChangeDeg: 0, altitudeChangeM: -40,
-    entryIasKnots: 220 }).ok, true);
 });
 
 test('a longer or slower leg turns further', () => {

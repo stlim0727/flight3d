@@ -28,15 +28,46 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  sweep:
+  plan:
     runs-on: ubuntu-latest
-    # Measured on this runner: the core tier takes 153 s of sweep wall (177 s for
-    # the whole job) and the full matrix with screenshots 942 s, on SwiftShader
-    # because there is no GPU here. Local Vulkan is 66 s and 258 s. The ceilings
-    # below keep the ~4x headroom the first PR runs left.
-    timeout-minutes: ${{ github.event_name == 'pull_request' && 25 || 45 }}
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - id: set-matrix
+        run: |
+          node -e "
+            import fs from 'node:fs';
+            const tier = process.env.TIER;
+            const text = fs.readFileSync('./scripts/lib/demoSweepSpec.mjs', 'utf8');
+            const regex = /id:\s*'([^']+)',\s*aircraft:[^}]*?tier:\s*'([^']+)'/gs;
+            let match;
+            const routes = [];
+            while ((match = regex.exec(text)) !== null) {
+              if (tier === 'all' || match[2] === tier) {
+                routes.push(match[1]);
+              }
+            }
+            console.log('matrix=' + JSON.stringify(routes));
+          " >> $GITHUB_OUTPUT
+        env:
+          TIER: ${{ github.event_name == 'pull_request' && 'core' || github.event.inputs.tier || 'all' }}
+
+  sweep:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        route: ${{ fromJson(needs.plan.outputs.matrix) }}
+    # Each route runs in parallel on its own runner. A single route in core takes
+    # ~35–66 s on SwiftShader, dropping the PR gate from ~4 min to ~1 min.
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 10 || 20 }}
     env:
-      TIER: ${{ github.event_name == 'pull_request' && 'core' || github.event.inputs.tier || 'all' }}
+      ONLY: ${{ matrix.route }}
       # Screenshots are evidence for a human, and only worth the wall clock on a
       # scheduled or dispatched run; a PR wants the fastest possible verdict.
       SHOTS: ${{ github.event_name == 'pull_request' && '0' || '1' }}
@@ -54,7 +85,7 @@ jobs:
       - run: npm ci
       # The sweep serves dist/ through `vite preview`, so the bundle is part of the test.
       - run: npm run build
-      - run: node scripts/demo-sweep.mjs
+      - run: node scripts/demo-sweep.mjs --only ${{ matrix.route }}
       - name: Summarize the sweep
         if: always()
         run: node scripts/demo-sweep-summary.mjs .cache/demo-sweep/demo-sweep-report.json
@@ -62,6 +93,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: demo-sweep-${{ github.run_id }}
+          name: demo-sweep-${{ matrix.route }}-${{ github.run_id }}
           path: .cache/demo-sweep
           retention-days: 14
