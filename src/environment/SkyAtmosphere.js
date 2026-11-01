@@ -322,6 +322,15 @@ export class SkyAtmosphere {
     this.cloudsGroup.add(this.cloudLayer);
   }
 
+  setCloudsVisible(visible) {
+    if (this.cloudsGroup) {
+      this.cloudsGroup.visible = visible;
+    }
+    if (this.cloudLayer) {
+      this.cloudLayer.visible = visible;
+    }
+  }
+
   setShadowMapSize(size) {
     const shadow = this.sunLight.shadow;
     if (size <= 0) {
@@ -363,7 +372,7 @@ export class SkyAtmosphere {
       this.sunShadowRefresh.beforeRender(this.scene, camera);
     }
     // Sort before renderer.render uploads instance buffers, including camera cuts.
-    if (this.cloudLayer?.group?.visible !== false) {
+    if (this.cloudLayer?.visible && this.cloudsGroup?.visible !== false) {
       this.cloudLayer.sortForCamera(camera);
     }
   }

@@ -10,7 +10,8 @@ export class WaterOcean {
     this.size = size;
     this.quality = options.quality ?? 'high';
     this.segments = this.quality === 'ultraLow' ? 1 : segments;
-    this.snapStep = this.size / this.segments;
+    const baseSegments = options.snapSegments ?? (segments > 1 ? segments : 180);
+    this.snapStep = options.snapStep ?? (this.size / baseSegments);
     this.waterLevel = 0.0;
     this.sunDirection = new THREE.Vector3(0.5, 0.6, 0.4).normalize();
 
@@ -210,7 +211,6 @@ export class WaterOcean {
     const targetSegments = isUltraLow ? 1 : 180;
     if (this.segments !== targetSegments) {
       this.segments = targetSegments;
-      this.snapStep = this.size / this.segments;
       const oldGeom = this.geometry;
       this.geometry = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
       this.geometry.rotateX(-Math.PI * 0.5);

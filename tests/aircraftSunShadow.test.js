@@ -69,3 +69,29 @@ test('quality changes replace GPU maps only when necessary and respect texture l
   sky.setShadowMapSize(RENDER_QUALITY.high.shadowMapSize);
   assert.equal(shadow.mapSize.x, 2048);
 });
+
+test('cloud layer visibility and sorting guard respects ultraLow preset', () => {
+  const sky = new SkyAtmosphere(new THREE.Scene());
+  assert.equal(sky.cloudLayer.visible, true);
+  assert.equal(sky.cloudsGroup.visible, true);
+
+  let sorted = 0;
+  sky.cloudLayer.sortForCamera = () => { sorted++; };
+
+  const camera = new THREE.PerspectiveCamera();
+  sky.prepareRender(camera);
+  assert.equal(sorted, 1, 'Clouds should be sorted when visible');
+
+  sky.setCloudsVisible(false);
+  assert.equal(sky.cloudLayer.visible, false);
+  assert.equal(sky.cloudsGroup.visible, false);
+
+  sky.prepareRender(camera);
+  assert.equal(sorted, 1, 'Clouds must not be sorted when hidden in ultraLow');
+
+  sky.setCloudsVisible(true);
+  assert.equal(sky.cloudLayer.visible, true);
+  assert.equal(sky.cloudsGroup.visible, true);
+  sky.prepareRender(camera);
+  assert.equal(sorted, 2, 'Clouds should be sorted again when re-enabled');
+});

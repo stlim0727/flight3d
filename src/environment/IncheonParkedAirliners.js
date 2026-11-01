@@ -6,7 +6,7 @@ import { createRunwayMarkingMaterial } from './RunwayMarkings.js';
 import { PARKED_RADIUS } from '../geospatial/incheonParking.js';
 
 export const PARKED_QUALITY = {
-  high:{limit:48,distance:2200}, balanced:{limit:32,distance:1600}, performance:{limit:16,distance:1000},
+  high:{limit:48,distance:2200}, balanced:{limit:32,distance:1600}, performance:{limit:16,distance:1000}, ultraLow:{limit:8,distance:600},
 };
 
 function standPaint() {
@@ -73,14 +73,14 @@ export class IncheonParkedAirliners {
       .filter(row=>row.distance<config.distance).sort((a,b)=>a.distance-b.distance).slice(0,config.limit).map(row=>row.stand);
     const key=quality+':'+chosen.map(s=>s.id).join(',');if(key===this.selectionKey)return this.visibleCount;
     this.selectionKey=key;const counts=new Map();
-    for(const pair of this.batches.values()){pair.body.count=0;pair.decal.count=0;pair.body.castShadow=quality!=='performance';}
+    for(const pair of this.batches.values()){pair.body.count=0;pair.decal.count=0;pair.body.castShadow=quality!=='performance'&&quality!=='ultraLow';}
     for(const [i,stand] of chosen.entries()) {
       const pair=this.batches.get(stand.airline),index=counts.get(stand.airline)??0;
       pair.body.setMatrixAt(index,stand.matrix);pair.decal.setMatrixAt(index,stand.matrix);
       pair.body.count=pair.decal.count=index+1;counts.set(stand.airline,index+1);
       this.gear.setMatrixAt(i,stand.matrix);this.paint.setMatrixAt(i,stand.matrix);
     }
-    this.gear.count=this.paint.count=chosen.length;this.gear.castShadow=quality!=='performance';
+    this.gear.count=this.paint.count=chosen.length;this.gear.castShadow=quality!=='performance'&&quality!=='ultraLow';
     for(const mesh of this.group.children){mesh.visible=mesh.count>0;mesh.instanceMatrix.needsUpdate=true;}
     this.visibleIds=chosen.map(s=>s.id);this.visibleCount=chosen.length;return chosen.length;
   }

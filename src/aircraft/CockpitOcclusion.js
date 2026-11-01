@@ -72,7 +72,7 @@ export class CockpitOcclusion {
   }
 
   render(renderer, quality, reduced = false) {
-    if (!this.enabled || quality === 'performance' || !this.cockpit.gltfCockpitLoaded) return;
+    if (!this.enabled || quality === 'performance' || quality === 'ultraLow' || !this.cockpit.gltfCockpitLoaded) return;
     if (!this.pass) this.init();
     const camera = this.aoCamera;
     camera.copy(this.camera);

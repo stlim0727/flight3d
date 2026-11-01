@@ -245,16 +245,23 @@ test('loaded F16 configures canopy mesh and responds to cockpit mode transitions
 
   // Exterior mode initially
   aircraft.setCockpitMode(false);
+  assert.equal(aircraft.cockpit.group.visible, true);
   assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
   assert.equal(aircraft.canopyMaterial.opacity, 0.22);
 
-  // Switch to cockpit mode
+  // If external view in ultraLow hid cockpit group
+  aircraft.cockpit.group.visible = false;
+
+  // Switch to cockpit mode restores visibility
   aircraft.setCockpitMode(true);
+  assert.equal(aircraft.cockpit.group.visible, true);
   assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
   assert.equal(aircraft.canopyMaterial.opacity, 0.06);
 
-  // Switch back to exterior mode
+  // Switch back to exterior mode restores normal visibility
+  aircraft.cockpit.group.visible = false;
   aircraft.setCockpitMode(false);
+  assert.equal(aircraft.cockpit.group.visible, true);
   assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
   assert.equal(aircraft.canopyMaterial.opacity, 0.22);
 });

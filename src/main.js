@@ -149,7 +149,7 @@ class FlightSimulator {
     this.scene.add(this.aircraft.group);
     this.cockpitOcclusion = new CockpitOcclusion(this.scene, this.camera, this.aircraft.cockpit);
     try {
-      this.cockpitOcclusion.enabled = localStorage.getItem('flight3d.cockpitQuality') !== 'performance';
+      this.cockpitOcclusion.enabled = initialPreset.ao !== false && localStorage.getItem('flight3d.cockpitQuality') !== 'performance';
     } catch { /* Use detailed cockpit shading. */ }
     this.warmCockpitShaders(this.aircraft);
 
@@ -204,8 +204,8 @@ class FlightSimulator {
 
     this.sky = new SkyAtmosphere(this.scene, this.renderer, this.water);
     this.sky.setShadowMapSize(initialPreset.shadowMapSize);
-    if (initialPreset.clouds === false && this.sky.cloudLayer?.group) {
-      this.sky.cloudLayer.group.visible = false;
+    if (this.sky?.setCloudsVisible) {
+      this.sky.setCloudsVisible(initialPreset.clouds ?? true);
     }
     this.foliage.setTimeOfDay(this.sky.timeOfDay);
     this.water.syncWithAtmosphere(this.sky);
@@ -939,7 +939,9 @@ class FlightSimulator {
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && this.cameraSystem.supportsPhotoCockpit && !isLookingAway;
     this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
     if (!isCockpit && this.renderQuality === 'ultraLow') {
-      this.aircraft.cockpit.group.visible = false;
+      if (this.aircraft.cockpit?.group) {
+        this.aircraft.cockpit.group.visible = false;
+      }
     }
     // Looking forward in photo mode skips the occlusion pass entirely, so build
     // and compile it now instead of on the user's first head turn. The forced
@@ -962,9 +964,7 @@ class FlightSimulator {
       dt: frameDelta,
       casterState: cockpitCasterState(this.aircraft.cockpit),
     });
-    if (this.renderQuality !== 'ultraLow') {
-      this.aircraft.cockpit.syncLighting(this.sky, this.quaternion, frameDelta);
-    }
+    this.aircraft.cockpit.syncLighting(this.sky, this.quaternion, frameDelta);
     if (this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.enabled = isPhotoCockpit && this.cameraSystem.supportsPhotoCockpit;
       if (this.cockpitPhotoOverlay.enabled) {

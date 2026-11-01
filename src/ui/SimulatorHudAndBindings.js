@@ -284,7 +284,9 @@ class SimulatorHudAndBindingsMethods {
     }
     this.sky.prepareRender(this.camera, this.aircraft.group.position);
     this.renderer.render(this.scene, this.camera);
-    if (this.cockpitOcclusion?.enabled &&
+    const preset = RENDER_QUALITY[this.renderQuality];
+    if (preset?.ao !== false &&
+        this.cockpitOcclusion?.enabled &&
         this.cameraSystem.mode === CameraSystem.MODES.COCKPIT &&
         (!this.cameraSystem.photoCockpit || this.cameraSystem.isLookingAwayFromCenter())) {
       // Photo mode only reaches the 3D interior mid head-turn; the cabin then
@@ -321,8 +323,11 @@ class SimulatorHudAndBindingsMethods {
       this.renderer.shadowMap.enabled = preset.shadows ?? (preset.shadowMapSize > 0);
     }
     this.sky?.setShadowMapSize(preset.shadowMapSize);
-    if (this.sky?.cloudLayer?.group) {
-      this.sky.cloudLayer.group.visible = preset.clouds ?? true;
+    if (this.sky?.setCloudsVisible) {
+      this.sky.setCloudsVisible(preset.clouds ?? true);
+    } else {
+      if (this.sky?.cloudsGroup) this.sky.cloudsGroup.visible = preset.clouds ?? true;
+      if (this.sky?.cloudLayer) this.sky.cloudLayer.visible = preset.clouds ?? true;
     }
     if (this.cockpitOcclusion && preset.ao === false) {
       this.cockpitOcclusion.enabled = false;
