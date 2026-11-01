@@ -183,3 +183,20 @@ pixel `[255,0,0,255]`, GL error 0. The same isolated browser then verified:
 Final local gate: Node 22.23.2, `npm run check` (491 JavaScript files / 14 pinned
 action references), `npm test` (1077 passed), `npm run build` passed. These are
 local results; CI and deployment must be checked independently on the PR.
+
+## Valley slalom (`valley-slalom-v1`)
+
+The follow-up mission is a fast, low slalom that carves the bends instead of
+completing a valley safely at altitude. Its course and judging contract —
+experience goal, measured F-16 basis, generation rules, validity gate, dev/eval
+seed lists, passage-space judging and the pre-tuning baseline — is frozen in
+[f16-valley-slalom.md](f16-valley-slalom.md) before any controller is tuned
+against it. `valley-low-v1` above is unchanged and keeps its own score space.
+
+This section is contract and harness only: `SlalomMissionAdapter` plus
+`SlalomMission` run on production physics without a renderer
+(`npm run test:slalom`, `npm run test:slalom:courses`), and the generated valley
+is host-side terrain, never a registered airport. The slalom is not yet selectable
+in the arena panel, has no HUD page and no scoreboard entries; those belong to the
+controller work that follows, and no slalom score exists to compare yet.
+

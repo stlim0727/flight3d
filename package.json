@@ -16,6 +16,8 @@
     "test:flight": "node scripts/test-flight-agent.js",
     "test:pilot": "node scripts/test-pilot-missions.mjs",
     "test:valley": "node scripts/test-valley-pilot.mjs",
+    "test:slalom": "node scripts/run-valley-slalom.mjs",
+    "test:slalom:courses": "node scripts/validate-valley-courses.mjs",
     "test:flight:visual": "node scripts/test-flight-agent.js --screenshots",
     "test:landing": "node scripts/test-landing-damage.js",
     "test:crash": "node scripts/test-crash-scenarios.js",
