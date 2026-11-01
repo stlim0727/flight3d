@@ -61,6 +61,7 @@ test('pause, reset, culling and quality transitions keep one bounded instance bu
   traffic.update(.1,camera,'high');assert.notDeepEqual(Array.from(mesh.instanceMatrix.array),first);
   traffic.reset();traffic.update(.1,camera,'high');assert.deepEqual(Array.from(mesh.instanceMatrix.array),first);
   assert.ok(traffic.update(0,camera,'performance')<=TRAFFIC_QUALITY.performance.limit);
+  assert.ok(traffic.update(0,camera,'ultraLow')<=TRAFFIC_QUALITY.ultraLow.limit);
   assert.equal(traffic.update(0,{x:10000,y:1000,z:10000},'high'),0);
   assert.equal(mesh.visible,false);
   traffic.enabled=false;assert.equal(traffic.update(0,camera,'high'),0);

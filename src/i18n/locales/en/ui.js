@@ -265,6 +265,7 @@ export default {
   "quality.high": "High",
   "quality.balanced": "Balanced",
   "quality.performance": "Performance",
+  "quality.ultraLow": "Ultra Low",
   "help.close": "Close flight guide",
   "ap.master": "AP",
   "ap.hdg": "HDG",

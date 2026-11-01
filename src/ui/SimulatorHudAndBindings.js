@@ -279,10 +279,15 @@ class SimulatorHudAndBindingsMethods {
   }
 
   renderStandardScene(aoQuality = this.renderQuality) {
-    prepareCockpitShadowDepth(this.aircraft.group);
+    if (this.renderQuality !== 'ultraLow') {
+      prepareCockpitShadowDepth(this.aircraft.group);
+    }
     this.sky.prepareRender(this.camera, this.aircraft.group.position);
     this.renderer.render(this.scene, this.camera);
-    if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT &&
+    const preset = RENDER_QUALITY[this.renderQuality];
+    if (preset?.ao !== false &&
+        this.cockpitOcclusion?.enabled &&
+        this.cameraSystem.mode === CameraSystem.MODES.COCKPIT &&
         (!this.cameraSystem.photoCockpit || this.cameraSystem.isLookingAwayFromCenter())) {
       // Photo mode only reaches the 3D interior mid head-turn; the cabin then
       // fills the viewport and the AO early-out cannot fire, so run that
@@ -314,10 +319,33 @@ class SimulatorHudAndBindingsMethods {
     this.renderDiagnosticsPanel?.close();
     this.renderQuality = resolveRenderQuality(value);
     const preset = RENDER_QUALITY[this.renderQuality];
-    this.sky.setShadowMapSize(preset.shadowMapSize);
-    if (this.terrain.getQuality() !== preset.terrain) this.terrain.setQuality(preset.terrain);
+    if (this.renderer?.shadowMap) {
+      this.renderer.shadowMap.enabled = preset.shadows ?? (preset.shadowMapSize > 0);
+    }
+    this.sky?.setShadowMapSize(preset.shadowMapSize);
+    if (this.sky?.setCloudsVisible) {
+      this.sky.setCloudsVisible(preset.clouds ?? true);
+    } else {
+      if (this.sky?.cloudsGroup) this.sky.cloudsGroup.visible = preset.clouds ?? true;
+      if (this.sky?.cloudLayer) this.sky.cloudLayer.visible = preset.clouds ?? true;
+    }
+    if (this.cockpitOcclusion && preset.ao === false) {
+      this.cockpitOcclusion.enabled = false;
+      const cockpitQuality = document.getElementById('cockpit-quality');
+      if (cockpitQuality) cockpitQuality.value = 'performance';
+    }
+    if (this.terrain && this.terrain.getQuality() !== preset.terrain) {
+      this.terrain.setQuality(preset.terrain);
+    }
+    if (this.water?.setQuality) {
+      this.water.setQuality(this.renderQuality);
+    }
+    if (this.foliage?.setQuality) {
+      this.foliage.setQuality(this.renderQuality);
+    }
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, preset.maxDpr));
-    document.getElementById('render-quality').value = this.renderQuality;
+    const select = document.getElementById('render-quality');
+    if (select) select.value = this.renderQuality;
     try { localStorage.setItem(RENDER_QUALITY_KEY, this.renderQuality); } catch { /* Session-only setting. */ }
   }
 

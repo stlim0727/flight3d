@@ -47,11 +47,15 @@ test('quality and camera culling reuse exterior instances while collision remain
   assert.equal(parked.load('/unused',async()=>{throw new Error('must not reload');}),ready);
   assert.equal(await ready,true);assert.equal(loads,1);
   const meshes=[...parked.group.children];
-  for(const quality of ['high','balanced','performance']){
+  for(const quality of ['high','balanced','performance','ultraLow']){
     const count=parked.update(camera,quality);assert.equal(count,PARKED_QUALITY[quality].limit);
     assert.equal(parked.gear.count,count);assert.equal(parked.paint.count,count);
     assert.equal([...parked.batches.values()].reduce((n,p)=>n+p.body.count,0),count);
     assert.deepEqual(parked.group.children,meshes,'no per-aircraft objects or buffer reallocations on quality change');
+    if (quality === 'performance' || quality === 'ultraLow') {
+      assert.equal(parked.gear.castShadow, false);
+      for (const pair of parked.batches.values()) assert.equal(pair.body.castShadow, false);
+    }
   }
   parked.update(new THREE.Vector3(10000,30,10000),'performance');assert.equal(parked.visibleCount,0);
   const contact=parked.checkCollision([{pos:new THREE.Vector3(2.05,10.5,0),radius:.1,desc:'wing'}]);

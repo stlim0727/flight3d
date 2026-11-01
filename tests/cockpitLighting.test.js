@@ -115,6 +115,11 @@ it('AO linearizes nearby contacts with its own range on initialization and camer
     ao.render(renderer, quality);
     assert.equal(camera.far, 45000, 'AO must leave the exterior camera range unchanged');
   }
+  let aoPassCalled = 0;
+  ao.pass.render = () => { aoPassCalled++; };
+  ao.render(renderer, 'performance');
+  ao.render(renderer, 'ultraLow');
+  assert.equal(aoPassCalled, 0, 'performance and ultraLow must skip AO rendering pass');
   ao.dispose();
 });
 
@@ -144,7 +149,10 @@ it('warmup preserves independent photo deck visibility and skips performance unt
   };
   // Isolate warmup orchestration from WebGL; render() itself is covered above.
   ao.render = () => { aoDraws++; ao.pass = {}; };
-  for (let i = 0; i < 3; i++) ao.warm(renderer, 'performance');
+  for (let i = 0; i < 3; i++) {
+    ao.warm(renderer, 'performance');
+    ao.warm(renderer, 'ultraLow');
+  }
   assert.equal(beautyDraws, 0);
   assert.equal(aoDraws, 0);
   assert.equal(ao.pass, null);

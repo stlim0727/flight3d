@@ -25,8 +25,11 @@ export class Terrain {
     this.size = size;
     this.segments = segments;
 
-    // Quality preset: 'high' (5-layer + triplanar + micro normal) or 'low' (2-layer planar)
-    this.quality = options.quality === 'low' ? 'low' : 'high';
+    // Quality preset: 'high', 'low', or 'ultraLow'
+    this.quality = ['low', 'ultraLow'].includes(options.quality) ? options.quality : 'high';
+    if (this.quality === 'ultraLow' && segments === 256) {
+      this.segments = 64;
+    }
 
     // PBR tuning parameters
     this.normalStrength = options.normalStrength !== undefined ? options.normalStrength : 0.85;
@@ -156,14 +159,22 @@ export class Terrain {
   }
 
   setQuality(quality) {
-    if (quality !== 'high' && quality !== 'low') {
-      throw new Error(`Invalid quality preset: ${quality}. Expected 'high' or 'low'.`);
+    if (quality !== 'high' && quality !== 'low' && quality !== 'ultraLow') {
+      throw new Error(`Invalid quality preset: ${quality}. Expected 'high', 'low', or 'ultraLow'.`);
     }
     this.quality = quality;
     if (this.material) {
       this.material.defines = this.material.defines || {};
       this.material.defines.QUALITY_LOW = (quality === 'low' ? 1 : 0);
+      this.material.defines.QUALITY_ULTRALOW = (quality === 'ultraLow' ? 1 : 0);
       this.material.needsUpdate = true;
+    }
+    if (this.mesh) {
+      this.mesh.receiveShadow = quality !== 'ultraLow';
+    }
+    const targetSegments = quality === 'ultraLow' ? 64 : 256;
+    if (this.segments !== targetSegments) {
+      this.rebuildGeometry(targetSegments);
     }
   }
 
@@ -209,11 +220,11 @@ export class Terrain {
     this.material.needsUpdate = true;
   }
 
-  initTerrain() {
-    this.geometry = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
-    this.geometry.rotateX(-Math.PI * 0.5); // Align to X-Z horizontal plane
+  buildGeometry(segments = this.segments) {
+    const geometry = new THREE.PlaneGeometry(this.size, this.size, segments, segments);
+    geometry.rotateX(-Math.PI * 0.5); // Align to X-Z horizontal plane
 
-    const pos = this.geometry.attributes.position;
+    const pos = geometry.attributes.position;
     const colors = new Float32Array(pos.count * 3);
 
     // Procedural color palette (kept on geometry for debugging / fallback)
@@ -263,15 +274,32 @@ export class Terrain {
       colors[i * 3 + 2] = tempColor.b;
     }
 
-    this.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    this.geometry.computeVertexNormals();
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
+  rebuildGeometry(newSegments) {
+    if (this.segments === newSegments && this.geometry) return;
+    this.segments = newSegments;
+    const oldGeometry = this.geometry;
+    this.geometry = this.buildGeometry(newSegments);
+    if (this.mesh) {
+      this.mesh.geometry = this.geometry;
+    }
+    oldGeometry?.dispose();
+  }
+
+  initTerrain() {
+    this.geometry = this.buildGeometry(this.segments);
 
     const terrainMat = new THREE.MeshStandardMaterial({
       roughness: 0.88,
       metalness: 0.0,
       flatShading: false,
       defines: {
-        QUALITY_LOW: this.quality === 'low' ? 1 : 0
+        QUALITY_LOW: this.quality === 'low' ? 1 : 0,
+        QUALITY_ULTRALOW: this.quality === 'ultraLow' ? 1 : 0
       }
     });
 
@@ -431,7 +459,15 @@ export class Terrain {
         float tFinalMetalness;
         vec3 tFinalWorldNormal;
 
-        #if defined(QUALITY_LOW) && QUALITY_LOW == 1
+        #if defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1
+          // Ultra-Low Quality Preset: single planar diffuse sample, no normal mapping or triplanar sampling
+          vec4 grassSamp = terrainSample(uGrassMap, wPos.xz * uGrassScale);
+          vec4 runwaySamp = terrainSample(uRunwayMap, wPos.xz * uRunwayScale);
+          tFinalAlbedo = mix(grassSamp.rgb, runwaySamp.rgb, airportWeight);
+          tFinalRoughness = 0.9;
+          tFinalMetalness = 0.0;
+          tFinalWorldNormal = wNorm;
+        #elif defined(QUALITY_LOW) && QUALITY_LOW == 1
           // Low Quality Preset: 2 layers (Grass & Rock) with planar mapping
           float rockWeight = max(slopeCliff, smoothstep(180.0, 320.0, wPos.y));
           float grassWeight = (1.0 - rockWeight) * (1.0 - airportWeight);
@@ -587,7 +623,7 @@ export class Terrain {
 
     this.material = terrainMat;
     this.mesh = new THREE.Mesh(this.geometry, terrainMat);
-    this.mesh.receiveShadow = true;
+    this.mesh.receiveShadow = this.quality !== 'ultraLow';
   }
 
   /**
@@ -606,5 +642,9 @@ export class Terrain {
     const normal = new THREE.Vector3(hL - hR, 2.0 * eps, hD - hU);
     normal.normalize();
     return normal;
+  }
+
+  getTerrainNormal(x, z) {
+    return this.getNormal(x, z);
   }
 }

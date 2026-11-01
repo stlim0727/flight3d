@@ -249,13 +249,16 @@ export class F16 {
     if (this.landingLight) this.landingLight.visible = this.lightsOn && !this.isCrashed && extension > 0.95;
   }
 
-  setCockpitMode(isCockpit) {
+  setCockpitMode(isCockpit, showInterior = true) {
     this.isCockpit = isCockpit;
     if (this.canopyMaterial) {
       this.canopyMaterial.side = THREE.DoubleSide;
       this.canopyMaterial.opacity = isCockpit ? 0.06 : 0.22;
       this.canopyMaterial.envMapIntensity = isCockpit ? 0.45 : 1.2;
       this.canopyMaterial.userData.cockpitUniform.value = isCockpit ? 1 : 0;
+    }
+    if (this.cockpit && this.cockpit.group) {
+      this.cockpit.group.visible = isCockpit ? showInterior : true;
     }
   }
   triggerCrashVisuals() {

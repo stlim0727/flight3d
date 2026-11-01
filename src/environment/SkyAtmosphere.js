@@ -322,8 +322,28 @@ export class SkyAtmosphere {
     this.cloudsGroup.add(this.cloudLayer);
   }
 
+  setCloudsVisible(visible) {
+    if (this.cloudsGroup) {
+      this.cloudsGroup.visible = visible;
+    }
+    if (this.cloudLayer) {
+      this.cloudLayer.visible = visible;
+    }
+  }
+
   setShadowMapSize(size) {
     const shadow = this.sunLight.shadow;
+    if (size <= 0) {
+      this.sunLight.castShadow = false;
+      if (shadow.mapSize.x === 0 && shadow.mapSize.y === 0) return;
+      shadow.map?.dispose();
+      shadow.mapPass?.dispose();
+      shadow.map = null;
+      shadow.mapPass = null;
+      shadow.mapSize.set(0, 0);
+      return;
+    }
+    this.sunLight.castShadow = true;
     const supportedSize = Math.min(size, this.renderer?.capabilities?.maxTextureSize ?? size);
     if (shadow.mapSize.x === supportedSize && shadow.mapSize.y === supportedSize) return;
     shadow.map?.dispose();
@@ -338,19 +358,23 @@ export class SkyAtmosphere {
     // Use the displayed aircraft pose, including interpolation, at the final
     // render boundary. Close views retain ~3 cm texels at balanced quality;
     // distant tower/flyby views expand continuously up to the old world coverage.
-    const distance = camera.position.distanceTo(aircraftPosition);
-    const halfSize = THREE.MathUtils.clamp(32 + Math.max(0, distance - 60) * 0.2, 32, 120);
-    const shadowCamera = this.sunLight.shadow.camera;
-    if (shadowCamera.right !== halfSize) {
-      shadowCamera.left = shadowCamera.bottom = -halfSize;
-      shadowCamera.right = shadowCamera.top = halfSize;
-      shadowCamera.updateProjectionMatrix();
+    if (this.sunLight.castShadow) {
+      const distance = camera.position.distanceTo(aircraftPosition);
+      const halfSize = THREE.MathUtils.clamp(32 + Math.max(0, distance - 60) * 0.2, 32, 120);
+      const shadowCamera = this.sunLight.shadow.camera;
+      if (shadowCamera.right !== halfSize) {
+        shadowCamera.left = shadowCamera.bottom = -halfSize;
+        shadowCamera.right = shadowCamera.top = halfSize;
+        shadowCamera.updateProjectionMatrix();
+      }
+      this.sunLight.target.position.copy(aircraftPosition);
+      this.sunLight.position.copy(aircraftPosition).addScaledVector(this.sunPosition, 600);
+      this.sunShadowRefresh.beforeRender(this.scene, camera);
     }
-    this.sunLight.target.position.copy(aircraftPosition);
-    this.sunLight.position.copy(aircraftPosition).addScaledVector(this.sunPosition, 600);
-    this.sunShadowRefresh.beforeRender(this.scene, camera);
     // Sort before renderer.render uploads instance buffers, including camera cuts.
-    this.cloudLayer.sortForCamera(camera);
+    if (this.cloudLayer?.visible && this.cloudsGroup?.visible !== false) {
+      this.cloudLayer.sortForCamera(camera);
+    }
   }
 
   getSunDirection() {

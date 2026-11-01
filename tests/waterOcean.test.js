@@ -83,4 +83,26 @@ test('WaterOcean (Camera Anchoring, Grid Snapping & Gerstner Waves)', async (t) 
     assert.ok(fs.includes('uEdgeFadeEnd'), 'Fragment shader must declare uEdgeFadeEnd uniform');
     assert.ok(fs.includes('max(abs(vLocalPos.x), abs(vLocalPos.y))'), 'Fragment shader must compute edgeDist from vLocalPos');
   });
+
+  await t.test('ultraLow quality switches to single quad mesh, keeps decoupled snapStep and sets WATER_FLAT define', () => {
+    const ocean = new WaterOcean(36000, 180);
+    assert.equal(ocean.segments, 180);
+    assert.equal(ocean.snapStep, 200);
+    assert.equal(ocean.material.defines?.WATER_FLAT, 0);
+
+    ocean.setQuality('ultraLow');
+    assert.equal(ocean.segments, 1);
+    assert.equal(ocean.snapStep, 200, 'snapStep must remain 200m even in ultraLow single-quad mode');
+    assert.equal(ocean.material.defines.WATER_FLAT, 1);
+    assert.equal(ocean.geometry.attributes.position.count, 4);
+
+    ocean.setQuality('high');
+    assert.equal(ocean.segments, 180);
+    assert.equal(ocean.snapStep, 200);
+    assert.equal(ocean.material.defines.WATER_FLAT, 0);
+
+    const directUltraLow = new WaterOcean(36000, 1, { quality: 'ultraLow' });
+    assert.equal(directUltraLow.segments, 1);
+    assert.equal(directUltraLow.snapStep, 200, 'snapStep must be 200m when constructed directly with ultraLow');
+  });
 });

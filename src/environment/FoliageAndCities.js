@@ -130,13 +130,30 @@ export class FoliageAndCities {
     this.update(new THREE.Vector3());
   }
 
+  setQuality(quality) {
+    this.quality = quality;
+    const isUltraLow = quality === 'ultraLow';
+    for (const batch of this.treeBatches) {
+      batch.meshes[0].castShadow = !isUltraLow;
+      batch.meshes[1].castShadow = false;
+      batch.meshes[0].receiveShadow = !isUltraLow;
+      batch.meshes[1].receiveShadow = !isUltraLow;
+    }
+    this.lastTreeCamera.set(Infinity, Infinity, Infinity);
+    this.cityLodCamera.set(Infinity, Infinity, Infinity);
+  }
+
   update(cameraPosition) {
     if (!this.group.visible || this.lastTreeCamera.distanceToSquared(cameraPosition) < 25 * 25) return;
     this.lastTreeCamera.copy(cameraPosition);
     for (const batch of this.treeBatches) for (const mesh of batch.meshes) mesh.count = 0;
+    const isUltraLow = this.quality === 'ultraLow';
+    const maxDistSq = isUltraLow ? 2200 * 2200 : Infinity;
     for (const tree of this.treeInstances) {
+      const distSq = tree.position.distanceToSquared(cameraPosition);
+      if (distSq > maxDistSq) continue;
       const threshold = TREE_LOD_DISTANCE + (tree.near ? TREE_LOD_HYSTERESIS : 0);
-      tree.near = tree.position.distanceToSquared(cameraPosition) < threshold * threshold;
+      tree.near = !isUltraLow && distSq < threshold * threshold;
       const mesh = this.treeBatches[tree.speciesIndex].meshes[tree.near ? 0 : 1];
       mesh.setMatrixAt(mesh.count, tree.matrix);
       mesh.setColorAt(mesh.count, tree.color);
@@ -301,7 +318,8 @@ export class FoliageAndCities {
     if (this.cityLodCamera.distanceToSquared(cameraPosition) < 80 * 80) return;
     this.cityLodCamera.copy(cameraPosition);
     this.cityFoundations.count = 0;
-    const nearDistanceSquared = this.cityLodNearDistance ** 2;
+    const isUltraLow = this.quality === 'ultraLow';
+    const nearDistanceSquared = isUltraLow ? 0 : this.cityLodNearDistance ** 2;
     for (const { near, far, records } of this.cityArchetypes) {
       let nearCount = 0;
       let farCount = 0;
@@ -309,7 +327,7 @@ export class FoliageAndCities {
         const dx = cameraPosition.x - record.x;
         const dy = cameraPosition.y - (record.y + record.height / 2);
         const dz = cameraPosition.z - record.z;
-        const mesh = dx * dx + dy * dy + dz * dz < nearDistanceSquared ? near : far;
+        const mesh = nearDistanceSquared > 0 && (dx * dx + dy * dy + dz * dz < nearDistanceSquared) ? near : far;
         const index = mesh === near ? nearCount++ : farCount++;
         mesh.setMatrixAt(index, mesh === near ? record.matrix : record.farMatrix);
         if (mesh === near && record.foundationMatrix) {
@@ -324,7 +342,7 @@ export class FoliageAndCities {
       if (near.instanceColor) near.instanceColor.needsUpdate = true;
       if (far.instanceColor) far.instanceColor.needsUpdate = true;
     }
-    this.cityFoundations.instanceMatrix.needsUpdate = true;
+    if (this.cityFoundations.count > 0) this.cityFoundations.instanceMatrix.needsUpdate = true;
   }
 
   setTimeOfDay(hour) {

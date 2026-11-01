@@ -44,7 +44,7 @@ test('sun frustum follows displayed pose and encloses the airframe across camera
 test('quality changes replace GPU maps only when necessary and respect texture limits', () => {
   const sky = new SkyAtmosphere(new THREE.Scene());
   const shadow = sky.sunLight.shadow;
-  assert.deepEqual(Object.values(RENDER_QUALITY).map(p => p.shadowMapSize), [4096, 2048, 1024]);
+  assert.deepEqual(Object.values(RENDER_QUALITY).map(p => p.shadowMapSize), [4096, 2048, 1024, 0]);
   for (const tier of ['performance', 'balanced', 'high', 'balanced', 'performance']) {
     let disposed = 0;
     const map = new THREE.WebGLRenderTarget(shadow.mapSize.x, shadow.mapSize.y);
@@ -60,7 +60,38 @@ test('quality changes replace GPU maps only when necessary and respect texture l
     assert.equal(disposed, 1, 'Unchanged tier keeps the allocated map');
     assert.equal(shadow.map, map);
   }
+  // ultraLow tier completely disables castShadow and frees maps
+  sky.setShadowMapSize(RENDER_QUALITY.ultraLow.shadowMapSize);
+  assert.equal(sky.sunLight.castShadow, false);
+  assert.equal(shadow.mapSize.x, 0);
+  assert.equal(shadow.map, null);
   sky.renderer = { capabilities: { maxTextureSize: 2048 } };
   sky.setShadowMapSize(RENDER_QUALITY.high.shadowMapSize);
   assert.equal(shadow.mapSize.x, 2048);
+});
+
+test('cloud layer visibility and sorting guard respects ultraLow preset', () => {
+  const sky = new SkyAtmosphere(new THREE.Scene());
+  assert.equal(sky.cloudLayer.visible, true);
+  assert.equal(sky.cloudsGroup.visible, true);
+
+  let sorted = 0;
+  sky.cloudLayer.sortForCamera = () => { sorted++; };
+
+  const camera = new THREE.PerspectiveCamera();
+  sky.prepareRender(camera);
+  assert.equal(sorted, 1, 'Clouds should be sorted when visible');
+
+  sky.setCloudsVisible(false);
+  assert.equal(sky.cloudLayer.visible, false);
+  assert.equal(sky.cloudsGroup.visible, false);
+
+  sky.prepareRender(camera);
+  assert.equal(sorted, 1, 'Clouds must not be sorted when hidden in ultraLow');
+
+  sky.setCloudsVisible(true);
+  assert.equal(sky.cloudLayer.visible, true);
+  assert.equal(sky.cloudsGroup.visible, true);
+  sky.prepareRender(camera);
+  assert.equal(sorted, 2, 'Clouds should be sorted again when re-enabled');
 });

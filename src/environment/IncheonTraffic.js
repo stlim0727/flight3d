@@ -6,6 +6,7 @@ export const TRAFFIC_QUALITY = Object.freeze({
   high: { limit:64, distance:1200 },
   balanced: { limit:40, distance:900 },
   performance: { limit:20, distance:600 },
+  ultraLow: { limit:10, distance:400 },
 });
 const MAX_CARS=64;
 
