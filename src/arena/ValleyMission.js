@@ -26,6 +26,11 @@ export class ValleyMission {
     this.previous = null; this.samples = []; this.maximumProgressM = 0; this.maxAglM = 0;
     this.minAglM = null;
     this.iasSumKt = 0; this.iasCount = 0; this.maxIasKnots = 0;
+    this.clearedGates = 0;
+    this.missedGates = 0;
+    this.lowClearanceTicks = 0;
+    this.offCourseTicks = 0;
+    this.underSpeedTicks = 0;
   }
 
   finish(status, reason) { this.status = status; this.reason = reason; return this.result(); }
@@ -46,8 +51,19 @@ export class ValleyMission {
     if (s.crashed || s.damaged || s.bodyContact) return this.finish('failed', s.crashed ? 'crash' : s.bodyContact ? 'body-strike' : 'damage');
     if (this.tick >= this.manifest.timeoutTicks) return this.finish('failed', 'timeout');
     const c = this.manifest.course;
-    if (s.aglM < c.minimumAglM) return this.finish('failed', 'clearance-floor');
-    if (s.iasKnots < this.manifest.minimumIasKnots || s.iasKnots > this.manifest.maximumIasKnots) return this.finish('failed', 'speed-envelope');
+    const strict = Boolean(this.manifest.strictConstraints);
+
+    if (s.aglM < c.minimumAglM) {
+      if (strict) return this.finish('failed', 'clearance-floor');
+      this.lowClearanceTicks++;
+    }
+    if (s.iasKnots < this.manifest.minimumIasKnots) {
+      if (strict) return this.finish('failed', 'speed-envelope');
+      this.underSpeedTicks++;
+    } else if (s.iasKnots > this.manifest.maximumIasKnots) {
+      if (strict) return this.finish('failed', 'speed-envelope');
+    }
+
     if (!this.previous && Math.hypot(s.position.x - c.points[0].x, s.position.z - c.points[0].z) > c.startRadiusM) {
       return this.finish('failed', 'invalid-spawn');
     }
@@ -57,7 +73,12 @@ export class ValleyMission {
     }
     const leg = this.legs[this.nextGateIndex - 1];
     const projected = projectValleyLeg(leg, s.position);
-    if (projected.distanceM > c.corridorHalfWidthM) return this.finish('failed', 'course-excursion');
+    if (projected.distanceM > c.corridorHalfWidthM) {
+      if (strict || projected.distanceM > c.corridorHalfWidthM * 4) {
+        return this.finish('failed', 'course-excursion');
+      }
+      this.offCourseTicks++;
+    }
     this.maxAglM = Math.max(this.maxAglM, s.aglM);
     const previousProgress = this.previous ? this.previous.progressM : 0;
     const previousAgl = this.previous ? this.previous.aglM : s.aglM;
@@ -72,11 +93,19 @@ export class ValleyMission {
     }
     this.maximumProgressM = Math.max(this.maximumProgressM, projected.progressM);
     const previousT = projectValleyLeg(leg, this.previous?.position ?? c.points[0]).rawT;
-    const crossedGate = previousT < 1 && projected.rawT >= 1 && Math.abs(projected.crossTrackM) <= c.gateHalfWidthM;
+    const crossedGatePlane = previousT < 1 && projected.rawT >= 1;
     this.previous = { position: { ...s.position }, aglM: s.aglM, progressM: projected.progressM };
-    if (crossedGate) {
-      this.nextGateIndex++;
-      if (this.nextGateIndex >= c.points.length) return this.finish('succeeded', 'completed');
+    if (crossedGatePlane) {
+      const withinGate = Math.abs(projected.crossTrackM) <= c.gateHalfWidthM;
+      if (withinGate) {
+        this.clearedGates++;
+        this.nextGateIndex++;
+        if (this.nextGateIndex >= c.points.length) return this.finish('succeeded', 'completed');
+      } else if (!strict) {
+        this.missedGates++;
+        this.nextGateIndex++;
+        if (this.nextGateIndex >= c.points.length) return this.finish('succeeded', 'completed');
+      }
     }
     return this.result();
   }
@@ -88,15 +117,40 @@ export class ValleyMission {
     const meanExcessM = distanceM ? this.samples.reduce((sum, s) => sum + excess(s) * s.widthM, 0) / distanceM : 0;
     const p95ExcessM = quantile(this.samples, 0.95, excess);
     const meanIasKnots = this.iasCount ? this.iasSumKt / this.iasCount : null;
+    const altitudeCostM = 0.7 * meanExcessM + 0.3 * p95ExcessM;
+    const durationSeconds = this.tick / this.manifest.physicsHz;
+
+    const baseScore = 5000;
+    const gateScore = this.clearedGates * 500;
+    const speedScore = meanIasKnots ? Math.round(meanIasKnots * 15) : 0;
+    const timeBonus = Math.max(0, Math.round((70 - durationSeconds) * 50));
+    const altitudeScore = Math.max(0, Math.round(3000 - altitudeCostM * 10));
+    const missedGatePenalty = this.missedGates * 500;
+    const lowClearancePenalty = Math.round((this.lowClearanceTicks / this.manifest.physicsHz) * 50);
+    const offCoursePenalty = Math.round((this.offCourseTicks / this.manifest.physicsHz) * 50);
+    const underSpeedPenalty = Math.round((this.underSpeedTicks / this.manifest.physicsHz) * 30);
+    const totalPenalties = missedGatePenalty + lowClearancePenalty + offCoursePenalty + underSpeedPenalty;
+    const finalScore = this.status === 'succeeded'
+      ? Math.max(0, Math.round(baseScore + gateScore + speedScore + timeBonus + altitudeScore - totalPenalties))
+      : null;
+
     return { status: this.status, reason: this.reason, tick: this.tick, metrics: {
-      completedGates: this.nextGateIndex - 1, totalGates: this.legs.length,
+      completedGates: this.nextGateIndex - 1,
+      clearedGates: this.clearedGates,
+      missedGates: this.missedGates,
+      totalGates: this.legs.length,
       progressM: this.maximumProgressM, courseLengthM: this.lengthM, scoredDistanceM: distanceM,
       meanExcessM, p95ExcessM, maxAglM: this.maxAglM,
       minAglM: this.minAglM,
       medianAglM: quantile(this.samples, 0.5, s => s.aglM),
-      altitudeCostM: this.status === 'succeeded' ? 0.7 * meanExcessM + 0.3 * p95ExcessM : null,
+      altitudeCostM: this.status === 'succeeded' ? altitudeCostM : null,
+      finalScore,
+      speedScore,
+      timeBonus,
+      altitudeScore,
+      totalPenalties,
       rulesVersion: this.manifest.rulesVersion,
-      durationSeconds: this.tick / this.manifest.physicsHz,
+      durationSeconds,
       meanIasKnots,
       maxIasKnots: this.iasCount ? this.maxIasKnots : null,
     } };

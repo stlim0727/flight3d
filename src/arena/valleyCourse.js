@@ -47,9 +47,10 @@ export function projectValleyPosition(course, position) {
 
 export function createValleyManifest(overrides = {}) {
   const manifest = {
-    id: 'valley-low-v1', type: 'valley', rulesVersion: '1.1.0',
+    id: 'valley-low-v1', type: 'valley', rulesVersion: '1.2.0',
     aircraftId: 'F16', airportId: 'lukla', physicsHz: 120, decisionPeriodTicks: 24,
-    timeoutTicks: 10800, minimumIasKnots: 180, maximumIasKnots: 340,
+    timeoutTicks: 10800, minimumIasKnots: 180, maximumIasKnots: 450,
+    strictConstraints: false,
     environmentProfile: 'mild-disturbance-v1', calibration: 'pending',
     course: { points: structuredClone(POINTS), corridorHalfWidthM: 400,
       gateHalfWidthM: 200, startRadiusM: 50, binSizeM: 25, targetAglM: 35, minimumAglM: 20 },

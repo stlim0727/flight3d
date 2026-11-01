@@ -91,14 +91,24 @@ export function installPilotArena(sim) {
   let savedRecord = null;
   const renderBoard = comparisonKey => {
     const rows = scoreboard.read().filter(r => !comparisonKey || r.comparisonKey === comparisonKey);
-    rows.sort((a, b) => (a.status === 'succeeded' ? a.metrics.altitudeCostM ?? Infinity : Infinity) -
-      (b.status === 'succeeded' ? b.metrics.altitudeCostM ?? Infinity : Infinity));
+    rows.sort((a, b) => {
+      const scoreA = a.metrics?.finalScore;
+      const scoreB = b.metrics?.finalScore;
+      if (scoreA != null && scoreB != null) return scoreB - scoreA;
+      if (scoreA != null) return -1;
+      if (scoreB != null) return 1;
+      return (a.status === 'succeeded' ? a.metrics?.altitudeCostM ?? Infinity : Infinity) -
+        (b.status === 'succeeded' ? b.metrics?.altitudeCostM ?? Infinity : Infinity);
+    });
     find('board').replaceChildren();
     for (const row of rows) {
       const line = document.createElement('p');
       const speedPart = Number.isFinite(row.metrics?.meanIasKnots) ? `평균 ${Math.round(row.metrics.meanIasKnots)} KT · ` : '';
+      const scoreText = row.metrics?.finalScore != null
+        ? `${row.metrics.finalScore.toLocaleString('ko-KR')}점`
+        : row.metrics?.altitudeCostM != null ? `${row.metrics.altitudeCostM.toFixed(2)} m` : '점수 없음';
       line.textContent = `${row.pilotKind === 'human' ? '사람' : 'AI'} · ${row.status} / ${row.reason} · ` +
-        `${row.metrics.altitudeCostM == null ? '점수 없음' : row.metrics.altitudeCostM.toFixed(2) + ' m'} · ` +
+        `${scoreText} · ` +
         `${row.durationSeconds.toFixed(1)}초 · ${speedPart}경유지 ${row.metrics.completedGates ?? 0}/${row.metrics.totalGates ?? 6} · ` +
         `${row.conditions.environmentProfile} / seed ${row.conditions.environmentSeed} · ` +
         `${row.conditions.navigationProfile} · ${row.recordedAt}`;
@@ -148,8 +158,8 @@ export function installPilotArena(sim) {
 
       if (active) {
         find('compact-status').textContent = `${pilotTag} · 비행 중 · ${(record.tick / 120).toFixed(1)}초`;
-      } else if (scoreData?.hasAltitudeScore) {
-        find('compact-status').textContent = `${pilotTag} · 완주 · 점수 ${scoreData.mainValue}m · ${(record.tick / 120).toFixed(1)}초`;
+      } else if (scoreData?.hasScore) {
+        find('compact-status').textContent = `${pilotTag} · 완주 · 점수 ${scoreData.mainValue}${scoreData.mainUnit} · ${(record.tick / 120).toFixed(1)}초`;
       } else if (scoreData?.isSucceeded) {
         find('compact-status').textContent = `${pilotTag} · 성공 · ${(record.tick / 120).toFixed(1)}초`;
       } else if (scoreData?.isFailed) {
@@ -167,8 +177,8 @@ export function installPilotArena(sim) {
       find('stop').disabled = !active;
       find('save').disabled = active || !record;
 
-      if (scoreData?.hasAltitudeScore) {
-        find('status').textContent = `[${pilotTag}] 완주 · 점수 ${scoreData.mainValue} m · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)`;
+      if (scoreData?.hasScore) {
+        find('status').textContent = `[${pilotTag}] 완주 · 최종 점수 ${scoreData.mainValue} ${scoreData.mainUnit} · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)`;
       } else {
         find('status').textContent = `[${pilotTag}] ${record.status} · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)${record.reason ? ` · ${koreanReason(record.reason)}` : ''}`;
       }

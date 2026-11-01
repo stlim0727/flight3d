@@ -12,8 +12,8 @@ export function valleyBriefingMarkup() {
       <text x="12" y="202" fill="#b8cddd" font-size="11">남 ↑ · 동 → | 정적 지도 · 지형/장애물 감지 아님</text>
     </svg>
     <p>로컬 좌표 (동 x, 남 z / m): ${points.map((p, i) => `${i === 0 ? '출발' : i === 6 ? '도착' : i}: (${p.x}, ${p.z})`).join(' · ')}</p>
-    <p>경유지 ±${m.course.gateHalfWidthM} m · 항로 ±${m.course.corridorHalfWidthM} m · 최저 ${m.course.minimumAglM} m AGL · ${m.minimumIasKnots}–${m.maximumIasKnots} KIAS · ${(m.timeoutTicks / m.physicsHz).toFixed(0)}초 이내 · 접촉/손상 금지.
-    완주 후 ${m.course.targetAglM} m 초과 고도의 평균 70% + P95 30%가 점수이며 낮을수록 좋습니다.</p>`;
+    <p>경유지 ±${m.course.gateHalfWidthM} m · 항로 ±${m.course.corridorHalfWidthM} m · 목표 ${m.course.targetAglM} m AGL (최저 ${m.course.minimumAglM} m) · ${(m.timeoutTicks / m.physicsHz).toFixed(0)}초 이내 · 충돌 금지.
+    <strong>비행 속도가 빠를수록 고득점</strong>이며, 저공 유지 및 게이트 통과율에 따라 점수가 가산되고 제약 위반 시 감점 처리됩니다.</p>`;
 }
 
 export function valleyNavigationText(navigation) {
