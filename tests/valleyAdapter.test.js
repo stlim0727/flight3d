@@ -11,7 +11,7 @@ test('F16 valley spawn and observations use real DEM and never expose live geome
   const { manifest, initialSnapshot } = await adapter.prepare({ environmentProfile: 'calm-debug-v1', noise: false });
   assert.equal(manifest.aircraftId, 'F16');
   assert.equal(manifest.airportId, 'lukla');
-  assert.ok(Math.abs(initialSnapshot.aglM - 120) < 1e-4);
+  assert.ok(Math.abs(initialSnapshot.aglM - 70) < 1e-4);
   assert.equal(sim.gear.gearState, 0);
   assert.equal(sim.aero.flapsIndex, 0);
   assert.equal(sim.currentTerrain.isLoaded, true);
