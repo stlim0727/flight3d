@@ -33,7 +33,7 @@ export function koreanReason(reason) {
   return REASON_KO[reason] ?? reason ?? '종료';
 }
 
-export function formatPilotScoreData(record, missionName = '계곡 미션') {
+export function formatPilotScoreData(record, missionName = '계곡 미션', { scoreboard, callsign } = {}) {
   if (!record) return null;
   const m = record.result?.metrics ?? {};
   const status = record.status;
@@ -44,6 +44,9 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
     || record.manifest?.id === 'valley-low-v1';
   const hasScore = isSucceeded && (Number.isFinite(m.finalScore) || Number.isFinite(m.altitudeCostM));
   const hasAltitudeScore = hasScore;
+
+  const resolvedCallsign = callsign ?? scoreboard?.getSavedCallsign?.() ?? 'MAV';
+  const leaderboard = scoreboard?.getLeaderboard?.(5) ?? [];
 
   const durationSec = (record.tick / (record.manifest?.physicsHz ?? 120));
   const durationText = `${durationSec.toFixed(1)}초`;
@@ -164,6 +167,8 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
     subtext,
     durationText,
     stats,
+    callsign: resolvedCallsign,
+    leaderboard,
   };
 }
 
@@ -206,6 +211,30 @@ export function scoreOverlayMarkup(data) {
       </div>
       ${statsHtml ? `<div class="modal-stats-grid">${statsHtml}</div>` : ''}
       ${data.isValley ? `
+      ${data.isSucceeded ? `
+      <div class="modal-callsign-box">
+        <label class="modal-callsign-label" for="score-callsign-input">🎖️ 파일럿 콜사인 (CALLSIGN)</label>
+        <div class="modal-callsign-row">
+          <input id="score-callsign-input" type="text" class="input-callsign" maxlength="8" value="${data.callsign || 'MAV'}" data-score-callsign placeholder="예: MAV" />
+          <button type="button" class="btn-save-callsign" data-save-callsign>등록</button>
+        </div>
+      </div>` : ''}
+      ${data.leaderboard?.length ? `
+      <div class="modal-leaderboard">
+        <div class="leaderboard-header">
+          <span>🏆 계곡 슬라롬 순위표 (TOP 5)</span>
+        </div>
+        <div class="leaderboard-table">
+          ${data.leaderboard.map(e => `
+            <div class="leaderboard-row${e.callsign === data.callsign ? ' is-me' : ''}">
+              <span class="lb-rank">#${e.rank}</span>
+              <span class="lb-callsign">${e.callsign} <small>(${e.pilotKind === 'human' ? '사람' : 'AI'})</small></span>
+              <span class="lb-time">${e.durationSeconds.toFixed(1)}초</span>
+              <span class="lb-score">${e.score.toLocaleString('ko-KR')}점</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
       <div class="modal-mode-select">
         <span class="modal-mode-label">재도전 조종 방식</span>
         <div class="modal-mode-chips" role="radiogroup" aria-label="재도전 조종 방식">

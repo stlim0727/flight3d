@@ -91,6 +91,9 @@ test('formatPilotScoreData handles human control valley slalom success with prom
   const overlay = scoreOverlayMarkup(data);
   assert.match(overlay, /사람 직접 조종/);
   assert.match(overlay, /modal-score-value.*16,420.*<span class="modal-score-unit">점<\/span>/);
+  assert.match(overlay, /modal-callsign-box/);
+  assert.match(overlay, /data-score-callsign/);
+  assert.match(overlay, /data-save-callsign/);
 });
 
 test('formatPilotScoreData handles human control valley crash failure', () => {
