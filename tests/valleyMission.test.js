@@ -11,11 +11,11 @@ function straightManifest(overrides = {}) {
     points: [{ id: 'start', x: 0, z: 0 }, { id: 'middle', x: 0, z: 500 }, { id: 'finish', x: 0, z: 1000 }] },
   spawn: { ...m.spawn, x: 0, z: 0, headingDeg: 180 }, ...overrides });
 }
-function sample(tick, x, z, aglM = 80, extra = {}) {
+function sample(tick, x, z, aglM = 15, extra = {}) {
   return { tick, position: { x, y: 2000 + aglM, z }, aglM, iasKnots: 220, groundSpeedKnots: 250,
     crashed: false, damaged: false, bodyContact: false, ...extra };
 }
-function flyStraight({ agl = () => 80, revisit = false } = {}) {
+function flyStraight({ agl = () => 15, revisit = false } = {}) {
   const mission = new ValleyMission(straightManifest());
   let tick = 0;
   mission.update(sample(++tick, 0, 0, agl(0)));
@@ -57,8 +57,8 @@ test('ordered plane crossings and complete distance coverage determine completio
   assert.equal(result.metrics.meanExcessM, 0);
   assert.equal(result.metrics.p95ExcessM, 0);
   assert.equal(result.metrics.altitudeCostM, 0);
-  assert.equal(result.metrics.medianAglM, 80);
-  assert.equal(result.metrics.rulesVersion, '1.3.0');
+  assert.equal(result.metrics.medianAglM, 15);
+  assert.equal(result.metrics.rulesVersion, '1.4.0');
   assert.equal(result.metrics.meanIasKnots, 220);
   assert.equal(result.metrics.maxIasKnots, 220);
   assert.ok(result.metrics.finalScore > 10000, `Expected finalScore > 10000, got ${result.metrics.finalScore}`);
@@ -71,12 +71,12 @@ test('ordered plane crossings and complete distance coverage determine completio
 test('climbing has a finite cost rather than an upper-altitude failure and sub-target skimming earns no bonus', () => {
   const high = flyStraight({ agl: () => 250 }).result();
   assert.equal(high.status, 'succeeded');
-  assert.equal(high.metrics.altitudeCostM, 150);
-  const low = flyStraight({ agl: () => 30 }).result();
+  assert.equal(high.metrics.altitudeCostM, 230);
+  const low = flyStraight({ agl: () => 15 }).result();
   assert.equal(low.status, 'succeeded');
   assert.equal(low.metrics.altitudeCostM, 0);
-  const unsafe = new ValleyMission(straightManifest({ strictConstraints: true, course: { ...straightManifest().course, minimumAglM: 20 } }));
-  assert.equal(unsafe.update(sample(1, 0, 0, 19)).reason, 'clearance-floor');
+  const unsafe = new ValleyMission(straightManifest({ strictConstraints: true, course: { ...straightManifest().course, minimumAglM: 10 } }));
+  assert.equal(unsafe.update(sample(1, 0, 0, 9)).reason, 'clearance-floor');
   assert.equal(unsafe.result().metrics.altitudeCostM, null);
 });
 
@@ -105,12 +105,12 @@ test('missed gates, discontinuous flight, incomplete logs and deadline cannot cr
   assert.deepEqual(deadline.update(sample(3, 0, 1000)), before);
 });
 
-test('shorter completion time yields higher score and climbing above 100m penalizes', () => {
+test('shorter completion time yields higher score and climbing above 20m penalizes', () => {
   // Slower flight (more steps: advance 2.5m per tick -> 401 ticks)
   const slowMission = new ValleyMission(straightManifest());
   let tick = 0;
   for (let z = 0; z <= 1000; z += 2.5) {
-    slowMission.update(sample(++tick, 0, z, 50, { iasKnots: 200 }));
+    slowMission.update(sample(++tick, 0, z, 15, { iasKnots: 200 }));
   }
   const slowResult = slowMission.result();
   assert.equal(slowResult.status, 'succeeded');
@@ -119,7 +119,7 @@ test('shorter completion time yields higher score and climbing above 100m penali
   const fastMission = new ValleyMission(straightManifest());
   tick = 0;
   for (let z = 0; z <= 1000; z += 10) {
-    fastMission.update(sample(++tick, 0, z, 50, { iasKnots: 350 }));
+    fastMission.update(sample(++tick, 0, z, 15, { iasKnots: 350 }));
   }
   const fastResult = fastMission.result();
   assert.equal(fastResult.status, 'succeeded');
@@ -127,28 +127,28 @@ test('shorter completion time yields higher score and climbing above 100m penali
   assert.ok(fastResult.metrics.finalScore > slowResult.metrics.finalScore,
     `Fast score ${fastResult.metrics.finalScore} must exceed slow score ${slowResult.metrics.finalScore}`);
 
-  // Altitude test: low flight (e.g. 20m AGL, under 100m) has zero altitude penalty (no lower bound)
+  // Altitude test: low flight (e.g. 15m AGL, under 20m) has zero altitude penalty (no lower bound)
   const lowMission = new ValleyMission(straightManifest());
   tick = 0;
   for (let z = 0; z <= 1000; z += 5) {
-    lowMission.update(sample(++tick, 0, z, 20, { iasKnots: 350 }));
+    lowMission.update(sample(++tick, 0, z, 15, { iasKnots: 550 }));
   }
   const lowResult = lowMission.result();
   assert.equal(lowResult.status, 'succeeded');
-  assert.equal(lowResult.metrics.altitudePenalty, 0, 'Flight under 100m must have zero altitude penalty');
+  assert.equal(lowResult.metrics.altitudePenalty, 0, 'Flight under 20m must have zero altitude penalty');
   assert.equal(lowResult.metrics.altitudeCostM, 0);
 
-  // High flight: climbing above 100m (e.g. 180m AGL) incurs altitude penalty
+  // High flight: climbing above 20m (e.g. 80m AGL) incurs altitude penalty
   const highMission = new ValleyMission(straightManifest());
   tick = 0;
   for (let z = 0; z <= 1000; z += 5) {
-    highMission.update(sample(++tick, 0, z, 180, { iasKnots: 350 }));
+    highMission.update(sample(++tick, 0, z, 80, { iasKnots: 550 }));
   }
   const highResult = highMission.result();
   assert.equal(highResult.status, 'succeeded');
-  assert.ok(highResult.metrics.altitudePenalty > 0, 'Flight above 100m must incur altitude penalty');
+  assert.ok(highResult.metrics.altitudePenalty > 0, 'Flight above 20m must incur altitude penalty');
   assert.ok(highResult.metrics.finalScore < lowResult.metrics.finalScore,
-    'Climbing above 100m must lower the final score');
+    'Climbing above 20m must lower the final score');
 });
 
 test('manifest rejects missing geometry and invalid score/speed parameters', () => {

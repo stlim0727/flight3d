@@ -88,7 +88,7 @@ export function createSignboardCanvas(index, isFinish) {
     // Target altitude & descent guide
     ctx.fillStyle = '#9fe8ff';
     ctx.font = '24px monospace';
-    ctx.fillText('기준 100m · ▼ PASS', 256, 155);
+    ctx.fillText(isFinish ? '도착선 · ▼ PASS' : '기준 20m · 550-600 KT · ▼ PASS', 256, 155);
 
     return canvas;
   } catch {
@@ -186,7 +186,8 @@ export class ValleyWaypointsVisualizer {
       innerMesh.position.set(pt.x, groundY + pillarHeight / 2, pt.z);
       wpGroup.add(innerMesh);
 
-      // Gate ring at target passage altitude (100m AGL)
+      // Gate ring at target passage altitude (20m AGL)
+      const targetAgl = this.course?.targetAglM ?? 20;
       const ringMat = new THREE.MeshBasicMaterial({
         color: isFinish ? 0xffd700 : 0x00ff88,
         transparent: true,
@@ -196,7 +197,7 @@ export class ValleyWaypointsVisualizer {
         fog: false,
       });
       const ringMesh = new THREE.Mesh(this.ringGeo, ringMat);
-      ringMesh.position.set(pt.x, groundY + 100, pt.z);
+      ringMesh.position.set(pt.x, groundY + targetAgl, pt.z);
       ringMesh.rotation.x = Math.PI / 2;
       wpGroup.add(ringMesh);
 
@@ -238,7 +239,7 @@ export class ValleyWaypointsVisualizer {
         innerMat,
         ringMat,
         signMesh,
-        targetWorld: new THREE.Vector3(pt.x, groundY + 100, pt.z),
+        targetWorld: new THREE.Vector3(pt.x, groundY + targetAgl, pt.z),
       };
     }
   }

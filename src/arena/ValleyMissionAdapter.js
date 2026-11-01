@@ -9,7 +9,7 @@ import { ValleyWaypointsVisualizer } from './ValleyWaypointsVisualizer.js';
 /** Host-only Lukla/F16 bridge. Public observations are built separately. */
 export class ValleyMissionAdapter extends SimulatorMissionAdapter {
   async prepare({ missionId = 'valley-low-v1', environmentProfile = 'mild-disturbance-v1', seed = 1,
-    sensorSeed = seed, noise = environmentProfile !== 'calm-debug-v1', signal } = {}) {
+    sensorSeed = seed, noise = environmentProfile !== 'calm-debug-v1', pilotKind = 'ai', signal } = {}) {
     if (missionId !== 'valley-low-v1' || !Number.isSafeInteger(seed) || !Number.isSafeInteger(sensorSeed) ||
         !['calm-debug-v1', 'mild-disturbance-v1'].includes(environmentProfile) || typeof noise !== 'boolean') {
       throw new Error('invalid-scenario: valley profile/seed');
@@ -32,6 +32,10 @@ export class ValleyMissionAdapter extends SimulatorMissionAdapter {
       throw new Error('invalid-scenario: Lukla/F16/120Hz required');
     }
     const manifest = createValleyManifest();
+    if (pilotKind === 'human') {
+      manifest.spawn.iasKnots = 550;
+      manifest.spawn.aglM = 25;
+    }
     const { spawn } = manifest;
     const ground = sim.currentTerrain.getHeight(spawn.x, spawn.z);
     if (!Number.isFinite(ground)) throw new Error('invalid-scenario: missing spawn terrain');

@@ -47,13 +47,13 @@ export function projectValleyPosition(course, position) {
 
 export function createValleyManifest(overrides = {}) {
   const manifest = {
-    id: 'valley-low-v1', type: 'valley', rulesVersion: '1.3.0',
+    id: 'valley-low-v1', type: 'valley', rulesVersion: '1.4.0',
     aircraftId: 'F16', airportId: 'lukla', physicsHz: 120, decisionPeriodTicks: 24,
-    timeoutTicks: 10800, minimumIasKnots: 180, maximumIasKnots: 450,
+    timeoutTicks: 10800, minimumIasKnots: 180, maximumIasKnots: 700,
     strictConstraints: false,
     environmentProfile: 'mild-disturbance-v1', calibration: 'pending',
     course: { points: structuredClone(POINTS), corridorHalfWidthM: 400,
-      gateHalfWidthM: 200, startRadiusM: 50, binSizeM: 25, targetAglM: 100, minimumAglM: 0 },
+      gateHalfWidthM: 200, startRadiusM: 50, binSizeM: 25, targetAglM: 20, minimumAglM: 0 },
     spawn: { x: -1700, z: 500, aglM: 70, headingDeg: 183.17983011986425,
       iasKnots: 260, flightPathAngleDeg: 0 },
     terrain: { profile: 'copernicus-lukla-1025-v1', sampleSpacingM: 42.96875,
