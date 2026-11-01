@@ -47,14 +47,14 @@ export function projectValleyPosition(course, position) {
 
 export function createValleyManifest(overrides = {}) {
   const manifest = {
-    id: 'valley-low-v1', type: 'valley', rulesVersion: '1.0.0',
+    id: 'valley-low-v1', type: 'valley', rulesVersion: '1.1.0',
     aircraftId: 'F16', airportId: 'lukla', physicsHz: 120, decisionPeriodTicks: 24,
-    timeoutTicks: 14400, minimumIasKnots: 160, maximumIasKnots: 320,
+    timeoutTicks: 10800, minimumIasKnots: 180, maximumIasKnots: 340,
     environmentProfile: 'mild-disturbance-v1', calibration: 'pending',
     course: { points: structuredClone(POINTS), corridorHalfWidthM: 400,
-      gateHalfWidthM: 200, startRadiusM: 50, binSizeM: 25, targetAglM: 50, minimumAglM: 20 },
-    spawn: { x: -1700, z: 500, aglM: 120, headingDeg: 183.17983011986425,
-      iasKnots: 220, flightPathAngleDeg: 0 },
+      gateHalfWidthM: 200, startRadiusM: 50, binSizeM: 25, targetAglM: 35, minimumAglM: 20 },
+    spawn: { x: -1700, z: 500, aglM: 70, headingDeg: 183.17983011986425,
+      iasKnots: 260, flightPathAngleDeg: 0 },
     terrain: { profile: 'copernicus-lukla-1025-v1', sampleSpacingM: 42.96875,
       sha256: 'dfc3d92e211fa6995faf3dfb51bfb28848c7713d21ae0a1e110ea1a58dd18191' },
     fixedConfiguration: { gearDown: false, flapIndex: 0, spoilers: 0, reverser: false, parkingBrake: false },

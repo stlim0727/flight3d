@@ -6,8 +6,8 @@ export function createPilot() {
   const signed = value => ((value + 540) % 360) - 180;
   let cruiseKnots, targetAgl, trimDeg, dt, previousPitch, previousRoll, filteredVz, command, course;
   function reset(briefing = {}) {
-    cruiseKnots = briefing.recommendedSpeeds?.cruiseKnots ?? 220;
-    targetAgl = briefing.successConditions?.targetAglM ?? briefing.course?.targetAglM ?? 50;
+    cruiseKnots = briefing.recommendedSpeeds?.cruiseKnots ?? 260;
+    targetAgl = briefing.successConditions?.targetAglM ?? briefing.course?.targetAglM ?? 35;
     trimDeg = briefing.configuration?.pitchTrimDeg ?? 0;
     course = briefing.course?.points ?? [];
     dt = briefing.decisionPeriodSeconds ?? 0.2;

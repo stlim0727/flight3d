@@ -54,10 +54,13 @@ test('ordered plane crossings and complete distance coverage determine completio
   assert.equal(result.status, 'succeeded');
   assert.equal(result.metrics.completedGates, 2);
   assert.equal(result.metrics.scoredDistanceM, 1000);
-  assert.equal(result.metrics.meanExcessM, 30);
-  assert.equal(result.metrics.p95ExcessM, 30);
-  assert.equal(result.metrics.altitudeCostM, 30);
+  assert.equal(result.metrics.meanExcessM, 45);
+  assert.equal(result.metrics.p95ExcessM, 45);
+  assert.equal(result.metrics.altitudeCostM, 45);
   assert.equal(result.metrics.medianAglM, 80);
+  assert.equal(result.metrics.rulesVersion, '1.1.0');
+  assert.equal(result.metrics.meanIasKnots, 220);
+  assert.equal(result.metrics.maxIasKnots, 220);
   assert.deepEqual(projectValleyPosition(straightManifest().course, { x: 40, z: 250 }), {
     rawT: 0.5, t: 0.5, progressM: 250, crossTrackM: -40, distanceM: 40, headingDeg: 180,
     segmentIndex: 0, totalLengthM: 1000,
@@ -67,7 +70,7 @@ test('ordered plane crossings and complete distance coverage determine completio
 test('climbing has a finite cost rather than an upper-altitude failure and sub-target skimming earns no bonus', () => {
   const high = flyStraight({ agl: () => 250 }).result();
   assert.equal(high.status, 'succeeded');
-  assert.equal(high.metrics.altitudeCostM, 200);
+  assert.equal(high.metrics.altitudeCostM, 215);
   const low = flyStraight({ agl: () => 30 }).result();
   assert.equal(low.status, 'succeeded');
   assert.equal(low.metrics.altitudeCostM, 0);
