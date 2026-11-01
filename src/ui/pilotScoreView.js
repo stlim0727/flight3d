@@ -46,6 +46,9 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
 
   const durationSec = (record.tick / (record.manifest?.physicsHz ?? 120));
   const durationText = `${durationSec.toFixed(1)}초`;
+  const isHuman = record.pilotKind === 'human';
+  const pilotPrefix = isHuman ? '👤 사람 조종' : '🤖 AI 조종';
+  const pilotRoleText = isHuman ? '사람 (직접 조종)' : 'AI 파일럿';
 
   let badgeText = '미션 종료';
   let badgeType = 'neutral';
@@ -57,12 +60,13 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
 
   if (isValley) {
     if (isSucceeded) {
-      badgeText = '🏁 계곡 저공 완주';
+      badgeText = `${pilotPrefix} · 🏁 계곡 완주`;
       badgeType = 'success';
       mainLabel = '최종 점수 (고도 초과 비용)';
       mainValue = m.altitudeCostM != null ? m.altitudeCostM.toFixed(2) : '완주';
       mainUnit = m.altitudeCostM != null ? 'm' : '';
       subtext = '낮을수록 우수 · 50 m 초과 고도 페널티';
+      stats.push({ label: '조종 구분', value: pilotRoleText });
       stats.push({ label: '소요 시간', value: durationText });
       stats.push({ label: '경유지', value: `${m.completedGates ?? m.gatesCleared ?? 6} / ${m.totalGates ?? 6} 완주` });
       if (Number.isFinite(m.medianAglM)) stats.push({ label: '중위 고도', value: `${Math.round(m.medianAglM)} m` });
@@ -70,12 +74,13 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
       if (Number.isFinite(m.maxAglM)) stats.push({ label: '최고 고도', value: `${Math.round(m.maxAglM)} m` });
       if (Number.isFinite(m.meanExcessM)) stats.push({ label: '평균 초과', value: `${m.meanExcessM.toFixed(1)} m` });
     } else if (isFailed) {
-      badgeText = '⚠️ 미션 실패';
+      badgeText = `${pilotPrefix} · ⚠️ 미션 실패`;
       badgeType = 'failed';
       mainLabel = '실패 사유';
       mainValue = koreanReason(record.reason);
       mainUnit = '';
       subtext = '완주 시 고도 점수가 기록됩니다';
+      stats.push({ label: '조종 구분', value: pilotRoleText });
       stats.push({ label: '비행 시간', value: durationText });
       if (Number.isFinite(m.completedGates ?? m.gatesCleared)) {
         stats.push({ label: '통과 경유지', value: `${m.completedGates ?? m.gatesCleared ?? 0} / ${m.totalGates ?? 6}` });
@@ -85,20 +90,22 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
       }
       if (Number.isFinite(m.minAglM)) stats.push({ label: '최저 고도', value: `${Math.round(m.minAglM)} m` });
     } else {
-      badgeText = '수동 중지';
+      badgeText = `${pilotPrefix} · 수동 중지`;
       badgeType = 'aborted';
       mainLabel = '중지 사유';
       mainValue = koreanReason(record.reason);
       subtext = '수동 인계 또는 비행 설정이 변경되었습니다';
+      stats.push({ label: '조종 구분', value: pilotRoleText });
       stats.push({ label: '비행 시간', value: durationText });
     }
   } else {
     // Takeoff or landing or general mission
     if (isSucceeded) {
-      badgeText = '🏁 미션 성공';
+      badgeText = `${pilotPrefix} · 🏁 미션 성공`;
       badgeType = 'success';
       mainLabel = '완료 시간';
       mainValue = durationText;
+      stats.push({ label: '조종 구분', value: pilotRoleText });
       if (m.liftoffIasKnots) {
         stats.push({ label: '이륙 속도', value: `${Math.round(m.liftoffIasKnots)} KT` });
       }
@@ -110,16 +117,18 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
       }
       stats.push({ label: '소요 시간', value: durationText });
     } else if (isFailed) {
-      badgeText = '⚠️ 미션 실패';
+      badgeText = `${pilotPrefix} · ⚠️ 미션 실패`;
       badgeType = 'failed';
       mainLabel = '실패 사유';
       mainValue = koreanReason(record.reason);
+      stats.push({ label: '조종 구분', value: pilotRoleText });
       stats.push({ label: '비행 시간', value: durationText });
     } else {
-      badgeText = '수동 중지';
+      badgeText = `${pilotPrefix} · 수동 중지`;
       badgeType = 'aborted';
       mainLabel = '중지 사유';
       mainValue = koreanReason(record.reason);
+      stats.push({ label: '조종 구분', value: pilotRoleText });
       stats.push({ label: '비행 시간', value: durationText });
     }
   }
@@ -130,6 +139,7 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
     isFailed,
     isAborted,
     isValley,
+    isHuman,
     hasAltitudeScore,
     missionName,
     badgeText,
@@ -174,7 +184,7 @@ export function scoreOverlayMarkup(data) {
   return `
     <div class="pilot-score-modal${failedClass}">
       <span class="modal-badge">${data.badgeText}</span>
-      <div class="modal-mission-title">${data.missionName}</div>
+      <div class="modal-mission-title">${data.missionName} · ${data.isHuman ? '사람 직접 조종' : 'AI 자동 조종'}</div>
       <div class="modal-score-box">
         <div class="modal-score-label">${data.mainLabel}</div>
         <div class="modal-score-value">${data.mainValue}${data.mainUnit ? `<span class="modal-score-unit">${data.mainUnit}</span>` : ''}</div>

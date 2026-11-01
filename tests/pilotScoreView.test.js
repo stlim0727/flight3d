@@ -12,6 +12,7 @@ test('koreanReason translates known internal reasons and preserves unknown strin
 
 test('formatPilotScoreData handles valley slalom success with large altitude score', () => {
   const record = {
+    pilotKind: 'ai',
     status: 'succeeded',
     reason: 'completed',
     tick: 5580, // 46.5 seconds at 120 Hz
@@ -35,7 +36,8 @@ test('formatPilotScoreData handles valley slalom success with large altitude sco
   assert.equal(data.mainValue, '279.22');
   assert.equal(data.mainUnit, 'm');
   assert.equal(data.durationText, '46.5초');
-  assert.equal(data.badgeText, '🏁 계곡 저공 완주');
+  assert.match(data.badgeText, /AI.*완주/);
+  assert.equal(data.stats.some(s => s.label === '조종 구분' && s.value === 'AI 파일럿'), true);
   assert.equal(data.stats.some(s => s.label === '경유지' && s.value === '6 / 6 완주'), true);
   assert.equal(data.stats.some(s => s.label === '중위 고도' && s.value === '290 m'), true);
 
@@ -47,6 +49,70 @@ test('formatPilotScoreData handles valley slalom success with large altitude sco
   assert.match(overlay, /modal-score-value.*279\.22.*<span class="modal-score-unit">m<\/span>/);
   assert.match(overlay, /data-score-retry/);
   assert.match(overlay, /data-score-close/);
+});
+
+test('formatPilotScoreData handles human control valley slalom success with prominent score', () => {
+  const record = {
+    pilotKind: 'human',
+    status: 'succeeded',
+    reason: 'completed',
+    tick: 6000, // 50.0 seconds
+    manifest: { type: 'valley', physicsHz: 120 },
+    result: {
+      metrics: {
+        altitudeCostM: 215.42,
+        completedGates: 6,
+        totalGates: 6,
+        medianAglM: 255.0,
+        minAglM: 75.0,
+        maxAglM: 380.0,
+        meanExcessM: 190.0,
+      },
+    },
+  };
+
+  const data = formatPilotScoreData(record, 'F-16 루클라 계곡 저공');
+  assert.equal(data.isSucceeded, true);
+  assert.equal(data.isHuman, true);
+  assert.equal(data.hasAltitudeScore, true);
+  assert.equal(data.mainValue, '215.42');
+  assert.equal(data.mainUnit, 'm');
+  assert.match(data.badgeText, /사람 조종.*완주/);
+  assert.equal(data.stats.some(s => s.label === '조종 구분' && s.value === '사람 (직접 조종)'), true);
+
+  const overlay = scoreOverlayMarkup(data);
+  assert.match(overlay, /사람 직접 조종/);
+  assert.match(overlay, /modal-score-value.*215\.42.*<span class="modal-score-unit">m<\/span>/);
+});
+
+test('formatPilotScoreData handles human control valley crash failure', () => {
+  const record = {
+    pilotKind: 'human',
+    status: 'failed',
+    reason: 'crash',
+    tick: 1800, // 15.0 seconds
+    manifest: { type: 'valley', physicsHz: 120 },
+    result: {
+      metrics: {
+        altitudeCostM: null,
+        completedGates: 3,
+        totalGates: 6,
+        progressM: 2400,
+      },
+    },
+  };
+
+  const data = formatPilotScoreData(record, 'F-16 루클라 계곡 저공');
+  assert.equal(data.isFailed, true);
+  assert.equal(data.isHuman, true);
+  assert.match(data.badgeText, /사람 조종.*실패/);
+  assert.equal(data.mainValue, '지형 충돌');
+  assert.equal(data.stats.some(s => s.label === '조종 구분' && s.value === '사람 (직접 조종)'), true);
+
+  const overlay = scoreOverlayMarkup(data);
+  assert.match(overlay, /사람 직접 조종/);
+  assert.match(overlay, /is-failed/);
+  assert.match(overlay, /지형 충돌/);
 });
 
 test('formatPilotScoreData handles valley failure with reason and progress', () => {
@@ -70,7 +136,7 @@ test('formatPilotScoreData handles valley failure with reason and progress', () 
   assert.equal(data.hasAltitudeScore, false);
   assert.equal(data.mainValue, '지형 충돌');
   assert.equal(data.mainUnit, '');
-  assert.equal(data.badgeText, '⚠️ 미션 실패');
+  assert.match(data.badgeText, /미션 실패/);
   assert.equal(data.stats.some(s => s.label === '통과 경유지' && s.value === '2 / 6'), true);
   assert.equal(data.stats.some(s => s.label === '진행 거리' && s.value === '1,850 m'), true);
 

@@ -69,6 +69,10 @@ export function installPilotArena(sim) {
   scoreOverlay.addEventListener('click', event => {
     if (event.target === scoreOverlay || event.target.closest('[data-score-close]')) {
       hideScoreOverlay();
+      if (runner.record?.pilotKind === 'human') {
+        shell.open = true;
+        updateToggle();
+      }
     } else if (event.target.closest('[data-score-retry]')) {
       hideScoreOverlay();
       find('run').click();
@@ -136,23 +140,25 @@ export function installPilotArena(sim) {
     yieldFrame: () => new Promise(resolve => requestAnimationFrame(resolve)),
     onUpdate: record => {
       const active = runner.active;
+      const isHuman = record.pilotKind === 'human';
+      const pilotTag = isHuman ? '사람' : 'AI';
       const missionLabel = find('mission').selectedOptions[0]?.textContent ?? '계곡 미션';
       const scoreData = !active && record ? formatPilotScoreData(record, missionLabel) : null;
 
       if (active) {
-        find('compact-status').textContent = `비행 중 · ${(record.tick / 120).toFixed(1)}초`;
+        find('compact-status').textContent = `${pilotTag} · 비행 중 · ${(record.tick / 120).toFixed(1)}초`;
       } else if (scoreData?.hasAltitudeScore) {
-        find('compact-status').textContent = `완주 · 점수 ${scoreData.mainValue}m · ${(record.tick / 120).toFixed(1)}초`;
+        find('compact-status').textContent = `${pilotTag} · 완주 · 점수 ${scoreData.mainValue}m · ${(record.tick / 120).toFixed(1)}초`;
       } else if (scoreData?.isSucceeded) {
-        find('compact-status').textContent = `성공 · ${(record.tick / 120).toFixed(1)}초`;
+        find('compact-status').textContent = `${pilotTag} · 성공 · ${(record.tick / 120).toFixed(1)}초`;
       } else if (scoreData?.isFailed) {
-        find('compact-status').textContent = `실패 (${koreanReason(record.reason)}) · ${(record.tick / 120).toFixed(1)}초`;
+        find('compact-status').textContent = `${pilotTag} · 실패 (${koreanReason(record.reason)}) · ${(record.tick / 120).toFixed(1)}초`;
       } else {
-        find('compact-status').textContent = `${record.status} · ${(record.tick / 120).toFixed(1)}초`;
+        find('compact-status').textContent = `${pilotTag} · ${record.status} · ${(record.tick / 120).toFixed(1)}초`;
       }
 
       if (record.status !== lastStatus) {
-        appendLog(`${record.status}${record.reason ? ` · ${koreanReason(record.reason)}` : ''}${record.detail ? ` · ${record.detail}` : ''}`, record.tick);
+        appendLog(`[${pilotTag}] ${record.status}${record.reason ? ` · ${koreanReason(record.reason)}` : ''}${record.detail ? ` · ${record.detail}` : ''}`, record.tick);
         lastStatus = record.status;
       }
       renderTelemetry(record);
@@ -161,9 +167,9 @@ export function installPilotArena(sim) {
       find('save').disabled = active || !record;
 
       if (scoreData?.hasAltitudeScore) {
-        find('status').textContent = `완주 · 점수 ${scoreData.mainValue} m · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)`;
+        find('status').textContent = `[${pilotTag}] 완주 · 점수 ${scoreData.mainValue} m · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)`;
       } else {
-        find('status').textContent = `${record.status} · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)${record.reason ? ` · ${koreanReason(record.reason)}` : ''}`;
+        find('status').textContent = `[${pilotTag}] ${record.status} · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)${record.reason ? ` · ${koreanReason(record.reason)}` : ''}`;
       }
 
       const scoreBanner = find('score-banner');
