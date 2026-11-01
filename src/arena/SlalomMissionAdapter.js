@@ -48,10 +48,7 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     sim.position.set(spawn.x, ground + spawn.aglM, spawn.z); sim.angularVelocity.set(0, 0, 0);
     const solution = solveTrim(sim.aero, sim.engines, { iasKnots: spawn.iasKnots,
       altitudeMeters: sim.position.y, flightPathAngleDeg: 0, flapsIndex: 0, gearState: 0, spoilers: 0 });
-    // The shared F-16 model can have more idle thrust than level-flight drag, as
-    // in low-v1: accept its feasible idle-limited trim rather than inventing
-    // lower thrust to make the spawn look calmer than the airframe is.
-    if (!solution.feasible || (!solution.handsOffFeasible && solution.reason !== 'idle')) {
+    if (!solution.feasible || !solution.handsOffFeasible) {
       throw new Error('invalid-scenario: F16 trim');
     }
     const heading = spawn.headingDeg * RAD;

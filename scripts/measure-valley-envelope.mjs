@@ -48,7 +48,7 @@ for (const altitudeMeters of altitudes) {
   const sinks = [];
   for (const iasKnots of bandSpeeds) for (const bankDeg of bandBanks) {
     sinks.push(run(`sink ias ${iasKnots} bank ${bankDeg}`,
-      { altitudeMeters, iasKnots, bankDeg, hold: 'energy', sinkRateMs: 15,
+      { altitudeMeters, iasKnots, bankDeg, hold: 'energy', sinkRateMs: 40,
         seconds: 48, settleSeconds: 30 }));
   }
   console.log('-- climb authority: airspeed held, climb demanded past the limit');
