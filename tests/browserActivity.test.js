@@ -99,12 +99,18 @@ test('background animation schedules its next frame but never advances simulatio
   }
 });
 
-test('actual browser activity handling cancels a pending pilot reply before it can advance physics', async () => {
+test('actual browser activity handling holds a pending pilot reply without advancing judged physics', async () => {
   const { sim } = fixture();
   let finishTick, steps = 0;
   const adapter = { async prepare() { return { manifest: createMissionManifest('takeoff') }; },
     acquire() {}, release() {}, apply() {}, snapshot() { return {}; }, step() { steps++; } };
-  const runner = sim.pilotArena = new MissionRunner(adapter, { hostFactory: () => ({
+  let heldFrames = 0;
+  const runner = sim.pilotArena = new MissionRunner(adapter, {
+    canAdvance: () => !sim.browserBackgrounded,
+    yieldFrame: async () => {
+      assert.equal(steps, 0);
+      if (++heldFrames === 3) runner.stop('manual-takeover');
+    }, hostFactory: () => ({
     async start() {}, tick() { return new Promise(resolve => { finishTick = resolve; }); }, stop() {},
   }) });
   const run = runner.start('source');
@@ -113,6 +119,7 @@ test('actual browser activity handling cancels a pending pilot reply before it c
   finishTick({ elevator: 0, aileron: 0, rudder: 0, throttle: 1, brakes: 0 });
   const record = await run;
   assert.equal(record.status, 'aborted');
-  assert.equal(record.reason, 'browser-backgrounded');
+  assert.equal(record.reason, 'manual-takeover');
+  assert.equal(heldFrames, 3);
   assert.equal(steps, 0);
 });

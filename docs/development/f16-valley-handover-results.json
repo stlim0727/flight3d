@@ -1,0 +1,129 @@
+{
+  "status": "limited synchronous production-physics calibration; not release acceptance",
+  "focusedTests": {
+    "passed": 23,
+    "failed": 0
+  },
+  "runs": [
+    {
+      "seed": 1,
+      "profile": "mild-disturbance-v1",
+      "status": "succeeded",
+      "reason": "completed",
+      "tick": 4683,
+      "metrics": {
+        "completedGates": 6,
+        "totalGates": 6,
+        "progressM": 5727.799617600676,
+        "courseLengthM": 5727.799617600676,
+        "scoredDistanceM": 5727.799617600676,
+        "meanExcessM": 246.17700913276815,
+        "p95ExcessM": 366.435835568895,
+        "maxAglM": 426.17467796563005,
+        "minAglM": 109.41401847627223,
+        "medianAglM": 311.6404809741723,
+        "altitudeCostM": 282.2546570636062
+      }
+    },
+    {
+      "seed": 2,
+      "profile": "mild-disturbance-v1",
+      "status": "succeeded",
+      "reason": "completed",
+      "tick": 4660,
+      "metrics": {
+        "completedGates": 6,
+        "totalGates": 6,
+        "progressM": 5727.799617600676,
+        "courseLengthM": 5727.799617600676,
+        "scoredDistanceM": 5727.799617600676,
+        "meanExcessM": 234.76514859520833,
+        "p95ExcessM": 354.8609054328604,
+        "maxAglM": 415.29429038723487,
+        "minAglM": 109.37242751670426,
+        "medianAglM": 295.00582361505445,
+        "altitudeCostM": 270.7938756465039
+      }
+    },
+    {
+      "seed": 3,
+      "profile": "mild-disturbance-v1",
+      "status": "succeeded",
+      "reason": "completed",
+      "tick": 4717,
+      "metrics": {
+        "completedGates": 6,
+        "totalGates": 6,
+        "progressM": 5727.799617600676,
+        "courseLengthM": 5727.799617600676,
+        "scoredDistanceM": 5727.799617600676,
+        "meanExcessM": 241.19494064281938,
+        "p95ExcessM": 363.12688149815875,
+        "maxAglM": 444.32226662736,
+        "minAglM": 109.4237793893902,
+        "medianAglM": 293.66646393654736,
+        "altitudeCostM": 277.7745228994212
+      }
+    },
+    {
+      "seed": 4,
+      "profile": "mild-disturbance-v1",
+      "status": "succeeded",
+      "reason": "completed",
+      "tick": 4649,
+      "metrics": {
+        "completedGates": 6,
+        "totalGates": 6,
+        "progressM": 5727.799617600676,
+        "courseLengthM": 5727.799617600676,
+        "scoredDistanceM": 5727.799617600676,
+        "meanExcessM": 238.75360058230157,
+        "p95ExcessM": 362.1055941312354,
+        "maxAglM": 430.70178977727215,
+        "minAglM": 109.36262581052206,
+        "medianAglM": 296.01442933995065,
+        "altitudeCostM": 275.7591986469817
+      }
+    },
+    {
+      "seed": 5,
+      "profile": "mild-disturbance-v1",
+      "status": "succeeded",
+      "reason": "completed",
+      "tick": 4702,
+      "metrics": {
+        "completedGates": 6,
+        "totalGates": 6,
+        "progressM": 5727.799617600676,
+        "courseLengthM": 5727.799617600676,
+        "scoredDistanceM": 5727.799617600676,
+        "meanExcessM": 244.7932219735687,
+        "p95ExcessM": 359.3742153722481,
+        "maxAglM": 423.00385703487416,
+        "minAglM": 109.41538340019537,
+        "medianAglM": 306.5366449745562,
+        "altitudeCostM": 279.1675199931725
+      }
+    },
+    {
+      "seed": 1,
+      "profile": "calm-debug-v1",
+      "status": "succeeded",
+      "reason": "completed",
+      "tick": 4640,
+      "metrics": {
+        "completedGates": 6,
+        "totalGates": 6,
+        "progressM": 5727.799617600676,
+        "courseLengthM": 5727.799617600676,
+        "scoredDistanceM": 5727.799617600676,
+        "meanExcessM": 232.6549635732917,
+        "p95ExcessM": 355.965127807177,
+        "maxAglM": 417.3563187508926,
+        "minAglM": 109.39636634167695,
+        "medianAglM": 286.8926358666797,
+        "altitudeCostM": 269.6480128434573
+      }
+    }
+  ]
+}

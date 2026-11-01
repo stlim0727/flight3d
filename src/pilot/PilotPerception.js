@@ -10,6 +10,8 @@ const INSTRUMENTS = Object.freeze({
   iasKnots: [1, true], groundSpeedKnots: [0.5, true], pitchDeg: [0.2, false],
   rollDeg: [0.2, false], headingDeg: [0.3, false], altitudeFt: [3, false],
   radioAltFt: [1, true], vsiFpm: [30, false],
+  tasKnots: [1.5, true], pitchRateDegS: [0.15, false],
+  rollRateDegS: [0.15, false], yawRateDegS: [0.15, false],
 });
 const FEEDBACK = ['elevator', 'aileron', 'rudder', 'throttle', 'brakes'];
 

@@ -3,6 +3,7 @@ import { PilotPerception } from '../pilot/PilotPerception.js';
 import { createBriefing } from '../pilot/PilotProtocol.js';
 import { TakeoffMission } from './TakeoffMission.js';
 import { LandingMission } from './LandingMission.js';
+import { ValleyMission } from './ValleyMission.js';
 
 /** Local, unranked evaluator. Only this loop advances physics while active.
  * A computed command waits one full decision period before it can be applied.
@@ -11,12 +12,13 @@ import { LandingMission } from './LandingMission.js';
 export class MissionRunner {
   constructor(adapter, { hostFactory = () => new PilotHost(),
     yieldFrame = () => new Promise(resolve => setTimeout(resolve, 0)),
-    onUpdate = () => {}, paceTick = null } = {}) {
+    onUpdate = () => {}, paceTick = null, canAdvance = () => true } = {}) {
     this.adapter = adapter;
     this.hostFactory = hostFactory;
     this.yieldFrame = yieldFrame;
     this.onUpdate = onUpdate;
     this.paceTick = paceTick;
+    this.canAdvance = canAdvance;
     this.state = 'idle';
     this.generation = 0;
     this.record = null;
@@ -29,7 +31,7 @@ export class MissionRunner {
     const generation = ++this.generation;
     this.abortPreparation = new AbortController();
     this.state = 'preparing';
-    this.record = { status: 'preparing', reason: null, tick: 0, observations: [],
+    this.record = { pilotKind: options.pilotKind === 'human' ? 'human' : 'ai', status: 'preparing', reason: null, tick: 0, observations: [],
       commands: [], poses: [], result: null };
     const record = this.record;
     this.notify();
@@ -42,45 +44,56 @@ export class MissionRunner {
       const manifest = prepared.manifest;
       if (manifest.physicsHz !== 120) throw new Error('Unsupported physics rate');
       record.manifest = structuredClone(manifest);
-      record.source = source;
+      if (record.pilotKind === 'human' && manifest.type !== 'valley') throw new Error('Human mode requires valley mission');
+      record.source = record.pilotKind === 'ai' ? source : null;
       record.sensorSeed = options.sensorSeed ?? options.seed ?? 1;
       record.noiseEnabled = options.noise ?? options.environmentProfile !== 'calm-debug-v1';
       const hash = async text => Array.from(new Uint8Array(await crypto.subtle.digest(
         'SHA-256', new TextEncoder().encode(text))), b => b.toString(16).padStart(2, '0')).join('');
-      record.sourceHash = await hash(source);
+      record.sourceHash = record.pilotKind === 'ai' ? await hash(source) : null;
       record.manifestHash = await hash(JSON.stringify(manifest));
       if (generation !== this.generation) return record;
-      this.adapter.acquire();
-      const evaluator = manifest.id.startsWith('landing')
+      this.adapter.acquire({ human: record.pilotKind === 'human' });
+      const evaluator = manifest.type === 'valley' ? new ValleyMission(manifest) : manifest.id.startsWith('landing')
         ? new LandingMission(manifest) : new TakeoffMission(manifest);
       const perception = new PilotPerception({ sensorSeed: options.sensorSeed ?? options.seed ?? 1,
         noise: options.noise ?? options.environmentProfile !== 'calm-debug-v1',
         physicsHz: 120, mission: manifest.id, runway: { headingDeg: manifest.runwayHeadingDeg,
           elevationM: manifest.runwayThreshold.y } });
-      const host = this.host = this.hostFactory();
-      await host.start(source, createBriefing(manifest));
+      record.briefing = createBriefing(manifest);
+      const host = this.host = record.pilotKind === 'ai' ? this.hostFactory() : null;
+      await host?.start(source, record.briefing);
       if (generation !== this.generation) return record;
       this.state = this.record.status = 'running';
       let tick = 0, pending = null;
       const period = 24;
       while (generation === this.generation) {
+        while (!this.canAdvance() && generation === this.generation) await this.yieldFrame();
+        if (generation !== this.generation) break;
         // Order at t: due command, observation, physics, completed-tick judging.
         if (pending) {
           this.adapter.apply(pending.command);
           this.record.commands.push({ ...pending, applyTick: tick });
         }
-        const observation = perception.sample(this.adapter.snapshot(tick), tick);
+        const snapshotAtDecision = this.adapter.snapshot(tick);
+        const observation = this.adapter.observe?.(perception, snapshotAtDecision, tick, evaluator)
+          ?? perception.sample(snapshotAtDecision, tick);
         this.record.observations.push({ sampleTick: tick, observation });
-        const command = await host.tick(observation, { sampleTick: tick });
+        this.notify();
         if (generation !== this.generation) break;
-        pending = { command, sampleTick: tick, scheduledTick: tick + period };
+        const command = await host?.tick(observation, { sampleTick: tick });
+        if (generation !== this.generation) break;
+        pending = host ? { command, sampleTick: tick, scheduledTick: tick + period } : null;
         for (let i = 0; i < period; i++) {
+          while (!this.canAdvance() && generation === this.generation) await this.yieldFrame();
           if (this.paceTick) await this.paceTick(tick + 1, manifest.physicsHz);
+          while (!this.canAdvance() && generation === this.generation) await this.yieldFrame();
           if (generation !== this.generation) break;
           this.adapter.step();
           const snapshot = this.adapter.snapshot(++tick);
           perception.updateContact(snapshot.weightOnWheels, tick);
           const result = evaluator.update(snapshot);
+          this.record.result = result;
           this.record.tick = tick;
           if (tick % period === 0 || result.status !== 'running') {
             this.record.poses.push({ tick, ...this.adapter.pose?.(),
@@ -89,13 +102,13 @@ export class MissionRunner {
               centerlineOffsetM: snapshot.centerlineOffsetM });
           }
           if (result.status !== 'running') {
-            this.record.result = result;
             this.state = this.record.status = result.status;
             this.record.reason = result.reason;
             this.notify();
             return this.record;
           }
         }
+        if (generation !== this.generation) break;
         this.notify();
         await this.yieldFrame();
       }
@@ -105,6 +118,7 @@ export class MissionRunner {
         this.record.reason = error.code ?? (/invalid-scenario|infrastructure-error/.exec(error.message)?.[0])
           ?? 'pilot-or-runtime-error';
         this.record.detail = error.message;
+        if (this.record.result) this.record.result = { ...this.record.result, status: 'failed', reason: this.record.reason };
         this.notify();
       }
     } finally {
@@ -125,6 +139,7 @@ export class MissionRunner {
     this.host = null;
     this.state = this.record.status = 'aborted';
     this.record.reason = reason;
+    if (this.record.result) this.record.result = { ...this.record.result, status: 'aborted', reason };
     this.adapter.release();
     this.notify();
   }

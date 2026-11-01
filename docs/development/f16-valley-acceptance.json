@@ -1,0 +1,143 @@
+{
+  "description": "Rendererless synchronous SDK sweeps using production F16 physics and bundled Lukla DEM; 2026-11-01. Worker and browser evidence are separate.",
+  "runs": [
+    {
+      "environmentProfile": "mild-disturbance-v1",
+      "seed": 1,
+      "sensorNoiseEnabled": true,
+      "result": {
+        "status": "succeeded",
+        "reason": "completed",
+        "tick": 4684,
+        "metrics": {
+          "completedGates": 6,
+          "totalGates": 6,
+          "progressM": 5727.799617600676,
+          "courseLengthM": 5727.799617600676,
+          "scoredDistanceM": 5727.799617600676,
+          "meanExcessM": 243.32248298057684,
+          "p95ExcessM": 362.97529377234275,
+          "maxAglM": 422.444622862031,
+          "minAglM": 109.41401847627223,
+          "medianAglM": 304.39116041916054,
+          "altitudeCostM": 279.2183262181066
+        }
+      }
+    },
+    {
+      "environmentProfile": "mild-disturbance-v1",
+      "seed": 2,
+      "sensorNoiseEnabled": true,
+      "result": {
+        "status": "succeeded",
+        "reason": "completed",
+        "tick": 4656,
+        "metrics": {
+          "completedGates": 6,
+          "totalGates": 6,
+          "progressM": 5727.799617600676,
+          "courseLengthM": 5727.799617600676,
+          "scoredDistanceM": 5727.799617600676,
+          "meanExcessM": 230.2773162951815,
+          "p95ExcessM": 339.90226539734874,
+          "maxAglM": 411.62996170422554,
+          "minAglM": 109.37242751670426,
+          "medianAglM": 292.867496080789,
+          "altitudeCostM": 263.16480102583165
+        }
+      }
+    },
+    {
+      "environmentProfile": "mild-disturbance-v1",
+      "seed": 3,
+      "sensorNoiseEnabled": true,
+      "result": {
+        "status": "succeeded",
+        "reason": "completed",
+        "tick": 4709,
+        "metrics": {
+          "completedGates": 6,
+          "totalGates": 6,
+          "progressM": 5727.799617600676,
+          "courseLengthM": 5727.799617600676,
+          "scoredDistanceM": 5727.799617600676,
+          "meanExcessM": 240.65423341332294,
+          "p95ExcessM": 363.44493835511173,
+          "maxAglM": 431.7047303435535,
+          "minAglM": 109.4237793893902,
+          "medianAglM": 294.645360492488,
+          "altitudeCostM": 277.49144489585956
+        }
+      }
+    },
+    {
+      "environmentProfile": "mild-disturbance-v1",
+      "seed": 4,
+      "sensorNoiseEnabled": true,
+      "result": {
+        "status": "succeeded",
+        "reason": "completed",
+        "tick": 4657,
+        "metrics": {
+          "completedGates": 6,
+          "totalGates": 6,
+          "progressM": 5727.799617600676,
+          "courseLengthM": 5727.799617600676,
+          "scoredDistanceM": 5727.799617600676,
+          "meanExcessM": 235.84957638430643,
+          "p95ExcessM": 351.97399174058836,
+          "maxAglM": 415.18156888362034,
+          "minAglM": 109.36262581052206,
+          "medianAglM": 293.94452591005245,
+          "altitudeCostM": 270.686900991191
+        }
+      }
+    },
+    {
+      "environmentProfile": "mild-disturbance-v1",
+      "seed": 5,
+      "sensorNoiseEnabled": true,
+      "result": {
+        "status": "succeeded",
+        "reason": "completed",
+        "tick": 4709,
+        "metrics": {
+          "completedGates": 6,
+          "totalGates": 6,
+          "progressM": 5727.799617600676,
+          "courseLengthM": 5727.799617600676,
+          "scoredDistanceM": 5727.799617600676,
+          "meanExcessM": 243.39300987709828,
+          "p95ExcessM": 365.1483300632927,
+          "maxAglM": 423.00385703487416,
+          "minAglM": 109.41538340019537,
+          "medianAglM": 301.23750678592535,
+          "altitudeCostM": 279.9196059329566
+        }
+      }
+    },
+    {
+      "environmentProfile": "calm-debug-v1",
+      "seed": 1,
+      "sensorNoiseEnabled": false,
+      "result": {
+        "status": "succeeded",
+        "reason": "completed",
+        "tick": 4637,
+        "metrics": {
+          "completedGates": 6,
+          "totalGates": 6,
+          "progressM": 5727.799617600676,
+          "courseLengthM": 5727.799617600676,
+          "scoredDistanceM": 5727.799617600676,
+          "meanExcessM": 228.25143073091718,
+          "p95ExcessM": 345.2712414052027,
+          "maxAglM": 407.806750261303,
+          "minAglM": 109.39636634167695,
+          "medianAglM": 283.35049993182116,
+          "altitudeCostM": 263.35737393320284
+        }
+      }
+    }
+  ]
+}
