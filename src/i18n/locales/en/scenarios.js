@@ -7,7 +7,7 @@ export default {
   "hangang.title": "Han River · bridge challenge",
   "hangang.briefing": "Dedicated map · automatic C172 · 3 bridges · calm/twilight\nStart at 19 m above water / 89 kt. Hold 10–28 m, 68–113 kt and vertical speed within ±3 m/s. Bank within 12° near bridges, 30° between them. 8 continuous seconds outside the envelope fails the run.",
   "hangang.provenance": "Yeouido–Yongsan corridor with illuminated bridges, expressway arteries and twilight skyline. Manually fly 01 → 02 → 03, then recover stable flight.",
-  "hangang.contact": "Contact with bridge, terrain or water.",
+  "hangang.contact": "Collision with a bridge, obstacle, terrain or water.",
   "hangang.manual": "Manual control required. Autopilot disconnected.",
   "demo.sihwa.name": "Sihwa coastal tour",
   "demo.sihwa.briefing": "Start airborne near Sihwa seawall, visit the tidal power station, Dal Observatory and Bangameori Beach, then return for an airborne manual handoff. Speed and turn radius suit each aircraft.",
