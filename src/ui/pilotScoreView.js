@@ -65,9 +65,12 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
       mainLabel = '최종 점수 (고도 초과 비용)';
       mainValue = m.altitudeCostM != null ? m.altitudeCostM.toFixed(2) : '완주';
       mainUnit = m.altitudeCostM != null ? 'm' : '';
-      subtext = '낮을수록 우수 · 50 m 초과 고도 페널티';
+      const targetAgl = record.manifest?.course?.targetAglM ?? 35;
+      subtext = `낮을수록 우수 · ${targetAgl} m 초과 고도 페널티`;
       stats.push({ label: '조종 구분', value: pilotRoleText });
       stats.push({ label: '소요 시간', value: durationText });
+      if (Number.isFinite(m.meanIasKnots)) stats.push({ label: '평균 속도', value: `${Math.round(m.meanIasKnots)} KT` });
+      if (Number.isFinite(m.maxIasKnots)) stats.push({ label: '최고 속도', value: `${Math.round(m.maxIasKnots)} KT` });
       stats.push({ label: '경유지', value: `${m.completedGates ?? m.gatesCleared ?? 6} / ${m.totalGates ?? 6} 완주` });
       if (Number.isFinite(m.medianAglM)) stats.push({ label: '중위 고도', value: `${Math.round(m.medianAglM)} m` });
       if (Number.isFinite(m.minAglM)) stats.push({ label: '최저 고도', value: `${Math.round(m.minAglM)} m` });
@@ -82,6 +85,7 @@ export function formatPilotScoreData(record, missionName = '계곡 미션') {
       subtext = '완주 시 고도 점수가 기록됩니다';
       stats.push({ label: '조종 구분', value: pilotRoleText });
       stats.push({ label: '비행 시간', value: durationText });
+      if (Number.isFinite(m.meanIasKnots)) stats.push({ label: '평균 속도', value: `${Math.round(m.meanIasKnots)} KT` });
       if (Number.isFinite(m.completedGates ?? m.gatesCleared)) {
         stats.push({ label: '통과 경유지', value: `${m.completedGates ?? m.gatesCleared ?? 0} / ${m.totalGates ?? 6}` });
       }
