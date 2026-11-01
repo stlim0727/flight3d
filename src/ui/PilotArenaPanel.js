@@ -10,6 +10,7 @@ import { createRealtimePacer } from '../arena/realtimePacer.js';
 import { ValleyScoreboard } from '../arena/ValleyScoreboard.js';
 import { valleyBriefingMarkup, valleyNavigationText } from './valleyNavigationView.js';
 import { bindPilotPanelInput } from './pilotPanelInput.js';
+import { formatPilotScoreData, scoreBannerMarkup, scoreOverlayMarkup, koreanReason } from './pilotScoreView.js';
 
 /** Opt-in local pilot lab. No remote upload and no security sandbox claims. */
 export function installPilotArena(sim) {
@@ -17,6 +18,7 @@ export function installPilotArena(sim) {
   shell.id = 'pilot-arena';
   shell.open = !window.matchMedia('(max-width: 640px)').matches;
   shell.innerHTML = `<summary><span>Pilot · <span data-compact-status>대기 중</span></span><span data-toggle-label>최소화</span></summary>
+    <div data-score-banner class="pilot-score-banner" hidden></div>
     <p>본인이 신뢰하는 코드만 실행하세요. 예제는 제한된 물리 테스트를 통과한 실험용이며 결과는 로컬 비랭킹입니다.</p>
     <label>미션 <select data-mission><option value="takeoff-basic-v1">이륙</option><option value="landing-basic-v1">착륙</option><option value="valley-low-v1">F-16 루클라 계곡 저공</option></select></label>
     <label>조종 <select data-kind><option value="ai">AI</option><option value="human">사람 · F-16 계곡 미션</option></select></label>
@@ -55,6 +57,29 @@ export function installPilotArena(sim) {
   navigationHud.hidden = true;
   navigationHud.setAttribute('aria-label', '계곡 미션 공통 항법 보조');
   document.body.append(navigationHud);
+  const scoreOverlay = document.createElement('div');
+  scoreOverlay.id = 'pilot-score-overlay';
+  scoreOverlay.hidden = true;
+  scoreOverlay.setAttribute('role', 'dialog');
+  scoreOverlay.setAttribute('aria-modal', 'true');
+  scoreOverlay.setAttribute('aria-label', '미션 결과 점수');
+  document.body.append(scoreOverlay);
+  let shownOverlayRecord = null;
+  const hideScoreOverlay = () => { scoreOverlay.hidden = true; };
+  scoreOverlay.addEventListener('click', event => {
+    if (event.target === scoreOverlay || event.target.closest('[data-score-close]')) {
+      hideScoreOverlay();
+    } else if (event.target.closest('[data-score-retry]')) {
+      hideScoreOverlay();
+      find('run').click();
+    }
+  });
+  window.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !scoreOverlay.hidden) hideScoreOverlay();
+  });
+  find('score-banner').addEventListener('click', event => {
+    if (event.target.closest('[data-banner-retry]')) find('run').click();
+  });
   const scoreboard = new ValleyScoreboard({
     getItem: key => window.localStorage.getItem(key),
     setItem: (key, value) => window.localStorage.setItem(key, value),
@@ -111,16 +136,50 @@ export function installPilotArena(sim) {
     yieldFrame: () => new Promise(resolve => requestAnimationFrame(resolve)),
     onUpdate: record => {
       const active = runner.active;
-      find('compact-status').textContent = `${record.status} · ${(record.tick / 120).toFixed(1)}초`;
+      const missionLabel = find('mission').selectedOptions[0]?.textContent ?? '계곡 미션';
+      const scoreData = !active && record ? formatPilotScoreData(record, missionLabel) : null;
+
+      if (active) {
+        find('compact-status').textContent = `비행 중 · ${(record.tick / 120).toFixed(1)}초`;
+      } else if (scoreData?.hasAltitudeScore) {
+        find('compact-status').textContent = `완주 · 점수 ${scoreData.mainValue}m · ${(record.tick / 120).toFixed(1)}초`;
+      } else if (scoreData?.isSucceeded) {
+        find('compact-status').textContent = `성공 · ${(record.tick / 120).toFixed(1)}초`;
+      } else if (scoreData?.isFailed) {
+        find('compact-status').textContent = `실패 (${koreanReason(record.reason)}) · ${(record.tick / 120).toFixed(1)}초`;
+      } else {
+        find('compact-status').textContent = `${record.status} · ${(record.tick / 120).toFixed(1)}초`;
+      }
+
       if (record.status !== lastStatus) {
-        appendLog(`${record.status}${record.reason ? ` · ${record.reason}` : ''}${record.detail ? ` · ${record.detail}` : ''}`, record.tick);
+        appendLog(`${record.status}${record.reason ? ` · ${koreanReason(record.reason)}` : ''}${record.detail ? ` · ${record.detail}` : ''}`, record.tick);
         lastStatus = record.status;
       }
       renderTelemetry(record);
       for (const name of ['kind', 'run', 'mission', 'environment', 'seed', 'playback', 'file', 'example', 'source']) find(name).disabled = active;
       find('stop').disabled = !active;
       find('save').disabled = active || !record;
-      find('status').textContent = `${record.status} · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)${record.reason ? ` · ${record.reason}` : ''}`;
+
+      if (scoreData?.hasAltitudeScore) {
+        find('status').textContent = `완주 · 점수 ${scoreData.mainValue} m · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)`;
+      } else {
+        find('status').textContent = `${record.status} · ${(record.tick / 120).toFixed(1)}초 (시뮬레이션 시간)${record.reason ? ` · ${koreanReason(record.reason)}` : ''}`;
+      }
+
+      const scoreBanner = find('score-banner');
+      if (!active && scoreData) {
+        scoreBanner.className = `pilot-score-banner${scoreData.isFailed ? ' is-failed' : scoreData.isAborted ? ' is-aborted' : ''}`;
+        scoreBanner.innerHTML = scoreBannerMarkup(scoreData);
+        scoreBanner.hidden = false;
+        if ((scoreData.isSucceeded || scoreData.isFailed) && shownOverlayRecord !== record) {
+          shownOverlayRecord = record;
+          scoreOverlay.innerHTML = scoreOverlayMarkup(scoreData);
+          scoreOverlay.hidden = false;
+        }
+      } else if (active) {
+        scoreBanner.hidden = true;
+      }
+
       if (!active) find('result').textContent = JSON.stringify(record.result?.metrics ?? { detail: record.detail ?? record.reason }, null, 2);
       if (!active) syncMode();
       const valley = record.manifest?.type === 'valley';
@@ -143,8 +202,8 @@ export function installPilotArena(sim) {
     if (human) { find('briefing').open = true; find('playback').value = 'realtime'; }
     for (const name of ['playback', 'source', 'example', 'file']) find(name).disabled = human;
   };
-  find('kind').addEventListener('change', () => { syncMode(); loadExample(); });
-  find('mission').addEventListener('change', () => { syncMode(); loadExample(); });
+  find('kind').addEventListener('change', () => { hideScoreOverlay(); find('score-banner').hidden = true; syncMode(); loadExample(); });
+  find('mission').addEventListener('change', () => { hideScoreOverlay(); find('score-banner').hidden = true; syncMode(); loadExample(); });
   find('example').addEventListener('click', loadExample);
   find('file').addEventListener('change', async event => {
     const file = event.target.files[0];
@@ -155,6 +214,9 @@ export function installPilotArena(sim) {
   find('run').addEventListener('click', () => {
     const seed = Number(find('seed').value);
     if (!Number.isSafeInteger(seed) || seed < 0) { find('status').textContent = '시드는 0 이상의 정수여야 합니다.'; return; }
+    hideScoreOverlay();
+    find('score-banner').hidden = true;
+    shownOverlayRecord = null;
     find('result').textContent = '';
     logs.length = 0; find('log').textContent = '';
     find('telemetry').textContent = '관측 대기 중';
@@ -167,7 +229,7 @@ export function installPilotArena(sim) {
       find('status').textContent = error.message;
     });
   });
-  find('stop').addEventListener('click', () => runner.stop());
+  find('stop').addEventListener('click', () => { hideScoreOverlay(); runner.stop(); });
   find('save').addEventListener('click', () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(runner.record, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a');
