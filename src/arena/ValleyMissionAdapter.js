@@ -4,11 +4,12 @@ import { createValleyManifest, projectValleyPosition } from './valleyCourse.js';
 import { solveTrim } from '../physics/TrimSolver.js';
 import { WindField } from '../physics/WindField.js';
 import { TerrainPerception } from '../pilot/TerrainPerception.js';
+import { ValleyWaypointsVisualizer } from './ValleyWaypointsVisualizer.js';
 
 /** Host-only Lukla/F16 bridge. Public observations are built separately. */
 export class ValleyMissionAdapter extends SimulatorMissionAdapter {
   async prepare({ missionId = 'valley-low-v1', environmentProfile = 'mild-disturbance-v1', seed = 1,
-    sensorSeed = seed, noise = environmentProfile !== 'calm-debug-v1', signal } = {}) {
+    sensorSeed = seed, noise = environmentProfile !== 'calm-debug-v1', pilotKind = 'ai', signal } = {}) {
     if (missionId !== 'valley-low-v1' || !Number.isSafeInteger(seed) || !Number.isSafeInteger(sensorSeed) ||
         !['calm-debug-v1', 'mild-disturbance-v1'].includes(environmentProfile) || typeof noise !== 'boolean') {
       throw new Error('invalid-scenario: valley profile/seed');
@@ -31,6 +32,10 @@ export class ValleyMissionAdapter extends SimulatorMissionAdapter {
       throw new Error('invalid-scenario: Lukla/F16/120Hz required');
     }
     const manifest = createValleyManifest();
+    if (pilotKind === 'human') {
+      manifest.spawn.iasKnots = 550;
+      manifest.spawn.aglM = 25;
+    }
     const { spawn } = manifest;
     const ground = sim.currentTerrain.getHeight(spawn.x, spawn.z);
     if (!Number.isFinite(ground)) throw new Error('invalid-scenario: missing spawn terrain');
@@ -80,6 +85,9 @@ export class ValleyMissionAdapter extends SimulatorMissionAdapter {
         quaternion: sim.quaternion.toArray(), velocity: sim.linearVelocity.toArray() } };
     this.terrainPerception = new TerrainPerception({ sensorSeed, noise });
     this.syncPose();
+    this.visualizer?.dispose();
+    this.visualizer = new ValleyWaypointsVisualizer(sim, this.manifest.course);
+    sim.valleyVisualizer = this.visualizer;
     return { manifest: this.manifest, initialSnapshot: this.snapshot(0) };
   }
 
@@ -114,6 +122,17 @@ export class ValleyMissionAdapter extends SimulatorMissionAdapter {
       Math.hypot(fx, fz), 3 + Math.hypot(fx, fz) * 0.01, tick);
     observation.terrain = this.terrainPerception.sample({ position: this.sim.position, quaternion: this.sim.quaternion,
       getHeight: (x, z) => this.sim.currentTerrain.getHeight(x, z) }, tick);
+    this.visualizer?.setEvaluator(evaluator);
+    this.visualizer?.setNextGateIndex(evaluator.nextGateIndex);
     return observation;
+  }
+
+  release() {
+    this.visualizer?.dispose();
+    this.visualizer = null;
+    if (this.sim?.valleyVisualizer) {
+      this.sim.valleyVisualizer = null;
+    }
+    super.release();
   }
 }

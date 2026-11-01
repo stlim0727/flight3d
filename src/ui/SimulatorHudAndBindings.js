@@ -171,6 +171,7 @@ class SimulatorHudAndBindingsMethods {
       parkingBrake: this.controls.parkingBrake,
     });
     this.hudView.update();
+    this.valleyVisualizer?.update();
   }
 
   flightPhase() {

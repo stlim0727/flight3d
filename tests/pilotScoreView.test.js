@@ -40,7 +40,7 @@ test('formatPilotScoreData handles valley slalom success with large altitude sco
   assert.equal(data.durationText, '46.5초');
   assert.match(data.badgeText, /AI.*완주/);
   assert.equal(data.stats.some(s => s.label === '조종 구분' && s.value === 'AI 파일럿'), true);
-  assert.equal(data.stats.some(s => s.label === '소요 시간' && s.value === '46.5초'), true);
+  assert.equal(data.stats.some(s => s.label === '완주 시간' && s.value === '46.5초'), true);
   assert.equal(data.stats.some(s => s.label === '평균 속도' && s.value === '278 KT'), true);
   assert.equal(data.stats.some(s => s.label === '최고 속도' && s.value === '285 KT'), true);
   assert.equal(data.stats.some(s => s.label === '경유지' && s.value === '6 / 6 완주'), true);
@@ -65,6 +65,7 @@ test('formatPilotScoreData handles human control valley slalom success with prom
     manifest: { type: 'valley', physicsHz: 120 },
     result: {
       metrics: {
+        finalScore: 16420,
         altitudeCostM: 215.42,
         completedGates: 6,
         totalGates: 6,
@@ -72,6 +73,7 @@ test('formatPilotScoreData handles human control valley slalom success with prom
         minAglM: 75.0,
         maxAglM: 380.0,
         meanExcessM: 190.0,
+        meanIasKnots: 345.2,
       },
     },
   };
@@ -79,15 +81,16 @@ test('formatPilotScoreData handles human control valley slalom success with prom
   const data = formatPilotScoreData(record, 'F-16 루클라 계곡 저공');
   assert.equal(data.isSucceeded, true);
   assert.equal(data.isHuman, true);
-  assert.equal(data.hasAltitudeScore, true);
-  assert.equal(data.mainValue, '215.42');
-  assert.equal(data.mainUnit, 'm');
+  assert.equal(data.hasScore, true);
+  assert.equal(data.mainValue, '16,420');
+  assert.equal(data.mainUnit, '점');
   assert.match(data.badgeText, /사람 조종.*완주/);
   assert.equal(data.stats.some(s => s.label === '조종 구분' && s.value === '사람 (직접 조종)'), true);
+  assert.equal(data.stats.some(s => s.label === '평균 속도' && s.value === '345 KT'), true);
 
   const overlay = scoreOverlayMarkup(data);
   assert.match(overlay, /사람 직접 조종/);
-  assert.match(overlay, /modal-score-value.*215\.42.*<span class="modal-score-unit">m<\/span>/);
+  assert.match(overlay, /modal-score-value.*16,420.*<span class="modal-score-unit">점<\/span>/);
 });
 
 test('formatPilotScoreData handles human control valley crash failure', () => {

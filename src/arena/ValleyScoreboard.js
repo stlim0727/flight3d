@@ -15,6 +15,7 @@ export function valleyAttempt(record) {
     conditions, comparisonKey: JSON.stringify(conditions),
     status: record.status, reason: record.reason, durationSeconds: record.tick / m.physicsHz,
     metrics: { ...record.result?.metrics,
+      finalScore: record.status === 'succeeded' ? record.result?.metrics?.finalScore ?? null : null,
       altitudeCostM: record.status === 'succeeded' ? record.result?.metrics?.altitudeCostM ?? null : null } };
 }
 
