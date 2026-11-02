@@ -141,3 +141,25 @@ test('trackEvent forwards formatted payload to PostHog instance when initialized
 
   _resetAnalyticsForTesting(null);
 });
+
+test('src/main.js imports all analytics methods attached to this.analytics', async () => {
+  const fs = await import('node:fs');
+  const mainSrc = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  // Verify analytics methods in constructor are properly imported
+  const importMatch = mainSrc.match(/import\s*\{([^}]+)\}\s*from\s*['"]\.\/analytics\/posthog\.js['"]/);
+  assert.ok(importMatch, 'Should import from ./analytics/posthog.js');
+
+  const imported = importMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+  const required = [
+    'initAnalytics',
+    'trackFlightStart',
+    'trackFlightEnd',
+    'trackFlightCrash',
+    'captureException',
+  ];
+
+  for (const name of required) {
+    assert.ok(imported.includes(name), `src/main.js should import ${name} from posthog.js`);
+  }
+});

@@ -64,7 +64,13 @@ import { installInputLatencyMonitor } from './ui/InputLatencyMonitor.js';
 import { installPresetSpawner } from './core/PresetSpawner.js';
 import { installPhysicsIntegrator } from './core/PhysicsIntegrator.js';
 import { installSimulatorHudAndBindings } from './ui/SimulatorHudAndBindings.js';
-import { initAnalytics, trackFlightStart, trackFlightEnd, captureException } from './analytics/posthog.js';
+import {
+  initAnalytics,
+  trackFlightStart,
+  trackFlightEnd,
+  trackFlightCrash,
+  captureException,
+} from './analytics/posthog.js';
 import { openFeedbackDialog } from './analytics/FeedbackDialog.js';
 
 // Expose THREE globally for test harness and browser console debugging
