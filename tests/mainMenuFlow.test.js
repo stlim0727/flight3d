@@ -14,23 +14,27 @@ function simulator() {
   });
 }
 
-test('menu button opens and holds a flight; repeated presses cannot resume or restart', () => {
+test('menu button toggles between in-play and held menu; resumes without respawn', () => {
   const sim = simulator();
   sim.gameFlow.enterFlight();
+  // 1. In-play -> held menu
   sim.toggleMainMenu();
   assert.equal(sim.gameFlow.state, FLOW.LOBBY);
   assert.equal(sim.gameFlow.isPhysicsFrozen(), true);
+  assert.equal(sim.gameFlow.canResumeFromLobby(), true);
+
+  // 2. Second press resumes held flight without respawn
   sim.toggleMainMenu();
-  assert.equal(sim.gameFlow.state, FLOW.LOBBY);
-  assert.equal(sim.starts, 0);
-  sim.resumeFlight();
   assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
   assert.equal(sim.gameFlow.isPhysicsFrozen(), false);
   assert.equal(sim.starts, 0);
+
+  // 3. From PAUSED, toggleMainMenu resumes flight
   sim.gameFlow.pause();
+  assert.equal(sim.gameFlow.state, FLOW.PAUSED);
   sim.toggleMainMenu();
-  assert.equal(sim.gameFlow.state, FLOW.LOBBY);
-  assert.equal(sim.gameFlow.canResumeFromLobby(), true);
+  assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
+  assert.equal(sim.starts, 0);
 });
 
 test('resume ignores pending choices; start new applies them', async () => {

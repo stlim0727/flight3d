@@ -371,3 +371,53 @@ test('menu holds a crashed flight until an explicit new start, without repeating
   assert.equal(sim.aircraft.crashed, false);
   assert.equal(sim.explosions, 1, 'releasing a wreck must not replay the crash rig');
 });
+
+test('toggleMainMenu provides one-click symmetric toggle between in-play and menu', async () => {
+  class ToggleHarness {
+    constructor() {
+      this.gameFlow = new GameFlowController();
+      this.gameFlow.enterFlight();
+      this.isCrashed = false;
+      this.airportLoading = false;
+      this.startingFlight = false;
+      this.flownCount = 0;
+    }
+    toggleMainMenu() {
+      SimulatorClass.prototype.toggleMainMenu.call(this);
+    }
+    resumeFlight() {
+      SimulatorClass.prototype.resumeFlight.call(this);
+    }
+    async fly() {
+      this.flownCount++;
+      this.gameFlow.enterFlight();
+    }
+  }
+
+  const sim = new ToggleHarness();
+  assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
+
+  // 1. From FLIGHT to LOBBY (held sortie)
+  sim.toggleMainMenu();
+  assert.equal(sim.gameFlow.state, FLOW.LOBBY);
+  assert.equal(sim.gameFlow.canResumeFromLobby(), true);
+
+  // 2. From held LOBBY back to FLIGHT (one-click resume)
+  sim.toggleMainMenu();
+  assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
+  assert.equal(sim.gameFlow.canResumeFromLobby(), false);
+
+  // 3. From PAUSED to FLIGHT
+  sim.gameFlow.pause();
+  assert.equal(sim.gameFlow.state, FLOW.PAUSED);
+  sim.toggleMainMenu();
+  assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
+
+  // 4. From clean boot LOBBY (no held sortie) to FLIGHT
+  sim.gameFlow.enterLobby();
+  assert.equal(sim.gameFlow.state, FLOW.LOBBY);
+  assert.equal(sim.gameFlow.canResumeFromLobby(), false);
+  sim.toggleMainMenu();
+  assert.equal(sim.flownCount, 1);
+  assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
+});

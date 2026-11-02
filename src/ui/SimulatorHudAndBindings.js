@@ -553,6 +553,19 @@ class SimulatorHudAndBindingsMethods {
       }
       if (this.gameFlow.state === FLOW.FLIGHT) this.gameFlow.pause();
       else if (this.gameFlow.state === FLOW.PAUSED) this.gameFlow.resume();
+      else if (this.gameFlow.state === FLOW.LOBBY && this.gameFlow.canResumeFromLobby()) this.resumeFlight();
+    });
+
+    // Tap backdrop outside the cards to resume in-flight play
+    document.getElementById('lobby-screen')?.addEventListener('click', (e) => {
+      if (e.target?.id === 'lobby-screen' && this.gameFlow.canResumeFromLobby()) {
+        this.resumeFlight();
+      }
+    });
+    document.getElementById('pause-menu')?.addEventListener('click', (e) => {
+      if (e.target?.id === 'pause-menu' && this.gameFlow.state === FLOW.PAUSED) {
+        this.gameFlow.resume();
+      }
     });
 
     // Initialize Audio UI state
