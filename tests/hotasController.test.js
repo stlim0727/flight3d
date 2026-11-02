@@ -17,9 +17,14 @@ describe('HotasController - Device Identification & Deadzone', () => {
   });
 
   it('identifies T.Flight Hotas One across various OS and browser string formats', () => {
-    // Linux / Chrome
+    // Linux / Chrome (PID b68b)
     assert.strictEqual(
       identifyGamepadType({ id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)' }),
+      'hotas-one'
+    );
+    // PC / Xbox mode variant (PID b68d)
+    assert.strictEqual(
+      identifyGamepadType({ id: 'Thrustmaster (Vendor: 044f Product: b68d)' }),
       'hotas-one'
     );
     // Windows / Firefox
@@ -100,59 +105,77 @@ describe('HotasController - T.Flight Hotas One Flight Axes', () => {
 
   it('handles dual-rudder inputs (twist stick vs throttle rocker) with maximum deflection arbitration', () => {
     const controls = createMockControls();
-    // Twist stick (+0.6 right), rocker at center (0.0)
-    let mockGamepad = createHotasGamepad([0, 0, 0, 0.6, 0]);
+    // Twist stick (+0.6 right on axis 2), rocker at center (0.0 on axis 4)
+    let mockGamepad = createHotasGamepad([0, 0, 0.6, 0, 0]);
     const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
 
     hotas.update(1 / 60);
     assert.ok(hotas.rudder > 0.5, `Expected rudder from twist, got ${hotas.rudder}`);
 
-    // Pilot now uses throttle rocker (-0.9 left), overriding slight twist (+0.2)
-    mockGamepad = createHotasGamepad([0, 0, 0, 0.2, -0.9]);
+    // Pilot now uses throttle rocker (-0.9 left on axis 4), overriding slight twist (+0.2 on axis 2)
+    mockGamepad = createHotasGamepad([0, 0, 0.2, 0, -0.9]);
     hotas.update(1 / 60);
     assert.ok(hotas.rudder < -0.8, `Expected rudder from rocker paddle to override, got ${hotas.rudder}`);
   });
 
-  it('maps throttle lever (axis 2) from idle (backward, +1.0) to full TOGA (forward, -1.0)', () => {
+  it('maps throttle lever (axis 3) from idle (backward, +1.0) to full TOGA (forward, -1.0) without rudder interference', () => {
     const controls = createMockControls();
-    // Throttle fully back (+1.0) -> 0.0 (Idle)
-    let mockGamepad = createHotasGamepad([0, 0, 1.0, 0, 0]);
+    // Throttle fully back (+1.0 on axis 3) -> 0.0 (Idle), rudder must stay 0.0 (never bias to the right!)
+    let mockGamepad = createHotasGamepad([0, 0, 0, 1.0, 0]);
     const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
 
     hotas.update(1 / 60);
     assert.strictEqual(hotas.throttle, 0.0);
     assert.strictEqual(controls.throttle, 0.0);
     assert.strictEqual(hotas.hasThrottleControl, true);
+    assert.strictEqual(hotas.rudder, 0.0, 'Rudder must remain neutral (0.0) when throttle is at idle (+1.0)');
 
-    // Push lever forward to mid-power (0.0) -> 50% thrust
-    mockGamepad = createHotasGamepad([0, 0, 0.0, 0, 0]);
+    // Push lever forward to mid-power (0.0 on axis 3) -> 50% thrust
+    mockGamepad = createHotasGamepad([0, 0, 0, 0.0, 0]);
     hotas.update(1 / 60);
     assert.strictEqual(hotas.throttle, 0.5);
     assert.strictEqual(controls.throttle, 0.5);
+    assert.strictEqual(hotas.rudder, 0.0);
 
-    // Push lever fully forward (-1.0) -> 100% TOGA thrust
-    mockGamepad = createHotasGamepad([0, 0, -1.0, 0, 0]);
+    // Push lever fully forward (-1.0 on axis 3) -> 100% TOGA thrust
+    mockGamepad = createHotasGamepad([0, 0, 0, -1.0, 0]);
     hotas.update(1 / 60);
     assert.strictEqual(hotas.throttle, 1.0);
     assert.strictEqual(controls.throttle, 1.0);
+    assert.strictEqual(hotas.rudder, 0.0);
+  });
+
+  it('maps 3-axis flight stick fallback where axis 2 is throttle and rudder is neutral', () => {
+    const controls = createMockControls();
+    // 3 axes: [roll, pitch, throttle] (no twist rudder)
+    const mockGamepad = {
+      id: 'Generic 3-Axis Joystick',
+      index: 0,
+      axes: [0, 0, 1.0], // Idle throttle
+      buttons: [],
+    };
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.throttle, 0.0);
+    assert.strictEqual(hotas.rudder, 0.0);
   });
 
   it('maps main trigger (button 0) to proportional wheel brakes', () => {
     const controls = createMockControls();
     const buttons = [0]; // Trigger released
-    let mockGamepad = createHotasGamepad([0, 0, 1.0, 0, 0], buttons);
+    let mockGamepad = createHotasGamepad([0, 0, 0, 1.0, 0], buttons);
     const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
 
     hotas.update(1 / 60);
     assert.strictEqual(hotas.brakes, 0.0);
 
     // Pull trigger halfway (0.5)
-    mockGamepad = createHotasGamepad([0, 0, 1.0, 0, 0], [0.5]);
+    mockGamepad = createHotasGamepad([0, 0, 0, 1.0, 0], [0.5]);
     hotas.update(1 / 60);
     assert.strictEqual(hotas.brakes, 0.5);
 
     // Full brake pull (1.0)
-    mockGamepad = createHotasGamepad([0, 0, 1.0, 0, 0], [1.0]);
+    mockGamepad = createHotasGamepad([0, 0, 0, 1.0, 0], [1.0]);
     hotas.update(1 / 60);
     assert.strictEqual(hotas.brakes, 1.0);
   });

@@ -28,8 +28,8 @@ export function identifyGamepadType(gamepad) {
   if (!gamepad || !gamepad.id) return 'generic';
   const id = gamepad.id.toLowerCase();
 
-  // T.Flight Hotas One explicitly (VID 044f, PID b68b or name contains 'hotas one')
-  const isHotasOneVidPid = /(?:044f|vendor:\s*044f).*?(?:b68b|product:\s*b68b)/i.test(gamepad.id);
+  // T.Flight Hotas One explicitly (VID 044f, PID b68b or b68d, or name contains 'hotas one')
+  const isHotasOneVidPid = /(?:044f|vendor:\s*044f).*?(?:b68b|b68d|product:\s*(?:b68b|b68d))/i.test(gamepad.id);
   const isHotasOneName = id.includes('hotas one') || id.includes('hotas-one');
   if (isHotasOneVidPid || isHotasOneName) {
     return 'hotas-one';
@@ -258,6 +258,27 @@ export class HotasController {
     return current && !prev;
   }
 
+  updateThrottleFromRaw(rawThrottle) {
+    let normalized = this.throttleInverted
+      ? (rawThrottle + 1.0) * 0.5
+      : (1.0 - rawThrottle) * 0.5;
+    normalized = Math.max(0.0, Math.min(1.0, normalized));
+
+    if (this.lastRawThrottle === null) {
+      // Initial sync
+      this.lastRawThrottle = rawThrottle;
+      this.throttle = normalized;
+      this.hasThrottleControl = true;
+      if (this.controls) this.controls.throttle = normalized;
+    } else if (Math.abs(rawThrottle - this.lastRawThrottle) > this.throttleDeltaThreshold) {
+      // Pilot physically adjusted lever
+      this.lastRawThrottle = rawThrottle;
+      this.throttle = normalized;
+      this.hasThrottleControl = true;
+      if (this.controls) this.controls.throttle = normalized;
+    }
+  }
+
   updateHotasProfile(gp, axes, buttons, dt) {
     const blocked = this.controls?.inputBlocked === true;
     const aircraftDisabled = this.controls?.aircraftControlsDisabled === true;
@@ -270,32 +291,23 @@ export class HotasController {
       // Axis 1: Pitch (Elevator) - forward negative (dive/down), back positive (climb/up)
       this.elevator = applyDeadzone(axes[1] ?? 0.0, this.deadzoneStick);
 
-      // Axis 3: Stick Twist (Rudder) & Axis 4: Throttle Rocker Paddles
-      const twist = applyDeadzone(axes[3] ?? 0.0, this.deadzoneRudder);
-      const rocker = (axes.length > 4) ? applyDeadzone(axes[4] ?? 0.0, this.deadzoneRudder) : 0.0;
-      // Arbitration: whichever has higher deflection governs the rudder
-      this.rudder = Math.abs(rocker) > Math.abs(twist) ? rocker : twist;
+      if (axes.length >= 4) {
+        // Standard 4+ axis HOTAS/flight stick (Hotas One, Hotas X/4, T.16000M, Extreme 3D Pro):
+        // Axis 2: Stick Twist (Rudder) & Axis 4: Throttle Rocker Paddles
+        const twist = applyDeadzone(axes[2] ?? 0.0, this.deadzoneRudder);
+        const rocker = (axes.length > 4) ? applyDeadzone(axes[4] ?? 0.0, this.deadzoneRudder) : 0.0;
+        // Arbitration: whichever has higher deflection governs the rudder
+        this.rudder = Math.abs(rocker) > Math.abs(twist) ? rocker : twist;
 
-      // Axis 2: Throttle Lever
-      if (axes.length > 2 && axes[2] !== undefined) {
-        const rawThrottle = axes[2];
-        let normalized = this.throttleInverted
-          ? (rawThrottle + 1.0) * 0.5
-          : (1.0 - rawThrottle) * 0.5;
-        normalized = Math.max(0.0, Math.min(1.0, normalized));
-
-        if (this.lastRawThrottle === null) {
-          // Initial sync
-          this.lastRawThrottle = rawThrottle;
-          this.throttle = normalized;
-          this.hasThrottleControl = true;
-          if (this.controls) this.controls.throttle = normalized;
-        } else if (Math.abs(rawThrottle - this.lastRawThrottle) > this.throttleDeltaThreshold) {
-          // Pilot physically adjusted lever
-          this.lastRawThrottle = rawThrottle;
-          this.throttle = normalized;
-          this.hasThrottleControl = true;
-          if (this.controls) this.controls.throttle = normalized;
+        // Axis 3: Throttle Lever (Forward = TOGA / 1.0, Backward = Idle / 0.0)
+        if (axes[3] !== undefined) {
+          this.updateThrottleFromRaw(axes[3]);
+        }
+      } else {
+        // Fallback for rare 3-axis flight stick without twist rudder (Axis 2 = Throttle)
+        this.rudder = 0.0;
+        if (axes[2] !== undefined) {
+          this.updateThrottleFromRaw(axes[2]);
         }
       }
 
