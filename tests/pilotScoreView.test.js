@@ -187,6 +187,8 @@ test('scoreOverlayMarkup includes clear retry, pilot mode choice, and return-to-
   };
   const data = formatPilotScoreData(record, '계곡 저공');
   const overlay = scoreOverlayMarkup(data);
+  assert.match(overlay, /btn-modal-close/);
+  assert.match(overlay, /aria-label="닫기"/);
   assert.match(overlay, /data-score-mode="human"/);
   assert.match(overlay, /data-score-mode="ai"/);
   assert.match(overlay, /data-score-retry/);
