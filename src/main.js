@@ -25,7 +25,7 @@ import { Boeing737 } from './aircraft/Boeing737.js';
 import { Cessna172 } from './aircraft/Cessna172.js';
 import { F16 } from './aircraft/F16.js';
 import { Terrain } from './environment/Terrain.js';
-import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality } from './config/renderQuality.js';
+import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality, applyFlatShading } from './config/renderQuality.js';
 import { WaterOcean } from './environment/WaterOcean.js';
 import { Airport } from './environment/Airport.js';
 import { FoliageAndCities } from './environment/FoliageAndCities.js';
@@ -116,16 +116,17 @@ class FlightSimulator {
     // near: 0.08m and far: 45,000m combined with logarithmicDepthBuffer completely eliminates pillar clipping & Z-fighting
     this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.08, 45000);
 
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      logarithmicDepthBuffer: true,
-      powerPreference: 'high-performance'
-    });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
     let savedQuality;
     try { savedQuality = localStorage.getItem(RENDER_QUALITY_KEY); } catch { /* Use default. */ }
     this.renderQuality = resolveRenderQuality(savedQuality);
     const initialPreset = RENDER_QUALITY[this.renderQuality];
+
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: initialPreset.antialias ?? true,
+      logarithmicDepthBuffer: true,
+      powerPreference: 'high-performance'
+    });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, initialPreset.maxDpr));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -778,17 +779,24 @@ class FlightSimulator {
    * second one ahead of the user's pick costs memory but cannot disturb the current view.
    */
   buildAircraftInstance(aircraftId) {
-    if (aircraftId === 'F16') return new F16();
-    return aircraftId === 'C172'
-      ? new Cessna172(this.pfdCanvas, this.ndCanvas)
-      : new Boeing737(
-        this.pfdCanvas,
-        this.ndCanvas,
-        this.eicasCanvas,
-        this.mcpCanvas,
-        this.isfdCanvas,
-        this.cduCanvas
-      );
+    const instance = aircraftId === 'F16'
+      ? new F16()
+      : aircraftId === 'C172'
+        ? new Cessna172(this.pfdCanvas, this.ndCanvas)
+        : new Boeing737(
+          this.pfdCanvas,
+          this.ndCanvas,
+          this.eicasCanvas,
+          this.mcpCanvas,
+          this.isfdCanvas,
+          this.cduCanvas
+        );
+    const preset = RENDER_QUALITY[this.renderQuality];
+    if (preset?.flatShading) {
+      instance.setFlatShading?.(true);
+      applyFlatShading(instance.group, true);
+    }
+    return instance;
   }
 
   /**
@@ -902,6 +910,11 @@ class FlightSimulator {
       this.scene.remove(this.aircraft.group);
     }
     this.aircraft = instance;
+    const currentPreset = RENDER_QUALITY[this.renderQuality];
+    if (currentPreset?.flatShading !== undefined) {
+      instance.setFlatShading?.(currentPreset.flatShading);
+      applyFlatShading(instance.group, currentPreset.flatShading);
+    }
     instance.group.visible = !this.isCrashed;
     if (instance.group.parent !== this.scene) {
       this.scene.add(instance.group);

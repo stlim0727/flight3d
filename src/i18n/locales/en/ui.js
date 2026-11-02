@@ -266,6 +266,7 @@ export default {
   "quality.balanced": "Balanced",
   "quality.performance": "Performance",
   "quality.ultraLow": "Ultra Low",
+  "quality.antialias.restart.hint": "Reload to fully apply hardware anti-aliasing changes",
   "help.close": "Close flight guide",
   "ap.master": "AP",
   "ap.hdg": "HDG",

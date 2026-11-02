@@ -466,7 +466,10 @@ export class Terrain {
           tFinalAlbedo = mix(grassSamp.rgb, runwaySamp.rgb, airportWeight);
           tFinalRoughness = 0.9;
           tFinalMetalness = 0.0;
-          tFinalWorldNormal = wNorm;
+          // Faceted polygon face normal for retro low-poly aesthetic (VF1/Model 1 style)
+          vec3 faceNorm = normalize(cross(dFdx(wPos), dFdy(wPos)));
+          if (dot(faceNorm, wNorm) < 0.0) faceNorm = -faceNorm;
+          tFinalWorldNormal = faceNorm;
         #elif defined(QUALITY_LOW) && QUALITY_LOW == 1
           // Low Quality Preset: 2 layers (Grass & Rock) with planar mapping
           float rockWeight = max(slopeCliff, smoothstep(180.0, 320.0, wPos.y));

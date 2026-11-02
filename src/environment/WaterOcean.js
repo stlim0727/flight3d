@@ -133,17 +133,22 @@ export class WaterOcean {
           #include <logdepthbuf_fragment>
 
           vec3 viewDir = normalize(cameraPosition - vWorldPos);
-          // Fine wind ripples (16cm–1.1m) sit over gentle metre-scale waves.
-          // Physical wavelengths stay in world metres; never scale UVs by camera distance.
-          vec3 waves = waveSlope(vec2(1.0, 0.4), 0.0024, 1600.0, 1.0)
-                     + waveSlope(vec2(-0.6, 0.8), 0.0024, 900.0, 1.2)
-                     + waveSlope(vec2(1.0, 0.4), 0.008, 5.6, 1.0)
-                     + waveSlope(vec2(-0.6, 0.8), 0.014, 2.4, 1.1)
-                     + waveSlope(vec2(0.2, -1.0), 0.025, 1.1, 1.0)
-                     + waveSlope(vec2(0.8, 0.6), 0.032, 0.57, 0.9)
-                     + waveSlope(vec2(-0.9, 0.3), 0.040, 0.31, 0.8)
-                     + waveSlope(vec2(0.5, -0.9), 0.045, 0.16, 0.7);
-          vec3 normal = normalize(vec3(-waves.x, 1.0, -waves.y));
+          #if defined(WATER_FLAT) && WATER_FLAT == 1
+            vec3 waves = vec3(0.0);
+            vec3 normal = vec3(0.0, 1.0, 0.0);
+          #else
+            // Fine wind ripples (16cm–1.1m) sit over gentle metre-scale waves.
+            // Physical wavelengths stay in world metres; never scale UVs by camera distance.
+            vec3 waves = waveSlope(vec2(1.0, 0.4), 0.0024, 1600.0, 1.0)
+                       + waveSlope(vec2(-0.6, 0.8), 0.0024, 900.0, 1.2)
+                       + waveSlope(vec2(1.0, 0.4), 0.008, 5.6, 1.0)
+                       + waveSlope(vec2(-0.6, 0.8), 0.014, 2.4, 1.1)
+                       + waveSlope(vec2(0.2, -1.0), 0.025, 1.1, 1.0)
+                       + waveSlope(vec2(0.8, 0.6), 0.032, 0.57, 0.9)
+                       + waveSlope(vec2(-0.9, 0.3), 0.040, 0.31, 0.8)
+                       + waveSlope(vec2(0.5, -0.9), 0.045, 0.16, 0.7);
+            vec3 normal = normalize(vec3(-waves.x, 1.0, -waves.y));
+          #endif
 
           // Water is a dielectric (F0 ~ 0.02), with stronger sky reflection at grazing angles.
           float cosTheta = clamp(dot(viewDir, normal), 0.0, 1.0);

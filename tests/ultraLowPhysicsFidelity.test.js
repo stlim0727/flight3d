@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { RENDER_QUALITY, resolveRenderQuality } from '../src/config/renderQuality.js';
+import { RENDER_QUALITY, resolveRenderQuality, applyFlatShading } from '../src/config/renderQuality.js';
 import { Terrain } from '../src/environment/Terrain.js';
 import { WaterOcean } from '../src/environment/WaterOcean.js';
 import { SkyAtmosphere } from '../src/environment/SkyAtmosphere.js';
@@ -12,6 +12,7 @@ import { LandingGear } from '../src/physics/LandingGear.js';
 import { CollisionDetector } from '../src/physics/CollisionDetector.js';
 import { stepPhysics, advancePhysicsFrame } from '../src/core/physicsTiming.js';
 import { SIM_CONFIG } from '../src/config/simConfig.js';
+import { F16 } from '../src/aircraft/F16.js';
 import { RenderPose } from '../src/core/RenderPose.js';
 
 test('Ultra-Low-Spec Mode Configuration & Resolution', () => {
@@ -26,6 +27,44 @@ test('Ultra-Low-Spec Mode Configuration & Resolution', () => {
   assert.equal(preset.clouds, false);
   assert.equal(preset.terrainSegments, 64);
   assert.equal(preset.waterSegments, 1);
+  assert.equal(preset.antialias, false, 'UltraLow must disable hardware antialiasing');
+  assert.equal(preset.flatShading, true, 'UltraLow must enable retro faceted flat shading');
+
+  // Verify other quality levels retain antialiasing
+  for (const q of ['high', 'balanced', 'performance']) {
+    assert.equal(RENDER_QUALITY[q].antialias, true, `${q} must retain antialias: true`);
+    assert.equal(RENDER_QUALITY[q].flatShading, false, `${q} must have flatShading: false`);
+  }
+});
+
+test('Retro Low-Poly Aesthetic: applyFlatShading toggles material flatShading in hierarchy', () => {
+  const root = new THREE.Group();
+  const mat1 = new THREE.MeshStandardMaterial({ flatShading: false });
+  const mat2 = new THREE.MeshLambertMaterial({ flatShading: false });
+  const mesh1 = new THREE.Mesh(new THREE.BoxGeometry(), mat1);
+  const mesh2 = new THREE.Mesh(new THREE.SphereGeometry(), mat2);
+  root.add(mesh1);
+  mesh1.add(mesh2);
+
+  assert.equal(mat1.flatShading, false);
+  assert.equal(mat2.flatShading, false);
+
+  applyFlatShading(root, true);
+  assert.equal(mat1.flatShading, true);
+  assert.equal(mat2.flatShading, true);
+
+  applyFlatShading(root, false);
+  assert.equal(mat1.flatShading, false);
+  assert.equal(mat2.flatShading, false);
+});
+
+test('Aircraft Models: F16 responds to setFlatShading for retro aesthetic', () => {
+  const f16 = new F16();
+  assert.equal(f16.flatShading, false);
+  f16.setFlatShading(true);
+  assert.equal(f16.flatShading, true);
+  f16.setFlatShading(false);
+  assert.equal(f16.flatShading, false);
 });
 
 test('Physics Invariance: Terrain.getHeight and getTerrainNormal are identical between high and ultraLow', () => {

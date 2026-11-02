@@ -4,6 +4,7 @@ import { F16_FALCON } from '../config/aircraftConfigs.js';
 import { gearSupportHeight, tireContact } from './gearVisualContact.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { JetExhaust } from '../effects/JetExhaust.js';
+import { applyFlatShading } from '../config/renderQuality.js';
 
 // The supplied asset is +X forward, with a 93.94-unit wingspan. Its authored
 // hierarchy supplies the Z-up conversion; mount it in our metre/-Z-forward frame.
@@ -131,6 +132,7 @@ export class F16 {
     this.loadingGltf = true;
     this.modelLoaded = false;
     this.isCrashed = false;
+    this.flatShading = false;
     this.gearLegs = {};
     this.gearExtension = 1;
     this.cockpit = {
@@ -144,7 +146,12 @@ export class F16 {
     this.cockpit.group.add(this.cockpit.gltfCockpitGroup);
     this.instrumentLight = installInstrumentLighting(this.cockpit, F16_FALCON.cockpit.captainEyePos, 0x91ffb5, () => !this.isCrashed);
     this.ready = new GLTFLoader().loadAsync(`${import.meta.env?.BASE_URL ?? '/'}models/f-16.glb`)
-      .then(gltf => this.installModel(gltf.scene))
+      .then(gltf => {
+        this.installModel(gltf.scene);
+        if (this.flatShading) {
+          applyFlatShading(this.group, true);
+        }
+      })
       .catch(error => {
         this.cockpit.cockpitModelFailed = true;
         console.error('F-16 model failed to load:', error);
@@ -267,4 +274,9 @@ export class F16 {
     if (this.exhaust) { this.exhaust.power = 0; this.exhaust.group.visible = false; }
   }
   resetCrashVisuals() { this.isCrashed = false; this.lightsGroup.visible = this.lightsOn; }
+
+  setFlatShading(flatShading) {
+    this.flatShading = Boolean(flatShading);
+    applyFlatShading(this.group, this.flatShading);
+  }
 }

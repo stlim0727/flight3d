@@ -1,7 +1,7 @@
 import { t, bindText } from '../i18n/index.js';
 import { SHADOW_VIEWS } from '../director/CockpitShadowDemo.js';
 import { prepareCockpitShadowDepth } from '../aircraft/CockpitDepth.js';
-import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality } from '../config/renderQuality.js';
+import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality, applyFlatShading } from '../config/renderQuality.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { updateControlState, touchLabel } from './FlightPanels.js';
 import { FLOW } from './GameFlowController.js';
@@ -318,6 +318,7 @@ class SimulatorHudAndBindingsMethods {
 
   setRenderQuality(value) {
     this.renderDiagnosticsPanel?.close();
+    const prevPreset = RENDER_QUALITY[this.renderQuality];
     this.renderQuality = resolveRenderQuality(value);
     const preset = RENDER_QUALITY[this.renderQuality];
     if (this.renderer?.shadowMap) {
@@ -344,10 +345,24 @@ class SimulatorHudAndBindingsMethods {
     if (this.foliage?.setQuality) {
       this.foliage.setQuality(this.renderQuality);
     }
+    if (preset.flatShading !== undefined) {
+      if (this.aircraftInstances) {
+        for (const inst of this.aircraftInstances.values()) {
+          inst.setFlatShading?.(preset.flatShading);
+          applyFlatShading(inst.group, preset.flatShading);
+        }
+      } else if (this.aircraft) {
+        this.aircraft.setFlatShading?.(preset.flatShading);
+        applyFlatShading(this.aircraft.group, preset.flatShading);
+      }
+    }
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, preset.maxDpr));
     const select = document.getElementById('render-quality');
     if (select) select.value = this.renderQuality;
     try { localStorage.setItem(RENDER_QUALITY_KEY, this.renderQuality); } catch { /* Session-only setting. */ }
+    if (prevPreset && prevPreset.antialias !== preset.antialias) {
+      this.showToast?.(() => t('quality.antialias.restart.hint'));
+    }
   }
 
   initUI() {
