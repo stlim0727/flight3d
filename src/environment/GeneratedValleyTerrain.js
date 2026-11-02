@@ -6,7 +6,7 @@ import * as THREE from 'three';
  * generateValley({ seed, rules }).
  */
 export class GeneratedValleyTerrain {
-  constructor(valleyTerrain, sim = null, { size = 16000, segments = 128 } = {}) {
+  constructor(valleyTerrain, sim = null, { size = 16000, segments = 256 } = {}) {
     this.terrain = valleyTerrain;
     this.isLoaded = true;
     this.loadError = null;
@@ -20,23 +20,30 @@ export class GeneratedValleyTerrain {
     if (sim?.scene) {
       const geom = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
       geom.rotateX(-Math.PI * 0.5);
-      // Center the mesh along the generated valley trajectory (starts at z=0, extends southward)
-      geom.translate(0, 0, 4000);
+      // Center the mesh along the generated valley trajectory (starts at z=0, extends northward/negative z to ~-7500m)
+      geom.translate(0, 0, -3800);
 
       const pos = geom.attributes.position;
       const count = pos.count;
+      for (let i = 0; i < count; i++) {
+        const x = pos.getX(i);
+        const z = pos.getZ(i);
+        pos.setY(i, this.terrain.getHeight(x, z));
+      }
+      geom.computeVertexNormals();
+
+      const norm = geom.attributes.normal;
       const colors = new Float32Array(count * 3);
       const cFloor = new THREE.Color(0x273628);  // valley floor moss/pine
       const cCanyon = new THREE.Color(0x524638); // canyon earth/rock
+      const cCliff = new THREE.Color(0x352e26);  // sheer cliff rock face
       const cRidge = new THREE.Color(0x7a746e);  // alpine granite
       const cSnow = new THREE.Color(0xdce5ed);   // high mountain peaks
       const tmpColor = new THREE.Color();
 
       for (let i = 0; i < count; i++) {
-        const x = pos.getX(i);
-        const z = pos.getZ(i);
-        const y = this.terrain.getHeight(x, z);
-        pos.setY(i, y);
+        const y = pos.getY(i);
+        const ny = norm.getY(i);
 
         // Procedural vertex tint based on elevation above valley floor (~2100m)
         const relY = y - 2100;
@@ -47,13 +54,19 @@ export class GeneratedValleyTerrain {
         } else {
           tmpColor.lerpColors(cRidge, cSnow, Math.min(1, (relY - 320) / 300));
         }
+
+        // Steep canyon wall shading: darken sheer rock faces
+        if (ny < 0.78) {
+          const cliffFactor = Math.min(1, (0.78 - ny) / 0.45);
+          tmpColor.lerp(cCliff, cliffFactor * 0.75);
+        }
+
         colors[i * 3] = tmpColor.r;
         colors[i * 3 + 1] = tmpColor.g;
         colors[i * 3 + 2] = tmpColor.b;
       }
 
       geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      geom.computeVertexNormals();
 
       const mat = new THREE.MeshStandardMaterial({
         vertexColors: true,
