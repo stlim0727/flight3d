@@ -310,6 +310,8 @@ export default {
   "lobby.briefing.scenario.cliff": "절벽 끝 24번 활주로 내리막 이륙.",
   "lobby.briefing.scenario.valley": "F-16 가상 계곡 저공 슬라롬: 시드 기반 가상 협곡에서 저공·고속으로 슬라롬 게이트를 통과하는 도전 미션.",
   "lobby.briefing.scenario.demo": "자동 영상 비행을 감상하세요. Esc를 누르면 직접 조종할 수 있습니다.",
+  "lobby.spec.valley": "시드 기반 가상 협곡 · F-16 전용",
+  "valley.region": "⛰️ 가상 계곡",
   "valley.slalom.title": "⚡ 계곡 저공 슬라롬 (550-600 KT)",
   "valley.mode.label": "조종 방식 선택 (사람 / AI)",
   "valley.pilot.human.title": "👤 사람 직접 조종",

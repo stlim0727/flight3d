@@ -487,6 +487,7 @@ class SimulatorHudAndBindingsMethods {
         this.lobby.airport = id;
         this.lobby.preset = defaultScenarioForRegion(id);
         if (id === 'hangang') this.lobby.aircraft = 'C172';
+        if (id === 'valley') this.lobby.aircraft = 'F16';
         this.lobbyScreen?.refresh();
       },
       onPreset: type => {

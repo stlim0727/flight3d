@@ -39,8 +39,8 @@ export const SPAWN_SCENARIOS = {
     lobbyButtonId: 'lobby-preset-cliff',
   },
   valley: {
-    airports: ['lukla'],
-    labelKeys: { lukla: 'valley.slalom.title' },
+    airports: ['valley'],
+    labelKeys: { valley: 'valley.slalom.title' },
     briefingKey: 'lobby.briefing.scenario.valley',
     lobbyButtonId: 'lobby-preset-valley',
   },
@@ -53,7 +53,7 @@ export const SPAWN_SCENARIOS = {
 };
 
 export const DEFAULT_SCENARIO = 'runway';
-export const defaultScenarioForRegion = region => region === 'hangang' ? 'hangang' : DEFAULT_SCENARIO;
+export const defaultScenarioForRegion = region => region === 'hangang' ? 'hangang' : region === 'valley' ? 'valley' : DEFAULT_SCENARIO;
 
 export function isScenarioAvailable(airportKey, scenarioType) {
   const scenario = Object.hasOwn(SPAWN_SCENARIOS, scenarioType) ? SPAWN_SCENARIOS[scenarioType] : undefined;

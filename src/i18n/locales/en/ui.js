@@ -310,6 +310,8 @@ export default {
   "lobby.briefing.scenario.cliff": "Downhill takeoff run from the cliff-top end (Rwy 24).",
   "lobby.briefing.scenario.valley": "F-16 Virtual Valley Low-Pass Slalom: Low-altitude, high-speed challenge through procedural canyon slalom gates.",
   "lobby.briefing.scenario.demo": "Sit back: the cinematic demo flight flies itself; press Esc to take control.",
+  "lobby.spec.valley": "Seed-based procedural canyon · F-16 only",
+  "valley.region": "⛰️ Virtual Canyon",
   "valley.slalom.title": "⚡ Valley Low-Pass Slalom (550-600 KT)",
   "valley.mode.label": "Pilot Control Mode",
   "valley.pilot.human.title": "👤 Human Pilot",

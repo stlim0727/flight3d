@@ -11,8 +11,8 @@ test('invalid values and unsupported combinations resolve safely', () => {
   assert.deepEqual(resolveFlightUrl('?aircraft=no&terrain=no&scenario=no', saved), { airport: 'coastal', aircraft: 'B738', scenario: 'runway' });
   assert.deepEqual(resolveFlightUrl('?terrain=hangang&aircraft=F16&scenario=demo', saved), { airport: 'hangang', aircraft: 'C172', scenario: 'hangang' });
   assert.equal(resolveFlightUrl('?terrain=coastal&aircraft=F16&scenario=demo', saved).scenario, 'runway');
-  assert.equal(resolveFlightUrl('?terrain=lukla&aircraft=C172&scenario=valley', saved).scenario, 'runway');
-  assert.deepEqual(resolveFlightUrl('?terrain=lukla&aircraft=F16&scenario=valley', saved), { airport: 'lukla', aircraft: 'F16', scenario: 'valley' });
+  assert.equal(resolveFlightUrl('?terrain=lukla&aircraft=F16&scenario=valley', saved).scenario, 'runway');
+  assert.deepEqual(resolveFlightUrl('?terrain=valley&aircraft=F16&scenario=valley', saved), { airport: 'valley', aircraft: 'F16', scenario: 'valley' });
 });
 test('every listed combination round trips without substitution', () => {
   const rows = flightCombinations();
@@ -27,10 +27,10 @@ test('every listed combination round trips without substitution', () => {
 
 test('inherited property names in URL scenarios fall back without throwing', () => {
   for (const scenario of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
-    for (const airport of ['coastal', 'lukla', 'incheon', 'neon', 'hangang']) {
+    for (const airport of ['coastal', 'lukla', 'incheon', 'neon', 'hangang', 'valley']) {
       const result = resolveFlightUrl(`?terrain=${airport}&scenario=${scenario}`, saved);
       assert.equal(result.airport, airport);
-      assert.equal(result.scenario, airport === 'hangang' ? 'hangang' : 'runway');
+      assert.equal(result.scenario, airport === 'hangang' ? 'hangang' : airport === 'valley' ? 'valley' : 'runway');
     }
   }
 });
