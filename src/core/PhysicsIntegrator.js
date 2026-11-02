@@ -12,6 +12,7 @@ import { advanceSimulationWind } from '../physics/WindField.js';
 import { stepPhysics } from './physicsTiming.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { FLOW } from '../ui/GameFlowController.js';
+import { trackFlightCrash } from '../analytics/posthog.js';
 
 class PhysicsIntegratorMethods {
   /**
@@ -418,6 +419,13 @@ class PhysicsIntegratorMethods {
     this.flightWarnings.reset();
     this.telemetry.warnings = [];
     this.crashResult = crashResult;
+    trackFlightCrash({
+      airport: this.activeAirport,
+      aircraft: this.currentAircraftId,
+      scenario: this.lastPresetType,
+      crashResult,
+      speedKnots: this.telemetry?.iasKnots,
+    });
 
     // 1. Spawn Visual Explosion Particles, Fireball, Smoke & Dynamic Light Flash
     this.explosionSystem.spawnExplosion(crashResult, impactVelocity);

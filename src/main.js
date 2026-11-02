@@ -64,6 +64,14 @@ import { installInputLatencyMonitor } from './ui/InputLatencyMonitor.js';
 import { installPresetSpawner } from './core/PresetSpawner.js';
 import { installPhysicsIntegrator } from './core/PhysicsIntegrator.js';
 import { installSimulatorHudAndBindings } from './ui/SimulatorHudAndBindings.js';
+import {
+  initAnalytics,
+  trackFlightStart,
+  trackFlightEnd,
+  trackFlightCrash,
+  captureException,
+} from './analytics/posthog.js';
+import { openFeedbackDialog } from './analytics/FeedbackDialog.js';
 
 // Expose THREE globally for test harness and browser console debugging
 if (typeof window !== 'undefined') {
@@ -368,6 +376,16 @@ class FlightSimulator {
       throttle: 0, x: 0, z: 0,
     };
 
+    // Telemetry & Feedback
+    this.analytics = {
+      initAnalytics,
+      trackFlightStart,
+      trackFlightEnd,
+      trackFlightCrash,
+      captureException,
+    };
+    this._openFeedbackDialog = openFeedbackDialog;
+
     restoreSimulatorPreferences(this, loadSimulatorPreferences());
     this.initControls();
     this.initUI();
@@ -408,6 +426,22 @@ class FlightSimulator {
     this.hasRenderedFirstFrame = false;
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
+
+    // Initialize analytics/error reporting asynchronously without delaying startup
+    if (typeof window !== 'undefined') {
+      const initTelemetry = () => initAnalytics(this);
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(initTelemetry, { timeout: 2000 });
+      } else {
+        setTimeout(initTelemetry, 1000);
+      }
+      this.renderer?.domElement?.addEventListener('webglcontextlost', () => {
+        captureException(new Error('WebGL context lost'), {
+          source: 'canvas.webglcontextlost',
+          gpu: this.renderer?.capabilities?.renderVersion,
+        });
+      });
+    }
 
     // Boot cleanly into the lobby with its live 3D cinematic backdrop, unless a
     // direct launch URL parameter (?fly=1, ?instant=1, ?pilotArena=1) is present.
@@ -587,6 +621,13 @@ class FlightSimulator {
       this.setPreset(this.lobby.preset);
     }
     this.beginFlightRecording();
+    this.analytics?.trackFlightStart?.({
+      airport: this.activeAirport,
+      aircraft: this.currentAircraftId,
+      scenario: wantsValley ? 'valley' : wantsDemo ? 'demo' : this.lobby.preset,
+      pilotMode: wantsValley ? (this.lobby.pilotMode || 'human') : 'human',
+      timeOfDay: this.sky?.timeOfDay,
+    });
     saveSimulatorPreferences({ demoProfile: this.lobby.demoProfile });
     saveFlightSelection({
       airport: this.lobby.airport,
@@ -678,8 +719,19 @@ class FlightSimulator {
     this.crashDebriefRemaining = null;
     this.debriefReport = this.isCrashed ? this.flightRecorder.finish('crash', this.crashResult)
       : this.flightRecorder.finish(reason);
+    this.analytics?.trackFlightEnd?.({
+      airport: this.activeAirport,
+      aircraft: this.currentAircraftId,
+      scenario: this.lastPresetType,
+      reason: this.isCrashed ? 'crash' : reason,
+      durationSeconds: this.flightRecorder?.elapsedSeconds,
+    });
     this.gameFlow.endFlight();
     this.debriefOverlay.show(this.debriefReport);
+  }
+
+  openFeedbackDialog() {
+    this._openFeedbackDialog?.(this);
   }
 
   retryDebrief() {

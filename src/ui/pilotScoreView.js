@@ -251,6 +251,7 @@ export function scoreOverlayMarkup(data) {
         <button type="button" class="btn-retry" data-score-retry>다시 도전</button>
         <button type="button" class="btn-close" data-score-close>메인 메뉴 (자이로·설정)</button>
       </div>
+      <button type="button" class="btn-score-report" data-score-report>🐞 문제/버그 제보</button>
     </div>
   `;
 }
