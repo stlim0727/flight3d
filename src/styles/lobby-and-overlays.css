@@ -269,6 +269,21 @@ body[data-flow="lobby"] .menu-toggle {
   background: currentColor;
   box-shadow: 0 -6px currentColor, 0 6px currentColor;
 }
+.menu-toggle.is-open {
+  background: rgba(14, 116, 144, 0.7);
+  border-color: #38bdf8;
+}
+.menu-toggle.is-open .menu-toggle-glyph:empty::before {
+  content: '✕';
+  display: block;
+  width: auto;
+  height: auto;
+  background: transparent;
+  box-shadow: none;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
 @media (min-width: 961px) {
   .presets-bar { top: 60px; }
 }

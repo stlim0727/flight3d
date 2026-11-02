@@ -408,14 +408,22 @@ class FlightSimulator {
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
 
-    // Open straight into the flight HUD rather than the main menu. The menu
-    // and its cinematic backdrop stay reachable via the persistent top-left
-    // toggle (or ESC > pause). #123 hardcoded the markup to
-    // boot at the lobby, so that first-paint attribute is flipped to flight too.
-    this.fly();
-    inputLatency?.mark('fly');
+    // Boot cleanly into the lobby with its live 3D cinematic backdrop, unless a
+    // direct launch URL parameter (?fly=1, ?instant=1, ?pilotArena=1) is present.
+    const urlParams = new URLSearchParams(window.location.search);
+    const launchDirectly = urlParams.has('fly') || urlParams.has('instant') || urlParams.get('pilotArena') === '1';
+
+    if (launchDirectly) {
+      this.fly();
+      inputLatency?.mark('fly');
+    } else {
+      if (isScenarioAvailable(this.activeAirport, 'demo')) {
+        this.demoDirector.start(this.activeAirport);
+      }
+      inputLatency?.mark('lobby-ready');
+    }
     this.syncFlowUi();
-    if (new URLSearchParams(location.search).get('pilotArena') === '1') {
+    if (urlParams.get('pilotArena') === '1') {
       const { installPilotArena } = await import('./ui/PilotArenaPanel.js');
       installPilotArena(this);
     }
@@ -610,10 +618,26 @@ class FlightSimulator {
     }
   }
 
-  /** The HUD menu button only opens the main menu, holding the current flight. */
+  /**
+   * One-click toggle between in-play and menu.
+   * - In FLIGHT: enters the lobby while holding the active sortie.
+   * - In LOBBY: if a held sortie exists, resumes it; otherwise starts fresh flight.
+   * - In PAUSED: resumes flight.
+   */
   toggleMainMenu() {
     if (this.gameFlow.state === FLOW.DEBRIEF) return;
-    this.gameFlow.returnToLobby(true);
+    if (this.gameFlow.state === FLOW.FLIGHT) {
+      this.gameFlow.returnToLobby(true);
+    } else if (this.gameFlow.state === FLOW.PAUSED) {
+      this.gameFlow.resume();
+    } else if (this.gameFlow.state === FLOW.LOBBY) {
+      if (this.isCrashed) return;
+      if (this.gameFlow.canResumeFromLobby()) {
+        this.resumeFlight();
+      } else {
+        this.fly();
+      }
+    }
   }
 
   beginFlightRecording() {
@@ -676,14 +700,16 @@ class FlightSimulator {
   updateMenuToggle() {
     const btn = document.getElementById('menu-toggle');
     if (!btn) return;
-    const open = this.gameFlow.state === FLOW.LOBBY;
-    btn.classList.toggle('is-open', open);
-    // Live closure: setLanguage() re-runs it, so the label follows language too.
-    bindText(btn, () => t('menu.open'), 'aria-label');
-    btn.setAttribute('aria-expanded', String(open));
-    btn.setAttribute('aria-controls', 'lobby-screen');
-    const glyph = btn.querySelector('.menu-toggle-glyph');
-    if (glyph) glyph.textContent = '';
+    const isMenu = this.gameFlow.state === FLOW.LOBBY || this.gameFlow.state === FLOW.PAUSED;
+    btn.classList.toggle('is-open', isMenu);
+    const canResume = this.gameFlow.canResumeFromLobby() || this.gameFlow.state === FLOW.PAUSED;
+    bindText(btn, () => t(isMenu ? 'menu.close' : 'menu.open'), 'aria-label');
+    btn.setAttribute('aria-expanded', String(isMenu));
+    btn.setAttribute('aria-controls', isMenu ? (this.gameFlow.state === FLOW.PAUSED ? 'pause-menu' : 'lobby-screen') : 'lobby-screen');
+    const title = btn.querySelector('.menu-toggle-title');
+    if (title) {
+      bindText(title, () => isMenu ? (canResume ? t('lobby.resume') : t('lobby.startNew')) : 'FLIGHT3D');
+    }
   }
 
   setTimeOfDay(hours, { persist = true } = {}) {

@@ -6,9 +6,8 @@
   <title>Flight3d</title>
   <link rel="stylesheet" href="./style.css">
 </head>
-<!-- Open on the flight HUD; the main menu is reached via the persistent top-left menu toggle.
-     .booting keeps flight chrome hidden until startup preparation finishes. -->
-<body data-flow="flight" class="booting">
+<!-- Boot cleanly into the lobby; .booting keeps chrome hidden until startup finishes. -->
+<body data-flow="lobby" class="booting">
   <section id="startup-overlay" class="startup-overlay" aria-labelledby="startup-title">
     <div class="startup-card">
       <h1 id="startup-title">Flight3d</h1>
