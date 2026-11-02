@@ -141,7 +141,7 @@ export function createPilot() {
       const speed = Math.max(40, (read(s.tasKnots) ?? ias * 1.13) * 0.514444);
 
       // Pure pursuit carrot guidance with lookahead and path curvature feedforward
-      const lookDist = speed * 2.2;
+      const lookDist = speed * 2.6;
       const carrot = pathPointAt(here.progressM + lookDist);
 
       const dx = carrot.x - ownX, dz = carrot.z - ownZ;
@@ -149,7 +149,7 @@ export function createPilot() {
       const carrotBearing = (Math.atan2(dx, -dz) / RAD + 360) % 360;
       const bearingError = signed(carrotBearing - heading);
 
-      const ffAcc = speed * speed * pathCurvatureAt(here.progressM + speed * 1.4);
+      const ffAcc = speed * speed * pathCurvatureAt(here.progressM + speed * 2.8);
       const fbAcc = 2 * speed * speed * Math.sin(bearingError * RAD) / carrotDist;
       const aLat = clamp(ffAcc + fbAcc, -14.5, 14.5);
       const bankTarget = clamp(Math.atan(aLat / GRAVITY) / RAD, -58, 58);
@@ -183,7 +183,7 @@ export function createPilot() {
 
       // High-authority bank response with 0.32s transport-delay prediction
       const rollLead = roll + (rollRate / RAD) * 0.32;
-      const desiredRollRate = clamp((bankTarget - rollLead) * 1.6, -70, 70) * RAD;
+      const desiredRollRate = clamp((bankTarget - rollLead) * 2.2, -70, 70) * RAD;
       const requiredCl = 12800 * (desiredRollRate - rollRate) * 3 / (q * 27.87 * 9.96);
       const aileron = (requiredCl + 0.45 * rollRate * 9.96 / (2 * speed)) / (0.35 * 1.05 * 20 * RAD);
       const throttle = clamp((cruise - ias) * 0.04 + Math.max(0, filteredVz) * 0.005 + 0.30, 0, 1);
