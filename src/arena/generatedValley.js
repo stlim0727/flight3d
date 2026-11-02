@@ -32,30 +32,30 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
   gates: 7,
   /** Leg length floor comes from the measured bank reversal: at the fast end of
    * the band a full reversal costs about 600 m of straight line. */
-  legLengthM: [900, 1250],
-  headingChangeDeg: [22, 30],
+  legLengthM: [2400, 2800],
+  headingChangeDeg: [28, 33],
   /** Half of the canyon floor. Tight trench-like canyon profile so turns carve
    * around steep rocky spurs. */
-  corridorHalfWidthM: [100, 135],
+  corridorHalfWidthM: [280, 340],
   gatePassageHalfWidthM: 35,
   /** The aim point sits across the valley, alternating sides, so the line must
    * carve the bend instead of following the middle. */
-  gateOffsetFraction: [0.60, 0.85],
+  gateOffsetFraction: [0.15, 0.25],
   /** The ceiling a gate is credited under, and how much deeper it may be. */
   passageMinAglM: 50,
   passageBandM: [35, 75],
   /** Between gates the valley may drop by no more than what a constant-speed leg
    * can actually sink, and may rise by a good deal more. */
-  floorStepDownM: 25,
-  floorStepUpM: 180,
-  wallRiseM: [450, 700],
-  ridgeExponent: [0.75, 1.1],
-  speedKnots: [SLALOM_IAS_MIN_KT, SLALOM_IAS_MAX_KT],
+  floorStepDownM: 20,
+  floorStepUpM: 40,
+  wallRiseM: [550, 800],
+  ridgeExponent: [0.75, 1.0],
+  speedKnots: [409, 580],
   /** The measured turn rate and sink ceiling are both best at the slow end of the
    * band, and a leg assessed at any other speed would be sized on borrowed time. */
-  cruiseKnots: 240,
+  cruiseKnots: 410,
   clearanceFloorM: 20,
-  reliefAmplitudeM: 10,
+  reliefAmplitudeM: 5,
   decisionPeriodTicks: 24,
   commandDelayTicks: 24,
   sampleStepM: 25,

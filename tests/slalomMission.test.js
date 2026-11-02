@@ -35,7 +35,7 @@ function gateValue(gates, s, column) {
 
 /** Fly the course as the contract asks: aim at each gate's passage space, stay
  * under its ceiling, and climb only where the line says to. */
-function fly(manifest, { iasKnots = 260, cross = s => gateValue(manifest.course.gates, s, 'crossOffsetM'),
+function fly(manifest, { iasKnots = manifest?.spawn?.iasKnots ?? 260, cross = s => gateValue(manifest.course.gates, s, 'crossOffsetM'),
   agl = s => gateValue(manifest.course.gates, s, 'maxAglM'), fromS = manifest.course.gates[0].sM,
   toS = manifest.course.lengthM, straight = null, rampM = 0 } = {}) {
   const judge = new SlalomMission(manifest);
@@ -136,8 +136,8 @@ test('the judge refuses a snapshot that is not the next physics tick', () => {
   const manifest = createSlalomManifest({ seed: 7 });
   const judge = new SlalomMission(manifest);
   const gate = manifest.course.gates[0];
-  const base = { position: { x: manifest.spawn.x, y: 2200, z: manifest.spawn.z }, iasKnots: 260,
-    groundSpeedKnots: 260, aglM: gate.maxAglM - 10, crashed: false, damaged: false, bodyContact: false };
+  const base = { position: { x: manifest.spawn.x, y: 2200, z: manifest.spawn.z }, iasKnots: manifest.spawn.iasKnots,
+    groundSpeedKnots: manifest.spawn.iasKnots, aglM: gate.maxAglM - 10, crashed: false, damaged: false, bodyContact: false };
   assert.equal(judge.update({ ...base, tick: 2 }).reason, 'invalid-snapshot');
   const fresh = new SlalomMission(manifest);
   assert.notEqual(fresh.update({ ...base, tick: 1 }).status, 'failed');

@@ -78,7 +78,7 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     }
     const manifest = createSlalomManifest({ seed, rules });
     if (pilotKind === 'human') {
-      manifest.spawn.iasKnots = Math.min(manifest.spawn.iasKnots + 20, 260);
+      manifest.spawn.iasKnots = Math.min(manifest.spawn.iasKnots + 20, manifest.maximumIasKnots);
     }
     const { spawn } = manifest;
     const ground = sim.currentTerrain.getHeight(spawn.x, spawn.z);
