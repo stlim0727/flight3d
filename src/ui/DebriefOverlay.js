@@ -4,7 +4,7 @@ import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
 import { scenarioLabelKey } from '../config/scenarioRegistry.js';
 
 const airportKeys = { coastal: 'coastal.airport', incheon: 'incheon.airport', lukla: 'lukla.vnlk',
-  neon: 'neon.metropolis', hangang: 'hangang.title' };
+  neon: 'neon.metropolis', hangang: 'hangang.title', valley: 'valley.region' };
 const number = value => Number.isFinite(value) ? Math.round(value).toLocaleString('en-US') : '—';
 const g = value => Number.isFinite(value) ? value.toFixed(2) : '—';
 const crashName = crash => crash.name ?? t('debrief.reason.crash');

@@ -4,7 +4,7 @@ import { FLIGHT_BASE_URL } from './flightUrls.js';
 export function pilotCases() {
   return ['takeoff', 'landing', 'valley'].flatMap(type => {
     const name = type === 'takeoff' ? '이륙' : type === 'landing' ? '착륙' : 'F-16 가상 계곡 슬라롬';
-    const common = type === 'valley' ? { aircraft: 'F16', airport: 'lukla', scenario: 'cruise' } : {};
+    const common = type === 'valley' ? { aircraft: 'F16', airport: 'valley', scenario: 'valley' } : {};
     return [
     { id: `${type}-calm`, missionId: `${type}-basic-v1`, type,
       ...common, ...(type === 'valley' ? { missionId: 'valley-slalom-v1' } : {}),

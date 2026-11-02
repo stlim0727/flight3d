@@ -269,15 +269,13 @@ class PresetSpawnerMethods {
 
         this.showToast(() => t('preset.lukla.runway.24.downhill.takeoff.11'));
       } else if (type === 'valley') {
-        // Lukla Valley Low-Pass Slalom spawn
-        const ground = this.currentTerrain?.getHeight?.(-1700, 500) ?? 2800;
-        this.position.set(-1700, ground + 25, 500);
-        const headingRad = 183.18 * Math.PI / 180;
-        this.linearVelocity.set(Math.sin(headingRad) * 280, 0, -Math.cos(headingRad) * 280);
+        const ground = this.currentTerrain?.getHeight?.(0, 0) ?? 2100;
+        this.position.set(0, ground + 40, 0);
+        this.linearVelocity.set(0, 0, -228 * 0.514444);
         this.angularVelocity.set(0, 0, 0);
-        this.quaternion.setFromEuler(new THREE.Euler(0, -headingRad, 0, 'YXZ'));
-        this.controls.throttle = 0.9;
-        this.engines.setThrottle(0.9);
+        this.quaternion.setFromEuler(new THREE.Euler(0, 0, 0, 'YXZ'));
+        this.controls.throttle = 0.4;
+        this.engines.setThrottle(0.4);
         this.engines.setReverser(false, false);
         this.gear.setGearTarget(false);
         this.gear.gearState = 0;
@@ -471,7 +469,7 @@ class PresetSpawnerMethods {
   async setAirport(id, pilotPreparation = false) {
     if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('airport-changed');
     this.renderDiagnosticsPanel?.close();
-    if (!['coastal', 'lukla', 'incheon', 'neon', 'hangang'].includes(id)) return;
+    if (!['coastal', 'lukla', 'incheon', 'neon', 'hangang', 'valley'].includes(id)) return;
     if (this.activeAirport === id) {
       if (id === 'incheon' && this.incheonAirport) {
         this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = true;
@@ -523,6 +521,7 @@ class PresetSpawnerMethods {
     const isCoastal = id === 'coastal';
     const isNeon = id === 'neon';
     const isHangang = id === 'hangang';
+    const isValley = id === 'valley';
     if (isLukla && !this.luklaTerrain) {
       this.luklaTerrain = new LuklaTerrain();
       this.luklaAirport = new LuklaAirport();
@@ -534,7 +533,7 @@ class PresetSpawnerMethods {
     // Toggle 3D mesh visibility
     this.terrain.mesh.visible = isCoastal;
     this.airport.group.visible = isCoastal;
-    this.water.mesh.visible = !isLukla && !isNeon;
+    this.water.mesh.visible = !isLukla && !isNeon && !isValley;
     this.ships.group.visible = isCoastal;
     this.foliage.group.visible = isCoastal;
 

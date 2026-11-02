@@ -7,7 +7,7 @@ export const PLANE_STORAGE_KEY = 'flight3d.plane';
 export const SCENARIO_STORAGE_KEY = 'flight3d.scenario';
 export const PRESET_STORAGE_KEY = 'flight3d.preset';
 
-export const VALID_AIRPORTS = Object.freeze(['coastal', 'lukla', 'incheon', 'neon', 'hangang']);
+export const VALID_AIRPORTS = Object.freeze(['coastal', 'lukla', 'incheon', 'neon', 'hangang', 'valley']);
 export const DEFAULT_AIRPORT = 'coastal';
 export const DEFAULT_AIRCRAFT = DEFAULT_AIRCRAFT_ID || 'B738';
 
@@ -20,7 +20,7 @@ export function resolveAircraft(aircraft) {
 }
 
 export function resolveScenario(scenario, airport = DEFAULT_AIRPORT, aircraft = DEFAULT_AIRCRAFT) {
-  if (airport === 'hangang') return defaultScenarioForRegion(airport);
+  if (airport === 'hangang' || airport === 'valley') return defaultScenarioForRegion(airport);
   if (!scenario || typeof scenario !== 'string') return DEFAULT_SCENARIO;
   if (!isScenarioAvailable(airport, scenario)) return DEFAULT_SCENARIO;
   if (scenario === 'valley' && aircraft !== 'F16') return DEFAULT_SCENARIO;
@@ -53,7 +53,7 @@ export function loadSavedFlightSelection(storage) {
     /* Storage unavailable or throws */
   }
   const airport = resolveAirport(savedAirport);
-  const aircraft = airport === 'hangang' ? 'C172' : resolveAircraft(savedAircraft);
+  const aircraft = airport === 'hangang' ? 'C172' : airport === 'valley' ? 'F16' : resolveAircraft(savedAircraft);
   const scenario = resolveScenario(savedScenario, airport, aircraft);
   return { airport, aircraft, scenario };
 }
