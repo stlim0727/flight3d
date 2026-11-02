@@ -631,8 +631,8 @@ class FlightSimulator {
     } else if (this.gameFlow.state === FLOW.PAUSED) {
       this.gameFlow.resume();
     } else if (this.gameFlow.state === FLOW.LOBBY) {
-      if (this.isCrashed) return;
       if (this.gameFlow.canResumeFromLobby()) {
+        if (this.isCrashed) return;
         this.resumeFlight();
       } else {
         this.fly();
@@ -701,9 +701,17 @@ class FlightSimulator {
     const btn = document.getElementById('menu-toggle');
     if (!btn) return;
     const isMenu = this.gameFlow.state === FLOW.LOBBY || this.gameFlow.state === FLOW.PAUSED;
-    btn.classList.toggle('is-open', isMenu);
     const canResume = this.gameFlow.canResumeFromLobby() || this.gameFlow.state === FLOW.PAUSED;
-    bindText(btn, () => t(isMenu ? 'menu.close' : 'menu.open'), 'aria-label');
+    // Only show the "close (✕)" state when there is an active flight to resume to.
+    // In a clean boot lobby without a held sortie, the lobby is the home base.
+    const showCloseAffordance = isMenu && canResume;
+    btn.classList.toggle('is-open', showCloseAffordance);
+    btn.classList.toggle('can-resume', canResume);
+    if (isMenu) {
+      bindText(btn, () => t(canResume ? 'lobby.resume' : 'lobby.startNew'), 'aria-label');
+    } else {
+      bindText(btn, () => t('menu.open'), 'aria-label');
+    }
     btn.setAttribute('aria-expanded', String(isMenu));
     btn.setAttribute('aria-controls', isMenu ? (this.gameFlow.state === FLOW.PAUSED ? 'pause-menu' : 'lobby-screen') : 'lobby-screen');
     const title = btn.querySelector('.menu-toggle-title');
