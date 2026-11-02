@@ -1,6 +1,6 @@
 import test from 'node:test';
 import { Box3, Matrix4, Vector3 } from 'three';
-import { HANGANG_COURSE, bridgeSolids } from '../src/config/hangangCourse.js';
+import { HANGANG_COURSE, bridgeLampX, bridgeOpening, bridgeSolids } from '../src/config/hangangCourse.js';
 import { HangangCollision } from '../src/director/HangangCollision.js';
 import assert from 'node:assert/strict';
 import { HangangScene } from '../src/environment/HangangScene.js';
@@ -80,15 +80,30 @@ function bridgeTriangles(bridge) {
   return triangles;
 }
 
-test('no bridge triangle intrudes into the central opening', () => {
+test('main spans follow the surveyed longest spans in real west-to-east order (#396)', () => {
+  const [seogang, mapo, hangang] = HANGANG_COURSE.bridges;
+  assert.deepEqual(HANGANG_COURSE.bridges.map(b => b.id), ['seogang', 'mapo', 'hangang']);
+  // 1.08 km and 2.65 km apart, as between the real bridges.
+  assert.equal(seogang.z - mapo.z, 1080); assert.equal(mapo.z - hangang.z, 2650);
+  for (const [bridge, span] of [[seogang, 150], [mapo, 70], [hangang, 63.5]]) {
+    const piers = bridge.piers, gaps = piers.slice(1).map((x, i) => x - piers[i]);
+    assert.equal(Math.max(...gaps), span, bridge.id);
+    assert.equal(bridgeOpening(bridge).halfWidth, span / 2 - 5, bridge.id);
+  }
+  assert.ok(Math.abs(hangang.x - HANGANG_COURSE.nodeulseom.x) < 1e-9 && hangang.z === HANGANG_COURSE.nodeulseom.z);
+});
+
+test('no bridge triangle intrudes into the main-span opening', () => {
   // Merged meshes span the opening, so check each triangle: nothing drawn may enter
-  // the passage under the deck (|x| < 50 m, below 34 m).
-  const opening = new Box3(new Vector3(-49.99, 0, -12), new Vector3(49.99, 33.99, 12));
-  for (const bridge of new HangangScene().bridges) {
-    for (const { mesh, points } of bridgeTriangles(bridge)) {
+  // the passage under the decks, between the main span's pier caps and below 34 m.
+  const scene = new HangangScene();
+  HANGANG_COURSE.bridges.forEach((spec, i) => {
+    const { halfWidth, soffit, halfDepth } = bridgeOpening(spec);
+    const opening = new Box3(new Vector3(-halfWidth + 0.01, 0, -halfDepth), new Vector3(halfWidth - 0.01, soffit - 0.01, halfDepth));
+    for (const { mesh, points } of bridgeTriangles(scene.bridges[i])) {
       assert.ok(!new Box3().setFromPoints(points).intersectsBox(opening), `${mesh} triangle at ${points[0].toArray()}`);
     }
-  }
+  });
 });
 
 test('bridges draw their collision solids in five merged meshes', () => {
@@ -101,7 +116,7 @@ test('bridges draw their collision solids in five merged meshes', () => {
     const solids = bridgeSolids(spec).map(s => ({ ...s, box: new Box3().setFromCenterAndSize(new Vector3(...s.center), new Vector3(...s.size)) }));
     // Every solid except the railing and arch envelopes is drawn as exactly that box,
     // deck lamps included (#395).
-    assert.equal(solids.filter(s => s.part === 'lamp').length, 84, spec.id);
+    assert.equal(solids.filter(s => s.part === 'lamp').length, bridgeLampX(spec).length * 4 * spec.decks.length, spec.id);
     for (const { part, box } of solids.filter(s => s.part !== 'rail' && s.part !== 'arch')) {
       for (let corner = 0; corner < 8; corner++) {
         const p = new Vector3(corner & 1 ? box.max.x : box.min.x, corner & 2 ? box.max.y : box.min.y, corner & 4 ? box.max.z : box.min.z);
@@ -110,15 +125,18 @@ test('bridges draw their collision solids in five merged meshes', () => {
     }
     // The open railing at the deck edges stays inside its collision envelopes.
     const rails = solids.filter(s => s.part === 'rail').map(s => s.box.clone().expandByScalar(1e-6));
-    const railing = triangles.filter(t => t.points.every(p => p.y > 40.01 && Math.abs(p.z) > 10.7));
+    const edges = spec.decks.flatMap(d => [d.z - d.width / 2, d.z + d.width / 2]);
+    const railing = triangles.filter(t => t.points.every(p => p.y > 40.01 && edges.some(z => Math.abs(p.z - z) < 0.3)));
     assert.ok(railing.length > 0);
     for (const { points } of railing) assert.ok(rails.some(r => points.every(p => r.containsPoint(p))), `${spec.id} railing ${points[0].toArray()}`);
-    // The arch tube is drawn only on arch bridges, wholly inside its collision boxes (#395).
+    // Arch ribs are drawn only where the bridge has arches, wholly inside their collision
+    // boxes (#395). Above the lamps (43.8 m) only ribs are drawn.
     const arches = solids.filter(s => s.part === 'arch').map(s => s.box.clone().expandByScalar(1e-4)); // float32 vertices
     const tube = triangles.filter(t => t.points.every(p => p.y > 44.5));
-    assert.equal(arches.length > 0, spec.style === 'arch', spec.id);
-    if (spec.style !== 'arch') return;
-    assert.ok(tube.length > 1000 && Math.max(...arches.map(b => b.max.y)) > 77.3);
+    assert.equal(arches.length > 0, spec.arches.length > 0, spec.id);
+    if (!spec.arches.length) { assert.equal(tube.length, 0, spec.id); return; }
+    const crown = Math.max(...spec.arches.map(a => 41 + a.rise + a.radius));
+    assert.ok(tube.length > 1000 && Math.abs(Math.max(...arches.map(b => b.max.y)) - crown) < 0.01, spec.id);
     for (const { points } of tube) assert.ok(arches.some(b => points.every(p => b.containsPoint(p))), `${spec.id} arch ${points[0].toArray()}`);
   });
 });

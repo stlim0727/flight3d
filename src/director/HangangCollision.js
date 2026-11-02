@@ -50,8 +50,11 @@ export class HangangCollision {
     this.bridges = course.bridges.map(b => {
       const transform = new THREE.Matrix4().compose(new THREE.Vector3(b.x, 0, b.z),
         new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.yaw), new THREE.Vector3(1, 1, 1));
-      return { ...b, inverse: transform.invert(), solids: bridgeSolids(b).map(s => ({ ...s,
-        box: new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(...s.center), new THREE.Vector3(...s.size)) })) };
+      const solids = bridgeSolids(b).map(s => ({ ...s,
+        box: new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(...s.center), new THREE.Vector3(...s.size)) }));
+      // Conservative broadphase: the widest solid plus the aircraft's furthest extremity.
+      const reach = Math.max(...solids.map(s => Math.max(-s.box.min.z, s.box.max.z))) + 10;
+      return { ...b, inverse: transform.invert(), solids, reach };
     });
     this.matrix = new THREE.Matrix4(); this.localMatrix = new THREE.Matrix4();
     this.p = new THREE.Vector3(); this.q = new THREE.Quaternion(); this.unit = new THREE.Vector3(1, 1, 1);
@@ -135,8 +138,7 @@ export class HangangCollision {
       for (let i = 0; i < this.bridges.length && !this.contact; i++) {
         const bridge = this.bridges[i];
         this.local.copy(this.p).applyMatrix4(bridge.inverse);
-        // Conservative broadphase includes the aircraft's furthest extremity.
-        if (Math.abs(this.local.z) > 28) continue;
+        if (Math.abs(this.local.z) > bridge.reach) continue;
         this.localMatrix.multiplyMatrices(bridge.inverse, this.matrix);
         // Narrow the bridge's solids (lamps and arch segments included) to those near
         // the whole aircraft, then test each part against them in order.
