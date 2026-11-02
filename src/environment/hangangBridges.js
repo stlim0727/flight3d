@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { BRIDGE_PIER_X, bridgeSolids } from '../config/hangangCourse.js';
+import { BRIDGE_ARCH, BRIDGE_PIER_X, archCentre, bridgeSolids } from '../config/hangangCourse.js';
 
 // Procedural bridge built from the same bridgeSolids() boxes HangangCollision uses.
+// The arch is the exception: its boxes bound a tube drawn through the same rings.
 // Members are merged into one mesh per material, so a bridge costs a handful of draw
 // calls instead of one per member.
 
@@ -17,6 +18,15 @@ function railing({ center: [, cy, cz], size: [length, height, width] }) {
   ];
   for (let x = -length / 2 + 0.1; x < length / 2; x += 3) parts.push(box([x, cy, cz], [0.2, height, width * 0.5]));
   return parts;
+}
+
+class ArchCurve extends THREE.Curve {
+  constructor(z) { super(); this.z = z; }
+  getPoint(t, target = new THREE.Vector3()) { const [x, y] = archCentre(t); return target.set(x, y, this.z); }
+  // TubeGeometry places rings by arc length; keep them at archCentre(i / segments),
+  // the ends of the collision boxes' chords.
+  getPointAt(u, target) { return this.getPoint(u, target); }
+  getTangentAt(u, target) { return this.getTangent(u, target); }
 }
 
 export function createBridgeMaterials() {
@@ -38,32 +48,20 @@ export function createBridge(bridge, materials) {
   const buckets = { steel: [], concrete: [], road: [], light: [], marker: [] };
 
   for (const solid of bridgeSolids(bridge)) {
+    if (solid.render === false) continue;
     if (solid.part === 'rail') buckets.steel.push(...railing(solid));
-    else buckets[solid.part === 'pier' ? 'concrete' : 'steel'].push(box(solid.center, solid.size));
+    else buckets[solid.material ?? (solid.part === 'pier' ? 'concrete' : 'steel')].push(box(solid.center, solid.size));
   }
 
   // Road deck surface
   buckets.road.push(box([0, 40.03, 0], [1200, 0.05, 19]));
 
-  // Deck streetlights
-  for (let sx = -550; sx <= 550; sx += 55) {
-    for (const sz of [-9.5, 9.5]) {
-      buckets.concrete.push(box([sx, 41.8, sz], [0.3, 3.5, 0.3]));
-      buckets.light.push(box([sx, 43.6, sz], [0.6, 0.4, 0.6]));
-    }
-  }
-
   // Upward floodlights at the foot of each pier's upstream and downstream faces
   for (const px of BRIDGE_PIER_X) for (const pz of [-7.6, 7.6]) buckets.light.push(box([px, 0.6, pz], [3, 1, 1]));
 
-  // Above-deck decorative arches (Hangang Bridge / Central bridge)
+  // Above-deck arches (Central bridge), one tube segment per arch collision box.
   if (isArch) {
-    for (const z of [-9, 9]) {
-      const curve = new THREE.CatmullRomCurve3(
-        Array.from({ length: 17 }, (_, i) => new THREE.Vector3(-150 + i * 18.75, 41 + 35 * Math.sin(i * Math.PI / 16), z))
-      );
-      buckets.steel.push(new THREE.TubeGeometry(curve, 32, 1.4, 8, false));
-    }
+    for (const z of BRIDGE_ARCH.z) buckets.steel.push(new THREE.TubeGeometry(new ArchCurve(z), BRIDGE_ARCH.segments, BRIDGE_ARCH.radius, 8, false));
   }
 
   // Navigation clearance markers on the gate pier caps' approach faces. They have no

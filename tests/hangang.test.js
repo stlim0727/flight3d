@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Vector3, Quaternion, Scene, Box3 } from 'three';
+import { Vector3, Quaternion, Scene, Box3, Euler, Matrix4 } from 'three';
 import { HangangCollision } from '../src/director/HangangCollision.js';
 import { HangangScenario } from '../src/director/HangangScenario.js';
 import { HANGANG_COURSE as course, riverCenter } from '../src/config/hangangCourse.js';
@@ -68,6 +68,101 @@ test('pavilion collides where its mesh stands, not across its bounding box', () 
   assert.ok(roofs > 800, `roof cells ${roofs}`); assert.ok(open > 800, `open cells ${open}`);
   assert.ok(field.top > 15 && field.top < 15.5, `roof top ${field.top}`);
   assert.equal(probe(0, 0, field.top + 0.3), null);
+});
+// Crosses bridge `index` level, along its own deck-crossing axis, at bridge-local x
+// and height y; returns the first contact.
+function deckCrossing(index, x, y) {
+  const collision = new HangangCollision(), b = course.bridges[index];
+  const yaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), b.yaw);
+  for (let s = 30; s >= -30 && !collision.contact; s -= 2.3) {
+    collision.update(new Vector3(x, y, s).applyQuaternion(yaw).add(new Vector3(b.x, 0, b.z)), yaw);
+  }
+  return collision.contact;
+}
+test('deck streetlights and the central arch are solid (#395)', () => {
+  // Lamps (to 43.8 m) stand every 55 m on both deck edges of every bridge.
+  for (const index of [0, 1, 2]) {
+    assert.equal(deckCrossing(index, 0, 44)?.structure, 'lamp');
+    assert.equal(deckCrossing(index, 27.5, 44), null, 'between lamps');
+    assert.equal(deckCrossing(index, 0, 46), null, 'above the lamps');
+  }
+  // Arch (centreline 76 m at x = 0, tube radius 1.4 m) spans x = -150..150 on the central bridge.
+  assert.equal(deckCrossing(1, 0, 75)?.structure, 'arch');
+  assert.equal(deckCrossing(1, -95, 60)?.structure, 'arch');
+  assert.equal(deckCrossing(1, 95, 60)?.structure, 'arch');
+  for (const [x, y] of [[0, 80], [0, 60], [27.5, 66], [-175, 50]]) assert.equal(deckCrossing(1, x, y), null, `under/over arch ${x} ${y}`);
+  // Arch is central-only: the same crossing over the other bridges is clear.
+  for (const index of [0, 2]) assert.equal(deckCrossing(index, 0, 75), null);
+});
+
+// Reference for #395: sample the faces of every padded part box at `step` metres and test
+// each sample against the pavilion cells, optionally grown by `grow` metres.
+const PARTS = [[[-0.65, -0.55, -2.9], [0.65, 1.1, 4.6]], [[-5.8, 0.70, -1.3], [5.8, 1.15, 1]],
+  [[-2.1, 0.3, 3.1], [2.1, 0.85, 4.6]], [[-0.3, 0.5, 3], [0.3, 2.4, 4.6]], [[-1.3, -1.65, -1.8], [1.3, -0.3, 1]]];
+function sampledPavilionHit(matrix, step, grow) {
+  const island = course.nodeulseom, field = island.pavilion.heights, p = new Vector3();
+  const inCells = (x, y, z) => {
+    const fx = x - island.x - field.x0, fz = z - island.z - field.z0;
+    for (let j = Math.floor((fz - grow) / field.cell); j <= Math.floor((fz + grow) / field.cell); j++) {
+      for (let i = Math.floor((fx - grow) / field.cell); i <= Math.floor((fx + grow) / field.cell); i++) {
+        if (i >= 0 && j >= 0 && i < field.cols && j < field.rows && field.heights[j * field.cols + i] + grow >= y) return true;
+      }
+    }
+    return false;
+  };
+  for (const [lo, hi] of PARTS) {
+    const min = lo.map(v => v - 0.15), max = hi.map(v => v + 0.15);
+    for (let axis = 0; axis < 3; axis++) {
+      const [a, b] = [0, 1, 2].filter(k => k !== axis);
+      const na = Math.ceil((max[a] - min[a]) / step), nb = Math.ceil((max[b] - min[b]) / step);
+      for (const side of [min[axis], max[axis]]) {
+        for (let ia = 0; ia <= na; ia++) {
+          for (let ib = 0; ib <= nb; ib++) {
+            const v = [0, 0, 0];
+            v[axis] = side; v[a] = min[a] + (max[a] - min[a]) * ia / na; v[b] = min[b] + (max[b] - min[b]) * ib / nb;
+            p.set(...v).applyMatrix4(matrix);
+            if (inCells(p.x, p.y, p.z)) return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+test('banked pavilion contact matches the surface-sampled aircraft (#395)', () => {
+  const island = course.nodeulseom, matrix = new Matrix4(), unit = new Vector3(1, 1, 1);
+  let seed = 395;
+  const random = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+  for (const bank of [12, 20, 29]) {
+    let hits = 0, clear = 0, decided = 0, boxOnly = 0;
+    for (let n = 0; n < 320; n++) {
+      const roll = (random() < 0.5 ? -1 : 1) * bank * Math.PI / 180;
+      const attitude = new Quaternion().setFromEuler(new Euler((random() - 0.5) * 0.15, random() * 2 * Math.PI, roll, 'YXZ'));
+      const position = new Vector3(island.x + (random() - 0.5) * 60, 6 + random() * 12, island.z + (random() - 0.5) * 60);
+      matrix.compose(position, attitude, unit);
+      // Keep every part above the island top and plaza, so only the pavilion can be hit.
+      const lowest = Math.min(...PARTS.flatMap(([lo, hi]) => [0, 1, 2, 3, 4, 5, 6, 7].map(c =>
+        new Vector3(c & 1 ? hi[0] : lo[0], c & 2 ? hi[1] : lo[1], c & 4 ? hi[2] : lo[2]).applyMatrix4(matrix).y))) - 0.4;
+      if (lowest < 4.5) continue;
+      const collision = new HangangCollision();
+      const hit = collision.update(position, attitude)?.structure === 'pavilion';
+      const exact = sampledPavilionHit(matrix, 0.1, 0), loose = sampledPavilionHit(matrix, 0.1, 0.1);
+      // A sampled hit is a real hit; a hit must at least graze within the sample spacing.
+      if (exact) assert.ok(hit, `bank ${bank} pose ${n} missed`);
+      if (hit) assert.ok(loose, `bank ${bank} pose ${n} hit clear air`);
+      if (exact === loose) decided++;
+      hit ? hits++ : clear++;
+      // The former world-AABB test: its lowest corner against every overlapped cell.
+      const field = island.pavilion.heights, box = new Box3();
+      const aabbHit = PARTS.some(([lo, hi]) => {
+        box.set(new Vector3(...lo), new Vector3(...hi)).applyMatrix4(matrix).expandByScalar(0.15);
+        return collision.pavilionHit(box);
+      });
+      if (aabbHit && !loose) boxOnly++;
+    }
+    assert.ok(hits > 20 && clear > 20 && decided > hits + clear - 10, `bank ${bank}: ${hits} hits, ${clear} clear, ${decided} decided`);
+    assert.ok(boxOnly > 0, `bank ${bank}: the former AABB test over-reports`);
+  }
 });
 test('malformed samples and teleports never switch collision off', () => {
   const collision = new HangangCollision();

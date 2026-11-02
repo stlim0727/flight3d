@@ -37,6 +37,17 @@ export function hangangHeight(x, z) {
 }
 
 export const BRIDGE_PIER_X = [-550, -350, -150, -55, 55, 150, 350, 550];
+export const BRIDGE_LAMP_X = Array.from({ length: 21 }, (_, i) => -550 + i * 55);
+
+// Above-deck arch on 'arch' bridges: two tubes rising from the deck to 76 m (77.4 m
+// with the tube radius) over bridge-local x = -150..150, one over each deck edge.
+export const BRIDGE_ARCH = { halfSpan: 150, base: 41, rise: 35, radius: 1.4, z: [-9, 9], segments: 96 };
+
+// Bridge-local [x, y] of the arch centreline, t = 0..1 from one foot to the other.
+export function archCentre(t) {
+  const { halfSpan, base, rise } = BRIDGE_ARCH;
+  return [-halfSpan + 2 * halfSpan * t, base + rise * Math.sin(Math.PI * t)];
+}
 
 // Local bridge X spans the river, Z crosses the deck. Clear central opening 100 x 34 m,
 // bounded by the gate pier caps' inner faces and the girder soffit.
@@ -52,8 +63,27 @@ export function bridgeSolids(bridge) {
   for (let x = -590; x <= 590; x += 20) boxes.push({ part: 'crossbeam', center: [x, 35.2, 0], size: [0.6, 1.6, 16] });
   // Rail boxes are the collision envelope of the open railing drawn inside them.
   for (const z of [-11, 11]) boxes.push({ part: 'rail', center: [0, 41, z], size: [1200, 2, 0.4] });
+  // Deck streetlights: a pole and a lamp head, drawn and collided as these boxes.
+  for (const x of BRIDGE_LAMP_X) {
+    for (const z of [-9.5, 9.5]) {
+      boxes.push({ part: 'lamp', material: 'concrete', center: [x, 41.8, z], size: [0.3, 3.5, 0.3] });
+      boxes.push({ part: 'lamp', material: 'light', center: [x, 43.6, z], size: [0.6, 0.4, 0.6] });
+    }
+  }
   if (bridge.style === 'tower') {
     for (const x of [-150, 150]) boxes.push({ part: 'tower', center: [x, 62, 0], size: [10, 52, 7] });
+  }
+  // The arch tube is drawn through the same rings these boxes are built from: each box
+  // bounds one tube segment, a straight chord between rings, padded by the tube radius.
+  if (bridge.style === 'arch') {
+    const { segments, radius, z: sides } = BRIDGE_ARCH;
+    for (const z of sides) {
+      for (let i = 0; i < segments; i++) {
+        const [x0, y0] = archCentre(i / segments), [x1, y1] = archCentre((i + 1) / segments);
+        boxes.push({ part: 'arch', render: false, center: [(x0 + x1) / 2, (y0 + y1) / 2, z],
+          size: [Math.abs(x1 - x0) + 2 * radius, Math.abs(y1 - y0) + 2 * radius, 2 * radius] });
+      }
+    }
   }
   return boxes;
 }

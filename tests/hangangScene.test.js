@@ -99,8 +99,10 @@ test('bridges draw their collision solids in five merged meshes', () => {
     const key = p => p.toArray().map(v => v.toFixed(3)).join();
     const drawn = new Set(triangles.flatMap(t => t.points.map(key)));
     const solids = bridgeSolids(spec).map(s => ({ ...s, box: new Box3().setFromCenterAndSize(new Vector3(...s.center), new Vector3(...s.size)) }));
-    // Every solid except the railing envelopes is drawn as exactly that box.
-    for (const { part, box } of solids.filter(s => s.part !== 'rail')) {
+    // Every solid except the railing and arch envelopes is drawn as exactly that box,
+    // deck lamps included (#395).
+    assert.equal(solids.filter(s => s.part === 'lamp').length, 84, spec.id);
+    for (const { part, box } of solids.filter(s => s.part !== 'rail' && s.part !== 'arch')) {
       for (let corner = 0; corner < 8; corner++) {
         const p = new Vector3(corner & 1 ? box.max.x : box.min.x, corner & 2 ? box.max.y : box.min.y, corner & 4 ? box.max.z : box.min.z);
         assert.ok(drawn.has(key(p)), `${spec.id} ${part} corner ${p.toArray()}`);
@@ -111,6 +113,13 @@ test('bridges draw their collision solids in five merged meshes', () => {
     const railing = triangles.filter(t => t.points.every(p => p.y > 40.01 && Math.abs(p.z) > 10.7));
     assert.ok(railing.length > 0);
     for (const { points } of railing) assert.ok(rails.some(r => points.every(p => r.containsPoint(p))), `${spec.id} railing ${points[0].toArray()}`);
+    // The arch tube is drawn only on arch bridges, wholly inside its collision boxes (#395).
+    const arches = solids.filter(s => s.part === 'arch').map(s => s.box.clone().expandByScalar(1e-4)); // float32 vertices
+    const tube = triangles.filter(t => t.points.every(p => p.y > 44.5));
+    assert.equal(arches.length > 0, spec.style === 'arch', spec.id);
+    if (spec.style !== 'arch') return;
+    assert.ok(tube.length > 1000 && Math.max(...arches.map(b => b.max.y)) > 77.3);
+    for (const { points } of tube) assert.ok(arches.some(b => points.every(p => b.containsPoint(p))), `${spec.id} arch ${points[0].toArray()}`);
   });
 });
 
