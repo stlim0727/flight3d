@@ -16,7 +16,7 @@ export function createPilot() {
   const read = s => s?.status === 'available' && Number.isFinite(s.mean) ? s.mean : null;
 
   let route = [], gates = [], waypoints = [], knots = [];
-  let cruise = 228, trimDeg = 0, dt = 0.2;
+  let cruise = 236, trimDeg = 0, dt = 0.2;
   let filteredVz = 0, previousPitch = null, previousRoll = null, previousHeight = null;
   let command = { elevator: 0, aileron: 0, rudder: 0, throttle: 0.4, brakes: 0 };
   let hint = 0;
@@ -26,19 +26,9 @@ export function createPilot() {
       if (i === 0) return g.crossOffsetM;
       const off = g.crossOffsetM;
       const nextOff = gates[i + 1]?.crossOffsetM ?? 0;
-      if (off > 0) {
-        if (nextOff < 0) {
-          return Math.max(15, off - 130 + 35);
-        } else {
-          return Math.max(off - 90, Math.min(off * 0.5, 60));
-        }
-      } else {
-        if (nextOff > 0) {
-          return Math.min(-15, off + 130 - 35);
-        } else {
-          return Math.min(off + 90, Math.max(off * 0.5, -60));
-        }
-      }
+      const clipDir = (nextOff < off) ? -1 : 1;
+      const maxClip = Math.min(24, (g.passageHalfWidthM ?? 60) * 0.4);
+      return off + clipDir * maxClip;
     });
   }
 
@@ -74,6 +64,19 @@ export function createPilot() {
     return { x: center.x + center.nx * crossM, z: center.z + center.nz * crossM };
   }
 
+  function pathCurvatureAt(progressM) {
+    const ds = 40;
+    const p0 = pathPointAt(progressM - ds);
+    const p1 = pathPointAt(progressM);
+    const p2 = pathPointAt(progressM + ds);
+    const h1 = Math.atan2(p1.x - p0.x, -(p1.z - p0.z));
+    const h2 = Math.atan2(p2.x - p1.x, -(p2.z - p1.z));
+    let dh = h2 - h1;
+    while (dh > Math.PI) dh -= 2 * Math.PI;
+    while (dh < -Math.PI) dh += 2 * Math.PI;
+    return dh / ds;
+  }
+
   function project(x, z) {
     let best = null;
     const last = route.length - 2;
@@ -101,12 +104,19 @@ export function createPilot() {
     route = briefing.course?.route ?? [];
     gates = briefing.course?.gates ?? [];
     waypoints = briefing.course?.points ?? [];
-    cruise = 228;
+    cruise = 236;
     trimDeg = briefing.configuration?.pitchTrimDeg ?? 0;
     dt = briefing.decisionPeriodSeconds ?? 0.2;
     hint = 0;
     filteredVz = 0;
     previousPitch = previousRoll = previousHeight = null;
+    if (gates[0] && route.length) {
+      let bestD = Infinity;
+      for (let i = 0; i < route.length; i++) {
+        const d = Math.hypot(route[i].x - gates[0].x, route[i].z - gates[0].z);
+        if (d < bestD) { bestD = d; hint = i; }
+      }
+    }
     if (gates.length >= 2) knots = solveKnots();
     command = { elevator: 0, aileron: 0, rudder: 0, throttle: 0.35, brakes: 0 };
   }
@@ -130,8 +140,8 @@ export function createPilot() {
       const height = altitudeFt * 0.3048, vz = vsiFpm * 0.3048 / 60;
       const speed = Math.max(40, (read(s.tasKnots) ?? ias * 1.13) * 0.514444);
 
-      // Pure pursuit carrot guidance with 2.8s nominal lookahead
-      const lookDist = speed * 2.8;
+      // Pure pursuit carrot guidance with lookahead and path curvature feedforward
+      const lookDist = speed * 2.2;
       const carrot = pathPointAt(here.progressM + lookDist);
 
       const dx = carrot.x - ownX, dz = carrot.z - ownZ;
@@ -139,16 +149,19 @@ export function createPilot() {
       const carrotBearing = (Math.atan2(dx, -dz) / RAD + 360) % 360;
       const bearingError = signed(carrotBearing - heading);
 
-      const aLat = clamp(2 * speed * speed * Math.sin(bearingError * RAD) / carrotDist, -14.5, 14.5);
+      const ffAcc = speed * speed * pathCurvatureAt(here.progressM + speed * 1.4);
+      const fbAcc = 2 * speed * speed * Math.sin(bearingError * RAD) / carrotDist;
+      const aLat = clamp(ffAcc + fbAcc, -14.5, 14.5);
       const bankTarget = clamp(Math.atan(aLat / GRAVITY) / RAD, -58, 58);
 
       // Vertical equilibrium with terrain slope feedforward
       const terrainClimbRate = clamp(vz - (height - (previousHeight ?? height)) / dt, -10, 15);
       previousHeight = height;
 
-      const targetHeight = 65;
-      let desiredVz = clamp((targetHeight - height) * 0.5 + 0.8 * Math.max(0, terrainClimbRate), -9, 16);
-      desiredVz += (Math.abs(bankTarget) / 58) ** 2 * 3.5;
+      const targetHeight = 60;
+      let desiredVz = clamp((targetHeight - height) * 0.5 + 0.8 * Math.max(0, terrainClimbRate), -8, 16);
+      if (height < 35 && vz < 1) desiredVz = Math.max(desiredVz, (40 - height) * 0.8);
+      desiredVz += (Math.abs(bankTarget) / 58) ** 2 * 1.0;
       filteredVz += (desiredVz - filteredVz) * (1 - Math.exp(-dt / 0.35));
 
       const measuredPitchRate = read(s.pitchRateDegS) ?? (previousPitch === null ? 0 : (pitch - previousPitch) / dt);

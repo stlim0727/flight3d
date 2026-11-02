@@ -88,7 +88,7 @@ test('the middle of the valley is not the passage space', () => {
   const manifest = createSlalomManifest({ seed: 3 });
   const centred = fly(manifest, { cross: () => 0, agl: () => 90, rampM: 300 });
   assert.equal(centred.judge.reason, 'gate-missed');
-  assert.ok(Math.abs(manifest.course.gates[1].crossOffsetM) > 60,
+  assert.ok(Math.abs(manifest.course.gates[1].crossOffsetM) > manifest.course.gates[1].passageHalfWidthM,
     'a gate with no lateral demand proves nothing');
 });
 
