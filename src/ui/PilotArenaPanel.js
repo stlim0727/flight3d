@@ -94,7 +94,12 @@ export function installPilotArena(sim) {
         renderBoard();
         const missionLabel = find('mission').selectedOptions[0]?.textContent ?? '계곡 미션';
         const refreshed = formatPilotScoreData(shownOverlayRecord, missionLabel, { scoreboard, callsign: newCallsign });
+        const modal = scoreOverlay.querySelector('.pilot-score-modal');
+        const prevScroll = modal ? modal.scrollTop : scoreOverlay.scrollTop;
         scoreOverlay.innerHTML = scoreOverlayMarkup(refreshed);
+        const newModal = scoreOverlay.querySelector('.pilot-score-modal');
+        if (newModal) newModal.scrollTop = prevScroll;
+        else scoreOverlay.scrollTop = prevScroll;
       }
       return;
     }
@@ -250,6 +255,9 @@ export function installPilotArena(sim) {
           selectedRetryMode = record.pilotKind === 'ai' ? 'ai' : 'human';
           scoreOverlay.innerHTML = scoreOverlayMarkup(scoreData);
           scoreOverlay.hidden = false;
+          scoreOverlay.scrollTop = 0;
+          const modal = scoreOverlay.querySelector('.pilot-score-modal');
+          if (modal) modal.scrollTop = 0;
         }
       } else if (active) {
         scoreBanner.hidden = true;
