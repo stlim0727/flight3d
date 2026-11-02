@@ -5,6 +5,7 @@ import { excludeFromDeckShadow } from './CockpitLighting.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
 import { applyKoreanAirLivery } from './KoreanAirLivery.js';
+import { applyFlatShading } from '../config/renderQuality.js';
 
 /**
  * Boeing 737-800 Airliner 3D Model
@@ -19,6 +20,11 @@ export class Boeing737 {
     // Internal cockpit
     this.cockpit = new Cockpit(pfdCanvas, ndCanvas, eicasCanvas, mcpCanvas, isfdCanvas, cduCanvas);
     this.group.add(this.cockpit.group);
+    const prevOnModelReady = this.cockpit.onModelReady;
+    this.cockpit.onModelReady = () => {
+      prevOnModelReady?.();
+      if (this.flatShading) applyFlatShading(this.cockpit.group, true);
+    };
 
     // GLTF PBR High-Detail Model references
     this.gltfModel = null;
@@ -32,6 +38,7 @@ export class Boeing737 {
     this.loadingGltf = false;
     this.modelLoaded = false;
     this.isCockpit = false;
+    this.flatShading = false;
     this.gltfShadowProxy = null;
     this.proceduralShadowProxy = null;
 
@@ -1007,6 +1014,9 @@ export class Boeing737 {
           const originalAirframeGeometry = this.gltfModel.getObjectByName('B737')?.geometry;
           this.gltfControlSurfaces = bindGltfControlSurfaces(this.gltfModel);
           applyKoreanAirLivery(this.gltfModel, this.group, this.gltfGroup);
+          if (this.flatShading) {
+            applyFlatShading(this.gltfModel, true);
+          }
 
           // Turbine fan blades
           this.gltfFans = [];
@@ -1121,5 +1131,10 @@ export class Boeing737 {
       this.wingGroup.children[1].rotation.z = 0;
       this.wingGroup.children[1].rotation.x = 0;
     }
+  }
+
+  setFlatShading(flatShading) {
+    this.flatShading = Boolean(flatShading);
+    applyFlatShading(this.group, this.flatShading);
   }
 }

@@ -266,6 +266,7 @@ export default {
   "quality.balanced": "균형",
   "quality.performance": "성능 우선",
   "quality.ultraLow": "초저사양",
+  "quality.antialias.restart.hint": "하드웨어 안티앨리어싱 설정을 완전히 적용하려면 새로고침하세요",
   "help.close": "도움말 닫기",
   "ap.master": "AP",
   "ap.hdg": "HDG",

@@ -4,6 +4,7 @@ import { CESSNA_172 } from '../config/aircraftConfigs.js';
 import { gearSupportHeight, tireContact } from './gearVisualContact.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { applyFlatShading } from '../config/renderQuality.js';
 
 // Ground-handling assembly baked into c172.glb, which must never travel with the
 // aircraft: tie-down straps, their metal spreader bars and cables, the chock bar,
@@ -49,6 +50,7 @@ export class Cessna172 {
     this.isCockpit = false;
     this.isCrashed = false;
     this.lightsOn = true;
+    this.flatShading = false;
 
     // GLTF references
     this.gltfModel = null;
@@ -546,6 +548,10 @@ export class Cessna172 {
             }
           });
 
+          if (this.flatShading) {
+            applyFlatShading(this.gltfModel, true);
+          }
+
           this.cockpit.gltfYokes = [];
           this.cockpit.cockpitModelFailed = false;
           this.cockpit.gltfCockpitGroup = this.gltfModel;
@@ -793,5 +799,10 @@ export class Cessna172 {
     if (this.gltfGroup) {
       this.gltfGroup.visible = this.useGltf;
     }
+  }
+
+  setFlatShading(flatShading) {
+    this.flatShading = Boolean(flatShading);
+    applyFlatShading(this.group, this.flatShading);
   }
 }
