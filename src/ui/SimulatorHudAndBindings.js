@@ -600,6 +600,9 @@ class SimulatorHudAndBindingsMethods {
     document.getElementById('btn-crash-toggle')?.addEventListener('click', () => {
       this.setCrashReportMinimized(!this.isCrashReportMinimized);
     });
+    document.getElementById('btn-crash-report')?.addEventListener('click', () => {
+      this.openFeedbackDialog?.();
+    });
 
     const toggleYokes = () => {
       const visible = this.aircraft.cockpit.toggleYokes();

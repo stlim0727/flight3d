@@ -193,5 +193,6 @@ test('scoreOverlayMarkup includes clear retry, pilot mode choice, and return-to-
   assert.match(overlay, /data-score-mode="ai"/);
   assert.match(overlay, /data-score-retry/);
   assert.match(overlay, /data-score-close/);
+  assert.match(overlay, /data-score-report/);
   assert.match(overlay, /메인 메뉴/);
 });

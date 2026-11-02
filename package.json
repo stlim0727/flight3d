@@ -32,6 +32,7 @@
     "check": "node scripts/check-syntax.mjs && node scripts/check-workflow-actions.mjs"
   },
   "dependencies": {
+    "posthog-js": "^1.444.0",
     "three": "^0.186.0"
   },
   "devDependencies": {

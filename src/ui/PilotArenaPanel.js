@@ -11,6 +11,7 @@ import { ValleyScoreboard } from '../arena/ValleyScoreboard.js';
 import { valleyBriefingMarkup, valleyNavigationText } from './valleyNavigationView.js';
 import { bindPilotPanelInput } from './pilotPanelInput.js';
 import { formatPilotScoreData, scoreBannerMarkup, scoreOverlayMarkup, koreanReason } from './pilotScoreView.js';
+import { trackPilotModeChange, trackFlightEnd } from '../analytics/posthog.js';
 
 /** Opt-in local pilot lab. No remote upload and no security sandbox claims. */
 export function installPilotArena(sim) {
@@ -107,11 +108,16 @@ export function installPilotArena(sim) {
     const modeBtn = event.target.closest('[data-score-mode]');
     if (modeBtn) {
       selectedRetryMode = modeBtn.dataset.scoreMode;
+      trackPilotModeChange(selectedRetryMode, find('mission')?.value);
       for (const btn of scoreOverlay.querySelectorAll('[data-score-mode]')) {
         const active = btn.dataset.scoreMode === selectedRetryMode;
         btn.classList.toggle('active', active);
         btn.setAttribute('aria-checked', String(active));
       }
+      return;
+    }
+    if (event.target.closest('[data-score-report]')) {
+      sim.openFeedbackDialog?.();
       return;
     }
     if (event.target.closest('[data-score-retry]')) {
@@ -214,6 +220,15 @@ export function installPilotArena(sim) {
         const attempt = scoreboard.add(record, { callsign: scoreboard.getSavedCallsign() });
         record.id = attempt?.id;
         renderBoard(attempt?.comparisonKey);
+        trackFlightEnd({
+          airport: sim.activeAirport,
+          aircraft: sim.currentAircraftId,
+          scenario: 'valley-slalom-v1',
+          reason: record.status === 'succeeded' ? 'completed' : record.reason || record.status,
+          durationSeconds: record.tick / 120,
+          score: record.result?.metrics?.finalScore,
+          gatesCleared: record.result?.metrics?.completedGates,
+        });
       }
 
       const missionLabel = find('mission').selectedOptions[0]?.textContent ?? '계곡 미션';
