@@ -64,6 +64,68 @@ export function bridgeLampX(bridge) {
   return Array.from({ length: 2 * n + 1 }, (_, i) => (i - n) * 55);
 }
 
+// Approach ramps (#429): past each deck end the road descends at `grade` to the bank, so
+// the 40 m deck meets the ground instead of stopping in the air. A game choice, like the
+// deck height. The ramp is a `slab` on columns every `columnSpacing`; where less than
+// `clearance` would stay beneath it, a retained embankment carries it to the bank.
+export const APPROACH = { grade: 0.06, slab: 4, step: 10, columnSpacing: 40, clearance: 6, parapet: 1.1 };
+
+// World [x, z] of a bridge-local point.
+export function bridgeToWorld(bridge, x, z = 0) {
+  const c = Math.cos(bridge.yaw), s = Math.sin(bridge.yaw);
+  return [bridge.x + x * c + z * s, bridge.z - x * s + z * c];
+}
+
+// Each deck end's ramp along bridge-local X: `side` ±1, from the deck end `start` for
+// `length` metres down to the bank height `ground`. top(x) is the road surface.
+export function bridgeApproaches(bridge) {
+  return [-1, 1].map(side => {
+    const start = side * bridge.length / 2;
+    let ground = hangangHeight(...bridgeToWorld(bridge, start)), length = 0;
+    // The bank height at the foot sets the length; settle the two together.
+    for (let i = 0; i < 4; i++) {
+      length = (40 - ground) / APPROACH.grade;
+      ground = hangangHeight(...bridgeToWorld(bridge, start + side * length));
+    }
+    return { side, start, length, ground,
+      top: x => 40 - APPROACH.grade * Math.max(0, Math.min(length, side * (x - start))) };
+  });
+}
+
+// The ramp in `step` lengths, x0 uphill and x1 downhill, with road heights top0/top1 and
+// soffit heights bottom0/bottom1. On the embankment the bottom lies flat below the bank.
+export function approachSegments(ramp) {
+  const segments = [];
+  for (let s = 0; s < ramp.length - 1e-6; s += APPROACH.step) {
+    const x0 = ramp.start + ramp.side * s, x1 = ramp.start + ramp.side * Math.min(ramp.length, s + APPROACH.step);
+    const top0 = ramp.top(x0), top1 = ramp.top(x1);
+    const fill = top1 - APPROACH.slab - ramp.ground < APPROACH.clearance;
+    segments.push({ x0, x1, top0, top1, fill,
+      bottom0: fill ? ramp.ground - 1 : top0 - APPROACH.slab, bottom1: fill ? ramp.ground - 1 : top1 - APPROACH.slab });
+  }
+  return segments;
+}
+
+// Columns from the deck end down the elevated part; lamps continue the deck's 55 m rhythm.
+function approachColumnX(ramp) {
+  const out = [];
+  for (let s = 0; ramp.top(ramp.start + ramp.side * s) - APPROACH.slab - ramp.ground >= APPROACH.clearance; s += APPROACH.columnSpacing) out.push(ramp.start + ramp.side * s);
+  return out;
+}
+function approachLampX(ramp) {
+  const out = [];
+  for (let s = 30; s <= ramp.length - 30; s += 55) out.push(ramp.start + ramp.side * s);
+  return out;
+}
+
+// A streetlight standing on the road at `base`: a pole and a lamp head.
+function lampBoxes(x, base, z) {
+  return [
+    { part: 'lamp', material: 'concrete', center: [x, base + 1.8, z], size: [0.3, 3.5, 0.3] },
+    { part: 'lamp', material: 'light', center: [x, base + 3.6, z], size: [0.6, 0.4, 0.6] },
+  ];
+}
+
 // Bridge-local [x, y, z] of an arch rib's centreline, t = 0..1 from one foot to the other.
 // Ribs stand 2 m inside a deck edge (`edge` = ±1); leaning ribs close by `crownInset`.
 export function archCentre(arch, deck, edge, t) {
@@ -80,7 +142,7 @@ export function bridgeOpening(bridge) {
 
 // Local bridge X spans the river, Z crosses the decks.
 export function bridgeSolids(bridge) {
-  const boxes = [], length = bridge.length;
+  const boxes = [], length = bridge.length, approaches = bridgeApproaches(bridge);
   for (const deck of bridge.decks) {
     const { z, width } = deck, half = width / 2;
     boxes.push({ part: 'deck', center: [0, 38, z], size: [length, 4, width] });
@@ -96,9 +158,22 @@ export function bridgeSolids(bridge) {
     for (const edge of [-1, 1]) boxes.push({ part: 'rail', center: [0, 41, z + edge * half], size: [length, 2, 0.4] });
     // Deck streetlights: a pole and a lamp head, drawn and collided as these boxes.
     for (const x of bridgeLampX(bridge)) {
-      for (const edge of [-1, 1]) {
-        boxes.push({ part: 'lamp', material: 'concrete', center: [x, 41.8, z + edge * (half - 1.5)], size: [0.3, 3.5, 0.3] });
-        boxes.push({ part: 'lamp', material: 'light', center: [x, 43.6, z + edge * (half - 1.5)], size: [0.6, 0.4, 0.6] });
+      for (const edge of [-1, 1]) boxes.push(...lampBoxes(x, 40, z + edge * (half - 1.5)));
+    }
+    // Approach ramps: one box per slab segment bounds the sloped slab, road and parapets
+    // drawn inside it; columns and streetlights are drawn and collided as these boxes.
+    for (const ramp of approaches) {
+      for (const s of approachSegments(ramp)) {
+        const low = Math.min(s.bottom0, s.bottom1), high = Math.max(s.top0, s.top1) + APPROACH.parapet;
+        boxes.push({ part: 'approach', render: false, center: [(s.x0 + s.x1) / 2, (low + high) / 2, z],
+          size: [Math.abs(s.x1 - s.x0), high - low, width] });
+      }
+      for (const x of approachColumnX(ramp)) {
+        const foot = ramp.ground - 1, soffit = ramp.top(x) - APPROACH.slab;
+        boxes.push({ part: 'pier', center: [x, (foot + soffit) / 2, z], size: [3, soffit - foot, width - 8] });
+      }
+      for (const x of approachLampX(ramp)) {
+        for (const edge of [-1, 1]) boxes.push(...lampBoxes(x, ramp.top(x), z + edge * (half - 1.5)));
       }
     }
     // Arch ribs are drawn through the same rings these boxes are built from: each box

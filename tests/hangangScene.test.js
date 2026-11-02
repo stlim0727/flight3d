@@ -1,6 +1,8 @@
 import test from 'node:test';
-import { Box3, Matrix4, Vector3 } from 'three';
-import { HANGANG_COURSE, bridgeLampX, bridgeOpening, bridgeSolids } from '../src/config/hangangCourse.js';
+import { readFileSync } from 'node:fs';
+import { Box3, Matrix4, Quaternion, Vector3 } from 'three';
+import { APPROACH, HANGANG_COURSE, bridgeApproaches, bridgeLampX, bridgeOpening, bridgeSolids, bridgeToWorld, hangangHeight } from '../src/config/hangangCourse.js';
+import { readGlbTriangles } from '../scripts/lib/nodeul-pavilion-heights.mjs';
 import { HangangCollision } from '../src/director/HangangCollision.js';
 import assert from 'node:assert/strict';
 import { HangangScene } from '../src/environment/HangangScene.js';
@@ -114,10 +116,11 @@ test('bridges draw their collision solids in five merged meshes', () => {
     const key = p => p.toArray().map(v => v.toFixed(3)).join();
     const drawn = new Set(triangles.flatMap(t => t.points.map(key)));
     const solids = bridgeSolids(spec).map(s => ({ ...s, box: new Box3().setFromCenterAndSize(new Vector3(...s.center), new Vector3(...s.size)) }));
-    // Every solid except the railing and arch envelopes is drawn as exactly that box,
-    // deck lamps included (#395).
-    assert.equal(solids.filter(s => s.part === 'lamp').length, bridgeLampX(spec).length * 4 * spec.decks.length, spec.id);
-    for (const { part, box } of solids.filter(s => s.part !== 'rail' && s.part !== 'arch')) {
+    // Every solid except the railing, arch and approach envelopes is drawn as exactly
+    // that box, deck lamps included (#395).
+    const deckLamps = solids.filter(s => s.part === 'lamp' && Math.abs(s.center[0]) <= spec.length / 2);
+    assert.equal(deckLamps.length, bridgeLampX(spec).length * 4 * spec.decks.length, spec.id);
+    for (const { part, box } of solids.filter(s => s.part !== 'rail' && s.render !== false)) {
       for (let corner = 0; corner < 8; corner++) {
         const p = new Vector3(corner & 1 ? box.max.x : box.min.x, corner & 2 ? box.max.y : box.min.y, corner & 4 ? box.max.z : box.min.z);
         assert.ok(drawn.has(key(p)), `${spec.id} ${part} corner ${p.toArray()}`);
@@ -139,6 +142,53 @@ test('bridges draw their collision solids in five merged meshes', () => {
     assert.ok(tube.length > 1000 && Math.abs(Math.max(...arches.map(b => b.max.y)) - crown) < 0.01, spec.id);
     for (const { points } of tube) assert.ok(arches.some(b => points.every(p => b.containsPoint(p))), `${spec.id} arch ${points[0].toArray()}`);
   });
+});
+
+test('approach ramps carry every deck end down to the bank (#429)', () => {
+  for (const bridge of HANGANG_COURSE.bridges) {
+    const approaches = bridgeApproaches(bridge);
+    assert.deepEqual(approaches.map(a => a.side), [-1, 1], bridge.id);
+    for (const a of approaches) {
+      const end = a.start + a.side * a.length;
+      assert.equal(a.start, a.side * bridge.length / 2, bridge.id);
+      assert.equal(a.top(a.start), 40, bridge.id);
+      assert.ok(Math.abs(a.top(end) - hangangHeight(...bridgeToWorld(bridge, end))) < 0.05, `${bridge.id} ${a.side}`);
+      assert.ok((40 - a.top(end)) / a.length <= APPROACH.grade + 1e-9, `${bridge.id} ${a.side}`);
+    }
+  }
+});
+
+test('approach ramps are drawn inside their collision solids up to the bank (#429)', () => {
+  const scene = new HangangScene();
+  HANGANG_COURSE.bridges.forEach((spec, i) => {
+    const solids = bridgeSolids(spec).map(s => new Box3().setFromCenterAndSize(new Vector3(...s.center), new Vector3(...s.size)).expandByScalar(1e-3));
+    const ramps = bridgeTriangles(scene.bridges[i]).filter(t => t.points.every(p => Math.abs(p.x) > spec.length / 2 + 1e-3));
+    assert.ok(ramps.length > 0, spec.id);
+    for (const { mesh, points } of ramps) assert.ok(solids.some(b => points.every(p => b.containsPoint(p))), `${mesh} triangle at ${points[0].toArray()}`);
+    // The ramp road runs on from the deck road to the far end of each approach.
+    const road = ramps.filter(t => t.mesh.endsWith(' road')).flatMap(t => t.points);
+    for (const a of bridgeApproaches(spec)) {
+      const reach = Math.max(...road.map(p => a.side * p.x));
+      assert.ok(Math.abs(reach - Math.abs(a.start) - a.length) < 0.01, `${spec.id} ${a.side} road ends at ${reach}`);
+    }
+  });
+});
+
+test('landmark models leave the approach ramps clear (#429)', () => {
+  const models = ['yeouido-landmarks', 'namsan-tower', 'lotte-tower']
+    .map(name => [name, readGlbTriangles(readFileSync(`public/models/hangang/${name}.glb`))]);
+  for (const bridge of HANGANG_COURSE.bridges) {
+    const toLocal = new Matrix4().compose(new Vector3(bridge.x, 0, bridge.z),
+      new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), bridge.yaw), new Vector3(1, 1, 1)).invert();
+    const ramp = bridgeSolids(bridge).filter(s => Math.abs(s.center[0]) > bridge.length / 2)
+      .map(s => new Box3().setFromCenterAndSize(new Vector3(...s.center), new Vector3(...s.size)));
+    for (const [name, triangles] of models) {
+      for (const points of triangles) {
+        const box = new Box3().setFromPoints(points.map(p => p.clone().applyMatrix4(toLocal)));
+        assert.ok(!ramp.some(r => r.intersectsBox(box)), `${name} pierces the ${bridge.id} approach at ${points[0].toArray()}`);
+      }
+    }
+  }
 });
 
 test('Nodeulseom stand-ins show the solids HangangCollision collides with before GLBs load', async () => {

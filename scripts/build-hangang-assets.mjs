@@ -5,7 +5,7 @@ import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { HANGANG_COURSE } from '../src/config/hangangCourse.js';
+import { HANGANG_COURSE, bridgeApproaches, bridgeOpening } from '../src/config/hangangCourse.js';
 import { pavilionMatrix } from '../src/environment/nodeulPavilion.js';
 import { bakePavilionHeights, readGlbTriangles } from './lib/nodeul-pavilion-heights.mjs';
 
@@ -39,6 +39,19 @@ async function exportGLB(group, filename) {
     bytes: bytes.byteLength,
     bounds: computeBounds(group),
   };
+}
+
+// Whether a building of footprint `radius` at world (x, z) stays 15 m clear of every
+// bridge's approach ramps (#429), tested in bridge-local terms.
+function clearOfApproaches(x, z, radius) {
+  return HANGANG_COURSE.bridges.every(bridge => {
+    const c = Math.cos(bridge.yaw), s = Math.sin(bridge.yaw), dx = x - bridge.x, dz = z - bridge.z;
+    const lx = dx * c - dz * s, lz = dx * s + dz * c, halfDepth = bridgeOpening(bridge).halfDepth + 15;
+    return bridgeApproaches(bridge).every(ramp => {
+      const a = Math.min(ramp.start, ramp.start + ramp.side * ramp.length), b = Math.max(ramp.start, ramp.start + ramp.side * ramp.length);
+      return lx + radius < a || lx - radius > b || Math.abs(lz) - radius > halfDepth;
+    });
+  });
 }
 
 // 1. Yeouido Landmarks (63 Building, Parc.1, IFC, National Assembly, LG Twin Towers, skyline)
@@ -183,7 +196,8 @@ function buildYeouidoModel() {
   {
     const lg = new THREE.Group();
     lg.name = 'LG_Twin_Towers';
-    lg.position.set(740, 0, -50);
+    // South of Seogang's east approach ramp (#429).
+    lg.position.set(740, 0, -65);
     for (const oz of [-20, 20]) {
       const tower = new THREE.Mesh(new THREE.BoxGeometry(28, 144, 28), darkGlassMat);
       tower.position.set(0, 72, oz);
@@ -207,6 +221,7 @@ function buildYeouidoModel() {
       const h = 45 + ((i * 47) % 115);
       const w = 26 + (i % 16);
       const d = 24 + ((i * 7) % 18);
+      if (!clearOfApproaches(x, z, Math.hypot(w, d) / 2)) continue;
 
       const geo = new THREE.BoxGeometry(w, h, d);
       geo.translate(x, h / 2, z);

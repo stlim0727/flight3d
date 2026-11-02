@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Vector3, Quaternion, Scene, Box3, Euler, Matrix4 } from 'three';
 import { HangangCollision } from '../src/director/HangangCollision.js';
 import { HangangScenario } from '../src/director/HangangScenario.js';
-import { HANGANG_COURSE as course, riverCenter } from '../src/config/hangangCourse.js';
+import { HANGANG_COURSE as course, bridgeApproaches, riverCenter } from '../src/config/hangangCourse.js';
 import { lobbyBriefing } from '../src/ui/lobbyBriefing.js';
 import { setLanguage, t } from '../src/i18n/index.js';
 
@@ -35,6 +35,13 @@ test('thin deck, wing and fin contacts are detected between frames', () => {
     const contact = step(collision, x, y, -30);
     assert.equal(contact.bridge, 'seogang'); assert.ok(contact.aircraftPart);
   }
+});
+test('approach ramps past the deck ends are solid (#429)', () => {
+  // 100 m down Seogang's east ramp, crossing the road below and above its surface.
+  const east = bridgeApproaches(course.bridges[0])[1], x = east.start + 100, top = east.top(x);
+  const cross = y => { const collision = new HangangCollision(); step(collision, x, y, 40); return step(collision, x, y, -40); };
+  assert.equal(cross(top - 2)?.structure, 'approach');
+  assert.equal(cross(top + 8), null);
 });
 // Flies Hangang Bridge's main span along its own axis, `offset` metres across the river.
 function islandPass(height, offset = 0) {
