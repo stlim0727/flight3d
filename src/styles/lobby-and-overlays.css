@@ -274,13 +274,13 @@ body[data-flow="lobby"] .menu-toggle {
   border-color: #38bdf8;
 }
 .menu-toggle.is-open .menu-toggle-glyph:empty::before {
-  content: '✕';
-  display: block;
+  content: '↩';
+  display: inline-block;
   width: auto;
   height: auto;
   background: transparent;
   box-shadow: none;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1;
 }
