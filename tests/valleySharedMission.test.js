@@ -1,24 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MissionRunner } from '../src/arena/MissionRunner.js';
-import { ValleyMissionAdapter } from '../src/arena/ValleyMissionAdapter.js';
-import { ValleyMission } from '../src/arena/ValleyMission.js';
+import { SlalomMissionAdapter } from '../src/arena/SlalomMissionAdapter.js';
+import { SlalomMission } from '../src/arena/SlalomMission.js';
 import { ValleyScoreboard, valleyAttempt } from '../src/arena/ValleyScoreboard.js';
 import { PilotPerception } from '../src/pilot/PilotPerception.js';
 import { PilotHost } from '../src/pilot/PilotHost.js';
 import { validatePlainData } from '../src/pilot/PilotProtocol.js';
-import { valleyPilotSource } from '../src/pilot/examples/valley.js';
-import { createValleySimulation } from './helpers/valleyFlight.js';
+import { valleySlalomPilotSource } from '../src/pilot/examples/valleySlalom.js';
+import { createSlalomSimulation } from './helpers/slalomFlight.js';
 import { PilotThreadWorker } from './helpers/pilotThreadWorker.js';
 import { valleyNavigationText } from '../src/ui/valleyNavigationView.js';
 
 test('isolated Worker completes F16 valley on production physics with bounded observations and 24 tick delay', async () => {
-  const sim = createValleySimulation();
-  const runner = new MissionRunner(new ValleyMissionAdapter(sim), {
+  const sim = createSlalomSimulation(1);
+  const runner = new MissionRunner(new SlalomMissionAdapter(sim), {
     hostFactory: () => new PilotHost({ workerFactory: () => new PilotThreadWorker(),
       startupTimeoutMs: 5000, tickTimeoutMs: 1000 }), yieldFrame: async () => {},
   });
-  const record = await runner.start(valleyPilotSource, { missionId: 'valley-low-v1', seed: 1 });
+  const record = await runner.start(valleySlalomPilotSource, { missionId: 'valley-slalom-v1', seed: 1 });
   assert.equal(record.status, 'succeeded', `${record.reason}: ${record.detail}`);
   assert.equal(record.result.metrics.completedGates, 6);
   assert.ok(record.commands.length > 100);
@@ -32,9 +32,9 @@ test('isolated Worker completes F16 valley on production physics with bounded ob
 });
 
 test('human inputs own the same production steps; holds freeze ticks, abort releases, restart resets navigation', async () => {
-  const sim = createValleySimulation();
+  const sim = createSlalomSimulation(3);
   let held = false, holdCount = 0;
-  const adapter = new ValleyMissionAdapter(sim);
+  const adapter = new SlalomMissionAdapter(sim);
   const runner = new MissionRunner(adapter, {
     hostFactory: () => { throw new Error('Human must not start a Worker'); },
     canAdvance: () => !held,
@@ -55,7 +55,7 @@ test('human inputs own the same production steps; holds freeze ticks, abort rele
   });
   for (let i = 0; i < 2; i++) {
     holdCount = 0;
-    const record = await runner.start('ignored', { pilotKind: 'human', missionId: 'valley-low-v1', seed: 3 });
+    const record = await runner.start('ignored', { pilotKind: 'human', missionId: 'valley-slalom-v1', seed: 3 });
     assert.equal(record.status, 'aborted', record.detail);
     assert.equal(record.reason, 'preset-changed');
     assert.equal(record.tick, 48);
@@ -71,12 +71,12 @@ test('human inputs own the same production steps; holds freeze ticks, abort rele
 });
 
 test('human and AI navigation share exact seeded measurements, gate transition and final destination', async () => {
-  const sim = createValleySimulation(), adapter = new ValleyMissionAdapter(sim);
+  const sim = createSlalomSimulation(4), adapter = new SlalomMissionAdapter(sim);
   const { manifest } = await adapter.prepare({ seed: 4 });
-  const evaluator = new ValleyMission(manifest);
+  const evaluator = new SlalomMission(manifest);
   const human = new PilotPerception({ sensorSeed: 4 }), ai = new PilotPerception({ sensorSeed: 4 });
   for (const [tick, index] of [[0, 1], [24, 2], [48, 6]]) {
-    evaluator.nextGateIndex = index;
+    evaluator.gate = index;
     const snapshot = adapter.snapshot(tick);
     const a = adapter.observe(human, snapshot, tick, evaluator).navigation;
     const b = adapter.observe(ai, snapshot, tick, evaluator).navigation;
@@ -88,13 +88,13 @@ test('human and AI navigation share exact seeded measurements, gate transition a
     if (index === 6) assert.ok(Math.abs(a.goalRangeM.mean - a.finishRangeM.mean) < 300);
   }
   await adapter.prepare({ seed: 4 });
-  const initial = adapter.observe(new PilotPerception({ sensorSeed: 4 }), adapter.snapshot(0), 0, new ValleyMission(manifest));
+  const initial = adapter.observe(new PilotPerception({ sensorSeed: 4 }), adapter.snapshot(0), 0, new SlalomMission(manifest));
   assert.equal(initial.navigation.currentGateIndex, 1);
   adapter.release();
 });
 
 test('local scoreboard preserves failed and aborted attempts with null scores and separates comparison conditions', async () => {
-  const sim = createValleySimulation(), adapter = new ValleyMissionAdapter(sim);
+  const sim = createSlalomSimulation(1), adapter = new SlalomMissionAdapter(sim);
   const { manifest } = await adapter.prepare({ seed: 1 });
   const record = { manifest, pilotKind: 'human', status: 'succeeded', reason: 'completed', tick: 6000,
     sensorSeed: 1, noiseEnabled: true, sourceHash: null,

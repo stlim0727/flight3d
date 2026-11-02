@@ -4,7 +4,7 @@ import { MissionRunner } from '../arena/MissionRunner.js';
 import { PilotMissionAdapter } from '../arena/PilotMissionAdapter.js';
 import takeoffSource from '../pilot/examples/takeoff.js?raw';
 import landingSource from '../pilot/examples/landing.js?raw';
-import valleySource from '../pilot/examples/valley.js?raw';
+import valleySlalomSource from '../pilot/examples/valleySlalom.js?raw';
 import { resolvePilotCase } from '../config/pilotCases.js';
 import { createRealtimePacer } from '../arena/realtimePacer.js';
 import { ValleyScoreboard } from '../arena/ValleyScoreboard.js';
@@ -22,8 +22,8 @@ export function installPilotArena(sim) {
   shell.innerHTML = `<summary><span>Pilot · <span data-compact-status>대기 중</span></span><span data-toggle-label>최소화</span></summary>
     <div data-score-banner class="pilot-score-banner" hidden></div>
     <p>본인이 신뢰하는 코드만 실행하세요. 예제는 제한된 물리 테스트를 통과한 실험용이며 결과는 로컬 비랭킹입니다.</p>
-    <label>미션 <select data-mission><option value="takeoff-basic-v1">이륙</option><option value="landing-basic-v1">착륙</option><option value="valley-low-v1">F-16 루클라 계곡 로우패스 (고속·저공)</option></select></label>
-    <label>조종 <select data-kind><option value="ai">AI</option><option value="human">사람 · F-16 계곡 로우패스</option></select></label>
+    <label>미션 <select data-mission><option value="takeoff-basic-v1">이륙</option><option value="landing-basic-v1">착륙</option><option value="valley-slalom-v1">F-16 가상 계곡 슬라롬 (시드 기반 저공)</option></select></label>
+    <label>조종 <select data-kind><option value="ai">AI</option><option value="human">사람 · F-16 가상 계곡 슬라롬</option></select></label>
     <details data-briefing hidden><summary>미션 브리핑 · 항로 지도</summary>${valleyBriefingMarkup()}</details>
     <label>환경 <select data-environment><option value="mild-disturbance-v1">약한 측풍·돌풍</option><option value="calm-debug-v1">무풍 · 디버깅</option></select></label>
     <label>시드 <input data-seed type="number" min="0" step="1" value="1"></label>
@@ -271,14 +271,22 @@ export function installPilotArena(sim) {
       find('plot').querySelector('polyline').setAttribute('points', points);
     },
   });
-  const loadExample = () => { source.value = find('mission').value === 'valley-low-v1' ? valleySource : find('mission').value.startsWith('landing') ? landingSource : takeoffSource; };
+  const isValleyMission = val => val === 'valley-slalom-v1' || val === 'valley-low-v1' || val === 'valley';
+  const loadExample = () => { source.value = isValleyMission(find('mission').value) ? valleySlalomSource : find('mission').value.startsWith('landing') ? landingSource : takeoffSource; };
   const syncMode = () => {
     const human = find('kind').value === 'human';
-    if (human) find('mission').value = 'valley-low-v1';
-    find('briefing').hidden = find('mission').value !== 'valley-low-v1';
+    if (human) find('mission').value = 'valley-slalom-v1';
+    find('briefing').hidden = !isValleyMission(find('mission').value);
     if (human) { find('briefing').open = true; find('playback').value = 'realtime'; }
     for (const name of ['playback', 'source', 'example', 'file']) find(name).disabled = human;
   };
+  find('seed').addEventListener('input', () => {
+    const seed = Number(find('seed').value) || 1;
+    const briefingEl = find('briefing');
+    if (briefingEl) {
+      briefingEl.innerHTML = `<summary>미션 브리핑 · 항로 지도</summary>${valleyBriefingMarkup(seed)}`;
+    }
+  });
   find('kind').addEventListener('change', () => { hideScoreOverlay(); find('score-banner').hidden = true; syncMode(); loadExample(); });
   find('mission').addEventListener('change', () => { hideScoreOverlay(); find('score-banner').hidden = true; syncMode(); loadExample(); });
   find('example').addEventListener('click', loadExample);

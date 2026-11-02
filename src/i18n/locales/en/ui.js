@@ -308,7 +308,7 @@ export default {
   "lobby.briefing.scenario.approach": "On final approach, gear and flaps down.",
   "lobby.briefing.scenario.cruise": "Cruising high above the terrain.",
   "lobby.briefing.scenario.cliff": "Downhill takeoff run from the cliff-top end (Rwy 24).",
-  "lobby.briefing.scenario.valley": "F-16 Lukla Valley Low-Pass Slalom: 20m target AGL and 550-600 KT high speed challenge through 6 canyon gates.",
+  "lobby.briefing.scenario.valley": "F-16 Virtual Valley Low-Pass Slalom: Low-altitude, high-speed challenge through procedural canyon slalom gates.",
   "lobby.briefing.scenario.demo": "Sit back: the cinematic demo flight flies itself; press Esc to take control.",
   "valley.slalom.title": "⚡ Valley Low-Pass Slalom (550-600 KT)",
   "valley.mode.label": "Pilot Control Mode",
