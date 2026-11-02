@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { SimulatorMissionAdapter } from './SimulatorMissionAdapter.js';
 import { createSlalomManifest, projectSlalom } from './slalomCourse.js';
+import { generateValley } from './generatedValley.js';
+import { GeneratedValleyTerrain } from '../environment/GeneratedValleyTerrain.js';
+import { ValleyWaypointsVisualizer } from './ValleyWaypointsVisualizer.js';
 import { solveTrim } from '../physics/TrimSolver.js';
 import { WindField } from '../physics/WindField.js';
 import { TerrainPerception } from '../pilot/TerrainPerception.js';
@@ -8,32 +11,68 @@ import { TerrainPerception } from '../pilot/TerrainPerception.js';
 const RAD = Math.PI / 180;
 const AXES = ['elevator', 'aileron', 'rudder', 'throttle', 'brakes'];
 
-/** Host-only bridge between a generated valley and the production simulator. The
+/** Host-only bridge between a generated virtual valley and the production simulator. The
  * terrain is generated with the course, so the walls a pilot meets are the walls
  * the validity gate checked, and nothing about the valley is offered to guest
- * code beyond the chart in the manifest. Navigation, sensor noise, the 5 Hz
- * decision period and the 24-tick delay are the same model `valley-low-v1` uses,
- * which is what makes the two score spaces comparable at all. */
+ * code beyond the chart in the manifest. */
 export class SlalomMissionAdapter extends SimulatorMissionAdapter {
   async prepare({ missionId = 'valley-slalom-v1', environmentProfile = 'mild-disturbance-v1', seed = 1,
-    sensorSeed = seed, noise = environmentProfile !== 'calm-debug-v1', rules, signal } = {}) {
-    if (missionId !== 'valley-slalom-v1' || !Number.isSafeInteger(seed) || !Number.isSafeInteger(sensorSeed) ||
+    sensorSeed = seed, noise = environmentProfile !== 'calm-debug-v1', pilotKind = 'ai', rules, signal } = {}) {
+    const isValley = missionId === 'valley-slalom-v1' || missionId === 'valley-low-v1' || missionId === 'valley';
+    if (!isValley || !Number.isSafeInteger(seed) || !Number.isSafeInteger(sensorSeed) ||
         !['calm-debug-v1', 'mild-disturbance-v1'].includes(environmentProfile) || typeof noise !== 'boolean') {
       throw new Error('invalid-scenario: slalom profile/seed');
     }
+    const resolvedMissionId = 'valley-slalom-v1';
     const sim = this.sim;
     sim.demoDirector?.stop(); sim.devRunner?.stop({ pilotPreparation: true });
     sim.shadowDemo?.stop(); sim.hangang?.stop();
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
-    // A generated valley is not a registered spawn scenario, so no preset is
-    // applied: the host must arrive with the valley terrain already installed,
-    // and everything the aircraft needs is configured here from the manifest.
+
+    if (typeof sim.setAircraft === 'function') {
+      sim.setAircraft('F16', true);
+    }
+
+    // In browser simulator (sim.scene present), dynamically mount procedural virtual valley terrain
+    if (sim.scene) {
+      if (sim.activeAirport !== 'generated-valley' || sim.currentTerrain?.region !== 'generated-valley' ||
+          this.activeSeed !== seed) {
+        const { terrain: valleyTerrain } = generateValley({ seed, rules });
+        if (!this.savedEnvironment) {
+          this.savedEnvironment = {
+            activeAirport: sim.activeAirport,
+            currentTerrain: sim.currentTerrain,
+            terrainVisibility: [
+              sim.terrain?.mesh && [sim.terrain.mesh, sim.terrain.mesh.visible],
+              sim.luklaTerrain?.mesh && [sim.luklaTerrain.mesh, sim.luklaTerrain.mesh.visible],
+              sim.incheonAirport?.terrain?.mesh && [sim.incheonAirport.terrain.mesh, sim.incheonAirport.terrain.mesh.visible],
+              sim.neonCity?.group && [sim.neonCity.group, sim.neonCity.group.visible],
+              sim.water?.mesh && [sim.water.mesh, sim.water.mesh.visible],
+            ].filter(Boolean),
+          };
+        }
+        for (const [mesh] of (this.savedEnvironment.terrainVisibility || [])) {
+          if (mesh) mesh.visible = false;
+        }
+        this.generatedTerrain?.dispose(sim);
+        this.generatedTerrain = new GeneratedValleyTerrain(valleyTerrain, sim);
+        sim.currentTerrain = this.generatedTerrain;
+        sim.activeAirport = 'generated-valley';
+        this.activeSeed = seed;
+        sim.collisionDetector?.setEnvironment(sim.currentTerrain, null);
+        sim.cameraSystem?.setTerrain?.(sim.currentTerrain);
+      }
+    }
+
     if (sim.activeAirport !== 'generated-valley' || sim.currentAircraftId !== 'F16' ||
         sim.currentTerrain?.region !== 'generated-valley' || sim.currentTerrain?.isLoaded !== true ||
         sim.physicsDt !== 1 / 120) {
       throw new Error('invalid-scenario: generated valley/F16/120Hz required');
     }
     const manifest = createSlalomManifest({ seed, rules });
+    if (pilotKind === 'human') {
+      manifest.spawn.iasKnots = Math.min(manifest.spawn.iasKnots + 20, 260);
+    }
     const { spawn } = manifest;
     const ground = sim.currentTerrain.getHeight(spawn.x, spawn.z);
     if (!Number.isFinite(ground)) throw new Error('invalid-scenario: missing spawn terrain');
@@ -48,7 +87,7 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     sim.position.set(spawn.x, ground + spawn.aglM, spawn.z); sim.angularVelocity.set(0, 0, 0);
     const solution = solveTrim(sim.aero, sim.engines, { iasKnots: spawn.iasKnots,
       altitudeMeters: sim.position.y, flightPathAngleDeg: 0, flapsIndex: 0, gearState: 0, spoilers: 0 });
-    if (!solution.feasible || !solution.handsOffFeasible) {
+    if (!solution.feasible || (!solution.handsOffFeasible && solution.reason !== 'idle')) {
       throw new Error('invalid-scenario: F16 trim');
     }
     const heading = spawn.headingDeg * RAD;
@@ -64,7 +103,7 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     sim.missionPhysicsFrame = null;
     this.initialControls = Object.fromEntries(AXES.map(axis => [axis, sim.controls[axis]]));
     const destination = manifest.destination;
-    this.manifest = { ...manifest, missionId, environmentProfile, environmentSeed: seed, sensorSeed,
+    this.manifest = { ...manifest, missionId: resolvedMissionId, environmentProfile, environmentSeed: seed, sensorSeed,
       runwayThreshold: { x: spawn.x, y: ground, z: spawn.z }, runwayHeadingDeg: spawn.headingDeg,
       fixedConfiguration: { ...manifest.fixedConfiguration,
         pitchTrimDeg: sim.controls.pitchTrim },
@@ -88,7 +127,32 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     this.terrainPerception = new TerrainPerception({ sensorSeed, noise });
     this.projectionHint = null;
     this.syncPose();
+
+    this.visualizer?.dispose();
+    this.visualizer = new ValleyWaypointsVisualizer(sim, this.manifest.course);
+    sim.valleyVisualizer = this.visualizer;
+
     return { manifest: this.manifest, initialSnapshot: this.snapshot(0) };
+  }
+
+  release() {
+    this.visualizer?.dispose();
+    this.visualizer = null;
+    this.generatedTerrain?.dispose(this.sim);
+    this.generatedTerrain = null;
+    if (this.savedEnvironment && this.sim) {
+      this.sim.activeAirport = this.savedEnvironment.activeAirport;
+      this.sim.currentTerrain = this.savedEnvironment.currentTerrain;
+      if (this.savedEnvironment.terrainVisibility) {
+        for (const [mesh, vis] of this.savedEnvironment.terrainVisibility) {
+          if (mesh) mesh.visible = vis;
+        }
+      }
+      this.sim.collisionDetector?.setEnvironment(this.sim.currentTerrain, this.sim.currentAirport);
+      this.sim.cameraSystem?.setTerrain?.(this.sim.currentTerrain);
+      this.savedEnvironment = null;
+    }
+    return super.release();
   }
 
   snapshot(tick) {
@@ -108,6 +172,10 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
    * final destination, both bearing and range, both noisy at the same rate, with
    * the chart kept separate from the live measurement. */
   observe(perception, snapshot, tick, evaluator) {
+    if (evaluator && this.visualizer) {
+      this.visualizer.setEvaluator(evaluator);
+      this.visualizer.setNextGateIndex(evaluator.nextGateIndex);
+    }
     const observation = perception.sample(snapshot, tick);
     const gates = this.manifest.course.gates;
     const gateIndex = Math.min(evaluator.nextGateIndex, gates.length - 1);

@@ -121,8 +121,14 @@ export class SlalomMission {
     const meanExcessM = distanceM
       ? this.samples.reduce((sum, sample) => sum + sample.excessM * sample.widthM, 0) / distanceM : 0;
     const p95ExcessM = quantile(this.samples, 0.95, sample => sample.excessM);
+    const durationSeconds = this.tick / this.manifest.physicsHz;
+    const altitudeCostM = this.status === 'succeeded' ? 0.7 * meanExcessM + 0.3 * p95ExcessM : null;
+    const finalScore = this.status === 'succeeded'
+      ? Math.max(0, Math.round(20000 - durationSeconds * 100 - (altitudeCostM ?? 0) * 50))
+      : null;
     return { status: this.status, reason: this.reason, tick: this.tick, metrics: {
       rulesVersion: this.manifest.rulesVersion,
+      completedGates: this.gate - 1,
       gatesCleared: this.gate - 1, totalGates: this.course.gates.length - 1,
       progressM: Math.max(0, this.maximumProgressM - this.startS),
       courseLengthM: this.lengthM, scoredDistanceM: distanceM,
@@ -130,8 +136,9 @@ export class SlalomMission {
       medianAglM: quantile(this.samples, 0.5, sample => sample.aglM),
       meanIasKnots: this.iasCount ? this.iasSumKt / this.iasCount : 0,
       maxIasKnots: this.maxIasKnots,
-      durationSeconds: this.tick / this.manifest.physicsHz,
-      altitudeCostM: this.status === 'succeeded' ? 0.7 * meanExcessM + 0.3 * p95ExcessM : null,
+      durationSeconds,
+      altitudeCostM,
+      finalScore,
     } };
   }
 }

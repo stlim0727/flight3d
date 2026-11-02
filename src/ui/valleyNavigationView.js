@@ -1,19 +1,25 @@
-import { createValleyManifest, valleyLegs } from '../arena/valleyCourse.js';
+import { createSlalomManifest } from '../arena/slalomCourse.js';
 
-/** Static chart only; no live truth position or terrain predictions. */
-export function valleyBriefingMarkup() {
-  const m = createValleyManifest(), points = m.course.points;
-  const xy = p => `${35 + (p.x + 3400) / 2000 * 320},${175 - (p.z - 500) / 5500 * 150}`;
-  return `<p>F-16 · 루클라 초고속·저공 로우패스 · 약 ${(m.courseLengthM / 1000).toFixed(2)} km. 목표 속도 550–600 KT · 기준 고도 ${m.course.targetAglM} m AGL.
-    출발 → 1–5번 경유지 → 도착선 순서로 통과하세요. 도착 방향 ${valleyLegs(m.course).at(-1).headingDeg.toFixed(0)}°.</p>
-    <svg viewBox="0 0 400 210" role="img" aria-label="정적 계곡 항로 지도. 위쪽이 남쪽, 오른쪽이 동쪽. 출발에서 다섯 경유지를 거쳐 도착">
+/** Dynamic chart for seed-based virtual valley courses. */
+export function valleyBriefingMarkup(seed = 1) {
+  const m = createSlalomManifest({ seed: Number.isSafeInteger(seed) && seed >= 0 ? seed : 1 });
+  const points = m.course.points;
+  const xs = points.map(p => p.x), zs = points.map(p => p.z);
+  const minX = Math.min(...xs) - 200, maxX = Math.max(...xs) + 200;
+  const minZ = Math.min(...zs) - 100, maxZ = Math.max(...zs) + 100;
+  const rangeX = maxX - minX || 1, rangeZ = maxZ - minZ || 1;
+  const xy = p => `${30 + (p.x - minX) / rangeX * 340},${25 + (p.z - minZ) / rangeZ * 150}`;
+  const totalGates = points.length - 1;
+
+  return `<p>F-16 · 가상 계곡 슬라롬 (시드 ${seed}) · 약 ${(m.course.lengthM / 1000).toFixed(2)} km. 목표 속도 ${m.envelope.cruiseKnots} KT · 최저 고도 ${m.course.clearanceFloorM} m AGL.
+    출발 → 1–${totalGates - 1}번 게이트 → 도착선 순서로 통과하세요.</p>
+    <svg viewBox="0 0 400 210" role="img" aria-label="가상 계곡 항로 지도. 출발에서 경유지를 거쳐 도착">
       <polyline points="${points.map(xy).join(' ')}" fill="none" stroke="#63e3b4" stroke-width="2"/>
       ${points.map((p, i) => { const [x, y] = xy(p).split(','); return `<circle cx="${x}" cy="${y}" r="4" fill="#fff"/><text x="${Number(x) + 9}" y="${Number(y) + 4}" fill="#fff" font-size="12">${i === 0 ? '출발' : i === points.length - 1 ? '도착' : i}</text>`; }).join('')}
-      <text x="12" y="202" fill="#b8cddd" font-size="11">남 ↑ · 동 → | 정적 지도 · 지형/장애물 감지 아님</text>
+      <text x="12" y="202" fill="#b8cddd" font-size="11">동 → · 남 ↓ | 시드 기반 절차적 가상 협곡 지형</text>
     </svg>
-    <p>로컬 좌표 (동 x, 남 z / m): ${points.map((p, i) => `${i === 0 ? '출발' : i === 6 ? '도착' : i}: (${p.x}, ${p.z})`).join(' · ')}</p>
-    <p>경유지 ±${m.course.gateHalfWidthM} m · 항로 ±${m.course.corridorHalfWidthM} m · 고도 하한 없음 (기준 ${m.course.targetAglM} m) · ${(m.timeoutTicks / m.physicsHz).toFixed(0)}초 이내 · 충돌 금지.
-    <strong>완주 시간이 짧을수록 높은 점수</strong>를 획득하며, 기준 고도(${m.course.targetAglM} m)보다 올라갈 경우 감점 페널티가 부여됩니다.</p>`;
+    <p>게이트 통과 공간 진입 · 최저 고도 ${m.course.clearanceFloorM} m 유지 · ${(m.timeoutTicks / m.physicsHz).toFixed(0)}초 이내 · 충돌 금지.
+    <strong>완주 시간 단축 및 통과 천장 준수</strong>에 따라 최종 점수가 기록됩니다.</p>`;
 }
 
 export function valleyNavigationText(navigation) {

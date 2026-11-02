@@ -3,7 +3,7 @@ import { PilotPerception } from '../pilot/PilotPerception.js';
 import { createBriefing } from '../pilot/PilotProtocol.js';
 import { TakeoffMission } from './TakeoffMission.js';
 import { LandingMission } from './LandingMission.js';
-import { ValleyMission } from './ValleyMission.js';
+import { SlalomMission } from './SlalomMission.js';
 
 /** Local, unranked evaluator. Only this loop advances physics while active.
  * A computed command waits one full decision period before it can be applied.
@@ -44,7 +44,8 @@ export class MissionRunner {
       const manifest = prepared.manifest;
       if (manifest.physicsHz !== 120) throw new Error('Unsupported physics rate');
       record.manifest = structuredClone(manifest);
-      if (record.pilotKind === 'human' && manifest.type !== 'valley') throw new Error('Human mode requires valley mission');
+      const isValley = manifest.type === 'valley' || manifest.type === 'valley-slalom';
+      if (record.pilotKind === 'human' && !isValley) throw new Error('Human mode requires valley mission');
       record.source = record.pilotKind === 'ai' ? source : null;
       record.sensorSeed = options.sensorSeed ?? options.seed ?? 1;
       record.noiseEnabled = options.noise ?? options.environmentProfile !== 'calm-debug-v1';
@@ -54,7 +55,7 @@ export class MissionRunner {
       record.manifestHash = await hash(JSON.stringify(manifest));
       if (generation !== this.generation) return record;
       this.adapter.acquire({ human: record.pilotKind === 'human' });
-      const evaluator = manifest.type === 'valley' ? new ValleyMission(manifest) : manifest.id.startsWith('landing')
+      const evaluator = isValley ? new SlalomMission(manifest) : manifest.id.startsWith('landing')
         ? new LandingMission(manifest) : new TakeoffMission(manifest);
       const perception = new PilotPerception({ sensorSeed: options.sensorSeed ?? options.seed ?? 1,
         noise: options.noise ?? options.environmentProfile !== 'calm-debug-v1',

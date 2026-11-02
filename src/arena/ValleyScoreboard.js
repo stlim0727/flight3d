@@ -12,7 +12,8 @@ export function sanitizeCallsign(raw) {
 /** Local and global attempts. Only matching comparison keys can be ranked. */
 export function valleyAttempt(record, { callsign } = {}) {
   const m = record?.manifest;
-  if (m?.type !== 'valley' || !TERMINAL.has(record.status)) return null;
+  const isValley = m?.type === 'valley' || m?.type === 'valley-slalom';
+  if (!isValley || !TERMINAL.has(record.status)) return null;
   const conditions = { mission: m.id, rulesVersion: m.rulesVersion, terrain: m.terrain,
     environmentProfile: m.environmentProfile, environmentSeed: m.environmentSeed,
     sensorSeed: record.sensorSeed, sensorNoiseEnabled: record.noiseEnabled,

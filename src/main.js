@@ -597,7 +597,7 @@ class FlightSimulator {
 
     const missionSelect = arenaEl?.querySelector('[data-mission]');
     if (missionSelect) {
-      missionSelect.value = 'valley-low-v1';
+      missionSelect.value = 'valley-slalom-v1';
     }
     const kindSelect = arenaEl?.querySelector('[data-kind]');
     if (kindSelect) {
