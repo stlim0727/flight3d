@@ -1,7 +1,8 @@
 # Hangang low-flight scenario
 
 Related: #253 (scenario), #267 (detailed bridge assets), #391 (free flight),
-#395 (deck lamp/arch collision, banked pavilion contact).
+#395 (deck lamp/arch collision, banked pavilion contact), #396 (bridge motifs from
+the [bridge survey](hangang-bridge-survey.md)).
 
 The lobby offers **Han River** alongside the airports under **Flight region**.
 Only this region offers **Han River low-level flight**; existing airports do not.
@@ -19,8 +20,29 @@ Autopilot disengages while the scenario is active.
 Like the other scenarios, Han River does not judge how the aircraft is flown
 (#391). There is no course order, gate count, score, flight envelope, route,
 time limit or completion state, and nothing fails the run except physical
-contact. The bridges, their clearance markers and the central opening remain as
+contact. The bridges, their clearance markers and main-span openings remain as
 scenery to fly under or around; the bridges carry no number boards.
+
+## Bridges (#396)
+
+The three bridges are motifs of Seogang, Mapo and Hangang Bridge, in their real
+west-to-east order and spacing (1.08 km, then 2.65 km). Each keeps its surveyed
+structural type, deck width and longest span from the
+[bridge survey](hangang-bridge-survey.md):
+
+| Bridge | Decks | Piers | Above the deck |
+|---|---|---|---|
+| `seogang` | one, 29 m | 150 m main span, then 90 m spans | Nielsen arch over the main span: ribs lean from x = ±75 m to meet near the deck axis at 67 m |
+| `mapo` | upstream and downstream, 22.75 m each | 70 m spans | none |
+| `hangang` | twin, 22 m each | 63.5 m spans, main span over Nodeulseom | six tied arches (rise 11 m) over the south channel, from the island's edge to the bank |
+
+The survey has no deck elevations, clearances, water level or pier layout beyond
+the longest span, so these stay game choices: girder soffit 34 m, deck top 40 m,
+Seogang's 90 m approach spans, the 3–3.25 m gap between twin decks, arch rises and the
+crossing angles. Mapo and Hangang Bridge are each two parallel decks in reality
+too. The narrowest main span is Hangang Bridge's: 53.5 m between pier caps, about
+21 m of clearance either side of the C172's wings on the river axis. The UI still
+labels the region as Han River inspired scenery, not a survey reproduction.
 
 The scenario uses the common flight HUD and controls. Use **Esc → Scenario
 restart** to restart; after a crash use the common report and
@@ -38,17 +60,20 @@ the scenario adds collision detection only, not corrective forces.
 The bridge deck is not inserted into the terrain heightmap. Water/ground height
 therefore continues to supply the ground-effect and radio-altimeter reference.
 
-`bridgeSolids()` supplies both rendered geometry and solid collision boxes: deck,
-three girders, cross beams every 20 m, and per pier a column and the cap the
-girders bear on. The gate pier caps' inner faces (|x| = 50 m) and the girder
-soffit (34 m) bound the central opening. Each rail box is the collision envelope
+`bridgeSolids()` supplies both rendered geometry and solid collision boxes. Per
+deck: the deck, three girders, cross beams every 20 m, and per pier a column and
+the cap the girders bear on. `bridgeOpening()` gives the main span's clear
+passage: between its pier caps' inner faces (half the span less 5 m), below the
+girder soffit (34 m) and across every deck. Each rail box is the collision envelope
 of the open railing (curb, posts, mid and top rails) that `hangangBridges.js`
-draws inside it. Each deck streetlight (every 55 m on both deck edges, to 43.8 m) is a
-pole box and a lamp-head box, drawn and collided as those boxes. The central `arch`
-bridge's two arch tubes (to 77.4 m) follow `archCentre()`; `bridgeSolids()` gives one
-box per tube segment (the chord between rings, padded by the tube radius) and the
-renderer places the tube's rings at the same segment ends, so the drawn tube lies
-inside its collision boxes (#395). `hangangBridges.js` merges every bridge into one mesh per
+draws inside it. Each deck streetlight (every 55 m from the bridge centre on both
+edges of every deck, to 43.8 m) is a pole box and a lamp-head box, drawn and
+collided as those boxes. Arch ribs follow `archCentre()`; `bridgeSolids()` gives one
+box per tube segment (the chord between rings, padded by the tube radius on every
+axis, so leaning ribs are covered too) and the renderer places the tube's rings at
+the same segment ends, so the drawn tube lies inside its collision boxes (#395).
+`HangangCollision` skips a bridge while the aircraft is more than 10 m beyond its
+widest solid across the decks. `hangangBridges.js` merges every bridge into one mesh per
 material (steel, concrete, road, lights, markers), so a bridge costs five draw
 calls rather than about 110. `HangangCollision` transforms C172 part bounds using
 `inverse(M_bridge) * M_aircraft`. Fuselage, wings, tail, fin and fixed gear have
@@ -59,7 +84,7 @@ mesh collision. Each bridge's solids are first narrowed to those overlapping the
 whole aircraft's bounds, then tested part by part. A malformed sample is skipped, and a jump of more than about 100 m (a respawn or
 teleport) tests only the new pose, so collision stays active afterwards.
 
-Nodeulseom sits under the central bridge opening (#378). `HANGANG_COURSE.nodeulseom`
+Nodeulseom sits under Hangang Bridge's main span (#378, moved with the bridge in #396). `HANGANG_COURSE.nodeulseom`
 supplies the island (tapered elliptical cylinder, 0–4 m) to both
 `scripts/build-hangang-assets.mjs` and `HangangCollision`, so it is a solid obstacle,
 not decoration. The pavilion on it (#381) is `nodeul-pavilion.glb`, placed by
@@ -102,10 +127,10 @@ downloaded (SHA-256 `36476ab1…9b4269b4b`, 541,164 bytes, 3 × 512 px PNG
 textures); scale, rotation and an opaque alpha cut-out are applied at runtime.
 It stands in for the real Nodeulseom music lounge and does not depict it; see
 `public/models/hangang/nodeul-pavilion.LICENSE.txt`. No external bridge models
-or map data are bundled. The UI explicitly
+or map data are bundled; the bridge motifs take only published figures (type,
+width, longest span, spacing) from the survey. The UI explicitly
 labels this as **Han River inspired training scenery**, not a survey-accurate
-reproduction of named Seoul bridges. Dimensions are designed for the playable
-course.
+reproduction of named Seoul bridges.
 
 The bridges deliberately stay procedural rather than GLB (#396). The repository's
 GLBs are themselves exported from Three.js code by `build-hangang-assets.mjs`, so a
@@ -113,8 +138,8 @@ bridge GLB would add no detail. It would add an asynchronous load, and with it a
 stand-in, failure handling and a second copy of the dimensions, for the scenario's
 main obstacles. Revisit this only for externally authored or licensed models, or
 when geometry becomes measurably expensive to build at runtime. Survey-accurate
-named bridges, LOD and real-world provenance are not in scope while the scenery
-remains a motif.
+bridges need deck elevations and clearances the survey could not find; until then
+the scenery remains a motif, and LOD is not in scope.
 
 ## Verification
 
@@ -170,3 +195,20 @@ rAF intervals, not a benchmark. After merging #400, the full `verify-hangang.mjs
 run passes against this change with no runtime exceptions. The C172 flies under
 all three bridges without contact, and the climb, water impact, pause restart and
 crash-to-menu checks all pass.
+
+### Surveyed spans and order (#396)
+
+On Node 22.23.2: syntax/action checks and the production build passed, and 1,155
+of 1,156 Node tests passed. The one failure is the existing Incheon checksum test
+on this Windows checkout: `coastline.json` is checked out with CRLF, and its LF
+bytes hash to the expected `8bd5dd1c…`. `nodeulPavilionHeights.json` is unchanged
+after rebaking, because the field is island-relative; `bridges-kit.glb` was
+rebuilt for the island's new position.
+
+`verify-hangang.mjs` passes against this change with no runtime exceptions: the
+test pilot follows the river axis under Seogang, Mapo and Hangang Bridge to
+z = -3,800 m without contact, then the climb, water impact, pause restart and
+crash-to-menu checks pass. `review-artifacts/hangang-396-spans/` holds fixed-camera
+captures of each bridge (approach, oblique, under the deck) and an overview,
+rendered from the running scene with the clock frozen. They are visual checks, not
+a frame-time measurement.

@@ -29,16 +29,17 @@ test('route, direction, altitude band and duration are not judged (#391)', () =>
   }
 });
 test('thin deck, wing and fin contacts are detected between frames', () => {
-  for (const [x, y] of [[0, 33], [49, 19]]) {
+  // Girder soffit at 34 m; Seogang's main-span piers stand at x = ±75 m (columns from 71 m).
+  for (const [x, y] of [[0, 33], [69, 19]]) {
     const collision = new HangangCollision(); step(collision, x, y, 30);
     const contact = step(collision, x, y, -30);
-    assert.equal(contact.bridge, 'west'); assert.ok(contact.aircraftPart);
+    assert.equal(contact.bridge, 'seogang'); assert.ok(contact.aircraftPart);
   }
 });
-// Flies the central opening along its own axis, `offset` metres across the river.
-function centralPass(height, offset = 0) {
+// Flies Hangang Bridge's main span along its own axis, `offset` metres across the river.
+function islandPass(height, offset = 0) {
   const collision = new HangangCollision();
-  const b = course.bridges[1];
+  const b = course.bridges.find(bridge => bridge.id === 'hangang');
   const yaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), b.yaw);
   const forward = new Vector3(0, 0, -1).applyQuaternion(yaw), across = new Vector3(1, 0, 0).applyQuaternion(yaw);
   for (let s = -200; s <= 200 && !collision.contact; s += 2.3) {
@@ -46,10 +47,11 @@ function centralPass(height, offset = 0) {
   }
   return collision;
 }
-test('Nodeulseom island and pavilion under the central bridge are solid', () => {
-  for (const height of [11, 14]) assert.equal(centralPass(height).contact?.structure, 'pavilion');
-  assert.equal(centralPass(5, 38).contact?.structure, 'island');
-  for (const collision of [centralPass(18), centralPass(11, 38)]) assert.equal(collision.contact, null);
+test('Nodeulseom island and pavilion under Hangang Bridge are solid', () => {
+  for (const height of [11, 14]) assert.equal(islandPass(height).contact?.structure, 'pavilion');
+  // Mid-way between the piers at 31.75 and 95.25 m, over bare island.
+  assert.equal(islandPass(5, 63.5).contact?.structure, 'island');
+  for (const collision of [islandPass(18), islandPass(11, 63.5)]) assert.equal(collision.contact, null);
 });
 test('pavilion collides where its mesh stands, not across its bounding box', () => {
   const collision = new HangangCollision(), island = course.nodeulseom, field = island.pavilion.heights;
@@ -74,25 +76,29 @@ test('pavilion collides where its mesh stands, not across its bounding box', () 
 function deckCrossing(index, x, y) {
   const collision = new HangangCollision(), b = course.bridges[index];
   const yaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), b.yaw);
-  for (let s = 30; s >= -30 && !collision.contact; s -= 2.3) {
+  for (let s = 40; s >= -40 && !collision.contact; s -= 2.3) {
     collision.update(new Vector3(x, y, s).applyQuaternion(yaw).add(new Vector3(b.x, 0, b.z)), yaw);
   }
   return collision.contact;
 }
-test('deck streetlights and the central arch are solid (#395)', () => {
-  // Lamps (to 43.8 m) stand every 55 m on both deck edges of every bridge.
+test('deck streetlights and arch ribs are solid (#395)', () => {
+  // Lamps (to 43.8 m) stand every 55 m from the centre on both edges of every deck.
   for (const index of [0, 1, 2]) {
     assert.equal(deckCrossing(index, 0, 44)?.structure, 'lamp');
     assert.equal(deckCrossing(index, 27.5, 44), null, 'between lamps');
     assert.equal(deckCrossing(index, 0, 46), null, 'above the lamps');
   }
-  // Arch (centreline 76 m at x = 0, tube radius 1.4 m) spans x = -150..150 on the central bridge.
-  assert.equal(deckCrossing(1, 0, 75)?.structure, 'arch');
-  assert.equal(deckCrossing(1, -95, 60)?.structure, 'arch');
-  assert.equal(deckCrossing(1, 95, 60)?.structure, 'arch');
-  for (const [x, y] of [[0, 80], [0, 60], [27.5, 66], [-175, 50]]) assert.equal(deckCrossing(1, x, y), null, `under/over arch ${x} ${y}`);
-  // Arch is central-only: the same crossing over the other bridges is clear.
-  for (const index of [0, 2]) assert.equal(deckCrossing(index, 0, 75), null);
+  // Seogang's Nielsen arch: ribs lean from x = ±75 m to meet near the deck axis at 67 m
+  // (tube radius 1.4 m); at x = ±50 m they are 54 m high and 7 m off the axis.
+  assert.equal(deckCrossing(0, 0, 67)?.structure, 'arch');
+  assert.equal(deckCrossing(0, -50, 54)?.structure, 'arch');
+  assert.equal(deckCrossing(0, 50, 54)?.structure, 'arch');
+  for (const [x, y] of [[0, 72], [0, 55], [-100, 50]]) assert.equal(deckCrossing(0, x, y), null, `under/over arch ${x} ${y}`);
+  // Hangang Bridge's tied arches (crown 52 m) stand over the south channel only.
+  assert.equal(deckCrossing(2, 127, 52)?.structure, 'arch');
+  for (const [x, y] of [[127, 46], [127, 56], [0, 52], [-127, 52]]) assert.equal(deckCrossing(2, x, y), null, `tied arch ${x} ${y}`);
+  // Mapo has no arch.
+  assert.equal(deckCrossing(1, 0, 67), null);
 });
 
 // Reference for #395: sample the faces of every padded part box at `step` metres and test
@@ -144,7 +150,8 @@ test('banked pavilion contact matches the surface-sampled aircraft (#395)', () =
       const lowest = Math.min(...PARTS.flatMap(([lo, hi]) => [0, 1, 2, 3, 4, 5, 6, 7].map(c =>
         new Vector3(c & 1 ? hi[0] : lo[0], c & 2 ? hi[1] : lo[1], c & 4 ? hi[2] : lo[2]).applyMatrix4(matrix).y))) - 0.4;
       if (lowest < 4.5) continue;
-      const collision = new HangangCollision();
+      // Hangang Bridge's piers stand on the island; leave them out to test the pavilion alone.
+      const collision = new HangangCollision({ ...course, bridges: [] });
       const hit = collision.update(position, attitude)?.structure === 'pavilion';
       const exact = sampledPavilionHit(matrix, 0.1, 0), loose = sampledPavilionHit(matrix, 0.1, 0.1);
       // A sampled hit is a real hit; a hit must at least graze within the sample spacing.

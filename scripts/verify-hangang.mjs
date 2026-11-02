@@ -94,7 +94,7 @@ try {
         s.stepSimulation(0.05);
       }
     };
-    fly(120,19,()=>s.position.z>-3700);
+    fly(120,19,()=>s.position.z>-3800);
     const bridges={contact:s.hangang.collision.contact,crashed:s.isCrashed,position:s.position.toArray()};
     fly(30,60);
     s.controls.clearVirtualInputs();
@@ -168,7 +168,7 @@ try {
   console.log(JSON.stringify({result,flight,lifecycle,failure,retry,menu,restored,exceptions}));
   assert.equal(result.initial.aircraft,'C172');assert.equal(result.initial.preset,'hangang');
   assert.equal(failure.crashed,true);assert.equal(failure.contact?.structure,'water');
-  assert.equal(flight.bridges.contact,null);assert.equal(flight.bridges.crashed,false);assert.ok(flight.bridges.position[2]<=-3700);
+  assert.equal(flight.bridges.contact,null);assert.equal(flight.bridges.crashed,false);assert.ok(flight.bridges.position[2]<=-3800);
   assert.equal(flight.contact,null);assert.equal(flight.crashed,false);assert.ok(flight.active);assert.ok(flight.height>40);
   assert.ok(Object.values(lifecycle).every(Boolean));assert.equal(exceptions.length,0);
   assert.ok(retry.reportShown && retry.crashToMenu && retry.healthy && retry.reset);assert.equal(retry.trauma,0);assert.ok(retry.altitude>50);

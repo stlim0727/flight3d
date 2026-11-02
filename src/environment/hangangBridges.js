@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { BRIDGE_ARCH, BRIDGE_PIER_X, archCentre, bridgeSolids } from '../config/hangangCourse.js';
+import { archCentre, bridgeOpening, bridgeSolids } from '../config/hangangCourse.js';
 
 // Procedural bridge built from the same bridgeSolids() boxes HangangCollision uses.
-// The arch is the exception: its boxes bound a tube drawn through the same rings.
+// Arch ribs are the exception: their boxes bound a tube drawn through the same rings.
 // Members are merged into one mesh per material, so a bridge costs a handful of draw
 // calls instead of one per member.
 
@@ -21,8 +21,8 @@ function railing({ center: [, cy, cz], size: [length, height, width] }) {
 }
 
 class ArchCurve extends THREE.Curve {
-  constructor(z) { super(); this.z = z; }
-  getPoint(t, target = new THREE.Vector3()) { const [x, y] = archCentre(t); return target.set(x, y, this.z); }
+  constructor(arch, deck, edge) { super(); Object.assign(this, { arch, deck, edge }); }
+  getPoint(t, target = new THREE.Vector3()) { return target.set(...archCentre(this.arch, this.deck, this.edge, t)); }
   // TubeGeometry places rings by arc length; keep them at archCentre(i / segments),
   // the ends of the collision boxes' chords.
   getPointAt(u, target) { return this.getPoint(u, target); }
@@ -39,11 +39,9 @@ export function createBridgeMaterials() {
 }
 
 export function createBridge(bridge, materials) {
-  const isArch = bridge.style === 'arch', isTower = bridge.style === 'tower';
   // Steel superstructure with emissive night glow
   const steel = new THREE.MeshStandardMaterial({
-    color: bridge.color, roughness: 0.5, metalness: 0.45,
-    emissive: isArch ? 0xcc3300 : isTower ? 0x0055bb : 0x223344, emissiveIntensity: 0.45,
+    color: bridge.color, roughness: 0.5, metalness: 0.45, emissive: bridge.glow, emissiveIntensity: 0.45,
   });
   const buckets = { steel: [], concrete: [], road: [], light: [], marker: [] };
 
@@ -53,20 +51,22 @@ export function createBridge(bridge, materials) {
     else buckets[solid.material ?? (solid.part === 'pier' ? 'concrete' : 'steel')].push(box(solid.center, solid.size));
   }
 
-  // Road deck surface
-  buckets.road.push(box([0, 40.03, 0], [1200, 0.05, 19]));
-
-  // Upward floodlights at the foot of each pier's upstream and downstream faces
-  for (const px of BRIDGE_PIER_X) for (const pz of [-7.6, 7.6]) buckets.light.push(box([px, 0.6, pz], [3, 1, 1]));
-
-  // Above-deck arches (Central bridge), one tube segment per arch collision box.
-  if (isArch) {
-    for (const z of BRIDGE_ARCH.z) buckets.steel.push(new THREE.TubeGeometry(new ArchCurve(z), BRIDGE_ARCH.segments, BRIDGE_ARCH.radius, 8, false));
+  for (const deck of bridge.decks) {
+    // Road deck surface
+    buckets.road.push(box([0, 40.03, deck.z], [bridge.length, 0.05, deck.width - 3]));
+    // Upward floodlights at the foot of each pier's upstream and downstream faces
+    for (const px of bridge.piers) for (const edge of [-1, 1]) buckets.light.push(box([px, 0.6, deck.z + edge * (deck.width / 2 - 3.4)], [3, 1, 1]));
+    // Arch ribs, one tube segment per arch collision box.
+    for (const arch of bridge.arches) {
+      for (const edge of [-1, 1]) buckets.steel.push(new THREE.TubeGeometry(new ArchCurve(arch, deck, edge), arch.segments, arch.radius, 8, false));
+    }
   }
 
-  // Navigation clearance markers on the gate pier caps' approach faces. They have no
-  // collision proxy, so they must stay outside the 100 x 34 m opening.
-  for (const x of [-52, 52]) buckets.marker.push(box([x, 32.5, 10.7], [2, 2.4, 0.4]));
+  // Navigation clearance markers on the main span's pier caps, on the approach face of
+  // the first deck the course meets. They have no collision proxy, so they must stay
+  // outside the opening.
+  const opening = bridgeOpening(bridge), approach = bridge.decks.at(-1);
+  for (const x of [-1, 1]) buckets.marker.push(box([x * (opening.halfWidth + 2), 32.5, approach.z + approach.width / 2 - 0.3], [2, 2.4, 0.4]));
 
   const group = new THREE.Group();
   group.name = `Hangang bridge ${bridge.id}`;
