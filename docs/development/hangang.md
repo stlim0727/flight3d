@@ -2,7 +2,7 @@
 
 Related: #253 (scenario), #267 (detailed bridge assets), #391 (free flight),
 #395 (deck lamp/arch collision, banked pavilion contact), #396 (bridge motifs from
-the [bridge survey](hangang-bridge-survey.md)).
+the [bridge survey](hangang-bridge-survey.md)), #429 (approach ramps to the banks).
 
 The lobby offers **Han River** alongside the airports under **Flight region**.
 Only this region offers **Han River low-level flight**; existing airports do not.
@@ -44,6 +44,14 @@ too. The narrowest main span is Hangang Bridge's: 53.5 m between pier caps, abou
 21 m of clearance either side of the C172's wings on the river axis. The UI still
 labels the region as Han River inspired scenery, not a survey reproduction.
 
+Past each deck end an approach ramp (#429) carries the road down to the 8 m bank at
+a 6% grade (about 530 m), so no deck stops in the air. Each ramp is a 4 m concrete slab
+with 1.1 m parapets, on columns every 40 m from the deck end; where less than 6 m would
+stay beneath the slab, a retained embankment takes it to the ground. Deck streetlights
+continue down the ramp. The grade, slab and column spacing are game choices. The
+Yeouido skyline keeps 15 m clear of every ramp, and the LG Twin Towers stand south of
+Seogang's east ramp.
+
 The scenario uses the common flight HUD and controls. Use **Esc → Scenario
 restart** to restart; after a crash use the common report and
 **Space / R / Enter → main menu → Fly**. Menu selection retains the Han River region.
@@ -57,7 +65,7 @@ Coordinates are metres, +Y up; progression is generally -Z. Bridge-local X
 spans the river. Height is `h = y_aircraft - y_water`. The existing aerodynamic,
 engine, mass/CG, trim and fixed-step integration models provide flight behavior;
 the scenario adds collision detection only, not corrective forces.
-The bridge deck is not inserted into the terrain heightmap. Water/ground height
+The bridge deck and its approach ramps are not inserted into the terrain heightmap. Water/ground height
 therefore continues to supply the ground-effect and radio-altimeter reference.
 
 `bridgeSolids()` supplies both rendered geometry and solid collision boxes. Per
@@ -72,6 +80,13 @@ collided as those boxes. Arch ribs follow `archCentre()`; `bridgeSolids()` gives
 box per tube segment (the chord between rings, padded by the tube radius on every
 axis, so leaning ribs are covered too) and the renderer places the tube's rings at
 the same segment ends, so the drawn tube lies inside its collision boxes (#395).
+Approach ramps follow `bridgeApproaches()` (road height `top(x)` from 40 m at the deck
+end down to the bank height under the ramp's foot) and `approachSegments()`, which cuts
+each ramp into 10 m segments. Collision boxes are axis-aligned, so `bridgeSolids()`
+gives one box per segment, from its lowest soffit to its highest parapet top; the
+renderer draws that segment's sloped slab, road and parapets inside it. The boxes step
+up to 0.6 m above the sloped road, a conservative envelope like the arch boxes. Ramp
+columns and streetlights are drawn and collided as their own boxes.
 `HangangCollision` skips a bridge while the aircraft is more than 10 m beyond its
 widest solid across the decks. `hangangBridges.js` merges every bridge into one mesh per
 material (steel, concrete, road, lights, markers), so a bridge costs five draw
