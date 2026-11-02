@@ -33,14 +33,14 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
   /** Leg length floor comes from the measured bank reversal: at the fast end of
    * the band a full reversal costs about 600 m of straight line. */
   legLengthM: [900, 1250],
-  headingChangeDeg: [18, 28],
+  headingChangeDeg: [22, 30],
   /** Half of the canyon floor. Tight trench-like canyon profile so turns carve
    * around steep rocky spurs. */
-  corridorHalfWidthM: [120, 170],
-  gatePassageHalfWidthM: 50,
+  corridorHalfWidthM: [100, 135],
+  gatePassageHalfWidthM: 35,
   /** The aim point sits across the valley, alternating sides, so the line must
    * carve the bend instead of following the middle. */
-  gateOffsetFraction: [0.45, 0.75],
+  gateOffsetFraction: [0.60, 0.85],
   /** The ceiling a gate is credited under, and how much deeper it may be. */
   passageMinAglM: 50,
   passageBandM: [35, 75],
@@ -48,8 +48,8 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
    * can actually sink, and may rise by a good deal more. */
   floorStepDownM: 25,
   floorStepUpM: 180,
-  wallRiseM: [380, 620],
-  ridgeExponent: [0.85, 1.25],
+  wallRiseM: [450, 700],
+  ridgeExponent: [0.75, 1.1],
   speedKnots: [SLALOM_IAS_MIN_KT, SLALOM_IAS_MAX_KT],
   /** The measured turn rate and sink ceiling are both best at the slow end of the
    * band, and a leg assessed at any other speed would be sized on borrowed time. */
@@ -94,20 +94,23 @@ function valueNoise(random, cells = 240) {
  * floor height, a half width and a wall height carried along it. */
 function buildCenterline(random, rules) {
   const samples = [];
-  let heading = (random() - 0.5) * 20 * RAD, x = 0, z = 0, floor = 2100, progress = 0;
+  let heading = (random() - 0.5) * 6 * RAD, x = 0, z = 0, floor = 2100, progress = 0;
   const legs = [];
   for (let index = 0; index < rules.gates; index++) {
     const lengthM = rules.legLengthM[0] + random() * (rules.legLengthM[1] - rules.legLengthM[0]);
-    // Slalom: the bend reverses side, so no leg can be flown without a roll.
+    // Slalom: the bend reverses side, alternating S-curve turns so each leg requires a roll.
     const side = index % 2 === 0 ? 1 : -1;
-    const headingChangeDeg = side * (rules.headingChangeDeg[0]
-      + random() * (rules.headingChangeDeg[1] - rules.headingChangeDeg[0]));
+    const legTurnDeg = rules.headingChangeDeg[0]
+      + random() * (rules.headingChangeDeg[1] - rules.headingChangeDeg[0]);
+    const headingChangeDeg = index === 0 ? side * (legTurnDeg / 2) : side * legTurnDeg;
     const stepDownM = random() * rules.floorStepDownM;
     const floorAt = floor - stepDownM
       + (random() < 0.35 ? random() * rules.floorStepUpM * 0.4 : 0);
-    const wallRiseRange = rules.wallRiseM ?? [380, 620];
-    const ridgeExpRange = rules.ridgeExponent ?? [0.85, 1.25];
+    const wallRiseRange = rules.wallRiseM ?? [450, 700];
+    const ridgeExpRange = rules.ridgeExponent ?? [0.75, 1.1];
+    const startSample = samples.length ? samples.length - 1 : 0;
     const leg = { index, lengthM, headingChangeDeg, startFloor: floor, endFloor: floorAt,
+      startSample,
       halfWidth: rules.corridorHalfWidthM[0]
         + random() * (rules.corridorHalfWidthM[1] - rules.corridorHalfWidthM[0]),
       wallRiseM: wallRiseRange[0] + random() * (wallRiseRange[1] - wallRiseRange[0]),
