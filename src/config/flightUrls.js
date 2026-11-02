@@ -8,7 +8,7 @@ export const FLIGHT_BASE_URL = 'https://stlim0727.github.io/flight3d/';
 export function resolveFlightUrl(search, saved) {
   const params = new URLSearchParams(search);
   const airport = resolveAirport(params.get('terrain') ?? saved.airport);
-  const aircraft = airport === 'hangang' ? 'C172' : resolveAircraft(params.get('aircraft') ?? saved.aircraft);
+  const aircraft = airport === 'hangang' ? 'C172' : airport === 'valley' ? 'F16' : resolveAircraft(params.get('aircraft') ?? saved.aircraft);
   const scenario = resolveScenario(params.get('scenario') ?? saved.scenario, airport, aircraft);
   return { airport, aircraft, scenario };
 }
@@ -23,6 +23,7 @@ export function flightCombinations() {
   return VALID_AIRPORTS.flatMap(airport => Object.keys(AIRCRAFT_REGISTRY).flatMap(aircraft =>
     scenariosForAirport(airport).flatMap(scenario => {
       if (airport === 'hangang' && aircraft !== 'C172') return [];
+      if (airport === 'valley' && aircraft !== 'F16') return [];
       if (resolveScenario(scenario, airport, aircraft) !== scenario) return [];
       return [{ airport, aircraft, scenario }];
     })));

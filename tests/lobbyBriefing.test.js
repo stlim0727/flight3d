@@ -54,3 +54,13 @@ test('korean locale renders briefing', () => {
   assert.match(lines[2], /순항/);
   setLanguage('en');
 });
+
+test('valley scenario is briefed for valley flight site', () => {
+  setLanguage('en');
+  const valley = lobbyBriefing('valley', 'valley');
+  assert.equal(valley.length, 2);
+  assert.match(valley[0], /Valley/);
+  assert.match(valley[1], /F-16/);
+  const coastalValley = lobbyBriefing('coastal', 'valley');
+  assert.equal(coastalValley.length, 2);
+});

@@ -12,6 +12,7 @@ test('menu badges come from aircraft and approach configuration', () => {
   assert.equal(airportSpec('coastal'), 'RWY 090° · 39 FT · GS 3°');
   assert.match(airportSpec('lukla'), /^RWY 058° · 9,203 FT · GS 4\.28°$/);
   assert.match(airportSpec('hangang'), /C172/);
+  assert.match(airportSpec('valley'), /F-16/);
 });
 
 test('unknown ids yield no badge and every lobby aircraft has one', () => {

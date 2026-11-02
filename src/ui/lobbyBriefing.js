@@ -19,6 +19,9 @@ export function lobbyBriefing(airportKey, presetType) {
   if (presetType === 'hangang' && isScenarioAvailable(airportKey, presetType)) {
     return [t('hangang.title'), t('hangang.briefing'), t('hangang.provenance')];
   }
+  if (presetType === 'valley' && isScenarioAvailable(airportKey, presetType)) {
+    return [t('valley.slalom.title'), t('lobby.briefing.scenario.valley')];
+  }
   const data = APPROACH_DATA[airportKey];
   if (!data) return [];
   const lines = [
