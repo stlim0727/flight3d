@@ -29,6 +29,13 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     sim.shadowDemo?.stop(); sim.hangang?.stop();
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
 
+    if (typeof sim.clearCrashState === 'function') {
+      sim.clearCrashState();
+    } else {
+      sim.isCrashed = false;
+      sim.crashResult = null;
+    }
+
     if (typeof sim.setAircraft === 'function') {
       sim.setAircraft('F16', true);
     }
@@ -127,6 +134,21 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     this.terrainPerception = new TerrainPerception({ sensorSeed, noise });
     this.projectionHint = null;
     this.syncPose();
+
+    if (sim.cameraSystem) {
+      sim.cameraSystem.userLookOverridden = false;
+      sim.cameraSystem.snapToTarget?.(sim.aircraft?.group);
+    }
+    if (sim.tireSmokeSystem) sim.tireSmokeSystem.clear?.();
+    sim.lastOnGround = false;
+    sim.airborneTime = 15.0;
+    sim.hasTouchedDownThisFlight = false;
+    sim.landingIncident = false;
+    sim.landingStopped = false;
+    sim.bodyContactStarted = false;
+    sim.bodyContactNotices = new Set();
+    sim.landingRestTime = 0;
+    if (sim.aero) sim.aero.separation = 0.0;
 
     this.visualizer?.dispose();
     this.visualizer = new ValleyWaypointsVisualizer(sim, this.manifest.course);

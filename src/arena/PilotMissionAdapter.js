@@ -5,6 +5,12 @@ import { SlalomMissionAdapter } from './SlalomMissionAdapter.js';
 export class PilotMissionAdapter {
   constructor(sim) { this.sim = sim; this.current = null; }
   async prepare(options) {
+    if (typeof this.sim.clearCrashState === 'function') {
+      this.sim.clearCrashState();
+    } else {
+      this.sim.isCrashed = false;
+      this.sim.crashResult = null;
+    }
     this.current?.release();
     const isValley = options.missionId === 'valley-slalom-v1' || options.missionId === 'valley-low-v1' || options.missionId === 'valley';
     this.current = isValley

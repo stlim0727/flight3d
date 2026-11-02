@@ -74,6 +74,7 @@ export function installPilotArena(sim) {
   const returnToLobbyMenu = () => {
     hideScoreOverlay();
     runner.stop();
+    sim.clearCrashState?.();
     if (isDevMode) {
       shell.open = true;
       updateToggle();
@@ -306,6 +307,7 @@ export function installPilotArena(sim) {
     logs.length = 0; find('log').textContent = '';
     find('telemetry').textContent = '관측 대기 중';
     lastStatus = null;
+    sim.clearCrashState?.();
     runner.paceTick = find('kind').value === 'human' || find('playback').value === 'realtime' ? createRealtimePacer() : null;
     if (find('kind').value === 'human' || new URLSearchParams(location.search).get('pilotArena') !== '1') shell.open = false;
     sim.gameFlow.enterFlight();

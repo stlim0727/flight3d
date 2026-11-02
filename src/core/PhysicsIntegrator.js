@@ -451,12 +451,13 @@ class PhysicsIntegratorMethods {
     this.crashDebriefRemaining = null;
     this.isCrashed = false;
     this.crashResult = null;
-    this.explosionSystem.clear();
-    this.aircraftBreakup.aircraft?.resetCrashVisuals();
-    this.aircraftBreakup.clear();
-    this.cameraSystem.endCrashView();
-    this.aircraft.group.visible = true;
-    this.aircraft.resetCrashVisuals();
+    this.explosionSystem?.clear?.();
+    this.aircraftBreakup?.aircraft?.resetCrashVisuals?.();
+    this.aircraftBreakup?.clear?.();
+    this.cameraSystem?.endCrashView?.();
+    if (this.aircraft?.group) this.aircraft.group.visible = true;
+    this.aircraft?.resetCrashVisuals?.();
+    this.audio?.reset?.();
 
     const crashEl = typeof document !== 'undefined' ? document.getElementById('crash-overlay') : null;
     if (crashEl) crashEl.style.display = 'none';
