@@ -127,3 +127,16 @@ test('an un-flyable valley never reaches a pilot', async () => {
   await assert.rejects(adapter.prepare({ seed: 5,
     rules: { ...VALLEY_SLALOM_RULES, floorStepDownM: 400 } }), /unflyable-course/);
 });
+
+test('adapter preparation clears crashed state so retries after crash fly rather than immediately failing', async () => {
+  const sim = createSlalomSimulation(1);
+  const adapter = new SlalomMissionAdapter(sim);
+  await adapter.prepare({ seed: 1 });
+  sim.triggerCrash({ type: 'TERRAIN', name: '지형 충돌' });
+  assert.equal(sim.isCrashed, true);
+
+  const { initialSnapshot } = await adapter.prepare({ seed: 1 });
+  assert.equal(sim.isCrashed, false);
+  assert.equal(initialSnapshot.crashed, false);
+  assert.equal(adapter.snapshot(0).crashed, false);
+});
