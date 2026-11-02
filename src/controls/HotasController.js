@@ -81,6 +81,7 @@ export class HotasController {
     this.activeGamepadIndex = -1;
     this.connectedDevice = null;
     this.lastActiveTime = 0;
+    this.axis4Valid = undefined;
 
     // Callbacks
     this.onDeviceConnected = null;
@@ -147,6 +148,7 @@ export class HotasController {
     this.hasThrottleControl = false;
     this.lastRawThrottle = null;
     this.prevButtons = [];
+    this.axis4Valid = undefined;
   }
 
   getGamepads() {
@@ -291,25 +293,36 @@ export class HotasController {
       // Axis 1: Pitch (Elevator) - forward negative (dive/down), back positive (climb/up)
       this.elevator = applyDeadzone(axes[1] ?? 0.0, this.deadzoneStick);
 
-      if (axes.length >= 4) {
-        // Standard 4+ axis HOTAS/flight stick (Hotas One, Hotas X/4, T.16000M, Extreme 3D Pro):
-        // Axis 2: Stick Twist (Rudder) & Axis 4: Throttle Rocker Paddles
-        const twist = applyDeadzone(axes[2] ?? 0.0, this.deadzoneRudder);
-        const rocker = (axes.length > 4) ? applyDeadzone(axes[4] ?? 0.0, this.deadzoneRudder) : 0.0;
-        // Arbitration: whichever has higher deflection governs the rudder
-        this.rudder = Math.abs(rocker) > Math.abs(twist) ? rocker : twist;
+      // Axis 2: Throttle Lever (Forward = TOGA / 1.0, Backward = Idle / 0.0)
+      if (axes.length > 2 && axes[2] !== undefined) {
+        this.updateThrottleFromRaw(axes[2]);
+      }
 
-        // Axis 3: Throttle Lever (Forward = TOGA / 1.0, Backward = Idle / 0.0)
-        if (axes[3] !== undefined) {
-          this.updateThrottleFromRaw(axes[3]);
+      // Axis 3: Primary Rudder (Stick Twist handle, and throttle rocker in 4-axis mode)
+      const twist = (axes.length > 3 && axes[3] !== undefined)
+        ? applyDeadzone(axes[3], this.deadzoneRudder)
+        : 0.0;
+
+      // Axis 4: Secondary Rudder (e.g. TFRP pedals or independent 5-axis rocker paddle).
+      // Note: On T.Flight Hotas One, if no pedals are plugged into the RJ12 port,
+      // the floating ADC pin defaults to +1.0 (or -1.0), which would lock the rudder hard right/left.
+      // We only accept axis 4 if it starts near neutral center (abs <= 0.25).
+      let secondaryRudder = 0.0;
+      if (axes.length > 4 && axes[4] !== undefined) {
+        const rawAxis4 = axes[4];
+        if (this.axis4Valid === undefined) {
+          this.axis4Valid = Math.abs(rawAxis4) <= 0.25;
+        } else if (!this.axis4Valid && Math.abs(rawAxis4) <= 0.1) {
+          // If pedals were plugged in later and passed through neutral center
+          this.axis4Valid = true;
         }
-      } else {
-        // Fallback for rare 3-axis flight stick without twist rudder (Axis 2 = Throttle)
-        this.rudder = 0.0;
-        if (axes[2] !== undefined) {
-          this.updateThrottleFromRaw(axes[2]);
+        if (this.axis4Valid) {
+          secondaryRudder = applyDeadzone(rawAxis4, this.deadzoneRudder);
         }
       }
+
+      // Whichever has higher deflection governs the rudder
+      this.rudder = Math.abs(secondaryRudder) > Math.abs(twist) ? secondaryRudder : twist;
 
       // Wheel Brakes: Trigger (Button 0)
       const triggerBtn = buttons[0];
