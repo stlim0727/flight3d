@@ -84,7 +84,12 @@ export class HotasController {
     this.activeGamepadIndex = -1;
     this.connectedDevice = null;
     this.lastActiveTime = 0;
-    this.axis4Valid = undefined;
+    this.axis4Valid = false;
+    this.axis4CenterFrames = 0;
+    this.hasSecondaryRudderControl = false;
+    this.lastRawAxis4 = null;
+    this.axis4Floating = false;
+    this.activeRudderSource = 'twist';
 
     // Callbacks
     this.onDeviceConnected = null;
@@ -192,7 +197,12 @@ export class HotasController {
     this.hasThrottleControl = false;
     this.lastRawThrottle = null;
     this.prevButtons = [];
-    this.axis4Valid = undefined;
+    this.axis4Valid = false;
+    this.axis4CenterFrames = 0;
+    this.hasSecondaryRudderControl = false;
+    this.lastRawAxis4 = null;
+    this.axis4Floating = false;
+    this.activeRudderSource = 'twist';
   }
 
   getGamepads() {
@@ -353,30 +363,63 @@ export class HotasController {
       // Axis 4: Secondary Rudder (e.g. TFRP pedals or independent 5-axis rocker paddle).
       // Note: On T.Flight Hotas One, if no pedals are plugged into the RJ12 port,
       // the floating ADC pin defaults to +1.0 (or -1.0), which would lock the rudder hard right/left.
-      // We only accept axis 4 if it starts near neutral center (abs <= 0.25).
+      // Floating pin protection:
+      // A floating pin sits continuously pegged at extreme values (+1.0 or -1.0) without returning to center.
+      // A real physical pedal or rocker paddle rests at neutral center (abs <= 0.20) with a return spring.
       let secondaryRudder = 0.0;
+      let axis4Floating = false;
+
       if (axes.length > 4 && axes[4] !== undefined) {
         const rawAxis4 = axes[4];
         if (this.rudderMode === 'pedals') {
+          // Explicit user override in settings
           this.axis4Valid = true;
-        } else if (this.axis4Valid === undefined) {
-          this.axis4Valid = Math.abs(rawAxis4) <= 0.25;
-        } else if (!this.axis4Valid && Math.abs(rawAxis4) <= 0.1) {
-          // If pedals were plugged in later and passed through neutral center
-          this.axis4Valid = true;
-        }
-        if (this.axis4Valid) {
+          this.hasSecondaryRudderControl = true;
           secondaryRudder = applyDeadzone(rawAxis4, this.deadzoneRudder);
+        } else if (this.rudderMode === 'twist') {
+          // Explicit twist only: disable secondary axis completely
+          this.axis4Valid = false;
+          this.hasSecondaryRudderControl = false;
+        } else {
+          // 'auto' mode:
+          // A real physical pedal or rocker paddle rests at neutral center (abs <= 0.20) with a return spring.
+          // A floating pin sits continuously pegged at extreme values (+1.0 or -1.0) without resting at center.
+          const isExtreme = Math.abs(rawAxis4) >= 0.90;
+
+          if (Math.abs(rawAxis4) <= 0.20) {
+            this.axis4CenterFrames = (this.axis4CenterFrames || 0) + 1;
+            if (this.axis4CenterFrames >= 2) {
+              this.axis4Valid = true;
+            }
+          } else if (isExtreme && !this.axis4Valid) {
+            // Pegged at extreme without having been confirmed centered: floating pin!
+            this.axis4CenterFrames = 0;
+            axis4Floating = true;
+          }
+
+          if (this.axis4Valid) {
+            secondaryRudder = applyDeadzone(rawAxis4, this.deadzoneRudder);
+          }
         }
+        this.lastRawAxis4 = rawAxis4;
       }
+      this.axis4Floating = axis4Floating;
 
       if (this.rudderMode === 'twist') {
         this.rudder = twist;
+        this.activeRudderSource = 'twist';
       } else if (this.rudderMode === 'pedals') {
         this.rudder = secondaryRudder;
+        this.activeRudderSource = 'pedals';
       } else {
-        // Whichever has higher deflection governs the rudder
-        this.rudder = Math.abs(secondaryRudder) > Math.abs(twist) ? secondaryRudder : twist;
+        // Auto mode: whichever active source has higher deflection governs the rudder
+        if (Math.abs(secondaryRudder) > Math.abs(twist)) {
+          this.rudder = secondaryRudder;
+          this.activeRudderSource = 'pedals';
+        } else {
+          this.rudder = twist;
+          this.activeRudderSource = 'twist';
+        }
       }
 
       // Wheel Brakes: Trigger (Button 0)
@@ -516,6 +559,8 @@ export class HotasController {
       this.rudder = (axes.length > 2 && axes[2] !== undefined)
         ? applyDeadzone(axes[2], this.deadzoneRudder)
         : 0.0;
+      this.activeRudderSource = 'xbox';
+      this.axis4Floating = false;
 
       // Wheel Brakes: Main trigger is Right Trigger (RT / Button 7), fallback to Button 0 or Left Trigger (LT)
       const rtBtn = buttons[7];
@@ -641,6 +686,8 @@ export class HotasController {
       const bumperR = this.isButtonPressed(buttons, 5) ? 1.0 : 0.0;
       const bumperRudder = bumperL + bumperR;
       this.rudder = Math.abs(rStickX) > 0.05 ? rStickX : bumperRudder;
+      this.activeRudderSource = 'gamepad';
+      this.axis4Floating = false;
 
       // Triggers: LT (brakes), RT (throttle / brake)
       const ltBtn = buttons[6];
@@ -719,6 +766,9 @@ export class HotasController {
           throttle: this.throttle,
           brakes: this.brakes,
         },
+        activeRudderSource: this.activeRudderSource || 'twist',
+        axis4Valid: false,
+        axis4Floating: false,
       };
     }
 
@@ -751,6 +801,9 @@ export class HotasController {
         throttle: this.throttle,
         brakes: this.brakes,
       },
+      activeRudderSource: this.activeRudderSource || 'twist',
+      axis4Valid: Boolean(this.axis4Valid),
+      axis4Floating: Boolean(this.axis4Floating),
     };
   }
 }

@@ -404,6 +404,17 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     assert.strictEqual(dialog.buttonsGrid.children[1].classList.contains('is-pressed'), false);
     assert.strictEqual(dialog.buttonsGrid.children[2].classList.contains('is-pressed'), true);
 
+    // Check rudder source display
+    assert.ok(dialog.sourceRudder);
+    assert.ok(dialog.sourceRudder.textContent.length > 0);
+
+    // Verify floating pin detection badge
+    mockGamepad.axes = [0, 0, 1.0, 0, 1.0]; // Floating Axis 4 at 1.0
+    sim.controls.hotas.update(1 / 60);
+    dialog.updateTelemetry();
+    assert.strictEqual(dialog.sourceRudder.classList.contains('warning'), true);
+    assert.ok(dialog.sourceRudder.textContent.includes('부유 핀') || dialog.sourceRudder.textContent.includes('Floating'));
+
     dialog.close();
   });
 });

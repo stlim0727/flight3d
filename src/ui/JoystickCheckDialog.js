@@ -128,6 +128,7 @@ export class JoystickCheckDialog {
             <div class="joystick-meter-card">
               <div class="joystick-meter-head">
                 <span class="joystick-meter-name" data-i18n="joystick.axis.rudder">러더 (방향타 & 지상조향 / Rudder)</span>
+                <span class="joystick-meter-source" data-source-rudder></span>
                 <span class="joystick-meter-val" data-val-rudder>0.00</span>
               </div>
               <div class="joystick-meter-bar-wrap">
@@ -211,6 +212,7 @@ export class JoystickCheckDialog {
           <ul>
             <li data-i18n="joystick.tip.switch">스위치 위치: T.Flight Hotas One 본체 뒤쪽 'PC / XBOX' 스위치가 PC에 있어야 5축 원시 HID로 작동합니다. XBOX 모드인 경우 위 프로필에서 'XBOX 모드'를 선택하면 스로틀과 러더가 자동 정렬됩니다.</li>
             <li data-i18n="joystick.tip.led">5축 / 4축 모드 LED: Home/Preset 버튼 LED가 초록색이면 5축 모드(로커 패들 독립), 빨간색이면 4축 모드(트위스트와 로커 패들 연동)입니다.</li>
+            <li data-i18n="joystick.tip.rudder">러더 고정 현상: TFRP 페달이 연결되지 않은 경우 Axis 4(RJ12 단자)가 +1.0/-1.0으로 고정될 수 있습니다. 시스템이 부유 핀을 자동 차단하여 스틱 트위스트(Axis 3)로 정상 비행할 수 있으며, 필요 시 '러더 입력 소스'를 '스틱 트위스트 전용'으로 설정할 수 있습니다.</li>
             <li data-i18n="joystick.tip.browser">브라우저 보안: 웹 브라우저는 보안상 조종간 레버를 움직이거나 버튼을 누르기 전까지 입력을 노출하지 않습니다.</li>
           </ul>
         </div>
@@ -250,6 +252,7 @@ export class JoystickCheckDialog {
     this.barThrottle = this.dialog.querySelector('[data-bar-throttle]');
     this.valRudder = this.dialog.querySelector('[data-val-rudder]');
     this.barRudder = this.dialog.querySelector('[data-bar-rudder]');
+    this.sourceRudder = this.dialog.querySelector('[data-source-rudder]');
     this.valBrakes = this.dialog.querySelector('[data-val-brakes]');
     this.barBrakes = this.dialog.querySelector('[data-bar-brakes]');
 
@@ -497,6 +500,22 @@ export class JoystickCheckDialog {
       }
     }
 
+    if (this.sourceRudder) {
+      if (diag.axis4Floating) {
+        this.sourceRudder.textContent = t('joystick.rudder.source.floating') || '부유 핀 차단됨 · 트위스트 활성';
+        this.sourceRudder.className = 'joystick-meter-source warning';
+      } else if (diag.activeRudderSource === 'pedals') {
+        this.sourceRudder.textContent = t('joystick.rudder.source.pedals') || '로커/페달 (Axis 4)';
+        this.sourceRudder.className = 'joystick-meter-source active';
+      } else if (diag.activeRudderSource === 'xbox') {
+        this.sourceRudder.textContent = t('joystick.rudder.source.xbox') || '우측 스틱 X (Axis 2)';
+        this.sourceRudder.className = 'joystick-meter-source active';
+      } else {
+        this.sourceRudder.textContent = t('joystick.rudder.source.twist') || '스틱 트위스트 (Axis 3)';
+        this.sourceRudder.className = 'joystick-meter-source';
+      }
+    }
+
     // Wheel Brakes (unipolar: 0.0 to 1.0)
     if (this.valBrakes && this.barBrakes) {
       const brk = Math.max(0, Math.min(1, brakes));
@@ -537,16 +556,28 @@ export class JoystickCheckDialog {
     // 4. Raw Axes Inspector
     if (this.rawAxesList) {
       const axes = diag.axes || [];
+      const axisDescriptions = {
+        0: 'Roll / 에일러론',
+        1: 'Pitch / 엘리베이터',
+        2: diag.activeProfile === 'hotas-one-xbox' ? 'Rudder / 우측 스틱 X (Xbox)' : 'Throttle / 스로틀 레버',
+        3: diag.activeProfile === 'hotas-one-xbox' ? 'Throttle / 우측 스틱 Y (Xbox)' : 'Rudder Twist / 트위스트',
+        4: diag.axis4Floating ? 'Rocker/Pedal (부유 핀 감지 · 차단됨)' : 'Rocker/Pedal / 로커·페달',
+      };
+
       while (this.rawAxesList.children.length < axes.length) {
         const idx = this.rawAxesList.children.length;
         const item = document.createElement('div');
         item.className = 'joystick-raw-item';
-        item.innerHTML = `<span>Axis ${idx}:</span><span data-raw-axis="${idx}">0.000</span>`;
+        item.innerHTML = `<span>Axis ${idx}:</span><span data-raw-axis="${idx}">0.000</span><span class="raw-desc" data-raw-desc="${idx}"></span>`;
         this.rawAxesList.appendChild(item);
       }
       for (let i = 0; i < axes.length; i++) {
         const span = this.rawAxesList.querySelector(`[data-raw-axis="${i}"]`);
         if (span) span.textContent = axes[i].toFixed(3);
+        const descSpan = this.rawAxesList.querySelector(`[data-raw-desc="${i}"]`);
+        if (descSpan) {
+          descSpan.textContent = axisDescriptions[i] ? ` (${axisDescriptions[i]})` : '';
+        }
       }
     }
   }
