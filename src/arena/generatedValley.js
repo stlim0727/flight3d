@@ -161,7 +161,12 @@ function profileHeight({ crossM, floorM, halfWidthM, wallRiseM, ridgeExponent })
 export function createValleyTerrain({ samples, noise, reliefAmplitudeM = 10, crossJitterM = 12 }) {
   const cellSizeM = 400;
   const index = new Map();
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   samples.forEach((sample, sampleIndex) => {
+    if (sample.x < minX) minX = sample.x;
+    if (sample.x > maxX) maxX = sample.x;
+    if (sample.z < minZ) minZ = sample.z;
+    if (sample.z > maxZ) maxZ = sample.z;
     const reach = 2 * sample.halfWidth + 300;
     const fromX = Math.floor((sample.x - reach) / cellSizeM), toX = Math.floor((sample.x + reach) / cellSizeM);
     const fromZ = Math.floor((sample.z - reach) / cellSizeM), toZ = Math.floor((sample.z + reach) / cellSizeM);
@@ -215,6 +220,7 @@ export function createValleyTerrain({ samples, noise, reliefAmplitudeM = 10, cro
     size: 44000,
     gridSize: 0,
     region: 'generated-valley',
+    bounds: { minX, maxX, minZ, maxZ },
     project,
     getHeight(x, z) {
       const here = project(x, z);
