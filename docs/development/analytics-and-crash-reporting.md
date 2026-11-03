@@ -8,9 +8,10 @@ Telemetry is opt-in and safe no-op by default when no API key is configured.
 
 | Environment Variable / Config | Description | Default |
 | :--- | :--- | :--- |
-| `VITE_POSTHOG_KEY` | PostHog Project API Key (`phc_...`) | `""` (disabled) |
-| `VITE_POSTHOG_HOST` | PostHog API Host endpoint | `https://us.i.posthog.com` |
+| `VITE_POSTHOG_KEY` | PostHog Project API Key (`phc_...`) | Configured default (`phc_ussf...`) |
+| `VITE_POSTHOG_HOST` | PostHog API Host endpoint | `https://eu.i.posthog.com` |
 | `?posthogKey=<key>` | Runtime URL parameter override for debugging | None |
+| `?posthogHost=<host>` | Runtime URL host override for debugging | None |
 | `?telemetry=0` | Runtime URL parameter to disable telemetry | None |
 
 ### GitHub Pages Deployment

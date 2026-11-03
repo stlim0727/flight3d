@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  DEFAULT_POSTHOG_HOST,
+  DEFAULT_POSTHOG_KEY,
   getPostHogConfig,
   gatherFlightContext,
   trackEvent,
@@ -13,11 +15,48 @@ import {
   _resetAnalyticsForTesting,
 } from '../src/analytics/posthog.js';
 
-test('getPostHogConfig returns disabled config when no API key is provided', () => {
+test('getPostHogConfig defaults to EU host and provides configured EU key', () => {
+  assert.equal(DEFAULT_POSTHOG_HOST, 'https://eu.i.posthog.com');
+  assert.equal(DEFAULT_POSTHOG_KEY, 'phc_ussf2qgryzxghWApkvG2kcpXarbF4nNGTNEnwCBy8VKj');
+
   const config = getPostHogConfig();
   assert.equal(typeof config.apiKey, 'string');
-  assert.equal(typeof config.host, 'string');
+  assert.equal(config.host, 'https://eu.i.posthog.com');
+  // Safe in Node environments without window
   assert.equal(config.enabled, false);
+});
+
+test('getPostHogConfig in browser uses default EU credentials or query overrides', () => {
+  const originalWindow = globalThis.window;
+  try {
+    globalThis.window = {
+      location: { search: '' },
+      localStorage: { getItem: () => null },
+    };
+
+    const browserConfig = getPostHogConfig();
+    assert.equal(browserConfig.apiKey, DEFAULT_POSTHOG_KEY);
+    assert.equal(browserConfig.host, 'https://eu.i.posthog.com');
+    assert.equal(browserConfig.enabled, true);
+
+    // Test URL query param override
+    globalThis.window.location.search = '?posthogKey=custom_key&posthogHost=https://custom.posthog.com';
+    const overrideConfig = getPostHogConfig();
+    assert.equal(overrideConfig.apiKey, 'custom_key');
+    assert.equal(overrideConfig.host, 'https://custom.posthog.com');
+    assert.equal(overrideConfig.enabled, true);
+
+    // Test opt-out via query param
+    globalThis.window.location.search = '?telemetry=0';
+    const disabledConfig = getPostHogConfig();
+    assert.equal(disabledConfig.enabled, false);
+  } finally {
+    if (originalWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = originalWindow;
+    }
+  }
 });
 
 test('gatherFlightContext extracts simulator state safely', () => {

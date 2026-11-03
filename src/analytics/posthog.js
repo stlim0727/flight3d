@@ -14,7 +14,8 @@ let initialized = false;
 let initPromise = null;
 let activeSim = null;
 
-export const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com';
+export const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com';
+export const DEFAULT_POSTHOG_KEY = 'phc_ussf2qgryzxghWApkvG2kcpXarbF4nNGTNEnwCBy8VKj';
 
 /** Read PostHog API key from environment, window, or URL query */
 export function getPostHogConfig() {
@@ -32,7 +33,7 @@ export function getPostHogConfig() {
   const envKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_POSTHOG_KEY) || '';
   const envHost = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_POSTHOG_HOST) || DEFAULT_POSTHOG_HOST;
 
-  const apiKey = (urlKey || window.__POSTHOG_KEY__ || envKey || '').trim();
+  const apiKey = (urlKey || window.__POSTHOG_KEY__ || envKey || DEFAULT_POSTHOG_KEY || '').trim();
   const host = (urlHost || window.__POSTHOG_HOST__ || envHost || DEFAULT_POSTHOG_HOST).trim();
 
   return {
@@ -64,6 +65,7 @@ export async function initAnalytics(sim = null) {
 
       posthog.init(apiKey, {
         api_host: host,
+        defaults: '2026-05-30',
         autocapture: true,
         capture_pageview: true,
         capture_pageleave: true,
