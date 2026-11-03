@@ -97,12 +97,13 @@ test('analytics calls safely no-op when uninitialized without throwing', () => {
   });
 });
 
-test('trackEvent forwards formatted payload to PostHog instance when initialized', () => {
+test('trackEvent forwards formatted payload to PostHog instance when initialized', async () => {
   const captured = [];
   const mockPostHog = {
-    capture: (eventName, properties) => {
-      captured.push({ eventName, properties });
+    capture: (eventName, properties, options) => {
+      captured.push({ eventName, properties, options });
     },
+    flush: () => {},
   };
 
   _resetAnalyticsForTesting(mockPostHog);
@@ -160,23 +161,29 @@ test('trackEvent forwards formatted payload to PostHog instance when initialized
   assert.equal(captured[3].eventName, 'pilot_mode_selected');
   assert.equal(captured[3].properties.pilotMode, 'ai');
 
-  sendUserFeedback({
+  await sendUserFeedback({
     message: 'HUD text overlapped',
     contact: 'pilot@example.com',
     category: 'bug',
     includeContext: false,
   });
 
-  assert.equal(captured.length, 5);
+  assert.equal(captured.length, 6);
   assert.equal(captured[4].eventName, 'user_feedback_submitted');
   assert.equal(captured[4].properties.feedback_message, 'HUD text overlapped');
   assert.equal(captured[4].properties.feedback_contact, 'pilot@example.com');
+  assert.equal(captured[4].options?.send_instantly, true);
+
+  assert.equal(captured[5].eventName, '$feedback');
+  assert.equal(captured[5].properties.$feedback_text, 'HUD text overlapped');
+  assert.equal(captured[5].options?.send_instantly, true);
 
   captureException(new Error('Sample WebGL error'), { extra: 'debug' });
-  assert.equal(captured.length, 6);
-  assert.equal(captured[5].eventName, '$exception');
-  assert.equal(captured[5].properties.$exception_message, 'Sample WebGL error');
-  assert.equal(captured[5].properties.extra, 'debug');
+  assert.equal(captured.length, 7);
+  assert.equal(captured[6].eventName, '$exception');
+  assert.equal(captured[6].properties.$exception_message, 'Sample WebGL error');
+  assert.equal(captured[6].properties.extra, 'debug');
+  assert.equal(captured[6].options?.send_instantly, true);
 
   _resetAnalyticsForTesting(null);
 });

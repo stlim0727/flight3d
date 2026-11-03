@@ -154,14 +154,14 @@ export function gatherFlightContext(sim = activeSim) {
 }
 
 /** Safe track event */
-export function trackEvent(eventName, properties = {}) {
+export function trackEvent(eventName, properties = {}, options = {}) {
   if (!posthogInstance) return;
   try {
     posthogInstance.capture(eventName, {
       ...gatherFlightContext(),
       ...properties,
       timestamp: Date.now(),
-    });
+    }, options);
   } catch (err) {
     console.debug('[Analytics] capture error:', err);
   }
@@ -178,7 +178,7 @@ export function captureException(error, additionalContext = {}) {
       $exception_stack_trace_raw: errorObj.stack || '',
       ...gatherFlightContext(),
       ...additionalContext,
-    });
+    }, { send_instantly: true });
   } catch (err) {
     console.debug('[Analytics] exception capture error:', err);
   }
@@ -229,7 +229,15 @@ export function trackPilotModeChange(mode, missionId) {
 }
 
 /** Submit user bug report or feedback */
-export function sendUserFeedback({ message, contact = '', category = 'bug', includeContext = true, context = {} }) {
+export async function sendUserFeedback({ message, contact = '', category = 'bug', includeContext = true, context = {} }) {
+  if (!posthogInstance && !initialized) {
+    try {
+      await initAnalytics();
+    } catch {
+      // safe no-op on load failure
+    }
+  }
+
   const payload = {
     feedback_message: message,
     feedback_contact: contact,
@@ -237,7 +245,22 @@ export function sendUserFeedback({ message, contact = '', category = 'bug', incl
     ...(includeContext ? gatherFlightContext() : {}),
     ...context,
   };
-  trackEvent('user_feedback_submitted', payload);
+
+  trackEvent('user_feedback_submitted', payload, { send_instantly: true });
+  trackEvent('$feedback', {
+    $feedback_text: message,
+    $feedback_category: category,
+    $feedback_contact: contact,
+    ...payload,
+  }, { send_instantly: true });
+
+  try {
+    if (typeof posthogInstance?.flush === 'function') {
+      posthogInstance.flush();
+    }
+  } catch {
+    // ignore flush errors
+  }
 }
 
 /** For tests: inject mock or reset state */
