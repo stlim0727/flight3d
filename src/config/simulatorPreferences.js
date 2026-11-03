@@ -23,6 +23,9 @@ export function validateSimulatorPreferences(value) {
     if (typeof value.joystick.profileOverride === 'string' && /^[a-z0-9-]{1,32}$/.test(value.joystick.profileOverride)) {
       joy.profileOverride = value.joystick.profileOverride;
     }
+    if (['thrustmaster', 'legacy', 'auto'].includes(value.joystick.axesLayout)) {
+      joy.axesLayout = value.joystick.axesLayout;
+    }
     if (typeof value.joystick.throttleInverted === 'boolean') joy.throttleInverted = value.joystick.throttleInverted;
     if (typeof value.joystick.pitchInverted === 'boolean') joy.pitchInverted = value.joystick.pitchInverted;
     if (['auto', 'twist', 'pedals'].includes(value.joystick.rudderMode)) joy.rudderMode = value.joystick.rudderMode;

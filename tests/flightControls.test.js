@@ -355,7 +355,7 @@ it('integrates HOTAS One stick, throttle, and trigger inputs into FlightControls
       let mockGamepad = {
         id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
         index: 0,
-        axes: [0.75, 0.8, -1.0, 0.6, 0.0], // Roll right, Pitch up, Full TOGA throttle (axis 2), Rudder right (axis 3)
+        axes: [0.75, 0.8, 0.6, -1.0, 0.0], // Roll right (axis 0), Pitch up (axis 1), Rudder right (axis 2), Full TOGA throttle (axis 3)
         buttons: [{ pressed: true, value: 0.85 }], // Trigger brakes pulled at 85%
       };
 

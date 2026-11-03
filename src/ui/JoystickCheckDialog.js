@@ -112,6 +112,7 @@ export class JoystickCheckDialog {
             <div class="joystick-meter-card">
               <div class="joystick-meter-head">
                 <span class="joystick-meter-name" data-i18n="joystick.axis.throttle">스로틀 레버 (추력 / Throttle)</span>
+                <span class="joystick-meter-source" data-source-throttle></span>
                 <span class="joystick-meter-val" data-val-throttle>0%</span>
               </div>
               <div class="joystick-meter-bar-wrap">
@@ -173,10 +174,18 @@ export class JoystickCheckDialog {
               <span data-i18n="joystick.invert.pitch">피치 반전 (당겨서 상승, 밀어서 하강)</span>
             </label>
             <div class="joystick-field">
+              <label class="joystick-field-label" data-i18n="joystick.layout.label">축 배치 (Axis Layout)</label>
+              <select class="joystick-select" data-select-axes-layout>
+                <option value="thrustmaster" data-i18n="joystick.layout.thrustmaster">Thrustmaster 표준 (러더: Axis 2, 스로틀: Axis 3)</option>
+                <option value="legacy" data-i18n="joystick.layout.legacy">반전 레이아웃 (스로틀: Axis 2, 러더: Axis 3)</option>
+                <option value="auto" data-i18n="joystick.layout.auto">스마트 자동 감지 (Auto-Detect)</option>
+              </select>
+            </div>
+            <div class="joystick-field">
               <label class="joystick-field-label" data-i18n="joystick.rudder.mode">러더 입력 소스</label>
               <select class="joystick-select" data-select-rudder-mode>
                 <option value="auto" data-i18n="joystick.rudder.auto">자동 감지 (트위스트 + 패들/페달)</option>
-                <option value="twist" data-i18n="joystick.rudder.twist">스틱 트위스트 전용 (Axis 3)</option>
+                <option value="twist" data-i18n="joystick.rudder.twist">스틱 트위스트 전용</option>
                 <option value="pedals" data-i18n="joystick.rudder.pedals">로커 패들 / TFRP 페달 전용 (Axis 4)</option>
               </select>
             </div>
@@ -238,6 +247,7 @@ export class JoystickCheckDialog {
     this.statusBadge = this.dialog.querySelector('[data-status-badge]');
     this.detailsEl = this.dialog.querySelector('[data-device-details]');
     this.profileSelect = this.dialog.querySelector('[data-profile-select]');
+    this.axesLayoutSelect = this.dialog.querySelector('[data-select-axes-layout]');
     this.throttleInvertCheck = this.dialog.querySelector('[data-check-throttle-invert]');
     this.pitchInvertCheck = this.dialog.querySelector('[data-check-pitch-invert]');
     this.rudderModeSelect = this.dialog.querySelector('[data-select-rudder-mode]');
@@ -250,6 +260,7 @@ export class JoystickCheckDialog {
     this.barRoll = this.dialog.querySelector('[data-bar-roll]');
     this.valThrottle = this.dialog.querySelector('[data-val-throttle]');
     this.barThrottle = this.dialog.querySelector('[data-bar-throttle]');
+    this.sourceThrottle = this.dialog.querySelector('[data-source-throttle]');
     this.valRudder = this.dialog.querySelector('[data-val-rudder]');
     this.barRudder = this.dialog.querySelector('[data-bar-rudder]');
     this.sourceRudder = this.dialog.querySelector('[data-source-rudder]');
@@ -285,6 +296,12 @@ export class JoystickCheckDialog {
     // Profile selector
     this.profileSelect?.addEventListener('change', () => {
       this.hotas?.applyConfig({ profileOverride: this.profileSelect.value });
+      this.savePreferences();
+    });
+
+    // Axes layout selector
+    this.axesLayoutSelect?.addEventListener('change', () => {
+      this.hotas?.applyConfig({ axesLayout: this.axesLayoutSelect.value });
       this.savePreferences();
     });
 
@@ -328,6 +345,7 @@ export class JoystickCheckDialog {
     // Populate current config
     const config = this.hotas?.getConfig() || {};
     if (this.profileSelect) this.profileSelect.value = config.profileOverride || 'auto';
+    if (this.axesLayoutSelect) this.axesLayoutSelect.value = config.axesLayout || 'thrustmaster';
     if (this.throttleInvertCheck) this.throttleInvertCheck.checked = Boolean(config.throttleInverted);
     if (this.pitchInvertCheck) this.pitchInvertCheck.checked = Boolean(config.pitchInverted);
     if (this.rudderModeSelect) this.rudderModeSelect.value = config.rudderMode || 'auto';
@@ -486,6 +504,11 @@ export class JoystickCheckDialog {
       this.barThrottle.style.width = `${(th * 100).toFixed(1)}%`;
     }
 
+    if (this.sourceThrottle) {
+      this.sourceThrottle.textContent = `[Axis ${diag.throttleAxis ?? 3}]`;
+      this.sourceThrottle.className = 'joystick-meter-source active';
+    }
+
     // Rudder (bipolar: -1.0 to 1.0)
     if (this.valRudder && this.barRudder) {
       const rud = rudder;
@@ -501,17 +524,18 @@ export class JoystickCheckDialog {
     }
 
     if (this.sourceRudder) {
+      const rAxis = diag.rudderAxis ?? 2;
       if (diag.axis4Floating) {
-        this.sourceRudder.textContent = t('joystick.rudder.source.floating') || '부유 핀 차단됨 · 트위스트 활성';
+        this.sourceRudder.textContent = `부유 핀 차단됨 · Axis ${rAxis} 트위스트 활성`;
         this.sourceRudder.className = 'joystick-meter-source warning';
       } else if (diag.activeRudderSource === 'pedals') {
-        this.sourceRudder.textContent = t('joystick.rudder.source.pedals') || '로커/페달 (Axis 4)';
+        this.sourceRudder.textContent = '로커/페달 (Axis 4)';
         this.sourceRudder.className = 'joystick-meter-source active';
-      } else if (diag.activeRudderSource === 'xbox') {
-        this.sourceRudder.textContent = t('joystick.rudder.source.xbox') || '우측 스틱 X (Axis 2)';
+      } else if (diag.activeProfile === 'hotas-one-xbox') {
+        this.sourceRudder.textContent = '우측 스틱 X (Axis 2)';
         this.sourceRudder.className = 'joystick-meter-source active';
       } else {
-        this.sourceRudder.textContent = t('joystick.rudder.source.twist') || '스틱 트위스트 (Axis 3)';
+        this.sourceRudder.textContent = `스틱 트위스트 (Axis ${rAxis})`;
         this.sourceRudder.className = 'joystick-meter-source';
       }
     }
@@ -556,11 +580,18 @@ export class JoystickCheckDialog {
     // 4. Raw Axes Inspector
     if (this.rawAxesList) {
       const axes = diag.axes || [];
+      const isXbox = diag.activeProfile === 'hotas-one-xbox';
+      const rAxis = diag.rudderAxis ?? 2;
+      const tAxis = diag.throttleAxis ?? 3;
       const axisDescriptions = {
         0: 'Roll / 에일러론',
         1: 'Pitch / 엘리베이터',
-        2: diag.activeProfile === 'hotas-one-xbox' ? 'Rudder / 우측 스틱 X (Xbox)' : 'Throttle / 스로틀 레버',
-        3: diag.activeProfile === 'hotas-one-xbox' ? 'Throttle / 우측 스틱 Y (Xbox)' : 'Rudder Twist / 트위스트',
+        2: isXbox
+          ? 'Rudder / 우측 스틱 X (Xbox)'
+          : (rAxis === 2 ? 'Rudder Twist / 트위스트 (Z)' : 'Throttle / 스로틀 레버 (Z)'),
+        3: isXbox
+          ? 'Throttle / 우측 스틱 Y (Xbox)'
+          : (tAxis === 3 ? 'Throttle / 스로틀 레버 (RZ)' : 'Rudder Twist / 트위스트 (RZ)'),
         4: diag.axis4Floating ? 'Rocker/Pedal (부유 핀 감지 · 차단됨)' : 'Rocker/Pedal / 로커·페달',
       };
 
@@ -591,6 +622,7 @@ export class JoystickCheckDialog {
     if (!this.hotas) return;
     const defaults = {
       profileOverride: 'auto',
+      axesLayout: 'thrustmaster',
       throttleInverted: false,
       pitchInverted: false,
       rudderMode: 'auto',
@@ -600,6 +632,7 @@ export class JoystickCheckDialog {
     this.hotas.applyConfig(defaults);
 
     if (this.profileSelect) this.profileSelect.value = 'auto';
+    if (this.axesLayoutSelect) this.axesLayoutSelect.value = 'thrustmaster';
     if (this.throttleInvertCheck) this.throttleInvertCheck.checked = false;
     if (this.pitchInvertCheck) this.pitchInvertCheck.checked = false;
     if (this.rudderModeSelect) this.rudderModeSelect.value = 'auto';

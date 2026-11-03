@@ -71,12 +71,15 @@ export class HotasController {
 
     // Configuration
     this.profileOverride = options.profileOverride || 'auto'; // 'auto', 'hotas-one', 'hotas-one-xbox', 'hotas-tflight', 'flight-stick', 'standard-gamepad'
+    this.axesLayout = options.axesLayout || 'thrustmaster'; // 'thrustmaster' (Rudder 2, Throttle 3), 'legacy' (Throttle 2, Rudder 3), 'auto'
     this.throttleInverted = options.throttleInverted ?? false; // standard: forward = 1.0 (TOGA), backward = 0.0 (Idle)
     this.pitchInverted = options.pitchInverted ?? false;
     this.rudderMode = options.rudderMode || 'auto'; // 'auto', 'twist', 'pedals'
     this.deadzoneStick = options.deadzoneStick ?? 0.04;
     this.deadzoneRudder = options.deadzoneRudder ?? 0.05;
     this.throttleDeltaThreshold = 0.005;
+    this.throttleAxis = 3;
+    this.rudderAxis = 2;
 
     // Internal state tracking
     this.lastRawThrottle = null;
@@ -100,6 +103,7 @@ export class HotasController {
 
   applyConfig(cfg = {}) {
     if (typeof cfg.profileOverride === 'string') this.profileOverride = cfg.profileOverride;
+    if (['thrustmaster', 'legacy', 'auto'].includes(cfg.axesLayout)) this.axesLayout = cfg.axesLayout;
     if (typeof cfg.throttleInverted === 'boolean') this.throttleInverted = cfg.throttleInverted;
     if (typeof cfg.pitchInverted === 'boolean') this.pitchInverted = cfg.pitchInverted;
     if (['auto', 'twist', 'pedals'].includes(cfg.rudderMode)) this.rudderMode = cfg.rudderMode;
@@ -114,6 +118,7 @@ export class HotasController {
   getConfig() {
     return {
       profileOverride: this.profileOverride,
+      axesLayout: this.axesLayout,
       throttleInverted: this.throttleInverted,
       pitchInverted: this.pitchInverted,
       rudderMode: this.rudderMode,
@@ -129,8 +134,9 @@ export class HotasController {
     }
     const baseType = identifyGamepadType(gamepad);
     if (baseType === 'hotas-one') {
+      const isPcMode = /(?:b68b|product:\s*b68b)/i.test(gamepad.id || '');
+      if (isPcMode) return 'hotas-one';
       const isXboxMode = /(?:b68d|product:\s*b68d)/i.test(gamepad.id || '')
-        || gamepad.mapping === 'standard'
         || (gamepad.id || '').toLowerCase().includes('xbox')
         || (gamepad.id || '').toLowerCase().includes('xinput');
       return isXboxMode ? 'hotas-one-xbox' : 'hotas-one';
@@ -350,14 +356,32 @@ export class HotasController {
       const rawElevator = applyDeadzone(axes[1] ?? 0.0, this.deadzoneStick);
       this.elevator = this.pitchInverted ? -rawElevator : rawElevator;
 
-      // Axis 2: Throttle Lever (Forward = TOGA / 1.0, Backward = Idle / 0.0)
-      if (axes.length > 2 && axes[2] !== undefined) {
-        this.updateThrottleFromRaw(axes[2]);
+      // Determine axes assignment based on layout
+      let twistAxisIdx = 2;
+      let throttleAxisIdx = 3;
+
+      if (axes.length <= 3) {
+        twistAxisIdx = -1;
+        throttleAxisIdx = 2;
+      } else if (this.axesLayout === 'legacy') {
+        twistAxisIdx = 3;
+        throttleAxisIdx = 2;
+      } else {
+        // 'thrustmaster' default (and auto with >= 4 axes): Z=Rudder (Axis 2), RZ=Throttle (Axis 3)
+        twistAxisIdx = 2;
+        throttleAxisIdx = 3;
+      }
+      this.throttleAxis = throttleAxisIdx;
+      this.rudderAxis = twistAxisIdx;
+
+      // Throttle Lever
+      if (throttleAxisIdx >= 0 && axes.length > throttleAxisIdx && axes[throttleAxisIdx] !== undefined) {
+        this.updateThrottleFromRaw(axes[throttleAxisIdx]);
       }
 
-      // Axis 3: Primary Rudder (Stick Twist handle, and throttle rocker in 4-axis mode)
-      const twist = (axes.length > 3 && axes[3] !== undefined)
-        ? applyDeadzone(axes[3], this.deadzoneRudder)
+      // Primary Rudder (Stick Twist handle on Axis 2, and throttle rocker in 4-axis mode)
+      const twist = (twistAxisIdx >= 0 && axes.length > twistAxisIdx && axes[twistAxisIdx] !== undefined)
+        ? applyDeadzone(axes[twistAxisIdx], this.deadzoneRudder)
         : 0.0;
 
       // Axis 4: Secondary Rudder (e.g. TFRP pedals or independent 5-axis rocker paddle).
@@ -769,6 +793,9 @@ export class HotasController {
         activeRudderSource: this.activeRudderSource || 'twist',
         axis4Valid: false,
         axis4Floating: false,
+        axesLayout: this.axesLayout,
+        throttleAxis: this.throttleAxis,
+        rudderAxis: this.rudderAxis,
       };
     }
 
@@ -804,6 +831,9 @@ export class HotasController {
       activeRudderSource: this.activeRudderSource || 'twist',
       axis4Valid: Boolean(this.axis4Valid),
       axis4Floating: Boolean(this.axis4Floating),
+      axesLayout: this.axesLayout,
+      throttleAxis: this.throttleAxis,
+      rudderAxis: this.rudderAxis,
     };
   }
 }
