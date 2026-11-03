@@ -45,6 +45,7 @@ export default {
   "ui.camera.drone": "드론 · 7",
   "ui.camera.auto": "Auto · 8",
   "ui.camera.hud": "HUD · 9",
+  "ui.camera.director": "감독 (시네마틱) · 0",
   "hud.trim": "트림",
   "hud.flaps": "플랩",
   "hud.brake": "주차 브레이크",

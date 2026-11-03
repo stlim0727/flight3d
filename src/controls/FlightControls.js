@@ -105,12 +105,13 @@ export class FlightControls {
   handleKeyDown(e) {
     if (e.target?.closest?.('select')) return;
     if (this.inputBlocked) return;
-    const cameraDigit = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
+    const cameraDigit = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
     if (cameraDigit || e.code === 'KeyC') {
       if (e.repeat || e.ctrlKey || e.altKey || e.metaKey ||
           e.target?.isContentEditable || e.target?.closest?.('input, textarea, select')) return;
       if (cameraDigit) {
-        if (this.onSelectCamera) this.onSelectCamera(Number(cameraDigit[1]) - 1);
+        const val = Number(cameraDigit[1]);
+        if (this.onSelectCamera) this.onSelectCamera(val === 0 ? 9 : val - 1);
       } else if (this.onCycleCamera) this.onCycleCamera();
       return;
     }

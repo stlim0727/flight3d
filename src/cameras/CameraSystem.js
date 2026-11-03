@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { autoCameraIntent } from './autoCameraIntent.js';
+import { CinematicCameraDirector } from './CinematicCameraDirector.js';
 
 /**
- * Eight camera views with a separate automatic scenic director
+ * Camera views with automatic scenic director and cinematic camera director
  * Features G-force cockpit head dynamics, stall buffeting vibration, touchdown shock jolt,
  * smooth exterior damping, and automatic temporary cinematic view cuts for takeoff/landing/gear transit.
  */
@@ -16,7 +17,8 @@ export class CameraSystem {
     GEAR: 5,
     DRONE: 6,
     AUTO: 7,
-    HUD: 8
+    HUD: 8,
+    DIRECTOR: 9
   };
 
   // Keep digit shortcuts stable; the quick cycle follows viewing intent instead.
@@ -36,6 +38,10 @@ export class CameraSystem {
     this.autoSwitchTimer = 0;
     this.autoContext = null;
     this.customViewUpdater = null;
+    this.cinematicDirector = new CinematicCameraDirector({
+      camera: this.camera,
+      queryGroundHeight: (x, z) => this.queryGroundHeight(x, z),
+    });
 
     // Temporary Cinematic View Cut State (e.g. brief gear cam preview during takeoff, landing, gear transit)
     this.temporaryViewTimer = 0;
@@ -647,6 +653,7 @@ export class CameraSystem {
     this.targetCursorNormY = 0;
     this.cursorNormX = 0;
     this.cursorNormY = 0;
+    this.cinematicDirector?.reset?.();
   }
 
   togglePointerLock() {
@@ -925,6 +932,9 @@ export class CameraSystem {
     if (this.mode === CameraSystem.MODES.DRONE) {
       this.droneInitialized = false;
     }
+    if (this.mode === CameraSystem.MODES.DIRECTOR) {
+      this.cinematicDirector?.reset?.();
+    }
     return true;
   }
 
@@ -972,6 +982,7 @@ export class CameraSystem {
       case CameraSystem.MODES.GEAR: return 'GEAR CAM (BELLY)';
       case CameraSystem.MODES.DRONE: return 'DRONE (ORBIT VIEW)';
       case CameraSystem.MODES.HUD: return 'HUD';
+      case CameraSystem.MODES.DIRECTOR: return 'CINEMATIC DIRECTOR';
       default: return 'CAMERA';
     }
   }
@@ -1542,6 +1553,19 @@ export class CameraSystem {
         this.camera.up.set(0, 1, 0);
         const lookTarget = planePos.clone().add(this.droneLookOffset);
         this.camera.lookAt(lookTarget);
+        break;
+      }
+      case CameraSystem.MODES.DIRECTOR: {
+        this.cinematicDirector.setTerrainQuery((x, z) => this.queryGroundHeight(x, z));
+        this.cinematicDirector.update({
+          dt,
+          camera: this.camera,
+          planePos,
+          planeQuat,
+          aircraftMesh,
+          flightState,
+          queryGroundHeight: (x, z) => this.queryGroundHeight(x, z),
+        });
         break;
       }
     }
