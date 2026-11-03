@@ -18,6 +18,8 @@ export function createPilot() {
   let route = [], gates = [], waypoints = [], knots = [];
   let cruise = 236, trimDeg = 0, dt = 0.2;
   let filteredVz = 0, previousPitch = null, previousRoll = null, previousHeight = null;
+  let bankIntegral = 0;
+  let estX = null, estZ = null;
   let command = { elevator: 0, aileron: 0, rudder: 0, throttle: 0.4, brakes: 0 };
   let hint = 0;
 
@@ -27,7 +29,7 @@ export function createPilot() {
       const off = g.crossOffsetM;
       const nextOff = gates[i + 1]?.crossOffsetM ?? 0;
       const clipDir = (nextOff < off) ? -1 : 1;
-      const maxClip = Math.min(24, (g.passageHalfWidthM ?? 60) * 0.4);
+      const maxClip = Math.min(10, (g.passageHalfWidthM ?? 25) * 0.35);
       return off + clipDir * maxClip;
     });
   }
@@ -52,16 +54,23 @@ export function createPilot() {
   }
 
   function planCrossAt(progressM) {
-    if (progressM <= gates[0].sM) return knots[0];
+    if (!gates.length) return 0;
+    if (progressM <= gates[0].sM) return gates[0].crossOffsetM;
     const N = gates.length;
-    if (progressM >= gates[N - 1].sM) return knots[N - 1];
+    if (progressM >= gates[N - 1].sM) return gates[N - 1].crossOffsetM;
     let i = 1;
-    while (i < N - 1 && gates[i].sM < progressM) i++;
+    while (i < N && gates[i].sM < progressM) i++;
     const from = gates[i - 1], to = gates[i];
-    const h = to.sM - from.sM || 1;
-    const t = clamp((progressM - from.sM) / h, 0, 1);
-    const S = t * t * (3 - 2 * t);
-    return knots[i - 1] + (knots[i] - knots[i - 1]) * S;
+    const s = progressM - from.sM;
+    const L = to.sM - from.sM || 1;
+    const transitionStart = Math.max(L * 0.70, L - 750);
+    const apexOffset = from.crossOffsetM * 0.60;
+    if (s < transitionStart) {
+      return apexOffset;
+    }
+    const u = (s - transitionStart) / (L - transitionStart || 1);
+    const w = u * u * (3 - 2 * u);
+    return apexOffset * (1 - w) + to.crossOffsetM * w;
   }
 
   function pathPointAt(progressM) {
@@ -71,22 +80,9 @@ export function createPilot() {
   }
 
   function pathCurvatureAt(progressM) {
-    if (gates.length < 2) return 0;
-    let i = 1;
-    while (i < gates.length - 1 && gates[i].sM < progressM) i++;
-    const from = gates[i - 1], to = gates[i];
-    const ds = to.sM - from.sM || 1;
-    const curCurv = signed(to.headingDeg - from.headingDeg) * RAD / ds;
-    const distToGate = to.sM - progressM;
-    const blendDist = 100;
-    if (i < gates.length - 1 && distToGate < blendDist && distToGate > 0) {
-      const nextGate = gates[i + 1];
-      const nextDs = nextGate.sM - to.sM || 1;
-      const nextCurv = signed(nextGate.headingDeg - to.headingDeg) * RAD / nextDs;
-      const blend = (blendDist - distToGate) / blendDist;
-      return curCurv * (1 - blend) + nextCurv * blend;
-    }
-    return curCurv;
+    const c1 = centerAt(progressM - 150);
+    const c2 = centerAt(progressM + 150);
+    return signed(c2.headingDeg - c1.headingDeg) * RAD / 300;
   }
 
   function project(x, z) {
@@ -121,7 +117,9 @@ export function createPilot() {
     dt = briefing.decisionPeriodSeconds ?? 0.2;
     hint = 0;
     filteredVz = 0;
+    bankIntegral = 0;
     previousPitch = previousRoll = previousHeight = null;
+    estX = estZ = null;
     if (gates[0] && route.length) {
       let bestD = Infinity;
       for (let i = 0; i < route.length; i++) {
@@ -145,62 +143,79 @@ export function createPilot() {
       if ([ias, pitch, roll, heading, altitudeFt, vsiFpm, gateBearing, gateRange].some(v => v === null)
           || !waypoint || !currentGate || !route.length || !gates.length) return { ...command };
 
-      const ownX = waypoint.x - Math.sin(gateBearing * RAD) * gateRange;
-      const ownZ = waypoint.z + Math.cos(gateBearing * RAD) * gateRange;
-      const here = project(ownX, ownZ);
+      // Noise-filtered absolute position from gate radio beacon
+      const measX = waypoint.x - Math.sin(gateBearing * RAD) * gateRange;
+      const measZ = waypoint.z + Math.cos(gateBearing * RAD) * gateRange;
+      if (estX === null) { estX = measX; estZ = measZ; }
+      else {
+        estX += 0.35 * (measX - estX);
+        estZ += 0.35 * (measZ - estZ);
+      }
+      const here = project(estX, estZ);
       if (!here || here.distance > 1200) return { ...command };
 
       const height = altitudeFt * 0.3048, vz = vsiFpm * 0.3048 / 60;
       const speed = Math.max(40, (read(s.tasKnots) ?? ias * 1.13) * 0.514444);
 
-      // Tangent heading guidance with PD cross-track correction & curvature feedforward
-      const center = centerAt(here.progressM + Math.min(150, speed * 0.6));
-      const targetCross = planCrossAt(here.progressM + Math.min(150, speed * 0.6));
-      const crossError = targetCross - here.crossM;
-      const relHdg = signed(heading - (center.headingDeg ?? heading));
-      const headingCorrection = clamp(crossError * 0.14 - relHdg * 0.65, -18, 18);
-      const targetHeading = ((center.headingDeg ?? heading) + headingCorrection + 360) % 360;
-      const headingError = signed(targetHeading - heading);
+      // Lateral guidance: path curvature feedforward + Stanley cross-track correction
+      const center = centerAt(here.progressM);
+      const relHdg = signed(heading - center.headingDeg);
 
-      const ffAcc = speed * speed * pathCurvatureAt(here.progressM + speed * 0.9);
-      const fbAcc = clamp(headingError * 1.6, -14, 14);
-      const aLat = clamp(ffAcc + fbAcc, -34, 34);
-      const bankTarget = clamp(Math.atan(aLat / GRAVITY) / RAD, -73, 73);
+      const curvLeadDist = clamp(speed * 0.80, 180, 230);
+      const curvLeadAhead = pathCurvatureAt(here.progressM + curvLeadDist);
+      const curvHere = pathCurvatureAt(here.progressM);
+      // Lead into turns in advance; but when exiting, stay in the turn until actually reaching the exit!
+      const curvDemand = (Math.abs(curvLeadAhead) < Math.abs(curvHere)) ? curvHere : curvLeadAhead;
+      const ffAcc = speed * speed * curvDemand;
 
-      // Vertical equilibrium with terrain slope feedforward
-      const terrainClimbRate = clamp(vz - (height - (previousHeight ?? height)) / dt, -10, 15);
-      previousHeight = height;
+      // Cross-track heading intercept
+      const targetCross = planCrossAt(here.progressM);
+      const crossError = here.crossM - targetCross;
+      const headingInterceptDeg = clamp((-crossError * 0.70 / speed) / RAD, -12, 12);
+      const desiredHeading = center.headingDeg + headingInterceptDeg;
+      const headingError = signed(desiredHeading - heading);
+      const fbAcc = clamp(headingError * 1.2, -12, 12);
 
-      const targetHeight = 60;
-      const desiredVz = clamp((targetHeight - height) * 0.8 + 0.8 * Math.max(0, terrainClimbRate), -15, 18);
-      filteredVz += (desiredVz - filteredVz) * (1 - Math.exp(-dt / 0.35));
+      const aLat = clamp(ffAcc + fbAcc, -46, 46);
+      const bankTarget = clamp(Math.atan(aLat / GRAVITY) / RAD, -77, 77);
+
+      // Coordinated turn load factor: exactly balance weight and centripetal demand
+      const cosBank = Math.max(0.20, Math.cos(roll * RAD));
+      const nLat = Math.abs(aLat) / GRAVITY;
+      const reqNz = Math.sqrt(1 + nLat * nLat);
+      // Vertical altitude regulation: hold flat level flight (vz -> 0) in the turn
+      const deltaNz = clamp((-vz * 0.4) / (GRAVITY * cosBank), -0.25, 0.5);
+      const targetNz = clamp(reqNz + deltaNz, 0.8, 5.0);
+
+      // Dynamic control stiffness at current IAS
+      const stiffness = Math.max(0.40, 1.0 - Math.max(0, (ias - 140) / 220.0) * 0.55);
+      const elevFeedforward = clamp((targetNz - 1.0) / (27.0 * stiffness), -0.30, 0.65);
 
       const measuredPitchRate = read(s.pitchRateDegS) ?? (previousPitch === null ? 0 : (pitch - previousPitch) / dt);
       const measuredRollRate = read(s.rollRateDegS) ?? (previousRoll === null ? 0 : (roll - previousRoll) / dt);
       previousPitch = pitch; previousRoll = roll;
       const pitchRate = clamp(measuredPitchRate, -50, 50) * RAD;
-      const rollRate = clamp(measuredRollRate, -80, 80) * RAD;
-      const q = Math.max(500, 0.5 * 1.225 * (ias * 0.514444) ** 2);
-      const flightPath = Math.atan2(vz, speed);
+      const rollRate = clamp(measuredRollRate, -100, 100) * RAD;
 
-      const cosBank = Math.max(0.28, Math.cos(roll * RAD));
-      const turnAlpha = clamp((12000 * GRAVITY / (q * 27.87 * cosBank) - 0.05) / 4.2, 0.02, 0.23);
-      const alphaEstimate = pitch * RAD - flightPath;
-      const bankGComp = (1 / cosBank - 1) * 1.2 * RAD;
-      const pitchTarget = clamp((Math.atan2(filteredVz, speed) + turnAlpha + (turnAlpha - alphaEstimate) + bankGComp) / RAD, -20, 32) * RAD;
-      const desiredPitchRate = clamp((pitchTarget - pitch * RAD) * 1.8, -0.35, 0.35);
-      const qRef = Math.min(q, 9500);
-      const requiredCm = 75000 * (desiredPitchRate - pitchRate) * 2.5 / (qRef * 27.87 * 3.45);
-      const qHat = pitchRate * 3.45 / (2 * speed);
-      const turnElevator = clamp((1 / cosBank - 1) * 0.08 + (targetHeight - height) * 0.004 - vz * 0.006, -0.20, 0.25);
-      const elevator = ((requiredCm + 0.45 * alphaEstimate + 12 * qHat) / 1.8 - trimDeg * RAD) / (20 * RAD) + turnElevator;
+      const qTurn = Math.abs(curvDemand) * speed * Math.abs(Math.sin(roll * RAD));
+      // Steady-turn pitch rate trim with vertical rate stabilization
+      const qTrimElev = Math.max(0, (qTurn * 0.10 - clamp(vz * 0.015, -0.04, 0.04))) / stiffness;
 
-      // Damped bank response with transport-delay prediction (calibrated for 410kt IAS)
-      const rollLead = roll + (rollRate / RAD) * 0.25;
-      const bankError = bankTarget - rollLead;
-      const aileron = clamp(bankError * 0.009 - (rollRate / RAD) * 0.0016, -0.32, 0.32);
+      // Pitch attitude tracking active for bank < 60 deg
+      const wingsLevel = Math.max(0, cosBank - 0.5) / 0.5;
+      const desiredVz = clamp((80 - height) * 0.6, -18, 12);
+      const targetPitchDeg = 1.19 + clamp(desiredVz * 0.35, -5.0, 3.0);
+      const straightPitchElev = (wingsLevel * clamp((targetPitchDeg - pitch) * 0.08 - (pitchRate / RAD) * 0.03, -0.35, 0.35)) / stiffness;
+
+      const elevator = elevFeedforward + qTrimElev + straightPitchElev;
+
+      // Critically damped roll response (calibrated for F-16 roll inertia and 435kt dynamic pressure)
+      const bankError = bankTarget - roll;
+      const rollRateDeg = rollRate / RAD;
+      const aileron = clamp(bankError * 0.009 - rollRateDeg * 0.0022, -0.45, 0.45);
       const throttle = clamp((cruise - ias) * 0.08 + (1 / cosBank - 1) * 0.30 + 0.52, 0, 1);
 
+      // Control outputs with calibrated actuator bounds
       command = {
         elevator: clamp(elevator, -0.7, 0.8),
         aileron: clamp(aileron, -0.6, 0.6),
