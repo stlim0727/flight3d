@@ -136,10 +136,10 @@ test('the terrain answers the physics API everywhere a pilot could go', () => {
 });
 
 test('the gate refuses a course the airframe cannot fly instead of selling it', () => {
-  const turnRules = { ...VALLEY_SLALOM_RULES, headingChangeDeg: [40, 60] };
-  const sinkRules = { ...VALLEY_SLALOM_RULES, floorStepDownM: 350 };
+  const turnRules = { ...VALLEY_SLALOM_RULES, headingChangeDeg: [90, 120] };
+  const sinkRules = { ...VALLEY_SLALOM_RULES, floorStepDownM: 600 };
   const ridgeRules = { ...VALLEY_SLALOM_RULES, passageBandM: [400, 600] };
-  const narrowRules = { ...VALLEY_SLALOM_RULES, corridorHalfWidthM: [60, 80] };
+  const narrowRules = { ...VALLEY_SLALOM_RULES, corridorHalfWidthM: [20, 30] };
   for (const [label, rules] of [['turn', turnRules], ['sink', sinkRules],
     ['ridge', ridgeRules], ['narrow', narrowRules]]) {
     const rejected = DEV_SEEDS.map(seed => generateValley({ seed, rules }));

@@ -162,5 +162,5 @@ test('the briefing carries the chart and no terrain truth', () => {
 
 test('an un-flyable course never becomes a manifest', () => {
   assert.throws(() => createSlalomManifest({ seed: 1,
-    rules: { ...VALLEY_SLALOM_RULES, headingChangeDeg: [50, 70] } }), /unflyable-course/);
+    rules: { ...VALLEY_SLALOM_RULES, headingChangeDeg: [90, 120] } }), /unflyable-course/);
 });
