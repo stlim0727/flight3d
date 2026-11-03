@@ -56,8 +56,12 @@ The scenario uses the common flight HUD and controls. Use **Esc → Scenario
 restart** to restart; after a crash use the common report and
 **Space / R / Enter → main menu → Fly**. Menu selection retains the Han River region.
 
-Leaving the river corridor is not prevented. Skyline buildings have no collision
-proxies (see below); boundary handling is tracked in #393.
+Leaving the river corridor is not prevented. The corridor is the water between the
+banks (450 m either side of the river centreline) over the 10.4 km the banks are drawn,
+z = 2,500 to -7,900 m (`HANGANG_CORRIDOR`, `corridorExcess()`). Crossing out of it shows
+a toast once that the scenery ends ahead; it does not mention the skyline's missing
+collision. Nothing fails; the notice re-arms 50 m back inside (#393). Collision proxies for the skyline and
+landmarks, and closing off the scene edge, remain open in #393.
 
 ## Physics and geometry contracts
 
