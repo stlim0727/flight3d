@@ -1,6 +1,5 @@
 export default {
   "the.nose.struck.an.airport.control.tower": "The nose struck an airport control tower.",
-  "aircraft.damage": "Aircraft damage",
   "touch.controls": "📱 Touch controls",
   "aircraft.systems.cameras": "⚙️ Aircraft systems & cameras",
   "right.virtual.stick.yoke": "Right virtual stick (yoke)",
@@ -79,10 +78,6 @@ export default {
   "aircraft.c172": "🛩️ Cessna 172",
   "notice.aircraft": "Aircraft: {name}",
   "warning.stall": "⚠️ STALL WARNING - LOWER THE NOSE ⚠️",
-  "crash.impact": "💥 CATASTROPHIC IMPACT",
-  "crash.hullLoss": "HULL LOSS",
-  "crash.expand": "Expand report",
-  "crash.collapse": "Collapse report",
   "notice.bodyContact": "Ground contact: {parts}",
   "notice.bodyDamage": "{part}: {state}",
   "body.state.damaged": "DAMAGED",

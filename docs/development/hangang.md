@@ -180,8 +180,8 @@ Evidence is in `review-artifacts/hangang/`. Checks cover a contact-free flight
 under all three bridges, a sustained climb well above the former envelope that
 keeps flying, water impact, common pause/restart and crash-to-menu recovery,
 autopilot exclusion, absence of a dedicated scenario HUD, and environment restore.
-Crash-to-menu follows the player's flow: the collapsed crash report is visible
-during the crash scene, then Space opens the menu holding the wreck (still
+Crash-to-menu follows the player's flow: the crash scene shows the wreckage
+without an in-flight report (#454), then Space opens the menu holding the wreck (still
 crashed, no Resume, pending debrief cancelled) and Fly starts a fresh sortie.
 Headless runs enable CDP focus emulation so the simulator loop is not held as a
 background tab.

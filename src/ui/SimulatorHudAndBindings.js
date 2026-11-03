@@ -529,6 +529,7 @@ class SimulatorHudAndBindingsMethods {
     this.debriefOverlay = new DebriefOverlay({
       onRetry: () => this.retryDebrief(),
       onLobby: () => { this.demoDirector.stop(); this.gameFlow.returnToLobby(false); document.getElementById('btn-fly')?.focus(); },
+      onFeedback: () => this.openFeedbackDialog?.(),
     });
     document.getElementById('btn-pause-end')?.addEventListener('click', () => this.endFlight());
     document.getElementById('btn-lobby-end')?.addEventListener('click', () => this.endFlight());
@@ -599,15 +600,6 @@ class SimulatorHudAndBindingsMethods {
     document.getElementById('btn-help-joystick-check')?.addEventListener('click', () => {
       helpModal?.classList.remove('visible');
       this.joystickDialog?.open();
-    });
-
-    // Crash report: header toggles the full report; the main menu button is the
-    // persistent top-left one. Back to the lobby is also [Space / R / Enter].
-    document.getElementById('btn-crash-toggle')?.addEventListener('click', () => {
-      this.setCrashReportMinimized(!this.isCrashReportMinimized);
-    });
-    document.getElementById('btn-crash-report')?.addEventListener('click', () => {
-      this.openFeedbackDialog?.();
     });
 
     const toggleYokes = () => {

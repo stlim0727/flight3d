@@ -134,8 +134,8 @@ try {
   await delay(300);await capture('failure');
   const retry = await evaluate(()=>{
     const s=window.simulator;
-    // The player sees the collapsed crash report during the crash scene (#362), before the debrief.
-    const reportShown=document.getElementById('crash-overlay').style.display==='flex'
+    // The player watches the crash scene (#362) before the debrief, the only crash report (#454).
+    const crashScene=!document.getElementById('crash-overlay')
       && s.gameFlow.state==='flight' && s.crashDebriefRemaining>0;
     window.dispatchEvent(new KeyboardEvent('keydown',{code:'Space',key:' '}));
     // Space holds the wreck behind the menu without a resume or a later debrief.
@@ -143,7 +143,7 @@ try {
       && s.crashDebriefRemaining===null && document.getElementById('btn-lobby-resume').hidden;
     document.getElementById('btn-fly').click();
     s.stepSimulation(0.1);
-    return {reportShown,crashToMenu,healthy:!s.isCrashed && !s.aero.isStalled, trauma:s.cameraSystem.trauma,
+    return {crashScene,crashToMenu,healthy:!s.isCrashed && !s.aero.isStalled, trauma:s.cameraSystem.trauma,
       reset:s.hangang.collision.contact===null, altitude:s.telemetry.radioAltFt};
   });
   await send('Emulation.setDeviceMetricsOverride',{width:412,height:915,deviceScaleFactor:1,mobile:true});
@@ -171,7 +171,7 @@ try {
   assert.equal(flight.bridges.contact,null);assert.equal(flight.bridges.crashed,false);assert.ok(flight.bridges.position[2]<=-3800);
   assert.equal(flight.contact,null);assert.equal(flight.crashed,false);assert.ok(flight.active);assert.ok(flight.height>40);
   assert.ok(Object.values(lifecycle).every(Boolean));assert.equal(exceptions.length,0);
-  assert.ok(retry.reportShown && retry.crashToMenu && retry.healthy && retry.reset);assert.equal(retry.trauma,0);assert.ok(retry.altitude>50);
+  assert.ok(retry.crashScene && retry.crashToMenu && retry.healthy && retry.reset);assert.equal(retry.trauma,0);assert.ok(retry.altitude>50);
 } finally {
   socket?.close();chrome.kill();
   await delay(1500);

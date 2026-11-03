@@ -91,14 +91,20 @@ test('crash reports snapshot the collision once and include it in shared text', 
   const time = flightDuration(report.durationSec);
   setLanguage('ko');
   assert.ok(reportText(report).includes(`충돌: 지형 충돌 · 178 KT · ${time}`));
+  assert.ok(reportText(report).includes('충돌 대상: 지형'), 'the collision target replaces the removed crash card field');
   setLanguage('en');
   assert.ok(reportText(report).includes(`Impact: 지형 충돌 · 178 KT · ${time}`));
+  assert.ok(reportText(report).includes('Collision target: Terrain'));
 
   const manual = new FlightRecorder(); manual.start(metadata); record(5, manual);
   assert.equal(manual.finish('manual').crash, null);
-  assert.doesNotMatch(reportText(manual.report), /Impact:/);
+  assert.doesNotMatch(reportText(manual.report), /Impact:|Collision target:/);
   const unknown = new FlightRecorder(); unknown.start(metadata); record(5, unknown);
   assert.equal(unknown.finish('crash', { type: 'WATER', speedKnots: NaN }).crash.speedKnots, null);
+  const unlisted = new FlightRecorder(); unlisted.start(metadata); record(5, unlisted);
+  assert.ok(reportText(unlisted.finish('crash', { type: 'BRIDGE', speedKnots: 90 })).includes('Collision target: BRIDGE'));
+  const untyped = new FlightRecorder(); untyped.start(metadata); record(5, untyped);
+  assert.doesNotMatch(reportText(untyped.finish('crash', { speedKnots: 90 })), /Collision target:/);
 });
 
 test('flow sequence excludes pause/menu time, freezes completed reports, retry starts fresh', () => {

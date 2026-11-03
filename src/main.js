@@ -285,7 +285,6 @@ class FlightSimulator {
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
     this.isCrashed = false;
     this.crashResult = null;
-    this.isCrashReportMinimized = true;
     this.lastOnGround = true;
     this.lastGearTarget = true;
     this.airborneTime = 0.0;

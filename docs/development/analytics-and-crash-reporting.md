@@ -33,5 +33,5 @@ Add `VITE_POSTHOG_KEY` as a GitHub Actions repository secret or variable.
    - `user_feedback_submitted`: in-game bug reports and comments with attached diagnostic state.
 
 3. **In-Game Bug Report Dialog**:
-   - Available on the mission score overlay (`[data-score-report]`) and crash overlay (`#btn-crash-report`).
+   - Available on the mission score overlay (`[data-score-report]`) and flight debrief (`#debrief-feedback`).
    - Automatically attaches anonymized flight telemetry (aircraft, scenario, crash reason, FPS, browser info).

@@ -1,6 +1,5 @@
 export default {
   "the.nose.struck.an.airport.control.tower": "공항 관제탑 시설에 기수 부위가 격돌했습니다.",
-  "aircraft.damage": "기체 피해 상태",
   "touch.controls": "📱 터치 조작",
   "aircraft.systems.cameras": "⚙️ 항공기 시스템 및 카메라",
   "right.virtual.stick.yoke": "우측 가상 스틱 (Yoke)",
@@ -79,10 +78,6 @@ export default {
   "aircraft.c172": "🛩️ 세스나 172",
   "notice.aircraft": "기체 변경: {name}",
   "warning.stall": "⚠️ 실속 경고 - 기수를 내리세요 ⚠️",
-  "crash.impact": "💥 치명적 충돌",
-  "crash.hullLoss": "기체 전손",
-  "crash.expand": "보고서 펼치기",
-  "crash.collapse": "보고서 접기",
   "notice.bodyContact": "지면 접촉: {parts}",
   "notice.bodyDamage": "{part}: {state}",
   "body.state.damaged": "손상",
