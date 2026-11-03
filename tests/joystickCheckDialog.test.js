@@ -260,6 +260,7 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     // Calibration toggles
     assert.ok(dialog.dialog.querySelector('[data-check-throttle-invert]'));
     assert.ok(dialog.dialog.querySelector('[data-check-pitch-invert]'));
+    assert.ok(dialog.dialog.querySelector('[data-select-axes-layout]'));
     assert.ok(dialog.dialog.querySelector('[data-select-rudder-mode]'));
     assert.ok(dialog.dialog.querySelector('[data-range-deadzone]'));
 
@@ -270,6 +271,7 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
   it('opens and closes cleanly, syncing hotas config with form controls', () => {
     sim.controls.hotas.applyConfig({
       profileOverride: 'hotas-one-xbox',
+      axesLayout: 'legacy',
       throttleInverted: true,
       pitchInverted: true,
       rudderMode: 'twist',
@@ -282,6 +284,7 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     assert.strictEqual(dialog.isOpen, true);
     assert.strictEqual(dialog.dialog.hidden, false);
     assert.strictEqual(dialog.profileSelect.value, 'hotas-one-xbox');
+    assert.strictEqual(dialog.axesLayoutSelect.value, 'legacy');
     assert.strictEqual(dialog.throttleInvertCheck.checked, true);
     assert.strictEqual(dialog.pitchInvertCheck.checked, true);
     assert.strictEqual(dialog.rudderModeSelect.value, 'twist');
@@ -301,6 +304,11 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     dialog.profileSelect.value = 'hotas-one';
     dialog.profileSelect.dispatchEvent(new Event('change'));
     assert.strictEqual(sim.controls.hotas.profileOverride, 'hotas-one');
+
+    // Change axes layout
+    dialog.axesLayoutSelect.value = 'legacy';
+    dialog.axesLayoutSelect.dispatchEvent(new Event('change'));
+    assert.strictEqual(sim.controls.hotas.axesLayout, 'legacy');
 
     // Toggle throttle invert
     dialog.throttleInvertCheck.checked = true;
@@ -327,6 +335,7 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     const saved = JSON.parse(mockStorage.getItem('flight3d.preferences.v1') || '{}');
     assert.ok(saved.joystick);
     assert.strictEqual(saved.joystick.profileOverride, 'hotas-one');
+    assert.strictEqual(saved.joystick.axesLayout, 'legacy');
     assert.strictEqual(saved.joystick.throttleInverted, true);
     assert.strictEqual(saved.joystick.pitchInverted, true);
     assert.strictEqual(saved.joystick.rudderMode, 'pedals');
@@ -338,6 +347,7 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
   it('restores default configuration on reset button click', () => {
     sim.controls.hotas.applyConfig({
       profileOverride: 'hotas-one-xbox',
+      axesLayout: 'legacy',
       throttleInverted: true,
       pitchInverted: true,
       rudderMode: 'pedals',
@@ -353,12 +363,14 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     resetBtn.click();
 
     assert.strictEqual(sim.controls.hotas.profileOverride, 'auto');
+    assert.strictEqual(sim.controls.hotas.axesLayout, 'thrustmaster');
     assert.strictEqual(sim.controls.hotas.throttleInverted, false);
     assert.strictEqual(sim.controls.hotas.pitchInverted, false);
     assert.strictEqual(sim.controls.hotas.rudderMode, 'auto');
     assert.strictEqual(sim.controls.hotas.deadzoneStick, 0.04);
 
     assert.strictEqual(dialog.profileSelect.value, 'auto');
+    assert.strictEqual(dialog.axesLayoutSelect.value, 'thrustmaster');
     assert.strictEqual(dialog.throttleInvertCheck.checked, false);
     assert.strictEqual(dialog.pitchInvertCheck.checked, false);
     assert.strictEqual(dialog.rudderModeSelect.value, 'auto');
@@ -372,7 +384,7 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
       id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
       index: 0,
       mapping: '',
-      axes: [0.6, -0.8, -1.0, 0.5, 0.0], // Roll right, Pitch down (dive), TOGA (-1.0), Rudder right
+      axes: [0.6, -0.8, 0.5, -1.0, 0.0], // Roll right, Pitch down (dive), Rudder right (0.5), TOGA (-1.0), Rocker 0.0
       buttons: [
         { pressed: true, value: 1.0 }, // Trigger pressed
         { pressed: false, value: 0.0 },
@@ -384,37 +396,42 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     const dialog = new JoystickCheckDialog(sim);
     dialog.open();
 
-    // Run one telemetry cycle
-    sim.controls.hotas.update(1 / 60);
-    dialog.updateTelemetry();
+    try {
+      // Run one telemetry cycle
+      sim.controls.hotas.update(1 / 60);
+      dialog.updateTelemetry();
 
-    // Check device badge
-    assert.strictEqual(dialog.statusBadge.classList.contains('connected'), true);
-    assert.strictEqual(dialog.nameEl.textContent, 'Thrustmaster T.Flight Hotas One');
+      // Check device badge
+      assert.strictEqual(dialog.statusBadge.classList.contains('connected'), true);
+      assert.strictEqual(dialog.nameEl.textContent, 'Thrustmaster T.Flight Hotas One');
 
-    // Check meters
-    assert.ok(dialog.valPitch.textContent.includes('Dive'));
-    assert.ok(dialog.valRoll.textContent.includes('Right'));
-    assert.ok(dialog.valThrottle.textContent.includes('TOGA 100%'));
-    assert.ok(dialog.valBrakes.textContent.includes('100%'));
+      // Check meters
+      assert.ok(dialog.valPitch.textContent.includes('Dive'));
+      assert.ok(dialog.valRoll.textContent.includes('Right'));
+      assert.ok(dialog.valThrottle.textContent.includes('TOGA 100%'));
+      assert.ok(dialog.valBrakes.textContent.includes('100%'));
 
-    // Check button highlights
-    assert.strictEqual(dialog.buttonsGrid.children.length >= 16, true);
-    assert.strictEqual(dialog.buttonsGrid.children[0].classList.contains('is-pressed'), true);
-    assert.strictEqual(dialog.buttonsGrid.children[1].classList.contains('is-pressed'), false);
-    assert.strictEqual(dialog.buttonsGrid.children[2].classList.contains('is-pressed'), true);
+      // Check button highlights
+      assert.strictEqual(dialog.buttonsGrid.children.length >= 16, true);
+      assert.strictEqual(dialog.buttonsGrid.children[0].classList.contains('is-pressed'), true);
+      assert.strictEqual(dialog.buttonsGrid.children[1].classList.contains('is-pressed'), false);
+      assert.strictEqual(dialog.buttonsGrid.children[2].classList.contains('is-pressed'), true);
 
-    // Check rudder source display
-    assert.ok(dialog.sourceRudder);
-    assert.ok(dialog.sourceRudder.textContent.length > 0);
+      // Check rudder source display & throttle indicator
+      assert.ok(dialog.sourceThrottle);
+      assert.ok(dialog.sourceThrottle.textContent.includes('Axis 3'));
+      assert.ok(dialog.sourceRudder);
+      assert.ok(dialog.sourceRudder.textContent.length > 0);
+      assert.ok(dialog.sourceRudder.textContent.includes('Axis 2'));
 
-    // Verify floating pin detection badge
-    mockGamepad.axes = [0, 0, 1.0, 0, 1.0]; // Floating Axis 4 at 1.0
-    sim.controls.hotas.update(1 / 60);
-    dialog.updateTelemetry();
-    assert.strictEqual(dialog.sourceRudder.classList.contains('warning'), true);
-    assert.ok(dialog.sourceRudder.textContent.includes('부유 핀') || dialog.sourceRudder.textContent.includes('Floating'));
-
-    dialog.close();
+      // Verify floating pin detection badge
+      mockGamepad.axes = [0, 0, 0.0, 1.0, 1.0]; // Floating Axis 4 at 1.0, twist at 0.0, throttle at 1.0
+      sim.controls.hotas.update(1 / 60);
+      dialog.updateTelemetry();
+      assert.strictEqual(dialog.sourceRudder.classList.contains('warning'), true);
+      assert.ok(dialog.sourceRudder.textContent.includes('부유 핀') || dialog.sourceRudder.textContent.includes('Floating'));
+    } finally {
+      dialog.close();
+    }
   });
 });

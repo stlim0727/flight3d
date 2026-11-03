@@ -103,10 +103,10 @@ describe('HotasController - T.Flight Hotas One Flight Axes', () => {
     assert.ok(hotas.elevator > 0.7, `Expected positive pitch for climb, got ${hotas.elevator}`);
   });
 
-  it('maps throttle lever (axis 2) from idle (+1.0) to full TOGA (-1.0) without altering rudder', () => {
+  it('maps throttle lever (axis 3) from idle (+1.0) to full TOGA (-1.0) without altering rudder', () => {
     const controls = createMockControls();
-    // Throttle fully back (+1.0 on axis 2) -> 0.0 (Idle), rudder must stay 0.0
-    let mockGamepad = createHotasGamepad([0, 0, 1.0, 0.0, 0.0]);
+    // Throttle fully back (+1.0 on axis 3) -> 0.0 (Idle), rudder (axis 2) must stay 0.0
+    let mockGamepad = createHotasGamepad([0, 0, 0.0, 1.0, 0.0]);
     const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
 
     hotas.update(1 / 60);
@@ -115,38 +115,38 @@ describe('HotasController - T.Flight Hotas One Flight Axes', () => {
     assert.strictEqual(hotas.hasThrottleControl, true);
     assert.strictEqual(hotas.rudder, 0.0, 'Rudder must remain neutral (0.0) when throttle is at idle (+1.0)');
 
-    // Push lever forward to mid-power (0.0 on axis 2) -> 50% thrust
+    // Push lever forward to mid-power (0.0 on axis 3) -> 50% thrust
     mockGamepad = createHotasGamepad([0, 0, 0.0, 0.0, 0.0]);
     hotas.update(1 / 60);
     assert.strictEqual(hotas.throttle, 0.5);
     assert.strictEqual(controls.throttle, 0.5);
     assert.strictEqual(hotas.rudder, 0.0, 'Throttle stick movement must never affect rudder');
 
-    // Push lever fully forward (-1.0 on axis 2) -> 100% TOGA thrust
-    mockGamepad = createHotasGamepad([0, 0, -1.0, 0.0, 0.0]);
+    // Push lever fully forward (-1.0 on axis 3) -> 100% TOGA thrust
+    mockGamepad = createHotasGamepad([0, 0, 0.0, -1.0, 0.0]);
     hotas.update(1 / 60);
     assert.strictEqual(hotas.throttle, 1.0);
     assert.strictEqual(controls.throttle, 1.0);
     assert.strictEqual(hotas.rudder, 0.0, 'Full TOGA throttle must never affect rudder');
   });
 
-  it('maps stick twist (axis 3) to rudder and ignores floating/unconnected RJ12 pedal axis (axis 4 at 1.0)', () => {
+  it('maps stick twist (axis 2) to rudder and ignores floating/unconnected RJ12 pedal axis (axis 4 at 1.0)', () => {
     const controls = createMockControls();
-    // Hotas One without pedals: Axis 4 floats at +1.0, axis 2 is throttle (+1.0 idle), axis 3 is twist (0.0)
-    let mockGamepad = createHotasGamepad([0, 0, 1.0, 0.0, 1.0]);
+    // Hotas One without pedals: Axis 4 floats at +1.0, axis 3 is throttle (+1.0 idle), axis 2 is twist (0.0)
+    let mockGamepad = createHotasGamepad([0, 0, 0.0, 1.0, 1.0]);
     const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
 
     hotas.update(1 / 60);
     assert.strictEqual(hotas.throttle, 0.0, 'Throttle should be idle');
     assert.strictEqual(hotas.rudder, 0.0, 'Floating axis 4 (+1.0) must NOT lock rudder right');
 
-    // Pilot twists stick right (+0.6 on axis 3) while floating axis 4 remains at 1.0
-    mockGamepad = createHotasGamepad([0, 0, 1.0, 0.6, 1.0]);
+    // Pilot twists stick right (+0.6 on axis 2) while floating axis 4 remains at 1.0
+    mockGamepad = createHotasGamepad([0, 0, 0.6, 1.0, 1.0]);
     hotas.update(1 / 60);
     assert.ok(hotas.rudder > 0.5, `Expected rudder from twist, got ${hotas.rudder}`);
 
-    // Pilot twists stick left (-0.7 on axis 3)
-    mockGamepad = createHotasGamepad([0, 0, 1.0, -0.7, 1.0]);
+    // Pilot twists stick left (-0.7 on axis 2)
+    mockGamepad = createHotasGamepad([0, 0, -0.7, 1.0, 1.0]);
     hotas.update(1 / 60);
     assert.ok(hotas.rudder < -0.6, `Expected negative rudder from left twist, got ${hotas.rudder}`);
   });
@@ -154,7 +154,7 @@ describe('HotasController - T.Flight Hotas One Flight Axes', () => {
   it('accepts valid centered secondary rudder (TFRP pedals or 5-axis rocker) on axis 4 when initialized near neutral', () => {
     const controls = createMockControls();
     // Real pedals plugged in, centered at neutral 0.0 on connect
-    let mockGamepad = createHotasGamepad([0, 0, 1.0, 0.0, 0.0]);
+    let mockGamepad = createHotasGamepad([0, 0, 0.0, 1.0, 0.0]);
     const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
 
     hotas.update(1 / 60);
@@ -162,8 +162,8 @@ describe('HotasController - T.Flight Hotas One Flight Axes', () => {
     assert.strictEqual(hotas.rudder, 0.0);
     assert.strictEqual(hotas.axis4Valid, true, 'Axis 4 should be marked valid after confirmed neutral center');
 
-    // Pilot now presses pedals (-0.9 left on axis 4), overriding slight stick twist (+0.2 on axis 3)
-    mockGamepad = createHotasGamepad([0, 0, 1.0, 0.2, -0.9]);
+    // Pilot now presses pedals (-0.9 left on axis 4), overriding slight stick twist (+0.2 on axis 2)
+    mockGamepad = createHotasGamepad([0, 0, 0.2, 1.0, -0.9]);
     hotas.update(1 / 60);
     assert.ok(hotas.rudder < -0.8, `Expected pedal rudder to override stick twist, got ${hotas.rudder}`);
   });
@@ -177,23 +177,39 @@ describe('HotasController - T.Flight Hotas One Flight Axes', () => {
     hotas.update(1 / 60);
     assert.strictEqual(hotas.rudder, 0.0);
 
-    // Frame 1: Real hardware report arrives: idle throttle (+1.0) and floating RJ12 pin (+1.0)
-    mockGamepad = createHotasGamepad([0, 0, 1.0, 0.0, 1.0]);
+    // Frame 1: Real hardware report arrives: idle throttle (+1.0 on axis 3) and floating RJ12 pin (+1.0 on axis 4)
+    mockGamepad = createHotasGamepad([0, 0, 0.0, 1.0, 1.0]);
     hotas.update(1 / 60);
     assert.strictEqual(hotas.rudder, 0.0, 'Rudder MUST remain neutral (0.0) despite axis 4 jumping to 1.0');
     assert.strictEqual(hotas.axis4Floating, true, 'Axis 4 must be flagged as floating pin');
     assert.strictEqual(hotas.axis4Valid, false, 'Axis 4 must be marked invalid');
 
-    // Frame 2: Pilot twists stick (+0.5 on axis 3) while axis 4 remains floating at 1.0
-    mockGamepad = createHotasGamepad([0, 0, 1.0, 0.5, 1.0]);
+    // Frame 2: Pilot twists stick (+0.5 on axis 2) while axis 4 remains floating at 1.0
+    mockGamepad = createHotasGamepad([0, 0, 0.5, 1.0, 1.0]);
     hotas.update(1 / 60);
     assert.ok(hotas.rudder > 0.4, `Stick twist must control rudder, got ${hotas.rudder}`);
     assert.strictEqual(hotas.activeRudderSource, 'twist');
 
-    // Frame 3: Pilot releases stick (0.0 on axis 3)
-    mockGamepad = createHotasGamepad([0, 0, 1.0, 0.0, 1.0]);
+    // Frame 3: Pilot releases stick (0.0 on axis 2)
+    mockGamepad = createHotasGamepad([0, 0, 0.0, 1.0, 1.0]);
     hotas.update(1 / 60);
     assert.strictEqual(hotas.rudder, 0.0, 'Rudder MUST return to neutral 0.0 when stick is released');
+  });
+
+  it('supports legacy axis layout (throttle on axis 2, rudder on axis 3) when configured', () => {
+    const controls = createMockControls();
+    // In legacy layout: Axis 2 = Throttle (idle = +1.0), Axis 3 = Twist Rudder (+0.75 right)
+    const mockGamepad = createHotasGamepad([0, 0, 1.0, 0.75, 1.0]);
+    const hotas = new HotasController(controls, {
+      axesLayout: 'legacy',
+      getGamepads: () => [mockGamepad],
+    });
+
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.throttle, 0.0, 'Throttle should be idle from axis 2');
+    assert.ok(hotas.rudder > 0.6, `Rudder should read twist from axis 3, got ${hotas.rudder}`);
+    assert.strictEqual(hotas.throttleAxis, 2);
+    assert.strictEqual(hotas.rudderAxis, 3);
   });
 
   it('maps 3-axis flight stick fallback where axis 2 is throttle and rudder is neutral', () => {
@@ -523,11 +539,11 @@ describe('HotasController - Xbox Mode Profile & Custom Configuration', () => {
   it('supports pitchInverted and throttleInverted configurations', () => {
     const controls = createMockControls();
     // Axis 1 = +0.6 (pulling back). Normally pitch up (> 0). If pitchInverted, pitch down (< 0).
-    // Axis 2 = +1.0 (pulling back). Normally idle (0.0). If throttleInverted, 100% (1.0).
+    // Axis 3 = +1.0 (pulling back). Normally idle (0.0). If throttleInverted, 100% (1.0).
     const mockGamepad = {
       id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
       index: 0,
-      axes: [0, 0.6, 1.0, 0, 0],
+      axes: [0, 0.6, 0.0, 1.0, 0],
       buttons: [],
     };
 
@@ -544,11 +560,11 @@ describe('HotasController - Xbox Mode Profile & Custom Configuration', () => {
 
   it('supports rudderMode twist-only and pedals-only', () => {
     const controls = createMockControls();
-    // Twist on axis 3 = +0.8, Pedals on axis 4 = -0.7
+    // Twist on axis 2 = +0.8, Throttle on axis 3 = 1.0, Pedals on axis 4 = -0.7
     const mockGamepad = {
       id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
       index: 0,
-      axes: [0, 0, 0, 0.8, -0.7],
+      axes: [0, 0, 0.8, 1.0, -0.7],
       buttons: [],
     };
 
