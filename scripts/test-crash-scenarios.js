@@ -387,8 +387,8 @@ async function main() {
     await takeScreenshot('crash_excursion_showcase.png');
 
     // Pausing after a crash (#322) must hold the post-crash scene without repeating the
-    // crash: the pause card replaces the hull-loss card, the rig yields to the crash camera,
-    // and resuming hands the wreck back untouched.
+    // crash: the rig yields to the crash camera, and resuming hands the wreck back untouched.
+    // Issue #454: the debrief is the only crash report, so no hull-loss card exists.
     const menuRoundTrip = await evalJs(`(() => {
       const sim = window.simulator;
       const crashesBefore = sim.impactVelocityChecks.crashes;
@@ -396,7 +396,7 @@ async function main() {
       const inPause = document.body.dataset.flow === 'paused'
         && sim.isCrashed
         && sim.aircraftBreakup.pieces.length > 0
-        && getComputedStyle(document.getElementById('crash-overlay')).display === 'none'
+        && !document.getElementById('crash-overlay')
         && sim.gameFlow.isPhysicsFrozen()
         && !sim.cameraSystem.pauseView;
       document.getElementById('menu-toggle').click();
@@ -404,7 +404,6 @@ async function main() {
       const backInFlight = document.body.dataset.flow === 'flight'
         && sim.isCrashed
         && sim.aircraftBreakup.pieces.length > 0
-        && getComputedStyle(document.getElementById('crash-overlay')).display !== 'none'
         && sim.impactVelocityChecks.crashes === crashesBefore;
       return { inPause, backInFlight, crashesBefore, crashesAfter: sim.impactVelocityChecks.crashes };
     })()`);
@@ -418,7 +417,7 @@ async function main() {
     await evalJs(`window.simulator.resetCrash();`);
     await new Promise(r => setTimeout(r, 400));
     const restartOk = await evalJs(`
-      Boolean(!window.simulator.isCrashed && document.getElementById('crash-overlay').style.display === 'none')
+      Boolean(!window.simulator.isCrashed && !window.simulator.crashResult)
     `);
     console.log(`   Restart Cleanliness: ${restartOk ? 'PASS ✅' : 'FAIL ❌'}`);
 

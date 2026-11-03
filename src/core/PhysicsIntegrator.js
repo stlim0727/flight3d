@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { t, bindText } from '../i18n/index.js';
+import { t } from '../i18n/index.js';
 import { terrainConflictSeconds } from '../systems/FlightWarnings.js';
 import { cockpitCasterState } from '../aircraft/CockpitLighting.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
@@ -450,9 +450,7 @@ class PhysicsIntegratorMethods {
     this.controls.throttle = 0.0;
     this.linearVelocity.multiplyScalar(0.25);
     if (this.linearVelocity.y < 0) this.linearVelocity.y = 0;
-
-    // 7. Show Crash UI Overlay
-    this.showCrashUI(crashResult);
+    // The recorded sortie's debrief reports the collision after the crash scene (#454).
   }
 
   clearCrashState() {
@@ -466,9 +464,6 @@ class PhysicsIntegratorMethods {
     if (this.aircraft?.group) this.aircraft.group.visible = true;
     this.aircraft?.resetCrashVisuals?.();
     this.audio?.reset?.();
-
-    const crashEl = typeof document !== 'undefined' ? document.getElementById('crash-overlay') : null;
-    if (crashEl) crashEl.style.display = 'none';
   }
 
   resetCrash() {
@@ -488,40 +483,6 @@ class PhysicsIntegratorMethods {
     }
     if (!this.isCrashed) return;
     this.gameFlow.returnToLobby(true);
-  }
-
-  showCrashUI(crashResult) {
-    // Crashes during the lobby cinematic are part of the show: the loop
-    // restarts the scenario without a hull-loss UI. Only interrupt the player.
-    if (this.gameFlow.state !== FLOW.FLIGHT || typeof document === 'undefined') return;
-    const overlay = document.getElementById('crash-overlay');
-    const title = document.getElementById('crash-title');
-    const desc = document.getElementById('crash-desc');
-    const speed = document.getElementById('crash-speed');
-    const type = document.getElementById('crash-type');
-
-    if (title) bindText(title, () => crashResult.name);
-    if (desc) bindText(desc, () => crashResult.description);
-    if (speed) speed.textContent = `${Math.round(crashResult.speedKnots)} KT`;
-    if (type) type.textContent = crashResult.type;
-
-    // Start collapsed so the report never hides the wreckage.
-    this.setCrashReportMinimized(true);
-    if (overlay) overlay.style.display = 'flex';
-  }
-
-  setCrashReportMinimized(minimized) {
-    this.isCrashReportMinimized = minimized;
-    const overlay = document.getElementById('crash-overlay');
-    if (overlay) overlay.classList.toggle('is-minimized', minimized);
-
-    const button = document.getElementById('btn-crash-toggle');
-    if (!button) return;
-    button.setAttribute('aria-expanded', String(!minimized));
-    const label = () => t(this.isCrashReportMinimized ? 'crash.expand' : 'crash.collapse');
-    bindText(button, label);
-    bindText(button, label, 'title');
-    bindText(button, label, 'aria-label');
   }
 
   /**

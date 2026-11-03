@@ -8,6 +8,13 @@ const airportKeys = { coastal: 'coastal.airport', incheon: 'incheon.airport', lu
 const number = value => Number.isFinite(value) ? Math.round(value).toLocaleString('en-US') : '—';
 const g = value => Number.isFinite(value) ? value.toFixed(2) : '—';
 const crashName = crash => crash.name ?? t('debrief.reason.crash');
+// Collision codes come from CollisionDetector; an unlisted code is shown as-is.
+const crashTarget = crash => {
+  if (!crash.type) return null;
+  const key = `debrief.target.${crash.type}`;
+  const text = t(key);
+  return text === key ? crash.type : text;
+};
 
 export function reportText(report) {
   const m = report.metadata;
@@ -18,12 +25,13 @@ export function reportText(report) {
     `${t('debrief.g')} ${g(report.peaks.gForce?.gForce)} G`,
     `${t('debrief.reason')}: ${t(`debrief.reason.${report.reason}`)}`,
     ...(report.crash ? [`${t('debrief.impact')}: ${crashName(report.crash)} · ${number(report.crash.speedKnots)} KT · ${flightDuration(report.crash.timeSec)}`] : []),
+    ...(report.crash && crashTarget(report.crash) ? [`${t('debrief.impactTarget')}: ${crashTarget(report.crash)}`] : []),
     report.touchdowns.length ? `${t('debrief.sink')} ${number(report.touchdowns.at(-1).sinkRateFpm)} FPM · ${t('debrief.contactG')} ${g(report.touchdowns.at(-1).contactG)} G` : t('debrief.noTouchdown'),
   ].join('\n');
 }
 
 export class DebriefOverlay {
-  constructor({ onRetry, onLobby }) {
+  constructor({ onRetry, onLobby, onFeedback }) {
     this.root = document.getElementById('debrief-overlay');
     this.root.innerHTML = `
       <div class="debrief-card">
@@ -69,6 +77,7 @@ export class DebriefOverlay {
           <div class="debrief-actions">
             <button class="btn debrief-primary" id="debrief-retry" data-i18n="debrief.retry"></button>
             <button class="btn" id="debrief-lobby" data-i18n="debrief.lobby"></button>
+            <button class="btn" id="debrief-feedback" data-i18n="debrief.feedback"></button>
           </div>
         </div>
       </div>`;
@@ -98,6 +107,7 @@ export class DebriefOverlay {
     });
     this.el('retry').addEventListener('click', onRetry);
     this.el('lobby').addEventListener('click', onLobby);
+    this.el('feedback').addEventListener('click', () => onFeedback?.());
     this.el('copy').addEventListener('click', () => this.copy());
     this.el('native-share').hidden = typeof navigator.share !== 'function';
     this.el('native-share').addEventListener('click', async () => {
@@ -183,8 +193,10 @@ export class DebriefOverlay {
     bindText(this.el('crash-name'), () => crash ? crashName(crash) : '');
     this.el('crash-desc').textContent = crash?.description ?? '';
     this.el('crash-desc').hidden = !crash?.description;
+    // Collision target sits on its own line so the speed/time pair keeps its 360px layout.
+    const target = crash && crashTarget(crash);
     bindText(this.el('crash-facts'), () => crash
-      ? `${t('debrief.impactSpeed')}  ${number(crash.speedKnots)} KT     ${t('debrief.impactTime')}  ${flightDuration(crash.timeSec)}` : '');
+      ? `${target ? `${t('debrief.impactTarget')}  ${crashTarget(crash)}\n` : ''}${t('debrief.impactSpeed')}  ${number(crash.speedKnots)} KT     ${t('debrief.impactTime')}  ${flightDuration(crash.timeSec)}` : '');
     bindText(this.el('identity'), () => enough
       ? `${AIRCRAFT_REGISTRY[report.metadata.aircraft]?.name ?? report.metadata.aircraft} · ${t(airportKeys[report.metadata.airport] ?? 'coastal.airport')}\n${t(scenarioLabelKey(report.metadata.airport, report.metadata.scenario) ?? 'lobby.spawn')} · ${t(`debrief.reason.${report.reason}`)}`
       : t('debrief.emptyHint'));

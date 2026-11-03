@@ -89,7 +89,7 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 #debrief-preview { background: #142536; padding: 12px; border-radius: 7px; color: #a6b5c8; font-size: 11px; white-space: pre-line; user-select: text; }
 #debrief-status { color: #67d5a3; min-height: 17px; font-size: 11px; }
 .debrief-card [hidden] { display: none !important; }
-body[data-flow="debrief"] :is(.menu-toggle, .hud-strip, .hud-top-actions, .ap-bar, .flight-toolbar, .flight-panel, .quick-mute, .presets-bar, .action-panel, .crash-overlay, #demo-banner, .demo-pill-btn, .touch-controls-overlay, .dev-live, .flight-warning, .stall-banner, .toast, .audio-start-hint) { display: none !important; }
+body[data-flow="debrief"] :is(.menu-toggle, .hud-strip, .hud-top-actions, .ap-bar, .flight-toolbar, .flight-panel, .quick-mute, .presets-bar, .action-panel, #demo-banner, .demo-pill-btn, .touch-controls-overlay, .dev-live, .flight-warning, .stall-banner, .toast, .audio-start-hint) { display: none !important; }
 @media (max-width: 600px) {
   #debrief-overlay { justify-content: center; padding: 12px; }
   .debrief-card { width: min(360px, 100%); margin: 0; max-height: calc(100dvh - 24px); }

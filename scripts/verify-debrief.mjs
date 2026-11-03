@@ -149,7 +149,8 @@ try {
   assert.equal(await ev('!!s.cameraSystem.crashView && s.aircraftBreakup.pieces.length > 0'), true);
   assert.equal(await ev('s.flightRecorder.active'), false);
   assert.equal(await ev('getComputedStyle(document.querySelector("#debrief-overlay")).display'), 'none');
-  assert.equal(await ev('getComputedStyle(document.querySelector("#crash-overlay")).display'), 'flex');
+  // Issue #454: the debrief replaces the former in-flight crash report.
+  assert.equal(await ev('document.querySelector("#crash-overlay")'), null);
   const debrisBefore = await ev('s.aircraftBreakup.pieces[0].object.position.toArray()');
   await shot('crash-observation');
   await new Promise(resolve => setTimeout(resolve, 500));
@@ -170,6 +171,13 @@ try {
   assert.equal(await ev('getComputedStyle(document.querySelector("#debrief-crash")).display'), 'flex');
   assert.equal(await ev('document.querySelector("#debrief-crash-name").textContent'), 'Terrain', 'short records name the collision in the block');
   assert.equal(await ev('document.querySelector("#debrief-crash-desc").textContent'), 'Verification impact');
+  assert.match(await ev('document.querySelector("#debrief-crash-facts").textContent'), /^(Collision target|충돌 대상)  (Terrain|지형)\n/);
+  // The former crash card's bug report button lives on every debrief.
+  await click('#debrief-feedback');
+  assert.equal(await ev('getComputedStyle(document.querySelector("#feedback-dialog-overlay")).display'), 'flex');
+  await click('[data-feedback-close]');
+  assert.equal(await ev('document.querySelector("#feedback-dialog-overlay").hidden'), true);
+  assert.equal(await ev('s.gameFlow.state'), 'debrief');
   assert.equal(await ev('document.querySelector("#debrief-events li:last-child").classList.contains("debrief-impact")'), true);
   assert.equal(await ev('getComputedStyle(document.querySelector("#debrief-impact-marker")).display'), 'inline', 'impact marker is rendered');
   await shot('crash-debrief');

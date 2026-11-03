@@ -16,8 +16,8 @@ the existing cinematic/menu flow.
 The [crash/recovery UX flow](https://www.figma.com/design/XmTUnPoI13ISmLJABHx2Bo/Flight3d?node-id=107-86)
 specifies **impact → three seconds of crash scene → accident debrief**. At the
 impact tick, finalize the recorded sortie, including that tick's telemetry. Keep
-the exterior crash camera, wreckage physics, explosion animation and existing
-collapsed crash report visible before opening the debrief once. Observation time
+the exterior crash camera, wreckage physics and explosion animation visible
+before opening the debrief once. Observation time
 does not extend flight duration, peaks, trajectory or sharing eligibility.
 
 Count the three seconds with foreground rendered frame deltas, not fixed physics
@@ -51,6 +51,25 @@ Name and description keep the language active at impact, like exported text.
 Impact speed is the collision detector's world velocity magnitude in knots
 (`|v| × 1.94384`), not indicated airspeed. Opening a detailed debrief through an
 external URL is tracked separately in issue #368.
+
+## Single crash report (issue #454)
+
+The debrief is the only crash report. The former in-flight hull-loss card
+(`#crash-overlay`) is removed, so the three-second crash scene shows only the
+wreckage. Its fields not already in the debrief moved there:
+
+- Collision target: `report.crash.type` (`WATER`, `TERRAIN`, `BUILDING`, `TOWER`,
+  `TREE`, `SHIP`) is localized as the first crash-facts line and as a
+  `Collision target` line in shared text. An unlisted code is shown as-is; an
+  untyped crash omits the line. The JSON export is unchanged.
+- Bug report: every debrief (crash, landing, manual end) has a
+  `🐞 Report a problem` action below Fly again / Main menu that opens the
+  feedback dialog with the held sortie's diagnostics.
+
+Its static "destroyed" state is the existing crash severity line, and its impact
+airspeed was already the debrief's impact speed. Developer scenarios report
+crashes through their pass/fail result and the pilot arena through its score
+overlay; neither opened a debrief before.
 
 ## Long headlines (issue #370)
 
