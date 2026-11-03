@@ -10,6 +10,9 @@
  *   and sharpens exactly as the gate it points to is reached, so a fast blend would
  *   steer on the error and a slow one would not. The leftover drift is learned as a
  *   bias instead of being flown out as a turn.
+ * - Fixes cross-track against the valley walls the forward terrain instrument ranges,
+ *   which is worth a few metres anywhere in a leg; the beacon remains the fallback
+ *   when the instrument sees no wall.
  * - Feeds the arc the line is actually on into bank a second and a third ahead, and
  *   closes a damped loop on the cross-track and heading error left over, because
  *   feedforward is only as good as the chart and the speed the aircraft reports.
@@ -51,6 +54,19 @@ export function createPilot() {
    * has to be willing to learn that much or it steers on a phantom drift. */
   const BIAS_WANDER = 8;
   const PROGRESS_FILTER_SECONDS = 9;
+  /** The valley-slalom-v1 wall: it rises 550-800 m over one half-width beyond the
+   * floor edge with a 0.75-1.0 exponent. Between the foot and a few hundred metres up
+   * the middle of those ranges puts the rock within three metres of where any of them
+   * would, and the wall itself wanders sideways by about as much. */
+  const WALL_RISE_M = 675;
+  const WALL_EXPONENT = 0.875;
+  const WALL_FOOT_M = 25;
+  const WALL_TOP_M = 300;
+  const WALL_RAY_MAX_M = 900;
+  /** What one wall fix is trusted to. The rays share a second of correlated range
+   * noise and the same stretch of wandering rock, so their consensus is worth about
+   * one good hit and no more: trusted harder, the filter chases that wander. */
+  const WALL_SIGMA_M = 5;
 
   let route = [], gates = [], waypoints = [];
   let cruise = 435, dt = 0.2;
@@ -138,6 +154,68 @@ export function createPilot() {
     if (!len1 || !len2) return 0;
     // Cross-track is positive to the right, so a right turn has a positive sweep.
     return Math.atan2(dx1 * dz2 - dz1 * dx2, dx1 * dx2 + dz1 * dz2) / ((len1 + len2) / 2);
+  }
+
+  /** Nearest point of the centreline to a world position, searched along the stretch
+   * of route either side of an along-track guess: progress, signed cross-track and
+   * the half-width the chart states there. */
+  function projectRoute(x, z, nearM, reachM) {
+    let best = null;
+    for (let i = 0; i < route.length - 1; i++) {
+      const a = route[i], b = route[i + 1];
+      if (b.sM < nearM - reachM || a.sM > nearM + reachM) continue;
+      const dx = b.x - a.x, dz = b.z - a.z, lengthSquared = dx * dx + dz * dz || 1;
+      const share = clamp(((x - a.x) * dx + (z - a.z) * dz) / lengthSquared, 0, 1);
+      const px = a.x + dx * share, pz = a.z + dz * share;
+      const distanceSquared = (x - px) ** 2 + (z - pz) ** 2;
+      if (best && distanceSquared >= best.distanceSquared) continue;
+      const length = Math.sqrt(lengthSquared);
+      best = { distanceSquared, sM: a.sM + (b.sM - a.sM) * share,
+        crossM: ((x - px) * -dz + (z - pz) * dx) / length,
+        halfWidthM: (a.halfWidthM ?? 70) + ((b.halfWidthM ?? 70) - (a.halfWidthM ?? 70)) * share };
+    }
+    return best;
+  }
+
+  /** A body-frame direction (+X right, +Y up, -Z forward) in the world, from the
+   * attitude the instruments report: roll about the nose, then pitch, then heading. */
+  function bodyToWorld(d, headingDeg, pitchDeg, rollDeg) {
+    const r = -rollDeg * RAD, p = pitchDeg * RAD, h = -headingDeg * RAD;
+    const x1 = d.x * Math.cos(r) - d.y * Math.sin(r), y1 = d.x * Math.sin(r) + d.y * Math.cos(r);
+    const y2 = y1 * Math.cos(p) - d.z * Math.sin(p), z2 = y1 * Math.sin(p) + d.z * Math.cos(p);
+    return { x: x1 * Math.cos(h) + z2 * Math.sin(h), y: y2, z: -x1 * Math.sin(h) + z2 * Math.cos(h) };
+  }
+
+  /** Cross-track of the aircraft as the valley walls place it. Each range the forward
+   * terrain instrument returns off a wall puts a point of rock somewhere relative to
+   * the aircraft; the course contract says how far outside the half-width rock that
+   * high above the floor stands, so the point says where across the corridor the
+   * aircraft must be. A wall hit is a few metres wrong where the beacon is tens of
+   * them, and it does not get worse with the distance left to the gate. Hits low on
+   * the wall foot cannot be told from the floor and are left out, as are long rays
+   * whose range error lands across the corridor. Many rays see the same rock, so the
+   * answer is the consensus around their median, not a mean that one stray can pull. */
+  function wallCross(terrain, aircraft, height, headingDeg, pitchDeg, rollDeg) {
+    const fixes = [];
+    for (const cell of terrain?.cells ?? []) {
+      if (cell.status !== 'available' || !Number.isFinite(cell.rangeM?.mean)) continue;
+      const rangeM = cell.rangeM.mean;
+      if (rangeM > WALL_RAY_MAX_M) continue;
+      const az = cell.azimuthDeg * RAD, el = cell.elevationDeg * RAD;
+      const ray = bodyToWorld({ x: Math.sin(az) * Math.cos(el), y: Math.sin(el), z: -Math.cos(az) * Math.cos(el) },
+        headingDeg, pitchDeg, rollDeg);
+      const rise = height + ray.y * rangeM;
+      if (rise < WALL_FOOT_M || rise > WALL_TOP_M) continue;
+      const hit = projectRoute(aircraft.x + ray.x * rangeM, aircraft.z + ray.z * rangeM, progress, rangeM + 300);
+      if (!hit) continue;
+      const wall = hit.halfWidthM * (1 + (rise / WALL_RISE_M) ** (1 / WALL_EXPONENT));
+      fixes.push(Math.sign(hit.crossM) * wall - (hit.crossM - crossTrack));
+    }
+    if (fixes.length < 3) return null;
+    fixes.sort((a, b) => a - b);
+    const median = fixes[fixes.length >> 1];
+    const near = fixes.filter(v => Math.abs(v - median) < 10);
+    return near.reduce((sum, v) => sum + v, 0) / near.length;
   }
 
   /** Azimuth of the direction of travel, from an attitude the pilot is briefed and a
@@ -263,6 +341,23 @@ export function createPilot() {
       pBias -= fixBias * pCrossBias;
       pCross *= 1 - fixCross;
       pCrossBias *= 1 - fixCross;
+
+      // The walls are the better fix wherever the instrument can see them, and folding
+      // them in the same way keeps the bias learning from both.
+      const here = centerAt(progress);
+      const aircraft = { x: here.x + Math.cos(here.headingDeg * RAD) * crossTrack,
+        z: here.z + Math.sin(here.headingDeg * RAD) * crossTrack };
+      const walled = wallCross(observation.terrain, aircraft, height, heading, pitch, roll);
+      if (walled !== null) {
+        const wallShare = pCross + WALL_SIGMA_M * WALL_SIGMA_M;
+        const wallFix = pCross / wallShare, wallBias = pCrossBias / wallShare;
+        const wallCorrection = walled - crossTrack;
+        crossTrack += wallFix * wallCorrection;
+        rateBias += wallBias * wallCorrection;
+        pBias -= wallBias * pCrossBias;
+        pCross *= 1 - wallFix;
+        pCrossBias *= 1 - wallFix;
+      }
 
       // Lateral: feed the arc the line is on, then close a damped loop on what the
       // feedforward missed. The lead is the lag the loop cannot see through: a
