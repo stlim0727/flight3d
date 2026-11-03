@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { createTreeGeometry } from './TreeModels.js';
+import { planValleyTrees } from './valleyTrees.js';
 
 const VALLEY_FLOOR_REFERENCE_M = 2100; // course start floor elevation
 const C_FLOOR = new THREE.Color(0x273628);  // valley floor moss/pine
@@ -31,8 +33,31 @@ const RIBBON_BLEND_FROM = 3.5;   // half widths where the ribbon starts followin
 const RIBBON_BLEND_TO = 4.6;     // half widths where it has fully joined it
 const SEAM_RECESS_M = 3;         // depress the coarse surface where the ribbon overlaps it
 
-/** Elevation and slope tint shared by the coarse world mesh and the corridor ribbon. */
-function shadeSurfaceVertex(color, y, ny) {
+/** Deterministic lattice hash, the seed for every tint detail below. Cheap and
+ * stable, so the same vertex always gets the same blotch. */
+function hash2(ix, iz) {
+  let h = Math.imul(ix | 0, 374761393) + Math.imul(iz | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+function latticeNoise(x, z) {
+  const ix = Math.floor(x), iz = Math.floor(z);
+  const fx = x - ix, fz = z - iz;
+  const sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
+  const a = hash2(ix, iz), b = hash2(ix + 1, iz), c = hash2(ix, iz + 1), d = hash2(ix + 1, iz + 1);
+  return (a + (b - a) * sx) * (1 - sz) + (c + (d - c) * sx) * sz;
+}
+
+function fbm(x, z) {
+  return latticeNoise(x, z) * 0.6 + latticeNoise(x * 2.7 + 11.3, z * 2.7 - 5.7) * 0.4;
+}
+
+/** Elevation and slope tint shared by the coarse world mesh and the corridor
+ * ribbon, plus deterministic noise so the bands read as rock and earth instead
+ * of an airbrush: patchy vegetation, per-vertex grain, strata on steep faces,
+ * damp pockets on the floor. Judging and collision never see any of this. */
+function shadeSurfaceVertex(color, y, ny, x, z) {
   const relY = y - VALLEY_FLOOR_REFERENCE_M;
   if (relY < 60) {
     color.lerpColors(C_FLOOR, C_CANYON, Math.max(0, relY / 60));
@@ -43,6 +68,15 @@ function shadeSurfaceVertex(color, y, ny) {
   }
   if (ny < 0.78) {
     color.lerp(C_CLIFF, Math.min(1, (0.78 - ny) / 0.45) * 0.75);
+  }
+  const patch = fbm(x * 0.02, z * 0.02);
+  color.offsetHSL((patch - 0.5) * 0.012, (patch - 0.5) * 0.10, (patch - 0.5) * 0.10);
+  color.multiplyScalar(1 + (hash2(Math.round(x), Math.round(z)) - 0.5) * 0.08);
+  if (ny < 0.8) {
+    const strata = 0.5 + 0.5 * Math.sin(relY * 0.075 + fbm(x * 0.01, z * 0.01) * 5);
+    color.multiplyScalar(0.86 + strata * 0.22);
+  } else if (relY < 80 && ny > 0.9) {
+    if (latticeNoise(x * 0.015 + 31.7, z * 0.015 - 17.3) > 0.62) color.multiplyScalar(0.9);
   }
 }
 
@@ -187,6 +221,7 @@ export class GeneratedValleyTerrain {
     this.segments = Math.max(segmentsX, segmentsZ);
     this.mesh = null;
     this.ribbonMesh = null;
+    this.treeMeshes = [];
     this.ribbonRings = 0;
     this.ribbonStops = CORRIDOR_STOPS.length;
     this.group = new THREE.Group();
@@ -217,7 +252,7 @@ export class GeneratedValleyTerrain {
       const tmpColor = new THREE.Color();
 
       for (let i = 0; i < count; i++) {
-        shadeSurfaceVertex(tmpColor, pos.getY(i), norm.getY(i));
+        shadeSurfaceVertex(tmpColor, pos.getY(i), norm.getY(i), pos.getX(i), pos.getZ(i));
         colors[i * 3] = tmpColor.r;
         colors[i * 3 + 1] = tmpColor.g;
         colors[i * 3 + 2] = tmpColor.b;
@@ -237,7 +272,40 @@ export class GeneratedValleyTerrain {
       this.group.add(this.mesh);
 
       this.buildCorridorRibbon(mat, coarseSurfaceSampler(pos, segmentsX + 1));
+      this.buildTreeInstances();
       sim.scene.add(this.group);
+    }
+  }
+
+  /** Low-poly conifers on the flank benches, wall ledges, and plateau: one static
+   * InstancedMesh per species, planted from the planner's rejection sample of the
+   * same analytic surface the ribbon is lifted from. No shadow casting — a depth
+   * pass for thousands of trees is not what the sense of terrain is bought with. */
+  buildTreeInstances() {
+    const trees = planValleyTrees(this.terrain, { floorReferenceM: VALLEY_FLOOR_REFERENCE_M });
+    if (!trees.length) return;
+    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+    const dummy = new THREE.Object3D();
+    for (const species of new Set(trees.map(tree => tree.species))) {
+      const batch = trees.filter(tree => tree.species === species);
+      const mesh = new THREE.InstancedMesh(createTreeGeometry(species, false), material, batch.length);
+      mesh.name = 'valley-trees-' + species;
+      batch.forEach((tree, i) => {
+        dummy.position.set(tree.x, tree.y, tree.z);
+        dummy.rotation.set(0, tree.rotY, 0);
+        dummy.scale.setScalar(tree.scale);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.receiveShadow = true;
+      mesh.castShadow = false;
+      // Instances are spread along the whole course but the base geometry sits at
+      // the origin, so the default per-mesh bounding sphere would cull the forest
+      // once the camera moves down-course. The batches are static and span the map.
+      mesh.frustumCulled = false;
+      this.treeMeshes.push(mesh);
+      this.group.add(mesh);
     }
   }
 
@@ -315,7 +383,7 @@ export class GeneratedValleyTerrain {
     const colors = new Float32Array(vertCount * 3);
     const tmpColor = new THREE.Color();
     for (let v = 0; v < vertCount; v++) {
-      shadeSurfaceVertex(tmpColor, positions[v * 3 + 1], norm.getY(v));
+      shadeSurfaceVertex(tmpColor, positions[v * 3 + 1], norm.getY(v), positions[v * 3], positions[v * 3 + 2]);
       colors[v * 3] = tmpColor.r;
       colors[v * 3 + 1] = tmpColor.g;
       colors[v * 3 + 2] = tmpColor.b;
@@ -340,6 +408,14 @@ export class GeneratedValleyTerrain {
   }
 
   dispose(sim = null) {
+    for (const mesh of this.treeMeshes) {
+      this.group.remove(mesh);
+      mesh.geometry.dispose();
+    }
+    if (this.treeMeshes.length) {
+      this.treeMeshes[0].material.dispose();
+      this.treeMeshes = [];
+    }
     if (this.ribbonMesh) {
       this.ribbonMesh.geometry.dispose();
       this.ribbonMesh = null;
