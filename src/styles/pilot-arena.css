@@ -1,22 +1,22 @@
 /* Share the measured dock boundary so the pilot toggle clears both control rows. */
 #pilot-arena {
-  --pilot-top: calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + 100px)) + var(--flight-alert-space, 0px));
+  --pilot-top: calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)))) + var(--flight-alert-space, 0px));
   position: fixed;
   top: var(--pilot-top);
   right: var(--edge-right, max(8px, env(safe-area-inset-right)));
   z-index: 1200;
   box-sizing: border-box;
-  width: min(400px, calc(100vw - 24px));
+  width: min(calc(400px * var(--ui-scale, 1)), calc(100vw - 24px));
   max-height: calc(100dvh - var(--pilot-top) - var(--edge-bottom, 8px));
   overflow: auto;
   overscroll-behavior: contain;
   touch-action: pan-y;
-  padding: 8px 12px;
+  padding: calc(8px * var(--ui-scale, 1)) calc(12px * var(--ui-scale, 1));
   color: #eef5fb;
   background: #101e2bf5;
   border: 1px solid #526879;
-  border-radius: 10px;
-  font: 13px/1.5 system-ui;
+  border-radius: calc(10px * var(--ui-scale, 1));
+  font: calc(13px * var(--ui-scale, 1))/1.5 system-ui;
 }
 #pilot-arena:not([open]) { width: max-content; max-width: calc(100vw - 24px); }
 #pilot-arena > summary {
@@ -26,8 +26,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  min-height: 44px;
+  gap: calc(12px * var(--ui-scale, 1));
+  min-height: calc(44px * var(--ui-scale, 1));
   list-style: none;
   user-select: none;
   background: #101e2b;

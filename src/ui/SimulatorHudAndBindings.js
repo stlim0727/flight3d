@@ -11,6 +11,7 @@ import { DeveloperPanel } from './DeveloperPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
 import { defaultScenarioForRegion } from '../config/scenarioRegistry.js';
 import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
+import { computeUiScale, applyUiScale } from './UiScale.js';
 
 class SimulatorHudAndBindingsMethods {
   initControls() {
@@ -661,6 +662,7 @@ class SimulatorHudAndBindingsMethods {
   }
 
   handleResize() {
+    applyUiScale(computeUiScale(window.innerWidth, window.innerHeight));
     this.camera.aspect = window.innerWidth / window.innerHeight;
     const isCockpit = this.cameraSystem && this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     let targetFov = isCockpit ? 60 : 54;

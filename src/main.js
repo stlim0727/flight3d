@@ -44,6 +44,7 @@ import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
 import { initFlightPanels } from './ui/FlightPanels.js';
+import { initUiScale } from './ui/UiScale.js';
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
 import { FlightRecorder } from './core/FlightRecorder.js';
 import { LOBBY_AIRCRAFT_IDS } from './ui/LobbyScreen.js';
@@ -115,6 +116,7 @@ const inputLatency = installInputLatencyMonitor();
  */
 class FlightSimulator {
   async initialize() {
+    initUiScale();
     await startupStage(0, 'startup.scene');
     const savedSelection = resolveFlightUrl(window.location.search, loadSavedFlightSelection());
     this.container = document.getElementById('canvas-container');
