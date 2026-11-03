@@ -241,6 +241,24 @@ export function createValleyTerrain({ samples, noise, reliefAmplitudeM = 10, cro
     return best;
   }
 
+  /** World position for (arc length, signed cross-track): the inverse of project().
+   * Uses the same segment basis and heading as project(), so a placed point reads
+   * back with the cross-track it was written with. */
+  function place(s, crossM) {
+    const last = samples.length - 1;
+    const target = Math.min(Math.max(s, samples[0].s), samples[last].s);
+    let lo = 0, hi = last;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (samples[mid].s <= target) lo = mid; else hi = mid;
+    }
+    const from = samples[lo], to = samples[hi];
+    const share = clamp((target - from.s) / (to.s - from.s || 1), 0, 1);
+    const px = from.x + (to.x - from.x) * share, pz = from.z + (to.z - from.z) * share;
+    const along = { x: Math.sin(to.heading), z: -Math.cos(to.heading) };
+    return { x: px + along.z * -crossM, z: pz + along.x * crossM };
+  }
+
   return {
     isLoaded: true,
     loadError: null,
@@ -248,7 +266,9 @@ export function createValleyTerrain({ samples, noise, reliefAmplitudeM = 10, cro
     gridSize: 0,
     region: 'generated-valley',
     bounds: { minX, maxX, minZ, maxZ },
+    centerline: samples,
     project,
+    place,
     getHeight(x, z) {
       const here = project(x, z);
       const floor = here.floorM + (noise(x, z) - 0.5) * 2 * reliefAmplitudeM;
