@@ -193,3 +193,52 @@ test('Replay plan execution advances shots deterministically based on timeline',
   }
   assert.equal(director.currentShotType, CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY);
 });
+
+test('CinematicCameraDirector eliminates forward-backward translation stutter at high speeds', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const director = new CinematicCameraDirector({ camera });
+
+  director.switchShot(CINEMATIC_SHOTS.WINGTIP_ACTION);
+  const planePos = new THREE.Vector3(0, 1000, 0);
+  const planeQuat = new THREE.Quaternion();
+
+  const relativeDistances = [];
+  // Simulate fluctuating frame rates (14ms to 20ms) at 300 knots (154 m/s)
+  for (let frame = 0; frame < 60; frame++) {
+    const dt = 0.014 + (frame % 7) * 0.001;
+    planePos.z -= 154 * dt;
+    director.update({ dt, camera, planePos, planeQuat, flightState: { iasKnots: 300 } });
+    relativeDistances.push(camera.position.distanceTo(planePos));
+  }
+
+  const minD = Math.min(...relativeDistances);
+  const maxD = Math.max(...relativeDistances);
+  assert.ok(maxD - minD < 0.2, `Wing camera must not stutter; distance variation was ${maxD - minD}m`);
+});
+
+test('Airborne flyby camera anchors altitude to aircraft altitude and centers aircraft in frame', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const mountainElevation = () => 1500;
+  const director = new CinematicCameraDirector({ camera, queryGroundHeight: mountainElevation });
+
+  director.switchShot(CINEMATIC_SHOTS.TELEPHOTO_FLYBY);
+  const planePos = new THREE.Vector3(0, 2000, 0);
+  const planeQuat = new THREE.Quaternion();
+
+  director.update({
+    dt: 0.016,
+    camera,
+    planePos,
+    planeQuat,
+    flightState: { onGround: false, iasKnots: 250 },
+    queryGroundHeight: mountainElevation,
+  });
+
+  assert.ok(camera.position.y >= 1950, `Airborne flyby camera (${camera.position.y}) must be near aircraft altitude (2000m)`);
+  assert.ok(camera.position.y >= 1500 + 2.0, 'Camera must be above terrain');
+
+  const toAircraft = planePos.clone().sub(camera.position).normalize();
+  const camDir = new THREE.Vector3();
+  camera.getWorldDirection(camDir);
+  assert.ok(camDir.dot(toAircraft) > 0.98, 'Camera must point directly at aircraft so it is centered in frame');
+});
