@@ -30,6 +30,8 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY || 'phc_ussf2qgryzxghWApkvG2kcpXarbF4nNGTNEnwCBy8VKj' }}
+          VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST || 'https://eu.i.posthog.com' }}
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: dist
