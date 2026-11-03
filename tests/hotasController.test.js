@@ -607,3 +607,140 @@ describe('HotasController - Xbox Mode Profile & Custom Configuration', () => {
     assert.ok(typeof diag.outputs.throttle === 'number');
   });
 });
+
+describe('HotasController - Auto Axis Roles & Floating Pin Recovery (PR #441/#450/#452 review)', () => {
+  function createMockControls() {
+    return {
+      pitchTrim: 0.0,
+      pitchTrimRate: 0.0,
+      throttle: 0.0,
+      parkingBrake: false,
+      inputBlocked: false,
+      aircraftControlsDisabled: false,
+      spoilersToggled: 0,
+      setParkingBrake(val) { this.parkingBrake = Boolean(val); },
+      onUserInteract() {},
+      onToggleSpoilers() { this.spoilersToggled += 1; },
+    };
+  }
+
+  function makePad(axes, overrides = {}) {
+    return {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [...axes],
+      buttons: Array.from({ length: 12 }, () => ({ pressed: false, value: 0 })),
+      ...overrides,
+    };
+  }
+
+  it("defaults to 'auto' axes layout and learns a legacy report (lever on axis 2, twist on axis 3)", () => {
+    const controls = createMockControls();
+    let pad = makePad([0, 0, 1.0, 0.0, 1.0]); // PR #450-style: lever idle +1.0 (ax2), twist 0 (ax3), pedals unplugged (ax4 floats)
+    const hotas = new HotasController(controls, { getGamepads: () => [pad] });
+    assert.strictEqual(hotas.axesLayout, 'auto');
+
+    for (let i = 0; i < 3; i++) hotas.update(1 / 60);
+    assert.strictEqual(hotas.throttleAxis, 2, 'Pegged axis must be learned as the throttle');
+    assert.strictEqual(hotas.rudderAxis, 3, 'Centered axis must be learned as the twist rudder');
+    assert.strictEqual(hotas.throttle, 0.0, 'Idle lever reads throttle 0');
+    assert.strictEqual(hotas.rudder, 0.0, 'Idle lever must NOT lock the rudder');
+
+    pad = makePad([0, 0, -1.0, 0.0, 1.0]); // lever to TOGA
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.throttle, 1.0, 'TOGA on the learned lever axis reaches 100%');
+    assert.strictEqual(hotas.rudder, 0.0, 'Throttle movement must never steer');
+
+    pad = makePad([0, 0, -1.0, 0.6, 1.0]); // pilot twists right
+    hotas.update(1 / 60);
+    assert.ok(hotas.rudder > 0.5, `Twist on the learned rudder axis steers, got ${hotas.rudder}`);
+    assert.strictEqual(hotas.throttle, 1.0, 'Twist must not alter throttle');
+  });
+
+  it('auto-detects the 4-axis legacy report without throttle-rudder crosstalk', () => {
+    const controls = createMockControls();
+    let pad = makePad([0, 0, 1.0, 0.0]); // [roll, pitch, lever@+1.0 idle, twist@0]
+    const hotas = new HotasController(controls, { getGamepads: () => [pad] });
+
+    for (let i = 0; i < 3; i++) hotas.update(1 / 60);
+    assert.strictEqual(hotas.rudder, 0.0, 'Rudder must not sit at full deflection on a 4-axis stick at idle');
+    assert.strictEqual(hotas.throttle, 0.0);
+
+    pad = makePad([0, 0, -1.0, 0.0]);
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.throttle, 1.0);
+    assert.strictEqual(hotas.rudder, 0.0);
+  });
+
+  it('invalidates a connected axis 4 when its value parks at the rail (pedal hot-unplug)', () => {
+    const controls = createMockControls();
+    let pad = makePad([0, 0, 0.0, 1.0, 0.0]); // TFRP pedals present and centered
+    const hotas = new HotasController(controls, { getGamepads: () => [pad] });
+
+    for (let i = 0; i < 3; i++) hotas.update(1 / 60);
+    assert.strictEqual(hotas.axis4Valid, true);
+
+    pad = makePad([0, 0, 0.0, 1.0, 1.0]); // pedals unplugged: pin floats to +1.0, stick stays connected
+    for (let i = 0; i < 50; i++) hotas.update(1 / 60);
+    assert.strictEqual(hotas.axis4Valid, false, 'Sustained rail on a once-valid axis must invalidate it');
+    assert.strictEqual(hotas.axis4Floating, true, 'Floating must be flagged for the dialog');
+    assert.strictEqual(hotas.rudder, 0.0, 'Rudder must return to neutral twist control');
+
+    pad = makePad([0, 0, 0.5, 1.0, 1.0]);
+    hotas.update(1 / 60);
+    assert.ok(hotas.rudder > 0.4, `Twist retains control after the unplug, got ${hotas.rudder}`);
+
+    pad = makePad([0, 0, 0.0, 1.0, 0.0]); // pedals plugged back in, centered
+    for (let i = 0; i < 3; i++) hotas.update(1 / 60);
+    assert.strictEqual(hotas.axis4Valid, true, 'Re-centering axis 4 re-arms pedal detection');
+  });
+
+  it('does not count stale duplicate reports toward the axis 4 center budget', () => {
+    const controls = createMockControls();
+    // Chrome serves the same (initially zeroed) report across frames until real data arrives
+    const pad = makePad([0, 0, 0.0, 0.0, 0.0], { timestamp: 1000 });
+    const hotas = new HotasController(controls, { getGamepads: () => [pad] });
+
+    for (let i = 0; i < 10; i++) hotas.update(1 / 60);
+    assert.strictEqual(hotas.axis4Valid, false, 'One zeroed report must not latch as a centered pedal');
+    assert.strictEqual(hotas.axis4CenterFrames, 1);
+
+    pad.timestamp = 1001; // first real hardware report still centered
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.axis4Valid, true, 'Two distinct centered reports confirm a real control');
+  });
+
+  it('resolves Windows XInput Hotas One (generic vendor id, standard mapping) to the Xbox profile', () => {
+    const controls = createMockControls();
+    const pad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 045e Product: 028e)',
+      index: 0,
+      mapping: 'standard',
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 15 }, (_, i) => ({
+        pressed: i === 0, value: i === 0 ? 1.0 : 0.0,
+      })),
+    };
+    const hotas = new HotasController(controls, { getGamepads: () => [pad] });
+    assert.strictEqual(hotas.resolveProfile(pad), 'hotas-one-xbox');
+
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.brakes, 0.0, 'A button must not command wheel brakes in the PC-mode layout');
+
+    const pcPad = makePad([0, 0, 0.0, 1.0, 1.0], { mapping: 'standard', axes: [0, 0, 0.0, 1.0, 1.0] });
+    assert.strictEqual(hotas.resolveProfile(pcPad), 'hotas-one', 'A 5-axis PC-mode report stays in the PC profile');
+  });
+
+  it('clears learned device state when a different controller connects', () => {
+    const controls = createMockControls();
+    let pad = makePad([0, 0, 0.0, 1.0, 0.0]);
+    const hotas = new HotasController(controls, { getGamepads: () => [pad] });
+    for (let i = 0; i < 3; i++) hotas.update(1 / 60);
+    assert.strictEqual(hotas.axis4Valid, true);
+
+    pad = makePad([0, 0, 0.0, 1.0, 0.0], { id: 'Thrustmaster T.Flight Hotas X (Vendor: 044f Product: b363)' });
+    hotas.handleGamepadConnected(pad);
+    assert.strictEqual(hotas.axis4Valid, false, 'Axis-role and pedal state must not leak across devices');
+    assert.strictEqual(hotas.axisRoleProbe, null);
+  });
+});
