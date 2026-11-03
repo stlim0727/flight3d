@@ -6,22 +6,49 @@ import * as THREE from 'three';
  * generateValley({ seed, rules }).
  */
 export class GeneratedValleyTerrain {
-  constructor(valleyTerrain, sim = null, { size = 16000, segments = 256 } = {}) {
+  constructor(valleyTerrain, sim = null, options = {}) {
     this.terrain = valleyTerrain;
     this.isLoaded = true;
     this.loadError = null;
     this.region = 'generated-valley';
-    this.size = size;
-    this.segments = segments;
+
+    const b = valleyTerrain?.bounds;
+    const minX = b?.minX ?? -2000;
+    const maxX = b?.maxX ?? 2000;
+    const minZ = b?.minZ ?? -18000;
+    const maxZ = b?.maxZ ?? 0;
+
+    // Course extends northward (negative Z) from z=0 to minZ (~-18000m).
+    // Provide generous mountain terrain margins:
+    // - Ahead of finish line: 10,000m beyond minZ (runout and forward visibility)
+    // - Behind start line: 6,000m past maxZ (approach and rear visibility)
+    // - Lateral margin: at least 7,000m on each side of the corridor
+    const northEdgeZ = minZ - 10000;
+    const southEdgeZ = maxZ + 6000;
+    const lengthZ = options.lengthZ ?? (options.size ? options.size : (southEdgeZ - northEdgeZ));
+    const centerZ = options.centerZ ?? ((southEdgeZ + northEdgeZ) / 2);
+
+    const widthX = options.widthX ?? (options.size ? options.size : Math.max(18000, (maxX - minX) + 14000));
+    const centerX = options.centerX ?? ((minX + maxX) / 2);
+
+    this.size = Math.max(widthX, lengthZ);
+    this.widthX = widthX;
+    this.lengthZ = lengthZ;
+    this.centerX = centerX;
+    this.centerZ = centerZ;
+
+    const segmentsX = options.segmentsX ?? (options.segments ? options.segments : 200);
+    const segmentsZ = options.segmentsZ ?? (options.segments ? Math.round(options.segments * (lengthZ / widthX)) : 380);
+    this.segments = Math.max(segmentsX, segmentsZ);
     this.mesh = null;
     this.group = new THREE.Group();
     this.group.name = 'generated-valley-terrain';
 
     if (sim?.scene) {
-      const geom = new THREE.PlaneGeometry(this.size, this.size, this.segments, this.segments);
+      const geom = new THREE.PlaneGeometry(widthX, lengthZ, segmentsX, segmentsZ);
       geom.rotateX(-Math.PI * 0.5);
-      // Center the mesh along the generated valley trajectory (starts at z=0, extends northward/negative z to ~-7500m)
-      geom.translate(0, 0, -3800);
+      // Center the mesh along the generated valley trajectory
+      geom.translate(centerX, 0, centerZ);
 
       const pos = geom.attributes.position;
       const count = pos.count;
@@ -31,6 +58,8 @@ export class GeneratedValleyTerrain {
         pos.setY(i, this.terrain.getHeight(x, z));
       }
       geom.computeVertexNormals();
+      geom.computeBoundingBox();
+      geom.computeBoundingSphere();
 
       const norm = geom.attributes.normal;
       const colors = new Float32Array(count * 3);

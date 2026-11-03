@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { VALLEY_SLALOM_RULES, generateValley } from '../src/arena/generatedValley.js';
+import { GeneratedValleyTerrain } from '../src/environment/GeneratedValleyTerrain.js';
 import { bankReversalMeters } from '../src/arena/slalomEnvelope.js';
 
 /** The validity gate is the promise that no un-flyable course is ever offered as
@@ -146,5 +147,32 @@ test('the gate refuses a course the airframe cannot fly instead of selling it', 
     assert.ok(rejected.some(entry => !entry.assessment.ok),
       `${label}: impossible geometry was accepted as a course`);
     for (const entry of rejected) if (!entry.assessment.ok) assert.ok(reasonsOf(entry.assessment).length);
+  }
+});
+
+test('GeneratedValleyTerrain mesh fully encloses all course gates and waypoints with margin', () => {
+  for (const seed of DEV_SEEDS) {
+    const { course, terrain } = generateValley({ seed });
+    assert.ok(terrain.bounds, `seed ${seed} terrain missing bounds`);
+    assert.ok(terrain.bounds.minZ <= course.gates.at(-1).z, `seed ${seed} bounds do not cover final gate`);
+
+    const mockScene = { add() {} };
+    const gTerrain = new GeneratedValleyTerrain(terrain, { scene: mockScene });
+    const pos = gTerrain.mesh.geometry.attributes.position;
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      minX = Math.min(minX, pos.getX(i));
+      maxX = Math.max(maxX, pos.getX(i));
+      minZ = Math.min(minZ, pos.getZ(i));
+      maxZ = Math.max(maxZ, pos.getZ(i));
+    }
+
+    // Every gate and charted point must be strictly inside the rendered mesh with margin
+    for (const gate of course.gates) {
+      assert.ok(gate.x > minX + 2000 && gate.x < maxX - 2000,
+        `seed ${seed} gate ${gate.index} x=${gate.x.toFixed(1)} too close to lateral mesh edge [${minX}, ${maxX}]`);
+      assert.ok(gate.z > minZ + 5000 && gate.z < maxZ - 2000,
+        `seed ${seed} gate ${gate.index} z=${gate.z.toFixed(1)} outside longitudinal mesh bounds [${minZ}, ${maxZ}]`);
+    }
   }
 });
