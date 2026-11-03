@@ -42,7 +42,13 @@ export function createPilot() {
     const share = clamp((progressM - a.sM) / (b.sM - a.sM || 1), 0, 1);
     const dx = b.x - a.x, dz = b.z - a.z;
     const len = Math.hypot(dx, dz) || 1;
-    return { x: a.x + dx * share, z: a.z + dz * share, nx: -dz / len, nz: dx / len };
+    return {
+      x: a.x + dx * share,
+      z: a.z + dz * share,
+      nx: -dz / len,
+      nz: dx / len,
+      headingDeg: (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360,
+    };
   }
 
   function planCrossAt(progressM) {
@@ -72,7 +78,7 @@ export function createPilot() {
     const ds = to.sM - from.sM || 1;
     const curCurv = signed(to.headingDeg - from.headingDeg) * RAD / ds;
     const distToGate = to.sM - progressM;
-    const blendDist = 450;
+    const blendDist = 100;
     if (i < gates.length - 1 && distToGate < blendDist && distToGate > 0) {
       const nextGate = gates[i + 1];
       const nextDs = nextGate.sM - to.sM || 1;
@@ -147,29 +153,26 @@ export function createPilot() {
       const height = altitudeFt * 0.3048, vz = vsiFpm * 0.3048 / 60;
       const speed = Math.max(40, (read(s.tasKnots) ?? ias * 1.13) * 0.514444);
 
-      // Pure pursuit carrot guidance with lookahead and path curvature feedforward
-      const lookDist = Math.min(550, speed * 2.2);
-      const targetS = here.progressM + lookDist;
-      const carrot = pathPointAt(targetS);
+      // Tangent heading guidance with PD cross-track correction & curvature feedforward
+      const center = centerAt(here.progressM + Math.min(150, speed * 0.6));
+      const targetCross = planCrossAt(here.progressM + Math.min(150, speed * 0.6));
+      const crossError = targetCross - here.crossM;
+      const relHdg = signed(heading - (center.headingDeg ?? heading));
+      const headingCorrection = clamp(crossError * 0.20 - relHdg * 0.40, -18, 18);
+      const targetHeading = ((center.headingDeg ?? heading) + headingCorrection + 360) % 360;
+      const headingError = signed(targetHeading - heading);
 
-      const dx = carrot.x - ownX, dz = carrot.z - ownZ;
-      const carrotDist = Math.hypot(dx, dz) || 1;
-      const carrotBearing = (Math.atan2(dx, -dz) / RAD + 360) % 360;
-      const bearingError = signed(carrotBearing - heading);
-
-      const ffAcc = speed * speed * pathCurvatureAt(here.progressM + speed * 0.8) * 1.05;
-      const fbAcc = clamp(2 * speed * speed * Math.sin(bearingError * RAD) / carrotDist, -9, 9);
-      const aLat = clamp(ffAcc + fbAcc, -19.5, 19.5);
-      const bankTarget = clamp(Math.atan(aLat / GRAVITY) / RAD, -60, 60);
+      const ffAcc = speed * speed * pathCurvatureAt(here.progressM + speed * 0.9);
+      const fbAcc = clamp(headingError * 1.6, -14, 14);
+      const aLat = clamp(ffAcc + fbAcc, -34, 34);
+      const bankTarget = clamp(Math.atan(aLat / GRAVITY) / RAD, -73, 73);
 
       // Vertical equilibrium with terrain slope feedforward
       const terrainClimbRate = clamp(vz - (height - (previousHeight ?? height)) / dt, -10, 15);
       previousHeight = height;
 
-      const targetHeight = 65;
-      let desiredVz = clamp((targetHeight - height) * 0.6 + 0.8 * Math.max(0, terrainClimbRate), -8, 18);
-      if (height < 45 && vz < 2) desiredVz = Math.max(desiredVz, (50 - height) * 1.0);
-      desiredVz += (Math.abs(bankTarget) / 58) ** 2 * 2.5;
+      const targetHeight = 60;
+      const desiredVz = clamp((targetHeight - height) * 0.8 + 0.8 * Math.max(0, terrainClimbRate), -15, 18);
       filteredVz += (desiredVz - filteredVz) * (1 - Math.exp(-dt / 0.35));
 
       const measuredPitchRate = read(s.pitchRateDegS) ?? (previousPitch === null ? 0 : (pitch - previousPitch) / dt);
@@ -180,23 +183,23 @@ export function createPilot() {
       const q = Math.max(500, 0.5 * 1.225 * (ias * 0.514444) ** 2);
       const flightPath = Math.atan2(vz, speed);
 
-      const cosBank = Math.max(0.42, Math.cos(roll * RAD));
+      const cosBank = Math.max(0.28, Math.cos(roll * RAD));
       const turnAlpha = clamp((12000 * GRAVITY / (q * 27.87 * cosBank) - 0.05) / 4.2, 0.02, 0.23);
       const alphaEstimate = pitch * RAD - flightPath;
-      const bankGComp = (1 / cosBank - 1) * 2.5 * RAD;
+      const bankGComp = (1 / cosBank - 1) * 1.2 * RAD;
       const pitchTarget = clamp((Math.atan2(filteredVz, speed) + turnAlpha + (turnAlpha - alphaEstimate) + bankGComp) / RAD, -20, 32) * RAD;
       const desiredPitchRate = clamp((pitchTarget - pitch * RAD) * 1.8, -0.35, 0.35);
       const qRef = Math.min(q, 9500);
       const requiredCm = 75000 * (desiredPitchRate - pitchRate) * 2.5 / (qRef * 27.87 * 3.45);
       const qHat = pitchRate * 3.45 / (2 * speed);
-      const turnElevator = clamp((1 / cosBank - 1) * 0.10 + (targetHeight - height) * 0.003 - vz * 0.005, 0, 0.20);
+      const turnElevator = clamp((1 / cosBank - 1) * 0.08 + (targetHeight - height) * 0.004 - vz * 0.006, -0.20, 0.25);
       const elevator = ((requiredCm + 0.45 * alphaEstimate + 12 * qHat) / 1.8 - trimDeg * RAD) / (20 * RAD) + turnElevator;
 
       // Damped bank response with transport-delay prediction (calibrated for 410kt IAS)
       const rollLead = roll + (rollRate / RAD) * 0.25;
       const bankError = bankTarget - rollLead;
-      const aileron = clamp(bankError * 0.009 - (rollRate / RAD) * 0.0016, -0.28, 0.28);
-      const throttle = clamp((cruise - ias) * 0.05 + Math.max(0, filteredVz) * 0.005 + 0.52, 0, 1);
+      const aileron = clamp(bankError * 0.009 - (rollRate / RAD) * 0.0016, -0.32, 0.32);
+      const throttle = clamp((cruise - ias) * 0.08 + (1 / cosBank - 1) * 0.30 + 0.52, 0, 1);
 
       command = {
         elevator: clamp(elevator, -0.7, 0.8),

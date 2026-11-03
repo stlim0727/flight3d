@@ -33,7 +33,7 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
   /** Leg length floor comes from the measured bank reversal: at the fast end of
    * the band a full reversal costs about 600 m of straight line. */
   legLengthM: [2400, 2800],
-  headingChangeDeg: [28, 33],
+  headingChangeDeg: [60, 65],
   /** Half of the canyon floor. Tight trench-like canyon profile so turns carve
    * around steep rocky spurs. */
   corridorHalfWidthM: [280, 340],
@@ -274,8 +274,7 @@ export function assessCourse({ course, terrain, rules = VALLEY_SLALOM_RULES }) {
     const legLengthM = to.sM - from.sM;
     const headingChangeDeg = ((to.headingDeg - from.headingDeg + 540) % 360) - 180;
     const leg = assessLeg({ lengthM: legLengthM, headingChangeDeg,
-      altitudeChangeM: to.floorM - from.floorM, entryIasKnots: rules.cruiseKnots,
-      exitIasKnots: rules.cruiseKnots });
+      altitudeChangeM: to.floorM - from.floorM });
     if (!leg.ok) for (const shortfall of leg.shortfalls) {
       push(index, `leg-${shortfall}`, { legLengthM, headingChangeDeg,
         floorChangeM: to.floorM - from.floorM, ...leg });
@@ -325,11 +324,15 @@ export function assessCourse({ course, terrain, rules = VALLEY_SLALOM_RULES }) {
   const climbBudgetM = CLIMB_BUDGET_MS * (rules.sampleStepM / (rules.cruiseKnots * KT_TO_MS));
   for (let index = 1; index < gates.length; index++) {
     const from = gates[index - 1], to = gates[index];
-    const steps = Math.max(2, Math.round((to.sM - from.sM) / rules.sampleStepM));
+    const legSamples = course.centerline.filter(s => s.sM >= from.sM && s.sM <= to.sM);
     let previousGround = terrain.getHeight(from.x, from.z);
-    for (let step = 1; step <= steps; step++) {
-      const share = step / steps;
-      const x = from.x + (to.x - from.x) * share, z = from.z + (to.z - from.z) * share;
+    for (const sample of legSamples) {
+      const share = (sample.sM - from.sM) / (to.sM - from.sM || 1);
+      const crossOffset = from.crossOffsetM + (to.crossOffsetM - from.crossOffsetM) * share;
+      const nx = Math.cos(sample.headingDeg * RAD);
+      const nz = Math.sin(sample.headingDeg * RAD);
+      const x = sample.x + nx * crossOffset;
+      const z = sample.z + nz * crossOffset;
       const projected = terrain.project(x, z);
       if (Math.abs(projected.crossM) > projected.halfWidthM) {
         push(index, 'line-leaves-the-corridor',
