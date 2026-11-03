@@ -148,7 +148,16 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     sim.bodyContactStarted = false;
     sim.bodyContactNotices = new Set();
     sim.landingRestTime = 0;
-    if (sim.aero) sim.aero.separation = 0.0;
+    if (sim.aero) {
+      sim.aero.separation = 0.0;
+      sim.aero.stallSeverity = 0.0;
+      sim.aero.alpha = 0.0;
+      sim.aero.beta = 0.0;
+    }
+    sim.physicsAccumulator = 0;
+    if (sim.telemetry) sim.telemetry.warnings = [];
+    sim.flightWarnings?.reset?.();
+    this.command = { elevator: 0, aileron: 0, rudder: 0, throttle: this.manifest.configuration.trimThrottle, brakes: 0 };
 
     this.visualizer?.dispose();
     this.visualizer = new ValleyWaypointsVisualizer(sim, this.manifest.course);

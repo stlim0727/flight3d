@@ -322,7 +322,9 @@ export function installPilotArena(sim) {
     logs.length = 0; find('log').textContent = '';
     find('telemetry').textContent = '관측 대기 중';
     lastStatus = null;
+    if (runner.active) runner.stop('retry');
     sim.clearCrashState?.();
+    sim.physicsAccumulator = 0;
     runner.paceTick = find('kind').value === 'human' || find('playback').value === 'realtime' ? createRealtimePacer() : null;
     if (find('kind').value === 'human' || new URLSearchParams(location.search).get('pilotArena') !== '1') shell.open = false;
     sim.gameFlow.enterFlight();

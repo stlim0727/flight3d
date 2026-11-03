@@ -70,8 +70,8 @@ export class ValleyMission {
     if (!this.previous && Math.hypot(s.position.x - c.points[0].x, s.position.z - c.points[0].z) > c.startRadiusM) {
       return this.finish('failed', 'invalid-spawn');
     }
-    if (this.previous && Math.hypot(s.position.x - this.previous.position.x, s.position.z - this.previous.position.z) >
-        Math.max(10, s.groundSpeedKnots * 0.514444 / this.manifest.physicsHz * 2)) {
+    const maxStepM = Math.max(12, s.groundSpeedKnots * 0.514444 / this.manifest.physicsHz * 3);
+    if (this.previous && Math.hypot(s.position.x - this.previous.position.x, s.position.z - this.previous.position.z) > maxStepM) {
       return this.finish('failed', 'discontinuous-flight');
     }
     const leg = this.legs[this.nextGateIndex - 1];

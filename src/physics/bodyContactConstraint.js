@@ -27,6 +27,8 @@ export function bodyClearances(position, quaternion, height, points = BODY_SUPPO
 export function constrainBodyContact(position, quaternion, linearVelocity, angularVelocity,
   mass, inverseInertia, height, terrainNormal, points = BODY_SUPPORT_POINTS, cg = ZERO_CG) {
   inverse.copy(quaternion).invert();
+  let totalCorrectionM = 0;
+  const maxCorrectionM = 8.0;
   for (let iteration = 0; iteration < 4; iteration++) {
     let corrected = false;
     for (const probe of points) {
@@ -41,8 +43,14 @@ export function constrainBodyContact(position, quaternion, linearVelocity, angul
       if (normal.y < 0.1) normal.set(0, 1, 0);
       // Penetration is vertical clearance. Along a normalized surface normal,
       // planar clearance changes by distance / normal.y (the terrain height
-      // also changes as X/Z move). Convert the excess to normal distance.
-      position.addScaledVector(normal, (penetration - BODY_PENETRATION_LIMIT) * normal.y);
+      // also changes as X/Z move). Convert the excess to normal distance,
+      // capped per call so extreme wall penetrations cannot teleport the hull.
+      const neededDelta = (penetration - BODY_PENETRATION_LIMIT) * normal.y;
+      const normalDelta = Math.min(neededDelta, Math.max(0, maxCorrectionM - totalCorrectionM));
+      if (normalDelta > 0) {
+        position.addScaledVector(normal, normalDelta);
+        totalCorrectionM += normalDelta;
+      }
       velocity.copy(angularVelocity).applyQuaternion(quaternion).cross(arm).add(linearVelocity);
       const closing = velocity.dot(normal);
       if (closing >= 0) continue;
@@ -56,6 +64,6 @@ export function constrainBodyContact(position, quaternion, linearVelocity, angul
       angularVelocity.y += torque.y * inverseInertia.y * impulse;
       angularVelocity.z += torque.z * inverseInertia.z * impulse;
     }
-    if (!corrected) break;
+    if (!corrected || totalCorrectionM >= maxCorrectionM) break;
   }
 }
