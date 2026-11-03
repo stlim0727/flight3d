@@ -1,13 +1,17 @@
 :root {
-  --ui-scale: 1;
+  --ui-scale: 1.25;
+}
+
+@media (max-width: 1024px) {
+  :root { --ui-scale: 1; }
 }
 
 @media (min-width: 2560px) and (min-height: 1400px) {
-  :root { --ui-scale: 1.333; }
+  :root { --ui-scale: 1.667; }
 }
 
 @media (min-width: 3840px) and (min-height: 2100px) {
-  :root { --ui-scale: 2; }
+  :root { --ui-scale: 2.5; }
 }
 
 * {
