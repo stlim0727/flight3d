@@ -32,15 +32,18 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
   gates: 7,
   /** Leg length floor comes from the measured bank reversal: at the fast end of
    * the band a full reversal costs about 600 m of straight line. */
-  legLengthM: [2400, 2800],
+  legLengthM: [2600, 2900],
   headingChangeDeg: [60, 65],
-  /** Half of the canyon floor. Tight trench-like canyon profile so turns carve
-   * around steep rocky spurs. */
-  corridorHalfWidthM: [140, 160],
-  gatePassageHalfWidthM: 35,
+  /** Sharp turn radius in the bend section (2350-2500m avg, peaking at ~1880-2000m)
+   * to produce genuine 3.5G trench carving around towering cliff spurs. */
+  turnRadiusM: [2350, 2500],
+  /** Half of the canyon floor. Narrow 70m half-width (140m total floor width)
+   * between 700m tall sheer cliffs. */
+  corridorHalfWidthM: [68, 72],
+  gatePassageHalfWidthM: 25,
   /** The aim point sits across the valley, alternating sides, so the line must
    * carve the bend instead of following the middle. */
-  gateOffsetFraction: [0.35, 0.45],
+  gateOffsetFraction: [0.58, 0.65],
   /** The ceiling a gate is credited under, and how much deeper it may be. */
   passageMinAglM: 50,
   passageBandM: [35, 75],
@@ -53,7 +56,7 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
   speedKnots: [409, 580],
   /** The measured turn rate and sink ceiling are both best at the slow end of the
    * band, and a leg assessed at any other speed would be sized on borrowed time. */
-  cruiseKnots: 410,
+  cruiseKnots: 435,
   clearanceFloorM: 20,
   reliefAmplitudeM: 5,
   decisionPeriodTicks: 24,
@@ -118,20 +121,44 @@ function buildCenterline(random, rules) {
       offsetFraction: rules.gateOffsetFraction[0]
         + random() * (rules.gateOffsetFraction[1] - rules.gateOffsetFraction[0]) };
     legs.push(leg);
-    const curvature = headingChangeDeg * RAD / lengthM;
     const steps = Math.max(2, Math.round(lengthM / rules.sampleStepM));
     const stepM = lengthM / steps;
+
+    // Short-radius bend: concentrate heading change with smoothstep transitions
+    const turnRadiusRange = rules.turnRadiusM ?? [1350, 1450];
+    const turnRadiusM = turnRadiusRange[0] + random() * (turnRadiusRange[1] - turnRadiusRange[0]);
+    const turnRad = Math.abs(headingChangeDeg) * RAD;
+    let turnLengthM = turnRadiusM * turnRad;
+    let turnSteps = Math.max(4, Math.round(turnLengthM / stepM));
+    turnLengthM = turnSteps * stepM;
+    if (turnSteps >= steps - 4) {
+      turnSteps = Math.max(4, steps - 4);
+      turnLengthM = turnSteps * stepM;
+    }
+    const straightStepsBefore = Math.floor((steps - turnSteps) / 2);
+    const easeFraction = 0.2;
+    const peakCurvature = (headingChangeDeg * RAD) / (turnLengthM * (1 - easeFraction));
+
     // The first sample of a leg is the last sample of the one before it; pushing
     // it twice would freeze the position while the arc length kept counting.
     for (let step = index === 0 ? 0 : 1; step <= steps; step++) {
       const share = step / steps;
       if (step > 0) {
-        // Integrate the arc: heading changes uniformly along the leg, so the
-        // demand the contract puts on a leg is the demand the turn was sized to.
-        // Half a step at the old heading, the whole step's turn, half a step at
-        // the new heading; anything else quietly shortens the bend.
+        let curCurv = 0;
+        if (step > straightStepsBefore && step <= straightStepsBefore + turnSteps) {
+          const u = (step - straightStepsBefore - 0.5) / turnSteps;
+          let profile = 1;
+          if (u < easeFraction) {
+            const t = u / easeFraction;
+            profile = t * t * (3 - 2 * t);
+          } else if (u > 1 - easeFraction) {
+            const t = (1 - u) / easeFraction;
+            profile = t * t * (3 - 2 * t);
+          }
+          curCurv = peakCurvature * profile;
+        }
         x += Math.sin(heading) * stepM / 2; z -= Math.cos(heading) * stepM / 2;
-        heading += curvature * stepM;
+        heading += curCurv * stepM;
         x += Math.sin(heading) * stepM / 2; z -= Math.cos(heading) * stepM / 2;
         progress += stepM;
       }
@@ -363,7 +390,8 @@ export function generateValley({ seed, rules = VALLEY_SLALOM_RULES } = {}) {
   const random = mulberry32(seed);
   const { samples, legs } = buildCenterline(random, rules);
   const noise = valueNoise(mulberry32(seed ^ 0x5bf03635));
-  const terrain = createValleyTerrain({ samples, noise, reliefAmplitudeM: rules.reliefAmplitudeM });
+  const crossJitterM = Math.min(12, (rules.corridorHalfWidthM?.[0] ?? 70) * 0.05);
+  const terrain = createValleyTerrain({ samples, noise, reliefAmplitudeM: rules.reliefAmplitudeM, crossJitterM });
   const gates = buildGates({ samples, legs, rules, random, terrain });
   const centerline = samples.map(sample => ({ x: sample.x, z: sample.z, sM: sample.s,
     halfWidthM: sample.halfWidth, headingDeg: sample.heading / RAD }));
