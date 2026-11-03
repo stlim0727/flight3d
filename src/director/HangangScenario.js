@@ -1,5 +1,6 @@
 import { HangangScene } from '../environment/HangangScene.js';
 import { HangangCollision } from './HangangCollision.js';
+import { HANGANG_CORRIDOR, corridorExcess } from '../config/hangangCourse.js';
 import { t } from '../i18n/index.js';
 
 export class HangangScenario {
@@ -24,7 +25,7 @@ export class HangangScenario {
     s.cameraSystem.trauma = 0;
     s.cameraSystem.towerPos.set(80, 70, 80);
     s.setTimeOfDay(18.25, { persist: false }); s.aero.windWorld.set(0, 0, 0);
-    this.collision.reset();
+    this.collision.reset(); this.outside = false;
   }
   stop() {
     if (!this.saved) return;
@@ -77,6 +78,13 @@ export class HangangScenario {
       const structure = contact.structure;
       s.triggerCrash({ collided: true, type: structure === 'water' ? 'WATER' : structure === 'island' ? 'TERRAIN' : 'BUILDING',
         name: t('hangang.contact'), description: t('hangang.contact'), point: s.position.clone(), speedKnots: s.linearVelocity.length() * 1.94384 });
+      return;
+    }
+    // Advise once per excursion beyond the corridor (#393); it never ends the run.
+    const excess = corridorExcess(s.position.x, s.position.z);
+    if (this.outside ? excess < -HANGANG_CORRIDOR.rearm : excess > 0) {
+      this.outside = !this.outside;
+      if (this.outside) s.showToast?.(() => t('hangang.corridor'));
     }
   }
 }

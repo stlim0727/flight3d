@@ -56,8 +56,12 @@ The scenario uses the common flight HUD and controls. Use **Esc → Scenario
 restart** to restart; after a crash use the common report and
 **Space / R / Enter → main menu → Fly**. Menu selection retains the Han River region.
 
-Leaving the river corridor is not prevented. Skyline buildings have no collision
-proxies (see below); boundary handling is tracked in #393.
+Leaving the river corridor is not prevented. The corridor is the water between the
+banks (450 m either side of the river centreline) over the 10.4 km the banks are drawn,
+z = 2,500 to -7,900 m (`HANGANG_CORRIDOR`, `corridorExcess()`). Crossing out of it shows
+a toast once: buildings beyond it have no collision and the scenery ends ahead. Nothing
+fails; the notice re-arms 50 m back inside (#393). Collision proxies for the skyline and
+landmarks, and closing off the scene edge, remain open in #393.
 
 ## Physics and geometry contracts
 
@@ -131,7 +135,7 @@ merged meshes span the opening (`tests/hangangScene.test.js`).
 The riverbanks use sampled BufferGeometry ribbons and the skyline uses one
 InstancedMesh with 160 buildings. Scenery is cached and reused on retries.
 Buildings outside the river corridor are visual approximations without
-collision proxies; #393 tracks them.
+collision proxies; the corridor toast warns of this, and #393 tracks the proxies.
 
 ## Provenance and limits
 
