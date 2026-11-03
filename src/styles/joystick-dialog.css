@@ -208,6 +208,29 @@
   color: #f1f5f9;
 }
 
+.joystick-meter-source {
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.joystick-meter-source.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.joystick-meter-source.active {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
 .joystick-meter-val {
   font-size: 0.82rem;
   font-weight: 700;

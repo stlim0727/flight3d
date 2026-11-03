@@ -158,12 +158,42 @@ describe('HotasController - T.Flight Hotas One Flight Axes', () => {
     const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
 
     hotas.update(1 / 60);
+    hotas.update(1 / 60);
     assert.strictEqual(hotas.rudder, 0.0);
+    assert.strictEqual(hotas.axis4Valid, true, 'Axis 4 should be marked valid after confirmed neutral center');
 
     // Pilot now presses pedals (-0.9 left on axis 4), overriding slight stick twist (+0.2 on axis 3)
     mockGamepad = createHotasGamepad([0, 0, 1.0, 0.2, -0.9]);
     hotas.update(1 / 60);
     assert.ok(hotas.rudder < -0.8, `Expected pedal rudder to override stick twist, got ${hotas.rudder}`);
+  });
+
+  it('rejects floating axis 4 when browser emits initial zero frame before hardware floats to 1.0', () => {
+    const controls = createMockControls();
+    // Frame 0: Browser Gamepad API allocates array with all zeros
+    let mockGamepad = createHotasGamepad([0, 0, 0, 0, 0]);
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.rudder, 0.0);
+
+    // Frame 1: Real hardware report arrives: idle throttle (+1.0) and floating RJ12 pin (+1.0)
+    mockGamepad = createHotasGamepad([0, 0, 1.0, 0.0, 1.0]);
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.rudder, 0.0, 'Rudder MUST remain neutral (0.0) despite axis 4 jumping to 1.0');
+    assert.strictEqual(hotas.axis4Floating, true, 'Axis 4 must be flagged as floating pin');
+    assert.strictEqual(hotas.axis4Valid, false, 'Axis 4 must be marked invalid');
+
+    // Frame 2: Pilot twists stick (+0.5 on axis 3) while axis 4 remains floating at 1.0
+    mockGamepad = createHotasGamepad([0, 0, 1.0, 0.5, 1.0]);
+    hotas.update(1 / 60);
+    assert.ok(hotas.rudder > 0.4, `Stick twist must control rudder, got ${hotas.rudder}`);
+    assert.strictEqual(hotas.activeRudderSource, 'twist');
+
+    // Frame 3: Pilot releases stick (0.0 on axis 3)
+    mockGamepad = createHotasGamepad([0, 0, 1.0, 0.0, 1.0]);
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.rudder, 0.0, 'Rudder MUST return to neutral 0.0 when stick is released');
   });
 
   it('maps 3-axis flight stick fallback where axis 2 is throttle and rudder is neutral', () => {
