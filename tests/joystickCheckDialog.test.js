@@ -363,14 +363,14 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     resetBtn.click();
 
     assert.strictEqual(sim.controls.hotas.profileOverride, 'auto');
-    assert.strictEqual(sim.controls.hotas.axesLayout, 'thrustmaster');
+    assert.strictEqual(sim.controls.hotas.axesLayout, 'auto');
     assert.strictEqual(sim.controls.hotas.throttleInverted, false);
     assert.strictEqual(sim.controls.hotas.pitchInverted, false);
     assert.strictEqual(sim.controls.hotas.rudderMode, 'auto');
     assert.strictEqual(sim.controls.hotas.deadzoneStick, 0.04);
 
     assert.strictEqual(dialog.profileSelect.value, 'auto');
-    assert.strictEqual(dialog.axesLayoutSelect.value, 'thrustmaster');
+    assert.strictEqual(dialog.axesLayoutSelect.value, 'auto');
     assert.strictEqual(dialog.throttleInvertCheck.checked, false);
     assert.strictEqual(dialog.pitchInvertCheck.checked, false);
     assert.strictEqual(dialog.rudderModeSelect.value, 'auto');

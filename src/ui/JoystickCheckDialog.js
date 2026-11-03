@@ -178,7 +178,7 @@ export class JoystickCheckDialog {
               <select class="joystick-select" data-select-axes-layout>
                 <option value="thrustmaster" data-i18n="joystick.layout.thrustmaster">Thrustmaster 표준 (러더: Axis 2, 스로틀: Axis 3)</option>
                 <option value="legacy" data-i18n="joystick.layout.legacy">반전 레이아웃 (스로틀: Axis 2, 러더: Axis 3)</option>
-                <option value="auto" data-i18n="joystick.layout.auto">스마트 자동 감지 (Auto-Detect)</option>
+                <option value="auto" data-i18n="joystick.layout.auto">연결 시 축 역할 자동 판별 (Auto-Detect)</option>
               </select>
             </div>
             <div class="joystick-field">
@@ -221,7 +221,7 @@ export class JoystickCheckDialog {
           <ul>
             <li data-i18n="joystick.tip.switch">스위치 위치: T.Flight Hotas One 본체 뒤쪽 'PC / XBOX' 스위치가 PC에 있어야 5축 원시 HID로 작동합니다. XBOX 모드인 경우 위 프로필에서 'XBOX 모드'를 선택하면 스로틀과 러더가 자동 정렬됩니다.</li>
             <li data-i18n="joystick.tip.led">5축 / 4축 모드 LED: Home/Preset 버튼 LED가 초록색이면 5축 모드(로커 패들 독립), 빨간색이면 4축 모드(트위스트와 로커 패들 연동)입니다.</li>
-            <li data-i18n="joystick.tip.rudder">러더 고정 현상: TFRP 페달이 연결되지 않은 경우 Axis 4(RJ12 단자)가 +1.0/-1.0으로 고정될 수 있습니다. 시스템이 부유 핀을 자동 차단하여 스틱 트위스트(Axis 3)로 정상 비행할 수 있으며, 필요 시 '러더 입력 소스'를 '스틱 트위스트 전용'으로 설정할 수 있습니다.</li>
+            <li data-i18n="joystick.tip.rudder">러더 고정 현상: TFRP 페달이 연결되지 않은 경우 Axis 4(RJ12 단자)가 +1.0/-1.0으로 고정될 수 있습니다. 시스템이 부유 핀을 자동 차단하여 스틱 트위스트로 정상 비행할 수 있으며, 필요 시 '러더 입력 소스'를 '스틱 트위스트 전용'으로 설정할 수 있습니다.</li>
             <li data-i18n="joystick.tip.browser">브라우저 보안: 웹 브라우저는 보안상 조종간 레버를 움직이거나 버튼을 누르기 전까지 입력을 노출하지 않습니다.</li>
           </ul>
         </div>
@@ -345,7 +345,7 @@ export class JoystickCheckDialog {
     // Populate current config
     const config = this.hotas?.getConfig() || {};
     if (this.profileSelect) this.profileSelect.value = config.profileOverride || 'auto';
-    if (this.axesLayoutSelect) this.axesLayoutSelect.value = config.axesLayout || 'thrustmaster';
+    if (this.axesLayoutSelect) this.axesLayoutSelect.value = config.axesLayout || 'auto';
     if (this.throttleInvertCheck) this.throttleInvertCheck.checked = Boolean(config.throttleInverted);
     if (this.pitchInvertCheck) this.pitchInvertCheck.checked = Boolean(config.pitchInverted);
     if (this.rudderModeSelect) this.rudderModeSelect.value = config.rudderMode || 'auto';
@@ -526,16 +526,16 @@ export class JoystickCheckDialog {
     if (this.sourceRudder) {
       const rAxis = diag.rudderAxis ?? 2;
       if (diag.axis4Floating) {
-        this.sourceRudder.textContent = `부유 핀 차단됨 · Axis ${rAxis} 트위스트 활성`;
+        this.sourceRudder.textContent = t('joystick.rudder.source.floating');
         this.sourceRudder.className = 'joystick-meter-source warning';
       } else if (diag.activeRudderSource === 'pedals') {
-        this.sourceRudder.textContent = '로커/페달 (Axis 4)';
+        this.sourceRudder.textContent = t('joystick.rudder.source.pedals');
         this.sourceRudder.className = 'joystick-meter-source active';
       } else if (diag.activeProfile === 'hotas-one-xbox') {
-        this.sourceRudder.textContent = '우측 스틱 X (Axis 2)';
+        this.sourceRudder.textContent = t('joystick.rudder.source.xbox');
         this.sourceRudder.className = 'joystick-meter-source active';
       } else {
-        this.sourceRudder.textContent = `스틱 트위스트 (Axis ${rAxis})`;
+        this.sourceRudder.textContent = `${t('joystick.rudder.source.twist')} (Axis ${rAxis})`;
         this.sourceRudder.className = 'joystick-meter-source';
       }
     }
@@ -622,7 +622,7 @@ export class JoystickCheckDialog {
     if (!this.hotas) return;
     const defaults = {
       profileOverride: 'auto',
-      axesLayout: 'thrustmaster',
+      axesLayout: 'auto',
       throttleInverted: false,
       pitchInverted: false,
       rudderMode: 'auto',
@@ -632,7 +632,7 @@ export class JoystickCheckDialog {
     this.hotas.applyConfig(defaults);
 
     if (this.profileSelect) this.profileSelect.value = 'auto';
-    if (this.axesLayoutSelect) this.axesLayoutSelect.value = 'thrustmaster';
+    if (this.axesLayoutSelect) this.axesLayoutSelect.value = 'auto';
     if (this.throttleInvertCheck) this.throttleInvertCheck.checked = false;
     if (this.pitchInvertCheck) this.pitchInvertCheck.checked = false;
     if (this.rudderModeSelect) this.rudderModeSelect.value = 'auto';

@@ -71,7 +71,7 @@ export class HotasController {
 
     // Configuration
     this.profileOverride = options.profileOverride || 'auto'; // 'auto', 'hotas-one', 'hotas-one-xbox', 'hotas-tflight', 'flight-stick', 'standard-gamepad'
-    this.axesLayout = options.axesLayout || 'thrustmaster'; // 'thrustmaster' (Rudder 2, Throttle 3), 'legacy' (Throttle 2, Rudder 3), 'auto'
+    this.axesLayout = options.axesLayout || 'auto'; // 'auto' (detect roles at rest), 'thrustmaster' (Rudder 2, Throttle 3), 'legacy' (Throttle 2, Rudder 3)
     this.throttleInverted = options.throttleInverted ?? false; // standard: forward = 1.0 (TOGA), backward = 0.0 (Idle)
     this.pitchInverted = options.pitchInverted ?? false;
     this.rudderMode = options.rudderMode || 'auto'; // 'auto', 'twist', 'pedals'
@@ -87,12 +87,7 @@ export class HotasController {
     this.activeGamepadIndex = -1;
     this.connectedDevice = null;
     this.lastActiveTime = 0;
-    this.axis4Valid = false;
-    this.axis4CenterFrames = 0;
-    this.hasSecondaryRudderControl = false;
-    this.lastRawAxis4 = null;
-    this.axis4Floating = false;
-    this.activeRudderSource = 'twist';
+    this.resetAdaptationState();
 
     // Callbacks
     this.onDeviceConnected = null;
@@ -138,7 +133,10 @@ export class HotasController {
       if (isPcMode) return 'hotas-one';
       const isXboxMode = /(?:b68d|product:\s*b68d)/i.test(gamepad.id || '')
         || (gamepad.id || '').toLowerCase().includes('xbox')
-        || (gamepad.id || '').toLowerCase().includes('xinput');
+        || (gamepad.id || '').toLowerCase().includes('xinput')
+        // Windows XInput hides the Thrustmaster vendor/product ids. A PC-mode
+        // Hotas One always reports >= 5 raw axes; XInput serves 4 standard axes.
+        || (gamepad.mapping === 'standard' && (gamepad.axes || []).length <= 4);
       return isXboxMode ? 'hotas-one-xbox' : 'hotas-one';
     }
     return baseType;
@@ -157,6 +155,11 @@ export class HotasController {
 
   handleGamepadConnected(gamepad) {
     if (!gamepad) return;
+    if (!this.connectedDevice
+      || this.connectedDevice.index !== gamepad.index
+      || this.connectedDevice.id !== gamepad.id) {
+      this.resetAdaptationState();
+    }
     const type = identifyGamepadType(gamepad);
     this.connectedDevice = {
       index: gamepad.index,
@@ -203,12 +206,30 @@ export class HotasController {
     this.hasThrottleControl = false;
     this.lastRawThrottle = null;
     this.prevButtons = [];
+    this.resetAdaptationState();
+  }
+
+  // Clear per-device learned state (axis validity latch, auto-detected axis roles).
+  resetAdaptationState() {
     this.axis4Valid = false;
     this.axis4CenterFrames = 0;
+    this.axis4ExtremeFrames = 0;
     this.hasSecondaryRudderControl = false;
     this.lastRawAxis4 = null;
     this.axis4Floating = false;
     this.activeRudderSource = 'twist';
+    this.lastReportTimestamp = null;
+    this.axisRoleProbe = null;
+  }
+
+  // Chrome can serve several animation frames of one hardware report (and an
+  // all-zero synthesized array right after connect). Only count frames that
+  // carry a new report so rest-detection budgets cannot be burned by stale data.
+  newGamepadReport(gp) {
+    if (gp.timestamp === undefined) return true;
+    if (gp.timestamp === this.lastReportTimestamp) return false;
+    this.lastReportTimestamp = gp.timestamp;
+    return true;
   }
 
   getGamepads() {
@@ -343,6 +364,73 @@ export class HotasController {
     }
   }
 
+  // Observe candidate axes 2 and 3 and assign roles from physical behavior:
+  // the twist handle is spring-centered (rests at 0 and returns after release),
+  // the throttle lever parks where it is left (often pegged near a rail at idle).
+  // Returns { twist, throttle, decided }; while undecided, the candidate axis
+  // nearer center is provisionally treated as the twist.
+  detectAxisRoles(gp, axes, freshReport) {
+    if (!this.axisRoleProbe || this.axisRoleProbe.deviceId !== gp.id) {
+      this.axisRoleProbe = { deviceId: gp.id, frames: 0, obs: {} };
+      for (const idx of [2, 3]) {
+        this.axisRoleProbe.obs[idx] = {
+          min: axes[idx] ?? 0,
+          max: axes[idx] ?? 0,
+          centerFrames: 0,
+          extremeFrames: 0,
+          stayFrames: 0,
+          returnedToCenter: false,
+          lastValue: axes[idx] ?? 0,
+        };
+      }
+    }
+    const probe = this.axisRoleProbe;
+    if (freshReport) {
+      probe.frames += 1;
+      for (const idx of [2, 3]) {
+        const o = probe.obs[idx];
+        const v = axes[idx] ?? 0.0;
+        o.min = Math.min(o.min, v);
+        o.max = Math.max(o.max, v);
+        if (Math.abs(v) <= 0.15) o.centerFrames += 1;
+        if (Math.abs(v) > 0.35) o.extremeFrames += 1;
+        if (Math.abs(v - o.lastValue) > 0.04) {
+          o.stayFrames = 0;
+        } else if (Math.abs(v) > 0.15) {
+          o.stayFrames += 1;
+        }
+        if ((o.max > 0.4 || o.min < -0.4) && Math.abs(v) <= 0.15) o.returnedToCenter = true;
+        o.lastValue = v;
+      }
+    }
+
+    const a = probe.obs[2];
+    const b = probe.obs[3];
+    const centeredAlways = (o) => probe.frames >= 2 && o.centerFrames === probe.frames;
+    const parkedAtRail = (o) => probe.frames >= 2 && o.extremeFrames === probe.frames;
+    // One axis has sat at a rail since connect while the other never left center.
+    if (parkedAtRail(a) && centeredAlways(b)) return { twist: 3, throttle: 2, decided: true };
+    if (parkedAtRail(b) && centeredAlways(a)) return { twist: 2, throttle: 3, decided: true };
+    // One axis moved and stayed put while the other showed a release-to-center.
+    if (a.stayFrames >= 45 && b.returnedToCenter) return { twist: 3, throttle: 2, decided: true };
+    if (b.stayFrames >= 45 && a.returnedToCenter) return { twist: 2, throttle: 3, decided: true };
+    if (probe.frames >= 120) {
+      // Settle timeout: whichever axis has spent more time near center is the twist.
+      const aScore = a.centerFrames + (a.returnedToCenter ? 60 : 0);
+      const bScore = b.centerFrames + (b.returnedToCenter ? 60 : 0);
+      return aScore >= bScore
+        ? { twist: 2, throttle: 3, decided: true }
+        : { twist: 3, throttle: 2, decided: true };
+    }
+    // Undecided: provisionally treat the axis nearer center as the twist so
+    // even the first frames map a rail-parked idle lever to the throttle.
+    const aAbs = Math.abs(a.lastValue);
+    const bAbs = Math.abs(b.lastValue);
+    return aAbs <= bAbs
+      ? { twist: 2, throttle: 3, decided: false }
+      : { twist: 3, throttle: 2, decided: false };
+  }
+
   updateHotasProfile(gp, axes, buttons, dt) {
     const blocked = this.controls?.inputBlocked === true;
     const aircraftDisabled = this.controls?.aircraftControlsDisabled === true;
@@ -357,8 +445,9 @@ export class HotasController {
       this.elevator = this.pitchInverted ? -rawElevator : rawElevator;
 
       // Determine axes assignment based on layout
-      let twistAxisIdx = 2;
-      let throttleAxisIdx = 3;
+      const freshReport = this.newGamepadReport(gp);
+      let twistAxisIdx;
+      let throttleAxisIdx;
 
       if (axes.length <= 3) {
         twistAxisIdx = -1;
@@ -366,10 +455,16 @@ export class HotasController {
       } else if (this.axesLayout === 'legacy') {
         twistAxisIdx = 3;
         throttleAxisIdx = 2;
-      } else {
-        // 'thrustmaster' default (and auto with >= 4 axes): Z=Rudder (Axis 2), RZ=Throttle (Axis 3)
+      } else if (this.axesLayout === 'thrustmaster') {
         twistAxisIdx = 2;
         throttleAxisIdx = 3;
+      } else {
+        // 'auto': Thrustmaster units disagree on which of axes 2/3 is the
+        // spring-centered twist handle versus the parkable lever (model and
+        // 4/5-axis switch mode), so learn the roles from observed behavior.
+        const roles = this.detectAxisRoles(gp, axes, freshReport);
+        twistAxisIdx = roles.twist;
+        throttleAxisIdx = roles.throttle;
       }
       this.throttleAxis = throttleAxisIdx;
       this.rudderAxis = twistAxisIdx;
@@ -379,7 +474,7 @@ export class HotasController {
         this.updateThrottleFromRaw(axes[throttleAxisIdx]);
       }
 
-      // Primary Rudder (Stick Twist handle on Axis 2, and throttle rocker in 4-axis mode)
+      // Primary Rudder: spring-centered stick twist handle at the resolved twist axis
       const twist = (twistAxisIdx >= 0 && axes.length > twistAxisIdx && axes[twistAxisIdx] !== undefined)
         ? applyDeadzone(axes[twistAxisIdx], this.deadzoneRudder)
         : 0.0;
@@ -411,14 +506,31 @@ export class HotasController {
           const isExtreme = Math.abs(rawAxis4) >= 0.90;
 
           if (Math.abs(rawAxis4) <= 0.20) {
-            this.axis4CenterFrames = (this.axis4CenterFrames || 0) + 1;
+            if (freshReport) this.axis4CenterFrames += 1;
             if (this.axis4CenterFrames >= 2) {
+              // Spring-centered control confirmed at rest; this also re-arms
+              // axis 4 when pedals are plugged back in after a floating pin.
               this.axis4Valid = true;
+              this.axis4ExtremeFrames = 0;
             }
-          } else if (isExtreme && !this.axis4Valid) {
-            // Pegged at extreme without having been confirmed centered: floating pin!
-            this.axis4CenterFrames = 0;
-            axis4Floating = true;
+          } else if (isExtreme) {
+            if (this.axis4Valid) {
+              if (freshReport) this.axis4ExtremeFrames += 1;
+              if (this.axis4ExtremeFrames >= 45) {
+                // A confirmed-connected pedal was unplugged while the stick stayed
+                // connected: the ADC pin floats back to the rail. A real full pedal
+                // press is transient; a sustained rail means the control is gone.
+                this.axis4Valid = false;
+                this.axis4CenterFrames = 0;
+                this.axis4ExtremeFrames = 0;
+                axis4Floating = true;
+              }
+            } else {
+              this.axis4CenterFrames = 0;
+              axis4Floating = true;
+            }
+          } else {
+            this.axis4ExtremeFrames = 0;
           }
 
           if (this.axis4Valid) {
