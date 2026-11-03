@@ -158,7 +158,7 @@ export function createPilot() {
       const targetCross = planCrossAt(here.progressM + Math.min(150, speed * 0.6));
       const crossError = targetCross - here.crossM;
       const relHdg = signed(heading - (center.headingDeg ?? heading));
-      const headingCorrection = clamp(crossError * 0.20 - relHdg * 0.40, -18, 18);
+      const headingCorrection = clamp(crossError * 0.14 - relHdg * 0.65, -18, 18);
       const targetHeading = ((center.headingDeg ?? heading) + headingCorrection + 360) % 360;
       const headingError = signed(targetHeading - heading);
 

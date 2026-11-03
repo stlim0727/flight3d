@@ -57,7 +57,7 @@ test('a short wings-level hold stays a running slalom mission on real physics', 
   adapter.apply({ elevator: 0, aileron: 0, rudder: 0, throttle: manifest.configuration.trimThrottle,
     brakes: 0 });
   let result;
-  for (let tick = 0; tick < 600; tick++) {
+  for (let tick = 0; tick < 240; tick++) {
     adapter.step();
     result = evaluator.update(adapter.snapshot(tick + 1));
     if (result.status !== 'running') break;

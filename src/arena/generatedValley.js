@@ -36,11 +36,11 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
   headingChangeDeg: [60, 65],
   /** Half of the canyon floor. Tight trench-like canyon profile so turns carve
    * around steep rocky spurs. */
-  corridorHalfWidthM: [280, 340],
+  corridorHalfWidthM: [140, 160],
   gatePassageHalfWidthM: 35,
   /** The aim point sits across the valley, alternating sides, so the line must
    * carve the bend instead of following the middle. */
-  gateOffsetFraction: [0.15, 0.25],
+  gateOffsetFraction: [0.35, 0.45],
   /** The ceiling a gate is credited under, and how much deeper it may be. */
   passageMinAglM: 50,
   passageBandM: [35, 75],

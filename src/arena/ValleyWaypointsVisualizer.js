@@ -88,7 +88,7 @@ export function createSignboardCanvas(index, isFinish) {
     // Target altitude & descent guide
     ctx.fillStyle = '#9fe8ff';
     ctx.font = '24px monospace';
-    ctx.fillText(isFinish ? '도착선 · ▼ PASS' : '기준 20m · 550-600 KT · ▼ PASS', 256, 155);
+    ctx.fillText(isFinish ? '도착선 · ▼ PASS' : '기준 20m · 409-580 KT · ▼ PASS', 256, 155);
 
     return canvas;
   } catch {
