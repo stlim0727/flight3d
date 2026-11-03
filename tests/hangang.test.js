@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Vector3, Quaternion, Scene, Box3, Euler, Matrix4 } from 'three';
 import { HangangCollision } from '../src/director/HangangCollision.js';
 import { HangangScenario } from '../src/director/HangangScenario.js';
-import { HANGANG_COURSE as course, bridgeApproaches, riverCenter, corridorExcess } from '../src/config/hangangCourse.js';
+import { HANGANG_COURSE as course, bridgeApproaches, riverCenter } from '../src/config/hangangCourse.js';
 import { lobbyBriefing } from '../src/ui/lobbyBriefing.js';
 import { setLanguage, t } from '../src/i18n/index.js';
 
@@ -271,39 +271,5 @@ test('HangangScenario crashes only on contact and restarts collision on start', 
     assert.equal(crashes.length, 1); assert.equal(crashes[0].type, 'WATER');
     hs.update(0.05); assert.equal(crashes.length, 1);
     sim.isCrashed = false; hs.start(); assert.equal(hs.collision.contact, null);
-  });
-});
-
-test('the river corridor spans the water between the banks where they are drawn (#393)', () => {
-  for (const z of [850, 0, -3730, -7800]) assert.ok(corridorExcess(riverCenter(z), z) < 0, `z ${z}`);
-  assert.ok(corridorExcess(riverCenter(-1000) + 440, -1000) < 0);
-  assert.ok(corridorExcess(riverCenter(-1000) - 460, -1000) > 0);
-  assert.ok(corridorExcess(0, 2600) > 0); assert.ok(corridorExcess(200, -8000) > 0);
-});
-
-test('leaving the corridor advises once per excursion and never fails the run (#393)', () => {
-  withSim(sim => {
-    const toasts = [], crashes = [];
-    sim.isCrashed = false;
-    sim.showToast = msg => toasts.push(msg());
-    sim.triggerCrash = result => { crashes.push(result); sim.isCrashed = true; };
-    const hs = new HangangScenario(sim);
-    const fly = (x0, x1, z = -1600) => {
-      for (let i = 0; i <= 200; i++) { sim.position.set(x0 + (x1 - x0) * i / 200, 120, z); hs.update(0.05); }
-    };
-    hs.start();
-    fly(riverCenter(-1600), riverCenter(-1600) + 2000);
-    assert.deepEqual(toasts, [t('hangang.corridor')]);
-    // Hovering near the bank inside the re-arm margin does not repeat it.
-    fly(riverCenter(-1600) + 430, riverCenter(-1600) + 470);
-    assert.equal(toasts.length, 1);
-    fly(riverCenter(-1600), riverCenter(-1600) - 2000);
-    assert.equal(toasts.length, 2);
-    // Off the end of the drawn river, and well beyond it.
-    for (let z = -7000; z >= -12000; z -= 10) { sim.position.set(200, 120, z); hs.update(0.05); }
-    assert.equal(toasts.length, 3);
-    assert.equal(crashes.length, 0);
-    hs.start(); sim.position.set(0, 120, 850); hs.update(0.05);
-    assert.equal(hs.outside, false); assert.equal(toasts.length, 3);
   });
 });

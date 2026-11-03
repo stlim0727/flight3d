@@ -53,17 +53,6 @@ export function riverCenter(z) {
   return points.at(-1)[1];
 }
 
-// River corridor (#393): the water between the banks, along the 10.4 km the banks are drawn.
-// Outside it the skyline has no collision and the scenery soon ends, so the scenario tells
-// the pilot on leaving it; nothing fails. `rearm` is how far back inside re-arms the notice.
-export const HANGANG_CORRIDOR = { halfWidth: 450, north: 2500, south: -7900, rearm: 50 };
-
-// Metres outside the corridor; negative inside.
-export function corridorExcess(x, z) {
-  const { halfWidth, north, south } = HANGANG_CORRIDOR;
-  return Math.max(Math.abs(x - riverCenter(z)) - halfWidth, z - north, south - z);
-}
-
 export function hangangHeight(x, z) {
   const d = Math.abs(x - riverCenter(z));
   return d < 450 ? 0 : Math.min(8, (d - 450) * 0.2);
