@@ -2,22 +2,24 @@
  * Dynamic Resolution-Based UI Scale Controller
  *
  * Automatically computes an ergonomic scale multiplier (--ui-scale) on high-resolution
- * desktop displays (e.g. 1440p, 4K, 5K) so menus, telemetry strips, buttons, and text
- * remain legible and comfortable to interact with.
+ * desktop displays (e.g. 1080p, 1440p, 4K, 5K) so menus, telemetry strips, buttons, and text
+ * remain clearly legible and comfortable to read and interact with from normal desk distance.
  *
  * Sizing rules:
- * - 1920x1080 (1080p desktop) is the baseline (scale = 1.0).
- * - Mobile / tablet displays (width <= 1024px) or viewports smaller than 1080p remain at 1.0
- *   to preserve existing compact-ui / touch layouts.
- * - On higher resolutions (1440p -> ~1.333, 4K -> 2.0), scale smoothly with the viewport.
- * - Uses the minimum of width/1920 and height/1080 to prevent oversized elements on ultra-wide
- *   (21:9 / 32:9) or tall aspect ratios.
- * - Clamped to a maximum of 2.25 to prevent extreme blowout on 5K/8K displays.
+ * - Mobile / tablet displays (width <= 1024px) remain at 1.0 baseline to preserve existing
+ *   compact-ui / touch layouts.
+ * - Sized proportionally to viewport height & width:
+ *   - 1080p (1920x1080): ~1.25x (giving comfortable ~10px labels, ~16px metrics)
+ *   - 1440p QHD (2560x1440): ~1.667x (giving crisp ~13px labels, ~22px metrics)
+ *   - 4K UHD (3840x2160): ~2.5x (giving sharp ~20px labels, ~33px metrics)
+ * - Constrained by the minimum dimension ratio (width vs height) so ultra-wide
+ *   (21:9 / 32:9) monitors do not blow out vertical space.
+ * - Clamped between 1.0 and 2.8.
  */
 
-export const BASE_VIEWPORT_WIDTH = 1920;
-export const BASE_VIEWPORT_HEIGHT = 1080;
-export const MAX_UI_SCALE = 2.25;
+export const BASE_VIEWPORT_WIDTH = 1536;
+export const BASE_VIEWPORT_HEIGHT = 864;
+export const MAX_UI_SCALE = 2.8;
 export const MIN_UI_SCALE = 1.0;
 
 export function computeUiScale(width = (typeof window !== 'undefined' ? window.innerWidth : 1920), height = (typeof window !== 'undefined' ? window.innerHeight : 1080)) {

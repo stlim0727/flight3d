@@ -10,19 +10,19 @@ import {
   MIN_UI_SCALE,
 } from '../src/ui/UiScale.js';
 
-test('computeUiScale returns 1.0 for standard 1080p desktop', () => {
+test('computeUiScale scales generously for 1080p desktop (1.25x for enhanced readability)', () => {
   const scale = computeUiScale(1920, 1080);
-  assert.equal(scale, 1.0);
+  assert.equal(scale, 1.25);
 });
 
-test('computeUiScale scales proportionally for 1440p (QHD) display', () => {
+test('computeUiScale scales proportionally for 1440p (QHD) display (~1.667x)', () => {
   const scale = computeUiScale(2560, 1440);
-  assert.equal(scale, 1.333);
+  assert.equal(scale, 1.667);
 });
 
-test('computeUiScale returns 2.0 for 4K (UHD) display', () => {
+test('computeUiScale returns 2.5 for 4K (UHD) display', () => {
   const scale = computeUiScale(3840, 2160);
-  assert.equal(scale, 2.0);
+  assert.equal(scale, 2.5);
 });
 
 test('computeUiScale clamps to MAX_UI_SCALE on 5K+ displays', () => {
@@ -31,9 +31,9 @@ test('computeUiScale clamps to MAX_UI_SCALE on 5K+ displays', () => {
 });
 
 test('computeUiScale constrains ultra-wide viewports by height to prevent vertical overflow', () => {
-  // 3440x1440 ultrawide has width ratio 1.79, but height ratio 1.333
+  // 3440x1440 ultrawide has width ratio 2.24, but height ratio 1.667
   const scale = computeUiScale(3440, 1440);
-  assert.equal(scale, 1.333);
+  assert.equal(scale, 1.667);
 });
 
 test('computeUiScale preserves 1.0 on mobile and tablet viewports (width <= 1024)', () => {
@@ -44,7 +44,7 @@ test('computeUiScale preserves 1.0 on mobile and tablet viewports (width <= 1024
 
 test('computeUiScale does not scale below 1.0 on smaller desktop screens', () => {
   assert.equal(computeUiScale(1366, 768), 1.0);
-  assert.equal(computeUiScale(1600, 900), 1.0);
+  assert.equal(computeUiScale(800, 600), 1.0);
 });
 
 test('computeUiScale safely handles invalid, zero or negative inputs', () => {
@@ -63,8 +63,8 @@ test('applyUiScale sets --ui-scale CSS property on target element', () => {
   };
   const mockRoot = { style: mockStyle };
 
-  applyUiScale(1.5, mockRoot);
-  assert.equal(mockStyle.properties['--ui-scale'], '1.5');
+  applyUiScale(1.8, mockRoot);
+  assert.equal(mockStyle.properties['--ui-scale'], '1.8');
 });
 
 test('initUiScale sets initial scale and updates on window resize', () => {
@@ -87,10 +87,10 @@ test('initUiScale sets initial scale and updates on window resize', () => {
   };
 
   const update = initUiScale(mockWindow);
-  assert.equal(mockStyle.properties['--ui-scale'], '1.333');
+  assert.equal(mockStyle.properties['--ui-scale'], '1.667');
 
   mockWindow.innerWidth = 3840;
   mockWindow.innerHeight = 2160;
   listeners.resize();
-  assert.equal(mockStyle.properties['--ui-scale'], '2');
+  assert.equal(mockStyle.properties['--ui-scale'], '2.5');
 });
