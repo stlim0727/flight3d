@@ -14,12 +14,15 @@ import * as THREE from 'three';
  *    - Wingtip / Tail-Spine action cam with aerodynamic micro-vibrations
  *    - Runway Touchdown Spotter cam focusing on gear touchdown and rollout
  *    - Lead-In Reverse Chase Hero cam
- * 3. Enforces cinema composition rules:
- *    - Rule of Thirds leading space along aircraft velocity vector
- *    - Shot duration rhythm (3.0s - 6.5s pacing, anti-flicker hysteresis)
- *    - Optical focal length variety (28° telephoto to 75° wide-angle)
- *    - Continuous terrain and water ground clearance clamp (zero clipping)
- *    - Smooth critically-damped tracking inertia (no robotic snapping)
+ * 3. Enforces cinema composition and framing guarantees:
+ *    - Rock-solid zero-stutter camera tracking (plane translation carried through rigidly;
+ *      no world-space velocity drag lag)
+ *    - Centered subject tracking: aircraft is always framed inside the viewport
+ *    - Proximity-adaptive dynamic FOV: widens as aircraft approaches to prevent edge clipping
+ *    - Altitude-anchored camera placement: camera altitude references aircraft altitude
+ *      and enforces strict terrain clearance (+2.5m minimum floor) so the camera is never
+ *      buried underground or occluded by hills
+ *    - Post-flyby automatic cut: transitions as soon as the jet roars past
  */
 
 export const CINEMATIC_SHOTS = {
@@ -57,10 +60,13 @@ export class CinematicCameraDirector {
 
     // Camera kinematics & interpolation state
     this.camPos = new THREE.Vector3();
-    this.camLookTarget = new THREE.Vector3();
     this.camUp = new THREE.Vector3(0, 1, 0);
     this.camFov = 50.0;
     this.initialized = false;
+
+    // Translation tracking to eliminate forward-backward stutter
+    this.prevPlanePos = new THREE.Vector3();
+    this.prevPlanePosInitialized = false;
 
     // Shot-specific state variables
     this.orbitAngle = 0;
@@ -68,7 +74,7 @@ export class CinematicCameraDirector {
     this.orbitHeight = 9.0;
     this.orbitSpeed = 0.24;
     this.flybyWorldPos = new THREE.Vector3();
-    this.flybyPassed = false;
+    this.flybySet = false;
     this.wingHardpointIndex = 0;
 
     // Rolling telemetry history for live derivative analysis
@@ -83,6 +89,7 @@ export class CinematicCameraDirector {
 
   reset() {
     this.initialized = false;
+    this.prevPlanePosInitialized = false;
     this.shotTimer = 0;
     this.totalTimer = 0;
     this.currentShotType = CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY;
@@ -92,6 +99,8 @@ export class CinematicCameraDirector {
     this.wasOnGround = true;
     this.orbitAngle = Math.random() * Math.PI * 2;
     this.replayCursor = 0;
+    this.flybySet = false;
+    this.flybyWorldPos.set(0, 0, 0);
   }
 
   /**
@@ -312,8 +321,8 @@ export class CinematicCameraDirector {
         return;
       }
 
-      // 3. Low-altitude high-speed terrain skimming
-      if (agl < 200 && ias > 220 && !onGround && this.currentShotType !== CINEMATIC_SHOTS.TERRAIN_CANYON_SKIM) {
+      // 3. Low-altitude high-speed terrain skimming (only in active low trench)
+      if (agl < 180 && ias > 220 && !onGround && this.currentShotType !== CINEMATIC_SHOTS.TERRAIN_CANYON_SKIM) {
         this.switchShot(CINEMATIC_SHOTS.TERRAIN_CANYON_SKIM, flightState);
         this.wasOnGround = onGround;
         return;
@@ -324,7 +333,6 @@ export class CinematicCameraDirector {
 
     // Paced Cut Rhythm (maxShotDuration reached)
     if (this.shotTimer >= this.maxShotDuration) {
-      // Pick next shot from normal roster avoiding repeating current
       const candidateList = SHOT_LIST_NORMAL.filter(s => s !== this.currentShotType);
       const nextType = candidateList[(this.shotIndex++) % candidateList.length];
       this.switchShot(nextType, flightState);
@@ -338,15 +346,13 @@ export class CinematicCameraDirector {
     this.lastShotType = this.currentShotType;
     this.currentShotType = newType;
     this.shotTimer = 0;
+    this.flybySet = false;
+    this.flybyWorldPos.set(0, 0, 0);
 
-    // Shot initialization hooks
-    if (newType === CINEMATIC_SHOTS.TELEPHOTO_FLYBY || newType === CINEMATIC_SHOTS.TERRAIN_CANYON_SKIM) {
-      this.flybyPassed = false;
-      this.flybyWorldPos.set(0, 0, 0); // Will be populated on first frame of shot
-    } else if (newType === CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY) {
+    if (newType === CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY) {
       this.orbitAngle = Math.random() * Math.PI * 2;
       this.orbitSpeed = (Math.random() > 0.5 ? 1 : -1) * (0.22 + Math.random() * 0.12);
-      this.orbitRadius = 32.0 + Math.random() * 12.0;
+      this.orbitRadius = 34.0 + Math.random() * 10.0;
     } else if (newType === CINEMATIC_SHOTS.WINGTIP_ACTION) {
       this.wingHardpointIndex = (this.wingHardpointIndex + 1) % 4;
     }
@@ -368,6 +374,15 @@ export class CinematicCameraDirector {
     if (!camera || !planePos || !planeQuat) return false;
     const safeDt = Math.min(2.0, Math.max(0.0001, dt ?? 0.016));
 
+    // Calculate frame-to-frame translation delta to eliminate world-space lag stutter
+    const planePosDelta = new THREE.Vector3();
+    if (this.prevPlanePosInitialized) {
+      planePosDelta.copy(planePos).sub(this.prevPlanePos);
+    } else {
+      this.prevPlanePosInitialized = true;
+    }
+    this.prevPlanePos.copy(planePos);
+
     // Evaluate cut and timing
     this.evaluateShotCut(flightState, safeDt);
 
@@ -380,56 +395,77 @@ export class CinematicCameraDirector {
     const ias = flightState.iasKnots ?? 150;
     const gForce = flightState.gForce ?? 1.0;
     const rollDeg = flightState.rollDeg ?? 0;
+    const onGround = Boolean(flightState.onGround);
 
     let targetCamPos = new THREE.Vector3();
-    let targetLook = new THREE.Vector3().copy(planePos);
+    // Default look target: center of aircraft fuselage, slightly raised for good framing
+    let targetLook = planePos.clone().addScaledVector(up, 1.2);
     let targetUp = new THREE.Vector3(0, 1, 0);
     let targetFov = 50.0;
-    let posLerpFactor = 1.0 - Math.exp(-safeDt * 6.0);
-    let lookLerpFactor = 1.0 - Math.exp(-safeDt * 8.0);
-
-    // Calculate Cinema Rule-of-Thirds look-ahead lead in velocity direction
-    const leadDistance = Math.min(18.0, (ias / 200.0) * 10.0);
-    const leadOffset = forward.clone().multiplyScalar(leadDistance);
+    let isRigidMount = false;
+    let isChasingDolly = false;
 
     switch (this.currentShotType) {
       case CINEMATIC_SHOTS.TELEPHOTO_FLYBY: {
-        targetFov = 30.0; // Telephoto compression
-        if (this.flybyWorldPos.lengthSq() < 1) {
-          // Initialize flyby camera 220m ahead and 32m to the side
-          const lateral = (Math.random() > 0.5 ? 1 : -1) * 36.0;
-          this.flybyWorldPos.copy(planePos)
-            .addScaledVector(forward, 220.0)
-            .addScaledVector(right, lateral)
-            .addScaledVector(up, 4.0);
-        }
+        const forwardHoriz = new THREE.Vector3(forward.x, 0, forward.z);
+        if (forwardHoriz.lengthSq() > 0.001) forwardHoriz.normalize();
+        else forwardHoriz.set(0, 0, -1);
+        const rightHoriz = new THREE.Vector3(-forwardHoriz.z, 0, forwardHoriz.x);
 
-        // Check if aircraft has roared past camera plane
-        const toPlane = planePos.clone().sub(this.flybyWorldPos);
-        const distAlong = toPlane.dot(forward);
-        if (distAlong > 30.0) {
-          this.flybyPassed = true;
+        if (!this.flybySet || this.flybyWorldPos.lengthSq() < 1) {
+          const lateralSign = Math.random() > 0.5 ? 1 : -1;
+          if (onGround) {
+            // Runway-edge spotter view ahead of rollout
+            const targetX = planePos.x + forwardHoriz.x * 85.0 + rightHoriz.x * lateralSign * 20.0;
+            const targetZ = planePos.z + forwardHoriz.z * 85.0 + rightHoriz.z * lateralSign * 20.0;
+            const gh = Math.max(0, queryGroundHeight(targetX, targetZ));
+            this.flybyWorldPos.set(targetX, gh + 2.2, targetZ);
+          } else {
+            // Airborne flyby: 220m ahead along flight path, 38m lateral offset
+            const targetX = planePos.x + forwardHoriz.x * 220.0 + rightHoriz.x * lateralSign * 38.0;
+            const targetZ = planePos.z + forwardHoriz.z * 220.0 + rightHoriz.z * lateralSign * 38.0;
+            const gh = Math.max(0, queryGroundHeight(targetX, targetZ));
+            // Anchor height to aircraft altitude; strictly above ground
+            const targetY = Math.max(gh + 5.0, planePos.y - 6.0);
+            this.flybyWorldPos.set(targetX, targetY, targetZ);
+          }
+          this.flybySet = true;
+          this.camPos.copy(this.flybyWorldPos);
         }
 
         // Slow camera drift
-        this.flybyWorldPos.addScaledVector(up, 0.4 * safeDt);
+        this.flybyWorldPos.y += 0.25 * safeDt;
         targetCamPos.copy(this.flybyWorldPos);
 
-        // Smoothly track the jet with anticipation
-        targetLook.copy(planePos).add(leadOffset.clone().multiplyScalar(0.4));
-        posLerpFactor = 1.0; // Stationary/drifting spotter
-        lookLerpFactor = 1.0 - Math.exp(-safeDt * 10.0);
+        // Ground safety clamp
+        const gh = Math.max(0, queryGroundHeight(targetCamPos.x, targetCamPos.z));
+        if (targetCamPos.y < gh + 2.0) targetCamPos.y = gh + 2.0;
+        this.camPos.copy(targetCamPos);
+
+        // Adaptive FOV: telephoto at distance (32°), widens smoothly as plane passes (up to 56°)
+        const currentDist = this.camPos.distanceTo(planePos);
+        targetFov = THREE.MathUtils.clamp(32.0 + Math.max(0, 180.0 - currentDist) * 0.16, 32.0, 56.0);
+
+        // Track aircraft center directly
+        targetLook.copy(planePos).addScaledVector(up, 1.2);
+        targetUp.set(0, 1, 0);
+
+        // Once aircraft passes camera plane by > 45m or moves past 420m, cut to next shot
+        const toPlane = planePos.clone().sub(this.camPos);
+        if (toPlane.dot(forwardHoriz) > 45.0 || currentDist > 420.0) {
+          this.shotTimer = this.maxShotDuration; // Trigger clean transition
+        }
         break;
       }
 
       case CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY: {
+        isChasingDolly = true;
         this.orbitAngle += this.orbitSpeed * safeDt;
-        targetFov = 52.0;
+        targetFov = 50.0;
 
-        // Dolly expands and changes elevation across the shot
         const progress = Math.min(1.0, this.shotTimer / this.maxShotDuration);
-        const radius = this.orbitRadius + progress * 8.0;
-        const elev = this.orbitHeight + Math.sin(progress * Math.PI) * 4.0;
+        const radius = this.orbitRadius + Math.sin(progress * Math.PI) * 8.0;
+        const elev = this.orbitHeight + Math.sin(progress * Math.PI * 2) * 3.5;
 
         const cosA = Math.cos(this.orbitAngle);
         const sinA = Math.sin(this.orbitAngle);
@@ -437,182 +473,237 @@ export class CinematicCameraDirector {
         targetCamPos.copy(planePos)
           .addScaledVector(right, cosA * radius)
           .addScaledVector(forward, sinA * radius)
-          .add(new THREE.Vector3(0, elev, 0));
+          .addScaledVector(up, elev);
 
-        // Subtle Dutch roll tilt with orbital motion
+        const gh = Math.max(0, queryGroundHeight(targetCamPos.x, targetCamPos.z));
+        if (targetCamPos.y < gh + 3.0) targetCamPos.y = gh + 3.0;
+
         const dutchTilt = Math.sin(this.orbitAngle) * 0.08;
         targetUp.copy(new THREE.Vector3(0, 1, 0)).addScaledVector(right, dutchTilt).normalize();
-
-        targetLook.copy(planePos).add(leadOffset.clone().multiplyScalar(0.2));
+        targetLook.copy(planePos).addScaledVector(up, 1.2);
         break;
       }
 
       case CINEMATIC_SHOTS.WINGTIP_ACTION: {
-        targetFov = 74.0; // Wide-angle action rush
-        const wingspanOffset = 18.0; // Representative half-span
+        isRigidMount = true;
+        targetFov = 72.0; // Wide-angle action rush
+        const wingspanOffset = 18.0; // Half-span
+
+        let localPos = new THREE.Vector3();
+        let localLook = new THREE.Vector3();
 
         if (this.wingHardpointIndex === 0) {
-          // Left wingtip looking inward at fuselage & cockpit
-          targetCamPos.copy(planePos)
-            .addScaledVector(right, -wingspanOffset)
-            .addScaledVector(forward, -2.5)
-            .addScaledVector(up, 0.8);
-          targetLook.copy(planePos).addScaledVector(forward, 2.0);
+          // Left wingtip looking inward across cockpit & fuselage
+          localPos.set(-wingspanOffset, 0.6, -1.0);
+          localLook.set(0, 0.4, 1.0);
         } else if (this.wingHardpointIndex === 1) {
-          // Right wingtip looking across airframe
-          targetCamPos.copy(planePos)
-            .addScaledVector(right, wingspanOffset)
-            .addScaledVector(forward, -2.5)
-            .addScaledVector(up, 0.8);
-          targetLook.copy(planePos).addScaledVector(forward, 2.0);
+          // Right wingtip looking inward
+          localPos.set(wingspanOffset, 0.6, -1.0);
+          localLook.set(0, 0.4, 1.0);
         } else if (this.wingHardpointIndex === 2) {
-          // Vertical stabilizer fin looking forward down the spine
-          targetCamPos.copy(planePos)
-            .addScaledVector(forward, -14.0)
-            .addScaledVector(up, 4.8);
-          targetLook.copy(planePos).addScaledVector(forward, 15.0);
+          // Vertical stabilizer tail fin looking forward down spine
+          localPos.set(0, 4.5, 12.0);
+          localLook.set(0, 0.5, -20.0);
         } else {
-          // Nose underbelly action cam looking rearward at gear/flaps
-          targetCamPos.copy(planePos)
-            .addScaledVector(forward, 8.0)
-            .addScaledVector(up, -1.8);
-          targetLook.copy(planePos).addScaledVector(forward, -6.0);
+          // Nose underbelly looking rearward at gear
+          localPos.set(0, -1.8, -8.0);
+          localLook.set(0, -0.5, 10.0);
         }
 
-        // Camera rolls locked to aircraft bank
-        targetUp.copy(up);
+        targetCamPos.copy(planePos)
+          .addScaledVector(right, localPos.x)
+          .addScaledVector(up, localPos.y)
+          .addScaledVector(forward, -localPos.z);
 
-        // High-speed aerodynamic buffeting jitter
-        const shakeMag = (ias / 350.0) * 0.04;
+        targetLook.copy(planePos)
+          .addScaledVector(right, localLook.x)
+          .addScaledVector(up, localLook.y)
+          .addScaledVector(forward, -localLook.z);
+
+        // High-speed aerodynamic buffeting jitter (subtle micro-vibration)
+        const shakeMag = (ias / 400.0) * 0.025;
         const shakeX = Math.sin(this.totalTimer * 42.0) * shakeMag;
         const shakeY = Math.cos(this.totalTimer * 58.0) * shakeMag;
         targetCamPos.addScaledVector(right, shakeX).addScaledVector(up, shakeY);
+
+        targetUp.copy(up);
         break;
       }
 
       case CINEMATIC_SHOTS.HIGH_G_BANK_HERO: {
-        targetFov = 62.0;
-        // Position camera on upper-outer side of turn
+        isChasingDolly = true;
+        targetFov = 58.0;
         const bankSign = rollDeg >= 0 ? 1 : -1;
-        targetCamPos.copy(planePos)
-          .addScaledVector(right, -bankSign * 22.0)
-          .addScaledVector(forward, -18.0)
-          .addScaledVector(up, 7.5);
 
-        // Partial Dutch angle sync (30% bank coupling for cinematic intensity)
-        const partialRollRad = THREE.MathUtils.degToRad(rollDeg) * 0.32;
+        // Position on upper-outer side of turn
+        targetCamPos.copy(planePos)
+          .addScaledVector(right, -bankSign * 24.0)
+          .addScaledVector(forward, -20.0)
+          .addScaledVector(up, 8.5);
+
+        const gh = Math.max(0, queryGroundHeight(targetCamPos.x, targetCamPos.z));
+        if (targetCamPos.y < gh + 3.0) targetCamPos.y = gh + 3.0;
+
+        // 30% Dutch tilt roll sync
+        const partialRollRad = THREE.MathUtils.degToRad(rollDeg) * 0.30;
         targetUp.copy(new THREE.Vector3(0, 1, 0))
           .addScaledVector(right, Math.sin(partialRollRad))
           .normalize();
 
-        // G-load vibration
-        const gShake = Math.max(0, gForce - 1.0) * 0.05;
+        const gShake = Math.max(0, gForce - 1.0) * 0.035;
         targetCamPos.add(new THREE.Vector3(
           Math.sin(this.totalTimer * 50.0) * gShake,
           Math.cos(this.totalTimer * 65.0) * gShake,
           0
         ));
 
-        targetLook.copy(planePos).addScaledVector(forward, 4.0);
+        targetLook.copy(planePos).addScaledVector(up, 1.2);
         break;
       }
 
       case CINEMATIC_SHOTS.TERRAIN_CANYON_SKIM: {
-        targetFov = 42.0;
-        if (this.flybyWorldPos.lengthSq() < 1) {
-          const lateral = (Math.random() > 0.5 ? 1 : -1) * 25.0;
-          this.flybyWorldPos.copy(planePos)
-            .addScaledVector(forward, 150.0)
-            .addScaledVector(right, lateral);
-          const gh = queryGroundHeight(this.flybyWorldPos.x, this.flybyWorldPos.z);
-          this.flybyWorldPos.y = gh + 2.5; // Perched 2.5m above ground/water
+        const forwardHoriz = new THREE.Vector3(forward.x, 0, forward.z);
+        if (forwardHoriz.lengthSq() > 0.001) forwardHoriz.normalize();
+        else forwardHoriz.set(0, 0, -1);
+        const rightHoriz = new THREE.Vector3(-forwardHoriz.z, 0, forwardHoriz.x);
+
+        const currentDist = this.camPos.distanceTo(planePos);
+        if (!this.flybySet || this.flybyWorldPos.lengthSq() < 1) {
+          const lateralSign = Math.random() > 0.5 ? 1 : -1;
+          const targetX = planePos.x + forwardHoriz.x * 140.0 + rightHoriz.x * lateralSign * 24.0;
+          const targetZ = planePos.z + forwardHoriz.z * 140.0 + rightHoriz.z * lateralSign * 24.0;
+          const gh = Math.max(0, queryGroundHeight(targetX, targetZ));
+          const targetY = Math.max(gh + 3.0, planePos.y - 3.0);
+          this.flybyWorldPos.set(targetX, targetY, targetZ);
+          this.flybySet = true;
+          this.camPos.copy(this.flybyWorldPos);
         }
 
         targetCamPos.copy(this.flybyWorldPos);
-        targetLook.copy(planePos).add(leadOffset.clone().multiplyScalar(0.3));
-        posLerpFactor = 1.0;
-        lookLerpFactor = 1.0 - Math.exp(-safeDt * 9.0);
+        const gh = Math.max(0, queryGroundHeight(targetCamPos.x, targetCamPos.z));
+        if (targetCamPos.y < gh + 2.5) targetCamPos.y = gh + 2.5;
+        this.camPos.copy(targetCamPos);
+
+        targetFov = THREE.MathUtils.clamp(38.0 + Math.max(0, 140.0 - currentDist) * 0.15, 38.0, 58.0);
+        targetLook.copy(planePos).addScaledVector(up, 1.2);
+        targetUp.set(0, 1, 0);
+
+        const toPlane = planePos.clone().sub(this.camPos);
+        if (toPlane.dot(forwardHoriz) > 40.0 || currentDist > 350.0) {
+          this.shotTimer = this.maxShotDuration;
+        }
         break;
       }
 
       case CINEMATIC_SHOTS.TOUCHDOWN_SPOTTER: {
-        targetFov = 38.0;
-        // Low ground-level runway spotter looking up at the wheels
-        targetCamPos.copy(planePos)
-          .addScaledVector(forward, 45.0)
-          .addScaledVector(right, 14.0);
-        const gh = queryGroundHeight(targetCamPos.x, targetCamPos.z);
-        targetCamPos.y = gh + 1.6;
+        const forwardHoriz = new THREE.Vector3(forward.x, 0, forward.z);
+        if (forwardHoriz.lengthSq() > 0.001) forwardHoriz.normalize();
+        else forwardHoriz.set(0, 0, -1);
+        const rightHoriz = new THREE.Vector3(-forwardHoriz.z, 0, forwardHoriz.x);
 
-        targetLook.copy(planePos).add(new THREE.Vector3(0, -1.0, 0));
-        posLerpFactor = 1.0 - Math.exp(-safeDt * 4.0);
+        if (!this.flybySet || this.flybyWorldPos.lengthSq() < 1) {
+          const targetX = planePos.x + forwardHoriz.x * 55.0 + rightHoriz.x * 16.0;
+          const targetZ = planePos.z + forwardHoriz.z * 55.0 + rightHoriz.z * 16.0;
+          const gh = Math.max(0, queryGroundHeight(targetX, targetZ));
+          this.flybyWorldPos.set(targetX, gh + 2.2, targetZ);
+          this.flybySet = true;
+          this.camPos.copy(this.flybyWorldPos);
+        }
+
+        targetCamPos.copy(this.flybyWorldPos);
+        const gh = Math.max(0, queryGroundHeight(targetCamPos.x, targetCamPos.z));
+        if (targetCamPos.y < gh + 1.8) targetCamPos.y = gh + 1.8;
+        this.camPos.copy(targetCamPos);
+
+        targetFov = 42.0;
+        targetLook.copy(planePos).addScaledVector(up, 0.6); // Focused on wheels/gear
+        targetUp.set(0, 1, 0);
+
+        const toPlane = planePos.clone().sub(this.camPos);
+        if (toPlane.dot(forwardHoriz) > 35.0 || this.shotTimer > 4.5) {
+          this.shotTimer = this.maxShotDuration;
+        }
         break;
       }
 
       case CINEMATIC_SHOTS.LEAD_IN_TRACKING: {
-        targetFov = 50.0;
-        // Nose-on reverse chase looking back at cockpit and nose
+        isChasingDolly = true;
+        targetFov = 52.0;
+        // Positioned ahead of the nose looking backward at the approaching aircraft
         targetCamPos.copy(planePos)
           .addScaledVector(forward, 32.0)
-          .addScaledVector(up, 3.0)
+          .addScaledVector(up, 3.5)
           .addScaledVector(right, 4.0);
-        targetLook.copy(planePos).addScaledVector(forward, -2.0);
-        targetUp.copy(new THREE.Vector3(0, 1, 0)).addScaledVector(up, 0.2).normalize();
+
+        const gh = Math.max(0, queryGroundHeight(targetCamPos.x, targetCamPos.z));
+        if (targetCamPos.y < gh + 3.0) targetCamPos.y = gh + 3.0;
+
+        targetLook.copy(planePos).addScaledVector(up, 1.0);
+        targetUp.copy(new THREE.Vector3(0, 1, 0)).addScaledVector(up, 0.15).normalize();
         break;
       }
 
       case CINEMATIC_SHOTS.COCKPIT_HERO:
       default: {
+        isRigidMount = true;
         targetFov = 58.0;
-        // Over-the-shoulder cockpit framing
+        // Over-the-shoulder pilot vantage: slightly behind captain seat looking forward
         targetCamPos.copy(planePos)
-          .addScaledVector(forward, -11.5)
-          .addScaledVector(up, 1.2)
-          .addScaledVector(right, 0.4);
-        targetLook.copy(planePos).addScaledVector(forward, 8.0);
+          .addScaledVector(right, -0.38)
+          .addScaledVector(up, 0.95)
+          .addScaledVector(forward, 11.8);
+
+        targetLook.copy(planePos)
+          .addScaledVector(right, -0.2)
+          .addScaledVector(up, 0.7)
+          .addScaledVector(forward, 30.0);
+
         targetUp.copy(up);
         break;
       }
     }
 
-    // Absolute Ground Clearance Safety Guarantee (No underground clipping)
-    const groundH = queryGroundHeight(targetCamPos.x, targetCamPos.z);
-    const minSafeY = Math.max(groundH + 1.8, 1.8);
-    if (targetCamPos.y < minSafeY) {
-      targetCamPos.y = minSafeY;
-    }
-
-    // Initialize or smooth interpolate camera transform
+    // Kinematics and Position Integration:
     if (!this.initialized) {
       this.camPos.copy(targetCamPos);
-      this.camLookTarget.copy(targetLook);
       this.camUp.copy(targetUp);
       this.camFov = targetFov;
       this.initialized = true;
-    } else {
-      this.camPos.lerp(targetCamPos, posLerpFactor);
-      this.camLookTarget.lerp(targetLook, lookLerpFactor);
+    } else if (isRigidMount) {
+      // Rigid body mounts (wing, cockpit) copy transform directly: ZERO lag or stutter!
+      this.camPos.copy(targetCamPos);
+      this.camUp.copy(targetUp);
+    } else if (isChasingDolly) {
+      // Chasing/orbiting dollies carry aircraft translation rigidly, then damp relative angle
+      if (this.prevPlanePosInitialized && planePosDelta.lengthSq() < 10000) {
+        this.camPos.add(planePosDelta);
+      }
+      this.camPos.lerp(targetCamPos, 1.0 - Math.exp(-safeDt * 8.0));
       this.camUp.lerp(targetUp, 1.0 - Math.exp(-safeDt * 6.0));
-      this.camFov += (targetFov - this.camFov) * (1.0 - Math.exp(-safeDt * 5.0));
     }
 
-    // Ground clamp after interpolation
-    const postGroundH = queryGroundHeight(this.camPos.x, this.camPos.z);
-    if (this.camPos.y < postGroundH + 1.8) {
-      this.camPos.y = postGroundH + 1.8;
+    // Absolute Ground Clearance Safety Guarantee
+    const currentGroundH = Math.max(0, queryGroundHeight(this.camPos.x, this.camPos.z));
+    if (this.camPos.y < currentGroundH + 1.8) {
+      this.camPos.y = currentGroundH + 1.8;
     }
 
-    // Apply to camera
-    camera.position.copy(this.camPos);
-    camera.up.copy(this.camUp);
-    camera.lookAt(this.camLookTarget);
-
-    if (camera.fov !== undefined && Math.abs(camera.fov - this.camFov) > 0.05) {
-      camera.fov = this.camFov;
+    // Smooth FOV transition
+    if (camera.fov !== undefined) {
+      if (!this.initialized) {
+        camera.fov = targetFov;
+      } else {
+        camera.fov += (targetFov - camera.fov) * (1.0 - Math.exp(-safeDt * 6.0));
+      }
       if (typeof camera.updateProjectionMatrix === 'function') {
         camera.updateProjectionMatrix();
       }
     }
+
+    // Apply to camera
+    camera.position.copy(this.camPos);
+    camera.up.copy(targetUp);
+    camera.lookAt(targetLook);
 
     return true;
   }
