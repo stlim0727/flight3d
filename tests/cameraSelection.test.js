@@ -41,7 +41,9 @@ test('camera shortcuts map digits and numpad, ignoring repeats, modifiers and ed
   }
   controls.handleKeyDown({ code: 'Numpad8' });
   controls.handleKeyDown({ code: 'KeyC' });
-  const expected = [0, 1, 2, 3, 4, 5, 6, 7, 8, 7, 'cycle'];
+  controls.handleKeyDown({ code: 'Digit0' });
+  controls.handleKeyDown({ code: 'Numpad0' });
+  const expected = [0, 1, 2, 3, 4, 5, 6, 7, 8, 7, 'cycle', 9, 9];
   assert.deepEqual(selected, expected);
   for (const extra of [{ repeat: true }, { ctrlKey: true }, { altKey: true },
     { metaKey: true }, { target: { isContentEditable: true } },
@@ -338,4 +340,16 @@ test('pause view keeps the drone above terrain that rises over its orbit, and yi
   assert.equal(system.mode, M.DRONE);
   system.endPauseView();
   assert.equal(system.mode, M.COCKPIT);
+});
+
+test('director view 9 (DIRECTOR) engages CinematicCameraDirector and names itself', () => {
+  const system = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  const aircraft = new THREE.Object3D();
+  aircraft.position.set(100, 200, 300);
+  assert.equal(CameraSystem.MODES.DIRECTOR, 9);
+  system.setMode(CameraSystem.MODES.DIRECTOR, true);
+  assert.equal(system.mode, CameraSystem.MODES.DIRECTOR);
+  assert.equal(system.getModeName(), 'CINEMATIC DIRECTOR');
+  system.update(0.016, aircraft, { iasKnots: 250, gForce: 1.0 });
+  assert.ok(system.camera.position.lengthSq() > 0);
 });

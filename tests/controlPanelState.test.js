@@ -56,6 +56,10 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-reverser']['aria-pressed'], 'false');
     assert.equal(nodes['btn-touch-toggle']['aria-pressed'], 'false');
     assert.equal(nodes['open-camera'].title, 'Camera: Drone');
+    camera.mode = 9;
+    updateControlState(telemetry, camera);
+    assert.equal(nodes['open-camera'].title, 'Camera: Director');
+    assert.equal(nodes['camera-select'].value, '9');
     delete telemetry.gearDamage;
     telemetry.gearState = 1;
     updateControlState(telemetry, camera);

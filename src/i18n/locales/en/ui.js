@@ -45,6 +45,7 @@ export default {
   "ui.camera.drone": "Drone · 7",
   "ui.camera.auto": "Auto · 8",
   "ui.camera.hud": "HUD · 9",
+  "ui.camera.director": "Director · 0",
   "hud.trim": "TRIM",
   "hud.flaps": "FLAPS",
   "hud.brake": "PARK BRAKE",
