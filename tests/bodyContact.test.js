@@ -185,4 +185,14 @@ describe('Body penetration constraint', () => {
     assert.deepEqual(v.toArray(), [0, -10, -60]);
     assert.deepEqual(w.toArray(), [0.1, 0, 0]);
   });
+
+  it('clamps extreme cliff penetration displacement so it never teleports the aircraft', () => {
+    const p = new THREE.Vector3(0, 50, 0), q = new THREE.Quaternion();
+    const v = new THREE.Vector3(200, 0, 0), w = new THREE.Vector3();
+    const height = () => 500;
+    const terrainNormal = () => new THREE.Vector3(-0.9, 0.435, 0).normalize();
+    constrainBodyContact(p, q, v, w, 12000, inertia, height, terrainNormal);
+    const displacement = Math.hypot(p.x, p.z);
+    assert.ok(displacement < 10, `displacement was ${displacement}m, expected < 10m`);
+  });
 });

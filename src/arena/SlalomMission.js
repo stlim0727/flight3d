@@ -66,8 +66,8 @@ export class SlalomMission {
     }
     if (!this.previous && Math.hypot(position.x - this.manifest.spawn.x, position.z - this.manifest.spawn.z)
         > this.binSizeM * 2) return this.finish('failed', 'invalid-spawn');
-    if (this.previous && Math.hypot(position.x - this.previous.x, position.z - this.previous.z) >
-        Math.max(10, snapshot.groundSpeedKnots * 0.514444 / this.manifest.physicsHz * 2)) {
+    const maxStepM = Math.max(12, snapshot.groundSpeedKnots * 0.514444 / this.manifest.physicsHz * 3);
+    if (this.previous && Math.hypot(position.x - this.previous.x, position.z - this.previous.z) > maxStepM) {
       return this.finish('failed', 'discontinuous-flight');
     }
     const projected = projectSlalom(course, position, this.hintIndex ?? null);

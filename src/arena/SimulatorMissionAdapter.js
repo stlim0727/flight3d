@@ -175,6 +175,14 @@ export class SimulatorMissionAdapter {
         controls: { ...this.initialControls }, radioAltitudeReference: 'model-origin-above-terrain',
       },
     };
+    if (sim.aero) {
+      sim.aero.separation = 0.0;
+      sim.aero.stallSeverity = 0.0;
+    }
+    sim.physicsAccumulator = 0;
+    if (sim.telemetry) sim.telemetry.warnings = [];
+    sim.flightWarnings?.reset?.();
+    this.command = Object.fromEntries(AXES.map(a => [a, 0]));
     this.syncPose();
     const initialSnapshot = this.snapshot(0);
     if (type === 'landing' && (initialSnapshot.weightOnWheels || initialSnapshot.radioAltFt < 100)) {

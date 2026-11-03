@@ -140,3 +140,20 @@ test('adapter preparation clears crashed state so retries after crash fly rather
   assert.equal(initialSnapshot.crashed, false);
   assert.equal(adapter.snapshot(0).crashed, false);
 });
+
+test('adapter preparation resets aero separation, warnings, and physics accumulator for clean retry', async () => {
+  const sim = createSlalomSimulation(1);
+  const adapter = new SlalomMissionAdapter(sim);
+  await adapter.prepare({ seed: 1 });
+  sim.aero.separation = 0.85;
+  sim.aero.stallSeverity = 0.85;
+  sim.physicsAccumulator = 0.05;
+  sim.telemetry.warnings = ['STALL'];
+
+  await adapter.prepare({ seed: 1 });
+  assert.equal(sim.aero.separation, 0.0);
+  assert.equal(sim.aero.stallSeverity, 0.0);
+  assert.equal(sim.physicsAccumulator, 0);
+  assert.deepEqual(sim.telemetry.warnings, []);
+  assert.ok(adapter.command.throttle > 0);
+});
