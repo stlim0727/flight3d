@@ -2,6 +2,7 @@ import '../styles/feedback-dialog.css';
 import { gatherFlightContext, sendUserFeedback } from './posthog.js';
 
 let feedbackOverlay = null;
+let currentSim = null;
 
 /**
  * Mount and open the in-game feedback / bug reporting dialog.
@@ -10,13 +11,14 @@ let feedbackOverlay = null;
  */
 export function openFeedbackDialog(sim = null) {
   if (typeof document === 'undefined') return;
+  if (sim) currentSim = sim;
 
   if (!feedbackOverlay) {
-    feedbackOverlay = createFeedbackOverlay(sim);
+    feedbackOverlay = createFeedbackOverlay(() => currentSim);
     document.body.appendChild(feedbackOverlay);
   }
 
-  const context = gatherFlightContext(sim);
+  const context = gatherFlightContext(currentSim);
   const diagPreview = feedbackOverlay.querySelector('[data-feedback-diag-preview]');
   if (diagPreview) {
     diagPreview.textContent = JSON.stringify(context, null, 2);
@@ -26,7 +28,10 @@ export function openFeedbackDialog(sim = null) {
   if (textarea) textarea.value = '';
 
   const submitBtn = feedbackOverlay.querySelector('[data-feedback-submit]');
-  if (submitBtn) submitBtn.disabled = false;
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '제보 보내기';
+  }
 
   feedbackOverlay.hidden = false;
   setTimeout(() => textarea?.focus(), 50);
@@ -38,7 +43,7 @@ export function closeFeedbackDialog() {
   }
 }
 
-function createFeedbackOverlay(sim) {
+function createFeedbackOverlay(getSim) {
   const overlay = document.createElement('div');
   overlay.id = 'feedback-dialog-overlay';
   overlay.setAttribute('role', 'dialog');
@@ -98,7 +103,7 @@ function createFeedbackOverlay(sim) {
   });
 
   const form = overlay.querySelector('[data-feedback-form]');
-  form.addEventListener('submit', event => {
+  form.addEventListener('submit', async event => {
     event.preventDefault();
     const textarea = overlay.querySelector('[data-feedback-text]');
     const contactInput = overlay.querySelector('[data-feedback-contact]');
@@ -111,19 +116,32 @@ function createFeedbackOverlay(sim) {
     }
 
     const submitBtn = overlay.querySelector('[data-feedback-submit]');
-    if (submitBtn) submitBtn.disabled = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = '전송 중...';
+    }
 
-    sendUserFeedback({
-      message,
-      contact: contactInput?.value?.trim() || '',
-      category: 'bug',
-      includeContext: includeDiag,
-      context: includeDiag ? gatherFlightContext(sim) : {},
-    });
-
-    closeFeedbackDialog();
-    if (sim?.showToast) {
-      sim.showToast(() => '소중한 문제 제보가 전달되었습니다. 감사합니다!');
+    const sim = (typeof getSim === 'function' ? getSim() : getSim) || currentSim;
+    try {
+      await sendUserFeedback({
+        message,
+        contact: contactInput?.value?.trim() || '',
+        category: 'bug',
+        includeContext: includeDiag,
+        context: includeDiag ? gatherFlightContext(sim) : {},
+      });
+      closeFeedbackDialog();
+      if (sim?.showToast) {
+        sim.showToast(() => '소중한 문제 제보가 전달되었습니다. 감사합니다!');
+      }
+    } catch (err) {
+      console.warn('[Feedback] Failed to send feedback:', err);
+      closeFeedbackDialog();
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '제보 보내기';
+      }
     }
   });
 
