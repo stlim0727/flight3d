@@ -176,3 +176,99 @@ test('GeneratedValleyTerrain mesh fully encloses all course gates and waypoints 
     }
   }
 });
+
+/** Cross-track offset where the drawn corridor surface first climbs a wing height
+ * above the local floor, walking outward from the centreline. */
+function drawnWallCross(gTerrain, terrain, ring, side, targetY, centerStop) {
+  const pos = gTerrain.ribbonMesh.geometry.attributes.position;
+  const stops = gTerrain.ribbonStops;
+  const step = side > 0 ? 1 : -1;
+  for (let c = centerStop; c >= 0 && c < stops; c += step) {
+    if (pos.getY(ring * stops + c) < targetY) continue;
+    const prev = c - step;
+    if (prev < 0 || prev >= stops) return null;
+    const y0 = pos.getY(ring * stops + prev), y1 = pos.getY(ring * stops + c);
+    const share = (targetY - y0) / (y1 - y0 || 1);
+    const here = terrain.project(pos.getX(ring * stops + prev), pos.getZ(ring * stops + prev));
+    const next = terrain.project(pos.getX(ring * stops + c), pos.getZ(ring * stops + c));
+    return Math.abs(here.crossM + (next.crossM - here.crossM) * share);
+  }
+  return null;
+}
+
+/** The same measurement on the analytic surface collision queries. */
+function collisionWallCross(terrain, sample, side, targetY) {
+  let lo = sample.halfWidth * 0.8, hi = sample.halfWidth * 2.2;
+  for (let k = 0; k < 18; k++) {
+    const mid = (lo + hi) / 2;
+    const at = terrain.place(sample.s, side * mid);
+    if (terrain.getHeight(at.x, at.z) < targetY) lo = mid; else hi = mid;
+  }
+  return hi;
+}
+
+test('the corridor the pilot sees is the corridor collision queries', () => {
+  const mockScene = { add() {}, remove() {} };
+  for (const seed of [101, 202, 303]) {
+    const { terrain } = generateValley({ seed });
+    const gTerrain = new GeneratedValleyTerrain(terrain, { scene: mockScene });
+    assert.ok(gTerrain.ribbonMesh, `seed ${seed} mounted without a corridor ribbon`);
+
+    const pos = gTerrain.ribbonMesh.geometry.attributes.position;
+    const stops = gTerrain.ribbonStops;
+    const endRings = (gTerrain.ribbonRings - terrain.centerline.length) / 2;
+    // Locate the centreline stop from the built geometry, not from mirrored constants.
+    let centerStop = 0;
+    const probeRing = endRings + 40;
+    for (let c = 0; c < stops; c++) {
+      const i = probeRing * stops + c;
+      const off = Math.abs(terrain.project(pos.getX(i), pos.getZ(i)).crossM);
+      if (off < Math.abs(terrain.project(pos.getX(probeRing * stops + centerStop),
+        pos.getZ(probeRing * stops + centerStop)).crossM)) centerStop = c;
+    }
+
+    const offsets = [];
+    for (let s = 0; s < terrain.centerline.length; s += 8) {
+      const sample = terrain.centerline[s];
+      const ring = endRings + s;
+      const targetY = terrain.getHeight(sample.x, sample.z) + 85;
+      for (const side of [1, -1]) {
+        const drawn = drawnWallCross(gTerrain, terrain, ring, side, targetY, centerStop);
+        const solid = collisionWallCross(terrain, sample, side, targetY);
+        if (drawn === null || !Number.isFinite(drawn)) {
+          assert.fail(`seed ${seed} sM ${sample.s.toFixed(0)}: no drawn wall face at side ${side}`);
+        }
+        offsets.push(Math.abs(drawn - solid));
+      }
+    }
+    offsets.sort((a, b) => a - b);
+    const median = offsets[Math.floor(offsets.length / 2)];
+    const max = offsets.at(-1);
+    // A uniform 90m world grid put the drawn face a median 28m / max 46m inside the
+    // surface the probes test, which reads as flying through solid rock.
+    assert.ok(median < 8, `seed ${seed}: drawn wall is a median ${median.toFixed(1)}m from the collision wall`);
+    assert.ok(max < 8, `seed ${seed}: drawn wall is up to ${max.toFixed(1)}m from the collision wall`);
+    gTerrain.dispose({ scene: mockScene });
+    assert.equal(gTerrain.ribbonMesh, null, `seed ${seed} ribbon geometry survives dispose()`);
+  }
+});
+
+test('place inverts project so ribbon and judging share one corridor frame', () => {
+  for (const seed of [1, 7]) {
+    const { terrain } = generateValley({ seed });
+    const centerline = terrain.centerline;
+    for (let s = 0; s < centerline.length; s += 9) {
+      for (const crossM of [-150, -71.5, -20, 0, 35.25, 71.5, 140]) {
+        const sample = centerline[s];
+        const at = terrain.place(sample.s, crossM);
+        const here = terrain.project(at.x, at.z);
+        assert.ok(Math.abs(here.crossM - crossM) < 1,
+          `seed ${seed}: cross ${crossM} read back as ${here.crossM.toFixed(2)}`);
+        assert.ok(Math.abs(here.s - sample.s) < 3,
+          `seed ${seed}: s ${sample.s} read back as ${here.s.toFixed(2)}`);
+      }
+    }
+    // Ends are clamped to the centreline rather than extrapolated.
+    assert.deepEqual(terrain.place(-5000, 0), terrain.place(centerline[0].s, 0));
+  }
+});

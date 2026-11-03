@@ -13,6 +13,15 @@ export function createSlalomSimulation(seed, rules) {
   return createPilotMissionSimulation({ aircraftId: 'F16', airportId: 'generated-valley', terrain });
 }
 
+/** The browser mounting path without a renderer. A stub scene is what makes
+ * `prepare` install the GeneratedValleyTerrain, so a test can assert the terrain
+ * that draws the corridor is the terrain the collision probes query. */
+export function createMountedSlalomSimulation(seed, rules) {
+  const sim = createSlalomSimulation(seed, rules);
+  sim.scene = { add() {}, remove() {} };
+  return sim;
+}
+
 /** The same 5 Hz decision period, 24-tick command delay and shared navigation
  * sensor model as `flyValley`, so the two score spaces differ only in course. */
 export async function flySlalom({ createPilot, seed = 1, environmentProfile = 'mild-disturbance-v1',
