@@ -104,7 +104,8 @@ export class CessnaDemoScenario {
     const sim = this.sim, tel = sim.telemetry;
     const stage = this.director.currentStage, time = this.director.stageTimer;
     this.camera();
-    const clearance = sim.position.y - sim.currentTerrain.getHeight(sim.position.x, sim.position.z);
+    const surface = Math.max(sim.currentTerrain.getHeight(sim.position.x, sim.position.z), sim.water?.waterLevel ?? -Infinity);
+    const clearance = sim.position.y - surface;
     this.result.minClearanceM = Math.min(this.result.minClearanceM, clearance);
     this.result.maxBankDeg = Math.max(this.result.maxBankDeg, Math.abs(tel.rollDeg));
     sim.controls.setVirtualInput('brakes', 0);
@@ -149,11 +150,13 @@ export class CessnaDemoScenario {
     // remains a physical climb command; collision detection stays enabled.
     let terrainAhead = -Infinity;
     const heading = tel.headingDeg * Math.PI / 180;
-    for (const seconds of [0, 2, 4, 6]) {
+    const waterLevel = sim.water?.waterLevel ?? -Infinity;
+    for (const seconds of [0, 2, 4, 6, 8]) {
       for (const side of [-25, 0, 25]) {
-        terrainAhead = Math.max(terrainAhead, sim.currentTerrain.getHeight(
-          sim.position.x + sim.linearVelocity.x * seconds + Math.cos(heading) * side,
-          sim.position.z + sim.linearVelocity.z * seconds + Math.sin(heading) * side));
+        const x = sim.position.x + sim.linearVelocity.x * seconds + Math.cos(heading) * side;
+        const z = sim.position.z + sim.linearVelocity.z * seconds + Math.sin(heading) * side;
+        const h = Math.max(sim.currentTerrain.getHeight(x, z), waterLevel);
+        terrainAhead = Math.max(terrainAhead, h);
       }
     }
     altitude = Math.max(altitude, terrainAhead + 55);

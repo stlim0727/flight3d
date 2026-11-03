@@ -153,4 +153,15 @@ describe('aircraft-specific demos', () => {
     assert.equal(buildingClearance({x: 0, z: 0}, {x: 1, z: 0}, 100, 50,
       [{x: 50, z: 0, width: 20, depth: 20, y: 0, height: 100}]), -Math.hypot(20, 20) / 2);
   });
+
+  it('maintains safe clearance above water level when terrain is negative', () => {
+    const sim = simulator();
+    sim.currentTerrain = { getHeight: () => -45, isLoaded: true };
+    sim.water = { waterLevel: 0 };
+    sim.position.set(0, 50, 0);
+    const d = new DemoFlightDirector(sim);
+    d.start('coastal', 'scenic');
+    d.update(0.1);
+    assert.ok(d.cessnaScenario.result.minClearanceM >= 45, 'clearance measured against water surface, not underwater terrain');
+  });
 });

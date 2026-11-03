@@ -3,7 +3,7 @@ import * as THREE from 'three';
 const clamp = THREE.MathUtils.clamp;
 
 function corridorHeight(terrain, start, direction, length, width = 45) {
-  let height = -Infinity;
+  let height = 0;
   for (let along = -350; along <= length + 350; along += 50) {
     for (const cross of [-width, 0, width]) {
       height = Math.max(height, terrain.getHeight(

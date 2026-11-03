@@ -121,3 +121,16 @@ test('sloped lots have foundations and far LOD covering the same collision volum
   city.updateCityLod(new THREE.Vector3(0, 10000, 0));
   assert.equal(city.cityFoundations.count, 0);
 });
+
+test('default constructor uses a deterministic PRNG producing repeatable building placements', () => {
+  const terrain = { getHeight: () => 25 };
+  const city1 = new FoliageAndCities(terrain);
+  const city2 = new FoliageAndCities(terrain);
+  assert.equal(city1.buildingData.length, city2.buildingData.length);
+  for (let i = 0; i < city1.buildingData.length; i++) {
+    const b1 = city1.buildingData[i], b2 = city2.buildingData[i];
+    assert.equal(b1.x, b2.x);
+    assert.equal(b1.z, b2.z);
+    assert.equal(b1.height, b2.height);
+  }
+});
