@@ -38,6 +38,7 @@ import { CameraSystem } from './cameras/CameraSystem.js';
 import { HudView } from './ui/HudView.js';
 import { RenderPose } from './core/RenderPose.js';
 import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
+import { JoystickCheckDialog } from './ui/JoystickCheckDialog.js';
 import { DemoFlightDirector } from './director/DemoFlightDirector.js';
 import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
@@ -247,6 +248,7 @@ class FlightSimulator {
     };
     this.loadAircraftConfig(AIRCRAFT_REGISTRY[savedSelection.aircraft] || BOEING_737_800);
     this.diagnostics = new DiagnosticsInspector(this);
+    this.joystickDialog = new JoystickCheckDialog(this);
     this.demoDirector = new DemoFlightDirector(this);
     this.shadowDemo = new CockpitShadowDemo(this, () => this.updateShadowDemoUi());
     this.developerMode = new DeveloperModeController(() => {
@@ -732,6 +734,10 @@ class FlightSimulator {
 
   openFeedbackDialog() {
     this._openFeedbackDialog?.(this);
+  }
+
+  openJoystickCheckDialog() {
+    this.joystickDialog?.open();
   }
 
   retryDebrief() {

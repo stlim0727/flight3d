@@ -426,3 +426,138 @@ describe('HotasController - Device Connection & Disconnection', () => {
     assert.strictEqual(disconnected.type, 'hotas-one');
   });
 });
+
+describe('HotasController - Xbox Mode Profile & Custom Configuration', () => {
+  function createMockControls() {
+    return {
+      pitchTrim: 2.0,
+      pitchTrimRate: 0.0,
+      throttle: 0.0,
+      parkingBrake: false,
+      inputBlocked: false,
+      aircraftControlsDisabled: false,
+      setParkingBrake(val) { this.parkingBrake = Boolean(val); },
+      onUserInteract() {},
+      onToggleSpoilers() {},
+      onToggleGear() {},
+      onCycleFlaps() {},
+    };
+  }
+
+  it('detects Xbox mode and maps Axis 3 to throttle, Axis 2 to rudder, and Button 7 to brakes', () => {
+    const controls = createMockControls();
+    // In Xbox mode on Hotas One:
+    // axes[0] = roll, axes[1] = pitch, axes[2] = rudder (twist/rocker), axes[3] = throttle (forward = -1.0 TOGA, back = +1.0 Idle)
+    // buttons[7] = RT trigger (brakes)
+    const buttons = new Array(16).fill(0).map(() => ({ pressed: false, value: 0 }));
+    buttons[7] = { pressed: true, value: 0.8 }; // Pull RT trigger
+    const mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68d)', // Xbox mode PID b68d
+      mapping: 'standard',
+      index: 0,
+      axes: [0.5, -0.4, 0.7, -1.0], // Roll right, Pitch down, Rudder right, Throttle full TOGA (-1.0)
+      buttons,
+    };
+
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+    assert.strictEqual(hotas.resolveProfile(mockGamepad), 'hotas-one-xbox');
+
+    hotas.update(1 / 60);
+
+    assert.ok(hotas.aileron > 0.4, `Expected right roll, got ${hotas.aileron}`);
+    assert.ok(hotas.elevator < -0.3, `Expected pitch down, got ${hotas.elevator}`);
+    assert.ok(hotas.rudder > 0.6, `Expected rudder right from axis 2, got ${hotas.rudder}`);
+    assert.strictEqual(hotas.throttle, 1.0, `Expected full TOGA throttle from axis 3 (-1.0), got ${hotas.throttle}`);
+    assert.strictEqual(hotas.brakes, 0.8, `Expected wheel brakes from button 7 (RT), got ${hotas.brakes}`);
+  });
+
+  it('supports profileOverride to force Xbox mode or PC mode regardless of detection', () => {
+    const controls = createMockControls();
+    const mockGamepad = {
+      id: 'Generic Flight Stick',
+      index: 0,
+      axes: [0, 0, 0, 0],
+      buttons: [],
+    };
+
+    const hotas = new HotasController(controls, {
+      profileOverride: 'hotas-one-xbox',
+      getGamepads: () => [mockGamepad],
+    });
+    assert.strictEqual(hotas.resolveProfile(mockGamepad), 'hotas-one-xbox');
+
+    hotas.applyConfig({ profileOverride: 'hotas-one' });
+    assert.strictEqual(hotas.resolveProfile(mockGamepad), 'hotas-one');
+  });
+
+  it('supports pitchInverted and throttleInverted configurations', () => {
+    const controls = createMockControls();
+    // Axis 1 = +0.6 (pulling back). Normally pitch up (> 0). If pitchInverted, pitch down (< 0).
+    // Axis 2 = +1.0 (pulling back). Normally idle (0.0). If throttleInverted, 100% (1.0).
+    const mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [0, 0.6, 1.0, 0, 0],
+      buttons: [],
+    };
+
+    const hotas = new HotasController(controls, {
+      pitchInverted: true,
+      throttleInverted: true,
+      getGamepads: () => [mockGamepad],
+    });
+    hotas.update(1 / 60);
+
+    assert.ok(hotas.elevator < -0.5, `Expected negative pitch with inverted elevator, got ${hotas.elevator}`);
+    assert.strictEqual(hotas.throttle, 1.0, `Expected 1.0 with inverted throttle when raw axis is +1.0`);
+  });
+
+  it('supports rudderMode twist-only and pedals-only', () => {
+    const controls = createMockControls();
+    // Twist on axis 3 = +0.8, Pedals on axis 4 = -0.7
+    const mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [0, 0, 0, 0.8, -0.7],
+      buttons: [],
+    };
+
+    // Twist only
+    const hotasTwist = new HotasController(controls, {
+      rudderMode: 'twist',
+      getGamepads: () => [mockGamepad],
+    });
+    hotasTwist.update(1 / 60);
+    assert.ok(hotasTwist.rudder > 0.7, `Expected twist rudder (+0.8), got ${hotasTwist.rudder}`);
+
+    // Pedals only
+    const hotasPedals = new HotasController(controls, {
+      rudderMode: 'pedals',
+      getGamepads: () => [mockGamepad],
+    });
+    hotasPedals.update(1 / 60);
+    assert.ok(hotasPedals.rudder < -0.6, `Expected pedal rudder (-0.7), got ${hotasPedals.rudder}`);
+  });
+
+  it('provides comprehensive getDiagnostics() for live UI inspection', () => {
+    const controls = createMockControls();
+    const mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      mapping: '',
+      axes: [0.1, -0.2, 0.5, 0.0, 0.0],
+      buttons: [{ pressed: true, value: 1.0 }],
+    };
+
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+    hotas.update(1 / 60);
+
+    const diag = hotas.getDiagnostics();
+    assert.strictEqual(diag.connected, true);
+    assert.strictEqual(diag.device.name, 'Thrustmaster T.Flight Hotas One');
+    assert.strictEqual(diag.activeProfile, 'hotas-one');
+    assert.strictEqual(diag.axes.length, 5);
+    assert.strictEqual(diag.buttons[0].pressed, true);
+    assert.ok(typeof diag.outputs.throttle === 'number');
+  });
+});

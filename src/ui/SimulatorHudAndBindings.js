@@ -410,6 +410,7 @@ class SimulatorHudAndBindingsMethods {
     });
     document.getElementById('btn-sound')?.addEventListener('click', () => this.controls.onToggleAudio());
     document.getElementById('btn-diag')?.addEventListener('click', () => this.diagnostics.toggle());
+    document.getElementById('btn-joystick-check')?.addEventListener('click', () => this.joystickDialog?.toggle());
     document.getElementById('btn-touch-toggle')?.addEventListener('click', () => {
       this.touchControls.toggle();
       saveSimulatorPreferences({ touchControls: this.touchControls.enabled });
@@ -593,6 +594,10 @@ class SimulatorHudAndBindingsMethods {
     });
     document.getElementById('btn-help-close')?.addEventListener('click', () => {
       helpModal?.classList.remove('visible');
+    });
+    document.getElementById('btn-help-joystick-check')?.addEventListener('click', () => {
+      helpModal?.classList.remove('visible');
+      this.joystickDialog?.open();
     });
 
     // Crash report: header toggles the full report; the main menu button is the

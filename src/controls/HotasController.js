@@ -70,9 +70,12 @@ export class HotasController {
     this.hasThrottleControl = false;
 
     // Configuration
-    this.deadzoneStick = 0.04;
-    this.deadzoneRudder = 0.05;
-    this.throttleInverted = false; // standard: forward = 1.0 (TOGA), backward = 0.0 (Idle)
+    this.profileOverride = options.profileOverride || 'auto'; // 'auto', 'hotas-one', 'hotas-one-xbox', 'hotas-tflight', 'flight-stick', 'standard-gamepad'
+    this.throttleInverted = options.throttleInverted ?? false; // standard: forward = 1.0 (TOGA), backward = 0.0 (Idle)
+    this.pitchInverted = options.pitchInverted ?? false;
+    this.rudderMode = options.rudderMode || 'auto'; // 'auto', 'twist', 'pedals'
+    this.deadzoneStick = options.deadzoneStick ?? 0.04;
+    this.deadzoneRudder = options.deadzoneRudder ?? 0.05;
     this.throttleDeltaThreshold = 0.005;
 
     // Internal state tracking
@@ -88,6 +91,46 @@ export class HotasController {
     this.onDeviceDisconnected = null;
 
     this.initListeners();
+  }
+
+  applyConfig(cfg = {}) {
+    if (typeof cfg.profileOverride === 'string') this.profileOverride = cfg.profileOverride;
+    if (typeof cfg.throttleInverted === 'boolean') this.throttleInverted = cfg.throttleInverted;
+    if (typeof cfg.pitchInverted === 'boolean') this.pitchInverted = cfg.pitchInverted;
+    if (['auto', 'twist', 'pedals'].includes(cfg.rudderMode)) this.rudderMode = cfg.rudderMode;
+    if (typeof cfg.deadzoneStick === 'number' && Number.isFinite(cfg.deadzoneStick)) {
+      this.deadzoneStick = Math.max(0, Math.min(0.2, cfg.deadzoneStick));
+    }
+    if (typeof cfg.deadzoneRudder === 'number' && Number.isFinite(cfg.deadzoneRudder)) {
+      this.deadzoneRudder = Math.max(0, Math.min(0.2, cfg.deadzoneRudder));
+    }
+  }
+
+  getConfig() {
+    return {
+      profileOverride: this.profileOverride,
+      throttleInverted: this.throttleInverted,
+      pitchInverted: this.pitchInverted,
+      rudderMode: this.rudderMode,
+      deadzoneStick: this.deadzoneStick,
+      deadzoneRudder: this.deadzoneRudder,
+    };
+  }
+
+  resolveProfile(gamepad) {
+    if (!gamepad) return 'generic';
+    if (this.profileOverride && this.profileOverride !== 'auto') {
+      return this.profileOverride;
+    }
+    const baseType = identifyGamepadType(gamepad);
+    if (baseType === 'hotas-one') {
+      const isXboxMode = /(?:b68d|product:\s*b68d)/i.test(gamepad.id || '')
+        || gamepad.mapping === 'standard'
+        || (gamepad.id || '').toLowerCase().includes('xbox')
+        || (gamepad.id || '').toLowerCase().includes('xinput');
+      return isXboxMode ? 'hotas-one-xbox' : 'hotas-one';
+    }
+    return baseType;
   }
 
   initListeners() {
@@ -133,6 +176,7 @@ export class HotasController {
   }
 
   formatDeviceName(rawId, type) {
+    if (type === 'hotas-one-xbox') return 'Thrustmaster T.Flight Hotas One (Xbox Mode)';
     if (type === 'hotas-one') return 'Thrustmaster T.Flight Hotas One';
     if (type === 'hotas-tflight') return 'Thrustmaster T.Flight Hotas';
     if (type === 'flight-stick') return 'Flight Stick / HOTAS';
@@ -216,7 +260,7 @@ export class HotasController {
       this.handleGamepadConnected(gp);
     }
 
-    const type = this.connectedDevice?.type || identifyGamepadType(gp);
+    const activeProfile = this.resolveProfile(gp);
     const axes = gp.axes || [];
     const buttons = gp.buttons || [];
 
@@ -231,7 +275,9 @@ export class HotasController {
       }
     }
 
-    if (type === 'hotas-one' || type === 'hotas-tflight' || type === 'flight-stick') {
+    if (activeProfile === 'hotas-one-xbox') {
+      this.updateHotasXboxProfile(gp, axes, buttons, dt);
+    } else if (activeProfile === 'hotas-one' || activeProfile === 'hotas-tflight' || activeProfile === 'flight-stick') {
       this.updateHotasProfile(gp, axes, buttons, dt);
     } else {
       this.updateStandardGamepadProfile(gp, axes, buttons, dt);
@@ -291,7 +337,8 @@ export class HotasController {
       this.aileron = applyDeadzone(axes[0] ?? 0.0, this.deadzoneStick);
 
       // Axis 1: Pitch (Elevator) - forward negative (dive/down), back positive (climb/up)
-      this.elevator = applyDeadzone(axes[1] ?? 0.0, this.deadzoneStick);
+      const rawElevator = applyDeadzone(axes[1] ?? 0.0, this.deadzoneStick);
+      this.elevator = this.pitchInverted ? -rawElevator : rawElevator;
 
       // Axis 2: Throttle Lever (Forward = TOGA / 1.0, Backward = Idle / 0.0)
       if (axes.length > 2 && axes[2] !== undefined) {
@@ -310,7 +357,9 @@ export class HotasController {
       let secondaryRudder = 0.0;
       if (axes.length > 4 && axes[4] !== undefined) {
         const rawAxis4 = axes[4];
-        if (this.axis4Valid === undefined) {
+        if (this.rudderMode === 'pedals') {
+          this.axis4Valid = true;
+        } else if (this.axis4Valid === undefined) {
           this.axis4Valid = Math.abs(rawAxis4) <= 0.25;
         } else if (!this.axis4Valid && Math.abs(rawAxis4) <= 0.1) {
           // If pedals were plugged in later and passed through neutral center
@@ -321,8 +370,14 @@ export class HotasController {
         }
       }
 
-      // Whichever has higher deflection governs the rudder
-      this.rudder = Math.abs(secondaryRudder) > Math.abs(twist) ? secondaryRudder : twist;
+      if (this.rudderMode === 'twist') {
+        this.rudder = twist;
+      } else if (this.rudderMode === 'pedals') {
+        this.rudder = secondaryRudder;
+      } else {
+        // Whichever has higher deflection governs the rudder
+        this.rudder = Math.abs(secondaryRudder) > Math.abs(twist) ? secondaryRudder : twist;
+      }
 
       // Wheel Brakes: Trigger (Button 0)
       const triggerBtn = buttons[0];
@@ -439,6 +494,137 @@ export class HotasController {
     }
   }
 
+  updateHotasXboxProfile(gp, axes, buttons, dt) {
+    const blocked = this.controls?.inputBlocked === true;
+    const aircraftDisabled = this.controls?.aircraftControlsDisabled === true;
+
+    // --- 1. Flight Control Axes (Xbox / XInput Mode) ---
+    if (!blocked && !aircraftDisabled) {
+      // Axis 0: Roll (Aileron) - left negative, right positive
+      this.aileron = applyDeadzone(axes[0] ?? 0.0, this.deadzoneStick);
+
+      // Axis 1: Pitch (Elevator) - forward negative (dive/down), back positive (climb/up)
+      const rawElevator = applyDeadzone(axes[1] ?? 0.0, this.deadzoneStick);
+      this.elevator = this.pitchInverted ? -rawElevator : rawElevator;
+
+      // Axis 3: Throttle Lever (Right Stick Y in Xbox mode: forward = -1.0 TOGA, backward = +1.0 Idle)
+      if (axes.length > 3 && axes[3] !== undefined) {
+        this.updateThrottleFromRaw(axes[3]);
+      }
+
+      // Axis 2: Rudder (Twist & Rocker paddle map to Right Stick X in Xbox mode)
+      this.rudder = (axes.length > 2 && axes[2] !== undefined)
+        ? applyDeadzone(axes[2], this.deadzoneRudder)
+        : 0.0;
+
+      // Wheel Brakes: Main trigger is Right Trigger (RT / Button 7), fallback to Button 0 or Left Trigger (LT)
+      const rtBtn = buttons[7];
+      const ltBtn = buttons[6];
+      const b0 = buttons[0];
+      const primaryTrig = rtBtn ?? b0;
+      let trigVal = 0.0;
+      if (primaryTrig) {
+        trigVal = primaryTrig.value !== undefined ? primaryTrig.value : (primaryTrig.pressed ? 1.0 : 0.0);
+      }
+      if (trigVal <= 0.05 && ltBtn) {
+        trigVal = ltBtn.value !== undefined ? ltBtn.value : (ltBtn.pressed ? 1.0 : 0.0);
+      }
+      this.brakes = trigVal > 0.05 ? trigVal : 0.0;
+    } else {
+      this.elevator = 0.0;
+      this.aileron = 0.0;
+      this.rudder = 0.0;
+      this.brakes = 0.0;
+    }
+
+    if (blocked) return;
+
+    // --- 2. Aircraft Systems Buttons (Xbox layout) ---
+    if (!aircraftDisabled) {
+      // Button 0 (A): Toggle Spoilers / Speedbrakes
+      if (this.wasJustPressed(buttons, 0)) {
+        this.controls?.onToggleSpoilers?.();
+      }
+
+      // Button 1 (B): Toggle Landing Gear
+      if (this.wasJustPressed(buttons, 1)) {
+        this.controls?.onToggleGear?.();
+      }
+
+      // Button 2 (X): Parking Brake Toggle
+      if (this.wasJustPressed(buttons, 2)) {
+        this.controls?.setParkingBrake?.(!this.controls.parkingBrake);
+      }
+
+      // Button 3 (Y): Thrust Reverser Toggle
+      if (this.wasJustPressed(buttons, 3)) {
+        this.controls?.onToggleReverser?.();
+      }
+
+      // Button 4 (LB on throttle): Flaps Retract
+      if (this.wasJustPressed(buttons, 4)) {
+        this.controls?.onCycleFlaps?.(-1);
+      }
+
+      // Button 5 (RB on throttle): Flaps Extend
+      if (this.wasJustPressed(buttons, 5)) {
+        this.controls?.onCycleFlaps?.(1);
+      }
+
+      // Button 11 (RS click): Cycle Engine Failure Simulation
+      if (this.wasJustPressed(buttons, 11)) {
+        this.controls?.onCycleEngineFailure?.();
+      }
+    }
+
+    // --- 3. View, Camera, Lighting & Utility Buttons ---
+    // Button 8 (View / Back): Camera Mode Cycle
+    if (this.wasJustPressed(buttons, 8)) {
+      this.controls?.onCycleCamera?.();
+    }
+
+    // Button 9 (Menu / Start): Center View / Reset Look
+    if (this.wasJustPressed(buttons, 9)) {
+      if (this.controls?.onResetLook) {
+        this.controls.onResetLook();
+      } else if (this.controls?.onSelectCamera) {
+        this.controls.onSelectCamera(0);
+      }
+    }
+
+    // Button 10 (LS click): Toggle Aircraft Lights
+    if (this.wasJustPressed(buttons, 10)) {
+      this.controls?.onToggleLights?.();
+    }
+
+    // --- 4. POV / D-pad ---
+    // Button 12: D-pad Up (Trim Nose Down)
+    const hatUp = this.isButtonPressed(buttons, 12);
+    // Button 13: D-pad Down (Trim Nose Up)
+    const hatDown = this.isButtonPressed(buttons, 13);
+    // Button 14: D-pad Left (Time cycle backward)
+    const hatLeft = this.wasJustPressed(buttons, 14);
+    // Button 15: D-pad Right (Time cycle forward)
+    const hatRight = this.wasJustPressed(buttons, 15);
+
+    if (!aircraftDisabled) {
+      if (hatUp) {
+        if (this.controls) {
+          this.controls.pitchTrim -= dt * 1.5;
+          this.controls.pitchTrimRate = -1.0;
+        }
+      } else if (hatDown) {
+        if (this.controls) {
+          this.controls.pitchTrim += dt * 1.5;
+          this.controls.pitchTrimRate = 1.0;
+        }
+      }
+    }
+
+    if (hatLeft) this.controls?.onCycleTimeOfDay?.(-1.5);
+    if (hatRight) this.controls?.onCycleTimeOfDay?.(1.5);
+  }
+
   updateStandardGamepadProfile(gp, axes, buttons, dt) {
     const blocked = this.controls?.inputBlocked === true;
     const aircraftDisabled = this.controls?.aircraftControlsDisabled === true;
@@ -514,5 +700,57 @@ export class HotasController {
 
     if (dLeft) this.controls?.onCycleTimeOfDay?.(-1.5);
     if (dRight) this.controls?.onCycleTimeOfDay?.(1.5);
+  }
+
+  getDiagnostics() {
+    const gp = this.findActiveGamepad();
+    if (!gp) {
+      return {
+        connected: false,
+        device: null,
+        activeProfile: 'none',
+        config: this.getConfig(),
+        axes: [],
+        buttons: [],
+        outputs: {
+          elevator: this.elevator,
+          aileron: this.aileron,
+          rudder: this.rudder,
+          throttle: this.throttle,
+          brakes: this.brakes,
+        },
+      };
+    }
+
+    const type = identifyGamepadType(gp);
+    const activeProfile = this.resolveProfile(gp);
+    const axes = Array.from(gp.axes || []);
+    const buttons = (gp.buttons || []).map((b, i) => ({
+      index: i,
+      pressed: Boolean(b && (b.pressed || b.value > 0.5)),
+      value: b ? (b.value !== undefined ? b.value : (b.pressed ? 1.0 : 0.0)) : 0.0,
+    }));
+
+    return {
+      connected: true,
+      device: {
+        index: gp.index,
+        id: gp.id,
+        mapping: gp.mapping || 'raw',
+        type,
+        name: this.formatDeviceName(gp.id, activeProfile),
+      },
+      activeProfile,
+      config: this.getConfig(),
+      axes,
+      buttons,
+      outputs: {
+        elevator: this.elevator,
+        aileron: this.aileron,
+        rudder: this.rudder,
+        throttle: this.throttle,
+        brakes: this.brakes,
+      },
+    };
   }
 }

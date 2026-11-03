@@ -374,6 +374,7 @@
         <button id="btn-cam-reset" class="btn" title="카메라 시선 정면 초기화 (O / 더블클릭)" data-i18n-title="center.camera.view.o.double.click"><span data-i18n="center.view.o">시선 리셋 [O]</span></button>
         <button id="btn-yokes" class="btn" aria-pressed="false" title="계기판을 가리는 조종간 표시/숨김 (J)" data-i18n-title="show.hide.instrument.panel.yokes.j"><span data-i18n="hide.yokes.j">조종간 숨김 [J]</span></button>
         <button id="btn-diag" class="btn" title="실시간 물리 진단 & 튜닝 [`]" data-i18n-title="live.physics.inspector.tuning"><span data-i18n="physics">🔬 물리 진단 [`]</span></button>
+        <button id="btn-joystick-check" class="btn" title="조이스틱 / HOTAS 점검 및 매핑" data-i18n-title="joystick.check.title"><span data-i18n="joystick.check">🕹️ 조이스틱 점검</span></button>
         <button id="btn-help" class="btn btn-accent" title="비행 가이드 (H)" data-i18n-title="flight.guide.h"><span data-i18n="flight.guide.h.53">조작 안내 [H]</span></button>
       </div>
     </div>
@@ -433,7 +434,10 @@
             </table>
           </div>
           <div class="help-col help-col-wide">
-            <h3><span data-i18n="hotas.controls">🕹️ HOTAS / 조이스틱 조작 가이드 (T.Flight Hotas One)</span></h3>
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+              <h3 style="margin: 0;"><span data-i18n="hotas.controls">🕹️ HOTAS / 조이스틱 조작 가이드 (T.Flight Hotas One)</span></h3>
+              <button id="btn-help-joystick-check" class="btn btn-accent" type="button"><span data-i18n="joystick.check">🕹️ 조이스틱 점검</span></button>
+            </div>
             <table class="key-table">
               <tr><td><kbd><span data-i18n="hotas.stick.pitch.roll">조종간 피치 & 롤 (Stick Pitch & Roll)</span></kbd></td><td><span data-i18n="hotas.stick.pitch.roll.desc">스틱 앞으로 밀어 기수 내림(하강), 뒤로 당겨 기수 올림(상승), 좌우 기울여 롤 선회</span></td></tr>
               <tr><td><kbd><span data-i18n="hotas.throttle.lever">스로틀 레버 (Throttle Lever)</span></kbd></td><td><span data-i18n="hotas.throttle.lever.desc">레버를 앞으로 밀어 최대 추력(TOGA 100%), 뒤로 당겨 아이들(Idle)</span></td></tr>
