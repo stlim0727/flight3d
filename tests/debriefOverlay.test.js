@@ -72,3 +72,29 @@ test('debrief CSS defines responsive styling for top-left header and back button
   assert.ok(cssSource.includes('.debrief-back-caption'), 'CSS must define .debrief-back-caption');
   assert.ok(cssSource.includes('.debrief-card .debrief-lobby-btn'), 'CSS must define .debrief-card .debrief-lobby-btn');
 });
+
+test('pause menu positions main menu back button at top left with u-turn arrow and caption', () => {
+  const htmlSource = readFileSync(resolve('index.html'), 'utf8');
+  assert.match(
+    htmlSource,
+    /<div class="pause-card">[\s\S]*?<header class="pause-header">[\s\S]*?<button class="btn pause-lobby-btn" id="btn-pause-lobby"[\s\S]*?↩[\s\S]*?<\/header>/,
+    'pause card must have pause-lobby-btn in pause-header with ↩ arrow'
+  );
+
+  const cssSource = readFileSync(resolve('src/styles/lobby-and-overlays.css'), 'utf8');
+  assert.ok(cssSource.includes('.pause-header'), 'lobby-and-overlays.css must define .pause-header');
+  assert.ok(cssSource.includes('.pause-lobby-btn'), 'lobby-and-overlays.css must define .pause-lobby-btn');
+});
+
+test('pilot arena score modal provides prominent top-left return to main menu button', () => {
+  const viewSource = readFileSync(resolve('src/ui/pilotScoreView.js'), 'utf8');
+  assert.match(
+    viewSource,
+    /class="btn-score-lobby"[\s\S]*?↩[\s\S]*?메인 메뉴/,
+    'scoreOverlayMarkup must include btn-score-lobby with ↩ glyph and caption'
+  );
+
+  const cssSource = readFileSync(resolve('src/styles/pilot-arena.css'), 'utf8');
+  assert.ok(cssSource.includes('.btn-score-lobby'), 'pilot-arena.css must define .btn-score-lobby');
+});
+
