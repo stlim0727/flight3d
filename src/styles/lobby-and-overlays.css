@@ -45,6 +45,8 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 }
 .lobby-card > * { flex-shrink: 0; }
 .lobby-header { display: flex; justify-content: space-between; align-items: center; gap: calc(12px * var(--ui-scale, 1)); }
+.lobby-title-row { display: flex; align-items: center; gap: calc(10px * var(--ui-scale, 1)); min-width: 0; }
+.lobby-title-wrap { min-width: 0; }
 .lobby-title { color: #e2e8f0; font-size: calc(18px * var(--ui-scale, 1)); font-weight: 600; letter-spacing: -.4px; margin: 0; }
 .lobby-title > span { display: block; color: #94a3b8; font-size: calc(11px * var(--ui-scale, 1)); font-weight: 400; letter-spacing: 0; margin-top: calc(4px * var(--ui-scale, 1)); }
 .lobby-language { display: flex; flex-direction: column; gap: calc(4px * var(--ui-scale, 1)); }
@@ -249,8 +251,31 @@ body.booting .menu-toggle { display: none !important; }
   display: inline;
   font-size: 11px;
 }
-/* With the strip hidden in the menu, keep its close affordance off the card. */
-body[data-flow="lobby"] .menu-toggle {
+.lobby-card .menu-toggle {
+  position: static;
+  flex: 0 0 auto;
+  width: calc(38px * var(--ui-scale, 1));
+  height: calc(38px * var(--ui-scale, 1));
+  min-width: calc(38px * var(--ui-scale, 1));
+  padding: 0;
+  border-radius: calc(8px * var(--ui-scale, 1));
+  background: rgba(148, 163, 184, .12);
+  border: 1px solid rgba(148, 163, 184, .28);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #edf5ff;
+}
+.lobby-card .menu-toggle:hover {
+  background: rgba(148, 163, 184, .22);
+  border-color: #38bdf8;
+}
+.lobby-card .menu-toggle .menu-toggle-title {
+  display: none !important;
+}
+/* When the menu toggle is outside the card (e.g. fallback or flight), place it at safe screen edge. */
+body[data-flow="lobby"] > .menu-toggle,
+body[data-flow="lobby"] #hud-overlay .menu-toggle {
   top: var(--edge-top);
   left: var(--edge-left);
 }
@@ -317,28 +342,38 @@ body[data-flow="lobby"] .menu-toggle {
 
 /* Compact menus keep the scene visible and every control reachable by scrolling. */
 .compact-ui #lobby-screen {
-  align-items: flex-end;
+  align-items: center;
+  justify-content: center;
   background: linear-gradient(0deg, rgba(6, 10, 18, .8), rgba(6, 10, 18, 0) 100%);
 }
 .compact-ui .lobby-card {
-  margin: 0 auto calc(var(--edge-bottom) + 8px);
-  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 72px);
-  height: min(700px, calc(100dvh - var(--edge-top) - var(--edge-bottom) - 72px));
+  margin: calc(var(--edge-top) + 8px) auto calc(var(--edge-bottom) + 8px);
+  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 16px);
+  height: min(720px, calc(100dvh - var(--edge-top) - var(--edge-bottom) - 16px));
   width: min(360px, calc(100% - var(--edge-left) - var(--edge-right) - 16px));
   padding: 16px;
   gap: 12px;
 }
 .compact-ui .lobby-card .btn { min-height: 44px; }
+.compact-ui .lobby-card .menu-toggle {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+}
+.compact-ui .lobby-card .lobby-title-row {
+  gap: 8px;
+}
 
 @media (max-height: 500px) and (min-width: 541px) {
-  .compact-ui #lobby-screen { align-items: center; }
+  .compact-ui #lobby-screen { align-items: center; justify-content: flex-start; }
   .compact-ui .lobby-card {
-    margin: 0 0 0 calc(var(--edge-left) + 56px);
+    margin: 0 0 0 calc(var(--edge-left) + 8px);
     max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 8px);
     height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 8px);
     padding: 8px 12px;
     gap: 6px;
-    width: min(420px, calc(100vw - var(--edge-left) - var(--edge-right) - 72px));
+    width: min(420px, calc(100vw - var(--edge-left) - var(--edge-right) - 16px));
   }
   /* Short landscape: give the scrolling panel the height. The build line,
      subtitle, language caption and ESC hint return in taller layouts. */

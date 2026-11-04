@@ -43,7 +43,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   topActions.append(ap, mute);
   if (apPanel) hud.append(apPanel);
   const menu = document.getElementById('menu-toggle');
-  if (menu) topBar.append(menu);
+  if (menu && !document.querySelector('.lobby-title-row')) topBar.append(menu);
   topBar.append(strip, topActions);
   hud.prepend(topBar);
 
