@@ -214,10 +214,13 @@ export class FlightControls {
   update(dt, iasKnots = 140) {
     if (this.hotas) {
       this.hotas.update(dt);
-      this.hotasElevator = this.hotas.elevator;
-      this.hotasAileron = this.hotas.aileron;
-      this.hotasRudder = this.hotas.rudder;
-      this.hotasBrakes = this.hotas.brakes;
+      // Diagnostic mode reports live axes for the joystick check dialog; the
+      // aircraft must not consume them while flight input is blocked or disabled.
+      const hotasLive = !this.inputBlocked && !this.aircraftControlsDisabled;
+      this.hotasElevator = hotasLive ? this.hotas.elevator : 0.0;
+      this.hotasAileron = hotasLive ? this.hotas.aileron : 0.0;
+      this.hotasRudder = hotasLive ? this.hotas.rudder : 0.0;
+      this.hotasBrakes = hotasLive ? this.hotas.brakes : 0.0;
     }
 
     if (this.aircraftControlsDisabled) {

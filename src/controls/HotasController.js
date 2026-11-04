@@ -87,6 +87,9 @@ export class HotasController {
     this.activeGamepadIndex = -1;
     this.connectedDevice = null;
     this.lastActiveTime = 0;
+    // Set by the Joystick Check Dialog: map live axis values into the outputs
+    // for its meters while suppressing every write that would reach the aircraft.
+    this.diagnosticActive = false;
     this.resetAdaptationState();
 
     // Callbacks
@@ -343,7 +346,7 @@ export class HotasController {
     return current && !prev;
   }
 
-  updateThrottleFromRaw(rawThrottle) {
+  updateThrottleFromRaw(rawThrottle, applyToControls = true) {
     let normalized = this.throttleInverted
       ? (rawThrottle + 1.0) * 0.5
       : (1.0 - rawThrottle) * 0.5;
@@ -354,13 +357,13 @@ export class HotasController {
       this.lastRawThrottle = rawThrottle;
       this.throttle = normalized;
       this.hasThrottleControl = true;
-      if (this.controls) this.controls.throttle = normalized;
+      if (applyToControls && this.controls) this.controls.throttle = normalized;
     } else if (Math.abs(rawThrottle - this.lastRawThrottle) > this.throttleDeltaThreshold) {
       // Pilot physically adjusted lever
       this.lastRawThrottle = rawThrottle;
       this.throttle = normalized;
       this.hasThrottleControl = true;
-      if (this.controls) this.controls.throttle = normalized;
+      if (applyToControls && this.controls) this.controls.throttle = normalized;
     }
   }
 
@@ -434,9 +437,10 @@ export class HotasController {
   updateHotasProfile(gp, axes, buttons, dt) {
     const blocked = this.controls?.inputBlocked === true;
     const aircraftDisabled = this.controls?.aircraftControlsDisabled === true;
+    const live = !blocked && !aircraftDisabled;
 
     // --- 1. Flight Control Axes ---
-    if (!blocked && !aircraftDisabled) {
+    if (live || this.diagnosticActive) {
       // Axis 0: Roll (Aileron) - left negative, right positive
       this.aileron = applyDeadzone(axes[0] ?? 0.0, this.deadzoneStick);
 
@@ -471,7 +475,7 @@ export class HotasController {
 
       // Throttle Lever
       if (throttleAxisIdx >= 0 && axes.length > throttleAxisIdx && axes[throttleAxisIdx] !== undefined) {
-        this.updateThrottleFromRaw(axes[throttleAxisIdx]);
+        this.updateThrottleFromRaw(axes[throttleAxisIdx], live && !this.diagnosticActive);
       }
 
       // Primary Rudder: spring-centered stick twist handle at the resolved twist axis
@@ -573,7 +577,7 @@ export class HotasController {
       this.brakes = 0.0;
     }
 
-    if (blocked) return;
+    if (blocked || this.diagnosticActive) return;
 
     // --- 2. Aircraft Systems One-Shot Buttons ---
     if (!aircraftDisabled) {
@@ -676,9 +680,10 @@ export class HotasController {
   updateHotasXboxProfile(gp, axes, buttons, dt) {
     const blocked = this.controls?.inputBlocked === true;
     const aircraftDisabled = this.controls?.aircraftControlsDisabled === true;
+    const live = !blocked && !aircraftDisabled;
 
     // --- 1. Flight Control Axes (Xbox / XInput Mode) ---
-    if (!blocked && !aircraftDisabled) {
+    if (live || this.diagnosticActive) {
       // Axis 0: Roll (Aileron) - left negative, right positive
       this.aileron = applyDeadzone(axes[0] ?? 0.0, this.deadzoneStick);
 
@@ -688,7 +693,7 @@ export class HotasController {
 
       // Axis 3: Throttle Lever (Right Stick Y in Xbox mode: forward = -1.0 TOGA, backward = +1.0 Idle)
       if (axes.length > 3 && axes[3] !== undefined) {
-        this.updateThrottleFromRaw(axes[3]);
+        this.updateThrottleFromRaw(axes[3], live && !this.diagnosticActive);
       }
 
       // Axis 2: Rudder (Twist & Rocker paddle map to Right Stick X in Xbox mode)
@@ -718,7 +723,7 @@ export class HotasController {
       this.brakes = 0.0;
     }
 
-    if (blocked) return;
+    if (blocked || this.diagnosticActive) return;
 
     // --- 2. Aircraft Systems Buttons (Xbox layout) ---
     if (!aircraftDisabled) {
@@ -809,8 +814,9 @@ export class HotasController {
   updateStandardGamepadProfile(gp, axes, buttons, dt) {
     const blocked = this.controls?.inputBlocked === true;
     const aircraftDisabled = this.controls?.aircraftControlsDisabled === true;
+    const live = !blocked && !aircraftDisabled;
 
-    if (!blocked && !aircraftDisabled) {
+    if (live || this.diagnosticActive) {
       // Left Stick: Pitch and Roll
       this.aileron = applyDeadzone(axes[0] ?? 0.0, this.deadzoneStick);
       this.elevator = applyDeadzone(axes[1] ?? 0.0, this.deadzoneStick);
@@ -835,7 +841,7 @@ export class HotasController {
       }
 
       // Right Stick Y or RT can drive throttle
-      if (axes.length > 3 && axes[3] !== undefined) {
+      if (live && !this.diagnosticActive && axes.length > 3 && axes[3] !== undefined) {
         const rawRightY = axes[3];
         if (Math.abs(rawRightY) > 0.15) {
           // Relative throttle adjustment
@@ -851,7 +857,7 @@ export class HotasController {
       this.brakes = 0.0;
     }
 
-    if (blocked) return;
+    if (blocked || this.diagnosticActive) return;
 
     if (!aircraftDisabled) {
       // Face Buttons: A (Spoilers), B (Gear), X (Flaps -), Y (Flaps +)

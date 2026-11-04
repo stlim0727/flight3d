@@ -381,6 +381,40 @@ it('integrates HOTAS One stick, throttle, and trigger inputs into FlightControls
   }
 });
 
+it('keeps the aircraft neutral while the joystick check dialog samples HOTAS input under inputBlocked', () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { addEventListener() {} };
+  try {
+    const mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [0.75, 0.8, 0.6, -1.0, 0.0], // roll right, pitch up, rudder right, TOGA
+      buttons: [{ pressed: true, value: 0.85 }], // trigger brakes at 85%
+    };
+
+    const controls = new FlightControls({ addEventListener() {} }, {
+      getGamepads: () => [mockGamepad],
+    });
+    controls.inputBlocked = true; // menu/lobby state where the dialog opens
+    controls.hotas.diagnosticActive = true; // dialog is open and observing
+
+    controls.update(1.0, 140);
+    controls.update(1.0, 140);
+
+    assert.ok(controls.hotas.aileron > 0.4, `Dialog meters stay live, got ${controls.hotas.aileron}`);
+    assert.strictEqual(controls.hotas.throttle, 1.0, 'Throttle meter live for the dialog');
+    assert.strictEqual(controls.hotasElevator, 0.0, 'Aircraft must not consume diagnostic elevator');
+    assert.strictEqual(controls.hotasAileron, 0.0, 'Aircraft must not consume diagnostic aileron');
+    assert.strictEqual(controls.hotasRudder, 0.0, 'Aircraft must not consume diagnostic rudder');
+    assert.strictEqual(controls.hotasBrakes, 0.0, 'Aircraft must not consume diagnostic brakes');
+    assert.strictEqual(controls.throttle, 0.0, 'Diagnostic mode must not command aircraft throttle');
+    assert.strictEqual(controls.brakes, 0.0, 'Brakes must stay released');
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
+
 
 describe('Touch release response', () => {
   function controls() {

@@ -744,3 +744,134 @@ describe('HotasController - Auto Axis Roles & Floating Pin Recovery (PR #441/#45
     assert.strictEqual(hotas.axisRoleProbe, null);
   });
 });
+
+describe('HotasController - Diagnostic mode (Joystick Check Dialog live input)', () => {
+  function createMockControls() {
+    return {
+      pitchTrim: 0.0,
+      pitchTrimRate: 0.0,
+      throttle: 0.0,
+      parkingBrake: false,
+      inputBlocked: false,
+      aircraftControlsDisabled: false,
+      spoilersToggled: 0,
+      setParkingBrake(val) { this.parkingBrake = Boolean(val); },
+      onUserInteract() {},
+      onToggleSpoilers() { this.spoilersToggled += 1; },
+    };
+  }
+
+  function makePad(axes, overrides = {}) {
+    return {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      axes: [...axes],
+      buttons: Array.from({ length: 12 }, () => ({ pressed: false, value: 0 })),
+      ...overrides,
+    };
+  }
+
+  it('maps live axes into outputs while input is blocked, without touching the aircraft', () => {
+    const controls = createMockControls();
+    controls.inputBlocked = true; // the dialog opens from lobby/menu/pause, where input is always blocked
+    const pad = makePad([0.8, 0.6, 0.0, -1.0, 0.0]); // roll, pitch, twist centered, lever at TOGA, pedals 0
+    pad.buttons[1] = { pressed: true, value: 1.0 }; // spoilers button must stay inert
+    const hotas = new HotasController(controls, { getGamepads: () => [pad] });
+    hotas.diagnosticActive = true;
+
+    hotas.update(1 / 60);
+    hotas.update(1 / 60);
+
+    assert.ok(hotas.aileron > 0.5, `Aileron meter tracks roll, got ${hotas.aileron}`);
+    assert.ok(hotas.elevator > 0.3, `Elevator meter tracks pitch, got ${hotas.elevator}`);
+    assert.strictEqual(hotas.throttle, 1.0, 'Throttle meter reaches TOGA while blocked');
+    assert.strictEqual(hotas.rudder, 0.0, 'Centered twist reads neutral');
+    assert.strictEqual(controls.throttle, 0.0, 'Diagnostic mode must never write the aircraft throttle');
+    assert.strictEqual(controls.spoilersToggled, 0, 'Buttons must not command aircraft systems');
+
+    const diag = hotas.getDiagnostics();
+    assert.strictEqual(diag.outputs.aileron, hotas.aileron, 'Dialog reads diag.outputs; they must be live');
+    assert.ok(diag.outputs.throttle === 1.0);
+  });
+
+  it('maps live axes into outputs while aircraft controls are disabled (demo/arena)', () => {
+    const controls = createMockControls();
+    controls.aircraftControlsDisabled = true;
+    const pad = makePad([0.5, 0.0, 0.6, 0.0, 0.0]); // twist deflected right
+    const hotas = new HotasController(controls, { getGamepads: () => [pad] });
+    hotas.axesLayout = 'thrustmaster'; // lever on axis 3, twist on axis 2; skip the role probe
+    hotas.diagnosticActive = true;
+
+    hotas.update(1 / 60);
+    hotas.update(1 / 60);
+
+    assert.ok(hotas.aileron > 0.3, `Aileron meter tracks roll, got ${hotas.aileron}`);
+    assert.ok(hotas.rudder > 0.3, `Rudder meter tracks twist, got ${hotas.rudder}`);
+    assert.strictEqual(controls.spoilersToggled, 0);
+  });
+
+  it('keeps outputs zeroed when blocked without diagnostic mode (regression)', () => {
+    const controls = createMockControls();
+    controls.inputBlocked = true;
+    const pad = makePad([0.8, 0.6, 0.0, -1.0, 0.0]);
+    const hotas = new HotasController(controls, { getGamepads: () => [pad] });
+    assert.strictEqual(hotas.diagnosticActive, false, 'Diagnostic mode must default off');
+
+    hotas.update(1 / 60);
+    hotas.update(1 / 60);
+
+    assert.strictEqual(hotas.aileron, 0.0);
+    assert.strictEqual(hotas.elevator, 0.0);
+    assert.strictEqual(hotas.rudder, 0.0);
+    assert.strictEqual(hotas.throttle, 0.0);
+    assert.strictEqual(controls.throttle, 0.0);
+  });
+
+  it('does not move the aircraft when the dialog is open during unblocked flight input', () => {
+    const controls = createMockControls();
+    let pad = makePad([0.0, 0.0, 0.0, 1.0, 0.0]); // lever pegged idle
+    const hotas = new HotasController(controls, { getGamepads: () => [pad] });
+    hotas.update(1 / 60);
+    hotas.update(1 / 60);
+    assert.strictEqual(controls.throttle, 0.0);
+
+    hotas.diagnosticActive = true; // dialog opened mid-flight
+    pad = makePad([0.9, 0.7, 0.0, -1.0, 0.0]); // full stick + TOGA while testing hardware
+    hotas.update(1 / 60);
+    hotas.update(1 / 60);
+
+    assert.ok(hotas.aileron > 0.5, 'Meters still live');
+    assert.strictEqual(hotas.throttle, 1.0, 'Throttle meter follows the lever');
+    assert.strictEqual(controls.throttle, 0.0, 'Aircraft throttle must not move while observing hardware');
+    assert.strictEqual(controls.spoilersToggled, 0);
+
+    hotas.diagnosticActive = false; // dialog closed: normal control resumes
+    pad = makePad([0.9, 0.7, 0.0, -0.95, 0.0]); // pilot nudges the lever after closing
+    hotas.update(1 / 60);
+    assert.ok(Math.abs(controls.throttle - 0.975) < 1e-9, `Lever movement re-commands the aircraft throttle, got ${controls.throttle}`);
+  });
+
+  it('suppresses button actions and trim in the Xbox profile under diagnostic mode', () => {
+    const controls = createMockControls();
+    controls.inputBlocked = true;
+    const buttons = Array.from({ length: 15 }, () => ({ pressed: false, value: 0 }));
+    buttons[7] = { pressed: true, value: 0.9 }; // RT: wheel brakes
+    buttons[0] = { pressed: true, value: 1.0 }; // A: spoilers
+    const pad = makePad([0.4, 0.2, -0.6, -1.0], {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 045e Product: 028e)',
+      mapping: 'standard',
+      buttons,
+    });
+    const hotas = new HotasController(controls, { getGamepads: () => [pad] });
+    hotas.diagnosticActive = true;
+
+    hotas.update(1 / 60);
+    hotas.update(1 / 60);
+
+    assert.ok(hotas.aileron > 0.2, `Xbox-profile meters track axes, got ${hotas.aileron}`);
+    assert.ok(hotas.brakes > 0.5, `RT brake meter live in diagnostic mode, got ${hotas.brakes}`);
+    assert.strictEqual(hotas.throttle, 1.0);
+    assert.strictEqual(controls.throttle, 0.0, 'Diagnostic mode must not command the aircraft');
+    assert.strictEqual(controls.spoilersToggled, 0);
+  });
+});
