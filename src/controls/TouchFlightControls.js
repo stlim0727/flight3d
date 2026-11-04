@@ -222,7 +222,7 @@ export class TouchFlightControls {
     presetButtons.forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (this.controls?.aircraftControlsDisabled) return;
+        if (this.controls?.aircraftControlsDisabled || this.controls?.inputBlocked) return;
         const thr = parseFloat(btn.getAttribute('data-thr') || '0');
         this.setThrottleValue(thr);
         this.triggerHaptic(15);
@@ -238,7 +238,7 @@ export class TouchFlightControls {
     // 4. Brake Button (Hold to Brake)
     const startBraking = (e) => {
       e.preventDefault();
-      if (this.controls?.aircraftControlsDisabled) return;
+      if (this.controls?.aircraftControlsDisabled || this.controls?.inputBlocked) return;
       this.brakeBtn.classList.add('active');
       this.controls.setTouchBrakes(1.0);
       this.triggerHaptic(20);
@@ -308,7 +308,8 @@ export class TouchFlightControls {
   restoreGyroSettings() {
     if (!this.gyroRequested) return;
     this.enable();
-    this.gyroSettings.hidden = false;
+    if (this.gyroSettings) this.gyroSettings.hidden = false;
+    if (this.gyroActive && !this.gyroPending) return;
     const orientation = window.DeviceOrientationEvent;
     // iOS requires a new user gesture. Restore the preference without prompting.
     if (window.isSecureContext === false || !orientation ||
@@ -388,7 +389,7 @@ export class TouchFlightControls {
   }
 
   onStickPointerDown(e) {
-    if (this.controls?.aircraftControlsDisabled || this.stickActive) return;
+    if (this.controls?.aircraftControlsDisabled || this.controls?.inputBlocked || this.stickActive) return;
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     if (this.controls.onUserInteract) this.controls.onUserInteract();
     this.stickActive = true;
@@ -467,7 +468,7 @@ export class TouchFlightControls {
 
   /* ---------------- Throttle Quadrant Handling ---------------- */
   onThrottlePointerDown(e) {
-    if (this.controls?.aircraftControlsDisabled) return;
+    if (this.controls?.aircraftControlsDisabled || this.controls?.inputBlocked) return;
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     if (this.controls.onUserInteract) this.controls.onUserInteract();
     this.throttleActive = true;
@@ -521,7 +522,7 @@ export class TouchFlightControls {
 
   /* ---------------- Rudder Bar Handling ---------------- */
   onRudderPointerDown(e) {
-    if (this.controls?.aircraftControlsDisabled) return;
+    if (this.controls?.aircraftControlsDisabled || this.controls?.inputBlocked) return;
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     if (this.controls.onUserInteract) this.controls.onUserInteract();
     this.rudderActive = true;
@@ -571,7 +572,6 @@ export class TouchFlightControls {
 
   /* ---------------- Gyroscope / Tilt Flight Mode ---------------- */
   async toggleGyro() {
-    if (this.controls?.aircraftControlsDisabled) return;
     if (this.gyroActive) {
       this.disableGyro();
       return;
@@ -728,7 +728,7 @@ export class TouchFlightControls {
       this.gyroBtn?.classList.add('active');
       this.setGyroLabel('gyro.on');
     }
-    if (this.controls?.aircraftControlsDisabled) return;
+    if (this.controls?.aircraftControlsDisabled || this.controls?.inputBlocked) return;
 
     const screen = readGyroScreen(window);
     if (screen.angle !== this.gyroScreen?.angle || screen.type !== this.gyroScreen?.type) {

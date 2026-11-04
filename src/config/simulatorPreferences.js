@@ -66,7 +66,7 @@ export function restoreSimulatorPreferences(sim, preferences) {
     else sim.touchControls.disable();
   }
   // Gyro needs the touch-input path; restore it after all visibility preferences.
-  if (preferences.gyroEnabled === true) sim.touchControls.restoreGyroSettings();
+  if (preferences.gyroEnabled === true) sim.touchControls?.restoreGyroSettings?.();
   if (preferences.joystick && sim.controls?.hotas) {
     sim.controls.hotas.applyConfig(preferences.joystick);
   }

@@ -138,3 +138,33 @@ test('gyro restoration enables its input path and preserves unrelated saved pref
     gyroEnabled: true, gyroOrientation: 'landscape', touchControls: true, audioMuted: true, timeOfDay: 22,
   });
 });
+
+test('gyro can be toggled and remembered even when aircraft controls are disabled (e.g. lobby or menu)', async t => {
+  const { create, s } = environment(t);
+  const controls = create();
+  controls.controls.aircraftControlsDisabled = true;
+  assert.equal(controls.gyroActive, false);
+  await controls.toggleGyro();
+  assert.equal(controls.gyroActive, true);
+  assert.equal(loadSimulatorPreferences(s).gyroEnabled, true);
+  await controls.toggleGyro();
+  assert.equal(controls.gyroActive, false);
+  assert.equal(loadSimulatorPreferences(s).gyroEnabled, false);
+});
+
+test('flight startup restores gyro if requested, even if startup timed out during lobby', async t => {
+  const { create, expire, s } = environment(t, { gyroEnabled: true, gyroOrientation: 'auto' });
+  const controls = create();
+  assert.equal(controls.gyroActive, true);
+  expire(); // Timed out during lobby
+  assert.equal(controls.gyroActive, false);
+  assert.equal(controls.gyroRequested, true);
+  // Entering flight re-restores:
+  controls.restoreGyroSettings();
+  assert.equal(controls.gyroActive, true);
+  // Re-restoring when already active is a no-op
+  controls.gyroPending = false;
+  controls.restoreGyroSettings();
+  assert.equal(controls.gyroActive, true);
+  assert.equal(controls.gyroPending, false);
+});
