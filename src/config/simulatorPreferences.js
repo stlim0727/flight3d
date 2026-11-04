@@ -35,6 +35,28 @@ export function validateSimulatorPreferences(value) {
     if (typeof value.joystick.deadzoneRudder === 'number' && Number.isFinite(value.joystick.deadzoneRudder)) {
       joy.deadzoneRudder = Math.max(0, Math.min(0.2, value.joystick.deadzoneRudder));
     }
+    if (value.joystick.customMapping && typeof value.joystick.customMapping === 'object' && !Array.isArray(value.joystick.customMapping)) {
+      const cm = value.joystick.customMapping;
+      const validAxis = (idx) => typeof idx === 'number' && Number.isInteger(idx) && idx >= -1 && idx <= 32;
+      const validBtn = (idx) => typeof idx === 'number' && Number.isInteger(idx) && idx >= -1 && idx <= 64;
+      const validNum = (num) => typeof num === 'number' && Number.isFinite(num);
+      joy.customMapping = {
+        rollAxis: validAxis(cm.rollAxis) ? cm.rollAxis : 0,
+        rollInverted: Boolean(cm.rollInverted),
+        pitchAxis: validAxis(cm.pitchAxis) ? cm.pitchAxis : 1,
+        pitchInverted: Boolean(cm.pitchInverted),
+        throttleAxis: validAxis(cm.throttleAxis) ? cm.throttleAxis : 2,
+        throttleIdleVal: validNum(cm.throttleIdleVal) ? cm.throttleIdleVal : 1.0,
+        throttleMaxVal: validNum(cm.throttleMaxVal) ? cm.throttleMaxVal : -1.0,
+        throttleInverted: Boolean(cm.throttleInverted),
+        rudderAxis: validAxis(cm.rudderAxis) ? cm.rudderAxis : 3,
+        rudderInverted: Boolean(cm.rudderInverted),
+        brakesButton: validBtn(cm.brakesButton) ? cm.brakesButton : 0,
+        brakesAxis: validAxis(cm.brakesAxis) ? cm.brakesAxis : -1,
+      };
+    } else if (value.joystick.customMapping === null) {
+      joy.customMapping = null;
+    }
     result.joystick = joy;
   }
   return result;

@@ -15,6 +15,26 @@ export class JoystickCheckDialog {
     this.rafId = null;
     this.storage = simulator?.storage || (typeof globalThis !== 'undefined' ? globalThis.localStorage : null);
 
+    this.wizardActive = false;
+    this.wizardStep = 0;
+    this.wizardBaseline = null;
+    this.wizardCandidate = null;
+    this.wizardExtremes = {};
+    this.wizardMapping = {
+      rollAxis: null,
+      rollInverted: false,
+      pitchAxis: null,
+      pitchInverted: false,
+      throttleAxis: null,
+      throttleIdleVal: null,
+      throttleMaxVal: null,
+      throttleInverted: false,
+      rudderAxis: null,
+      rudderInverted: false,
+      brakesButton: 0,
+      brakesAxis: null,
+    };
+
     this.createDOM();
     this.initListeners();
   }
@@ -161,6 +181,44 @@ export class JoystickCheckDialog {
           </div>
         </div>
 
+        <!-- Calibration Wizard Card -->
+        <div class="joystick-wizard-card">
+          <div class="joystick-wizard-info">
+            <div class="joystick-wizard-title" data-i18n="joystick.wizard.title">🧙‍♂️ 맞춤형 축 자동 보정 마법사</div>
+            <div class="joystick-wizard-desc" data-i18n="joystick.wizard.desc">스틱과 스로틀을 안내에 따라 움직여 하드웨어 축을 100% 오차 없이 맞춤 보정합니다.</div>
+            <div class="joystick-calibrated-badge" data-calibrated-badge style="display: none;"></div>
+          </div>
+          <div class="joystick-wizard-actions">
+            <button type="button" class="btn-joystick-wizard" data-btn-start-wizard data-i18n="joystick.wizard.btn_start">마법사 시작</button>
+            <button type="button" class="btn-joystick-reset-cal" data-btn-reset-cal style="display: none;" data-i18n="joystick.wizard.btn_reset">맞춤 보정 초기화</button>
+          </div>
+        </div>
+
+        <!-- Wizard Step Overlay Panel -->
+        <div class="joystick-wizard-panel" data-wizard-panel style="display: none;">
+          <div class="wizard-header">
+            <span class="wizard-step-tag" data-wizard-step-tag>Step 1 / 6</span>
+            <button type="button" class="wizard-close-btn" data-wizard-cancel aria-label="Cancel Wizard">✕</button>
+          </div>
+          <h4 class="wizard-step-title" data-wizard-title>준비 및 초기 기준점</h4>
+          <p class="wizard-step-prompt" data-wizard-prompt>스틱은 중앙에 두고, 스로틀 레버는 맨 뒤(아이들/0%)로 당긴 상태에서 [측정 시작]을 누르세요.</p>
+          <div class="wizard-tip-box" data-wizard-tip style="display: none;"></div>
+          
+          <div class="wizard-visual-box">
+            <div class="wizard-progress-bar-wrap">
+              <div class="wizard-progress-bar" data-wizard-progress style="width: 0%;"></div>
+            </div>
+            <div class="wizard-detected-label" data-wizard-detected>대기 중...</div>
+            <div class="wizard-summary-list" data-wizard-summary style="display: none;"></div>
+          </div>
+
+          <div class="wizard-footer">
+            <button type="button" class="btn-wizard-nav secondary" data-wizard-cancel data-i18n="joystick.wizard.cancel">취소</button>
+            <button type="button" class="btn-wizard-nav secondary" data-wizard-skip style="display: none;" data-i18n="joystick.wizard.skip">건너뛰기</button>
+            <button type="button" class="btn-wizard-nav primary" data-wizard-next data-i18n="joystick.wizard.next">측정 시작</button>
+          </div>
+        </div>
+
         <!-- Calibration & Tuning Toggles -->
         <div class="joystick-section">
           <h3 class="joystick-section-title">조종간 튜닝 & 축 보정 (Calibration)</h3>
@@ -269,6 +327,21 @@ export class JoystickCheckDialog {
 
     this.buttonsGrid = this.dialog.querySelector('[data-buttons-grid]');
     this.rawAxesList = this.dialog.querySelector('[data-raw-axes-list]');
+
+    // Wizard DOM elements
+    this.btnStartWizard = this.dialog.querySelector('[data-btn-start-wizard]');
+    this.btnResetCal = this.dialog.querySelector('[data-btn-reset-cal]');
+    this.calibratedBadge = this.dialog.querySelector('[data-calibrated-badge]');
+    this.wizardPanel = this.dialog.querySelector('[data-wizard-panel]');
+    this.wizardStepTag = this.dialog.querySelector('[data-wizard-step-tag]');
+    this.wizardTitle = this.dialog.querySelector('[data-wizard-title]');
+    this.wizardPrompt = this.dialog.querySelector('[data-wizard-prompt]');
+    this.wizardTip = this.dialog.querySelector('[data-wizard-tip]');
+    this.wizardProgress = this.dialog.querySelector('[data-wizard-progress]');
+    this.wizardDetected = this.dialog.querySelector('[data-wizard-detected]');
+    this.wizardSummary = this.dialog.querySelector('[data-wizard-summary]');
+    this.btnWizardNext = this.dialog.querySelector('[data-wizard-next]');
+    this.btnWizardSkip = this.dialog.querySelector('[data-wizard-skip]');
   }
 
   initListeners() {
@@ -278,6 +351,15 @@ export class JoystickCheckDialog {
     this.dialog.querySelectorAll('[data-joystick-close], [data-joystick-close-btn]').forEach(btn => {
       btn.addEventListener('click', () => this.close());
     });
+
+    // Wizard buttons
+    this.btnStartWizard?.addEventListener('click', () => this.startWizard());
+    this.btnResetCal?.addEventListener('click', () => this.resetCustomCalibration());
+    this.dialog.querySelectorAll('[data-wizard-cancel]').forEach(btn => {
+      btn.addEventListener('click', () => this.cancelWizard());
+    });
+    this.btnWizardNext?.addEventListener('click', () => this.advanceWizardStep());
+    this.btnWizardSkip?.addEventListener('click', () => this.skipWizardStep());
 
     // Background overlay click
     this.dialog.addEventListener('click', (e) => {
@@ -358,6 +440,7 @@ export class JoystickCheckDialog {
       if (this.deadzoneVal) this.deadzoneVal.textContent = `${Math.round(dz * 100)}%`;
     }
 
+    this.refreshConfigUI();
     this.startLoop();
   }
 
@@ -377,6 +460,7 @@ export class JoystickCheckDialog {
     if (!this.isOpen || !this.dialog) return;
     this.isOpen = false;
     this.dialog.hidden = true;
+    if (this.wizardActive) this.cancelWizard();
     if (this.hotas) this.hotas.diagnosticActive = false;
     if (this.rafId) {
       this._cancelFrame(this.rafId);
@@ -451,6 +535,11 @@ export class JoystickCheckDialog {
     if (!this.hotas) return;
     const diag = this.hotas.getDiagnostics();
 
+    // 0. Update Wizard Telemetry if active
+    if (this.wizardActive) {
+      this.processWizardTelemetry(diag);
+    }
+
     // 1. Connection & Device Banner
     if (diag.connected) {
       if (this.nameEl) this.nameEl.textContent = diag.device.name;
@@ -474,6 +563,7 @@ export class JoystickCheckDialog {
 
     // 2. Flight Controls Meters
     const { elevator, aileron, throttle, rudder, brakes } = diag.outputs;
+    const isCustom = Boolean(diag.customMapping);
 
     // Pitch (bipolar: -1.0 to 1.0)
     if (this.valPitch && this.barPitch) {
@@ -512,8 +602,13 @@ export class JoystickCheckDialog {
     }
 
     if (this.sourceThrottle) {
-      this.sourceThrottle.textContent = `[Axis ${diag.throttleAxis ?? 3}]`;
-      this.sourceThrottle.className = 'joystick-meter-source active';
+      if (isCustom && diag.customMapping.throttleAxis != null) {
+        this.sourceThrottle.textContent = `[맞춤 보정: Axis ${diag.customMapping.throttleAxis}]`;
+        this.sourceThrottle.className = 'joystick-meter-source active';
+      } else {
+        this.sourceThrottle.textContent = `[Axis ${diag.throttleAxis ?? 3}]`;
+        this.sourceThrottle.className = 'joystick-meter-source active';
+      }
     }
 
     // Rudder (bipolar: -1.0 to 1.0)
@@ -531,19 +626,24 @@ export class JoystickCheckDialog {
     }
 
     if (this.sourceRudder) {
-      const rAxis = diag.rudderAxis ?? 2;
-      if (diag.axis4Floating) {
-        this.sourceRudder.textContent = t('joystick.rudder.source.floating');
-        this.sourceRudder.className = 'joystick-meter-source warning';
-      } else if (diag.activeRudderSource === 'pedals') {
-        this.sourceRudder.textContent = t('joystick.rudder.source.pedals');
-        this.sourceRudder.className = 'joystick-meter-source active';
-      } else if (diag.activeProfile === 'hotas-one-xbox') {
-        this.sourceRudder.textContent = t('joystick.rudder.source.xbox');
+      if (isCustom && diag.customMapping.rudderAxis != null) {
+        this.sourceRudder.textContent = `[맞춤 보정: Axis ${diag.customMapping.rudderAxis}]`;
         this.sourceRudder.className = 'joystick-meter-source active';
       } else {
-        this.sourceRudder.textContent = `${t('joystick.rudder.source.twist')} (Axis ${rAxis})`;
-        this.sourceRudder.className = 'joystick-meter-source';
+        const rAxis = diag.rudderAxis ?? 2;
+        if (diag.axis4Floating) {
+          this.sourceRudder.textContent = t('joystick.rudder.source.floating');
+          this.sourceRudder.className = 'joystick-meter-source warning';
+        } else if (diag.activeRudderSource === 'pedals') {
+          this.sourceRudder.textContent = t('joystick.rudder.source.pedals');
+          this.sourceRudder.className = 'joystick-meter-source active';
+        } else if (diag.activeProfile === 'hotas-one-xbox') {
+          this.sourceRudder.textContent = t('joystick.rudder.source.xbox');
+          this.sourceRudder.className = 'joystick-meter-source active';
+        } else {
+          this.sourceRudder.textContent = `${t('joystick.rudder.source.twist')} (Axis ${rAxis})`;
+          this.sourceRudder.className = 'joystick-meter-source';
+        }
       }
     }
 
@@ -635,6 +735,7 @@ export class JoystickCheckDialog {
       rudderMode: 'auto',
       deadzoneStick: 0.04,
       deadzoneRudder: 0.05,
+      customMapping: null,
     };
     this.hotas.applyConfig(defaults);
 
@@ -648,6 +749,383 @@ export class JoystickCheckDialog {
       if (this.deadzoneVal) this.deadzoneVal.textContent = '4%';
     }
 
+    this.refreshConfigUI();
     this.savePreferences();
+  }
+
+  refreshConfigUI() {
+    const config = this.hotas?.getConfig() || {};
+    const hasCustom = Boolean(config.customMapping);
+    if (this.calibratedBadge) {
+      this.calibratedBadge.style.display = hasCustom ? 'inline-block' : 'none';
+      if (hasCustom) {
+        this.calibratedBadge.textContent = t('joystick.wizard.badge.calibrated');
+      }
+    }
+    if (this.btnResetCal) {
+      this.btnResetCal.style.display = hasCustom ? 'inline-block' : 'none';
+    }
+  }
+
+  startWizard() {
+    this.wizardActive = true;
+    this.wizardStep = 1;
+    this.wizardBaseline = null;
+    this.wizardCandidate = null;
+    this.wizardExtremes = {};
+    this.wizardMapping = {
+      rollAxis: null,
+      rollInverted: false,
+      pitchAxis: null,
+      pitchInverted: false,
+      throttleAxis: null,
+      throttleIdleVal: null,
+      throttleMaxVal: null,
+      throttleInverted: false,
+      rudderAxis: null,
+      rudderInverted: false,
+      brakesButton: 0,
+      brakesAxis: null,
+    };
+    if (this.wizardPanel) this.wizardPanel.style.display = 'block';
+    this.renderWizardStep();
+  }
+
+  cancelWizard() {
+    this.wizardActive = false;
+    this.wizardStep = 0;
+    this.wizardBaseline = null;
+    this.wizardCandidate = null;
+    if (this.wizardPanel) this.wizardPanel.style.display = 'none';
+  }
+
+  resetCustomCalibration() {
+    this.hotas?.applyConfig({ customMapping: null });
+    this.savePreferences();
+    this.refreshConfigUI();
+  }
+
+  renderWizardStep() {
+    if (!this.wizardPanel) return;
+
+    if (this.wizardSummary) this.wizardSummary.style.display = 'none';
+    if (this.wizardTip) this.wizardTip.style.display = 'none';
+    const progressWrap = this.wizardPanel.querySelector('.wizard-progress-bar-wrap');
+    if (progressWrap) progressWrap.style.display = 'block';
+    if (this.wizardDetected) this.wizardDetected.style.display = 'block';
+
+    this.wizardCandidate = null;
+    this.wizardExtremes = {};
+
+    switch (this.wizardStep) {
+      case 1: // Baseline (Idle & Center)
+        if (this.wizardStepTag) this.wizardStepTag.textContent = t('joystick.wizard.step1.tag');
+        if (this.wizardTitle) this.wizardTitle.textContent = t('joystick.wizard.step1.title');
+        if (this.wizardPrompt) this.wizardPrompt.textContent = t('joystick.wizard.step1.prompt');
+        if (this.wizardProgress) this.wizardProgress.style.width = '0%';
+        if (this.wizardDetected) this.wizardDetected.textContent = '대기 중... (레버를 아이들(0%)에 두고 [측정 시작] 클릭)';
+        if (this.btnWizardNext) this.btnWizardNext.textContent = t('joystick.wizard.next');
+        if (this.btnWizardSkip) this.btnWizardSkip.style.display = 'none';
+        break;
+
+      case 2: // Roll
+        if (this.wizardStepTag) this.wizardStepTag.textContent = t('joystick.wizard.step2.tag');
+        if (this.wizardTitle) this.wizardTitle.textContent = t('joystick.wizard.step2.title');
+        if (this.wizardPrompt) this.wizardPrompt.textContent = t('joystick.wizard.step2.prompt');
+        if (this.wizardProgress) this.wizardProgress.style.width = '16%';
+        if (this.wizardDetected) this.wizardDetected.textContent = '스틱을 좌우로 끝까지 움직이세요...';
+        if (this.btnWizardNext) this.btnWizardNext.textContent = '다음 (Next)';
+        if (this.btnWizardSkip) this.btnWizardSkip.style.display = 'inline-block';
+        break;
+
+      case 3: // Pitch
+        if (this.wizardStepTag) this.wizardStepTag.textContent = t('joystick.wizard.step3.tag');
+        if (this.wizardTitle) this.wizardTitle.textContent = t('joystick.wizard.step3.title');
+        if (this.wizardPrompt) this.wizardPrompt.textContent = t('joystick.wizard.step3.prompt');
+        if (this.wizardProgress) this.wizardProgress.style.width = '33%';
+        if (this.wizardDetected) this.wizardDetected.textContent = '스틱을 앞뒤로 끝까지 움직이세요...';
+        if (this.btnWizardNext) this.btnWizardNext.textContent = '다음 (Next)';
+        if (this.btnWizardSkip) this.btnWizardSkip.style.display = 'inline-block';
+        break;
+
+      case 4: // Throttle
+        if (this.wizardStepTag) this.wizardStepTag.textContent = t('joystick.wizard.step4.tag');
+        if (this.wizardTitle) this.wizardTitle.textContent = t('joystick.wizard.step4.title');
+        if (this.wizardPrompt) this.wizardPrompt.textContent = t('joystick.wizard.step4.prompt');
+        if (this.wizardProgress) this.wizardProgress.style.width = '50%';
+        if (this.wizardDetected) this.wizardDetected.textContent = '스로틀을 맨 앞(TOGA)까지 밀어주세요...';
+        if (this.btnWizardNext) this.btnWizardNext.textContent = '다음 (Next)';
+        if (this.btnWizardSkip) this.btnWizardSkip.style.display = 'inline-block';
+        break;
+
+      case 5: // Rudder
+        if (this.wizardStepTag) this.wizardStepTag.textContent = t('joystick.wizard.step5.tag');
+        if (this.wizardTitle) this.wizardTitle.textContent = t('joystick.wizard.step5.title');
+        if (this.wizardPrompt) this.wizardPrompt.textContent = t('joystick.wizard.step5.prompt');
+        if (this.wizardTip) {
+          this.wizardTip.style.display = 'block';
+          this.wizardTip.textContent = t('joystick.wizard.step5.tip');
+        }
+        if (this.wizardProgress) this.wizardProgress.style.width = '66%';
+        if (this.wizardDetected) this.wizardDetected.textContent = '스틱을 비틀거나 스로틀 뒤 로커 패들을 움직이세요...';
+        if (this.btnWizardNext) this.btnWizardNext.textContent = '다음 (Next)';
+        if (this.btnWizardSkip) this.btnWizardSkip.style.display = 'inline-block';
+        break;
+
+      case 6: // Brakes
+        if (this.wizardStepTag) this.wizardStepTag.textContent = t('joystick.wizard.step6.tag');
+        if (this.wizardTitle) this.wizardTitle.textContent = t('joystick.wizard.step6.title');
+        if (this.wizardPrompt) this.wizardPrompt.textContent = t('joystick.wizard.step6.prompt');
+        if (this.wizardProgress) this.wizardProgress.style.width = '83%';
+        if (this.wizardDetected) this.wizardDetected.textContent = '메인 트리거를 당기거나 브레이크 버튼을 누르세요...';
+        if (this.btnWizardNext) this.btnWizardNext.textContent = '다음 (Next)';
+        if (this.btnWizardSkip) this.btnWizardSkip.style.display = 'inline-block';
+        break;
+
+      case 7: // Summary
+        if (this.wizardStepTag) this.wizardStepTag.textContent = t('joystick.wizard.complete.tag');
+        if (this.wizardTitle) this.wizardTitle.textContent = t('joystick.wizard.complete.title');
+        if (this.wizardPrompt) this.wizardPrompt.textContent = t('joystick.wizard.complete.prompt');
+        if (this.wizardProgress) this.wizardProgress.style.width = '100%';
+        if (progressWrap) progressWrap.style.display = 'none';
+        if (this.wizardDetected) this.wizardDetected.style.display = 'none';
+        if (this.wizardSummary) {
+          this.wizardSummary.style.display = 'block';
+          const r = this.wizardMapping.rollAxis ?? 0;
+          const p = this.wizardMapping.pitchAxis ?? 1;
+          const th = this.wizardMapping.throttleAxis ?? 3;
+          const rud = this.wizardMapping.rudderAxis ?? 2;
+          const brk = this.wizardMapping.brakesButton ?? 0;
+          const idleStr = (this.wizardMapping.throttleIdleVal ?? 1).toFixed(2);
+          const maxStr = (this.wizardMapping.throttleMaxVal ?? -1).toFixed(2);
+
+          this.wizardSummary.innerHTML = `
+            <div class="wizard-summary-item"><span>에일러론 (Roll)</span><strong>Axis ${r}${this.wizardMapping.rollInverted ? ' (반전)' : ''}</strong></div>
+            <div class="wizard-summary-item"><span>엘리베이터 (Pitch)</span><strong>Axis ${p}${this.wizardMapping.pitchInverted ? ' (반전)' : ''}</strong></div>
+            <div class="wizard-summary-item"><span>스로틀 (Throttle)</span><strong>Axis ${th} (Idle: ${idleStr} → TOGA: ${maxStr})</strong></div>
+            <div class="wizard-summary-item"><span>러더 (Rudder)</span><strong>Axis ${rud}${this.wizardMapping.rudderInverted ? ' (반전)' : ''}</strong></div>
+            <div class="wizard-summary-item"><span>브레이크 (Brakes)</span><strong>Button ${brk}</strong></div>
+          `;
+        }
+        if (this.btnWizardNext) this.btnWizardNext.textContent = t('joystick.wizard.save');
+        if (this.btnWizardSkip) this.btnWizardSkip.style.display = 'none';
+        break;
+    }
+  }
+
+  processWizardTelemetry(diag) {
+    if (!this.wizardActive || !diag || !diag.connected) return;
+    const axes = diag.axes || [];
+    const buttons = diag.buttons || [];
+
+    if (this.wizardStep === 1) return;
+    const baseline = this.wizardBaseline || [];
+
+    switch (this.wizardStep) {
+      case 2: { // Roll
+        let bestAxis = null;
+        let maxDelta = 0;
+        for (let i = 0; i < axes.length; i++) {
+          const delta = Math.abs(axes[i] - (baseline[i] ?? 0));
+          if (delta > maxDelta) {
+            maxDelta = delta;
+            bestAxis = i;
+          }
+        }
+        if (bestAxis !== null && maxDelta >= 0.35) {
+          this.wizardCandidate = bestAxis;
+          if (this.wizardDetected) {
+            this.wizardDetected.textContent = `감지됨: Axis ${bestAxis} (변화량: ${(maxDelta * 100).toFixed(0)}%)`;
+          }
+        }
+        break;
+      }
+
+      case 3: { // Pitch
+        let bestAxis = null;
+        let maxDelta = 0;
+        for (let i = 0; i < axes.length; i++) {
+          if (i === this.wizardMapping.rollAxis) continue;
+          const delta = Math.abs(axes[i] - (baseline[i] ?? 0));
+          if (delta > maxDelta) {
+            maxDelta = delta;
+            bestAxis = i;
+          }
+        }
+        if (bestAxis !== null && maxDelta >= 0.35) {
+          this.wizardCandidate = bestAxis;
+          if (this.wizardDetected) {
+            this.wizardDetected.textContent = `감지됨: Axis ${bestAxis} (변화량: ${(maxDelta * 100).toFixed(0)}%)`;
+          }
+        }
+        break;
+      }
+
+      case 4: { // Throttle
+        let bestAxis = null;
+        let maxDelta = 0;
+        for (let i = 0; i < axes.length; i++) {
+          if (i === this.wizardMapping.rollAxis || i === this.wizardMapping.pitchAxis) continue;
+          const delta = Math.abs(axes[i] - (baseline[i] ?? 0));
+          if (delta > maxDelta) {
+            maxDelta = delta;
+            bestAxis = i;
+          }
+        }
+        if (bestAxis !== null && maxDelta >= 0.35) {
+          this.wizardCandidate = bestAxis;
+          const idleVal = baseline[bestAxis] ?? 1;
+          this.wizardExtremes[bestAxis] = this.wizardExtremes[bestAxis] || {
+            idle: idleVal,
+            peak: axes[bestAxis],
+          };
+          if (Math.abs(axes[bestAxis] - idleVal) > Math.abs(this.wizardExtremes[bestAxis].peak - idleVal)) {
+            this.wizardExtremes[bestAxis].peak = axes[bestAxis];
+          }
+          if (this.wizardDetected) {
+            this.wizardDetected.textContent = `감지됨: Axis ${bestAxis} (아이들: ${idleVal.toFixed(2)} → 현재: ${axes[bestAxis].toFixed(2)})`;
+          }
+        }
+        break;
+      }
+
+      case 5: { // Rudder
+        let bestAxis = null;
+        let maxDelta = 0;
+        for (let i = 0; i < axes.length; i++) {
+          if (
+            i === this.wizardMapping.rollAxis ||
+            i === this.wizardMapping.pitchAxis ||
+            i === this.wizardMapping.throttleAxis
+          ) continue;
+          const delta = Math.abs(axes[i] - (baseline[i] ?? 0));
+          if (delta > maxDelta) {
+            maxDelta = delta;
+            bestAxis = i;
+          }
+        }
+        if (bestAxis !== null && maxDelta >= 0.30) {
+          this.wizardCandidate = bestAxis;
+          const label = bestAxis === 4 ? '로커 패들 / Axis 4' : `스틱 트위스트 / Axis ${bestAxis}`;
+          if (this.wizardDetected) {
+            this.wizardDetected.textContent = `감지됨: ${label} (변화량: ${(maxDelta * 100).toFixed(0)}%)`;
+          }
+        }
+        break;
+      }
+
+      case 6: { // Brakes
+        for (let i = 0; i < buttons.length; i++) {
+          if (buttons[i] && (buttons[i].pressed || buttons[i].value > 0.6)) {
+            this.wizardCandidate = i;
+            if (this.wizardDetected) {
+              this.wizardDetected.textContent = `감지됨: Button ${i} (${this.getButtonActionLabel(i, diag.activeProfile)})`;
+            }
+            break;
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  advanceWizardStep() {
+    if (!this.wizardActive) return;
+
+    const diag = this.hotas?.getDiagnostics?.() || {};
+    const axes = diag.axes || [];
+
+    switch (this.wizardStep) {
+      case 1: { // Baseline captured
+        this.wizardBaseline = [...axes];
+        this.wizardStep = 2;
+        this.renderWizardStep();
+        break;
+      }
+      case 2: { // Roll confirmed
+        this.wizardMapping.rollAxis = this.wizardCandidate ?? 0;
+        this.wizardStep = 3;
+        this.renderWizardStep();
+        break;
+      }
+      case 3: { // Pitch confirmed
+        this.wizardMapping.pitchAxis = this.wizardCandidate ?? 1;
+        this.wizardStep = 4;
+        this.renderWizardStep();
+        break;
+      }
+      case 4: { // Throttle confirmed
+        const thAxis = this.wizardCandidate ?? 3;
+        this.wizardMapping.throttleAxis = thAxis;
+        const baselineIdle = this.wizardBaseline ? (this.wizardBaseline[thAxis] ?? 1) : 1;
+        const peakVal = (this.wizardExtremes[thAxis] && this.wizardExtremes[thAxis].peak !== undefined)
+          ? this.wizardExtremes[thAxis].peak
+          : (baselineIdle > 0 ? -1 : 1);
+        this.wizardMapping.throttleIdleVal = baselineIdle;
+        this.wizardMapping.throttleMaxVal = peakVal;
+        this.wizardStep = 5;
+        this.renderWizardStep();
+        break;
+      }
+      case 5: { // Rudder confirmed
+        let rudAxis = this.wizardCandidate;
+        if (rudAxis == null) {
+          const taken = [this.wizardMapping.rollAxis, this.wizardMapping.pitchAxis, this.wizardMapping.throttleAxis];
+          rudAxis = [2, 4, 3, 0].find(a => !taken.includes(a)) ?? 2;
+        }
+        this.wizardMapping.rudderAxis = rudAxis;
+        this.wizardStep = 6;
+        this.renderWizardStep();
+        break;
+      }
+      case 6: { // Brakes confirmed
+        this.wizardMapping.brakesButton = this.wizardCandidate ?? 0;
+        this.wizardStep = 7;
+        this.renderWizardStep();
+        break;
+      }
+      case 7: { // Save & apply
+        if (this.hotas) {
+          this.hotas.applyConfig({ customMapping: { ...this.wizardMapping } });
+          this.savePreferences();
+          this.refreshConfigUI();
+        }
+        this.cancelWizard();
+        break;
+      }
+    }
+  }
+
+  skipWizardStep() {
+    if (!this.wizardActive) return;
+    switch (this.wizardStep) {
+      case 2: // Roll skip -> default 0
+        this.wizardMapping.rollAxis = 0;
+        this.wizardStep = 3;
+        this.renderWizardStep();
+        break;
+      case 3: // Pitch skip -> default 1
+        this.wizardMapping.pitchAxis = 1;
+        this.wizardStep = 4;
+        this.renderWizardStep();
+        break;
+      case 4: // Throttle skip -> default 3
+        this.wizardMapping.throttleAxis = 3;
+        this.wizardMapping.throttleIdleVal = 1;
+        this.wizardMapping.throttleMaxVal = -1;
+        this.wizardStep = 5;
+        this.renderWizardStep();
+        break;
+      case 5: // Rudder skip -> default 2
+        this.wizardMapping.rudderAxis = 2;
+        this.wizardStep = 6;
+        this.renderWizardStep();
+        break;
+      case 6: // Brakes skip -> default 0
+        this.wizardMapping.brakesButton = 0;
+        this.wizardStep = 7;
+        this.renderWizardStep();
+        break;
+    }
   }
 }
