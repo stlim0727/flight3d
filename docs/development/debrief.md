@@ -8,8 +8,9 @@ instead of the design's example curve.
 End flight is available in the pause menu and held-flight lobby. A recorded
 sortie also ends on a crash, or after a qualifying touchdown followed by three
 seconds on the ground below 1 kt ground speed. Completed flights cannot resume.
-Fly again restores that sortie's metadata and respawns it. Main menu returns to
-the existing cinematic/menu flow.
+Fly again restores that sortie's metadata and respawns it. Main menu is
+available at the top left of the card with a u-turn arrow (↩) affordance to return
+to the existing cinematic/menu flow.
 
 ## Crash observation (issue #362)
 
@@ -63,7 +64,7 @@ wreckage. Its fields not already in the debrief moved there:
   `Collision target` line in shared text. An unlisted code is shown as-is; an
   untyped crash omits the line. The JSON export is unchanged.
 - Bug report: every debrief (crash, landing, manual end) has a
-  `🐞 Report a problem` action below Fly again / Main menu that opens the
+  `🐞 Report a problem` action below Fly again that opens the
   feedback dialog with the held sortie's diagnostics.
 
 Its static "destroyed" state is the existing crash severity line, and its impact

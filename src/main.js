@@ -793,14 +793,16 @@ class FlightSimulator {
     btn.classList.toggle('can-resume', canResume);
     if (isMenu) {
       bindText(btn, () => t(canResume ? 'lobby.resume' : 'lobby.startNew'), 'aria-label');
+      bindText(btn, () => t(canResume ? 'lobby.resume' : 'lobby.startNew'), 'title');
     } else {
       bindText(btn, () => t('menu.open'), 'aria-label');
+      bindText(btn, () => t('menu.open'), 'title');
     }
     btn.setAttribute('aria-expanded', String(isMenu));
     btn.setAttribute('aria-controls', isMenu ? (this.gameFlow.state === FLOW.PAUSED ? 'pause-menu' : 'lobby-screen') : 'lobby-screen');
     const title = btn.querySelector('.menu-toggle-title');
     if (title) {
-      bindText(title, () => isMenu ? (canResume ? t('lobby.resume') : t('lobby.startNew')) : 'FLIGHT3D');
+      bindText(title, () => isMenu ? (canResume ? t('lobby.resume') : t('lobby.startNew')) : t('debrief.lobby'));
     }
   }
 

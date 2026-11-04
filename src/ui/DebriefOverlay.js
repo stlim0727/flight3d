@@ -35,8 +35,16 @@ export class DebriefOverlay {
     this.root = document.getElementById('debrief-overlay');
     this.root.innerHTML = `
       <div class="debrief-card">
-        <h2 id="debrief-title">Flight3d</h2>
-        <p class="debrief-muted" data-i18n="debrief.title"></p>
+        <header class="debrief-header">
+          <button class="btn debrief-lobby-btn" id="debrief-lobby" type="button" data-i18n-aria-label="debrief.lobby" data-i18n-title="debrief.lobby">
+            <span class="debrief-back-glyph" aria-hidden="true">↩</span>
+            <span class="debrief-back-caption" data-i18n="debrief.lobby"></span>
+          </button>
+          <div class="debrief-title-wrap">
+            <h2 id="debrief-title">Flight3d</h2>
+            <p class="debrief-muted" data-i18n="debrief.title"></p>
+          </div>
+        </header>
         <div class="debrief-tabs" role="tablist" data-i18n-aria-label="debrief.title">
           ${['summary', 'record', 'share'].map(name => `<button class="btn" id="debrief-tab-${name}" role="tab" aria-controls="debrief-${name}" data-debrief-label="${name}"></button>`).join('')}
         </div>
@@ -76,7 +84,6 @@ export class DebriefOverlay {
           </section>
           <div class="debrief-actions">
             <button class="btn debrief-primary" id="debrief-retry" data-i18n="debrief.retry"></button>
-            <button class="btn" id="debrief-lobby" data-i18n="debrief.lobby"></button>
             <button class="btn" id="debrief-feedback" data-i18n="debrief.feedback"></button>
           </div>
         </div>

@@ -202,6 +202,10 @@ export function scoreOverlayMarkup(data) {
 
   return `
     <div class="pilot-score-modal${failedClass}">
+      <button type="button" class="btn-score-lobby" data-score-close aria-label="메인 메뉴" title="메인 메뉴">
+        <span class="score-back-glyph" aria-hidden="true">↩</span>
+        <span class="score-back-caption">메인 메뉴</span>
+      </button>
       <button type="button" class="btn-modal-close" data-score-close aria-label="닫기">×</button>
       <span class="modal-badge">${data.badgeText}</span>
       <div class="modal-mission-title">${data.missionName} · ${data.isHuman ? '사람 직접 조종' : 'AI 자동 조종'}</div>

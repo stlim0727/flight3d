@@ -142,7 +142,7 @@
           <!-- Persistent main-menu toggle: in main menu on same row as Flight3d title; moves to HUD top bar during flight -->
           <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Open main menu">
             <span class="menu-toggle-glyph" aria-hidden="true"></span>
-            <span class="menu-toggle-title">FLIGHT3D</span>
+            <span class="menu-toggle-title" data-i18n="debrief.lobby">FLIGHT3D</span>
           </button>
           <div class="lobby-title-wrap">
             <h1 class="lobby-title">Flight3d <span data-i18n="lobby.title">메인 메뉴</span></h1>
@@ -297,11 +297,16 @@
   <div id="debrief-overlay" class="flow-overlay" role="dialog" aria-modal="true" aria-labelledby="debrief-title"></div>
   <div id="pause-menu" class="menu-backdrop flow-overlay" role="dialog" aria-modal="true" aria-labelledby="pause-title">
     <div class="pause-card">
-      <h2 id="pause-title"><span data-i18n="pause.title">일시정지</span></h2>
+      <header class="pause-header">
+        <button class="btn pause-lobby-btn" id="btn-pause-lobby" type="button" data-i18n-aria-label="debrief.lobby" data-i18n-title="debrief.lobby">
+          <span class="pause-back-glyph" aria-hidden="true">↩</span>
+          <span class="pause-back-caption" data-i18n="debrief.lobby">메인 메뉴</span>
+        </button>
+        <h2 id="pause-title"><span data-i18n="pause.title">일시정지</span></h2>
+      </header>
       <button id="btn-pause-resume" class="btn"><span data-i18n="pause.resume">계속하기</span></button>
-      <button id="btn-pause-end" class="btn"><span data-i18n="debrief.end">비행 종료</span></button>
       <button id="btn-pause-restart" class="btn"><span data-i18n="pause.restart">시나리오 재시작</span></button>
-      <button id="btn-pause-lobby" class="btn"><span data-i18n="pause.lobby">메인 메뉴로 이동</span></button>
+      <button id="btn-pause-end" class="btn"><span data-i18n="debrief.end">비행 종료</span></button>
     </div>
   </div>
 
