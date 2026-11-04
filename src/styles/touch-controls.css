@@ -22,20 +22,23 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  padding: 16px 20px;
+  /* One design pixel for every touch panel: the bottom row fits the narrower of
+     the viewport width and a third of its height, up to the desktop UI scale. */
+  --tc: clamp(0.5px, min((100vw - 16px) / 580, 100dvh / 600), 1px * var(--ui-scale, 1));
+  padding: calc(16 * var(--tc)) calc(20 * var(--tc));
   box-sizing: border-box;
   touch-action: none;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+  padding-bottom: max(calc(16 * var(--tc)), env(safe-area-inset-bottom, 0px));
 }
 
 .touch-quadrant {
   pointer-events: auto;
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  gap: calc(10 * var(--tc));
 }
 
 /* Left Quadrant: Throttle & Engine Controls */
@@ -48,24 +51,28 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(56, 189, 248, 0.4);
-  border-radius: 12px;
-  padding: 8px 10px;
-  width: 108px;
+  border-radius: calc(12 * var(--tc));
+  padding: calc(8 * var(--tc)) calc(10 * var(--tc));
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.15);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: calc(6 * var(--tc));
 }
 
 .touch-card-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  font-size: 10px;
+  gap: 0 calc(6 * var(--tc));
+  /* Wrap within the card's control width instead of widening the card. */
+  width: 0;
+  min-width: 100%;
+  font-size: max(8px, calc(10 * var(--tc)));
   font-weight: 800;
   letter-spacing: 0.6px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 4px;
+  padding-bottom: calc(4 * var(--tc));
 }
 
 .touch-label {
@@ -74,13 +81,13 @@
 
 .touch-value {
   font-family: monospace;
-  font-size: 11px;
+  font-size: max(8px, calc(11 * var(--tc)));
   font-weight: 700;
 }
 
 .touch-throttle-body {
   display: flex;
-  gap: 8px;
+  gap: calc(8 * var(--tc));
   align-items: center;
   justify-content: space-between;
 }
@@ -88,17 +95,17 @@
 .touch-throttle-presets {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: calc(5 * var(--tc));
 }
 
 .btn-touch-preset {
-  width: 42px;
-  height: 32px;
+  width: max(32px, calc(42 * var(--tc)));
+  height: max(26px, calc(32 * var(--tc)));
   background: rgba(30, 41, 59, 0.9);
   border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: 6px;
+  border-radius: calc(6 * var(--tc));
   color: #e2e8f0;
-  font-size: 10px;
+  font-size: max(8px, calc(10 * var(--tc)));
   font-weight: 800;
   cursor: pointer;
   display: flex;
@@ -117,11 +124,11 @@
 
 .touch-throttle-track {
   position: relative;
-  width: 44px;
-  height: 160px;
+  width: max(36px, calc(44 * var(--tc)));
+  height: calc(160 * var(--tc));
   background: rgba(0, 0, 0, 0.65);
   border: 2px solid rgba(56, 189, 248, 0.45);
-  border-radius: 22px;
+  border-radius: max(18px, calc(22 * var(--tc)));
   overflow: hidden;
   cursor: ns-resize;
   touch-action: none;
@@ -135,7 +142,7 @@
   width: 100%;
   height: 0%;
   background: linear-gradient(to top, rgba(14, 165, 233, 0.25), rgba(56, 189, 248, 0.85));
-  border-radius: 0 0 20px 20px;
+  border-radius: 0 0 max(16px, calc(20 * var(--tc))) max(16px, calc(20 * var(--tc)));
   pointer-events: none;
   transition: height 0.05s ease-out;
 }
@@ -144,12 +151,12 @@
   position: absolute;
   left: 50%;
   top: 100%;
-  width: 44px;
-  height: 26px;
+  width: 100%;
+  height: max(18px, calc(26 * var(--tc)));
   transform: translate(-50%, -50%);
   background: linear-gradient(135deg, #38bdf8, #0284c7);
   border: 2px solid #ffffff;
-  border-radius: 13px;
+  border-radius: max(9px, calc(13 * var(--tc)));
   box-shadow: 0 0 14px rgba(56, 189, 248, 0.9);
   pointer-events: none;
   display: flex;
@@ -203,7 +210,13 @@
   box-shadow: 0 0 14px rgba(16, 185, 129, 0.6);
 }
 
+/* Gyro mode stacks this icon above the stick so it never widens the bottom row. */
 .touch-btn-recenter {
+  position: relative;
+  min-width: 0;
+  width: max(40px, calc(44 * var(--tc)));
+  height: max(40px, calc(44 * var(--tc)));
+  padding: 0;
   background: rgba(14, 116, 144, 0.85);
   border: 1px solid #06b6d4;
   color: #ecfeff;
@@ -217,18 +230,28 @@
   transform: scale(0.92);
   box-shadow: 0 0 20px rgba(34, 211, 238, 0.8);
 }
+.touch-btn-recenter [data-i18n] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 /* Center Quadrant: Rudder & Brakes */
 .touch-center {
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: calc(8 * var(--tc));
   margin-bottom: 2px;
+  /* The rudder absorbs whatever width the minimum touch targets leave over. */
+  min-width: 0;
 }
 
 .btn-touch-brake {
-  width: 68px;
-  height: 68px;
+  width: max(44px, calc(68 * var(--tc)));
+  height: max(44px, calc(68 * var(--tc)));
   border-radius: 50%;
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(185, 28, 28, 0.45));
   border: 2px solid #ef4444;
@@ -244,13 +267,13 @@
 }
 
 .btn-touch-brake .brake-label {
-  font-size: 12px;
+  font-size: max(8px, calc(12 * var(--tc)));
   font-weight: 900;
   letter-spacing: 1px;
 }
 
 .btn-touch-brake .brake-sub {
-  font-size: 9px;
+  font-size: max(7px, calc(9 * var(--tc)));
   font-weight: 700;
   opacity: 0.8;
 }
@@ -268,18 +291,19 @@
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(56, 189, 248, 0.35);
-  border-radius: 10px;
-  padding: 6px 10px;
-  width: 170px;
+  border-radius: calc(10 * var(--tc));
+  padding: calc(6 * var(--tc)) calc(10 * var(--tc));
+  width: calc(170 * var(--tc));
+  max-width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: calc(4 * var(--tc));
 }
 
 .rudder-label-strip {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: max(8px, calc(9 * var(--tc)));
   font-weight: 800;
   color: #94a3b8;
 }
@@ -287,10 +311,10 @@
 .touch-rudder-track {
   position: relative;
   width: 100%;
-  height: 32px;
+  height: max(30px, calc(32 * var(--tc)));
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(56, 189, 248, 0.4);
-  border-radius: 16px;
+  border-radius: max(15px, calc(16 * var(--tc)));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -300,15 +324,15 @@
 
 .rudder-center-notch {
   width: 2px;
-  height: 14px;
+  height: 45%;
   background: rgba(255, 255, 255, 0.3);
   pointer-events: none;
 }
 
 .touch-rudder-thumb {
   position: absolute;
-  width: 28px;
-  height: 28px;
+  width: max(24px, calc(28 * var(--tc)));
+  height: max(24px, calc(28 * var(--tc)));
   background: linear-gradient(135deg, #38bdf8, #0284c7);
   border: 2px solid #ffffff;
   border-radius: 50%;
@@ -320,7 +344,9 @@
 
 /* Right Quadrant: Virtual Flight Stick Yoke */
 .touch-right {
-  flex-direction: row;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(6 * var(--tc));
 }
 
 .touch-stick-card {
@@ -328,18 +354,18 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(56, 189, 248, 0.4);
-  border-radius: 12px;
-  padding: 8px 10px;
+  border-radius: calc(12 * var(--tc));
+  padding: calc(8 * var(--tc)) calc(10 * var(--tc));
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.15);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: calc(6 * var(--tc));
 }
 
 .touch-stick-zone {
   position: relative;
-  width: 160px;
-  height: 160px;
+  width: calc(160 * var(--tc));
+  height: calc(160 * var(--tc));
   border-radius: 50%;
   background: radial-gradient(circle, rgba(14, 165, 233, 0.12) 0%, rgba(15, 23, 42, 0.95) 75%);
   border: 2px solid rgba(56, 189, 248, 0.5);
@@ -369,8 +395,8 @@
 
 .stick-boundary {
   position: absolute;
-  width: 120px;
-  height: 120px;
+  width: 75%;
+  height: 75%;
   border: 1px dashed rgba(56, 189, 248, 0.35);
   border-radius: 50%;
   pointer-events: none;
@@ -378,8 +404,8 @@
 
 .touch-stick-knob {
   position: absolute;
-  width: 56px;
-  height: 56px;
+  width: max(32px, calc(56 * var(--tc)));
+  height: max(32px, calc(56 * var(--tc)));
   border-radius: 50%;
   background: radial-gradient(circle, #38bdf8 25%, #0284c7 85%);
   border: 3px solid #ffffff;
@@ -393,16 +419,16 @@
 }
 
 .knob-ring {
-  width: 24px;
-  height: 24px;
+  width: 43%;
+  height: 43%;
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 50%;
 }
 
 .knob-dot {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 14%;
+  height: 14%;
   background: #ffffff;
   border-radius: 50%;
   box-shadow: 0 0 6px #ffffff;
@@ -467,32 +493,6 @@ body.touch-mode .action-panel {
   }
   .action-panel {
     display: none !important;
-  }
-  .touch-controls-overlay {
-    padding: 8px 12px;
-  }
-  .touch-throttle-card {
-    width: 96px;
-    padding: 6px 8px;
-  }
-  .touch-throttle-track {
-    width: 38px;
-    height: 135px;
-  }
-  .touch-stick-zone {
-    width: 135px;
-    height: 135px;
-  }
-  .touch-stick-knob {
-    width: 48px;
-    height: 48px;
-  }
-  .btn-touch-brake {
-    width: 58px;
-    height: 58px;
-  }
-  .touch-rudder-card {
-    width: 130px;
   }
   .help-col-wide {
     grid-column: span 1;
@@ -576,16 +576,6 @@ body.touch-mode .action-panel {
     padding: 3px 6px;
     font-size: 9px;
     white-space: nowrap;
-  }
-  .touch-throttle-track {
-    height: 120px;
-  }
-  .touch-stick-zone {
-    width: 125px;
-    height: 125px;
-  }
-  .touch-controls-overlay {
-    padding: 6px 12px;
   }
   .demo-banner {
     top: 38px;
@@ -680,15 +670,9 @@ body.compact-ui {
 .compact-ui .touch-controls-overlay {
   height: 100dvh;
   padding: 0 var(--edge-right) var(--edge-bottom) var(--edge-left);
-  gap: 8px;
+  gap: calc(8 * var(--tc));
 }
-.compact-ui .touch-quadrant { flex-shrink: 0; }
-.compact-ui .touch-throttle-card { width: 108px; }
-.compact-ui .touch-stick-zone { width: 120px; height: 120px; }
-.compact-ui .touch-stick-card { padding: 6px; }
-.compact-ui .touch-stick-card .touch-card-header { flex-direction: column; }
-.compact-ui .touch-throttle-track { height: 120px; flex-shrink: 0; }
-.compact-ui .touch-rudder-card { width: 140px; }
+.compact-ui .touch-quadrant:not(.touch-center) { flex-shrink: 0; }
 .compact-ui .diagnostics-panel {
   top: calc(var(--edge-top) + 52px);
   right: var(--edge-right);
@@ -699,24 +683,6 @@ body.compact-ui {
 .compact-ui .modal-header { flex-shrink: 0; }
 .compact-ui .modal-body { min-height: 0; }
 .compact-ui .help-grid { grid-template-columns: 1fr; }
-@media (max-width: 540px) {
-  .compact-ui.touch-mode .touch-controls-overlay {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr auto auto;
-    align-items: end;
-    row-gap: 6px;
-  }
-  .compact-ui .touch-left { grid-column: 1; grid-row: 2; }
-  .compact-ui .touch-right { grid-column: 2; grid-row: 2; justify-self: end; }
-  .compact-ui .touch-center {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    flex-direction: row;
-    justify-content: center;
-  }
-  .compact-ui .touch-center .btn-touch-brake { width: 52px; height: 52px; }
-}
 .compact-ui .mobile-menu button { touch-action: pan-y; }
 .compact-ui .modal-close, .compact-ui .diag-close-btn {
   min-width: 44px;

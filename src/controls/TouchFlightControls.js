@@ -142,9 +142,9 @@ export class TouchFlightControls {
           <!-- Rudder Slider -->
           <div class="touch-rudder-card">
             <div class="rudder-label-strip">
-              <span>◄ L RUDDER</span>
+              <span>◄ L</span>
               <span id="touch-rudder-val">0°</span>
-              <span>R RUDDER ►</span>
+              <span>R ►</span>
             </div>
             <div id="touch-rudder-track" class="touch-rudder-track">
               <div class="rudder-center-notch"></div>
