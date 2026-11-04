@@ -78,6 +78,9 @@ export async function initAnalytics(sim = null) {
         // Disable high-frequency canvas video to preserve 60/120fps GPU performance
         record_canvas: false,
         persistence: 'localStorage+cookie',
+        // Cohorts and person-level insights join on person profiles; the default
+        // 'if_enabled' drops them, leaving behavioral cohorts unable to calculate.
+        person_profiles: 'always',
         bootstrap: {
           distinctID: getOrCreateAnonymousId(),
         },
