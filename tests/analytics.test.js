@@ -12,6 +12,7 @@ import {
   trackFlightCrash,
   trackPilotModeChange,
   trackStartupTrace,
+  trackResourceLatency,
   sendUserFeedback,
   _resetAnalyticsForTesting,
 } from '../src/analytics/posthog.js';
@@ -218,6 +219,9 @@ test('trackStartupTrace sends one aggregated load event and stays a no-op when u
   assert.equal(captured[0].properties.startupAircraft, 'B738');
   assert.deepEqual(captured[0].properties.classes, { glb: { count: 2, totalMs: 1450 } });
   assert.deepEqual(captured[0].properties.slowest, report.slowest);
+  assert.equal(captured[0].properties.slowestAsset, 'models/b737-cockpit-medium.glb');
+  assert.equal(captured[0].properties.slowestAssetDurationMs, 1450);
+  assert.equal(captured[0].properties.glbTotalLatencyMs, 1450);
   assert.equal(captured[0].options.send_instantly, true);
 
   // Detail groups ride as JSON properties, so PostHog can drill into them.
@@ -229,6 +233,78 @@ test('trackStartupTrace sends one aggregated load event and stays a no-op when u
   _resetAnalyticsForTesting(null);
   trackStartupTrace(report);
   assert.equal(captured.length, 1, 'silent once telemetry is off');
+});
+
+test('trackStartupTrace keeps the blocking pair together and nulls absent classes', () => {
+  const captured = [];
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties, options) => captured.push({ eventName, properties, options }),
+    flush: () => {},
+  });
+
+  // buildStartupTraceReport always fills every class bucket; a zero-count bucket must
+  // surface as null, not 0. A cached blocking asset can round to duration 0, which
+  // must stay paired with its own name instead of falling through to slowest[0].
+  trackStartupTrace({
+    blocking: { name: 'models/aircraft.glb', cls: 'glb', duration: 0 },
+    classes: {
+      glb: { count: 1, totalMs: 0, maxMs: 0 },
+      texture: { count: 0, totalMs: 0, maxMs: 0 },
+    },
+    slowest: [{ name: 'terrain/hdr-0.hdr', cls: 'hdr', duration: 512 }],
+  });
+
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].properties.slowestAsset, 'models/aircraft.glb');
+  assert.equal(captured[0].properties.slowestAssetDurationMs, 0);
+  assert.equal(captured[0].properties.glbMaxLatencyMs, 0);
+  assert.equal(captured[0].properties.binMaxLatencyMs, null, 'absent bucket is null, not 0');
+  assert.equal(captured[0].properties.textureMaxLatencyMs, null);
+  assert.equal(captured[0].properties.audioMaxLatencyMs, null);
+
+  _resetAnalyticsForTesting(null);
+});
+
+test('trackResourceLatency sends formatted resource latency telemetry', () => {
+  const captured = [];
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties, options) => captured.push({ eventName, properties, options }),
+    flush: () => {},
+  });
+
+  trackResourceLatency({
+    name: 'models/f-16.glb',
+    durationMs: 342.6,
+    type: 'glb',
+    sizeBytes: 1250000,
+    cached: false,
+  });
+
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].eventName, 'resource_loaded');
+  assert.equal(captured[0].properties.resource_name, 'models/f-16.glb');
+  assert.equal(captured[0].properties.resource_duration_ms, 343);
+  assert.equal(captured[0].properties.resource_type, 'glb');
+  assert.equal(captured[0].properties.resource_size_bytes, 1250000);
+  assert.equal(captured[0].properties.resource_cached, false);
+
+  // Invalid or missing duration does not emit
+  trackResourceLatency({ name: 'invalid.glb', durationMs: NaN });
+  assert.equal(captured.length, 1);
+
+  trackResourceLatency({ name: '', durationMs: 100 });
+  assert.equal(captured.length, 1);
+
+  _resetAnalyticsForTesting(null);
+});
+
+test('posthog.js configures API defaults 2026-08-30 and enables performance tracking', async () => {
+  const fs = await import('node:fs');
+  const posthogSrc = fs.readFileSync(new URL('../src/analytics/posthog.js', import.meta.url), 'utf8');
+  assert.match(posthogSrc, /defaults:\s*['"]2026-08-30['"]/);
+  assert.match(posthogSrc, /capture_performance:\s*\{/);
+  assert.match(posthogSrc, /network_timing:\s*true/);
+  assert.match(posthogSrc, /web_vitals:\s*true/);
 });
 
 test('the startup monitor is the importer of trackStartupTrace', async () => {
@@ -251,6 +327,7 @@ test('src/main.js imports all analytics methods attached to this.analytics', asy
     'trackFlightStart',
     'trackFlightEnd',
     'trackFlightCrash',
+    'trackResourceLatency',
     'captureException',
   ];
 

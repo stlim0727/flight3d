@@ -65,10 +65,15 @@ export async function initAnalytics(sim = null) {
 
       posthog.init(apiKey, {
         api_host: host,
-        defaults: '2026-05-30',
+        defaults: '2026-08-30',
         autocapture: true,
         capture_pageview: true,
         capture_pageleave: true,
+        capture_performance: {
+          network_timing: true,
+          web_vitals: true,
+          web_vitals_attribution: ['LCP', 'INP'],
+        },
         disable_session_recording: false,
         // Disable high-frequency canvas video to preserve 60/120fps GPU performance
         record_canvas: false,
@@ -235,7 +240,34 @@ export function trackPilotModeChange(mode, missionId) {
  */
 export function trackStartupTrace(report) {
   if (!report) return;
-  trackEvent('startup_trace', report, { send_instantly: true });
+  const top = report.blocking ?? report.slowest?.[0] ?? null;
+  const latency = (cls, field) => (report.classes?.[cls]?.count ? report.classes[cls][field] : null);
+  const payload = {
+    ...report,
+    slowestAsset: top?.name ?? null,
+    slowestAssetDurationMs: top?.duration ?? null,
+    glbMaxLatencyMs: latency('glb', 'maxMs'),
+    glbTotalLatencyMs: latency('glb', 'totalMs'),
+    binMaxLatencyMs: latency('bin', 'maxMs'),
+    textureMaxLatencyMs: latency('texture', 'maxMs'),
+    audioMaxLatencyMs: latency('audio', 'maxMs'),
+  };
+  trackEvent('startup_trace', payload, { send_instantly: true });
+}
+
+/**
+ * Track an individual resource loading latency measurement.
+ * Useful for runtime dynamic asset fetching (e.g. aircraft swap, scenery kit, sound effects).
+ */
+export function trackResourceLatency({ name, durationMs, type = 'other', sizeBytes = null, cached = false }) {
+  if (!name || !Number.isFinite(durationMs)) return;
+  trackEvent('resource_loaded', {
+    resource_name: name,
+    resource_duration_ms: Math.round(durationMs),
+    resource_type: type,
+    resource_size_bytes: sizeBytes != null ? Math.round(sizeBytes) : null,
+    resource_cached: Boolean(cached),
+  });
 }
 
 /** Submit user bug report or feedback */
