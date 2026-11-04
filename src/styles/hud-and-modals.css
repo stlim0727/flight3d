@@ -640,4 +640,227 @@ body.booting .audio-start-hint { display: none; }
   color: #ffffff;
 }
 
+/* Voice ATC Challenge Subtitle Overlay */
+.voice-challenge-overlay {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+  pointer-events: auto;
+  max-width: 92vw;
+  width: 580px;
+  animation: slide-up-voice 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
+@keyframes slide-up-voice {
+  from { opacity: 0; transform: translate(-50%, 20px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.voice-challenge-card {
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75), 0 0 20px rgba(56, 189, 248, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.voice-challenge-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.voice-mic-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(14, 165, 233, 0.2);
+  border: 1px solid #38bdf8;
+  border-radius: 16px;
+  padding: 3px 10px;
+}
+
+.voice-mic-icon {
+  font-size: 13px;
+  animation: pulse-mic 1s infinite alternate;
+}
+
+@keyframes pulse-mic {
+  from { opacity: 0.6; transform: scale(0.9); }
+  to   { opacity: 1.0; transform: scale(1.1); }
+}
+
+.voice-mic-status {
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.voice-challenge-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.voice-prompt-desc {
+  font-size: 12px;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.voice-options-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.voice-option-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.voice-option-card:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(56, 189, 248, 0.6);
+}
+
+.voice-option-card.matched {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.5);
+}
+
+.voice-opt-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  font-weight: 800;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.voice-option-card.matched .voice-opt-tag {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.voice-opt-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.voice-opt-primary {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.voice-opt-secondary {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.voice-recognized-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px dashed rgba(56, 189, 248, 0.35);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  min-height: 38px;
+}
+
+.voice-recognized-banner.success {
+  border-style: solid;
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.voice-recognized-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.voice-recognized-text {
+  color: #38bdf8;
+  font-style: italic;
+  flex-grow: 1;
+}
+
+.voice-recognized-banner.success .voice-recognized-text {
+  color: #10b981;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.voice-match-score {
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.voice-recognized-banner.success .voice-match-score {
+  color: #10b981;
+}
+
+.voice-challenge-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.btn-voice-retry {
+  background: rgba(51, 65, 85, 0.8);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-voice-retry:hover {
+  background: rgba(71, 85, 105, 0.9);
+}
+
+.btn-voice-skip {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-voice-skip:hover {
+  background: linear-gradient(135deg, #0369a1, #075985);
+}

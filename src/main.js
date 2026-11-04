@@ -40,6 +40,7 @@ import { RenderPose } from './core/RenderPose.js';
 import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
 import { JoystickCheckDialog } from './ui/JoystickCheckDialog.js';
 import { DemoFlightDirector } from './director/DemoFlightDirector.js';
+import { VoiceChallengeOverlay } from './ui/VoiceChallengeOverlay.js';
 import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
@@ -260,6 +261,7 @@ class FlightSimulator {
     this.diagnostics = new DiagnosticsInspector(this);
     this.joystickDialog = new JoystickCheckDialog(this);
     this.demoDirector = new DemoFlightDirector(this);
+    this.voiceChallengeOverlay = new VoiceChallengeOverlay({ sim: this });
     this.shadowDemo = new CockpitShadowDemo(this, () => this.updateShadowDemoUi());
     this.developerMode = new DeveloperModeController(() => {
       this.devRunner?.stop(); this.renderDiagnosticsPanel?.close();

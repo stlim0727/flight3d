@@ -121,7 +121,7 @@ export class DemoFlightDirector {
 
     if (this.skipBtn) {
       this.skipBtn.addEventListener('click', () => {
-        this.stop(() => t('manual.control.engaged'));
+        this.requestManualControl();
       });
     }
 
@@ -191,7 +191,7 @@ export class DemoFlightDirector {
         }
 
         if (e.key === 'Escape' && this.isActive) {
-          this.stop(() => t('manual.control.engaged'));
+          this.requestManualControl();
           e.preventDefault?.();
         } else if ((e.key === 'p' || e.key === 'P') && !e.target?.matches?.('input, textarea')) {
           this.requestRestart();
@@ -229,6 +229,54 @@ export class DemoFlightDirector {
       this.restartDialogEl.classList.remove('visible');
     }
     if (this.sim?.syncAudioPause) this.sim.syncAudioPause();
+  }
+
+  requestManualControl() {
+    const scenario = this.getActiveScenario();
+    if (this.isActive && scenario === this.incheonDepartureScenario && this.sim?.voiceChallengeOverlay) {
+      const options = [
+        {
+          id: 'a',
+          tag: 'A',
+          primary: t('departure.voice.esc.optA.primary'),
+          secondary: t('departure.voice.esc.optA.secondary'),
+          phrases: [
+            'Korean Air 123, taking manual control',
+            'taking manual control',
+            'Korean Air 123',
+            '대한항공 123, 직접 조종 인계',
+            '대한항공 일 이 삼 직접 조종 인계',
+            '대한항공 123',
+            '직접 조종 인계'
+          ]
+        },
+        {
+          id: 'b',
+          tag: 'B',
+          primary: t('departure.voice.esc.optB.primary'),
+          secondary: t('departure.voice.esc.optB.secondary'),
+          phrases: [
+            'Disengaging autopilot, manual control',
+            'autopilot disconnect',
+            'manual control',
+            '오토파일럿 해제, 수동 조종 전환',
+            '오토파일럿 해제',
+            '수동 조종 전환'
+          ]
+        }
+      ];
+
+      this.sim.voiceChallengeOverlay.show({
+        options,
+        onPass: () => {
+          this.stop(() => t('manual.control.engaged'));
+        }
+      });
+      return;
+    }
+
+    this.stop(() => t('manual.control.engaged'));
+  }
   }
 
   closeBanner() {
@@ -372,6 +420,7 @@ export class DemoFlightDirector {
   stop(message = null, keepParkingBrake = false, { preserveThrottle = false } = {}) {
     this.closeRestartConfirm?.();
     if (!this.isActive) return;
+    this.sim?.voiceChallengeOverlay?.hide();
     const retainSpeedBrakes=this.getActiveScenario()===this.sihwaTourScenario;
     this.getActiveScenario().stop?.();
     if (this.activeDemoAircraft === 'B738' && this.activeDemoAirport === 'lukla' &&
@@ -428,7 +477,7 @@ export class DemoFlightDirector {
         this.sim.controls.brakes = 0.0;
       }
     }
-    if (this.sim.gear) {
+    if (this.sim.gear?.setBrakes) {
       this.sim.gear.setBrakes(holdBrakes ? 1.0 : 0.0);
     }
     if (this.sim.aero && !retainSpeedBrakes) {
