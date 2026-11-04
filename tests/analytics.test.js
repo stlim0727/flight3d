@@ -11,6 +11,7 @@ import {
   trackFlightEnd,
   trackFlightCrash,
   trackPilotModeChange,
+  trackStartupTrace,
   sendUserFeedback,
   _resetAnalyticsForTesting,
 } from '../src/analytics/posthog.js';
@@ -186,6 +187,54 @@ test('trackEvent forwards formatted payload to PostHog instance when initialized
   assert.equal(captured[6].options?.send_instantly, true);
 
   _resetAnalyticsForTesting(null);
+});
+
+test('trackStartupTrace sends one aggregated load event and stays a no-op when unconfigured', async () => {
+  const captured = [];
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties, options) => captured.push({ eventName, properties, options }),
+    flush: () => {},
+  });
+
+  const report = {
+    version: 1,
+    readyMs: 8421,
+    readySource: 'booting-class',
+    cockpitStageMs: 4890,
+    bytesBeforeReady: 8912340,
+    startupAircraft: 'B738',
+    startupAirport: 'coastal',
+    backgroundBoot: false,
+    longTasks: { count: 14, totalMs: 2600, maxMs: 780 },
+    classes: { glb: { count: 2, totalMs: 1450 } },
+    slowest: [{ name: 'models/b737-cockpit-medium.glb', duration: 1450 }],
+  };
+  trackStartupTrace(report);
+
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].eventName, 'startup_trace');
+  assert.equal(captured[0].properties.readyMs, 8421);
+  assert.equal(captured[0].properties.cockpitStageMs, 4890);
+  assert.equal(captured[0].properties.startupAircraft, 'B738');
+  assert.deepEqual(captured[0].properties.classes, { glb: { count: 2, totalMs: 1450 } });
+  assert.deepEqual(captured[0].properties.slowest, report.slowest);
+  assert.equal(captured[0].options.send_instantly, true);
+
+  // Detail groups ride as JSON properties, so PostHog can drill into them.
+  assert.equal(captured[0].properties.longTasks.count, 14);
+
+  trackStartupTrace(null);
+  assert.equal(captured.length, 1, 'an absent report sends nothing');
+
+  _resetAnalyticsForTesting(null);
+  trackStartupTrace(report);
+  assert.equal(captured.length, 1, 'silent once telemetry is off');
+});
+
+test('the startup monitor is the importer of trackStartupTrace', async () => {
+  const fs = await import('node:fs');
+  const monitorSrc = fs.readFileSync(new URL('../src/ui/StartupLoadMonitor.js', import.meta.url), 'utf8');
+  assert.match(monitorSrc, /import\s*\{[^}]*trackStartupTrace[^}]*\}\s*from\s*['"]\.\.\/analytics\/posthog\.js['"]/);
 });
 
 test('src/main.js imports all analytics methods attached to this.analytics', async () => {
