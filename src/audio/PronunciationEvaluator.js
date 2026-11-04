@@ -7,14 +7,14 @@
 const NUMBER_WORDS_EN = {
   '0': 'zero', '1': 'one', '2': 'two', '3': 'three', '4': 'four',
   '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine',
-  '123': 'one two three', '33': 'thirty three', '33l': 'thirty three left',
+  '123': 'one two three', '1102': 'one one zero two', '33': 'thirty three', '33l': 'thirty three left',
   '737': 'seven three seven', '738': 'seven three eight'
 };
 
 const NUMBER_WORDS_KO = {
   '0': '영', '1': '일', '2': '이', '3': '삼', '4': '사',
   '5': '오', '6': '육', '7': '칠', '8': '팔', '9': '구',
-  '123': '일이삼', '33': '삼십삼', '33l': '삼십삼 레프트',
+  '123': '일이삼', '1102': '일일공이', '33': '삼십삼', '33l': '삼십삼 레프트',
   '737': '칠삼칠', '738': '칠삼팔'
 };
 

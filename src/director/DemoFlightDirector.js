@@ -241,12 +241,12 @@ export class DemoFlightDirector {
           primary: t('departure.voice.esc.optA.primary'),
           secondary: t('departure.voice.esc.optA.secondary'),
           phrases: [
-            'Korean Air 123, taking manual control',
+            'Jeju Air 1102, taking manual control',
             'taking manual control',
-            'Korean Air 123',
-            '대한항공 123, 직접 조종 인계',
-            '대한항공 일 이 삼 직접 조종 인계',
-            '대한항공 123',
+            'Jeju Air 1102',
+            '제주항공 1102, 직접 조종 인계',
+            '제주항공 일일공이 직접 조종 인계',
+            '제주항공 1102',
             '직접 조종 인계'
           ]
         },

@@ -196,10 +196,11 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
             primary: t('departure.voice.pushback.optB.primary'),
             secondary: t('departure.voice.pushback.optB.secondary'),
             phrases: [
-              'Korean Air 123, taking manual control',
+              'Jeju Air 1102, taking manual control',
               'taking manual control',
-              '대한항공 123, 직접 조종 인계',
-              '대한항공 123',
+              'Jeju Air 1102',
+              '제주항공 1102, 직접 조종 인계',
+              '제주항공 1102',
               '직접 조종 인계'
             ]
           }

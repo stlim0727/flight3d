@@ -68,9 +68,9 @@ test('VoiceChallengeOverlay displays options A and B and passes when recognized 
     {
       id: 'b',
       tag: 'B',
-      primary: 'Korean Air 123, taking manual control',
-      secondary: '(대한항공 123, 직접 조종 인계)',
-      phrases: ['Korean Air 123, taking manual control', '대한항공 123']
+      primary: 'Jeju Air 1102, taking manual control',
+      secondary: '(제주항공 1102, 직접 조종 인계)',
+      phrases: ['Jeju Air 1102, taking manual control', '제주항공 1102']
     }
   ];
 
