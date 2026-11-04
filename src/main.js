@@ -63,6 +63,7 @@ import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 import { initBuildInfo } from './ui/BuildInfo.js';
 import { installInputLatencyMonitor } from './ui/InputLatencyMonitor.js';
+import { installStartupLoadMonitor } from './ui/StartupLoadMonitor.js';
 import { installPresetSpawner } from './core/PresetSpawner.js';
 import { installPhysicsIntegrator } from './core/PhysicsIntegrator.js';
 import { installSimulatorHudAndBindings } from './ui/SimulatorHudAndBindings.js';
@@ -92,6 +93,7 @@ window.addEventListener('keydown', event => {
 }, { capture: true });
 
 async function startupStage(value, message) {
+  startupTrace?.noteStage(value);
   document.getElementById('startup-progress').value = value;
   bindText(document.getElementById('startup-status'), () => t(message));
   // Two frames ensure the updated stage paints before synchronous construction.
@@ -99,6 +101,7 @@ async function startupStage(value, message) {
 }
 
 function showStartupError(error) {
+  startupTrace?.noteFailed();
   console.error('Simulator startup failed:', error);
   bindText(document.getElementById('startup-status'), () => t('startup.failed'));
   document.getElementById('startup-progress').hidden = true;
@@ -109,6 +112,8 @@ function showStartupError(error) {
 // build is exactly the window where user input stalls, and event-timing entries are
 // buffered retroactively to navigation start.
 const inputLatency = installInputLatencyMonitor();
+// Per-asset load timing for the same boot window, reported to analytics once the overlay lifts.
+const startupTrace = installStartupLoadMonitor(inputLatency);
 
 /**
  * Main Simulation Coordinator
@@ -119,6 +124,8 @@ class FlightSimulator {
     initUiScale();
     await startupStage(0, 'startup.scene');
     const savedSelection = resolveFlightUrl(window.location.search, loadSavedFlightSelection());
+    // Pinned now: by emit time the lobby context may already describe a flight the user started.
+    startupTrace?.noteSelection(savedSelection);
     this.container = document.getElementById('canvas-container');
     this.inputLatency = inputLatency;
 

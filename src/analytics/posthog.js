@@ -228,6 +228,16 @@ export function trackPilotModeChange(mode, missionId) {
   });
 }
 
+/**
+ * Track one startup load trace per page load. The report arrives already aggregated by
+ * src/core/startupTrace.js: flat scalars for trending, per-asset-class buckets plus the
+ * slowest/largest names as JSON properties.
+ */
+export function trackStartupTrace(report) {
+  if (!report) return;
+  trackEvent('startup_trace', report, { send_instantly: true });
+}
+
 /** Submit user bug report or feedback */
 export async function sendUserFeedback({ message, contact = '', category = 'bug', includeContext = true, context = {} }) {
   if (!posthogInstance && !initialized) {
