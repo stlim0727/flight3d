@@ -762,6 +762,21 @@ class FlightSimulator {
     if (!btn) return;
     const isMenu = this.gameFlow.state === FLOW.LOBBY || this.gameFlow.state === FLOW.PAUSED;
     const canResume = this.gameFlow.canResumeFromLobby() || this.gameFlow.state === FLOW.PAUSED;
+
+    // In lobby: keep toggle in main menu header beside the title.
+    // In flight / paused: keep toggle in the HUD top bar.
+    if (this.gameFlow.state === FLOW.LOBBY) {
+      const titleRow = document.querySelector('.lobby-title-row');
+      if (titleRow && btn.parentElement !== titleRow) {
+        titleRow.prepend(btn);
+      }
+    } else {
+      const topBar = document.querySelector('.hud-top-bar');
+      if (topBar && btn.parentElement !== topBar) {
+        topBar.prepend(btn);
+      }
+    }
+
     // Only show the "close (✕)" state when there is an active flight to resume to.
     // In a clean boot lobby without a held sortie, the lobby is the home base.
     const showCloseAffordance = isMenu && canResume;
