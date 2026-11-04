@@ -6,7 +6,7 @@ export function clampFrameDelta(delta) {
 
 export function stepPhysics(simulation) {
   if (simulation.gameFlow?.state === 'debrief') return;
-  if (simulation.devRunner?.blocksPhysics) return;
+  if (simulation.devRunner?.blocksPhysics || simulation.demoDirector?.isRestartConfirmOpen) return;
   if (simulation.demoDirector?.isActive) {
     simulation.demoDirector.update(simulation.physicsDt);
   }
@@ -33,6 +33,6 @@ export function advancePhysicsFrame(simulation, delta) {
   while (simulation.physicsAccumulator >= simulation.physicsDt) {
     stepPhysics(simulation);
     simulation.physicsAccumulator -= simulation.physicsDt;
-    if (simulation.devRunner?.blocksPhysics || simulation.gameFlow?.state === 'debrief') { simulation.physicsAccumulator = 0; break; }
+    if (simulation.devRunner?.blocksPhysics || simulation.gameFlow?.state === 'debrief' || simulation.demoDirector?.isRestartConfirmOpen) { simulation.physicsAccumulator = 0; break; }
   }
 }

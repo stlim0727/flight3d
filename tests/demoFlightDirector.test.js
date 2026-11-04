@@ -146,44 +146,132 @@ describe('DemoFlightDirector (Nepal Lukla & Coastal Autonomous Demos)', () => {
     assert.strictEqual(sim.gear.brakes, 1.0);
   });
 
-  it('should trigger demo flight with P keyboard shortcut', () => {
+  it('should require confirmation before starting demo with P shortcut and allow cancel or confirm', () => {
+    const originalWindow = globalThis.window;
+    const originalDocument = globalThis.document;
     const windowListeners = {};
-    globalThis.window = {
-      addEventListener: (type, fn) => { windowListeners[type] = fn; }
+    const elements = {};
+    const getEl = id => {
+      if (!elements[id]) {
+        elements[id] = {
+          hidden: true,
+          style: {},
+          classList: {
+            add: (cls) => { elements[id][cls] = true; },
+            remove: (cls) => { delete elements[id][cls]; },
+          },
+          listeners: {},
+          addEventListener(type, fn) { this.listeners[type] = fn; },
+          click() { this.listeners['click']?.(); },
+          focus() {},
+          querySelector: () => null,
+        };
+      }
+      return elements[id];
     };
-    globalThis.document = {
-      getElementById: () => null
-    };
+    try {
+      globalThis.window = {
+        addEventListener: (type, fn) => { windowListeners[type] = fn; }
+      };
+      globalThis.document = {
+        getElementById: (id) => getEl(id)
+      };
 
-    const sim = createMockSimulator('lukla');
-    const director = new DemoFlightDirector(sim);
-    director.initUI();
+      const sim = createMockSimulator('lukla');
+      const director = new DemoFlightDirector(sim);
+      director.initUI();
 
-    assert.strictEqual(typeof windowListeners['keydown'], 'function');
+      assert.strictEqual(typeof windowListeners['keydown'], 'function');
 
-    // Pressing 'p' starts demo
-    windowListeners['keydown']({
-      key: 'p',
-      target: { matches: () => false }
-    });
-    assert.strictEqual(director.isActive, true);
+      // Pressing 'p' opens confirmation dialog instead of starting immediately
+      windowListeners['keydown']({
+        key: 'p',
+        target: { matches: () => false },
+        preventDefault() {},
+        stopPropagation() {},
+      });
+      assert.strictEqual(director.isRestartConfirmOpen, true);
+      assert.strictEqual(director.isActive, false);
+      assert.strictEqual(getEl('demo-restart-dialog').hidden, false);
+      assert.strictEqual(getEl('demo-restart-dialog').visible, true);
 
-    // Pressing Escape stops demo
-    windowListeners['keydown']({
-      key: 'Escape',
-      target: { matches: () => false }
-    });
-    assert.strictEqual(director.isActive, false);
+      // Pressing Escape cancels confirmation without starting demo
+      windowListeners['keydown']({
+        key: 'Escape',
+        target: { matches: () => false },
+        preventDefault() {},
+        stopPropagation() {},
+      });
+      assert.strictEqual(director.isRestartConfirmOpen, false);
+      assert.strictEqual(director.isActive, false);
+      assert.strictEqual(getEl('demo-restart-dialog').hidden, true);
 
-    // Pressing 'P' starts demo
-    windowListeners['keydown']({
-      key: 'P',
-      target: { matches: () => false }
-    });
-    assert.strictEqual(director.isActive, true);
+      // Pressing 'p' and then pressing 'p' again confirms and starts demo
+      windowListeners['keydown']({
+        key: 'p',
+        target: { matches: () => false },
+        preventDefault() {},
+        stopPropagation() {},
+      });
+      assert.strictEqual(director.isRestartConfirmOpen, true);
+      windowListeners['keydown']({
+        key: 'p',
+        target: { matches: () => false },
+        preventDefault() {},
+        stopPropagation() {},
+      });
+      assert.strictEqual(director.isRestartConfirmOpen, false);
+      assert.strictEqual(director.isActive, true);
 
-    delete globalThis.window;
-    delete globalThis.document;
+      // Pressing Escape while demo is active stops demo
+      windowListeners['keydown']({
+        key: 'Escape',
+        target: { matches: () => false },
+        preventDefault() {},
+        stopPropagation() {},
+      });
+      assert.strictEqual(director.isActive, false);
+
+      // Pressing 'P' and confirming via Enter starts demo
+      windowListeners['keydown']({
+        key: 'P',
+        target: { matches: () => false },
+        preventDefault() {},
+        stopPropagation() {},
+      });
+      assert.strictEqual(director.isRestartConfirmOpen, true);
+      windowListeners['keydown']({
+        key: 'Enter',
+        target: { matches: () => false },
+        preventDefault() {},
+        stopPropagation() {},
+      });
+      assert.strictEqual(director.isRestartConfirmOpen, false);
+      assert.strictEqual(director.isActive, true);
+
+      // Stopping demo closes any open confirmation
+      director.stop();
+      assert.strictEqual(director.isActive, false);
+
+      // Clicking cancel button cancels confirmation
+      director.requestRestart();
+      assert.strictEqual(director.isRestartConfirmOpen, true);
+      getEl('btn-demo-restart-cancel').click();
+      assert.strictEqual(director.isRestartConfirmOpen, false);
+      assert.strictEqual(director.isActive, false);
+
+      // Clicking confirm button starts demo
+      director.requestRestart();
+      assert.strictEqual(director.isRestartConfirmOpen, true);
+      getEl('btn-demo-restart-confirm').click();
+      assert.strictEqual(director.isRestartConfirmOpen, false);
+      assert.strictEqual(director.isActive, true);
+    } finally {
+      if (originalWindow === undefined) delete globalThis.window;
+      else globalThis.window = originalWindow;
+      if (originalDocument === undefined) delete globalThis.document;
+      else globalThis.document = originalDocument;
+    }
   });
 
   it('should allow user to cycle camera during ROTATION_CLIMB without mid-stage cut reverting user choice', () => {
