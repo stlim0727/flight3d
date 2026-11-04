@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { HANGANG_COURSE, bridgeSolids, hangangHeight } from '../config/hangangCourse.js';
+import { HANGANG_COURSE, bridgeSolids, hangangSurfaceModel } from '../config/hangangCourse.js';
+import { surfaceContact } from '../physics/SurfaceModel.js';
 
 // Conservative part envelopes in the C172 model frame. Covers fixed landing gear.
 // These deliberately have a small safety margin; not triangle-exact contact.
@@ -47,6 +48,8 @@ export class HangangCollision {
   constructor(course = HANGANG_COURSE) {
     if (course.bridges.some(b => ![b.x, b.z, b.yaw].every(Number.isFinite))) throw new Error('Invalid Hangang course');
     this.course = course;
+    this.surfaceModel = hangangSurfaceModel(course);
+    this.surfacePoint = new THREE.Vector3();
     this.bridges = course.bridges.map(b => {
       const transform = new THREE.Matrix4().compose(new THREE.Vector3(b.x, 0, b.z),
         new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.yaw), new THREE.Vector3(1, 1, 1));
@@ -119,7 +122,6 @@ export class HangangCollision {
     // Malformed samples are skipped; the next valid one is tested on its own.
     if (![...position.toArray(), ...quaternion.toArray()].every(Number.isFinite) ||
         Math.abs(quaternion.lengthSq() - 1) > 0.01) { this.previous = null; return null; }
-    const c = this.course;
     let previous = this.previous;
     // Subdivide both translation and rotation; padding covers between-sample motion.
     let count = previous ? Math.ceil(Math.max(1, previous.p.distanceTo(position) / 0.2, previous.q.angleTo(quaternion) / 0.015)) : 1;
@@ -131,9 +133,18 @@ export class HangangCollision {
       this.matrix.compose(this.p, this.q, this.unit);
       for (const part of parts) {
         this.box.copy(part.box).applyMatrix4(this.matrix).expandByScalar(PAD);
-        const structure = this.box.min.y <= c.waterLevel || this.box.min.y <= hangangHeight(this.p.x, this.p.z)
-          ? 'water' : this.nodeulseomHit(this.box, this.obb, this.orient(part, this.matrix));
-        if (structure) { this.contact = { aircraftPart: part.name, structure, position: this.p.toArray() }; break; }
+        let structure = this.nodeulseomHit(this.box, this.obb, this.orient(part, this.matrix));
+        let type = structure === 'island' ? 'TERRAIN' : 'BUILDING';
+        // Query actual transformed part corners, not the centre combined with the
+        // world's AABB lowest Y. This keeps bank/water membership at the contact.
+        for (let corner = 0; corner < 8 && !structure; corner++) {
+          this.surfacePoint.set(corner & 1 ? part.box.max.x : part.box.min.x,
+            corner & 2 ? part.box.max.y : part.box.min.y,
+            corner & 4 ? part.box.max.z : part.box.min.z).applyMatrix4(this.matrix);
+          const contact = surfaceContact(this.surfaceModel, this.surfacePoint, PAD);
+          if (contact) { structure = contact.label; type = contact.type; }
+        }
+        if (structure) { this.contact = { aircraftPart: part.name, structure, type, position: this.p.toArray() }; break; }
       }
       for (let i = 0; i < this.bridges.length && !this.contact; i++) {
         const bridge = this.bridges[i];
@@ -150,7 +161,7 @@ export class HangangCollision {
           const part = parts[k];
           this.box.copy(part.box).applyMatrix4(this.localMatrix).expandByScalar(PAD);
           const hit = near.find(s => s.box.intersectsBox(this.box));
-          if (hit) { this.contact = { bridge: bridge.id, aircraftPart: part.name, structure: hit.part, position: this.p.toArray() }; break; }
+          if (hit) { this.contact = { bridge: bridge.id, aircraftPart: part.name, structure: hit.part, type: 'BUILDING', position: this.p.toArray() }; break; }
         }
       }
     }

@@ -1,5 +1,6 @@
 import { t } from '../i18n/index.js';
 import * as THREE from 'three';
+import { createSurfaceModel, surfaceAt, waterContact } from './SurfaceModel.js';
 
 export const B738_COLLISION_PROBES = Object.freeze([
   { id: 'nose', pos: [0, -0.2, -17.5], radius: 1.5, descKey: 'nose.radome' },
@@ -49,6 +50,7 @@ export class CollisionDetector {
     this.foliage = foliageAndCities;
     this.ships = ships;
     this.water = water;
+    this.surfaceModel = terrain?.surfaceModel ?? createSurfaceModel((x, z) => this.terrain?.getHeight(x, z) ?? null);
     this.shipInverse = new THREE.Matrix4();
     this.shipProbe = new THREE.Vector3();
     this.shipClosest = new THREE.Vector3();
@@ -127,6 +129,7 @@ export class CollisionDetector {
     this.foliage = foliage;
     this.ships = ships;
     this.water = water;
+    this.surfaceModel = terrain?.surfaceModel ?? createSurfaceModel((x, z) => this.terrain?.getHeight(x, z) ?? null);
     // The grids index static foliage/building data, so re-selecting an airport can
     // reuse them instead of re-binning every tree and building on the click thread.
     if (this.gridSource === foliage) return;
@@ -508,16 +511,11 @@ export class CollisionDetector {
   checkWater(aircraftPos, worldProbes, speedMs, vsiMs) {
     if (!this.terrain) return null;
 
-    const terrainH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
-    // Water is located where natural terrain is at or below sea level (elevation <= 2.5m)
-    if (terrainH > 2.5) return null;
-
-    const waterLevel = 0.0;
-    // Ditching / crashing into water: speed > 15 m/s (~30 knots) or vertical descent > 3.0 m/s
+    // Keep the existing impact-speed gate; surface type is independent of speed.
     if (speedMs < 5.0 && Math.abs(vsiMs) < 1.0) return null; // Stationary boat/seaplane safe state
 
     for (const probe of worldProbes) {
-      if (probe.pos.y <= waterLevel + 0.5) {
+      if (waterContact(this.surfaceModel, probe.pos)) {
         return { point: probe.pos.clone() };
       }
     }
@@ -551,7 +549,8 @@ export class CollisionDetector {
     }
 
     // Evaluate off-runway ground excursion: when the aircraft moves on the ground outside the runway
-    const groundH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
+    const centerSurface = surfaceAt(this.surfaceModel, aircraftPos.x, aircraftPos.z);
+    const groundH = centerSurface?.height ?? -Infinity;
     const gearHeight = gearState >= 0.5 ? 3.85 : 1.85;
     const isWheelGrounded = groundContact !== null
       ? Boolean(groundContact.contacts?.some(c => c.isGrounded))
@@ -569,7 +568,7 @@ export class CollisionDetector {
     // 1. Structural gear collapse from sustained off-runway stress while moving
     // 2. High-speed deep excursion outside paved runway and airport safety area (> 15 m/s)
     // 3. Catastrophic hull impact while off-runway
-    const isExcursionCrash = isWheelGrounded && isMoving && (
+    const isExcursionCrash = centerSurface?.type === 'TERRAIN' && isWheelGrounded && isMoving && (
       (gearCollapsed && (!onRunway || wheelOffRunway)) ||
       (!onRunway && !inSafetyArea && speedMs > 15.0) ||
       (catastrophicHullLoss && !onRunway)
@@ -590,7 +589,9 @@ export class CollisionDetector {
       // The contact solver owns supported lower surfaces on the runway. A fin
       // strike or any probe outside the runway still uses fatal terrain detection.
       if (groundContact && onRunway && probeOnRunway && probe.id !== 'fin') continue;
-      const ground = this.terrain.getHeight(probe.pos.x, probe.pos.z);
+      const surface = surfaceAt(this.surfaceModel, probe.pos.x, probe.pos.z);
+      if (surface?.type !== 'TERRAIN') continue;
+      const ground = surface.height;
       const radius = probe.id === 'engineL' || probe.id === 'engineR' ? probe.radius : 0;
       if (probe.pos.y - radius < ground + 0.1) {
         return {

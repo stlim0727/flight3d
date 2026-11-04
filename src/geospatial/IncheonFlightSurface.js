@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import airfield from '../config/incheonAirfield.json' with { type: 'json' };
 import { pointInRing, segmentDistance } from './incheonDressing.js';
+import { createSurfaceModel } from '../physics/SurfaceModel.js';
 
 export { airfield as INCHEON_AIRFIELD };
 
@@ -11,6 +12,7 @@ export class IncheonFlightSurface {
     this.region = region;
     this.isLand = (x,z)=>region ? region.isCoreLand(x,z) : source.isLand(x,z);
     this.isLoaded = true;
+    this.surfaceModel = createSurfaceModel((x,z)=>this.sampleGroundHeight(x,z), [{type:'WATER',height:0}]);
     this.surfaces = airfield.surfaces.map(s => ({ ...s, bounds: [
       Math.min(...s.points.map(p=>p[0])), Math.min(...s.points.map(p=>p[1])),
       Math.max(...s.points.map(p=>p[0])), Math.max(...s.points.map(p=>p[1])),
@@ -80,13 +82,19 @@ export class IncheonFlightSurface {
   }
 
   getHeight(x,z) {
+    return this.sampleGroundHeight(x,z) ?? 0;
+  }
+
+  sampleGroundHeight(x,z) {
     if (![x,z].every(Number.isFinite)) throw new Error('Invalid flight terrain coordinate');
-    if (Math.max(Math.abs(x),Math.abs(z))>6000) return this.region?.getHeight(x,z) ?? 0;
+    if (Math.max(Math.abs(x),Math.abs(z))>6000) {
+      return this.region?.sampleSurfaceHeight(x,z) ?? null;
+    }
     const col=(x+6000)/25,row=(z+6000)/25;
     const ix=Math.min(Math.floor(col),480-1),iz=Math.min(Math.floor(row),480-1);
     const u=col-ix,v=row-iz,i=iz*this.gridSize+ix,g=this.elevations;
     const isLand=this.coastCells[iz*480+ix] ? this.isLand(x,z) : this.landNodes[i];
-    if (!isLand) return 0;
+    if (!isLand) return null;
     // PlaneGeometry's NW/SW/NE and SW/SE/NE triangles, not bilinear sampling.
     return u+v<=1 ? g[i]*(1-u-v)+g[i+1]*u+g[i+this.gridSize]*v
       : g[i+this.gridSize+1]*(u+v-1)+g[i+1]*(1-v)+g[i+this.gridSize]*(1-u);

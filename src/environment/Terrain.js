@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
 import { TerrainTextures } from './TerrainTextures.js';
+import { createSurfaceModel } from '../physics/SurfaceModel.js';
 
 function mulberry32(a) {
   return function() {
@@ -53,6 +54,7 @@ export class Terrain {
     this.material = null;
     this.shaderUniforms = null;
     this.pavementBounds = [];
+    this.surfaceModel = createSurfaceModel((x, z) => this.getHeight(x, z), [{ type: 'WATER', height: 0 }]);
 
     this.initTerrain();
   }

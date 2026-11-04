@@ -7,6 +7,7 @@ import {SihwaRegion} from '../src/geospatial/SihwaRegion.js';
 import {IncheonTerrain} from '../src/geospatial/IncheonTerrain.js';
 import {IncheonFlightSurface} from '../src/geospatial/IncheonFlightSurface.js';
 import {projectToLocal} from '../src/geospatial/incheon.js';
+import {surfaceAt} from '../src/physics/SurfaceModel.js';
 const base=new URL('../public/scenery/incheon/',import.meta.url);
 const read=file=>fs.readFileSync(new URL(file,base));
 const json=file=>JSON.parse(read(file));
@@ -18,6 +19,21 @@ const region=new SihwaRegion(meta,positions,indices,json('sihwa/core-coastline.j
 const oldMeta=json('terrain-metadata.json'),grids=Object.fromEntries(Object.entries(oldMeta.grids).map(([name,d])=>[name,floats(d.file)]));
 const source=new IncheonTerrain(oldMeta,grids,json('coastline.json'));
 const terrain=new IncheonFlightSurface(source,region);
+
+test('regional geometry supplies nullable ground to the common surface selector',()=>{
+  assert.equal(region.sampleGroundHeight(30000,30000),null);
+  assert.equal(surfaceAt(terrain.surfaceModel,30000,30000).type,'WATER');
+  let checked=0;
+  for(let i=0;i<indices.length;i+=900) {
+    const ids=[indices[i]*3,indices[i+1]*3,indices[i+2]*3];
+    const x=ids.reduce((sum,j)=>sum+positions[j],0)/3,z=ids.reduce((sum,j)=>sum+positions[j+2],0)/3;
+    if(Math.max(Math.abs(x),Math.abs(z))<=6000)continue;
+    const height=region.sampleGroundHeight(x,z);
+    assert.equal(surfaceAt(terrain.surfaceModel,x,z).type,height>=0?'TERRAIN':'WATER');
+    checked++;
+  }
+  assert.ok(checked>100);
+});
 
 test('regional assets and frozen OSM snapshots match declared checksums',()=>{
   for(const d of [meta.geometry.positions,meta.geometry.indices,...Object.values(meta.geometry.overlays)])assert.equal(createHash('sha256').update(read('sihwa/'+d.file)).digest('hex'),d.sha256);

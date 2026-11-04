@@ -34,10 +34,20 @@ export class SihwaRegion {
   isCoreLand(x,z) {return this.coreLand.isLand(x,z);}
 
   getHeight(x,z) {
-    return Math.max(this.groundHeight(x,z),...this.additionalSurfaces.map(s=>s.getHeight(x,z)));
+    return this.sampleSurfaceHeight(x,z) ?? 0;
+  }
+
+  sampleSurfaceHeight(x,z) {
+    const ground=this.sampleGroundHeight(x,z);
+    const top=Math.max(ground ?? 0,...this.additionalSurfaces.map(s=>s.getHeight(x,z)));
+    return ground === null && top === 0 ? null : top;
   }
 
   groundHeight(x,z) {
+    return this.sampleGroundHeight(x,z) ?? 0;
+  }
+
+  sampleGroundHeight(x,z) {
     if(![x,z].every(Number.isFinite))throw new Error('Invalid regional coordinate');
     const triangles=this.cells.get(`${Math.floor(x/100)},${Math.floor(z/100)}`)??[];
     const p=this.positions,ids=this.indices;
@@ -49,7 +59,7 @@ export class SihwaRegion {
       const dx=x-p[a],dz=z-p[a+2],u=(dx*cz-dz*cx)/det,v=(bx*dz-bz*dx)/det;
       if(u>=-1e-5 && v>=-1e-5 && u+v<=1.00001)return p[a+1]*(1-u-v)+p[b+1]*u+p[c+1]*v;
     }
-    return 0;
+    return null;
   }
 }
 

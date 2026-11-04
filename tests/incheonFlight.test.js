@@ -17,12 +17,17 @@ import { EngineModel } from '../src/physics/EngineModel.js';
 import { Atmosphere } from '../src/physics/Atmosphere.js';
 import { solveTrim } from '../src/physics/TrimSolver.js';
 import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
+import { surfaceAt } from '../src/physics/SurfaceModel.js';
 const base=new URL('../public/scenery/incheon/',import.meta.url);
 const metadata=JSON.parse(readFileSync(new URL('terrain-metadata.json',base)));
 const grids=Object.fromEntries(Object.entries(metadata.grids).map(([key,d])=>{
   const b=readFileSync(new URL(d.file,base));return [key,Float32Array.from({length:b.length/4},(_,i)=>b.readFloatLE(i*4))];
 }));
 const surface=new IncheonFlightSurface(new IncheonTerrain(metadata,grids,JSON.parse(readFileSync(new URL('coastline.json',base)))));
+
+test('common surface selector agrees with coastline checkpoints',()=>{
+  for(const p of metadata.coast.checkpoints) assert.equal(surfaceAt(surface.surfaceModel,p.x,p.z).type,p.land?'TERRAIN':'WATER',p.name);
+});
 
 test('full runways retain frozen source endpoints and fit the loaded terrain',()=>{
   const bytes=gunzipSync(readFileSync(new URL('source.osm.json.gz',base)));

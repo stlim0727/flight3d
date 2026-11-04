@@ -4,6 +4,7 @@
 // crossing angles are game choices, so this is a motif, NOT a survey reproduction.
 // Metres, +Y up, travel generally -Z. Geometry and collision share these dimensions.
 import pavilionHeights from './nodeulPavilionHeights.json' with { type: 'json' };
+import { createSurfaceModel } from '../physics/SurfaceModel.js';
 
 // Bridge-local pier X: the main span is centred on the river axis, then `side` spans
 // repeat outward while they fit inside the deck.
@@ -56,6 +57,20 @@ export function riverCenter(z) {
 export function hangangHeight(x, z) {
   const d = Math.abs(x - riverCenter(z));
   return d < 450 ? 0 : Math.min(8, (d - 450) * 0.2);
+}
+
+// Register existing bank/island geometry and a flat river; classification is shared.
+export function hangangSurfaceModel(course = HANGANG_COURSE) {
+  const layers = [{ type: 'WATER', height: course.waterLevel, label: 'water' }];
+  const island = course.nodeulseom;
+  if (island) layers.push({ type: 'TERRAIN', label: 'island', heightAt: (x, z) => {
+    const radius = Math.hypot(x - island.x, (z - island.z) / island.zScale);
+    if (radius > island.bottomRadius) return null;
+    return island.height * Math.min(1, (island.bottomRadius - radius) / (island.bottomRadius - island.topRadius));
+  } });
+  const model = createSurfaceModel((x, z) => Math.abs(x - riverCenter(z)) >= 450 ? hangangHeight(x, z) : null, layers);
+  model[0].label = 'bank';
+  return model;
 }
 
 // Deck streetlights every 55 m from the bridge centre, at least 50 m from either end.

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { CollisionDetector } from '../src/physics/CollisionDetector.js';
+import { createSurfaceModel } from '../src/physics/SurfaceModel.js';
 
 test('CollisionDetector (Multi-Obstacle & Crash Detection System)', async (t) => {
   // Mock terrain: flat runway plateau (12m) with hills in positive Z and ocean at Z > 3000
@@ -13,6 +14,8 @@ test('CollisionDetector (Multi-Obstacle & Crash Detection System)', async (t) =>
       return 25.0; // Rolling hills
     }
   };
+
+  mockTerrain.surfaceModel = createSurfaceModel(mockTerrain.getHeight, [{ type: 'WATER', height: 0 }]);
 
   const mockAirport = {
     elevation: 12.0,
