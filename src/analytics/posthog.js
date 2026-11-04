@@ -240,15 +240,17 @@ export function trackPilotModeChange(mode, missionId) {
  */
 export function trackStartupTrace(report) {
   if (!report) return;
+  const top = report.blocking ?? report.slowest?.[0] ?? null;
+  const latency = (cls, field) => (report.classes?.[cls]?.count ? report.classes[cls][field] : null);
   const payload = {
     ...report,
-    slowestAsset: report.blocking?.name || report.slowest?.[0]?.name || null,
-    slowestAssetDurationMs: report.blocking?.duration || report.slowest?.[0]?.duration || null,
-    glbMaxLatencyMs: report.classes?.glb?.maxMs ?? null,
-    glbTotalLatencyMs: report.classes?.glb?.totalMs ?? null,
-    binMaxLatencyMs: report.classes?.bin?.maxMs ?? null,
-    textureMaxLatencyMs: report.classes?.texture?.maxMs ?? null,
-    audioMaxLatencyMs: report.classes?.audio?.maxMs ?? null,
+    slowestAsset: top?.name ?? null,
+    slowestAssetDurationMs: top?.duration ?? null,
+    glbMaxLatencyMs: latency('glb', 'maxMs'),
+    glbTotalLatencyMs: latency('glb', 'totalMs'),
+    binMaxLatencyMs: latency('bin', 'maxMs'),
+    textureMaxLatencyMs: latency('texture', 'maxMs'),
+    audioMaxLatencyMs: latency('audio', 'maxMs'),
   };
   trackEvent('startup_trace', payload, { send_instantly: true });
 }

@@ -235,6 +235,36 @@ test('trackStartupTrace sends one aggregated load event and stays a no-op when u
   assert.equal(captured.length, 1, 'silent once telemetry is off');
 });
 
+test('trackStartupTrace keeps the blocking pair together and nulls absent classes', () => {
+  const captured = [];
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties, options) => captured.push({ eventName, properties, options }),
+    flush: () => {},
+  });
+
+  // buildStartupTraceReport always fills every class bucket; a zero-count bucket must
+  // surface as null, not 0. A cached blocking asset can round to duration 0, which
+  // must stay paired with its own name instead of falling through to slowest[0].
+  trackStartupTrace({
+    blocking: { name: 'models/aircraft.glb', cls: 'glb', duration: 0 },
+    classes: {
+      glb: { count: 1, totalMs: 0, maxMs: 0 },
+      texture: { count: 0, totalMs: 0, maxMs: 0 },
+    },
+    slowest: [{ name: 'terrain/hdr-0.hdr', cls: 'hdr', duration: 512 }],
+  });
+
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].properties.slowestAsset, 'models/aircraft.glb');
+  assert.equal(captured[0].properties.slowestAssetDurationMs, 0);
+  assert.equal(captured[0].properties.glbMaxLatencyMs, 0);
+  assert.equal(captured[0].properties.binMaxLatencyMs, null, 'absent bucket is null, not 0');
+  assert.equal(captured[0].properties.textureMaxLatencyMs, null);
+  assert.equal(captured[0].properties.audioMaxLatencyMs, null);
+
+  _resetAnalyticsForTesting(null);
+});
+
 test('trackResourceLatency sends formatted resource latency telemetry', () => {
   const captured = [];
   _resetAnalyticsForTesting({
