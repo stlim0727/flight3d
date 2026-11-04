@@ -80,6 +80,7 @@ export class HotasController {
     this.throttleDeltaThreshold = 0.005;
     this.throttleAxis = 3;
     this.rudderAxis = 2;
+    this.customMapping = options.customMapping || null;
 
     // Internal state tracking
     this.lastRawThrottle = null;
@@ -111,12 +112,16 @@ export class HotasController {
     if (typeof cfg.deadzoneRudder === 'number' && Number.isFinite(cfg.deadzoneRudder)) {
       this.deadzoneRudder = Math.max(0, Math.min(0.2, cfg.deadzoneRudder));
     }
+    if (cfg.customMapping !== undefined) {
+      this.customMapping = cfg.customMapping;
+    }
   }
 
   getConfig() {
     return {
       profileOverride: this.profileOverride,
       axesLayout: this.axesLayout,
+      customMapping: this.customMapping,
       throttleInverted: this.throttleInverted,
       pitchInverted: this.pitchInverted,
       rudderMode: this.rudderMode,
@@ -315,7 +320,9 @@ export class HotasController {
       }
     }
 
-    if (activeProfile === 'hotas-one-xbox') {
+    if (this.customMapping) {
+      this.updateCustomMappingProfile(gp, axes, buttons, dt);
+    } else if (activeProfile === 'hotas-one-xbox') {
       this.updateHotasXboxProfile(gp, axes, buttons, dt);
     } else if (activeProfile === 'hotas-one' || activeProfile === 'hotas-tflight' || activeProfile === 'flight-stick') {
       this.updateHotasProfile(gp, axes, buttons, dt);
@@ -579,6 +586,90 @@ export class HotasController {
 
     if (blocked || this.diagnosticActive) return;
 
+    // --- 2. Aircraft Systems & View Buttons ---
+    this.updateHotasButtons(gp, axes, buttons, dt, aircraftDisabled);
+  }
+
+  updateCustomMappingProfile(gp, axes, buttons, dt) {
+    const blocked = this.controls?.inputBlocked === true;
+    const aircraftDisabled = this.controls?.aircraftControlsDisabled === true;
+    const live = !blocked && !aircraftDisabled;
+    const m = this.customMapping;
+
+    if (live || this.diagnosticActive) {
+      // 1. Roll (Aileron)
+      if (m.rollAxis >= 0 && axes.length > m.rollAxis && axes[m.rollAxis] !== undefined) {
+        const rawRoll = applyDeadzone(axes[m.rollAxis], this.deadzoneStick);
+        this.aileron = m.rollInverted ? -rawRoll : rawRoll;
+      }
+
+      // 2. Pitch (Elevator)
+      if (m.pitchAxis >= 0 && axes.length > m.pitchAxis && axes[m.pitchAxis] !== undefined) {
+        const rawPitch = applyDeadzone(axes[m.pitchAxis], this.deadzoneStick);
+        const inv = Boolean(m.pitchInverted) !== Boolean(this.pitchInverted);
+        this.elevator = inv ? -rawPitch : rawPitch;
+      }
+
+      // 3. Throttle Lever (Calibrated from idleVal to maxVal)
+      if (m.throttleAxis >= 0 && axes.length > m.throttleAxis && axes[m.throttleAxis] !== undefined) {
+        this.throttleAxis = m.throttleAxis;
+        const raw = axes[m.throttleAxis];
+        const idle = typeof m.throttleIdleVal === 'number' ? m.throttleIdleVal : 1.0;
+        const max = typeof m.throttleMaxVal === 'number' ? m.throttleMaxVal : -1.0;
+        let normalized;
+        if (Math.abs(max - idle) > 0.05) {
+          normalized = (raw - idle) / (max - idle);
+        } else {
+          normalized = (1.0 - raw) * 0.5;
+        }
+        if (m.throttleInverted || this.throttleInverted) {
+          normalized = 1.0 - normalized;
+        }
+        normalized = Math.max(0.0, Math.min(1.0, normalized));
+
+        if (this.lastRawThrottle === null) {
+          this.lastRawThrottle = raw;
+          this.throttle = normalized;
+          this.hasThrottleControl = true;
+          if (live && !this.diagnosticActive && this.controls) this.controls.throttle = normalized;
+        } else if (Math.abs(raw - this.lastRawThrottle) > this.throttleDeltaThreshold) {
+          this.lastRawThrottle = raw;
+          this.throttle = normalized;
+          this.hasThrottleControl = true;
+          if (live && !this.diagnosticActive && this.controls) this.controls.throttle = normalized;
+        }
+      }
+
+      // 4. Rudder
+      if (m.rudderAxis >= 0 && axes.length > m.rudderAxis && axes[m.rudderAxis] !== undefined) {
+        this.rudderAxis = m.rudderAxis;
+        const rawRudder = applyDeadzone(axes[m.rudderAxis], this.deadzoneRudder);
+        this.rudder = m.rudderInverted ? -rawRudder : rawRudder;
+        this.activeRudderSource = 'custom';
+      }
+
+      // 5. Wheel Brakes
+      let brakeVal = 0.0;
+      if (m.brakesButton >= 0 && buttons[m.brakesButton]) {
+        const btn = buttons[m.brakesButton];
+        brakeVal = btn.value !== undefined ? btn.value : (btn.pressed ? 1.0 : 0.0);
+      } else if (m.brakesAxis >= 0 && axes.length > m.brakesAxis && axes[m.brakesAxis] !== undefined) {
+        brakeVal = Math.max(0.0, axes[m.brakesAxis]);
+      }
+      this.brakes = brakeVal > 0.05 ? brakeVal : 0.0;
+    } else {
+      this.elevator = 0.0;
+      this.aileron = 0.0;
+      this.rudder = 0.0;
+      this.brakes = 0.0;
+    }
+
+    if (blocked || this.diagnosticActive) return;
+
+    this.updateHotasButtons(gp, axes, buttons, dt, aircraftDisabled);
+  }
+
+  updateHotasButtons(gp, axes, buttons, dt, aircraftDisabled) {
     // --- 2. Aircraft Systems One-Shot Buttons ---
     if (!aircraftDisabled) {
       // Button 1 (B1 / A): Toggle Spoilers / Speedbrakes
@@ -912,6 +1003,7 @@ export class HotasController {
         axis4Valid: false,
         axis4Floating: false,
         axesLayout: this.axesLayout,
+        customMapping: this.customMapping,
         throttleAxis: this.throttleAxis,
         rudderAxis: this.rudderAxis,
       };
@@ -946,10 +1038,11 @@ export class HotasController {
         throttle: this.throttle,
         brakes: this.brakes,
       },
-      activeRudderSource: this.activeRudderSource || 'twist',
+      activeRudderSource: this.customMapping ? 'custom' : (this.activeRudderSource || 'twist'),
       axis4Valid: Boolean(this.axis4Valid),
       axis4Floating: Boolean(this.axis4Floating),
       axesLayout: this.axesLayout,
+      customMapping: this.customMapping,
       throttleAxis: this.throttleAxis,
       rudderAxis: this.rudderAxis,
     };

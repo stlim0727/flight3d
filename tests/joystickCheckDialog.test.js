@@ -29,6 +29,16 @@ class MockElement {
     this.attributes.set(name, String(val));
     if (name === 'id') this.id = String(val);
     if (name === 'value') this.value = String(val);
+    if (name === 'style') {
+      const parts = String(val).split(';').map(s => s.trim()).filter(Boolean);
+      for (const p of parts) {
+        const [k, v] = p.split(':').map(s => s.trim());
+        if (k && v) {
+          const camel = k.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+          this.style[camel] = v;
+        }
+      }
+    }
   }
 
   getAttribute(name) {
@@ -141,6 +151,7 @@ class MockElement {
 
   set innerHTML(html) {
     this.children = [];
+    this._textContent = String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     // Parse tags into MockElements
     const tagRe = /<(\/?[a-zA-Z0-9]+)([^>]*?)>/g;
     let match;
@@ -464,5 +475,176 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
       dialog.close();
     }
     assert.strictEqual(sim.controls.hotas.diagnosticActive, false, 'Closing the dialog ends diagnostic mode');
+  });
+
+  it('starts calibration wizard, captures baseline, steps through all axes, and applies custom mapping', () => {
+    const mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      mapping: '',
+      axes: [0.0, 0.0, 0.0, 1.0, 0.0], // Initial state: Stick centered, Throttle at Idle (1.0)
+      buttons: [{ pressed: false, value: 0.0 }, { pressed: false, value: 0.0 }],
+    };
+    sim.controls.hotas.getGamepadsFn = () => [mockGamepad];
+
+    const dialog = new JoystickCheckDialog(sim);
+    dialog.open();
+
+    try {
+      // 1. Initial State: Wizard not active, calibrated badge hidden
+      assert.strictEqual(dialog.wizardActive, false);
+      assert.strictEqual(dialog.wizardPanel.style.display, 'none');
+      assert.strictEqual(dialog.calibratedBadge.style.display, 'none');
+
+      // 2. Start Wizard
+      dialog.btnStartWizard.click();
+      assert.strictEqual(dialog.wizardActive, true);
+      assert.strictEqual(dialog.wizardStep, 1);
+      assert.strictEqual(dialog.wizardPanel.style.display, 'block');
+      assert.ok(dialog.wizardTitle.textContent.includes('초기 기준점') || dialog.wizardTitle.textContent.includes('Baseline'));
+
+      // 3. Step 1 -> Next: Capture Baseline (Idle: Axis 3 is 1.0)
+      dialog.btnWizardNext.click();
+      assert.strictEqual(dialog.wizardStep, 2);
+      assert.deepStrictEqual(dialog.wizardBaseline, [0.0, 0.0, 0.0, 1.0, 0.0]);
+
+      // 4. Step 2 (Roll): Move stick to Right (Axis 0 = 0.8)
+      mockGamepad.axes[0] = 0.8;
+      sim.controls.hotas.update(1 / 60);
+      dialog.updateTelemetry();
+      assert.strictEqual(dialog.wizardCandidate, 0);
+      assert.ok(dialog.wizardDetected.textContent.includes('Axis 0'));
+      dialog.btnWizardNext.click();
+      assert.strictEqual(dialog.wizardStep, 3);
+      assert.strictEqual(dialog.wizardMapping.rollAxis, 0);
+
+      // 5. Step 3 (Pitch): Move stick forward (Axis 1 = -0.9)
+      mockGamepad.axes[0] = 0.0;
+      mockGamepad.axes[1] = -0.9;
+      sim.controls.hotas.update(1 / 60);
+      dialog.updateTelemetry();
+      assert.strictEqual(dialog.wizardCandidate, 1);
+      assert.ok(dialog.wizardDetected.textContent.includes('Axis 1'));
+      dialog.btnWizardNext.click();
+      assert.strictEqual(dialog.wizardStep, 4);
+      assert.strictEqual(dialog.wizardMapping.pitchAxis, 1);
+
+      // 6. Step 4 (Throttle): Push throttle forward to TOGA (Axis 3: 1.0 -> -1.0)
+      mockGamepad.axes[1] = 0.0;
+      mockGamepad.axes[3] = -1.0;
+      sim.controls.hotas.update(1 / 60);
+      dialog.updateTelemetry();
+      assert.strictEqual(dialog.wizardCandidate, 3);
+      assert.ok(dialog.wizardDetected.textContent.includes('Axis 3'));
+      dialog.btnWizardNext.click();
+      assert.strictEqual(dialog.wizardStep, 5);
+      assert.strictEqual(dialog.wizardMapping.throttleAxis, 3);
+      assert.strictEqual(dialog.wizardMapping.throttleIdleVal, 1.0);
+      assert.strictEqual(dialog.wizardMapping.throttleMaxVal, -1.0);
+
+      // 7. Step 5 (Rudder): Squeeze rocker paddle on Axis 4 (0.0 -> 0.7)
+      mockGamepad.axes[4] = 0.7;
+      sim.controls.hotas.update(1 / 60);
+      dialog.updateTelemetry();
+      assert.strictEqual(dialog.wizardCandidate, 4);
+      assert.ok(dialog.wizardDetected.textContent.includes('Axis 4'));
+      dialog.btnWizardNext.click();
+      assert.strictEqual(dialog.wizardStep, 6);
+      assert.strictEqual(dialog.wizardMapping.rudderAxis, 4);
+
+      // 8. Step 6 (Brakes): Press main trigger (Button 0)
+      mockGamepad.axes[4] = 0.0;
+      mockGamepad.buttons[0] = { pressed: true, value: 1.0 };
+      sim.controls.hotas.update(1 / 60);
+      dialog.updateTelemetry();
+      assert.strictEqual(dialog.wizardCandidate, 0);
+      assert.ok(dialog.wizardDetected.textContent.includes('Button 0'));
+      dialog.btnWizardNext.click();
+      assert.strictEqual(dialog.wizardStep, 7);
+      assert.strictEqual(dialog.wizardMapping.brakesButton, 0);
+
+      // 9. Step 7 (Summary): Click Save
+      assert.strictEqual(dialog.wizardSummary.style.display, 'block');
+      assert.ok(dialog.wizardSummary.textContent.includes('Axis 0'));
+      assert.ok(dialog.wizardSummary.textContent.includes('Axis 1'));
+      assert.ok(dialog.wizardSummary.textContent.includes('Axis 3'));
+      assert.ok(dialog.wizardSummary.textContent.includes('Axis 4'));
+      dialog.btnWizardNext.click();
+
+      // 10. Verify wizard finished and customMapping applied
+      assert.strictEqual(dialog.wizardActive, false);
+      assert.strictEqual(dialog.wizardPanel.style.display, 'none');
+      const hotasCfg = sim.controls.hotas.getConfig();
+      assert.ok(hotasCfg.customMapping);
+      assert.strictEqual(hotasCfg.customMapping.throttleAxis, 3);
+      assert.strictEqual(hotasCfg.customMapping.rudderAxis, 4);
+      assert.strictEqual(dialog.calibratedBadge.style.display, 'inline-block');
+      assert.strictEqual(dialog.btnResetCal.style.display, 'inline-block');
+
+      // Telemetry should now show [맞춤 보정: Axis ...]
+      dialog.updateTelemetry();
+      assert.ok(dialog.sourceThrottle.textContent.includes('맞춤 보정: Axis 3'));
+      assert.ok(dialog.sourceRudder.textContent.includes('맞춤 보정: Axis 4'));
+    } finally {
+      dialog.close();
+    }
+  });
+
+  it('supports skipping steps and resetting custom calibration', () => {
+    const mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      mapping: '',
+      axes: [0.0, 0.0, 0.0, 1.0, 0.0],
+      buttons: [{ pressed: false, value: 0.0 }],
+    };
+    sim.controls.hotas.getGamepadsFn = () => [mockGamepad];
+
+    const dialog = new JoystickCheckDialog(sim);
+    dialog.open();
+
+    try {
+      dialog.btnStartWizard.click();
+      dialog.btnWizardNext.click(); // Baseline
+      assert.strictEqual(dialog.wizardStep, 2);
+
+      // Skip Roll -> defaults to 0
+      dialog.btnWizardSkip.click();
+      assert.strictEqual(dialog.wizardStep, 3);
+      assert.strictEqual(dialog.wizardMapping.rollAxis, 0);
+
+      // Skip Pitch -> defaults to 1
+      dialog.btnWizardSkip.click();
+      assert.strictEqual(dialog.wizardStep, 4);
+      assert.strictEqual(dialog.wizardMapping.pitchAxis, 1);
+
+      // Skip Throttle -> defaults to 3
+      dialog.btnWizardSkip.click();
+      assert.strictEqual(dialog.wizardStep, 5);
+      assert.strictEqual(dialog.wizardMapping.throttleAxis, 3);
+
+      // Skip Rudder -> defaults to 2
+      dialog.btnWizardSkip.click();
+      assert.strictEqual(dialog.wizardStep, 6);
+      assert.strictEqual(dialog.wizardMapping.rudderAxis, 2);
+
+      // Skip Brakes -> defaults to 0
+      dialog.btnWizardSkip.click();
+      assert.strictEqual(dialog.wizardStep, 7);
+      assert.strictEqual(dialog.wizardMapping.brakesButton, 0);
+
+      // Save
+      dialog.btnWizardNext.click();
+      assert.strictEqual(dialog.wizardActive, false);
+      assert.ok(sim.controls.hotas.getConfig().customMapping);
+
+      // Reset Custom Calibration
+      dialog.btnResetCal.click();
+      assert.strictEqual(sim.controls.hotas.getConfig().customMapping, null);
+      assert.strictEqual(dialog.calibratedBadge.style.display, 'none');
+      assert.strictEqual(dialog.btnResetCal.style.display, 'none');
+    } finally {
+      dialog.close();
+    }
   });
 });

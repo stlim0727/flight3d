@@ -875,3 +875,112 @@ describe('HotasController - Diagnostic mode (Joystick Check Dialog live input)',
     assert.strictEqual(controls.spoilersToggled, 0);
   });
 });
+
+describe('HotasController - Custom Mapping (Calibration Wizard Profile)', () => {
+  function createMockControls() {
+    return {
+      pitchTrim: 0.0,
+      pitchTrimRate: 0.0,
+      throttle: 0.0,
+      parkingBrake: false,
+      inputBlocked: false,
+      aircraftControlsDisabled: false,
+      setParkingBrake(val) { this.parkingBrake = Boolean(val); },
+      onUserInteract() {},
+    };
+  }
+
+  it('uses custom mapping overrides for roll, pitch, throttle, rudder, and brakes', () => {
+    const controls = createMockControls();
+    // Simulate user hardware layout:
+    // Axis 0 = Roll, Axis 1 = Pitch, Axis 2 = Throttle Lever (Idle +1.0, TOGA -1.0)
+    // Axis 4 = Rocker paddle / Rudder (+0.75 right), Axis 3 = inert/ignored
+    // Button 0 = Main Trigger Brakes (value 0.8)
+    const customMapping = {
+      rollAxis: 0,
+      rollInverted: false,
+      pitchAxis: 1,
+      pitchInverted: false,
+      throttleAxis: 2,
+      throttleIdleVal: 1.0,
+      throttleMaxVal: -1.0,
+      throttleInverted: false,
+      rudderAxis: 4,
+      rudderInverted: false,
+      brakesButton: 0,
+      brakesAxis: -1,
+    };
+
+    let pad = {
+      id: 'Custom Controller',
+      index: 0,
+      axes: [0.6, -0.7, 1.0, 0.0, 0.75], // roll 0.6, dive -0.7, idle 1.0, ignored 0, rudder 0.75
+      buttons: [{ pressed: true, value: 0.8 }],
+    };
+
+    const hotas = new HotasController(controls, {
+      customMapping,
+      getGamepads: () => [pad],
+    });
+
+    hotas.update(1 / 60);
+
+    assert.ok(hotas.aileron > 0.5, `Roll mapped from axis 0, got ${hotas.aileron}`);
+    assert.ok(hotas.elevator < -0.6, `Pitch mapped from axis 1, got ${hotas.elevator}`);
+    assert.strictEqual(hotas.throttle, 0.0, 'Throttle idle +1.0 correctly maps to 0.0');
+    assert.ok(hotas.rudder > 0.6, `Rudder mapped from axis 4, got ${hotas.rudder}`);
+    assert.strictEqual(hotas.brakes, 0.8, 'Brakes mapped from button 0');
+
+    // Push throttle to 50% (axis 2 = 0.0)
+    pad = {
+      ...pad,
+      axes: [0.0, 0.0, 0.0, 0.0, 0.0],
+    };
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.throttle, 0.5, 'Throttle at mid-stroke maps to 0.5');
+
+    // Push throttle to 100% TOGA (axis 2 = -1.0)
+    pad = {
+      ...pad,
+      axes: [0.0, 0.0, -1.0, 0.0, 0.0],
+    };
+    hotas.update(1 / 60);
+    assert.strictEqual(hotas.throttle, 1.0, 'Throttle at full forward maps to 1.0');
+  });
+
+  it('supports pitchInverted and throttleInverted modifiers with custom mapping', () => {
+    const controls = createMockControls();
+    const customMapping = {
+      rollAxis: 0,
+      rollInverted: false,
+      pitchAxis: 1,
+      pitchInverted: false,
+      throttleAxis: 2,
+      throttleIdleVal: 1.0,
+      throttleMaxVal: -1.0,
+      throttleInverted: false,
+      rudderAxis: 4,
+      rudderInverted: false,
+      brakesButton: 0,
+      brakesAxis: -1,
+    };
+
+    const pad = {
+      id: 'Custom Controller',
+      index: 0,
+      axes: [0.0, 0.8, 1.0, 0.0, 0.0], // pitch pulled back (+0.8), throttle idle (+1.0)
+      buttons: [],
+    };
+
+    const hotas = new HotasController(controls, {
+      customMapping,
+      pitchInverted: true, // invert pitch
+      throttleInverted: true, // invert throttle
+      getGamepads: () => [pad],
+    });
+
+    hotas.update(1 / 60);
+    assert.ok(hotas.elevator < -0.7, 'Pitch inverted from positive to negative');
+    assert.strictEqual(hotas.throttle, 1.0, 'Throttle inverted maps idle (+1.0) to 1.0');
+  });
+});
