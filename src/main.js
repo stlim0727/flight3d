@@ -526,6 +526,9 @@ class FlightSimulator {
       const attribution = document.getElementById('incheon-attribution');
       attribution?.classList.remove('expanded');
       attribution?.querySelector('#incheon-attribution-chip')?.setAttribute('aria-expanded', 'false');
+      if (this.touchControls?.gyroRequested && !this.touchControls.gyroActive && !this.demoDirector?.isActive) {
+        this.touchControls.restoreGyroSettings();
+      }
     }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
     this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human');
@@ -646,6 +649,9 @@ class FlightSimulator {
       aircraft: this.lobby.aircraft ?? this.currentAircraftId,
       scenario: this.lobby.preset,
     });
+    if (!wantsDemo && this.touchControls?.gyroRequested && !this.touchControls?.gyroActive) {
+      this.touchControls.restoreGyroSettings();
+    }
   }
 
   async startValleyMission({ pilotKind = 'human' } = {}) {

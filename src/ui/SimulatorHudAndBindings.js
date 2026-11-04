@@ -496,7 +496,16 @@ class SimulatorHudAndBindingsMethods {
       onDemoProfile: id => { this.lobby.demoProfile = id; },
       getPilotMode: () => this.lobby.pilotMode || 'human',
       onPilotMode: mode => { this.lobby.pilotMode = mode; },
-      onToggleGyro: () => this.touchControls?.toggleGyro(),
+      onToggleGyro: () => {
+        if (!this.touchControls) return;
+        if (this.touchControls.gyroActive) {
+          this.touchControls.disableGyro();
+        } else if (this.touchControls.gyroRequested && this.touchControls.label !== 'gyro.resume') {
+          this.touchControls.disableGyro();
+        } else {
+          return this.touchControls.toggleGyro();
+        }
+      },
       isGyroActive: () => Boolean(this.touchControls?.gyroActive || this.touchControls?.gyroRequested),
       // Pending by design: the click records the wish; the start button applies it,
       // and only a flight actually flown is persisted.
