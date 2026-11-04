@@ -58,6 +58,16 @@ export function hangangHeight(x, z) {
   return d < 450 ? 0 : Math.min(8, (d - 450) * 0.2);
 }
 
+// Water footprint at mean level; Nodeulseom's base is dry land, even at y = 0.
+export function hangangIsWater(x, z, course = HANGANG_COURSE) {
+  if (Math.abs(x - riverCenter(z)) >= 450) return false;
+  const island = course.nodeulseom;
+  if (!island) return true;
+  const dx = (x - island.x) / island.bottomRadius;
+  const dz = (z - island.z) / (island.bottomRadius * island.zScale);
+  return dx * dx + dz * dz > 1;
+}
+
 // Deck streetlights every 55 m from the bridge centre, at least 50 m from either end.
 export function bridgeLampX(bridge) {
   const n = Math.floor((bridge.length / 2 - 50) / 55);

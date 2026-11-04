@@ -24,6 +24,10 @@ const grids=Object.fromEntries(Object.entries(metadata.grids).map(([key,d])=>{
 }));
 const surface=new IncheonFlightSurface(new IncheonTerrain(metadata,grids,JSON.parse(readFileSync(new URL('coastline.json',base)))));
 
+test('flight collision water membership follows the source coastline checkpoints',()=>{
+  for(const p of metadata.coast.checkpoints) assert.equal(surface.isWater(p.x,p.z),!p.land,p.name);
+});
+
 test('full runways retain frozen source endpoints and fit the loaded terrain',()=>{
   const bytes=gunzipSync(readFileSync(new URL('source.osm.json.gz',base)));
   assert.equal(createHash('sha256').update(bytes).digest('hex'),field.sourceSha256);

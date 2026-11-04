@@ -245,6 +245,8 @@ export class LuklaTerrain {
     return (h00 * (1 - fx) + h10 * fx) * (1 - fy) + (h01 * (1 - fx) + h11 * fx) * fy;
   }
 
+  isWater() { return false; }
+
   getHeight(x, z) {
     const naturalH = this.getNaturalHeight(x, z);
 

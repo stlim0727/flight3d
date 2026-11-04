@@ -79,6 +79,11 @@ export class IncheonFlightSurface {
     return this.source.getHeight(x,z)*(1-weight)+airfield.elevationM*weight;
   }
 
+  isWater(x,z) {
+    if (Math.max(Math.abs(x),Math.abs(z))>6000) return this.region ? !this.region.isLand(x,z) : true;
+    return !this.isLand(x,z);
+  }
+
   getHeight(x,z) {
     if (![x,z].every(Number.isFinite)) throw new Error('Invalid flight terrain coordinate');
     if (Math.max(Math.abs(x),Math.abs(z))>6000) return this.region?.getHeight(x,z) ?? 0;

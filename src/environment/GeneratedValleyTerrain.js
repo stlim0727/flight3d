@@ -399,6 +399,8 @@ export class GeneratedValleyTerrain {
     this.mesh.add(this.ribbonMesh);
   }
 
+  isWater() { return false; }
+
   getHeight(x, z) {
     return this.terrain.getHeight(x, z);
   }

@@ -31,6 +31,24 @@ test('NeonCity initializes ground, runway, retro sun, and skyscraper clusters', 
   assert.ok(sun.position.x > 5000, 'Sun should be placed on horizon in distance');
 });
 
+test('NeonCity sea-level ground contact is terrain, including after environment switches', () => {
+  const city = new NeonCity();
+  const ocean = { getHeight: () => -10, isWater: () => true };
+  const detector = new CollisionDetector(ocean, null);
+  detector.loadAircraftConfig({ id: 'C172' });
+  const position = new THREE.Vector3(0, 0.2, 1000);
+  const attitude = new THREE.Quaternion();
+  const velocity = new THREE.Vector3(30, 0, 0);
+  const check = () => detector.checkCollision(position, attitude, velocity, 0, 0, 0);
+  assert.equal(check().type, 'WATER');
+  for (let i = 0; i < 2; i++) {
+    detector.setEnvironment(city.terrain, city.airport, city);
+    assert.equal(check().type, 'TERRAIN');
+    detector.setEnvironment(ocean, null);
+    assert.equal(check().type, 'WATER');
+  }
+});
+
 test('NeonCity skyscrapers are large/tall with a central canyon wide enough for Cessna', () => {
   const city = new NeonCity();
 

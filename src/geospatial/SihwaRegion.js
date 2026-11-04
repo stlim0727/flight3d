@@ -38,6 +38,14 @@ export class SihwaRegion {
   }
 
   groundHeight(x,z) {
+    return this.sampleGroundHeight(x,z) ?? 0;
+  }
+
+  isLand(x,z) {
+    return this.sampleGroundHeight(x,z) !== null;
+  }
+
+  sampleGroundHeight(x,z) {
     if(![x,z].every(Number.isFinite))throw new Error('Invalid regional coordinate');
     const triangles=this.cells.get(`${Math.floor(x/100)},${Math.floor(z/100)}`)??[];
     const p=this.positions,ids=this.indices;
@@ -49,7 +57,7 @@ export class SihwaRegion {
       const dx=x-p[a],dz=z-p[a+2],u=(dx*cz-dz*cx)/det,v=(bx*dz-bz*dx)/det;
       if(u>=-1e-5 && v>=-1e-5 && u+v<=1.00001)return p[a+1]*(1-u-v)+p[b+1]*u+p[c+1]*v;
     }
-    return 0;
+    return null;
   }
 }
 

@@ -6,6 +6,7 @@ import { CollisionDetector } from '../src/physics/CollisionDetector.js';
 test('CollisionDetector (Multi-Obstacle & Crash Detection System)', async (t) => {
   // Mock terrain: flat runway plateau (12m) with hills in positive Z and ocean at Z > 3000
   const mockTerrain = {
+    isWater: (x, z) => z > 3000,
     getHeight: (x, z) => {
       if (z > 3000) return -10.0; // Ocean
       if (Math.abs(x) < 2000 && Math.abs(z) < 400) return 12.0; // Runway plateau

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HANGANG_COURSE, riverCenter, hangangHeight } from '../config/hangangCourse.js';
+import { HANGANG_COURSE, riverCenter, hangangHeight, hangangIsWater } from '../config/hangangCourse.js';
 import { createBridge, createBridgeMaterials } from './hangangBridges.js';
 import { createSeoulScenery } from './SeoulLandmarks.js';
 
@@ -10,7 +10,8 @@ export class HangangScene {
     this.group = new THREE.Group();
     this.group.name = 'Hangang training scenery';
     this.group.visible = false;
-    this.terrain = { getHeight: hangangHeight, getNormal: () => new THREE.Vector3(0, 1, 0) };
+    this.terrain = { getHeight: hangangHeight, getNormal: () => new THREE.Vector3(0, 1, 0),
+      isWater: (x, z) => hangangIsWater(x, z, course), waterLevel: course.waterLevel };
     this.airport = { isOnRunway: () => false, update() {} };
 
     // Deep nocturnal water with high specular sheen to capture the sunset horizon reflection

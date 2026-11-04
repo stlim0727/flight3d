@@ -57,6 +57,11 @@ export class Terrain {
     this.initTerrain();
   }
 
+  isWater(x, z) {
+    // This coastal map's ocean covers the terrain below its mean sea level.
+    return this.getHeight(x, z) < 0;
+  }
+
   /**
    * Analytical height function for terrain at world (x, z)
    * CONTRACT: Analytical source of truth for all physics, collision, and placement systems.

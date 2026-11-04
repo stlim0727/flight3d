@@ -206,6 +206,7 @@ export class NeonCity {
     this.terrain = {
       mesh: this.group,
       isLoaded: true,
+      isWater: () => false,
       getHeight: (x, z) => this.getHeight(x, z),
       getNormal: (x, z) => this.getNormal(x, z),
     };

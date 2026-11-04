@@ -506,18 +506,15 @@ export class CollisionDetector {
   }
 
   checkWater(aircraftPos, worldProbes, speedMs, vsiMs) {
-    if (!this.terrain) return null;
+    // Surface membership belongs to the map, never to elevation or mesh visibility.
+    if (typeof this.terrain?.isWater !== 'function') return null;
 
-    const terrainH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
-    // Water is located where natural terrain is at or below sea level (elevation <= 2.5m)
-    if (terrainH > 2.5) return null;
-
-    const waterLevel = 0.0;
-    // Ditching / crashing into water: speed > 15 m/s (~30 knots) or vertical descent > 3.0 m/s
+    const waterLevel = this.terrain.waterLevel ?? 0;
+    // Retain the existing impact-speed gate and 0.5 m contact tolerance.
     if (speedMs < 5.0 && Math.abs(vsiMs) < 1.0) return null; // Stationary boat/seaplane safe state
 
     for (const probe of worldProbes) {
-      if (probe.pos.y <= waterLevel + 0.5) {
+      if (probe.pos.y <= waterLevel + 0.5 && this.terrain.isWater(probe.pos.x, probe.pos.z)) {
         return { point: probe.pos.clone() };
       }
     }
