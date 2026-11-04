@@ -341,6 +341,9 @@ export class JoystickCheckDialog {
     if (this.isOpen || !this.dialog) return;
     this.isOpen = true;
     this.dialog.hidden = false;
+    // Keep controller outputs mapped from live axes while the meters poll,
+    // without writing anything through to the aircraft.
+    if (this.hotas) this.hotas.diagnosticActive = true;
 
     // Populate current config
     const config = this.hotas?.getConfig() || {};
@@ -374,6 +377,7 @@ export class JoystickCheckDialog {
     if (!this.isOpen || !this.dialog) return;
     this.isOpen = false;
     this.dialog.hidden = true;
+    if (this.hotas) this.hotas.diagnosticActive = false;
     if (this.rafId) {
       this._cancelFrame(this.rafId);
       this.rafId = null;
@@ -389,6 +393,9 @@ export class JoystickCheckDialog {
   startLoop() {
     const step = () => {
       if (!this.isOpen) return;
+      // The flight loop may be frozen while a menu holds this dialog open, so
+      // sample the controller here; diagnostic mode keeps it aircraft-neutral.
+      this.hotas?.update(1 / 60);
       this.updateTelemetry();
       this.rafId = this._requestFrame(step);
     };

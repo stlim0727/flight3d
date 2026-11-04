@@ -434,4 +434,35 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
       dialog.close();
     }
   });
+
+  it('activates diagnostic mode while open so meters respond with flight input blocked', async () => {
+    const mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      mapping: '',
+      axes: [0.6, -0.8, 0.5, -1.0, 0.0], // Roll right, Pitch down, Rudder right, TOGA
+      buttons: [{ pressed: true, value: 1.0 }],
+    };
+    sim.controls.inputBlocked = true; // exactly the frozen-menu state that used to kill the meters
+    sim.controls.hotas.getGamepadsFn = () => [mockGamepad];
+
+    const dialog = new JoystickCheckDialog(sim);
+    assert.strictEqual(sim.controls.hotas.diagnosticActive, false);
+
+    dialog.open();
+    try {
+      assert.strictEqual(sim.controls.hotas.diagnosticActive, true, 'Open dialog must request diagnostic sampling');
+
+      // Let the dialog's own rAF loop drive hotas.update; the flight loop is frozen.
+      await new Promise((resolve) => setTimeout(resolve, 40));
+
+      assert.ok(dialog.valRoll.textContent.includes('Right'), `Roll meter live while blocked, got "${dialog.valRoll.textContent}"`);
+      assert.ok(dialog.valPitch.textContent.includes('Dive'), `Pitch meter live while blocked, got "${dialog.valPitch.textContent}"`);
+      assert.ok(dialog.valThrottle.textContent.includes('TOGA 100%'), `Throttle meter live while blocked, got "${dialog.valThrottle.textContent}"`);
+      assert.strictEqual(sim.controls.throttle, undefined, 'Diagnostic mode must not write aircraft controls');
+    } finally {
+      dialog.close();
+    }
+    assert.strictEqual(sim.controls.hotas.diagnosticActive, false, 'Closing the dialog ends diagnostic mode');
+  });
 });
