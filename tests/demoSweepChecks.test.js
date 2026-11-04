@@ -574,7 +574,7 @@ test('an intermittent known issue absorbs every line of one fault and stays quie
     ...recover, aglM: 3.9,
   }, {
     stage: -1, active: false, crashed: true, crashType: 'WATER',
-    crashDescription: 'The aircraft hit the ocean surface at high speed.',
+    crashDescription: 'The aircraft hit the surface at high speed.',
   }]);
   assert.deepEqual(outcome.fails, [], JSON.stringify(outcome.fails));
   assert.equal(outcome.knownIssues.length, 3, 'the dive writes three faults and one declaration cannot absorb them all');

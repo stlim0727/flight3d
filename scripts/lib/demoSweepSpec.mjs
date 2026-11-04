@@ -127,7 +127,7 @@ export const ROUTES = [
       },
       {
         contains: ['CRASH WATER'], intermittent: true,
-        note: 'the terminal event of the same fault — "The aircraft hit the ocean surface at '
+        note: 'the terminal event of the same fault — "The aircraft hit the surface at '
           + 'high speed" at 86 kt, a second or two after the clearance violations above.',
       },
     ],

@@ -26,7 +26,7 @@ export default {
   'debrief.impactSpeed': '충돌 속도',
   'debrief.impactTime': '충돌 시점',
   'debrief.impactTarget': '충돌 대상',
-  'debrief.target.WATER': '수면',
+  'debrief.target.WATER': '지표면',
   'debrief.target.TERRAIN': '지형',
   'debrief.target.BUILDING': '건물',
   'debrief.target.TOWER': '관제탑',
