@@ -11,8 +11,15 @@ if (!['gemini-2.5-flash-preview-tts', 'gemini-3.1-flash-tts-preview'].includes(m
 const voices = { pilot: 'Charon', crew: 'Fenrir', apron: 'Kore', ground: 'Kore', tower: 'Kore' };
 const output = path.resolve('public/audio/departure');
 const cache = path.resolve('.cache/gemini-departure');
-const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-if (!key) throw new Error('Set GEMINI_API_KEY in the authoring environment.');
+let key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_FREE_KEY;
+if (!key) {
+  try {
+    const envFile = await fs.readFile(path.join(os.homedir(), '.env'), 'utf8');
+    const match = envFile.match(/(?:GEMINI_API_KEY|GOOGLE_API_KEY|GEMINI_FREE_KEY)=(.*)/);
+    if (match) key = match[1].trim();
+  } catch {}
+}
+if (!key) throw new Error('Set GEMINI_API_KEY in the authoring environment or ~/.env.');
 execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
 await fs.mkdir(cache, { recursive: true });
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'flight3d-gemini-'));
