@@ -305,6 +305,41 @@ test('a pre-ready page hide flushes with its own reason', async () => {
   assert.equal(captured[0].properties.outcome, 'never-ready');
 });
 
+test('a tab hidden after ready reports the completed boot, not a partial one', async () => {
+  _resetAnalyticsForTesting(null);
+  const captured = [];
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties) => captured.push({ eventName, properties }),
+    flush: () => {},
+  });
+  const g = fixture({ resourceEntries: [resource('https://flight3d.test/models/a.glb', 100, 400)] });
+  let monitor;
+  withWindow(g, () => {
+    monitor = install(null, g);
+    g.currentTime = 6000;
+    g.document.body.classList.remove('booting');
+    FakeMutation.instances.forEach(o => o.fire());
+    g.document.visibilityState = 'hidden';
+    g.dispatch('visibilitychange');
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(captured.length, 1);
+  const props = captured[0].properties;
+  // The hide branch must not fall into shouldEmitPartialTrace once the boot is done: that would
+  // quietly downgrade a finished load to never-ready and spend the only row it was going to send.
+  assert.equal(props.outcome, 'ready');
+  assert.equal(props.flushReason, 'hidden');
+  assert.equal(props.readyMs, 6000);
+  assert.equal(props.postReadyMs, 0);
+
+  withWindow(g, () => {
+    g.dispatch('pagehide');
+    monitor.emit();
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(captured.length, 1, 'the hidden flush was final, so nothing follows it');
+});
+
 test('a partial flush does not spend the final report for the same boot', async () => {
   _resetAnalyticsForTesting(null);
   const captured = [];

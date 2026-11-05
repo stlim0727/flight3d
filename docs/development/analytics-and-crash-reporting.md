@@ -102,19 +102,23 @@ Expected quirks in the data:
   procedurally (`ctx.createBuffer`, oscillators); the only real fetch is
   `src/audio/DepartureRadio.js`, driven from `src/director/scenarios/IncheonDepartureScenario.js`
   long after `ready`.
-- `backgroundBoot: true` means the tab was created hidden, so no paint or LCP is meaningful.
+- `backgroundBoot: true` means the load ran out of sight: the tab never became visible, or it became
+  visible only after the overlay had lifted. Paint and LCP on such a row describe the reveal, not the
+  boot. A load that was visible from install reports `false`.
 
-Health query — the capture rate is the instrument for this whole feature:
+Health query — the capture rate is the instrument for this whole feature. `events` has no `name`
+column; group on `event` and read custom fields through `properties.<field>`:
 
 ```sql
-SELECT e.name, count() FROM events AS e
-WHERE event = '$pageview' OR event = 'startup_trace'
-GROUP BY e.name
+SELECT event, count() FROM events
+WHERE (event = '$pageview' OR event = 'startup_trace') AND timestamp > now() - INTERVAL 30 DAY
+GROUP BY event
 ```
 
-`startup_trace ÷ $pageview` should be ≥ 0.8; the v1 field data was 6 ÷ 46 ≈ 0.13. Filter or split
-by `properties.outcome` before reading any percentile, and remember that everything here is
-`event = 'startup_trace'` plus `properties.<field>` — PostHog properties are not top-level columns.
+`startup_trace ÷ $pageview` should be ≥ 0.8. The v1 field data measured 6 ÷ 46 ≈ 0.13 over 24 h and
+18 ÷ 86 ≈ 0.21 over 30 days (both verified against the EU project with the read-only key). Split by
+`properties.outcome` before reading any percentile: `never-ready` rows carry `readyMs: null`, so an
+average silently drops the loads this feature was added to capture.
 
 3. **In-Game Bug Report Dialog**:
    - Available on the mission score overlay (`[data-score-report]`) and flight debrief (`#debrief-feedback`).
@@ -124,7 +128,8 @@ by `properties.outcome` before reading any percentile, and remember that everyth
 
 `scripts/lib/posthogDashboard.mjs` declares the "Flight3d Overview" dashboard (flights/day, outcomes, players by country world map, players by region and city table,
 start→end funnel, breakdowns by aircraft/scenario/airport, pilot mode, crash types, duration, score,
-startup time, feedback, exceptions). Create or update it in PostHog (idempotent):
+boot-to-interactive and reached-a-cockpit timings broken down by `outcome`, feedback, exceptions).
+Create or update it in PostHog (idempotent):
 
 ```sh
 POSTHOG_PERSONAL_API_KEY=phx_... POSTHOG_PROJECT_ID=<id> npm run posthog:dashboard
@@ -134,3 +139,7 @@ npm run posthog:dashboard -- --dry-run   # list insights without calling the API
 The personal API key needs `dashboard:write` and `insight:write` scopes. Set `POSTHOG_APP_HOST` for
 US Cloud (`https://us.posthog.com`); the default is EU. Never commit the key. Query shapes were not
 verified against a live project; check the first run's output.
+
+The script adds an insight only when its **name** is not already on the dashboard, so renaming a tile
+here leaves the old one in PostHog and editing a query under an existing name does nothing. Delete or
+edit the stale tile in the UI after a rename.

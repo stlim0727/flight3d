@@ -278,7 +278,7 @@ test('milestones ignore non-finite values and map onto the navigation payload', 
   assert.equal(report.capability.lcp, false);
 });
 
-test('backgroundBoot flags a load that finished while the tab was hidden', () => {
+test('backgroundBoot flags every load that ran out of sight, including a killed background tab', () => {
   const s = state();
   noteReady(s, 90_000);
   noteFirstVisible(s, 120_000);
@@ -287,7 +287,14 @@ test('backgroundBoot flags a load that finished while the tab was hidden', () =>
   noteReady(lit, 9000);
   noteFirstVisible(lit, 1000);
   assert.equal(buildStartupTraceReport(lit, {}).backgroundBoot, false);
-  assert.equal(buildStartupTraceReport(state(), {}).backgroundBoot, false);
+  // The mobile bounce this whole feature exists to capture: created hidden, never revealed, so
+  // there is no visible mark at all. Reporting false here would hide the population in a segment.
+  assert.equal(buildStartupTraceReport(state(), {}).backgroundBoot, true,
+    'a load with no visible mark was never in the foreground');
+  // Revealed before the overlay lifted: the paint timings are real, so this is not a background boot.
+  const revealed = state();
+  noteFirstVisible(revealed, 20_000);
+  assert.equal(buildStartupTraceReport(revealed, {}).backgroundBoot, false);
 });
 
 test('startup selection survives the analytics context merge', () => {

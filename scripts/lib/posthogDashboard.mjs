@@ -41,7 +41,8 @@ export const INSIGHTS = [
   ['Crashes by aircraft', trends([ev('flight_crashed')], { breakdown: 'aircraft', display: 'ActionsBarValue' })],
   ['Average flight duration (s)', trends([avg('flight_ended', 'durationSeconds')])],
   ['Average score', trends([avg('flight_ended', 'score')], { breakdown: 'scenario', display: 'ActionsBarValue' })],
-  ['Startup time (ms)', trends([avg('startup_trace', 'fcpMs'), avg('startup_trace', 'firstFrameMs'), avg('startup_trace', 'readyMs')])],
+  ['Boot to interactive (ms)', trends([avg('startup_trace', 'fcpMs'), avg('startup_trace', 'lobbyReadyMs')])],
+  ['Reached a cockpit (ms)', trends([avg('startup_trace', 'readyMs'), avg('startup_trace', 'firstFrameMs')], { breakdown: 'outcome' })],
   ['User feedback submitted', trends([ev('user_feedback_submitted')])],
   ['JS exceptions', trends([ev('$exception')])],
 ];

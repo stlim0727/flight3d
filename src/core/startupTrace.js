@@ -379,9 +379,11 @@ export function buildStartupTraceReport(state, { marks = {}, longTasks = null, n
       ? state.documentTransferSize === 0
       : null,
     fcpMs: state.milestones.firstContentfulPaint ?? null,
-    backgroundBoot: state.firstVisibleMs !== null && ready !== null
-      ? state.firstVisibleMs > ready
-      : false,
+    // Paint and LCP only mean something for a load that ran in the foreground. A tab created hidden
+    // gets no visible mark until the user reveals it, so "never visible" counts as a background boot
+    // rather than reporting false for the population that is killed before ever being seen.
+    backgroundBoot: state.firstVisibleMs === null
+      || (ready !== null && state.firstVisibleMs > ready),
     ...state.selection,
     capability: { ...state.capability },
     navigation: {

@@ -234,7 +234,10 @@ function pageOrigin(g) {
   return origin.startsWith('http') ? `${origin}/` : '';
 }
 
-/** Per-load join key. PostHog's own `$window_id` survives reloads in one tab, so it cannot pair a partial trace with its final one. */
+/**
+ * Per-load join key. PostHog's own `$window_id` survives reloads inside one tab, so it cannot pair
+ * a partial trace with the final one for the same boot.
+ */
 function newBootId(g) {
   if (typeof g.crypto?.randomUUID === 'function') return g.crypto.randomUUID();
   return `boot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
