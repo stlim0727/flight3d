@@ -59,7 +59,8 @@ import {
   saveFlightSelection,
 } from './config/flightSelection.js';
 import { resolveFlightUrl } from './config/flightUrls.js';
-import { loadSimulatorPreferences, restoreSimulatorPreferences, saveSimulatorPreferences } from './config/simulatorPreferences.js';
+import { applyDeviceTimeOfDay, loadSimulatorPreferences, restoreSimulatorPreferences,
+  saveSimulatorPreferences } from './config/simulatorPreferences.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 import { initBuildInfo } from './ui/BuildInfo.js';
@@ -628,6 +629,11 @@ class FlightSimulator {
     const wantsValley = this.lobby.preset === 'valley';
     if (this.demoDirector?.isActive || this.demoDirector?.waitingForTerrain) {
       this.demoDirector.stop(wantsDemo ? null : () => t('manual.control.engaged'));
+    }
+    // The lobby backdrop demo scripts its own sky; without a saved or chosen time a
+    // flown sortie starts at the device's local time, not the demo's last setting.
+    if (!wantsDemo && this.demoDirector && !this.demoDirector.userTimeOfDayOverridden) {
+      applyDeviceTimeOfDay(this);
     }
     this.gameFlow.enterFlight();
     // setAirport may have clamped the scenario to the region it loaded.
