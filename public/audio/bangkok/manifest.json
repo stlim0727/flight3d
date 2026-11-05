@@ -1,0 +1,209 @@
+{
+  "gate": {
+    "file": "gate.wav",
+    "duration": 50.32,
+    "provider": "Gemini",
+    "model": "gemini-3.1-flash-tts-preview",
+    "lines": [
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Incheon Delivery, Jeju Air Two-Five-Zero-Three, Gate 32, Information Bravo, request IFR clearance to Bangkok."
+      },
+      {
+        "speaker": "delivery",
+        "voice": "Kore",
+        "text": "Jeju Air Two-Five-Zero-Three, Incheon Delivery, cleared to Bangkok Airport via SEL1N departure, flight planned route. Climb and maintain flight level 190, squawk 5102."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Cleared to Bangkok Airport via SEL1N departure, climb and maintain flight level 190, squawk 5102, Jeju Air Two-Five-Zero-Three."
+      },
+      {
+        "speaker": "delivery",
+        "voice": "Kore",
+        "text": "Jeju Air Two-Five-Zero-Three, read-back is correct. Contact Ground on 121.4 for pushback."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Incheon Ground, Jeju Air Two-Five-Zero-Three, Gate 32, request pushback and start."
+      },
+      {
+        "speaker": "ground",
+        "voice": "Kore",
+        "text": "Jeju Air Two-Five-Zero-Three, Incheon Ground, pushback and start approved, face South, Runway 34R."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Pushback and start approved, face South, runway 34R, Jeju Air Two-Five-Zero-Three."
+      }
+    ]
+  },
+  "pushback": {
+    "file": "pushback.wav",
+    "duration": 4.82,
+    "provider": "Gemini",
+    "model": "gemini-3.1-flash-tts-preview",
+    "lines": [
+      {
+        "speaker": "crew",
+        "voice": "Fenrir",
+        "text": "Brakes released, commencing pushback."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Pushback acknowledged, starting engines."
+      }
+    ]
+  },
+  "disconnect": {
+    "file": "disconnect.wav",
+    "duration": 8.42,
+    "provider": "Gemini",
+    "model": "gemini-3.1-flash-tts-preview",
+    "lines": [
+      {
+        "speaker": "crew",
+        "voice": "Fenrir",
+        "text": "Pushback complete. Set parking brake. Stand by for equipment clearance."
+      },
+      {
+        "speaker": "crew",
+        "voice": "Fenrir",
+        "text": "Tug disconnected, all equipment clear. Have a good flight to Bangkok!"
+      }
+    ]
+  },
+  "taxi": {
+    "file": "taxi.wav",
+    "duration": 28.18,
+    "provider": "Gemini",
+    "model": "gemini-3.1-flash-tts-preview",
+    "lines": [
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Incheon Ground, Jeju Air Two-Five-Zero-Three, request taxi."
+      },
+      {
+        "speaker": "ground",
+        "voice": "Kore",
+        "text": "Jeju Air Two-Five-Zero-Three, taxi to holding point runway 34R via taxiway November 2 and Alpha, hold short of runway 34R."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Taxi to holding point runway 34R via November 2 and Alpha, hold short of runway 34R, Jeju Air Two-Five-Zero-Three."
+      },
+      {
+        "speaker": "ground",
+        "voice": "Kore",
+        "text": "Jeju Air Two-Five-Zero-Three, contact Tower on 118.2."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Tower on 118.2, Jeju Air Two-Five-Zero-Three."
+      }
+    ]
+  },
+  "hold": {
+    "file": "hold.wav",
+    "duration": 14.06,
+    "provider": "Gemini",
+    "model": "gemini-3.1-flash-tts-preview",
+    "lines": [
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Incheon Tower, Jeju Air Two-Five-Zero-Three, holding short of runway 34R."
+      },
+      {
+        "speaker": "tower",
+        "voice": "Kore",
+        "text": "Jeju Air Two-Five-Zero-Three, Incheon Tower, line up and wait runway 34R."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Line up and wait runway 34R, Jeju Air Two-Five-Zero-Three."
+      }
+    ]
+  },
+  "lineup": {
+    "file": "lineup.wav",
+    "duration": 9.7,
+    "provider": "Gemini",
+    "model": "gemini-3.1-flash-tts-preview",
+    "lines": [
+      {
+        "speaker": "tower",
+        "voice": "Kore",
+        "text": "Jeju Air Two-Five-Zero-Three, wind 290 at 8 knots, runway 34R, cleared for takeoff."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Cleared for takeoff, runway 34R, Jeju Air Two-Five-Zero-Three."
+      }
+    ]
+  },
+  "clearance": {
+    "file": "clearance.wav",
+    "duration": 7.1,
+    "provider": "Gemini",
+    "model": "gemini-3.1-flash-tts-preview",
+    "lines": [
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Takeoff clearance confirmed. 80 knots, V1, rotate, positive rate, gear up."
+      }
+    ]
+  },
+  "takeoff": {
+    "file": "takeoff.wav",
+    "duration": 9.94,
+    "provider": "Gemini",
+    "model": "gemini-3.1-flash-tts-preview",
+    "lines": [
+      {
+        "speaker": "tower",
+        "voice": "Kore",
+        "text": "Jeju Air Two-Five-Zero-Three, contact Departure on 125.15. Good day."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Departure 125.15, Jeju Air Two-Five-Zero-Three. Thank you, good day."
+      }
+    ]
+  },
+  "departure": {
+    "file": "departure.wav",
+    "duration": 21.06,
+    "provider": "Gemini",
+    "model": "gemini-3.1-flash-tts-preview",
+    "lines": [
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Incheon Departure, Jeju Air Two-Five-Zero-Three, passing 2,500 for flight level 190."
+      },
+      {
+        "speaker": "departure",
+        "voice": "Kore",
+        "text": "Jeju Air Two-Five-Zero-Three, Incheon Departure, radar contact. Climb and maintain flight level 290, turn right heading 210."
+      },
+      {
+        "speaker": "pilot",
+        "voice": "Charon",
+        "text": "Climb and maintain flight level 290, turn right heading 210, Jeju Air Two-Five-Zero-Three."
+      }
+    ]
+  }
+}

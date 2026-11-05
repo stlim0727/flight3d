@@ -61,6 +61,8 @@ function fixture(withVoiceOverlay = false) {
       setFlapPosition() {}
     },
     aircraft: { group: new THREE.Group() },
+    currentAircraftId: 'B738',
+    activeAirport: 'incheon',
     telemetry: {
       headingDeg: DEPARTURE_GATE.heading * 180 / Math.PI,
       iasKnots: 0,
@@ -144,8 +146,8 @@ test('JejuBangkokDepartureScenario initializes gate with authentic 5-stage Bangk
   assert.ok(gateText.includes('121.4'));
 });
 
-test('at disconnect stage with voice challenge, options A and B are presented for Jeju Air 2503', () => {
-  const f = fixture(true);
+test('disconnect stage advances automatically to taxi in spectator mode when tug clears and radio completes', () => {
+  const f = fixture(false);
   const { director, scenario, sim } = f;
 
   finishAtc(scenario);
@@ -168,44 +170,32 @@ test('at disconnect stage with voice challenge, options A and B are presented fo
   finishAtc(scenario);
 
   scenario.update(0.1);
+  assert.equal(director.currentStage, S.TAXI, 'automatically proceeds to taxi in spectator mode');
+});
+
+test('requesting manual control for Jeju Air 2503 triggers voice challenge overlay with 2503 callsign options', () => {
+  const f = fixture(true);
+  const { sim } = f;
+
+  const realDirector = new DemoFlightDirector(sim);
+  realDirector.start('incheon', 'jeju-bangkok-2503');
+
+  let stopped = false;
+  realDirector.stop = () => {
+    stopped = true;
+    realDirector.isActive = false;
+  };
+
+  realDirector.requestManualControl();
   assert.equal(f.getChallengeShown(), true);
 
   const options = f.getChallengeOptions();
   assert.equal(options.length, 2);
   assert.ok(options[0].phrases.some(p => p.includes('2503')));
-  assert.ok(options[1].phrases.some(p => p.includes('taxi') || p.includes('지상 이동')));
+  assert.ok(options[1].phrases.some(p => p.includes('autopilot') || p.includes('오토파일럿')));
 
-  // Option B advances to taxi stage
-  f.passChallenge(options[1]);
-  assert.equal(director.currentStage, S.TAXI);
-});
-
-test('option A at disconnect hands over manual control to user', () => {
-  const f = fixture(true);
-  const { director, scenario, sim } = f;
-
-  finishAtc(scenario);
-  director.stageTimer = 7;
-  scenario.update(0.1);
-  assert.equal(director.currentStage, S.PUSHBACK);
-
-  finishAtc(scenario);
-  const end = departurePushbackPose(1);
-  sim.position.x = end.x;
-  sim.position.z = end.z;
-  sim.quaternion.setFromEuler(new THREE.Euler(0, -end.heading, 0, 'YXZ'));
-  scenario.update(0.6);
-  scenario.update(0.6);
-  assert.equal(director.currentStage, S.DISCONNECT);
-
-  scenario.tug.userData.animation.clear = true;
-  scenario.tug.userData.animation.distance = 26;
-  finishAtc(scenario);
-  scenario.update(0.1);
-
-  const options = f.getChallengeOptions();
   f.passChallenge(options[0]);
-  assert.equal(director.stopped, true);
+  assert.equal(stopped, true, 'hands over manual control upon passing voice challenge');
 });
 
 test('takeoff and climb stages execute tower handoff and heading 210 turn towards Bangkok', () => {

@@ -18,7 +18,10 @@ function fixture() {
     controls: { setVirtualInput: (k,v) => { inputs[k]=v; }, setParkingBrake() {} },
     gear: { onGround: true, cgGroundHeightM: 3.5, setGearTarget() {} },
     aero: { mass: 66000, invIzz: 1/4850000, setFlapPosition() {} },
-    aircraft: { group: new THREE.Group() }, telemetry: { headingDeg: DEPARTURE_GATE.heading*180/Math.PI, iasKnots: 0 },
+    aircraft: { group: new THREE.Group() },
+    currentAircraftId: 'B738',
+    activeAirport: 'incheon',
+    telemetry: { headingDeg: DEPARTURE_GATE.heading*180/Math.PI, iasKnots: 0 },
     setPreset() {},
   };
   const director = { stageTimer: 0, totalTimer: 0, currentStage: S.GATE,
@@ -173,39 +176,45 @@ test('taxi and runway entry wait for instructions and readbacks even without aud
   assert.equal(moves,2);
 });
 
-test('disconnect triggers voice challenge overlay when present and transitions to manual taxi upon passing', () => {
+test('disconnect advances automatically to taxi in spectator mode when tug clears and radio completes', () => {
   const {sim,director,scenario,inputs}=fixture();
+  director.setStage(S.DISCONNECT);
+  scenario.tug.userData.animation.distance = 26;
+  scenario.tug.userData.animation.speed = 0;
+  scenario.tug.userData.animation.clear = true;
+  for (let i = 0; i < 50 && director.currentStage !== S.TAXI; i++) {
+    finishAtc(scenario);
+    scenario.update(0.1);
+  }
+  assert.equal(director.currentStage, S.TAXI, 'automatically proceeds to taxi in spectator mode');
+});
+
+test('requesting manual control during incheon departure triggers voice challenge overlay', () => {
+  const {sim,director,scenario}=fixture();
   let challengeShown = false;
   let passedOptions = null;
-  let stoppedMessage = null;
+  let stopped = false;
 
   sim.voiceChallengeOverlay = {
     show({ options, onPass }) {
       challengeShown = true;
       passedOptions = options;
-      // Simulate user passing challenge with option A
       onPass({ option: options[0], score: 0.95 });
     },
     hide() {}
   };
 
-  director.stop = (msg) => {
-    stoppedMessage = typeof msg === 'function' ? msg() : msg;
-    scenario.stop();
+  const realDirector = new DemoFlightDirector(sim);
+  realDirector.start('incheon');
+  realDirector.stop = () => {
+    stopped = true;
+    realDirector.isActive = false;
   };
 
-  director.setStage(S.DISCONNECT);
-  scenario.tug.userData.animation.distance = 26;
-  scenario.tug.userData.animation.speed = 0;
-  scenario.tug.userData.animation.clear = true;
-  for (let i = 0; i < 50 && !challengeShown; i++) {
-    finishAtc(scenario);
-    scenario.update(0.1);
-  }
-
+  realDirector.requestManualControl();
   assert.equal(challengeShown, true, 'voice challenge overlay was shown');
   assert.equal(passedOptions.length, 2, 'presents options A and B');
   assert.equal(passedOptions[0].id, 'a');
   assert.equal(passedOptions[1].id, 'b');
-  assert.ok(stoppedMessage, 'scenario stopped to hand off to manual taxi');
+  assert.equal(stopped, true, 'scenario stopped to hand off to manual control');
 });

@@ -2,9 +2,10 @@ import { DEPARTURE_RADIO } from '../config/departureRadio.js';
 
 /** Bundled radio speech. It shares the master gain, but not exterior attenuation. */
 export class DepartureRadio {
-  constructor({ context, output, muted, baseUrl = '/' , fetcher = (...args) => fetch(...args) }) {
+  constructor({ context, output, muted, baseUrl = '/', audioDir = 'audio/departure', radioConfig = DEPARTURE_RADIO, fetcher = (...args) => fetch(...args) }) {
     this.context = context; this.output = output; this.muted = muted;
-    this.baseUrl = baseUrl; this.fetcher = fetcher;
+    this.baseUrl = baseUrl; this.audioDir = audioDir; this.radioConfig = radioConfig;
+    this.fetcher = fetcher;
     this.cache = new Map(); this.pending = new Map();
     this.generation = 0; this.status = 'idle'; this.paused = false;
     this.source = null; this.buffer = null; this.stage = null; this.offset = 0;
@@ -14,11 +15,11 @@ export class DepartureRadio {
   get busy() { return ['loading', 'playing', 'paused'].includes(this.status); }
 
   async load(stage) {
-    if (!Object.hasOwn(DEPARTURE_RADIO, stage) || !this.context()) return null;
+    if (!Object.hasOwn(this.radioConfig, stage) || !this.context()) return null;
     if (this.cache.has(stage)) return this.cache.get(stage);
     if (this.pending.has(stage)) return this.pending.get(stage);
     const request = (async () => {
-      const response = await this.fetcher(`${this.baseUrl}audio/departure/${stage}.wav`);
+      const response = await this.fetcher(`${this.baseUrl}${this.audioDir}/${stage}.wav`);
       if (!response.ok) throw new Error(`Radio ${stage}: HTTP ${response.status}`);
       const buffer = await this.context().decodeAudioData(await response.arrayBuffer());
       this.cache.set(stage, buffer);
@@ -30,7 +31,7 @@ export class DepartureRadio {
   }
 
   preload() {
-    return Promise.allSettled(Object.keys(DEPARTURE_RADIO).map(stage => this.load(stage)));
+    return Promise.allSettled(Object.keys(this.radioConfig).map(stage => this.load(stage)));
   }
 
   async play(stage) {
