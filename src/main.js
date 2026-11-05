@@ -31,6 +31,7 @@ import { Airport } from './environment/Airport.js';
 import { FoliageAndCities } from './environment/FoliageAndCities.js';
 import { Ships } from './environment/Ships.js';
 import { SkyAtmosphere } from './environment/SkyAtmosphere.js';
+import { GroundContactShadow } from './environment/GroundContactShadow.js';
 import { NeonCity } from './environment/NeonCity.js';
 import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
@@ -196,6 +197,10 @@ class FlightSimulator {
     // 5. Procedural World & Real-World Environments
     this.terrain = new Terrain(22000, initialPreset.terrainSegments ?? 256, { quality: initialPreset.terrain });
     this.scene.add(this.terrain.mesh);
+
+    // Height-over-ground cue for the ultraLow tier, which ships without shadow maps.
+    this.contactShadow = new GroundContactShadow(this.scene);
+    this.contactShadow.setEnabled(this.renderQuality === 'ultraLow');
 
     this.water = new WaterOcean(36000, initialPreset.waterSegments ?? 180, { quality: this.renderQuality });
     this.scene.add(this.water.mesh);
@@ -1171,6 +1176,10 @@ class FlightSimulator {
         this.aircraft.cockpit.group.visible = false;
       }
     }
+    this.contactShadow.setEnabled(!isCockpit && this.renderQuality === 'ultraLow');
+    this.contactShadow.update(this.aircraft.group.position,
+      this.currentTerrain.getHeight(this.aircraft.group.position.x, this.aircraft.group.position.z),
+      this.aero.wingspan);
     // Looking forward in photo mode skips the occlusion pass entirely, so build
     // and compile it now instead of on the user's first head turn. The forced
     // cockpit sun state makes warm compile the shadow-receiving deck variants
