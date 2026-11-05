@@ -542,63 +542,61 @@ export class CollisionDetector {
     if (!this.terrain) return null;
 
     const onRunway = this.isPositionOnRunway(aircraftPos.x, aircraftPos.z);
-    if (onRunway && groundContact?.catastrophicImpact) {
+    // Hull destruction is decided by the contact solver: an excessive first-body
+    // impact sink or accumulated structural damage reaching its budgets. This is
+    // the only excursion fatality on the runtime path — a gentle drift-off is
+    // graded by soft-ground drag and damage instead.
+    if (groundContact?.catastrophicImpact) {
+      const excursion = !onRunway;
       return {
-        get name() { return t('catastrophic.landing.impact'); },
+        get name() { return excursion ? t('runway.excursion') : t('catastrophic.landing.impact'); },
         point: groundContact.bodyContacts[0]?.worldPos.clone() || aircraftPos.clone(),
-        get description() { return t('excessive.belly.impact.or.accumulated.structural.damage'); }
+        get description() { return excursion
+          ? t('the.aircraft.departed.the.runway')
+          : t('excessive.belly.impact.or.accumulated.structural.damage'); }
       };
     }
 
-    // Evaluate off-runway ground excursion: when the aircraft moves on the ground outside the runway
-    const groundH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
-    const gearHeight = gearState >= 0.5 ? 3.85 : 1.85;
-    const isWheelGrounded = groundContact !== null
-      ? Boolean(groundContact.contacts?.some(c => c.isGrounded))
-      : (aircraftPos.y - groundH <= gearHeight && aircraftPos.y - groundH >= -2.0);
+    if (!groundContact) {
+      // Detection-only callers have no contact solver to integrate drag or damage;
+      // they keep the conservative geometric excursion kill.
+      const groundH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
+      const gearHeight = gearState >= 0.5 ? 3.85 : 1.85;
+      const isWheelGrounded = aircraftPos.y - groundH <= gearHeight && aircraftPos.y - groundH >= -2.0;
+      const isMoving = speedMs > 5.0; // Low-speed taxi into grass halts safely rather than detonating
+      const inSafetyArea = this.isPositionInSafetyArea(aircraftPos.x, aircraftPos.z);
 
-    const isMoving = speedMs > 5.0; // Low-speed taxi into grass halts safely rather than detonating
-    const inSafetyArea = this.isPositionInSafetyArea(aircraftPos.x, aircraftPos.z);
-    const gearCollapsed = groundContact?.contacts?.some(c => c.damageState === 'collapsed');
-    const catastrophicHullLoss = Boolean(groundContact?.catastrophicImpact);
-    const wheelOffRunway = groundContact?.contacts?.some(c =>
-      c.isGrounded && !this.isPositionOnRunway(c.worldPos.x, c.worldPos.z)
-    );
-
-    // Fatal excursion conditions:
-    // 1. Structural gear collapse from sustained off-runway stress while moving
-    // 2. High-speed deep excursion outside paved runway and airport safety area (> 15 m/s)
-    // 3. Catastrophic hull impact while off-runway
-    const isExcursionCrash = isWheelGrounded && isMoving && (
-      (gearCollapsed && (!onRunway || wheelOffRunway)) ||
-      (!onRunway && !inSafetyArea && speedMs > 15.0) ||
-      (catastrophicHullLoss && !onRunway)
-    );
-
-    if (isExcursionCrash) {
-      return {
-        get name() { return t('runway.excursion'); },
-        point: aircraftPos.clone(),
-        get description() { return t('the.aircraft.departed.the.runway'); }
-      };
+      if (isWheelGrounded && isMoving && !onRunway && !inSafetyArea && speedMs > 15.0) {
+        return {
+          get name() { return t('runway.excursion'); },
+          point: aircraftPos.clone(),
+          get description() { return t('the.aircraft.departed.the.runway'); }
+        };
+      }
     }
 
     // Body contact is evaluated on every surface, including the runway. Gear
     // deployment and nominal attitude never exempt nacelles or wings from contact.
     for (const probe of worldProbes) {
       const probeOnRunway = this.isPositionOnRunway(probe.pos.x, probe.pos.z);
-      // The contact solver owns supported lower surfaces on the runway. A fin
-      // strike or any probe outside the runway still uses fatal terrain detection.
-      if (groundContact && onRunway && probeOnRunway && probe.id !== 'fin') continue;
       const ground = this.terrain.getHeight(probe.pos.x, probe.pos.z);
       const radius = probe.id === 'engineL' || probe.id === 'engineR' ? probe.radius : 0;
-      if (probe.pos.y - radius < ground + 0.1) {
-        return {
-          get name() { return gearState < 0.25 ? t('gear.up.belly.crash') : t('terrain.body.strike'); },
-          point: probe.pos.clone(),
-          get description() { return t('the.value.made.ground.contact', { value: probe.desc }); }
-        };
+      if (groundContact) {
+        // The contact solver owns supported lower surfaces on every terrain and
+        // rates grazing contact into damage budgets. It cannot represent deep
+        // volumetric burial (slope or cliff plows) beyond its penetration limit,
+        // nor the fin, which sits outside its support envelope on any surface.
+        if (onRunway && probeOnRunway && probe.id !== 'fin') continue;
+        const depth = ground - (probe.pos.y - radius);
+        if (!(depth > 1.0 || (probe.id === 'fin' && probe.pos.y - radius < ground + 0.1))) continue;
+      } else if (probe.pos.y - radius >= ground + 0.1) {
+        continue;
       }
+      return {
+        get name() { return gearState < 0.25 ? t('gear.up.belly.crash') : t('terrain.body.strike'); },
+        point: probe.pos.clone(),
+        get description() { return t('the.value.made.ground.contact', { value: probe.desc }); }
+      };
     }
     return null;
   }

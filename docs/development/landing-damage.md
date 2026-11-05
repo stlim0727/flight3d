@@ -1,8 +1,9 @@
 # Landing damage and runway scraping
 
 The runtime now keeps landing incidents in the 120 Hz contact solver instead of
-sending every runway body contact directly to the explosion path. Obstacle,
-water and off-runway terrain collisions retain their existing fatal behavior.
+sending every runway body contact directly to the explosion path. Obstacle and
+water collisions retain their existing fatal behavior; off-runway excursions are
+graded by soft-ground loads and accumulated damage (see below).
 
 ## Failure conditions
 
@@ -89,6 +90,37 @@ body and engine damage and clear incident/contact history.
 | Severe wing/tail strike | Part impact damage and possible structural failure |
 | Controlled belly landing | Continued abrasion while sliding, then stable damaged rest |
 | Bounce/recontact | Existing damage retained; a new impact can add damage |
+| Gentle drift-off (<~30 kt past the safety area) | Soft-ground rolling drag decelerates the aircraft; legs stay intact |
+| High-speed plow beyond the safety area | Shock loads collapse legs → nacelles grind to destruction → hull settles and belly abrasion accumulates → hull loss when a structural budget is exhausted |
+
+## Soft ground and graded excursions
+
+`LandingGear` carries a second continuously relaxed engagement state beside
+`turfEngagement`: per-wheel `soilEngagement` and a hull-wide
+`bodySoilEngagement`, sampled from the airport's runway/safety-area extents
+(missing samplers default to the mild safety-area class, never deep soil).
+Pavement is 0, the runway safety area settles at 0.45 (firm grass), ground
+beyond it at 1.0 (soft soil). The state scales rolling resistance, roughness
+shock loads, fuselage slide friction (plus a plow drag term acting at the patch
+arm, so nose-dip emerges from contact moments) and slide abrasion, with
+asymmetric 0.30 s / 0.50 s relaxation time constants — no behavior switches.
+
+Once a nacelle patch exhausts its abrasion budget it stops supporting the
+airframe (`supportedBodyPoints`), the hull settles onto the belly patches, and
+structural abrasion takes over. Fatal outcomes are the solver's own verdicts:
+first body contact above 12.5 m/s sink, or any non-engine part reaching full
+damage — on pavement and off it alike. `CollisionDetector` no longer kills on
+gear collapse or safety-area crossing; with a contact solver present, terrain
+probes are fatal only when buried more than 1 m (deep volumetric plow) or on a
+fin strike, because the solver and its 4 cm penetration constraint already own
+shallower contact. Detection-only callers keep the previous geometric rules.
+
+`tests/runwayExcursion.test.js` covers engagement relaxation across ground
+classes at 60/120/240 Hz, survivable 15-30 kt drift-offs, gradual leg collapse
+at 45 m/s, staged hull loss at 72 m/s, no runaway abrasion at rest, and the
+safety-area fallback default. Tuning lives in the constant block at the top of
+`LandingGear.js`; the fatal/survivable split is calibration, not certification
+data.
 
 `CollisionDetector.checkCollision` accepts the integrated ground-contact result
 as its final argument. Runtime runway landings use that result. Detection-only
@@ -127,7 +159,7 @@ The script owns a temporary browser profile and stops the browser after the run.
 
 ## Follow-up scope
 
-Tire burst, wheel lock/anti-skid failures, steering jams, soft soil, ditch/curb
+Tire burst, wheel lock/anti-skid failures, steering jams, ditch/curb
 geometry, aerodynamic overspeed damage, dedicated sparks/scrape audio, and
 persistent fuselage mesh deformation are not implemented by this change.
 Structural abrasion is a friction-work approximation, with fixed part budgets. Body collision

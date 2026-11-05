@@ -24,6 +24,7 @@ export default {
   "left.main.gear": "좌측 주기어",
   "right.main.gear": "우측 주기어",
   "notice.gearDamage": "{value1} {value2} — 지지·조향 성능 저하",
+  "notice.excursion": "활주로 이탈 — 연약 지면 저항으로 감속 중",
   "notice.engineFailure": "ENG {which} 고장 — 풍차 회전, 비대칭 추력 (K)",
   "notice.enginesBothFailed": "양쪽 엔진 Flames Out — 풍차 회전 (K)",
   "notice.enginesRecovered": "엔진 재시동 — 추력 회복",

@@ -8,6 +8,21 @@ import { BODY_DAMAGE_LIMITS, bodyDamageState, updateBodyDamage } from './bodyDam
 // the airframe back off the runway (bounce/porpoise). Continuous at v = 0.
 const OLEO_REBOUND_DAMPING = 3.0;
 
+// Tunable simulator limits for soft-ground interaction, not physics constants.
+// Ground classes by engagement state: paved (soil 0), runway safety area
+// (firm grass, SOIL_RSA_TARGET), beyond-RSA soil (full 1.0: buries wheels,
+// plows the fuselage, and triples slide abrasion).
+const SOIL_RSA_TARGET = 0.45;      // safety-area firm-grass class
+const SOIL_TAU_LOAD = 0.30;        // s, sinking into soft ground
+const SOIL_TAU_UNLOAD = 0.50;      // s, coming back onto pavement
+const SOIL_ROLLING_MU = 0.40;      // extra rolling mu at full soil (bulldozing)
+const SOIL_SHOCK_WEIGHT = 1.6;     // soil's share of roughness shock loads vs turf
+const SLIDE_MU_PAVED = 0.45;       // fuselage slide friction on pavement (legacy value)
+const SLIDE_MU_SOIL = 0.40;        // extra slide friction at full soil engagement
+const PLOW_DRAG_PER_MS = 9000;     // N per m/s slide speed at full soil...
+const PLOW_LOAD_CAP = 0.8;         // ...capped at this multiple of the patch load
+const SOIL_ABRASION_GAIN = 2.0;    // friction work multiplier: 1 + gain * soil
+
 // Scratch objects reused by the per-contact math in update(). Purely internal:
 // returned force/moment vectors stay freshly allocated because callers hold
 // them across substeps.
@@ -176,13 +191,22 @@ export class LandingGear {
       c.touchdownThisFrame = false;
       c.sinkRateMs = 0;
       c.turfEngagement = 0;
+      c.soilEngagement = 0;
     }
+    this.bodySoilEngagement = 0;
     this.bodyGrounded = new Set();
     this.structuralDamage = 0;
     this.bodyDamage = Object.fromEntries(BODY_CONTACTS.map(p => [p.id, 0]));
     this.onGround = false;
     this.totalWeightOnWheels = 0;
     this.touchdownEvent = false;
+  }
+
+  // A nacelle that has ground through its abrasion budget crushes away and stops
+  // supporting the airframe; the hull then settles onto the belly patches and the
+  // slide escalates from engine failure to structural wear.
+  get supportedBodyPoints() {
+    return this.bodySupportPoints.filter(p => !(p.id.startsWith('engine') && this.bodyDamage[p.id] >= 1));
   }
 
   toggleGear() {
@@ -242,7 +266,7 @@ export class LandingGear {
 
   }
 
-  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null, sampleIsOnRunway = null, cg = ZERO_CG, configurationAdvanced = false) {
+  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null, sampleIsOnRunway = null, cg = ZERO_CG, configurationAdvanced = false, sampleIsInSafetyArea = null) {
     if (!configurationAdvanced) this.advanceConfiguration(dt);
 
     const netForceWorld = new THREE.Vector3(0, 0, 0);
@@ -366,9 +390,17 @@ export class LandingGear {
         const tauTurf = targetTurf > (c.turfEngagement || 0) ? 0.25 : 0.40;
         c.turfEngagement = (c.turfEngagement || 0) + (targetTurf - (c.turfEngagement || 0)) * Math.min(1.0, dt / tauTurf);
 
+        // Soft-soil engagement: the safety area behaves like firm grass; beyond it
+        // the wheels plow. Relaxed on the same continuous scale as turf.
+        const inSafetyArea = onRunway || !sampleIsInSafetyArea || sampleIsInSafetyArea(c.worldPos.x, c.worldPos.z);
+        const targetSoil = onRunway ? 0.0 : (inSafetyArea ? SOIL_RSA_TARGET : 1.0);
+        const tauSoil = targetSoil > (c.soilEngagement || 0) ? SOIL_TAU_LOAD : SOIL_TAU_UNLOAD;
+        c.soilEngagement = (c.soilEngagement || 0) + (targetSoil - (c.soilEngagement || 0)) * Math.min(1.0, dt / tauSoil);
+
         // Continuous rolling resistance derived from turf engagement state
         const baseRolling = this.rollingFriction ?? 0.02;
-        const muRolling = THREE.MathUtils.lerp(baseRolling, 0.18, c.turfEngagement);
+        const muRolling = THREE.MathUtils.lerp(baseRolling, 0.18, c.turfEngagement)
+          + SOIL_ROLLING_MU * c.soilEngagement;
         let muBrake = muRolling;
         if (this.brakes > 0.01) {
           muBrake += this.brakes * (this.maxBrakingFriction ?? 0.58); // Anti-skid brake friction
@@ -385,9 +417,10 @@ export class LandingGear {
         let dynamicLateralLoad = Math.abs(fLateralMag);
         let dynamicLongitudinalLoad = Math.abs(fForwardMag);
         const limits = GEAR_DAMAGE_LIMITS[c.id === 'nose' ? 'nose' : 'main'];
-        if (c.turfEngagement > 0.01 && Math.abs(vForward) > 10.0) {
+        const roughness = c.turfEngagement + SOIL_SHOCK_WEIGHT * c.soilEngagement;
+        if (roughness > 0.01 && Math.abs(vForward) > 10.0) {
           const excessSpeed = Math.abs(vForward) - 10.0;
-          const shockRatio = (excessSpeed / 20.0) * c.turfEngagement;
+          const shockRatio = (excessSpeed / 20.0) * roughness;
           dynamicNormalLoad += limits.vertical * shockRatio;
           dynamicLateralLoad += limits.lateral * 0.5 * shockRatio;
           dynamicLongitudinalLoad += limits.longitudinal * 0.5 * shockRatio;
@@ -440,7 +473,9 @@ export class LandingGear {
     // Body support is always active, including a single collapsed leg with gear DOWN.
     const groundedNow = new Set();
     const demands = new Map();
-    for (const probe of this.bodySupportPoints) {
+    let bodySoilTargetSum = 0;
+    let bodySoilTargetCount = 0;
+    for (const probe of this.supportedBodyPoints) {
       const local = scratchBcLocal.set(...probe.position);
       const point = scratchBcPoint.copy(local).applyMatrix4(aircraftMesh.matrixWorld);
       const groundH = getTerrainHeight(point.x, point.z);
@@ -456,11 +491,20 @@ export class LandingGear {
       // Sample imminent impacts before the post-integration constraint removes
       // closing velocity. A small skin retains contact history during settling.
       if (depth < -0.005 && depth - vNormal * dt <= 0) continue;
+      const patchOnRunway = sampleIsOnRunway ? sampleIsOnRunway(point.x, point.z) : true;
+      const patchInSafetyArea = patchOnRunway || !sampleIsInSafetyArea || sampleIsInSafetyArea(point.x, point.z);
+      bodySoilTargetSum += patchOnRunway ? 0.0 : (patchInSafetyArea ? SOIL_RSA_TARGET : 1.0);
+      bodySoilTargetCount++;
       const tangent = scratchBcTangent.copy(velocity).addScaledVector(normal, -vNormal);
       const speed = tangent.length();
       const load = Math.max(0, 18000000 * Math.max(0, Math.min(depth, 0.04)) - 400000 * vNormal) * probe.weight;
       const force = scratchBcForce.copy(normal).multiplyScalar(load);
-      const friction = Math.min(speed * 18000, load * 0.45);
+      // Sliding on soft ground grips harder and plows material aside; the plow
+      // acts at the patch arm, so nose-down after a nose-gear loss emerges from
+      // the moment instead of a scripted impulse.
+      const muSlide = SLIDE_MU_PAVED + SLIDE_MU_SOIL * this.bodySoilEngagement;
+      const plow = Math.min(this.bodySoilEngagement * speed * PLOW_DRAG_PER_MS, load * PLOW_LOAD_CAP * this.bodySoilEngagement);
+      const friction = Math.min(speed * 18000, load * muSlide) + plow;
       if (speed > 0) force.addScaledVector(tangent, -friction / speed);
       netForceWorld.add(force);
       netMomentBody.add(scratchMoment.copy(local).sub(cg).cross(scratchFWheelBody.copy(force).applyQuaternion(invWorldQuat)));
@@ -471,11 +515,16 @@ export class LandingGear {
       const demand = demands.get(probe.id) || { firstContact: false, sinkRate: 0, frictionWork: 0 };
       demand.firstContact ||= firstContact;
       if (firstContact) demand.sinkRate = Math.max(demand.sinkRate, -vNormal);
-      demand.frictionWork += friction * speed * dt;
+      demand.frictionWork += friction * speed * dt * (1 + SOIL_ABRASION_GAIN * this.bodySoilEngagement);
       demands.set(probe.id, demand);
       bodyContacts.push({ id: probe.id, worldPos: point.clone(), sinkRate: -vNormal, speed, load, depth,
         frictionWork: friction * speed * dt });
     }
+    // Relax the shared hull/soil engagement toward the penetrating patches' ground
+    // class (pavement or airborne contact decays it back to zero).
+    const bodySoilTarget = bodySoilTargetCount > 0 ? bodySoilTargetSum / bodySoilTargetCount : 0;
+    const tauBodySoil = bodySoilTarget > this.bodySoilEngagement ? SOIL_TAU_LOAD : SOIL_TAU_UNLOAD;
+    this.bodySoilEngagement += (bodySoilTarget - this.bodySoilEngagement) * Math.min(1.0, dt / tauBodySoil);
     for (const [id, demand] of demands) {
       const previous = this.bodyDamage[id];
       this.bodyDamage[id] = updateBodyDamage(previous, demand, BODY_DAMAGE_LIMITS[id]);
@@ -508,6 +557,7 @@ export class LandingGear {
       gearDamage: Object.fromEntries(this.contacts.map(c => [c.id, c.damageState])),
       bodyContacts,
       structuralDamage: this.structuralDamage,
+      groundRoughness: Math.max(this.bodySoilEngagement, ...this.contacts.map(c => c.soilEngagement || 0)),
       bodyDamage: { ...this.bodyDamage },
       bodyDamageEvents,
       catastrophicImpact,

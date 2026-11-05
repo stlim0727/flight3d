@@ -71,6 +71,8 @@ class PresetSpawnerMethods {
     this.landingStopped = false;
     this.bodyContactStarted = false;
     this.bodyContactNotices = new Set();
+    this.excursionAnnounced = false;
+    this.slideEmitClock = 0;
     this.landingRestTime = 0;
 
     if (this.isCrashed) {

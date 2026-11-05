@@ -359,16 +359,17 @@ async function main() {
     await takeScreenshot('crash_tree_showcase.png');
 
     // =========================================================================
-    // TEST 6: Off-Runway Ground Excursion Collision
+    // TEST 6: Off-Runway Ground Excursion — graded slide, then hull-loss crash
     // =========================================================================
     console.log('\n🚜 TEST 6: Off-Runway Ground Excursion...');
-    await evalJs(`
+    const placeExcursion = (speed) => evalJs(`
       (() => {
         const sim = window.simulator;
         sim.resetCrash();
-        // Position in grass north of Runway 09L at z = 70m, rolling at 45 m/s
+        // Position in grass north of Runway 09L at z = 70m (beyond the 55 m
+        // safety area), rolling along +X at the given ground speed
         sim.position.set(-1000, 15.5, 70);
-        sim.linearVelocity.set(45, 0, 0);
+        sim.linearVelocity.set(${speed}, 0, 0);
         sim.quaternion.setFromAxisAngle(new window.THREE.Vector3(0, 1, 0), -Math.PI * 0.5);
         sim.aircraft.group.position.copy(sim.position);
         sim.aircraft.group.quaternion.copy(sim.quaternion);
@@ -378,7 +379,25 @@ async function main() {
       })()
     `);
 
-    await evalJs(`window.simulator.stepSimulation(0.5);`);
+    // 29 kt drift-off: soft-ground drag decelerates the aircraft; it must NOT
+    // detonate at the safety-area boundary anymore.
+    await placeExcursion(15);
+    await evalJs(`window.simulator.stepSimulation(6.0);`);
+    await new Promise(r => setTimeout(r, 400));
+    const gentle = await evalJs(`(() => {
+      const sim = window.simulator;
+      return { crashed: Boolean(sim.isCrashed),
+        speed: Math.hypot(sim.linearVelocity.x, sim.linearVelocity.z),
+        rough: sim.telemetry.groundRoughness };
+    })()`);
+    const gentleOk = !gentle.crashed && gentle.speed < 1 && gentle.rough > 0.5;
+    console.log(`   Gentle excursion decelerates without crash: ${gentleOk ? 'PASS ✅' : 'FAIL ❌'} [v=${gentle.speed.toFixed(1)} m/s, rough=${gentle.rough?.toFixed(2)}]`);
+    await takeScreenshot('crash_excursion_graded.png');
+
+    // 140 kt plow: staged collapse → nacelle grind → belly abrasion → hull loss.
+    await placeExcursion(72);
+    await evalJs(`window.simulator.stepSimulation(4.0);`);
+    await evalJs(`window.simulator.stepSimulation(4.0);`);
     await new Promise(r => setTimeout(r, 600));
 
     const excursionCrashed = await evalJs(`Boolean(window.simulator.isCrashed && window.simulator.crashResult?.type === 'TERRAIN')`);
@@ -421,7 +440,7 @@ async function main() {
     `);
     console.log(`   Restart Cleanliness: ${restartOk ? 'PASS ✅' : 'FAIL ❌'}`);
 
-    if (![towerCrashed, waterCrashed, terrainCrashed, bldgCrashed, treeCrashed, excursionCrashed, restartOk].every(Boolean)) {
+    if (![towerCrashed, waterCrashed, terrainCrashed, bldgCrashed, treeCrashed, gentleOk, excursionCrashed, restartOk].every(Boolean)) {
       throw new Error('One or more collision/restart checks failed');
     }
     const velocityChecks = await evalJs('window.simulator.impactVelocityChecks');
