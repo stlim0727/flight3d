@@ -98,6 +98,9 @@ export async function loadIncheonAirport(base) {
   }
   nightLighting.illuminateWindows(group);
   group.traverse(o=>{if(o.isMesh)o.receiveShadow=true;});
+  // The ground and city sheets live on terrain.mesh, outside `group`, and would
+  // otherwise never receive the aircraft shadow on the grass beside the pavement.
+  terrain.mesh.traverse(o=>{if(o.isMesh)o.receiveShadow=true;});
   const traffic=new IncheonTraffic(trafficData,height,(x,z)=>source.isLand(x,z) && !terrain.isOnRunway(x,z)
     && !colliders.some(c=>x>=c.bounds.min.x-1 && x<=c.bounds.max.x+1 && z>=c.bounds.min.z-1 && z<=c.bounds.max.z+1
       && (pointInRing(x,z,c.points) || c.points.slice(1).some((b,i)=>segmentDistance(x,z,c.points[i],b)<1))));
