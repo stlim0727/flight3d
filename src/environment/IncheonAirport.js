@@ -17,6 +17,17 @@ import { generatePlanting, pointInRing, segmentDistance } from '../geospatial/in
 import { terrainGeometry, placeBuilding } from '../previews/incheonGeometry.js';
 import { createCityGround, createBuildingMaterials, createTexturedBuildings, createPlantingInstances } from '../previews/incheonCityAssets.js';
 
+export const INCHEON_APRON_LAMPS = [
+  { x: 58, z: -188, target: [90, -202] },
+  { x: 72, z: -237, target: [88, -202] },
+  { x: 92, z: -242, target: [92, -202] },
+  { x: 108, z: -258, target: [145, -245] },
+  { x: 108, z: -273, target: [145, -275] },
+  { x: 100, z: -288, target: [130, -315] },
+  { x: 75, z: -302, target: [65, -345] },
+  { x: 40, z: -310, target: [10, -355] },
+];
+
 function shape(points) { return new THREE.Shape(points.slice(0,-1).map(([x,z])=>new THREE.Vector2(x,-z))); }
 export async function loadIncheonAirport(base) {
   const json=async file=> {const r=await fetch(base+file);if(!r.ok)throw new Error(`${file}: ${r.status}`);return r.json();};
@@ -52,9 +63,10 @@ export async function loadIncheonAirport(base) {
     INCHEON_AIRFIELD.surfaces.filter(s => s.kind === 'runway').map(s => ({
       start: [s.points[0][0], INCHEON_AIRFIELD.elevationM, s.points[0][1]],
       end: [s.points.at(-1)[0], INCHEON_AIRFIELD.elevationM, s.points.at(-1)[1]], width: s.width,
-    })), [20, 32, 45, 58, 71, 84, 97, 110].map(offset => ({ x: DEPARTURE_GATE.x + offset,
-      y: INCHEON_AIRFIELD.elevationM, z: DEPARTURE_GATE.z - 45, height: 20,
-      target: [DEPARTURE_GATE.x + offset - 15, INCHEON_AIRFIELD.elevationM + 3, DEPARTURE_GATE.z] })));
+    })), INCHEON_APRON_LAMPS.map(lamp => ({
+      x: lamp.x, y: INCHEON_AIRFIELD.elevationM, z: lamp.z, height: 20,
+      target: [lamp.target[0], INCHEON_AIRFIELD.elevationM + 3, lamp.target[1]],
+    })));
   const tower = createControlTower(height);
   colliders.push(tower.collider);
   group.add(tower.group);
