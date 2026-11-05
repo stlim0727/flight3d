@@ -7,6 +7,28 @@ import { SunShadowRefresh } from './SunShadowRefresh.js';
 
 const OVERCAST_GREY = new THREE.Color(0.55, 0.57, 0.60);
 
+// Tail height of the tallest shipped airliner (737-800, 12.6 m), used to size the
+// sun-shadow box so a low sun's projected airframe shadow stays inside the map.
+export const GROUND_SHADOW_HEIGHT_M = 13;
+
+/**
+ * Where to centre the sun's orthographic shadow box so both the aircraft and the
+ * shadow it projects on the ground stay inside the map. A low sun throws the ground
+ * shadow far behind the airframe; centring on the aircraft alone clips it entirely.
+ */
+export function sunShadowPlacement(sunPosition, aircraftPosition, out = new THREE.Vector3(), reachLimit = 160) {
+  const sunY = sunPosition.y;
+  const sunHorizon = Math.hypot(sunPosition.x, sunPosition.z);
+  const reach = sunY > 0.05 && sunHorizon > 1e-4
+    ? Math.min(GROUND_SHADOW_HEIGHT_M * sunHorizon / sunY, reachLimit) : 0;
+  out.copy(aircraftPosition);
+  if (reach > 0) {
+    out.x -= sunPosition.x / sunHorizon * reach / 2;
+    out.z -= sunPosition.z / sunHorizon * reach / 2;
+  }
+  return { focus: out, reach };
+}
+
 /**
  * Atmospheric Sky, Sun, Dynamic Lighting & Cumulus Clouds
  * Features realistic Rayleigh & Mie scattering Sky shader, time-of-day presets (Dawn, Noon, Sunset, Night),
@@ -56,6 +78,7 @@ export class SkyAtmosphere {
     // deck that is only turning its head does not redraw the whole map behind the cockpit.
     this.sunLight.shadow.autoUpdate = false;
     this.sunShadowRefresh = new SunShadowRefresh(this.sunLight);
+    this.shadowFocus = new THREE.Vector3();
     this.scene.add(this.sunLight);
     this.scene.add(this.sunLight.target);
 
@@ -361,14 +384,16 @@ export class SkyAtmosphere {
     if (this.sunLight.castShadow) {
       const distance = camera.position.distanceTo(aircraftPosition);
       const halfSize = THREE.MathUtils.clamp(32 + Math.max(0, distance - 60) * 0.2, 32, 120);
+      const { focus, reach } = sunShadowPlacement(this.sunPosition, aircraftPosition, this.shadowFocus);
+      const coverage = halfSize + reach / 2;
       const shadowCamera = this.sunLight.shadow.camera;
-      if (shadowCamera.right !== halfSize) {
-        shadowCamera.left = shadowCamera.bottom = -halfSize;
-        shadowCamera.right = shadowCamera.top = halfSize;
+      if (shadowCamera.right !== coverage) {
+        shadowCamera.left = shadowCamera.bottom = -coverage;
+        shadowCamera.right = shadowCamera.top = coverage;
         shadowCamera.updateProjectionMatrix();
       }
-      this.sunLight.target.position.copy(aircraftPosition);
-      this.sunLight.position.copy(aircraftPosition).addScaledVector(this.sunPosition, 600);
+      this.sunLight.target.position.copy(focus);
+      this.sunLight.position.copy(focus).addScaledVector(this.sunPosition, 600);
       this.sunShadowRefresh.beforeRender(this.scene, camera);
     }
     // Sort before renderer.render uploads instance buffers, including camera cuts.
