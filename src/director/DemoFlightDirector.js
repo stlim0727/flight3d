@@ -291,7 +291,6 @@ export class DemoFlightDirector {
 
     this.stop(() => t('manual.control.engaged'));
   }
-  }
 
   closeBanner() {
     this.isBannerMinimized = true;
