@@ -27,6 +27,7 @@ export class AirportNightLighting {
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(this.sources.flatMap(s => s.position), 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(this.sources.flatMap(s => s.color), 3));
     geometry.setAttribute('endDirection', new THREE.Float32BufferAttribute(this.sources.flatMap(s => s.endDirection ?? [0, 0, 0]), 3));
+    geometry.setAttribute('sourceIntensity', new THREE.Float32BufferAttribute(this.sources.map(s => s.intensity ?? 1), 1));
     this.material = new THREE.ShaderMaterial({
       uniforms: { brightness: { value: 0 } },
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -35,18 +36,21 @@ export class AirportNightLighting {
         #include <logdepthbuf_pars_vertex>
         attribute vec3 color;
         attribute vec3 endDirection;
+        attribute float sourceIntensity;
         varying vec3 lightColor;
+        varying float vIntensity;
         void main() {
           vec4 world = modelMatrix * vec4(position, 1.);
           vec4 mvPosition = viewMatrix * world;
           lightColor = color;
+          vIntensity = sourceIntensity;
           if (length(endDirection) > .5) {
             // Green looking into the runway, red looking out toward its end.
             lightColor = dot(cameraPosition - world.xyz, endDirection) > 0.
               ? vec3(1., .025, .01) : vec3(.02, 1., .12);
           }
           gl_Position = projectionMatrix * mvPosition;
-          gl_PointSize = clamp(1800. / max(1., -mvPosition.z), 3., 24.);
+          gl_PointSize = clamp(2600. * sourceIntensity / max(1., -mvPosition.z), 4., 40.);
           #include <logdepthbuf_vertex>
         }`,
       fragmentShader: `
@@ -54,12 +58,13 @@ export class AirportNightLighting {
         #include <logdepthbuf_pars_fragment>
         uniform float brightness;
         varying vec3 lightColor;
+        varying float vIntensity;
         void main() {
           float radius = length(gl_PointCoord - .5) * 2.;
           if (radius > 1.) discard;
           #include <logdepthbuf_fragment>
-          float glow = exp(-radius * radius * 5.) * (1. - smoothstep(.7, 1., radius));
-          gl_FragColor = vec4(lightColor * 2., glow * brightness);
+          float glow = exp(-radius * radius * 2.5) * (1. - smoothstep(.75, 1., radius));
+          gl_FragColor = vec4(lightColor * 4. * vIntensity, glow * brightness);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }`,
@@ -69,8 +74,8 @@ export class AirportNightLighting {
     this.group.add(this.points);
   }
 
-  source(position, color, endDirection) {
-    this.sources.push({ position, color: new THREE.Color(color).toArray(), endDirection });
+  source(position, color, endDirection, intensity = 1) {
+    this.sources.push({ position, color: new THREE.Color(color).toArray(), endDirection, intensity });
   }
 
   addRunway({ start, end, width, spacing = 60 }) {
@@ -83,13 +88,13 @@ export class AirportNightLighting {
         const p = a.clone().addScaledVector(along, i / count).addScaledVector(right, side * (width / 2 + 1));
         p.y += .65;
         // Last 600 m of edge lighting is amber on long runways.
-        this.source(p.toArray(), count * spacing > 1200 && (i * spacing < 600 || (count - i) * spacing < 600) ? 0xffcc55 : 0xfff3db);
+        this.source(p.toArray(), count * spacing > 1200 && (i * spacing < 600 || (count - i) * spacing < 600) ? 0xffcc55 : 0xfff3db, undefined, 2.5);
       }
     }
     for (const [p, sign] of [[a, -1], [b, 1]]) {
       for (let across = -width / 2; across <= width / 2; across += 3) {
         const position = p.clone().addScaledVector(right, across); position.y += .65;
-        this.source(position.toArray(), 0xffffff, along.clone().normalize().multiplyScalar(-sign).toArray());
+        this.source(position.toArray(), 0xffffff, along.clone().normalize().multiplyScalar(-sign).toArray(), 2.);
       }
     }
   }
@@ -106,8 +111,8 @@ export class AirportNightLighting {
     light.target.position.fromArray(target);
     // No shadow maps or per-runway PointLights: bounded shader/light cost.
     this.group.add(pole, head, light, light.target);
-    this.lamps.push({ light, head, maximum: height * height * 12 });
-    this.source([x, y + height, z], 0xffdfb0);
+    this.lamps.push({ light, head, maximum: height * height * 16 });
+    this.source([x, y + height, z], 0xffdfb0, undefined, 1.5);
   }
 
   /** Clone once so shared GLB/library materials and other airports stay independent. */
