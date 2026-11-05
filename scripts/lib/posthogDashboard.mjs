@@ -10,7 +10,11 @@ const trends = (series, { breakdown, display = 'ActionsLineGraph', interval = 'd
     interval,
     dateRange: { date_from: dateFrom },
     trendsFilter: { display },
-    ...(breakdown && { breakdownFilter: { breakdown, breakdown_type: 'event' } }),
+    ...(breakdown && {
+      breakdownFilter: Array.isArray(breakdown)
+        ? { breakdowns: breakdown.map(property => ({ property, type: 'event' })) }
+        : { breakdown, breakdown_type: 'event' },
+    }),
   },
 });
 const avg = (event, property) => ev(event, { math: 'avg', math_property: property });
@@ -30,6 +34,7 @@ export const INSIGHTS = [
   ['Flights by aircraft', trends([ev('flight_started')], { breakdown: 'aircraft', display: 'ActionsBarValue' })],
   ['Flights by scenario', trends([ev('flight_started')], { breakdown: 'scenario', display: 'ActionsBarValue' })],
   ['Players by country (world map)', trends([ev('flight_started', { math: 'dau' })], { breakdown: '$geoip_country_code', display: 'WorldMap' })],
+  ['Players by region and city', trends([ev('flight_started', { math: 'dau' })], { breakdown: ['$geoip_subdivision_1_name', '$geoip_city_name'], display: 'ActionsTable' })],
   ['Flights by airport', trends([ev('flight_started')], { breakdown: 'airport', display: 'ActionsBarValue' })],
   ['Pilot mode (human vs AI)', trends([ev('pilot_mode_selected')], { breakdown: 'pilotMode', display: 'ActionsPie' })],
   ['Crash types', trends([ev('flight_crashed')], { breakdown: 'crashType', display: 'ActionsBarValue' })],
