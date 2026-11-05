@@ -1177,9 +1177,9 @@ class FlightSimulator {
       }
     }
     this.contactShadow.setEnabled(!isCockpit && this.renderQuality === 'ultraLow');
-    this.contactShadow.update(this.aircraft.group.position,
+    this.contactShadow.update(this.aircraft.group.position, this.aircraft.group.quaternion,
       this.currentTerrain.getHeight(this.aircraft.group.position.x, this.aircraft.group.position.z),
-      this.aero.wingspan);
+      this.currentAircraftId, this.aero.wingspan);
     // Looking forward in photo mode skips the occlusion pass entirely, so build
     // and compile it now instead of on the user's first head turn. The forced
     // cockpit sun state makes warm compile the shadow-receiving deck variants
