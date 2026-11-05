@@ -498,15 +498,9 @@ class SimulatorHudAndBindingsMethods {
       onPilotMode: mode => { this.lobby.pilotMode = mode; },
       onToggleGyro: () => {
         if (!this.touchControls) return;
-        if (this.touchControls.gyroActive) {
-          this.touchControls.disableGyro();
-        } else if (this.touchControls.gyroRequested && this.touchControls.label !== 'gyro.resume') {
-          this.touchControls.disableGyro();
-        } else {
-          return this.touchControls.toggleGyro();
-        }
+        return this.touchControls.toggleGyro({ userGesture: true });
       },
-      isGyroActive: () => Boolean(this.touchControls?.gyroActive || this.touchControls?.gyroRequested),
+      isGyroActive: () => Boolean(this.touchControls?.gyroActive || (this.touchControls?.gyroRequested && this.touchControls?.label !== 'gyro.off')),
       // Pending by design: the click records the wish; the start button applies it,
       // and only a flight actually flown is persisted.
       onAirport: id => {

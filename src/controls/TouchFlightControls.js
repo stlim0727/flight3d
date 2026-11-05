@@ -42,6 +42,8 @@ export class TouchFlightControls {
     const gyroPreferences = loadSimulatorPreferences();
     this.gyroOrientation = gyroPreferences.gyroOrientation ?? 'auto';
     this.gyroRequested = gyroPreferences.gyroEnabled === true;
+    this.label = this.gyroRequested ? 'gyro.on' : 'gyro.off';
+    this.onOptionsChange = options.onOptionsChange ?? null;
     this.gyroCalibration = null;
     this.gyroLockAttempt = 0;
     this.gyroOwnsLock = false;
@@ -88,6 +90,7 @@ export class TouchFlightControls {
     this.initDOM();
     this.bindEvents();
     this.initGyroSettings();
+    this.syncGyroUI();
 
     if (isTouch) {
       this.enable();
@@ -305,18 +308,25 @@ export class TouchFlightControls {
     });
   }
 
-  restoreGyroSettings() {
+  restoreGyroSettings({ userGesture = false } = {}) {
     if (!this.gyroRequested) return;
     this.enable();
     if (this.gyroSettings) this.gyroSettings.hidden = false;
     if (this.gyroActive && !this.gyroPending) return;
     const orientation = window.DeviceOrientationEvent;
-    // iOS requires a new user gesture. Restore the preference without prompting.
-    if (window.isSecureContext === false || !orientation ||
-        typeof orientation.requestPermission === 'function') {
+    if (window.isSecureContext === false || !orientation) {
       this.setGyroLabel('gyro.resume');
-      this.setGyroOrientationStatus('gyro.resume.help');
+      this.setGyroOrientationStatus(window.isSecureContext === false ? 'gyro.insecure' : 'gyro.unsupported');
       return;
+    }
+    if (typeof orientation.requestPermission === 'function') {
+      if (!userGesture) {
+        // iOS requires a new user gesture. Restore the preference without prompting.
+        this.setGyroLabel('gyro.resume');
+        this.setGyroOrientationStatus('gyro.resume.help');
+        return;
+      }
+      return this.toggleGyro({ userGesture: true });
     }
     this.gyroRestoring = true;
     this.setGyroLabel('gyro.checking');
@@ -571,8 +581,8 @@ export class TouchFlightControls {
   }
 
   /* ---------------- Gyroscope / Tilt Flight Mode ---------------- */
-  async toggleGyro() {
-    if (this.gyroActive) {
+  async toggleGyro({ userGesture = true } = {}) {
+    if (this.gyroActive || (this.gyroRequested && this.label === 'gyro.on' && !this.gyroPending)) {
       this.disableGyro();
       return;
     }
@@ -609,8 +619,33 @@ export class TouchFlightControls {
     }
   }
 
+  syncGyroUI() {
+    const active = Boolean(this.gyroActive || (this.gyroRequested && this.label !== 'gyro.off'));
+    if (this.gyroBtn) {
+      this.gyroBtn.classList.toggle('active', active);
+      this.gyroBtn.setAttribute('aria-pressed', String(active));
+      const key = this.label || (active ? 'gyro.on' : 'gyro.off');
+      bindText(this.gyroBtn, () => t(key));
+    }
+    if (this.gyroSettings) {
+      if (!this.gyroRequested || this.label === 'gyro.off') {
+        this.gyroSettings.hidden = true;
+      } else if (this.gyroActive || this.gyroPending || this.label === 'gyro.resume' || this.label === 'gyro.checking') {
+        this.gyroSettings.hidden = false;
+      }
+      if (this.gyroOrientationSelect) {
+        this.gyroOrientationSelect.value = this.gyroOrientation;
+      }
+    }
+    if (this.recenterBtn) {
+      this.recenterBtn.hidden = !this.gyroActive;
+    }
+    this.onOptionsChange?.();
+  }
+
   setGyroLabel(key) {
-    bindText(this.gyroBtn, () => t(key));
+    this.label = key;
+    this.syncGyroUI();
   }
 
   failGyro(reason) {
@@ -680,14 +715,14 @@ export class TouchFlightControls {
     this.saveGyroSettings();
     this.gyroActive = true;
     this.gyroPending = true;
-    if (this.gyroSettings) this.gyroSettings.hidden = false;
-    if (this.recenterBtn) this.recenterBtn.hidden = false;
+    this.syncGyroUI();
     window.screen?.orientation?.addEventListener('change', this.onGyroScreenChange);
     window.addEventListener('orientationchange', this.onGyroScreenChange);
     this.recenterGyro();
     if (this.gyroOrientation !== 'auto') this.setGyroOrientation(this.gyroOrientation);
     window.addEventListener('deviceorientation', this.handleOrientation);
     // API presence and permission do not prove that the browser delivers readings.
+    window.clearTimeout(this.gyroTimer);
     this.gyroTimer = window.setTimeout(() => {
       if (this.gyroPending) this.failGyro('gyro.no.readings');
     }, 4000);
@@ -708,13 +743,9 @@ export class TouchFlightControls {
     window.screen?.orientation?.removeEventListener('change', this.onGyroScreenChange);
     window.removeEventListener('orientationchange', this.onGyroScreenChange);
     this.releaseGyroLock();
-    if (this.gyroSettings) this.gyroSettings.hidden = true;
-    if (this.recenterBtn) this.recenterBtn.hidden = true;
     this.gyroCalibration = null;
-    if (this.gyroBtn) {
-      this.gyroBtn.classList.remove('active');
-      this.setGyroLabel('gyro.off');
-    }
+    this.label = 'gyro.off';
+    this.syncGyroUI();
     this.controls.setTouchStick(0.0, 0.0);
     this.updateStickTelemetry(0.0, 0.0);
   }
@@ -725,7 +756,6 @@ export class TouchFlightControls {
       this.gyroRestoring = false;
       this.gyroPending = false;
       window.clearTimeout(this.gyroTimer);
-      this.gyroBtn?.classList.add('active');
       this.setGyroLabel('gyro.on');
     }
     if (this.controls?.aircraftControlsDisabled || this.controls?.inputBlocked) return;
