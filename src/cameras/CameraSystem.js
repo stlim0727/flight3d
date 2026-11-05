@@ -39,6 +39,10 @@ export class CameraSystem {
     this.touchAutoResumeTimer = null;
     // Explicit view choices persist across demo stages, presets and look resets.
     this.userModeSelected = false;
+    // A cockpit view needs the streamed interior. The gate reports its state and may start
+    // the download; while it says 'loading' the entry is held instead of showing bare airframe.
+    this.cockpitInteriorGate = null;
+    this.pendingCockpitEntry = false;
     this.autoSwitchTimer = 0;
     this.autoContext = null;
     this.customViewUpdater = null;
@@ -914,7 +918,42 @@ export class CameraSystem {
     return this.#applyMode(m);
   }
 
+  /**
+   * Install the interior-readiness probe: a function returning 'ready', 'loading' or
+   * 'unavailable'. It is called only when something asks for the cockpit view, so an
+   * interior nobody looks at is never downloaded.
+   */
+  setCockpitInteriorGate(gate) {
+    this.cockpitInteriorGate = typeof gate === 'function' ? gate : null;
+  }
+
+  /** Land a cockpit entry the gate held, once the interior has arrived. */
+  completeCockpitEntry() {
+    if (!this.pendingCockpitEntry) return false;
+    this.pendingCockpitEntry = false;
+    return this.#applyMode(CameraSystem.MODES.COCKPIT);
+  }
+
+  /** Arm a cockpit entry to be landed later, after the view was pulled out for a new interior. */
+  holdCockpitEntry() {
+    this.pendingCockpitEntry = true;
+  }
+
+  /** Stop waiting on an interior that will never arrive; true when a held entry was waiting. */
+  releaseCockpitEntry() {
+    const wasPending = this.pendingCockpitEntry;
+    this.pendingCockpitEntry = false;
+    return wasPending;
+  }
+
   #applyMode(m) {
+    // Every route into the cockpit converges here — the key, the panel, HOTAS, the demo director
+    // and AUTO's own intent — so this is where a cockpit view waits for its interior.
+    if (m === CameraSystem.MODES.COCKPIT && this.cockpitInteriorGate?.() === 'loading') {
+      this.pendingCockpitEntry = true;
+      return false;
+    }
+    this.pendingCockpitEntry = false;
     if (m === CameraSystem.MODES.AUTO) this.autoContext = null;
     this.userLookOverridden = false;
     this.cancelTemporaryView();

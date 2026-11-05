@@ -12,6 +12,7 @@ const STAGES = LuklaCircuitScenario.STAGES;
 function setup({ cockpitModelLoading = false } = {}) {
   const inputs = {};
   const modes = [];
+  const cockpit = { cockpitModelLoading };
   const sim = {
     activeAirport: 'lukla', position: new THREE.Vector3(),
     linearVelocity: new THREE.Vector3(), angularVelocity: new THREE.Vector3(),
@@ -20,7 +21,8 @@ function setup({ cockpitModelLoading = false } = {}) {
     aero: new Aerodynamics(), gear: new LandingGear(), engines: new EngineModel(),
     controls: { setVirtualInput: (k, v) => { assert.ok(Number.isFinite(v)); inputs[k] = v; },
       clearVirtualInputs: () => {}, setParkingBrake(v) { this.parkingBrake = v; } },
-    aircraft: { cockpit: { cockpitModelLoading } },
+    aircraft: { cockpit },
+    cockpitInteriorStatus: () => (cockpit.cockpitModelLoading ? 'loading' : 'ready'),
     cameraSystem: { setMode(m) { modes.push(m); }, userLookOverridden: false },
     sky: { setTimeOfDay() {} }, showToast() {},
     setPreset() { this.presetCalls = (this.presetCalls || 0) + 1; }

@@ -137,8 +137,9 @@ npm run posthog:dashboard -- --dry-run   # list insights without calling the API
 ```
 
 The personal API key needs `dashboard:write` and `insight:write` scopes. Set `POSTHOG_APP_HOST` for
-US Cloud (`https://us.posthog.com`); the default is EU. Never commit the key. Query shapes were not
-verified against a live project; check the first run's output.
+US Cloud (`https://us.posthog.com`); the default is EU. Never commit the key. The query shapes have
+been applied to the live EU project, where the tiles return data; `--dry-run` output is still the
+place to check a new query before spending a write.
 
 The script adds an insight only when its **name** is not already on the dashboard, so renaming a tile
 here leaves the old one in PostHog and editing a query under an existing name does nothing. Delete or

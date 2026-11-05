@@ -7,7 +7,9 @@ import path from 'node:path';
 // The GLTF interior is an asynchronous asset and the only cockpit geometry, so
 // the evidence needed is: (1) the demo never frames an interior that is not
 // there, and (2) when the interior can never arrive, cockpit mode is explicitly
-// left for the exterior view. Artifacts land in ARTIFACT_DIR.
+// left for the exterior view. The interior is fetched by the cockpit view itself,
+// so a harness that wants to observe its failure has to ask for the view first.
+// Artifacts land in ARTIFACT_DIR.
 
 const PORT = Number(process.env.PORT || 5196);
 const REUSE_BROWSER = Boolean(process.env.CHROME_DEBUG_PORT);
@@ -147,6 +149,13 @@ async function coldLoad(session) {
   assert.ok(reachedCockpit, 'The demo should cut into the cockpit once the interior loads');
 }
 
+async function readToast(session) {
+  return evaluate(session, `(() => {
+    const el = document.getElementById('toast-msg');
+    return { visible: Boolean(el?.classList.contains('visible')), text: el?.textContent || '' };
+  })()`);
+}
+
 async function unavailableInterior(session) {
   let blocked = 0;
   session.on('Fetch.requestPaused', ({ requestId, request }) => {
@@ -159,17 +168,41 @@ async function unavailableInterior(session) {
   });
   await session.send('Page.navigate', { url: `${SIM_URL}?probe=fail` });
 
+  assert.ok(await waitForCondition(session, 'Boolean(window.simulator?.cameraSystem)', 45000),
+    'The simulator must be up before a view can ask for the interior');
+
+  // Nothing fetches the interior until a cockpit view is requested, so this press is
+  // the event under test: it must wait rather than frame an airplane with no cabin.
+  const pressed = await evaluate(session, `(() => {
+    const sim = window.simulator;
+    sim.demoDirector?.stop?.();
+    sim.cameraSystem.setMode(${MODES.COCKPIT}, true);
+    return { mode: sim.cameraSystem.mode, pending: sim.cameraSystem.pendingCockpitEntry };
+  })()`);
+  assert.equal(pressed.pending, true,
+    'The first cockpit press must wait for the interior it just requested');
+  assert.notEqual(pressed.mode, MODES.COCKPIT,
+    `A cockpit whose interior is still arriving must not be framed, got mode ${pressed.mode}`);
+
   assert.ok(await waitForCondition(session,
     'window.simulator?.aircraft?.cockpit?.cockpitModelFailed === true', 45000),
     'Blocking every interior asset must report the failure');
   assert.ok(blocked >= 2,
     `Both the medium and the lite asset should be requested; blocked ${blocked}`);
 
+  // The wait is over and the answer is no: the hold has to be dropped and explained,
+  // or the press looks ignored and a later request could still be stolen by it.
+  assert.ok(await waitForCondition(session,
+    'window.simulator?.cameraSystem?.pendingCockpitEntry === false', 5000),
+    'A held entry must stop waiting once its interior can never arrive');
+  const heldToast = await readToast(session);
+  assert.match(heldToast.text, /cockpit interior unavailable/i,
+    'An entry that cannot land should be explained at the moment it is dropped');
+
   // Read the mode back in the same task: the animation loop is allowed to
   // redirect it on the next frame, which is exactly what is being verified.
   const entered = await evaluate(session, `(() => {
     const sim = window.simulator;
-    sim.demoDirector?.stop?.();
     sim.cameraSystem.setMode(${MODES.COCKPIT}, true);
     return sim.cameraSystem.mode;
   })()`);
@@ -177,10 +210,6 @@ async function unavailableInterior(session) {
 
   const redirected = await waitForCondition(session,
     `window.simulator.cameraSystem.mode === ${MODES.CHASE}`, 5000);
-  const toast = await evaluate(session, `(() => {
-    const el = document.getElementById('toast-msg');
-    return { visible: Boolean(el?.classList.contains('visible')), text: el?.textContent || '' };
-  })()`);
   const state = await evaluate(session, `(() => {
     const cockpit = window.simulator.aircraft.cockpit;
     return {
@@ -190,11 +219,10 @@ async function unavailableInterior(session) {
     };
   })()`);
   fs.writeFileSync(path.join(ARTIFACT_DIR, 'failed-asset-run.json'),
-    JSON.stringify({ blocked, redirected, toast, state }, null, 2));
+    JSON.stringify({ blocked, pressed, heldToast, redirected, entered, state }, null, 2));
   await capture(session, '2_interior_unavailable_exterior.png');
 
   assert.ok(redirected, 'A cockpit view with no interior asset must fall back to the exterior');
-  assert.match(toast.text, /cockpit interior unavailable/i, 'The view change should be explained');
 }
 
 async function main() {

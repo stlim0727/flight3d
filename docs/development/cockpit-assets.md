@@ -76,12 +76,19 @@ full-scene shadows/AO and audio; it is not a simulator FPS guarantee.
 
 The GLTF interior is the only cockpit geometry; the vector cockpit and its photo
 textures were removed. `Cockpit.cockpitModelLoading` and
-`cockpitModelFailed` report the download state. The default cockpit must request
-`b737-cockpit-medium.glb`. Call
-`loadCockpitModel()` without a URL at initialization; explicitly passing the lite
-URL bypasses the medium default. The lite Draco asset remains the load fallback.
-If neither asset resolves, `main.js` leaves the cockpit view for chase and toasts
-that the interior is unavailable, because cockpit mode hides the exterior groups.
+`cockpitModelFailed` report the download state, and
+`Cockpit.ensureCockpitModel()` starts it. Construction never does: the medium
+GLB is 3,827,468 bytes and its light-transfer pair adds another 3,984,414, all of
+which only the cockpit view can display while the lobby and every exterior camera
+run outside the fuselage. The camera system holds a cockpit request while
+`cockpitInteriorGate()` reports `loading`, then lands the view when the model and
+its shader warmup resolve, so the interior is downloaded on the first cockpit entry
+rather than during boot. `loadCockpitModel()` still takes no URL at that point and
+defaults to `b737-cockpit-medium.glb`; explicitly passing the lite URL bypasses the
+medium default, and the lite Draco asset remains the load fallback. If neither
+asset resolves, `main.js` leaves the cockpit view for chase and toasts that the
+interior is unavailable, because cockpit mode hides the exterior groups — the same
+notice explains a request that was held and then could not land.
 
 ## Preserve the enclosure
 

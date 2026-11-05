@@ -65,6 +65,9 @@ try {
       document.body.replaceChildren();
       const canvases = Types.map((Type,i) => new Type(...(i===3 ? [1024,128] : i===4 ? [256,256] : [512,512])));
       const cockpit = new (variant === 'before' ? Before : After)(...canvases);
+      // The shipped cockpit no longer fetches its interior at construction; the
+      // baseline copy still does, so ask only when the method exists.
+      cockpit.ensureCockpitModel?.();
       for (let i=0; i<300 && !cockpit.gltfCockpitLoaded && !cockpit.cockpitModelFailed; i++) await new Promise(r=>setTimeout(r,50));
       if (!cockpit.gltfCockpitLoaded) throw Error('Cockpit GLB failed to load');
       const scene=new T.Scene(); scene.background=new T.Color(0x7ca8cf);
