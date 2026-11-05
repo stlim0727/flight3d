@@ -106,6 +106,16 @@ export const ROUTES = [
     shotStage: 'TAKEOFF',
   },
   {
+    id: 'b738-incheon-jeju-bangkok-2503', aircraft: 'B738', airport: 'incheon', profile: 'jeju-bangkok-2503',
+    tier: 'full', scenario: 'incheonDeparture',
+    stages: ['GATE', 'PUSHBACK', 'DISCONNECT', 'TAXI', 'HOLD', 'LINEUP', 'CLEARANCE', 'TAKEOFF',
+      'DEPARTURE', 'COMPLETED'],
+    groundStages: ['GATE', 'PUSHBACK', 'DISCONNECT', 'TAXI', 'HOLD', 'LINEUP', 'CLEARANCE'],
+    lands: false, handoff: 'airborne', budgetSimSeconds: 600, clearanceIntentM: 0,
+    allowedWarnings: ['gear', 'flaps', 'takeoff-config'],
+    shotStage: 'TAKEOFF',
+  },
+  {
     id: 'c172-coastal-scenic', aircraft: 'C172', airport: 'coastal', profile: 'scenic',
     tier: 'core', scenario: 'cessna',
     stages: ['ESTABLISH', 'LOW_PASS', 'CLIMB', 'RECOVER', 'COMPLETED'],
