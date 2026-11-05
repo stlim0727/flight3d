@@ -70,6 +70,9 @@ function createMockSimulator(activeAirport = 'lukla') {
     },
     setAirport: function(id) { this.activeAirport = id; },
     setPreset: () => {},
+    // The lukla opening asks the simulator whether the interior is on screen yet;
+    // this mock has no streamed assets, so the cockpit is always available.
+    cockpitInteriorStatus: () => 'ready',
     showToast: () => {}
   };
 }

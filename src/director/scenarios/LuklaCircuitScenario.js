@@ -69,10 +69,12 @@ export class LuklaCircuitScenario {
         if (this.sim.setPreset) {
           this.sim.setPreset('cliff', true);
         }
-        // The interior is a separate asynchronous GLB. Entering it before that
-        // download settles would show an unfinished cockpit, so open on the
-        // exterior and cut in from update() once the model has resolved.
-        this.pendingCockpitCut = this.sim.aircraft?.cockpit?.cockpitModelLoading === true;
+        // The interior is a separate asynchronous GLB, and the cockpit view is what
+        // asks for it. Opening before that download settles would show an unfinished
+        // cockpit, so this request starts the transfer and update() cuts in once it
+        // has resolved. Asking the gate rather than the loading flag is what makes
+        // the wait see a download that boot deliberately left alone.
+        this.pendingCockpitCut = this.sim.cockpitInteriorStatus() === 'loading';
         this.sim.cameraSystem.setMode(this.pendingCockpitCut
           ? CameraSystem.MODES.CHASE
           : CameraSystem.MODES.COCKPIT);

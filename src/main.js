@@ -253,6 +253,9 @@ class FlightSimulator {
     });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
+    // The interior is fetched by the first cockpit view rather than by boot, and the cut is
+    // held until it arrives so an entry never shows the bare airframe interior.
+    this.cameraSystem.setCockpitInteriorGate(() => this.cockpitInteriorStatus());
     this.hudView = new HudView(this);
     this.cameraSystem.onResetLook = () => {
       this.showToast(() => t('camera.view.centered'));
@@ -842,6 +845,25 @@ class FlightSimulator {
   }
 
   /**
+   * Interior state for the camera's cockpit-entry gate. 'loading' is what starts the download,
+   * so a visitor who never enters a cockpit never pays for the interior asset. Aircraft whose
+   * cabin arrives inside the airframe model have no lazy loader and report their own state.
+   */
+  cockpitInteriorStatus() {
+    const cockpit = this.aircraft?.cockpit;
+    if (!cockpit) return 'ready';
+    if (cockpit.gltfCockpitLoaded) return 'ready';
+    if (cockpit.cockpitModelFailed) return 'unavailable';
+    if (cockpit.ensureCockpitModel?.()) {
+      // The only place the interior asset is requested, so this is also the only moment the
+      // visitor waits on it: say so rather than appearing to ignore the view change.
+      this.showToast(() => t('notice.cockpit.loading'));
+      return 'loading';
+    }
+    return cockpit.cockpitModelLoading ? 'loading' : 'ready';
+  }
+
+  /**
    * Compile the flight-deck programs while the interior is off-screen so the first
    * cockpit view of that model does not pay for them. Bound to the instance because
    * models persist across selections.
@@ -862,6 +884,9 @@ class FlightSimulator {
       } finally {
         cockpit.group.visible = visible;
       }
+      // A cockpit entry the gate held lands once the programs are compiled, so the cut never
+      // arrives a frame ahead of the shaders it needs.
+      cockpit.shaderWarmup?.then(() => this.cameraSystem?.completeCockpitEntry());
     };
   }
 
@@ -926,7 +951,9 @@ class FlightSimulator {
     await startupStage(4, 'startup.preload');
     await startupStage(5, 'startup.cockpit');
     const deadline = performance.now() + 60000;
-    while (this.aircraft.cockpit?.cockpitModelLoading || this.aircraft.loadingGltf) {
+    // Boot waits for the airframe only. The streamed interior belongs to the cockpit view, not
+    // to the lobby, and aircraft whose cabin ships inside the airframe model still land here.
+    while (this.aircraft.loadingGltf) {
       if (performance.now() > deadline) throw new Error('Startup assets timed out');
       await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -1018,9 +1045,15 @@ class FlightSimulator {
     }
 
     if (this.cameraSystem) {
-      if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT && this.aircraft.cockpit?.cockpitModelFailed) {
-        this.cameraSystem.setMode(CameraSystem.MODES.CHASE, true);
-        this.showToast(() => t('notice.cockpit.unavailable'));
+      if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) {
+        const interior = this.cockpitInteriorStatus();
+        if (interior !== 'ready') {
+          // This model's cabin has not arrived: hold the exterior and land back inside once it
+          // has, instead of rendering a cockpit shell with no interior geometry.
+          this.cameraSystem.setMode(CameraSystem.MODES.CHASE, true);
+          if (interior === 'loading') this.cameraSystem.holdCockpitEntry();
+          else this.showToast(() => t('notice.cockpit.unavailable'));
+        }
       }
       this.cameraSystem.snapToTarget(this.aircraft.group);
     }
@@ -1070,12 +1103,17 @@ class FlightSimulator {
 
     // 4. Update Cockpit Visibility & Audio
     let isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
-    if (isCockpit && !this.cameraSystem.photoCockpit && this.aircraft.cockpit.cockpitModelFailed) {
+    if (!this.cameraSystem.photoCockpit && this.aircraft.cockpit.cockpitModelFailed) {
       // The GLTF interior is the only 3D cockpit geometry, and it never arrived.
-      // The exterior groups are hidden in this mode, so pull the view out.
-      this.cameraSystem.setMode(CameraSystem.MODES.CHASE, true);
-      isCockpit = false;
-      if (!this.interiorUnavailableWarned) {
+      // The exterior groups are hidden in this mode, so pull the view out. A held
+      // entry has no view to pull: it only stops waiting, and must still say why.
+      const wasHeld = this.cameraSystem.releaseCockpitEntry();
+      const wasCockpit = isCockpit;
+      if (wasCockpit) {
+        this.cameraSystem.setMode(CameraSystem.MODES.CHASE, true);
+        isCockpit = false;
+      }
+      if ((wasCockpit || wasHeld) && !this.interiorUnavailableWarned) {
         this.interiorUnavailableWarned = true;
         this.showToast(() => t('notice.cockpit.unavailable'));
       }

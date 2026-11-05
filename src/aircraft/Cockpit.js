@@ -37,6 +37,7 @@ export class Cockpit {
     this.gltfCockpitLoaded = false;
     this.cockpitModelLoading = false;
     this.cockpitModelFailed = false;
+    this.cockpitModelRequested = false;
     this.gltfDisplays = null;
     this.gltfCockpitFraming = null;
     this.gltfGlassPanels = [];
@@ -66,8 +67,19 @@ export class Cockpit {
 
     this.floods = [this.glareshieldFlood, this.pedestalFlood, this.cockpitLight];
     this.floodBaseIntensity = this.floods.map((flood) => flood.intensity);
+  }
 
+  /**
+   * Begin streaming the interior, once. Boot no longer calls this: the interior GLB and its
+   * light-transfer bakes are several megabytes that only the cockpit view ever displays, and
+   * the lobby runs in an exterior view. The camera asks for it on first cockpit entry.
+   */
+  ensureCockpitModel() {
+    if (typeof window === 'undefined') return false;
+    if (this.cockpitModelRequested || this.gltfCockpitLoaded) return false;
+    this.cockpitModelRequested = true;
     this.loadCockpitModel();
+    return true;
   }
 
   /** Actual external radiance drives baked transfer, independently of aperture area. */
