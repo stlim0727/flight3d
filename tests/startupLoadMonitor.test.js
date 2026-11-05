@@ -1,6 +1,7 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { installStartupLoadMonitor } from '../src/ui/StartupLoadMonitor.js';
+import { PARTIAL_MIN_MS } from '../src/core/startupTrace.js';
 import { _resetAnalyticsForTesting, trackStartupTrace } from '../src/analytics/posthog.js';
 
 /**
@@ -50,7 +51,7 @@ class FakeMutation {
 }
 FakeMutation.instances = [];
 
-function fixture({ search = '', resourceEntries = [], paintEntries = [], navEntry = null } = {}) {
+function fixture({ search = '', resourceEntries = [], paintEntries = [], navEntry = null, clockLag = 0 } = {}) {
   const listeners = new Map();
   const body = {
     classList: {
@@ -61,8 +62,11 @@ function fixture({ search = '', resourceEntries = [], paintEntries = [], navEntr
   };
   const g = {
     // Explicit clock: the test advances it, so expected mark values never depend on how many
-    // times the adapter happened to call now().
+    // times the adapter happened to call now(). `lagMs` models the one thing a scripted clock
+    // cannot express: wall time that keeps running while the test waits on a real timer.
     currentTime: 0,
+    lagMs: clockLag,
+    lag(elapsedMs) { g.currentTime = Math.max(g.currentTime, elapsedMs - g.lagMs); },
     location: { search, origin: 'https://flight3d.test' },
     document: {
       body,
@@ -240,6 +244,217 @@ test('a failed boot reports immediately with readySource failed', async () => {
   assert.equal(captured.length, 1);
   assert.equal(captured[0].e, 'startup_trace');
   assert.equal(captured[0].p.readySource, 'failed');
+  assert.equal(captured[0].p.outcome, 'failed');
+  assert.equal(captured[0].p.flushReason, 'failed');
+});
+
+test('a tab hidden before ready still reports the boot, tagged never-ready', async () => {
+  _resetAnalyticsForTesting(null);
+  const captured = [];
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties) => captured.push({ eventName, properties }),
+    flush: () => {},
+  });
+
+  const entries = [
+    resource('https://flight3d.test/models/b737-cockpit-medium.glb', 3310, 1450, 3_827_468),
+    resource('https://flight3d.test/lighting/cockpit-medium.bin', 3312, 620, 2_706_720),
+  ];
+  const g = fixture({ resourceEntries: entries });
+  withWindow(g, () => {
+    const m = install(null, g);
+    FakeObserver.instances.filter(o => o.type === 'resource').forEach(o => o.push(entries));
+    g.currentTime = 6000;
+    g.document.visibilityState = 'hidden';
+    g.dispatch('visibilitychange');
+    return m;
+  });
+
+  await new Promise(resolve => setImmediate(resolve));
+  // A backgrounded mobile tab is usually killed without ever firing pagehide, and this is what
+  // the pre-ready bounces used to produce instead: nothing.
+  assert.equal(captured.length, 1);
+  const props = captured[0].properties;
+  assert.equal(props.outcome, 'never-ready');
+  assert.equal(props.flushReason, 'hidden');
+  assert.equal(props.readyMs, null);
+  assert.equal(props.totals.requests, 2, 'the buffered replay still carries every boot asset');
+  assert.equal(props.classes.glb.count, 1);
+  assert.equal(typeof props.bootId, 'string');
+  assert.ok(props.bootId.length > 0, 'a per-load id so partial and final rows can be joined');
+});
+
+test('a pre-ready page hide flushes with its own reason', async () => {
+  _resetAnalyticsForTesting(null);
+  const captured = [];
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties) => captured.push({ eventName, properties }),
+    flush: () => {},
+  });
+  const g = fixture({ resourceEntries: [resource('https://flight3d.test/models/a.glb', 100, 400)] });
+  // Everything the adapter reacts to has to happen with the fake window installed: the emit path
+  // re-reads telemetry config, exactly as it does in a browser.
+  withWindow(g, () => {
+    install(null, g);
+    g.currentTime = 4000;
+    g.dispatch('pagehide');
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].properties.flushReason, 'pagehide');
+  assert.equal(captured[0].properties.outcome, 'never-ready');
+});
+
+test('a partial flush does not spend the final report for the same boot', async () => {
+  _resetAnalyticsForTesting(null);
+  const captured = [];
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties) => captured.push({ eventName, properties }),
+    flush: () => {},
+  });
+  const g = fixture({ resourceEntries: [resource('https://flight3d.test/models/a.glb', 100, 400)] });
+
+  // The capture lands on a microtask (initAnalytics().then(...)), so each stage is its own
+  // withWindow block with a drain between; asserting inside the block would see the emit's start.
+  let mutations;
+  const monitor = withWindow(g, () => {
+    const m = install(null, g);
+    mutations = [...FakeMutation.instances];
+    g.currentTime = 6000;
+    g.document.visibilityState = 'hidden';
+    g.dispatch('visibilitychange');
+    return m;
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(captured.length, 1, 'the visitor came back instead of bouncing');
+
+  withWindow(g, () => {
+    g.document.visibilityState = 'visible';
+    g.currentTime = 9000;
+    g.document.body.classList.remove('booting');
+    mutations.forEach(o => o.fire());
+    g.currentTime = 9000 + 10_000;
+    monitor.emit();
+  });
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(captured.length, 2);
+  assert.equal(captured[0].properties.outcome, 'never-ready');
+  assert.equal(captured[1].properties.outcome, 'ready');
+  assert.equal(captured[1].properties.flushReason, 'settle');
+  assert.equal(captured[1].properties.readyMs, 9000);
+  assert.equal(captured[1].properties.bootId, captured[0].properties.bootId, 'one boot, two rows');
+
+  // Only one final report, however many exits follow it.
+  withWindow(g, () => {
+    g.dispatch('pagehide');
+    monitor.emit({ forced: true, reason: 'hidden' });
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(captured.length, 2);
+});
+
+test('a hidden tab that is too young to report retries at the floor', async () => {
+  _resetAnalyticsForTesting(null);
+  const captured = [];
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties) => captured.push({ eventName, properties }),
+    flush: () => {},
+  });
+  const g = fixture({ resourceEntries: [resource('https://flight3d.test/models/a.glb', 100, 400)] });
+  // This one cannot use withWindow: the retry fires from a timer, so the fake window has to stay
+  // installed across the wait exactly as the real one does in a browser.
+  const previous = globalThis.window;
+  globalThis.window = g;
+  let monitor;
+  try {
+    monitor = withWindow(g, () => {
+      const m = install(null, g);
+      g.currentTime = PARTIAL_MIN_MS - 400;
+      g.document.visibilityState = 'hidden';
+      g.dispatch('visibilitychange');
+      assert.equal(captured.length, 0, 'below the floor the row would describe a page with no timing');
+      return m;
+    });
+    // The retry runs on the host's timer, which the fake clock cannot fast-forward; wait it out.
+    g.currentTime = PARTIAL_MIN_MS;
+    await new Promise(resolve => setTimeout(resolve, 600));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(captured.length, 1, 'a killed background tab never fires pagehide again');
+    assert.equal(captured[0].properties.flushReason, 'hidden');
+    assert.equal(captured[0].properties.outcome, 'never-ready');
+  } finally {
+    if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+  }
+  monitor.dispose();
+});
+
+test('a floor retry that wakes a hair early re-arms instead of losing the load', async () => {
+  _resetAnalyticsForTesting(null);
+  const captured = [];
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties) => captured.push({ eventName, properties }),
+    flush: () => {},
+  });
+  const g = fixture({
+    resourceEntries: [resource('https://flight3d.test/models/a.glb', 100, 400)],
+    clockLag: 3,
+  });
+  const previous = globalThis.window;
+  globalThis.window = g;
+  let monitor;
+  try {
+    monitor = withWindow(g, () => {
+      const m = install(null, g);
+      g.document.visibilityState = 'hidden';
+      g.dispatch('visibilitychange');
+      assert.equal(captured.length, 0);
+      return m;
+    });
+    // A browser timer can wake before the deadline it was handed, so the first retry lands a few
+    // milliseconds short of the floor. A one-shot retry loses the load right there: a backgrounded
+    // tab fires no further event, and this is exactly the mobile bounce row the floor exists to keep.
+    const started = Date.now();
+    const ticker = setInterval(() => g.lag(Date.now() - started), 1);
+    const deadline = Date.now() + 4000;
+    try {
+      while (captured.length === 0 && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    } finally {
+      clearInterval(ticker);
+    }
+    assert.ok(captured.length > 0, 'the retry re-armed and crossed the floor');
+    assert.equal(captured.length, 1, 'the retry loop reports once, not once per wake');
+    assert.equal(captured[0].properties.flushReason, 'hidden');
+    assert.equal(captured[0].properties.outcome, 'never-ready');
+  } finally {
+    if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+  }
+  monitor.dispose();
+});
+
+test('a load that installs while hidden does not flush at zero milliseconds', async () => {
+  _resetAnalyticsForTesting(null);
+  const captured = [];
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties) => captured.push({ eventName, properties }),
+    flush: () => {},
+  });
+  const g = fixture();
+  g.document.visibilityState = 'hidden';
+
+  const monitor = withWindow(g, () => {
+    const m = install(null, g);
+    assert.equal(captured.length, 0, 'backgroundBoot has nothing collected yet');
+    g.currentTime = 7000;
+    g.dispatch('visibilitychange');
+    return m;
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(captured.length, 1, 'once there is a resource list, it is worth sending');
+  assert.equal(captured[0].properties.outcome, 'never-ready');
+  monitor.dispose();
 });
 
 test('dispose disconnects every observer so collection lifetime is bounded', () => {

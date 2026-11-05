@@ -13,6 +13,12 @@ Telemetry is opt-in and safe no-op by default when no API key is configured.
 | `?posthogKey=<key>` | Runtime URL parameter override for debugging | None |
 | `?posthogHost=<host>` | Runtime URL host override for debugging | None |
 | `?telemetry=0` | Runtime URL parameter to disable telemetry | None |
+| `window.__POSTHOG_KEY__` / `__POSTHOG_HOST__` | Build/hosting override, same precedence slot below the URL parameter | None |
+| `window.__POSTHOG_DISABLED__` | Set `true` to force telemetry off regardless of key | None |
+| `localStorage.flight3d_telemetry_optout` | Set to `'1'` to opt this browser out permanently | unset |
+
+`?telemetry=0` and the opt-out key short-circuit `getPostHogConfig()`, so no observer is
+installed and nothing is queued.
 
 ### GitHub Pages Deployment
 To enable PostHog in production GitHub Actions builds:
@@ -31,6 +37,84 @@ Add `VITE_POSTHOG_KEY` as a GitHub Actions repository secret or variable.
    - `flight_ended`: landing completion, duration, score, gates cleared.
    - `pilot_mode_selected`: tracks player preference between human control and AI autopilot.
    - `user_feedback_submitted`: in-game bug reports and comments with attached diagnostic state.
+   - `startup_trace`: one boot timeline per page load (below).
+   - `$exception`: raised through `captureException()`, with live simulator context attached.
+   - Every event carries `clientTimeMs` (epoch ms, client clock). Do **not** add a `timestamp`
+     property: PostHog already owns that column and a property with the same name shadows the
+     server-received time in table views and HogQL filters.
+   - Events sent before `posthog-js` finishes its dynamic import are held in a bounded queue
+     (`PENDING_EVENT_CAP`, oldest dropped) and replayed on init, so a startup trace that fires
+     during page hide is not silently discarded. When telemetry is disabled or unconfigured the
+     queue is cleared instead, so an opted-out load sends nothing later.
+
+### `startup_trace` (v2)
+
+Collected by `src/ui/StartupLoadMonitor.js`, aggregated by the pure `src/core/startupTrace.js`
+(`TRACE_VERSION = 2`), sent with `send_instantly` and **without** flight context — a boot that
+never reached a cockpit has no meaningful `aircraft`/`airport`, and mixing the two populations was
+the source of contradictory properties in v1.
+
+Latency KPIs — use these for performance work:
+
+| Field | Meaning |
+| :--- | :--- |
+| `lobbyReadyMs` | navigation start → the first `lobby-ready` or `fly` mark: the app is interactive. This is the number that should fall when the boot gets faster. |
+| `fcpMs`, `navigation.firstContentfulPaintMs`, `navigation.largestContentfulPaintMs` | browser paint marks, independent of our own overlay. |
+| `navigation.*` (`fetchStartMs`, `responseStartMs`, `domContentLoadedMs`, `loadMs`) | `PerformanceNavigationTiming`, i.e. what the network and HTML parse cost. |
+| `boot.stagesMs` | per-stage durations from the boot `marks`, so a regression is attributable to a stage. |
+| `assetMsBeforeReady`, `requestsBeforeReady`, `bytesBeforeReady` | the asset work done before the overlay lifted. |
+| `slowest`, `largest`, `blocking` | top-N assets by duration / encoded size, and the single longest pre-ready asset. |
+| `longTasks` | `{ count, totalMs, maxMs }` of blocking main-thread tasks during the boot. |
+
+Funnel stages, **not** latency:
+
+- `readyMs` is when the user happened to reach a cockpit. It includes lobby idle time, so a field
+  median in the tens of seconds is expected and says nothing about boot speed. Chart it as
+  "did this load reach a cockpit", never as a p50/p95 target.
+- `firstFrameMs` and `cockpitStageMs` mark rendering milestones inside that funnel.
+
+Outcome and completeness:
+
+- `outcome`: `ready` \| `failed` \| `deadline` (no ready anchor by `HARD_DEADLINE_MS`) \|
+  `never-ready` (a forced flush with no ready anchor). `readySource` is kept as-is for insight
+  continuity, including `'never'`.
+- `flushReason`: `settle` \| `pagehide` \| `hidden` \| `deadline` \| `failed`. Pre-ready loads
+  flush on tab hide, which is what mobile does instead of `pagehide` before killing a tab.
+- `bootId`: per-load id (`crypto.randomUUID`, random fallback). A load can emit at most one
+  partial row (`flushReason` on `never-ready`) plus one final row; join them on `bootId` to see
+  what each early flush missed. `$window_id` is **not** per-load — three field traces shared one —
+  so it cannot substitute.
+- Coverage of a row is measurable: `totals.requestsAfterReady`, `totals.bytesAfterReady`,
+  `postReadyMs`.
+
+Cold vs warm:
+
+- `totals.transferBytes: 0` with a non-zero `encodedBodySize` means HTTP-cache hits, not a missing
+  measurement: `cacheWarmRatio` (hits / sized requests, `null` when nothing was sizeable),
+  `totals.cacheHitRequests`, `totals.sizeUnknownRequests`, and `documentCached`.
+- `isOpaque` counts "size unavailable", which includes a *memory*-cache hit, not cross-origin:
+  own-origin filtering runs first, so on GitHub Pages every surviving entry is same-origin. Treat
+  `sizeUnknownRequests` as sizing gaps, not as third-party traffic.
+
+Expected quirks in the data:
+
+- `classes.audio.count: 0` is correct. `src/audio/FlightAudio.js` synthesises everything
+  procedurally (`ctx.createBuffer`, oscillators); the only real fetch is
+  `src/audio/DepartureRadio.js`, driven from `src/director/scenarios/IncheonDepartureScenario.js`
+  long after `ready`.
+- `backgroundBoot: true` means the tab was created hidden, so no paint or LCP is meaningful.
+
+Health query — the capture rate is the instrument for this whole feature:
+
+```sql
+SELECT e.name, count() FROM events AS e
+WHERE event = '$pageview' OR event = 'startup_trace'
+GROUP BY e.name
+```
+
+`startup_trace ÷ $pageview` should be ≥ 0.8; the v1 field data was 6 ÷ 46 ≈ 0.13. Filter or split
+by `properties.outcome` before reading any percentile, and remember that everything here is
+`event = 'startup_trace'` plus `properties.<field>` — PostHog properties are not top-level columns.
 
 3. **In-Game Bug Report Dialog**:
    - Available on the mission score overlay (`[data-score-report]`) and flight debrief (`#debrief-feedback`).

@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   shortenAssetName, classifyAsset, createStartupTraceState, addResourceEntry, noteReady,
-  noteMilestone, noteFirstVisible, noteSelection, shouldEmitTrace, stageSpans,
-  buildStartupTraceReport, BOOT_STAGES, ASSET_CLASSES, SETTLE_MS, HARD_DEADLINE_MS,
+  noteMilestone, noteFirstVisible, noteDocumentTransfer, noteSelection, shouldEmitTrace,
+  shouldEmitPartialTrace,
+  stageSpans, buildStartupTraceReport, BOOT_STAGES, ASSET_CLASSES, SETTLE_MS, HARD_DEADLINE_MS,
+  TRACE_VERSION, PARTIAL_MIN_MS,
 } from '../src/core/startupTrace.js';
 
 const ORIGIN = 'https://flight3d.example/';
@@ -151,6 +153,115 @@ test('a report emitted before any ready anchor labels readySource never', () => 
   assert.equal(buildStartupTraceReport(s, { nowMs: 20_000 }).readySource, 'never');
   noteReady(s, 800, 'booting-class');
   assert.equal(buildStartupTraceReport(s, { nowMs: 9_000 }).readySource, 'booting-class');
+});
+
+test('a pre-ready forced flush is allowed once and keeps the final emit right', () => {
+  const s = state();
+  assert.equal(shouldEmitPartialTrace(s, PARTIAL_MIN_MS - 1), false, 'too early to have a resource list worth sending');
+  assert.equal(shouldEmitPartialTrace(s, PARTIAL_MIN_MS), true);
+  assert.equal(s.partialEmitted, true);
+  assert.equal(s.emitted, false, 'the partial trace does not spend the completed boot');
+  assert.equal(shouldEmitPartialTrace(s, 3000), false, 'one partial per load');
+
+  noteReady(s, 3200, 'booting-class');
+  assert.equal(shouldEmitTrace(s, 3200 + SETTLE_MS), true, 'the settle path still reports the finished boot');
+
+  const done = state();
+  noteReady(done, 800, 'booting-class');
+  assert.equal(shouldEmitPartialTrace(done, 5000), false, 'a completed boot is not partial');
+
+  const spent = state();
+  spent.emitted = true;
+  assert.equal(shouldEmitPartialTrace(spent, 5000), false);
+});
+
+test('outcome names what the boot reached, so partial rows never pollute latency percentiles', () => {
+  const ready = state();
+  noteReady(ready, 2400, 'booting-class');
+  assert.equal(buildStartupTraceReport(ready, { nowMs: 12_400 }).outcome, 'ready');
+
+  const never = state();
+  assert.equal(buildStartupTraceReport(never, { nowMs: 2400 }).outcome, 'never-ready');
+
+  const failed = state();
+  failed.readySource = 'failed';
+  assert.equal(buildStartupTraceReport(failed, { nowMs: 2400 }).outcome, 'failed');
+
+  const late = state();
+  late.readySource = 'timeout';
+  assert.equal(buildStartupTraceReport(late, { nowMs: HARD_DEADLINE_MS }).outcome, 'deadline');
+});
+
+test('lobbyReadyMs reads the usable-app mark and never falls back to lobby idle time', () => {
+  const s = state();
+  const report = buildStartupTraceReport(s, {
+    marks: { 'module-start': 180, 'lobby-ready': 913, 'first-frame': 21636, fly: 300 },
+    nowMs: 30_000,
+  });
+  assert.equal(report.lobbyReadyMs, 913, 'the demo lobby mark wins over a later fly mark');
+  assert.equal(report.lobbyReadySource, 'lobby-ready');
+  assert.equal(report.readyMs, null);
+
+  const direct = buildStartupTraceReport(state(), { marks: { fly: 2750 }, nowMs: 9000 });
+  assert.equal(direct.lobbyReadyMs, 2750, '?fly boots never mark a lobby');
+  assert.equal(direct.lobbyReadySource, 'fly');
+
+  const blind = buildStartupTraceReport(state(), { marks: {}, nowMs: 9000 });
+  assert.equal(blind.lobbyReadyMs, null);
+  assert.equal(blind.lobbyReadySource, null);
+});
+
+test('cache hits are counted separately from entries with no sizing at all', () => {
+  const s = state();
+  // HTTP cache hit: body size known, nothing transferred.
+  addResourceEntry(s, entry(`${ORIGIN}models/a.glb`, 100, 400, { transfer: 0, encoded: 2_000_000, decoded: 3_000_000 }));
+  // Cold load.
+  addResourceEntry(s, entry(`${ORIGIN}models/b.glb`, 600, 100, { transfer: 5000, encoded: 4000, decoded: 6000 }));
+  // No sizing: memory-cache hit or (on a non-same-origin harness) a CORS-opaque response.
+  addResourceEntry(s, entry(`${ORIGIN}textures/c.png`, 700, 50, { transfer: 0, encoded: 0, decoded: 0 }));
+
+  const report = buildStartupTraceReport(s, { nowMs: 1200 });
+  assert.equal(report.totals.cacheHitRequests, 1);
+  assert.equal(report.totals.sizeUnknownRequests, 1);
+  assert.equal(report.totals.opaqueDropped, 1);
+  assert.equal(report.cacheWarmRatio, 0.5, 'one of the two entries with sizing was served from cache');
+
+  const empty = buildStartupTraceReport(state(), { nowMs: 10 });
+  assert.equal(empty.cacheWarmRatio, null, 'no data is not 0 % warm');
+
+  noteDocumentTransfer(s, 0);
+  assert.equal(buildStartupTraceReport(s, { nowMs: 1200 }).documentCached, true);
+  assert.equal(buildStartupTraceReport(state(), { nowMs: 1200 }).documentCached, null, 'no navigation entry is not a miss');
+});
+
+test('post-ready requests are totalled so a partial flush can be told from a short capture window', () => {
+  const s = state();
+  noteReady(s, 1000, 'booting-class');
+  addResourceEntry(s, entry(`${ORIGIN}models/early.glb`, 100, 400, { transfer: 1500, encoded: 1400 }));
+  addResourceEntry(s, entry(`${ORIGIN}models/late.glb`, 1200, 300, { transfer: 2500, encoded: 2400 }));
+
+  const report = buildStartupTraceReport(s, { nowMs: 11_000 });
+  assert.equal(report.requestsBeforeReady, 1);
+  assert.equal(report.totals.requestsAfterReady, 1);
+  assert.equal(report.totals.bytesAfterReady, 2500);
+  assert.equal(report.postReadyMs, 10_000, 'how long the window stayed open before flushing');
+
+  const partial = buildStartupTraceReport(state(), { nowMs: 1200 });
+  assert.equal(partial.postReadyMs, null, 'no ready anchor means no post-ready window');
+});
+
+test('flushReason is carried onto the report and defaults to the settle path', () => {
+  assert.equal(buildStartupTraceReport(state(), { nowMs: 10 }).flushReason, 'settle');
+  assert.equal(buildStartupTraceReport(state(), { nowMs: 10, flushReason: 'hidden' }).flushReason, 'hidden');
+});
+
+test('bootId and version identify the report schema in PostHog', () => {
+  const s = state({ bootId: '01a1a49c-3a21-783f' });
+  const report = buildStartupTraceReport(s, { nowMs: 10 });
+  assert.equal(report.bootId, '01a1a49c-3a21-783f');
+  assert.equal(report.version, TRACE_VERSION);
+  assert.equal(TRACE_VERSION, 2, 'v2 added outcome/flushReason/lobbyReadyMs and the cache totals');
+  assert.equal(buildStartupTraceReport(state(), { nowMs: 10 }).bootId, null);
 });
 
 test('milestones ignore non-finite values and map onto the navigation payload', () => {

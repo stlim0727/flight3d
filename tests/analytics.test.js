@@ -1,10 +1,12 @@
-import test from 'node:test';
+import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_POSTHOG_HOST,
   DEFAULT_POSTHOG_KEY,
+  PENDING_EVENT_CAP,
   getPostHogConfig,
   gatherFlightContext,
+  initAnalytics,
   trackEvent,
   captureException,
   trackFlightStart,
@@ -12,10 +14,15 @@ import {
   trackFlightCrash,
   trackPilotModeChange,
   trackStartupTrace,
-  trackResourceLatency,
   sendUserFeedback,
   _resetAnalyticsForTesting,
 } from '../src/analytics/posthog.js';
+
+// Events captured without an SDK are held in a module queue and released the moment one appears,
+// so a test that queued events would otherwise hand them to the next test's mock.
+afterEach(() => {
+  _resetAnalyticsForTesting(null);
+});
 
 test('getPostHogConfig defaults to EU host and provides configured EU key', () => {
   assert.equal(DEFAULT_POSTHOG_HOST, 'https://eu.i.posthog.com');
@@ -125,7 +132,9 @@ test('trackEvent forwards formatted payload to PostHog instance when initialized
   assert.equal(captured[0].properties.scenario, 'valley-slalom-v1');
   assert.equal(captured[0].properties.pilotMode, 'human');
   assert.equal(captured[0].properties.timeOfDay, 'sunrise');
-  assert.equal(typeof captured[0].properties.timestamp, 'number');
+  assert.equal(typeof captured[0].properties.clientTimeMs, 'number');
+  assert.ok(!('timestamp' in captured[0].properties),
+    'a custom timestamp property would shadow PostHog event timestamps in HogQL');
 
   trackFlightCrash({
     airport: 'lukla',
@@ -265,37 +274,103 @@ test('trackStartupTrace keeps the blocking pair together and nulls absent classe
   _resetAnalyticsForTesting(null);
 });
 
-test('trackResourceLatency sends formatted resource latency telemetry', () => {
+test('events captured before the SDK resolves are queued and released on init', async () => {
+  const captured = [];
+  const mock = {
+    capture: (eventName, properties, options) => captured.push({ eventName, properties, options }),
+    flush: () => {},
+  };
+
+  // This is the page-hide case: the trace exists while the dynamic import has not finished, and
+  // there is no opportunity to wait for it.
+  _resetAnalyticsForTesting(null);
+  trackStartupTrace({ readyMs: 900, classes: { glb: { count: 1, totalMs: 120, maxMs: 120 } } });
+  trackFlightStart({ airport: 'coastal', aircraft: 'B738', scenario: 'runway', pilotMode: 'human' });
+  assert.equal(captured.length, 0, 'nothing can be sent before an instance exists');
+
+  _resetAnalyticsForTesting(mock);
+  assert.equal(captured.length, 2, 'installing the SDK releases everything queued');
+  assert.equal(captured[0].eventName, 'startup_trace');
+  assert.equal(captured[0].options.send_instantly, true, 'the instant flag survives the queue');
+  assert.equal(captured[1].eventName, 'flight_started');
+
+  trackEvent('later_event', { ok: true });
+  assert.equal(captured.length, 3, 'after init the path is direct');
+});
+
+test('the pre-init queue is bounded and drops the oldest events', () => {
+  const captured = [];
+  _resetAnalyticsForTesting(null);
+  for (let i = 0; i < PENDING_EVENT_CAP + 5; i += 1) trackEvent('queued', { seq: i });
+  assert.equal(captured.length, 0);
+
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties) => captured.push({ eventName, properties }),
+    flush: () => {},
+  });
+  assert.equal(captured.length, PENDING_EVENT_CAP, 'a load that never initializes holds nothing more');
+  assert.equal(captured[0].properties.seq, 5, 'the oldest events are the ones given up on');
+  assert.equal(captured.at(-1).properties.seq, PENDING_EVENT_CAP + 4);
+});
+
+test('an unconfigured load clears the queue instead of holding events forever', async () => {
+  const captured = [];
+  _resetAnalyticsForTesting(null);
+  trackEvent('orphan', { seq: 1 });
+  // No window in Node, which is how an opted-out visitor behaves: initialization resolves as
+  // disabled rather than pending.
+  await initAnalytics();
+
+  _resetAnalyticsForTesting({
+    capture: (eventName, properties) => captured.push({ eventName, properties }),
+    flush: () => {},
+  });
+  assert.equal(captured.length, 0, 'events from a disabled load never resurface');
+});
+
+test('startup_trace reports the boot only, never the live simulator state it flushed from', () => {
   const captured = [];
   _resetAnalyticsForTesting({
     capture: (eventName, properties, options) => captured.push({ eventName, properties, options }),
     flush: () => {},
   });
 
-  trackResourceLatency({
-    name: 'models/f-16.glb',
-    durationMs: 342.6,
-    type: 'glb',
-    sizeBytes: 1250000,
-    cached: false,
-  });
+  const report = {
+    version: 2,
+    bootId: '01a1a49c-test-boot',
+    outcome: 'ready',
+    flushReason: 'settle',
+    readyMs: 21775,
+    lobbyReadyMs: 1398,
+    lobbyReadySource: 'lobby-ready',
+    cacheWarmRatio: 0.75,
+    classes: {},
+    slowest: [],
+  };
+  trackStartupTrace(report);
 
-  assert.equal(captured.length, 1);
-  assert.equal(captured[0].eventName, 'resource_loaded');
-  assert.equal(captured[0].properties.resource_name, 'models/f-16.glb');
-  assert.equal(captured[0].properties.resource_duration_ms, 343);
-  assert.equal(captured[0].properties.resource_type, 'glb');
-  assert.equal(captured[0].properties.resource_size_bytes, 1250000);
-  assert.equal(captured[0].properties.resource_cached, false);
+  // PostHog field data paired a B738/coastal boot with aircraft F16/generated-valley because the
+  // flight context was merged in at flush time. The payload must be the report plus derived
+  // scalars and nothing else.
+  const expected = [
+    ...Object.keys(report),
+    'slowestAsset', 'slowestAssetDurationMs',
+    'glbMaxLatencyMs', 'glbTotalLatencyMs', 'binMaxLatencyMs',
+    'textureMaxLatencyMs', 'audioMaxLatencyMs', 'clientTimeMs',
+  ].sort();
+  assert.deepEqual(Object.keys(captured[0].properties).sort(), expected);
+  assert.equal(captured[0].properties.bootId, '01a1a49c-test-boot');
+  assert.equal(captured[0].properties.outcome, 'ready');
+  assert.equal(captured[0].properties.lobbyReadyMs, 1398);
+});
 
-  // Invalid or missing duration does not emit
-  trackResourceLatency({ name: 'invalid.glb', durationMs: NaN });
-  assert.equal(captured.length, 1);
-
-  trackResourceLatency({ name: '', durationMs: 100 });
-  assert.equal(captured.length, 1);
-
-  _resetAnalyticsForTesting(null);
+test('resource_loaded telemetry was removed with its uncalled producer', async () => {
+  const fs = await import('node:fs');
+  const posthogSrc = fs.readFileSync(new URL('../src/analytics/posthog.js', import.meta.url), 'utf8');
+  const mainSrc = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(posthogSrc, /trackResourceLatency|resource_loaded/,
+    'PostHog held zero resource_loaded events: the per-asset timings live in startup_trace totals');
+  assert.doesNotMatch(mainSrc, /trackResourceLatency/);
 });
 
 test('posthog.js configures API defaults 2026-08-30 and enables performance tracking', async () => {
@@ -327,7 +402,6 @@ test('src/main.js imports all analytics methods attached to this.analytics', asy
     'trackFlightStart',
     'trackFlightEnd',
     'trackFlightCrash',
-    'trackResourceLatency',
     'captureException',
   ];
 
