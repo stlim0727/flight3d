@@ -27,3 +27,12 @@ test('737 bridge docks at the port door and telescopes clear without moving the 
   b.setExtension(5);assert.equal(b.extension,1);
   b.setExtension(-1);assert.equal(b.extension,0);
 });
+
+test('stand jet bridge attaches to arbitrary terminal stands and docks flush with Door 1L', () => {
+  const stand = { id: 'P01', x: 145.56, z: -244.83, yaw: 1.25 };
+  const b = createDepartureJetBridge(7, stand, { terminalZ: -58, extension: 1 });
+  b.group.updateMatrixWorld(true);
+  const dock = b.cab.localToWorld(new THREE.Vector3(0, 0, 1.05));
+  assert.ok(Math.hypot(dock.x - b.door.x, dock.z - b.door.z) < 0.001);
+  assert.equal(b.extension, 1);
+});
