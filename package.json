@@ -29,6 +29,8 @@
     "test:lukla": "node scripts/test-lukla-demo-benchmark.mjs",
     "test:cockpit": "node scripts/verify-cockpit-startup.js",
     "test:camera-look": "node scripts/verify-camera-look.mjs",
+    "audio:departure": "node scripts/build-gemini-departure-radio.mjs",
+    "audio:check": "node scripts/build-gemini-departure-radio.mjs --check",
     "refresh:images": "node scripts/refresh-all-readme-images.mjs",
     "check": "node scripts/check-syntax.mjs && node scripts/check-workflow-actions.mjs"
   },

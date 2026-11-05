@@ -47,9 +47,17 @@ test('missing audio falls back without blocking the flight; successful calls rel
 
 test('every scripted stage ships a non-silent PCM voice clip with matching transcript',()=>{
   const manifest=JSON.parse(fs.readFileSync(new URL('../public/audio/departure/manifest.json',import.meta.url)));
-  assert.deepEqual(Object.keys(manifest),Object.keys(DEPARTURE_RADIO));
+  assert.deepEqual(
+    Object.keys(manifest),
+    Object.keys(DEPARTURE_RADIO),
+    'manifest.json stages must match DEPARTURE_RADIO. Run "npm run audio:departure" to update.'
+  );
   for(const [stage,lines] of Object.entries(DEPARTURE_RADIO)) {
-    assert.deepEqual(manifest[stage].lines.map(l=>[l.speaker,l.text]),lines);
+    assert.deepEqual(
+      manifest[stage].lines.map(l=>[l.speaker,l.text]),
+      lines,
+      `manifest.json lines for stage "${stage}" do not match DEPARTURE_RADIO. Run "npm run audio:departure" to update.`
+    );
     const wav=fs.readFileSync(new URL('../public/audio/departure/'+manifest[stage].file,import.meta.url));
     assert.equal(wav.toString('ascii',0,4),'RIFF');
     let offset=12,samples;
