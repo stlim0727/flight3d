@@ -1,4 +1,5 @@
 export default {
+  "demo.scenario.title": "{title} (Demo)",
   "departure.climbInstruction": "Maintain runway heading · Cleared altitude 3000 ft · Squawk 4213",
   "departure.stage.departure": "[9/9] Departure contact · initial climb",
   "departure.speaker.departure": "Departure",

@@ -1,4 +1,5 @@
 export default {
+  "demo.scenario.title": "{title} (데모)",
   "departure.climbInstruction": "활주로 방향 유지 · 허가 고도 3000 ft · 스쿼크 4213",
   "departure.stage.departure": "[9/9] 출발 관제 교신 · 초기 상승",
   "departure.speaker.departure": "출발 관제",

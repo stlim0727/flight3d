@@ -448,7 +448,8 @@ body[data-flow="lobby"] #hud-overlay .menu-toggle {
 @media (max-width: 600px) { .shadow-demo { top: 146px; font-size: 11px; } }
 
 #lobby-demo-options[hidden] { display: none; }
-#lobby-demo-select { width: 100%; min-height: 44px; white-space: normal; }
+#lobby-demo-options label,
+#lobby-demo-select { display: none; }
 .demo-route-briefing { margin: 8px 0 0; line-height: 1.55; font-size: 13px; color: #cbd5e1; }
 
 /* Keep the active geographic scenery attribution visible during flight.
