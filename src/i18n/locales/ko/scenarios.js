@@ -85,6 +85,7 @@ export default {
   "incheon.airport": "인천공항 (RKSI)",
   "incheon.runway": "15R 이륙 준비",
   "incheon.approach": "15R 최종 접근 · 1.5 km",
+  "incheon.challenge": "⚡ 15R 강풍·오프셋 착륙 챌린지",
   "incheon.cruise": "영종도 순항 · 750 m",
   "incheon.loading": "인천 지형·공항을 불러오는 중…",
   "incheon.load.failed": "인천 데이터를 불러오지 못했습니다. 다시 선택해 주세요.",

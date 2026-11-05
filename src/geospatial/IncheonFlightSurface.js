@@ -102,11 +102,28 @@ export class IncheonFlightSurface {
 export function incheonSpawn(type, groundClearance, aircraftId='B738') {
   const a=airfield.approach, angle=a.headingDeg*Math.PI/180;
   const direction={x:Math.sin(angle),z:-Math.cos(angle)};
-  const distance=type==='approach'?-1500:type==='cruise'?500:100;
-  const speed=type==='runway'?0:aircraftId==='C172'?(type==='approach'?33:48):(type==='approach'?74.5:108);
-  const y=type==='runway'?airfield.elevationM+groundClearance:type==='approach'
-    ?airfield.elevationM+groundClearance+1500*Math.tan(3*Math.PI/180):750;
-  return { x:a.threshold.x+direction.x*distance, z:a.threshold.z+direction.z*distance,
-    y, yaw:-angle, vx:direction.x*speed, vz:direction.z*speed,
-    vy:type==='approach'?-speed*Math.tan(3*Math.PI/180):0 };
+  const isChallenge = type === 'challenge';
+  const distance = isChallenge ? -5500 : type === 'approach' ? -1500 : type === 'cruise' ? 500 : 100;
+  const offset = isChallenge ? 350 : 0;
+  const interceptAngle = isChallenge ? angle - (20 * Math.PI / 180) : angle;
+  const speed = type === 'runway' ? 0
+    : aircraftId === 'C172' ? (isChallenge ? 42 : type === 'approach' ? 33 : 48)
+    : aircraftId === 'F16' ? (isChallenge ? 105 : type === 'approach' ? 90 : 180)
+    : (isChallenge ? 85 : type === 'approach' ? 74.5 : 108);
+  const y = type === 'runway' ? airfield.elevationM + groundClearance
+    : isChallenge ? airfield.elevationM + groundClearance + 5500 * Math.tan(3 * Math.PI / 180) + 65
+    : type === 'approach' ? airfield.elevationM + groundClearance + 1500 * Math.tan(3 * Math.PI / 180)
+    : 750;
+  const vx = isChallenge ? Math.sin(interceptAngle) * speed : direction.x * speed;
+  const vz = isChallenge ? -Math.cos(interceptAngle) * speed : direction.z * speed;
+  const vy = isChallenge ? -2.5 : type === 'approach' ? -speed * Math.tan(3 * Math.PI / 180) : 0;
+  return {
+    x: a.threshold.x + direction.x * distance + Math.cos(angle) * offset,
+    z: a.threshold.z + direction.z * distance + Math.sin(angle) * offset,
+    y,
+    yaw: -interceptAngle,
+    vx,
+    vz,
+    vy,
+  };
 }

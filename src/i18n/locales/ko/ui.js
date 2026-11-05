@@ -305,6 +305,7 @@ export default {
   "lobby.briefing.runway": "활주로 {heading} · 문턱 고도 {elevationFt} ft · 접근각 {gsAngle}°",
   "lobby.briefing.scenario.runway": "활주로 진입 전, 이륙 준비 상태.",
   "lobby.briefing.scenario.approach": "최종 접근 단계, 항행장치와 플랩 전개.",
+  "lobby.briefing.scenario.challenge": "강한 해상 측풍(19 kt)과 돌풍, 축 오프셋과 높은 에너지 상태에서 시작합니다. 플랩·스로틀·러더를 직접 조작해 활주로에 정렬하고 감속 착륙하세요.",
   "lobby.briefing.scenario.cruise": "상공 순항 단계.",
   "lobby.briefing.scenario.cliff": "절벽 끝 24번 활주로 내리막 이륙.",
   "lobby.briefing.scenario.valley": "F-16 가상 계곡 저공 슬라롬: 시드 기반 가상 협곡에서 저공·고속으로 슬라롬 게이트를 통과하는 도전 미션.",

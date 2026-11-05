@@ -305,6 +305,7 @@ export default {
   "lobby.briefing.runway": "Rwy {heading} · threshold elev {elevationFt} ft · glideslope {gsAngle}°",
   "lobby.briefing.scenario.runway": "Holding short, ready for takeoff.",
   "lobby.briefing.scenario.approach": "On final approach, gear and flaps down.",
+  "lobby.briefing.scenario.challenge": "High and fast on an offset approach with strong gusting crosswinds (19 kt). Direct manual control of pitch, power, flaps, and rudder required.",
   "lobby.briefing.scenario.cruise": "Cruising high above the terrain.",
   "lobby.briefing.scenario.cliff": "Downhill takeoff run from the cliff-top end (Rwy 24).",
   "lobby.briefing.scenario.valley": "F-16 Virtual Valley Low-Pass Slalom: Low-altitude, high-speed challenge through procedural canyon slalom gates.",

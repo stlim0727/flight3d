@@ -20,6 +20,12 @@ export const SPAWN_SCENARIOS = {
     briefingKey: 'lobby.briefing.scenario.approach',
     lobbyButtonId: 'lobby-preset-app',
   },
+  challenge: {
+    airports: ['incheon'],
+    labelKeys: { incheon: 'incheon.challenge' },
+    briefingKey: 'lobby.briefing.scenario.challenge',
+    lobbyButtonId: 'lobby-preset-challenge',
+  },
   hangang: {
     airports: ['hangang'],
     labelKeys: { hangang: 'hangang.title' },

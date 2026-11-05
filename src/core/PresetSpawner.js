@@ -8,11 +8,12 @@ import { solveTrim } from '../physics/TrimSolver.js';
 import { rebaseCgVelocity } from '../physics/massKinematics.js';
 import { takeoffPerformance } from '../physics/TakeoffPerformance.js';
 import { stallSpeedEstimate } from '../physics/stallSpeedEstimate.js';
-import { setSimulationWind } from '../physics/WindField.js';
+import { setSimulationWind, WindField } from '../physics/WindField.js';
 import { loadIncheonAirport } from '../environment/IncheonAirport.js';
 import { incheonSpawn } from '../geospatial/IncheonFlightSurface.js';
 import { LuklaTerrain } from '../environment/LuklaTerrain.js';
 import { LuklaAirport } from '../environment/LuklaAirport.js';
+import { APPROACH_DATA } from '../config/approachData.js';
 import {
   defaultScenarioForRegion,
   isScenarioAvailable,
@@ -161,17 +162,22 @@ class PresetSpawnerMethods {
       this.position.set(spawn.x, spawn.y, spawn.z);
       this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
       this.angularVelocity.set(0, 0, 0);
-      this.quaternion.setFromEuler(new THREE.Euler(type === 'approach' ? .04 : 0, spawn.yaw, 0, 'YXZ'));
+      const pitchAttitude = type === 'approach' ? .04 : type === 'challenge' ? .01 : 0;
+      this.quaternion.setFromEuler(new THREE.Euler(pitchAttitude, spawn.yaw, 0, 'YXZ'));
       const airborne = type !== 'runway';
-      this.controls.throttle = airborne ? .5 : 0;
+      this.controls.throttle = type === 'challenge' ? .35 : airborne ? .5 : 0;
       this.engines.setThrottle(this.controls.throttle);
       this.engines.setReverser(false, true);
       this.gear.setGearTarget(type !== 'cruise');
       this.gear.gearState = this.gear.isFixed || type !== 'cruise' ? 1 : 0;
-      this.aero.setFlapPosition(type === 'approach' ? 5 : type === 'runway' ? 2 : 0);
+      this.aero.setFlapPosition(type === 'approach' ? 5 : (type === 'challenge' || type === 'runway') ? 2 : 0);
       this.aero.spoilers = 0;
-      this.controls.pitchTrim = this.aero.pitchTrim = 1.6;
-      const label = { runway: 'incheon.runway', approach: 'incheon.approach', cruise: 'incheon.cruise' }[type];
+      this.controls.pitchTrim = this.aero.pitchTrim = type === 'challenge' ? 1.4 : 1.6;
+      if (type === 'challenge') {
+        const headingDeg = APPROACH_DATA.incheon?.headingDeg ?? 144.68;
+        setSimulationWind(this, new WindField({ profile: 'incheon-crosswind-v1', runwayHeadingDeg: headingDeg, seed: 15, crosswindSign: 1 }));
+      }
+      const label = { runway: 'incheon.runway', approach: 'incheon.approach', cruise: 'incheon.cruise', challenge: 'incheon.challenge' }[type];
       this.showToast(() => t(label));
     } else if (this.activeAirport === 'lukla') {
       const sin58 = 0.848048;
@@ -383,6 +389,12 @@ class PresetSpawnerMethods {
       this.aero.massProperties.setConfiguration(this.gear.gearState, this.aero.currentFlapAngle / (this.aero.flapAngles.at(-1) || 1));
       this.aero.syncMassProperties();
       this.applyComputedTrim();
+      this.engines.settleSpool();
+    } else if (type === 'challenge') {
+      this.aero.currentFlapAngle = this.aero.flapAngles[this.aero.flapsIndex];
+      this.controls.elevator = this.controls.aileron = this.controls.rudder = 0;
+      this.aero.massProperties.setConfiguration(this.gear.gearState, this.aero.currentFlapAngle / (this.aero.flapAngles.at(-1) || 1));
+      this.aero.syncMassProperties();
       this.engines.settleSpool();
     }
 

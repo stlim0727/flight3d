@@ -39,6 +39,8 @@ test('runway coordinate transforms preserve bounded along/right/up amplitudes at
     }
   }
   assert.equal(WIND_PROFILES['mild-disturbance-v1'].crosswind, 1.5);
+  assert.equal(WIND_PROFILES['incheon-crosswind-v1'].crosswind, 9.5);
+  assert.deepEqual(WIND_PROFILES['incheon-crosswind-v1'].gust, [2.8, 3.5, 1.8]);
 });
 
 test('field is continuous with bounded time and space changes', () => {
