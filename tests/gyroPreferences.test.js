@@ -25,7 +25,19 @@ test('preferences validate saved values and tolerate invalid or unavailable stor
 });
 
 class GyroControls extends TouchFlightControls {
-  initDOM() {}
+  initDOM() {
+    const classes = new Set();
+    this.gyroBtn = {
+      classList: {
+        add: c => classes.add(c),
+        remove: c => classes.delete(c),
+        toggle: (c, v) => (v ? classes.add(c) : classes.delete(c)),
+        contains: c => classes.has(c),
+      },
+      setAttribute: (k, v) => { this.gyroBtn[k] = String(v); },
+      getAttribute: k => this.gyroBtn[k] ?? null,
+    };
+  }
   bindEvents() {}
   initGyroSettings() {
     this.gyroSettings = { hidden: true };
@@ -34,7 +46,6 @@ class GyroControls extends TouchFlightControls {
   enable() { this.enabled = true; }
   updateStickTelemetry() {}
   triggerHaptic() {}
-  setGyroLabel(key) { this.label = key; }
   setGyroOrientationStatus(key) { this.status = key; }
   showGyroHelp(reason) { this.help = reason; }
 }
@@ -82,6 +93,8 @@ test('enable and orientation survive reload; explicit off survives the next relo
   assert.equal(reloaded.gyroOrientation, 'landscape');
   assert.equal(reloaded.gyroOrientationSelect.value, 'landscape');
   assert.equal(reloaded.gyroSettings.hidden, false);
+  assert.equal(reloaded.gyroBtn.classList.contains('active'), true);
+  assert.equal(reloaded.gyroBtn.getAttribute('aria-pressed'), 'true');
   assert.equal(reloaded.gyroCalibration, null);
   assert.deepEqual(locks, ['landscape', 'landscape']);
   await reloaded.toggleGyro();
@@ -89,6 +102,8 @@ test('enable and orientation survive reload; explicit off survives the next relo
   const off = create();
   assert.equal(off.gyroActive, false);
   assert.equal(off.gyroOrientationSelect.value, 'landscape');
+  assert.equal(off.gyroBtn.classList.contains('active'), false);
+  assert.equal(off.gyroBtn.getAttribute('aria-pressed'), 'false');
 });
 
 test('gesture-only browsers restore settings without prompting and resume on tap', async t => {
@@ -167,4 +182,30 @@ test('flight startup restores gyro if requested, even if startup timed out durin
   controls.restoreGyroSettings();
   assert.equal(controls.gyroActive, true);
   assert.equal(controls.gyroPending, false);
+});
+
+test('flight startup with user gesture requests permission and activates gyro on gesture platforms', async t => {
+  let prompts = 0;
+  const { create } = environment(t, { gyroEnabled: true, gyroOrientation: 'portrait' }, async () => { ++prompts; return 'granted'; });
+  const reloaded = create();
+  assert.equal(prompts, 0);
+  assert.equal(reloaded.label, 'gyro.resume');
+  assert.equal(reloaded.gyroBtn.classList.contains('active'), true);
+  // Flight startup with userGesture: true
+  await reloaded.restoreGyroSettings({ userGesture: true });
+  assert.equal(prompts, 1);
+  assert.equal(reloaded.gyroActive, true);
+  assert.equal(reloaded.label, 'gyro.checking');
+});
+
+test('toggling gyro off persists preference even before motion readings stream', async t => {
+  const { create, s } = environment(t, { gyroEnabled: true, gyroOrientation: 'auto' });
+  const controls = create();
+  assert.equal(controls.gyroRequested, true);
+  controls.label = 'gyro.on';
+  controls.gyroActive = false;
+  controls.gyroPending = false;
+  await controls.toggleGyro();
+  assert.equal(controls.gyroRequested, false);
+  assert.equal(loadSimulatorPreferences(s).gyroEnabled, false);
 });

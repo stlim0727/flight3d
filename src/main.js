@@ -237,6 +237,7 @@ class FlightSimulator {
     this.audio = new FlightAudio();
     this.controls = new FlightControls(this.renderer.domElement);
     this.touchControls = new TouchFlightControls(this.controls);
+    this.touchControls.onOptionsChange = () => this.lobby?.refresh?.();
     initFlightPanels({
       onSelectCamera: mode => this.controls.onSelectCamera(mode),
       onAdjustTrim: delta => {
@@ -529,7 +530,7 @@ class FlightSimulator {
       attribution?.classList.remove('expanded');
       attribution?.querySelector('#incheon-attribution-chip')?.setAttribute('aria-expanded', 'false');
       if (this.touchControls?.gyroRequested && !this.touchControls.gyroActive && !this.demoDirector?.isActive) {
-        this.touchControls.restoreGyroSettings();
+        this.touchControls.restoreGyroSettings({ userGesture: true });
       }
     }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
@@ -652,7 +653,7 @@ class FlightSimulator {
       scenario: this.lobby.preset,
     });
     if (!wantsDemo && this.touchControls?.gyroRequested && !this.touchControls?.gyroActive) {
-      this.touchControls.restoreGyroSettings();
+      this.touchControls.restoreGyroSettings({ userGesture: true });
     }
   }
 
