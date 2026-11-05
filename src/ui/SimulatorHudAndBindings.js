@@ -491,6 +491,8 @@ class SimulatorHudAndBindingsMethods {
       getAirport: () => this.lobby.airport,
       getPreset: () => this.lobby.preset,
       getTime: () => this.sky.timeOfDay,
+      // Without a chosen time a flight starts on the device clock, whatever the backdrop demo shows.
+      isDeviceTime: () => this.demoDirector?.userTimeOfDayOverridden === false,
       getAircraft: () => this.lobby.aircraft || this.currentAircraftId || 'B738',
       getDemoProfile: () => this.lobby.demoProfile,
       onDemoProfile: id => { this.lobby.demoProfile = id; },
@@ -518,6 +520,7 @@ class SimulatorHudAndBindingsMethods {
         this.lobbyScreen.refresh();
       },
       onTime: hours => this.setTimeOfDay(hours),
+      onDeviceTime: () => this.useDeviceTimeOfDay(),
       onAircraft: id => {
         this.lobby.aircraft = id;
         this.lobbyScreen?.refresh();

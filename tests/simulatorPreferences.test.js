@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { SIMULATOR_PREFERENCES_KEY, loadSimulatorPreferences, saveSimulatorPreferences,
-  restoreSimulatorPreferences } from '../src/config/simulatorPreferences.js';
+  restoreSimulatorPreferences, deviceTimeOfDay, forgetSimulatorPreference } from '../src/config/simulatorPreferences.js';
 import { SkyAtmosphere } from '../src/environment/SkyAtmosphere.js';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { resolveDemoProfile } from '../src/director/demoProfiles.js';
@@ -23,6 +23,16 @@ test('independent preference updates survive reload, including midnight and fals
   });
   saveSimulatorPreferences({ timeOfDay: 23.5 }, storage);
   assert.equal(loadSimulatorPreferences(storage).timeOfDay, 23.5);
+});
+
+test('choosing current time forgets only the saved time so the next visit follows the device clock', () => {
+  const storage = memoryStorage();
+  saveSimulatorPreferences({ timeOfDay: 12.5, audioMuted: true }, storage);
+  forgetSimulatorPreference('timeOfDay', storage);
+  assert.deepEqual(loadSimulatorPreferences(storage), { audioMuted: true });
+  assert.doesNotThrow(() => forgetSimulatorPreference('timeOfDay', storage));
+  const blocked = { getItem() { throw Error('blocked'); }, setItem() { throw Error('quota'); } };
+  assert.doesNotThrow(() => forgetSimulatorPreference('timeOfDay', blocked));
 });
 
 test('missing, corrupt and unavailable storage retain defaults without breaking startup', () => {
@@ -84,6 +94,45 @@ test('first visit keeps automatic time and device detection; explicit preference
   restoreSimulatorPreferences(sim, { audioMuted: false, touchControls: true });
   assert.equal(sim.audio.isMuted, false);
   assert.equal(sim.touchControls.enabled, true);
+});
+
+test('device clock maps to continuous hours including midnight and late evening', () => {
+  assert.equal(deviceTimeOfDay(new Date(2026, 10, 6, 0, 0, 0)), 0);
+  assert.equal(deviceTimeOfDay(new Date(2026, 10, 6, 14, 15, 0)), 14.25);
+  assert.ok(Math.abs(deviceTimeOfDay(new Date(2026, 10, 6, 23, 59, 59)) - (24 - 1 / 3600)) < 1e-9);
+});
+
+test('first visit starts at device time without overriding scripted demo time; saved time still wins', () => {
+  const makeSim = () => {
+    const sim = {
+      sky: new SkyAtmosphere(new THREE.Scene()),
+      foliage: { setTimeOfDay(hour) { this.hour = hour; } },
+      water: { syncWithAtmosphere(sky) { this.hour = sky.timeOfDay; } },
+      lobby: {},
+    };
+    sim.demoDirector = Object.create(DemoFlightDirector.prototype);
+    sim.demoDirector.sim = sim;
+    sim.demoDirector.userTimeOfDayOverridden = false;
+    return sim;
+  };
+  const now = new Date(2026, 10, 6, 21, 30, 0);
+
+  const fresh = makeSim();
+  restoreSimulatorPreferences(fresh, {}, { now });
+  assert.equal(fresh.sky.timeOfDay, 21.5);
+  assert.equal(fresh.foliage.hour, 21.5);
+  assert.equal(fresh.water.hour, 21.5);
+  fresh.demoDirector.setTimeOfDay(9);
+  assert.equal(fresh.sky.timeOfDay, 9, 'Device time is a default, not a user override of demo lighting');
+
+  const returning = makeSim();
+  restoreSimulatorPreferences(returning, { timeOfDay: 12.5 }, { now });
+  assert.equal(returning.sky.timeOfDay, 12.5);
+  returning.demoDirector.setTimeOfDay(9);
+  assert.equal(returning.sky.timeOfDay, 12.5);
+
+  fresh.sky.cloudLayer.dispose();
+  returning.sky.cloudLayer.dispose();
 });
 
 test('keyboard time adjustments use the same persistent path as menu time changes', () => {

@@ -16,7 +16,7 @@ const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, onAirport, onPreset, onTime, onAircraft, onFly, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const selectionEl = document.getElementById('lobby-selection');
@@ -56,7 +56,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     chip.type = 'button';
     chip.className = 'btn lobby-time-chip';
     chip.dataset.hours = option.value;
-    chip.textContent = option.textContent;
+    if (option.dataset.i18n) bindText(chip, () => t(option.dataset.i18n));
+    else chip.textContent = option.textContent;
     chip.addEventListener('click', () => {
       timeSelect.value = option.value;
       timeSelect.dispatchEvent(new Event('change'));
@@ -134,6 +135,10 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     });
   }
   timeSelect?.addEventListener('change', () => {
+    if (timeSelect.value === 'now') {
+      onDeviceTime();
+      return;
+    }
     const hours = Number.parseFloat(timeSelect.value);
     if (Number.isFinite(hours)) onTime(hours);
   });
@@ -284,14 +289,20 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
       timeSelect.disabled = airport === 'hangang' || airport === 'valley';
       // The clock is continuous (and float-modulo noisy after restore), so show
       // the nearest preset option rather than requiring an exact value match.
+      // Distance wraps at midnight so 23:50 shows 22:30, not 06:30.
       const hours = getTime();
+      const clockDistance = value => {
+        const d = Math.abs(value - hours) % 24;
+        return Math.min(d, 24 - d);
+      };
       let nearest = null;
       for (const option of timeSelect.options) {
         const value = Number.parseFloat(option.value);
         if (!Number.isFinite(value)) continue;
-        if (nearest === null || Math.abs(value - hours) < Math.abs(nearest - hours)) nearest = value;
+        if (nearest === null || clockDistance(value) < clockDistance(nearest)) nearest = value;
       }
-      if (nearest !== null) timeSelect.value = String(nearest);
+      if (isDeviceTime()) timeSelect.value = 'now';
+      else if (nearest !== null) timeSelect.value = String(nearest);
       for (const chip of timeChips.children) {
         const on = chip.dataset.hours === timeSelect.value;
         chip.classList.toggle('active', on);

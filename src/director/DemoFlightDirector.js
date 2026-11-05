@@ -518,6 +518,10 @@ export class DemoFlightDirector {
     this.userTimeOfDayOverridden = true;
   }
 
+  clearUserTimeOfDayChange() {
+    this.userTimeOfDayOverridden = false;
+  }
+
   setTimeOfDay(hours) {
     if (!this.userTimeOfDayOverridden) {
       this.sim.sky?.setTimeOfDay?.(hours);

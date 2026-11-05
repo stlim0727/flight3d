@@ -74,13 +74,44 @@ export function saveSimulatorPreferences(patch, storage) {
   catch { /* Keep the current session usable when storage is unavailable. */ }
 }
 
+/** Remove one saved preference so its default applies on the next visit. */
+export function forgetSimulatorPreference(key, storage) {
+  const preferences = loadSimulatorPreferences(storage);
+  delete preferences[key];
+  try { safeStorage(storage)?.setItem(SIMULATOR_PREFERENCES_KEY, JSON.stringify(preferences)); }
+  catch { /* Keep the current session usable when storage is unavailable. */ }
+}
+
+/**
+ * Hours on the device's local clock. Sun elevation is a continuous function of the
+ * hour, so the exact time is used rather than snapping to a lobby preset.
+ */
+export function deviceTimeOfDay(now = new Date()) {
+  return now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+}
+
+function applySkyTime(sim, hours) {
+  sim.sky.setTimeOfDay(hours);
+  sim.foliage.setTimeOfDay(sim.sky.timeOfDay);
+  sim.water.syncWithAtmosphere(sim.sky);
+}
+
+/**
+ * Light the scene at the device's local time without recording a user choice, so
+ * nothing is persisted and scripted demo times still apply afterwards.
+ */
+export function applyDeviceTimeOfDay(sim, now = new Date()) {
+  applySkyTime(sim, deviceTimeOfDay(now));
+}
+
 /** Run before UI bindings and automatic flight start, without starting Web Audio. */
-export function restoreSimulatorPreferences(sim, preferences) {
+export function restoreSimulatorPreferences(sim, preferences, { now = new Date() } = {}) {
+  // A saved choice wins and overrides demo times; a first visit starts at device time.
   if (preferences.timeOfDay !== undefined) {
-    sim.sky.setTimeOfDay(preferences.timeOfDay);
-    sim.foliage.setTimeOfDay(sim.sky.timeOfDay);
-    sim.water.syncWithAtmosphere(sim.sky);
+    applySkyTime(sim, preferences.timeOfDay);
     sim.demoDirector.onUserTimeOfDayChange();
+  } else if (sim.sky) {
+    applyDeviceTimeOfDay(sim, now);
   }
   if (preferences.audioMuted !== undefined) sim.audio.setMuted(preferences.audioMuted);
   if (preferences.touchControls !== undefined && preferences.gyroEnabled !== true) {

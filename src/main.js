@@ -59,7 +59,8 @@ import {
   saveFlightSelection,
 } from './config/flightSelection.js';
 import { resolveFlightUrl } from './config/flightUrls.js';
-import { loadSimulatorPreferences, restoreSimulatorPreferences, saveSimulatorPreferences } from './config/simulatorPreferences.js';
+import { applyDeviceTimeOfDay, forgetSimulatorPreference, loadSimulatorPreferences,
+  restoreSimulatorPreferences, saveSimulatorPreferences } from './config/simulatorPreferences.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 import { initBuildInfo } from './ui/BuildInfo.js';
@@ -621,13 +622,18 @@ class FlightSimulator {
   }
 
   /** Spawn the chosen scenario and hand the cockpit over. Nothing here waits. */
-  startFlight() {
+  startFlight({ keepTimeOfDay = false } = {}) {
     this.devRunner.stop();
     this.shadowDemo.stop();
     const wantsDemo = this.lobby.preset === 'demo';
     const wantsValley = this.lobby.preset === 'valley';
     if (this.demoDirector?.isActive || this.demoDirector?.waitingForTerrain) {
       this.demoDirector.stop(wantsDemo ? null : () => t('manual.control.engaged'));
+    }
+    // The lobby backdrop demo scripts its own sky; without a saved or chosen time a
+    // flown sortie starts at the device's local time, not the demo's last setting.
+    if (!wantsDemo && !keepTimeOfDay && this.demoDirector && !this.demoDirector.userTimeOfDayOverridden) {
+      applyDeviceTimeOfDay(this);
     }
     this.gameFlow.enterFlight();
     // setAirport may have clamped the scenario to the region it loaded.
@@ -764,8 +770,9 @@ class FlightSimulator {
     const metadata = this.debriefReport.metadata;
     Object.assign(this.lobby, { airport: metadata.airport, aircraft: metadata.aircraft,
       preset: metadata.scenario, demoProfile: metadata.demoProfile });
-    this.setTimeOfDay(metadata.timeOfDay);
-    this.startFlight();
+    // Replay the recorded sky without saving it or treating it as the user's time choice.
+    this.setTimeOfDay(metadata.timeOfDay, { persist: false, userChoice: false });
+    this.startFlight({ keepTimeOfDay: true });
   }
 
   /** Resume the held flight without applying pending menu choices or respawning. */
@@ -815,12 +822,24 @@ class FlightSimulator {
     }
   }
 
-  setTimeOfDay(hours, { persist = true } = {}) {
-    this.demoDirector?.onUserTimeOfDayChange();
+  setTimeOfDay(hours, { persist = true, userChoice = true } = {}) {
+    if (userChoice) this.demoDirector?.onUserTimeOfDayChange();
     this.sky.setTimeOfDay(hours, this.position, this.camera.position);
     if (persist) saveSimulatorPreferences({ timeOfDay: this.sky.timeOfDay });
     this.foliage.setTimeOfDay(this.sky.timeOfDay);
     this.water.syncWithAtmosphere(this.sky);
+    this.showTimeOfDayNotice();
+  }
+
+  /** Follow the device's local clock again: forget the saved time and let demos script theirs. */
+  useDeviceTimeOfDay() {
+    this.demoDirector?.clearUserTimeOfDayChange();
+    forgetSimulatorPreference('timeOfDay');
+    applyDeviceTimeOfDay(this);
+    this.showTimeOfDayNotice();
+  }
+
+  showTimeOfDayNotice() {
     const h = Math.floor(this.sky.timeOfDay);
     const m = Math.floor((this.sky.timeOfDay % 1) * 60);
     const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
