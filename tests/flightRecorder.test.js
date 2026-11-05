@@ -221,11 +221,13 @@ test('retry restores the completed sortie instead of applying staged menu choice
   const sim = { gameFlow: new GameFlowController(),
     debriefReport: { metadata: { ...metadata, timeOfDay: 10, demoProfile: 'standard' } },
     lobby: { aircraft: 'F16', airport: 'lukla', preset: 'runway' },
-    setTimeOfDay(hours) { this.hours = hours; },
-    startFlight() { this.started = { ...this.lobby }; this.gameFlow.enterFlight(); } };
+    setTimeOfDay(hours, options) { this.hours = hours; this.timeOptions = options; },
+    startFlight(options) { this.started = { ...this.lobby }; this.startOptions = options; this.gameFlow.enterFlight(); } };
   sim.gameFlow.enterFlight(); sim.gameFlow.endFlight();
   SimulatorClass.prototype.retryDebrief.call(sim);
   assert.deepEqual(sim.started, { aircraft: 'C172', airport: 'coastal', preset: 'approach', demoProfile: 'standard' });
   assert.equal(sim.hours, 10);
+  assert.deepEqual(sim.timeOptions, { persist: false, userChoice: false }, 'A retry must not save or claim the time choice');
+  assert.deepEqual(sim.startOptions, { keepTimeOfDay: true }, 'The device-time reset must not overwrite the replayed sky');
   assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
 });

@@ -292,6 +292,7 @@ export default {
   "lobby.spawn": "시나리오",
   "lobby.preset.demo": "🎬 데모 비행",
   "lobby.time": "시간대",
+  "lobby.time.now": "현재 시각",
   "lobby.applying": "선택을 적용하는 중…",
   "lobby.fly": "비행 시작",
   "lobby.resume": "비행 계속하기",

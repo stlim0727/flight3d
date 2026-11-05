@@ -74,6 +74,14 @@ export function saveSimulatorPreferences(patch, storage) {
   catch { /* Keep the current session usable when storage is unavailable. */ }
 }
 
+/** Remove one saved preference so its default applies on the next visit. */
+export function forgetSimulatorPreference(key, storage) {
+  const preferences = loadSimulatorPreferences(storage);
+  delete preferences[key];
+  try { safeStorage(storage)?.setItem(SIMULATOR_PREFERENCES_KEY, JSON.stringify(preferences)); }
+  catch { /* Keep the current session usable when storage is unavailable. */ }
+}
+
 /**
  * Hours on the device's local clock. Sun elevation is a continuous function of the
  * hour, so the exact time is used rather than snapping to a lobby preset.

@@ -292,6 +292,7 @@ export default {
   "lobby.spawn": "Spawn scenario",
   "lobby.preset.demo": "🎬 Demo flight",
   "lobby.time": "Time of day",
+  "lobby.time.now": "Current time",
   "lobby.applying": "Applying your selection…",
   "lobby.fly": "Fly",
   "lobby.resume": "Resume flight",

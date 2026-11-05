@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { SIMULATOR_PREFERENCES_KEY, loadSimulatorPreferences, saveSimulatorPreferences,
-  restoreSimulatorPreferences, deviceTimeOfDay } from '../src/config/simulatorPreferences.js';
+  restoreSimulatorPreferences, deviceTimeOfDay, forgetSimulatorPreference } from '../src/config/simulatorPreferences.js';
 import { SkyAtmosphere } from '../src/environment/SkyAtmosphere.js';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { resolveDemoProfile } from '../src/director/demoProfiles.js';
@@ -23,6 +23,16 @@ test('independent preference updates survive reload, including midnight and fals
   });
   saveSimulatorPreferences({ timeOfDay: 23.5 }, storage);
   assert.equal(loadSimulatorPreferences(storage).timeOfDay, 23.5);
+});
+
+test('choosing current time forgets only the saved time so the next visit follows the device clock', () => {
+  const storage = memoryStorage();
+  saveSimulatorPreferences({ timeOfDay: 12.5, audioMuted: true }, storage);
+  forgetSimulatorPreference('timeOfDay', storage);
+  assert.deepEqual(loadSimulatorPreferences(storage), { audioMuted: true });
+  assert.doesNotThrow(() => forgetSimulatorPreference('timeOfDay', storage));
+  const blocked = { getItem() { throw Error('blocked'); }, setItem() { throw Error('quota'); } };
+  assert.doesNotThrow(() => forgetSimulatorPreference('timeOfDay', blocked));
 });
 
 test('missing, corrupt and unavailable storage retain defaults without breaking startup', () => {

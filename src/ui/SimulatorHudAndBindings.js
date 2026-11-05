@@ -10,7 +10,7 @@ import { initLobbyScreen } from './LobbyScreen.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
 import { defaultScenarioForRegion } from '../config/scenarioRegistry.js';
-import { deviceTimeOfDay, saveSimulatorPreferences } from '../config/simulatorPreferences.js';
+import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { computeUiScale, applyUiScale } from './UiScale.js';
 
 class SimulatorHudAndBindingsMethods {
@@ -490,9 +490,9 @@ class SimulatorHudAndBindingsMethods {
     this.lobbyScreen = initLobbyScreen({
       getAirport: () => this.lobby.airport,
       getPreset: () => this.lobby.preset,
-      // Show the time a flight will start at, not the backdrop demo's scripted sky.
-      getTime: () => (this.demoDirector?.userTimeOfDayOverridden === false
-        ? deviceTimeOfDay() : this.sky.timeOfDay),
+      getTime: () => this.sky.timeOfDay,
+      // Without a chosen time a flight starts on the device clock, whatever the backdrop demo shows.
+      isDeviceTime: () => this.demoDirector?.userTimeOfDayOverridden === false,
       getAircraft: () => this.lobby.aircraft || this.currentAircraftId || 'B738',
       getDemoProfile: () => this.lobby.demoProfile,
       onDemoProfile: id => { this.lobby.demoProfile = id; },
@@ -520,6 +520,7 @@ class SimulatorHudAndBindingsMethods {
         this.lobbyScreen.refresh();
       },
       onTime: hours => this.setTimeOfDay(hours),
+      onDeviceTime: () => this.useDeviceTimeOfDay(),
       onAircraft: id => {
         this.lobby.aircraft = id;
         this.lobbyScreen?.refresh();
