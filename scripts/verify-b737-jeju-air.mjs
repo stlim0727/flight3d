@@ -87,7 +87,7 @@ await withBrowserSession(
     await screenshot(join(output, 'b737-jeju-air-chase.png'));
     console.log('Captured chase view');
 
-    // 2. Drone side view (mode 6) - Shows "JEJU air" fuselage wordmark and orange tail
+    // 2. Drone side view (mode 6) - Shows "JEJUair" fuselage wordmark and orange tail
     await updateView(6, () => {
       const s = window.simulator;
       s.cameraSystem.droneAzimuth = Math.PI * 0.45;

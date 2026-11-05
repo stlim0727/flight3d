@@ -71,7 +71,7 @@ describe('Jeju Air Livery & Aircraft Customization', () => {
     applyJejuAirLivery(model, root, container);
 
     assert.strictEqual(root.userData.airline, 'Jeju Air');
-    assert.strictEqual(airframe.material.customProgramCacheKey(), 'jeju-air-v1');
+    assert.strictEqual(airframe.material.customProgramCacheKey(), 'jeju-air-v2');
 
     const decalGroup = container.getObjectByName('JejuAirLivery');
     assert.ok(decalGroup, 'JejuAirLivery decal group must be added to container');
