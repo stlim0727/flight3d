@@ -6,6 +6,7 @@
  * - Game-specific domain events (flight start, crash, completion, pilot mode change)
  * - Error tracking & WebGL context loss capture
  * - User feedback / bug report telemetry
+ * - A bounded queue for events captured before the lazily imported SDK resolves
  * - Zero-overhead / safe no-op when unconfigured or in tests
  */
 
@@ -13,6 +14,14 @@ let posthogInstance = null;
 let initialized = false;
 let initPromise = null;
 let activeSim = null;
+
+/**
+ * Events are queued until `posthog.init` resolves because the SDK arrives through a dynamic
+ * import, and a page-hide flush cannot wait for it. Bounded so a load that never initializes
+ * (telemetry disabled, import failure) leaks nothing.
+ */
+export const PENDING_EVENT_CAP = 32;
+let pendingEvents = [];
 
 export const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com';
 export const DEFAULT_POSTHOG_KEY = 'phc_ussf2qgryzxghWApkvG2kcpXarbF4nNGTNEnwCBy8VKj';
@@ -55,6 +64,8 @@ export async function initAnalytics(sim = null) {
   const { apiKey, host, enabled } = getPostHogConfig();
   if (!enabled || typeof window === 'undefined') {
     initialized = true;
+    // Opted out or unconfigured: hold nothing and send nothing.
+    pendingEvents = [];
     return null;
   }
 
@@ -97,6 +108,7 @@ export async function initAnalytics(sim = null) {
 
       posthogInstance = posthog;
       initialized = true;
+      drainPendingEvents();
 
       // Register global error listener
       window.addEventListener('error', event => {
@@ -161,35 +173,53 @@ export function gatherFlightContext(sim = activeSim) {
   }
 }
 
-/** Safe track event */
-export function trackEvent(eventName, properties = {}, options = {}) {
-  if (!posthogInstance) return;
+/**
+ * Capture through the SDK, or hold the event until it resolves. Keeping this path in one place
+ * is what lets a `pagehide` startup trace survive a boot where the SDK import has not finished.
+ */
+function captureOrQueue(eventName, payload, options) {
+  if (!posthogInstance) {
+    if (pendingEvents.length >= PENDING_EVENT_CAP) pendingEvents.shift();
+    pendingEvents.push({ eventName, payload, options });
+    return;
+  }
   try {
-    posthogInstance.capture(eventName, {
-      ...gatherFlightContext(),
-      ...properties,
-      timestamp: Date.now(),
-    }, options);
+    posthogInstance.capture(eventName, payload, options);
   } catch (err) {
     console.debug('[Analytics] capture error:', err);
   }
 }
 
+function drainPendingEvents() {
+  const queued = pendingEvents;
+  pendingEvents = [];
+  for (const event of queued) captureOrQueue(event.eventName, event.payload, event.options);
+}
+
+/**
+ * Send an event without flight context. Use this for events that carry their own state, so a
+ * startup trace is not tagged with whatever the simulator happened to be holding when it flushed.
+ */
+export function sendEvent(eventName, properties = {}, options = {}) {
+  captureOrQueue(eventName, { ...properties, clientTimeMs: Date.now() }, options);
+}
+
+/** Safe track event, tagged with the live simulator state */
+export function trackEvent(eventName, properties = {}, options = {}) {
+  sendEvent(eventName, { ...gatherFlightContext(), ...properties }, options);
+}
+
 /** Capture exceptions with game context */
 export function captureException(error, additionalContext = {}) {
-  if (!posthogInstance) return;
-  try {
-    const errorObj = error instanceof Error ? error : new Error(String(error));
-    posthogInstance.capture('$exception', {
-      $exception_message: errorObj.message,
-      $exception_type: errorObj.name || 'Error',
-      $exception_stack_trace_raw: errorObj.stack || '',
-      ...gatherFlightContext(),
-      ...additionalContext,
-    }, { send_instantly: true });
-  } catch (err) {
-    console.debug('[Analytics] exception capture error:', err);
-  }
+  const errorObj = error instanceof Error ? error : new Error(String(error));
+  captureOrQueue('$exception', {
+    $exception_message: errorObj.message,
+    $exception_type: errorObj.name || 'Error',
+    $exception_stack_trace_raw: errorObj.stack || '',
+    ...gatherFlightContext(),
+    ...additionalContext,
+    clientTimeMs: Date.now(),
+  }, { send_instantly: true });
 }
 
 /** Track flight start */
@@ -239,7 +269,8 @@ export function trackPilotModeChange(mode, missionId) {
 /**
  * Track one startup load trace per page load. The report arrives already aggregated by
  * src/core/startupTrace.js: flat scalars for trending, per-asset-class buckets plus the
- * slowest/largest names as JSON properties.
+ * slowest/largest names as JSON properties. Sent without flight context: the trace describes
+ * the boot, and the simulator may already have moved on by the time it flushes.
  */
 export function trackStartupTrace(report) {
   if (!report) return;
@@ -255,22 +286,7 @@ export function trackStartupTrace(report) {
     textureMaxLatencyMs: latency('texture', 'maxMs'),
     audioMaxLatencyMs: latency('audio', 'maxMs'),
   };
-  trackEvent('startup_trace', payload, { send_instantly: true });
-}
-
-/**
- * Track an individual resource loading latency measurement.
- * Useful for runtime dynamic asset fetching (e.g. aircraft swap, scenery kit, sound effects).
- */
-export function trackResourceLatency({ name, durationMs, type = 'other', sizeBytes = null, cached = false }) {
-  if (!name || !Number.isFinite(durationMs)) return;
-  trackEvent('resource_loaded', {
-    resource_name: name,
-    resource_duration_ms: Math.round(durationMs),
-    resource_type: type,
-    resource_size_bytes: sizeBytes != null ? Math.round(sizeBytes) : null,
-    resource_cached: Boolean(cached),
-  });
+  sendEvent('startup_trace', payload, { send_instantly: true });
 }
 
 /** Submit user bug report or feedback */
@@ -314,4 +330,8 @@ export function _resetAnalyticsForTesting(instance = null) {
   initialized = Boolean(instance);
   initPromise = null;
   activeSim = null;
+  // An injected instance plays the role of `posthog.init` resolving, so whatever queued before
+  // it must arrive; resetting to null is teardown, and queued events go with it.
+  if (instance) drainPendingEvents();
+  else pendingEvents = [];
 }

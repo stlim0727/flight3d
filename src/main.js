@@ -73,7 +73,6 @@ import {
   trackFlightStart,
   trackFlightEnd,
   trackFlightCrash,
-  trackResourceLatency,
   captureException,
 } from './analytics/posthog.js';
 import { openFeedbackDialog } from './analytics/FeedbackDialog.js';
@@ -396,7 +395,6 @@ class FlightSimulator {
       trackFlightStart,
       trackFlightEnd,
       trackFlightCrash,
-      trackResourceLatency,
       captureException,
     };
     this._openFeedbackDialog = openFeedbackDialog;
