@@ -8,6 +8,7 @@ import { CameraSystem } from '../../cameras/CameraSystem.js';
 import { t } from '../../i18n/index.js';
 import { DepartureAtc } from '../DepartureAtc.js';
 import { BANGKOK_DEPARTURE_ATC, BANGKOK_CLEARANCE } from '../../config/bangkokDepartureAtc.js';
+import { BANGKOK_DEPARTURE_RADIO } from '../../config/bangkokDepartureRadio.js';
 
 const clamp = THREE.MathUtils.clamp;
 const STAGES = IncheonDepartureScenario.STAGES;
@@ -19,8 +20,9 @@ export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
     const sim = this.sim;
     if (stage === STAGES.GATE) {
       super.enterStage(stage);
-      // Replace default atc with Bangkok departure atc
-      this.atc = new DepartureAtc('gate', voice => sim.audio?.playDepartureRadio(voice), BANGKOK_DEPARTURE_ATC, {});
+      sim.audio?.bangkokRadio?.preload();
+      // Replace default atc with Bangkok departure atc and radio
+      this.atc = new DepartureAtc('gate', voice => sim.audio?.playDepartureRadio(voice, 'bangkok'), BANGKOK_DEPARTURE_ATC, BANGKOK_DEPARTURE_RADIO);
       const caption = () => this.atc?.caption(speaker => t(`departure.speaker.${speaker}`)) || t('departure.climbInstruction');
       this.result.radio = [this.atc.blocks.flatMap(block => block.lines).map(([speaker, text]) => `${speaker}: ${text}`).join(' ')];
       this.director.updateBanner(() => t('departure.stage.gate'), caption);
@@ -32,7 +34,7 @@ export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
     if (name) {
       this.result.stages.push(name);
       // For Bangkok, takeoff stage has explicit tower handoff exchanges
-      this.atc = new DepartureAtc(name, voice => sim.audio?.playDepartureRadio(voice), BANGKOK_DEPARTURE_ATC, {});
+      this.atc = new DepartureAtc(name, voice => sim.audio?.playDepartureRadio(voice, 'bangkok'), BANGKOK_DEPARTURE_ATC, BANGKOK_DEPARTURE_RADIO);
       const caption = () => this.atc?.caption(speaker => t(`departure.speaker.${speaker}`)) || t('departure.climbInstruction');
       this.result.radio.push(this.atc.blocks.flatMap(block => block.lines).map(([speaker, text]) => `${speaker}: ${text}`).join(' '));
       this.director.updateBanner(() => t(`departure.stage.${name}`), caption);
@@ -47,6 +49,11 @@ export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
     }
   }
 
+  stop() {
+    super.stop();
+    this.sim.audio?.bangkokRadio?.stop();
+  }
+
   update(dt) {
     const sim = this.sim, d = this.director, stage = d.currentStage;
     sim.controls.setVirtualInput('throttle', 0);
@@ -55,7 +62,7 @@ export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
     sim.controls.setVirtualInput('aileron', 0);
     sim.controls.setVirtualInput('rudder', 0);
     const exchange = this.atc?.index;
-    this.atc?.update(dt, sim.audio?.departureRadio.busy ?? false, this.tug?.userData.animation.clear ?? false);
+    this.atc?.update(dt, sim.audio?.bangkokRadio?.busy ?? false, this.tug?.userData.animation.clear ?? false);
     if (exchange !== this.atc?.index) {
       const name = stage === STAGES.DEPARTURE ? 'departure' : names[stage - STAGES.GATE];
       this.director.updateBanner(() => t(`departure.stage.${name}`),
@@ -79,59 +86,7 @@ export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
       this.settleTime = stopped ? this.settleTime + dt : 0;
       if (this.settleTime > 1 && !radioBusy) d.setStage(STAGES.DISCONNECT);
     } else if (stage === STAGES.DISCONNECT && this.tug?.userData.animation.clear && !radioBusy) {
-      if (sim.voiceChallengeOverlay && !this.voiceChallengeInitiated) {
-        this.voiceChallengeInitiated = true;
-        const options = [
-          {
-            id: 'a',
-            tag: 'A',
-            primary: t('departure.bangkok.voice.optA.primary'),
-            secondary: t('departure.bangkok.voice.optA.secondary'),
-            phrases: [
-              'Jeju Air 2503, taking manual control',
-              'taking manual control',
-              'Jeju Air 2503',
-              'Jeju Air Two Five Zero Three',
-              '제주항공 2503, 직접 조종 인계',
-              '제주항공 이오공삼 직접 조종 인계',
-              '제주항공 2503',
-              '직접 조종 인계'
-            ]
-          },
-          {
-            id: 'b',
-            tag: 'B',
-            primary: t('departure.bangkok.voice.optB.primary'),
-            secondary: t('departure.bangkok.voice.optB.secondary'),
-            phrases: [
-              'Request taxi, Jeju Air 2503',
-              'request taxi',
-              'Incheon Ground, Jeju Air 2503, request taxi',
-              'Taxi to holding point runway 34R',
-              '지상 이동 요청, 제주항공 2503',
-              '지상 이동 요청 제주항공 2503',
-              '지상 이동 요청',
-              '택시 요청'
-            ]
-          }
-        ];
-
-        sim.voiceChallengeOverlay.show({
-          options,
-          onPass: (matchedOption) => {
-            if (matchedOption?.id === 'b') {
-              d.setStage(STAGES.TAXI);
-            } else {
-              d.stop(() => t('departure.manual.taxi.engaged'), false, { preserveThrottle: false });
-              sim.controls?.setParkingBrake?.(false);
-              sim.controls?.setVirtualInput?.('brakes', 0);
-              sim.controls?.setVirtualInput?.('throttle', 0);
-            }
-          }
-        });
-      } else if (!sim.voiceChallengeOverlay) {
-        d.setStage(STAGES.TAXI);
-      }
+      d.setStage(STAGES.TAXI);
     } else if (stage === STAGES.TAXI) {
       if (!radioBusy && this.taxi(DEPARTURE_TAXI_ROUTE, true)) d.setStage(STAGES.HOLD);
       this.result.taxiPoints = this.index;

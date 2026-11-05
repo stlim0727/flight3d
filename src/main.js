@@ -507,7 +507,9 @@ class FlightSimulator {
   syncAudioPause() {
     const backgrounded = this.browserBackgrounded === true;
     const held = this.gameFlow.state === FLOW.DEBRIEF || this.gameFlow.state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby() || Boolean(this.demoDirector?.isRestartConfirmOpen);
-    this.audio?.departureRadio.setPaused(backgrounded || this.gameFlow.state !== FLOW.FLIGHT || Boolean(this.demoDirector?.isRestartConfirmOpen));
+    const radioPaused = backgrounded || this.gameFlow.state !== FLOW.FLIGHT || Boolean(this.demoDirector?.isRestartConfirmOpen);
+    if (this.audio?.setRadioPaused) this.audio.setRadioPaused(radioPaused);
+    else this.audio?.departureRadio.setPaused(radioPaused);
     this.audio?.setPaused(backgrounded || held);
   }
 

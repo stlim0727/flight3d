@@ -174,50 +174,7 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       this.settleTime = stopped ? this.settleTime + dt : 0;
       if (this.settleTime > 1 && !radioBusy) d.setStage(STAGES.DISCONNECT);
     } else if (stage === STAGES.DISCONNECT && this.tug?.userData.animation.clear && !radioBusy) {
-      if (sim.voiceChallengeOverlay && !this.voiceChallengeInitiated) {
-        this.voiceChallengeInitiated = true;
-        const options = [
-          {
-            id: 'a',
-            tag: 'A',
-            primary: t('departure.voice.pushback.optA.primary'),
-            secondary: t('departure.voice.pushback.optA.secondary'),
-            phrases: [
-              'Brakes set, ready to taxi',
-              'ready to taxi',
-              'brakes set',
-              '브레이크 설정 완료, 지상 주행 준비',
-              '브레이크 설정 완료'
-            ]
-          },
-          {
-            id: 'b',
-            tag: 'B',
-            primary: t('departure.voice.pushback.optB.primary'),
-            secondary: t('departure.voice.pushback.optB.secondary'),
-            phrases: [
-              'Jeju Air 1102, taking manual control',
-              'taking manual control',
-              'Jeju Air 1102',
-              '제주항공 1102, 직접 조종 인계',
-              '제주항공 1102',
-              '직접 조종 인계'
-            ]
-          }
-        ];
-
-        sim.voiceChallengeOverlay.show({
-          options,
-          onPass: () => {
-            d.stop(() => t('departure.manual.taxi.engaged'), false, { preserveThrottle: false });
-            sim.controls?.setParkingBrake?.(false);
-            sim.controls?.setVirtualInput?.('brakes', 0);
-            sim.controls?.setVirtualInput?.('throttle', 0);
-          }
-        });
-      } else if (!sim.voiceChallengeOverlay) {
-        d.setStage(STAGES.TAXI);
-      }
+      d.setStage(STAGES.TAXI);
     } else if (stage === STAGES.TAXI) {
       if (!radioBusy && this.taxi(DEPARTURE_TAXI_ROUTE, true)) d.setStage(STAGES.HOLD);
       this.result.taxiPoints = this.index;

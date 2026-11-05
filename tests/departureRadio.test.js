@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { DepartureRadio } from '../src/audio/DepartureRadio.js';
 import { DEPARTURE_RADIO } from '../src/config/departureRadio.js';
+import { BANGKOK_DEPARTURE_RADIO } from '../src/config/bangkokDepartureRadio.js';
 import { TUG, createDepartureTug, updateDepartureTug, disposeDepartureTug } from '../src/environment/DepartureTug.js';
 import * as THREE from 'three';
 
@@ -70,6 +71,34 @@ test('every scripted stage ships a non-silent PCM voice clip with matching trans
     let energy=0;
     for(let i=0;i<samples.length;i+=2)energy+=(samples.readInt16LE(i)/32768)**2;
     assert.ok(Math.sqrt(energy/(samples.length/2))>.015,'audible signal');
+  }
+});
+
+test('every Bangkok scripted stage ships a non-silent PCM voice clip with matching transcript', () => {
+  const manifest = JSON.parse(fs.readFileSync(new URL('../public/audio/bangkok/manifest.json', import.meta.url)));
+  assert.deepEqual(
+    Object.keys(manifest),
+    Object.keys(BANGKOK_DEPARTURE_RADIO),
+    'manifest.json stages must match BANGKOK_DEPARTURE_RADIO. Run "npm run audio:departure" to update.'
+  );
+  for (const [stage, lines] of Object.entries(BANGKOK_DEPARTURE_RADIO)) {
+    assert.deepEqual(
+      manifest[stage].lines.map(l => [l.speaker, l.text]),
+      lines,
+      `manifest.json lines for stage "${stage}" do not match BANGKOK_DEPARTURE_RADIO.`
+    );
+    const wav = fs.readFileSync(new URL('../public/audio/bangkok/' + manifest[stage].file, import.meta.url));
+    assert.equal(wav.toString('ascii', 0, 4), 'RIFF');
+    let offset = 12, samples;
+    while (offset + 8 < wav.length) {
+      const size = wav.readUInt32LE(offset + 4);
+      if (wav.toString('ascii', offset, offset + 4) === 'data') { samples = wav.subarray(offset + 8, offset + 8 + size); break; }
+      offset += 8 + size + (size % 2);
+    }
+    assert.ok(samples?.length > 22050, 'substantial speech data');
+    let energy = 0;
+    for (let i = 0; i < samples.length; i += 2) energy += (samples.readInt16LE(i) / 32768) ** 2;
+    assert.ok(Math.sqrt(energy / (samples.length / 2)) > .015, 'audible signal');
   }
 });
 
