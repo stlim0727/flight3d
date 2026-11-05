@@ -6,6 +6,10 @@ export function clampFrameDelta(delta) {
 
 export function stepPhysics(simulation) {
   if (simulation.gameFlow?.state === 'debrief') return;
+  // While a pending airport/aircraft swap is applied, the previous flight's pose
+  // sits inside the new scenery (e.g. sea level inside Lukla's 2800 m terrain).
+  // Integrating it would crash the aircraft before the scenario ever spawns it.
+  if (simulation.startingFlight) return;
   if (simulation.devRunner?.blocksPhysics || simulation.demoDirector?.isRestartConfirmOpen) return;
   if (simulation.demoDirector?.isActive) {
     simulation.demoDirector.update(simulation.physicsDt);

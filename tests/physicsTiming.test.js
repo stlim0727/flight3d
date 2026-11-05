@@ -138,3 +138,13 @@ test('demo restart confirmation freezes physics and clears accumulator', () => {
   assert.equal(sim.ticks, 0);
   assert.equal(sim.inputTicks, 0);
 });
+
+test('physics holds while a pending scene swap is being applied', () => {
+  const sim = createSimulation();
+  sim.startingFlight = true;
+  advancePhysicsFrame(sim, 0.1);
+  assert.equal(sim.ticks, 0);
+  sim.startingFlight = false;
+  stepPhysics(sim);
+  assert.equal(sim.ticks, 1);
+});
