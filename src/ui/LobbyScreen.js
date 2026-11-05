@@ -109,11 +109,25 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     document.getElementById(id)?.addEventListener('click', handler);
   }
   for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
+    if (type === 'demo') continue;
     document.getElementById(scenario.lobbyButtonId)?.addEventListener('click', () => {
       onPreset(type);
-      if (type === 'demo') demoGroup?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
     });
   }
+  const demoPresetBtn = document.getElementById(SPAWN_SCENARIOS.demo.lobbyButtonId);
+  demoPresetBtn?.addEventListener('click', () => {
+    const airport = getAirport();
+    const aircraft = getAircraft?.() ?? 'B738';
+    const choices = demoProfiles(aircraft, airport);
+    onPreset('demo');
+    const profileId = demoPresetBtn.dataset.profileId || choices[0]?.id;
+    if (profileId) {
+      onDemoProfile?.(profileId);
+      if (demoSelect) demoSelect.value = profileId;
+    }
+    refresh();
+    demoGroup?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  });
   for (const [code, id] of Object.entries(LANGUAGE_BUTTONS)) {
     document.getElementById(id)?.addEventListener('click', () => {
       if (setLanguage(code)) refresh();
@@ -144,6 +158,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
       document.getElementById(id).disabled = airport === 'hangang' || airport === 'valley';
     }
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
+      if (type === 'demo') continue;
       const span = document.getElementById(scenario.lobbyButtonId)?.querySelector('span');
       if (span) {
         bindText(span, () => t(scenarioLabelKey(getAirport(), type) ?? 'lobby.spawn'));
@@ -157,8 +172,11 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
       const airport = getAirport();
       const preset = getPreset();
       const labelKey = scenarioLabelKey(airport, preset);
+      const scenarioTitle = preset === 'demo'
+        ? t('demo.scenario.title', { title: t(resolveDemoProfile(getAircraft?.(), airport, getDemoProfile?.()).labelKey) })
+        : (labelKey && t(labelKey));
       return [...new Set(['Flight3d', AIRCRAFT_REGISTRY[getAircraft?.() ?? 'B738']?.name,
-        lobbyBriefing(airport, preset)[0], labelKey && t(labelKey)].filter(Boolean))].join(' | ');
+        lobbyBriefing(airport, preset)[0], scenarioTitle].filter(Boolean))].join(' | ');
     });
     if (demoGroup) demoGroup.hidden = preset !== 'demo';
     if (valleyGroup) valleyGroup.hidden = preset !== 'valley';
@@ -183,10 +201,11 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
         bindText(gyroLabel, () => t(gyroOn ? 'gyro.on' : 'gyro.off'));
       }
     }
+    const isDemoAvail = isScenarioAvailable(airport, 'demo') && !(aircraft === 'F16' && !['lukla', 'incheon'].includes(airport));
+    const choices = isDemoAvail ? demoProfiles(aircraft, airport) : [];
+    const selected = resolveDemoProfile(aircraft, airport, getDemoProfile?.());
+    onDemoProfile?.(selected.id);
     if (demoSelect) {
-      const choices = demoProfiles(aircraft, airport);
-      const selected = resolveDemoProfile(aircraft, airport, getDemoProfile?.());
-      onDemoProfile?.(selected.id);
       demoSelect.replaceChildren(...choices.map(choice => {
         const option = document.createElement('option');
         option.value = choice.id;
@@ -196,6 +215,49 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
       demoSelect.value = selected.id;
       if (demoBriefing) bindText(demoBriefing, () => t(resolveDemoProfile(getAircraft?.(), getAirport(), getDemoProfile?.()).briefingKey));
     }
+    if (demoPresetBtn) {
+      if (choices.length === 0) {
+        demoPresetBtn.style.display = 'none';
+        delete demoPresetBtn.dataset.profileId;
+      } else {
+        demoPresetBtn.style.display = '';
+        demoPresetBtn.dataset.profileId = choices[0].id;
+        const span = demoPresetBtn.querySelector('span');
+        if (span) {
+          bindText(span, () => t('demo.scenario.title', { title: t(choices[0].labelKey) }));
+        }
+      }
+    }
+    const extraChoices = choices.slice(1);
+    const existingExtras = [...document.querySelectorAll('.lobby-scenarios .btn-demo-extra')];
+    while (existingExtras.length > extraChoices.length) {
+      existingExtras.pop().remove();
+    }
+    let prevElement = demoPresetBtn;
+    for (let i = 0; i < extraChoices.length; i++) {
+      const choice = extraChoices[i];
+      let btn = existingExtras[i];
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.className = 'btn btn-preset btn-demo-scenario btn-demo-extra';
+        const span = document.createElement('span');
+        btn.appendChild(span);
+        prevElement?.insertAdjacentElement('afterend', btn);
+      }
+      btn.dataset.profileId = choice.id;
+      btn.onclick = () => {
+        onPreset('demo');
+        onDemoProfile?.(choice.id);
+        if (demoSelect) demoSelect.value = choice.id;
+        refresh();
+        demoGroup?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+      };
+      const span = btn.querySelector('span');
+      if (span) {
+        bindText(span, () => t('demo.scenario.title', { title: t(choice.labelKey) }));
+      }
+      prevElement = btn;
+    }
     const flyLabel = document.getElementById('btn-fly')?.querySelector('span');
     if (flyLabel) bindText(flyLabel, () => t(getPreset() === 'demo' ? 'lobby.startDemo' : 'lobby.startNew'));
     const resume = document.getElementById('btn-lobby-resume');
@@ -203,10 +265,17 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, getAircraft, o
     const end = document.getElementById('btn-lobby-end');
     if (end) end.hidden = !canEnd();
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
+      if (type === 'demo') continue;
       const button = document.getElementById(scenario.lobbyButtonId);
       if (!button) continue;
       button.classList.toggle('active', type === preset);
-      button.style.display = isScenarioAvailable(airport, type) && !((aircraft === 'F16' && !['lukla','incheon'].includes(airport)) && type === 'demo') ? '' : 'none';
+      button.style.display = isScenarioAvailable(airport, type) ? '' : 'none';
+    }
+    if (demoPresetBtn) {
+      demoPresetBtn.classList.toggle('active', preset === 'demo' && demoPresetBtn.dataset.profileId === selected.id);
+    }
+    for (const extraBtn of document.querySelectorAll('.lobby-scenarios .btn-demo-extra')) {
+      extraBtn.classList.toggle('active', preset === 'demo' && extraBtn.dataset.profileId === selected.id);
     }
     if (briefingEl) {
       bindText(briefingEl, () => lobbyBriefing(getAirport(), getPreset()).join('\n'));
