@@ -139,7 +139,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
 
     camSys.chasePitch = 0;
     camSys.applyMouseDelta(0, -500);
-    assert.ok(camSys.chasePitch >= 0.28 - 1e-9, `chasePitch (${camSys.chasePitch}) should reach the 0.28 aiming-up clamp`);
+    assert.ok(camSys.chasePitch >= CameraSystem.CHASE_PITCH_LOW_LIMIT - 1e-9, `chasePitch (${camSys.chasePitch}) should reach the low-orbit clamp`);
   });
 
   it('should lift the chase gaze on a down drag so the exterior orbit grabs scenery like the head views', () => {
@@ -638,6 +638,18 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       assert.ok(camSys.droneOrbitAngle < initialDroneAngle, 'droneOrbitAngle should decrease on left touch drag');
       assert.ok(camSys.droneHeight < initialDroneHeight, 'droneHeight should decrease on downward touch drag');
       camSys.handleTouchEnd({ touches: [] });
+    });
+
+    it('should let the drone camera drop below the aircraft, leaving terrain to the ground clamp', () => {
+      const camSys = new CameraSystem(new THREE.PerspectiveCamera(), mockDom);
+      camSys.setMode(CameraSystem.MODES.DRONE, true);
+      camSys.applyMouseDelta(0, -2000);
+      assert.ok(camSys.droneHeight < 0, `droneHeight (${camSys.droneHeight}) should go negative`);
+      const mesh = new THREE.Object3D();
+      mesh.position.set(0, 500, 0);
+      mesh.updateMatrixWorld(true);
+      camSys.update(0.016, mesh, {}, () => 0);
+      assert.ok(camSys.camera.position.y < 500, 'camera should sit below the aircraft in flight');
     });
 
     it('should ignore touchstart on interactive UI elements and touch flight controls', () => {
