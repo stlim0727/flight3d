@@ -592,6 +592,15 @@ body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display
   border-color: rgba(245, 158, 11, .5);
 }
 
+/* Landing challenge preset */
+.lobby-scenarios .btn-challenge {
+  border-left: 3px solid #ef4444;
+}
+.lobby-scenarios .btn-challenge.active {
+  box-shadow: inset 3px 0 0 #ef4444, 0 0 12px rgba(239, 68, 68, .25);
+  border-color: rgba(239, 68, 68, .5);
+}
+
 .lobby-valley-options {
   background: rgba(15, 23, 42, .65);
   border: 1px solid rgba(56, 189, 248, .22);

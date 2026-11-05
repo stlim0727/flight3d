@@ -63,7 +63,19 @@ test('runway and approach spawns align with navigation for both aircraft',()=>{
     assert.ok(Math.abs(air.vy/Math.hypot(air.vx,air.vz)+Math.tan(Math.PI/60))<1e-10);
     assert.ok(air.y>surface.getHeight(air.x,air.z)+50);
   }
-  assert.deepEqual(scenariosForAirport('incheon'),['runway','approach','cruise','demo']);
+  assert.deepEqual(scenariosForAirport('incheon'),['runway','approach','challenge','cruise','demo']);
+});
+
+test('challenge spawn places aircraft on a 3 NM offset approach with high energy',()=>{
+  for(const id of ['B738','C172','F16']) {
+    const air=incheonSpawn('challenge',3.5,id);
+    const deviation=approachDeviation('incheon',{...air,altitudeFt:(air.y-3.5)/.3048});
+    assert.ok(Math.abs(deviation.distanceToThresholdM-5500)<1e-6,`${id} distance`);
+    assert.ok(Math.abs(deviation.crossTrackM-350)<1e-6,`${id} cross-track offset`);
+    assert.ok(deviation.glideslopeErrorFt>150,`${id} glideslope high error`);
+    const normalSpeed=id==='C172'?33:id==='F16'?90:74.5;
+    assert.ok(Math.hypot(air.vx,air.vz)>normalSpeed,`${id} speed`);
+  }
 });
 
 test('manual airport lobby freezes and never starts an unrelated demo; switching restores cinematic',()=>{
