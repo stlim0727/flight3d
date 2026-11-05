@@ -505,8 +505,8 @@ class FlightSimulator {
 
   syncAudioPause() {
     const backgrounded = this.browserBackgrounded === true;
-    const held = this.gameFlow.state === FLOW.DEBRIEF || this.gameFlow.state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
-    this.audio?.departureRadio.setPaused(backgrounded || this.gameFlow.state !== FLOW.FLIGHT);
+    const held = this.gameFlow.state === FLOW.DEBRIEF || this.gameFlow.state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby() || Boolean(this.demoDirector?.isRestartConfirmOpen);
+    this.audio?.departureRadio.setPaused(backgrounded || this.gameFlow.state !== FLOW.FLIGHT || Boolean(this.demoDirector?.isRestartConfirmOpen));
     this.audio?.setPaused(backgrounded || held);
   }
 
@@ -531,7 +531,7 @@ class FlightSimulator {
       }
     }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
-    this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human');
+    this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human') || Boolean(this.demoDirector?.isRestartConfirmOpen);
     if (state !== FLOW.FLIGHT) {
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0.0, 0.0);
@@ -1045,7 +1045,7 @@ class FlightSimulator {
     if (this.shadowDemo.active) {
       this.physicsAccumulator = 0;
       if (!this.gameFlow.isPhysicsFrozen()) this.shadowDemo.update(frameDelta);
-    } else if (this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active) {
+    } else if (this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
       this.physicsAccumulator = 0;
     } else {
       advancePhysicsFrame(this, frameDelta);

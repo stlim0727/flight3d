@@ -127,3 +127,14 @@ test('debris shares fixed steps only after impact and receives the current ocean
   stepPhysics(simulation);
   assert.equal(calls.length, 61, 'blocked physics must also hold debris');
 });
+
+test('demo restart confirmation freezes physics and clears accumulator', () => {
+  const sim = createSimulation();
+  sim.demoDirector.isRestartConfirmOpen = true;
+  advancePhysicsFrame(sim, 0.1);
+  assert.equal(sim.ticks, 0);
+  assert.equal(sim.physicsAccumulator, 0);
+  stepPhysics(sim);
+  assert.equal(sim.ticks, 0);
+  assert.equal(sim.inputTicks, 0);
+});

@@ -409,4 +409,10 @@ export default {
   "joystick.wizard.complete.title": "🎉 Axis Calibration Complete!",
   "joystick.wizard.complete.prompt": "Review detected axis assignments and click [Save & Apply Calibration].",
   "joystick.wizard.badge.calibrated": "✨ Custom Calibrated",
+  "demo.confirm.title": "Restart Demo Flight",
+  "demo.confirm.message": "Restart the demo flight?\nCurrent flight progress will be reset.",
+  "demo.confirm.hint": "Press [Restart] or P / Enter to restart. Press Esc to cancel.",
+  "demo.confirm.restart": "Restart",
+  "demo.confirm.cancel": "Cancel",
+  "demo.confirm.close": "Close",
 };

@@ -409,4 +409,10 @@ export default {
   "joystick.wizard.complete.title": "🎉 맞춤형 축 보정 완료!",
   "joystick.wizard.complete.prompt": "감지된 축 배치를 확인하고 [보정 저장 및 적용]을 누르세요.",
   "joystick.wizard.badge.calibrated": "✨ 맞춤 보정 적용됨 (Custom Calibrated)",
+  "demo.confirm.title": "데모 비행 재시작",
+  "demo.confirm.message": "데모 비행을 다시 시작하시겠습니까?\n현재 비행 진행 상황이 초기화됩니다.",
+  "demo.confirm.hint": "다시 시작하려면 [다시 시작] 버튼이나 P / Enter 키를 누르세요. 취소하려면 Esc 키를 누르세요.",
+  "demo.confirm.restart": "다시 시작",
+  "demo.confirm.cancel": "취소",
+  "demo.confirm.close": "닫기",
 };

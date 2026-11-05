@@ -578,6 +578,10 @@ class SimulatorHudAndBindingsMethods {
         helpModal.classList.remove('visible');
         return;
       }
+      if (this.demoDirector?.isRestartConfirmOpen) {
+        this.demoDirector.cancelRestart();
+        return;
+      }
       if (this.gameFlow.state === FLOW.FLIGHT) this.gameFlow.pause();
       else if (this.gameFlow.state === FLOW.PAUSED) this.gameFlow.resume();
       else if (this.gameFlow.state === FLOW.LOBBY && this.gameFlow.canResumeFromLobby()) this.resumeFlight();

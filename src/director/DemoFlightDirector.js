@@ -82,6 +82,13 @@ export class DemoFlightDirector {
     // Audio initial click flag
     this.audioInitiated = false;
 
+    // Restart confirmation dialog state
+    this.isRestartConfirmOpen = false;
+    this.restartDialogEl = null;
+    this.restartConfirmBtn = null;
+    this.restartCancelBtn = null;
+    this.restartCloseBtn = null;
+
     // Track whether user has manually changed camera view in current stage
     this.userCameraOverridden = false;
     this.userTimeOfDayOverridden = false;
@@ -141,19 +148,87 @@ export class DemoFlightDirector {
       });
     }
 
-    // Keyboard shortcut for cancelling demo (ESC) or starting/restarting demo (P)
+    this.restartDialogEl = document.getElementById('demo-restart-dialog');
+    this.restartConfirmBtn = document.getElementById('btn-demo-restart-confirm');
+    this.restartCancelBtn = document.getElementById('btn-demo-restart-cancel');
+    this.restartCloseBtn = document.getElementById('btn-demo-restart-close');
+
+    if (this.restartConfirmBtn) {
+      this.restartConfirmBtn.addEventListener('click', () => this.confirmRestart());
+    }
+    if (this.restartCancelBtn) {
+      this.restartCancelBtn.addEventListener('click', () => this.cancelRestart());
+    }
+    if (this.restartCloseBtn) {
+      this.restartCloseBtn.addEventListener('click', () => this.cancelRestart());
+    }
+    if (this.restartDialogEl) {
+      this.restartDialogEl.addEventListener('click', (e) => {
+        if (e.target === this.restartDialogEl) this.cancelRestart();
+      });
+    }
+
+    // Keyboard shortcut for cancelling demo (ESC) or requesting demo restart (P)
     if (typeof window !== 'undefined') {
       window.addEventListener('keydown', (e) => {
         if (e.target?.closest?.('select')) return;
         if (this.sim.gameFlow?.blocksFlightInput?.()) return;
+
+        if (this.isRestartConfirmOpen) {
+          if (e.key === 'Escape') {
+            e.preventDefault?.();
+            e.stopPropagation?.();
+            this.cancelRestart();
+            return;
+          }
+          if (e.key === 'Enter' || e.key === 'p' || e.key === 'P') {
+            e.preventDefault?.();
+            e.stopPropagation?.();
+            this.confirmRestart();
+            return;
+          }
+          return;
+        }
+
         if (e.key === 'Escape' && this.isActive) {
           this.stop(() => t('manual.control.engaged'));
           e.preventDefault?.();
         } else if ((e.key === 'p' || e.key === 'P') && !e.target?.matches?.('input, textarea')) {
-          this.start();
+          this.requestRestart();
         }
       });
     }
+  }
+
+  requestRestart() {
+    if (this.isRestartConfirmOpen) return;
+    this.isRestartConfirmOpen = true;
+    if (this.sim?.controls?.releaseAllKeys) this.sim.controls.releaseAllKeys();
+    if (this.sim?.syncAudioPause) this.sim.syncAudioPause();
+    if (this.restartDialogEl) {
+      this.restartDialogEl.hidden = false;
+      this.restartDialogEl.classList.add('visible');
+      this.restartCancelBtn?.focus?.({ preventScroll: true });
+    }
+  }
+
+  confirmRestart() {
+    this.closeRestartConfirm();
+    this.start();
+  }
+
+  cancelRestart() {
+    this.closeRestartConfirm();
+  }
+
+  closeRestartConfirm() {
+    if (!this.isRestartConfirmOpen && (!this.restartDialogEl || this.restartDialogEl.hidden)) return;
+    this.isRestartConfirmOpen = false;
+    if (this.restartDialogEl) {
+      this.restartDialogEl.hidden = true;
+      this.restartDialogEl.classList.remove('visible');
+    }
+    if (this.sim?.syncAudioPause) this.sim.syncAudioPause();
   }
 
   closeBanner() {
@@ -185,6 +260,7 @@ export class DemoFlightDirector {
   }
 
   start(targetAirport = null, requestedProfile = this.sim.lobby?.demoProfile) {
+    this.closeRestartConfirm?.();
     if ((targetAirport || this.sim.activeAirport) === 'hangang') return false;
     const sihwa=(targetAirport || this.sim.activeAirport)==='incheon' && resolveDemoProfile(this.sim.currentAircraftId,'incheon',requestedProfile).id==='sihwa-tour';
     if (!sihwa && (targetAirport || this.sim.activeAirport) === 'incheon' && !['B738', 'C172'].includes(this.sim.currentAircraftId)) return false;
@@ -294,6 +370,7 @@ export class DemoFlightDirector {
   }
 
   stop(message = null, keepParkingBrake = false, { preserveThrottle = false } = {}) {
+    this.closeRestartConfirm?.();
     if (!this.isActive) return;
     const retainSpeedBrakes=this.getActiveScenario()===this.sihwaTourScenario;
     this.getActiveScenario().stop?.();
@@ -400,7 +477,7 @@ export class DemoFlightDirector {
   }
 
   update(dt) {
-    if (!this.isActive) return;
+    if (!this.isActive || this.isRestartConfirmOpen) return;
     if (this.waitingForTerrain) {
       if (this.sim.currentTerrain?.loadError) {
         this.getActiveScenario().recordFailure({ description: this.sim.currentTerrain.loadError });
