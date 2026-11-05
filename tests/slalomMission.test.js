@@ -124,10 +124,16 @@ test('a climb between gates is allowed, charged, and stops when the line comes b
     `climbing out is not charged: ${small.toFixed(1)} m then ${large.toFixed(1)} m`);
 });
 
-test('the speed band and the clearance floor end a run rather than costing one', () => {
+test('speed only costs score (below the minimum, no upper bound) while the clearance floor ends a run', () => {
   const manifest = createSlalomManifest({ seed: 6 });
-  assert.equal(fly(manifest, { iasKnots: VALLEY_SLALOM_RULES.speedKnots[0] - 10 }).judge.reason, 'speed-envelope');
-  assert.equal(fly(manifest, { iasKnots: VALLEY_SLALOM_RULES.speedKnots[1] + 5 }).judge.reason, 'speed-envelope');
+  const agl = s => gateValue(manifest.course.gates, s, 'maxAglM') - 10;
+  const normal = fly(manifest, { agl }).judge.result();
+  const slow = fly(manifest, { iasKnots: VALLEY_SLALOM_RULES.speedKnots[0] - 10, agl }).judge.result();
+  const fast = fly(manifest, { iasKnots: VALLEY_SLALOM_RULES.speedKnots[1] + 200, agl }).judge.result();
+  assert.equal(slow.status, 'succeeded', slow.reason);
+  assert.ok(slow.metrics.finalScore < normal.metrics.finalScore, 'slow flight is charged');
+  assert.equal(fast.status, 'succeeded', fast.reason);
+  assert.equal(fast.metrics.speedPenalty, 0, 'no penalty for speed above the old maximum');
   const low = fly(manifest, { agl: () => manifest.course.clearanceFloorM - 1 });
   assert.equal(low.judge.reason, 'clearance-floor');
 });

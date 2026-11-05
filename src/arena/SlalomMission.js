@@ -1,5 +1,8 @@
 import { crossAtPlane, passageCeilingAglAt, projectSlalom } from './slalomCourse.js';
 
+/** Score points lost per knot of mean time-weighted shortfall below the minimum speed. */
+const SPEED_SHORTFALL_POINTS_PER_KT = 10;
+
 const quantile = (samples, fraction, value) => {
   const ordered = [...samples].sort((a, b) => value(a) - value(b));
   const threshold = samples.reduce((sum, sample) => sum + sample.widthM, 0) * fraction;
@@ -30,7 +33,7 @@ export class SlalomMission {
     this.status = 'running'; this.reason = null; this.tick = 0;
     this.previous = null; this.samples = [];
     this.maximumProgressM = 0; this.maxAglM = 0; this.minAglM = null;
-    this.iasSumKt = 0; this.iasCount = 0; this.maxIasKnots = 0;
+    this.iasSumKt = 0; this.iasCount = 0; this.maxIasKnots = 0; this.iasShortfallSumKt = 0;
     this.startS = course.gates[0].sM;
     this.lengthM = course.lengthM - this.startS;
     this.binSizeM = course.sampleStepM;
@@ -61,9 +64,6 @@ export class SlalomMission {
     if (this.tick >= this.manifest.timeoutTicks) return this.finish('failed', 'timeout');
     const course = this.course;
     if (snapshot.aglM < course.clearanceFloorM) return this.finish('failed', 'clearance-floor');
-    if (snapshot.iasKnots < this.manifest.minimumIasKnots || snapshot.iasKnots > this.manifest.maximumIasKnots) {
-      return this.finish('failed', 'speed-envelope');
-    }
     if (!this.previous && Math.hypot(position.x - this.manifest.spawn.x, position.z - this.manifest.spawn.z)
         > this.binSizeM * 2) return this.finish('failed', 'invalid-spawn');
     const maxStepM = Math.max(12, snapshot.groundSpeedKnots * 0.514444 / this.manifest.physicsHz * 3);
@@ -76,6 +76,9 @@ export class SlalomMission {
     this.maximumProgressM = Math.max(this.maximumProgressM, projected.progressM);
     this.maxAglM = Math.max(this.maxAglM, snapshot.aglM);
     this.iasSumKt += snapshot.iasKnots;
+    // Speed is scored, never judged: only time below the lower bound costs points.
+    // There is no upper bound.
+    this.iasShortfallSumKt += Math.max(0, this.manifest.minimumIasKnots - snapshot.iasKnots);
     this.iasCount++;
     this.maxIasKnots = Math.max(this.maxIasKnots, snapshot.iasKnots);
     this.bin(projected, snapshot);
@@ -123,8 +126,10 @@ export class SlalomMission {
     const p95ExcessM = quantile(this.samples, 0.95, sample => sample.excessM);
     const durationSeconds = this.tick / this.manifest.physicsHz;
     const altitudeCostM = this.status === 'succeeded' ? 0.7 * meanExcessM + 0.3 * p95ExcessM : null;
+    const meanSpeedShortfallKt = this.iasCount ? this.iasShortfallSumKt / this.iasCount : 0;
+    const speedPenalty = meanSpeedShortfallKt * SPEED_SHORTFALL_POINTS_PER_KT;
     const finalScore = this.status === 'succeeded'
-      ? Math.max(0, Math.round(20000 - durationSeconds * 100 - (altitudeCostM ?? 0) * 50))
+      ? Math.max(0, Math.round(20000 - durationSeconds * 100 - (altitudeCostM ?? 0) * 50 - speedPenalty))
       : null;
     return { status: this.status, reason: this.reason, tick: this.tick, metrics: {
       rulesVersion: this.manifest.rulesVersion,
@@ -135,7 +140,7 @@ export class SlalomMission {
       meanExcessM, p95ExcessM, maxAglM: this.maxAglM, minAglM: this.minAglM,
       medianAglM: quantile(this.samples, 0.5, sample => sample.aglM),
       meanIasKnots: this.iasCount ? this.iasSumKt / this.iasCount : 0,
-      maxIasKnots: this.maxIasKnots,
+      maxIasKnots: this.maxIasKnots, meanSpeedShortfallKt, speedPenalty,
       durationSeconds,
       altitudeCostM,
       finalScore,
