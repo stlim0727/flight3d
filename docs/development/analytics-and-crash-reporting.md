@@ -35,3 +35,18 @@ Add `VITE_POSTHOG_KEY` as a GitHub Actions repository secret or variable.
 3. **In-Game Bug Report Dialog**:
    - Available on the mission score overlay (`[data-score-report]`) and flight debrief (`#debrief-feedback`).
    - Automatically attaches anonymized flight telemetry (aircraft, scenario, crash reason, FPS, browser info).
+
+## Built-in PostHog Dashboard
+
+`scripts/lib/posthogDashboard.mjs` declares the "Flight3d Overview" dashboard (flights/day, outcomes,
+start→end funnel, breakdowns by aircraft/scenario/airport, pilot mode, crash types, duration, score,
+resource load time, feedback, exceptions). Create or update it in PostHog (idempotent):
+
+```sh
+POSTHOG_PERSONAL_API_KEY=phx_... POSTHOG_PROJECT_ID=<id> npm run posthog:dashboard
+npm run posthog:dashboard -- --dry-run   # list insights without calling the API
+```
+
+The personal API key needs `dashboard:write` and `insight:write` scopes. Set `POSTHOG_APP_HOST` for
+US Cloud (`https://us.posthog.com`); the default is EU. Never commit the key. Query shapes were not
+verified against a live project; check the first run's output.
