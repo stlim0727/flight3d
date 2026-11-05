@@ -43,4 +43,32 @@ for (const [name, query] of INSIGHTS) {
   await api('/insights/', 'POST', { name, query, dashboards: [dashboard.id] });
   console.log(`added  ${name}`);
 }
+const refreshed = await api(`/dashboards/${dashboard.id}/`);
+const tiles = refreshed.tiles || [];
+const updatedTiles = [];
+let currentSmY = 0;
+let currentXsY = 0;
+
+for (let i = 0; i < tiles.length; i += 2) {
+  const pair = tiles.slice(i, i + 2);
+  const hasMapOrTable = pair.some(t => {
+    const name = (t.insight?.name || '').toLowerCase();
+    return name.includes('world map') || name.includes('region and city');
+  });
+  const rowH = hasMapOrTable ? 4 : 3;
+
+  pair.forEach((t, colIdx) => {
+    const layouts = {
+      sm: { w: 6, h: rowH, x: colIdx === 0 ? 0 : 6, y: currentSmY },
+      xs: { w: 1, h: rowH, x: 0, y: currentXsY },
+    };
+    currentXsY += rowH;
+    updatedTiles.push({ id: t.id, layouts });
+  });
+  currentSmY += rowH;
+}
+if (updatedTiles.length > 0) {
+  await api(`/dashboards/${dashboard.id}/`, 'PATCH', { tiles: updatedTiles });
+  console.log(`applied compact layout (${updatedTiles.length} tiles)`);
+}
 console.log(`Done: ${host}/project/${project}/dashboard/${dashboard.id}`);
