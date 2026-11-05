@@ -40,7 +40,7 @@ Add `VITE_POSTHOG_KEY` as a GitHub Actions repository secret or variable.
 
 `scripts/lib/posthogDashboard.mjs` declares the "Flight3d Overview" dashboard (flights/day, outcomes, players by country world map, players by region and city table,
 start→end funnel, breakdowns by aircraft/scenario/airport, pilot mode, crash types, duration, score,
-resource load time, feedback, exceptions). Create or update it in PostHog (idempotent):
+startup time, feedback, exceptions). Create or update it in PostHog (idempotent):
 
 ```sh
 POSTHOG_PERSONAL_API_KEY=phx_... POSTHOG_PROJECT_ID=<id> npm run posthog:dashboard

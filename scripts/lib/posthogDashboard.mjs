@@ -41,7 +41,7 @@ export const INSIGHTS = [
   ['Crashes by aircraft', trends([ev('flight_crashed')], { breakdown: 'aircraft', display: 'ActionsBarValue' })],
   ['Average flight duration (s)', trends([avg('flight_ended', 'durationSeconds')])],
   ['Average score', trends([avg('flight_ended', 'score')], { breakdown: 'scenario', display: 'ActionsBarValue' })],
-  ['Resource load time (ms) by type', trends([avg('resource_loaded', 'resource_duration_ms')], { breakdown: 'resource_type' })],
+  ['Startup time (ms)', trends([avg('startup_trace', 'firstVisibleMs'), avg('startup_trace', 'ready')])],
   ['User feedback submitted', trends([ev('user_feedback_submitted')])],
   ['JS exceptions', trends([ev('$exception')])],
 ];
