@@ -5,6 +5,7 @@ import { excludeFromDeckShadow } from './CockpitLighting.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
 import { applyKoreanAirLivery } from './KoreanAirLivery.js';
+import { applyJejuAirLivery } from './JejuAirLivery.js';
 import { applyFlatShading } from '../config/renderQuality.js';
 
 /**
@@ -14,8 +15,9 @@ import { applyFlatShading } from '../config/renderQuality.js';
  * retractable tricycle landing gear with doors, and complete navigation/strobe/landing light system.
  */
 export class Boeing737 {
-  constructor(pfdCanvas, ndCanvas, eicasCanvas, mcpCanvas = null, isfdCanvas = null, cduCanvas = null) {
+  constructor(pfdCanvas, ndCanvas, eicasCanvas, mcpCanvas = null, isfdCanvas = null, cduCanvas = null, options = {}) {
     this.group = new THREE.Group();
+    this.livery = options.livery ?? 'jeju';
 
     // Internal cockpit
     this.cockpit = new Cockpit(pfdCanvas, ndCanvas, eicasCanvas, mcpCanvas, isfdCanvas, cduCanvas);
@@ -92,10 +94,17 @@ export class Boeing737 {
       metalness: 0.15
     });
 
-    const boeingBlueMat = new THREE.MeshStandardMaterial({
-      color: 0x003366, // Classic Boeing deep blue
+    const isKorean = this.livery === 'korean';
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: isKorean ? 0x003366 : 0xf47920, // Jeju Air signature orange or classic blue
       roughness: 0.3,
-      metalness: 0.25
+      metalness: 0.2
+    });
+
+    const bellyMat = new THREE.MeshStandardMaterial({
+      color: isKorean ? 0x003366 : 0xe7eaed, // Clean pearl grey or classic blue belly
+      roughness: 0.3,
+      metalness: 0.15
     });
 
     const wingGreyMat = new THREE.MeshStandardMaterial({
@@ -123,16 +132,16 @@ export class Boeing737 {
     });
 
     // 1. Fuselage
-    this.buildFuselage(fuselageWhiteMat, boeingBlueMat, windowMat);
+    this.buildFuselage(fuselageWhiteMat, bellyMat, windowMat);
 
     // 2. Swept Wings & Winglets
-    this.buildWings(wingGreyMat, boeingBlueMat, chromeMat);
+    this.buildWings(wingGreyMat, accentMat, chromeMat);
 
     // 3. Tailfin (Vertical Stabilizer) & Horizontal Stabilizers
-    this.buildEmpennage(fuselageWhiteMat, boeingBlueMat, wingGreyMat);
+    this.buildEmpennage(fuselageWhiteMat, accentMat, wingGreyMat);
 
     // 4. Twin Turbofan Engines (CFM56 / LEAP)
-    this.buildEngines(boeingBlueMat, chromeMat, darkEngineMat);
+    this.buildEngines(accentMat, chromeMat, darkEngineMat);
 
     // 5. Tricycle Landing Gear
     this.buildLandingGear();
@@ -1013,7 +1022,7 @@ export class Boeing737 {
           // Preserve the complete neutral airframe for the cockpit shadow proxy.
           const originalAirframeGeometry = this.gltfModel.getObjectByName('B737')?.geometry;
           this.gltfControlSurfaces = bindGltfControlSurfaces(this.gltfModel);
-          applyKoreanAirLivery(this.gltfModel, this.group, this.gltfGroup);
+          this.applyCurrentLivery();
           if (this.flatShading) {
             applyFlatShading(this.gltfModel, true);
           }
@@ -1136,5 +1145,24 @@ export class Boeing737 {
   setFlatShading(flatShading) {
     this.flatShading = Boolean(flatShading);
     applyFlatShading(this.group, this.flatShading);
+  }
+
+  applyCurrentLivery() {
+    if (!this.gltfModel) return;
+    const existingKorean = this.gltfGroup.getObjectByName('KoreanAirLivery');
+    if (existingKorean) this.gltfGroup.remove(existingKorean);
+    const existingJeju = this.gltfGroup.getObjectByName('JejuAirLivery');
+    if (existingJeju) this.gltfGroup.remove(existingJeju);
+
+    if (this.livery === 'korean') {
+      applyKoreanAirLivery(this.gltfModel, this.group, this.gltfGroup);
+    } else {
+      applyJejuAirLivery(this.gltfModel, this.group, this.gltfGroup);
+    }
+  }
+
+  setLivery(liveryName) {
+    this.livery = liveryName;
+    this.applyCurrentLivery();
   }
 }
