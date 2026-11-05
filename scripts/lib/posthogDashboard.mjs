@@ -29,6 +29,7 @@ export const INSIGHTS = [
   }],
   ['Flights by aircraft', trends([ev('flight_started')], { breakdown: 'aircraft', display: 'ActionsBarValue' })],
   ['Flights by scenario', trends([ev('flight_started')], { breakdown: 'scenario', display: 'ActionsBarValue' })],
+  ['Players by country (world map)', trends([ev('flight_started', { math: 'dau' })], { breakdown: '$geoip_country_code', display: 'WorldMap' })],
   ['Flights by airport', trends([ev('flight_started')], { breakdown: 'airport', display: 'ActionsBarValue' })],
   ['Pilot mode (human vs AI)', trends([ev('pilot_mode_selected')], { breakdown: 'pilotMode', display: 'ActionsPie' })],
   ['Crash types', trends([ev('flight_crashed')], { breakdown: 'crashType', display: 'ActionsBarValue' })],
