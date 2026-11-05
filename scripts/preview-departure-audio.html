@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jeju Air 1102 - Incheon Departure Radio Audio Preview</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(15, 23, 42, 0.85);
+      --card-border: rgba(56, 189, 248, 0.25);
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --accent: #f97316;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --pilot-bg: rgba(56, 189, 248, 0.15);
+      --pilot-color: #38bdf8;
+      --crew-bg: rgba(245, 158, 11, 0.15);
+      --crew-color: #fbbf24;
+      --atc-bg: rgba(16, 185, 129, 0.15);
+      --atc-color: #34d399;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background: radial-gradient(circle at 50% 0%, #1e293b 0%, #090d16 80%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px 20px 80px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: var(--primary);
+      padding: 4px 14px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .controls-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 12px;
+      padding: 14px 20px;
+      margin-bottom: 28px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(12px);
+    }
+
+    .master-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .master-btn:hover {
+      background: linear-gradient(135deg, #0369a1, #075985);
+      transform: translateY(-1px);
+    }
+
+    .meta-stat {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .meta-stat strong {
+      color: var(--text);
+    }
+
+    .stages-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .stage-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 20px 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      transition: all 0.25s ease;
+      backdrop-filter: blur(12px);
+    }
+
+    .stage-card:hover {
+      border-color: rgba(56, 189, 248, 0.55);
+      box-shadow: 0 8px 30px rgba(56, 189, 248, 0.12);
+    }
+
+    .stage-card.playing {
+      border-color: var(--primary);
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.3);
+      background: rgba(22, 34, 56, 0.95);
+    }
+
+    .stage-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .stage-title {
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .stage-number {
+      font-size: 12px;
+      font-weight: 800;
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--primary);
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    .stage-duration {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-feature-settings: "tnum";
+    }
+
+    .dialogue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .dialogue-line {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .speaker-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .speaker-pilot { background: var(--pilot-bg); color: var(--pilot-color); }
+    .speaker-crew { background: var(--crew-bg); color: var(--crew-color); }
+    .speaker-apron, .speaker-ground, .speaker-tower { background: var(--atc-bg); color: var(--atc-color); }
+
+    .line-text {
+      color: #e2e8f0;
+    }
+
+    .player-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+
+    audio {
+      width: 100%;
+      height: 36px;
+      outline: none;
+      filter: invert(0.9) hue-rotate(180deg);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">✈️ Gemini 3.1 Flash TTS Preview Audio Preview</div>
+      <h1>Jeju Air 1102 (제주항공 1102편)</h1>
+      <p class="subtitle">인천국제공항(RKSI) 탑승구 출발 · 푸시백 · 유도 · 이륙 8단계 관제 무전 합성 음성</p>
+    </header>
+
+    <div class="controls-bar">
+      <div>
+        <button id="btn-play-all" class="master-btn">▶ 전체 순차 재생 (Play All)</button>
+      </div>
+      <div class="meta-stat">
+        총 8개 단계 · 재생 시간: <strong id="total-duration">64.5초</strong> · 음성 합성: <strong>Gemini TTS + Telecom Filter</strong>
+      </div>
+    </div>
+
+    <div class="stages-grid" id="stages-container">
+      <!-- Dynamic cards generated from manifest -->
+    </div>
+  </div>
+
+  <script type="module">
+    const manifestUrl = '/audio/departure/manifest.json';
+    const container = document.getElementById('stages-container');
+    const playAllBtn = document.getElementById('btn-play-all');
+    let audios = [];
+    let isPlayingAll = false;
+    let currentPlayIndex = 0;
+
+    const STAGE_TITLES = {
+      gate: '[1/8] 탑승구 출발 준비 (Gate Preparation)',
+      pushback: '[2/8] 견인차 푸시백 (Tug Pushback)',
+      disconnect: '[3/8] 견인차 분리 및 확인 (Tug Disconnect)',
+      taxi: '[4/8] 지상 이동 관제 (Ground Control Taxi)',
+      hold: '[5/8] 관제탑 교신 및 활주로 앞 대기 (Tower Hold Short)',
+      lineup: '[6/8] 활주로 진입 및 정렬 대기 (Line Up & Wait)',
+      clearance: '[7/8] 활주로 33L 이륙 허가 (Takeoff Clearance)',
+      takeoff: '[8/8] 가속 및 이륙 상승 (Rotation & Climb)'
+    };
+
+    async function load() {
+      try {
+        const res = await fetch(manifestUrl);
+        const manifest = await res.json();
+        renderStages(manifest);
+      } catch (e) {
+        container.innerHTML = `<p style="color:#ef4444;text-align:center;">오디오 매니페스트를 불러올 수 없습니다: ${e.message}</p>`;
+      }
+    }
+
+    function renderStages(manifest) {
+      container.innerHTML = '';
+      audios = [];
+      const stages = Object.entries(manifest);
+      let totalSec = 0;
+
+      stages.forEach(([stage, data], idx) => {
+        totalSec += data.duration;
+        const card = document.createElement('div');
+        card.className = 'stage-card';
+        card.id = `card-${stage}`;
+
+        const dialogueHtml = data.lines.map(line => `
+          <div class="dialogue-line">
+            <span class="speaker-pill speaker-${line.speaker}">${line.speaker}</span>
+            <span class="line-text">${line.text}</span>
+          </div>
+        `).join('');
+
+        card.innerHTML = `
+          <div class="stage-header">
+            <div class="stage-title">
+              <span class="stage-number">${idx + 1}</span>
+              <span>${STAGE_TITLES[stage] || stage}</span>
+            </div>
+            <div class="stage-duration">⏱️ ${data.duration.toFixed(2)}s</div>
+          </div>
+          <div class="dialogue-list">
+            ${dialogueHtml}
+          </div>
+          <div class="player-row">
+            <audio id="audio-${stage}" controls preload="metadata" src="/audio/departure/${data.file}"></audio>
+          </div>
+        `;
+
+        container.appendChild(card);
+        const audioElement = card.querySelector('audio');
+        audios.push({ stage, element: audioElement, card });
+
+        audioElement.addEventListener('play', () => {
+          audios.forEach(a => { if (a.element !== audioElement) a.element.pause(); });
+          document.querySelectorAll('.stage-card').forEach(c => c.classList.remove('playing'));
+          card.classList.add('playing');
+        });
+
+        audioElement.addEventListener('ended', () => {
+          card.classList.remove('playing');
+          if (isPlayingAll) {
+            currentPlayIndex++;
+            if (currentPlayIndex < audios.length) {
+              audios[currentPlayIndex].element.play();
+            } else {
+              isPlayingAll = false;
+              playAllBtn.textContent = '▶ 전체 순차 재생 (Play All)';
+            }
+          }
+        });
+      });
+
+      document.getElementById('total-duration').textContent = `${totalSec.toFixed(1)}초`;
+    }
+
+    playAllBtn.addEventListener('click', () => {
+      if (isPlayingAll) {
+        isPlayingAll = false;
+        audios.forEach(a => a.element.pause());
+        playAllBtn.textContent = '▶ 전체 순차 재생 (Play All)';
+      } else {
+        isPlayingAll = true;
+        currentPlayIndex = 0;
+        playAllBtn.textContent = '⏹ 정지 (Stop All)';
+        if (audios[0]) audios[0].element.play();
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>
