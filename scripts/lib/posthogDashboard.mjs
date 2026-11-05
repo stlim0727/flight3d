@@ -20,7 +20,7 @@ const trends = (series, { breakdown, display = 'ActionsLineGraph', interval = 'd
 const avg = (event, property) => ev(event, { math: 'avg', math_property: property });
 
 export const INSIGHTS = [
-  ['Flights started per day', trends([ev('flight_started')])],
+  ['Flights started per day', trends([ev('flight_started')], { display: 'ActionsBar' })],
   ['Flight outcomes (ended vs crashed)', trends([ev('flight_ended'), ev('flight_crashed')])],
   ['Start → end funnel', {
     kind: 'InsightVizNode',
