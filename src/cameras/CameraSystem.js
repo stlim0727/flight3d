@@ -8,6 +8,10 @@ import { CinematicCameraDirector } from './CinematicCameraDirector.js';
  * smooth exterior damping, and automatic temporary cinematic view cuts for takeoff/landing/gear transit.
  */
 export class CameraSystem {
+  // Lowest orbit the chase camera may take (radians). The ground clamp, not this
+  // limit, keeps the eye out of terrain, so the view may drop below the aircraft.
+  static CHASE_PITCH_LOW_LIMIT = 1.0;
+
   static MODES = {
     COCKPIT: 0,
     CHASE: 1,
@@ -552,7 +556,7 @@ export class CameraSystem {
         // and the pointer-lock path land on that reading, which makes a down
         // gesture lift the view like it does in the cockpit.
         this.chasePitch -= dy * 0.005;
-        this.chasePitch = Math.max(-1.1, Math.min(0.28, this.chasePitch));
+        this.chasePitch = Math.max(-1.1, Math.min(CameraSystem.CHASE_PITCH_LOW_LIMIT, this.chasePitch));
         break;
       }
       case CameraSystem.MODES.WING: {
@@ -564,7 +568,7 @@ export class CameraSystem {
       }
       case CameraSystem.MODES.DRONE: {
         this.droneOrbitAngle -= dx * 0.005;
-        this.droneHeight = Math.max(4.0, Math.min(32.0, this.droneHeight + dy * 0.05));
+        this.droneHeight = Math.max(-32.0, Math.min(32.0, this.droneHeight + dy * 0.05));
         break;
       }
       case CameraSystem.MODES.GEAR: {
@@ -794,7 +798,7 @@ export class CameraSystem {
       this.camera.lookAt(targetWorld);
     } else if (this.mode === CameraSystem.MODES.DRONE) {
       const px = aircraftMesh.position.x + Math.sin(this.droneOrbitAngle) * this.droneDistance;
-      const py = Math.max(aircraftMesh.position.y + 1.5, aircraftMesh.position.y + this.droneHeight);
+      const py = aircraftMesh.position.y + this.droneHeight;
       const pz = aircraftMesh.position.z + Math.cos(this.droneOrbitAngle) * this.droneDistance;
       // A paused or parked airframe sits on terrain, so the rig must not snap inside it.
       this.dronePos.set(px, Math.max(py, this.queryGroundHeight(px, pz) + 2.5), pz);
@@ -1327,7 +1331,7 @@ export class CameraSystem {
         const cursorChasePitch = this.enableCursorTrack ? (-this.cursorNormY * 0.12) : 0;
 
         const totalYaw = this.chaseYaw + cursorChaseYaw;
-        const totalPitch = Math.max(-1.1, Math.min(0.28, this.chasePitch + cursorChasePitch));
+        const totalPitch = Math.max(-1.1, Math.min(CameraSystem.CHASE_PITCH_LOW_LIMIT, this.chasePitch + cursorChasePitch));
 
         const effectiveChaseDist = this.chaseDistance + this.chaseSpeedLag;
         const behindLocal = new THREE.Vector3(0, this.chaseHeight, effectiveChaseDist);
@@ -1535,7 +1539,7 @@ export class CameraSystem {
 
         // Subtle organic drone hovering bob motion
         const hoverBob = Math.sin(this.droneOrbitAngle * 2.2) * 0.55;
-        const currentHeight = Math.max(planePos.y + 2.0, planePos.y + this.droneHeight + hoverBob);
+        const currentHeight = planePos.y + this.droneHeight + hoverBob;
         const targetX = planePos.x + Math.sin(this.droneOrbitAngle) * this.droneDistance;
         const targetZ = planePos.z + Math.cos(this.droneOrbitAngle) * this.droneDistance;
 
