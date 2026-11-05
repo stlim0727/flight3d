@@ -1,6 +1,6 @@
 import { loadSihwaRegion } from '../geospatial/SihwaRegion.js';
 import { createSihwaScenery } from './SihwaScenery.js';
-import { createDepartureJetBridge } from './DepartureJetBridge.js';
+import { createDepartureJetBridge, createJetBridgeMaterials, findTerminalZ } from './DepartureJetBridge.js';
 import * as THREE from 'three';
 import { AirportNightLighting } from './AirportNightLighting.js';
 import { DEPARTURE_GATE } from '../config/incheonDeparture.js';
@@ -17,6 +17,17 @@ import { generatePlanting, pointInRing, segmentDistance } from '../geospatial/in
 import { terrainGeometry, placeBuilding } from '../previews/incheonGeometry.js';
 import { createCityGround, createBuildingMaterials, createTexturedBuildings, createPlantingInstances } from '../previews/incheonCityAssets.js';
 
+export const INCHEON_APRON_LAMPS = [
+  { x: 58, z: -188, target: [90, -202] },
+  { x: 72, z: -237, target: [88, -202] },
+  { x: 92, z: -242, target: [92, -202] },
+  { x: 108, z: -258, target: [145, -245] },
+  { x: 108, z: -273, target: [145, -275] },
+  { x: 100, z: -288, target: [130, -315] },
+  { x: 75, z: -302, target: [65, -345] },
+  { x: 40, z: -310, target: [10, -355] },
+];
+
 function shape(points) { return new THREE.Shape(points.slice(0,-1).map(([x,z])=>new THREE.Vector2(x,-z))); }
 export async function loadIncheonAirport(base) {
   const json=async file=> {const r=await fetch(base+file);if(!r.ok)throw new Error(`${file}: ${r.status}`);return r.json();};
@@ -28,7 +39,10 @@ export async function loadIncheonAirport(base) {
   terrain.mesh.add(sihwa.group);
   const height=(x,z)=>terrain.getHeight(x,z);
   group.add(createDepartureStand(INCHEON_AIRFIELD.elevationM));
-  const departureBridge = createDepartureJetBridge(INCHEON_AIRFIELD.elevationM);
+  const bridgeMaterials = createJetBridgeMaterials();
+  const departureBridge = createDepartureJetBridge(INCHEON_AIRFIELD.elevationM, DEPARTURE_GATE, {
+    materials: bridgeMaterials,
+  });
   group.add(departureBridge.group);
   const groundMaterial=new THREE.MeshLambertMaterial({vertexColors:true,map:createIncheonGroundTexture(),alphaMap:mask,alphaTest:.5});
   for(const geometry of [terrainGeometry(12000,480,height,true)]) {
@@ -52,9 +66,10 @@ export async function loadIncheonAirport(base) {
     INCHEON_AIRFIELD.surfaces.filter(s => s.kind === 'runway').map(s => ({
       start: [s.points[0][0], INCHEON_AIRFIELD.elevationM, s.points[0][1]],
       end: [s.points.at(-1)[0], INCHEON_AIRFIELD.elevationM, s.points.at(-1)[1]], width: s.width,
-    })), [20, 32, 45, 58, 71, 84, 97, 110].map(offset => ({ x: DEPARTURE_GATE.x + offset,
-      y: INCHEON_AIRFIELD.elevationM, z: DEPARTURE_GATE.z - 45, height: 20,
-      target: [DEPARTURE_GATE.x + offset - 15, INCHEON_AIRFIELD.elevationM + 3, DEPARTURE_GATE.z] })));
+    })), INCHEON_APRON_LAMPS.map(lamp => ({
+      x: lamp.x, y: INCHEON_AIRFIELD.elevationM, z: lamp.z, height: 20,
+      target: [lamp.target[0], INCHEON_AIRFIELD.elevationM + 3, lamp.target[1]],
+    })));
   const tower = createControlTower(height);
   colliders.push(tower.collider);
   group.add(tower.group);
@@ -87,7 +102,21 @@ export async function loadIncheonAirport(base) {
     && !colliders.some(c=>x>=c.bounds.min.x-1 && x<=c.bounds.max.x+1 && z>=c.bounds.min.z-1 && z<=c.bounds.max.z+1
       && (pointInRing(x,z,c.points) || c.points.slice(1).some((b,i)=>segmentDistance(x,z,c.points[i],b)<1))));
   group.add(traffic.mesh);
-  const parked=new IncheonParkedAirliners(planParkedAirliners(INCHEON_AIRFIELD,patch),INCHEON_AIRFIELD.elevationM);
+  const parkedStands = planParkedAirliners(INCHEON_AIRFIELD,patch);
+  const terminalPoly = patch.features.find(f=>f.id==='relation/3917466')?.parts[0];
+  const nearbyTerminalStands = parkedStands.filter(s => s.area === 'terminal'
+    && Math.hypot(s.x - DEPARTURE_GATE.x, s.z - DEPARTURE_GATE.z) < 300);
+  for (const stand of nearbyTerminalStands) {
+    const tz = terminalPoly ? findTerminalZ(stand, terminalPoly) : -48;
+    const standBridge = createDepartureJetBridge(INCHEON_AIRFIELD.elevationM, stand, {
+      name: `jetbridge-${stand.id}`,
+      terminalZ: tz,
+      extension: 1,
+      materials: bridgeMaterials,
+    });
+    group.add(standBridge.group);
+  }
+  const parked=new IncheonParkedAirliners(parkedStands,INCHEON_AIRFIELD.elevationM);
   group.add(parked.group);parked.load(import.meta.env?.BASE_URL??'/');
   return {terrain,group,nightLighting,departureBridge,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,parked,
     towerCab:tower.cab,

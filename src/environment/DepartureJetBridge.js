@@ -1,26 +1,45 @@
 import * as THREE from 'three';
 import { DEPARTURE_GATE } from '../config/incheonDeparture.js';
+import { pointInRing } from '../geospatial/incheonDressing.js';
+
+export function createJetBridgeMaterials() {
+  return {
+    shell: new THREE.MeshStandardMaterial({color:0xc7d0d7,roughness:.75}),
+    frame: new THREE.MeshStandardMaterial({color:0x52616f,roughness:.8}),
+    glass: new THREE.MeshStandardMaterial({color:0x39728a,roughness:.25,metalness:.15}),
+    rubber: new THREE.MeshStandardMaterial({color:0x222a30,roughness:.95}),
+  };
+}
+
+export function findTerminalZ(stand, polygon, localX = -26, defaultZ = -48.35) {
+  const yaw = stand.yaw ?? -stand.heading;
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  for (let tz = -25; tz >= -75; tz -= 0.5) {
+    const wx = stand.x + c * localX + s * tz;
+    const wz = stand.z - s * localX + c * tz;
+    if (pointInRing(wx, wz, polygon)) return tz;
+  }
+  return defaultZ;
+}
 
 /** Authored L-shaped gate: fixed access corridor, rotunda, telescopic apron arm. */
-export function createDepartureJetBridge(groundHeight) {
-  const group = new THREE.Group(); group.name = 'departure-jetbridge';
-  const yaw = -DEPARTURE_GATE.heading;
+export function createDepartureJetBridge(groundHeight, gate = DEPARTURE_GATE, options = {}) {
+  const group = new THREE.Group(); group.name = options.name ?? 'departure-jetbridge';
+  const yaw = gate.yaw ?? -gate.heading;
   // The access axis meets the frozen terminal footprint (relation/3917466)
   // at local Z=-48.227 m. Start just inside that wall, not in open apron space.
-  const terminalZ = -48.35;
+  const terminalZ = options.terminalZ ?? -48.35;
   const anchor = new THREE.Vector3(-26, 0, terminalZ)
     .applyAxisAngle(new THREE.Vector3(0,1,0), yaw)
-    .add(new THREE.Vector3(DEPARTURE_GATE.x, groundHeight, DEPARTURE_GATE.z));
+    .add(new THREE.Vector3(gate.x, groundHeight, gate.z));
   const door = new THREE.Vector3(-2.15, 0, -12.2)
-    .applyAxisAngle(new THREE.Vector3(0,1,0), -DEPARTURE_GATE.heading)
-    .add(new THREE.Vector3(DEPARTURE_GATE.x,groundHeight,DEPARTURE_GATE.z));
+    .applyAxisAngle(new THREE.Vector3(0,1,0), yaw)
+    .add(new THREE.Vector3(gate.x, groundHeight, gate.z));
   const accessLength = -12.2-terminalZ, distance = 23.85;
   group.position.copy(anchor);
   group.rotation.y = yaw;
-  const shell = new THREE.MeshStandardMaterial({color:0xc7d0d7,roughness:.75});
-  const frame = new THREE.MeshStandardMaterial({color:0x52616f,roughness:.8});
-  const glass = new THREE.MeshStandardMaterial({color:0x39728a,roughness:.25,metalness:.15});
-  const rubber = new THREE.MeshStandardMaterial({color:0x222a30,roughness:.95});
+  const materials = options.materials ?? createJetBridgeMaterials();
+  const { shell, frame, glass, rubber } = materials;
   const floorHeight = 3.35, tunnelHeight = 2.6, width = 2.8;
   const box=(parent,w,h,d,x,y,z,material=shell)=>{
     const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);
@@ -53,7 +72,7 @@ export function createDepartureJetBridge(groundHeight) {
   const cab=new THREE.Group();cab.name='jetbridge-door-cab';arm.add(cab);
   // The rotunda turns independently so the bellows face the port door,
   // rather than pointing along the terminal's telescoping tunnel.
-  const intoDoor=new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0),-DEPARTURE_GATE.heading);
+  const intoDoor=new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
   cab.rotation.y=Math.atan2(intoDoor.x,intoDoor.z)-group.rotation.y-arm.rotation.y;
   box(cab,3.1,.2,2.1,0,floorHeight,0,frame);
   box(cab,3.1,.18,2.1,0,floorHeight+tunnelHeight,0);
@@ -81,6 +100,6 @@ export function createDepartureJetBridge(groundHeight) {
     cab.position.z=end-Math.cos(cab.rotation.y)*1.05;
     support.position.z=end-3;
   }};
-  bridge.setExtension(0);
+  bridge.setExtension(options.extension ?? 0);
   return bridge;
 }

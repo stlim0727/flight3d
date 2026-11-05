@@ -1,10 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import * as THREE from 'three';
 import { AirportNightLighting, nightLightLevel } from '../src/environment/AirportNightLighting.js';
 import { installInstrumentLighting } from '../src/aircraft/InstrumentLighting.js';
 import { createRoomLightTexture } from '../src/environment/WindowRoomLighting.js';
 import { createBuildingMaterials } from '../src/previews/incheonCityAssets.js';
+import { INCHEON_APRON_LAMPS } from '../src/environment/IncheonAirport.js';
+import airfield from '../src/config/incheonAirfield.json' with { type: 'json' };
+import { DEPARTURE_GATE } from '../src/config/incheonDeparture.js';
+import { planParkedAirliners } from '../src/geospatial/incheonParking.js';
+import { pointInRing } from '../src/geospatial/incheonDressing.js';
 
 const runway = { start: [0, 2805, 0], end: [447, 2867, -279], width: 30, spacing: 35 };
 
@@ -123,4 +129,24 @@ test('apron flood aims at aircraft height and covers the stand without shadow-ma
   assert.equal(light.intensity, maximum);
   lights.update(.3);
   assert.equal(light.intensity, 0);
+});
+
+test('Incheon apron floodlights sit on mapped apron, stay clear of terminal and maintain safe separation from departure gate and parked aircraft', () => {
+  const patch = JSON.parse(fs.readFileSync(new URL('../public/scenery/incheon/patch.json', import.meta.url)));
+  const apron = airfield.surfaces.find(s => s.id === 'relation/3917465/0');
+  const terminal = patch.features.find(f => f.id === 'relation/3917466');
+  const stands = planParkedAirliners(airfield, patch);
+  const protectedSpots = [{ id: 'DEPARTURE_GATE', x: DEPARTURE_GATE.x, z: DEPARTURE_GATE.z }, ...stands];
+
+  assert.ok(INCHEON_APRON_LAMPS.length >= 6 && INCHEON_APRON_LAMPS.length <= 8);
+  for (const lamp of INCHEON_APRON_LAMPS) {
+    assert.ok(pointInRing(lamp.x, lamp.z, apron.points), `lamp at (${lamp.x}, ${lamp.z}) must sit on mapped apron pavement`);
+    for (const part of terminal.parts) {
+      assert.ok(!pointInRing(lamp.x, lamp.z, part), `lamp at (${lamp.x}, ${lamp.z}) must stay outside terminal building`);
+    }
+    for (const spot of protectedSpots) {
+      const dist = Math.hypot(lamp.x - spot.x, lamp.z - spot.z);
+      assert.ok(dist >= 30, `lamp at (${lamp.x}, ${lamp.z}) must clear stand ${spot.id} (got ${dist.toFixed(1)}m, expected >= 30m)`);
+    }
+  }
 });
