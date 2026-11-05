@@ -3,6 +3,7 @@ import { F16LuklaScenario } from './scenarios/F16LuklaScenario.js';
 import { F16CanyonSlalomScenario } from './scenarios/F16CanyonSlalomScenario.js';
 import { F16CanyonChaseScenario } from './scenarios/F16CanyonChaseScenario.js';
 import { IncheonDepartureScenario } from './scenarios/IncheonDepartureScenario.js';
+import { JejuBangkokDepartureScenario } from './scenarios/JejuBangkokDepartureScenario.js';
 import { IncheonCessnaScenario } from './scenarios/IncheonCessnaScenario.js';
 import { t, bindText } from '../i18n/index.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
@@ -56,6 +57,7 @@ export class DemoFlightDirector {
     this.coastalScenario = new CoastalDemoScenario(this, simulator);
     this.incheonCessnaScenario = new IncheonCessnaScenario(this, simulator);
     this.incheonDepartureScenario = new IncheonDepartureScenario(this, simulator);
+    this.jejuBangkokScenario = new JejuBangkokDepartureScenario(this, simulator);
     this.f16Scenario = new F16LuklaScenario(this, simulator);
     this.f16CanyonScenario = new F16CanyonChaseScenario(this, simulator);
     this.f16SlalomScenario = new F16CanyonSlalomScenario(this, simulator);
@@ -101,7 +103,9 @@ export class DemoFlightDirector {
       return this.profile === 'canyon-slalom' ? this.f16SlalomScenario
         : this.profile === 'canyon-chase' ? this.f16CanyonScenario : this.f16Scenario;
     }
-    if (this.activeDemoAirport === 'incheon' && this.activeDemoAircraft === 'B738') return this.incheonDepartureScenario;
+    if (this.activeDemoAirport === 'incheon' && this.activeDemoAircraft === 'B738') {
+      return this.profile === 'jeju-bangkok-2503' ? this.jejuBangkokScenario : this.incheonDepartureScenario;
+    }
     if (this.activeDemoAircraft === 'C172') {
       if (this.activeDemoAirport === 'incheon') return this.incheonCessnaScenario;
       return this.profile === 'proximity' ? this.cessnaProximityScenario : this.cessnaScenario;
@@ -233,14 +237,24 @@ export class DemoFlightDirector {
 
   requestManualControl() {
     const scenario = this.getActiveScenario();
-    if (this.isActive && scenario === this.incheonDepartureScenario && this.sim?.voiceChallengeOverlay) {
+    if (this.isActive && (scenario === this.incheonDepartureScenario || scenario === this.jejuBangkokScenario) && this.sim?.voiceChallengeOverlay) {
+      const isBangkok = scenario === this.jejuBangkokScenario;
       const options = [
         {
           id: 'a',
           tag: 'A',
-          primary: t('departure.voice.esc.optA.primary'),
-          secondary: t('departure.voice.esc.optA.secondary'),
-          phrases: [
+          primary: isBangkok ? t('departure.bangkok.voice.optA.primary') : t('departure.voice.esc.optA.primary'),
+          secondary: isBangkok ? t('departure.bangkok.voice.optA.secondary') : t('departure.voice.esc.optA.secondary'),
+          phrases: isBangkok ? [
+            'Jeju Air 2503, taking manual control',
+            'taking manual control',
+            'Jeju Air 2503',
+            'Jeju Air Two Five Zero Three',
+            '제주항공 2503, 직접 조종 인계',
+            '제주항공 이오공삼 직접 조종 인계',
+            '제주항공 2503',
+            '직접 조종 인계'
+          ] : [
             'Jeju Air 1102, taking manual control',
             'taking manual control',
             'Jeju Air 1102',

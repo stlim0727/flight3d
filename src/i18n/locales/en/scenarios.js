@@ -171,4 +171,11 @@ export default {
   "departure.voice.esc.optA.secondary": "(Jeju Air 1102, taking manual control)",
   "departure.voice.esc.optB.primary": "Disengaging autopilot, manual control",
   "departure.voice.esc.optB.secondary": "(Disengaging autopilot, manual control)",
+  "departure.bangkok.name": "Jeju Air 2503 Bangkok departure",
+  "departure.bangkok.briefing": "Jeju Air 2503 (B738 RKSI→VTBS) full IFR departure: Incheon Delivery clearance via SEL1N, Ground pushback & taxi via N2/A to runway 34R, Tower takeoff clearance, and handoff to Departure with a climbing right turn heading 210.",
+  "departure.bangkok.complete": "Jeju Air 2503 departure procedures complete. Radar contact established.",
+  "departure.bangkok.voice.optA.primary": "Jeju Air 2503, taking manual control",
+  "departure.bangkok.voice.optA.secondary": "(Jeju Air 2503, taking manual control)",
+  "departure.bangkok.voice.optB.primary": "Request taxi, Jeju Air 2503",
+  "departure.bangkok.voice.optB.secondary": "(Request taxi, Jeju Air 2503)",
 };

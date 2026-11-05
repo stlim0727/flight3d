@@ -20,8 +20,10 @@ test('levenshteinDistance calculates exact edit distances', () => {
 test('normalizePhrase strips punctuation, normalizes spacing and converts numbers', () => {
   assert.equal(normalizePhrase('Jeju Air 1102, ready for pushback!'), 'jeju air one one zero two ready for pushback');
   assert.equal(normalizePhrase('Korean Air 123, ready for pushback!'), 'korean air one two three ready for pushback');
+  assert.equal(normalizePhrase('Jeju Air 2503, runway 34R, squawk 5102'), 'jeju air two five zero three runway thirty four right squawk five one zero two');
   assert.equal(normalizePhrase('Runway 33L, cleared for takeoff.'), 'runway thirty three left cleared for takeoff');
   assert.equal(normalizePhrase('푸시백 완료!  1102번.', 'ko'), '푸시백 완료 일일공이번');
+  assert.equal(normalizePhrase('제주항공 2503, 활주로 34R.', 'ko'), '제주항공 이오공삼 활주로 삼십사 라이트');
 });
 
 test('stringSimilarity returns 1.0 for exact matches and degrades gracefully with errors', () => {

@@ -10,6 +10,7 @@ export function demoProfiles(aircraftId = 'B738', airport = 'coastal') {
       ] : [];
   if (aircraftId === 'B738' && airport === 'incheon') return [
     { id: 'incheon-departure', labelKey: 'departure.name', briefingKey: 'departure.briefing' },
+    { id: 'jeju-bangkok-2503', labelKey: 'departure.bangkok.name', briefingKey: 'departure.bangkok.briefing' },
     sihwa,
   ];
   if (aircraftId === 'C172') {

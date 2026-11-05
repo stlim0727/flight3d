@@ -7,18 +7,20 @@ const readingSeconds = text => Math.max(3, text.split(/\s+/).length / 2.5);
  * Pause follows simulation time; a voiced block also waits for actual audio end.
  */
 export class DepartureAtc {
-  constructor(stage, playVoice = () => {}) {
-    const plan = DEPARTURE_ATC[stage] ?? {};
+  constructor(stage, playVoice = () => {}, atcConfig = DEPARTURE_ATC, radioConfig = DEPARTURE_RADIO) {
+    const plan = atcConfig[stage] ?? {};
     this.blocks = [];
-    if (plan.waitForTug) this.blocks.push({ waitForTug: true, seconds: 0,
-      lines: [['crew', 'Pushback complete. Set parking brake. Stand by for equipment clearance.']] });
+    if (plan.waitForTug) {
+      const waitLines = plan.waitForTugLines ?? [['crew', 'Pushback complete. Set parking brake. Stand by for equipment clearance.']];
+      this.blocks.push({ waitForTug: true, seconds: 0, lines: waitLines });
+    }
     const append = lines => {
       for (const line of lines ?? []) this.blocks.push({ lines: [line], seconds: readingSeconds(line[1]) });
     };
     append(plan.before);
-    if (DEPARTURE_RADIO[stage]) this.blocks.push({ lines: DEPARTURE_RADIO[stage],
+    if (radioConfig && radioConfig[stage]) this.blocks.push({ lines: radioConfig[stage],
       voice: stage,
-      seconds: DEPARTURE_RADIO[stage].reduce((sum, line) => sum + readingSeconds(line[1]), 0) });
+      seconds: radioConfig[stage].reduce((sum, line) => sum + readingSeconds(line[1]), 0) });
     append(plan.after);
     this.index = 0; this.elapsed = 0; this.playVoice = playVoice;
     this.activate();

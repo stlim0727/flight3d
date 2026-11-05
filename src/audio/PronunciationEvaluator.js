@@ -5,17 +5,21 @@
  */
 
 const NUMBER_WORDS_EN = {
+  '2503': 'two five zero three', '5102': 'five one zero two', '1102': 'one one zero two', '123': 'one two three',
+  '190': 'one nine zero', '290': 'two nine zero', '210': 'two one zero',
+  '33l': 'thirty three left', '33': 'thirty three', '34r': 'thirty four right', '34': 'thirty four',
+  '737': 'seven three seven', '738': 'seven three eight',
   '0': 'zero', '1': 'one', '2': 'two', '3': 'three', '4': 'four',
-  '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine',
-  '123': 'one two three', '1102': 'one one zero two', '33': 'thirty three', '33l': 'thirty three left',
-  '737': 'seven three seven', '738': 'seven three eight'
+  '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine'
 };
 
 const NUMBER_WORDS_KO = {
+  '2503': '이오공삼', '5102': '오일공이', '1102': '일일공이', '123': '일이삼',
+  '190': '일구공', '290': '이구공', '210': '이일공',
+  '33l': '삼십삼 레프트', '33': '삼십삼', '34r': '삼십사 라이트', '34': '삼십사',
+  '737': '칠삼칠', '738': '칠삼팔',
   '0': '영', '1': '일', '2': '이', '3': '삼', '4': '사',
-  '5': '오', '6': '육', '7': '칠', '8': '팔', '9': '구',
-  '123': '일이삼', '1102': '일일공이', '33': '삼십삼', '33l': '삼십삼 레프트',
-  '737': '칠삼칠', '738': '칠삼팔'
+  '5': '오', '6': '육', '7': '칠', '8': '팔', '9': '구'
 };
 
 /** Compute Levenshtein distance between two strings */

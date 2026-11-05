@@ -171,4 +171,11 @@ export default {
   "departure.voice.esc.optA.secondary": "(제주항공 1102, 직접 조종 인계)",
   "departure.voice.esc.optB.primary": "Disengaging autopilot, manual control",
   "departure.voice.esc.optB.secondary": "(오토파일럿 해제, 수동 조종 전환)",
+  "departure.bangkok.name": "제주항공 2503편 방콕행 출발",
+  "departure.bangkok.briefing": "제주항공 2503편(B738 RKSI→VTBS) 전 과정 IFR 관제 절차: 인천 딜리버리 SEL1N 비행 허가, 지상관제 푸시백 및 N2/A 유도로 34R 활주로 택싱, 타워 이륙 허가, 출발관제 이관 및 헤딩 210도 우회전 상승 교신 데모.",
+  "departure.bangkok.complete": "제주항공 2503편 출발 절차 완료. 방콕행 순항 항로 진입.",
+  "departure.bangkok.voice.optA.primary": "제주항공 2503, 직접 조종 인계",
+  "departure.bangkok.voice.optA.secondary": "(Jeju Air 2503, taking manual control)",
+  "departure.bangkok.voice.optB.primary": "지상 이동 요청, 제주항공 2503",
+  "departure.bangkok.voice.optB.secondary": "(Request taxi, Jeju Air 2503)",
 };
