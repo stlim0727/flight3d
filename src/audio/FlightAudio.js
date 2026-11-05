@@ -611,8 +611,9 @@ export class FlightAudio {
     if (this.rumbleGain && this.rumbleFilter) {
       const gndSpeed = state.groundSpeedKnots !== undefined ? state.groundSpeedKnots : (state.onGround ? (state.iasKnots || 0) : 0);
       if (state.onGround && gndSpeed > 3) {
-        const rumbleVol = Math.min(0.60, (gndSpeed / 110.0) * 0.55);
-        const rumbleCutoff = 180 + Math.min(260, gndSpeed * 1.8);
+        const roughness = state.groundRoughness || 0; // soft-ground engagement 0..1
+        const rumbleVol = Math.min(0.60, (gndSpeed / 110.0) * 0.55 * (1 + 0.5 * roughness));
+        const rumbleCutoff = 180 + Math.min(260, gndSpeed * 1.8 + roughness * 200);
         this.rumbleGain.gain.setTargetAtTime(rumbleVol, now, 0.08);
         this.rumbleFilter.frequency.setTargetAtTime(rumbleCutoff, now, 0.08);
       } else {

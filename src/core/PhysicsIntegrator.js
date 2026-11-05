@@ -106,7 +106,8 @@ class PhysicsIntegratorMethods {
       (x, z) => this.currentTerrain.getHeight(x, z),
       (x, z) => (this.currentTerrain.getNormal ? this.currentTerrain.getNormal(x, z) : null),
       (x, z) => (this.currentAirport?.isOnRunway ? this.currentAirport.isOnRunway(x, z) : true),
-      this.aero.cg, true
+      this.aero.cg, true,
+      (x, z) => (this.currentAirport?.isRunwaySafetyArea ? this.currentAirport.isRunwaySafetyArea(x, z) : true)
     );
     // Preserve this substep's contact kinematics for local mission judging.
     // This stays on the trusted host; it is never a pilot observation.
@@ -133,6 +134,27 @@ class PhysicsIntegratorMethods {
       this.showToast(() => t('notice.bodyDamage', {
         part: t(`body.part.${event.id}`), state: t(`body.state.${event.state}`),
       }));
+    }
+    // Excursion announcement and soft-ground dust: presentation derived from the
+    // engagement state; never feeds back into forces or control authority.
+    const groundRoughness = gearResult.groundRoughness || 0;
+    if (groundRoughness > 0.5 && !this.excursionAnnounced) {
+      this.excursionAnnounced = true;
+      this.showToast(() => t('notice.excursion'));
+    } else if (groundRoughness < 0.2) {
+      this.excursionAnnounced = false;
+    }
+    if (groundRoughness > 0.3 && groundSpeed > 5 && gearResult.bodyContacts.length > 0
+      && this.tireSmokeSystem) {
+      this.slideEmitClock = (this.slideEmitClock || 0) + dt;
+      if (this.slideEmitClock >= 0.1) {
+        this.slideEmitClock = 0;
+        for (const contact of gearResult.bodyContacts.slice(0, 3)) {
+          this.tireSmokeSystem.emitSmokeBurst(contact.worldPos, this.linearVelocity, groundSpeed, 2);
+        }
+      }
+    } else {
+      this.slideEmitClock = 0;
     }
     const resting = gearResult.onGround && this.linearVelocity.length() < 0.5 && this.angularVelocity.length() < 0.02;
     this.landingRestTime = resting ? this.landingRestTime + dt : 0;
@@ -300,6 +322,7 @@ class PhysicsIntegratorMethods {
       gearDamage: gearResult.gearDamage,
       bodyContacts: [...new Set(gearResult.bodyContacts.map(c => c.id))],
       structuralDamage: gearResult.structuralDamage,
+      groundRoughness: gearResult.groundRoughness || 0,
       bodyDamage: gearResult.bodyDamage,
       flapDegree: this.aero.currentFlapAngle,
       flapIndex: this.aero.flapsIndex,
@@ -410,7 +433,7 @@ class PhysicsIntegratorMethods {
     constrainBodyContact(this.position, this.quaternion, this.linearVelocity, this.angularVelocity,
       this.aero.mass, { x: this.aero.invIyy, y: this.aero.invIzz, z: this.aero.invIxx },
       (x, z) => this.currentTerrain.getHeight(x, z),
-      (x, z) => this.currentTerrain.getNormal?.(x, z), this.gear.bodySupportPoints, this.aero.cg);
+      (x, z) => this.currentTerrain.getNormal?.(x, z), this.gear.supportedBodyPoints, this.aero.cg);
   }
 
   triggerCrash(crashResult, impactVelocity = this.linearVelocity) {

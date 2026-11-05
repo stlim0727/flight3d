@@ -24,6 +24,7 @@ export default {
   "left.main.gear": "Left main gear",
   "right.main.gear": "Right main gear",
   "notice.gearDamage": "{value1} {value2} — reduced support and steering",
+  "notice.excursion": "Runway excursion — soft ground drag, reducing speed",
   "notice.engineFailure": "ENG {which} failed — windmilling, asymmetric thrust (K)",
   "notice.enginesBothFailed": "Both engines flamed out — windmilling (K)",
   "notice.enginesRecovered": "Engines restarted — thrust restored",
