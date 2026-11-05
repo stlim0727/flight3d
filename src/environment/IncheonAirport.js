@@ -18,7 +18,7 @@ import { terrainGeometry, placeBuilding } from '../previews/incheonGeometry.js';
 import { createCityGround, createBuildingMaterials, createTexturedBuildings, createPlantingInstances } from '../previews/incheonCityAssets.js';
 
 export const INCHEON_APRON_LAMPS = [
-  { x: 58, z: -188, target: [90, -202] },
+  { x: 60, z: -215, target: [90, -202] },
   { x: 72, z: -237, target: [88, -202] },
   { x: 92, z: -242, target: [92, -202] },
   { x: 108, z: -258, target: [145, -245] },
