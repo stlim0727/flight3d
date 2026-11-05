@@ -3,6 +3,7 @@ import { F16LuklaScenario } from './scenarios/F16LuklaScenario.js';
 import { F16CanyonSlalomScenario } from './scenarios/F16CanyonSlalomScenario.js';
 import { F16CanyonChaseScenario } from './scenarios/F16CanyonChaseScenario.js';
 import { IncheonDepartureScenario } from './scenarios/IncheonDepartureScenario.js';
+import { JejuBangkokDepartureScenario } from './scenarios/JejuBangkokDepartureScenario.js';
 import { IncheonCessnaScenario } from './scenarios/IncheonCessnaScenario.js';
 import { t, bindText } from '../i18n/index.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
@@ -56,6 +57,7 @@ export class DemoFlightDirector {
     this.coastalScenario = new CoastalDemoScenario(this, simulator);
     this.incheonCessnaScenario = new IncheonCessnaScenario(this, simulator);
     this.incheonDepartureScenario = new IncheonDepartureScenario(this, simulator);
+    this.jejuBangkokScenario = new JejuBangkokDepartureScenario(this, simulator);
     this.f16Scenario = new F16LuklaScenario(this, simulator);
     this.f16CanyonScenario = new F16CanyonChaseScenario(this, simulator);
     this.f16SlalomScenario = new F16CanyonSlalomScenario(this, simulator);
@@ -101,7 +103,9 @@ export class DemoFlightDirector {
       return this.profile === 'canyon-slalom' ? this.f16SlalomScenario
         : this.profile === 'canyon-chase' ? this.f16CanyonScenario : this.f16Scenario;
     }
-    if (this.activeDemoAirport === 'incheon' && this.activeDemoAircraft === 'B738') return this.incheonDepartureScenario;
+    if (this.activeDemoAirport === 'incheon' && this.activeDemoAircraft === 'B738') {
+      return this.profile === 'jeju-bangkok-2503' ? this.jejuBangkokScenario : this.incheonDepartureScenario;
+    }
     if (this.activeDemoAircraft === 'C172') {
       if (this.activeDemoAirport === 'incheon') return this.incheonCessnaScenario;
       return this.profile === 'proximity' ? this.cessnaProximityScenario : this.cessnaScenario;
@@ -121,7 +125,7 @@ export class DemoFlightDirector {
 
     if (this.skipBtn) {
       this.skipBtn.addEventListener('click', () => {
-        this.stop(() => t('manual.control.engaged'));
+        this.requestManualControl();
       });
     }
 
@@ -191,7 +195,7 @@ export class DemoFlightDirector {
         }
 
         if (e.key === 'Escape' && this.isActive) {
-          this.stop(() => t('manual.control.engaged'));
+          this.requestManualControl();
           e.preventDefault?.();
         } else if ((e.key === 'p' || e.key === 'P') && !e.target?.matches?.('input, textarea')) {
           this.requestRestart();
@@ -229,6 +233,63 @@ export class DemoFlightDirector {
       this.restartDialogEl.classList.remove('visible');
     }
     if (this.sim?.syncAudioPause) this.sim.syncAudioPause();
+  }
+
+  requestManualControl() {
+    const scenario = this.getActiveScenario();
+    if (this.isActive && (scenario === this.incheonDepartureScenario || scenario === this.jejuBangkokScenario) && this.sim?.voiceChallengeOverlay) {
+      const isBangkok = scenario === this.jejuBangkokScenario;
+      const options = [
+        {
+          id: 'a',
+          tag: 'A',
+          primary: isBangkok ? t('departure.bangkok.voice.optA.primary') : t('departure.voice.esc.optA.primary'),
+          secondary: isBangkok ? t('departure.bangkok.voice.optA.secondary') : t('departure.voice.esc.optA.secondary'),
+          phrases: isBangkok ? [
+            'Jeju Air 2503, taking manual control',
+            'taking manual control',
+            'Jeju Air 2503',
+            'Jeju Air Two Five Zero Three',
+            '제주항공 2503, 직접 조종 인계',
+            '제주항공 이오공삼 직접 조종 인계',
+            '제주항공 2503',
+            '직접 조종 인계'
+          ] : [
+            'Jeju Air 1102, taking manual control',
+            'taking manual control',
+            'Jeju Air 1102',
+            '제주항공 1102, 직접 조종 인계',
+            '제주항공 일일공이 직접 조종 인계',
+            '제주항공 1102',
+            '직접 조종 인계'
+          ]
+        },
+        {
+          id: 'b',
+          tag: 'B',
+          primary: t('departure.voice.esc.optB.primary'),
+          secondary: t('departure.voice.esc.optB.secondary'),
+          phrases: [
+            'Disengaging autopilot, manual control',
+            'autopilot disconnect',
+            'manual control',
+            '오토파일럿 해제, 수동 조종 전환',
+            '오토파일럿 해제',
+            '수동 조종 전환'
+          ]
+        }
+      ];
+
+      this.sim.voiceChallengeOverlay.show({
+        options,
+        onPass: () => {
+          this.stop(() => t('manual.control.engaged'));
+        }
+      });
+      return;
+    }
+
+    this.stop(() => t('manual.control.engaged'));
   }
 
   closeBanner() {
@@ -372,6 +433,7 @@ export class DemoFlightDirector {
   stop(message = null, keepParkingBrake = false, { preserveThrottle = false } = {}) {
     this.closeRestartConfirm?.();
     if (!this.isActive) return;
+    this.sim?.voiceChallengeOverlay?.hide();
     const retainSpeedBrakes=this.getActiveScenario()===this.sihwaTourScenario;
     this.getActiveScenario().stop?.();
     if (this.activeDemoAircraft === 'B738' && this.activeDemoAirport === 'lukla' &&
@@ -428,7 +490,7 @@ export class DemoFlightDirector {
         this.sim.controls.brakes = 0.0;
       }
     }
-    if (this.sim.gear) {
+    if (this.sim.gear?.setBrakes) {
       this.sim.gear.setBrakes(holdBrakes ? 1.0 : 0.0);
     }
     if (this.sim.aero && !retainSpeedBrakes) {

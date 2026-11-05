@@ -33,7 +33,7 @@ try {
     const clips = [];
     for (const [index, group] of groups.entries()) {
       const speakers = [...new Set(group.map(([speaker]) => speaker))];
-      const spoken = group.map(([speaker, text]) => `${speaker}: ${text.replaceAll('123', 'one two three').replaceAll('33L', 'three three left')}`).join('\n');
+      const spoken = group.map(([speaker, text]) => `${speaker}: ${text.replaceAll('1102', 'one one zero two').replaceAll('123', 'one two three').replaceAll('33L', 'three three left')}`).join('\n');
       const prompt = `Read this scripted English aviation radio exchange exactly, with no introduction or additional dialogue. Calm professional voices, natural conversational intonation, brisk but clearly intelligible. Pilot is an airline pilot, crew is a ground crew member, other roles are air traffic controllers. Brief pauses between turns. No music, radio noise or sound effects.\n${spoken}`;
       const speechConfig = speakers.length === 1
         ? { voiceConfig: { prebuiltVoiceConfig: { voiceName: voices[speakers[0]] } } }
@@ -49,7 +49,7 @@ try {
         if (stage === 'clearance') {
           audition = await fs.readFile(path.join(auditionDir, 'manifest.json'), 'utf8').then(JSON.parse).catch(() => null);
         }
-        const expected = group.map(([speaker, text]) => ({ speaker, voice: voices[speaker], text: text.replaceAll('123', 'one two three').replaceAll('33L', 'three three left') }));
+        const expected = group.map(([speaker, text]) => ({ speaker, voice: voices[speaker], text: text.replaceAll('1102', 'one one zero two').replaceAll('123', 'one two three').replaceAll('33L', 'three three left') }));
         if (audition?.model === model && JSON.stringify(audition.samples) === JSON.stringify(expected)) {
           execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', path.join(auditionDir, 'tower-clean.wav'), '-i', path.join(auditionDir, 'pilot-clean.wav'), '-filter_complex', '[0:a]apad=pad_dur=0.22[a];[a][1:a]concat=n=2:v=0:a=1[out]', '-map', '[out]', '-ar', '24000', '-ac', '1', '-c:a', 'pcm_s16le', clean]);
         } else {

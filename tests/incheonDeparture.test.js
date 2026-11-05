@@ -172,3 +172,40 @@ test('taxi and runway entry wait for instructions and readbacks even without aud
   }
   assert.equal(moves,2);
 });
+
+test('disconnect triggers voice challenge overlay when present and transitions to manual taxi upon passing', () => {
+  const {sim,director,scenario,inputs}=fixture();
+  let challengeShown = false;
+  let passedOptions = null;
+  let stoppedMessage = null;
+
+  sim.voiceChallengeOverlay = {
+    show({ options, onPass }) {
+      challengeShown = true;
+      passedOptions = options;
+      // Simulate user passing challenge with option A
+      onPass({ option: options[0], score: 0.95 });
+    },
+    hide() {}
+  };
+
+  director.stop = (msg) => {
+    stoppedMessage = typeof msg === 'function' ? msg() : msg;
+    scenario.stop();
+  };
+
+  director.setStage(S.DISCONNECT);
+  scenario.tug.userData.animation.distance = 26;
+  scenario.tug.userData.animation.speed = 0;
+  scenario.tug.userData.animation.clear = true;
+  for (let i = 0; i < 50 && !challengeShown; i++) {
+    finishAtc(scenario);
+    scenario.update(0.1);
+  }
+
+  assert.equal(challengeShown, true, 'voice challenge overlay was shown');
+  assert.equal(passedOptions.length, 2, 'presents options A and B');
+  assert.equal(passedOptions[0].id, 'a');
+  assert.equal(passedOptions[1].id, 'b');
+  assert.ok(stoppedMessage, 'scenario stopped to hand off to manual taxi');
+});

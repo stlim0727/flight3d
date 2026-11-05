@@ -37,6 +37,7 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       this.result = { status: 'running', airborne: false, stages: [], radio: [], taxiPoints: 0 };
       this.index = 0;
       this.settleTime = 0;
+      this.voiceChallengeInitiated = false;
       this.force = new THREE.Vector3(); this.moment = new THREE.Vector3();
       this.tug = createDepartureTug(); sim.scene.add(this.tug);
       updateDepartureTug(this.tug, sim, 0, false, 0);
@@ -68,6 +69,7 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
     this.removeTug();
     this.atc = null;
     this.sim.audio?.departureRadio.stop();
+    this.sim.voiceChallengeOverlay?.hide();
     this.sim.currentAirport?.departureBridge?.setExtension(0);
     if (this.result.status === 'running') this.result.status = 'cancelled';
   }
@@ -171,8 +173,52 @@ export class IncheonDepartureScenario extends CessnaDemoScenario {
       const stopped = Math.hypot(sim.position.x-pushbackEnd.x,sim.position.z-pushbackEnd.z)<.7 && sim.linearVelocity.length()<.3 && aligned;
       this.settleTime = stopped ? this.settleTime + dt : 0;
       if (this.settleTime > 1 && !radioBusy) d.setStage(STAGES.DISCONNECT);
-    } else if (stage === STAGES.DISCONNECT && this.tug?.userData.animation.clear && !radioBusy) d.setStage(STAGES.TAXI);
-    else if (stage === STAGES.TAXI) {
+    } else if (stage === STAGES.DISCONNECT && this.tug?.userData.animation.clear && !radioBusy) {
+      if (sim.voiceChallengeOverlay && !this.voiceChallengeInitiated) {
+        this.voiceChallengeInitiated = true;
+        const options = [
+          {
+            id: 'a',
+            tag: 'A',
+            primary: t('departure.voice.pushback.optA.primary'),
+            secondary: t('departure.voice.pushback.optA.secondary'),
+            phrases: [
+              'Brakes set, ready to taxi',
+              'ready to taxi',
+              'brakes set',
+              '브레이크 설정 완료, 지상 주행 준비',
+              '브레이크 설정 완료'
+            ]
+          },
+          {
+            id: 'b',
+            tag: 'B',
+            primary: t('departure.voice.pushback.optB.primary'),
+            secondary: t('departure.voice.pushback.optB.secondary'),
+            phrases: [
+              'Jeju Air 1102, taking manual control',
+              'taking manual control',
+              'Jeju Air 1102',
+              '제주항공 1102, 직접 조종 인계',
+              '제주항공 1102',
+              '직접 조종 인계'
+            ]
+          }
+        ];
+
+        sim.voiceChallengeOverlay.show({
+          options,
+          onPass: () => {
+            d.stop(() => t('departure.manual.taxi.engaged'), false, { preserveThrottle: false });
+            sim.controls?.setParkingBrake?.(false);
+            sim.controls?.setVirtualInput?.('brakes', 0);
+            sim.controls?.setVirtualInput?.('throttle', 0);
+          }
+        });
+      } else if (!sim.voiceChallengeOverlay) {
+        d.setStage(STAGES.TAXI);
+      }
+    } else if (stage === STAGES.TAXI) {
       if (!radioBusy && this.taxi(DEPARTURE_TAXI_ROUTE, true)) d.setStage(STAGES.HOLD);
       this.result.taxiPoints = this.index;
     } else if (stage === STAGES.HOLD && d.stageTimer > 8 && !radioBusy) d.setStage(STAGES.LINEUP);

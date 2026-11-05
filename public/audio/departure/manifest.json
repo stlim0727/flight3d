@@ -8,12 +8,12 @@
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Incheon Apron, Korean Air 123, ready for pushback."
+        "text": "Incheon Apron, Jeju Air 1102, ready for pushback."
       },
       {
         "speaker": "apron",
         "voice": "Kore",
-        "text": "Korean Air 123, pushback approved."
+        "text": "Jeju Air 1102, pushback approved."
       },
       {
         "speaker": "crew",
@@ -72,7 +72,7 @@
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Ground, Korean Air 123, ready to taxi."
+        "text": "Ground, Jeju Air 1102, ready to taxi."
       },
       {
         "speaker": "ground",
@@ -82,7 +82,7 @@
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Taxi to 33L, hold short, Korean Air 123."
+        "text": "Taxi to 33L, hold short, Jeju Air 1102."
       }
     ]
   },
@@ -95,7 +95,7 @@
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Incheon Tower, Korean Air 123, holding short runway 33L, ready for departure."
+        "text": "Incheon Tower, Jeju Air 1102, holding short runway 33L, ready for departure."
       },
       {
         "speaker": "tower",
@@ -105,7 +105,7 @@
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Holding short, Korean Air 123."
+        "text": "Holding short, Jeju Air 1102."
       }
     ]
   },
@@ -118,12 +118,12 @@
       {
         "speaker": "tower",
         "voice": "Kore",
-        "text": "Korean Air 123, runway 33L, line up and wait."
+        "text": "Jeju Air 1102, runway 33L, line up and wait."
       },
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Runway 33L, line up and wait, Korean Air 123."
+        "text": "Runway 33L, line up and wait, Jeju Air 1102."
       }
     ]
   },
@@ -136,12 +136,12 @@
       {
         "speaker": "tower",
         "voice": "Kore",
-        "text": "Korean Air 123, runway 33L, cleared for takeoff."
+        "text": "Jeju Air 1102, runway 33L, cleared for takeoff."
       },
       {
         "speaker": "pilot",
         "voice": "Charon",
-        "text": "Runway 33L, cleared for takeoff, Korean Air 123."
+        "text": "Runway 33L, cleared for takeoff, Jeju Air 1102."
       }
     ]
   },

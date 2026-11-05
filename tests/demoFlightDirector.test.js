@@ -551,3 +551,29 @@ for (const airport of ['coastal', 'lukla']) {
     director.stop();
   });
 }
+
+it('routes Incheon manual control requests through voice challenge overlay when available', () => {
+  const sim = createMockSimulator('incheon');
+  sim.currentAircraftId = 'B738';
+  sim.quaternion = new THREE.Quaternion();
+  sim.gear = { cgGroundHeightM: 3.5, onGround: true };
+  sim.aero = { setFlapPosition() {} };
+  sim.aircraft = { group: new THREE.Group() };
+  sim.scene = new THREE.Scene();
+  sim.setPreset = () => {};
+  let challengeTriggered = false;
+  sim.voiceChallengeOverlay = {
+    show({ options, onPass }) {
+      challengeTriggered = true;
+      assert.equal(options.length, 2);
+      onPass({ option: options[0], score: 0.9 });
+    },
+    hide() {}
+  };
+  const director = new DemoFlightDirector(sim);
+  director.start('incheon');
+  assert.equal(director.isActive, true);
+  director.requestManualControl();
+  assert.equal(challengeTriggered, true, 'triggered voice challenge');
+  assert.equal(director.isActive, false, 'stopped after voice challenge passed');
+});

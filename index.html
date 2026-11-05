@@ -126,6 +126,53 @@
       </div>
     </div>
 
+    <!-- Voice ATC Challenge Subtitle Overlay for Pushback Manual Takeover -->
+    <div id="voice-challenge-overlay" class="voice-challenge-overlay" style="display: none;" role="region" aria-label="ATC Voice Challenge">
+      <div class="voice-challenge-card">
+        <div class="voice-challenge-header">
+          <div class="voice-mic-badge">
+            <span class="voice-mic-icon">🎙️</span>
+            <span class="voice-mic-status" data-i18n="voice.mic.listening">음성 인식 중…</span>
+          </div>
+          <div class="voice-challenge-title" data-i18n="voice.challenge.title">수동 조종 인계 음성 교신</div>
+        </div>
+
+        <div class="voice-prompt-desc" data-i18n="voice.prompt.desc">
+          아래 교신 중 하나(A 또는 B)를 마이크로 발음하면 수동 직접 조종으로 전환됩니다:
+        </div>
+
+        <!-- Options A or B Subtitles -->
+        <div class="voice-options-container">
+          <div id="voice-opt-a" class="voice-option-card" role="button" tabindex="0">
+            <span class="voice-opt-tag">A</span>
+            <div class="voice-opt-content">
+              <span class="voice-opt-primary">Brakes set, ready to taxi</span>
+              <span class="voice-opt-secondary">(브레이크 설정 완료, 지상 주행 준비)</span>
+            </div>
+          </div>
+          <div id="voice-opt-b" class="voice-option-card" role="button" tabindex="0">
+            <span class="voice-opt-tag">B</span>
+            <div class="voice-opt-content">
+              <span class="voice-opt-primary">Jeju Air 1102, taking manual control</span>
+              <span class="voice-opt-secondary">(제주항공 1102, 직접 조종 인계)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-time Recognized Speech Subtitle -->
+        <div class="voice-recognized-banner">
+          <span class="voice-recognized-label" data-i18n="voice.recognized.label">인식된 발음:</span>
+          <span id="voice-recognized-text" class="voice-recognized-text" data-i18n="voice.waiting.speech">말씀해 주세요... (예: "Brakes set...")</span>
+          <span id="voice-match-score" class="voice-match-score"></span>
+        </div>
+
+        <div class="voice-challenge-actions">
+          <button id="btn-voice-retry" class="btn btn-voice-retry" type="button" data-i18n="voice.retry">마이크 재시도</button>
+          <button id="btn-voice-skip" class="btn btn-voice-skip" type="button" data-i18n="voice.skip">음성 건너뛰기 [Enter]</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Stall Warning Alert Banner -->
     <div id="hud-warning" class="flight-warning" role="alert" hidden></div>
     <div id="hud-stall" class="stall-banner" data-i18n="warning.stall">⚠️ STALL WARNING - PULL DOWN NOSE ⚠️</div>
