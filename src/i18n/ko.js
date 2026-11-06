@@ -7,7 +7,12 @@ import dev from "./locales/ko/dev.js";
 
 export default {
   "mp.showLink": "전체 초대 링크",
-  "mp.setupHelp": "방을 만들거나 코드를 입력하세요. 이 창이 열려 있는 동안 비행 조작은 멈춥니다.",
+  "mp.setupHelp": "직접 방을 만들거나 친구 방에 참가하세요. 이 창이 열려 있는 동안 내 기체는 멈춥니다.",
+  "mp.hostTitle": "방 만들기",
+  "mp.setupChoice": "방 만들기 또는 참가",
+  "mp.hostHelp": "두 사람이 함께 비행할 무대와 기종을 고른 뒤 친구를 초대하세요.",
+  "mp.joinTitle": "친구 방 참가",
+  "mp.joinHelp": "친구의 코드를 입력하세요. 무대와 기종은 방장의 선택을 따릅니다. 초대 링크를 열면 자동으로 참가합니다.",
   "mp.hostWaitingHelp": "코드를 공유하고 아래 버튼으로 대기 시간을 연장하세요. 이 창을 닫으면 방이 취소됩니다.",
   "mp.guestWaitingHelp": "방장이 시작할 때까지 기다려 주세요. 창을 닫으면 참가가 취소됩니다.",
 
@@ -27,9 +32,9 @@ export default {
   "mp.description": "두 사람이 함께 비행합니다. 방을 만들거나 친구의 코드로 참가하세요.",
   "mp.privacy": "신뢰하는 친구만 초대하세요. 상대에게 IP 주소가 보일 수 있습니다. 마이크는 선택이며 앱에서 녹음하지 않습니다.",
   "mp.name": "내 이름",
-  "mp.airport": "함께 비행할 지형 (방장)",
-  "mp.aircraft": "함께 탈 기종 (방장)",
-  "mp.scenario": "시작 위치 (방장)",
+  "mp.airport": "비행 무대",
+  "mp.aircraft": "기종",
+  "mp.scenario": "시작 위치",
   "mp.coastal": "해안 공항",
   "mp.incheon": "인천",
   "mp.neon": "네온 도시",

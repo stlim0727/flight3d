@@ -3,7 +3,8 @@
 1. Open **Fly together** in the main menu. Multiplayer setup and room controls
    use a modal dialog. Background simulator controls cannot be used while it is
    open, and your own aircraft is held.
-2. Enter your name, scenery, aircraft, and runway/cruise start, then choose
+2. Enter your name. Under **Host a flight**, choose the stage, aircraft, and
+   runway/cruise start, then choose
    **Create room · max 2**. Share the six-character code (for example `K7M 2QX`)
    or use **Copy invite** for a compact link ending in `?r=K7M2QX`.
 3. While waiting to start, the creator must press **Keep room open** before the
@@ -11,7 +12,8 @@
    press cancels the room; it cannot be revived by pressing late.
 4. Opening the shared invite link automatically joins your friend's room and
    opens its dialog; no typing, pasting, or Join button is needed. With a code,
-   enter it in **Fly together** and choose **Join friend**. Spaces, hyphens,
+   enter it under **Join a friend** and choose **Join friend**. The host's stage
+   and aircraft apply to both pilots. Spaces, hyphens,
    and lowercase letters are accepted. The creator chooses **Start together**;
    both dialogs close when the shared flight is ready. The waiting deadline no
    longer applies after starting preparation or during flight.

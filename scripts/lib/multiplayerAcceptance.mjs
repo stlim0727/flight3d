@@ -25,16 +25,19 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
     assert.equal(await c.evaluate('sim.controls.inputBlocked'), true);
   }
   async function capture(c, name) {
+    await c.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     const { data } = await c.send('Page.captureScreenshot', { format: 'png' });
     await writeFile(`review-artifacts/multiplayer/${name}.png`, Buffer.from(data, 'base64'));
   }
   async function create(airport = 'coastal', aircraft = 'C172', scenario = 'runway') {
     for (const c of [host, guest]) await open(c);
+    await host.evaluate('document.getElementById("mp-choose-host").click()');
     await host.evaluate(`document.getElementById('mp-airport').value=${JSON.stringify(airport)}; document.getElementById('mp-aircraft').value=${JSON.stringify(aircraft)}; document.getElementById('mp-scenario').value=${JSON.stringify(scenario)}; document.getElementById('mp-name').value='Lead'; document.getElementById('mp-create').click()`);
     await until(() => host.evaluate('sim.multiplayer.room?.registered'), 'creator registered');
     return host.evaluate('({code:sim.multiplayer.room.room,invite:document.getElementById("mp-invite").value})');
   }
   async function join(code) {
+    await guest.evaluate('document.getElementById("mp-choose-join").click()');
     await guest.evaluate(`document.getElementById('mp-room').value=${JSON.stringify(code)}; document.getElementById('mp-name').value='Wing'; document.getElementById('mp-join').click()`);
     for (const c of [host, guest]) await until(() => c.evaluate('sim.multiplayer.room?.session.state === "connected"'), 'two pilots connected');
   }
@@ -56,6 +59,15 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   }
 
   await open(host); await capture(host, 'modal-setup');
+  await host.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await capture(host, 'mobile-setup');
+  await host.evaluate('document.getElementById("mp-choose-join").click()');
+  await capture(host, 'mobile-join');
+  assert.equal(await host.evaluate('document.getElementById("mp-host-panel").hidden && !document.getElementById("mp-join-panel").hidden'), true, 'joining hides host-only stage and aircraft choices');
+  await host.evaluate('document.getElementById("mp-choose-host").click()');
+  const setupBounds = await host.evaluate('(() => { const d=document.getElementById("mp-dialog"),r=d.getBoundingClientRect(); return {left:r.left,right:r.right,w:innerWidth,scroll:d.scrollWidth,client:d.clientWidth}; })()');
+  assert.ok(setupBounds.left >= 0 && setupBounds.right <= setupBounds.w && setupBounds.scroll <= setupBounds.client + 2, 'host/join setup fits phone width');
+  await host.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   const invite = await create();
   assert.match(invite.code, /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
   const url = new URL(invite.invite); assert.equal(url.searchParams.get('r'), invite.code); assert.equal(url.searchParams.size, 1);

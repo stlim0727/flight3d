@@ -12,13 +12,14 @@ const Controller = new Function('t', 'bindText', 'parseRoom', `return (${source.
 test('invite URL joins automatically; missing or invalid invites never connect', () => {
   const joined = [];
   const controller = Object.assign(Object.create(Controller.prototype), {
-    roomInput: { value: '' }, openDialog() { this.opened = true; },
+    roomInput: { value: '' }, chooseSetup(mode) { this.mode = mode; }, openDialog() { this.opened = true; },
     connect(room) { joined.push(room); }, refresh() {},
   });
   controller.joinInvite(null);
   assert.equal(controller.opened, undefined);
   controller.joinInvite('k7m-2qx');
   assert.equal(controller.opened, true);
+  assert.equal(controller.mode, 'join');
   assert.deepEqual(joined, ['K7M2QX']);
   for (const invite of ['', 'invalid-room']) {
     controller.joinInvite(invite);

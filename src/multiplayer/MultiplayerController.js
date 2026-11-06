@@ -20,6 +20,8 @@ export class MultiplayerController {
     this.audio = document.getElementById('mp-audio');
     this.roomInput = document.getElementById('mp-room');
     this.preferences = bindMultiplayerPreferences();
+    document.getElementById('mp-choose-host').onclick = () => this.chooseSetup('host');
+    document.getElementById('mp-choose-join').onclick = () => this.chooseSetup('join');
     document.getElementById('mp-create').onclick = () => this.connect();
     document.getElementById('mp-join').onclick = () => {
       const room = parseRoom(this.roomInput.value);
@@ -59,11 +61,18 @@ export class MultiplayerController {
   }
   joinInvite(invite) {
     if (invite === null) return;
+    this.chooseSetup('join');
     this.roomInput.value = invite;
     this.openDialog();
     const room = parseRoom(invite);
     if (room) this.connect(room);
     else { this.message = 'invalid-room'; this.refresh(); }
+  }
+  chooseSetup(mode) {
+    for (const path of ['host', 'join']) {
+      document.getElementById(`mp-${path}-panel`).hidden = path !== mode;
+      document.getElementById(`mp-choose-${path}`).setAttribute('aria-pressed', String(path === mode));
+    }
   }
   get modalOpen() { return this.dialog.open; }
   openDialog() { this.releaseTalk(); this.modal.open(); this.refresh(); }

@@ -7,7 +7,12 @@ import dev from "./locales/en/dev.js";
 
 export default {
   "mp.showLink": "Full invite link",
-  "mp.setupHelp": "Create a room or enter a code. Flight controls are held while this dialog is open.",
+  "mp.setupHelp": "Host your own flight or join a friend. Your aircraft is held while this dialog is open.",
+  "mp.hostTitle": "Host a flight",
+  "mp.setupChoice": "Host or join",
+  "mp.hostHelp": "Choose the stage and aircraft for both pilots, then invite a friend.",
+  "mp.joinTitle": "Join a friend",
+  "mp.joinHelp": "Enter your friend's code. Their stage and aircraft apply to both pilots. Opening an invite link joins automatically.",
   "mp.hostWaitingHelp": "Share the code, then keep the room open using the button below. Closing cancels this room.",
   "mp.guestWaitingHelp": "Waiting for the creator to start. Closing cancels your participation.",
 
@@ -27,9 +32,9 @@ export default {
   "mp.description": "Two pilots share one flight. Create a room or join your friend with a code.",
   "mp.privacy": "Invite trusted friends: they may see your IP address. Microphone is optional; this app never records voice.",
   "mp.name": "Your name",
-  "mp.airport": "Shared scenery (host)",
-  "mp.aircraft": "Shared aircraft (host)",
-  "mp.scenario": "Starting position (host)",
+  "mp.airport": "Stage",
+  "mp.aircraft": "Aircraft",
+  "mp.scenario": "Starting position",
   "mp.coastal": "Coastal airport",
   "mp.incheon": "Incheon",
   "mp.neon": "Neon city",
