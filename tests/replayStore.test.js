@@ -252,3 +252,16 @@ test('stored payloads are padding-free base64url', () => {
   assert.match(raw, /^[A-Za-z0-9_-]+$/);
   assert.equal(decodeTrack(fromBase64(raw)).samples.length, 20);
 });
+
+test('a successful quota retry removes already purged payloads from the index', () => {
+  const storage = new QuotaStorage(100000);
+  const store = storeFor(storage);
+  const first = store.save(track()).entry;
+  const second = store.save(track()).entry;
+  // Enough for two payloads and their index, but not for a third payload-first write.
+  storage.capacity = storage.used() + 10;
+  const third = store.save(track()).entry;
+  assert.ok(third);
+  assert.ok(store.list().every(row => store.get(row.id)), 'every surviving index row must be playable');
+  assert.ok(!store.get(first.id) || !store.get(second.id));
+});

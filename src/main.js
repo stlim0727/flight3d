@@ -5,6 +5,7 @@ import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
 import { cockpitCasterState } from './aircraft/CockpitLighting.js';
 import { CockpitShadowDemo } from './director/CockpitShadowDemo.js';
+import { ReplayDirector } from './director/ReplayDirector.js';
 import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
 import { Atmosphere } from './physics/Atmosphere.js';
 import { AIRCRAFT_REGISTRY, BOEING_737_800 } from './config/aircraftConfigs.js';
@@ -278,6 +279,9 @@ class FlightSimulator {
     this.demoDirector = new DemoFlightDirector(this);
     this.voiceChallengeOverlay = new VoiceChallengeOverlay({ sim: this });
     this.shadowDemo = new CockpitShadowDemo(this, () => this.updateShadowDemoUi());
+    this.replayDirector = new ReplayDirector(this);
+    // First claim wins the frame, so the developer shadow rig keeps priority over a replay.
+    this.poseDrivers = [this.shadowDemo, this.replayDirector];
     this.developerMode = new DeveloperModeController(() => {
       this.devRunner?.stop(); this.renderDiagnosticsPanel?.close();
     });
@@ -579,6 +583,7 @@ class FlightSimulator {
   async fly() {
     if (this.multiplayer?.locked) return;
     if (this.airportLoading || this.startingFlight) return;
+    this.replayDirector.stop();
     const pending = {
       airport: this.lobby.airport,
       aircraft: this.lobby.aircraft ?? this.currentAircraftId,
@@ -647,6 +652,7 @@ class FlightSimulator {
     if (this.multiplayer?.locked) return;
     this.devRunner.stop();
     this.shadowDemo.stop();
+    this.replayDirector.stop();
     const wantsDemo = this.lobby.preset === 'demo';
     const wantsValley = this.lobby.preset === 'valley';
     if (this.demoDirector?.isActive || this.demoDirector?.waitingForTerrain) {
@@ -717,6 +723,7 @@ class FlightSimulator {
    * - In PAUSED: resumes flight.
    */
   toggleMainMenu() {
+    if (this.replayDirector.active) { this.replayPanel.exit(); return; }
     if (this.gameFlow.state === FLOW.DEBRIEF) return;
     if (this.gameFlow.state === FLOW.FLIGHT) {
       this.gameFlow.returnToLobby(true);
@@ -1127,15 +1134,17 @@ class FlightSimulator {
     const elapsed = this.clock.getDelta();
     if (this.browserBackgrounded) return;
     const frameDelta = this.startupReady ? clampFrameDelta(elapsed) : 0;
+    this.replayPanel?.refresh();
     this.totalSimTime += frameDelta;
     if (!this.gameFlow.isPhysicsFrozen()) this.devRunner.updatePreparation(frameDelta);
     this.devPanelTimer = (this.devPanelTimer || 0) + frameDelta;
     if (this.devPanelTimer >= .2) { this.developerPanel?.refresh(); this.devPanelTimer = 0; }
 
     // High-rate substepping for rock-solid flight physics
-    if (this.shadowDemo.active) {
+    const poseDriver = this.activePoseDriver();
+    if (poseDriver) {
       this.physicsAccumulator = 0;
-      if (!this.gameFlow.isPhysicsFrozen()) this.shadowDemo.update(frameDelta);
+      if (!this.gameFlow.isPhysicsFrozen()) poseDriver.update(frameDelta);
     } else if (this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
       this.physicsAccumulator = 0;
     } else {

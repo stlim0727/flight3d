@@ -329,6 +329,7 @@ test('menu holds a crashed flight until an explicit new start, without repeating
       this.lobby = { airport: 'coastal', aircraft: 'B738', preset: 'runway' };
       this.activeAirport = 'coastal';
       this.currentAircraftId = 'B738';
+      this.replayDirector = { active: false, stop() {} };
     }
     toggleMainMenu() {
       SimulatorClass.prototype.toggleMainMenu.call(this);
@@ -381,6 +382,7 @@ test('toggleMainMenu provides one-click symmetric toggle between in-play and men
       this.airportLoading = false;
       this.startingFlight = false;
       this.flownCount = 0;
+      this.replayDirector = { active: false, stop() {} };
     }
     toggleMainMenu() {
       SimulatorClass.prototype.toggleMainMenu.call(this);

@@ -27,7 +27,10 @@ export function replayLabel(track) {
  * oversized write cannot lose the whole library, and quota pressure evicts the oldest saves.
  */
 export class ReplayStore {
-  constructor(storage = globalThis.localStorage, { budget = REPLAY_BUDGET } = {}) {
+  constructor(storage, { budget = REPLAY_BUDGET } = {}) {
+    if (storage === undefined) {
+      try { storage = globalThis.localStorage; } catch { storage = null; }
+    }
     this.storage = storage ?? {
       getItem: () => null,
       removeItem: () => {},
@@ -125,6 +128,7 @@ export class ReplayStore {
     let parsed;
     try { parsed = JSON.parse(text); } catch (error) { return { entry: null, error: error.message }; }
     if (parsed?.kind !== EXPORT_KIND || typeof parsed.payload !== 'string') return { entry: null, error: 'notAReplay' };
+    if (parsed.payload.length > this.budget.entryBase64Bytes) return { entry: null, error: 'tooLong' };
     let track;
     try {
       track = decodeTrack(fromBase64(parsed.payload));
@@ -142,7 +146,7 @@ export class ReplayStore {
       this.pruneIndex(rows, purged);
       return false;
     }
-    let candidates = this.applyBudget([...rows, entry]);
+    let candidates = this.applyBudget([...rows.filter(row => !purged.includes(row.id)), entry]);
     for (let attempt = 0; attempt <= this.budget.entries; attempt++) {
       try {
         this.storage.setItem(INDEX_KEY, JSON.stringify(candidates.rows));

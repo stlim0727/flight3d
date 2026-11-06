@@ -169,3 +169,30 @@ test('the sample budget keeps an entry inside the localStorage budget and a long
   }
   assert.ok(maxTrackSeconds() > 35 * 60, 'the coarsest rung must outlast a realistic long sortie');
 });
+
+test('valid-length imports reject corrupt timing, metadata and nonfinite poses', () => {
+  const source = track(3);
+  const bytes = encodeTrack(source);
+  const badTime = bytes.slice();
+  new DataView(badTime.buffer).setFloat32(12, NaN);
+  assert.throws(() => decodeTrack(badTime), /timing is corrupt/);
+  const duplicateTimes = { ...source, samples: [source.samples[0], source.samples[0]] };
+  assert.throws(() => decodeTrack(encodeTrack(duplicateTimes)), /sample is corrupt/);
+  // Replace the encoded empty object with JSON null of the same byte length as "null".
+  const nullBytes = encodeTrack({ ...source, metadata: 'xx' });
+  nullBytes.set(new TextEncoder().encode('null'), HEADER_BYTES);
+  assert.throws(() => decodeTrack(nullBytes), /metadata is corrupt/);
+  const badPose = bytes.slice();
+  const firstRecord = HEADER_BYTES + new DataView(bytes.buffer).getUint16(16);
+  new DataView(badPose.buffer).setFloat32(firstRecord + 4, NaN);
+  assert.throws(() => decodeTrack(badPose), /sample is corrupt/);
+});
+
+test('selected cruise altitude covers the airliner range without saturation', () => {
+  for (const altitude of [6000, 13000, 35000, 41000]) {
+    const source = track(2);
+    source.samples[0].selectedAltitude = altitude;
+    const decoded = decodeTrack(encodeTrack(source));
+    assert.ok(Math.abs(decoded.samples[0].selectedAltitude - altitude) <= 4);
+  }
+});

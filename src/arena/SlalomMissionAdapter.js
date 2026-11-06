@@ -26,7 +26,7 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     const resolvedMissionId = 'valley-slalom-v1';
     const sim = this.sim;
     sim.demoDirector?.stop(); sim.devRunner?.stop({ pilotPreparation: true });
-    sim.shadowDemo?.stop(); sim.hangang?.stop();
+    sim.shadowDemo?.stop(); sim.replayDirector?.stop(); sim.hangang?.stop();
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
 
     if (typeof sim.clearCrashState === 'function') {
@@ -163,6 +163,11 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     this.visualizer = new ValleyWaypointsVisualizer(sim, this.manifest.course);
     sim.valleyVisualizer = this.visualizer;
 
+    if (sim.replayRecorder?.active) {
+      // Preparation is asynchronous; capture the actual course seed before its first tick.
+      sim.replayRecorder.start({ ...sim.replayRecorder.metadata, airport: 'valley',
+        aircraft: 'F16', scenario: 'valley', seed });
+    }
     return { manifest: this.manifest, initialSnapshot: this.snapshot(0) };
   }
 

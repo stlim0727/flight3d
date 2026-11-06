@@ -5,6 +5,7 @@ import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality, renderPixelRa
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { updateControlState, touchLabel } from './FlightPanels.js';
 import { FLOW } from './GameFlowController.js';
+import { ReplayPanel } from './ReplayPanel.js';
 import { DebriefOverlay } from './DebriefOverlay.js';
 import { initLobbyScreen } from './LobbyScreen.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
@@ -532,11 +533,15 @@ class SimulatorHudAndBindingsMethods {
       onResume: () => this.resumeFlight(),
     });
     this.renderDiagnosticsPanel = new RenderDiagnosticsPanel(this);
+    this.replayPanel = new ReplayPanel(this);
+    this.replayDirector.onChange = () => this.replayPanel.refresh();
+    document.getElementById('btn-replays')?.addEventListener('click', () => this.replayPanel.openLibrary());
     this.debriefOverlay = new DebriefOverlay({
       onRetry: () => this.retryDebrief(),
       onLobby: () => { this.demoDirector.stop(); this.gameFlow.returnToLobby(false); document.getElementById('btn-fly')?.focus(); },
       onFeedback: () => this.openFeedbackDialog?.(),
       onSaveReplay: () => this.saveDebriefReplay(),
+      onWatchReplay: () => this.replayPanel.watch(this.debriefReplay),
     });
     document.getElementById('btn-pause-end')?.addEventListener('click', () => this.endFlight());
     document.getElementById('btn-lobby-end')?.addEventListener('click', () => this.endFlight());
@@ -569,6 +574,7 @@ class SimulatorHudAndBindingsMethods {
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
       if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
+      if (this.replayDirector.active) { this.replayPanel.exit(); return; }
       if (this.isCrashed) return;
       if (document.getElementById('hud-overlay')?.classList.contains('panel-open')) return;
       const helpModal = document.getElementById('help-modal');

@@ -16,10 +16,18 @@ import { trackFlightCrash } from '../analytics/posthog.js';
 
 class PhysicsIntegratorMethods {
   /**
+   * Whoever claims this frame owns the aircraft pose, so the loop asks one question instead of
+   * testing each feature flag. Registry order decides priority.
+   */
+  activePoseDriver() {
+    return this.poseDrivers?.find(driver => driver?.active) ?? null;
+  }
+
+  /**
    * Physics Integration Substep (120 Hz)
    */
   integratePhysics(dt) {
-    if (this.shadowDemo?.active) return;
+    if (this.activePoseDriver()) return;
     // Gear/contact queries consume this mesh too. Restore the authoritative
     // transform before physics so a rendered interpolation never feeds back.
     this.aircraft.group.position.copy(this.position);
@@ -519,7 +527,7 @@ class PhysicsIntegratorMethods {
     if (this.gameFlow.state === FLOW.DEBRIEF) return this.telemetry;
     if (this.devRunner.active && this.gameFlow.isPhysicsFrozen()) return this.telemetry;
     this.devRunner.updatePreparation(0);
-    if (this.shadowDemo.active) this.shadowDemo.update(simSeconds);
+    this.activePoseDriver()?.update(simSeconds);
     const numSubsteps = Math.max(1, Math.round(simSeconds * this.physicsHz));
     for (let i = 0; i < numSubsteps; i++) {
       if (this.devRunner.blocksPhysics || this.gameFlow.state === FLOW.DEBRIEF) break;

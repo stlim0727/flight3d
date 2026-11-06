@@ -22,7 +22,7 @@ const SCALARS = Object.freeze([
 ]);
 const ENGINE_FIELDS = Object.freeze([['n1', 2], ['n2', 2], ['egt', 0.25], ['ff', 0.1]]);
 const SELECTED_FIELDS = Object.freeze([['selectedHeading', 67, 'u16', 100],
-  ['selectedAltitude', 69, 'u16', 8], ['selectedSpeed', 71, 'u16', 10]]);
+  ['selectedAltitude', 69, 'u16', 0.125], ['selectedSpeed', 71, 'u16', 10]]);
 const COMPRESSION_LEGS = Object.freeze(['nose', 'mainLeft', 'mainRight']);
 
 const encoder = new TextEncoder();
@@ -225,12 +225,25 @@ export function decodeTrack(bytes) {
   } catch {
     throw new Error('replay track metadata is corrupt');
   }
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    throw new Error('replay track metadata is corrupt');
+  }
+  const intervalSec = view.getUint16(6) / 1000;
+  const durationSec = view.getFloat32(12);
+  if (!(intervalSec > 0) || !Number.isFinite(durationSec) || durationSec < 0) {
+    throw new Error('replay track timing is corrupt');
+  }
   const ids = trackDamageIds({ gearIds: metadata.gearIds, bodyIds: metadata.bodyIds });
   const samples = [];
   for (let index = 0; index < count; index++) {
-    samples.push(readSample(view, HEADER_BYTES + metadataLength + index * RECORD_BYTES, ids));
+    const sample = readSample(view, HEADER_BYTES + metadataLength + index * RECORD_BYTES, ids);
+    if (![sample.timeSec, sample.x, sample.y, sample.z, ...sample.quat].every(Number.isFinite)
+      || sample.timeSec < 0 || (index > 0 && sample.timeSec <= samples[index - 1].timeSec)) {
+      throw new Error('replay track sample is corrupt');
+    }
+    samples.push(sample);
   }
-  return { version, intervalSec: view.getUint16(6) / 1000, durationSec: view.getFloat32(12),
+  return { version, intervalSec, durationSec,
     metadata, samples, gearIds: ids.gear, bodyIds: metadata.bodyIds || [] };
 }
 

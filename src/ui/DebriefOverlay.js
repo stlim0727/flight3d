@@ -33,7 +33,7 @@ export function reportText(report) {
 export const SAVE_REPLAY_STATUS = Object.freeze({ tooShort: 'replay.tooShort', tooLong: 'replay.tooLong' });
 
 export class DebriefOverlay {
-  constructor({ onRetry, onLobby, onFeedback, onSaveReplay }) {
+  constructor({ onRetry, onLobby, onFeedback, onSaveReplay, onWatchReplay }) {
     this.root = document.getElementById('debrief-overlay');
     this.root.innerHTML = `
       <div class="debrief-card">
@@ -86,6 +86,7 @@ export class DebriefOverlay {
             <button class="btn" data-debrief-tab="summary" data-i18n="debrief.back"></button>
           </section>
           <div class="debrief-actions">
+            <button class="btn" id="debrief-watch-replay" data-i18n="replay.watch" hidden></button>
             <button class="btn debrief-primary" id="debrief-retry" data-i18n="debrief.retry"></button>
             <button class="btn" id="debrief-feedback" data-i18n="debrief.feedback"></button>
           </div>
@@ -114,6 +115,11 @@ export class DebriefOverlay {
       const index = this.report.samples.reduce((best, sample, i, samples) =>
         Math.abs(sample.timeSec - time) < Math.abs(samples[best].timeSec - time) ? i : best, 0);
       this.inspect(index);
+    });
+    this.el('watch-replay').addEventListener('click', async () => {
+      this.el('watch-replay').disabled = true;
+      if (!await onWatchReplay?.()) { this.selectTab('share'); this.status('replay.loadFailed'); }
+      this.el('watch-replay').disabled = false;
     });
     this.el('retry').addEventListener('click', onRetry);
     this.el('lobby').addEventListener('click', onLobby);
@@ -236,6 +242,7 @@ export class DebriefOverlay {
     this.el('view-record').hidden = !enough;
     for (const id of ['copy', 'export', 'native-share']) this.el(id).disabled = !enough;
     // A track the recorder refused to build leaves nothing to keep, so the offer disappears.
+    this.el('watch-replay').hidden = !replay;
     this.el('save-replay').hidden = !replay;
     this.el('save-replay').disabled = false;
     bindText(this.el('preview'), () => enough ? reportText(report) : t('debrief.insufficient'));

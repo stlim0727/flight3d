@@ -9,6 +9,7 @@ function simulator() {
     lobby: { airport: 'coastal', aircraft: 'B738', preset: 'runway' },
     activeAirport: 'coastal', currentAircraftId: 'B738',
     starts: 0, rebuilds: 0,
+    replayDirector: { active: false, stop() { this.active = false; } },
     startFlight() { this.starts++; this.gameFlow.enterFlight(); },
     async applyPendingScene() { this.rebuilds++; this.startFlight(); },
   });
@@ -76,4 +77,24 @@ test('resume rejects boot lobby, crashes and in-progress starts', () => {
   }
   sim.resumeFlight();
   assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
+});
+
+test('opening the menu during replay exits rather than holding a resumable flight', () => {
+  const sim = simulator();
+  sim.gameFlow.enterFlight();
+  sim.replayDirector.active = true;
+  sim.replayPanel = { exit() { sim.gameFlow.returnToLobby(false); sim.replayDirector.stop(); } };
+  sim.toggleMainMenu();
+  assert.equal(sim.gameFlow.state, FLOW.LOBBY);
+  assert.equal(sim.gameFlow.canResumeFromLobby(), false);
+  assert.equal(sim.replayDirector.active, false);
+});
+
+test('starting another scene releases replay terrain before comparing or rebuilding scenery', async () => {
+  const sim = simulator();
+  sim.replayDirector.stop = () => { sim.activeAirport = 'lukla'; };
+  sim.lobby.airport = 'lukla';
+  await sim.fly();
+  assert.equal(sim.rebuilds, 0, 'the saved terrain is restored before deciding whether to rebuild');
+  assert.equal(sim.starts, 1);
 });

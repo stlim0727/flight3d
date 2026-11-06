@@ -6,6 +6,17 @@ const LINEAR_FIELDS = Object.freeze(['x', 'y', 'z', 'elevator', 'aileron', 'rudd
 const DISCRETE_FIELDS = Object.freeze(['flapIndex', 'selectedHeading', 'selectedAltitude', 'selectedSpeed']);
 const ENGINE_SCALARS = Object.freeze(['n1', 'n2', 'egt', 'ff']);
 
+/**
+ * Everything a viewer needs besides the transform: instruments, controls, configuration.
+ * `y` stays out because telemetry reports height as altitudeFt, never as metres.
+ */
+export const STATE_FIELDS = Object.freeze([
+  ...LINEAR_FIELDS.filter(name => name !== 'y'),
+  ...DISCRETE_FIELDS, ...BOOL_FIELDS, 'parkBrake', 'altitudeFt', 'headingDeg',
+]);
+/** Sample values that are objects, so a viewer must adopt them by reference, not copy numbers. */
+export const OBJECT_FIELDS = Object.freeze(['compressions', 'gearDamage', 'bodyDamage', 'engine1', 'engine2']);
+
 function lerp(a, b, alpha) {
   return a + (b - a) * alpha;
 }
