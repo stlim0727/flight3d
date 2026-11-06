@@ -27,6 +27,8 @@ test('takeoff requires sustained 1200 ticks and resets stable counter on a singl
   run.update(snapshot(1201, { rollDeg: 11 })); assert.equal(run.metrics.stableTicks, 0);
   for (let tick = 1202; tick <= 2401; tick++) run.update(snapshot(tick));
   assert.equal(run.status, 'succeeded'); assert.equal(run.metrics.liftoffTick, 2);
+  // 10000 - 2401/120s * 100 - rms 0 - (11deg roll - 5deg allowance) * 100.
+  assert.equal(run.result().metrics.finalScore, 7399);
 });
 test('takeoff contact footprint excursion, recontact and bad initial spawn fail irrevocably', () => {
   const excursion = new TakeoffMission();
@@ -55,6 +57,8 @@ test('landing requires first touchdown then 600 uninterrupted stopped ticks', ()
   assert.equal(run.metrics.stopTicks, 0);
   for (let tick = 603; tick <= 1202; tick++) run.update(contact(snapshot(tick, { groundSpeedKnots: 2 }), ['mainLeft', 'mainRight'], 0));
   assert.equal(run.status, 'succeeded');
+  // 10000 - 2 m/s sink * 500 - centreline 0 - zone offset (525-300) * 2 - stop 0 - bounces 0.
+  assert.equal(run.result().metrics.finalScore, 8550);
 });
 test('a gentle contact without a touchdown event still anchors landing; main contact offset controls zone', () => {
   const run = new LandingMission(); startLanding(run);

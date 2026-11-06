@@ -142,11 +142,14 @@ Hard ends: `invalid-snapshot`, `crash`, `body-strike`, `damage`, `timeout`,
 `clearance-floor`, `speed-envelope`, `invalid-spawn`, `discontinuous-flight`,
 `corridor-excursion`.
 
-Stored scoreboard attempts carry a fingerprint of `VALLEY_SLALOM_RULES`
-(`ValleyScoreboard.js`): any change to the generation/judging numbers in that
-frozen rules object discards every previously stored attempt. A judging change
-that does not touch the rules (the score formula itself) must therefore bump
-`rules.version`.
+Stored scoreboard attempts carry `SCORE_RULES_FINGERPRINT`
+(`ValleyScoreboard.js`) — the frozen rules objects of every scored mission
+joined together: `VALLEY_SLALOM_RULES`, `TAKEOFF_SCORE_RULES` and
+`LANDING_SCORE_RULES`. Any change to those generation/judging/scoring numbers
+discards every previously stored attempt and marks new submissions with the new
+fingerprint, so old-rules scores never mix with new ones. A fingerprint hash is
+enough on its own here because the objects are serialised verbatim; a judging
+change that leaves the frozen objects untouched must still bump `rules.version`.
 
 Altitude cost uses fixed 25 m progress bins sampled on first entry (loitering
 cannot dilute a bin), against the **interpolated passage ceiling** rather than a
@@ -159,6 +162,26 @@ so an avoidance climb over rising terrain is allowed and is charged for, and
 returning into the low space stops the charge. `medianAglM`, `minAglM`,
 `maxAglM`, `meanIasKnots`, `gatesCleared`, `progressM` and `durationSeconds` are
 reported next to it; a failure earns no altitude score.
+
+## Shared global leaderboard
+
+The local scoreboard is mirrored globally without adding a server. Any
+successful scored run (valley slalom, `takeoff-basic-v1`, `landing-basic-v1`)
+emits a `score_submitted` PostHog event carrying mission, score, duration,
+callsign, pilot kind and SHA-256 hashes of the attempt's `comparisonKey` and of
+`SCORE_RULES_FINGERPRINT` (`src/analytics/posthog.js`,
+`src/arena/GlobalLeaderboard.js`). The slalom seed defaults to the UTC day
+number (`src/arena/dailySeed.js`) so every player flies the same course per day.
+
+The Pages deploy workflow (`.github/workflows/pages.yml`, also on an hourly
+cron) runs `scripts/build-leaderboard.mjs`: a HogQL query over the last 30 days
+of `score_submitted` events filtered by the current fingerprint hash, grouped
+into the top five rows per comparison key (`scripts/lib/leaderboard-core.mjs`),
+published as `leaderboard.json` next to the bundle. The client fetches it
+inline and shows matching global rows beneath the local board; without the
+secrets or the file it silently keeps the committed snapshot. Scores are
+client-computed and posted straight from the browser — the board is
+honour-based, not adversarially validated.
 
 ## What a pilot may know
 

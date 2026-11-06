@@ -3,6 +3,9 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: [main]
+  schedule:
+    # Hourly refresh of the shared leaderboard snapshot, even without pushes.
+    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -27,6 +30,12 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - name: Refresh shared leaderboard snapshot
+        run: node scripts/build-leaderboard.mjs
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
       - run: npm run build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/

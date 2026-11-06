@@ -8,10 +8,12 @@ import valleySlalomSource from '../pilot/examples/valleySlalom.js?raw';
 import { resolvePilotCase } from '../config/pilotCases.js';
 import { createRealtimePacer } from '../arena/realtimePacer.js';
 import { ValleyScoreboard } from '../arena/ValleyScoreboard.js';
+import { sha256Hex, scoreFingerprintHash, fetchGlobalLeaderboard, rowsForComparison } from '../arena/GlobalLeaderboard.js';
+import { dailySeed } from '../arena/dailySeed.js';
 import { valleyBriefingMarkup, valleyNavigationText } from './valleyNavigationView.js';
 import { bindPilotPanelInput } from './pilotPanelInput.js';
 import { formatPilotScoreData, scoreBannerMarkup, scoreOverlayMarkup, koreanReason } from './pilotScoreView.js';
-import { trackPilotModeChange, trackFlightEnd } from '../analytics/posthog.js';
+import { trackPilotModeChange, trackFlightEnd, trackScoreSubmitted } from '../analytics/posthog.js';
 
 /** Opt-in local pilot lab. No remote upload and no security sandbox claims. */
 export function installPilotArena(sim) {
@@ -50,6 +52,11 @@ export function installPilotArena(sim) {
       <p data-storage-status></p><div data-board></div></details>`;
   document.body.append(shell);
   const find = name => shell.querySelector(`[data-${name}]`);
+  // The day is the course: every player flies the same seed unless they pick another.
+  find('seed').value = String(dailySeed());
+  find('briefing').innerHTML = `<summary>미션 브리핑 · 항로 지도</summary>${valleyBriefingMarkup(dailySeed())}`;
+  void fetchGlobalLeaderboard(`${import.meta.env.BASE_URL}leaderboard.json`)
+    .then(board => { globalBoard = board; });
   const updateToggle = () => {
     find('toggle-label').textContent = shell.open ? '− 최소화' : '+ 펼치기';
   };
@@ -71,6 +78,8 @@ export function installPilotArena(sim) {
   let selectedRetryMode = 'human';
   const scoreboard = new ValleyScoreboard(typeof window !== 'undefined' ? window.localStorage : null);
   let savedRecord = null;
+  let globalBoard = null;
+  let lastGlobalRows = null;
   const hideScoreOverlay = () => { scoreOverlay.hidden = true; };
   const returnToLobbyMenu = () => {
     hideScoreOverlay();
@@ -95,7 +104,7 @@ export function installPilotArena(sim) {
         scoreboard.updateCallsign(savedRecord.id, newCallsign);
         renderBoard();
         const missionLabel = find('mission').selectedOptions[0]?.textContent ?? '계곡 미션';
-        const refreshed = formatPilotScoreData(shownOverlayRecord, missionLabel, { scoreboard, callsign: newCallsign });
+        const refreshed = formatPilotScoreData(shownOverlayRecord, missionLabel, { scoreboard, callsign: newCallsign, globalRows: lastGlobalRows });
         const modal = scoreOverlay.querySelector('.pilot-score-modal');
         const prevScroll = modal ? modal.scrollTop : scoreOverlay.scrollTop;
         scoreOverlay.innerHTML = scoreOverlayMarkup(refreshed);
@@ -177,6 +186,17 @@ export function installPilotArena(sim) {
       const pre = document.createElement('pre'); pre.textContent = JSON.stringify(row, null, 2);
       detail.append(summary, pre); find('board').append(line, detail);
     }
+    if (lastGlobalRows?.length) {
+      const head = document.createElement('p');
+      head.textContent = `글로벌 순위 · 동일 조건 스냅샷 (leaderboard.json${globalBoard?.generatedAt ? ` · ${globalBoard.generatedAt}` : ''})`;
+      find('board').append(head);
+      for (const [index, row] of lastGlobalRows.entries()) {
+        const line = document.createElement('p');
+        line.textContent = `${index + 1}. ${row.callsign} (${row.pilotKind === 'human' ? '사람' : 'AI'}) · ` +
+          `${(row.score ?? 0).toLocaleString('ko-KR')}점 · ${Number(row.durationSeconds ?? 0).toFixed(1)}초`;
+        find('board').append(line);
+      }
+    }
     find('storage-status').textContent = scoreboard.error ? `저장소 사용 불가: ${scoreboard.error}` :
       comparisonKey ? '현재 실행과 동일한 조건의 기록' : '저장된 모든 조건의 기록 · 서로 다른 조건은 순위 비교 불가';
   };
@@ -214,12 +234,25 @@ export function installPilotArena(sim) {
       const isHuman = record.pilotKind === 'human';
       const pilotTag = isHuman ? '사람' : 'AI';
       const valley = record.manifest?.type === 'valley' || record.manifest?.id?.startsWith('valley-');
+      const scored = valley || record.manifest?.type === 'takeoff' || record.manifest?.type === 'landing';
 
-      if (!active && savedRecord !== record && valley) {
+      if (!active && savedRecord !== record && scored) {
         savedRecord = record;
         const attempt = scoreboard.add(record, { callsign: scoreboard.getSavedCallsign() });
         record.id = attempt?.id;
+        lastGlobalRows = null;
         renderBoard(attempt?.comparisonKey);
+        if (attempt && attempt.metrics?.finalScore != null) {
+          void (async () => {
+            const comparisonKeyHash = await sha256Hex(attempt.comparisonKey);
+            const fingerprintHash = await scoreFingerprintHash();
+            trackScoreSubmitted(attempt, { comparisonKeyHash, fingerprintHash });
+            lastGlobalRows = rowsForComparison(
+              globalBoard ?? await fetchGlobalLeaderboard(`${import.meta.env.BASE_URL}leaderboard.json`),
+              comparisonKeyHash, fingerprintHash);
+            renderBoard(attempt.comparisonKey);
+          })();
+        }
         trackFlightEnd({
           airport: sim.activeAirport,
           aircraft: sim.currentAircraftId,
@@ -232,7 +265,7 @@ export function installPilotArena(sim) {
       }
 
       const missionLabel = find('mission').selectedOptions[0]?.textContent ?? '계곡 미션';
-      const scoreData = !active && record ? formatPilotScoreData(record, missionLabel, { scoreboard }) : null;
+      const scoreData = !active && record ? formatPilotScoreData(record, missionLabel, { scoreboard, globalRows: lastGlobalRows }) : null;
 
       if (active) {
         find('compact-status').textContent = `${pilotTag} · 비행 중 · ${(record.tick / 120).toFixed(1)}초`;

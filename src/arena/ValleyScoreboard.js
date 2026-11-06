@@ -1,14 +1,19 @@
 import { VALLEY_SLALOM_RULES } from './generatedValley.js';
+import { TAKEOFF_SCORE_RULES } from './TakeoffMission.js';
+import { LANDING_SCORE_RULES } from './LandingMission.js';
 
 const KEY = 'flight3d.valley-attempts.v1';
 const FINGERPRINT_KEY = 'flight3d.valley-attempts.rules-fingerprint.v1';
 const CALLSIGN_KEY = 'flight3d.pilot.callsign';
 const TERMINAL = new Set(['succeeded', 'failed', 'aborted']);
+const SCORED_TYPES = new Set(['valley', 'valley-slalom', 'takeoff', 'landing']);
 
-/** The characteristics every stored score was judged under. Any change to the
- * slalom rules (or a bump of their version for a judging change) rewrites this
- * and discards the attempts recorded under the old shape. */
-const RULES_FINGERPRINT = JSON.stringify(VALLEY_SLALOM_RULES);
+/** The characteristics every stored score was judged under: the slalom
+ * generation/judging numbers and the takeoff and landing scoring formulas. Any
+ * change here rewrites the fingerprint and discards the attempts recorded
+ * under the old shape. */
+export const SCORE_RULES_FINGERPRINT = JSON.stringify(
+  [VALLEY_SLALOM_RULES, TAKEOFF_SCORE_RULES, LANDING_SCORE_RULES]);
 
 /** Clean and sanitize a pilot callsign (max 8 uppercase alphanumeric chars, default MAV). */
 export function sanitizeCallsign(raw) {
@@ -25,11 +30,11 @@ function attemptCallsign(record, callsign) {
   return record.pilotKind === 'human' ? sanitizeCallsign(callsign) : 'AI';
 }
 
-/** Local and global attempts. Only matching comparison keys can be ranked. */
+/** Recorded attempts for every judged mission. Only matching comparison keys
+ * can be ranked with each other. */
 export function valleyAttempt(record, { callsign } = {}) {
   const m = record?.manifest;
-  const isValley = m?.type === 'valley' || m?.type === 'valley-slalom';
-  if (!isValley || !TERMINAL.has(record.status)) return null;
+  if (!SCORED_TYPES.has(m?.type) || !TERMINAL.has(record.status)) return null;
   const conditions = { mission: m.id, rulesVersion: m.rulesVersion, terrain: m.terrain,
     environmentProfile: m.environmentProfile, environmentSeed: m.environmentSeed,
     sensorSeed: record.sensorSeed, sensorNoiseEnabled: record.noiseEnabled,
@@ -66,7 +71,7 @@ export class ValleyScoreboard {
   /** Discard all stored attempts and stamp the current rules fingerprint. */
   reset() {
     try {
-      this.storage.setItem(FINGERPRINT_KEY, RULES_FINGERPRINT);
+      this.storage.setItem(FINGERPRINT_KEY, SCORE_RULES_FINGERPRINT);
       this.storage.setItem(KEY, '[]');
       this.error = null;
       return true;
@@ -75,7 +80,7 @@ export class ValleyScoreboard {
 
   read() {
     try {
-      if (this.storage.getItem(FINGERPRINT_KEY) !== RULES_FINGERPRINT) {
+      if (this.storage.getItem(FINGERPRINT_KEY) !== SCORE_RULES_FINGERPRINT) {
         this.reset();
         return [];
       }

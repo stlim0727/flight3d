@@ -1,5 +1,15 @@
 import { MissionState, headingError } from './MissionState.js';
 
+/** Takeoff scoring numbers. Frozen and fingerprinted by ValleyScoreboard:
+ * changing one changes what a stored score means, so old records are discarded. */
+export const TAKEOFF_SCORE_RULES = Object.freeze({
+  base: 10000,
+  perSecond: 100,
+  perRmsMeter: 50,
+  softRollAllowanceDeg: 5,
+  perSoftRollDegOverAllowance: 100,
+});
+
 export class TakeoffMission extends MissionState {
   constructor(manifest) {
     super('takeoff', manifest);
@@ -31,5 +41,17 @@ export class TakeoffMission extends MissionState {
     this.metrics.stableTicks = this.stableTicks;
     if (this.stableTicks >= m.stableTicks) return this.finish('succeeded', 'completed');
     return this.result();
+  }
+
+  result() {
+    const r = super.result();
+    if (r.status === 'succeeded') {
+      const rules = TAKEOFF_SCORE_RULES, m = r.metrics;
+      m.finalScore = Math.max(0, Math.round(rules.base
+        - r.tick / this.manifest.physicsHz * rules.perSecond
+        - (m.centerlineRmsM ?? 0) * rules.perRmsMeter
+        - Math.max(0, (m.maximumRollDeg ?? 0) - rules.softRollAllowanceDeg) * rules.perSoftRollDegOverAllowance));
+    }
+    return r;
   }
 }
