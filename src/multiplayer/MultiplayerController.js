@@ -7,7 +7,8 @@ import { setSimulationWind } from '../physics/WindField.js';
 
 export class MultiplayerController {
   constructor(sim) {
-    this.sim = sim; this.preparing = false;
+    this.sim = sim; this.preparing = false; this.preparationHold = false;
+    this.soloControls = new Map();
     this.audio = document.getElementById('mp-audio');
     this.roomInput = document.getElementById('mp-room');
     const invite = new URLSearchParams(location.search).get('room');
@@ -41,7 +42,7 @@ export class MultiplayerController {
     const ptt = document.getElementById('mp-ptt');
     ptt.onpointerdown = e => { if (e.button !== 0) return; e.preventDefault(); ptt.setPointerCapture(e.pointerId); this.voice?.setTalking(true); };
     for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) ptt.addEventListener(event, () => this.releaseTalk());
-    ptt.onkeydown = e => { if ([' ', 'Enter'].includes(e.key)) { e.preventDefault(); this.voice?.setTalking(true); } };
+    ptt.onkeydown = e => { if ([' ', 'Enter'].includes(e.key)) { e.preventDefault(); e.stopPropagation(); this.voice?.setTalking(true); } };
     ptt.onkeyup = e => { if ([' ', 'Enter'].includes(e.key)) { e.preventDefault(); this.releaseTalk(); } };
     ptt.onblur = () => this.releaseTalk();
     // Capture N before flight controls, only outside text inputs, only while in a room.
@@ -68,16 +69,25 @@ export class MultiplayerController {
       // Unlock the voice context inside Create/Join's user gesture, even for listeners.
       this.voice.context.resume().catch(() => {});
       this.room = new PeerRoom({ room, name: document.getElementById('mp-name').value, config, voice: this.voice,
-        prepare: (c, slot) => this.prepare(c, slot), fly: () => { this.sim.gameFlow.enterFlight(); this.sim.syncFlowUi(); },
+        prepare: (c, slot) => this.prepare(c, slot), fly: () => this.startTogether(),
         changed: () => this.refresh(), remoteStream: stream => { this.audio.srcObject = stream; this.playAudio(); },
         ended: reason => this.ended(reason) });
       this.snapshotTimer = setInterval(() => this.sendSnapshot(), 1000 / 15);
     } catch { this.voice?.close(); this.message = 'connection'; }
     this.refresh();
   }
+  startTogether() {
+    this.preparationHold = false;
+    this.sim.gameFlow.enterFlight(); this.sim.syncFlowUi();
+  }
+  releasePreparationHold() {
+    const owned = this.preparationHold;
+    this.preparationHold = false;
+    if (owned && this.sim.gameFlow.state === 'paused') this.sim.gameFlow.resume();
+  }
   async prepare(config, slot) {
     const room = this.room;
-    this.preparing = true; this.slot = slot; this.releaseTalk();
+    this.preparing = true; this.preparationHold = true; this.slot = slot; this.releaseTalk();
     this.remote?.dispose(); this.remote = null;
     try {
       this.sim.pilotArena?.stop('multiplayer'); this.sim.demoDirector.stop();
@@ -85,7 +95,7 @@ export class MultiplayerController {
       Object.assign(this.sim.lobby, { airport: config.airport, aircraft: config.aircraft, preset: config.scenario, pilotMode: 'human' });
       await this.sim.fly();
       if (!this.active || this.room !== room) {
-        if (this.sim.gameFlow.state === 'paused') this.sim.gameFlow.resume();
+        this.releasePreparationHold();
         return;
       }
       if (this.sim.activeAirport !== config.airport || this.sim.currentAircraftId !== config.aircraft || this.sim.lastPresetType !== config.scenario) throw new Error('prepare-failed');
@@ -144,7 +154,7 @@ export class MultiplayerController {
     this.sim.lobbyScreen?.setSelectionBusy(false);
     this.sim.lobbyScreen?.refresh();
     // A failed prepare must not leave the local simulator stuck at the barrier.
-    if (this.sim.gameFlow.state === 'paused') this.sim.gameFlow.resume();
+    this.releasePreparationHold();
     this.refresh();
   }
   refresh() {
@@ -177,6 +187,16 @@ export class MultiplayerController {
     document.getElementById('mp-listen').hidden = !this.playbackBlocked;
     document.getElementById('mp-mute').setAttribute('aria-pressed', String(this.audio.muted));
     // Room configuration is immutable until leaving; regular solo selections cannot diverge it.
-    if (active) document.querySelectorAll('#lobby-panel-scenario button, #lobby-panel-scenario select, #btn-fly').forEach(el => { el.disabled = true; });
+    if (active) {
+      for (const el of document.querySelectorAll('#lobby-panel-scenario button, #lobby-panel-scenario select, #btn-fly')) {
+        if (!this.soloControls.has(el)) this.soloControls.set(el, el.disabled);
+        el.disabled = true;
+      }
+    } else if (this.soloControls.size) {
+      for (const [el, disabled] of this.soloControls) el.disabled = disabled;
+      this.soloControls.clear();
+      // Recompute aircraft/time availability for any scenery changed during preparation.
+      this.sim.lobbyScreen?.refresh();
+    }
   }
 }

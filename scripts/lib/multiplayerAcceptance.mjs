@@ -64,11 +64,18 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   // Permission grant uses Chrome fake microphone but production getUserMedia + UI.
   await host.evaluate('document.getElementById("mp-microphone").click()');
   await until(() => host.evaluate('Boolean(sim.multiplayer.voice.microphone)'), 'microphone UI');
-  await host.send('Input.dispatchKeyEvent', { type: 'keyDown', code: 'KeyN', key: 'v' });
+  for (const [key, code] of [[' ', 'Space'], ['Enter', 'Enter']]) {
+    await host.evaluate('sim.controls.setParkingBrake(false); document.getElementById("mp-ptt").focus()');
+    await host.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code });
+    assert.equal(await host.evaluate('sim.multiplayer.voice.talking && !sim.controls.keys.Space'), true, 'focused keyboard PTT cannot apply wheel brakes');
+    await host.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code });
+    assert.equal(await host.evaluate('sim.multiplayer.voice.talking'), false);
+  }
+  await host.send('Input.dispatchKeyEvent', { type: 'keyDown', code: 'KeyN', key: 'n' });
   assert.equal(await host.evaluate('sim.multiplayer.voice.talking'), true);
-  await host.send('Input.dispatchKeyEvent', { type: 'keyUp', code: 'KeyN', key: 'v' });
+  await host.send('Input.dispatchKeyEvent', { type: 'keyUp', code: 'KeyN', key: 'n' });
   assert.equal(await host.evaluate('sim.multiplayer.voice.talking'), false);
-  await host.send('Input.dispatchKeyEvent', { type: 'keyDown', code: 'KeyN', key: 'v' });
+  await host.send('Input.dispatchKeyEvent', { type: 'keyDown', code: 'KeyN', key: 'n' });
   await host.evaluate('window.dispatchEvent(new Event("blur"))');
   assert.equal(await host.evaluate('sim.multiplayer.voice.talking'), false);
   await host.evaluate('sim.setBrowserActive(true)');
@@ -84,9 +91,21 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   await capture(guest, 'mobile-controls');
   const bounds = await guest.evaluate('(() => { const r=document.getElementById("mp-controls").getBoundingClientRect(); return { left:r.left,right:r.right,bottom:r.bottom,width:innerWidth,height:innerHeight }; })()');
   assert.ok(bounds.left >= 0 && bounds.right <= bounds.width && bounds.bottom <= bounds.height, 'mobile controls fit viewport');
+  for (const c of [host, guest]) await c.evaluate('sim.gameFlow.pause()');
   await guest.evaluate('document.getElementById("mp-leave").click()');
   await until(() => host.evaluate('sim.multiplayer.room.closed && !sim.multiplayer.remote && sim.multiplayer.voice.closed'), 'simulator leave cleanup');
-  assert.equal(await host.evaluate('sim.gameFlow.state'), 'flight', 'solo flight continues');
+  for (const c of [host, guest]) assert.equal(await c.evaluate('sim.gameFlow.state'), 'paused', 'room teardown preserves each pilot’s intentional pause');
+  await host.evaluate('sim.gameFlow.resume()');
+  assert.equal(await host.evaluate('sim.gameFlow.state'), 'flight', 'solo flight resumes explicitly');
+  await host.evaluate('sim.gameFlow.returnToLobby(true); document.getElementById("lobby-tab-scenario").click()');
+  for (const id of ['lobby-airport-neon', 'lobby-airport-coastal', 'lobby-preset-cru']) {
+    assert.equal(await host.evaluate(`document.getElementById(${JSON.stringify(id)}).disabled`), false, 'solo airport/preset choice restored');
+    await host.evaluate(`document.getElementById(${JSON.stringify(id)}).click()`);
+  }
+  assert.equal(await host.evaluate('sim.lobby.preset'), 'cruise');
+  await host.evaluate('document.getElementById("lobby-airport-hangang").click()');
+  assert.equal(await host.evaluate('[...document.querySelectorAll("#lobby-aircraft-b738,#lobby-aircraft-c172,#lobby-aircraft-f16,#lobby-time-select")].every(el=>el.disabled)'), true, 'normal solo availability still enforced');
+  await host.evaluate('document.getElementById("lobby-airport-coastal").click()');
   // Exercise airborne scenery/model swaps as well as the runway path.
   for (const [airport, aircraft, scenario] of [['neon', 'B738', 'cruise'], ['incheon', 'F16', 'runway'], ['coastal', 'C172', 'cruise']]) {
     await host.evaluate(`document.getElementById('mp-airport').value=${JSON.stringify(airport)}; document.getElementById('mp-aircraft').value=${JSON.stringify(aircraft)}; document.getElementById('mp-scenario').value=${JSON.stringify(scenario)}; document.getElementById('mp-create').click()`);
@@ -103,6 +122,21 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
     await host.evaluate('document.getElementById("mp-leave").click()');
     await until(() => guest.evaluate('sim.multiplayer.room.closed'), 'host leave ends room');
   }
+  // A room ending while both pilots wait at the preparation barrier must release its pause.
+  await host.evaluate('document.getElementById("mp-create").click()');
+  await until(() => host.evaluate('sim.multiplayer.room.registered'), 'barrier cleanup host');
+  const abortInvite = await host.evaluate('document.getElementById("mp-invite").value');
+  await guest.evaluate(`document.getElementById('mp-room').value=${JSON.stringify(abortInvite)}; document.getElementById('mp-join').click()`);
+  await until(() => host.evaluate('sim.multiplayer.room.session.state === "connected"'), 'barrier cleanup guest');
+  await guest.evaluate(`(() => { const session=sim.multiplayer.room.session, prepare=session.prepare;
+    session.prepare=async (...args)=>{ await prepare(...args); await new Promise(r=>window.releaseAbortedPrepare=r); };
+  })()`);
+  await host.evaluate('document.getElementById("mp-start").click()');
+  await until(() => host.evaluate('sim.multiplayer.room.session.localReady'), 'barrier cleanup local ready');
+  await until(() => guest.evaluate('Boolean(window.releaseAbortedPrepare)'), 'barrier cleanup remote waiting');
+  await guest.evaluate('document.getElementById("mp-leave").click(); window.releaseAbortedPrepare()');
+  await until(() => host.evaluate('sim.multiplayer.room.closed'), 'barrier cleanup disconnect');
+  for (const c of [host, guest]) assert.equal(await c.evaluate('sim.gameFlow.state'), 'flight', 'preparation hold released after abort');
   for (const c of browsers) assert.deepEqual(c.errors, [], 'simulator browser exceptions');
-  console.log('PASS hardware Chrome simulator: UI invite/join, shared runway start, separated slots, remote model, actual throttle movement replication, reset, PTT key release/blur, restart, individual crash recovery, mobile controls, leave-to-solo, all three aircraft and scenery types with runway/cruise starts. Screenshots: review-artifacts/multiplayer/');
+  console.log('PASS hardware Chrome simulator: UI invite/join, shared runway start, separated slots, remote model, actual throttle movement replication, reset, PTT key release/blur without braking, pause/solo-control restoration and barrier abort, restart, individual crash recovery, mobile controls, leave-to-solo, all three aircraft and scenery types with runway/cruise starts. Screenshots: review-artifacts/multiplayer/');
 }

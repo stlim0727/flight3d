@@ -50,13 +50,14 @@ No query-string signaling overrides or production test hooks.
 
 1. `npm test`: pure room state/authority/capacity, invalid messages, delayed and
    reordered snapshots, interpolation, timeout/disconnect/restart, and voice
-   permission/cleanup lifecycle with injected adapters.
+   permission/cleanup lifecycle with injected adapters. Controller regressions cover
+   restored solo availability, intentional pause retention and preparation holds.
 2. `npm run test:multiplayer`: real Chromium WebRTC between independent pages,
    local PeerServer, no public network or mic hardware: host/guest handshake,
    shared start barrier/config, bidirectional movement/reset, third-peer
    rejection, real audio RTP + decoded signal/silence for PTT, disconnect cleanup.
    This is a required CI step. The fixture imports production room/transport/voice
-   modules but never creates WebGL; hosted CI does not claim 3D acceptance.
+   modules plus the PTT controller/flight-controls DOM boundary but never creates WebGL; hosted CI does not claim 3D acceptance.
 3. Local hardware Chrome: GPU verifier first, then two complete simulator pages,
    actual room UI, remote aircraft drawing, reset/restart, voice controls and
    mobile-sized layout. Report actual renderer and evidence, not context creation

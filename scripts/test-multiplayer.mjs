@@ -38,6 +38,14 @@ try {
     const { verifyMultiplayerSimulator } = await import('./lib/multiplayerAcceptance.mjs');
     await verifyMultiplayerSimulator({ page, cdpPort, browsers });
   } else {
+  const ui = await page('/tests/fixtures/multiplayer-ui.html', 'Boolean(window.uiFixture)');
+  for (const [key, code] of [[' ', 'Space'], ['Enter', 'Enter']]) {
+    assert.deepEqual(await ui.evaluate(`uiFixture.press(${JSON.stringify(key)}, ${JSON.stringify(code)})`), { talking: true, braking: false }, 'PTT activation must not brake');
+    assert.deepEqual(await ui.evaluate(`uiFixture.release(${JSON.stringify(key)}, ${JSON.stringify(code)})`), { talking: false, braking: false }, 'PTT release must not brake');
+  }
+  // Keyup must still release a brake key pressed before focus moved to PTT.
+  await ui.evaluate('uiFixture.controls.keys.Space = true');
+  assert.deepEqual(await ui.evaluate('uiFixture.release(" ", "Space")'), { talking: false, braking: false });
   const host = await page(), guest = await page();
   const room = await host.evaluate('fixture.create()');
   await until(() => host.evaluate('fixture.status().registered'), 'host registered');
