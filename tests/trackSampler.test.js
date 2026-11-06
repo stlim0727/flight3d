@@ -165,3 +165,16 @@ test('a track that has not been through the codec yet still samples finite', () 
   assert.equal(mid.onGround, false, 'absent flags read as false, not undefined');
   assert.equal(mid.engine1.failed, false);
 });
+
+test('roll and quaternion remain inverted while crossing the signed roll wrap', () => {
+  for (const sign of [-1, 1]) {
+    const angle = sign * 179 * Math.PI / 180;
+    const source = two(
+      pose({ timeSec: 0, rollDeg: sign * 179, quat: [0, 0, Math.sin(angle / 2), Math.cos(angle / 2)] }),
+      pose({ timeSec: 1, rollDeg: -sign * 179, quat: [0, 0, -Math.sin(angle / 2), Math.cos(angle / 2)] }));
+    const mid = sampleTrack(source, .5);
+    assert.ok(Math.abs(Math.abs(mid.rollDeg) - 180) < 1e-9);
+    assert.ok(Math.abs(Math.abs(mid.quat[2]) - 1) < 1e-9);
+    assert.ok(Math.abs(sampleTrack(source, .25).rollDeg) > 179);
+  }
+});

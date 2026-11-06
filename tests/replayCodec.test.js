@@ -196,3 +196,10 @@ test('selected cruise altitude covers the airliner range without saturation', ()
     assert.ok(Math.abs(decoded.samples[0].selectedAltitude - altitude) <= 4);
   }
 });
+
+test('pitch trim retains the full degree range used by the trim wheels', () => {
+  for (const trim of [-5, -2.5, 2, 6.37, 12]) {
+    const source = track(2); source.samples[0].pitchTrim = trim;
+    assert.ok(Math.abs(decodeTrack(encodeTrack(source)).samples[0].pitchTrim - trim) <= .051);
+  }
+});

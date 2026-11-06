@@ -246,6 +246,7 @@ export class SimulatorMissionAdapter {
     // A pointer drag or UI callback cannot steal a held throttle target.
     if (!this.human) this.apply(this.command);
     this.sim.integratePhysics(this.sim.physicsDt);
+    this.sim.updateFlightRecording?.(this.sim.physicsDt, { missionOwned: true });
     this.syncPose();
   }
 

@@ -180,3 +180,40 @@ test('a fresh start discards the previous sortie instead of appending to it', ()
   assert.equal(first.samples.length, firstCount);
   assert.equal(second.samples[0].timeSec, TICK, 'elapsed time restarts with the new start');
 });
+
+test('finish budgets a between-tick endpoint at every decimation boundary', () => {
+  const recorder = started();
+  const rungs = new Set();
+  // Check each capacity boundary without allocating an entire simulated flight.
+  for (const interval of REPLAY_INTERVAL_LADDER) {
+    recorder.start(METADATA);
+    recorder.interval = interval;
+    recorder.update(TICK, TELEMETRY, quat);
+    const capacity = maxSamplesFor(recorder.maxBase64Bytes, recorder.metadataBytes);
+    const observed = recorder.samples[0];
+    recorder.samples = Array.from({ length: capacity }, (_, index) => ({ ...observed, timeSec: index * interval }));
+    recorder.elapsed = recorder.samples.at(-1).timeSec + interval / 2;
+    recorder.validDuration = recorder.elapsed;
+    recorder.latest = { ...observed, timeSec: recorder.elapsed };
+    const result = recorder.finish();
+    assert.equal(result.samples.at(-1).timeSec, result.durationSec);
+    if (interval < REPLAY_INTERVAL_LADDER.at(-1)) {
+      assert.equal(result.overflow, false);
+      assert.ok(base64ByteLength(encodeTrack(result).length) <= recorder.maxBase64Bytes);
+      assert.equal(result.intervalSec, interval * 2);
+    } else assert.equal(result.overflow, true);
+    rungs.add(interval);
+  }
+  assert.equal(rungs.size, 4);
+});
+
+test('production engine fuelFlow survives immediate and stored replay', () => {
+  const recorder = started();
+  record(6, recorder, { ...TELEMETRY, engine1: { fuelFlow: 350 }, engine2: { fuelFlow: 720, ff: 0 } });
+  const result = recorder.finish();
+  assert.equal(result.samples[0].engine1.ff, 350);
+  assert.equal(result.samples[0].engine2.ff, 720);
+  const stored = decodeTrack(encodeTrack(result));
+  assert.equal(stored.samples[0].engine1.ff, 350);
+  assert.equal(stored.samples[0].engine2.ff, 720);
+});

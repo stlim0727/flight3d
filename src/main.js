@@ -668,11 +668,13 @@ class FlightSimulator {
     if (wantsDemo) {
       this.demoDirector.start();
     } else if (wantsValley) {
+      this.lastPresetType = 'valley';
+      this.beginFlightRecording();
       this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' });
     } else {
       this.setPreset(this.lobby.preset);
     }
-    this.beginFlightRecording();
+    if (!wantsValley) this.beginFlightRecording();
     this.analytics?.trackFlightStart?.({
       airport: this.activeAirport,
       aircraft: this.currentAircraftId,
@@ -750,10 +752,12 @@ class FlightSimulator {
     this.replayRecorder?.start(sortie);
   }
 
-  updateFlightRecording(dt) {
+  updateFlightRecording(dt, { missionOwned = false } = {}) {
     if (this.gameFlow.state !== FLOW.FLIGHT || !this.flightRecorder.active || this.devRunner?.active) return;
     this.flightRecorder.update(dt, this.telemetry);
     this.replayRecorder.update(dt, this.telemetry, this.quaternion);
+    // The mission runner owns scoring and its completion UI. Only observe its ticks.
+    if (missionOwned) return;
     if (this.isCrashed) {
       // Freeze the sortie at impact, while the exterior crash scene keeps running.
       this.debriefReport = this.flightRecorder.finish('crash', this.crashResult);

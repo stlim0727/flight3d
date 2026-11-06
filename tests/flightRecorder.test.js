@@ -244,3 +244,23 @@ test('retry restores the completed sortie instead of applying staged menu choice
   assert.deepEqual(sim.startOptions, { keepTimeOfDay: true }, 'The device-time reset must not overwrite the replayed sky');
   assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
 });
+
+test('a repeated valley start arms recording before synchronous course preparation', () => {
+  const sim = Object.assign(Object.create(SimulatorClass.prototype), recorders(), {
+    gameFlow: new GameFlowController(),
+    lobby: { preset: 'valley', airport: 'valley', aircraft: 'F16' },
+    activeAirport: 'valley', currentAircraftId: 'F16', sky: { timeOfDay: 12 },
+    devRunner: { stop() {} }, shadowDemo: { stop() {} }, replayDirector: { stop() {} },
+    demoDirector: { userTimeOfDayOverridden: true },
+    startValleyMission() {
+      this.activeAirport = 'generated-valley';
+      this.replayRecorder.start({ ...this.replayRecorder.metadata, airport: 'valley', scenario: 'valley', seed: 42 });
+    },
+  });
+  for (let i = 0; i < 2; i++) {
+    sim.startFlight();
+    assert.equal(sim.replayRecorder.metadata.airport, 'valley');
+    assert.equal(sim.replayRecorder.metadata.seed, 42);
+    assert.equal(sim.replayRecorder.metadata.aircraft, 'F16');
+  }
+});

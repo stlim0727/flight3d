@@ -157,3 +157,31 @@ test('adapter preparation resets aero separation, warnings, and physics accumula
   assert.deepEqual(sim.telemetry.warnings, []);
   assert.ok(adapter.command.throttle > 0);
 });
+
+test('mission-owned physics ticks record a playable track and freeze it on release', async () => {
+  const { ReplayRecorder } = await import('../src/core/ReplayRecorder.js');
+  const { FlightRecorder } = await import('../src/core/FlightRecorder.js');
+  const { SimulatorClass } = await import('./helpers/simulatorClass.js');
+  const sim = createSlalomSimulation(1);
+  sim.gameFlow = { state: 'flight' };
+  sim.flightRecorder = new FlightRecorder(); sim.flightRecorder.start({ airport: 'valley', aircraft: 'F16' });
+  sim.replayRecorder = new ReplayRecorder(); sim.replayRecorder.start({ airport: 'valley', aircraft: 'F16' });
+  sim.updateFlightRecording = SimulatorClass.prototype.updateFlightRecording;
+  sim.endFlight = () => { throw new Error('mission ticks must leave completion to the runner'); };
+  const adapter = new SlalomMissionAdapter(sim);
+  await adapter.prepare({ seed: 1 });
+  adapter.acquire();
+  adapter.apply({ elevator: 0, aileron: 0, rudder: 0, throttle: adapter.manifest.configuration.trimThrottle, brakes: 0 });
+  for (let tick = 0; tick < 720; tick++) adapter.step();
+  assert.ok(Math.abs(sim.replayRecorder.elapsed - 6) < 1e-8, 'one update per mission tick');
+  assert.ok(Math.abs(sim.flightRecorder.elapsed - 6) < 1e-8);
+  adapter.release();
+  assert.ok(sim.debriefReplay.samples.length >= 30);
+  assert.equal(sim.debriefReplay.metadata.airport, 'valley');
+  assert.equal(sim.debriefReplay.metadata.seed, 1);
+  assert.equal(sim.replayRecorder.active, false);
+  // A retry can be armed before the old adapter is released again.
+  sim.replayRecorder.start({ airport: 'valley', aircraft: 'F16' });
+  adapter.release();
+  assert.equal(sim.replayRecorder.active, true);
+});

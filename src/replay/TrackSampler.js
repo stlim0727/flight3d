@@ -88,6 +88,7 @@ export function sampleTrack(track, timeSec, out = {}, state = {}) {
   out.timeSec = time;
   for (const name of LINEAR_FIELDS) out[name] = lerp(num(a[name]), num(b[name]), alpha);
   out.headingDeg = lerpDegrees(num(a.headingDeg), num(b.headingDeg), alpha);
+  out.rollDeg = ((lerpDegrees(num(a.rollDeg), num(b.rollDeg), alpha) + 180) % 360) - 180;
   out.altitudeFt = Atmosphere.metersToFeet(out.y);
   for (const name of DISCRETE_FIELDS) out[name] = num(alpha < 0.5 ? a[name] : b[name]);
   for (const name of BOOL_FIELDS) out[name] = (alpha < 0.5 ? a[name] : b[name]) === true;

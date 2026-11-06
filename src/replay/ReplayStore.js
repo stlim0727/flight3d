@@ -138,48 +138,50 @@ export class ReplayStore {
     return this.save(track, { label: parsed.entry?.label });
   }
 
-  /** Writes payload then index, evicting the oldest saves when the shared budget is exhausted. */
+  /** Commit payload and index together, restoring old saves if quota retries fail. */
   writeEntry(entry, base64, rows) {
-    const purged = [];
-    if (!this.writePayload(entry.id, base64, rows, purged)) {
-      this.discardPayload(entry.id);
-      this.pruneIndex(rows, purged);
+    const backups = new Map();
+    try {
+      // Read everything we might evict before the first destructive operation.
+      for (const row of rows) backups.set(row.id, this.storage.getItem(payloadKey(row.id)));
+    } catch (error) {
+      this.error = error.message;
       return false;
     }
-    let candidates = this.applyBudget([...rows.filter(row => !purged.includes(row.id)), entry]);
-    for (let attempt = 0; attempt <= this.budget.entries; attempt++) {
-      try {
-        this.storage.setItem(INDEX_KEY, JSON.stringify(candidates.rows));
-        this.error = null;
-        this.dropPayloads(candidates.evicted);
-        return true;
-      } catch (error) {
-        this.error = error.message;
-        const [oldest, ...rest] = candidates.rows;
-        if (oldest.id === entry.id || !rest.length) break;
-        candidates = { rows: rest, evicted: [...candidates.evicted, oldest] };
+    const candidates = this.applyBudget([...rows, entry]);
+    const removed = new Set();
+    const evict = row => {
+      this.storage.removeItem(payloadKey(row.id));
+      removed.add(row.id);
+    };
+    try {
+      for (const row of candidates.evicted) evict(row);
+      for (;;) {
+        try {
+          this.storage.setItem(payloadKey(entry.id), base64);
+          this.storage.setItem(INDEX_KEY, JSON.stringify(candidates.rows));
+          this.error = null;
+          return true;
+        } catch (error) {
+          const victim = candidates.rows.find(row => row.id !== entry.id);
+          if (!victim) throw error;
+          evict(victim);
+          candidates.rows = candidates.rows.filter(row => row.id !== victim.id);
+        }
       }
-    }
-    const evictedIds = candidates.evicted.map(row => row.id);
-    this.discardPayload(entry.id);
-    this.dropPayloads(candidates.evicted);
-    this.pruneIndex(rows, [...purged, ...evictedIds]);
-    return false;
-  }
-
-  writePayload(id, base64, rows, purged) {
-    const oldestFirst = [...rows].sort((a, b) => String(a.savedAt).localeCompare(String(b.savedAt)));
-    for (;;) {
-      try {
-        this.storage.setItem(payloadKey(id), base64);
-        return true;
-      } catch (error) {
-        this.error = error.message;
-        const victim = oldestFirst.shift();
-        if (!victim) return false;
-        purged.push(victim.id);
-        this.discardPayload(victim.id);
+    } catch (error) {
+      this.discardPayload(entry.id);
+      // The old index is unchanged: localStorage.setItem is atomic on failure.
+      // Removing the new payload first frees the space held by the original saves.
+      for (const id of removed) {
+        const payload = backups.get(id);
+        if (payload !== null) {
+          try { this.storage.setItem(payloadKey(id), payload); }
+          catch { /* Storage may have become inaccessible; preserve the original error. */ }
+        }
       }
+      this.error = error.message;
+      return false;
     }
   }
 
@@ -194,17 +196,6 @@ export class ReplayStore {
       evicted.push(oldest);
     }
     return { rows: kept, evicted };
-  }
-
-  dropPayloads(evicted) {
-    for (const row of evicted) this.discardPayload(row.id);
-  }
-
-  /** Never leave the index listing a save whose payload has been dropped. */
-  pruneIndex(rows, ids) {
-    const gone = new Set(ids);
-    if (!gone.size) return;
-    this.writeIndex(rows.filter(row => !gone.has(row.id)));
   }
 
   discardPayload(id) {

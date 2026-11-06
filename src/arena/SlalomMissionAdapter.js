@@ -172,6 +172,13 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
   }
 
   release() {
+    const recorder = this.sim.replayRecorder;
+    // Keep the mission's final pose before releasing its terrain. A newly armed retry
+    // has no prepared seed yet and must not be finished by the previous adapter.
+    if (recorder?.active && Number.isSafeInteger(this.manifest?.environmentSeed)
+      && recorder.metadata.seed === this.manifest.environmentSeed) {
+      this.sim.debriefReplay = recorder.finish();
+    }
     this.visualizer?.dispose();
     this.visualizer = null;
     this.generatedTerrain?.dispose(this.sim);

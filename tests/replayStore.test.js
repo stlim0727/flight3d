@@ -265,3 +265,28 @@ test('a successful quota retry removes already purged payloads from the index', 
   assert.ok(store.list().every(row => store.get(row.id)), 'every surviving index row must be playable');
   assert.ok(!store.get(first.id) || !store.get(second.id));
 });
+
+test('failed oversized quota replacement restores every original payload and index', () => {
+  const storage = new QuotaStorage(4000);
+  const store = storeFor(storage);
+  const original = store.save(track(20)).entry;
+  const before = [...storage.store];
+  assert.equal(store.save(track(60)).entry, null);
+  assert.deepEqual([...storage.store].sort(), before.sort());
+  assert.equal(store.get(original.id).track.samples.length, 20);
+});
+
+test('index write failure rolls back evictions after a new payload fit', () => {
+  const storage = new QuotaStorage(8000);
+  const store = storeFor(storage);
+  const original = store.save(track(20)).entry;
+  const before = [...storage.store];
+  const setItem = storage.setItem.bind(storage);
+  storage.setItem = (key, value) => {
+    if (key === INDEX_KEY) throw new Error('index unavailable');
+    setItem(key, value);
+  };
+  assert.equal(store.save(track(60)).entry, null);
+  assert.deepEqual([...storage.store].sort(), before.sort());
+  assert.equal(store.get(original.id).track.samples.length, 20);
+});

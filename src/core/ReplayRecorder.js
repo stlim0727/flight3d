@@ -104,7 +104,11 @@ export class ReplayRecorder {
     if (this.track) return this.track;
     this.active = false;
     if (this.samples.length < 2 || this.validDuration + 1e-9 < REPLAY_MIN_DURATION_SEC) return null;
-    if (this.latest && this.samples.at(-1) !== this.latest) this.samples.push(this.latest);
+    if (this.latest && this.samples.at(-1) !== this.latest) {
+      this._append(this.latest);
+      // At the final rung retain the endpoint even when the flight is too long to save.
+      if (this.samples.at(-1) !== this.latest) this.samples[this.samples.length - 1] = this.latest;
+    }
     this.track = {
       intervalSec: this.interval,
       durationSec: this.elapsed,
@@ -123,6 +127,6 @@ function isQuaternion(value) {
 }
 
 function observeEngine(engine) {
-  return { n1: engine?.n1 ?? 0, n2: engine?.n2 ?? 0, egt: engine?.egt ?? 0, ff: engine?.ff ?? 0,
+  return { n1: engine?.n1 ?? 0, n2: engine?.n2 ?? 0, egt: engine?.egt ?? 0, ff: engine?.fuelFlow ?? engine?.ff ?? 0,
     failed: Boolean(engine?.failed) };
 }

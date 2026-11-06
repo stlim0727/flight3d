@@ -13,7 +13,7 @@ const GEAR_DAMAGE_STATES = Object.freeze(['normal', 'damaged', 'collapsed']);
 const SCALARS = Object.freeze([
   ['x', 0, 'f32', 1], ['y', 4, 'f32', 1], ['z', 8, 'f32', 1], ['timeSec', 12, 'f32', 1],
   ['elevator', 26, 'i8', 127], ['aileron', 27, 'i8', 127], ['rudder', 28, 'i8', 127],
-  ['pitchTrim', 29, 'i8', 127], ['flapDegree', 30, 'u8', 1], ['flapIndex', 31, 'u8', 1],
+  ['pitchTrim', 29, 'i8', 10], ['flapDegree', 30, 'u8', 1], ['flapIndex', 31, 'u8', 1],
   ['spoilers', 32, 'u8', 255], ['gearState', 33, 'u8', 255], ['throttle', 34, 'u8', 255],
   ['iasKnots', 38, 'u16', 10], ['tasKnots', 40, 'u16', 10], ['groundSpeedKnots', 42, 'u16', 10],
   ['vsiFpm', 44, 'i16', 1], ['radioAltFt', 46, 'i16', 2], ['mach', 48, 'u16', 1000],

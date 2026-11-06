@@ -29,7 +29,9 @@ debris and world animations are not recorded.
 `ReplayDirector` owns the pose during playback, interpolating positions and
 quaternions rather than re-simulating pilot input. `activePoseDriver()` is the
 physics ownership seam; the existing shadow rig keeps priority. Replay resets
-render interpolation every frame and reseeds camera damping on seeks. The host
+render interpolation every frame and reseeds camera damping on seeks. Mission-owned physics ticks feed the recorders once per step, while mission
+scoring keeps control of completion. A prepared course seed survives retry setup,
+and its track is frozen before mission terrain is released. The host
 flight created for playback is removed from both recorders and never produces a
 new debrief. Playback exit restores the previous camera/sky settings and releases
 any generated terrain owned by replay.
@@ -53,5 +55,6 @@ The script verifies record/save/watch, the 3× clock and rendered pose, backward
 scrubbing, recorded frame stepping, all cameras, portrait/landscape layouts,
 native touch speed selection, exit, library rename/delete/import, invalid input,
 reload persistence, a real Lukla recording/replay, and seeded valley terrain
-restoration using a pose fixture. Screenshots, GPU evidence and a result file
+restoration using a pose fixture, plus two real valley mission recordings with
+save/playback across a retry. Screenshots, GPU evidence and a result file
 are written under ignored `review-artifacts/replay/`.

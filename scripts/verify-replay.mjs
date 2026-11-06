@@ -10,10 +10,11 @@ process.env.GPU_ANGLE = 'vulkan';
 process.env.CHROME_PATH ||= '/home/stlim/.local/bin/chrome-headless';
 const output = resolve('review-artifacts/replay');
 await mkdir(output, { recursive: true });
-await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({ origin, cdpPort, send, evaluate: ev, screenshot, exceptions, delay }) => {
+await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({ origin, cdpPort, send, evaluate: ev, screenshot: captureScreenshot, exceptions, delay }) => {
   execFileSync(process.execPath, ['scripts/verify-browser-gpu.mjs', `http://127.0.0.1:${cdpPort}`], {
     env: { ...process.env, GPU_REPORT: `${output}/gpu.json` }, stdio: 'inherit',
   });
+  const screenshot = async file => { console.log(`Replay screenshot: ${file}`); return captureScreenshot(file); };
   await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   const click = async selector => {
     const point = await ev(`(() => {const el=document.querySelector(${JSON.stringify(selector)});el.scrollIntoView({block:'nearest'});const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
@@ -107,7 +108,30 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   await screenshot(`${output}/valley-seed.png`);
   await click('[data-exit]');
   assert.equal(await ev('s.activeAirport'), 'lukla', 'exiting restores the terrain replaced by the valley');
+  // Exercise actual arena-owned ticks and the synchronous retry preparation path.
+  await ev(`(async()=>{
+    const {installPilotArena}=await import('/src/ui/PilotArenaPanel.js');
+    if(!s.pilotArena)installPilotArena(s);
+    document.querySelector('#pilot-arena [data-seed]').value='1';
+    s.lobby.airport='valley';s.lobby.aircraft='F16';s.lobby.preset='valley';s.lobby.pilotMode='ai';
+    await s.fly();
+  })()`);
+  for (let attempt=0;attempt<2;attempt++) {
+    if(attempt)await ev('s.startFlight()');
+    await until(() => ev('s.replayRecorder.elapsed >= 6'), `real valley recording ${attempt}`, 30000);
+    assert.equal(await ev('s.replayRecorder.metadata.seed'), 1);
+    assert.equal(await ev('s.replayRecorder.metadata.airport'), 'valley');
+    await ev('s.endFlight();');
+    assert.ok(await ev('s.debriefReplay.samples.length >= 30'));
+    const saved = await ev('s.saveDebriefReplay()');
+    assert.equal(saved.ok,true);
+    await ev('(async()=>{await s.replayPanel.watch(s.replayStore.get(s.replayStore.list()[0].id).track);s.replayDirector.pause();s.replayDirector.seek(3);})()');
+    assert.equal(await ev('s.replayDirector.active'), true);
+    assert.equal(await ev('s.replayDirector._scenarioAdapter.activeSeed'), 1);
+    await ev('s.replayPanel.exit()');
+  }
+  await screenshot(`${output}/real-valley-recording.png`);
   assert.deepEqual(exceptions, [], 'no uncaught browser exceptions');
-  await writeFile(`${output}/result.json`, JSON.stringify({ passed: true, checks: ['record/save/watch', '3x clock and rendered pose', 'backwards scrub', 'frame step', '10 cameras', 'desktop/mobile/landscape', 'native touch', 'exit', 'rename/delete/import/invalid import', 'reload persistence', 'Lukla DEM replay', 'seeded valley terrain restore/exit'] }, null, 2));
+  await writeFile(`${output}/result.json`, JSON.stringify({ passed: true, checks: ['record/save/watch', '3x clock and rendered pose', 'backwards scrub', 'frame step', '10 cameras', 'desktop/mobile/landscape', 'native touch', 'exit', 'rename/delete/import/invalid import', 'reload persistence', 'Lukla DEM replay', 'seeded valley terrain restore/exit', 'two real mission recordings/save/playback'] }, null, 2));
   console.log('Replay acceptance passed');
 });
