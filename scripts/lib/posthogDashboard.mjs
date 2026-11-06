@@ -18,6 +18,8 @@ const trends = (series, { breakdown, display = 'ActionsLineGraph', interval = 'd
   },
 });
 const avg = (event, property) => ev(event, { math: 'avg', math_property: property });
+// Median resists outliers (slow cold boots) that make startup averages spiky.
+const median = (event, property) => ev(event, { math: 'median', math_property: property });
 
 export const INSIGHTS = [
   ['Flights started per day', trends([ev('flight_started')], { display: 'ActionsBar' })],
@@ -41,8 +43,8 @@ export const INSIGHTS = [
   ['Crashes by aircraft', trends([ev('flight_crashed')], { breakdown: 'aircraft', display: 'ActionsBarValue' })],
   ['Average flight duration (s)', trends([avg('flight_ended', 'durationSeconds')])],
   ['Average score', trends([avg('flight_ended', 'score')], { breakdown: 'scenario', display: 'ActionsBarValue' })],
-  ['Boot to interactive (ms)', trends([avg('startup_trace', 'fcpMs'), avg('startup_trace', 'lobbyReadyMs')])],
-  ['Reached a cockpit (ms)', trends([avg('startup_trace', 'readyMs'), avg('startup_trace', 'firstFrameMs')], { breakdown: 'outcome' })],
+  ['Boot to interactive (ms)', trends([median('startup_trace', 'fcpMs'), median('startup_trace', 'lobbyReadyMs')], { dateFrom: '-7d' })],
+  ['Reached a cockpit (ms)', trends([median('startup_trace', 'readyMs'), median('startup_trace', 'firstFrameMs')], { breakdown: 'outcome', dateFrom: '-7d' })],
   ['User feedback submitted', trends([ev('user_feedback_submitted')])],
   ['JS exceptions', trends([ev('$exception')])],
 ];
