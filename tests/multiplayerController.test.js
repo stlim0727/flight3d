@@ -8,6 +8,21 @@ import { t, bindText } from '../src/i18n/index.js';
 const source = readFileSync(new URL('../src/multiplayer/MultiplayerController.js', import.meta.url), 'utf8');
 const Controller = new Function('t', 'bindText', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText);
 
+test('pending lobby demo restart survives multiplayer modal and active room', () => {
+  const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  const condition = main.match(/if \(([^\n]+consumeDemoRestart\(\)[^\n]*)\) \{/)[1];
+  const shouldRestart = new Function(`return (${condition});`);
+  const gameFlow = new GameFlowController();
+  gameFlow.update(10);
+  const sim = { gameFlow, multiplayer: { active: false, modalOpen: true } };
+  assert.equal(shouldRestart.call(sim), false);
+  sim.multiplayer.active = true; sim.multiplayer.modalOpen = false;
+  assert.equal(shouldRestart.call(sim), false);
+  sim.multiplayer.active = false;
+  assert.equal(shouldRestart.call(sim), true);
+  assert.equal(shouldRestart.call(sim), false);
+});
+
 function fixture(run) {
   const previous = globalThis.document;
   const elements = new Map();

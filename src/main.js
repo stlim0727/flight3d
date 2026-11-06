@@ -1125,7 +1125,7 @@ class FlightSimulator {
 
     // Keep the lobby backdrop alive: re-arm the demo after it ends.
     this.gameFlow.update(frameDelta);
-    if (this.gameFlow.consumeDemoRestart() && !this.multiplayer?.active && !this.multiplayer?.modalOpen) {
+    if (!this.multiplayer?.active && !this.multiplayer?.modalOpen && this.gameFlow.consumeDemoRestart()) {
       if (isScenarioAvailable(this.activeAirport, 'demo')) this.demoDirector.start(this.activeAirport);
       if (this.lobbyScreen) {
         this.lobbyScreen.setWaitingForTerrain(this.demoDirector.waitingForTerrain === true);
