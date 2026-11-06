@@ -25,7 +25,7 @@ import { Boeing737 } from './aircraft/Boeing737.js';
 import { Cessna172 } from './aircraft/Cessna172.js';
 import { F16 } from './aircraft/F16.js';
 import { Terrain } from './environment/Terrain.js';
-import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality, applyFlatShading } from './config/renderQuality.js';
+import { RENDER_QUALITY, RENDER_QUALITY_KEY, initialRenderQuality, renderPixelRatio, applyFlatShading } from './config/renderQuality.js';
 import { WaterOcean } from './environment/WaterOcean.js';
 import { Airport } from './environment/Airport.js';
 import { FoliageAndCities } from './environment/FoliageAndCities.js';
@@ -139,7 +139,10 @@ class FlightSimulator {
 
     let savedQuality;
     try { savedQuality = localStorage.getItem(RENDER_QUALITY_KEY); } catch { /* Use default. */ }
-    this.renderQuality = resolveRenderQuality(savedQuality);
+    this.renderQuality = initialRenderQuality(savedQuality, {
+      coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+      deviceMemory: navigator.deviceMemory,
+    });
     const initialPreset = RENDER_QUALITY[this.renderQuality];
 
     this.renderer = new THREE.WebGLRenderer({
@@ -147,8 +150,8 @@ class FlightSimulator {
       logarithmicDepthBuffer: true,
       powerPreference: 'high-performance'
     });
+    this.renderer.setPixelRatio(renderPixelRatio(this.renderQuality, window.innerWidth, window.innerHeight, window.devicePixelRatio));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, initialPreset.maxDpr));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = initialPreset.shadows ?? (initialPreset.shadowMapSize > 0);

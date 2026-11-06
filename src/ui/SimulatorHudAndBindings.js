@@ -1,7 +1,7 @@
 import { t, bindText } from '../i18n/index.js';
 import { SHADOW_VIEWS } from '../director/CockpitShadowDemo.js';
 import { prepareCockpitShadowDepth } from '../aircraft/CockpitDepth.js';
-import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality, applyFlatShading } from '../config/renderQuality.js';
+import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality, renderPixelRatio, applyFlatShading } from '../config/renderQuality.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { updateControlState, touchLabel } from './FlightPanels.js';
 import { FLOW } from './GameFlowController.js';
@@ -357,7 +357,7 @@ class SimulatorHudAndBindingsMethods {
         applyFlatShading(this.aircraft.group, preset.flatShading);
       }
     }
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, preset.maxDpr));
+    this.renderer.setPixelRatio(renderPixelRatio(this.renderQuality, window.innerWidth, window.innerHeight, window.devicePixelRatio));
     const select = document.getElementById('render-quality');
     if (select) select.value = this.renderQuality;
     try { localStorage.setItem(RENDER_QUALITY_KEY, this.renderQuality); } catch { /* Session-only setting. */ }
@@ -677,6 +677,12 @@ class SimulatorHudAndBindingsMethods {
     // The projection must be rebuilt for the new aspect even when the zoomed
     // vertical FOV happens to be unchanged.
     this.camera.updateProjectionMatrix();
+    const ratio = renderPixelRatio(this.renderQuality, window.innerWidth, window.innerHeight, window.devicePixelRatio);
+    // Keep the comparison's restoration baseline valid after a viewport change.
+    if (this.renderDiagnostics?.active) this.renderDiagnostics.saved.ratio = ratio;
+    if (!this.renderDiagnostics?.active || this.renderDiagnostics.options.resolution === 'default') {
+      this.renderer.setPixelRatio(ratio);
+    }
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     if (this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.onResize(window.innerWidth, window.innerHeight);
