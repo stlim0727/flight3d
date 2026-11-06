@@ -205,6 +205,7 @@ export class DemoFlightDirector {
   }
 
   requestRestart() {
+    if (this.sim.multiplayer?.active) return;
     if (this.isRestartConfirmOpen) return;
     this.isRestartConfirmOpen = true;
     if (this.sim?.controls?.releaseAllKeys) this.sim.controls.releaseAllKeys();
@@ -321,6 +322,7 @@ export class DemoFlightDirector {
   }
 
   start(targetAirport = null, requestedProfile = this.sim.lobby?.demoProfile) {
+    if (this.sim.multiplayer?.active) return false;
     this.closeRestartConfirm?.();
     if ((targetAirport || this.sim.activeAirport) === 'hangang') return false;
     const sihwa=(targetAirport || this.sim.activeAirport)==='incheon' && resolveDemoProfile(this.sim.currentAircraftId,'incheon',requestedProfile).id==='sihwa-tour';

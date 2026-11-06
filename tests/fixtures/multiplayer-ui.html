@@ -3,6 +3,7 @@
 <script type="module">
 import { MultiplayerController } from '/src/multiplayer/MultiplayerController.js';
 import { FlightControls } from '/src/controls/FlightControls.js';
+import { DemoFlightDirector } from '/src/director/DemoFlightDirector.js';
 import { GameFlowController } from '/src/ui/GameFlowController.js';
 for (const id of ['mp-audio','mp-room','lobby-tab-multiplayer','mp-create','mp-join','mp-start','mp-respawn','mp-leave','mp-copy','mp-microphone','mp-listen','mp-mute','mp-ptt','mp-controls','mp-connect','mp-invite-row','mp-invite','mp-status','mp-roster','mp-voice-status']) {
   const el = document.createElement(id === 'mp-audio' ? 'audio' : id === 'mp-ptt' ? 'button' : 'div'); el.id = id; document.body.append(el);
@@ -14,8 +15,14 @@ const controller = new MultiplayerController(sim);
 controller.room = { host: false, closed: false, session: { name: 'Pilot', state: 'flying' } };
 controller.voice = { microphone: {}, talking: false, setTalking(on) { this.talking = on; } };
 controller.refresh();
+sim.multiplayer = controller; sim.controls = controls; sim.activeAirport = 'coastal'; sim.currentAircraftId = 'C172';
+const demo = new DemoFlightDirector(sim); demo.initUI();
 window.uiFixture = {
   controller, controls,
+  demoShortcut() {
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', code: 'KeyP', bubbles: true }));
+    return { dialog: demo.isRestartConfirmOpen, active: demo.isActive, manual: !controls.aircraftControlsDisabled };
+  },
   press(key, code) {
     const button = document.getElementById('mp-ptt'); button.focus();
     button.dispatchEvent(new KeyboardEvent('keydown', { key, code, bubbles: true, cancelable: true }));

@@ -40,6 +40,18 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   await guest.evaluate('window.releaseMultiplayerPrepare()');
   for (const c of [host, guest]) await until(() => c.evaluate('sim.multiplayer.room?.session.state === "flying" && sim.gameFlow.state === "flight"'), 'simulator shared flight', 60000);
   assert.equal(await host.evaluate('sim.controls.inputBlocked'), false, 'input released after shared go');
+  for (const c of [host, guest]) {
+    await c.evaluate('document.activeElement?.blur()');
+    const beforeDemo = await c.evaluate('sim.position.toArray()');
+    await c.send('Input.dispatchKeyEvent', { type: 'keyDown', code: 'KeyP', key: 'p' });
+    await c.send('Input.dispatchKeyEvent', { type: 'keyUp', code: 'KeyP', key: 'p' });
+    assert.equal(await c.evaluate('sim.demoDirector.isRestartConfirmOpen'), false, 'shared flight blocks P restart dialog');
+    assert.equal(await c.evaluate('sim.demoDirector.start()'), false, 'shared flight blocks direct demo starts');
+    await c.evaluate('sim.demoDirector.confirmRestart()');
+    assert.equal(await c.evaluate('!sim.demoDirector.isActive && !sim.controls.aircraftControlsDisabled'), true, 'pilot retains manual control');
+    const afterDemo = await c.evaluate('sim.position.toArray()');
+    assert.ok(Math.hypot(...afterDemo.map((n, i) => n - beforeDemo[i])) < 1, 'demo cannot teleport a parked shared aircraft');
+  }
   const hp = await host.evaluate('sim.position.toArray()'), gp = await guest.evaluate('sim.position.toArray()');
   assert.ok(Math.hypot(...hp.map((n, i) => n - gp[i])) > 70, 'separated runway slots');
   for (const c of [host, guest]) {

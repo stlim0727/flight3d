@@ -580,3 +580,38 @@ it('routes Incheon manual control requests through voice challenge overlay when 
   assert.equal(challengeTriggered, true, 'triggered voice challenge');
   assert.equal(director.isActive, false, 'stopped after voice challenge passed');
 });
+
+for (const phase of ['connecting', 'starting', 'flying']) {
+  it(`blocks demo restart requests while multiplayer is ${phase}`, () => {
+    const sim = createMockSimulator('coastal');
+    sim.currentAircraftId = 'C172';
+    sim.multiplayer = { active: true, room: { session: { state: phase } } };
+    const director = new DemoFlightDirector(sim);
+    director.requestRestart();
+    assert.strictEqual(director.isRestartConfirmOpen, false);
+    assert.strictEqual(director.isActive, false);
+  });
+}
+
+it('blocks direct demo starts and stale restart confirmations until the room is left', () => {
+  const sim = createMockSimulator('coastal');
+  sim.currentAircraftId = 'C172';
+  sim.multiplayer = { active: false };
+  const director = new DemoFlightDirector(sim);
+  director.setStage = () => {};
+  director.requestRestart();
+  assert.strictEqual(director.isRestartConfirmOpen, true);
+  sim.multiplayer.active = true;
+  const position = sim.position.clone(), velocity = sim.linearVelocity.clone();
+  assert.strictEqual(director.start('coastal'), false);
+  director.confirmRestart();
+  assert.strictEqual(director.isRestartConfirmOpen, false);
+  assert.strictEqual(director.isActive, false);
+  assert.strictEqual(sim.controls.aircraftControlsDisabled, false);
+  assert.ok(sim.position.equals(position)); assert.ok(sim.linearVelocity.equals(velocity));
+  sim.multiplayer.active = false;
+  director.requestRestart();
+  assert.strictEqual(director.isRestartConfirmOpen, true, 'solo restart available again after leaving');
+  director.confirmRestart();
+  assert.strictEqual(director.isActive, true);
+});

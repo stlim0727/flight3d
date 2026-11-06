@@ -46,6 +46,7 @@ try {
   // Keyup must still release a brake key pressed before focus moved to PTT.
   await ui.evaluate('uiFixture.controls.keys.Space = true');
   assert.deepEqual(await ui.evaluate('uiFixture.release(" ", "Space")'), { talking: false, braking: false });
+  assert.deepEqual(await ui.evaluate('uiFixture.demoShortcut()'), { dialog: false, active: false, manual: true }, 'P cannot start a demo during a shared flight');
   const host = await page(), guest = await page();
   const room = await host.evaluate('fixture.create()');
   await until(() => host.evaluate('fixture.status().registered'), 'host registered');
