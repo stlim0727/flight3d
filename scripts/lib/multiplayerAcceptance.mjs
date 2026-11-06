@@ -59,8 +59,28 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   }
 
   await open(host); await capture(host, 'modal-setup');
-  await host.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await host.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 640, deviceScaleFactor: 1, mobile: true });
   await capture(host, 'mobile-setup');
+  await host.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
+  async function swipeDialog(selector, direction) {
+    const point = await host.evaluate(`(() => { const d=document.getElementById('mp-dialog'); d.scrollTop=${direction < 0 ? '0' : 'd.scrollHeight'}; const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return {x:r.x+r.width/2,y:Math.max(120,Math.min(innerHeight-120,r.y+r.height/2))}; })()`);
+    const before = await host.evaluate('document.getElementById("mp-dialog").scrollTop');
+    await host.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...point, id: 1 }] });
+    assert.equal(await host.evaluate('sim.cameraSystem.isDragging || sim.cameraSystem.isPinching'), false, 'dialog touch must never start camera look');
+    for (let step = 1; step <= 10; step++) {
+      await host.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: point.x, y: point.y + direction * step * 18, id: 1 }] });
+      await delay(20);
+    }
+    await host.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await until(async () => {
+      const after = await host.evaluate('document.getElementById("mp-dialog").scrollTop');
+      return direction < 0 ? after > before + 30 : after < before - 30;
+    }, 'native dialog touch scroll', 3000);
+  }
+  await swipeDialog('#mp-host-title', -1);
+  await swipeDialog('#mp-host-panel', 1);
+  await capture(host, 'mobile-scrolled');
+  await host.evaluate('document.getElementById("mp-dialog").scrollTop=0');
   await host.evaluate('document.getElementById("mp-choose-join").click()');
   await capture(host, 'mobile-join');
   assert.equal(await host.evaluate('document.getElementById("mp-host-panel").hidden && !document.getElementById("mp-join-panel").hidden'), true, 'joining hides host-only stage and aircraft choices');

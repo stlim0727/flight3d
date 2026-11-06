@@ -190,7 +190,7 @@ export class CameraSystem {
   isInteractiveUI(target) {
     if (!target || typeof target.closest !== 'function') return false;
     return !!target.closest(
-      '#pilot-arena, #pilot-score-overlay, .flight-panel, .flight-toolbar, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #help-modal, #demo-restart-dialog, #diagnostics-overlay, .menu-backdrop, .debrief-card'
+      '#pilot-arena, #pilot-score-overlay, .flight-panel, .flight-toolbar, dialog, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #help-modal, #demo-restart-dialog, #diagnostics-overlay, .menu-backdrop, .debrief-card'
     );
   }
 

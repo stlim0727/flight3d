@@ -670,6 +670,19 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       assert.strictEqual(camSys.isDragging, false, 'isDragging must remain false when touching flight controls');
     });
 
+    it('leaves native dialog text and padding swipes to browser scrolling', () => {
+      const cam = new CameraSystem(new THREE.PerspectiveCamera(), mockDom);
+      const target = { closest: selector => selector.split(',').some(part => part.trim() === 'dialog') ? target : null };
+      let prevented = false;
+      const touch = { identifier: 403, clientX: 180, clientY: 400, target };
+      cam.handleTouchStart({ touches: [touch], cancelable: true, preventDefault() { prevented = true; } });
+      cam.handleTouchMove({ touches: [{ ...touch, clientY: 150 }], cancelable: true, preventDefault() { prevented = true; } });
+      assert.equal(prevented, false, 'dialog swipe must not be cancelled by camera look');
+      assert.equal(cam.activeTouchId, null);
+      assert.equal(cam.isDragging, false);
+      assert.equal(cam.isPinching, false);
+    });
+
     it('leaves pilot panel summary taps and content scrolling to the browser', () => {
       const camSys = new CameraSystem(new THREE.PerspectiveCamera(), mockDom);
       for (const surface of ['summary span', 'textarea', 'log pre', 'panel padding']) {
