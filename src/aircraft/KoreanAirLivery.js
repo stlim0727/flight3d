@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
+import { applyLogDepthOffset } from '../environment/RunwayMarkings.js';
 
 /** Classic Korean Air blue-top scheme for the 737-800.
  * Original atlas still supplies windows, doors and fan detail. No GLB is replaced.
@@ -66,8 +67,8 @@ export function applyKoreanAirLivery(model, root, container) {
         positions.getY(i) + normals.getY(i) * .008, positions.getZ(i) + normals.getZ(i) * .008);
     }
     positions.needsUpdate = true;
-    const material = new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false,
-      alphaTest: .05, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8, roughness: .4, metalness: .05 });
+    const material = applyLogDepthOffset(new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false,
+      alphaTest: .05, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8, roughness: .4, metalness: .05 }), 4);
     const decal = new THREE.Mesh(geometry, material); decal.name = name; decals.add(decal);
   };
   for (const side of [-1, 1]) {

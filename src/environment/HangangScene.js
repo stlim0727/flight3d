@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { HANGANG_COURSE, riverCenter, hangangHeight } from '../config/hangangCourse.js';
 import { createBridge, createBridgeMaterials } from './hangangBridges.js';
 import { createSeoulScenery } from './SeoulLandmarks.js';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 
 // Realistic twilight Hangang scenery featuring the Yeouido–Yongsan Han River corridor,
 // glowing bridge architecture, expressways, and sparkling metropolis night grid.
@@ -16,14 +17,15 @@ export class HangangScene {
     // Deep nocturnal water with high specular sheen to capture the sunset horizon reflection
     const river = new THREE.Mesh(
       new THREE.PlaneGeometry(18000, 18000),
-      new THREE.MeshStandardMaterial({
+      applyLogDepthOffset(new THREE.MeshStandardMaterial({
         color: 0x081119,
         roughness: 0.14,
         metalness: 0.68,
-      })
+      }), -4)
     );
     river.rotation.x = -Math.PI / 2;
     river.position.z = -2500;
+    river.renderOrder = -1;
     river.receiveShadow = true;
     this.group.add(river);
 

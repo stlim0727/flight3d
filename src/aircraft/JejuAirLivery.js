@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
+import { applyLogDepthOffset } from '../environment/RunwayMarkings.js';
 
 /**
  * Jeju Air orange-and-white livery for the Boeing 737-800 (current scheme).
@@ -168,7 +169,7 @@ export function applyJejuAirLivery(model, root, container) {
       );
     }
     positions.needsUpdate = true;
-    const material = new THREE.MeshStandardMaterial({
+    const material = applyLogDepthOffset(new THREE.MeshStandardMaterial({
       map,
       transparent: true,
       depthWrite: false,
@@ -178,7 +179,7 @@ export function applyJejuAirLivery(model, root, container) {
       polygonOffsetUnits: -8,
       roughness: 0.4,
       metalness: 0.05
-    });
+    }), 4);
     const decal = new THREE.Mesh(geometry, material);
     decal.name = name;
     decals.add(decal);

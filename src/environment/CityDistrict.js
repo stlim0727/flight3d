@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { districtSurfaceHeight } from './CitySurface.js';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 export { districtSurfaceHeight } from './CitySurface.js';
 
 export const DISTRICT = { x: 900, z: 950, spacing: 60, columns: 11, rows: 10 };
@@ -30,7 +31,7 @@ export function createDistrictRoads(terrain) {
     strip(d.x + (col - (d.columns - 1) / 2) * d.spacing,
       d.z + (row - d.rows / 2) * d.spacing, d.spacing - 12, 12);
   }
-  const mesh = new THREE.Mesh(mergeGeometries(pieces), new THREE.MeshStandardMaterial({ color: 0x444a4c, roughness: .95 }));
+  const mesh = new THREE.Mesh(mergeGeometries(pieces), applyLogDepthOffset(new THREE.MeshStandardMaterial({ color: 0x444a4c, roughness: .95 }), 2));
   pieces.forEach(g => g.dispose()); mesh.name = 'district-roads'; mesh.receiveShadow = true;
   return mesh;
 }

@@ -131,6 +131,16 @@ export class WaterOcean {
 
         void main() {
           #include <logdepthbuf_fragment>
+          #ifdef USE_LOGARITHMIC_DEPTH_BUFFER
+            if (vIsPerspective != 0.0) {
+              float camHeight = max(0.01, cameraPosition.y);
+              float crestLift = clamp(vWorldPos.y, 0.0, camHeight * 0.95);
+              float seaLevelRayScale = camHeight / max(0.01, camHeight - crestLift);
+              float seaLevelFragDepth = 1.0 + max(0.0, vFragDepth - 1.0) * seaLevelRayScale;
+              float waterDepthBias = max(0.15, 0.0005 * seaLevelFragDepth);
+              gl_FragDepth = log2(max(1.0, seaLevelFragDepth + waterDepthBias)) * logDepthBufFC * 0.5;
+            }
+          #endif
 
           vec3 viewDir = normalize(cameraPosition - vWorldPos);
           #if defined(WATER_FLAT) && WATER_FLAT == 1
@@ -204,6 +214,7 @@ export class WaterOcean {
 
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.position.y = this.waterLevel;
+    this.mesh.renderOrder = -1;
   }
 
   setQuality(quality) {

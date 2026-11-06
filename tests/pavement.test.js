@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { setPavementUVs, createRunwayRepairs } from '../src/environment/Pavement.js';
+import { setPavementUVs, createPavementMaterial, createRunwayRepairs, createRunwaySurfaceWear, createRunwayWearMaterial } from '../src/environment/Pavement.js';
+import { applyLogDepthOffset, createRunwayMarkingMaterial } from '../src/environment/RunwayMarkings.js';
+import { useProjectionDepth } from '../src/aircraft/CockpitDepth.js';
 import { LuklaAirport } from '../src/environment/LuklaAirport.js';
 
 test('pavement retains a three metre tile across different slabs and subdivisions', () => {
@@ -96,4 +98,79 @@ test('coastal pavement coverage follows the actual eight slabs without changing 
   for (const [x, z] of [[1601, 0], [0, -31], [100, 80], [701, 270], [0, 361]]) assert.equal(covered(x, z), false);
   assert.deepEqual(terrain.geometry.attributes.position.array, geometry);
   assert.deepEqual([[-1400, 0], [0, 160], [0, 270], [1700, 350]].map(([x, z]) => terrain.getHeight(x, z)), heights);
+});
+
+test('coplanar surface materials bias logarithmic fragment depth in ordered tiers and strip cleanly under projection depth', async () => {
+  const compileFragment = (material) => {
+    const shader = { fragmentShader: 'void main() {\n#include <logdepthbuf_fragment>\n}' };
+    material.onBeforeCompile(shader, {});
+    return shader.fragmentShader;
+  };
+
+  // Tier 1: runway repair slab (2.5 cm)
+  const repairsGroup = createRunwayRepairs(45, 3000);
+  const repairPatch = repairsGroup.children[0];
+  assert.match(compileFragment(repairPatch.material), /vFragDepth - 0\.025\)/);
+
+  // Tier 2: runway markings (5 cm)
+  const markingMat = createRunwayMarkingMaterial();
+  assert.match(compileFragment(markingMat), /gl_FragDepth\s*=\s*log2\(max\(1\.0,\s*vFragDepth\s*-\s*0\.05\)\)/);
+
+  // Negative units push water/river behind coplanar banks (+10 cm away from camera)
+  const riverMat = applyLogDepthOffset(new THREE.MeshStandardMaterial(), -4);
+  assert.equal(riverMat.polygonOffset, true);
+  assert.equal(riverMat.polygonOffsetFactor, 4);
+  assert.match(compileFragment(riverMat), /vFragDepth \+ 0\.1\)/);
+
+  // Projection depth strips both logdepthbuf_fragment and the injected bias block
+  const projMat = applyLogDepthOffset(new THREE.MeshStandardMaterial(), 2);
+  useProjectionDepth(projMat);
+  const stripped = compileFragment(projMat);
+  assert.ok(!stripped.includes('logdepthbuf_fragment'));
+  assert.ok(!stripped.includes('gl_FragDepth'));
+
+  // Verify surface wear (Tier 2), rubber skid marks (Tier 3), and cracks (Tier 4)
+  const context = new Proxy({}, { get: () => () => ({ addColorStop() {} }) });
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  globalThis.document = { createElement: () => ({ getContext: () => context }) };
+  globalThis.window = globalThis;
+  try {
+    const wearMesh = createRunwaySurfaceWear(45, 3000);
+    assert.match(compileFragment(wearMesh.material), /vFragDepth - 0\.05\)/);
+
+    const rubberMat = createRunwayWearMaterial();
+    assert.match(compileFragment(rubberMat), /vFragDepth - 0\.075\)/);
+
+    const repairs = createRunwayRepairs(45, 3000);
+    const crackMesh = repairs.children.find(c => c.name === 'runway-cracks');
+    assert.match(compileFragment(crackMesh.material), /vFragDepth - 0\.1\)/);
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
+  }
+});
+
+test('FoliageAndCities rebuilds draped road geometries when terrain quality switches segments', async () => {
+  const { Terrain } = await import('../src/environment/Terrain.js');
+  const { FoliageAndCities } = await import('../src/environment/FoliageAndCities.js');
+  const terrain = new Terrain(22000, 64, { quality: 'ultraLow' });
+  const scenery = new FoliageAndCities(terrain);
+
+  const initialDistrictGeo = scenery.districtRoadsMesh.geometry;
+  const initialNorthGeo = scenery.northRoadsMesh.geometry;
+  assert.equal(scenery.roadTerrainSegments, 64);
+
+  const shader = { fragmentShader: 'void main() {\n#include <logdepthbuf_fragment>\n}' };
+  scenery.districtRoadsMesh.material.onBeforeCompile(shader, {});
+  assert.match(shader.fragmentShader, /vFragDepth - 0\.05\)/);
+
+  // Switch terrain to high quality (256 segments) and notify scenery
+  terrain.setQuality('high');
+  scenery.setQuality('high');
+  assert.equal(scenery.roadTerrainSegments, 256);
+  assert.notEqual(scenery.districtRoadsMesh.geometry, initialDistrictGeo);
+  assert.notEqual(scenery.northRoadsMesh.geometry, initialNorthGeo);
 });

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 
 export const PARKED_LIVERIES = {
   korean: { name:'Korean Air', title:'KOREAN AIR', upper:0x94c8df, lower:0xe8edef, tail:0x94c8df, engine:0xe8edef, ink:'#063b70', stripe:0xc91b43 },
@@ -129,8 +130,8 @@ export async function loadParkedAirlinerAssets(baseUrl='/') {
   const decals=decalGeometry(body),gear=gearGeometry(),liveries={};
   for(const [id,livery] of Object.entries(PARKED_LIVERIES)) {
     const map=atlas(livery,id);textures.add(map);
-    liveries[id]={body:liveryMaterial(base,livery),decal:new THREE.MeshStandardMaterial({map,transparent:true,alphaTest:.05,depthWrite:false,
-      polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-8,roughness:.4})};
+    liveries[id]={body:liveryMaterial(base,livery),decal:applyLogDepthOffset(new THREE.MeshStandardMaterial({map,transparent:true,alphaTest:.05,depthWrite:false,
+      polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-8,roughness:.4}), 4)};
   }
   gltf.scene.traverse(mesh=>{if(mesh.isMesh){mesh.geometry.dispose();mesh.material.dispose();}});
   return {geometry,decals,gear,liveries,textures};

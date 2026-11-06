@@ -5,6 +5,7 @@ import { gearSupportHeight, tireContact } from './gearVisualContact.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { applyFlatShading } from '../config/renderQuality.js';
+import { applyLogDepthOffset } from '../environment/RunwayMarkings.js';
 
 // Ground-handling assembly baked into c172.glb, which must never travel with the
 // aircraft: tie-down straps, their metal spreader bars and cables, the chock bar,
@@ -558,13 +559,13 @@ export class Cessna172 {
 
           // Mount live real-time flight displays onto the Garmin G1000 instrument panel
           if (this.pfdCanvas && this.ndCanvas) {
-            const createDisplayMat = (canvas) => new THREE.MeshBasicMaterial({
+            const createDisplayMat = (canvas) => applyLogDepthOffset(new THREE.MeshBasicMaterial({
               map: canvas.texture,
               toneMapped: false,
               polygonOffset: true,
               polygonOffsetFactor: -1.0,
               polygonOffsetUnits: -2.0
-            });
+            }), 1);
 
             const screenGeo = new THREE.PlaneGeometry(0.23, 0.155);
             const mipY = 0.420;

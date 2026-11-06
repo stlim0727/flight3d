@@ -4,6 +4,7 @@ import { DISTRICT, districtLot, inDistrict, createDistrictRoads, loadDistrictKit
 import { cityWindowIntensity, createCityBuildingAssets } from './CityBuildingAssets.js';
 import { planNorthDistrict } from './NorthCityDistrict.js';
 import { surfaceGeometry } from './CitySurface.js';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 
 function mulberry32(a) {
   return function() {
@@ -34,10 +35,13 @@ export class FoliageAndCities {
     this.treeData = this.treeData.filter((_, i) => keep[i]);
     this.lastTreeCamera.set(Infinity, Infinity, Infinity);
     this.update(new THREE.Vector3());
-    this.group.add(createDistrictRoads(terrain));
+    this.districtRoadsMesh = createDistrictRoads(terrain);
+    this.group.add(this.districtRoadsMesh);
     const roads = new THREE.Mesh(surfaceGeometry(terrain, this.northDistrict.polygons),
-      new THREE.MeshStandardMaterial({ color: 0x444a4c, roughness: .95 }));
+      applyLogDepthOffset(new THREE.MeshStandardMaterial({ color: 0x444a4c, roughness: .95 }), 2));
     roads.name = 'north-district-roads'; roads.receiveShadow = true;
+    this.northRoadsMesh = roads;
+    this.roadTerrainSegments = terrain.segments;
     this.group.add(roads);
     this.districtReady = typeof window === 'undefined' ? Promise.resolve(false) :
       loadDistrictKit().then(meshes => {
@@ -147,6 +151,19 @@ export class FoliageAndCities {
       batch.meshes[1].castShadow = false;
       batch.meshes[0].receiveShadow = !isUltraLow;
       batch.meshes[1].receiveShadow = !isUltraLow;
+    }
+    if (this.terrain?.geometry && this.roadTerrainSegments !== this.terrain.segments) {
+      this.roadTerrainSegments = this.terrain.segments;
+      if (this.districtRoadsMesh) {
+        const rebuilt = createDistrictRoads(this.terrain);
+        this.districtRoadsMesh.geometry?.dispose();
+        this.districtRoadsMesh.geometry = rebuilt.geometry;
+        rebuilt.material?.dispose();
+      }
+      if (this.northRoadsMesh) {
+        this.northRoadsMesh.geometry?.dispose();
+        this.northRoadsMesh.geometry = surfaceGeometry(this.terrain, this.northDistrict.polygons);
+      }
     }
     this.lastTreeCamera.set(Infinity, Infinity, Infinity);
     this.cityLodCamera.set(Infinity, Infinity, Infinity);

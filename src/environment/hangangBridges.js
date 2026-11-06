@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { APPROACH, approachSegments, archCentre, bridgeApproaches, bridgeOpening, bridgeSolids } from '../config/hangangCourse.js';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 
 // Procedural bridge built from the same bridgeSolids() boxes HangangCollision uses.
 // Arch ribs and approach ramps are the exception: their boxes bound a tube drawn through
@@ -46,7 +47,7 @@ class ArchCurve extends THREE.Curve {
 export function createBridgeMaterials() {
   return {
     concrete: new THREE.MeshStandardMaterial({ color: 0x586066, roughness: 0.85 }),
-    road: new THREE.MeshStandardMaterial({ color: 0x1f2428, roughness: 0.9 }),
+    road: applyLogDepthOffset(new THREE.MeshStandardMaterial({ color: 0x1f2428, roughness: 0.9 }), 2),
     light: new THREE.MeshBasicMaterial({ color: 0xffb35a }),
     marker: new THREE.MeshStandardMaterial({ color: 0xffd044, emissive: 0xff9900, emissiveIntensity: 0.9 }),
   };

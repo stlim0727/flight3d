@@ -5,6 +5,7 @@ import {
   createWakeTexture,
   shipBounds
 } from './ShipAssets.js';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 
 function mulberry32(a) {
   return function() {
@@ -27,7 +28,7 @@ export class Ships {
     this.assetsRequested = new Promise(resolve => { this.startAssets = resolve; });
     this.loadAsset = loadAsset;
     this.wakeTexture = createWakeTexture();
-    this.wakeMaterial = new THREE.MeshBasicMaterial({
+    this.wakeMaterial = applyLogDepthOffset(new THREE.MeshBasicMaterial({
       map: this.wakeTexture,
       transparent: true,
       opacity: 0.55,
@@ -35,7 +36,7 @@ export class Ships {
       polygonOffset: true,
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1
-    });
+    }), 1);
     this.addVessel('cargo', 800, 4200, 35);
     this.addVessel('cruise', -2400, 5500, -60);
     this.addVessel('tanker', 4500, 6500, 110);

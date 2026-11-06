@@ -140,7 +140,10 @@ export class RenderDiagnostics {
     if (this.options.depth === 'projection') for (const [material, original] of this.materials) {
       applyOwned(material, original, 'onBeforeCompile', function(shader, renderer) {
         original.compile.call(this, shader, renderer);
-        shader.fragmentShader = shader.fragmentShader.replace('#include <logdepthbuf_fragment>', '');
+        shader.fragmentShader = shader.fragmentShader.replace(
+          /#include <logdepthbuf_fragment>(\s*#ifdef USE_LOGARITHMIC_DEPTH_BUFFER[\s\S]*?#endif)?/,
+          ''
+        );
       });
       applyOwned(material, original, 'customProgramCacheKey', () => `${original.keyValue}:render-trial-projection`);
       material.needsUpdate = true;
