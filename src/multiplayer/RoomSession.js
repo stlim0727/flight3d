@@ -2,9 +2,9 @@ import { VERSION, validConfig, cleanName, RemoteTrack } from './protocol.js';
 
 /** Pure two-pilot protocol. Transport and simulation are injected, never DOM/WebRTC. */
 export class RoomSession {
-  constructor({ host, name, config, send, prepare = async () => {}, fly = () => {}, changed = () => {}, ended = () => {}, now = () => performance.now() }) {
+  constructor({ host, name, config, send, prepare = async () => {}, canStart = () => true, fly = () => {}, changed = () => {}, ended = () => {}, now = () => performance.now() }) {
     if (host && !validConfig(config)) throw new Error('invalid-config');
-    Object.assign(this, { host, name: cleanName(name), config, send, prepare, fly, changed, ended, now });
+    Object.assign(this, { host, name: cleanName(name), config, send, prepare, canStart, fly, changed, ended, now });
     this.state = 'connecting'; this.round = 0; this.track = new RemoteTrack();
     this.lastSeen = now(); this.createdAt = now(); this.seq = 0; this.epoch = 0;
   }
@@ -13,8 +13,8 @@ export class RoomSession {
   }
   receive(m) {
     if (this.state === 'ended' || !m || typeof m !== 'object') return;
-    if (m.type === 'reject') { this.end(m.reason === 'full' ? 'full' : 'incompatible'); return; }
-    if (m.type === 'bye') { this.end('peer-left'); return; }
+    if (m.type === 'reject') { this.end(['full', 'cancelled'].includes(m.reason) ? m.reason : 'incompatible'); return; }
+    if (m.type === 'bye') { this.end(m.reason === 'cancelled' ? 'cancelled' : 'peer-left'); return; }
     if (m.type === 'ping') { this.lastSeen = this.now(); return; }
     if (m.type === 'hello' && this.host && this.state === 'connecting') {
       if (m.version !== VERSION || typeof m.name !== 'string' || m.name.length > 64) { this.end('incompatible'); return; }
@@ -41,7 +41,7 @@ export class RoomSession {
     }
   }
   start() {
-    if (!this.host || !['connected', 'flying'].includes(this.state)) return false;
+    if (!this.host || !['connected', 'flying'].includes(this.state) || !this.canStart()) return false;
     this.send({ type: 'prepare', round: this.round + 1 });
     this.beginRound(this.round + 1); return true;
   }

@@ -21,7 +21,7 @@ function fixture(run) {
   globalThis.document = { getElementById: element, querySelectorAll: () => controls };
   const gameFlow = new GameFlowController(); gameFlow.enterFlight();
   const controller = Object.assign(Object.create(Controller.prototype), {
-    soloControls: new Map(), preparationHold: false,
+    soloControls: new Map(), dialog: { open: false }, modal: { close() {}, hold() {} }, preparationHold: false,
     audio: { pause() {} },
     room: { closed: false, host: false, session: { name: 'Pilot', state: 'flying' } },
     sim: { gameFlow, syncFlowUi() {}, showToast() {}, lobbyScreen: { setSelectionBusy() {}, refresh() { restricted.disabled = true; } } },
@@ -86,3 +86,31 @@ for (const reason of ['left', 'peer-left', 'timeout']) {
     assert.equal(controller.sim.controls.inputBlocked, false);
   }));
 }
+
+test('clipboard completion cannot overwrite cancellation after the waiting deadline', async () => {
+  const previousDocument = globalThis.document;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  try {
+    globalThis.document = { getElementById: () => ({ value: 'https://example.org/?r=K7M2QX', select() {} }) };
+    for (const kind of ['code', 'link']) {
+      let complete;
+      Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { clipboard: { writeText: () => new Promise(resolve => { complete = resolve; }) } } });
+      const controller = Object.assign(Object.create(Controller.prototype), { room: { closed: false, room: 'K7M2QX' }, message: null });
+      const pending = controller.copyInvite(kind);
+      controller.room.closed = true; controller.message = 'cancelled';
+      complete(); await pending;
+      assert.equal(controller.message, 'cancelled');
+    }
+  } finally {
+    globalThis.document = previousDocument;
+    if (previousNavigator) Object.defineProperty(globalThis, 'navigator', previousNavigator);
+    else delete globalThis.navigator;
+  }
+});
+
+test('waiting and preparing rooms do not read or send flight snapshots', () => fixture(({ controller }) => {
+  for (const state of ['connecting', 'connected', 'starting', 'ended']) {
+    controller.room.session.state = state;
+    assert.doesNotThrow(() => controller.sendSnapshot(), state);
+  }
+}));

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Quaternion } from 'three';
 import { RoomSession } from '../src/multiplayer/RoomSession.js';
-import { DEFAULT_CONFIG, RemoteTrack, validSnapshot, inviteUrl, validRoom, newRoom, slotOffset, cleanName } from '../src/multiplayer/protocol.js';
+import { DEFAULT_CONFIG, RemoteTrack, validSnapshot, inviteUrl, validRoom, newRoom, slotOffset, cleanName, parseRoom, roomPeerId } from '../src/multiplayer/protocol.js';
+import { WaitingLease } from '../src/multiplayer/WaitingLease.js';
 import { VoiceLink } from '../src/multiplayer/VoiceLink.js';
 
 const pose = (seq = 0, epoch = 0) => ({ seq, epoch, round: 1, p: [0, 750, 0], q: [0, 0, 0, 1], v: [0, 0, -60], gear: 1, flaps: 0, crashed: false, held: false, talking: false });
@@ -17,13 +18,40 @@ function pair({ prepareHost = async () => {}, prepareGuest = async () => {} } = 
   return { host, guest, flush, hq, gq, ends, advance: ms => { now += ms; }, flights: () => [hostFlights, guestFlights] };
 }
 
-test('invite IDs use 128-bit UUID capabilities, retain deployment path and discard solo URL/hash', () => {
+test('six-character room codes keep deployment paths and discard solo URL/hash', () => {
   const room = newRoom(); assert.equal(validRoom(room), true);
   const u = new URL(inviteUrl(room, 'https://example.org/flight3d/?fly=1&terrain=lukla#x'));
-  assert.equal(u.pathname, '/flight3d/'); assert.equal(u.searchParams.get('room'), room); assert.equal(u.hash, ''); assert.equal(u.searchParams.size, 1);
-  for (const invalid of ['', '<script>', 'f3d-1234', null, room + '/x']) assert.equal(validRoom(invalid), false);
+  assert.equal(u.pathname, '/flight3d/'); assert.equal(u.searchParams.get('r'), room); assert.equal(u.hash, ''); assert.equal(u.searchParams.size, 1);
+  for (const invalid of ['', '<script>', 'f3d-1234', null, room + '/x', '01IO00']) assert.equal(validRoom(invalid), false);
   assert.equal(cleanName('<b>\nPilot\0'), 'bPilot');
   assert.equal(cleanName(''), 'Pilot');
+});
+
+test('manual room input accepts grouped/lowercase codes and compact invite links', () => {
+  assert.equal(parseRoom(' k7m-2qx '), 'K7M2QX');
+  assert.equal(parseRoom('https://example.org/flight3d/?r=k7m2qx'), 'K7M2QX');
+  assert.equal(parseRoom('https://example.org/?room=K7M2QX'), 'K7M2QX');
+  for (const invalid of ['abc', 'https://bad/?r=abc', 'K7M2QX/evil', null, '000000']) assert.equal(parseRoom(invalid), null);
+  assert.equal(roomPeerId('K7M2QX'), 'flight3d-v2-K7M2QX');
+  for (let i = 0; i < 100; i++) assert.equal(validRoom(newRoom()), true);
+});
+
+test('creator waiting lease expires at exactly ten seconds and cannot be revived', () => {
+  let now = 0;
+  const lease = new WaitingLease({ now: () => now });
+  assert.equal(lease.remaining, 10000);
+  now = 9999; assert.equal(lease.expired, false); assert.equal(lease.renew(), true);
+  assert.equal(lease.deadline, 19999);
+  now = 19999; assert.equal(lease.expired, true); assert.equal(lease.remaining, 0);
+  assert.equal(lease.renew(), false); assert.equal(lease.deadline, 19999);
+});
+
+test('late guests understand explicit cancellation and expired hosts cannot start', () => {
+  let reason;
+  const guest = new RoomSession({ host: false, send() {}, ended: r => { reason = r; } });
+  guest.receive({ type: 'reject', reason: 'cancelled' }); assert.equal(reason, 'cancelled');
+  const p = pair(); p.host.canStart = () => false;
+  assert.equal(p.host.start(), false); assert.equal(p.host.round, 0); assert.equal(p.host.state, 'connected');
 });
 
 test('host owns config and start; neither pilot flies until both prepare, duplicates cannot restart', async () => {

@@ -21,7 +21,7 @@ try {
   if (!publicMode) process.env.VITE_MULTIPLAYER_SIGNAL_URL = `http://127.0.0.1:${signalPort}/flight3d`;
   vite = await createServer({ server: { host: '127.0.0.1', port: vitePort, strictPort: true }, logLevel: 'error' }); await vite.listen();
   chrome = spawn(process.env.CHROME_PATH || 'google-chrome-stable', [
-    '--headless=new', `--user-data-dir=${profile}`, `--remote-debugging-port=${cdpPort}`,
+    '--headless=new', '--window-size=1280,900', `--user-data-dir=${profile}`, `--remote-debugging-port=${cdpPort}`,
     '--enable-gpu', '--use-gl=angle', '--use-angle=vulkan', '--disable-software-rasterizer',
     '--no-first-run', '--no-default-browser-check', '--autoplay-policy=no-user-gesture-required',
     ...(simulatorMode ? ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] : []),
@@ -39,6 +39,11 @@ try {
     await verifyMultiplayerSimulator({ page, cdpPort, browsers });
   } else {
   const ui = await page('/tests/fixtures/multiplayer-ui.html', 'Boolean(window.uiFixture)');
+  assert.deepEqual(await ui.evaluate('uiFixture.modalStatus()'), { open: true, held: true, blocked: true, focusInside: true, outsideClicks: 0 }, 'modal isolates background focus and flight input');
+  const outside = await ui.evaluate('(() => { const r=document.getElementById("outside").getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()');
+  await ui.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...outside });
+  await ui.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...outside });
+  assert.equal((await ui.evaluate('uiFixture.modalStatus()')).outsideClicks, 0, 'native modal blocks background clicks');
   for (const [key, code] of [[' ', 'Space'], ['Enter', 'Enter']]) {
     assert.deepEqual(await ui.evaluate(`uiFixture.press(${JSON.stringify(key)}, ${JSON.stringify(code)})`), { talking: true, braking: false }, 'PTT activation must not brake');
     assert.deepEqual(await ui.evaluate(`uiFixture.release(${JSON.stringify(key)}, ${JSON.stringify(code)})`), { talking: false, braking: false }, 'PTT release must not brake');
@@ -85,9 +90,26 @@ try {
   await guest.evaluate('fixture.room.close()');
   await until(() => host.evaluate('fixture.ended.includes("peer-left") && fixture.voice.closed'), 'disconnect and microphone cleanup');
   assert.equal(await guest.evaluate('fixture.voice.stream.getTracks().every(t => t.readyState === "ended")'), true);
+  // Expiry is advertised after multiplayer and voice have already been torn down.
+  const expiring = await page();
+  const cancelledCode = await expiring.evaluate('fixture.create(undefined, 1500)');
+  await until(() => expiring.evaluate('fixture.room.registered'), 'expiring room registration');
+  assert.equal(await expiring.evaluate('fixture.room.keepWaiting()'), true, 'creator explicitly renews waiting lease');
+  await until(() => expiring.evaluate('fixture.ended.includes("cancelled") && fixture.voice.closed'), 'waiting lease cancellation');
+  assert.equal(await expiring.evaluate('fixture.room.keepWaiting()'), false, 'cancelled room cannot be revived');
+  const late = await page(); await late.evaluate(`fixture.create(${JSON.stringify(cancelledCode)})`);
+  await until(() => late.evaluate('fixture.ended.includes("cancelled")'), 'late join receives explicit cancellation');
+  assert.equal(await late.evaluate('fixture.flights'), 0);
+  await ui.evaluate(`uiFixture.join(${JSON.stringify(cancelledCode)})`);
+  await until(() => ui.evaluate('uiFixture.controller.message === "cancelled"'), 'late join modal cancellation message');
+  assert.match(await ui.evaluate('document.getElementById("mp-status").textContent'), /cancelled/i);
+  assert.equal(await ui.evaluate('uiFixture.controller.dialog.matches(":modal")'), true);
+  await expiring.evaluate('fixture.room.dispose()');
+  const gone = await page(); await gone.evaluate(`fixture.create(${JSON.stringify(cancelledCode)})`);
+  await until(() => gone.evaluate('fixture.ended.includes("not-found")'), 'closed creator tab has no live room');
   for (const c of browsers) assert.deepEqual(c.errors, [], 'no browser exceptions');
   console.log(`${publicMode ? 'Public PeerJS service' : 'Local signaling'} verified`);
-  console.log('PASS Chrome WebRTC: two-pilot config/start barrier, bidirectional snapshots, respawn, third-peer rejection, bidirectional decoded audio/PTT silence + RTP, restart, disconnect/track cleanup. No WebGL tested.');
+  console.log('PASS Chrome WebRTC: two-pilot config/start barrier, bidirectional snapshots, respawn, third-peer rejection, bidirectional decoded audio/PTT silence + RTP, restart, disconnect/track cleanup, modal focus/input isolation, creator lease expiry and late-join cancellation. No WebGL tested.');
   }
 } catch (error) {
   console.error(error); if (chromeLog) console.error(chromeLog);

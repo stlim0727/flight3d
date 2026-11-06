@@ -1,30 +1,41 @@
 # Fly and talk with a friend
 
-1. Open **Fly together** in the main menu. Enter your name and choose the shared
-   scenery, aircraft, and runway or cruise start.
-2. Choose **Create room · max 2**, then copy the invite link to one friend.
-3. Your friend opens that link and chooses **Join friend**. Both pilots see the
-   same room configuration; the host chooses **Start together**.
-4. Choose **Enable microphone**, then hold **N** or **Hold to talk** to speak.
-   Release to stop. Microphone access is optional: you can listen without it.
-   **Mute friend** affects only what you hear. If the browser blocks playback,
-   choose **Play friend’s voice**.
+1. Open **Fly together** in the main menu. Multiplayer setup and room controls
+   use a modal dialog. Background simulator controls cannot be used while it is
+   open, and your own aircraft is held.
+2. Enter your name, scenery, aircraft, and runway/cruise start, then choose
+   **Create room · max 2**. Share the six-character code (for example `K7M 2QX`)
+   or use **Copy invite** for a compact link ending in `?r=K7M2QX`.
+3. While waiting to start, the creator must press **Keep room open** before the
+   ten-second countdown ends. Each press grants another ten seconds. Missing a
+   press cancels the room; it cannot be revived by pressing late.
+4. Your friend chooses **Join friend** with the code or link. Spaces, hyphens,
+   and lowercase letters are accepted. The creator chooses **Start together**;
+   both dialogs close when the shared flight is ready. The waiting deadline no
+   longer applies after starting preparation or during flight.
+5. Open **Room** to change voice settings, reset or restart, or leave. Your plane
+   stays held while this dialog is open; the other pilot may continue flying.
+   Closing it resumes only the pause introduced by the dialog. A pause you set
+   yourself stays paused.
 
-The room holds two pilots including the host. It supports the C172, B738 and F16
-at coastal airport, Incheon and neon city. The host selects one shared aircraft
-type. Cruise places the guest beside the host; runway starts put the guest 80 m
-behind. Remote aircraft are blue simplified models and do not collide with you.
-There is no automatic takeoff clearance or scoring in this shared flight mode.
+Choose **Enable microphone** in the room dialog. During flight, hold **N** to
+speak and release to stop. The touch/keyboard **Hold to talk** button is inside
+the modal and operates while your aircraft is held. Microphone access is
+optional; you can listen without it. **Mute friend** affects only what you hear.
+If the browser blocks playback, choose **Play friend’s voice**.
 
-**Reset my aircraft** returns only you to your slot, including after a crash.
-The host can **Restart together**. Menus, pause and background tabs hold your own
-plane; the other pilot sees a paused indicator. Keep the flight tab visible to
-fly. **Leave room** releases the microphone and returns both players to solo
-flight. If either pilot loses connection, create a new room to reconnect.
+The room holds two pilots including its creator. It supports the C172, B738 and
+F16 at coastal airport, Incheon and neon city. Both use the creator's aircraft
+type. Cruise places the guest beside the creator; runway starts put the guest
+80 m behind. Remote aircraft are simplified blue models without collisions.
+**Reset my aircraft** returns only you to your slot; **Restart together** starts
+both pilots again. There is no automatic takeoff clearance or scoring.
 
-Invite only trusted friends: peer-to-peer connections can reveal IP addresses.
-The app does not record voice. The static site uses external PeerJS connection
-services; a room needs its host tab open, and restrictive networks can prevent
-connections. Try another network or recreate the room if connection fails.
-Cross-network and mobile-browser support depends on WebRTC and available relay
-services; see [implementation and verification](development/multiplayer.md).
+A cancelled room releases its media and cannot accept players. Later joiners
+receive a cancellation message. If the creator's tab is gone or its cancelled
+address has been released, the message says the room was cancelled or is
+unavailable and asks for a new code. Losing either pilot ends the session.
+
+Invite trusted friends: peer-to-peer connections can reveal IP addresses. The
+app does not record voice. It uses external PeerJS services, so some networks
+may prevent connections. See [implementation and verification](development/multiplayer.md).

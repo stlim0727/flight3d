@@ -7,14 +7,14 @@ const signalPort = Number(new URLSearchParams(location.search).get('signalPort')
 let prepareResolve;
 window.fixture = {
   flights: 0, prepared: [], ended: [], hold: false,
-  create(room) {
+  create(room, waitingMs) {
     this.voice = new VoiceLink({ capture: async () => {
       const oscillator = this.voice.context.createOscillator(); oscillator.frequency.value = 440;
       const destination = this.voice.context.createMediaStreamDestination();
       oscillator.connect(destination); oscillator.start(); this.oscillator = oscillator;
       return destination.stream;
     } });
-    this.room = new PeerRoom({ room, name: room ? 'Guest' : 'Host', config: DEFAULT_CONFIG, voice: this.voice,
+    this.room = new PeerRoom({ room, name: room ? 'Guest' : 'Host', config: DEFAULT_CONFIG, voice: this.voice, waitingMs,
       options: new URLSearchParams(location.search).has('public') ? undefined : { host: '127.0.0.1', port: signalPort, secure: false, path: '/flight3d', config: { iceServers: [] } },
       prepare: async (c, slot) => { this.prepared.push({ c, slot }); if (this.hold) await new Promise(r => { prepareResolve = r; }); },
       fly: () => this.flights++, ended: reason => this.ended.push(reason),
