@@ -1,6 +1,7 @@
 import { Peer } from 'peerjs';
 import { RoomSession } from './RoomSession.js';
-import { newRoom, validRoom, VERSION } from './protocol.js';
+import { WaitingLease, WAITING_TIMEOUT_MS } from './WaitingLease.js';
+import { newRoom, validRoom, roomPeerId, VERSION } from './protocol.js';
 
 /** Production configuration comes from the build, never an invite link. */
 export function peerOptions(env = import.meta.env) {
@@ -16,51 +17,79 @@ export function peerOptions(env = import.meta.env) {
 
 /** Exactly one admitted peer. PeerJS is confined here so protocol tests need no browser. */
 export class PeerRoom {
-  constructor({ room, name, config, voice, options = peerOptions(), prepare, fly, changed = () => {}, remoteStream = () => {}, ended = () => {} }) {
+  constructor({ room, name, config, voice, options = peerOptions(), prepare, fly, changed = () => {}, remoteStream = () => {}, ended = () => {}, waitingMs = WAITING_TIMEOUT_MS }) {
     if (room && !validRoom(room)) throw new Error('invalid-room');
-    this.host = !room; this.room = room || newRoom(); this.closed = false;
+    this.host = !room; this.room = room || newRoom(); this.closed = false; this.disposed = false; this.waitingMs = waitingMs; this.rejections = new Map();
     Object.assign(this, { voice, changed, remoteStream, ended });
-    this.session = new RoomSession({ host: this.host, name, config, prepare, fly,
+    this.session = new RoomSession({ host: this.host, name, config, prepare, canStart: () => this.checkWaiting(),
+      fly: () => { this.hasStarted = true; fly?.(); },
       send: m => this.send(m), changed, ended: reason => this.close(reason) });
-    this.peer = new Peer(this.host ? this.room : undefined, options);
+    this.peer = new Peer(this.host ? roomPeerId(this.room) : undefined, options);
     this.peer.on('open', () => {
       if (this.closed) return;
-      this.registered = true; this.changed();
-      if (!this.host) this.attach(this.peer.connect(this.room, { reliable: true, serialization: 'json', metadata: { version: VERSION } }));
+      this.registered = true;
+      if (this.host) this.waitingLease = new WaitingLease({ duration: this.waitingMs });
+      this.changed();
+      if (!this.host) this.attach(this.peer.connect(roomPeerId(this.room), { reliable: true, serialization: 'json', metadata: { version: VERSION } }));
     });
     this.peer.on('connection', conn => {
-      if (!this.host || this.connection || this.closed) {
-        conn.on('open', () => {
-          conn.send({ type: 'reject', reason: 'full' });
-          // Give the rejection a chance to leave the reliable channel before closing it.
-          const timer = setTimeout(() => { conn.close(); this.rejections.delete(conn); }, 250);
-          this.rejections.set(conn, timer);
-        });
-        conn.on('error', () => conn.close()); return;
-      }
+      this.checkWaiting();
+      if (this.closed) { this.reject(conn, 'cancelled'); return; }
+      if (!this.host || this.connection) { this.reject(conn, 'full'); return; }
       this.attach(conn);
     });
     this.peer.on('call', call => {
+      if (!this.checkWaiting()) { call.close(); return; }
       if (this.closed || !this.connection?.open || call.peer !== this.connection.peer || this.call || !this.voice) { call.close(); return; }
       this.attachCall(call); call.answer(this.voice.stream);
     });
-    this.peer.on('error', error => this.close(error.type === 'peer-unavailable' ? 'not-found' : 'connection'));
-    this.peer.on('disconnected', () => this.close('connection'));
-    this.rejections = new Map();
+    this.peer.on('error', error => {
+      if (this.closed) { this.dispose(); return; }
+      this.close(error.type === 'peer-unavailable' ? 'not-found' : 'connection');
+    });
+    this.peer.on('disconnected', () => { if (this.closed) this.dispose(); else this.close('connection'); });
+    this.lastHeartbeat = performance.now();
     this.timer = setInterval(() => {
-      // A host can wait indefinitely for its first friend, but not a half-open join.
+      if (!this.checkWaiting()) return;
+      const seconds = this.waitingSeconds;
+      if (seconds !== this.shownSeconds) { this.shownSeconds = seconds; this.changed(); }
+      if (performance.now() - this.lastHeartbeat < 1000) return;
+      this.lastHeartbeat = performance.now();
       if (this.host && this.registered && !this.connection) this.session.createdAt = performance.now();
       this.session.tick();
-    }, 1000);
+    }, 100);
+  }
+  get waiting() { return this.host && this.registered && !this.closed && ['connecting', 'connected'].includes(this.session.state); }
+  get waitingSeconds() { return this.waiting ? Math.ceil(this.waitingLease.remaining / 1000) : null; }
+  checkWaiting() {
+    if (this.closed) return false;
+    if (this.waiting && this.waitingLease.expired) { this.close('cancelled'); return false; }
+    return true;
+  }
+  keepWaiting() {
+    if (!this.checkWaiting() || !this.waiting || !this.waitingLease.renew()) return false;
+    this.changed(); return true;
+  }
+  reject(conn, reason) {
+    const cleanup = () => { clearTimeout(this.rejections.get(conn)); this.rejections.delete(conn); conn.close(); };
+    this.rejections.set(conn, setTimeout(cleanup, 5000));
+    conn.on('error', cleanup);
+    conn.on('open', () => {
+      if (this.disposed) { cleanup(); return; }
+      conn.send({ type: 'reject', reason });
+      clearTimeout(this.rejections.get(conn));
+      this.rejections.set(conn, setTimeout(cleanup, 250));
+    });
   }
   attach(conn) {
     this.connection = conn;
     conn.on('open', () => {
-      if (this.closed) { conn.close(); return; }
+      if (!this.checkWaiting()) { conn.close(); return; }
       this.session.opened(); this.changed();
     });
     conn.on('data', message => {
       if (typeof message !== 'object' || message === null || JSON.stringify(message).length > 4096) return;
+      if (!this.checkWaiting()) return;
       // Bound work from a peer independently of rendering and room heartbeat.
       const second = Math.floor(performance.now() / 1000);
       if (second !== this.messageSecond) { this.messageSecond = second; this.messageCount = 0; }
@@ -70,7 +99,7 @@ export class PeerRoom {
         this.attachCall(this.peer.call(conn.peer, this.voice.stream));
       }
     });
-    conn.on('close', () => this.close('peer-left'));
+    conn.on('close', () => this.close(this.hasStarted ? 'peer-left' : 'cancelled'));
     conn.on('error', () => this.close('connection'));
   }
   attachCall(call) {
@@ -87,11 +116,20 @@ export class PeerRoom {
   }
   close(reason = 'left') {
     if (this.closed) return;
-    this.send({ type: 'bye' }); this.closed = true; clearInterval(this.timer);
+    this.send({ type: 'bye', reason: reason === 'cancelled' ? 'cancelled' : 'peer-left' }); this.closed = true; clearInterval(this.timer);
     this.session.end(reason);
     for (const [conn, timer] of this.rejections) { clearTimeout(timer); conn.close(); }
     this.rejections.clear();
-    this.call?.close(); this.connection?.close(); this.peer.destroy(); this.voice?.close();
+    this.call?.close(); this.connection?.close(); this.voice?.close();
+    // Keep a cancelled host address reserved while this tab lives, so late joiners
+    // get an explicit rejection rather than joining a silently abandoned room.
+    if (!this.host || !this.registered || this.disposed || reason === 'connection') this.peer.destroy();
     this.ended(reason); this.changed();
+  }
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true; this.close();
+    for (const [conn, timer] of this.rejections) { clearTimeout(timer); conn.close(); }
+    this.rejections.clear(); this.peer.destroy();
   }
 }

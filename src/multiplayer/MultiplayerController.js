@@ -1,7 +1,8 @@
 import { PeerRoom } from './PeerRoom.js';
 import { VoiceLink } from './VoiceLink.js';
+import { MultiplayerDialog } from './MultiplayerDialog.js';
 import { RemoteAircraft } from './RemoteAircraft.js';
-import { inviteUrl, validRoom, DEFAULT_CONFIG, slotOffset } from './protocol.js';
+import { inviteUrl, parseRoom, DEFAULT_CONFIG, slotOffset } from './protocol.js';
 import { t, bindText } from '../i18n/index.js';
 import { setSimulationWind } from '../physics/WindField.js';
 
@@ -9,30 +10,25 @@ export class MultiplayerController {
   constructor(sim) {
     this.sim = sim; this.preparing = false; this.preparationHold = false;
     this.soloControls = new Map();
+    this.dialog = document.getElementById('mp-dialog');
+    this.modal = new MultiplayerDialog(sim, this.dialog, () => this.dismissDialog());
+    document.getElementById('mp-open').onclick = () => this.openDialog();
+    document.getElementById('mp-room-menu').onclick = () => this.openDialog();
+    document.getElementById('mp-dialog-close').onclick = () => this.dismissDialog();
+    document.getElementById('mp-keep-waiting').onclick = () => this.room?.keepWaiting();
     this.audio = document.getElementById('mp-audio');
     this.roomInput = document.getElementById('mp-room');
-    const invite = new URLSearchParams(location.search).get('room');
-    if (invite) {
-      this.roomInput.value = invite;
-      document.getElementById('lobby-tab-multiplayer').click();
-      if (!validRoom(invite)) this.message = 'invalid-room';
-    }
     document.getElementById('mp-create').onclick = () => this.connect();
     document.getElementById('mp-join').onclick = () => {
-      let room = this.roomInput.value.trim();
-      try { if (room.startsWith('http')) room = new URL(room).searchParams.get('room'); } catch { /* Invalid below. */ }
-      if (!validRoom(room)) { this.message = 'invalid-room'; this.refresh(); return; }
+      const room = parseRoom(this.roomInput.value);
+      if (!room) { this.message = 'invalid-room'; this.refresh(); return; }
       this.connect(room);
     };
     document.getElementById('mp-start').onclick = () => this.room?.session.start();
     document.getElementById('mp-respawn').onclick = () => this.respawnLocal();
     document.getElementById('mp-leave').onclick = () => this.room?.close();
-    document.getElementById('mp-copy').onclick = async () => {
-      const input = document.getElementById('mp-invite'); input.select();
-      try { await navigator.clipboard.writeText(input.value); this.message = 'copied'; }
-      catch { this.message = 'copy-manually'; }
-      this.refresh();
-    };
+    document.getElementById('mp-copy-code').onclick = () => this.copyInvite('code');
+    document.getElementById('mp-copy').onclick = () => this.copyInvite('link');
     document.getElementById('mp-microphone').onclick = () => {
       if (this.voice?.microphone) this.voice.disableMicrophone();
       else this.voice?.enableMicrophone();
@@ -47,15 +43,46 @@ export class MultiplayerController {
     ptt.onblur = () => this.releaseTalk();
     // Capture N before flight controls, only outside text inputs, only while in a room.
     window.addEventListener('keydown', e => {
-      if (this.active && e.code === 'KeyN' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.target.closest?.('input,textarea,select,[contenteditable=true]')) {
+      if (this.active && !this.modalOpen && e.code === 'KeyN' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.target.closest?.('input,textarea,select,[contenteditable=true]')) {
         e.preventDefault(); e.stopImmediatePropagation(); this.voice?.setTalking(true);
       }
     }, true);
     window.addEventListener('keyup', e => { if (e.code === 'KeyN') this.releaseTalk(); }, true);
     window.addEventListener('blur', () => this.releaseTalk());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.releaseTalk(); });
-    window.addEventListener('pagehide', () => this.room?.close());
+    window.addEventListener('pagehide', () => this.room?.dispose());
     this.refresh();
+    const params = new URLSearchParams(location.search);
+    this.joinInvite(params.get('r') ?? params.get('room'));
+  }
+  joinInvite(invite) {
+    if (invite === null) return;
+    this.roomInput.value = invite;
+    this.openDialog();
+    const room = parseRoom(invite);
+    if (room) this.connect(room);
+    else { this.message = 'invalid-room'; this.refresh(); }
+  }
+  get modalOpen() { return this.dialog.open; }
+  openDialog() { this.releaseTalk(); this.modal.open(); this.refresh(); }
+  dismissDialog() {
+    if (this.active && this.room.session.state !== 'flying') this.room.close('cancelled');
+    this.releaseTalk(); this.modal.close();
+  }
+  async copyInvite(kind) {
+    if (!this.active) return;
+    const room = this.room;
+    const input = document.getElementById(kind === 'code' ? 'mp-code' : 'mp-invite');
+    let copied = false;
+    try { await navigator.clipboard.writeText(kind === 'code' ? room.room : input.value); copied = true; }
+    catch { /* Offer manual selection below if this room is still live. */ }
+    // Permission prompts can outlive the waiting deadline or a replacement room.
+    if (room !== this.room || room.closed) return;
+    if (!copied) {
+      if (kind === 'link') document.getElementById('mp-link-details').open = true;
+      input.select();
+    }
+    this.message = copied ? 'copied' : 'copy-manually'; this.refresh();
   }
   get active() { return Boolean(this.room && !this.room.closed); }
   get locked() { return this.active && !this.preparing; }
@@ -63,10 +90,11 @@ export class MultiplayerController {
   connect(room) {
     if (this.active || this.preparing || this.sim.startingFlight || this.sim.airportLoading) return;
     this.message = null;
+    this.room?.dispose();
     const config = Object.fromEntries(Object.keys(DEFAULT_CONFIG).map(key => [key, document.getElementById(`mp-${key}`).value]));
     try {
       this.voice = new VoiceLink({ changed: () => this.refresh() });
-      // Unlock the voice context inside Create/Join's user gesture, even for listeners.
+      // Invite URLs join without a gesture; blocked audio can be enabled in the modal.
       this.voice.context.resume().catch(() => {});
       this.room = new PeerRoom({ room, name: document.getElementById('mp-name').value, config, voice: this.voice,
         prepare: (c, slot) => this.prepare(c, slot), fly: () => this.startTogether(),
@@ -78,6 +106,7 @@ export class MultiplayerController {
   }
   startTogether() {
     this.preparationHold = false;
+    this.modal.close({ resume: false });
     this.sim.gameFlow.enterFlight(); this.sim.syncFlowUi();
   }
   releasePreparationHold() {
@@ -87,6 +116,7 @@ export class MultiplayerController {
   }
   async prepare(config, slot) {
     const room = this.room;
+    this.openDialog();
     this.preparing = true; this.preparationHold = true; this.slot = slot; this.releaseTalk();
     this.remote?.dispose(); this.remote = null;
     try {
@@ -120,14 +150,15 @@ export class MultiplayerController {
     if (!this.active || this.room.session.state !== 'flying') return;
     this.releaseTalk();
     this.sim.setPreset(this.room.session.config.scenario);
+    this.modal.close({ resume: false });
     this.sim.gameFlow.enterFlight();
     this.sim.beginFlightRecording();
   }
   sendSnapshot() {
-    if (!this.active) return;
+    if (!this.active || this.room.session.state !== 'flying') return;
     const sim = this.sim;
     this.room.session.snapshot({ p: sim.position.toArray(), q: sim.quaternion.toArray(), v: sim.linearVelocity.toArray(),
-      crashed: sim.isCrashed, held: sim.browserBackgrounded === true || sim.gameFlow.isPhysicsFrozen(),
+      crashed: sim.isCrashed, held: this.modalOpen || sim.browserBackgrounded === true || sim.gameFlow.isPhysicsFrozen(),
       gear: sim.gear.gearState, flaps: sim.aero.currentFlapAngle, talking: this.voice?.talking === true });
   }
   update() {
@@ -155,6 +186,7 @@ export class MultiplayerController {
     this.sim.lobbyScreen?.refresh();
     // A failed prepare must not leave the local simulator stuck at the barrier.
     this.releasePreparationHold();
+    this.modal.hold();
     // An early local resume may already be in flight while input still belongs to the barrier.
     this.sim.syncFlowUi();
     this.refresh();
@@ -162,11 +194,23 @@ export class MultiplayerController {
   refresh() {
     const active = this.active, room = this.room, s = room?.session;
     document.getElementById('mp-controls').hidden = !active;
+    document.getElementById('mp-intro').hidden = active;
+    bindText(document.getElementById('mp-dialog-help'), () => t(!active ? 'mp.setupHelp' : s.state === 'starting' ? 'mp.state.starting' : s.state !== 'flying' ? (room.host ? 'mp.hostWaitingHelp' : 'mp.guestWaitingHelp') : 'mp.dialogHelp'));
     document.getElementById('mp-connect').disabled = active;
+    document.getElementById('mp-connect').hidden = active;
+    document.getElementById('mp-room-menu').hidden = !active;
+    bindText(document.getElementById('mp-dialog-close'), () => t(active && s.state !== 'flying' ? 'mp.cancelAndClose' : 'mp.closeDialog'));
+    const waiting = active && room.waiting;
+    document.getElementById('mp-waiting').hidden = !waiting;
+    document.getElementById('mp-keep-waiting').disabled = !waiting;
+    bindText(document.getElementById('mp-waiting-status'), () => waiting ? t('mp.keepWaitingCountdown', { seconds: room.waitingSeconds }) : '');
     document.getElementById('mp-create').disabled = active;
     document.getElementById('mp-join').disabled = active;
     document.getElementById('mp-invite-row').hidden = !active || !room.host || !room.registered;
-    if (active && room.host) document.getElementById('mp-invite').value = inviteUrl(room.room, location.href);
+    if (active && room.host) {
+      document.getElementById('mp-invite').value = inviteUrl(room.room, location.href);
+      document.getElementById('mp-code').value = `${room.room.slice(0, 3)} ${room.room.slice(3)}`;
+    }
     document.getElementById('mp-respawn').disabled = s?.state !== 'flying';
     const start = document.getElementById('mp-start');
     start.hidden = !active || !room.host;
@@ -188,7 +232,7 @@ export class MultiplayerController {
     bindText(document.getElementById('mp-voice-status'), () => t(this.voice?.error ? 'mp.status.microphone' : room?.voiceError ? 'mp.voiceFailed' : this.voice?.talking ? 'mp.transmitting' : room?.mediaConnected ? 'mp.voiceReady' : 'mp.listenOnly'));
     document.getElementById('mp-listen').hidden = !this.playbackBlocked;
     document.getElementById('mp-mute').setAttribute('aria-pressed', String(this.audio.muted));
-    // Room configuration is immutable until leaving; regular solo selections cannot diverge it.
+    // Room configuration stays immutable even when the flight menu is reopened.
     if (active) {
       for (const el of document.querySelectorAll('#lobby-panel-scenario button, #lobby-panel-scenario select, #btn-fly')) {
         if (!this.soloControls.has(el)) this.soloControls.set(el, el.disabled);
@@ -197,7 +241,6 @@ export class MultiplayerController {
     } else if (this.soloControls.size) {
       for (const [el, disabled] of this.soloControls) el.disabled = disabled;
       this.soloControls.clear();
-      // Recompute aircraft/time availability for any scenery changed during preparation.
       this.sim.lobbyScreen?.refresh();
     }
   }

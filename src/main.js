@@ -548,7 +548,7 @@ class FlightSimulator {
       }
     }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
-    this.controls.inputBlocked = this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human') || Boolean(this.demoDirector?.isRestartConfirmOpen);
+    this.controls.inputBlocked = this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human') || Boolean(this.demoDirector?.isRestartConfirmOpen);
     if (state !== FLOW.FLIGHT) {
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0.0, 0.0);
@@ -1117,7 +1117,7 @@ class FlightSimulator {
     if (this.shadowDemo.active) {
       this.physicsAccumulator = 0;
       if (!this.gameFlow.isPhysicsFrozen()) this.shadowDemo.update(frameDelta);
-    } else if (this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
+    } else if (this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
       this.physicsAccumulator = 0;
     } else {
       advancePhysicsFrame(this, frameDelta);
@@ -1125,7 +1125,7 @@ class FlightSimulator {
 
     // Keep the lobby backdrop alive: re-arm the demo after it ends.
     this.gameFlow.update(frameDelta);
-    if (this.gameFlow.consumeDemoRestart() && !this.multiplayer?.active) {
+    if (!this.multiplayer?.active && !this.multiplayer?.modalOpen && this.gameFlow.consumeDemoRestart()) {
       if (isScenarioAvailable(this.activeAirport, 'demo')) this.demoDirector.start(this.activeAirport);
       if (this.lobbyScreen) {
         this.lobbyScreen.setWaitingForTerrain(this.demoDirector.waitingForTerrain === true);

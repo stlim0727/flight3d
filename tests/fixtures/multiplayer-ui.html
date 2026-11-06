@@ -1,25 +1,45 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><title>Multiplayer UI regression fixture</title>
-<section id="lobby-panel-scenario"><button id="solo-airport">Airport</button><button id="solo-preset">Preset</button><button id="solo-restricted" disabled>Restricted aircraft</button></section>
+<button id="outside">Outside action</button>
 <script type="module">
 import { MultiplayerController } from '/src/multiplayer/MultiplayerController.js';
 import { FlightControls } from '/src/controls/FlightControls.js';
 import { DemoFlightDirector } from '/src/director/DemoFlightDirector.js';
 import { GameFlowController } from '/src/ui/GameFlowController.js';
-for (const id of ['mp-audio','mp-room','lobby-tab-multiplayer','mp-create','mp-join','mp-start','mp-respawn','mp-leave','mp-copy','mp-microphone','mp-listen','mp-mute','mp-ptt','mp-controls','mp-connect','mp-invite-row','mp-invite','mp-status','mp-roster','mp-voice-status']) {
-  const el = document.createElement(id === 'mp-audio' ? 'audio' : id === 'mp-ptt' ? 'button' : 'div'); el.id = id; document.body.append(el);
-}
+import { initLocalization, setLanguage } from '/src/i18n/index.js';
+// Use the shipping modal markup, without starting a WebGL simulator in hosted CI.
+const source = new DOMParser().parseFromString(await (await fetch('/')).text(), 'text/html');
+for (const id of ['mp-dialog', 'mp-open', 'mp-room-menu', 'mp-audio']) document.body.append(source.getElementById(id));
+initLocalization(); setLanguage('en');
 const controls = new FlightControls(document.body);
 const gameFlow = new GameFlowController(); gameFlow.enterFlight();
-const sim = { gameFlow, showToast() {}, lobbyScreen: { setSelectionBusy() {}, refresh() { document.getElementById('solo-restricted').disabled = true; } } };
-const controller = new MultiplayerController(sim);
-controller.room = { host: false, closed: false, session: { name: 'Pilot', state: 'flying' } };
+const sim = { controls, gameFlow, showToast() {},
+  syncFlowUi() {
+    controls.inputBlocked = Boolean(this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || gameFlow.blocksFlightInput());
+    if (controls.inputBlocked) controls.releaseAllKeys();
+    this.multiplayer?.refresh();
+  },
+  lobbyScreen: { setSelectionBusy() {}, refresh() {} }
+};
+const controller = new MultiplayerController(sim); sim.multiplayer = controller;
+gameFlow.onStateChange = () => sim.syncFlowUi();
+if (!new URLSearchParams(location.search).has('r')) {
+controller.room = { host: false, closed: false, session: { name: 'Pilot', state: 'flying' },
+  dispose() { this.closed = true; }, close(reason = 'left') { this.closed = true; this.session.state = 'ended'; controller.ended(reason); } };
 controller.voice = { microphone: {}, talking: false, setTalking(on) { this.talking = on; } };
-controller.refresh();
-sim.multiplayer = controller; sim.controls = controls; sim.activeAirport = 'coastal'; sim.currentAircraftId = 'C172';
+controller.refresh(); controller.openDialog();
+}
+sim.activeAirport = 'coastal'; sim.currentAircraftId = 'C172';
 const demo = new DemoFlightDirector(sim); demo.initUI();
+let outsideClicks = 0; document.getElementById('outside').onclick = () => outsideClicks++;
 window.uiFixture = {
-  controller, controls,
+  controller, controls, sim,
+  modalStatus() {
+    document.getElementById('outside').focus();
+    return { open: controller.dialog.matches(':modal'), held: gameFlow.isPhysicsFrozen(), blocked: controls.inputBlocked,
+      focusInside: controller.dialog.contains(document.activeElement), outsideClicks };
+  },
   demoShortcut() {
+    controller.modal.close();
     document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', code: 'KeyP', bubbles: true }));
     return { dialog: demo.isRestartConfirmOpen, active: demo.isActive, manual: !controls.aircraftControlsDisabled };
   },
@@ -31,6 +51,10 @@ window.uiFixture = {
   release(key, code) {
     document.getElementById('mp-ptt').dispatchEvent(new KeyboardEvent('keyup', { key, code, bubbles: true, cancelable: true }));
     return { talking: controller.voice.talking, braking: Boolean(controls.keys.Space) };
+  },
+  join(code) {
+    controller.room.dispose(); controller.room = null; controller.voice = null;
+    controller.openDialog(); document.getElementById('mp-room').value = code; document.getElementById('mp-join').click();
   }
 };
 </script></html>
