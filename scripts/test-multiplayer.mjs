@@ -90,6 +90,16 @@ try {
   await guest.evaluate('fixture.room.close()');
   await until(() => host.evaluate('fixture.ended.includes("peer-left") && fixture.voice.closed'), 'disconnect and microphone cleanup');
   assert.equal(await guest.evaluate('fixture.voice.stream.getTracks().every(t => t.readyState === "ended")'), true);
+  const autoHost = await page();
+  const autoCode = await autoHost.evaluate('fixture.create()');
+  await until(() => autoHost.evaluate('fixture.room.registered'), 'URL invite host registered');
+  const autoGuest = await page(`/tests/fixtures/multiplayer-ui.html?r=${autoCode}`, 'Boolean(window.uiFixture)');
+  await until(() => autoGuest.evaluate('uiFixture.controller.room?.session.state === "connected"'), 'URL invite joins without typing or clicking');
+  assert.equal(await autoGuest.evaluate('uiFixture.controller.modalOpen && !uiFixture.controller.voice.microphone'), true);
+  await autoGuest.evaluate('uiFixture.controller.room.close()');
+  await autoHost.evaluate('fixture.room.dispose()');
+  const invalid = await page('/tests/fixtures/multiplayer-ui.html?r=invalid', 'Boolean(window.uiFixture)');
+  assert.equal(await invalid.evaluate('!uiFixture.controller.room && uiFixture.controller.modalOpen && uiFixture.controller.message === "invalid-room"'), true);
   // Expiry is advertised after multiplayer and voice have already been torn down.
   const expiring = await page();
   const cancelledCode = await expiring.evaluate('fixture.create(undefined, 1500)');
@@ -100,16 +110,16 @@ try {
   const late = await page(); await late.evaluate(`fixture.create(${JSON.stringify(cancelledCode)})`);
   await until(() => late.evaluate('fixture.ended.includes("cancelled")'), 'late join receives explicit cancellation');
   assert.equal(await late.evaluate('fixture.flights'), 0);
-  await ui.evaluate(`uiFixture.join(${JSON.stringify(cancelledCode)})`);
-  await until(() => ui.evaluate('uiFixture.controller.message === "cancelled"'), 'late join modal cancellation message');
-  assert.match(await ui.evaluate('document.getElementById("mp-status").textContent'), /cancelled/i);
-  assert.equal(await ui.evaluate('uiFixture.controller.dialog.matches(":modal")'), true);
+  const cancelledInvite = await page(`/tests/fixtures/multiplayer-ui.html?r=${cancelledCode}`, 'Boolean(window.uiFixture)');
+  await until(() => cancelledInvite.evaluate('uiFixture.controller.message === "cancelled"'), 'URL invite modal cancellation message');
+  assert.match(await cancelledInvite.evaluate('document.getElementById("mp-status").textContent'), /cancelled/i);
+  assert.equal(await cancelledInvite.evaluate('uiFixture.controller.dialog.matches(":modal")'), true);
   await expiring.evaluate('fixture.room.dispose()');
   const gone = await page(); await gone.evaluate(`fixture.create(${JSON.stringify(cancelledCode)})`);
   await until(() => gone.evaluate('fixture.ended.includes("not-found")'), 'closed creator tab has no live room');
   for (const c of browsers) assert.deepEqual(c.errors, [], 'no browser exceptions');
   console.log(`${publicMode ? 'Public PeerJS service' : 'Local signaling'} verified`);
-  console.log('PASS Chrome WebRTC: two-pilot config/start barrier, bidirectional snapshots, respawn, third-peer rejection, bidirectional decoded audio/PTT silence + RTP, restart, disconnect/track cleanup, modal focus/input isolation, creator lease expiry and late-join cancellation. No WebGL tested.');
+  console.log('PASS Chrome WebRTC: two-pilot config/start barrier, bidirectional snapshots, respawn, third-peer rejection, bidirectional decoded audio/PTT silence + RTP, restart, disconnect/track cleanup, modal focus/input isolation, automatic URL joining, invalid/cancelled invites, creator lease expiry and late-join cancellation. No WebGL tested.');
   }
 } catch (error) {
   console.error(error); if (chromeLog) console.error(chromeLog);

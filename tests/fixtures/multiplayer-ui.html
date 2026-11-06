@@ -22,10 +22,12 @@ const sim = { controls, gameFlow, showToast() {},
 };
 const controller = new MultiplayerController(sim); sim.multiplayer = controller;
 gameFlow.onStateChange = () => sim.syncFlowUi();
+if (!new URLSearchParams(location.search).has('r')) {
 controller.room = { host: false, closed: false, session: { name: 'Pilot', state: 'flying' },
   dispose() { this.closed = true; }, close(reason = 'left') { this.closed = true; this.session.state = 'ended'; controller.ended(reason); } };
 controller.voice = { microphone: {}, talking: false, setTalking(on) { this.talking = on; } };
 controller.refresh(); controller.openDialog();
+}
 sim.activeAirport = 'coastal'; sim.currentAircraftId = 'C172';
 const demo = new DemoFlightDirector(sim); demo.initUI();
 let outsideClicks = 0; document.getElementById('outside').onclick = () => outsideClicks++;

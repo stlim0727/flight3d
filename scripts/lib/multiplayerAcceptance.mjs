@@ -11,7 +11,7 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   await mkdir('review-artifacts/multiplayer', { recursive: true });
   const ready = 'Boolean(window.sim?.multiplayer && window.sim?.startupReady)';
   const host = await page('/?aircraft=C172&terrain=coastal&scenario=runway', ready);
-  const guest = await page('/?aircraft=C172&terrain=coastal&scenario=runway', ready);
+  let guest = await page('/?aircraft=C172&terrain=coastal&scenario=runway', ready);
   for (const c of [host, guest]) {
     await c.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     await c.evaluate('sim.setRenderQuality("ultraLow"); sim.setBrowserActive(true)');
@@ -113,6 +113,20 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   await open(host); await start();
   await leave();
 
+  // Navigate to the actual shared URL: joining requires no input or Join click.
+  const direct = await create();
+  const renew = setInterval(() => host.evaluate('sim.multiplayer.room.keepWaiting()').catch(() => {}), 3000);
+  try {
+    const link = new URL(direct.invite);
+    guest = await page(link.pathname + link.search, ready);
+    await guest.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await guest.evaluate('sim.setRenderQuality("ultraLow"); sim.setBrowserActive(true)');
+    for (const c of [host, guest]) await until(() => c.evaluate('sim.multiplayer.room?.session.state === "connected"'), 'invite URL automatically connected');
+    assert.equal(await guest.evaluate('sim.multiplayer.modalOpen && !sim.multiplayer.voice.microphone'), true, 'invite opens modal without microphone permission');
+    await start();
+    await leave();
+  } finally { clearInterval(renew); }
+
   for (const config of [['neon', 'B738', 'cruise'], ['incheon', 'F16', 'runway'], ['coastal', 'C172', 'cruise']]) {
     const next = await create(...config); await join(next.code); await start(); await leave();
   }
@@ -132,5 +146,5 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   assert.equal(await guest.evaluate('document.getElementById("mp-status").textContent.length > 0'), true);
   await capture(guest, 'cancelled-invite');
   for (const c of browsers) assert.deepEqual(c.errors, [], 'browser exceptions');
-  console.log('PASS hardware Chrome: compact/manual invites, modal focus/physics/input isolation, microphone/PTT, remote drawing/movement/reset/restart, three scenery/aircraft types, phone modal, creator renewal and real 10s expiry, connected/late guest cancellation. Evidence: review-artifacts/multiplayer/');
+  console.log('PASS hardware Chrome: compact/manual and automatic URL invites, modal focus/physics/input isolation, microphone/PTT, remote drawing/movement/reset/restart, three scenery/aircraft types, phone modal, creator renewal and real 10s expiry, connected/late guest cancellation. Evidence: review-artifacts/multiplayer/');
 }

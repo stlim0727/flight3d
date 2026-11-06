@@ -9,7 +9,9 @@
 3. While waiting to start, the creator must press **Keep room open** before the
    ten-second countdown ends. Each press grants another ten seconds. Missing a
    press cancels the room; it cannot be revived by pressing late.
-4. Your friend chooses **Join friend** with the code or link. Spaces, hyphens,
+4. Opening the shared invite link automatically joins your friend's room and
+   opens its dialog; no typing, pasting, or Join button is needed. With a code,
+   enter it in **Fly together** and choose **Join friend**. Spaces, hyphens,
    and lowercase letters are accepted. The creator chooses **Start together**;
    both dialogs close when the shared flight is ready. The waiting deadline no
    longer applies after starting preparation or during flight.

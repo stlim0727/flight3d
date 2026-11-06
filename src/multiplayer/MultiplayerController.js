@@ -18,13 +18,6 @@ export class MultiplayerController {
     document.getElementById('mp-keep-waiting').onclick = () => this.room?.keepWaiting();
     this.audio = document.getElementById('mp-audio');
     this.roomInput = document.getElementById('mp-room');
-    const params = new URLSearchParams(location.search);
-    const invite = params.get('r') ?? params.get('room');
-    if (invite) {
-      this.roomInput.value = invite;
-      this.openDialog();
-      if (!parseRoom(invite)) this.message = 'invalid-room';
-    }
     document.getElementById('mp-create').onclick = () => this.connect();
     document.getElementById('mp-join').onclick = () => {
       const room = parseRoom(this.roomInput.value);
@@ -59,6 +52,16 @@ export class MultiplayerController {
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.releaseTalk(); });
     window.addEventListener('pagehide', () => this.room?.dispose());
     this.refresh();
+    const params = new URLSearchParams(location.search);
+    this.joinInvite(params.get('r') ?? params.get('room'));
+  }
+  joinInvite(invite) {
+    if (invite === null) return;
+    this.roomInput.value = invite;
+    this.openDialog();
+    const room = parseRoom(invite);
+    if (room) this.connect(room);
+    else { this.message = 'invalid-room'; this.refresh(); }
   }
   get modalOpen() { return this.dialog.open; }
   openDialog() { this.releaseTalk(); this.modal.open(); this.refresh(); }
@@ -91,7 +94,7 @@ export class MultiplayerController {
     const config = Object.fromEntries(Object.keys(DEFAULT_CONFIG).map(key => [key, document.getElementById(`mp-${key}`).value]));
     try {
       this.voice = new VoiceLink({ changed: () => this.refresh() });
-      // Unlock the voice context inside Create/Join's user gesture, even for listeners.
+      // Invite URLs join without a gesture; blocked audio can be enabled in the modal.
       this.voice.context.resume().catch(() => {});
       this.room = new PeerRoom({ room, name: document.getElementById('mp-name').value, config, voice: this.voice,
         prepare: (c, slot) => this.prepare(c, slot), fly: () => this.startTogether(),

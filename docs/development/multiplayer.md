@@ -46,8 +46,10 @@ Room management is a native modal; invites use six-character codes.
 - A user explicitly enables their microphone. Default is listen-only. Hold N or
   the touch/keyboard PTT button to send; release, blur, hiding the page and leaving
   all silence it. Remote playback has an explicit retry if autoplay is blocked.
-- Opening a room link does not connect or ask for microphone permission until
-  Join is pressed. Invite IDs are random capabilities. Room membership is not a
+- Opening a valid room link automatically connects and opens the room modal.
+  It never requests microphone permission; enabling the microphone remains an
+  explicit action, and blocked playback has a retry button. Invalid links show
+  an error without connecting. Invite IDs are random capabilities. Room membership is not a
   verified identity; invite only trusted friends. P2P can disclose IP addresses.
 
 ## Infrastructure

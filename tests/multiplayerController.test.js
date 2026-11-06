@@ -3,10 +3,29 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { GameFlowController } from '../src/ui/GameFlowController.js';
 import { t, bindText } from '../src/i18n/index.js';
+import { parseRoom } from '../src/multiplayer/protocol.js';
 
 // Load the production coordinator without importing its browser-only PeerJS adapter.
 const source = readFileSync(new URL('../src/multiplayer/MultiplayerController.js', import.meta.url), 'utf8');
-const Controller = new Function('t', 'bindText', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText);
+const Controller = new Function('t', 'bindText', 'parseRoom', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom);
+
+test('invite URL joins automatically; missing or invalid invites never connect', () => {
+  const joined = [];
+  const controller = Object.assign(Object.create(Controller.prototype), {
+    roomInput: { value: '' }, openDialog() { this.opened = true; },
+    connect(room) { joined.push(room); }, refresh() {},
+  });
+  controller.joinInvite(null);
+  assert.equal(controller.opened, undefined);
+  controller.joinInvite('k7m-2qx');
+  assert.equal(controller.opened, true);
+  assert.deepEqual(joined, ['K7M2QX']);
+  for (const invite of ['', 'invalid-room']) {
+    controller.joinInvite(invite);
+    assert.equal(controller.message, 'invalid-room');
+  }
+  assert.deepEqual(joined, ['K7M2QX']);
+});
 
 test('pending lobby demo restart survives multiplayer modal and active room', () => {
   const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
