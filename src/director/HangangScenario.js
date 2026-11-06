@@ -75,7 +75,7 @@ export class HangangScenario {
     const contact = this.collision.update(s.position, s.quaternion);
     if (contact) {
       const structure = contact.structure;
-      s.triggerCrash({ collided: true, type: structure === 'water' ? 'WATER' : structure === 'island' ? 'TERRAIN' : 'BUILDING',
+      s.triggerCrash({ collided: true, type: structure === 'water' ? 'WATER' : structure === 'island' || structure === 'hill' ? 'TERRAIN' : 'BUILDING',
         name: t('hangang.contact'), description: t('hangang.contact'), point: s.position.clone(), speedKnots: s.linearVelocity.length() * 1.94384 });
     }
   }
