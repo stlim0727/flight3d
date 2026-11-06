@@ -174,3 +174,30 @@ test('FoliageAndCities rebuilds draped road geometries when terrain quality swit
   assert.notEqual(scenery.districtRoadsMesh.geometry, initialDistrictGeo);
   assert.notEqual(scenery.northRoadsMesh.geometry, initialNorthGeo);
 });
+
+test('codebase-wide guard: every polygonOffset material in src/ uses logarithmic depth separation', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+
+  // Cockpit.js is locked by a precomputed radiosity bake checksum and draws live displays on DISPLAY_LAYER = 2 at ~0.6m.
+  const allowlist = new Set(['src/aircraft/Cockpit.js']);
+  const walk = (dir) => {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    return entries.flatMap(e => {
+      const full = path.join(dir, e.name);
+      return e.isDirectory() ? walk(full) : (full.endsWith('.js') ? [full] : []);
+    });
+  };
+
+  for (const file of walk('src')) {
+    const rel = file.replace(/\\/g, '/');
+    if (allowlist.has(rel)) continue;
+    const source = fs.readFileSync(file, 'utf8');
+    if (/polygonOffset\s*:\s*(true|layer\s*!==)/.test(source)) {
+      assert.ok(
+        source.includes('applyLogDepthOffset') || source.includes('createRunwayMarkingMaterial'),
+        `${rel} sets polygonOffset without applyLogDepthOffset or createRunwayMarkingMaterial (hardware polygonOffset is ignored under logarithmicDepthBuffer)`
+      );
+    }
+  }
+});

@@ -7,6 +7,8 @@ import * as THREE from 'three';
  */
 export function applyLogDepthOffset(material, units = -(material?.polygonOffsetFactor || -1)) {
   if (!material || !Number.isFinite(units) || units === 0) return material;
+  material.userData = material.userData || {};
+  material.userData.logDepthOffsetUnits = units;
   if (!material.polygonOffset) {
     material.polygonOffset = true;
     material.polygonOffsetFactor = -units;
