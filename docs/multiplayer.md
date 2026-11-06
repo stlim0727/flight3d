@@ -26,6 +26,9 @@ the modal and operates while your aircraft is held. Microphone access is
 optional; you can listen without it. **Mute friend** affects only what you hear.
 If the browser blocks playback, choose **Play friend’s voice**.
 
+Your pilot name, scenery, aircraft, and start selection are saved in this browser
+and restored on your next visit, including when opening an invite link.
+
 The room holds two pilots including its creator. It supports the C172, B738 and
 F16 at coastal airport, Incheon and neon city. Both use the creator's aircraft
 type. Cruise places the guest beside the creator; runway starts put the guest

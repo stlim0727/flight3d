@@ -52,6 +52,13 @@ try {
   await ui.evaluate('uiFixture.controls.keys.Space = true');
   assert.deepEqual(await ui.evaluate('uiFixture.release(" ", "Space")'), { talking: false, braking: false });
   assert.deepEqual(await ui.evaluate('uiFixture.demoShortcut()'), { dialog: false, active: false, manual: true }, 'P cannot start a demo during a shared flight');
+  await ui.evaluate(`for (const [key,value] of Object.entries({name:'Wing',airport:'neon',aircraft:'F16',scenario:'runway'})) {
+    const input=document.getElementById('mp-'+key); input.value=value;
+    input.dispatchEvent(new Event(key==='name'?'input':'change'));
+  }`);
+  const restoredUi = await page('/tests/fixtures/multiplayer-ui.html', 'Boolean(window.uiFixture)');
+  assert.deepEqual(await restoredUi.evaluate(`Object.fromEntries(['name','airport','aircraft','scenario'].map(key=>[key,document.getElementById('mp-'+key).value]))`),
+    { name: 'Wing', airport: 'neon', aircraft: 'F16', scenario: 'runway' }, 'setup preferences restored in a new page');
   const host = await page(), guest = await page();
   const room = await host.evaluate('fixture.create()');
   await until(() => host.evaluate('fixture.status().registered'), 'host registered');
@@ -95,6 +102,7 @@ try {
   await until(() => autoHost.evaluate('fixture.room.registered'), 'URL invite host registered');
   const autoGuest = await page(`/tests/fixtures/multiplayer-ui.html?r=${autoCode}`, 'Boolean(window.uiFixture)');
   await until(() => autoGuest.evaluate('uiFixture.controller.room?.session.state === "connected"'), 'URL invite joins without typing or clicking');
+  assert.equal(await autoGuest.evaluate('uiFixture.controller.room.session.name'), 'Wing', 'automatic invite joining uses the saved pilot name');
   assert.equal(await autoGuest.evaluate('uiFixture.controller.modalOpen && !uiFixture.controller.voice.microphone'), true);
   await autoGuest.evaluate('uiFixture.controller.room.close()');
   await autoHost.evaluate('fixture.room.dispose()');

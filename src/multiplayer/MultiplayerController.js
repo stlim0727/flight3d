@@ -5,6 +5,7 @@ import { RemoteAircraft } from './RemoteAircraft.js';
 import { inviteUrl, parseRoom, DEFAULT_CONFIG, slotOffset } from './protocol.js';
 import { t, bindText } from '../i18n/index.js';
 import { setSimulationWind } from '../physics/WindField.js';
+import { bindMultiplayerPreferences } from './preferences.js';
 
 export class MultiplayerController {
   constructor(sim) {
@@ -18,6 +19,7 @@ export class MultiplayerController {
     document.getElementById('mp-keep-waiting').onclick = () => this.room?.keepWaiting();
     this.audio = document.getElementById('mp-audio');
     this.roomInput = document.getElementById('mp-room');
+    this.preferences = bindMultiplayerPreferences();
     document.getElementById('mp-create').onclick = () => this.connect();
     document.getElementById('mp-join').onclick = () => {
       const room = parseRoom(this.roomInput.value);
@@ -89,6 +91,7 @@ export class MultiplayerController {
   releaseTalk() { this.voice?.setTalking(false); }
   connect(room) {
     if (this.active || this.preparing || this.sim.startingFlight || this.sim.airportLoading) return;
+    this.preferences.save();
     this.message = null;
     this.room?.dispose();
     const config = Object.fromEntries(Object.keys(DEFAULT_CONFIG).map(key => [key, document.getElementById(`mp-${key}`).value]));

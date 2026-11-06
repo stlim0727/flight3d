@@ -4,6 +4,12 @@ Implementation plan (Discussion #509): friends share an invite link, join a priv
 room capped at two pilots including the host, then fly and use push-to-talk.
 Room management is a native modal; invites use six-character codes.
 
+Setup preferences use `flight3d.multiplayer.preferences.v1` in localStorage:
+pilot name, scenery, aircraft, and start selection. Restore them before automatic
+invite joining; save edits immediately and again when connecting. Validate saved
+choices against the supported options and keep defaults for invalid data.
+Unavailable storage must not block room creation or joining.
+
 ## Contract
 
 - Codes contain six unambiguous base32 characters (30 random bits) from
