@@ -67,3 +67,22 @@ test('shared start releases preparation ownership before a later user pause', ()
   controller.ended('peer-left');
   assert.equal(gameFlow.state, 'paused');
 }));
+
+for (const reason of ['left', 'peer-left', 'timeout']) {
+  test(`${reason} resynchronizes input after an early preparation resume`, () => fixture(({ controller, gameFlow }) => {
+    controller.preparationHold = true; controller.preparing = false;
+    controller.room.session.state = 'starting';
+    gameFlow.pause(); gameFlow.resume();
+    controller.sim.controls = { inputBlocked: true };
+    let syncs = 0;
+    controller.sim.syncFlowUi = () => {
+      syncs++;
+      controller.sim.controls.inputBlocked = gameFlow.blocksFlightInput();
+    };
+    controller.room.closed = true; controller.room.session.state = 'ended';
+    controller.ended(reason);
+    assert.equal(gameFlow.state, 'flight');
+    assert.equal(syncs, 1, 'teardown must sync even without a game-flow transition');
+    assert.equal(controller.sim.controls.inputBlocked, false);
+  }));
+}

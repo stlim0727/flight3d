@@ -146,9 +146,20 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   await host.evaluate('document.getElementById("mp-start").click()');
   await until(() => host.evaluate('sim.multiplayer.room.session.localReady'), 'barrier cleanup local ready');
   await until(() => guest.evaluate('Boolean(window.releaseAbortedPrepare)'), 'barrier cleanup remote waiting');
+  await host.evaluate('document.activeElement?.blur()');
+  await host.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+  await host.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape' });
+  await guest.evaluate('document.getElementById("btn-pause-resume").click()');
+  for (const c of [host, guest]) {
+    assert.equal(await c.evaluate('sim.gameFlow.state'), 'flight', 'local resume while waiting for peer');
+    assert.equal(await c.evaluate('sim.controls.inputBlocked'), true, 'preparation still blocks flight input');
+  }
   await guest.evaluate('document.getElementById("mp-leave").click(); window.releaseAbortedPrepare()');
   await until(() => host.evaluate('sim.multiplayer.room.closed'), 'barrier cleanup disconnect');
-  for (const c of [host, guest]) assert.equal(await c.evaluate('sim.gameFlow.state'), 'flight', 'preparation hold released after abort');
+  for (const c of [host, guest]) {
+    assert.equal(await c.evaluate('sim.gameFlow.state'), 'flight', 'preparation hold released after abort');
+    assert.equal(await c.evaluate('sim.controls.inputBlocked'), false, 'teardown releases input after early local resume');
+  }
   for (const c of browsers) assert.deepEqual(c.errors, [], 'simulator browser exceptions');
   console.log('PASS hardware Chrome simulator: UI invite/join, shared runway start, separated slots, remote model, actual throttle movement replication, reset, PTT key release/blur without braking, pause/solo-control restoration and barrier abort, restart, individual crash recovery, mobile controls, leave-to-solo, all three aircraft and scenery types with runway/cruise starts. Screenshots: review-artifacts/multiplayer/');
 }

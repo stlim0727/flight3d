@@ -155,6 +155,8 @@ export class MultiplayerController {
     this.sim.lobbyScreen?.refresh();
     // A failed prepare must not leave the local simulator stuck at the barrier.
     this.releasePreparationHold();
+    // An early local resume may already be in flight while input still belongs to the barrier.
+    this.sim.syncFlowUi();
     this.refresh();
   }
   refresh() {
