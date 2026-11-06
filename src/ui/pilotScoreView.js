@@ -215,7 +215,7 @@ export function scoreOverlayMarkup(data) {
       </div>
       ${statsHtml ? `<div class="modal-stats-grid">${statsHtml}</div>` : ''}
       ${data.isValley ? `
-      ${data.isSucceeded ? `
+      ${data.isSucceeded && data.isHuman ? `
       <div class="modal-callsign-box">
         <label class="modal-callsign-label" for="score-callsign-input">🎖️ 파일럿 콜사인 (CALLSIGN)</label>
         <div class="modal-callsign-row">
