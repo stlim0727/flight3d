@@ -176,7 +176,7 @@ function coarseSurfaceSampler(pos, cols) {
  * generateValley({ seed, rules }).
  *
  * The coarse world grid is a ~90m cell heightfield, far too wide to resolve a
- * 68-72m corridor with 550-800m walls: sampled there the wall face is a chord that
+ * 68-72m corridor with 200-300m walls: sampled there the wall face is a chord that
  * cuts tens of metres inside the surface collision queries. So the corridor gets its
  * own ribbon, sampled vertex-by-vertex from the analytic getHeight() the probes call,
  * and the coarse triangles underneath it are culled. The ribbon's outer stops blend

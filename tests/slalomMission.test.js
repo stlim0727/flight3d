@@ -75,24 +75,27 @@ test('a line that rides the passage spaces clears the course at zero altitude co
   assert.ok(metrics.scoredDistanceM > 5000);
 });
 
-test('crossing a gate above its ceiling is a missed gate, however well centred it is', () => {
+test('crossing a gate above its ceiling is a missed gate, and surviving to the finish still counts', () => {
   const manifest = createSlalomManifest({ seed: 2 });
   const { judge } = fly(manifest, { agl: s => gateValue(manifest.course.gates, s, 'maxAglM') + 40 });
-  assert.equal(judge.status, 'failed');
-  assert.equal(judge.reason, 'gate-missed');
-  assert.equal(judge.result().metrics.gatesCleared, 0);
-  assert.equal(judge.result().metrics.altitudeCostM, null);
+  assert.equal(judge.status, 'succeeded', `failed as ${judge.reason}`);
+  const metrics = judge.result().metrics;
+  assert.equal(metrics.gatesCleared, 0);
+  assert.equal(metrics.missedGates, metrics.totalGates);
+  assert.equal(metrics.altitudeCostM > 0, true);
 });
 
 test('the middle of the valley is not the passage space', () => {
   const manifest = createSlalomManifest({ seed: 3 });
   const centred = fly(manifest, { cross: () => 0, agl: () => 90, rampM: 300 });
-  assert.equal(centred.judge.reason, 'gate-missed');
+  assert.equal(centred.judge.status, 'succeeded');
+  assert.ok(centred.judge.result().metrics.missedGates > 0,
+    'a centred line that clears every gate proves nothing');
   assert.ok(Math.abs(manifest.course.gates[1].crossOffsetM) > manifest.course.gates[1].passageHalfWidthM,
     'a gate with no lateral demand proves nothing');
 });
 
-test('cutting the bend on a straight line misses the ordered gates while corridor excursion between gates costs score', () => {
+test('cutting the bend on a straight line misses the ordered gates without ending the run', () => {
   const manifest = createSlalomManifest({ seed: 4 });
   const gates = manifest.course.gates;
   const start = manifest.spawn, finish = manifest.destination;
@@ -100,10 +103,10 @@ test('cutting the bend on a straight line misses the ordered gates while corrido
   const chord = fly(manifest, { straight: { x: start.x, z: start.z,
     dx: dx / length, dz: dz / length, right: { x: -dz / length, z: dx / length } },
   toS: gates[0].sM + length, agl: () => 100, cross: () => 0 });
-  assert.equal(chord.judge.status, 'failed');
-  assert.equal(chord.judge.reason, 'gate-missed',
-    `a corner cut scored as ${chord.judge.status}/${chord.judge.reason}`);
+  assert.equal(chord.judge.status, 'succeeded',
+    `a corner cut ended as ${chord.judge.status}/${chord.judge.reason}`);
   assert.ok(chord.judge.result().metrics.gatesCleared < gates.length - 1);
+  assert.ok(chord.judge.result().metrics.missedGates > 0);
 
   const agl = s => gateValue(gates, s, 'maxAglM') - 10;
   const clean = fly(manifest, { agl }).judge.result();

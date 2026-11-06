@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ValleyScoreboard, sanitizeCallsign, valleyAttempt } from '../src/arena/ValleyScoreboard.js';
+import { VALLEY_SLALOM_RULES } from '../src/arena/generatedValley.js';
+
+const FINGERPRINT_KEY = 'flight3d.valley-attempts.rules-fingerprint.v1';
+const CURRENT_FINGERPRINT = JSON.stringify(VALLEY_SLALOM_RULES);
 
 class MockStorage {
   constructor() { this.store = new Map(); }
@@ -21,6 +25,7 @@ test('sanitizeCallsign cleans and formats callsigns correctly', () => {
 
 test('ValleyScoreboard saves, ranks and retrieves leaderboard attempts', () => {
   const storage = new MockStorage();
+  storage.setItem(FINGERPRINT_KEY, CURRENT_FINGERPRINT);
   const scoreboard = new ValleyScoreboard(storage);
 
   assert.equal(scoreboard.getSavedCallsign(), 'MAV');
@@ -70,6 +75,7 @@ test('ValleyScoreboard saves, ranks and retrieves leaderboard attempts', () => {
 
 test('ValleyScoreboard handles corrupted storage gracefully', () => {
   const storage = new MockStorage();
+  storage.setItem(FINGERPRINT_KEY, CURRENT_FINGERPRINT);
   storage.setItem('flight3d.valley-attempts.v1', '{ corrupt json');
   const scoreboard = new ValleyScoreboard(storage);
 
@@ -79,4 +85,25 @@ test('ValleyScoreboard handles corrupted storage gracefully', () => {
 
   const leaderboard = scoreboard.getLeaderboard(5);
   assert.deepEqual(leaderboard, []);
+});
+
+test('changed rules characteristics discard every stored attempt', () => {
+  const storage = new MockStorage();
+  const scoreboard = new ValleyScoreboard(storage);
+  const record = {
+    pilotKind: 'human',
+    status: 'succeeded',
+    reason: 'completed',
+    tick: 4800,
+    manifest: { id: 'valley-slalom-v1', type: 'valley-slalom', physicsHz: 120, rulesVersion: 'valley-slalom-v1' },
+    result: { metrics: { finalScore: 12000 } },
+  };
+  scoreboard.add(record, { callsign: 'VIPER' });
+  assert.equal(scoreboard.read().length, 1);
+
+  storage.setItem(FINGERPRINT_KEY, JSON.stringify({ ...VALLEY_SLALOM_RULES, wallRiseM: [550, 800] }));
+  assert.deepEqual(scoreboard.read(), []);
+  assert.equal(storage.getItem('flight3d.valley-attempts.v1'), '[]');
+  assert.equal(storage.getItem(FINGERPRINT_KEY), CURRENT_FINGERPRINT);
+  assert.deepEqual(scoreboard.getLeaderboard(5), []);
 });

@@ -137,8 +137,8 @@ export class ValleyWaypointsVisualizer {
   initWaypoints() {
     const points = this.course?.points || [];
     const pillarHeight = 800;
-    const outerRadius = 35;
-    const innerRadius = 8;
+    const outerRadius = 10;
+    const innerRadius = 3;
     const ringRadius = 110;
 
     // Create shared geometries
