@@ -6,6 +6,7 @@ import { AirportNightLighting } from './AirportNightLighting.js';
 import { DEPARTURE_GATE } from '../config/incheonDeparture.js';
 import { createDepartureStand } from './DepartureStand.js';
 import { createIncheonPavement } from './IncheonPavement.js';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 import { colourIncheonGround, createIncheonGroundTexture } from './IncheonGround.js';
 import { IncheonTraffic } from './IncheonTraffic.js';
 import { IncheonParkedAirliners } from './IncheonParkedAirliners.js';
@@ -81,14 +82,14 @@ export async function loadIncheonAirport(base) {
   for(const surface of INCHEON_AIRFIELD.surfaces.filter(s=>s.kind==='runway')) {
     const a=surface.points[0],b=surface.points.at(-1),yaw=-Math.atan2(b[0]-a[0],a[1]-b[1]);
     for(const [i,p] of [a,b].entries()) {
-      const bar=new THREE.Mesh(new THREE.BoxGeometry(surface.width, .025, 3),new THREE.MeshBasicMaterial({color:0xffffff}));
+      const bar=new THREE.Mesh(new THREE.BoxGeometry(surface.width, .025, 3),applyLogDepthOffset(new THREE.MeshBasicMaterial({color:0xffffff}), 3));
       bar.position.set(p[0],7.04,p[1]);bar.rotation.y=yaw;group.add(bar);
       const canvas=document.createElement('canvas');canvas.width=128;canvas.height=256;
       const context=canvas.getContext('2d');context.fillStyle='#fff';context.textAlign='center';context.font='bold 85px sans-serif';
       const ref=surface.ref.split('/')[i];
       context.fillText(ref.slice(0,2),64,110);context.font='bold 75px sans-serif';context.fillText(ref.slice(2),64,205);
       const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-      const marking=new THREE.Mesh(new THREE.PlaneGeometry(20,40),new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false}));
+      const marking=new THREE.Mesh(new THREE.PlaneGeometry(20,40),applyLogDepthOffset(new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false}), 4));
       marking.rotation.set(-Math.PI/2,0,0);
       marking.rotateOnWorldAxis(new THREE.Vector3(0,1,0),yaw+(i?Math.PI:0));
       const direction=i?-1:1,length=Math.hypot(b[0]-a[0],b[1]-a[1]);

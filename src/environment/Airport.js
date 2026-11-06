@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { AirportNightLighting } from './AirportNightLighting.js';
 import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs, createRunwaySurfaceWear } from './Pavement.js';
 import { loadAirportKit, createAirportBuildings } from './AirportBuildings.js';
-import { createRunwayMarkingMaterial } from './RunwayMarkings.js';
+import { applyLogDepthOffset, createRunwayMarkingMaterial } from './RunwayMarkings.js';
 
 /**
  * International Airport Environment (Runway 09L/27R, Control Tower, Terminal, Hangars, Lighting)
@@ -102,14 +102,14 @@ export class Airport {
     // Materials with hardware polygon offset to guarantee zero Z-fighting with terrain
     const asphaltMat = createPavementMaterial('asphalt');
 
-    const concreteMat = new THREE.MeshStandardMaterial({
+    const concreteMat = applyLogDepthOffset(new THREE.MeshStandardMaterial({
       color: 0x94a3b8,
       roughness: 0.75,
       metalness: 0.2,
       polygonOffset: true,
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1
-    });
+    }), 1);
 
     const towerGlassMat = new THREE.MeshStandardMaterial({
       name: 'tower-window-glass',

@@ -105,4 +105,23 @@ test('WaterOcean (Camera Anchoring, Grid Snapping & Gerstner Waves)', async (t) 
     assert.equal(directUltraLow.segments, 1);
     assert.equal(directUltraLow.snapStep, 200, 'snapStep must be 200m when constructed directly with ultraLow');
   });
+
+  await t.test('biases logarithmic fragment depth behind sea-level land in both ultraLow and wave modes', () => {
+    const ocean = new WaterOcean(36000, 180, { quality: 'ultraLow' });
+    assert.equal(ocean.mesh.renderOrder, -1, 'Water mesh should render before terrain');
+
+    const fs = ocean.material.fragmentShader;
+    assert.ok(
+      fs.includes('float seaLevelRayScale = camHeight / max(0.01, camHeight - crestLift);'),
+      'Fragment shader must project Gerstner wave crests along the camera ray to the Y=0 sea-level plane'
+    );
+    assert.ok(
+      fs.includes('float waterDepthBias = max(0.15, 0.0005 * seaLevelFragDepth);'),
+      'Fragment shader must compute a positive logarithmic depth bias away from the camera'
+    );
+    assert.ok(
+      fs.includes('gl_FragDepth = log2(max(1.0, seaLevelFragDepth + waterDepthBias)) * logDepthBufFC * 0.5;'),
+      'Fragment shader must push water depth behind coplanar Y=0 coastal land'
+    );
+  });
 });

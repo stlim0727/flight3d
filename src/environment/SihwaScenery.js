@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { colourIncheonGround, createIncheonGroundTexture } from './IncheonGround.js';
 import { SihwaRegion } from '../geospatial/SihwaRegion.js';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 
 /** Source-positioned landmarks, with deliberately lightweight procedural exteriors. */
 export function createSihwaScenery(region) {
@@ -88,7 +89,11 @@ export function createSihwaScenery(region) {
   }
   for(const [color,parts] of batches) {
     const g=mergeGeometries(parts,false);parts.forEach(p=>p.dispose());
-    const mesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color}));
+    const material=new THREE.MeshLambertMaterial({color});
+    if(color===0xcdbb8f)applyLogDepthOffset(material,4);
+    else if(color===0x60656a)applyLogDepthOffset(material,8);
+    else if(color===0x656b70)applyLogDepthOffset(material,12);
+    const mesh=new THREE.Mesh(g,material);
     mesh.receiveShadow=true;group.add(mesh);
   }
   group.userData.landmarks={tower:{x:tx,y:tb+th,z:tz},plant:{x:cx,y:base,z:cz},beach:feature('beach').center};

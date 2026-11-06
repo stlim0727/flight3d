@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createPavementMaterial, setPavementUVs, createRunwaySurfaceWear, createRunwayWearMaterial } from './Pavement.js';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 
 let runwaySurfaceWearMaterial;
 
@@ -104,6 +105,7 @@ export function createIncheonPavement(field) {
         if (!runwaySurfaceWearMaterial) {
           runwaySurfaceWearMaterial = wear.material.clone();
           runwaySurfaceWearMaterial.side = THREE.DoubleSide;
+          applyLogDepthOffset(runwaySurfaceWearMaterial, 2);
         }
         wear.material = runwaySurfaceWearMaterial;
         // Keep the exact ribbon footprint, including every mapped bend. Project
@@ -153,7 +155,11 @@ export function createIncheonPavement(field) {
       material = createPavementMaterial('asphalt');
       material.color.setHex(color);
       material.side = THREE.DoubleSide;
-    } else material = new THREE.MeshLambertMaterial({color,side:THREE.DoubleSide});
+    } else {
+      const units = name.endsWith('-marking') ? 2 : 1;
+      material = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
+      applyLogDepthOffset(material, units);
+    }
     const mesh=new THREE.Mesh(geometry,material);
     mesh.name=`incheon-${name}-pavement`;group.add(mesh);
   }

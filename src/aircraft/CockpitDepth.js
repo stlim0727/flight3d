@@ -10,7 +10,10 @@ export function useProjectionDepth(material) {
   const cacheKey = material.customProgramCacheKey();
   material.onBeforeCompile = function (shader, renderer) {
     compile.call(this, shader, renderer);
-    shader.fragmentShader = shader.fragmentShader.replace('#include <logdepthbuf_fragment>', '');
+    shader.fragmentShader = shader.fragmentShader.replace(
+      /#include <logdepthbuf_fragment>(\s*#ifdef USE_LOGARITHMIC_DEPTH_BUFFER[\s\S]*?#endif)?/,
+      ''
+    );
   };
   material.customProgramCacheKey = () => `${cacheKey}:projection-depth-v1`;
   material.needsUpdate = true;

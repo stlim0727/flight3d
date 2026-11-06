@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 
 // The blob fades out by 60 m AGL (~200 ft), the window where a radio-altimeter
 // height cue actually matters on approach and climb-out.
@@ -104,10 +105,10 @@ export class GroundContactShadow {
   constructor(scene) {
     this.geometry = new THREE.PlaneGeometry(1, 1);
     this.geometry.rotateX(-Math.PI / 2);
-    this.material = new THREE.MeshBasicMaterial({
+    this.material = applyLogDepthOffset(new THREE.MeshBasicMaterial({
       color: 0x14171c, transparent: true, opacity: 0, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
-    });
+    }), 4);
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.name = 'Ground contact shadow';
     this.mesh.visible = false;

@@ -5,6 +5,7 @@ import { loadIncheonTerrain } from '../geospatial/IncheonTerrain.js';
 import { drapeSurface, placeBuilding, terrainGeometry } from './incheonGeometry.js';
 import { generatePlanting, roadWidth } from '../geospatial/incheonDressing.js';
 import { createCityGround, createBuildingMaterials, createTexturedBuildings, createPlantingInstances, GROUND_TEXTURE_SIZE } from './incheonCityAssets.js';
+import { applyLogDepthOffset } from '../environment/RunwayMarkings.js';
 
 const canvas = document.querySelector('#scene');
 const status = document.querySelector('#status');
@@ -169,8 +170,10 @@ async function start() {
   for (const { layer, color, geometries } of batches.values()) {
     const geometry = mergeGeometries(geometries, false);
     if (!geometry) throw new Error('지도 도형 병합에 실패했습니다.');
-    layers[layer].add(new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide,
-      polygonOffset: layer !== 'buildings', polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+    const material = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide,
+      polygonOffset: layer !== 'buildings', polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    if (layer !== 'buildings') applyLogDepthOffset(material, layer === 'roads' ? 4 : 2);
+    layers[layer].add(new THREE.Mesh(geometry, material));
     geometries.forEach(g => g.dispose());
   }
   const decoratedBuildings=createTexturedBuildings(buildingRecords,createBuildingMaterials());

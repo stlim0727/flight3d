@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DEPARTURE_GATE } from '../config/incheonDeparture.js';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 
 /** Authored G1 stand sign and lead-in, kept distinct from mapped airport data. */
 export function createDepartureStand(height) {
@@ -7,7 +8,7 @@ export function createDepartureStand(height) {
   group.name = 'departure-gate-G1';
   group.position.set(DEPARTURE_GATE.x, height, DEPARTURE_GATE.z);
   group.rotation.y = -DEPARTURE_GATE.heading;
-  const yellow = new THREE.MeshBasicMaterial({ color: 0xf9cf38 });
+  const yellow = applyLogDepthOffset(new THREE.MeshBasicMaterial({ color: 0xf9cf38 }), 3);
   const line = new THREE.Mesh(new THREE.PlaneGeometry(.2, 40), yellow);
   line.rotation.x = -Math.PI / 2; line.position.set(0, .06, 15); group.add(line);
   const stop = new THREE.Mesh(new THREE.PlaneGeometry(8, .3), yellow);

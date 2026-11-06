@@ -1,5 +1,51 @@
 import * as THREE from 'three';
 
+/**
+ * Apply an explicit logarithmic depth bias (2.5 cm per unit along the view ray)
+ * alongside hardware polygonOffset so coplanar surfaces stay separated when
+ * Three.js writes gl_FragDepth under logarithmicDepthBuffer.
+ */
+export function applyLogDepthOffset(material, units = -(material?.polygonOffsetFactor || -1)) {
+  if (!material || !Number.isFinite(units) || units === 0) return material;
+  material.userData = material.userData || {};
+  material.userData.logDepthOffsetUnits = units;
+  if (!material.polygonOffset) {
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = -units;
+    material.polygonOffsetUnits = -units;
+  }
+  const offset = Number((0.025 * units).toFixed(4));
+  const offsetExpr = offset >= 0 ? `- ${offset}` : `+ ${Math.abs(offset)}`;
+  const previousCompile = material.onBeforeCompile;
+  const previousKey = typeof material.customProgramCacheKey === 'function'
+    ? material.customProgramCacheKey.bind(material)
+    : null;
+  material.onBeforeCompile = function (shader, renderer) {
+    if (typeof previousCompile === 'function') {
+      previousCompile.call(this, shader, renderer);
+    }
+    if (!shader?.fragmentShader?.includes('#include <logdepthbuf_fragment>')) return;
+    // Native polygon offset alone is not a dependable separation when the
+    // fragment shader writes logarithmic depth. Bias the same depth encoding
+    // explicitly along the view ray.
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <logdepthbuf_fragment>',
+      `#include <logdepthbuf_fragment>
+      #ifdef USE_LOGARITHMIC_DEPTH_BUFFER
+        if (vIsPerspective != 0.0) {
+          gl_FragDepth = log2(max(1.0, vFragDepth ${offsetExpr})) * logDepthBufFC * 0.5;
+        }
+      #endif`
+    );
+  };
+  const suffix = `log-depth-offset:${offset}`;
+  material.customProgramCacheKey = function () {
+    const baseKey = previousKey ? previousKey() : '';
+    return baseKey ? `${baseKey}:${suffix}` : suffix;
+  };
+  return material;
+}
+
 /** Painted overlays keep their real position for lighting and shadow lookup. */
 export function createRunwayMarkingMaterial(parameters = {}) {
   const material = new THREE.MeshStandardMaterial({
@@ -12,21 +58,8 @@ export function createRunwayMarkingMaterial(parameters = {}) {
     depthWrite: false,
     ...parameters
   });
-  material.onBeforeCompile = shader => {
-    // Native polygon offset alone is not a dependable separation when the
-    // fragment shader writes logarithmic depth. Bias the same depth encoding
-    // explicitly, by a bounded 5 cm toward the camera rather than a normalized
-    // constant whose world-space displacement grows with viewing distance.
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <logdepthbuf_fragment>',
-      `#include <logdepthbuf_fragment>
-      #ifdef USE_LOGARITHMIC_DEPTH_BUFFER
-        if (vIsPerspective != 0.0) {
-          gl_FragDepth = log2(max(1.0, vFragDepth - 0.05)) * logDepthBufFC * 0.5;
-        }
-      #endif`
-    );
-  };
-  material.customProgramCacheKey = () => 'runway-marking-depth-v1';
+  const units = -(material.polygonOffsetFactor || -2);
+  applyLogDepthOffset(material, units);
+  material.customProgramCacheKey = () => (units === 2 ? 'runway-marking-depth-v1' : `runway-marking-depth-v1:${units}`);
   return material;
 }

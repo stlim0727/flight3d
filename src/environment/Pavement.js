@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 
 // Airports stay allocated for the lifetime of the simulator. Share maps across
 // both airports; preset changes never allocate another texture set.
@@ -86,6 +87,7 @@ export function createRunwayWearMaterial() {
     polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3
   });
   material.name = 'runway-rubber';
+  applyLogDepthOffset(material, 3);
   wearMaterial = material;
   return wearMaterial;
 }
@@ -134,6 +136,7 @@ export function createRunwaySurfaceWear(width, length) {
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
     });
     surfaceWearMaterial.name = 'runway-surface-wear';
+    applyLogDepthOffset(surfaceWearMaterial, 2);
   }
   const geometry = new THREE.PlaneGeometry(width, length).rotateX(-Math.PI / 2);
   const mesh = new THREE.Mesh(geometry, surfaceWearMaterial);
@@ -146,7 +149,7 @@ export function createRunwaySurfaceWear(width, length) {
 export function createRunwayRepairs(width, length) {
   const group = new THREE.Group();
   group.name = 'runway-repairs';
-  const material = createPavementMaterial('asphalt', -3);
+  const material = applyLogDepthOffset(createPavementMaterial('asphalt', -3), 1);
   material.name = 'runway-repair';
   material.color.multiplyScalar(0.7);
   const geometry = setPavementUVs(new THREE.PlaneGeometry(3, 7).rotateX(-Math.PI / 2));
@@ -206,5 +209,6 @@ function getCrackMaterial() {
     polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3
   });
   crackMaterial.name = 'runway-cracks';
+  applyLogDepthOffset(crackMaterial, 4);
   return crackMaterial;
 }
