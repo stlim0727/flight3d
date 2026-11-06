@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ValleyScoreboard, sanitizeCallsign, valleyAttempt } from '../src/arena/ValleyScoreboard.js';
+import { ValleyScoreboard, sanitizeCallsign, valleyAttempt, SCORE_RULES_FINGERPRINT } from '../src/arena/ValleyScoreboard.js';
 import { VALLEY_SLALOM_RULES } from '../src/arena/generatedValley.js';
+import { TAKEOFF_SCORE_RULES } from '../src/arena/TakeoffMission.js';
+import { LANDING_SCORE_RULES } from '../src/arena/LandingMission.js';
 
 const FINGERPRINT_KEY = 'flight3d.valley-attempts.rules-fingerprint.v1';
-const CURRENT_FINGERPRINT = JSON.stringify(VALLEY_SLALOM_RULES);
+const CURRENT_FINGERPRINT = SCORE_RULES_FINGERPRINT;
 
 class MockStorage {
   constructor() { this.store = new Map(); }
@@ -104,9 +106,25 @@ test('changed rules characteristics discard every stored attempt', () => {
   scoreboard.add(record, { callsign: 'VIPER' });
   assert.equal(scoreboard.read().length, 1);
 
-  storage.setItem(FINGERPRINT_KEY, JSON.stringify({ ...VALLEY_SLALOM_RULES, wallRiseM: [550, 800] }));
+  storage.setItem(FINGERPRINT_KEY, JSON.stringify(
+    [{ ...VALLEY_SLALOM_RULES, wallRiseM: [550, 800] }, TAKEOFF_SCORE_RULES, LANDING_SCORE_RULES]));
   assert.deepEqual(scoreboard.read(), []);
   assert.equal(storage.getItem('flight3d.valley-attempts.v1'), '[]');
   assert.equal(storage.getItem(FINGERPRINT_KEY), CURRENT_FINGERPRINT);
   assert.deepEqual(scoreboard.getLeaderboard(5), []);
+});
+
+test('takeoff and landing attempts are recorded; other mission types are not', () => {
+  const storage = new MockStorage();
+  const scoreboard = new ValleyScoreboard(storage);
+  const takeoff = {
+    pilotKind: 'ai', status: 'succeeded', reason: 'completed', tick: 1440,
+    manifest: { id: 'takeoff-basic-v1', type: 'takeoff', physicsHz: 120, rulesVersion: '1.0.0' },
+    result: { metrics: { finalScore: 8100 } },
+  };
+  const attempt = scoreboard.add(takeoff);
+  assert.equal(attempt.callsign, 'AI');
+  assert.equal(attempt.metrics.finalScore, 8100);
+  assert.equal(scoreboard.getLeaderboard(5)[0].score, 8100);
+  assert.equal(valleyAttempt({ ...takeoff, manifest: { ...takeoff.manifest, type: 'cruise' } }), null);
 });

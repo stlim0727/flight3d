@@ -1,5 +1,18 @@
 import { MissionState, headingError } from './MissionState.js';
 
+/** Landing scoring numbers. Frozen and fingerprinted by ValleyScoreboard:
+ * changing one changes what a stored score means, so old records are discarded.
+ * The stopping-distance charge is one point per metre because a full-length
+ * rollout (2950 m) consumes the whole headroom a soft landing can save. */
+export const LANDING_SCORE_RULES = Object.freeze({
+  base: 10000,
+  perTouchdownSinkMs: 500,
+  perTouchdownCenterlineM: 50,
+  perZoneCentreOffsetM: 2,
+  perStopMeter: 1,
+  perBounceTick: 2,
+});
+
 export class LandingMission extends MissionState {
   constructor(manifest) {
     super('landing', manifest);
@@ -46,5 +59,20 @@ export class LandingMission extends MissionState {
       if (this.stopTicks >= m.stopTicks) return this.finish('succeeded', 'completed');
     }
     return this.result();
+  }
+
+  result() {
+    const r = super.result();
+    if (r.status === 'succeeded') {
+      const rules = LANDING_SCORE_RULES, m = r.metrics, t = m.touchdown ?? {};
+      const zoneCentreM = (this.manifest.touchdownStartS + this.manifest.touchdownEndS) / 2;
+      m.finalScore = Math.max(0, Math.round(rules.base
+        - (t.sinkRateMs ?? 0) * rules.perTouchdownSinkMs
+        - Math.abs(t.centerlineOffsetM ?? 0) * rules.perTouchdownCenterlineM
+        - Math.abs((t.runwayS ?? zoneCentreM) - zoneCentreM) * rules.perZoneCentreOffsetM
+        - (m.stoppingDistanceM ?? 0) * rules.perStopMeter
+        - (m.bounceTicks ?? 0) * rules.perBounceTick));
+    }
+    return r;
   }
 }

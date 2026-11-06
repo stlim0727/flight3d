@@ -267,6 +267,29 @@ export function trackPilotModeChange(mode, missionId) {
 }
 
 /**
+ * Submit one scored attempt to the shared leaderboard feed. Read back by the
+ * Pages build (scripts/build-leaderboard.mjs) into leaderboard.json, so the
+ * browser never needs a write endpoint. Flat snake_case scalars keep the
+ * HogQL side simple; identity rides on the anonymous distinct id.
+ */
+export function trackScoreSubmitted(attempt, { comparisonKeyHash = '', fingerprintHash = '' } = {}) {
+  if (!attempt) return;
+  trackEvent('score_submitted', {
+    mission: attempt.conditions?.mission ?? null,
+    rulesVersion: attempt.conditions?.rulesVersion ?? null,
+    callsign: attempt.callsign,
+    pilot_kind: attempt.pilotKind,
+    score: attempt.metrics?.finalScore ?? null,
+    duration_seconds: Number.isFinite(attempt.durationSeconds)
+      ? Number(attempt.durationSeconds.toFixed(2)) : null,
+    environment_seed: attempt.conditions?.environmentSeed ?? null,
+    comparison_key_hash: comparisonKeyHash,
+    fingerprint_hash: fingerprintHash,
+    recorded_at: attempt.recordedAt,
+  }, { send_instantly: true });
+}
+
+/**
  * Track one startup load trace per page load. The report arrives already aggregated by
  * src/core/startupTrace.js: flat scalars for trending, per-asset-class buckets plus the
  * slowest/largest names as JSON properties. Sent without flight context: the trace describes

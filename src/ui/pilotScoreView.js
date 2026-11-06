@@ -32,7 +32,7 @@ export function koreanReason(reason) {
   return REASON_KO[reason] ?? reason ?? '종료';
 }
 
-export function formatPilotScoreData(record, missionName = '계곡 미션', { scoreboard, callsign } = {}) {
+export function formatPilotScoreData(record, missionName = '계곡 미션', { scoreboard, callsign, globalRows } = {}) {
   if (!record) return null;
   const m = record.result?.metrics ?? {};
   const status = record.status;
@@ -45,7 +45,10 @@ export function formatPilotScoreData(record, missionName = '계곡 미션', { sc
   const hasAltitudeScore = hasScore;
 
   const resolvedCallsign = callsign ?? scoreboard?.getSavedCallsign?.() ?? 'MAV';
-  const leaderboard = scoreboard?.getLeaderboard?.(5) ?? [];
+  // Global rows come from the published leaderboard snapshot for this exact
+  // set of conditions; without a snapshot the board stays the local one.
+  const leaderboardGlobal = Array.isArray(globalRows) && globalRows.length > 0;
+  const leaderboard = leaderboardGlobal ? globalRows : scoreboard?.getLeaderboard?.(5) ?? [];
 
   const durationSec = (record.tick / (record.manifest?.physicsHz ?? 120));
   const durationText = `${durationSec.toFixed(1)}초`;
@@ -168,6 +171,7 @@ export function formatPilotScoreData(record, missionName = '계곡 미션', { sc
     stats,
     callsign: resolvedCallsign,
     leaderboard,
+    leaderboardGlobal,
   };
 }
 
@@ -226,7 +230,7 @@ export function scoreOverlayMarkup(data) {
       ${data.leaderboard?.length ? `
       <div class="modal-leaderboard">
         <div class="leaderboard-header">
-          <span>🏆 계곡 슬라롬 순위표 (TOP 5)</span>
+          <span>🏆 ${data.leaderboardGlobal ? '글로벌 ' : ''}계곡 슬라롬 순위표 (TOP 5)</span>
         </div>
         <div class="leaderboard-table">
           ${data.leaderboard.map(e => `
