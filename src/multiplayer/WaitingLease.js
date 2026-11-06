@@ -1,4 +1,4 @@
-export const WAITING_TIMEOUT_MS = 10000;
+export const WAITING_TIMEOUT_MS = 30000;
 
 /** Only an explicit creator button press renews this deadline. Expiry is irreversible. */
 export class WaitingLease {

@@ -18,7 +18,7 @@ export default {
   "mp.cancelAndClose": "Cancel & close",
   "mp.roomMenu": "Room",
   "mp.dialogHelp": "Your aircraft is held while this dialog is open. Close it to fly; hold N to talk during flight.",
-  "mp.keepWaiting": "Keep room open · 10 more seconds",
+  "mp.keepWaiting": "Keep room open · 30 more seconds",
   "mp.keepWaitingCountdown": "Room cancels in {seconds}s.",
   "mp.status.cancelled": "This room has been cancelled. Ask the creator for a new code.",
 

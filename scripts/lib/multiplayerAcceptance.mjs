@@ -131,13 +131,13 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
     const next = await create(...config); await join(next.code); await start(); await leave();
   }
 
-  // A real ten-second deadline: renew halfway, survive the original deadline,
+  // A real thirty-second deadline: renew halfway, survive the original deadline,
   // then miss the next press. Connected guests and later arrivals see cancellation.
   const cancelled = await create(); await join(cancelled.code);
-  await delay(5200); await host.evaluate('document.getElementById("mp-keep-waiting").click()');
-  await delay(5200);
+  await delay(15200); await host.evaluate('document.getElementById("mp-keep-waiting").click()');
+  await delay(15200);
   assert.equal(await host.evaluate('sim.multiplayer.active'), true, 'creator renewal survives original deadline');
-  await until(() => host.evaluate('sim.multiplayer.room.closed && sim.multiplayer.message === "cancelled"'), 'ten-second missed press cancellation', 7000);
+  await until(() => host.evaluate('sim.multiplayer.room.closed && sim.multiplayer.message === "cancelled"'), 'thirty-second missed press cancellation', 17000);
   await until(() => guest.evaluate('!sim.multiplayer.active && sim.multiplayer.message === "cancelled"'), 'connected guest notified');
   assert.equal(await host.evaluate('sim.multiplayer.room.keepWaiting()'), false);
   await guest.evaluate(`document.getElementById('mp-room').value=${JSON.stringify(cancelled.code)}; document.getElementById('mp-join').click()`);
@@ -146,5 +146,5 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   assert.equal(await guest.evaluate('document.getElementById("mp-status").textContent.length > 0'), true);
   await capture(guest, 'cancelled-invite');
   for (const c of browsers) assert.deepEqual(c.errors, [], 'browser exceptions');
-  console.log('PASS hardware Chrome: compact/manual and automatic URL invites, modal focus/physics/input isolation, microphone/PTT, remote drawing/movement/reset/restart, three scenery/aircraft types, phone modal, creator renewal and real 10s expiry, connected/late guest cancellation. Evidence: review-artifacts/multiplayer/');
+  console.log('PASS hardware Chrome: compact/manual and automatic URL invites, modal focus/physics/input isolation, microphone/PTT, remote drawing/movement/reset/restart, three scenery/aircraft types, phone modal, creator renewal and real 30s expiry, connected/late guest cancellation. Evidence: review-artifacts/multiplayer/');
 }

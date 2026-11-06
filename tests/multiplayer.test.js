@@ -36,14 +36,14 @@ test('manual room input accepts grouped/lowercase codes and compact invite links
   for (let i = 0; i < 100; i++) assert.equal(validRoom(newRoom()), true);
 });
 
-test('creator waiting lease expires at exactly ten seconds and cannot be revived', () => {
+test('creator waiting lease expires at exactly thirty seconds and cannot be revived', () => {
   let now = 0;
   const lease = new WaitingLease({ now: () => now });
-  assert.equal(lease.remaining, 10000);
-  now = 9999; assert.equal(lease.expired, false); assert.equal(lease.renew(), true);
-  assert.equal(lease.deadline, 19999);
-  now = 19999; assert.equal(lease.expired, true); assert.equal(lease.remaining, 0);
-  assert.equal(lease.renew(), false); assert.equal(lease.deadline, 19999);
+  assert.equal(lease.remaining, 30000);
+  now = 29999; assert.equal(lease.expired, false); assert.equal(lease.renew(), true);
+  assert.equal(lease.deadline, 59999);
+  now = 59999; assert.equal(lease.expired, true); assert.equal(lease.remaining, 0);
+  assert.equal(lease.renew(), false); assert.equal(lease.deadline, 59999);
 });
 
 test('late guests understand explicit cancellation and expired hosts cannot start', () => {

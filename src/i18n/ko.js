@@ -18,7 +18,7 @@ export default {
   "mp.cancelAndClose": "취소하고 닫기",
   "mp.roomMenu": "방 메뉴",
   "mp.dialogHelp": "이 창이 열려 있는 동안 내 기체는 멈춥니다. 닫으면 비행하고, 비행 중 N을 눌러 말할 수 있습니다.",
-  "mp.keepWaiting": "계속 기다리기 · 10초 연장",
+  "mp.keepWaiting": "계속 기다리기 · 30초 연장",
   "mp.keepWaitingCountdown": "{seconds}초 뒤 방이 취소됩니다.",
   "mp.status.cancelled": "이미 취소된 방입니다. 방장에게 새 코드를 요청하세요.",
 

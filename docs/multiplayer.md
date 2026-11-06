@@ -7,7 +7,7 @@
    **Create room · max 2**. Share the six-character code (for example `K7M 2QX`)
    or use **Copy invite** for a compact link ending in `?r=K7M2QX`.
 3. While waiting to start, the creator must press **Keep room open** before the
-   ten-second countdown ends. Each press grants another ten seconds. Missing a
+   thirty-second countdown ends. Each press grants another thirty seconds. Missing a
    press cancels the room; it cannot be revived by pressing late.
 4. Opening the shared invite link automatically joins your friend's room and
    opens its dialog; no typing, pasting, or Join button is needed. With a code,
