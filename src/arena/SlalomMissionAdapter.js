@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CameraSystem } from '../cameras/CameraSystem.js';
 import { SimulatorMissionAdapter } from './SimulatorMissionAdapter.js';
 import { createSlalomManifest, projectSlalom } from './slalomCourse.js';
 import { generateValley } from './generatedValley.js';
@@ -29,15 +30,15 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     sim.shadowDemo?.stop(); sim.hangang?.stop();
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
 
+    if (typeof sim.setAircraft === 'function') {
+      sim.setAircraft('F16', true);
+    }
+    // Restore the selected cached airframe too, not just the outgoing aircraft.
     if (typeof sim.clearCrashState === 'function') {
       sim.clearCrashState();
     } else {
       sim.isCrashed = false;
       sim.crashResult = null;
-    }
-
-    if (typeof sim.setAircraft === 'function') {
-      sim.setAircraft('F16', true);
     }
 
     // In browser simulator (sim.scene present), dynamically mount procedural virtual valley terrain
@@ -136,6 +137,8 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     this.syncPose();
 
     if (sim.cameraSystem) {
+      // A lobby cinematic may leave AUTO/GEAR or a temporary belly view behind.
+      sim.cameraSystem.setMode?.(CameraSystem.MODES.HUD, true);
       sim.cameraSystem.userLookOverridden = false;
       sim.cameraSystem.snapToTarget?.(sim.aircraft?.group);
     }

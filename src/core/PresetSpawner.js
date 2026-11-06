@@ -79,9 +79,8 @@ class PresetSpawnerMethods {
     this.slideEmitClock = 0;
     this.landingRestTime = 0;
 
-    if (this.isCrashed) {
-      this.clearCrashState();
-    }
+    // Cached aircraft and effects can outlive the global crash flag.
+    this.clearCrashState();
 
     const groundClearance = this.gear?.cgGroundHeightM ?? 3.5;
 
