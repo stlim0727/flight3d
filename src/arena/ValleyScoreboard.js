@@ -17,6 +17,14 @@ export function sanitizeCallsign(raw) {
   return clean || 'MAV';
 }
 
+/** A claimed name belongs to a human line only. Human runs hold the controls from
+ * tick 0 (and taking over an AI or demo run aborts it before it can be recorded),
+ * so a recorded human attempt always flew under its pilot's control from the
+ * start. An AI flight is never attributable to a person: it is stamped AI. */
+function attemptCallsign(record, callsign) {
+  return record.pilotKind === 'human' ? sanitizeCallsign(callsign) : 'AI';
+}
+
 /** Local and global attempts. Only matching comparison keys can be ranked. */
 export function valleyAttempt(record, { callsign } = {}) {
   const m = record?.manifest;
@@ -28,7 +36,7 @@ export function valleyAttempt(record, { callsign } = {}) {
     navigationProfile: m.navigationProfile, sensorProfile: m.sensorProfile,
     fixedConfiguration: m.fixedConfiguration, configuredState: m.configuredState };
   return { id: crypto.randomUUID(), recordedAt: new Date().toISOString(),
-    callsign: sanitizeCallsign(callsign),
+    callsign: attemptCallsign(record, callsign),
     pilotKind: record.pilotKind, sourceHash: record.sourceHash,
     conditions, comparisonKey: JSON.stringify(conditions),
     status: record.status, reason: record.reason, durationSeconds: record.tick / m.physicsHz,
@@ -91,10 +99,10 @@ export class ValleyScoreboard {
 
   updateCallsign(attemptId, newCallsign) {
     if (!attemptId) return false;
-    const clean = this.saveCallsign(newCallsign);
     const rows = this.read();
     const target = rows.find(r => r.id === attemptId);
-    if (!target) return false;
+    if (!target || target.pilotKind !== 'human') return false;
+    const clean = this.saveCallsign(newCallsign);
     target.callsign = clean;
     try {
       this.storage.setItem(KEY, JSON.stringify(rows));

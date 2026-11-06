@@ -199,3 +199,18 @@ test('scoreOverlayMarkup includes clear retry, pilot mode choice, and return-to-
   assert.match(overlay, /data-score-report/);
   assert.match(overlay, /메인 메뉴/);
 });
+
+test('a successful AI valley flight offers no callsign input, a human one does', () => {
+  const base = {
+    status: 'succeeded',
+    reason: 'completed',
+    tick: 4800,
+    manifest: { type: 'valley-slalom', physicsHz: 120 },
+    result: { metrics: { finalScore: 12000, completedGates: 6, totalGates: 6 } },
+  };
+  const ai = scoreOverlayMarkup(formatPilotScoreData({ ...base, pilotKind: 'ai' }, '계곡 슬라롬'));
+  assert.doesNotMatch(ai, /modal-callsign-box/);
+  assert.doesNotMatch(ai, /data-save-callsign/);
+  const human = scoreOverlayMarkup(formatPilotScoreData({ ...base, pilotKind: 'human' }, '계곡 슬라롬'));
+  assert.match(human, /modal-callsign-box/);
+});

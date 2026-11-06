@@ -54,19 +54,22 @@ test('ValleyScoreboard saves, ranks and retrieves leaderboard attempts', () => {
   const attempt2 = scoreboard.add(record2, { callsign: 'BOT_ACE' });
 
   assert.equal(attempt1.callsign, 'VIPER');
-  assert.equal(attempt2.callsign, 'BOT_ACE');
+  // An AI flight is never attributed to a person, whatever callsign is offered.
+  assert.equal(attempt2.callsign, 'AI');
 
   const leaderboard = scoreboard.getLeaderboard(5);
   assert.equal(leaderboard.length, 2);
   assert.equal(leaderboard[0].rank, 1);
-  assert.equal(leaderboard[0].callsign, 'BOT_ACE');
+  assert.equal(leaderboard[0].callsign, 'AI');
   assert.equal(leaderboard[0].score, 15200);
 
   assert.equal(leaderboard[1].rank, 2);
   assert.equal(leaderboard[1].callsign, 'VIPER');
   assert.equal(leaderboard[1].score, 14500);
 
-  // Test updating callsign
+  // Test updating callsign: the human row takes a new name, the AI row refuses.
+  assert.equal(scoreboard.updateCallsign(attempt2.id, 'CYBER'), false);
+  assert.equal(scoreboard.read().find(r => r.id === attempt2.id).callsign, 'AI');
   const updated = scoreboard.updateCallsign(attempt1.id, 'ROOSTER');
   assert.equal(updated, true);
   const updatedLeaderboard = scoreboard.getLeaderboard(5);
