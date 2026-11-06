@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FlightRecorder, flightDuration } from '../src/core/FlightRecorder.js';
+import { ReplayRecorder } from '../src/core/ReplayRecorder.js';
 import { reportText } from '../src/ui/DebriefOverlay.js';
 import { setLanguage } from '../src/i18n/index.js';
 import { SimulatorClass } from './helpers/simulatorClass.js';
@@ -12,6 +13,10 @@ const telemetry = { x: 0, z: 0, altitudeFt: 6000, iasKnots: 120, gForce: 1,
 function record(seconds, recorder, data = telemetry) {
   for (let i = 0; i < Math.round(seconds * 120); i++) recorder.update(1 / 120, data);
 }
+
+// The production simulator owns both recorders, so every fake sortie has to as well.
+const attitude = { x: 0, y: 0, z: 0, w: 1 };
+const recorders = () => ({ flightRecorder: new FlightRecorder(), replayRecorder: new ReplayRecorder() });
 
 test('fixed-step sampling retains peaks between samples and owns immutable sortie data', () => {
   const recorder = new FlightRecorder(); recorder.start(metadata);
@@ -108,11 +113,12 @@ test('crash reports snapshot the collision once and include it in shared text', 
 });
 
 test('flow sequence excludes pause/menu time, freezes completed reports, retry starts fresh', () => {
-  const sim = { gameFlow: new GameFlowController(), flightRecorder: new FlightRecorder(), devRunner: {},
-    telemetry, isCrashed: false, debriefOverlay: { show(report) { this.report = report; } } };
+  const sim = { gameFlow: new GameFlowController(), ...recorders(), devRunner: {},
+    telemetry, quaternion: attitude, isCrashed: false,
+    debriefOverlay: { show(report) { this.report = report; } } };
   sim.endFlight = reason => SimulatorClass.prototype.endFlight.call(sim, reason);
   const tick = () => SimulatorClass.prototype.updateFlightRecording.call(sim, 1 / 120);
-  sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata);
+  sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata); sim.replayRecorder.start(metadata);
   for (let i = 0; i < 240; i++) tick();
   sim.gameFlow.pause(); for (let i = 0; i < 1200; i++) tick();
   sim.gameFlow.resume(); for (let i = 0; i < 360; i++) tick();
@@ -120,13 +126,20 @@ test('flow sequence excludes pause/menu time, freezes completed reports, retry s
   sim.endFlight();
   assert.equal(sim.gameFlow.state, FLOW.DEBRIEF);
   assert.ok(Math.abs(sim.debriefReport.durationSec - 5) < 1e-9);
+  assert.ok(sim.debriefReplay, 'the pose track rides the same sortie');
+  assert.ok(Math.abs(sim.debriefReplay.durationSec - 5) < 1e-9, 'pause and menu time stay out of the track too');
+  assert.equal(sim.debriefReplay.metadata.aircraft, 'C172');
+  assert.ok(sim.debriefReplay.samples.length >= 25 && sim.debriefReplay.samples.length <= 27);
+  assert.ok(sim.debriefReplay.samples.every(s => Number.isFinite(s.y) && s.quat.length === 4),
+    'a replay needs world height and attitude, which the chart report omits');
   assert.equal(sim.gameFlow.isPhysicsFrozen(), true);
   assert.equal(sim.gameFlow.resume(), false);
   tick(); assert.equal(sim.debriefReport.samples.length, sim.debriefOverlay.report.samples.length);
-  sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata); tick();
+  sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata); sim.replayRecorder.start(metadata); tick();
   assert.equal(sim.flightRecorder.elapsed, 1 / 120);
   sim.isCrashed = true; tick();
   assert.equal(sim.debriefReport.reason, 'crash');
+  assert.equal(sim.debriefReplay, null, 'a one-tick sortie has no track worth saving');
   assert.equal(sim.gameFlow.state, FLOW.FLIGHT, 'impact must leave the crash scene visible');
   SimulatorClass.prototype.updateCrashDebrief.call(sim, 3);
   assert.equal(sim.gameFlow.state, FLOW.DEBRIEF);
@@ -135,13 +148,13 @@ test('flow sequence excludes pause/menu time, freezes completed reports, retry s
 });
 
 function crashSortie() {
-  const sim = { gameFlow: new GameFlowController(), flightRecorder: new FlightRecorder(), devRunner: {},
-    telemetry: { ...telemetry }, isCrashed: false, shown: 0,
+  const sim = { gameFlow: new GameFlowController(), ...recorders(), devRunner: {},
+    telemetry: { ...telemetry }, quaternion: attitude, isCrashed: false, shown: 0,
     debriefOverlay: { show() { sim.shown++; } } };
   for (const method of ['endFlight', 'updateFlightRecording', 'updateCrashDebrief', 'beginFlightRecording']) {
     sim[method] = (...args) => SimulatorClass.prototype[method].call(sim, ...args);
   }
-  sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata);
+  sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata); sim.replayRecorder.start(metadata);
   for (let i = 0; i < 120; i++) sim.updateFlightRecording(1 / 120);
   sim.isCrashed = true; sim.telemetry.gForce = 4;
   sim.crashResult = { type: 'TOWER', name: 'Tower', description: 'Hit the tower.', speedKnots: 140 };
@@ -204,10 +217,10 @@ test('reset, fresh recordings and developer crashes cannot open an old accident 
 });
 
 test('landing completion needs a recorded airborne touchdown and a sustained stop', () => {
-  const sim = { gameFlow: new GameFlowController(), flightRecorder: new FlightRecorder(), devRunner: {},
-    telemetry: { ...telemetry }, debriefOverlay: { show() {} } };
+  const sim = { gameFlow: new GameFlowController(), ...recorders(), devRunner: {},
+    telemetry: { ...telemetry }, quaternion: attitude, debriefOverlay: { show() {} } };
   sim.endFlight = reason => SimulatorClass.prototype.endFlight.call(sim, reason);
-  sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata);
+  sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata); sim.replayRecorder.start(metadata);
   for (let i = 0; i < 240; i++) SimulatorClass.prototype.updateFlightRecording.call(sim, 1 / 120);
   Object.assign(sim.telemetry, { onGround: true, groundSpeedKnots: 0, touchdownSinkRate: 1 });
   for (let i = 0; i < 240; i++) SimulatorClass.prototype.updateFlightRecording.call(sim, 1 / 120);

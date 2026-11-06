@@ -4,6 +4,7 @@ import scenarios from "./locales/ko/scenarios.js";
 import ui from "./locales/ko/ui.js";
 import systems from "./locales/ko/systems.js";
 import dev from "./locales/ko/dev.js";
+import replay from './locales/ko/replay.js';
 
 export default {
   ...debrief,
@@ -12,4 +13,5 @@ export default {
   ...ui,
   ...systems,
   ...dev,
+  ...replay,
 };

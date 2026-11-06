@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import en from '../src/i18n/en.js';
+import ko from '../src/i18n/ko.js';
+import { SAVE_REPLAY_STATUS } from '../src/ui/DebriefOverlay.js';
 import enDebrief from '../src/i18n/locales/en/debrief.js';
 import koDebrief from '../src/i18n/locales/ko/debrief.js';
 
@@ -96,5 +99,28 @@ test('pilot arena score modal provides prominent top-left return to main menu bu
 
   const cssSource = readFileSync(resolve('src/styles/pilot-arena.css'), 'utf8');
   assert.ok(cssSource.includes('.btn-score-lobby'), 'pilot-arena.css must define .btn-score-lobby');
+});
+
+test('debrief offers save replay only when the sortie produced a pose track', () => {
+  const debriefSource = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
+  assert.match(debriefSource, /show\(report, replay = null\)/, 'show must accept the recorded track');
+  assert.match(debriefSource, /id="debrief-save-replay" data-i18n="debrief\.saveReplay" hidden/);
+  assert.match(debriefSource, /this\.el\('save-replay'\)\.hidden = !replay;/);
+  assert.match(debriefSource, /this\.el\('save-replay'\)\.disabled = false;/, 'a fresh debrief must be savable again');
+  const share = debriefSource.match(/<section id="debrief-share"[\s\S]*?<\/section>/)[0];
+  assert.ok(share.includes('id="debrief-save-replay"') && share.includes('id="debrief-status"'),
+    'save replay must sit beside the live region that reports its result');
+  assert.match(debriefSource, /if \(this\.replaySaved\) return;/, 'one save per sortie');
+});
+
+test('every replay store refusal token has a localized reason in both catalogs', () => {
+  for (const [token, key] of Object.entries(SAVE_REPLAY_STATUS)) {
+    assert.match(key, /^replay\./, `${token} must report a replay-scoped message`);
+    assert.ok(en[key], `english message for ${token}`);
+    assert.ok(ko[key], `korean message for ${token}`);
+    assert.doesNotMatch(en[key], /[가-힣]/, key);
+  }
+  assert.ok(en['replay.saveFailed'] && ko['replay.saveFailed'], 'quota and codec failures need a message');
+  assert.ok(enDebrief['debrief.saveReplay'] && koDebrief['debrief.saveReplay']);
 });
 

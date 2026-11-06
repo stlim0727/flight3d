@@ -41,6 +41,7 @@ export default {
   'debrief.shareReport': '보고서 공유',
   'debrief.report': '비행 보고서',
   'debrief.copy': '보고서 복사',
+  'debrief.saveReplay': '리플레이 저장',
   'debrief.export': '로그 내보내기 (.json)',
   'debrief.shareHint': '보고서에는 기체·코스·요약 지표와 사고 시 충돌 정보가 포함됩니다.',
   'debrief.copied': '보고서를 복사했습니다.',

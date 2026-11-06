@@ -536,6 +536,7 @@ class SimulatorHudAndBindingsMethods {
       onRetry: () => this.retryDebrief(),
       onLobby: () => { this.demoDirector.stop(); this.gameFlow.returnToLobby(false); document.getElementById('btn-fly')?.focus(); },
       onFeedback: () => this.openFeedbackDialog?.(),
+      onSaveReplay: () => this.saveDebriefReplay(),
     });
     document.getElementById('btn-pause-end')?.addEventListener('click', () => this.endFlight());
     document.getElementById('btn-lobby-end')?.addEventListener('click', () => this.endFlight());
