@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { pathToFileURL } from 'node:url';
 import { FlightControls } from '../src/controls/FlightControls.js';
+import { applyDeadzone } from '../src/controls/HotasController.js';
 import { shapeTouchStick } from '../src/controls/TouchFlightControls.js';
 import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { Atmosphere } from '../src/physics/Atmosphere.js';
@@ -11,14 +12,21 @@ import { F16_FALCON } from '../src/config/aircraftConfigs.js';
  * relative to neutral. Use the live integrator's pitch/roll inertia convention.
  */
 export function sampleControlResponse({ input, axis = 'roll', legacyGyro = false,
-  iasKnots = 350, altitudeMeters = 3000 } = {}) {
+  iasKnots = 350, altitudeMeters = 3000, source = 'touch' } = {}) {
   const previousWindow = globalThis.window;
   globalThis.window ??= { addEventListener() {} };
   try {
     const controls = new FlightControls({ addEventListener() {} });
-    const normalized = legacyGyro ? input : shapeTouchStick(0, input)[1];
-    controls.setTouchStick(axis === 'pitch' ? normalized : 0, axis === 'roll' ? normalized : 0);
-    for (let i = 0; i < 240; i++) controls.update(1 / 120, iasKnots);
+    const normalized = source === 'hotas' ? applyDeadzone(input)
+      : legacyGyro ? input : shapeTouchStick(0, input)[1];
+    if (source === 'hotas') {
+      controls.hotas.update = () => {};
+      controls.hotas.elevator = axis === 'pitch' ? normalized : 0;
+      controls.hotas.aileron = axis === 'roll' ? normalized : 0;
+    } else {
+      controls.setTouchStick(axis === 'pitch' ? normalized : 0, axis === 'roll' ? normalized : 0);
+    }
+    for (let i = 0; i < 240; i++) controls.update(1 / 120, iasKnots, 'F16');
     const aero = new Aerodynamics(F16_FALCON);
     aero.pitchTrim = 0;
     const densityRatio = Atmosphere.getConditions(altitudeMeters).densityRatio;
@@ -33,7 +41,7 @@ export function sampleControlResponse({ input, axis = 'roll', legacyGyro = false
     aero.elevator = controls.elevator;
     aero.aileron = controls.aileron;
     const acceleration = THREE.MathUtils.radToDeg(measure() - neutral);
-    return { input, normalized, surface: axis === 'pitch' ? aero.elevator : aero.aileron,
+    return { input, normalized: source === 'hotas' ? .35 * normalized + .65 * normalized ** 3 : normalized, surface: axis === 'pitch' ? aero.elevator : aero.aileron,
       accelerationDegS2: acceleration };
   } finally {
     if (previousWindow === undefined) delete globalThis.window;
