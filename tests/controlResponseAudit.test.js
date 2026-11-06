@@ -28,20 +28,20 @@ for (const axis of ['pitch', 'roll']) {
   });
 }
 
-for (const axis of ['pitch', 'roll']) {
-  test(`F16 HOTAS ${axis} preserves precision and full authority across airspeeds`, () => {
-    for (const iasKnots of [200, 350, 500]) {
+for (const aircraftId of ['F16', 'C172']) for (const axis of ['pitch', 'roll']) {
+  test(`${aircraftId} HOTAS ${axis} preserves precision and full authority across airspeeds`, () => {
+    for (const iasKnots of (aircraftId === 'C172' ? [70, 100, 130] : [200, 350, 500])) {
       let previous = -1;
       for (const input of [0, .04, .1, .2, .5, 1]) {
-        const current = sampleControlResponse({ input, axis, iasKnots, source: 'hotas' });
+        const current = sampleControlResponse({ input, axis, iasKnots, aircraftId, source: 'hotas' });
         const oldLinear = sampleControlResponse({ input: Math.max(0, (input - .04) / .96),
-          axis, iasKnots, legacyGyro: true });
+          axis, iasKnots, aircraftId, legacyGyro: true });
         assert.ok(current.accelerationDegS2 >= previous - 1e-8);
         assert.ok(current.accelerationDegS2 <= oldLinear.accelerationDegS2 + 1e-8);
         if (input === .1 || input === .2) {
           assert.ok(current.accelerationDegS2 < oldLinear.accelerationDegS2 * .4);
         }
-        const opposite = sampleControlResponse({ input: -input, axis, iasKnots, source: 'hotas' });
+        const opposite = sampleControlResponse({ input: -input, axis, iasKnots, aircraftId, source: 'hotas' });
         assert.ok(Math.abs(current.accelerationDegS2 + opposite.accelerationDegS2) < 1e-7);
         if (input === 1) assert.equal(current.surface, oldLinear.surface);
         previous = current.accelerationDegS2;

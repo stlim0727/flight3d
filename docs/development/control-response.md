@@ -46,15 +46,15 @@ input tuning described below.
 Physical touch/gyro feel still requires device/browser acceptance under the
 hardware GPU procedure in `browser-gpu.md`.
 
-## F16 HOTAS and keyboard precision
+## Manual HOTAS and keyboard precision
 
-The F16 manual path now applies `0.35*x + 0.65*x^3` to HOTAS pitch and roll
-**after** the configured axis deadzone. Other aircraft retain the linear HOTAS
+The F16 and C172 manual paths apply `0.35*x + 0.65*x^3` to HOTAS pitch and roll
+**after** the configured axis deadzone. The B738 retains its linear HOTAS
 response. This matches the touch/tilt polynomial, but HOTAS keeps its adjustable
 per-axis deadzone rather than the touch stick's radial deadzone. Full travel
 retains full command; rudder, throttle, touch/tilt and virtual commands are unchanged.
 
-| Raw axis travel | Previous HOTAS command | F16 HOTAS command | Touch / tilt command |
+| Raw axis travel | Previous HOTAS command | F16 / C172 HOTAS command | Touch / tilt command |
 | --- | --- | --- | --- |
 | 10% | 6.250% | 2.203% | 1.494% |
 | 20% | 16.667% | 6.134% | 5.428% |
@@ -66,11 +66,10 @@ These HOTAS values use the default 4% deadzone. At the audit's 350 KIAS airflow,
 full-travel acceleration is unchanged. `sampleControlResponse({ input: .1,
 source: 'hotas' })` reproduces the tuned path through the F16 controls and aero model.
 
-Released F16 pitch/roll keys now return surfaces at 4 normalized units/second,
+Released F16, C172 and B738 pitch/roll keys return surfaces at 4 normalized units/second,
 matching touch release (at most 250 ms from full surface travel). Key engagement
 and reversal retain the existing slew limits. The faster return applies only
-when the combined command is neutral, with no mouse or virtual override. Other
-aircraft retain the original keyboard return. For example, a 0.5-second roll-key
+when the combined command is neutral, with no mouse or virtual override. Return state is discarded when switching aircraft. For example, a 0.5-second roll-key
 hold at 350 KIAS reaches 0.425 surface command: release now centres in about
 108 ms at 120 Hz, versus about 508 ms before. Neutral surfaces do not cancel
 existing angular velocity or automatically level the aircraft.
@@ -78,3 +77,11 @@ existing angular velocity or automatically level the aircraft.
 Node coverage checks both signs, airspeeds, timestep rates, release/reversal,
 full authority, source handoff and aircraft switching. This is a manual precision
 tuning, not an implementation or validation of the real F16 FLCS.
+
+At 100 KIAS and the same fixed-airflow audit conditions, the C172's 10% raw
+HOTAS pitch acceleration falls from 35.69 to 12.58 deg/s², and roll acceleration
+from 64.91 to 21.79 deg/s². Full-travel authority is retained. The B738's HOTAS
+path is unchanged; its faster keyboard release removes lingering surface input
+without changing key engagement or its aerodynamic coefficients. Use
+`sampleControlResponse({ input: .1, source: 'hotas', aircraftId: 'C172',
+iasKnots: 100 })` to reproduce the C172 sample.

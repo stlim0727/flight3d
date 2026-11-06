@@ -5,14 +5,14 @@ import { applyDeadzone } from '../src/controls/HotasController.js';
 import { shapeTouchStick } from '../src/controls/TouchFlightControls.js';
 import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { Atmosphere } from '../src/physics/Atmosphere.js';
-import { F16_FALCON } from '../src/config/aircraftConfigs.js';
+import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
 
 /** Fixed-airflow snapshot, not a flight envelope or manufacturer validation.
  * Settle the live control actuator, then measure incremental moment/acceleration
  * relative to neutral. Use the live integrator's pitch/roll inertia convention.
  */
 export function sampleControlResponse({ input, axis = 'roll', legacyGyro = false,
-  iasKnots = 350, altitudeMeters = 3000, source = 'touch' } = {}) {
+  iasKnots = 350, altitudeMeters = 3000, source = 'touch', aircraftId = 'F16' } = {}) {
   const previousWindow = globalThis.window;
   globalThis.window ??= { addEventListener() {} };
   try {
@@ -26,8 +26,8 @@ export function sampleControlResponse({ input, axis = 'roll', legacyGyro = false
     } else {
       controls.setTouchStick(axis === 'pitch' ? normalized : 0, axis === 'roll' ? normalized : 0);
     }
-    for (let i = 0; i < 240; i++) controls.update(1 / 120, iasKnots, 'F16');
-    const aero = new Aerodynamics(F16_FALCON);
+    for (let i = 0; i < 240; i++) controls.update(1 / 120, iasKnots, aircraftId);
+    const aero = new Aerodynamics(AIRCRAFT_REGISTRY[aircraftId]);
     aero.pitchTrim = 0;
     const densityRatio = Atmosphere.getConditions(altitudeMeters).densityRatio;
     const tas = Atmosphere.iasToTas(Atmosphere.knotsToMs(iasKnots), densityRatio);
@@ -41,7 +41,7 @@ export function sampleControlResponse({ input, axis = 'roll', legacyGyro = false
     aero.elevator = controls.elevator;
     aero.aileron = controls.aileron;
     const acceleration = THREE.MathUtils.radToDeg(measure() - neutral);
-    return { input, normalized: source === 'hotas' ? .35 * normalized + .65 * normalized ** 3 : normalized, surface: axis === 'pitch' ? aero.elevator : aero.aileron,
+    return { input, normalized: source === 'hotas' && aircraftId !== 'B738' ? .35 * normalized + .65 * normalized ** 3 : normalized, surface: axis === 'pitch' ? aero.elevator : aero.aileron,
       accelerationDegS2: acceleration };
   } finally {
     if (previousWindow === undefined) delete globalThis.window;
