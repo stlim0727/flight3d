@@ -129,8 +129,9 @@ Gates are ordered and each is a **terrain-connected passage space**: the lateral
 band around the gate's own aim point, under a ceiling measured from the ground
 under that band. A gate is credited where its plane is crossed — signed
 cross-track and AGL interpolated between the two samples that straddle `gate.sM`
-— inside the band and under the ceiling. A missed gate ends the run, because
-slalom order cannot be recovered later.
+— inside the band and under the ceiling. A missed gate is recorded and advanced
+past; it ends neither the run nor the score, because surviving to the finish is
+the requirement and the passage spaces only define the intended line.
 
 Corner cutting is closed by geometry rather than by a rule nobody can read: the
 corridor follows the curving centreline, so a straight line across a bend leaves
@@ -139,7 +140,13 @@ sides so the middle of the valley is not the short path anyway.
 
 Hard ends: `invalid-snapshot`, `crash`, `body-strike`, `damage`, `timeout`,
 `clearance-floor`, `speed-envelope`, `invalid-spawn`, `discontinuous-flight`,
-`corridor-excursion`, `gate-missed`.
+`corridor-excursion`.
+
+Stored scoreboard attempts carry a fingerprint of `VALLEY_SLALOM_RULES`
+(`ValleyScoreboard.js`): any change to the generation/judging numbers in that
+frozen rules object discards every previously stored attempt. A judging change
+that does not touch the rules (the score formula itself) must therefore bump
+`rules.version`.
 
 Altitude cost uses fixed 25 m progress bins sampled on first entry (loitering
 cannot dilute a bin), against the **interpolated passage ceiling** rather than a

@@ -22,8 +22,9 @@ const quantile = (samples, fraction, value) => {
  * update({tick,position:{x,z},iasKnots,groundSpeedKnots,aglM,crashed,damaged,bodyContact})
  * is called once per completed 120 Hz step. Ordered gates each have a passage
  * space: a ceiling above the ground under them and a lateral band inside the
- * corridor. A gate crossed anywhere else is missed, and a missed gate ends the
- * run, because slalom order cannot be recovered later. Altitude cost is measured
+ * corridor. A gate crossed anywhere else is recorded as missed but does not end
+ * the run and costs no score: surviving to the finish is the requirement, the
+ * passage spaces only define the intended line. Altitude cost is measured
  * against the interpolated ceiling, so a climb over a ridge is allowed and paid
  * for, and returning to the low space stops the charge.
  */
@@ -38,6 +39,7 @@ export class SlalomMission {
     this.maximumProgressM = 0; this.maxAglM = 0; this.minAglM = null;
     this.iasSumKt = 0; this.iasCount = 0; this.maxIasKnots = 0; this.iasShortfallSumKt = 0;
     this.corridorExcursionSumM = 0; this.maxCorridorExcursionM = 0;
+    this.clearedGates = 0; this.missedGates = 0;
     this.startS = course.gates[0].sM;
     this.lengthM = course.lengthM - this.startS;
     this.binSizeM = course.sampleStepM;
@@ -101,7 +103,7 @@ export class SlalomMission {
       // middle of the valley: the low line has to be flown to the wall side.
       const cleared = Math.abs(atPlane.crossM - gate.crossOffsetM) <= gate.passageHalfWidthM &&
         atPlane.aglM <= gate.maxAglM;
-      if (!cleared) return this.finish('failed', 'gate-missed');
+      if (cleared) this.clearedGates++; else this.missedGates++;
       this.gate++;
       if (this.gate >= course.gates.length) return this.finish('succeeded', 'completed');
     }
@@ -144,7 +146,8 @@ export class SlalomMission {
     return { status: this.status, reason: this.reason, tick: this.tick, metrics: {
       rulesVersion: this.manifest.rulesVersion,
       completedGates: this.gate - 1,
-      gatesCleared: this.gate - 1, totalGates: this.course.gates.length - 1,
+      gatesCleared: this.clearedGates, clearedGates: this.clearedGates,
+      missedGates: this.missedGates, totalGates: this.course.gates.length - 1,
       progressM: Math.max(0, this.maximumProgressM - this.startS),
       courseLengthM: this.lengthM, scoredDistanceM: distanceM,
       meanExcessM, p95ExcessM, maxAglM: this.maxAglM, minAglM: this.minAglM,

@@ -38,7 +38,8 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
    * to produce genuine 3.5G trench carving around towering cliff spurs. */
   turnRadiusM: [2350, 2500],
   /** Half of the canyon floor. Narrow 70m half-width (140m total floor width)
-   * between 700m tall sheer cliffs. */
+   * between 200-300m walls, kept proportionate so the valley reads as rock
+   * rather than a fissure. */
   corridorHalfWidthM: [68, 72],
   gatePassageHalfWidthM: 25,
   /** The aim point sits across the valley, alternating sides, so the line must
@@ -51,7 +52,7 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
    * can actually sink, and may rise by a good deal more. */
   floorStepDownM: 20,
   floorStepUpM: 40,
-  wallRiseM: [550, 800],
+  wallRiseM: [200, 300],
   ridgeExponent: [0.75, 1.0],
   speedKnots: [409, 580],
   /** The measured turn rate and sink ceiling are both best at the slow end of the
@@ -109,7 +110,7 @@ function buildCenterline(random, rules) {
     const stepDownM = random() * rules.floorStepDownM;
     const floorAt = floor - stepDownM
       + (random() < 0.35 ? random() * rules.floorStepUpM * 0.4 : 0);
-    const wallRiseRange = rules.wallRiseM ?? [450, 700];
+    const wallRiseRange = rules.wallRiseM ?? [200, 300];
     const ridgeExpRange = rules.ridgeExponent ?? [0.75, 1.1];
     const startSample = samples.length ? samples.length - 1 : 0;
     const leg = { index, lengthM, headingChangeDeg, startFloor: floor, endFloor: floorAt,

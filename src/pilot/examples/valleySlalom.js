@@ -54,14 +54,14 @@ export function createPilot() {
    * has to be willing to learn that much or it steers on a phantom drift. */
   const BIAS_WANDER = 8;
   const PROGRESS_FILTER_SECONDS = 9;
-  /** The valley-slalom-v1 wall: it rises 550-800 m over one half-width beyond the
+  /** The valley-slalom-v1 wall: it rises 200-300 m over one half-width beyond the
    * floor edge with a 0.75-1.0 exponent. Between the foot and a few hundred metres up
    * the middle of those ranges puts the rock within three metres of where any of them
    * would, and the wall itself wanders sideways by about as much. */
-  const WALL_RISE_M = 675;
+  const WALL_RISE_M = 250;
   const WALL_EXPONENT = 0.875;
   const WALL_FOOT_M = 25;
-  const WALL_TOP_M = 300;
+  const WALL_TOP_M = 240;
   const WALL_RAY_MAX_M = 900;
   /** What one wall fix is trusted to. The rays share a second of correlated range
    * noise and the same stretch of wandering rock, so their consensus is worth about

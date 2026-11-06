@@ -1,6 +1,14 @@
+import { VALLEY_SLALOM_RULES } from './generatedValley.js';
+
 const KEY = 'flight3d.valley-attempts.v1';
+const FINGERPRINT_KEY = 'flight3d.valley-attempts.rules-fingerprint.v1';
 const CALLSIGN_KEY = 'flight3d.pilot.callsign';
 const TERMINAL = new Set(['succeeded', 'failed', 'aborted']);
+
+/** The characteristics every stored score was judged under. Any change to the
+ * slalom rules (or a bump of their version for a judging change) rewrites this
+ * and discards the attempts recorded under the old shape. */
+const RULES_FINGERPRINT = JSON.stringify(VALLEY_SLALOM_RULES);
 
 /** Clean and sanitize a pilot callsign (max 8 uppercase alphanumeric chars, default MAV). */
 export function sanitizeCallsign(raw) {
@@ -47,8 +55,22 @@ export class ValleyScoreboard {
     return clean;
   }
 
+  /** Discard all stored attempts and stamp the current rules fingerprint. */
+  reset() {
+    try {
+      this.storage.setItem(FINGERPRINT_KEY, RULES_FINGERPRINT);
+      this.storage.setItem(KEY, '[]');
+      this.error = null;
+      return true;
+    } catch (error) { this.error = error.message; return false; }
+  }
+
   read() {
     try {
+      if (this.storage.getItem(FINGERPRINT_KEY) !== RULES_FINGERPRINT) {
+        this.reset();
+        return [];
+      }
       const rows = JSON.parse(this.storage.getItem(KEY) ?? '[]');
       if (!Array.isArray(rows)) throw new Error('Invalid local scoreboard');
       return rows.filter(row => row && TERMINAL.has(row.status) && typeof row.comparisonKey === 'string');

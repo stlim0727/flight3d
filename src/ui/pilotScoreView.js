@@ -13,7 +13,6 @@ export const REASON_KO = {
   'speed-envelope': '속도 한계 초과',
   'course-excursion': '항로 이탈 (±400m 초과)',
   'corridor-excursion': '협곡 이탈',
-  'gate-missed': '경유지 미통과',
   'invalid-spawn': '출발 위치 오류',
   'discontinuous-flight': '비행 불연속',
   'runway-excursion': '활주로 이탈',
