@@ -2,13 +2,14 @@
 
 The GitHub Actions gate runs on main pushes, pull requests, and manual dispatch.
 It uses Node 22.23.2 (Vite 8 requires at least 22.12.0), npm's lockfile-based install and cache, syntax/action-pin checks,
-Node logic tests, and a Vite production build. Run the same gate locally:
+Node logic tests, a Vite production build, and real two-player WebRTC data/audio tests against local signaling. Run the same gate locally:
 
 ```sh
 npm ci
 npm run check
 npm test
 npm run build
+npm run test:multiplayer
 ```
 
 `npm test` uses `scripts/lib/compactReporter.mjs` to emit a single-line summary when all suites pass and full stack traces on failure. Run `npm run test:bake` (or `CI=true npm test`) to force the full Draco WASM vertex-by-vertex cockpit bake verification even when SHA-256 source/asset checksums are unchanged.
@@ -25,6 +26,21 @@ Use these scripts to avoid multi-turn git/GitHub shell polling:
 - `npm run wt:new -- <branch> [path]`: fetches `origin` and creates a fresh worktree from `origin/main`.
 - `npm run pr:arc -- [pr]` / `npm run pr:arc -- --resolve <threadId>`: prints PR check status, review decision, and unresolved review threads in one command, or resolves a thread.
 - `npm run pr:mac -- [pr]`: verifies CI/merge gates, merges the PR, removes the completed worktree and branch, and fast-forwards the clean shared checkout.
+
+## Multiplayer CI
+
+`npm run test:multiplayer` starts an isolated installed Chrome, a loopback Vite
+server and a local PeerServer. It uses real RTCPeerConnections in independent
+pages and verifies shared starts, bidirectional positions, respawns, a rejected
+third pilot, decoded audio/RTP and push-to-talk silence in both directions,
+restart and disconnect cleanup. It needs no public service, physical microphone
+or WebGL. `CHROME_PATH` selects the browser; sandbox disabling is explicit via
+`CHROME_NO_SANDBOX=1` only where required by the execution environment.
+
+`npm run test:multiplayer -- --simulator` additionally tests the real simulator
+UI and 3D scene and requires the hardware GPU preflight. `--public` optionally
+checks the default external PeerJS connection path; it is deliberately outside
+the deterministic CI gate. See [multiplayer](multiplayer.md).
 
 ## Browser acceptance
 

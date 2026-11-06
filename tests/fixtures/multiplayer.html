@@ -1,0 +1,41 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Multiplayer transport fixture</title>
+<script type="module">
+import { PeerRoom } from '/src/multiplayer/PeerRoom.js';
+import { VoiceLink } from '/src/multiplayer/VoiceLink.js';
+import { DEFAULT_CONFIG } from '/src/multiplayer/protocol.js';
+const signalPort = Number(new URLSearchParams(location.search).get('signalPort'));
+let prepareResolve;
+window.fixture = {
+  flights: 0, prepared: [], ended: [], hold: false,
+  create(room) {
+    this.voice = new VoiceLink({ capture: async () => {
+      const oscillator = this.voice.context.createOscillator(); oscillator.frequency.value = 440;
+      const destination = this.voice.context.createMediaStreamDestination();
+      oscillator.connect(destination); oscillator.start(); this.oscillator = oscillator;
+      return destination.stream;
+    } });
+    this.room = new PeerRoom({ room, name: room ? 'Guest' : 'Host', config: DEFAULT_CONFIG, voice: this.voice,
+      options: new URLSearchParams(location.search).has('public') ? undefined : { host: '127.0.0.1', port: signalPort, secure: false, path: '/flight3d', config: { iceServers: [] } },
+      prepare: async (c, slot) => { this.prepared.push({ c, slot }); if (this.hold) await new Promise(r => { prepareResolve = r; }); },
+      fly: () => this.flights++, ended: reason => this.ended.push(reason),
+      remoteStream: stream => {
+        this.remote = stream; this.analyser = this.voice.context.createAnalyser();
+        this.voice.context.createMediaStreamSource(stream).connect(this.analyser);
+        this.audio = new Audio(); this.audio.srcObject = stream; this.audio.play().catch(() => {});
+      } });
+    return this.room.room;
+  },
+  release() { prepareResolve?.(); },
+  status() { return { state: this.room?.session.state, registered: this.room?.registered, flights: this.flights, prepared: this.prepared, ended: this.ended, remote: Boolean(this.remote), closed: this.voice?.closed }; },
+  snapshot(x) { this.room.session.snapshot({ p: [x, 750, 0], q: [0, 0, 0, 1], v: [50, 0, 0], gear: .5, flaps: 5, crashed: false, held: false, talking: this.voice.talking }); },
+  energy() {
+    if (!this.analyser) return -1;
+    const samples = new Float32Array(this.analyser.fftSize); this.analyser.getFloatTimeDomainData(samples);
+    return Math.sqrt(samples.reduce((sum, n) => sum + n*n, 0) / samples.length);
+  },
+  async stats() {
+    const stats = await this.room.call.peerConnection.getStats();
+    return [...stats.values()].filter(s => s.type === 'inbound-rtp' && s.kind === 'audio').map(s => ({ packetsReceived: s.packetsReceived, bytesReceived: s.bytesReceived }));
+  }
+};
+</script></html>

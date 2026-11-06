@@ -1,3 +1,4 @@
+import { MultiplayerController } from './multiplayer/MultiplayerController.js';
 import { FlightWarnings } from './systems/FlightWarnings.js';
 import { AircraftBreakup } from './effects/AircraftBreakup.js';
 import { t, bindText, initLocalization } from './i18n/index.js';
@@ -482,6 +483,7 @@ class FlightSimulator {
       }
       inputLatency?.mark('lobby-ready');
     }
+    this.multiplayer = new MultiplayerController(this);
     this.syncFlowUi();
     if (urlParams.get('pilotArena') === '1') {
       const { installPilotArena } = await import('./ui/PilotArenaPanel.js');
@@ -546,7 +548,7 @@ class FlightSimulator {
       }
     }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
-    this.controls.inputBlocked = this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human') || Boolean(this.demoDirector?.isRestartConfirmOpen);
+    this.controls.inputBlocked = this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human') || Boolean(this.demoDirector?.isRestartConfirmOpen);
     if (state !== FLOW.FLIGHT) {
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0.0, 0.0);
@@ -564,10 +566,12 @@ class FlightSimulator {
     if (held) this.cameraSystem?.beginPauseView();
     else this.cameraSystem?.endPauseView();
     this.updateMenuToggle();
+    this.multiplayer?.refresh?.();
   }
 
   /** Start a fresh flight using the menu choices, rebuilding the scene if needed. */
   async fly() {
+    if (this.multiplayer?.locked) return;
     if (this.airportLoading || this.startingFlight) return;
     const pending = {
       airport: this.lobby.airport,
@@ -634,6 +638,7 @@ class FlightSimulator {
 
   /** Spawn the chosen scenario and hand the cockpit over. Nothing here waits. */
   startFlight({ keepTimeOfDay = false } = {}) {
+    if (this.multiplayer?.locked) return;
     this.devRunner.stop();
     this.shadowDemo.stop();
     const wantsDemo = this.lobby.preset === 'demo';
@@ -672,6 +677,7 @@ class FlightSimulator {
     if (!wantsDemo && this.touchControls?.gyroRequested && !this.touchControls?.gyroActive) {
       this.touchControls.restoreGyroSettings({ userGesture: true });
     }
+    if (this.multiplayer?.active && this.multiplayer.preparing) this.gameFlow.pause();
   }
 
   async startValleyMission({ pilotKind = 'human' } = {}) {
@@ -777,6 +783,7 @@ class FlightSimulator {
   }
 
   retryDebrief() {
+    if (this.multiplayer?.active) { this.multiplayer.respawnLocal(); return; }
     if (this.gameFlow.state !== FLOW.DEBRIEF) return;
     const metadata = this.debriefReport.metadata;
     Object.assign(this.lobby, { airport: metadata.airport, aircraft: metadata.aircraft,
@@ -834,6 +841,7 @@ class FlightSimulator {
   }
 
   setTimeOfDay(hours, { persist = true, userChoice = true } = {}) {
+    if (this.multiplayer?.locked) return;
     if (userChoice) this.demoDirector?.onUserTimeOfDayChange();
     this.sky.setTimeOfDay(hours, this.position, this.camera.position);
     if (persist) saveSimulatorPreferences({ timeOfDay: this.sky.timeOfDay });
@@ -1022,6 +1030,7 @@ class FlightSimulator {
   }
 
   setAircraft(aircraftId = 'B738', pilotPreparation = false) {
+    if (this.multiplayer?.locked) return;
     if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('aircraft-changed');
     const config = AIRCRAFT_REGISTRY[aircraftId];
     if (!config) return;
@@ -1108,7 +1117,7 @@ class FlightSimulator {
     if (this.shadowDemo.active) {
       this.physicsAccumulator = 0;
       if (!this.gameFlow.isPhysicsFrozen()) this.shadowDemo.update(frameDelta);
-    } else if (this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
+    } else if (this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
       this.physicsAccumulator = 0;
     } else {
       advancePhysicsFrame(this, frameDelta);
@@ -1116,7 +1125,7 @@ class FlightSimulator {
 
     // Keep the lobby backdrop alive: re-arm the demo after it ends.
     this.gameFlow.update(frameDelta);
-    if (this.gameFlow.consumeDemoRestart()) {
+    if (this.gameFlow.consumeDemoRestart() && !this.multiplayer?.active) {
       if (isScenarioAvailable(this.activeAirport, 'demo')) this.demoDirector.start(this.activeAirport);
       if (this.lobbyScreen) {
         this.lobbyScreen.setWaitingForTerrain(this.demoDirector.waitingForTerrain === true);
@@ -1236,6 +1245,8 @@ class FlightSimulator {
     this.loadingPanel.update();
 
     this.foliage.update(this.camera.position);
+
+    this.multiplayer?.update();
 
     // 8. Render 3D Scene
     this.renderScene();

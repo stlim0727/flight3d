@@ -515,6 +515,7 @@ class PhysicsIntegratorMethods {
    * @returns {object} updated telemetry state
    */
   stepSimulation(simSeconds) {
+    if (this.multiplayer?.room?.session.state === 'starting') return this.telemetry;
     if (this.gameFlow.state === FLOW.DEBRIEF) return this.telemetry;
     if (this.devRunner.active && this.gameFlow.isPhysicsFrozen()) return this.telemetry;
     this.devRunner.updatePreparation(0);

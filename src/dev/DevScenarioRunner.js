@@ -18,6 +18,7 @@ export class DevScenarioRunner {
   get blocksPhysics() { return Boolean(this.active && this.status !== 'running'); }
 
   start(id) {
+    if (this.sim.multiplayer?.active) return false;
     const definition = this.definitions[id];
     if (!this.mode.canRun(definition, this.context)) return false;
     this.stop();
