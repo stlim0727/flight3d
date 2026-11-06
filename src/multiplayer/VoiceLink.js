@@ -2,7 +2,7 @@
 export class VoiceLink {
   constructor({ context, capture = () => navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false }), changed = () => {} } = {}) {
     this.context = context ?? new AudioContext();
-    this.capture = capture; this.changed = changed; this.closed = false; this.talking = false;
+    this.capture = capture; this.changed = changed; this.closed = false; this.talking = false; this.muted = false;
     this.output = this.context.createMediaStreamDestination();
     this.gain = this.context.createGain(); this.gain.gain.value = 0;
     this.gain.connect(this.output);
@@ -11,31 +11,39 @@ export class VoiceLink {
     this.silence.connect(this.gain); this.silence.start();
     this.stream = this.output.stream;
     this.stream.getAudioTracks()[0].enabled = false;
+    this.context.addEventListener?.('statechange', () => this.syncTransmission());
   }
   async enableMicrophone() {
     if (this.closed || this.microphone || this.requesting) return;
     this.requesting = true; this.error = null; this.changed();
     try {
-      await this.context.resume();
+      // An invite can open without a user gesture. Never let suspended playback
+      // prevent the browser's microphone permission request from being shown.
+      this.context.resume().catch(() => {});
       const stream = await this.capture();
       if (this.closed) { stream.getTracks().forEach(t => t.stop()); return; }
       this.microphone = stream;
       this.source = this.context.createMediaStreamSource(stream); this.source.connect(this.gain);
       stream.getAudioTracks().forEach(track => track.addEventListener('ended', () => {
-        this.setTalking(false); this.disableMicrophone(); this.error = 'microphone'; this.changed();
+        this.disableMicrophone(); this.error = 'microphone'; this.changed();
       }));
+      this.syncTransmission();
     } catch { this.error = 'microphone'; }
     finally { this.requesting = false; this.changed(); }
   }
-  setTalking(pressed) {
-    this.talking = Boolean(pressed && this.microphone && !this.closed && this.context.state === 'running');
+  setMuted(muted) {
+    this.muted = Boolean(muted); this.syncTransmission();
+  }
+  syncTransmission() {
+    this.talking = Boolean(!this.muted && this.microphone && !this.closed && this.context.state === 'running');
     this.gain.gain.value = this.talking ? 1 : 0;
     this.stream.getAudioTracks().forEach(t => { t.enabled = this.talking; });
     this.changed();
   }
   disableMicrophone() {
-    this.setTalking(false); this.source?.disconnect(); this.source = null;
+    this.source?.disconnect(); this.source = null;
     const stream = this.microphone; this.microphone = null;
+    this.syncTransmission();
     stream?.getTracks().forEach(t => t.stop()); this.changed();
   }
   close() {

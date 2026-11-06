@@ -34,26 +34,11 @@ export class MultiplayerController {
     document.getElementById('mp-copy-code').onclick = () => this.copyInvite('code');
     document.getElementById('mp-copy').onclick = () => this.copyInvite('link');
     document.getElementById('mp-microphone').onclick = () => {
-      if (this.voice?.microphone) this.voice.disableMicrophone();
+      if (this.voice?.microphone) this.voice.setMuted(!this.voice.muted);
       else this.voice?.enableMicrophone();
     };
     document.getElementById('mp-listen').onclick = () => this.playAudio();
     document.getElementById('mp-mute').onclick = () => { this.audio.muted = !this.audio.muted; this.refresh(); };
-    const ptt = document.getElementById('mp-ptt');
-    ptt.onpointerdown = e => { if (e.button !== 0) return; e.preventDefault(); ptt.setPointerCapture(e.pointerId); this.voice?.setTalking(true); };
-    for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) ptt.addEventListener(event, () => this.releaseTalk());
-    ptt.onkeydown = e => { if ([' ', 'Enter'].includes(e.key)) { e.preventDefault(); e.stopPropagation(); this.voice?.setTalking(true); } };
-    ptt.onkeyup = e => { if ([' ', 'Enter'].includes(e.key)) { e.preventDefault(); this.releaseTalk(); } };
-    ptt.onblur = () => this.releaseTalk();
-    // Capture N before flight controls, only outside text inputs, only while in a room.
-    window.addEventListener('keydown', e => {
-      if (this.active && !this.modalOpen && e.code === 'KeyN' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.target.closest?.('input,textarea,select,[contenteditable=true]')) {
-        e.preventDefault(); e.stopImmediatePropagation(); this.voice?.setTalking(true);
-      }
-    }, true);
-    window.addEventListener('keyup', e => { if (e.code === 'KeyN') this.releaseTalk(); }, true);
-    window.addEventListener('blur', () => this.releaseTalk());
-    document.addEventListener('visibilitychange', () => { if (document.hidden) this.releaseTalk(); });
     window.addEventListener('pagehide', () => this.room?.dispose());
     this.refresh();
     const params = new URLSearchParams(location.search);
@@ -75,10 +60,10 @@ export class MultiplayerController {
     }
   }
   get modalOpen() { return this.dialog.open; }
-  openDialog() { this.releaseTalk(); this.modal.open(); this.refresh(); }
+  openDialog() { this.modal.open(); this.refresh(); }
   dismissDialog() {
     if (this.active && this.room.session.state !== 'flying') this.room.close('cancelled');
-    this.releaseTalk(); this.modal.close();
+    this.modal.close();
   }
   async copyInvite(kind) {
     if (!this.active) return;
@@ -97,7 +82,6 @@ export class MultiplayerController {
   }
   get active() { return Boolean(this.room && !this.room.closed); }
   get locked() { return this.active && !this.preparing; }
-  releaseTalk() { this.voice?.setTalking(false); }
   connect(room) {
     if (this.active || this.preparing || this.sim.startingFlight || this.sim.airportLoading) return;
     this.preferences.save();
@@ -112,6 +96,7 @@ export class MultiplayerController {
         prepare: (c, slot) => this.prepare(c, slot), fly: () => this.startTogether(),
         changed: () => this.refresh(), remoteStream: stream => { this.audio.srcObject = stream; this.playAudio(); },
         ended: reason => this.ended(reason) });
+      this.voice.enableMicrophone();
       this.snapshotTimer = setInterval(() => this.sendSnapshot(), 1000 / 15);
     } catch { this.voice?.close(); this.message = 'connection'; }
     this.refresh();
@@ -129,7 +114,7 @@ export class MultiplayerController {
   async prepare(config, slot) {
     const room = this.room;
     this.openDialog();
-    this.preparing = true; this.preparationHold = true; this.slot = slot; this.releaseTalk();
+    this.preparing = true; this.preparationHold = true; this.slot = slot;
     this.remote?.dispose(); this.remote = null;
     try {
       this.sim.pilotArena?.stop('multiplayer'); this.sim.demoDirector.stop();
@@ -160,7 +145,6 @@ export class MultiplayerController {
   }
   respawnLocal() {
     if (!this.active || this.room.session.state !== 'flying') return;
-    this.releaseTalk();
     this.sim.setPreset(this.room.session.config.scenario);
     this.modal.close({ resume: false });
     this.sim.gameFlow.enterFlight();
@@ -192,7 +176,7 @@ export class MultiplayerController {
   ended(reason) {
     clearInterval(this.snapshotTimer); this.remote?.dispose(); this.remote = null;
     this.audio.pause(); this.audio.srcObject = null; this.audio.muted = false;
-    this.message = reason; this.releaseTalk();
+    this.message = reason;
     this.sim.showToast(() => t(`mp.status.${reason}`));
     this.sim.lobbyScreen?.setSelectionBusy(false);
     this.sim.lobbyScreen?.refresh();
@@ -236,12 +220,9 @@ export class MultiplayerController {
     bindText(document.getElementById('mp-roster'), () => active ? `${s.name} + ${s.remoteName || t('mp.waiting')} · ${s.config ? `${t(`mp.${s.config.airport}`)} / ${s.config.aircraft} / ${t(`mp.${s.config.scenario}`)}` : ''}` : '');
     const microphone = document.getElementById('mp-microphone');
     microphone.disabled = !active || this.voice?.requesting;
-    bindText(microphone, () => t(this.voice?.microphone ? 'mp.disableMic' : 'mp.enableMic'));
-    microphone.setAttribute('aria-pressed', String(Boolean(this.voice?.microphone)));
-    const ptt = document.getElementById('mp-ptt');
-    ptt.disabled = !active || !this.voice?.microphone;
-    ptt.setAttribute('aria-pressed', String(Boolean(this.voice?.talking)));
-    bindText(document.getElementById('mp-voice-status'), () => t(this.voice?.error ? 'mp.status.microphone' : room?.voiceError ? 'mp.voiceFailed' : this.voice?.talking ? 'mp.transmitting' : room?.mediaConnected ? 'mp.voiceReady' : 'mp.listenOnly'));
+    bindText(microphone, () => t(this.voice?.microphone ? (this.voice.muted ? 'mp.unmuteMic' : 'mp.muteMic') : 'mp.enableMic'));
+    microphone.setAttribute('aria-pressed', String(Boolean(this.voice?.muted)));
+    bindText(document.getElementById('mp-voice-status'), () => t(this.voice?.error ? 'mp.status.microphone' : room?.voiceError ? 'mp.voiceFailed' : this.voice?.muted ? 'mp.micMuted' : this.voice?.talking ? 'mp.transmitting' : room?.mediaConnected ? 'mp.voiceReady' : 'mp.listenOnly'));
     document.getElementById('mp-listen').hidden = !this.playbackBlocked;
     document.getElementById('mp-mute').setAttribute('aria-pressed', String(this.audio.muted));
     // Room configuration stays immutable even when the flight menu is reopened.

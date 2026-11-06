@@ -25,7 +25,7 @@ gameFlow.onStateChange = () => sim.syncFlowUi();
 if (!new URLSearchParams(location.search).has('r')) {
 controller.room = { host: false, closed: false, session: { name: 'Pilot', state: 'flying' },
   dispose() { this.closed = true; }, close(reason = 'left') { this.closed = true; this.session.state = 'ended'; controller.ended(reason); } };
-controller.voice = { microphone: {}, talking: false, setTalking(on) { this.talking = on; } };
+controller.voice = { microphone: {}, muted: false, talking: true, setMuted(muted) { this.muted = muted; this.talking = !muted; } };
 controller.refresh(); controller.openDialog();
 }
 sim.activeAirport = 'coastal'; sim.currentAircraftId = 'C172';
@@ -44,12 +44,12 @@ window.uiFixture = {
     return { dialog: demo.isRestartConfirmOpen, active: demo.isActive, manual: !controls.aircraftControlsDisabled };
   },
   press(key, code) {
-    const button = document.getElementById('mp-ptt'); button.focus();
+    const button = document.getElementById('mp-microphone'); button.focus();
     button.dispatchEvent(new KeyboardEvent('keydown', { key, code, bubbles: true, cancelable: true }));
     return { talking: controller.voice.talking, braking: Boolean(controls.keys.Space) };
   },
   release(key, code) {
-    document.getElementById('mp-ptt').dispatchEvent(new KeyboardEvent('keyup', { key, code, bubbles: true, cancelable: true }));
+    document.getElementById('mp-microphone').dispatchEvent(new KeyboardEvent('keyup', { key, code, bubbles: true, cancelable: true }));
     return { talking: controller.voice.talking, braking: Boolean(controls.keys.Space) };
   },
   join(code) {

@@ -22,11 +22,12 @@
    Closing it resumes only the pause introduced by the dialog. A pause you set
    yourself stays paused.
 
-Choose **Enable microphone** in the room dialog. During flight, hold **N** to
-speak and release to stop. The touch/keyboard **Hold to talk** button is inside
-the modal and operates while your aircraft is held. Microphone access is
-optional; you can listen without it. **Mute friend** affects only what you hear.
-If the browser blocks playback, choose **Play friend’s voice**.
+Voice is on by default when you create or join a room. Allow microphone access
+when the browser asks; then speak normally without holding a key or button.
+Use **Mute microphone** / **Unmute microphone** in the room dialog. Voice
+continues during flight and while the dialog is open. If permission is denied,
+you can still listen and choose **Enable microphone** to retry. **Mute friend**
+affects only what you hear. If playback is blocked, choose **Play friend’s voice**.
 
 Your pilot name, scenery, aircraft, and start selection are saved in this browser
 and restored on your next visit, including when opening an invite link.

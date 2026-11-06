@@ -65,6 +65,18 @@ function fixture(run) {
   finally { globalThis.document = previous; }
 }
 
+test('personal reset keeps continuous voice and microphone mute unchanged', () => fixture(({ controller }) => {
+  controller.room.session.config = { scenario: 'cruise' };
+  controller.sim.setPreset = () => {};
+  controller.sim.beginFlightRecording = () => {};
+  for (const muted of [false, true]) {
+    controller.voice = { muted, talking: !muted };
+    controller.respawnLocal();
+    assert.equal(controller.voice.muted, muted);
+    assert.equal(controller.voice.talking, !muted);
+  }
+}));
+
 test('leave restores airport/preset controls and keeps normal solo restrictions', () => fixture(({ controller, airport, preset, restricted }) => {
   controller.refresh();
   assert.ok(airport.disabled && preset.disabled && restricted.disabled);

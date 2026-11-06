@@ -28,8 +28,7 @@
 #mp-controls { border-top: 1px solid #395066; padding-top: .7rem; }
 #mp-roster, #mp-voice-status { display: block; }
 .mp-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
-#mp-ptt { touch-action: none; user-select: none; }
-#mp-ptt[aria-pressed="true"], #mp-mute[aria-pressed="true"] { background: #226c63; border-color: #8fffe2; }
+#mp-microphone[aria-pressed="true"], #mp-mute[aria-pressed="true"] { background: #226c63; border-color: #8fffe2; }
 #mp-room-menu { position: fixed; right: 10px; top: 110px; z-index: 125; background: #0b1829ed; color: #e7f5ff; border: 1px solid #67d8f0; }
 .mp-nameplate { position: fixed; z-index: 120; pointer-events: none; transform: translate(-50%, -100%); padding: .2rem .4rem; color: #9cf5ff; background: #051729ba; border-radius: 3px; font: 12px system-ui; }
 @media (max-width: 560px) { #mp-dialog { padding: 14px; } #mp-code { font-size: 1.5rem; } }
