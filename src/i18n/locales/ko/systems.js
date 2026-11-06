@@ -76,7 +76,7 @@ export default {
   "notice.parkingBrakeReleased": "주차 브레이크 해제 [.]",
   "notice.ap.modes": "자동조종: {modes}",
   "aircraft.b738": "✈️ 보잉 737",
-  "aircraft.f16": "🛦 F-16 Fighting Falcon",
+  "aircraft.f16": "F-16 Fighting Falcon",
   "aircraft.c172": "🛩️ 세스나 172",
   "notice.aircraft": "기체 변경: {name}",
   "warning.stall": "⚠️ 실속 경고 - 기수를 내리세요 ⚠️",

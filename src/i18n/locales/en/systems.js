@@ -76,7 +76,7 @@ export default {
   "notice.parkingBrakeReleased": "Parking brake: RELEASED (.)",
   "notice.ap.modes": "Autopilot: {modes}",
   "aircraft.b738": "✈️ Boeing 737",
-  "aircraft.f16": "🛦 F-16 Fighting Falcon",
+  "aircraft.f16": "F-16 Fighting Falcon",
   "aircraft.c172": "🛩️ Cessna 172",
   "notice.aircraft": "Aircraft: {name}",
   "warning.stall": "⚠️ STALL WARNING - LOWER THE NOSE ⚠️",

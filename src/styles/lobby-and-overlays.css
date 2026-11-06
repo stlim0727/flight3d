@@ -557,6 +557,8 @@ body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display
 }
 .lobby-card .btn-airport { flex: 1 1 calc(50% - 3px); }
 .lobby-card .btn-aircraft { flex: 1 1 100%; }
+/* Inline SVG stand-in for an emoji prefix where Unicode has no colour glyph. */
+.aircraft-icon { width: 1.25em; height: 1.25em; margin-right: .3em; vertical-align: -.25em; }
 .spec-badge {
   color: #7f93ab;
   font: 500 9.5px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
