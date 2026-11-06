@@ -50,6 +50,8 @@ import { initFlightPanels } from './ui/FlightPanels.js';
 import { initUiScale } from './ui/UiScale.js';
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
 import { FlightRecorder } from './core/FlightRecorder.js';
+import { ReplayRecorder } from './core/ReplayRecorder.js';
+import { ReplayStore } from './replay/ReplayStore.js';
 import { LOBBY_AIRCRAFT_IDS } from './ui/LobbyScreen.js';
 import { DeveloperModeController } from './dev/DeveloperModeController.js';
 import { DevScenarioRunner } from './dev/DevScenarioRunner.js';
@@ -289,6 +291,10 @@ class FlightSimulator {
       onStateChange: () => this.syncFlowUi(),
     });
     this.flightRecorder = new FlightRecorder();
+    // Pose track for replay; the telemetry recorder above only feeds the debrief chart.
+    this.replayRecorder = new ReplayRecorder();
+    this.replayStore = new ReplayStore();
+    this.debriefReplay = null;
     this.lobby = { airport: savedSelection.airport, preset: savedSelection.scenario, aircraft: savedSelection.aircraft, pilotMode: 'human' };
     this.currentAircraftId = savedSelection.aircraft;
     this.lastPresetType = savedSelection.scenario;
@@ -729,17 +735,22 @@ class FlightSimulator {
   beginFlightRecording() {
     this.crashDebriefRemaining = null;
     this.debriefReport = null;
-    this.flightRecorder?.start({ airport: this.activeAirport, aircraft: this.currentAircraftId,
+    this.debriefReplay = null;
+    const sortie = { airport: this.activeAirport, aircraft: this.currentAircraftId,
       scenario: this.demoDirector?.isActive ? 'demo' : this.lastPresetType,
-      demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay });
+      demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay };
+    this.flightRecorder?.start(sortie);
+    this.replayRecorder?.start(sortie);
   }
 
   updateFlightRecording(dt) {
     if (this.gameFlow.state !== FLOW.FLIGHT || !this.flightRecorder.active || this.devRunner?.active) return;
     this.flightRecorder.update(dt, this.telemetry);
+    this.replayRecorder.update(dt, this.telemetry, this.quaternion);
     if (this.isCrashed) {
       // Freeze the sortie at impact, while the exterior crash scene keeps running.
       this.debriefReport = this.flightRecorder.finish('crash', this.crashResult);
+      this.debriefReplay = this.replayRecorder.finish();
       this.crashDebriefRemaining = 3;
     }
     else if (this.flightRecorder.stopped >= 3) this.endFlight('landed');
@@ -763,6 +774,7 @@ class FlightSimulator {
     this.crashDebriefRemaining = null;
     this.debriefReport = this.isCrashed ? this.flightRecorder.finish('crash', this.crashResult)
       : this.flightRecorder.finish(reason);
+    this.debriefReplay = this.replayRecorder.finish();
     this.analytics?.trackFlightEnd?.({
       airport: this.activeAirport,
       aircraft: this.currentAircraftId,
@@ -771,7 +783,14 @@ class FlightSimulator {
       durationSeconds: this.flightRecorder?.elapsedSeconds,
     });
     this.gameFlow.endFlight();
-    this.debriefOverlay.show(this.debriefReport);
+    this.debriefOverlay.show(this.debriefReport, this.debriefReplay);
+  }
+
+  /** Persists the finished sortie's pose track. Returns the store's error token for the debrief to show. */
+  saveDebriefReplay() {
+    if (!this.debriefReplay) return { ok: false, error: 'tooShort' };
+    const { entry, error } = this.replayStore.save(this.debriefReplay);
+    return { ok: Boolean(entry), error: error ?? null };
   }
 
   openFeedbackDialog() {

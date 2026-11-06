@@ -4,6 +4,7 @@ import scenarios from "./locales/en/scenarios.js";
 import ui from "./locales/en/ui.js";
 import systems from "./locales/en/systems.js";
 import dev from "./locales/en/dev.js";
+import replay from './locales/en/replay.js';
 
 export default {
   "mp.showLink": "Full invite link",
@@ -87,4 +88,5 @@ export default {
   ...ui,
   ...systems,
   ...dev,
+  ...replay,
 };
