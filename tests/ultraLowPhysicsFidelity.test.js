@@ -26,7 +26,7 @@ test('Ultra-Low-Spec Mode Configuration & Resolution', () => {
   assert.equal(preset.ao, false);
   assert.equal(preset.clouds, false);
   assert.equal(preset.terrainSegments, 64);
-  assert.equal(preset.waterSegments, 1);
+  assert.equal(preset.waterSegments, 64);
   assert.equal(preset.antialias, false, 'UltraLow must disable hardware antialiasing');
   assert.equal(preset.flatShading, true, 'UltraLow must enable retro faceted flat shading');
 
@@ -105,11 +105,11 @@ test('Physics Invariance: Terrain.getHeight and getTerrainNormal are identical b
 
 test('Physics Invariance: WaterOcean wave height query is identical across qualities', () => {
   const oceanHigh = new WaterOcean(36000, 180, { quality: 'high' });
-  const oceanUltra = new WaterOcean(36000, 1, { quality: 'ultraLow' });
+  const oceanUltra = new WaterOcean(36000, 64, { quality: 'ultraLow' });
 
   assert.equal(oceanHigh.segments, 180);
-  assert.equal(oceanUltra.segments, 1);
-  assert.equal(oceanUltra.geometry.attributes.position.count, 4, 'ultraLow ocean has only 4 vertices (1 quad = 2 triangles)');
+  assert.equal(oceanUltra.segments, 64);
+  assert.equal(oceanUltra.geometry.attributes.position.count, 65 * 65, 'ultraLow ocean uses 64x64 flat grid to avoid 36km near-plane clipping');
 
   for (let t = 0; t < 10; t += 0.5) {
     for (let x = -5000; x <= 5000; x += 2500) {

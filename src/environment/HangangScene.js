@@ -16,7 +16,7 @@ export class HangangScene {
 
     // Deep nocturnal water with high specular sheen to capture the sunset horizon reflection
     const river = new THREE.Mesh(
-      new THREE.PlaneGeometry(18000, 18000),
+      new THREE.PlaneGeometry(18000, 18000, 64, 64),
       applyLogDepthOffset(new THREE.MeshStandardMaterial({
         color: 0x081119,
         roughness: 0.14,

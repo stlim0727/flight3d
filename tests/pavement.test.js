@@ -107,20 +107,20 @@ test('coplanar surface materials bias logarithmic fragment depth in ordered tier
     return shader.fragmentShader;
   };
 
-  // Tier 1: runway repair slab (2.5 cm)
+  // Tier 1: runway repair slab (2.5 cm + 500 ppm relative)
   const repairsGroup = createRunwayRepairs(45, 3000);
   const repairPatch = repairsGroup.children[0];
-  assert.match(compileFragment(repairPatch.material), /vFragDepth - 0\.025\)/);
+  assert.match(compileFragment(repairPatch.material), /vFragDepth \* 0\.9995 - 0\.025\)/);
 
-  // Tier 2: runway markings (5 cm)
+  // Tier 2: runway markings (5 cm + 1000 ppm relative)
   const markingMat = createRunwayMarkingMaterial();
-  assert.match(compileFragment(markingMat), /gl_FragDepth\s*=\s*log2\(max\(1\.0,\s*vFragDepth\s*-\s*0\.05\)\)/);
+  assert.match(compileFragment(markingMat), /gl_FragDepth\s*=\s*log2\(max\(1\.0,\s*vFragDepth\s*\*\s*0\.999\s*-\s*0\.05\)\)/);
 
-  // Negative units push water/river behind coplanar banks (+10 cm away from camera)
+  // Negative units push water/river behind coplanar banks (+10 cm + 2000 ppm away from camera)
   const riverMat = applyLogDepthOffset(new THREE.MeshStandardMaterial(), -4);
   assert.equal(riverMat.polygonOffset, true);
   assert.equal(riverMat.polygonOffsetFactor, 4);
-  assert.match(compileFragment(riverMat), /vFragDepth \+ 0\.1\)/);
+  assert.match(compileFragment(riverMat), /vFragDepth \* 1\.002 \+ 0\.1\)/);
 
   // Projection depth strips both logdepthbuf_fragment and the injected bias block
   const projMat = applyLogDepthOffset(new THREE.MeshStandardMaterial(), 2);
@@ -137,14 +137,14 @@ test('coplanar surface materials bias logarithmic fragment depth in ordered tier
   globalThis.window = globalThis;
   try {
     const wearMesh = createRunwaySurfaceWear(45, 3000);
-    assert.match(compileFragment(wearMesh.material), /vFragDepth - 0\.05\)/);
+    assert.match(compileFragment(wearMesh.material), /vFragDepth \* 0\.999 - 0\.05\)/);
 
     const rubberMat = createRunwayWearMaterial();
-    assert.match(compileFragment(rubberMat), /vFragDepth - 0\.075\)/);
+    assert.match(compileFragment(rubberMat), /vFragDepth \* 0\.9985 - 0\.075\)/);
 
     const repairs = createRunwayRepairs(45, 3000);
     const crackMesh = repairs.children.find(c => c.name === 'runway-cracks');
-    assert.match(compileFragment(crackMesh.material), /vFragDepth - 0\.1\)/);
+    assert.match(compileFragment(crackMesh.material), /vFragDepth \* 0\.998 - 0\.1\)/);
   } finally {
     if (originalDocument === undefined) delete globalThis.document;
     else globalThis.document = originalDocument;
@@ -165,7 +165,7 @@ test('FoliageAndCities rebuilds draped road geometries when terrain quality swit
 
   const shader = { fragmentShader: 'void main() {\n#include <logdepthbuf_fragment>\n}' };
   scenery.districtRoadsMesh.material.onBeforeCompile(shader, {});
-  assert.match(shader.fragmentShader, /vFragDepth - 0\.05\)/);
+  assert.match(shader.fragmentShader, /vFragDepth \* 0\.999 - 0\.05\)/);
 
   // Switch terrain to high quality (256 segments) and notify scenery
   terrain.setQuality('high');
@@ -199,5 +199,39 @@ test('codebase-wide guard: every polygonOffset material in src/ uses logarithmic
         `${rel} sets polygonOffset without applyLogDepthOffset or createRunwayMarkingMaterial (hardware polygonOffset is ignored under logarithmicDepthBuffer)`
       );
     }
+  }
+});
+
+test('multi-kilometer ground and water planes subdivide geometry to prevent near-plane 1/w interpolation corruption', async () => {
+  const { WaterOcean } = await import('../src/environment/WaterOcean.js');
+  const { HangangScene } = await import('../src/environment/HangangScene.js');
+  const { Airport } = await import('../src/environment/Airport.js');
+
+  const ultraOcean = new WaterOcean(36000, 1, { quality: 'ultraLow' });
+  assert.ok(ultraOcean.segments >= 64, 'ultraLow ocean must use at least 64x64 grid so triangles do not span 36km across near=0.08m');
+
+  const hangang = new HangangScene();
+  const river = hangang.group.children.find(c => c.isMesh && c.renderOrder === -1);
+  assert.ok(river, 'Hangang river mesh must exist');
+  assert.ok(river.geometry.parameters.widthSegments >= 64, 'Hangang 18km river plane must be subdivided');
+  assert.ok(river.geometry.parameters.heightSegments >= 64, 'Hangang 18km river plane must be subdivided');
+
+  const context = new Proxy({}, { get: () => () => ({ addColorStop() {} }) });
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  globalThis.document = { createElement: () => ({ getContext: () => context }) };
+  globalThis.window = globalThis;
+  try {
+    class HeadlessAirport extends Airport { async loadBuildings() { return false; } }
+    const airport = new HeadlessAirport();
+    const runway = airport.group.getObjectByName('runway-pavement');
+    assert.ok(runway.geometry.parameters.widthSegments >= 32, '3.2km runway slab must be subdivided along its length');
+    const wear = createRunwaySurfaceWear(60, 3200);
+    assert.ok(wear.geometry.parameters.heightSegments >= 32, '3.2km runway surface wear must be subdivided along its length');
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
   }
 });

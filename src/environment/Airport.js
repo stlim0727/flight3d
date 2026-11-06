@@ -137,8 +137,8 @@ export class Airport {
   }
 
   buildRunway(asphaltMat) {
-    // Main Runway Tarmac Slab
-    const rwyGeo = new THREE.PlaneGeometry(this.runwayLength, this.runwayWidth);
+    // Main Runway Tarmac Slab (subdivided along length so near-plane clipping never spans 3.2 km)
+    const rwyGeo = new THREE.PlaneGeometry(this.runwayLength, this.runwayWidth, 32, 1);
     rwyGeo.rotateX(-Math.PI * 0.5);
     setPavementUVs(rwyGeo);
     const rwyMesh = new THREE.Mesh(rwyGeo, asphaltMat);
@@ -307,7 +307,7 @@ export class Airport {
     const taxiGroup = new THREE.Group();
 
     // Parallel Taxiway A (length 3200m, width 25m, offset z = 160m to North)
-    const taxiGeo = new THREE.PlaneGeometry(this.runwayLength, 25);
+    const taxiGeo = new THREE.PlaneGeometry(this.runwayLength, 25, 32, 1);
     taxiGeo.rotateX(-Math.PI * 0.5);
     setPavementUVs(taxiGeo);
     const taxiMesh = new THREE.Mesh(taxiGeo, asphaltMat);
@@ -317,7 +317,7 @@ export class Airport {
 
     // Connector Taxiways linking runway to parallel taxiway (every 600m)
     for (let x = -1200; x <= 1200; x += 600) {
-      const connGeo = new THREE.PlaneGeometry(24, 160);
+      const connGeo = new THREE.PlaneGeometry(24, 160, 1, 4);
       connGeo.rotateX(-Math.PI * 0.5);
       setPavementUVs(connGeo);
       const conn = new THREE.Mesh(connGeo, asphaltMat);
@@ -327,7 +327,7 @@ export class Airport {
     }
 
     // Apron / Ramp Area (z = 240m to 420m)
-    const apronGeo = new THREE.PlaneGeometry(1400, 180);
+    const apronGeo = new THREE.PlaneGeometry(1400, 180, 14, 2);
     apronGeo.rotateX(-Math.PI * 0.5);
     setPavementUVs(apronGeo);
     const apron = new THREE.Mesh(apronGeo, apronMat);

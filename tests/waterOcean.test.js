@@ -84,25 +84,25 @@ test('WaterOcean (Camera Anchoring, Grid Snapping & Gerstner Waves)', async (t) 
     assert.ok(fs.includes('max(abs(vLocalPos.x), abs(vLocalPos.y))'), 'Fragment shader must compute edgeDist from vLocalPos');
   });
 
-  await t.test('ultraLow quality switches to single quad mesh, keeps decoupled snapStep and sets WATER_FLAT define', () => {
+  await t.test('ultraLow quality switches to 64x64 flat mesh (preventing 36km near-plane clipping), keeps decoupled snapStep and sets WATER_FLAT define', () => {
     const ocean = new WaterOcean(36000, 180);
     assert.equal(ocean.segments, 180);
     assert.equal(ocean.snapStep, 200);
     assert.equal(ocean.material.defines?.WATER_FLAT, 0);
 
     ocean.setQuality('ultraLow');
-    assert.equal(ocean.segments, 1);
-    assert.equal(ocean.snapStep, 200, 'snapStep must remain 200m even in ultraLow single-quad mode');
+    assert.equal(ocean.segments, 64);
+    assert.equal(ocean.snapStep, 200, 'snapStep must remain 200m even in ultraLow flat-grid mode');
     assert.equal(ocean.material.defines.WATER_FLAT, 1);
-    assert.equal(ocean.geometry.attributes.position.count, 4);
+    assert.equal(ocean.geometry.attributes.position.count, 65 * 65);
 
     ocean.setQuality('high');
     assert.equal(ocean.segments, 180);
     assert.equal(ocean.snapStep, 200);
     assert.equal(ocean.material.defines.WATER_FLAT, 0);
 
-    const directUltraLow = new WaterOcean(36000, 1, { quality: 'ultraLow' });
-    assert.equal(directUltraLow.segments, 1);
+    const directUltraLow = new WaterOcean(36000, 64, { quality: 'ultraLow' });
+    assert.equal(directUltraLow.segments, 64);
     assert.equal(directUltraLow.snapStep, 200, 'snapStep must be 200m when constructed directly with ultraLow');
   });
 
@@ -110,13 +110,19 @@ test('WaterOcean (Camera Anchoring, Grid Snapping & Gerstner Waves)', async (t) 
     const ocean = new WaterOcean(36000, 180, { quality: 'ultraLow' });
     assert.equal(ocean.mesh.renderOrder, -1, 'Water mesh should render before terrain');
 
+    const vs = ocean.material.vertexShader;
+    assert.ok(
+      vs.includes('modelViewMatrix * vec4(pos, 1.0)'),
+      'Vertex shader must use 64-bit CPU-computed modelViewMatrix to avoid 32-bit float world-origin cancellation far from (0,0)'
+    );
+
     const fs = ocean.material.fragmentShader;
     assert.ok(
-      fs.includes('float seaLevelRayScale = camHeight / max(0.01, camHeight - crestLift);'),
-      'Fragment shader must project Gerstner wave crests along the camera ray to the Y=0 sea-level plane'
+      fs.includes('float seaLevelRayScale = (camHeight + 0.35) / max(0.01, camHeight - crestLift);'),
+      'Fragment shader must project Gerstner wave crests and depress virtual sea level along the camera ray'
     );
     assert.ok(
-      fs.includes('float waterDepthBias = max(0.15, 0.0005 * seaLevelFragDepth);'),
+      fs.includes('float waterDepthBias = max(0.5, 0.002 * seaLevelFragDepth);'),
       'Fragment shader must compute a positive logarithmic depth bias away from the camera'
     );
     assert.ok(

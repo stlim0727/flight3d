@@ -9,8 +9,8 @@ export class WaterOcean {
   constructor(size = 36000, segments = 180, options = {}) {
     this.size = size;
     this.quality = options.quality ?? 'high';
-    this.segments = this.quality === 'ultraLow' ? 1 : segments;
-    const baseSegments = options.snapSegments ?? (segments > 1 ? segments : 180);
+    this.segments = this.quality === 'ultraLow' ? 64 : segments;
+    const baseSegments = options.snapSegments ?? (segments > 64 ? segments : 180);
     this.snapStep = options.snapStep ?? (this.size / baseSegments);
     this.waterLevel = 0.0;
     this.sunDirection = new THREE.Vector3(0.5, 0.6, 0.4).normalize();
@@ -73,15 +73,17 @@ export class WaterOcean {
 
           #if defined(WATER_FLAT) && WATER_FLAT == 1
             vec3 displacedWorld = baseWorldPos.xyz;
+            vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
           #else
             // Only broad swell belongs on the 200m grid. Short waves are shaded per pixel.
             vec3 totalDisplacement = gerstnerWave(normalize(vec2(1.0, 0.4)), 0.0024, 1600.0, 1.0, worldXZ, uTime)
                                    + gerstnerWave(normalize(vec2(-0.6, 0.8)), 0.0024, 900.0, 1.2, worldXZ, uTime);
             vec3 displacedWorld = baseWorldPos.xyz + totalDisplacement;
+            vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0) + viewMatrix * vec4(totalDisplacement, 0.0);
           #endif
 
           vWorldPos = displacedWorld;
-          gl_Position = projectionMatrix * viewMatrix * vec4(displacedWorld, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
           #include <logdepthbuf_vertex>
         }
       `,
@@ -134,10 +136,10 @@ export class WaterOcean {
           #ifdef USE_LOGARITHMIC_DEPTH_BUFFER
             if (vIsPerspective != 0.0) {
               float camHeight = max(0.01, cameraPosition.y);
-              float crestLift = clamp(vWorldPos.y, 0.0, camHeight * 0.95);
-              float seaLevelRayScale = camHeight / max(0.01, camHeight - crestLift);
+              float crestLift = clamp(vWorldPos.y, -2.0, camHeight * 0.95);
+              float seaLevelRayScale = (camHeight + 0.35) / max(0.01, camHeight - crestLift);
               float seaLevelFragDepth = 1.0 + max(0.0, vFragDepth - 1.0) * seaLevelRayScale;
-              float waterDepthBias = max(0.15, 0.0005 * seaLevelFragDepth);
+              float waterDepthBias = max(0.5, 0.002 * seaLevelFragDepth);
               gl_FragDepth = log2(max(1.0, seaLevelFragDepth + waterDepthBias)) * logDepthBufFC * 0.5;
             }
           #endif
@@ -224,7 +226,7 @@ export class WaterOcean {
       this.material.defines.WATER_FLAT = isUltraLow ? 1 : 0;
       this.material.needsUpdate = true;
     }
-    const targetSegments = isUltraLow ? 1 : 180;
+    const targetSegments = isUltraLow ? 64 : 180;
     if (this.segments !== targetSegments) {
       this.segments = targetSegments;
       const oldGeom = this.geometry;

@@ -15,6 +15,7 @@ export function applyLogDepthOffset(material, units = -(material?.polygonOffsetF
     material.polygonOffsetUnits = -units;
   }
   const offset = Number((0.025 * units).toFixed(4));
+  const scale = Number((1 - 0.0005 * units).toFixed(6));
   const offsetExpr = offset >= 0 ? `- ${offset}` : `+ ${Math.abs(offset)}`;
   const previousCompile = material.onBeforeCompile;
   const previousKey = typeof material.customProgramCacheKey === 'function'
@@ -27,13 +28,13 @@ export function applyLogDepthOffset(material, units = -(material?.polygonOffsetF
     if (!shader?.fragmentShader?.includes('#include <logdepthbuf_fragment>')) return;
     // Native polygon offset alone is not a dependable separation when the
     // fragment shader writes logarithmic depth. Bias the same depth encoding
-    // explicitly along the view ray.
+    // explicitly along the view ray with both near-field and distance-invariant terms.
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <logdepthbuf_fragment>',
       `#include <logdepthbuf_fragment>
       #ifdef USE_LOGARITHMIC_DEPTH_BUFFER
         if (vIsPerspective != 0.0) {
-          gl_FragDepth = log2(max(1.0, vFragDepth ${offsetExpr})) * logDepthBufFC * 0.5;
+          gl_FragDepth = log2(max(1.0, vFragDepth * ${scale} ${offsetExpr})) * logDepthBufFC * 0.5;
         }
       #endif`
     );

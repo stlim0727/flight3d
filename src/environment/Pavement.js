@@ -138,7 +138,8 @@ export function createRunwaySurfaceWear(width, length) {
     surfaceWearMaterial.name = 'runway-surface-wear';
     applyLogDepthOffset(surfaceWearMaterial, 2);
   }
-  const geometry = new THREE.PlaneGeometry(width, length).rotateX(-Math.PI / 2);
+  const lengthSegments = Math.max(1, Math.round(length / 100));
+  const geometry = new THREE.PlaneGeometry(width, length, 1, lengthSegments).rotateX(-Math.PI / 2);
   const mesh = new THREE.Mesh(geometry, surfaceWearMaterial);
   mesh.name = 'runway-surface-wear';
   mesh.position.y = 0.004;
