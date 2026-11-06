@@ -92,7 +92,7 @@ test('the middle of the valley is not the passage space', () => {
     'a gate with no lateral demand proves nothing');
 });
 
-test('cutting the bend on a straight line leaves the corridor instead of shortening the course', () => {
+test('cutting the bend on a straight line misses the ordered gates while corridor excursion between gates costs score', () => {
   const manifest = createSlalomManifest({ seed: 4 });
   const gates = manifest.course.gates;
   const start = manifest.spawn, finish = manifest.destination;
@@ -101,9 +101,22 @@ test('cutting the bend on a straight line leaves the corridor instead of shorten
     dx: dx / length, dz: dz / length, right: { x: -dz / length, z: dx / length } },
   toS: gates[0].sM + length, agl: () => 100, cross: () => 0 });
   assert.equal(chord.judge.status, 'failed');
-  assert.ok(['corridor-excursion', 'gate-missed'].includes(chord.judge.reason),
+  assert.equal(chord.judge.reason, 'gate-missed',
     `a corner cut scored as ${chord.judge.status}/${chord.judge.reason}`);
   assert.ok(chord.judge.result().metrics.gatesCleared < gates.length - 1);
+
+  const agl = s => gateValue(gates, s, 'maxAglM') - 10;
+  const clean = fly(manifest, { agl }).judge.result();
+  const center = (gates[1].sM + gates[2].sM) / 2;
+  const widthM = 500;
+  const wide = fly(manifest, { agl, cross: (s) => {
+    const base = gateValue(gates, s, 'crossOffsetM');
+    const dist = Math.abs(s - center);
+    return base + (dist < widthM / 2 ? 120 * Math.cos(dist / widthM * Math.PI) : 0);
+  } }).judge.result();
+  assert.equal(wide.status, 'succeeded', wide.reason);
+  assert.ok(wide.metrics.corridorPenalty > 0, 'corridor excursion is charged');
+  assert.ok(wide.metrics.finalScore < clean.metrics.finalScore, 'corridor excursion lowers final score');
 });
 
 test('a climb between gates is allowed, charged, and stops when the line comes back down', () => {

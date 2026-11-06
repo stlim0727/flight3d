@@ -3,6 +3,9 @@ import { crossAtPlane, passageCeilingAglAt, projectSlalom } from './slalomCourse
 /** Score points lost per knot of mean time-weighted shortfall below the minimum speed. */
 const SPEED_SHORTFALL_POINTS_PER_KT = 10;
 
+/** Score points lost per metre of mean time-weighted excursion outside the corridor half-width. */
+const CORRIDOR_EXCURSION_POINTS_PER_M = 10;
+
 const quantile = (samples, fraction, value) => {
   const ordered = [...samples].sort((a, b) => value(a) - value(b));
   const threshold = samples.reduce((sum, sample) => sum + sample.widthM, 0) * fraction;
@@ -34,6 +37,7 @@ export class SlalomMission {
     this.previous = null; this.samples = [];
     this.maximumProgressM = 0; this.maxAglM = 0; this.minAglM = null;
     this.iasSumKt = 0; this.iasCount = 0; this.maxIasKnots = 0; this.iasShortfallSumKt = 0;
+    this.corridorExcursionSumM = 0; this.maxCorridorExcursionM = 0;
     this.startS = course.gates[0].sM;
     this.lengthM = course.lengthM - this.startS;
     this.binSizeM = course.sampleStepM;
@@ -72,7 +76,11 @@ export class SlalomMission {
     }
     const projected = projectSlalom(course, position, this.hintIndex ?? null);
     this.hintIndex = projected.segmentIndex;
-    if (Math.abs(projected.crossM) > projected.halfWidthM) return this.finish('failed', 'corridor-excursion');
+    // Corridor excursions are scored rather than immediately ending the run;
+    // physical terrain collision and ordered gate passage still enforce the course.
+    const excursionM = Math.max(0, Math.abs(projected.crossM) - projected.halfWidthM);
+    this.corridorExcursionSumM += excursionM;
+    this.maxCorridorExcursionM = Math.max(this.maxCorridorExcursionM, excursionM);
     this.maximumProgressM = Math.max(this.maximumProgressM, projected.progressM);
     this.maxAglM = Math.max(this.maxAglM, snapshot.aglM);
     this.iasSumKt += snapshot.iasKnots;
@@ -128,8 +136,10 @@ export class SlalomMission {
     const altitudeCostM = this.status === 'succeeded' ? 0.7 * meanExcessM + 0.3 * p95ExcessM : null;
     const meanSpeedShortfallKt = this.iasCount ? this.iasShortfallSumKt / this.iasCount : 0;
     const speedPenalty = meanSpeedShortfallKt * SPEED_SHORTFALL_POINTS_PER_KT;
+    const meanCorridorExcursionM = this.iasCount ? this.corridorExcursionSumM / this.iasCount : 0;
+    const corridorPenalty = meanCorridorExcursionM * CORRIDOR_EXCURSION_POINTS_PER_M;
     const finalScore = this.status === 'succeeded'
-      ? Math.max(0, Math.round(20000 - durationSeconds * 100 - (altitudeCostM ?? 0) * 50 - speedPenalty))
+      ? Math.max(0, Math.round(20000 - durationSeconds * 100 - (altitudeCostM ?? 0) * 50 - speedPenalty - corridorPenalty))
       : null;
     return { status: this.status, reason: this.reason, tick: this.tick, metrics: {
       rulesVersion: this.manifest.rulesVersion,
@@ -141,6 +151,7 @@ export class SlalomMission {
       medianAglM: quantile(this.samples, 0.5, sample => sample.aglM),
       meanIasKnots: this.iasCount ? this.iasSumKt / this.iasCount : 0,
       maxIasKnots: this.maxIasKnots, meanSpeedShortfallKt, speedPenalty,
+      meanCorridorExcursionM, maxCorridorExcursionM: this.maxCorridorExcursionM, corridorPenalty,
       durationSeconds,
       altitudeCostM,
       finalScore,
