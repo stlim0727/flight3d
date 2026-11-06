@@ -36,14 +36,14 @@ test('manual room input accepts grouped/lowercase codes and compact invite links
   for (let i = 0; i < 100; i++) assert.equal(validRoom(newRoom()), true);
 });
 
-test('creator waiting lease expires at exactly ten seconds and cannot be revived', () => {
+test('creator waiting lease expires at exactly thirty seconds and cannot be revived', () => {
   let now = 0;
   const lease = new WaitingLease({ now: () => now });
-  assert.equal(lease.remaining, 10000);
-  now = 9999; assert.equal(lease.expired, false); assert.equal(lease.renew(), true);
-  assert.equal(lease.deadline, 19999);
-  now = 19999; assert.equal(lease.expired, true); assert.equal(lease.remaining, 0);
-  assert.equal(lease.renew(), false); assert.equal(lease.deadline, 19999);
+  assert.equal(lease.remaining, 30000);
+  now = 29999; assert.equal(lease.expired, false); assert.equal(lease.renew(), true);
+  assert.equal(lease.deadline, 59999);
+  now = 59999; assert.equal(lease.expired, true); assert.equal(lease.remaining, 0);
+  assert.equal(lease.renew(), false); assert.equal(lease.deadline, 59999);
 });
 
 test('late guests understand explicit cancellation and expired hosts cannot start', () => {
@@ -117,20 +117,34 @@ function voiceFixture(capture) {
   const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
   const mic = { getTracks: () => [micTrack], getAudioTracks: () => [micTrack] };
   const node = () => ({ connect() {}, disconnect() {}, start() {}, stop() {}, gain: { value: 1 }, offset: { value: 1 } });
-  const context = { state: 'suspended', createMediaStreamDestination: () => ({ ...node(), stream }), createGain: node, createConstantSource: node, createMediaStreamSource: node,
-    async resume() { this.state = 'running'; }, async close() { this.state = 'closed'; } };
+  const context = Object.assign(new EventTarget(), { state: 'suspended', createMediaStreamDestination: () => ({ ...node(), stream }), createGain: node, createConstantSource: node, createMediaStreamSource: node,
+    async resume() { this.state = 'running'; }, async close() { this.state = 'closed'; } });
   const voice = new VoiceLink({ context, capture: capture ?? (async () => mic) });
   return { voice, context, track, micTrack, mic };
 }
 
-test('listen-only never captures; PTT needs permission, release and disable silence, leave stops all tracks', async () => {
+test('voice transmits after permission by default; mute/unmute and leave silence tracks', async () => {
   const { voice, context, track, micTrack } = voiceFixture();
-  assert.equal(track.enabled, false); voice.setTalking(true); assert.equal(voice.talking, false);
-  await voice.enableMicrophone(); assert.equal(track.enabled, false);
-  voice.setTalking(true); assert.equal(voice.talking, true); assert.equal(track.enabled, true); assert.equal(voice.gain.gain.value, 1);
-  voice.setTalking(false); assert.equal(track.enabled, false); assert.equal(voice.gain.gain.value, 0);
+  assert.equal(track.enabled, false); voice.setMuted(false); assert.equal(voice.talking, false);
+  await voice.enableMicrophone(); assert.equal(track.enabled, true);
+  voice.setMuted(false); assert.equal(voice.talking, true); assert.equal(track.enabled, true); assert.equal(voice.gain.gain.value, 1);
+  voice.setMuted(true); assert.equal(track.enabled, false); assert.equal(voice.gain.gain.value, 0);
   voice.disableMicrophone(); assert.equal(micTrack.stopped, true);
   voice.close(); voice.close(); assert.equal(track.stopped, true); assert.equal(context.state, 'closed');
+});
+
+test('suspended autoplay does not block microphone capture and mute survives context changes', async () => {
+  const { voice, context, track } = voiceFixture();
+  context.resume = () => new Promise(() => {});
+  await voice.enableMicrophone();
+  assert.ok(voice.microphone); assert.equal(track.enabled, false);
+  context.state = 'running'; context.dispatchEvent(new Event('statechange'));
+  assert.equal(voice.talking, true); assert.equal(track.enabled, true);
+  voice.setMuted(true);
+  context.state = 'suspended'; context.dispatchEvent(new Event('statechange'));
+  context.state = 'running'; context.dispatchEvent(new Event('statechange'));
+  assert.equal(track.enabled, false); assert.equal(voice.muted, true);
+  voice.close();
 });
 
 test('permission denial retains listening; capture resolving after leave is stopped', async () => {

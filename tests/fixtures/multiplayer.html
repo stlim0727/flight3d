@@ -23,6 +23,7 @@ window.fixture = {
         this.voice.context.createMediaStreamSource(stream).connect(this.analyser);
         this.audio = new Audio(); this.audio.srcObject = stream; this.audio.play().catch(() => {});
       } });
+    this.voice.enableMicrophone();
     return this.room.room;
   },
   release() { prepareResolve?.(); },

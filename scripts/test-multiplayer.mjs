@@ -24,7 +24,7 @@ try {
     '--headless=new', '--window-size=1280,900', `--user-data-dir=${profile}`, `--remote-debugging-port=${cdpPort}`,
     '--enable-gpu', '--use-gl=angle', '--use-angle=vulkan', '--disable-software-rasterizer',
     '--no-first-run', '--no-default-browser-check', '--autoplay-policy=no-user-gesture-required',
-    ...(simulatorMode ? ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] : []),
+    '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
     ...(process.env.CHROME_NO_SANDBOX === '1' ? ['--no-sandbox'] : []), 'about:blank'
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   chrome.stderr.on('data', b => { chromeLog = (chromeLog + b).slice(-8000); });
@@ -45,13 +45,20 @@ try {
   await ui.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...outside });
   assert.equal((await ui.evaluate('uiFixture.modalStatus()')).outsideClicks, 0, 'native modal blocks background clicks');
   for (const [key, code] of [[' ', 'Space'], ['Enter', 'Enter']]) {
-    assert.deepEqual(await ui.evaluate(`uiFixture.press(${JSON.stringify(key)}, ${JSON.stringify(code)})`), { talking: true, braking: false }, 'PTT activation must not brake');
-    assert.deepEqual(await ui.evaluate(`uiFixture.release(${JSON.stringify(key)}, ${JSON.stringify(code)})`), { talking: false, braking: false }, 'PTT release must not brake');
+    assert.deepEqual(await ui.evaluate(`uiFixture.press(${JSON.stringify(key)}, ${JSON.stringify(code)})`), { talking: true, braking: false }, 'Microphone button keydown must not brake');
+    assert.deepEqual(await ui.evaluate(`uiFixture.release(${JSON.stringify(key)}, ${JSON.stringify(code)})`), { talking: true, braking: false }, 'Microphone button keyup must not brake');
   }
-  // Keyup must still release a brake key pressed before focus moved to PTT.
+  // Keyup must still release a brake key pressed before focus moved to the microphone button.
   await ui.evaluate('uiFixture.controls.keys.Space = true');
-  assert.deepEqual(await ui.evaluate('uiFixture.release(" ", "Space")'), { talking: false, braking: false });
+  assert.deepEqual(await ui.evaluate('uiFixture.release(" ", "Space")'), { talking: true, braking: false });
   assert.deepEqual(await ui.evaluate('uiFixture.demoShortcut()'), { dialog: false, active: false, manual: true }, 'P cannot start a demo during a shared flight');
+  await ui.evaluate(`for (const [key,value] of Object.entries({name:'Wing',airport:'neon',aircraft:'F16',scenario:'runway'})) {
+    const input=document.getElementById('mp-'+key); input.value=value;
+    input.dispatchEvent(new Event(key==='name'?'input':'change'));
+  }`);
+  const restoredUi = await page('/tests/fixtures/multiplayer-ui.html', 'Boolean(window.uiFixture)');
+  assert.deepEqual(await restoredUi.evaluate(`Object.fromEntries(['name','airport','aircraft','scenario'].map(key=>[key,document.getElementById('mp-'+key).value]))`),
+    { name: 'Wing', airport: 'neon', aircraft: 'F16', scenario: 'runway' }, 'setup preferences restored in a new page');
   const host = await page(), guest = await page();
   const room = await host.evaluate('fixture.create()');
   await until(() => host.evaluate('fixture.status().registered'), 'host registered');
@@ -77,13 +84,12 @@ try {
   // Real oscillator -> production microphone graph -> WebRTC RTP -> remote decoded audio.
   for (const [sender, receiver] of [[host, guest], [guest, host]]) {
     await sender.evaluate('fixture.voice.enableMicrophone()');
-    await until(() => receiver.evaluate('fixture.energy() >= 0 && fixture.energy() < .005'), 'listen-only silence');
-    await sender.evaluate('fixture.voice.setTalking(true)');
-    await until(() => receiver.evaluate('fixture.energy() > .05'), 'audible decoded PTT signal');
+
+    await until(() => receiver.evaluate('fixture.energy() > .05'), 'audible voice without push-to-talk');
     const stats = await receiver.evaluate('fixture.stats()');
     assert.ok(stats.some(s => s.packetsReceived > 0 && s.bytesReceived > 0), 'received real audio RTP');
-    await sender.evaluate('fixture.voice.setTalking(false)');
-    await until(() => receiver.evaluate('fixture.energy() >= 0 && fixture.energy() < .005'), 'PTT release silence');
+    await sender.evaluate('fixture.voice.setMuted(true)');
+    await until(() => receiver.evaluate('fixture.energy() >= 0 && fixture.energy() < .005'), 'Microphone button keyup silence');
   }
   await guest.evaluate('fixture.hold = false'); await host.evaluate('fixture.room.session.start()');
   for (const c of [host, guest]) await until(() => c.evaluate('fixture.flights === 2'), 'shared restart');
@@ -95,7 +101,8 @@ try {
   await until(() => autoHost.evaluate('fixture.room.registered'), 'URL invite host registered');
   const autoGuest = await page(`/tests/fixtures/multiplayer-ui.html?r=${autoCode}`, 'Boolean(window.uiFixture)');
   await until(() => autoGuest.evaluate('uiFixture.controller.room?.session.state === "connected"'), 'URL invite joins without typing or clicking');
-  assert.equal(await autoGuest.evaluate('uiFixture.controller.modalOpen && !uiFixture.controller.voice.microphone'), true);
+  assert.equal(await autoGuest.evaluate('uiFixture.controller.room.session.name'), 'Wing', 'automatic invite joining uses the saved pilot name');
+  await until(() => autoGuest.evaluate('uiFixture.controller.modalOpen && uiFixture.controller.voice.talking'), 'invite automatically enables microphone');
   await autoGuest.evaluate('uiFixture.controller.room.close()');
   await autoHost.evaluate('fixture.room.dispose()');
   const invalid = await page('/tests/fixtures/multiplayer-ui.html?r=invalid', 'Boolean(window.uiFixture)');
@@ -119,7 +126,7 @@ try {
   await until(() => gone.evaluate('fixture.ended.includes("not-found")'), 'closed creator tab has no live room');
   for (const c of browsers) assert.deepEqual(c.errors, [], 'no browser exceptions');
   console.log(`${publicMode ? 'Public PeerJS service' : 'Local signaling'} verified`);
-  console.log('PASS Chrome WebRTC: two-pilot config/start barrier, bidirectional snapshots, respawn, third-peer rejection, bidirectional decoded audio/PTT silence + RTP, restart, disconnect/track cleanup, modal focus/input isolation, automatic URL joining, invalid/cancelled invites, creator lease expiry and late-join cancellation. No WebGL tested.');
+  console.log('PASS Chrome WebRTC: two-pilot config/start barrier, bidirectional snapshots, respawn, third-peer rejection, bidirectional continuous audio/mute/unmute + RTP, restart, disconnect/track cleanup, modal focus/input isolation, automatic URL joining, invalid/cancelled invites, creator lease expiry and late-join cancellation. No WebGL tested.');
   }
 } catch (error) {
   console.error(error); if (chromeLog) console.error(chromeLog);

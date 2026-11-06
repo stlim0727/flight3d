@@ -3,15 +3,17 @@
 1. Open **Fly together** in the main menu. Multiplayer setup and room controls
    use a modal dialog. Background simulator controls cannot be used while it is
    open, and your own aircraft is held.
-2. Enter your name, scenery, aircraft, and runway/cruise start, then choose
+2. Enter your name. Under **Host a flight**, choose the stage, aircraft, and
+   runway/cruise start, then choose
    **Create room · max 2**. Share the six-character code (for example `K7M 2QX`)
    or use **Copy invite** for a compact link ending in `?r=K7M2QX`.
 3. While waiting to start, the creator must press **Keep room open** before the
-   ten-second countdown ends. Each press grants another ten seconds. Missing a
+   thirty-second countdown ends. Each press grants another thirty seconds. Missing a
    press cancels the room; it cannot be revived by pressing late.
 4. Opening the shared invite link automatically joins your friend's room and
    opens its dialog; no typing, pasting, or Join button is needed. With a code,
-   enter it in **Fly together** and choose **Join friend**. Spaces, hyphens,
+   enter it under **Join a friend** and choose **Join friend**. The host's stage
+   and aircraft apply to both pilots. Spaces, hyphens,
    and lowercase letters are accepted. The creator chooses **Start together**;
    both dialogs close when the shared flight is ready. The waiting deadline no
    longer applies after starting preparation or during flight.
@@ -20,11 +22,15 @@
    Closing it resumes only the pause introduced by the dialog. A pause you set
    yourself stays paused.
 
-Choose **Enable microphone** in the room dialog. During flight, hold **N** to
-speak and release to stop. The touch/keyboard **Hold to talk** button is inside
-the modal and operates while your aircraft is held. Microphone access is
-optional; you can listen without it. **Mute friend** affects only what you hear.
-If the browser blocks playback, choose **Play friend’s voice**.
+Voice is on by default when you create or join a room. Allow microphone access
+when the browser asks; then speak normally without holding a key or button.
+Use **Mute microphone** / **Unmute microphone** in the room dialog. Voice
+continues during flight and while the dialog is open. If permission is denied,
+you can still listen and choose **Enable microphone** to retry. **Mute friend**
+affects only what you hear. If playback is blocked, choose **Play friend’s voice**.
+
+Your pilot name, scenery, aircraft, and start selection are saved in this browser
+and restored on your next visit, including when opening an invite link.
 
 The room holds two pilots including its creator. It supports the C172, B738 and
 F16 at coastal airport, Incheon and neon city. Both use the creator's aircraft

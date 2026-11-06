@@ -1,8 +1,14 @@
 # Two-player shared flight and voice
 
 Implementation plan (Discussion #509): friends share an invite link, join a private
-room capped at two pilots including the host, then fly and use push-to-talk.
+room capped at two pilots including the host, then fly with continuous voice by default.
 Room management is a native modal; invites use six-character codes.
+
+Setup preferences use `flight3d.multiplayer.preferences.v1` in localStorage:
+pilot name, scenery, aircraft, and start selection. Restore them before automatic
+invite joining; save edits immediately and again when connecting. Validate saved
+choices against the supported options and keep defaults for invalid data.
+Unavailable storage must not block room creation or joining.
 
 ## Contract
 
@@ -10,7 +16,7 @@ Room management is a native modal; invites use six-character codes.
   `crypto.getRandomValues`. URLs use `?r=CODE`; manual entry accepts lowercase,
   spaces and hyphens. PeerJS IDs are namespaced separately from display codes.
   Protocol v2 uses these codes; old v1 UUID invites are not accepted.
-- After signaling registration, the creator has ten seconds to explicitly renew
+- After signaling registration, the creator has thirty seconds to explicitly renew
   the waiting deadline. The deadline covers connecting/connected lobby states,
   stops when preparation starts, and never renews from heartbeats, copying a link,
   receiving data or other activity. Expiry is checked before admission, media
@@ -26,8 +32,7 @@ Room management is a native modal; invites use six-character codes.
   Native focus/pointer isolation and stopped dialog key propagation exclude
   background UI; input and deterministic/frame physics also check modal state.
   A dialog owns only the pause it created. Shared start/reset closes it before
-  entering flight; room cancellation keeps the explanatory dialog open. N PTT
-  remains available during flight; the touch PTT control is inside the held dialog.
+  entering flight; room cancellation keeps the explanatory dialog open. Voice stays on during flight and while the dialog is open; mute/unmute is inside the dialog.
 - Host owns room configuration and starts/restarts. Both clients prepare the same
   airport, aircraft, runway/cruise preset, noon lighting and calm wind before a
   ready barrier releases flight. Initial supported airports: coastal, Incheon,
@@ -43,13 +48,17 @@ Room management is a native modal; invites use six-character codes.
   stale-packet rejection, interpolation, stale hiding and bounded send buffering.
   Reliable ordered room control; snapshots share that channel at 15 Hz with
   backpressure rather than accumulating old positions.
-- A user explicitly enables their microphone. Default is listen-only. Hold N or
-  the touch/keyboard PTT button to send; release, blur, hiding the page and leaving
-  all silence it. Remote playback has an explicit retry if autoplay is blocked.
-- Opening a valid room link automatically connects and opens the room modal.
-  It never requests microphone permission; enabling the microphone remains an
-  explicit action, and blocked playback has a retry button. Invalid links show
-  an error without connecting. Invite IDs are random capabilities. Room membership is not a
+- Creating or joining automatically requests microphone access. Once permitted,
+  voice transmits continuously by default. The modal has a mute/unmute button;
+  no push-to-talk shortcut or held button is required. Muting survives dialog,
+  reset and AudioContext state changes. Leaving closes all audio tracks.
+  Denied permission retains listening and offers an explicit retry.
+- Opening a valid room link automatically connects, opens the room modal, and
+  requests microphone access. Capture does not wait for AudioContext resume,
+  which may be blocked until a user gesture. Context state changes synchronize
+  transmission; playback has a retry button when blocked. Invalid links show
+  an error without connecting or requesting a microphone. Invite IDs are random
+  capabilities. Room membership is not a
   verified identity; invite only trusted friends. P2P can disclose IP addresses.
 
 ## Infrastructure
@@ -77,12 +86,12 @@ No query-string signaling overrides or production test hooks.
    reordered snapshots, interpolation, timeout/disconnect/restart, and voice
    permission/cleanup lifecycle with injected adapters. Controller regressions cover
    restored solo availability, intentional pause retention and preparation holds.
-   WaitingLease tests exact ten-second expiry, renewal and non-revival; modal tests
+   WaitingLease tests exact thirty-second expiry, renewal and non-revival; modal tests
    cover pause ownership, shared starts and explicit cancel handling.
 2. `npm run test:multiplayer`: real Chromium WebRTC between independent pages,
    local PeerServer, no public network or mic hardware: host/guest handshake,
    shared start barrier/config, bidirectional movement/reset, third-peer
-   rejection, real audio RTP + decoded signal/silence for PTT, disconnect cleanup.
+   rejection, real audio RTP + decoded continuous voice/mute/unmute, disconnect cleanup.
    This is a required CI step. The fixture imports production room/transport/voice
    modules plus the shipping native-modal markup and controller/flight-controls
    boundary. It verifies focus/pointer isolation, renewal/expiry, and cancellation
@@ -96,7 +105,7 @@ No query-string signaling overrides or production test hooks.
 
 Implementation checklist:
 - [x] Protocol/session and interpolation with Node coverage.
-- [x] PeerJS transport and explicit microphone/PTT lifecycle.
+- [x] PeerJS transport and automatic microphone/mute lifecycle.
 - [x] Lobby/HUD, shared start, remote model, reset and leave integration.
 - [x] Real browser data/audio integration test wired into CI.
 - [x] Full check/test/build and hardware Chrome acceptance.

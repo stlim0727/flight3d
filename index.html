@@ -518,14 +518,21 @@
     <header class="mp-dialog-header"><h2 id="mp-dialog-title" data-i18n="mp.title"></h2><button id="mp-dialog-close" class="btn" type="button" data-i18n="mp.closeDialog"></button></header>
     <p id="mp-dialog-help" data-i18n="mp.dialogHelp"></p>
         <section id="mp-setup">
-          <div id="mp-intro"><p data-i18n="mp.description"></p>
-          <p class="mp-notice" data-i18n="mp.privacy"></p></div>
+          <div id="mp-intro"><p class="mp-notice" data-i18n="mp.privacy"></p></div>
           <section id="mp-waiting" hidden>
             <p id="mp-waiting-status" role="status"></p>
             <button id="mp-keep-waiting" class="btn" type="button" data-i18n="mp.keepWaiting"></button>
           </section>
           <fieldset id="mp-connect">
-            <label for="mp-name" data-i18n="mp.name"></label><input id="mp-name" maxlength="12" autocomplete="nickname" value="Pilot">
+            <div class="mp-pilot-field"><label for="mp-name" data-i18n="mp.name"></label><input id="mp-name" maxlength="12" autocomplete="nickname" value="Pilot"></div>
+            <div class="mp-path-choice" role="group" data-i18n-aria-label="mp.setupChoice">
+              <button id="mp-choose-host" class="btn" type="button" aria-pressed="true" aria-controls="mp-host-panel" data-i18n="mp.hostTitle"></button>
+              <button id="mp-choose-join" class="btn" type="button" aria-pressed="false" aria-controls="mp-join-panel" data-i18n="mp.joinTitle"></button>
+            </div>
+            <div class="mp-setup-paths">
+            <section id="mp-host-panel" class="mp-setup-path" aria-labelledby="mp-host-title">
+            <h3 id="mp-host-title" data-i18n="mp.hostTitle"></h3>
+            <p class="mp-path-help" data-i18n="mp.hostHelp"></p>
             <label for="mp-airport" data-i18n="mp.airport"></label>
             <select id="mp-airport"><option value="coastal" data-i18n="mp.coastal"></option><option value="incheon" data-i18n="mp.incheon"></option><option value="neon" data-i18n="mp.neon"></option></select>
             <label for="mp-aircraft" data-i18n="mp.aircraft"></label>
@@ -533,8 +540,14 @@
             <label for="mp-scenario" data-i18n="mp.scenario"></label>
             <select id="mp-scenario"><option value="cruise" data-i18n="mp.cruise"></option><option value="runway" data-i18n="mp.runway"></option></select>
             <button id="mp-create" class="btn" type="button" data-i18n="mp.create"></button>
+            </section>
+            <section id="mp-join-panel" class="mp-setup-path mp-join-path" aria-labelledby="mp-join-title" hidden>
+            <h3 id="mp-join-title" data-i18n="mp.joinTitle"></h3>
+            <p class="mp-path-help" data-i18n="mp.joinHelp"></p>
             <label for="mp-room" data-i18n="mp.invite"></label><input id="mp-room" autocomplete="off" spellcheck="false">
             <button id="mp-join" class="btn" type="button" data-i18n="mp.join"></button>
+            </section>
+            </div>
           </fieldset>
           <div id="mp-invite-row" hidden><label for="mp-code" data-i18n="mp.code"></label><div class="mp-code-row"><input id="mp-code" readonly aria-describedby="mp-code-help"><button id="mp-copy-code" class="btn" type="button" data-i18n="mp.copyCode"></button></div><p id="mp-code-help" data-i18n="mp.codeHelp"></p><button id="mp-copy" class="btn" data-i18n="mp.copy"></button><details id="mp-link-details"><summary data-i18n="mp.showLink"></summary><label for="mp-invite" data-i18n="mp.share"></label><input id="mp-invite" readonly></details></div>
           <p id="mp-status" role="status"></p>
@@ -545,7 +558,6 @@
     <div class="mp-actions">
       <button id="mp-start" class="btn" data-i18n="mp.start"></button>
       <button id="mp-microphone" class="btn" data-i18n="mp.enableMic"></button>
-      <button id="mp-ptt" class="btn" aria-pressed="false" data-i18n="mp.ptt"></button>
       <button id="mp-listen" class="btn" data-i18n="mp.listen" hidden></button>
       <button id="mp-mute" class="btn" aria-pressed="false" data-i18n="mp.mute"></button>
       <button id="mp-respawn" class="btn" data-i18n="mp.respawn"></button>

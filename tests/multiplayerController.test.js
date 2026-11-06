@@ -12,13 +12,14 @@ const Controller = new Function('t', 'bindText', 'parseRoom', `return (${source.
 test('invite URL joins automatically; missing or invalid invites never connect', () => {
   const joined = [];
   const controller = Object.assign(Object.create(Controller.prototype), {
-    roomInput: { value: '' }, openDialog() { this.opened = true; },
+    roomInput: { value: '' }, chooseSetup(mode) { this.mode = mode; }, openDialog() { this.opened = true; },
     connect(room) { joined.push(room); }, refresh() {},
   });
   controller.joinInvite(null);
   assert.equal(controller.opened, undefined);
   controller.joinInvite('k7m-2qx');
   assert.equal(controller.opened, true);
+  assert.equal(controller.mode, 'join');
   assert.deepEqual(joined, ['K7M2QX']);
   for (const invite of ['', 'invalid-room']) {
     controller.joinInvite(invite);
@@ -63,6 +64,18 @@ function fixture(run) {
   try { return run({ controller, gameFlow, airport, preset, restricted }); }
   finally { globalThis.document = previous; }
 }
+
+test('personal reset keeps continuous voice and microphone mute unchanged', () => fixture(({ controller }) => {
+  controller.room.session.config = { scenario: 'cruise' };
+  controller.sim.setPreset = () => {};
+  controller.sim.beginFlightRecording = () => {};
+  for (const muted of [false, true]) {
+    controller.voice = { muted, talking: !muted };
+    controller.respawnLocal();
+    assert.equal(controller.voice.muted, muted);
+    assert.equal(controller.voice.talking, !muted);
+  }
+}));
 
 test('leave restores airport/preset controls and keeps normal solo restrictions', () => fixture(({ controller, airport, preset, restricted }) => {
   controller.refresh();

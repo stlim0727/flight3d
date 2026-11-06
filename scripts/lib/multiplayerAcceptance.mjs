@@ -25,16 +25,19 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
     assert.equal(await c.evaluate('sim.controls.inputBlocked'), true);
   }
   async function capture(c, name) {
+    await c.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     const { data } = await c.send('Page.captureScreenshot', { format: 'png' });
     await writeFile(`review-artifacts/multiplayer/${name}.png`, Buffer.from(data, 'base64'));
   }
   async function create(airport = 'coastal', aircraft = 'C172', scenario = 'runway') {
     for (const c of [host, guest]) await open(c);
+    await host.evaluate('document.getElementById("mp-choose-host").click()');
     await host.evaluate(`document.getElementById('mp-airport').value=${JSON.stringify(airport)}; document.getElementById('mp-aircraft').value=${JSON.stringify(aircraft)}; document.getElementById('mp-scenario').value=${JSON.stringify(scenario)}; document.getElementById('mp-name').value='Lead'; document.getElementById('mp-create').click()`);
     await until(() => host.evaluate('sim.multiplayer.room?.registered'), 'creator registered');
     return host.evaluate('({code:sim.multiplayer.room.room,invite:document.getElementById("mp-invite").value})');
   }
   async function join(code) {
+    await guest.evaluate('document.getElementById("mp-choose-join").click()');
     await guest.evaluate(`document.getElementById('mp-room').value=${JSON.stringify(code)}; document.getElementById('mp-name').value='Wing'; document.getElementById('mp-join').click()`);
     for (const c of [host, guest]) await until(() => c.evaluate('sim.multiplayer.room?.session.state === "connected"'), 'two pilots connected');
   }
@@ -56,6 +59,15 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   }
 
   await open(host); await capture(host, 'modal-setup');
+  await host.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await capture(host, 'mobile-setup');
+  await host.evaluate('document.getElementById("mp-choose-join").click()');
+  await capture(host, 'mobile-join');
+  assert.equal(await host.evaluate('document.getElementById("mp-host-panel").hidden && !document.getElementById("mp-join-panel").hidden'), true, 'joining hides host-only stage and aircraft choices');
+  await host.evaluate('document.getElementById("mp-choose-host").click()');
+  const setupBounds = await host.evaluate('(() => { const d=document.getElementById("mp-dialog"),r=d.getBoundingClientRect(); return {left:r.left,right:r.right,w:innerWidth,scroll:d.scrollWidth,client:d.clientWidth}; })()');
+  assert.ok(setupBounds.left >= 0 && setupBounds.right <= setupBounds.w && setupBounds.scroll <= setupBounds.client + 2, 'host/join setup fits phone width');
+  await host.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   const invite = await create();
   assert.match(invite.code, /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
   const url = new URL(invite.invite); assert.equal(url.searchParams.get('r'), invite.code); assert.equal(url.searchParams.size, 1);
@@ -86,23 +98,18 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   assert.deepEqual(await host.evaluate('sim.position.toArray()'), held, 'no physics behind modal');
   assert.equal(await host.evaluate('sim.cameraSystem.mode'), camera, 'no background shortcut behind modal');
   await until(() => guest.evaluate('sim.multiplayer.room.session.track.sample(performance.now())?.held'), 'peer sees modal hold');
+  await until(() => host.evaluate('sim.multiplayer.voice.talking'), 'microphone automatically enabled');
   await host.evaluate('document.getElementById("mp-microphone").click()');
-  await until(() => host.evaluate('Boolean(sim.multiplayer.voice.microphone)'), 'explicit microphone permission');
-  await host.evaluate('document.getElementById("mp-ptt").focus()');
-  await host.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space' });
-  assert.equal(await host.evaluate('sim.multiplayer.voice.talking && !sim.controls.keys.Space'), true);
-  await host.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space' });
-  assert.equal(await host.evaluate('sim.multiplayer.voice.talking'), false);
+  assert.equal(await host.evaluate('sim.multiplayer.voice.muted && !sim.multiplayer.voice.talking'), true);
+  await host.evaluate('document.getElementById("mp-microphone").click()');
+  assert.equal(await host.evaluate('sim.multiplayer.voice.talking'), true);
   await host.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await capture(host, 'mobile-modal');
   const bounds = await host.evaluate('(() => { const d=document.getElementById("mp-dialog"),r=d.getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,w:innerWidth,h:innerHeight,scroll:d.scrollWidth,client:d.clientWidth}; })()');
   assert.ok(bounds.left >= 0 && bounds.right <= bounds.w && bounds.top >= 0 && bounds.bottom <= bounds.h && bounds.scroll <= bounds.client + 2, 'modal fits phone viewport');
   await host.evaluate('document.getElementById("mp-dialog-close").click()');
   assert.equal(await host.evaluate('sim.gameFlow.state === "flight" && !sim.controls.inputBlocked'), true);
-  await host.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'n', code: 'KeyN' });
-  assert.equal(await host.evaluate('sim.multiplayer.voice.talking'), true, 'voice shortcut remains available during flight');
-  await host.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'n', code: 'KeyN' });
-  assert.equal(await host.evaluate('sim.multiplayer.voice.talking'), false);
+  assert.equal(await host.evaluate('sim.multiplayer.voice.talking'), true, 'voice continues after closing room controls');
 
   // Movement, personal reset and host restart still work with the modal lifecycle.
   await guest.evaluate('sim.controls.setParkingBrake(false); sim.controls.throttle=.8');
@@ -122,7 +129,7 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
     await guest.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     await guest.evaluate('sim.setRenderQuality("ultraLow"); sim.setBrowserActive(true)');
     for (const c of [host, guest]) await until(() => c.evaluate('sim.multiplayer.room?.session.state === "connected"'), 'invite URL automatically connected');
-    assert.equal(await guest.evaluate('sim.multiplayer.modalOpen && !sim.multiplayer.voice.microphone'), true, 'invite opens modal without microphone permission');
+    await until(() => guest.evaluate('sim.multiplayer.modalOpen && sim.multiplayer.voice.talking'), 'invite automatically enables voice');
     await start();
     await leave();
   } finally { clearInterval(renew); }
@@ -131,13 +138,13 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
     const next = await create(...config); await join(next.code); await start(); await leave();
   }
 
-  // A real ten-second deadline: renew halfway, survive the original deadline,
+  // A real thirty-second deadline: renew halfway, survive the original deadline,
   // then miss the next press. Connected guests and later arrivals see cancellation.
   const cancelled = await create(); await join(cancelled.code);
-  await delay(5200); await host.evaluate('document.getElementById("mp-keep-waiting").click()');
-  await delay(5200);
+  await delay(15200); await host.evaluate('document.getElementById("mp-keep-waiting").click()');
+  await delay(15200);
   assert.equal(await host.evaluate('sim.multiplayer.active'), true, 'creator renewal survives original deadline');
-  await until(() => host.evaluate('sim.multiplayer.room.closed && sim.multiplayer.message === "cancelled"'), 'ten-second missed press cancellation', 7000);
+  await until(() => host.evaluate('sim.multiplayer.room.closed && sim.multiplayer.message === "cancelled"'), 'thirty-second missed press cancellation', 17000);
   await until(() => guest.evaluate('!sim.multiplayer.active && sim.multiplayer.message === "cancelled"'), 'connected guest notified');
   assert.equal(await host.evaluate('sim.multiplayer.room.keepWaiting()'), false);
   await guest.evaluate(`document.getElementById('mp-room').value=${JSON.stringify(cancelled.code)}; document.getElementById('mp-join').click()`);
@@ -146,5 +153,5 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   assert.equal(await guest.evaluate('document.getElementById("mp-status").textContent.length > 0'), true);
   await capture(guest, 'cancelled-invite');
   for (const c of browsers) assert.deepEqual(c.errors, [], 'browser exceptions');
-  console.log('PASS hardware Chrome: compact/manual and automatic URL invites, modal focus/physics/input isolation, microphone/PTT, remote drawing/movement/reset/restart, three scenery/aircraft types, phone modal, creator renewal and real 10s expiry, connected/late guest cancellation. Evidence: review-artifacts/multiplayer/');
+  console.log('PASS hardware Chrome: compact/manual and automatic URL invites, modal focus/physics/input isolation, continuous voice/mute, remote drawing/movement/reset/restart, three scenery/aircraft types, phone modal, creator renewal and real 30s expiry, connected/late guest cancellation. Evidence: review-artifacts/multiplayer/');
 }
