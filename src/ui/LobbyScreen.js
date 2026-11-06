@@ -68,7 +68,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
 
   const tabs = [...document.querySelectorAll('.lobby-tab')];
   function selectTab(selected, focus = false) {
-    document.getElementById('btn-fly').hidden = selected.id === 'lobby-tab-dev';
+    document.getElementById('btn-fly').hidden = ['lobby-tab-dev', 'lobby-tab-multiplayer'].includes(selected.id);
     for (const tab of tabs) {
       const active = tab === selected;
       tab.setAttribute('aria-selected', String(active));

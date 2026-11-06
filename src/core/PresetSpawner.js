@@ -25,6 +25,10 @@ import {
 
 class PresetSpawnerMethods {
   setPreset(type, isDemoInternal = false, pilotPreparation = false) {
+    if (this.multiplayer?.locked) {
+      if (this.multiplayer.room.session.state !== 'flying') return;
+      type = this.multiplayer.room.session.config.scenario;
+    }
     if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('preset-changed');
     // An arena field must not leak into a different mission or ordinary flight.
     if (this.windField) setSimulationWind(this);
@@ -414,6 +418,7 @@ class PresetSpawnerMethods {
     }
     this.physicsAccumulator = 0;
 
+    this.multiplayer?.respawn();
     this.renderPose.reset(this.position, this.quaternion);
     this.aircraft.group.position.copy(this.position);
     this.aircraft.group.quaternion.copy(this.quaternion);
@@ -481,6 +486,7 @@ class PresetSpawnerMethods {
    * Switch the active airport; Incheon assets are loaded before committing the selection.
    */
   async setAirport(id, pilotPreparation = false) {
+    if (this.multiplayer?.locked) return;
     if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('airport-changed');
     this.renderDiagnosticsPanel?.close();
     if (!['coastal', 'lukla', 'incheon', 'neon', 'hangang', 'valley'].includes(id)) return;

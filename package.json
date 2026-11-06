@@ -32,14 +32,17 @@
     "audio:departure": "node scripts/build-gemini-departure-radio.mjs",
     "audio:check": "node scripts/build-gemini-departure-radio.mjs --check",
     "refresh:images": "node scripts/refresh-all-readme-images.mjs",
-    "check": "node scripts/check-syntax.mjs && node scripts/check-workflow-actions.mjs"
+    "check": "node scripts/check-syntax.mjs && node scripts/check-workflow-actions.mjs",
+    "test:multiplayer": "node scripts/test-multiplayer.mjs"
   },
   "dependencies": {
+    "peerjs": "1.5.5",
     "posthog-js": "^1.445.1",
     "three": "^0.186.0"
   },
   "devDependencies": {
     "jpeg-js": "^0.4.4",
+    "peer": "1.0.2",
     "three-mesh-bvh": "^0.9.17",
     "vite": "^8.3.4",
     "yaml": "2.8.1"

@@ -215,6 +215,7 @@
       <div class="lobby-tabs" role="tablist" aria-labelledby="lobby-tabs-title">
         <span id="lobby-tabs-title" hidden data-i18n="lobby.title">메인 메뉴</span>
         <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario" data-i18n="lobby.spawn">시나리오</button>
+        <button id="lobby-tab-multiplayer" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-multiplayer" tabindex="-1" data-i18n="mp.title">Multiplayer</button>
         <button id="lobby-tab-settings" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-settings" tabindex="-1" data-i18n="ui.settings.short">설정</button>
         <button id="lobby-tab-dev" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-dev" tabindex="-1" data-i18n="dev.title" hidden>개발자</button>
       </div>
@@ -306,6 +307,24 @@
           </label>
           <span class="lobby-label" data-i18n="lobby.briefingTitle">Dispatch briefing</span>
           <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
+        </section>
+        <section id="lobby-panel-multiplayer" class="lobby-tab-panel" role="tabpanel" aria-labelledby="lobby-tab-multiplayer" tabindex="0" hidden>
+          <p data-i18n="mp.description"></p>
+          <p class="mp-notice" data-i18n="mp.privacy"></p>
+          <fieldset id="mp-connect">
+            <label for="mp-name" data-i18n="mp.name"></label><input id="mp-name" maxlength="12" autocomplete="nickname" value="Pilot">
+            <label for="mp-airport" data-i18n="mp.airport"></label>
+            <select id="mp-airport"><option value="coastal" data-i18n="mp.coastal"></option><option value="incheon" data-i18n="mp.incheon"></option><option value="neon" data-i18n="mp.neon"></option></select>
+            <label for="mp-aircraft" data-i18n="mp.aircraft"></label>
+            <select id="mp-aircraft"><option>C172</option><option>B738</option><option>F16</option></select>
+            <label for="mp-scenario" data-i18n="mp.scenario"></label>
+            <select id="mp-scenario"><option value="cruise" data-i18n="mp.cruise"></option><option value="runway" data-i18n="mp.runway"></option></select>
+            <button id="mp-create" class="btn" type="button" data-i18n="mp.create"></button>
+            <label for="mp-room" data-i18n="mp.invite"></label><input id="mp-room" autocomplete="off" spellcheck="false">
+            <button id="mp-join" class="btn" type="button" data-i18n="mp.join"></button>
+          </fieldset>
+          <div id="mp-invite-row" hidden><label for="mp-invite" data-i18n="mp.share"></label><input id="mp-invite" readonly><button id="mp-copy" class="btn" data-i18n="mp.copy"></button></div>
+          <p id="mp-status" role="status"></p>
         </section>
         <section id="lobby-panel-settings" class="lobby-tab-panel lobby-settings" role="tabpanel" aria-labelledby="lobby-tab-settings" tabindex="0" hidden>
           <label class="dev-enable"><input id="dev-enabled" type="checkbox"><span data-i18n="dev.enable">개발자 모드 (이번 세션)</span></label>
@@ -512,6 +531,20 @@
     </div>
   </div>
 
+  <aside id="mp-controls" data-i18n-aria-label="mp.title" hidden>
+    <span id="mp-roster"></span>
+    <span id="mp-voice-status" role="status"></span>
+    <div class="mp-actions">
+      <button id="mp-start" class="btn" data-i18n="mp.start"></button>
+      <button id="mp-microphone" class="btn" data-i18n="mp.enableMic"></button>
+      <button id="mp-ptt" class="btn" aria-pressed="false" data-i18n="mp.ptt"></button>
+      <button id="mp-listen" class="btn" data-i18n="mp.listen" hidden></button>
+      <button id="mp-mute" class="btn" aria-pressed="false" data-i18n="mp.mute"></button>
+      <button id="mp-respawn" class="btn" data-i18n="mp.respawn"></button>
+      <button id="mp-leave" class="btn" data-i18n="mp.leave"></button>
+    </div>
+  </aside>
+  <audio id="mp-audio" autoplay playsinline></audio>
   <script type="module" src="./src/main.js"></script>
   <aside id="incheon-attribution" hidden>
     <button id="incheon-attribution-chip" type="button" aria-expanded="false" aria-label="Map data attribution">©</button>
