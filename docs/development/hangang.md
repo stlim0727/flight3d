@@ -56,8 +56,8 @@ The scenario uses the common flight HUD and controls. Use **Esc → Scenario
 restart** to restart; after a crash use the common report and
 **Space / R / Enter → main menu → Fly**. Menu selection retains the Han River region.
 
-Leaving the river corridor is not prevented. Skyline buildings have no collision
-proxies (see below); boundary handling is tracked in #393.
+Leaving the river corridor is not prevented. The Seoul landmarks and the Yeouido
+skyline are solid (see below); boundary guidance and the scene edge remain in #393.
 
 ## Physics and geometry contracts
 
@@ -128,10 +128,33 @@ geometry without a collision proxy, such as the gate markers on the pier caps, s
 outside the designated opening; the test checks every rendered triangle, because
 merged meshes span the opening (`tests/hangangScene.test.js`).
 
-The riverbanks use sampled BufferGeometry ribbons and the skyline uses one
-InstancedMesh with 160 buildings. Scenery is cached and reused on retries.
-Buildings outside the river corridor are visual approximations without
-collision proxies; #393 tracks them.
+The riverbanks use sampled BufferGeometry ribbons. Scenery is cached and reused on retries.
+
+### Landmark and skyline collision (#393)
+
+`src/config/hangangLandmarks.js` defines collision proxies for the buildings outside
+the river corridor: the Yeouido group (63 Building, Parc.1, IFC, National Assembly,
+LG Twin Towers and the generic highrises from `yeouidoHighrises()`, which the
+builder draws from the same list), Namsan's hill and N Seoul Tower, Lotte World Tower,
+and the summit strobes (`HANGANG_BEACONS`, drawn by `SeoulLandmarks.js`). Proxies are
+axis-aligned boxes and vertical tapered cylinders/cones, each a conservative envelope
+of the builder's geometry rather than triangle-exact contact. `HangangCollision` tests
+boxes against each aircraft part's padded oriented box (separating axes) and cylinders
+against the part's world AABB at the widest radius over its height span. Each
+landmark's bounds narrow the search first; near Yeouido the cost is a few
+microseconds per frame. Contacts report `structure: 'building'` with the proxy's
+`part`, except Namsan's hill, which is `'hill'` and crashes as terrain.
+
+`tests/hangangLandmarks.test.js` reads the shipped GLBs and checks that every triangle
+lies inside one proxy and that every proxy's bounds are those of the triangles it
+holds, so there are no invisible walls. Rerun it after changing the builder's
+landmark geometry. Like Nodeulseom, collision does not wait for the GLBs:
+`createLandmarkStandIns()` draws the proxies themselves until each GLB loads, and a
+failed load keeps them visible.
+
+Not covered: the expressway tubes along the banks, the night light points (no solid
+geometry) and anything beyond the scenery edge. Detailed per-asset collision and new
+asset work are out of scope here (bridge assets: #267).
 
 ## Provenance and limits
 
@@ -159,7 +182,7 @@ the scenery remains a motif, and LOD is not in scope.
 ## Verification
 
 Node 22.23.2: `npm run check`, `npm test`, `npm run build`.
-Focused coverage: `node --test tests/hangang.test.js tests/hangangScene.test.js`.
+Focused coverage: `node --test tests/hangang.test.js tests/hangangScene.test.js tests/hangangLandmarks.test.js`.
 The full suite passed 798 tests. In this Windows checkout, Incheon JSON fixture
 line endings were restored to the canonical LF bytes matching their manifest
 hashes; CRLF checkout bytes fail the existing checksum test on the base too.

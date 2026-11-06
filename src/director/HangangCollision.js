@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { HANGANG_COURSE, bridgeSolids, hangangHeight } from '../config/hangangCourse.js';
+import { HANGANG_LANDMARKS, shapeBounds } from '../config/hangangLandmarks.js';
 
 // Conservative part envelopes in the C172 model frame. Covers fixed landing gear.
 // These deliberately have a small safety margin; not triangle-exact contact.
@@ -40,13 +41,30 @@ function obbHitsBox(obb, min, max) {
   return true;
 }
 
+// Box `box` overlaps the vertical (tapered) cylinder `shape`, using the widest radius
+// over the box's height span. Conservative for an oriented part: its world AABB is tested.
+function cylinderHitsBox(shape, box) {
+  const y0 = Math.max(box.min.y, shape.y0), y1 = Math.min(box.max.y, shape.y1);
+  if (y0 > y1) return false;
+  const radius = t => shape.r0 + (shape.r1 - shape.r0) * (t - shape.y0) / (shape.y1 - shape.y0);
+  const r = Math.max(radius(y0), radius(y1));
+  const dx = Math.max(box.min.x - shape.x, 0, shape.x - box.max.x), dz = Math.max(box.min.z - shape.z, 0, shape.z - box.max.z);
+  return dx * dx + dz * dz <= r * r;
+}
+
 // Solid contact with the Han River bridges (deck lamps and arches included), Nodeulseom,
-// its pavilion, banks and water.
+// its pavilion, the Seoul landmarks and skyline outside the corridor (#393), banks and water.
 // Free flight: no course, gates or flight envelope are judged here (#391).
 export class HangangCollision {
-  constructor(course = HANGANG_COURSE) {
+  constructor(course = HANGANG_COURSE, landmarks = HANGANG_LANDMARKS) {
     if (course.bridges.some(b => ![b.x, b.z, b.yaw].every(Number.isFinite))) throw new Error('Invalid Hangang course');
     this.course = course;
+    const toBox = ([min, max]) => new THREE.Box3(new THREE.Vector3(...min), new THREE.Vector3(...max));
+    // Each landmark's bounds narrow the search before its shapes are tested.
+    this.landmarks = landmarks.map(l => {
+      const shapes = l.shapes.map(s => ({ ...s, bounds: toBox(shapeBounds(s)) }));
+      return { id: l.id, shapes, bounds: shapes.reduce((b, s) => b.union(s.bounds), new THREE.Box3()) };
+    });
     this.bridges = course.bridges.map(b => {
       const transform = new THREE.Matrix4().compose(new THREE.Vector3(b.x, 0, b.z),
         new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.yaw), new THREE.Vector3(1, 1, 1));
@@ -113,6 +131,18 @@ export class HangangCollision {
     const dz = Math.max(box.min.z - island.z, 0, island.z - box.max.z) / (r * island.zScale);
     return dx * dx + dz * dz <= 1 ? 'island' : null;
   }
+  // The landmark shape that the part touches, as { landmark, shape }, or null. Boxes are
+  // tested against the part's padded oriented box; cylinders against its world AABB `reach`.
+  landmarkHit(obb, reach) {
+    for (const landmark of this.landmarks) {
+      if (!landmark.bounds.intersectsBox(reach)) continue;
+      for (const shape of landmark.shapes) {
+        if (!shape.bounds.intersectsBox(reach)) continue;
+        if (shape.kind === 'box' ? obbHitsBox(obb, shape.bounds.min, shape.bounds.max) : cylinderHitsBox(shape, reach)) return { landmark, shape };
+      }
+    }
+    return null;
+  }
   // Returns the first contact, then keeps it until reset().
   update(position, quaternion) {
     if (this.contact) return this.contact;
@@ -131,9 +161,18 @@ export class HangangCollision {
       this.matrix.compose(this.p, this.q, this.unit);
       for (const part of parts) {
         this.box.copy(part.box).applyMatrix4(this.matrix).expandByScalar(PAD);
-        const structure = this.box.min.y <= c.waterLevel || this.box.min.y <= hangangHeight(this.p.x, this.p.z)
-          ? 'water' : this.nodeulseomHit(this.box, this.obb, this.orient(part, this.matrix));
+        if (this.box.min.y <= c.waterLevel || this.box.min.y <= hangangHeight(this.p.x, this.p.z)) {
+          this.contact = { aircraftPart: part.name, structure: 'water', position: this.p.toArray() }; break;
+        }
+        const reach = this.orient(part, this.matrix), structure = this.nodeulseomHit(this.box, this.obb, reach);
         if (structure) { this.contact = { aircraftPart: part.name, structure, position: this.p.toArray() }; break; }
+        const hit = this.landmarkHit(this.obb, reach);
+        if (hit) {
+          // Namsan's hill is ground; everything else is a building.
+          this.contact = { landmark: hit.landmark.id, aircraftPart: part.name, structure: hit.shape.terrain ? 'hill' : 'building',
+            part: hit.shape.part, position: this.p.toArray() };
+          break;
+        }
       }
       for (let i = 0; i < this.bridges.length && !this.contact; i++) {
         const bridge = this.bridges[i];

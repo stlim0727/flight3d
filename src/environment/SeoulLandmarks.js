@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HANGANG_COURSE, riverCenter, hangangHeight } from '../config/hangangCourse.js';
+import { HANGANG_BEACONS, HANGANG_LANDMARKS } from '../config/hangangLandmarks.js';
 import { createHangangAssetLoader } from './HangangAssetLoader.js';
 import { createNodeulseomStandIns, placeNodeulPavilion } from './nodeulPavilion.js';
 
@@ -32,6 +34,27 @@ export function createLightPointTexture(size = 32) {
   return texture;
 }
 
+// HangangCollision collides with the landmark proxies whether or not their GLBs have
+// loaded, so until one does, its proxies themselves are drawn: one mesh per GLB, keyed
+// by asset id. A failed load keeps the stand-in visible.
+export function createLandmarkStandIns() {
+  const material = new THREE.MeshStandardMaterial({ color: 0x2a3036, roughness: 0.85 });
+  const standIns = new Map();
+  for (const landmark of HANGANG_LANDMARKS) {
+    if (!landmark.asset) continue;
+    const parts = landmark.shapes.map(shape => shape.kind === 'box'
+      ? new THREE.BoxGeometry(...[0, 1, 2].map(i => shape.max[i] - shape.min[i]))
+        .translate(...[0, 1, 2].map(i => (shape.min[i] + shape.max[i]) / 2))
+      : new THREE.CylinderGeometry(shape.r1, shape.r0, shape.y1 - shape.y0, 16)
+        .translate(shape.x, (shape.y0 + shape.y1) / 2, shape.z));
+    const mesh = new THREE.Mesh(mergeGeometries(parts), material);
+    mesh.name = `${landmark.asset} stand-in`;
+    mesh.castShadow = mesh.receiveShadow = true;
+    standIns.set(landmark.asset, mesh);
+  }
+  return standIns;
+}
+
 /**
  * Builds Seoul cityscape scenery using real GLB 3D model assets:
  * - GLB 3D Models: Yeouido landmarks (63 Building, Parc.1, IFC, etc.), N Seoul Tower, Lotte World Tower, Nodeulseom
@@ -47,17 +70,9 @@ export function createSeoulScenery() {
 
   // 1. Aviation Obstruction Strobes at surveyed summit heights
   // (63 Building: 250m, Parc.1: 340m, N Seoul Tower: 480m, Lotte World Tower: 570m)
-  const beaconCoords = [
-    [780, 250, -350],   // 63 Building
-    [910, 340, -120],   // Parc.1 Tower A
-    [975, 258, -60],    // Parc.1 Tower B
-    [1040, 290, -120],  // Three IFC
-    [-1550, 480, -2100], // N Seoul Tower Spire
-    [2200, 570, -6400], // Lotte World Tower Crown
-  ];
-
-  for (const [x, y, z] of beaconCoords) {
-    const beacon = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 4), strobeMat);
+  for (const [x, y, z] of HANGANG_BEACONS.positions) {
+    const size = HANGANG_BEACONS.size;
+    const beacon = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), strobeMat);
     beacon.position.set(x, y, z);
     group.add(beacon);
     strobes.push(beacon);
@@ -162,6 +177,8 @@ export function createSeoulScenery() {
   // Solid obstacles stay visible while their GLBs load and if loading fails.
   const standIns = createNodeulseomStandIns(HANGANG_COURSE.nodeulseom);
   group.add(standIns.island, standIns.pavilion);
+  const landmarkStandIns = createLandmarkStandIns();
+  for (const mesh of landmarkStandIns.values()) group.add(mesh);
   const loaded = model => model && !model.userData.fallback;
 
   const ready = typeof window === 'undefined'
@@ -183,6 +200,8 @@ export function createSeoulScenery() {
         if (pavilion) modelsGroup.add(placeNodeulPavilion(pavilion, HANGANG_COURSE.nodeulseom));
         standIns.island.visible = !loaded(bridges);
         standIns.pavilion.visible = !loaded(pavilion);
+        const assets = { 'yeouido-landmarks': yeouido, 'namsan-tower': namsan, 'lotte-tower': lotte };
+        for (const [asset, mesh] of landmarkStandIns) mesh.visible = !loaded(assets[asset]);
         return true;
       })().catch(err => {
         console.warn('Hangang GLB models load notice:', err);
