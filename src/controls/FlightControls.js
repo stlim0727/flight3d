@@ -32,6 +32,9 @@ export class FlightControls {
     this.touchAileron = 0.0;
     this.touchPitchReturning = false;
     this.touchRollReturning = false;
+    this.keyboardPitchReturning = false;
+    this.keyboardRollReturning = false;
+    this.keyboardAircraftId = null;
     this.touchRudder = 0.0;
     this.touchBrakes = 0.0;
 
@@ -211,7 +214,7 @@ export class FlightControls {
     }
   }
 
-  update(dt, iasKnots = 140) {
+  update(dt, iasKnots = 140, aircraftId = 'B738') {
     if (this.hotas) {
       this.hotas.update(dt);
       // Diagnostic mode reports live axes for the joystick check dialog; the
@@ -266,11 +269,22 @@ export class FlightControls {
       this.throttle = Math.max(0.0, this.throttle - dt * 0.35);
     }
 
+    // F16/C172 manual precision curve: soften the centre without reducing full travel.
+    // HOTAS axes have already had their configurable deadzone applied. Touch/tilt
+    // are shaped upstream; virtual controllers must retain their calibrated inputs.
+    const precisionStick = value => 0.35 * value + 0.65 * value ** 3;
+    const precisionHotas = aircraftId === 'F16' || aircraftId === 'C172';
+    const keyboardReturnEnabled = precisionHotas || aircraftId === 'B738';
+    const sameKeyboardAircraft = this.keyboardAircraftId === aircraftId;
+    this.keyboardAircraftId = aircraftId;
+    const hotasPitch = precisionHotas ? precisionStick(this.hotasElevator) : this.hotasElevator;
+    const hotasRoll = precisionHotas ? precisionStick(this.hotasAileron) : this.hotasAileron;
+
     // 2. Pitch Control (W/S or Down/Up Arrow or Touch or HOTAS)
     // Positive elevator = pitch UP (pulling stick back / KeyS / ArrowDown / Touch Drag Down / HOTAS Stick Back)
     let targetElevator = this.virtualElevator !== null
       ? this.virtualElevator
-      : (this.touchElevator + this.hotasElevator);
+      : (this.touchElevator + hotasPitch);
     if (this.keys['KeyS'] || this.keys['ArrowDown']) {
       targetElevator += 1.0; // Pitch UP
     }
@@ -282,7 +296,7 @@ export class FlightControls {
     // 3. Roll Control (A/D or Left/Right Arrow or Touch or HOTAS)
     let targetAileron = this.virtualAileron !== null
       ? this.virtualAileron
-      : (this.touchAileron + this.hotasAileron);
+      : (this.touchAileron + hotasRoll);
     if (this.keys['KeyD'] || this.keys['ArrowRight']) {
       targetAileron += 1.0; // Bank RIGHT
     }
@@ -336,8 +350,18 @@ export class FlightControls {
         this.keys['KeyD'] || this.keys['ArrowRight'] || this.keys['KeyA'] || this.keys['ArrowLeft']) {
       this.touchRollReturning = false;
     }
-    const elevatorRate = this.touchPitchReturning ? 4.0 : maxElevatorRate;
-    const aileronRate = this.touchRollReturning ? 4.0 : maxAileronRate;
+    const pitchKeyHeld = this.keys.KeyS || this.keys.ArrowDown || this.keys.KeyW || this.keys.ArrowUp;
+    const rollKeyHeld = this.keys.KeyD || this.keys.ArrowRight || this.keys.KeyA || this.keys.ArrowLeft;
+    this.keyboardPitchReturning = Boolean(keyboardReturnEnabled && (pitchKeyHeld ||
+      (sameKeyboardAircraft && this.keyboardPitchReturning && targetElevator === 0 && this.elevator !== 0)));
+    this.keyboardRollReturning = Boolean(keyboardReturnEnabled && (rollKeyHeld ||
+      (sameKeyboardAircraft && this.keyboardRollReturning && targetAileron === 0 && this.aileron !== 0)));
+    const keyboardPitchReturn = this.keyboardPitchReturning && !pitchKeyHeld &&
+      targetElevator === 0 && this.virtualElevator === null && !this.mouseControl;
+    const keyboardRollReturn = this.keyboardRollReturning && !rollKeyHeld &&
+      targetAileron === 0 && this.virtualAileron === null && !this.mouseControl;
+    const elevatorRate = this.touchPitchReturning || keyboardPitchReturn ? 4.0 : maxElevatorRate;
+    const aileronRate = this.touchRollReturning || keyboardRollReturn ? 4.0 : maxAileronRate;
     this.elevator += Math.sign(elevDelta) * Math.min(Math.abs(elevDelta), elevatorRate * dt);
     this.aileron += Math.sign(aileronDelta) * Math.min(Math.abs(aileronDelta), aileronRate * dt);
     if (this.elevator === 0) this.touchPitchReturning = false;

@@ -40,7 +40,7 @@ class PhysicsIntegratorMethods {
     advanceSimulationWind(this, dt);
 
     // 1. Controls processing
-    this.controls.update(dt, this.telemetry.iasKnots);
+    this.controls.update(dt, this.telemetry.iasKnots, this.currentAircraftId);
     this.aero.elevator = this.controls.elevator;
     this.aero.aileron = this.controls.aileron;
     this.aero.rudder = this.controls.rudder;

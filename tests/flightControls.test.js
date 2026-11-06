@@ -455,7 +455,79 @@ describe('Touch release response', () => {
       c.clearVirtualInputs();
       c.mouseControl = false;
       c.update(0.1, 140);
-      assert.ok(Math.abs(c.elevator - 0.89) < 1e-12);
+      assert.ok(Math.abs(c.elevator - (source === 'keyboard' ? 0.545 : 0.89)) < 1e-12);
+    }
+  });
+});
+
+// Manual tuning must survive hold/release, reversal and switching aircraft, while
+// leaving the touch curve and autonomous commands at their original authority.
+describe('Manual precision', () => {
+  function makeControls() {
+    const previous = globalThis.window;
+    globalThis.window = { addEventListener() {} };
+    try {
+      const c = new FlightControls({ addEventListener() {} });
+      c.hotas.update = () => {};
+      return c;
+    } finally { globalThis.window = previous; }
+  }
+
+  it('softens both HOTAS axes symmetrically but preserves full authority and other sources', () => {
+    for (const aircraftId of ['F16', 'C172']) for (const value of [-1, -.5, -.1, 0, .1, .5, 1]) {
+      const c = makeControls();
+      c.hotas.elevator = value;
+      c.hotas.aileron = value;
+      c.update(3, 140, aircraftId);
+      const shaped = .35 * value + .65 * value ** 3;
+      assert.ok(Math.abs(c.elevator - shaped) < 1e-12);
+      assert.ok(Math.abs(c.aileron - shaped) < 1e-12);
+      c.update(3, 140, 'B738');
+      assert.equal(c.elevator, value);
+      assert.equal(c.aileron, value);
+      c.hotas.elevator = c.hotas.aileron = 0;
+      c.setTouchStick(value, value);
+      c.update(3, 140, aircraftId);
+      assert.equal(c.elevator, value);
+      c.setVirtualInput('elevator', value);
+      c.setVirtualInput('aileron', value);
+      c.update(3, 140, aircraftId);
+      assert.equal(c.elevator, value);
+      assert.equal(c.aileron, value);
+    }
+  });
+
+  it('centres released keys within 250ms across speeds and timesteps, then accepts reversal', () => {
+    for (const aircraftId of ['F16', 'C172', 'B738'])
+    for (const hz of [60, 120]) for (const speed of [100, 250, 350]) {
+      const c = makeControls();
+      c.keys.KeyS = c.keys.KeyD = true;
+      for (let i = 0; i < hz; i++) c.update(1 / hz, speed, aircraftId);
+      assert.ok(c.elevator > 0 && c.aileron > 0);
+      c.releaseAllKeys();
+      for (let i = 0; i < hz / 4 + 1; i++) c.update(1 / hz, speed, aircraftId);
+      assert.equal(c.elevator, 0);
+      assert.equal(c.aileron, 0);
+      c.keys.KeyW = c.keys.KeyA = true;
+      c.update(1 / hz, speed, aircraftId);
+      assert.ok(c.elevator < 0 && c.aileron < 0);
+    }
+  });
+
+  it('does not speed up a new HOTAS/virtual command or carry fast return to another aircraft', () => {
+    for (const source of ['hotas', 'virtual', 'aircraft']) {
+      const c = makeControls();
+      c.keys.KeyS = c.keys.KeyD = true;
+      c.update(1, 140, 'F16');
+      c.keys = {};
+      if (source === 'hotas') c.hotas.elevator = c.hotas.aileron = -.5;
+      if (source === 'virtual') {
+        c.setVirtualInput('elevator', 0);
+        c.setVirtualInput('aileron', 0);
+      }
+      c.update(.1, 140, source === 'aircraft' ? 'C172' : 'F16');
+      assert.ok(Math.abs(c.elevator - .495) < 1e-12);
+      assert.ok(Math.abs(c.aileron - .765) < 1e-12);
     }
   });
 });
