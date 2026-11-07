@@ -33,10 +33,11 @@ async function recordScreen(screenshot, meta) {
 
 await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ evaluate, screenshot, send, delay, origin, exceptions }) => {
   // Wait for simulator to be ready
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 120; i++) {
     if (await evaluate('Boolean(window.simulator?.startupReady)')) break;
     await delay(300);
   }
+  assert.ok(await evaluate('Boolean(window.simulator?.startupReady)'), 'Simulator startup readiness');
 
   // 1. Startup & Loading Progress Overlay
   await evaluate(() => {
@@ -234,6 +235,40 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
   });
   await delay(200);
 
+  if (tier === 'all') {
+    // 44. Lobby - Night & Runway Lighting Environment Preset
+    await evaluate(() => {
+      const timeSelect = document.getElementById('lobby-time-select');
+      if (timeSelect) {
+        timeSelect.value = '19.5';
+        timeSelect.dispatchEvent(new Event('change'));
+      }
+      const chip = document.querySelector('.lobby-time-chip[data-hours="19.5"]');
+      if (chip) chip.click();
+    });
+    await delay(400);
+    await recordScreen(screenshot, {
+      id: '43_lobby_environment_night',
+      category: 'lobby',
+      file: '43_lobby_environment_night.png',
+      title_ko: '메인 로비 — 일몰/야간 환경 및 활주로 조명 뷰',
+      title_en: 'Main Lobby — Sunset/Night Environment & Runway Lighting',
+      description_ko: '시간대 빠른 선택(19:30): 석양/황혼 하늘, 활주로 ALS 진입등 및 PAPI 점등, 공항 야간 조명 렌더링',
+      description_en: 'Time of day preset (19:30): dusk sky, illuminated ALS approach lights, PAPI lights, and night airport lighting',
+      selector: '#lobby-panel-scenario',
+      tier: 'full',
+    });
+    await evaluate(() => {
+      const timeSelect = document.getElementById('lobby-time-select');
+      if (timeSelect) {
+        timeSelect.value = 'now';
+        timeSelect.dispatchEvent(new Event('change'));
+      }
+      const chip = document.querySelector('.lobby-time-chip[data-hours="now"]');
+      if (chip) chip.click();
+    });
+  }
+
   await evaluate(async () => {
     await window.simulator.fly();
     window.simulator.cameraSystem.setMode(0, true);
@@ -373,6 +408,89 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
       const stall = document.getElementById('hud-stall');
       if (stall) { stall.classList.remove('active'); stall.style.display = 'none'; }
     });
+
+    // 40. Multiplayer Offscreen Friend Direction Indicator
+    await evaluate(() => {
+      let bounds = document.querySelector('.mp-indicator-bounds');
+      if (!bounds) {
+        bounds = document.createElement('div');
+        bounds.className = 'mp-indicator-bounds';
+        document.body.append(bounds);
+      }
+      bounds.hidden = false;
+      let marker = bounds.querySelector('.mp-edge-marker');
+      if (!marker) {
+        marker = document.createElement('div');
+        marker.className = 'mp-edge-marker';
+        marker.dataset.direction = 'right';
+        const SVG = 'http://www.w3.org/2000/svg';
+        const arrow = document.createElementNS(SVG, 'svg');
+        arrow.setAttribute('viewBox', '0 0 20 20');
+        arrow.setAttribute('aria-hidden', 'true');
+        const path = document.createElementNS(SVG, 'path');
+        path.setAttribute('d', 'M4 3L17 10L4 17L8 10Z');
+        arrow.append(path);
+        const plate = document.createElement('div');
+        plate.className = 'mp-nameplate';
+        const name = document.createElement('span');
+        name.textContent = 'SkyWalker (C172) ';
+        const status = document.createElement('span');
+        status.textContent = '· 1.8 km';
+        plate.append(name, status);
+        marker.append(arrow, plate);
+        bounds.append(marker);
+      }
+      marker.hidden = false;
+      marker.style.top = '140px';
+      marker.style.right = '40px';
+      marker.style.left = 'auto';
+    });
+    await delay(200);
+    await recordScreen(screenshot, {
+      id: '40_multiplayer_friend_direction_indicator',
+      category: 'flight',
+      file: '40_multiplayer_friend_direction_indicator.png',
+      title_ko: '비행 HUD — 멀티플레이어 친구 기체 방향 지시계',
+      title_en: 'In-Flight HUD — Remote Peer Aircraft Edge Indicator',
+      description_ko: '시야 밖 친구 기체 실시간 추적: 화면 가장자리 회전 화살표(SVG), 파일럿 호출부호 명판 및 상대 거리(km) 표시',
+      description_en: 'Offscreen peer aircraft tracking: edge rotating arrow SVG, pilot callsign nameplate, and relative distance (km)',
+      selector: '.mp-edge-marker',
+      tier: 'full',
+    });
+    await evaluate(() => {
+      const bounds = document.querySelector('.mp-indicator-bounds');
+      if (bounds) bounds.hidden = true;
+    });
+
+    // 41. Flight More Panel (Trim & Parking Brake)
+    await evaluate(() => {
+      const moreBtn = document.getElementById('open-flight-more');
+      const morePanel = document.getElementById('flight-more-panel');
+      if (moreBtn && morePanel) {
+        morePanel.hidden = false;
+        moreBtn.setAttribute('aria-expanded', 'true');
+        const trimVal = document.getElementById('flight-trim-value');
+        if (trimVal) trimVal.textContent = '+2.4°';
+      }
+    });
+    await delay(200);
+    await recordScreen(screenshot, {
+      id: '41_flight_hud_more_panel',
+      category: 'flight',
+      file: '41_flight_hud_more_panel.png',
+      title_ko: '비행 HUD — 세부 조종 패널 (트림 및 주차 브레이크)',
+      title_en: 'In-Flight HUD — Flight More Panel (Trim & Parking Brake)',
+      description_ko: 'HUD 우측 상단 더보기(⋯) 패널: 엘리베이터 트림 미세조정(−/+) 및 파킹 브레이크 토글',
+      description_en: 'HUD More (⋯) panel: fine elevator trim adjustment (−/+) and parking brake toggle',
+      selector: '#flight-more-panel',
+      tier: 'full',
+    });
+    await evaluate(() => {
+      const moreBtn = document.getElementById('open-flight-more');
+      const morePanel = document.getElementById('flight-more-panel');
+      if (morePanel) morePanel.hidden = true;
+      if (moreBtn) moreBtn.setAttribute('aria-expanded', 'false');
+    });
   }
 
   // 18. Pause Menu Overlay
@@ -453,6 +571,57 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
       if (mpDialog && mpDialog.open) mpDialog.close();
     });
 
+    // 39. Multiplayer Active Room & Controls
+    await evaluate(() => {
+      const mpDialog = document.getElementById('mp-dialog');
+      if (mpDialog) {
+        document.getElementById('mp-intro').hidden = true;
+        document.getElementById('mp-connect').hidden = true;
+        document.getElementById('mp-waiting').hidden = false;
+        document.getElementById('mp-waiting-status').textContent = '친구 접속 대기 중… (3분 남음)';
+        document.getElementById('mp-keep-waiting').disabled = false;
+        document.getElementById('mp-invite-row').hidden = false;
+        document.getElementById('mp-code').value = 'SKY 738';
+        document.getElementById('mp-invite').value = 'https://stlim0727.github.io/flight3d/?room=SKY738';
+        const details = document.getElementById('mp-link-details');
+        if (details) details.open = true;
+        document.getElementById('mp-status').textContent = '접속 대기 중 · 1/2';
+        document.getElementById('mp-controls').hidden = false;
+        document.getElementById('mp-roster').textContent = 'HL7380 (호스트, B738) + 참가자 대기 중 · 인천 / B738 / 순항';
+        document.getElementById('mp-voice-status').textContent = '음성 대화: 마이크 활성 (말하는 중…)';
+        const mic = document.getElementById('mp-microphone');
+        if (mic) { mic.disabled = false; mic.setAttribute('aria-pressed', 'true'); }
+        const mute = document.getElementById('mp-mute');
+        if (mute) mute.setAttribute('aria-pressed', 'false');
+        const start = document.getElementById('mp-start');
+        if (start) { start.hidden = false; start.disabled = false; start.setAttribute('data-ready', 'true'); }
+        const respawn = document.getElementById('mp-respawn');
+        if (respawn) respawn.disabled = false;
+        if (!mpDialog.open) mpDialog.showModal();
+      }
+    });
+    await delay(300);
+    await recordScreen(screenshot, {
+      id: '39_multiplayer_active_room_controls',
+      category: 'modal',
+      file: '39_multiplayer_active_room_controls.png',
+      title_ko: '멀티플레이어 대화상자 — 활성 룸 및 음성 채팅 제어',
+      title_en: 'Multiplayer Active Room & Voice Chat Controls',
+      description_ko: '멀티플레이어 세션 대기실: 룸 참가 코드/링크 복사, 참가자 로스터(Host/Guest), 마이크/음소거 토글, 엔진음 볼륨 조절',
+      description_en: 'Multiplayer active session: invite code/link share, pilot roster, voice microphone toggle, mute, and engine volume slider',
+      selector: '#mp-dialog',
+      tier: 'full',
+    });
+    await evaluate(() => {
+      const mpDialog = document.getElementById('mp-dialog');
+      if (mpDialog && mpDialog.open) mpDialog.close();
+      document.getElementById('mp-intro').hidden = false;
+      document.getElementById('mp-connect').hidden = false;
+      document.getElementById('mp-waiting').hidden = true;
+      document.getElementById('mp-invite-row').hidden = true;
+      document.getElementById('mp-controls').hidden = true;
+    });
+
     // 22. Joystick Calibration Dialog
     await evaluate(() => { window.simulator.openJoystickCheckDialog(); });
     await delay(300);
@@ -468,6 +637,44 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
       tier: 'full',
     });
     await evaluate(() => { window.simulator.joystickDialog?.close(); });
+
+    // 43. Gyroscope Sensor Permission & Browser Guide Modal
+    await evaluate(() => {
+      if (window.simulator.touchControls) {
+        window.simulator.touchControls.showGyroHelp('gyro.denied');
+      } else {
+        const dialog = document.createElement('dialog');
+        dialog.className = 'gyro-help';
+        dialog.innerHTML = `
+          <h2 id="gyro-help-title">기기 모션(자이로) 센서 설정</h2>
+          <p class="gyro-help-reason" role="status">브라우저에서 모션 센서 접근이 차단되었습니다.</p>
+          <label for="gyro-browser">브라우저 선택</label>
+          <select id="gyro-browser"><option value="chrome" selected>Android Chrome</option></select>
+          <p class="gyro-help-guide">주소창 좌측 설정(자물쇠/조정) 아이콘 ➔ 사이트 설정 ➔ 모션 센서 허용으로 변경 후 새로고침하세요.</p>
+          <div class="gyro-help-actions">
+            <button type="button" class="gyro-retry">다시 시도</button>
+            <button type="button" class="gyro-close">터치 조종 유지</button>
+          </div>`;
+        document.body.appendChild(dialog);
+        dialog.showModal();
+      }
+    });
+    await delay(300);
+    await recordScreen(screenshot, {
+      id: '42_gyro_sensor_permission_modal',
+      category: 'modal',
+      file: '42_gyro_sensor_permission_modal.png',
+      title_ko: '모바일 자이로 센서 활성화 및 브라우저 가이드 모달',
+      title_en: 'Mobile Gyroscope Sensor Permission & Browser Guide Modal',
+      description_ko: '모바일 기기 모션 제어 안내: 모션 센서 권한 요청, 브라우저별(Brave, Chrome, iOS) 설정 가이드 및 캘리브레이션 팁',
+      description_en: 'Mobile motion steering guide: motion permission prompt, per-browser (Brave, Chrome, iOS) instructions, and gyro calibration notes',
+      selector: 'dialog.gyro-help',
+      tier: 'full',
+    });
+    await evaluate(() => {
+      const dlg = document.querySelector('dialog.gyro-help');
+      if (dlg && dlg.open) dlg.close();
+    });
 
     // 23. Feedback Dialog
     await evaluate(() => { window.simulator.openFeedbackDialog(); });

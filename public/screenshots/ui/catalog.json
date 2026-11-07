@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-11-07T06:20:25.753Z",
-  "branch": "feat-ui-screens-ci",
-  "commit": "10b227e967852180ac1deb48ed6568fc15d801a6",
-  "commitShort": "10b227e",
-  "commitDate": "2026-11-07T04:50:52Z",
+  "generatedAt": "2026-11-07T09:22:55.915Z",
+  "branch": "feat/exhaustive-ui-screens",
+  "commit": "519da002e2289757285031815c9f82732a40e26e",
+  "commitShort": "519da00",
+  "commitDate": "2026-11-07T16:54:50+09:00",
   "screens": [
     {
       "id": "01_startup_loading",
@@ -421,6 +421,61 @@
       "description_ko": "AI 자율 비행 코드 에디터, 실시간 경로 오차 SVG 플롯, 관측/로그 모니터",
       "description_en": "Autonomous flight script editor, real-time trajectory deviation SVG plot, and live logger",
       "selector": "#pilot-arena",
+      "tier": "full"
+    },
+    {
+      "id": "39_multiplayer_active_room_controls",
+      "category": "modal",
+      "file": "39_multiplayer_active_room_controls.png",
+      "title_ko": "멀티플레이어 대화상자 — 활성 룸 및 음성 채팅 제어",
+      "title_en": "Multiplayer Active Room & Voice Chat Controls",
+      "description_ko": "멀티플레이어 세션 대기실: 룸 참가 코드/링크 복사, 참가자 로스터(Host/Guest), 마이크/음소거 토글, 엔진음 볼륨 조절",
+      "description_en": "Multiplayer active session: invite code/link share, pilot roster, voice microphone toggle, mute, and engine volume slider",
+      "selector": "#mp-dialog",
+      "tier": "full"
+    },
+    {
+      "id": "40_multiplayer_friend_direction_indicator",
+      "category": "flight",
+      "file": "40_multiplayer_friend_direction_indicator.png",
+      "title_ko": "비행 HUD — 멀티플레이어 친구 기체 방향 지시계",
+      "title_en": "In-Flight HUD — Remote Peer Aircraft Edge Indicator",
+      "description_ko": "시야 밖 친구 기체 실시간 추적: 화면 가장자리 회전 화살표(SVG), 파일럿 호출부호 명판 및 상대 거리(km) 표시",
+      "description_en": "Offscreen peer aircraft tracking: edge rotating arrow SVG, pilot callsign nameplate, and relative distance (km)",
+      "selector": ".mp-edge-marker",
+      "tier": "full"
+    },
+    {
+      "id": "41_flight_hud_more_panel",
+      "category": "flight",
+      "file": "41_flight_hud_more_panel.png",
+      "title_ko": "비행 HUD — 세부 조종 패널 (트림 및 주차 브레이크)",
+      "title_en": "In-Flight HUD — Flight More Panel (Trim & Parking Brake)",
+      "description_ko": "HUD 우측 상단 더보기(⋯) 패널: 엘리베이터 트림 미세조정(−/+) 및 파킹 브레이크 토글",
+      "description_en": "HUD More (⋯) panel: fine elevator trim adjustment (−/+) and parking brake toggle",
+      "selector": "#flight-more-panel",
+      "tier": "full"
+    },
+    {
+      "id": "42_gyro_sensor_permission_modal",
+      "category": "modal",
+      "file": "42_gyro_sensor_permission_modal.png",
+      "title_ko": "모바일 자이로 센서 활성화 및 브라우저 가이드 모달",
+      "title_en": "Mobile Gyroscope Sensor Permission & Browser Guide Modal",
+      "description_ko": "모바일 기기 모션 제어 안내: 모션 센서 권한 요청, 브라우저별(Brave, Chrome, iOS) 설정 가이드 및 캘리브레이션 팁",
+      "description_en": "Mobile motion steering guide: motion permission prompt, per-browser (Brave, Chrome, iOS) instructions, and gyro calibration notes",
+      "selector": "dialog.gyro-help",
+      "tier": "full"
+    },
+    {
+      "id": "43_lobby_environment_night",
+      "category": "lobby",
+      "file": "43_lobby_environment_night.png",
+      "title_ko": "메인 로비 — 일몰/야간 환경 및 활주로 조명 뷰",
+      "title_en": "Main Lobby — Sunset/Night Environment & Runway Lighting",
+      "description_ko": "시간대 빠른 선택(19:30): 석양/황혼 하늘, 활주로 ALS 진입등 및 PAPI 점등, 공항 야간 조명 렌더링",
+      "description_en": "Time of day preset (19:30): dusk sky, illuminated ALS approach lights, PAPI lights, and night airport lighting",
+      "selector": "#lobby-panel-scenario",
       "tier": "full"
     }
   ]

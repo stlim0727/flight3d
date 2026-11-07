@@ -163,6 +163,7 @@ export async function withBrowserSession(options = {}, fn) {
     if (options.path || options.url) {
       const targetUrl = options.url || `${origin}${options.path.startsWith('/') ? '' : '/'}${options.path}`;
       await send('Page.navigate', { url: targetUrl });
+      await send('Page.bringToFront');
     }
 
     return await fn({ origin, cdpPort, gpuAngle, send, evaluate, screenshot, exceptions, consoleMessages, delay });
