@@ -400,6 +400,10 @@ body, html {
   transform: translateY(1px);
 }
 
+/* Native select popups default to a light background; keep option text readable. */
+select.btn { color-scheme: dark; }
+select.btn option { background: #142030; color: #f0f9ff; }
+
 .btn-preset {
   background: rgba(15, 23, 42, 0.85);
   border-left: 3px solid #38bdf8;
