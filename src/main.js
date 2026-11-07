@@ -435,10 +435,51 @@ class FlightSimulator {
     // Start with the flight when autoplay is permitted. Otherwise the browser
     // keeps the context suspended until the first flight/menu interaction.
     const audioHint = document.getElementById('audio-start-hint');
+    const interactionEvents = ['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'];
+    let listenersAttached = false;
+
+    const attachInteractionListeners = () => {
+      if (listenersAttached) return;
+      interactionEvents.forEach(evt => {
+        window.addEventListener(evt, ensureAudio, { passive: true, capture: true });
+      });
+      listenersAttached = true;
+    };
+
+    const detachInteractionListeners = () => {
+      if (!listenersAttached) return;
+      interactionEvents.forEach(evt => {
+        window.removeEventListener(evt, ensureAudio, { capture: true });
+      });
+      listenersAttached = false;
+    };
+
     const syncAudioHint = () => {
       const state = this.audio.ctx?.state;
-      audioHint.hidden = this.audio.isMuted || !['suspended', 'interrupted'].includes(state);
+      const isRunning = state === 'running';
+      if (audioHint) {
+        if (isRunning || this.audio.isMuted) {
+          audioHint.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+          audioHint.style.opacity = '0';
+          audioHint.style.transform = 'translate(-50%, 8px)';
+          setTimeout(() => {
+            if (this.audio.ctx?.state === 'running' || this.audio.isMuted) {
+              audioHint.hidden = true;
+            }
+          }, 250);
+        } else {
+          audioHint.hidden = false;
+          audioHint.style.opacity = '1';
+          audioHint.style.transform = 'translate(-50%, 0)';
+        }
+      }
+      if (isRunning) {
+        detachInteractionListeners();
+      } else if (!this.audio.isMuted && ['suspended', 'interrupted'].includes(state)) {
+        attachInteractionListeners();
+      }
     };
+
     let hintContext;
     const ensureAudio = () => {
       if (!this.audio.isInitialized) {
@@ -452,10 +493,8 @@ class FlightSimulator {
       }
       syncAudioHint();
     };
-    ['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'].forEach(evt => {
-      // Controls may consume the event before it bubbles to window.
-      window.addEventListener(evt, ensureAudio, { passive: true, capture: true });
-    });
+
+    attachInteractionListeners();
     ensureAudio();
 
     // Begin Animation Loop

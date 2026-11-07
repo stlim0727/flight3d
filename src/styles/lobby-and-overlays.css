@@ -44,10 +44,12 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   display: flex;
   flex-direction: column;
   gap: calc(12px * var(--ui-scale, 1));
-  background: rgba(10, 16, 26, 0.82);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  border-radius: calc(12px * var(--ui-scale, 1));
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: calc(14px * var(--ui-scale, 1));
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
   color: #e2e8f0;
   padding: calc(18px * var(--ui-scale, 1)) calc(20px * var(--ui-scale, 1));
 }
@@ -59,13 +61,15 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   width: min(calc(360px * var(--ui-scale, 1)), calc(100vw - max(64px, calc(env(safe-area-inset-left) + 16px)) - 32px));
   padding: calc(20px * var(--ui-scale, 1));
   gap: calc(16px * var(--ui-scale, 1));
-  background: rgba(16, 28, 43, .94);
-  border-color: rgba(148, 163, 184, .18);
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: calc(16px * var(--ui-scale, 1));
-  box-shadow: 0 16px 48px rgba(0, 0, 0, .24);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
   flex-shrink: 0;
 }
-.lobby-card > * { flex-shrink: 0; }
+.lobby-card > :not(.lobby-panels) { flex-shrink: 0; }
 .lobby-header { display: flex; justify-content: space-between; align-items: center; gap: calc(12px * var(--ui-scale, 1)); }
 .btn-card-fold {
   display: inline-flex;
@@ -219,9 +223,11 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   white-space: pre-line;
   color: #a6b5c8;
   border-top: 1px solid rgba(148, 163, 184, .14);
+  font-family: 'JetBrains Mono', 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: calc(11px * var(--ui-scale, 1));
   line-height: 1.65;
   padding-top: calc(12px * var(--ui-scale, 1));
+  letter-spacing: -0.01em;
 }
 .lobby-group { display: flex; flex-direction: column; gap: calc(7px * var(--ui-scale, 1)); min-width: 0; }
 .lobby-label { color: #94a3b8; font-size: calc(10px * var(--ui-scale, 1)); font-weight: 500; letter-spacing: .3px; }
@@ -240,12 +246,27 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   background: rgba(148, 163, 184, .05);
   box-shadow: none;
   transform: none;
-  transition: background-color .15s, border-color .15s, color .15s;
+  transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s;
 }
 .lobby-card .btn:hover { background: rgba(148, 163, 184, .12); color: #e2e8f0; border-color: rgba(148, 163, 184, .35); }
-.lobby-card .btn.active { background: rgba(56, 189, 248, .12); color: #bae6fd; border-color: rgba(56, 189, 248, .45); }
+.lobby-card .btn.active {
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.18) 0%, rgba(15, 23, 42, 0.8) 100%);
+  color: #bae6fd;
+  border-color: #0ea5e9;
+  box-shadow: inset 3px 0 0 #0ea5e9, 0 0 16px rgba(14, 165, 233, 0.25);
+}
 .lobby-card .btn-airport,
-.lobby-card .btn-aircraft { flex: 1; }
+.lobby-card .btn-aircraft {
+  flex: 1;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lobby-card .btn-aircraft.active {
+  border: 1px solid #0ea5e9;
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.22) 0%, rgba(15, 23, 42, 0.85) 100%);
+  box-shadow: inset 3px 0 0 #0ea5e9, 0 0 16px rgba(14, 165, 233, 0.25);
+  color: #e0f2fe;
+}
 .lobby-scenarios .btn-preset { flex: 1 1 100%; text-align: left; }
 .lobby-language .btn { min-height: calc(28px * var(--ui-scale, 1)); padding: calc(4px * var(--ui-scale, 1)) calc(7px * var(--ui-scale, 1)); font-size: calc(10px * var(--ui-scale, 1)); }
 /* Panel content scrolls vertically; the tabs and flight action stay in place. */
@@ -305,19 +326,27 @@ body[data-dev-scenario="true"] #touch-controls-overlay { display: none !importan
   border-color: rgba(56, 189, 248, .28);
 }
 .lobby-card .btn-fly {
-  background: #0284c7;
-  border-color: #38bdf8;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   color: #ffffff;
   font-size: calc(13px * var(--ui-scale, 1));
   font-weight: 700;
+  letter-spacing: 0.03em;
   min-height: calc(44px * var(--ui-scale, 1));
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.45);
+  box-shadow: 0 4px 14px 0 rgba(2, 132, 199, 0.45);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
 }
 .lobby-card .btn-fly:hover {
-  background: #0ea5e9;
-  border-color: #7dd3fc;
+  background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
+  border-color: rgba(255, 255, 255, 0.4);
   color: #fff;
-  box-shadow: 0 0 24px rgba(56, 189, 248, 0.65);
+  box-shadow: 0 6px 22px rgba(2, 132, 199, 0.65);
+  transform: translateY(-1px);
+}
+.lobby-card .btn-fly:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
 }
 .lobby-actions {
   display: flex;
@@ -325,6 +354,11 @@ body[data-dev-scenario="true"] #touch-controls-overlay { display: none !importan
   flex-wrap: wrap;
   padding-top: calc(8px * var(--ui-scale, 1));
   border-top: 1px solid rgba(148, 163, 184, 0.16);
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: inherit;
 }
 .lobby-card .lobby-actions .btn,
 .compact-ui .lobby-card .lobby-actions .btn { flex: 1 1 calc(120px * var(--ui-scale, 1)); min-height: calc(44px * var(--ui-scale, 1)); }

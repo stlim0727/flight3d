@@ -820,7 +820,7 @@ export class TouchFlightControls {
       if (!this.stickActive && !this.throttleActive && !this.rudderActive) {
         this.overlay?.classList.add('touch-faded');
       }
-    }, 3500);
+    }, 1500);
   }
 
   /* ---------------- Visibility & Toggle ---------------- */
