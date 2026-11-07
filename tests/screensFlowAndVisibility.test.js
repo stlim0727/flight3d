@@ -10,8 +10,9 @@ import { TouchFlightControls } from '../src/controls/TouchFlightControls.js';
 test('index.html contains back button in lobby header and 3 canonical pause modal options', () => {
   const html = readFileSync(resolve('index.html'), 'utf8');
 
-  // 1. Lobby setup back button
+  // 1. Lobby setup back button (hidden by default on boot)
   assert.ok(html.includes('id="btn-lobby-back"'), 'lobby header must have btn-lobby-back');
+  assert.ok(/<button[^>]+id="btn-lobby-back"[^>]*hidden/.test(html), 'btn-lobby-back must be hidden on initial boot');
 
   // 2. Pause menu modal options (Resume, Restart, Exit)
   assert.ok(html.includes('id="btn-pause-resume"'), 'pause menu must have btn-pause-resume');
@@ -62,4 +63,17 @@ test('i18n catalogs include translations for new screen flow actions', () => {
   assert.equal(ko['debrief.retrySame'], '같은 조건 즉시 재도전');
   assert.equal(en['debrief.changeConditions'], 'Change Flight Setup');
   assert.equal(ko['debrief.changeConditions'], '비행 조건 변경');
+});
+
+test('Mobile header layout and audio hint snackbar positioning are correctly configured', () => {
+  const lobbyCss = readFileSync(resolve('src/styles/lobby-and-overlays.css'), 'utf8');
+  assert.ok(lobbyCss.includes('.lobby-header-actions'), 'lobby CSS must define .lobby-header-actions');
+  assert.ok(lobbyCss.includes('body[data-flow="lobby"] .menu-toggle'), 'lobby CSS must hide redundant menu toggle during lobby');
+
+  const hudCss = readFileSync(resolve('src/styles/hud-and-modals.css'), 'utf8');
+  assert.ok(hudCss.includes('.audio-start-hint'), 'hud CSS must style .audio-start-hint');
+  assert.ok(hudCss.includes('bottom: max(16px'), 'audio start hint must be placed at bottom snackbar to avoid covering cards');
+
+  const lobbyJs = readFileSync(resolve('src/ui/LobbyScreen.js'), 'utf8');
+  assert.ok(lobbyJs.includes('updateBackButton'), 'LobbyScreen must manage back button visibility via updateBackButton');
 });

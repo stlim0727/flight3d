@@ -864,14 +864,12 @@ class FlightSimulator {
     const isMenu = this.gameFlow.state === FLOW.LOBBY || this.gameFlow.state === FLOW.PAUSED;
     const canResume = this.gameFlow.canResumeFromLobby() || this.gameFlow.state === FLOW.PAUSED;
 
-    // In lobby: keep toggle in main menu header beside the title.
     // In flight / paused: keep toggle in the HUD top bar.
+    // In lobby: hide toggle because lobby card has its own back/resume controls.
     if (this.gameFlow.state === FLOW.LOBBY) {
-      const titleRow = document.querySelector('.lobby-title-row');
-      if (titleRow && btn.parentElement !== titleRow) {
-        titleRow.prepend(btn);
-      }
+      btn.hidden = true;
     } else {
+      btn.hidden = false;
       const topBar = document.querySelector('.hud-top-bar');
       if (topBar && btn.parentElement !== topBar) {
         topBar.prepend(btn);

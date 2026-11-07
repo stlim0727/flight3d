@@ -34,6 +34,13 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const lobbyUnfoldBtn = document.getElementById('btn-lobby-unfold');
   const lobbyBackBtn = document.getElementById('btn-lobby-back');
 
+  function updateBackButton() {
+    if (!lobbyBackBtn) return;
+    const scenarioTab = document.getElementById('lobby-tab-scenario');
+    const isScenarioActive = scenarioTab?.getAttribute('aria-selected') === 'true';
+    lobbyBackBtn.hidden = isScenarioActive && !canResume();
+  }
+
   function setLobbyFolded(folded) {
     const isFolded = Boolean(folded);
     lobbyScreen?.classList.toggle('is-folded', isFolded);
@@ -108,6 +115,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
     }
     document.querySelector('.lobby-panels').scrollTop = 0;
+    updateBackButton();
     if (focus) selected.focus();
   }
   for (const tab of tabs) {
@@ -299,6 +307,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (flyLabel) bindText(flyLabel, () => t(getPreset() === 'demo' ? 'lobby.startDemo' : 'lobby.startNew'));
     const resume = document.getElementById('btn-lobby-resume');
     if (resume) resume.hidden = !canResume();
+    updateBackButton();
     const end = document.getElementById('btn-lobby-end');
     if (end) end.hidden = !canEnd();
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {

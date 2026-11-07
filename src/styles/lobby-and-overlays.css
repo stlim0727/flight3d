@@ -145,7 +145,13 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 .pause-unfold-pill:hover {
   transform: translateX(-50%) translateY(-1px) scale(1.02);
 }
-.lobby-title-row { display: flex; align-items: center; gap: calc(10px * var(--ui-scale, 1)); min-width: 0; }
+.lobby-header-actions {
+  display: flex;
+  align-items: center;
+  gap: calc(8px * var(--ui-scale, 1));
+  flex-shrink: 0;
+  margin-left: auto;
+}
 .lobby-back-btn {
   flex: 0 0 auto;
   display: inline-flex;
@@ -177,9 +183,35 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   font-weight: 600;
   line-height: 1;
 }
-.lobby-title-wrap { min-width: 0; }
-.lobby-title { color: #e2e8f0; font-size: calc(18px * var(--ui-scale, 1)); font-weight: 600; letter-spacing: -.4px; margin: 0; }
-.lobby-title > span { display: block; color: #94a3b8; font-size: calc(11px * var(--ui-scale, 1)); font-weight: 400; letter-spacing: 0; margin-top: calc(4px * var(--ui-scale, 1)); }
+.lobby-back-btn[hidden] {
+  display: none !important;
+}
+.lobby-title-wrap {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.lobby-title {
+  color: #e2e8f0;
+  font-size: calc(18px * var(--ui-scale, 1));
+  font-weight: 600;
+  letter-spacing: -.4px;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lobby-title > span {
+  display: block;
+  color: #94a3b8;
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 400;
+  letter-spacing: 0;
+  margin-top: calc(4px * var(--ui-scale, 1));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .lobby-language { display: flex; flex-direction: column; gap: calc(4px * var(--ui-scale, 1)); }
 .lobby-language > .lobby-label { font-size: calc(9px * var(--ui-scale, 1)); }
 .lobby-loading { color: #fbbf24; font-size: calc(11px * var(--ui-scale, 1)); line-height: 1.5; margin: 0; }
@@ -287,7 +319,13 @@ body[data-dev-scenario="true"] #touch-controls-overlay { display: none !importan
   color: #fff;
   box-shadow: 0 0 24px rgba(56, 189, 248, 0.65);
 }
-.lobby-actions { display: flex; gap: calc(8px * var(--ui-scale, 1)); flex-wrap: wrap; }
+.lobby-actions {
+  display: flex;
+  gap: calc(8px * var(--ui-scale, 1));
+  flex-wrap: wrap;
+  padding-top: calc(8px * var(--ui-scale, 1));
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
 .lobby-card .lobby-actions .btn,
 .compact-ui .lobby-card .lobby-actions .btn { flex: 1 1 calc(120px * var(--ui-scale, 1)); min-height: calc(44px * var(--ui-scale, 1)); }
 .lobby-card .lobby-actions .btn[hidden] { display: none; }
@@ -438,33 +476,9 @@ body.booting .menu-toggle { display: none !important; }
   display: inline;
   font-size: 11px;
 }
-.lobby-card .menu-toggle {
-  position: static;
-  flex: 0 0 auto;
-  width: calc(38px * var(--ui-scale, 1));
-  height: calc(38px * var(--ui-scale, 1));
-  min-width: calc(38px * var(--ui-scale, 1));
-  padding: 0;
-  border-radius: calc(8px * var(--ui-scale, 1));
-  background: rgba(148, 163, 184, .12);
-  border: 1px solid rgba(148, 163, 184, .28);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #edf5ff;
-}
-.lobby-card .menu-toggle:hover {
-  background: rgba(148, 163, 184, .22);
-  border-color: #38bdf8;
-}
-.lobby-card .menu-toggle .menu-toggle-title {
+/* With the strip hidden in the menu, keep its close affordance off the card. */
+body[data-flow="lobby"] .menu-toggle {
   display: none !important;
-}
-/* When the menu toggle is outside the card (e.g. fallback or flight), place it at safe screen edge. */
-body[data-flow="lobby"] > .menu-toggle,
-body[data-flow="lobby"] #hud-overlay .menu-toggle {
-  top: var(--edge-top);
-  left: var(--edge-left);
 }
 .menu-toggle:hover { background: rgba(30, 41, 59, 0.85); border-color: #38bdf8; }
 .menu-toggle:focus-visible { outline: 2px solid #67e8f9; }
@@ -534,22 +548,49 @@ body[data-flow="lobby"] #hud-overlay .menu-toggle {
   background: linear-gradient(0deg, rgba(6, 10, 18, .8), rgba(6, 10, 18, 0) 100%);
 }
 .compact-ui .lobby-card {
-  margin: calc(var(--edge-top) + 8px) auto calc(var(--edge-bottom) + 8px);
-  max-height: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 16px);
-  height: min(720px, calc(100dvh - var(--edge-top) - var(--edge-bottom) - 16px));
-  width: min(360px, calc(100% - var(--edge-left) - var(--edge-right) - 16px));
-  padding: 16px;
+  margin: max(16px, calc(var(--edge-top) + 12px)) auto max(16px, calc(var(--edge-bottom) + 12px));
+  max-height: calc(100dvh - max(32px, calc(var(--edge-top) + var(--edge-bottom) + 24px)));
+  height: min(720px, calc(100dvh - max(32px, calc(var(--edge-top) + var(--edge-bottom) + 24px))));
+  width: min(420px, calc(100vw - 32px));
+  padding: 16px 18px;
   gap: 12px;
 }
 .compact-ui .lobby-card .btn { min-height: 44px; }
-.compact-ui .lobby-card .menu-toggle {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  padding: 0;
+.compact-ui .lobby-card .lobby-header { gap: 8px; }
+.compact-ui .lobby-header-actions { gap: 6px; }
+.compact-ui .lobby-language {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
 }
-.compact-ui .lobby-card .lobby-title-row {
-  gap: 8px;
+.compact-ui .lobby-language > .lobby-label {
+  display: none !important;
+}
+.compact-ui .lobby-language .lobby-buttons {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.compact-ui .lobby-language .btn {
+  min-height: 28px;
+  padding: 3px 6px;
+  font-size: 10px;
+}
+.compact-ui .btn-card-fold {
+  min-height: 28px;
+  padding: 3px 7px;
+  font-size: 11px;
+}
+.compact-ui .lobby-back-btn {
+  min-height: 30px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.compact-ui .lobby-card .lobby-title {
+  font-size: 16px;
+}
+.compact-ui .lobby-card .lobby-title > span {
+  font-size: 10px;
 }
 
 @media (max-height: 500px) and (min-width: 541px) {

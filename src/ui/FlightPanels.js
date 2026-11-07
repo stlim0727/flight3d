@@ -68,7 +68,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   hudFold.addEventListener('click', () => setHudFolded(true));
   hudUnfold.addEventListener('click', () => setHudFolded(false));
   const menu = document.getElementById('menu-toggle');
-  if (menu && !document.querySelector('.lobby-title-row')) topBar.append(menu);
+  if (menu) topBar.append(menu);
   topBar.append(strip, topActions);
   hud.prepend(topBar);
 
