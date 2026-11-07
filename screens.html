@@ -34,11 +34,16 @@
     header {
       background: var(--bg-surface);
       border-bottom: 1px solid var(--border-subtle);
-      padding: 24px 32px;
+      padding: 16px 32px;
       position: sticky;
       top: 0;
       z-index: 100;
       backdrop-filter: blur(12px);
+      transition: padding 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+    }
+    header.is-collapsed {
+      padding: 8px 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
     }
     .header-top {
       display: flex;
@@ -72,13 +77,73 @@
       background: var(--bg-card-hover);
       border-color: var(--accent);
     }
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .fold-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: var(--text-main);
+      font-weight: 500;
+      font-size: 0.88rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      user-select: none;
+    }
+    .fold-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .fold-btn-icon {
+      font-size: 0.72rem;
+      display: inline-block;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    header.is-collapsed .fold-btn-icon {
+      transform: rotate(180deg);
+    }
+    .collapsed-filter-pill {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--accent);
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .collapsed-filter-pill:hover {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: var(--accent);
+    }
+    header.is-collapsed .collapsed-filter-pill.is-active {
+      display: inline-flex;
+    }
     h1 {
-      font-size: 1.5rem;
+      font-size: 1.45rem;
       font-weight: 700;
       color: #fff;
       display: flex;
       align-items: center;
       gap: 10px;
+      transition: font-size 0.2s ease;
+    }
+    header.is-collapsed h1 {
+      font-size: 1.15rem;
     }
     .count-badge {
       font-size: 0.8rem;
@@ -90,12 +155,25 @@
     }
     .controls-bar {
       max-width: 1600px;
-      margin: 20px auto 0;
+      margin: 14px auto 0;
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
       align-items: center;
       justify-content: space-between;
+      max-height: 200px;
+      opacity: 1;
+      overflow: hidden;
+      transition: max-height 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease, margin 0.25s ease;
+    }
+    header.is-collapsed .controls-bar {
+      max-height: 0;
+      opacity: 0;
+      margin-top: 0;
+      pointer-events: none;
+    }
+    header.is-collapsed .top-build-info {
+      display: none;
     }
     .filter-pills {
       display: flex;
@@ -444,15 +522,56 @@
       color: var(--text-main);
       font-weight: 600;
     }
+
+    @media (max-width: 900px) {
+      header.is-collapsed .header-top {
+        flex-wrap: nowrap;
+      }
+      header.is-collapsed .header-meta .back-link {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      header {
+        padding: 12px 16px;
+      }
+      header.is-collapsed {
+        padding: 8px 12px;
+      }
+      .header-top {
+        gap: 10px;
+      }
+      h1 {
+        font-size: 1.15rem;
+      }
+      .back-link, .fold-btn {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+      }
+      .search-box {
+        min-width: 100%;
+      }
+      main {
+        padding: 16px;
+      }
+      .screen-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+    }
   </style>
 </head>
 <body>
-  <header>
+  <header id="gallery-header">
     <div class="header-top">
       <div class="header-title-wrap">
         <a class="back-link" href="./">← Flight3d</a>
         <div class="header-titles">
-          <h1>UI Screens Showcase <span class="count-badge" id="screen-count">38 Screens</span></h1>
+          <h1>
+            UI Screens Showcase <span class="count-badge" id="screen-count">38 Screens</span>
+            <button class="collapsed-filter-pill" id="collapsed-filter-pill" title="클릭하여 필터 및 검색 바 펼치기"></button>
+          </h1>
           <div class="build-info-bar top-build-info" id="top-build-info">
             <span class="meta-item"><span class="meta-dot"></span><span id="top-timestamp" title="Generated timestamp">Updated -</span></span>
             <span class="meta-sep">·</span>
@@ -463,10 +582,14 @@
         </div>
       </div>
       <div class="header-meta">
+        <button id="header-fold-btn" class="fold-btn" aria-expanded="true" aria-controls="controls-bar" title="상단 필터 및 검색 바 접기/펼치기 (단축키: F)">
+          <span class="fold-btn-icon" aria-hidden="true">▲</span>
+          <span class="fold-btn-text" id="fold-btn-text">접기</span>
+        </button>
         <a class="back-link" href="./flights.html">Flight URL Selector ↗</a>
       </div>
     </div>
-    <div class="controls-bar">
+    <div class="controls-bar" id="controls-bar">
       <div class="filter-pills" id="category-filters">
         <button class="filter-pill active" data-category="all">전체 (All)</button>
         <button class="filter-pill" data-category="lobby">로비 & 설정 (Lobby)</button>
@@ -613,6 +736,67 @@
     const searchInput = document.getElementById('search-input');
     const filterPills = document.querySelectorAll('.filter-pill');
     const screenCount = document.getElementById('screen-count');
+    const header = document.getElementById('gallery-header');
+    const foldBtn = document.getElementById('header-fold-btn');
+    const foldBtnText = document.getElementById('fold-btn-text');
+    const collapsedFilterPill = document.getElementById('collapsed-filter-pill');
+    const FOLD_STORAGE_KEY = 'flight3d_screens_header_collapsed';
+
+    function updateCollapsedFilterPill() {
+      if (!collapsedFilterPill) return;
+      const activePill = document.querySelector('.filter-pill.active');
+      const activeCat = activePill?.dataset.category || 'all';
+      const activeCatLabel = activePill ? activePill.textContent.split(' ')[0] : '전체';
+      const query = searchInput ? searchInput.value.trim() : '';
+
+      if (activeCat !== 'all' || query) {
+        const parts = [];
+        if (activeCat !== 'all') parts.push(activeCatLabel);
+        if (query) parts.push(`"${query}"`);
+        collapsedFilterPill.textContent = `⚡ ${parts.join(' · ')} (${filteredScreens.length}) ▼`;
+        collapsedFilterPill.classList.add('is-active');
+      } else {
+        collapsedFilterPill.textContent = '';
+        collapsedFilterPill.classList.remove('is-active');
+      }
+    }
+
+    function setHeaderCollapsed(collapsed) {
+      if (!header || !foldBtn) return;
+      if (collapsed) {
+        header.classList.add('is-collapsed');
+        foldBtn.setAttribute('aria-expanded', 'false');
+        if (foldBtnText) foldBtnText.textContent = '필터 펼치기';
+        foldBtn.title = '상단 필터 및 검색 바 펼치기 (단축키: F)';
+        updateCollapsedFilterPill();
+      } else {
+        header.classList.remove('is-collapsed');
+        foldBtn.setAttribute('aria-expanded', 'true');
+        if (foldBtnText) foldBtnText.textContent = '접기';
+        foldBtn.title = '상단 필터 및 검색 바 접기 (단축키: F)';
+      }
+      try {
+        localStorage.setItem(FOLD_STORAGE_KEY, collapsed ? 'true' : 'false');
+      } catch {}
+    }
+
+    function toggleHeaderFold() {
+      if (!header) return;
+      setHeaderCollapsed(!header.classList.contains('is-collapsed'));
+    }
+
+    if (foldBtn) {
+      foldBtn.addEventListener('click', toggleHeaderFold);
+    }
+    if (collapsedFilterPill) {
+      collapsedFilterPill.addEventListener('click', () => setHeaderCollapsed(false));
+    }
+
+    try {
+      if (localStorage.getItem(FOLD_STORAGE_KEY) === 'true') {
+        setHeaderCollapsed(true);
+      }
+    } catch {}
 
     const lightbox = document.getElementById('lightbox');
     const lightboxImg = document.getElementById('lightbox-img');
@@ -666,6 +850,7 @@
       });
 
       screenCount.textContent = `${filteredScreens.length} / ${allScreens.length} Screens`;
+      updateCollapsedFilterPill();
       renderGrid();
     }
 
@@ -755,10 +940,17 @@
     lightboxNext.addEventListener('click', () => navLightbox(1));
 
     window.addEventListener('keydown', e => {
-      if (!lightbox.classList.contains('active')) return;
-      if (e.key === 'Escape') closeLightbox();
-      else if (e.key === 'ArrowLeft') navLightbox(-1);
-      else if (e.key === 'ArrowRight') navLightbox(1);
+      if (lightbox.classList.contains('active')) {
+        if (e.key === 'Escape') closeLightbox();
+        else if (e.key === 'ArrowLeft') navLightbox(-1);
+        else if (e.key === 'ArrowRight') navLightbox(1);
+        return;
+      }
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        toggleHeaderFold();
+      }
     });
 
     function getFallbackCatalog() {
