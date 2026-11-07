@@ -249,7 +249,7 @@
     "title_en": "User Feedback & Bug Report Modal",
     "description_ko": "비행 피드백/버그 제보: 실시간 기체 상태, 텔레메트리, 브라우저 스펙 JSON 자동 첨부",
     "description_en": "User feedback and bug report modal with auto-collected flight state telemetry JSON",
-    "selector": "#feedback-dialog",
+    "selector": "#feedback-dialog-overlay",
     "tier": "full"
   },
   {

@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { withBrowserSession } from './lib/browserHarness.mjs';
@@ -24,7 +25,7 @@ async function recordScreen(screenshot, meta) {
   console.log(`✓ [${meta.id}] ${meta.title_ko} (${meta.file})`);
 }
 
-await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ evaluate, screenshot, send, delay, origin }) => {
+await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ evaluate, screenshot, send, delay, origin, exceptions }) => {
   // Wait for simulator to be ready
   for (let i = 0; i < 60; i++) {
     if (await evaluate('Boolean(window.simulator?.startupReady)')) break;
@@ -227,8 +228,19 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
   });
   await delay(200);
 
-  await evaluate(() => { window.simulator.fly(); });
-  await delay(1200);
+  await evaluate(async () => {
+    await window.simulator.fly();
+    window.simulator.cameraSystem.setMode(0, true);
+  });
+  for (let i = 0; i < 60; i++) {
+    const ready = await evaluate(() => Boolean(
+      window.simulator?.aircraft?.cockpit?.gltfCockpitLoaded &&
+      window.simulator?.cameraSystem?.mode === 0
+    ));
+    if (ready) break;
+    await delay(200);
+  }
+  await delay(400);
 
   // 11. In-Flight Cockpit View
   await evaluate(() => { window.simulator.controls.onSelectCamera(0); });
@@ -460,11 +472,11 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
       title_en: 'User Feedback & Bug Report Modal',
       description_ko: '비행 피드백/버그 제보: 실시간 기체 상태, 텔레메트리, 브라우저 스펙 JSON 자동 첨부',
       description_en: 'User feedback and bug report modal with auto-collected flight state telemetry JSON',
-      selector: '#feedback-dialog',
+      selector: '#feedback-dialog-overlay',
       tier: 'full',
     });
     await evaluate(() => {
-      const fb = document.getElementById('feedback-dialog');
+      const fb = document.getElementById('feedback-dialog-overlay');
       if (fb) fb.hidden = true;
     });
 
@@ -571,6 +583,7 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
   // 28. Debrief Overlay - Summary Tab
   await evaluate(() => {
     const mockReport = {
+      sufficient: true,
       metadata: { airport: 'coastal', aircraft: 'B738', scenario: 'rwy' },
       durationSec: 184.2,
       reason: 'manual',
@@ -602,6 +615,7 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
     // 29. Debrief - Touchdown Evaluation
     await evaluate(() => {
       const mockLandingReport = {
+        sufficient: true,
         metadata: { airport: 'coastal', aircraft: 'B738', scenario: 'app' },
         durationSec: 120.0,
         reason: 'landed',
@@ -660,6 +674,7 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
     // 32. Debrief - Crash Investigation
     await evaluate(() => {
       const mockCrashReport = {
+        sufficient: true,
         metadata: { airport: 'lukla', aircraft: 'B738', scenario: 'rwy' },
         durationSec: 42.5,
         reason: 'crash',
@@ -686,8 +701,13 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
     });
   }
 
-  // Hide debrief
-  await evaluate(() => { document.getElementById('debrief-overlay').classList.remove('visible'); });
+  // Hide debrief and return flow to flight
+  await evaluate(() => {
+    window.simulator.gameFlow.enterFlight();
+    window.simulator.syncFlowUi();
+    const debrief = document.getElementById('debrief-overlay');
+    if (debrief) debrief.classList.remove('visible');
+  });
 
   // 33. Replay Controls Panel
   await evaluate(() => {
@@ -830,11 +850,13 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
       tier: 'full',
     });
   }
+
+  assert.equal(exceptions.length, 0, `Uncaught browser exceptions: ${exceptions.join('; ')}`);
 });
 
 if (tier === 'all') {
   // 38. AI Pilot Lab Arena Panel (?pilotArena=1)
-  await withBrowserSession({ width: 1920, height: 1080, path: '/?pilotArena=1&airport=valley&aircraft=F16' }, async ({ evaluate, screenshot, delay }) => {
+  await withBrowserSession({ width: 1920, height: 1080, path: '/?pilotArena=1&airport=valley&aircraft=F16' }, async ({ evaluate, screenshot, delay, exceptions }) => {
     for (let i = 0; i < 60; i++) {
       if (await evaluate('Boolean(window.simulator?.startupReady)')) break;
       await delay(300);
@@ -858,6 +880,8 @@ if (tier === 'all') {
       selector: '#pilot-arena',
       tier: 'full',
     });
+
+    assert.equal(exceptions.length, 0, `Uncaught browser exceptions in pilot arena: ${exceptions.join('; ')}`);
   });
 }
 
