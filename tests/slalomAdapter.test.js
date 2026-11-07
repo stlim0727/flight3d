@@ -206,22 +206,31 @@ test('starting a mission repairs the selected cached F16 and replaces the inheri
   assert.equal(sim.cameraSystem.userLookOverridden, false);
 });
 
-test('runner preparation rearms both recorders after a completed valley attempt', async () => {
+test('coordinated mission starts arm each recording once and preserve prepared seed on retry', async () => {
   const { PilotMissionAdapter } = await import('../src/arena/PilotMissionAdapter.js');
   const { ReplayRecorder } = await import('../src/core/ReplayRecorder.js');
   const { FlightRecorder } = await import('../src/core/FlightRecorder.js');
   const { SimulatorClass } = await import('./helpers/simulatorClass.js');
+  const { createSimulatorScenarioStart } = await import('../src/core/simulatorScenarioStart.js');
+  const { GameFlowController } = await import('../src/ui/GameFlowController.js');
   const sim = createSlalomSimulation(1);
+  let recordingStarts = 0;
   Object.assign(sim, {
-    gameFlow: { state: 'flight' }, sky: { timeOfDay: 12 }, lobby: {}, lastPresetType: 'valley',
+    devRunner: { stop() {} }, shadowDemo: { stop() {} }, replayDirector: { stop() {} },
+    demoDirector: { userTimeOfDayOverridden: true, stop() {} },
+    gameFlow: new GameFlowController(), sky: { timeOfDay: 12 },
+    lobby: { airport: 'valley', aircraft: 'F16', preset: 'valley' }, lastPresetType: 'valley',
     flightRecorder: new FlightRecorder(), replayRecorder: new ReplayRecorder(),
-    beginFlightRecording: SimulatorClass.prototype.beginFlightRecording,
+    beginFlightRecording() { recordingStarts++; SimulatorClass.prototype.beginFlightRecording.call(this); },
     updateFlightRecording: SimulatorClass.prototype.updateFlightRecording,
   });
   const adapter = new PilotMissionAdapter(sim);
+  sim.startValleyMission = ({ pilotKind }) => adapter.prepare({ missionId: 'valley-slalom-v1', seed: 1, pilotKind });
+  const start = createSimulatorScenarioStart(sim);
   let previous;
   for (let attempt = 0; attempt < 2; attempt++) {
-    await adapter.prepare({ missionId: 'valley-slalom-v1', seed: 1 });
+    await start.start();
+    assert.equal(recordingStarts, attempt + 1);
     assert.equal(sim.replayRecorder.active, true);
     assert.equal(sim.flightRecorder.active, true);
     assert.equal(sim.replayRecorder.elapsed, 0);

@@ -35,12 +35,21 @@ export function createSimulatorFlightStart(sim, stage) {
         }
       },
     },
-    recover(error) {
-      sim.gameFlow.returnToLobby(false);
-      sim.gameFlow.setCinematicAvailable(false);
-      sim.syncFlowUi();
-      console.warn('Flight start failed:', error);
-      sim.showToast(() => t('startup.failed'));
-    },
+    recover: error => recoverSimulatorFlightStart(sim, error),
   });
+}
+
+/** Shared failure recovery for coordinated starts and the pause mission retry. */
+export function recoverSimulatorFlightStart(sim, error) {
+  sim.pilotArena?.stop('start-failed');
+  if (sim.flightRecorder) sim.flightRecorder.active = false;
+  if (sim.replayRecorder) sim.replayRecorder.active = false;
+  sim.crashDebriefRemaining = null;
+  sim.debriefReport = null;
+  sim.debriefReplay = null;
+  sim.gameFlow.returnToLobby(false);
+  sim.gameFlow.setCinematicAvailable(false);
+  sim.syncFlowUi();
+  console.warn('Flight start failed:', error);
+  sim.showToast(() => t('startup.failed'));
 }

@@ -67,6 +67,11 @@ await withBrowserSession({}, async b => {
   assert.equal(started.crashed, false);
   assert.equal(started.debris, 0);
 
+  await b.evaluate(() => {
+    window.syntheticMissionClicks = 0;
+    document.querySelector('#pilot-arena [data-run]').addEventListener('click', () => { window.syntheticMissionClicks++; });
+  });
+
   // Real crash -> menu -> fresh mission, including the active runner's cleanup.
   await b.evaluate(async () => {
     sim.pilotArena.stop('verification');
@@ -102,6 +107,42 @@ await withBrowserSession({}, async b => {
   assert.equal(cached.explosions, 1);
   assert.equal(cached.mode, 8);
   await b.screenshot(`${artifacts}/cached-f16-hud.png`);
+  // Reject real runner preparation, rather than a scene swap, and verify that
+  // failure reaches the outer transaction without persisting or publishing it.
+  const missionFailure = await b.evaluate(async () => {
+    sim.pilotArena.stop('verification');
+    sim.gameFlow.returnToLobby(true);
+    const saved = () => Object.fromEntries(['flight3d.airport', 'flight3d.aircraft',
+      'flight3d.scenario', 'flight3d.preferences.v1'].map(key => [key, localStorage.getItem(key)]));
+    const before = saved();
+    const adapter = sim.pilotArena.adapter;
+    const prepare = adapter.prepare;
+    const analytics = sim.analytics;
+    let starts = 0;
+    sim.analytics = { trackFlightStart() { starts++; } };
+    adapter.prepare = async () => { throw Error('verification: course unavailable'); };
+    try { await sim.fly(); }
+    finally { adapter.prepare = prepare; sim.analytics = analytics; }
+    return { before, after: saved(), starts, status: sim.pilotArena.record.status,
+      starting: sim.startingFlight, busy: sim.flightStartCoordinator.busy,
+      frozen: sim.gameFlow.isPhysicsFrozen(), resume: sim.gameFlow.canResumeFromLobby(),
+      flightRecording: sim.flightRecorder.active, replayRecording: sim.replayRecorder.active,
+      debrief: sim.debriefReport, syntheticClicks: window.syntheticMissionClicks };
+  });
+  assert.deepEqual(missionFailure.after, missionFailure.before);
+  assert.equal(missionFailure.starts, 0);
+  assert.equal(missionFailure.status, 'failed');
+  assert.equal(missionFailure.starting, false);
+  assert.equal(missionFailure.busy, false);
+  assert.equal(missionFailure.frozen, true);
+  assert.equal(missionFailure.resume, false);
+  assert.equal(missionFailure.flightRecording, false);
+  assert.equal(missionFailure.replayRecording, false);
+  assert.equal(missionFailure.debrief, null);
+  assert.equal(missionFailure.syntheticClicks, 0, 'programmatic starts must not click panel controls');
+  await b.evaluate(async () => { await sim.fly(); });
+  await waitFor('sim.pilotArena?.record?.status === "running"', 'mission retry after preparation failure');
+
   // Exercise the extracted coordinator's real scene-swap and ordinary paths.
   const transitions = await b.evaluate(async () => {
     sim.pilotArena.stop('verification');
@@ -128,6 +169,21 @@ await withBrowserSession({}, async b => {
   assert.equal(transitions.busy, false);
   assert.equal(transitions.crashed, false);
 
+  const demo = await b.evaluate(async () => {
+    let recordingStarts = 0;
+    const begin = sim.beginFlightRecording;
+    sim.beginFlightRecording = function(...args) { recordingStarts++; return begin.apply(this, args); };
+    try {
+      sim.lobby.preset = 'demo';
+      await sim.fly();
+      const result = { active: sim.demoDirector.isActive, recordingStarts,
+        recording: sim.flightRecorder.active, starting: sim.startingFlight };
+      sim.gameFlow.pause();
+      return result;
+    } finally { sim.beginFlightRecording = begin; }
+  });
+  assert.deepEqual(demo, { active: true, recordingStarts: 1, recording: true, starting: false });
+
   // A scene failure must release UI/physics ownership without exposing Resume or Ready.
   const failed = await b.evaluate(async () => {
     sim.gameFlow.returnToLobby(true);
@@ -144,7 +200,7 @@ await withBrowserSession({}, async b => {
   });
   assert.deepEqual(failed, { starting: false, applying: false, busy: false,
     frozen: true, resume: false, flow: 'lobby', overlayHidden: true, progress: 1 });
-  const report = { gpu, loading, started, retry, cached, transitions, failed, exceptions: b.exceptions };
+  const report = { gpu, loading, started, retry, cached, missionFailure, transitions, demo, failed, exceptions: b.exceptions };
   await writeFile(`${artifacts}/report.json`, `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   assert.deepEqual(b.exceptions, []);

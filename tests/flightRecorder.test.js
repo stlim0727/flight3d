@@ -245,7 +245,7 @@ test('retry restores the completed sortie instead of applying staged menu choice
   assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
 });
 
-test('a repeated valley start arms recording before synchronous course preparation', async () => {
+test('a repeated valley start preserves mission-owned recording and its prepared seed', async () => {
   const sim = Object.assign(Object.create(SimulatorClass.prototype), recorders(), {
     gameFlow: new GameFlowController(),
     lobby: { preset: 'valley', airport: 'valley', aircraft: 'F16' },
@@ -253,6 +253,8 @@ test('a repeated valley start arms recording before synchronous course preparati
     devRunner: { stop() {} }, shadowDemo: { stop() {} }, replayDirector: { stop() {} },
     demoDirector: { userTimeOfDayOverridden: true },
     startValleyMission() {
+      // PilotMissionAdapter owns recording before SlalomMissionAdapter prepares.
+      this.beginFlightRecording();
       this.activeAirport = 'generated-valley';
       this.replayRecorder.start({ ...this.replayRecorder.metadata, airport: 'valley', scenario: 'valley', seed: 42 });
     },

@@ -1,3 +1,4 @@
+import { recoverSimulatorFlightStart } from '../core/simulatorFlightStart.js';
 import { t, bindText } from '../i18n/index.js';
 import { SHADOW_VIEWS } from '../director/CockpitShadowDemo.js';
 import { prepareCockpitShadowDepth } from '../aircraft/CockpitDepth.js';
@@ -578,7 +579,8 @@ class SimulatorHudAndBindingsMethods {
       if (this.devRunner.active) { this.devRunner.restart(); return; }
       if (this.lastPresetType === 'valley') {
         this.clearCrashState?.();
-        this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' });
+        this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' })
+          .catch(error => recoverSimulatorFlightStart(this, error));
         return;
       }
       this.setPreset(this.lastPresetType || 'runway');
