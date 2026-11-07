@@ -59,7 +59,8 @@ export class PeerRoom {
       this.session.tick();
     }, 100);
   }
-  get waiting() { return this.host && this.registered && !this.closed && ['connecting', 'connected'].includes(this.session.state); }
+  // Only until a friend is admitted: a joined room never expires while waiting for Start.
+  get waiting() { return this.host && this.registered && !this.closed && this.session.state === 'connecting'; }
   get waitingSeconds() { return this.waiting ? Math.ceil(this.waitingLease.remaining / 1000) : null; }
   checkWaiting() {
     if (this.closed) return false;

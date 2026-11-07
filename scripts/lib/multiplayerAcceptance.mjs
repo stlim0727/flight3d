@@ -102,6 +102,7 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   await host.evaluate('document.getElementById("mp-keep-waiting").click()');
   await host.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await join(`${invite.code.slice(0, 3).toLowerCase()}-${invite.code.slice(3).toLowerCase()}`);
+  assert.equal(await host.evaluate('!sim.multiplayer.room.waiting && document.getElementById("mp-waiting").hidden'), true, 'friend admission stops the waiting countdown');
   await start();
   const hp = await host.evaluate('sim.position.toArray()'), gp = await guest.evaluate('sim.position.toArray()');
   assert.ok(Math.hypot(...hp.map((n, i) => n - gp[i])) > 70, 'non-overlapping runway slots');
@@ -158,20 +159,20 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
     const next = await create(...config); await join(next.code); await start(); await leave();
   }
 
-  // A real thirty-second deadline: renew halfway, survive the original deadline,
-  // then miss the next press. Connected guests and later arrivals see cancellation.
-  const cancelled = await create(); await join(cancelled.code);
-  await delay(15200); await host.evaluate('document.getElementById("mp-keep-waiting").click()');
-  await delay(15200);
+  // A real sixty-second deadline before anyone joins: renew halfway, survive the
+  // original deadline, then miss the next press. Later arrivals see cancellation.
+  const cancelled = await create();
+  await delay(30200); await host.evaluate('document.getElementById("mp-keep-waiting").click()');
+  await delay(30200);
   assert.equal(await host.evaluate('sim.multiplayer.active'), true, 'creator renewal survives original deadline');
-  await until(() => host.evaluate('sim.multiplayer.room.closed && sim.multiplayer.message === "cancelled"'), 'thirty-second missed press cancellation', 17000);
-  await until(() => guest.evaluate('!sim.multiplayer.active && sim.multiplayer.message === "cancelled"'), 'connected guest notified');
+  await until(() => host.evaluate('sim.multiplayer.room.closed && sim.multiplayer.message === "cancelled"'), 'sixty-second missed press cancellation', 32000);
   assert.equal(await host.evaluate('sim.multiplayer.room.keepWaiting()'), false);
+  await guest.evaluate('document.getElementById("mp-choose-join").click()');
   await guest.evaluate(`document.getElementById('mp-room').value=${JSON.stringify(cancelled.code)}; document.getElementById('mp-join').click()`);
   await until(() => guest.evaluate('sim.multiplayer.message === "cancelled" && sim.multiplayer.room.closed'), 'late join explicitly cancelled');
   assert.equal(await guest.evaluate('document.getElementById("mp-dialog").matches(":modal")'), true);
   assert.equal(await guest.evaluate('document.getElementById("mp-status").textContent.length > 0'), true);
   await capture(guest, 'cancelled-invite');
   for (const c of browsers) assert.deepEqual(c.errors, [], 'browser exceptions');
-  console.log('PASS hardware Chrome: compact/manual and automatic URL invites, modal focus/physics/input isolation, continuous voice/mute, remote drawing/movement/reset/restart, three scenery/aircraft types, phone modal, creator renewal and real 30s expiry, connected/late guest cancellation. Evidence: review-artifacts/multiplayer/');
+  console.log('PASS hardware Chrome: compact/manual and automatic URL invites, modal focus/physics/input isolation, continuous voice/mute, remote drawing/movement/reset/restart, three scenery/aircraft types, phone modal, creator renewal and real 60s expiry, admission ending the countdown, late guest cancellation. Evidence: review-artifacts/multiplayer/');
 }

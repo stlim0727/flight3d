@@ -16,9 +16,10 @@ Unavailable storage must not block room creation or joining.
   `crypto.getRandomValues`. URLs use `?r=CODE`; manual entry accepts lowercase,
   spaces and hyphens. PeerJS IDs are namespaced separately from display codes.
   Protocol v2 uses these codes; old v1 UUID invites are not accepted.
-- After signaling registration, the creator has thirty seconds to explicitly renew
-  the waiting deadline. The deadline covers connecting/connected lobby states,
-  stops when preparation starts, and never renews from heartbeats, copying a link,
+- After signaling registration, the creator has sixty seconds to explicitly renew
+  the waiting deadline. The deadline covers only the connecting state, stops once
+  the friend's hello admits them (connected lobby, preparation and flight never
+  expire), and never renews from heartbeats, copying a link,
   receiving data or other activity. Expiry is checked before admission, media
   acceptance, renewal and start, not only by the 100ms timer. An expired room
   cannot be revived. A renewal does not require the friend to press anything.
@@ -86,7 +87,7 @@ No query-string signaling overrides or production test hooks.
    reordered snapshots, interpolation, timeout/disconnect/restart, and voice
    permission/cleanup lifecycle with injected adapters. Controller regressions cover
    restored solo availability, intentional pause retention and preparation holds.
-   WaitingLease tests exact thirty-second expiry, renewal and non-revival; modal tests
+   WaitingLease tests exact sixty-second expiry, renewal and non-revival; modal tests
    cover pause ownership, shared starts and explicit cancel handling.
 2. `npm run test:multiplayer`: real Chromium WebRTC between independent pages,
    local PeerServer, no public network or mic hardware: host/guest handshake,

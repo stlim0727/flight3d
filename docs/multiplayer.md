@@ -7,16 +7,16 @@
    runway/cruise start, then choose
    **Create room · max 2**. Share the six-character code (for example `K7M 2QX`)
    or use **Copy invite** for a compact link ending in `?r=K7M2QX`.
-3. While waiting to start, the creator must press **Keep room open** before the
-   thirty-second countdown ends. Each press grants another thirty seconds. Missing a
-   press cancels the room; it cannot be revived by pressing late.
+3. While waiting for a friend to join, the creator must press **Keep room open**
+   before the sixty-second countdown ends. Each press grants another sixty seconds.
+   Missing a press cancels the room; it cannot be revived by pressing late. The
+   countdown stops once the friend joins.
 4. Opening the shared invite link automatically joins your friend's room and
    opens its dialog; no typing, pasting, or Join button is needed. With a code,
    enter it under **Join a friend** and choose **Join friend**. The host's stage
    and aircraft apply to both pilots. Spaces, hyphens,
    and lowercase letters are accepted. The creator chooses **Start together**;
-   both dialogs close when the shared flight is ready. The waiting deadline no
-   longer applies after starting preparation or during flight.
+   both dialogs close when the shared flight is ready.
 5. Open **Room** to change voice settings, reset or restart, or leave. Your plane
    stays held while this dialog is open; the other pilot may continue flying.
    Closing it resumes only the pause introduced by the dialog. A pause you set
