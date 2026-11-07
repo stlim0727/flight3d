@@ -1,11 +1,11 @@
 # Fresh scenario starts
 
 A new flight must not integrate the outgoing flight's pose before the new
-scenario installs its position, terrain and aircraft. `startFlight()` owns
+scenario installs its position, terrain and aircraft. `FlightStartCoordinator` owns
 `startingFlight` across `spawnFlight()`, including the first lazy import of
-`PilotArenaPanel`. `applyPendingScene()` awaits that start and keeps its outer
-hold through the final loading-card paint. Ordinary preset spawning still runs
-inside the initial click task. `stepPhysics()` rejects pending-start ticks.
+`PilotArenaPanel`. `applyPendingScene()` delegates a rebuild transaction that
+keeps its hold through scene preparation, spawning, the final loading-card paint
+and cleanup. Ordinary preset spawning still runs inside the initial click task. `stepPhysics()` rejects pending-start ticks.
 
 The scene-swap-only hold from #487 did not cover a lazy mission import after
 `startFlight()` entered FLIGHT. Clearing damage after that import cannot undo
@@ -32,3 +32,11 @@ selects the F16 before clearing them. A new slalom mission selects HUD through
   Follow [GPU setup](browser-gpu.md); this script defaults to the user-owned
   hardware Chrome wrapper and requires Vulkan. The explosion counter checks
   sound dispatch, not subjective listening quality.
+
+For the broader ownership inventory, confirmed lifecycle fixes and staged SOLID
+refactoring recommendations, see [state lifecycle review](state-lifecycle-review.md).
+
+The coordinator is directly importable without browser startup. Its narrow ports
+separate lifecycle policy from `FlightStartLoadingView` presentation and the
+`simulatorFlightStart` composition adapter. The `busy` guard covers both direct
+starts and rebuilds; competing entry points cannot release the active hold.

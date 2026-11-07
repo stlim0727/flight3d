@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Vector3, Quaternion, Scene, Box3, Euler, Matrix4 } from 'three';
 import { HangangCollision } from '../src/director/HangangCollision.js';
+import { SimulatorClass } from './helpers/simulatorClass.js';
 import { HangangScenario } from '../src/director/HangangScenario.js';
 import { HANGANG_COURSE as course, bridgeApproaches, riverCenter } from '../src/config/hangangCourse.js';
 import { lobbyBriefing } from '../src/ui/lobbyBriefing.js';
@@ -271,5 +272,24 @@ test('HangangScenario crashes only on contact and restarts collision on start', 
     assert.equal(crashes.length, 1); assert.equal(crashes[0].type, 'WATER');
     hs.update(0.05); assert.equal(crashes.length, 1);
     sim.isCrashed = false; hs.start(); assert.equal(hs.collision.contact, null);
+  });
+});
+
+
+test('temporary Hangang time preserves automatic and explicit user-time ownership', () => {
+  for (const overridden of [false, true]) withSim(sim => {
+    sim.demoDirector = { userTimeOfDayOverridden: overridden,
+      onUserTimeOfDayChange() { this.userTimeOfDayOverridden = true; } };
+    sim.camera = {};
+    sim.sky.setTimeOfDay = hours => { sim.sky.timeOfDay = hours; };
+    sim.foliage.setTimeOfDay = sim.water.syncWithAtmosphere = sim.showTimeOfDayNotice = () => {};
+    sim.setTimeOfDay = SimulatorClass.prototype.setTimeOfDay;
+    const scenario = new HangangScenario(sim);
+    scenario.start();
+    assert.equal(sim.sky.timeOfDay, 18.25);
+    assert.equal(sim.demoDirector.userTimeOfDayOverridden, overridden);
+    scenario.stop();
+    assert.equal(sim.sky.timeOfDay, 12);
+    assert.equal(sim.demoDirector.userTimeOfDayOverridden, overridden);
   });
 });
