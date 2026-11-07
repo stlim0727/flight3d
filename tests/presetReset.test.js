@@ -36,3 +36,21 @@ test('valley preset sets safe aloft coordinates and zero velocity', () => {
   assert.equal(sim.linearVelocity.length(), 0);
   assert.equal(sim.gear.gearState, 0);
 });
+
+test('preset reset and clearCrashState reset telemetry pilot physiology state', () => {
+  const sim = createPilotMissionSimulation({ aircraftId: 'F16' });
+  sim.telemetry.pilot = {
+    isGLOC: true,
+    consciousness: 0.0,
+    blackout: 1.0,
+    gZ: 8.0,
+  };
+  sim.clearCrashState();
+  assert.equal(sim.telemetry.pilot.isGLOC, false);
+  assert.equal(sim.telemetry.pilot.consciousness, 1.0);
+
+  sim.telemetry.pilot = { isGLOC: true, consciousness: 0.0 };
+  sim.setPreset('runway');
+  assert.equal(sim.telemetry.pilot.isGLOC, false);
+  assert.equal(sim.telemetry.pilot.consciousness, 1.0);
+});

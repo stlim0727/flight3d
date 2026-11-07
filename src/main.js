@@ -371,7 +371,11 @@ class FlightSimulator {
       demoActive: false,
       x: 0,
       z: 0,
-      parkBrake: false
+      parkBrake: false,
+      pilot: {
+        gZ: 1.0, consciousness: 1.0, responsiveness: 1.0, isGLOC: false,
+        blackout: 0, redout: 0, tunnelVision: 0, grayout: 0, blur: 0, glocIncidents: 0, gFatigueSeconds: 0
+      }
     };
 
     // Autopilot (pure control laws in src/physics/Autopilot.js). The trim

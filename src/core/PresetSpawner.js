@@ -53,6 +53,12 @@ class PresetSpawnerMethods {
     this.flightWarnings?.reset();
     this.pilotPhysiology?.reset?.();
     this.pilotPhysiologyFx?.reset?.();
+    if (this.telemetry) {
+      this.telemetry.pilot = this.pilotPhysiology ? this.pilotPhysiology.getSnapshot() : {
+        gZ: 1.0, consciousness: 1.0, responsiveness: 1.0, isGLOC: false,
+        blackout: 0, redout: 0, tunnelVision: 0, grayout: 0, blur: 0, glocIncidents: 0, gFatigueSeconds: 0
+      };
+    }
     this.telemetry.warnings = [];
     if (!isDemoInternal) this.loadAircraftConfig(this.currentAircraftConfig || BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {
