@@ -46,6 +46,7 @@ class PresetSpawnerMethods {
     // pick (e.g. cliff at coastal) falls back instead of leaving a stale pose.
     if (!isScenarioAvailable(this.activeAirport, type)) type = defaultScenarioForRegion(this.activeAirport);
     this.shadowDemo?.stop();
+    this.replayDirector?.stop();
     this.lastPresetType = type;
     if (type === 'hangang' && this.currentAircraftId !== 'C172') this.setAircraft('C172');
     this.audio?.reset();

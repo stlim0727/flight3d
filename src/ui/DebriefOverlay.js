@@ -30,8 +30,10 @@ export function reportText(report) {
   ].join('\n');
 }
 
+export const SAVE_REPLAY_STATUS = Object.freeze({ tooShort: 'replay.tooShort', tooLong: 'replay.tooLong' });
+
 export class DebriefOverlay {
-  constructor({ onRetry, onLobby, onFeedback }) {
+  constructor({ onRetry, onLobby, onFeedback, onSaveReplay, onWatchReplay }) {
     this.root = document.getElementById('debrief-overlay');
     this.root.innerHTML = `
       <div class="debrief-card">
@@ -78,11 +80,13 @@ export class DebriefOverlay {
             <button class="btn debrief-primary" id="debrief-copy" data-i18n="debrief.copy"></button>
             <button class="btn" id="debrief-export" data-i18n="debrief.export"></button>
             <button class="btn" id="debrief-native-share" data-i18n="debrief.shareReport" hidden></button>
+            <button class="btn" id="debrief-save-replay" data-i18n="debrief.saveReplay" hidden></button>
             <p class="debrief-caption" data-i18n="debrief.shareHint"></p>
             <p id="debrief-status" role="status" aria-live="polite"></p>
             <button class="btn" data-debrief-tab="summary" data-i18n="debrief.back"></button>
           </section>
           <div class="debrief-actions">
+            <button class="btn" id="debrief-watch-replay" data-i18n="replay.watch" hidden></button>
             <button class="btn debrief-primary" id="debrief-retry" data-i18n="debrief.retry"></button>
             <button class="btn" id="debrief-feedback" data-i18n="debrief.feedback"></button>
           </div>
@@ -112,9 +116,23 @@ export class DebriefOverlay {
         Math.abs(sample.timeSec - time) < Math.abs(samples[best].timeSec - time) ? i : best, 0);
       this.inspect(index);
     });
+    this.el('watch-replay').addEventListener('click', async () => {
+      this.el('watch-replay').disabled = true;
+      if (!await onWatchReplay?.()) { this.selectTab('share'); this.status('replay.loadFailed'); }
+      this.el('watch-replay').disabled = false;
+    });
     this.el('retry').addEventListener('click', onRetry);
     this.el('lobby').addEventListener('click', onLobby);
     this.el('feedback').addEventListener('click', () => onFeedback?.());
+    this.el('save-replay').addEventListener('click', () => {
+      if (this.replaySaved) return;
+      const { ok, error } = onSaveReplay?.() ?? { ok: false };
+      if (!ok) { this.status(SAVE_REPLAY_STATUS[error] ?? 'replay.saveFailed'); return; }
+      // One save per sortie: a second click would only duplicate the row.
+      this.replaySaved = true;
+      this.el('save-replay').disabled = true;
+      this.status('replay.saved');
+    });
     this.el('copy').addEventListener('click', () => this.copy());
     this.el('native-share').hidden = typeof navigator.share !== 'function';
     this.el('native-share').addEventListener('click', async () => {
@@ -189,8 +207,10 @@ export class DebriefOverlay {
     this.root.querySelector('.debrief-panels').scrollTop = 0;
   }
 
-  show(report) {
+  show(report, replay = null) {
     this.report = report;
+    this.replay = replay;
+    this.replaySaved = false;
     const enough = report.sufficient;
     const crash = report.crash;
     // A crash headline names the collision; short records keep their own headline, so the block names it.
@@ -221,6 +241,10 @@ export class DebriefOverlay {
     this.el('insufficient').hidden = enough;
     this.el('view-record').hidden = !enough;
     for (const id of ['copy', 'export', 'native-share']) this.el(id).disabled = !enough;
+    // A track the recorder refused to build leaves nothing to keep, so the offer disappears.
+    this.el('watch-replay').hidden = !replay;
+    this.el('save-replay').hidden = !replay;
+    this.el('save-replay').disabled = false;
     bindText(this.el('preview'), () => enough ? reportText(report) : t('debrief.insufficient'));
     this.status(null);
     this.drawChart();

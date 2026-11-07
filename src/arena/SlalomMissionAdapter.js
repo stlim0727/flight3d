@@ -27,7 +27,7 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     const resolvedMissionId = 'valley-slalom-v1';
     const sim = this.sim;
     sim.demoDirector?.stop(); sim.devRunner?.stop({ pilotPreparation: true });
-    sim.shadowDemo?.stop(); sim.hangang?.stop();
+    sim.shadowDemo?.stop(); sim.replayDirector?.stop(); sim.hangang?.stop();
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
 
     if (typeof sim.setAircraft === 'function') {
@@ -166,10 +166,22 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     this.visualizer = new ValleyWaypointsVisualizer(sim, this.manifest.course);
     sim.valleyVisualizer = this.visualizer;
 
+    if (sim.replayRecorder?.active) {
+      // Preparation is asynchronous; capture the actual course seed before its first tick.
+      sim.replayRecorder.start({ ...sim.replayRecorder.metadata, airport: 'valley',
+        aircraft: 'F16', scenario: 'valley', seed });
+    }
     return { manifest: this.manifest, initialSnapshot: this.snapshot(0) };
   }
 
   release() {
+    const recorder = this.sim.replayRecorder;
+    // Keep the mission's final pose before releasing its terrain. A newly armed retry
+    // has no prepared seed yet and must not be finished by the previous adapter.
+    if (recorder?.active && Number.isSafeInteger(this.manifest?.environmentSeed)
+      && recorder.metadata.seed === this.manifest.environmentSeed) {
+      this.sim.debriefReplay = recorder.finish();
+    }
     this.visualizer?.dispose();
     this.visualizer = null;
     this.generatedTerrain?.dispose(this.sim);

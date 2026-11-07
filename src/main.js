@@ -5,6 +5,7 @@ import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
 import { cockpitCasterState } from './aircraft/CockpitLighting.js';
 import { CockpitShadowDemo } from './director/CockpitShadowDemo.js';
+import { ReplayDirector } from './director/ReplayDirector.js';
 import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
 import { Atmosphere } from './physics/Atmosphere.js';
 import { AIRCRAFT_REGISTRY, BOEING_737_800 } from './config/aircraftConfigs.js';
@@ -50,6 +51,8 @@ import { initFlightPanels } from './ui/FlightPanels.js';
 import { initUiScale } from './ui/UiScale.js';
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
 import { FlightRecorder } from './core/FlightRecorder.js';
+import { ReplayRecorder } from './core/ReplayRecorder.js';
+import { ReplayStore } from './replay/ReplayStore.js';
 import { LOBBY_AIRCRAFT_IDS } from './ui/LobbyScreen.js';
 import { DeveloperModeController } from './dev/DeveloperModeController.js';
 import { DevScenarioRunner } from './dev/DevScenarioRunner.js';
@@ -276,6 +279,9 @@ class FlightSimulator {
     this.demoDirector = new DemoFlightDirector(this);
     this.voiceChallengeOverlay = new VoiceChallengeOverlay({ sim: this });
     this.shadowDemo = new CockpitShadowDemo(this, () => this.updateShadowDemoUi());
+    this.replayDirector = new ReplayDirector(this);
+    // First claim wins the frame, so the developer shadow rig keeps priority over a replay.
+    this.poseDrivers = [this.shadowDemo, this.replayDirector];
     this.developerMode = new DeveloperModeController(() => {
       this.devRunner?.stop(); this.renderDiagnosticsPanel?.close();
     });
@@ -289,6 +295,10 @@ class FlightSimulator {
       onStateChange: () => this.syncFlowUi(),
     });
     this.flightRecorder = new FlightRecorder();
+    // Pose track for replay; the telemetry recorder above only feeds the debrief chart.
+    this.replayRecorder = new ReplayRecorder();
+    this.replayStore = new ReplayStore();
+    this.debriefReplay = null;
     this.lobby = { airport: savedSelection.airport, preset: savedSelection.scenario, aircraft: savedSelection.aircraft, pilotMode: 'human' };
     this.currentAircraftId = savedSelection.aircraft;
     this.lastPresetType = savedSelection.scenario;
@@ -573,6 +583,7 @@ class FlightSimulator {
   async fly() {
     if (this.multiplayer?.locked) return;
     if (this.airportLoading || this.startingFlight) return;
+    this.replayDirector.stop();
     const pending = {
       airport: this.lobby.airport,
       aircraft: this.lobby.aircraft ?? this.currentAircraftId,
@@ -661,6 +672,7 @@ class FlightSimulator {
   async spawnFlight({ keepTimeOfDay = false } = {}) {
     this.devRunner.stop();
     this.shadowDemo.stop();
+    this.replayDirector.stop();
     const wantsDemo = this.lobby.preset === 'demo';
     const wantsValley = this.lobby.preset === 'valley';
     if (this.demoDirector?.isActive || this.demoDirector?.waitingForTerrain) {
@@ -677,11 +689,13 @@ class FlightSimulator {
     if (wantsDemo) {
       this.demoDirector.start();
     } else if (wantsValley) {
+      this.lastPresetType = 'valley';
+      this.beginFlightRecording();
       await this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' });
     } else {
       this.setPreset(this.lobby.preset);
     }
-    this.beginFlightRecording();
+    if (!wantsValley) this.beginFlightRecording();
     this.analytics?.trackFlightStart?.({
       airport: this.activeAirport,
       aircraft: this.currentAircraftId,
@@ -732,6 +746,7 @@ class FlightSimulator {
    * - In PAUSED: resumes flight.
    */
   toggleMainMenu() {
+    if (this.replayDirector.active) { this.replayPanel.exit(); return; }
     if (this.gameFlow.state === FLOW.DEBRIEF) return;
     if (this.gameFlow.state === FLOW.FLIGHT) {
       this.gameFlow.returnToLobby(true);
@@ -750,17 +765,24 @@ class FlightSimulator {
   beginFlightRecording() {
     this.crashDebriefRemaining = null;
     this.debriefReport = null;
-    this.flightRecorder?.start({ airport: this.activeAirport, aircraft: this.currentAircraftId,
+    this.debriefReplay = null;
+    const sortie = { airport: this.activeAirport, aircraft: this.currentAircraftId,
       scenario: this.demoDirector?.isActive ? 'demo' : this.lastPresetType,
-      demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay });
+      demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay };
+    this.flightRecorder?.start(sortie);
+    this.replayRecorder?.start(sortie);
   }
 
-  updateFlightRecording(dt) {
+  updateFlightRecording(dt, { missionOwned = false } = {}) {
     if (this.gameFlow.state !== FLOW.FLIGHT || !this.flightRecorder.active || this.devRunner?.active) return;
     this.flightRecorder.update(dt, this.telemetry);
+    this.replayRecorder.update(dt, this.telemetry, this.quaternion);
+    // The mission runner owns scoring and its completion UI. Only observe its ticks.
+    if (missionOwned) return;
     if (this.isCrashed) {
       // Freeze the sortie at impact, while the exterior crash scene keeps running.
       this.debriefReport = this.flightRecorder.finish('crash', this.crashResult);
+      this.debriefReplay = this.replayRecorder.finish();
       this.crashDebriefRemaining = 3;
     }
     else if (this.flightRecorder.stopped >= 3) this.endFlight('landed');
@@ -784,6 +806,7 @@ class FlightSimulator {
     this.crashDebriefRemaining = null;
     this.debriefReport = this.isCrashed ? this.flightRecorder.finish('crash', this.crashResult)
       : this.flightRecorder.finish(reason);
+    this.debriefReplay = this.replayRecorder.finish();
     this.analytics?.trackFlightEnd?.({
       airport: this.activeAirport,
       aircraft: this.currentAircraftId,
@@ -792,7 +815,14 @@ class FlightSimulator {
       durationSeconds: this.flightRecorder?.elapsedSeconds,
     });
     this.gameFlow.endFlight();
-    this.debriefOverlay.show(this.debriefReport);
+    this.debriefOverlay.show(this.debriefReport, this.debriefReplay);
+  }
+
+  /** Persists the finished sortie's pose track. Returns the store's error token for the debrief to show. */
+  saveDebriefReplay() {
+    if (!this.debriefReplay) return { ok: false, error: 'tooShort' };
+    const { entry, error } = this.replayStore.save(this.debriefReplay);
+    return { ok: Boolean(entry), error: error ?? null };
   }
 
   openFeedbackDialog() {
@@ -1129,15 +1159,17 @@ class FlightSimulator {
     const elapsed = this.clock.getDelta();
     if (this.browserBackgrounded) return;
     const frameDelta = this.startupReady ? clampFrameDelta(elapsed) : 0;
+    this.replayPanel?.refresh();
     this.totalSimTime += frameDelta;
     if (!this.gameFlow.isPhysicsFrozen()) this.devRunner.updatePreparation(frameDelta);
     this.devPanelTimer = (this.devPanelTimer || 0) + frameDelta;
     if (this.devPanelTimer >= .2) { this.developerPanel?.refresh(); this.devPanelTimer = 0; }
 
     // High-rate substepping for rock-solid flight physics
-    if (this.shadowDemo.active) {
+    const poseDriver = this.activePoseDriver();
+    if (poseDriver) {
       this.physicsAccumulator = 0;
-      if (!this.gameFlow.isPhysicsFrozen()) this.shadowDemo.update(frameDelta);
+      if (!this.gameFlow.isPhysicsFrozen()) poseDriver.update(frameDelta);
     } else if (this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
       this.physicsAccumulator = 0;
     } else {

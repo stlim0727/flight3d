@@ -41,6 +41,7 @@ export default {
   'debrief.shareReport': 'Share report',
   'debrief.report': 'Flight report',
   'debrief.copy': 'Copy report',
+  'debrief.saveReplay': 'Save replay',
   'debrief.export': 'Export log (.json)',
   'debrief.shareHint': 'The report includes aircraft, scenario, flight statistics and any collision.',
   'debrief.copied': 'Report copied.',

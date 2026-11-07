@@ -41,6 +41,7 @@ export class SimulatorMissionAdapter {
     sim.demoDirector?.stop();
     sim.devRunner?.stop({ pilotPreparation: true });
     sim.shadowDemo?.stop();
+    sim.replayDirector?.stop();
     sim.hangang?.stop();
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
     await sim.setAirport('coastal', true);
@@ -245,6 +246,7 @@ export class SimulatorMissionAdapter {
     // A pointer drag or UI callback cannot steal a held throttle target.
     if (!this.human) this.apply(this.command);
     this.sim.integratePhysics(this.sim.physicsDt);
+    this.sim.updateFlightRecording?.(this.sim.physicsDt, { missionOwned: true });
     this.syncPose();
   }
 

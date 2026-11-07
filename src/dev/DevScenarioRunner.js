@@ -25,6 +25,7 @@ export class DevScenarioRunner {
     const sim = this.sim;
     sim.demoDirector.stop();
     sim.shadowDemo.stop();
+    sim.replayDirector?.stop();
     this.savedCamera = {
       mode: sim.cameraSystem.autoSwitch ? 7 : sim.cameraSystem.mode,
       photo: sim.cameraSystem.photoCockpit,
@@ -159,7 +160,7 @@ export class DevScenarioRunner {
     const sim = this.sim;
     this.changingState = true;
     try {
-      sim.shadowDemo.stop();
+      sim.shadowDemo.stop(); sim.replayDirector?.stop();
       sim.controls.aircraftControlsDisabled = false;
       sim.controls.releaseAllKeys();
       sim.controls.clearVirtualInputs();
