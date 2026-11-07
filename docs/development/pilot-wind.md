@@ -147,20 +147,49 @@ same Coastal/B738 cruise preset, position (-600, 750, 3200) m, velocity
 (96, 0, -49) m/s, attitude, loading, trim, seed and 063° wind basis above.
 Restart and switching levels reconstruct that start and reset the wind clock.
 
-| Level | Profile | Along / right / up amplitude caps (m/s) | Scale |
+| Level | Profile | Base along / right / up caps (m/s) | Additional wing-scale vertical cap (m/s) |
 | --- | --- | --- | --- |
-| Light | `light-turbulence-v1` | 0.3 / 0.6 / 0.2 | 1x |
-| Moderate | `moderate-turbulence-v1` | 0.9 / 1.8 / 0.6 | 3x |
-| Strong | `strong-turbulence-v1` | 1.8 / 3.6 / 1.2 | 6x |
+| Light | `light-turbulence-v1` | 0.3 / 0.6 / 0.2 | 0 |
+| Moderate | `moderate-turbulence-v1` | 0.9 / 1.8 / 0.6 | 0.8 |
+| Strong | `strong-turbulence-v1` | 1.8 / 3.6 / 1.2 | 1.6 |
 
-Mean wind stays zero. At identical world position and simulation time,
-`u_level(x,t) = scale * u_light(x,t)`: the seeded wavelengths, periods and phases
-are unchanged. These are relative comparison levels in the existing training
+Mean wind stays zero. The original comparison scaled only the central field.
+Moderate/Strong now also contain three vertical modes with cross-track wavelengths
+70–150 m, along-track wavelengths 1,500–2,500 m and periods 5–10 s, using the
+separate deterministic seed suffix `:wing-gust`. Their axes stay world-fixed at
+the configured 063° heading; the field never follows the airplane. The shorter
+cross-track scale gives the two wings different updrafts. At identical position
+and time, the complete Strong field is exactly twice Moderate's. Light retains
+its original field and central sampling. These are relative comparison levels in the existing training
 model, not calibrated meteorological severity classes. Different flight paths
 sample different parts of the field, so aircraft motion need not scale linearly.
-The relative-airflow force/moment calculation and 120 Hz timestep are unchanged;
-there are no synthetic pose or camera shakes. All levels remain global and
+The 120 Hz timestep is unchanged. There are no synthetic pose or camera shakes. All levels remain global and
 invisible. The localized region in #563 is separate work.
+
+### Wing-gradient rolling moment
+
+For the two-panel approximation, sample the same world field at body offsets
+`(-b/4, 0, 0)` and `(+b/4, 0, 0)`, rotated by the physical quaternion and translated
+by the physical position. These are uniform half-wing area centroids, not the
+wingtips. Both samples use the center sample's time; the clock advances only once.
+
+Rotate `windRight - windLeft` into body coordinates. With center relative-airflow
+components `u = -vBody.z`, `w = -vBody.y`, the linearized angle-of-attack difference is
+`deltaAlpha = (u * deltaWind.y - w * deltaWind.z) / max(100, u² + w²)`.
+The denominator floor regularizes low-speed evaluation; dynamic pressure makes
+the correction vanish at zero airspeed. The incremental difference in lift is
+`deltaL = q * (S/2) * CLa * deltaAlpha * (1 - separation) * liftMultiplier`.
+The normal-force couple is `Mz = (b/4) * deltaL * cos(alpha)` in N m. A stronger
+right-wing updraft lifts the right wing, giving positive body Z / a left bank.
+Equal left/right winds produce zero additional moment. The antisymmetric force
+pair has zero net force; central airflow retains the existing common heave model.
+
+This is an attached-flow, small-gust gradient correction fading with the existing
+separation state, not a full spanwise wing solver or separate left/right stall
+model. It does not add angular-velocity-induced section flow: the existing `Cl_p`
+already supplies roll damping. Gust-induced differential drag/yaw is omitted.
+Incheon, mild, calm and Light keep center-only sampling. Reset clears all three
+wind vectors so a prior Strong run cannot leave a residual rolling moment.
 
 The Node comparison test flies all levels for 7,200 ticks, checks equal starts,
 increasing roll range for this seed, and no crash/damage/stall/G-LOC/engine failure.
@@ -175,13 +204,18 @@ identical starts, and 7,200 physics ticks per level. Shader preflight returned
 
 | Quantity | Light | Moderate | Strong |
 | --- | --- | --- | --- |
-| Altitude (m) | 748.756–751.888 | 745.342–755.397 | 740.284–760.853 |
-| Roll (deg) | −0.205–0.233 | −0.624–0.673 | −1.255–1.332 |
-| Normal load (G) | 0.9835–1.0059 | 0.9602–1.0279 | 0.9246–1.0620 |
+| Altitude (m) | 748.756–751.888 | 745.320–755.336 | 736.698–760.210 |
+| Roll (deg) | −0.205–0.233 | −1.865–2.669 | −3.409–4.616 |
+| Normal load (G) | 0.9835–1.0059 | 0.9328–1.0577 | 0.8652–1.1757 |
+| Wing-gradient roll moment (kN m) | 0 | −107.031–123.863 | −325.511–338.701 |
 
 All levels passed the no-failure observation checks. Strong also passed pause,
 resume, deterministic restart, keyboard/touch hold-release and rendered-loop
 progress. Exit, preset, aircraft, airport and mode-disable cleanup passed.
-Desktop entries and mobile manual-flight screenshots were inspected. Evidence
+Desktop entries, both bank extremes for Moderate/Strong, and mobile manual-flight
+screenshots were inspected. Before wing sampling, Moderate's roll range was
+−0.624–0.673° and Strong's was −1.255–1.332°. `tests/wingGust.test.js` checks
+the analytical moment/sign, uniform-flow cancellation, world-rotation invariance,
+physical sample locations, shared time, reset and low-speed/separation behavior. Evidence
 is local under `.tmp/turbulence/`; this remains a one-seed B738 comparison, not
 a general strong-turbulence handling claim.

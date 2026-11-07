@@ -52,6 +52,9 @@ test('all three menu scenarios share initial conditions and fly 60 s with increa
     assert.equal(sim.devRunner.result.status, 'passed', id);
     assert.equal(sim.devRunner.result.observation.samples, 7200);
     assert.ok(maxRoll - minRoll > previousRollRange, id);
+    if (id !== 'turbulence') {
+      assert.ok(minRoll < -1.5 && maxRoll > 2, `${id}: visible banks in both directions`);
+    }
     previousRollRange = maxRoll - minRoll;
     assert.equal(sim.autopilot.master, false);
   }
@@ -115,6 +118,8 @@ for (const [id, profile] of levels) test(`${id}: manual ownership, restart and p
   assert.equal(sim.windField, null);
   assert.equal(sim.windTimeSeconds, 0);
   assert.deepEqual(sim.aero.windWorld.toArray(), [0, 0, 0]);
+  assert.deepEqual(sim.aero.windLeftWorld.toArray(), [0, 0, 0]);
+  assert.deepEqual(sim.aero.windRightWorld.toArray(), [0, 0, 0]);
 });
 
 test('switching strengths resets the wind clock and restores the shared cruise start', () => {

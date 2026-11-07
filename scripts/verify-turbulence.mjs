@@ -72,21 +72,25 @@ await withBrowserSession({ startVite: false, origin: process.env.SIM_URL || 'htt
         if (profile?.includes('turbulence') && s.windField.profile !== profile) throw new Error(`Wrong profile for ${id}`);
         const seed = s.windField.seed;
         if (!profile || profile === 'calm-debug-v1') setSimulationWind(s, profile ? new WindField({ profile, seed, runwayHeadingDeg: 63 }) : null);
-        const min = {}, max = {}, trace = [];
+        const min = {}, max = {}, trace = [], rollTicks = {};
         for (let tick = 0; tick < 7200; tick++) {
           stepPhysics(s);
           const values = { altitude: s.position.y, agl: s.position.y - s.currentTerrain.getHeight(s.position.x, s.position.z),
             ias: s.telemetry.iasKnots, g: s.telemetry.gForce, pitch: s.telemetry.pitchDeg, roll: s.telemetry.rollDeg,
-            heading: s.telemetry.headingDeg };
+            heading: s.telemetry.headingDeg, wingMoment: s._aeroResult.wingGustRollMoment,
+            wingWindDifference: s.aero.windRightWorld.y - s.aero.windLeftWorld.y };
+          if (values.roll < (min.roll ?? Infinity)) rollTicks.min = tick;
+          if (values.roll > (max.roll ?? -Infinity)) rollTicks.max = tick;
           for (const [key, value] of Object.entries(values)) {
             if (!Number.isFinite(value)) throw new Error(`Invalid ${key}`);
             min[key] = Math.min(min[key] ?? Infinity, value); max[key] = Math.max(max[key] ?? -Infinity, value);
           }
           if (tick % 120 === 0) trace.push({ tick, ...values, wind: s.aero.windWorld.toArray(),
             force: s._aeroResult.forceWorld.toArray(), moment: s._aeroResult.momentBody.toArray(),
+            leftWind: s.aero.windLeftWorld.toArray(), rightWind: s.aero.windRightWorld.toArray(),
             tas: s.telemetry.tasKnots, rates: s.angularVelocity.toArray() });
         }
-        runs[profile ?? 'none'] = { initial, min, max, trace, result: s.devRunner.result,
+        runs[profile ?? 'none'] = { initial, min, max, trace, rollTicks, result: s.devRunner.result,
           position: s.position.toArray(), quaternion: s.quaternion.toArray(),
           velocity: s.linearVelocity.toArray(), rates: s.angularVelocity.toArray(),
           ap: s.autopilot.master, demo: s.demoDirector.isActive };
@@ -110,8 +114,28 @@ await withBrowserSession({ startVite: false, origin: process.env.SIM_URL || 'htt
       assert.deepEqual(run.initial, flights.none.initial);
       assert.ok(run.max.roll - run.min.roll > previousRollRange, profile);
       previousRollRange = run.max.roll - run.min.roll;
+      if (profile !== 'light-turbulence-v1') {
+        assert.ok(run.min.roll < -1.5 && run.max.roll > 2, `${profile}: visible banks both ways`);
+        assert.ok(run.min.wingMoment < -1000 && run.max.wingMoment > 1000);
+        assert.ok(run.min.wingWindDifference < 0 && run.max.wingWindDifference > 0);
+      } else {
+        assert.equal(run.min.wingMoment, 0); assert.equal(run.max.wingMoment, 0);
+      }
     }
     await screenshot(resolve(directory, 'cruise-60s.png'));
+    for (const [id, profile] of [['turbulence-moderate', 'moderate-turbulence-v1'], ['turbulence-strong', 'strong-turbulence-v1']]) {
+      for (const extreme of ['min', 'max']) {
+        const roll = await evaluate(({ id, ticks }) => {
+          const s = window.simulator;
+          s.devRunner.start(id); s.devRunner.updatePreparation(0);
+          s.stepSimulation((ticks + 1) * s.physicsDt);
+          s.cameraSystem.snapToTarget(s.aircraft.group); s.developerPanel.refresh(); s.renderScene();
+          return s.telemetry.rollDeg;
+        }, { id, ticks: flights[profile].rollTicks[extreme] });
+        assert.ok(Math.abs(roll - flights[profile][extreme].roll) < 1e-9);
+        await screenshot(resolve(directory, `${id}-roll-${extreme}.png`));
+      }
+    }
     const lifecycle = await evaluate(() => {
       const s = window.simulator;
       const snap = () => ({ position: s.position.toArray(), quaternion: s.quaternion.toArray(), wind: s.aero.windWorld.toArray(), time: s.windTimeSeconds });

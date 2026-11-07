@@ -65,6 +65,9 @@ export class Aerodynamics {
 
     // Wind vector in world space (m/s)
     this.windWorld = new THREE.Vector3(0, 0, 0);
+    this.windLeftWorld = new THREE.Vector3();
+    this.windRightWorld = new THREE.Vector3();
+    this._wingWindDifference = new THREE.Vector3();
     this._airVelocity = new THREE.Vector3();
     this._bodyVelocity = new THREE.Vector3();
     this._inverseQuaternion = new THREE.Quaternion();
@@ -409,6 +412,18 @@ export class Aerodynamics {
       (this.Cm0 + this.Cma * this.alpha - this.Cm_de * elevatorEffective) + thrustPitchMoment);
     result.momentBody.y += this.cg.x * (longitudinal.z - engineThrustTotal) - this.cg.z * sideForce;
     result.momentBody.z += this.cg.y * sideForce - this.cg.x * longitudinal.y;
+    // First-order antisymmetric wing-gust lift, not another roll-rate damper.
+    // Existing whole-aircraft lift owns common-mode heave and Cl_p owns damping.
+    // alpha = atan2(w,u); d(alpha) = (u*d(w) - w*d(u)) / (u²+w²).
+    const wingWind = this._wingWindDifference.subVectors(this.windRightWorld, this.windLeftWorld)
+      .applyQuaternion(invQuat);
+    const deltaAlpha = (u * wingWind.y - w * wingWind.z) / Math.max(100, u * u + w * w);
+    const deltaLift = qDyn * (this.wingArea / 2) * this.CLa * deltaAlpha
+      * (1 - this.separation) * this.tuning.liftMultiplier;
+    // +X right wing, +Y up: stronger right-wing lift produces +Z (left bank).
+    const wingGustRollMoment = (this.wingspan / 4) * deltaLift * Math.cos(this.alpha);
+    result.momentBody.z += wingGustRollMoment;
+    result.wingGustRollMoment = wingGustRollMoment;
     this.lift = longitudinal.lift;
     this.drag = longitudinal.drag;
     this.gForce = longitudinal.y / (this.mass * Atmosphere.G0);
