@@ -71,7 +71,14 @@ export function loadSimulatorPreferences(storage) {
 }
 
 export function saveSimulatorPreferences(patch, storage) {
-  const preferences = { ...loadSimulatorPreferences(storage), ...validateSimulatorPreferences(patch) };
+  const saved = loadSimulatorPreferences(storage);
+  const validPatch = validateSimulatorPreferences(patch);
+  const preferences = { ...saved, ...validPatch };
+  // Joystick controls commit independently, just like top-level preferences.
+  // A custom mapping is one calibrated value; null explicitly clears it.
+  if (validPatch.joystick) {
+    preferences.joystick = { ...saved.joystick, ...validPatch.joystick };
+  }
   try { safeStorage(storage)?.setItem(SIMULATOR_PREFERENCES_KEY, JSON.stringify(preferences)); }
   catch { /* Keep the current session usable when storage is unavailable. */ }
 }

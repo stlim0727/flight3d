@@ -101,7 +101,7 @@ export class GameFlowController {
    * Allowed from FLIGHT (HUD button) as well as PAUSED (pause menu).
    */
   returnToLobby(resumable = false) {
-    if (this.state === FLOW.LOBBY) return false;
+    if (this.state === FLOW.LOBBY && this.resumableFlight === resumable) return false;
     this.resumableFlight = resumable;
     this._setState(FLOW.LOBBY);
     this._resetLoopCap();

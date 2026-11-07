@@ -32,3 +32,6 @@ selects the F16 before clearing them. A new slalom mission selects HUD through
   Follow [GPU setup](browser-gpu.md); this script defaults to the user-owned
   hardware Chrome wrapper and requires Vulkan. The explosion counter checks
   sound dispatch, not subjective listening quality.
+
+For the broader ownership inventory, confirmed lifecycle fixes and staged SOLID
+refactoring recommendations, see [state lifecycle review](state-lifecycle-review.md).

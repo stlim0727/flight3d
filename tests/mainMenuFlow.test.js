@@ -138,3 +138,57 @@ test('valley lobby disarms cinematic demo and keeps physics frozen', async () =>
   assert.equal(sim.gameFlow.cinematicAvailable, false);
   assert.equal(sim.gameFlow.isPhysicsFrozen(), true);
 });
+
+test('direct starts share the same exclusion guard and release it after success or failure', async () => {
+  for (const failed of [false, true]) {
+    const sim = simulator();
+    sim.startFlight = SimulatorClass.prototype.startFlight;
+    let finish;
+    sim.spawnFlight = async () => {
+      sim.starts++;
+      await new Promise((resolve, reject) => { finish = () => failed ? reject(Error('spawn failed')) : resolve(); });
+    };
+    sim.showToast = sim.syncFlowUi = () => {};
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      const pending = sim.startFlight();
+      assert.equal(await sim.startFlight(), false);
+      assert.equal(sim.starts, 1);
+      finish();
+      assert.equal(await pending, !failed);
+      assert.equal(sim.startingFlight, false);
+      assert.equal(sim.spawningFlight, false);
+      sim.spawnFlight = async () => { sim.starts++; };
+      assert.equal(await sim.startFlight(), true);
+      assert.equal(sim.starts, 2);
+    } finally { console.warn = warn; }
+  }
+});
+
+test('failed spawn from a held lobby clears resume ownership and remains frozen', async () => {
+  const sim = simulator();
+  sim.startFlight = SimulatorClass.prototype.startFlight;
+  sim.gameFlow.enterFlight();
+  sim.gameFlow.returnToLobby(true);
+  sim.spawnFlight = async () => { throw Error('failed before enterFlight'); };
+  sim.showToast = sim.syncFlowUi = () => {};
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    assert.equal(await sim.startFlight(), false);
+    assert.equal(sim.gameFlow.state, FLOW.LOBBY);
+    assert.equal(sim.gameFlow.canResumeFromLobby(), false);
+    assert.equal(sim.gameFlow.isPhysicsFrozen(), true);
+  } finally { console.warn = warn; }
+});
+
+test('nested spawn preserves the scene-swap hold until its outer owner releases it', async () => {
+  const sim = simulator();
+  sim.startFlight = SimulatorClass.prototype.startFlight;
+  sim.startingFlight = true;
+  sim.spawnFlight = async () => { assert.equal(sim.startingFlight, true); };
+  assert.equal(await sim.startFlight(), true);
+  assert.equal(sim.startingFlight, true);
+  assert.equal(sim.spawningFlight, false);
+});

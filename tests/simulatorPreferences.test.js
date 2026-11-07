@@ -158,3 +158,16 @@ test('engine volume persists as a 0..1 level, rejects malformed values and resto
   restoreSimulatorPreferences(sim, { engineVolume: 0.35 });
   assert.equal(sim.audio.engineVolume, 0.35);
 });
+
+test('partial joystick saves preserve calibration and reject invalid sibling updates', () => {
+  const storage = memoryStorage();
+  saveSimulatorPreferences({ joystick: { axesLayout: 'legacy', pitchInverted: true,
+    customMapping: { rollAxis: 4, throttleIdleVal: 0.8, throttleMaxVal: -0.9 } } }, storage);
+  const original = loadSimulatorPreferences(storage).joystick;
+  saveSimulatorPreferences({ joystick: { deadzoneStick: 0.05 } }, storage);
+  saveSimulatorPreferences({ joystick: { axesLayout: 'invalid', pitchInverted: 'false' } }, storage);
+  assert.deepEqual(loadSimulatorPreferences(storage).joystick, { ...original, deadzoneStick: 0.05 });
+  saveSimulatorPreferences({ joystick: { customMapping: null } }, storage);
+  assert.deepEqual(loadSimulatorPreferences(storage).joystick,
+    { ...original, deadzoneStick: 0.05, customMapping: null });
+});

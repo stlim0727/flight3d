@@ -303,6 +303,7 @@ class FlightSimulator {
     this.currentAircraftId = savedSelection.aircraft;
     this.lastPresetType = savedSelection.scenario;
     this.startingFlight = false;
+    this.spawningFlight = false;
     this.applyingPendingStart = false;
 
     // 7. Collision Detection & Explosion & Tire Smoke Particle Systems
@@ -673,7 +674,7 @@ class FlightSimulator {
         await stage(2, 'startup.aircraft');
         this.setAircraft(this.lobby.aircraft);
       }
-      await this.startFlight();
+      if (!await this.startFlight()) return;
       await stage(3, 'startup.ready');
     } catch (error) {
       this.gameFlow.returnToLobby(false);
@@ -689,20 +690,24 @@ class FlightSimulator {
     }
   }
 
-  /** Own the entire start, including lazy mission loading, for every caller. */
+  /** Own the entire spawn; return false for blocked or failed starts. */
   async startFlight(options = {}) {
-    if (this.multiplayer?.locked) return;
+    if (this.multiplayer?.locked || this.spawningFlight) return false;
+    this.spawningFlight = true;
     const alreadyStarting = Boolean(this.startingFlight);
     this.startingFlight = true;
     try {
       await this.spawnFlight(options);
+      return true;
     } catch (error) {
       this.gameFlow.returnToLobby(false);
       this.gameFlow.setCinematicAvailable(false);
       this.syncFlowUi();
       console.warn('Flight start failed:', error);
       this.showToast(() => t('startup.failed'));
+      return false;
     } finally {
+      this.spawningFlight = false;
       this.startingFlight = alreadyStarting;
     }
   }
