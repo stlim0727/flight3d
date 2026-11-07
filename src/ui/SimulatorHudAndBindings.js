@@ -112,6 +112,10 @@ class SimulatorHudAndBindingsMethods {
       this.showToast(() => t('camera.view.centered'));
     };
 
+    this.controls.onHatLook = (dirX, dirY, dt) => {
+      this.cameraSystem?.applyHatLook?.(dirX, dirY, dt);
+    };
+
     this.controls.onDeviceConnected = (device) => {
       this.showToast(() => t('notice.hotasConnected', { name: device.name }));
     };
@@ -400,6 +404,13 @@ class SimulatorHudAndBindingsMethods {
     document.getElementById('btn-cam-reset')?.addEventListener('click', () => {
       this.cameraSystem.resetLook();
       this.showToast(() => t('camera.view.centered'));
+    });
+    document.getElementById('btn-reset-pov')?.addEventListener('click', (e) => {
+      e?.stopPropagation?.();
+      this.cameraSystem.resetLook();
+      this.showToast(() => t('camera.view.centered'));
+      const btn = document.getElementById('btn-reset-pov');
+      if (btn) btn.hidden = true;
     });
     document.getElementById('btn-mute')?.addEventListener('click', () => {
       this.audio.setMuted(!this.audio.isMuted);

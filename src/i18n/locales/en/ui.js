@@ -107,6 +107,8 @@ export default {
   "himalayan.cruise.13.000.ft": "✈️ Himalayan cruise (13,000 FT)",
   "downhill.takeoff.rwy.24": "⚡ Downhill takeoff (Rwy 24)",
   "center.view.o": "Center view [O]",
+  "reset.pov": "Reset POV",
+  "reset.pov.title": "Reset camera POV to default [O]",
   "hide.yokes.j": "Hide yokes [J]",
   "physics": "🔬 Physics [`]",
   "flight.guide.h.53": "Flight guide [H]",

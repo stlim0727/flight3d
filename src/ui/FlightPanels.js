@@ -143,6 +143,10 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   })) {
     bindText(document.getElementById(id), () => touchLabel(t(key)));
   }
+  const povResetTarget = document.getElementById('pov-reset-label') || document.getElementById('btn-reset-pov');
+  if (povResetTarget) {
+    bindText(povResetTarget, () => touchLabel(t('reset.pov')));
+  }
 
   // Remove the legacy containers after moving their controls.
   document.querySelectorAll('.presets-bar, .action-panel').forEach(node => node.remove());
@@ -241,4 +245,15 @@ export function updateControlState(telemetry, camera, options = {}) {
   quickCamera?.setAttribute('title', t('ui.camera.current', { name: zoomed ? `${viewName} · ${zoomValue}` : viewName }));
   const toggle = document.getElementById('btn-touch-toggle');
   toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('touch-mode')));
+  const resetPovBtn = document.getElementById('btn-reset-pov');
+  if (resetPovBtn) {
+    const isModified = camera && typeof camera.isPovModified === 'function' ? camera.isPovModified() : false;
+    resetPovBtn.hidden = !isModified;
+    if (isModified && typeof camera.getPovIndicatorAngle === 'function') {
+      const arrow = document.getElementById('pov-arrow-icon');
+      if (arrow) {
+        arrow.style.transform = `rotate(${camera.getPovIndicatorAngle().toFixed(1)}deg)`;
+      }
+    }
+  }
 }

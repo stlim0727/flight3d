@@ -336,19 +336,19 @@ describe('HotasController - Buttons & Systems Actions', () => {
     assert.strictEqual(engineFailureCycled, 1);
   });
 
-  it('adjusts pitch trim smoothly with POV Hat Up / Down while held', () => {
-    let timeDelta = 0;
+  it('pans camera view with POV Hat switch (Left, Right, Up, Down, Diagonals) while held', () => {
+    const hatEvents = [];
     const controls = {
       pitchTrim: 2.0,
       pitchTrimRate: 0.0,
       inputBlocked: false,
       aircraftControlsDisabled: false,
-      onCycleTimeOfDay: (d) => timeDelta += d,
+      onHatLook: (dirX, dirY, dt) => hatEvents.push({ dirX, dirY, dt }),
     };
 
     const buttons = new Array(16).fill(0);
-    // Button 12 = Hat Up (Trim nose down)
-    buttons[12] = 1;
+    // Button 14 = Hat Left
+    buttons[14] = 1;
     let mockGamepad = {
       id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
       index: 0,
@@ -357,24 +357,53 @@ describe('HotasController - Buttons & Systems Actions', () => {
     };
 
     const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
-    hotas.update(0.5); // 0.5s held
-    assert.ok(controls.pitchTrim < 2.0, `Pitch trim should have decreased, got ${controls.pitchTrim}`);
-    assert.strictEqual(controls.pitchTrimRate, -1.0);
+    hotas.update(0.1);
+    assert.strictEqual(hatEvents.length, 1);
+    assert.deepStrictEqual(hatEvents[0], { dirX: -1, dirY: 0, dt: 0.1 });
 
-    // Switch to Button 13 = Hat Down (Trim nose up)
+    // Switch to Button 15 = Hat Right
+    hatEvents.length = 0;
+    buttons[14] = 0;
+    buttons[15] = 1;
+    mockGamepad.buttons = buttons.map(b => ({ pressed: b > 0.5, value: b }));
+    hotas.update(0.1);
+    assert.strictEqual(hatEvents.length, 1);
+    assert.deepStrictEqual(hatEvents[0], { dirX: 1, dirY: 0, dt: 0.1 });
+
+    // Switch to Button 12 = Hat Up
+    hatEvents.length = 0;
+    buttons[15] = 0;
+    buttons[12] = 1;
+    mockGamepad.buttons = buttons.map(b => ({ pressed: b > 0.5, value: b }));
+    hotas.update(0.1);
+    assert.strictEqual(hatEvents.length, 1);
+    assert.deepStrictEqual(hatEvents[0], { dirX: 0, dirY: -1, dt: 0.1 });
+
+    // Switch to Button 13 = Hat Down
+    hatEvents.length = 0;
     buttons[12] = 0;
     buttons[13] = 1;
     mockGamepad.buttons = buttons.map(b => ({ pressed: b > 0.5, value: b }));
-    hotas.update(1.0);
-    assert.ok(controls.pitchTrim > 2.0, `Pitch trim should have increased, got ${controls.pitchTrim}`);
-    assert.strictEqual(controls.pitchTrimRate, 1.0);
+    hotas.update(0.1);
+    assert.strictEqual(hatEvents.length, 1);
+    assert.deepStrictEqual(hatEvents[0], { dirX: 0, dirY: 1, dt: 0.1 });
 
-    // Hat Right (15) changes time of day
+    // Diagonal: Hat Up (12) + Hat Right (15)
+    hatEvents.length = 0;
+    buttons[12] = 1;
     buttons[13] = 0;
     buttons[15] = 1;
     mockGamepad.buttons = buttons.map(b => ({ pressed: b > 0.5, value: b }));
-    hotas.update(1 / 60);
-    assert.strictEqual(timeDelta, 1.5);
+    hotas.update(0.1);
+    assert.strictEqual(hatEvents.length, 1);
+    assert.deepStrictEqual(hatEvents[0], { dirX: 1, dirY: -1, dt: 0.1 });
+
+    // Release all hat buttons: onHatLook must not be called
+    hatEvents.length = 0;
+    buttons.fill(0);
+    mockGamepad.buttons = buttons.map(b => ({ pressed: b > 0.5, value: b }));
+    hotas.update(0.1);
+    assert.strictEqual(hatEvents.length, 0);
   });
 
   it('respects inputBlocked by suppressing flight surfaces and action buttons', () => {

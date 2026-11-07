@@ -970,5 +970,152 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       assert.strictEqual(camSys.userLookOverridden, false);
     });
   });
+
+  describe('Automatic POV Return & Reset POV Button', () => {
+    it('should slowly return cockpit POV to default position after mouse drag release', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+      const defaultPitch = camSys.aircraftLookPitch ?? -0.25;
+
+      const aircraft = new THREE.Object3D();
+      aircraft.position.set(0, 100, 0);
+
+      assert.strictEqual(camSys.isPovModified(), false);
+
+      // User drags mouse to look around
+      camSys.isDragging = true;
+      camSys.applyDragDelta(100, 50, false);
+      const draggedYaw = camSys.lookYaw;
+      const draggedPitch = camSys.lookPitch;
+
+      assert.strictEqual(camSys.isPovModified(), true);
+      assert.notStrictEqual(draggedYaw, 0);
+      assert.notStrictEqual(draggedPitch, defaultPitch);
+
+      // User releases mouse
+      camSys.isDragging = false;
+
+      // Update 0.5s - POV moves closer to default slowly
+      camSys.update(0.5, aircraft);
+      assert.ok(Math.abs(camSys.lookYaw) < Math.abs(draggedYaw), 'lookYaw should move towards 0');
+      assert.ok(Math.abs(camSys.lookYaw) > 0, 'lookYaw should not snap to 0 immediately');
+      assert.ok(Math.abs(camSys.lookPitch - defaultPitch) < Math.abs(draggedPitch - defaultPitch), 'lookPitch should move towards default');
+
+      // Update remaining time (5s) - POV smoothly settles to exact default
+      for (let i = 0; i < 50; i++) {
+        camSys.update(0.1, aircraft);
+      }
+      assert.strictEqual(camSys.lookYaw, 0, 'lookYaw should settle at 0');
+      assert.strictEqual(camSys.lookPitch, defaultPitch, 'lookPitch should settle at default pitch');
+      assert.strictEqual(camSys.isPovModified(), false, 'isPovModified should be false at default');
+    });
+
+    it('should slowly return chase POV to default position after touch drag release', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.CHASE, true);
+
+      const aircraft = new THREE.Object3D();
+      aircraft.position.set(0, 100, 0);
+
+      // Single-finger touch drag
+      camSys.isDragging = true;
+      camSys.applyTouchDragDelta(120, 40);
+      const draggedYaw = camSys.chaseYaw;
+      const draggedPitch = camSys.chasePitch;
+
+      assert.strictEqual(camSys.isPovModified(), true);
+      assert.notStrictEqual(draggedYaw, 0);
+
+      // Touch ends
+      camSys.isDragging = false;
+
+      // Partial time update
+      camSys.update(0.5, aircraft);
+      assert.ok(Math.abs(camSys.chaseYaw) < Math.abs(draggedYaw), 'chaseYaw should move towards 0');
+      assert.ok(Math.abs(camSys.chaseYaw) > 0, 'chaseYaw should not snap to 0 immediately');
+
+      // Settle time update (6.5s)
+      for (let i = 0; i < 65; i++) {
+        camSys.update(0.1, aircraft);
+      }
+      assert.strictEqual(camSys.chaseYaw, 0, 'chaseYaw should settle to 0');
+      assert.strictEqual(camSys.chasePitch, 0, 'chasePitch should settle to 0');
+      assert.strictEqual(camSys.isPovModified(), false);
+    });
+
+    it('should NOT return POV while user is actively dragging or in pointer lock', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+
+      const aircraft = new THREE.Object3D();
+      aircraft.position.set(0, 100, 0);
+
+      // While dragging
+      camSys.isDragging = true;
+      camSys.applyDragDelta(80, 0, false);
+      const heldYaw = camSys.lookYaw;
+
+      camSys.update(0.2, aircraft);
+      assert.strictEqual(camSys.lookYaw, heldYaw, 'POV must not decay while dragging');
+
+      // In pointer lock
+      camSys.isDragging = false;
+      camSys.pointerLocked = true;
+      camSys.update(0.2, aircraft);
+      assert.strictEqual(camSys.lookYaw, heldYaw, 'POV must not decay in pointer lock');
+    });
+
+    it('should immediately reset POV when resetPov() or resetLook() is called', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const camSys = new CameraSystem(camera, mockDom);
+      camSys.setMode(CameraSystem.MODES.CHASE, true);
+
+      camSys.isDragging = true;
+      camSys.applyDragDelta(150, 75, false);
+      camSys.isDragging = false;
+
+      assert.strictEqual(camSys.isPovModified(), true);
+      assert.notStrictEqual(camSys.chaseYaw, 0);
+      assert.notStrictEqual(camSys.chasePitch, 0);
+
+      // Immediately reset POV
+      camSys.resetPov();
+
+      assert.strictEqual(camSys.chaseYaw, 0);
+      assert.strictEqual(camSys.chasePitch, 0);
+      assert.strictEqual(camSys.isPovModified(), false);
+    });
+
+    it('should synchronize reset pov button visibility in DOM on drag and reset', () => {
+      const previousDocument = globalThis.document;
+      const mockBtn = { hidden: true };
+      globalThis.document = {
+        getElementById: (id) => (id === 'btn-reset-pov' ? mockBtn : null)
+      };
+
+      try {
+        const camera = new THREE.PerspectiveCamera();
+        const camSys = new CameraSystem(camera, mockDom);
+        camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+
+        assert.strictEqual(mockBtn.hidden, true);
+
+        // User drags -> button becomes visible
+        camSys.isDragging = true;
+        camSys.applyDragDelta(50, 20, false);
+        assert.strictEqual(mockBtn.hidden, false, 'reset pov button should become visible on drag');
+
+        // Immediate reset -> button hides
+        camSys.resetPov();
+        assert.strictEqual(mockBtn.hidden, true, 'reset pov button should hide after resetPov()');
+      } finally {
+        if (previousDocument === undefined) delete globalThis.document;
+        else globalThis.document = previousDocument;
+      }
+    });
+  });
 });
 

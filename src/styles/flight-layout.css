@@ -264,6 +264,71 @@ body:has(#hud-warning:not([hidden]), #hud-stall[style*="block"]) { --flight-aler
 }
 .demo-actions .btn-demo-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
 
+/* Immediate Reset POV Button & Default Indicator Arrow */
+.btn-reset-pov {
+  position: fixed;
+  top: calc(var(--edge-top, 8px) + (54px * var(--ui-scale, 1)));
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(8px * var(--ui-scale, 1));
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  color: #e0f2fe;
+  font-size: calc(13px * var(--ui-scale, 1));
+  font-weight: 700;
+  padding: calc(6px * var(--ui-scale, 1)) calc(16px * var(--ui-scale, 1));
+  border-radius: 9999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(56, 189, 248, 0.35);
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 75;
+  transition: opacity 0.2s ease, transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.btn-reset-pov:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: #7dd3fc;
+  color: #ffffff;
+  box-shadow: 0 4px 20px rgba(56, 189, 248, 0.55);
+}
+.btn-reset-pov:active {
+  transform: translateX(-50%) scale(0.96);
+}
+.btn-reset-pov[hidden] {
+  display: none !important;
+}
+.btn-reset-pov .pov-arrow-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(16px * var(--ui-scale, 1));
+  height: calc(16px * var(--ui-scale, 1));
+  color: #38bdf8;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.8));
+  transform-origin: 50% 50%;
+  transition: transform 0.05s linear;
+}
+.btn-reset-pov .pov-arrow-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.compact-ui .btn-reset-pov {
+  top: calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)));
+  font-size: calc(11px * var(--ui-scale, 1));
+  padding: calc(5px * var(--ui-scale, 1)) calc(12px * var(--ui-scale, 1));
+}
+.compact-ui .btn-reset-pov .pov-arrow-icon {
+  width: calc(14px * var(--ui-scale, 1));
+  height: calc(14px * var(--ui-scale, 1));
+}
+
 /* Portrait notices share the strips' left inset and measured bottom edge. */
 @media (max-width: 1024px) and (orientation: portrait) {
   .compact-ui .demo-banner,

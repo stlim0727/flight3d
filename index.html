@@ -93,6 +93,16 @@
       </div>
     </div>
 
+    <!-- Immediate POV Reset Button & Default Indicator Arrow -->
+    <button id="btn-reset-pov" class="btn btn-reset-pov" type="button" hidden title="카메라 시선 정면 초기화 (O)" data-i18n-title="reset.pov.title">
+      <span class="pov-arrow-icon" id="pov-arrow-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
+        </svg>
+      </span>
+      <span id="pov-reset-label" class="pov-label" data-i18n="reset.pov">Reset POV</span>
+    </button>
+
     <!-- Minimized Demo Flight Showcase Pill (Tap to Reopen) -->
     <button id="btn-demo-open" class="demo-pill-btn" style="display: none;" title="데모 비행 안내 팝업 열기" aria-label="데모 비행 안내 팝업 열기" data-i18n-title="open.demo.flight.guide" data-i18n-aria-label="open.demo.flight.guide">
       <span class="demo-dot"></span>
@@ -497,8 +507,7 @@
               <tr><td><kbd><span data-i18n="hotas.throttle.lever">스로틀 레버 (Throttle Lever)</span></kbd></td><td><span data-i18n="hotas.throttle.lever.desc">레버를 앞으로 밀어 최대 추력(TOGA 100%), 뒤로 당겨 아이들(Idle)</span></td></tr>
               <tr><td><kbd><span data-i18n="hotas.rudder.dual">스틱 트위스트 / 스로틀 로커 패들</span></kbd></td><td><span data-i18n="hotas.rudder.dual.desc">스틱을 비틀거나 스로틀 뒷면 로커 패들을 눌러 러더 요(Yaw) 및 활주로 조향</span></td></tr>
               <tr><td><kbd><span data-i18n="hotas.trigger.brakes">메인 트리거 (Button 0)</span></kbd></td><td><span data-i18n="hotas.trigger.brakes.desc">트리거를 당겨 휠 브레이크 비례 제동</span></td></tr>
-              <tr><td><kbd><span data-i18n="hotas.hat.trim">햇 스위치 (POV 상/하)</span></kbd></td><td><span data-i18n="hotas.hat.trim.desc">스틱 상단 햇 위로 밀어 기수 내림 트림, 아래로 당겨 기수 올림 트림</span></td></tr>
-              <tr><td><kbd><span data-i18n="hotas.hat.time">햇 스위치 (POV 좌/우)</span></kbd></td><td><span data-i18n="hotas.hat.time.desc">시간대 이전 / 이후로 순환 변경</span></td></tr>
+              <tr><td><kbd><span data-i18n="hotas.hat.look">햇 스위치 (POV 상/하/좌/우)</span></kbd></td><td><span data-i18n="hotas.hat.look.desc">스틱 상단 햇 스위치로 시선 둘러보기 (좌/우 및 상/하 시선 이동)</span></td></tr>
               <tr><td><kbd><span data-i18n="hotas.buttons.systems">시스템 조작 버튼 (B1~B5)</span></kbd></td><td><span data-i18n="hotas.buttons.systems.desc">B1: 스포일러, B2: 랜딩 기어, B3: 역추진, B4: 플랩 접기, B5: 플랩 펼치기</span></td></tr>
               <tr><td><kbd><span data-i18n="hotas.buttons.base">유틸리티 버튼 (B6~B10)</span></kbd></td><td><span data-i18n="hotas.buttons.base.desc">B6: 파킹 브레이크, B7: 카메라 순환, B8: 시선 정면 초기화, B9: 조명, B10: 엔진 고장 재현</span></td></tr>
             </table>

@@ -7,6 +7,11 @@ import { CinematicCameraDirector } from './CinematicCameraDirector.js';
  * Features G-force cockpit head dynamics, stall buffeting vibration, touchdown shock jolt,
  * smooth exterior damping, and automatic temporary cinematic view cuts for takeoff/landing/gear transit.
  */
+function normalizeAngle(angle) {
+  const twoPi = Math.PI * 2;
+  return ((angle + Math.PI) % twoPi + twoPi) % twoPi - Math.PI;
+}
+
 export class CameraSystem {
   // Lowest orbit the chase camera may take (radians). The ground clamp, not this
   // limit, keeps the eye out of terrain, so the view may drop below the aircraft.
@@ -164,6 +169,13 @@ export class CameraSystem {
     this.touchMoved = false;
     this.onResetLook = null;
 
+    // Automatic slow return of POV look angles to default position after drag
+    this.povReturnSpeed = 1.0; // Decay rate (~2-3s gentle settle back to default)
+    this._lastPovModified = false;
+    this.povChangedByDrag = false;
+    this.isHatLooking = false;
+    this.onPovChange = null;
+
     // Manual look holds automatic framing; touch interruptions in AUTO resume after release.
     this.userLookOverridden = false;
 
@@ -190,7 +202,7 @@ export class CameraSystem {
   isInteractiveUI(target) {
     if (!target || typeof target.closest !== 'function') return false;
     return !!target.closest(
-      '#pilot-arena, #pilot-score-overlay, .flight-panel, .flight-toolbar, dialog, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #help-modal, #demo-restart-dialog, #diagnostics-overlay, .menu-backdrop, .debrief-card'
+      '#pilot-arena, #pilot-score-overlay, .flight-panel, .flight-toolbar, dialog, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #btn-reset-pov, .btn-reset-pov, #help-modal, #demo-restart-dialog, #diagnostics-overlay, .menu-backdrop, .debrief-card'
     );
   }
 
@@ -534,6 +546,7 @@ export class CameraSystem {
   // Grab the scenery: mouse and touch move it with the gesture. Pointer lock
   // retains directional head movement through applyMouseDelta.
   applyDragDelta(dx, dy, isTouch = (this.activeTouchId !== null)) {
+    this.povChangedByDrag = true;
     // Gear yaw offsets the look target along +X, unlike the head/orbit yaw
     // rotations. Its original horizontal mapping already grabs the scenery.
     const lookDx = this.mode === CameraSystem.MODES.GEAR ? dx : -dx;
@@ -545,6 +558,9 @@ export class CameraSystem {
   }
 
   applyMouseDelta(dx, dy, isTouch = (this.activeTouchId !== null)) {
+    if (this.isDragging) {
+      this.povChangedByDrag = true;
+    }
     if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
       this.holdForManualLook(isTouch);
     }
@@ -586,6 +602,7 @@ export class CameraSystem {
         break;
       }
     }
+    this.updatePovButtonState();
   }
 
   /**
@@ -641,7 +658,187 @@ export class CameraSystem {
     this.targetCursorNormY = Math.max(-1.0, Math.min(1.0, (clientY - cy) / cy));
   }
 
+  /**
+   * Determine whether the camera look angle (POV) deviates from its default position.
+   */
+  isPovModified() {
+    const defaultPitch = this.aircraftLookPitch ?? -0.25;
+    switch (this.mode) {
+      case CameraSystem.MODES.COCKPIT:
+        return Math.abs(normalizeAngle(this.lookYaw)) > 0.001 || Math.abs(this.lookPitch - defaultPitch) > 0.001;
+      case CameraSystem.MODES.CHASE:
+        return Math.abs(normalizeAngle(this.chaseYaw)) > 0.001 || Math.abs(this.chasePitch) > 0.001;
+      case CameraSystem.MODES.WING:
+        return Math.abs(normalizeAngle(this.wingLookYaw)) > 0.001 || Math.abs(this.wingLookPitch) > 0.001;
+      case CameraSystem.MODES.GEAR:
+        return Math.abs(this.gearLookYaw) > 0.001 || Math.abs(this.gearLookPitch) > 0.001;
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Calculates the angle (in degrees, 0 = up, 90 = right, 180 = down, -90 = left)
+   * pointing toward the default POV forward orientation from the current look angle.
+   */
+  getPovIndicatorAngle() {
+    let deltaYaw = 0;
+    let deltaPitch = 0;
+    const defaultPitch = this.aircraftLookPitch ?? -0.25;
+
+    switch (this.mode) {
+      case CameraSystem.MODES.COCKPIT:
+        deltaYaw = normalizeAngle(this.lookYaw);
+        deltaPitch = this.lookPitch - defaultPitch;
+        break;
+      case CameraSystem.MODES.CHASE:
+        deltaYaw = normalizeAngle(this.chaseYaw);
+        deltaPitch = this.chasePitch;
+        break;
+      case CameraSystem.MODES.WING:
+        deltaYaw = normalizeAngle(this.wingLookYaw);
+        deltaPitch = this.wingLookPitch;
+        break;
+      case CameraSystem.MODES.GEAR:
+        deltaYaw = -this.gearLookYaw;
+        deltaPitch = this.gearLookPitch;
+        break;
+      default:
+        return 0;
+    }
+
+    if (Math.hypot(deltaYaw, deltaPitch) < 0.001) {
+      return 0;
+    }
+
+    // Direction vector toward default (0, 0):
+    // deltaYaw < 0 means looking right, so default is left (x < 0, atan2 -> -90 deg)
+    // deltaYaw > 0 means looking left, so default is right (x > 0, atan2 -> +90 deg)
+    // deltaPitch > 0 means looking up, so default is down (y < 0, atan2 -> 180 deg)
+    // deltaPitch < 0 means looking down, so default is up (y > 0, atan2 -> 0 deg)
+    const x = deltaYaw;
+    const y = -deltaPitch;
+    return Math.atan2(x, y) * (180 / Math.PI);
+  }
+
+  /**
+   * Immediately resets camera POV to default position.
+   */
+  resetPov() {
+    this.resetLook();
+  }
+
+  /**
+   * Synchronize DOM button visibility, indicator arrow orientation, and callback
+   * when POV modification state changes.
+   */
+  updatePovButtonState() {
+    const modified = this.isPovModified();
+    if (this._lastPovModified !== modified) {
+      this._lastPovModified = modified;
+      if (typeof this.onPovChange === 'function') {
+        this.onPovChange(modified);
+      }
+      if (typeof document !== 'undefined') {
+        const btn = document.getElementById('btn-reset-pov');
+        if (btn) btn.hidden = !modified;
+      }
+    }
+    if (modified && typeof document !== 'undefined') {
+      const arrow = document.getElementById('pov-arrow-icon');
+      if (arrow) {
+        const angle = this.getPovIndicatorAngle();
+        arrow.style.transform = `rotate(${angle.toFixed(1)}deg)`;
+      }
+    }
+  }
+
+  /**
+   * Pan or look around using HOTAS hat switch / D-pad.
+   * dirX: -1 (left), +1 (right)
+   * dirY: -1 (up), +1 (down)
+   */
+  applyHatLook(dirX, dirY, dt) {
+    if (dirX === 0 && dirY === 0) return;
+    const safeDt = Math.min(0.1, dt || (1 / 60));
+    const panSpeed = 700; // equivalent screen pixels per second for gaze sensitivity
+    const dx = dirX * panSpeed * safeDt;
+    const dy = dirY * panSpeed * safeDt;
+    this.isHatLooking = true;
+    this.povChangedByDrag = true;
+    this.applyMouseDelta(dx, dy);
+    this.updatePovButtonState();
+  }
+
+  /**
+   * Smoothly and slowly returns the camera POV back to the default position when not actively dragging or looking with hat.
+   */
+  updatePovReturn(dt) {
+    if (this.isDragging || this.pointerLocked || this.isHatLooking || dt <= 0 || !this.povChangedByDrag) return;
+
+    const povModes = [
+      CameraSystem.MODES.COCKPIT,
+      CameraSystem.MODES.CHASE,
+      CameraSystem.MODES.WING,
+      CameraSystem.MODES.GEAR
+    ];
+    if (!povModes.includes(this.mode)) return;
+
+    const defaultPitch = this.aircraftLookPitch ?? -0.25;
+    const rate = 1 - Math.exp(-Math.min(0.1, dt) * (this.povReturnSpeed ?? 1.0));
+
+    const stepToward = (current, target) => {
+      const diff = target - current;
+      if (Math.abs(diff) < 0.001) return target;
+      const step = diff * rate;
+      const next = current + step;
+      return (Math.abs(target - next) < 0.001) ? target : next;
+    };
+
+    const stepTowardAngle = (current, target) => {
+      const cur = normalizeAngle(current);
+      const diff = normalizeAngle(target - cur);
+      if (Math.abs(diff) < 0.001) return target;
+      const step = diff * rate;
+      const next = cur + step;
+      return (Math.abs(normalizeAngle(target - next)) < 0.001) ? target : next;
+    };
+
+    switch (this.mode) {
+      case CameraSystem.MODES.COCKPIT: {
+        this.lookYaw = stepTowardAngle(this.lookYaw, 0);
+        this.lookPitch = stepToward(this.lookPitch, defaultPitch);
+        break;
+      }
+      case CameraSystem.MODES.CHASE: {
+        this.chaseYaw = stepTowardAngle(this.chaseYaw, 0);
+        this.chasePitch = stepToward(this.chasePitch, 0);
+        break;
+      }
+      case CameraSystem.MODES.WING: {
+        this.wingLookYaw = stepTowardAngle(this.wingLookYaw, 0);
+        this.wingLookPitch = stepToward(this.wingLookPitch, 0);
+        break;
+      }
+      case CameraSystem.MODES.GEAR: {
+        this.gearLookYaw = stepToward(this.gearLookYaw, 0);
+        this.gearLookPitch = stepToward(this.gearLookPitch, 0);
+        break;
+      }
+    }
+
+    if (!this.isPovModified()) {
+      this.povChangedByDrag = false;
+      if (this.mode === CameraSystem.MODES.CHASE) this.chaseYaw = 0;
+      else if (this.mode === CameraSystem.MODES.COCKPIT) this.lookYaw = 0;
+      else if (this.mode === CameraSystem.MODES.WING) this.wingLookYaw = 0;
+    }
+
+    this.updatePovButtonState();
+  }
+
   resetLook() {
+    this.povChangedByDrag = false;
     this.touchAutoResumeTimer = null;
     this.userLookOverridden = false;
     this.lookYaw = 0;
@@ -665,6 +862,7 @@ export class CameraSystem {
     this.cursorNormX = 0;
     this.cursorNormY = 0;
     this.cinematicDirector?.reset?.();
+    this.updatePovButtonState();
   }
 
   togglePointerLock() {
@@ -1283,6 +1481,10 @@ export class CameraSystem {
     // Continuous Edge Pan (마우스 드래그 중 화면 끝 도달 시 적당한 속도로 시선 지속 회전)
     this.updateEdgePan(dt);
 
+    // Slowly return camera POV back to default position after drag
+    this.updatePovReturn(dt);
+    this.updatePovButtonState();
+
     if (this.customViewUpdater && !this.userModeSelected && !this.userLookOverridden) {
       const handled = this.customViewUpdater({
         dt,
@@ -1629,6 +1831,9 @@ export class CameraSystem {
       );
       this.camera.position.add(shakeOffset);
     }
+
+    // Reset per-frame hat look flag so release can resume gentle POV decay
+    this.isHatLooking = false;
   }
 
   addTrauma(amount = 1.0) {

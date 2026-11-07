@@ -501,10 +501,10 @@ export class JoystickCheckDialog {
         9: 'Menu (시선 정면)',
         10: 'LS (조명)',
         11: 'RS (엔진 고장)',
-        12: 'POV ▲ (기수 내림 트림)',
-        13: 'POV ▼ (기수 올림 트림)',
-        14: 'POV ◀ (시간대 -)',
-        15: 'POV ▶ (시간대 +)',
+        12: 'POV ▲ (시선 상향)',
+        13: 'POV ▼ (시선 하향)',
+        14: 'POV ◀ (시선 좌측)',
+        15: 'POV ▶ (시선 우측)',
       };
       return xboxActions[index] || `Button ${index}`;
     }
@@ -523,10 +523,10 @@ export class JoystickCheckDialog {
       9: 'B9 (조명)',
       10: 'B10 (엔진 고장)',
       11: 'B11 (오디오 토글)',
-      12: 'POV ▲ (기수 내림 트림)',
-      13: 'POV ▼ (기수 올림 트림)',
-      14: 'POV ◀ (시간대 -)',
-      15: 'POV ▶ (시간대 +)',
+      12: 'POV ▲ (시선 상향)',
+      13: 'POV ▼ (시선 하향)',
+      14: 'POV ◀ (시선 좌측)',
+      15: 'POV ▶ (시선 우측)',
     };
     return pcActions[index] || `Button ${index}`;
   }

@@ -735,36 +735,26 @@ export class HotasController {
       this.controls?.onToggleAudio?.();
     }
 
-    // --- 4. POV / Hat Switch ---
+    // --- 4. POV / Hat Switch (Look around / look at each side) ---
     // Buttons 12-15 or raw Hat axes (D-pad mapping)
-    // Hat Up (12): Trim Nose Down (T equivalent)
+    // Hat Up (12): Look Up
+    // Hat Down (13): Look Down
+    // Hat Left (14): Look Left
+    // Hat Right (15): Look Right
     const hatUp = this.isButtonPressed(buttons, 12);
-    // Hat Down (13): Trim Nose Up (Y equivalent)
     const hatDown = this.isButtonPressed(buttons, 13);
-    // Hat Left (14): Cycle Time of Day backward
-    const hatLeft = this.wasJustPressed(buttons, 14);
-    // Hat Right (15): Cycle Time of Day forward
-    const hatRight = this.wasJustPressed(buttons, 15);
+    const hatLeft = this.isButtonPressed(buttons, 14);
+    const hatRight = this.isButtonPressed(buttons, 15);
 
-    if (!aircraftDisabled) {
-      if (hatUp) {
-        if (this.controls) {
-          this.controls.pitchTrim -= dt * 1.5;
-          this.controls.pitchTrimRate = -1.0;
-        }
-      } else if (hatDown) {
-        if (this.controls) {
-          this.controls.pitchTrim += dt * 1.5;
-          this.controls.pitchTrimRate = 1.0;
-        }
-      }
-    }
+    let hatDirX = 0;
+    let hatDirY = 0;
+    if (hatLeft) hatDirX -= 1;
+    if (hatRight) hatDirX += 1;
+    if (hatUp) hatDirY -= 1;
+    if (hatDown) hatDirY += 1;
 
-    if (hatLeft) {
-      this.controls?.onCycleTimeOfDay?.(-1.5);
-    }
-    if (hatRight) {
-      this.controls?.onCycleTimeOfDay?.(1.5);
+    if (hatDirX !== 0 || hatDirY !== 0) {
+      this.controls?.onHatLook?.(hatDirX, hatDirY, dt);
     }
   }
 
@@ -874,32 +864,26 @@ export class HotasController {
       this.controls?.onToggleLights?.();
     }
 
-    // --- 4. POV / D-pad ---
-    // Button 12: D-pad Up (Trim Nose Down)
+    // --- 4. POV / D-pad (Look around / look at each side) ---
+    // Button 12: D-pad Up (Look Up)
+    // Button 13: D-pad Down (Look Down)
+    // Button 14: D-pad Left (Look Left)
+    // Button 15: D-pad Right (Look Right)
     const hatUp = this.isButtonPressed(buttons, 12);
-    // Button 13: D-pad Down (Trim Nose Up)
     const hatDown = this.isButtonPressed(buttons, 13);
-    // Button 14: D-pad Left (Time cycle backward)
-    const hatLeft = this.wasJustPressed(buttons, 14);
-    // Button 15: D-pad Right (Time cycle forward)
-    const hatRight = this.wasJustPressed(buttons, 15);
+    const hatLeft = this.isButtonPressed(buttons, 14);
+    const hatRight = this.isButtonPressed(buttons, 15);
 
-    if (!aircraftDisabled) {
-      if (hatUp) {
-        if (this.controls) {
-          this.controls.pitchTrim -= dt * 1.5;
-          this.controls.pitchTrimRate = -1.0;
-        }
-      } else if (hatDown) {
-        if (this.controls) {
-          this.controls.pitchTrim += dt * 1.5;
-          this.controls.pitchTrimRate = 1.0;
-        }
-      }
+    let hatDirX = 0;
+    let hatDirY = 0;
+    if (hatLeft) hatDirX -= 1;
+    if (hatRight) hatDirX += 1;
+    if (hatUp) hatDirY -= 1;
+    if (hatDown) hatDirY += 1;
+
+    if (hatDirX !== 0 || hatDirY !== 0) {
+      this.controls?.onHatLook?.(hatDirX, hatDirY, dt);
     }
-
-    if (hatLeft) this.controls?.onCycleTimeOfDay?.(-1.5);
-    if (hatRight) this.controls?.onCycleTimeOfDay?.(1.5);
   }
 
   updateStandardGamepadProfile(gp, axes, buttons, dt) {
@@ -962,24 +946,22 @@ export class HotasController {
     if (this.wasJustPressed(buttons, 8)) this.controls?.onCycleCamera?.();
     if (this.wasJustPressed(buttons, 9)) this.controls?.onToggleLights?.();
 
-    // D-pad
+    // D-pad (Look around / look at each side)
     const dUp = this.isButtonPressed(buttons, 12);
     const dDown = this.isButtonPressed(buttons, 13);
-    const dLeft = this.wasJustPressed(buttons, 14);
-    const dRight = this.wasJustPressed(buttons, 15);
+    const dLeft = this.isButtonPressed(buttons, 14);
+    const dRight = this.isButtonPressed(buttons, 15);
 
-    if (!aircraftDisabled) {
-      if (dUp && this.controls) {
-        this.controls.pitchTrim -= dt * 1.5;
-        this.controls.pitchTrimRate = -1.0;
-      } else if (dDown && this.controls) {
-        this.controls.pitchTrim += dt * 1.5;
-        this.controls.pitchTrimRate = 1.0;
-      }
+    let dDirX = 0;
+    let dDirY = 0;
+    if (dLeft) dDirX -= 1;
+    if (dRight) dDirX += 1;
+    if (dUp) dDirY -= 1;
+    if (dDown) dDirY += 1;
+
+    if (dDirX !== 0 || dDirY !== 0) {
+      this.controls?.onHatLook?.(dDirX, dDirY, dt);
     }
-
-    if (dLeft) this.controls?.onCycleTimeOfDay?.(-1.5);
-    if (dRight) this.controls?.onCycleTimeOfDay?.(1.5);
   }
 
   getDiagnostics() {
