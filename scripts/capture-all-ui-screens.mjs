@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execSync, spawn } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { withBrowserSession, getFreePort } from './lib/browserHarness.mjs';
@@ -1170,10 +1170,10 @@ async function runSession2({ evaluate, screenshot, delay, exceptions }, recordSc
 }
 
 async function captureViewport(vpConfig, origin, tier, isVerify) {
-  const outDir = process.env.UI_SCREENSHOTS_DIR && selectedViewports.length === 1
-    ? resolve(process.cwd(), process.env.UI_SCREENSHOTS_DIR)
-    : isVerify && selectedViewports.length === 1
-      ? await mkdtemp(join(tmpdir(), `flight3d-ui-screens-${vpConfig.id}-`))
+  const outDir = isVerify
+    ? await mkdtemp(join(tmpdir(), `flight3d-ui-screens-${vpConfig.id}-`))
+    : process.env.UI_SCREENSHOTS_DIR && selectedViewports.length === 1
+      ? resolve(process.cwd(), process.env.UI_SCREENSHOTS_DIR)
       : resolve(process.cwd(), vpConfig.defaultOutDir);
 
   await mkdir(outDir, { recursive: true });
@@ -1193,6 +1193,7 @@ async function captureViewport(vpConfig, origin, tier, isVerify) {
     width: vpConfig.width,
     height: vpConfig.height,
     mobile: vpConfig.mobile,
+    touch: vpConfig.mobile,
     deviceScaleFactor: vpConfig.deviceScaleFactor,
     startVite: false,
     path: '/',
@@ -1207,6 +1208,7 @@ async function captureViewport(vpConfig, origin, tier, isVerify) {
       width: vpConfig.width,
       height: vpConfig.height,
       mobile: vpConfig.mobile,
+      touch: vpConfig.mobile,
       deviceScaleFactor: vpConfig.deviceScaleFactor,
       startVite: false,
       path: '/?pilotArena=1&airport=valley&aircraft=F16',
@@ -1270,6 +1272,9 @@ async function captureViewport(vpConfig, origin, tier, isVerify) {
 
   await writeFile(`${outDir}/catalog.json`, JSON.stringify(catalogPayload, null, 2));
   console.log(`[capture-all-ui-screens][${vpConfig.id}] Complete. ${catalog.length} screens captured (${finalCatalog.length} in catalog).`);
+  if (isVerify) {
+    await rm(outDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 // Start shared Vite server for concurrent parallel sessions

@@ -1,9 +1,11 @@
 {
-  "generatedAt": "2026-11-07T09:22:55.915Z",
-  "branch": "feat/exhaustive-ui-screens",
-  "commit": "519da002e2289757285031815c9f82732a40e26e",
-  "commitShort": "519da00",
-  "commitDate": "2026-11-07T16:54:50+09:00",
+  "generatedAt": "2026-11-07T12:53:20.924Z",
+  "branch": "feat/debrief-overlay-streamline",
+  "commit": "dd83c454efcf8b4293619a3065e49fa7f80bb9e9",
+  "commitShort": "dd83c45",
+  "commitDate": "2026-11-07T12:42:32Z",
+  "viewport": "mobile-portrait",
+  "dimensions": "390x844",
   "screens": [
     {
       "id": "01_startup_loading",

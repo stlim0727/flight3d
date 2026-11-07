@@ -148,4 +148,10 @@ test('Multi-viewport screens showcases, concurrent capture, and navigation switc
   assert.ok(pkg.scripts['screens:capture:all'].includes('--all-viewports'));
   assert.ok(pkg.scripts['screens:capture:portrait'].includes('--viewport mobile-portrait'));
   assert.ok(pkg.scripts['screens:capture:landscape'].includes('--viewport mobile-landscape'));
+
+  // Verify mobile catalogs exist and reference valid screens
+  const portraitCatalog = JSON.parse(readFileSync(resolve('public/screenshots/ui-mobile-portrait/catalog.json'), 'utf8'));
+  const landscapeCatalog = JSON.parse(readFileSync(resolve('public/screenshots/ui-mobile-landscape/catalog.json'), 'utf8'));
+  assert.ok(Array.isArray(portraitCatalog.screens) && portraitCatalog.screens.length > 0);
+  assert.ok(Array.isArray(landscapeCatalog.screens) && landscapeCatalog.screens.length > 0);
 });
