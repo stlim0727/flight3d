@@ -2,6 +2,21 @@
    The backdrop and chart use the live scene and recorded data, respectively. */
 body[data-flow="debrief"] #debrief-overlay { display: flex; }
 #debrief-overlay { align-items: center; background: rgba(6, 10, 18, .5); }
+#debrief-overlay.is-folded {
+  background: transparent !important;
+  pointer-events: none !important;
+}
+#debrief-overlay.is-folded .debrief-card {
+  display: none !important;
+}
+#debrief-overlay.is-folded .debrief-unfold-pill {
+  display: inline-flex !important;
+  pointer-events: auto !important;
+}
+.debrief-unfold-pill {
+  top: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-top) + 8px));
+  left: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-left) + 8px));
+}
 .debrief-card {
   width: min(calc(360px * var(--ui-scale, 1)), calc(100vw - 32px));
   height: min(calc(620px * var(--ui-scale, 1)), calc(100dvh - 32px));
@@ -34,6 +49,9 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 }
 .debrief-title-wrap p {
   margin: 0;
+}
+.debrief-card .debrief-fold-btn {
+  margin-left: auto;
 }
 .debrief-card .debrief-lobby-btn {
   flex: 0 0 auto;

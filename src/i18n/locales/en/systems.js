@@ -71,6 +71,8 @@ export default {
   "notice.time": "Time of day: {time}",
   "notice.hotasConnected": "Controller connected: {name}",
   "notice.hotasDisconnected": "Controller disconnected: {name}",
+  "notice.hudHidden": "HUD hidden (Press U to show)",
+  "notice.hudVisible": "HUD visible",
   "notice.autopilot": "Autopilot: {state}",
   "notice.parkingBrakeSet": "Parking brake: SET (.)",
   "notice.parkingBrakeReleased": "Parking brake: RELEASED (.)",

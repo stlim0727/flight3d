@@ -253,6 +253,25 @@ body:has(#hud-warning:not([hidden]), #hud-stall[style*="block"]) { --flight-aler
 .stall-banner { max-width: calc(100vw - var(--edge-left) - var(--edge-right)); font-size: calc(12px * var(--ui-scale, 1)); padding: calc(8px * var(--ui-scale, 1)) calc(12px * var(--ui-scale, 1)); pointer-events: none; }
 #hud-overlay:has(#hud-warning:not([hidden])) .stall-banner { display: none !important; }
 #hud-overlay:has(#hud-warning:not([hidden]), #hud-stall[style*="block"]) :is(.toast, .audio-start-hint) { visibility: hidden; }
+
+/* In-flight foldable HUD for clean plane watching */
+body.hud-folded .hud-top-bar,
+body.hud-folded .flight-toolbar,
+body.hud-folded .flight-more-panel,
+body.hud-folded .touch-controls-overlay,
+body.hud-folded #demo-banner,
+body.hud-folded .demo-pill-btn,
+body.hud-folded .ap-panel {
+  display: none !important;
+}
+body.hud-folded .hud-unfold-pill {
+  display: inline-flex !important;
+  pointer-events: auto !important;
+}
+.hud-unfold-pill {
+  top: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-top) + 8px));
+  right: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-right) + 8px));
+}
 /* Draw the collapse glyph without relying on a device's symbol-font coverage. */
 .demo-actions .btn-demo-close { position: relative; font-size: 0; }
 .demo-actions .btn-demo-close::before, .demo-actions .btn-demo-close::after {

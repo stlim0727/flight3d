@@ -46,6 +46,10 @@ export class DebriefOverlay {
             <h2 id="debrief-title">Flight3d</h2>
             <p class="debrief-muted" data-i18n="debrief.title"></p>
           </div>
+          <button class="btn btn-card-fold debrief-fold-btn" id="debrief-fold" type="button" data-i18n-title="ui.fold" data-i18n-aria-label="ui.fold">
+            <span class="fold-glyph" aria-hidden="true">▾</span>
+            <span class="fold-caption" data-i18n="ui.fold"></span>
+          </button>
         </header>
         <div class="debrief-tabs" role="tablist" data-i18n-aria-label="debrief.title">
           ${['summary', 'record', 'share'].map(name => `<button class="btn" id="debrief-tab-${name}" role="tab" aria-controls="debrief-${name}" data-debrief-label="${name}"></button>`).join('')}
@@ -91,7 +95,12 @@ export class DebriefOverlay {
             <button class="btn" id="debrief-feedback" data-i18n="debrief.feedback"></button>
           </div>
         </div>
-      </div>`;
+      </div>
+      <button id="debrief-unfold" class="ui-unfold-pill debrief-unfold-pill" type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
+        <span class="unfold-icon">📋</span>
+        <span class="unfold-caption" data-i18n="debrief.title"></span>
+        <span class="unfold-glyph" aria-hidden="true">▴</span>
+      </button>`;
     translateDOM(this.root);
     for (const el of this.root.querySelectorAll('[data-debrief-label]')) bindText(el, () => t(`debrief.${el.dataset.debriefLabel}`));
     this.tabs = [...this.root.querySelectorAll('[role="tab"]')];
@@ -124,6 +133,9 @@ export class DebriefOverlay {
     this.el('retry').addEventListener('click', onRetry);
     this.el('lobby').addEventListener('click', onLobby);
     this.el('feedback').addEventListener('click', () => onFeedback?.());
+    this.isFolded = false;
+    this.el('fold')?.addEventListener('click', () => this.setFolded(true));
+    this.el('unfold')?.addEventListener('click', () => this.setFolded(false));
     this.el('save-replay').addEventListener('click', () => {
       if (this.replaySaved) return;
       const { ok, error } = onSaveReplay?.() ?? { ok: false };
@@ -181,6 +193,15 @@ export class DebriefOverlay {
   el(name) { return document.getElementById(`debrief-${name}`); }
   status(key) { bindText(this.el('status'), () => key ? t(key) : ''); }
 
+  setFolded(folded) {
+    this.isFolded = Boolean(folded);
+    this.root.classList.toggle('is-folded', this.isFolded);
+    const unfoldBtn = this.el('unfold');
+    if (unfoldBtn) unfoldBtn.hidden = !this.isFolded;
+    if (this.isFolded) unfoldBtn?.focus();
+    else this.el('fold')?.focus();
+  }
+
   measureOutcome() {
     const outcome = this.el('outcome');
     // Hidden panels report zero widths; the ResizeObserver re-measures once laid out.
@@ -211,6 +232,7 @@ export class DebriefOverlay {
     this.report = report;
     this.replay = replay;
     this.replaySaved = false;
+    this.setFolded(false);
     const enough = report.sufficient;
     const crash = report.crash;
     // A crash headline names the collision; short records keep their own headline, so the block names it.

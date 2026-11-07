@@ -33,7 +33,10 @@ export class DiagnosticsInspector {
     this.panel.innerHTML = `
       <div class="diag-header">
         <span class="diag-title"><span data-i18n="physics.aerodynamics.inspector">🔬 실시간 물리 & 항공역학 진단기 (Physics Inspector)</span></span>
-        <button id="diag-close" class="diag-close-btn">&times;</button>
+        <div class="diag-header-actions">
+          <button id="diag-fold" class="btn btn-card-fold diag-fold-btn" type="button" title="접기" aria-label="Fold" data-i18n-title="ui.fold" data-i18n-aria-label="ui.fold">&minus;</button>
+          <button id="diag-close" class="diag-close-btn">&times;</button>
+        </div>
       </div>
 
       <div class="diag-content">
@@ -143,6 +146,12 @@ export class DiagnosticsInspector {
 
     document.getElementById('diag-close')?.addEventListener('click', () => {
       this.hide();
+    });
+
+    const foldBtn = document.getElementById('diag-fold');
+    foldBtn?.addEventListener('click', () => {
+      const isFolded = this.panel.classList.toggle('is-folded');
+      foldBtn.textContent = isFolded ? '+' : '−';
     });
 
     // Tuning Sliders

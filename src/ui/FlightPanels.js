@@ -40,8 +40,33 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   fullscreen.setAttribute('data-short-label', '⛶');
   const ap = document.getElementById('ap-bar');
   const apPanel = document.getElementById('ap-panel');
-  topActions.append(ap, mute);
+  const hudFold = document.createElement('button');
+  hudFold.id = 'btn-hud-fold';
+  hudFold.className = 'btn btn-hud-fold';
+  hudFold.type = 'button';
+  bindText(hudFold, () => t('ui.foldHud'), 'aria-label');
+  bindText(hudFold, () => t('ui.foldHud'), 'title');
+  hudFold.innerHTML = '<span class="fold-glyph" aria-hidden="true">👁</span>';
+  topActions.append(ap, mute, hudFold);
   if (apPanel) hud.append(apPanel);
+  const hudUnfold = document.createElement('button');
+  hudUnfold.id = 'btn-hud-unfold';
+  hudUnfold.className = 'ui-unfold-pill hud-unfold-pill';
+  hudUnfold.type = 'button';
+  hudUnfold.hidden = true;
+  bindText(hudUnfold, () => t('ui.unfoldHud'), 'aria-label');
+  bindText(hudUnfold, () => t('ui.unfoldHud'), 'title');
+  hudUnfold.innerHTML = '<span class="unfold-icon">👁</span><span class="unfold-caption" data-i18n="ui.unfoldHud"></span><span class="unfold-glyph" aria-hidden="true">▴</span>';
+  hud.append(hudUnfold);
+  const setHudFolded = (folded) => {
+    const isFolded = Boolean(folded);
+    document.body.classList.toggle('hud-folded', isFolded);
+    hudUnfold.hidden = !isFolded;
+    if (isFolded) hudUnfold.focus();
+    else hudFold.focus();
+  };
+  hudFold.addEventListener('click', () => setHudFolded(true));
+  hudUnfold.addEventListener('click', () => setHudFolded(false));
   const menu = document.getElementById('menu-toggle');
   if (menu && !document.querySelector('.lobby-title-row')) topBar.append(menu);
   topBar.append(strip, topActions);
@@ -178,7 +203,10 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   const observer = new ResizeObserver(positionEdgeButtons);
   for (const node of [topBar, strip, bar, menu, ap, document.documentElement]) observer.observe(node);
   new MutationObserver(() => {
-    if (document.body.dataset.flow !== 'flight') setMoreOpen(false);
+    if (document.body.dataset.flow !== 'flight') {
+      setMoreOpen(false);
+      setHudFolded(false);
+    }
     positionEdgeButtons();
   }).observe(document.body, {
     attributes: true, attributeFilter: ['class', 'data-flow'],

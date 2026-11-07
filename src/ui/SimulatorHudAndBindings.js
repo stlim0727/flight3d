@@ -557,6 +557,18 @@ class SimulatorHudAndBindingsMethods {
       this.setPreset(this.lastPresetType || 'runway');
     });
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
+    const pauseMenu = document.getElementById('pause-menu');
+    const pauseFold = document.getElementById('btn-pause-fold');
+    const pauseUnfold = document.getElementById('btn-pause-unfold');
+    const setPauseFolded = (folded) => {
+      const isFolded = Boolean(folded);
+      pauseMenu?.classList.toggle('is-folded', isFolded);
+      if (pauseUnfold) pauseUnfold.hidden = !isFolded;
+      if (isFolded) pauseUnfold?.focus();
+      else pauseFold?.focus();
+    };
+    pauseFold?.addEventListener('click', () => setPauseFolded(true));
+    pauseUnfold?.addEventListener('click', () => setPauseFolded(false));
     document.getElementById('menu-toggle')?.addEventListener('click', () => this.toggleMainMenu());
 
     document.getElementById('shadow-prev')?.addEventListener('click', () => this.shadowDemo.next(-1));
@@ -574,7 +586,27 @@ class SimulatorHudAndBindingsMethods {
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
       if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
-      if (this.replayDirector.active) { this.replayPanel.exit(); return; }
+      const lobbyScreen = document.getElementById('lobby-screen');
+      if (this.gameFlow.state === FLOW.LOBBY && lobbyScreen?.classList.contains('is-folded')) {
+        this.lobbyScreen?.setFolded?.(false);
+        return;
+      }
+      if (this.debriefOverlay?.isFolded) {
+        this.debriefOverlay.setFolded(false);
+        return;
+      }
+      if (this.gameFlow.state === FLOW.PAUSED && pauseMenu?.classList.contains('is-folded')) {
+        setPauseFolded(false);
+        return;
+      }
+      if (this.replayDirector.active) {
+        if (this.replayPanel?.isFolded) {
+          this.replayPanel.setFolded(false);
+          return;
+        }
+        this.replayPanel.exit();
+        return;
+      }
       if (this.isCrashed) return;
       if (document.getElementById('hud-overlay')?.classList.contains('panel-open')) return;
       const helpModal = document.getElementById('help-modal');
@@ -589,6 +621,30 @@ class SimulatorHudAndBindingsMethods {
       if (this.gameFlow.state === FLOW.FLIGHT) this.gameFlow.pause();
       else if (this.gameFlow.state === FLOW.PAUSED) this.gameFlow.resume();
       else if (this.gameFlow.state === FLOW.LOBBY && this.gameFlow.canResumeFromLobby()) this.resumeFlight();
+    });
+
+    // U key toggles folding for the active UI overlay so users can watch planes.
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'KeyU' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
+      const lobbyScreen = document.getElementById('lobby-screen');
+      if (this.gameFlow.state === FLOW.LOBBY) {
+        const folded = !lobbyScreen?.classList.contains('is-folded');
+        this.lobbyScreen?.setFolded?.(folded);
+      } else if (this.gameFlow.state === FLOW.DEBRIEF) {
+        this.debriefOverlay?.setFolded(!this.debriefOverlay.isFolded);
+      } else if (this.gameFlow.state === FLOW.PAUSED) {
+        const folded = !pauseMenu?.classList.contains('is-folded');
+        setPauseFolded(folded);
+      } else if (this.replayDirector.active) {
+        this.replayPanel?.setFolded(!this.replayPanel.isFolded);
+      } else if (this.gameFlow.state === FLOW.FLIGHT) {
+        const folded = !document.body.classList.contains('hud-folded');
+        document.body.classList.toggle('hud-folded', folded);
+        const hudUnfold = document.getElementById('btn-hud-unfold');
+        if (hudUnfold) hudUnfold.hidden = !folded;
+        this.showToast(() => t(folded ? 'notice.hudHidden' : 'notice.hudVisible'));
+      }
     });
 
     // Tap backdrop outside the cards to resume in-flight play

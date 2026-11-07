@@ -29,6 +29,21 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const pilotAiBtn = document.getElementById('lobby-pilot-ai');
   const valleyGyroBtn = document.getElementById('lobby-valley-gyro');
   const valleySettingsBtn = document.getElementById('lobby-valley-settings');
+  const lobbyScreen = document.getElementById('lobby-screen');
+  const lobbyFoldBtn = document.getElementById('btn-lobby-fold');
+  const lobbyUnfoldBtn = document.getElementById('btn-lobby-unfold');
+
+  function setLobbyFolded(folded) {
+    const isFolded = Boolean(folded);
+    lobbyScreen?.classList.toggle('is-folded', isFolded);
+    if (lobbyUnfoldBtn) lobbyUnfoldBtn.hidden = !isFolded;
+    if (lobbyFoldBtn) lobbyFoldBtn.setAttribute('aria-expanded', String(!isFolded));
+    if (isFolded) lobbyUnfoldBtn?.focus();
+    else lobbyFoldBtn?.focus();
+  }
+
+  lobbyFoldBtn?.addEventListener('click', () => setLobbyFolded(true));
+  lobbyUnfoldBtn?.addEventListener('click', () => setLobbyFolded(false));
 
   pilotHumanBtn?.addEventListener('click', () => {
     onPilotMode('human');
@@ -326,5 +341,5 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
 
   refresh();
-  return { refresh, setWaitingForTerrain, setSelectionBusy };
+  return { refresh, setWaitingForTerrain, setSelectionBusy, setFolded: setLobbyFolded };
 }
