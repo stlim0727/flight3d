@@ -32,6 +32,7 @@ async function verifyFriendIndicator(host, capture) {
       };
       const r = edge.getBoundingClientRect();
       const controls = [...document.querySelectorAll('.hud-top-bar, .flight-toolbar, #mp-room-menu, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, #touch-btn-brake, #touch-btn-gyro, #touch-btn-recenter')]
+        .filter(node => getComputedStyle(node).visibility === 'visible')
         .map(node => node.getBoundingClientRect()).filter(rect => rect.width && rect.height);
       return {
         edge: !edge.hidden, name: !name.hidden, direction: edge.dataset.direction,
@@ -66,9 +67,11 @@ async function verifyFriendIndicator(host, capture) {
     await host.evaluate('sim.cameraSystem.setMode(1, true); sim.touchControls.enable()');
     for (const [width, height] of [[844, 390], [390, 844], [320, 568]]) {
       await host.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+      await host.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
       const bottom = await marker({ p: [0, -250, -120] });
-      assert.ok(bottom.edge && bottom.direction === 'down' && bottom.noOverlap && bottom.passThrough, `bottom marker fits ${width}x${height}`);
       await capture(host, `friend-edge-${width}x${height}`);
+      assert.ok(bottom.edge && bottom.direction === 'down' && bottom.noOverlap && bottom.passThrough,
+        `bottom marker fits ${width}x${height}: ${JSON.stringify(bottom)}`);
     }
     await host.evaluate('document.getElementById("mp-room-menu").click(); sim.multiplayer.update()');
     const paused = await marker({ p: [200, 0, -120] });
