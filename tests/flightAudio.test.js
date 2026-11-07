@@ -615,3 +615,45 @@ describe('Touchdown contact audio', () => {
     }
   });
 });
+
+describe('Engine volume', () => {
+  const engineOutputs = ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain'];
+
+  it('routes every engine source through one engine bus before cockpit acoustics', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio(); audio.init();
+      assert.ok(audio.engineBus.connectedTo.includes(audio.cockpitFilter));
+      for (const name of engineOutputs) {
+        assert.deepStrictEqual(audio[name].connectedTo, [audio.engineBus], `${name} should feed only the engine bus`);
+      }
+      for (const name of ['packGain', 'windGain', 'rumbleGain']) {
+        assert.ok(!audio[name].connectedTo.includes(audio.engineBus), `${name} must not follow engine volume`);
+      }
+      assert.strictEqual(audio.engineBus.gain.value, 1);
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('clamps, applies before and after initialization, and keeps master volume and mute unchanged', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      assert.strictEqual(audio.engineVolume, 1);
+      audio.setEngineVolume(0.4);
+      audio.init();
+      assert.strictEqual(audio.engineBus.gain.value, 0.4, 'a restored setting applies when audio starts');
+      audio.setEngineVolume(1.7); assert.strictEqual(audio.engineVolume, 1);
+      audio.setEngineVolume(-1); assert.strictEqual(audio.engineVolume, 0);
+      audio.setEngineVolume(Number.NaN); assert.strictEqual(audio.engineVolume, 0, 'invalid input keeps the current value');
+      assert.strictEqual(audio.engineBus.gain.value, 0);
+      assert.strictEqual(audio.isMuted, false, 'silencing engines is not a global mute');
+      assert.strictEqual(audio.masterGain.gain.value, 1);
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+});

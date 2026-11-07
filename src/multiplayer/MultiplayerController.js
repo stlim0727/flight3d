@@ -211,6 +211,11 @@ export class MultiplayerController {
     const start = document.getElementById('mp-start');
     start.hidden = !active || !room.host;
     start.disabled = !['connected', 'flying'].includes(s?.state);
+    // Highlight the first start once a friend joins; move focus to it only on that transition.
+    const ready = active && room.host && s.state === 'connected';
+    start.setAttribute('data-ready', String(ready));
+    if (ready && !this.startReady && this.dialog?.open) start.focus?.();
+    this.startReady = ready;
     bindText(start, () => t(s?.state === 'flying' ? 'mp.restart' : 'mp.start'));
     bindText(document.getElementById('mp-status'), () => {
       if (this.message) return t(`mp.status.${this.message}`);

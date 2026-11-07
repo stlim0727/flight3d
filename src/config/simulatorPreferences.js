@@ -14,6 +14,8 @@ export function validateSimulatorPreferences(value) {
   for (const key of ['audioMuted', 'touchControls', 'gyroEnabled']) {
     if (typeof value[key] === 'boolean') result[key] = value[key];
   }
+  if (typeof value.engineVolume === 'number' && Number.isFinite(value.engineVolume)
+      && value.engineVolume >= 0 && value.engineVolume <= 1) result.engineVolume = value.engineVolume;
   if (['auto', 'portrait', 'landscape'].includes(value.gyroOrientation)) result.gyroOrientation = value.gyroOrientation;
   if (typeof value.demoProfile === 'string' && /^[a-z0-9-]{1,64}$/.test(value.demoProfile)) {
     result.demoProfile = value.demoProfile;
@@ -114,6 +116,7 @@ export function restoreSimulatorPreferences(sim, preferences, { now = new Date()
     applyDeviceTimeOfDay(sim, now);
   }
   if (preferences.audioMuted !== undefined) sim.audio.setMuted(preferences.audioMuted);
+  if (preferences.engineVolume !== undefined) sim.audio.setEngineVolume(preferences.engineVolume);
   if (preferences.touchControls !== undefined && preferences.gyroEnabled !== true) {
     if (preferences.touchControls) sim.touchControls.enable();
     else sim.touchControls.disable();

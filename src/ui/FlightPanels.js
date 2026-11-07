@@ -125,7 +125,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   cameraSelect.addEventListener('change', () => onSelectCamera(Number(cameraSelect.value)));
   cameraLabel.append(caption, cameraSelect);
   settings.append(cameraLabel);
-  for (const selector of ['.language-control[for="render-quality"]', '.language-control[for="cockpit-quality"]', '#btn-sound', '#btn-touch-toggle', '#touch-btn-gyro', '#gyro-settings', '#btn-cam-reset', '#btn-yokes', '#btn-diag', '#btn-joystick-check', '#btn-help']) {
+  for (const selector of ['.language-control[for="render-quality"]', '.language-control[for="cockpit-quality"]', '#btn-sound', '.language-control[for="engine-volume"]', '#btn-touch-toggle', '#touch-btn-gyro', '#gyro-settings', '#btn-cam-reset', '#btn-yokes', '#btn-diag', '#btn-joystick-check', '#btn-help']) {
     const node = document.querySelector(selector);
     if (node) settings.append(node);
   }

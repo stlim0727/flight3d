@@ -257,6 +257,8 @@ export default {
   "choose.a.preset.and.camera.view.to": "이제 원하는 프리셋과 카메라 뷰를 선택하여 직접 비행을 즐겨보세요! [Esc]",
   "language.label": "언어",
   "cockpit.quality.label": "콕핏 음영",
+  "engine.volume.label": "엔진음",
+  "engine.volume.value": "엔진음 {value}%",
   "cockpit.quality.detailed": "정밀",
   "cockpit.quality.performance": "성능 우선 (접촉 음영 끄기)",
   "quality.label": "화질",

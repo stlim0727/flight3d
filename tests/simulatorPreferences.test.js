@@ -146,3 +146,15 @@ test('keyboard time adjustments use the same persistent path as menu time change
   sim.controls.onCycleTimeOfDay(1);
   assert.equal(sim.requestedTime, 24.5);
 });
+
+test('engine volume persists as a 0..1 level, rejects malformed values and restores into audio', () => {
+  const storage = memoryStorage();
+  saveSimulatorPreferences({ engineVolume: 0 }, storage);
+  assert.equal(loadSimulatorPreferences(storage).engineVolume, 0, 'silent engines survive reload');
+  saveSimulatorPreferences({ engineVolume: 0.35, audioMuted: true }, storage);
+  for (const engineVolume of [-0.1, 1.2, Number.NaN, '0.5', null]) saveSimulatorPreferences({ engineVolume }, storage);
+  assert.deepEqual(loadSimulatorPreferences(storage), { engineVolume: 0.35, audioMuted: true });
+  const sim = { lobby: {}, audio: { setMuted() {}, setEngineVolume(level) { this.engineVolume = level; } } };
+  restoreSimulatorPreferences(sim, { engineVolume: 0.35 });
+  assert.equal(sim.audio.engineVolume, 0.35);
+});

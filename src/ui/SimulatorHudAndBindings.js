@@ -606,6 +606,26 @@ class SimulatorHudAndBindingsMethods {
     // Initialize Audio UI state
     this.updateAudioUI();
 
+    // Engine volume sliders (flight settings and multiplayer dialog) share one audio level.
+    const engineVolumeInputs = [...document.querySelectorAll('[data-engine-volume]')];
+    const syncEngineVolume = () => {
+      const percent = Math.round(this.audio.engineVolume * 100);
+      for (const input of engineVolumeInputs) {
+        input.value = String(percent);
+        bindText(input, () => t('engine.volume.value', { value: percent }), 'aria-valuetext');
+        const output = input.parentElement?.querySelector('[data-engine-volume-value]');
+        if (output) output.textContent = `${percent}%`;
+      }
+    };
+    for (const input of engineVolumeInputs) {
+      input.addEventListener('input', () => {
+        this.audio.setEngineVolume(Number(input.value) / 100);
+        syncEngineVolume();
+      });
+      input.addEventListener('change', () => saveSimulatorPreferences({ engineVolume: this.audio.engineVolume }));
+    }
+    syncEngineVolume();
+
     // Flight Guide Modal
     const helpModal = document.getElementById('help-modal');
     document.getElementById('btn-help')?.addEventListener('click', () => {

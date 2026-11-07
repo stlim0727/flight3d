@@ -13,6 +13,8 @@
 }
 .language-control select { cursor: pointer; min-width: 110px; }
 .language-control option { background: #142030; color: #fff; }
+.engine-volume-control input[type="range"] { flex: 1 1 96px; min-width: 96px; accent-color: #38bdf8; cursor: pointer; }
+.engine-volume-control output { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Shared flight controls. Panels keep their header outside the scrolling body. */ body {
   --edge-left: max(8px, env(safe-area-inset-left));
