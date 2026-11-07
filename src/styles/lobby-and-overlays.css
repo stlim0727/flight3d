@@ -25,7 +25,7 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 #lobby-screen.is-folded .lobby-card {
   display: none !important;
 }
-#lobby-screen.is-folded .lobby-unfold-pill {
+#lobby-screen.is-folded .lobby-unfold-pill:not([hidden]) {
   display: inline-flex !important;
   pointer-events: auto !important;
 }
@@ -36,7 +36,7 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 #pause-menu.is-folded .pause-card {
   display: none !important;
 }
-#pause-menu.is-folded .pause-unfold-pill {
+#pause-menu.is-folded .pause-unfold-pill:not([hidden]) {
   display: inline-flex !important;
   pointer-events: auto !important;
 }
@@ -114,6 +114,10 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   cursor: pointer;
   pointer-events: auto;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ui-unfold-pill[hidden],
+.btn-card-fold[hidden] {
+  display: none !important;
 }
 .ui-unfold-pill:hover {
   background: rgba(16, 36, 60, 0.95);

@@ -264,9 +264,12 @@ body.hud-folded .demo-pill-btn,
 body.hud-folded .ap-panel {
   display: none !important;
 }
-body.hud-folded .hud-unfold-pill {
+body.hud-folded .hud-unfold-pill:not([hidden]) {
   display: inline-flex !important;
   pointer-events: auto !important;
+}
+.hud-unfold-pill[hidden] {
+  display: none !important;
 }
 .hud-unfold-pill {
   top: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-top) + 8px));

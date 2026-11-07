@@ -9,9 +9,12 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 #debrief-overlay.is-folded .debrief-card {
   display: none !important;
 }
-#debrief-overlay.is-folded .debrief-unfold-pill {
+#debrief-overlay.is-folded .debrief-unfold-pill:not([hidden]) {
   display: inline-flex !important;
   pointer-events: auto !important;
+}
+.debrief-unfold-pill[hidden] {
+  display: none !important;
 }
 .debrief-unfold-pill {
   top: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-top) + 8px));

@@ -13,8 +13,11 @@
 #replay-panel.is-folded > :not(.replay-unfold-pill) {
   display: none !important;
 }
-#replay-panel.is-folded .replay-unfold-pill {
+#replay-panel.is-folded .replay-unfold-pill:not([hidden]) {
   display: inline-flex !important;
+}
+.replay-unfold-pill[hidden] {
+  display: none !important;
 }
 .replay-unfold-pill {
   position: static;

@@ -54,20 +54,24 @@ test('CSS files define .is-folded and .ui-unfold-pill styles for clear plane wat
   assert.ok(lobbyCss.includes('#lobby-screen.is-folded'), 'lobby CSS must define #lobby-screen.is-folded');
   assert.ok(lobbyCss.includes('#pause-menu.is-folded'), 'lobby CSS must define #pause-menu.is-folded');
   assert.ok(lobbyCss.includes('.ui-unfold-pill'), 'lobby CSS must define .ui-unfold-pill');
+  assert.ok(lobbyCss.includes('.ui-unfold-pill[hidden]'), 'lobby CSS must hide .ui-unfold-pill[hidden]');
   assert.ok(lobbyCss.includes('.lobby-unfold-pill'), 'lobby CSS must define .lobby-unfold-pill');
   assert.ok(lobbyCss.includes('.pause-unfold-pill'), 'lobby CSS must define .pause-unfold-pill');
 
   const debriefCss = readFileSync(resolve('src/styles/debrief.css'), 'utf8');
   assert.ok(debriefCss.includes('#debrief-overlay.is-folded'), 'debrief CSS must define #debrief-overlay.is-folded');
   assert.ok(debriefCss.includes('.debrief-unfold-pill'), 'debrief CSS must define .debrief-unfold-pill');
+  assert.ok(debriefCss.includes('.debrief-unfold-pill[hidden]'), 'debrief CSS must hide .debrief-unfold-pill[hidden]');
 
   const replayCss = readFileSync(resolve('src/styles/replay.css'), 'utf8');
   assert.ok(replayCss.includes('#replay-panel.is-folded'), 'replay CSS must define #replay-panel.is-folded');
   assert.ok(replayCss.includes('.replay-unfold-pill'), 'replay CSS must define .replay-unfold-pill');
+  assert.ok(replayCss.includes('.replay-unfold-pill[hidden]'), 'replay CSS must hide .replay-unfold-pill[hidden]');
 
   const flightLayoutCss = readFileSync(resolve('src/styles/flight-layout.css'), 'utf8');
   assert.ok(flightLayoutCss.includes('body.hud-folded'), 'flight-layout CSS must define body.hud-folded');
   assert.ok(flightLayoutCss.includes('.hud-unfold-pill'), 'flight-layout CSS must define .hud-unfold-pill');
+  assert.ok(flightLayoutCss.includes('.hud-unfold-pill[hidden]'), 'flight-layout CSS must hide .hud-unfold-pill[hidden]');
 
   const diagCss = readFileSync(resolve('src/styles/diagnostics-and-crash.css'), 'utf8');
   assert.ok(diagCss.includes('.diagnostics-panel.is-folded'), 'diag CSS must define .diagnostics-panel.is-folded');
