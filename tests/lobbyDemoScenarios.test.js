@@ -123,7 +123,7 @@ function setupMockDOM() {
     'lobby-valley-options', 'lobby-pilot-human', 'lobby-pilot-ai',
     'lobby-valley-gyro', 'lobby-valley-settings', 'lobby-valley-preflight',
     'lobby-time-select', 'lobby-tab-settings', 'dev-enabled',
-    'lobby-airport-hangang', 'lobby-airport-incheon', 'lobby-airport-coastal',
+    'lobby-airport-incheon', 'lobby-airport-coastal',
     'lobby-airport-lukla', 'lobby-airport-neon', 'lobby-airport-valley',
     'lobby-aircraft-b738', 'lobby-aircraft-c172', 'lobby-aircraft-f16',
     'lobby-lang-en', 'lobby-lang-ko',

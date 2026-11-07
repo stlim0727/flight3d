@@ -54,7 +54,7 @@ test('default selection constants are valid', () => {
   assert.equal(DEFAULT_AIRPORT, 'coastal');
   assert.equal(DEFAULT_AIRCRAFT, 'B738');
   assert.equal(DEFAULT_SCENARIO, 'runway');
-  assert.deepEqual([...VALID_AIRPORTS], ['coastal', 'lukla', 'incheon', 'neon', 'hangang', 'valley']);
+  assert.deepEqual([...VALID_AIRPORTS], ['coastal', 'lukla', 'incheon', 'neon', 'valley']);
 });
 
 test('resolveAirport accepts known airports and degrades unknown ones', () => {
@@ -230,12 +230,20 @@ test('roundtrip saving and restoring matches selection across page reloads', () 
 });
 
 
-test('Hangang persists as an independent region with a valid default and C172', () => {
+test('the retired Hangang region restores as the Neon Metropolis bridge flight in a C172 (#551)', () => {
   const storage = createMockStorage();
   saveFlightSelection({airport:'hangang', aircraft:'B738', scenario:'runway'}, storage);
-  assert.deepEqual(loadSavedFlightSelection(storage), {airport:'hangang', aircraft:'C172', scenario:'hangang'});
-  assert.equal(resolveScenario(null, 'hangang'), 'hangang');
-  for (const airport of ['coastal','incheon','lukla','neon']) assert.equal(resolveScenario('hangang', airport), 'runway');
+  assert.deepEqual(loadSavedFlightSelection(storage), {airport:'neon', aircraft:'C172', scenario:'bridge'});
+  assert.equal(resolveAirport('hangang'), 'neon');
+  for (const airport of ['coastal','incheon','lukla','neon','valley']) assert.notEqual(resolveScenario('hangang', airport), 'hangang');
+});
+
+test('the bridge flight is a Neon Metropolis scenario that always flies the C172', () => {
+  const storage = createMockStorage();
+  saveFlightSelection({airport:'neon', aircraft:'F16', scenario:'bridge'}, storage);
+  assert.deepEqual(loadSavedFlightSelection(storage), {airport:'neon', aircraft:'C172', scenario:'bridge'});
+  for (const airport of ['coastal','incheon','lukla']) assert.equal(resolveScenario('bridge', airport), 'runway');
+  assert.equal(resolveScenario('bridge', 'valley'), 'valley');
 });
 
 test('hasPendingFlightSelection reports only real differences from the flown scene', () => {

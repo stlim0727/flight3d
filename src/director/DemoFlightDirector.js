@@ -324,7 +324,8 @@ export class DemoFlightDirector {
   start(targetAirport = null, requestedProfile = this.sim.lobby?.demoProfile) {
     if (this.sim.multiplayer?.active) return false;
     this.closeRestartConfirm?.();
-    if ((targetAirport || this.sim.activeAirport) === 'hangang') return false;
+    // The bridge flight is flown by hand; a demo may only take over another airport.
+    if (this.sim.hangang?.active && (!targetAirport || targetAirport === this.sim.activeAirport)) return false;
     const sihwa=(targetAirport || this.sim.activeAirport)==='incheon' && resolveDemoProfile(this.sim.currentAircraftId,'incheon',requestedProfile).id==='sihwa-tour';
     if (!sihwa && (targetAirport || this.sim.activeAirport) === 'incheon' && !['B738', 'C172'].includes(this.sim.currentAircraftId)) return false;
     if (!sihwa && this.sim.currentAircraftId === 'F16' && (targetAirport || this.sim.activeAirport) !== 'lukla') return false;
@@ -434,6 +435,8 @@ export class DemoFlightDirector {
 
   stop(message = null, keepParkingBrake = false, { preserveThrottle = false } = {}) {
     this.closeRestartConfirm?.();
+    // The bridge flight is flown by hand; a demo may only take over another airport.
+    if (this.sim.hangang?.active && (!targetAirport || targetAirport === this.sim.activeAirport)) return false;
     if (!this.isActive) return;
     this.sim?.voiceChallengeOverlay?.hide();
     const retainSpeedBrakes=this.getActiveScenario()===this.sihwaTourScenario;

@@ -1,17 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Vector3, Quaternion, Scene, Box3, Euler, Matrix4 } from 'three';
+import { Vector3, Quaternion } from 'three';
 import { HangangCollision } from '../src/director/HangangCollision.js';
-import { SimulatorClass } from './helpers/simulatorClass.js';
 import { HangangScenario } from '../src/director/HangangScenario.js';
-import { HANGANG_COURSE as course, bridgeApproaches, riverCenter } from '../src/config/hangangCourse.js';
+import { HANGANG_COURSE as course, bridgeApproaches, courseToWorld, riverCenter, worldToCourse } from '../src/config/hangangCourse.js';
 import { lobbyBriefing } from '../src/ui/lobbyBriefing.js';
 import { setLanguage, t } from '../src/i18n/index.js';
 
+// Course-frame poses, placed in the Neon Metropolis world the way the bridge flight flies.
+const up = new Vector3(0, 1, 0), frameTurn = new Quaternion().setFromAxisAngle(up, course.frame.yaw);
 const q = new Quaternion();
-function step(collision, x, y, z, attitude = q) {
-  return collision.update(new Vector3(x, y, z), attitude);
+function worldPose(x, y, z, attitude = q) {
+  const [wx, wz] = courseToWorld(x, z);
+  return [new Vector3(wx, y, wz), frameTurn.clone().multiply(attitude)];
 }
+function step(collision, x, y, z, attitude = q) {
+  return collision.update(...worldPose(x, y, z, attitude));
+}
+
+test('the course frame places the river along the south of the skyline, flying east', () => {
+  const [x, z] = courseToWorld(12, -340);
+  assert.deepEqual(worldToCourse(x, z).map(v => Math.round(v * 1e6) / 1e6), [12, -340]);
+  // Course -Z is world +X, course +X is world +Z.
+  const origin = courseToWorld(0, 0), east = courseToWorld(0, -100), north = courseToWorld(100, 0);
+  assert.ok(Math.abs(east[0] - origin[0] - 100) < 1e-9 && Math.abs(east[1] - origin[1]) < 1e-9);
+  assert.ok(Math.abs(north[1] - origin[1] - 100) < 1e-9 && Math.abs(north[0] - origin[0]) < 1e-9);
+  // Clear of the runway (|z| <= 30) by more than a kilometre.
+  for (const z of [1200, 0, -1080, -3730, -6500]) assert.ok(courseToWorld(riverCenter(z) + course.halfWidth, z)[1] < -1000, `bank at ${z}`);
+});
 test('flying the river under all three bridges makes no contact', () => {
   const collision = new HangangCollision();
   for (let z = 850; z >= -3800; z -= 2.3) assert.equal(step(collision, riverCenter(z), 19, z), null, `z ${z}`);
@@ -44,48 +60,14 @@ test('approach ramps past the deck ends are solid (#429)', () => {
   assert.equal(cross(top - 2)?.structure, 'approach');
   assert.equal(cross(top + 8), null);
 });
-// Flies Hangang Bridge's main span along its own axis, `offset` metres across the river.
-function islandPass(height, offset = 0) {
-  const collision = new HangangCollision();
-  const b = course.bridges.find(bridge => bridge.id === 'hangang');
-  const yaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), b.yaw);
-  const forward = new Vector3(0, 0, -1).applyQuaternion(yaw), across = new Vector3(1, 0, 0).applyQuaternion(yaw);
-  for (let s = -200; s <= 200 && !collision.contact; s += 2.3) {
-    collision.update(new Vector3(b.x, height, b.z).addScaledVector(across, offset).addScaledVector(forward, s), yaw);
-  }
-  return collision;
-}
-test('Nodeulseom island and pavilion under Hangang Bridge are solid', () => {
-  for (const height of [11, 14]) assert.equal(islandPass(height).contact?.structure, 'pavilion');
-  // Mid-way between the piers at 31.75 and 95.25 m, over bare island.
-  assert.equal(islandPass(5, 63.5).contact?.structure, 'island');
-  for (const collision of [islandPass(18), islandPass(11, 63.5)]) assert.equal(collision.contact, null);
-});
-test('pavilion collides where its mesh stands, not across its bounding box', () => {
-  const collision = new HangangCollision(), island = course.nodeulseom, field = island.pavilion.heights;
-  const probe = (x, z, y) => collision.nodeulseomHit(new Box3().setFromCenterAndSize(
-    new Vector3(island.x + x, y, island.z + z), new Vector3(0.4, 0.4, 0.4)));
-  let roofs = 0, open = 0;
-  field.heights.forEach((top, k) => {
-    const x = field.x0 + (k % field.cols + 0.5) * field.cell, z = field.z0 + (Math.floor(k / field.cols) + 0.5) * field.cell;
-    if (top > island.height + 1) {
-      roofs++; assert.equal(probe(x, z, top - 0.3), 'pavilion'); assert.equal(probe(x, z, top + 0.3), null);
-    } else if (Math.abs(x) < 22.5 && Math.abs(z) < 40) {
-      // Inside the former 45 x 80 m box, but only plaza or bare island here.
-      open++; assert.equal(probe(x, z, 8), null);
-    }
-  });
-  assert.ok(roofs > 800, `roof cells ${roofs}`); assert.ok(open > 800, `open cells ${open}`);
-  assert.ok(field.top > 15 && field.top < 15.5, `roof top ${field.top}`);
-  assert.equal(probe(0, 0, field.top + 0.3), null);
-});
 // Crosses bridge `index` level, along its own deck-crossing axis, at bridge-local x
 // and height y; returns the first contact.
 function deckCrossing(index, x, y) {
   const collision = new HangangCollision(), b = course.bridges[index];
-  const yaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), b.yaw);
+  const yaw = new Quaternion().setFromAxisAngle(up, b.yaw);
   for (let s = 40; s >= -40 && !collision.contact; s -= 2.3) {
-    collision.update(new Vector3(x, y, s).applyQuaternion(yaw).add(new Vector3(b.x, 0, b.z)), yaw);
+    const p = new Vector3(x, y, s).applyQuaternion(yaw).add(new Vector3(b.x, 0, b.z));
+    step(collision, p.x, p.y, p.z, yaw);
   }
   return collision.contact;
 }
@@ -108,81 +90,15 @@ test('deck streetlights and arch ribs are solid (#395)', () => {
   // Mapo has no arch.
   assert.equal(deckCrossing(1, 0, 67), null);
 });
-
-// Reference for #395: sample the faces of every padded part box at `step` metres and test
-// each sample against the pavilion cells, optionally grown by `grow` metres.
-const PARTS = [[[-0.65, -0.55, -2.9], [0.65, 1.1, 4.6]], [[-5.8, 0.70, -1.3], [5.8, 1.15, 1]],
-  [[-2.1, 0.3, 3.1], [2.1, 0.85, 4.6]], [[-0.3, 0.5, 3], [0.3, 2.4, 4.6]], [[-1.3, -1.65, -1.8], [1.3, -0.3, 1]]];
-function sampledPavilionHit(matrix, step, grow) {
-  const island = course.nodeulseom, field = island.pavilion.heights, p = new Vector3();
-  const inCells = (x, y, z) => {
-    const fx = x - island.x - field.x0, fz = z - island.z - field.z0;
-    for (let j = Math.floor((fz - grow) / field.cell); j <= Math.floor((fz + grow) / field.cell); j++) {
-      for (let i = Math.floor((fx - grow) / field.cell); i <= Math.floor((fx + grow) / field.cell); i++) {
-        if (i >= 0 && j >= 0 && i < field.cols && j < field.rows && field.heights[j * field.cols + i] + grow >= y) return true;
-      }
-    }
-    return false;
-  };
-  for (const [lo, hi] of PARTS) {
-    const min = lo.map(v => v - 0.15), max = hi.map(v => v + 0.15);
-    for (let axis = 0; axis < 3; axis++) {
-      const [a, b] = [0, 1, 2].filter(k => k !== axis);
-      const na = Math.ceil((max[a] - min[a]) / step), nb = Math.ceil((max[b] - min[b]) / step);
-      for (const side of [min[axis], max[axis]]) {
-        for (let ia = 0; ia <= na; ia++) {
-          for (let ib = 0; ib <= nb; ib++) {
-            const v = [0, 0, 0];
-            v[axis] = side; v[a] = min[a] + (max[a] - min[a]) * ia / na; v[b] = min[b] + (max[b] - min[b]) * ib / nb;
-            p.set(...v).applyMatrix4(matrix);
-            if (inCells(p.x, p.y, p.z)) return true;
-          }
-        }
-      }
-    }
-  }
-  return false;
-}
-test('banked pavilion contact matches the surface-sampled aircraft (#395)', () => {
-  const island = course.nodeulseom, matrix = new Matrix4(), unit = new Vector3(1, 1, 1);
-  let seed = 395;
-  const random = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
-  for (const bank of [12, 20, 29]) {
-    let hits = 0, clear = 0, decided = 0, boxOnly = 0;
-    for (let n = 0; n < 320; n++) {
-      const roll = (random() < 0.5 ? -1 : 1) * bank * Math.PI / 180;
-      const attitude = new Quaternion().setFromEuler(new Euler((random() - 0.5) * 0.15, random() * 2 * Math.PI, roll, 'YXZ'));
-      const position = new Vector3(island.x + (random() - 0.5) * 60, 6 + random() * 12, island.z + (random() - 0.5) * 60);
-      matrix.compose(position, attitude, unit);
-      // Keep every part above the island top and plaza, so only the pavilion can be hit.
-      const lowest = Math.min(...PARTS.flatMap(([lo, hi]) => [0, 1, 2, 3, 4, 5, 6, 7].map(c =>
-        new Vector3(c & 1 ? hi[0] : lo[0], c & 2 ? hi[1] : lo[1], c & 4 ? hi[2] : lo[2]).applyMatrix4(matrix).y))) - 0.4;
-      if (lowest < 4.5) continue;
-      // Hangang Bridge's piers stand on the island; leave them out to test the pavilion alone.
-      const collision = new HangangCollision({ ...course, bridges: [] });
-      const hit = collision.update(position, attitude)?.structure === 'pavilion';
-      const exact = sampledPavilionHit(matrix, 0.1, 0), loose = sampledPavilionHit(matrix, 0.1, 0.1);
-      // A sampled hit is a real hit; a hit must at least graze within the sample spacing.
-      if (exact) assert.ok(hit, `bank ${bank} pose ${n} missed`);
-      if (hit) assert.ok(loose, `bank ${bank} pose ${n} hit clear air`);
-      if (exact === loose) decided++;
-      hit ? hits++ : clear++;
-      // The former world-AABB test: its lowest corner against every overlapped cell.
-      const field = island.pavilion.heights, box = new Box3();
-      const aabbHit = PARTS.some(([lo, hi]) => {
-        box.set(new Vector3(...lo), new Vector3(...hi)).applyMatrix4(matrix).expandByScalar(0.15);
-        return collision.pavilionHit(box);
-      });
-      if (aabbHit && !loose) boxOnly++;
-    }
-    assert.ok(hits > 20 && clear > 20 && decided > hits + clear - 10, `bank ${bank}: ${hits} hits, ${clear} clear, ${decided} decided`);
-    assert.ok(boxOnly > 0, `bank ${bank}: the former AABB test over-reports`);
-  }
+test('the river is water and the banks are city ground', () => {
+  assert.equal(step(new HangangCollision(), riverCenter(600), 0.5, 600)?.structure, 'water');
+  assert.equal(step(new HangangCollision(), riverCenter(600) + course.halfWidth + 200, 0.5, 600)?.structure, 'ground');
+  assert.equal(step(new HangangCollision(), riverCenter(600), 3, 600), null);
 });
 test('malformed samples and teleports never switch collision off', () => {
   const collision = new HangangCollision();
   assert.equal(step(collision, NaN, 19, 100), null);
-  assert.equal(step(collision, 0, 19, 100, new Quaternion(0, 0, 0, 2)), null);
+  assert.equal(collision.update(new Vector3(0, 19, 100), new Quaternion(0, 0, 0, 2)), null);
   // An 820 m jump tests only the new pose; the following deck strike still counts.
   step(collision, 0, 33, 850); step(collision, 0, 33, 30);
   assert.equal(step(collision, 0, 33, -30)?.structure, 'girder');
@@ -196,100 +112,52 @@ test('first contact is kept until reset', () => {
   assert.equal(step(collision, 0, 19, 500), null);
   assert.throws(() => new HangangCollision({ ...course, bridges: [{ ...course.bridges[0], x: NaN }] }));
 });
-test('briefing describes free flight and stays out of unrelated airports', () => {
+test('bridge briefing describes free flight and stays out of other airports', () => {
   for (const lang of ['en', 'ko']) {
     setLanguage(lang);
-    const briefing = lobbyBriefing('hangang', 'hangang').join();
-    assert.ok(briefing.includes('C172'));
-    assert.ok(!briefing.includes('01 → 02'));
-    assert.ok(!lobbyBriefing('coastal', 'hangang').join().includes(t('hangang.briefing')));
+    const briefing = lobbyBriefing('neon', 'bridge');
+    assert.equal(briefing[0], t('neon.metropolis'));
+    assert.ok(briefing.join().includes('C172'));
+    assert.ok(briefing.includes(t('lobby.briefing.scenario.bridge')));
+    for (const airport of ['coastal', 'incheon', 'lukla']) assert.ok(!lobbyBriefing(airport, 'bridge').includes(t('lobby.briefing.scenario.bridge')));
   }
   setLanguage('en');
 });
 
-function withSim(run) {
-  const prevDoc = globalThis.document;
-  globalThis.document = {
-    getElementById: () => ({ addEventListener: () => {}, hidden: false }),
-    createElement: () => ({ getContext: () => new Proxy({}, { get: () => () => {} }) })
+function scenarioSim() {
+  const sim = {
+    position: new Vector3(), quaternion: new Quaternion(), linearVelocity: new Vector3(),
+    aero: { windWorld: new Vector3(4, 0, -2) }, cameraSystem: { trauma: 1 }, isCrashed: false, crashes: [],
   };
-  try {
-    run({
-      scene: new Scene(),
-      activeAirport: 'incheon',
-      gameFlow: { state: 'flight' },
-      position: new Vector3(),
-      quaternion: new Quaternion(),
-      linearVelocity: new Vector3(),
-      terrain: { mesh: { visible: false } },
-      airport: { group: { visible: false } },
-      water: { mesh: { visible: true } },
-      ships: { group: { visible: false } },
-      foliage: { group: { visible: false } },
-      neonCity: { group: { visible: false } },
-      incheonAirport: {
-        group: { visible: false },
-        terrain: { mesh: { visible: false } }
-      },
-      collisionDetector: {
-        setEnvironment: () => {},
-        terrain: null, airport: null, foliage: null, ships: null, water: null
-      },
-      sky: { timeOfDay: 12 },
-      aero: { windWorld: new Vector3() },
-      cameraSystem: { towerPos: new Vector3() },
-      setTimeOfDay: () => {}
-    });
-  } finally {
-    if (prevDoc === undefined) delete globalThis.document;
-    else globalThis.document = prevDoc;
-  }
+  sim.triggerCrash = result => { sim.crashes.push(result); sim.isCrashed = true; };
+  return sim;
 }
 
-test('HangangScenario stop reconciles active airport terrain visibility', () => {
-  withSim(sim => {
-    const hs = new HangangScenario(sim);
-    hs.start();
-    hs.stop();
-    assert.equal(sim.incheonAirport.terrain.mesh.visible, true);
-    assert.equal(sim.incheonAirport.group.visible, true);
-    assert.equal(sim.currentTerrain, sim.incheonAirport.terrain);
-    assert.equal(sim.currentAirport, sim.incheonAirport);
-  });
+test('bridge flight holds calm wind while active and restores the wind after', () => {
+  const sim = scenarioSim(), scenario = new HangangScenario(sim);
+  scenario.start();
+  assert.equal(scenario.active, true);
+  assert.deepEqual(sim.aero.windWorld.toArray(), [0, 0, 0]);
+  assert.equal(sim.cameraSystem.trauma, 0);
+  // A restart keeps the wind that was set before the flight.
+  scenario.start(); scenario.stop();
+  assert.equal(scenario.active, false);
+  assert.deepEqual(sim.aero.windWorld.toArray(), [4, 0, -2]);
+  scenario.stop(); assert.deepEqual(sim.aero.windWorld.toArray(), [4, 0, -2]);
 });
 
-test('HangangScenario crashes only on contact and restarts collision on start', () => {
-  withSim(sim => {
-    const crashes = [];
-    sim.isCrashed = false;
-    sim.triggerCrash = result => { crashes.push(result); sim.isCrashed = true; };
-    const hs = new HangangScenario(sim);
-    hs.start();
-    // Well above the former 28 m ceiling for longer than the former 8 s excursion.
-    for (let i = 0; i < 400; i++) { sim.position.set(0, 60, 800 - i * 2.3); hs.update(0.05); }
-    assert.equal(crashes.length, 0);
-    sim.position.set(0, 0.5, -200); hs.update(0.05);
-    assert.equal(crashes.length, 1); assert.equal(crashes[0].type, 'WATER');
-    hs.update(0.05); assert.equal(crashes.length, 1);
-    sim.isCrashed = false; hs.start(); assert.equal(hs.collision.contact, null);
-  });
-});
-
-
-test('temporary Hangang time preserves automatic and explicit user-time ownership', () => {
-  for (const overridden of [false, true]) withSim(sim => {
-    sim.demoDirector = { userTimeOfDayOverridden: overridden,
-      onUserTimeOfDayChange() { this.userTimeOfDayOverridden = true; } };
-    sim.camera = {};
-    sim.sky.setTimeOfDay = hours => { sim.sky.timeOfDay = hours; };
-    sim.foliage.setTimeOfDay = sim.water.syncWithAtmosphere = sim.showTimeOfDayNotice = () => {};
-    sim.setTimeOfDay = SimulatorClass.prototype.setTimeOfDay;
-    const scenario = new HangangScenario(sim);
-    scenario.start();
-    assert.equal(sim.sky.timeOfDay, 18.25);
-    assert.equal(sim.demoDirector.userTimeOfDayOverridden, overridden);
-    scenario.stop();
-    assert.equal(sim.sky.timeOfDay, 12);
-    assert.equal(sim.demoDirector.userTimeOfDayOverridden, overridden);
-  });
+test('bridge flight crashes only on contact and restarts collision on start', () => {
+  const sim = scenarioSim(), scenario = new HangangScenario(sim);
+  scenario.start();
+  // Well above the former 28 m ceiling for longer than the former 8 s excursion.
+  for (let i = 0; i < 400; i++) {
+    const [p, r] = worldPose(0, 60, 800 - i * 2.3);
+    sim.position.copy(p); sim.quaternion.copy(r); scenario.update(0.05);
+  }
+  assert.equal(sim.crashes.length, 0);
+  const [p] = worldPose(0, 0.5, -200);
+  sim.position.copy(p); scenario.update(0.05);
+  assert.equal(sim.crashes.length, 1); assert.equal(sim.crashes[0].type, 'WATER');
+  scenario.update(0.05); assert.equal(sim.crashes.length, 1);
+  sim.isCrashed = false; scenario.start(); assert.equal(scenario.collision.contact, null);
 });

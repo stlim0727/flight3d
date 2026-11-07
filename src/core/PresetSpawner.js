@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { t } from '../i18n/index.js';
 import { HangangScenario } from '../director/HangangScenario.js';
-import { HANGANG_COURSE } from '../config/hangangCourse.js';
+import { HANGANG_COURSE, courseToWorld } from '../config/hangangCourse.js';
 import { BOEING_737_800 } from '../config/aircraftConfigs.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { solveTrim } from '../physics/TrimSolver.js';
@@ -17,6 +17,7 @@ import { APPROACH_DATA } from '../config/approachData.js';
 import {
   defaultScenarioForRegion,
   isScenarioAvailable,
+  requiredAircraft,
 } from '../config/scenarioRegistry.js';
 import {
   saveSavedAirport,
@@ -48,7 +49,8 @@ class PresetSpawnerMethods {
     this.shadowDemo?.stop();
     this.replayDirector?.stop();
     this.lastPresetType = type;
-    if (type === 'hangang' && this.currentAircraftId !== 'C172') this.setAircraft('C172');
+    const aircraft = requiredAircraft(type);
+    if (aircraft && this.currentAircraftId !== aircraft) this.setAircraft(aircraft);
     this.audio?.reset();
     this.flightWarnings?.reset();
     this.pilotPhysiology?.reset?.();
@@ -93,13 +95,15 @@ class PresetSpawnerMethods {
 
     const groundClearance = this.gear?.cgGroundHeightM ?? 3.5;
 
-    if (type === 'hangang') {
+    if (type === 'bridge') {
+      // Upstream of the first bridge, trimmed 19 m above the river, flying east along it.
       this.hangang ??= new HangangScenario(this);
       this.hangang.start();
-      this.position.set(...HANGANG_COURSE.spawn);
-      this.linearVelocity.set(0, 0, -HANGANG_COURSE.speedMs);
+      const [x, y, z] = HANGANG_COURSE.spawn, yaw = HANGANG_COURSE.frame.yaw;
+      this.position.set(courseToWorld(x, z)[0], y, courseToWorld(x, z)[1]);
+      this.linearVelocity.set(0, 0, -HANGANG_COURSE.speedMs).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
       this.angularVelocity.set(0, 0, 0);
-      this.quaternion.identity();
+      this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
       this.controls.throttle = 0.5;
       this.engines.setThrottle(0.5);
       this.engines.setReverser(false, false);
@@ -390,7 +394,7 @@ class PresetSpawnerMethods {
     this.engines.failed.fill(false);
     this.engines.contactDamage.fill(0);
 
-    if (type === 'approach' || type === 'cruise' || type === 'hangang') {
+    if (type === 'approach' || type === 'cruise' || type === 'bridge') {
       // A preset declares a settled state, not a set of control inputs, so the
       // state variables have to be where the declared configuration puts them:
       // the wing at the commanded flap angle, the fans at the commanded N1, the
@@ -416,7 +420,7 @@ class PresetSpawnerMethods {
     this.controls.clearVirtualInputs();
     // Runway presets spawn stationary at throttle=0; engage the parking brake so
     // the aircraft holds still without the user having to hold the brake key.
-    // Any other preset (approach/cruise/hangang) spawns moving, so brakes off.
+    // Any other preset (approach/cruise/bridge) spawns moving, so brakes off.
     // FlightControls auto-releases the parking brake when throttle exceeds 25%.
     const isGroundSpawn = this.controls.throttle === 0.0 &&
       this.linearVelocity.lengthSq() < 0.01;
@@ -498,7 +502,7 @@ class PresetSpawnerMethods {
     if (this.multiplayer?.locked) return;
     if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('airport-changed');
     this.renderDiagnosticsPanel?.close();
-    if (!['coastal', 'lukla', 'incheon', 'neon', 'hangang', 'valley'].includes(id)) return;
+    if (!['coastal', 'lukla', 'incheon', 'neon', 'valley'].includes(id)) return;
     if (this.activeAirport === id) {
       if (id === 'incheon' && this.incheonAirport) {
         this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = true;
@@ -549,7 +553,6 @@ class PresetSpawnerMethods {
     const isIncheon = id === 'incheon';
     const isCoastal = id === 'coastal';
     const isNeon = id === 'neon';
-    const isHangang = id === 'hangang';
     const isValley = id === 'valley';
     if (isLukla && !this.luklaTerrain) {
       this.luklaTerrain = new LuklaTerrain();
@@ -646,9 +649,9 @@ class PresetSpawnerMethods {
     if (!this.applyingPendingStart) this.setPreset(defaultScenarioForRegion(id), false, pilotPreparation);
     this.lobbyScreen?.refresh();
 
-    const airportKey = isHangang ? 'hangang.region' : isIncheon ? 'incheon.airport' : isLukla
+    const airportKey = isIncheon ? 'incheon.airport' : isLukla
       ? 'tenzing.hillary.airport.nepal.vnlk.runway.24'
-      : isValley ? 'valley.region'
+      : isValley ? 'valley.region' : isNeon ? 'neon.metropolis'
       : 'pacific.coastal.international.airport.runway.09l.elevation';
     this.showToast(() => t('airport.changed.value', { value: t(airportKey) }));
     this.renderDiagnostics?.refreshScene();

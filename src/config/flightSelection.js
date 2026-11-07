@@ -1,5 +1,5 @@
 import { AIRCRAFT_REGISTRY, DEFAULT_AIRCRAFT_ID } from './aircraftConfigs.js';
-import { DEFAULT_SCENARIO, defaultScenarioForRegion, isScenarioAvailable } from './scenarioRegistry.js';
+import { DEFAULT_SCENARIO, defaultScenarioForRegion, isScenarioAvailable, requiredAircraft } from './scenarioRegistry.js';
 
 export const AIRPORT_STORAGE_KEY = 'flight3d.airport';
 export const AIRCRAFT_STORAGE_KEY = 'flight3d.aircraft';
@@ -7,12 +7,33 @@ export const PLANE_STORAGE_KEY = 'flight3d.plane';
 export const SCENARIO_STORAGE_KEY = 'flight3d.scenario';
 export const PRESET_STORAGE_KEY = 'flight3d.preset';
 
-export const VALID_AIRPORTS = Object.freeze(['coastal', 'lukla', 'incheon', 'neon', 'hangang', 'valley']);
+export const VALID_AIRPORTS = Object.freeze(['coastal', 'lukla', 'incheon', 'neon', 'valley']);
+// Retired regions and the flight that replaced them: the Han River region became the
+// Neon Metropolis bridge flight (#551), so saved choices and old links keep working.
+const LEGACY_REGIONS = Object.freeze({ hangang: { airport: 'neon', scenario: 'bridge' } });
 export const DEFAULT_AIRPORT = 'coastal';
 export const DEFAULT_AIRCRAFT = DEFAULT_AIRCRAFT_ID || 'B738';
 
 export function resolveAirport(airport) {
+  if (Object.hasOwn(LEGACY_REGIONS, airport)) return LEGACY_REGIONS[airport].airport;
   return VALID_AIRPORTS.includes(airport) ? airport : DEFAULT_AIRPORT;
+}
+
+/** The scenario a retired region now stands for, or undefined. */
+export function legacyRegionScenario(airport) {
+  return Object.hasOwn(LEGACY_REGIONS, airport) ? LEGACY_REGIONS[airport].scenario : undefined;
+}
+
+/**
+ * Airport, aircraft and scenario wishes resolved together: a region or scenario that
+ * always flies one aircraft overrides the aircraft wish.
+ */
+export function resolveFlightSelection({ airport: airportWish, aircraft: aircraftWish, scenario: scenarioWish } = {}) {
+  const airport = resolveAirport(airportWish);
+  let aircraft = airport === 'valley' ? 'F16' : resolveAircraft(aircraftWish);
+  const scenario = resolveScenario(legacyRegionScenario(airportWish) ?? scenarioWish, airport, aircraft);
+  aircraft = requiredAircraft(scenario) ?? aircraft;
+  return { airport, aircraft, scenario };
 }
 
 export function resolveAircraft(aircraft) {
@@ -20,7 +41,7 @@ export function resolveAircraft(aircraft) {
 }
 
 export function resolveScenario(scenario, airport = DEFAULT_AIRPORT, aircraft = DEFAULT_AIRCRAFT) {
-  if (airport === 'hangang' || airport === 'valley') return defaultScenarioForRegion(airport);
+  if (airport === 'valley') return defaultScenarioForRegion(airport);
   if (!scenario || typeof scenario !== 'string') return DEFAULT_SCENARIO;
   if (!isScenarioAvailable(airport, scenario)) return DEFAULT_SCENARIO;
   if (scenario === 'valley' && aircraft !== 'F16') return DEFAULT_SCENARIO;
@@ -52,10 +73,7 @@ export function loadSavedFlightSelection(storage) {
   } catch {
     /* Storage unavailable or throws */
   }
-  const airport = resolveAirport(savedAirport);
-  const aircraft = airport === 'hangang' ? 'C172' : airport === 'valley' ? 'F16' : resolveAircraft(savedAircraft);
-  const scenario = resolveScenario(savedScenario, airport, aircraft);
-  return { airport, aircraft, scenario };
+  return resolveFlightSelection({ airport: savedAirport, aircraft: savedAircraft, scenario: savedScenario });
 }
 
 export function saveSavedAirport(airport, storage) {

@@ -204,17 +204,22 @@ test('codebase-wide guard: every polygonOffset material in src/ uses logarithmic
 
 test('multi-kilometer ground and water planes subdivide geometry to prevent near-plane 1/w interpolation corruption', async () => {
   const { WaterOcean } = await import('../src/environment/WaterOcean.js');
-  const { HangangScene } = await import('../src/environment/HangangScene.js');
+  const { createNeonRiver } = await import('../src/environment/NeonRiver.js');
   const { Airport } = await import('../src/environment/Airport.js');
 
   const ultraOcean = new WaterOcean(36000, 1, { quality: 'ultraLow' });
   assert.ok(ultraOcean.segments >= 64, 'ultraLow ocean must use at least 64x64 grid so triangles do not span 36km across near=0.08m');
 
-  const hangang = new HangangScene();
-  const river = hangang.group.children.find(c => c.isMesh && c.renderOrder === -1);
-  assert.ok(river, 'Hangang river mesh must exist');
-  assert.ok(river.geometry.parameters.widthSegments >= 64, 'Hangang 18km river plane must be subdivided');
-  assert.ok(river.geometry.parameters.heightSegments >= 64, 'Hangang 18km river plane must be subdivided');
+  // The Neon Metropolis river and the city ground beside it span 24 km (#551).
+  const river = createNeonRiver();
+  for (const mesh of [river.water, ...river.ground.children]) {
+    // Every quad is at most 100 m along the river and across it.
+    const { index, attributes: { position } } = mesh.geometry, x = n => position.getX(index.getX(n)), z = n => position.getZ(index.getX(n));
+    for (let n = 0; n < index.count; n += 3) {
+      const span = Math.max(Math.abs(x(n) - x(n + 1)), Math.abs(x(n + 1) - x(n + 2)), Math.abs(z(n) - z(n + 1)), Math.abs(z(n + 1) - z(n + 2)));
+      assert.ok(span <= 100 + 1e-3, `${mesh.name || 'neon ground'} must be subdivided`);
+    }
+  }
 
   const context = new Proxy({}, { get: () => () => ({ addColorStop() {} }) });
   const originalDocument = globalThis.document;

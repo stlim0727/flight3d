@@ -1,9 +1,11 @@
-// Training scenery modelled on three Han River bridges in their real west-to-east order
-// (#396): Seogang, Mapo and Hangang Bridge. Spacing, deck widths and longest spans follow
-// docs/development/hangang-bridge-survey.md; heights, the remaining pier layout and the
-// crossing angles are game choices, so this is a motif, NOT a survey reproduction.
-// Metres, +Y up, travel generally -Z. Geometry and collision share these dimensions.
-import pavilionHeights from './nodeulPavilionHeights.json' with { type: 'json' };
+// Neon Metropolis river (#551), carrying three bridges modelled on Han River bridges in
+// their real west-to-east order (#396): Seogang, Mapo and Hangang Bridge. Spacing, deck
+// widths and longest spans follow docs/development/hangang-bridge-survey.md; heights, the
+// remaining pier layout and the crossing angles are game choices, so this is a motif,
+// NOT a survey reproduction.
+// Metres, +Y up. Everything below is in the course frame, where travel is generally -Z;
+// `frame` places that frame in the Neon Metropolis world. Geometry and collision share
+// these dimensions.
 
 // Bridge-local pier X: the main span is centred on the river axis, then `side` spans
 // repeat outward while they fit inside the deck.
@@ -13,11 +15,16 @@ function piers(main, side, length) {
   return [...out.map(x => -x).reverse(), ...out];
 }
 
-// Six 63.5 m tied arches over the south channel, from Nodeulseom's edge to the bank.
+// Six 63.5 m tied arches over the south channel, from the main span's pier to the bank.
 const HANGANG_ARCHES = Array.from({ length: 6 }, (_, i) => ({ from: 95.25 + i * 63.5, to: 158.75 + i * 63.5, rise: 11, radius: 0.9, segments: 16 }));
 
 export const HANGANG_COURSE = {
-  id: 'hangang-training-v2', waterLevel: 0,
+  id: 'neon-river-v1', waterLevel: 0,
+  // Course -Z runs world +X (east) along the south edge of the Neon Metropolis skyline;
+  // course +X (across the river) is world +Z (north). The water lies flush with the
+  // city ground, so the city's flat terrain stays the ground and radio-altimeter reference.
+  frame: { x: -700, z: -1900, yaw: -Math.PI / 2 },
+  halfWidth: 450,
   spawn: [0, 19, 850], speedMs: 46,
   bridges: [
     // Seogang: 29 m deck, 150 m Nielsen arch whose ribs lean together at the crown.
@@ -28,18 +35,10 @@ export const HANGANG_COURSE = {
     // Mapo: upstream and downstream 22.75 m decks, 70 m spans; 1.08 km east of Seogang.
     { id: 'mapo', x: 60, z: -1080, yaw: 0.10, color: 0x779993, glow: 0x223344, length: 1190, mainSpan: 70,
       piers: piers(70, 70, 1190), decks: [{ z: -13, width: 22.75 }, { z: 13, width: 22.75 }], arches: [] },
-    // Hangang Bridge: twin 22 m decks over Nodeulseom, 63.5 m spans; 2.65 km east of Mapo.
+    // Hangang Bridge: twin 22 m decks, 63.5 m spans; 2.65 km east of Mapo.
     { id: 'hangang', x: 200, z: -3730, yaw: -0.08, color: 0x7591b4, glow: 0x0055bb, length: 1005, mainSpan: 63.5,
       piers: piers(63.5, 63.5, 1005), decks: [{ z: -12.5, width: 22 }, { z: 12.5, width: 22 }], arches: HANGANG_ARCHES },
   ],
-  // Island under Hangang Bridge, world-aligned. The GLB builder draws it and
-  // HangangCollision collides with it from these numbers. The pavilion model stands on the
-  // island top at `scale`, long axis along the river; its collision heightfield is
-  // island-relative and rebaked from that GLB by scripts/build-hangang-assets.mjs.
-  nodeulseom: {
-    x: 200, z: -3730, height: 4, bottomRadius: 75, topRadius: 70, zScale: 2.4,
-    pavilion: { scale: 8.5, yaw: Math.PI / 2, heights: pavilionHeights },
-  },
 };
 
 export function riverCenter(z) {
@@ -53,9 +52,19 @@ export function riverCenter(z) {
   return points.at(-1)[1];
 }
 
-export function hangangHeight(x, z) {
-  const d = Math.abs(x - riverCenter(z));
-  return d < 450 ? 0 : Math.min(8, (d - 450) * 0.2);
+// Course point [x, z] lies on the river rather than its banks.
+export function isRiver(x, z, course = HANGANG_COURSE) {
+  return Math.abs(x - riverCenter(z)) < course.halfWidth;
+}
+
+// World [x, z] of a course point, and back.
+export function courseToWorld(x, z, frame = HANGANG_COURSE.frame) {
+  const c = Math.cos(frame.yaw), s = Math.sin(frame.yaw);
+  return [frame.x + x * c + z * s, frame.z - x * s + z * c];
+}
+export function worldToCourse(x, z, frame = HANGANG_COURSE.frame) {
+  const c = Math.cos(frame.yaw), s = Math.sin(frame.yaw), dx = x - frame.x, dz = z - frame.z;
+  return [dx * c - dz * s, dx * s + dz * c];
 }
 
 // Deck streetlights every 55 m from the bridge centre, at least 50 m from either end.
@@ -65,28 +74,23 @@ export function bridgeLampX(bridge) {
 }
 
 // Approach ramps (#429): past each deck end the road descends at `grade` to the bank, so
-// the 40 m deck meets the ground instead of stopping in the air. A game choice, like the
+// the 40 m deck meets the ground (flush with the water) instead of stopping in the air. A game choice, like the
 // deck height. The ramp is a `slab` on columns every `columnSpacing`; where less than
 // `clearance` would stay beneath it, a retained embankment carries it to the bank.
 export const APPROACH = { grade: 0.06, slab: 4, step: 10, columnSpacing: 40, clearance: 6, parapet: 1.1 };
 
-// World [x, z] of a bridge-local point.
-export function bridgeToWorld(bridge, x, z = 0) {
+// Course [x, z] of a bridge-local point.
+export function bridgeToCourse(bridge, x, z = 0) {
   const c = Math.cos(bridge.yaw), s = Math.sin(bridge.yaw);
   return [bridge.x + x * c + z * s, bridge.z - x * s + z * c];
 }
 
 // Each deck end's ramp along bridge-local X: `side` ±1, from the deck end `start` for
 // `length` metres down to the bank height `ground`. top(x) is the road surface.
-export function bridgeApproaches(bridge) {
+export function bridgeApproaches(bridge, ground = HANGANG_COURSE.waterLevel) {
+  const length = (40 - ground) / APPROACH.grade;
   return [-1, 1].map(side => {
     const start = side * bridge.length / 2;
-    let ground = hangangHeight(...bridgeToWorld(bridge, start)), length = 0;
-    // The bank height at the foot sets the length; settle the two together.
-    for (let i = 0; i < 4; i++) {
-      length = (40 - ground) / APPROACH.grade;
-      ground = hangangHeight(...bridgeToWorld(bridge, start + side * length));
-    }
     return { side, start, length, ground,
       top: x => 40 - APPROACH.grade * Math.max(0, Math.min(length, side * (x - start))) };
   });
@@ -189,4 +193,19 @@ export function bridgeSolids(bridge) {
     }
   }
   return boxes;
+}
+
+// Every bridge solid as a world-space box rotated about +Y, in the city building record
+// shape CollisionDetector indexes, so any aircraft in any Neon Metropolis flight hits the
+// bridges. Its probes are points; the bridge flight's swept C172 test stays in
+// HangangCollision.
+export function bridgeWorldBoxes(course = HANGANG_COURSE) {
+  return course.bridges.flatMap(bridge => {
+    const rotationY = course.frame.yaw + bridge.yaw, c = Math.abs(Math.cos(rotationY)), s = Math.abs(Math.sin(rotationY));
+    return bridgeSolids(bridge).map(({ part, center: [x, y, z], size: [w, h, d] }) => {
+      const [wx, wz] = courseToWorld(...bridgeToCourse(bridge, x, z), course.frame);
+      return { bridge: bridge.id, part, x: wx, y: y - h / 2, z: wz, height: h,
+        width: c * w + s * d, depth: s * w + c * d, localWidth: w, localDepth: d, rotationY };
+    });
+  });
 }

@@ -138,8 +138,8 @@ checked as a guard dependency, not comprehensively retested in this review.
   the held lobby, and guard recovery after failure.
 - `simulatorPreferences`: startup defaults/restoration, malformed/unavailable
   storage, independent saves, joystick calibration retention and explicit clear.
-- `hangang`: temporary sunset/restore preserves both automatic and explicit
-  user-time ownership using the production time setter.
+- `hangang`: the Neon Metropolis bridge flight holds calm wind and restores the
+  previous wind when it ends (#551); it no longer changes the time of day.
 - Existing `presetReset`, flow, demo, replay and mission tests remain part of
   the full Node gate. The Node simulator helper extracts the production class
   from source; replacing that mechanism with importable coordinators is useful

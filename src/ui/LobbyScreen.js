@@ -3,9 +3,9 @@ import { bindText, getLanguage, setLanguage, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
 import { aircraftSpec, airportSpec } from './lobbySpecs.js';
 import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
-import { SPAWN_SCENARIOS, isScenarioAvailable, scenarioLabelKey } from '../config/scenarioRegistry.js';
+import { SPAWN_SCENARIOS, isScenarioAvailable, requiredAircraft, scenarioLabelKey } from '../config/scenarioRegistry.js';
 
-const AIRPORT_BUTTONS = { hangang: 'lobby-airport-hangang', incheon: 'lobby-airport-incheon', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla', neon: 'lobby-airport-neon', valley: 'lobby-airport-valley' };
+const AIRPORT_BUTTONS = { incheon: 'lobby-airport-incheon', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla', neon: 'lobby-airport-neon', valley: 'lobby-airport-valley' };
 const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c172', F16: 'lobby-aircraft-f16' };
 /** Aircraft the lobby offers, so warmup can prepare exactly this set. */
 export const LOBBY_AIRCRAFT_IDS = Object.keys(AIRCRAFT_BUTTONS);
@@ -137,7 +137,6 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   for (const [id, handler] of [
     ['btn-fly', onFly],
     ['btn-lobby-resume', () => onResume?.()],
-    ['lobby-airport-hangang', () => onAirport('hangang')],
     ['lobby-airport-coastal', () => onAirport('coastal')],
     ['lobby-airport-incheon', () => onAirport('incheon')],
     ['lobby-airport-lukla', () => onAirport('lukla')],
@@ -200,7 +199,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const aircraft = getAircraft?.() ?? 'B738';
     for (const [key, id] of Object.entries(AIRCRAFT_BUTTONS)) {
       document.getElementById(id)?.classList.toggle('active', key === aircraft);
-      document.getElementById(id).disabled = airport === 'hangang' || airport === 'valley';
+      document.getElementById(id).disabled = airport === 'valley' || Boolean(requiredAircraft(getPreset()));
     }
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
       if (type === 'demo') continue;
@@ -327,7 +326,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       bindText(briefingEl, () => lobbyBriefing(getAirport(), getPreset()).join('\n'));
     }
     if (timeSelect) {
-      timeSelect.disabled = airport === 'hangang' || airport === 'valley';
+      timeSelect.disabled = airport === 'valley';
       // The clock is continuous (and float-modulo noisy after restore), so show
       // the nearest preset option rather than requiring an exact value match.
       // Distance wraps at midnight so 23:50 shows 22:30, not 06:30.

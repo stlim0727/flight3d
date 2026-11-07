@@ -18,9 +18,15 @@ test('every ordinary flight remains individually selectable without a fallback U
 
 test('changing terrain or aircraft replaces only now-unsupported dependent choices', () => {
   const rows = flightCombinations();
-  const hangang = selectFlightLink(rows, { airport: 'hangang', aircraft: 'F16', scenario: 'cruise' }, flightKeys);
-  assert.deepEqual(hangang.row, { airport: 'hangang', aircraft: 'C172', scenario: 'hangang' });
-  assert.deepEqual(hangang.options.aircraft, ['C172']);
+  const valley = selectFlightLink(rows, { airport: 'valley', aircraft: 'C172', scenario: 'cruise' }, flightKeys);
+  assert.deepEqual(valley.row, { airport: 'valley', aircraft: 'F16', scenario: 'valley' });
+  assert.deepEqual(valley.options.aircraft, ['F16']);
+  // Only the C172 offers the Neon Metropolis bridge flight.
+  const neon = selectFlightLink(rows, { airport: 'neon', aircraft: 'B738', scenario: 'bridge' }, flightKeys);
+  assert.equal(neon.row.aircraft, 'B738');
+  assert.ok(!neon.options.scenario.includes('bridge'));
+  assert.deepEqual(selectFlightLink(rows, { airport: 'neon', aircraft: 'C172', scenario: 'bridge' }, flightKeys).row,
+    { airport: 'neon', aircraft: 'C172', scenario: 'bridge' });
   const coastal = selectFlightLink(rows, { airport: 'coastal', aircraft: 'F16', scenario: 'demo' }, flightKeys);
   assert.equal(coastal.row.aircraft, 'F16');
   assert.ok(!coastal.options.scenario.includes('demo'));

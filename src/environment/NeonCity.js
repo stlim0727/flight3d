@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { bridgeWorldBoxes } from '../config/hangangCourse.js';
+import { createNeonRiver } from './NeonRiver.js';
 
 /**
  * Creates clean, sleek facade textures tailored to eliminate trypophobia.
@@ -358,23 +360,21 @@ export class NeonCity {
   }
 
   initGroundAndRoads() {
-    // Deep midnight indigo ground plane matching horizon haze
-    const groundGeo = new THREE.PlaneGeometry(24000, 24000, 1, 1);
-    groundGeo.rotateX(-Math.PI / 2);
-    const groundMat = new THREE.MeshBasicMaterial({
-      color: 0x070312,
-    });
-    const groundMesh = new THREE.Mesh(groundGeo, groundMat);
-    groundMesh.name = 'neon-ground';
-    this.group.add(groundMesh);
+    // City ground on both banks of the river, the water and its bridges (#551)
+    this.river = createNeonRiver();
+    this.group.add(this.river.group);
+    // Bridges are solid for every aircraft, like the towers
+    this.buildingData.push(...bridgeWorldBoxes());
 
-    // Glowing city avenue grid lines
+    // Glowing city avenue grid lines, on the north bank and across the river on the south bank
     const gridLines = [];
-    for (let x = -2000; x <= 4500; x += 300) {
-      gridLines.push(new THREE.Vector3(x, 0.02, -1800), new THREE.Vector3(x, 0.02, 1800));
-    }
-    for (let z = -1800; z <= 1800; z += 300) {
-      gridLines.push(new THREE.Vector3(-2000, 0.02, z), new THREE.Vector3(4500, 0.02, z));
+    for (const [z0, z1] of [[-1200, 1800], [-3900, -2400]]) {
+      for (let x = -2000; x <= 4500; x += 300) {
+        gridLines.push(new THREE.Vector3(x, 0.02, z0), new THREE.Vector3(x, 0.02, z1));
+      }
+      for (let z = z0; z <= z1; z += 300) {
+        gridLines.push(new THREE.Vector3(-2000, 0.02, z), new THREE.Vector3(4500, 0.02, z));
+      }
     }
     const gridGeo = new THREE.BufferGeometry().setFromPoints(gridLines);
     this.group.add(new THREE.LineSegments(gridGeo, new THREE.LineBasicMaterial({
@@ -596,13 +596,27 @@ export class NeonCity {
       { x: 1620, z: -650,  w: 80, d: 85, h: 320, type: 'stepped-spire', facade: 'monolith', rot: -0.18 },
       { x: 2080, z: -740,  w: 95, d: 80, h: 310, type: 'blade-slab', facade: 'ribbon', rot: 0.12 },
       { x: 2510, z: -670,  w: 85, d: 90, h: 290, type: 'cylinder', facade: 'monolith', rot: 0 },
-      { x: 2910, z: -750,  w: 90, d: 75, h: 280, type: 'stepped-spire', facade: 'ribbon', rot: -0.22 },
+      { x: 2780, z: -750,  w: 90, d: 75, h: 280, type: 'stepped-spire', facade: 'ribbon', rot: -0.22 },
       { x: 3310, z: -680,  w: 80, d: 85, h: 250, type: 'wedge-chisel', facade: 'monolith', rot: 0.14 },
       { x: 1080, z: -990,  w: 105, d: 90, h: 230, type: 'blade-slab', facade: 'fin', rot: 0 },
       { x: 1580, z: -1030, w: 95, d: 100, h: 250, type: 'cylinder', facade: 'monolith', rot: 0 },
       { x: 2110, z: -1000, w: 100, d: 85, h: 260, type: 'stepped-spire', facade: 'ribbon', rot: 0.22 },
       { x: 2610, z: -1050, w: 90, d: 95, h: 220, type: 'wedge-chisel', facade: 'monolith', rot: -0.18 },
       { x: 3110, z: -1010, w: 110, d: 85, h: 210, type: 'blade-slab', facade: 'monolith', rot: 0.1 },
+
+      // === South Bank Skyline across the river (#551), clear of the bridge approaches ===
+      { x: -380, z: -2520, w: 60, d: 55, h: 210, type: 'blade-slab', facade: 'ribbon', rot: 0.1 },
+      { x: -150, z: -2700, w: 70, d: 60, h: 260, type: 'cylinder', facade: 'monolith', rot: 0 },
+      { x: 650,  z: -2480, w: 62, d: 58, h: 240, type: 'wedge-chisel', facade: 'fin', rot: -0.15 },
+      { x: 900,  z: -2650, w: 70, d: 65, h: 300, type: 'stepped-spire', facade: 'ribbon', rot: 0.2 },
+      { x: 1250, z: -2450, w: 58, d: 62, h: 270, type: 'blade-slab', facade: 'monolith', rot: -0.1 },
+      { x: 1550, z: -2620, w: 66, d: 66, h: 320, type: 'cylinder', facade: 'ribbon', rot: 0 },
+      { x: 1880, z: -2420, w: 64, d: 58, h: 250, type: 'wedge-chisel', facade: 'fin', rot: 0.18 },
+      { x: 2200, z: -2600, w: 72, d: 64, h: 290, type: 'stepped-spire', facade: 'monolith', rot: -0.2 },
+      { x: 2520, z: -2380, w: 60, d: 60, h: 230, type: 'blade-slab', facade: 'ribbon', rot: 0.12 },
+      { x: 2760, z: -2560, w: 62, d: 70, h: 260, type: 'cylinder', facade: 'fin', rot: 0 },
+      { x: 3400, z: -2360, w: 66, d: 60, h: 280, type: 'wedge-chisel', facade: 'ribbon', rot: -0.14 },
+      { x: 3680, z: -2560, w: 70, d: 66, h: 240, type: 'blade-slab', facade: 'monolith', rot: 0.2 },
 
       // === Varied Asymmetric Urban Podiums / Terraces (Plazas & Setbacks) ===
       { x: 420,  z: 160,  w: 42, d: 40, h: 75,  type: 'podium', facade: 'monolith', rot: 0.12 },

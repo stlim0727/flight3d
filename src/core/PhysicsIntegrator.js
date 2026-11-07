@@ -80,7 +80,7 @@ class PhysicsIntegratorMethods {
     // axes; the AP commands surfaces directly, bypassing yoke rate limiters.
     if (this.hangang?.active && this.autopilot.master) {
       this.autopilot.disengage();
-      this.showToast(() => t('hangang.manual'));
+      this.showToast(() => t('bridge.manual'));
     }
     if (this.autopilot.master) {
       const apCmd = this.autopilot.update(this.readAutopilotState(), dt);
@@ -543,7 +543,7 @@ class PhysicsIntegratorMethods {
 
   resetCrash() {
     if (this.devRunner.active) { this.devRunner.restart(); return; }
-    if (this.hangang?.active) { this.setPreset('hangang'); return; }
+    if (this.hangang?.active) { this.setPreset('bridge'); return; }
     this.clearCrashState();
     this.setPreset('runway');
     this.showToast(() => t(this.activeAirport === 'incheon'
