@@ -76,7 +76,7 @@ export default {
   "mp.voiceFailed": "Voice connection failed — leave and rejoin to retry",
   "mp.status.invalid-room": "Enter a six-character room code or a full invite link.",
   "mp.status.full": "Room full (2/2). Ask your friend for a new invite.",
-  "mp.status.incompatible": "Different multiplayer versions. Both pilots should reload.",
+  "mp.status.incompatible": "Multiplayer protocol or flight data is incompatible. Update the game and host, then reconnect.",
   "mp.status.peer-left": "Your friend left. Room ended; you can continue solo or create a new room.",
   "mp.status.left": "Left room. Microphone released.",
   "mp.status.timeout": "Connection timed out. Retry, or try a different network.",

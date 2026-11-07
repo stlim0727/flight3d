@@ -1,15 +1,18 @@
+import { SESSION_CONTRACT, compatibilityFailure } from './compatibility.js';
 import { VERSION, validConfig, cleanName, RemoteTrack } from './protocol.js';
 
 /** Pure two-pilot protocol. Transport and simulation are injected, never DOM/WebRTC. */
 export class RoomSession {
-  constructor({ host, name, config, send, prepare = async () => {}, canStart = () => true, fly = () => {}, changed = () => {}, ended = () => {}, now = () => performance.now() }) {
+  constructor({ host, name, config, contract = SESSION_CONTRACT, send, prepare = async () => {}, canStart = () => true, fly = () => {}, changed = () => {}, ended = () => {}, now = () => performance.now() }) {
+    if (!Number.isSafeInteger(contract?.flight) || contract.flight < 1) throw new Error('invalid-contract');
+    this.contract = Object.freeze({ flight: contract.flight });
     if (host && !validConfig(config)) throw new Error('invalid-config');
     Object.assign(this, { host, name: cleanName(name), config, send, prepare, canStart, fly, changed, ended, now });
     this.state = 'connecting'; this.round = 0; this.track = new RemoteTrack();
     this.lastSeen = now(); this.createdAt = now(); this.seq = 0; this.epoch = 0;
   }
   opened() {
-    if (!this.host) this.send({ type: 'hello', version: VERSION, name: this.name });
+    if (!this.host) this.send({ type: 'hello', version: VERSION, contract: this.contract, name: this.name });
   }
   receive(m) {
     if (this.state === 'ended' || !m || typeof m !== 'object') return;
@@ -17,13 +20,15 @@ export class RoomSession {
     if (m.type === 'bye') { this.end(m.reason === 'cancelled' ? 'cancelled' : 'peer-left'); return; }
     if (m.type === 'ping') { this.lastSeen = this.now(); return; }
     if (m.type === 'hello' && this.host && this.state === 'connecting') {
-      if (m.version !== VERSION || typeof m.name !== 'string' || m.name.length > 64) { this.end('incompatible'); return; }
+      if (!this.acceptContract(m)) return;
+      if (typeof m.name !== 'string' || m.name.length > 64) { this.rejectIncompatible('malformed-handshake'); return; }
       this.remoteName = cleanName(m.name); this.state = 'connected';
-      this.send({ type: 'welcome', version: VERSION, name: this.name, config: this.config });
+      this.send({ type: 'welcome', version: VERSION, contract: this.contract, name: this.name, config: this.config });
       this.lastSeen = this.now(); this.changed(); return;
     }
     if (m.type === 'welcome' && !this.host && this.state === 'connecting') {
-      if (m.version !== VERSION || !validConfig(m.config) || typeof m.name !== 'string' || m.name.length > 64) { this.end('incompatible'); return; }
+      if (!this.acceptContract(m)) return;
+      if (!validConfig(m.config) || typeof m.name !== 'string' || m.name.length > 64) { this.rejectIncompatible('malformed-handshake'); return; }
       this.config = { airport: m.config.airport, aircraft: m.config.aircraft, scenario: m.config.scenario };
       this.remoteName = cleanName(m.name); this.state = 'connected'; this.lastSeen = this.now(); this.changed(); return;
     }
@@ -39,6 +44,17 @@ export class RoomSession {
     if (m.type === 'snapshot' && this.state === 'flying' && m.round === this.round && this.track.push(m, this.now())) {
       this.lastSeen = this.now();
     }
+  }
+  acceptContract(message) {
+    const failure = compatibilityFailure(message, this.contract);
+    if (!failure) return true;
+    this.rejectIncompatible(failure);
+    return false;
+  }
+  rejectIncompatible(failure) {
+    this.compatibilityFailure = failure;
+    this.send({ type: 'reject', reason: 'incompatible' });
+    this.end('incompatible');
   }
   start() {
     if (!this.host || !['connected', 'flying'].includes(this.state) || !this.canStart()) return false;
