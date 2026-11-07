@@ -191,7 +191,7 @@ export class MultiplayerController {
     const active = this.active, room = this.room, s = room?.session;
     document.getElementById('mp-controls').hidden = !active;
     document.getElementById('mp-intro').hidden = active;
-    bindText(document.getElementById('mp-dialog-help'), () => t(!active ? 'mp.setupHelp' : s.state === 'starting' ? 'mp.state.starting' : s.state !== 'flying' ? (room.host ? 'mp.hostWaitingHelp' : 'mp.guestWaitingHelp') : 'mp.dialogHelp'));
+    bindText(document.getElementById('mp-dialog-help'), () => t(!active ? 'mp.setupHelp' : s.state === 'starting' ? 'mp.state.starting' : s.state !== 'flying' ? (room.host ? (s.state === 'connected' ? 'mp.hostReadyHelp' : 'mp.hostWaitingHelp') : 'mp.guestWaitingHelp') : 'mp.dialogHelp'));
     document.getElementById('mp-connect').disabled = active;
     document.getElementById('mp-connect').hidden = active;
     document.getElementById('mp-room-menu').hidden = !active;

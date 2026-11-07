@@ -107,6 +107,20 @@ try {
   await autoHost.evaluate('fixture.room.dispose()');
   const invalid = await page('/tests/fixtures/multiplayer-ui.html?r=invalid', 'Boolean(window.uiFixture)');
   assert.equal(await invalid.evaluate('!uiFixture.controller.room && uiFixture.controller.modalOpen && uiFixture.controller.message === "invalid-room"'), true);
+  // A friend's arrival ends the creator's waiting deadline: the joined room outlives it and can still start.
+  const patientHost = await page(), patientGuest = await page();
+  const patientCode = await patientHost.evaluate('fixture.create(undefined, 4000)');
+  await until(() => patientHost.evaluate('fixture.room.registered'), 'short-lease room registration');
+  await patientGuest.evaluate(`fixture.create(${JSON.stringify(patientCode)})`);
+  for (const c of [patientHost, patientGuest]) await until(() => c.evaluate('fixture.status().state === "connected"'), 'friend admitted before lease expiry');
+  assert.equal(await patientHost.evaluate('fixture.room.waiting || fixture.room.keepWaiting()'), false, 'admission stops the waiting countdown');
+  await delay(5000);
+  assert.equal(await patientHost.evaluate('!fixture.room.closed && fixture.ended.length === 0 && fixture.room.session.state === "connected"'), true, 'joined room survives the original deadline');
+  assert.equal(await patientHost.evaluate('fixture.room.session.start()'), true, 'creator can still start after the deadline');
+  for (const c of [patientHost, patientGuest]) await until(() => c.evaluate('fixture.flights === 1'), 'shared start after the deadline');
+  await patientGuest.evaluate('fixture.room.close()');
+  await until(() => patientHost.evaluate('fixture.ended.includes("peer-left")'), 'patient room teardown');
+  await patientHost.evaluate('fixture.room.dispose()');
   // Expiry is advertised after multiplayer and voice have already been torn down.
   const expiring = await page();
   const cancelledCode = await expiring.evaluate('fixture.create(undefined, 1500)');
@@ -126,7 +140,7 @@ try {
   await until(() => gone.evaluate('fixture.ended.includes("not-found")'), 'closed creator tab has no live room');
   for (const c of browsers) assert.deepEqual(c.errors, [], 'no browser exceptions');
   console.log(`${publicMode ? 'Public PeerJS service' : 'Local signaling'} verified`);
-  console.log('PASS Chrome WebRTC: two-pilot config/start barrier, bidirectional snapshots, respawn, third-peer rejection, bidirectional continuous audio/mute/unmute + RTP, restart, disconnect/track cleanup, modal focus/input isolation, automatic URL joining, invalid/cancelled invites, creator lease expiry and late-join cancellation. No WebGL tested.');
+  console.log('PASS Chrome WebRTC: two-pilot config/start barrier, bidirectional snapshots, respawn, third-peer rejection, bidirectional continuous audio/mute/unmute + RTP, restart, disconnect/track cleanup, modal focus/input isolation, automatic URL joining, invalid/cancelled invites, creator lease expiry, lease ending on admission and late-join cancellation. No WebGL tested.');
   }
 } catch (error) {
   console.error(error); if (chromeLog) console.error(chromeLog);

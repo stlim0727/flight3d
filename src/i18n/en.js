@@ -14,6 +14,7 @@ export default {
   "mp.joinTitle": "Join a friend",
   "mp.joinHelp": "Enter your friend's code. Their stage and aircraft apply to both pilots. Opening an invite link joins automatically.",
   "mp.hostWaitingHelp": "Share the code, then keep the room open using the button below. Closing cancels this room.",
+  "mp.hostReadyHelp": "Your friend has joined. Press Start together when ready. Closing cancels this room.",
   "mp.guestWaitingHelp": "Waiting for the creator to start. Closing cancels your participation.",
 
   "mp.code": "Room code",
@@ -23,7 +24,7 @@ export default {
   "mp.cancelAndClose": "Cancel & close",
   "mp.roomMenu": "Room",
   "mp.dialogHelp": "Your aircraft is held while this dialog is open. Voice stays on until you mute your microphone.",
-  "mp.keepWaiting": "Keep room open · 30 more seconds",
+  "mp.keepWaiting": "Keep room open · 60 more seconds",
   "mp.keepWaitingCountdown": "Room cancels in {seconds}s.",
   "mp.status.cancelled": "This room has been cancelled. Ask the creator for a new code.",
 

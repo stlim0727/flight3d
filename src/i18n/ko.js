@@ -14,6 +14,7 @@ export default {
   "mp.joinTitle": "친구 방 참가",
   "mp.joinHelp": "친구의 코드를 입력하세요. 무대와 기종은 방장의 선택을 따릅니다. 초대 링크를 열면 자동으로 참가합니다.",
   "mp.hostWaitingHelp": "코드를 공유하고 아래 버튼으로 대기 시간을 연장하세요. 이 창을 닫으면 방이 취소됩니다.",
+  "mp.hostReadyHelp": "친구가 들어왔습니다. 준비되면 함께 시작을 누르세요. 이 창을 닫으면 방이 취소됩니다.",
   "mp.guestWaitingHelp": "방장이 시작할 때까지 기다려 주세요. 창을 닫으면 참가가 취소됩니다.",
 
   "mp.code": "방 코드",
@@ -23,7 +24,7 @@ export default {
   "mp.cancelAndClose": "취소하고 닫기",
   "mp.roomMenu": "방 메뉴",
   "mp.dialogHelp": "이 창이 열려 있는 동안 내 기체는 멈춥니다. 마이크를 음소거하기 전까지 음성이 계속 켜져 있습니다.",
-  "mp.keepWaiting": "계속 기다리기 · 30초 연장",
+  "mp.keepWaiting": "계속 기다리기 · 60초 연장",
   "mp.keepWaitingCountdown": "{seconds}초 뒤 방이 취소됩니다.",
   "mp.status.cancelled": "이미 취소된 방입니다. 방장에게 새 코드를 요청하세요.",
 
