@@ -1,3 +1,4 @@
+import { createSimulatorScenarioStart } from './core/simulatorScenarioStart.js';
 import { createSimulatorFlightStart } from './core/simulatorFlightStart.js';
 import { MultiplayerController } from './multiplayer/MultiplayerController.js';
 import { FlightWarnings } from './systems/FlightWarnings.js';
@@ -64,7 +65,6 @@ import { isScenarioAvailable } from './config/scenarioRegistry.js';
 import {
   loadSavedFlightSelection,
   saveSavedAircraft,
-  saveFlightSelection,
 } from './config/flightSelection.js';
 import { resolveFlightUrl } from './config/flightUrls.js';
 import { applyDeviceTimeOfDay, forgetSimulatorPreference, loadSimulatorPreferences,
@@ -661,82 +661,22 @@ class FlightSimulator {
     return this.flightStartCoordinator.start(options);
   }
 
-  /** Install the selected scenario before recording or publishing its start. */
-  async spawnFlight({ keepTimeOfDay = false } = {}) {
-    this.devRunner.stop();
-    this.shadowDemo.stop();
-    this.replayDirector.stop();
-    const wantsDemo = this.lobby.preset === 'demo';
-    const wantsValley = this.lobby.preset === 'valley';
-    if (this.demoDirector?.isActive || this.demoDirector?.waitingForTerrain) {
-      this.demoDirector.stop(wantsDemo ? null : () => t('manual.control.engaged'));
-    }
-    // The lobby backdrop demo scripts its own sky; without a saved or chosen time a
-    // flown sortie starts at the device's local time, not the demo's last setting.
-    if (!wantsDemo && !keepTimeOfDay && this.demoDirector && !this.demoDirector.userTimeOfDayOverridden) {
-      applyDeviceTimeOfDay(this);
-    }
-    this.gameFlow.setCinematicAvailable(isScenarioAvailable(this.activeAirport, 'demo'));
-    this.gameFlow.enterFlight();
-    // setAirport may have clamped the scenario to the region it loaded.
-    if (wantsDemo) {
-      this.demoDirector.start();
-    } else if (wantsValley) {
-      this.lastPresetType = 'valley';
-      this.beginFlightRecording();
-      await this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' });
-    } else {
-      this.setPreset(this.lobby.preset);
-    }
-    if (!wantsValley) this.beginFlightRecording();
-    this.analytics?.trackFlightStart?.({
-      airport: this.activeAirport,
-      aircraft: this.currentAircraftId,
-      scenario: wantsValley ? 'valley' : wantsDemo ? 'demo' : this.lobby.preset,
-      pilotMode: wantsValley ? (this.lobby.pilotMode || 'human') : 'human',
-      timeOfDay: this.sky?.timeOfDay,
-    });
-    saveSimulatorPreferences({ demoProfile: this.lobby.demoProfile });
-    saveFlightSelection({
-      airport: this.lobby.airport,
-      aircraft: this.lobby.aircraft ?? this.currentAircraftId,
-      scenario: this.lobby.preset,
-    });
-    if (!wantsDemo && this.touchControls?.gyroRequested && !this.touchControls?.gyroActive) {
-      this.touchControls.restoreGyroSettings({ userGesture: true });
-    }
-    if (this.multiplayer?.active && this.multiplayer.preparing) this.gameFlow.pause();
+  get scenarioStartCoordinator() {
+    return this._scenarioStartCoordinator ??= createSimulatorScenarioStart(this);
+  }
+
+  /** Install the selected scenario before publishing its successful start. */
+  spawnFlight(options = {}) {
+    return this.scenarioStartCoordinator.start(options);
   }
 
   async startValleyMission({ pilotKind = 'human' } = {}) {
     this.lastPresetType = 'valley';
-    if (!this.pilotArena) {
+    if (!this.pilotMissionStarter) {
       const { installPilotArena } = await import('./ui/PilotArenaPanel.js');
       installPilotArena(this);
     }
-    const arenaEl = document.getElementById('pilot-arena');
-    if (arenaEl) arenaEl.open = false;
-
-    const missionSelect = arenaEl?.querySelector('[data-mission]');
-    if (missionSelect) {
-      missionSelect.value = 'valley-slalom-v1';
-    }
-    const kindSelect = arenaEl?.querySelector('[data-kind]');
-    if (kindSelect) {
-      kindSelect.value = pilotKind;
-      kindSelect.dispatchEvent(new Event('change'));
-    }
-    const runBtn = arenaEl?.querySelector('[data-run]');
-    if (runBtn) {
-      runBtn.click();
-    }
-    if (this.pilotArena?.readyPromise) {
-      try {
-        await this.pilotArena.readyPromise;
-      } catch {
-        // Runner handles and exposes failure in its own record/status
-      }
-    }
+    return this.pilotMissionStarter.start({ missionId: 'valley-slalom-v1', pilotKind });
   }
 
   /**

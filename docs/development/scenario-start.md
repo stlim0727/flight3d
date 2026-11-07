@@ -40,3 +40,13 @@ The coordinator is directly importable without browser startup. Its narrow ports
 separate lifecycle policy from `FlightStartLoadingView` presentation and the
 `simulatorFlightStart` composition adapter. The `busy` guard covers both direct
 starts and rebuilds; competing entry points cannot release the active hold.
+
+Scenario installation is delegated to `ScenarioStartCoordinator`, with simulator
+services wired in `simulatorScenarioStart`. The launched selection is captured
+before asynchronous mission preparation and committed only after it succeeds.
+`startValleyMission` invokes `PilotMissionStartController` directly: the mission
+panel is a form adapter, not an execution API accessed via synthetic clicks.
+Preparation rejection/cancellation propagates to the outer start transaction.
+Ordinary presets, demos and mission adapters each own their own fresh recording;
+commitment must not reset the prepared mission seed. Failed coordinated starts
+stop recording and discard old crash/debrief presentation state.

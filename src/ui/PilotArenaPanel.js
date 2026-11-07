@@ -1,3 +1,4 @@
+import { PilotMissionStartController } from '../arena/PilotMissionStartController.js';
 import '../styles/pilot-arena.css';
 import { PilotHost } from '../pilot/PilotHost.js';
 import { MissionRunner } from '../arena/MissionRunner.js';
@@ -137,7 +138,7 @@ export function installPilotArena(sim) {
         kindSelect.dispatchEvent(new Event('change'));
       }
       if (sim.lobby) sim.lobby.pilotMode = selectedRetryMode;
-      find('run').click();
+      launchMissionFromUi();
       return;
     }
     if (event.target === scoreOverlay || event.target.closest('[data-score-close]')) {
@@ -156,7 +157,7 @@ export function installPilotArena(sim) {
     }
   });
   find('score-banner').addEventListener('click', event => {
-    if (event.target.closest('[data-banner-retry]')) find('run').click();
+    if (event.target.closest('[data-banner-retry]')) launchMissionFromUi();
   });
   const renderBoard = comparisonKey => {
     const rows = scoreboard.read().filter(r => !comparisonKey || r.comparisonKey === comparisonKey);
@@ -345,28 +346,42 @@ export function installPilotArena(sim) {
     if (file.size > 256 * 1024) { find('status').textContent = '코드 파일은 256 KiB 이하여야 합니다.'; return; }
     source.value = await file.text();
   });
-  find('run').addEventListener('click', () => {
-    const seed = Number(find('seed').value);
-    if (!Number.isSafeInteger(seed) || seed < 0) { find('status').textContent = '시드는 0 이상의 정수여야 합니다.'; return; }
-    hideScoreOverlay();
-    find('score-banner').hidden = true;
-    shownOverlayRecord = null;
-    find('result').textContent = '';
-    logs.length = 0; find('log').textContent = '';
-    find('telemetry').textContent = '관측 대기 중';
-    lastStatus = null;
-    if (runner.active) runner.stop('retry');
-    sim.clearCrashState?.();
-    sim.physicsAccumulator = 0;
-    runner.paceTick = find('kind').value === 'human' || find('playback').value === 'realtime' ? createRealtimePacer() : null;
-    if (find('kind').value === 'human' || new URLSearchParams(location.search).get('pilotArena') !== '1') shell.open = false;
-    sim.gameFlow.enterFlight();
-    if (!source.value && find('kind').value === 'ai') loadExample();
-    void runner.start(source.value, { pilotKind: find('kind').value, missionId: find('mission').value,
-      environmentProfile: find('environment').value, seed }).catch(error => {
-      find('status').textContent = error.message;
-    });
+  const starter = sim.pilotMissionStarter = new PilotMissionStartController({
+    runner,
+    createPacer: createRealtimePacer,
+    readRequest(overrides) {
+      const missionId = overrides.missionId ?? find('mission').value;
+      const pilotKind = overrides.pilotKind ?? find('kind').value;
+      // An explicit scenario/mode command chooses its own example, as the former
+      // selection change handler did. A lab Run preserves the user's edited code.
+      const example = isValleyMission(missionId) ? valleySlalomSource
+        : missionId.startsWith('landing') ? landingSource : takeoffSource;
+      return { missionId, pilotKind, environmentProfile: find('environment').value,
+        seed: Number(find('seed').value), playback: find('playback').value,
+        source: overrides.missionId || overrides.pilotKind ? example : source.value || example };
+    },
+    beforeStart(request) {
+      find('mission').value = request.missionId;
+      find('kind').value = request.pilotKind;
+      source.value = request.source;
+      syncMode();
+      hideScoreOverlay();
+      find('score-banner').hidden = true;
+      shownOverlayRecord = null;
+      find('result').textContent = '';
+      logs.length = 0; find('log').textContent = '';
+      find('telemetry').textContent = '관측 대기 중';
+      lastStatus = null;
+      sim.clearCrashState?.();
+      sim.physicsAccumulator = 0;
+      if (request.pilotKind === 'human' || !isDevMode) shell.open = false;
+      sim.gameFlow.enterFlight();
+    },
   });
+  function launchMissionFromUi() {
+    void starter.start().catch(error => { find('status').textContent = error.message; });
+  }
+  find('run').addEventListener('click', launchMissionFromUi);
   find('stop').addEventListener('click', () => { hideScoreOverlay(); runner.stop(); });
   find('save').addEventListener('click', () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(runner.record, null, 2)], { type: 'application/json' }));
@@ -384,7 +399,7 @@ export function installPilotArena(sim) {
     find('status').textContent = `${selected.label} · 준비 중`;
     const started = performance.now();
     const startWhenReady = () => {
-      if (sim.startupReady && !sim.browserBackgrounded) find('run').click();
+      if (sim.startupReady && !sim.browserBackgrounded) launchMissionFromUi();
       else if (performance.now() - started < 30000) requestAnimationFrame(startWhenReady);
       else find('status').textContent = '시뮬레이터 준비 시간이 초과되었습니다. 준비 후 미션 실행을 눌러주세요.';
     };
