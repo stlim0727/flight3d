@@ -58,7 +58,7 @@ test('ordered plane crossings and complete distance coverage determine completio
   assert.equal(result.metrics.p95ExcessM, 0);
   assert.equal(result.metrics.altitudeCostM, 0);
   assert.equal(result.metrics.medianAglM, 15);
-  assert.equal(result.metrics.rulesVersion, '1.4.0');
+  assert.equal(result.metrics.rulesVersion, '1.5.0');
   assert.equal(result.metrics.meanIasKnots, 220);
   assert.equal(result.metrics.maxIasKnots, 220);
   assert.ok(result.metrics.finalScore > 10000, `Expected finalScore > 10000, got ${result.metrics.finalScore}`);

@@ -656,4 +656,36 @@ describe('Engine volume', () => {
       if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
     }
   });
+
+  it('mutes gStrainGain on explosion and keeps breathing gain non-negative during consciousness recovery', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      audio.ctx.currentTime = 0.5;
+
+      // Cockpit view during high G produces positive straining volume
+      const highGState = {
+        pilot: { gZ: 5.0, consciousness: 0.8, isGLOC: false },
+        gForce: 5.0,
+      };
+      audio.update(1 / 60, highGState, true, 0);
+      assert.ok(audio.gStrainGain.gain.value > 0, 'High-G straining should produce positive gain');
+
+      // Recovering at 1.0 G with low/moderate consciousness (e.g. 0.89) must NOT produce negative gain
+      const recoveryState = {
+        pilot: { gZ: 1.0, consciousness: 0.89, isGLOC: false },
+        gForce: 1.0,
+      };
+      audio.update(1 / 60, recoveryState, true, 0);
+      assert.ok(audio.gStrainGain.gain.value >= 0, `Recovery volume must be >= 0, got ${audio.gStrainGain.gain.value}`);
+
+      // Explosion mutes gStrainGain
+      audio.playExplosion();
+      assert.strictEqual(audio.gStrainGain.gain.value, 0, 'Explosion must silence gStrainGain');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
 });

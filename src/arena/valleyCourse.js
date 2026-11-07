@@ -47,7 +47,7 @@ export function projectValleyPosition(course, position) {
 
 export function createValleyManifest(overrides = {}) {
   const manifest = {
-    id: 'valley-low-v1', type: 'valley', rulesVersion: '1.4.0',
+    id: 'valley-low-v1', type: 'valley', rulesVersion: '1.5.0',
     aircraftId: 'F16', airportId: 'lukla', physicsHz: 120, decisionPeriodTicks: 24,
     timeoutTicks: 10800, minimumIasKnots: 180, maximumIasKnots: 700,
     strictConstraints: false,

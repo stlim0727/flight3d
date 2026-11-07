@@ -39,7 +39,7 @@ test('ValleyScoreboard saves, ranks and retrieves leaderboard attempts', () => {
     status: 'succeeded',
     reason: 'completed',
     tick: 4800, // 40s
-    manifest: { id: 'valley-low-v1', type: 'valley', physicsHz: 120, rulesVersion: '1.4.0' },
+    manifest: { id: 'valley-low-v1', type: 'valley', physicsHz: 120, rulesVersion: '1.5.0' },
     result: { metrics: { finalScore: 14500, meanIasKnots: 560 } },
   };
 
@@ -48,7 +48,7 @@ test('ValleyScoreboard saves, ranks and retrieves leaderboard attempts', () => {
     status: 'succeeded',
     reason: 'completed',
     tick: 4680, // 39s
-    manifest: { id: 'valley-low-v1', type: 'valley', physicsHz: 120, rulesVersion: '1.4.0' },
+    manifest: { id: 'valley-low-v1', type: 'valley', physicsHz: 120, rulesVersion: '1.5.0' },
     result: { metrics: { finalScore: 15200, meanIasKnots: 575 } },
   };
 
@@ -100,7 +100,7 @@ test('changed rules characteristics discard every stored attempt', () => {
     status: 'succeeded',
     reason: 'completed',
     tick: 4800,
-    manifest: { id: 'valley-slalom-v1', type: 'valley-slalom', physicsHz: 120, rulesVersion: 'valley-slalom-v1' },
+    manifest: { id: 'valley-slalom-v1', type: 'valley-slalom', physicsHz: 120, rulesVersion: VALLEY_SLALOM_RULES.version },
     result: { metrics: { finalScore: 12000 } },
   };
   scoreboard.add(record, { callsign: 'VIPER' });

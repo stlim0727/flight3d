@@ -84,6 +84,10 @@ export class ReplayDirector {
     // Instrument panels read fields a track never recorded, so replay fills a real telemetry
     // object instead of inventing one. It is replaced wholesale every physics step anyway.
     this._telemetry = { ...sim.telemetry };
+    this._telemetry.pilot = {
+      gZ: 1.0, consciousness: 1.0, responsiveness: 1.0, isGLOC: false,
+      blackout: 0, redout: 0, tunnelVision: 0, grayout: 0, blur: 0, glocIncidents: 0, gFatigueSeconds: 0
+    };
     this._view = view;
     sim.controls.setAircraftControlsDisabled(true);
     this.active = true;
@@ -175,6 +179,14 @@ export class ReplayDirector {
     this._scenarioAdapter?.release();
     this._scenarioAdapter = null;
     sim.controls.setAircraftControlsDisabled(false);
+    sim.pilotPhysiology?.reset?.();
+    sim.pilotPhysiologyFx?.reset?.();
+    if (sim.telemetry) {
+      sim.telemetry.pilot = sim.pilotPhysiology ? sim.pilotPhysiology.getSnapshot() : {
+        gZ: 1.0, consciousness: 1.0, responsiveness: 1.0, isGLOC: false,
+        blackout: 0, redout: 0, tunnelVision: 0, grayout: 0, blur: 0, glocIncidents: 0, gFatigueSeconds: 0
+      };
+    }
     if (this._view) this._restoreView(this._view);
     this._view = null;
     this._telemetry = null;

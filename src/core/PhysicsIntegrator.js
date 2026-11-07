@@ -14,6 +14,7 @@ import { stepPhysics } from './physicsTiming.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { FLOW } from '../ui/GameFlowController.js';
 import { trackFlightCrash } from '../analytics/posthog.js';
+import { PilotPhysiology } from '../physics/PilotPhysiology.js';
 
 class PhysicsIntegratorMethods {
   /**
@@ -50,9 +51,29 @@ class PhysicsIntegratorMethods {
 
     // 1. Controls processing
     this.controls.update(dt, this.telemetry.iasKnots, this.currentAircraftId);
-    this.aero.elevator = this.controls.elevator;
-    this.aero.aileron = this.controls.aileron;
-    this.aero.rudder = this.controls.rudder;
+    if (!this.pilotPhysiology) {
+      this.pilotPhysiology = new PilotPhysiology();
+    }
+    const rawInputs = {
+      elevator: this.controls.elevator,
+      aileron: this.controls.aileron,
+      rudder: this.controls.rudder
+    };
+    const isAutonomousDemo = Boolean(this.demoDirector?.isActive);
+    if (!isAutonomousDemo) {
+      this.pilotPhysiology.update(dt, this.telemetry.gForce ?? 1.0, rawInputs);
+      this.aero.elevator = this.pilotPhysiology.effectiveElevator;
+      this.aero.aileron = this.pilotPhysiology.effectiveAileron;
+      this.aero.rudder = this.pilotPhysiology.effectiveRudder;
+    } else {
+      this.pilotPhysiology.reset();
+      this.pilotPhysiology.effectiveElevator = this.controls.elevator;
+      this.pilotPhysiology.effectiveAileron = this.controls.aileron;
+      this.pilotPhysiology.effectiveRudder = this.controls.rudder;
+      this.aero.elevator = this.controls.elevator;
+      this.aero.aileron = this.controls.aileron;
+      this.aero.rudder = this.controls.rudder;
+    }
     this.aero.pitchTrim = this.controls.pitchTrim;
 
     // Autopilot control laws. Pilot yoke input above the gate overrides the
@@ -72,7 +93,8 @@ class PhysicsIntegratorMethods {
 
     // Ground steering & brakes
     const groundSpeed = Math.sqrt(this.linearVelocity.x * this.linearVelocity.x + this.linearVelocity.z * this.linearVelocity.z);
-    this.gear.setSteering(this.controls.rudder, groundSpeed);
+    const steeringRudder = isAutonomousDemo ? this.controls.rudder : this.pilotPhysiology.effectiveRudder;
+    this.gear.setSteering(steeringRudder, groundSpeed);
     this.gear.setBrakes(this.controls.brakes);
 
     // 2. Turbofan Engines Update
@@ -218,7 +240,7 @@ class PhysicsIntegratorMethods {
 
     // A connected ground tug contributes forces through the normal integrator.
     const towing = this.demoDirector?.isActive
-      ? this.demoDirector.getActiveScenario().towingForces?.() : null;
+      ? this.demoDirector.getActiveScenario()?.towingForces?.() : null;
     if (towing) netForceWorld.add(towing.force);
     const accelerationWorld = netForceWorld.divideScalar(this.aero.mass);
     this.linearVelocity.addScaledVector(accelerationWorld, dt);
@@ -288,6 +310,7 @@ class PhysicsIntegratorMethods {
     // resolveBodyPenetration impulses and using the interval's midpoint axis.
     const measuredGForce = normalLoadFactor(velocityBeforeStep, this.linearVelocity,
       rotationBeforeStep, this.quaternion, dt);
+    if (this.pilotPhysiology) this.pilotPhysiology.gZ = measuredGForce;
 
     if (this._hasGroundContact && this.lastOnGround && !gearResult.onGround && this.actualTakeoffMassKg === null) {
       this.actualTakeoffMassKg = this.aero.mass;
@@ -351,11 +374,18 @@ class PhysicsIntegratorMethods {
       selectedHeading: this.autopilot.master ? Math.round(this.autopilot.targets.headingDeg) : this.telemetry.selectedHeading,
       selectedAltitude: this.autopilot.master ? Math.round(this.autopilot.targets.altitudeFt) : this.telemetry.selectedAltitude,
       selectedSpeed: this.autopilot.master && this.autopilot.speedMode ? Math.round(this.autopilot.targets.iasKnots) : this.telemetry.selectedSpeed,
-      elevator: this.controls.elevator,
-      aileron: this.controls.aileron,
-      rudder: this.controls.rudder,
+      rawElevator: this.controls.elevator,
+      rawAileron: this.controls.aileron,
+      rawRudder: this.controls.rudder,
+      elevator: isAutonomousDemo ? this.controls.elevator : (this.pilotPhysiology ? this.pilotPhysiology.effectiveElevator : this.controls.elevator),
+      aileron: isAutonomousDemo ? this.controls.aileron : (this.pilotPhysiology ? this.pilotPhysiology.effectiveAileron : this.controls.aileron),
+      rudder: isAutonomousDemo ? this.controls.rudder : (this.pilotPhysiology ? this.pilotPhysiology.effectiveRudder : this.controls.rudder),
       throttle: this.controls.throttle,
       pitchTrim: this.aero.pitchTrim,
+      pilot: this.pilotPhysiology ? this.pilotPhysiology.getSnapshot() : {
+        gZ: measuredGForce, consciousness: 1.0, responsiveness: 1.0, isGLOC: false,
+        blackout: 0, redout: 0, tunnelVision: 0, grayout: 0, blur: 0, glocIncidents: 0, gFatigueSeconds: 0
+      },
       x: this.position.x,
       z: this.position.z,
       demoActive: Boolean(this.demoDirector?.isActive),
@@ -501,6 +531,14 @@ class PhysicsIntegratorMethods {
     if (this.aircraft?.group) this.aircraft.group.visible = true;
     this.aircraft?.resetCrashVisuals?.();
     this.audio?.reset?.();
+    this.pilotPhysiology?.reset?.();
+    this.pilotPhysiologyFx?.reset?.();
+    if (this.telemetry) {
+      this.telemetry.pilot = this.pilotPhysiology ? this.pilotPhysiology.getSnapshot() : {
+        gZ: 1.0, consciousness: 1.0, responsiveness: 1.0, isGLOC: false,
+        blackout: 0, redout: 0, tunnelVision: 0, grayout: 0, blur: 0, glocIncidents: 0, gFatigueSeconds: 0
+      };
+    }
   }
 
   resetCrash() {

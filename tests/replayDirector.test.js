@@ -310,3 +310,26 @@ test('all speed presets advance simulation time and invalid metadata never chang
     assert.equal(director.progressSec, speed);
   }
 });
+
+test('replay load and stop reset stale pilot physiological telemetry to nominal', async () => {
+  const sim = fakeSim();
+  // Simulate ending the sortie in G-LOC blackout
+  sim.telemetry.pilot = {
+    isGLOC: true,
+    consciousness: 0.0,
+    blackout: 1.0,
+    redout: 0.0,
+    gZ: 7.5,
+  };
+  const director = new ReplayDirector(sim);
+  await director.load(track());
+
+  assert.equal(sim.telemetry.pilot.isGLOC, false, 'Replay must clear prior G-LOC state');
+  assert.equal(sim.telemetry.pilot.consciousness, 1.0, 'Replay must reset consciousness to 1.0');
+  assert.equal(sim.telemetry.pilot.blackout, 0, 'Replay must clear blackout');
+
+  // Stop replay should also leave pilot physiology reset
+  sim.telemetry.pilot = { isGLOC: true, consciousness: 0.0 };
+  director.stop();
+  assert.equal(sim.telemetry.pilot.isGLOC, false, 'Stopping replay must leave pilot state nominal');
+});

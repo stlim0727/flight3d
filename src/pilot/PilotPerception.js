@@ -126,7 +126,14 @@ export class PilotPerception {
     feedback.weightOnWheels = !this.contactValid || this.contact === undefined
       ? { status: 'unavailable', value: null, sampleTick: tick, reason: 'missing-source' }
       : { status: 'available', value: this.contact, sampleTick: tick };
-    const result = { instruments, navigation, feedback, visual: { contacts: [] }, capabilities: { visualContacts: false, trainingNavigation: true } };
+    const pilotSnapshot = snapshot.pilot;
+    const pilot = {
+      gZ: pilotSnapshot && Number.isFinite(pilotSnapshot.gZ) ? pilotSnapshot.gZ : (Number.isFinite(snapshot.gForce) ? snapshot.gForce : 1.0),
+      consciousness: pilotSnapshot && Number.isFinite(pilotSnapshot.consciousness) ? pilotSnapshot.consciousness : 1.0,
+      responsiveness: pilotSnapshot && Number.isFinite(pilotSnapshot.responsiveness) ? pilotSnapshot.responsiveness : 1.0,
+      isGLOC: Boolean(pilotSnapshot?.isGLOC),
+    };
+    const result = { instruments, navigation, feedback, pilot, visual: { contacts: [] }, capabilities: { visualContacts: false, trainingNavigation: true } };
     this.lastTick = tick;
     this.lastObservation = structuredClone(result);
     return result;
