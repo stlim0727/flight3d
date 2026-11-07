@@ -54,27 +54,30 @@
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 16px;
+      gap: 12px;
       max-width: 1600px;
       margin: 0 auto;
     }
     .header-title-wrap {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
+      flex-wrap: wrap;
+      min-width: 0;
     }
     .back-link {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 14px;
+      padding: 7px 12px;
       background: var(--bg-card);
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
       color: var(--accent);
       text-decoration: none;
       font-weight: 500;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
+      white-space: nowrap;
       transition: background 0.15s, border-color 0.15s;
     }
     .back-link:hover {
@@ -85,6 +88,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-shrink: 0;
     }
     .fold-btn {
       display: inline-flex;
@@ -166,6 +170,21 @@
       color: var(--accent);
       font-weight: 600;
     }
+    .header-sub {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      max-width: 1600px;
+      margin: 10px auto 0;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    header.is-collapsed .header-sub {
+      margin-top: 6px;
+      padding-top: 6px;
+    }
     .viewport-switcher {
       display: inline-flex;
       align-items: center;
@@ -174,6 +193,7 @@
       border-radius: 12px;
       padding: 4px;
       gap: 4px;
+      flex-shrink: 0;
     }
     .viewport-tab {
       display: inline-flex;
@@ -516,10 +536,13 @@
       gap: 8px;
       font-size: 0.8rem;
       color: var(--text-muted);
-      margin-top: 4px;
     }
     .top-build-info {
       padding: 2px 0;
+    }
+    .top-build-info .meta-strong {
+      color: var(--text-main);
+      font-weight: 600;
     }
     .meta-item {
       display: inline-flex;
@@ -594,10 +617,15 @@
 
     @media (max-width: 900px) {
       header.is-collapsed .header-top {
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
       }
-      header.is-collapsed .header-meta .back-link {
+      header.is-collapsed .header-meta .flight-selector-link {
         display: none;
+      }
+      .header-sub {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
       }
     }
 
@@ -609,7 +637,7 @@
         padding: calc(6px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) 6px calc(12px + env(safe-area-inset-left, 0px));
       }
       .header-top {
-        gap: 10px;
+        gap: 8px;
       }
       h1 {
         font-size: 1.15rem;
@@ -630,7 +658,7 @@
       }
     }
 
-    @media (max-width: 480px) {
+    @media (max-width: 600px) {
       header {
         padding: calc(8px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) 10px calc(12px + env(safe-area-inset-left, 0px));
       }
@@ -638,7 +666,6 @@
         padding: calc(6px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) 6px calc(12px + env(safe-area-inset-left, 0px));
       }
       .header-top {
-        flex-wrap: nowrap;
         gap: 8px;
         align-items: center;
       }
@@ -647,11 +674,8 @@
         flex: 1;
         min-width: 0;
       }
-      .header-titles {
-        min-width: 0;
-      }
       h1 {
-        font-size: 0.98rem;
+        font-size: 1.05rem;
         gap: 6px;
       }
       .count-badge {
@@ -663,14 +687,34 @@
         font-size: 0.78rem;
         white-space: nowrap;
       }
-      .header-meta .back-link {
+      .header-meta .flight-selector-link {
+        display: none;
+      }
+      .header-sub {
+        margin-top: 8px;
+        padding-top: 6px;
+        gap: 6px;
+      }
+      .viewport-switcher {
+        width: 100%;
+        display: flex;
+      }
+      .viewport-tab {
+        flex: 1 1 0;
+        justify-content: center;
+        padding: 5px 4px;
+        font-size: 0.75rem;
+      }
+      .viewport-dim {
         display: none;
       }
       .top-build-info {
-        display: none;
+        font-size: 0.72rem;
+        gap: 6px;
+        flex-wrap: wrap;
       }
       .controls-bar {
-        margin-top: 10px;
+        margin-top: 8px;
         gap: 8px;
       }
       .filter-pills {
@@ -687,7 +731,7 @@
       .filter-pill {
         white-space: nowrap;
         padding: 4px 10px;
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         flex-shrink: 0;
       }
     }
@@ -698,21 +742,21 @@
     <div class="header-top">
       <div class="header-title-wrap">
         <a class="back-link" href="./">← Flight3d</a>
-        <div class="header-titles">
-          <h1>
-            UI Screens Showcase <span class="count-badge" id="screen-count">38 Screens</span>
-            <span class="viewport-badge">📱 Mobile Portrait (390×844)</span>
-            <button class="collapsed-filter-pill" id="collapsed-filter-pill" title="클릭하여 필터 및 검색 바 펼치기"></button>
-          </h1>
-          <div class="build-info-bar top-build-info" id="top-build-info">
-            <span class="meta-item"><span class="meta-dot"></span><span id="top-timestamp" title="Generated timestamp">Updated -</span></span>
-            <span class="meta-sep">·</span>
-            <span class="meta-item"><span class="meta-dim">branch:</span> <code class="meta-code" id="top-branch">-</code></span>
-            <span class="meta-sep">·</span>
-            <span class="meta-item"><span class="meta-dim">commit:</span> <a class="meta-commit-link" id="top-commit" href="#" target="_blank" rel="noopener">-</a></span>
-          </div>
-        </div>
+        <h1>
+          UI Screens Showcase <span class="count-badge" id="screen-count">38 Screens</span>
+          <span class="viewport-badge">📱 Mobile Portrait (390×844)</span>
+          <button class="collapsed-filter-pill" id="collapsed-filter-pill" title="클릭하여 필터 및 검색 바 펼치기"></button>
+        </h1>
       </div>
+      <div class="header-meta">
+        <a class="back-link flight-selector-link" href="./flights.html">Flight URL Selector ↗</a>
+        <button id="header-fold-btn" class="fold-btn" aria-expanded="true" aria-controls="controls-bar" title="상단 필터 및 검색 바 접기/펼치기 (단축키: F)">
+          <span class="fold-btn-icon" aria-hidden="true">▲</span>
+          <span class="fold-btn-text" id="fold-btn-text">접기</span>
+        </button>
+      </div>
+    </div>
+    <div class="header-sub">
       <nav class="viewport-switcher" role="navigation" aria-label="화면 뷰포트 전환">
         <a href="./screens.html" class="viewport-tab" data-viewport="desktop" title="데스크톱 뷰포트 (1440×900)">
           <span class="viewport-icon">🖥️</span>
@@ -730,12 +774,12 @@
           <span class="viewport-dim">844×390</span>
         </a>
       </nav>
-      <div class="header-meta">
-        <button id="header-fold-btn" class="fold-btn" aria-expanded="true" aria-controls="controls-bar" title="상단 필터 및 검색 바 접기/펼치기 (단축키: F)">
-          <span class="fold-btn-icon" aria-hidden="true">▲</span>
-          <span class="fold-btn-text" id="fold-btn-text">접기</span>
-        </button>
-        <a class="back-link" href="./flights.html">Flight URL Selector ↗</a>
+      <div class="build-info-bar top-build-info" id="top-build-info">
+        <span class="meta-item">🕒 Captured: <strong id="top-timestamp" class="meta-strong">-</strong></span>
+        <span class="meta-sep">·</span>
+        <span class="meta-item">🌿 Branch: <code class="meta-code" id="top-branch">-</code></span>
+        <span class="meta-sep">·</span>
+        <span class="meta-item">🔖 Commit: <a class="meta-commit-link" id="top-commit" href="#" target="_blank" rel="noopener">-</a></span>
       </div>
     </div>
     <div class="controls-bar" id="controls-bar">
@@ -842,8 +886,8 @@
       const commitUrl = isRealCommit ? `https://github.com/stlim0727/flight3d/commit/${commitSha}` : '#';
 
       if (topTimestamp) {
-        topTimestamp.textContent = `Updated ${rel}`;
-        topTimestamp.title = `${iso} (${localStr})`;
+        topTimestamp.textContent = `${rel} (${iso})`;
+        topTimestamp.title = localStr;
       }
       if (topBranch) {
         topBranch.textContent = branchName;
