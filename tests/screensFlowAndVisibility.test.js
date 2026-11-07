@@ -96,3 +96,20 @@ test('Mobile header layout and audio hint snackbar positioning are correctly con
   assert.ok(replayCss.includes('::file-selector-button'), 'replay library must style file selector button');
   assert.ok(replayCss.includes('border-radius: 14px'), 'replay library must use unified 14px border radius');
 });
+
+test('DebriefOverlay UI layout, header hierarchy, and styling tokens', () => {
+  const debriefSrc = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
+  assert.ok(debriefSrc.includes('class="debrief-header-actions"'), 'header must have debrief-header-actions');
+  assert.ok(debriefSrc.includes('id="debrief-feedback"'), 'header must contain debrief-feedback');
+  assert.ok(debriefSrc.includes('id="debrief-fold"'), 'header must contain debrief-fold');
+  assert.ok(debriefSrc.includes('id="debrief-pill"'), 'header must contain debrief-pill');
+  assert.ok(debriefSrc.includes('class="debrief-secondary-actions"'), 'actions must contain debrief-secondary-actions');
+
+  const css = readFileSync(resolve('src/styles/debrief.css'), 'utf8');
+  assert.ok(css.includes('rgba(15, 23, 42, 0.85)'), 'debrief card must use dark cockpit glass background');
+  assert.ok(css.includes('backdrop-filter: blur(16px)'), 'debrief card must use 16px blur');
+  assert.ok(css.includes('max-width: 440px'), 'debrief card must enforce 440px max width');
+  assert.ok(css.includes('max-height: calc(100dvh - 32px)'), 'debrief card must enforce max height');
+  assert.ok(css.includes('position: sticky'), 'debrief actions must be sticky');
+  assert.ok(css.includes('linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'), 'retry button must use primary accent gradient');
+});

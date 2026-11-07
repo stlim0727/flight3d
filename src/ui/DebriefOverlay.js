@@ -43,13 +43,21 @@ export class DebriefOverlay {
             <span class="debrief-back-caption" data-i18n="debrief.lobby"></span>
           </button>
           <div class="debrief-title-wrap">
-            <h2 id="debrief-title">Flight3d</h2>
+            <div class="debrief-title-row">
+              <h2 id="debrief-title">Flight3d</h2>
+              <span id="debrief-pill" class="debrief-header-pill" hidden></span>
+            </div>
             <p class="debrief-muted" data-i18n="debrief.title"></p>
           </div>
-          <button class="btn btn-card-fold debrief-fold-btn" id="debrief-fold" type="button" data-i18n-title="ui.fold" data-i18n-aria-label="ui.fold">
-            <span class="fold-glyph" aria-hidden="true">▾</span>
-            <span class="fold-caption" data-i18n="ui.fold"></span>
-          </button>
+          <div class="debrief-header-actions">
+            <button class="btn debrief-feedback-btn" id="debrief-feedback" type="button" data-i18n-title="debrief.feedback" data-i18n-aria-label="debrief.feedback">
+              <span class="debrief-feedback-icon" aria-hidden="true">🐞</span>
+            </button>
+            <button class="btn btn-card-fold debrief-fold-btn" id="debrief-fold" type="button" data-i18n-title="ui.fold" data-i18n-aria-label="ui.fold">
+              <span class="fold-glyph" aria-hidden="true">▾</span>
+              <span class="fold-caption" data-i18n="ui.fold"></span>
+            </button>
+          </div>
         </header>
         <div class="debrief-tabs" role="tablist" data-i18n-aria-label="debrief.title">
           ${['summary', 'record', 'share'].map(name => `<button class="btn" id="debrief-tab-${name}" role="tab" aria-controls="debrief-${name}" data-debrief-label="${name}"></button>`).join('')}
@@ -64,6 +72,7 @@ export class DebriefOverlay {
             </div>
             <div class="debrief-stats">
               ${['duration', 'altitude', 'speed', 'g'].map(name => `<div data-stat="${name}"><span data-debrief-label="${name}"></span><strong id="debrief-stat-${name}"></strong></div>`).join('')}
+              <div data-stat="touchdown" id="debrief-stat-sink-card" hidden><span data-i18n="debrief.touchdown"></span><strong id="debrief-stat-sink"></strong></div>
               <div data-stat="empty-touchdown" hidden><span data-i18n="debrief.touchdown"></span><strong>—</strong></div>
             </div>
             <div id="debrief-touchdown"><p class="debrief-caption" data-i18n="debrief.touchdown"></p><p id="debrief-contact"></p><p id="debrief-contact-note" class="debrief-caption"></p></div>
@@ -89,11 +98,12 @@ export class DebriefOverlay {
             <p id="debrief-status" role="status" aria-live="polite"></p>
             <button class="btn" data-debrief-tab="summary" data-i18n="debrief.back"></button>
           </section>
-          <div class="debrief-actions">
-            <button class="btn" id="debrief-watch-replay" data-i18n="replay.watch" hidden></button>
-            <button class="btn debrief-primary" id="debrief-retry" data-i18n="debrief.retrySame"></button>
-            <button class="btn" id="debrief-change-setup" data-i18n="debrief.changeConditions"></button>
-            <button class="btn" id="debrief-feedback" data-i18n="debrief.feedback"></button>
+        </div>
+        <div class="debrief-actions">
+          <button class="btn debrief-primary" id="debrief-retry" data-i18n="debrief.retrySame"></button>
+          <div class="debrief-secondary-actions">
+            <button class="btn debrief-secondary" id="debrief-change-setup" data-i18n="debrief.changeConditions"></button>
+            <button class="btn debrief-secondary" id="debrief-watch-replay" data-i18n="replay.watch" hidden></button>
           </div>
         </div>
       </div>
@@ -237,6 +247,21 @@ export class DebriefOverlay {
     this.setFolded(false);
     const enough = report.sufficient;
     const crash = report.crash;
+    const outcomeEl = this.el('outcome');
+    outcomeEl.classList.remove('is-crash', 'is-landed', 'is-empty');
+    if (!enough) {
+      outcomeEl.classList.add('is-empty');
+    } else if (crash) {
+      outcomeEl.classList.add('is-crash');
+    } else {
+      outcomeEl.classList.add('is-landed');
+    }
+    const headerPill = this.el('pill');
+    if (headerPill) {
+      headerPill.hidden = false;
+      headerPill.className = 'debrief-header-pill ' + (!enough ? 'is-empty' : crash ? 'is-crash' : 'is-landed');
+      bindText(headerPill, () => !enough ? t('debrief.insufficient') : crash ? t('debrief.crashSeverity') : t(`debrief.outcome.${report.reason}`));
+    }
     // A crash headline names the collision; short records keep their own headline, so the block names it.
     bindText(this.el('outcome'), () => !enough ? t('debrief.empty') : crash ? crashName(crash) : t(`debrief.outcome.${report.reason}`));
     this.el('crash').hidden = !crash;
@@ -258,13 +283,29 @@ export class DebriefOverlay {
     for (const key of ['altitude', 'speed', 'g']) this.root.querySelector(`[data-stat="${key}"]`).hidden = !enough;
     this.root.querySelector('[data-stat="empty-touchdown"]').hidden = enough;
     const touchdown = report.touchdowns.at(-1);
+    const sinkCard = this.el('stat-sink-card');
+    const sinkVal = this.el('stat-sink');
+    if (sinkCard && sinkVal) {
+      if (enough && touchdown) {
+        sinkVal.textContent = `${number(touchdown.sinkRateFpm)} FPM`;
+        sinkCard.hidden = false;
+      } else {
+        sinkCard.hidden = true;
+      }
+    }
     // After a crash the collision replaces the touchdown block unless a touchdown actually happened.
     this.el('touchdown').hidden = !enough || Boolean(crash && !touchdown);
     bindText(this.el('contact'), () => `${t('debrief.sink')} ${number(touchdown?.sinkRateFpm)} FPM · ${t('debrief.contactG')} ${g(touchdown?.contactG)} G`);
     bindText(this.el('contact-note'), () => t(touchdown ? 'debrief.contactNote' : 'debrief.noTouchdown'));
     this.el('insufficient').hidden = enough;
     this.el('view-record').hidden = !enough;
-    for (const id of ['copy', 'export', 'native-share']) this.el(id).disabled = !enough;
+    for (const id of ['copy', 'export', 'native-share']) {
+      const el = this.el(id);
+      if (el) {
+        el.disabled = !enough;
+        el.classList.toggle('is-disabled', !enough);
+      }
+    }
     // A track the recorder refused to build leaves nothing to keep, so the offer disappears.
     this.el('watch-replay').hidden = !replay;
     this.el('save-replay').hidden = !replay;
