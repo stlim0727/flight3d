@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { encodeTrack, decodeTrack, toBase64, fromBase64, decodedByteLength,
   REPLAY_TRACK_VERSION } from '../src/replay/ReplayCodec.js';
+import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
 import { RECORD_BYTES, HEADER_BYTES, REPLAY_BUDGET, REPLAY_INTERVAL_LADDER,
   maxSamplesFor, maxTrackSeconds, base64ByteLength } from '../src/replay/replayConfig.js';
 
@@ -78,7 +79,7 @@ test('every recorded field survives the round trip inside its quantization bound
   assert.ok(Math.abs(a.engine1.n2 - b.engine1.n2) < 0.26);
   assert.ok(Math.abs(a.engine1.egt - b.engine1.egt) < 2.01, `egt ${a.engine1.egt}`);
   assert.ok(Math.abs(a.engine1.ff - b.engine1.ff) < 5.01, `ff ${a.engine1.ff}`);
-  assert.ok(a.engine1.egt <= 1000 && a.engine1.ff <= 2550, 'engine dials stay inside their byte range');
+  assert.ok(a.engine1.egt <= 1000, 'EGT stays inside its byte range');
   assert.ok(Math.abs(a.selectedAltitude - b.selectedAltitude) < 4.1);
   assert.ok(Math.abs(a.selectedSpeed - b.selectedSpeed) < 0.06);
   assert.equal(a.gearDamage.mainLeft, 'damaged', 'gear damage states are preserved per leg');
@@ -202,4 +203,40 @@ test('pitch trim retains the full degree range used by the trim wheels', () => {
     const source = track(2); source.samples[0].pitchTrim = trim;
     assert.ok(Math.abs(decodeTrack(encodeTrack(source)).samples[0].pitchTrim - trim) <= .051);
   }
+});
+
+test('v2 fuel flow covers every supported aircraft maximum without changing record size', () => {
+  const flows = [0, 350, 2550, 2551, 4500];
+  for (const config of Object.values(AIRCRAFT_REGISTRY)) {
+    assert.ok(Number.isFinite(config.propulsion.maxFuelFlowKgPerHour));
+    flows.push(config.propulsion.maxFuelFlowKgPerHour);
+  }
+  for (const flow of flows) {
+    const source = track(2);
+    source.samples[0].engine1.ff = flow;
+    source.samples[0].engine2.ff = flow;
+    const bytes = encodeTrack(source);
+    assert.equal(bytes.length, decodedByteLength(source));
+    const decoded = decodeTrack(bytes);
+    assert.equal(decoded.version, 2);
+    for (const engine of ['engine1', 'engine2']) {
+      assert.ok(Math.abs(decoded.samples[0][engine].ff - flow) <= 5, `${engine}: ${flow}`);
+    }
+  }
+});
+
+test('v1 files still decode their original one-byte fuel flow', () => {
+  const source = track(2);
+  source.samples[0].engine1.ff = 1180;
+  source.samples[0].engine2.ff = 2550;
+  const legacy = encodeTrack(source);
+  legacy[5] = 1;
+  const view = new DataView(legacy.buffer);
+  const base = HEADER_BYTES + view.getUint16(16);
+  // A genuine v1 record has zero-filled reserved bytes, not the v2 extension.
+  for (let i = 0; i < source.samples.length; i++) legacy.fill(0, base + i * RECORD_BYTES + 73, base + (i + 1) * RECORD_BYTES);
+  const decoded = decodeTrack(legacy);
+  assert.equal(decoded.version, 1);
+  assert.equal(decoded.samples[0].engine1.ff, 1180);
+  assert.equal(decoded.samples[0].engine2.ff, 2550);
 });

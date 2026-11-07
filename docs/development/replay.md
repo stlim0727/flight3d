@@ -21,7 +21,11 @@ start during a multiplayer room or an in-progress scene swap.
 `ReplayRecorder` observes telemetry plus the authoritative quaternion at 5 Hz.
 It progressively thins samples to 2.5/1.25/0.625 Hz to fit the byte budget. An
 80-byte binary record quantizes scalar telemetry and stores a compact unit
-quaternion. Longer flights that exceed the final rung remain viewable from the
+quaternion. Codec v2 uses four previously reserved bytes for two unsigned 16-bit
+fuel-flow readings (10 kg/h resolution), covering the F16's 4,500 kg/h maximum
+without increasing storage budgets. The decoder continues to read v1 tracks
+with their original one-byte fuel-flow layout; existing library/export containers
+keep their keys and identifiers. Longer flights that exceed the final rung remain viewable from the
 current debrief but cannot be saved. Damage flags are quantized, so replay is a
 visual flight record rather than an exact simulation checkpoint. Dynamic traffic,
 debris and world animations are not recorded.
