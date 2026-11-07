@@ -17,9 +17,9 @@ function peerOptions(env = import.meta.env) {
 
 /** Exactly one admitted peer. PeerJS is confined here so protocol tests need no browser. */
 export class PeerRoom {
-  constructor({ room, name, config, voice, options = peerOptions(), prepare, fly, changed = () => {}, remoteStream = () => {}, ended = () => {}, waitingMs = WAITING_TIMEOUT_MS }) {
-    if (room && !validRoom(room)) throw new Error('invalid-room');
-    this.host = !room; this.room = room || newRoom(); this.closed = false; this.disposed = false; this.waitingMs = waitingMs; this.rejections = new Map();
+  constructor({ room, hostRoom, name, config, voice, options = peerOptions(), prepare, fly, changed = () => {}, remoteStream = () => {}, ended = () => {}, waitingMs = WAITING_TIMEOUT_MS }) {
+    if ((room && hostRoom) || (hostRoom && !validRoom(hostRoom)) || (room && !validRoom(room))) throw new Error('invalid-room');
+    this.host = !room; this.room = room || hostRoom || newRoom(); this.closed = false; this.disposed = false; this.waitingMs = waitingMs; this.rejections = new Map();
     Object.assign(this, { voice, changed, remoteStream, ended });
     this.session = new RoomSession({ host: this.host, name, config, prepare, canStart: () => this.checkWaiting(),
       fly: () => { this.hasStarted = true; fly?.(); },

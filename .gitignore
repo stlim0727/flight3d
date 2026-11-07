@@ -58,3 +58,6 @@ docs/development/evidence/
 
 # Raw large 3D source assets (optimized Draco versions are committed)
 public/models/b737-cockpit.glb
+
+# Persistent local service state
+.local/

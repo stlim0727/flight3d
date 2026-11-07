@@ -1,0 +1,13 @@
+<!doctype html><title>Ghost protocol fixture</title>
+<script type="module">
+import '../../src/multiplayer/ghostHostPage.js';
+import { newRoom } from '../../src/multiplayer/protocol.js';
+window.startFixtureGhost = () => {
+  const query = new URLSearchParams(location.search);
+  const room = newRoom();
+  startGhostHost({ room, options: query.has('public') ? undefined : {
+    host: '127.0.0.1', port: Number(query.get('signalPort')), path: '/flight3d', secure: false,
+  } });
+  return room;
+};
+</script>
