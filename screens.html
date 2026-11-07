@@ -371,6 +371,79 @@
     }
     footer a { color: var(--accent); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
+
+    .build-info-bar {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .top-build-info {
+      padding: 2px 0;
+    }
+    .meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .meta-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 6px rgba(52, 211, 153, 0.6);
+      display: inline-block;
+    }
+    .meta-sep {
+      color: var(--text-dim);
+    }
+    .meta-dim {
+      color: var(--text-dim);
+    }
+    .meta-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.78rem;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 1px 6px;
+      border-radius: 4px;
+      color: var(--accent);
+      border: 1px solid var(--border-subtle);
+    }
+    .meta-commit-link {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.78rem;
+      background: rgba(56, 189, 248, 0.08);
+      color: var(--accent);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .meta-commit-link:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent);
+      text-decoration: underline;
+    }
+    .footer-build-info {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .footer-build-info .meta-strong {
+      color: var(--text-main);
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -378,7 +451,16 @@
     <div class="header-top">
       <div class="header-title-wrap">
         <a class="back-link" href="./">← Flight3d</a>
-        <h1>UI Screens Showcase <span class="count-badge" id="screen-count">38 Screens</span></h1>
+        <div class="header-titles">
+          <h1>UI Screens Showcase <span class="count-badge" id="screen-count">38 Screens</span></h1>
+          <div class="build-info-bar top-build-info" id="top-build-info">
+            <span class="meta-item"><span class="meta-dot"></span><span id="top-timestamp" title="Generated timestamp">Updated -</span></span>
+            <span class="meta-sep">·</span>
+            <span class="meta-item"><span class="meta-dim">branch:</span> <code class="meta-code" id="top-branch">-</code></span>
+            <span class="meta-sep">·</span>
+            <span class="meta-item"><span class="meta-dim">commit:</span> <a class="meta-commit-link" id="top-commit" href="#" target="_blank" rel="noopener">-</a></span>
+          </div>
+        </div>
       </div>
       <div class="header-meta">
         <a class="back-link" href="./flights.html">Flight URL Selector ↗</a>
@@ -429,6 +511,13 @@
   </div>
 
   <footer>
+    <div class="footer-build-info" id="footer-build-info">
+      <span class="meta-item">🕒 Captured: <strong id="footer-timestamp" class="meta-strong">-</strong></span>
+      <span class="meta-sep">·</span>
+      <span class="meta-item">🌿 Branch: <code class="meta-code" id="footer-branch">-</code></span>
+      <span class="meta-sep">·</span>
+      <span class="meta-item">🔖 Commit: <a class="meta-commit-link" id="footer-commit" href="#" target="_blank" rel="noopener">-</a></span>
+    </div>
     <p>Flight3d Simulation Engine · Autonomous Headless Visual Acceptance Suite · <a href="./">Flight Simulator</a> · <a href="./flights.html">Flight Selector</a></p>
   </footer>
 
@@ -436,6 +525,85 @@
     let allScreens = [];
     let filteredScreens = [];
     let currentIndex = 0;
+
+    let currentMetadata = {
+      timestamp: (typeof __BUILD_INFO__ !== 'undefined' ? __BUILD_INFO__.builtAt : null),
+      branch: (typeof __BUILD_INFO__ !== 'undefined' ? __BUILD_INFO__.branch : null),
+      commit: (typeof __BUILD_INFO__ !== 'undefined' ? __BUILD_INFO__.commit : null),
+      commitShort: (typeof __BUILD_INFO__ !== 'undefined' ? (__BUILD_INFO__.revision?.slice(0, 7) || __BUILD_INFO__.revision) : null),
+    };
+
+    function getRelativeTime(timestamp) {
+      if (!timestamp) return '';
+      const parsed = Date.parse(timestamp);
+      if (!Number.isFinite(parsed)) return '';
+      const elapsedSec = Math.max(0, Math.floor((Date.now() - parsed) / 1000));
+      if (elapsedSec < 10) return 'just now';
+      if (elapsedSec < 60) return `${elapsedSec}s ago`;
+      const minutes = Math.floor(elapsedSec / 60);
+      if (minutes < 60) return `${minutes} min ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours} hr${hours > 1 ? 's' : ''} ago`;
+      const days = Math.floor(hours / 24);
+      if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`;
+      const months = Math.floor(days / 30);
+      if (months < 12) return `${months} mo${months > 1 ? 's' : ''} ago`;
+      const years = Math.floor(days / 365);
+      return `${years} yr${years > 1 ? 's' : ''} ago`;
+    }
+
+    function renderBuildInfo() {
+      const topTimestamp = document.getElementById('top-timestamp');
+      const topBranch = document.getElementById('top-branch');
+      const topCommit = document.getElementById('top-commit');
+      const footerTimestamp = document.getElementById('footer-timestamp');
+      const footerBranch = document.getElementById('footer-branch');
+      const footerCommit = document.getElementById('footer-commit');
+
+      const rel = getRelativeTime(currentMetadata.timestamp) || 'just now';
+      const iso = currentMetadata.timestamp ? new Date(currentMetadata.timestamp).toISOString() : '';
+      const localStr = currentMetadata.timestamp ? new Date(currentMetadata.timestamp).toLocaleString() : '';
+      const commitSha = currentMetadata.commit || 'unknown';
+      const commitShort = currentMetadata.commitShort || (commitSha.length >= 7 ? commitSha.slice(0, 7) : commitSha);
+      const branchName = currentMetadata.branch || 'unknown';
+      const isRealCommit = /^[a-f0-9]{7,40}$/i.test(commitSha);
+      const commitUrl = isRealCommit ? `https://github.com/stlim0727/flight3d/commit/${commitSha}` : '#';
+
+      if (topTimestamp) {
+        topTimestamp.textContent = `Updated ${rel}`;
+        topTimestamp.title = `${iso} (${localStr})`;
+      }
+      if (topBranch) {
+        topBranch.textContent = branchName;
+      }
+      if (topCommit) {
+        topCommit.textContent = commitShort;
+        if (isRealCommit) {
+          topCommit.href = commitUrl;
+        } else {
+          topCommit.removeAttribute('href');
+        }
+      }
+
+      if (footerTimestamp) {
+        footerTimestamp.textContent = `${rel} (${iso})`;
+        footerTimestamp.title = localStr;
+      }
+      if (footerBranch) {
+        footerBranch.textContent = branchName;
+      }
+      if (footerCommit) {
+        footerCommit.textContent = commitShort;
+        if (isRealCommit) {
+          footerCommit.href = commitUrl;
+        } else {
+          footerCommit.removeAttribute('href');
+        }
+      }
+    }
+
+    renderBuildInfo();
+    setInterval(renderBuildInfo, 15000);
 
     const basePath = (import.meta.env && import.meta.env.BASE_URL) ? import.meta.env.BASE_URL : './';
     const screensUrl = new URL('screenshots/ui/catalog.json', new URL(basePath, window.location.href)).href;
@@ -461,11 +629,21 @@
       try {
         const res = await fetch(screensUrl);
         if (!res.ok) throw new Error('Catalog fetch status ' + res.status);
-        allScreens = await res.json();
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          allScreens = data;
+        } else {
+          allScreens = data.screens || [];
+          if (data.generatedAt) currentMetadata.timestamp = data.generatedAt;
+          if (data.branch) currentMetadata.branch = data.branch;
+          if (data.commit) currentMetadata.commit = data.commit;
+          if (data.commitShort) currentMetadata.commitShort = data.commitShort;
+        }
       } catch (err) {
         console.warn('Failed to fetch catalog.json, using fallback manifest', err);
         allScreens = getFallbackCatalog();
       }
+      renderBuildInfo();
       applyFilter();
     }
 

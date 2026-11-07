@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
@@ -905,14 +906,25 @@ if (tier === 'all') {
 }
 
 let finalCatalog = catalog;
+let previousMeta = {};
 if (tier !== 'all') {
   try {
     const existing = JSON.parse(await readFile(`${outDir}/catalog.json`, 'utf8'));
-    if (Array.isArray(existing)) {
+    const existingScreens = Array.isArray(existing) ? existing : (existing.screens || []);
+    if (!Array.isArray(existing)) {
+      previousMeta = {
+        generatedAt: existing.generatedAt,
+        branch: existing.branch,
+        commit: existing.commit,
+        commitShort: existing.commitShort,
+        commitDate: existing.commitDate,
+      };
+    }
+    if (Array.isArray(existingScreens)) {
       const capturedMap = new Map(catalog.map(c => [c.id, c]));
-      finalCatalog = existing.map(item => capturedMap.get(item.id) || item);
+      finalCatalog = existingScreens.map(item => capturedMap.get(item.id) || item);
       for (const item of catalog) {
-        if (!existing.some(e => e.id === item.id)) {
+        if (!existingScreens.some(e => e.id === item.id)) {
           finalCatalog.push(item);
         }
       }
@@ -924,5 +936,27 @@ if (tier !== 'all') {
 
 finalCatalog.sort((a, b) => a.id.localeCompare(b.id));
 
+let gitBranch = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || previousMeta.branch || '';
+let gitCommit = process.env.GITHUB_SHA || previousMeta.commit || '';
+let gitCommitDate = previousMeta.commitDate || '';
+try {
+  if (!gitBranch) gitBranch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+} catch {}
+try {
+  if (!gitCommit) gitCommit = execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+} catch {}
+try {
+  if (!gitCommitDate) gitCommitDate = execSync('git log -1 --format=%cI', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+} catch {}
+
+const catalogPayload = {
+  generatedAt: new Date().toISOString(),
+  branch: gitBranch || 'unknown',
+  commit: gitCommit || 'unknown',
+  commitShort: gitCommit ? gitCommit.slice(0, 7) : 'unknown',
+  commitDate: gitCommitDate || 'unknown',
+  screens: finalCatalog,
+};
+
 console.log(`[capture-all-ui-screens] Finished. Total captured: ${catalog.length} screens (${finalCatalog.length} in catalog).`);
-await writeFile(`${outDir}/catalog.json`, JSON.stringify(finalCatalog, null, 2));
+await writeFile(`${outDir}/catalog.json`, JSON.stringify(catalogPayload, null, 2));
