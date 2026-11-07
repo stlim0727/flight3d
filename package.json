@@ -37,7 +37,8 @@
     "test:ui-screens": "node scripts/capture-all-ui-screens.mjs --tier core --verify",
     "refresh:images": "node scripts/refresh-all-readme-images.mjs",
     "check": "node scripts/check-syntax.mjs && node scripts/check-workflow-actions.mjs",
-    "test:multiplayer": "node scripts/test-multiplayer.mjs"
+    "test:multiplayer": "node scripts/test-multiplayer.mjs",
+    "multiplayer:ghost": "node scripts/ghost-host.mjs"
   },
   "dependencies": {
     "peerjs": "1.5.5",

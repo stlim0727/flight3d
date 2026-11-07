@@ -66,6 +66,26 @@ try {
   const restoredUi = await page('/tests/fixtures/multiplayer-ui.html', 'Boolean(window.uiFixture)');
   assert.deepEqual(await restoredUi.evaluate(`Object.fromEntries(['name','airport','aircraft','scenario'].map(key=>[key,document.getElementById('mp-'+key).value]))`),
     { name: 'Wing', airport: 'neon', aircraft: 'F16', scenario: 'runway' }, 'setup preferences restored in a new page');
+  const ghost = await page(`/tests/fixtures/ghost-host.html?signalPort=${signalPort}${publicMode ? '&public=1' : ''}`, 'Boolean(window.startFixtureGhost)');
+  const ghostCode = await ghost.evaluate('startFixtureGhost()');
+  await until(() => ghost.evaluate('ghostHost.registered'), 'ghost registered');
+  const companion = await page();
+  await companion.evaluate(`fixture.create(${JSON.stringify(ghostCode)})`);
+  await until(() => companion.evaluate('fixture.flights === 1 && fixture.room.session.track.samples.length > 2'), 'ghost automatic flight and snapshots');
+  assert.equal(await companion.evaluate('fixture.room.session.remoteName'), 'Maverick');
+  const ghostPosition = await companion.evaluate('fixture.room.session.track.samples.at(-1).p');
+  await until(async () => {
+    const movedPosition = await companion.evaluate('fixture.room.session.track.samples.at(-1)?.p');
+    return movedPosition && Math.hypot(...movedPosition.map((v, i) => v - ghostPosition[i])) > 50;
+  }, 'AI actually moves');
+  await companion.evaluate('fixture.room.close()');
+  await until(() => ghost.evaluate('ghostHost.generation === 2 && ghostHost.registered && ghostHost.state === "connecting"'), 'ghost reopens same room');
+  const returning = await page();
+  await returning.evaluate(`fixture.create(${JSON.stringify(ghostCode)})`);
+  await until(() => returning.evaluate('fixture.flights === 1 && fixture.room.session.track.samples.length > 2'), 'same-code ghost rejoin');
+  await returning.evaluate('fixture.room.close()');
+  await ghost.evaluate('ghostHost.stop()');
+  console.log('PASS ghost host: ordinary peer joins, automatic ready barrier, real AI movement, disconnect and same-code rejoin. No renderer.');
   const host = await page(), guest = await page();
   const room = await host.evaluate('fixture.create()');
   await until(() => host.evaluate('fixture.status().registered'), 'host registered');
