@@ -59,6 +59,7 @@ export async function withBrowserSession(options = {}, fn) {
     }
   }
 
+  const needsNoSandbox = Boolean(process.env.CI || process.env.GITHUB_ACTIONS || process.env.CHROME_NO_SANDBOX === '1' || (typeof process.getuid === 'function' && process.getuid() === 0));
   const chromeArgs = [
     '--headless=new',
     `--user-data-dir=${profileDir}`,
@@ -66,13 +67,17 @@ export async function withBrowserSession(options = {}, fn) {
     `--window-size=${width},${height}`,
     '--no-first-run',
     '--no-default-browser-check',
+    '--disable-dev-shm-usage',
+    ...(needsNoSandbox ? ['--no-sandbox', '--disable-setuid-sandbox'] : []),
     '--use-gl=angle',
     `--use-angle=${gpuAngle}`,
     ...(gpuAngle === 'swiftshader' ? ['--enable-unsafe-swiftshader'] : []),
     'about:blank',
   ];
 
-  const chromeProc = spawn(chromeBin, chromeArgs, { stdio: 'ignore', windowsHide: true });
+  let chromeStderr = '';
+  const chromeProc = spawn(chromeBin, chromeArgs, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
+  chromeProc.stderr?.on('data', chunk => { chromeStderr = (chromeStderr + chunk).slice(-4000); });
   let socket = null;
   let seq = 0;
   const pending = new Map();
@@ -119,15 +124,19 @@ export async function withBrowserSession(options = {}, fn) {
 
   try {
     let target = null;
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 150; i++) {
       try {
         const pages = await (await fetch(`http://127.0.0.1:${cdpPort}/json`)).json();
         target = pages.find(p => p.type === 'page');
+        if (!target && pages.length === 0) {
+          const created = await (await fetch(`http://127.0.0.1:${cdpPort}/json/new`, { method: 'PUT' })).json();
+          if (created?.type === 'page') target = created;
+        }
       } catch { /* starting */ }
       if (target) break;
       await delay(100);
     }
-    if (!target) throw new Error(`Chrome CDP page target not available on port ${cdpPort}`);
+    if (!target) throw new Error(`Chrome CDP page target not available on port ${cdpPort}. Chrome stderr:\n${chromeStderr}`);
 
     socket = new WebSocket(target.webSocketDebuggerUrl);
     await new Promise((resolveOpen, rejectOpen) => {
