@@ -32,6 +32,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const lobbyScreen = document.getElementById('lobby-screen');
   const lobbyFoldBtn = document.getElementById('btn-lobby-fold');
   const lobbyUnfoldBtn = document.getElementById('btn-lobby-unfold');
+  const lobbyBackBtn = document.getElementById('btn-lobby-back');
 
   function setLobbyFolded(folded) {
     const isFolded = Boolean(folded);
@@ -47,6 +48,19 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
 
   lobbyFoldBtn?.addEventListener('click', () => setLobbyFolded(true));
   lobbyUnfoldBtn?.addEventListener('click', () => setLobbyFolded(false));
+  lobbyBackBtn?.addEventListener('click', () => {
+    const scenarioTab = document.getElementById('lobby-tab-scenario');
+    const isScenarioActive = scenarioTab?.getAttribute('aria-selected') === 'true';
+    if (!isScenarioActive) {
+      scenarioTab?.click();
+      return;
+    }
+    if (canResume()) {
+      onResume?.();
+      return;
+    }
+    setLobbyFolded(true);
+  });
 
   pilotHumanBtn?.addEventListener('click', () => {
     onPilotMode('human');

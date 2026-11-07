@@ -51,6 +51,8 @@ export default {
   'debrief.exported': '비행 로그를 내보냈습니다.',
   'debrief.back': '요약으로',
   'debrief.retry': '다시 비행',
+  'debrief.retrySame': '같은 조건 즉시 재도전',
+  'debrief.changeConditions': '비행 조건 변경',
   'debrief.lobby': '메인 메뉴',
   'debrief.feedback': '🐞 문제/버그 제보',
   'debrief.empty': '비행 기록이 충분하지 않아요',

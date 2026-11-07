@@ -13,10 +13,10 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 #lobby-screen {
   align-items: center;
   background: linear-gradient(90deg,
-    rgba(6, 10, 18, 0.94) 0%,
-    rgba(6, 10, 18, 0.86) 34%,
-    rgba(6, 10, 18, 0.35) 55%,
-    rgba(6, 10, 18, 0) 72%);
+    rgba(6, 10, 18, 0.96) 0%,
+    rgba(6, 10, 18, 0.88) 36%,
+    rgba(6, 10, 18, 0.5) 58%,
+    rgba(6, 10, 18, 0.28) 100%);
 }
 #lobby-screen.is-folded {
   background: transparent !important;
@@ -146,6 +146,37 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   transform: translateX(-50%) translateY(-1px) scale(1.02);
 }
 .lobby-title-row { display: flex; align-items: center; gap: calc(10px * var(--ui-scale, 1)); min-width: 0; }
+.lobby-back-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(5px * var(--ui-scale, 1));
+  min-height: calc(34px * var(--ui-scale, 1));
+  padding: calc(6px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+  background: #142536;
+  border: 1px solid #385268;
+  border-radius: calc(8px * var(--ui-scale, 1));
+  color: #e2e8f0;
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.lobby-back-btn:hover {
+  background: #263c51;
+  border-color: #538aa4;
+}
+.lobby-back-btn .back-glyph {
+  font-size: calc(14px * var(--ui-scale, 1));
+  line-height: 1;
+}
+.lobby-back-btn .back-caption {
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 600;
+  line-height: 1;
+}
 .lobby-title-wrap { min-width: 0; }
 .lobby-title { color: #e2e8f0; font-size: calc(18px * var(--ui-scale, 1)); font-weight: 600; letter-spacing: -.4px; margin: 0; }
 .lobby-title > span { display: block; color: #94a3b8; font-size: calc(11px * var(--ui-scale, 1)); font-weight: 400; letter-spacing: 0; margin-top: calc(4px * var(--ui-scale, 1)); }
@@ -242,14 +273,20 @@ body[data-dev-scenario="true"] #touch-controls-overlay { display: none !importan
   border-color: rgba(56, 189, 248, .28);
 }
 .lobby-card .btn-fly {
-  background: #157598;
-  border-color: rgba(125, 211, 252, .35);
-  color: #f0f9ff;
-  font-size: calc(12px * var(--ui-scale, 1));
-  font-weight: 600;
-  min-height: calc(40px * var(--ui-scale, 1));
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+  font-size: calc(13px * var(--ui-scale, 1));
+  font-weight: 700;
+  min-height: calc(44px * var(--ui-scale, 1));
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.45);
 }
-.lobby-card .btn-fly:hover { background: #1986ac; color: #fff; }
+.lobby-card .btn-fly:hover {
+  background: #0ea5e9;
+  border-color: #7dd3fc;
+  color: #fff;
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.65);
+}
 .lobby-actions { display: flex; gap: calc(8px * var(--ui-scale, 1)); flex-wrap: wrap; }
 .lobby-card .lobby-actions .btn,
 .compact-ui .lobby-card .lobby-actions .btn { flex: 1 1 calc(120px * var(--ui-scale, 1)); min-height: calc(44px * var(--ui-scale, 1)); }
@@ -332,6 +369,16 @@ body[data-dev-scenario="true"] #touch-controls-overlay { display: none !importan
 .pause-card #btn-pause-resume:hover {
   background: #1986ac;
   color: #fff;
+}
+.pause-card .btn-pause-exit {
+  background: #1a293b;
+  border-color: #334e68;
+  color: #cbd5e1;
+}
+.pause-card .btn-pause-exit:hover {
+  background: #243b55;
+  border-color: #486581;
+  color: #f1f5f9;
 }
 
 /* The lobby owns airport/spawn/time: park the in-game chrome meanwhile.

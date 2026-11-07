@@ -196,6 +196,10 @@
     <div class="lobby-card">
       <header class="lobby-header">
         <div class="lobby-title-row">
+          <button id="btn-lobby-back" class="btn lobby-back-btn" type="button" aria-label="뒤로 가기" data-i18n-aria-label="ui.back" data-i18n-title="ui.back" title="뒤로 가기">
+            <span class="back-glyph" aria-hidden="true">←</span>
+            <span class="back-caption" data-i18n="ui.back">뒤로</span>
+          </button>
           <!-- Persistent main-menu toggle: in main menu on same row as Flight3d title; moves to HUD top bar during flight -->
           <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Open main menu">
             <span class="menu-toggle-glyph" aria-hidden="true"></span>
@@ -385,7 +389,8 @@
       </header>
       <button id="btn-pause-resume" class="btn"><span data-i18n="pause.resume">계속하기</span></button>
       <button id="btn-pause-restart" class="btn"><span data-i18n="pause.restart">시나리오 재시작</span></button>
-      <button id="btn-pause-end" class="btn"><span data-i18n="debrief.end">비행 종료</span></button>
+      <button id="btn-pause-exit" class="btn btn-pause-exit"><span data-i18n="pause.exit">로비로 나가기</span></button>
+      <button id="btn-pause-end" class="btn" hidden><span data-i18n="debrief.end">비행 종료</span></button>
     </div>
     <button id="btn-pause-unfold" class="ui-unfold-pill pause-unfold-pill" type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
       <span class="unfold-icon">⏸</span>

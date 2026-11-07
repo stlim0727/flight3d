@@ -579,6 +579,7 @@ class SimulatorHudAndBindingsMethods {
       this.setPreset(this.lastPresetType || 'runway');
     });
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
+    document.getElementById('btn-pause-exit')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
     const pauseMenu = document.getElementById('pause-menu');
     const pauseFold = document.getElementById('btn-pause-fold');
     const pauseUnfold = document.getElementById('btn-pause-unfold');
