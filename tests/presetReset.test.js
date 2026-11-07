@@ -22,3 +22,17 @@ test('fresh ordinary presets clear cached damage even after the global crash fla
     }
   }
 });
+
+test('valley preset sets safe aloft coordinates and zero velocity', () => {
+  const sim = createPilotMissionSimulation({ aircraftId: 'F16' });
+  sim.activeAirport = 'valley';
+  sim.isCrashed = true;
+  sim.aircraft.damaged = true;
+  sim.aircraft.resetCrashVisuals = function() { this.damaged = false; };
+  sim.setPreset('valley');
+  assert.equal(sim.isCrashed, false);
+  assert.equal(sim.aircraft.damaged, false);
+  assert.ok(sim.position.y >= 2200);
+  assert.equal(sim.linearVelocity.length(), 0);
+  assert.equal(sim.gear.gearState, 0);
+});

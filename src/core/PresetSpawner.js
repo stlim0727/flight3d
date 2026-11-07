@@ -280,20 +280,6 @@ class PresetSpawnerMethods {
         this.controls.pitchTrim = luklaTrim;
 
         this.showToast(() => t('preset.lukla.runway.24.downhill.takeoff.11'));
-      } else if (type === 'valley') {
-        const ground = this.currentTerrain?.getHeight?.(0, 0) ?? 2100;
-        this.position.set(0, ground + 40, 0);
-        this.linearVelocity.set(0, 0, -228 * 0.514444);
-        this.angularVelocity.set(0, 0, 0);
-        this.quaternion.setFromEuler(new THREE.Euler(0, 0, 0, 'YXZ'));
-        this.controls.throttle = 0.4;
-        this.engines.setThrottle(0.4);
-        this.engines.setReverser(false, false);
-        this.gear.setGearTarget(false);
-        this.gear.gearState = 0;
-        this.aero.setFlapPosition(0);
-        this.aero.spoilers = 0.0;
-        this.showToast(() => t('valley.slalom.title'));
       } else if (type === 'cruise') {
         // Scenic Himalayan Valley Cruise at 13,000 FT (3,960m)
         this.position.set(-1500, 3960, -800);
@@ -311,6 +297,21 @@ class PresetSpawnerMethods {
 
         this.showToast(() => t('preset.himalayan.cruise.13.000.ft'));
       }
+    } else if (this.activeAirport === 'valley' || type === 'valley') {
+      const ground = this.currentTerrain?.getHeight?.(0, 0) ?? 2100;
+      const safeAltitude = Math.max(ground + 100, 2200);
+      this.position.set(0, safeAltitude, 0);
+      this.linearVelocity.set(0, 0, 0);
+      this.angularVelocity.set(0, 0, 0);
+      this.quaternion.identity();
+      this.controls.throttle = 0;
+      this.engines.setThrottle(0);
+      this.engines.setReverser(false, false);
+      this.gear.setGearTarget(false);
+      this.gear.gearState = 0;
+      this.aero.setFlapPosition(0);
+      this.aero.spoilers = 0.0;
+      this.showToast(() => t('valley.slalom.title'));
     } else {
       // Coastal International Airport Presets
       if (type === 'runway') {
@@ -572,6 +573,8 @@ class PresetSpawnerMethods {
         this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
       } else if (isLukla) {
         this.collisionDetector.setEnvironment(this.luklaTerrain, this.luklaAirport, null, null, null);
+      } else if (isValley) {
+        this.collisionDetector.setEnvironment(null, null, null, null, null);
       } else {
         this.collisionDetector.setEnvironment(this.terrain, this.currentAirport, this.foliage, this.ships, this.water);
       }
@@ -625,7 +628,7 @@ class PresetSpawnerMethods {
     if (!this.applyingPendingStart) {
       this.gameFlow.abandonResumableFlight();
     }
-    this.gameFlow.setCinematicAvailable(!isIncheon && !isHangang);
+    this.gameFlow.setCinematicAvailable(isScenarioAvailable(id, 'demo'));
     this.lobbyScreen?.refresh();
 
     if (this.demoDirector && this.demoDirector.isActive) {
@@ -637,6 +640,7 @@ class PresetSpawnerMethods {
 
     const airportKey = isHangang ? 'hangang.region' : isIncheon ? 'incheon.airport' : isLukla
       ? 'tenzing.hillary.airport.nepal.vnlk.runway.24'
+      : isValley ? 'valley.region'
       : 'pacific.coastal.international.airport.runway.09l.elevation';
     this.showToast(() => t('airport.changed.value', { value: t(airportKey) }));
     this.renderDiagnostics?.refreshScene();

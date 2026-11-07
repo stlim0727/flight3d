@@ -737,6 +737,13 @@ class FlightSimulator {
     if (runBtn) {
       runBtn.click();
     }
+    if (this.pilotArena?.readyPromise) {
+      try {
+        await this.pilotArena.readyPromise;
+      } catch {
+        // Runner handles and exposes failure in its own record/status
+      }
+    }
   }
 
   /**
@@ -1184,7 +1191,7 @@ class FlightSimulator {
     if (poseDriver) {
       this.physicsAccumulator = 0;
       if (!this.gameFlow.isPhysicsFrozen()) poseDriver.update(frameDelta);
-    } else if (this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
+    } else if (this.startingFlight || this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
       this.physicsAccumulator = 0;
     } else {
       advancePhysicsFrame(this, frameDelta);

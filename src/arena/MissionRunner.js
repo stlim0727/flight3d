@@ -31,6 +31,11 @@ export class MissionRunner {
     const generation = ++this.generation;
     this.abortPreparation = new AbortController();
     this.state = 'preparing';
+    let resolveReady, rejectReady;
+    this.readyPromise = new Promise((resolve, reject) => {
+      resolveReady = resolve;
+      rejectReady = reject;
+    });
     this.record = { pilotKind: options.pilotKind === 'human' ? 'human' : 'ai', status: 'preparing', reason: null, tick: 0, observations: [],
       commands: [], poses: [], result: null };
     const record = this.record;
@@ -40,7 +45,10 @@ export class MissionRunner {
       let prepared;
       try { prepared = await this.adapter.prepare({ ...options, signal: this.abortPreparation.signal }); }
       finally { this.preparing = false; }
-      if (generation !== this.generation) return record;
+      if (generation !== this.generation) {
+        resolveReady?.(record);
+        return record;
+      }
       const manifest = prepared.manifest;
       if (manifest.physicsHz !== 120) throw new Error('Unsupported physics rate');
       record.manifest = structuredClone(manifest);
@@ -53,7 +61,10 @@ export class MissionRunner {
         'SHA-256', new TextEncoder().encode(text))), b => b.toString(16).padStart(2, '0')).join('');
       record.sourceHash = record.pilotKind === 'ai' ? await hash(source) : null;
       record.manifestHash = await hash(JSON.stringify(manifest));
-      if (generation !== this.generation) return record;
+      if (generation !== this.generation) {
+        resolveReady?.(record);
+        return record;
+      }
       this.adapter.acquire({ human: record.pilotKind === 'human' });
       const evaluator = isValley ? new SlalomMission(manifest) : manifest.id.startsWith('landing')
         ? new LandingMission(manifest) : new TakeoffMission(manifest);
@@ -64,8 +75,12 @@ export class MissionRunner {
       record.briefing = createBriefing(manifest);
       const host = this.host = record.pilotKind === 'ai' ? this.hostFactory() : null;
       await host?.start(source, record.briefing);
-      if (generation !== this.generation) return record;
+      if (generation !== this.generation) {
+        resolveReady?.(record);
+        return record;
+      }
       this.state = this.record.status = 'running';
+      resolveReady?.(record);
       let tick = 0, pending = null;
       const period = 24;
       while (generation === this.generation) {
@@ -122,7 +137,9 @@ export class MissionRunner {
         if (this.record.result) this.record.result = { ...this.record.result, status: 'failed', reason: this.record.reason };
         this.notify();
       }
+      rejectReady?.(error);
     } finally {
+      resolveReady?.(record);
       if (generation === this.generation) {
         this.host?.stop();
         this.host = null;
