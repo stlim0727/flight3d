@@ -42,7 +42,11 @@
     "refresh:images": "node scripts/refresh-all-readme-images.mjs",
     "check": "node scripts/check-syntax.mjs && node scripts/check-workflow-actions.mjs",
     "test:multiplayer": "node scripts/test-multiplayer.mjs",
-    "multiplayer:ghost": "node scripts/ghost-host.mjs"
+    "multiplayer:ghost": "npm run build:ghost && node scripts/ghost-host.mjs",
+    "build:ghost": "node scripts/build-ghost-host.mjs",
+    "test:ghost-package": "node scripts/test-ghost-package.mjs",
+    "build:ghost:native": "npm run build:ghost && node scripts/build-ghost-native.mjs",
+    "test:ghost-native": "node scripts/test-ghost-native.mjs"
   },
   "dependencies": {
     "peerjs": "1.5.5",
@@ -52,6 +56,7 @@
   "devDependencies": {
     "jpeg-js": "^0.4.4",
     "peer": "1.0.2",
+    "postject": "1.0.0-alpha.6",
     "three-mesh-bvh": "^0.9.17",
     "vite": "^8.3.4",
     "yaml": "2.8.1"

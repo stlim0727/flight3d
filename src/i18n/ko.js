@@ -76,7 +76,7 @@ export default {
   "mp.voiceFailed": "음성 연결 실패 — 나간 후 다시 참가하세요",
   "mp.status.invalid-room": "여섯 글자 방 코드 또는 전체 초대 링크를 입력하세요.",
   "mp.status.full": "방이 가득 찼습니다 (2/2). 친구에게 새 초대를 요청하세요.",
-  "mp.status.incompatible": "멀티플레이 버전이 다릅니다. 두 사람 모두 새로고침하세요.",
+  "mp.status.incompatible": "멀티플레이 통신 규약 또는 비행 데이터가 호환되지 않습니다. 게임과 호스트를 업데이트한 후 다시 연결하세요.",
   "mp.status.peer-left": "친구가 나갔습니다. 혼자 계속하거나 새 방을 만드세요.",
   "mp.status.left": "방에서 나왔습니다. 마이크를 해제했습니다.",
   "mp.status.timeout": "연결 시간이 초과됐습니다. 재시도하거나 다른 네트워크를 사용하세요.",

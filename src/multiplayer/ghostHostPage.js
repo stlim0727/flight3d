@@ -13,7 +13,7 @@ window.startGhostHost = ({ room: code, name = 'Maverick', options } = {}) => {
     clearTimeout(startTimer);
     room?.dispose();
     const current = ++generation;
-    Object.assign(status, { state: 'connecting', registered: false, generation, error: null });
+    Object.assign(status, { state: 'connecting', registered: false, generation, error: null, transportError: null });
     const voice = new VoiceLink();
     voice.setMuted(true);
     voice.context.resume().catch(() => {});
@@ -25,7 +25,7 @@ window.startGhostHost = ({ room: code, name = 'Maverick', options } = {}) => {
       changed: () => {
         if (current !== generation || !room) return;
         Object.assign(status, { state: room.session.state, registered: room.registered === true,
-          generation, round: room.session.round, remoteName: room.session.remoteName });
+          generation, transportError: room.transportError, compatibilityFailure: room.session.compatibilityFailure, round: room.session.round, remoteName: room.session.remoteName });
         if (room.session.state === 'connected' && !startTimer) {
           // Give the normal guest dialog time to show the host before preparation.
           startTimer = setTimeout(() => { startTimer = null; room.session.start(); }, 2000);

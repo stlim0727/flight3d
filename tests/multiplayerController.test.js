@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { GameFlowController } from '../src/ui/GameFlowController.js';
 import { t, bindText } from '../src/i18n/index.js';
-import { parseRoom, inviteUrl } from '../src/multiplayer/protocol.js';
+import { parseRoom, inviteUrl, inviteCompatibilityFailure } from '../src/multiplayer/protocol.js';
 
 // Load the production coordinator without importing its browser-only PeerJS adapter.
 const source = readFileSync(new URL('../src/multiplayer/MultiplayerController.js', import.meta.url), 'utf8');
-const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl);
+const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', 'inviteCompatibilityFailure', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl, inviteCompatibilityFailure);
 
 test('invite URL joins automatically; missing or invalid invites never connect', () => {
   const joined = [];
@@ -25,6 +25,8 @@ test('invite URL joins automatically; missing or invalid invites never connect',
     controller.joinInvite(invite);
     assert.equal(controller.message, 'invalid-room');
   }
+  controller.joinInvite('https://example.org/?r=K7M2QX&mp=3&fr=1');
+  assert.equal(controller.message, 'incompatible');
   assert.deepEqual(joined, ['K7M2QX']);
 });
 

@@ -1,0 +1,62 @@
+name: Ghost host native builds
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'host/**'
+      - 'src/multiplayer/**'
+      - 'src/core/HeadlessSimulation.js'
+      - 'scripts/*ghost*'
+      - 'deploy/flight3d-ghost*'
+      - 'package*.json'
+      - '.node-version'
+      - '.github/workflows/ghost-host-*.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            target: linux-x64
+          - runner: ubuntu-22.04-arm
+            target: linux-arm64
+          - runner: macos-15
+            target: macos-arm64
+          - runner: macos-15-intel
+            target: macos-x64
+          - runner: windows-2022
+            target: windows-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run build:ghost:native
+      - run: npm run test:ghost-native
+      - name: Real guest lifecycle against native Linux executable
+        if: matrix.target == 'linux-x64'
+        run: npm run test:ghost-package
+        env:
+          GHOST_TEST_EXECUTABLE: artifacts/ghost-host/native-linux-x64/package/flight3d-ghost-host
+          CHROME_NO_SANDBOX: '1'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ghost-host-native-${{ matrix.target }}
+          path: |
+            artifacts/ghost-host/*-${{ matrix.target }}.tar.gz
+            artifacts/ghost-host/*-${{ matrix.target }}.zip
+            artifacts/ghost-host/SHA256SUMS-${{ matrix.target }}
+          if-no-files-found: error

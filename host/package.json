@@ -1,0 +1,23 @@
+{
+  "name": "flight3d-ghost-host",
+  "version": "0.1.0",
+  "description": "Standalone GPU-free Flight3d multiplayer host",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.23.2"
+  },
+  "bin": {
+    "flight3d-ghost-host": "./cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "web",
+    "manifest.json",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.txt",
+    "flight3d-ghost.service",
+    "SETUP.md"
+  ]
+}

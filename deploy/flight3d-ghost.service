@@ -1,18 +1,18 @@
 [Unit]
-Description=Flight3d persistent multiplayer host
+Description=Flight3d standalone multiplayer host
 StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-WorkingDirectory=/var/shared/repos/flight3d/.local/ghost-host-runtime
-ExecStart=/opt/node/bin/node scripts/ghost-host.mjs
-Environment=PATH=/opt/node/bin:/usr/local/bin:/usr/bin:/bin
-Environment=GHOST_STATE_DIR=/var/shared/repos/flight3d/.local/ghost-host-state
+# Install the extracted package under ~/.local/share/flight3d-ghost/current.
+# Override ExecStart with your absolute Node path if it is not in this PATH.
+ExecStart=/usr/bin/env node %h/.local/share/flight3d-ghost/current/cli.mjs
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
 Environment=GHOST_NAME=Maverick
 Restart=always
 RestartSec=10
 KillMode=control-group
-TimeoutStopSec=20
+TimeoutStopSec=15
 UMask=0077
 StandardOutput=journal
 StandardError=journal

@@ -89,6 +89,18 @@ npm run build    # Production build into dist/
 
 ---
 
+### Host multiplayer without the game checkout
+
+The ghost host runs an ordinary multiplayer room and flies an AI pilot when a
+player joins. Download the matching executable from a `ghost-host-v...` entry on
+[GitHub Releases](https://github.com/stlim0727/flight3d/releases), install
+Chrome/Chromium, then follow the [setup guide](host/SETUP.md). Native executables
+include Node and need no repository, npm dependencies, game assets or GPU.
+Release artifacts become available after the corresponding release build passes.
+The guide covers Windows, Linux and macOS, invite sharing, Linux systemd startup,
+checksums, updates and rollback. A small JavaScript package is also available for
+[existing Node users](host/README.md).
+
 ### Direct flight URLs
 
 Open a specific flight with query parameters, for example:

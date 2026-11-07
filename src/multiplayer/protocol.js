@@ -1,38 +1,13 @@
 import { Quaternion, Vector3 } from 'three';
 
-export const VERSION = 2;
+export { PROTOCOL_VERSION as VERSION } from './compatibility.js';
 export const AIRPORTS = ['coastal', 'incheon', 'neon'];
 export const AIRCRAFT = ['C172', 'B738', 'F16'];
 export const SCENARIOS = ['runway', 'cruise'];
 export const DEFAULT_CONFIG = Object.freeze({ airport: 'coastal', aircraft: 'C172', scenario: 'cruise' });
 export const validConfig = c => c && AIRPORTS.includes(c.airport) && AIRCRAFT.includes(c.aircraft) && SCENARIOS.includes(c.scenario);
 export const cleanName = name => String(name ?? '').replace(/[\p{C}<>]/gu, '').trim().slice(0, 12) || 'Pilot';
-const ROOM_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-export const validRoom = room => typeof room === 'string' && /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/.test(room);
-export function newRoom() {
-  return [...crypto.getRandomValues(new Uint8Array(6))].map(n => ROOM_ALPHABET[n & 31]).join('');
-}
-export function parseRoom(value) {
-  if (typeof value !== 'string') return null;
-  let code = value.trim();
-  if (/^https?:/i.test(code)) {
-    try { const url = new URL(code); code = url.searchParams.get('r') ?? url.searchParams.get('room') ?? ''; }
-    catch { return null; }
-  }
-  code = code.replace(/[\s-]/g, '').toUpperCase();
-  return validRoom(code) ? code : null;
-}
-export function roomPeerId(room) {
-  if (!validRoom(room)) throw new Error('invalid-room');
-  return `flight3d-v2-${room}`;
-}
-export function inviteUrl(room, base) {
-  if (!validRoom(room)) throw new Error('invalid-room');
-  const url = new URL(base);
-  url.search = new URLSearchParams({ r: room }).toString();
-  url.hash = '';
-  return url.href;
-}
+export { validRoom, newRoom, parseRoom, roomPeerId, inviteUrl, inviteCompatibilityFailure } from './roomCode.js';
 const finiteArray = (a, count, limit) => Array.isArray(a) && a.length === count && a.every(n => Number.isFinite(n) && Math.abs(n) <= limit);
 const integer = n => Number.isSafeInteger(n) && n >= 0;
 export function validSnapshot(s) {
