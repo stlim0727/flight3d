@@ -3,6 +3,9 @@ export const WIND_PROFILES = Object.freeze({
   'calm-debug-v1': Object.freeze({ crosswind: 0, gust: Object.freeze([0, 0, 0]) }),
   'mild-disturbance-v1': Object.freeze({ crosswind: 1.5, gust: Object.freeze([0.3, 0.6, 0.2]) }),
   'light-turbulence-v1': Object.freeze({ crosswind: 0, gust: Object.freeze([0.3, 0.6, 0.2]) }),
+  // Comparison presets: identical seeded modes, only amplitude changes (3x / 6x).
+  'moderate-turbulence-v1': Object.freeze({ crosswind: 0, gust: Object.freeze([0.9, 1.8, 0.6]) }),
+  'strong-turbulence-v1': Object.freeze({ crosswind: 0, gust: Object.freeze([1.8, 3.6, 1.2]) }),
   'incheon-crosswind-v1': Object.freeze({ crosswind: 9.5, gust: Object.freeze([2.8, 3.5, 1.8]) }),
 });
 

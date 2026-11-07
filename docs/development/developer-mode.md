@@ -26,8 +26,10 @@ resets RenderPose and restores the camera/lighting. Airport/aircraft/preset chan
 starting a demo and disabling developer mode also cancel the run. Opening the
 menu holds a run; closing it resumes. Results survive exit and clear on next run.
 
-**Light turbulence cruise (60 s)** is a manual Coastal/B738 flight. It uses the
-existing trimmed coastal cruise preset, then installs `light-turbulence-v1`.
+**Light / Moderate / Strong turbulence cruise (60 s)** are adjacent manual
+Coastal/B738 flights. All use the same trimmed coastal cruise start and wind seed;
+only gust amplitude changes (1x / 3x / 6x). The profiles are
+`light-turbulence-v1`, `moderate-turbulence-v1`, and `strong-turbulence-v1`.
 Pitch/roll/yaw, throttle and trim remain pilot-controlled; autopilot stays off.
 Gear/flaps/spoilers and failure injection retain the developer fixture locks.
 Touch controls remain visible for this manual scenario. Completion holds the
@@ -107,7 +109,7 @@ Ten landing fixtures: normal, hard, asymmetric, unlocked, injected left/right/bo
 main/nose failures, belly landing and catastrophic body impact. Five crash fixtures
 approach actual tower/water/terrain/building/tree geometry; they never manufacture
 a collision by calling triggerCrash. The catalog also includes manual shadow review
-and the 60-second turbulence flight.
+and the three 60-second turbulence comparison flights.
 
 Physical reproduction tests the existing contact solver. Failure injection sets
 selected legs to collapsed and tests the aftermath, not the load threshold that
