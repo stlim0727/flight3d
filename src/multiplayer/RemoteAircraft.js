@@ -1,32 +1,46 @@
 import * as THREE from 'three';
 import { RemoteAircraftIndicator } from './RemoteAircraftIndicator.js';
+import { createRemoteAircraftModel, disposeRemoteModel } from './RemoteAircraftModel.js';
 
-/** Lightweight remote-only silhouette; never registered with physics or collisions. */
+/** Remote visual only: production aircraft assets, no physics or collision ownership. */
 export class RemoteAircraft {
-  constructor(scene, aircraft) {
+  constructor(scene, aircraft, { createModel = createRemoteAircraftModel,
+    createIndicator = () => new RemoteAircraftIndicator() } = {}) {
     this.group = new THREE.Group(); this.group.name = 'MultiplayerGhost';
-    const [length, span, width] = { C172: [8.3, 11, 1.2], B738: [39.5, 35.8, 3.8], F16: [15, 10, 1.5] }[aircraft];
-    const material = new THREE.MeshStandardMaterial({ color: 0x67d8f0, roughness: .65 });
-    const add = (geometry, x, y, z) => {
-      const mesh = new THREE.Mesh(geometry, material); mesh.position.set(x, y, z);
-      mesh.castShadow = true; this.group.add(mesh); return mesh;
-    };
-    const body = add(new THREE.CylinderGeometry(width * .3, width * .45, length, 10), 0, 0, 0);
-    body.rotation.x = Math.PI / 2;
-    add(new THREE.BoxGeometry(span, .16 * width, length * .13), 0, aircraft === 'C172' ? width * .5 : 0, 0);
-    add(new THREE.BoxGeometry(span * .35, width * .12, length * .09), 0, width * .15, length * .38);
-    add(new THREE.BoxGeometry(width * .15, length * .15, length * .14), 0, length * .065, length * .38);
-    const canopy = add(new THREE.SphereGeometry(width * .5, 12, 8), 0, width * .3, -length * .2);
-    canopy.scale.set(1, .8, 1.7);
-    this.gear = new THREE.Group(); this.group.add(this.gear);
-    for (const [x, z] of [[-width * .7, length * .05], [width * .7, length * .05], [0, -length * .3]]) {
-      const wheel = new THREE.Mesh(new THREE.SphereGeometry(width * .2, 8, 6), material);
-      wheel.position.set(x, -width * .7, z); this.gear.add(wheel);
-    }
+    this.model = createModel(aircraft);
+    this.group.add(this.model.group);
     this.group.visible = false; scene.add(this.group);
-    this.indicator = new RemoteAircraftIndicator();
+    this.indicator = createIndicator();
+    this.disposed = false;
+    this.disposedResources = new Set();
+    this.lastUpdate = performance.now();
+    this.configureExterior();
+    this.ready = Promise.resolve(this.model.ready).then(() => {
+      if (this.disposed) {
+        disposeRemoteModel(this.model.group, this.disposedResources);
+        return;
+      }
+      this.configureExterior();
+      this.animate(this.group.userData.remote, 0);
+    });
+  }
+  configureExterior() {
+    this.model.setCockpitMode(false);
+    // Remote navigation lamps remain visible, but do not add another set of
+    // scene-illuminating lights and shadow maps on mobile.
+    this.lights = [];
+    this.model.group.traverse(node => { if (node.isLight) { node.visible = false; this.lights.push(node); } });
+  }
+  animate(sample, dt) {
+    if (!sample) return;
+    this.model.update(dt, { gearState: sample.gear, flapDegree: sample.flaps });
+    for (const light of this.lights) light.visible = false;
   }
   update(sample, name, camera, { status = '', showIndicator = true, localPosition, cameraMode } = {}) {
+    if (this.disposed) return;
+    const now = performance.now();
+    const dt = Math.min(.1, Math.max(0, (now - this.lastUpdate) / 1000));
+    this.lastUpdate = now;
     this.group.visible = Boolean(sample && !sample.crashed);
     if (!this.group.visible) {
       this.indicator.hide();
@@ -38,7 +52,7 @@ export class RemoteAircraft {
       this.indicator.hide();
     }
     this.group.position.fromArray(sample.p); this.group.quaternion.fromArray(sample.q);
-    this.gear.visible = sample.gear > .5;
+    this.animate(sample, dt);
     this.group.userData.remote = sample;
     if (!showIndicator) {
       this.indicator.hide();
@@ -48,9 +62,9 @@ export class RemoteAircraft {
     this.indicator.update(this.group.position, name, status, camera, { distance, cameraMode });
   }
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     this.group.removeFromParent(); this.indicator.dispose();
-    const materials = new Set();
-    this.group.traverse(o => { o.geometry?.dispose(); if (o.material) materials.add(o.material); });
-    materials.forEach(m => m.dispose());
+    disposeRemoteModel(this.model.group, this.disposedResources);
   }
 }

@@ -115,7 +115,7 @@ export function splitF16Gear(geometry) {
 }
 
 export class F16 {
-  constructor() {
+  constructor(options = {}) {
     this.group = new THREE.Group();
     this.group.name = 'Aircraft_F16';
     // AircraftBreakup traverses this hierarchy, including the cockpit and the
@@ -123,8 +123,10 @@ export class F16 {
     this.gltfGroup = new THREE.Group();
     this.gltfGroup.name = 'GLTF_F16';
     this.group.add(this.gltfGroup);
-    this.exhaust = new JetExhaust();
-    this.group.add(this.exhaust.group);
+    if (!options.exteriorOnly) {
+      this.exhaust = new JetExhaust();
+      this.group.add(this.exhaust.group);
+    }
     this.lightsGroup = new THREE.Group();
     this.gltfGroup.add(this.lightsGroup);
     this.lightsOn = true;
@@ -144,7 +146,7 @@ export class F16 {
     // The cockpit stays in the complete airframe, so exterior views also show it.
     this.gltfGroup.add(this.cockpit.group);
     this.cockpit.group.add(this.cockpit.gltfCockpitGroup);
-    this.instrumentLight = installInstrumentLighting(this.cockpit, F16_FALCON.cockpit.captainEyePos, 0x91ffb5, () => !this.isCrashed);
+    if (!options.exteriorOnly) this.instrumentLight = installInstrumentLighting(this.cockpit, F16_FALCON.cockpit.captainEyePos, 0x91ffb5, () => !this.isCrashed);
     this.ready = new GLTFLoader().loadAsync(`${import.meta.env?.BASE_URL ?? '/'}models/f-16.glb`)
       .then(gltf => {
         this.installModel(gltf.scene);
