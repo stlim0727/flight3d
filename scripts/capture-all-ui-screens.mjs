@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve, join } from 'node:path';
 import { withBrowserSession } from './lib/browserHarness.mjs';
+
+const isVerify = process.argv.includes('--verify') || process.env.npm_lifecycle_event === 'test:ui-screens';
 
 const outDir = process.env.UI_SCREENSHOTS_DIR
   ? resolve(process.cwd(), process.env.UI_SCREENSHOTS_DIR)
-  : resolve(process.cwd(), 'public/screenshots/ui');
+  : isVerify
+    ? await mkdtemp(join(tmpdir(), 'flight3d-ui-screens-'))
+    : resolve(process.cwd(), 'public/screenshots/ui');
 
 await mkdir(outDir, { recursive: true });
 
@@ -885,5 +890,23 @@ if (tier === 'all') {
   });
 }
 
-console.log(`[capture-all-ui-screens] Finished. Total captured: ${catalog.length} screens.`);
-await writeFile(`${outDir}/catalog.json`, JSON.stringify(catalog, null, 2));
+let finalCatalog = catalog;
+if (tier !== 'all') {
+  try {
+    const existing = JSON.parse(await readFile(`${outDir}/catalog.json`, 'utf8'));
+    if (Array.isArray(existing)) {
+      const capturedMap = new Map(catalog.map(c => [c.id, c]));
+      finalCatalog = existing.map(item => capturedMap.get(item.id) || item);
+      for (const item of catalog) {
+        if (!existing.some(e => e.id === item.id)) {
+          finalCatalog.push(item);
+        }
+      }
+    }
+  } catch {
+    // No previous catalog in outDir, keep captured catalog
+  }
+}
+
+console.log(`[capture-all-ui-screens] Finished. Total captured: ${catalog.length} screens (${finalCatalog.length} in catalog).`);
+await writeFile(`${outDir}/catalog.json`, JSON.stringify(finalCatalog, null, 2));
