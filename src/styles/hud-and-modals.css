@@ -555,15 +555,16 @@ kbd {
   padding: 8px 16px;
   border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: 20px;
-  background: rgba(12, 20, 30, 0.92);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: #f0f6fc;
   font: 12px/1.4 system-ui, sans-serif;
   text-align: center;
   pointer-events: none;
-  z-index: 96;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 150;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
 body.booting .audio-start-hint { display: none; }
