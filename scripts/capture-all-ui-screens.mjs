@@ -31,7 +31,11 @@ async function recordScreen(screenshot, meta) {
   console.log(`✓ [${meta.id}] ${meta.title_ko} (${meta.file})`);
 }
 
-await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ evaluate, screenshot, send, delay, origin, exceptions }) => {
+const isLowResource = isVerify || process.env.FORCE_GPU === '0';
+const sessionWidth = isLowResource ? 1280 : 1920;
+const sessionHeight = isLowResource ? 720 : 1080;
+
+await withBrowserSession({ width: sessionWidth, height: sessionHeight, path: '/' }, async ({ evaluate, screenshot, send, delay, origin, exceptions }) => {
   // Wait for simulator to be ready
   for (let i = 0; i < 120; i++) {
     if (await evaluate('Boolean(window.simulator?.startupReady)')) break;

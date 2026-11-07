@@ -87,10 +87,11 @@ export async function withBrowserSession(options = {}, fn) {
   const send = (method, params = {}) =>
     new Promise((resolveSend, rejectSend) => {
       const id = ++seq;
+      const defaultTimeout = gpuAngle === 'swiftshader' ? 120000 : 60000;
       const timer = setTimeout(() => {
         pending.delete(id);
         rejectSend(new Error(`CDP timeout: ${method}`));
-      }, options.timeoutMs ?? 60000);
+      }, options.timeoutMs ?? defaultTimeout);
       pending.set(id, msg => {
         clearTimeout(timer);
         if (msg.error) rejectSend(new Error(JSON.stringify(msg.error)));
@@ -114,8 +115,8 @@ export async function withBrowserSession(options = {}, fn) {
     return result.result?.value;
   };
 
-  const screenshot = async filePath => {
-    const { data } = await send('Page.captureScreenshot', { format: 'png' });
+  const screenshot = async (filePath, screenshotOptions = {}) => {
+    const { data } = await send('Page.captureScreenshot', { format: 'png', ...screenshotOptions });
     const resolved = resolve(filePath);
     await mkdir(resolve(resolved, '..'), { recursive: true });
     await writeFile(resolved, Buffer.from(data, 'base64'));
