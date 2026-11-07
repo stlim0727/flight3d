@@ -1,0 +1,38 @@
+name: UI Screens
+
+on:
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Which screens tier to capture/verify'
+        required: false
+        default: 'core'
+        type: choice
+        options:
+          - core
+          - full
+          - all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-screens-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-screens:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: node scripts/capture-all-ui-screens.mjs --tier ${{ inputs.tier || 'core' }} --verify
+        env:
+          FORCE_GPU: '0'

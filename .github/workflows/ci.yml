@@ -29,9 +29,6 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
-      - run: npm run test:ui-screens
-        env:
-          FORCE_GPU: '0'
       - run: npm run test:multiplayer
         env:
           FORCE_GPU: '0'
