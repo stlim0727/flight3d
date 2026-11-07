@@ -49,6 +49,26 @@
   color: #ffffff;
 }
 
+.diag-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.diag-fold-btn {
+  padding: 2px 8px;
+  font-size: 14px;
+  line-height: 1;
+  min-height: 24px;
+}
+.diagnostics-panel.is-folded {
+  height: auto;
+  max-height: none;
+  overflow: hidden;
+}
+.diagnostics-panel.is-folded .diag-content {
+  display: none !important;
+}
+
 .diag-content {
   padding: 14px 16px;
   display: flex;

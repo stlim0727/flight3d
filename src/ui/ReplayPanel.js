@@ -10,7 +10,16 @@ export class ReplayPanel {
     this.root = document.getElementById('replay-panel');
     this.library = document.getElementById('replay-library');
     this.root.innerHTML = `
-      <header><strong data-i18n="replay.title"></strong><button class="btn" data-exit data-i18n="replay.exit"></button></header>
+      <header>
+        <strong data-i18n="replay.title"></strong>
+        <div class="replay-header-actions">
+          <button class="btn btn-card-fold replay-fold-btn" data-fold type="button" data-i18n-title="ui.fold" data-i18n-aria-label="ui.fold">
+            <span class="fold-glyph" aria-hidden="true">▾</span>
+            <span class="fold-caption" data-i18n="ui.fold"></span>
+          </button>
+          <button class="btn" data-exit data-i18n="replay.exit"></button>
+        </div>
+      </header>
       <div class="replay-transport">
         <button class="btn" data-step="-1" data-i18n-aria-label="replay.previous">⏮</button>
         <button class="btn" data-play></button>
@@ -20,7 +29,13 @@ export class ReplayPanel {
       <input data-seek type="range" min="0" max="1" step="0.01" value="0" data-i18n-aria-label="replay.seek">
       <div class="replay-speeds" role="group" data-i18n-aria-label="replay.speed">${REPLAY_SPEEDS.map(speed => `<button class="btn" data-speed="${speed}" aria-pressed="false">${speed * 100}%</button>`).join('')}</div>
       <div class="replay-cameras" role="group" data-i18n-aria-label="replay.camera">${CAMERAS.map((name, mode) => `<button class="btn" data-camera="${mode}" aria-pressed="false"></button>`).join('')}</div>
-      <p data-wait role="status" data-i18n="replay.waiting" hidden></p>`;
+      <p data-wait role="status" data-i18n="replay.waiting" hidden></p>
+      <button class="btn ui-unfold-pill replay-unfold-pill" data-unfold type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
+        <span class="unfold-icon">▶</span>
+        <span class="unfold-caption" data-i18n="replay.title"></span>
+        <output data-time-mini></output>
+        <span class="unfold-glyph" aria-hidden="true">▴</span>
+      </button>`;
     this.library.innerHTML = `<div class="replay-library-card">
       <header><h2 id="replay-library-title" data-i18n="replay.library"></h2><button class="btn" data-close data-i18n="ui.close"></button></header>
       <p data-i18n="replay.storageHint"></p>
@@ -31,6 +46,9 @@ export class ReplayPanel {
     bindText(this.root.querySelector('[data-play]'), () => t(sim.replayDirector.paused ? 'replay.play' : 'replay.pause'));
     this.root.querySelector('[data-play]').addEventListener('click', () => sim.replayDirector.togglePause());
     this.root.querySelector('[data-exit]').addEventListener('click', () => this.exit());
+    this.isFolded = false;
+    this.root.querySelector('[data-fold]')?.addEventListener('click', () => this.setFolded(true));
+    this.root.querySelector('[data-unfold]')?.addEventListener('click', () => this.setFolded(false));
     this.root.querySelector('[data-seek]').addEventListener('input', e => sim.replayDirector.seek(e.target.value));
     for (const el of this.root.querySelectorAll('[data-step]')) el.addEventListener('click', () => sim.replayDirector.stepFrame(Number(el.dataset.step)));
     for (const el of this.root.querySelectorAll('[data-speed]')) el.addEventListener('click', () => sim.replayDirector.setSpeed(el.dataset.speed));
@@ -124,8 +142,18 @@ export class ReplayPanel {
     }
   }
 
+  setFolded(folded) {
+    this.isFolded = Boolean(folded);
+    this.root.classList.toggle('is-folded', this.isFolded);
+    const unfoldBtn = this.root.querySelector('[data-unfold]');
+    if (unfoldBtn) unfoldBtn.hidden = !this.isFolded;
+    if (this.isFolded) unfoldBtn?.focus();
+    else this.root.querySelector('[data-fold]')?.focus();
+  }
+
   async watch(track, entryId = null) {
     try {
+      this.setFolded(false);
       if (!await this.sim.replayDirector.load(track, { entryId })) return false;
       this.sim.replayDirector.play(); this.refresh();
       this.root.querySelector('[data-play]').focus();
@@ -139,6 +167,7 @@ export class ReplayPanel {
   }
 
   exit() {
+    this.setFolded(false);
     // Freeze live physics before releasing pose ownership.
     this.sim.gameFlow.returnToLobby(false);
     this.sim.replayDirector.stop();
@@ -153,7 +182,10 @@ export class ReplayPanel {
     this.root.querySelector('[data-play]').textContent = t(director.paused ? 'replay.play' : 'replay.pause');
     const seek = this.root.querySelector('[data-seek]');
     seek.max = director.durationSec; seek.value = director.progressSec;
-    this.root.querySelector('[data-time]').textContent = `${flightDuration(director.progressSec)} / ${flightDuration(director.durationSec)}`;
+    const timeFormatted = `${flightDuration(director.progressSec)} / ${flightDuration(director.durationSec)}`;
+    this.root.querySelector('[data-time]').textContent = timeFormatted;
+    const timeMini = this.root.querySelector('[data-time-mini]');
+    if (timeMini) timeMini.textContent = ` (${timeFormatted})`;
     this.root.querySelector('[data-wait]').hidden = !director.waitingTerrain;
     for (const el of this.root.querySelectorAll('[data-speed]')) el.setAttribute('aria-pressed', String(Number(el.dataset.speed) === director.speed));
     for (const el of this.root.querySelectorAll('[data-camera]')) el.setAttribute('aria-pressed', String(Number(el.dataset.camera) === (this.sim.cameraSystem.autoSwitch ? 7 : this.sim.cameraSystem.mode)));

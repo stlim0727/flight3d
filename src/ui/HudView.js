@@ -19,7 +19,8 @@ export class HudView {
 
   update() {
     const sim = this.sim;
-    const active = sim.cameraSystem.mode === CameraSystem.MODES.HUD && !sim.isCrashed;
+    const hudFolded = typeof document !== 'undefined' && document.body?.classList.contains('hud-folded');
+    const active = sim.cameraSystem.mode === CameraSystem.MODES.HUD && !sim.isCrashed && !hudFolded;
     if (this.root.hidden === active) {
       this.root.hidden = !active;
       document.body.classList.toggle('hud-camera-mode', active);

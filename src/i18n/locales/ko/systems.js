@@ -73,6 +73,8 @@ export default {
   "notice.time": "시간대: {time}",
   "notice.hotasConnected": "컨트롤러 연결됨: {name}",
   "notice.hotasDisconnected": "컨트롤러 연결 해제됨: {name}",
+  "notice.hudHidden": "HUD 숨김 (U 키로 복원)",
+  "notice.hudVisible": "HUD 표시",
   "notice.autopilot": "자동조종: {state}",
   "notice.parkingBrakeSet": "주차 브레이크 설정 [.]",
   "notice.parkingBrakeReleased": "주차 브레이크 해제 [.]",
