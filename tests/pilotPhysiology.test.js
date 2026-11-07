@@ -89,6 +89,14 @@ test('high G introduces muscle strain jitter when conscious', () => {
 
   // High G jitter introduces oscillation around the target
   assert.notEqual(sample1, sample2);
+
+  // Dedicated internal dt accumulation also advances jitter when simTime argument is omitted
+  const pilotAuto = new PilotPhysiology();
+  pilotAuto.update(dt, 6.0, { elevator: 0.5, aileron: 0.0, rudder: 0.0 });
+  const auto1 = pilotAuto.effectiveElevator;
+  pilotAuto.update(dt, 6.0, { elevator: 0.5, aileron: 0.0, rudder: 0.0 });
+  const auto2 = pilotAuto.effectiveElevator;
+  assert.notEqual(auto1, auto2, 'Internal dt accumulation must produce oscillating jitter across physics steps');
 });
 
 test('maximum authority is attenuated when consciousness drops', () => {

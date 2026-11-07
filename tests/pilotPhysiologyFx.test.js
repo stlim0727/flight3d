@@ -1,19 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PilotPhysiologyFx } from '../src/effects/PilotPhysiologyFx.js';
+import { CameraSystem } from '../src/cameras/CameraSystem.js';
 
 test('pilot physiology fx scales intensity by camera mode (100% cockpit vs 25% exterior)', () => {
   const fx = new PilotPhysiologyFx();
 
-  // Test positive G consciousness loss in cockpit view
-  fx.update('cockpit', { consciousness: 0.2, gZ: 5.0, isGLOC: false });
-  assert.equal(fx.viewScale, 1.0);
+  // Test positive G consciousness loss in cockpit view (both string and numeric CameraSystem mode 0)
+  fx.update(CameraSystem.MODES.COCKPIT, { consciousness: 0.2, gZ: 5.0, isGLOC: false });
+  assert.equal(fx.viewScale, 1.0, 'Numeric COCKPIT mode (0) must have 100% intensity');
   const cockpitBlackout = fx.blackoutAlpha;
   const cockpitGrayout = fx.grayoutAlpha;
 
-  // Same state in chase (exterior) view
-  fx.update('chase', { consciousness: 0.2, gZ: 5.0, isGLOC: false });
-  assert.equal(fx.viewScale, 0.25);
+  // HUD numeric mode (8)
+  fx.update(CameraSystem.MODES.HUD, { consciousness: 0.2, gZ: 5.0, isGLOC: false });
+  assert.equal(fx.viewScale, 1.0, 'Numeric HUD mode (8) must have 100% intensity');
+
+  // Same state in chase numeric mode (1)
+  fx.update(CameraSystem.MODES.CHASE, { consciousness: 0.2, gZ: 5.0, isGLOC: false });
+  assert.equal(fx.viewScale, 0.25, 'Numeric CHASE mode (1) must have 25% intensity');
   assert.ok(Math.abs(fx.blackoutAlpha - cockpitBlackout * 0.25) < 1e-4, 'Exterior blackout must be 25% of cockpit');
   assert.ok(Math.abs(fx.grayoutAlpha - cockpitGrayout * 0.25) < 1e-4, 'Exterior grayout must be 25% of cockpit');
 });

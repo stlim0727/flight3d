@@ -31,6 +31,7 @@ export class PilotPhysiology {
     this.responsiveness = 1.0;
     this.glocIncidents = 0;
     this.gFatigueAccumulator = 0.0; // Accumulated seconds where consciousness < 0.8
+    this.elapsedTime = 0.0; // Dedicated simulation time advanced strictly by physics dt
   }
 
   /**
@@ -39,11 +40,13 @@ export class PilotPhysiology {
    * @param {number} dt Simulation timestep in seconds (e.g. 1/120s)
    * @param {number} gZ Vertical load factor along body vertical axis (+1.0 G in level flight)
    * @param {{ elevator: number, aileron: number, rudder: number }} rawInputs Commanded inputs (-1..1)
-   * @param {number} [simTime=0] Continuous simulation time for harmonic jitter
+   * @param {number} [simTime=null] Optional continuous simulation time (defaults to internal dt accumulator)
    */
-  update(dt, gZ, rawInputs = {}, simTime = 0) {
+  update(dt, gZ, rawInputs = {}, simTime = null) {
     if (!Number.isFinite(dt) || dt <= 0) return;
+    this.elapsedTime += dt;
     this.gZ = Number.isFinite(gZ) ? gZ : 1.0;
+    const continuousTime = Number.isFinite(simTime) ? simTime : this.elapsedTime;
 
     const rawElevator = Number.isFinite(rawInputs.elevator) ? rawInputs.elevator : 0.0;
     const rawAileron = Number.isFinite(rawInputs.aileron) ? rawInputs.aileron : 0.0;
@@ -146,7 +149,7 @@ export class PilotPhysiology {
 
       // ③ High-G Muscle Strain Jitter (|G_z| > 4.0 G)
       if (Math.abs(this.gZ) > 4.0 && this.consciousness > 0.0) {
-        const jitter = Math.sin(simTime * 35.0) * (Math.abs(this.gZ) - 4.0) * 0.02;
+        const jitter = Math.sin(continuousTime * 35.0) * (Math.abs(this.gZ) - 4.0) * 0.02;
         this.effectiveElevator = clamp(this.effectiveElevator + jitter, -maxAuthority, maxAuthority);
         this.effectiveAileron = clamp(this.effectiveAileron + jitter, -maxAuthority, maxAuthority);
       }

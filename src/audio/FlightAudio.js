@@ -631,8 +631,10 @@ export class FlightAudio {
         const breathShape = cycle < 0.25
           ? Math.sin(cycle / 0.25 * Math.PI)
           : 0.35 + 0.35 * Math.sin((cycle - 0.25) / 0.75 * Math.PI);
-        const severity = Math.min(1.0, (Math.abs(gZ) - 3.0) / 4.0 + (1.0 - consciousness) * 0.7);
-        const targetVol = Math.min(0.70, severity * breathShape * 0.65);
+        const gExcess = Math.max(0.0, (Math.abs(gZ) - 3.0) / 4.0);
+        const fatigueExcess = Math.max(0.0, (1.0 - consciousness) * 0.7);
+        const severity = Math.max(0.0, Math.min(1.0, gExcess + fatigueExcess));
+        const targetVol = Math.max(0.0, Math.min(0.70, severity * breathShape * 0.65));
         const targetFreq = 500 + severity * 400 + (cycle < 0.25 ? 300 : 0);
         this.gStrainGain.gain.setTargetAtTime(targetVol, now, 0.05);
         this.gStrainFilter.frequency.setTargetAtTime(targetFreq, now, 0.05);
@@ -772,7 +774,7 @@ export class FlightAudio {
     this.departureRadio.stop();
     this.bangkokRadio?.stop();
     if (this.ctx) {
-      for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'windGain', 'rumbleGain', 'packGain', 'warningGain']) {
+      for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'windGain', 'rumbleGain', 'packGain', 'warningGain', 'gStrainGain']) {
         this[name]?.gain.setValueAtTime(0, this.ctx.currentTime);
       }
     }

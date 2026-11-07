@@ -7,6 +7,8 @@
  * - Viewport scaling: 100% intensity in cockpit 1st-person view, 25% intensity in exterior 3rd-person view.
  */
 
+import { CameraSystem } from '../cameras/CameraSystem.js';
+
 export class PilotPhysiologyFx {
   constructor(domElement = null) {
     this.domElement = domElement;
@@ -79,7 +81,9 @@ export class PilotPhysiologyFx {
    * @param {Object} pilotSnapshot Physiological snapshot from PilotPhysiology
    */
   update(cameraMode, pilotSnapshot = {}) {
-    const isCockpit = cameraMode === 'cockpit' || cameraMode === 'hud';
+    const isCockpit = cameraMode === 'cockpit' || cameraMode === 'hud' ||
+      cameraMode === CameraSystem.MODES?.COCKPIT || cameraMode === CameraSystem.MODES?.HUD ||
+      cameraMode === 0 || cameraMode === 8;
     // 100% intensity in cockpit 1st-person view, 25% intensity in external 3rd-person view
     this.viewScale = isCockpit ? 1.0 : 0.25;
 

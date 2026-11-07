@@ -61,7 +61,7 @@ class PhysicsIntegratorMethods {
     };
     const isAutonomousDemo = Boolean(this.demoDirector?.isActive);
     if (!isAutonomousDemo) {
-      this.pilotPhysiology.update(dt, this.telemetry.gForce ?? 1.0, rawInputs, this.totalSimTime ?? 0);
+      this.pilotPhysiology.update(dt, this.telemetry.gForce ?? 1.0, rawInputs);
       this.aero.elevator = this.pilotPhysiology.effectiveElevator;
       this.aero.aileron = this.pilotPhysiology.effectiveAileron;
       this.aero.rudder = this.pilotPhysiology.effectiveRudder;
