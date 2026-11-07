@@ -216,7 +216,7 @@ body.demo-active .flight-toolbar :is(#btn-gear, #btn-flaps-ret, #btn-flaps-ext, 
 .demo-banner .demo-actions .btn { min-height: calc(44px * var(--ui-scale, 1)); min-width: calc(44px * var(--ui-scale, 1)); }
 .stall-banner { top: var(--demo-row-top, calc(var(--edge-top) + (100px * var(--ui-scale, 1)))); }
 body:has(#ap-panel:not([hidden]), #flight-more-panel:not([hidden])) :is(.demo-banner, .demo-pill-btn) { visibility: hidden; }
-.audio-start-hint { top: calc(var(--demo-row-top, calc(108px * var(--ui-scale, 1))) + (88px * var(--ui-scale, 1))); font-size: calc(11px * var(--ui-scale, 1)); padding: calc(5px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1)); }
+body[data-flow="flight"] .audio-start-hint { top: calc(var(--demo-row-top, calc(108px * var(--ui-scale, 1))) + (88px * var(--ui-scale, 1))); font-size: calc(11px * var(--ui-scale, 1)); padding: calc(5px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1)); }
 @media (max-width: 1024px) {
   .hud-top-bar .menu-toggle { padding: 0; width: 44px; }
   .hud-top-bar .menu-toggle-title { display: none; }
@@ -225,7 +225,7 @@ body:has(#ap-panel:not([hidden]), #flight-more-panel:not([hidden])) :is(.demo-ba
 
 /* Transient notices never cover the demo's take-control action or top buttons. */
 .toast { top: auto; bottom: calc(var(--edge-bottom) + (144px * var(--ui-scale, 1))); max-width: calc(100vw - var(--edge-left) - var(--edge-right)); font-size: calc(12px * var(--ui-scale, 1)); text-align: center; }
-.audio-start-hint { top: auto; bottom: calc(var(--edge-bottom) + (190px * var(--ui-scale, 1))); }
+body[data-flow="flight"] .audio-start-hint { top: auto; bottom: calc(var(--edge-bottom) + (190px * var(--ui-scale, 1))); }
 
 /* Warnings keep the first notice slot. Expanded guides and open panels move
    below them; the compact folded pill stays beside the control strip. */
