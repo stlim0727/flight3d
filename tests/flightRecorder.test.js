@@ -245,7 +245,7 @@ test('retry restores the completed sortie instead of applying staged menu choice
   assert.equal(sim.gameFlow.state, FLOW.FLIGHT);
 });
 
-test('a repeated valley start arms recording before synchronous course preparation', () => {
+test('a repeated valley start arms recording before synchronous course preparation', async () => {
   const sim = Object.assign(Object.create(SimulatorClass.prototype), recorders(), {
     gameFlow: new GameFlowController(),
     lobby: { preset: 'valley', airport: 'valley', aircraft: 'F16' },
@@ -258,7 +258,7 @@ test('a repeated valley start arms recording before synchronous course preparati
     },
   });
   for (let i = 0; i < 2; i++) {
-    sim.startFlight();
+    await sim.startFlight();
     assert.equal(sim.replayRecorder.metadata.airport, 'valley');
     assert.equal(sim.replayRecorder.metadata.seed, 42);
     assert.equal(sim.replayRecorder.metadata.aircraft, 'F16');

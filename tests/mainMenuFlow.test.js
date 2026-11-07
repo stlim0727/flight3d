@@ -98,3 +98,34 @@ test('starting another scene releases replay terrain before comparing or rebuild
   assert.equal(sim.rebuilds, 0, 'the saved terrain is restored before deciding whether to rebuild');
   assert.equal(sim.starts, 1);
 });
+
+test('a lazy scenario holds physics and rejects repeated starts until spawn completes', async () => {
+  const { stepPhysics } = await import('../src/core/physicsTiming.js');
+  for (const outcome of ['ready', 'failed']) {
+    const sim = simulator();
+    let complete;
+    sim.startFlight = SimulatorClass.prototype.startFlight;
+    sim.spawnFlight = async () => {
+      sim.starts++;
+      sim.gameFlow.enterFlight();
+      await new Promise((resolve, reject) => { complete = outcome === 'ready' ? resolve : reject; });
+    };
+    // A stale pose must never reach collision detection during a lazy import.
+    sim.integratePhysics = () => assert.fail('integrated the previous scenario before spawning');
+    sim.showToast = sim.syncFlowUi = () => {};
+    const savedWarn = console.warn;
+    console.warn = () => {};
+    try {
+      const start = sim.fly();
+      assert.equal(sim.startingFlight, true);
+      stepPhysics(sim);
+      await sim.fly();
+      assert.equal(sim.starts, 1);
+      complete(outcome === 'failed' ? new Error('module download failed') : undefined);
+      await start;
+      assert.equal(sim.startingFlight, false);
+      assert.equal(sim.gameFlow.isPhysicsFrozen(), outcome === 'failed');
+      assert.equal(sim.gameFlow.canResumeFromLobby(), false);
+    } finally { console.warn = savedWarn; }
+  }
+});

@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import * as THREE from 'three';
+import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import assert from 'node:assert/strict';
 import { SlalomMissionAdapter } from '../src/arena/SlalomMissionAdapter.js';
 import { SlalomMission } from '../src/arena/SlalomMission.js';
@@ -184,4 +186,53 @@ test('mission-owned physics ticks record a playable track and freeze it on relea
   sim.replayRecorder.start({ airport: 'valley', aircraft: 'F16' });
   adapter.release();
   assert.equal(sim.replayRecorder.active, true);
+});
+
+test('starting a mission repairs the selected cached F16 and replaces the inherited belly view', async () => {
+  const sim = createSlalomSimulation(1);
+  const outgoing = sim.aircraft;
+  const cached = { ...outgoing, damaged: true,
+    resetCrashVisuals() { this.damaged = false; } };
+  outgoing.damaged = false;
+  sim.setAircraft = () => { sim.aircraft = cached; };
+  sim.cameraSystem = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  sim.cameraSystem.setMode(CameraSystem.MODES.GEAR, true);
+  const adapter = new SlalomMissionAdapter(sim);
+  // The global flag was already cleared when the pilot left the previous wreck.
+  sim.isCrashed = false;
+  await adapter.prepare({ seed: 1, pilotKind: 'human' });
+  assert.equal(cached.damaged, false);
+  assert.equal(sim.cameraSystem.mode, CameraSystem.MODES.HUD);
+  assert.equal(sim.cameraSystem.userLookOverridden, false);
+});
+
+test('runner preparation rearms both recorders after a completed valley attempt', async () => {
+  const { PilotMissionAdapter } = await import('../src/arena/PilotMissionAdapter.js');
+  const { ReplayRecorder } = await import('../src/core/ReplayRecorder.js');
+  const { FlightRecorder } = await import('../src/core/FlightRecorder.js');
+  const { SimulatorClass } = await import('./helpers/simulatorClass.js');
+  const sim = createSlalomSimulation(1);
+  Object.assign(sim, {
+    gameFlow: { state: 'flight' }, sky: { timeOfDay: 12 }, lobby: {}, lastPresetType: 'valley',
+    flightRecorder: new FlightRecorder(), replayRecorder: new ReplayRecorder(),
+    beginFlightRecording: SimulatorClass.prototype.beginFlightRecording,
+    updateFlightRecording: SimulatorClass.prototype.updateFlightRecording,
+  });
+  const adapter = new PilotMissionAdapter(sim);
+  let previous;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await adapter.prepare({ missionId: 'valley-slalom-v1', seed: 1 });
+    assert.equal(sim.replayRecorder.active, true);
+    assert.equal(sim.flightRecorder.active, true);
+    assert.equal(sim.replayRecorder.elapsed, 0);
+    assert.equal(sim.debriefReplay, null);
+    assert.equal(sim.replayRecorder.metadata.airport, 'valley');
+    assert.equal(sim.replayRecorder.metadata.seed, 1);
+    adapter.acquire();
+    for (let tick = 0; tick < 720; tick++) adapter.step();
+    adapter.release();
+    assert.ok(sim.debriefReplay.samples.length >= 30);
+    assert.notEqual(sim.debriefReplay, previous);
+    previous = sim.debriefReplay;
+  }
 });

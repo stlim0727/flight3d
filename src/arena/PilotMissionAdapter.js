@@ -12,6 +12,9 @@ export class PilotMissionAdapter {
       this.sim.crashResult = null;
     }
     this.current?.release();
+    // Every runner start, including a results-screen retry, owns a fresh recording.
+    // Replay uses SlalomMissionAdapter directly and does not enter this path.
+    this.sim.beginFlightRecording?.();
     const isValley = options.missionId === 'valley-slalom-v1' || options.missionId === 'valley-low-v1' || options.missionId === 'valley';
     this.current = isValley
       ? new SlalomMissionAdapter(this.sim) : new SimulatorMissionAdapter(this.sim);

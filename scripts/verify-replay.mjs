@@ -130,8 +130,21 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
     assert.equal(await ev('s.replayDirector._scenarioAdapter.activeSeed'), 1);
     await ev('s.replayPanel.exit()');
   }
+  // Results-screen retry bypasses startFlight; exercise its actual button handler.
+  await ev(`document.querySelector('#pilot-arena [data-playback]').value='fast';document.querySelector('#pilot-arena [data-run]').click();`);
+  await until(() => ev('!s.pilotArena.active && !document.querySelector("#pilot-score-overlay").hidden'), 'valley result screen', 120000);
+  assert.ok(await ev('s.debriefReplay?.durationSec >= 5'), 'completed mission has a replay');
+  await ev('window.previousResultTrack=s.debriefReplay');
+  await click('#pilot-score-overlay [data-score-retry]');
+  assert.equal(await ev('s.replayRecorder.active && s.flightRecorder.active && s.debriefReplay === null'), true, 'results retry rearms both recorders');
+  await until(() => ev('s.replayRecorder.elapsed >= 6'), 'results retry recording', 30000);
+  await ev('s.endFlight()');
+  assert.equal(await ev('s.debriefReplay !== window.previousResultTrack'), true);
+  assert.equal(await ev('s.saveDebriefReplay().ok'), true);
+  await ev('(async()=>{await s.replayPanel.watch(s.debriefReplay);s.replayDirector.pause();s.replayDirector.seek(3);})()');
+  assert.equal(await ev('s.replayDirector.active'), true);
   await screenshot(`${output}/real-valley-recording.png`);
   assert.deepEqual(exceptions, [], 'no uncaught browser exceptions');
-  await writeFile(`${output}/result.json`, JSON.stringify({ passed: true, checks: ['record/save/watch', '3x clock and rendered pose', 'backwards scrub', 'frame step', '10 cameras', 'desktop/mobile/landscape', 'native touch', 'exit', 'rename/delete/import/invalid import', 'reload persistence', 'Lukla DEM replay', 'seeded valley terrain restore/exit', 'two real mission recordings/save/playback'] }, null, 2));
+  await writeFile(`${output}/result.json`, JSON.stringify({ passed: true, checks: ['record/save/watch', '3x clock and rendered pose', 'backwards scrub', 'frame step', '10 cameras', 'desktop/mobile/landscape', 'native touch', 'exit', 'rename/delete/import/invalid import', 'reload persistence', 'Lukla DEM replay', 'seeded valley terrain restore/exit', 'two real mission recordings/save/playback', 'results-screen retry re-record/save/playback'] }, null, 2));
   console.log('Replay acceptance passed');
 });
