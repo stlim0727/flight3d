@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { access, readdir, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 /** A missing/unknown renderer or an incomplete draw must never earn a pass. */
 export function assertHardwareDraw(report) {
@@ -54,7 +55,15 @@ async function verify(endpoint) {
     try { await access(device, constants.R_OK | constants.W_OK); accessible.push(device); }
     catch { /* Renderer inspection below cannot replace device access. */ }
   }
-  assert.ok(accessible.length, 'No accessible /dev/dri/renderD* in this executor. Check sandbox visibility and render/video permissions; use the authorized host execution path, not software fallback.');
+  if (process.platform === 'win32') {
+    const adapters = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-Command',
+      'Get-CimInstance Win32_VideoController | Select-Object Name,Status | ConvertTo-Json -Compress'],
+    { encoding: 'utf8', windowsHide: true }));
+    for (const adapter of [adapters].flat()) {
+      if (adapter.Status === 'OK') accessible.push(adapter.Name);
+    }
+  }
+  assert.ok(accessible.length, 'No accessible GPU device in this executor. Check device access and drivers; use the authorized host execution path, not software fallback.');
   const request = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
   const version = await (await request(`${endpoint}/json/version`)).json();
   const response = await request(`${endpoint}/json/new?about:blank`, { method: 'PUT' });

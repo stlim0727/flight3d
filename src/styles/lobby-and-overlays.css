@@ -283,9 +283,10 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 .dev-live[hidden], body[data-flow="paused"] .dev-live { display: none; }
 .dev-live .btn { min-height: calc(44px * var(--ui-scale, 1)); }
 body[data-dev-scenario="true"] #ap-bar,
-body[data-dev-scenario="true"] #touch-controls-overlay { display: none !important; }
+body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-controls-overlay { display: none !important; }
 @media (max-width: 600px) {
   .dev-live { top: auto; bottom: 12px; max-height: 35dvh; overflow: auto; }
+  body[data-dev-manual-flight="true"] .dev-live { top: 110px; bottom: auto; }
 }
 .lobby-card .lobby-tab { min-height: calc(44px * var(--ui-scale, 1)); font-size: calc(12px * var(--ui-scale, 1)); border-color: transparent; background: transparent; color: #94a3b8; }
 .lobby-card .lobby-tab[aria-selected="true"] { background: #263c51; color: #e0f2fe; border-color: rgba(125, 211, 252, .25); }

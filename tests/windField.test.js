@@ -6,6 +6,18 @@ import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 
 const point = { x: 120, y: 200, z: -900 };
 
+test('light turbulence has zero mean and bounded gusts, reusing the seeded mild modes', () => {
+  const field = new WindField({ profile: 'light-turbulence-v1', seed: 7, runwayHeadingDeg: 90 });
+  const mild = new WindField({ profile: 'mild-disturbance-v1', seed: 7, runwayHeadingDeg: 90 });
+  assert.deepEqual(field.mean(), { x: 0, y: 0, z: 0 });
+  for (let time = 0; time < 60; time += .25) {
+    const wind = field.sample(point, time), prior = mild.sample(point, time);
+    assert.ok(Math.abs(wind.x) <= .3 && Math.abs(wind.y) <= .2 && Math.abs(wind.z) <= .6);
+    assert.ok(Math.abs(prior.z - wind.z - 1.5) < 1e-12);
+    assert.equal(wind.y, prior.y);
+  }
+});
+
 test('same space/time is reproducible despite query order, seed and heading are explicit', () => {
   const options = { profile: 'mild-disturbance-v1', seed: 'environment-2', runwayHeadingDeg: 90 };
   const field = new WindField(options);

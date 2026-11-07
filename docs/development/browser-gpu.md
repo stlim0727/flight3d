@@ -79,6 +79,11 @@ SwiftShader, llvmpipe, softpipe, lavapipe, missing/unknown renderer information,
 and malformed/incomplete evidence. If renderer information is hidden, investigate
 browser GPU diagnostics instead of claiming a pass.
 
+On Windows, use installed Chrome with `--use-gl=angle --use-angle=d3d11`.
+The same preflight inventories healthy `Win32_VideoController` adapters instead
+of Linux render nodes, then requires the same hardware renderer and pixel draw.
+Start background processes with hidden windows and a dedicated profile/port.
+
 It compiles shaders, draws a red triangle over a blue clear color, and checks
 that the center pixel is exactly `[255, 0, 0, 255]` with GL error `0`. A context,
 GPU process, launch flag, device file, or successful build alone is insufficient.

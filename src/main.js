@@ -606,7 +606,8 @@ class FlightSimulator {
       }
     }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
-    this.controls.inputBlocked = this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.active) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human') || Boolean(this.demoDirector?.isRestartConfirmOpen);
+    document.body.dataset.devManualFlight = String(Boolean(this.devRunner?.active?.definition.pilotControlled));
+    this.controls.inputBlocked = this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.blocksInput) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human') || Boolean(this.demoDirector?.isRestartConfirmOpen);
     if (state !== FLOW.FLIGHT) {
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0.0, 0.0);

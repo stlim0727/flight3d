@@ -70,3 +70,71 @@ Full takeoff/landing acceptance, visual responsiveness, and five-seed feedback
 pilot success require the arena integration and hardware-GPU Chrome evidence.
 This executor has no `/dev/dri/renderD128` or installed Chrome binary, so browser
 acceptance has not been established; software rendering was not used.
+
+## Light turbulence cruise (#562)
+
+Main menu → Settings → Developer mode (this session) → Developer →
+**Light turbulence cruise (60 s)** → Run. Select Coastal and B738 first.
+This adds `light-turbulence-v1`: zero mean wind, along/right/up amplitude caps
+0.3/0.6/0.2 m/s, seed `coastal-b738-turbulence-1`, heading basis 063°.
+The existing mild and Incheon profiles are unchanged. This is a spatial/temporal
+sine-wave training field, not a validated atmospheric turbulence spectrum.
+The field is invisible and global; regional restriction belongs to #563.
+
+The existing coastal cruise preset supplies position (-600, 750, 3200) m,
+world velocity (96, 0, -49) m/s, 66,000 kg B738, gear/flaps/spoilers up,
+zero angular rates and computed hands-off trim. At the verified configuration,
+throttle is 0.40871194 and trim 4.87959445°. The initial pitch is approximately
+5.679°, heading 063°. Setup applies wind **after** all nested preset resets.
+No position, quaternion or angular velocity receives a synthetic disturbance.
+
+The existing relative-airflow calculation `v_air = v_aircraft - u'(x,t)` changes
+angle of attack, sideslip, dynamic pressure and hence actual forces/moments.
+World axes are +X east, +Y up, +Z south; body forward is -Z. Quaternion inverse
+rotation converts world airflow to body coordinates. Each 1/120 s physics tick
+samples the same seeded field, regardless of render grouping or extra queries.
+
+Leave pitch/roll/yaw centered and throttle/trim unchanged for the fixed-control
+comparison; AP and demo steering are off. Observe heading, attitude, altitude and
+G on the existing instruments or the exterior aircraft. Keyboard/touch/manual
+controls remain available; configuration/failure shortcuts retain fixture locks.
+Pause holds physics and wind time; restart recreates the same initial state and
+seed; exit, mode disabling and preset/aircraft/airport changes remove the field
+and zero its time/vector. The final pose holds at 60 s. Arbitrary pilot inputs
+can still stall or crash the aircraft; no damage or collision protection is added.
+
+### Reproduction and measured evidence
+
+Use Node 22.23.2, `npm ci`, and start `npm run dev -- --host 127.0.0.1 --port 5196`.
+Then run `node scripts/verify-turbulence.mjs` (`SIM_URL`, `CHROME_PATH`,
+`ARTIFACT_DIR` override location/binary/output). The harness runs the hardware
+preflight first, enters through Developer controls, integrates the production
+physics for 7,200 ticks per run, and records `.tmp/turbulence/results.json`, GPU
+evidence and desktop/mobile screenshots. It compares no field, zero-amplitude
+field and turbulence, and checks input hold/release and lifecycle cleanup.
+
+Hardware Chrome 156 / Intel Arc 140V / ANGLE D3D11 passed a red shader draw with
+`readPixels = [255, 0, 0, 255]`, GL error 0. Recorded fixed-control 60 s ranges:
+
+| Quantity | No field | Light turbulence |
+| --- | --- | --- |
+| Altitude (m) | 750.000–750.497 | 748.756–751.888 |
+| IAS (kt) | 201.960–202.042 | 201.315–202.811 |
+| Normal load (G) | 0.99502–0.99517 | 0.98354–1.00593 |
+| Pitch (deg) | 5.679–5.689 | 5.584–5.765 |
+| Roll (deg) | 0.000–0.031 | −0.205–0.233 |
+| Heading (deg) | 62.953–63.000 | 62.717–63.222 |
+
+Minimum terrain clearance was 612 m. Final turbulent position differs from calm
+by approximately (+1.357, −0.944, +0.028) m. Both runs recorded zero crash, gear
+or body damage, body contact, stall, G-LOC and engine failure. A zero-amplitude
+field gives exactly the no-field final position, quaternion, velocity and rates.
+The small calm drift is the production model's open-loop cruise response, not
+claimed perfect equilibrium. The 60 s audit is deterministic simulation time;
+rendered-loop progress and manual input are separate browser checks.
+
+`tests/turbulenceScenario.test.js` also exercises production physics, frame
+grouping, unrelated sampling, replay after reset, nested preset cancellation,
+manual control ownership and transient unsafe conditions. This is evidence for
+one seed, one aircraft/loading and one starting condition, not a handling-quality
+certification or general weather model.
