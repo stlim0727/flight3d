@@ -107,6 +107,8 @@ export default {
   "himalayan.cruise.13.000.ft": "✈️ 히말라야 순항 (13,000 FT)",
   "downhill.takeoff.rwy.24": "⚡ 내리막 이륙 (Rwy 24)",
   "center.view.o": "시선 리셋 [O]",
+  "reset.pov": "POV 리셋",
+  "reset.pov.title": "카메라 시선 정면 초기화 [O]",
   "hide.yokes.j": "조종간 숨김 [J]",
   "physics": "🔬 물리 진단 [`]",
   "flight.guide.h.53": "조작 안내 [H]",

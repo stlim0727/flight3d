@@ -138,6 +138,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
 
   for (const [id, key] of Object.entries({
     'btn-cam-reset': 'center.view.o',
+    'btn-reset-pov': 'reset.pov',
     'btn-yokes': 'hide.yokes.j', 'btn-diag': 'physics',
     'btn-help': 'flight.guide.h.53', 'btn-skip-demo': 'take.control.esc',
   })) {
@@ -241,4 +242,9 @@ export function updateControlState(telemetry, camera, options = {}) {
   quickCamera?.setAttribute('title', t('ui.camera.current', { name: zoomed ? `${viewName} · ${zoomValue}` : viewName }));
   const toggle = document.getElementById('btn-touch-toggle');
   toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('touch-mode')));
+  const resetPovBtn = document.getElementById('btn-reset-pov');
+  if (resetPovBtn) {
+    const isModified = camera && typeof camera.isPovModified === 'function' ? camera.isPovModified() : false;
+    resetPovBtn.hidden = !isModified;
+  }
 }
