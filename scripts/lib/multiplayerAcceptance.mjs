@@ -4,6 +4,86 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { until, delay } from './cdpClient.mjs';
 
+async function verifyFriendIndicator(host, capture) {
+  // Hold repeatable camera-relative positions while the real room stays connected.
+  await host.evaluate(`(() => {
+    const track = sim.multiplayer.room.session.track;
+    const sample = track.sample.bind(track);
+    window.friendCase = { p: [0, 0, -120] };
+    track.sample = now => {
+      const live = sample(now), fixture = window.friendCase;
+      if (!live || fixture.missing) return null;
+      return {
+        ...live, stale: Boolean(fixture.stale), crashed: Boolean(fixture.crashed),
+        p: sim.camera.localToWorld(new THREE.Vector3(...fixture.p)).toArray(),
+      };
+    };
+    window.restoreFriendTrack = () => { track.sample = sample; delete window.friendCase; };
+  })()`);
+  async function marker(fixture) {
+    await host.evaluate(`window.friendCase = ${JSON.stringify(fixture)}; sim.multiplayer.update()`);
+    const observed = await host.evaluate(`(() => {
+      const edge = document.querySelector('.mp-edge-marker');
+      const name = document.querySelector('body > .mp-nameplate');
+      if (!edge || !name) return null;
+      const style = node => {
+        const css = getComputedStyle(node);
+        return [css.fontSize, css.fontFamily, css.color, css.backgroundColor, css.padding, css.borderRadius];
+      };
+      const r = edge.getBoundingClientRect();
+      const controls = [...document.querySelectorAll('.hud-top-bar, .flight-toolbar, #mp-room-menu, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, #touch-btn-brake, #touch-btn-gyro, #touch-btn-recenter')]
+        .filter(node => getComputedStyle(node).visibility === 'visible')
+        .map(node => node.getBoundingClientRect()).filter(rect => rect.width && rect.height);
+      return {
+        edge: !edge.hidden, name: !name.hidden, direction: edge.dataset.direction,
+        text: edge.textContent, sharedStyle: JSON.stringify(style(name)) === JSON.stringify(style(edge.lastElementChild)),
+        noOverlap: controls.every(c => c.right <= r.left || c.left >= r.right || c.bottom <= r.top || c.top >= r.bottom),
+        passThrough: getComputedStyle(edge).pointerEvents === 'none',
+      };
+    })()`);
+    assert.ok(observed, 'friend overlay remains mounted in the active room');
+    return observed;
+  }
+  try {
+    const inside = await marker({ p: [0, 0, -120] });
+    assert.ok(inside.name && !inside.edge, 'screen interior keeps the original nameplate');
+    const right = await marker({ p: [200, 0, -120] });
+    assert.ok(right.edge && !right.name && right.direction === 'right');
+    assert.ok(right.sharedStyle && right.noOverlap && right.passThrough, 'edge uses existing nameplate style and leaves HUD input free');
+    await capture(host, 'friend-edge-exterior');
+    const behind = await marker({ p: [-120, 0, 80] });
+    assert.ok(behind.edge && behind.direction === 'left' && /Behind|뒤쪽/i.test(behind.text));
+    const stale = await marker({ p: [-120, 0, 80], stale: true });
+    assert.ok(stale.edge && /unstable|연결 불안정/i.test(stale.text) && !/\d\s*(?:km|m)\b/.test(stale.text));
+    for (const state of [{ missing: true }, { crashed: true }]) {
+      const hidden = await marker({ p: [-120, 0, 80], ...state });
+      assert.ok(!hidden.edge && !hidden.name);
+    }
+    await host.evaluate('sim.cameraSystem.setMode(0, true)');
+    await until(() => host.evaluate('sim.cameraSystem.mode === 0'), 'cockpit view', 30000);
+    const above = await marker({ p: [0, 180, -120] });
+    assert.ok(above.edge && above.direction === 'up' && above.noOverlap);
+    await capture(host, 'friend-edge-cockpit');
+    await host.evaluate('sim.cameraSystem.setMode(1, true); sim.touchControls.enable()');
+    for (const [width, height] of [[844, 390], [390, 844], [320, 568]]) {
+      await host.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+      await host.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+      const bottom = await marker({ p: [0, -250, -120] });
+      await capture(host, `friend-edge-${width}x${height}`);
+      assert.ok(bottom.edge && bottom.direction === 'down' && bottom.noOverlap && bottom.passThrough,
+        `bottom marker fits ${width}x${height}: ${JSON.stringify(bottom)}`);
+    }
+    await host.evaluate('document.getElementById("mp-room-menu").click(); sim.multiplayer.update()');
+    const paused = await marker({ p: [200, 0, -120] });
+    assert.ok(!paused.edge && !paused.name, 'room modal hides the overlay');
+    await host.evaluate('document.getElementById("mp-dialog-close").click(); sim.multiplayer.update()');
+    assert.ok((await marker({ p: [200, 0, -120] })).edge, 'overlay returns to live flight');
+  } finally {
+    await host.evaluate('window.restoreFriendTrack(); sim.touchControls.disable()');
+    await host.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
+}
+
 /** Full simulator acceptance; hosted CI separately checks transport and modal DOM. */
 export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   const { stdout } = await promisify(execFile)(process.execPath, ['scripts/verify-browser-gpu.mjs', `http://127.0.0.1:${cdpPort}`]);
@@ -29,6 +109,12 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
     const { data } = await c.send('Page.captureScreenshot', { format: 'png' });
     await writeFile(`review-artifacts/multiplayer/${name}.png`, Buffer.from(data, 'base64'));
   }
+  // Warm the cockpit before connecting so a cold GPU shader compile cannot
+  // backlog incoming room snapshots during the camera transition check.
+  await host.evaluate('sim.gameFlow.enterFlight(); sim.cameraSystem.setMode(0, true)');
+  await until(() => host.evaluate('sim.cameraSystem.mode === 0'), 'cockpit warmup view', 30000);
+  await host.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+  await host.evaluate('sim.cameraSystem.setMode(1, true); sim.gameFlow.returnToLobby(true)');
   async function create(airport = 'coastal', aircraft = 'C172', scenario = 'runway') {
     for (const c of [host, guest]) await open(c);
     await host.evaluate('document.getElementById("mp-choose-host").click()');
@@ -108,6 +194,7 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   assert.ok(Math.hypot(...hp.map((n, i) => n - gp[i])) > 70, 'non-overlapping runway slots');
   await host.evaluate('sim.camera.position.copy(sim.multiplayer.remote.group.position).add(new THREE.Vector3(22,12,26)); sim.camera.lookAt(sim.multiplayer.remote.group.position); sim.camera.updateMatrixWorld(true); sim.multiplayer.update(); sim.renderScene()');
   await capture(host, 'remote-aircraft');
+  await verifyFriendIndicator(host, capture);
 
   // Opening room management holds the plane and excludes all other simulator UI.
   await open(host);
@@ -140,6 +227,7 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   assert.equal(await guest.evaluate('sim.multiplayer.modalOpen'), false);
   await open(host); await start();
   await leave();
+  assert.equal(await host.evaluate('document.querySelectorAll(".mp-indicator-bounds, body > .mp-nameplate").length'), 0, 'peer departure removes both indicators');
 
   // Navigate to the actual shared URL: joining requires no input or Join click.
   const direct = await create();

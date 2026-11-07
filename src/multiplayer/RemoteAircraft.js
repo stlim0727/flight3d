@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RemoteAircraftIndicator } from './RemoteAircraftIndicator.js';
 
 /** Lightweight remote-only silhouette; never registered with physics or collisions. */
 export class RemoteAircraft {
@@ -23,24 +24,31 @@ export class RemoteAircraft {
       wheel.position.set(x, -width * .7, z); this.gear.add(wheel);
     }
     this.group.visible = false; scene.add(this.group);
-    this.label = document.createElement('div'); this.label.className = 'mp-nameplate';
-    this.label.hidden = true; document.body.append(this.label);
+    this.indicator = new RemoteAircraftIndicator();
   }
-  update(sample, name, camera) {
+  update(sample, name, camera, { status = '', showIndicator = true, localPosition, cameraMode } = {}) {
     this.group.visible = Boolean(sample && !sample.crashed);
-    this.label.hidden = !this.group.visible;
-    if (!this.group.visible) return;
+    if (!this.group.visible) {
+      this.indicator.hide();
+      return;
+    }
+    const previous = this.group.userData.remote;
+    if (previous?.epoch !== sample.epoch || previous?.round !== sample.round
+      || (previous && Math.hypot(...sample.p.map((value, i) => value - previous.p[i])) > 1000)) {
+      this.indicator.hide();
+    }
     this.group.position.fromArray(sample.p); this.group.quaternion.fromArray(sample.q);
     this.gear.visible = sample.gear > .5;
-    const projected = this.group.position.clone().add(new THREE.Vector3(0, 10, 0)).project(camera);
-    this.label.hidden = projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1;
-    this.label.style.left = `${(projected.x * .5 + .5) * innerWidth}px`;
-    this.label.style.top = `${(-projected.y * .5 + .5) * innerHeight}px`;
-    this.label.textContent = name;
     this.group.userData.remote = sample;
+    if (!showIndicator) {
+      this.indicator.hide();
+      return;
+    }
+    const distance = localPosition && !sample.stale ? this.group.position.distanceTo(localPosition) : undefined;
+    this.indicator.update(this.group.position, name, status, camera, { distance, cameraMode });
   }
   dispose() {
-    this.group.removeFromParent(); this.label.remove();
+    this.group.removeFromParent(); this.indicator.dispose();
     const materials = new Set();
     this.group.traverse(o => { o.geometry?.dispose(); if (o.material) materials.add(o.material); });
     materials.forEach(m => m.dispose());
