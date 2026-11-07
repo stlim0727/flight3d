@@ -1,7 +1,9 @@
 import { LANDING_CASES, setupLanding } from './landingScenarios.js';
 import { setupCrash } from './crashScenarios.js';
+import { turbulenceScenario } from './turbulenceScenario.js';
 
 export const DEV_SCENARIOS = {
+  turbulence: turbulenceScenario,
   shadow: {
     airports: ['coastal', 'lukla'], aircraft: ['B738', 'C172'], kind: 'visual',
     labelKey: 'shadow.title', descriptionKey: 'shadow.briefing',

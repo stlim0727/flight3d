@@ -1,4 +1,7 @@
 export default {
+  "dev.kind.flight": "수동 비행 — 바람에 의한 물리 반응",
+  "dev.scenario.turbulence": "약한 난기류 순항 (60초)",
+  "dev.expect.turbulence": "Coastal / B738: 고도 750 m, 속도 107.8 m/s, 기수 063°의 트림 순항, 기어·플랩 접힘. 평균 바람 0, 고정 시드 coastal-b738-turbulence-1. 자동조종 꺼짐, 수동 조종 가능. 조종을 중립에 두고 기존 계기로 약한 피치·롤·요와 이동을 관찰하세요. 60초 동안 실속·G-LOC·손상·엔진 고장 없이 비행합니다. 재시작하면 같은 초기 상태로 돌아갑니다.",
   "render.open": "렌더링 비교 패널",
   "render.cockpitUnsupported": "이 기체는 내부·외부 모델이 통합되어 있어 콕핏 전용 재질·표면 비교를 지원하지 않습니다.",
   "render.cockpitLoading": "모델·베이크 로딩이 끝나면 콕핏 재질·표면 비교를 사용할 수 있습니다.",

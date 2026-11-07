@@ -16,6 +16,9 @@ export class DevScenarioRunner {
 
   get context() { return { airport: this.sim.activeAirport, aircraft: this.sim.currentAircraftId }; }
   get blocksPhysics() { return Boolean(this.active && this.status !== 'running'); }
+  get blocksInput() {
+    return Boolean(this.active && (this.status !== 'running' || !this.active.definition.pilotControlled));
+  }
 
   start(id) {
     if (this.sim.multiplayer?.active) return false;
@@ -82,7 +85,7 @@ export class DevScenarioRunner {
       if (!visual) sim.cameraSystem.setMode(1, true);
       sim.cameraSystem.snapToTarget(sim.aircraft.group);
       this.status = visual ? 'inspecting' : 'running';
-      sim.controls.aircraftControlsDisabled = !visual;
+      sim.controls.aircraftControlsDisabled = !visual && !this.active.definition.pilotControlled;
       sim.syncFlowUi();
     } catch (error) {
       this.finish('failed', 'dev.reason.setup', error.message);
@@ -95,10 +98,11 @@ export class DevScenarioRunner {
   beforePhysics() {
     if (this.status !== 'running') return;
     const sim = this.sim;
+    sim.autopilot.disengage();
+    if (this.active.definition.pilotControlled) return;
     sim.controls.throttle = 0;
     sim.controls.virtualElevator = sim.controls.virtualAileron = sim.controls.virtualRudder = 0;
     sim.controls.aircraftControlsDisabled = true;
-    sim.autopilot.disengage();
   }
 
   afterPhysics(dt) {
@@ -119,6 +123,7 @@ export class DevScenarioRunner {
     o.bodyDamage ||= Object.values(sim.gear.bodyDamage).some(d => d > .01);
     o.crashed ||= sim.isCrashed;
     o.stopped = Boolean(sim.landingStopped);
+    definition.observe?.(sim, o);
     if (sim.isCrashed) {
       const expectedType = definition.expectedCrash ?? (definition.check === 'crash' ? 'TERRAIN' : null);
       const expected = Boolean(expectedType && expectedType === sim.crashResult?.type);
@@ -130,7 +135,8 @@ export class DevScenarioRunner {
     if (definition.expectedCrash || definition.check === 'crash') {
       this.finish('timeout', 'dev.reason.noCrash'); return;
     }
-    if (!landingVerdict(definition.check, o)) { this.finish('failed', 'dev.reason.expectation'); return; }
+    const passed = definition.verdict ? definition.verdict(o) : landingVerdict(definition.check, o);
+    if (!passed) { this.finish('failed', 'dev.reason.expectation'); return; }
     if (definition.check === 'stop') {
       // Ten further seconds prove the aircraft stays parked and does not abrade at rest.
       if (!this.restDamage) this.restDamage = { ...sim.gear.bodyDamage };
@@ -148,6 +154,7 @@ export class DevScenarioRunner {
       observation: { ...this.observation }, crashType: this.sim.crashResult?.type ?? null,
       gearDamage: Object.fromEntries(this.sim.gear.contacts.map(c => [c.id, c.damageState])),
       bodyDamage: { ...this.sim.gear.bodyDamage } };
+    this.sim.syncFlowUi();
   }
 
   restart() { return this.active ? this.start(this.active.id) : false; }
