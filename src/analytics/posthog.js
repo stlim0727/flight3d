@@ -7,8 +7,10 @@
  * - Error tracking & WebGL context loss capture
  * - User feedback / bug report telemetry
  * - A bounded queue for events captured before the lazily imported SDK resolves
- * - Zero-overhead / safe no-op when unconfigured or in tests
+ * - Automatic analytics safely no-op when unconfigured; explicit reports require acknowledgement
  */
+
+import { createFeedbackReport, deliverFeedbackReport, gatherFeedbackDiagnostics } from './feedbackReport.js';
 
 let posthogInstance = null;
 let initialized = false;
@@ -35,9 +37,9 @@ export function getPostHogConfig() {
   const urlParams = new URLSearchParams(window.location.search);
   const urlKey = urlParams.get('posthogKey');
   const urlHost = urlParams.get('posthogHost');
-  const disabled = urlParams.get('telemetry') === '0' ||
-    window.__POSTHOG_DISABLED__ === true ||
-    window.localStorage?.getItem('flight3d_telemetry_optout') === '1';
+  let storedOptOut = false;
+  try { storedOptOut = window.localStorage?.getItem('flight3d_telemetry_optout') === '1'; } catch { /* Restricted storage. */ }
+  const disabled = urlParams.get('telemetry') === '0' || window.__POSTHOG_DISABLED__ === true || storedOptOut;
 
   const envKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_POSTHOG_KEY) || '';
   const envHost = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_POSTHOG_HOST) || DEFAULT_POSTHOG_HOST;
@@ -165,8 +167,8 @@ export function gatherFlightContext(sim = activeSim) {
       pilotMode: sim.lobby?.pilotMode ?? null,
       fps: Number.isFinite(sim.lastFrameDelta) && sim.lastFrameDelta > 0
         ? Math.round(1 / sim.lastFrameDelta) : null,
-      flightDurationSec: sim.flightRecorder?.elapsedSeconds != null
-        ? Number(sim.flightRecorder.elapsedSeconds.toFixed(1)) : null,
+      flightDurationSec: sim.flightRecorder?.elapsed != null
+        ? Number(sim.flightRecorder.elapsed.toFixed(1)) : null,
     };
   } catch {
     return {};
@@ -312,39 +314,32 @@ export function trackStartupTrace(report) {
   sendEvent('startup_trace', payload, { send_instantly: true });
 }
 
-/** Submit user bug report or feedback */
-export async function sendUserFeedback({ message, contact = '', category = 'bug', includeContext = true, context = {} }) {
-  if (!posthogInstance && !initialized) {
-    try {
-      await initAnalytics();
-    } catch {
-      // safe no-op on load failure
-    }
-  }
-
-  const payload = {
-    feedback_message: message,
-    feedback_contact: contact,
-    feedback_category: category,
-    ...(includeContext ? gatherFlightContext() : {}),
-    ...context,
+/** Separate from common analytics tags so detailed samples are sent only by request. */
+export function gatherUserFeedbackContext(sim = activeSim) {
+  const browser = typeof navigator !== 'undefined' ? navigator : {};
+  return { ...gatherFlightContext(sim), ...gatherFeedbackDiagnostics(sim),
+    userAgent: browser.userAgent ?? null, platform: browser.platform ?? null,
+    maxTouchPoints: browser.maxTouchPoints ?? 0, braveApiAvailable: Boolean(browser.brave),
+    pageUrl: typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : null,
+    viewport: typeof window !== 'undefined' ? { width: window.innerWidth, height: window.innerHeight } : null,
   };
+}
 
-  trackEvent('user_feedback_submitted', payload, { send_instantly: true });
-  trackEvent('$feedback', {
-    $feedback_text: message,
-    $feedback_category: category,
-    $feedback_contact: contact,
-    ...payload,
-  }, { send_instantly: true });
+/** Capture now, rather than after an SDK load or a later retry. */
+export function prepareUserFeedback({ message, contact = '', category = 'bug', includeContext = true, context, sim = activeSim }) {
+  return createFeedbackReport({ message, contact, category,
+    context: includeContext ? (context ?? gatherUserFeedbackContext(sim)) : {},
+  });
+}
 
-  try {
-    if (typeof posthogInstance?.flush === 'function') {
-      posthogInstance.flush();
-    }
-  } catch {
-    // ignore flush errors
-  }
+/** User-requested report; never enable automatic telemetry as a side effect. */
+export async function sendUserFeedback(options) {
+  const report = options.report ?? prepareUserFeedback(options);
+  const { apiKey, host } = getPostHogConfig();
+  let distinctId;
+  try { distinctId = posthogInstance?.get_distinct_id?.(); } catch { /* SDK unavailable. */ }
+  return deliverFeedbackReport(report, { apiKey, host,
+    distinctId: distinctId || getOrCreateAnonymousId() });
 }
 
 /** For tests: inject mock or reset state */

@@ -122,7 +122,39 @@ average silently drops the loads this feature was added to capture.
 
 3. **In-Game Bug Report Dialog**:
    - Available on the mission score overlay (`[data-score-report]`) and flight debrief (`#debrief-feedback`).
-   - Automatically attaches anonymized flight telemetry (aircraft, scenario, crash reason, FPS, browser info).
+   - Explicit user reports use a direct POST to the configured PostHog ingestion host's
+     `/i/v0/e/` endpoint, independently of the lazy analytics SDK and automatic telemetry
+     opt-out. Clicking Send is an explicit request; it does not re-enable automatic analytics.
+   - The dialog reports acceptance only after a readable HTTP success plus ingestion
+     acknowledgement (`{"status":"Ok"}`, legacy `1` / `{"status":1}`). Queueing,
+     `capture()` return values, opaque responses and beacons are not confirmation.
+   - There is one `user_feedback_submitted` event per report, with `reportId` as the
+     event UUID and a fixed creation timestamp. Explicit retries reuse the same snapshot
+     and ID; editing the message, contact, or diagnostics checkbox creates a new report.
+   - Network failures, rejected/invalid acknowledgements and a 12-second deadline keep
+     the dialog open with the draft, an error, Retry and Save report file. Closing/reopening
+     preserves an unsent draft within the page. A reload does not; save the JSON first.
+   - Mobile Brave Shields may block the PostHog domain itself. This client-side fix cannot
+     bypass a blocked host: use the exported JSON, or retry after choosing to allow the
+     request. GitHub Pages has no first-party server relay. A first-party proxy would
+     require hosting/DNS configuration; see [PostHog proxy guidance](https://posthog.com/docs/advanced/proxy).
+   - Optional diagnostics are frozen when the dialog opens and include current G, exact
+     recorded peak G/time/sample, 21 samples around the peak, the latest 30 samples,
+     up to 10 touchdowns with contact G and sink rate, speeds/attitude/altitude, position,
+     linear/angular velocity, gear failure/contact state, body damage, aircraft/airport,
+     duration, build and browser/viewport data. A completed debrief's sortie metadata,
+     peak and trace take precedence over a different live aircraft. G is simulated CG
+     body-normal specific force, not a certified crash or occupant measurement.
+   - Unchecking diagnostics removes simulator/browser details from both delivery and
+     JSON export. The SDK no longer silently adds them back. Export contains no API token.
+   - `flightDurationSec` reads `FlightRecorder.elapsed`, not the nonexistent `elapsedSeconds`.
+
+Verification: `node --test tests/analytics.test.js tests/feedbackReport.test.js`.
+`CHROME_PATH=/home/stlim/.local/bin/chrome-headless node scripts/verify-feedback-delivery.mjs`
+checks the 390px simulator dialog, blocked requests, retained text/G snapshot, JSON save,
+and delayed acknowledgement/retry. Add `--live` to submit one clearly labelled synthetic
+verification report; confirm its exact UUID in PostHog afterward. The script always runs
+hardware-GPU preflight. Chrome mobile emulation is not evidence of native Brave Shields.
 
 ## Built-in PostHog Dashboard
 

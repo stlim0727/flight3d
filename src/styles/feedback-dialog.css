@@ -31,6 +31,7 @@
   width: 100%;
   max-width: 460px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   color: #e2e8f0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -230,4 +231,20 @@
   background: rgba(148, 163, 184, 0.12);
   color: #e2e8f0;
   border-color: rgba(148, 163, 184, 0.5);
+}
+
+.feedback-status {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #a7f3d0;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.feedback-status:empty { display: none; }
+.feedback-status[data-failed="true"] { color: #fca5a5; }
+@media (max-width: 480px) {
+  #feedback-dialog-overlay { padding: 8px; }
+  .feedback-card { padding: 16px; max-height: calc(100dvh - 16px); }
+  .feedback-actions { flex-wrap: wrap; }
+  .feedback-actions button { min-height: 44px; flex: 1; }
 }
