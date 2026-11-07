@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { t } from '../i18n/index.js';
 import { terrainConflictSeconds } from '../systems/FlightWarnings.js';
 import { cockpitCasterState } from '../aircraft/CockpitLighting.js';
+import { normalLoadFactor } from '../physics/loadFactor.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { asymmetricThrustYawMoment } from '../physics/EngineModel.js';
 import { BODY_SUPPORT_POINTS, FALLBACK_BODY_SUPPORT_POINTS } from '../physics/groundContacts.js';
@@ -97,6 +98,13 @@ class PhysicsIntegratorMethods {
     this.aero.syncMassProperties();
     rebaseCgVelocity(this.linearVelocity, this.angularVelocity, this.quaternion, this._cgBefore, this.aero.cg);
 
+    // Capture after a moving-CG velocity rebase, before physical forces and
+    // contact impulses. A change of reference point is not an acceleration.
+    const velocityBeforeStep = this._gVelocityBefore ??= new THREE.Vector3();
+    const rotationBeforeStep = this._gRotationBefore ??= new THREE.Quaternion();
+    velocityBeforeStep.copy(this.linearVelocity);
+    rotationBeforeStep.copy(this.quaternion);
+
     // 3. Terrain Height & Ground Clearance
     const groundHeight = this.currentTerrain.getHeight(this.position.x, this.position.z);
     const heightAboveGround = Math.max(0, this.position.y - groundHeight);
@@ -115,7 +123,8 @@ class PhysicsIntegratorMethods {
       (x, z) => (this.currentTerrain.getNormal ? this.currentTerrain.getNormal(x, z) : null),
       (x, z) => (this.currentAirport?.isOnRunway ? this.currentAirport.isOnRunway(x, z) : true),
       this.aero.cg, true,
-      (x, z) => (this.currentAirport?.isRunwaySafetyArea ? this.currentAirport.isRunwaySafetyArea(x, z) : true)
+      (x, z) => (this.currentAirport?.isRunwaySafetyArea ? this.currentAirport.isRunwaySafetyArea(x, z) : true),
+      { mass: this.aero.mass, inverseInertia: { x: this.aero.invIyy, y: this.aero.invIzz, z: this.aero.invIxx } }
     );
     // Preserve this substep's contact kinematics for local mission judging.
     // This stays on the trusted host; it is never a pilot observation.
@@ -275,13 +284,10 @@ class PhysicsIntegratorMethods {
     // Track
     const trackDeg = (THREE.MathUtils.radToDeg(Math.atan2(this.linearVelocity.x, -this.linearVelocity.z)) + 360) % 360;
 
-    // Compute authentic load factor Nz (accelerometer along body cabin vertical axis +Y)
-    const nonGravForceWorld = this._intNonGrav.set(0, 0, 0)
-      .add(thrustWorld)
-      .add(aeroResult.forceWorld)
-      .add(gearResult.forces);
-    const cabinCeilingWorld = this._intCabinUp.set(0, 1, 0).applyQuaternion(this.quaternion);
-    const measuredGForce = nonGravForceWorld.dot(cabinCeilingWorld) / (this.aero.mass * Atmosphere.G0);
+    // CG normal specific force averaged over this physics step, including
+    // resolveBodyPenetration impulses and using the interval's midpoint axis.
+    const measuredGForce = normalLoadFactor(velocityBeforeStep, this.linearVelocity,
+      rotationBeforeStep, this.quaternion, dt);
 
     if (this._hasGroundContact && this.lastOnGround && !gearResult.onGround && this.actualTakeoffMassKg === null) {
       this.actualTakeoffMassKg = this.aero.mass;

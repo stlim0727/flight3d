@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GEAR_DAMAGE_LIMITS, updateGearDamage } from './gearDamage.js';
 import { BODY_CONTACTS, BODY_SUPPORT_POINTS } from './groundContacts.js';
+import { compliantNormalForce, inverseContactMass } from './contactCompliance.js';
 import { BODY_DAMAGE_LIMITS, bodyDamageState, updateBodyDamage } from './bodyDamage.js';
 
 // Oleo damper is asymmetric: while the strut extends (vNormal > 0) damping is
@@ -38,6 +39,10 @@ const scratchFWheelWorld = new THREE.Vector3();
 const scratchFWheelBody = new THREE.Vector3();
 const scratchMoment = new THREE.Vector3();
 const scratchCgWorld = new THREE.Vector3();
+const DEFAULT_BODY_DYNAMICS = Object.freeze({
+  mass: 66000,
+  inverseInertia: Object.freeze({ x: 1 / 3450000, y: 1 / 4850000, z: 1 / 1650000 }),
+});
 const ZERO_CG = Object.freeze({ x: 0, y: 0, z: 0 });
 const scratchBcLocal = new THREE.Vector3();
 const scratchBcPoint = new THREE.Vector3();
@@ -58,6 +63,7 @@ const AXIS_FWD = new THREE.Vector3(0, 0, -1);
 export class LandingGear {
   constructor(config = null) {
     this.bodySupportPoints ??= BODY_SUPPORT_POINTS;
+    this.bodyDynamics = DEFAULT_BODY_DYNAMICS;
     this.failure = null;
     this.maxImpactSpeed = 0;
     this.lastMomentBody = new THREE.Vector3();
@@ -136,6 +142,11 @@ export class LandingGear {
 
   loadConfig(config = {}) {
     const gear = config?.landingGear || config || {};
+    const properties = config.massProperties;
+    if (properties) this.bodyDynamics = {
+      mass: properties.currentMassKg,
+      inverseInertia: { x: 1 / properties.Iyy, y: 1 / properties.Izz, z: 1 / properties.Ixx },
+    };
     if (gear.gearTransitTimeSec !== undefined) {
       this.gearTransitSpeed = 1.0 / Math.max(0.1, gear.gearTransitTimeSec);
     }
@@ -266,7 +277,7 @@ export class LandingGear {
 
   }
 
-  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null, sampleIsOnRunway = null, cg = ZERO_CG, configurationAdvanced = false, sampleIsInSafetyArea = null) {
+  update(dt, aircraftMesh, linearVelocity, angularVelocity, getTerrainHeight, getTerrainNormal = null, sampleIsOnRunway = null, cg = ZERO_CG, configurationAdvanced = false, sampleIsInSafetyArea = null, dynamics = null) {
     if (!configurationAdvanced) this.advanceConfiguration(dt);
 
     const netForceWorld = new THREE.Vector3(0, 0, 0);
@@ -471,6 +482,7 @@ export class LandingGear {
     }
 
     // Body support is always active, including a single collapsed leg with gear DOWN.
+    const bodyDynamics = dynamics ?? this.bodyDynamics;
     const groundedNow = new Set();
     const demands = new Map();
     let bodySoilTargetSum = 0;
@@ -497,7 +509,16 @@ export class LandingGear {
       bodySoilTargetCount++;
       const tangent = scratchBcTangent.copy(velocity).addScaledVector(normal, -vNormal);
       const speed = tangent.length();
-      const load = Math.max(0, 18000000 * Math.max(0, Math.min(depth, 0.04)) - 400000 * vNormal) * probe.weight;
+      // Implicit compliance uses the mass seen at this patch, including rotation.
+      // The old explicit damper could reverse a light fighter's tail velocity
+      // in one step and throw its nose into the runway. Retain signed clearance
+      // for speculative contact so an airborne patch cannot get full damping.
+      const { mass, inverseInertia } = bodyDynamics;
+      const normalBody = scratchFWheelBody.copy(normal).applyQuaternion(invWorldQuat);
+      const localArm = scratchMoment.copy(local).sub(cg);
+      const invMass = inverseContactMass(localArm, normalBody, mass, inverseInertia);
+      const load = compliantNormalForce(Math.min(depth, 0.04), vNormal,
+        18000000 * probe.weight, 400000 * probe.weight, invMass, dt);
       const force = scratchBcForce.copy(normal).multiplyScalar(load);
       // Sliding on soft ground grips harder and plows material aside; the plow
       // acts at the patch arm, so nose-down after a nose-gear loss emerges from

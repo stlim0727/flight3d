@@ -40,6 +40,22 @@ describe('Independent gear damage and body support', () => {
       assert.equal(c.damageState, state);
     }
   });
+  it('does not collapse a fresh leg below its configured impact-collapse speed', () => {
+    for (const limits of [GEAR_DAMAGE_LIMITS.nose, GEAR_DAMAGE_LIMITS.main]) {
+      const fresh = leg();
+      updateGearDamage(fresh, demand({ normalLoad: 0, firstContact: true,
+        sinkRate: limits.collapseImpact - 0.01 }), 1 / 120, limits);
+      assert.equal(fresh.damageState, 'damaged');
+      const atLimit = leg();
+      updateGearDamage(atLimit, demand({ normalLoad: 0, firstContact: true,
+        sinkRate: limits.collapseImpact }), 1 / 120, limits);
+      assert.equal(atLimit.damageState, 'collapsed');
+    }
+    const replayNose = leg();
+    updateGearDamage(replayNose, demand({ normalLoad: 0, firstContact: true,
+      sinkRate: 6.4555 }), 1 / 120, GEAR_DAMAGE_LIMITS.nose);
+    assert.equal(replayNose.damageState, 'damaged');
+  });
   it('accumulates combined vertical/lateral/braking overload rather than failing on one spike', () => {
     const c = leg();
     const d = demand({ normalLoad: 1500000, lateralLoad: 750000, longitudinalLoad: 1000000 });
