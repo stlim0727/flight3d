@@ -37,7 +37,7 @@ export const GROUND_ARTIFACT_MATERIALS = ['Concrete', 'remove_before_flight'];
  * - PBR materials with optional GLTF model loading fallback
  */
 export class Cessna172 {
-  constructor(pfdCanvas = null, ndCanvas = null) {
+  constructor(pfdCanvas = null, ndCanvas = null, options = {}) {
     this.group = new THREE.Group();
     this.group.name = 'Aircraft_Cessna172';
 
@@ -122,7 +122,7 @@ export class Cessna172 {
       onModelReady: null
     };
     this.group.add(this.cockpit.group);
-    this.instrumentLight = installInstrumentLighting(this.cockpit, CESSNA_172.cockpit.captainEyePos, 0xffb46b, () => !this.isCrashed);
+    if (!options.exteriorOnly) this.instrumentLight = installInstrumentLighting(this.cockpit, CESSNA_172.cockpit.captainEyePos, 0xffb46b, () => !this.isCrashed);
 
     // Build the procedural 3D model
     this.initProceduralModel();
@@ -483,11 +483,15 @@ export class Cessna172 {
   }
 
   loadGltfModel(url = `${import.meta.env?.BASE_URL ?? '/'}models/c172.glb`) {
+    this.ready = Promise.resolve();
     if (typeof window === 'undefined') return;
+    let settle;
+    this.ready = new Promise(resolve => { settle = resolve; });
     this.loadingGltf = true;
 
     try {
       const dracoLoader = new DRACOLoader();
+      this.ready.then(() => dracoLoader.dispose());
       dracoLoader.setDecoderPath(`${import.meta.env?.BASE_URL ?? '/'}draco/gltf/`);
 
       const loader = new GLTFLoader();
@@ -595,6 +599,7 @@ export class Cessna172 {
           if (typeof this.cockpit.onModelReady === 'function') {
             this.cockpit.onModelReady();
           }
+          settle();
         },
         undefined,
         err => {
@@ -606,6 +611,7 @@ export class Cessna172 {
           this.cockpit.cockpitModelFailed = true;
           this.gltfGroup.visible = false;
           this.proceduralGroup.visible = true;
+          settle();
         }
       );
     } catch (err) {
@@ -615,6 +621,7 @@ export class Cessna172 {
       this.cockpit.cockpitModelFailed = true;
       this.gltfGroup.visible = false;
       this.proceduralGroup.visible = true;
+      settle();
     }
   }
 

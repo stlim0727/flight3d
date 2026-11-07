@@ -133,6 +133,9 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
       await until(() => c.evaluate('sim.multiplayer.room?.session.state === "flying" && sim.gameFlow.state === "flight"'), 'shared start', 90000);
       assert.equal(await c.evaluate('sim.multiplayer.modalOpen || sim.controls.inputBlocked'), false, 'flight starts after modal closes');
       await until(() => c.evaluate('sim.multiplayer.remote?.group.visible'), 'remote aircraft drawing');
+      await until(() => c.evaluate('sim.multiplayer.remote?.model.modelLoaded'), 'remote production model loaded', 60000);
+      assert.equal(await c.evaluate('sim.multiplayer.remote.model.constructor.name'),
+        await c.evaluate('({ C172: "Cessna172", B738: "Boeing737", F16: "F16" })[sim.multiplayer.room.session.config.aircraft]'));
     }
   }
   async function leave() {
