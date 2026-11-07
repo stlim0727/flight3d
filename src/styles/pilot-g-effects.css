@@ -1,0 +1,48 @@
+/* Pilot Physiological Visual FX (Tunnel Vision, Blackout, Grayout, Redout) */
+
+.pilot-g-effects {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 12;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.05s linear;
+}
+
+.pilot-g-effects.active {
+  opacity: 1;
+}
+
+.pilot-g-grayout-blur {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: grayscale(var(--g-grayout, 0)) blur(var(--g-blur, 0px));
+  -webkit-backdrop-filter: grayscale(var(--g-grayout, 0)) blur(var(--g-blur, 0px));
+  pointer-events: none;
+}
+
+.pilot-g-tunnel-blackout {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(0, 0, 0, 0) var(--tunnel-inner, 100%),
+    rgba(0, 0, 0, var(--blackout-edge, 0)) var(--tunnel-outer, 120%),
+    rgba(0, 0, 0, var(--blackout-outer, 0)) 100%
+  );
+  background-color: rgba(0, 0, 0, var(--blackout-fill, 0));
+  pointer-events: none;
+}
+
+.pilot-g-redout {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(180, 0, 0, var(--redout-center, 0)) 0%,
+    rgba(220, 20, 20, var(--redout-edge, 0)) 75%,
+    rgba(120, 0, 0, var(--redout-outer, 0)) 100%
+  );
+  opacity: var(--redout-opacity, 0);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}

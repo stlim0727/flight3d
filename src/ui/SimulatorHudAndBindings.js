@@ -165,7 +165,12 @@ class SimulatorHudAndBindingsMethods {
       elSpoilers.textContent = this.telemetry.spoilers > 0.1 ? 'EXT' : 'ARM';
       elSpoilers.className = this.telemetry.spoilers > 0.1 ? 'status-amber' : 'status-green';
     }
-    if (elGForce) elGForce.textContent = `${this.telemetry.gForce.toFixed(2)} G`;
+    if (elGForce) {
+      const gZ = this.telemetry.gForce ?? 1.0;
+      const isGLOC = Boolean(this.telemetry.pilot?.isGLOC);
+      elGForce.textContent = isGLOC ? 'G-LOC' : `${gZ.toFixed(2)} G`;
+      elGForce.className = isGLOC ? 'hud-val status-danger' : (Math.abs(gZ) > 3.5 ? 'hud-val status-amber' : 'hud-val');
+    }
     if (elStall) {
       elStall.style.display = this.telemetry.isStalled ? 'block' : 'none';
     }

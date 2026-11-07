@@ -10,6 +10,7 @@ import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
 import { Atmosphere } from './physics/Atmosphere.js';
 import { AIRCRAFT_REGISTRY, BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics, createAeroResult } from './physics/Aerodynamics.js';
+import { PilotPhysiology } from './physics/PilotPhysiology.js';
 import { SIM_CONFIG } from './config/simConfig.js';
 import { advancePhysicsFrame, clampFrameDelta } from './core/physicsTiming.js';
 import { EngineModel } from './physics/EngineModel.js';
@@ -47,6 +48,7 @@ import { VoiceChallengeOverlay } from './ui/VoiceChallengeOverlay.js';
 import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
+import { PilotPhysiologyFx } from './effects/PilotPhysiologyFx.js';
 import { initFlightPanels } from './ui/FlightPanels.js';
 import { initUiScale } from './ui/UiScale.js';
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
@@ -198,6 +200,7 @@ class FlightSimulator {
     this.engines = new EngineModel();
     this.engines.bindMassProperties(this.aero.massProperties);
     this.gear = new LandingGear();
+    this.pilotPhysiology = new PilotPhysiology();
 
     await startupStage(2, 'startup.world');
 
@@ -316,6 +319,7 @@ class FlightSimulator {
     this.explosionSystem = new ExplosionSystem(this.scene, this.currentTerrain);
     this.aircraftBreakup = new AircraftBreakup(this.scene);
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
+    this.pilotPhysiologyFx = new PilotPhysiologyFx(this.container);
     this.isCrashed = false;
     this.crashResult = null;
     this.lastOnGround = true;
@@ -1353,6 +1357,7 @@ class FlightSimulator {
     this.updateHUD();
     this.touchControls.updateUI();
     this.diagnostics.update(frameDelta, this.telemetry);
+    this.pilotPhysiologyFx?.update(this.cameraSystem?.mode, this.telemetry?.pilot);
     this.loadingPanel.update();
 
     this.foliage.update(this.camera.position);

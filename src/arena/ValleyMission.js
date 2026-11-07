@@ -32,6 +32,10 @@ export class ValleyMission {
     this.offCourseTicks = 0;
     this.underSpeedTicks = 0;
     this.overSpeedTicks = 0;
+    this.glocTicks = 0;
+    this.glocIncidents = 0;
+    this.wasGLOC = false;
+    this.gFatigueTicks = 0;
   }
 
   finish(status, reason) { this.status = status; this.reason = reason; return this.result(); }
@@ -49,6 +53,15 @@ export class ValleyMission {
     this.iasSumKt += s.iasKnots;
     this.iasCount++;
     this.maxIasKnots = Math.max(this.maxIasKnots, s.iasKnots);
+    const isGLOC = Boolean(s.pilot?.isGLOC);
+    if (isGLOC) {
+      this.glocTicks++;
+      if (!this.wasGLOC) this.glocIncidents++;
+    }
+    this.wasGLOC = isGLOC;
+    if (s.pilot && s.pilot.consciousness < 0.8) {
+      this.gFatigueTicks++;
+    }
     if (s.crashed || s.damaged || s.bodyContact) return this.finish('failed', s.crashed ? 'crash' : s.bodyContact ? 'body-strike' : 'damage');
     if (this.tick >= this.manifest.timeoutTicks) return this.finish('failed', 'timeout');
     const c = this.manifest.course;
@@ -133,7 +146,11 @@ export class ValleyMission {
     const offCoursePenalty = Math.round((this.offCourseTicks / this.manifest.physicsHz) * 50);
     const underSpeedPenalty = Math.round((this.underSpeedTicks / this.manifest.physicsHz) * 30);
     const overSpeedPenalty = Math.round((this.overSpeedTicks / this.manifest.physicsHz) * 30);
-    const totalPenalties = altitudePenalty + missedGatePenalty + lowClearancePenalty + offCoursePenalty + underSpeedPenalty + overSpeedPenalty;
+    const glocSeconds = this.glocTicks / this.manifest.physicsHz;
+    const gFatigueSeconds = this.gFatigueTicks / this.manifest.physicsHz;
+    const glocPenalty = this.glocIncidents * 1500 + Math.round(glocSeconds * 300);
+    const gFatiguePenalty = Math.round(gFatigueSeconds * 50);
+    const totalPenalties = altitudePenalty + missedGatePenalty + lowClearancePenalty + offCoursePenalty + underSpeedPenalty + overSpeedPenalty + glocPenalty + gFatiguePenalty;
     const finalScore = this.status === 'succeeded'
       ? Math.max(0, Math.round(baseScore + gateScore + timeScore + speedScore - totalPenalties))
       : null;
@@ -152,6 +169,11 @@ export class ValleyMission {
       timeScore,
       speedScore,
       altitudePenalty,
+      glocIncidents: this.glocIncidents,
+      glocSeconds,
+      glocPenalty,
+      gFatigueSeconds,
+      gFatiguePenalty,
       totalPenalties,
       rulesVersion: this.manifest.rulesVersion,
       durationSeconds,

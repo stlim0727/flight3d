@@ -40,6 +40,8 @@ export class SlalomMission {
     this.iasSumKt = 0; this.iasCount = 0; this.maxIasKnots = 0; this.iasShortfallSumKt = 0;
     this.corridorExcursionSumM = 0; this.maxCorridorExcursionM = 0;
     this.clearedGates = 0; this.missedGates = 0;
+    this.glocTicks = 0; this.glocIncidents = 0; this.wasGLOC = false;
+    this.gFatigueTicks = 0;
     this.startS = course.gates[0].sM;
     this.lengthM = course.lengthM - this.startS;
     this.binSizeM = course.sampleStepM;
@@ -91,6 +93,15 @@ export class SlalomMission {
     this.iasShortfallSumKt += Math.max(0, this.manifest.minimumIasKnots - snapshot.iasKnots);
     this.iasCount++;
     this.maxIasKnots = Math.max(this.maxIasKnots, snapshot.iasKnots);
+    const isGLOC = Boolean(snapshot.pilot?.isGLOC);
+    if (isGLOC) {
+      this.glocTicks++;
+      if (!this.wasGLOC) this.glocIncidents++;
+    }
+    this.wasGLOC = isGLOC;
+    if (snapshot.pilot && snapshot.pilot.consciousness < 0.8) {
+      this.gFatigueTicks++;
+    }
     this.bin(projected, snapshot);
     const previous = this.previous;
     this.previous = { ...position, aglM: snapshot.aglM, progressM: projected.progressM,
@@ -140,8 +151,12 @@ export class SlalomMission {
     const speedPenalty = meanSpeedShortfallKt * SPEED_SHORTFALL_POINTS_PER_KT;
     const meanCorridorExcursionM = this.iasCount ? this.corridorExcursionSumM / this.iasCount : 0;
     const corridorPenalty = meanCorridorExcursionM * CORRIDOR_EXCURSION_POINTS_PER_M;
+    const glocSeconds = this.glocTicks / this.manifest.physicsHz;
+    const gFatigueSeconds = this.gFatigueTicks / this.manifest.physicsHz;
+    const glocPenalty = this.glocIncidents * 1500 + Math.round(glocSeconds * 300);
+    const gFatiguePenalty = Math.round(gFatigueSeconds * 50);
     const finalScore = this.status === 'succeeded'
-      ? Math.max(0, Math.round(20000 - durationSeconds * 100 - (altitudeCostM ?? 0) * 50 - speedPenalty - corridorPenalty))
+      ? Math.max(0, Math.round(20000 - durationSeconds * 100 - (altitudeCostM ?? 0) * 50 - speedPenalty - corridorPenalty - glocPenalty - gFatiguePenalty))
       : null;
     return { status: this.status, reason: this.reason, tick: this.tick, metrics: {
       rulesVersion: this.manifest.rulesVersion,
@@ -155,6 +170,8 @@ export class SlalomMission {
       meanIasKnots: this.iasCount ? this.iasSumKt / this.iasCount : 0,
       maxIasKnots: this.maxIasKnots, meanSpeedShortfallKt, speedPenalty,
       meanCorridorExcursionM, maxCorridorExcursionM: this.maxCorridorExcursionM, corridorPenalty,
+      glocIncidents: this.glocIncidents, glocSeconds, glocPenalty,
+      gFatigueSeconds, gFatiguePenalty,
       durationSeconds,
       altitudeCostM,
       finalScore,

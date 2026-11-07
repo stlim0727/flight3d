@@ -279,6 +279,10 @@ export class SimulatorMissionAdapter {
       altitudeFt: Atmosphere.metersToFeet(sim.position.y),
       radioAltFt: Atmosphere.metersToFeet(Math.max(0, sim.position.y - terrainHeight)),
       vsiFpm: Atmosphere.metersToFeet(sim.linearVelocity.y) * 60,
+      gForce: sim.telemetry?.gForce ?? 1.0,
+      pilot: sim.pilotPhysiology?.getSnapshot?.() ?? (sim.telemetry?.pilot ?? {
+        gZ: sim.telemetry?.gForce ?? 1.0, consciousness: 1.0, responsiveness: 1.0, isGLOC: false
+      }),
       runwayS: relative.dot(this.forward), centerlineOffsetM: relative.dot(this.right),
       heightAboveRunwayM: cgWorld.y - m.runwayThreshold.y,
       weightOnWheels: contactList.some(c => c.grounded),

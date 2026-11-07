@@ -51,6 +51,8 @@ class PresetSpawnerMethods {
     if (type === 'hangang' && this.currentAircraftId !== 'C172') this.setAircraft('C172');
     this.audio?.reset();
     this.flightWarnings?.reset();
+    this.pilotPhysiology?.reset?.();
+    this.pilotPhysiologyFx?.reset?.();
     this.telemetry.warnings = [];
     if (!isDemoInternal) this.loadAircraftConfig(this.currentAircraftConfig || BOEING_737_800);
     if (!isDemoInternal && this.demoDirector && this.demoDirector.isActive) {

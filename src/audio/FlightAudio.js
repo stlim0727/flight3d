@@ -84,11 +84,12 @@ export class FlightAudio {
     this.bangkokRadio?.stop();
     if (this.packGain) this.packGain.gain.setTargetAtTime(this.isPiston ? 0 : 0.16, this.ctx.currentTime, 0.04);
     if (this.warningGain) this.warningGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    if (this.gStrainGain) this.gStrainGain.gain.setValueAtTime(0, this.ctx.currentTime);
   }
 
   silenceEngines() {
     if (!this.ctx) return;
-    for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain']) {
+    for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'gStrainGain']) {
       this[name]?.gain.setTargetAtTime(0, this.ctx.currentTime, 0.04);
     }
   }
@@ -171,9 +172,12 @@ export class FlightAudio {
       // 9. Cockpit Warning Tone Oscillator
       this.initWarningSynth();
 
+      // 10. Pilot High-G Straining Maneuver Breath Synthesizer
+      this.initGStrainSynth();
+
       this.isInitialized = true;
-      for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain']) {
-        this[name].gain.setValueAtTime(0, this.ctx.currentTime);
+      for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'gStrainGain']) {
+        this[name]?.gain.setValueAtTime(0, this.ctx.currentTime);
       }
       this.packGain.gain.setValueAtTime(this.isPiston || this.crashed ? 0 : 0.16, this.ctx.currentTime);
     } catch (e) {
@@ -420,6 +424,33 @@ export class FlightAudio {
     this.warningOsc.start();
   }
 
+  initGStrainSynth() {
+    // Continuous strained breathing airflow buffer for G-straining maneuvers
+    const bufferSize = this.ctx.sampleRate * 2;
+    const strainBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = strainBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.5;
+    }
+
+    this.gStrainNoise = this.ctx.createBufferSource();
+    this.gStrainNoise.buffer = strainBuffer;
+    this.gStrainNoise.loop = true;
+
+    this.gStrainFilter = this.ctx.createBiquadFilter();
+    this.gStrainFilter.type = 'bandpass';
+    this.gStrainFilter.frequency.setValueAtTime(650, this.ctx.currentTime);
+    this.gStrainFilter.Q.setValueAtTime(1.8, this.ctx.currentTime);
+
+    this.gStrainGain = this.ctx.createGain();
+    this.gStrainGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+
+    this.gStrainNoise.connect(this.gStrainFilter);
+    this.gStrainFilter.connect(this.gStrainGain);
+    this.gStrainGain.connect(this.cockpitFilter);
+    this.gStrainNoise.start();
+  }
+
   // Broadband friction/structural transients: no pitched oscillators or
   // frequency sweeps, which sound like laser chirps rather than wheel contact.
   playContactNoise(duration, frequency, level, type = 'lowpass') {
@@ -575,15 +606,39 @@ export class FlightAudio {
     if (!this.isInitialized || !this.ctx || this.crashed) return;
 
     const now = this.ctx.currentTime;
+    const pilot = state.pilot;
+    const gZ = pilot?.gZ ?? state.gForce ?? 1.0;
+    const consciousness = pilot?.consciousness ?? 1.0;
+    const isGLOC = Boolean(pilot?.isGLOC);
 
     // Interior vs Exterior camera acoustics: the cockpit keeps a fixed muffled
     // level; exterior views attenuate volume and treble with camera-to-aircraft distance.
     if (isCockpitCam) {
-      this.cockpitFilter.frequency.setTargetAtTime(2700, now, 0.1);
+      const baseFreq = 2700;
+      // High-G or consciousness loss muffles hearing (low-pass filter down to ~380Hz)
+      const muffleRatio = isGLOC ? 0.14 : Math.max(0.14, Math.min(1.0, consciousness));
+      this.cockpitFilter.frequency.setTargetAtTime(baseFreq * muffleRatio, now, 0.1);
       this.distanceGain.gain.setTargetAtTime(1.0, now, 0.1);
     } else {
       this.cockpitFilter.frequency.setTargetAtTime(exteriorAirCutoff(cameraDistanceMeters), now, 0.1);
       this.distanceGain.gain.setTargetAtTime(exteriorDistanceGain(cameraDistanceMeters), now, 0.1);
+    }
+
+    // Pilot G-straining maneuver breathing sound
+    if (this.gStrainGain && this.gStrainFilter) {
+      if (isCockpitCam && !isGLOC && (Math.abs(gZ) > 3.0 || consciousness < 0.9) && consciousness > 0.0) {
+        const cycle = (now % 2.5) / 2.5;
+        const breathShape = cycle < 0.25
+          ? Math.sin(cycle / 0.25 * Math.PI)
+          : 0.35 + 0.35 * Math.sin((cycle - 0.25) / 0.75 * Math.PI);
+        const severity = Math.min(1.0, (Math.abs(gZ) - 3.0) / 4.0 + (1.0 - consciousness) * 0.7);
+        const targetVol = Math.min(0.70, severity * breathShape * 0.65);
+        const targetFreq = 500 + severity * 400 + (cycle < 0.25 ? 300 : 0);
+        this.gStrainGain.gain.setTargetAtTime(targetVol, now, 0.05);
+        this.gStrainFilter.frequency.setTargetAtTime(targetFreq, now, 0.05);
+      } else {
+        this.gStrainGain.gain.setTargetAtTime(0.0, now, 0.08);
+      }
     }
 
     if (this.isPiston) {
