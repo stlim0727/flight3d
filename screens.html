@@ -157,6 +157,60 @@
       color: var(--badge-text);
       font-weight: 600;
     }
+    .viewport-badge {
+      font-size: 0.78rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .viewport-switcher {
+      display: inline-flex;
+      align-items: center;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 4px;
+      gap: 4px;
+    }
+    .viewport-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .viewport-tab:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+    }
+    .viewport-tab.active {
+      background: var(--accent);
+      color: #031326;
+      font-weight: 700;
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+    .viewport-dim {
+      font-size: 0.72rem;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.25);
+      font-variant-numeric: tabular-nums;
+      opacity: 0.85;
+    }
+    .viewport-tab.active .viewport-dim {
+      background: rgba(3, 19, 38, 0.2);
+      color: #031326;
+      font-weight: 700;
+    }
     .controls-bar {
       max-width: 1600px;
       margin: 14px auto 0;
@@ -646,6 +700,7 @@
         <div class="header-titles">
           <h1>
             UI Screens Showcase <span class="count-badge" id="screen-count">38 Screens</span>
+            <span class="viewport-badge">🖥️ Desktop</span>
             <button class="collapsed-filter-pill" id="collapsed-filter-pill" title="클릭하여 필터 및 검색 바 펼치기"></button>
           </h1>
           <div class="build-info-bar top-build-info" id="top-build-info">
@@ -657,6 +712,23 @@
           </div>
         </div>
       </div>
+      <nav class="viewport-switcher" role="navigation" aria-label="화면 뷰포트 전환">
+        <a href="./screens.html" class="viewport-tab active" data-viewport="desktop" title="데스크톱 뷰포트 (1440×900)">
+          <span class="viewport-icon">🖥️</span>
+          <span class="viewport-name">데스크톱</span>
+          <span class="viewport-dim">1440×900</span>
+        </a>
+        <a href="./screens-mobile-portrait.html" class="viewport-tab" data-viewport="mobile-portrait" title="모바일 세로 뷰포트 (390×844)">
+          <span class="viewport-icon">📱</span>
+          <span class="viewport-name">모바일 세로</span>
+          <span class="viewport-dim">390×844</span>
+        </a>
+        <a href="./screens-mobile-landscape.html" class="viewport-tab" data-viewport="mobile-landscape" title="모바일 가로 뷰포트 (844×390)">
+          <span class="viewport-icon">🔄</span>
+          <span class="viewport-name">모바일 가로</span>
+          <span class="viewport-dim">844×390</span>
+        </a>
+      </nav>
       <div class="header-meta">
         <button id="header-fold-btn" class="fold-btn" aria-expanded="true" aria-controls="controls-bar" title="상단 필터 및 검색 바 접기/펼치기 (단축키: F)">
           <span class="fold-btn-icon" aria-hidden="true">▲</span>

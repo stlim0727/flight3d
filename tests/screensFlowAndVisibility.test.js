@@ -113,3 +113,39 @@ test('DebriefOverlay UI layout, header hierarchy, and styling tokens', () => {
   assert.ok(css.includes('position: sticky'), 'debrief actions must be sticky');
   assert.ok(css.includes('linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'), 'retry button must use primary accent gradient');
 });
+
+test('Multi-viewport screens showcases, concurrent capture, and navigation switcher', () => {
+  const desktopHtml = readFileSync(resolve('screens.html'), 'utf8');
+  const portraitHtml = readFileSync(resolve('screens-mobile-portrait.html'), 'utf8');
+  const landscapeHtml = readFileSync(resolve('screens-mobile-landscape.html'), 'utf8');
+
+  // Verify all 3 pages define the viewport switcher
+  for (const html of [desktopHtml, portraitHtml, landscapeHtml]) {
+    assert.ok(html.includes('class="viewport-switcher"'), 'must contain viewport-switcher');
+    assert.ok(html.includes('href="./screens.html"'), 'must link to desktop screens');
+    assert.ok(html.includes('href="./screens-mobile-portrait.html"'), 'must link to mobile portrait screens');
+    assert.ok(html.includes('href="./screens-mobile-landscape.html"'), 'must link to mobile landscape screens');
+  }
+
+  // Verify respective active states and catalog endpoints
+  assert.ok(desktopHtml.includes('class="viewport-tab active" data-viewport="desktop"'));
+  assert.ok(desktopHtml.includes('screenshots/ui/catalog.json'));
+
+  assert.ok(portraitHtml.includes('class="viewport-tab active" data-viewport="mobile-portrait"'));
+  assert.ok(portraitHtml.includes('screenshots/ui-mobile-portrait/catalog.json'));
+
+  assert.ok(landscapeHtml.includes('class="viewport-tab active" data-viewport="mobile-landscape"'));
+  assert.ok(landscapeHtml.includes('screenshots/ui-mobile-landscape/catalog.json'));
+
+  // Verify Vite rollup inputs include all 3 HTML files
+  const viteConfig = readFileSync(resolve('vite.config.js'), 'utf8');
+  assert.ok(viteConfig.includes("screens: 'screens.html'"));
+  assert.ok(viteConfig.includes("screensMobilePortrait: 'screens-mobile-portrait.html'"));
+  assert.ok(viteConfig.includes("screensMobileLandscape: 'screens-mobile-landscape.html'"));
+
+  // Verify package.json concurrent and multi-viewport scripts
+  const pkg = JSON.parse(readFileSync(resolve('package.json'), 'utf8'));
+  assert.ok(pkg.scripts['screens:capture:all'].includes('--all-viewports'));
+  assert.ok(pkg.scripts['screens:capture:portrait'].includes('--viewport mobile-portrait'));
+  assert.ok(pkg.scripts['screens:capture:landscape'].includes('--viewport mobile-landscape'));
+});

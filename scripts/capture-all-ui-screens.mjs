@@ -1,41 +1,76 @@
 import assert from 'node:assert/strict';
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
-import { withBrowserSession } from './lib/browserHarness.mjs';
+import { withBrowserSession, getFreePort } from './lib/browserHarness.mjs';
+
+const delay = ms => new Promise(r => setTimeout(r, ms));
 
 const isVerify = process.argv.includes('--verify') || process.env.npm_lifecycle_event === 'test:ui-screens';
-
-const outDir = process.env.UI_SCREENSHOTS_DIR
-  ? resolve(process.cwd(), process.env.UI_SCREENSHOTS_DIR)
-  : isVerify
-    ? await mkdtemp(join(tmpdir(), 'flight3d-ui-screens-'))
-    : resolve(process.cwd(), 'public/screenshots/ui');
-
-await mkdir(outDir, { recursive: true });
+const isLowResource = isVerify || process.env.FORCE_GPU === '0';
 
 const tierArg = process.argv.find(arg => arg.startsWith('--tier=') || arg === '--tier');
 const tier = tierArg
   ? (tierArg.includes('=') ? tierArg.split('=')[1] : process.argv[process.argv.indexOf('--tier') + 1])
   : 'all';
 
-console.log(`[capture-all-ui-screens] Target directory: ${outDir} (tier: ${tier})`);
+export const VIEWPORT_DEFINITIONS = {
+  desktop: {
+    id: 'desktop',
+    name: 'Desktop (1440×900)',
+    width: isLowResource ? 1280 : 1440,
+    height: isLowResource ? 720 : 900,
+    mobile: false,
+    deviceScaleFactor: 1,
+    defaultOutDir: 'public/screenshots/ui',
+  },
+  'mobile-portrait': {
+    id: 'mobile-portrait',
+    name: 'Mobile Portrait (390×844)',
+    width: 390,
+    height: 844,
+    mobile: true,
+    deviceScaleFactor: 2,
+    defaultOutDir: 'public/screenshots/ui-mobile-portrait',
+  },
+  'mobile-landscape': {
+    id: 'mobile-landscape',
+    name: 'Mobile Landscape (844×390)',
+    width: 844,
+    height: 390,
+    mobile: true,
+    deviceScaleFactor: 2,
+    defaultOutDir: 'public/screenshots/ui-mobile-landscape',
+  },
+};
 
-const catalog = [];
+// Parse requested viewports
+let selectedViewportKeys = [];
+const allViewportsFlag = process.argv.includes('--all-viewports') || process.argv.includes('--concurrent');
+const viewportArg = process.argv.find(arg => arg.startsWith('--viewport=') || arg === '--viewport');
+const viewportsArg = process.argv.find(arg => arg.startsWith('--viewports=') || arg === '--viewports');
 
-async function recordScreen(screenshot, meta) {
-  const filePath = `${outDir}/${meta.file}`;
-  await screenshot(filePath);
-  catalog.push(meta);
-  console.log(`✓ [${meta.id}] ${meta.title_ko} (${meta.file})`);
+if (allViewportsFlag) {
+  selectedViewportKeys = ['desktop', 'mobile-portrait', 'mobile-landscape'];
+} else if (viewportsArg) {
+  const val = viewportsArg.includes('=') ? viewportsArg.split('=')[1] : process.argv[process.argv.indexOf('--viewports') + 1];
+  selectedViewportKeys = val === 'all' ? ['desktop', 'mobile-portrait', 'mobile-landscape'] : val.split(',').map(s => s.trim());
+} else if (viewportArg) {
+  const val = viewportArg.includes('=') ? viewportArg.split('=')[1] : process.argv[process.argv.indexOf('--viewport') + 1];
+  selectedViewportKeys = [val.trim()];
+} else {
+  selectedViewportKeys = ['desktop'];
 }
 
-const isLowResource = isVerify || process.env.FORCE_GPU === '0';
-const sessionWidth = isLowResource ? 1280 : 1920;
-const sessionHeight = isLowResource ? 720 : 1080;
+const selectedViewports = selectedViewportKeys.map(key => {
+  const cfg = VIEWPORT_DEFINITIONS[key];
+  if (!cfg) throw new Error(`Unknown viewport: ${key}. Available: desktop, mobile-portrait, mobile-landscape`);
+  return cfg;
+});
 
-await withBrowserSession({ width: sessionWidth, height: sessionHeight, path: '/' }, async ({ evaluate, screenshot, send, delay, origin, exceptions }) => {
+async function runSession1({ evaluate, screenshot, send, delay, origin, exceptions }, recordScreen, tier) {
+
   // Wait for simulator to be ready
   for (let i = 0; i < 120; i++) {
     if (await evaluate('Boolean(window.simulator?.startupReady)')) break;
@@ -1032,12 +1067,12 @@ await withBrowserSession({ width: sessionWidth, height: sessionHeight, path: '/'
     });
   }
 
-  assert.equal(exceptions.length, 0, `Uncaught browser exceptions: ${exceptions.join('; ')}`);
-});
 
-if (tier === 'all') {
-  // 35. Pilot Mission Score Modal & 38. AI Pilot Lab Arena Panel (?pilotArena=1)
-  await withBrowserSession({ width: 1920, height: 1080, path: '/?pilotArena=1&airport=valley&aircraft=F16' }, async ({ evaluate, screenshot, delay, exceptions }) => {
+  assert.equal(exceptions.length, 0, `Uncaught browser exceptions: ${exceptions.join('; ')}`);
+}
+
+async function runSession2({ evaluate, screenshot, delay, exceptions }, recordScreen, tier) {
+
     for (let i = 0; i < 60; i++) {
       if (await evaluate('Boolean(window.simulator?.startupReady)')) break;
       await delay(300);
@@ -1130,62 +1165,134 @@ if (tier === 'all') {
       tier: 'full',
     });
 
-    assert.equal(exceptions.length, 0, `Uncaught browser exceptions in pilot arena: ${exceptions.join('; ')}`);
-  });
+
+  assert.equal(exceptions.length, 0, `Uncaught browser exceptions in pilot arena: ${exceptions.join('; ')}`);
 }
 
-let finalCatalog = catalog;
-let previousMeta = {};
-if (tier !== 'all') {
-  try {
-    const existing = JSON.parse(await readFile(`${outDir}/catalog.json`, 'utf8'));
-    const existingScreens = Array.isArray(existing) ? existing : (existing.screens || []);
-    if (!Array.isArray(existing)) {
-      previousMeta = {
-        generatedAt: existing.generatedAt,
-        branch: existing.branch,
-        commit: existing.commit,
-        commitShort: existing.commitShort,
-        commitDate: existing.commitDate,
-      };
-    }
-    if (Array.isArray(existingScreens)) {
-      const capturedMap = new Map(catalog.map(c => [c.id, c]));
-      finalCatalog = existingScreens.map(item => capturedMap.get(item.id) || item);
-      for (const item of catalog) {
-        if (!existingScreens.some(e => e.id === item.id)) {
-          finalCatalog.push(item);
+async function captureViewport(vpConfig, origin, tier, isVerify) {
+  const outDir = process.env.UI_SCREENSHOTS_DIR && selectedViewports.length === 1
+    ? resolve(process.cwd(), process.env.UI_SCREENSHOTS_DIR)
+    : isVerify && selectedViewports.length === 1
+      ? await mkdtemp(join(tmpdir(), `flight3d-ui-screens-${vpConfig.id}-`))
+      : resolve(process.cwd(), vpConfig.defaultOutDir);
+
+  await mkdir(outDir, { recursive: true });
+  console.log(`[capture-all-ui-screens][${vpConfig.id}] Target: ${outDir} (${vpConfig.width}x${vpConfig.height}, tier: ${tier})`);
+
+  const catalog = [];
+  async function recordScreen(screenshot, meta) {
+    const filePath = `${outDir}/${meta.file}`;
+    await screenshot(filePath);
+    catalog.push(meta);
+    console.log(`✓ [${vpConfig.id}][${meta.id}] ${meta.title_ko} (${meta.file})`);
+  }
+
+  // Session 1: Main simulator flow
+  await withBrowserSession({
+    origin,
+    width: vpConfig.width,
+    height: vpConfig.height,
+    mobile: vpConfig.mobile,
+    deviceScaleFactor: vpConfig.deviceScaleFactor,
+    startVite: false,
+    path: '/',
+  }, async (session) => {
+    await runSession1(session, recordScreen, tier);
+  });
+
+  // Session 2: Pilot Arena (only in full 'all' tier)
+  if (tier === 'all') {
+    await withBrowserSession({
+      origin,
+      width: vpConfig.width,
+      height: vpConfig.height,
+      mobile: vpConfig.mobile,
+      deviceScaleFactor: vpConfig.deviceScaleFactor,
+      startVite: false,
+      path: '/?pilotArena=1&airport=valley&aircraft=F16',
+    }, async (session) => {
+      await runSession2(session, recordScreen, tier);
+    });
+  }
+
+  let finalCatalog = catalog;
+  let previousMeta = {};
+  if (tier !== 'all') {
+    try {
+      const existing = JSON.parse(await readFile(`${outDir}/catalog.json`, 'utf8'));
+      const existingScreens = Array.isArray(existing) ? existing : (existing.screens || []);
+      if (!Array.isArray(existing)) {
+        previousMeta = {
+          generatedAt: existing.generatedAt,
+          branch: existing.branch,
+          commit: existing.commit,
+          commitShort: existing.commitShort,
+          commitDate: existing.commitDate,
+        };
+      }
+      if (Array.isArray(existingScreens)) {
+        const capturedMap = new Map(catalog.map(c => [c.id, c]));
+        finalCatalog = existingScreens.map(item => capturedMap.get(item.id) || item);
+        for (const item of catalog) {
+          if (!existingScreens.some(e => e.id === item.id)) {
+            finalCatalog.push(item);
+          }
         }
       }
-    }
-  } catch {
-    // No previous catalog in outDir, keep captured catalog
+    } catch {}
   }
+
+  finalCatalog.sort((a, b) => a.id.localeCompare(b.id));
+
+  let gitBranch = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || previousMeta.branch || '';
+  let gitCommit = process.env.GITHUB_SHA || previousMeta.commit || '';
+  let gitCommitDate = previousMeta.commitDate || '';
+  try {
+    if (!gitBranch) gitBranch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {}
+  try {
+    if (!gitCommit) gitCommit = execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {}
+  try {
+    if (!gitCommitDate) gitCommitDate = execSync('git log -1 --format=%cI', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {}
+
+  const catalogPayload = {
+    generatedAt: new Date().toISOString(),
+    branch: gitBranch || 'unknown',
+    commit: gitCommit || 'unknown',
+    commitShort: gitCommit ? gitCommit.slice(0, 7) : 'unknown',
+    commitDate: gitCommitDate || 'unknown',
+    viewport: vpConfig.id,
+    dimensions: `${vpConfig.width}x${vpConfig.height}`,
+    screens: finalCatalog,
+  };
+
+  await writeFile(`${outDir}/catalog.json`, JSON.stringify(catalogPayload, null, 2));
+  console.log(`[capture-all-ui-screens][${vpConfig.id}] Complete. ${catalog.length} screens captured (${finalCatalog.length} in catalog).`);
 }
 
-finalCatalog.sort((a, b) => a.id.localeCompare(b.id));
+// Start shared Vite server for concurrent parallel sessions
+const vitePort = await getFreePort();
+const origin = `http://127.0.0.1:${vitePort}`;
+const mode = process.argv.includes('--preview') ? 'preview' : 'dev';
+const viteProc = spawn('npx', ['vite', ...(mode === 'preview' ? ['preview'] : []), '--host', '127.0.0.1', '--port', String(vitePort), '--strictPort'], {
+  stdio: 'ignore',
+  windowsHide: true,
+});
 
-let gitBranch = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || previousMeta.branch || '';
-let gitCommit = process.env.GITHUB_SHA || previousMeta.commit || '';
-let gitCommitDate = previousMeta.commitDate || '';
-try {
-  if (!gitBranch) gitBranch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-} catch {}
-try {
-  if (!gitCommit) gitCommit = execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-} catch {}
-try {
-  if (!gitCommitDate) gitCommitDate = execSync('git log -1 --format=%cI', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-} catch {}
+for (let i = 0; i < 100; i++) {
+  try {
+    const res = await fetch(origin);
+    if (res.ok) break;
+  } catch {}
+  await delay(100);
+}
 
-const catalogPayload = {
-  generatedAt: new Date().toISOString(),
-  branch: gitBranch || 'unknown',
-  commit: gitCommit || 'unknown',
-  commitShort: gitCommit ? gitCommit.slice(0, 7) : 'unknown',
-  commitDate: gitCommitDate || 'unknown',
-  screens: finalCatalog,
-};
-
-console.log(`[capture-all-ui-screens] Finished. Total captured: ${catalog.length} screens (${finalCatalog.length} in catalog).`);
-await writeFile(`${outDir}/catalog.json`, JSON.stringify(catalogPayload, null, 2));
+try {
+  console.log(`[capture-all-ui-screens] Shared Vite server ready at ${origin}. Launching ${selectedViewports.length} viewport(s) concurrently.`);
+  await Promise.all(selectedViewports.map(vp => captureViewport(vp, origin, tier, isVerify)));
+  console.log(`[capture-all-ui-screens] Concurrency complete across all ${selectedViewports.length} viewport(s).`);
+} finally {
+  try { viteProc.kill('SIGTERM'); } catch {}
+}
