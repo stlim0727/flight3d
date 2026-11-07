@@ -138,3 +138,50 @@ grouping, unrelated sampling, replay after reset, nested preset cancellation,
 manual control ownership and transient unsafe conditions. This is evidence for
 one seed, one aircraft/loading and one starting condition, not a handling-quality
 certification or general weather model.
+
+## Turbulence strength comparison (before #563)
+
+The Developer menu places **Moderate turbulence cruise (60 s)** and
+**Strong turbulence cruise (60 s)** immediately after Light. All three reuse the
+same Coastal/B738 cruise preset, position (-600, 750, 3200) m, velocity
+(96, 0, -49) m/s, attitude, loading, trim, seed and 063° wind basis above.
+Restart and switching levels reconstruct that start and reset the wind clock.
+
+| Level | Profile | Along / right / up amplitude caps (m/s) | Scale |
+| --- | --- | --- | --- |
+| Light | `light-turbulence-v1` | 0.3 / 0.6 / 0.2 | 1x |
+| Moderate | `moderate-turbulence-v1` | 0.9 / 1.8 / 0.6 | 3x |
+| Strong | `strong-turbulence-v1` | 1.8 / 3.6 / 1.2 | 6x |
+
+Mean wind stays zero. At identical world position and simulation time,
+`u_level(x,t) = scale * u_light(x,t)`: the seeded wavelengths, periods and phases
+are unchanged. These are relative comparison levels in the existing training
+model, not calibrated meteorological severity classes. Different flight paths
+sample different parts of the field, so aircraft motion need not scale linearly.
+The relative-airflow force/moment calculation and 120 Hz timestep are unchanged;
+there are no synthetic pose or camera shakes. All levels remain global and
+invisible. The localized region in #563 is separate work.
+
+The Node comparison test flies all levels for 7,200 ticks, checks equal starts,
+increasing roll range for this seed, and no crash/damage/stall/G-LOC/engine failure.
+It also checks each level's manual input, deterministic restart, and preset
+cleanup, plus switching strong back to light. `scripts/verify-turbulence.mjs`
+enters all three through Developer controls and records matching starts,
+60-second ranges and screenshots; its input/lifecycle checks run on Strong.
+
+Hardware Chrome 156 / Intel Arc 140V / ANGLE D3D11 verified all three menu entries,
+identical starts, and 7,200 physics ticks per level. Shader preflight returned
+`[255, 0, 0, 255]` with GL error 0. Measured fixed-control ranges:
+
+| Quantity | Light | Moderate | Strong |
+| --- | --- | --- | --- |
+| Altitude (m) | 748.756–751.888 | 745.342–755.397 | 740.284–760.853 |
+| Roll (deg) | −0.205–0.233 | −0.624–0.673 | −1.255–1.332 |
+| Normal load (G) | 0.9835–1.0059 | 0.9602–1.0279 | 0.9246–1.0620 |
+
+All levels passed the no-failure observation checks. Strong also passed pause,
+resume, deterministic restart, keyboard/touch hold-release and rendered-loop
+progress. Exit, preset, aircraft, airport and mode-disable cleanup passed.
+Desktop entries and mobile manual-flight screenshots were inspected. Evidence
+is local under `.tmp/turbulence/`; this remains a one-seed B738 comparison, not
+a general strong-turbulence handling claim.

@@ -1,6 +1,10 @@
 export default {
   "dev.kind.flight": "Manual flight — physical wind response",
   "dev.scenario.turbulence": "Light turbulence cruise (60 s)",
+  "dev.scenario.turbulence-moderate": "Moderate turbulence cruise (60 s)",
+  "dev.scenario.turbulence-strong": "Strong turbulence cruise (60 s)",
+  "dev.expect.turbulence-moderate": "Coastal / B738: same starting position as light turbulence, trimmed cruise at 750 m, 107.8 m/s, heading 063°. Same wind pattern with gust amplitudes scaled to 3x. Zero mean wind, gear/flaps up, autopilot off; manual controls available. Compare pitch/roll/yaw and drift over 60 s. Restart repeats the initial state and wind pattern.",
+  "dev.expect.turbulence-strong": "Coastal / B738: same starting position as light turbulence, trimmed cruise at 750 m, 107.8 m/s, heading 063°. Same wind pattern with gust amplitudes scaled to 6x. Zero mean wind, gear/flaps up, autopilot off; manual controls available. Compare pitch/roll/yaw and drift over 60 s. Restart repeats the initial state and wind pattern.",
   "dev.expect.turbulence": "Coastal / B738: trimmed cruise at 750 m, 107.8 m/s, heading 063°, gear/flaps up. Zero mean wind, fixed seed coastal-b738-turbulence-1. Autopilot off; manual controls available. Leave controls centered to observe gentle pitch/roll/yaw and drift on the existing instruments. No stall, G-LOC, damage or engine failure over 60 s. Restart repeats the initial state.",
   "render.open": "Render comparison panel",
   "render.cockpitUnsupported": "This aircraft has a unified interior/exterior model. Cockpit-only material and face comparisons are unavailable.",

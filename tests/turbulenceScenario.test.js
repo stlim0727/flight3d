@@ -7,7 +7,7 @@ import { GameFlowController } from '../src/ui/GameFlowController.js';
 import { WindField, setSimulationWind } from '../src/physics/WindField.js';
 import { advancePhysicsFrame, stepPhysics } from '../src/core/physicsTiming.js';
 
-function flight(profile = 'light-turbulence-v1') {
+function flight(profile = 'light-turbulence-v1', scenario = 'turbulence') {
   const sim = createPilotMissionSimulation();
   sim.aircraft.modelLoaded = true;
   sim.aircraft.cockpit = {};
@@ -17,7 +17,7 @@ function flight(profile = 'light-turbulence-v1') {
   sim.syncFlowUi = () => { sim.controls.inputBlocked = sim.gameFlow.blocksFlightInput() || sim.devRunner.blocksInput; };
   const mode = new DeveloperModeController(); mode.enable();
   sim.devRunner = new DevScenarioRunner(sim, mode);
-  assert.equal(sim.devRunner.start('turbulence'), true);
+  assert.equal(sim.devRunner.start(scenario), true);
   sim.devRunner.updatePreparation(0);
   assert.equal(sim.devRunner.status, 'running');
   if (profile !== 'light-turbulence-v1') {
@@ -27,6 +27,35 @@ function flight(profile = 'light-turbulence-v1') {
 }
 
 const state = s => [s.position.toArray(), s.quaternion.toArray(), s.linearVelocity.toArray(), s.angularVelocity.toArray()];
+
+const levels = [
+  ['turbulence', 'light-turbulence-v1'],
+  ['turbulence-moderate', 'moderate-turbulence-v1'],
+  ['turbulence-strong', 'strong-turbulence-v1'],
+];
+
+test('all three menu scenarios share initial conditions and fly 60 s with increasing response', () => {
+  let initial, previousRollRange = 0;
+  for (const [id, profile] of levels) {
+    const sim = flight(undefined, id);
+    const setup = { state: state(sim), throttle: sim.controls.throttle, trim: sim.controls.pitchTrim,
+      mass: sim.aero.mass, seed: sim.windField.seed, heading: sim.windField.runwayHeadingDeg };
+    initial ??= setup;
+    assert.deepEqual(setup, initial);
+    assert.equal(sim.windField.profile, profile);
+    let minRoll = Infinity, maxRoll = -Infinity;
+    for (let tick = 0; tick < 7200; tick++) {
+      stepPhysics(sim);
+      minRoll = Math.min(minRoll, sim.telemetry.rollDeg);
+      maxRoll = Math.max(maxRoll, sim.telemetry.rollDeg);
+    }
+    assert.equal(sim.devRunner.result.status, 'passed', id);
+    assert.equal(sim.devRunner.result.observation.samples, 7200);
+    assert.ok(maxRoll - minRoll > previousRollRange, id);
+    previousRollRange = maxRoll - minRoll;
+    assert.equal(sim.autopilot.master, false);
+  }
+});
 
 test('60 s production cruise: wind changes airflow, forces, moments and motion without failures', () => {
   const windy = flight(), calm = flight(null);
@@ -61,8 +90,8 @@ test('zero profile equals no field; grouping and extra diagnostic samples preser
   assert.equal(grouped.windTimeSeconds, reference.windTimeSeconds);
 });
 
-test('manual ownership, restart and nested preset cleanup use the normal lifecycle', () => {
-  const sim = flight();
+for (const [id, profile] of levels) test(`${id}: manual ownership, restart and preset cleanup`, () => {
+  const sim = flight(undefined, id);
   const initial = state(sim), seed = sim.windField.seed;
   assert.equal(sim.controls.inputBlocked, false);
   assert.equal(sim.controls.aircraftControlsDisabled, false);
@@ -73,6 +102,7 @@ test('manual ownership, restart and nested preset cleanup use the normal lifecyc
   sim.devRunner.restart(); sim.devRunner.updatePreparation(0);
   assert.deepEqual(state(sim), initial);
   assert.equal(sim.windField.seed, seed);
+  assert.equal(sim.windField.profile, profile);
   assert.equal(sim.windTimeSeconds, 0);
   assert.equal(sim.controls.virtualAileron, null);
   for (let tick = 0; tick < 12; tick++) stepPhysics(sim);
@@ -85,6 +115,20 @@ test('manual ownership, restart and nested preset cleanup use the normal lifecyc
   assert.equal(sim.windField, null);
   assert.equal(sim.windTimeSeconds, 0);
   assert.deepEqual(sim.aero.windWorld.toArray(), [0, 0, 0]);
+});
+
+test('switching strengths resets the wind clock and restores the shared cruise start', () => {
+  const sim = flight();
+  const initial = state(sim);
+  for (const [id, profile] of [...levels.slice(1), levels[0]]) {
+    for (let tick = 0; tick < 120; tick++) stepPhysics(sim);
+    assert.equal(sim.devRunner.start(id), true);
+    sim.devRunner.updatePreparation(0);
+    assert.deepEqual(state(sim), initial);
+    assert.equal(sim.windField.profile, profile);
+    assert.equal(sim.windTimeSeconds, 0);
+    assert.deepEqual(sim.aero.windWorld.toArray(), [0, 0, 0]);
+  }
 });
 
 test('transient stall, G-LOC, damage and engine failure cannot earn a safe-cruise pass', () => {

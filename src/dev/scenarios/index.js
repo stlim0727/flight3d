@@ -1,9 +1,11 @@
 import { LANDING_CASES, setupLanding } from './landingScenarios.js';
 import { setupCrash } from './crashScenarios.js';
-import { turbulenceScenario } from './turbulenceScenario.js';
+import { turbulenceScenario, moderateTurbulenceScenario, strongTurbulenceScenario } from './turbulenceScenario.js';
 
 export const DEV_SCENARIOS = {
   turbulence: turbulenceScenario,
+  'turbulence-moderate': moderateTurbulenceScenario,
+  'turbulence-strong': strongTurbulenceScenario,
   shadow: {
     airports: ['coastal', 'lukla'], aircraft: ['B738', 'C172'], kind: 'visual',
     labelKey: 'shadow.title', descriptionKey: 'shadow.briefing',

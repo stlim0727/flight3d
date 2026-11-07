@@ -31,13 +31,23 @@ await withBrowserSession({ startVite: false, origin: process.env.SIM_URL || 'htt
       document.getElementById('dev-enabled').click();
       document.getElementById('lobby-tab-dev').click();
       s.developerPanel.select.value = 'turbulence'; s.developerPanel.refresh();
-      return { enabled: !document.getElementById('dev-run').disabled,
+      return { options: [...s.developerPanel.select.options].slice(0, 3).map(o => ({ id: o.value, label: o.textContent })),
+        enabled: !document.getElementById('dev-run').disabled,
         description: document.getElementById('dev-description').textContent };
     });
     assert.ok(entry.enabled);
+    assert.deepEqual(entry.options.map(o => o.id), ['turbulence', 'turbulence-moderate', 'turbulence-strong']);
     await screenshot(resolve(directory, 'entry.png'));
+    for (const id of ['turbulence-moderate', 'turbulence-strong']) {
+      await evaluate(id => {
+        const select = window.simulator.developerPanel.select;
+        select.value = id; select.dispatchEvent(new Event('change'));
+      }, id);
+      await screenshot(resolve(directory, `entry-${id}.png`));
+    }
     const initial = await evaluate(() => {
       const s = window.simulator;
+      s.developerPanel.select.value = 'turbulence'; s.developerPanel.refresh();
       document.getElementById('dev-run').click(); s.devRunner.updatePreparation(0);
       return { position: s.position.toArray(), velocity: s.linearVelocity.toArray(), quaternion: s.quaternion.toArray(),
         throttle: s.controls.throttle, trim: s.controls.pitchTrim, mass: s.aero.mass,
@@ -50,10 +60,18 @@ await withBrowserSession({ startVite: false, origin: process.env.SIM_URL || 'htt
       const { setSimulationWind, WindField } = await import('/src/physics/WindField.js');
       const { stepPhysics } = await import('/src/core/physicsTiming.js');
       const s = window.simulator, runs = {};
-      for (const profile of [null, 'calm-debug-v1', 'light-turbulence-v1']) {
-        s.devRunner.restart(); s.devRunner.updatePreparation(0);
+      for (const [id, profile] of [
+        ['turbulence', null], ['turbulence', 'calm-debug-v1'], ['turbulence', 'light-turbulence-v1'],
+        ['turbulence-moderate', 'moderate-turbulence-v1'], ['turbulence-strong', 'strong-turbulence-v1'],
+      ]) {
+        s.developerPanel.select.value = id; s.developerPanel.refresh();
+        document.getElementById('dev-run').click(); s.devRunner.updatePreparation(0);
+        const initial = { position: s.position.toArray(), velocity: s.linearVelocity.toArray(), quaternion: s.quaternion.toArray(),
+          rates: s.angularVelocity.toArray(), throttle: s.controls.throttle, trim: s.controls.pitchTrim,
+          mass: s.aero.mass, seed: s.windField.seed, time: s.windTimeSeconds };
+        if (profile?.includes('turbulence') && s.windField.profile !== profile) throw new Error(`Wrong profile for ${id}`);
         const seed = s.windField.seed;
-        if (profile !== 'light-turbulence-v1') setSimulationWind(s, profile ? new WindField({ profile, seed, runwayHeadingDeg: 63 }) : null);
+        if (!profile || profile === 'calm-debug-v1') setSimulationWind(s, profile ? new WindField({ profile, seed, runwayHeadingDeg: 63 }) : null);
         const min = {}, max = {}, trace = [];
         for (let tick = 0; tick < 7200; tick++) {
           stepPhysics(s);
@@ -68,7 +86,7 @@ await withBrowserSession({ startVite: false, origin: process.env.SIM_URL || 'htt
             force: s._aeroResult.forceWorld.toArray(), moment: s._aeroResult.momentBody.toArray(),
             tas: s.telemetry.tasKnots, rates: s.angularVelocity.toArray() });
         }
-        runs[profile ?? 'none'] = { min, max, trace, result: s.devRunner.result,
+        runs[profile ?? 'none'] = { initial, min, max, trace, result: s.devRunner.result,
           position: s.position.toArray(), quaternion: s.quaternion.toArray(),
           velocity: s.linearVelocity.toArray(), rates: s.angularVelocity.toArray(),
           ap: s.autopilot.master, demo: s.demoDirector.isActive };
@@ -86,6 +104,13 @@ await withBrowserSession({ startVite: false, origin: process.env.SIM_URL || 'htt
     assert.notDeepEqual(flights.none.position, flights['light-turbulence-v1'].position);
     assert.notDeepEqual(flights.none.trace[0].force, flights['light-turbulence-v1'].trace[0].force);
     assert.notDeepEqual(flights.none.trace[0].moment, flights['light-turbulence-v1'].trace[0].moment);
+    let previousRollRange = 0;
+    for (const profile of ['light-turbulence-v1', 'moderate-turbulence-v1', 'strong-turbulence-v1']) {
+      const run = flights[profile];
+      assert.deepEqual(run.initial, flights.none.initial);
+      assert.ok(run.max.roll - run.min.roll > previousRollRange, profile);
+      previousRollRange = run.max.roll - run.min.roll;
+    }
     await screenshot(resolve(directory, 'cruise-60s.png'));
     const lifecycle = await evaluate(() => {
       const s = window.simulator;
@@ -159,5 +184,6 @@ await withBrowserSession({ startVite: false, origin: process.env.SIM_URL || 'htt
     assert.deepEqual(exceptions, []);
     const report = { entry, initial, flights, lifecycle, held, released, touch, realtime, cleanup, exceptions };
     await writeFile(resolve(directory, 'results.json'), JSON.stringify(report, null, 2));
-    console.log(JSON.stringify({ initial, ranges: flights['light-turbulence-v1'], lifecycle, held, released, touch, cleanup }, (k, v) => k === 'trace' ? undefined : v, 2));
+    console.log(JSON.stringify({ initial, ranges: Object.fromEntries(Object.entries(flights).map(([id, run]) =>
+      [id, { min: run.min, max: run.max, status: run.result.status }])), lifecycle, held, released, touch, cleanup }, null, 2));
   });

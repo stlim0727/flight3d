@@ -6,6 +6,24 @@ import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 
 const point = { x: 120, y: 200, z: -900 };
 
+test('comparison levels scale the same zero-mean field at matching positions and times', () => {
+  for (const runwayHeadingDeg of [0, 63, 90, 180, 270]) {
+    const options = { seed: 'coastal-b738-turbulence-1', runwayHeadingDeg };
+    const light = new WindField({ ...options, profile: 'light-turbulence-v1' });
+    for (const [profile, scale] of [['moderate-turbulence-v1', 3], ['strong-turbulence-v1', 6]]) {
+      const field = new WindField({ ...options, profile });
+      assert.deepEqual(field.mean(), light.mean());
+      for (let time = 0; time < 60; time += .25) {
+        const position = { x: -600 + time * 96, y: 750, z: 3200 - time * 49 };
+        const reference = light.sample(position, time), wind = field.sample(position, time);
+        for (const axis of ['x', 'y', 'z']) {
+          assert.ok(Math.abs(wind[axis] - scale * reference[axis]) < 1e-12);
+        }
+      }
+    }
+  }
+});
+
 test('light turbulence has zero mean and bounded gusts, reusing the seeded mild modes', () => {
   const field = new WindField({ profile: 'light-turbulence-v1', seed: 7, runwayHeadingDeg: 90 });
   const mild = new WindField({ profile: 'mild-disturbance-v1', seed: 7, runwayHeadingDeg: 90 });
