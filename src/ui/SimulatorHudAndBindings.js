@@ -572,6 +572,7 @@ class SimulatorHudAndBindingsMethods {
       this.gameFlow.resume();
       if (this.devRunner.active) { this.devRunner.restart(); return; }
       if (this.lastPresetType === 'valley') {
+        this.clearCrashState?.();
         this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' });
         return;
       }

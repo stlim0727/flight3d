@@ -129,3 +129,12 @@ test('a lazy scenario holds physics and rejects repeated starts until spawn comp
     } finally { console.warn = savedWarn; }
   }
 });
+
+test('valley lobby disarms cinematic demo and keeps physics frozen', async () => {
+  const { isScenarioAvailable } = await import('../src/config/scenarioRegistry.js');
+  const sim = simulator();
+  sim.activeAirport = 'valley';
+  sim.gameFlow.setCinematicAvailable(isScenarioAvailable('valley', 'demo'));
+  assert.equal(sim.gameFlow.cinematicAvailable, false);
+  assert.equal(sim.gameFlow.isPhysicsFrozen(), true);
+});

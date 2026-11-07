@@ -40,6 +40,11 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
       sim.isCrashed = false;
       sim.crashResult = null;
     }
+    if (sim.position) {
+      sim.position.y = Math.max(sim.position.y, 3000);
+      sim.linearVelocity?.set?.(0, 0, 0);
+      sim.angularVelocity?.set?.(0, 0, 0);
+    }
 
     // In browser simulator (sim.scene present), dynamically mount procedural virtual valley terrain
     if (sim.scene) {
