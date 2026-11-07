@@ -596,7 +596,6 @@ class SimulatorHudAndBindingsMethods {
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
       if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
-      if (this.isCrashed) return;
       if (document.getElementById('hud-overlay')?.classList.contains('panel-open')) return;
       const helpModal = document.getElementById('help-modal');
       if (helpModal?.classList.contains('visible')) {
@@ -608,6 +607,7 @@ class SimulatorHudAndBindingsMethods {
         return;
       }
       if (hasActiveModal()) return;
+
       const lobbyScreen = document.getElementById('lobby-screen');
       if (this.gameFlow.state === FLOW.LOBBY && lobbyScreen?.classList.contains('is-folded')) {
         this.lobbyScreen?.setFolded?.(false);
@@ -629,6 +629,9 @@ class SimulatorHudAndBindingsMethods {
         this.replayPanel.exit();
         return;
       }
+
+      if (this.isCrashed) return;
+
       if (this.gameFlow.state === FLOW.FLIGHT) this.gameFlow.pause();
       else if (this.gameFlow.state === FLOW.PAUSED) this.gameFlow.resume();
       else if (this.gameFlow.state === FLOW.LOBBY && this.gameFlow.canResumeFromLobby()) this.resumeFlight();

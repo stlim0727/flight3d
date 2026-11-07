@@ -90,6 +90,14 @@ test('SimulatorHudAndBindings guards folding shortcuts against active open modal
   assert.ok(bindingsSrc.includes('if (hasActiveModal()'), 'must return early if modal is active in keydown');
 });
 
+test('SimulatorHudAndBindings unfolds debrief on Escape even when isCrashed is true', () => {
+  const bindingsSrc = readFileSync(resolve('src/ui/SimulatorHudAndBindings.js'), 'utf8');
+  const debriefFoldIdx = bindingsSrc.indexOf('this.debriefOverlay?.isFolded');
+  const isCrashedIdx = bindingsSrc.indexOf('if (this.isCrashed) return;');
+  assert.ok(debriefFoldIdx !== -1 && isCrashedIdx !== -1, 'both checks must exist');
+  assert.ok(debriefFoldIdx < isCrashedIdx, 'debrief unfold check must precede isCrashed check');
+});
+
 test('i18n catalogs include fold and unfold translations for both EN and KO', () => {
   assert.equal(en['ui.fold'], 'Fold');
   assert.equal(ko['ui.fold'], '접기');
