@@ -160,6 +160,12 @@ export async function withBrowserSession(options = {}, fn) {
     await send('Runtime.enable');
     await send('Page.enable');
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile });
+    if (mobile || options.touch) {
+      await send('Emulation.setTouchEmulationEnabled', {
+        enabled: true,
+        maxTouchPoints: options.maxTouchPoints ?? 5,
+      });
+    }
 
     if (options.path || options.url) {
       const targetUrl = options.url || `${origin}${options.path.startsWith('/') ? '' : '/'}${options.path}`;

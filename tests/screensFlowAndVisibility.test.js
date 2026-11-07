@@ -96,3 +96,62 @@ test('Mobile header layout and audio hint snackbar positioning are correctly con
   assert.ok(replayCss.includes('::file-selector-button'), 'replay library must style file selector button');
   assert.ok(replayCss.includes('border-radius: 14px'), 'replay library must use unified 14px border radius');
 });
+
+test('DebriefOverlay UI layout, header hierarchy, and styling tokens', () => {
+  const debriefSrc = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
+  assert.ok(debriefSrc.includes('class="debrief-header-actions"'), 'header must have debrief-header-actions');
+  assert.ok(debriefSrc.includes('id="debrief-feedback"'), 'header must contain debrief-feedback');
+  assert.ok(debriefSrc.includes('id="debrief-fold"'), 'header must contain debrief-fold');
+  assert.ok(debriefSrc.includes('id="debrief-pill"'), 'header must contain debrief-pill');
+  assert.ok(debriefSrc.includes('class="debrief-secondary-actions"'), 'actions must contain debrief-secondary-actions');
+
+  const css = readFileSync(resolve('src/styles/debrief.css'), 'utf8');
+  assert.ok(css.includes('rgba(15, 23, 42, 0.85)'), 'debrief card must use dark cockpit glass background');
+  assert.ok(css.includes('backdrop-filter: blur(16px)'), 'debrief card must use 16px blur');
+  assert.ok(css.includes('max-width: min(calc(440px * var(--ui-scale, 1))') || css.includes('max-width: 440px'), 'debrief card must enforce scaled max width');
+  assert.ok(css.includes('max-height: calc(100dvh - 32px)'), 'debrief card must enforce max height');
+  assert.ok(css.includes('position: sticky'), 'debrief actions must be sticky');
+  assert.ok(css.includes('linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'), 'retry button must use primary accent gradient');
+});
+
+test('Multi-viewport screens showcases, concurrent capture, and navigation switcher', () => {
+  const desktopHtml = readFileSync(resolve('screens.html'), 'utf8');
+  const portraitHtml = readFileSync(resolve('screens-mobile-portrait.html'), 'utf8');
+  const landscapeHtml = readFileSync(resolve('screens-mobile-landscape.html'), 'utf8');
+
+  // Verify all 3 pages define the viewport switcher
+  for (const html of [desktopHtml, portraitHtml, landscapeHtml]) {
+    assert.ok(html.includes('class="viewport-switcher"'), 'must contain viewport-switcher');
+    assert.ok(html.includes('href="./screens.html"'), 'must link to desktop screens');
+    assert.ok(html.includes('href="./screens-mobile-portrait.html"'), 'must link to mobile portrait screens');
+    assert.ok(html.includes('href="./screens-mobile-landscape.html"'), 'must link to mobile landscape screens');
+  }
+
+  // Verify respective active states and catalog endpoints
+  assert.ok(desktopHtml.includes('class="viewport-tab active" data-viewport="desktop"'));
+  assert.ok(desktopHtml.includes('screenshots/ui/catalog.json'));
+
+  assert.ok(portraitHtml.includes('class="viewport-tab active" data-viewport="mobile-portrait"'));
+  assert.ok(portraitHtml.includes('screenshots/ui-mobile-portrait/catalog.json'));
+
+  assert.ok(landscapeHtml.includes('class="viewport-tab active" data-viewport="mobile-landscape"'));
+  assert.ok(landscapeHtml.includes('screenshots/ui-mobile-landscape/catalog.json'));
+
+  // Verify Vite rollup inputs include all 3 HTML files
+  const viteConfig = readFileSync(resolve('vite.config.js'), 'utf8');
+  assert.ok(viteConfig.includes("screens: 'screens.html'"));
+  assert.ok(viteConfig.includes("screensMobilePortrait: 'screens-mobile-portrait.html'"));
+  assert.ok(viteConfig.includes("screensMobileLandscape: 'screens-mobile-landscape.html'"));
+
+  // Verify package.json concurrent and multi-viewport scripts
+  const pkg = JSON.parse(readFileSync(resolve('package.json'), 'utf8'));
+  assert.ok(pkg.scripts['screens:capture:all'].includes('--all-viewports'));
+  assert.ok(pkg.scripts['screens:capture:portrait'].includes('--viewport mobile-portrait'));
+  assert.ok(pkg.scripts['screens:capture:landscape'].includes('--viewport mobile-landscape'));
+
+  // Verify mobile catalogs exist and reference valid screens
+  const portraitCatalog = JSON.parse(readFileSync(resolve('public/screenshots/ui-mobile-portrait/catalog.json'), 'utf8'));
+  const landscapeCatalog = JSON.parse(readFileSync(resolve('public/screenshots/ui-mobile-landscape/catalog.json'), 'utf8'));
+  assert.ok(Array.isArray(portraitCatalog.screens) && portraitCatalog.screens.length > 0);
+  assert.ok(Array.isArray(landscapeCatalog.screens) && landscapeCatalog.screens.length > 0);
+});

@@ -44,7 +44,7 @@ test('debrief overlay positions main menu back button at top left with u-turn ar
     'debrief-lobby must have localized title'
   );
 
-  // debrief-actions must no longer contain debrief-lobby
+  // debrief-actions must no longer contain debrief-lobby or debrief-feedback
   const debriefActionsMatch = debriefSource.match(/<div class="debrief-actions">([\s\S]*?)<\/div>/);
   assert.ok(debriefActionsMatch, 'debrief-actions block must exist');
   assert.ok(
@@ -56,8 +56,13 @@ test('debrief overlay positions main menu back button at top left with u-turn ar
     'debrief-actions must contain debrief-retry'
   );
   assert.ok(
-    debriefActionsMatch[1].includes('id="debrief-feedback"'),
-    'debrief-actions must contain debrief-feedback'
+    !debriefActionsMatch[1].includes('id="debrief-feedback"'),
+    'debrief-actions must not contain debrief-feedback'
+  );
+  assert.match(
+    debriefSource,
+    /<header class="debrief-header">[\s\S]*?id="debrief-feedback"[\s\S]*?<\/header>/,
+    'debrief-feedback must be inside debrief-header as a discrete utility icon button'
   );
 });
 
