@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AircraftBreakup } from '../src/effects/AircraftBreakup.js';
+import { Cessna172 } from '../src/aircraft/Cessna172.js';
+import { CESSNA_172 } from '../src/config/aircraftConfigs.js';
 
 function fixture() {
   const scene = new THREE.Scene();
@@ -107,6 +109,68 @@ test('switching a prepared aircraft from fallback to loaded geometry rebuilds th
   assert.notEqual(breakup.preparedRoot, previous);
   breakup.spawn(aircraft, new THREE.Vector3());
   assert.equal(breakup.pieces.length, 6);
+});
+
+test('C172 flexible struts retain live suspension deformation and normals across prepared crashes', () => {
+  for (const indexed of [false, true]) {
+    const { scene, aircraft } = fixture();
+    const strutGeometry = new THREE.BoxGeometry(0.4, 2, 0.3, 1, 2, 1);
+    const strut = new THREE.Mesh(indexed ? strutGeometry : strutGeometry.toNonIndexed(), new THREE.MeshStandardMaterial());
+    strut.userData.flexible = true;
+    strut.geometry.computeBoundingBox();
+    strut.userData.rest = strut.geometry.attributes.position.array.slice();
+    const wheel = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial());
+    const assembly = new THREE.Group();
+    assembly.scale.x = -1; // Mapping must also preserve reversed triangle winding.
+    assembly.add(strut, wheel);
+    aircraft.gltfGroup.add(assembly);
+    const contact = CESSNA_172.landingGear.contacts[0];
+    aircraft.visualGear = [{ contact: new THREE.Vector3(contact.localPos.x,
+      contact.localPos.y - contact.wheelRadius, contact.localPos.z), meshes: [strut, wheel], offset: null }];
+    const update = compression => Cessna172.prototype.updateVisualGear.call(aircraft, {
+      nose: compression, mainLeft: compression, mainRight: compression,
+    });
+    update(0.03);
+    const breakup = new AircraftBreakup(scene);
+    breakup.prepare(aircraft);
+    const buffers = breakup.preparedFragments.map(f => f.mesh.geometry);
+    const rigidPosition = buffers.find((_, i) => breakup.preparedFragments[i].source === wheel).attributes.position;
+    const rigidVersion = rigidPosition.version;
+    for (const compression of [0.2, 0, 0.12]) {
+      update(compression);
+      assembly.rotation.z += 0.1;
+      aircraft.group.rotation.set(0.1, 0.5, -0.2);
+      aircraft.group.updateWorldMatrix(true, true);
+      const sourcePosition = strut.geometry.attributes.position;
+      const sourceNormal = strut.geometry.attributes.normal;
+      const normalMatrix = new THREE.Matrix3().getNormalMatrix(strut.matrixWorld);
+      const expected = Array.from({ length: sourcePosition.count }, (_, i) => ({
+        position: new THREE.Vector3().fromBufferAttribute(sourcePosition, i).applyMatrix4(strut.matrixWorld),
+        normal: new THREE.Vector3().fromBufferAttribute(sourceNormal, i).applyNormalMatrix(normalMatrix),
+      }));
+      breakup.spawn(aircraft, new THREE.Vector3());
+      let checked = 0;
+      for (const { object } of breakup.pieces) object.traverse(mesh => {
+        if (!mesh.isMesh || mesh.material !== strut.material) return;
+        mesh.updateWorldMatrix(true, false);
+        const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+        const position = mesh.geometry.attributes.position;
+        const normal = mesh.geometry.attributes.normal;
+        for (let i = 0; i < position.count; i++) {
+          const p = new THREE.Vector3().fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+          const n = new THREE.Vector3().fromBufferAttribute(normal, i).applyNormalMatrix(normalMatrix);
+          assert.ok(expected.some(e => e.position.distanceTo(p) < 1e-5 && e.normal.distanceTo(n) < 1e-5),
+            'wreckage must match the deformed source surface and shading');
+          checked++;
+        }
+        assert.ok(mesh.geometry.boundingBox.containsPoint(new THREE.Vector3().fromBufferAttribute(position, 0)));
+      });
+      assert.equal(checked, strut.geometry.index?.count ?? sourcePosition.count);
+      assert.deepEqual(breakup.preparedFragments.map(f => f.mesh.geometry.uuid), buffers.map(g => g.uuid));
+      assert.equal(rigidPosition.version, rigidVersion, 'rigid wheel buffers must not be refreshed');
+      breakup.clear();
+    }
+  }
 });
 
 test('breakup conserves triangles, separates actual geometry and restores aircraft through repeated reset', () => {

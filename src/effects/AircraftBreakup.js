@@ -109,7 +109,14 @@ export class AircraftBreakup {
         mesh.matrixAutoUpdate = false;
         fragment.computeBoundingBox();
         fragment.computeBoundingSphere();
-        this.preparedFragments.push({ mesh, source, inverseTransform, matIndex });
+        // C172 spring struts deform their buffers rather than their transforms.
+        // Only those small parts retain a vertex mapping; rigid airframes stay cached.
+        const deformation = source.userData.flexible ? {
+          indices: Uint32Array.from(indices, i => source.geometry.index?.getX(i) ?? i),
+          transform: inverseTransform.clone().invert(),
+          version: source.geometry.attributes.position.version,
+        } : null;
+        this.preparedFragments.push({ mesh, source, inverseTransform, matIndex, deformation });
         if (!regions.has(region)) regions.set(region, new THREE.Group());
         regions.get(region).add(mesh);
       }
@@ -126,7 +133,28 @@ export class AircraftBreakup {
     const root = aircraft.group;
     root.updateWorldMatrix(true, true);
     const inverse = root.matrixWorld.clone().invert();
-    for (const { mesh, source, inverseTransform, matIndex } of this.preparedFragments) {
+    for (const { mesh, source, inverseTransform, matIndex, deformation } of this.preparedFragments) {
+      if (deformation && deformation.version !== source.geometry.attributes.position.version) {
+        const position = mesh.geometry.attributes.position;
+        const normal = mesh.geometry.attributes.normal;
+        const sourcePosition = source.geometry.attributes.position;
+        const sourceNormal = source.geometry.attributes.normal;
+        const normalTransform = new THREE.Matrix3().getNormalMatrix(deformation.transform);
+        const vertex = new THREE.Vector3();
+        deformation.indices.forEach((index, i) => {
+          vertex.fromBufferAttribute(sourcePosition, index).applyMatrix4(deformation.transform);
+          position.setXYZ(i, vertex.x, vertex.y, vertex.z);
+          if (normal && sourceNormal) {
+            vertex.fromBufferAttribute(sourceNormal, index).applyNormalMatrix(normalTransform);
+            normal.setXYZ(i, vertex.x, vertex.y, vertex.z);
+          }
+        });
+        position.needsUpdate = true;
+        if (normal && sourceNormal) normal.needsUpdate = true;
+        mesh.geometry.computeBoundingBox();
+        mesh.geometry.computeBoundingSphere();
+        deformation.version = sourcePosition.version;
+      }
       mesh.matrix.copy(inverse).multiply(source.matrixWorld).multiply(inverseTransform);
       mesh.matrixWorldNeedsUpdate = true;
       mesh.visible = visibleBelow(source, root);

@@ -60,7 +60,11 @@ geometry off-scene and starts `compileAsync` with the current scene lighting.
 Initial startup waits for this shader warmup behind the loading overlay; later
 model swaps start warmup before the next physics frame. Impact reuses those
 buffers, samples current source transforms/materials and visibility (including
-stowed/deployed gear), and positions the fragments without copying vertices.
+stowed/deployed gear), and positions rigid fragments without copying vertices.
+C172 flexible struts retain a source-vertex mapping: when suspension deformation
+changes their position-buffer version, impact refreshes those small fragments'
+positions/normals and bounds in place. Their buffers are still reused, and rigid
+airframe/wheel geometry is not refreshed.
 Reset retains the prepared buffers for another crash. Selecting another aircraft
 or changing between loaded/procedural geometry disposes the previous cache;
 `disposePrepared()` releases it explicitly. Source materials/textures stay shared.
