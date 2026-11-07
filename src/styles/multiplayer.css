@@ -42,6 +42,47 @@
 #mp-microphone[aria-pressed="true"], #mp-mute[aria-pressed="true"] { background: #226c63; border-color: #8fffe2; }
 #mp-room-menu { position: fixed; right: 10px; top: 110px; z-index: 125; background: #0b1829ed; color: #e7f5ff; border: 1px solid #67d8f0; }
 .mp-nameplate { position: fixed; z-index: 120; pointer-events: none; transform: translate(-50%, -100%); padding: .2rem .4rem; color: #9cf5ff; background: #051729ba; border-radius: 3px; font: 12px system-ui; }
+.mp-indicator-bounds {
+  position: fixed;
+  inset: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-right, 0px))
+    calc(24px + env(safe-area-inset-bottom, 0px)) calc(24px + env(safe-area-inset-left, 0px));
+  z-index: 120;
+  pointer-events: none;
+}
+.mp-edge-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: max-content;
+  color: #9cf5ff;
+}
+.mp-edge-marker[hidden] { display: none; }
+.mp-edge-marker[data-direction="right"] { flex-direction: row-reverse; }
+.mp-edge-marker[data-direction="up"] { flex-direction: column; }
+.mp-edge-marker[data-direction="down"] { flex-direction: column-reverse; }
+.mp-edge-marker > svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  stroke: #051729;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.mp-edge-marker > .mp-nameplate {
+  position: static;
+  transform: none;
+  display: flex;
+  white-space: pre;
+}
+.mp-edge-compact .mp-nameplate > :first-child {
+  max-width: 4em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 @media (max-width: 560px) { #mp-dialog { padding: 14px; } #mp-code { font-size: 1.5rem; } }
 
 #mp-dialog p { margin: .5rem 0; }

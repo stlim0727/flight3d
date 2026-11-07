@@ -161,7 +161,13 @@ export class MultiplayerController {
     if (!this.remote || !this.active) return;
     const s = this.room.session;
     const sample = s.track.sample(performance.now());
-    this.remote.update(sample, `${s.remoteName}${sample?.talking ? " ●" : ""}${sample?.held ? ` · ${t('mp.held')}` : ''}${sample?.stale ? ` · ${t('mp.stale')}` : ''}`, this.sim.camera);
+    const status = `${sample?.talking ? ' ●' : ''}${sample?.held ? ` · ${t('mp.held')}` : ''}${sample?.stale ? ` · ${t('mp.stale')}` : ''}`;
+    this.remote.update(sample, s.remoteName, this.sim.camera, {
+      status,
+      showIndicator: s.state === 'flying' && this.sim.gameFlow.state === 'flight' && !this.modalOpen && !this.sim.isCrashed,
+      localPosition: this.sim.position,
+      cameraMode: this.sim.cameraSystem.mode,
+    });
   }
   async playAudio() {
     try {
