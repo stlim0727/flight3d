@@ -108,7 +108,7 @@ test('DebriefOverlay UI layout, header hierarchy, and styling tokens', () => {
   const css = readFileSync(resolve('src/styles/debrief.css'), 'utf8');
   assert.ok(css.includes('rgba(15, 23, 42, 0.85)'), 'debrief card must use dark cockpit glass background');
   assert.ok(css.includes('backdrop-filter: blur(16px)'), 'debrief card must use 16px blur');
-  assert.ok(css.includes('max-width: 440px'), 'debrief card must enforce 440px max width');
+  assert.ok(css.includes('max-width: min(calc(440px * var(--ui-scale, 1))') || css.includes('max-width: 440px'), 'debrief card must enforce scaled max width');
   assert.ok(css.includes('max-height: calc(100dvh - 32px)'), 'debrief card must enforce max height');
   assert.ok(css.includes('position: sticky'), 'debrief actions must be sticky');
   assert.ok(css.includes('linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'), 'retry button must use primary accent gradient');

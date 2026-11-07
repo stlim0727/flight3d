@@ -23,7 +23,7 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 
 .debrief-card {
   width: min(calc(380px * var(--ui-scale, 1)), calc(100vw - 32px));
-  max-width: 440px;
+  max-width: min(calc(440px * var(--ui-scale, 1)), calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   margin-left: max(calc(64px * var(--ui-scale, 1)), calc(env(safe-area-inset-left) + 16px));
   padding: calc(18px * var(--ui-scale, 1)) calc(20px * var(--ui-scale, 1));
@@ -54,6 +54,7 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1 1 auto;
 }
 .debrief-title-row {
   display: flex;
@@ -103,6 +104,7 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   align-items: center;
   gap: calc(6px * var(--ui-scale, 1));
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .debrief-card .debrief-lobby-btn {
