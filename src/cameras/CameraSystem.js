@@ -7,6 +7,11 @@ import { CinematicCameraDirector } from './CinematicCameraDirector.js';
  * Features G-force cockpit head dynamics, stall buffeting vibration, touchdown shock jolt,
  * smooth exterior damping, and automatic temporary cinematic view cuts for takeoff/landing/gear transit.
  */
+function normalizeAngle(angle) {
+  const twoPi = Math.PI * 2;
+  return ((angle + Math.PI) % twoPi + twoPi) % twoPi - Math.PI;
+}
+
 export class CameraSystem {
   // Lowest orbit the chase camera may take (radians). The ground clamp, not this
   // limit, keeps the eye out of terrain, so the view may drop below the aircraft.
@@ -657,11 +662,11 @@ export class CameraSystem {
     const defaultPitch = this.aircraftLookPitch ?? -0.25;
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT:
-        return Math.abs(this.lookYaw) > 0.001 || Math.abs(this.lookPitch - defaultPitch) > 0.001;
+        return Math.abs(normalizeAngle(this.lookYaw)) > 0.001 || Math.abs(this.lookPitch - defaultPitch) > 0.001;
       case CameraSystem.MODES.CHASE:
-        return Math.abs(this.chaseYaw) > 0.001 || Math.abs(this.chasePitch) > 0.001;
+        return Math.abs(normalizeAngle(this.chaseYaw)) > 0.001 || Math.abs(this.chasePitch) > 0.001;
       case CameraSystem.MODES.WING:
-        return Math.abs(this.wingLookYaw) > 0.001 || Math.abs(this.wingLookPitch) > 0.001;
+        return Math.abs(normalizeAngle(this.wingLookYaw)) > 0.001 || Math.abs(this.wingLookPitch) > 0.001;
       case CameraSystem.MODES.GEAR:
         return Math.abs(this.gearLookYaw) > 0.001 || Math.abs(this.gearLookPitch) > 0.001;
       default:
@@ -680,15 +685,15 @@ export class CameraSystem {
 
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT:
-        deltaYaw = this.lookYaw;
+        deltaYaw = normalizeAngle(this.lookYaw);
         deltaPitch = this.lookPitch - defaultPitch;
         break;
       case CameraSystem.MODES.CHASE:
-        deltaYaw = this.chaseYaw;
+        deltaYaw = normalizeAngle(this.chaseYaw);
         deltaPitch = this.chasePitch;
         break;
       case CameraSystem.MODES.WING:
-        deltaYaw = this.wingLookYaw;
+        deltaYaw = normalizeAngle(this.wingLookYaw);
         deltaPitch = this.wingLookPitch;
         break;
       case CameraSystem.MODES.GEAR:
@@ -787,19 +792,28 @@ export class CameraSystem {
       return (Math.abs(target - next) < 0.001) ? target : next;
     };
 
+    const stepTowardAngle = (current, target) => {
+      const cur = normalizeAngle(current);
+      const diff = normalizeAngle(target - cur);
+      if (Math.abs(diff) < 0.001) return target;
+      const step = diff * rate;
+      const next = cur + step;
+      return (Math.abs(normalizeAngle(target - next)) < 0.001) ? target : next;
+    };
+
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: {
-        this.lookYaw = stepToward(this.lookYaw, 0);
+        this.lookYaw = stepTowardAngle(this.lookYaw, 0);
         this.lookPitch = stepToward(this.lookPitch, defaultPitch);
         break;
       }
       case CameraSystem.MODES.CHASE: {
-        this.chaseYaw = stepToward(this.chaseYaw, 0);
+        this.chaseYaw = stepTowardAngle(this.chaseYaw, 0);
         this.chasePitch = stepToward(this.chasePitch, 0);
         break;
       }
       case CameraSystem.MODES.WING: {
-        this.wingLookYaw = stepToward(this.wingLookYaw, 0);
+        this.wingLookYaw = stepTowardAngle(this.wingLookYaw, 0);
         this.wingLookPitch = stepToward(this.wingLookPitch, 0);
         break;
       }
@@ -812,6 +826,9 @@ export class CameraSystem {
 
     if (!this.isPovModified()) {
       this.povChangedByDrag = false;
+      if (this.mode === CameraSystem.MODES.CHASE) this.chaseYaw = 0;
+      else if (this.mode === CameraSystem.MODES.COCKPIT) this.lookYaw = 0;
+      else if (this.mode === CameraSystem.MODES.WING) this.wingLookYaw = 0;
     }
 
     this.updatePovButtonState();

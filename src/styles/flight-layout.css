@@ -323,7 +323,7 @@ body:has(#hud-warning:not([hidden]), #hud-stall[style*="block"]) { --flight-aler
   display: block;
 }
 .compact-ui .btn-reset-pov {
-  top: calc(var(--edge-top, 8px) + (48px * var(--ui-scale, 1)));
+  top: calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)));
   font-size: calc(11px * var(--ui-scale, 1));
   padding: calc(5px * var(--ui-scale, 1)) calc(12px * var(--ui-scale, 1));
 }

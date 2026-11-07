@@ -122,6 +122,39 @@ test('CameraSystem applyHatLook pans camera view and returns to default when rel
   assert.equal(cam.isPovModified(), false);
 });
 
+test('CameraSystem normalizes yaw across multiple revolutions and eases along shortest arc', () => {
+  const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
+  cam.setMode(CameraSystem.MODES.CHASE, true);
+  const aircraft = new THREE.Object3D();
+
+  // 1. Full 360 degree orbit (2 * Math.PI) is equivalent to 0:
+  cam.chaseYaw = 2 * Math.PI;
+  cam.chasePitch = 0;
+  assert.equal(cam.isPovModified(), false);
+  assert.equal(cam.getPovIndicatorAngle(), 0);
+
+  // 2. Dragging 360 + 0.3 rad -> returns along the 0.3 rad arc instead of a full revolution
+  cam.povChangedByDrag = true;
+  cam.chaseYaw = 2 * Math.PI + 0.3;
+  assert.equal(cam.isPovModified(), true);
+  assert.equal(Math.round(cam.getPovIndicatorAngle()), 90);
+
+  cam.update(0.5, aircraft);
+  // Should step toward 0 along shortest path, remaining in small positive range
+  assert.ok(cam.chaseYaw < 0.3, `chaseYaw should be < 0.3, got ${cam.chaseYaw}`);
+  assert.ok(cam.chaseYaw > 0, `chaseYaw should be > 0, got ${cam.chaseYaw}`);
+
+  // Negative revolution: -2 * Math.PI - 0.3 rad -> returns toward 0 along positive direction
+  cam.chaseYaw = -2 * Math.PI - 0.3;
+  cam.povChangedByDrag = true;
+  assert.equal(cam.isPovModified(), true);
+  assert.equal(Math.round(cam.getPovIndicatorAngle()), -90);
+
+  cam.update(0.5, aircraft);
+  assert.ok(cam.chaseYaw > -0.3, `chaseYaw should be > -0.3, got ${cam.chaseYaw}`);
+  assert.ok(cam.chaseYaw < 0, `chaseYaw should be < 0, got ${cam.chaseYaw}`);
+});
+
 test('CameraSystem updatePovReturn smoothly returns POV after drag, preserving POV during drag', () => {
   const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
   cam.setMode(CameraSystem.MODES.COCKPIT, true);
