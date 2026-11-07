@@ -33,14 +33,54 @@
 .replay-cameras { overflow-x: auto; padding-bottom: 4px; }
 .replay-cameras .btn { flex-shrink: 0; white-space: nowrap; }
 #replay-panel [aria-pressed="true"] { background: #205342; border-color: #67d5a3; color: #fff; }
-#replay-library { position: fixed; z-index: 210; inset: 0; display: grid; place-items: center; padding: 16px; background: #000b; color: #e2e8f0; font: 14px system-ui, sans-serif; }
-.replay-library-card { width: min(600px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; box-sizing: border-box; padding: 20px; background: #0a1622; border: 1px solid #476277; border-radius: 12px; }
+#replay-library {
+  position: fixed;
+  z-index: 210;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(6, 10, 18, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #e2e8f0;
+  font: 14px system-ui, sans-serif;
+}
+.replay-library-card {
+  width: min(600px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+}
 .replay-library-card h2 { font-size: 20px; }
 .replay-entry { margin-top: 12px; padding: 12px 0; border-top: 1px solid #385268; }
 .replay-entry input { width: 100%; box-sizing: border-box; min-height: 44px; border: 1px solid #476277; border-radius: 6px; background: #142535; color: #fff; padding: 8px; font: inherit; }
 .replay-entry-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .replay-import { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .replay-import input { max-width: 100%; }
+.replay-import input[type="file"]::file-selector-button {
+  background: #1e293b;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 6px;
+  color: #e2e8f0;
+  padding: 6px 12px;
+  font: 600 12px system-ui, sans-serif;
+  cursor: pointer;
+  margin-right: 8px;
+  transition: all 0.15s ease;
+}
+.replay-import input[type="file"]::file-selector-button:hover {
+  background: #334155;
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
 body.replaying #touch-controls, body.replaying #btn-lobby-end { display: none !important; }
 body:not([data-flow="flight"]) #replay-panel { display: none; }
 @media (max-width: 480px) {

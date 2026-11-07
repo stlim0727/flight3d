@@ -87,4 +87,12 @@ test('Mobile header layout and audio hint snackbar positioning are correctly con
   const debriefJs = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
   assert.ok(debriefJs.includes('debrief-altitude-gradient'), 'DebriefOverlay must render gradient under altitude chart');
   assert.ok(debriefJs.includes('debrief-chart-area'), 'DebriefOverlay must update area polygon points');
+
+  const mpCss = readFileSync(resolve('src/styles/multiplayer.css'), 'utf8');
+  assert.ok(mpCss.includes('border-radius: 14px'), 'multiplayer dialog must use unified 14px border radius');
+  assert.ok(mpCss.includes('#0284c7'), 'multiplayer start button must use unified sky blue CTA color');
+
+  const replayCss = readFileSync(resolve('src/styles/replay.css'), 'utf8');
+  assert.ok(replayCss.includes('::file-selector-button'), 'replay library must style file selector button');
+  assert.ok(replayCss.includes('border-radius: 14px'), 'replay library must use unified 14px border radius');
 });

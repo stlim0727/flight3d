@@ -6,12 +6,12 @@
   right: 18px;
   width: 360px;
   max-height: 82vh;
-  background: rgba(10, 16, 26, 0.94);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  border-radius: 10px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
   z-index: 90;
   overflow-y: auto;
   pointer-events: auto;
