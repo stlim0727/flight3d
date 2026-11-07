@@ -13,16 +13,38 @@ checks below, not exhaustive browser acceptance of every combination.
 | Validated saved preferences | `simulatorPreferences.js` | Survive reload; partial saves preserve siblings. No aircraft pose, pause or scripted time. |
 | Pending airport/aircraft/scenario/profile | `sim.lobby`, lobby callbacks | Browsing must leave a held sortie intact; Resume ignores pending choices. |
 | Flow and held-sortie permission | `GameFlowController` | A failed new start cannot offer Resume for the outgoing pose. |
-| Scene rebuild hold | `applyPendingScene`, `startingFlight` | Cover loading-card paints and the whole nested spawn. |
-| Exclusive scenario spawn | `startFlight`, `spawningFlight` | Every caller, including retry and tooling, shares one exclusion guard. |
+| Scene rebuild hold | `FlightStartCoordinator`, `startingFlight` | Cover loading-card paints and the whole nested spawn. |
+| Exclusive scene/spawn transaction | `FlightStartCoordinator.busy` | Every caller, including retry and tooling, shares one exclusion guard. |
 | Aircraft physics reset | `PresetSpawner.setPreset`, mission adapter | Clear damage, controls, engine failures, integrator remainder and contact history before integration. |
 | Temporary environment and view | Hangang, replay, developer drivers | Pair acquisition/release; scripted time must not claim a user preference. |
 | Flight/replay recording | `beginFlightRecording`, recorders | Metadata must describe the installed sortie rather than pending menu choices. |
 
-`startingFlight` and `spawningFlight` have different responsibilities: the former
-also spans scene loading and final paints, while the latter excludes concurrent
-calls to the inner spawn. A nested start must preserve the outer hold, and a
-second direct start must return false without releasing either owner's hold.
+`startingFlight` is the simulator-facing physics hold, which can also be owned
+by external preparation. `FlightStartCoordinator.busy` excludes concurrent start
+and rebuild transactions. The coordinator restores the previous hold only after
+the final loading paint and cleanup. A competing start cannot release either
+owner's hold.
+
+## Implemented responsibility boundaries
+
+- `core/FlightStartCoordinator.js`: importable lifecycle policy. It serializes
+  starts/rebuilds, owns hold acquisition/release, and orders recovery/cleanup.
+  It receives narrow ports and imports no simulator, DOM, Three.js or storage.
+- `ui/FlightStartLoadingView.js`: loading-card visibility, progress paints,
+  selection-busy display and latency notifications. Hidden tabs skip paints.
+- `core/simulatorFlightStart.js`: composition adapter. It wires real scene
+  preparation, scenario installation, flow recovery and loading presentation
+  into the coordinator. Airport preparation keeps its `applyingPendingStart`
+  scope and releases it on errors.
+- `main.js`: keeps public `fly`, `startFlight` and `applyPendingScene` entry
+  points compatible, lazily composes the coordinator and delegates transactions.
+  Scenario-specific installation/recording remains in `spawnFlight` for the
+  next boundary; this refactor does not change mission scoring or retry policy.
+
+Ordinary starts still invoke scenario installation synchronously in the click
+call stack. Rebuilds call that same installation port after scene preparation,
+without opening a nested public start transaction. Direct callers during either
+preparation, lazy spawning or final paint are rejected with false.
 
 ## Confirmed defects corrected
 
@@ -53,12 +75,11 @@ pure components (`GameFlowController`, preference validation, physics models)
 are good boundaries and should stay independently testable. LSP/ISP do not
 justify introducing new inheritance or interface hierarchies here.
 
-Recommended sequence for subsequent refactoring, each with observable sequence
-coverage before migration:
+The lifecycle-policy extraction above is complete. Remaining boundaries, each
+with observable sequence coverage before migration:
 
-1. Extract a flight-start coordinator from `main.js`. Give it narrow scene,
-   scenario, flow and recording operations. Preserve the synchronous ordinary
-   preset path and the outer/inner ownership contract above. Make preparation
+1. Extract scenario-specific installation/recording from `spawnFlight`. Preserve
+   the synchronous ordinary preset path and hold ownership above. Make preparation
    report ready/failed explicitly; `startValleyMission` currently dispatches a
    DOM button and consumes `readyPromise` failures locally. Review its status
    contract before moving recording and persistence to a shared commit point.
@@ -86,6 +107,9 @@ checked as a guard dependency, not comprehensively retested in this review.
 
 ## Verification
 
+- `flightStartCoordinator`: delayed scene/spawn/final paint, competing start and
+  rebuild callers, recovery at each phase, external holds, locked sessions and
+  cleanup failure. These tests import the policy directly, without source extraction.
 - `mainMenuFlow`: pending choices versus Resume, unchanged-selection restart,
   delayed and rejected spawn, duplicate direct callers, failure before leaving
   the held lobby, and guard recovery after failure.
@@ -101,7 +125,9 @@ checked as a guard dependency, not comprehensively retested in this review.
   ANGLE Vulkan on Intel Graphics (ADL-N). WebGL2 shader drawing returned
   `[255, 0, 0, 255]`, GL error 0. Delayed first mission import, crash/retry and
   damaged cached F16 return passed without extra explosions or runtime
-  exceptions. Evidence is Chrome evidence; artifacts are in
+  exceptions. Extended acceptance also checks a valley → coastal/C172 scene
+  rebuild, synchronous cruise installation and an injected scene-load failure
+  returning to a frozen lobby without Resume or Ready. Evidence is Chrome evidence; artifacts are in
   `.tmp/scenario-start/` in the task worktree.
 - Browser coverage above does not assert every pause/debrief/settings
   combination, physical joystick behavior, subjective audio, or multiplayer.

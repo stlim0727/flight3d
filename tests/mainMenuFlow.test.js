@@ -158,7 +158,7 @@ test('direct starts share the same exclusion guard and release it after success 
       finish();
       assert.equal(await pending, !failed);
       assert.equal(sim.startingFlight, false);
-      assert.equal(sim.spawningFlight, false);
+      assert.equal(sim.flightStartCoordinator.busy, false);
       sim.spawnFlight = async () => { sim.starts++; };
       assert.equal(await sim.startFlight(), true);
       assert.equal(sim.starts, 2);
@@ -190,5 +190,5 @@ test('nested spawn preserves the scene-swap hold until its outer owner releases 
   sim.spawnFlight = async () => { assert.equal(sim.startingFlight, true); };
   assert.equal(await sim.startFlight(), true);
   assert.equal(sim.startingFlight, true);
-  assert.equal(sim.spawningFlight, false);
+  assert.equal(sim.flightStartCoordinator.busy, false);
 });

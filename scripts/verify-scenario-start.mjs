@@ -102,8 +102,49 @@ await withBrowserSession({}, async b => {
   assert.equal(cached.explosions, 1);
   assert.equal(cached.mode, 8);
   await b.screenshot(`${artifacts}/cached-f16-hud.png`);
-  await b.evaluate('sim.gameFlow.pause()');
-  const report = { gpu, loading, started, retry, cached, exceptions: b.exceptions };
+  // Exercise the extracted coordinator's real scene-swap and ordinary paths.
+  const transitions = await b.evaluate(async () => {
+    sim.pilotArena.stop('verification');
+    sim.gameFlow.returnToLobby(true);
+    Object.assign(sim.lobby, { airport: 'coastal', aircraft: 'C172', preset: 'runway' });
+    await sim.fly();
+    const rebuilt = { airport: sim.activeAirport, aircraft: sim.currentAircraftId,
+      starting: sim.startingFlight, busy: sim.flightStartCoordinator.busy,
+      overlayHidden: document.getElementById('startup-overlay').hidden,
+      flow: sim.gameFlow.state, crashed: sim.isCrashed };
+    sim.lobby.preset = 'cruise';
+    const ordinary = sim.fly();
+    const synchronousPreset = sim.lastPresetType;
+    await ordinary;
+    const result = { rebuilt, synchronousPreset, starting: sim.startingFlight,
+      busy: sim.flightStartCoordinator.busy, crashed: sim.isCrashed };
+    sim.gameFlow.pause();
+    return result;
+  });
+  assert.deepEqual(transitions.rebuilt, { airport: 'coastal', aircraft: 'C172',
+    starting: false, busy: false, overlayHidden: true, flow: 'flight', crashed: false });
+  assert.equal(transitions.synchronousPreset, 'cruise');
+  assert.equal(transitions.starting, false);
+  assert.equal(transitions.busy, false);
+  assert.equal(transitions.crashed, false);
+
+  // A scene failure must release UI/physics ownership without exposing Resume or Ready.
+  const failed = await b.evaluate(async () => {
+    sim.gameFlow.returnToLobby(true);
+    sim.lobby.airport = 'lukla';
+    const setAirport = sim.setAirport;
+    sim.setAirport = async () => { throw Error('verification: scene load failure'); };
+    try { await sim.fly(); }
+    finally { sim.setAirport = setAirport; }
+    return { starting: sim.startingFlight, applying: sim.applyingPendingStart,
+      busy: sim.flightStartCoordinator.busy, frozen: sim.gameFlow.isPhysicsFrozen(),
+      resume: sim.gameFlow.canResumeFromLobby(), flow: sim.gameFlow.state,
+      overlayHidden: document.getElementById('startup-overlay').hidden,
+      progress: Number(document.getElementById('startup-progress').value) };
+  });
+  assert.deepEqual(failed, { starting: false, applying: false, busy: false,
+    frozen: true, resume: false, flow: 'lobby', overlayHidden: true, progress: 1 });
+  const report = { gpu, loading, started, retry, cached, transitions, failed, exceptions: b.exceptions };
   await writeFile(`${artifacts}/report.json`, `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   assert.deepEqual(b.exceptions, []);

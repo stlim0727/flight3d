@@ -1,3 +1,4 @@
+import { createSimulatorFlightStart } from './core/simulatorFlightStart.js';
 import { MultiplayerController } from './multiplayer/MultiplayerController.js';
 import { FlightWarnings } from './systems/FlightWarnings.js';
 import { AircraftBreakup } from './effects/AircraftBreakup.js';
@@ -303,7 +304,6 @@ class FlightSimulator {
     this.currentAircraftId = savedSelection.aircraft;
     this.lastPresetType = savedSelection.scenario;
     this.startingFlight = false;
-    this.spawningFlight = false;
     this.applyingPendingStart = false;
 
     // 7. Collision Detection & Explosion & Tire Smoke Particle Systems
@@ -639,77 +639,18 @@ class FlightSimulator {
     else await this.startFlight();
   }
 
-  /**
-   * Rebuild the world for the pending selection behind the boot overlay's loading card. The
-   * scene is parked first, so a swap never leaves the aircraft falling through scenery that
-   * is being replaced.
-   */
-  async applyPendingScene() {
-    // Each stage paints for two frames, which is only worth waiting for when the tab can paint.
-    const stage = document.hidden ? async () => {} : (value, messageKey) => startupStage(value, messageKey);
-    const overlay = document.getElementById('startup-overlay');
-    const progress = document.getElementById('startup-progress');
-    this.startingFlight = true;
-    inputLatency?.noteSelectionStart();
-    // The boot overlay fades to translucent once the scene is painted; a rebuild has to
-    // hide the swap, so the opaque card goes back on for the duration.
-    overlay.classList.remove('scene-ready');
-    overlay.hidden = false;
-    progress.hidden = false;
-    progress.max = 3;
-    progress.value = 0;
-    this.lobbyScreen?.setSelectionBusy(true);
-    try {
-      this.gameFlow.holdForPendingStart();
-      if (this.lobby.airport !== this.activeAirport) {
-        await stage(1, 'startup.world');
-        this.applyingPendingStart = true;
-        try {
-          await this.setAirport(this.lobby.airport);
-        } finally {
-          this.applyingPendingStart = false;
-        }
-      }
-      if (this.lobby.aircraft !== this.currentAircraftId) {
-        await stage(2, 'startup.aircraft');
-        this.setAircraft(this.lobby.aircraft);
-      }
-      if (!await this.startFlight()) return;
-      await stage(3, 'startup.ready');
-    } catch (error) {
-      this.gameFlow.returnToLobby(false);
-      this.gameFlow.setCinematicAvailable(false);
-      this.syncFlowUi();
-      console.warn('Flight start failed:', error);
-      this.showToast(() => t('startup.failed'));
-    } finally {
-      overlay.hidden = true;
-      this.lobbyScreen?.setSelectionBusy(false);
-      inputLatency?.noteSelectionApplied();
-      this.startingFlight = false;
-    }
+  get flightStartCoordinator() {
+    return this._flightStartCoordinator ??= createSimulatorFlightStart(this, startupStage);
   }
 
-  /** Own the entire spawn; return false for blocked or failed starts. */
-  async startFlight(options = {}) {
-    if (this.multiplayer?.locked || this.spawningFlight) return false;
-    this.spawningFlight = true;
-    const alreadyStarting = Boolean(this.startingFlight);
-    this.startingFlight = true;
-    try {
-      await this.spawnFlight(options);
-      return true;
-    } catch (error) {
-      this.gameFlow.returnToLobby(false);
-      this.gameFlow.setCinematicAvailable(false);
-      this.syncFlowUi();
-      console.warn('Flight start failed:', error);
-      this.showToast(() => t('startup.failed'));
-      return false;
-    } finally {
-      this.spawningFlight = false;
-      this.startingFlight = alreadyStarting;
-    }
+  /** Prepare the pending scene and install its scenario under the same hold. */
+  applyPendingScene() {
+    return this.flightStartCoordinator.rebuild();
+  }
+
+  /** Install a scenario without rebuilding the current scene. */
+  startFlight(options = {}) {
+    return this.flightStartCoordinator.start(options);
   }
 
   /** Install the selected scenario before recording or publishing its start. */

@@ -1,3 +1,4 @@
+import { createSimulatorFlightStart } from '../../src/core/simulatorFlightStart.js';
 import { readFileSync } from 'node:fs';
 import { saveSimulatorPreferences } from '../../src/config/simulatorPreferences.js';
 import { saveFlightSelection } from '../../src/config/flightSelection.js';
@@ -9,4 +10,4 @@ const source = readFileSync(new URL('../../src/main.js', import.meta.url), 'utf8
 const start = source.indexOf('class FlightSimulator {');
 const end = source.indexOf('\ninstallPresetSpawner(FlightSimulator);');
 if (start < 0 || end < start) throw new Error('Simulator class boundaries not found');
-export const SimulatorClass = new Function('FLOW', 'saveSimulatorPreferences', 'saveFlightSelection', 'isScenarioAvailable', `return (${source.slice(start, end)});`)(FLOW, saveSimulatorPreferences, saveFlightSelection, isScenarioAvailable);
+export const SimulatorClass = new Function('createSimulatorFlightStart', 'startupStage', 'FLOW', 'saveSimulatorPreferences', 'saveFlightSelection', 'isScenarioAvailable', `return (${source.slice(start, end)});`)(createSimulatorFlightStart, () => {}, FLOW, saveSimulatorPreferences, saveFlightSelection, isScenarioAvailable);
