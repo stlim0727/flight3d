@@ -978,6 +978,16 @@ class FlightSimulator {
     };
   }
 
+  prepareCrashVisuals() {
+    if (this.isCrashed || this.aircraft.loadingGltf) return;
+    if (!this.aircraftBreakup.prepare(this.aircraft)) return;
+    // The debris uses mesh programs (not the intact model's batched programs).
+    // Gather them off-scene while retaining the real scene lighting/environment.
+    this.crashShaderWarmup = this.renderer.compileAsync(
+      this.aircraftBreakup.preparedRoot, this.camera, this.scene
+    ).catch(error => console.warn('Crash shader warmup failed:', error));
+  }
+
   /**
    * Construct an aircraft model for the per-session cache. The instrument canvases are
    * shared: a model only draws into them while it is the active aircraft, so building a
@@ -1045,10 +1055,11 @@ class FlightSimulator {
       if (performance.now() > deadline) throw new Error('Startup assets timed out');
       await new Promise(resolve => setTimeout(resolve, 100));
     }
+    this.prepareCrashVisuals();
     let timeout;
     try {
       await Promise.race([
-        Promise.resolve(this.aircraft.cockpit?.shaderWarmup),
+        Promise.all([this.aircraft.cockpit?.shaderWarmup, this.crashShaderWarmup]),
         new Promise((_, reject) => {
           timeout = setTimeout(() => reject(new Error('Startup shaders timed out')), Math.max(0, deadline - performance.now()));
         }),
@@ -1159,6 +1170,9 @@ class FlightSimulator {
     const elapsed = this.clock.getDelta();
     if (this.browserBackgrounded) return;
     const frameDelta = this.startupReady ? clampFrameDelta(elapsed) : 0;
+    // Also covers model swaps and failed-load procedural fallbacks. Preparation
+    // precedes physics so the first impact after loading can reuse the fragments.
+    this.prepareCrashVisuals();
     this.replayPanel?.refresh();
     this.totalSimTime += frameDelta;
     if (!this.gameFlow.isPhysicsFrozen()) this.devRunner.updatePreparation(frameDelta);

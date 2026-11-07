@@ -1,5 +1,17 @@
 import * as THREE from 'three';
 
+function visibleBelow(object, root) {
+  for (let node = object; node && node !== root; node = node.parent) {
+    if (!node.visible) return false;
+  }
+  return true;
+}
+
+function fragmentBounds(object, box = new THREE.Box3()) {
+  for (const mesh of object.children) if (mesh.visible) box.expandByObject(mesh);
+  return box;
+}
+
 // Partition actual exterior triangles into structural regions, including batched GLBs.
 // Own only generated geometry; source materials/textures remain owned by the aircraft.
 export class AircraftBreakup {
@@ -10,9 +22,28 @@ export class AircraftBreakup {
     this.radius = 20;
   }
 
-  spawn(aircraft, velocity) {
-    this.clear();
+  // Prepare once after the selected airframe loads, never in the impact hot path.
+  // Retain source transforms so articulated gear still uses its impact-time pose.
+  prepare(aircraft) {
+    if (this.preparedAircraft === aircraft && this.preparedUseGltf === aircraft.useGltf) return false;
+    this.disposePrepared();
+    const wasCockpit = Boolean(aircraft.isCockpit);
+    const cockpitVisible = aircraft.cockpit?.group.visible;
     aircraft.setCockpitMode(false);
+    try {
+      this.buildPrepared(aircraft);
+      this.preparedAircraft = aircraft;
+      this.preparedUseGltf = aircraft.useGltf;
+    } finally {
+      aircraft.setCockpitMode(wasCockpit);
+      if (aircraft.cockpit && cockpitVisible != null) aircraft.cockpit.group.visible = cockpitVisible;
+    }
+    return true;
+  }
+
+  buildPrepared(aircraft) {
+    this.preparedRoot = new THREE.Group();
+    this.preparedFragments = [];
     const root = aircraft.group;
     root.updateWorldMatrix(true, true);
     const sources = aircraft.useGltf ? [aircraft.gltfGroup,
@@ -23,7 +54,9 @@ export class AircraftBreakup {
     const inverse = root.matrixWorld.clone().invert();
     const meshes = [];
     const bounds = new THREE.Box3();
-    for (const source of sources.filter(Boolean)) source.traverseVisible(mesh => {
+    // Include hidden articulation alternatives (e.g. stowed/deployed F16 gear).
+    // Their impact-time visibility is applied without generating new geometry.
+    for (const source of sources.filter(Boolean)) source.traverse(mesh => {
       if (!mesh.isMesh || !mesh.geometry.attributes.position) return;
       const geometry = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
       const transform = inverse.clone().multiply(mesh.matrixWorld);
@@ -34,14 +67,17 @@ export class AircraftBreakup {
         for (let i = 0; i < tangent.count; i++) tangent.setW(i, -tangent.getW(i));
       }
       geometry.computeBoundingBox();
-      bounds.union(geometry.boundingBox);
-      meshes.push({ geometry, material: mesh.material, mirrored });
+      if (visibleBelow(mesh, root)) bounds.union(geometry.boundingBox);
+      meshes.push({ geometry, material: mesh.material, mirrored, source: mesh, inverseTransform: transform.clone().invert() });
     });
-    if (bounds.isEmpty()) return;
+    if (bounds.isEmpty()) {
+      for (const { geometry } of meshes) geometry.dispose();
+      return;
+    }
     const size = bounds.getSize(new THREE.Vector3());
     const center = bounds.getCenter(new THREE.Vector3());
     const regions = new Map();
-    for (const { geometry, material, mirrored } of meshes) {
+    for (const { geometry, material, mirrored, source, inverseTransform } of meshes) {
       const p = geometry.attributes.position;
       const buckets = new Map();
       for (let i = 0; i < p.count; i += 3) {
@@ -70,17 +106,55 @@ export class AircraftBreakup {
         const mesh = new THREE.Mesh(fragment, Array.isArray(material) ? material[matIndex] : material);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        mesh.matrixAutoUpdate = false;
+        fragment.computeBoundingBox();
+        fragment.computeBoundingSphere();
+        this.preparedFragments.push({ mesh, source, inverseTransform, matIndex });
         if (!regions.has(region)) regions.set(region, new THREE.Group());
         regions.get(region).add(mesh);
       }
       geometry.dispose();
     }
+    for (const object of regions.values()) this.preparedRoot.add(object);
+  }
+
+  spawn(aircraft, velocity) {
+    this.clear();
+    // Direct callers and crashes during asset loading still have a safe fallback.
+    this.prepare(aircraft);
+    aircraft.setCockpitMode(false);
+    const root = aircraft.group;
+    root.updateWorldMatrix(true, true);
+    const inverse = root.matrixWorld.clone().invert();
+    for (const { mesh, source, inverseTransform, matIndex } of this.preparedFragments) {
+      mesh.matrix.copy(inverse).multiply(source.matrixWorld).multiply(inverseTransform);
+      mesh.matrixWorldNeedsUpdate = true;
+      mesh.visible = visibleBelow(source, root);
+      // Liveries/material quality can change without replacing the geometry.
+      mesh.material = Array.isArray(source.material) ? source.material[matIndex] : source.material;
+    }
+    const regions = [...this.preparedRoot.children];
+    const bounds = new THREE.Box3();
+    for (const object of regions) {
+      object.position.set(0, 0, 0);
+      object.quaternion.identity();
+      object.scale.setScalar(1);
+      object.updateMatrixWorld(true);
+      fragmentBounds(object, bounds);
+    }
+    if (bounds.isEmpty()) return;
+    const center = bounds.getCenter(new THREE.Vector3());
     let n = 0;
     const speed = velocity.length();
-    for (const object of regions.values()) {
-      const box = new THREE.Box3().setFromObject(object);
+    for (const object of regions) {
+      const box = fragmentBounds(object);
+      if (box.isEmpty()) continue;
       const pivot = box.getCenter(new THREE.Vector3());
-      object.children.forEach(mesh => mesh.geometry.translate(-pivot.x, -pivot.y, -pivot.z));
+      const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
+      object.children.forEach(mesh => {
+        mesh.matrix.premultiply(offset);
+        mesh.matrixWorldNeedsUpdate = true;
+      });
       object.position.copy(pivot).applyMatrix4(root.matrixWorld);
       object.quaternion.copy(root.getWorldQuaternion(new THREE.Quaternion()));
       const outward = pivot.clone().sub(center).applyQuaternion(object.quaternion).normalize();
@@ -136,7 +210,10 @@ export class AircraftBreakup {
   updateBounds(terrain, waterLevel = null) {
     if (!this.pieces.length) return;
     const box = new THREE.Box3();
-    for (const { object } of this.pieces) box.expandByObject(object);
+    for (const { object } of this.pieces) {
+      object.updateWorldMatrix(true, true);
+      fragmentBounds(object, box);
+    }
     box.getCenter(this.target);
     this.radius = Math.max(10, box.getSize(new THREE.Vector3()).length() / 2);
     const floor = terrain?.getHeight(this.target.x, this.target.z) ?? 0;
@@ -146,10 +223,18 @@ export class AircraftBreakup {
   clear() {
     for (const { object } of this.pieces) {
       this.scene.remove(object);
-      object.traverse(mesh => mesh.geometry?.dispose());
+      this.preparedRoot.add(object);
     }
     this.pieces = [];
     if (this.aircraft) this.aircraft.group.visible = true;
     this.aircraft = null;
+  }
+
+  disposePrepared() {
+    this.clear();
+    this.preparedRoot?.traverse(mesh => mesh.geometry?.dispose());
+    this.preparedRoot = null;
+    this.preparedFragments = [];
+    this.preparedAircraft = null;
   }
 }
