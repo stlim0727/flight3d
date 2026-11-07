@@ -53,17 +53,58 @@ stepping applies only post-impact time without truncating long requests. Paused
 physics also holds debris. Water drag and seabed restitution vary with each
 piece's immersed height above the current terrain, independently of the collision
 label. This lets ship-impact debris sink and water-impact debris reach dry land.
-Scenes without a visible ocean supply no water surface. Generated geometry is disposed
-on reset; aircraft materials and textures remain shared.
+Scenes without a visible ocean supply no water surface.
+
+After the selected airframe finishes loading, `prepareCrashVisuals` partitions its
+geometry off-scene and starts `compileAsync` with the current scene lighting.
+Initial startup waits for this shader warmup behind the loading overlay; later
+model swaps start warmup before the next physics frame. Impact reuses those
+buffers, samples current source transforms/materials and visibility (including
+stowed/deployed gear), and positions rigid fragments without copying vertices.
+C172 flexible struts retain a source-vertex mapping: when suspension deformation
+changes their position-buffer version, impact refreshes those small fragments'
+positions/normals and bounds in place. Their buffers are still reused, and rigid
+airframe/wheel geometry is not refreshed.
+Reset retains the prepared buffers for another crash. Selecting another aircraft
+or changing between loaded/procedural geometry disposes the previous cache;
+`disposePrepared()` releases it explicitly. Source materials/textures stay shared.
+The cache retains one selected aircraft's expanded geometry, trading memory and
+preparation time for a shorter impact task. Direct callers without preparation
+still build synchronously as a fallback.
 
 The camera cuts immediately outside, fits the debris bounds (including portrait
 aspect ratios), follows its center and prevents view switches until crash reset.
 Reset restores the previous view, user/automatic camera selection state and the
 intact aircraft. Deterministic steps snap the camera to the final debris bounds.
-Node verification is `node --test tests/aircraftBreakup.test.js tests/physicsTiming.test.js`;
+Node verification is `node --test tests/aircraftBreakup.test.js tests/crashPreparation.test.js tests/f16.test.js tests/physicsTiming.test.js`;
 `test:crash` checks the exterior view, complete loaded geometry including gear,
 camera reset, and equal debris/camera state for one 10-second request versus ten
 1-second requests. It captures `aircraft_breakup_exterior.png`.
+
+## Crash response and realism rollout
+
+1. **Prepare breakup before impact (this change).** Reuse partitioned geometry
+   and start debris material shader compilation before collision. Preserve current
+   gear poses, material changes, reset behavior and camera framing. Browser checks
+   verify buffer identity across impact and report setup time for all three aircraft.
+2. **Remove remaining first-frame GPU/effect stalls.** Measure actual collision to
+   first presented crash frame, separately from CPU setup. Warm shadow variants,
+   upload debris buffers/textures and prepare bounded particle pools off-screen.
+   Cover first/repeated crashes, aircraft/quality changes and slower devices. A
+   breakup-only render measurement does not include particle/audio/debrief work;
+   `compileAsync` alone does not guarantee a stall-free first frame.
+3. **Improve fracture surfaces.** Replace open regional cuts with authored or
+   prepared closed fracture meshes, exposed internal surfaces and damaged materials.
+   Keep the mesh/draw-call budget bounded and review close-range screenshots.
+4. **Improve impact-dependent motion and effects.** Derive fragment impulses/spin
+   from contact position, surface normal, incoming momentum and angular velocity.
+   Improve ground sliding/settling, directional dust/spray, and severity/fuel-based
+   fire. Verify low/high-energy terrain, runway, structure and water impacts over
+   time, alongside camera and reset sequences.
+
+The three-second crash-to-debrief timer is separate from impact rendering. This
+rollout does not shorten that viewing interval or claim the observed end-to-end
+delay is fully resolved by step 1.
 
 This is a bounded visual breakup approximation, not a structural solver: region
 boundaries have open cut faces, and debris uses approximate terrain contact radii.

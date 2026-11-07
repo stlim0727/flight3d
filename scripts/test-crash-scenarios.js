@@ -186,6 +186,7 @@ async function main() {
       (() => {
         const sim = window.simulator;
         sim.resetCrash();
+        sim.gameFlow.enterFlight();
         // Position 80m South of Tower (tower is at x=120, z=280, height=83m) heading North (-Z) at 85 m/s
         sim.position.set(120, 65, 360);
         sim.linearVelocity.set(0, 0, -85);
@@ -203,7 +204,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 600));
 
     const towerCrashed = await evalJs(`Boolean(window.simulator.isCrashed && window.simulator.crashResult?.type === 'TOWER')`);
-    const towerTitle = await evalJs(`document.getElementById('crash-title').textContent`);
+    const towerTitle = await evalJs(`window.simulator.crashResult?.name ?? ''`);
     console.log(`   Tower Collision Detected: ${towerCrashed ? 'PASS ✅' : 'FAIL ❌'} [${towerTitle}]`);
     const breakupState = await evalJs(`(() => {
       const sim = window.simulator;
@@ -228,6 +229,7 @@ async function main() {
       (() => {
         const sim = window.simulator;
         sim.resetCrash();
+        sim.gameFlow.enterFlight();
         // Over ocean bay (z=4200) diving into water surface (y=5m, Vy=-22m/s, Vx=60m/s)
         sim.position.set(400, 5, 4200);
         sim.linearVelocity.set(60, -22, 0);
@@ -244,7 +246,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 600));
 
     const waterCrashed = await evalJs(`Boolean(window.simulator.isCrashed && window.simulator.crashResult?.type === 'WATER')`);
-    const waterTitle = await evalJs(`document.getElementById('crash-title').textContent`);
+    const waterTitle = await evalJs(`window.simulator.crashResult?.name ?? ''`);
     console.log(`   Water Impact Detected: ${waterCrashed ? 'PASS ✅' : 'FAIL ❌'} [${waterTitle}]`);
     await takeScreenshot('crash_water_showcase.png');
 
@@ -256,6 +258,7 @@ async function main() {
       (() => {
         const sim = window.simulator;
         sim.resetCrash();
+        sim.gameFlow.enterFlight();
         // Find an actual rising mountainside outside the carved departure corridor.
         // Keep the CG clear of terrain while the forward nose probes hit the slope.
         let site = null;
@@ -287,7 +290,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 600));
 
     const terrainCrashed = await evalJs(`Boolean(window.simulator.isCrashed && window.simulator.crashResult?.type === 'TERRAIN')`);
-    const terrainTitle = await evalJs(`document.getElementById('crash-title').textContent`);
+    const terrainTitle = await evalJs(`window.simulator.crashResult?.name ?? ''`);
     console.log(`   Mountain Terrain Collision: ${terrainCrashed ? 'PASS ✅' : 'FAIL ❌'} [${terrainTitle}]`);
     await takeScreenshot('crash_terrain_showcase.png');
 
@@ -299,6 +302,7 @@ async function main() {
       (() => {
         const sim = window.simulator;
         sim.resetCrash();
+        sim.gameFlow.enterFlight();
         // Find a tall skyscraper in East Bay cluster
         const b = sim.foliage.buildingData.find(item => item.height > 60) || sim.foliage.buildingData[0];
         const startX = b.x - 45;
@@ -319,7 +323,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 600));
 
     const bldgCrashed = await evalJs(`Boolean(window.simulator.isCrashed && window.simulator.crashResult?.type === 'BUILDING')`);
-    const bldgTitle = await evalJs(`document.getElementById('crash-title').textContent`);
+    const bldgTitle = await evalJs(`window.simulator.crashResult?.name ?? ''`);
     console.log(`   Skyscraper Collision: ${bldgCrashed ? 'PASS ✅' : 'FAIL ❌'} [${bldgTitle}]`);
     await takeScreenshot('crash_building_showcase.png');
 
@@ -331,6 +335,7 @@ async function main() {
       (() => {
         const sim = window.simulator;
         sim.resetCrash();
+        sim.gameFlow.enterFlight();
         // Find a tall tree on flat terrain
         const t = sim.foliage.treeData.find(item => {
           const h1 = sim.terrain.getHeight(item.x - 15, item.z);
@@ -354,7 +359,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 600));
 
     const treeCrashed = await evalJs(`Boolean(window.simulator.isCrashed && window.simulator.crashResult?.type === 'TREE')`);
-    const treeTitle = await evalJs(`document.getElementById('crash-title').textContent`);
+    const treeTitle = await evalJs(`window.simulator.crashResult?.name ?? ''`);
     console.log(`   Tree Collision: ${treeCrashed ? 'PASS ✅' : 'FAIL ❌'} [${treeTitle}]`);
     await takeScreenshot('crash_tree_showcase.png');
 
@@ -366,6 +371,7 @@ async function main() {
       (() => {
         const sim = window.simulator;
         sim.resetCrash();
+        sim.gameFlow.enterFlight();
         // Position in grass north of Runway 09L at z = 70m (beyond the 55 m
         // safety area), rolling along +X at the given ground speed
         sim.position.set(-1000, 15.5, 70);
@@ -401,18 +407,19 @@ async function main() {
     await new Promise(r => setTimeout(r, 600));
 
     const excursionCrashed = await evalJs(`Boolean(window.simulator.isCrashed && window.simulator.crashResult?.type === 'TERRAIN')`);
-    const excursionTitle = await evalJs(`document.getElementById('crash-title').textContent`);
+    const excursionTitle = await evalJs(`window.simulator.crashResult?.name ?? ''`);
     console.log(`   Off-Runway Excursion: ${excursionCrashed ? 'PASS ✅' : 'FAIL ❌'} [${excursionTitle}]`);
     await takeScreenshot('crash_excursion_showcase.png');
 
-    // Pausing after a crash (#322) must hold the post-crash scene without repeating the
-    // crash: the rig yields to the crash camera, and resuming hands the wreck back untouched.
+    // Opening the menu after a crash must hold the post-crash scene without repeating the
+    // crash. A crashed sortie stays held when the menu toggle is clicked again.
     // Issue #454: the debrief is the only crash report, so no hull-loss card exists.
     const menuRoundTrip = await evalJs(`(() => {
       const sim = window.simulator;
       const crashesBefore = sim.impactVelocityChecks.crashes;
       document.getElementById('menu-toggle').click();
-      const inPause = document.body.dataset.flow === 'paused'
+      const inMenu = document.body.dataset.flow === 'lobby'
+        && sim.gameFlow.canResumeFromLobby()
         && sim.isCrashed
         && sim.aircraftBreakup.pieces.length > 0
         && !document.getElementById('crash-overlay')
@@ -420,16 +427,18 @@ async function main() {
         && !sim.cameraSystem.pauseView;
       document.getElementById('menu-toggle').click();
       sim.stepSimulation(0.5);
-      const backInFlight = document.body.dataset.flow === 'flight'
+      const staysHeld = document.body.dataset.flow === 'lobby'
+        && sim.gameFlow.canResumeFromLobby()
+        && sim.gameFlow.isPhysicsFrozen()
         && sim.isCrashed
         && sim.aircraftBreakup.pieces.length > 0
         && sim.impactVelocityChecks.crashes === crashesBefore;
-      return { inPause, backInFlight, crashesBefore, crashesAfter: sim.impactVelocityChecks.crashes };
+      return { inMenu, staysHeld, crashesBefore, crashesAfter: sim.impactVelocityChecks.crashes };
     })()`);
-    if (!menuRoundTrip.inPause || !menuRoundTrip.backInFlight) {
-      throw new Error('Crash pause/resume repeated or lost crash state: ' + JSON.stringify(menuRoundTrip));
+    if (!menuRoundTrip.inMenu || !menuRoundTrip.staysHeld) {
+      throw new Error('Crash menu repeated or lost crash state: ' + JSON.stringify(menuRoundTrip));
     }
-    console.log('   Crash Pause/Resume Preservation: PASS ✅', JSON.stringify(menuRoundTrip));
+    console.log('   Crash Menu Hold Preservation: PASS ✅', JSON.stringify(menuRoundTrip));
 
     // Test Quick Restart
     console.log('\n🔄 Testing Quick Restart...');
@@ -449,13 +458,30 @@ async function main() {
     }
     console.log('Pre-contact impact velocity:', JSON.stringify(velocityChecks));
 
-    const aircraftBreakups = await evalJs(`(() => {
+    const aircraftBreakups = await evalJs(`(async () => {
       const sim = window.simulator;
       const results = [];
       for (const id of ['B738', 'C172', 'F16']) {
         sim.setAircraft(id);
+        const deadline = performance.now() + 60000;
+        while (sim.aircraft.loadingGltf) {
+          if (performance.now() > deadline) throw new Error('Aircraft load timed out: ' + id);
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
         sim.setPreset('runway');
+        sim.prepareCrashVisuals();
+        await sim.crashShaderWarmup;
+        const prepared = new Set(sim.aircraftBreakup.preparedFragments.map(f => f.mesh.geometry));
+        if (!prepared.size) throw new Error('Missing prepared breakup: ' + id);
         sim.cameraSystem.userModeSelected = false;
+        sim.cameraSystem.setMode(0);
+        // Cockpit entry lazily loads the 737 interior. Wait for the actual
+        // pre-crash view instead of asserting restoration of a still-pending cut.
+        while (sim.aircraft.cockpit?.cockpitModelLoading) {
+          if (performance.now() > deadline) throw new Error('Cockpit load timed out: ' + id);
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        await sim.aircraft.cockpit?.shaderWarmup;
         sim.cameraSystem.setMode(0);
         const vertexCount = source => {
           let count = 0;
@@ -467,7 +493,12 @@ async function main() {
         sim.aircraft.setCockpitMode(false);
         const gearVertices = id === 'B738' ? vertexCount(sim.aircraft.gearGroup) : 0;
         const expectedVertices = vertexCount(sim.aircraft.gltfGroup) + gearVertices;
+        const impactStart = performance.now();
         sim.aircraftBreakup.spawn(sim.aircraft, new window.THREE.Vector3(35, -8, 0));
+        const setupMs = performance.now() - impactStart;
+        for (const p of sim.aircraftBreakup.pieces) p.object.traverse(mesh => {
+          if (mesh.isMesh && !prepared.has(mesh.geometry)) throw new Error('Impact rebuilt geometry: ' + id);
+        });
         sim.cameraSystem.beginCrashView(sim.aircraftBreakup);
         sim.aircraftBreakup.update(0.6, sim.currentTerrain);
         sim.cameraSystem.updateCrashView(0, true);
@@ -481,7 +512,7 @@ async function main() {
         sim.cameraSystem.endCrashView();
         const restored = sim.aircraft.group.visible && sim.cameraSystem.mode === 0 && !sim.cameraSystem.userModeSelected;
         if (!sim.cameraSystem.setMode(1)) throw new Error('Crash reset blocked automatic camera selection');
-        results.push({ id, pieces, outside, gearVertices, restored });
+        results.push({ id, pieces, outside, gearVertices, restored, setupMs });
       }
       sim.setAircraft('B738');
       return results;
@@ -531,6 +562,7 @@ async function main() {
     const stepping = await evalJs(`(() => {
       const sim = window.simulator;
       sim.resetCrash();
+      sim.gameFlow.enterFlight();
       sim.position.set(120, 65, 360);
       sim.linearVelocity.set(0, 0, -85);
       sim.angularVelocity.set(0, 0, 0);
@@ -589,6 +621,7 @@ async function main() {
       const maxDifference = Math.max(...whole.map((v, i) => Math.abs(v - grouped[i])));
       if (!Number.isFinite(maxDifference) || maxDifference > 1e-7) throw new Error('Crash step grouping changed state: ' + maxDifference);
       sim.resetCrash();
+      sim.gameFlow.enterFlight();
       return { crashTick, postImpactTime, comparedSeconds: debrisTime, maxDifference };
     })()`);
     console.log('Deterministic post-impact debris and camera (10s vs 10 x 1s):', JSON.stringify(stepping));
