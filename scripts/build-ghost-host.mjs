@@ -28,7 +28,7 @@ await writeFile(join(pkg, 'package.json'), JSON.stringify(metadata, null, 2) + '
 await writeFile(join(pkg, 'manifest.json'), JSON.stringify({ version: metadata.version, sourceCommit, sourceDirty,
   protocolVersion: PROTOCOL_VERSION, flightRevision: FLIGHT_REVISION,
   legacyFlightRevision: LEGACY_FLIGHT_REVISION, configSchema: 1 }, null, 2) + '\n');
-for (const name of ['README.md', 'LICENSE']) await copyFile(join(root, 'host', name), join(pkg, name));
+for (const name of ['README.md', 'LICENSE', 'SETUP.md']) await copyFile(join(root, 'host', name), join(pkg, name));
 await copyFile(join(root, 'deploy/flight3d-ghost.service'), join(pkg, 'flight3d-ghost.service'));
 let notices = 'Bundled JavaScript licenses. No aircraft models, scenery, audio or other game assets are distributed.\n';
 for (const module of ['three', 'peerjs']) {
@@ -39,7 +39,9 @@ for (const module of ['three', 'peerjs']) {
 }
 await writeFile(join(pkg, 'THIRD_PARTY_NOTICES.txt'), notices);
 await chmod(join(pkg, 'cli.mjs'), 0o755);
-const packed = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', out], { cwd: pkg, encoding: 'utf8' }))[0];
+const npmCommand = process.env.npm_execpath ? process.execPath : 'npm';
+const npmPrefix = process.env.npm_execpath ? [process.env.npm_execpath] : [];
+const packed = JSON.parse(execFileSync(npmCommand, [...npmPrefix, 'pack', '--ignore-scripts', '--json', '--pack-destination', out], { cwd: pkg, encoding: 'utf8' }))[0];
 const archive = join(out, packed.filename);
 const sha = createHash('sha256').update(await readFile(archive)).digest('hex');
 await writeFile(join(out, 'SHA256SUMS'), `${sha}  ${packed.filename}\n`);

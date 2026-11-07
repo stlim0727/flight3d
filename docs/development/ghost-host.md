@@ -16,10 +16,27 @@ The simulator guest still needs its normal WebGL-capable browser.
 
 ## Standalone distribution
 
+Native executables include Node and embed all runtime assets. Users only install
+Chrome/Chromium. [The end-user setup guide](../../host/SETUP.md) is included in every
+archive and attached separately to releases. Maintainers run
+`npm run build:ghost:native` on the target OS/architecture; output archives are
+named with version, OS and CPU. The build requires the exact Node distribution's
+LICENSE and includes it in the native archive.
+
+A reusable native-build workflow produces Linux x64/ARM64, macOS x64/ARM64 and
+Windows x64 archives. It smoke-tests each executable in an empty directory; Linux
+x64 also passes the complete real WebRTC guest lifecycle test against the binary.
+The release job waits for the portable and every native job, downloads their
+artifacts by run ID, verifies the combined checksums and attaches all archives,
+`SHA256SUMS`, and `SETUP.md`. No partial set is uploaded after a failed build.
+macOS uses ad-hoc signing; Windows publisher signing and macOS notarization are
+not configured. Supported runner labels come from GitHub's hosted-runner reference.
+
+
 See [the standalone README](../../host/README.md) for installation without this
 repository and [the compatibility contract](multiplayer-contract.md) for host,
-guest and game versioning. The runtime archive is roughly 330 KB compressed and
-contains nine files: a Node CLI, a prebuilt browser bundle, metadata, licenses,
+guest and game versioning. The portable JavaScript archive is roughly 330 KB compressed and
+contains ten files: a Node CLI, a prebuilt browser bundle, metadata, licenses,
 documentation and a portable systemd unit. It has zero runtime npm dependencies.
 Installed Node 22.23.2+ and Chrome/Chromium are still required.
 

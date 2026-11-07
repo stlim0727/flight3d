@@ -4,7 +4,23 @@ Run an ordinary Flight3d multiplayer host without cloning the game repository,
 installing npm dependencies, downloading game assets, or owning a GPU.
 The AI flies a B738 coastal-cruise orbit. Guests use the existing game/invite UI.
 
-## Install and run
+## Download an executable
+
+Choose a `ghost-host-v...` release from the [project releases](https://github.com/stlim0727/flight3d/releases).
+Native archives are provided for Windows x64, Linux x64/ARM64, and macOS Intel/Apple
+Silicon. They include Node; installed Chrome/Chromium is the only application
+prerequisite. Follow [SETUP.md](SETUP.md) for choosing an archive, verifying the
+checksum, first run, sharing an invite and automatic startup/update instructions.
+The guide is included in every archive and attached separately to the release.
+
+Native executables are built on their target OS/CPU and smoke-tested there. Linux
+x64 additionally runs the real guest lifecycle test. macOS builds are ad-hoc signed;
+Windows builds are unsigned. Publisher signing/notarization is not configured.
+
+PR build artifacts are for review; public downloads appear only after the release
+workflow succeeds for a published matching ghost-host release tag.
+
+## Portable JavaScript package
 
 Requirements: **Node.js 22.23.2+** and installed **Chrome or Chromium**. The same
 JavaScript package supports Linux, macOS and Windows. Linux is the verified service
@@ -19,7 +35,8 @@ flight3d-ghost-host --check
 flight3d-ghost-host --name Maverick
 ```
 
-Or extract it into an empty directory and run `node cli.mjs` there. Nothing is
+Or extract it into an empty directory, enter the extracted `package/` directory,
+and run `node cli.mjs` there. Nothing is
 installed or built on first run. No registry publication is required for this
 archive, and no automatic browser download occurs.
 
@@ -69,8 +86,9 @@ a particular room code. A corrupt room file fails startup instead of silently
 changing the invite. The original service's room file can be reused by pointing
 `GHOST_STATE_DIR` at its existing directory.
 
-For long-running Linux installations, extract releases into
-`~/.local/share/flight3d-ghost/releases/<version>-<commit>/`, and point `current`
+For portable-package long-running Linux installations, extract releases into
+`~/.local/share/flight3d-ghost/releases/<version>-<commit>/` using
+`tar -xzf ARCHIVE.tgz -C RELEASE_DIRECTORY --strip-components=1`, and point `current`
 at the chosen release. Install the included `flight3d-ghost.service` into
 `~/.config/systemd/user/`, adjust the Node PATH if necessary, then:
 

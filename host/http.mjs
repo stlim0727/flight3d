@@ -1,10 +1,9 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
 
 /** Serve exactly the bundled host files, never the checkout or arbitrary paths. */
-export async function serveHost(webRoot, health) {
-  const html = await readFile(new URL('index.html', webRoot));
-  const script = await readFile(new URL('host.js', webRoot));
+export async function serveHost(readAsset, health) {
+  const html = await readAsset('web/index.html');
+  const script = await readAsset('web/host.js');
   const server = createServer((req, res) => {
     const path = new URL(req.url, 'http://localhost').pathname;
     if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405); res.end(); return; }

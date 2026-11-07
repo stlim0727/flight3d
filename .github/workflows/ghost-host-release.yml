@@ -8,12 +8,10 @@ permissions:
   contents: read
 
 jobs:
-  package:
+  portable:
     if: startsWith(github.event.release.tag_name, 'ghost-host-v')
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -35,9 +33,47 @@ jobs:
       - run: npm run test:ghost-package
         env:
           CHROME_NO_SANDBOX: '1'
-      - name: Attach verified standalone archive and checksum
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ghost-host-portable
+          path: |
+            artifacts/ghost-host/*.tgz
+            artifacts/ghost-host/SHA256SUMS
+          if-no-files-found: error
+
+  native:
+    if: startsWith(github.event.release.tag_name, 'ghost-host-v')
+    uses: ./.github/workflows/ghost-host-native.yml
+
+  publish:
+    needs: [portable, native]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - name: Download and verify all platform packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          gh run download "$RUN_ID" --pattern 'ghost-host-*' --dir artifacts/download
+          mkdir -p artifacts/release
+          cp artifacts/download/ghost-host-portable/*.tgz artifacts/release/
+          cp artifacts/download/ghost-host-native-*/*.tar.gz artifacts/release/
+          cp artifacts/download/ghost-host-native-*/*.zip artifacts/release/
+          cat artifacts/download/ghost-host-portable/SHA256SUMS artifacts/download/ghost-host-native-*/SHA256SUMS-* > artifacts/release/SHA256SUMS
+          cp host/SETUP.md artifacts/release/SETUP.md
+          cd artifacts/release
+          sha256sum -c SHA256SUMS
+      - name: Attach executables, guide and checksums
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$RELEASE_TAG" artifacts/ghost-host/*.tgz artifacts/ghost-host/SHA256SUMS
+        run: gh release upload "$RELEASE_TAG" artifacts/release/*

@@ -2,7 +2,7 @@
 // The host/guest fixture has no renderer; WebGL is explicitly unavailable.
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createServer } from 'vite';
@@ -10,14 +10,16 @@ import { getFreePort } from './lib/browserHarness.mjs';
 import { connectCdp, until, delay } from './lib/cdpClient.mjs';
 
 const artifactDir = resolve('artifacts/ghost-host');
-const archive = join(artifactDir, (await readdir(artifactDir)).find(name => name.endsWith('.tgz')));
+const native = process.env.GHOST_TEST_EXECUTABLE ? resolve(process.env.GHOST_TEST_EXECUTABLE) : null;
+const archive = native ? null : join(artifactDir, (await readdir(artifactDir)).find(name => name.endsWith('.tgz')));
 const directory = await mkdtemp(join(tmpdir(), 'flight3d-distribution-'));
 const signalPort = await getFreePort();
 let signal, vite, hostProcess, hostClient, ready, guest;
+let command = process.execPath, commandArgs = [join(directory, 'package/cli.mjs')];
 const clients = []; let hostOutput = '', hostError = '';
 async function launch() {
   ready = null; hostOutput = ''; hostError = '';
-  hostProcess = spawn(process.execPath, [join(directory, 'package/cli.mjs'),
+  hostProcess = spawn(command, [...commandArgs,
     '--state-dir', join(directory, 'state'), '--signal-url', `http://127.0.0.1:${signalPort}/flight3d`],
   { cwd: directory, env: { ...process.env, NODE_PATH: '', GHOST_ROOM: '', GHOST_NAME: 'Maverick' }, stdio: ['ignore', 'pipe', 'pipe'] });
   hostProcess.stdout.on('data', bytes => {
@@ -57,12 +59,18 @@ async function joinRoom(code, contract) {
   return guest;
 }
 try {
-  const entries = execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split('\n');
-  assert.equal(entries.some(path => /node_modules|\/src\/|\/public\//.test(path)), false, 'archive excludes checkout/assets/dependencies');
-  execFileSync('tar', ['-xzf', archive, '-C', directory]);
-  const packageInfo = JSON.parse(await readFile(join(directory, 'package/package.json'), 'utf8'));
-  assert.equal(Object.keys(packageInfo.dependencies || {}).length, 0);
-  const version = JSON.parse(execFileSync(process.execPath, [join(directory, 'package/cli.mjs'), '--version'], { cwd: directory, encoding: 'utf8', env: { ...process.env, NODE_PATH: '' } }));
+  let entries = [];
+  if (native) {
+    command = join(directory, 'flight3d-ghost-host'); commandArgs = [];
+    await copyFile(native, command);
+  } else {
+    entries = execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split('\n');
+    assert.equal(entries.some(path => /node_modules|\/src\/|\/public\//.test(path)), false, 'archive excludes checkout/assets/dependencies');
+    execFileSync('tar', ['-xzf', archive, '-C', directory]);
+    const packageInfo = JSON.parse(await readFile(join(directory, 'package/package.json'), 'utf8'));
+    assert.equal(Object.keys(packageInfo.dependencies || {}).length, 0);
+  }
+  const version = JSON.parse(execFileSync(command, [...commandArgs, '--version'], { cwd: directory, encoding: 'utf8', env: { ...process.env, NODE_PATH: '' } }));
   assert.equal(version.protocolVersion, 2); assert.equal(version.flightRevision, 1);
   signal = spawn(process.execPath, ['--input-type=module', '-e', `import {PeerServer} from 'peer'; PeerServer({host:'127.0.0.1',port:${signalPort},path:'/flight3d',allow_discovery:false});`], { stdio: ['ignore', 'ignore', 'pipe'] });
   await until(async () => { try { return (await fetch(`http://127.0.0.1:${signalPort}/flight3d`)).ok; } catch { return false; } }, 'local signaling');
@@ -92,7 +100,7 @@ try {
   assert.equal(hostProcess.exitCode, 1); assert.match(hostError, /simulation stalled/);
   hostClient.close(); hostClient = null;
   await launch(); assert.equal(ready.room, code, 'recovery after stall preserves room');
-  console.log(`PASS standalone archive: ${entries.length} files, no runtime npm dependencies or checkout; GPU-free Chrome WebRTC; legacy/current guest compatibility; explicit flight mismatch rejection before start; AI movement; persistent room across restart; stalled-simulation recovery.`);
+  console.log(`PASS standalone ${native ? "native executable" : `archive (${entries.length} files)`}, no runtime npm dependencies or checkout; GPU-free Chrome WebRTC; legacy/current guest compatibility; explicit flight mismatch rejection before start; AI movement; persistent room across restart; stalled-simulation recovery.`);
 } catch (error) {
   console.error(error, hostError, hostOutput); process.exitCode = 1;
 } finally {
