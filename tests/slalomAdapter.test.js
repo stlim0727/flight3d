@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import * as THREE from 'three';
+import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import assert from 'node:assert/strict';
 import { SlalomMissionAdapter } from '../src/arena/SlalomMissionAdapter.js';
 import { SlalomMission } from '../src/arena/SlalomMission.js';
@@ -156,4 +158,22 @@ test('adapter preparation resets aero separation, warnings, and physics accumula
   assert.equal(sim.physicsAccumulator, 0);
   assert.deepEqual(sim.telemetry.warnings, []);
   assert.ok(adapter.command.throttle > 0);
+});
+
+test('starting a mission repairs the selected cached F16 and replaces the inherited belly view', async () => {
+  const sim = createSlalomSimulation(1);
+  const outgoing = sim.aircraft;
+  const cached = { ...outgoing, damaged: true,
+    resetCrashVisuals() { this.damaged = false; } };
+  outgoing.damaged = false;
+  sim.setAircraft = () => { sim.aircraft = cached; };
+  sim.cameraSystem = new CameraSystem(new THREE.PerspectiveCamera(), null);
+  sim.cameraSystem.setMode(CameraSystem.MODES.GEAR, true);
+  const adapter = new SlalomMissionAdapter(sim);
+  // The global flag was already cleared when the pilot left the previous wreck.
+  sim.isCrashed = false;
+  await adapter.prepare({ seed: 1, pilotKind: 'human' });
+  assert.equal(cached.damaged, false);
+  assert.equal(sim.cameraSystem.mode, CameraSystem.MODES.HUD);
+  assert.equal(sim.cameraSystem.userLookOverridden, false);
 });

@@ -585,7 +585,7 @@ class FlightSimulator {
     // Only a region or model swap is slow enough to need the loading card. Everything else
     // starts inside the click task, so callers can keep sequencing steps after fly().
     if (needsScene) await this.applyPendingScene();
-    else this.startFlight();
+    else await this.startFlight();
   }
 
   /**
@@ -623,9 +623,12 @@ class FlightSimulator {
         await stage(2, 'startup.aircraft');
         this.setAircraft(this.lobby.aircraft);
       }
-      this.startFlight();
+      await this.startFlight();
       await stage(3, 'startup.ready');
     } catch (error) {
+      this.gameFlow.returnToLobby(false);
+      this.gameFlow.setCinematicAvailable(false);
+      this.syncFlowUi();
       console.warn('Flight start failed:', error);
       this.showToast(() => t('startup.failed'));
     } finally {
@@ -636,9 +639,26 @@ class FlightSimulator {
     }
   }
 
-  /** Spawn the chosen scenario and hand the cockpit over. Nothing here waits. */
-  startFlight({ keepTimeOfDay = false } = {}) {
+  /** Own the entire start, including lazy mission loading, for every caller. */
+  async startFlight(options = {}) {
     if (this.multiplayer?.locked) return;
+    const alreadyStarting = Boolean(this.startingFlight);
+    this.startingFlight = true;
+    try {
+      await this.spawnFlight(options);
+    } catch (error) {
+      this.gameFlow.returnToLobby(false);
+      this.gameFlow.setCinematicAvailable(false);
+      this.syncFlowUi();
+      console.warn('Flight start failed:', error);
+      this.showToast(() => t('startup.failed'));
+    } finally {
+      this.startingFlight = alreadyStarting;
+    }
+  }
+
+  /** Install the selected scenario before recording or publishing its start. */
+  async spawnFlight({ keepTimeOfDay = false } = {}) {
     this.devRunner.stop();
     this.shadowDemo.stop();
     const wantsDemo = this.lobby.preset === 'demo';
@@ -651,12 +671,13 @@ class FlightSimulator {
     if (!wantsDemo && !keepTimeOfDay && this.demoDirector && !this.demoDirector.userTimeOfDayOverridden) {
       applyDeviceTimeOfDay(this);
     }
+    this.gameFlow.setCinematicAvailable(isScenarioAvailable(this.activeAirport, 'demo'));
     this.gameFlow.enterFlight();
     // setAirport may have clamped the scenario to the region it loaded.
     if (wantsDemo) {
       this.demoDirector.start();
     } else if (wantsValley) {
-      this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' });
+      await this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' });
     } else {
       this.setPreset(this.lobby.preset);
     }
