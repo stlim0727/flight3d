@@ -12,8 +12,11 @@ Unavailable storage must not block room creation or joining.
 
 ## Contract
 
+See [the versioned compatibility contract](multiplayer-contract.md) for wire,
+flight-data, invite and standalone-host release compatibility.
+
 - Codes contain six unambiguous base32 characters (30 random bits) from
-  `crypto.getRandomValues`. URLs use `?r=CODE`; manual entry accepts lowercase,
+  `crypto.getRandomValues`. URLs use `?r=CODE&mp=2&fr=1` (legacy `?r=CODE` still works); manual entry accepts lowercase,
   spaces and hyphens. PeerJS IDs are namespaced separately from display codes.
   Protocol v2 uses these codes; old v1 UUID invites are not accepted.
 - After signaling registration, the creator has sixty seconds to explicitly renew

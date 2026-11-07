@@ -2,7 +2,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 
 const files = execFileSync('git', ['ls-files', '--cached', '--others',
-  '--exclude-standard', '-z', '--', 'src', 'scripts', 'tests', 'vite.config.js'],
+  '--exclude-standard', '-z', '--', 'src', 'scripts', 'tests', 'host', 'vite.config.js'],
   { encoding: 'utf8' }).split('\0').filter(file => /\.m?js$/.test(file));
 if (!files.length) throw new Error('No JavaScript files found; run from the repository root.');
 let failures = 0;

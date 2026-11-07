@@ -21,7 +21,7 @@ function pair({ prepareHost = async () => {}, prepareGuest = async () => {} } = 
 test('six-character room codes keep deployment paths and discard solo URL/hash', () => {
   const room = newRoom(); assert.equal(validRoom(room), true);
   const u = new URL(inviteUrl(room, 'https://example.org/flight3d/?fly=1&terrain=lukla#x'));
-  assert.equal(u.pathname, '/flight3d/'); assert.equal(u.searchParams.get('r'), room); assert.equal(u.hash, ''); assert.equal(u.searchParams.size, 1);
+  assert.equal(u.pathname, '/flight3d/'); assert.equal(u.searchParams.get('r'), room); assert.equal(u.hash, ''); assert.equal(u.searchParams.size, 3); assert.equal(u.searchParams.get('mp'), '2'); assert.equal(u.searchParams.get('fr'), '1');
   for (const invalid of ['', '<script>', 'f3d-1234', null, room + '/x', '01IO00']) assert.equal(validRoom(invalid), false);
   assert.equal(cleanName('<b>\nPilot\0'), 'bPilot');
   assert.equal(cleanName(''), 'Pilot');

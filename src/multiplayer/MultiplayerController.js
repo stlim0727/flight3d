@@ -2,7 +2,7 @@ import { PeerRoom } from './PeerRoom.js';
 import { VoiceLink } from './VoiceLink.js';
 import { MultiplayerDialog } from './MultiplayerDialog.js';
 import { RemoteAircraft } from './RemoteAircraft.js';
-import { inviteUrl, parseRoom, DEFAULT_CONFIG, slotOffset } from './protocol.js';
+import { inviteUrl, parseRoom, inviteCompatibilityFailure, DEFAULT_CONFIG, slotOffset } from './protocol.js';
 import { t, bindText } from '../i18n/index.js';
 import { setSimulationWind } from '../physics/WindField.js';
 import { bindMultiplayerPreferences } from './preferences.js';
@@ -24,9 +24,7 @@ export class MultiplayerController {
     document.getElementById('mp-choose-join').onclick = () => this.chooseSetup('join');
     document.getElementById('mp-create').onclick = () => this.connect();
     document.getElementById('mp-join').onclick = () => {
-      const room = parseRoom(this.roomInput.value);
-      if (!room) { this.message = 'invalid-room'; this.refresh(); return; }
-      this.connect(room);
+      this.connectInvite(this.roomInput.value);
     };
     document.getElementById('mp-start').onclick = () => this.room?.session.start();
     document.getElementById('mp-respawn').onclick = () => this.respawnLocal();
@@ -42,16 +40,20 @@ export class MultiplayerController {
     window.addEventListener('pagehide', () => this.room?.dispose());
     this.refresh();
     const params = new URLSearchParams(location.search);
-    this.joinInvite(params.get('r') ?? params.get('room'));
+    this.joinInvite(params.has('r') || params.has('room') ? location.href : null);
   }
   joinInvite(invite) {
     if (invite === null) return;
     this.chooseSetup('join');
     this.roomInput.value = invite;
     this.openDialog();
+    this.connectInvite(invite);
+  }
+  connectInvite(invite) {
     const room = parseRoom(invite);
-    if (room) this.connect(room);
-    else { this.message = 'invalid-room'; this.refresh(); }
+    if (!room) { this.message = 'invalid-room'; this.refresh(); return; }
+    if (inviteCompatibilityFailure(invite)) { this.message = 'incompatible'; this.refresh(); return; }
+    this.connect(room);
   }
   chooseSetup(mode) {
     for (const path of ['host', 'join']) {

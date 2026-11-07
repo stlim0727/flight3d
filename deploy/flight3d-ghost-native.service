@@ -1,0 +1,18 @@
+[Unit]
+Description=Flight3d standalone multiplayer host
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/flight3d-ghost/current/flight3d-ghost-host
+Environment=GHOST_NAME=Maverick
+Restart=always
+RestartSec=10
+KillMode=control-group
+TimeoutStopSec=15
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
