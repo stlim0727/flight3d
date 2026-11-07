@@ -18,15 +18,19 @@ export class Boeing737 {
   constructor(pfdCanvas, ndCanvas, eicasCanvas, mcpCanvas = null, isfdCanvas = null, cduCanvas = null, options = {}) {
     this.group = new THREE.Group();
     this.livery = options.livery ?? 'jeju';
+    this.exteriorOnly = options.exteriorOnly === true;
 
     // Internal cockpit
-    this.cockpit = new Cockpit(pfdCanvas, ndCanvas, eicasCanvas, mcpCanvas, isfdCanvas, cduCanvas);
-    this.group.add(this.cockpit.group);
-    const prevOnModelReady = this.cockpit.onModelReady;
-    this.cockpit.onModelReady = () => {
-      prevOnModelReady?.();
-      if (this.flatShading) applyFlatShading(this.cockpit.group, true);
-    };
+    this.cockpit = null;
+    if (!this.exteriorOnly) {
+      this.cockpit = new Cockpit(pfdCanvas, ndCanvas, eicasCanvas, mcpCanvas, isfdCanvas, cduCanvas);
+      this.group.add(this.cockpit.group);
+      const prevOnModelReady = this.cockpit.onModelReady;
+      this.cockpit.onModelReady = () => {
+        prevOnModelReady?.();
+        if (this.flatShading) applyFlatShading(this.cockpit.group, true);
+      };
+    }
 
     // GLTF PBR High-Detail Model references
     this.gltfModel = null;
@@ -900,7 +904,7 @@ export class Boeing737 {
     }
 
     // 6. Update Cockpit Interior Controls
-    this.cockpit.updateControls(flightState);
+    this.cockpit?.updateControls(flightState);
   }
 
   fitNoseDoorsToSkin(exterior = this.gltfModel) {
@@ -968,7 +972,10 @@ export class Boeing737 {
   }
 
   loadGltfModel(url) {
+    this.ready = Promise.resolve();
     if (typeof window === 'undefined') return;
+    let settle;
+    this.ready = new Promise(resolve => { settle = resolve; });
     this.loadingGltf = true;
 
     // Suppress procedural exterior while primary GLTF asset is loading to prevent flash of old model
@@ -1041,7 +1048,7 @@ export class Boeing737 {
           // Setup airframe shadow proxy so realistic airframe shadows are cast in cockpit view
           // while preserving gltfGroup.visible = false contract in cockpit mode
           const b737Mesh = this.gltfModel.getObjectByName('B737');
-          if (b737Mesh) {
+          if (b737Mesh && !this.exteriorOnly) {
             const shadowMat = new THREE.MeshBasicMaterial({
               colorWrite: false,
               depthWrite: false
@@ -1066,6 +1073,7 @@ export class Boeing737 {
           if (this.empennageGroup) this.empennageGroup.visible = false;
           if (this.enginesGroup) this.enginesGroup.visible = false;
           if (this.proceduralShadowProxy) this.proceduralShadowProxy.visible = false;
+          settle();
         },
         undefined,
         (err) => {
@@ -1078,6 +1086,7 @@ export class Boeing737 {
           if (this.tailGroup) this.tailGroup.visible = !this.isCockpit;
           if (this.empennageGroup) this.empennageGroup.visible = !this.isCockpit;
           if (this.enginesGroup) this.enginesGroup.visible = !this.isCockpit;
+          settle();
         }
       );
     } catch (e) {
@@ -1088,6 +1097,7 @@ export class Boeing737 {
       if (this.tailGroup) this.tailGroup.visible = !this.isCockpit;
       if (this.empennageGroup) this.empennageGroup.visible = !this.isCockpit;
       if (this.enginesGroup) this.enginesGroup.visible = !this.isCockpit;
+      settle();
     }
   }
 

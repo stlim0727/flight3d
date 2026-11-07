@@ -45,6 +45,13 @@ flight-data, invite and standalone-host release compatibility.
 - Slots are separated: runway guest waits 80 m behind; cruise guest starts 60 m
   right and 20 m behind the host. Aircraft are ghosts, with no remote forces or
   collision events. Reset retains the assigned slot and advances a respawn epoch.
+- Remote aircraft use the same C172, B738 and F16 visual classes and GLB assets as
+  the selected local aircraft, including the normal alignment/livery and gear
+  animation. Remote instances create no physics or collision state. Exterior-only
+  construction omits the B738 instrument cockpit, live C172 displays, instrument
+  lighting and F16 exhaust effects. Remote lights do not illuminate the scene.
+  Leaving disposes owned geometry, materials and textures, including assets that
+  finish loading after departure. The local aircraft keeps its own resources.
 - One admitted data connection and one media connection per room. A third pilot
   receives room-full. No automatic host migration; losing either pilot ends the
   session, releases microphone/calls, and leaves the local flight available solo.
