@@ -261,7 +261,12 @@ body.hud-folded .flight-more-panel,
 body.hud-folded .touch-controls-overlay,
 body.hud-folded #demo-banner,
 body.hud-folded .demo-pill-btn,
-body.hud-folded .ap-panel {
+body.hud-folded .ap-panel,
+body.hud-folded #ap-bar,
+body.hud-folded #hud-view,
+body.hud-folded #voice-challenge-overlay,
+body.hud-folded #shadow-demo,
+body.hud-folded .flight-alert-stack {
   display: none !important;
 }
 body.hud-folded .hud-unfold-pill:not([hidden]) {

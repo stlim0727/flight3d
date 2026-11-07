@@ -70,11 +70,24 @@ test('CSS files define .is-folded and .ui-unfold-pill styles for clear plane wat
 
   const flightLayoutCss = readFileSync(resolve('src/styles/flight-layout.css'), 'utf8');
   assert.ok(flightLayoutCss.includes('body.hud-folded'), 'flight-layout CSS must define body.hud-folded');
+  assert.ok(flightLayoutCss.includes('body.hud-folded #hud-view'), 'flight-layout CSS must hide #hud-view when hud-folded');
   assert.ok(flightLayoutCss.includes('.hud-unfold-pill'), 'flight-layout CSS must define .hud-unfold-pill');
   assert.ok(flightLayoutCss.includes('.hud-unfold-pill[hidden]'), 'flight-layout CSS must hide .hud-unfold-pill[hidden]');
 
   const diagCss = readFileSync(resolve('src/styles/diagnostics-and-crash.css'), 'utf8');
   assert.ok(diagCss.includes('.diagnostics-panel.is-folded'), 'diag CSS must define .diagnostics-panel.is-folded');
+});
+
+test('HudView hides and suspends drawing when body.hud-folded is present', () => {
+  const hudViewSrc = readFileSync(resolve('src/ui/HudView.js'), 'utf8');
+  assert.ok(hudViewSrc.includes('hud-folded'), 'HudView must check hud-folded class');
+  assert.ok(hudViewSrc.includes('!hudFolded'), 'HudView must not be active when hud-folded is true');
+});
+
+test('SimulatorHudAndBindings guards folding shortcuts against active open modals', () => {
+  const bindingsSrc = readFileSync(resolve('src/ui/SimulatorHudAndBindings.js'), 'utf8');
+  assert.ok(bindingsSrc.includes('hasActiveModal'), 'must define or check hasActiveModal');
+  assert.ok(bindingsSrc.includes('if (hasActiveModal()'), 'must return early if modal is active in keydown');
 });
 
 test('i18n catalogs include fold and unfold translations for both EN and KO', () => {

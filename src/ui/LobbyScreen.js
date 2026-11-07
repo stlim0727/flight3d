@@ -38,8 +38,11 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     lobbyScreen?.classList.toggle('is-folded', isFolded);
     if (lobbyUnfoldBtn) lobbyUnfoldBtn.hidden = !isFolded;
     if (lobbyFoldBtn) lobbyFoldBtn.setAttribute('aria-expanded', String(!isFolded));
-    if (isFolded) lobbyUnfoldBtn?.focus();
-    else lobbyFoldBtn?.focus();
+    const activeModal = document.querySelector('dialog[open], .modal-backdrop.visible, #replay-library:not([hidden]), #feedback-dialog-overlay:not([hidden]), #demo-restart-dialog:not([hidden]), #joystick-dialog-overlay:not([hidden]), [aria-modal="true"]:not([hidden]):not(.flow-overlay)');
+    if (!activeModal) {
+      if (isFolded) lobbyUnfoldBtn?.focus();
+      else lobbyFoldBtn?.focus();
+    }
   }
 
   lobbyFoldBtn?.addEventListener('click', () => setLobbyFolded(true));

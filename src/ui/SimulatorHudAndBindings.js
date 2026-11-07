@@ -14,6 +14,16 @@ import { defaultScenarioForRegion } from '../config/scenarioRegistry.js';
 import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { computeUiScale, applyUiScale } from './UiScale.js';
 
+export function hasActiveModal() {
+  if (typeof document === 'undefined') return false;
+  if (document.querySelector('dialog[open]')) return true;
+  if (document.querySelector('.modal-backdrop.visible')) return true;
+  if (document.querySelector('#replay-library:not([hidden]), #feedback-dialog-overlay:not([hidden]), #demo-restart-dialog:not([hidden]), #joystick-dialog-overlay:not([hidden])')) return true;
+  if (document.querySelector('[aria-modal="true"]:not([hidden]):not(.flow-overlay), [role="dialog"]:not([hidden]):not(.flow-overlay)')) return true;
+  const activeModalEl = document.activeElement?.closest?.('dialog, [aria-modal="true"]:not(.flow-overlay), [role="dialog"]:not(.flow-overlay), .modal-backdrop, .modal-card, #replay-library');
+  return Boolean(activeModalEl);
+}
+
 class SimulatorHudAndBindingsMethods {
   initControls() {
     this.controls.onUserInteract = () => {
@@ -586,6 +596,18 @@ class SimulatorHudAndBindingsMethods {
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
       if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
+      if (this.isCrashed) return;
+      if (document.getElementById('hud-overlay')?.classList.contains('panel-open')) return;
+      const helpModal = document.getElementById('help-modal');
+      if (helpModal?.classList.contains('visible')) {
+        helpModal.classList.remove('visible');
+        return;
+      }
+      if (this.demoDirector?.isRestartConfirmOpen) {
+        this.demoDirector.cancelRestart();
+        return;
+      }
+      if (hasActiveModal()) return;
       const lobbyScreen = document.getElementById('lobby-screen');
       if (this.gameFlow.state === FLOW.LOBBY && lobbyScreen?.classList.contains('is-folded')) {
         this.lobbyScreen?.setFolded?.(false);
@@ -607,17 +629,6 @@ class SimulatorHudAndBindingsMethods {
         this.replayPanel.exit();
         return;
       }
-      if (this.isCrashed) return;
-      if (document.getElementById('hud-overlay')?.classList.contains('panel-open')) return;
-      const helpModal = document.getElementById('help-modal');
-      if (helpModal?.classList.contains('visible')) {
-        helpModal.classList.remove('visible');
-        return;
-      }
-      if (this.demoDirector?.isRestartConfirmOpen) {
-        this.demoDirector.cancelRestart();
-        return;
-      }
       if (this.gameFlow.state === FLOW.FLIGHT) this.gameFlow.pause();
       else if (this.gameFlow.state === FLOW.PAUSED) this.gameFlow.resume();
       else if (this.gameFlow.state === FLOW.LOBBY && this.gameFlow.canResumeFromLobby()) this.resumeFlight();
@@ -627,6 +638,7 @@ class SimulatorHudAndBindingsMethods {
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'KeyU' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
       if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
+      if (hasActiveModal() || this.demoDirector?.isRestartConfirmOpen) return;
       const lobbyScreen = document.getElementById('lobby-screen');
       if (this.gameFlow.state === FLOW.LOBBY) {
         const folded = !lobbyScreen?.classList.contains('is-folded');
