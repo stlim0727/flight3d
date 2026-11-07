@@ -12,7 +12,9 @@ export function updateGearDamage(contact, demand, dt, limits) {
     lateralLoad / limits.lateral, longitudinalLoad / limits.longitudinal);
   let increment = Math.max(0, ratio - 1) ** 2 * dt * 2;
   if (firstContact && sinkRate > limits.impact) {
-    increment += 0.35 + (sinkRate - limits.impact) / (limits.collapseImpact - limits.impact);
+    // Damage starts at 0.35 at the impact limit and reaches 1 at the
+    // collapse limit, rather than prematurely collapsing at 65% of that range.
+    increment += 0.35 + 0.65 * (sinkRate - limits.impact) / (limits.collapseImpact - limits.impact);
   }
   if (overtravel > 0.08) {
     if (firstContact) contact.damage = Math.max(0.3, contact.damage);

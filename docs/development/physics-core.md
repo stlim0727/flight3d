@@ -80,3 +80,34 @@ not guaranteed by this change.
 
 See [the recorded browser comparison](physics-core-verification.md) for the
 baseline, measured results, reproduction steps and remaining limitations.
+
+## Normal load and impact contact
+
+`telemetry.gForce` is unfiltered normal specific force at the instantaneous CG,
+not resultant acceleration or a cockpit/seat sensor. `normalLoadFactor` measures
+`(deltaVelocity / dt - gravity) / g0` projected onto the midpoint body-up axis.
+The velocity interval starts after the moving-CG reference rebase and ends after
+body contact constraint impulses. At rest this reads +1g; free fall reads 0g.
+Constraint impulses are physical velocity changes and must be included. Their
+step-averaged peaks can depend on the physics timestep; they are not certified
+real-aircraft crash measurements. Do not clamp or smooth them to hide solver errors.
+
+Body support uses backward-Euler spring/damper compliance with the contact's
+effective mass, including the CG arm and rotational inertia. This prevents a
+stiff aft-body damper from reversing a light aircraft's contact velocity in one
+120Hz step and slamming its nose down. Speculative contact retains signed
+clearance rather than applying full damping before the surface is reached.
+The penetration constraint remains a last-resort unilateral safeguard.
+
+Gear damage never consumes `gForce`. It uses local contact closing speed,
+combined normal/side/drag loads, overtravel, lock state and accumulated damage.
+The first-contact damage curve starts at 0.35 at `impact` and reaches 1 at
+`collapseImpact`; a fresh leg must not collapse from that speed term below the
+configured collapse speed. Other simultaneous overload or existing damage can
+still cause earlier failure. These limits are simulator tuning, not F16 or other
+aircraft certification data.
+
+Regression checks: `tests/loadFactor.test.js`, `tests/contactCompliance.test.js`,
+and `tests/gearDamage.test.js`. The F16 contact regression uses the aft support
+geometry and closing speed reconstructed from the November 2026 landing replay;
+it checks dissipated energy at 60/120/240Hz rather than an arbitrary G ceiling.
