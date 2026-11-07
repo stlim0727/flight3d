@@ -168,7 +168,11 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
     });
 
     // 5. Lobby - Lukla Airport
-    await evaluate(() => { document.querySelector('#lobby-airport-lukla')?.click(); });
+    await evaluate(() => {
+      const button = document.querySelector('#lobby-airport-lukla');
+      button?.click();
+      button?.scrollIntoView({ block: 'center' });
+    });
     await delay(300);
     await recordScreen(screenshot, {
       id: '05_lobby_airport_lukla',
@@ -183,7 +187,11 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
     });
 
     // 6. Lobby - Incheon Airport
-    await evaluate(() => { document.querySelector('#lobby-airport-incheon')?.click(); });
+    await evaluate(() => {
+      const button = document.querySelector('#lobby-airport-incheon');
+      button?.click();
+      button?.scrollIntoView({ block: 'center' });
+    });
     await delay(300);
     await recordScreen(screenshot, {
       id: '06_lobby_airport_incheon',
@@ -198,7 +206,11 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
     });
 
     // 7. Lobby - Valley Slalom Mode
-    await evaluate(() => { document.querySelector('#lobby-airport-valley')?.click(); });
+    await evaluate(() => {
+      const button = document.querySelector('#lobby-airport-valley');
+      button?.click();
+      button?.scrollIntoView({ block: 'center' });
+    });
     await delay(300);
     await recordScreen(screenshot, {
       id: '07_lobby_airport_valley',
@@ -209,6 +221,44 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
       description_ko: '사람 직접 조종 vs AI 자율 비행 라디오 버튼 및 자이로 사전 점검 박스',
       description_en: 'Human manual piloting vs. AI autonomous flight radio controls and gyro preflight',
       selector: '#lobby-airport-valley',
+      tier: 'full',
+    });
+
+    // 44. Lobby - Han River Low-Level Flight Region (briefing scrolled into view)
+    await evaluate(() => {
+      document.querySelector('#lobby-airport-hangang')?.click();
+      document.querySelector('#lobby-preset-hangang')?.click();
+      document.querySelector('#lobby-briefing')?.scrollIntoView({ block: 'end' });
+    });
+    await delay(300);
+    await recordScreen(screenshot, {
+      id: '44_lobby_airport_hangang',
+      category: 'lobby',
+      file: '44_lobby_airport_hangang.png',
+      title_ko: '메인 로비 — 한강 저공 비행 지역',
+      title_en: 'Main Lobby — Han River Low-Level Flight Region',
+      description_ko: '한강 전용 맵: C172·무풍/황혼 자동 고정, 교량 3개(서강·마포·한강대교 모티프), 수면 위 19 m / 89 kt 자유 비행 브리핑',
+      description_en: 'Dedicated Han River map: C172 and calm twilight locked, three bridge motifs (Seogang, Mapo, Hangang), free flight from 19 m / 89 kt',
+      selector: '#lobby-airport-hangang',
+      tier: 'full',
+    });
+
+    // 45. Lobby - Neon Metropolis Region
+    await evaluate(() => {
+      const button = document.querySelector('#lobby-airport-neon');
+      button?.click();
+      button?.scrollIntoView({ block: 'center' });
+    });
+    await delay(300);
+    await recordScreen(screenshot, {
+      id: '45_lobby_airport_neon',
+      category: 'lobby',
+      file: '45_lobby_airport_neon.png',
+      title_ko: '메인 로비 — 네온 메트로폴리스 도시 지역',
+      title_en: 'Main Lobby — Neon Metropolis City Region',
+      description_ko: '야간 도시 지역: 네온 하이웨이 이륙, 마천루 사이 어반 캐니언 저공비행(120 m), 나이트라인 순항(2,500 FT) 시나리오',
+      description_en: 'Night city region: Neon highway takeoff, urban canyon low pass between skyscrapers (120 m), and nightline cruise (2,500 FT)',
+      selector: '#lobby-airport-neon',
       tier: 'full',
     });
   }
@@ -457,6 +507,66 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
       if (stall) { stall.classList.remove('active'); stall.style.display = 'none'; }
     });
 
+    // 46. Flight Warning Banner (GPWS/configuration alerts). The HUD repaints the
+    // highest-priority warning every frame, so feed it a fixed alert while capturing.
+    await evaluate(() => {
+      const warnings = window.simulator.flightWarnings;
+      if (warnings) {
+        warnings.__captureUpdate = warnings.update;
+        warnings.update = () => [{ id: 'pull-up', text: 'PULL UP', priority: 100, voice: null }];
+      }
+    });
+    await delay(400);
+    await recordScreen(screenshot, {
+      id: '46_flight_warning_banner',
+      category: 'flight',
+      file: '46_flight_warning_banner.png',
+      title_ko: '비행 화면 — 지형·형상 경고 배너 (GPWS)',
+      title_en: 'In-Flight Terrain & Configuration Warning Banner (GPWS)',
+      description_ko: '우선순위 최상위 경고 1개 표시: PULL UP·TERRAIN·SINK RATE·OVERSPEED(적색, 우선순위 85+), BANK ANGLE·TOO LOW GEAR/FLAPS·TAKEOFF CONFIG(황색)',
+      description_en: 'Shows the single highest-priority alert: PULL UP, TERRAIN, SINK RATE, OVERSPEED (red, priority 85+); BANK ANGLE, TOO LOW GEAR/FLAPS, TAKEOFF CONFIG (amber)',
+      selector: '#hud-warning',
+      tier: 'full',
+    });
+    await evaluate(() => {
+      const warnings = window.simulator.flightWarnings;
+      if (warnings?.__captureUpdate) {
+        warnings.update = warnings.__captureUpdate;
+        delete warnings.__captureUpdate;
+        warnings.reset?.();
+      }
+    });
+
+    // 47. Pilot G-Force Physiology Effects. The FX layer is driven every frame from
+    // the pilot snapshot, so pin a high positive-G state while capturing.
+    await evaluate(() => {
+      const fx = window.simulator.pilotPhysiologyFx;
+      if (fx) {
+        fx.__captureUpdate = fx.update;
+        fx.update = mode => fx.__captureUpdate(mode, { consciousness: 0.3, gZ: 8.2, isGLOC: false });
+      }
+    });
+    await delay(400);
+    await recordScreen(screenshot, {
+      id: '47_flight_g_force_effects',
+      category: 'flight',
+      file: '47_flight_g_force_effects.png',
+      title_ko: '비행 화면 — G-force 생리 효과 (터널 시야·그레이아웃)',
+      title_en: 'In-Flight G-Force Physiology Effects (Tunnel Vision & Grayout)',
+      description_ko: '고G 기동 시 의식 저하에 따라 터널 시야 → 그레이아웃 → 블랙아웃, 음G에서는 레드아웃·주변 흐림. 콕핏 100%, 외부 카메라 25% 강도, HUD G 표시는 G-LOC 시 적색',
+      description_en: 'Reduced consciousness under high G narrows to tunnel vision, grayout, then blackout; negative G adds redout and peripheral blur. Full strength in cockpit, 25% in exterior views; HUD G readout turns red at G-LOC',
+      selector: '#pilot-g-effects',
+      tier: 'full',
+    });
+    await evaluate(() => {
+      const fx = window.simulator.pilotPhysiologyFx;
+      if (fx?.__captureUpdate) {
+        fx.update = fx.__captureUpdate;
+        delete fx.__captureUpdate;
+        fx.reset();
+      }
+    });
+
     // 40. Multiplayer Offscreen Friend Direction Indicator
     await evaluate(() => {
       let bounds = document.querySelector('.mp-indicator-bounds');
@@ -626,7 +736,7 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
         document.getElementById('mp-intro').hidden = true;
         document.getElementById('mp-connect').hidden = true;
         document.getElementById('mp-waiting').hidden = false;
-        document.getElementById('mp-waiting-status').textContent = '친구 접속 대기 중… (3분 남음)';
+        document.getElementById('mp-waiting-status').textContent = '42초 뒤 방이 취소됩니다.';
         document.getElementById('mp-keep-waiting').disabled = false;
         document.getElementById('mp-invite-row').hidden = false;
         document.getElementById('mp-code').value = 'SKY 738';
@@ -738,9 +848,45 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
       selector: '#feedback-dialog-overlay',
       tier: 'full',
     });
+
+    // 48. Feedback Delivery Not Confirmed (retry + save report file). Painted directly so
+    // the catalog run never sends a real report.
     await evaluate(() => {
       const fb = document.getElementById('feedback-dialog-overlay');
-      if (fb) fb.hidden = true;
+      if (!fb) return;
+      const text = fb.querySelector('[data-feedback-text]');
+      if (text) text.value = '한강 교량 아래 통과 직후 기체가 수면에 닿지 않았는데 충돌 처리됐습니다.';
+      const status = fb.querySelector('[data-feedback-status]');
+      if (status) {
+        status.textContent = '서버 수신을 확인하지 못했습니다. Brave Shields·네트워크 설정을 확인한 뒤 다시 시도하거나 신고 파일을 저장해 주세요. 신고 ID: 3f6c2a91-7d4e-4b8a-9c15-2e0d8b7a4f63';
+        status.dataset.failed = 'true';
+        status.setAttribute('role', 'alert');
+      }
+      const submit = fb.querySelector('[data-feedback-submit]');
+      if (submit) submit.textContent = '다시 보내기';
+    });
+    await delay(200);
+    await recordScreen(screenshot, {
+      id: '48_feedback_delivery_retry',
+      category: 'modal',
+      file: '48_feedback_delivery_retry.png',
+      title_ko: '버그 제보 — 서버 수신 미확인 및 재전송 상태',
+      title_en: 'Bug Report — Delivery Not Confirmed & Retry State',
+      description_ko: '서버 접수 응답을 받아야만 성공 처리: 미확인 시 적색 안내와 신고 ID, "다시 보내기" 버튼, 서버 전송과 별개인 "신고 파일 저장"(JSON) 제공. 접수 성공 시 대화상자 닫힘 및 신고 ID 토스트',
+      description_en: 'Success requires a server acknowledgement: otherwise a red notice with report ID, a "Send again" button, and a separate "Save report file" (JSON). On acceptance the dialog closes and a toast shows the report ID',
+      selector: '#feedback-dialog-overlay',
+      tier: 'full',
+    });
+    await evaluate(() => {
+      const fb = document.getElementById('feedback-dialog-overlay');
+      if (!fb) return;
+      const text = fb.querySelector('[data-feedback-text]');
+      if (text) text.value = '';
+      const status = fb.querySelector('[data-feedback-status]');
+      if (status) { status.textContent = ''; status.dataset.failed = 'false'; }
+      const submit = fb.querySelector('[data-feedback-submit]');
+      if (submit) submit.textContent = '제보 보내기';
+      fb.hidden = true;
     });
 
     // 24. Render Diagnostics Inspector
@@ -848,6 +994,33 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
   // Resume flight and trigger debriefs
   await evaluate(() => { window.simulator.gameFlow.resume(); });
   await delay(200);
+
+  if (tier === 'all') {
+    // 49. Auto Demo Flight Guide Banner (shown over live flight, not the pause menu).
+    // The banner yields to an open AP panel, which screen 12 left expanded.
+    await evaluate(() => {
+      const apPanel = document.getElementById('ap-panel');
+      if (apPanel) apPanel.hidden = true;
+      const banner = document.getElementById('demo-banner');
+      if (banner) banner.style.display = 'flex';
+    });
+    await delay(300);
+    await recordScreen(screenshot, {
+      id: '49_demo_flight_banner',
+      category: 'flight',
+      file: '49_demo_flight_banner.png',
+      title_ko: '데모 비행 — 단계 안내 배너 (AUTO DEMO)',
+      title_en: 'Auto Demo Flight — Stage Guide Banner',
+      description_ko: '데모 비행 진행 중 상단 안내: AUTO DEMO 배지(클릭 시 접기), 현재 단계 제목·설명, "직접 조종 (Esc)" 전환 및 안내 닫기 버튼',
+      description_en: 'Auto demo stage guide: AUTO DEMO badge (click to collapse), current stage title and description, "Take control (Esc)" and close buttons',
+      selector: '#demo-banner',
+      tier: 'full',
+    });
+    await evaluate(() => {
+      const banner = document.getElementById('demo-banner');
+      if (banner) banner.style.display = 'none';
+    });
+  }
 
   // 28. Debrief Overlay - Summary Tab
   await evaluate(() => {
@@ -1281,7 +1454,8 @@ async function captureViewport(vpConfig, origin, tier, isVerify) {
 const vitePort = await getFreePort();
 const origin = `http://127.0.0.1:${vitePort}`;
 const mode = process.argv.includes('--preview') ? 'preview' : 'dev';
-const viteProc = spawn('npx', ['vite', ...(mode === 'preview' ? ['preview'] : []), '--host', '127.0.0.1', '--port', String(vitePort), '--strictPort'], {
+// Run Vite's bin through Node directly: `npx` is not spawnable without a shell on Windows.
+const viteProc = spawn(process.execPath, [resolve('node_modules/vite/bin/vite.js'), ...(mode === 'preview' ? ['preview'] : []), '--host', '127.0.0.1', '--port', String(vitePort), '--strictPort'], {
   stdio: 'ignore',
   windowsHide: true,
 });

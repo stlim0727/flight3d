@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-11-07T12:53:20.924Z",
-  "branch": "feat/debrief-overlay-streamline",
-  "commit": "dd83c454efcf8b4293619a3065e49fa7f80bb9e9",
-  "commitShort": "dd83c45",
-  "commitDate": "2026-11-07T12:42:32Z",
+  "generatedAt": "2026-11-07T20:46:42.883Z",
+  "branch": "docs/ux-screens-refresh",
+  "commit": "2170c12b9c22e0bffac210bcfdc871ed0378d908",
+  "commitShort": "2170c12",
+  "commitDate": "2026-11-07T22:30:44+09:00",
   "viewport": "mobile-portrait",
   "dimensions": "390x844",
   "screens": [
@@ -478,6 +478,72 @@
       "description_ko": "시간대 빠른 선택(19:30): 석양/황혼 하늘, 활주로 ALS 진입등 및 PAPI 점등, 공항 야간 조명 렌더링",
       "description_en": "Time of day preset (19:30): dusk sky, illuminated ALS approach lights, PAPI lights, and night airport lighting",
       "selector": "#lobby-panel-scenario",
+      "tier": "full"
+    },
+    {
+      "id": "44_lobby_airport_hangang",
+      "category": "lobby",
+      "file": "44_lobby_airport_hangang.png",
+      "title_ko": "메인 로비 — 한강 저공 비행 지역",
+      "title_en": "Main Lobby — Han River Low-Level Flight Region",
+      "description_ko": "한강 전용 맵: C172·무풍/황혼 자동 고정, 교량 3개(서강·마포·한강대교 모티프), 수면 위 19 m / 89 kt 자유 비행 브리핑",
+      "description_en": "Dedicated Han River map: C172 and calm twilight locked, three bridge motifs (Seogang, Mapo, Hangang), free flight from 19 m / 89 kt",
+      "selector": "#lobby-airport-hangang",
+      "tier": "full"
+    },
+    {
+      "id": "45_lobby_airport_neon",
+      "category": "lobby",
+      "file": "45_lobby_airport_neon.png",
+      "title_ko": "메인 로비 — 네온 메트로폴리스 도시 지역",
+      "title_en": "Main Lobby — Neon Metropolis City Region",
+      "description_ko": "야간 도시 지역: 네온 하이웨이 이륙, 마천루 사이 어반 캐니언 저공비행(120 m), 나이트라인 순항(2,500 FT) 시나리오",
+      "description_en": "Night city region: Neon highway takeoff, urban canyon low pass between skyscrapers (120 m), and nightline cruise (2,500 FT)",
+      "selector": "#lobby-airport-neon",
+      "tier": "full"
+    },
+    {
+      "id": "46_flight_warning_banner",
+      "category": "flight",
+      "file": "46_flight_warning_banner.png",
+      "title_ko": "비행 화면 — 지형·형상 경고 배너 (GPWS)",
+      "title_en": "In-Flight Terrain & Configuration Warning Banner (GPWS)",
+      "description_ko": "우선순위 최상위 경고 1개 표시: PULL UP·TERRAIN·SINK RATE·OVERSPEED(적색, 우선순위 85+), BANK ANGLE·TOO LOW GEAR/FLAPS·TAKEOFF CONFIG(황색)",
+      "description_en": "Shows the single highest-priority alert: PULL UP, TERRAIN, SINK RATE, OVERSPEED (red, priority 85+); BANK ANGLE, TOO LOW GEAR/FLAPS, TAKEOFF CONFIG (amber)",
+      "selector": "#hud-warning",
+      "tier": "full"
+    },
+    {
+      "id": "47_flight_g_force_effects",
+      "category": "flight",
+      "file": "47_flight_g_force_effects.png",
+      "title_ko": "비행 화면 — G-force 생리 효과 (터널 시야·그레이아웃)",
+      "title_en": "In-Flight G-Force Physiology Effects (Tunnel Vision & Grayout)",
+      "description_ko": "고G 기동 시 의식 저하에 따라 터널 시야 → 그레이아웃 → 블랙아웃, 음G에서는 레드아웃·주변 흐림. 콕핏 100%, 외부 카메라 25% 강도, HUD G 표시는 G-LOC 시 적색",
+      "description_en": "Reduced consciousness under high G narrows to tunnel vision, grayout, then blackout; negative G adds redout and peripheral blur. Full strength in cockpit, 25% in exterior views; HUD G readout turns red at G-LOC",
+      "selector": "#pilot-g-effects",
+      "tier": "full"
+    },
+    {
+      "id": "48_feedback_delivery_retry",
+      "category": "modal",
+      "file": "48_feedback_delivery_retry.png",
+      "title_ko": "버그 제보 — 서버 수신 미확인 및 재전송 상태",
+      "title_en": "Bug Report — Delivery Not Confirmed & Retry State",
+      "description_ko": "서버 접수 응답을 받아야만 성공 처리: 미확인 시 적색 안내와 신고 ID, \"다시 보내기\" 버튼, 서버 전송과 별개인 \"신고 파일 저장\"(JSON) 제공. 접수 성공 시 대화상자 닫힘 및 신고 ID 토스트",
+      "description_en": "Success requires a server acknowledgement: otherwise a red notice with report ID, a \"Send again\" button, and a separate \"Save report file\" (JSON). On acceptance the dialog closes and a toast shows the report ID",
+      "selector": "#feedback-dialog-overlay",
+      "tier": "full"
+    },
+    {
+      "id": "49_demo_flight_banner",
+      "category": "flight",
+      "file": "49_demo_flight_banner.png",
+      "title_ko": "데모 비행 — 단계 안내 배너 (AUTO DEMO)",
+      "title_en": "Auto Demo Flight — Stage Guide Banner",
+      "description_ko": "데모 비행 진행 중 상단 안내: AUTO DEMO 배지(클릭 시 접기), 현재 단계 제목·설명, \"직접 조종 (Esc)\" 전환 및 안내 닫기 버튼",
+      "description_en": "Auto demo stage guide: AUTO DEMO badge (click to collapse), current stage title and description, \"Take control (Esc)\" and close buttons",
+      "selector": "#demo-banner",
       "tier": "full"
     }
   ]
