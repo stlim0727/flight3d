@@ -62,7 +62,9 @@ export class CinematicCameraDirector {
     this.camPos = new THREE.Vector3();
     this.camUp = new THREE.Vector3(0, 1, 0);
     this.camFov = 50.0;
+    this.camFovInitialized = false;
     this.initialized = false;
+    this.snapNextFrame = false;
 
     // Translation tracking to eliminate forward-backward stutter
     this.prevPlanePos = new THREE.Vector3();
@@ -89,6 +91,8 @@ export class CinematicCameraDirector {
 
   reset() {
     this.initialized = false;
+    this.camFovInitialized = false;
+    this.snapNextFrame = true;
     this.prevPlanePosInitialized = false;
     this.shotTimer = 0;
     this.totalTimer = 0;
@@ -348,6 +352,7 @@ export class CinematicCameraDirector {
     this.shotTimer = 0;
     this.flybySet = false;
     this.flybyWorldPos.set(0, 0, 0);
+    this.snapNextFrame = true; // Instant cinematic cut to new camera vantage
 
     if (newType === CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY) {
       this.orbitAngle = Math.random() * Math.PI * 2;
@@ -663,12 +668,23 @@ export class CinematicCameraDirector {
       }
     }
 
+    // Adapt field of view for portrait displays (aspect < 1.0) to prevent tunnel vision
+    const aspect = camera.aspect || 1.0;
+    if (aspect < 1.0) {
+      const baseVFovRad = (targetFov * Math.PI) / 180;
+      const hFovRad = 2 * Math.atan(Math.tan(baseVFovRad / 2) * 1.5);
+      const vFovRad = 2 * Math.atan(Math.tan(hFovRad / 2) / aspect);
+      targetFov = Math.min(105, Math.max(30, (vFovRad * 180) / Math.PI));
+    }
+
     // Kinematics and Position Integration:
-    if (!this.initialized) {
+    if (!this.initialized || this.snapNextFrame) {
       this.camPos.copy(targetCamPos);
       this.camUp.copy(targetUp);
       this.camFov = targetFov;
+      this.camFovInitialized = true;
       this.initialized = true;
+      this.snapNextFrame = false;
     } else if (isRigidMount) {
       // Rigid body mounts (wing, cockpit) copy transform directly: ZERO lag or stutter!
       this.camPos.copy(targetCamPos);
@@ -688,13 +704,15 @@ export class CinematicCameraDirector {
       this.camPos.y = currentGroundH + 1.8;
     }
 
-    // Smooth FOV transition
+    // Smooth FOV transition using internal director state (isolated from external clobbering)
     if (camera.fov !== undefined) {
-      if (!this.initialized) {
-        camera.fov = targetFov;
+      if (!this.camFovInitialized) {
+        this.camFov = targetFov;
+        this.camFovInitialized = true;
       } else {
-        camera.fov += (targetFov - camera.fov) * (1.0 - Math.exp(-safeDt * 6.0));
+        this.camFov += (targetFov - this.camFov) * (1.0 - Math.exp(-safeDt * 6.0));
       }
+      camera.fov = this.camFov;
       if (typeof camera.updateProjectionMatrix === 'function') {
         camera.updateProjectionMatrix();
       }
@@ -702,7 +720,7 @@ export class CinematicCameraDirector {
 
     // Apply to camera
     camera.position.copy(this.camPos);
-    camera.up.copy(targetUp);
+    camera.up.copy(isRigidMount ? targetUp : this.camUp);
     camera.lookAt(targetLook);
 
     return true;

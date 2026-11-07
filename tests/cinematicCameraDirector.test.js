@@ -5,6 +5,7 @@ import {
   CinematicCameraDirector,
   CINEMATIC_SHOTS,
 } from '../src/cameras/CinematicCameraDirector.js';
+import { CameraSystem } from '../src/cameras/CameraSystem.js';
 
 test('CinematicCameraDirector initializes with defaults and reset() cleans state', () => {
   const camera = new THREE.PerspectiveCamera();
@@ -241,4 +242,71 @@ test('Airborne flyby camera anchors altitude to aircraft altitude and centers ai
   const camDir = new THREE.Vector3();
   camera.getWorldDirection(camDir);
   assert.ok(camDir.dot(toAircraft) > 0.98, 'Camera must point directly at aircraft so it is centered in frame');
+});
+
+test('switchShot cuts instantly to target vantage point on next update frame', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const director = new CinematicCameraDirector({ camera });
+
+  const planePos = new THREE.Vector3(0, 1000, 0);
+  const planeQuat = new THREE.Quaternion();
+
+  director.switchShot(CINEMATIC_SHOTS.TELEPHOTO_FLYBY);
+  director.update({ dt: 0.016, camera, planePos, planeQuat });
+  const flybyDist = camera.position.distanceTo(planePos);
+  assert.ok(flybyDist > 150, `Flyby camera should be at distance > 150m, got ${flybyDist}m`);
+
+  // Switch to DYNAMIC_ORBIT_DOLLY (orbit radius ~38m)
+  director.switchShot(CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY);
+  director.update({ dt: 0.016, camera, planePos, planeQuat });
+  const dollyDist = camera.position.distanceTo(planePos);
+  assert.ok(dollyDist < 55, `On cut, camera must immediately snap to dolly radius, got ${dollyDist}m`);
+});
+
+test('CinematicCameraDirector FOV is resilient to variable frame delta and external applyBaseFov', () => {
+  const camera = new THREE.PerspectiveCamera();
+  camera.aspect = 0.46; // Portrait mobile aspect ratio
+  const cameraSystem = new CameraSystem(camera);
+  cameraSystem.setMode(CameraSystem.MODES.DIRECTOR, true);
+
+  const planePos = new THREE.Vector3(0, 1000, 0);
+  const planeQuat = new THREE.Quaternion();
+
+  const fovHistory = [];
+  // Simulate 30 frames with jittered frame times (16.6ms, 33.3ms, 8.3ms, etc.)
+  const dts = [0.016, 0.033, 0.016, 0.008, 0.033, 0.016, 0.016, 0.025, 0.016];
+  for (let i = 0; i < 40; i++) {
+    const dt = dts[i % dts.length];
+    planePos.z -= 100 * dt;
+    // Simulates main.js loop: applyBaseFov called every frame before cameraSystem.update
+    cameraSystem.applyBaseFov(100);
+    cameraSystem.update(dt, { position: planePos, quaternion: planeQuat, matrixWorld: new THREE.Matrix4() });
+    fovHistory.push(camera.fov);
+  }
+
+  // Once settled (after first 15 frames), frame-to-frame FOV changes should be tiny and smooth (< 0.2 deg)
+  for (let i = 15; i < fovHistory.length - 1; i++) {
+    const stepDiff = Math.abs(fovHistory[i + 1] - fovHistory[i]);
+    assert.ok(
+      stepDiff < 0.2,
+      `FOV must not oscillate or jump on frame time jitter: frame ${i} had jump of ${stepDiff.toFixed(3)}° (fov=${fovHistory[i].toFixed(2)} -> ${fovHistory[i+1].toFixed(2)})`
+    );
+  }
+});
+
+test('CameraSystem.snapToTarget resets CinematicCameraDirector in DIRECTOR mode', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const cameraSystem = new CameraSystem(camera);
+  cameraSystem.setMode(CameraSystem.MODES.DIRECTOR, true);
+
+  cameraSystem.cinematicDirector.initialized = true;
+  cameraSystem.cinematicDirector.shotTimer = 4.0;
+  cameraSystem.cinematicDirector.totalTimer = 10.0;
+
+  const mockMesh = new THREE.Object3D();
+  mockMesh.position.set(100, 200, 300);
+  cameraSystem.snapToTarget(mockMesh);
+
+  assert.equal(cameraSystem.cinematicDirector.initialized, false, 'Director should be reset on snapToTarget');
+  assert.equal(cameraSystem.cinematicDirector.shotTimer, 0, 'Shot timer should be reset');
 });

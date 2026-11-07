@@ -515,6 +515,9 @@ export class CameraSystem {
    * doubles the apparent size of the subject.
    */
   applyBaseFov(baseFovDeg) {
+    if (this.mode === CameraSystem.MODES.DIRECTOR) {
+      return this.camera?.fov ?? baseFovDeg;
+    }
     const effectiveBase = baseFovDeg + (this.speedFov || 0);
     const halfTan = Math.tan((effectiveBase * Math.PI) / 360) / this.opticalZoom;
     const zoomedFov = (Math.atan(halfTan) * 360) / Math.PI;
@@ -766,7 +769,7 @@ export class CameraSystem {
         if (typeof h === 'number' && !Number.isNaN(h)) return h;
       } catch (e) {}
     }
-    return 12.0; // RKSS airport elevation default fallback
+    return 0.0;
   }
   snapToTarget(aircraftMesh) {
     const behindLocal = new THREE.Vector3(0, this.chaseHeight, this.chaseDistance);
@@ -830,6 +833,8 @@ export class CameraSystem {
       this.camera.lookAt(planePos.clone().add(new THREE.Vector3(0, 1.2, 0)));
       this.flybySet = true;
       this.flybyRegime = 'parked';
+    } else if (this.mode === CameraSystem.MODES.DIRECTOR) {
+      this.cinematicDirector?.reset?.();
     } else {
       this.camera.position.copy(this.chasePos);
       this.camera.up.set(0, 1, 0);
