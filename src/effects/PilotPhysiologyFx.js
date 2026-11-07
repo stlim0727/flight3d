@@ -96,8 +96,11 @@ export class PilotPhysiologyFx {
     this.blackoutAlpha = Math.max(0.0, Math.min(1.0, rawBlackout * this.viewScale));
 
     // Tunnel Vision vignette inner and outer radiuses
-    const innerRadius = Math.max(0, (1.0 - this.tunnelRatio * 0.9) * 85 * this.viewScale);
-    const outerRadius = Math.max(10, innerRadius + (45 * (1.0 - this.tunnelRatio * 0.45)));
+    // In cockpit (viewScale = 1.0), tunnel vision constricts down towards 8.5%.
+    // In exterior view (viewScale = 0.25), constriction and opacity are attenuated so the center remains open.
+    const effectiveTunnel = this.tunnelRatio * this.viewScale;
+    const innerRadius = Math.max(0, (1.0 - effectiveTunnel * 0.9) * 85);
+    const outerRadius = Math.max(innerRadius + 5, innerRadius + (45 * (1.0 - effectiveTunnel * 0.45)));
 
     // 2. Negative G: Redout & Peripheral Blur
     if (gZ < -1.0) {
@@ -110,15 +113,15 @@ export class PilotPhysiologyFx {
       this.blurPx = 0.0;
     }
 
-    const hasEffect = this.blackoutAlpha > 0.01 || this.tunnelRatio > 0.05 ||
+    const hasEffect = this.blackoutAlpha > 0.01 || effectiveTunnel > 0.05 ||
       this.grayoutAlpha > 0.01 || this.redoutAlpha > 0.01;
 
     if (!this.element) return;
 
     if (hasEffect) {
       this.element.classList.add('active');
-      const edgeAlpha = Math.min(1.0, 0.85 * (this.tunnelRatio + this.blackoutAlpha));
-      const outerAlpha = Math.min(1.0, this.tunnelRatio * 1.3 + this.blackoutAlpha);
+      const edgeAlpha = Math.min(1.0, 0.85 * (effectiveTunnel + this.blackoutAlpha));
+      const outerAlpha = Math.min(1.0, effectiveTunnel * 1.3 + this.blackoutAlpha);
 
       this.element.style.setProperty('--tunnel-inner', `${innerRadius.toFixed(1)}%`);
       this.element.style.setProperty('--tunnel-outer', `${outerRadius.toFixed(1)}%`);

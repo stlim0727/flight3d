@@ -170,7 +170,7 @@ test('the briefing carries the chart and no terrain truth', () => {
   const manifest = createSlalomManifest({ seed: 8 });
   const briefing = createBriefing(manifest);
   assert.ok(validatePlainData(briefing).ok, 'briefing does not fit the payload budget');
-  assert.equal(briefing.course.version, 'valley-slalom-v1');
+  assert.equal(briefing.course.version, VALLEY_SLALOM_RULES.version);
   assert.equal(briefing.successConditions, undefined);
   for (const gate of briefing.course.gates) {
     assert.ok(!Object.hasOwn(gate, 'floorM'), 'the ground under a gate is not chart data');

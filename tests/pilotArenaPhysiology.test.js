@@ -108,3 +108,42 @@ test('mission scoring penalizes G-LOC occurrences and excessive high-G fatigue',
   assert.ok(glocResult.metrics.glocPenalty > 0, 'G-LOC penalty must be applied');
   assert.ok(glocResult.metrics.finalScore < cleanResult.metrics.finalScore, 'G-LOC must reduce final score');
 });
+
+test('autonomous demo maintains ground steering input and totalSimTime advances jitter', async () => {
+  const sim = createSlalomSimulation(1);
+  sim.position.set(0, 3000, 0);
+  sim.isCrashed = false;
+  let capturedSteering = null;
+  sim.gear.setSteering = (rudder, speed) => {
+    capturedSteering = rudder;
+  };
+
+  // 1. Autonomous demo active: rudder 0.6 commanded by demo
+  sim.demoDirector = { isActive: true, stop() {}, getActiveScenario() { return null; } };
+  sim.controls.rudder = 0.6;
+  sim.totalSimTime = 5.0;
+
+  // Run a physics step
+  sim.integratePhysics(sim.physicsDt);
+
+  assert.equal(capturedSteering, sim.controls.rudder, 'Autonomous demo must pass rudder directly to gear steering');
+  assert.ok(capturedSteering > 0.5, 'Autonomous demo steering must not be zeroed out by physiology reset');
+  assert.equal(sim.telemetry.rudder, sim.controls.rudder, 'Autonomous demo telemetry must reflect commanded rudder');
+
+  // 2. Normal flight with high G advances totalSimTime and produces non-zero muscle jitter
+  sim.demoDirector = { isActive: false };
+  sim.controls.update = () => { sim.controls.elevator = 0.8; };
+  sim.telemetry.gForce = 6.0;
+  sim.totalSimTime = 10.0;
+  sim.position.set(0, 3000, 0);
+  sim.isCrashed = false;
+
+  sim.integratePhysics(sim.physicsDt);
+  const elevator1 = sim.aero.elevator;
+
+  sim.totalSimTime = 10.05;
+  sim.integratePhysics(sim.physicsDt);
+  const elevator2 = sim.aero.elevator;
+
+  assert.notEqual(elevator1, elevator2, 'High G with advancing totalSimTime must produce oscillating jitter');
+});

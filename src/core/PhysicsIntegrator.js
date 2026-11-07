@@ -61,12 +61,15 @@ class PhysicsIntegratorMethods {
     };
     const isAutonomousDemo = Boolean(this.demoDirector?.isActive);
     if (!isAutonomousDemo) {
-      this.pilotPhysiology.update(dt, this.telemetry.gForce ?? 1.0, rawInputs, this.simulationTime ?? 0);
+      this.pilotPhysiology.update(dt, this.telemetry.gForce ?? 1.0, rawInputs, this.totalSimTime ?? 0);
       this.aero.elevator = this.pilotPhysiology.effectiveElevator;
       this.aero.aileron = this.pilotPhysiology.effectiveAileron;
       this.aero.rudder = this.pilotPhysiology.effectiveRudder;
     } else {
       this.pilotPhysiology.reset();
+      this.pilotPhysiology.effectiveElevator = this.controls.elevator;
+      this.pilotPhysiology.effectiveAileron = this.controls.aileron;
+      this.pilotPhysiology.effectiveRudder = this.controls.rudder;
       this.aero.elevator = this.controls.elevator;
       this.aero.aileron = this.controls.aileron;
       this.aero.rudder = this.controls.rudder;
@@ -90,7 +93,8 @@ class PhysicsIntegratorMethods {
 
     // Ground steering & brakes
     const groundSpeed = Math.sqrt(this.linearVelocity.x * this.linearVelocity.x + this.linearVelocity.z * this.linearVelocity.z);
-    this.gear.setSteering(this.pilotPhysiology.effectiveRudder, groundSpeed);
+    const steeringRudder = isAutonomousDemo ? this.controls.rudder : this.pilotPhysiology.effectiveRudder;
+    this.gear.setSteering(steeringRudder, groundSpeed);
     this.gear.setBrakes(this.controls.brakes);
 
     // 2. Turbofan Engines Update
@@ -236,7 +240,7 @@ class PhysicsIntegratorMethods {
 
     // A connected ground tug contributes forces through the normal integrator.
     const towing = this.demoDirector?.isActive
-      ? this.demoDirector.getActiveScenario().towingForces?.() : null;
+      ? this.demoDirector.getActiveScenario()?.towingForces?.() : null;
     if (towing) netForceWorld.add(towing.force);
     const accelerationWorld = netForceWorld.divideScalar(this.aero.mass);
     this.linearVelocity.addScaledVector(accelerationWorld, dt);
@@ -373,9 +377,9 @@ class PhysicsIntegratorMethods {
       rawElevator: this.controls.elevator,
       rawAileron: this.controls.aileron,
       rawRudder: this.controls.rudder,
-      elevator: this.pilotPhysiology ? this.pilotPhysiology.effectiveElevator : this.controls.elevator,
-      aileron: this.pilotPhysiology ? this.pilotPhysiology.effectiveAileron : this.controls.aileron,
-      rudder: this.pilotPhysiology ? this.pilotPhysiology.effectiveRudder : this.controls.rudder,
+      elevator: isAutonomousDemo ? this.controls.elevator : (this.pilotPhysiology ? this.pilotPhysiology.effectiveElevator : this.controls.elevator),
+      aileron: isAutonomousDemo ? this.controls.aileron : (this.pilotPhysiology ? this.pilotPhysiology.effectiveAileron : this.controls.aileron),
+      rudder: isAutonomousDemo ? this.controls.rudder : (this.pilotPhysiology ? this.pilotPhysiology.effectiveRudder : this.controls.rudder),
       throttle: this.controls.throttle,
       pitchTrim: this.aero.pitchTrim,
       pilot: this.pilotPhysiology ? this.pilotPhysiology.getSnapshot() : {

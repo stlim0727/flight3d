@@ -63,3 +63,29 @@ test('reset clears all effect alphas', () => {
   assert.equal(fx.redoutAlpha, 0.0);
   assert.equal(fx.blurPx, 0.0);
 });
+
+test('exterior view preserves wide visual aperture and low vignette opacity during high G', () => {
+  const container = {
+    classList: { add() {}, remove() {} },
+    style: {
+      props: {},
+      setProperty(k, v) { this.props[k] = v; },
+      removeProperty(k) { delete this.props[k]; }
+    }
+  };
+  const fx = new PilotPhysiologyFx();
+  fx.element = container;
+
+  // Cockpit view at C = 0.2: tight tunnel pinhole (e.g. 8.5%)
+  fx.update('cockpit', { consciousness: 0.2, gZ: 5.0, isGLOC: false });
+  const cockpitInner = parseFloat(container.style.props['--tunnel-inner']);
+  const cockpitEdgeAlpha = parseFloat(container.style.props['--blackout-edge']);
+
+  // Chase view at C = 0.2: wide clear center (~65%), attenuated vignette opacity
+  fx.update('chase', { consciousness: 0.2, gZ: 5.0, isGLOC: false });
+  const chaseInner = parseFloat(container.style.props['--tunnel-inner']);
+  const chaseEdgeAlpha = parseFloat(container.style.props['--blackout-edge']);
+
+  assert.ok(chaseInner > cockpitInner * 4, `Chase view inner radius (${chaseInner}%) should be much wider than cockpit (${cockpitInner}%)`);
+  assert.ok(chaseEdgeAlpha < cockpitEdgeAlpha * 0.5, `Chase view edge opacity (${chaseEdgeAlpha}) should be much lower than cockpit (${cockpitEdgeAlpha})`);
+});

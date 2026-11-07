@@ -1,4 +1,5 @@
 import { crossAtPlane, passageCeilingAglAt, projectSlalom } from './slalomCourse.js';
+import { VALLEY_SLALOM_RULES } from './generatedValley.js';
 
 /** Score points lost per knot of mean time-weighted shortfall below the minimum speed. */
 const SPEED_SHORTFALL_POINTS_PER_KT = 10;
@@ -153,8 +154,11 @@ export class SlalomMission {
     const corridorPenalty = meanCorridorExcursionM * CORRIDOR_EXCURSION_POINTS_PER_M;
     const glocSeconds = this.glocTicks / this.manifest.physicsHz;
     const gFatigueSeconds = this.gFatigueTicks / this.manifest.physicsHz;
-    const glocPenalty = this.glocIncidents * 1500 + Math.round(glocSeconds * 300);
-    const gFatiguePenalty = Math.round(gFatigueSeconds * 50);
+    const glocIncidentPenalty = this.manifest.rules?.glocIncidentPenalty ?? VALLEY_SLALOM_RULES.glocIncidentPenalty;
+    const glocPerSecondPenalty = this.manifest.rules?.glocPerSecondPenalty ?? VALLEY_SLALOM_RULES.glocPerSecondPenalty;
+    const gFatiguePerSecondPenalty = this.manifest.rules?.gFatiguePerSecondPenalty ?? VALLEY_SLALOM_RULES.gFatiguePerSecondPenalty;
+    const glocPenalty = this.glocIncidents * glocIncidentPenalty + Math.round(glocSeconds * glocPerSecondPenalty);
+    const gFatiguePenalty = Math.round(gFatigueSeconds * gFatiguePerSecondPenalty);
     const finalScore = this.status === 'succeeded'
       ? Math.max(0, Math.round(20000 - durationSeconds * 100 - (altitudeCostM ?? 0) * 50 - speedPenalty - corridorPenalty - glocPenalty - gFatiguePenalty))
       : null;
