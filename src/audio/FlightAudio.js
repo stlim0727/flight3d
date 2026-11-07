@@ -20,6 +20,7 @@ export class FlightAudio {
     this.isInitialized = false;
 
     this.volume = 1.0;
+    this.engineVolume = 1.0;
 
     this.departureRadio = new DepartureRadio({
       context: () => this.ctx, output: () => this.masterGain,
@@ -148,6 +149,12 @@ export class FlightAudio {
       this.cockpitFilter.connect(this.distanceGain);
       this.distanceGain.connect(this.masterGain);
 
+      // 4c. Engine bus: the pilot's engine volume scales jet and piston/propeller
+      // sources only, so warnings, wind and radio keep their level.
+      this.engineBus = this.ctx.createGain();
+      this.engineBus.gain.setValueAtTime(this.engineVolume, this.ctx.currentTime);
+      this.engineBus.connect(this.cockpitFilter);
+
       // 5. Cockpit Avionics Cooling Fan & Air Conditioning Packs (Continuous ambient hum)
       this.initPackSynth();
 
@@ -257,7 +264,7 @@ export class FlightAudio {
 
     this.engineNoise.connect(this.engineFilter);
     this.engineFilter.connect(this.engineGain);
-    this.engineGain.connect(this.cockpitFilter);
+    this.engineGain.connect(this.engineBus);
     this.engineNoise.start();
 
     // Primary N1 Low-Pressure Fan Compressor Whine (Sine Oscillator)
@@ -269,7 +276,7 @@ export class FlightAudio {
     this.turbineGain.gain.setValueAtTime(0.08, this.ctx.currentTime);
 
     this.turbineWhine.connect(this.turbineGain);
-    this.turbineGain.connect(this.cockpitFilter);
+    this.turbineGain.connect(this.engineBus);
     this.turbineWhine.start();
 
     // Secondary N2 High-Pressure Core Compressor Whine & Harmonics (Triangle Oscillator)
@@ -282,7 +289,7 @@ export class FlightAudio {
     this.turbineGain2.gain.setValueAtTime(0.04, this.ctx.currentTime);
 
     this.turbineWhine2.connect(this.turbineGain2);
-    this.turbineGain2.connect(this.cockpitFilter);
+    this.turbineGain2.connect(this.engineBus);
     this.turbineWhine2.start();
   }
 
@@ -305,7 +312,7 @@ export class FlightAudio {
     this.pistonGain.gain.setValueAtTime(0, this.ctx.currentTime);
     this.pistonPulse.connect(this.pistonFilter);
     this.pistonFilter.connect(this.pistonGain);
-    this.pistonGain.connect(this.cockpitFilter);
+    this.pistonGain.connect(this.engineBus);
     this.pistonPulse.start();
 
     // Propeller air noise is amplitude-modulated by blade passage, not pitched
@@ -321,7 +328,7 @@ export class FlightAudio {
     this.propGain.gain.setValueAtTime(0, this.ctx.currentTime);
     this.propNoise.connect(this.propFilter);
     this.propFilter.connect(this.propGain);
-    this.propGain.connect(this.cockpitFilter);
+    this.propGain.connect(this.engineBus);
     this.propBeat = this.ctx.createOscillator();
     this.propBeat.type = 'sine';
     this.propBeat.frequency.setValueAtTime(24, this.ctx.currentTime);
@@ -511,6 +518,14 @@ export class FlightAudio {
     }
     if (this.volume === 0) { this.cancelSpeech(); this.departureRadio.stop(); this.bangkokRadio?.stop(); }
     this.applyMasterGain();
+  }
+
+  /** Scale only engine sounds (0..1); invalid input keeps the current level. */
+  setEngineVolume(level) {
+    if (!Number.isFinite(level)) return this.engineVolume;
+    this.engineVolume = Math.max(0, Math.min(1, level));
+    if (this.engineBus && this.ctx) this.engineBus.gain.setTargetAtTime(this.engineVolume, this.ctx.currentTime, 0.05);
+    return this.engineVolume;
   }
 
   setMuted(muted) {

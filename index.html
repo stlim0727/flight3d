@@ -383,6 +383,11 @@
       </label>
       <button id="btn-touch-toggle" class="btn btn-preset btn-touch-toggle" title="모바일 / 온스크린 터치 조작 토글" data-i18n-title="toggle.mobile.on.screen.touch.controls"><span data-i18n="touch.controls">📱 터치 조작</span></button>
       <button id="btn-sound" class="btn btn-preset btn-sound-toggle" title="소리 켜기 / 끄기 (M)" data-i18n-title="sound.toggle.m"><span data-i18n="sound.100">🔊 소리: 100%</span></button>
+      <label class="language-control engine-volume-control" for="engine-volume">
+        <span data-i18n="engine.volume.label">엔진음</span>
+        <input id="engine-volume" type="range" min="0" max="100" step="5" value="100" data-engine-volume>
+        <output for="engine-volume" data-engine-volume-value>100%</output>
+      </label>
       <button id="btn-fullscreen" class="btn btn-preset btn-fullscreen-toggle" aria-pressed="false" title="전체화면 토글" data-i18n-title="toggle.fullscreen"><span data-i18n="fullscreen.enter">⛶ 전체화면</span></button>
     </div>
 
@@ -565,6 +570,11 @@
       <button id="mp-mute" class="btn" aria-pressed="false" data-i18n="mp.mute"></button>
       <button id="mp-respawn" class="btn" data-i18n="mp.respawn"></button>
       <button id="mp-leave" class="btn" data-i18n="mp.leave"></button>
+      <label class="language-control engine-volume-control mp-engine-volume" for="mp-engine-volume">
+        <span data-i18n="engine.volume.label">엔진음</span>
+        <input id="mp-engine-volume" type="range" min="0" max="100" step="5" value="100" data-engine-volume>
+        <output for="mp-engine-volume" data-engine-volume-value>100%</output>
+      </label>
     </div>
   </section>
   </dialog>

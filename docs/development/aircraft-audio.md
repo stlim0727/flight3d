@@ -22,6 +22,11 @@ Mute controls the shared output while the engine parameters continue updating.
 Muting and aircraft/preset changes cancel queued speech. Crash audio suppresses
 continuous sound until a preset reset, including crashes that occurred muted.
 
+Engine volume (0–100%) scales one engine bus that carries the jet roar/whine and
+piston/propeller sources before cockpit and distance acoustics. Wind, rumble,
+pack hum, warnings, GPWS, radio and multiplayer voice keep their level. The
+slider appears in flight settings and the multiplayer dialog; both stay in sync.
+
 ## Verification
 
 ```sh

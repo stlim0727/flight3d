@@ -28,6 +28,17 @@
 #mp-controls { border-top: 1px solid #395066; padding-top: .7rem; }
 #mp-roster, #mp-voice-status { display: block; }
 .mp-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+/* Primary action: own full-width row, high contrast, pulses only while waiting for the first start. */
+#mp-dialog #mp-start { order: -1; flex: 1 0 100%; min-height: 56px; font-size: 1.15rem; font-weight: 700; letter-spacing: .02em; color: #04220f; background: linear-gradient(180deg, #4ade80, #16a34a); border: 2px solid #bbf7d0; border-radius: 8px; }
+#mp-dialog #mp-start::before { content: "▶ "; }
+#mp-dialog #mp-start:not(:disabled):hover { background: linear-gradient(180deg, #86efac, #22c55e); color: #04220f; }
+#mp-dialog #mp-start:focus-visible { outline: 3px solid #fef08a; outline-offset: 2px; }
+#mp-dialog #mp-start:disabled { color: #cbd5e1; background: #1e2b38; border: 2px dashed #658397; }
+#mp-start[data-ready="true"] { animation: mp-start-pulse 1.6s ease-in-out infinite; }
+@keyframes mp-start-pulse { 0%, 100% { box-shadow: 0 0 0 0 #4ade8099; } 50% { box-shadow: 0 0 0 8px #4ade8000; } }
+@media (prefers-reduced-motion: reduce) { #mp-start[data-ready="true"] { animation: none; box-shadow: 0 0 0 3px #4ade80; } }
+#mp-start[hidden] { display: none; }
+#mp-dialog .mp-engine-volume { flex: 1 0 100%; min-height: 44px; font-size: 14px; }
 #mp-microphone[aria-pressed="true"], #mp-mute[aria-pressed="true"] { background: #226c63; border-color: #8fffe2; }
 #mp-room-menu { position: fixed; right: 10px; top: 110px; z-index: 125; background: #0b1829ed; color: #e7f5ff; border: 1px solid #67d8f0; }
 .mp-nameplate { position: fixed; z-index: 120; pointer-events: none; transform: translate(-50%, -100%); padding: .2rem .4rem; color: #9cf5ff; background: #051729ba; border-radius: 3px; font: 12px system-ui; }

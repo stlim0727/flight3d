@@ -1,6 +1,7 @@
 # Simulator preferences on reload
 
 `flight3d.preferences.v1` stores explicitly chosen time of day, audio mute state,
+engine volume (0..1, saved when a slider change is committed),
 touch-control visibility, and the demo profile of the last flight started. The
 existing airport/aircraft/scenario, graphics-quality and language storage keys
 remain in place; URL flight choices still override saved flight selection.

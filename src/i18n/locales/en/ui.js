@@ -257,6 +257,8 @@ export default {
   "choose.a.preset.and.camera.view.to": "Choose a preset and camera view to enjoy flying! [Esc]",
   "language.label": "Language",
   "cockpit.quality.label": "Cockpit shading",
+  "engine.volume.label": "Engine sound",
+  "engine.volume.value": "Engine sound {value}%",
   "cockpit.quality.detailed": "Detailed",
   "cockpit.quality.performance": "Performance (contact shading off)",
   "quality.label": "Graphics",

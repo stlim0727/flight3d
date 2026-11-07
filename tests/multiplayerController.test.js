@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { GameFlowController } from '../src/ui/GameFlowController.js';
 import { t, bindText } from '../src/i18n/index.js';
-import { parseRoom } from '../src/multiplayer/protocol.js';
+import { parseRoom, inviteUrl } from '../src/multiplayer/protocol.js';
 
 // Load the production coordinator without importing its browser-only PeerJS adapter.
 const source = readFileSync(new URL('../src/multiplayer/MultiplayerController.js', import.meta.url), 'utf8');
-const Controller = new Function('t', 'bindText', 'parseRoom', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom);
+const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl);
 
 test('invite URL joins automatically; missing or invalid invites never connect', () => {
   const joined = [];
@@ -160,4 +160,27 @@ test('waiting and preparing rooms do not read or send flight snapshots', () => f
     controller.room.session.state = state;
     assert.doesNotThrow(() => controller.sendSnapshot(), state);
   }
+}));
+
+test('host start button is highlighted and focused once when a friend joins', () => fixture(({ controller }) => {
+  const start = document.getElementById('mp-start');
+  const attributes = {};
+  let focused = 0;
+  Object.assign(start, { setAttribute(name, value) { attributes[name] = value; }, focus() { focused++; } });
+  const previousLocation = globalThis.location;
+  globalThis.location = { href: 'https://example.org/' };
+  try {
+    Object.assign(controller, { dialog: { open: true }, voice: null, playbackBlocked: false, audio: { muted: false } });
+    Object.assign(controller.room, { host: true, registered: true, room: 'K7M2QX', waiting: false, session: { name: 'Pilot', state: 'connecting' } });
+    controller.refresh();
+    assert.equal(attributes['data-ready'], 'false');
+    assert.equal(focused, 0);
+    controller.room.session.state = 'connected';
+    controller.refresh(); controller.refresh();
+    assert.equal(attributes['data-ready'], 'true');
+    assert.equal(focused, 1, 'focus moves only on the transition, not on every refresh');
+    controller.room.session.state = 'flying';
+    controller.refresh();
+    assert.equal(attributes['data-ready'], 'false', 'restart during flight is not pulsed');
+  } finally { globalThis.location = previousLocation; }
 }));
