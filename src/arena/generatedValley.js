@@ -1,6 +1,6 @@
+import { mulberry32 } from '../core/random.js';
 import * as THREE from 'three';
-import { CLIMB_BUDGET_MS, MAX_BANK_DEG, SLALOM_ENVELOPE_VERSION, SLALOM_IAS_MAX_KT,
-  SLALOM_IAS_MIN_KT, assessLeg, bankReversalMeters } from './slalomEnvelope.js';
+import { CLIMB_BUDGET_MS, MAX_BANK_DEG, SLALOM_ENVELOPE_VERSION, assessLeg, bankReversalMeters } from './slalomEnvelope.js';
 
 /** Seed-reproducible valley courses for validating the slalom contract. Terrain
  * and geometry are generated together, which keeps a course honest in two
@@ -12,17 +12,6 @@ import { CLIMB_BUDGET_MS, MAX_BANK_DEG, SLALOM_ENVELOPE_VERSION, SLALOM_IAS_MAX_
 
 const RAD = Math.PI / 180, KT_TO_MS = 0.514444;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
-
-export function mulberry32(seed) {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6D2B79F5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /** Frozen generation and judging numbers. `valley-low-v1` stays untouched as the
  * regression baseline; slalom scores live in their own version and are never
@@ -186,7 +175,7 @@ function profileHeight({ crossM, floorM, halfWidthM, wallRiseM, ridgeExponent })
   return floorM + wallRiseM * Math.min(2.2, 1 + (outside - 1) * 0.3);
 }
 
-export function createValleyTerrain({ samples, noise, reliefAmplitudeM = 10, crossJitterM = 12 }) {
+function createValleyTerrain({ samples, noise, reliefAmplitudeM = 10, crossJitterM = 12 }) {
   const cellSizeM = 400;
   const index = new Map();
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -290,7 +279,7 @@ export function createValleyTerrain({ samples, noise, reliefAmplitudeM = 10, cro
 
 /** Gates sit at the leg boundaries, aimed across the valley rather than down the
  * middle, each with its own terrain-relative passage band. */
-export function buildGates({ samples, legs, rules, random, terrain }) {
+function buildGates({ samples, legs, rules, random, terrain }) {
   const gates = [];
   for (let index = 0; index < legs.length; index++) {
     const leg = legs[index];
@@ -319,7 +308,7 @@ export function buildGates({ samples, legs, rules, random, terrain }) {
 /** Every rule a course must satisfy before anyone is asked to fly it. Geometry
  * is checked against the measured envelope, not against a pilot's result: a
  * course that fails here is a generation failure and never becomes a level. */
-export function assessCourse({ course, terrain, rules = VALLEY_SLALOM_RULES }) {
+function assessCourse({ course, terrain, rules = VALLEY_SLALOM_RULES }) {
   const failures = [];
   const push = (gateIndex, reason, detail) => failures.push({ gateIndex, reason, detail });
   const { gates } = course;

@@ -6,7 +6,7 @@ function safeStorage(storage) {
 }
 
 /** Persist user preferences, never transient aircraft state or scripted demo time. */
-export function validateSimulatorPreferences(value) {
+function validateSimulatorPreferences(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const result = {};
   if (typeof value.timeOfDay === 'number' && Number.isFinite(value.timeOfDay)

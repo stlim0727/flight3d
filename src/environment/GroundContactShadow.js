@@ -37,7 +37,7 @@ export function planformYaw(forwardX, forwardZ) {
  * Silhouette of the top-view planform, drawn once into a canvas alpha map.
  * Canvas y grows toward the tail; the nose sits at the top of the texture.
  */
-export function createPlanformTexture(planform) {
+function createPlanformTexture(planform) {
   const canvas = document.createElement('canvas');
   canvas.width = 128;
   canvas.height = 256;

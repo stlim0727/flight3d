@@ -253,7 +253,7 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
 
 /** A gate's passage space is aimed across the valley; the waypoint a pilot
  * steers to is the middle of that band, which the chart can already describe. */
-export function slalomAnchor(gate) {
+function slalomAnchor(gate) {
   return { x: gate.x + Math.cos(gate.headingDeg * RAD) * gate.crossOffsetM,
     z: gate.z + Math.sin(gate.headingDeg * RAD) * gate.crossOffsetM };
 }

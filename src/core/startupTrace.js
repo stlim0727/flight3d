@@ -9,8 +9,8 @@
 
 export const TRACE_VERSION = 2;
 
-export const RESOURCE_CAPACITY = 256;
-export const TOP_N = 5;
+const RESOURCE_CAPACITY = 256;
+const TOP_N = 5;
 export const SETTLE_MS = 10_000;
 export const HARD_DEADLINE_MS = 180_000;
 /** Below this, a forced pre-ready flush has no resource list worth reporting yet. */

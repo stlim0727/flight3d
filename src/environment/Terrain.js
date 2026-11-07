@@ -1,15 +1,7 @@
+import { mulberry32 } from '../core/random.js';
 import * as THREE from 'three';
 import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
 import { TerrainTextures } from './TerrainTextures.js';
-
-function mulberry32(a) {
-  return function() {
-    let t = (a += 0x6D2B79F5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /**
  * Procedural Terrain with Rolling Hills, Coastal Mountains, and Flat Airport Mesa

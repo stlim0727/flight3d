@@ -16,7 +16,7 @@ export function asymmetricThrustYawMoment(thrustLeft, thrustRight, armMeters = 4
  * Normalized thrust factor from N1 fan speed.
  * Normalizes N1 between idleN1 (zero net thrust floor) and togaN1 (full thrust).
  */
-export function n1ToThrustFactor(n1, idleN1 = 22.0, togaN1 = 100.0) {
+function n1ToThrustFactor(n1, idleN1 = 22.0, togaN1 = 100.0) {
   const thrustIdleFloor = Math.max(0.0, idleN1 - 2.0);
   const thrustN1Range = Math.max(1.0, togaN1 - thrustIdleFloor);
   const n1Norm = Math.max(0.0, (n1 - thrustIdleFloor) / thrustN1Range);

@@ -34,7 +34,7 @@ const STAGES = {
   COMPLETED: 54
 };
 
-export class CanyonChaseTarget {
+class CanyonChaseTarget {
   constructor(scene) {
     this.scene = scene;
     this.group = new THREE.Group();

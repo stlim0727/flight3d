@@ -2,9 +2,9 @@
 // See public/licenses/effect-atlas-MIT.txt (generator and generated atlases).
 import * as THREE from 'three';
 
-export const FLIPBOOK_GRID = 4;
-export const FLIPBOOK_FRAMES = 16;
-export const FLIPBOOK_TILE = 64;
+const FLIPBOOK_GRID = 4;
+const FLIPBOOK_FRAMES = 16;
+const FLIPBOOK_TILE = 64;
 
 function noise(x, y) {
   const ix = Math.floor(x), iy = Math.floor(y);

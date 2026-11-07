@@ -197,17 +197,7 @@ To add an aircraft (e.g. Airbus A320, Boeing 777, F-16):
 3. In `src/environment/Airport.js`, the runway geometry and ALS strobe arrays dynamically adapt to the runway length and heading parameters.
 4. In `src/config/scenarioRegistry.js`, list the airport in every spawn scenario it offers; lobby/in-game button labels, briefing lines, and preset availability are all derived from that table.
 
-### 4.3 Event Catalog (`src/core/EventBus.js`)
-The decoupled event bus allows external telemetry loggers, multiplayer sockets, or blackbox recorders to listen without touching simulation internals:
-- `flight:takeoff`: Emitted when all landing gear leaves ground contact.
-- `flight:touchdown`: Emitted with vertical descent velocity and G-load on touchdown.
-- `flight:stall`: Emitted with stall severity percentage.
-- `flight:crashed`: Emitted with collision telemetry (type, speed, impact point, obstacle description).
-- `flight:reset`: Emitted when user initiates instant repair and runway alignment.
-- `aircraft:gearTransit`: Emitted during gear up/down cycles.
-- `aircraft:tune`: Emitted when live tuning sliders are adjusted.
-
-### 4.4 Multi-Obstacle Collision Detection (`src/physics/CollisionDetector.js`)
+### 4.3 Multi-Obstacle Collision Detection (`src/physics/CollisionDetector.js`)
 The collision pipeline runs on every 120Hz physics sub-step:
 1. **8-Point Aircraft Transform Matrix:**
    - Evaluates world coordinates of 8 critical fuselage locations: Nose Radome, Tail Cone, Vertical Fin, Left/Right Wingtips, Left/Right CFM56 Engine Nacelles, and Belly Keel.
@@ -217,7 +207,7 @@ The collision pipeline runs on every 120Hz physics sub-step:
    - Normal takeoff rotation (pitch $-5.5^\circ \sim +14.5^\circ$), oleo strut landing compression, and wings-level roll ($\le 16.5^\circ$) on the airport plateau are safeguarded to ensure authentic touch-and-go and ILS landings without false alarms.
    - Detects extreme structural failures: vertical slam ($V_y < -12.5\text{ m/s}$), wingtip ground strikes, inverted nose dives, tail strikes, or gear-up belly collisions.
 
-### 4.5 Procedural Particle Explosion & Audio Synthesis Engine (`src/effects/ExplosionSystem.js`)
+### 4.4 Procedural Particle Explosion & Audio Synthesis Engine (`src/effects/ExplosionSystem.js`)
 1. **Point Light Flash:** $15,000\text{ lm}$ instant incandescent flash illuminating local geometry with exponential decay.
 2. **Expanding Fireball Core:** Procedural radial gradient billboard particles expanding to $28\text{m}$ with combustion turbulence.
 3. **Buoyant Plume Smoke:** $40\sim 60$ dense carbonaceous smoke particles driven by upward buoyancy ($1.8\text{m/s}$) and atmospheric wind.

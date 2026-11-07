@@ -55,19 +55,19 @@ export const SLALOM_IAS_MAX_KT = 320;
  * 22-29 degrees angle of attack with flow separation, which is a departure. */
 export const MAX_BANK_DEG = 60;
 /** Wings-level to within 3 degrees of 60 degrees of bank: worst measured settle. */
-export const ROLL_ESTABLISH_SECONDS = 1.6;
+const ROLL_ESTABLISH_SECONDS = 1.6;
 /** 5 Hz decisions plus the 24-tick command delay. */
-export const CONTROL_LAG_SECONDS = 0.4;
+const CONTROL_LAG_SECONDS = 0.4;
 /** The measured sustained climb rate is 27-36 m/s; a leg is a transient, so only
  * part of it is spent as a budget. */
 export const CLIMB_BUDGET_MS = 27 * 0.8;
 /** Fraction of the measured constant-speed sink ceiling a course may demand. */
-export const SINK_MARGIN = 0.75;
+const SINK_MARGIN = 0.75;
 /** Fraction of the measured sustained turn rate a course may demand. */
-export const TURN_MARGIN = 0.85;
+const TURN_MARGIN = 0.85;
 /** Height traded for airspeed is not free: the baseline trace loses 14-16 m/s
  * while gaining 3.2-3.7 kt/s, about 0.66 of the ideal conversion. */
-export const ENERGY_SINK_FACTOR = 0.6;
+const ENERGY_SINK_FACTOR = 0.6;
 
 const KT_TO_MS = 0.514444;
 const GRAVITY = 9.80665;

@@ -1,18 +1,8 @@
+import { mulberry32 } from '../core/random.js';
 /** Deterministic foliage placement for the generated valley. Visual-only: nothing
  * in the physics reads this. Placement only asks the terrain where its own
  * analytic surface would tolerate a tree, so the forest always stands on the
  * rock the pilot actually sees and the collision probes actually test. */
-
-function mulberry32(seed) {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6D2B79F5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /** A stable integer identity for one generated valley, so the same course grows
  * the same forest without the renderer ever being told the seed. */

@@ -175,19 +175,16 @@ body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
   background: var(--flight-control-surface);
 }
 .flight-more-panel .btn,
-.flight-panel-body .btn,
 .mobile-menu .btn {
   background: transparent;
 }
 .flight-more-panel .btn:hover,
-.flight-panel-body .btn:hover,
 .mobile-menu .btn:hover,
 .hud-top-bar .btn:hover {
   background: rgba(181, 211, 234, .14);
 }
 .flight-toolbar .btn:is([aria-pressed="true"], [aria-expanded="true"]),
 .flight-more-panel .btn:is([aria-pressed="true"], [aria-expanded="true"]),
-.flight-panel-body .btn:is([aria-pressed="true"], [aria-expanded="true"]),
 .mobile-menu .btn:is([aria-pressed="true"], [aria-expanded="true"]) {
   background: rgba(14, 165, 233, .25);
 }
