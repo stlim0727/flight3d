@@ -4,7 +4,7 @@ import { WaitingLease, WAITING_TIMEOUT_MS } from './WaitingLease.js';
 import { newRoom, validRoom, roomPeerId, VERSION } from './protocol.js';
 
 /** Production configuration comes from the build, never an invite link. */
-export function peerOptions(env = import.meta.env) {
+function peerOptions(env = import.meta.env) {
   const options = { debug: 0 };
   if (env.VITE_MULTIPLAYER_SIGNAL_URL) {
     const url = new URL(env.VITE_MULTIPLAYER_SIGNAL_URL);

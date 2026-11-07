@@ -37,7 +37,7 @@ export function openFeedbackDialog(sim = null) {
   setTimeout(() => textarea?.focus(), 50);
 }
 
-export function closeFeedbackDialog() {
+function closeFeedbackDialog() {
   if (feedbackOverlay) {
     feedbackOverlay.hidden = true;
   }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { IncheonDepartureScenario } from './IncheonDepartureScenario.js';
 import { INCHEON_AIRFIELD } from '../../geospatial/IncheonFlightSurface.js';
-import { DEPARTURE_TAXI_ROUTE, DEPARTURE_LINEUP_ROUTE, DEPARTURE_GATE, DEPARTURE_RUNWAY, DEPARTURE_PUSHBACK, departurePushbackPose } from '../../config/incheonDeparture.js';
+import { DEPARTURE_TAXI_ROUTE, DEPARTURE_LINEUP_ROUTE, DEPARTURE_RUNWAY, DEPARTURE_PUSHBACK, departurePushbackPose } from '../../config/incheonDeparture.js';
 import { updateDepartureTug } from '../../environment/DepartureTug.js';
 import { flyVerticalPath } from '../PilotControlLaws.js';
 import { CameraSystem } from '../../cameras/CameraSystem.js';

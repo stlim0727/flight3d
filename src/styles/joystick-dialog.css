@@ -376,14 +376,6 @@
   color: #ffffff;
 }
 
-/* POV Hat Card */
-.joystick-pov-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 /* Hardware Tips Card */
 .joystick-tips-card {
   background: rgba(2, 132, 199, 0.08);

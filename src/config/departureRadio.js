@@ -34,7 +34,3 @@ export const DEPARTURE_RADIO = {
   ],
   takeoff: [['pilot', 'Takeoff clearance confirmed. Accelerating, rotating and climbing.']],
 };
-
-export function departureRadioCaption(stage, speakerLabel = speaker => speaker) {
-  return (DEPARTURE_RADIO[stage] ?? []).map(([speaker, text]) => `${speakerLabel(speaker)}: ${text}`).join(' ');
-}

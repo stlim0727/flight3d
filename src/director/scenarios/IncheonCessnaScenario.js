@@ -13,14 +13,14 @@ const angle = approach.headingDeg * Math.PI / 180;
 const forward = { x: Math.sin(angle), z: -Math.cos(angle) };
 const right = { x: -forward.z, z: forward.x };
 
-export function incheonDemoPoint(along, cross, altitude) {
+function incheonDemoPoint(along, cross, altitude) {
   return { x: approach.threshold.x + forward.x * along + right.x * cross,
     z: approach.threshold.z + forward.z * along + right.z * cross, altitude };
 }
 
 // Airport-frame metres. Broad lead-in turns establish the close-pass corridor
 // before the mapped concourse, T1/transport centre and business district.
-export const INCHEON_DEMO_ROUTE = [
+const INCHEON_DEMO_ROUTE = [
   [1600, 0, 85], [2100, 350, 85], [2400, 1000, 55],
   [3100, 1100, 45, 'concourse'], [4050, 1100, 40, 'terminal'],
   [5150, 1100, 55, 'business'], [5700, 1600, 180],

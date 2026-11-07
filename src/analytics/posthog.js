@@ -200,7 +200,7 @@ function drainPendingEvents() {
  * Send an event without flight context. Use this for events that carry their own state, so a
  * startup trace is not tagged with whatever the simulator happened to be holding when it flushed.
  */
-export function sendEvent(eventName, properties = {}, options = {}) {
+function sendEvent(eventName, properties = {}, options = {}) {
   captureOrQueue(eventName, { ...properties, clientTimeMs: Date.now() }, options);
 }
 

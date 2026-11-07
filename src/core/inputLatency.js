@@ -4,9 +4,9 @@
  * can drive every computation directly with fake timings.
  */
 
-export const EVENT_CAPACITY = 128;
-export const LONGTASK_CAPACITY = 64;
-export const SELECTION_CAPACITY = 32;
+const EVENT_CAPACITY = 128;
+const LONGTASK_CAPACITY = 64;
+const SELECTION_CAPACITY = 32;
 export const THRESHOLDS = {
   eventMs: 100,        // an input taking longer than this is a breach
   longTaskTotalMs: 5000, // per summary window

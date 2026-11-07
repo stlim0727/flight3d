@@ -1,5 +1,4 @@
 /** Pure training-navigation sensor model. Input is a trusted snapshot, never sent whole. */
-export const SENSOR_PROFILE_VERSION = 'training-navigation-v1';
 const FEET_PER_METER = 3.280839895013123;
 const DEG_PER_RAD = 180 / Math.PI;
 const wrap360 = value => ((value % 360) + 360) % 360;

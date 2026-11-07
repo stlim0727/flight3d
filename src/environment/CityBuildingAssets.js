@@ -68,7 +68,7 @@ function box(width, height, depth, bottom, facadeTile) {
 
 // Keep window bays close to human scale even when a normalized archetype is
 // instanced as a 25 m block or a 150 m tower. Rooftops retain their original UVs.
-export function cityFacadeUvShader(shader) {
+function cityFacadeUvShader(shader) {
   shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
     varying vec3 vCityMetricPosition;
     varying vec3 vCityFaceNormal;`);

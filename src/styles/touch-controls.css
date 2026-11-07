@@ -599,7 +599,7 @@ body.touch-mode .action-panel {
 
 
 /* Compact browser layout: reserve the center for the flight view. */
-.mobile-menu-toggle, .mobile-menu { display: none; }
+.mobile-menu { display: none; }
 body.compact-ui {
   height: 100dvh;
   --edge-left: max(8px, env(safe-area-inset-left));
@@ -608,15 +608,6 @@ body.compact-ui {
   --edge-bottom: max(8px, env(safe-area-inset-bottom));
 }
 .compact-ui #hud-overlay { height: 100dvh; z-index: 30; }
-.compact-ui .mobile-menu-toggle {
-  display: block;
-  position: absolute;
-  top: var(--edge-top);
-  left: var(--edge-left);
-  min-height: 44px;
-  pointer-events: auto;
-  z-index: 60;
-}
 .compact-ui .hud-strip {
   top: var(--edge-top);
   left: calc(var(--edge-left) + 86px);

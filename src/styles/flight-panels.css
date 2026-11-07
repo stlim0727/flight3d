@@ -147,24 +147,6 @@ body.demo-active #touch-controls-overlay {
   font: 600 calc(16px * var(--ui-scale, 1)) system-ui;
   color: #f1f5f9;
 }
-.panel-close {
-  min-width: calc(44px * var(--ui-scale, 1));
-  font-size: calc(22px * var(--ui-scale, 1));
-}
-.flight-panel-body {
-  display: grid;
-  gap: calc(8px * var(--ui-scale, 1));
-  padding: calc(12px * var(--ui-scale, 1));
-  overflow-y: auto;
-  min-height: 0;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-}
-.flight-panel-body .btn {
-  white-space: normal;
-  text-align: left;
-  margin: 0;
-}
 .flight-panel option {
   background: #101c2b;
   color: #f1f5f9;
@@ -271,7 +253,7 @@ body.demo-active #touch-controls-overlay {
     max-height: calc(100dvh - 210px);
   }
 }
-.flight-panel, .flight-panel-body, .flight-panel-body button, .flight-panel-body select {
+.flight-panel {
   touch-action: pan-y;
 }
 

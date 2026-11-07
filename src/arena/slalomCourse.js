@@ -68,7 +68,7 @@ export function createSlalomManifest({ seed, rules = VALLEY_SLALOM_RULES,
   return validateSlalomManifest(manifest);
 }
 
-export function validateSlalomManifest(manifest) {
+function validateSlalomManifest(manifest) {
   const course = manifest?.course, spawn = manifest?.spawn;
   const valid = manifest && manifest.type === 'valley-slalom' && manifest.aircraftId === 'F16'
     && manifest.physicsHz === 120 && manifest.decisionPeriodTicks === 24
@@ -102,16 +102,6 @@ export function validateSlalomManifest(manifest) {
       - Math.abs(course.gates[0].crossOffsetM)) < 1;
   if (!valid) throw new TypeError('Invalid valley slalom manifest');
   return manifest;
-}
-
-/** Legs between consecutive ordered gates, in the terms the envelope measures. */
-export function slalomLegs(course) {
-  return course.gates.slice(1).map((gate, index) => {
-    const previous = course.gates[index];
-    return { index: index + 1, from: previous, to: gate, startS: previous.sM,
-      lengthM: gate.sM - previous.sM,
-      headingChangeDeg: ((gate.headingDeg - previous.headingDeg + 540) % 360) - 180 };
-  });
 }
 
 /** The passage ceiling at any progress: interpolated between gate ceilings, so

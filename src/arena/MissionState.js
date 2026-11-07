@@ -9,7 +9,7 @@ const ids = ['nose', 'mainLeft', 'mainRight'];
  * sinkRateMs is max(0,-contactVelocity.dot(groundNormal)), even at first gentle contact.
  * Do not derive contact onset only from touchdownContacts: the gear model omits <=0.25m/s events.
  */
-export function validMissionSnapshot(s) {
+function validMissionSnapshot(s) {
   return s && Number.isInteger(s.tick) && s.tick > 0 && numeric.every(k => Number.isFinite(s[k])) &&
     s.iasKnots >= 0 && s.groundSpeedKnots >= 0 &&
     ['crashed', 'damaged', 'bodyContact'].every(k => typeof s[k] === 'boolean') &&
