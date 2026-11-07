@@ -5,7 +5,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'vite';
-import { getFreePort } from './lib/browserHarness.mjs';
+import { getFreePort, detectGpuAngle } from './lib/browserHarness.mjs';
 import { connectCdp, until, delay } from './lib/cdpClient.mjs';
 
 const simulatorMode = process.argv.includes('--simulator');
@@ -20,12 +20,19 @@ try {
   await until(async () => { try { return (await fetch(`http://127.0.0.1:${signalPort}/flight3d`)).ok; } catch { return false; } }, 'local PeerServer');
   if (!publicMode) process.env.VITE_MULTIPLAYER_SIGNAL_URL = `http://127.0.0.1:${signalPort}/flight3d`;
   vite = await createServer({ server: { host: '127.0.0.1', port: vitePort, strictPort: true }, logLevel: 'error' }); await vite.listen();
+  const gpuAngle = detectGpuAngle();
+  const needsNoSandbox = Boolean(process.env.CI || process.env.GITHUB_ACTIONS || process.env.CHROME_NO_SANDBOX === '1' || (typeof process.getuid === 'function' && process.getuid() === 0));
+
   chrome = spawn(process.env.CHROME_PATH || 'google-chrome-stable', [
     '--headless=new', '--window-size=1280,900', `--user-data-dir=${profile}`, `--remote-debugging-port=${cdpPort}`,
-    '--enable-gpu', '--use-gl=angle', '--use-angle=vulkan', '--disable-software-rasterizer',
     '--no-first-run', '--no-default-browser-check', '--autoplay-policy=no-user-gesture-required',
+    '--disable-dev-shm-usage',
     '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
-    ...(process.env.CHROME_NO_SANDBOX === '1' ? ['--no-sandbox'] : []), 'about:blank'
+    ...(needsNoSandbox ? ['--no-sandbox', '--disable-setuid-sandbox'] : []),
+    '--use-gl=angle',
+    `--use-angle=${gpuAngle}`,
+    ...(gpuAngle === 'swiftshader' ? ['--enable-unsafe-swiftshader'] : ['--disable-software-rasterizer']),
+    'about:blank'
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   chrome.stderr.on('data', b => { chromeLog = (chromeLog + b).slice(-8000); });
   await until(async () => { try { return (await fetch(`http://127.0.0.1:${cdpPort}/json/version`)).ok; } catch { return false; } }, 'Chrome CDP');

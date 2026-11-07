@@ -79,7 +79,7 @@ export class PeerRoom {
       if (this.disposed) { cleanup(); return; }
       conn.send({ type: 'reject', reason });
       clearTimeout(this.rejections.get(conn));
-      this.rejections.set(conn, setTimeout(cleanup, 250));
+      this.rejections.set(conn, setTimeout(cleanup, 2000));
     });
   }
   attach(conn) {

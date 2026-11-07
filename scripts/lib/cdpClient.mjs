@@ -26,7 +26,8 @@ export async function connectCdp(url) {
   };
 }
 export const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-export async function until(check, label, timeout = 20000) {
+const DEFAULT_UNTIL_TIMEOUT = process.env.CI ? 60000 : 30000;
+export async function until(check, label, timeout = DEFAULT_UNTIL_TIMEOUT) {
   const deadline = Date.now() + timeout;
   let last;
   while (Date.now() < deadline) {

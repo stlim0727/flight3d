@@ -33,3 +33,5 @@ jobs:
         env:
           FORCE_GPU: '0'
       - run: npm run test:multiplayer
+        env:
+          FORCE_GPU: '0'
