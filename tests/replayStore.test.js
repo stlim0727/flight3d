@@ -290,3 +290,17 @@ test('index write failure rolls back evictions after a new payload fit', () => {
   assert.deepEqual([...storage.store].sort(), before.sort());
   assert.equal(store.get(original.id).track.samples.length, 20);
 });
+
+test('F16 high fuel flow survives save and export/import', () => {
+  const source = track();
+  source.metadata.aircraft = 'F16';
+  source.samples[0].engine1.ff = 4500;
+  source.samples[0].engine2 = { ff: 3900 };
+  const store = storeFor();
+  const saved = store.save(source).entry;
+  assert.equal(store.get(saved.id).track.samples[0].engine1.ff, 4500);
+  const target = storeFor();
+  const imported = target.importJson(store.exportJson(saved.id)).entry;
+  assert.equal(target.get(imported.id).track.samples[0].engine1.ff, 4500);
+  assert.equal(target.get(imported.id).track.samples[0].engine2.ff, 3900);
+});

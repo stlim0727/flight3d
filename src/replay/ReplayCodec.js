@@ -1,6 +1,6 @@
 import { RECORD_BYTES, HEADER_BYTES, REPLAY_INTERVAL_SEC } from './replayConfig.js';
 
-export const REPLAY_TRACK_VERSION = 1;
+export const REPLAY_TRACK_VERSION = 2;
 export const REPLAY_MAGIC = 'F3DR1';
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
@@ -136,9 +136,13 @@ function writeSample(dv, base, sample, ids) {
     writeScalar(dv, base + offset, type, sample[name], scale);
   }
   for (let offset = 73; offset < RECORD_BYTES; offset++) dv.setUint8(base + offset, 0);
+  // v2 uses four reserved bytes for full-range fuel flow, retaining 80-byte records.
+  for (let engine = 0; engine < 2; engine++) {
+    writeScalar(dv, base + 73 + engine * 2, 'u16', sample[`engine${engine + 1}`]?.ff, 0.1);
+  }
 }
 
-function readSample(dv, base, ids) {
+function readSample(dv, base, ids, version) {
   const sample = { quat: [0, 0, 0, 1] };
   for (const [name, offset, type, scale] of SCALARS) sample[name] = readScalar(dv, base + offset, type, scale);
   sample.quat = readQuaternion(dv, base + 16, sample.quat);
@@ -164,6 +168,7 @@ function readSample(dv, base, ids) {
     ENGINE_FIELDS.forEach(([name, scale], index) => {
       state[name] = readScalar(dv, base + 58 + engine * 4 + index, 'u8', scale);
     });
+    if (version >= 2) state.ff = readScalar(dv, base + 73 + engine * 2, 'u16', 0.1);
     state.failed = Boolean(flags2 & (1 << engine));
     sample[`engine${engine + 1}`] = state;
   }
@@ -214,7 +219,7 @@ export function decodeTrack(bytes) {
   const magic = String.fromCharCode(...bytes.subarray(0, 5));
   if (magic !== REPLAY_MAGIC) throw new Error(`not a flight3d replay track (${magic})`);
   const version = view.getUint8(5);
-  if (version !== REPLAY_TRACK_VERSION) throw new Error(`unsupported replay track version ${version}`);
+  if (version !== 1 && version !== REPLAY_TRACK_VERSION) throw new Error(`unsupported replay track version ${version}`);
   const count = view.getUint32(8);
   const metadataLength = view.getUint16(16);
   const expected = HEADER_BYTES + metadataLength + count * RECORD_BYTES;
@@ -236,7 +241,7 @@ export function decodeTrack(bytes) {
   const ids = trackDamageIds({ gearIds: metadata.gearIds, bodyIds: metadata.bodyIds });
   const samples = [];
   for (let index = 0; index < count; index++) {
-    const sample = readSample(view, HEADER_BYTES + metadataLength + index * RECORD_BYTES, ids);
+    const sample = readSample(view, HEADER_BYTES + metadataLength + index * RECORD_BYTES, ids, version);
     if (![sample.timeSec, sample.x, sample.y, sample.z, ...sample.quat].every(Number.isFinite)
       || sample.timeSec < 0 || (index > 0 && sample.timeSec <= samples[index - 1].timeSec)) {
       throw new Error('replay track sample is corrupt');
