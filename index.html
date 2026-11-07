@@ -191,34 +191,35 @@
   <div id="toast-msg" class="toast">Runway 09L Ready</div>
   <p id="audio-start-hint" class="audio-start-hint" role="status" data-i18n="audio.startHint" hidden>Tap, click or press a key to enable sound.</p>
 
+  <!-- Persistent main-menu toggle for HUD during flight -->
+  <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Open main menu">
+    <span class="menu-toggle-glyph" aria-hidden="true"></span>
+    <span class="menu-toggle-title" data-i18n="debrief.lobby">FLIGHT3D</span>
+  </button>
+
   <!-- Lobby / main menu over the live cinematic -->
   <div id="lobby-screen" class="menu-backdrop flow-overlay">
     <div class="lobby-card">
       <header class="lobby-header">
-        <div class="lobby-title-row">
-          <button id="btn-lobby-back" class="btn lobby-back-btn" type="button" aria-label="뒤로 가기" data-i18n-aria-label="ui.back" data-i18n-title="ui.back" title="뒤로 가기">
-            <span class="back-glyph" aria-hidden="true">←</span>
-            <span class="back-caption" data-i18n="ui.back">뒤로</span>
-          </button>
-          <!-- Persistent main-menu toggle: in main menu on same row as Flight3d title; moves to HUD top bar during flight -->
-          <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Open main menu">
-            <span class="menu-toggle-glyph" aria-hidden="true"></span>
-            <span class="menu-toggle-title" data-i18n="debrief.lobby">FLIGHT3D</span>
-          </button>
-          <div class="lobby-title-wrap">
-            <h1 class="lobby-title">Flight3d <span data-i18n="lobby.title">메인 메뉴</span></h1>
-          </div>
-        </div>
-        <button id="btn-lobby-fold" class="btn btn-card-fold lobby-fold-btn" type="button" aria-expanded="true" aria-controls="lobby-screen" aria-label="메인 메뉴 접기" data-i18n-aria-label="ui.fold" data-i18n-title="ui.fold" title="메인 메뉴 접기">
-          <span class="fold-glyph" aria-hidden="true">▾</span>
-          <span class="fold-caption" data-i18n="ui.fold">접기</span>
+        <button id="btn-lobby-back" class="btn lobby-back-btn" type="button" aria-label="뒤로 가기" data-i18n-aria-label="ui.back" data-i18n-title="ui.back" title="뒤로 가기" hidden>
+          <span class="back-glyph" aria-hidden="true">←</span>
+          <span class="back-caption" data-i18n="ui.back">뒤로</span>
         </button>
-        <div class="lobby-language" role="group" aria-labelledby="lobby-language-label">
-          <span id="lobby-language-label" class="lobby-label" data-i18n="language.label">Language</span>
-          <div class="lobby-buttons">
-            <button id="lobby-lang-en" class="btn btn-lang"><span lang="en">English</span></button>
-            <button id="lobby-lang-ko" class="btn btn-lang"><span lang="ko">한국어</span></button>
+        <div class="lobby-title-wrap">
+          <h1 class="lobby-title">Flight3d <span data-i18n="lobby.title">메인 메뉴</span></h1>
+        </div>
+        <div class="lobby-header-actions">
+          <div class="lobby-language" role="group" aria-labelledby="lobby-language-label">
+            <span id="lobby-language-label" class="lobby-label" data-i18n="language.label">Language</span>
+            <div class="lobby-buttons">
+              <button id="lobby-lang-en" class="btn btn-lang"><span lang="en">English</span></button>
+              <button id="lobby-lang-ko" class="btn btn-lang"><span lang="ko">한국어</span></button>
+            </div>
           </div>
+          <button id="btn-lobby-fold" class="btn btn-card-fold lobby-fold-btn" type="button" aria-expanded="true" aria-controls="lobby-screen" aria-label="메인 메뉴 접기" data-i18n-aria-label="ui.fold" data-i18n-title="ui.fold" title="메인 메뉴 접기">
+            <span class="fold-glyph" aria-hidden="true">▾</span>
+            <span class="fold-caption" data-i18n="ui.fold">접기</span>
+          </button>
         </div>
       </header>
       <p class="build-info" data-build-info>
