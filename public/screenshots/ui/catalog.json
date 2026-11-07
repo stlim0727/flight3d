@@ -172,7 +172,7 @@
     "title_en": "Mobile Touch Controls UI Overlay",
     "description_ko": "가상 비행 조종간(Stick), 수직 스로틀 바, 좌우 러더 페달 및 플랩 제어",
     "description_en": "Virtual flight stick, vertical throttle slider, rudder control pedals, and flap buttons",
-    "selector": "#hud-overlay",
+    "selector": "#touch-controls-overlay",
     "tier": "full"
   },
   {
@@ -381,7 +381,7 @@
     "title_en": "Pilot Arena — Mission Scorecard & Global Leaderboard",
     "description_ko": "계곡 슬라롬 완료 스코어카드: 최종 완주 시간, 통과 고도, 콜사인 등록 및 TOP 5 랭킹",
     "description_en": "Valley slalom score overlay: completion time, flight stats, callsign registration, and leaderboard",
-    "selector": ".pilot-score-modal",
+    "selector": "#pilot-score-overlay",
     "tier": "full"
   },
   {

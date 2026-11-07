@@ -333,7 +333,7 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
     // 16. Mobile Touch Controls
     await evaluate(() => {
       window.simulator.controls.onSelectCamera(0);
-      document.body.classList.add('touch-controls-active');
+      window.simulator.touchControls?.enable();
     });
     await delay(300);
     await recordScreen(screenshot, {
@@ -344,10 +344,12 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
       title_en: 'Mobile Touch Controls UI Overlay',
       description_ko: '가상 비행 조종간(Stick), 수직 스로틀 바, 좌우 러더 페달 및 플랩 제어',
       description_en: 'Virtual flight stick, vertical throttle slider, rudder control pedals, and flap buttons',
-      selector: '#hud-overlay',
+      selector: '#touch-controls-overlay',
       tier: 'full',
     });
-    await evaluate(() => { document.body.classList.remove('touch-controls-active'); });
+    await evaluate(() => {
+      window.simulator.touchControls?.disable();
+    });
 
     // 17. Stall Warning Banner
     await evaluate(() => {
@@ -561,7 +563,10 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
     // 27. Demo Restart Dialog
     await evaluate(() => {
       const dlg = document.getElementById('demo-restart-dialog');
-      if (dlg) dlg.hidden = false;
+      if (dlg) {
+        dlg.hidden = false;
+        dlg.classList.add('visible');
+      }
     });
     await delay(300);
     await recordScreen(screenshot, {
@@ -577,7 +582,10 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
     });
     await evaluate(() => {
       const dlg = document.getElementById('demo-restart-dialog');
-      if (dlg) dlg.hidden = true;
+      if (dlg) {
+        dlg.hidden = true;
+        dlg.classList.remove('visible');
+      }
     });
   }
 
@@ -706,25 +714,36 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
     });
   }
 
-  // Hide debrief and return flow to flight
-  await evaluate(() => {
-    window.simulator.gameFlow.enterFlight();
-    window.simulator.syncFlowUi();
+  // Hide debrief and start real replay to show replay transport panel
+  await evaluate(async () => {
+    const s = window.simulator;
     const debrief = document.getElementById('debrief-overlay');
     if (debrief) debrief.classList.remove('visible');
-  });
+    s.gameFlow.enterFlight();
+    s.syncFlowUi();
 
-  // 33. Replay Controls Panel
-  await evaluate(() => {
-    const rp = document.getElementById('replay-panel');
-    rp.hidden = false;
-    document.body.classList.add('replaying');
-    const seek = rp.querySelector('[data-seek]');
-    if (seek) { seek.max = 180; seek.value = 65; }
-    const time = rp.querySelector('[data-time]');
-    if (time) time.textContent = '01:05 / 03:00';
+    const sampleA = {
+      timeSec: 0, x: 0, y: 10, z: 0, quat: [0, 0, 0, 1],
+      altitudeFt: 30, iasKnots: 150, groundSpeedKnots: 150,
+      throttle: 0.8, pitchDeg: 5, rollDeg: 0, headingDeg: 90,
+      compressions: { nose: 0, mainLeft: 0, mainRight: 0 }
+    };
+    const sampleB = {
+      timeSec: 180, x: 1000, y: 300, z: 1000, quat: [0, 0, 0, 1],
+      altitudeFt: 1000, iasKnots: 220, groundSpeedKnots: 220,
+      throttle: 0.85, pitchDeg: 3, rollDeg: 0, headingDeg: 90,
+      compressions: { nose: 0, mainLeft: 0, mainRight: 0 }
+    };
+    const validTrack = {
+      metadata: { airport: 'coastal', aircraft: 'B738', scenario: 'rwy' },
+      durationSec: 180,
+      samples: [sampleA, sampleB]
+    };
+    await s.replayPanel.watch(validTrack);
+    s.replayDirector.pause();
+    s.replayDirector.seek(65);
   });
-  await delay(300);
+  await delay(400);
   await recordScreen(screenshot, {
     id: '33_flight_replay_controls_panel',
     category: 'replay',
@@ -754,75 +773,7 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
     });
     await evaluate(() => {
       window.simulator.replayPanel?.closeLibrary();
-      document.getElementById('replay-panel').hidden = true;
-      document.body.classList.remove('replaying');
-    });
-
-    // 35. Pilot Mission Score Modal
-    await evaluate(() => {
-      let overlay = document.getElementById('pilot-score-overlay');
-      if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'pilot-score-overlay';
-        overlay.className = 'pilot-score-overlay';
-        document.body.appendChild(overlay);
-      }
-      overlay.innerHTML = `
-        <div class="pilot-score-modal">
-          <button type="button" class="btn-score-lobby" data-score-close aria-label="메인 메뉴" title="메인 메뉴">
-            <span class="score-back-glyph" aria-hidden="true">↩</span>
-            <span class="score-back-caption">메인 메뉴</span>
-          </button>
-          <button type="button" class="btn-modal-close" data-score-close aria-label="닫기">×</button>
-          <span class="modal-badge">🏆 임무 완주 (MISSION ACCOMPLISHED)</span>
-          <div class="modal-mission-title">F-16 가상 계곡 슬라롬 · 사람 직접 조종</div>
-          <div class="modal-score-box">
-            <div class="modal-score-label">최종 완주 시간</div>
-            <div class="modal-score-value">104.8<span class="modal-score-unit">초</span></div>
-            <div class="modal-score-sub">평균 대지속도 562 KT · 최저 통과 고도 24 m</div>
-          </div>
-          <div class="modal-stats-grid">
-            <div class="modal-stat-item"><span class="modal-stat-name">평균 비행 고도</span><strong class="modal-stat-value">32.4 m</strong></div>
-            <div class="modal-stat-item"><span class="modal-stat-name">웨이포인트 통과</span><strong class="modal-stat-value">12 / 12</strong></div>
-            <div class="modal-stat-item"><span class="modal-stat-name">최대 가속도</span><strong class="modal-stat-value">7.82 G</strong></div>
-            <div class="modal-stat-item"><span class="modal-stat-name">항로 편차</span><strong class="modal-stat-value">±18 m</strong></div>
-          </div>
-          <div class="modal-callsign-box">
-            <label class="modal-callsign-label" for="score-callsign-input">🎖️ 파일럿 콜사인 (CALLSIGN)</label>
-            <div class="modal-callsign-row">
-              <input id="score-callsign-input" type="text" class="input-callsign" maxlength="8" value="MAVERICK" readonly />
-              <button type="button" class="btn-save-callsign">등록됨</button>
-            </div>
-          </div>
-          <div class="modal-leaderboard">
-            <div class="leaderboard-header"><span>🏆 글로벌 계곡 슬라롬 순위표 (TOP 5)</span></div>
-            <div class="leaderboard-table">
-              <div class="leaderboard-row is-me"><span class="lb-rank">#1</span><span class="lb-callsign">MAVERICK <small>(사람)</small></span><span class="lb-time">104.8초</span></div>
-              <div class="leaderboard-row"><span class="lb-rank">#2</span><span class="lb-callsign">VIPER <small>(사람)</small></span><span class="lb-time">106.2초</span></div>
-              <div class="leaderboard-row"><span class="lb-rank">#3</span><span class="lb-callsign">AI_AGENT_V2 <small>(AI)</small></span><span class="lb-time">108.5초</span></div>
-              <div class="leaderboard-row"><span class="lb-rank">#4</span><span class="lb-callsign">ROOSTER <small>(사람)</small></span><span class="lb-time">109.1초</span></div>
-              <div class="leaderboard-row"><span class="lb-rank">#5</span><span class="lb-callsign">PHOENIX <small>(사람)</small></span><span class="lb-time">111.4초</span></div>
-            </div>
-          </div>
-        </div>
-      `;
-      overlay.style.display = 'block';
-    });
-    await delay(300);
-    await recordScreen(screenshot, {
-      id: '35_pilot_mission_score_modal',
-      category: 'pilot',
-      file: '35_pilot_mission_score_modal.png',
-      title_ko: '파일럿 아레나 — 미션 완료 스코어카드 및 글로벌 순위표',
-      title_en: 'Pilot Arena — Mission Scorecard & Global Leaderboard',
-      description_ko: '계곡 슬라롬 완료 스코어카드: 최종 완주 시간, 통과 고도, 콜사인 등록 및 TOP 5 랭킹',
-      description_en: 'Valley slalom score overlay: completion time, flight stats, callsign registration, and leaderboard',
-      selector: '.pilot-score-modal',
-      tier: 'full',
-    });
-    await evaluate(() => {
-      const overlay = document.getElementById('pilot-score-overlay');
-      if (overlay) overlay.style.display = 'none';
+      window.simulator.replayDirector?.stop();
     });
 
     // 36. Standalone Flights URL Selection Page (flights.html)
@@ -854,19 +805,82 @@ await withBrowserSession({ width: 1920, height: 1080, path: '/' }, async ({ eval
       selector: 'body',
       tier: 'full',
     });
+  } else {
+    await evaluate(() => {
+      window.simulator.replayDirector?.stop();
+    });
   }
 
   assert.equal(exceptions.length, 0, `Uncaught browser exceptions: ${exceptions.join('; ')}`);
 });
 
 if (tier === 'all') {
-  // 38. AI Pilot Lab Arena Panel (?pilotArena=1)
+  // 35. Pilot Mission Score Modal & 38. AI Pilot Lab Arena Panel (?pilotArena=1)
   await withBrowserSession({ width: 1920, height: 1080, path: '/?pilotArena=1&airport=valley&aircraft=F16' }, async ({ evaluate, screenshot, delay, exceptions }) => {
     for (let i = 0; i < 60; i++) {
       if (await evaluate('Boolean(window.simulator?.startupReady)')) break;
       await delay(300);
     }
     await delay(800);
+
+    // 35. Pilot Mission Score Modal (rendered with real pilot-arena.css)
+    await evaluate(async () => {
+      const { formatPilotScoreData, scoreOverlayMarkup } = await import('/src/ui/pilotScoreView.js');
+      const mockRecord = {
+        status: 'succeeded',
+        pilotKind: 'human',
+        tick: 12576,
+        reason: 'completed',
+        manifest: { type: 'valley', id: 'valley-slalom', physicsHz: 120, course: { targetAglM: 20 } },
+        result: {
+          metrics: {
+            finalScore: 18450,
+            altitudeCostM: 14.8,
+            meanIasKnots: 562,
+            maxIasKnots: 620,
+            clearedGates: 12,
+            totalGates: 12,
+            medianAglM: 28,
+            minAglM: 19
+          }
+        }
+      };
+      const globalRows = [
+        { rank: 1, callsign: 'MAVERICK', pilotKind: 'human', durationSeconds: 104.8, score: 18450 },
+        { rank: 2, callsign: 'VIPER', pilotKind: 'human', durationSeconds: 106.2, score: 18120 },
+        { rank: 3, callsign: 'AI_AGENT_V2', pilotKind: 'ai', durationSeconds: 108.5, score: 17890 },
+        { rank: 4, callsign: 'ROOSTER', pilotKind: 'human', durationSeconds: 109.1, score: 17650 },
+        { rank: 5, callsign: 'PHOENIX', pilotKind: 'human', durationSeconds: 111.4, score: 17400 }
+      ];
+      const data = formatPilotScoreData(mockRecord, 'F-16 가상 계곡 슬라롬', { callsign: 'MAVERICK', globalRows });
+      const overlay = document.getElementById('pilot-score-overlay');
+      if (overlay) {
+        overlay.innerHTML = scoreOverlayMarkup(data);
+        overlay.hidden = false;
+        overlay.style.display = 'flex';
+      }
+    });
+    await delay(300);
+    await recordScreen(screenshot, {
+      id: '35_pilot_mission_score_modal',
+      category: 'pilot',
+      file: '35_pilot_mission_score_modal.png',
+      title_ko: '파일럿 아레나 — 미션 완료 스코어카드 및 글로벌 순위표',
+      title_en: 'Pilot Arena — Mission Scorecard & Global Leaderboard',
+      description_ko: '계곡 슬라롬 완료 스코어카드: 최종 완주 시간, 통과 고도, 콜사인 등록 및 TOP 5 랭킹',
+      description_en: 'Valley slalom score overlay: completion time, flight stats, callsign registration, and leaderboard',
+      selector: '#pilot-score-overlay',
+      tier: 'full',
+    });
+    await evaluate(() => {
+      const overlay = document.getElementById('pilot-score-overlay');
+      if (overlay) {
+        overlay.hidden = true;
+        overlay.style.display = 'none';
+      }
+    });
+
+    // 38. AI Pilot Lab Arena Panel
     await evaluate(() => {
       const arena = document.getElementById('pilot-arena');
       if (arena) arena.open = true;
@@ -907,6 +921,8 @@ if (tier !== 'all') {
     // No previous catalog in outDir, keep captured catalog
   }
 }
+
+finalCatalog.sort((a, b) => a.id.localeCompare(b.id));
 
 console.log(`[capture-all-ui-screens] Finished. Total captured: ${catalog.length} screens (${finalCatalog.length} in catalog).`);
 await writeFile(`${outDir}/catalog.json`, JSON.stringify(finalCatalog, null, 2));
