@@ -32,6 +32,9 @@
     "test:camera-look": "node scripts/verify-camera-look.mjs",
     "audio:departure": "node scripts/build-gemini-departure-radio.mjs",
     "audio:check": "node scripts/build-gemini-departure-radio.mjs --check",
+    "screens:capture": "node scripts/capture-all-ui-screens.mjs",
+    "screens:capture:core": "node scripts/capture-all-ui-screens.mjs --tier core",
+    "test:ui-screens": "node scripts/capture-all-ui-screens.mjs --tier core",
     "refresh:images": "node scripts/refresh-all-readme-images.mjs",
     "check": "node scripts/check-syntax.mjs && node scripts/check-workflow-actions.mjs",
     "test:multiplayer": "node scripts/test-multiplayer.mjs"
