@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path';
 
 export function detectGpuAngle() {
   if (process.env.GPU_ANGLE) return process.env.GPU_ANGLE;
+  if (process.env.FORCE_GPU === '0') return 'swiftshader';
   return existsSync('/dev/dri/renderD128') ? 'vulkan' : 'swiftshader';
 }
 
