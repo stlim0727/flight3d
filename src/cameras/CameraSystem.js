@@ -168,6 +168,7 @@ export class CameraSystem {
     this.povReturnSpeed = 1.0; // Decay rate (~2-3s gentle settle back to default)
     this._lastPovModified = false;
     this.povChangedByDrag = false;
+    this.isHatLooking = false;
     this.onPovChange = null;
 
     // Manual look holds automatic framing; touch interruptions in AUTO resume after release.
@@ -669,6 +670,50 @@ export class CameraSystem {
   }
 
   /**
+   * Calculates the angle (in degrees, 0 = up, 90 = right, 180 = down, -90 = left)
+   * pointing toward the default POV forward orientation from the current look angle.
+   */
+  getPovIndicatorAngle() {
+    let deltaYaw = 0;
+    let deltaPitch = 0;
+    const defaultPitch = this.aircraftLookPitch ?? -0.25;
+
+    switch (this.mode) {
+      case CameraSystem.MODES.COCKPIT:
+        deltaYaw = this.lookYaw;
+        deltaPitch = this.lookPitch - defaultPitch;
+        break;
+      case CameraSystem.MODES.CHASE:
+        deltaYaw = this.chaseYaw;
+        deltaPitch = this.chasePitch;
+        break;
+      case CameraSystem.MODES.WING:
+        deltaYaw = this.wingLookYaw;
+        deltaPitch = this.wingLookPitch;
+        break;
+      case CameraSystem.MODES.GEAR:
+        deltaYaw = -this.gearLookYaw;
+        deltaPitch = this.gearLookPitch;
+        break;
+      default:
+        return 0;
+    }
+
+    if (Math.hypot(deltaYaw, deltaPitch) < 0.001) {
+      return 0;
+    }
+
+    // Direction vector toward default (0, 0):
+    // deltaYaw < 0 means looking right, so default is left (x < 0, atan2 -> -90 deg)
+    // deltaYaw > 0 means looking left, so default is right (x > 0, atan2 -> +90 deg)
+    // deltaPitch > 0 means looking up, so default is down (y < 0, atan2 -> 180 deg)
+    // deltaPitch < 0 means looking down, so default is up (y > 0, atan2 -> 0 deg)
+    const x = deltaYaw;
+    const y = -deltaPitch;
+    return Math.atan2(x, y) * (180 / Math.PI);
+  }
+
+  /**
    * Immediately resets camera POV to default position.
    */
   resetPov() {
@@ -676,7 +721,8 @@ export class CameraSystem {
   }
 
   /**
-   * Synchronize DOM button visibility and callback when POV modification state changes.
+   * Synchronize DOM button visibility, indicator arrow orientation, and callback
+   * when POV modification state changes.
    */
   updatePovButtonState() {
     const modified = this.isPovModified();
@@ -690,13 +736,37 @@ export class CameraSystem {
         if (btn) btn.hidden = !modified;
       }
     }
+    if (modified && typeof document !== 'undefined') {
+      const arrow = document.getElementById('pov-arrow-icon');
+      if (arrow) {
+        const angle = this.getPovIndicatorAngle();
+        arrow.style.transform = `rotate(${angle.toFixed(1)}deg)`;
+      }
+    }
   }
 
   /**
-   * Smoothly and slowly returns the camera POV back to the default position when not actively dragging.
+   * Pan or look around using HOTAS hat switch / D-pad.
+   * dirX: -1 (left), +1 (right)
+   * dirY: -1 (up), +1 (down)
+   */
+  applyHatLook(dirX, dirY, dt) {
+    if (dirX === 0 && dirY === 0) return;
+    const safeDt = Math.min(0.1, dt || (1 / 60));
+    const panSpeed = 700; // equivalent screen pixels per second for gaze sensitivity
+    const dx = dirX * panSpeed * safeDt;
+    const dy = dirY * panSpeed * safeDt;
+    this.isHatLooking = true;
+    this.povChangedByDrag = true;
+    this.applyMouseDelta(dx, dy);
+    this.updatePovButtonState();
+  }
+
+  /**
+   * Smoothly and slowly returns the camera POV back to the default position when not actively dragging or looking with hat.
    */
   updatePovReturn(dt) {
-    if (this.isDragging || this.pointerLocked || dt <= 0 || !this.povChangedByDrag) return;
+    if (this.isDragging || this.pointerLocked || this.isHatLooking || dt <= 0 || !this.povChangedByDrag) return;
 
     const povModes = [
       CameraSystem.MODES.COCKPIT,
@@ -1391,6 +1461,7 @@ export class CameraSystem {
 
     // Slowly return camera POV back to default position after drag
     this.updatePovReturn(dt);
+    this.updatePovButtonState();
 
     if (this.customViewUpdater && !this.userModeSelected && !this.userLookOverridden) {
       const handled = this.customViewUpdater({
@@ -1738,6 +1809,9 @@ export class CameraSystem {
       );
       this.camera.position.add(shakeOffset);
     }
+
+    // Reset per-frame hat look flag so release can resume gentle POV decay
+    this.isHatLooking = false;
   }
 
   addTrauma(amount = 1.0) {

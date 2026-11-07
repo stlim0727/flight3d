@@ -12,7 +12,11 @@ test('updateControlState synchronizes btn-reset-pov visibility with isPovModifie
     textContent: '',
     setAttribute: () => {},
   };
+  const arrowIcon = {
+    style: { transform: '' },
+  };
   mockElements.set('btn-reset-pov', resetBtn);
+  mockElements.set('pov-arrow-icon', arrowIcon);
 
   globalThis.document = {
     getElementById: (id) => mockElements.get(id) || null,
@@ -29,13 +33,14 @@ test('updateControlState synchronizes btn-reset-pov visibility with isPovModifie
     updateControlState(telemetry, cam);
     assert.equal(resetBtn.hidden, true);
 
-    // After drag -> modified -> shown
+    // After drag -> modified -> shown with rotated arrow
     cam.isDragging = true;
     cam.applyDragDelta(80, 40, false);
     cam.isDragging = false;
 
     updateControlState(telemetry, cam);
     assert.equal(resetBtn.hidden, false);
+    assert.ok(arrowIcon.style.transform.startsWith('rotate('));
 
     // Reset POV -> hidden again
     cam.resetPov();
@@ -45,6 +50,76 @@ test('updateControlState synchronizes btn-reset-pov visibility with isPovModifie
     if (previousDocument === undefined) delete globalThis.document;
     else globalThis.document = previousDocument;
   }
+});
+
+test('CameraSystem getPovIndicatorAngle accurately computes default direction', () => {
+  const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
+  cam.setMode(CameraSystem.MODES.COCKPIT, true);
+  const defaultPitch = cam.aircraftLookPitch ?? -0.25;
+
+  // 1. Center / default -> 0
+  assert.equal(cam.getPovIndicatorAngle(), 0);
+
+  // 2. Looking Right (yaw < 0) -> default is Left (-90 deg)
+  cam.lookYaw = -0.5;
+  cam.lookPitch = defaultPitch;
+  assert.equal(Math.round(cam.getPovIndicatorAngle()), -90);
+
+  // 3. Looking Left (yaw > 0) -> default is Right (+90 deg)
+  cam.lookYaw = 0.5;
+  cam.lookPitch = defaultPitch;
+  assert.equal(Math.round(cam.getPovIndicatorAngle()), 90);
+
+  // 4. Looking Up (pitch > defaultPitch) -> default is Down (180 deg)
+  cam.lookYaw = 0;
+  cam.lookPitch = defaultPitch + 0.3;
+  assert.equal(Math.abs(Math.round(cam.getPovIndicatorAngle())), 180);
+
+  // 5. Looking Down (pitch < defaultPitch) -> default is Up (0 deg)
+  cam.lookYaw = 0;
+  cam.lookPitch = defaultPitch - 0.3;
+  assert.equal(Math.round(cam.getPovIndicatorAngle()), 0);
+
+  // 6. Diagonal: Looking Up & Right -> default is Down & Left (-135 deg)
+  cam.lookYaw = -0.3;
+  cam.lookPitch = defaultPitch + 0.3;
+  assert.equal(Math.round(cam.getPovIndicatorAngle()), -135);
+});
+
+test('CameraSystem applyHatLook pans camera view and returns to default when released', () => {
+  const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
+  cam.setMode(CameraSystem.MODES.COCKPIT, true);
+  const aircraft = new THREE.Object3D();
+  const defaultPitch = cam.aircraftLookPitch ?? -0.25;
+
+  // 1. Hat Left (dirX = -1): lookYaw should increase (look left)
+  cam.applyHatLook(-1, 0, 0.1);
+  assert.ok(cam.lookYaw > 0, `lookYaw should be > 0, got ${cam.lookYaw}`);
+  assert.equal(cam.isPovModified(), true);
+  assert.equal(cam.povChangedByDrag, true);
+  assert.equal(cam.isHatLooking, true);
+
+  const yawAfterHatLeft = cam.lookYaw;
+
+  // 2. While hat look is active, update does NOT decay POV
+  cam.update(0.1, aircraft);
+  assert.equal(cam.lookYaw, yawAfterHatLeft);
+  assert.equal(cam.isHatLooking, false); // Resets flag for subsequent frame
+
+  // 3. When released (no applyHatLook called), update smoothly returns to default
+  cam.update(0.5, aircraft);
+  assert.ok(cam.lookYaw < yawAfterHatLeft);
+  assert.ok(cam.lookYaw > 0);
+
+  // 4. Hat Up (dirY = -1): lookPitch should increase (look up)
+  cam.resetPov();
+  cam.applyHatLook(0, -1, 0.1);
+  assert.ok(cam.lookPitch > defaultPitch, `lookPitch should be > defaultPitch, got ${cam.lookPitch}`);
+
+  // 5. Reset immediately snaps back
+  cam.resetPov();
+  assert.equal(cam.lookPitch, defaultPitch);
+  assert.equal(cam.isPovModified(), false);
 });
 
 test('CameraSystem updatePovReturn smoothly returns POV after drag, preserving POV during drag', () => {

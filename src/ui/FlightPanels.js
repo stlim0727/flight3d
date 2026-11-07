@@ -138,11 +138,14 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
 
   for (const [id, key] of Object.entries({
     'btn-cam-reset': 'center.view.o',
-    'btn-reset-pov': 'reset.pov',
     'btn-yokes': 'hide.yokes.j', 'btn-diag': 'physics',
     'btn-help': 'flight.guide.h.53', 'btn-skip-demo': 'take.control.esc',
   })) {
     bindText(document.getElementById(id), () => touchLabel(t(key)));
+  }
+  const povResetTarget = document.getElementById('pov-reset-label') || document.getElementById('btn-reset-pov');
+  if (povResetTarget) {
+    bindText(povResetTarget, () => touchLabel(t('reset.pov')));
   }
 
   // Remove the legacy containers after moving their controls.
@@ -246,5 +249,11 @@ export function updateControlState(telemetry, camera, options = {}) {
   if (resetPovBtn) {
     const isModified = camera && typeof camera.isPovModified === 'function' ? camera.isPovModified() : false;
     resetPovBtn.hidden = !isModified;
+    if (isModified && typeof camera.getPovIndicatorAngle === 'function') {
+      const arrow = document.getElementById('pov-arrow-icon');
+      if (arrow) {
+        arrow.style.transform = `rotate(${camera.getPovIndicatorAngle().toFixed(1)}deg)`;
+      }
+    }
   }
 }

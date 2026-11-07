@@ -69,6 +69,7 @@ export class FlightControls {
     this.onCycleCamera = null;
     this.onSelectCamera = null;
     this.onResetLook = null;
+    this.onHatLook = null;
     this.onToggleLights = null;
     this.onCycleTimeOfDay = null;
     this.onToggleAudio = null;

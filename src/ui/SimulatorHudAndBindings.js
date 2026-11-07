@@ -112,6 +112,10 @@ class SimulatorHudAndBindingsMethods {
       this.showToast(() => t('camera.view.centered'));
     };
 
+    this.controls.onHatLook = (dirX, dirY, dt) => {
+      this.cameraSystem?.applyHatLook?.(dirX, dirY, dt);
+    };
+
     this.controls.onDeviceConnected = (device) => {
       this.showToast(() => t('notice.hotasConnected', { name: device.name }));
     };
