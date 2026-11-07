@@ -82,19 +82,30 @@ body, html {
 }
 
 .hud-val {
-  font-family: "Courier New", Courier, monospace;
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", "Roboto Mono", Menlo, Consolas, "Courier New", Courier, monospace;
   font-size: calc(14px * var(--ui-scale, 1));
   font-weight: 700;
   color: #ffffff;
+  font-variant-numeric: tabular-nums;
 }
 
-.hud-val.green { color: #00ff66; }
-.hud-val.cyan  { color: #38bdf8; }
+.hud-val.green, .status-green {
+  color: #10b981;
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.45);
+}
+.hud-val.cyan  {
+  color: #06b6d4;
+  text-shadow: 0 0 8px rgba(6, 182, 212, 0.45);
+}
 
-.status-green { color: #10b981; }
-.status-red { color: #ef4444; }
-.status-danger { color: #ef4444; }
-.status-amber { color: #f59e0b; }
+.status-red, .status-danger {
+  color: #ef4444;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.45);
+}
+.status-amber {
+  color: #f59e0b;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+}
 .status-dim   { color: #64748b; }
 
 /* Stall Alert Banner */
@@ -544,7 +555,7 @@ kbd {
 
 .audio-start-hint {
   position: fixed;
-  bottom: max(16px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+  bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 20px));
   top: auto;
   left: 50%;
   transform: translateX(-50%);
@@ -552,18 +563,21 @@ kbd {
   max-width: calc(100vw - 32px);
   box-sizing: border-box;
   margin: 0;
-  padding: 8px 16px;
+  padding: 8px 18px;
   border: 1px solid rgba(56, 189, 248, 0.35);
-  border-radius: 20px;
+  border-radius: 9999px;
   background: rgba(15, 23, 42, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   color: #f0f6fc;
-  font: 12px/1.4 system-ui, sans-serif;
+  font: 500 13px/1.4 system-ui, sans-serif;
+  letter-spacing: -0.01em;
   text-align: center;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
   z-index: 150;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
 

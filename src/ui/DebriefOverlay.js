@@ -72,7 +72,7 @@ export class DebriefOverlay {
           </section>
           <section id="debrief-record" role="tabpanel" aria-labelledby="debrief-tab-record" tabindex="0" hidden>
             <h3 data-i18n="debrief.history"></h3><p class="debrief-caption" data-i18n="debrief.altitudeAxis"></p>
-            <svg id="debrief-chart" viewBox="0 0 320 90" role="img" data-i18n-aria-label="debrief.altitudeAxis"><path d="M0 85 H320" stroke="#385268"/><polyline fill="none" stroke="#67d5a3" stroke-width="2"/><circle id="debrief-impact-marker" r="4" fill="#ef4444" stroke="#e2e8f0" hidden/><circle id="debrief-cursor" r="3" fill="#e2e8f0"/></svg>
+            <svg id="debrief-chart" viewBox="0 0 320 90" role="img" data-i18n-aria-label="debrief.altitudeAxis"><defs><linearGradient id="debrief-altitude-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.32"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0.0"/></linearGradient></defs><path d="M0 85 H320" stroke="#385268"/><polygon class="debrief-chart-area" fill="url(#debrief-altitude-gradient)"/><polyline fill="none" stroke="#38bdf8" stroke-width="2"/><circle id="debrief-impact-marker" r="4" fill="#ef4444" stroke="#e2e8f0" hidden/><circle id="debrief-cursor" r="3" fill="#e2e8f0"/></svg>
             <div id="debrief-axis" class="debrief-caption"></div>
             <input id="debrief-scrub" type="range" min="0" value="0" step="1" data-i18n-aria-label="debrief.inspect" />
             <output id="debrief-sample" for="debrief-scrub"></output>
@@ -282,7 +282,16 @@ export class DebriefOverlay {
     const low = Math.min(...samples.map(s => s.altitudeFt), 0);
     const high = Math.max(peaks.altitudeFt?.altitudeFt ?? 1, low + 1);
     this.point = s => [s.timeSec / (durationSec || 1) * 320, 80 - (s.altitudeFt - low) / (high - low) * 65];
-    this.el('chart').querySelector('polyline').setAttribute('points', samples.map(s => this.point(s).join(',')).join(' '));
+    const polylinePoints = samples.map(s => this.point(s).join(',')).join(' ');
+    this.el('chart').querySelector('polyline').setAttribute('points', polylinePoints);
+    const area = this.el('chart').querySelector('.debrief-chart-area');
+    if (area && samples.length) {
+      const first = this.point(samples[0]);
+      const last = this.point(samples.at(-1));
+      area.setAttribute('points', `${first[0]},85 ${polylinePoints} ${last[0]},85`);
+    } else if (area) {
+      area.removeAttribute('points');
+    }
     this.el('axis').replaceChildren(...[0, durationSec / 2, durationSec].map(time => {
       const span = document.createElement('span'); span.textContent = flightDuration(time); return span;
     }));

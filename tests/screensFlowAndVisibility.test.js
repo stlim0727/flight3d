@@ -69,11 +69,22 @@ test('Mobile header layout and audio hint snackbar positioning are correctly con
   const lobbyCss = readFileSync(resolve('src/styles/lobby-and-overlays.css'), 'utf8');
   assert.ok(lobbyCss.includes('.lobby-header-actions'), 'lobby CSS must define .lobby-header-actions');
   assert.ok(lobbyCss.includes('body[data-flow="lobby"] .menu-toggle'), 'lobby CSS must hide redundant menu toggle during lobby');
+  assert.ok(lobbyCss.includes('.lobby-actions'), 'lobby CSS must style .lobby-actions');
+  assert.ok(lobbyCss.includes('.lobby-panels::-webkit-scrollbar'), 'lobby CSS must style slim scrollbar for panels');
 
   const hudCss = readFileSync(resolve('src/styles/hud-and-modals.css'), 'utf8');
   assert.ok(hudCss.includes('.audio-start-hint'), 'hud CSS must style .audio-start-hint');
-  assert.ok(hudCss.includes('bottom: max(16px'), 'audio start hint must be placed at bottom snackbar to avoid covering cards');
+  assert.ok(hudCss.includes('pointer-events: auto'), 'audio start hint must be clickable to dismiss on touch');
+  assert.ok(hudCss.includes('.hud-val'), 'hud CSS must style .hud-val');
+  assert.ok(hudCss.includes('tabular-nums'), 'hud telemetry values must use tabular nums');
+
+  const flightLayoutCss = readFileSync(resolve('src/styles/flight-layout.css'), 'utf8');
+  assert.ok(flightLayoutCss.includes('body[data-flow="flight"] .audio-start-hint'), 'flight-layout CSS must only elevate audio hint during flight');
 
   const lobbyJs = readFileSync(resolve('src/ui/LobbyScreen.js'), 'utf8');
   assert.ok(lobbyJs.includes('updateBackButton'), 'LobbyScreen must manage back button visibility via updateBackButton');
+
+  const debriefJs = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
+  assert.ok(debriefJs.includes('debrief-altitude-gradient'), 'DebriefOverlay must render gradient under altitude chart');
+  assert.ok(debriefJs.includes('debrief-chart-area'), 'DebriefOverlay must update area polygon points');
 });

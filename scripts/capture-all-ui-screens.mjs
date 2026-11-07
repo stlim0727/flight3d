@@ -43,6 +43,15 @@ await withBrowserSession({ width: sessionWidth, height: sessionHeight, path: '/'
   }
   assert.ok(await evaluate('Boolean(window.simulator?.startupReady)'), 'Simulator startup readiness');
 
+  // Suppress transient audio prompt during visual catalog capture so screenshots remain clean
+  await evaluate(() => {
+    const hint = document.getElementById('audio-start-hint');
+    if (hint) {
+      hint.hidden = true;
+      hint.style.display = 'none';
+    }
+  });
+
   // 1. Startup & Loading Progress Overlay
   await evaluate(() => {
     const el = document.getElementById('startup-overlay');
@@ -1034,6 +1043,15 @@ if (tier === 'all') {
       await delay(300);
     }
     await delay(800);
+
+    // Suppress transient audio prompt during visual catalog capture so screenshots remain clean
+    await evaluate(() => {
+      const hint = document.getElementById('audio-start-hint');
+      if (hint) {
+        hint.hidden = true;
+        hint.style.display = 'none';
+      }
+    });
 
     // 35. Pilot Mission Score Modal (rendered with real pilot-arena.css)
     await evaluate(async () => {

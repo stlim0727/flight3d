@@ -504,6 +504,10 @@ class FlightSimulator {
     };
 
     attachInteractionListeners();
+    audioHint?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      ensureAudio();
+    });
     ensureAudio();
 
     // Begin Animation Loop
