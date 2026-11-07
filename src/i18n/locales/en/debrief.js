@@ -51,6 +51,8 @@ export default {
   'debrief.exported': 'Flight log exported.',
   'debrief.back': 'Back to summary',
   'debrief.retry': 'Fly again',
+  'debrief.retrySame': 'Instant Retry',
+  'debrief.changeConditions': 'Change Flight Setup',
   'debrief.lobby': 'Main menu',
   'debrief.feedback': '🐞 Report a problem',
   'debrief.empty': 'Not enough flight data',

@@ -207,6 +207,10 @@ export class TouchFlightControls {
   bindEvents() {
     if (!this.overlay) return;
 
+    const onUserActivity = () => this.resetFadeTimer();
+    this.overlay.addEventListener('pointerdown', onUserActivity);
+    this.overlay.addEventListener('pointermove', onUserActivity);
+
     // 1. Virtual Stick Pointer Events
     this.stickZone.addEventListener('pointerdown', (e) => this.onStickPointerDown(e));
     this.stickZone.addEventListener('pointermove', (e) => this.onStickPointerMove(e));
@@ -809,6 +813,16 @@ export class TouchFlightControls {
     if (this.throttleReadout) this.throttleReadout.textContent = `${pct}%`;
   }
 
+  resetFadeTimer() {
+    this.overlay?.classList.remove('touch-faded');
+    if (this.fadeTimeout) clearTimeout(this.fadeTimeout);
+    this.fadeTimeout = setTimeout(() => {
+      if (!this.stickActive && !this.throttleActive && !this.rudderActive) {
+        this.overlay?.classList.add('touch-faded');
+      }
+    }, 3500);
+  }
+
   /* ---------------- Visibility & Toggle ---------------- */
   enable() {
     this.enabled = true;
@@ -817,6 +831,7 @@ export class TouchFlightControls {
     }
     if (this.overlay) {
       this.overlay.style.display = 'flex';
+      this.resetFadeTimer();
     }
     const toggleBtn = document.getElementById('btn-touch-toggle');
     if (toggleBtn) {
@@ -826,11 +841,13 @@ export class TouchFlightControls {
 
   disable() {
     this.enabled = false;
+    if (this.fadeTimeout) clearTimeout(this.fadeTimeout);
     if (typeof document !== 'undefined') {
       document.body.classList.remove('touch-mode');
     }
     if (this.overlay) {
       this.overlay.style.display = 'none';
+      this.overlay.classList.remove('touch-faded');
     }
     this.disableGyro();
     this.gyroHelp?.close();

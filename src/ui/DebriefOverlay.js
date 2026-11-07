@@ -91,7 +91,8 @@ export class DebriefOverlay {
           </section>
           <div class="debrief-actions">
             <button class="btn" id="debrief-watch-replay" data-i18n="replay.watch" hidden></button>
-            <button class="btn debrief-primary" id="debrief-retry" data-i18n="debrief.retry"></button>
+            <button class="btn debrief-primary" id="debrief-retry" data-i18n="debrief.retrySame"></button>
+            <button class="btn" id="debrief-change-setup" data-i18n="debrief.changeConditions"></button>
             <button class="btn" id="debrief-feedback" data-i18n="debrief.feedback"></button>
           </div>
         </div>
@@ -131,6 +132,7 @@ export class DebriefOverlay {
       this.el('watch-replay').disabled = false;
     });
     this.el('retry').addEventListener('click', onRetry);
+    this.el('change-setup')?.addEventListener('click', onLobby);
     this.el('lobby').addEventListener('click', onLobby);
     this.el('feedback').addEventListener('click', () => onFeedback?.());
     this.isFolded = false;

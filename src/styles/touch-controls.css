@@ -32,6 +32,16 @@
   -webkit-user-select: none;
   user-select: none;
   padding-bottom: max(calc(16 * var(--tc)), env(safe-area-inset-bottom, 0px));
+  transition: opacity 0.4s ease;
+}
+
+.touch-controls-overlay.touch-faded {
+  opacity: 0.28;
+}
+
+.touch-controls-overlay.touch-faded:hover,
+.touch-controls-overlay.touch-faded:focus-within {
+  opacity: 1;
 }
 
 .touch-quadrant {
@@ -47,13 +57,13 @@
 }
 
 .touch-throttle-card {
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: calc(12 * var(--tc));
   padding: calc(8 * var(--tc)) calc(10 * var(--tc));
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 10px rgba(56, 189, 248, 0.08);
   display: flex;
   flex-direction: column;
   gap: calc(6 * var(--tc));
@@ -287,10 +297,10 @@
 }
 
 .touch-rudder-card {
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(56, 189, 248, 0.3);
   border-radius: calc(10 * var(--tc));
   padding: calc(6 * var(--tc)) calc(10 * var(--tc));
   width: calc(170 * var(--tc));
@@ -350,13 +360,13 @@
 }
 
 .touch-stick-card {
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: calc(12 * var(--tc));
   padding: calc(8 * var(--tc)) calc(10 * var(--tc));
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 10px rgba(56, 189, 248, 0.08);
   display: flex;
   flex-direction: column;
   gap: calc(6 * var(--tc));
