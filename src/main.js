@@ -436,7 +436,23 @@ class FlightSimulator {
     // keeps the context suspended until the first flight/menu interaction.
     const audioHint = document.getElementById('audio-start-hint');
     const interactionEvents = ['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'];
-    let removeInteractionListeners = null;
+    let listenersAttached = false;
+
+    const attachInteractionListeners = () => {
+      if (listenersAttached) return;
+      interactionEvents.forEach(evt => {
+        window.addEventListener(evt, ensureAudio, { passive: true, capture: true });
+      });
+      listenersAttached = true;
+    };
+
+    const detachInteractionListeners = () => {
+      if (!listenersAttached) return;
+      interactionEvents.forEach(evt => {
+        window.removeEventListener(evt, ensureAudio, { capture: true });
+      });
+      listenersAttached = false;
+    };
 
     const syncAudioHint = () => {
       const state = this.audio.ctx?.state;
@@ -447,7 +463,9 @@ class FlightSimulator {
           audioHint.style.opacity = '0';
           audioHint.style.transform = 'translate(-50%, 8px)';
           setTimeout(() => {
-            audioHint.hidden = true;
+            if (this.audio.ctx?.state === 'running' || this.audio.isMuted) {
+              audioHint.hidden = true;
+            }
           }, 250);
         } else {
           audioHint.hidden = false;
@@ -455,9 +473,10 @@ class FlightSimulator {
           audioHint.style.transform = 'translate(-50%, 0)';
         }
       }
-      if (isRunning && removeInteractionListeners) {
-        removeInteractionListeners();
-        removeInteractionListeners = null;
+      if (isRunning) {
+        detachInteractionListeners();
+      } else if (!this.audio.isMuted && ['suspended', 'interrupted'].includes(state)) {
+        attachInteractionListeners();
       }
     };
 
@@ -475,16 +494,7 @@ class FlightSimulator {
       syncAudioHint();
     };
 
-    removeInteractionListeners = () => {
-      interactionEvents.forEach(evt => {
-        window.removeEventListener(evt, ensureAudio, { capture: true });
-      });
-    };
-
-    interactionEvents.forEach(evt => {
-      // Controls may consume the event before it bubbles to window.
-      window.addEventListener(evt, ensureAudio, { passive: true, capture: true });
-    });
+    attachInteractionListeners();
     ensureAudio();
 
     // Begin Animation Loop
