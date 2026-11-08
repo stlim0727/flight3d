@@ -85,8 +85,10 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 }
 .debrief-title-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: calc(8px * var(--ui-scale, 1));
+  gap: calc(2px * var(--ui-scale, 1)) calc(8px * var(--ui-scale, 1));
+  min-width: 0;
 }
 .debrief-title-wrap h2 {
   margin: 0;
@@ -97,6 +99,11 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 }
 .debrief-header-pill {
   display: inline-block;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   padding: 1px 6px;
   border-radius: 4px;
   font-size: calc(9px * var(--ui-scale, 1));
@@ -513,6 +520,10 @@ body[data-flow="debrief"] .btn-reset-pov:not([hidden]) { display: inline-flex !i
   .debrief-card .btn { min-height: 42px; }
   .debrief-card .debrief-lobby-btn { min-height: 38px; padding: 0 10px; }
   .debrief-card .debrief-feedback-btn { width: 38px; height: 38px; min-height: 38px; }
+}
+/* Issue #597: phone-width headers squeeze the title column below "Flight3d"; the fold button keeps its glyph and label. */
+@media (max-width: 420px) {
+  .debrief-fold-btn .fold-caption { display: none; }
 }
 @media (max-height: 500px) and (min-width: 601px) {
   .debrief-card {
