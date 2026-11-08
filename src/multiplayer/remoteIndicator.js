@@ -1,5 +1,10 @@
 export const REENTRY_MARGIN = 16;
 
+export function distanceLabel(meters) {
+  const m = Math.max(0, meters);
+  return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
+}
+
 export function indicatorMode(point, width, height, previous) {
   if (!point.front || !point.inDepth) return 'offscreen';
   const inset = previous === 'offscreen' ? REENTRY_MARGIN : 0;

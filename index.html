@@ -231,12 +231,12 @@
       </p>
       <p id="lobby-loading" class="lobby-loading" data-i18n="loading.lukla.terrain" hidden></p>
       <p id="lobby-selection" class="lobby-loading" data-i18n="lobby.applying" aria-live="polite" hidden></p>
-      <button id="mp-open" class="btn" type="button" aria-haspopup="dialog" aria-controls="mp-dialog" data-i18n="mp.title"></button>
+      <button id="mp-open" class="btn" type="button" aria-haspopup="dialog" aria-controls="mp-dialog"><span class="btn-icon" aria-hidden="true">👥</span> <span data-i18n="mp.title">함께 비행</span></button>
       <div class="lobby-tabs" role="tablist" aria-labelledby="lobby-tabs-title">
         <span id="lobby-tabs-title" hidden data-i18n="lobby.title">메인 메뉴</span>
-        <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario" data-i18n="lobby.spawn">시나리오</button>
-        <button id="lobby-tab-settings" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-settings" tabindex="-1" data-i18n="ui.settings.short">설정</button>
-        <button id="lobby-tab-dev" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-dev" tabindex="-1" data-i18n="dev.title" hidden>개발자</button>
+        <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario"><span class="tab-icon" aria-hidden="true">🎯</span> <span data-i18n="lobby.spawn">시나리오</span></button>
+        <button id="lobby-tab-settings" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-settings" tabindex="-1"><span class="tab-icon" aria-hidden="true">⚙️</span> <span data-i18n="ui.settings.short">설정</span></button>
+        <button id="lobby-tab-dev" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-dev" tabindex="-1" hidden><span class="tab-icon" aria-hidden="true">🛠️</span> <span data-i18n="dev.title">개발자</span></button>
       </div>
       <div class="lobby-panels">
         <section id="lobby-panel-scenario" class="lobby-tab-panel" role="tabpanel" aria-labelledby="lobby-tab-scenario" tabindex="0">
@@ -259,8 +259,8 @@
             </div>
           </div>
           <div class="lobby-links-row" style="display: flex; gap: 12px; margin: 4px 0 10px;">
-            <a class="lobby-link" href="./flights.html" data-i18n="lobby.allFlights">All flight URLs</a>
-            <a class="lobby-link" href="./screens.html">UI Screens</a>
+            <a class="lobby-link" href="./flights.html"><span aria-hidden="true">🌐</span> <span data-i18n="lobby.allFlights">All flight URLs</span></a>
+            <a class="lobby-link" href="./screens.html"><span aria-hidden="true">📱</span> <span>UI Screens</span></a>
           </div>
           <div class="lobby-group lobby-scenarios" role="group">
             <span class="lobby-label" data-i18n="lobby.spawn">시나리오</span>
@@ -348,10 +348,10 @@
         </section>
       </div>
       <div class="lobby-actions">
-        <button id="btn-lobby-resume" class="btn" hidden><span data-i18n="lobby.resume">비행 계속하기</span></button>
-        <button id="btn-lobby-end" class="btn" hidden><span data-i18n="debrief.end">비행 종료</span></button>
-        <button id="btn-replays" class="btn" data-i18n="replay.library"></button>
-        <button id="btn-fly" class="btn btn-fly"><span data-i18n="lobby.startNew">새 비행 시작</span></button>
+        <button id="btn-lobby-resume" class="btn" hidden><span class="btn-icon" aria-hidden="true">▶️</span> <span data-i18n="lobby.resume">비행 계속하기</span></button>
+        <button id="btn-lobby-end" class="btn" hidden><span class="btn-icon" aria-hidden="true">⏹️</span> <span data-i18n="debrief.end">비행 종료</span></button>
+        <button id="btn-replays" class="btn"><span class="btn-icon" aria-hidden="true">📼</span> <span data-i18n="replay.library">저장된 리플레이</span></button>
+        <button id="btn-fly" class="btn btn-fly"><span class="btn-icon" aria-hidden="true">🛫</span> <span data-i18n="lobby.startNew">새 비행 시작</span></button>
       </div>
       <p class="lobby-hint" data-i18n="lobby.hint.esc">비행 중 ESC를 누르면 일시정지 메뉴가 열립니다.</p>
     </div>
@@ -387,10 +387,10 @@
           <span class="fold-caption" data-i18n="ui.fold">접기</span>
         </button>
       </header>
-      <button id="btn-pause-resume" class="btn"><span data-i18n="pause.resume">계속하기</span></button>
-      <button id="btn-pause-restart" class="btn"><span data-i18n="pause.restart">시나리오 재시작</span></button>
-      <button id="btn-pause-exit" class="btn btn-pause-exit"><span data-i18n="pause.exit">로비로 나가기</span></button>
-      <button id="btn-pause-end" class="btn" hidden><span data-i18n="debrief.end">비행 종료</span></button>
+      <button id="btn-pause-resume" class="btn"><span class="btn-icon" aria-hidden="true">▶️</span> <span data-i18n="pause.resume">계속하기</span></button>
+      <button id="btn-pause-restart" class="btn"><span class="btn-icon" aria-hidden="true">🔄</span> <span data-i18n="pause.restart">시나리오 재시작</span></button>
+      <button id="btn-pause-exit" class="btn btn-pause-exit"><span class="btn-icon" aria-hidden="true">🚪</span> <span data-i18n="pause.exit">로비로 나가기</span></button>
+      <button id="btn-pause-end" class="btn" hidden><span class="btn-icon" aria-hidden="true">⏹️</span> <span data-i18n="debrief.end">비행 종료</span></button>
     </div>
     <button id="btn-pause-unfold" class="ui-unfold-pill pause-unfold-pill" type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
       <span class="unfold-icon">⏸</span>

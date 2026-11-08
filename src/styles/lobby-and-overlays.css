@@ -382,6 +382,16 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
 .lobby-card .lobby-actions .btn,
 .compact-ui .lobby-card .lobby-actions .btn { flex: 1 1 calc(120px * var(--ui-scale, 1)); min-height: calc(44px * var(--ui-scale, 1)); }
 .lobby-card .lobby-actions .btn[hidden] { display: none; }
+.btn-icon,
+.tab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+  line-height: 1;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
 .lobby-hint { color: #94a3b8; font-size: calc(10px * var(--ui-scale, 1)); line-height: 1.5; margin: -6px 0 0; text-align: center; }
 
 /* Pause: dim the frozen scene lightly. */

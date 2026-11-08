@@ -102,11 +102,13 @@ export class FlightControls {
     this.domElement.addEventListener('mousedown', (e) => {
       if (e.button === 0) {
         // Left click to toggle mouse control or enable audio context
+        this.onUserInteract?.();
       }
     });
   }
 
   handleKeyDown(e) {
+    this.onUserInteract?.();
     if (e.target?.closest?.('select')) return;
     if (this.inputBlocked) return;
     const cameraDigit = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);

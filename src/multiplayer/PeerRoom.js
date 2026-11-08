@@ -64,14 +64,22 @@ export class PeerRoom {
   }
   reject(conn, reason) {
     const cleanup = () => { clearTimeout(this.rejections.get(conn)); this.rejections.delete(conn); conn.close(); };
+    // Chrome can drop the answerer's first send as its channel opens (INVALID_STATE), so
+    // repeat the reason, a bounded number of times, whenever the rejected peer speaks.
+    let replies = 0;
+    const send = () => {
+      if (this.disposed) { cleanup(); return; }
+      if (conn.open && replies++ < 5) conn.send({ type: 'reject', reason });
+    };
     this.rejections.set(conn, setTimeout(cleanup, 5000));
     conn.on('error', cleanup);
     conn.on('open', () => {
-      if (this.disposed) { cleanup(); return; }
-      conn.send({ type: 'reject', reason });
+      send();
+      if (!this.rejections.has(conn)) return;
       clearTimeout(this.rejections.get(conn));
       this.rejections.set(conn, setTimeout(cleanup, 2000));
     });
+    conn.on('data', send);
   }
   attach(conn) {
     this.connection = conn;

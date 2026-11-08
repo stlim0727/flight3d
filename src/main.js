@@ -463,16 +463,24 @@ class FlightSimulator {
       listenersAttached = false;
     };
 
+    const isMultiplayerVoiceBlocked = () => Boolean(
+      this.multiplayer?.playbackBlocked ||
+      (this.multiplayer?.active && this.multiplayer?.voice?.microphone && this.multiplayer?.voice?.context?.state === 'suspended')
+    );
+
     const syncAudioHint = () => {
       const state = this.audio.ctx?.state;
       const isRunning = state === 'running';
+      const isVoiceBlocked = isMultiplayerVoiceBlocked();
       if (audioHint) {
-        if (isRunning || this.audio.isMuted) {
+        if ((isRunning && !isVoiceBlocked) || this.audio.isMuted) {
           audioHint.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
           audioHint.style.opacity = '0';
           audioHint.style.transform = 'translate(-50%, 8px)';
           setTimeout(() => {
-            if (this.audio.ctx?.state === 'running' || this.audio.isMuted) {
+            const stillRunning = this.audio.ctx?.state === 'running';
+            const stillBlocked = isMultiplayerVoiceBlocked();
+            if ((stillRunning && !stillBlocked) || this.audio.isMuted) {
               audioHint.hidden = true;
             }
           }, 250);
@@ -482,9 +490,9 @@ class FlightSimulator {
           audioHint.style.transform = 'translate(-50%, 0)';
         }
       }
-      if (isRunning) {
+      if (isRunning && !isVoiceBlocked) {
         detachInteractionListeners();
-      } else if (!this.audio.isMuted && ['suspended', 'interrupted'].includes(state)) {
+      } else if (!this.audio.isMuted && (['suspended', 'interrupted'].includes(state) || isVoiceBlocked)) {
         attachInteractionListeners();
       }
     };
@@ -495,6 +503,7 @@ class FlightSimulator {
         this.audio.init();
       }
       this.audio.ensureContextRunning();
+      this.multiplayer?.playAudio();
       if (this.audio.ctx && hintContext !== this.audio.ctx) {
         hintContext?.removeEventListener('statechange', syncAudioHint);
         hintContext = this.audio.ctx;
@@ -502,6 +511,9 @@ class FlightSimulator {
       }
       syncAudioHint();
     };
+
+    this.ensureAudio = ensureAudio;
+    this.syncAudioHint = syncAudioHint;
 
     attachInteractionListeners();
     audioHint?.addEventListener('click', (e) => {

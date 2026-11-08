@@ -612,7 +612,7 @@ class PhysicsIntegratorMethods {
     this.aircraft.cockpit.syncLighting(this.sky, this.quaternion, simSeconds);
     this.water.update(simSeconds, this.camera ? this.camera.position : this.position);
     this.explosionSystem.update(simSeconds);
-    if (this.isCrashed) this.cameraSystem.updateCrashView(0, true);
+    if (this.isCrashed) this.cameraSystem.updateCrashView(simSeconds);
     this.tireSmokeSystem.update(simSeconds);
     this.touchControls.updateUI();
     this.diagnostics.update(simSeconds, this.telemetry);

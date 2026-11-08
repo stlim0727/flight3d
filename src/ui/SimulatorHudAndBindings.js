@@ -28,8 +28,11 @@ export function hasActiveModal() {
 class SimulatorHudAndBindingsMethods {
   initControls() {
     this.controls.onUserInteract = () => {
-      this.audio.init();
-      this.audio.ensureContextRunning();
+      if (this.ensureAudio) this.ensureAudio();
+      else {
+        this.audio.init();
+        this.audio.ensureContextRunning();
+      }
     };
 
     this.controls.onToggleGear = () => {
@@ -91,12 +94,16 @@ class SimulatorHudAndBindingsMethods {
         this.demoDirector.onUserCameraChange();
       }
       this.showToast(() => t('notice.camera', { name: modeName }));
+      this.debriefOverlay?.updateFoldCameraLabel?.();
     };
 
     this.controls.onSelectCamera = (mode) => {
-      this.cameraSystem.setMode(mode, true);
+      const ok = this.cameraSystem.setMode(mode, true);
       if (this.demoDirector?.isActive) this.demoDirector.onUserCameraChange();
-      this.showToast(() => t('notice.camera', { name: this.cameraSystem.getModeName() }));
+      if (ok !== false) {
+        this.showToast(() => t('notice.camera', { name: this.cameraSystem.getModeName() }));
+        this.debriefOverlay?.updateFoldCameraLabel?.();
+      }
     };
 
     this.controls.onToggleLights = () => {
@@ -569,6 +576,8 @@ class SimulatorHudAndBindingsMethods {
       onFeedback: () => this.openFeedbackDialog?.(),
       onSaveReplay: () => this.saveDebriefReplay(),
       onWatchReplay: () => this.replayPanel.watch(this.debriefReplay),
+      onCycleCamera: () => this.controls.onCycleCamera?.(),
+      getCameraModeName: () => this.cameraSystem.getModeName(),
     });
     document.getElementById('btn-pause-end')?.addEventListener('click', () => this.endFlight());
     document.getElementById('btn-lobby-end')?.addEventListener('click', () => this.endFlight());
@@ -759,7 +768,26 @@ class SimulatorHudAndBindingsMethods {
     });
 
     window.addEventListener('keydown', (e) => {
-      if (e.target?.closest?.('select')) return;
+      if (e.target?.closest?.('select, input, textarea, [contenteditable]')) return;
+      if (this.isCrashed || document.body.dataset.flow === 'debrief') {
+        if (e.code === 'KeyO') {
+          this.cameraSystem.resetLook();
+          this.showToast(() => t('camera.view.centered'));
+          return;
+        }
+        if (!e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          if (e.code === 'KeyC') {
+            this.controls?.onCycleCamera?.();
+            return;
+          }
+          const cameraDigit = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
+          if (cameraDigit) {
+            const val = Number(cameraDigit[1]);
+            this.controls?.onSelectCamera?.(val === 0 ? 9 : val - 1);
+            return;
+          }
+        }
+      }
       if (this.gameFlow.blocksFlightInput()) return;
       if (this.isCrashed && (e.code === 'Space' || e.code === 'KeyR' || e.code === 'Enter')) {
         this.exitCrashToLobby();
