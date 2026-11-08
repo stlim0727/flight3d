@@ -279,18 +279,21 @@ export class DebriefOverlay {
     const enough = report.sufficient;
     const crash = report.crash;
     const outcomeEl = this.el('outcome');
-    outcomeEl.classList.remove('is-crash', 'is-landed', 'is-empty');
+    outcomeEl.classList.remove('is-crash', 'is-landed', 'is-ditching', 'is-empty');
     if (!enough) {
       outcomeEl.classList.add('is-empty');
     } else if (crash) {
       outcomeEl.classList.add('is-crash');
+    } else if (report.reason === 'ditching') {
+      outcomeEl.classList.add('is-ditching');
     } else {
       outcomeEl.classList.add('is-landed');
     }
     const headerPill = this.el('pill');
     if (headerPill) {
       headerPill.hidden = false;
-      headerPill.className = 'debrief-header-pill ' + (!enough ? 'is-empty' : crash ? 'is-crash' : 'is-landed');
+      const stateClass = !enough ? 'is-empty' : crash ? 'is-crash' : report.reason === 'ditching' ? 'is-ditching' : 'is-landed';
+      headerPill.className = 'debrief-header-pill ' + stateClass;
       // A 374px-wide phone leaves the title column about 85px, so the pill shows a badge word; the sentence moves to the tooltip.
       const pillState = !enough ? 'empty' : crash ? 'crash' : report.reason;
       bindText(headerPill, () => t(`debrief.pill.${pillState}`));

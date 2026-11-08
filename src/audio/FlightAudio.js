@@ -863,4 +863,62 @@ export class FlightAudio {
     bassGain.connect(this.masterGain);
     noiseSrc.start(now);
   }
+
+  playWaterSplash() {
+    this.cancelSpeech();
+    if (!this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+
+    // Fade out engine noise smoothly on water contact
+    if (this.engineGain) this.engineGain.gain.setTargetAtTime(0, now, 0.4);
+    if (this.windGain) this.windGain.gain.setTargetAtTime(0.05, now, 0.8);
+
+    // Deep water displacement thump
+    const bufferSize = Math.floor(this.ctx.sampleRate * 2.5);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.9));
+    }
+
+    const noiseSrc = this.ctx.createBufferSource();
+    noiseSrc.buffer = noiseBuffer;
+
+    const splashFilter = this.ctx.createBiquadFilter();
+    splashFilter.type = 'lowpass';
+    splashFilter.frequency.setValueAtTime(380, now);
+    splashFilter.frequency.exponentialRampToValueAtTime(80, now + 2.2);
+
+    const splashGain = this.ctx.createGain();
+    splashGain.gain.setValueAtTime(0.9, now);
+    splashGain.gain.exponentialRampToValueAtTime(0.001, now + 2.4);
+
+    noiseSrc.connect(splashFilter);
+    splashFilter.connect(splashGain);
+    splashGain.connect(this.masterGain);
+    noiseSrc.start(now);
+
+    // Continuous water wash / planing rush
+    const washBuffer = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 3.0), this.ctx.sampleRate);
+    const wData = washBuffer.getChannelData(0);
+    for (let i = 0; i < wData.length; i++) {
+      wData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 1.5));
+    }
+    const washSrc = this.ctx.createBufferSource();
+    washSrc.buffer = washBuffer;
+
+    const washFilter = this.ctx.createBiquadFilter();
+    washFilter.type = 'bandpass';
+    washFilter.frequency.setValueAtTime(550, now);
+    washFilter.frequency.exponentialRampToValueAtTime(220, now + 2.8);
+
+    const washGain = this.ctx.createGain();
+    washGain.gain.setValueAtTime(0.65, now);
+    washGain.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
+
+    washSrc.connect(washFilter);
+    washFilter.connect(washGain);
+    washGain.connect(this.masterGain);
+    washSrc.start(now);
+  }
 }

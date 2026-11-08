@@ -122,6 +122,11 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   color: #6ee7b7;
   border: 1px solid rgba(16, 185, 129, 0.5);
 }
+.debrief-header-pill.is-ditching {
+  background: rgba(6, 182, 212, 0.25);
+  color: #67e8f9;
+  border: 1px solid rgba(6, 182, 212, 0.5);
+}
 .debrief-header-pill.is-empty {
   background: rgba(56, 189, 248, 0.2);
   color: #7dd3fc;
@@ -232,6 +237,11 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   background: rgba(16, 185, 129, 0.16);
   border: 1px solid rgba(16, 185, 129, 0.45);
   color: #6ee7b7;
+}
+#debrief-outcome.is-ditching {
+  background: rgba(6, 182, 212, 0.16);
+  border: 1px solid rgba(6, 182, 212, 0.45);
+  color: #67e8f9;
 }
 #debrief-outcome.is-empty {
   background: rgba(56, 189, 248, 0.12);

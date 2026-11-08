@@ -15,6 +15,7 @@ import { CameraSystem } from '../cameras/CameraSystem.js';
 import { FLOW } from '../ui/GameFlowController.js';
 import { trackFlightCrash } from '../analytics/posthog.js';
 import { PilotPhysiology } from '../physics/PilotPhysiology.js';
+import { WaterDitching } from '../physics/WaterDitching.js';
 
 class PhysicsIntegratorMethods {
   /**
@@ -152,6 +153,69 @@ class PhysicsIntegratorMethods {
     // This stays on the trusted host; it is never a pilot observation.
     this.missionPhysicsFrame = { gearResult };
 
+    // 4b. Hydrodynamic Water Ditching & Sinking Forces
+    this.waterDitching ??= new WaterDitching();
+    const stepEuler = this._intEuler.setFromQuaternion(this.quaternion, 'YXZ');
+    const stepPitchDeg = THREE.MathUtils.radToDeg(stepEuler.x);
+    const stepRollDeg = THREE.MathUtils.radToDeg(-stepEuler.z);
+
+    const waterResult = this.waterDitching.update(
+      dt,
+      this.aircraft.group,
+      this.linearVelocity,
+      this.angularVelocity,
+      this.currentTerrain,
+      this.aero,
+      this.gear.supportedBodyPoints,
+      gearResult.gearState,
+      stepPitchDeg,
+      stepRollDeg,
+      { mass: this.aero.mass, inverseInertia: { x: this.aero.invIyy, y: this.aero.invIzz, z: this.aero.invIxx } }
+    );
+    gearResult.waterDitching = this.waterDitching;
+    gearResult.waterResult = waterResult;
+
+    if (waterResult.onWater && waterResult.ditchingContact) {
+      if (!this.waterDitchingNoticed) {
+        this.waterDitchingNoticed = true;
+        this.landingIncident = true;
+        if (this.demoDirector?.isActive) this.demoDirector.stop();
+        this.autopilot.disengage();
+        this.engines.setThrottle(0.0);
+        this.controls.throttle = 0.0;
+        this.audio?.playWaterSplash?.();
+        this.showToast(() => t('notice.waterDitching'));
+      }
+      if (waterResult.ditchingPhase === 'sinking' && !this.waterSinkingNoticed) {
+        this.waterSinkingNoticed = true;
+        this.showToast(() => t('notice.waterSinking'));
+      }
+      if (waterResult.submerged && !this.waterSubmergedNoticed) {
+        this.waterSubmergedNoticed = true;
+        this.showToast(() => t('notice.waterSunken'));
+      }
+
+      // Visual water spray and ripples
+      if (this.tireSmokeSystem) {
+        if (waterResult.sprayIntensity > 0.04 && groundSpeed > 3.0) {
+          this.waterSprayClock = (this.waterSprayClock || 0) + dt;
+          if (this.waterSprayClock >= 0.08) {
+            this.waterSprayClock = 0;
+            const pointsToEmit = waterResult.contactPoints.length > 0 ? waterResult.contactPoints.slice(0, 4) : [this.position];
+            for (const pt of pointsToEmit) {
+              this.tireSmokeSystem.emitWaterSprayBurst(pt, this.linearVelocity, groundSpeed, 3);
+            }
+          }
+        } else if (waterResult.ditchingPhase === 'sinking' && !waterResult.submerged) {
+          this.waterRippleClock = (this.waterRippleClock || 0) + dt;
+          if (this.waterRippleClock >= 0.35) {
+            this.waterRippleClock = 0;
+            this.tireSmokeSystem.emitWaterRipples(this.position, 2);
+          }
+        }
+      }
+    }
+
     if (gearResult.damageEvents.length || (gearResult.bodyContacts.length && !this.bodyContactStarted)) {
       this.landingIncident = true;
       if (this.demoDirector?.isActive) this.demoDirector.stop();
@@ -195,7 +259,7 @@ class PhysicsIntegratorMethods {
     } else {
       this.slideEmitClock = 0;
     }
-    const resting = gearResult.onGround && this.linearVelocity.length() < 0.5 && this.angularVelocity.length() < 0.02;
+    const resting = (gearResult.onGround || (waterResult.onWater && waterResult.ditchingContact)) && this.linearVelocity.length() < 0.5 && this.angularVelocity.length() < 0.02;
     this.landingRestTime = resting ? this.landingRestTime + dt : 0;
     if (!resting) this.landingStopped = false;
     if (this.landingIncident && !this.landingStopped && this.landingRestTime >= 1) {
@@ -236,7 +300,8 @@ class PhysicsIntegratorMethods {
       .add(gravityWorld)
       .add(thrustWorld)
       .add(aeroResult.forceWorld)
-      .add(gearResult.forces);
+      .add(gearResult.forces)
+      .add(waterResult.forces);
 
     // A connected ground tug contributes forces through the normal integrator.
     const towing = this.demoDirector?.isActive
@@ -254,10 +319,11 @@ class PhysicsIntegratorMethods {
     this._rotationBefore.copy(this.quaternion);
 
     // 9. Total Moments Integration: M = I * alpha
-    // Moment in body frame: aero moment + landing gear moment
+    // Moment in body frame: aero moment + landing gear moment + water hydrodynamic moment
     const netMomentBody = this._intNetMoment.set(0, 0, 0)
       .add(aeroResult.momentBody)
-      .add(gearResult.moments);
+      .add(gearResult.moments)
+      .add(waterResult.moments);
 
     if (towing) netMomentBody.add(towing.moment);
 
@@ -364,9 +430,12 @@ class PhysicsIntegratorMethods {
       flapDegree: this.aero.currentFlapAngle,
       flapIndex: this.aero.flapsIndex,
       spoilers: this.aero.spoilers,
-      touchdown: gearResult.touchdown,
-      touchdownSinkRate: Math.max(0, ...gearResult.touchdownContacts.map(contact => contact.sinkRate)),
-      onGround: gearResult.onGround,
+      onWater: Boolean(waterResult.onWater),
+      ditchingPhase: waterResult.ditchingPhase,
+      flooding: waterResult.flooding,
+      touchdown: gearResult.touchdown || (waterResult.onWater && waterResult.ditchingContact),
+      touchdownSinkRate: Math.max(0, ...gearResult.touchdownContacts.map(contact => contact.sinkRate), waterResult.ditchingContact ? waterResult.touchdownVsi : 0),
+      onGround: gearResult.onGround || (waterResult.onWater && waterResult.ditchingContact),
       apEngaged: this.autopilot.master,
       airportKey: this.activeAirport,
       apModes: this.autopilot.annunciation(),
@@ -531,6 +600,10 @@ class PhysicsIntegratorMethods {
     if (this.aircraft?.group) this.aircraft.group.visible = true;
     this.aircraft?.resetCrashVisuals?.();
     this.audio?.reset?.();
+    this.waterDitching?.reset?.();
+    this.waterDitchingNoticed = false;
+    this.waterSinkingNoticed = false;
+    this.waterSubmergedNoticed = false;
     this.pilotPhysiology?.reset?.();
     this.pilotPhysiologyFx?.reset?.();
     if (this.telemetry) {

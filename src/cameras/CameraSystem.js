@@ -1080,6 +1080,7 @@ export class CameraSystem {
   }
 
   setTerrain(terrain) {
+    this.terrainObj = terrain;
     if (typeof terrain === 'function') {
       this.getTerrainHeight = terrain;
     } else if (terrain && typeof terrain.getHeight === 'function') {
@@ -1088,13 +1089,15 @@ export class CameraSystem {
   }
 
   queryGroundHeight(x, z) {
+    let groundH = 0.0;
     if (this.getTerrainHeight) {
       try {
         const h = this.getTerrainHeight(x, z);
-        if (typeof h === 'number' && !Number.isNaN(h)) return h;
+        if (typeof h === 'number' && !Number.isNaN(h)) groundH = h;
       } catch (e) {}
     }
-    return 0.0;
+    const waterLevel = this.terrainObj?.getWaterLevel?.(x, z) ?? 0.0;
+    return Math.max(groundH, waterLevel);
   }
   snapToTarget(aircraftMesh) {
     const behindLocal = new THREE.Vector3(0, this.chaseHeight, this.chaseDistance);

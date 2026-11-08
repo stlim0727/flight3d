@@ -84,6 +84,10 @@ class PresetSpawnerMethods {
     this.aero.separation = 0.0;
     this.landingIncident = false;
     this.landingStopped = false;
+    this.waterDitching?.reset();
+    this.waterDitchingNoticed = false;
+    this.waterSinkingNoticed = false;
+    this.waterSubmergedNoticed = false;
     this.bodyContactStarted = false;
     this.bodyContactNotices = new Set();
     this.excursionAnnounced = false;
