@@ -155,3 +155,29 @@ test('Multi-viewport screens showcases, concurrent capture, and navigation switc
   assert.ok(Array.isArray(portraitCatalog.screens) && portraitCatalog.screens.length > 0);
   assert.ok(Array.isArray(landscapeCatalog.screens) && landscapeCatalog.screens.length > 0);
 });
+
+test('Screens showcases header hierarchy and build-info metadata synchronization', () => {
+  const desktopHtml = readFileSync(resolve('screens.html'), 'utf8');
+  const portraitHtml = readFileSync(resolve('screens-mobile-portrait.html'), 'utf8');
+  const landscapeHtml = readFileSync(resolve('screens-mobile-landscape.html'), 'utf8');
+
+  for (const html of [desktopHtml, portraitHtml, landscapeHtml]) {
+    // 1. Verify header layout defines dedicated sub-toolbar row separating navigation and switcher
+    assert.ok(html.includes('class="header-sub"'), 'must define .header-sub toolbar row');
+    assert.ok(html.includes('.header-sub {'), 'CSS must define .header-sub flex styles');
+
+    // 2. Verify git info is present in both top header and footer
+    assert.ok(html.includes('id="top-build-info"'), 'header must define #top-build-info');
+    assert.ok(html.includes('id="top-timestamp"'), 'header build info must have #top-timestamp');
+    assert.ok(html.includes('id="top-branch"'), 'header build info must have #top-branch');
+    assert.ok(html.includes('id="top-commit"'), 'header build info must have #top-commit');
+
+    assert.ok(html.includes('id="footer-build-info"'), 'footer must define #footer-build-info');
+    assert.ok(html.includes('id="footer-timestamp"'), 'footer build info must have #footer-timestamp');
+    assert.ok(html.includes('id="footer-branch"'), 'footer build info must have #footer-branch');
+    assert.ok(html.includes('id="footer-commit"'), 'footer build info must have #footer-commit');
+
+    // 3. Verify header build info is NOT hidden on mobile
+    assert.ok(!html.includes('.top-build-info {\n        display: none;'), 'must not hide top-build-info on mobile');
+  }
+});
