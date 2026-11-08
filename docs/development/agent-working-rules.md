@@ -22,8 +22,11 @@ Adapted from Keepory's CLAUDE.md and docs/development/agent-working-rules.md.
 - Do not retry the same failing approach or browser script past two attempts without
   isolating the cause in a small reproducer. Keep transient screenshots and JSON
   dumps in ignored directories (`.tmp/`, `.cache/`, `review-artifacts/`).
-- Verify the behavior affected by the change. Reuse completed checks unless new
-  edits, failures, or unresolved questions justify another run.
+- Verify the behavior affected by the change. Avoid running the long full test suite
+  (`npm test`) locally when almost identical tests run in remote CI. Run fast focused unit
+  tests (`node --test tests/<name>.test.js`) and syntax checks (`npm run check`) locally,
+  and boldly push to let CI test verify it. Reuse completed checks unless new edits, failures,
+  or unresolved questions justify another run.
 - Keep commands and task routing current when moving files or changing scripts.
   Document reusable lessons in repository files, without credentials or transient
   session details. Verify live PR, CI, and deployment state before reporting it.
