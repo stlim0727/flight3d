@@ -7,6 +7,7 @@ import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfContro
 import { applyKoreanAirLivery } from './KoreanAirLivery.js';
 import { applyJejuAirLivery } from './JejuAirLivery.js';
 import { applyFlatShading } from '../config/renderQuality.js';
+import { CockpitHudCanvas, createB737HudCombiner } from './CockpitHudCanvas.js';
 
 /**
  * Boeing 737-800 Airliner 3D Model
@@ -22,8 +23,14 @@ export class Boeing737 {
 
     // Internal cockpit
     this.cockpit = null;
+    this.hudCanvas = null;
+    this.hudCombiner = null;
     if (!this.exteriorOnly) {
       this.cockpit = new Cockpit(pfdCanvas, ndCanvas, eicasCanvas, mcpCanvas, isfdCanvas, cduCanvas);
+      this.hudCanvas = options.hudCanvas || new CockpitHudCanvas(512, 512, { variant: 'b738' });
+      this.hudCombiner = createB737HudCombiner(this.hudCanvas);
+      this.cockpit.hudCombiner = this.hudCombiner;
+      this.cockpit.group.add(this.hudCombiner);
       this.group.add(this.cockpit.group);
       const prevOnModelReady = this.cockpit.onModelReady;
       this.cockpit.onModelReady = () => {

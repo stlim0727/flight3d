@@ -5,6 +5,7 @@ import { gearSupportHeight, tireContact } from './gearVisualContact.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { JetExhaust } from '../effects/JetExhaust.js';
 import { applyFlatShading } from '../config/renderQuality.js';
+import { CockpitHudCanvas, configureF16HudMesh } from './CockpitHudCanvas.js';
 
 // The supplied asset is +X forward, with a 93.94-unit wingspan. Its authored
 // hierarchy supplies the Z-up conversion; mount it in our metre/-Z-forward frame.
@@ -146,6 +147,10 @@ export class F16 {
     // The cockpit stays in the complete airframe, so exterior views also show it.
     this.gltfGroup.add(this.cockpit.group);
     this.cockpit.group.add(this.cockpit.gltfCockpitGroup);
+    this.hudCanvas = options.exteriorOnly
+      ? null
+      : (options.hudCanvas || new CockpitHudCanvas(512, 512, { variant: 'f16' }));
+    this.hudMesh = null;
     if (!options.exteriorOnly) this.instrumentLight = installInstrumentLighting(this.cockpit, F16_FALCON.cockpit.captainEyePos, 0x91ffb5, () => !this.isCrashed);
     this.ready = new GLTFLoader().loadAsync(`${import.meta.env?.BASE_URL ?? '/'}models/f-16.glb`)
       .then(gltf => {
@@ -196,6 +201,12 @@ export class F16 {
       mesh.name = name;
       mesh.castShadow = !material.transparent;
       mesh.receiveShadow = !material.transparent;
+      if (name.startsWith('F-16-hud_') || material.name === 'F-16-hud') {
+        this.hudMesh = mesh;
+        if (this.hudCanvas) {
+          configureF16HudMesh(mesh, this.hudCanvas);
+        }
+      }
       if (name.startsWith('F-16-canopy_')) {
         this.canopyMesh = mesh;
       }

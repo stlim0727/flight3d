@@ -634,6 +634,10 @@ class PhysicsIntegratorMethods {
     }
     this.mcpCanvas.updateData(this.telemetry);
     this.cduCanvas.updateData(this.telemetry);
+    if (this.aircraft?.hudCanvas) {
+      this.aircraft.hudCanvas.updateData(this.telemetry);
+      this.aircraft.hudCanvas.render();
+    }
   }
 
 }
