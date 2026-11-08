@@ -39,6 +39,43 @@ function wall(at, y0, y1) {
   return indexed(vertices, indices);
 }
 
+// An equirectangular copy of NeonCity's stylized sky dome (initStylizedSky) for the water
+// to mirror (#581). The scene's environment is a daytime HDR that Neon Metropolis dims to
+// 3%, which left the glossy water black. Row 0 is the nadir; below the horizon is the
+// midnight ground.
+function nightSkyEnvironment(width = 64, height = 32) {
+  const horizon = [0.48, 0.04, 0.46], mid = [0.20, 0.03, 0.32], top = [0.03, 0.01, 0.10], ground = [0.027, 0.012, 0.07];
+  const mix = (a, b, t) => a.map((v, k) => v + (b[k] - v) * t);
+  const data = new Uint8Array(width * height * 4);
+  for (let row = 0; row < height; row++) {
+    const h = Math.sin(Math.PI * ((row + 0.5) / height - 0.5));
+    const t = Math.min(1, Math.max(0, (h + 0.05) / 0.95));
+    const color = h < 0 ? ground : t < 0.4 ? mix(horizon, mid, t / 0.4) : mix(mid, top, (t - 0.4) / 0.6);
+    for (let column = 0; column < width; column++) data.set([...color.map(v => Math.round(v * 255)), 255], (row * width + column) * 4);
+  }
+  const texture = new THREE.DataTexture(data, width, height);
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = texture.minFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+// A soft round glow for point lights.
+function glowTexture(size = 16) {
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const r = Math.hypot(x + 0.5 - size / 2, y + 0.5 - size / 2) / (size / 2);
+      data.set([255, 255, 255, Math.round(255 * Math.max(0, 1 - r) ** 2)], (y * size + x) * 4);
+    }
+  }
+  const texture = new THREE.DataTexture(data, size, size);
+  texture.magFilter = texture.minFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function indexed(vertices, indices) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
@@ -63,9 +100,9 @@ export function createNeonRiver(river = NEON_RIVER) {
   ground.add(new THREE.Mesh(strip(() => -EXTENT, west, 0), groundMat), new THREE.Mesh(strip(east, () => EXTENT, 0), groundMat));
   group.add(ground);
 
-  // Dark, glossy water that mirrors the skyline glow.
+  // Dark, glossy water that mirrors the night sky's glow, brightest toward the horizon.
   const water = new THREE.Mesh(strip(west, east, river.waterLevel), new THREE.MeshStandardMaterial({
-    color: 0x081119, roughness: 0.14, metalness: 0.68,
+    color: 0x081119, roughness: 0.14, metalness: 0, envMap: nightSkyEnvironment(),
   }));
   water.name = 'neon-river-water';
   water.receiveShadow = true;
@@ -97,12 +134,33 @@ export function createNeonRiver(river = NEON_RIVER) {
   });
   group.add(...edges);
 
+  // Quay lights every 20 m along both wall tops, in each bank's promenade colour, so the
+  // canal's course reads ahead from the water and from above (#581). Light only: they
+  // stand flush with the promenade and have no collision.
+  const positions = [], colors = [];
+  for (const [bank, side, color] of [[west, -1, 0xff7ad6], [east, 1, 0x8ffaff]]) {
+    const rgb = new THREE.Color(color);
+    for (let z = -EXTENT; z <= EXTENT; z += 20) {
+      positions.push(bank(z) + side, 0.5, z);
+      colors.push(rgb.r, rgb.g, rgb.b);
+    }
+  }
+  const lightGeometry = new THREE.BufferGeometry();
+  lightGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  lightGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const quayLights = new THREE.Points(lightGeometry, new THREE.PointsMaterial({
+    size: 6, map: glowTexture(), vertexColors: true, transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+  }));
+  quayLights.name = 'neon-river-quay-lights';
+  group.add(quayLights);
+
   const materials = createBridgeMaterials();
   const bridges = river.bridges.map(bridge => {
     const bridgeGroup = createBridge(bridge, materials, river);
     group.add(bridgeGroup);
     return bridgeGroup;
   });
-  return { group, ground, water, walls, waterline, bridges };
+  return { group, ground, water, walls, waterline, quayLights, bridges };
 }
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Box3, Quaternion, Vector3 } from 'three';
+import { Box3, EquirectangularReflectionMapping, Quaternion, Vector3 } from 'three';
 import { NEON_RIVER as river, bridgeOpening, bridgeRamps, bridgeSolids, bridgeToWorld, bridgeWorldBoxes,
   deckHalf, isRiver, riverCenter } from '../src/config/neonRiver.js';
 import { createNeonRiver } from '../src/environment/NeonRiver.js';
@@ -38,6 +38,31 @@ test('the street stops at the quay walls and the water lies between them, below 
   for (const mesh of [...canal.ground.children, canal.water]) {
     const normals = mesh.geometry.attributes.normal;
     for (let n = 0; n < normals.count; n++) assert.ok(normals.getY(n) > 0.99, `${mesh.name} faces up`);
+  }
+});
+
+test('the water mirrors its own night sky rather than the dimmed daytime environment (#581)', () => {
+  const { water } = createNeonRiver(), envMap = water.material.envMap;
+  assert.ok(envMap?.isTexture, 'the water carries its own environment map');
+  assert.equal(envMap.mapping, EquirectangularReflectionMapping);
+  // Row 0 is the nadir; the upper half is the sky, its horizon brighter than the zenith.
+  const { data, width, height } = envMap.image, luma = row => {
+    const i = row * width * 4;
+    return data[i] + data[i + 1] + data[i + 2];
+  };
+  assert.ok(luma(height / 2) > luma(height - 1), 'horizon brighter than zenith');
+});
+
+test('quay lights line both walls at street level, every 20 m, off the water (#581)', () => {
+  const { quayLights } = createNeonRiver(), points = vertices(quayLights);
+  for (const side of [-1, 1]) {
+    const row = points.filter(p => Math.sign(p.x - riverCenter(p.z)) === side).sort((a, b) => a.z - b.z);
+    assert.ok(row.length > 1000, `side ${side} has a full row`);
+    for (const p of row) {
+      const offset = Math.abs(p.x - riverCenter(p.z)) - river.halfWidth;
+      assert.ok(offset > 0 && offset < 2 && p.y > 0 && p.y < 1, `light on the quay edge at ${p.toArray()}`);
+    }
+    for (let n = 1; n < row.length; n++) assert.ok(row[n].z - row[n - 1].z <= 20 + 1e-6);
   }
 });
 

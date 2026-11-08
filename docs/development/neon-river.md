@@ -31,6 +31,14 @@ from x = -2400 to 1800). Metres, +Y up.
   promenade strips along their tops. Ground and water are strips sampled every 100 m and
   cut into columns at most 100 m wide, so no triangle spans kilometres (near-plane 1/w
   interpolation). Avenue grid lines and street lamps stop at the walls.
+- The canal must read at night without brightening the city (#581). The scene's
+  environment is a daytime HDR that Neon Metropolis dims to 3%, so the water carries its
+  own environment map, an equirectangular copy of the stylized sky dome's gradient: the
+  glossy water mirrors the magenta horizon and stands out from the black quay walls,
+  brightest at the grazing angles of the bridge flight. Quay lights (`quayLights`, one
+  `Points` cloud) stand every 20 m on both promenade strips, 1 m behind the wall tops,
+  tracing the canal's course ahead from the water and from above. They are light only,
+  flush with the promenade, with no collision.
 - Ten towers were moved clear of the canal and the bridges; the Chrysler-style crown
   tower now stands on the east quay. `tests/neonRiver.test.js` keeps every tower more
   than 30 m from the water and 15 m from every bridge solid.
