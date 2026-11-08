@@ -158,6 +158,9 @@ function getOrCreateAnonymousId() {
 export function gatherFlightContext(sim = activeSim) {
   if (!sim) return {};
   try {
+    const isMultiplayer = Boolean(sim.multiplayer?.active);
+    const room = isMultiplayer ? sim.multiplayer?.room : null;
+    const session = room?.session;
     return {
       aircraft: sim.currentAircraftId ?? null,
       airport: sim.activeAirport ?? null,
@@ -169,6 +172,9 @@ export function gatherFlightContext(sim = activeSim) {
         ? Math.round(1 / sim.lastFrameDelta) : null,
       flightDurationSec: sim.flightRecorder?.elapsed != null
         ? Number(sim.flightRecorder.elapsed.toFixed(1)) : null,
+      isMultiplayer,
+      multiplayerRole: room ? (room.host ? 'host' : 'guest') : null,
+      multiplayerState: session?.state ?? null,
     };
   } catch {
     return {};
@@ -289,6 +295,64 @@ export function trackScoreSubmitted(attempt, { comparisonKeyHash = '', fingerpri
     fingerprint_hash: fingerprintHash,
     recorded_at: attempt.recordedAt,
   }, { send_instantly: true });
+}
+
+/** Track multiplayer room creation */
+export function trackMultiplayerRoomCreated({ room, scenario, aircraft, airport, isPublic = false }) {
+  trackEvent('multiplayer_room_created', {
+    room,
+    scenario,
+    aircraft,
+    airport,
+    isPublic: Boolean(isPublic),
+  });
+}
+
+/** Track multiplayer room join attempt */
+export function trackMultiplayerRoomJoined({ room, method = 'code' }) {
+  trackEvent('multiplayer_room_joined', {
+    room,
+    joinMethod: method,
+  });
+}
+
+/** Track successful peer-to-peer connection */
+export function trackMultiplayerConnected({ room, role, connectionDurationMs = null }) {
+  trackEvent('multiplayer_connected', {
+    room,
+    role,
+    connectionDurationMs: connectionDurationMs != null ? Math.round(connectionDurationMs) : null,
+  });
+}
+
+/** Track multiplayer round start */
+export function trackMultiplayerRoundStarted({ room, round, scenario, aircraft, airport }) {
+  trackEvent('multiplayer_round_started', {
+    room,
+    round,
+    scenario,
+    aircraft,
+    airport,
+  });
+}
+
+/** Track multiplayer session end / disconnect */
+export function trackMultiplayerSessionEnded({ room, role, reason, durationSeconds = null, roundsPlayed = 0 }) {
+  trackEvent('multiplayer_session_ended', {
+    room,
+    role,
+    endReason: reason || 'unknown',
+    durationSeconds: durationSeconds != null ? Number(durationSeconds.toFixed(1)) : null,
+    roundsPlayed: Number(roundsPlayed) || 0,
+  });
+}
+
+/** Track microphone / voice state changes */
+export function trackMultiplayerVoiceToggled({ enabled, muted }) {
+  trackEvent('multiplayer_voice_toggled', {
+    voiceEnabled: Boolean(enabled),
+    voiceMuted: Boolean(muted),
+  });
 }
 
 /**

@@ -33,12 +33,16 @@ export class MultiplayerController {
     this.registeringHost = false;
     this.registrationGeneration = 0;
     this.refreshingRooms = false;
+    this.lastJoinMethod = 'code';
+    this.connectStartedAt = null;
+    this.hasConnected = false;
     if (this.refreshRoomsBtn) this.refreshRoomsBtn.onclick = () => this.refreshOpenRooms();
     this.preferences = bindMultiplayerPreferences();
     document.getElementById('mp-choose-host').onclick = () => this.chooseSetup('host');
     document.getElementById('mp-choose-join').onclick = () => this.chooseSetup('join');
     document.getElementById('mp-create').onclick = () => this.connect();
     document.getElementById('mp-join').onclick = () => {
+      this.lastJoinMethod = 'code';
       this.connectInvite(this.roomInput.value);
     };
     document.getElementById('mp-start').onclick = () => this.room?.session.start();
@@ -47,8 +51,14 @@ export class MultiplayerController {
     document.getElementById('mp-copy-code').onclick = () => this.copyInvite('code');
     document.getElementById('mp-copy').onclick = () => this.copyInvite('link');
     document.getElementById('mp-microphone').onclick = () => {
-      if (this.voice?.microphone) this.voice.setMuted(!this.voice.muted);
-      else this.voice?.enableMicrophone();
+      if (this.voice?.microphone) {
+        const newMuted = !this.voice.muted;
+        this.voice.setMuted(newMuted);
+        this.sim.analytics?.trackMultiplayerVoiceToggled?.({ enabled: true, muted: newMuted });
+      } else {
+        this.voice?.enableMicrophone();
+        this.sim.analytics?.trackMultiplayerVoiceToggled?.({ enabled: true, muted: false });
+      }
     };
     document.getElementById('mp-listen').onclick = () => this.playAudio();
     document.getElementById('mp-mute').onclick = () => { this.audio.muted = !this.audio.muted; this.refresh(); };
@@ -65,6 +75,7 @@ export class MultiplayerController {
   }
   joinInvite(invite) {
     if (invite === null) return;
+    this.lastJoinMethod = 'invite';
     this.chooseSetup('join');
     this.roomInput.value = invite;
     this.openDialog();
@@ -128,6 +139,8 @@ export class MultiplayerController {
     this.hostDirectoryClient = null;
     this.isPublicHost = !room && Boolean(this.publicCheckbox?.checked);
     this.room?.dispose();
+    this.connectStartedAt = performance.now();
+    this.hasConnected = false;
     const config = Object.fromEntries(Object.keys(DEFAULT_CONFIG).map(key => [key, document.getElementById(`mp-${key}`).value]));
     try {
       this.voice = new VoiceLink({ changed: () => this.refresh() });
@@ -137,6 +150,20 @@ export class MultiplayerController {
         prepare: (c, slot) => this.prepare(c, slot), fly: () => this.startTogether(),
         changed: () => this.refresh(), remoteStream: stream => { this.audio.srcObject = stream; this.playAudio(); },
         ended: reason => this.ended(reason) });
+      if (!room) {
+        this.sim.analytics?.trackMultiplayerRoomCreated?.({
+          room: this.room.room,
+          scenario: config.scenario,
+          aircraft: config.aircraft,
+          airport: config.airport,
+          isPublic: this.isPublicHost,
+        });
+      } else {
+        this.sim.analytics?.trackMultiplayerRoomJoined?.({
+          room: this.room.room,
+          method: this.lastJoinMethod || 'code',
+        });
+      }
       this.voice.enableMicrophone();
       this.snapshotTimer = setInterval(() => this.sendSnapshot(), 1000 / 15);
     } catch { this.voice?.close(); this.message = 'connection'; }
@@ -148,6 +175,13 @@ export class MultiplayerController {
     this.sim.gameFlow.enterFlight(); this.sim.syncFlowUi();
     this.sim.ensureAudio?.();
     this.playAudio();
+    this.sim.analytics?.trackMultiplayerRoundStarted?.({
+      room: this.room?.room,
+      round: this.room?.session?.round ?? 1,
+      scenario: this.sim.lastPresetType ?? this.room?.session?.config?.scenario,
+      aircraft: this.sim.currentAircraftId ?? this.room?.session?.config?.aircraft,
+      airport: this.sim.activeAirport ?? this.room?.session?.config?.airport,
+    });
   }
   releasePreparationHold() {
     const owned = this.preparationHold;
@@ -224,6 +258,17 @@ export class MultiplayerController {
     this.refresh();
   }
   ended(reason) {
+    const durationSeconds = this.connectStartedAt ? Number(((performance.now() - this.connectStartedAt) / 1000).toFixed(1)) : 0;
+    const roundsPlayed = this.room?.session?.round ?? 0;
+    this.sim.analytics?.trackMultiplayerSessionEnded?.({
+      room: this.room?.room ?? null,
+      role: this.room?.host ? 'host' : 'guest',
+      reason,
+      durationSeconds,
+      roundsPlayed,
+    });
+    this.connectStartedAt = null;
+    this.hasConnected = false;
     this.registrationGeneration++;
     this.registeringHost = false;
     this.hostDirectoryClient?.unregister();
@@ -245,6 +290,15 @@ export class MultiplayerController {
   }
   refresh() {
     const active = this.active, room = this.room, s = room?.session;
+    if (active && s?.state === 'connected' && !this.hasConnected) {
+      this.hasConnected = true;
+      const connectionDurationMs = this.connectStartedAt ? performance.now() - this.connectStartedAt : null;
+      this.sim.analytics?.trackMultiplayerConnected?.({
+        room: room.room,
+        role: room.host ? 'host' : 'guest',
+        connectionDurationMs,
+      });
+    }
     document.getElementById('mp-controls').hidden = !active;
     document.getElementById('mp-intro').hidden = active;
     bindText(document.getElementById('mp-dialog-help'), () => t(!active ? 'mp.setupHelp' : s.state === 'starting' ? 'mp.state.starting' : s.state !== 'flying' ? (room.host ? (s.state === 'connected' ? 'mp.hostReadyHelp' : 'mp.hostWaitingHelp') : 'mp.guestWaitingHelp') : 'mp.dialogHelp'));
@@ -409,6 +463,7 @@ export class MultiplayerController {
         joinBtn.textContent = t('mp.joinRoom');
         joinBtn.disabled = isFull || this.active;
         joinBtn.onclick = () => {
+          this.lastJoinMethod = 'directory';
           if (this.roomInput) this.roomInput.value = room.roomCode;
           this.connectInvite(room.roomCode);
         };

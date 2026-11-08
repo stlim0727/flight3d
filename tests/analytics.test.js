@@ -14,6 +14,12 @@ import {
   trackFlightCrash,
   trackPilotModeChange,
   trackStartupTrace,
+  trackMultiplayerRoomCreated,
+  trackMultiplayerRoomJoined,
+  trackMultiplayerConnected,
+  trackMultiplayerRoundStarted,
+  trackMultiplayerSessionEnded,
+  trackMultiplayerVoiceToggled,
   sendUserFeedback,
   _resetAnalyticsForTesting,
 } from '../src/analytics/posthog.js';
@@ -90,6 +96,24 @@ test('gatherFlightContext extracts simulator state safely', () => {
   assert.equal(context.pilotMode, 'human');
   assert.equal(context.fps, 60);
   assert.equal(context.flightDurationSec, 42.5);
+  assert.equal(context.isMultiplayer, false);
+  assert.equal(context.multiplayerRole, null);
+  assert.equal(context.multiplayerState, null);
+
+  const mpSim = {
+    ...mockSim,
+    multiplayer: {
+      active: true,
+      room: {
+        host: true,
+        session: { state: 'flying' },
+      },
+    },
+  };
+  const mpContext = gatherFlightContext(mpSim);
+  assert.equal(mpContext.isMultiplayer, true);
+  assert.equal(mpContext.multiplayerRole, 'host');
+  assert.equal(mpContext.multiplayerState, 'flying');
 });
 
 test('analytics calls safely no-op when uninitialized without throwing', () => {
@@ -102,6 +126,12 @@ test('analytics calls safely no-op when uninitialized without throwing', () => {
     trackFlightEnd({ airport: 'coastal', aircraft: 'B738', scenario: 'runway', reason: 'landed', durationSeconds: 60 });
     trackFlightCrash({ airport: 'coastal', aircraft: 'B738', scenario: 'runway', crashResult: { type: 'WATER', name: 'Water' } });
     trackPilotModeChange('ai', 'valley-slalom-v1');
+    trackMultiplayerRoomCreated({ room: 'ABC123', scenario: 'cruise', aircraft: 'C172', airport: 'coastal', isPublic: true });
+    trackMultiplayerRoomJoined({ room: 'ABC123', method: 'code' });
+    trackMultiplayerConnected({ room: 'ABC123', role: 'guest', connectionDurationMs: 420 });
+    trackMultiplayerRoundStarted({ room: 'ABC123', round: 1, scenario: 'cruise', aircraft: 'C172', airport: 'coastal' });
+    trackMultiplayerSessionEnded({ room: 'ABC123', role: 'guest', reason: 'peer-left', durationSeconds: 120.5, roundsPlayed: 2 });
+    trackMultiplayerVoiceToggled({ enabled: true, muted: false });
   });
 });
 
@@ -177,6 +207,48 @@ test('trackEvent forwards formatted payload to PostHog instance when initialized
   assert.equal(captured[4].properties.$exception_message, 'Sample WebGL error');
   assert.equal(captured[4].properties.extra, 'debug');
   assert.equal(captured[4].options?.send_instantly, true);
+
+  trackMultiplayerRoomCreated({ room: 'ABC123', scenario: 'cruise', aircraft: 'C172', airport: 'coastal', isPublic: true });
+  assert.equal(captured.length, 6);
+  assert.equal(captured[5].eventName, 'multiplayer_room_created');
+  assert.equal(captured[5].properties.room, 'ABC123');
+  assert.equal(captured[5].properties.scenario, 'cruise');
+  assert.equal(captured[5].properties.aircraft, 'C172');
+  assert.equal(captured[5].properties.airport, 'coastal');
+  assert.equal(captured[5].properties.isPublic, true);
+
+  trackMultiplayerRoomJoined({ room: 'XYZ789', method: 'directory' });
+  assert.equal(captured.length, 7);
+  assert.equal(captured[6].eventName, 'multiplayer_room_joined');
+  assert.equal(captured[6].properties.room, 'XYZ789');
+  assert.equal(captured[6].properties.joinMethod, 'directory');
+
+  trackMultiplayerConnected({ room: 'XYZ789', role: 'guest', connectionDurationMs: 450 });
+  assert.equal(captured.length, 8);
+  assert.equal(captured[7].eventName, 'multiplayer_connected');
+  assert.equal(captured[7].properties.room, 'XYZ789');
+  assert.equal(captured[7].properties.role, 'guest');
+  assert.equal(captured[7].properties.connectionDurationMs, 450);
+
+  trackMultiplayerRoundStarted({ room: 'XYZ789', round: 2, scenario: 'valley', aircraft: 'F16', airport: 'lukla' });
+  assert.equal(captured.length, 9);
+  assert.equal(captured[8].eventName, 'multiplayer_round_started');
+  assert.equal(captured[8].properties.room, 'XYZ789');
+  assert.equal(captured[8].properties.round, 2);
+
+  trackMultiplayerSessionEnded({ room: 'XYZ789', role: 'guest', reason: 'peer-left', durationSeconds: 85.3, roundsPlayed: 2 });
+  assert.equal(captured.length, 10);
+  assert.equal(captured[9].eventName, 'multiplayer_session_ended');
+  assert.equal(captured[9].properties.room, 'XYZ789');
+  assert.equal(captured[9].properties.endReason, 'peer-left');
+  assert.equal(captured[9].properties.durationSeconds, 85.3);
+  assert.equal(captured[9].properties.roundsPlayed, 2);
+
+  trackMultiplayerVoiceToggled({ enabled: true, muted: true });
+  assert.equal(captured.length, 11);
+  assert.equal(captured[10].eventName, 'multiplayer_voice_toggled');
+  assert.equal(captured[10].properties.voiceEnabled, true);
+  assert.equal(captured[10].properties.voiceMuted, true);
 
   _resetAnalyticsForTesting(null);
 });
@@ -385,6 +457,12 @@ test('src/main.js imports all analytics methods attached to this.analytics', asy
     'trackFlightEnd',
     'trackFlightCrash',
     'captureException',
+    'trackMultiplayerRoomCreated',
+    'trackMultiplayerRoomJoined',
+    'trackMultiplayerConnected',
+    'trackMultiplayerRoundStarted',
+    'trackMultiplayerSessionEnded',
+    'trackMultiplayerVoiceToggled',
   ];
 
   for (const name of required) {

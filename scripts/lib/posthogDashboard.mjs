@@ -47,4 +47,7 @@ export const INSIGHTS = [
   ['Reached a cockpit (ms)', trends([median('startup_trace', 'readyMs'), median('startup_trace', 'firstFrameMs')], { breakdown: 'outcome', dateFrom: '-7d' })],
   ['User feedback submitted', trends([ev('user_feedback_submitted')])],
   ['JS exceptions', trends([ev('$exception')])],
+  ['Multiplayer rooms (created vs joined)', trends([ev('multiplayer_room_created'), ev('multiplayer_room_joined')])],
+  ['Multiplayer connections & rounds', trends([ev('multiplayer_connected'), ev('multiplayer_round_started')])],
+  ['Multiplayer session outcomes', trends([ev('multiplayer_session_ended')], { breakdown: 'endReason', display: 'ActionsBarValue' })],
 ];
