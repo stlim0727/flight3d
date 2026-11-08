@@ -173,7 +173,11 @@ export class MultiplayerController {
       setSimulationWind(this.sim);
       this.sim.aero.windWorld.set(0, 0, 0);
       this.sim.gameFlow.pause();
-      this.remote = new RemoteAircraft(this.sim.scene, config.aircraft);
+      this.remote = new RemoteAircraft(this.sim.scene, config.aircraft, {
+        terrain: this.sim.currentTerrain,
+        explosionSystem: this.sim.explosionSystem,
+        audio: this.sim.audio,
+      });
     } finally { this.preparing = false; this.refresh(); }
   }
   /** Called exactly once at the end of each preset reset, including crash recovery. */
@@ -202,6 +206,9 @@ export class MultiplayerController {
   }
   update() {
     if (!this.remote || !this.active) return;
+    if (!this.remote.terrain && this.sim.currentTerrain) this.remote.terrain = this.sim.currentTerrain;
+    if (!this.remote.explosionSystem && this.sim.explosionSystem) this.remote.explosionSystem = this.sim.explosionSystem;
+    if (!this.remote.audio && this.sim.audio) this.remote.audio = this.sim.audio;
     const s = this.room.session;
     const sample = s.track.sample(performance.now());
     const status = `${sample?.talking ? ' ●' : ''}${sample?.held ? ` · ${t('mp.held')}` : ''}${sample?.stale ? ` · ${t('mp.stale')}` : ''}`;

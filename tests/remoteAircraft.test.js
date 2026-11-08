@@ -62,3 +62,105 @@ test('737 and C172 use production exterior classes without cockpit instruments',
   }
   assert.throws(() => createRemoteAircraftModel('unknown'));
 });
+
+test('remote aircraft crash triggers explosion, remote audio, breakup and persists on respawn', async () => {
+  const scene = new THREE.Scene();
+  const explosionCalls = [];
+  const audioCalls = [];
+  const breakupCalls = [];
+  const explosionSystem = {
+    spawnExplosion(crashResult, vel) { explosionCalls.push({ crashResult, vel }); }
+  };
+  const audio = {
+    playRemoteExplosion(dist, isWater) { audioCalls.push({ dist, isWater }); }
+  };
+  const breakup = {
+    prepare(m) { breakupCalls.push(['prepare', m]); },
+    spawn(m, vel) { breakupCalls.push(['spawn', m, vel]); },
+    update(dt, t, wl) { breakupCalls.push(['update', dt, t, wl]); },
+    clear(opts) { breakupCalls.push(['clear', opts]); },
+    disposePrepared() { breakupCalls.push(['disposePrepared']); }
+  };
+  const terrain = {
+    getHeight(x, z) { return 0; },
+    getWaterLevel(x, z) { return 0; }
+  };
+  const indicator = { hideCalls: 0, hide() { this.hideCalls++; }, update() {} };
+  const model = { group: new THREE.Group(), ready: Promise.resolve(), setCockpitMode() {}, update() {} };
+  const remote = new RemoteAircraft(scene, 'F16', {
+    createModel: () => model,
+    createIndicator: () => indicator,
+    createBreakup: () => breakup,
+    explosionSystem,
+    audio,
+    terrain
+  });
+  await remote.ready;
+
+  // 1. Initial flying sample
+  const flightSample = { p: [100, 50, 200], q: [0, 0, 0, 1], v: [50, -5, 10], gear: 0, flaps: 0, crashed: false };
+  remote.update(flightSample, 'Ghost', null, { localPosition: new THREE.Vector3(0, 50, 0) });
+  assert.equal(remote.group.visible, true);
+  assert.equal(explosionCalls.length, 0);
+
+  // 2. Crash sample on land
+  const crashSample = { p: [150, 20, 250], q: [0, 0, 0, 1], v: [60, -20, 15], gear: 0, flaps: 0, crashed: true };
+  remote.update(crashSample, 'Ghost', null, { localPosition: new THREE.Vector3(0, 50, 0) });
+  assert.equal(remote.group.visible, false);
+  assert.equal(explosionCalls.length, 1);
+  assert.equal(explosionCalls[0].crashResult.type, 'TERRAIN');
+  assert.equal(audioCalls.length, 1);
+  assert.equal(audioCalls[0].isWater, false);
+  assert.ok(audioCalls[0].dist > 0);
+  assert.equal(breakupCalls.some(c => c[0] === 'spawn'), true);
+  assert.ok(indicator.hideCalls > 0);
+
+  // 3. Stays crashed
+  remote.update(crashSample, 'Ghost', null);
+  assert.equal(explosionCalls.length, 1, 'Explosion should only fire once per crash event');
+
+  // 4. Respawn (crashed becomes false)
+  const respawnSample = { p: [0, 500, 0], q: [0, 0, 0, 1], v: [80, 0, 0], gear: 0, flaps: 0, crashed: false };
+  remote.update(respawnSample, 'Ghost', null);
+  assert.equal(remote.group.visible, true);
+  const clearCall = breakupCalls.find(c => c[0] === 'clear');
+  assert.ok(clearCall, 'Breakup should be cleared with persistence on respawn');
+  assert.deepEqual(clearCall[1], { persist: true, duration: 30 });
+
+  remote.dispose();
+  assert.equal(breakupCalls.at(-1)[0], 'disposePrepared');
+});
+
+test('remote aircraft water crash detects WATER and passes isWater to audio and explosion', async () => {
+  const scene = new THREE.Scene();
+  const explosionCalls = [];
+  const audioCalls = [];
+  const explosionSystem = {
+    spawnExplosion(crashResult, vel) { explosionCalls.push({ crashResult, vel }); }
+  };
+  const audio = {
+    playRemoteExplosion(dist, isWater) { audioCalls.push({ dist, isWater }); }
+  };
+  const terrain = {
+    getHeight(x, z) { return -10; },
+    getWaterLevel(x, z) { return 0; }
+  };
+  const model = { group: new THREE.Group(), ready: Promise.resolve(), setCockpitMode() {}, update() {} };
+  const remote = new RemoteAircraft(scene, 'F16', {
+    createModel: () => model,
+    createIndicator: () => ({ hide() {}, update() {} }),
+    createBreakup: () => ({ prepare() {}, spawn() {}, update() {}, clear() {}, disposePrepared() {} }),
+    explosionSystem,
+    audio,
+    terrain
+  });
+  await remote.ready;
+
+  const waterCrashSample = { p: [0, 0.5, 0], q: [0, 0, 0, 1], v: [30, -10, 5], gear: 0, flaps: 0, crashed: true };
+  remote.update(waterCrashSample, 'Ghost', null, { localPosition: new THREE.Vector3(0, 0, 0) });
+  assert.equal(explosionCalls.length, 1);
+  assert.equal(explosionCalls[0].crashResult.type, 'WATER');
+  assert.equal(audioCalls.length, 1);
+  assert.equal(audioCalls[0].isWater, true);
+  remote.dispose();
+});

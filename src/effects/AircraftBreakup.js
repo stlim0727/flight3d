@@ -18,6 +18,7 @@ export class AircraftBreakup {
   constructor(scene) {
     this.scene = scene;
     this.pieces = [];
+    this.persistentPieces = [];
     this.target = new THREE.Vector3();
     this.radius = 20;
   }
@@ -199,40 +200,79 @@ export class AircraftBreakup {
     this.updateBounds();
   }
 
+  integratePieces(pieces, h, terrain, waterLevel) {
+    for (const piece of pieces) {
+      const { object, velocity, spin, radius } = piece;
+      const floor = terrain?.getHeight(object.position.x, object.position.z) ?? 0;
+      // Approximate the immersed height of the fragment's contact sphere.
+      // Dry terrain, shoreline crossings and shallow water use the same forces.
+      const immersion = Number.isFinite(waterLevel) ? THREE.MathUtils.clamp(
+        (Math.min(waterLevel, object.position.y + radius)
+          - Math.max(floor, object.position.y - radius)) / (2 * radius), 0, 1) : 0;
+      velocity.y -= 9.81 * h;
+      velocity.multiplyScalar(Math.exp(-(0.12 + 2 * immersion) * h));
+      spin.multiplyScalar(Math.exp(-2 * immersion * h));
+      object.position.addScaledVector(velocity, h);
+      object.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), spin.x * h);
+      object.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), spin.y * h);
+      object.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), spin.z * h);
+      object.quaternion.normalize();
+      const contactHeight = (terrain?.getHeight(object.position.x, object.position.z) ?? 0) + radius;
+      if (object.position.y < contactHeight) {
+        object.position.y = contactHeight;
+        if (velocity.y < 0) velocity.y = Math.abs(velocity.y) > 1 ? -velocity.y * 0.18 * (1 - immersion) : 0;
+        velocity.x *= Math.exp(-3.5 * h);
+        velocity.z *= Math.exp(-3.5 * h);
+        spin.multiplyScalar(Math.exp(-5 * h));
+      }
+    }
+  }
+
   update(dt, terrain, waterLevel = null) {
     // Substeps bound contact integration, not the total elapsed simulation time.
     let remaining = Number.isFinite(dt) ? Math.max(dt, 0) : 0;
     while (remaining > 0) {
       const h = Math.min(remaining, 1 / 120);
       remaining -= h;
-      for (const piece of this.pieces) {
-        const { object, velocity, spin, radius } = piece;
-        const floor = terrain?.getHeight(object.position.x, object.position.z) ?? 0;
-        // Approximate the immersed height of the fragment's contact sphere.
-        // Dry terrain, shoreline crossings and shallow water use the same forces.
-        const immersion = Number.isFinite(waterLevel) ? THREE.MathUtils.clamp(
-          (Math.min(waterLevel, object.position.y + radius)
-            - Math.max(floor, object.position.y - radius)) / (2 * radius), 0, 1) : 0;
-        velocity.y -= 9.81 * h;
-        velocity.multiplyScalar(Math.exp(-(0.12 + 2 * immersion) * h));
-        spin.multiplyScalar(Math.exp(-2 * immersion * h));
-        object.position.addScaledVector(velocity, h);
-        object.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), spin.x * h);
-        object.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), spin.y * h);
-        object.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), spin.z * h);
-        object.quaternion.normalize();
-        const contactHeight = (terrain?.getHeight(object.position.x, object.position.z) ?? 0) + radius;
-        if (object.position.y < contactHeight) {
-          object.position.y = contactHeight;
-          if (velocity.y < 0) velocity.y = Math.abs(velocity.y) > 1 ? -velocity.y * 0.18 * (1 - immersion) : 0;
-          velocity.x *= Math.exp(-3.5 * h);
-          velocity.z *= Math.exp(-3.5 * h);
-          spin.multiplyScalar(Math.exp(-5 * h));
-        }
+      this.integratePieces(this.pieces, h, terrain, waterLevel);
+      if (this.persistentPieces?.length) {
+        this.integratePieces(this.persistentPieces, h, terrain, waterLevel);
       }
     }
     if (this.aircraft) this.aircraft.group.visible = false;
     this.updateBounds(terrain, waterLevel);
+
+    // Update persistent wreckage pieces (fade and dispose after duration)
+    if (this.persistentPieces?.length) {
+      for (let i = this.persistentPieces.length - 1; i >= 0; i--) {
+        const p = this.persistentPieces[i];
+        p.timer = (p.timer ?? 0) + dt;
+        if (p.timer >= p.duration) {
+          this.scene.remove(p.object);
+          p.object.traverse(node => {
+            if (node.isMesh) {
+              node.geometry?.dispose();
+              if (Array.isArray(node.material)) node.material.forEach(m => m?.dispose());
+              else node.material?.dispose();
+            }
+          });
+          this.persistentPieces.splice(i, 1);
+        } else if (p.timer > p.duration - 2) {
+          const alpha = Math.max(0, (p.duration - p.timer) / 2);
+          p.object.traverse(node => {
+            if (node.isMesh && node.material) {
+              const mats = Array.isArray(node.material) ? node.material : [node.material];
+              for (const m of mats) {
+                if (m) {
+                  m.transparent = true;
+                  m.opacity = alpha;
+                }
+              }
+            }
+          });
+        }
+      }
+    }
   }
 
   updateBounds(terrain, waterLevel = null) {
@@ -248,10 +288,34 @@ export class AircraftBreakup {
     if (Number.isFinite(waterLevel) && floor < waterLevel) this.target.y = Math.max(waterLevel, this.target.y);
   }
 
-  clear() {
+  clear({ persist = false, duration = 30 } = {}) {
+    if (persist && this.pieces.length > 0) {
+      for (const piece of this.pieces) {
+        const objClone = piece.object.clone(true);
+        objClone.children.forEach(mesh => {
+          if (mesh.isMesh) {
+            if (mesh.geometry) mesh.geometry = mesh.geometry.clone();
+            if (mesh.material) {
+              mesh.material = Array.isArray(mesh.material)
+                ? mesh.material.map(m => m ? m.clone() : m)
+                : mesh.material.clone();
+            }
+          }
+        });
+        this.scene.add(objClone);
+        this.persistentPieces.push({
+          object: objClone,
+          velocity: piece.velocity.clone(),
+          spin: piece.spin.clone(),
+          radius: piece.radius,
+          timer: piece.timer ?? 0,
+          duration,
+        });
+      }
+    }
     for (const { object } of this.pieces) {
       this.scene.remove(object);
-      this.preparedRoot.add(object);
+      this.preparedRoot?.add(object);
     }
     this.pieces = [];
     if (this.aircraft) this.aircraft.group.visible = true;
@@ -260,6 +324,17 @@ export class AircraftBreakup {
 
   disposePrepared() {
     this.clear();
+    for (const piece of this.persistentPieces) {
+      this.scene.remove(piece.object);
+      piece.object.traverse(node => {
+        if (node.isMesh) {
+          node.geometry?.dispose();
+          if (Array.isArray(node.material)) node.material.forEach(m => m?.dispose());
+          else node.material?.dispose();
+        }
+      });
+    }
+    this.persistentPieces = [];
     this.preparedRoot?.traverse(mesh => mesh.geometry?.dispose());
     this.preparedRoot = null;
     this.preparedFragments = [];

@@ -424,3 +424,36 @@ test('submerged fragments settle on the seabed without a dry-ground bounce', () 
     assert.ok(Math.abs(p.velocity.y) < 1e-12);
   }
 });
+
+test('persistent breakup pieces survive clear, settle, fade and dispose after 30 seconds', () => {
+  const { scene, aircraft } = fixture();
+  const breakup = new AircraftBreakup(scene);
+  breakup.spawn(aircraft, new THREE.Vector3(20, -10, 0));
+  assert.ok(breakup.pieces.length > 0);
+
+  // Clear with persist: true (30 seconds duration)
+  breakup.clear({ persist: true, duration: 30 });
+  assert.equal(breakup.pieces.length, 0, 'Active pieces cleared');
+  assert.ok(breakup.persistentPieces.length > 0, 'Persistent pieces retained');
+  assert.equal(aircraft.group.visible, true, 'Aircraft visible on respawn');
+
+  let persistentDisposed = 0;
+  for (const p of breakup.persistentPieces) {
+    p.object.traverse(node => {
+      if (node.isMesh && node.geometry) {
+        node.geometry.addEventListener('dispose', () => persistentDisposed++);
+      }
+    });
+  }
+
+  // Update through 28 seconds (should still be present and settled)
+  const terrain = { getHeight: () => 0 };
+  for (let i = 0; i < 280; i++) breakup.update(0.1, terrain);
+  assert.ok(breakup.persistentPieces.length > 0);
+  assert.equal(persistentDisposed, 0);
+
+  // Update through last 2 seconds (fade) and reach 30 seconds
+  for (let i = 0; i < 30; i++) breakup.update(0.1, terrain);
+  assert.equal(breakup.persistentPieces.length, 0, 'Persistent pieces removed after 30s');
+  assert.ok(persistentDisposed > 0, 'Persistent geometries disposed');
+});

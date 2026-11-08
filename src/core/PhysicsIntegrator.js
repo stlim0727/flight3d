@@ -524,9 +524,9 @@ class PhysicsIntegratorMethods {
     this.crashDebriefRemaining = null;
     this.isCrashed = false;
     this.crashResult = null;
-    this.explosionSystem?.clear?.();
+    this.explosionSystem?.clear?.({ preservePersistent: true });
     this.aircraftBreakup?.aircraft?.resetCrashVisuals?.();
-    this.aircraftBreakup?.clear?.();
+    this.aircraftBreakup?.clear?.({ persist: true, duration: 30 });
     this.cameraSystem?.endCrashView?.();
     if (this.aircraft?.group) this.aircraft.group.visible = true;
     this.aircraft?.resetCrashVisuals?.();

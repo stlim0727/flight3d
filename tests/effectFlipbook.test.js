@@ -106,3 +106,42 @@ test('impacts separate water from solid materials, settle, expire and reset with
   system.dispose();
   assert.equal(system.scene.children.length, 0);
 });
+
+test('persistent wreckage maintains smoke and water foam for 30 seconds across clear({ preservePersistent: true })', () => {
+  const original = ExplosionSystem.prototype.createSparkTexture;
+  ExplosionSystem.prototype.createSparkTexture = () => new THREE.Texture();
+  let system;
+  try {
+    system = new ExplosionSystem(new THREE.Scene());
+    // 1. Terrain impact initiates 30s smoke
+    system.spawnExplosion({ type: 'TERRAIN', point: new THREE.Vector3(10, 0, 10), speedKnots: 80 });
+    assert.equal(system.persistentWreckages.length, 1);
+    assert.equal(system.persistentWreckages[0].duration, 30);
+
+    // 2. Water impact initiates 30s water foam
+    system.spawnExplosion({ type: 'WATER', point: new THREE.Vector3(50, 0, 50), speedKnots: 80 });
+    assert.equal(system.persistentWaterWreckages.length, 1);
+    assert.equal(system.persistentWaterWreckages[0].duration, 30);
+
+    // 3. Clear with preservePersistent: true (like respawn)
+    system.clear({ preservePersistent: true });
+    assert.equal(system.persistentWreckages.length, 1, 'Smoke wreckage preserved');
+    assert.equal(system.persistentWaterWreckages.length, 1, 'Water wreckage preserved');
+
+    // 4. Update for 25 seconds: smoke and foam should continue emitting
+    for (let i = 0; i < 250; i++) system.update(0.1);
+    assert.ok(system.smokePuffs.length > 0, 'Smoke should still be billowing at 25s');
+    assert.ok(system.waterPlumes.length > 0, 'Water foam should still be bubbling at 25s');
+
+    // 5. Update past 30 seconds (up to 36s): wreckages expire and particles fade to 0
+    for (let i = 0; i < 110; i++) system.update(0.1);
+    assert.equal(system.persistentWreckages.length, 0, 'Ground wreckage expired after 30s');
+    assert.equal(system.persistentWaterWreckages.length, 0, 'Water wreckage expired after 30s');
+    assert.equal(system.smokePuffs.length, 0, 'Smoke puffs completely dissipated');
+    assert.equal(system.waterPlumes.length, 0, 'Water plumes completely dissipated');
+
+    system.dispose();
+  } finally {
+    ExplosionSystem.prototype.createSparkTexture = original;
+  }
+});
