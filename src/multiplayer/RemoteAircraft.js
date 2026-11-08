@@ -11,6 +11,7 @@ export class RemoteAircraft {
     terrain = null,
     explosionSystem = null,
     audio = null } = {}) {
+    this.aircraft = aircraft;
     this.group = new THREE.Group(); this.group.name = 'MultiplayerGhost';
     this.scene = scene;
     this.terrain = terrain;
@@ -53,6 +54,9 @@ export class RemoteAircraft {
     const now = performance.now();
     const dt = Math.min(.1, Math.max(0, (now - this.lastUpdate) / 1000));
     this.lastUpdate = now;
+    if (sample) {
+      this.group.userData.remote = sample;
+    }
 
     const isCrashed = Boolean(sample && sample.crashed);
     if (isCrashed) {
@@ -96,19 +100,22 @@ export class RemoteAircraft {
       this.breakup?.update(dt, this.terrain);
     }
 
+    if (sample) {
+      this.group.position.fromArray(sample.p);
+      this.group.quaternion.fromArray(sample.q);
+    }
     this.group.visible = Boolean(sample);
     if (!this.group.visible) {
       this.indicator.hide();
       return;
     }
-    const previous = this.group.userData.remote;
+    const previous = this.lastRemoteSample;
     if (previous?.epoch !== sample.epoch || previous?.round !== sample.round
       || (previous && Math.hypot(...sample.p.map((value, i) => value - previous.p[i])) > 1000)) {
       this.indicator.hide();
     }
-    this.group.position.fromArray(sample.p); this.group.quaternion.fromArray(sample.q);
+    this.lastRemoteSample = sample;
     this.animate(sample, dt);
-    this.group.userData.remote = sample;
     if (!showIndicator) {
       this.indicator.hide();
       return;

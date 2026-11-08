@@ -36,6 +36,7 @@ export default {
   'debrief.target.TOWER': '관제탑',
   'debrief.target.TREE': '나무',
   'debrief.target.SHIP': '선박',
+  'debrief.target.AIRCRAFT': '항공기',
   'debrief.viewRecord': '비행 기록 보기',
   'debrief.history': '비행의 흐름',
   'debrief.altitudeAxis': '고도 (FT)',

@@ -36,6 +36,7 @@ export default {
   'debrief.target.TOWER': 'Control tower',
   'debrief.target.TREE': 'Tree',
   'debrief.target.SHIP': 'Ship',
+  'debrief.target.AIRCRAFT': 'Aircraft',
   'debrief.viewRecord': 'View flight log',
   'debrief.history': 'Your flight at a glance',
   'debrief.altitudeAxis': 'Altitude (FT)',

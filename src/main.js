@@ -584,6 +584,7 @@ class FlightSimulator {
       inputLatency?.mark('lobby-ready');
     }
     this.multiplayer = new MultiplayerController(this);
+    this.collisionDetector?.setRemoteAircraftProvider(() => this.multiplayer?.getCollisionTargets());
     this.syncFlowUi();
     if (urlParams.get('pilotArena') === '1') {
       const { installPilotArena } = await import('./ui/PilotArenaPanel.js');
