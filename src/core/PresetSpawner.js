@@ -295,6 +295,8 @@ class PresetSpawnerMethods {
         // Scenic Himalayan Valley Cruise at 13,000 FT (3,960m)
         this.position.set(-1500, 3960, -800);
         this.linearVelocity.set(80, 0, -60);
+        // 100 m/s TAS is ~159 KIAS, beyond what the C172 can hold level (#599).
+        if (isC172) this.linearVelocity.setLength(53);
         this.angularVelocity.set(0, 0, 0);
         this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.3);
 
@@ -363,9 +365,11 @@ class PresetSpawnerMethods {
 
         this.showToast(() => t('preset.coastal.approach'));
       } else if (type === 'cruise') {
-        // Scenic Coastal Cruise over Bay & Ships at 2,600 ft (800m), Speed 210 knots (108 m/s)
+        // Scenic Coastal Cruise over Bay & Ships at 2,600 ft (800m), Speed 210 knots (108 m/s);
+        // C172 flies the same track at 48 m/s (~90 KIAS), below its 163 KIAS Vne (#599).
         this.position.set(-600, 750, 3200);
         this.linearVelocity.set(96, 0, -49); // Aligned with heading 153° (yaw -0.35pi)
+        if (this.currentAircraftId === 'C172') this.linearVelocity.setLength(48);
         this.angularVelocity.set(0, 0, 0);
         this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.35);
 
