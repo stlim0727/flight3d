@@ -12,7 +12,7 @@ export function commitFlightCamera(select, onSelectCamera) {
 }
 
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
-export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParkingBrake }) {
+export function initFlightPanels({ onSelectCamera, onCameraOpen, onCameraClose, onAdjustTrim, onToggleParkingBrake }) {
   const hud = document.getElementById('hud-overlay');
   // Let keyboard users scroll the full telemetry row as well as touch users.
   const strip = document.querySelector('.hud-strip');
@@ -80,6 +80,8 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   cameraButton.id = 'open-camera';
   cameraButton.className = 'btn';
   bindText(cameraButton, () => t('ui.camera.select'), 'aria-label');
+  cameraButton.addEventListener('focus', () => onCameraOpen?.());
+  cameraButton.addEventListener('blur', () => onCameraClose?.());
   cameraButton.addEventListener('change', () => commitFlightCamera(cameraButton, onSelectCamera));
   // Taking over must remain available when the guide is collapsed or yields to
   // warnings. Keep the existing button/handler outside the notification tree.

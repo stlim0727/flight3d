@@ -233,7 +233,7 @@
       <p id="lobby-selection" class="lobby-loading" data-i18n="lobby.applying" aria-live="polite" hidden></p>
       <div class="lobby-tabs" role="tablist" aria-labelledby="lobby-tabs-title">
         <span id="lobby-tabs-title" hidden data-i18n="lobby.title">메인 메뉴</span>
-        <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario"><span class="tab-icon" aria-hidden="true">🎯</span> <span data-i18n="lobby.tab.single">싱글</span></button>
+        <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario"><span class="tab-icon" aria-hidden="true">🎯</span> <span id="lobby-tab-scenario-label" data-i18n="lobby.tab.single">싱글</span></button>
         <button id="lobby-tab-multi" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-multi" tabindex="-1"><span class="tab-icon" aria-hidden="true">👥</span> <span data-i18n="lobby.tab.multi">멀티</span></button>
         <button id="lobby-tab-settings" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-settings" tabindex="-1"><span class="tab-icon" aria-hidden="true">⚙️</span> <span data-i18n="lobby.tab.option">옵션</span></button>
         <button id="lobby-tab-dev" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-dev" tabindex="-1" hidden><span class="tab-icon" aria-hidden="true">🛠️</span> <span data-i18n="dev.title">개발자</span></button>
@@ -329,6 +329,30 @@
           <span class="lobby-label" data-i18n="lobby.briefingTitle">Dispatch briefing</span>
           <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
         </section>
+        <section id="lobby-panel-managed-flight" class="lobby-tab-panel lobby-managed-flight" role="tabpanel" aria-labelledby="lobby-tab-scenario" tabindex="0" hidden>
+          <div class="lobby-group" role="group">
+            <span class="lobby-label" data-i18n="lobby.managed.title">진행 중인 비행</span>
+            <p class="lobby-managed-hint" data-i18n="lobby.managed.hint">비행이 일시정지 상태로 보관되어 있습니다. 다른 기체·지역·시간을 선택하려면 먼저 비행을 종료하세요.</p>
+          </div>
+          <div class="lobby-managed-card">
+            <div class="lobby-managed-item">
+              <span class="managed-label" data-i18n="lobby.managed.aircraft">기체</span>
+              <strong id="lobby-managed-aircraft" class="managed-value">-</strong>
+            </div>
+            <div class="lobby-managed-item">
+              <span class="managed-label" data-i18n="lobby.managed.airport">지역</span>
+              <strong id="lobby-managed-airport" class="managed-value">-</strong>
+            </div>
+            <div class="lobby-managed-item">
+              <span class="managed-label" data-i18n="lobby.managed.scenario">시나리오</span>
+              <strong id="lobby-managed-scenario" class="managed-value">-</strong>
+            </div>
+            <div class="lobby-managed-item">
+              <span class="managed-label" data-i18n="lobby.managed.time">시간대</span>
+              <strong id="lobby-managed-time" class="managed-value">-</strong>
+            </div>
+          </div>
+        </section>
         <section id="lobby-panel-multi" class="lobby-tab-panel lobby-multi" role="tabpanel" aria-labelledby="lobby-tab-multi" tabindex="0" hidden>
           <div class="lobby-group" role="group">
             <span class="lobby-label" data-i18n="mp.title">함께 비행</span>
@@ -384,6 +408,7 @@
       </div>
       <div class="lobby-actions">
         <button id="btn-lobby-resume" class="btn" hidden><span class="btn-icon" aria-hidden="true">▶️</span> <span data-i18n="lobby.resume">비행 계속하기</span></button>
+        <button id="btn-lobby-restart" class="btn" hidden><span class="btn-icon" aria-hidden="true">🔄</span> <span data-i18n="pause.restart">시나리오 재시작</span></button>
         <button id="btn-lobby-end" class="btn" hidden><span class="btn-icon" aria-hidden="true">⏹️</span> <span data-i18n="debrief.end">비행 종료</span></button>
         <button id="btn-replays" class="btn"><span class="btn-icon" aria-hidden="true">📼</span> <span data-i18n="replay.library">저장된 리플레이</span></button>
         <button id="btn-fly" class="btn btn-fly"><span class="btn-icon" aria-hidden="true">🛫</span> <span data-i18n="lobby.startNew">새 비행 시작</span></button>

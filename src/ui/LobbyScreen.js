@@ -11,12 +11,21 @@ const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c1
 export const LOBBY_AIRCRAFT_IDS = Object.keys(AIRCRAFT_BUTTONS);
 const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
 
+function formatFlightTime(hours, deviceTime = false) {
+  if (deviceTime) return t('lobby.time.now');
+  if (!Number.isFinite(hours)) return '--:--';
+  const totalMinutes = Math.round(((hours % 24 + 24) % 24) * 60);
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 /**
  * Wire the lobby overlay (markup lives in index.html); it is the only place
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const selectionEl = document.getElementById('lobby-selection');
@@ -107,17 +116,26 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
 
   const tabs = [...document.querySelectorAll('.lobby-tab')];
   function selectTab(selected, focus = false) {
+    const isHeld = canResume();
     const flyBtn = document.getElementById('btn-fly');
-    if (flyBtn) flyBtn.hidden = selected.id === 'lobby-tab-dev' || selected.id === 'lobby-tab-multi';
+    if (flyBtn) flyBtn.hidden = isHeld || selected.id === 'lobby-tab-dev' || selected.id === 'lobby-tab-multi';
     for (const tab of tabs) {
       const active = tab === selected;
       tab.setAttribute('aria-selected', String(active));
       tab.tabIndex = active ? 0 : -1;
       const targetId = tab.getAttribute('aria-controls');
-      const panel = targetId ? document.getElementById(targetId) : null;
-      if (panel) panel.hidden = !active;
+      if (tab.id === 'lobby-tab-scenario') {
+        const scenarioPanel = document.getElementById('lobby-panel-scenario');
+        const managedPanel = document.getElementById('lobby-panel-managed-flight');
+        if (scenarioPanel) scenarioPanel.hidden = !active || isHeld;
+        if (managedPanel) managedPanel.hidden = !active || !isHeld;
+      } else {
+        const panel = targetId ? document.getElementById(targetId) : null;
+        if (panel) panel.hidden = !active;
+      }
     }
-    document.querySelector('.lobby-panels').scrollTop = 0;
+    const panels = document.querySelector('.lobby-panels');
+    if (panels) panels.scrollTop = 0;
     updateBackButton();
     if (focus) selected.focus();
   }
@@ -140,6 +158,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   for (const [id, handler] of [
     ['btn-fly', onFly],
     ['btn-lobby-resume', () => onResume?.()],
+    ['btn-lobby-restart', () => onRestart?.()],
     ['lobby-airport-coastal', () => onAirport('coastal')],
     ['lobby-airport-incheon', () => onAirport('incheon')],
     ['lobby-airport-lukla', () => onAirport('lukla')],
@@ -305,12 +324,75 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       }
       prevElement = btn;
     }
+    const isHeld = canResume();
+    const panelScenario = document.getElementById('lobby-panel-scenario');
+    const panelManaged = document.getElementById('lobby-panel-managed-flight');
+    const tabScenario = document.getElementById('lobby-tab-scenario');
+    const tabLabel = document.getElementById('lobby-tab-scenario-label');
+    const tabMulti = document.getElementById('lobby-tab-multi');
+
+    if (tabLabel) {
+      bindText(tabLabel, () => t(isHeld ? 'lobby.tab.managed' : 'lobby.tab.single'));
+    }
+    if (tabMulti) {
+      tabMulti.hidden = isHeld;
+    }
+
+    const isScenarioActive = tabScenario?.getAttribute('aria-selected') === 'true';
+    if (isScenarioActive) {
+      if (panelScenario) panelScenario.hidden = isHeld;
+      if (panelManaged) panelManaged.hidden = !isHeld;
+    }
+
+    if (panelManaged && isHeld) {
+      const managedAircraft = document.getElementById('lobby-managed-aircraft');
+      const managedAirport = document.getElementById('lobby-managed-airport');
+      const managedScenario = document.getElementById('lobby-managed-scenario');
+      const managedTime = document.getElementById('lobby-managed-time');
+
+      if (managedAircraft) {
+        bindText(managedAircraft, () => {
+          const id = getAircraft?.() ?? 'B738';
+          return AIRCRAFT_REGISTRY[id]?.name || id;
+        });
+      }
+      if (managedAirport) {
+        bindText(managedAirport, () => {
+          const id = getAirport?.() ?? 'coastal';
+          const btn = document.getElementById(AIRPORT_BUTTONS[id]);
+          return btn?.querySelector('span')?.textContent?.trim() || id;
+        });
+      }
+      if (managedScenario) {
+        bindText(managedScenario, () => {
+          const airportId = getAirport?.() ?? 'coastal';
+          const presetId = getPreset?.() ?? 'runway';
+          if (presetId === 'demo') {
+            const profile = resolveDemoProfile(getAircraft?.(), airportId, getDemoProfile?.());
+            return t('demo.scenario.title', { title: t(profile.labelKey) });
+          }
+          const key = scenarioLabelKey(airportId, presetId);
+          return key ? t(key) : presetId;
+        });
+      }
+      if (managedTime) {
+        bindText(managedTime, () => formatFlightTime(getTime?.(), isDeviceTime?.()));
+      }
+    }
+
     const flyLabel = document.getElementById('btn-fly')?.querySelector('[data-i18n]')
       || document.getElementById('btn-fly')?.querySelector('span:not(.btn-icon)')
       || document.getElementById('btn-fly')?.querySelector('span');
     if (flyLabel) bindText(flyLabel, () => t(getPreset() === 'demo' ? 'lobby.startDemo' : 'lobby.startNew'));
+    const flyBtn = document.getElementById('btn-fly');
+    if (flyBtn) {
+      const isDevOrMultiActive = document.getElementById('lobby-tab-dev')?.getAttribute('aria-selected') === 'true' || document.getElementById('lobby-tab-multi')?.getAttribute('aria-selected') === 'true';
+      flyBtn.hidden = isHeld || isDevOrMultiActive;
+    }
     const resume = document.getElementById('btn-lobby-resume');
-    if (resume) resume.hidden = !canResume();
+    if (resume) resume.hidden = !isHeld;
+    const restart = document.getElementById('btn-lobby-restart');
+    if (restart) restart.hidden = !isHeld;
     updateBackButton();
     const end = document.getElementById('btn-lobby-end');
     if (end) end.hidden = !canEnd();
@@ -368,6 +450,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (flyBtn) flyBtn.disabled = busy;
     const resume = document.getElementById('btn-lobby-resume');
     if (resume) resume.disabled = busy;
+    const restart = document.getElementById('btn-lobby-restart');
+    if (restart) restart.disabled = busy;
   }
 
   refresh();
