@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MemoryRoomDirectoryStore,
+  LocalRoomDirectoryStore,
   handleDirectoryRequest,
   validateRoomRegistration,
   hashToken,
@@ -433,4 +434,54 @@ test('D1RoomDirectoryStore atomically upserts room_code and increments lease gen
   const list = await store.listRooms();
   assert.equal(list.length, 1);
   assert.equal(list[0].roomCode, 'K7M2QX');
+  db.close();
+});
+
+test('LocalRoomDirectoryStore supports localStorage cross-tab discovery and RoomDirectoryClient local fallback', async () => {
+  const storageMap = new Map();
+  const mockStorage = {
+    getItem: k => storageMap.get(k) ?? null,
+    setItem: (k, v) => storageMap.set(k, String(v)),
+    removeItem: k => storageMap.delete(k),
+  };
+
+  const localStore = new LocalRoomDirectoryStore({ storage: mockStorage, ttlMs: 45000 });
+
+  const client1 = new RoomDirectoryClient({ localStore });
+  const client2 = new RoomDirectoryClient({ localStore });
+
+  // Initially empty
+  const initial = await client2.fetchRooms();
+  assert.equal(initial.ok, true);
+  assert.equal(initial.rooms.length, 0);
+
+  // Client 1 registers public room
+  const reg1 = await client1.register({
+    roomCode: 'K7M2QX',
+    name: 'HostA',
+    airport: 'coastal',
+    aircraft: 'C172',
+    scenario: 'cruise',
+  });
+  assert.equal(reg1.ok, true);
+  assert.equal(reg1.isLocal, true);
+
+  // Client 2 (other tab) immediately sees room in listing
+  const listed = await client2.fetchRooms();
+  assert.equal(listed.ok, true);
+  assert.equal(listed.rooms.length, 1);
+  assert.equal(listed.rooms[0].roomCode, 'K7M2QX');
+  assert.equal(listed.rooms[0].name, 'HostA');
+
+  // Heartbeat updates room status
+  const hb = await client1.heartbeat({ status: 'flying' });
+  assert.equal(hb.ok, true);
+
+  const updated = await client2.fetchRooms();
+  assert.equal(updated.rooms[0].status, 'flying');
+
+  // Client 1 unregisters upon leaving
+  await client1.unregister();
+  const afterUnreg = await client2.fetchRooms();
+  assert.equal(afterUnreg.rooms.length, 0);
 });
