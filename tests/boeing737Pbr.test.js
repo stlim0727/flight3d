@@ -117,6 +117,53 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     }
   });
 
+  it('binds GLTF engine turbine fans and animates rotation based on engine1 and engine2 N1', (t) => {
+    const aircraft = new Boeing737(new PFDCanvas(256, 256), new NDCanvas(256, 256), new EICASCanvas(256, 256));
+
+    let completeLoad;
+    t.mock.method(GLTFLoader.prototype, 'load', (_url, onLoad) => { completeLoad = onLoad; });
+    const previousWindow = globalThis.window;
+    globalThis.window = {};
+
+    try {
+      aircraft.loadGltfModel('/test.glb');
+      const scene = new THREE.Group();
+      const turbs = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial());
+      turbs.name = 'turbs';
+      const tur01 = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial());
+      tur01.name = 'tur_01';
+      scene.add(turbs, tur01);
+
+      completeLoad({ scene });
+
+      assert.strictEqual(aircraft.gltfFanL, turbs, 'turbs should bind as left engine fan');
+      assert.strictEqual(aircraft.gltfFanR, tur01, 'tur_01 should bind as right engine fan');
+      assert.strictEqual(aircraft.gltfFans.length, 2, 'gltfFans array should contain both fans');
+
+      // Test asymmetric engine N1 values
+      const dt = 0.1;
+      aircraft.update(dt, {
+        engine1: { n1: 80 },
+        engine2: { n1: 40 }
+      });
+
+      const expectedRotL = (80 / 100.0) * 85.0 * dt;
+      const expectedRotR = (40 / 100.0) * 85.0 * dt;
+
+      assert.ok(Math.abs(aircraft.gltfFanL.rotation.x - expectedRotL) < 1e-5, 'Left fan rotates around X by expected delta');
+      assert.ok(Math.abs(aircraft.gltfFanR.rotation.x - expectedRotR) < 1e-5, 'Right fan rotates around X by expected delta');
+      assert.strictEqual(aircraft.gltfFanL.rotation.z, 0, 'Left fan must not rotate around Z to avoid out-of-plane wobble');
+      assert.strictEqual(aircraft.gltfFanR.rotation.z, 0, 'Right fan must not rotate around Z to avoid out-of-plane wobble');
+
+      // Procedural fans also update
+      assert.ok(Math.abs(aircraft.fanL.rotation.z - expectedRotL) < 1e-5);
+      assert.ok(Math.abs(aircraft.fanR.rotation.z - expectedRotR) < 1e-5);
+    } finally {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
+    }
+  });
+
   it('should suppress procedural exterior during GLTF load to prevent popping, and restore on failure', (t) => {
     const aircraft = new Boeing737(new PFDCanvas(256, 256), new NDCanvas(256, 256), new EICASCanvas(256, 256));
     assert.strictEqual(aircraft.fuselageGroup.visible, true);
