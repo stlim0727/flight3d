@@ -60,23 +60,36 @@ export class MultiplayerController {
       this.lastJoinMethod = 'code';
       this.connectInvite(this.roomInput.value);
     };
-    document.getElementById('mp-start').onclick = () => this.room?.session.start();
+    document.getElementById('mp-start').onclick = () => {
+      this.sim.ensureAudio?.();
+      this.playAudio();
+      this.room?.session.start();
+    };
     document.getElementById('mp-respawn').onclick = () => this.respawnLocal();
     document.getElementById('mp-leave').onclick = () => this.room?.close();
     document.getElementById('mp-copy-code').onclick = () => this.copyInvite('code');
     document.getElementById('mp-copy').onclick = () => this.copyInvite('link');
     document.getElementById('mp-microphone').onclick = () => {
+      this.sim.ensureAudio?.();
+      this.playAudio();
       if (this.voice?.microphone) {
         const newMuted = !this.voice.muted;
         this.voice.setMuted(newMuted);
         this.sim.analytics?.trackMultiplayerVoiceToggled?.({ enabled: true, muted: newMuted });
       } else {
-        this.voice?.enableMicrophone();
+        this.enableVoiceMicrophone();
         this.sim.analytics?.trackMultiplayerVoiceToggled?.({ enabled: true, muted: false });
       }
     };
-    document.getElementById('mp-listen').onclick = () => this.playAudio();
-    document.getElementById('mp-mute').onclick = () => { this.audio.muted = !this.audio.muted; this.refresh(); };
+    document.getElementById('mp-listen').onclick = () => {
+      this.sim.ensureAudio?.();
+      this.playAudio();
+    };
+    document.getElementById('mp-mute').onclick = () => {
+      this.audio.muted = !this.audio.muted;
+      this.syncRemoteAudioOutput();
+      this.refresh();
+    };
     window.addEventListener('pagehide', () => {
       this.registrationGeneration++;
       this.registeringHost = false;
@@ -162,9 +175,19 @@ export class MultiplayerController {
       this.voice = new VoiceLink({ changed: () => this.refresh() });
       // Invite URLs join without a gesture; blocked audio can be enabled in the modal.
       this.voice.context.resume().catch(() => {});
+      this.sim.ensureAudio?.();
+      this.playAudio();
       this.room = new PeerRoom({ room, name: document.getElementById('mp-name').value, config, voice: this.voice,
         prepare: (c, slot) => this.prepare(c, slot), fly: () => this.startTogether(),
-        changed: () => this.refresh(), remoteStream: stream => { this.audio.srcObject = stream; this.playAudio(); },
+        changed: () => this.refresh(),
+        remoteStream: stream => {
+          this.audio.srcObject = stream;
+          this.voice?.attachRemoteStream?.(stream);
+          for (const track of stream?.getAudioTracks?.() ?? []) {
+            track.addEventListener?.('unmute', () => this.playAudio());
+          }
+          this.playAudio();
+        },
         ended: reason => this.ended(reason) });
       if (!room) {
         this.sim.analytics?.trackMultiplayerRoomCreated?.({
@@ -180,10 +203,24 @@ export class MultiplayerController {
           method: this.lastJoinMethod || 'code',
         });
       }
-      this.voice.enableMicrophone();
+      this.enableVoiceMicrophone();
       this.snapshotTimer = setInterval(() => this.sendSnapshot(), 1000 / 15);
     } catch { this.voice?.close(); this.message = 'connection'; }
     this.refresh();
+  }
+  enableVoiceMicrophone() {
+    const pending = this.voice?.enableMicrophone?.();
+    pending?.then?.(() => {
+      if (!this.active) return;
+      this.sim.ensureAudio?.();
+      this.playAudio();
+    }, () => {});
+    return pending;
+  }
+  syncRemoteAudioOutput() {
+    const elementPlaying = Boolean(this.audio?.srcObject && !this.playbackBlocked && this.audio.paused !== true);
+    const useWebAudioFallback = Boolean(this.audio?.srcObject && !this.audio?.muted && !elementPlaying);
+    this.voice?.setRemoteOutput?.(useWebAudioFallback);
   }
   startTogether() {
     this.preparationHold = false;
@@ -271,13 +308,17 @@ export class MultiplayerController {
   }
   async playAudio() {
     this.voice?.context.resume().catch(() => {});
-    if (!this.audio?.srcObject) return;
+    if (!this.audio?.srcObject) {
+      this.audio?.play?.().catch(() => {});
+      return;
+    }
     try {
       // A suspended AudioContext resume can remain pending until another gesture.
       // Do not let it prevent the audio element from reporting autoplay rejection.
       await this.audio.play(); this.playbackBlocked = false;
     }
     catch { this.playbackBlocked = true; }
+    this.syncRemoteAudioOutput();
     this.refresh();
   }
   ended(reason) {
@@ -373,6 +414,11 @@ export class MultiplayerController {
       for (const [el, disabled] of this.soloControls) el.disabled = disabled;
       this.soloControls.clear();
       this.sim.lobbyScreen?.refresh();
+    }
+    this.syncRemoteAudioOutput();
+    if (active && this.voice?.context?.state === 'running' && this.sim.audio && (!this.sim.audio.isInitialized || this.sim.audio.ctx?.state !== 'running')) {
+      this.sim.audio.init?.();
+      this.sim.audio.ensureContextRunning?.();
     }
     this.sim.syncAudioHint?.();
     this.syncDirectoryHost();

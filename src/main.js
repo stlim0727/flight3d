@@ -466,7 +466,7 @@ class FlightSimulator {
     // Start with the flight when autoplay is permitted. Otherwise the browser
     // keeps the context suspended until the first flight/menu interaction.
     const audioHint = document.getElementById('audio-start-hint');
-    const interactionEvents = ['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'];
+    const interactionEvents = ['touchstart', 'touchend', 'pointerdown', 'pointerup', 'mousedown', 'click', 'keydown'];
     let listenersAttached = false;
 
     const attachInteractionListeners = () => {
@@ -487,7 +487,8 @@ class FlightSimulator {
 
     const isMultiplayerVoiceBlocked = () => Boolean(
       this.multiplayer?.playbackBlocked ||
-      (this.multiplayer?.active && this.multiplayer?.voice?.microphone && this.multiplayer?.voice?.context?.state === 'suspended')
+      (this.multiplayer?.active && this.multiplayer?.audio?.srcObject && this.multiplayer?.audio?.paused) ||
+      (this.multiplayer?.active && this.multiplayer?.voice?.context && this.multiplayer?.voice?.context?.state !== 'running')
     );
 
     const syncAudioHint = () => {
@@ -514,13 +515,16 @@ class FlightSimulator {
       }
       if (isRunning && !isVoiceBlocked) {
         detachInteractionListeners();
-      } else if (!this.audio.isMuted && (['suspended', 'interrupted'].includes(state) || isVoiceBlocked)) {
+      } else if (!this.audio.isMuted && (!isRunning || isVoiceBlocked)) {
         attachInteractionListeners();
       }
     };
 
     let hintContext;
     const ensureAudio = () => {
+      if (this.browserBackgrounded && !document.hidden && document.hasFocus?.()) {
+        this.setBrowserActive(true);
+      }
       if (!this.audio.isInitialized) {
         this.audio.init();
       }

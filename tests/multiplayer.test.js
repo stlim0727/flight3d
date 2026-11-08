@@ -157,6 +157,35 @@ test('permission denial retains listening; capture resolving after leave is stop
   assert.equal(f.micTrack.stopped, true); assert.equal(f.voice.microphone, null);
 });
 
+test('microphone capture retries context resume after permission prompt and supports WebAudio remote stream fallback', async () => {
+  let captured = false;
+  const { voice, context, track, mic } = voiceFixture(async () => {
+    captured = true;
+    // Simulate OS/browser suspending context until getUserMedia permission is granted
+    context.state = 'suspended';
+    return mic;
+  });
+  context.destination = {};
+  context.resume = async () => {
+    if (captured) context.state = 'running';
+  };
+  await voice.enableMicrophone();
+  await settle();
+  assert.equal(context.state, 'running');
+  assert.equal(voice.talking, true);
+  assert.equal(track.enabled, true);
+
+  // Remote stream fallback connects to context.destination and toggles gain cleanly
+  const remoteStream = {};
+  voice.attachRemoteStream(remoteStream);
+  assert.equal(voice.remoteGain.gain.value, 0);
+  voice.setRemoteOutput(true);
+  assert.equal(voice.remoteGain.gain.value, 1);
+  voice.setRemoteOutput(false);
+  assert.equal(voice.remoteGain.gain.value, 0);
+  voice.close();
+});
+
 test('multiplayer crash debrief retry resets only this pilot, preserving the shared room', async () => {
   const { SimulatorClass } = await import('./helpers/simulatorClass.js');
   const sim = Object.create(SimulatorClass.prototype);

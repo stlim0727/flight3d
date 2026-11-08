@@ -400,32 +400,80 @@ test('late registration for superseded room does not cancel newer room heartbeat
 
 test('playAudio only plays when srcObject is present; manages playbackBlocked and voice context resume', () => fixture(async ({ controller }) => {
   let resumed = 0;
-  controller.voice = { context: { resume: async () => { resumed++; } } };
-  controller.audio = { srcObject: null, play: async () => {} };
+  let remoteOutput = null;
+  controller.voice = {
+    context: { resume: async () => { resumed++; } },
+    setRemoteOutput: enabled => { remoteOutput = enabled; },
+  };
+  controller.audio = { srcObject: null, paused: true, muted: false, play: async () => { controller.audio.paused = false; } };
   let refreshed = 0;
   controller.refresh = () => { refreshed++; };
 
-  // 1. Without srcObject, playAudio resumes voice context but does not attempt audio.play()
+  // 1. Without srcObject, playAudio resumes voice context and primes audio element without setting playbackBlocked
+  controller.audio.play = async () => { throw new Error('NotSupportedError'); };
   await controller.playAudio();
   assert.equal(resumed, 1);
   assert.equal(controller.playbackBlocked, undefined);
   assert.equal(refreshed, 0);
 
-  // 2. With srcObject, if audio.play() rejects (e.g. autoplay blocked), playbackBlocked becomes true
+  // 2. With srcObject, if audio.play() rejects (e.g. autoplay blocked), playbackBlocked becomes true and WebAudio fallback activates
   const stream = {};
   controller.audio.srcObject = stream;
+  controller.audio.paused = true;
   controller.audio.play = async () => { throw new Error('NotAllowedError'); };
   await controller.playAudio();
   assert.equal(resumed, 2);
   assert.equal(controller.playbackBlocked, true);
+  assert.equal(remoteOutput, true);
   assert.equal(refreshed, 1);
 
-  // 3. When called again with a successful play (user gesture), playbackBlocked becomes false
-  controller.audio.play = async () => {};
+  // 3. When called again with a successful play (user gesture), playbackBlocked becomes false and WebAudio fallback deactivates to prevent double audio
+  controller.audio.play = async () => { controller.audio.paused = false; };
   await controller.playAudio();
   assert.equal(resumed, 3);
   assert.equal(controller.playbackBlocked, false);
+  assert.equal(remoteOutput, false);
   assert.equal(refreshed, 2);
+}));
+
+test('enableVoiceMicrophone unlocks local engine audio and remote voice playback once microphone permission resolves', () => fixture(async ({ controller }) => {
+  let resolveMic;
+  let audioEnsured = 0;
+  let played = 0;
+  controller.voice = {
+    enableMicrophone: () => new Promise(resolve => { resolveMic = resolve; }),
+  };
+  controller.sim.ensureAudio = () => { audioEnsured++; };
+  controller.playAudio = () => { played++; };
+
+  const pending = controller.enableVoiceMicrophone();
+  assert.equal(audioEnsured, 0);
+  assert.equal(played, 0);
+
+  resolveMic();
+  await pending;
+  await new Promise(r => setImmediate(r));
+  assert.equal(audioEnsured, 1);
+  assert.equal(played, 1);
+}));
+
+test('refresh resumes FlightAudio when VoiceLink context is running', () => fixture(({ controller }) => {
+  let inited = 0;
+  let ensured = 0;
+  controller.voice = {
+    context: { state: 'running' },
+    setRemoteOutput() {},
+  };
+  controller.audio = { muted: false, srcObject: null, paused: false };
+  controller.sim.audio = {
+    isInitialized: false,
+    ctx: { state: 'suspended' },
+    init() { inited++; this.isInitialized = true; },
+    ensureContextRunning() { ensured++; this.ctx.state = 'running'; },
+  };
+  controller.refresh();
+  assert.equal(inited, 1);
+  assert.equal(ensured, 1);
 }));
 
 test('startTogether triggers ensureAudio and playAudio so guests unlock sound upon flight entry', () => fixture(({ controller }) => {

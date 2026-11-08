@@ -266,12 +266,14 @@ export class TouchFlightControls {
     const startBraking = (e) => {
       e.preventDefault();
       if (this.controls?.aircraftControlsDisabled || this.controls?.inputBlocked) return;
+      this.controls?.onUserInteract?.();
       this.brakeBtn.classList.add('active');
       this.controls.setTouchBrakes(1.0);
       this.triggerHaptic(20);
     };
     const stopBraking = (e) => {
       e.preventDefault();
+      this.controls?.onUserInteract?.();
       this.brakeBtn.classList.remove('active');
       this.controls.setTouchBrakes(0.0);
     };
@@ -446,6 +448,7 @@ export class TouchFlightControls {
 
   onStickPointerUp(e) {
     if (!this.stickActive || e.pointerId !== this.stickPointerId) return;
+    this.controls?.onUserInteract?.();
     this.stickActive = false;
     this.stickPointerId = null;
 
@@ -556,6 +559,7 @@ export class TouchFlightControls {
 
   onThrottlePointerUp(e) {
     if (!this.throttleActive || e.pointerId !== this.throttlePointerId) return;
+    this.controls?.onUserInteract?.();
     this.throttleActive = false;
     this.throttlePointerId = null;
   }
@@ -614,6 +618,7 @@ export class TouchFlightControls {
 
   onRudderPointerUp(e) {
     if (!this.rudderActive || e.pointerId !== this.rudderPointerId) return;
+    this.controls?.onUserInteract?.();
     this.rudderActive = false;
     this.rudderPointerId = null;
 
