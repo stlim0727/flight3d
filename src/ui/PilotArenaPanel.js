@@ -14,7 +14,7 @@ import { dailySeed } from '../arena/dailySeed.js';
 import { valleyBriefingMarkup, valleyNavigationText } from './valleyNavigationView.js';
 import { bindPilotPanelInput } from './pilotPanelInput.js';
 import { formatPilotScoreData, scoreBannerMarkup, scoreOverlayMarkup, koreanReason } from './pilotScoreView.js';
-import { trackPilotModeChange, trackFlightEnd, trackScoreSubmitted } from '../analytics/posthog.js';
+import { trackPilotModeChange, trackMissionEnd, trackScoreSubmitted } from '../analytics/posthog.js';
 
 /** Opt-in local pilot lab. No remote upload and no security sandbox claims. */
 export function installPilotArena(sim) {
@@ -254,15 +254,7 @@ export function installPilotArena(sim) {
             renderBoard(attempt.comparisonKey);
           })();
         }
-        trackFlightEnd({
-          airport: sim.activeAirport,
-          aircraft: sim.currentAircraftId,
-          scenario: 'valley-slalom-v1',
-          reason: record.status === 'succeeded' ? 'completed' : record.reason || record.status,
-          durationSeconds: record.tick / 120,
-          score: record.result?.metrics?.finalScore,
-          gatesCleared: record.result?.metrics?.completedGates,
-        });
+        trackMissionEnd(record, { airport: sim.activeAirport, aircraft: sim.currentAircraftId });
       }
 
       const missionLabel = find('mission').selectedOptions[0]?.textContent ?? '계곡 미션';

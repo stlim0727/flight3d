@@ -794,7 +794,8 @@ class FlightSimulator {
     this.debriefReport = this.isCrashed ? this.flightRecorder.finish('crash', this.crashResult)
       : this.flightRecorder.finish(reason);
     this.debriefReplay = this.replayRecorder.finish();
-    this.analytics?.trackFlightEnd?.({
+    // An arena run reports its own end when leaving flight stops the runner.
+    if (!this.pilotArena?.active) this.analytics?.trackFlightEnd?.({
       airport: this.activeAirport,
       aircraft: this.currentAircraftId,
       scenario: this.lastPresetType,

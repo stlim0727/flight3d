@@ -12,6 +12,7 @@ import {
   trackFlightStart,
   trackFlightEnd,
   trackFlightCrash,
+  trackMissionEnd,
   trackPilotModeChange,
   trackStartupTrace,
   trackMultiplayerRoomCreated,
@@ -23,6 +24,7 @@ import {
   sendUserFeedback,
   _resetAnalyticsForTesting,
 } from '../src/analytics/posthog.js';
+import { getLanguage, setLanguage, t } from '../src/i18n/index.js';
 
 // Events captured without an SDK are held in a module queue and released the moment one appears,
 // so a test that queued events would otherwise hand them to the next test's mock.
@@ -114,6 +116,42 @@ test('gatherFlightContext extracts simulator state safely', () => {
   assert.equal(mpContext.isMultiplayer, true);
   assert.equal(mpContext.multiplayerRole, 'host');
   assert.equal(mpContext.multiplayerState, 'flying');
+});
+
+test('crash names are captured in English whatever the UI language, without changing it', () => {
+  const captured = [];
+  _resetAnalyticsForTesting({ capture: (eventName, properties) => captured.push({ eventName, properties }) });
+  const saved = getLanguage();
+  try {
+    for (const language of ['ko', 'en']) {
+      setLanguage(language);
+      trackFlightCrash({ crashResult: { type: 'TREE', get name() { return t('tree.collision'); } } });
+      assert.equal(getLanguage(), language, 'telemetry must not switch the visible language');
+    }
+  } finally {
+    setLanguage(saved);
+  }
+  assert.deepEqual(captured.map(event => event.properties.crashName), ['TREE COLLISION', 'TREE COLLISION']);
+});
+
+test('arena mission ends report the mission id and the runner verdict', () => {
+  const captured = [];
+  _resetAnalyticsForTesting({ capture: (eventName, properties) => captured.push({ eventName, properties }) });
+  trackMissionEnd({ manifest: { id: 'landing-basic-v1' }, status: 'failed', reason: 'timeout', tick: 1200 },
+    { airport: 'coastal', aircraft: 'C172' });
+  trackMissionEnd({ manifest: { id: 'valley-slalom-v1' }, status: 'succeeded', tick: 4608,
+    result: { metrics: { finalScore: 16420, completedGates: 6 } } }, { airport: 'valley', aircraft: 'F16' });
+  trackMissionEnd(null);
+
+  assert.equal(captured.length, 2);
+  assert.deepEqual(captured.map(event => event.eventName), ['flight_ended', 'flight_ended']);
+  assert.equal(captured[0].properties.scenario, 'landing-basic-v1', 'a landing run must not be filed as the valley');
+  assert.equal(captured[0].properties.endReason, 'timeout');
+  assert.equal(captured[0].properties.durationSeconds, 10);
+  assert.equal(captured[1].properties.scenario, 'valley-slalom-v1');
+  assert.equal(captured[1].properties.endReason, 'completed');
+  assert.equal(captured[1].properties.score, 16420);
+  assert.equal(captured[1].properties.gatesCleared, 6);
 });
 
 test('analytics calls safely no-op when uninitialized without throwing', () => {

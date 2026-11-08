@@ -29,7 +29,7 @@ export class BridgeFlightScenario {
     if (contact) {
       const structure = contact.structure;
       s.triggerCrash({ collided: true, type: structure === 'water' ? 'WATER' : structure === 'wall' ? 'TERRAIN' : 'BUILDING',
-        name: t('bridge.contact'), description: t('bridge.contact'), point: s.position.clone(), speedKnots: s.linearVelocity.length() * 1.94384 });
+        get name() { return t('bridge.contact'); }, get description() { return t('bridge.contact'); }, point: s.position.clone(), speedKnots: s.linearVelocity.length() * 1.94384 });
     }
   }
 }
