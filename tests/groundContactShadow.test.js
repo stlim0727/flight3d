@@ -83,5 +83,5 @@ test('contact shadow tracks the displayed pose, banks, and stays hidden when dis
 
   blob.setEnabled(false);
   blob.update(position, heading, groundHeight, 'B738');
-  assert.equal(blob.mesh.visible, false, 'Leaving ultraLow hands shading back to the shadow map');
+  assert.equal(blob.mesh.visible, false, 'Disabling contact shadow hides the mesh');
 });
