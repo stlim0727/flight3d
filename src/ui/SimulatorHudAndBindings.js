@@ -28,8 +28,11 @@ export function hasActiveModal() {
 class SimulatorHudAndBindingsMethods {
   initControls() {
     this.controls.onUserInteract = () => {
-      this.audio.init();
-      this.audio.ensureContextRunning();
+      if (this.ensureAudio) this.ensureAudio();
+      else {
+        this.audio.init();
+        this.audio.ensureContextRunning();
+      }
     };
 
     this.controls.onToggleGear = () => {

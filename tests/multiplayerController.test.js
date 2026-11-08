@@ -186,3 +186,53 @@ test('host start button is highlighted and focused once when a friend joins', ()
     assert.equal(attributes['data-ready'], 'false', 'restart during flight is not pulsed');
   } finally { globalThis.location = previousLocation; }
 }));
+
+test('playAudio only plays when srcObject is present; manages playbackBlocked and voice context resume', () => fixture(async ({ controller }) => {
+  let resumed = 0;
+  controller.voice = { context: { resume: async () => { resumed++; } } };
+  controller.audio = { srcObject: null, play: async () => {} };
+  let refreshed = 0;
+  controller.refresh = () => { refreshed++; };
+
+  // 1. Without srcObject, playAudio resumes voice context but does not attempt audio.play()
+  await controller.playAudio();
+  assert.equal(resumed, 1);
+  assert.equal(controller.playbackBlocked, undefined);
+  assert.equal(refreshed, 0);
+
+  // 2. With srcObject, if audio.play() rejects (e.g. autoplay blocked), playbackBlocked becomes true
+  const stream = {};
+  controller.audio.srcObject = stream;
+  controller.audio.play = async () => { throw new Error('NotAllowedError'); };
+  await controller.playAudio();
+  assert.equal(resumed, 2);
+  assert.equal(controller.playbackBlocked, true);
+  assert.equal(refreshed, 1);
+
+  // 3. When called again with a successful play (user gesture), playbackBlocked becomes false
+  controller.audio.play = async () => {};
+  await controller.playAudio();
+  assert.equal(resumed, 3);
+  assert.equal(controller.playbackBlocked, false);
+  assert.equal(refreshed, 2);
+}));
+
+test('startTogether triggers ensureAudio and playAudio so guests unlock sound upon flight entry', () => fixture(({ controller }) => {
+  let audioEnsured = 0;
+  let played = 0;
+  controller.sim.ensureAudio = () => { audioEnsured++; };
+  controller.playAudio = () => { played++; };
+  controller.startTogether();
+  assert.equal(audioEnsured, 1);
+  assert.equal(played, 1);
+}));
+
+test('ended clears playbackBlocked and synchronizes audio hint', () => fixture(({ controller }) => {
+  let hintSynced = 0;
+  controller.sim.syncAudioHint = () => { hintSynced++; };
+  controller.playbackBlocked = true;
+  controller.room.closed = true;
+  controller.ended('peer-left');
+  assert.equal(controller.playbackBlocked, false);
+  assert.equal(hintSynced, 1);
+}));

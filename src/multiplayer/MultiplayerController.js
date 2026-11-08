@@ -107,6 +107,8 @@ export class MultiplayerController {
     this.preparationHold = false;
     this.modal.close({ resume: false });
     this.sim.gameFlow.enterFlight(); this.sim.syncFlowUi();
+    this.sim.ensureAudio?.();
+    this.playAudio();
   }
   releasePreparationHold() {
     const owned = this.preparationHold;
@@ -172,10 +174,11 @@ export class MultiplayerController {
     });
   }
   async playAudio() {
+    this.voice?.context.resume().catch(() => {});
+    if (!this.audio?.srcObject) return;
     try {
       // A suspended AudioContext resume can remain pending until another gesture.
       // Do not let it prevent the audio element from reporting autoplay rejection.
-      this.voice?.context.resume().catch(() => {});
       await this.audio.play(); this.playbackBlocked = false;
     }
     catch { this.playbackBlocked = true; }
@@ -184,6 +187,7 @@ export class MultiplayerController {
   ended(reason) {
     clearInterval(this.snapshotTimer); this.remote?.dispose(); this.remote = null;
     this.audio.pause(); this.audio.srcObject = null; this.audio.muted = false;
+    this.playbackBlocked = false;
     this.message = reason;
     this.sim.showToast(() => t(`mp.status.${reason}`));
     this.sim.lobbyScreen?.setSelectionBusy(false);
@@ -249,5 +253,6 @@ export class MultiplayerController {
       this.soloControls.clear();
       this.sim.lobbyScreen?.refresh();
     }
+    this.sim.syncAudioHint?.();
   }
 }
