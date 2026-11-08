@@ -32,6 +32,8 @@ export class CameraSystem {
 
   // Keep digit shortcuts stable; the quick cycle follows viewing intent instead.
   static QUICK_CYCLE = [1, 6, 4, 2, 0, 8];
+  // Crash views exclude cockpit (0), wing (2), gear (5), HUD (8) - exterior vantage points only
+  static CRASH_MODES = [1, 6, 4, 3];
 
   constructor(camera, domElement) {
     this.camera = camera;
@@ -564,6 +566,20 @@ export class CameraSystem {
     if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
       this.holdForManualLook(isTouch);
     }
+    if (this.crashView) {
+      if (this.mode === CameraSystem.MODES.DRONE) {
+        this.droneOrbitAngle -= dx * 0.005;
+        this.droneHeight = Math.max(-15.0, Math.min(45.0, this.droneHeight + dy * 0.05));
+      } else if (this.mode === CameraSystem.MODES.FLYBY) {
+        this.flybyLookYaw = (this.flybyLookYaw || 0) - dx * 0.005;
+      } else {
+        this.chaseYaw -= dx * 0.005;
+        this.chasePitch -= dy * 0.005;
+        this.chasePitch = Math.max(-1.1, Math.min(1.1, this.chasePitch));
+      }
+      this.updatePovButtonState();
+      return;
+    }
     const sensitivity = isTouch ? this.touchGazeSensitivity : this.gazeSensitivity;
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: {
@@ -662,6 +678,15 @@ export class CameraSystem {
    * Determine whether the camera look angle (POV) deviates from its default position.
    */
   isPovModified() {
+    if (this.crashView) {
+      if (this.mode === CameraSystem.MODES.DRONE) {
+        return Math.abs(this.droneOrbitAngle) > 0.01 || Math.abs(this.droneHeight - 11.5) > 0.5 || Math.abs(this.opticalZoom - this.opticalZoomMin) > 0.01;
+      }
+      if (this.mode === CameraSystem.MODES.FLYBY) {
+        return Math.abs(this.flybyLookYaw || 0) > 0.01 || Math.abs(this.opticalZoom - this.opticalZoomMin) > 0.01;
+      }
+      return Math.abs(normalizeAngle(this.chaseYaw)) > 0.001 || Math.abs(this.chasePitch) > 0.001 || Math.abs(this.opticalZoom - this.opticalZoomMin) > 0.01;
+    }
     const defaultPitch = this.aircraftLookPitch ?? -0.25;
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT:
@@ -682,6 +707,14 @@ export class CameraSystem {
    * pointing toward the default POV forward orientation from the current look angle.
    */
   getPovIndicatorAngle() {
+    if (this.crashView) {
+      const deltaYaw = normalizeAngle(this.chaseYaw);
+      const deltaPitch = this.chasePitch;
+      if (Math.hypot(deltaYaw, deltaPitch) < 0.001) {
+        return 0;
+      }
+      return Math.atan2(deltaYaw, -deltaPitch) * (180 / Math.PI);
+    }
     let deltaYaw = 0;
     let deltaPitch = 0;
     const defaultPitch = this.aircraftLookPitch ?? -0.25;
@@ -856,6 +889,9 @@ export class CameraSystem {
     this.wingLookPitch = 0;
     this.gearLookYaw = 0;
     this.gearLookPitch = 0;
+    this.flybyLookYaw = 0;
+    this.droneOrbitAngle = 0;
+    this.droneHeight = 11.5;
     this.opticalZoom = this.opticalZoomMin;
     this.targetCursorNormX = 0;
     this.targetCursorNormY = 0;
@@ -1072,6 +1108,17 @@ export class CameraSystem {
   }
 
   cycleMode() {
+    if (this.crashView) {
+      const selected = this.mode;
+      const index = CameraSystem.CRASH_MODES.indexOf(selected);
+      const nextIndex = index === -1 ? 0 : (index + 1) % CameraSystem.CRASH_MODES.length;
+      const next = CameraSystem.CRASH_MODES[nextIndex];
+      this.setMode(next, true);
+      if (this.onCycleMode) {
+        this.onCycleMode(this.mode);
+      }
+      return this.getModeName();
+    }
     const selected = this.savedMode ?? this.mode;
     const index = CameraSystem.QUICK_CYCLE.indexOf(selected);
     const next = this.autoSwitch ? CameraSystem.MODES.CHASE
@@ -1110,7 +1157,13 @@ export class CameraSystem {
   }
 
   setMode(m, isUserAction = false) {
-    if (this.crashView) return false;
+    if (this.crashView) {
+      if (!isUserAction) return false;
+      if (!CameraSystem.CRASH_MODES.includes(m)) return false;
+      this.#applyMode(m);
+      this.resetLook();
+      return true;
+    }
     if ((this.userLookOverridden || this.userModeSelected) && !isUserAction) {
       return false;
     }
@@ -1219,6 +1272,15 @@ export class CameraSystem {
   }
 
   getViewName() {
+    if (this.crashView) {
+      switch (this.mode) {
+        case CameraSystem.MODES.CHASE: return 'WRECKAGE ORBIT';
+        case CameraSystem.MODES.DRONE: return 'CRASH SCENE DRONE';
+        case CameraSystem.MODES.FLYBY: return 'SPECTATOR VIEW';
+        case CameraSystem.MODES.TOWER: return 'AIRPORT TOWER';
+        default: return 'CRASH VIEW';
+      }
+    }
     switch (this.mode) {
       case CameraSystem.MODES.COCKPIT: return 'COCKPIT (CAPTAIN)';
       case CameraSystem.MODES.CHASE: return 'CHASE (EXTERIOR)';
@@ -1323,6 +1385,11 @@ export class CameraSystem {
     };
     this.#applyMode(CameraSystem.MODES.CHASE);
     this.crashView = wreckage;
+    this.chaseYaw = 0;
+    this.chasePitch = 0;
+    this.droneOrbitAngle = 0;
+    this.droneHeight = 11.5;
+    this.flybyLookYaw = 0;
     this.crashDirection = new THREE.Vector3(1, 0.65, 1).normalize();
     this.updateCrashView(0, true);
   }
@@ -1370,15 +1437,69 @@ export class CameraSystem {
   }
 
   updateCrashView(dt, snap = false) {
+    if (!this.crashView) return;
     const { target, radius } = this.crashView;
     const halfFov = THREE.MathUtils.degToRad(50 / 2);
-    const fit = radius / Math.sin(Math.atan(Math.tan(halfFov) * Math.min(1, this.camera.aspect)));
-    const eye = target.clone().addScaledVector(this.crashDirection, fit * 1.15);
-    if (this.getTerrainHeight) eye.y = Math.max(eye.y, this.getTerrainHeight(eye.x, eye.z) + 5);
-    this.camera.position.lerp(eye, snap ? 1 : 1 - Math.exp(-3 * dt));
-    this.camera.up.set(0, 1, 0);
-    this.camera.lookAt(target);
+    const fit = (radius || 20) / Math.sin(Math.atan(Math.tan(halfFov) * Math.min(1, this.camera.aspect)));
+
+    if (this.mode === CameraSystem.MODES.DRONE) {
+      if (!this.userLookOverridden && !this.autoPaused && dt > 0) {
+        this.droneOrbitAngle += 0.22 * dt;
+      }
+      const dist = Math.max(30, fit * 0.9) / (this.opticalZoom || 1.0);
+      const droneH = Math.max(12, (radius || 20) * 0.8) + (this.droneHeight || 0);
+      const hoverBob = Math.sin(this.droneOrbitAngle * 1.8) * 0.4;
+      const tx = target.x + Math.sin(this.droneOrbitAngle) * dist;
+      const tz = target.z + Math.cos(this.droneOrbitAngle) * dist;
+      const groundH = this.queryGroundHeight ? this.queryGroundHeight(tx, tz) : (this.getTerrainHeight ? this.getTerrainHeight(tx, tz) : 0);
+      const ty = Math.max(target.y + droneH + hoverBob, groundH + 3.0);
+      const eye = new THREE.Vector3(tx, ty, tz);
+      this.camera.position.lerp(eye, snap ? 1 : 1 - Math.exp(-4 * (dt || 0.016)));
+      this.camera.up.set(0, 1, 0);
+      this.camera.lookAt(target);
+    } else if (this.mode === CameraSystem.MODES.FLYBY) {
+      const spotterDist = Math.max(50, fit * 1.4) / (this.opticalZoom || 1.0);
+      const spotterAngle = (Math.PI / 4) + (this.flybyLookYaw || 0);
+      const tx = target.x + Math.sin(spotterAngle) * spotterDist;
+      const tz = target.z + Math.cos(spotterAngle) * spotterDist;
+      const groundH = this.queryGroundHeight ? this.queryGroundHeight(tx, tz) : (this.getTerrainHeight ? this.getTerrainHeight(tx, tz) : 0);
+      const ty = groundH + 2.0;
+      const eye = new THREE.Vector3(tx, ty, tz);
+      this.camera.position.lerp(eye, snap ? 1 : 1 - Math.exp(-4 * (dt || 0.016)));
+      this.camera.up.set(0, 1, 0);
+      const lookOffset = new THREE.Vector3(0, (radius || 20) * 0.2, 0);
+      this.camera.lookAt(target.clone().add(lookOffset));
+    } else if (this.mode === CameraSystem.MODES.TOWER) {
+      this.camera.position.lerp(this.towerPos, snap ? 1 : 1 - Math.exp(-4 * (dt || 0.016)));
+      this.camera.up.set(0, 1, 0);
+      this.camera.lookAt(target);
+    } else {
+      // CHASE / Wreckage Orbit
+      const dist = (fit * 1.15) / (this.opticalZoom || 1.0);
+      const baseAzimuth = Math.PI / 4;
+      const baseElevation = 0.43;
+      const totalYaw = baseAzimuth + (this.chaseYaw || 0);
+      const totalPitch = THREE.MathUtils.clamp(baseElevation + (this.chasePitch || 0), 0.08, 1.45);
+      const dir = new THREE.Vector3(
+        Math.cos(totalPitch) * Math.sin(totalYaw),
+        Math.sin(totalPitch),
+        Math.cos(totalPitch) * Math.cos(totalYaw)
+      );
+      const eye = target.clone().addScaledVector(dir, dist);
+      const groundH = this.queryGroundHeight ? this.queryGroundHeight(eye.x, eye.z) : (this.getTerrainHeight ? this.getTerrainHeight(eye.x, eye.z) : 0);
+      if (Number.isFinite(groundH)) {
+        eye.y = Math.max(eye.y, groundH + 2.0);
+      }
+      this.camera.position.lerp(eye, snap ? 1 : 1 - Math.exp(-4 * (dt || 0.016)));
+      this.camera.up.set(0, 1, 0);
+      this.camera.lookAt(target);
+    }
+
     this.camera.fov = 50;
+    if (this.opticalZoom && this.opticalZoom > 1.0) {
+      const halfTan = Math.tan((50 * Math.PI) / 360) / this.opticalZoom;
+      this.camera.fov = (Math.atan(halfTan) * 360) / Math.PI;
+    }
     this.camera.updateProjectionMatrix();
   }
 

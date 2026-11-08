@@ -302,7 +302,9 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       }
       prevElement = btn;
     }
-    const flyLabel = document.getElementById('btn-fly')?.querySelector('span');
+    const flyLabel = document.getElementById('btn-fly')?.querySelector('[data-i18n]')
+      || document.getElementById('btn-fly')?.querySelector('span:not(.btn-icon)')
+      || document.getElementById('btn-fly')?.querySelector('span');
     if (flyLabel) bindText(flyLabel, () => t(getPreset() === 'demo' ? 'lobby.startDemo' : 'lobby.startNew'));
     const resume = document.getElementById('btn-lobby-resume');
     if (resume) resume.hidden = !canResume();

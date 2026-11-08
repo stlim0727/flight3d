@@ -13,12 +13,39 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   display: inline-flex !important;
   pointer-events: auto !important;
 }
-.debrief-unfold-pill[hidden] {
+#debrief-overlay.is-folded .debrief-camera-pill:not([hidden]) {
+  display: inline-flex !important;
+  pointer-events: auto !important;
+}
+.debrief-unfold-pill[hidden],
+.debrief-camera-pill[hidden] {
   display: none !important;
+}
+.debrief-unfold-actions {
+  position: fixed;
+  top: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-top) + 8px));
+  left: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-left) + 8px));
+  display: flex;
+  gap: 8px;
+  z-index: 100;
+  pointer-events: none;
+}
+.debrief-unfold-actions > button {
+  position: static;
+  pointer-events: auto;
 }
 .debrief-unfold-pill {
   top: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-top) + 8px));
   left: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-left) + 8px));
+}
+.debrief-camera-btn {
+  width: calc(36px * var(--ui-scale, 1));
+  height: calc(36px * var(--ui-scale, 1));
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(14px * var(--ui-scale, 1));
 }
 
 .debrief-card {
@@ -472,7 +499,8 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 }
 
 .debrief-card [hidden] { display: none !important; }
-body[data-flow="debrief"] :is(.menu-toggle, .hud-strip, .hud-top-actions, .ap-bar, .flight-toolbar, .flight-panel, .quick-mute, .presets-bar, .action-panel, #demo-banner, .demo-pill-btn, .btn-reset-pov, #btn-reset-pov, .touch-controls-overlay, .dev-live, .flight-warning, .stall-banner, .toast, .audio-start-hint) { display: none !important; }
+body[data-flow="debrief"] :is(.menu-toggle, .hud-strip, .hud-top-actions, .ap-bar, .flight-toolbar, .flight-panel, .quick-mute, .presets-bar, .action-panel, #demo-banner, .demo-pill-btn, .touch-controls-overlay, .dev-live, .flight-warning, .stall-banner, .audio-start-hint) { display: none !important; }
+body[data-flow="debrief"] .btn-reset-pov:not([hidden]) { display: inline-flex !important; pointer-events: auto !important; z-index: 100 !important; }
 
 @media (max-width: 600px) {
   #debrief-overlay { justify-content: center; padding: 12px; }

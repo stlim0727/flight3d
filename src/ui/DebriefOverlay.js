@@ -33,7 +33,8 @@ export function reportText(report) {
 export const SAVE_REPLAY_STATUS = Object.freeze({ tooShort: 'replay.tooShort', tooLong: 'replay.tooLong' });
 
 export class DebriefOverlay {
-  constructor({ onRetry, onLobby, onFeedback, onSaveReplay, onWatchReplay }) {
+  constructor({ onRetry, onLobby, onFeedback, onSaveReplay, onWatchReplay, onCycleCamera, getCameraModeName }) {
+    this.getCameraModeName = getCameraModeName;
     this.root = document.getElementById('debrief-overlay');
     this.root.innerHTML = `
       <div class="debrief-card">
@@ -50,6 +51,9 @@ export class DebriefOverlay {
             <p class="debrief-muted" data-i18n="debrief.title"></p>
           </div>
           <div class="debrief-header-actions">
+            <button class="btn debrief-camera-btn" id="debrief-camera" type="button" data-i18n-title="change.camera.c" data-i18n-aria-label="change.camera.c">
+              <span class="debrief-camera-icon" aria-hidden="true">🎥</span>
+            </button>
             <button class="btn debrief-feedback-btn" id="debrief-feedback" type="button" data-i18n-title="debrief.feedback" data-i18n-aria-label="debrief.feedback">
               <span class="debrief-feedback-icon" aria-hidden="true">🐞</span>
             </button>
@@ -100,18 +104,24 @@ export class DebriefOverlay {
           </section>
         </div>
         <div class="debrief-actions">
-          <button class="btn debrief-primary" id="debrief-retry" data-i18n="debrief.retrySame"></button>
+          <button class="btn debrief-primary" id="debrief-retry"><span class="btn-icon" aria-hidden="true">🔄</span> <span data-i18n="debrief.retrySame"></span></button>
           <div class="debrief-secondary-actions">
-            <button class="btn debrief-secondary" id="debrief-change-setup" data-i18n="debrief.changeConditions"></button>
-            <button class="btn debrief-secondary" id="debrief-watch-replay" data-i18n="replay.watch" hidden></button>
+            <button class="btn debrief-secondary" id="debrief-change-setup"><span class="btn-icon" aria-hidden="true">⚙️</span> <span data-i18n="debrief.changeConditions"></span></button>
+            <button class="btn debrief-secondary" id="debrief-watch-replay" hidden><span class="btn-icon" aria-hidden="true">▶️</span> <span data-i18n="replay.watch"></span></button>
           </div>
         </div>
       </div>
-      <button id="debrief-unfold" class="ui-unfold-pill debrief-unfold-pill" type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
-        <span class="unfold-icon">📋</span>
-        <span class="unfold-caption" data-i18n="debrief.title"></span>
-        <span class="unfold-glyph" aria-hidden="true">▴</span>
-      </button>`;
+      <div class="debrief-unfold-actions">
+        <button id="debrief-unfold" class="ui-unfold-pill debrief-unfold-pill" type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
+          <span class="unfold-icon">📋</span>
+          <span class="unfold-caption" data-i18n="debrief.title"></span>
+          <span class="unfold-glyph" aria-hidden="true">▴</span>
+        </button>
+        <button id="debrief-fold-camera" class="ui-unfold-pill debrief-camera-pill" type="button" hidden data-i18n-title="change.camera.c" data-i18n-aria-label="change.camera.c">
+          <span class="unfold-icon" aria-hidden="true">🎥</span>
+          <span id="debrief-fold-camera-label" class="unfold-caption">CAM</span>
+        </button>
+      </div>`;
     translateDOM(this.root);
     for (const el of this.root.querySelectorAll('[data-debrief-label]')) bindText(el, () => t(`debrief.${el.dataset.debriefLabel}`));
     this.tabs = [...this.root.querySelectorAll('[role="tab"]')];
@@ -145,6 +155,14 @@ export class DebriefOverlay {
     this.el('change-setup')?.addEventListener('click', onLobby);
     this.el('lobby').addEventListener('click', onLobby);
     this.el('feedback').addEventListener('click', () => onFeedback?.());
+    this.el('camera')?.addEventListener('click', () => {
+      onCycleCamera?.();
+      this.updateFoldCameraLabel();
+    });
+    this.el('fold-camera')?.addEventListener('click', () => {
+      onCycleCamera?.();
+      this.updateFoldCameraLabel();
+    });
     this.isFolded = false;
     this.el('fold')?.addEventListener('click', () => this.setFolded(true));
     this.el('unfold')?.addEventListener('click', () => this.setFolded(false));
@@ -205,13 +223,26 @@ export class DebriefOverlay {
   el(name) { return document.getElementById(`debrief-${name}`); }
   status(key) { bindText(this.el('status'), () => key ? t(key) : ''); }
 
+  updateFoldCameraLabel() {
+    const label = document.getElementById('debrief-fold-camera-label');
+    if (label && this.getCameraModeName) {
+      label.textContent = `CAM · ${this.getCameraModeName()}`;
+    }
+  }
+
   setFolded(folded) {
     this.isFolded = Boolean(folded);
     this.root.classList.toggle('is-folded', this.isFolded);
     const unfoldBtn = this.el('unfold');
     if (unfoldBtn) unfoldBtn.hidden = !this.isFolded;
-    if (this.isFolded) unfoldBtn?.focus();
-    else this.el('fold')?.focus();
+    const foldCamBtn = this.el('fold-camera');
+    if (foldCamBtn) foldCamBtn.hidden = !this.isFolded;
+    if (this.isFolded) {
+      this.updateFoldCameraLabel();
+      unfoldBtn?.focus();
+    } else {
+      this.el('fold')?.focus();
+    }
   }
 
   measureOutcome() {
