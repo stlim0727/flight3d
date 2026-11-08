@@ -26,17 +26,20 @@ export const SPAWN_SCENARIOS = {
     briefingKey: 'lobby.briefing.scenario.challenge',
     lobbyButtonId: 'lobby-preset-challenge',
   },
-  hangang: {
-    airports: ['hangang'],
-    labelKeys: { hangang: 'hangang.title' },
-    briefingKey: 'hangang.briefing',
-    lobbyButtonId: 'lobby-preset-hangang',
-  },
   cruise: {
     airports: ['coastal', 'lukla', 'incheon', 'neon'],
     labelKeys: { incheon: 'incheon.cruise', coastal: 'cruise.6.000.ft', lukla: 'himalayan.cruise.13.000.ft', neon: 'neon.cruise' },
     briefingKey: 'lobby.briefing.scenario.cruise',
     lobbyButtonId: 'lobby-preset-cru',
+  },
+  // Low flight along the Neon Metropolis river and under its bridges (#551); the swept
+  // bridge contact is modelled for the C172, so that aircraft is selected.
+  bridge: {
+    airports: ['neon'],
+    labelKeys: { neon: 'neon.bridge' },
+    briefingKey: 'lobby.briefing.scenario.bridge',
+    lobbyButtonId: 'lobby-preset-bridge',
+    aircraft: 'C172',
   },
   cliff: {
     airports: ['lukla'],
@@ -59,7 +62,12 @@ export const SPAWN_SCENARIOS = {
 };
 
 export const DEFAULT_SCENARIO = 'runway';
-export const defaultScenarioForRegion = region => region === 'hangang' ? 'hangang' : region === 'valley' ? 'valley' : DEFAULT_SCENARIO;
+export const defaultScenarioForRegion = region => region === 'valley' ? 'valley' : DEFAULT_SCENARIO;
+
+// The aircraft a scenario always flies, or undefined when any may fly it.
+export function requiredAircraft(scenarioType) {
+  return Object.hasOwn(SPAWN_SCENARIOS, scenarioType) ? SPAWN_SCENARIOS[scenarioType].aircraft : undefined;
+}
 
 export function isScenarioAvailable(airportKey, scenarioType) {
   const scenario = Object.hasOwn(SPAWN_SCENARIOS, scenarioType) ? SPAWN_SCENARIOS[scenarioType] : undefined;

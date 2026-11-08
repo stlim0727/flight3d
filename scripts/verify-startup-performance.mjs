@@ -108,10 +108,10 @@ try {
     const scenery = await evaluate(`(async () => {
       const initial = { airport: sim.activeAirport, lukla: Boolean(sim.luklaTerrain),
         ships: [...sim.ships.vessels, ...sim.ships.speedboats].map(v => v.assetStatus) };
-      // Hangang must remain usable without ever constructing Lukla.
-      await sim.setAirport('hangang');
-      sim.setPreset('hangang');
-      const hangang = sim.hangang.active;
+      // The Neon Metropolis bridge flight must remain usable without ever constructing Lukla.
+      await sim.setAirport('neon');
+      sim.setPreset('bridge');
+      const bridge = sim.bridgeFlight.active;
       await sim.setAirport('lukla');
       const terrain = sim.luklaTerrain, airport = sim.luklaAirport;
       const deadline = performance.now() + 30000;
@@ -120,7 +120,7 @@ try {
       await sim.setAirport('coastal');
       const hidden = !terrain.mesh.visible && !airport.group.visible;
       await sim.setAirport('lukla');
-      return { initial, hangang, loaded, hidden,
+      return { initial, bridge, loaded, hidden,
         reused: sim.luklaTerrain === terrain && sim.luklaAirport === airport,
         visible: terrain.mesh.visible && airport.group.visible,
         collision: sim.collisionDetector.terrain === terrain };
@@ -137,7 +137,7 @@ try {
       assert.equal(shipResources.length, 0);
       assert.ok(scenery.initial.ships.every(status => status === 'deferred'));
     }
-    for (const key of ['hangang', 'loaded', 'hidden', 'reused', 'visible', 'collision']) assert.equal(scenery[key], true, key);
+    for (const key of ['bridge', 'loaded', 'hidden', 'reused', 'visible', 'collision']) assert.equal(scenery[key], true, key);
     assert.equal(errors.length, 0, 'scenery transitions have no runtime exceptions');
   }
   console.log(JSON.stringify({ready: report.ready, longTaskMax: report.longTaskMax, longTaskTotal: report.longTaskTotal, aircraft: report.aircraft, renderer: report.renderer}));

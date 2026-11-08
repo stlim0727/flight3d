@@ -1039,7 +1039,7 @@ class FlightSimulator {
     if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('aircraft-changed');
     const config = AIRCRAFT_REGISTRY[aircraftId];
     if (!config) return;
-    this.hangang?.stop();
+    this.bridgeFlight?.stop();
     this.renderDiagnosticsPanel?.close();
     this.devRunner?.stop();
 

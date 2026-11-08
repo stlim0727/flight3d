@@ -509,10 +509,11 @@ export class CollisionDetector {
     if (!this.terrain) return null;
 
     const terrainH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
-    // Water is located where natural terrain is at or below sea level (elevation <= 2.5m)
-    if (terrainH > 2.5) return null;
+    // Sea level unless the terrain has its own water (the Neon Metropolis canal, #551).
+    const waterLevel = this.terrain.getWaterLevel?.(aircraftPos.x, aircraftPos.z) ?? 0.0;
+    // Water is located where natural terrain is at or below the water level (within 2.5m)
+    if (terrainH > waterLevel + 2.5) return null;
 
-    const waterLevel = 0.0;
     // Ditching / crashing into water: speed > 15 m/s (~30 knots) or vertical descent > 3.0 m/s
     if (speedMs < 5.0 && Math.abs(vsiMs) < 1.0) return null; // Stationary boat/seaplane safe state
 

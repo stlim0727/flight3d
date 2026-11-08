@@ -1,4 +1,4 @@
-/** Start Vite separately. SIM_URL / CDP_PORT / CHROME_PATH / ARTIFACT_DIR override. */
+/** Neon Metropolis bridge flight (#551). Start Vite separately. SIM_URL / CDP_PORT / CHROME_PATH / ARTIFACT_DIR override. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile, mkdtemp, rm } from 'node:fs/promises';
@@ -7,8 +7,8 @@ import { tmpdir } from 'node:os';
 import { once } from 'node:events';
 
 const port = Number(process.env.CDP_PORT || 9477);
-const directory = resolve(process.env.ARTIFACT_DIR || 'review-artifacts/hangang');
-const profile = await mkdtemp(join(tmpdir(), 'flight3d-hangang-'));
+const directory = resolve(process.env.ARTIFACT_DIR || 'review-artifacts/neon-bridge');
+const profile = await mkdtemp(join(tmpdir(), 'flight3d-neon-bridge-'));
 const chrome = spawn(process.env.CHROME_PATH || (process.platform === 'win32'
   ? 'C:/Program Files/Google/Chrome/Application/chrome.exe' : 'google-chrome-stable'), [
   '--headless=new', `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`,
@@ -64,7 +64,8 @@ try {
   const result = await evaluate(async () => {
     const s=window.simulator;
     s.clock.getDelta=()=>0; s.demoDirector.stop(); s.gameFlow.returnToLobby(true);
-    document.getElementById('lobby-airport-hangang').click();
+    document.getElementById('lobby-airport-neon').click();
+    document.getElementById('lobby-preset-bridge').click();
     document.getElementById('btn-fly').click();
     // The pick now lands on Fly (#322): the region rebuild runs behind the loading card.
     for(let i=0;i<3600 && (s.startingFlight || !document.getElementById('startup-overlay').hidden);i++) {
@@ -72,19 +73,21 @@ try {
     }
     const initial = { region:s.activeAirport, preset:s.lastPresetType, aircraft:s.currentAircraftId, mass:s.aero.mass, throttle:s.controls.throttle, trim:s.controls.pitchTrim, position:s.position.toArray() };
     s.stepSimulation(5);
-    return {initial,contact:s.hangang.collision.contact,position:s.position.toArray(),speed:s.linearVelocity.length(),pitch:s.telemetry.pitchDeg,crashed:s.isCrashed};
+    return {initial,contact:s.bridgeFlight.collision.contact,position:s.position.toArray(),speed:s.linearVelocity.length(),pitch:s.telemetry.pitchDeg,crashed:s.isCrashed};
   });
   await delay(500); await capture('approach');
   const flight = await evaluate(async () => {
     const {flyBank,flyVerticalPath}=await import('/src/director/PilotControlLaws.js');
-    const {riverCenter}=await import('/src/config/hangangCourse.js');
+    const {riverCenter}=await import('/src/config/neonRiver.js');
     const s=window.simulator;
     // Test pilot drives only ordinary control inputs. No state teleport or force override.
-    // Under all three bridges along the river, then a long climb far above the former
-    // 28 m ceiling: free flight (#391) must not end the run without contact.
+    // North along the canal 8 m above the water under all three bridges (the light
+    // bridge's deck is 14.7 m above the water), then a climb above the street: free
+    // flight (#391) must not end the run without contact.
     const fly=(seconds,height,keepGoing=()=>true)=>{
       for(let i=0;i<seconds/0.05 && !s.isCrashed && keepGoing();i++) {
         const tel=s.telemetry;
+        // Aim 180 m ahead along the canal's centreline.
         const lookZ=s.position.z-180;
         const heading=Math.atan2(riverCenter(lookZ)-s.position.x,180)*180/Math.PI;
         const error=((heading-tel.headingDeg+540)%360)-180;
@@ -94,29 +97,30 @@ try {
         s.stepSimulation(0.05);
       }
     };
-    fly(120,19,()=>s.position.z>-3800);
-    const bridges={contact:s.hangang.collision.contact,crashed:s.isCrashed,position:s.position.toArray()};
+    fly(120,-6,()=>s.position.z>-1900);
+    const bridges={contact:s.bridgeFlight.collision.contact,crashed:s.isCrashed,position:s.position.toArray()};
     fly(30,60);
     s.controls.clearVirtualInputs();
-    return {bridges,contact:s.hangang.collision.contact,crashed:s.isCrashed,active:s.hangang.active,
+    return {bridges,contact:s.bridgeFlight.collision.contact,crashed:s.isCrashed,active:s.bridgeFlight.active,
       position:s.position.toArray(),height:s.position.y};
   });
   await delay(300);await capture('finish');
   const lifecycle=await evaluate(async()=>{
     const s=window.simulator;
     s.gameFlow.pause();document.getElementById('btn-pause-restart').click();
-    const reset=s.hangang.collision.contact===null && !s.isCrashed;
+    const reset=s.bridgeFlight.collision.contact===null && !s.isCrashed;
     s.autopilot.master=true;s.stepSimulation(0.1);
     const manual=!s.autopilot.master;
     const noDemo=s.demoDirector.start()===false && !s.demoDirector.isActive;
-    const commonHud=!document.getElementById('hangang-hud') && !document.getElementById('hangang-retry')
+    const commonHud=!document.getElementById('bridge-hud')
       && document.getElementById('hud-overlay').getClientRects().length>0;
     s.gameFlow.returnToLobby(true);
     s.gameFlow.enterFlight();await s.setAirport('coastal');s.setPreset('runway');
-    const restore=!s.hangang.active && s.currentTerrain===s.terrain && !s.hangang.scene.group.visible;
-    await s.setAirport('hangang');await s.setAirport('lukla');
-    const airport=!s.hangang.active && s.currentTerrain===s.luklaTerrain;
-    await s.setAirport('hangang');
+    const restore=!s.bridgeFlight.active && s.currentTerrain===s.terrain && !s.neonCity.group.visible;
+    await s.setAirport('neon');s.setPreset('bridge');await s.setAirport('lukla');
+    const airport=!s.bridgeFlight.active && s.currentTerrain===s.luklaTerrain;
+    // Back to the bridge flight the way the menu picks it, so Fly later keeps it.
+    await s.setAirport('neon');document.getElementById('lobby-preset-bridge').click();s.setPreset('bridge');
     return {reset,manual,noDemo,commonHud,restore,airport};
   });
   await evaluate(async()=>{
@@ -129,7 +133,7 @@ try {
   const failure=await evaluate(()=>{
     const s=window.simulator;s.controls.setVirtualInput('elevator',-0.8);
     s.stepSimulation(6);
-    return {crashed:s.isCrashed,contact:s.hangang.collision.contact};
+    return {crashed:s.isCrashed,contact:s.bridgeFlight.collision.contact};
   });
   await delay(300);await capture('failure');
   const retry = await evaluate(()=>{
@@ -144,34 +148,37 @@ try {
     document.getElementById('btn-fly').click();
     s.stepSimulation(0.1);
     return {crashScene,crashToMenu,healthy:!s.isCrashed && !s.aero.isStalled, trauma:s.cameraSystem.trauma,
-      reset:s.hangang.collision.contact===null, altitude:s.telemetry.radioAltFt};
+      reset:s.bridgeFlight.collision.contact===null, altitude:s.telemetry.radioAltFt,
+      preset:s.lastPresetType, position:s.position.toArray(), crashed:s.isCrashed, stalled:s.aero.isStalled, state:s.gameFlow.state};
   });
   await send('Emulation.setDeviceMetricsOverride',{width:412,height:915,deviceScaleFactor:1,mobile:true});
   await delay(3500);await capture('mobile');
   const menu = await evaluate(()=>{
     const s=window.simulator;s.gameFlow.returnToLobby(true);s.lobbyScreen.refresh();
-    return {region:s.activeAirport, selected:document.getElementById('lobby-airport-hangang').classList.contains('active'),
-      onlyChallenge:[...document.querySelectorAll('.lobby-scenarios .btn-preset')].filter(b=>b.style.display!=='none').map(b=>b.id),
-      aircraftLocked:document.getElementById('lobby-aircraft-b738').disabled,timeLocked:document.getElementById('lobby-time-select').disabled};
+    return {region:s.activeAirport, selected:document.getElementById('lobby-airport-neon').classList.contains('active'),
+      bridgeSelected:document.getElementById('lobby-preset-bridge').classList.contains('active'),
+      presets:[...document.querySelectorAll('.lobby-scenarios .btn-preset')].filter(b=>b.style.display!=='none').map(b=>b.id),
+      aircraftLocked:document.getElementById('lobby-aircraft-b738').disabled, noHangang:!document.getElementById('lobby-airport-hangang')};
   });
   await delay(300);await capture('region-menu');
   await send('Page.reload');
   let restored;
   for(let i=0;i<240;i++) {
-    restored=await evaluate(()=>window.simulator?.startupReady ? {region:window.simulator.activeAirport,preset:window.simulator.lastPresetType,aircraft:window.simulator.currentAircraftId,active:window.simulator.hangang?.active}:null);
+    // Evaluations racing the reload's navigation fail; the next poll retries.
+    restored=await evaluate(()=>window.simulator?.startupReady ? {region:window.simulator.activeAirport,preset:window.simulator.lastPresetType,aircraft:window.simulator.currentAircraftId,active:window.simulator.bridgeFlight?.active}:null).catch(()=>null);
     if(restored) break;await delay(500);
   }
-  assert.deepEqual(restored,{region:'hangang',preset:'hangang',aircraft:'C172',active:true});
-  assert.ok(menu.selected && menu.aircraftLocked && menu.timeLocked);
-  assert.deepEqual(menu.onlyChallenge,['lobby-preset-hangang']);
   await writeFile(join(directory,'results.json'),JSON.stringify({result,flight,lifecycle,failure,retry,menu,restored,exceptions},null,2));
   console.log(JSON.stringify({result,flight,lifecycle,failure,retry,menu,restored,exceptions}));
-  assert.equal(result.initial.aircraft,'C172');assert.equal(result.initial.preset,'hangang');
+  assert.deepEqual(restored,{region:'neon',preset:'bridge',aircraft:'C172',active:true});
+  assert.ok(menu.selected && menu.bridgeSelected && menu.aircraftLocked && menu.noHangang);
+  assert.deepEqual(menu.presets,['lobby-preset-rwy','lobby-preset-app','lobby-preset-cru','lobby-preset-bridge']);
+  assert.equal(result.initial.aircraft,'C172');assert.equal(result.initial.preset,'bridge');assert.equal(result.initial.region,'neon');
   assert.equal(failure.crashed,true);assert.equal(failure.contact?.structure,'water');
-  assert.equal(flight.bridges.contact,null);assert.equal(flight.bridges.crashed,false);assert.ok(flight.bridges.position[2]<=-3800);
-  assert.equal(flight.contact,null);assert.equal(flight.crashed,false);assert.ok(flight.active);assert.ok(flight.height>40);
+  assert.equal(flight.bridges.contact,null);assert.equal(flight.bridges.crashed,false);assert.ok(flight.bridges.position[2]<=-1900);
+  assert.equal(flight.contact,null);assert.equal(flight.crashed,false);assert.ok(flight.active);assert.ok(flight.height>30);
   assert.ok(Object.values(lifecycle).every(Boolean));assert.equal(exceptions.length,0);
-  assert.ok(retry.crashScene && retry.crashToMenu && retry.healthy && retry.reset);assert.equal(retry.trauma,0);assert.ok(retry.altitude>50);
+  assert.ok(retry.crashScene && retry.crashToMenu && retry.healthy && retry.reset);assert.equal(retry.trauma,0);assert.ok(retry.altitude>25);
 } finally {
   socket?.close();chrome.kill();
   await delay(1500);

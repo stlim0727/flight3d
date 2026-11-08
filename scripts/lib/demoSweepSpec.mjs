@@ -13,10 +13,10 @@
  * than intent (bank, speed, G, warning frequency) is measured into
  * `scripts/demo-sweep-baseline.json` instead of being declared here.
  *
- * The Hangang region is deliberately absent: `DemoFlightDirector.start()` returns
- * false there because it is a manually flown bridge course, not an autonomous
- * demo, so there is no choreography for the sweep to fast-play. It is covered by
- * `tests/hangang.test.js` and `scripts/verify-hangang.mjs`.
+ * The Neon Metropolis bridge flight is deliberately absent: `DemoFlightDirector.start()`
+ * returns false there because it is flown by hand, not an autonomous demo, so there is
+ * no choreography for the sweep to fast-play. It is covered by
+ * `tests/bridgeFlight.test.js` and `scripts/verify-neon-bridge.mjs`.
  */
 import { CoastalDemoScenario } from '../../src/director/scenarios/CoastalDemoScenario.js';
 import { LuklaCircuitScenario } from '../../src/director/scenarios/LuklaCircuitScenario.js';

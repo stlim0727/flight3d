@@ -11,7 +11,6 @@ test('menu badges come from aircraft and approach configuration', () => {
   assert.doesNotMatch(aircraftSpec('F16'), /Fixed gear/);
   assert.equal(airportSpec('coastal'), 'RWY 090° · 39 FT · GS 3°');
   assert.match(airportSpec('lukla'), /^RWY 058° · 9,203 FT · GS 4\.28°$/);
-  assert.match(airportSpec('hangang'), /C172/);
   assert.match(airportSpec('valley'), /F-16/);
 });
 
@@ -24,6 +23,5 @@ test('unknown ids yield no badge and every lobby aircraft has one', () => {
 test('korean badge text localizes the descriptive part only', () => {
   setLanguage('ko');
   assert.match(aircraftSpec('C172'), /고정식 기어/);
-  assert.match(airportSpec('hangang'), /C172 전용/);
   setLanguage('en');
 });

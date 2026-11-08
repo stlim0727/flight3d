@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { NEON_RIVER, bridgeWorldBoxes, isRiver, riverCenter, riverGroundHeight } from '../config/neonRiver.js';
+import { createNeonRiver } from './NeonRiver.js';
 
 /**
  * Creates clean, sleek facade textures tailored to eliminate trypophobia.
@@ -208,6 +210,8 @@ export class NeonCity {
       isLoaded: true,
       getHeight: (x, z) => this.getHeight(x, z),
       getNormal: (x, z) => this.getNormal(x, z),
+      // The canal's water lies below the street (#551); CollisionDetector reads it here.
+      getWaterLevel: (x, z) => (isRiver(x, z) ? NEON_RIVER.waterLevel : 0),
     };
 
     this.airport = {
@@ -227,8 +231,9 @@ export class NeonCity {
     this.initRetroSun();
   }
 
+  // The street, or the canal's water between its quay walls.
   getHeight(x, z) {
-    return 0.0;
+    return riverGroundHeight(x, z);
   }
 
   getNormal(x, z) {
@@ -358,23 +363,22 @@ export class NeonCity {
   }
 
   initGroundAndRoads() {
-    // Deep midnight indigo ground plane matching horizon haze
-    const groundGeo = new THREE.PlaneGeometry(24000, 24000, 1, 1);
-    groundGeo.rotateX(-Math.PI / 2);
-    const groundMat = new THREE.MeshBasicMaterial({
-      color: 0x070312,
-    });
-    const groundMesh = new THREE.Mesh(groundGeo, groundMat);
-    groundMesh.name = 'neon-ground';
-    this.group.add(groundMesh);
+    // City ground on both banks of the canal, the canal and its bridges (#551)
+    this.river = createNeonRiver();
+    this.group.add(this.river.group);
+    // Bridges are solid for every aircraft, like the towers
+    this.buildingData.push(...bridgeWorldBoxes());
 
-    // Glowing city avenue grid lines
+    // Glowing city avenue grid lines, stopping at the canal's quay walls
     const gridLines = [];
+    const westBank = riverCenter(0) - NEON_RIVER.halfWidth, eastBank = riverCenter(0) + NEON_RIVER.halfWidth;
     for (let x = -2000; x <= 4500; x += 300) {
+      if (x > westBank && x < eastBank) continue;
       gridLines.push(new THREE.Vector3(x, 0.02, -1800), new THREE.Vector3(x, 0.02, 1800));
     }
     for (let z = -1800; z <= 1800; z += 300) {
-      gridLines.push(new THREE.Vector3(-2000, 0.02, z), new THREE.Vector3(4500, 0.02, z));
+      gridLines.push(new THREE.Vector3(-2000, 0.02, z), new THREE.Vector3(westBank, 0.02, z));
+      gridLines.push(new THREE.Vector3(eastBank, 0.02, z), new THREE.Vector3(4500, 0.02, z));
     }
     const gridGeo = new THREE.BufferGeometry().setFromPoints(gridLines);
     this.group.add(new THREE.LineSegments(gridGeo, new THREE.LineBasicMaterial({
@@ -457,6 +461,8 @@ export class NeonCity {
 
     for (let x = -2000; x <= 3200; x += 120) {
       for (const z of [-34, 34]) {
+        // No lamp stands in the canal or on its quay edge.
+        if (Math.abs(x - riverCenter(z)) < NEON_RIVER.halfWidth + 3) continue;
         const post = new THREE.CylinderGeometry(0.35, 0.5, 12, 6);
         post.translate(x, 6, z);
         lightPosts.push(post);
@@ -537,7 +543,7 @@ export class NeonCity {
       // 1. The Grand Art Deco Spire (Stepped pyramid, 440m tall with 36m spire)
       { x: 1950, z: 165, w: 75, d: 75, h: 440, type: 'stepped-spire', facade: 'fin', rot: -0.08 },
       // 2. The Chrysler Crown Tower (420m tall)
-      { x: 2450, z: -175, w: 70, d: 70, h: 420, type: 'stepped-spire', facade: 'ribbon', rot: 0.12 },
+      { x: 2500, z: -175, w: 70, d: 70, h: 420, type: 'stepped-spire', facade: 'ribbon', rot: 0.12 },
       // 3. Citigroup Chiseled Wedge Tower (45° angled roof, 380m tall)
       { x: 1420, z: -160, w: 68, d: 68, h: 380, type: 'wedge-chisel', facade: 'monolith', rot: -0.18 },
       // 4. Cylindrical Landmark Tower with glowing circular observation ring (370m tall)
@@ -553,8 +559,8 @@ export class NeonCity {
       { x: 1290, z: 390, w: 55, d: 75, h: 260, type: 'blade-slab', facade: 'monolith', rot: -0.10 },
       { x: 1620, z: 230, w: 65, d: 65, h: 360, type: 'cylinder', facade: 'ribbon', rot: 0 },
       { x: 1780, z: 380, w: 75, d: 60, h: 310, type: 'wedge-chisel', facade: 'fin', rot: 0.32 },
-      { x: 2150, z: 240, w: 60, d: 70, h: 350, type: 'blade-slab', facade: 'ribbon', rot: -0.15 },
-      { x: 2290, z: 430, w: 70, d: 65, h: 280, type: 'stepped-spire', facade: 'monolith', rot: 0.22 },
+      { x: 2080, z: 240, w: 60, d: 70, h: 350, type: 'blade-slab', facade: 'ribbon', rot: -0.15 },
+      { x: 2560, z: 430, w: 70, d: 65, h: 280, type: 'stepped-spire', facade: 'monolith', rot: 0.22 },
       { x: 2620, z: 225, w: 68, d: 60, h: 340, type: 'wedge-chisel', facade: 'ribbon', rot: -0.12 },
       { x: 2790, z: 400, w: 58, d: 68, h: 290, type: 'cylinder', facade: 'fin', rot: 0 },
       { x: 3100, z: 210, w: 62, d: 62, h: 330, type: 'stepped-spire', facade: 'ribbon', rot: 0.16 },
@@ -568,8 +574,8 @@ export class NeonCity {
       { x: 1240, z: -410, w: 75, d: 58, h: 270, type: 'wedge-chisel', facade: 'ribbon', rot: 0.28 },
       { x: 1650, z: -220, w: 68, d: 62, h: 360, type: 'stepped-spire', facade: 'ribbon', rot: -0.14 },
       { x: 1820, z: -380, w: 62, d: 72, h: 310, type: 'cylinder', facade: 'monolith', rot: 0 },
-      { x: 2120, z: -235, w: 72, d: 62, h: 350, type: 'wedge-chisel', facade: 'fin', rot: 0.19 },
-      { x: 2310, z: -440, w: 58, d: 68, h: 290, type: 'blade-slab', facade: 'ribbon', rot: -0.24 },
+      { x: 2060, z: -235, w: 72, d: 62, h: 350, type: 'wedge-chisel', facade: 'fin', rot: 0.19 },
+      { x: 2560, z: -440, w: 58, d: 68, h: 290, type: 'blade-slab', facade: 'ribbon', rot: -0.24 },
       { x: 2650, z: -215, w: 65, d: 65, h: 330, type: 'stepped-spire', facade: 'monolith', rot: 0.15 },
       { x: 2820, z: -370, w: 72, d: 58, h: 280, type: 'blade-slab', facade: 'fin', rot: -0.12 },
       { x: 3150, z: -220, w: 68, d: 68, h: 320, type: 'cylinder', facade: 'ribbon', rot: 0 },
@@ -581,7 +587,7 @@ export class NeonCity {
       { x: 1200, z: 720,  w: 75, d: 75, h: 290, type: 'stepped-spire', facade: 'ribbon', rot: -0.22 },
       { x: 1600, z: 640,  w: 80, d: 85, h: 310, type: 'cylinder', facade: 'monolith', rot: 0 },
       { x: 2050, z: 730,  w: 95, d: 75, h: 320, type: 'wedge-chisel', facade: 'fin', rot: 0.18 },
-      { x: 2480, z: 660,  w: 85, d: 80, h: 290, type: 'stepped-spire', facade: 'monolith', rot: -0.14 },
+      { x: 2600, z: 760,  w: 85, d: 80, h: 290, type: 'stepped-spire', facade: 'monolith', rot: -0.14 },
       { x: 2880, z: 740,  w: 80, d: 90, h: 280, type: 'blade-slab', facade: 'ribbon', rot: 0.25 },
       { x: 3280, z: 670,  w: 85, d: 75, h: 260, type: 'cylinder', facade: 'monolith', rot: 0 },
       { x: 1050, z: 980,  w: 110, d: 90, h: 220, type: 'blade-slab', facade: 'monolith', rot: 0 },
@@ -595,12 +601,12 @@ export class NeonCity {
       { x: 1220, z: -730,  w: 90, d: 75, h: 300, type: 'wedge-chisel', facade: 'fin', rot: 0.22 },
       { x: 1620, z: -650,  w: 80, d: 85, h: 320, type: 'stepped-spire', facade: 'monolith', rot: -0.18 },
       { x: 2080, z: -740,  w: 95, d: 80, h: 310, type: 'blade-slab', facade: 'ribbon', rot: 0.12 },
-      { x: 2510, z: -670,  w: 85, d: 90, h: 290, type: 'cylinder', facade: 'monolith', rot: 0 },
+      { x: 2560, z: -670,  w: 85, d: 90, h: 290, type: 'cylinder', facade: 'monolith', rot: 0 },
       { x: 2910, z: -750,  w: 90, d: 75, h: 280, type: 'stepped-spire', facade: 'ribbon', rot: -0.22 },
       { x: 3310, z: -680,  w: 80, d: 85, h: 250, type: 'wedge-chisel', facade: 'monolith', rot: 0.14 },
       { x: 1080, z: -990,  w: 105, d: 90, h: 230, type: 'blade-slab', facade: 'fin', rot: 0 },
       { x: 1580, z: -1030, w: 95, d: 100, h: 250, type: 'cylinder', facade: 'monolith', rot: 0 },
-      { x: 2110, z: -1000, w: 100, d: 85, h: 260, type: 'stepped-spire', facade: 'ribbon', rot: 0.22 },
+      { x: 2050, z: -1000, w: 100, d: 85, h: 260, type: 'stepped-spire', facade: 'ribbon', rot: 0.22 },
       { x: 2610, z: -1050, w: 90, d: 95, h: 220, type: 'wedge-chisel', facade: 'monolith', rot: -0.18 },
       { x: 3110, z: -1010, w: 110, d: 85, h: 210, type: 'blade-slab', facade: 'monolith', rot: 0.1 },
 
@@ -613,7 +619,7 @@ export class NeonCity {
       { x: 1580, z: -140, w: 48, d: 45, h: 120, type: 'podium', facade: 'monolith', rot: -0.12 },
       { x: 1980, z: 140,  w: 50, d: 42, h: 145, type: 'podium', facade: 'fin', rot: -0.16 },
       { x: 2120, z: -155, w: 54, d: 40, h: 130, type: 'podium', facade: 'ribbon', rot: 0.14 },
-      { x: 2420, z: 145,  w: 44, d: 46, h: 115, type: 'podium', facade: 'monolith', rot: 0.08 },
+      { x: 2490, z: 190,  w: 44, d: 46, h: 115, type: 'podium', facade: 'monolith', rot: 0.08 },
       { x: 2580, z: -145, w: 48, d: 42, h: 125, type: 'podium', facade: 'fin', rot: -0.20 },
       { x: 2880, z: 135,  w: 46, d: 40, h: 95,  type: 'podium', facade: 'ribbon', rot: 0.18 },
       { x: 3020, z: -150, w: 50, d: 44, h: 105, type: 'podium', facade: 'monolith', rot: -0.15 },
