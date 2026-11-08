@@ -29,6 +29,8 @@ export class MultiplayerController {
     const dirUrl = typeof window !== 'undefined' ? (window.__FLIGHT3D_DIRECTORY_URL__ || DEFAULT_DIRECTORY_URL) : null;
     this.directoryClient = new RoomDirectoryClient({ directoryUrl: dirUrl });
     this.isPublicHost = false;
+    this.registeringHost = false;
+    this.registrationGeneration = 0;
     this.refreshingRooms = false;
     if (this.refreshRoomsBtn) this.refreshRoomsBtn.onclick = () => this.refreshOpenRooms();
     this.preferences = bindMultiplayerPreferences();
@@ -50,6 +52,8 @@ export class MultiplayerController {
     document.getElementById('mp-listen').onclick = () => this.playAudio();
     document.getElementById('mp-mute').onclick = () => { this.audio.muted = !this.audio.muted; this.refresh(); };
     window.addEventListener('pagehide', () => {
+      this.registrationGeneration++;
+      this.registeringHost = false;
       this.directoryClient?.unregister();
       this.room?.dispose();
     });
@@ -87,6 +91,8 @@ export class MultiplayerController {
   }
   dismissDialog() {
     if (this.active && this.room.session.state !== 'flying') {
+      this.registrationGeneration++;
+      this.registeringHost = false;
       this.directoryClient?.unregister();
       this.room.close('cancelled');
     }
@@ -113,6 +119,8 @@ export class MultiplayerController {
     if (this.active || this.preparing || this.sim.startingFlight || this.sim.airportLoading) return;
     this.preferences.save();
     this.message = null;
+    this.registrationGeneration++;
+    this.registeringHost = false;
     this.directoryClient?.unregister();
     this.isPublicHost = !room && Boolean(this.publicCheckbox?.checked);
     this.room?.dispose();
@@ -209,6 +217,8 @@ export class MultiplayerController {
     this.refresh();
   }
   ended(reason) {
+    this.registrationGeneration++;
+    this.registeringHost = false;
     this.directoryClient?.unregister();
     this.isPublicHost = false;
     clearInterval(this.snapshotTimer); this.remote?.dispose(); this.remote = null;
@@ -281,19 +291,28 @@ export class MultiplayerController {
     this.syncDirectoryHost();
   }
   syncDirectoryHost() {
-    if (!this.isPublicHost || !this.room?.host || !this.room.registered || this.directoryClient?.isRegistered) return;
-    const s = this.room.session;
+    if (!this.isPublicHost || !this.room?.host || !this.room.registered || this.directoryClient?.isRegistered || this.registeringHost) return;
+    this.registeringHost = true;
+    const currentRoom = this.room;
+    const generation = ++this.registrationGeneration;
+    const s = currentRoom.session;
     this.directoryClient?.register({
-      roomCode: this.room.room,
-      name: document.getElementById('mp-name')?.value || s?.name || 'Pilot',
+      roomCode: currentRoom.room,
+      name: (typeof document !== 'undefined' ? document.getElementById('mp-name')?.value : null) || s?.name || 'Pilot',
       airport: s?.config?.airport || 'coastal',
       aircraft: s?.config?.aircraft || 'C172',
       scenario: s?.config?.scenario || 'cruise',
       currentPlayers: s?.remoteName ? 2 : 1,
       maxPlayers: 2,
       status: s?.state === 'flying' ? 'flying' : (s?.remoteName ? 'full' : 'waiting'),
-    }).then(res => {
-      if (res.ok) {
+    }).then(async res => {
+      if (this.registrationGeneration !== generation || !this.isPublicHost || this.room !== currentRoom || currentRoom.closed) {
+        if (res?.ok) {
+          await this.directoryClient?.unregister();
+        }
+        return;
+      }
+      if (res?.ok) {
         this.directoryClient.startHeartbeat({
           intervalMs: HEARTBEAT_INTERVAL_MS,
           getStatus: () => {
@@ -304,7 +323,11 @@ export class MultiplayerController {
           },
         });
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (this.registrationGeneration === generation) {
+        this.registeringHost = false;
+      }
+    });
   }
   async refreshOpenRooms() {
     if (!this.roomListContainer || this.refreshingRooms) return;

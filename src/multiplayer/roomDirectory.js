@@ -281,7 +281,7 @@ export async function handleDirectoryRequest(request, store, { now = Date.now() 
     const flightRevision = flightParam && /^\d+$/.test(flightParam) ? Number(flightParam) : undefined;
     const limit = limitParam && /^\d+$/.test(limitParam) ? Math.min(100, Math.max(1, Number(limitParam))) : 50;
 
-    const rooms = store.listRooms({
+    const rooms = await store.listRooms({
       protocolMajor,
       flightRevision,
       status: statusParam || undefined,

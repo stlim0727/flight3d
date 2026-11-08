@@ -80,8 +80,14 @@ export async function runCli({ readAsset, args = process.argv.slice(2) }) {
       }, 'signaling registration', 60000);
       log({ event: 'ready', name: config.name, room: code, invite, ...manifest,
         statePath, healthUrl: `http://127.0.0.1:${port}/health`, cdpEndpoint: `http://127.0.0.1:${cdpPort}` });
-      if (config.isPublic && config.directoryUrl) {
-        directoryClient = new RoomDirectoryClient({ directoryUrl: config.directoryUrl });
+      let registering = false, lastDirectoryAttempt = 0;
+      async function syncDirectory() {
+        if (!config.isPublic || !config.directoryUrl || stopping || !status?.registered || status?.state === 'ended') return;
+        if (directoryClient?.isRegistered || registering) return;
+        const now = Date.now();
+        if (now - lastDirectoryAttempt < 10000) return;
+        lastDirectoryAttempt = now;
+        registering = true;
         try {
           const reg = await directoryClient.register({
             roomCode: code,
@@ -89,29 +95,35 @@ export async function runCli({ readAsset, args = process.argv.slice(2) }) {
             airport: 'coastal',
             aircraft: 'B738',
             scenario: 'cruise',
-            currentPlayers: 1,
+            currentPlayers: status.remoteName ? 2 : 1,
             maxPlayers: 2,
-            status: 'waiting',
+            status: status.state === 'flying' ? 'flying' : (status.remoteName ? 'full' : 'waiting'),
             protocolMajor: manifest.protocolVersion,
             flightRevision: manifest.flightRevision,
           });
-          if (reg.ok) {
+          if (reg?.ok) {
             log({ event: 'directory-registered', id: reg.registration.id, directory: config.directoryUrl });
             directoryClient.startHeartbeat({
               intervalMs: 15000,
               getStatus: () => {
                 const cur = status;
-                const currentPlayers = cur.remoteName ? 2 : 1;
-                const roomStatus = cur.state === 'flying' ? 'flying' : (cur.remoteName ? 'full' : 'waiting');
+                const currentPlayers = cur?.remoteName ? 2 : 1;
+                const roomStatus = cur?.state === 'flying' ? 'flying' : (cur?.remoteName ? 'full' : 'waiting');
                 return { currentPlayers, maxPlayers: 2, status: roomStatus };
               },
             });
           } else {
-            console.warn(`[GhostHost] Directory registration failed: ${reg.error} (continuing flight process)`);
+            console.warn(`[GhostHost] Directory registration failed: ${reg?.error} (continuing flight process)`);
           }
         } catch (err) {
           console.warn(`[GhostHost] Directory registration error: ${err.message} (continuing flight process)`);
+        } finally {
+          registering = false;
         }
+      }
+      if (config.isPublic && config.directoryUrl) {
+        directoryClient = new RoomDirectoryClient({ directoryUrl: config.directoryUrl });
+        await syncDirectory();
       }
       let previous = '', lastSimulationTime, lastProgressAt = Date.now();
       watchdog = setInterval(async () => {
@@ -125,6 +137,7 @@ export async function runCli({ readAsset, args = process.argv.slice(2) }) {
           lastSimulationTime = status.simSeconds;
           const summary = JSON.stringify({ state: status.state, generation: status.generation, reason: status.reason, compatibilityFailure: status.compatibilityFailure });
           if (summary !== previous) { log({ event: 'state', ...JSON.parse(summary) }); previous = summary; }
+          await syncDirectory();
         } catch (error) { if (!stopping) { console.error(error.message); process.exitCode = 1; await stop(); } }
         finally { polling = false; }
       }, 2000);

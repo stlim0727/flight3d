@@ -252,3 +252,53 @@ test('refreshOpenRooms renders rooms and allows joining', async () => {
     globalThis.document = prevDoc;
   }
 });
+
+test('syncDirectoryHost serializes in-flight registration and cleans up if closed before response', async () => {
+  let registerCalls = 0;
+  let unregisterCalls = 0;
+  let resolveRegister;
+  const mockDirectoryClient = {
+    isRegistered: false,
+    register() {
+      registerCalls++;
+      return new Promise(resolve => { resolveRegister = resolve; });
+    },
+    async unregister() {
+      unregisterCalls++;
+      this.isRegistered = false;
+    },
+    startHeartbeat() {
+      this.heartbeatStarted = true;
+    },
+  };
+
+  const mockRoom = { host: true, registered: true, room: 'K7M2QX', closed: false, session: { name: 'Host' } };
+  const controller = Object.assign(Object.create(Controller.prototype), {
+    isPublicHost: true,
+    registeringHost: false,
+    registrationGeneration: 0,
+    room: mockRoom,
+    directoryClient: mockDirectoryClient,
+  });
+
+  // First sync triggers register()
+  controller.syncDirectoryHost();
+  assert.equal(registerCalls, 1);
+
+  // Second sync while first is in-flight must NOT trigger another register()
+  controller.syncDirectoryHost();
+  assert.equal(registerCalls, 1);
+
+  // Now simulate host leaving or room closing before register resolves
+  mockRoom.closed = true;
+  controller.registrationGeneration++;
+  controller.isPublicHost = false;
+
+  // Now registration completes with ok
+  resolveRegister({ ok: true, registration: { id: 'room-late' } });
+  await new Promise(r => setTimeout(r, 10));
+
+  // Late resolution must call unregister and NOT start heartbeats
+  assert.equal(unregisterCalls, 1);
+  assert.equal(mockDirectoryClient.heartbeatStarted, undefined);
+});

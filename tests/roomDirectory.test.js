@@ -201,6 +201,19 @@ test('handleDirectoryRequest handles HTTP routes, CORS, filters and errors', asy
 
   assert.equal(delRes.status, 200);
   assert.equal(store.listRooms({ now: now + 6000 }).length, 0);
+
+  // Asynchronous store listRooms (e.g. D1RoomDirectoryStore) is awaited
+  const asyncStore = {
+    async listRooms() {
+      return [{ id: 'room-async', name: 'AsyncHost', roomCode: 'K7M2QX' }];
+    },
+  };
+  const asyncGetRes = await handleDirectoryRequest(new Request('https://directory.flight3d/v1/rooms'), asyncStore);
+  assert.equal(asyncGetRes.status, 200);
+  const asyncGetData = await asyncGetRes.json();
+  assert.equal(Array.isArray(asyncGetData.rooms), true);
+  assert.equal(asyncGetData.rooms.length, 1);
+  assert.equal(asyncGetData.rooms[0].name, 'AsyncHost');
 });
 
 test('RoomDirectoryClient handles registration, heartbeat and graceful errors', async () => {
