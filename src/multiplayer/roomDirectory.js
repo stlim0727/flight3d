@@ -256,6 +256,195 @@ export class MemoryRoomDirectoryStore {
   }
 }
 
+export const LOCAL_ROOMS_STORAGE_KEY = 'flight3d.rooms.local.v1';
+export const LOCAL_DIRECTORY_CHANNEL = 'flight3d-directory-channel';
+
+/**
+ * Cross-tab in-browser room directory store using localStorage and BroadcastChannel.
+ * Provides instant same-origin room discovery even without a deployed Cloudflare Worker.
+ */
+export class LocalRoomDirectoryStore {
+  constructor({ storage = (typeof globalThis !== 'undefined' ? globalThis.localStorage : null), channelName = LOCAL_DIRECTORY_CHANNEL, ttlMs = HEARTBEAT_TTL_MS, maxRooms = 200 } = {}) {
+    this.storage = storage;
+    this.ttlMs = ttlMs;
+    this.maxRooms = maxRooms;
+    this.channel = typeof globalThis !== 'undefined' && typeof globalThis.BroadcastChannel !== 'undefined'
+      ? new globalThis.BroadcastChannel(channelName)
+      : null;
+    this.memoryFallback = new MemoryRoomDirectoryStore({ ttlMs, maxRooms });
+  }
+
+  _read(now = Date.now()) {
+    if (!this.storage) return null;
+    try {
+      const raw = this.storage.getItem(LOCAL_ROOMS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(room => room && typeof room === 'object' && room.expiresAt > now);
+    } catch {
+      return null;
+    }
+  }
+
+  _write(rooms) {
+    if (!this.storage) return false;
+    try {
+      this.storage.setItem(LOCAL_ROOMS_STORAGE_KEY, JSON.stringify(rooms));
+      this._notify('changed');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  _notify(type, data = {}) {
+    try {
+      this.channel?.postMessage({ type, timestamp: Date.now(), ...data });
+    } catch {}
+  }
+
+  async registerRoom(data, now = Date.now()) {
+    const valid = validateRoomRegistration(data);
+    const rooms = this._read(now);
+    if (!rooms) {
+      return this.memoryFallback.registerRoom(data, now);
+    }
+
+    let leaseGeneration = 1;
+    const filtered = [];
+    for (const room of rooms) {
+      if (room.expiresAt <= now) continue;
+      if (room.roomCode === valid.roomCode) {
+        leaseGeneration = (room.leaseGeneration || 1) + 1;
+        continue;
+      }
+      filtered.push(room);
+    }
+
+    if (filtered.length >= this.maxRooms) {
+      throw new Error('capacity-exceeded');
+    }
+
+    const id = `room_${crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').slice(0, 16) : Math.random().toString(36).slice(2, 14)}`;
+    const token = `tok_${crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)}`;
+    const tokenHash = await hashToken(token);
+
+    const roomRecord = {
+      id,
+      tokenHash,
+      leaseGeneration,
+      ...valid,
+      createdAt: now,
+      lastHeartbeatAt: now,
+      expiresAt: now + this.ttlMs,
+    };
+
+    filtered.push(roomRecord);
+    this._write(filtered);
+
+    return {
+      id,
+      token,
+      leaseGeneration,
+      expiresAt: roomRecord.expiresAt,
+      room: publicRoomSummary(roomRecord),
+    };
+  }
+
+  async heartbeat(id, token, updates = {}, now = Date.now()) {
+    const rooms = this._read(now);
+    if (!rooms) {
+      return this.memoryFallback.heartbeat(id, token, updates, now);
+    }
+
+    const roomIndex = rooms.findIndex(r => r.id === id && r.expiresAt > now);
+    if (roomIndex === -1) {
+      return { status: 404, error: 'room-not-found' };
+    }
+
+    const room = rooms[roomIndex];
+    const tokenHash = await hashToken(token);
+    if (!safeEqual(tokenHash, room.tokenHash)) {
+      return { status: 403, error: 'invalid-token' };
+    }
+
+    if (updates.leaseGeneration !== undefined && updates.leaseGeneration !== room.leaseGeneration) {
+      return { status: 409, error: 'stale-lease-generation' };
+    }
+
+    if (Number.isSafeInteger(updates.currentPlayers) && updates.currentPlayers >= 1 && updates.currentPlayers <= 4) {
+      room.currentPlayers = updates.currentPlayers;
+    }
+    if (Number.isSafeInteger(updates.maxPlayers) && updates.maxPlayers >= room.currentPlayers && updates.maxPlayers <= 4) {
+      room.maxPlayers = updates.maxPlayers;
+    }
+    if (typeof updates.status === 'string' && ['waiting', 'full', 'flying'].includes(updates.status)) {
+      room.status = updates.status;
+    }
+
+    room.lastHeartbeatAt = now;
+    room.expiresAt = now + this.ttlMs;
+
+    this._write(rooms);
+
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        expiresAt: room.expiresAt,
+        room: publicRoomSummary(room),
+      },
+    };
+  }
+
+  async deleteRoom(id, token, { leaseGeneration } = {}, now = Date.now()) {
+    const rooms = this._read(now);
+    if (!rooms) {
+      return this.memoryFallback.deleteRoom(id, token, { leaseGeneration }, now);
+    }
+
+    const roomIndex = rooms.findIndex(r => r.id === id);
+    if (roomIndex === -1) {
+      return { status: 404, error: 'room-not-found' };
+    }
+
+    const room = rooms[roomIndex];
+    const tokenHash = await hashToken(token);
+    if (!safeEqual(tokenHash, room.tokenHash)) {
+      return { status: 403, error: 'invalid-token' };
+    }
+
+    if (leaseGeneration !== undefined && leaseGeneration !== room.leaseGeneration) {
+      return { status: 409, error: 'stale-lease-generation' };
+    }
+
+    rooms.splice(roomIndex, 1);
+    this._write(rooms);
+
+    return { status: 200, body: { ok: true } };
+  }
+
+  async listRooms({ protocolMajor, flightRevision, status, limit = 50, now = Date.now() } = {}) {
+    const rooms = this._read(now);
+    if (!rooms) {
+      return this.memoryFallback.listRooms({ protocolMajor, flightRevision, status, limit, now });
+    }
+
+    const result = [];
+    for (const room of rooms) {
+      if (room.expiresAt <= now) continue;
+      if (protocolMajor !== undefined && room.protocolMajor !== protocolMajor) continue;
+      if (flightRevision !== undefined && room.flightRevision !== flightRevision) continue;
+      if (status !== undefined && room.status !== status) continue;
+      result.push(publicRoomSummary(room));
+      if (result.length >= limit) break;
+    }
+    result.sort((a, b) => b.lastHeartbeatAt - a.lastHeartbeatAt);
+    return result;
+  }
+}
+
 /**
  * Universal Web Standard Request / Response handler for `/v1/rooms`.
  * Works seamlessly across Cloudflare Workers, Node fetch servers, or test harnesses.

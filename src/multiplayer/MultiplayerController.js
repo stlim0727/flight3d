@@ -9,7 +9,11 @@ import { bindMultiplayerPreferences } from './preferences.js';
 import { RoomDirectoryClient } from './RoomDirectoryClient.js';
 import { HEARTBEAT_INTERVAL_MS } from './roomDirectory.js';
 
-const DEFAULT_DIRECTORY_URL = typeof window !== 'undefined' ? (window.__FLIGHT3D_DIRECTORY_URL__ || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MULTIPLAYER_DIRECTORY_URL)) : null;
+const DEFAULT_DIRECTORY_URL = typeof window !== 'undefined'
+  ? (window.__FLIGHT3D_DIRECTORY_URL__
+    || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MULTIPLAYER_DIRECTORY_URL)
+    || (typeof import.meta !== 'undefined' && import.meta.env?.DEV ? '' : null))
+  : null;
 
 export class MultiplayerController {
   constructor(sim) {
@@ -26,7 +30,7 @@ export class MultiplayerController {
     this.publicCheckbox = document.getElementById('mp-public-room');
     this.refreshRoomsBtn = document.getElementById('mp-refresh-rooms');
     this.roomListContainer = document.getElementById('mp-room-list');
-    const dirUrl = typeof window !== 'undefined' ? (window.__FLIGHT3D_DIRECTORY_URL__ || DEFAULT_DIRECTORY_URL) : null;
+    const dirUrl = typeof window !== 'undefined' ? (window.__FLIGHT3D_DIRECTORY_URL__ ?? DEFAULT_DIRECTORY_URL) : null;
     this.directoryClient = new RoomDirectoryClient({ directoryUrl: dirUrl });
     this.hostDirectoryClient = null;
     this.isPublicHost = false;
@@ -37,6 +41,17 @@ export class MultiplayerController {
     this.connectStartedAt = null;
     this.hasConnected = false;
     if (this.refreshRoomsBtn) this.refreshRoomsBtn.onclick = () => this.refreshOpenRooms();
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        this.directoryChannel = new BroadcastChannel('flight3d-directory-channel');
+        this.directoryChannel.onmessage = () => {
+          const joinPanel = document.getElementById('mp-join-panel');
+          if (this.dialog?.open && joinPanel && !joinPanel.hidden && !this.active) {
+            this.refreshOpenRooms();
+          }
+        };
+      } catch {}
+    }
     this.preferences = bindMultiplayerPreferences();
     document.getElementById('mp-choose-host').onclick = () => this.chooseSetup('host');
     document.getElementById('mp-choose-join').onclick = () => this.chooseSetup('join');
@@ -67,6 +82,7 @@ export class MultiplayerController {
       this.registeringHost = false;
       this.hostDirectoryClient?.unregister();
       this.hostDirectoryClient = null;
+      this.directoryChannel?.close();
       this.room?.dispose();
     });
     this.refresh();
@@ -365,6 +381,7 @@ export class MultiplayerController {
     return new RoomDirectoryClient({
       directoryUrl: this.directoryClient?.directoryUrl,
       fetchFn: this.directoryClient?.fetchFn,
+      localStore: this.directoryClient?.localStore,
     });
   }
   syncDirectoryHost() {
