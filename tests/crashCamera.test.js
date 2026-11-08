@@ -110,6 +110,7 @@ test('index.html menu items have intuitive icons for lobby and pause navigation'
   assert.ok(html.includes('id="mp-open"') && html.includes('👥'), 'mp-open must have 👥 icon');
 
   assert.ok(html.includes('id="lobby-tab-scenario"') && html.includes('🎯'), 'scenario tab must have 🎯 icon');
+  assert.ok(html.includes('id="lobby-tab-multi"') && html.includes('👥'), 'multi tab must have 👥 icon');
   assert.ok(html.includes('id="lobby-tab-settings"') && html.includes('⚙️'), 'settings tab must have ⚙️ icon');
   assert.ok(html.includes('id="lobby-tab-dev"') && html.includes('🛠️'), 'dev tab must have 🛠️ icon');
 

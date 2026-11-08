@@ -231,11 +231,11 @@
       </p>
       <p id="lobby-loading" class="lobby-loading" data-i18n="loading.lukla.terrain" hidden></p>
       <p id="lobby-selection" class="lobby-loading" data-i18n="lobby.applying" aria-live="polite" hidden></p>
-      <button id="mp-open" class="btn" type="button" aria-haspopup="dialog" aria-controls="mp-dialog"><span class="btn-icon" aria-hidden="true">👥</span> <span data-i18n="mp.title">함께 비행</span></button>
       <div class="lobby-tabs" role="tablist" aria-labelledby="lobby-tabs-title">
         <span id="lobby-tabs-title" hidden data-i18n="lobby.title">메인 메뉴</span>
-        <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario"><span class="tab-icon" aria-hidden="true">🎯</span> <span data-i18n="lobby.spawn">시나리오</span></button>
-        <button id="lobby-tab-settings" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-settings" tabindex="-1"><span class="tab-icon" aria-hidden="true">⚙️</span> <span data-i18n="ui.settings.short">설정</span></button>
+        <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario"><span class="tab-icon" aria-hidden="true">🎯</span> <span data-i18n="lobby.tab.single">싱글</span></button>
+        <button id="lobby-tab-multi" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-multi" tabindex="-1"><span class="tab-icon" aria-hidden="true">👥</span> <span data-i18n="lobby.tab.multi">멀티</span></button>
+        <button id="lobby-tab-settings" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-settings" tabindex="-1"><span class="tab-icon" aria-hidden="true">⚙️</span> <span data-i18n="lobby.tab.option">옵션</span></button>
         <button id="lobby-tab-dev" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-dev" tabindex="-1" hidden><span class="tab-icon" aria-hidden="true">🛠️</span> <span data-i18n="dev.title">개발자</span></button>
       </div>
       <div class="lobby-panels">
@@ -328,6 +328,41 @@
           </label>
           <span class="lobby-label" data-i18n="lobby.briefingTitle">Dispatch briefing</span>
           <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
+        </section>
+        <section id="lobby-panel-multi" class="lobby-tab-panel lobby-multi" role="tabpanel" aria-labelledby="lobby-tab-multi" tabindex="0" hidden>
+          <div class="lobby-group" role="group">
+            <span class="lobby-label" data-i18n="mp.title">함께 비행</span>
+            <p class="lobby-multi-desc" data-i18n="mp.tabDesc">실시간 P2P WebRTC로 다른 조종사와 함께 편대 비행을 즐기세요.</p>
+          </div>
+          <div class="lobby-buttons">
+            <button id="mp-open" class="btn btn-mp-launch" type="button" aria-haspopup="dialog" aria-controls="mp-dialog"><span class="btn-icon" aria-hidden="true">👥</span> <span data-i18n="mp.openDialog">함께 비행 (방 만들기 / 참여)</span></button>
+          </div>
+          <div class="lobby-group lobby-multi-info" role="group">
+            <span class="lobby-label" data-i18n="mp.featuresTitle">주요 기능</span>
+            <div class="lobby-multi-feature-card">
+              <div class="lobby-multi-feature-item">
+                <span class="feature-icon" aria-hidden="true">✈️</span>
+                <div class="feature-text">
+                  <strong data-i18n="mp.featureFormation">편대 비행</strong>
+                  <span data-i18n="mp.featureFormationDesc">상대 기체 실시간 동기화</span>
+                </div>
+              </div>
+              <div class="lobby-multi-feature-item">
+                <span class="feature-icon" aria-hidden="true">🎙️</span>
+                <div class="feature-text">
+                  <strong data-i18n="mp.featureVoice">3D 음성 통신</strong>
+                  <span data-i18n="mp.featureVoiceDesc">거리 기반 무전기 효과</span>
+                </div>
+              </div>
+              <div class="lobby-multi-feature-item">
+                <span class="feature-icon" aria-hidden="true">🌐</span>
+                <div class="feature-text">
+                  <strong data-i18n="mp.featureP2P">다이렉트 P2P</strong>
+                  <span data-i18n="mp.featureP2PDesc">서버 없이 저지연 연결</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
         <section id="lobby-panel-settings" class="lobby-tab-panel lobby-settings" role="tabpanel" aria-labelledby="lobby-tab-settings" tabindex="0" hidden>
           <label class="dev-enable"><input id="dev-enabled" type="checkbox"><span data-i18n="dev.enable">개발자 모드 (이번 세션)</span></label>
