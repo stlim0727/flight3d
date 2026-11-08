@@ -11,6 +11,7 @@
  */
 
 import { createFeedbackReport, deliverFeedbackReport, gatherFeedbackDiagnostics } from './feedbackReport.js';
+import { inLanguage } from '../i18n/index.js';
 
 let posthogInstance = null;
 let initialized = false;
@@ -254,6 +255,23 @@ export function trackFlightEnd({ airport, aircraft, scenario, reason, durationSe
   });
 }
 
+/**
+ * Track one scored arena run. The runner, not the lobby preset, owns the attempt, so the
+ * mission id is the scenario and the runner's verdict is the end reason.
+ */
+export function trackMissionEnd(record, { airport, aircraft } = {}) {
+  if (!record) return;
+  trackFlightEnd({
+    airport,
+    aircraft,
+    scenario: record.manifest?.id ?? null,
+    reason: record.status === 'succeeded' ? 'completed' : record.reason || record.status,
+    durationSeconds: record.tick / 120,
+    score: record.result?.metrics?.finalScore,
+    gatesCleared: record.result?.metrics?.completedGates,
+  });
+}
+
 /** Track aircraft impact / crash */
 export function trackFlightCrash({ airport, aircraft, scenario, crashResult, speedKnots }) {
   trackEvent('flight_crashed', {
@@ -261,7 +279,8 @@ export function trackFlightCrash({ airport, aircraft, scenario, crashResult, spe
     aircraft,
     scenario,
     crashType: crashResult?.type || 'UNKNOWN',
-    crashName: crashResult?.name || 'Crash',
+    // Crash names are localized getters; pin English so one crash is one breakdown value.
+    crashName: inLanguage('en', () => crashResult?.name) || 'Crash',
     speedKnots: speedKnots != null ? Math.round(speedKnots) : null,
   });
 }

@@ -27,6 +27,13 @@ export function t(key, values = {}) {
     Object.hasOwn(values, name) ? String(values[name]) : placeholder);
 }
 
+/** Evaluate lazily localized text in one language, e.g. telemetry that must not split by UI language. */
+export function inLanguage(next, render) {
+  const previous = language;
+  language = Object.hasOwn(locales, next) ? next : 'en';
+  try { return render(); } finally { language = previous; }
+}
+
 /** Keep a localized label current without resetting simulation or DOM state. */
 export function bindText(element, render, attribute = 'textContent') {
   if (!element) return;

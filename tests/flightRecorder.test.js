@@ -266,3 +266,18 @@ test('a repeated valley start preserves mission-owned recording and its prepared
     assert.equal(sim.replayRecorder.metadata.aircraft, 'F16');
   }
 });
+
+test('an active arena run leaves flight_ended to its runner instead of reporting twice', () => {
+  const ended = [];
+  for (const active of [true, false]) {
+    const sim = { gameFlow: new GameFlowController(), ...recorders(), devRunner: {},
+      telemetry, quaternion: attitude, isCrashed: false, pilotArena: { active },
+      analytics: { trackFlightEnd: event => ended.push(event) }, debriefOverlay: { show() {} } };
+    sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata); sim.replayRecorder.start(metadata);
+    for (let i = 0; i < 240; i++) SimulatorClass.prototype.updateFlightRecording.call(sim, 1 / 120);
+    SimulatorClass.prototype.endFlight.call(sim, 'manual');
+    assert.equal(sim.gameFlow.state, FLOW.DEBRIEF, 'the debrief still opens for an arena run');
+  }
+  assert.equal(ended.length, 1);
+  assert.equal(ended[0].reason, 'manual');
+});
