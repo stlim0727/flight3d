@@ -58,6 +58,33 @@ and arch ribs and cables as cylinders inside the boxes that pad each chord by th
 radius. Each bridge is merged into at most five meshes (steel, concrete, road, light,
 neon). `bridgeOpening()` is the clear passage under each deck; nothing is drawn in it.
 
+## Streets
+
+`src/config/neonRoads.js` (`neonStreets()`) lays a street network between the towers on
+both banks (#579). Before it the city had only the runway highway, which stopped 290 m
+short of the canal, and no road reached a bridge. Every street is an axis-aligned
+rectangle on the ground; a street joining another runs to that street's far edge, so
+junctions and corners are fully paved.
+
+- North-south streets (20 m) at x = 500, 1350, 1880, 2720, 3212 and 3700, from z = -880
+  to 880. The two inside the runway's length stop at its edges (|z| = 30) instead of
+  crossing it.
+- East-west streets (20 m) at z = ±540 and ±870, from x = 490 to the west riverside street
+  (x = 1880) and from the east riverside street (x = 2720) to x = 3710.
+- Bridge approaches at each deck's width from the riverside streets to the ramp feet
+  (`bridgeFeet()`). The arch bridge carries the main avenue: the runway highway runs on
+  from x = 1800 to its west foot, and the avenue continues from its east foot to x = 3710
+  under the gantries.
+- Only the bridges join the banks. `createNeonRoads()` (`NeonRoads.js`) draws dark asphalt
+  at the runway's height (y = 0.04) and violet curb lines (0.08) along every edge that does
+  not open onto another street, the runway or a bridge foot, all cut into pieces of at
+  most 100 m. Highway lamps that would stand in a street are left out.
+- The streets are flat decals on the street; they add no collision. The south tower at
+  x = 2560 moved from z = -670 to -760 to clear the light bridge's east approach.
+  `tests/neonRoads.test.js` keeps every street 10 m from every tower and off the water,
+  each ramp foot on an approach of the deck width, and the runway, streets and bridges
+  one connected network.
+
 ## Collision
 
 - **Every flight in Neon Metropolis.** `bridgeWorldBoxes()` turns every solid into a
@@ -93,7 +120,7 @@ and **Space / R / Enter → main menu → Fly** apply.
 ## Verification
 
 Node 22.23.2: `npm run check`, `npm test`, `npm run build`.
-Focused coverage: `node --test tests/bridgeFlight.test.js tests/neonRiver.test.js tests/neonCity.test.js`.
+Focused coverage: `node --test tests/bridgeFlight.test.js tests/neonRiver.test.js tests/neonCity.test.js tests/neonRoads.test.js`.
 
 Start Vite, then run `node scripts/verify-neon-bridge.mjs` (`SIM_URL`, `CHROME_PATH`,
 `CDP_PORT` and `ARTIFACT_DIR` are optional overrides). It picks Neon Metropolis and the
