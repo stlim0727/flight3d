@@ -7,12 +7,13 @@ import { serveHost } from './http.mjs';
 import { connectCdp, until, delay } from '../scripts/lib/cdpClient.mjs';
 import { getFreePort } from '../scripts/lib/browserHarness.mjs';
 import { newRoom, validRoom, inviteUrl } from '../src/multiplayer/roomCode.js';
+import { RoomDirectoryClient } from '../src/multiplayer/RoomDirectoryClient.js';
 
 export async function runCli({ readAsset, args = process.argv.slice(2) }) {
   const manifest = JSON.parse(await readAsset('manifest.json', 'utf8'));
   const config = readConfig(args);
   if (config.flags.has('help')) {
-    console.log(`flight3d-ghost-host ${manifest.version}\n\nRun a normal multiplayer host without a GPU or game checkout. Requires installed Chrome/Chromium. Native releases include Node; the portable JavaScript package requires Node 22.23.2+.\n\nOptions:\n  --name NAME          Pilot name (default Maverick)\n  --state-dir DIR      Persistent room state\n  --room CODE          Optional six-character room code\n  --public-url URL     Game URL used for invitations\n  --chrome PATH        Installed browser executable\n  --signal-url URL     PeerServer URL matching the guest deployment\n  --ice-servers JSON   ICE configuration matching the guest deployment\n  --version            Release and compatibility information\n  --check              Validate configuration/browser without starting a room\n  --help               Show this help\n\nConfiguration can also use GHOST_NAME, GHOST_STATE_DIR, GHOST_ROOM, GHOST_PUBLIC_URL, CHROME_PATH, GHOST_SIGNAL_URL and GHOST_ICE_SERVERS.`);
+    console.log(`flight3d-ghost-host ${manifest.version}\n\nRun a normal multiplayer host without a GPU or game checkout. Requires installed Chrome/Chromium. Native releases include Node; the portable JavaScript package requires Node 22.23.2+.\n\nOptions:\n  --name NAME          Pilot name (default Maverick)\n  --state-dir DIR      Persistent room state\n  --room CODE          Optional six-character room code\n  --public-url URL     Game URL used for invitations\n  --chrome PATH        Installed browser executable\n  --signal-url URL     PeerServer URL matching the guest deployment\n  --ice-servers JSON   ICE configuration matching the guest deployment\n  --directory URL      Public room directory API URL\n  --public             Register room in public directory\n  --version            Release and compatibility information\n  --check              Validate configuration/browser without starting a room\n  --help               Show this help\n\nConfiguration can also use GHOST_NAME, GHOST_STATE_DIR, GHOST_ROOM, GHOST_PUBLIC_URL, CHROME_PATH, GHOST_SIGNAL_URL, GHOST_ICE_SERVERS, GHOST_DIRECTORY_URL and GHOST_PUBLIC.`);
   } else if (config.flags.has('version')) {
     console.log(JSON.stringify(manifest, null, 2));
   } else {
@@ -34,12 +35,16 @@ export async function runCli({ readAsset, args = process.argv.slice(2) }) {
     await writeFile(stateTmp, JSON.stringify({ schema: 1, room: code, invite, name: config.name }, null, 2) + '\n', { mode: 0o600 });
     await rename(stateTmp, statePath); await chmod(statePath, 0o600);
     const profile = await mkdtemp(join(tmpdir(), 'flight3d-ghost-'));
-    let browser, server, client, watchdog;
+    let browser, server, client, watchdog, directoryClient;
     let stopping = false, polling = false, chromeLog = '', status = { state: 'starting', registered: false };
     const log = value => console.log(JSON.stringify(value));
     async function stop() {
       if (stopping) return;
       stopping = true; clearInterval(watchdog);
+      if (directoryClient) {
+        directoryClient.stopHeartbeat();
+        await directoryClient.unregister().catch(() => {});
+      }
       try { await Promise.race([client?.send('Browser.close').catch(() => {}), delay(1000)]); } catch { /* Browser may already have exited. */ }
       client?.close(); browser?.kill('SIGTERM');
       server?.closeAllConnections();
@@ -75,6 +80,58 @@ export async function runCli({ readAsset, args = process.argv.slice(2) }) {
       }, 'signaling registration', 60000);
       log({ event: 'ready', name: config.name, room: code, invite, ...manifest,
         statePath, healthUrl: `http://127.0.0.1:${port}/health`, cdpEndpoint: `http://127.0.0.1:${cdpPort}` });
+      let registering = false, lastDirectoryAttempt = 0;
+      async function syncDirectory() {
+        if (!config.isPublic || !config.directoryUrl || stopping || !status?.registered || status?.state === 'ended') return;
+        if (directoryClient?.isRegistered || registering) return;
+        const now = Date.now();
+        if (now - lastDirectoryAttempt < 10000) return;
+        lastDirectoryAttempt = now;
+        registering = true;
+        try {
+          const reg = await directoryClient.register({
+            roomCode: code,
+            name: config.name,
+            airport: 'coastal',
+            aircraft: 'B738',
+            scenario: 'cruise',
+            currentPlayers: status.remoteName ? 2 : 1,
+            maxPlayers: 2,
+            status: status.state === 'flying' ? 'flying' : (status.remoteName ? 'full' : 'waiting'),
+            protocolMajor: manifest.protocolVersion,
+            flightRevision: manifest.flightRevision,
+          });
+          if (stopping) {
+            if (reg?.ok) {
+              await directoryClient.unregisterLease(reg.registration).catch(() => {});
+            }
+            return;
+          }
+          if (reg?.ok) {
+            log({ event: 'directory-registered', id: reg.registration.id, directory: config.directoryUrl });
+            directoryClient.startHeartbeat({
+              intervalMs: 15000,
+              getStatus: () => {
+                const cur = status;
+                const currentPlayers = cur?.remoteName ? 2 : 1;
+                const roomStatus = cur?.state === 'flying' ? 'flying' : (cur?.remoteName ? 'full' : 'waiting');
+                return { currentPlayers, maxPlayers: 2, status: roomStatus };
+              },
+            });
+          } else {
+            console.warn(`[GhostHost] Directory registration failed: ${reg?.error} (continuing flight process)`);
+          }
+        } catch (err) {
+          console.warn(`[GhostHost] Directory registration error: ${err.message} (continuing flight process)`);
+        } finally {
+          registering = false;
+        }
+      }
+      if (config.isPublic && config.directoryUrl) {
+        directoryClient = new RoomDirectoryClient({ directoryUrl: config.directoryUrl });
+        await syncDirectory();
+      }
+      if (stopping) return;
       let previous = '', lastSimulationTime, lastProgressAt = Date.now();
       watchdog = setInterval(async () => {
         if (polling || stopping) return;
@@ -87,6 +144,7 @@ export async function runCli({ readAsset, args = process.argv.slice(2) }) {
           lastSimulationTime = status.simSeconds;
           const summary = JSON.stringify({ state: status.state, generation: status.generation, reason: status.reason, compatibilityFailure: status.compatibilityFailure });
           if (summary !== previous) { log({ event: 'state', ...JSON.parse(summary) }); previous = summary; }
+          await syncDirectory();
         } catch (error) { if (!stopping) { console.error(error.message); process.exitCode = 1; await stop(); } }
         finally { polling = false; }
       }, 2000);

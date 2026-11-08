@@ -4,10 +4,12 @@ import { readFileSync } from 'node:fs';
 import { GameFlowController } from '../src/ui/GameFlowController.js';
 import { t, bindText } from '../src/i18n/index.js';
 import { parseRoom, inviteUrl, inviteCompatibilityFailure } from '../src/multiplayer/protocol.js';
+import { RoomDirectoryClient } from '../src/multiplayer/RoomDirectoryClient.js';
+import { HEARTBEAT_INTERVAL_MS } from '../src/multiplayer/roomDirectory.js';
 
 // Load the production coordinator without importing its browser-only PeerJS adapter.
 const source = readFileSync(new URL('../src/multiplayer/MultiplayerController.js', import.meta.url), 'utf8');
-const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', 'inviteCompatibilityFailure', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl, inviteCompatibilityFailure);
+const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', 'inviteCompatibilityFailure', 'RoomDirectoryClient', 'HEARTBEAT_INTERVAL_MS', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl, inviteCompatibilityFailure, RoomDirectoryClient, HEARTBEAT_INTERVAL_MS);
 
 test('invite URL joins automatically; missing or invalid invites never connect', () => {
   const joined = [];
@@ -186,6 +188,215 @@ test('host start button is highlighted and focused once when a friend joins', ()
     assert.equal(attributes['data-ready'], 'false', 'restart during flight is not pulsed');
   } finally { globalThis.location = previousLocation; }
 }));
+
+test('refreshOpenRooms renders rooms and allows joining', async () => {
+  const children = [];
+  const container = {
+    replaceChildren() { children.length = 0; },
+    appendChild(child) { children.push(child); },
+  };
+  const prevDoc = globalThis.document;
+  const elements = [];
+  globalThis.document = {
+    createElement(tag) {
+      const el = {
+        tag,
+        className: '',
+        textContent: '',
+        disabled: false,
+        append(...items) { this.children = items; },
+        children: [],
+      };
+      elements.push(el);
+      return el;
+    },
+  };
+  try {
+    const joined = [];
+    const controller = Object.assign(Object.create(Controller.prototype), {
+      roomListContainer: container,
+      refreshingRooms: false,
+      roomInput: { value: '' },
+      room: null,
+      directoryClient: {
+        async fetchRooms() {
+          return {
+            ok: true,
+            rooms: [
+              { roomCode: 'K7M2QX', name: 'Maverick', airport: 'coastal', aircraft: 'B738', scenario: 'cruise', currentPlayers: 1, maxPlayers: 2, status: 'waiting' },
+              { roomCode: '8W3N9Z', name: 'FullRoom', airport: 'incheon', aircraft: 'F16', scenario: 'runway', currentPlayers: 2, maxPlayers: 2, status: 'full' },
+            ],
+          };
+        },
+      },
+      connectInvite(code) { joined.push(code); },
+    });
+
+    await controller.refreshOpenRooms();
+    assert.equal(children.length, 2);
+    // Find join button for Maverick
+    const maverickItem = children[0];
+    const actions = maverickItem.children[1];
+    const joinBtn = actions.children[1];
+    assert.equal(joinBtn.disabled, false);
+    joinBtn.onclick();
+    assert.deepEqual(joined, ['K7M2QX']);
+    assert.equal(controller.roomInput.value, 'K7M2QX');
+
+    // Full room button is disabled
+    const fullItem = children[1];
+    const fullActions = fullItem.children[1];
+    const fullJoinBtn = fullActions.children[1];
+    assert.equal(fullJoinBtn.disabled, true);
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});
+
+test('syncDirectoryHost serializes in-flight registration and cleans up if closed before response', async () => {
+  let registerCalls = 0;
+  const unregisterLeaseCalls = [];
+  let resolveRegister;
+  const mockDirectoryClient = {
+    isRegistered: false,
+    register() {
+      registerCalls++;
+      return new Promise(resolve => { resolveRegister = resolve; });
+    },
+    async unregisterLease(reg) {
+      unregisterLeaseCalls.push(reg);
+    },
+    startHeartbeat() {
+      this.heartbeatStarted = true;
+    },
+  };
+
+  const mockRoom = { host: true, registered: true, room: 'K7M2QX', closed: false, session: { name: 'Host' } };
+  const controller = Object.assign(Object.create(Controller.prototype), {
+    isPublicHost: true,
+    registeringHost: false,
+    registrationGeneration: 0,
+    room: mockRoom,
+    hostDirectoryClient: null,
+    directoryClient: { directoryUrl: 'https://directory.flight3d' },
+    createHostDirectoryClient() {
+      return mockDirectoryClient;
+    },
+  });
+
+  // First sync triggers register()
+  controller.syncDirectoryHost();
+  assert.equal(registerCalls, 1);
+
+  // Second sync while first is in-flight must NOT trigger another register()
+  controller.syncDirectoryHost();
+  assert.equal(registerCalls, 1);
+
+  // Now simulate host leaving or room closing before register resolves
+  mockRoom.closed = true;
+  controller.registrationGeneration++;
+  controller.isPublicHost = false;
+
+  // Now registration completes with ok
+  resolveRegister({ ok: true, registration: { id: 'room-late', token: 'tok-late', leaseGeneration: 1 } });
+  await new Promise(r => setTimeout(r, 10));
+
+  // Late resolution must call unregisterLease and NOT start heartbeats
+  assert.equal(unregisterLeaseCalls.length, 1);
+  assert.equal(unregisterLeaseCalls[0].id, 'room-late');
+  assert.equal(mockDirectoryClient.heartbeatStarted, undefined);
+});
+
+test('late registration for superseded room does not cancel newer room heartbeat or lease', async () => {
+  let resolveRegisterA;
+  let resolveRegisterB;
+  const unregisterLeaseCallsA = [];
+  const unregisterLeaseCallsB = [];
+
+  const clientA = {
+    isRegistered: false,
+    register() {
+      return new Promise(resolve => { resolveRegisterA = resolve; });
+    },
+    async unregisterLease(reg) {
+      unregisterLeaseCallsA.push(reg);
+    },
+    startHeartbeat() {
+      this.heartbeatStarted = true;
+    },
+    stopHeartbeat() {
+      this.heartbeatStarted = false;
+    },
+  };
+
+  const clientB = {
+    isRegistered: false,
+    register() {
+      this.isRegistered = true;
+      return new Promise(resolve => { resolveRegisterB = resolve; });
+    },
+    async unregisterLease(reg) {
+      unregisterLeaseCallsB.push(reg);
+    },
+    startHeartbeat() {
+      this.heartbeatStarted = true;
+    },
+    stopHeartbeat() {
+      this.heartbeatStarted = false;
+    },
+  };
+
+  let clientIndex = 0;
+  const clients = [clientA, clientB];
+
+  const roomA = { host: true, registered: true, room: 'ROOM0A', closed: false, session: { name: 'Host' } };
+  const roomB = { host: true, registered: true, room: 'ROOM0B', closed: false, session: { name: 'Host' } };
+
+  const controller = Object.assign(Object.create(Controller.prototype), {
+    isPublicHost: true,
+    registeringHost: false,
+    registrationGeneration: 0,
+    room: roomA,
+    hostDirectoryClient: null,
+    directoryClient: { directoryUrl: 'https://directory.flight3d' },
+    createHostDirectoryClient() {
+      return clients[clientIndex++];
+    },
+  });
+
+  // Start Room A registration (in-flight)
+  controller.syncDirectoryHost();
+  assert.equal(controller.hostDirectoryClient, clientA);
+
+  // Switch to Room B
+  controller.registrationGeneration++;
+  controller.registeringHost = false;
+  controller.room = roomB;
+  controller.syncDirectoryHost();
+  assert.equal(controller.hostDirectoryClient, clientB);
+
+  // Room B's register resolves first
+  resolveRegisterB({ ok: true, registration: { id: 'room-b', token: 'tok-b', leaseGeneration: 1 } });
+  await new Promise(r => setTimeout(r, 10));
+
+  assert.equal(clientB.heartbeatStarted, true);
+  assert.equal(clientB.isRegistered, true);
+  assert.equal(unregisterLeaseCallsB.length, 0);
+
+  // Now Room A's register resolves late
+  resolveRegisterA({ ok: true, registration: { id: 'room-a', token: 'tok-a', leaseGeneration: 1 } });
+  await new Promise(r => setTimeout(r, 10));
+
+  // Room A is cleaned up with unregisterLease
+  assert.equal(unregisterLeaseCallsA.length, 1);
+  assert.equal(unregisterLeaseCallsA[0].id, 'room-a');
+
+  // Room B is completely untouched and still running its heartbeat!
+  assert.equal(clientB.heartbeatStarted, true);
+  assert.equal(clientB.isRegistered, true);
+  assert.equal(unregisterLeaseCallsB.length, 0);
+  assert.equal(controller.hostDirectoryClient, clientB);
+});
 
 test('playAudio only plays when srcObject is present; manages playbackBlocked and voice context resume', () => fixture(async ({ controller }) => {
   let resumed = 0;

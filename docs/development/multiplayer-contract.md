@@ -30,6 +30,20 @@ There is no speculative feature-negotiation framework in this release.
 
 ## Discovery and handshake
 
+### Public room directory
+
+In addition to private direct invites, hosts can opt into the public directory service (`/v1/rooms`).
+The directory stores only short-lived metadata with a 45-second time-to-live (TTL) and 15-second host heartbeats.
+Secret lease tokens are stored as SHA-256 hashes and verified on heartbeat and deletion.
+Directory downtime never prevents direct invites or interrupts ongoing peer-to-peer flights.
+
+- `POST /v1/rooms`: Host registers public room, receives room ID and secret lease token.
+- `POST /v1/rooms/{id}/heartbeat`: 15s heartbeat with bearer token, updates status/player count, refreshes 45s TTL.
+- `DELETE /v1/rooms/{id}`: Best-effort unregister on graceful host exit.
+- `GET /v1/rooms`: Public listing filtered by `protocol` and `flight` revision. Excludes expired rooms (`expiresAt <= serverNow`).
+
+### Versioned invites and handshake
+
 Versioned invite: `https://GAME/flight3d/?r=K7M2QX&mp=2&fr=1`.
 The guest validates version hints before connecting or requesting its microphone.
 Room signaling identifiers are `flight3d-v2-K7M2QX`; another major has a separate
