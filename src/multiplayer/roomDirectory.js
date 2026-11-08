@@ -271,6 +271,8 @@ export class LocalRoomDirectoryStore {
     this.channel = typeof globalThis !== 'undefined' && typeof globalThis.BroadcastChannel !== 'undefined'
       ? new globalThis.BroadcastChannel(channelName)
       : null;
+    // The store only posts. In Node an open channel keeps the process alive, so a test run never exits.
+    this.channel?.unref?.();
     this.memoryFallback = new MemoryRoomDirectoryStore({ ttlMs, maxRooms });
   }
 
