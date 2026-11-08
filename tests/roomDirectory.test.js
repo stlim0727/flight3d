@@ -138,6 +138,38 @@ test('superseding registration increments generation and removes old entry', asy
   assert.equal(store.listRooms({ now: t0 + 7000 }).length, 0);
 });
 
+test('MemoryRoomDirectoryStore handles concurrent registrations for the same room code atomically', async () => {
+  const store = new MemoryRoomDirectoryStore();
+  const [r1, r2] = await Promise.all([
+    store.registerRoom({
+      roomCode: 'K7M2QX',
+      name: 'HostA',
+      airport: 'coastal',
+      aircraft: 'C172',
+      scenario: 'cruise',
+      protocolMajor: 2,
+      flightRevision: 1,
+    }),
+    store.registerRoom({
+      roomCode: 'K7M2QX',
+      name: 'HostB',
+      airport: 'coastal',
+      aircraft: 'B738',
+      scenario: 'runway',
+      protocolMajor: 2,
+      flightRevision: 1,
+    }),
+  ]);
+
+  assert.equal(store.rooms.size, 1);
+  const rooms = await store.listRooms();
+  assert.equal(rooms.length, 1);
+  assert.equal(rooms[0].roomCode, 'K7M2QX');
+
+  const generations = [r1.leaseGeneration, r2.leaseGeneration].sort();
+  assert.deepEqual(generations, [1, 2]);
+});
+
 test('handleDirectoryRequest handles HTTP routes, CORS, filters and errors', async () => {
   const store = new MemoryRoomDirectoryStore();
   const now = 200000;

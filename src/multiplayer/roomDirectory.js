@@ -96,6 +96,7 @@ export class MemoryRoomDirectoryStore {
     this.maxRooms = maxRooms;
     this.rooms = new Map();
     this.roomCodeToId = new Map();
+    this.roomLocks = new Map();
   }
 
   pruneExpired(now = Date.now()) {
@@ -110,46 +111,69 @@ export class MemoryRoomDirectoryStore {
   }
 
   async registerRoom(data, now = Date.now()) {
-    this.pruneExpired(now);
     const valid = validateRoomRegistration(data);
 
-    // If there's an existing unexpired registration for this room code, supersede it
-    const existingId = this.roomCodeToId.get(valid.roomCode);
-    let leaseGeneration = 1;
-    if (existingId && this.rooms.has(existingId)) {
-      const prev = this.rooms.get(existingId);
-      leaseGeneration = (prev.leaseGeneration || 1) + 1;
-      this.rooms.delete(existingId);
+    let resolveLock;
+    const lockPromise = new Promise(resolve => { resolveLock = resolve; });
+    while (this.roomLocks.has(valid.roomCode)) {
+      await this.roomLocks.get(valid.roomCode).catch(() => {});
     }
+    this.roomLocks.set(valid.roomCode, lockPromise);
 
-    if (this.rooms.size >= this.maxRooms) {
-      throw new Error('capacity-exceeded');
+    try {
+      this.pruneExpired(now);
+
+      // If there's an existing unexpired registration for this room code, supersede it
+      const existingId = this.roomCodeToId.get(valid.roomCode);
+      let leaseGeneration = 1;
+      if (existingId && this.rooms.has(existingId)) {
+        const prev = this.rooms.get(existingId);
+        leaseGeneration = (prev.leaseGeneration || 1) + 1;
+        this.rooms.delete(existingId);
+      }
+
+      if (this.rooms.size >= this.maxRooms) {
+        throw new Error('capacity-exceeded');
+      }
+
+      const id = `room_${crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').slice(0, 16) : Math.random().toString(36).slice(2, 14)}`;
+      const token = `tok_${crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)}`;
+      const tokenHash = await hashToken(token);
+
+      // Re-check and atomically clear any concurrent entry before saving
+      const concurrentId = this.roomCodeToId.get(valid.roomCode);
+      if (concurrentId && this.rooms.has(concurrentId)) {
+        const prev = this.rooms.get(concurrentId);
+        leaseGeneration = (prev.leaseGeneration || leaseGeneration) + 1;
+        this.rooms.delete(concurrentId);
+      }
+
+      const roomRecord = {
+        id,
+        tokenHash,
+        leaseGeneration,
+        ...valid,
+        createdAt: now,
+        lastHeartbeatAt: now,
+        expiresAt: now + this.ttlMs,
+      };
+
+      this.rooms.set(id, roomRecord);
+      this.roomCodeToId.set(valid.roomCode, id);
+
+      return {
+        id,
+        token,
+        leaseGeneration,
+        expiresAt: roomRecord.expiresAt,
+        room: publicRoomSummary(roomRecord),
+      };
+    } finally {
+      if (this.roomLocks.get(valid.roomCode) === lockPromise) {
+        this.roomLocks.delete(valid.roomCode);
+      }
+      resolveLock();
     }
-
-    const id = `room_${crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').slice(0, 16) : Math.random().toString(36).slice(2, 14)}`;
-    const token = `tok_${crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)}`;
-    const tokenHash = await hashToken(token);
-
-    const roomRecord = {
-      id,
-      tokenHash,
-      leaseGeneration,
-      ...valid,
-      createdAt: now,
-      lastHeartbeatAt: now,
-      expiresAt: now + this.ttlMs,
-    };
-
-    this.rooms.set(id, roomRecord);
-    this.roomCodeToId.set(valid.roomCode, id);
-
-    return {
-      id,
-      token,
-      leaseGeneration,
-      expiresAt: roomRecord.expiresAt,
-      room: publicRoomSummary(roomRecord),
-    };
   }
 
   async heartbeat(id, token, updates = {}, now = Date.now()) {
