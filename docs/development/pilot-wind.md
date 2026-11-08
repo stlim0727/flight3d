@@ -191,6 +191,13 @@ already supplies roll damping. Gust-induced differential drag/yaw is omitted.
 Incheon, mild, calm and Light keep center-only sampling. Reset clears all three
 wind vectors so a prior Strong run cannot leave a residual rolling moment.
 
+At the shared start and fixed seed, the first tick already sees a right-minus-left
+vertical wind difference of 0.159 m/s (Moderate) or 0.318 m/s (Strong), producing
+30.610/61.223 kN m of gradient moment. Attitude changes continuously after that
+force is applied: Strong reaches about 3.41° of bank at 2 s and 4.62° at 2.7 s.
+This guarantees an immediate disturbance for this fixture, not an instantaneous
+attitude jump or a region-entry event. Both first-tick values are regression-checked.
+
 The Node comparison test flies all levels for 7,200 ticks, checks equal starts,
 increasing roll range for this seed, and no crash/damage/stall/G-LOC/engine failure.
 It also checks each level's manual input, deterministic restart, and preset

@@ -115,6 +115,7 @@ await withBrowserSession({ startVite: false, origin: process.env.SIM_URL || 'htt
       assert.ok(run.max.roll - run.min.roll > previousRollRange, profile);
       previousRollRange = run.max.roll - run.min.roll;
       if (profile !== 'light-turbulence-v1') {
+        assert.ok(Math.abs(run.trace[0].wingMoment) > 1000, `${profile}: first-tick gust moment`);
         assert.ok(run.min.roll < -1.5 && run.max.roll > 2, `${profile}: visible banks both ways`);
         assert.ok(run.min.wingMoment < -1000 && run.max.wingMoment > 1000);
         assert.ok(run.min.wingWindDifference < 0 && run.max.wingWindDifference > 0);

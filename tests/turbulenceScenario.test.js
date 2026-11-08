@@ -46,6 +46,10 @@ test('all three menu scenarios share initial conditions and fly 60 s with increa
     let minRoll = Infinity, maxRoll = -Infinity;
     for (let tick = 0; tick < 7200; tick++) {
       stepPhysics(sim);
+      if (tick === 0 && id !== 'turbulence') {
+        assert.ok(Math.abs(sim._aeroResult.wingGustRollMoment) > 1000, `${id}: gust acts from the first tick`);
+        assert.notDeepEqual(sim.aero.windLeftWorld, sim.aero.windRightWorld);
+      }
       minRoll = Math.min(minRoll, sim.telemetry.rollDeg);
       maxRoll = Math.max(maxRoll, sim.telemetry.rollDeg);
     }
