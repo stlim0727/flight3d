@@ -107,12 +107,15 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
 
   const tabs = [...document.querySelectorAll('.lobby-tab')];
   function selectTab(selected, focus = false) {
-    document.getElementById('btn-fly').hidden = selected.id === 'lobby-tab-dev';
+    const flyBtn = document.getElementById('btn-fly');
+    if (flyBtn) flyBtn.hidden = selected.id === 'lobby-tab-dev' || selected.id === 'lobby-tab-multi';
     for (const tab of tabs) {
       const active = tab === selected;
       tab.setAttribute('aria-selected', String(active));
       tab.tabIndex = active ? 0 : -1;
-      document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
+      const targetId = tab.getAttribute('aria-controls');
+      const panel = targetId ? document.getElementById(targetId) : null;
+      if (panel) panel.hidden = !active;
     }
     document.querySelector('.lobby-panels').scrollTop = 0;
     updateBackButton();
