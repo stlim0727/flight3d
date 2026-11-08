@@ -113,6 +113,7 @@ class SimulatorHudAndBindingsMethods {
     };
 
     this.controls.onCycleTimeOfDay = (deltaHours) => {
+      if (this.developerMode && !this.developerMode.enabled) return;
       this.setTimeOfDay(this.sky.timeOfDay + deltaHours);
     };
 
@@ -521,6 +522,18 @@ class SimulatorHudAndBindingsMethods {
     // Initialize Demo Director UI bindings
     this.demoDirector.initUI();
 
+    const restartFlight = () => {
+      this.gameFlow.enterFlight();
+      if (this.devRunner.active) { this.devRunner.restart(); return; }
+      if (this.lastPresetType === 'valley') {
+        this.clearCrashState?.();
+        this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' })
+          .catch(error => recoverSimulatorFlightStart(this, error));
+        return;
+      }
+      this.setPreset(this.lastPresetType || 'runway');
+    };
+
     // Lobby + pause menu bindings
     this.lobbyScreen = initLobbyScreen({
       getAirport: () => this.lobby.airport,
@@ -561,9 +574,9 @@ class SimulatorHudAndBindingsMethods {
         this.lobbyScreen?.refresh();
       },
       onFly: () => this.fly(),
+      onRestart: () => restartFlight(),
       canResume: () => this.gameFlow.canResumeFromLobby() && !this.isCrashed,
-      canEnd: () => this.gameFlow.canResumeFromLobby() && (this.flightRecorder.active
-        || (this.isCrashed && this.debriefReport?.reason === 'crash')),
+      canEnd: () => this.gameFlow.canResumeFromLobby(),
       onResume: () => this.resumeFlight(),
     });
     this.renderDiagnosticsPanel = new RenderDiagnosticsPanel(this);
@@ -583,17 +596,7 @@ class SimulatorHudAndBindingsMethods {
     document.getElementById('btn-lobby-end')?.addEventListener('click', () => this.endFlight());
     this.developerPanel = new DeveloperPanel(this);
     document.getElementById('btn-pause-resume')?.addEventListener('click', () => this.gameFlow.resume());
-    document.getElementById('btn-pause-restart')?.addEventListener('click', () => {
-      this.gameFlow.resume();
-      if (this.devRunner.active) { this.devRunner.restart(); return; }
-      if (this.lastPresetType === 'valley') {
-        this.clearCrashState?.();
-        this.startValleyMission({ pilotKind: this.lobby.pilotMode || 'human' })
-          .catch(error => recoverSimulatorFlightStart(this, error));
-        return;
-      }
-      this.setPreset(this.lastPresetType || 'runway');
-    });
+    document.getElementById('btn-pause-restart')?.addEventListener('click', restartFlight);
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
     document.getElementById('btn-pause-exit')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
     const pauseMenu = document.getElementById('pause-menu');

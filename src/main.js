@@ -256,6 +256,16 @@ class FlightSimulator {
     this.touchControls.onOptionsChange = () => this.lobby?.refresh?.();
     initFlightPanels({
       onSelectCamera: mode => this.controls.onSelectCamera(mode),
+      onCameraOpen: () => {
+        if (!this.multiplayer?.active && this.gameFlow.state === FLOW.FLIGHT) {
+          this.gameFlow.holdCameraSelection();
+        }
+      },
+      onCameraClose: () => {
+        if (!this.multiplayer?.active) {
+          this.gameFlow.releaseCameraSelection();
+        }
+      },
       onAdjustTrim: delta => {
         if (this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed) return;
         this.aero.setTrim(delta);
@@ -641,6 +651,8 @@ class FlightSimulator {
     if (held) this.cameraSystem?.beginPauseView();
     else this.cameraSystem?.endPauseView();
     this.updateMenuToggle();
+    const pauseEnd = document.getElementById('btn-pause-end');
+    if (pauseEnd) pauseEnd.hidden = state !== FLOW.PAUSED;
     this.multiplayer?.refresh?.();
   }
 
@@ -758,7 +770,13 @@ class FlightSimulator {
   }
 
   endFlight(reason = 'manual') {
-    if (!this.flightRecorder.active && !(this.isCrashed && this.debriefReport?.reason === 'crash')) return;
+    if (!this.flightRecorder.active && !(this.isCrashed && this.debriefReport?.reason === 'crash')) {
+      if (this.gameFlow.canResumeFromLobby() || this.gameFlow.state === FLOW.PAUSED) {
+        this.gameFlow.returnToLobby(false);
+        this.syncFlowUi();
+      }
+      return;
+    }
     if (![FLOW.FLIGHT, FLOW.PAUSED].includes(this.gameFlow.state) && !this.gameFlow.canResumeFromLobby()) return;
     this.crashDebriefRemaining = null;
     this.debriefReport = this.isCrashed ? this.flightRecorder.finish('crash', this.crashResult)

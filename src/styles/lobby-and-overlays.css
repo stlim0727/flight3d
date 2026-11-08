@@ -475,6 +475,35 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
   font-size: calc(10px * var(--ui-scale, 1));
   color: #64748b;
 }
+.lobby-managed-hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: calc(11px * var(--ui-scale, 1));
+  line-height: 1.4;
+}
+.lobby-managed-card {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--ui-scale, 1));
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  border-radius: calc(8px * var(--ui-scale, 1));
+  padding: calc(10px * var(--ui-scale, 1)) calc(12px * var(--ui-scale, 1));
+}
+.lobby-managed-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: calc(11px * var(--ui-scale, 1));
+}
+.lobby-managed-item .managed-label {
+  color: #94a3b8;
+  font-weight: 500;
+}
+.lobby-managed-item .managed-value {
+  color: #e0f2fe;
+  font-weight: 600;
+}
 .lobby-card .btn-fly {
   background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
   border: 1px solid rgba(255, 255, 255, 0.25);
