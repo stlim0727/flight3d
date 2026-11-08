@@ -14,6 +14,9 @@ export class DeveloperPanel {
       this.select.append(option);
     }
     document.getElementById('dev-build').textContent = `v${build.version} · ${build.revision} · ${build.builtAt}`;
+    document.getElementById('lobby-tab-dev')?.addEventListener('click', () => {
+      document.getElementById('lobby-tab-settings')?.click();
+    });
     document.getElementById('dev-render-trials').addEventListener('click', () => {
       if (!sim.developerMode.enabled) return;
       sim.devRunner.stop(); sim.demoDirector.stop(); sim.gameFlow.enterFlight();
@@ -74,12 +77,10 @@ export class DeveloperPanel {
   refresh() {
     const sim = this.sim, runner = sim.devRunner;
     const enabled = sim.developerMode.enabled;
-    document.getElementById('dev-enabled').checked = enabled;
-    if (!enabled && document.getElementById('lobby-tab-dev').getAttribute('aria-selected') === 'true') {
-      document.getElementById('lobby-tab-settings').click();
-    }
-    document.getElementById('lobby-tab-dev').hidden = !enabled;
-    if (!enabled) document.getElementById('lobby-panel-dev').hidden = true;
+    const devEnabledCheckbox = document.getElementById('dev-enabled');
+    if (devEnabledCheckbox) devEnabledCheckbox.checked = enabled;
+    const devPanel = document.getElementById('lobby-panel-dev');
+    if (devPanel) devPanel.hidden = !enabled;
     document.getElementById('dev-live').hidden = !enabled || !runner.active || sim.gameFlow.state === 'lobby';
     document.getElementById('dev-run').disabled = !sim.developerMode.canRun(DEV_SCENARIOS[this.select.value], runner.context);
     for (const id of ['dev-stop', 'dev-restart']) document.getElementById(id).disabled = !runner.active;

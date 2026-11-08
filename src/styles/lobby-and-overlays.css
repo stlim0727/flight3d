@@ -367,6 +367,49 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
   white-space: normal;
   border-radius: calc(8px * var(--ui-scale, 1));
 }
+.lobby-dev-section {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--ui-scale, 1));
+  padding-top: calc(8px * var(--ui-scale, 1));
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+.dev-controls-box {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--ui-scale, 1));
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  border-radius: calc(8px * var(--ui-scale, 1));
+  padding: calc(10px * var(--ui-scale, 1));
+}
+.dev-controls-box[hidden] {
+  display: none !important;
+}
+.dev-controls-box .dev-build {
+  margin: 0;
+  font-size: calc(10.5px * var(--ui-scale, 1));
+}
+.dev-controls-box label {
+  font-size: calc(10px * var(--ui-scale, 1));
+  color: #94a3b8;
+}
+.dev-controls-box select {
+  width: 100%;
+}
+.dev-controls-box .dev-description {
+  margin: 0;
+  font-size: calc(11px * var(--ui-scale, 1));
+  line-height: 1.4;
+  color: #cbd5e1;
+}
+.dev-controls-box .lobby-buttons {
+  display: flex;
+  gap: calc(6px * var(--ui-scale, 1));
+}
+.dev-controls-box .lobby-buttons .btn {
+  flex: 1 1 auto;
+}
 #btn-diag, #btn-help {
   border-color: rgba(56, 189, 248, .28);
 }
