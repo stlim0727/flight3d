@@ -406,6 +406,60 @@ describe('HotasController - Buttons & Systems Actions', () => {
     assert.strictEqual(hatEvents.length, 0);
   });
 
+  it('reads raw HID POV hat switch from axes[9] (DirectInput/IOHIDManager 8-way encoding) and axes[5..6] (Linux evdev)', () => {
+    const hatEvents = [];
+    const controls = {
+      pitchTrim: 2.0,
+      pitchTrimRate: 0.0,
+      inputBlocked: false,
+      aircraftControlsDisabled: false,
+      onHatLook: (dirX, dirY, dt) => hatEvents.push({ dirX, dirY, dt }),
+    };
+
+    // 1. DirectInput / macOS raw HID 10-axis report with axes[9] 8-way POV hat
+    let mockGamepad = {
+      id: 'Thrustmaster T.Flight Hotas One (Vendor: 044f Product: b68b)',
+      index: 0,
+      mapping: '',
+      axes: [0, 0, 0, 1.0, 0, 0, 0, 0, 0, 9 / 7], // Centered hat (> 1.0)
+      buttons: new Array(12).fill(0).map(() => ({ pressed: false, value: 0 })),
+    };
+
+    const hotas = new HotasController(controls, { getGamepads: () => [mockGamepad] });
+    hotas.update(0.05);
+    assert.strictEqual(hatEvents.length, 0, 'Centered raw hat (> 1.0) must not fire onHatLook');
+
+    // Hat Up (k = 0 -> -1.0)
+    mockGamepad.axes[9] = -1.0;
+    hotas.update(0.05);
+    assert.deepStrictEqual(hatEvents.pop(), { dirX: 0, dirY: -1, dt: 0.05 });
+
+    // Hat Right (k = 2 -> -3/7)
+    mockGamepad.axes[9] = -3 / 7;
+    hotas.update(0.05);
+    assert.deepStrictEqual(hatEvents.pop(), { dirX: 1, dirY: 0, dt: 0.05 });
+
+    // Hat Down (k = 4 -> +1/7)
+    mockGamepad.axes[9] = 1 / 7;
+    hotas.update(0.05);
+    assert.deepStrictEqual(hatEvents.pop(), { dirX: 0, dirY: 1, dt: 0.05 });
+
+    // Hat Left (k = 6 -> +5/7)
+    mockGamepad.axes[9] = 5 / 7;
+    hotas.update(0.05);
+    assert.deepStrictEqual(hatEvents.pop(), { dirX: -1, dirY: 0, dt: 0.05 });
+
+    // Hat Up-Left (k = 7 -> +1.0)
+    mockGamepad.axes[9] = 1.0;
+    hotas.update(0.05);
+    assert.deepStrictEqual(hatEvents.pop(), { dirX: -1, dirY: -1, dt: 0.05 });
+
+    // 2. Linux evdev 7-axis report with ABS_HAT0X on axes[5] and ABS_HAT0Y on axes[6]
+    mockGamepad.axes = [0, 0, 0, 1.0, 0, -1.0, 1.0]; // Down-Left
+    hotas.update(0.05);
+    assert.deepStrictEqual(hatEvents.pop(), { dirX: -1, dirY: 1, dt: 0.05 });
+  });
+
   it('respects inputBlocked by suppressing flight surfaces and action buttons', () => {
     let gearToggled = 0;
     const controls = {

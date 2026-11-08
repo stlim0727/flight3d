@@ -353,6 +353,63 @@ export class HotasController {
     return current && !prev;
   }
 
+  /**
+   * Read 8-way POV hat switch direction from D-pad buttons (12-15),
+   * raw HID encoded 8-way hat axis (axes[9] on DirectInput/IOHIDManager),
+   * or dual-axis hat (axes[5], axes[6] on Linux evdev).
+   * @returns {{ dirX: number, dirY: number }}
+   */
+  readHatSwitch(gp, axes = [], buttons = []) {
+    const hatUp = this.isButtonPressed(buttons, 12);
+    const hatDown = this.isButtonPressed(buttons, 13);
+    const hatLeft = this.isButtonPressed(buttons, 14);
+    const hatRight = this.isButtonPressed(buttons, 15);
+
+    let dirX = (hatRight ? 1 : 0) - (hatLeft ? 1 : 0);
+    let dirY = (hatDown ? 1 : 0) - (hatUp ? 1 : 0);
+    if (dirX !== 0 || dirY !== 0) {
+      return { dirX, dirY };
+    }
+
+    if (gp?.mapping === 'standard') {
+      return { dirX: 0, dirY: 0 };
+    }
+
+    // DirectInput / macOS raw HID 8-way POV hat encoded on axes[9]:
+    // k = 0..7 -> value = (2 * k - 7) / 7; centered > 1.05 (e.g. 9/7 = 1.286 or 3.286) or 0.0
+    if (axes.length > 9 && Number.isFinite(axes[9])) {
+      const rawHat = axes[9];
+      if (Math.abs(rawHat) > 0.08 && rawHat <= 1.05) {
+        const k = Math.round(((rawHat + 1) * 7) / 2);
+        const expected = (2 * k - 7) / 7;
+        if (k >= 0 && k <= 7 && Math.abs(rawHat - expected) <= 0.08) {
+          const hatDirs = [
+            { dirX: 0, dirY: -1 },  // 0: N (Up)
+            { dirX: 1, dirY: -1 },  // 1: NE (Up-Right)
+            { dirX: 1, dirY: 0 },   // 2: E (Right)
+            { dirX: 1, dirY: 1 },   // 3: SE (Down-Right)
+            { dirX: 0, dirY: 1 },   // 4: S (Down)
+            { dirX: -1, dirY: 1 },  // 5: SW (Down-Left)
+            { dirX: -1, dirY: 0 },  // 6: W (Left)
+            { dirX: -1, dirY: -1 }, // 7: NW (Up-Left)
+          ];
+          return hatDirs[k];
+        }
+      }
+    }
+
+    // Linux evdev dual-axis POV hat (ABS_HAT0X on axes[5], ABS_HAT0Y on axes[6])
+    if (axes.length >= 7 && axes.length <= 8) {
+      const hx = Number.isFinite(axes[5]) && Math.abs(axes[5]) > 0.5 ? Math.sign(axes[5]) : 0;
+      const hy = Number.isFinite(axes[6]) && Math.abs(axes[6]) > 0.5 ? Math.sign(axes[6]) : 0;
+      if (hx !== 0 || hy !== 0) {
+        return { dirX: hx, dirY: hy };
+      }
+    }
+
+    return { dirX: 0, dirY: 0 };
+  }
+
   updateThrottleFromRaw(rawThrottle, applyToControls = true) {
     let normalized = this.throttleInverted
       ? (rawThrottle + 1.0) * 0.5
@@ -735,24 +792,9 @@ export class HotasController {
       this.controls?.onToggleAudio?.();
     }
 
-    // --- 4. POV / Hat Switch (Look around / look at each side) ---
-    // Buttons 12-15 or raw Hat axes (D-pad mapping)
-    // Hat Up (12): Look Up
-    // Hat Down (13): Look Down
-    // Hat Left (14): Look Left
-    // Hat Right (15): Look Right
-    const hatUp = this.isButtonPressed(buttons, 12);
-    const hatDown = this.isButtonPressed(buttons, 13);
-    const hatLeft = this.isButtonPressed(buttons, 14);
-    const hatRight = this.isButtonPressed(buttons, 15);
-
-    let hatDirX = 0;
-    let hatDirY = 0;
-    if (hatLeft) hatDirX -= 1;
-    if (hatRight) hatDirX += 1;
-    if (hatUp) hatDirY -= 1;
-    if (hatDown) hatDirY += 1;
-
+    // --- 4. POV / Hat Switch (Quick Glance) ---
+    // Buttons 12-15 or raw HID Hat axes (axes[9] encoded 8-way or axes[5..6] dual hat)
+    const { dirX: hatDirX, dirY: hatDirY } = this.readHatSwitch(gp, axes, buttons);
     if (hatDirX !== 0 || hatDirY !== 0) {
       this.controls?.onHatLook?.(hatDirX, hatDirY, dt);
     }
@@ -864,23 +906,8 @@ export class HotasController {
       this.controls?.onToggleLights?.();
     }
 
-    // --- 4. POV / D-pad (Look around / look at each side) ---
-    // Button 12: D-pad Up (Look Up)
-    // Button 13: D-pad Down (Look Down)
-    // Button 14: D-pad Left (Look Left)
-    // Button 15: D-pad Right (Look Right)
-    const hatUp = this.isButtonPressed(buttons, 12);
-    const hatDown = this.isButtonPressed(buttons, 13);
-    const hatLeft = this.isButtonPressed(buttons, 14);
-    const hatRight = this.isButtonPressed(buttons, 15);
-
-    let hatDirX = 0;
-    let hatDirY = 0;
-    if (hatLeft) hatDirX -= 1;
-    if (hatRight) hatDirX += 1;
-    if (hatUp) hatDirY -= 1;
-    if (hatDown) hatDirY += 1;
-
+    // --- 4. POV / D-pad (Quick Glance) ---
+    const { dirX: hatDirX, dirY: hatDirY } = this.readHatSwitch(gp, axes, buttons);
     if (hatDirX !== 0 || hatDirY !== 0) {
       this.controls?.onHatLook?.(hatDirX, hatDirY, dt);
     }
@@ -946,19 +973,8 @@ export class HotasController {
     if (this.wasJustPressed(buttons, 8)) this.controls?.onCycleCamera?.();
     if (this.wasJustPressed(buttons, 9)) this.controls?.onToggleLights?.();
 
-    // D-pad (Look around / look at each side)
-    const dUp = this.isButtonPressed(buttons, 12);
-    const dDown = this.isButtonPressed(buttons, 13);
-    const dLeft = this.isButtonPressed(buttons, 14);
-    const dRight = this.isButtonPressed(buttons, 15);
-
-    let dDirX = 0;
-    let dDirY = 0;
-    if (dLeft) dDirX -= 1;
-    if (dRight) dDirX += 1;
-    if (dUp) dDirY -= 1;
-    if (dDown) dDirY += 1;
-
+    // D-pad (Quick Glance)
+    const { dirX: dDirX, dirY: dDirY } = this.readHatSwitch(gp, axes, buttons);
     if (dDirX !== 0 || dDirY !== 0) {
       this.controls?.onHatLook?.(dDirX, dDirY, dt);
     }
