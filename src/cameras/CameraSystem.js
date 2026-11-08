@@ -938,6 +938,8 @@ export class CameraSystem {
   }
 
   loadAircraftConfig(config = {}) {
+    this.aircraftConfig = config;
+    this.cinematicDirector?.loadAircraftConfig?.(config);
     const cockpit = config.cockpit || {};
     this.cockpitPortraitEyeX = cockpit.portraitEyeX ?? -0.34;
     const aero = config.aerodynamics || {};
