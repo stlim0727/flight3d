@@ -291,7 +291,10 @@ export class DebriefOverlay {
     if (headerPill) {
       headerPill.hidden = false;
       headerPill.className = 'debrief-header-pill ' + (!enough ? 'is-empty' : crash ? 'is-crash' : 'is-landed');
-      bindText(headerPill, () => !enough ? t('debrief.insufficient') : crash ? t('debrief.crashSeverity') : t(`debrief.outcome.${report.reason}`));
+      // A 374px-wide phone leaves the title column about 85px, so the pill shows a badge word; the sentence moves to the tooltip.
+      const pillState = !enough ? 'empty' : crash ? 'crash' : report.reason;
+      bindText(headerPill, () => t(`debrief.pill.${pillState}`));
+      bindText(headerPill, () => !enough ? t('debrief.insufficient') : crash ? t('debrief.crashSeverity') : t(`debrief.outcome.${report.reason}`), 'title');
     }
     // A crash headline names the collision; short records keep their own headline, so the block names it.
     bindText(this.el('outcome'), () => !enough ? t('debrief.empty') : crash ? crashName(crash) : t(`debrief.outcome.${report.reason}`));

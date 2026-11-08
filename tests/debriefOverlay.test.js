@@ -129,3 +129,25 @@ test('every replay store refusal token has a localized reason in both catalogs',
   assert.ok(enDebrief['debrief.saveReplay'] && koDebrief['debrief.saveReplay']);
 });
 
+
+test('header outcome pill shows a short single-line label instead of a sentence (#597)', () => {
+  const debriefSource = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
+  const pillBinding = debriefSource.match(/bindText\(headerPill, \(\) => ([^\n]*)\);/);
+  assert.ok(pillBinding, 'header pill text must be bound');
+  assert.doesNotMatch(pillBinding[1], /debrief\.(insufficient|outcome\.|crashSeverity)/,
+    'the narrow header pill must not reuse full-sentence outcome messages');
+  for (const state of ['manual', 'landed', 'crash', 'empty']) {
+    const key = `debrief.pill.${state}`;
+    assert.ok(enDebrief[key] && koDebrief[key], `${key} must exist in both locales`);
+    assert.ok(koDebrief[key].length <= 5, `${key} must stay badge-sized in Korean`);
+    assert.ok(enDebrief[key].length <= 8, `${key} must stay badge-sized in English`);
+  }
+
+  const css = readFileSync(resolve('src/styles/debrief.css'), 'utf8');
+  const pillRule = css.match(/\.debrief-header-pill \{([^}]*)\}/);
+  assert.ok(pillRule, 'header pill rule must exist');
+  assert.match(pillRule[1], /white-space:\s*nowrap/, 'pill must never break one glyph per line');
+  assert.match(pillRule[1], /text-overflow:\s*ellipsis/, 'pill must clip instead of growing vertically');
+  assert.match(css, /@media \(max-width: 420px\) \{\s*\.debrief-fold-btn \.fold-caption \{ display: none; \}/,
+    'phone headers drop the fold caption so "Flight3d" does not overlap the utility buttons');
+});
