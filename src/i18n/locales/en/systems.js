@@ -47,6 +47,8 @@ export default {
   "the.value.struck.a.city.high.rise": "The {value} struck a city high-rise.",
   "the.value.struck.dense.trees": "The {value} struck dense trees.",
   "the.value.struck.a.vessel": "The {value} struck a vessel.",
+  "the.value.collided.with.another.aircraft": "The {value} collided with another aircraft.",
+  "the.value.collided.with.remote.pilot": "The {value} collided with {target}'s aircraft.",
   "the.aircraft.hit.the.ocean.surface.at": "The aircraft hit the surface at high speed.",
   "the.aircraft.departed.the.runway": "The aircraft departed the runway surface while moving on the ground.",
   "gear.up.belly.crash": "GEAR-UP BELLY CRASH",

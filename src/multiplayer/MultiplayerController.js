@@ -18,6 +18,7 @@ const DEFAULT_DIRECTORY_URL = typeof window !== 'undefined'
 export class MultiplayerController {
   constructor(sim) {
     this.sim = sim; this.preparing = false; this.preparationHold = false;
+    this.remoteCrashed = false;
     this.soloControls = new Map();
     this.dialog = document.getElementById('mp-dialog');
     this.modal = new MultiplayerDialog(sim, this.dialog, () => this.dismissDialog());
@@ -187,6 +188,7 @@ export class MultiplayerController {
   }
   startTogether() {
     this.preparationHold = false;
+    this.remoteCrashed = false;
     this.modal.close({ resume: false });
     this.sim.gameFlow.enterFlight(); this.sim.syncFlowUi();
     this.sim.ensureAudio?.();
@@ -208,6 +210,7 @@ export class MultiplayerController {
     const room = this.room;
     this.openDialog();
     this.preparing = true; this.preparationHold = true; this.slot = slot;
+    this.remoteCrashed = false;
     this.remote?.dispose(); this.remote = null;
     try {
       this.sim.pilotArena?.stop('multiplayer'); this.sim.demoDirector.stop();
@@ -233,6 +236,7 @@ export class MultiplayerController {
   /** Called exactly once at the end of each preset reset, including crash recovery. */
   respawn() {
     if (!this.active || !['starting', 'flying'].includes(this.room.session.state)) return;
+    this.remoteCrashed = false;
     const sim = this.sim;
     sim.position.add(slotOffset(this.room.session.config.scenario, this.slot, sim.quaternion));
     sim.renderPose.reset(sim.position, sim.quaternion);
@@ -242,6 +246,7 @@ export class MultiplayerController {
   }
   respawnLocal() {
     if (!this.active || this.room.session.state !== 'flying') return;
+    this.remoteCrashed = false;
     this.sim.setPreset(this.room.session.config.scenario);
     this.modal.close({ resume: false });
     this.sim.gameFlow.enterFlight();
@@ -253,6 +258,23 @@ export class MultiplayerController {
     this.room.session.snapshot({ p: sim.position.toArray(), q: sim.quaternion.toArray(), v: sim.linearVelocity.toArray(),
       crashed: sim.isCrashed, held: this.modalOpen || sim.browserBackgrounded === true || sim.gameFlow.isPhysicsFrozen(),
       gear: sim.gear.gearState, flaps: sim.aero.currentFlapAngle, talking: this.voice?.talking === true });
+  }
+  getCollisionTargets() {
+    if (!this.active || this.room?.session?.state !== 'flying') return [];
+    if (!this.remote || this.remote.disposed) return [];
+    const sample = this.remote.group.userData.remote;
+    if (!sample || sample.crashed || sample.held || sample.stale) return [];
+    if (!this.remote.group.visible) return [];
+    return [{
+      position: this.remote.group.position,
+      quaternion: this.remote.group.quaternion,
+      aircraft: this.remote.aircraft || this.room?.session?.config?.aircraft || 'C172',
+      name: this.room?.session?.remoteName || 'Pilot',
+      velocity: Array.isArray(sample.v)
+        ? { x: sample.v[0], y: sample.v[1], z: sample.v[2], length() { return Math.hypot(this.x, this.y, this.z); } }
+        : null,
+      crashed: sample.crashed === true,
+    }];
   }
   update() {
     if (!this.remote || !this.active) return;
@@ -268,6 +290,27 @@ export class MultiplayerController {
       localPosition: this.sim.position,
       cameraMode: this.sim.cameraSystem.mode,
     });
+    if (sample) {
+      if (sample.crashed) {
+        if (!this.remoteCrashed) {
+          this.remoteCrashed = true;
+          if (!this.remote.explosionSystem) {
+            const remoteVel = Array.isArray(sample.v)
+              ? { x: sample.v[0], y: sample.v[1], z: sample.v[2], length() { return Math.hypot(this.x, this.y, this.z); } }
+              : { x: 0, y: 0, z: 0, length() { return 0; } };
+            const speedKnots = remoteVel.length() * 1.94384;
+            this.sim.explosionSystem?.spawnExplosion({
+              point: this.remote.group.position,
+              type: 'AIRCRAFT',
+              speedKnots,
+            }, remoteVel);
+            this.sim.audio?.playExplosion(false);
+          }
+        }
+      } else {
+        this.remoteCrashed = false;
+      }
+    }
   }
   async playAudio() {
     this.voice?.context.resume().catch(() => {});
@@ -281,6 +324,7 @@ export class MultiplayerController {
     this.refresh();
   }
   ended(reason) {
+    this.remoteCrashed = false;
     const durationSeconds = this.connectStartedAt ? Number(((performance.now() - this.connectStartedAt) / 1000).toFixed(1)) : 0;
     const roundsPlayed = this.room?.session?.round ?? 0;
     this.sim.analytics?.trackMultiplayerSessionEnded?.({

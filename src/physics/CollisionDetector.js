@@ -31,6 +31,148 @@ export const F16_COLLISION_PROBES = Object.freeze([
   { id: 'belly', pos: [0, -0.7, 0], radius: 0.4, descKey: 'belly.fuselage' },
 ]);
 
+export const AIRCRAFT_COLLISION_CONFIG = Object.freeze({
+  B738: Object.freeze({
+    boundingRadius: 26.0,
+    segments: Object.freeze([
+      { id: 'fuselage', p1: Object.freeze([0, -0.2, -17.5]), p2: Object.freeze([0, 1.2, 17.5]), radius: 2.1 },
+      { id: 'wings', p1: Object.freeze([-17.2, 0.6, 2.8]), p2: Object.freeze([17.2, 0.6, 2.8]), radius: 1.2 },
+      { id: 'fin', p1: Object.freeze([0, 1.2, 16.5]), p2: Object.freeze([0, 9.2, 16.0]), radius: 0.9 },
+      { id: 'tailplane', p1: Object.freeze([-7.0, 1.5, 17.5]), p2: Object.freeze([7.0, 1.5, 17.5]), radius: 0.8 },
+    ]),
+    engines: Object.freeze([
+      { id: 'engineL', pos: Object.freeze([-5.06, -1.95, -5.22]), radius: 1.2, descKey: 'left.engine' },
+      { id: 'engineR', pos: Object.freeze([5.06, -1.95, -5.22]), radius: 1.2, descKey: 'right.engine' },
+    ]),
+  }),
+  C172: Object.freeze({
+    boundingRadius: 7.0,
+    segments: Object.freeze([
+      { id: 'fuselage', p1: Object.freeze([0, 0.0, -2.4]), p2: Object.freeze([0, 0.4, 4.2]), radius: 1.0 },
+      { id: 'wings', p1: Object.freeze([-5.5, 0.92, -0.3]), p2: Object.freeze([5.5, 0.92, -0.3]), radius: 0.6 },
+      { id: 'fin', p1: Object.freeze([0, 0.4, 3.7]), p2: Object.freeze([0, 2.0, 3.7]), radius: 0.5 },
+      { id: 'tailplane', p1: Object.freeze([-1.7, 0.5, 4.2]), p2: Object.freeze([1.7, 0.5, 4.2]), radius: 0.4 },
+    ]),
+    engines: Object.freeze([]),
+  }),
+  F16: Object.freeze({
+    boundingRadius: 12.0,
+    segments: Object.freeze([
+      { id: 'fuselage', p1: Object.freeze([0, 0, -7.7]), p2: Object.freeze([0, 0, 7.8]), radius: 1.3 },
+      { id: 'wings', p1: Object.freeze([-4.8, 0, 1.8]), p2: Object.freeze([4.8, 0, 1.8]), radius: 0.5 },
+      { id: 'fin', p1: Object.freeze([0, 0.5, 7.0]), p2: Object.freeze([0, 3.2, 6.8]), radius: 0.5 },
+      { id: 'tailplane', p1: Object.freeze([-2.7, 0.1, 7.8]), p2: Object.freeze([2.7, 0.1, 7.8]), radius: 0.4 },
+    ]),
+    engines: Object.freeze([]),
+  }),
+});
+
+function segmentSegmentDistanceSq(p1, q1, p2, q2) {
+  const d1x = q1.x - p1.x, d1y = q1.y - p1.y, d1z = q1.z - p1.z;
+  const d2x = q2.x - p2.x, d2y = q2.y - p2.y, d2z = q2.z - p2.z;
+  const rx = p1.x - p2.x, ry = p1.y - p2.y, rz = p1.z - p2.z;
+
+  const a = d1x * d1x + d1y * d1y + d1z * d1z;
+  const e = d2x * d2x + d2y * d2y + d2z * d2z;
+  const f = d2x * rx + d2y * ry + d2z * rz;
+
+  let s = 0.0;
+  let t = 0.0;
+
+  if (a <= 1e-6 && e <= 1e-6) {
+    return {
+      distSq: rx * rx + ry * ry + rz * rz,
+      c1: { x: p1.x, y: p1.y, z: p1.z },
+      c2: { x: p2.x, y: p2.y, z: p2.z },
+      s: 0,
+      t: 0
+    };
+  }
+
+  if (a <= 1e-6) {
+    s = 0.0;
+    t = Math.max(0.0, Math.min(1.0, f / e));
+  } else {
+    const c = d1x * rx + d1y * ry + d1z * rz;
+    if (e <= 1e-6) {
+      t = 0.0;
+      s = Math.max(0.0, Math.min(1.0, -c / a));
+    } else {
+      const b = d1x * d2x + d1y * d2y + d1z * d2z;
+      const denom = a * e - b * b;
+
+      if (denom > 1e-6) {
+        s = Math.max(0.0, Math.min(1.0, (b * f - c * e) / denom));
+      } else {
+        s = 0.0;
+      }
+
+      t = (b * s + f) / e;
+
+      if (t < 0.0) {
+        t = 0.0;
+        s = Math.max(0.0, Math.min(1.0, -c / a));
+      } else if (t > 1.0) {
+        t = 1.0;
+        s = Math.max(0.0, Math.min(1.0, (b - c) / a));
+      }
+    }
+  }
+
+  const c1x = p1.x + s * d1x, c1y = p1.y + s * d1y, c1z = p1.z + s * d1z;
+  const c2x = p2.x + t * d2x, c2y = p2.y + t * d2y, c2z = p2.z + t * d2z;
+  const dx = c1x - c2x, dy = c1y - c2y, dz = c1z - c2z;
+
+  return {
+    distSq: dx * dx + dy * dy + dz * dz,
+    c1: { x: c1x, y: c1y, z: c1z },
+    c2: { x: c2x, y: c2y, z: c2z },
+    s,
+    t
+  };
+}
+
+function pointSegmentDistanceSq(pt, p, q) {
+  const dx = q.x - p.x, dy = q.y - p.y, dz = q.z - p.z;
+  const l2 = dx * dx + dy * dy + dz * dz;
+  if (l2 <= 1e-6) {
+    const rx = pt.x - p.x, ry = pt.y - p.y, rz = pt.z - p.z;
+    return { distSq: rx * rx + ry * ry + rz * rz, c: { x: p.x, y: p.y, z: p.z }, t: 0 };
+  }
+  const t = Math.max(0.0, Math.min(1.0, ((pt.x - p.x) * dx + (pt.y - p.y) * dy + (pt.z - p.z) * dz) / l2));
+  const cx = p.x + t * dx, cy = p.y + t * dy, cz = p.z + t * dz;
+  const rx = pt.x - cx, ry = pt.y - cy, rz = pt.z - cz;
+  return { distSq: rx * rx + ry * ry + rz * rz, c: { x: cx, y: cy, z: cz }, t };
+}
+
+function getAircraftSegmentPartDesc(segmentId, s) {
+  if (segmentId === 'fuselage') {
+    if (s <= 0.25) return t('nose.radome');
+    if (s >= 0.75) return t('tail.empennage');
+    return t('belly.fuselage');
+  }
+  if (segmentId === 'wings') {
+    if (s <= 0.35) return t('left.wingtip');
+    if (s >= 0.65) return t('right.wingtip');
+    return s <= 0.5 ? t('left.wingtip') : t('right.wingtip');
+  }
+  if (segmentId === 'fin') {
+    return t('vertical.fin');
+  }
+  if (segmentId === 'tailplane') {
+    return t('tail.empennage');
+  }
+  return t('belly.fuselage');
+}
+
+const _acSegP1 = new THREE.Vector3();
+const _acSegQ1 = new THREE.Vector3();
+const _acSegP2 = new THREE.Vector3();
+const _acSegQ2 = new THREE.Vector3();
+const _acEngPos = new THREE.Vector3();
+const _acTargetPos = new THREE.Vector3();
+const _acTargetQuat = new THREE.Quaternion();
+
 /**
  * High-Performance Aircraft Collision & Obstacle Detector
  * Checks 6-DOF aircraft collision against:
@@ -61,12 +203,18 @@ export class CollisionDetector {
     this.treeGrid = new Map();
     this.buildingGrid = new Map();
     this.gridSource = foliageAndCities;
+    this.remoteAircraftProvider = null;
 
     this.buildSpatialGrids();
   }
 
+  setRemoteAircraftProvider(provider) {
+    this.remoteAircraftProvider = provider;
+  }
+
   loadAircraftConfig(config = {}) {
     const isC172 = config?.id === 'C172';
+    this.aircraftId = config?.id === 'F16' ? 'F16' : isC172 ? 'C172' : 'B738';
     const probes = config?.id === 'F16' ? F16_COLLISION_PROBES : isC172 ? C172_COLLISION_PROBES : B738_COLLISION_PROBES;
     this.probePoints = probes.map(p => ({
       id: p.id,
@@ -224,7 +372,28 @@ export class CollisionDetector {
       };
     }
 
-    // 6. Water / Ocean Impact Check
+    // 6. Remote Aircraft Collision Check
+    const aircraftResult = this.checkAircraft(position, quaternion, worldProbes, linearVelocity, groundContact);
+    if (aircraftResult) {
+      const isGround = Boolean(groundContact?.onGround);
+      const crashSpeedKnots = aircraftResult.relativeVelocity
+        ? Math.max(speedKnots, aircraftResult.relativeVelocity.length() * 1.94384)
+        : speedKnots;
+      return {
+        collided: true,
+        type: 'AIRCRAFT',
+        get name() { return isGround ? t('aircraft.collision') : t('midair.collision'); },
+        point: aircraftResult.point,
+        speedKnots: crashSpeedKnots,
+        get description() {
+          return aircraftResult.remoteName
+            ? t('the.value.collided.with.remote.pilot', { value: aircraftResult.part, target: aircraftResult.remoteName })
+            : t('the.value.collided.with.another.aircraft', { value: aircraftResult.part });
+        }
+      };
+    }
+
+    // 7. Water / Ocean Impact Check
     const waterResult = this.checkWater(position, worldProbes, speedMs, vsiMs);
     if (waterResult) {
       return {
@@ -237,7 +406,7 @@ export class CollisionDetector {
       };
     }
 
-    // 7. Terrain & Hills Collision Check
+    // 8. Terrain & Hills Collision Check
     const terrainResult = this.checkTerrain(position, worldProbes, gearState, pitchDeg, rollDeg, speedMs, vsiMs, linearVelocity, groundContact);
     if (terrainResult) {
       return {
@@ -248,6 +417,144 @@ export class CollisionDetector {
         speedKnots,
         get description() { return terrainResult.description; }
       };
+    }
+
+    return null;
+  }
+
+  checkAircraft(aircraftPos, aircraftQuat, worldProbes, linearVelocity, groundContact = null) {
+    if (!this.remoteAircraftProvider) return null;
+    const provider = typeof this.remoteAircraftProvider === 'function'
+      ? this.remoteAircraftProvider()
+      : this.remoteAircraftProvider;
+    if (!provider) return null;
+
+    const targets = Array.isArray(provider) ? provider : [provider];
+    const localGeom = AIRCRAFT_COLLISION_CONFIG[this.aircraftId] || AIRCRAFT_COLLISION_CONFIG.C172;
+
+    for (const target of targets) {
+      if (!target || target.crashed || target.active === false) continue;
+      if (!target.position || !target.quaternion) continue;
+
+      if (Array.isArray(target.position)) {
+        _acTargetPos.fromArray(target.position);
+      } else {
+        _acTargetPos.copy(target.position);
+      }
+
+      if (Array.isArray(target.quaternion)) {
+        _acTargetQuat.fromArray(target.quaternion);
+      } else {
+        _acTargetQuat.copy(target.quaternion);
+      }
+
+      const remoteGeom = AIRCRAFT_COLLISION_CONFIG[target.aircraft] || AIRCRAFT_COLLISION_CONFIG.C172;
+      const broadDist = localGeom.boundingRadius + remoteGeom.boundingRadius;
+      const dx = aircraftPos.x - _acTargetPos.x;
+      const dy = aircraftPos.y - _acTargetPos.y;
+      const dz = aircraftPos.z - _acTargetPos.z;
+      if (dx * dx + dy * dy + dz * dz > broadDist * broadDist) continue;
+
+      const calcRelVel = () => {
+        if (!target.velocity) return null;
+        if (target.velocity.isVector3) return linearVelocity.clone().sub(target.velocity);
+        if (Array.isArray(target.velocity)) {
+          return new THREE.Vector3(
+            linearVelocity.x - target.velocity[0],
+            linearVelocity.y - target.velocity[1],
+            linearVelocity.z - target.velocity[2]
+          );
+        }
+        return new THREE.Vector3(
+          linearVelocity.x - target.velocity.x,
+          linearVelocity.y - target.velocity.y,
+          linearVelocity.z - target.velocity.z
+        );
+      };
+
+      // 1. Check local segments vs remote segments
+      for (const segL of localGeom.segments) {
+        _acSegP1.set(segL.p1[0], segL.p1[1], segL.p1[2]).applyQuaternion(aircraftQuat).add(aircraftPos);
+        _acSegQ1.set(segL.p2[0], segL.p2[1], segL.p2[2]).applyQuaternion(aircraftQuat).add(aircraftPos);
+
+        for (const segR of remoteGeom.segments) {
+          _acSegP2.set(segR.p1[0], segR.p1[1], segR.p1[2]).applyQuaternion(_acTargetQuat).add(_acTargetPos);
+          _acSegQ2.set(segR.p2[0], segR.p2[1], segR.p2[2]).applyQuaternion(_acTargetQuat).add(_acTargetPos);
+
+          const { distSq, s, c1, c2 } = segmentSegmentDistanceSq(_acSegP1, _acSegQ1, _acSegP2, _acSegQ2);
+          const maxDist = segL.radius + segR.radius;
+          if (distSq <= maxDist * maxDist) {
+            return {
+              point: new THREE.Vector3((c1.x + c2.x) * 0.5, (c1.y + c2.y) * 0.5, (c1.z + c2.z) * 0.5),
+              get part() { return getAircraftSegmentPartDesc(segL.id, s); },
+              remoteName: target.name || null,
+              relativeVelocity: calcRelVel(),
+            };
+          }
+        }
+      }
+
+      // 2. Check local engines against remote segments
+      if (localGeom.engines && localGeom.engines.length) {
+        for (const eng of localGeom.engines) {
+          _acEngPos.set(eng.pos[0], eng.pos[1], eng.pos[2]).applyQuaternion(aircraftQuat).add(aircraftPos);
+          for (const segR of remoteGeom.segments) {
+            _acSegP2.set(segR.p1[0], segR.p1[1], segR.p1[2]).applyQuaternion(_acTargetQuat).add(_acTargetPos);
+            _acSegQ2.set(segR.p2[0], segR.p2[1], segR.p2[2]).applyQuaternion(_acTargetQuat).add(_acTargetPos);
+            const { distSq, c } = pointSegmentDistanceSq(_acEngPos, _acSegP2, _acSegQ2);
+            const maxDist = eng.radius + segR.radius;
+            if (distSq <= maxDist * maxDist) {
+              return {
+                point: new THREE.Vector3((_acEngPos.x + c.x) * 0.5, (_acEngPos.y + c.y) * 0.5, (_acEngPos.z + c.z) * 0.5),
+                get part() { return t(eng.descKey); },
+                remoteName: target.name || null,
+                relativeVelocity: calcRelVel(),
+              };
+            }
+          }
+        }
+      }
+
+      // 3. Check remote engines against local segments
+      if (remoteGeom.engines && remoteGeom.engines.length) {
+        for (const eng of remoteGeom.engines) {
+          _acEngPos.set(eng.pos[0], eng.pos[1], eng.pos[2]).applyQuaternion(_acTargetQuat).add(_acTargetPos);
+          for (const segL of localGeom.segments) {
+            _acSegP1.set(segL.p1[0], segL.p1[1], segL.p1[2]).applyQuaternion(aircraftQuat).add(aircraftPos);
+            _acSegQ1.set(segL.p2[0], segL.p2[1], segL.p2[2]).applyQuaternion(aircraftQuat).add(aircraftPos);
+            const { distSq, s, c } = pointSegmentDistanceSq(_acEngPos, _acSegP1, _acSegQ1);
+            const maxDist = eng.radius + segL.radius;
+            if (distSq <= maxDist * maxDist) {
+              return {
+                point: new THREE.Vector3((_acEngPos.x + c.x) * 0.5, (_acEngPos.y + c.y) * 0.5, (_acEngPos.z + c.z) * 0.5),
+                get part() { return getAircraftSegmentPartDesc(segL.id, s); },
+                remoteName: target.name || null,
+                relativeVelocity: calcRelVel(),
+              };
+            }
+          }
+        }
+      }
+
+      // 4. Check local world probes against remote segments
+      if (worldProbes && worldProbes.length) {
+        for (const probe of worldProbes) {
+          for (const segR of remoteGeom.segments) {
+            _acSegP2.set(segR.p1[0], segR.p1[1], segR.p1[2]).applyQuaternion(_acTargetQuat).add(_acTargetPos);
+            _acSegQ2.set(segR.p2[0], segR.p2[1], segR.p2[2]).applyQuaternion(_acTargetQuat).add(_acTargetPos);
+            const { distSq, c } = pointSegmentDistanceSq(probe.pos, _acSegP2, _acSegQ2);
+            const maxDist = probe.radius + segR.radius;
+            if (distSq <= maxDist * maxDist) {
+              return {
+                point: new THREE.Vector3((probe.pos.x + c.x) * 0.5, (probe.pos.y + c.y) * 0.5, (probe.pos.z + c.z) * 0.5),
+                get part() { return probe.desc; },
+                remoteName: target.name || null,
+                relativeVelocity: calcRelVel(),
+              };
+            }
+          }
+        }
+      }
     }
 
     return null;

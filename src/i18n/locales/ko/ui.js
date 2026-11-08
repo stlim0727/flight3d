@@ -196,6 +196,8 @@ export default {
   "skyscraper.collision": "도심 빌딩 충돌 (SKYSCRAPER COLLISION)",
   "tree.collision": "산림 수목 충돌 (TREE COLLISION)",
   "maritime.vessel.collision": "해상 선박 충돌 (MARITIME VESSEL COLLISION)",
+  "midair.collision": "공중 충돌 (MIDAIR COLLISION)",
+  "aircraft.collision": "항공기 충돌 (AIRCRAFT COLLISION)",
   "ocean.water.impact": "지표면 충돌 (SURFACE IMPACT)",
   "catastrophic.landing.impact": "치명적 착륙 충격 (CATASTROPHIC LANDING IMPACT)",
   "excessive.belly.impact.or.accumulated.structural.damage": "기체 하부의 과도한 충격 또는 누적 구조 손상으로 기체가 파손되었습니다.",
