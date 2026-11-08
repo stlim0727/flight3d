@@ -236,8 +236,8 @@
         <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario"><span class="tab-icon" aria-hidden="true">🎯</span> <span data-i18n="lobby.tab.single">싱글</span></button>
         <button id="lobby-tab-multi" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-multi" tabindex="-1"><span class="tab-icon" aria-hidden="true">👥</span> <span data-i18n="lobby.tab.multi">멀티</span></button>
         <button id="lobby-tab-settings" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-settings" tabindex="-1"><span class="tab-icon" aria-hidden="true">⚙️</span> <span data-i18n="lobby.tab.option">옵션</span></button>
-        <button id="lobby-tab-dev" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-dev" tabindex="-1" hidden><span class="tab-icon" aria-hidden="true">🛠️</span> <span data-i18n="dev.title">개발자</span></button>
       </div>
+      <button id="lobby-tab-dev" type="button" hidden style="display:none!important;" aria-hidden="true"><span class="tab-icon" aria-hidden="true">🛠️</span></button>
       <div class="lobby-panels">
         <section id="lobby-panel-scenario" class="lobby-tab-panel" role="tabpanel" aria-labelledby="lobby-tab-scenario" tabindex="0">
           <div class="lobby-group" role="group">
@@ -365,21 +365,23 @@
           </div>
         </section>
         <section id="lobby-panel-settings" class="lobby-tab-panel lobby-settings" role="tabpanel" aria-labelledby="lobby-tab-settings" tabindex="0" hidden>
-          <label class="dev-enable"><input id="dev-enabled" type="checkbox"><span data-i18n="dev.enable">개발자 모드 (이번 세션)</span></label>
           <div class="lobby-buttons" id="lobby-settings"></div>
-        </section>
-        <section id="lobby-panel-dev" class="lobby-tab-panel" role="tabpanel" aria-labelledby="lobby-tab-dev" tabindex="0" hidden>
-          <p id="dev-build" class="dev-build"></p>
-          <button id="dev-render-trials" class="btn" data-i18n="render.open">렌더링 비교 패널</button>
-          <label for="dev-scenario" data-i18n="dev.choose">테스트 시나리오</label>
-          <select id="dev-scenario" class="btn"></select>
-          <p id="dev-description" class="dev-description"></p>
-          <div class="lobby-buttons">
-            <button id="dev-run" class="btn" data-i18n="dev.run">실행</button>
-            <button id="dev-restart" class="btn" data-i18n="dev.restart">재실행</button>
-            <button id="dev-stop" class="btn" data-i18n="dev.stop">종료·복구</button>
+          <div class="lobby-dev-section">
+            <label class="dev-enable"><input id="dev-enabled" type="checkbox"><span data-i18n="dev.enable">개발자 모드 (이번 세션)</span></label>
+            <div id="lobby-panel-dev" class="dev-controls-box" hidden>
+              <p id="dev-build" class="dev-build"></p>
+              <button id="dev-render-trials" class="btn" data-i18n="render.open">렌더링 비교 패널</button>
+              <label for="dev-scenario" data-i18n="dev.choose">테스트 시나리오</label>
+              <select id="dev-scenario" class="btn"></select>
+              <p id="dev-description" class="dev-description"></p>
+              <div class="lobby-buttons">
+                <button id="dev-run" class="btn" data-i18n="dev.run">실행</button>
+                <button id="dev-restart" class="btn" data-i18n="dev.restart">재실행</button>
+                <button id="dev-stop" class="btn" data-i18n="dev.stop">종료·복구</button>
+              </div>
+              <p id="dev-result" class="dev-description" role="status"></p>
+            </div>
           </div>
-          <p id="dev-result" class="dev-description" role="status"></p>
         </section>
       </div>
       <div class="lobby-actions">
