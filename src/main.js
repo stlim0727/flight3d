@@ -17,6 +17,7 @@ import { SIM_CONFIG } from './config/simConfig.js';
 import { advancePhysicsFrame, clampFrameDelta } from './core/physicsTiming.js';
 import { EngineModel } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
+import { WaterDitching } from './physics/WaterDitching.js';
 import { AutopilotController } from './physics/Autopilot.js';
 import { solveTrim } from './physics/TrimSolver.js';
 import { LoadingPanel } from './ui/LoadingPanel.js';
@@ -207,6 +208,7 @@ class FlightSimulator {
     this.engines = new EngineModel();
     this.engines.bindMassProperties(this.aero.massProperties);
     this.gear = new LandingGear();
+    this.waterDitching = new WaterDitching();
     this.pilotPhysiology = new PilotPhysiology();
 
     await startupStage(2, 'startup.world');
@@ -770,6 +772,9 @@ class FlightSimulator {
       this.debriefReport = this.flightRecorder.finish('crash', this.crashResult);
       this.debriefReplay = this.replayRecorder.finish();
       this.crashDebriefRemaining = 3;
+    }
+    else if (this.waterDitching?.submerged && this.waterDitching?.timeSinceSubmerged >= 4) {
+      this.endFlight('ditching');
     }
     else if (this.flightRecorder.stopped >= 3) this.endFlight('landed');
   }

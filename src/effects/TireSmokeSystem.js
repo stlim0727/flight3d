@@ -22,6 +22,7 @@ export class TireSmokeSystem {
 
     // Realistic soft feathered smoke texture
     this.smokeTexture = createEffectAtlas('tire');
+    this.waterTexture = createEffectAtlas('water');
 
     // Reusable vectors for performance
     this._tempVec = new THREE.Vector3();
@@ -138,6 +139,102 @@ export class TireSmokeSystem {
     }
   }
 
+  /**
+   * Spawns expanding water spray plumes for hydroplaning ditching
+   */
+  emitWaterSprayBurst(origin, linearVelocity, groundSpeed, count = 3) {
+    const velNorm = this._tempVec.copy(linearVelocity).setY(0);
+    const speed = velNorm.length();
+    if (speed > 0.001) velNorm.normalize();
+    else velNorm.set(0, 0, -1);
+
+    const waterY = this.terrain?.getWaterLevel?.(origin.x, origin.z) ?? 0.0;
+
+    for (let i = 0; i < count; i++) {
+      if (this.particles.length >= 220) break;
+
+      const spriteMat = createFlipbookMaterial(this.waterTexture, {
+        transparent: true,
+        opacity: 0.75 + Math.random() * 0.20,
+        depthWrite: false
+      });
+
+      const sprite = new THREE.Sprite(spriteMat);
+      const lateralSpread = (Math.random() - 0.5) * 3.5;
+      const longitudinalSpread = (Math.random() - 0.5) * 2.0;
+      const latVec = new THREE.Vector3(-velNorm.z, 0, velNorm.x);
+
+      sprite.position.copy(origin).addScaledVector(latVec, lateralSpread).addScaledVector(velNorm, longitudinalSpread);
+      sprite.position.y = waterY + 0.3 + Math.random() * 0.4;
+
+      // High-velocity upward and backward water rooster tail
+      const backwardFactor = 0.2 + Math.random() * 0.3;
+      const vel = new THREE.Vector3(
+        -velNorm.x * groundSpeed * backwardFactor + (Math.random() - 0.5) * 4.0,
+        2.5 + Math.random() * 4.0, // Vigorous upward splash fountain
+        -velNorm.z * groundSpeed * backwardFactor + (Math.random() - 0.5) * 4.0
+      );
+
+      const baseScale = 1.2 + Math.random() * 0.8;
+      sprite.scale.set(baseScale, baseScale, 1.0);
+
+      this.group.add(sprite);
+      this.particles.push({
+        sprite,
+        vel,
+        scale: baseScale,
+        growth: 3.5 + Math.random() * 2.5,
+        life: 0.0,
+        maxLife: 1.4 + Math.random() * 0.4,
+        baseOpacity: 0.80,
+        isWater: true,
+      });
+    }
+  }
+
+  /**
+   * Spawns gentle bubbling water surface plumes while aircraft is sinking
+   */
+  emitWaterRipples(origin, count = 2) {
+    const waterY = this.terrain?.getWaterLevel?.(origin.x, origin.z) ?? 0.0;
+    for (let i = 0; i < count; i++) {
+      if (this.particles.length >= 220) break;
+
+      const spriteMat = createFlipbookMaterial(this.waterTexture, {
+        transparent: true,
+        opacity: 0.50 + Math.random() * 0.20,
+        depthWrite: false
+      });
+
+      const sprite = new THREE.Sprite(spriteMat);
+      sprite.position.copy(origin);
+      sprite.position.x += (Math.random() - 0.5) * 2.5;
+      sprite.position.z += (Math.random() - 0.5) * 2.5;
+      sprite.position.y = waterY + 0.15;
+
+      const vel = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.8,
+        0.3 + Math.random() * 0.5,
+        (Math.random() - 0.5) * 0.8
+      );
+
+      const baseScale = 0.8 + Math.random() * 0.6;
+      sprite.scale.set(baseScale, baseScale, 1.0);
+
+      this.group.add(sprite);
+      this.particles.push({
+        sprite,
+        vel,
+        scale: baseScale,
+        growth: 1.8 + Math.random() * 1.5,
+        life: 0.0,
+        maxLife: 1.8 + Math.random() * 0.5,
+        baseOpacity: 0.60,
+        isWater: true,
+      });
+    }
+  }
+
   update(dt) {
     // 1. Process active spin-up emitters
     for (let i = this.activeSpinUpEmitters.length - 1; i >= 0; i--) {
@@ -173,11 +270,13 @@ export class TireSmokeSystem {
 
         p.sprite.position.addScaledVector(p.vel, dt);
 
-        // Keep smoke rolling above ground
+        // Keep smoke/spray rolling above ground or water
         const groundY = this.terrain ? this.terrain.getHeight(p.sprite.position.x, p.sprite.position.z) : 0.0;
-        if (p.sprite.position.y < groundY + 0.2) {
-          p.sprite.position.y = groundY + 0.2;
-          p.vel.y = Math.abs(p.vel.y) * 0.3; // Gentle surface deflection
+        const waterY = p.isWater ? (this.terrain?.getWaterLevel?.(p.sprite.position.x, p.sprite.position.z) ?? 0.0) : groundY;
+        const surfaceY = p.isWater ? Math.max(groundY, waterY) : groundY;
+        if (p.sprite.position.y < surfaceY + 0.15) {
+          p.sprite.position.y = surfaceY + 0.15;
+          p.vel.y = Math.abs(p.vel.y) * 0.25; // Gentle surface deflection
         }
 
         // Expansion: smoke billows outward
@@ -192,7 +291,7 @@ export class TireSmokeSystem {
 
   dispose() {
     this.clear();
-    for (const texture of [this.smokeTexture]) texture.dispose();
+    for (const texture of [this.smokeTexture, this.waterTexture]) texture?.dispose?.();
     this.scene.remove(this.group);
   }
 

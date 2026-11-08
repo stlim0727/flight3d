@@ -394,7 +394,7 @@ export class CollisionDetector {
     }
 
     // 7. Water / Ocean Impact Check
-    const waterResult = this.checkWater(position, worldProbes, speedMs, vsiMs);
+    const waterResult = this.checkWater(position, worldProbes, speedMs, vsiMs, pitchDeg, rollDeg, groundContact);
     if (waterResult) {
       return {
         collided: true,
@@ -812,7 +812,7 @@ export class CollisionDetector {
     return null;
   }
 
-  checkWater(aircraftPos, worldProbes, speedMs, vsiMs) {
+  checkWater(aircraftPos, worldProbes, speedMs, vsiMs, pitchDeg = 0, rollDeg = 0, groundContact = null) {
     if (!this.terrain) return null;
 
     const terrainH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
@@ -821,14 +821,44 @@ export class CollisionDetector {
     // Water is located where natural terrain is at or below the water level (within 2.5m)
     if (terrainH > waterLevel + 2.5) return null;
 
-    // Ditching / crashing into water: speed > 15 m/s (~30 knots) or vertical descent > 3.0 m/s
-    if (speedMs < 5.0 && Math.abs(vsiMs) < 1.0) return null; // Stationary boat/seaplane safe state
-
+    let contactPoint = null;
     for (const probe of worldProbes) {
       if (probe.pos.y <= waterLevel + 0.5) {
-        return { point: probe.pos.clone() };
+        contactPoint = probe.pos;
+        break;
       }
     }
+    if (!contactPoint) return null;
+
+    // Detection-only callers (no contact solver):
+    if (!groundContact) {
+      // Ditching / crashing into water: speed > 15 m/s (~30 knots) or vertical descent > 3.0 m/s
+      if (speedMs < 5.0 && Math.abs(vsiMs) < 1.0) return null; // Stationary boat/seaplane safe state
+      return { point: contactPoint.clone() };
+    }
+
+    // Active simulation with solver:
+    const waterDitching = groundContact.waterDitching;
+    if (waterDitching?.catastrophic || groundContact.catastrophicImpact) {
+      return { point: contactPoint.clone() };
+    }
+
+    // If safe ditching is in progress, do not trigger an explosion crash
+    if (waterDitching?.ditchingContact) {
+      return null;
+    }
+
+    const sinkRate = -vsiMs;
+    const isFatal = sinkRate > 4.5 ||
+      pitchDeg < -4.0 ||
+      pitchDeg > 20.0 ||
+      Math.abs(rollDeg) > 16.0 ||
+      speedMs > 115.0;
+
+    if (isFatal) {
+      return { point: contactPoint.clone() };
+    }
+
     return null;
   }
 
