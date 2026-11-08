@@ -58,12 +58,14 @@ export function initFlightPanels({ onSelectCamera, onCameraOpen, onCameraClose, 
   bindText(hudUnfold, () => t('ui.unfoldHud'), 'title');
   hudUnfold.innerHTML = '<span class="unfold-icon">👁</span><span class="unfold-caption" data-i18n="ui.unfoldHud"></span><span class="unfold-glyph" aria-hidden="true">▴</span>';
   hud.append(hudUnfold);
-  const setHudFolded = (folded) => {
+  const setHudFolded = (folded, focus = true) => {
     const isFolded = Boolean(folded);
     document.body.classList.toggle('hud-folded', isFolded);
     hudUnfold.hidden = !isFolded;
-    if (isFolded) hudUnfold.focus();
-    else hudFold.focus();
+    if (focus) {
+      if (isFolded) hudUnfold.focus();
+      else hudFold.focus();
+    }
   };
   hudFold.addEventListener('click', () => setHudFolded(true));
   hudUnfold.addEventListener('click', () => setHudFolded(false));
@@ -211,7 +213,7 @@ export function initFlightPanels({ onSelectCamera, onCameraOpen, onCameraClose, 
   new MutationObserver(() => {
     if (document.body.dataset.flow !== 'flight') {
       setMoreOpen(false);
-      setHudFolded(false);
+      setHudFolded(false, false);
     }
     positionEdgeButtons();
   }).observe(document.body, {

@@ -597,7 +597,6 @@ class SimulatorHudAndBindingsMethods {
     this.developerPanel = new DeveloperPanel(this);
     document.getElementById('btn-pause-resume')?.addEventListener('click', () => this.gameFlow.resume());
     document.getElementById('btn-pause-restart')?.addEventListener('click', restartFlight);
-    document.getElementById('btn-lobby-restart')?.addEventListener('click', restartFlight);
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
     document.getElementById('btn-pause-exit')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
     const pauseMenu = document.getElementById('pause-menu');

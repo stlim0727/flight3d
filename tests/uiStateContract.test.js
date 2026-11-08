@@ -253,15 +253,47 @@ test('UI State Contract: In-Flight Menu Management hides condition selectors and
     assert.ok(managedAircraft.textContent.includes('Boeing 737') || managedAircraft.textContent.includes('B738'));
     assert.equal(managedTime.textContent, '16:48');
 
-    // Actions
+    // Actions: verify onRestart called exactly once
+    let restartCount = 0;
+    restartBtn.listeners['click'] = [() => { restartCount++; }];
     restartBtn.click();
-    assert.equal(restartCalled, true, 'Clicking restart button triggers onRestart');
+    assert.equal(restartCount, 1, 'Restart must be invoked exactly once');
     resumeBtn.click();
     assert.equal(resumeCalled, true, 'Clicking resume button triggers onResume');
     assert.equal(flyCalled, false, 'Fly button was hidden and not triggered');
   } finally {
     globalThis.document = originalDoc;
   }
+});
+
+test('UI State Contract: Camera selection hold freezes physics without stealing focus or opening pause menu', () => {
+  const gameFlow = new GameFlowController();
+  gameFlow.enterFlight();
+  assert.equal(gameFlow.state, FLOW.FLIGHT);
+  assert.equal(gameFlow.isPhysicsFrozen(), false);
+
+  // 1. Focusing camera select in singleplayer holds camera selection
+  gameFlow.holdCameraSelection();
+  assert.equal(gameFlow.isCameraSelectionHeld(), true);
+  assert.equal(gameFlow.isPhysicsFrozen(), true, 'Physics must be frozen during camera selection');
+  assert.equal(gameFlow.state, FLOW.FLIGHT, 'Flow state must remain FLIGHT so pause menu does not open or steal focus');
+
+  // 2. Committing or closing camera selection releases hold
+  gameFlow.releaseCameraSelection();
+  assert.equal(gameFlow.isCameraSelectionHeld(), false);
+  assert.equal(gameFlow.isPhysicsFrozen(), false, 'Physics resumes after camera selection');
+
+  // 3. Opening pause menu while camera selection is held
+  gameFlow.holdCameraSelection();
+  assert.equal(gameFlow.isPhysicsFrozen(), true);
+  gameFlow.pause('manual');
+  assert.equal(gameFlow.state, FLOW.PAUSED);
+  // Releasing camera hold while paused leaves physics frozen due to FLOW.PAUSED
+  gameFlow.releaseCameraSelection();
+  assert.equal(gameFlow.isPhysicsFrozen(), true);
+  gameFlow.resume('manual');
+  assert.equal(gameFlow.state, FLOW.FLIGHT);
+  assert.equal(gameFlow.isPhysicsFrozen(), false);
 });
 
 test('UI State Contract: In-flight time-of-day cycling is gated behind developer mode', () => {

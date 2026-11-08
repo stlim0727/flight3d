@@ -258,12 +258,12 @@ class FlightSimulator {
       onSelectCamera: mode => this.controls.onSelectCamera(mode),
       onCameraOpen: () => {
         if (!this.multiplayer?.active && this.gameFlow.state === FLOW.FLIGHT) {
-          this.gameFlow.pause('camera');
+          this.gameFlow.holdCameraSelection();
         }
       },
       onCameraClose: () => {
         if (!this.multiplayer?.active) {
-          this.gameFlow.resume('camera');
+          this.gameFlow.releaseCameraSelection();
         }
       },
       onAdjustTrim: delta => {

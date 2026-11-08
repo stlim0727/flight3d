@@ -36,6 +36,7 @@ export class GameFlowController {
     this.state = FLOW.LOBBY;
     this.resumableFlight = false;  // LOBBY is holding a live flight, not the cinematic
     this.pauseReasons = new Set();
+    this.cameraSelectionHeld = false;
     this._countdown = null;        // seconds until restart fires; null = not armed
     this._restartPending = false;
     this._demoWasActive = false;
@@ -50,7 +51,19 @@ export class GameFlowController {
   }
 
   isPhysicsFrozen() {
-    return this.state === FLOW.DEBRIEF || this.state === FLOW.PAUSED || (this.state === FLOW.LOBBY && (this.resumableFlight || !this.cinematicAvailable));
+    return this.state === FLOW.DEBRIEF || this.state === FLOW.PAUSED || (this.state === FLOW.LOBBY && (this.resumableFlight || !this.cinematicAvailable)) || Boolean(this.cameraSelectionHeld);
+  }
+
+  holdCameraSelection() {
+    this.cameraSelectionHeld = true;
+  }
+
+  releaseCameraSelection() {
+    this.cameraSelectionHeld = false;
+  }
+
+  isCameraSelectionHeld() {
+    return Boolean(this.cameraSelectionHeld);
   }
 
   setCinematicAvailable(available) {
@@ -63,6 +76,7 @@ export class GameFlowController {
     // Publish the hold before the state change: onStateChange reads both together to decide
     // whether the menu is framing a live sortie or the cinematic.
     this.pauseReasons.clear();
+    this.cameraSelectionHeld = false;
     this.resumableFlight = false;
     this._setState(FLOW.LOBBY);
     this._resetLoopCap();
@@ -72,6 +86,7 @@ export class GameFlowController {
   /** Used by start/resume actions and browser harnesses; pure state change. */
   enterFlight() {
     this.pauseReasons.clear();
+    this.cameraSelectionHeld = false;
     this.resumableFlight = false;
     this._setState(FLOW.FLIGHT);
     this._disarmRestart();
@@ -94,6 +109,7 @@ export class GameFlowController {
   endFlight() {
     if (this.state !== FLOW.FLIGHT && this.state !== FLOW.PAUSED && !this.canResumeFromLobby()) return false;
     this.pauseReasons.clear();
+    this.cameraSelectionHeld = false;
     this.resumableFlight = false;
     this._disarmRestart();
     this._setState(FLOW.DEBRIEF);
@@ -121,6 +137,7 @@ export class GameFlowController {
   returnToLobby(resumable = false) {
     if (this.state === FLOW.LOBBY && this.resumableFlight === resumable) return false;
     this.pauseReasons.clear();
+    this.cameraSelectionHeld = false;
     this.resumableFlight = resumable;
     this._setState(FLOW.LOBBY);
     this._resetLoopCap();
