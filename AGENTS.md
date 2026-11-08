@@ -30,6 +30,7 @@ Workflow rules that apply to every agent:
 2. Before committing or opening a PR, inspect `git diff origin/main` to verify that only intentional scoped changes are present and that no unrelated code or recent features from other PRs were accidentally deleted (`-` lines).
 3. Open a pull request when the work is ready: commit to a focused branch, push, and open a PR — unless the user explicitly requests local-only work.
 4. Multiple agents may work in this repository at the same time. Inspect git status before editing, never assume exclusive access, and leave other agents' and the user's edits untouched.
+5. Avoid running the full test suite (`npm test`) locally when it is long and almost identical to the remote CI test suite. Run focused unit tests (`node --test tests/<name>.test.js`) and fast syntax checks (`npm run check`) locally, then boldly push to let CI test verify it.
 
 - Read the relevant row in [the task map](docs/development/agent-task-map.md).
 - Follow [working rules](docs/development/agent-working-rules.md). Load only
@@ -49,10 +50,12 @@ npm run build
 ```
 
 `check` verifies JavaScript syntax and immutable GitHub action references.
-GitHub Actions runs the same checks, tests, and production build. Use a focused
-`node --test tests/<name>.test.js` during development; run the complete gate when
-changing CI or when no remote CI result is available. Avoid repeated full runs
-without a new change or unresolved failure.
+GitHub Actions runs the same checks, tests, and production build. Avoid running the
+long local test suite (`npm test`) when it is almost identical to CI. Use a focused
+`node --test tests/<name>.test.js` during development and boldly push to let CI test
+verify it. Reserve full local test runs strictly for changing CI configuration
+or when no remote CI result is available. Avoid repeated full runs without a new
+change or unresolved failure.
 
 Browser scenarios (`test:flight`, `test:crash`, `test:mobile`, `test:demo`) require
 separate setup and are not part of the default CI gate. See
