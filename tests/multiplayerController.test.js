@@ -255,7 +255,7 @@ test('refreshOpenRooms renders rooms and allows joining', async () => {
 
 test('syncDirectoryHost serializes in-flight registration and cleans up if closed before response', async () => {
   let registerCalls = 0;
-  let unregisterCalls = 0;
+  const unregisterLeaseCalls = [];
   let resolveRegister;
   const mockDirectoryClient = {
     isRegistered: false,
@@ -263,9 +263,8 @@ test('syncDirectoryHost serializes in-flight registration and cleans up if close
       registerCalls++;
       return new Promise(resolve => { resolveRegister = resolve; });
     },
-    async unregister() {
-      unregisterCalls++;
-      this.isRegistered = false;
+    async unregisterLease(reg) {
+      unregisterLeaseCalls.push(reg);
     },
     startHeartbeat() {
       this.heartbeatStarted = true;
@@ -278,7 +277,11 @@ test('syncDirectoryHost serializes in-flight registration and cleans up if close
     registeringHost: false,
     registrationGeneration: 0,
     room: mockRoom,
-    directoryClient: mockDirectoryClient,
+    hostDirectoryClient: null,
+    directoryClient: { directoryUrl: 'https://directory.flight3d' },
+    createHostDirectoryClient() {
+      return mockDirectoryClient;
+    },
   });
 
   // First sync triggers register()
@@ -295,10 +298,102 @@ test('syncDirectoryHost serializes in-flight registration and cleans up if close
   controller.isPublicHost = false;
 
   // Now registration completes with ok
-  resolveRegister({ ok: true, registration: { id: 'room-late' } });
+  resolveRegister({ ok: true, registration: { id: 'room-late', token: 'tok-late', leaseGeneration: 1 } });
   await new Promise(r => setTimeout(r, 10));
 
-  // Late resolution must call unregister and NOT start heartbeats
-  assert.equal(unregisterCalls, 1);
+  // Late resolution must call unregisterLease and NOT start heartbeats
+  assert.equal(unregisterLeaseCalls.length, 1);
+  assert.equal(unregisterLeaseCalls[0].id, 'room-late');
   assert.equal(mockDirectoryClient.heartbeatStarted, undefined);
+});
+
+test('late registration for superseded room does not cancel newer room heartbeat or lease', async () => {
+  let resolveRegisterA;
+  let resolveRegisterB;
+  const unregisterLeaseCallsA = [];
+  const unregisterLeaseCallsB = [];
+
+  const clientA = {
+    isRegistered: false,
+    register() {
+      return new Promise(resolve => { resolveRegisterA = resolve; });
+    },
+    async unregisterLease(reg) {
+      unregisterLeaseCallsA.push(reg);
+    },
+    startHeartbeat() {
+      this.heartbeatStarted = true;
+    },
+    stopHeartbeat() {
+      this.heartbeatStarted = false;
+    },
+  };
+
+  const clientB = {
+    isRegistered: false,
+    register() {
+      this.isRegistered = true;
+      return new Promise(resolve => { resolveRegisterB = resolve; });
+    },
+    async unregisterLease(reg) {
+      unregisterLeaseCallsB.push(reg);
+    },
+    startHeartbeat() {
+      this.heartbeatStarted = true;
+    },
+    stopHeartbeat() {
+      this.heartbeatStarted = false;
+    },
+  };
+
+  let clientIndex = 0;
+  const clients = [clientA, clientB];
+
+  const roomA = { host: true, registered: true, room: 'ROOM0A', closed: false, session: { name: 'Host' } };
+  const roomB = { host: true, registered: true, room: 'ROOM0B', closed: false, session: { name: 'Host' } };
+
+  const controller = Object.assign(Object.create(Controller.prototype), {
+    isPublicHost: true,
+    registeringHost: false,
+    registrationGeneration: 0,
+    room: roomA,
+    hostDirectoryClient: null,
+    directoryClient: { directoryUrl: 'https://directory.flight3d' },
+    createHostDirectoryClient() {
+      return clients[clientIndex++];
+    },
+  });
+
+  // Start Room A registration (in-flight)
+  controller.syncDirectoryHost();
+  assert.equal(controller.hostDirectoryClient, clientA);
+
+  // Switch to Room B
+  controller.registrationGeneration++;
+  controller.registeringHost = false;
+  controller.room = roomB;
+  controller.syncDirectoryHost();
+  assert.equal(controller.hostDirectoryClient, clientB);
+
+  // Room B's register resolves first
+  resolveRegisterB({ ok: true, registration: { id: 'room-b', token: 'tok-b', leaseGeneration: 1 } });
+  await new Promise(r => setTimeout(r, 10));
+
+  assert.equal(clientB.heartbeatStarted, true);
+  assert.equal(clientB.isRegistered, true);
+  assert.equal(unregisterLeaseCallsB.length, 0);
+
+  // Now Room A's register resolves late
+  resolveRegisterA({ ok: true, registration: { id: 'room-a', token: 'tok-a', leaseGeneration: 1 } });
+  await new Promise(r => setTimeout(r, 10));
+
+  // Room A is cleaned up with unregisterLease
+  assert.equal(unregisterLeaseCallsA.length, 1);
+  assert.equal(unregisterLeaseCallsA[0].id, 'room-a');
+
+  // Room B is completely untouched and still running its heartbeat!
+  assert.equal(clientB.heartbeatStarted, true);
+  assert.equal(clientB.isRegistered, true);
+  assert.equal(unregisterLeaseCallsB.length, 0);
+  assert.equal(controller.hostDirectoryClient, clientB);
 });

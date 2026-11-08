@@ -266,6 +266,28 @@ test('RoomDirectoryClient handles registration, heartbeat and graceful errors', 
   res = await client.fetchRooms();
   assert.equal(res.rooms.length, 0);
 
+  // unregisterLease deletes specified lease
+  const reg2 = await client.register({
+    roomCode: '9X2L4M',
+    name: 'GhostLease',
+    airport: 'coastal',
+    aircraft: 'B738',
+    scenario: 'cruise',
+  });
+  assert.equal(reg2.ok, true);
+  assert.equal(client.isRegistered, true);
+
+  // unregistering an unrelated lease does not affect current client registration
+  await client.unregisterLease({ id: 'room-other', token: 'tok-other' });
+  assert.equal(client.isRegistered, true);
+
+  // unregistering this lease removes the room and clears registration
+  const unregLeaseRes = await client.unregisterLease(reg2.registration);
+  assert.equal(unregLeaseRes.ok, true);
+  assert.equal(client.isRegistered, false);
+  res = await client.fetchRooms();
+  assert.equal(res.rooms.length, 0);
+
   // Graceful degradation when directory is not reachable
   const brokenClient = new RoomDirectoryClient({
     directoryUrl: 'https://unreachable.invalid',

@@ -101,6 +101,12 @@ export async function runCli({ readAsset, args = process.argv.slice(2) }) {
             protocolMajor: manifest.protocolVersion,
             flightRevision: manifest.flightRevision,
           });
+          if (stopping) {
+            if (reg?.ok) {
+              await directoryClient.unregisterLease(reg.registration).catch(() => {});
+            }
+            return;
+          }
           if (reg?.ok) {
             log({ event: 'directory-registered', id: reg.registration.id, directory: config.directoryUrl });
             directoryClient.startHeartbeat({
@@ -125,6 +131,7 @@ export async function runCli({ readAsset, args = process.argv.slice(2) }) {
         directoryClient = new RoomDirectoryClient({ directoryUrl: config.directoryUrl });
         await syncDirectory();
       }
+      if (stopping) return;
       let previous = '', lastSimulationTime, lastProgressAt = Date.now();
       watchdog = setInterval(async () => {
         if (polling || stopping) return;

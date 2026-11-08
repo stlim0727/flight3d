@@ -157,6 +157,7 @@ export class RoomDirectoryClient {
     if (!this.isRegistered || !this.directoryUrl) {
       this.registeredId = null;
       this.token = null;
+      this.leaseGeneration = null;
       return { ok: true };
     }
 
@@ -168,6 +169,17 @@ export class RoomDirectoryClient {
     this.token = null;
     this.leaseGeneration = null;
 
+    return this.unregisterLease({ id, token, leaseGeneration }, { timeoutMs });
+  }
+
+  async unregisterLease({ id, token, leaseGeneration } = {}, { timeoutMs = 3000 } = {}) {
+    if (!id || !token || !this.directoryUrl) return { ok: true };
+    if (this.registeredId === id) {
+      this.stopHeartbeat();
+      this.registeredId = null;
+      this.token = null;
+      this.leaseGeneration = null;
+    }
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);

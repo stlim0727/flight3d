@@ -28,6 +28,7 @@ export class MultiplayerController {
     this.roomListContainer = document.getElementById('mp-room-list');
     const dirUrl = typeof window !== 'undefined' ? (window.__FLIGHT3D_DIRECTORY_URL__ || DEFAULT_DIRECTORY_URL) : null;
     this.directoryClient = new RoomDirectoryClient({ directoryUrl: dirUrl });
+    this.hostDirectoryClient = null;
     this.isPublicHost = false;
     this.registeringHost = false;
     this.registrationGeneration = 0;
@@ -54,7 +55,8 @@ export class MultiplayerController {
     window.addEventListener('pagehide', () => {
       this.registrationGeneration++;
       this.registeringHost = false;
-      this.directoryClient?.unregister();
+      this.hostDirectoryClient?.unregister();
+      this.hostDirectoryClient = null;
       this.room?.dispose();
     });
     this.refresh();
@@ -93,7 +95,8 @@ export class MultiplayerController {
     if (this.active && this.room.session.state !== 'flying') {
       this.registrationGeneration++;
       this.registeringHost = false;
-      this.directoryClient?.unregister();
+      this.hostDirectoryClient?.unregister();
+      this.hostDirectoryClient = null;
       this.room.close('cancelled');
     }
     this.modal.close();
@@ -121,7 +124,8 @@ export class MultiplayerController {
     this.message = null;
     this.registrationGeneration++;
     this.registeringHost = false;
-    this.directoryClient?.unregister();
+    this.hostDirectoryClient?.unregister();
+    this.hostDirectoryClient = null;
     this.isPublicHost = !room && Boolean(this.publicCheckbox?.checked);
     this.room?.dispose();
     const config = Object.fromEntries(Object.keys(DEFAULT_CONFIG).map(key => [key, document.getElementById(`mp-${key}`).value]));
@@ -219,7 +223,8 @@ export class MultiplayerController {
   ended(reason) {
     this.registrationGeneration++;
     this.registeringHost = false;
-    this.directoryClient?.unregister();
+    this.hostDirectoryClient?.unregister();
+    this.hostDirectoryClient = null;
     this.isPublicHost = false;
     clearInterval(this.snapshotTimer); this.remote?.dispose(); this.remote = null;
     this.audio.pause(); this.audio.srcObject = null; this.audio.muted = false;
@@ -290,13 +295,21 @@ export class MultiplayerController {
     }
     this.syncDirectoryHost();
   }
+  createHostDirectoryClient() {
+    return new RoomDirectoryClient({
+      directoryUrl: this.directoryClient?.directoryUrl,
+      fetchFn: this.directoryClient?.fetchFn,
+    });
+  }
   syncDirectoryHost() {
-    if (!this.isPublicHost || !this.room?.host || !this.room.registered || this.directoryClient?.isRegistered || this.registeringHost) return;
+    if (!this.isPublicHost || !this.room?.host || !this.room.registered || this.hostDirectoryClient?.isRegistered || this.registeringHost) return;
     this.registeringHost = true;
     const currentRoom = this.room;
     const generation = ++this.registrationGeneration;
+    const client = this.createHostDirectoryClient();
+    this.hostDirectoryClient = client;
     const s = currentRoom.session;
-    this.directoryClient?.register({
+    client.register({
       roomCode: currentRoom.room,
       name: (typeof document !== 'undefined' ? document.getElementById('mp-name')?.value : null) || s?.name || 'Pilot',
       airport: s?.config?.airport || 'coastal',
@@ -306,14 +319,14 @@ export class MultiplayerController {
       maxPlayers: 2,
       status: s?.state === 'flying' ? 'flying' : (s?.remoteName ? 'full' : 'waiting'),
     }).then(async res => {
-      if (this.registrationGeneration !== generation || !this.isPublicHost || this.room !== currentRoom || currentRoom.closed) {
+      if (this.registrationGeneration !== generation || !this.isPublicHost || this.room !== currentRoom || currentRoom.closed || this.hostDirectoryClient !== client) {
         if (res?.ok) {
-          await this.directoryClient?.unregister();
+          await client.unregisterLease(res.registration).catch(() => {});
         }
         return;
       }
       if (res?.ok) {
-        this.directoryClient.startHeartbeat({
+        client.startHeartbeat({
           intervalMs: HEARTBEAT_INTERVAL_MS,
           getStatus: () => {
             const cur = this.room?.session;
