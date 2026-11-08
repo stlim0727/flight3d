@@ -4,10 +4,12 @@ import { readFileSync } from 'node:fs';
 import { GameFlowController } from '../src/ui/GameFlowController.js';
 import { t, bindText } from '../src/i18n/index.js';
 import { parseRoom, inviteUrl, inviteCompatibilityFailure } from '../src/multiplayer/protocol.js';
+import { RoomDirectoryClient } from '../src/multiplayer/RoomDirectoryClient.js';
+import { HEARTBEAT_INTERVAL_MS } from '../src/multiplayer/roomDirectory.js';
 
 // Load the production coordinator without importing its browser-only PeerJS adapter.
 const source = readFileSync(new URL('../src/multiplayer/MultiplayerController.js', import.meta.url), 'utf8');
-const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', 'inviteCompatibilityFailure', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl, inviteCompatibilityFailure);
+const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', 'inviteCompatibilityFailure', 'RoomDirectoryClient', 'HEARTBEAT_INTERVAL_MS', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl, inviteCompatibilityFailure, RoomDirectoryClient, HEARTBEAT_INTERVAL_MS);
 
 test('invite URL joins automatically; missing or invalid invites never connect', () => {
   const joined = [];
@@ -186,3 +188,67 @@ test('host start button is highlighted and focused once when a friend joins', ()
     assert.equal(attributes['data-ready'], 'false', 'restart during flight is not pulsed');
   } finally { globalThis.location = previousLocation; }
 }));
+
+test('refreshOpenRooms renders rooms and allows joining', async () => {
+  const children = [];
+  const container = {
+    replaceChildren() { children.length = 0; },
+    appendChild(child) { children.push(child); },
+  };
+  const prevDoc = globalThis.document;
+  const elements = [];
+  globalThis.document = {
+    createElement(tag) {
+      const el = {
+        tag,
+        className: '',
+        textContent: '',
+        disabled: false,
+        append(...items) { this.children = items; },
+        children: [],
+      };
+      elements.push(el);
+      return el;
+    },
+  };
+  try {
+    const joined = [];
+    const controller = Object.assign(Object.create(Controller.prototype), {
+      roomListContainer: container,
+      refreshingRooms: false,
+      roomInput: { value: '' },
+      room: null,
+      directoryClient: {
+        async fetchRooms() {
+          return {
+            ok: true,
+            rooms: [
+              { roomCode: 'K7M2QX', name: 'Maverick', airport: 'coastal', aircraft: 'B738', scenario: 'cruise', currentPlayers: 1, maxPlayers: 2, status: 'waiting' },
+              { roomCode: '8W3N9Z', name: 'FullRoom', airport: 'incheon', aircraft: 'F16', scenario: 'runway', currentPlayers: 2, maxPlayers: 2, status: 'full' },
+            ],
+          };
+        },
+      },
+      connectInvite(code) { joined.push(code); },
+    });
+
+    await controller.refreshOpenRooms();
+    assert.equal(children.length, 2);
+    // Find join button for Maverick
+    const maverickItem = children[0];
+    const actions = maverickItem.children[1];
+    const joinBtn = actions.children[1];
+    assert.equal(joinBtn.disabled, false);
+    joinBtn.onclick();
+    assert.deepEqual(joined, ['K7M2QX']);
+    assert.equal(controller.roomInput.value, 'K7M2QX');
+
+    // Full room button is disabled
+    const fullItem = children[1];
+    const fullActions = fullItem.children[1];
+    const fullJoinBtn = fullActions.children[1];
+    assert.equal(fullJoinBtn.disabled, true);
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});

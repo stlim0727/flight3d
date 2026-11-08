@@ -6,6 +6,10 @@ import { inviteUrl, parseRoom, inviteCompatibilityFailure, DEFAULT_CONFIG, slotO
 import { t, bindText } from '../i18n/index.js';
 import { setSimulationWind } from '../physics/WindField.js';
 import { bindMultiplayerPreferences } from './preferences.js';
+import { RoomDirectoryClient } from './RoomDirectoryClient.js';
+import { HEARTBEAT_INTERVAL_MS } from './roomDirectory.js';
+
+const DEFAULT_DIRECTORY_URL = typeof window !== 'undefined' ? (window.__FLIGHT3D_DIRECTORY_URL__ || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MULTIPLAYER_DIRECTORY_URL)) : null;
 
 export class MultiplayerController {
   constructor(sim) {
@@ -19,6 +23,14 @@ export class MultiplayerController {
     document.getElementById('mp-keep-waiting').onclick = () => this.room?.keepWaiting();
     this.audio = document.getElementById('mp-audio');
     this.roomInput = document.getElementById('mp-room');
+    this.publicCheckbox = document.getElementById('mp-public-room');
+    this.refreshRoomsBtn = document.getElementById('mp-refresh-rooms');
+    this.roomListContainer = document.getElementById('mp-room-list');
+    const dirUrl = typeof window !== 'undefined' ? (window.__FLIGHT3D_DIRECTORY_URL__ || DEFAULT_DIRECTORY_URL) : null;
+    this.directoryClient = new RoomDirectoryClient({ directoryUrl: dirUrl });
+    this.isPublicHost = false;
+    this.refreshingRooms = false;
+    if (this.refreshRoomsBtn) this.refreshRoomsBtn.onclick = () => this.refreshOpenRooms();
     this.preferences = bindMultiplayerPreferences();
     document.getElementById('mp-choose-host').onclick = () => this.chooseSetup('host');
     document.getElementById('mp-choose-join').onclick = () => this.chooseSetup('join');
@@ -37,7 +49,10 @@ export class MultiplayerController {
     };
     document.getElementById('mp-listen').onclick = () => this.playAudio();
     document.getElementById('mp-mute').onclick = () => { this.audio.muted = !this.audio.muted; this.refresh(); };
-    window.addEventListener('pagehide', () => this.room?.dispose());
+    window.addEventListener('pagehide', () => {
+      this.directoryClient?.unregister();
+      this.room?.dispose();
+    });
     this.refresh();
     const params = new URLSearchParams(location.search);
     this.joinInvite(params.has('r') || params.has('room') ? location.href : null);
@@ -57,14 +72,24 @@ export class MultiplayerController {
   }
   chooseSetup(mode) {
     for (const path of ['host', 'join']) {
-      document.getElementById(`mp-${path}-panel`).hidden = path !== mode;
-      document.getElementById(`mp-choose-${path}`).setAttribute('aria-pressed', String(path === mode));
+      const panel = document.getElementById(`mp-${path}-panel`);
+      if (panel) panel.hidden = path !== mode;
+      const btn = document.getElementById(`mp-choose-${path}`);
+      if (btn) btn.setAttribute('aria-pressed', String(path === mode));
     }
+    if (mode === 'join') this.refreshOpenRooms();
   }
   get modalOpen() { return this.dialog.open; }
-  openDialog() { this.modal.open(); this.refresh(); }
+  openDialog() {
+    this.modal.open();
+    this.refresh();
+    this.refreshOpenRooms();
+  }
   dismissDialog() {
-    if (this.active && this.room.session.state !== 'flying') this.room.close('cancelled');
+    if (this.active && this.room.session.state !== 'flying') {
+      this.directoryClient?.unregister();
+      this.room.close('cancelled');
+    }
     this.modal.close();
   }
   async copyInvite(kind) {
@@ -88,6 +113,8 @@ export class MultiplayerController {
     if (this.active || this.preparing || this.sim.startingFlight || this.sim.airportLoading) return;
     this.preferences.save();
     this.message = null;
+    this.directoryClient?.unregister();
+    this.isPublicHost = !room && Boolean(this.publicCheckbox?.checked);
     this.room?.dispose();
     const config = Object.fromEntries(Object.keys(DEFAULT_CONFIG).map(key => [key, document.getElementById(`mp-${key}`).value]));
     try {
@@ -182,6 +209,8 @@ export class MultiplayerController {
     this.refresh();
   }
   ended(reason) {
+    this.directoryClient?.unregister();
+    this.isPublicHost = false;
     clearInterval(this.snapshotTimer); this.remote?.dispose(); this.remote = null;
     this.audio.pause(); this.audio.srcObject = null; this.audio.muted = false;
     this.message = reason;
@@ -248,6 +277,111 @@ export class MultiplayerController {
       for (const [el, disabled] of this.soloControls) el.disabled = disabled;
       this.soloControls.clear();
       this.sim.lobbyScreen?.refresh();
+    }
+    this.syncDirectoryHost();
+  }
+  syncDirectoryHost() {
+    if (!this.isPublicHost || !this.room?.host || !this.room.registered || this.directoryClient?.isRegistered) return;
+    const s = this.room.session;
+    this.directoryClient?.register({
+      roomCode: this.room.room,
+      name: document.getElementById('mp-name')?.value || s?.name || 'Pilot',
+      airport: s?.config?.airport || 'coastal',
+      aircraft: s?.config?.aircraft || 'C172',
+      scenario: s?.config?.scenario || 'cruise',
+      currentPlayers: s?.remoteName ? 2 : 1,
+      maxPlayers: 2,
+      status: s?.state === 'flying' ? 'flying' : (s?.remoteName ? 'full' : 'waiting'),
+    }).then(res => {
+      if (res.ok) {
+        this.directoryClient.startHeartbeat({
+          intervalMs: HEARTBEAT_INTERVAL_MS,
+          getStatus: () => {
+            const cur = this.room?.session;
+            const currentPlayers = cur?.remoteName ? 2 : 1;
+            const status = cur?.state === 'flying' ? 'flying' : (cur?.remoteName ? 'full' : 'waiting');
+            return { currentPlayers, maxPlayers: 2, status };
+          },
+        });
+      }
+    }).catch(() => {});
+  }
+  async refreshOpenRooms() {
+    if (!this.roomListContainer || this.refreshingRooms) return;
+    this.refreshingRooms = true;
+    if (this.refreshRoomsBtn) {
+      this.refreshRoomsBtn.disabled = true;
+      this.refreshRoomsBtn.textContent = t('mp.refreshing');
+    }
+
+    try {
+      const res = await (this.directoryClient?.fetchRooms() ?? Promise.resolve({ ok: false }));
+      if (!this.roomListContainer) return;
+      this.roomListContainer.replaceChildren();
+
+      if (!res.ok) {
+        const errP = document.createElement('p');
+        errP.className = 'mp-room-list-empty';
+        errP.textContent = t('mp.directoryError');
+        this.roomListContainer.appendChild(errP);
+        return;
+      }
+
+      if (!res.rooms || res.rooms.length === 0) {
+        const emptyP = document.createElement('p');
+        emptyP.className = 'mp-room-list-empty';
+        emptyP.textContent = t('mp.noOpenRooms');
+        this.roomListContainer.appendChild(emptyP);
+        return;
+      }
+
+      for (const room of res.rooms) {
+        const item = document.createElement('div');
+        item.className = 'mp-room-item';
+
+        const info = document.createElement('div');
+        info.className = 'mp-room-item-info';
+
+        const title = document.createElement('div');
+        title.className = 'mp-room-item-title';
+        title.textContent = room.name || 'Pilot';
+
+        const desc = document.createElement('div');
+        desc.className = 'mp-room-item-desc';
+        const airportName = t(`mp.${room.airport}`) || room.airport;
+        const scenarioName = t(`mp.${room.scenario}`) || room.scenario;
+        desc.textContent = `${room.aircraft} · ${airportName} · ${scenarioName}`;
+
+        info.append(title, desc);
+
+        const actions = document.createElement('div');
+        actions.className = 'mp-room-item-actions';
+
+        const isFull = room.currentPlayers >= room.maxPlayers || room.status === 'full';
+        const badge = document.createElement('span');
+        badge.className = `mp-room-badge ${isFull ? 'full' : ''}`;
+        badge.textContent = `${room.currentPlayers}/${room.maxPlayers} · ${isFull ? t('mp.roomFull') : t('mp.roomAvailable')}`;
+
+        const joinBtn = document.createElement('button');
+        joinBtn.className = 'btn';
+        joinBtn.type = 'button';
+        joinBtn.textContent = t('mp.joinRoom');
+        joinBtn.disabled = isFull || this.active;
+        joinBtn.onclick = () => {
+          if (this.roomInput) this.roomInput.value = room.roomCode;
+          this.connectInvite(room.roomCode);
+        };
+
+        actions.append(badge, joinBtn);
+        item.append(info, actions);
+        this.roomListContainer.appendChild(item);
+      }
+    } finally {
+      this.refreshingRooms = false;
+      if (this.refreshRoomsBtn) {
+        this.refreshRoomsBtn.disabled = false;
+        this.refreshRoomsBtn.textContent = t('mp.refresh');
+      }
     }
   }
 }

@@ -582,11 +582,23 @@
             <select id="mp-aircraft"><option>C172</option><option>B738</option><option>F16</option></select>
             <label for="mp-scenario" data-i18n="mp.scenario"></label>
             <select id="mp-scenario"><option value="cruise" data-i18n="mp.cruise"></option><option value="runway" data-i18n="mp.runway"></option></select>
+            <label class="mp-checkbox-label" for="mp-public-room">
+              <input type="checkbox" id="mp-public-room">
+              <span data-i18n="mp.publicRoom"></span>
+            </label>
             <button id="mp-create" class="btn" type="button" data-i18n="mp.create"></button>
             </section>
             <section id="mp-join-panel" class="mp-setup-path mp-join-path" aria-labelledby="mp-join-title" hidden>
             <h3 id="mp-join-title" data-i18n="mp.joinTitle"></h3>
             <p class="mp-path-help" data-i18n="mp.joinHelp"></p>
+            <div class="mp-browser-header">
+              <h4 id="mp-browser-title" data-i18n="mp.openRooms"></h4>
+              <button id="mp-refresh-rooms" class="btn btn-sm" type="button" data-i18n="mp.refresh"></button>
+            </div>
+            <div id="mp-room-list" class="mp-room-list" role="region" aria-live="polite">
+              <p class="mp-room-list-empty" data-i18n="mp.noOpenRooms"></p>
+            </div>
+            <div class="mp-divider"><span data-i18n="mp.orDirectCode"></span></div>
             <label for="mp-room" data-i18n="mp.invite"></label><input id="mp-room" autocomplete="off" spellcheck="false">
             <button id="mp-join" class="btn" type="button" data-i18n="mp.join"></button>
             </section>
