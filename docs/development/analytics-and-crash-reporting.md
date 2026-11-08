@@ -36,9 +36,16 @@ Add `VITE_POSTHOG_KEY` as a GitHub Actions repository secret or variable.
    - `flight_crashed`: collision type (terrain, building, water), impact airspeed, scenario.
    - `flight_ended`: landing completion, duration, score, gates cleared.
    - `pilot_mode_selected`: tracks player preference between human control and AI autopilot.
+   - `multiplayer_room_created`: room code, scenario, aircraft, airport, isPublic.
+   - `multiplayer_room_joined`: room code, joinMethod (`invite`, `code`, `directory`).
+   - `multiplayer_connected`: room code, role (`host`, `guest`), connectionDurationMs.
+   - `multiplayer_round_started`: room code, round, scenario, aircraft, airport.
+   - `multiplayer_session_ended`: room code, role, endReason (`peer-left`, `cancelled`, `timeout`, etc.), durationSeconds, roundsPlayed.
+   - `multiplayer_voice_toggled`: voiceEnabled, voiceMuted.
    - `user_feedback_submitted`: in-game bug reports and comments with attached diagnostic state.
    - `startup_trace`: one boot timeline per page load (below).
    - `$exception`: raised through `captureException()`, with live simulator context attached.
+   - Standard flight events and exceptions inherit simulator context including `isMultiplayer`, `multiplayerRole`, and `multiplayerState`.
    - Every event carries `clientTimeMs` (epoch ms, client clock). Do **not** add a `timestamp`
      property: PostHog already owns that column and a property with the same name shadows the
      server-received time in table views and HogQL filters.

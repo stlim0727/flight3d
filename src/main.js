@@ -83,6 +83,12 @@ import {
   trackFlightEnd,
   trackFlightCrash,
   captureException,
+  trackMultiplayerRoomCreated,
+  trackMultiplayerRoomJoined,
+  trackMultiplayerConnected,
+  trackMultiplayerRoundStarted,
+  trackMultiplayerSessionEnded,
+  trackMultiplayerVoiceToggled,
 } from './analytics/posthog.js';
 import { openFeedbackDialog } from './analytics/FeedbackDialog.js';
 
@@ -438,6 +444,12 @@ class FlightSimulator {
       trackFlightEnd,
       trackFlightCrash,
       captureException,
+      trackMultiplayerRoomCreated,
+      trackMultiplayerRoomJoined,
+      trackMultiplayerConnected,
+      trackMultiplayerRoundStarted,
+      trackMultiplayerSessionEnded,
+      trackMultiplayerVoiceToggled,
     };
     this._openFeedbackDialog = openFeedbackDialog;
 
