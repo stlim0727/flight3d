@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { NEON_RIVER, bridgeWorldBoxes, isRiver, riverCenter, riverGroundHeight } from '../config/neonRiver.js';
+import { isStreet, neonStreets } from '../config/neonRoads.js';
 import { createNeonRiver } from './NeonRiver.js';
+import { createNeonRoads } from './NeonRoads.js';
 
 /**
  * Creates clean, sleek facade textures tailored to eliminate trypophobia.
@@ -368,6 +370,9 @@ export class NeonCity {
     this.group.add(this.river.group);
     // Bridges are solid for every aircraft, like the towers
     this.buildingData.push(...bridgeWorldBoxes());
+    // Streets between the towers, reaching every bridge (#579)
+    this.roads = createNeonRoads();
+    this.group.add(this.roads.group);
 
     // Glowing city avenue grid lines, stopping at the canal's quay walls
     const gridLines = [];
@@ -458,11 +463,14 @@ export class NeonCity {
 
     const lightPosts = [];
     const lightHeads = [];
+    const streets = neonStreets();
 
     for (let x = -2000; x <= 3200; x += 120) {
       for (const z of [-34, 34]) {
         // No lamp stands in the canal or on its quay edge.
         if (Math.abs(x - riverCenter(z)) < NEON_RIVER.halfWidth + 3) continue;
+        // Nor in a street crossing the highway (#579).
+        if (isStreet(x, z, 1.5, streets)) continue;
         const post = new THREE.CylinderGeometry(0.35, 0.5, 12, 6);
         post.translate(x, 6, z);
         lightPosts.push(post);
@@ -601,7 +609,8 @@ export class NeonCity {
       { x: 1220, z: -730,  w: 90, d: 75, h: 300, type: 'wedge-chisel', facade: 'fin', rot: 0.22 },
       { x: 1620, z: -650,  w: 80, d: 85, h: 320, type: 'stepped-spire', facade: 'monolith', rot: -0.18 },
       { x: 2080, z: -740,  w: 95, d: 80, h: 310, type: 'blade-slab', facade: 'ribbon', rot: 0.12 },
-      { x: 2560, z: -670,  w: 85, d: 90, h: 290, type: 'cylinder', facade: 'monolith', rot: 0 },
+      // Set back from the light bridge's east approach (#579)
+      { x: 2560, z: -760,  w: 85, d: 90, h: 290, type: 'cylinder', facade: 'monolith', rot: 0 },
       { x: 2910, z: -750,  w: 90, d: 75, h: 280, type: 'stepped-spire', facade: 'ribbon', rot: -0.22 },
       { x: 3310, z: -680,  w: 80, d: 85, h: 250, type: 'wedge-chisel', facade: 'monolith', rot: 0.14 },
       { x: 1080, z: -990,  w: 105, d: 90, h: 230, type: 'blade-slab', facade: 'fin', rot: 0 },
