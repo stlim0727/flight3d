@@ -15,7 +15,7 @@ export class ValleyMissionAdapter extends SimulatorMissionAdapter {
       throw new Error('invalid-scenario: valley profile/seed');
     }
     const sim = this.sim;
-    sim.demoDirector?.stop(); sim.devRunner?.stop({ pilotPreparation: true }); sim.shadowDemo?.stop(); sim.replayDirector?.stop(); sim.hangang?.stop();
+    sim.demoDirector?.stop(); sim.devRunner?.stop({ pilotPreparation: true }); sim.shadowDemo?.stop(); sim.replayDirector?.stop(); sim.bridgeFlight?.stop();
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
     await sim.setAirport('lukla', true);
     // The regional DEM may still be loading after setAirport returns.

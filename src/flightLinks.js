@@ -10,7 +10,7 @@ const base = new URL('./', location.href);
 const labels = {
   B738: 'Boeing 737-800', C172: 'Cessna 172', F16: 'F-16',
   coastal: '해안 · Coastal', lukla: '루클라 · Lukla', incheon: '인천 · Incheon',
-  neon: '네온 시티 · Neon', hangang: '한강 · Hangang', runway: '활주로 이륙',
+  neon: '네온 시티 · Neon', runway: '활주로 이륙', bridge: '강 다리 통과 저공비행',
   approach: '착륙 접근', cruise: '순항', cliff: '절벽 이륙', demo: '자동 비행 데모',
   takeoff: 'B738 · 이륙', landing: 'B738 · 착륙', valley: 'F-16 · 루클라 계곡 저공',
   'calm-debug-v1': '무풍 기준', 'mild-disturbance-v1': '약한 측풍·돌풍',

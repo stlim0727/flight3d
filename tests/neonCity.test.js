@@ -38,8 +38,10 @@ test('NeonCity skyscrapers are large/tall with a central canyon wide enough for 
   const maxHeight = Math.max(...city.buildingData.map(b => b.height));
   assert.ok(maxHeight >= 350, `Max skyscraper height (${maxHeight}m) should be tall (> 350m)`);
 
-  // Verify central canyon clearance along Z = 0
-  for (const b of city.buildingData) {
+  // Verify central canyon clearance along Z = 0. The canal's arch bridge crosses the
+  // canyon axis (#551), well below the canyon flight's 110 m.
+  for (const b of city.buildingData.filter(b => b.bridge)) assert.ok(b.y + b.height < 90, `${b.bridge} ${b.part} below the canyon flight`);
+  for (const b of city.buildingData.filter(b => !b.bridge)) {
     const halfD = b.depth / 2;
     const minZ = b.z - halfD;
     const maxZ = b.z + halfD;

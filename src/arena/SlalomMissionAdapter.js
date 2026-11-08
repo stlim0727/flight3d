@@ -27,7 +27,7 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
     const resolvedMissionId = 'valley-slalom-v1';
     const sim = this.sim;
     sim.demoDirector?.stop(); sim.devRunner?.stop({ pilotPreparation: true });
-    sim.shadowDemo?.stop(); sim.replayDirector?.stop(); sim.hangang?.stop();
+    sim.shadowDemo?.stop(); sim.replayDirector?.stop(); sim.bridgeFlight?.stop();
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
 
     if (typeof sim.setAircraft === 'function') {

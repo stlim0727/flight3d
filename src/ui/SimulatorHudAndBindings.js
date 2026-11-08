@@ -11,7 +11,7 @@ import { DebriefOverlay } from './DebriefOverlay.js';
 import { initLobbyScreen } from './LobbyScreen.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
-import { defaultScenarioForRegion } from '../config/scenarioRegistry.js';
+import { defaultScenarioForRegion, requiredAircraft } from '../config/scenarioRegistry.js';
 import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { computeUiScale, applyUiScale } from './UiScale.js';
 
@@ -536,7 +536,6 @@ class SimulatorHudAndBindingsMethods {
       onAirport: id => {
         this.lobby.airport = id;
         this.lobby.preset = defaultScenarioForRegion(id);
-        if (id === 'hangang') this.lobby.aircraft = 'C172';
         if (id === 'valley') this.lobby.aircraft = 'F16';
         this.lobbyScreen?.refresh();
       },
@@ -545,6 +544,7 @@ class SimulatorHudAndBindingsMethods {
         if (type === 'valley') {
           this.lobby.aircraft = 'F16';
         }
+        this.lobby.aircraft = requiredAircraft(type) ?? this.lobby.aircraft;
         this.lobbyScreen.refresh();
       },
       onTime: hours => this.setTimeOfDay(hours),

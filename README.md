@@ -111,12 +111,12 @@ See the [flight selector reference](docs/flight-urls.md) for available choices a
 The directory also includes an [AI mission selector](docs/flight-urls.md#ai-pilot-mission-selector), with gameplay and readable pilot-code links for takeoff, landing and F-16 Lukla valley flight.
 
 - `aircraft`: `B738`, `C172`, `F16` (case sensitive).
-- `terrain`: `coastal`, `lukla`, `incheon`, `neon`, `hangang`.
-- `scenario`: `runway`, `approach`, `cruise`, `cliff`, `demo`, `hangang`, subject to terrain and aircraft availability.
+- `terrain`: `coastal`, `lukla`, `incheon`, `neon`, `valley`.
+- `scenario`: `runway`, `approach`, `cruise`, `cliff`, `demo`, `bridge`, `valley`, subject to terrain and aircraft availability.
 
 URL values override saved preferences. Omitted values use the saved selection;
-invalid or unavailable choices fall back to the existing defaults. Hangang uses
-C172 only. Flights still follow browser audio permission rules.
+invalid or unavailable choices fall back to the existing defaults. The Neon
+Metropolis `bridge` flight uses C172 only, and the retired `terrain=hangang` opens it. Flights still follow browser audio permission rules.
 
 ## 🎮 Flight Controls
 

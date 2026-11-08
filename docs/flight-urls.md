@@ -21,7 +21,7 @@ only the environment and sensor-noise seed vary.
 | Parameter | Purpose |
 | --- | --- |
 | `aircraft` | `B738`, `C172`, or `F16` |
-| `terrain` | `coastal`, `lukla`, `incheon`, `neon`, or `hangang` |
+| `terrain` | `coastal`, `lukla`, `incheon`, `neon`, or `valley` |
 | `scenario` | A supported scenario for the selected terrain/aircraft |
 | `pilotArena=1` | Open the local pilot console |
 | `pilotCase` | Select and automatically start a known built-in pilot case |
@@ -29,8 +29,8 @@ only the environment and sensor-noise seed vary.
 Values are case sensitive. Ordinary URL parameters override saved preferences;
 omitted values retain saved choices. Invalid or unsupported ordinary selections
 fall back to the existing defaults. Unknown pilot case IDs never execute source
-or silently start a different test. Hangang is C172-only; cliff takeoff is
-Lukla-only. Browser audio permission rules still apply.
+or silently start a different test. The Neon Metropolis `bridge` scenario is C172-only, and the retired
+`terrain=hangang` opens it; cliff takeoff is Lukla-only. Browser audio permission rules still apply.
 
 ## AI pilot mission selector
 

@@ -42,7 +42,7 @@ export class SimulatorMissionAdapter {
     sim.devRunner?.stop({ pilotPreparation: true });
     sim.shadowDemo?.stop();
     sim.replayDirector?.stop();
-    sim.hangang?.stop();
+    sim.bridgeFlight?.stop();
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
     await sim.setAirport('coastal', true);
     if (signal?.aborted) throw new Error('pilot-preparation-aborted');
