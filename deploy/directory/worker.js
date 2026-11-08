@@ -1,6 +1,6 @@
 import { MemoryRoomDirectoryStore, handleDirectoryRequest } from '../../src/multiplayer/roomDirectory.js';
 
-class D1RoomDirectoryStore {
+export class D1RoomDirectoryStore {
   constructor(db, { ttlMs = 45000, maxRooms = 500 } = {}) {
     this.db = db;
     this.ttlMs = ttlMs;
@@ -26,29 +26,45 @@ class D1RoomDirectoryStore {
       throw new Error('capacity-exceeded');
     }
 
-    // Check existing registration for this room code
-    const existing = await this.db.prepare('SELECT lease_generation FROM rooms WHERE room_code = ?').bind(valid.roomCode).first();
-    const leaseGeneration = existing ? (existing.lease_generation || 1) + 1 : 1;
-
-    // Delete existing room code registration to ensure uniqueness
-    await this.db.prepare('DELETE FROM rooms WHERE room_code = ?').bind(valid.roomCode).run();
-
     const id = `room_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
     const token = `tok_${crypto.randomUUID().replace(/-/g, '')}`;
     const tokenHash = await hashToken(token);
     const expiresAt = now + this.ttlMs;
 
-    await this.db.prepare(`
+    // Atomic UPSERT by unique room_code to prevent concurrent registration duplicates
+    // and atomically increment lease_generation when replacing an existing room.
+    const upsertRow = await this.db.prepare(`
       INSERT INTO rooms (
         id, room_code, token_hash, lease_generation, name, airport, aircraft, scenario,
         current_players, max_players, status, protocol_major, flight_revision,
         created_at, last_heartbeat_at, expires_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(room_code) DO UPDATE SET
+        id = excluded.id,
+        token_hash = excluded.token_hash,
+        lease_generation = rooms.lease_generation + 1,
+        name = excluded.name,
+        airport = excluded.airport,
+        aircraft = excluded.aircraft,
+        scenario = excluded.scenario,
+        current_players = excluded.current_players,
+        max_players = excluded.max_players,
+        status = excluded.status,
+        protocol_major = excluded.protocol_major,
+        flight_revision = excluded.flight_revision,
+        created_at = excluded.created_at,
+        last_heartbeat_at = excluded.last_heartbeat_at,
+        expires_at = excluded.expires_at
+      RETURNING lease_generation
     `).bind(
-      id, valid.roomCode, tokenHash, leaseGeneration, valid.name, valid.airport, valid.aircraft, valid.scenario,
+      id, valid.roomCode, tokenHash, valid.name, valid.airport, valid.aircraft, valid.scenario,
       valid.currentPlayers, valid.maxPlayers, valid.status, valid.protocolMajor, valid.flightRevision,
       now, now, expiresAt
-    ).run();
+    ).first();
+
+    const leaseGeneration = (upsertRow && typeof upsertRow.lease_generation === 'number')
+      ? upsertRow.lease_generation
+      : 1;
 
     const record = {
       id,

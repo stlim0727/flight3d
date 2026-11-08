@@ -1,7 +1,7 @@
 -- Flight3d Multiplayer Room Directory D1 Schema
 CREATE TABLE IF NOT EXISTS rooms (
   id TEXT PRIMARY KEY,
-  room_code TEXT NOT NULL,
+  room_code TEXT NOT NULL UNIQUE,
   token_hash TEXT NOT NULL,
   lease_generation INTEGER NOT NULL DEFAULT 1,
   name TEXT NOT NULL,
@@ -20,4 +20,4 @@ CREATE TABLE IF NOT EXISTS rooms (
 
 CREATE INDEX IF NOT EXISTS idx_rooms_expires_at ON rooms (expires_at);
 CREATE INDEX IF NOT EXISTS idx_rooms_filter ON rooms (protocol_major, flight_revision, status, expires_at);
-CREATE INDEX IF NOT EXISTS idx_rooms_code ON rooms (room_code);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_code ON rooms (room_code);

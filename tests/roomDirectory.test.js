@@ -300,3 +300,105 @@ test('RoomDirectoryClient handles registration, heartbeat and graceful errors', 
   const brokenReg = await brokenClient.register({ roomCode: '4M9X2L', name: 'X' });
   assert.equal(brokenReg.ok, false);
 });
+
+test('RoomDirectoryClient request timeout covers response body streaming', async () => {
+  const stallingFetch = async (url, init) => ({
+    ok: true,
+    status: 201,
+    async json() {
+      return new Promise((resolve, reject) => {
+        if (init?.signal) {
+          init.signal.addEventListener('abort', () => reject(new DOMException('This operation was aborted', 'AbortError')));
+        }
+      });
+    },
+  });
+
+  const client = new RoomDirectoryClient({
+    directoryUrl: 'https://directory.flight3d',
+    fetchFn: stallingFetch,
+  });
+
+  const start = Date.now();
+  const res = await client.register({
+    roomCode: 'K7M2QX',
+    name: 'StallHost',
+    timeoutMs: 60,
+  });
+  const elapsed = Date.now() - start;
+
+  assert.equal(res.ok, false);
+  assert.equal(res.error, 'timeout');
+  assert.equal(client.isRegistered, false);
+  assert.ok(elapsed >= 50 && elapsed < 500, `Expected timeout around 60ms, took ${elapsed}ms`);
+});
+
+test('D1RoomDirectoryStore atomically upserts room_code and increments lease generation without duplicates', async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync(new URL('../deploy/directory/schema.sql', import.meta.url), 'utf8');
+  const { D1RoomDirectoryStore } = await import('../deploy/directory/worker.js');
+
+  const db = new DatabaseSync(':memory:');
+  db.exec(schema);
+
+  const d1 = {
+    prepare(sql) {
+      return {
+        bind(...args) {
+          return {
+            async first() {
+              const stmt = db.prepare(sql);
+              return stmt.get(...args);
+            },
+            async run() {
+              const stmt = db.prepare(sql);
+              return stmt.run(...args);
+            },
+            async all() {
+              const stmt = db.prepare(sql);
+              return { results: stmt.all(...args) };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const store = new D1RoomDirectoryStore(d1);
+
+  // Concurrent registration requests for the same room code
+  const [r1, r2] = await Promise.all([
+    store.registerRoom({
+      roomCode: 'K7M2QX',
+      name: 'HostA',
+      airport: 'coastal',
+      aircraft: 'C172',
+      scenario: 'cruise',
+      protocolMajor: 2,
+      flightRevision: 1,
+    }),
+    store.registerRoom({
+      roomCode: 'K7M2QX',
+      name: 'HostB',
+      airport: 'coastal',
+      aircraft: 'B738',
+      scenario: 'runway',
+      protocolMajor: 2,
+      flightRevision: 1,
+    }),
+  ]);
+
+  // Unique constraint ensures exactly one row in DB for this room code
+  const countRow = db.prepare('SELECT count(*) as c FROM rooms WHERE room_code = ?').get('K7M2QX');
+  assert.equal(countRow.c, 1);
+
+  // Both succeeded with distinct incremented lease generations
+  const generations = [r1.leaseGeneration, r2.leaseGeneration].sort();
+  assert.deepEqual(generations, [1, 2]);
+
+  // Active room listing returns exactly 1 room
+  const list = await store.listRooms();
+  assert.equal(list.length, 1);
+  assert.equal(list[0].roomCode, 'K7M2QX');
+});
