@@ -27,9 +27,29 @@ export class VoiceLink {
       stream.getAudioTracks().forEach(track => track.addEventListener('ended', () => {
         this.disableMicrophone(); this.error = 'microphone'; this.changed();
       }));
+      this.context.resume().then(() => this.syncTransmission(), () => {});
       this.syncTransmission();
     } catch { this.error = 'microphone'; }
     finally { this.requesting = false; this.changed(); }
+  }
+  attachRemoteStream(stream) {
+    this.remoteSource?.disconnect();
+    this.remoteSource = null;
+    if (this.closed || !stream || typeof this.context.createMediaStreamSource !== 'function') return;
+    try {
+      if (!this.remoteGain) {
+        this.remoteGain = this.context.createGain();
+        this.remoteGain.gain.value = 0;
+        if (this.context.destination) this.remoteGain.connect(this.context.destination);
+      }
+      this.remoteSource = this.context.createMediaStreamSource(stream);
+      this.remoteSource.connect(this.remoteGain);
+    } catch {}
+  }
+  setRemoteOutput(enabled) {
+    if (this.remoteGain) {
+      this.remoteGain.gain.value = enabled && !this.closed ? 1 : 0;
+    }
   }
   setMuted(muted) {
     this.muted = Boolean(muted); this.syncTransmission();
@@ -49,6 +69,8 @@ export class VoiceLink {
   close() {
     if (this.closed) return;
     this.closed = true; this.disableMicrophone(); this.silence.stop(); this.silence.disconnect();
+    this.remoteSource?.disconnect(); this.remoteSource = null;
+    this.remoteGain?.disconnect(); this.remoteGain = null;
     this.gain.disconnect(); this.stream.getTracks().forEach(t => t.stop());
     this.context.close().catch(() => {});
   }

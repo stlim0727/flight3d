@@ -105,6 +105,9 @@ export class FlightControls {
         this.onUserInteract?.();
       }
     });
+    this.domElement.addEventListener('pointerup', () => {
+      this.onUserInteract?.();
+    });
   }
 
   handleKeyDown(e) {
