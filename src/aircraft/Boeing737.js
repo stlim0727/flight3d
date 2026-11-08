@@ -39,6 +39,8 @@ export class Boeing737 {
     this.gltfGroup.visible = false;
     this.group.add(this.gltfGroup);
     this.gltfFans = [];
+    this.gltfFanL = null;
+    this.gltfFanR = null;
     this.gltfControlSurfaces = [];
     this.useGltf = false;
     this.loadingGltf = false;
@@ -784,14 +786,24 @@ export class Boeing737 {
    */
   update(dt, flightState) {
     // 1. Turbofan Fan Blade Rotation tied to Engine N1 RPM
-    const n1Left = flightState.engine1 ? flightState.engine1.n1 : 22;
-    const n1Right = flightState.engine2 ? flightState.engine2.n1 : 22;
+    const n1Left = flightState.engine1?.n1 ?? flightState.engineN1 ?? 22;
+    const n1Right = flightState.engine2?.n1 ?? flightState.engineN1 ?? 22;
 
     const rotSpeedL = (n1Left / 100.0) * 85.0 * dt;
     const rotSpeedR = (n1Right / 100.0) * 85.0 * dt;
 
+    // Procedural fallback fans (Z-axis rotation in procedural nacelle coordinate frame)
     if (this.fanL) this.fanL.rotation.z += rotSpeedL;
     if (this.fanR) this.fanR.rotation.z += rotSpeedR;
+
+    // GLTF turbine fans (X-axis rotation in GLTF engine coordinate frame)
+    if (this.gltfFanL) this.gltfFanL.rotation.x += rotSpeedL;
+    if (this.gltfFanR) this.gltfFanR.rotation.x += rotSpeedR;
+    else if (this.gltfFans && this.gltfFans.length > 0) {
+      this.gltfFans.forEach(fan => {
+        fan.rotation.x += rotSpeedL;
+      });
+    }
 
     // 2. Control Surface Deflections
     updateGltfControlSurfaces(this.gltfControlSurfaces, flightState);
@@ -894,16 +906,7 @@ export class Boeing737 {
       light.intensity = beaconActive ? 6.0 : 0.1;
     });
 
-    // 5. GLTF Turbine Fan Spin Animation
-    if (this.gltfFans && this.gltfFans.length > 0 && flightState.engineN1) {
-      const fanAngle = flightState.engineN1 * (Math.PI * 2.0) * 0.08;
-      this.gltfFans.forEach(fan => {
-        fan.rotation.x += fanAngle;
-        fan.rotation.z += fanAngle;
-      });
-    }
-
-    // 6. Update Cockpit Interior Controls
+    // 5. Update Cockpit Interior Controls
     this.cockpit?.updateControls(flightState);
   }
 
@@ -1034,12 +1037,10 @@ export class Boeing737 {
             applyFlatShading(this.gltfModel, true);
           }
 
-          // Turbine fan blades
-          this.gltfFans = [];
-          const fan1 = this.gltfModel.getObjectByName('tur_01');
-          const fan2 = this.gltfModel.getObjectByName('turbs');
-          if (fan1) this.gltfFans.push(fan1);
-          if (fan2) this.gltfFans.push(fan2);
+          // Turbine fan blades ('turbs' = port/left engine, 'tur_01' = starboard/right engine)
+          this.gltfFanL = this.gltfModel.getObjectByName('turbs') || null;
+          this.gltfFanR = this.gltfModel.getObjectByName('tur_01') || null;
+          this.gltfFans = [this.gltfFanL, this.gltfFanR].filter(Boolean);
 
           this.gltfGroup.visible = !this.isCockpit;
           this.modelLoaded = true;
