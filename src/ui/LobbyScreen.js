@@ -10,6 +10,8 @@ const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c1
 /** Aircraft the lobby offers, so warmup can prepare exactly this set. */
 export const LOBBY_AIRCRAFT_IDS = Object.keys(AIRCRAFT_BUTTONS);
 const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
+/** Airports that keep their own sky time (Neon is always night), so the lobby clock picker is locked. */
+const FIXED_TIME_AIRPORTS = new Set(['neon', 'valley']);
 
 /**
  * Wire the lobby overlay (markup lives in index.html); it is the only place
@@ -331,7 +333,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       bindText(briefingEl, () => lobbyBriefing(getAirport(), getPreset()).join('\n'));
     }
     if (timeSelect) {
-      timeSelect.disabled = airport === 'valley';
+      timeSelect.disabled = FIXED_TIME_AIRPORTS.has(airport);
       // The clock is continuous (and float-modulo noisy after restore), so show
       // the nearest preset option rather than requiring an exact value match.
       // Distance wraps at midnight so 23:50 shows 22:30, not 06:30.

@@ -268,3 +268,48 @@ test('inline demo scenario buttons render side-by-side with normal scenarios and
     else globalThis.document = originalDoc;
   }
 });
+
+test('time-of-day picker is locked at fixed-time airports (Neon, Valley)', () => {
+  const originalDoc = globalThis.document;
+  try {
+    const { mockDocument, elements } = setupMockDOM();
+    globalThis.document = mockDocument;
+
+    const timeSelect = elements.get('lobby-time-select');
+    const timeGroup = new MockElement('', 'label');
+    timeGroup.appendChild(timeSelect);
+    for (const value of ['now', '12', '22.5']) {
+      const option = new MockElement('', 'option');
+      option.value = value;
+      option.textContent = value;
+      timeSelect.options.push(option);
+    }
+
+    let airport = 'incheon';
+    const screen = initLobbyScreen({
+      getAirport: () => airport,
+      getPreset: () => 'runway',
+      getTime: () => 12,
+      getAircraft: () => 'C172',
+      getDemoProfile: () => null,
+      onAirport: () => {},
+      onPreset: () => {},
+      onTime: () => {},
+      onAircraft: () => {},
+      onDemoProfile: () => {},
+      onFly: () => {},
+    });
+    const chips = timeGroup.children.find(c => c.classList.contains('lobby-time-chips')).children;
+    assert.equal(chips.length, 3);
+
+    for (const [id, locked] of [['incheon', false], ['neon', true], ['valley', true], ['coastal', false]]) {
+      airport = id;
+      screen.refresh();
+      assert.equal(timeSelect.disabled, locked, `${id} select`);
+      assert.ok(chips.every(chip => chip.disabled === locked), `${id} chips`);
+    }
+  } finally {
+    if (originalDoc === undefined) delete globalThis.document;
+    else globalThis.document = originalDoc;
+  }
+});
