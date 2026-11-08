@@ -125,6 +125,21 @@ export class TireSmokeSystem {
   }
 
   /**
+   * Spawns lighter smoke puffs for heavy anti-skid wheel braking on runway
+   */
+  spawnBrakingSmoke(contacts, linearVelocity, brakeIntensity) {
+    if (!contacts || brakeIntensity < 0.6) return;
+    const groundSpeed = Math.hypot(linearVelocity.x, linearVelocity.z);
+    if (groundSpeed < 5.0) return; // Parked wheels cannot produce braking smoke.
+    if (Math.random() > 0.4) return; // Stagger braking emission
+
+    for (const c of contacts) {
+      if (c.id === 'nose' || !c.isGrounded) continue; // Only loaded main wheels can brake.
+      this.emitSmokeBurst(c.worldPos, linearVelocity, groundSpeed, 3);
+    }
+  }
+
+  /**
    * Spawns expanding water spray plumes for hydroplaning ditching
    */
   emitWaterSprayBurst(origin, linearVelocity, groundSpeed, count = 3) {
