@@ -17,6 +17,8 @@ export class ExplosionSystem {
     this.waterPlumes = [];
     this.shockwaves = [];
     this.persistentWreckage = null;
+    this.persistentWreckages = [];
+    this.persistentWaterWreckages = [];
 
     // Point lights for dynamic illumination
     this.lightPool = [];
@@ -78,6 +80,15 @@ export class ExplosionSystem {
       pos.y = 0.08; // Collision probes can already be below the sea surface.
       this.spawnShockwave(pos, true, spread);
       this.spawnWaterGeyser(pos, Math.ceil(35 + 35 * spread), velocity, spread);
+      const waterWreckage = {
+        pos: pos.clone(),
+        timer: 0,
+        duration: 30.0,
+        foamInterval: 0.35,
+        isWater: true
+      };
+      if (!this.persistentWaterWreckages) this.persistentWaterWreckages = [];
+      this.persistentWaterWreckages.push(waterWreckage);
       return; // No combustion, glowing sparks or persistent smoke on water.
     }
 
@@ -110,6 +121,15 @@ export class ExplosionSystem {
       p.vel.multiplyScalar(spread * 0.45).addScaledVector(velocity, 0.12);
       p.vel.y = Math.max(1, p.vel.y);
     }
+    const groundWreckage = {
+      pos: pos.clone(),
+      timer: 0,
+      duration: 30.0,
+      smokeInterval: 0.25,
+      isWater: false
+    };
+    this.persistentWreckages.push(groundWreckage);
+    this.persistentWreckage = groundWreckage;
   }
 
   spawnShockwave(pos, isWater, spread = 1) {
@@ -437,17 +457,72 @@ export class ExplosionSystem {
       }
     }
 
-    // 7. Persistent wreckage smoke emission
-    if (this.persistentWreckage) {
-      this.persistentWreckage.timer += dt;
-      if (this.persistentWreckage.timer < this.persistentWreckage.duration) {
-        this.persistentWreckage.smokeInterval -= dt;
-        if (this.persistentWreckage.smokeInterval <= 0) {
-          this.persistentWreckage.smokeInterval = 0.25;
-          this.spawnWreckageSmoke(this.persistentWreckage.pos);
+    // 7. Persistent wreckage smoke & water disturbance emission
+    if (!this.persistentWreckages) this.persistentWreckages = [];
+    if (!this.persistentWaterWreckages) this.persistentWaterWreckages = [];
+    if (this.persistentWreckage && !this.persistentWreckages.includes(this.persistentWreckage)) {
+      this.persistentWreckages.push(this.persistentWreckage);
+    }
+    for (let i = this.persistentWreckages.length - 1; i >= 0; i--) {
+      const w = this.persistentWreckages[i];
+      w.timer += dt;
+      if (w.timer < w.duration) {
+        w.smokeInterval = (w.smokeInterval ?? 0.25) - dt;
+        if (w.smokeInterval <= 0) {
+          w.smokeInterval = 0.25;
+          this.spawnWreckageSmoke(w.pos);
+        }
+      } else {
+        this.persistentWreckages.splice(i, 1);
+        if (this.persistentWreckage === w) {
+          this.persistentWreckage = this.persistentWreckages.at(-1) ?? null;
         }
       }
     }
+    for (let i = this.persistentWaterWreckages.length - 1; i >= 0; i--) {
+      const w = this.persistentWaterWreckages[i];
+      w.timer += dt;
+      if (w.timer < w.duration) {
+        w.foamInterval = (w.foamInterval ?? 0.35) - dt;
+        if (w.foamInterval <= 0) {
+          w.foamInterval = 0.35;
+          this.spawnWaterFoam(w.pos);
+        }
+      } else {
+        this.persistentWaterWreckages.splice(i, 1);
+      }
+    }
+  }
+
+  spawnWaterFoam(pos) {
+    if (this.waterPlumes.length >= 90) return;
+    const spriteMat = createFlipbookMaterial(this.waterTexture, {
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.NormalBlending,
+      depthWrite: false
+    });
+
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.position.copy(pos).add(new THREE.Vector3(
+      (Math.random() - 0.5) * 8.0,
+      0.15,
+      (Math.random() - 0.5) * 8.0
+    ));
+
+    const baseScale = 2.0 + Math.random() * 3.0;
+    sprite.scale.set(baseScale, baseScale, 1.0);
+
+    this.group.add(sprite);
+    this.waterPlumes.push({
+      sprite,
+      vel: new THREE.Vector3((Math.random() - 0.5) * 0.4, 0.04, (Math.random() - 0.5) * 0.4),
+      scale: baseScale,
+      growth: 0.8,
+      surfaceY: pos.y,
+      life: 0.0,
+      maxLife: 3.5
+    });
   }
 
   spawnWreckageSmoke(pos) {
@@ -494,18 +569,20 @@ export class ExplosionSystem {
     this.scene.remove(this.group);
   }
 
-  clear() {
+  clear({ preservePersistent = false } = {}) {
     for (const f of this.fireballs) {
       this.group.remove(f.sprite);
       f.sprite.material.dispose();
     }
     this.fireballs = [];
 
-    for (const s of this.smokePuffs) {
-      this.group.remove(s.sprite);
-      s.sprite.material.dispose();
+    if (!preservePersistent) {
+      for (const s of this.smokePuffs) {
+        this.group.remove(s.sprite);
+        s.sprite.material.dispose();
+      }
+      this.smokePuffs = [];
     }
-    this.smokePuffs = [];
 
     for (const d of this.debrisParticles) {
       this.group.remove(d.sprite);
@@ -513,11 +590,13 @@ export class ExplosionSystem {
     }
     this.debrisParticles = [];
 
-    for (const w of this.waterPlumes) {
-      this.group.remove(w.sprite);
-      w.sprite.material.dispose();
+    if (!preservePersistent) {
+      for (const w of this.waterPlumes) {
+        this.group.remove(w.sprite);
+        w.sprite.material.dispose();
+      }
+      this.waterPlumes = [];
     }
-    this.waterPlumes = [];
 
     for (const sw of this.shockwaves) {
       this.group.remove(sw.mesh);
@@ -530,6 +609,10 @@ export class ExplosionSystem {
       item.light.visible = false;
     }
 
-    this.persistentWreckage = null;
+    if (!preservePersistent) {
+      this.persistentWreckage = null;
+      this.persistentWreckages = [];
+      this.persistentWaterWreckages = [];
+    }
   }
 }

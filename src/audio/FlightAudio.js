@@ -830,4 +830,37 @@ export class FlightAudio {
     crunchGain.connect(this.masterGain);
     crunchSrc.start(now);
   }
+
+  playRemoteExplosion(distance = 0, isWater = false) {
+    if (!this.isInitialized || !this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    const safeDistance = Math.max(0, Number.isFinite(distance) ? distance : 0);
+    const volume = Math.min(1.0, Math.max(0.02, 1 / (1 + safeDistance / 1500)));
+
+    // 1. Distance-muffled low-frequency rumble
+    const bufferSize = Math.floor(this.ctx.sampleRate * 2.5);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.6));
+    }
+
+    const noiseSrc = this.ctx.createBufferSource();
+    noiseSrc.buffer = noiseBuffer;
+
+    const bassFilter = this.ctx.createBiquadFilter();
+    bassFilter.type = 'lowpass';
+    const cutoff = Math.max(50, (isWater ? 180 : 300) - (safeDistance / 4000) * 140);
+    bassFilter.frequency.setValueAtTime(cutoff, now);
+    bassFilter.frequency.exponentialRampToValueAtTime(26, now + 2.0);
+
+    const bassGain = this.ctx.createGain();
+    bassGain.gain.setValueAtTime(1.2 * volume, now);
+    bassGain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+
+    noiseSrc.connect(bassFilter);
+    bassFilter.connect(bassGain);
+    bassGain.connect(this.masterGain);
+    noiseSrc.start(now);
+  }
 }

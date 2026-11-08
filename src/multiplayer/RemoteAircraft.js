@@ -1,12 +1,23 @@
 import * as THREE from 'three';
+import { AircraftBreakup } from '../effects/AircraftBreakup.js';
 import { RemoteAircraftIndicator } from './RemoteAircraftIndicator.js';
 import { createRemoteAircraftModel, disposeRemoteModel } from './RemoteAircraftModel.js';
 
 /** Remote visual only: production aircraft assets, no physics or collision ownership. */
 export class RemoteAircraft {
   constructor(scene, aircraft, { createModel = createRemoteAircraftModel,
-    createIndicator = () => new RemoteAircraftIndicator() } = {}) {
+    createIndicator = () => new RemoteAircraftIndicator(),
+    createBreakup = s => new AircraftBreakup(s),
+    terrain = null,
+    explosionSystem = null,
+    audio = null } = {}) {
     this.group = new THREE.Group(); this.group.name = 'MultiplayerGhost';
+    this.scene = scene;
+    this.terrain = terrain;
+    this.explosionSystem = explosionSystem;
+    this.audio = audio;
+    this.breakup = createBreakup ? createBreakup(scene) : null;
+    this.wasCrashed = false;
     this.model = createModel(aircraft);
     this.group.add(this.model.group);
     this.group.visible = false; scene.add(this.group);
@@ -21,6 +32,7 @@ export class RemoteAircraft {
         return;
       }
       this.configureExterior();
+      this.breakup?.prepare(this.model);
       this.animate(this.group.userData.remote, 0);
     });
   }
@@ -41,7 +53,50 @@ export class RemoteAircraft {
     const now = performance.now();
     const dt = Math.min(.1, Math.max(0, (now - this.lastUpdate) / 1000));
     this.lastUpdate = now;
-    this.group.visible = Boolean(sample && !sample.crashed);
+
+    const isCrashed = Boolean(sample && sample.crashed);
+    if (isCrashed) {
+      if (!this.wasCrashed) {
+        this.wasCrashed = true;
+        const pos = new THREE.Vector3().fromArray(sample.p);
+        const vel = new THREE.Vector3().fromArray(sample.v);
+        const terrain = this.terrain;
+        const terrainH = terrain?.getHeight?.(pos.x, pos.z) ?? 0;
+        const waterLevel = terrain?.getWaterLevel?.(pos.x, pos.z) ?? 0.0;
+        const isWater = (terrainH <= waterLevel + 2.5) && (pos.y <= waterLevel + 2.0);
+        const crashType = isWater ? 'WATER' : 'TERRAIN';
+
+        this.explosionSystem?.spawnExplosion({
+          point: pos,
+          type: crashType,
+          speedKnots: vel.length() * 1.94384,
+        }, vel);
+
+        if (this.audio) {
+          const dist = localPosition ? pos.distanceTo(localPosition) : undefined;
+          this.audio.playRemoteExplosion?.(dist, isWater);
+        }
+
+        this.group.position.fromArray(sample.p);
+        this.group.quaternion.fromArray(sample.q);
+        this.group.updateMatrixWorld(true);
+        this.breakup?.spawn(this.model, vel);
+      }
+      this.group.visible = false;
+      this.indicator.hide();
+      const waterLevel = this.terrain?.getWaterLevel?.(sample.p[0], sample.p[2]) ?? 0;
+      this.breakup?.update(dt, this.terrain, waterLevel);
+      return;
+    }
+
+    if (this.wasCrashed) {
+      this.wasCrashed = false;
+      this.breakup?.clear({ persist: true, duration: 30 });
+    } else {
+      this.breakup?.update(dt, this.terrain);
+    }
+
+    this.group.visible = Boolean(sample);
     if (!this.group.visible) {
       this.indicator.hide();
       return;
@@ -64,7 +119,8 @@ export class RemoteAircraft {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
-    this.group.removeFromParent(); this.indicator.dispose();
+    this.breakup?.disposePrepared?.();
+    this.group.removeFromParent(); this.indicator?.dispose?.();
     disposeRemoteModel(this.model.group, this.disposedResources);
   }
 }
