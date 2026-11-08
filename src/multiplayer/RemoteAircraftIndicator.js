@@ -1,6 +1,8 @@
 import { Vector3 } from 'three';
 import { t } from '../i18n/index.js';
-import { edgePosition, indicatorMode, screenBearing } from './remoteIndicator.js';
+import { distanceLabel, edgePosition, indicatorMode, screenBearing } from './remoteIndicator.js';
+
+export { distanceLabel };
 
 const TOP_UI = '.hud-top-bar, .flight-toolbar';
 const BOTTOM_UI = '.touch-throttle-card, .touch-stick-card, .touch-rudder-card, #touch-btn-brake';
@@ -14,14 +16,11 @@ function visibleRects(selector) {
   });
 }
 
-function distanceLabel(meters) {
-  return meters < 1000 ? `${Math.round(meters / 10) * 10} m` : `${(meters / 1000).toFixed(1)} km`;
-}
-
 export class RemoteAircraftIndicator {
   constructor() {
     this.anchor = new Vector3();
     this.view = new Vector3();
+    this.labelSize = { width: 0, height: 0 };
     this.label = document.createElement('div');
     this.label.className = 'mp-nameplate';
     this.bounds = document.createElement('div');
@@ -65,18 +64,20 @@ export class RemoteAircraftIndicator {
     const x = (this.anchor.x + 1) * width / 2;
     const y = (1 - this.anchor.y) * height / 2;
     this.mode = indicatorMode({ x, y, front, inDepth: Math.abs(this.anchor.z) <= 1 }, width, height, this.mode);
+    const formattedDistance = Number.isFinite(distance) ? distanceLabel(distance) : '';
     if (this.mode === 'onscreen') {
       this.marker.hidden = true;
       this.label.hidden = false;
-      const text = name + status;
+      const text = name + status + (formattedDistance ? ` · ${formattedDistance}` : '');
       if (this.label.textContent !== text || this.labelViewport !== width) {
         this.label.textContent = text;
         this.labelViewport = width;
         this.labelSize = this.label.getBoundingClientRect();
       }
-      const halfWidth = this.labelSize.width / 2;
+      const halfWidth = (this.labelSize?.width || 0) / 2;
+      const labelHeight = this.labelSize?.height || 0;
       this.label.style.left = `${Math.max(halfWidth, Math.min(x, width - halfWidth))}px`;
-      this.label.style.top = `${Math.max(this.labelSize.height, y)}px`;
+      this.label.style.top = `${Math.max(labelHeight, y)}px`;
       return;
     }
     this.label.hidden = true;
@@ -90,7 +91,7 @@ export class RemoteAircraftIndicator {
     const rear = bearing.directlyBehind ? t('mp.directlyBehind')
       : bearing.behind ? t(vertical ? (bearing.y < 0 ? 'mp.behindAbove' : 'mp.behindBelow') : 'mp.behind') : '';
     const suffix = status + (rear ? ` · ${rear}` : '');
-    this.place(bearing, direction, name, suffix, Number.isFinite(distance) ? distanceLabel(distance) : '', width, height);
+    this.place(bearing, direction, name, suffix, formattedDistance, width, height);
   }
 
   place(bearing, direction, name, suffix, distance, width, height) {
