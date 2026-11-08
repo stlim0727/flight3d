@@ -15,6 +15,19 @@ export function shapeTouchStick(pitch, roll) {
 }
 
 /**
+ * Detect whether the device is a mobile or tablet form factor with gyroscope capabilities.
+ */
+export function isGyroSupportedDevice(win = globalThis.window, nav = globalThis.navigator) {
+  if (typeof win === 'undefined' || !win || !win.DeviceOrientationEvent) return false;
+  if (win.isSecureContext === false) return false;
+  const ua = nav?.userAgent || '';
+  const isMobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (/Macintosh/i.test(ua) && (nav?.maxTouchPoints || 0) > 1);
+  const isMobileClient = Boolean(nav?.userAgentData?.mobile);
+  const hasTouch = Boolean(('ontouchstart' in win) || ((nav?.maxTouchPoints ?? 0) > 0));
+  return (isMobileUA || isMobileClient) && hasTouch;
+}
+
+/**
  * TouchFlightControls.js
  * Comprehensive Mobile & Touchscreen Flight Control System
  * 
@@ -41,7 +54,10 @@ export class TouchFlightControls {
     this.handleOrientation = this.handleOrientation.bind(this);
     const gyroPreferences = loadSimulatorPreferences();
     this.gyroOrientation = gyroPreferences.gyroOrientation ?? 'auto';
-    this.gyroRequested = gyroPreferences.gyroEnabled === true;
+    const isGyroDefault = options.gyroDefault !== undefined ? options.gyroDefault : isGyroSupportedDevice();
+    this.gyroRequested = typeof gyroPreferences.gyroEnabled === 'boolean'
+      ? gyroPreferences.gyroEnabled
+      : Boolean(isGyroDefault);
     this.label = this.gyroRequested ? 'gyro.on' : 'gyro.off';
     this.onOptionsChange = options.onOptionsChange ?? null;
     this.gyroCalibration = null;
@@ -49,6 +65,8 @@ export class TouchFlightControls {
     this.gyroOwnsLock = false;
     this.gyroLockQueue = Promise.resolve();
     this.onGyroScreenChange = () => this.recenterGyro();
+    this.gyroNormPitch = 0;
+    this.gyroNormRoll = 0;
 
     // Virtual Stick State
     this.stickActive = false;
@@ -60,6 +78,8 @@ export class TouchFlightControls {
     this.stickCurrentY = 0;
     this.stickGrabOffsetX = 0;
     this.stickGrabOffsetY = 0;
+    this.stickNormPitch = 0;
+    this.stickNormRoll = 0;
 
     // Rudder State
     this.rudderActive = false;
@@ -344,11 +364,12 @@ export class TouchFlightControls {
   recenterGyro() {
     if (!this.gyroActive) return;
     this.gyroCalibration = null;
+    this.gyroNormPitch = 0;
+    this.gyroNormRoll = 0;
     this.gyroScreen = readGyroScreen(window);
     this.gyroReadyAt = performance.now() + 600;
-    this.controls.setTouchStick(0, 0);
-    this.updateStickTelemetry(0, 0);
-    if (this.stickKnob) this.stickKnob.style.transform = 'translate(0px, 0px)';
+    this.updateControlOutput();
+    this.syncStickKnobPosition();
     this.setGyroOrientationStatus('gyro.orientation.centering');
   }
 
@@ -431,14 +452,11 @@ export class TouchFlightControls {
     // Smooth spring back to center
     this.stickCurrentX = 0;
     this.stickCurrentY = 0;
-    if (this.stickKnob) {
-      this.stickKnob.style.transform = `translate(0px, 0px)`;
-    }
+    this.stickNormPitch = 0;
+    this.stickNormRoll = 0;
 
-    if (!this.gyroActive) {
-      this.controls.setTouchStick(0.0, 0.0);
-    }
-    this.updateStickTelemetry(0.0, 0.0);
+    this.updateControlOutput();
+    this.syncStickKnobPosition();
   }
 
   updateStickPosition(clientX, clientY) {
@@ -464,12 +482,52 @@ export class TouchFlightControls {
     // Push stick up (dy < 0) -> Nose DOWN (Elevator < 0, dive)
     // Push stick right (dx > 0) -> Bank RIGHT (Aileron > 0)
     // Push stick left (dx < 0) -> Bank LEFT (Aileron < 0)
-    const [normPitch, normRoll] = shapeTouchStick(dy / this.stickRadius, dx / this.stickRadius);
+    this.stickNormPitch = dy / this.stickRadius;
+    this.stickNormRoll = dx / this.stickRadius;
 
-    if (!this.gyroActive) {
-      this.controls.setTouchStick(normPitch, normRoll);
+    this.updateControlOutput();
+  }
+
+  updateControlOutput() {
+    let rawPitch = 0;
+    let rawRoll = 0;
+
+    if (this.gyroActive && this.gyroCalibration) {
+      rawPitch += this.gyroNormPitch || 0;
+      rawRoll += this.gyroNormRoll || 0;
     }
-    this.updateStickTelemetry(normPitch, normRoll);
+
+    if (this.stickActive) {
+      rawPitch += this.stickNormPitch || 0;
+      rawRoll += this.stickNormRoll || 0;
+    }
+
+    const magnitude = Math.hypot(rawPitch, rawRoll);
+    if (magnitude > 1) {
+      rawPitch /= magnitude;
+      rawRoll /= magnitude;
+    }
+
+    const [pitch, roll] = shapeTouchStick(rawPitch, rawRoll);
+    if (this.controls?.setTouchStick) {
+      this.controls.setTouchStick(pitch, roll);
+    }
+    this.updateStickTelemetry(pitch, roll);
+  }
+
+  syncStickKnobPosition() {
+    if (!this.stickKnob) return;
+    if (this.stickActive) {
+      this.stickKnob.style.transform = `translate(${this.stickCurrentX}px, ${this.stickCurrentY}px)`;
+    } else if (this.gyroActive && this.gyroCalibration) {
+      this.updateStickGeometry();
+      const magnitude = Math.max(1, Math.hypot(this.gyroNormRoll || 0, this.gyroNormPitch || 0));
+      const gx = (this.gyroNormRoll || 0) / magnitude * this.stickRadius;
+      const gy = (this.gyroNormPitch || 0) / magnitude * this.stickRadius;
+      this.stickKnob.style.transform = `translate(${gx}px, ${gy}px)`;
+    } else {
+      this.stickKnob.style.transform = 'translate(0px, 0px)';
+    }
   }
 
   updateStickTelemetry(pitch, roll) {
@@ -748,10 +806,12 @@ export class TouchFlightControls {
     window.removeEventListener('orientationchange', this.onGyroScreenChange);
     this.releaseGyroLock();
     this.gyroCalibration = null;
+    this.gyroNormPitch = 0;
+    this.gyroNormRoll = 0;
     this.label = 'gyro.off';
     this.syncGyroUI();
-    this.controls.setTouchStick(0.0, 0.0);
-    this.updateStickTelemetry(0.0, 0.0);
+    this.updateControlOutput();
+    this.syncStickKnobPosition();
   }
 
   handleOrientation(e) {
@@ -769,8 +829,10 @@ export class TouchFlightControls {
       this.recenterGyro();
     }
     if (this.gyroOrientation !== 'auto' && screen.type !== this.gyroOrientation) {
-      this.controls.setTouchStick(0, 0);
-      this.updateStickTelemetry(0, 0);
+      this.gyroNormPitch = 0;
+      this.gyroNormRoll = 0;
+      this.updateControlOutput();
+      this.syncStickKnobPosition();
       this.gyroCalibration = null;
       this.setGyroOrientationStatus(`gyro.orientation.rotate.${this.gyroOrientation}`);
       return;
@@ -783,24 +845,11 @@ export class TouchFlightControls {
       this.setGyroOrientationStatus(this.gyroLockUnavailable
         ? 'gyro.orientation.lock.unavailable' : 'gyro.orientation.ready');
     }
-    const normPitch = Math.max(-1, Math.min(1, angleDelta(tilt.pitch, this.gyroCalibration.pitch) / 25));
-    const normRoll = Math.max(-1, Math.min(1, angleDelta(tilt.roll, this.gyroCalibration.roll) / 30));
+    this.gyroNormPitch = Math.max(-1, Math.min(1, angleDelta(tilt.pitch, this.gyroCalibration.pitch) / 25));
+    this.gyroNormRoll = Math.max(-1, Math.min(1, angleDelta(tilt.roll, this.gyroCalibration.roll) / 30));
 
-    // Match the thumb stick's deadzone, fine centre response and circular travel.
-    // Raw axis tilt used to bypass shaping (and could command [1, 1] while the
-    // displayed knob was already clamped to the circular rim).
-    const [pitch, roll] = shapeTouchStick(normPitch, normRoll);
-    this.controls.setTouchStick(pitch, roll);
-    this.updateStickTelemetry(pitch, roll);
-
-    // Update virtual stick graphic to match gyro deflection
-    if (this.stickKnob && !this.stickActive) {
-      this.updateStickGeometry();
-      const magnitude = Math.max(1, Math.hypot(normRoll, normPitch));
-      const gx = normRoll / magnitude * this.stickRadius;
-      const gy = normPitch / magnitude * this.stickRadius;
-      this.stickKnob.style.transform = `translate(${gx}px, ${gy}px)`;
-    }
+    this.updateControlOutput();
+    this.syncStickKnobPosition();
   }
 
   /* ---------------- Sync Throttle Display ---------------- */

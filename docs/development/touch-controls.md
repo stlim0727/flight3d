@@ -91,14 +91,23 @@ portrait, equivalent sensor representations, short angle wrapping, rotation and
 re-centering sequences, mismatched screens, rejected locks and overlapping lock
 requests. Real-phone browser/OS rotation behavior still requires device testing.
 
-## Reloading gyro preferences
+## Reloading gyro preferences and mobile defaults
 
+On gyro-supported mobile and tablet devices, tilt controls are enabled by default
+on initial visit when no preference has been saved yet (`flight3d.preferences.v1`).
+Turning gyro off explicitly saves that choice and prevents future auto-activation.
 The shared `flight3d.preferences.v1` record stores `gyroEnabled` and
 `gyroOrientation` alongside other simulator preferences. Turning gyro off saves
 that choice; sensor failures leave the user's preference intact. The orientation
 selector restores its saved value even when gyro is off. Gyro activation also
 remembers touch controls as enabled so visibility restoration cannot disable the
 sensor input path later in startup.
+
+When tilt flight is enabled, the virtual flight yoke (touch drag) and gyro tilt
+both work simultaneously. Dragging the stick applies additive elevator and
+aileron control on top of device tilt, bounded by the circular travel budget
+and shaped by the same progressive response curve. Releasing the stick smoothly
+returns authority to the live device tilt without abrupt jumps or control lockouts.
 
 Restoration runs with the other preferences before automatic flight starts, and
 re-checks when entering flight if gyro was requested. Browsers without a gesture-only

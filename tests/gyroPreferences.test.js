@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TouchFlightControls } from '../src/controls/TouchFlightControls.js';
+import { TouchFlightControls, isGyroSupportedDevice } from '../src/controls/TouchFlightControls.js';
 import { SIMULATOR_PREFERENCES_KEY, loadSimulatorPreferences, saveSimulatorPreferences, restoreSimulatorPreferences } from '../src/config/simulatorPreferences.js';
 
 function storage() {
@@ -208,4 +208,84 @@ test('toggling gyro off persists preference even before motion readings stream',
   await controls.toggleGyro();
   assert.equal(controls.gyroRequested, false);
   assert.equal(loadSimulatorPreferences(s).gyroEnabled, false);
+});
+
+test('isGyroSupportedDevice correctly detects mobile gyro devices vs desktop/insecure contexts', () => {
+  const mockOrientation = class {};
+  // 1. Android phone with touch and secure context
+  assert.equal(isGyroSupportedDevice(
+    { DeviceOrientationEvent: mockOrientation, isSecureContext: true, ontouchstart: null },
+    { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7)', maxTouchPoints: 5 }
+  ), true);
+
+  // 2. iPhone with touch and secure context
+  assert.equal(isGyroSupportedDevice(
+    { DeviceOrientationEvent: mockOrientation, isSecureContext: true, ontouchstart: null },
+    { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', maxTouchPoints: 5 }
+  ), true);
+
+  // 3. iPad reporting Macintosh with touch points
+  assert.equal(isGyroSupportedDevice(
+    { DeviceOrientationEvent: mockOrientation, isSecureContext: true, ontouchstart: null },
+    { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', maxTouchPoints: 5 }
+  ), true);
+
+  // 4. Desktop Chrome on Linux/Windows/Mac (no mobile UA, no touch)
+  assert.equal(isGyroSupportedDevice(
+    { DeviceOrientationEvent: mockOrientation, isSecureContext: true },
+    { userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0', maxTouchPoints: 0 }
+  ), false);
+
+  // 5. Insecure context (HTTP)
+  assert.equal(isGyroSupportedDevice(
+    { DeviceOrientationEvent: mockOrientation, isSecureContext: false, ontouchstart: null },
+    { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7)', maxTouchPoints: 5 }
+  ), false);
+
+  // 6. Device without DeviceOrientationEvent
+  assert.equal(isGyroSupportedDevice(
+    { isSecureContext: true, ontouchstart: null },
+    { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7)', maxTouchPoints: 5 }
+  ), false);
+});
+
+test('gyro-supported mobile device enables tilt by default on first visit without saved preference', async t => {
+  const oldWindow = globalThis.window;
+  const oldStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const s = storage();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: s });
+  let timeout;
+  globalThis.window = {
+    ontouchstart: null, isSecureContext: true,
+    DeviceOrientationEvent: class {},
+    screen: { orientation: { angle: 0, type: 'portrait-primary', unlock() {}, addEventListener() {}, removeEventListener() {} } },
+    addEventListener() {}, removeEventListener() {},
+    setTimeout(fn) { timeout = fn; return 1; }, clearTimeout() { timeout = null; },
+  };
+  t.after(() => {
+    globalThis.window = oldWindow;
+    if (oldStorage) Object.defineProperty(globalThis, 'localStorage', oldStorage);
+    else delete globalThis.localStorage;
+  });
+
+  // Create on mobile device (using gyroDefault: true to simulate mobile gyro detection)
+  const controls = new GyroControls({ setTouchStick() {} }, { gyroDefault: true });
+  assert.equal(controls.gyroRequested, true, 'Gyro should be requested by default on mobile');
+  assert.equal(controls.label, 'gyro.on');
+
+  // restoreSimulatorPreferences restores gyro because gyroRequested is true
+  restoreSimulatorPreferences({ touchControls: controls, lobby: {} }, loadSimulatorPreferences(s));
+  assert.equal(controls.gyroActive, true, 'Gyro should be active after preference restoration');
+
+  // Explicitly turning it off saves gyroEnabled: false
+  await controls.toggleGyro();
+  assert.equal(controls.gyroActive, false);
+  assert.equal(controls.gyroRequested, false);
+  assert.equal(loadSimulatorPreferences(s).gyroEnabled, false);
+
+  // Reload honors the explicit off choice even on mobile gyro device
+  const reloaded = new GyroControls({ setTouchStick() {} }, { gyroDefault: true });
+  assert.equal(reloaded.gyroRequested, false, 'Saved gyroEnabled: false must override mobile default');
+  restoreSimulatorPreferences({ touchControls: reloaded, lobby: {} }, loadSimulatorPreferences(s));
+  assert.equal(reloaded.gyroActive, false);
 });
