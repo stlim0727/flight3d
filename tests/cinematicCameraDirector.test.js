@@ -6,6 +6,7 @@ import {
   CINEMATIC_SHOTS,
 } from '../src/cameras/CinematicCameraDirector.js';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
+import { BOEING_737_800, F16_FALCON, CESSNA_172 } from '../src/config/aircraftConfigs.js';
 
 test('CinematicCameraDirector initializes with defaults and reset() cleans state', () => {
   const camera = new THREE.PerspectiveCamera();
@@ -309,4 +310,191 @@ test('CameraSystem.snapToTarget resets CinematicCameraDirector in DIRECTOR mode'
 
   assert.equal(cameraSystem.cinematicDirector.initialized, false, 'Director should be reset on snapToTarget');
   assert.equal(cameraSystem.cinematicDirector.shotTimer, 0, 'Shot timer should be reset');
+});
+
+test('CinematicCameraDirector enforces fuselage clearance for all shot types', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const director = new CinematicCameraDirector({ camera });
+
+  const planePos = new THREE.Vector3(500, 1000, -2000);
+  const planeQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.7);
+
+  const shotsToTest = [
+    CINEMATIC_SHOTS.COCKPIT_HERO,
+    CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY,
+    CINEMATIC_SHOTS.HIGH_G_BANK_HERO,
+    CINEMATIC_SHOTS.LEAD_IN_TRACKING,
+    CINEMATIC_SHOTS.TELEPHOTO_FLYBY,
+    CINEMATIC_SHOTS.TERRAIN_CANYON_SKIM,
+    CINEMATIC_SHOTS.TOUCHDOWN_SPOTTER,
+  ];
+
+  for (const shot of shotsToTest) {
+    director.switchShot(shot);
+    director.update({
+      dt: 0.016,
+      camera,
+      planePos,
+      planeQuat,
+      flightState: { iasKnots: 250, gForce: 1.0, onGround: false },
+    });
+
+    // Check camera position in aircraft local coordinates
+    const rel = camera.position.clone().sub(planePos);
+    const local = rel.applyQuaternion(planeQuat.clone().invert());
+
+    const radX = director.fuselageRadiusX;
+    const radY = director.fuselageRadiusY;
+    const halfLen = director.fuselageLength * 0.5;
+
+    if (local.z >= -halfLen && local.z <= halfLen) {
+      const normX = local.x / radX;
+      const normY = (local.y - director.fuselageCenterY) / radY;
+      const distSq = normX * normX + normY * normY;
+      assert.ok(
+        distSq >= 0.98,
+        `Shot ${shot} camera must be outside fuselage (distSq was ${distSq.toFixed(3)}, local=[${local.x.toFixed(2)}, ${local.y.toFixed(2)}, ${local.z.toFixed(2)}])`
+      );
+    }
+  }
+
+  // Also test all 4 wing hardpoints of WINGTIP_ACTION
+  for (let hp = 0; hp < 4; hp++) {
+    director.currentShotType = CINEMATIC_SHOTS.WINGTIP_ACTION;
+    director.wingHardpointIndex = hp;
+    director.snapNextFrame = true;
+    director.update({
+      dt: 0.016,
+      camera,
+      planePos,
+      planeQuat,
+      flightState: { iasKnots: 250, gForce: 1.0, onGround: false },
+    });
+
+    const rel = camera.position.clone().sub(planePos);
+    const local = rel.applyQuaternion(planeQuat.clone().invert());
+    const radX = director.fuselageRadiusX;
+    const radY = director.fuselageRadiusY;
+    const halfLen = director.fuselageLength * 0.5;
+
+    if (local.z >= -halfLen && local.z <= halfLen) {
+      const normX = local.x / radX;
+      const normY = (local.y - director.fuselageCenterY) / radY;
+      const distSq = normX * normX + normY * normY;
+      assert.ok(
+        distSq >= 0.98,
+        `WINGTIP_ACTION hardpoint ${hp} camera must be outside fuselage (distSq was ${distSq.toFixed(3)}, local=[${local.x.toFixed(2)}, ${local.y.toFixed(2)}, ${local.z.toFixed(2)}])`
+      );
+    }
+  }
+});
+
+test('enforceFuselageClearance pushes interior points outside fuselage boundary', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const director = new CinematicCameraDirector({ camera });
+
+  const planePos = new THREE.Vector3(100, 500, 200);
+  const planeQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.2, 0.4, 0.1));
+
+  // Point at center of fuselage
+  const centerPoint = planePos.clone();
+  director.enforceFuselageClearance(centerPoint, planePos, planeQuat);
+
+  const localCenter = centerPoint.clone().sub(planePos).applyQuaternion(planeQuat.clone().invert());
+  const normX0 = localCenter.x / director.fuselageRadiusX;
+  const normY0 = (localCenter.y - director.fuselageCenterY) / director.fuselageRadiusY;
+  assert.ok(
+    normX0 * normX0 + normY0 * normY0 >= 1.0,
+    'Center point must be pushed outside fuselage boundary'
+  );
+
+  // Point in cabin at z = -10, y = 0.5 (where old cockpit_hero clipped)
+  const cabinPoint = planePos.clone().add(
+    new THREE.Vector3(0, 0.5, -10).applyQuaternion(planeQuat)
+  );
+  director.enforceFuselageClearance(cabinPoint, planePos, planeQuat);
+
+  const localCabin = cabinPoint.clone().sub(planePos).applyQuaternion(planeQuat.clone().invert());
+  const normXC = localCabin.x / director.fuselageRadiusX;
+  const normYC = (localCabin.y - director.fuselageCenterY) / director.fuselageRadiusY;
+  assert.ok(
+    normXC * normXC + normYC * normYC >= 1.0,
+    'Cabin interior point must be pushed outside fuselage boundary'
+  );
+});
+
+test('Director adapts to different aircraft configurations (B738, F16, C172)', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const director = new CinematicCameraDirector({ camera });
+
+  const planePos = new THREE.Vector3(0, 300, 0);
+  const planeQuat = new THREE.Quaternion();
+
+  // Test F16
+  director.loadAircraftConfig(F16_FALCON);
+  assert.equal(director.wingspan, F16_FALCON.aerodynamics.wingspanM);
+  assert.equal(director.fuselageLength, 15.0);
+
+  director.switchShot(CINEMATIC_SHOTS.COCKPIT_HERO);
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState: {} });
+
+  const relF16 = camera.position.clone().sub(planePos);
+  assert.ok(relF16.y > director.fuselageRadiusY, 'F16 canopy cam must be mounted above fuselage');
+  assert.ok(camera.position.z < planePos.z, 'F16 canopy cam must be in cockpit region');
+
+  // Test C172
+  director.loadAircraftConfig(CESSNA_172);
+  assert.equal(director.wingspan, CESSNA_172.aerodynamics.wingspanM);
+  assert.equal(director.fuselageLength, 8.5);
+
+  director.switchShot(CINEMATIC_SHOTS.COCKPIT_HERO);
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState: {} });
+
+  const relC172 = camera.position.clone().sub(planePos);
+  assert.ok(relC172.y > director.fuselageRadiusY, 'C172 canopy cam must be mounted above fuselage');
+
+  // Test B738
+  director.loadAircraftConfig(BOEING_737_800);
+  assert.equal(director.wingspan, BOEING_737_800.aerodynamics.wingspanM);
+  assert.equal(director.fuselageLength, 39.0);
+
+  director.switchShot(CINEMATIC_SHOTS.COCKPIT_HERO);
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState: {} });
+
+  const relB738 = camera.position.clone().sub(planePos);
+  assert.ok(relB738.y > director.fuselageRadiusY, 'B738 canopy cam must be mounted above fuselage');
+});
+
+test('Camera on ground maintains ground clearance and fuselage clearance simultaneously', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const groundElevation = () => 0;
+  const director = new CinematicCameraDirector({ camera, queryGroundHeight: groundElevation });
+
+  // Aircraft on runway with gear touching ground (fuselage center ~2.8m above ground)
+  const planePos = new THREE.Vector3(0, 2.8, 0);
+  const planeQuat = new THREE.Quaternion();
+
+  for (const shot of [CINEMATIC_SHOTS.WINGTIP_ACTION, CINEMATIC_SHOTS.COCKPIT_HERO, CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY]) {
+    director.switchShot(shot);
+    director.update({
+      dt: 0.016,
+      camera,
+      planePos,
+      planeQuat,
+      flightState: { onGround: true, iasKnots: 0 },
+      queryGroundHeight: groundElevation,
+    });
+
+    assert.ok(camera.position.y >= 1.5, `Camera y (${camera.position.y}) must stay >= ground + 1.5m`);
+
+    const rel = camera.position.clone().sub(planePos);
+    const radX = director.fuselageRadiusX;
+    const radY = director.fuselageRadiusY;
+    const normX = rel.x / radX;
+    const normY = rel.y / radY;
+    assert.ok(
+      normX * normX + normY * normY >= 0.98,
+      `Camera must be clear of fuselage on ground (distSq was ${(normX * normX + normY * normY).toFixed(3)})`
+    );
+  }
 });

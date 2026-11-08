@@ -79,6 +79,17 @@ export class CinematicCameraDirector {
     this.flybySet = false;
     this.wingHardpointIndex = 0;
 
+    // Aircraft geometric bounds for fuselage collision avoidance and exterior mounting
+    this.wingspan = 35.8;
+    this.fuselageRadiusX = 2.0;
+    this.fuselageRadiusY = 2.1;
+    this.fuselageCenterY = 0.0;
+    this.fuselageLength = 39.0;
+    this.tailFinHeight = 6.0;
+    this.captainEyePos = new THREE.Vector3(-0.39, 0.85, -12.35);
+    this.gearCamOffset = new THREE.Vector3(2.2, -2.4, 6.2);
+    this.gearLookTarget = new THREE.Vector3(-0.5, -1.9, -2.5);
+
     // Rolling telemetry history for live derivative analysis
     this.history = [];
     this.historyWindowSec = 4.0;
@@ -112,6 +123,121 @@ export class CinematicCameraDirector {
    */
   setTerrainQuery(fn) {
     if (typeof fn === 'function') this.queryGroundHeight = fn;
+  }
+
+  /**
+   * Configure director dimensions and hardpoint mounts to match the active aircraft.
+   */
+  loadAircraftConfig(config = {}) {
+    const cockpit = config.cockpit || {};
+    const aero = config.aerodynamics || {};
+    this.wingspan = aero.wingspanM ?? 35.8;
+
+    if (cockpit.captainEyePos) {
+      this.captainEyePos = new THREE.Vector3(cockpit.captainEyePos.x, cockpit.captainEyePos.y, cockpit.captainEyePos.z);
+    }
+    if (cockpit.gearCamOffset) {
+      this.gearCamOffset = new THREE.Vector3(cockpit.gearCamOffset.x, cockpit.gearCamOffset.y, cockpit.gearCamOffset.z);
+    }
+    if (cockpit.gearLookTarget) {
+      this.gearLookTarget = new THREE.Vector3(cockpit.gearLookTarget.x, cockpit.gearLookTarget.y, cockpit.gearLookTarget.z);
+    }
+
+    if (config.id === 'F16') {
+      this.fuselageRadiusX = 1.3;
+      this.fuselageRadiusY = 1.3;
+      this.fuselageCenterY = 0.0;
+      this.fuselageLength = 15.0;
+      this.tailFinHeight = 2.4;
+    } else if (config.id === 'C172') {
+      this.fuselageRadiusX = 1.0;
+      this.fuselageRadiusY = 1.1;
+      this.fuselageCenterY = 0.1;
+      this.fuselageLength = 8.5;
+      this.tailFinHeight = 1.8;
+    } else {
+      // Boeing 737-800 default
+      this.fuselageRadiusX = 2.0;
+      this.fuselageRadiusY = 2.1;
+      this.fuselageCenterY = 0.0;
+      this.fuselageLength = 39.0;
+      this.tailFinHeight = 6.0;
+    }
+  }
+
+  /**
+   * Enforces strict clearance from the aircraft fuselage envelope.
+   * If the camera position is inside or intersecting the fuselage bounding cylinder/capsule,
+   * it pushes the position outward along the radial axis to ensure the camera is NEVER inside
+   * the aircraft body.
+   */
+  enforceFuselageClearance(pos, planePos, planeQuat) {
+    if (!pos || !planePos || !planeQuat) return;
+
+    const rel = pos.clone().sub(planePos);
+    const invQuat = planeQuat.clone().invert();
+    const local = rel.applyQuaternion(invQuat);
+
+    const radX = (this.fuselageRadiusX ?? 2.0) + 0.6;
+    const radY = (this.fuselageRadiusY ?? 2.1) + 0.6;
+    const centerY = this.fuselageCenterY ?? 0.0;
+    const halfLen = (this.fuselageLength ?? 39.0) * 0.52;
+    const noseZ = -halfLen;
+    const tailZ = halfLen;
+
+    if (local.z >= noseZ && local.z <= tailZ) {
+      let taper = 1.0;
+      if (local.z < 0) {
+        taper = 0.6 + 0.4 * (1.0 - Math.min(1.0, Math.abs(local.z) / Math.abs(noseZ)));
+      } else {
+        taper = 0.6 + 0.4 * (1.0 - Math.min(1.0, local.z / tailZ));
+      }
+      taper = Math.max(0.5, Math.min(1.0, taper));
+
+      const effRadX = radX * taper;
+      const effRadY = radY * taper;
+
+      const normX = local.x / effRadX;
+      const normY = (local.y - centerY) / effRadY;
+      const distSq = normX * normX + normY * normY;
+
+      if (distSq < 1.0) {
+        const dist = Math.sqrt(distSq);
+        if (dist > 0.001) {
+          local.x = (normX / dist) * effRadX;
+          local.y = centerY + (normY / dist) * effRadY;
+        } else {
+          local.y = centerY + effRadY;
+        }
+        pos.copy(local.applyQuaternion(planeQuat).add(planePos));
+      }
+    }
+  }
+
+  /**
+   * Enforces lateral clearance if the camera was pushed upward by ground clearance clamp
+   * while positioned beneath the aircraft fuselage.
+   */
+  enforceLateralFuselageClearance(pos, planePos, planeQuat) {
+    if (!pos || !planePos || !planeQuat) return;
+    const rel = pos.clone().sub(planePos);
+    const invQuat = planeQuat.clone().invert();
+    const local = rel.applyQuaternion(invQuat);
+
+    const radX = (this.fuselageRadiusX ?? 2.0) + 0.6;
+    const radY = (this.fuselageRadiusY ?? 2.1) + 0.6;
+    const centerY = this.fuselageCenterY ?? 0.0;
+    const halfLen = (this.fuselageLength ?? 39.0) * 0.52;
+
+    if (local.z >= -halfLen && local.z <= halfLen) {
+      const normX = local.x / radX;
+      const normY = (local.y - centerY) / radY;
+      if (normX * normX + normY * normY < 1.0) {
+        const sign = local.x >= 0 ? 1 : -1;
+        local.x = sign * radX;
+        pos.copy(local.applyQuaternion(planeQuat).add(planePos));
+      }
+    }
   }
 
   /**
@@ -417,18 +543,20 @@ export class CinematicCameraDirector {
         else forwardHoriz.set(0, 0, -1);
         const rightHoriz = new THREE.Vector3(-forwardHoriz.z, 0, forwardHoriz.x);
 
+        const lateralDist = Math.max(28.0, (this.wingspan ?? 35.8) * 0.85);
+
         if (!this.flybySet || this.flybyWorldPos.lengthSq() < 1) {
           const lateralSign = Math.random() > 0.5 ? 1 : -1;
           if (onGround) {
             // Runway-edge spotter view ahead of rollout
-            const targetX = planePos.x + forwardHoriz.x * 85.0 + rightHoriz.x * lateralSign * 20.0;
-            const targetZ = planePos.z + forwardHoriz.z * 85.0 + rightHoriz.z * lateralSign * 20.0;
+            const targetX = planePos.x + forwardHoriz.x * 85.0 + rightHoriz.x * lateralSign * lateralDist;
+            const targetZ = planePos.z + forwardHoriz.z * 85.0 + rightHoriz.z * lateralSign * lateralDist;
             const gh = Math.max(0, queryGroundHeight(targetX, targetZ));
             this.flybyWorldPos.set(targetX, gh + 2.2, targetZ);
           } else {
-            // Airborne flyby: 220m ahead along flight path, 38m lateral offset
-            const targetX = planePos.x + forwardHoriz.x * 220.0 + rightHoriz.x * lateralSign * 38.0;
-            const targetZ = planePos.z + forwardHoriz.z * 220.0 + rightHoriz.z * lateralSign * 38.0;
+            // Airborne flyby: 220m ahead along flight path, lateral offset well clear of wings
+            const targetX = planePos.x + forwardHoriz.x * 220.0 + rightHoriz.x * lateralSign * lateralDist;
+            const targetZ = planePos.z + forwardHoriz.z * 220.0 + rightHoriz.z * lateralSign * lateralDist;
             const gh = Math.max(0, queryGroundHeight(targetX, targetZ));
             // Anchor height to aircraft altitude; strictly above ground
             const targetY = Math.max(gh + 5.0, planePos.y - 6.0);
@@ -455,9 +583,10 @@ export class CinematicCameraDirector {
         targetLook.copy(planePos).addScaledVector(up, 1.2);
         targetUp.set(0, 1, 0);
 
-        // Once aircraft passes camera plane by > 45m or moves past 420m, cut to next shot
+        // Once aircraft passes camera plane by > 18m or moves too close (< 12m) or past 420m, cut to next shot
         const toPlane = planePos.clone().sub(this.camPos);
-        if (toPlane.dot(forwardHoriz) > 45.0 || currentDist > 420.0) {
+        const passedAhead = toPlane.dot(forwardHoriz);
+        if (passedAhead > 18.0 || currentDist < 12.0 || currentDist > 420.0) {
           this.shotTimer = this.maxShotDuration; // Trigger clean transition
         }
         break;
@@ -492,7 +621,7 @@ export class CinematicCameraDirector {
       case CINEMATIC_SHOTS.WINGTIP_ACTION: {
         isRigidMount = true;
         targetFov = 72.0; // Wide-angle action rush
-        const wingspanOffset = 18.0; // Half-span
+        const wingspanOffset = (this.wingspan ?? 35.8) * 0.48; // Half-span near wingtip
 
         let localPos = new THREE.Vector3();
         let localLook = new THREE.Vector3();
@@ -507,12 +636,23 @@ export class CinematicCameraDirector {
           localLook.set(0, 0.4, 1.0);
         } else if (this.wingHardpointIndex === 2) {
           // Vertical stabilizer tail fin looking forward down spine
-          localPos.set(0, 4.5, 12.0);
-          localLook.set(0, 0.5, -20.0);
+          const tailZ = (this.fuselageLength ?? 39.0) * 0.31;
+          const tailY = (this.fuselageRadiusY ?? 2.1) + ((this.tailFinHeight ?? 6.0) * 0.42);
+          localPos.set(0, tailY, tailZ);
+          localLook.set(0, tailY * 0.1, -25.0);
         } else {
-          // Nose underbelly looking rearward at gear
-          localPos.set(0, -1.8, -8.0);
-          localLook.set(0, -0.5, 10.0);
+          // Belly gear cam: mounted safely outside fuselage looking at landing gear
+          if (this.gearCamOffset) {
+            localPos.copy(this.gearCamOffset);
+            if (this.gearLookTarget) {
+              localLook.copy(this.gearLookTarget);
+            } else {
+              localLook.set(0, -1.0, -1.0);
+            }
+          } else {
+            localPos.set(2.0, -2.5, 4.0);
+            localLook.set(-0.5, -1.8, -2.0);
+          }
         }
 
         targetCamPos.copy(planePos)
@@ -571,12 +711,13 @@ export class CinematicCameraDirector {
         if (forwardHoriz.lengthSq() > 0.001) forwardHoriz.normalize();
         else forwardHoriz.set(0, 0, -1);
         const rightHoriz = new THREE.Vector3(-forwardHoriz.z, 0, forwardHoriz.x);
+        const lateralDist = Math.max(26.0, (this.wingspan ?? 35.8) * 0.80);
 
         const currentDist = this.camPos.distanceTo(planePos);
         if (!this.flybySet || this.flybyWorldPos.lengthSq() < 1) {
           const lateralSign = Math.random() > 0.5 ? 1 : -1;
-          const targetX = planePos.x + forwardHoriz.x * 140.0 + rightHoriz.x * lateralSign * 24.0;
-          const targetZ = planePos.z + forwardHoriz.z * 140.0 + rightHoriz.z * lateralSign * 24.0;
+          const targetX = planePos.x + forwardHoriz.x * 140.0 + rightHoriz.x * lateralSign * lateralDist;
+          const targetZ = planePos.z + forwardHoriz.z * 140.0 + rightHoriz.z * lateralSign * lateralDist;
           const gh = Math.max(0, queryGroundHeight(targetX, targetZ));
           const targetY = Math.max(gh + 3.0, planePos.y - 3.0);
           this.flybyWorldPos.set(targetX, targetY, targetZ);
@@ -594,7 +735,7 @@ export class CinematicCameraDirector {
         targetUp.set(0, 1, 0);
 
         const toPlane = planePos.clone().sub(this.camPos);
-        if (toPlane.dot(forwardHoriz) > 40.0 || currentDist > 350.0) {
+        if (toPlane.dot(forwardHoriz) > 18.0 || currentDist < 10.0 || currentDist > 350.0) {
           this.shotTimer = this.maxShotDuration;
         }
         break;
@@ -605,10 +746,12 @@ export class CinematicCameraDirector {
         if (forwardHoriz.lengthSq() > 0.001) forwardHoriz.normalize();
         else forwardHoriz.set(0, 0, -1);
         const rightHoriz = new THREE.Vector3(-forwardHoriz.z, 0, forwardHoriz.x);
+        const lateralDist = Math.max(24.0, (this.wingspan ?? 35.8) * 0.70);
 
         if (!this.flybySet || this.flybyWorldPos.lengthSq() < 1) {
-          const targetX = planePos.x + forwardHoriz.x * 55.0 + rightHoriz.x * 16.0;
-          const targetZ = planePos.z + forwardHoriz.z * 55.0 + rightHoriz.z * 16.0;
+          const lateralSign = Math.random() > 0.5 ? 1 : -1;
+          const targetX = planePos.x + forwardHoriz.x * 55.0 + rightHoriz.x * lateralSign * lateralDist;
+          const targetZ = planePos.z + forwardHoriz.z * 55.0 + rightHoriz.z * lateralSign * lateralDist;
           const gh = Math.max(0, queryGroundHeight(targetX, targetZ));
           this.flybyWorldPos.set(targetX, gh + 2.2, targetZ);
           this.flybySet = true;
@@ -625,7 +768,8 @@ export class CinematicCameraDirector {
         targetUp.set(0, 1, 0);
 
         const toPlane = planePos.clone().sub(this.camPos);
-        if (toPlane.dot(forwardHoriz) > 35.0 || this.shotTimer > 4.5) {
+        const currentDist = this.camPos.distanceTo(planePos);
+        if (toPlane.dot(forwardHoriz) > 16.0 || currentDist < 10.0 || this.shotTimer > 4.5) {
           this.shotTimer = this.maxShotDuration;
         }
         break;
@@ -652,21 +796,34 @@ export class CinematicCameraDirector {
       default: {
         isRigidMount = true;
         targetFov = 58.0;
-        // Over-the-shoulder pilot vantage: slightly behind captain seat looking forward
+        // Canopy-top dorsal spine action cam mounted above the cockpit looking forward over nose
+        const canopyY = (this.captainEyePos?.y ?? 0.85) + (this.fuselageRadiusY ? this.fuselageRadiusY * 0.65 : 1.35);
+        const canopyZ = (this.captainEyePos?.z ?? -12.35) + 0.6;
+        const sideOffset = (this.captainEyePos?.x ?? -0.39) * 0.6;
+
         targetCamPos.copy(planePos)
-          .addScaledVector(right, -0.38)
-          .addScaledVector(up, 0.95)
-          .addScaledVector(forward, 11.8);
+          .addScaledVector(right, sideOffset)
+          .addScaledVector(up, canopyY)
+          .addScaledVector(forward, -canopyZ);
 
         targetLook.copy(planePos)
-          .addScaledVector(right, -0.2)
-          .addScaledVector(up, 0.7)
-          .addScaledVector(forward, 30.0);
+          .addScaledVector(right, sideOffset * 0.3)
+          .addScaledVector(up, canopyY - 0.35)
+          .addScaledVector(forward, -canopyZ + 30.0);
+
+        // Aerodynamic high-speed micro-vibrations
+        const shakeMag = (ias / 400.0) * 0.02;
+        const shakeX = Math.sin(this.totalTimer * 48.0) * shakeMag;
+        const shakeY = Math.cos(this.totalTimer * 62.0) * shakeMag;
+        targetCamPos.addScaledVector(right, shakeX).addScaledVector(up, shakeY);
 
         targetUp.copy(up);
         break;
       }
     }
+
+    // Ensure targetCamPos is strictly clear of the aircraft fuselage envelope
+    this.enforceFuselageClearance(targetCamPos, planePos, planeQuat);
 
     // Adapt field of view for portrait displays (aspect < 1.0) to prevent tunnel vision
     const aspect = camera.aspect || 1.0;
@@ -702,6 +859,16 @@ export class CinematicCameraDirector {
     const currentGroundH = Math.max(0, queryGroundHeight(this.camPos.x, this.camPos.z));
     if (this.camPos.y < currentGroundH + 1.8) {
       this.camPos.y = currentGroundH + 1.8;
+    }
+
+    // Absolute Aircraft Fuselage Clearance Safety Guarantee
+    this.enforceFuselageClearance(this.camPos, planePos, planeQuat);
+
+    // Final ground clearance safety check in case radial push went downwards
+    const postGroundH = Math.max(0, queryGroundHeight(this.camPos.x, this.camPos.z));
+    if (this.camPos.y < postGroundH + 1.8) {
+      this.camPos.y = postGroundH + 1.8;
+      this.enforceLateralFuselageClearance(this.camPos, planePos, planeQuat);
     }
 
     // Smooth FOV transition using internal director state (isolated from external clobbering)
