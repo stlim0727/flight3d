@@ -1,10 +1,13 @@
 import { WindField, setSimulationWind } from '../../physics/WindField.js';
+import { AIRCRAFT_REGISTRY } from '../../config/aircraftConfigs.js';
 
+// The seed name predates other aircraft; renaming it would change the field.
 export const TURBULENCE_SEED = 'coastal-b738-turbulence-1';
 
 function createTurbulenceScenario(profile, key) {
   return {
-    airports: ['coastal'], aircraft: ['B738'], kind: 'flight', pilotControlled: true,
+    // Wing-gust sampling and roll moment read each aircraft's own wingspan/area.
+    airports: ['coastal'], aircraft: Object.keys(AIRCRAFT_REGISTRY), kind: 'flight', pilotControlled: true,
     duration: 60, labelKey: `dev.scenario.${key}`, descriptionKey: `dev.expect.${key}`,
     setup(sim) {
       // PresetSpawner resets/reloads the aircraft and installs computed hands-off

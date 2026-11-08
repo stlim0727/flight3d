@@ -6,9 +6,10 @@ import { DeveloperModeController } from '../src/dev/DeveloperModeController.js';
 import { GameFlowController } from '../src/ui/GameFlowController.js';
 import { WindField, setSimulationWind } from '../src/physics/WindField.js';
 import { advancePhysicsFrame, stepPhysics } from '../src/core/physicsTiming.js';
+import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
 
-function flight(profile = 'light-turbulence-v1', scenario = 'turbulence') {
-  const sim = createPilotMissionSimulation();
+function flight(profile = 'light-turbulence-v1', scenario = 'turbulence', aircraftId = 'B738') {
+  const sim = createPilotMissionSimulation({ aircraftId });
   sim.aircraft.modelLoaded = true;
   sim.aircraft.cockpit = {};
   sim.shadowDemo = { stop() {} };
@@ -150,5 +151,24 @@ test('transient stall, G-LOC, damage and engine failure cannot earn a safe-cruis
     sim.engines.failed.fill(false); sim.gear.bodyDamage.belly = 0;
     sim.devRunner.afterPhysics(60);
     assert.equal(sim.devRunner.result.status, 'failed');
+  }
+});
+
+for (const aircraftId of Object.keys(AIRCRAFT_REGISTRY)) test(`${aircraftId}: all three levels fly 60 s, wing gusts above light`, () => {
+  let previousRollRange = 0;
+  for (const [id] of levels) {
+    const sim = flight(undefined, id, aircraftId);
+    assert.equal(sim.currentAircraftId, aircraftId);
+    let minRoll = Infinity, maxRoll = -Infinity, maxWingDifference = 0;
+    for (let tick = 0; tick < 7200; tick++) {
+      stepPhysics(sim);
+      minRoll = Math.min(minRoll, sim.telemetry.rollDeg);
+      maxRoll = Math.max(maxRoll, sim.telemetry.rollDeg);
+      maxWingDifference = Math.max(maxWingDifference, sim.aero.windRightWorld.distanceTo(sim.aero.windLeftWorld));
+    }
+    assert.equal(sim.devRunner.result.status, 'passed', `${aircraftId} ${id}`);
+    assert.equal(maxWingDifference > 0, id !== 'turbulence', `${aircraftId} ${id}: wing gusts only above light`);
+    assert.ok(maxRoll - minRoll > previousRollRange, `${aircraftId} ${id}`);
+    previousRollRange = maxRoll - minRoll;
   }
 });
