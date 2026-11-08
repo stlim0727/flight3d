@@ -3,12 +3,12 @@
  *
  * Implements:
  * 1. Pilot vertical load factor (G_z) and cerebral perfusion / consciousness buffer (1.0 to 0.0).
- * 2. Positive G ischemic drain (> +3.5 G) and negative G congestion drain (< -1.5 G).
+ * 2. Positive G ischemic drain (> +5.5 G) and negative G congestion drain (< -1.5 G).
  * 3. G-LOC (Loss of Consciousness) state machine with mandatory lockout and stupor phase.
  * 4. Control responsiveness degradation:
  *    - 1st-order low-pass filtering with increased time constant (1.5x on pitch axis).
  *    - Physical strength / authority attenuation: clamp(C + 0.3, 0.2, 1.0).
- *    - High-G muscle strain jitter when |G_z| > 4.0 G.
+ *    - High-G muscle strain jitter when |G_z| > 5.5 G.
  *    - G-LOC input lockout and 1.5s spring return to neutral.
  */
 
@@ -53,11 +53,11 @@ export class PilotPhysiology {
     const rawRudder = Number.isFinite(rawInputs.rudder) ? rawInputs.rudder : 0.0;
 
     // 1. Consciousness Buffer Dynamics
-    if (this.gZ > 3.5) {
+    if (this.gZ > 5.5) {
       // Positive G ischemia (blood pulled away from head into lower body)
-      // Drains with time constant ~1.75s scaled by excess G over threshold
-      const excessG = this.gZ - 3.5;
-      const drainRate = excessG / (3.0 * 1.75); // e.g. at +6.5G drains in ~1.75s
+      // Drains with time constant ~2.5s scaled by excess G over threshold (+5.5 G)
+      const excessG = this.gZ - 5.5;
+      const drainRate = excessG / (3.5 * 2.5); // e.g. at +9.0G drains in ~2.5s, at +7.0G drains in ~5.8s
       this.consciousness = Math.max(0.0, this.consciousness - drainRate * dt);
     } else if (this.gZ < -1.5) {
       // Negative G congestion / redout (blood forced into head)
@@ -65,9 +65,9 @@ export class PilotPhysiology {
       const drainRate = excessG / (2.0 * 1.5); // e.g. at -3.5G drains in ~1.5s
       this.consciousness = Math.max(0.0, this.consciousness - drainRate * dt);
     } else {
-      // Safe G buffer (-1.5 G <= gZ <= +3.5 G) -> recover consciousness towards 1.0
+      // Safe G buffer (-1.5 G <= gZ <= +5.5 G) -> recover consciousness towards 1.0
       if (!this.isGLOC) {
-        const recoveryTimeConstant = 3.0; // 2.5 ~ 3.5 seconds
+        const recoveryTimeConstant = 1.5; // Fast recovery when unloading G (1.5s)
         const recoveryRate = 1.0 / recoveryTimeConstant;
         this.consciousness = Math.min(1.0, this.consciousness + recoveryRate * dt);
       }
@@ -88,7 +88,7 @@ export class PilotPhysiology {
       this.consciousness = 0.0;
       this.glocTimer -= dt;
       // Waking criteria: mandatory timer elapsed and G-load within safe limits
-      if (this.glocTimer <= 0.0 && this.gZ >= -1.5 && this.gZ <= 3.5) {
+      if (this.glocTimer <= 0.0 && this.gZ >= -1.5 && this.gZ <= 5.5) {
         this.isGLOC = false;
         this.stuporTimer = 1.5; // 1.5s stupor phase upon regaining consciousness
       }
@@ -102,7 +102,7 @@ export class PilotPhysiology {
     }
 
     // 4. Control Responsiveness Degradation
-    if (this.consciousness >= 0.999 && Math.abs(this.gZ) <= 3.5 && !this.isGLOC && this.stuporTimer <= 0) {
+    if (this.consciousness >= 0.999 && Math.abs(this.gZ) <= 5.5 && !this.isGLOC && this.stuporTimer <= 0) {
       this.effectiveElevator = rawElevator;
       this.effectiveAileron = rawAileron;
       this.effectiveRudder = rawRudder;
@@ -147,9 +147,9 @@ export class PilotPhysiology {
       this.effectiveAileron = clamp(this.effectiveAileron, -maxAuthority, maxAuthority);
       this.effectiveRudder = clamp(this.effectiveRudder, -maxAuthority, maxAuthority);
 
-      // ③ High-G Muscle Strain Jitter (|G_z| > 4.0 G)
-      if (Math.abs(this.gZ) > 4.0 && this.consciousness > 0.0) {
-        const jitter = Math.sin(continuousTime * 35.0) * (Math.abs(this.gZ) - 4.0) * 0.02;
+      // ③ High-G Muscle Strain Jitter (|G_z| > 5.5 G)
+      if (Math.abs(this.gZ) > 5.5 && this.consciousness > 0.0) {
+        const jitter = Math.sin(continuousTime * 35.0) * (Math.abs(this.gZ) - 5.5) * 0.02;
         this.effectiveElevator = clamp(this.effectiveElevator + jitter, -maxAuthority, maxAuthority);
         this.effectiveAileron = clamp(this.effectiveAileron + jitter, -maxAuthority, maxAuthority);
       }
@@ -161,8 +161,8 @@ export class PilotPhysiology {
   // Visual FX Factors
   get blackout() {
     if (this.isGLOC) return 1.0;
-    if (this.consciousness >= 0.4) return 0.0;
-    return clamp((0.4 - this.consciousness) / 0.4, 0.0, 1.0);
+    if (this.consciousness >= 0.25) return 0.0;
+    return clamp((0.25 - this.consciousness) / 0.25, 0.0, 1.0);
   }
 
   get grayout() {

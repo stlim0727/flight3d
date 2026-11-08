@@ -96,7 +96,7 @@ export class PilotPhysiologyFx {
     const rawGrayout = isGLOC ? 1.0 : (c < 0.8 ? Math.min(1.0, (0.8 - c) / 0.5) : 0.0);
     this.grayoutAlpha = Math.max(0.0, Math.min(1.0, rawGrayout * this.viewScale));
 
-    const rawBlackout = isGLOC ? 1.0 : (c < 0.4 ? Math.min(1.0, (0.4 - c) / 0.4) : 0.0);
+    const rawBlackout = isGLOC ? 1.0 : (c < 0.25 ? Math.min(1.0, (0.25 - c) / 0.25) : 0.0);
     this.blackoutAlpha = Math.max(0.0, Math.min(1.0, rawBlackout * this.viewScale));
 
     // Tunnel Vision vignette inner and outer radiuses

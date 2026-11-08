@@ -114,3 +114,29 @@ test('maximum authority is attenuated when consciousness drops', () => {
   assert.ok(Math.abs(pilot.effectiveElevator - expectedAuthority) < 0.01,
     `Elevator must match maxAuthority (${expectedAuthority}), got ${pilot.effectiveElevator}`);
 });
+
+test('relaxed thresholds: sustained +5.0 G does not deplete consciousness and blackout triggers below C = 0.25', () => {
+  const pilot = new PilotPhysiology();
+  const dt = 1 / 120;
+
+  // Sustained +5.0 G for 5 seconds (600 ticks)
+  for (let i = 0; i < 600; i++) {
+    pilot.update(dt, 5.0, { elevator: 0.5, aileron: 0, rudder: 0 }, i * dt);
+  }
+
+  assert.equal(pilot.consciousness, 1.0, '5.0 G must remain within safe buffer (+5.5 G threshold)');
+  assert.equal(pilot.blackout, 0.0, 'No blackout at 5.0 G');
+  assert.equal(pilot.isGLOC, false);
+
+  // Blackout onset: at C = 0.3, blackout is still 0
+  pilot.consciousness = 0.3;
+  assert.equal(pilot.blackout, 0.0, 'No blackout yet at C = 0.3');
+
+  // At C = 0.125, blackout is 50%
+  pilot.consciousness = 0.125;
+  assert.ok(Math.abs(pilot.blackout - 0.5) < 1e-4, 'Blackout should be 0.5 at C = 0.125');
+
+  // Recovery is fast (1.5s time constant)
+  pilot.update(0.75, 1.0); // 0.75s recovery at 1G
+  assert.ok(pilot.consciousness >= 0.5, 'Consciousness should recover quickly (>= 0.5 after 0.75s)');
+});
