@@ -6,11 +6,11 @@ import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 
 const point = { x: 120, y: 200, z: -900 };
 
-test('comparison levels scale the same zero-mean field at matching positions and times', () => {
+test('strong scales the complete moderate field, including wing gusts, at matching space/time', () => {
   for (const runwayHeadingDeg of [0, 63, 90, 180, 270]) {
     const options = { seed: 'coastal-b738-turbulence-1', runwayHeadingDeg };
-    const light = new WindField({ ...options, profile: 'light-turbulence-v1' });
-    for (const [profile, scale] of [['moderate-turbulence-v1', 3], ['strong-turbulence-v1', 6]]) {
+    const light = new WindField({ ...options, profile: 'moderate-turbulence-v1' });
+    for (const [profile, scale] of [['strong-turbulence-v1', 2]]) {
       const field = new WindField({ ...options, profile });
       assert.deepEqual(field.mean(), light.mean());
       for (let time = 0; time < 60; time += .25) {
@@ -21,6 +21,16 @@ test('comparison levels scale the same zero-mean field at matching positions and
         }
       }
     }
+  }
+});
+
+test('wing sampling is opt-in and sample supports an aliased position/target', () => {
+  for (const profile of Object.keys(WIND_PROFILES)) {
+    const field = new WindField({ profile, seed: 'coastal-b738-turbulence-1', runwayHeadingDeg: 63 });
+    assert.equal(field.sampleWings, ['moderate-turbulence-v1', 'strong-turbulence-v1'].includes(profile));
+    const position = { x: -600, y: 750, z: 3200 };
+    const expected = field.sample(position, 13.7);
+    assert.deepEqual(field.sample(position, 13.7, position), expected);
   }
 });
 

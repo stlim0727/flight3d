@@ -27,8 +27,10 @@ starting a demo and disabling developer mode also cancel the run. Opening the
 menu holds a run; closing it resumes. Results survive exit and clear on next run.
 
 **Light / Moderate / Strong turbulence cruise (60 s)** are adjacent manual
-Coastal/B738 flights. All use the same trimmed coastal cruise start and wind seed;
-only gust amplitude changes (1x / 3x / 6x). The profiles are
+Coastal/B738 flights. All use the same trimmed coastal cruise start and wind seed.
+Base gust amplitudes are 1x / 3x / 6x; Moderate and Strong additionally sample
+spatial gusts at both wings, producing alternating banks from lift differences.
+Strong's complete wind field is twice Moderate's. The profiles are
 `light-turbulence-v1`, `moderate-turbulence-v1`, and `strong-turbulence-v1`.
 Pitch/roll/yaw, throttle and trim remain pilot-controlled; autopilot stays off.
 Gear/flaps/spoilers and failure injection retain the developer fixture locks.
