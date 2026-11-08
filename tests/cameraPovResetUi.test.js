@@ -122,6 +122,42 @@ test('CameraSystem applyHatLook pans camera view and returns to default when rel
   assert.equal(cam.isPovModified(), false);
 });
 
+test('CameraSystem applyHatLook glances to fixed target angle without spinning past and springs back quickly on release', () => {
+  const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
+  cam.setMode(CameraSystem.MODES.COCKPIT, true);
+  const aircraft = new THREE.Object3D();
+  const defaultPitch = cam.aircraftLookPitch ?? -0.25;
+
+  // Hold Hat Left for 2 seconds (120 frames at 60Hz): must settle at hatGlanceYaw (~1.35 rad) instead of spinning indefinitely
+  for (let i = 0; i < 120; i++) {
+    cam.applyHatLook(-1, 0, 1 / 60);
+    cam.update(1 / 60, aircraft);
+  }
+  assert.ok(Math.abs(cam.lookYaw - cam.hatGlanceYaw) < 0.005, `Expected lookYaw near ${cam.hatGlanceYaw}, got ${cam.lookYaw}`);
+  assert.equal(cam.lookPitch, defaultPitch);
+  assert.equal(cam.userLookOverridden, true);
+
+  // Switch directly to diagonal Up-Right (dirX = +1, dirY = -1): settles at 45° diagonal target
+  for (let i = 0; i < 120; i++) {
+    cam.applyHatLook(1, -1, 1 / 60);
+    cam.update(1 / 60, aircraft);
+  }
+  const expectedDiagYaw = -cam.hatGlanceYaw * Math.SQRT1_2;
+  const expectedDiagPitch = defaultPitch + cam.hatGlancePitchUp * Math.SQRT1_2;
+  assert.ok(Math.abs(cam.lookYaw - expectedDiagYaw) < 0.005, `Expected diagonal yaw ${expectedDiagYaw}, got ${cam.lookYaw}`);
+  assert.ok(Math.abs(cam.lookPitch - expectedDiagPitch) < 0.005, `Expected diagonal pitch ${expectedDiagPitch}, got ${cam.lookPitch}`);
+
+  // Release hat switch: returns to center within ~1.0s (60 frames at 60Hz) and clears userLookOverridden
+  for (let i = 0; i < 60; i++) {
+    cam.update(1 / 60, aircraft);
+  }
+  assert.equal(cam.isPovModified(), false);
+  assert.equal(cam.lookYaw, 0);
+  assert.equal(cam.lookPitch, defaultPitch);
+  assert.equal(cam.povChangedByHat, false);
+  assert.equal(cam.userLookOverridden, false);
+});
+
 test('CameraSystem normalizes yaw across multiple revolutions and eases along shortest arc', () => {
   const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
   cam.setMode(CameraSystem.MODES.CHASE, true);

@@ -171,10 +171,19 @@ export class CameraSystem {
     this.touchMoved = false;
     this.onResetLook = null;
 
-    // Automatic slow return of POV look angles to default position after drag
-    this.povReturnSpeed = 1.0; // Decay rate (~2-3s gentle settle back to default)
+    // Automatic slow return of POV look angles to default position after drag,
+    // and rapid spring-back return after a HOTAS hat switch glance.
+    this.povReturnSpeed = 1.0; // Decay rate (~2-3s gentle settle back to default after mouse/touch drag)
+    this.hatGlanceSpeed = 14.0; // Slew rate while holding hat switch (~0.2s quick glance to target angle)
+    this.hatReturnSpeed = 8.0; // Spring-back rate when releasing hat switch (~0.35s return to center)
+    this.hatGlanceYaw = 1.35; // ~77° cockpit side window glance yaw (radians)
+    this.hatGlancePitchUp = 0.55; // ~31.5° cockpit upward glance pitch offset (radians)
+    this.hatGlancePitchDown = 0.45; // ~26° cockpit instrument panel downward glance pitch offset (radians)
+    this.hatGlanceChaseYaw = Math.PI * 0.5; // 90° exterior chase side glance yaw (radians)
+    this.hatGlanceChasePitch = 0.45; // ~26° exterior chase elevation glance pitch (radians)
     this._lastPovModified = false;
     this.povChangedByDrag = false;
+    this.povChangedByHat = false;
     this.isHatLooking = false;
     this.onPovChange = null;
 
@@ -549,6 +558,7 @@ export class CameraSystem {
   // retains directional head movement through applyMouseDelta.
   applyDragDelta(dx, dy, isTouch = (this.activeTouchId !== null)) {
     this.povChangedByDrag = true;
+    this.povChangedByHat = false;
     // Gear yaw offsets the look target along +X, unlike the head/orbit yaw
     // rotations. Its original horizontal mapping already grabs the scenery.
     const lookDx = this.mode === CameraSystem.MODES.GEAR ? dx : -dx;
@@ -787,24 +797,94 @@ export class CameraSystem {
   }
 
   /**
-   * Pan or look around using HOTAS hat switch / D-pad.
+   * Quick glance using HOTAS hat switch / D-pad.
+   * Smoothly snaps toward a fixed target angle for the held direction
+   * and springs back to center when released.
    * dirX: -1 (left), +1 (right)
    * dirY: -1 (up), +1 (down)
    */
   applyHatLook(dirX, dirY, dt) {
     if (dirX === 0 && dirY === 0) return;
     const safeDt = Math.min(0.1, dt || (1 / 60));
-    const panSpeed = 700; // equivalent screen pixels per second for gaze sensitivity
-    const dx = dirX * panSpeed * safeDt;
-    const dy = dirY * panSpeed * safeDt;
     this.isHatLooking = true;
     this.povChangedByDrag = true;
-    this.applyMouseDelta(dx, dy);
+    this.povChangedByHat = true;
+    this.holdForManualLook(false);
+
+    const rate = 1 - Math.exp(-safeDt * (this.hatGlanceSpeed ?? 14.0));
+    const stepToward = (current, target) => {
+      const diff = target - current;
+      if (Math.abs(diff) < 0.001) return target;
+      const next = current + diff * rate;
+      return (Math.abs(target - next) < 0.001) ? target : next;
+    };
+    const stepTowardAngle = (current, target) => {
+      const cur = normalizeAngle(current);
+      const diff = normalizeAngle(target - cur);
+      if (Math.abs(diff) < 0.001) return target;
+      const next = cur + diff * rate;
+      return (Math.abs(normalizeAngle(target - next)) < 0.001) ? target : next;
+    };
+
+    const diagScale = (dirX !== 0 && dirY !== 0) ? Math.SQRT1_2 : 1.0;
+    const defaultPitch = this.aircraftLookPitch ?? -0.25;
+
+    if (this.crashView) {
+      if (this.mode === CameraSystem.MODES.DRONE || this.mode === CameraSystem.MODES.FLYBY) {
+        this.applyMouseDelta(dirX * 700 * safeDt, dirY * 700 * safeDt);
+        return;
+      }
+      const targetYaw = -dirX * (this.hatGlanceChaseYaw ?? Math.PI * 0.5) * diagScale;
+      const targetPitch = -dirY * (this.hatGlanceChasePitch ?? 0.45) * diagScale;
+      this.chaseYaw = stepTowardAngle(this.chaseYaw, targetYaw);
+      this.chasePitch = Math.max(-1.1, Math.min(1.1, stepToward(this.chasePitch, targetPitch)));
+      this.updatePovButtonState();
+      return;
+    }
+
+    switch (this.mode) {
+      case CameraSystem.MODES.COCKPIT: {
+        const targetYaw = -dirX * (this.hatGlanceYaw ?? 1.35) * diagScale;
+        const pitchDelta = dirY < 0
+          ? (-dirY * (this.hatGlancePitchUp ?? 0.55))
+          : (-dirY * (this.hatGlancePitchDown ?? 0.45));
+        const targetPitch = defaultPitch + pitchDelta * diagScale;
+        this.lookYaw = stepTowardAngle(this.lookYaw, targetYaw);
+        this.lookPitch = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, stepToward(this.lookPitch, targetPitch)));
+        break;
+      }
+      case CameraSystem.MODES.CHASE: {
+        const targetYaw = -dirX * (this.hatGlanceChaseYaw ?? Math.PI * 0.5) * diagScale;
+        const targetPitch = -dirY * (this.hatGlanceChasePitch ?? 0.45) * diagScale;
+        this.chaseYaw = stepTowardAngle(this.chaseYaw, targetYaw);
+        this.chasePitch = Math.max(-1.1, Math.min(CameraSystem.CHASE_PITCH_LOW_LIMIT, stepToward(this.chasePitch, targetPitch)));
+        break;
+      }
+      case CameraSystem.MODES.WING: {
+        const targetYaw = -dirX * 0.9 * diagScale;
+        const targetPitch = -dirY * 0.45 * diagScale;
+        this.wingLookYaw = Math.max(-Math.PI * 0.55, Math.min(Math.PI * 0.55, stepTowardAngle(this.wingLookYaw, targetYaw)));
+        this.wingLookPitch = Math.max(-Math.PI * 0.35, Math.min(Math.PI * 0.35, stepToward(this.wingLookPitch, targetPitch)));
+        break;
+      }
+      case CameraSystem.MODES.GEAR: {
+        const targetYaw = -dirX * 0.65 * diagScale;
+        const targetPitch = -dirY * 0.45 * diagScale;
+        this.gearLookYaw = Math.max(-0.8, Math.min(0.8, stepToward(this.gearLookYaw, targetYaw)));
+        this.gearLookPitch = Math.max(-0.6, Math.min(0.6, stepToward(this.gearLookPitch, targetPitch)));
+        break;
+      }
+      default: {
+        this.applyMouseDelta(dirX * 700 * safeDt, dirY * 700 * safeDt);
+        return;
+      }
+    }
     this.updatePovButtonState();
   }
 
   /**
-   * Smoothly and slowly returns the camera POV back to the default position when not actively dragging or looking with hat.
+   * Returns the camera POV back to the default position when not actively dragging or glancing with hat.
+   * Uses a rapid spring-back rate after a hat switch glance and a gentle settle rate after mouse/touch drag.
    */
   updatePovReturn(dt) {
     if (this.isDragging || this.pointerLocked || this.isHatLooking || dt <= 0 || !this.povChangedByDrag) return;
@@ -818,7 +898,10 @@ export class CameraSystem {
     if (!povModes.includes(this.mode)) return;
 
     const defaultPitch = this.aircraftLookPitch ?? -0.25;
-    const rate = 1 - Math.exp(-Math.min(0.1, dt) * (this.povReturnSpeed ?? 1.0));
+    const returnSpeed = this.povChangedByHat
+      ? (this.hatReturnSpeed ?? 8.0)
+      : (this.povReturnSpeed ?? 1.0);
+    const rate = 1 - Math.exp(-Math.min(0.1, dt) * returnSpeed);
 
     const stepToward = (current, target) => {
       const diff = target - current;
@@ -861,7 +944,11 @@ export class CameraSystem {
     }
 
     if (!this.isPovModified()) {
+      if (this.povChangedByHat && Math.abs(this.opticalZoom - this.opticalZoomMin) <= 0.01) {
+        this.userLookOverridden = false;
+      }
       this.povChangedByDrag = false;
+      this.povChangedByHat = false;
       if (this.mode === CameraSystem.MODES.CHASE) this.chaseYaw = 0;
       else if (this.mode === CameraSystem.MODES.COCKPIT) this.lookYaw = 0;
       else if (this.mode === CameraSystem.MODES.WING) this.wingLookYaw = 0;
@@ -872,6 +959,8 @@ export class CameraSystem {
 
   resetLook() {
     this.povChangedByDrag = false;
+    this.povChangedByHat = false;
+    this.isHatLooking = false;
     this.touchAutoResumeTimer = null;
     this.userLookOverridden = false;
     this.lookYaw = 0;
