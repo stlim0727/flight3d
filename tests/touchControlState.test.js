@@ -99,3 +99,77 @@ describe('Touch stick precision and pointer ownership', () => {
     assert.equal(c.stickActive, false);
   });
 });
+
+describe('Simultaneous gyro tilt and touch drag', () => {
+  it('allows touch drag to control aircraft surfaces while tilt is active and blends both smoothly', t => {
+    const original = globalThis.window;
+    globalThis.window = { screen: { orientation: { angle: 0, type: 'portrait-primary' } } };
+    t.after(() => { globalThis.window = original; });
+
+    const c = overlayControls();
+    let currentInput = null;
+    let telemetryText = '';
+    const telemetryEl = { set textContent(val) { telemetryText = val; }, get textContent() { return telemetryText; } };
+
+    Object.assign(c, {
+      gyroActive: true, stickActive: false, gyroOrientation: 'auto',
+      gyroScreen: { angle: 0, type: 'portrait' }, gyroReadyAt: 0,
+      gyroCalibration: screenTilt(0, 0, 0),
+      stickRadius: 60,
+      stickZone: {
+        getBoundingClientRect: () => ({ left: 100, top: 100, width: 120, height: 120 }),
+        setPointerCapture: () => {},
+      },
+      stickKnob: { offsetWidth: 48, offsetHeight: 48, style: {} },
+      stickTelemetry: telemetryEl,
+    });
+    c.controls.setTouchStick = (pitch, roll) => { currentInput = [pitch, roll]; };
+
+    // 1. Tilt phone: 0 degrees pitch, 15 degrees roll right
+    // gamma = 15 (roll: 15/30 = 0.5)
+    c.handleOrientation({ beta: 0, gamma: 15 });
+    const expectedPureGyro = shapeTouchStick(0, 0.5);
+    assert.deepEqual(currentInput, expectedPureGyro);
+    assert.ok(c.stickKnob.style.transform.includes('translate('));
+
+    // 2. Touch down on the flight yoke: grab starts neutral relative to grab point
+    c.onStickPointerDown({ pointerId: 1, clientX: 160, clientY: 160 });
+    assert.equal(c.stickActive, true);
+    // At grab point, touch delta is 0, so output remains pure gyro without sudden jumping
+    assert.deepEqual(currentInput, expectedPureGyro);
+
+    // 3. Drag stick right and up (more roll right, pitch up)
+    // stickRadius is (120 - 48)/2 - 2 = 34px
+    // clientX moved +17px (dx = +17 -> stickNormRoll = 17/34 = +0.5)
+    // clientY moved -17px (dy = -17 -> stickNormPitch = -17/34 = -0.5)
+    c.onStickPointerMove({ pointerId: 1, clientX: 177, clientY: 143 });
+    // Combined raw: pitch = 0 - 0.5 = -0.5, roll = 0.5 + 0.5 = 1.0
+    // Mag: hypot(-0.5, 1.0) = ~1.118 -> clamped to unit circle
+    const mag1 = Math.hypot(-0.5, 1.0);
+    const expectedCombined = shapeTouchStick(-0.5 / mag1, 1.0 / mag1);
+    assert.ok(Math.abs(currentInput[0] - expectedCombined[0]) < 1e-12);
+    assert.ok(Math.abs(currentInput[1] - expectedCombined[1]) < 1e-12);
+    assert.equal(c.stickKnob.style.transform, 'translate(17px, -17px)');
+    assert.ok(telemetryText.includes('P:') && telemetryText.includes('R:'));
+
+    // 4. Orientation update arrives while finger is still dragging
+    // beta changes to 0 (neutral pitch), gamma stays 15 (roll = 0.5)
+    c.handleOrientation({ beta: 0, gamma: 15 });
+    // Knob stays under user's thumb
+    assert.equal(c.stickKnob.style.transform, 'translate(17px, -17px)');
+    // Combined raw: pitch = 0 - 0.5 = -0.5, roll = 0.5 + 0.5 = 1.0
+    const mag = Math.hypot(-0.5, 1.0);
+    const expectedOrientationDuringTouch = shapeTouchStick(-0.5 / mag, 1.0 / mag);
+    assert.ok(Math.abs(currentInput[0] - expectedOrientationDuringTouch[0]) < 1e-12);
+    assert.ok(Math.abs(currentInput[1] - expectedOrientationDuringTouch[1]) < 1e-12);
+
+    // 5. Release touch: stick returns to 0, output smoothly transitions to pure gyro
+    c.onStickPointerUp({ pointerId: 1 });
+    assert.equal(c.stickActive, false);
+    const expectedAfterRelease = shapeTouchStick(0, 0.5);
+    assert.ok(Math.abs(currentInput[0] - expectedAfterRelease[0]) < 1e-12);
+    assert.ok(Math.abs(currentInput[1] - expectedAfterRelease[1]) < 1e-12);
+    // Knob reflects current gyro position
+    assert.equal(c.stickKnob.style.transform, 'translate(17px, 0px)');
+  });
+});

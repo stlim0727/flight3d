@@ -124,12 +124,13 @@ export function restoreSimulatorPreferences(sim, preferences, { now = new Date()
   }
   if (preferences.audioMuted !== undefined) sim.audio.setMuted(preferences.audioMuted);
   if (preferences.engineVolume !== undefined) sim.audio.setEngineVolume(preferences.engineVolume);
-  if (preferences.touchControls !== undefined && preferences.gyroEnabled !== true) {
+  const shouldRestoreGyro = preferences.gyroEnabled === true || (preferences.gyroEnabled === undefined && sim.touchControls?.gyroRequested);
+  if (preferences.touchControls !== undefined && !shouldRestoreGyro) {
     if (preferences.touchControls) sim.touchControls.enable();
     else sim.touchControls.disable();
   }
   // Gyro needs the touch-input path; restore it after all visibility preferences.
-  if (preferences.gyroEnabled === true) sim.touchControls?.restoreGyroSettings?.();
+  if (shouldRestoreGyro) sim.touchControls?.restoreGyroSettings?.();
   if (preferences.joystick && sim.controls?.hotas) {
     sim.controls.hotas.applyConfig(preferences.joystick);
   }
