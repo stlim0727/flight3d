@@ -1,14 +1,16 @@
-# Persistent multiplayer host
+# Persistent multiplayer player (host and guest)
 
 `npm run multiplayer:ghost` runs an unattended B738 coastal-cruise host. Its ordinary
 invite link works with the existing deployed mobile client. It uses the ordinary simulator UI and guest privileges, with no AI badge. The host name
-defaults to Maverick. It starts two seconds after a guest joins, waits for both
+defaults to Maverick (or Goose in guest mode). It starts two seconds after a guest joins, waits for both
 pilots' preparation, then flies an orbit using the production 120 Hz controls,
 physics, terrain/contact checks, trim and existing pilot control laws. It sends
-ordinary snapshots at 15 Hz. The host answers the ordinary voice connection with
-a silent track; it never requests or records microphone audio.
+ordinary snapshots at 15 Hz. The single executable can also join an existing room as a
+guest (`--join CODE` or `--guest`), flying wingman in slot 1. Optional `--voice`
+enables synthetic radio transmission (chime/squelch audio) and remote voice energy detection
+with call-and-response radio etiquette. By default, voice remains silent without requesting or recording microphone audio.
 
-The installed Chrome provides WebRTC and silent Web Audio only. WebGL is disabled;
+The installed Chrome provides WebRTC and headless Web Audio. WebGL is disabled;
 no WebGL renderer, software renderer, scenery mesh, cockpit or camera is created.
 Three.js vectors and aircraft transforms do not require graphics acceleration.
 The source headless runtime is also shared by existing physics calibration tests.

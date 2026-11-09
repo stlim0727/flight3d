@@ -13,27 +13,34 @@ export async function runCli({ readAsset, args = process.argv.slice(2) }) {
   const manifest = JSON.parse(await readAsset('manifest.json', 'utf8'));
   const config = readConfig(args);
   if (config.flags.has('help')) {
-    console.log(`flight3d-ghost-host ${manifest.version}\n\nRun a normal multiplayer host without a GPU or game checkout. Requires installed Chrome/Chromium. Native releases include Node; the portable JavaScript package requires Node 22.23.2+.\n\nOptions:\n  --name NAME          Pilot name (default Maverick)\n  --state-dir DIR      Persistent room state\n  --room CODE          Optional six-character room code\n  --public-url URL     Game URL used for invitations\n  --chrome PATH        Installed browser executable\n  --signal-url URL     PeerServer URL matching the guest deployment\n  --ice-servers JSON   ICE configuration matching the guest deployment\n  --directory URL      Public room directory API URL\n  --public             Register room in public directory\n  --version            Release and compatibility information\n  --check              Validate configuration/browser without starting a room\n  --help               Show this help\n\nConfiguration can also use GHOST_NAME, GHOST_STATE_DIR, GHOST_ROOM, GHOST_PUBLIC_URL, CHROME_PATH, GHOST_SIGNAL_URL, GHOST_ICE_SERVERS, GHOST_DIRECTORY_URL and GHOST_PUBLIC.`);
+    console.log(`flight3d-ghost-host ${manifest.version}\n\nRun an unattended multiplayer player (host or guest) without a GPU or game checkout. Requires installed Chrome/Chromium. Native releases include Node; the portable JavaScript package requires Node 22.23.2+.\n\nOptions:\n  --name NAME          Pilot name (default Maverick for host, Goose for guest)\n  --role ROLE          Player role: host (default) or guest\n  --host               Run as host (default)\n  --guest              Run as guest\n  --join CODE          Join an existing room code as guest\n  --room CODE          Six-character room code (host room or guest target)\n  --voice              Enable radio voice transmission and listening\n  --state-dir DIR      Persistent room state (host only)\n  --public-url URL     Game URL used for invitations\n  --chrome PATH        Installed browser executable\n  --signal-url URL     PeerServer URL matching the deployment\n  --ice-servers JSON   ICE configuration matching the deployment\n  --directory URL      Public room directory API URL\n  --public             Register room in public directory (host only)\n  --version            Release and compatibility information\n  --check              Validate configuration/browser without starting\n  --help               Show this help\n\nConfiguration can also use GHOST_ROLE, GHOST_JOIN, GHOST_VOICE, GHOST_NAME, GHOST_STATE_DIR, GHOST_ROOM, GHOST_PUBLIC_URL, CHROME_PATH, GHOST_SIGNAL_URL, GHOST_ICE_SERVERS, GHOST_DIRECTORY_URL and GHOST_PUBLIC.`);
   } else if (config.flags.has('version')) {
     console.log(JSON.stringify(manifest, null, 2));
   } else {
     const chrome = findChrome(config.chrome);
-    if (config.flags.has('check')) console.log(JSON.stringify({ ...manifest, chrome, stateDir: config.stateDir }, null, 2));
+    if (config.flags.has('check')) console.log(JSON.stringify({ ...manifest, chrome, role: config.role, stateDir: config.stateDir }, null, 2));
     else await run(chrome);
   }
   async function run(chrome) {
+    const isGuest = config.role === 'guest';
     const stateDir = config.stateDir;
-    await mkdir(stateDir, { recursive: true, mode: 0o700 });
-    const statePath = join(stateDir, 'room.json');
-    let saved;
-    try { saved = JSON.parse(await readFile(statePath, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
-    if (saved?.schema !== undefined && saved.schema !== manifest.configSchema) throw new Error('Unsupported room-state schema; use a compatible host release.');
-    const code = config.room || saved?.room || newRoom();
-    if (!validRoom(code)) throw new Error(`Invalid saved room in ${statePath}; preserve or explicitly replace it with --room CODE.`);
-    const invite = inviteUrl(code, config.publicUrl);
-    const stateTmp = join(stateDir, `room.${process.pid}.tmp`);
-    await writeFile(stateTmp, JSON.stringify({ schema: 1, room: code, invite, name: config.name }, null, 2) + '\n', { mode: 0o600 });
-    await rename(stateTmp, statePath); await chmod(statePath, 0o600);
+    let code, invite, statePath;
+    if (isGuest) {
+      code = config.room;
+      invite = inviteUrl(code, config.publicUrl);
+    } else {
+      await mkdir(stateDir, { recursive: true, mode: 0o700 });
+      statePath = join(stateDir, 'room.json');
+      let saved;
+      try { saved = JSON.parse(await readFile(statePath, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      if (saved?.schema !== undefined && saved.schema !== manifest.configSchema) throw new Error('Unsupported room-state schema; use a compatible host release.');
+      code = config.room || saved?.room || newRoom();
+      if (!validRoom(code)) throw new Error(`Invalid saved room in ${statePath}; preserve or explicitly replace it with --room CODE.`);
+      invite = inviteUrl(code, config.publicUrl);
+      const stateTmp = join(stateDir, `room.${process.pid}.tmp`);
+      await writeFile(stateTmp, JSON.stringify({ schema: 1, room: code, invite, name: config.name }, null, 2) + '\n', { mode: 0o600 });
+      await rename(stateTmp, statePath); await chmod(statePath, 0o600);
+    }
     const profile = await mkdtemp(join(tmpdir(), 'flight3d-ghost-'));
     let browser, server, client, watchdog, directoryClient;
     let stopping = false, polling = false, chromeLog = '', status = { state: 'starting', registered: false };
@@ -72,17 +79,23 @@ export async function runCli({ readAsset, args = process.argv.slice(2) }) {
       const tab = await (await fetch(`http://127.0.0.1:${cdpPort}/json/new?${encodeURIComponent(`http://127.0.0.1:${port}/`)}`, { method: 'PUT' })).json();
       client = await connectCdp(tab.webSocketDebuggerUrl); await client.send('Runtime.enable');
       await until(() => client.evaluate('typeof window.startGhostHost === "function"'), 'host bundle');
-      await client.evaluate(`window.startGhostHost(${JSON.stringify({ room: code, name: config.name, options: config.options })})`);
+      await client.evaluate(`window.startGhostHost(${JSON.stringify({
+        room: code,
+        role: config.role,
+        name: config.name,
+        voice: config.voice,
+        options: config.options,
+      })})`);
       await until(async () => {
         status = await client.evaluate('JSON.parse(JSON.stringify(window.ghostHost))');
         if (status?.transportError === 'unavailable-id') throw new Error('Room code is already in use. Stop the other host or choose another --room code.');
         return status?.registered;
-      }, 'signaling registration', 60000);
-      log({ event: 'ready', name: config.name, room: code, invite, ...manifest,
+      }, `${config.role} signaling registration`, 60000);
+      log({ event: 'ready', role: config.role, name: config.name, room: code, invite, voice: config.voice, ...manifest,
         statePath, healthUrl: `http://127.0.0.1:${port}/health`, cdpEndpoint: `http://127.0.0.1:${cdpPort}` });
       let registering = false, lastDirectoryAttempt = 0;
       async function syncDirectory() {
-        if (!config.isPublic || !config.directoryUrl || stopping || !status?.registered || status?.state === 'ended') return;
+        if (config.role === 'guest' || !config.isPublic || !config.directoryUrl || stopping || !status?.registered || status?.state === 'ended') return;
         if (directoryClient?.isRegistered || registering) return;
         const now = Date.now();
         if (now - lastDirectoryAttempt < 10000) return;

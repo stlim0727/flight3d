@@ -42,19 +42,34 @@ archive, and no automatic browser download occurs.
 
 The first JSON `ready` message prints the invite URL, room code, release and
 compatibility versions. Share the invite with a mobile player. The host starts
-when a guest joins and reopens the same room after departure. Voice is silent;
-the host never requests microphone access or records guests.
+when a guest joins and reopens the same room after departure. Voice transmission
+and listening can be enabled via `--voice`; by default, the ghost is silent and
+never requests or records microphone audio.
+
+A single unified executable can run either as host or as a guest joining an existing room:
+```sh
+# Host mode (default)
+flight3d-ghost --host --room ABC234
+
+# Guest mode (joins an existing game)
+flight3d-ghost --join ABC234 --voice
+```
 
 Use `--help` for options. Important configuration:
 
 | CLI option | Environment | Purpose |
 | --- | --- | --- |
-| `--name` | `GHOST_NAME` | Ordinary pilot name |
-| `--state-dir` | `GHOST_STATE_DIR` | Durable room storage |
+| `--name` | `GHOST_NAME` | Ordinary pilot name (default Maverick for host, Goose for guest) |
+| `--role` | `GHOST_ROLE` | Player role: `host` (default) or `guest` |
+| `--join` | `GHOST_JOIN` | Shortcut to join an existing room code as guest |
+| `--guest` | | Run in guest mode |
+| `--host` | | Run in host mode (default) |
+| `--voice` | `GHOST_VOICE` | Enable synthetic radio voice transmission and listening |
+| `--state-dir` | `GHOST_STATE_DIR` | Durable room storage (host only) |
 | `--room` | `GHOST_ROOM` | Explicit six-character room code |
 | `--public-url` | `GHOST_PUBLIC_URL` | Game deployment used for invites |
 | `--chrome` | `CHROME_PATH` | Installed Chrome/Chromium executable |
-| `--signal-url` | `GHOST_SIGNAL_URL` | PeerServer matching the guest deployment |
+| `--signal-url` | `GHOST_SIGNAL_URL` | PeerServer matching the deployment |
 | `--ice-servers` | `GHOST_ICE_SERVERS` | JSON RTCIceServer array |
 
 `--version` prints release metadata without launching Chrome or creating state.

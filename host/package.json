@@ -8,7 +8,8 @@
     "node": ">=22.23.2"
   },
   "bin": {
-    "flight3d-ghost-host": "./cli.mjs"
+    "flight3d-ghost-host": "./cli.mjs",
+    "flight3d-ghost": "./cli.mjs"
   },
   "files": [
     "cli.mjs",
