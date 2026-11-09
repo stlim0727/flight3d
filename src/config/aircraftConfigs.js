@@ -142,8 +142,10 @@ export const BOEING_737_800 = {
   // 5. Cockpit Camera & Instrument Layout
   cockpit: {
     hasPhotoCockpit: true,
-    captainEyePos: { x: -0.31, y: 0.85, z: -12.35 },
-    defaultLookPitchRad: -0.25,
+    captainEyePos: { x: -0.303, y: 0.81, z: -12.35 },
+    portraitEyeX: -0.303,
+    portraitEyeY: 0.81,
+    defaultLookPitchRad: -0.105, // -6.0° forward look showing runway, horizon & MCP
     defaultFov: 68.0,
     exteriorFov: 55.0,
     chaseDistance: 55.0,
@@ -279,9 +281,10 @@ export const F16_FALCON = {
   // 5. Cockpit Camera & Instrument Layout
   cockpit: {
     hasPhotoCockpit: false,
-    captainEyePos: { x: 0.0, y: 1.08, z: -3.35 },
+    captainEyePos: { x: 0.0, y: 0.94, z: -3.35 },
     portraitEyeX: 0.0, // Single seat stays centered in narrow viewports too.
-    defaultLookPitchRad: -0.06,
+    portraitEyeY: 0.94,
+    defaultLookPitchRad: -0.04, // -2.3° boresight level with HUD optical center
     defaultFov: 75.0,
     exteriorFov: 60.0,
     chaseDistance: 18.0,

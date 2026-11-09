@@ -67,11 +67,12 @@ export class CameraSystem {
     this.photoCockpit = false; // Default to high-fidelity 3D Virtual Cockpit with GLTF asset
     this.supportsPhotoCockpit = true; // Enabled for Boeing 737; disabled for 3D-only cockpits (e.g. C172)
     this.cockpitPortraitEyeX = -0.34;
-    this.cockpitHeadOffset = new THREE.Vector3(-0.31, 0.85, -12.35); // Captain eye centered behind yoke
+    this.cockpitPortraitEyeY = null;
+    this.cockpitHeadOffset = new THREE.Vector3(-0.31, 0.85, -12.35); // Default unconfigured captain eye
     this.headGForceOffset = new THREE.Vector3();
     this.touchJoltOffset = 0;
     this.lookYaw = 0;
-    this.lookPitch = -0.25; // Natural pilot head tilt showing MCP, instruments & runway horizon
+    this.lookPitch = -0.25; // Default unconfigured look pitch
 
     // Landing Gear Belly View Parameters (Oblique angle looking at nose and main gear under fuselage)
     this.gearCamOffset = new THREE.Vector3(2.2, -2.4, 6.2);
@@ -1031,6 +1032,7 @@ export class CameraSystem {
     this.cinematicDirector?.loadAircraftConfig?.(config);
     const cockpit = config.cockpit || {};
     this.cockpitPortraitEyeX = cockpit.portraitEyeX ?? -0.34;
+    this.cockpitPortraitEyeY = cockpit.portraitEyeY ?? null;
     const aero = config.aerodynamics || {};
     const span = aero.wingspanM ?? 35.8;
 
@@ -1113,7 +1115,11 @@ export class CameraSystem {
       const eyeLocal = this.cockpitHeadOffset.clone();
       if (this.camera && this.camera.aspect < 1.0) {
         eyeLocal.x = this.cockpitPortraitEyeX;
-        eyeLocal.y += 0.03;
+        if (this.cockpitPortraitEyeY !== null && this.cockpitPortraitEyeY !== undefined) {
+          eyeLocal.y = this.cockpitPortraitEyeY;
+        } else {
+          eyeLocal.y += 0.03;
+        }
       }
       const eyeWorld = eyeLocal.applyMatrix4(aircraftMesh.matrixWorld);
       this.camera.position.copy(eyeWorld);
@@ -1742,7 +1748,11 @@ export class CameraSystem {
         const eyeLocal = this.cockpitHeadOffset.clone();
         if (this.camera && this.camera.aspect < 1.0) {
           eyeLocal.x = this.cockpitPortraitEyeX;
-          eyeLocal.y += 0.03;
+          if (this.cockpitPortraitEyeY !== null && this.cockpitPortraitEyeY !== undefined) {
+            eyeLocal.y = this.cockpitPortraitEyeY;
+          } else {
+            eyeLocal.y += 0.03;
+          }
         }
         if (this.photoCockpit && this.supportsPhotoCockpit) {
           eyeLocal.set(-0.48, 0.88, -12.02);
