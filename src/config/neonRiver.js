@@ -1,16 +1,19 @@
 // Neon Metropolis canal (#551): a river cut through the middle of the skyline at right
 // angles to the runway (which runs 090°). It flows along world Z, sunk below the street
 // between vertical quay walls, and three bridges sized for the city cross it. The bridge
-// flight flies north (-Z) along it under all three.
+// flight flies north (-Z) along it under all three. The city stands on an island (#628):
+// the canal opens into the sea at both ends, and the runway runs out to sea on the only
+// causeway.
 // Metres, +Y up. Geometry and collision share these dimensions: bridgeSolids() is both
 // what is drawn and what is hit.
 
 export const NEON_RIVER = {
-  id: 'neon-canal-v1',
+  id: 'neon-canal-v2',
   // Centreline X through the city, half the water width, and the water surface below
-  // the street (y = 0). The canal is straight for |z| <= straight, then eases by `bend`.
-  x: 2300, halfWidth: 110, waterLevel: -14, straight: 2000, bend: 200,
-  // 10 m above the water south of the city, below the street, flying north.
+  // the street (y = 0), which is also the sea's. The quay walls curve out by `mouth`
+  // metres into the island's shore, so the canal widens into the sea.
+  x: 2300, halfWidth: 110, waterLevel: -14, mouth: 150,
+  // 10 m above the sea south of the island, below the street, flying north into the canal.
   spawn: [2300, -4, 1900], speedMs: 46,
   bridges: [
     // Tram and footbridge: a cable-stayed deck hung from an H pylon on the east bank,
@@ -23,27 +26,106 @@ export const NEON_RIVER = {
   ],
 };
 
+// The island (#628): a rectangle with rounded corners around the skyline, its north and
+// south shores at z = ±halfZ, and the runway's causeway out to sea west of it. Everything
+// else is sea at the canal's water level.
+export const NEON_ISLAND = {
+  west: 150, east: 4000, halfZ: 1350, corner: 600,
+  // Wider than the runway's safety area (|z| <= 50), out past its west end (x = -2500).
+  causeway: { west: -2600, halfWidth: 60 },
+};
+
 // Approach ramps carry each deck down to the street at this grade, on an embankment.
 export const RAMP = { grade: 0.08, step: 10, parapet: 1.1 };
 const LED = 0.3;
 
-const smooth = t => t * t * (3 - 2 * t);
-
 // Centreline X at z.
 export function riverCenter(z, river = NEON_RIVER) {
-  const over = Math.abs(z) - river.straight;
-  if (over <= 0) return river.x;
-  return river.x + Math.sign(z) * river.bend * smooth(Math.min(1, over / 2500));
+  return river.x;
 }
 
-// World point [x, z] lies on the water, between the quay walls.
-export function isRiver(x, z, river = NEON_RIVER) {
-  return Math.abs(x - riverCenter(z, river)) < river.halfWidth;
+// Height `over` metres into a quarter circle of `radius`: 0 at its start, `radius` at its end.
+const fillet = (over, radius) => (over > 0 ? radius - Math.sqrt(Math.max(0, radius ** 2 - over ** 2)) : 0);
+
+// Half the water width at z: constant through the city, curving out into the shore.
+export function riverHalfWidth(z, river = NEON_RIVER, island = NEON_ISLAND) {
+  return river.halfWidth + fillet(Math.abs(z) - (island.halfZ - river.mouth), river.mouth);
 }
 
-// Ground height: the water surface between the quay walls, the street elsewhere.
-export function riverGroundHeight(x, z, river = NEON_RIVER) {
-  return isRiver(x, z, river) ? river.waterLevel : 0;
+// The island's west (side -1) or east (+1) shore X at z, or null beyond its north and
+// south shores.
+export function islandShore(z, side, island = NEON_ISLAND) {
+  if (Math.abs(z) > island.halfZ) return null;
+  const inset = fillet(Math.abs(z) - (island.halfZ - island.corner), island.corner);
+  return side < 0 ? island.west + inset : island.east - inset;
+}
+
+// World point [x, z] lies on the canal's water, between the quay walls.
+export function isRiver(x, z, river = NEON_RIVER, island = NEON_ISLAND) {
+  return Math.abs(z) <= island.halfZ && Math.abs(x - riverCenter(z, river)) < riverHalfWidth(z, river, island);
+}
+
+// World point [x, z] lies on the street: the island beside the canal, or the causeway.
+export function isLand(x, z, river = NEON_RIVER, island = NEON_ISLAND) {
+  const west = islandShore(z, -1, island);
+  if (west !== null && x >= west && x <= islandShore(z, 1, island)) return !isRiver(x, z, river, island);
+  const { causeway } = island;
+  return x >= causeway.west && x <= island.west && Math.abs(z) <= causeway.halfWidth;
+}
+
+// Ground height: the street on land, the water surface of the canal and the sea elsewhere.
+export function riverGroundHeight(x, z, river = NEON_RIVER, island = NEON_ISLAND) {
+  return isLand(x, z, river, island) ? 0 : river.waterLevel;
+}
+
+// Z of the rows the island is drawn in, from south (+Z) to north: every 100 m, finer
+// through its rounded corners and the canal mouths, and at the causeway's edges.
+export function islandRows(river = NEON_RIVER, island = NEON_ISLAND) {
+  const h = island.halfZ, rows = new Set([island.causeway.halfWidth, -island.causeway.halfWidth]);
+  for (let z = -h; z <= h; z += 100) rows.add(z);
+  for (const [radius, n] of [[island.corner, 32], [river.mouth, 16]]) {
+    for (let k = 0; k <= n / 2; k++) {
+      const z = h - radius + radius * Math.sin(Math.PI * k / n);
+      rows.add(z).add(-z);
+    }
+  }
+  // Rows from both curves less than a metre apart are one row.
+  return [...rows].sort((a, b) => b - a).filter((z, i, sorted) => i === 0 || sorted[i - 1] - z > 1);
+}
+
+// The closed shore of the land west (side -1) or east (+1) of the canal as [x, z] points,
+// counter-clockwise in the x-z plane (the water lies to the right of each step): the quay
+// wall, the north shore, the coast, and the south shore back to the canal mouth. The west
+// land carries the runway causeway. No step is longer than 100 m.
+export function landOutline(side, river = NEON_RIVER, island = NEON_ISLAND) {
+  const rows = islandRows(river, island), h = island.halfZ, { causeway } = island, points = [];
+  const quay = z => riverCenter(z, river) + side * riverHalfWidth(z, river, island);
+  const shore = z => islandShore(z, side, island);
+  const add = (x, z) => {
+    const last = points.at(-1);
+    if (!last || last[0] !== x || last[1] !== z) points.push([x, z]);
+  };
+  const line = (x0, z0, x1, z1) => {
+    const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 100));
+    for (let i = 0; i <= n; i++) add(x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n);
+  };
+  for (const z of rows) add(quay(z), z);
+  line(quay(-h), -h, shore(-h), -h);
+  for (const z of [...rows].reverse()) {
+    if (side < 0 && Math.abs(z) < causeway.halfWidth) continue;
+    add(shore(z), z);
+    if (side < 0 && z === -causeway.halfWidth) {
+      line(island.west, z, causeway.west, z);
+      line(causeway.west, z, causeway.west, -z);
+      line(causeway.west, -z, island.west, -z);
+    }
+  }
+  line(shore(h), h, quay(h), h);
+  const [first, last] = [points[0], points.at(-1)];
+  if (first[0] === last[0] && first[1] === last[1]) points.pop();
+  let area = 0;
+  points.forEach(([x0, z0], i) => { const [x1, z1] = points[(i + 1) % points.length]; area += x0 * z1 - x1 * z0; });
+  return area > 0 ? points : points.reverse();
 }
 
 // Half the deck length: across the water and 12 m onto each bank.
