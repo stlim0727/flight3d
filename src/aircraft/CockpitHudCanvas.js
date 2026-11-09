@@ -110,20 +110,12 @@ export class CockpitHudCanvas {
       ctx.lineTo(right, bottom);
       ctx.closePath();
     } else {
-      // Boeing 737 overhead HGS combiner lens with chamfered corners
-      const left = inset;
-      const right = w - inset;
-      const top = inset;
-      const bottom = h - inset;
-      const chamfer = Math.min(w, h) * 0.08;
-      ctx.moveTo(left + chamfer, top);
-      ctx.lineTo(right - chamfer, top);
-      ctx.lineTo(right, top + chamfer);
-      ctx.lineTo(right, bottom - chamfer);
-      ctx.lineTo(right - chamfer, bottom);
-      ctx.lineTo(left + chamfer, bottom);
-      ctx.lineTo(left, bottom - chamfer);
-      ctx.lineTo(left, top + chamfer);
+      // Official Boeing 737 Rockwell Collins HGS-4000 round/oval combiner aperture
+      const cx = w * 0.5;
+      const cy = h * 0.5;
+      const rx = (w * 0.5) - inset;
+      const ry = (h * 0.44) - inset;
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
       ctx.closePath();
     }
   }
@@ -587,11 +579,11 @@ export class CockpitHudCanvas {
     ctx.fillStyle = hudBright;
     ctx.textBaseline = 'alphabetic';
 
-    const leftX = this.variant === 'f16' ? w * 0.12 : w * 0.08;
-    const rightX = this.variant === 'f16' ? w * 0.88 : w * 0.92;
-    const row1Y = this.variant === 'f16' ? h * 0.80 : h * 0.83;
-    const row2Y = this.variant === 'f16' ? h * 0.855 : h * 0.885;
-    const row3Y = this.variant === 'f16' ? h * 0.91 : h * 0.94;
+    const leftX = this.variant === 'f16' ? w * 0.12 : w * 0.15;
+    const rightX = this.variant === 'f16' ? w * 0.88 : w * 0.85;
+    const row1Y = this.variant === 'f16' ? h * 0.80 : h * 0.77;
+    const row2Y = this.variant === 'f16' ? h * 0.855 : h * 0.825;
+    const row3Y = this.variant === 'f16' ? h * 0.91 : h * 0.88;
 
     // Left block: G-Load, Mach, AoA
     ctx.textAlign = 'left';
@@ -690,6 +682,7 @@ export function configureF16HudMesh(mesh, hudCanvas) {
 /**
  * Builds the Boeing 737-800 3D overhead Head-Up Guidance System (HGS) fold-down combiner
  * assembly mounted above the Captain's windshield line of sight.
+ * Mimics the official Rockwell Collins HGS-4000 round/oval optical combiner glass.
  */
 export function createB737HudCombiner(hudCanvas) {
   const group = new THREE.Group();
@@ -698,25 +691,30 @@ export function createB737HudCombiner(hudCanvas) {
   const frameMat = new THREE.MeshBasicMaterial({
     name: 'B737-hgs-frame',
     color: 0x15191f,
+    side: THREE.DoubleSide,
   });
 
-  // Overhead projector housing & hinge bracket attached to the Captain's forward windshield ceiling mount
-  const mountX = -0.225;
-  const housingGeo = new THREE.BoxGeometry(0.14, 0.022, 0.085);
+  // Captain line-of-sight mount X framed in the center of Captain forward windshield 1L
+  const mountX = -0.270;
+  const mountY = 0.840;
+  const mountZ = -12.740;
+
+  // Overhead projector housing & hinge bracket attached to the Captain ceiling mount
+  const housingGeo = new THREE.BoxGeometry(0.12, 0.020, 0.075);
   const housingMesh = new THREE.Mesh(housingGeo, frameMat);
   housingMesh.name = 'B737_HGS_Housing';
-  housingMesh.position.set(mountX, 0.922, -12.775);
+  housingMesh.position.set(mountX, 0.955, -12.685);
   housingMesh.castShadow = false;
   housingMesh.receiveShadow = false;
   group.add(housingMesh);
 
-  // Dual support struts connecting ceiling mount to combiner top bar
-  const strutGeo = new THREE.BoxGeometry(0.010, 0.048, 0.012);
+  // Dual support struts connecting ceiling mount to combiner top hinge bracket
+  const strutGeo = new THREE.BoxGeometry(0.008, 0.075, 0.009);
   for (const side of [-1, 1]) {
     const strut = new THREE.Mesh(strutGeo, frameMat);
     strut.name = side < 0 ? 'B737_HGS_Strut_L' : 'B737_HGS_Strut_R';
-    strut.position.set(mountX + side * 0.055, 0.908, -12.768);
-    strut.rotation.x = 0.22;
+    strut.position.set(mountX + side * 0.042, 0.925, -12.700);
+    strut.rotation.x = 0.30;
     strut.castShadow = false;
     strut.receiveShadow = false;
     group.add(strut);
@@ -725,42 +723,31 @@ export function createB737HudCombiner(hudCanvas) {
   // Combiner assembly pivot in the Captain's forward windshield above the yoke and glareshield
   const combinerPivot = new THREE.Group();
   combinerPivot.name = 'B737_HGS_Lens_Pivot';
-  combinerPivot.position.set(mountX, 0.838, -12.762);
+  combinerPivot.position.set(mountX, mountY, mountZ);
   combinerPivot.rotation.x = -0.12;
-  combinerPivot.rotation.y = -0.16;
   group.add(combinerPivot);
 
-  const glassW = 0.180;
-  const glassH = 0.128;
-  const rimThickness = 0.0045;
-  const rimDepth = 0.005;
+  // Official Boeing 737 Rockwell Collins HGS-4000 round/oval combiner lens
+  const rx = 0.080; // 16.0 cm total width
+  const ry = 0.064; // 12.8 cm total height
+  const rimW = 0.0035; // 3.5 mm sleek black protective bezel
 
-  // Top & bottom frame bars
-  const hBarGeo = new THREE.BoxGeometry(glassW + rimThickness * 2, rimThickness, rimDepth);
-  const topBar = new THREE.Mesh(hBarGeo, frameMat);
-  topBar.position.set(0, (glassH + rimThickness) * 0.5, 0);
-  topBar.castShadow = false;
-  topBar.receiveShadow = false;
-  combinerPivot.add(topBar);
-
-  const bottomBar = new THREE.Mesh(hBarGeo, frameMat);
-  bottomBar.position.set(0, -(glassH + rimThickness) * 0.5, 0);
-  bottomBar.castShadow = false;
-  bottomBar.receiveShadow = false;
-  combinerPivot.add(bottomBar);
-
-  // Left & right frame bars
-  const vBarGeo = new THREE.BoxGeometry(rimThickness, glassH, rimDepth);
-  for (const side of [-1, 1]) {
-    const sideBar = new THREE.Mesh(vBarGeo, frameMat);
-    sideBar.position.set(side * (glassW + rimThickness) * 0.5, 0, 0);
-    sideBar.castShadow = false;
-    sideBar.receiveShadow = false;
-    combinerPivot.add(sideBar);
+  // Optical combiner glass geometry with normalized UVs
+  const glassShape = new THREE.Shape();
+  glassShape.absellipse(0, 0, rx, ry, 0, Math.PI * 2, false);
+  const glassGeo = new THREE.ShapeGeometry(glassShape, 36);
+  glassGeo.computeBoundingBox();
+  const b = glassGeo.boundingBox;
+  const pos = glassGeo.attributes.position;
+  const uvs = new Float32Array(pos.count * 2);
+  const spanX = Math.max(1e-5, b.max.x - b.min.x);
+  const spanY = Math.max(1e-5, b.max.y - b.min.y);
+  for (let i = 0; i < pos.count; i++) {
+    uvs[i * 2] = (pos.getX(i) - b.min.x) / spanX;
+    uvs[i * 2 + 1] = (pos.getY(i) - b.min.y) / spanY;
   }
+  glassGeo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
 
-  // Optical combiner glass displaying live HUD symbology
-  const glassGeo = new THREE.PlaneGeometry(glassW, glassH);
   const glassMat = new THREE.MeshBasicMaterial({
     name: 'B737-hgs-hud',
     map: hudCanvas?.texture || null,
@@ -769,6 +756,9 @@ export function createB737HudCombiner(hudCanvas) {
     depthWrite: false,
     side: THREE.FrontSide,
     toneMapped: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
   });
   const glassMesh = new THREE.Mesh(glassGeo, glassMat);
   glassMesh.name = 'B737_HGS_Glass';
@@ -777,6 +767,29 @@ export function createB737HudCombiner(hudCanvas) {
   glassMesh.receiveShadow = false;
   glassMesh.renderOrder = 12;
   combinerPivot.add(glassMesh);
+
+  // Outer oval bezel frame
+  const frameShape = new THREE.Shape();
+  frameShape.absellipse(0, 0, rx + rimW, ry + rimW, 0, Math.PI * 2, false);
+  const frameHole = new THREE.Path();
+  frameHole.absellipse(0, 0, rx, ry, 0, Math.PI * 2, true);
+  frameShape.holes.push(frameHole);
+  const rimGeo = new THREE.ShapeGeometry(frameShape, 36);
+  const rimMesh = new THREE.Mesh(rimGeo, frameMat);
+  rimMesh.name = 'B737_HGS_Rim';
+  rimMesh.position.set(0, 0, 0.002);
+  rimMesh.castShadow = false;
+  rimMesh.receiveShadow = false;
+  combinerPivot.add(rimMesh);
+
+  // Top hinge bracket connecting glass frame to overhead struts
+  const topHingeGeo = new THREE.BoxGeometry(0.052, 0.016, 0.014);
+  const topHinge = new THREE.Mesh(topHingeGeo, frameMat);
+  topHinge.name = 'B737_HGS_TopHinge';
+  topHinge.position.set(0, ry + 0.004, 0);
+  topHinge.castShadow = false;
+  topHinge.receiveShadow = false;
+  combinerPivot.add(topHinge);
 
   group.userData.glassMesh = glassMesh;
   return group;
