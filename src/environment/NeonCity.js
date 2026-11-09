@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { NEON_RIVER, bridgeWorldBoxes, isRiver, riverCenter, riverGroundHeight } from '../config/neonRiver.js';
+import { NEON_RIVER, bridgeWorldBoxes, isLand, riverCenter, riverGroundHeight } from '../config/neonRiver.js';
 import { isStreet, neonStreets } from '../config/neonRoads.js';
 import { createNeonRiver } from './NeonRiver.js';
 import { createNeonRoads } from './NeonRoads.js';
@@ -247,8 +247,9 @@ export class NeonCity {
       isLoaded: true,
       getHeight: (x, z) => this.getHeight(x, z),
       getNormal: (x, z) => this.getNormal(x, z),
-      // The canal's water lies below the street (#551); CollisionDetector reads it here.
-      getWaterLevel: (x, z) => (isRiver(x, z) ? NEON_RIVER.waterLevel : 0),
+      // The canal's and the sea's water lies below the street (#551, #628);
+      // CollisionDetector reads it here.
+      getWaterLevel: (x, z) => (isLand(x, z) ? 0 : NEON_RIVER.waterLevel),
     };
 
     this.airport = {
@@ -268,7 +269,7 @@ export class NeonCity {
     this.initRetroSun();
   }
 
-  // The street, or the canal's water between its quay walls.
+  // The street, or the water of the canal and the sea around the island.
   getHeight(x, z) {
     return riverGroundHeight(x, z);
   }
@@ -400,7 +401,7 @@ export class NeonCity {
   }
 
   initGroundAndRoads() {
-    // City ground on both banks of the canal, the canal and its bridges (#551)
+    // The island's ground on both banks of the canal, the sea, the canal and its bridges (#551, #628)
     this.river = createNeonRiver();
     this.group.add(this.river.group);
     // Bridges are solid for every aircraft, like the towers
@@ -409,17 +410,21 @@ export class NeonCity {
     this.roads = createNeonRoads();
     this.group.add(this.roads.group);
 
-    // Glowing city avenue grid lines, stopping at the canal's quay walls
+    // Glowing city avenue grid lines on the island, stopping short of the quay walls: each
+    // line is walked in 2 m steps and drawn over its runs of land.
     const gridLines = [];
-    const westBank = riverCenter(0) - NEON_RIVER.halfWidth, eastBank = riverCenter(0) + NEON_RIVER.halfWidth;
-    for (let x = -2000; x <= 4500; x += 300) {
-      if (x > westBank && x < eastBank) continue;
-      gridLines.push(new THREE.Vector3(x, 0.02, -1800), new THREE.Vector3(x, 0.02, 1800));
-    }
-    for (let z = -1800; z <= 1800; z += 300) {
-      gridLines.push(new THREE.Vector3(-2000, 0.02, z), new THREE.Vector3(westBank, 0.02, z));
-      gridLines.push(new THREE.Vector3(eastBank, 0.02, z), new THREE.Vector3(4500, 0.02, z));
-    }
+    const landRuns = (x0, z0, x1, z1) => {
+      const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 2);
+      let start = null, last = null;
+      for (let i = 0; i <= n + 1; i++) {
+        const p = i <= n ? new THREE.Vector3(x0 + (x1 - x0) * i / n, 0.02, z0 + (z1 - z0) * i / n) : null;
+        if (p && isLand(p.x, p.z)) { start ??= p; last = p; continue; }
+        if (start && last !== start) gridLines.push(start, last);
+        start = null;
+      }
+    };
+    for (let x = -2000; x <= 4500; x += 300) landRuns(x, -1800, x, 1800);
+    for (let z = -1800; z <= 1800; z += 300) landRuns(-2000, z, 4500, z);
     const gridGeo = new THREE.BufferGeometry().setFromPoints(gridLines);
     this.group.add(new THREE.LineSegments(gridGeo, new THREE.LineBasicMaterial({
       color: 0x22123d,

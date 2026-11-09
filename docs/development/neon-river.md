@@ -1,8 +1,8 @@
 # Neon Metropolis canal and bridge flight
 
 Related: #551 (a river for Neon Metropolis; the first attempt, PR #576, moved the Han
-River course in whole and left it outside the city), #253 (the former Han River
-scenario), #391 (free flight).
+River course in whole and left it outside the city), #628 (the city as an island), #253
+(the former Han River scenario), #391 (free flight).
 
 The separate **Han River** region is retired. Of it only the idea of an acrobatic flight
 under bridges survives, as Neon Metropolis's fourth scenario, **River Bridge Low
@@ -17,31 +17,51 @@ the middle of the skyline, at right angles to the runway (which runs 090° along
 from x = -2400 to 1800). Metres, +Y up.
 
 - Centreline x = 2300, between the Art Deco spire and the Chrysler-style crown tower,
-  crossing the canyon axis. Straight for |z| <= 2000, then easing 200 m to either side
-  toward the scenery edge (`riverCenter()`).
+  crossing the canyon axis, straight from shore to shore (`riverCenter()`).
 - 220 m of water between vertical quay walls (`halfWidth` 110 m), the water 14 m below
-  the street (`waterLevel` -14).
-- `NeonCity.getHeight()` is the water level between the walls and 0 elsewhere, so the
+  the street (`waterLevel` -14). From |z| = 1200 the walls curve out on a 150 m quarter
+  circle (`mouth`) into the island's shore, so at either end the canal widens to 520 m
+  and opens into the sea (`riverHalfWidth()`).
+- `NeonCity.getHeight()` is 0 on land (`isLand()`) and the water level elsewhere, so the
   walls are a step in the city terrain: ground effect, radio altitude, gear contact and
   body probes all see them. The terrain also reports `getWaterLevel()`, which
   `CollisionDetector.checkWater()` uses instead of sea level, so flying below the street
-  inside the canal is not ditching.
-- `createNeonRiver()` (`NeonRiver.js`) draws the street on both banks with the canal left
-  open, the water, the quay walls, violet waterline ribbons along the walls and pink/cyan
-  promenade strips along their tops. Ground and water are strips sampled every 100 m and
-  cut into columns at most 100 m wide, so no triangle spans kilometres (near-plane 1/w
-  interpolation). Avenue grid lines and street lamps stop at the walls.
+  over the canal or the sea is not ditching.
+- `createNeonRiver()` (`NeonRiver.js`) draws the street on both banks and the causeway,
+  one sea surface at the water level across the whole 24 km scenery (running on under the
+  island), the quay walls around every shore (`landOutline()`), violet waterline ribbons
+  along the walls and pink (west bank and causeway) / cyan (east bank) promenade strips
+  along their tops. Ground and water are strips sampled at most every 100 m (finer
+  through the curves, `islandRows()`) and cut into columns at most 100 m wide, so no
+  triangle spans kilometres (near-plane 1/w interpolation). Avenue grid lines stay on
+  land, and street lamps stop at the walls.
 - The canal must read at night without brightening the city (#581). The scene's
   environment is a daytime HDR that Neon Metropolis dims to 3%, so the water carries its
   own environment map, an equirectangular copy of the stylized sky dome's gradient: the
   glossy water mirrors the magenta horizon and stands out from the black quay walls,
   brightest at the grazing angles of the bridge flight. Quay lights (`quayLights`, one
-  `Points` cloud) stand every 20 m on both promenade strips, 1 m behind the wall tops,
-  tracing the canal's course ahead from the water and from above. They are light only,
-  flush with the promenade, with no collision.
+  `Points` cloud) stand every 20 m on every promenade strip, 1 m behind the wall tops,
+  tracing the canal's course and the island's shore ahead from the water and from above.
+  They are light only, flush with the promenade, with no collision.
 - Ten towers were moved clear of the canal and the bridges; the Chrysler-style crown
   tower now stands on the east quay. `tests/neonRiver.test.js` keeps every tower more
   than 30 m from the water and 15 m from every bridge solid.
+
+## The island
+
+`NEON_ISLAND` (#628) puts the city on an island in the sea. Everything that is not
+island or causeway is sea at the canal's water level, 14 m below the street.
+
+- A rectangle with 600 m rounded corners (`corner`) around the skyline: x = 150 to 4000,
+  its north and south shores straight at z = ±1350 (`halfZ`), where the canal opens into
+  the sea (`islandShore()`). Every tower stands at least 100 m from the outer shore.
+- The runway (and its safety area, x = -2500 to 1900, |z| <= 50) leaves the island
+  westward on the only causeway, 120 m wide (`causeway.halfWidth` 60 m) and out to
+  x = -2600: everything beside and beyond it is sea, so the take-off and approach run
+  over one road across the water. The highway lamps and gantries along it stand on it.
+- The quay walls, waterline ribbons, promenade strips and quay lights run around the whole
+  shore of both banks, the causeway included, as closed loops (`landOutline()`, counter-
+  clockwise, with the water on the right of each step).
 
 ## Bridges
 
@@ -106,15 +126,17 @@ junctions and corners are fully paved.
   over the canal is `water`. The street block beyond either wall is solid up to the
   street, tested against each part's oriented box (separating axes), so a wing tip past
   the wall below the street is `wall`, while a wing banked up over the wall's top is not.
-  The wall is taken as straight along Z at the part's position; the canal bends gently.
+  The land is the island on either side of the canal, up to its north and south shores,
+  and the causeway (#628); the walls are taken as straight along Z at the part's
+  position. Over the sea beyond the island only the water is solid.
   Malformed samples are skipped, and a jump of more than about 100 m (a respawn) tests
   only the new pose. The towers are left to `CollisionDetector`.
 
 ## Bridge flight
 
 The scenario starts a C172 in trimmed flight 10 m above the water (y = -4, below the
-street) at 46 m/s, in calm wind, 750 m south of the city, heading north (000°) up the
-canal toward the cable-stayed bridge. The altimeter reads below zero there, because the
+street) at 46 m/s, in calm wind, over the sea 550 m south of the island, heading north
+(000°) into the canal's mouth toward the cable-stayed bridge. The altimeter reads below zero there, because the
 street is the city's elevation. It keeps the city's time of day and night sky. The
 normal controls and common HUD apply; autopilot disengages and demos do not start while
 it is active. Selecting it in the menu selects the C172 and locks the aircraft buttons
