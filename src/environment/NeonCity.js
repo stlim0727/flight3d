@@ -8,7 +8,7 @@ import { createNeonRoads } from './NeonRoads.js';
 /**
  * Creates clean, sleek facade textures tailored to eliminate trypophobia.
  * Replaces high-frequency dot/slot perforations with smooth, elegant horizontal
- * ribbon glazing, vertical architectural fins, and pure velvety monolithic finishes.
+ * ribbon glazing, vertical architectural fins, and velvety monoliths with thin amber floor lines.
  */
 function createArchitecturalTextures() {
   const size = 128;
@@ -110,9 +110,44 @@ function createArchitecturalTextures() {
   finEmissiveMap.wrapS = finEmissiveMap.wrapT = THREE.RepeatWrapping;
   finEmissiveMap.needsUpdate = true;
 
+  // 3. Monolith Sunset Amber Floor Line (#624)
+  // One thin warm line per tile keeps the obsidian silhouette while lighting it.
+  const amberData = new Uint8Array(size * size * 4);
+  const amberEmissive = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    const isLine = y >= 60 && y <= 65;
+    const lineEdge = isLine ? Math.sin(((y - 60) / 5) * Math.PI) : 0;
+
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      // Obsidian body 0x160e28 blending into amber 0xffb46a
+      amberData[idx] = Math.floor(22 + 233 * lineEdge);
+      amberData[idx + 1] = Math.floor(14 + 166 * lineEdge);
+      amberData[idx + 2] = Math.floor(40 + 66 * lineEdge);
+      amberData[idx + 3] = 255;
+
+      // Glow 0xff9a3c
+      amberEmissive[idx] = Math.floor(255 * lineEdge);
+      amberEmissive[idx + 1] = Math.floor(154 * lineEdge);
+      amberEmissive[idx + 2] = Math.floor(60 * lineEdge);
+      amberEmissive[idx + 3] = 255;
+    }
+  }
+
+  const amberMap = new THREE.DataTexture(amberData, size, size, THREE.RGBAFormat);
+  amberMap.colorSpace = THREE.SRGBColorSpace;
+  amberMap.wrapS = amberMap.wrapT = THREE.RepeatWrapping;
+  amberMap.needsUpdate = true;
+
+  const amberEmissiveMap = new THREE.DataTexture(amberEmissive, size, size, THREE.RGBAFormat);
+  amberEmissiveMap.colorSpace = THREE.SRGBColorSpace;
+  amberEmissiveMap.wrapS = amberEmissiveMap.wrapT = THREE.RepeatWrapping;
+  amberEmissiveMap.needsUpdate = true;
+
   return {
     ribbon: { map: ribbonMap, emissiveMap: ribbonEmissiveMap },
     fin: { map: finMap, emissiveMap: finEmissiveMap },
+    amber: { map: amberMap, emissiveMap: amberEmissiveMap },
   };
 }
 
@@ -518,9 +553,12 @@ export class NeonCity {
       metalness: 0.3,
     });
 
-    // Material 3: Velvety Monolithic Obsidian Silhouette (zero windows)
+    // Material 3: Velvety Monolithic Obsidian Silhouette with sunset amber floor lines
     const monolithMat = new THREE.MeshStandardMaterial({
-      color: 0x160e28,
+      map: textures.amber.map,
+      emissiveMap: textures.amber.emissiveMap,
+      emissive: new THREE.Color(0xffffff),
+      emissiveIntensity: 0.75,
       roughness: 0.4,
       metalness: 0.5,
     });
@@ -760,14 +798,12 @@ export class NeonCity {
       });
     }
 
-    if (ribbonGeometries.length > 0) {
-      this.group.add(new THREE.Mesh(mergeGeometries(ribbonGeometries), ribbonMat));
-    }
-    if (finGeometries.length > 0) {
-      this.group.add(new THREE.Mesh(mergeGeometries(finGeometries), finMat));
-    }
-    if (monolithGeometries.length > 0) {
-      this.group.add(new THREE.Mesh(mergeGeometries(monolithGeometries), monolithMat));
+    const facades = [['ribbon', ribbonGeometries, ribbonMat], ['fin', finGeometries, finMat], ['monolith', monolithGeometries, monolithMat]];
+    for (const [facade, geometries, material] of facades) {
+      if (geometries.length === 0) continue;
+      const mesh = new THREE.Mesh(mergeGeometries(geometries), material);
+      mesh.name = `neon-facade-${facade}`;
+      this.group.add(mesh);
     }
     if (roofGeometries.length > 0) {
       this.group.add(new THREE.Mesh(mergeGeometries(roofGeometries), roofMat));
