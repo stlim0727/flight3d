@@ -243,7 +243,7 @@ export function trackFlightStart({ airport, aircraft, scenario, pilotMode, timeO
 }
 
 /** Track flight finish/stop */
-export function trackFlightEnd({ airport, aircraft, scenario, reason, durationSeconds, score, gatesCleared }) {
+export function trackFlightEnd({ airport, aircraft, scenario, reason, durationSeconds, score, gatesCleared, glocIncidents, maxG }) {
   trackEvent('flight_ended', {
     airport,
     aircraft,
@@ -252,6 +252,9 @@ export function trackFlightEnd({ airport, aircraft, scenario, reason, durationSe
     durationSeconds: durationSeconds != null ? Number(durationSeconds.toFixed(1)) : null,
     score: score ?? null,
     gatesCleared: gatesCleared ?? null,
+    // Summarised at the end, never sent mid-flight: pilot blackouts and the peak load behind them.
+    glocIncidents: Number.isFinite(glocIncidents) ? glocIncidents : null,
+    maxG: Number.isFinite(maxG) ? Number(maxG.toFixed(1)) : null,
   });
 }
 
@@ -269,7 +272,44 @@ export function trackMissionEnd(record, { airport, aircraft } = {}) {
     durationSeconds: record.tick / 120,
     score: record.result?.metrics?.finalScore,
     gatesCleared: record.result?.metrics?.completedGates,
+    glocIncidents: record.result?.metrics?.glocIncidents,
   });
+}
+
+const replaySeconds = seconds => (Number.isFinite(seconds) ? Number(seconds.toFixed(1)) : null);
+const REPLAY_SAVE_RESULTS = new Set(['ok', 'tooShort', 'tooLong', 'quota']);
+
+/** One debrief save attempt. Store refusals are tokens; anything else collapses to 'failed'. */
+export function trackReplaySaved({ result, durationSeconds } = {}) {
+  trackEvent('replay_saved', {
+    result: REPLAY_SAVE_RESULTS.has(result) ? result : 'failed',
+    durationSeconds: replaySeconds(durationSeconds),
+  });
+}
+
+/**
+ * One replay playback start. The replayed sortie, not whatever the simulator holds, names the
+ * aircraft, airport and scenario.
+ */
+export function trackReplayWatched({ source, ok, metadata = {}, durationSeconds } = {}) {
+  trackEvent('replay_watched', {
+    source,
+    ok: Boolean(ok),
+    aircraft: metadata.aircraft ?? null,
+    airport: metadata.airport ?? null,
+    scenario: metadata.scenario ?? null,
+    durationSeconds: replaySeconds(durationSeconds),
+  });
+}
+
+/** Saved replay library management: export, import or delete. */
+export function trackReplayLibraryAction({ action, ok } = {}) {
+  trackEvent('replay_library_action', { action, ok: Boolean(ok) });
+}
+
+/** One debrief button press; `outcome` is how the sortie ended. */
+export function trackDebriefAction({ action, outcome } = {}) {
+  trackEvent('debrief_action', { action, outcome: outcome ?? null });
 }
 
 /** Track aircraft impact / crash */

@@ -17,11 +17,17 @@ export class FlightRecorder {
     this.airborne = 0;
     this.wasOnGround = true;
     this.stopped = 0;
+    this.glocIncidents = 0;
+    this.wasGLOC = false;
   }
 
   update(dt, telemetry) {
     if (!this.active || !Number.isFinite(dt) || dt <= 0) return;
     this.elapsed += dt;
+    // Count blackouts on entry, so one long G-LOC is one incident.
+    const gloc = Boolean(telemetry.pilot?.isGLOC);
+    if (gloc && !this.wasGLOC) this.glocIncidents++;
+    this.wasGLOC = gloc;
     if (!FIELDS.every(key => Number.isFinite(telemetry[key]))) return;
     this.validDuration += dt;
     const sample = { timeSec: this.elapsed };
@@ -64,6 +70,7 @@ export class FlightRecorder {
     // Snapshots own their data, so a new sortie cannot change an exported report.
     this.report = structuredClone({ version: 2, metadata: this.metadata, reason,
       durationSec: this.elapsed, peaks: this.peaks, touchdowns: this.touchdowns, samples: this.samples,
+      glocIncidents: this.glocIncidents,
       crash: crash ? { type: crash.type ?? null, name: crash.name ?? null, description: crash.description ?? null,
         speedKnots: Number.isFinite(crash.speedKnots) ? crash.speedKnots : null, timeSec: this.elapsed } : null,
       sufficient: this.validDuration + 1e-9 >= 5 && this.samples.length >= 2,
