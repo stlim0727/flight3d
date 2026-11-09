@@ -107,9 +107,9 @@ export class PilotPhysiologyFx {
     const outerRadius = Math.max(innerRadius + 5, innerRadius + (45 * (1.0 - effectiveTunnel * 0.45)));
 
     // 2. Negative G: Redout & Peripheral Blur
-    if (gZ < -1.0) {
-      const excessNegG = -gZ - 1.0;
-      const rawRedout = Math.min(1.0, (excessNegG / 2.5) + (1.0 - c) * 0.6);
+    if (gZ < -1.8) {
+      const excessNegG = -gZ - 1.8;
+      const rawRedout = Math.min(1.0, (excessNegG / 1.5) + (1.0 - c) * 0.6);
       this.redoutAlpha = Math.max(0.0, Math.min(1.0, rawRedout * this.viewScale));
       this.blurPx = this.redoutAlpha * 8.0;
     } else {

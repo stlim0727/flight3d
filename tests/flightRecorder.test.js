@@ -281,3 +281,38 @@ test('an active arena run leaves flight_ended to its runner instead of reporting
   assert.equal(ended.length, 1);
   assert.equal(ended[0].reason, 'manual');
 });
+
+test('each sortie counts pilot G-LOC on entry and reports it with the peak load', () => {
+  const recorder = new FlightRecorder();
+  recorder.start(metadata);
+  const blackout = { ...telemetry, gForce: 8.4, pilot: { isGLOC: true } };
+  const awake = { ...telemetry, gForce: 6, pilot: { isGLOC: false } };
+  record(1, recorder, awake);
+  record(3, recorder, blackout); // one long blackout is still one incident
+  record(2, recorder, awake);
+  record(1, recorder, blackout);
+  record(1, recorder, telemetry); // no pilot snapshot, as in a demo
+  const report = recorder.finish('manual');
+  assert.equal(report.glocIncidents, 2);
+  assert.equal(report.peaks.gForce.gForce, 8.4);
+  recorder.start(metadata); record(1, recorder, blackout);
+  assert.equal(recorder.finish('manual').glocIncidents, 1, 'a new sortie starts its own count');
+});
+
+test('flight_ended carries the sortie duration, G-LOC count and peak load', () => {
+  const ended = [];
+  const sim = { gameFlow: new GameFlowController(), ...recorders(), devRunner: {},
+    telemetry: { ...telemetry }, quaternion: attitude, isCrashed: false,
+    analytics: { trackFlightEnd: event => ended.push(event) }, debriefOverlay: { show() {} } };
+  sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata); sim.replayRecorder.start(metadata);
+  for (let i = 0; i < 360; i++) {
+    sim.telemetry.pilot = { isGLOC: i >= 120 && i < 240 };
+    sim.telemetry.gForce = i === 130 ? 9.2 : 1;
+    SimulatorClass.prototype.updateFlightRecording.call(sim, 1 / 120);
+  }
+  SimulatorClass.prototype.endFlight.call(sim, 'manual');
+  assert.equal(ended.length, 1);
+  assert.ok(Math.abs(ended[0].durationSeconds - 3) < 1e-9, 'duration comes from the finished report');
+  assert.equal(ended[0].glocIncidents, 1);
+  assert.equal(ended[0].maxG, 9.2);
+});

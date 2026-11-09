@@ -13,6 +13,10 @@ import {
   trackFlightEnd,
   trackFlightCrash,
   trackMissionEnd,
+  trackReplaySaved,
+  trackReplayWatched,
+  trackReplayLibraryAction,
+  trackDebriefAction,
   trackPilotModeChange,
   trackStartupTrace,
   trackMultiplayerRoomCreated,
@@ -506,4 +510,47 @@ test('src/main.js imports all analytics methods attached to this.analytics', asy
   for (const name of required) {
     assert.ok(imported.includes(name), `src/main.js should import ${name} from posthog.js`);
   }
+});
+
+test('replay and debrief events carry normalised actions, results and the replayed sortie', () => {
+  const captured = [];
+  _resetAnalyticsForTesting({ capture: (eventName, properties) => captured.push({ eventName, properties }) });
+
+  trackReplaySaved({ result: 'ok', durationSeconds: 61.27 });
+  trackReplaySaved({ result: 'tooLong' });
+  trackReplaySaved({ result: 'The quota has been exceeded.' });
+  assert.deepEqual(captured.map(event => event.properties.result), ['ok', 'tooLong', 'failed'],
+    'raw store error messages must not become breakdown values');
+  assert.equal(captured[0].properties.durationSeconds, 61.3);
+  assert.equal(captured[1].properties.durationSeconds, null);
+
+  captured.length = 0;
+  trackReplayWatched({ source: 'library', ok: true, durationSeconds: 90,
+    metadata: { aircraft: 'F16', airport: 'valley', scenario: 'valley-slalom-v1' } });
+  trackReplayWatched({ source: 'debrief', ok: false });
+  assert.equal(captured[0].eventName, 'replay_watched');
+  assert.deepEqual([captured[0].properties.source, captured[0].properties.ok, captured[0].properties.aircraft,
+    captured[0].properties.airport, captured[0].properties.scenario], ['library', true, 'F16', 'valley', 'valley-slalom-v1']);
+  assert.deepEqual([captured[1].properties.source, captured[1].properties.ok, captured[1].properties.aircraft],
+    ['debrief', false, null]);
+
+  captured.length = 0;
+  trackReplayLibraryAction({ action: 'delete', ok: 1 });
+  trackDebriefAction({ action: 'retry', outcome: 'crash' });
+  trackDebriefAction({ action: 'share' });
+  assert.deepEqual(captured.map(event => event.eventName), ['replay_library_action', 'debrief_action', 'debrief_action']);
+  assert.deepEqual([captured[0].properties.action, captured[0].properties.ok], ['delete', true]);
+  assert.deepEqual([captured[1].properties.action, captured[1].properties.outcome], ['retry', 'crash']);
+  assert.equal(captured[2].properties.outcome, null);
+});
+
+test('flight_ended reports G-LOC incidents and peak load only when measured', () => {
+  const captured = [];
+  _resetAnalyticsForTesting({ capture: (eventName, properties) => captured.push({ eventName, properties }) });
+  trackFlightEnd({ scenario: 'cruise', reason: 'manual', durationSeconds: 120, glocIncidents: 2, maxG: 9.04 });
+  trackFlightEnd({ scenario: 'cruise', reason: 'manual', durationSeconds: 120 });
+  trackMissionEnd({ manifest: { id: 'valley-slalom-v1' }, status: 'failed', reason: 'crash', tick: 1200,
+    result: { metrics: { glocIncidents: 1 } } });
+  assert.deepEqual(captured.map(event => [event.properties.glocIncidents, event.properties.maxG]),
+    [[2, 9], [null, null], [1, null]]);
 });

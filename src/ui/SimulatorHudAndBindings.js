@@ -591,6 +591,7 @@ class SimulatorHudAndBindingsMethods {
       onWatchReplay: () => this.replayPanel.watch(this.debriefReplay),
       onCycleCamera: () => this.controls.onCycleCamera?.(),
       getCameraModeName: () => this.cameraSystem.getModeName(),
+      onAction: (action, report) => this.analytics?.trackDebriefAction?.({ action, outcome: report?.reason }),
     });
     document.getElementById('btn-pause-end')?.addEventListener('click', () => this.endFlight());
     document.getElementById('btn-lobby-end')?.addEventListener('click', () => this.endFlight());

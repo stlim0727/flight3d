@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { NEON_RIVER, bridgeSolids, bridgeToWorld, isRiver, riverCenter } from '../config/neonRiver.js';
+import { NEON_ISLAND, NEON_RIVER, bridgeSolids, bridgeToWorld, isLand, islandShore, riverCenter, riverHalfWidth } from '../config/neonRiver.js';
 
 // Conservative part envelopes in the C172 model frame. Covers fixed landing gear.
 // These deliberately have a small safety margin; not triangle-exact contact.
@@ -41,13 +41,14 @@ function obbHitsBox(obb, min, max) {
 }
 
 // Swept contact of the C172 with the canal for the bridge flight (#551): the three
-// bridges (lamps, arch ribs, hangers and cables included), the water and the quay walls.
+// bridges (lamps, arch ribs, hangers and cables included), the water and the quay walls
+// of the canal and the island's shore (#628).
 // The towers are left to CollisionDetector. Free flight: no course, gates or flight
 // envelope are judged here (#391).
 export class BridgeCollision {
-  constructor(river = NEON_RIVER) {
+  constructor(river = NEON_RIVER, island = NEON_ISLAND) {
     if (river.bridges.some(b => !Number.isFinite(b.z))) throw new Error('Invalid Neon river');
-    this.river = river;
+    this.river = river; this.island = island;
     this.bridges = river.bridges.map(b => {
       const [x, z] = bridgeToWorld(b, 0, 0, river);
       const solids = bridgeSolids(b, river).map(s => ({ ...s,
@@ -79,18 +80,23 @@ export class BridgeCollision {
     }
     return target;
   }
-  // The ground or wall the posed part touches: the water below it, or the street block
-  // beyond either quay wall, which is solid from far below up to the street (y = 0). The
-  // wall is taken as straight along Z at the part's position; the canal bends gently.
+  // The ground or wall the posed part touches: the water below it, or the land, which is
+  // solid from far below up to the street (y = 0): the island on either side of the canal,
+  // up to its north and south shores, and the runway causeway. The walls are taken as
+  // straight along Z at the part's position.
   groundHit(reach) {
-    const r = this.river;
+    const r = this.river, island = this.island, { x, z } = this.obb.c;
     if (reach.min.y > 0) return null;
-    if (reach.min.y <= r.waterLevel && isRiver(this.obb.c.x, this.obb.c.z, r)) return 'water';
-    const c = riverCenter(this.obb.c.z, r);
-    for (const side of [-1, 1]) {
-      const wall = c + side * r.halfWidth;
-      this.bankMin.set(side < 0 ? wall - 1000 : wall, r.waterLevel - 100, reach.min.z - 1);
-      this.bankMax.set(side < 0 ? wall : wall + 1000, 0, reach.max.z + 1);
+    if (reach.min.y <= r.waterLevel && !isLand(x, z, r, island)) return 'water';
+    const at = Math.max(-island.halfZ, Math.min(island.halfZ, z)), c = riverCenter(at, r), half = riverHalfWidth(at, r, island);
+    const z0 = Math.max(reach.min.z - 1, -island.halfZ), z1 = Math.min(reach.max.z + 1, island.halfZ);
+    const { causeway } = island;
+    const land = [[islandShore(at, -1, island), c - half, z0, z1], [c + half, islandShore(at, 1, island), z0, z1],
+      [causeway.west, island.west, -causeway.halfWidth, causeway.halfWidth]];
+    for (const [x0, x1, za, zb] of land) {
+      if (za > zb) continue;
+      this.bankMin.set(x0, r.waterLevel - 100, za);
+      this.bankMax.set(x1, 0, zb);
       if (obbHitsBox(this.obb, this.bankMin, this.bankMax)) return 'wall';
     }
     return null;

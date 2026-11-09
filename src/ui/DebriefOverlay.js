@@ -40,9 +40,14 @@ export function reportText(report) {
 }
 
 export const SAVE_REPLAY_STATUS = Object.freeze({ tooShort: 'replay.tooShort', tooLong: 'replay.tooLong' });
+/** Debrief button id (after `debrief-`) to the `debrief_action` it reports. Camera, fold and tabs are autocaptured. */
+export const DEBRIEF_ACTIONS = Object.freeze({
+  retry: 'retry', 'change-setup': 'change_setup', lobby: 'lobby', feedback: 'feedback',
+  'watch-replay': 'watch_replay', 'save-replay': 'save_replay', copy: 'copy', 'native-share': 'share', export: 'export',
+});
 
 export class DebriefOverlay {
-  constructor({ onRetry, onLobby, onFeedback, onSaveReplay, onWatchReplay, onCycleCamera, getCameraModeName }) {
+  constructor({ onRetry, onLobby, onFeedback, onSaveReplay, onWatchReplay, onCycleCamera, getCameraModeName, onAction }) {
     this.getCameraModeName = getCameraModeName;
     this.root = document.getElementById('debrief-overlay');
     this.root.innerHTML = `
@@ -185,6 +190,10 @@ export class DebriefOverlay {
       this.status('replay.saved');
     });
     this.el('copy').addEventListener('click', () => this.copy());
+    // Registered after the handlers above, so telemetry never decides whether an action runs.
+    for (const [id, action] of Object.entries(DEBRIEF_ACTIONS)) {
+      this.el(id)?.addEventListener('click', () => onAction?.(action, this.report));
+    }
     this.el('native-share').hidden = typeof navigator.share !== 'function';
     this.el('native-share').addEventListener('click', async () => {
       if (!this.report.sufficient) return;

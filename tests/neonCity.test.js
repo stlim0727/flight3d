@@ -28,7 +28,8 @@ test('NeonCity initializes ground, runway, retro sun, and skyscraper clusters', 
   // Verify retro sun exists in group
   const sun = city.group.getObjectByName('retro-synthwave-sun');
   assert.ok(sun, 'Retro synthwave sun must be present in group');
-  assert.ok(sun.position.x > 5000, 'Sun should be placed on horizon in distance');
+  assert.ok(sun.position.x > 12000, 'Moon sits beyond the sea edge, so the horizon (not nearer water) hides its base');
+  assert.ok(sun.position.x < 14000, 'Moon stays inside the sky dome');
 });
 
 test('NeonCity skyscrapers are large/tall with a central canyon wide enough for Cessna', () => {
@@ -92,4 +93,27 @@ test('Neon scenario registry and approach deviation resolve properly in all loca
     assert.notEqual(t('neon.cruise'), 'neon.cruise');
   }
   setLanguage('en');
+});
+
+test('Every NeonCity facade glows, monoliths in a warm amber distinct from cyan and magenta (#624)', () => {
+  const city = new NeonCity();
+  const glow = {};
+  for (const facade of ['ribbon', 'fin', 'monolith']) {
+    const mesh = city.group.getObjectByName(`neon-facade-${facade}`);
+    assert.ok(mesh, `${facade} facade mesh must exist`);
+    const { emissiveMap, emissiveIntensity } = mesh.material;
+    assert.ok(emissiveMap && emissiveIntensity > 0, `${facade} facade must be lit`);
+    // Brightest emissive texel of the facade
+    const data = emissiveMap.image.data;
+    let best = [0, 0, 0];
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] + data[i + 1] + data[i + 2] > best[0] + best[1] + best[2]) best = [data[i], data[i + 1], data[i + 2]];
+    }
+    assert.ok(best[0] + best[1] + best[2] > 0, `${facade} emissive map must contain light`);
+    glow[facade] = best;
+  }
+  const [r, g, b] = glow.monolith;
+  assert.ok(r > g && g > b, `Monolith glow must be amber, got ${glow.monolith}`);
+  // Cyan ribbons and magenta fins are blue-dominant; amber is not
+  assert.ok(glow.ribbon[2] > glow.ribbon[0] && glow.fin[2] > glow.fin[1]);
 });

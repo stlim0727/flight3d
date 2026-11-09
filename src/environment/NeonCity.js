@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { NEON_RIVER, bridgeWorldBoxes, isRiver, riverCenter, riverGroundHeight } from '../config/neonRiver.js';
+import { NEON_RIVER, bridgeWorldBoxes, isLand, riverCenter, riverGroundHeight } from '../config/neonRiver.js';
 import { isStreet, neonStreets } from '../config/neonRoads.js';
-import { createNeonRiver } from './NeonRiver.js';
+import { EXTENT as SEA_EXTENT, createNeonRiver } from './NeonRiver.js';
 import { createNeonRoads } from './NeonRoads.js';
 
 /**
  * Creates clean, sleek facade textures tailored to eliminate trypophobia.
  * Replaces high-frequency dot/slot perforations with smooth, elegant horizontal
- * ribbon glazing, vertical architectural fins, and pure velvety monolithic finishes.
+ * ribbon glazing, vertical architectural fins, and velvety monoliths with thin amber floor lines.
  */
 function createArchitecturalTextures() {
   const size = 128;
@@ -110,9 +110,44 @@ function createArchitecturalTextures() {
   finEmissiveMap.wrapS = finEmissiveMap.wrapT = THREE.RepeatWrapping;
   finEmissiveMap.needsUpdate = true;
 
+  // 3. Monolith Sunset Amber Floor Line (#624)
+  // One thin warm line per tile keeps the obsidian silhouette while lighting it.
+  const amberData = new Uint8Array(size * size * 4);
+  const amberEmissive = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    const isLine = y >= 60 && y <= 65;
+    const lineEdge = isLine ? Math.sin(((y - 60) / 5) * Math.PI) : 0;
+
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      // Obsidian body 0x160e28 blending into amber 0xffb46a
+      amberData[idx] = Math.floor(22 + 233 * lineEdge);
+      amberData[idx + 1] = Math.floor(14 + 166 * lineEdge);
+      amberData[idx + 2] = Math.floor(40 + 66 * lineEdge);
+      amberData[idx + 3] = 255;
+
+      // Glow 0xff9a3c
+      amberEmissive[idx] = Math.floor(255 * lineEdge);
+      amberEmissive[idx + 1] = Math.floor(154 * lineEdge);
+      amberEmissive[idx + 2] = Math.floor(60 * lineEdge);
+      amberEmissive[idx + 3] = 255;
+    }
+  }
+
+  const amberMap = new THREE.DataTexture(amberData, size, size, THREE.RGBAFormat);
+  amberMap.colorSpace = THREE.SRGBColorSpace;
+  amberMap.wrapS = amberMap.wrapT = THREE.RepeatWrapping;
+  amberMap.needsUpdate = true;
+
+  const amberEmissiveMap = new THREE.DataTexture(amberEmissive, size, size, THREE.RGBAFormat);
+  amberEmissiveMap.colorSpace = THREE.SRGBColorSpace;
+  amberEmissiveMap.wrapS = amberEmissiveMap.wrapT = THREE.RepeatWrapping;
+  amberEmissiveMap.needsUpdate = true;
+
   return {
     ribbon: { map: ribbonMap, emissiveMap: ribbonEmissiveMap },
     fin: { map: finMap, emissiveMap: finEmissiveMap },
+    amber: { map: amberMap, emissiveMap: amberEmissiveMap },
   };
 }
 
@@ -212,8 +247,9 @@ export class NeonCity {
       isLoaded: true,
       getHeight: (x, z) => this.getHeight(x, z),
       getNormal: (x, z) => this.getNormal(x, z),
-      // The canal's water lies below the street (#551); CollisionDetector reads it here.
-      getWaterLevel: (x, z) => (isRiver(x, z) ? NEON_RIVER.waterLevel : 0),
+      // The canal's and the sea's water lies below the street (#551, #628);
+      // CollisionDetector reads it here.
+      getWaterLevel: (x, z) => (isLand(x, z) ? 0 : NEON_RIVER.waterLevel),
     };
 
     this.airport = {
@@ -233,7 +269,7 @@ export class NeonCity {
     this.initRetroSun();
   }
 
-  // The street, or the canal's water between its quay walls.
+  // The street, or the water of the canal and the sea around the island.
   getHeight(x, z) {
     return riverGroundHeight(x, z);
   }
@@ -365,7 +401,7 @@ export class NeonCity {
   }
 
   initGroundAndRoads() {
-    // City ground on both banks of the canal, the canal and its bridges (#551)
+    // The island's ground on both banks of the canal, the sea, the canal and its bridges (#551, #628)
     this.river = createNeonRiver();
     this.group.add(this.river.group);
     // Bridges are solid for every aircraft, like the towers
@@ -374,17 +410,21 @@ export class NeonCity {
     this.roads = createNeonRoads();
     this.group.add(this.roads.group);
 
-    // Glowing city avenue grid lines, stopping at the canal's quay walls
+    // Glowing city avenue grid lines on the island, stopping short of the quay walls: each
+    // line is walked in 2 m steps and drawn over its runs of land.
     const gridLines = [];
-    const westBank = riverCenter(0) - NEON_RIVER.halfWidth, eastBank = riverCenter(0) + NEON_RIVER.halfWidth;
-    for (let x = -2000; x <= 4500; x += 300) {
-      if (x > westBank && x < eastBank) continue;
-      gridLines.push(new THREE.Vector3(x, 0.02, -1800), new THREE.Vector3(x, 0.02, 1800));
-    }
-    for (let z = -1800; z <= 1800; z += 300) {
-      gridLines.push(new THREE.Vector3(-2000, 0.02, z), new THREE.Vector3(westBank, 0.02, z));
-      gridLines.push(new THREE.Vector3(eastBank, 0.02, z), new THREE.Vector3(4500, 0.02, z));
-    }
+    const landRuns = (x0, z0, x1, z1) => {
+      const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 2);
+      let start = null, last = null;
+      for (let i = 0; i <= n + 1; i++) {
+        const p = i <= n ? new THREE.Vector3(x0 + (x1 - x0) * i / n, 0.02, z0 + (z1 - z0) * i / n) : null;
+        if (p && isLand(p.x, p.z)) { start ??= p; last = p; continue; }
+        if (start && last !== start) gridLines.push(start, last);
+        start = null;
+      }
+    };
+    for (let x = -2000; x <= 4500; x += 300) landRuns(x, -1800, x, 1800);
+    for (let z = -1800; z <= 1800; z += 300) landRuns(-2000, z, 4500, z);
     const gridGeo = new THREE.BufferGeometry().setFromPoints(gridLines);
     this.group.add(new THREE.LineSegments(gridGeo, new THREE.LineBasicMaterial({
       color: 0x22123d,
@@ -518,9 +558,12 @@ export class NeonCity {
       metalness: 0.3,
     });
 
-    // Material 3: Velvety Monolithic Obsidian Silhouette (zero windows)
+    // Material 3: Velvety Monolithic Obsidian Silhouette with sunset amber floor lines
     const monolithMat = new THREE.MeshStandardMaterial({
-      color: 0x160e28,
+      map: textures.amber.map,
+      emissiveMap: textures.amber.emissiveMap,
+      emissive: new THREE.Color(0xffffff),
+      emissiveIntensity: 0.75,
       roughness: 0.4,
       metalness: 0.5,
     });
@@ -760,14 +803,12 @@ export class NeonCity {
       });
     }
 
-    if (ribbonGeometries.length > 0) {
-      this.group.add(new THREE.Mesh(mergeGeometries(ribbonGeometries), ribbonMat));
-    }
-    if (finGeometries.length > 0) {
-      this.group.add(new THREE.Mesh(mergeGeometries(finGeometries), finMat));
-    }
-    if (monolithGeometries.length > 0) {
-      this.group.add(new THREE.Mesh(mergeGeometries(monolithGeometries), monolithMat));
+    const facades = [['ribbon', ribbonGeometries, ribbonMat], ['fin', finGeometries, finMat], ['monolith', monolithGeometries, monolithMat]];
+    for (const [facade, geometries, material] of facades) {
+      if (geometries.length === 0) continue;
+      const mesh = new THREE.Mesh(mergeGeometries(geometries), material);
+      mesh.name = `neon-facade-${facade}`;
+      this.group.add(mesh);
     }
     if (roofGeometries.length > 0) {
       this.group.add(new THREE.Mesh(mergeGeometries(roofGeometries), roofMat));
@@ -803,18 +844,25 @@ export class NeonCity {
   }
 
   initRetroSun() {
+    // Beyond the sea's edge (and inside the 14 km sky dome), so the horizon itself hides the
+    // moon's lower part at any altitude (#631). Nearer, the sea behind the moon rose above the
+    // line where the near water cut it, and it looked sunk in the water. Radius and height
+    // scale with distance to keep the 17.7° billboard centred 5° above the horizon, as it was at 7.4 km.
+    const distance = SEA_EXTENT + 1000;
+    const scale = distance / 7400;
     const moonTexture = createStylizedMoonTexture();
-    const moonGeo = new THREE.CircleGeometry(1150, 64);
+    const moonGeo = new THREE.CircleGeometry(1150 * scale, 64);
     const moonMat = new THREE.MeshBasicMaterial({
       map: moonTexture,
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
+      fog: false, // Night fog would wash the disc out at 13 km.
     });
 
     const moonMesh = new THREE.Mesh(moonGeo, moonMat);
     moonMesh.name = 'retro-synthwave-sun';
-    moonMesh.position.set(7400, 650, 0);
+    moonMesh.position.set(distance, 650 * scale, 0);
     moonMesh.rotation.y = -Math.PI / 2;
     this.group.add(moonMesh);
   }

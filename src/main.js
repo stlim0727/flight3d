@@ -90,6 +90,10 @@ import {
   trackMultiplayerRoundStarted,
   trackMultiplayerSessionEnded,
   trackMultiplayerVoiceToggled,
+  trackReplaySaved,
+  trackReplayWatched,
+  trackReplayLibraryAction,
+  trackDebriefAction,
 } from './analytics/posthog.js';
 import { openFeedbackDialog } from './analytics/FeedbackDialog.js';
 
@@ -452,6 +456,10 @@ class FlightSimulator {
       trackMultiplayerRoundStarted,
       trackMultiplayerSessionEnded,
       trackMultiplayerVoiceToggled,
+      trackReplaySaved,
+      trackReplayWatched,
+      trackReplayLibraryAction,
+      trackDebriefAction,
     };
     this._openFeedbackDialog = openFeedbackDialog;
 
@@ -810,7 +818,9 @@ class FlightSimulator {
       aircraft: this.currentAircraftId,
       scenario: this.lastPresetType,
       reason: this.isCrashed ? 'crash' : reason,
-      durationSeconds: this.flightRecorder?.elapsedSeconds,
+      durationSeconds: this.debriefReport?.durationSec,
+      glocIncidents: this.debriefReport?.glocIncidents,
+      maxG: this.debriefReport?.peaks?.gForce?.gForce,
     });
     this.gameFlow.endFlight();
     this.debriefOverlay.show(this.debriefReport, this.debriefReplay);
@@ -820,6 +830,7 @@ class FlightSimulator {
   saveDebriefReplay() {
     if (!this.debriefReplay) return { ok: false, error: 'tooShort' };
     const { entry, error } = this.replayStore.save(this.debriefReplay);
+    this.analytics?.trackReplaySaved?.({ result: entry ? 'ok' : error, durationSeconds: this.debriefReplay.durationSec });
     return { ok: Boolean(entry), error: error ?? null };
   }
 
