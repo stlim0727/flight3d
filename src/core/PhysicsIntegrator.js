@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { t } from '../i18n/index.js';
 import { terrainConflictSeconds } from '../systems/FlightWarnings.js';
 import { cockpitCasterState } from '../aircraft/CockpitLighting.js';
-import { normalLoadFactor } from '../physics/loadFactor.js';
+import { normalLoadFactor, GForceFilter } from '../physics/loadFactor.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { asymmetricThrustYawMoment } from '../physics/EngineModel.js';
 import { BODY_SUPPORT_POINTS, FALLBACK_BODY_SUPPORT_POINTS } from '../physics/groundContacts.js';
@@ -374,8 +374,12 @@ class PhysicsIntegratorMethods {
 
     // CG normal specific force averaged over this physics step, including
     // resolveBodyPenetration impulses and using the interval's midpoint axis.
-    const measuredGForce = normalLoadFactor(velocityBeforeStep, this.linearVelocity,
+    // 8.0 Hz 1st-order EMA low-pass filter eliminates discrete solver spike noise (Δv / Δt)
+    // while preserving sustained aerodynamic and landing loads.
+    const rawGForce = normalLoadFactor(velocityBeforeStep, this.linearVelocity,
       rotationBeforeStep, this.quaternion, dt);
+    this.gForceFilter ??= new GForceFilter(8.0);
+    const measuredGForce = this.gForceFilter.update(rawGForce, dt);
     if (this.pilotPhysiology) this.pilotPhysiology.gZ = measuredGForce;
 
     if (this._hasGroundContact && this.lastOnGround && !gearResult.onGround && this.actualTakeoffMassKg === null) {
@@ -410,6 +414,8 @@ class PhysicsIntegratorMethods {
       vsiFpm: Atmosphere.metersToFeet(this.linearVelocity.y) * 60.0,
       mach: aeroResult.mach,
       gForce: measuredGForce,
+      rawGForce,
+      wow: Boolean(gearResult.contacts?.slice(1).some(c => c.isGrounded)),
       isStalled: aeroResult.isStalled,
       isPreStall: aeroResult.isPreStall,
       isStallWarning: aeroResult.isStallWarning,
@@ -606,6 +612,7 @@ class PhysicsIntegratorMethods {
     this.waterSubmergedNoticed = false;
     this.pilotPhysiology?.reset?.();
     this.pilotPhysiologyFx?.reset?.();
+    this.gForceFilter?.reset();
     if (this.telemetry) {
       this.telemetry.pilot = this.pilotPhysiology ? this.pilotPhysiology.getSnapshot() : {
         gZ: 1.0, consciousness: 1.0, responsiveness: 1.0, isGLOC: false,

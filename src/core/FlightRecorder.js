@@ -1,3 +1,6 @@
+import { TouchdownGAnalyzer } from '../physics/loadFactor.js';
+import { getAircraftSpecs } from '../config/aircraftConfigs.js';
+
 // Observations only: time is integrated in simulation seconds, never wall time.
 const FIELDS = ['x', 'z', 'altitudeFt', 'iasKnots', 'gForce', 'pitchDeg', 'rollDeg', 'headingDeg'];
 export class FlightRecorder {
@@ -16,7 +19,9 @@ export class FlightRecorder {
     this.touchdowns = [];
     this.airborne = 0;
     this.wasOnGround = true;
+    this.wasGrounded = true;
     this.stopped = 0;
+    this.touchdownAnalyzer = new TouchdownGAnalyzer();
     this.glocIncidents = 0;
     this.wasGLOC = false;
   }
@@ -36,16 +41,38 @@ export class FlightRecorder {
     for (const key of ['altitudeFt', 'iasKnots', 'gForce']) {
       if (!this.peaks[key] || sample[key] > this.peaks[key][key]) this.peaks[key] = sample;
     }
-    if (!telemetry.onGround) this.airborne += dt;
+
+    this.touchdownAnalyzer.recordSample(this.elapsed, telemetry.gForce, dt);
+    this.touchdownAnalyzer.update(this.elapsed);
+
+    const isGrounded = Boolean(telemetry.wow ?? (telemetry.mainGearGrounded ?? telemetry.onGround));
+    if (!isGrounded) this.airborne += dt;
     else {
-      if (!this.wasOnGround && this.airborne >= 1.5 && Number.isFinite(telemetry.touchdownSinkRate)) {
+      if (!this.wasGrounded && this.airborne >= 1.5 && Number.isFinite(telemetry.touchdownSinkRate)) {
         // Contact sink rate is positive down in m/s; display its magnitude in ft/min.
-        this.touchdowns.push({ timeSec: this.elapsed, sinkRateFpm: Math.max(0, telemetry.touchdownSinkRate) * 60 / 0.3048,
-          contactG: telemetry.gForce });
+        const tdRecord = this.touchdownAnalyzer.triggerTouchdown(this.elapsed, telemetry.gForce);
+        const specs = getAircraftSpecs(this.metadata?.aircraft);
+        const contactG = Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(0, tdRecord.peakG));
+        this.touchdowns.push({
+          timeSec: this.elapsed,
+          sinkRateFpm: Math.max(0, telemetry.touchdownSinkRate) * 60 / 0.3048,
+          contactG,
+          _tdRecord: tdRecord
+        });
       }
       this.airborne = 0;
     }
+
+    const specs = getAircraftSpecs(this.metadata?.aircraft);
+    for (const td of this.touchdowns) {
+      if (td._tdRecord && !td._tdRecord.finalized) {
+        const peak = this.touchdownAnalyzer.evaluateTouchdown(td._tdRecord, this.elapsed);
+        td.contactG = Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(0, peak));
+      }
+    }
+
     this.wasOnGround = Boolean(telemetry.onGround);
+    this.wasGrounded = isGrounded;
     this.stopped = this.touchdowns.length && telemetry.onGround && telemetry.groundSpeedKnots < 1
       ? this.stopped + dt : 0;
     if (this.elapsed + 1e-9 >= this.nextSample) {
@@ -67,6 +94,16 @@ export class FlightRecorder {
     if (!this.active) return this.report;
     this.active = false;
     if (this.latest && this.samples.at(-1) !== this.latest) this._append(this.latest);
+
+    const specs = getAircraftSpecs(this.metadata?.aircraft);
+    for (const td of this.touchdowns) {
+      if (td._tdRecord) {
+        const peak = this.touchdownAnalyzer.evaluateTouchdown(td._tdRecord, this.elapsed);
+        td.contactG = Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(0, peak));
+        delete td._tdRecord;
+      }
+    }
+
     // Snapshots own their data, so a new sortie cannot change an exported report.
     this.report = structuredClone({ version: 2, metadata: this.metadata, reason,
       durationSec: this.elapsed, peaks: this.peaks, touchdowns: this.touchdowns, samples: this.samples,
