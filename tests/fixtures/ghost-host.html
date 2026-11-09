@@ -2,12 +2,21 @@
 <script type="module">
 import '../../src/multiplayer/ghostHostPage.js';
 import { newRoom } from '../../src/multiplayer/protocol.js';
-window.startFixtureGhost = () => {
+window.startFixtureGhost = (options = {}) => {
   const query = new URLSearchParams(location.search);
-  const room = newRoom();
-  startGhostHost({ room, options: query.has('public') ? undefined : {
-    host: '127.0.0.1', port: Number(query.get('signalPort')), path: '/flight3d', secure: false,
-  } });
+  const room = (typeof options === 'string' ? options : options.room) || newRoom();
+  startGhostPlayer({
+    room,
+    role: (typeof options === 'object' && options.role) || 'host',
+    name: typeof options === 'object' ? options.name : undefined,
+    voice: (typeof options === 'object' && options.voice !== undefined) ? options.voice : query.has('voice'),
+    options: query.has('public') ? undefined : {
+      host: '127.0.0.1', port: Number(query.get('signalPort')), path: '/flight3d', secure: false,
+    }
+  });
   return room;
+};
+window.startFixtureGhostGuest = (room, voice = true) => {
+  return window.startFixtureGhost({ room, role: 'guest', voice, name: 'Goose' });
 };
 </script>

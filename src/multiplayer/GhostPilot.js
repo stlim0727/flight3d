@@ -2,16 +2,27 @@ import { Vector3, MathUtils } from 'three';
 import { createHeadlessSimulation } from '../core/HeadlessSimulation.js';
 import { flyBank, flyVerticalPath } from '../director/PilotControlLaws.js';
 import { wrapHeading } from '../physics/Autopilot.js';
+import { slotOffset } from './protocol.js';
 
 export const GHOST_CONFIG = Object.freeze({ airport: 'coastal', aircraft: 'B738', scenario: 'cruise' });
 
 /** Real controls/forces at 120 Hz, with no scene, renderer, audio or input listeners. */
 export class GhostPilot {
-  constructor() { this.reset(); }
+  constructor(config = GHOST_CONFIG, slot = 0) {
+    this.config = config || GHOST_CONFIG;
+    this.slot = slot || 0;
+    this.reset();
+  }
   reset() {
-    this.sim = createHeadlessSimulation({ aircraftId: GHOST_CONFIG.aircraft });
+    this.sim = createHeadlessSimulation({
+      aircraftId: this.config?.aircraft || GHOST_CONFIG.aircraft,
+      airportId: this.config?.airport || GHOST_CONFIG.airport,
+    });
     const s = this.sim;
-    s.setPreset('cruise');
+    s.setPreset(this.config?.scenario || GHOST_CONFIG.scenario);
+    if (this.slot) {
+      s.position.add(slotOffset(this.config?.scenario || GHOST_CONFIG.scenario, this.slot, s.quaternion));
+    }
     // Prime telemetry and dynamic-pressure inputs before the first AI decision.
     s.integratePhysics(s.physicsDt);
     this.altitude = s.position.y;
@@ -45,9 +56,9 @@ export class GhostPilot {
       }
     }
   }
-  snapshot() {
+  snapshot(talking = false) {
     const s = this.sim;
     return { p: s.position.toArray(), q: s.quaternion.toArray(), v: s.linearVelocity.toArray(),
-      crashed: false, held: false, gear: s.gear.gearState, flaps: s.aero.currentFlapAngle, talking: false };
+      crashed: false, held: false, gear: s.gear.gearState, flaps: s.aero.currentFlapAngle, talking: Boolean(talking) };
   }
 }

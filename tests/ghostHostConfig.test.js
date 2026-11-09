@@ -30,3 +30,24 @@ test('installed browser discovery handles explicit paths, spaces, PATH, and miss
     assert.throws(() => findChrome(join(dir, 'missing'), {}));
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('configuration supports guest mode, join code, and voice flag', () => {
+  const guest = readConfig(['--join', 'K7M2QX', '--voice'], {});
+  assert.equal(guest.role, 'guest');
+  assert.equal(guest.room, 'K7M2QX');
+  assert.equal(guest.name, 'Goose');
+  assert.equal(guest.voice, true);
+
+  const customGuest = readConfig(['--guest', '--room', 'K7M2QX', '--name', 'Iceman'], {});
+  assert.equal(customGuest.role, 'guest');
+  assert.equal(customGuest.name, 'Iceman');
+  assert.equal(customGuest.voice, false);
+
+  const host = readConfig(['--host', '--voice'], {});
+  assert.equal(host.role, 'host');
+  assert.equal(host.name, 'Maverick');
+  assert.equal(host.voice, true);
+
+  assert.throws(() => readConfig(['--guest'], {}), /Guest mode requires a six-character room code/);
+  assert.throws(() => readConfig(['--role', 'unknown'], {}), /Role must be either/);
+});

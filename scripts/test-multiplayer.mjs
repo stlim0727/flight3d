@@ -86,6 +86,33 @@ try {
   await returning.evaluate('fixture.room.close()');
   await ghost.evaluate('ghostHost.stop()');
   console.log('PASS ghost host: ordinary peer joins, automatic ready barrier, real AI movement, disconnect and same-code rejoin. No renderer.');
+
+  // Ghost Host + Ghost Guest flying together with bidirectional voice (speaking and listening)
+  const ghostLeader = await page(`/tests/fixtures/ghost-host.html?signalPort=${signalPort}&voice=1`, 'Boolean(window.startFixtureGhost)');
+  const pairRoomCode = await ghostLeader.evaluate('startFixtureGhost({ voice: true, name: "Maverick" })');
+  await until(() => ghostLeader.evaluate('ghostHost.registered'), 'ghost leader registered');
+
+  const ghostWingman = await page(`/tests/fixtures/ghost-host.html?signalPort=${signalPort}&voice=1`, 'Boolean(window.startFixtureGhostGuest)');
+  await ghostWingman.evaluate(`startFixtureGhostGuest(${JSON.stringify(pairRoomCode)}, true)`);
+
+  await until(async () => {
+    const leaderState = await ghostLeader.evaluate('ghostHost.state');
+    const wingmanState = await ghostWingman.evaluate('ghostPlayer.state');
+    return leaderState === 'flying' && wingmanState === 'flying';
+  }, 'ghost pair flying together', 30000);
+  assert.equal(await ghostLeader.evaluate('ghostHost.remoteName'), 'Goose');
+  assert.equal(await ghostWingman.evaluate('ghostPlayer.remoteName'), 'Maverick');
+
+  // Trigger wingman speech and verify leader listens over real WebRTC
+  await ghostWingman.evaluate('ghostPlayer.speak(1000, 1000)');
+  await until(() => ghostLeader.evaluate('ghostHost.audioInEnergy > 0.015 || ghostHost.hearingVoice'), 'ghost leader hears ghost wingman voice', 15000);
+
+  // Leader acknowledges over radio and wingman hears
+  await until(() => ghostWingman.evaluate('ghostPlayer.audioInEnergy > 0.015 || ghostPlayer.hearingVoice'), 'ghost wingman hears leader response', 15000);
+
+  await ghostWingman.evaluate('ghostPlayer.stop()');
+  await ghostLeader.evaluate('ghostHost.stop()');
+  console.log('PASS ghost pair: ghost host + ghost guest automated flight with bidirectional voice speaking and listening.');
   const host = await page(), guest = await page();
   const room = await host.evaluate('fixture.create()');
   await until(() => host.evaluate('fixture.status().registered'), 'host registered');

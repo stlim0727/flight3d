@@ -72,6 +72,8 @@ try {
   }
   const version = JSON.parse(execFileSync(command, [...commandArgs, '--version'], { cwd: directory, encoding: 'utf8', env: { ...process.env, NODE_PATH: '' } }));
   assert.equal(version.protocolVersion, 2); assert.equal(version.flightRevision, 1);
+  const guestCheck = JSON.parse(execFileSync(command, [...commandArgs, '--check', '--join', 'K7M2QX', '--voice'], { cwd: directory, encoding: 'utf8', env: { ...process.env, NODE_PATH: '' } }));
+  assert.equal(guestCheck.role, 'guest'); assert.ok(guestCheck.chrome);
   signal = spawn(process.execPath, ['--input-type=module', '-e', `import {PeerServer} from 'peer'; PeerServer({host:'127.0.0.1',port:${signalPort},path:'/flight3d',allow_discovery:false});`], { stdio: ['ignore', 'ignore', 'pipe'] });
   await until(async () => { try { return (await fetch(`http://127.0.0.1:${signalPort}/flight3d`)).ok; } catch { return false; } }, 'local signaling');
   vite = await createServer({ configFile: false, server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' }); await vite.listen();
