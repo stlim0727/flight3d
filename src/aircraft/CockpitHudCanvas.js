@@ -756,9 +756,6 @@ export function createB737HudCombiner(hudCanvas) {
     depthWrite: false,
     side: THREE.FrontSide,
     toneMapped: false,
-    polygonOffset: true,
-    polygonOffsetFactor: -1,
-    polygonOffsetUnits: -1,
   });
   const glassMesh = new THREE.Mesh(glassGeo, glassMat);
   glassMesh.name = 'B737_HGS_Glass';

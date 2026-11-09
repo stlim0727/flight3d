@@ -142,7 +142,7 @@ export const BOEING_737_800 = {
   // 5. Cockpit Camera & Instrument Layout
   cockpit: {
     hasPhotoCockpit: true,
-    captainEyePos: { x: -0.30, y: 0.85, z: -12.35 },
+    captainEyePos: { x: -0.31, y: 0.85, z: -12.35 },
     defaultLookPitchRad: -0.25,
     defaultFov: 68.0,
     exteriorFov: 55.0,
