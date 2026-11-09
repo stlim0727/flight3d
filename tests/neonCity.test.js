@@ -93,3 +93,26 @@ test('Neon scenario registry and approach deviation resolve properly in all loca
   }
   setLanguage('en');
 });
+
+test('Every NeonCity facade glows, monoliths in a warm amber distinct from cyan and magenta (#624)', () => {
+  const city = new NeonCity();
+  const glow = {};
+  for (const facade of ['ribbon', 'fin', 'monolith']) {
+    const mesh = city.group.getObjectByName(`neon-facade-${facade}`);
+    assert.ok(mesh, `${facade} facade mesh must exist`);
+    const { emissiveMap, emissiveIntensity } = mesh.material;
+    assert.ok(emissiveMap && emissiveIntensity > 0, `${facade} facade must be lit`);
+    // Brightest emissive texel of the facade
+    const data = emissiveMap.image.data;
+    let best = [0, 0, 0];
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] + data[i + 1] + data[i + 2] > best[0] + best[1] + best[2]) best = [data[i], data[i + 1], data[i + 2]];
+    }
+    assert.ok(best[0] + best[1] + best[2] > 0, `${facade} emissive map must contain light`);
+    glow[facade] = best;
+  }
+  const [r, g, b] = glow.monolith;
+  assert.ok(r > g && g > b, `Monolith glow must be amber, got ${glow.monolith}`);
+  // Cyan ribbons and magenta fins are blue-dominant; amber is not
+  assert.ok(glow.ribbon[2] > glow.ribbon[0] && glow.fin[2] > glow.fin[1]);
+});
