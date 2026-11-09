@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import en from '../src/i18n/en.js';
 import ko from '../src/i18n/ko.js';
-import { SAVE_REPLAY_STATUS } from '../src/ui/DebriefOverlay.js';
+import { SAVE_REPLAY_STATUS, DEBRIEF_ACTIONS } from '../src/ui/DebriefOverlay.js';
 import enDebrief from '../src/i18n/locales/en/debrief.js';
 import koDebrief from '../src/i18n/locales/ko/debrief.js';
 
@@ -150,4 +150,14 @@ test('header outcome pill shows a short single-line label instead of a sentence 
   assert.match(pillRule[1], /text-overflow:\s*ellipsis/, 'pill must clip instead of growing vertically');
   assert.match(css, /@media \(max-width: 420px\) \{\s*\.debrief-fold-btn \.fold-caption \{ display: none; \}/,
     'phone headers drop the fold caption so "Flight3d" does not overlap the utility buttons');
+});
+
+test('every debrief action names a button that exists in the overlay markup', () => {
+  const source = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
+  const actions = Object.entries(DEBRIEF_ACTIONS);
+  assert.ok(actions.length >= 9);
+  for (const [id, action] of actions) {
+    assert.match(source, new RegExp(`id="debrief-${id}"`), `${action} must be bound to #debrief-${id}`);
+    assert.match(action, /^[a-z_]+$/, 'action values are snake_case event properties');
+  }
 });

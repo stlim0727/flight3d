@@ -72,13 +72,15 @@ export class ReplayPanel {
         if (file.size > 250_000) throw new Error('oversized');
         const { entry } = sim.replayStore.importJson(await file.text());
         this.status(entry ? 'replay.imported' : 'replay.importFailed');
+        this.track('import', Boolean(entry));
         this.renderList();
-      } catch { this.status('replay.importFailed'); }
+      } catch { this.status('replay.importFailed'); this.track('import', false); }
       e.target.value = '';
     });
   }
 
   status(key) { bindText(this.library.querySelector('[data-status]'), () => key ? t(key) : ''); }
+  track(action, ok) { this.sim.analytics?.trackReplayLibraryAction?.({ action, ok }); }
 
   openLibrary() {
     if (this.sim.multiplayer?.active || this.sim.startingFlight) return;
@@ -127,12 +129,15 @@ export class ReplayPanel {
             button.disabled = false;
           } else if (action === 'export') {
             const json = this.sim.replayStore.exportJson(entry.id);
+            this.track('export', Boolean(json));
             if (!json) { this.status('replay.loadFailed'); return; }
             const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
             const link = document.createElement('a'); link.href = url; link.download = `flight3d-replay-${entry.id}.json`; link.click();
             setTimeout(() => URL.revokeObjectURL(url), 1000);
           } else {
-            if (!this.sim.replayStore.remove(entry.id)) this.status('replay.saveFailed');
+            const removed = this.sim.replayStore.remove(entry.id);
+            this.track('delete', removed);
+            if (!removed) this.status('replay.saveFailed');
             this.renderList(); this.library.querySelector('[data-close]').focus();
           }
         });
@@ -152,6 +157,14 @@ export class ReplayPanel {
   }
 
   async watch(track, entryId = null) {
+    const ok = await this.load(track, entryId);
+    // A library entry has an id; the debrief plays the sortie that just ended.
+    this.sim.analytics?.trackReplayWatched?.({ source: entryId ? 'library' : 'debrief', ok,
+      metadata: track?.metadata, durationSeconds: track?.durationSec });
+    return ok;
+  }
+
+  async load(track, entryId) {
     try {
       this.setFolded(false);
       if (!await this.sim.replayDirector.load(track, { entryId })) return false;
