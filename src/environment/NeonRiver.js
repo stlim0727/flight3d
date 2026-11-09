@@ -4,7 +4,7 @@ import { NEON_ISLAND, NEON_RIVER, islandRows, islandShore, landOutline, riverCen
 import { createBridge, createBridgeMaterials } from './neonBridges.js';
 
 // Half the side of the square of sea, centred on the city.
-const EXTENT = 12000;
+export const EXTENT = 12000;
 const STEP = 100;
 const SEA_ROWS = Array.from({ length: 2 * EXTENT / STEP + 1 }, (_, i) => EXTENT - i * STEP);
 

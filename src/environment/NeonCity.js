@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { NEON_RIVER, bridgeWorldBoxes, isLand, riverCenter, riverGroundHeight } from '../config/neonRiver.js';
 import { isStreet, neonStreets } from '../config/neonRoads.js';
-import { createNeonRiver } from './NeonRiver.js';
+import { EXTENT as SEA_EXTENT, createNeonRiver } from './NeonRiver.js';
 import { createNeonRoads } from './NeonRoads.js';
 
 /**
@@ -844,18 +844,25 @@ export class NeonCity {
   }
 
   initRetroSun() {
+    // Beyond the sea's edge (and inside the 14 km sky dome), so the horizon itself hides the
+    // moon's lower part at any altitude (#631). Nearer, the sea behind the moon rose above the
+    // line where the near water cut it, and it looked sunk in the water. Radius and height
+    // scale with distance to keep the 17.7° billboard centred 5° above the horizon, as it was at 7.4 km.
+    const distance = SEA_EXTENT + 1000;
+    const scale = distance / 7400;
     const moonTexture = createStylizedMoonTexture();
-    const moonGeo = new THREE.CircleGeometry(1150, 64);
+    const moonGeo = new THREE.CircleGeometry(1150 * scale, 64);
     const moonMat = new THREE.MeshBasicMaterial({
       map: moonTexture,
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
+      fog: false, // Night fog would wash the disc out at 13 km.
     });
 
     const moonMesh = new THREE.Mesh(moonGeo, moonMat);
     moonMesh.name = 'retro-synthwave-sun';
-    moonMesh.position.set(7400, 650, 0);
+    moonMesh.position.set(distance, 650 * scale, 0);
     moonMesh.rotation.y = -Math.PI / 2;
     this.group.add(moonMesh);
   }

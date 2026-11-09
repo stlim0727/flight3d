@@ -28,7 +28,8 @@ test('NeonCity initializes ground, runway, retro sun, and skyscraper clusters', 
   // Verify retro sun exists in group
   const sun = city.group.getObjectByName('retro-synthwave-sun');
   assert.ok(sun, 'Retro synthwave sun must be present in group');
-  assert.ok(sun.position.x > 5000, 'Sun should be placed on horizon in distance');
+  assert.ok(sun.position.x > 12000, 'Moon sits beyond the sea edge, so the horizon (not nearer water) hides its base');
+  assert.ok(sun.position.x < 14000, 'Moon stays inside the sky dome');
 });
 
 test('NeonCity skyscrapers are large/tall with a central canyon wide enough for Cessna', () => {
