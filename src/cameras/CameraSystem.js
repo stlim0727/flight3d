@@ -67,7 +67,7 @@ export class CameraSystem {
     this.photoCockpit = false; // Default to high-fidelity 3D Virtual Cockpit with GLTF asset
     this.supportsPhotoCockpit = true; // Enabled for Boeing 737; disabled for 3D-only cockpits (e.g. C172)
     this.cockpitPortraitEyeX = -0.34;
-    this.cockpitHeadOffset = new THREE.Vector3(-0.39, 0.85, -12.35); // Captain eye
+    this.cockpitHeadOffset = new THREE.Vector3(-0.31, 0.85, -12.35); // Captain eye centered behind yoke
     this.headGForceOffset = new THREE.Vector3();
     this.touchJoltOffset = 0;
     this.lookYaw = 0;
