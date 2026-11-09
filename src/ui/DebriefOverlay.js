@@ -1,6 +1,6 @@
 import { bindText, t, translateDOM } from '../i18n/index.js';
 import { flightDuration } from '../core/FlightRecorder.js';
-import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
+import { AIRCRAFT_REGISTRY, getAircraftSpecs, classifyLanding } from '../config/aircraftConfigs.js';
 import { scenarioLabelKey } from '../config/scenarioRegistry.js';
 
 const airportKeys = { coastal: 'coastal.airport', incheon: 'incheon.airport', lukla: 'lukla.vnlk',
@@ -18,15 +18,24 @@ const crashTarget = crash => {
 
 export function reportText(report) {
   const m = report.metadata;
+  const specs = getAircraftSpecs(m?.aircraft);
+  const rawPeakG = report.peaks.gForce?.gForce;
+  const peakG = Number.isFinite(rawPeakG)
+    ? Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(specs.ultimateLoad?.min ?? -1.5, rawPeakG))
+    : rawPeakG;
+  const touchdown = report.touchdowns.at(-1);
+  const contactG = touchdown && Number.isFinite(touchdown.contactG)
+    ? Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(0, touchdown.contactG))
+    : touchdown?.contactG;
   return [`Flight3d / ${t(airportKeys[m.airport] ?? 'coastal.airport')}`,
     `${AIRCRAFT_REGISTRY[m.aircraft]?.name ?? m.aircraft} · ${t(scenarioLabelKey(m.airport, m.scenario) ?? 'lobby.spawn')}`,
     `${t('debrief.duration')} ${flightDuration(report.durationSec)}`,
     `${t('debrief.altitude')} ${number(report.peaks.altitudeFt?.altitudeFt)} FT · ${t('debrief.speed')} ${number(report.peaks.iasKnots?.iasKnots)} KT`,
-    `${t('debrief.g')} ${g(report.peaks.gForce?.gForce)} G`,
+    `${t('debrief.g')} ${g(peakG)} G`,
     `${t('debrief.reason')}: ${t(`debrief.reason.${report.reason}`)}`,
     ...(report.crash ? [`${t('debrief.impact')}: ${crashName(report.crash)} · ${number(report.crash.speedKnots)} KT · ${flightDuration(report.crash.timeSec)}`] : []),
     ...(report.crash && crashTarget(report.crash) ? [`${t('debrief.impactTarget')}: ${crashTarget(report.crash)}`] : []),
-    report.touchdowns.length ? `${t('debrief.sink')} ${number(report.touchdowns.at(-1).sinkRateFpm)} FPM · ${t('debrief.contactG')} ${g(report.touchdowns.at(-1).contactG)} G` : t('debrief.noTouchdown'),
+    report.touchdowns.length ? `${t('debrief.sink')} ${number(touchdown.sinkRateFpm)} FPM · ${t('debrief.contactG')} ${g(contactG)} G` : t('debrief.noTouchdown'),
   ].join('\n');
 }
 
@@ -313,13 +322,22 @@ export class DebriefOverlay {
     bindText(this.el('identity'), () => enough
       ? `${AIRCRAFT_REGISTRY[report.metadata.aircraft]?.name ?? report.metadata.aircraft} · ${t(airportKeys[report.metadata.airport] ?? 'coastal.airport')}\n${t(scenarioLabelKey(report.metadata.airport, report.metadata.scenario) ?? 'lobby.spawn')} · ${t(`debrief.reason.${report.reason}`)}`
       : t('debrief.emptyHint'));
+    const specs = getAircraftSpecs(report.metadata?.aircraft);
     this.el('stat-duration').textContent = flightDuration(report.durationSec);
     this.el('stat-altitude').textContent = `${number(report.peaks.altitudeFt?.altitudeFt)} FT`;
     this.el('stat-speed').textContent = `${number(report.peaks.iasKnots?.iasKnots)} KT`;
-    this.el('stat-g').textContent = `${g(report.peaks.gForce?.gForce)} G`;
+    const rawPeakG = report.peaks.gForce?.gForce;
+    const clampedPeakG = Number.isFinite(rawPeakG)
+      ? Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(specs.ultimateLoad?.min ?? -1.5, rawPeakG))
+      : rawPeakG;
+    this.el('stat-g').textContent = `${g(clampedPeakG)} G`;
     for (const key of ['altitude', 'speed', 'g']) this.root.querySelector(`[data-stat="${key}"]`).hidden = !enough;
     this.root.querySelector('[data-stat="empty-touchdown"]').hidden = enough;
     const touchdown = report.touchdowns.at(-1);
+    const clampedContactG = touchdown && Number.isFinite(touchdown.contactG)
+      ? Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(0, touchdown.contactG))
+      : touchdown?.contactG;
+    const landingEval = touchdown ? classifyLanding(report.metadata?.aircraft, clampedContactG, touchdown.sinkRateFpm) : null;
     const sinkCard = this.el('stat-sink-card');
     const sinkVal = this.el('stat-sink');
     if (sinkCard && sinkVal) {
@@ -332,8 +350,14 @@ export class DebriefOverlay {
     }
     // After a crash the collision replaces the touchdown block unless a touchdown actually happened.
     this.el('touchdown').hidden = !enough || Boolean(crash && !touchdown);
-    bindText(this.el('contact'), () => `${t('debrief.sink')} ${number(touchdown?.sinkRateFpm)} FPM · ${t('debrief.contactG')} ${g(touchdown?.contactG)} G`);
-    bindText(this.el('contact-note'), () => t(touchdown ? 'debrief.contactNote' : 'debrief.noTouchdown'));
+    bindText(this.el('contact'), () => `${t('debrief.sink')} ${number(touchdown?.sinkRateFpm)} FPM · ${t('debrief.contactG')} ${g(clampedContactG)} G`);
+    bindText(this.el('contact-note'), () => {
+      if (!touchdown) return t('debrief.noTouchdown');
+      if (landingEval?.labelKey) {
+        return `${t(landingEval.labelKey)} · ${t('debrief.contactNote')}`;
+      }
+      return t('debrief.contactNote');
+    });
     this.el('insufficient').hidden = enough;
     this.el('view-record').hidden = !enough;
     for (const id of ['copy', 'export', 'native-share']) {

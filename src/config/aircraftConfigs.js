@@ -446,3 +446,163 @@ export const AIRCRAFT_REGISTRY = {
 };
 
 export const DEFAULT_AIRCRAFT_ID = 'B738';
+
+/**
+ * Aircraft Structural Specifications, G-Force limits and Touchdown Ratings.
+ * Defines limit load, ultimate load (1.5x limit), oleo strut characteristics,
+ * and dynamic touchdown evaluation thresholds per aircraft category.
+ */
+export const AIRCRAFT_SPECS = Object.freeze({
+  B738: Object.freeze({
+    id: 'B738',
+    name: 'Boeing 737-800',
+    type: 'airliner',
+    // Structural flight limits: Flaps UP: -1.0G ~ +2.5G, Flaps DOWN: 0.0G ~ +2.0G
+    limitLoad: Object.freeze({ min: -1.0, max: 2.5, flapsDownMin: 0.0, flapsDownMax: 2.0 }),
+    // Ultimate load (1.5x limit factor)
+    ultimateLoad: Object.freeze({ min: -1.5, max: 3.75, flapsDownMin: 0.0, flapsDownMax: 3.0 }),
+    oleoStrokeM: 0.40, // 35-45 cm cushion travel
+    hardLandingGThreshold: 1.55,
+    crashGThreshold: 2.10,
+    landingRatings: Object.freeze([
+      { id: 'butter', maxG: 1.25, maxSinkFpm: 150, labelKey: 'debrief.rating.butter' },
+      { id: 'normal', maxG: 1.55, maxSinkFpm: 300, labelKey: 'debrief.rating.normal' },
+      { id: 'firm', maxG: 1.80, maxSinkFpm: 500, labelKey: 'debrief.rating.firm' },
+      { id: 'severeHard', maxG: 2.10, maxSinkFpm: 600, labelKey: 'debrief.rating.severeHard' },
+      { id: 'crash', minG: 2.10, minSinkFpm: 600, labelKey: 'debrief.rating.damage' }
+    ])
+  }),
+  F16: Object.freeze({
+    id: 'F16',
+    name: 'F-16 Fighting Falcon',
+    type: 'fighter',
+    // Structural flight limits: -3.0G ~ +9.0G (FBW G-limiter)
+    limitLoad: Object.freeze({ min: -3.0, max: 9.0 }),
+    // Ultimate load (1.5x limit factor)
+    ultimateLoad: Object.freeze({ min: -4.5, max: 13.5 }),
+    oleoStrokeM: 0.30,
+    hardLandingGThreshold: 2.20,
+    crashGThreshold: 3.50,
+    landingRatings: Object.freeze([
+      { id: 'soft', maxG: 1.50, maxSinkFpm: 300, labelKey: 'debrief.rating.soft' },
+      { id: 'normal', maxG: 2.20, maxSinkFpm: 600, labelKey: 'debrief.rating.normalMilitary' },
+      { id: 'firm', maxG: 3.00, maxSinkFpm: 900, labelKey: 'debrief.rating.firm' },
+      { id: 'severeHard', maxG: 3.50, maxSinkFpm: 1200, labelKey: 'debrief.rating.severeHard' },
+      { id: 'crash', minG: 3.50, minSinkFpm: 1200, labelKey: 'debrief.rating.damage' }
+    ])
+  }),
+  C172: Object.freeze({
+    id: 'C172',
+    name: 'Cessna 172 Skyhawk',
+    type: 'generalAviation',
+    // Structural flight limits: Normal: -1.52G ~ +3.8G, Utility: +4.4G
+    limitLoad: Object.freeze({ min: -1.52, max: 3.8, utilityMax: 4.4 }),
+    // Ultimate load (1.5x limit factor)
+    ultimateLoad: Object.freeze({ min: -2.28, max: 5.7, utilityMax: 6.6 }),
+    oleoStrokeM: 0.15, // Spring-steel leaf gear
+    hardLandingGThreshold: 1.70,
+    crashGThreshold: 2.50,
+    landingRatings: Object.freeze([
+      { id: 'smooth', maxG: 1.30, maxSinkFpm: 200, labelKey: 'debrief.rating.smooth' },
+      { id: 'normal', maxG: 1.70, maxSinkFpm: 400, labelKey: 'debrief.rating.normal' },
+      { id: 'firm', maxG: 2.20, maxSinkFpm: 600, labelKey: 'debrief.rating.firmBouncing' },
+      { id: 'severeHard', maxG: 2.50, maxSinkFpm: 800, labelKey: 'debrief.rating.severeHard' },
+      { id: 'crash', minG: 2.50, minSinkFpm: 800, labelKey: 'debrief.rating.damage' }
+    ])
+  })
+});
+
+export const AircraftSpecs = AIRCRAFT_SPECS;
+
+// Attach specs directly to aircraft configuration objects
+BOEING_737_800.specs = AIRCRAFT_SPECS.B738;
+BOEING_737_800.hardLandingGThreshold = AIRCRAFT_SPECS.B738.hardLandingGThreshold;
+BOEING_737_800.crashGThreshold = AIRCRAFT_SPECS.B738.crashGThreshold;
+
+F16_FALCON.specs = AIRCRAFT_SPECS.F16;
+F16_FALCON.hardLandingGThreshold = AIRCRAFT_SPECS.F16.hardLandingGThreshold;
+F16_FALCON.crashGThreshold = AIRCRAFT_SPECS.F16.crashGThreshold;
+
+CESSNA_172.specs = AIRCRAFT_SPECS.C172;
+CESSNA_172.hardLandingGThreshold = AIRCRAFT_SPECS.C172.hardLandingGThreshold;
+CESSNA_172.crashGThreshold = AIRCRAFT_SPECS.C172.crashGThreshold;
+
+/**
+ * Returns aircraft structural specifications or the default B738 spec.
+ * @param {string} aircraftId
+ * @returns {typeof AIRCRAFT_SPECS['B738']}
+ */
+export function getAircraftSpecs(aircraftId) {
+  return AIRCRAFT_SPECS[aircraftId] || AIRCRAFT_SPECS.B738;
+}
+
+/**
+ * Evaluates touchdown performance against the aircraft's specific operational limits.
+ * @param {string} aircraftId
+ * @param {number} contactG
+ * @param {number} [sinkRateFpm=0]
+ * @returns {{ rating: string, labelKey: string, isHard: boolean, isCrash: boolean }}
+ */
+export function classifyLanding(aircraftId, contactG, sinkRateFpm = 0) {
+  const specs = getAircraftSpecs(aircraftId);
+  const gVal = Number.isFinite(contactG) ? contactG : 1.0;
+  const fpm = Number.isFinite(sinkRateFpm) ? sinkRateFpm : 0;
+
+  if (aircraftId === 'B738') {
+    if (gVal > specs.crashGThreshold || fpm > 600) {
+      return { rating: 'crash', labelKey: 'debrief.rating.damage', isHard: true, isCrash: true };
+    }
+    if (gVal > 1.80 || fpm > 500) {
+      return { rating: 'severeHard', labelKey: 'debrief.rating.severeHard', isHard: true, isCrash: false };
+    }
+    if (gVal > specs.hardLandingGThreshold || fpm > 300) {
+      return { rating: 'firm', labelKey: 'debrief.rating.firm', isHard: true, isCrash: false };
+    }
+    if (gVal > 1.25 || fpm >= 150) {
+      return { rating: 'normal', labelKey: 'debrief.rating.normal', isHard: false, isCrash: false };
+    }
+    return { rating: 'butter', labelKey: 'debrief.rating.butter', isHard: false, isCrash: false };
+  }
+
+  if (aircraftId === 'F16') {
+    if (gVal > specs.crashGThreshold) {
+      return { rating: 'crash', labelKey: 'debrief.rating.damage', isHard: true, isCrash: true };
+    }
+    if (gVal > 3.00) {
+      return { rating: 'severeHard', labelKey: 'debrief.rating.severeHard', isHard: true, isCrash: false };
+    }
+    if (gVal > specs.hardLandingGThreshold) {
+      return { rating: 'firm', labelKey: 'debrief.rating.firm', isHard: true, isCrash: false };
+    }
+    if (gVal > 1.50) {
+      return { rating: 'normal', labelKey: 'debrief.rating.normalMilitary', isHard: false, isCrash: false };
+    }
+    return { rating: 'soft', labelKey: 'debrief.rating.soft', isHard: false, isCrash: false };
+  }
+
+  if (aircraftId === 'C172') {
+    if (gVal > specs.crashGThreshold) {
+      return { rating: 'crash', labelKey: 'debrief.rating.damage', isHard: true, isCrash: true };
+    }
+    if (gVal > 2.20) {
+      return { rating: 'severeHard', labelKey: 'debrief.rating.severeHard', isHard: true, isCrash: false };
+    }
+    if (gVal > specs.hardLandingGThreshold) {
+      return { rating: 'firm', labelKey: 'debrief.rating.firmBouncing', isHard: true, isCrash: false };
+    }
+    if (gVal > 1.30) {
+      return { rating: 'normal', labelKey: 'debrief.rating.normal', isHard: false, isCrash: false };
+    }
+    return { rating: 'smooth', labelKey: 'debrief.rating.smooth', isHard: false, isCrash: false };
+  }
+
+  // Fallback generic
+  const isCrash = gVal > specs.crashGThreshold;
+  const isHard = gVal > specs.hardLandingGThreshold;
+  return {
+    rating: isCrash ? 'crash' : isHard ? 'firm' : 'normal',
+    labelKey: isCrash ? 'debrief.rating.damage' : isHard ? 'debrief.rating.firm' : 'debrief.rating.normal',
+    isHard,
+    isCrash
+  };
+}
