@@ -3,7 +3,7 @@
  *
  * Implements:
  * 1. Pilot vertical load factor (G_z) and cerebral perfusion / consciousness buffer (1.0 to 0.0).
- * 2. Positive G ischemic drain (> +5.5 G) and negative G congestion drain (< -1.5 G).
+ * 2. Positive G ischemic drain (> +5.5 G) and negative G congestion drain (< -1.8 G).
  * 3. G-LOC (Loss of Consciousness) state machine with mandatory lockout and stupor phase.
  * 4. Control responsiveness degradation:
  *    - 1st-order low-pass filtering with increased time constant (1.5x on pitch axis).
@@ -59,13 +59,13 @@ export class PilotPhysiology {
       const excessG = this.gZ - 5.5;
       const drainRate = excessG / (3.5 * 2.5); // e.g. at +9.0G drains in ~2.5s, at +7.0G drains in ~5.8s
       this.consciousness = Math.max(0.0, this.consciousness - drainRate * dt);
-    } else if (this.gZ < -1.5) {
+    } else if (this.gZ < -1.8) {
       // Negative G congestion / redout (blood forced into head)
-      const excessG = -1.5 - this.gZ;
-      const drainRate = excessG / (2.0 * 1.5); // e.g. at -3.5G drains in ~1.5s
+      const excessG = -1.8 - this.gZ;
+      const drainRate = excessG / (1.7 * 1.5); // e.g. at -3.5G drains in ~1.5s
       this.consciousness = Math.max(0.0, this.consciousness - drainRate * dt);
     } else {
-      // Safe G buffer (-1.5 G <= gZ <= +5.5 G) -> recover consciousness towards 1.0
+      // Safe G buffer (-1.8 G <= gZ <= +5.5 G) -> recover consciousness towards 1.0
       if (!this.isGLOC) {
         const recoveryTimeConstant = 1.5; // Fast recovery when unloading G (1.5s)
         const recoveryRate = 1.0 / recoveryTimeConstant;
@@ -88,7 +88,7 @@ export class PilotPhysiology {
       this.consciousness = 0.0;
       this.glocTimer -= dt;
       // Waking criteria: mandatory timer elapsed and G-load within safe limits
-      if (this.glocTimer <= 0.0 && this.gZ >= -1.5 && this.gZ <= 5.5) {
+      if (this.glocTimer <= 0.0 && this.gZ >= -1.8 && this.gZ <= 5.5) {
         this.isGLOC = false;
         this.stuporTimer = 1.5; // 1.5s stupor phase upon regaining consciousness
       }
@@ -176,8 +176,8 @@ export class PilotPhysiology {
   }
 
   get redout() {
-    if (this.gZ >= -1.0) return 0.0;
-    const gFactor = clamp((-this.gZ - 1.0) / 2.5, 0.0, 1.0);
+    if (this.gZ >= -1.8) return 0.0;
+    const gFactor = clamp((-this.gZ - 1.8) / 1.5, 0.0, 1.0);
     const cFactor = (1.0 - this.consciousness) * 0.6;
     return clamp(gFactor + cFactor, 0.0, 1.0);
   }

@@ -54,6 +54,11 @@ test('negative G creates redout and blur', () => {
   // Exterior view has 25% redout intensity
   fx.update('orbit', { consciousness: 0.9, gZ: -2.5, isGLOC: false });
   assert.ok(fx.redoutAlpha <= 0.25, 'Exterior redout should be scaled to 25%');
+
+  // Mild negative G: -1.5 G should not produce redout
+  fx.update('cockpit', { consciousness: 1.0, gZ: -1.5, isGLOC: false });
+  assert.equal(fx.redoutAlpha, 0.0, 'Mild -1.5 G must not produce visual redout');
+  assert.equal(fx.blurPx, 0.0, 'Mild -1.5 G must not produce blur');
 });
 
 test('reset clears all effect alphas', () => {

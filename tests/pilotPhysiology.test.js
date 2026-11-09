@@ -62,6 +62,21 @@ test('negative G causes redout, peripheral blur and consciousness drain', () => 
   assert.ok(pilot.consciousness < 1.0, 'Consciousness should drain under negative G');
 });
 
+test('mild negative G (-1.0G to -1.5G) does not trigger redout or drain consciousness', () => {
+  const pilot = new PilotPhysiology();
+  const dt = 1 / 120;
+
+  pilot.update(dt, -1.2, { elevator: -0.2, aileron: 0, rudder: 0 });
+  assert.equal(pilot.redout, 0.0);
+  assert.equal(pilot.blur, 0.0);
+  assert.equal(pilot.consciousness, 1.0);
+
+  pilot.update(dt, -1.5, { elevator: -0.3, aileron: 0, rudder: 0 });
+  assert.equal(pilot.redout, 0.0);
+  assert.equal(pilot.blur, 0.0);
+  assert.equal(pilot.consciousness, 1.0);
+});
+
 test('control sluggishness increases with pitch axis 1.5x larger than roll', () => {
   const pilotNormal = new PilotPhysiology();
   const pilotFatigued = new PilotPhysiology();
