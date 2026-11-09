@@ -694,9 +694,9 @@ export function createB737HudCombiner(hudCanvas) {
     side: THREE.DoubleSide,
   });
 
-  // Captain line-of-sight mount X framed in the center of Captain forward windshield 1L
-  const mountX = -0.270;
-  const mountY = 0.840;
+  // Captain line-of-sight mount X aligned directly with the Captain eye, yoke, and seat center
+  const mountX = -0.303;
+  const mountY = 0.820;
   const mountZ = -12.740;
 
   // Overhead projector housing & hinge bracket attached to the Captain ceiling mount
