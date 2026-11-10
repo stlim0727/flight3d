@@ -82,15 +82,20 @@ export class ReplayPanel {
   status(key) { bindText(this.library.querySelector('[data-status]'), () => key ? t(key) : ''); }
   track(action, ok) { this.sim.analytics?.trackReplayLibraryAction?.({ action, ok }); }
 
+  // A multiplayer room owns the local aircraft pose, so only playback waits for leaving it;
+  // the library itself stays reachable for rename, export, delete and import (#642).
+  watchBlocked() { return Boolean(this.sim.multiplayer?.active); }
+
   openLibrary() {
-    if (this.sim.multiplayer?.active || this.sim.startingFlight) return;
+    if (this.sim.startingFlight) return;
     this.previousFocus = document.activeElement;
-    this.status(null); this.renderList();
+    this.status(this.watchBlocked() ? 'replay.multiplayerBlocked' : null); this.renderList();
     this.library.hidden = false;
     this.library.querySelector('[data-close]').focus();
   }
 
   closeLibrary() {
+    if (this.library.hidden) return;
     this.library.hidden = true;
     this.previousFocus?.focus();
   }
@@ -117,6 +122,7 @@ export class ReplayPanel {
       for (const action of ['watch', 'export', 'delete']) {
         const button = document.createElement('button'); button.className = 'btn'; button.dataset.action = action;
         bindText(button, () => t(`replay.${action}`));
+        if (action === 'watch') button.disabled = this.watchBlocked();
         button.addEventListener('click', async () => {
           if (action === 'watch') {
             const saved = this.sim.replayStore.get(entry.id);

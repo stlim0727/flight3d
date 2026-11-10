@@ -22,6 +22,7 @@ export default {
   'replay.export': "내보내기",
   'replay.delete': "삭제",
   'replay.loadFailed': "리플레이를 불러올 수 없습니다",
+  'replay.multiplayerBlocked': "멀티플레이 방에 있는 동안에는 다시 보기를 재생할 수 없습니다. 방을 나간 뒤 재생하세요.",
   'replay.play': "재생",
   'replay.pause': "일시 정지",
 };

@@ -247,6 +247,8 @@ export class MultiplayerController {
   }
   async prepare(config, slot) {
     const room = this.room;
+    // The saved-replay library stays open in a room; a round start must not fly under it.
+    this.sim.replayPanel?.closeLibrary();
     this.openDialog();
     this.preparing = true; this.preparationHold = true; this.slot = slot;
     this.remoteCrashed = false;
