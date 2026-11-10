@@ -13,7 +13,7 @@ const PLANFORMS = {
 };
 
 /**
- * Pure appearance model for the ground contact cue: contrast and spread fall
+ * Pure appearance model for the ultraLow ground cue: contrast and spread fall
  * off with height above ground so the blob reads as an altitude gauge.
  */
 export function contactShadowAppearance(heightAboveGroundM) {
@@ -96,8 +96,9 @@ const scratchForward = new THREE.Vector3();
 const scratchRight = new THREE.Vector3();
 
 /**
- * Aircraft-shaped ground contact cue: the planform silhouette pinned to the terrain
- * under the airframe, yawed with heading and foreshortened in bank. One textured
+ * Aircraft-shaped ground cue for the ultraLow tier, which ships without
+ * shadow maps: the planform silhouette pinned to the terrain under the
+ * airframe, yawed with heading and foreshortened in bank. One textured
  * quad, no extra render pass.
  */
 export class GroundContactShadow {

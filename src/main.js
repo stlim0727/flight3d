@@ -221,9 +221,9 @@ class FlightSimulator {
     this.terrain = new Terrain(22000, initialPreset.terrainSegments ?? 256, { quality: initialPreset.terrain });
     this.scene.add(this.terrain.mesh);
 
-    // Height-over-ground cue across all quality tiers during takeoff, approach, and low-altitude flight.
+    // Height-over-ground cue for the ultraLow tier, which ships without shadow maps.
     this.contactShadow = new GroundContactShadow(this.scene);
-    this.contactShadow.setEnabled(true);
+    this.contactShadow.setEnabled(this.renderQuality === 'ultraLow');
 
     this.water = new WaterOcean(36000, initialPreset.waterSegments ?? 180, { quality: this.renderQuality });
     this.scene.add(this.water.mesh);
@@ -1262,7 +1262,7 @@ class FlightSimulator {
         this.aircraft.cockpit.group.visible = false;
       }
     }
-    this.contactShadow.setEnabled(!isCockpit);
+    this.contactShadow.setEnabled(!isCockpit && this.renderQuality === 'ultraLow');
     this.contactShadow.update(this.aircraft.group.position, this.aircraft.group.quaternion,
       this.currentTerrain.getHeight(this.aircraft.group.position.x, this.aircraft.group.position.z),
       this.currentAircraftId, this.aero.wingspan);
