@@ -1109,7 +1109,16 @@ export class CameraSystem {
     this.chaseTarget.copy(aircraftMesh.position);
     this.chaseTargetInitialized = true;
 
-    if (this.mode === CameraSystem.MODES.HUD) {
+    if (this.mode === CameraSystem.MODES.CHASE) {
+      const groundH = this.queryGroundHeight(this.chasePos.x, this.chasePos.z);
+      if (this.chasePos.y < groundH + 1.8) {
+        this.chasePos.y = groundH + 1.8;
+      }
+      this.camera.position.copy(this.chasePos);
+      const lookTarget = aircraftMesh.position.clone().add(new THREE.Vector3(0, 1.5, 0));
+      this.camera.up.set(0, 1, 0);
+      this.camera.lookAt(lookTarget);
+    } else if (this.mode === CameraSystem.MODES.HUD) {
       this.updateHudView(aircraftMesh);
     } else if (this.mode === CameraSystem.MODES.COCKPIT) {
       const eyeLocal = this.cockpitHeadOffset.clone();
@@ -1167,6 +1176,17 @@ export class CameraSystem {
       this.camera.lookAt(planePos.clone().add(new THREE.Vector3(0, 1.2, 0)));
       this.flybySet = true;
       this.flybyRegime = 'parked';
+    } else if (this.mode === CameraSystem.MODES.WING) {
+      const windowLocal = new THREE.Vector3(-1.82, 0.45, 2.2);
+      const eyeWorld = windowLocal.applyMatrix4(aircraftMesh.matrixWorld);
+      this.camera.position.copy(eyeWorld);
+      const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraftMesh.quaternion);
+      this.camera.up.copy(upWorld);
+      const lookLocal = new THREE.Vector3(-15.0, -1.2, -4.0);
+      lookLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.wingLookYaw);
+      lookLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.wingLookPitch);
+      const lookWorld = eyeWorld.clone().add(lookLocal.applyQuaternion(aircraftMesh.quaternion));
+      this.camera.lookAt(lookWorld);
     } else if (this.mode === CameraSystem.MODES.DIRECTOR) {
       this.cinematicDirector?.reset?.();
     } else {
