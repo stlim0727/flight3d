@@ -83,5 +83,18 @@ test('contact shadow tracks the displayed pose, banks, and stays hidden when dis
 
   blob.setEnabled(false);
   blob.update(position, heading, groundHeight, 'B738');
-  assert.equal(blob.mesh.visible, false, 'Disabling contact shadow hides the mesh');
+  assert.equal(blob.mesh.visible, false, 'Leaving ultraLow hands shading back to the shadow map');
+});
+
+test('contact shadow is only enabled for ultraLow quality tier in exterior views', () => {
+  // Ground contact shadow is an ultraLow height cue when shadow maps are disabled;
+  // on higher tiers, real directional shadow maps are active and contact shadow must stay off
+  // to avoid rendering dual shadows.
+  const isEnabled = (isCockpit, renderQuality) => !isCockpit && renderQuality === 'ultraLow';
+
+  assert.equal(isEnabled(false, 'ultraLow'), true, 'Exterior ultraLow enables contact shadow');
+  assert.equal(isEnabled(true, 'ultraLow'), false, 'Cockpit ultraLow disables contact shadow');
+  assert.equal(isEnabled(false, 'performance'), false, 'Performance tier uses directional shadow map');
+  assert.equal(isEnabled(false, 'balanced'), false, 'Balanced tier uses directional shadow map');
+  assert.equal(isEnabled(false, 'high'), false, 'High tier uses directional shadow map');
 });
