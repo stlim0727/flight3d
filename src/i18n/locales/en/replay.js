@@ -22,6 +22,7 @@ export default {
   'replay.export': "Export",
   'replay.delete': "Delete",
   'replay.loadFailed': "Could not load the replay",
+  'replay.multiplayerBlocked': "Replays can't play while you're in a multiplayer room. Leave the room to watch.",
   'replay.play': "Play",
   'replay.pause': "Pause",
 };
