@@ -4,7 +4,7 @@ import { HEARTBEAT_INTERVAL_MS, LocalRoomDirectoryStore } from './roomDirectory.
 export class RoomDirectoryClient {
   constructor({ directoryUrl, fetchFn = globalThis.fetch, localStore = null } = {}) {
     this.directoryUrl = typeof directoryUrl === 'string' ? directoryUrl.replace(/\/+$/, '') : null;
-    this.fetchFn = fetchFn;
+    this.fetchFn = typeof fetchFn === 'function' ? (url, init) => fetchFn(url, init) : fetchFn;
     this.localStore = localStore;
     if (this.directoryUrl === null && !this.localStore && typeof globalThis !== 'undefined' && typeof globalThis.localStorage !== 'undefined') {
       try {
@@ -32,7 +32,7 @@ export class RoomDirectoryClient {
     protocolMajor = PROTOCOL_VERSION,
     flightRevision = FLIGHT_REVISION,
     status,
-    timeoutMs = 5000,
+    timeoutMs = 10000,
   } = {}) {
     if (this.directoryUrl !== null) {
       const url = this._resolveUrl('/v1/rooms');
@@ -79,7 +79,7 @@ export class RoomDirectoryClient {
     status = 'waiting',
     protocolMajor = PROTOCOL_VERSION,
     flightRevision = FLIGHT_REVISION,
-    timeoutMs = 5000,
+    timeoutMs = 10000,
   }) {
     if (this.directoryUrl !== null) {
       const controller = new AbortController();

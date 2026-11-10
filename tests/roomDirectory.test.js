@@ -10,6 +10,28 @@ import {
 import { RoomDirectoryClient } from '../src/multiplayer/RoomDirectoryClient.js';
 import { PROTOCOL_VERSION, FLIGHT_REVISION } from '../src/multiplayer/compatibility.js';
 
+test('RoomDirectoryClient invokes fetchFn safely without illegal invocation when fetch expects specific this context', async () => {
+  function strictFetch() {
+    if (this instanceof RoomDirectoryClient) {
+      throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+    }
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({ rooms: [] }),
+    });
+  }
+
+  const client = new RoomDirectoryClient({
+    directoryUrl: 'https://directory.flight3d',
+    fetchFn: strictFetch,
+  });
+
+  const res = await client.fetchRooms();
+  assert.equal(res.ok, true);
+  assert.deepEqual(res.rooms, []);
+});
+
 test('validateRoomRegistration accepts valid input and rejects malformed values', () => {
   const valid = {
     roomCode: 'K7M2QX',
