@@ -9,10 +9,12 @@ import { bindMultiplayerPreferences } from './preferences.js';
 import { RoomDirectoryClient } from './RoomDirectoryClient.js';
 import { HEARTBEAT_INTERVAL_MS } from './roomDirectory.js';
 
+const PRODUCTION_DIRECTORY_URL = 'https://flight3d-room-directory.stlim0727.workers.dev';
+
 const DEFAULT_DIRECTORY_URL = typeof window !== 'undefined'
   ? (window.__FLIGHT3D_DIRECTORY_URL__
     || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MULTIPLAYER_DIRECTORY_URL)
-    || (typeof import.meta !== 'undefined' && import.meta.env?.DEV ? '' : null))
+    || (typeof import.meta !== 'undefined' && import.meta.env?.DEV ? '' : PRODUCTION_DIRECTORY_URL))
   : null;
 
 export class MultiplayerController {
