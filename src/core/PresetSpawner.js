@@ -19,6 +19,7 @@ import {
   isScenarioAvailable,
   requiredAircraft,
 } from '../config/scenarioRegistry.js';
+import { CameraSystem } from '../cameras/CameraSystem.js';
 import {
   saveSavedAirport,
   saveSavedScenario,
@@ -67,6 +68,16 @@ class PresetSpawnerMethods {
       this.demoDirector.stop();
     }
     if (!isDemoInternal && this.cameraSystem) {
+      if (this.cameraSystem.temporaryViewTimer > 0) {
+        this.cameraSystem.temporaryViewTimer = 0;
+        this.cameraSystem.savedMode = null;
+      }
+      if (!this.cameraSystem.userModeSelected && typeof this.cameraSystem.setMode === 'function') {
+        this.cameraSystem.setMode(CameraSystem.MODES.CHASE);
+      }
+      if (typeof this.cameraSystem.resetLook === 'function') {
+        this.cameraSystem.resetLook();
+      }
       this.cameraSystem.userLookOverridden = false;
     }
 

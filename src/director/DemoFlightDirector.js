@@ -458,6 +458,9 @@ export class DemoFlightDirector {
     if (typeof this.sim?.updateHUD === 'function') {
       this.sim.updateHUD();
     }
+    if (this.sim?.cameraSystem && !this.sim.cameraSystem.userModeSelected && !this.userCameraOverridden && typeof this.sim.cameraSystem.setMode === 'function') {
+      this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
+    }
     this.currentStage = DemoFlightDirector.STAGES.IDLE;
     this.isBannerMinimized = false;
 
