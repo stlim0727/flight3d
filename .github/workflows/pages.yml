@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: github-pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -42,7 +42,7 @@ jobs:
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY || 'phc_ussf2qgryzxghWApkvG2kcpXarbF4nNGTNEnwCBy8VKj' }}
           VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST || 'https://eu.i.posthog.com' }}
           VITE_MULTIPLAYER_DIRECTORY_URL: ${{ secrets.VITE_MULTIPLAYER_DIRECTORY_URL || vars.VITE_MULTIPLAYER_DIRECTORY_URL || 'https://flight3d-room-directory.stlim0727.workers.dev' }}
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist
 
@@ -59,4 +59,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
