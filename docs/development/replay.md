@@ -46,6 +46,26 @@ flight created for playback is removed from both recorders and never produces a
 new debrief. Playback exit restores the previous camera/sky settings and releases
 any generated terrain owned by replay.
 
+## Multiplayer room tracks (#646)
+
+`RoomReplayRecorder` extends the solo recorder for a multiplayer room. Every frame
+holds the local aircraft's 80-byte record plus a 23-byte pose-only record per remote
+pilot, taken at the same instant from the interpolated snapshot this client showed:
+position, compact quaternion, gear, flaps, visible/crashed/held/stale flags and a
+segment counter. Each client records what it saw, so a room track does not depend on
+the other pilot staying connected. Remote aircraft carry no instruments.
+
+A segment changes whenever an aircraft respawns or the room restarts (the caller's
+local key, or a remote snapshot's round/epoch). `sampleTrack()` and `sampleRemote()`
+hold the earlier pose until the next segment's first sample and never blend toward an
+unseen remote sample. The pilot list is stored as `metadata.remotes`, so the decoder
+knows the frame width; codec v3 is written only for tracks with remote pilots, while
+solo tracks stay v2 for older builds. A room that outlasts the coarsest rung keeps its
+most recent frames instead of being refused, and its timeline is rebased to zero.
+
+Recording the room and saving it when the room ends is wired in a later step; this
+format and recorder are not yet used by the multiplayer controller.
+
 `ReplayStore` uses a small index and individual localStorage payloads. Import
 reuses the decoder and storage budgets; the library renders names as plain text.
 These files contain no executable pilot code.
@@ -53,7 +73,8 @@ These files contain no executable pilot code.
 ## Verification
 
 Run the Node replay tests with `node --test tests/replay*.test.js
- tests/trackSampler.test.js tests/poseOwnership.test.js` (on one line).
+ tests/roomReplay.test.js tests/trackSampler.test.js tests/poseOwnership.test.js`
+(on one line).
 
 `npm run test:replay` starts local Vite and isolated hardware Chrome. It invokes
 `scripts/verify-browser-gpu.mjs` against that actual browser before acceptance.

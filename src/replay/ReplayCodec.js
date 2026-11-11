@@ -1,6 +1,8 @@
-import { RECORD_BYTES, HEADER_BYTES, REPLAY_INTERVAL_SEC } from './replayConfig.js';
+import { RECORD_BYTES, REMOTE_RECORD_BYTES, HEADER_BYTES, REPLAY_INTERVAL_SEC, frameBytes } from './replayConfig.js';
 
 export const REPLAY_TRACK_VERSION = 2;
+// Multiplayer room tracks only: solo flights stay v2 so older builds can still import them.
+export const ROOM_TRACK_VERSION = 3;
 export const REPLAY_MAGIC = 'F3DR1';
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
@@ -106,7 +108,7 @@ function readDamage(dv, offset, ids) {
   return damage;
 }
 
-function writeSample(dv, base, sample, ids) {
+function writeSample(dv, base, sample, ids, version) {
   for (const [name, offset, type, scale] of SCALARS) writeScalar(dv, base + offset, type, sample[name], scale);
   writeQuaternion(dv, base + 16, sample.quat);
   let flags = 0;
@@ -140,6 +142,42 @@ function writeSample(dv, base, sample, ids) {
   for (let engine = 0; engine < 2; engine++) {
     writeScalar(dv, base + 73 + engine * 2, 'u16', sample[`engine${engine + 1}`]?.ff, 0.1);
   }
+  // v3 marks respawns and restarts so playback never blends across a teleport.
+  if (version >= 3) dv.setUint8(base + 77, segmentByte(sample.segment));
+}
+
+function segmentByte(segment) {
+  return (Number.isSafeInteger(segment) ? segment : 0) & 255;
+}
+
+const REMOTE_FLAGS = Object.freeze(['visible', 'crashed', 'held', 'stale']);
+
+/** A remote aircraft is a visual record only: pose, gear and flaps, never instruments. */
+function writeRemote(dv, base, sample) {
+  const visible = sample?.visible === true;
+  for (let offset = 0; offset < REMOTE_RECORD_BYTES; offset++) dv.setUint8(base + offset, 0);
+  if (visible) {
+    writeScalar(dv, base, 'f32', sample.x, 1);
+    writeScalar(dv, base + 4, 'f32', sample.y, 1);
+    writeScalar(dv, base + 8, 'f32', sample.z, 1);
+    writeScalar(dv, base + 19, 'u8', sample.gearState, 255);
+    writeScalar(dv, base + 20, 'u8', sample.flapDegree, 2);
+  }
+  writeQuaternion(dv, base + 12, visible ? sample.quat : null);
+  let flags = 0;
+  REMOTE_FLAGS.forEach((name, index) => { if (sample?.[name] === true) flags |= 1 << index; });
+  dv.setUint8(base + 21, visible ? flags : 0);
+  dv.setUint8(base + 22, segmentByte(sample?.segment));
+}
+
+function readRemote(dv, base, timeSec) {
+  const sample = { timeSec, x: dv.getFloat32(base), y: dv.getFloat32(base + 4), z: dv.getFloat32(base + 8),
+    quat: readQuaternion(dv, base + 12, [0, 0, 0, 1]),
+    gearState: readScalar(dv, base + 19, 'u8', 255), flapDegree: readScalar(dv, base + 20, 'u8', 2) };
+  const flags = dv.getUint8(base + 21);
+  REMOTE_FLAGS.forEach((name, index) => { sample[name] = Boolean(flags & (1 << index)); });
+  sample.segment = dv.getUint8(base + 22);
+  return sample;
 }
 
 function readSample(dv, base, ids, version) {
@@ -175,6 +213,7 @@ function readSample(dv, base, ids, version) {
   for (const [name, offset, type, scale] of SELECTED_FIELDS) {
     sample[name] = readScalar(dv, base + offset, type, scale);
   }
+  sample.segment = version >= 3 ? dv.getUint8(base + 77) : 0;
   return sample;
 }
 
@@ -185,20 +224,38 @@ function trackDamageIds(track) {
   };
 }
 
+function remoteTracks(track) {
+  return Array.isArray(track?.remotes) ? track.remotes : [];
+}
+
+/** The remote pilot list lives in metadata, so a decoder knows each frame's width before reading it. */
+function encodedMetadata(track) {
+  const remotes = remoteTracks(track);
+  const metadata = remotes.length
+    ? { ...track.metadata, remotes: remotes.map(({ samples, ...pilot }) => pilot) }
+    : track?.metadata || {};
+  return encoder.encode(JSON.stringify(metadata));
+}
+
 export function decodedByteLength(track) {
   const samples = track?.samples || [];
-  return HEADER_BYTES + encoder.encode(JSON.stringify(track?.metadata || {})).length
-    + samples.length * RECORD_BYTES;
+  return HEADER_BYTES + encodedMetadata(track).length + samples.length * frameBytes(remoteTracks(track).length);
 }
 
 export function encodeTrack(track) {
   if (!track || !Array.isArray(track.samples)) throw new Error('replay track requires a samples array');
-  const metadata = encoder.encode(JSON.stringify(track.metadata || {}));
+  const remotes = remoteTracks(track);
+  if (remotes.some(remote => !Array.isArray(remote?.samples) || remote.samples.length !== track.samples.length)) {
+    throw new Error('replay remote tracks must share the local frames');
+  }
+  const version = remotes.length ? ROOM_TRACK_VERSION : REPLAY_TRACK_VERSION;
+  const frame = frameBytes(remotes.length);
+  const metadata = encodedMetadata(track);
   if (metadata.length > 0xffff) throw new Error('replay track metadata is too large');
-  const bytes = new Uint8Array(HEADER_BYTES + metadata.length + track.samples.length * RECORD_BYTES);
+  const bytes = new Uint8Array(HEADER_BYTES + metadata.length + track.samples.length * frame);
   const view = new DataView(bytes.buffer);
   for (let index = 0; index < REPLAY_MAGIC.length; index++) bytes[index] = REPLAY_MAGIC.charCodeAt(index);
-  view.setUint8(5, REPLAY_TRACK_VERSION);
+  view.setUint8(5, version);
   view.setUint16(6, Math.round(finite(track.intervalSec ?? REPLAY_INTERVAL_SEC) * 1000));
   view.setUint32(8, track.samples.length);
   view.setFloat32(12, finite(track.durationSec));
@@ -207,7 +264,11 @@ export function encodeTrack(track) {
   const ids = trackDamageIds(track);
   const base = HEADER_BYTES + metadata.length;
   for (let index = 0; index < track.samples.length; index++) {
-    writeSample(view, base + index * RECORD_BYTES, track.samples[index], ids);
+    const frameBase = base + index * frame;
+    writeSample(view, frameBase, track.samples[index], ids, version);
+    remotes.forEach((remote, slot) => {
+      writeRemote(view, frameBase + RECORD_BYTES + slot * REMOTE_RECORD_BYTES, remote.samples[index]);
+    });
   }
   return bytes;
 }
@@ -219,11 +280,10 @@ export function decodeTrack(bytes) {
   const magic = String.fromCharCode(...bytes.subarray(0, 5));
   if (magic !== REPLAY_MAGIC) throw new Error(`not a flight3d replay track (${magic})`);
   const version = view.getUint8(5);
-  if (version !== 1 && version !== REPLAY_TRACK_VERSION) throw new Error(`unsupported replay track version ${version}`);
+  if (version < 1 || version > ROOM_TRACK_VERSION) throw new Error(`unsupported replay track version ${version}`);
   const count = view.getUint32(8);
   const metadataLength = view.getUint16(16);
-  const expected = HEADER_BYTES + metadataLength + count * RECORD_BYTES;
-  if (bytes.length !== expected) throw new Error(`replay track length ${bytes.length} does not match ${expected}`);
+  if (bytes.length < HEADER_BYTES + metadataLength) throw new Error('replay track is truncated');
   let metadata = {};
   try {
     metadata = JSON.parse(decoder.decode(bytes.subarray(HEADER_BYTES, HEADER_BYTES + metadataLength)));
@@ -233,6 +293,14 @@ export function decodeTrack(bytes) {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     throw new Error('replay track metadata is corrupt');
   }
+  const pilots = version >= 3 ? metadata.remotes : [];
+  if (!Array.isArray(pilots) || (version >= 3 && !pilots.length)
+    || pilots.some(pilot => !pilot || typeof pilot !== 'object' || Array.isArray(pilot))) {
+    throw new Error('replay track metadata is corrupt');
+  }
+  const frame = frameBytes(pilots.length);
+  const expected = HEADER_BYTES + metadataLength + count * frame;
+  if (bytes.length !== expected) throw new Error(`replay track length ${bytes.length} does not match ${expected}`);
   const intervalSec = view.getUint16(6) / 1000;
   const durationSec = view.getFloat32(12);
   if (!(intervalSec > 0) || !Number.isFinite(durationSec) || durationSec < 0) {
@@ -240,16 +308,25 @@ export function decodeTrack(bytes) {
   }
   const ids = trackDamageIds({ gearIds: metadata.gearIds, bodyIds: metadata.bodyIds });
   const samples = [];
+  const remotes = pilots.map(pilot => ({ ...pilot, samples: [] }));
   for (let index = 0; index < count; index++) {
-    const sample = readSample(view, HEADER_BYTES + metadataLength + index * RECORD_BYTES, ids, version);
+    const frameBase = HEADER_BYTES + metadataLength + index * frame;
+    const sample = readSample(view, frameBase, ids, version);
     if (![sample.timeSec, sample.x, sample.y, sample.z, ...sample.quat].every(Number.isFinite)
       || sample.timeSec < 0 || (index > 0 && sample.timeSec <= samples[index - 1].timeSec)) {
       throw new Error('replay track sample is corrupt');
     }
     samples.push(sample);
+    remotes.forEach((remote, slot) => {
+      const pose = readRemote(view, frameBase + RECORD_BYTES + slot * REMOTE_RECORD_BYTES, sample.timeSec);
+      if (![pose.x, pose.y, pose.z].every(Number.isFinite)) throw new Error('replay track sample is corrupt');
+      remote.samples.push(pose);
+    });
   }
-  return { version, intervalSec, durationSec,
+  const decoded = { version, intervalSec, durationSec,
     metadata, samples, gearIds: ids.gear, bodyIds: metadata.bodyIds || [] };
+  if (remotes.length) decoded.remotes = remotes;
+  return decoded;
 }
 
 export function toBase64(bytes) {

@@ -85,9 +85,14 @@ export class ReplayRecorder {
     })).length;
   }
 
+  /** Frames that still fit the per-entry budget once the metadata is paid for. */
+  capacity() {
+    return maxSamplesFor(this.maxBase64Bytes, this.metadataBytes);
+  }
+
   /** The byte budget, not a sample count, decides when a track is thinned or refused. */
   _append(sample) {
-    if (this.samples.length < maxSamplesFor(this.maxBase64Bytes, this.metadataBytes)) {
+    if (this.samples.length < this.capacity()) {
       this.samples.push(sample);
       return;
     }
