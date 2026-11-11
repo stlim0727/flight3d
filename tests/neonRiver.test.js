@@ -167,7 +167,7 @@ test('the city terrain sinks to the water between the quay walls and around the 
   assert.equal(city.terrain.getHeight(2300 + river.halfWidth + 1, 0), 0);
   assert.equal(city.terrain.getHeight(0, 0), 0);
   assert.equal(city.terrain.getWaterLevel(2300, 500), river.waterLevel);
-  assert.equal(city.terrain.getWaterLevel(1000, 500), 0);
+  assert.equal(city.terrain.getWaterLevel(1000, 500), river.waterLevel, 'the sea runs on under the street (#648)');
   assert.equal(city.terrain.getHeight(-1000, 300), river.waterLevel);
   assert.equal(city.terrain.getWaterLevel(-1000, 300), river.waterLevel);
   assert.equal(isRiver(2300, 9000), false, 'the canal ends at the shore of the island');
@@ -268,6 +268,9 @@ test('every aircraft collides with the bridges, the water and the shore anywhere
   // The sea beside the runway causeway (#628): low over it is flying, touching it is ditching.
   assert.equal(detector.checkCollision(new Vector3(-1000, -6, 300), north, new Vector3(0, 0, -70), 0, 0, 0), null);
   assert.equal(detector.checkCollision(new Vector3(-1000, river.waterLevel + 1, 300), north, new Vector3(0, 0, -70), 0, -3, 0)?.type, 'WATER');
+  // A street crash is ground, never a water impact, though the street sits at sea level (#458).
+  const street = detector.checkCollision(new Vector3(1000, 0.5, 600), north, new Vector3(0, -6, -70), 0, -3, 0);
+  assert.equal(street?.type, 'TERRAIN');
   // Below the street the island's shore is a wall.
   assert.ok(detector.checkCollision(new Vector3(1000, -6, island.halfZ - 5), north, new Vector3(0, 0, -70), 0, 0, 0));
 });

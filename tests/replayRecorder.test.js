@@ -217,3 +217,20 @@ test('production engine fuelFlow survives immediate and stored replay', () => {
   assert.equal(stored.samples[0].engine1.ff, 350);
   assert.equal(stored.samples[0].engine2.ff, 720);
 });
+
+test('a crash is marked once at its simulation time, survives storage and never leaks into the next sortie (#648)', () => {
+  const recorder = started();
+  record(6, recorder);
+  recorder.markCrash({ type: 'WATER', speedKnots: 312.6, name: 'WATER IMPACT' });
+  record(1, recorder);
+  recorder.markCrash({ type: 'TERRAIN', speedKnots: 10 });
+  const track = recorder.finish();
+  assert.deepEqual(track.metadata.crash, { type: 'WATER', timeSec: 6, speedKnots: 313 });
+  assert.deepEqual(decodeTrack(encodeTrack(track)).metadata.crash, track.metadata.crash);
+
+  recorder.markCrash({ type: 'TERRAIN', speedKnots: 10 });
+  assert.equal(recorder.finish().metadata.crash.type, 'WATER', 'a finished track is never re-marked');
+  recorder.start({ ...recorder.metadata });
+  record(6, recorder);
+  assert.equal(recorder.finish().metadata.crash, undefined);
+});

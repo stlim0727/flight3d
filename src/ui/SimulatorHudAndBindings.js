@@ -588,7 +588,12 @@ class SimulatorHudAndBindingsMethods {
       onLobby: () => { this.demoDirector.stop(); this.gameFlow.returnToLobby(false); document.getElementById('btn-fly')?.focus(); },
       onFeedback: () => this.openFeedbackDialog?.(),
       onSaveReplay: () => this.saveDebriefReplay(),
-      onWatchReplay: () => this.replayPanel.watch(this.debriefReplay),
+      onWatchReplay: () => {
+        // Playback replaces the debrief's sortie with its host flight; keep both to come back to.
+        const report = this.debriefReport;
+        const replay = this.debriefReplay;
+        return this.replayPanel.watch(replay, null, { returnTo: () => this.returnToDebrief(report, replay) });
+      },
       onCycleCamera: () => this.controls.onCycleCamera?.(),
       getCameraModeName: () => this.cameraSystem.getModeName(),
       onAction: (action, report) => this.analytics?.trackDebriefAction?.({ action, outcome: report?.reason }),

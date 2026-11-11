@@ -333,3 +333,72 @@ test('replay load and stop reset stale pilot physiological telemetry to nominal'
   director.stop();
   assert.equal(sim.telemetry.pilot.isGLOC, false, 'Stopping replay must leave pilot state nominal');
 });
+
+function crashStage(sim) {
+  const log = [];
+  sim.explosionSystem = {
+    spawnExplosion(result, velocity) { log.push(['explode', result.type, result.point.toArray(), velocity.clone()]); },
+    clear() { log.push(['clear-explosion']); },
+  };
+  sim.aircraft.triggerCrashVisuals = type => log.push(['crash-visuals', type]);
+  sim.aircraft.resetCrashVisuals = () => log.push(['reset-visuals']);
+  sim.aircraftBreakup = {
+    spawn(aircraft, velocity) { log.push(['breakup', aircraft.group.position.toArray(), velocity.clone()]); },
+    update(dt) { log.push(['debris', dt]); },
+    clear() { log.push(['clear-debris']); },
+  };
+  sim.water = { ...sim.water, mesh: { visible: true }, waterLevel: 0 };
+  return log;
+}
+
+test('a crashed sortie stages its impact at the marker and undoes it on a seek back (#648)', async () => {
+  const sim = fakeSim();
+  const log = crashStage(sim);
+  const director = new ReplayDirector(sim);
+  const source = track();
+  const end = trackDuration(source);
+  source.metadata.crash = { type: 'WATER', timeSec: end, speedKnots: 300 };
+  await director.load(source);
+  assert.deepEqual(log, [], 'nothing explodes before the impact');
+
+  director.seek(end);
+  const last = source.samples.at(-1);
+  const [explode, visuals, breakup] = log;
+  assert.deepEqual(explode.slice(0, 3), ['explode', 'WATER', [last.x, last.y, last.z]]);
+  assert.deepEqual(visuals, ['crash-visuals', 'WATER']);
+  assert.deepEqual(breakup[1], [last.x, last.y, last.z], 'debris leaves from the recorded impact pose');
+  // The final two samples move (+10, +1, -5) every 0.2 s; the impact speed sets the magnitude.
+  const velocity = breakup[2];
+  assert.ok(Math.abs(velocity.length() - 300 / 1.94384) < 1e-6);
+  assert.ok(velocity.x > 0 && velocity.y > 0 && velocity.z < 0);
+  assert.ok(Math.abs(velocity.x / velocity.z + 2) < 1e-9);
+
+  log.length = 0;
+  director.update(0.05);
+  assert.deepEqual(log, [['debris', 0.05]], 'debris keeps flying while playback rests at the end');
+
+  log.length = 0;
+  director.seek(1);
+  assert.deepEqual(log, [['clear-explosion'], ['reset-visuals'], ['clear-debris']]);
+  log.length = 0;
+  director.update(0.05);
+  assert.deepEqual(log, [], 'an intact airframe has no debris to advance');
+
+  director.seek(end);
+  log.length = 0;
+  director.stop();
+  assert.deepEqual(log, [['clear-explosion'], ['reset-visuals'], ['clear-debris']],
+    'leaving playback never strands replay wreckage in the scene');
+});
+
+test('a track without a crash marker never stages one', async () => {
+  const sim = fakeSim();
+  const log = crashStage(sim);
+  const director = new ReplayDirector(sim);
+  const source = track();
+  await director.load(source);
+  director.seek(trackDuration(source));
+  director.update(0.1);
+  director.stop();
+  assert.deepEqual(log, []);
+});

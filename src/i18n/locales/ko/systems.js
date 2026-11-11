@@ -52,7 +52,7 @@ export default {
   "the.value.struck.a.vessel": "해상 선박에 {value} 부위가 충돌했습니다.",
   "the.value.collided.with.another.aircraft": "다른 항공기와 {value} 부위가 공중 충돌했습니다.",
   "the.value.collided.with.remote.pilot": "{target} 항공기와 {value} 부위가 충돌했습니다.",
-  "the.aircraft.hit.the.ocean.surface.at": "지표면에 고속으로 격돌했습니다.",
+  "the.aircraft.hit.the.ocean.surface.at": "수면에 고속으로 격돌했습니다.",
   "the.aircraft.departed.the.runway": "기체가 활주로를 벗어나 지상으로 이동하여 사고가 발생했습니다.",
   "gear.up.belly.crash": "동체 착륙 (GEAR-UP BELLY CRASH)",
   "terrain.body.strike": "기체 지면 접촉 (TERRAIN / BODY STRIKE)",

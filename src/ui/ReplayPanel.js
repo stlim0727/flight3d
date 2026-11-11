@@ -162,8 +162,14 @@ export class ReplayPanel {
     else this.root.querySelector('[data-fold]')?.focus();
   }
 
-  async watch(track, entryId = null) {
+  /**
+   * @param {{returnTo?: () => boolean}} [options] set by the debrief that opened this playback, so
+   * leaving goes back to it and its save/share actions stay reachable (#648)
+   */
+  async watch(track, entryId = null, { returnTo = null } = {}) {
+    this.returnTo = null;
     const ok = await this.load(track, entryId);
+    if (ok) this.returnTo = returnTo;
     // A library entry has an id; the debrief plays the sortie that just ended.
     this.sim.analytics?.trackReplayWatched?.({ source: entryId ? 'library' : 'debrief', ok,
       metadata: track?.metadata, durationSeconds: track?.durationSec });
@@ -187,6 +193,9 @@ export class ReplayPanel {
 
   exit() {
     this.setFolded(false);
+    const returnTo = this.returnTo;
+    this.returnTo = null;
+    if (returnTo?.()) return;
     // Freeze live physics before releasing pose ownership.
     this.sim.gameFlow.returnToLobby(false);
     this.sim.replayDirector.stop();

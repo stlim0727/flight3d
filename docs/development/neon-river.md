@@ -26,7 +26,9 @@ from x = -2400 to 1800). Metres, +Y up.
   walls are a step in the city terrain: ground effect, radio altitude, gear contact and
   body probes all see them. The terrain also reports `getWaterLevel()`, which
   `CollisionDetector.checkWater()` uses instead of sea level, so flying below the street
-  over the canal or the sea is not ditching.
+  over the canal or the sea is not ditching. It is the same -14 m under the street, where
+  the sea runs on beneath the island: the shared water checks count water only where the
+  terrain is within 2.5 m of it, so a street crash stays a ground impact (#458, #648).
 - `createNeonRiver()` (`NeonRiver.js`) draws the street on both banks and the causeway,
   one sea surface at the water level across the whole 24 km scenery (running on under the
   island), the quay walls around every shore (`landOutline()`), violet waterline ribbons

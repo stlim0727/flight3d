@@ -16,7 +16,9 @@ export class ReplayRecorder {
   }
 
   start(metadata) {
-    this.metadata = { ...metadata };
+    // A crash belongs to the sortie that had it, never to one started from its metadata.
+    const { crash, ...sortie } = metadata ?? {};
+    this.metadata = sortie;
     this.active = true;
     this.overflow = false;
     this.elapsed = 0;
@@ -103,6 +105,18 @@ export class ReplayRecorder {
     this.samples = this.samples.filter((_, index) => index % 2 === 0);
     this.interval *= 2;
     this.samples.push(sample);
+  }
+
+  /**
+   * The pose track stops being meaningful at impact, so playback stages the crash from this
+   * marker instead (#648). Only the first impact of a sortie is kept.
+   */
+  markCrash(crashResult) {
+    if (!this.active || !crashResult || this.metadata.crash) return;
+    const speedKnots = Number(crashResult.speedKnots);
+    this.metadata.crash = { type: crashResult.type ?? null, timeSec: Math.round(this.elapsed * 1000) / 1000,
+      speedKnots: Number.isFinite(speedKnots) ? Math.round(speedKnots) : null };
+    this._measureMetadata();
   }
 
   finish() {

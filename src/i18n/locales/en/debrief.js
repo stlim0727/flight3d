@@ -42,7 +42,7 @@ export default {
   'debrief.impactSpeed': 'Impact speed',
   'debrief.impactTime': 'Impact time',
   'debrief.impactTarget': 'Collision target',
-  'debrief.target.WATER': 'Surface',
+  'debrief.target.WATER': 'Water',
   'debrief.target.TERRAIN': 'Terrain',
   'debrief.target.BUILDING': 'Building',
   'debrief.target.TOWER': 'Control tower',
