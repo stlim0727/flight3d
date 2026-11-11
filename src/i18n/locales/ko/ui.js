@@ -198,7 +198,7 @@ export default {
   "maritime.vessel.collision": "해상 선박 충돌 (MARITIME VESSEL COLLISION)",
   "midair.collision": "공중 충돌 (MIDAIR COLLISION)",
   "aircraft.collision": "항공기 충돌 (AIRCRAFT COLLISION)",
-  "ocean.water.impact": "지표면 충돌 (SURFACE IMPACT)",
+  "ocean.water.impact": "수면 충돌 (WATER IMPACT)",
   "catastrophic.landing.impact": "치명적 착륙 충격 (CATASTROPHIC LANDING IMPACT)",
   "excessive.belly.impact.or.accumulated.structural.damage": "기체 하부의 과도한 충격 또는 누적 구조 손상으로 기체가 파손되었습니다.",
   "runway.excursion": "활주로 이탈 (RUNWAY EXCURSION)",

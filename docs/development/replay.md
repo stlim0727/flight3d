@@ -17,7 +17,9 @@ Export files to retain copies outside that browser.
 Playback has play/pause, previous/next recorded sample, a time scrubber, all ten
 existing camera views, and 30/50/100/200/300 percent speeds. Camera digit shortcuts
 and mouse look continue to work while aircraft inputs are disabled. Exit or Escape
-returns to the lobby; it never hands the recorded aircraft pose to a live flight.
+returns to the debrief that opened the playback, so its save and share actions stay
+reachable (#648); library playback returns to the lobby. Neither hands the recorded
+aircraft pose to a live flight.
 The viewer waits for terrain to load. Recorded time of day and generated valley
 course seeds are restored without starting another scored attempt. Playback cannot
 start during a multiplayer room or an in-progress scene swap.
@@ -34,7 +36,9 @@ with their original one-byte fuel-flow layout; existing library/export container
 keep their keys and identifiers. Longer flights that exceed the final rung remain viewable from the
 current debrief but cannot be saved. Damage flags are quantized, so replay is a
 visual flight record rather than an exact simulation checkpoint. Dynamic traffic,
-debris and world animations are not recorded.
+debris and world animations are not recorded. A crashed sortie instead stores a
+`metadata.crash` marker (type, simulation time, impact speed); playback stages the
+explosion and breakup when it reaches that time and removes them on a seek back.
 
 `ReplayDirector` owns the pose during playback, interpolating positions and
 quaternions rather than re-simulating pilot input. `activePoseDriver()` is the

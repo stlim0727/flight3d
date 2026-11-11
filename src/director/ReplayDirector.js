@@ -170,6 +170,11 @@ export class ReplayDirector {
     this._applyPose();
     // Replay owns the rendered pose too: physics interpolation has no steps to blend.
     this.sim.renderPose.reset(this.sim.position, this.sim.quaternion);
+    // Physics is not stepping, so the staged wreckage advances on the frame clock instead.
+    if (this._crashStaged && Number.isFinite(dt) && dt > 0) {
+      const sim = this.sim;
+      sim.aircraftBreakup?.update(dt, sim.currentTerrain, sim.water?.mesh?.visible ? sim.water.waterLevel : null);
+    }
   }
 
   stop() {
@@ -187,6 +192,7 @@ export class ReplayDirector {
         blackout: 0, redout: 0, tunnelVision: 0, grayout: 0, blur: 0, glocIncidents: 0, gFatigueSeconds: 0
       };
     }
+    this._clearCrash();
     if (this._view) this._restoreView(this._view);
     this._view = null;
     this._telemetry = null;
@@ -225,7 +231,56 @@ export class ReplayDirector {
     for (const name of OBJECT_FIELDS) telemetry[name] = sample[name];
     telemetry.warnings = [];
     sim.telemetry = telemetry;
+    this._syncCrash();
     return true;
+  }
+
+  /**
+   * The pose track ends at impact; the explosion and breakup are staged from the recorded
+   * marker so a crashed sortie replays its crash, and a seek back restores the airframe (#648).
+   */
+  _syncCrash() {
+    const crash = this.track?.metadata?.crash;
+    const due = Number.isFinite(crash?.timeSec) && this.progressSec + 1e-6 >= crash.timeSec;
+    if (due === Boolean(this._crashStaged)) return;
+    if (!due) {
+      this._clearCrash();
+      return;
+    }
+    const sim = this.sim;
+    this._crashStaged = true;
+    const velocity = this._impactVelocity(crash);
+    // The breakup slices the airframe where it is drawn, so draw it at the impact pose first.
+    sim.aircraft.group.position.copy(sim.position);
+    sim.aircraft.group.quaternion.copy(sim.quaternion);
+    sim.aircraft.group.updateMatrixWorld(true);
+    sim.explosionSystem?.spawnExplosion({ type: crash.type, point: sim.position.clone(),
+      speedKnots: crash.speedKnots ?? 0 }, velocity);
+    sim.aircraft.triggerCrashVisuals?.(crash.type);
+    sim.aircraftBreakup?.spawn(sim.aircraft, velocity);
+  }
+
+  _clearCrash() {
+    if (!this._crashStaged) return;
+    this._crashStaged = false;
+    const sim = this.sim;
+    sim.explosionSystem?.clear?.();
+    sim.aircraft.resetCrashVisuals?.();
+    sim.aircraftBreakup?.clear?.();
+  }
+
+  /** Direction from the last recorded motion before impact, magnitude from the impact speed. */
+  _impactVelocity(crash) {
+    const samples = this.track.samples;
+    let index = samples.length - 1;
+    while (index > 1 && samples[index].timeSec > crash.timeSec) index--;
+    const a = samples[index - 1];
+    const b = samples[index];
+    const span = Math.max(1e-6, b.timeSec - a.timeSec);
+    const velocity = this.sim.position.clone().set((b.x - a.x) / span, (b.y - a.y) / span, (b.z - a.z) / span);
+    const speedMs = Number(crash.speedKnots) / 1.94384;
+    if (Number.isFinite(speedMs) && speedMs > 0 && velocity.lengthSq() > 0) velocity.setLength(speedMs);
+    return velocity;
   }
 
   _captureView() {

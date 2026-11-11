@@ -773,6 +773,8 @@ class FlightSimulator {
     if (this.gameFlow.state !== FLOW.FLIGHT || !this.flightRecorder.active || this.devRunner?.active) return;
     this.flightRecorder.update(dt, this.telemetry);
     this.replayRecorder.update(dt, this.telemetry, this.quaternion);
+    // Playback stages the impact from this marker; the pose track itself ends there (#648).
+    if (this.isCrashed) this.replayRecorder.markCrash(this.crashResult);
     // The mission runner owns scoring and its completion UI. Only observe its ticks.
     if (missionOwned) return;
     if (this.isCrashed) {
@@ -827,6 +829,17 @@ class FlightSimulator {
     });
     this.gameFlow.endFlight();
     this.debriefOverlay.show(this.debriefReport, this.debriefReplay);
+  }
+
+  /** Leave a replay the debrief opened for that same debrief instead of the lobby (#648). */
+  returnToDebrief(report, replay) {
+    // Freeze the playback host flight before releasing pose ownership, as the lobby exit does.
+    if (!report || !this.gameFlow.endFlight()) return false;
+    this.replayDirector.stop();
+    this.debriefReport = report;
+    this.debriefReplay = replay;
+    this.debriefOverlay.show(report, replay);
+    return true;
   }
 
   /** Persists the finished sortie's pose track. Returns the store's error token for the debrief to show. */

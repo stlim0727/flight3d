@@ -198,7 +198,7 @@ export default {
   "maritime.vessel.collision": "MARITIME VESSEL COLLISION",
   "midair.collision": "MIDAIR COLLISION",
   "aircraft.collision": "AIRCRAFT COLLISION",
-  "ocean.water.impact": "SURFACE IMPACT",
+  "ocean.water.impact": "WATER IMPACT",
   "catastrophic.landing.impact": "CATASTROPHIC LANDING IMPACT",
   "excessive.belly.impact.or.accumulated.structural.damage": "Excessive belly impact or accumulated structural damage destroyed the aircraft.",
   "runway.excursion": "RUNWAY EXCURSION",

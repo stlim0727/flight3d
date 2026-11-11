@@ -296,3 +296,20 @@ test('airport switches reuse the spatial grids of an unchanged foliage source', 
   detector.setEnvironment(null, null, foliage, null, null);
   assert.equal(detector.treeGrid.size, 2, 'returning to the foliage rebuilds the grid');
 });
+
+test('water impacts need terrain below the water surface, so sea-level land is not water (#458, #648)', () => {
+  // Neon-like island: the street sits exactly at sea level, and the canal's bed lies below its water.
+  const terrain = {
+    getHeight: (x) => (x < 0 ? 0 : -30),
+    getWaterLevel: (x) => (x < 0 ? 0 : -14),
+  };
+  const detector = new CollisionDetector(terrain, { elevation: 0 }, null, null, null);
+  const quat = new THREE.Quaternion();
+  const vel = new THREE.Vector3(80, -6, 0);
+
+  const land = detector.checkCollision(new THREE.Vector3(-800, 0.2, 0), quat, vel, 0.0, 0, 0);
+  assert.notEqual(land?.type, 'WATER', 'a street at sea level is land, not water');
+
+  const canal = detector.checkCollision(new THREE.Vector3(800, -13.8, 0), quat, vel, 0.0, 0, 0);
+  assert.equal(canal?.type, 'WATER', 'the canal below the street is water');
+});
