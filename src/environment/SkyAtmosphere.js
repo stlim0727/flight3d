@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { Sky } from 'three/addons/objects/Sky.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { CloudLayer } from './CloudLayer.js';
+import { createScreenSky } from './ScreenSky.js';
 import { CockpitSunShadow } from './CockpitSunShadow.js';
 import { SunShadowRefresh } from './SunShadowRefresh.js';
 
@@ -90,9 +90,8 @@ export class SkyAtmosphere {
     // cockpit entry: adding a shadow-casting light later recompiles every lit material.
     this.cockpitSun = new CockpitSunShadow(this.scene);
 
-    // Sky shader object
-    this.sky = new Sky();
-    this.sky.scale.setScalar(45000);
+    // Sky shader object, drawn as a screen-space background (see ScreenSky.js)
+    this.sky = createScreenSky();
     this.scene.add(this.sky);
 
     this.sunPosition = new THREE.Vector3();
