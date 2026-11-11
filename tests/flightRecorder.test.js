@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FlightRecorder, flightDuration } from '../src/core/FlightRecorder.js';
 import { ReplayRecorder } from '../src/core/ReplayRecorder.js';
+import { ReplayStore, AUTO_SAVE_LABEL } from '../src/replay/ReplayStore.js';
 import { reportText } from '../src/ui/DebriefOverlay.js';
 import { setLanguage } from '../src/i18n/index.js';
 import { SimulatorClass } from './helpers/simulatorClass.js';
@@ -14,9 +15,19 @@ function record(seconds, recorder, data = telemetry) {
   for (let i = 0; i < Math.round(seconds * 120); i++) recorder.update(1 / 120, data);
 }
 
-// The production simulator owns both recorders, so every fake sortie has to as well.
+function memoryStorage() {
+  const values = new Map();
+  return {
+    getItem: key => (values.has(key) ? values.get(key) : null),
+    setItem: (key, value) => { values.set(key, String(value)); },
+    removeItem: key => { values.delete(key); },
+  };
+}
+
+// The production simulator owns both recorders and the replay library, so every fake sortie has to as well.
 const attitude = { x: 0, y: 0, z: 0, w: 1 };
-const recorders = () => ({ flightRecorder: new FlightRecorder(), replayRecorder: new ReplayRecorder() });
+const recorders = () => ({ flightRecorder: new FlightRecorder(), replayRecorder: new ReplayRecorder(),
+  replayStore: new ReplayStore(memoryStorage()) });
 
 test('fixed-step sampling retains peaks between samples and owns immutable sortie data', () => {
   const recorder = new FlightRecorder(); recorder.start(metadata);
@@ -132,6 +143,9 @@ test('flow sequence excludes pause/menu time, freezes completed reports, retry s
   assert.ok(sim.debriefReplay.samples.length >= 25 && sim.debriefReplay.samples.length <= 27);
   assert.ok(sim.debriefReplay.samples.every(s => Number.isFinite(s.y) && s.quat.length === 4),
     'a replay needs world height and attitude, which the chart report omits');
+  const autoSaved = sim.replayStore.list().filter(entry => entry.auto === true);
+  assert.equal(autoSaved.length, 1, 'a finished sortie lands in the single auto-save slot');
+  assert.equal(autoSaved[0].label, AUTO_SAVE_LABEL);
   assert.equal(sim.gameFlow.isPhysicsFrozen(), true);
   assert.equal(sim.gameFlow.resume(), false);
   tick(); assert.equal(sim.debriefReport.samples.length, sim.debriefOverlay.report.samples.length);
@@ -140,6 +154,8 @@ test('flow sequence excludes pause/menu time, freezes completed reports, retry s
   sim.isCrashed = true; tick();
   assert.equal(sim.debriefReport.reason, 'crash');
   assert.equal(sim.debriefReplay, null, 'a one-tick sortie has no track worth saving');
+  assert.equal(sim.replayStore.list().filter(entry => entry.auto === true).length, 1,
+    'a sortie with no track leaves the kept auto save in place');
   assert.equal(sim.gameFlow.state, FLOW.FLIGHT, 'impact must leave the crash scene visible');
   SimulatorClass.prototype.updateCrashDebrief.call(sim, 3);
   assert.equal(sim.gameFlow.state, FLOW.DEBRIEF);

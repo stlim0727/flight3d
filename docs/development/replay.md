@@ -4,6 +4,12 @@ Flights automatically collect a pose track alongside the debrief's telemetry rep
 After at least five valid simulation seconds, the debrief offers **Watch replay**;
 its Share tab offers **Save replay**. The lobby's **Saved replays** opens the device's
 library. Flights can be renamed, watched, exported as JSON, imported or deleted.
+
+Every finished sortie is also written to a single `auto_save` slot, so the most
+recent flight is always in the library without a manual save. Each new flight replaces
+it; renaming it converts it into an ordinary save that later flights no longer
+overwrite, and the eight-entry budget still applies.
+
 Storage is local to the browser origin: at most eight saves, 160 KB base64 per
 flight and 1 MB total. The oldest saves are evicted under budget or quota pressure.
 Export files to retain copies outside that browser.

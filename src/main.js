@@ -812,6 +812,9 @@ class FlightSimulator {
     this.debriefReport = this.isCrashed ? this.flightRecorder.finish('crash', this.crashResult)
       : this.flightRecorder.finish(reason);
     this.debriefReplay = this.replayRecorder.finish();
+    // Keep the latest sortie in the library even when the debrief's manual save is skipped;
+    // the fixed auto_save slot is overwritten on the next flight (#645).
+    if (this.debriefReplay) this.replayStore.saveAuto(this.debriefReplay);
     // An arena run reports its own end when leaving flight stops the runner.
     if (!this.pilotArena?.active) this.analytics?.trackFlightEnd?.({
       airport: this.activeAirport,
