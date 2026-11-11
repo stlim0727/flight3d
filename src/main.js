@@ -37,7 +37,7 @@ import { Airport } from './environment/Airport.js';
 import { FoliageAndCities } from './environment/FoliageAndCities.js';
 import { Ships } from './environment/Ships.js';
 import { SkyAtmosphere } from './environment/SkyAtmosphere.js';
-import { GroundContactShadow } from './environment/GroundContactShadow.js';
+import { GroundContactShadow, contactShadowSurfaceHeight } from './environment/GroundContactShadow.js';
 import { NeonCity } from './environment/NeonCity.js';
 import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
@@ -1279,8 +1279,9 @@ class FlightSimulator {
       }
     }
     this.contactShadow.setEnabled(!isCockpit && this.renderQuality === 'ultraLow');
+    const { x: shadowX, z: shadowZ } = this.aircraft.group.position;
     this.contactShadow.update(this.aircraft.group.position, this.aircraft.group.quaternion,
-      this.currentTerrain.getHeight(this.aircraft.group.position.x, this.aircraft.group.position.z),
+      contactShadowSurfaceHeight(this.currentTerrain, this.water, shadowX, shadowZ),
       this.currentAircraftId, this.aero.wingspan);
     // Looking forward in photo mode skips the occlusion pass entirely, so build
     // and compile it now instead of on the user's first head turn. The forced

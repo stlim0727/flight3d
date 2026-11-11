@@ -24,11 +24,15 @@ export class WaterOcean {
     this.geometry.rotateX(-Math.PI * 0.5);
 
     // Broad geometry swell and filtered fragment detail share world-space coordinates.
+    // `lights` feeds the sun's shadow map in, so an aircraft skimming the sea shadows it
+    // the way it shadows land; tiers without shadow maps compile the lookup out.
     this.material = new THREE.ShaderMaterial({
       defines: {
         WATER_FLAT: this.quality === 'ultraLow' ? 1 : 0
       },
+      lights: true,
       uniforms: {
+        ...THREE.UniformsUtils.clone(THREE.UniformsLib.lights),
         uTime: { value: 0 },
         uSunDir: { value: this.sunDirection },
         uDeepColor: { value: new THREE.Color(0x0a284a) },   // Deep ocean navy
@@ -44,6 +48,7 @@ export class WaterOcean {
       vertexShader: `
         #include <common>
         #include <logdepthbuf_pars_vertex>
+        #include <shadowmap_pars_vertex>
 
         uniform float uTime;
         varying vec3 vWorldPos;
@@ -85,11 +90,20 @@ export class WaterOcean {
           vWorldPos = displacedWorld;
           gl_Position = projectionMatrix * mvPosition;
           #include <logdepthbuf_vertex>
+
+          // Shadow lookup at the displaced surface, offset along the flat-sea normal.
+          vec4 worldPosition = vec4(displacedWorld, 1.0);
+          vec3 transformedNormal = normalMatrix * normal;
+          #include <shadowmap_vertex>
         }
       `,
       fragmentShader: `
         #include <common>
         #include <logdepthbuf_pars_fragment>
+        #include <bsdfs>
+        #include <lights_pars_begin>
+        #include <shadowmap_pars_fragment>
+        #include <shadowmask_pars_fragment>
 
         uniform vec3 uSunDir;
         uniform vec3 uDeepColor;
@@ -174,12 +188,16 @@ export class WaterOcean {
           float alpha2 = pow(roughness, 4.0);
           float denominator = nDotH * nDotH * (alpha2 - 1.0) + 1.0;
           float distribution = alpha2 / max(0.00001, PI * denominator * denominator);
-          float sunGlint = min(8.0, distribution * 0.02) * daylight;
+          // Shadowed water loses the sun glint and the sunlight scattered back out of the
+          // water body and unresolved ripples. The sky reflection dims with them: it is most
+          // of what a chase camera sees, and left alone it would hide the height cue (#648).
+          float sunVisibility = mix(1.0, getShadowMask(), daylight);
+          float sunGlint = min(8.0, distribution * 0.02) * daylight * sunVisibility;
           vec3 reflected = reflect(-viewDir, normal);
           float skyHeight = clamp(reflected.y, 0.0, 1.0);
           vec3 skyReflection = mix(uFogColor, uFogColor * vec3(0.42, 0.62, 0.85), sqrt(skyHeight));
           vec3 waterColor = mix(uDeepColor, uShallowColor, 0.12) * mix(0.08, 0.7, daylight);
-          vec3 finalColor = mix(waterColor, skyReflection, fresnel);
+          vec3 finalColor = mix(waterColor, skyReflection, fresnel) * mix(0.55, 1.0, sunVisibility);
           finalColor += uSunColor * sunGlint;
 
           // Synchronized atmospheric aerial perspective fog
@@ -217,6 +235,7 @@ export class WaterOcean {
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.position.y = this.waterLevel;
     this.mesh.renderOrder = -1;
+    this.mesh.receiveShadow = true;
   }
 
   setQuality(quality) {

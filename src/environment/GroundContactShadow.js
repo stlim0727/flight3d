@@ -28,6 +28,17 @@ export function contactShadowAppearance(heightAboveGroundM) {
   };
 }
 
+/**
+ * Height of the surface the cue lies on. Over the sea the terrain reports the seabed,
+ * so the water wins wherever it is higher: a terrain's own water (the Neon canal) or
+ * else the shared ocean while it is shown.
+ */
+export function contactShadowSurfaceHeight(terrain, water, x, z) {
+  const waterLevel = terrain.getWaterLevel?.(x, z)
+    ?? (water?.mesh.visible ? water.waterLevel : -Infinity);
+  return Math.max(terrain.getHeight(x, z), waterLevel);
+}
+
 /** Yaw (radians, three.js Y-rotation) that points the silhouette nose (local -Z) along the aircraft forward vector. */
 export function planformYaw(forwardX, forwardZ) {
   return Math.atan2(-forwardX, -forwardZ);
