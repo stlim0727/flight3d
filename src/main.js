@@ -780,8 +780,9 @@ class FlightSimulator {
     if (this.isCrashed) {
       // Freeze the sortie at impact, while the exterior crash scene keeps running.
       this.debriefReport = this.flightRecorder.finish('crash', this.crashResult);
+      // The pose track ends at impact; playback stages the crash from the marker (#648).
       this.debriefReplay = this.replayRecorder.finish();
-      this.crashDebriefRemaining = 3;
+      if (this.crashDebriefRemaining == null) this.crashDebriefRemaining = 3;
     }
     else if (this.waterDitching?.submerged && this.waterDitching?.timeSinceSubmerged >= 4) {
       this.endFlight('ditching');

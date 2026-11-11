@@ -6,7 +6,9 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   background: transparent !important;
   pointer-events: none !important;
 }
-#debrief-overlay.is-folded .debrief-card {
+#debrief-overlay.is-folded .debrief-header,
+#debrief-overlay.is-folded .debrief-panels,
+#debrief-overlay.is-folded .debrief-footer {
   display: none !important;
 }
 #debrief-overlay.is-folded .debrief-unfold-pill:not([hidden]) {
@@ -48,7 +50,8 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   font-size: calc(14px * var(--ui-scale, 1));
 }
 
-.debrief-card {
+.debrief-overlay {
+  position: relative;
   width: min(calc(380px * var(--ui-scale, 1)), calc(100vw - 32px));
   max-width: min(calc(440px * var(--ui-scale, 1)), calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
@@ -76,26 +79,6 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   align-items: center;
   gap: calc(10px * var(--ui-scale, 1));
   flex-shrink: 0;
-}
-.debrief-title-wrap {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-.debrief-title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: calc(2px * var(--ui-scale, 1)) calc(8px * var(--ui-scale, 1));
-  min-width: 0;
-}
-.debrief-title-wrap h2 {
-  margin: 0;
-  font-size: calc(18px * var(--ui-scale, 1));
-  line-height: calc(24px * var(--ui-scale, 1));
-  font-weight: 700;
-  color: #f8fafc;
 }
 .debrief-header-pill {
   display: inline-block;
@@ -132,21 +115,7 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   color: #7dd3fc;
   border: 1px solid rgba(56, 189, 248, 0.4);
 }
-.debrief-title-wrap p {
-  margin: 0;
-  font-size: calc(11px * var(--ui-scale, 1));
-  color: #94a3b8;
-}
-
-.debrief-header-actions {
-  display: flex;
-  align-items: center;
-  gap: calc(6px * var(--ui-scale, 1));
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.debrief-card .debrief-lobby-btn {
+.debrief-overlay .debrief-lobby-btn {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -162,7 +131,7 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   white-space: nowrap;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
-.debrief-card .debrief-lobby-btn:hover {
+.debrief-overlay .debrief-lobby-btn:hover {
   background: #263c51;
   border-color: #538aa4;
 }
@@ -176,7 +145,15 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   line-height: 1;
 }
 
-.debrief-card .debrief-feedback-btn {
+.debrief-footer {
+  flex-shrink: 0;
+  display: flex;
+  padding-top: calc(4px * var(--ui-scale, 1));
+  border-top: 1px solid rgba(56, 82, 104, 0.35);
+}
+.debrief-footer .debrief-lobby-btn { flex: 1 1 auto; justify-content: center; font-weight: 700; }
+
+.debrief-overlay .debrief-feedback-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -191,7 +168,7 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.debrief-card .debrief-feedback-btn:hover {
+.debrief-overlay .debrief-feedback-btn:hover {
   background: #263c51;
   border-color: #538aa4;
   color: #f8fafc;
@@ -201,10 +178,8 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   line-height: 1;
 }
 
-.debrief-card h2 { font-size: calc(18px * var(--ui-scale, 1)); line-height: calc(27px * var(--ui-scale, 1)); }
-.debrief-card h3 { font-size: calc(18px * var(--ui-scale, 1)); line-height: calc(27px * var(--ui-scale, 1)); }
-#debrief-record h3, #debrief-share h3 { font-size: calc(15px * var(--ui-scale, 1)); line-height: calc(22px * var(--ui-scale, 1)); }
-
+.debrief-overlay h2 { font-size: calc(18px * var(--ui-scale, 1)); line-height: calc(27px * var(--ui-scale, 1)); }
+.debrief-overlay h3 { font-size: calc(18px * var(--ui-scale, 1)); line-height: calc(27px * var(--ui-scale, 1)); }
 /* Issue #370: Headline badge with progressive disclosure tooltip */
 .debrief-outcome {
   position: relative;
@@ -249,7 +224,7 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   color: #7dd3fc;
 }
 #debrief-outcome.is-truncated { cursor: help; }
-.debrief-card #debrief-outcome:focus-visible { outline-offset: -2px; border-radius: 4px; }
+.debrief-overlay #debrief-outcome:focus-visible { outline-offset: -2px; border-radius: 4px; }
 #debrief-outcome-tip {
   position: absolute;
   top: calc(100% + 4px);
@@ -267,44 +242,11 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   pointer-events: none;
 }
 
-.debrief-muted { color: #94a3b8; font-size: calc(11px * var(--ui-scale, 1)); white-space: pre-line; }
-.debrief-caption, .debrief-stats span { color: #94a3b8; font-size: calc(10px * var(--ui-scale, 1)); }
+.debrief-identity { color: #94a3b8; font-size: calc(11px * var(--ui-scale, 1)); white-space: pre-line; margin: 0; }
+.debrief-facts { color: #cbd5e1; font-size: 12px; font-variant-numeric: tabular-nums; white-space: pre-line; margin: 0; }
+.debrief-contact-note { margin: 0; color: #94a3b8; font-size: 10px; }
 
-/* Segmented Tablist */
-.debrief-tabs {
-  display: flex;
-  gap: calc(4px * var(--ui-scale, 1));
-  flex-shrink: 0;
-  background: rgba(11, 20, 34, 0.6);
-  padding: 3px;
-  border-radius: calc(8px * var(--ui-scale, 1));
-  border: 1px solid rgba(56, 82, 104, 0.35);
-}
-.debrief-tabs > .btn {
-  flex: 1;
-  text-align: center;
-  border-radius: calc(6px * var(--ui-scale, 1));
-  min-height: calc(30px * var(--ui-scale, 1));
-  padding: calc(6px * var(--ui-scale, 1)) calc(8px * var(--ui-scale, 1));
-  font-size: calc(11px * var(--ui-scale, 1));
-  font-weight: 600;
-  border: none;
-  background: transparent;
-  color: #94a3b8;
-  transition: all 0.15s ease;
-}
-.debrief-tabs > .btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #e2e8f0;
-}
-.debrief-tabs > .btn[aria-selected="true"] {
-  background: #0284c7;
-  color: #ffffff;
-  font-weight: 700;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-
-.debrief-card .btn {
+.debrief-overlay .btn {
   min-height: calc(34px * var(--ui-scale, 1));
   padding: calc(8px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
   border: 1px solid #385268;
@@ -319,17 +261,17 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   box-shadow: none;
   transform: none;
 }
-.debrief-card .btn:hover { background: #263c51; border-color: #538aa4; }
-.debrief-card .btn.debrief-primary {
+.debrief-overlay .btn:hover { background: #263c51; border-color: #538aa4; }
+.debrief-overlay .btn.debrief-primary {
   background: #157598;
   border-color: #538aa4;
 }
-.debrief-card .btn:disabled, .debrief-card .btn.is-disabled {
+.debrief-overlay .btn:disabled, .debrief-overlay .btn.is-disabled {
   opacity: .35;
   cursor: not-allowed;
   pointer-events: none;
 }
-.debrief-card :focus-visible { outline: 2px solid #67e8f9; outline-offset: 2px; }
+.debrief-overlay :focus-visible { outline: 2px solid #67e8f9; outline-offset: 2px; }
 
 /* Internal panels scrollable area */
 .debrief-panels {
@@ -338,12 +280,10 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  padding-bottom: 4px;
-}
-.debrief-panels > section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: calc(10px * var(--ui-scale, 1));
+  padding: 2px 2px 6px;
 }
 
 /* Sticky Bottom Action Bar Hierarchy */
@@ -359,57 +299,13 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   z-index: 5;
   flex-shrink: 0;
 }
-.debrief-secondary-actions {
-  display: flex;
-  gap: calc(8px * var(--ui-scale, 1));
-  width: 100%;
-}
-.debrief-secondary-actions > .btn {
-  flex: 1 1 0;
-}
-
-/* Primary CTA: High-contrast accent gradient */
-.debrief-card .btn#debrief-retry {
-  width: 100%;
-  min-height: calc(38px * var(--ui-scale, 1));
-  padding: calc(9px * var(--ui-scale, 1)) calc(14px * var(--ui-scale, 1));
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  border: 1px solid rgba(56, 189, 248, 0.6);
-  border-radius: calc(8px * var(--ui-scale, 1));
-  color: #ffffff;
-  font-weight: 700;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
-  transition: all 0.15s ease;
-}
-.debrief-card .btn#debrief-retry:hover {
-  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
-  border-color: #38bdf8;
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.5);
-}
-
-/* Secondary outline/ghost action buttons */
-.debrief-card .btn.debrief-secondary {
-  background: rgba(20, 37, 54, 0.7);
-  border: 1px solid #385268;
-  color: #cbd5e1;
-  text-align: center;
-  font-weight: 600;
-  transition: all 0.15s ease;
-}
-.debrief-card .btn.debrief-secondary:hover {
-  background: #263c51;
-  border-color: #538aa4;
-  color: #f8fafc;
-}
-
 /* Telemetry Metrics Grid */
-.debrief-stats {
+.debrief-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: calc(8px * var(--ui-scale, 1));
 }
-.debrief-stats > div {
+.debrief-metric {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -418,19 +314,28 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   background: rgba(20, 37, 54, 0.6);
   border: 1px solid rgba(56, 82, 104, 0.4);
 }
-.debrief-stats strong {
+.debrief-metric strong {
   font-size: calc(16px * var(--ui-scale, 1));
   font-variant-numeric: tabular-nums;
   line-height: 1.4;
   color: #f8fafc;
 }
-.debrief-stats span {
+.debrief-metric span {
   color: #94a3b8;
   font-size: calc(10px * var(--ui-scale, 1));
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 600;
 }
+.debrief-metric[data-stat="sink"] { grid-column: span 2; }
+.debrief-record-section,
+.debrief-share-section {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--ui-scale, 1));
+}
+.debrief-replay-actions { display: flex; gap: calc(8px * var(--ui-scale, 1)); }
+.debrief-replay-actions > .btn { flex: 1 1 0; }
 
 #debrief-touchdown { display: flex; flex-direction: column; gap: 4px; }
 
@@ -515,28 +420,28 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   font-size: calc(11px * var(--ui-scale, 1));
 }
 
-.debrief-card [hidden] { display: none !important; }
-body[data-flow="debrief"] :is(.menu-toggle, .hud-strip, .hud-top-actions, .ap-bar, .flight-toolbar, .flight-panel, .quick-mute, .presets-bar, .action-panel, #demo-banner, .demo-pill-btn, .touch-controls-overlay, .dev-live, .flight-warning, .stall-banner, .audio-start-hint) { display: none !important; }
+.debrief-overlay [hidden] { display: none !important; }
+body[data-flow="debrief"] :is(.menu-toggle, .hud-strip, .hud-top-actions, .ap-bar, .flight-toolbar, .flight-panel, .quick-mute, .presets-bar, .action-panel, #demo-banner, .demo-pill-btn, .touch-controls-overlay, .dev-live, .flight-warning, .stall-banner, .audio-start-hint, .toast) { display: none !important; }
 body[data-flow="debrief"] .btn-reset-pov:not([hidden]) { display: inline-flex !important; pointer-events: auto !important; z-index: 100 !important; }
 
 @media (max-width: 600px) {
   #debrief-overlay { justify-content: center; padding: 12px; }
-  .debrief-card {
+  .debrief-overlay {
     width: min(440px, 100%);
     margin: 0;
     max-height: calc(100dvh - 24px);
     padding: 14px 16px;
   }
-  .debrief-card .btn { min-height: 42px; }
-  .debrief-card .debrief-lobby-btn { min-height: 38px; padding: 0 10px; }
-  .debrief-card .debrief-feedback-btn { width: 38px; height: 38px; min-height: 38px; }
+  .debrief-overlay .btn { min-height: 42px; }
+  .debrief-overlay .debrief-lobby-btn { min-height: 38px; padding: 0 10px; }
+  .debrief-overlay .debrief-feedback-btn { width: 38px; height: 38px; min-height: 38px; }
 }
 /* Issue #597: phone-width headers squeeze the title column below "Flight3d"; the fold button keeps its glyph and label. */
 @media (max-width: 420px) {
   .debrief-fold-btn .fold-caption { display: none; }
 }
 @media (max-height: 500px) and (min-width: 601px) {
-  .debrief-card {
+  .debrief-overlay {
     margin-left: max(16px, env(safe-area-inset-left));
     max-height: calc(100dvh - 16px);
   }

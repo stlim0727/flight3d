@@ -27,15 +27,16 @@ test('DiagnosticsInspector uses chevron glyph instead of OS window minus charact
   assert.ok(!diagSrc.includes("textContent = isFolded ? '+' : '−'"), 'diag fold must not toggle +/-');
 });
 
-test('DebriefOverlay separates instant retry and setup change actions', () => {
+test('DebriefOverlay offers a single Return to Lobby exit instead of tabs or a retry button (#649)', () => {
   // Check markup
   const debriefSrc = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
-  assert.ok(debriefSrc.includes('id="debrief-retry"'), 'debrief must have debrief-retry');
-  assert.ok(debriefSrc.includes('id="debrief-change-setup"'), 'debrief must have debrief-change-setup');
-  assert.ok(debriefSrc.includes("data-i18n=\"debrief.retrySame\""), 'retry button must use debrief.retrySame');
-  assert.ok(debriefSrc.includes("data-i18n=\"debrief.changeConditions\""), 'change setup button must use debrief.changeConditions');
-  assert.ok(debriefSrc.includes("this.el('retry').addEventListener('click', onRetry)"), 'must bind onRetry');
-  assert.ok(debriefSrc.includes("this.el('change-setup')?.addEventListener('click', onLobby)"), 'must bind onLobby to change-setup');
+  assert.ok(debriefSrc.includes('id="debrief-lobby"'), 'debrief must have debrief-lobby');
+  assert.ok(debriefSrc.includes('class="debrief-footer"'), 'the return to lobby button must live in the debrief-footer');
+  assert.ok(debriefSrc.includes('data-i18n="debrief.lobby"'), 'lobby button must use debrief.lobby');
+  assert.ok(debriefSrc.includes("this.el('lobby').addEventListener('click', onLobby)"), 'must bind onLobby');
+  assert.ok(!debriefSrc.includes('id="debrief-retry"'), 'debrief must not reinstate the instant retry button');
+  assert.ok(!debriefSrc.includes('id="debrief-change-setup"'), 'debrief must not reinstate the change setup button');
+  assert.ok(!debriefSrc.includes('role="tab"'), 'debrief must not reinstate tabs');
 });
 
 test('Touch controls CSS and JS define translucent outline styles and auto-fading', () => {
@@ -99,19 +100,19 @@ test('Mobile header layout and audio hint snackbar positioning are correctly con
 
 test('DebriefOverlay UI layout, header hierarchy, and styling tokens', () => {
   const debriefSrc = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
-  assert.ok(debriefSrc.includes('class="debrief-header-actions"'), 'header must have debrief-header-actions');
+  assert.ok(debriefSrc.includes('<header class="debrief-header">'), 'must have a debrief-header');
   assert.ok(debriefSrc.includes('id="debrief-feedback"'), 'header must contain debrief-feedback');
   assert.ok(debriefSrc.includes('id="debrief-fold"'), 'header must contain debrief-fold');
   assert.ok(debriefSrc.includes('id="debrief-pill"'), 'header must contain debrief-pill');
-  assert.ok(debriefSrc.includes('class="debrief-secondary-actions"'), 'actions must contain debrief-secondary-actions');
+  assert.ok(debriefSrc.includes('class="debrief-share-section"'), 'actions must live in debrief-share-section');
 
   const css = readFileSync(resolve('src/styles/debrief.css'), 'utf8');
-  assert.ok(css.includes('rgba(15, 23, 42, 0.85)'), 'debrief card must use dark cockpit glass background');
-  assert.ok(css.includes('backdrop-filter: blur(16px)'), 'debrief card must use 16px blur');
-  assert.ok(css.includes('max-width: min(calc(440px * var(--ui-scale, 1))') || css.includes('max-width: 440px'), 'debrief card must enforce scaled max width');
-  assert.ok(css.includes('max-height: calc(100dvh - 32px)'), 'debrief card must enforce max height');
-  assert.ok(css.includes('position: sticky'), 'debrief actions must be sticky');
-  assert.ok(css.includes('linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'), 'retry button must use primary accent gradient');
+  assert.ok(css.includes('rgba(15, 23, 42, 0.85)'), 'debrief overlay must use dark cockpit glass background');
+  assert.ok(css.includes('backdrop-filter: blur(16px)'), 'debrief overlay must use 16px blur');
+  assert.ok(css.includes('max-width: min(calc(440px * var(--ui-scale, 1))') || css.includes('max-width: 440px'), 'debrief overlay must enforce scaled max width');
+  assert.ok(css.includes('max-height: calc(100dvh - 32px)'), 'debrief overlay must enforce max height');
+  assert.ok(css.includes('.debrief-overlay'), 'CSS must define the debrief-overlay container');
+  assert.ok(css.includes('.debrief-footer'), 'CSS must define the debrief-footer bar');
 });
 
 test('Multi-viewport screens showcases, concurrent capture, and navigation switcher', () => {

@@ -1,6 +1,6 @@
 // Start Vite and an isolated hardware Chrome with CDP; see browser-gpu.md.
 import assert from 'node:assert/strict';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { assertHardwareDraw } from './verify-browser-gpu.mjs';
 
@@ -84,17 +84,15 @@ try {
   assert.ok(await ev('s.flightRecorder.elapsed') >= before + 7.9);
   await click('#btn-pause-end');
   assert.equal(await ev('s.gameFlow.state'), 'debrief');
-  assert.equal(await ev('document.activeElement.id'), 'debrief-tab-summary');
+  assert.equal(await ev('getComputedStyle(document.querySelector("#debrief-overlay")).display'), 'flex');
   assert.equal(await ev('s.debriefReport.sufficient'), true);
   const duration = await ev('s.debriefReport.durationSec');
   await ev('s.stepSimulation(2)');
   assert.equal(await ev('s.debriefReport.durationSec'), duration);
   await shot('summary');
-  await click('#debrief-tab-record');
   await ev(`document.querySelector('#debrief-scrub').value=10;document.querySelector('#debrief-scrub').dispatchEvent(new Event('input'));`);
   assert.match(await ev('document.querySelector("#debrief-sample").textContent'), /FT.*KT.*G/);
   await shot('record');
-  await click('#debrief-tab-share');
   await send('Browser.setPermission', { permission: { name: 'clipboard-write' }, setting: 'granted', origin: new URL(url).origin });
   await send('Browser.setPermission', { permission: { name: 'clipboard-read' }, setting: 'granted', origin: new URL(url).origin });
   await click('#debrief-copy');
@@ -104,12 +102,14 @@ try {
   }
   assert.match(await ev('document.querySelector("#debrief-status").textContent'), /복사했습니다/);
   assert.match(await ev('await navigator.clipboard.readText()'), /Flight3d.*\nCessna/s);
-  await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: output });
+  // Capture the export blob in the page instead of relying on Browser download permissions.
+  await ev(`window.__exports=[];const origCreateObjectURL=URL.createObjectURL.bind(URL);URL.createObjectURL=blob=>{blob.text().then(text=>window.__exports.push(text));return origCreateObjectURL(blob);};`);
   await click('#debrief-export');
   let exported;
-  for (let n = 0; n < 20; n++) {
-    try { exported = JSON.parse(await readFile(resolve(output, 'flight3d-C172-flight.json'), 'utf8')); break; }
-    catch { await new Promise(resolve => setTimeout(resolve, 100)); }
+  for (let n = 0; n < 20 && !exported; n++) {
+    const text = await ev('window.__exports[0]');
+    if (text) exported = JSON.parse(text);
+    else await new Promise(resolve => setTimeout(resolve, 100));
   }
   assert.equal(exported?.metadata.aircraft, 'C172');
   assert.ok(exported?.samples.length > 1);
@@ -120,15 +120,12 @@ try {
   await shot('copy-failed');
   for (const [width, height] of [[390, 844], [320, 568], [844, 390], [568, 320]]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
-    for (const name of ['summary', 'record', 'share']) {
-      await click(`#debrief-tab-${name}`);
-      assert.equal(await ev(`document.querySelector('.debrief-card').getBoundingClientRect().right <= innerWidth`), true);
-      await shot(`${name}-${width}x${height}`);
-    }
+    assert.equal(await ev(`document.querySelector('.debrief-overlay').getBoundingClientRect().right <= innerWidth`), true);
+    await shot(`debrief-${width}x${height}`);
   }
   await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
-  await click('#debrief-tab-summary');
-  await click('#debrief-retry');
+  await click('#debrief-lobby');
+  await click('#btn-fly');
   await ev('s.gameFlow.pause()');
   assert.equal(await ev('s.flightRecorder.elapsed < 5'), true);
   assert.equal(await ev('s.currentAircraftId'), 'C172');
@@ -165,7 +162,7 @@ try {
   }
   assert.equal(await ev('s.gameFlow.state'), 'debrief');
   assert.equal(await ev('JSON.stringify(s.debriefReport)'), crashReport);
-  assert.equal(await ev('document.activeElement.id'), 'debrief-tab-summary');
+  assert.equal(await ev('getComputedStyle(document.querySelector("#debrief-overlay")).display'), 'flex');
   // Issue #365: the debrief carries the collision that ended the sortie.
   assert.deepEqual(await ev('[s.debriefReport.version, s.debriefReport.crash.type, s.debriefReport.crash.speedKnots]'), [2, 'TERRAIN', 100]);
   assert.equal(await ev('getComputedStyle(document.querySelector("#debrief-crash")).display'), 'flex');
@@ -182,8 +179,9 @@ try {
   assert.equal(await ev('getComputedStyle(document.querySelector("#debrief-impact-marker")).display'), 'inline', 'impact marker is rendered');
   await shot('crash-debrief');
 
-  // Menu entry cancels the pending transition; retry starts a clean sortie.
-  await click('#debrief-retry');
+  // Menu entry cancels the pending transition; the lobby button starts a clean sortie.
+  await click('#debrief-lobby');
+  await click('#btn-fly');
   await ev(`s.triggerCrash({type:'TERRAIN',name:'Terrain',description:'Second impact',point:s.position.clone(),speedKnots:100});s.stepSimulation(.02);s.toggleMainMenu();`);
   assert.equal(await ev('s.crashDebriefRemaining'), null);
   await new Promise(resolve => setTimeout(resolve, 3200));
@@ -192,29 +190,32 @@ try {
   await click('#btn-lobby-end');
   assert.equal(await ev('s.gameFlow.state'), 'debrief');
   assert.equal(await ev('s.debriefReport.reason'), 'crash');
-  await click('#debrief-retry');
+  await click('#debrief-lobby');
+  await click('#btn-fly');
   await ev('s.gameFlow.pause()');
   assert.equal(await ev('s.crashDebriefRemaining'), null);
   assert.equal(await ev('s.flightRecorder.active && !s.isCrashed'), true);
 
   // Issue #370: a long headline stays on one line; hover, focus and tap reveal the full text.
-  const longName = '기체 지면 접촉 (TERRAIN / BODY STRIKE)';
+  // Long enough to overflow the headline at every tested width, even with narrow fallback fonts.
+  const longName = '충돌 지면 접촉 (TERRAIN / BODY STRIKE) — 기체 전면부가 활주로 말단 잔디 구역 끝단의 낮은 지형에 접촉하며 완전히 정지했습니다';
   await ev(`s.gameFlow.resume();s.stepSimulation(6);s.triggerCrash({type:'TERRAIN',name:${JSON.stringify(longName)},description:'Long headline',point:s.position.clone(),speedKnots:100});s.stepSimulation(.02);`);
   for (let n = 0; n < 100 && await ev('s.gameFlow.state !== "debrief"'); n++) await new Promise(resolve => setTimeout(resolve, 100));
   assert.equal(await ev('s.debriefReport.sufficient'), true);
   const headline = `document.querySelector("#debrief-outcome")`;
   const tipShown = `getComputedStyle(document.querySelector("#debrief-outcome-tip")).display !== "none"`;
   const headlineState = () => ev(`(h => ({ text: h.textContent, truncated: h.classList.contains("is-truncated"), overflowing: h.scrollWidth > h.clientWidth,
-    height: h.getBoundingClientRect().height, tabIndex: h.tabIndex,
-    panelOverflow: (p => p.scrollHeight - p.clientHeight)(document.querySelector(".debrief-panels")) }))(${headline})`);
+    height: h.getBoundingClientRect().height, tabIndex: h.tabIndex }))(${headline})`);
   for (const [width, height] of [[1280, 720], [390, 844], [844, 390], [320, 568]]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
     await new Promise(resolve => setTimeout(resolve, 150));
     const state = await headlineState();
     assert.equal(state.text, longName, 'the DOM keeps the full headline for assistive technology');
     assert.ok(state.truncated && state.overflowing && state.tabIndex === 0, `${width}x${height} long headline is truncated and focusable`);
-    assert.ok(state.height < 30, `${width}x${height} headline is one line`);
-    if (width === 1280) assert.ok(state.panelOverflow <= 0, '1280x720 summary fits without scrolling');
+    // One line at 14px type is 9px+20px+9px = 38px; two lines would be ~58px.
+    assert.ok(state.height < 45, `${width}x${height} headline is one line`);
+    // Single-scroll design (#649): the overlay stays on screen and panels scroll internally.
+    if (width === 1280) assert.ok(await ev(`document.querySelector(".debrief-overlay").getBoundingClientRect().bottom <= innerHeight`), '1280x720 overlay fits the viewport');
   }
   await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
   await new Promise(resolve => setTimeout(resolve, 150));
@@ -223,7 +224,7 @@ try {
   await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...center });
   assert.equal(await ev(tipShown), true, 'hover opens the tooltip');
   assert.deepEqual(await ev('(t => [t.textContent, t.getAttribute("aria-hidden")])(document.querySelector("#debrief-outcome-tip"))'), [longName, 'true']);
-  assert.equal(await ev(`(t => (c => t.left >= c.left && t.right <= c.right)(document.querySelector(".debrief-card").getBoundingClientRect()))(document.querySelector("#debrief-outcome-tip").getBoundingClientRect())`), true, 'tooltip stays inside the card');
+  assert.equal(await ev(`(t => (c => t.left >= c.left && t.right <= c.right)(document.querySelector(".debrief-overlay").getBoundingClientRect()))(document.querySelector("#debrief-outcome-tip").getBoundingClientRect())`), true, 'tooltip stays inside the card');
   await shot('headline-tooltip');
   await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 400 });
   assert.equal(await ev(tipShown), false, 'leaving the headline closes the tooltip');
@@ -236,7 +237,7 @@ try {
   await ev(`${headline}.blur()`);
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
   await ev(`window.tapTypes=[];${headline}.addEventListener('pointerdown',e=>tapTypes.push(e.pointerType));
-    window.tapPrevented=[];window.addEventListener('touchstart',e=>{if(e.target.closest?.('.debrief-card'))tapPrevented.push(e.defaultPrevented)});`);
+    window.tapPrevented=[];window.addEventListener('touchstart',e=>{if(e.target.closest?.('.debrief-overlay'))tapPrevented.push(e.defaultPrevented)});`);
   const tap = async point => {
     await send('Input.synthesizeTapGesture', { ...point, gestureSourceType: 'touch' });
     await new Promise(resolve => setTimeout(resolve, 150));
@@ -250,7 +251,7 @@ try {
   await send('Emulation.setTouchEmulationEnabled', { enabled: false });
   assert.deepEqual(exceptions, [], 'no browser exceptions');
   await writeFile(resolve(output, 'results.json'), JSON.stringify({ gpu, durationSec: duration,
-    scenarios: ['manual end', 'pause exclusion', 'tabs', 'scrub', 'clipboard success/failure', 'JSON download', 'responsive', 'retry', 'insufficient data', 'main menu', 'crash observation', 'moving wreckage', 'crash pause exclusion', 'immutable impact report', 'delayed debrief', 'crash report in debrief', 'crash menu cancellation', 'crash retry', 'long headline ellipsis and tooltip'], exceptions }, null, 2));
+    scenarios: ['manual end', 'pause exclusion', 'record section', 'scrub', 'clipboard success/failure', 'JSON download', 'responsive', 'retry', 'insufficient data', 'main menu', 'crash observation', 'moving wreckage', 'crash pause exclusion', 'immutable impact report', 'delayed debrief', 'crash report in debrief', 'crash menu cancellation', 'crash relaunch', 'long headline ellipsis and tooltip'], exceptions }, null, 2));
   console.log(JSON.stringify({ passed: true, output, gpu, durationSec: duration }));
 } finally {
   ws.close();

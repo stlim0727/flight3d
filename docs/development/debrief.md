@@ -130,9 +130,10 @@ CDP_URL=http://127.0.0.1:9432 SIM_URL=http://127.0.0.1:5232/ node scripts/verify
 ```
 
 The script checks a hardware WebGL2 draw/red pixel (including Windows/D3D11),
-manual end, tabs, chart selection, clipboard success/failure, downloaded JSON,
-responsive layouts, retry, insufficient data, menu return, visible moving wreckage
-before delayed debrief, pause exclusion, immutable impact data and crash-menu cancellation.
+manual end, the single scrolling summary view, chart selection, clipboard
+success/failure, exported JSON, responsive layouts, the lobby exit and a fresh
+sortie, insufficient data, menu return, visible moving wreckage before delayed
+debrief, pause exclusion, immutable impact data and crash-menu cancellation.
 Screenshots, GPU details and results go to `review-artifacts/debrief`. Headless
 focus emulation prevents the simulator's background-tab hold during startup.
 This is desktop Chrome evidence, not a physical mobile/native share test.
