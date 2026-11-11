@@ -8,14 +8,14 @@ import { SAVE_REPLAY_STATUS, DEBRIEF_ACTIONS } from '../src/ui/DebriefOverlay.js
 import enDebrief from '../src/i18n/locales/en/debrief.js';
 import koDebrief from '../src/i18n/locales/ko/debrief.js';
 
-test('debrief overlay positions main menu back button at top left with u-turn arrow and caption', () => {
+test('debrief overlay positions main menu back button in the footer with u-turn arrow and caption', () => {
   const debriefSource = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
 
-  // Must have debrief-header at top of debrief-card with debrief-lobby button
+  // Must have debrief-footer at the bottom of the overlay with debrief-lobby button
   assert.match(
     debriefSource,
-    /<header class="debrief-header">[\s\S]*?<button class="btn debrief-lobby-btn" id="debrief-lobby"[\s\S]*?<\/header>/,
-    'debrief-lobby button must be inside debrief-header at the top of the card'
+    /<footer class="debrief-footer">[\s\S]*?<button class="btn debrief-primary debrief-lobby-btn" id="debrief-lobby"[\s\S]*?<\/footer>/,
+    'debrief-lobby button must be inside debrief-footer at the bottom of the overlay'
   );
 
   // Must contain u-turn arrow glyph ↩
@@ -44,16 +44,12 @@ test('debrief overlay positions main menu back button at top left with u-turn ar
     'debrief-lobby must have localized title'
   );
 
-  // debrief-actions must no longer contain debrief-lobby or debrief-feedback
+  // debrief-actions must not contain debrief-lobby or debrief-feedback
   const debriefActionsMatch = debriefSource.match(/<div class="debrief-actions">([\s\S]*?)<\/div>/);
   assert.ok(debriefActionsMatch, 'debrief-actions block must exist');
   assert.ok(
     !debriefActionsMatch[1].includes('id="debrief-lobby"'),
-    'debrief-actions at bottom must not contain debrief-lobby'
-  );
-  assert.ok(
-    debriefActionsMatch[1].includes('id="debrief-retry"'),
-    'debrief-actions must contain debrief-retry'
+    'debrief-actions must not contain debrief-lobby'
   );
   assert.ok(
     !debriefActionsMatch[1].includes('id="debrief-feedback"'),
@@ -64,6 +60,9 @@ test('debrief overlay positions main menu back button at top left with u-turn ar
     /<header class="debrief-header">[\s\S]*?id="debrief-feedback"[\s\S]*?<\/header>/,
     'debrief-feedback must be inside debrief-header as a discrete utility icon button'
   );
+  // The streamlined overlay is a single scrolling view without tabs (#649).
+  assert.doesNotMatch(debriefSource, /role="tab"/, 'the overlay must not reinstate tabs');
+  assert.doesNotMatch(debriefSource, /id="debrief-retry"/, 'the overlay must not reinstate the instant retry button');
 });
 
 test('debrief localization includes Main menu caption for both locales', () => {
@@ -78,7 +77,7 @@ test('debrief CSS defines responsive styling for top-left header and back button
   assert.ok(cssSource.includes('.debrief-lobby-btn'), 'CSS must define .debrief-lobby-btn');
   assert.ok(cssSource.includes('.debrief-back-glyph'), 'CSS must define .debrief-back-glyph');
   assert.ok(cssSource.includes('.debrief-back-caption'), 'CSS must define .debrief-back-caption');
-  assert.ok(cssSource.includes('.debrief-card .debrief-lobby-btn'), 'CSS must define .debrief-card .debrief-lobby-btn');
+  assert.ok(cssSource.includes('.debrief-overlay .debrief-lobby-btn'), 'CSS must define .debrief-overlay .debrief-lobby-btn');
 });
 
 test('pause menu positions main menu back button at top left with u-turn arrow and caption', () => {
@@ -109,10 +108,15 @@ test('pilot arena score modal provides prominent top-left return to main menu bu
 test('debrief offers save replay only when the sortie produced a pose track', () => {
   const debriefSource = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
   assert.match(debriefSource, /show\(report, replay = null\)/, 'show must accept the recorded track');
-  assert.match(debriefSource, /id="debrief-save-replay" data-i18n="debrief\.saveReplay" hidden/);
+  assert.match(debriefSource, /id="debrief-save-replay"[^>]*hidden/);
+  assert.match(debriefSource, /<button class="btn" id="debrief-save-replay"[\s\S]*?data-i18n="debrief\.saveReplay"/,
+    'save replay caption must use debrief.saveReplay');
   assert.match(debriefSource, /this\.el\('save-replay'\)\.hidden = !replay;/);
   assert.match(debriefSource, /this\.el\('save-replay'\)\.disabled = false;/, 'a fresh debrief must be savable again');
-  const share = debriefSource.match(/<section id="debrief-share"[\s\S]*?<\/section>/)[0];
+  const shareStart = debriefSource.indexOf('debrief-share-section');
+  const shareEnd = debriefSource.indexOf('debrief-footer');
+  assert.ok(shareStart >= 0 && shareEnd > shareStart, 'debrief-share-section must precede the debrief-footer');
+  const share = debriefSource.slice(shareStart, shareEnd);
   assert.ok(share.includes('id="debrief-save-replay"') && share.includes('id="debrief-status"'),
     'save replay must sit beside the live region that reports its result');
   assert.match(debriefSource, /if \(this\.replaySaved\) return;/, 'one save per sortie');
@@ -155,7 +159,7 @@ test('header outcome pill shows a short single-line label instead of a sentence 
 test('every debrief action names a button that exists in the overlay markup', () => {
   const source = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
   const actions = Object.entries(DEBRIEF_ACTIONS);
-  assert.ok(actions.length >= 9);
+  assert.ok(actions.length >= 7);
   for (const [id, action] of actions) {
     assert.match(source, new RegExp(`id="debrief-${id}"`), `${action} must be bound to #debrief-${id}`);
     assert.match(action, /^[a-z_]+$/, 'action values are snake_case event properties');

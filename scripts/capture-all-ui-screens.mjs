@@ -865,15 +865,14 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
     window.simulator.debriefReplay = { durationSec: 184.2, frames: [] };
     window.simulator.gameFlow.endFlight();
     window.simulator.debriefOverlay.show(mockReport, window.simulator.debriefReplay);
-    document.querySelector('#debrief-tab-summary')?.click();
   });
   await delay(300);
   await recordScreen(screenshot, {
     id: '28_debrief_flight_summary',
     category: 'debrief',
     file: '28_debrief_flight_summary.png',
-    title_ko: '디브리프 — 비행 종합 요약 탭',
-    title_en: 'Debrief Overlay — Flight Summary Tab',
+    title_ko: '디브리프 — 비행 종합 요약',
+    title_en: 'Debrief Overlay — Flight Summary',
     description_ko: '비행 종합 결과: 총 비행 시간, 최고 도달 고도, 최고 대기속도, 최대 하중(G-Force)',
     description_en: 'Flight summary: duration, peak altitude, top airspeed, and maximum G-force',
     selector: '#debrief-overlay',
@@ -895,7 +894,6 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
       };
       window.simulator.debriefReport = mockLandingReport;
       window.simulator.debriefOverlay.show(mockLandingReport, window.simulator.debriefReplay);
-      document.querySelector('#debrief-tab-summary')?.click();
     });
     await delay(300);
     await recordScreen(screenshot, {
@@ -911,32 +909,30 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
     });
 
     // 30. Debrief - Record Chart
-    await evaluate(() => { document.querySelector('#debrief-tab-record')?.click(); });
     await delay(300);
     await recordScreen(screenshot, {
       id: '30_debrief_flight_record_chart',
       category: 'debrief',
       file: '30_debrief_flight_record_chart.png',
-      title_ko: '디브리프 — 비행 기록 탭 (SVG 고도 차트)',
+      title_ko: '디브리프 — 비행 기록 (SVG 고도 차트)',
       title_en: 'Debrief Overlay — Flight Record Chart (SVG)',
       description_ko: '비행 고도 프로파일 SVG 곡선 차트, 타임라인 스크러버 및 주요 비행 이벤트 마커',
       description_en: 'Flight altitude profile SVG curve chart, time scrubber, and flight event markers',
-      selector: '#debrief-record',
+      selector: '#debrief-view-record',
       tier: 'full',
     });
 
     // 31. Debrief - Share Report Tab
-    await evaluate(() => { document.querySelector('#debrief-tab-share')?.click(); });
     await delay(300);
     await recordScreen(screenshot, {
       id: '31_debrief_flight_share_report',
       category: 'debrief',
       file: '31_debrief_flight_share_report.png',
-      title_ko: '디브리프 — 보고서 공유 및 리플레이 저장 탭',
-      title_en: 'Debrief Overlay — Share Report Tab',
+      title_ko: '디브리프 — 보고서 공유 및 리플레이 저장',
+      title_en: 'Debrief Overlay — Share Report',
       description_ko: '텍스트 형식 비행 결과지 프리뷰, 클립보드 복사, 파일 내보내기 및 리플레이 저장',
       description_en: 'Text format debrief preview, copy to clipboard, export, and save replay actions',
-      selector: '#debrief-share',
+      selector: '.debrief-share-section',
       tier: 'full',
     });
 
@@ -954,7 +950,6 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
       };
       window.simulator.debriefReport = mockCrashReport;
       window.simulator.debriefOverlay.show(mockCrashReport, window.simulator.debriefReplay);
-      document.querySelector('#debrief-tab-summary')?.click();
     });
     await delay(300);
     await recordScreen(screenshot, {

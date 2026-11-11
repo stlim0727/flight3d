@@ -584,7 +584,6 @@ class SimulatorHudAndBindingsMethods {
     this.replayDirector.onChange = () => this.replayPanel.refresh();
     document.getElementById('btn-replays')?.addEventListener('click', () => this.replayPanel.openLibrary());
     this.debriefOverlay = new DebriefOverlay({
-      onRetry: () => this.retryDebrief(),
       onLobby: () => { this.demoDirector.stop(); this.gameFlow.returnToLobby(false); document.getElementById('btn-fly')?.focus(); },
       onFeedback: () => this.openFeedbackDialog?.(),
       onSaveReplay: () => this.saveDebriefReplay(),

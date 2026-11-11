@@ -40,95 +40,79 @@ export function reportText(report) {
 }
 
 export const SAVE_REPLAY_STATUS = Object.freeze({ tooShort: 'replay.tooShort', tooLong: 'replay.tooLong' });
-/** Debrief button id (after `debrief-`) to the `debrief_action` it reports. Camera, fold and tabs are autocaptured. */
+/** Debrief button id (after `debrief-`) to the `debrief_action` it reports. Camera and fold are autocaptured. */
 export const DEBRIEF_ACTIONS = Object.freeze({
-  retry: 'retry', 'change-setup': 'change_setup', lobby: 'lobby', feedback: 'feedback',
+  lobby: 'lobby', feedback: 'feedback',
   'watch-replay': 'watch_replay', 'save-replay': 'save_replay', copy: 'copy', 'native-share': 'share', export: 'export',
 });
 
 export class DebriefOverlay {
-  constructor({ onRetry, onLobby, onFeedback, onSaveReplay, onWatchReplay, onCycleCamera, getCameraModeName, onAction }) {
+  constructor({ onLobby, onFeedback, onSaveReplay, onWatchReplay, onCycleCamera, getCameraModeName, onAction }) {
     this.getCameraModeName = getCameraModeName;
     this.root = document.getElementById('debrief-overlay');
     this.root.innerHTML = `
-      <div class="debrief-card">
+      <div class="debrief-overlay" role="dialog" aria-labelledby="debrief-outcome">
         <header class="debrief-header">
-          <button class="btn debrief-lobby-btn" id="debrief-lobby" type="button" data-i18n-aria-label="debrief.lobby" data-i18n-title="debrief.lobby">
-            <span class="debrief-back-glyph" aria-hidden="true">↩</span>
-            <span class="debrief-back-caption" data-i18n="debrief.lobby"></span>
+          <span id="debrief-pill" class="debrief-header-pill" hidden></span>
+          <button class="btn debrief-camera-btn" id="debrief-camera" type="button" data-i18n-title="change.camera.c" data-i18n-aria-label="change.camera.c">
+            <span class="debrief-camera-icon" aria-hidden="true">🎥</span>
           </button>
-          <div class="debrief-title-wrap">
-            <div class="debrief-title-row">
-              <h2 id="debrief-title">Flight3d</h2>
-              <span id="debrief-pill" class="debrief-header-pill" hidden></span>
-            </div>
-            <p class="debrief-muted" data-i18n="debrief.title"></p>
-          </div>
-          <div class="debrief-header-actions">
-            <button class="btn debrief-camera-btn" id="debrief-camera" type="button" data-i18n-title="change.camera.c" data-i18n-aria-label="change.camera.c">
-              <span class="debrief-camera-icon" aria-hidden="true">🎥</span>
-            </button>
-            <button class="btn debrief-feedback-btn" id="debrief-feedback" type="button" data-i18n-title="debrief.feedback" data-i18n-aria-label="debrief.feedback">
-              <span class="debrief-feedback-icon" aria-hidden="true">🐞</span>
-            </button>
-            <button class="btn btn-card-fold debrief-fold-btn" id="debrief-fold" type="button" data-i18n-title="ui.fold" data-i18n-aria-label="ui.fold">
-              <span class="fold-glyph" aria-hidden="true">▾</span>
-              <span class="fold-caption" data-i18n="ui.fold"></span>
-            </button>
-          </div>
+          <button class="btn debrief-feedback-btn" id="debrief-feedback" type="button" data-i18n-title="debrief.feedback" data-i18n-aria-label="debrief.feedback">
+            <span class="debrief-feedback-icon" aria-hidden="true">🐞</span>
+          </button>
+          <button class="btn btn-card-fold debrief-fold-btn" id="debrief-fold" type="button" data-i18n-title="ui.fold" data-i18n-aria-label="ui.fold">
+            <span class="fold-glyph" aria-hidden="true">▾</span>
+          </button>
         </header>
-        <div class="debrief-tabs" role="tablist" data-i18n-aria-label="debrief.title">
-          ${['summary', 'record', 'share'].map(name => `<button class="btn" id="debrief-tab-${name}" role="tab" aria-controls="debrief-${name}" data-debrief-label="${name}"></button>`).join('')}
-        </div>
+
         <div class="debrief-panels">
-          <section id="debrief-summary" role="tabpanel" aria-labelledby="debrief-tab-summary" tabindex="0">
-            <div class="debrief-outcome"><h3 id="debrief-outcome"></h3><div id="debrief-outcome-tip" role="tooltip" aria-hidden="true" hidden></div></div>
-            <p id="debrief-identity" class="debrief-muted"></p>
-            <div id="debrief-crash" hidden>
-              <div class="debrief-crash-header"><span class="debrief-caption" data-i18n="debrief.crashReport"></span><strong data-i18n="debrief.crashSeverity"></strong></div>
-              <strong id="debrief-crash-name"></strong><p id="debrief-crash-desc"></p><p id="debrief-crash-facts"></p>
-            </div>
-            <div class="debrief-stats">
-              ${['duration', 'altitude', 'speed', 'g'].map(name => `<div data-stat="${name}"><span data-debrief-label="${name}"></span><strong id="debrief-stat-${name}"></strong></div>`).join('')}
-              <div data-stat="touchdown" id="debrief-stat-sink-card" hidden><span data-i18n="debrief.touchdown"></span><strong id="debrief-stat-sink"></strong></div>
-              <div data-stat="empty-touchdown" hidden><span data-i18n="debrief.touchdown"></span><strong>—</strong></div>
-            </div>
-            <div id="debrief-touchdown"><p class="debrief-caption" data-i18n="debrief.touchdown"></p><p id="debrief-contact"></p><p id="debrief-contact-note" class="debrief-caption"></p></div>
-            <p id="debrief-insufficient" class="debrief-muted" data-i18n="debrief.insufficient" hidden></p>
-            <button class="btn" id="debrief-view-record" data-i18n="debrief.viewRecord"></button>
-          </section>
-          <section id="debrief-record" role="tabpanel" aria-labelledby="debrief-tab-record" tabindex="0" hidden>
-            <h3 data-i18n="debrief.history"></h3><p class="debrief-caption" data-i18n="debrief.altitudeAxis"></p>
+          <div class="debrief-outcome"><h3 id="debrief-outcome"></h3><div id="debrief-outcome-tip" role="tooltip" aria-hidden="true" hidden></div></div>
+          <p id="debrief-identity" class="debrief-identity"></p>
+          <div id="debrief-crash" class="debrief-crash" hidden>
+            <strong id="debrief-crash-name"></strong><p id="debrief-crash-desc"></p><p id="debrief-crash-facts" class="debrief-facts"></p>
+          </div>
+          <div class="debrief-grid">
+            <div class="debrief-metric" data-stat="duration"><span data-i18n="debrief.duration"></span><strong id="debrief-stat-duration"></strong></div>
+            <div class="debrief-metric" data-stat="altitude"><span data-i18n="debrief.altitude"></span><strong id="debrief-stat-altitude"></strong></div>
+            <div class="debrief-metric" data-stat="speed"><span data-i18n="debrief.speed"></span><strong id="debrief-stat-speed"></strong></div>
+            <div class="debrief-metric" data-stat="g"><span data-i18n="debrief.g"></span><strong id="debrief-stat-g"></strong></div>
+            <div id="debrief-stat-sink-card" class="debrief-metric" data-stat="sink" hidden><span data-i18n="debrief.sink"></span><strong id="debrief-stat-sink"></strong></div>
+          </div>
+          <div id="debrief-touchdown" class="debrief-touchdown">
+            <p id="debrief-contact" class="debrief-facts"></p><p id="debrief-contact-note" class="debrief-contact-note"></p>
+          </div>
+          <p id="debrief-insufficient" class="debrief-insufficient" data-i18n="debrief.insufficient" hidden></p>
+
+          <div id="debrief-view-record" class="debrief-record-section">
             <svg id="debrief-chart" viewBox="0 0 320 90" role="img" data-i18n-aria-label="debrief.altitudeAxis"><defs><linearGradient id="debrief-altitude-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.32"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0.0"/></linearGradient></defs><path d="M0 85 H320" stroke="#385268"/><polygon class="debrief-chart-area" fill="url(#debrief-altitude-gradient)"/><polyline fill="none" stroke="#38bdf8" stroke-width="2"/><circle id="debrief-impact-marker" r="4" fill="#ef4444" stroke="#e2e8f0" hidden/><circle id="debrief-cursor" r="3" fill="#e2e8f0"/></svg>
-            <div id="debrief-axis" class="debrief-caption"></div>
             <input id="debrief-scrub" type="range" min="0" value="0" step="1" data-i18n-aria-label="debrief.inspect" />
-            <output id="debrief-sample" for="debrief-scrub"></output>
-            <ol id="debrief-events"></ol><p class="debrief-muted" data-i18n="debrief.inspectHint"></p>
-            <button class="btn" data-debrief-tab="share" data-i18n="debrief.shareReport"></button>
-          </section>
-          <section id="debrief-share" role="tabpanel" aria-labelledby="debrief-tab-share" tabindex="0" hidden>
-            <h3 data-i18n="debrief.report"></h3><p id="debrief-preview"></p>
-            <button class="btn debrief-primary" id="debrief-copy" data-i18n="debrief.copy"></button>
-            <button class="btn" id="debrief-export" data-i18n="debrief.export"></button>
-            <button class="btn" id="debrief-native-share" data-i18n="debrief.shareReport" hidden></button>
-            <button class="btn" id="debrief-save-replay" data-i18n="debrief.saveReplay" hidden></button>
-            <p class="debrief-caption" data-i18n="debrief.shareHint"></p>
+            <div id="debrief-axis" class="debrief-axis" aria-hidden="true"></div>
+            <p id="debrief-sample" class="debrief-sample" aria-live="polite">—</p>
+            <ul id="debrief-events" class="debrief-events"></ul>
+          </div>
+
+          <div class="debrief-share-section">
             <p id="debrief-status" role="status" aria-live="polite"></p>
-            <button class="btn" data-debrief-tab="summary" data-i18n="debrief.back"></button>
-          </section>
-        </div>
-        <div class="debrief-actions">
-          <button class="btn debrief-primary" id="debrief-retry"><span class="btn-icon" aria-hidden="true">🔄</span> <span data-i18n="debrief.retrySame"></span></button>
-          <div class="debrief-secondary-actions">
-            <button class="btn debrief-secondary" id="debrief-change-setup"><span class="btn-icon" aria-hidden="true">⚙️</span> <span data-i18n="debrief.changeConditions"></span></button>
-            <button class="btn debrief-secondary" id="debrief-watch-replay" hidden><span class="btn-icon" aria-hidden="true">▶️</span> <span data-i18n="replay.watch"></span></button>
+            <textarea id="debrief-preview" readonly aria-hidden="true" tabindex="-1"></textarea>
+            <div class="debrief-actions">
+              <button class="btn" id="debrief-copy"><span class="btn-icon" aria-hidden="true">📋</span> <span data-i18n="debrief.copy"></span></button>
+              <button class="btn" id="debrief-export"><span class="btn-icon" aria-hidden="true">💾</span> <span data-i18n="debrief.export"></span></button>
+              <button class="btn" id="debrief-native-share" hidden><span class="btn-icon" aria-hidden="true">↗️</span> <span data-i18n="debrief.share"></span></button>
+            </div>
+            <div class="debrief-replay-actions">
+              <button class="btn" id="debrief-save-replay" hidden><span class="btn-icon" aria-hidden="true">💾</span> <span data-i18n="debrief.saveReplay"></span></button>
+              <button class="btn" id="debrief-watch-replay" hidden><span class="btn-icon" aria-hidden="true">▶️</span> <span data-i18n="replay.watch"></span></button>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="debrief-unfold-actions">
+
+        <footer class="debrief-footer">
+          <button class="btn debrief-primary debrief-lobby-btn" id="debrief-lobby" type="button" data-i18n-title="debrief.lobby" data-i18n-aria-label="debrief.lobby">
+            <span class="debrief-back-glyph" aria-hidden="true">↩</span> <span class="debrief-back-caption" data-i18n="debrief.lobby"></span>
+          </button>
+        </footer>
+
         <button id="debrief-unfold" class="ui-unfold-pill debrief-unfold-pill" type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
-          <span class="unfold-icon">📋</span>
-          <span class="unfold-caption" data-i18n="debrief.title"></span>
           <span class="unfold-glyph" aria-hidden="true">▴</span>
         </button>
         <button id="debrief-fold-camera" class="ui-unfold-pill debrief-camera-pill" type="button" hidden data-i18n-title="change.camera.c" data-i18n-aria-label="change.camera.c">
@@ -138,20 +122,6 @@ export class DebriefOverlay {
       </div>`;
     translateDOM(this.root);
     for (const el of this.root.querySelectorAll('[data-debrief-label]')) bindText(el, () => t(`debrief.${el.dataset.debriefLabel}`));
-    this.tabs = [...this.root.querySelectorAll('[role="tab"]')];
-    for (const [index, tab] of this.tabs.entries()) {
-      tab.addEventListener('click', () => this.selectTab(tab.id.replace('debrief-tab-', '')));
-      tab.addEventListener('keydown', event => {
-        const target = { ArrowRight: (index + 1) % 3, ArrowLeft: (index + 2) % 3, Home: 0, End: 2 }[event.key];
-        if (target === undefined) return;
-        event.preventDefault();
-        this.tabs[target].click(); this.tabs[target].focus();
-      });
-    }
-    for (const button of this.root.querySelectorAll('[data-debrief-tab]')) button.addEventListener('click', () => {
-      this.selectTab(button.dataset.debriefTab); this.tabs.find(tab => tab.getAttribute('aria-selected') === 'true').focus();
-    });
-    this.el('view-record').addEventListener('click', () => { this.selectTab('record'); this.el('tab-record').focus(); });
     this.el('scrub').addEventListener('input', () => this.inspect(Number(this.el('scrub').value)));
     this.el('chart').addEventListener('pointerdown', event => {
       const rect = this.el('chart').getBoundingClientRect();
@@ -162,11 +132,9 @@ export class DebriefOverlay {
     });
     this.el('watch-replay').addEventListener('click', async () => {
       this.el('watch-replay').disabled = true;
-      if (!await onWatchReplay?.()) { this.selectTab('share'); this.status('replay.loadFailed'); }
+      if (!await onWatchReplay?.()) this.status('replay.loadFailed');
       this.el('watch-replay').disabled = false;
     });
-    this.el('retry').addEventListener('click', onRetry);
-    this.el('change-setup')?.addEventListener('click', onLobby);
     this.el('lobby').addEventListener('click', onLobby);
     this.el('feedback').addEventListener('click', () => onFeedback?.());
     this.el('camera')?.addEventListener('click', () => {
@@ -278,17 +246,6 @@ export class DebriefOverlay {
     this.el('outcome-tip').hidden = !(open && this.el('outcome').classList.contains('is-truncated'));
   }
 
-  selectTab(name) {
-    this.showOutcomeTip(false);
-    for (const tab of this.tabs) {
-      const active = tab.id === `debrief-tab-${name}`;
-      tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1;
-      document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
-    }
-    this.el('retry').hidden = name === 'share';
-    this.root.querySelector('.debrief-panels').scrollTop = 0;
-  }
-
   show(report, replay = null) {
     this.report = report;
     this.replay = replay;
@@ -341,7 +298,6 @@ export class DebriefOverlay {
       : rawPeakG;
     this.el('stat-g').textContent = `${g(clampedPeakG)} G`;
     for (const key of ['altitude', 'speed', 'g']) this.root.querySelector(`[data-stat="${key}"]`).hidden = !enough;
-    this.root.querySelector('[data-stat="empty-touchdown"]').hidden = enough;
     const touchdown = report.touchdowns.at(-1);
     const clampedContactG = touchdown && Number.isFinite(touchdown.contactG)
       ? Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(0, touchdown.contactG))
@@ -383,9 +339,7 @@ export class DebriefOverlay {
     bindText(this.el('preview'), () => enough ? reportText(report) : t('debrief.insufficient'));
     this.status(null);
     this.drawChart();
-    this.selectTab('summary');
     this.measureOutcome();
-    this.el('tab-summary').focus();
   }
 
   drawChart() {

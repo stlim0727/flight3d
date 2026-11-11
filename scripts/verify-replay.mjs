@@ -26,7 +26,6 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   await ev(`(async()=>{window.s=window.simulator;(await import('/src/i18n/index.js')).setLanguage('en');s.lobby.airport='coastal';s.lobby.aircraft='C172';s.lobby.preset='cruise';s.setTimeOfDay(12,{persist:false});await s.fly();s.stepSimulation(10);s.gameFlow.pause();s.endFlight();})()`);
   assert.equal(await ev('s.gameFlow.state'), 'debrief');
   assert.ok(await ev('s.debriefReplay?.samples.length > 2'));
-  await click('#debrief-tab-share');
   await click('#debrief-save-replay');
   assert.equal(await ev('s.replayStore.list().length'), 1);
   await ev('window.replayExport=s.replayStore.exportJson(s.replayStore.list()[0].id);window.recordedTrack=s.debriefReplay;');
