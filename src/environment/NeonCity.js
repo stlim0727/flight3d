@@ -247,12 +247,10 @@ export class NeonCity {
       isLoaded: true,
       getHeight: (x, z) => this.getHeight(x, z),
       getNormal: (x, z) => this.getNormal(x, z),
-      // The canal's and the sea's water lies below the street (#551, #628);
-      // CollisionDetector reads it here.
-      getWaterLevel: (x, z) => (isLand(x, z) ? 0 : NEON_RIVER.waterLevel),
-      // The street and the water each sit exactly at their own level, so heights alone
-      // cannot tell a street crash from a water impact (#458, #648).
-      isWater: (x, z) => !isLand(x, z),
+      // One sea runs under the island at the canal's level (#551, #628). Reporting it under
+      // the street too keeps the street well above its water, so the shared water checks
+      // (CollisionDetector, WaterDitching, remote crashes) never call a street crash water (#458, #648).
+      getWaterLevel: () => NEON_RIVER.waterLevel,
     };
 
     this.airport = {

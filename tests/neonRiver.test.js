@@ -167,7 +167,7 @@ test('the city terrain sinks to the water between the quay walls and around the 
   assert.equal(city.terrain.getHeight(2300 + river.halfWidth + 1, 0), 0);
   assert.equal(city.terrain.getHeight(0, 0), 0);
   assert.equal(city.terrain.getWaterLevel(2300, 500), river.waterLevel);
-  assert.equal(city.terrain.getWaterLevel(1000, 500), 0);
+  assert.equal(city.terrain.getWaterLevel(1000, 500), river.waterLevel, 'the sea runs on under the street (#648)');
   assert.equal(city.terrain.getHeight(-1000, 300), river.waterLevel);
   assert.equal(city.terrain.getWaterLevel(-1000, 300), river.waterLevel);
   assert.equal(isRiver(2300, 9000), false, 'the canal ends at the shore of the island');
