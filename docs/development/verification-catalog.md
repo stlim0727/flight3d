@@ -18,6 +18,14 @@ the original neutral geometry, so its silhouette does not animate with controls.
 
 For rendering/input evidence, start the Vite server and launch Chromium with CDP on port 9447, then run `node scripts/verify-control-surfaces.mjs`. Output goes to `.cache/control-surfaces/` (override with `ARTIFACT_DIR`).
 
+The F-16 (issue #648) reuses the same clipper on its single merged
+`F-16-airframe_0` mesh: `f16ControlSurfaceSpecs()` in `src/aircraft/F16.js`
+splits all-moving stabilators (pitch plus 5° differential roll), flaperons
+(roll plus the 20° flap setting) and the rudder. Hinges are measured in
+`public/models/f-16.glb` airframe units; remeasure them if that asset changes.
+`node --test tests/f16.test.js` checks area conservation, deflection signs and
+neutral release on the real asset.
+
 ### Landing gear geometry acceptance
 
 `node scripts/test-gear-retraction.mjs --gpu` renders the loaded airframe and

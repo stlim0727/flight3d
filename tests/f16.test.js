@@ -265,3 +265,67 @@ test('loaded F16 configures canopy mesh and responds to cockpit mode transitions
   assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
   assert.equal(aircraft.canopyMaterial.opacity, 0.22);
 });
+
+function surfaceArea(geometry) {
+  const p = geometry.attributes.position, indices = geometry.index;
+  let sum = 0;
+  for (let i = 0; i < (indices?.count ?? p.count); i += 3) {
+    const [a, b, c] = [0, 1, 2].map(k => new THREE.Vector3().fromBufferAttribute(p, indices ? indices.getX(i + k) : i + k));
+    sum += b.sub(a).cross(c.sub(a)).length() / 2;
+  }
+  return sum;
+}
+
+test('loaded F16 deflects stabilators, flaperons and rudder from telemetry and restores neutral', async t => {
+  const loaded = await loadUntexturedAsset();
+  t.mock.method(GLTFLoader.prototype, 'loadAsync', async () => loaded);
+  const sourceArea = surfaceArea(loaded.scene.getObjectByName('Object_4').geometry) * F16_SCALE ** 2;
+  const aircraft = new F16({ exteriorOnly: true });
+  await aircraft.ready;
+  const surfaces = Object.fromEntries(aircraft.controlSurfaces.map(control => [control.name, control]));
+  assert.deepEqual(Object.keys(surfaces).sort(),
+    ['flaperonL', 'flaperonR', 'rudder', 'stabilatorL', 'stabilatorR']);
+  const airframe = aircraft.gltfGroup.getObjectByName('F-16-airframe_0');
+  let total = surfaceArea(airframe.geometry);
+  for (const control of aircraft.controlSurfaces) {
+    const moving = control.pivot.children[0];
+    assert.ok(moving.geometry.attributes.position.count > 30, `${control.name} has actual asset triangles`);
+    assert.strictEqual(moving.material, airframe.material);
+    total += surfaceArea(moving.geometry);
+  }
+  assert.ok(Math.abs(total - sourceArea) / sourceArea < 1e-5, 'splitting neither drops nor duplicates skin');
+
+  // Sample each surface's aftmost vertex (its trailing edge) in the aircraft frame.
+  const trailing = aircraft.controlSurfaces.map(control => {
+    const p = control.pivot.children[0].geometry.attributes.position;
+    let index = 0;
+    for (let i = 1; i < p.count; i++) if (p.getZ(i) > p.getZ(index)) index = i;
+    return new THREE.Vector3().fromBufferAttribute(p, index);
+  });
+  const sample = () => {
+    aircraft.group.updateMatrixWorld(true);
+    return Object.fromEntries(aircraft.controlSurfaces.map((control, i) =>
+      [control.name, control.pivot.localToWorld(trailing[i].clone())]));
+  };
+  const neutral = sample();
+  const moved = state => {
+    aircraft.update(0, { gearState: 1, ...state });
+    const positions = sample();
+    return Object.fromEntries(Object.entries(positions).map(([name, p]) => [name, p.clone().sub(neutral[name])]));
+  };
+  for (const sign of [1, 1, -1]) {
+    const pitch = moved({ elevator: sign });
+    assert.ok(sign * pitch.stabilatorL.y > .1 && sign * pitch.stabilatorR.y > .1, 'pull-up raises both stabilator trailing edges');
+    assert.ok(pitch.flaperonL.length() < 1e-6 && pitch.rudder.length() < 1e-6);
+    const roll = moved({ aileron: sign });
+    assert.ok(sign * roll.flaperonR.y > .1 && sign * roll.flaperonL.y < -.1, 'right roll raises starboard and lowers port flaperon');
+    assert.ok(sign * roll.stabilatorR.y > .02 && sign * roll.stabilatorL.y < -.02, 'stabilators assist roll differentially');
+    const yaw = moved({ rudder: sign });
+    assert.ok(sign * yaw.rudder.x > .1, 'right pedal swings the rudder trailing edge starboard');
+  }
+  const flaps = moved({ flapDegree: 20 });
+  assert.ok(flaps.flaperonL.y < -.1 && flaps.flaperonR.y < -.1, 'flaps lower both flaperons');
+  for (const released of [moved({}), moved({ elevator: NaN, aileron: Infinity, rudder: -Infinity, flapDegree: NaN })]) {
+    assert.ok(Object.values(released).every(delta => delta.length() < 1e-6), 'release and invalid telemetry restore neutral');
+  }
+});

@@ -37,15 +37,20 @@ function triangulate(polygon, output) {
 function geometryFrom(triangles, attributes) {
   const geometry = new THREE.BufferGeometry();
   for (const [name, attribute] of Object.entries(attributes)) {
-    const values = triangles.flatMap(triangle => triangle.flatMap(vertex => vertex[name]));
-    geometry.setAttribute(name, new THREE.Float32BufferAttribute(values, attribute.itemSize));
+    const size = attribute.itemSize;
+    const values = new Float32Array(triangles.length * 3 * size);
+    let offset = 0;
+    for (const triangle of triangles) {
+      for (const vertex of triangle) for (let k = 0; k < size; k++) values[offset++] = vertex[name][k];
+    }
+    geometry.setAttribute(name, new THREE.BufferAttribute(values, size));
   }
   geometry.normalizeNormals();
   geometry.computeBoundingSphere();
   return geometry;
 }
 
-function specifications() {
+function b737Specifications() {
   const specs = [];
   for (const [side, sign] of [['L', 1], ['R', -1]]) {
     const span = (min, max) => [plane(0, 0, sign, -min), plane(0, 0, -sign, max)];
@@ -63,8 +68,10 @@ function specifications() {
   return specs;
 }
 
-export function bindGltfControlSurfaces(model) {
-  const mesh = model.getObjectByName('B737');
+// Other airframes pass their own mesh name and hinge specifications; a spec may
+// supply deflection(state) in radians instead of a single input and gain.
+export function bindGltfControlSurfaces(model, { meshName = 'B737', specifications = b737Specifications } = {}) {
+  const mesh = model.getObjectByName(meshName);
   if (!mesh?.isMesh) return [];
   if (bindings.has(mesh)) return bindings.get(mesh);
   const source = mesh.geometry;
@@ -72,18 +79,32 @@ export function bindGltfControlSurfaces(model) {
   const position = attributes.position;
   let triangles = [];
   const count = source.index?.count ?? position.count;
+  // Indexed corners share one read-only vertex; clipping creates new ones.
+  const vertices = new Map(), entries = Object.entries(attributes);
+  const vertex = index => {
+    let result = vertices.get(index);
+    if (!result) {
+      result = {};
+      for (const [name, attribute] of entries) {
+        const values = result[name] = new Array(attribute.itemSize);
+        for (let k = 0; k < attribute.itemSize; k++) values[k] = attribute.getComponent(index, k);
+      }
+      vertices.set(index, result);
+    }
+    return result;
+  };
   for (let i = 0; i < count; i += 3) {
-    triangles.push([0, 1, 2].map(offset => {
-      const index = source.index ? source.index.getX(i + offset) : i + offset;
-      return Object.fromEntries(Object.entries(attributes).map(([name, attribute]) => [name,
-        Array.from({ length: attribute.itemSize }, (_, k) => attribute.getComponent(index, k))
-      ]));
-    }));
+    triangles.push([0, 1, 2].map(offset => vertex(source.index ? source.index.getX(i + offset) : i + offset)));
   }
   const controls = [];
   for (const spec of specifications()) {
     const moving = [], remaining = [];
     for (const triangle of triangles) {
+      // Most of the airframe lies wholly outside a surface; keep it without clipping.
+      if (spec.boundaries.some(boundary => triangle.every(v => distance(v, boundary) < 0))) {
+        remaining.push(triangle);
+        continue;
+      }
       let polygon = triangle;
       for (const boundary of spec.boundaries) {
         triangulate(clip(polygon, boundary, false), remaining);
@@ -114,6 +135,10 @@ export function bindGltfControlSurfaces(model) {
 
 export function updateGltfControlSurfaces(controls, state) {
   for (const control of controls ?? []) {
+    if (control.deflection) {
+      control.pivot.quaternion.setFromAxisAngle(control.axis, control.deflection(state));
+      continue;
+    }
     const raw = state[control.input];
     const value = Number.isFinite(raw) ? raw : 0;
     const limited = control.input === 'flapDegree'
