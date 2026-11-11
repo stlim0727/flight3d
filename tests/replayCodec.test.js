@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { encodeTrack, decodeTrack, toBase64, fromBase64, decodedByteLength,
-  REPLAY_TRACK_VERSION } from '../src/replay/ReplayCodec.js';
+  REPLAY_TRACK_VERSION, ROOM_TRACK_VERSION } from '../src/replay/ReplayCodec.js';
 import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
 import { RECORD_BYTES, HEADER_BYTES, REPLAY_BUDGET, REPLAY_INTERVAL_LADDER,
   maxSamplesFor, maxTrackSeconds, base64ByteLength } from '../src/replay/replayConfig.js';
@@ -132,7 +132,7 @@ test('corrupt, truncated and foreign payloads are rejected instead of playing no
   foreign[0] = 'X'.charCodeAt(0);
   assert.throws(() => decodeTrack(foreign), /not a flight3d replay track/);
   const future = new Uint8Array(bytes);
-  future[5] = REPLAY_TRACK_VERSION + 1;
+  future[5] = ROOM_TRACK_VERSION + 1;
   assert.throws(() => decodeTrack(future), /unsupported replay track version/);
   const badMeta = new Uint8Array(bytes);
   badMeta[HEADER_BYTES + 1] = 0xff;

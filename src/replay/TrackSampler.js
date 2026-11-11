@@ -83,8 +83,7 @@ export function sampleTrack(track, timeSec, out = {}, state = {}) {
   state.hint = index;
   const a = samples[index];
   const b = samples[index + 1] ?? a;
-  const span = b.timeSec - a.timeSec;
-  const alpha = span > 0 ? Math.min(1, Math.max(0, (time - a.timeSec) / span)) : 0;
+  const alpha = spanAlpha(a, b, time);
   out.timeSec = time;
   for (const name of LINEAR_FIELDS) out[name] = lerp(num(a[name]), num(b[name]), alpha);
   out.headingDeg = lerpDegrees(num(a.headingDeg), num(b.headingDeg), alpha);
@@ -109,6 +108,49 @@ export function sampleTrack(track, timeSec, out = {}, state = {}) {
     for (const name of ENGINE_SCALARS) target[name] = lerp(num(from[name]), num(to[name]), alpha);
     target.failed = (discrete[`engine${engine}`]?.failed) === true;
   }
+  return out;
+}
+
+/**
+ * Position inside a span. A respawn or restart between two samples is a teleport, so the
+ * earlier pose holds until the next segment's first sample instead of flying between them.
+ */
+function spanAlpha(a, b, time) {
+  if (time >= b.timeSec) return 1;
+  if ((a.segment ?? 0) !== (b.segment ?? 0)) return 0;
+  const span = b.timeSec - a.timeSec;
+  return span > 0 ? Math.min(1, Math.max(0, (time - a.timeSec) / span)) : 0;
+}
+
+/**
+ * Pose of one remote aircraft from a room track (#646), or null when it cannot be answered.
+ * `visible` is false while this client could not see that pilot; nothing is blended across
+ * a gap or a respawn.
+ */
+export function sampleRemote(track, remoteIndex, timeSec, out = {}, state = {}) {
+  const samples = track?.remotes?.[remoteIndex]?.samples;
+  if (!Number.isFinite(timeSec) || !Array.isArray(samples) || samples.length < 2) return null;
+  if (state.hint === undefined) state.hint = 0;
+  const time = Math.max(samples[0].timeSec, Math.min(samples.at(-1).timeSec, timeSec));
+  const index = findSpan(samples, time, state.hint);
+  state.hint = index;
+  const a = samples[index];
+  const b = samples[index + 1] ?? a;
+  let alpha = spanAlpha(a, b, time);
+  // Appearing or vanishing is a step: an unseen sample has no pose to blend toward.
+  if (!(a.visible && b.visible) && alpha < 1) alpha = 0;
+  const discrete = alpha < 0.5 ? a : b;
+  out.timeSec = time;
+  out.visible = discrete.visible === true;
+  out.x = lerp(num(a.x), num(b.x), alpha);
+  out.y = lerp(num(a.y), num(b.y), alpha);
+  out.z = lerp(num(a.z), num(b.z), alpha);
+  out.quat = out.quat || [0, 0, 0, 1];
+  slerp(out.quat, a.quat, b.quat, alpha);
+  out.gearState = lerp(num(a.gearState), num(b.gearState), alpha);
+  out.flapDegree = lerp(num(a.flapDegree), num(b.flapDegree), alpha);
+  for (const name of ['crashed', 'held', 'stale']) out[name] = discrete[name] === true;
+  out.segment = discrete.segment ?? 0;
   return out;
 }
 
