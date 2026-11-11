@@ -818,9 +818,11 @@ export class CollisionDetector {
     const terrainH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
     // Sea level unless the terrain has its own water (the Neon Metropolis canal, #551).
     const waterLevel = this.terrain.getWaterLevel?.(aircraftPos.x, aircraftPos.z) ?? 0.0;
-    // Water is visible only where the terrain lies below its surface. Land at sea level
-    // (Neon Metropolis streets) is ground, never a water impact (#458, #648).
-    if (terrainH >= waterLevel) return null;
+    // Water is visible only where the terrain does not rise above its surface. A terrain whose
+    // land sits exactly at its water level (Neon Metropolis streets) says where its water is,
+    // so a street is never a water impact (#458, #648).
+    const isWater = this.terrain.isWater?.(aircraftPos.x, aircraftPos.z) ?? terrainH <= waterLevel;
+    if (!isWater) return null;
 
     let contactPoint = null;
     for (const probe of worldProbes) {

@@ -268,6 +268,9 @@ test('every aircraft collides with the bridges, the water and the shore anywhere
   // The sea beside the runway causeway (#628): low over it is flying, touching it is ditching.
   assert.equal(detector.checkCollision(new Vector3(-1000, -6, 300), north, new Vector3(0, 0, -70), 0, 0, 0), null);
   assert.equal(detector.checkCollision(new Vector3(-1000, river.waterLevel + 1, 300), north, new Vector3(0, 0, -70), 0, -3, 0)?.type, 'WATER');
+  // A street crash is ground, never a water impact, though the street sits at sea level (#458).
+  const street = detector.checkCollision(new Vector3(1000, 0.5, 600), north, new Vector3(0, -6, -70), 0, -3, 0);
+  assert.equal(street?.type, 'TERRAIN');
   // Below the street the island's shore is a wall.
   assert.ok(detector.checkCollision(new Vector3(1000, -6, island.halfZ - 5), north, new Vector3(0, 0, -70), 0, 0, 0));
 });

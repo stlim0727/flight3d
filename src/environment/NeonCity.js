@@ -250,6 +250,9 @@ export class NeonCity {
       // The canal's and the sea's water lies below the street (#551, #628);
       // CollisionDetector reads it here.
       getWaterLevel: (x, z) => (isLand(x, z) ? 0 : NEON_RIVER.waterLevel),
+      // The street and the water each sit exactly at their own level, so heights alone
+      // cannot tell a street crash from a water impact (#458, #648).
+      isWater: (x, z) => !isLand(x, z),
     };
 
     this.airport = {

@@ -297,19 +297,23 @@ test('airport switches reuse the spatial grids of an unchanged foliage source', 
   assert.equal(detector.treeGrid.size, 2, 'returning to the foliage rebuilds the grid');
 });
 
-test('water impacts need terrain below the water surface, so sea-level land is not water (#458, #648)', () => {
-  // Neon-like island: the street sits exactly at sea level, and the canal's bed lies below its water.
-  const terrain = {
-    getHeight: (x) => (x < 0 ? 0 : -30),
-    getWaterLevel: (x) => (x < 0 ? 0 : -14),
-  };
-  const detector = new CollisionDetector(terrain, { elevation: 0 }, null, null, null);
+test('water impacts need visible water: low shore land is not water, and a terrain may say where its water is (#458, #648)', () => {
   const quat = new THREE.Quaternion();
   const vel = new THREE.Vector3(80, -6, 0);
+  // A shore just above the sea, and the sea floor below it.
+  const shore = new CollisionDetector({ getHeight: (x) => (x < 0 ? 1.5 : -20) }, { elevation: 0 }, null, null, null);
+  assert.notEqual(shore.checkCollision(new THREE.Vector3(-800, 0.2, 0), quat, vel, 0.0, 0, 0)?.type, 'WATER',
+    'land above the water surface hides the water plane');
+  assert.equal(shore.checkCollision(new THREE.Vector3(800, 0.2, 0), quat, vel, 0.0, 0, 0)?.type, 'WATER');
 
-  const land = detector.checkCollision(new THREE.Vector3(-800, 0.2, 0), quat, vel, 0.0, 0, 0);
-  assert.notEqual(land?.type, 'WATER', 'a street at sea level is land, not water');
-
-  const canal = detector.checkCollision(new THREE.Vector3(800, -13.8, 0), quat, vel, 0.0, 0, 0);
-  assert.equal(canal?.type, 'WATER', 'the canal below the street is water');
+  // Neon-like: street and canal each sit exactly at their own level, so only the terrain knows.
+  const flat = {
+    getHeight: (x) => (x < 0 ? 0 : -14),
+    getWaterLevel: (x) => (x < 0 ? 0 : -14),
+    isWater: (x) => x >= 0,
+  };
+  const neon = new CollisionDetector(flat, { elevation: 0 }, null, null, null);
+  assert.notEqual(neon.checkCollision(new THREE.Vector3(-800, 0.2, 0), quat, vel, 0.0, 0, 0)?.type, 'WATER',
+    'a street at its water level is land, not water');
+  assert.equal(neon.checkCollision(new THREE.Vector3(800, -13.8, 0), quat, vel, 0.0, 0, 0)?.type, 'WATER');
 });
