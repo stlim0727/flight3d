@@ -5,6 +5,9 @@ const INDEX_KEY = 'flight3d.replays.v1';
 const EXPORT_KIND = 'flight3d.replay.v1';
 const payloadKey = id => `flight3d.replay.${id}.v1`;
 
+/** Fixed name of the single slot that always holds the most recent flight (#645). */
+export const AUTO_SAVE_LABEL = 'auto_save';
+
 function cleanLabel(label) {
   if (typeof label !== 'string') return null;
   const cleaned = label.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -56,7 +59,7 @@ export class ReplayStore {
   }
 
   /** @returns {{entry: object, error: string|null}} */
-  save(track, { label } = {}) {
+  save(track, { label, auto = false } = {}) {
     if (!track || !Array.isArray(track.samples) || track.samples.length < 2) {
       return { entry: null, error: 'tooShort' };
     }
@@ -78,8 +81,24 @@ export class ReplayStore {
       bytes: base64.length,
       metadata: { ...track.metadata },
     };
+    if (auto) entry.auto = true;
     const rows = this.read();
     if (!this.writeEntry(entry, base64, rows)) return { entry: null, error: this.error || 'quota' };
+    return { entry, error: null };
+  }
+
+  /**
+   * Keep the most recent flight reachable without a manual save. The newest sortie always
+   * replaces the previous auto save, so at most one `auto` entry exists. Renaming it turns
+   * it into a permanent save that later flights no longer overwrite (#645).
+   * @returns {{entry: object, error: string|null}}
+   */
+  saveAuto(track) {
+    const stale = this.read().filter(row => row.auto === true);
+    const { entry, error } = this.save(track, { label: AUTO_SAVE_LABEL, auto: true });
+    if (!entry) return { entry: null, error };
+    // Write the replacement first so a refused save cannot drop the flight already kept.
+    for (const row of stale) if (row.id !== entry.id) this.remove(row.id);
     return { entry, error: null };
   }
 
@@ -104,6 +123,8 @@ export class ReplayStore {
     const row = rows.find(candidate => candidate.id === id);
     if (!row) return false;
     row.label = clean;
+    // Renaming an auto save keeps it: it is no longer the disposable latest-flight slot.
+    delete row.auto;
     return this.writeIndex(rows);
   }
 

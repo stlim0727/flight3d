@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ReplayStore, replayLabel } from '../src/replay/ReplayStore.js';
+import { ReplayStore, replayLabel, AUTO_SAVE_LABEL } from '../src/replay/ReplayStore.js';
 import { decodeTrack, fromBase64 } from '../src/replay/ReplayCodec.js';
 
 const INDEX_KEY = 'flight3d.replays.v1';
@@ -303,4 +303,51 @@ test('F16 high fuel flow survives save and export/import', () => {
   const imported = target.importJson(store.exportJson(saved.id)).entry;
   assert.equal(target.get(imported.id).track.samples[0].engine1.ff, 4500);
   assert.equal(target.get(imported.id).track.samples[0].engine2.ff, 3900);
+});
+
+test('saveAuto keeps exactly one latest-flight entry, replacing the previous one', () => {
+  const storage = new MockStorage();
+  const store = storeFor(storage);
+  const first = store.saveAuto(track(20)).entry;
+  assert.equal(first.label, AUTO_SAVE_LABEL);
+  assert.equal(first.auto, true);
+
+  const second = store.saveAuto(track(30)).entry;
+  assert.equal(second.auto, true);
+  assert.deepEqual(store.list().map(row => row.id), [second.id]);
+  assert.equal(store.get(second.id).track.samples.length, 30);
+  assert.equal(storage.getItem(payloadKey(first.id)), null, 'the replaced auto payload must be dropped');
+  assert.equal(store.get(first.id), null);
+});
+
+test('saveAuto refuses an unplayable track without disturbing the kept flight', () => {
+  const storage = new MockStorage();
+  const store = storeFor(storage);
+  const kept = store.saveAuto(track()).entry;
+  assert.equal(store.saveAuto(null).error, 'tooShort');
+  assert.equal(store.saveAuto({ ...track(), overflow: true }).error, 'tooLong');
+  const before = [...storage.store];
+  assert.deepEqual(store.list().map(row => row.id), [kept.id]);
+  assert.deepEqual([...storage.store].sort(), before.sort(), 'a refused auto save must not touch storage');
+});
+
+test('renaming an auto save promotes it so later flights no longer overwrite it', () => {
+  const store = storeFor();
+  const auto = store.saveAuto(track(20)).entry;
+  assert.equal(store.rename(auto.id, '  Lukla keep  '), true);
+  assert.equal(store.get(auto.id).meta.label, 'Lukla keep');
+  assert.equal(store.get(auto.id).meta.auto, undefined, 'a promoted save is no longer disposable');
+
+  const next = store.saveAuto(track(30)).entry;
+  assert.notEqual(next.id, auto.id);
+  assert.deepEqual(store.list().map(row => row.label).sort(), ['Lukla keep', AUTO_SAVE_LABEL].sort());
+  assert.equal(store.get(auto.id).track.samples.length, 20, 'the promoted save must survive the next flight');
+});
+
+test('an auto save coexists with manual saves in the same library', () => {
+  const store = storeFor();
+  const manual = store.save(track(24)).entry;
+  const auto = store.saveAuto(track(20)).entry;
+  assert.deepEqual(store.list().map(row => row.id).sort(), [auto.id, manual.id].sort());
+  assert.equal(store.get(manual.id).meta.auto, undefined);
 });
