@@ -84,6 +84,21 @@ test('WaterOcean (Camera Anchoring, Grid Snapping & Gerstner Waves)', async (t) 
     assert.ok(fs.includes('max(abs(vLocalPos.x), abs(vLocalPos.y))'), 'Fragment shader must compute edgeDist from vLocalPos');
   });
 
+  await t.test('receives the sun shadow map so a low aircraft shadows the sea (#648)', () => {
+    const ocean = new WaterOcean(36000, 180);
+    assert.equal(ocean.mesh.receiveShadow, true);
+    assert.equal(ocean.material.lights, true, 'light uniforms carry the shadow maps');
+    assert.ok(ocean.material.uniforms.directionalShadowMatrix, 'light uniforms are merged in');
+    assert.ok(ocean.material.uniforms.uSunDir.value === ocean.sunDirection, 'own uniforms are not cloned');
+    const vs = ocean.material.vertexShader;
+    assert.ok(vs.includes('#include <shadowmap_vertex>'));
+    assert.ok(vs.indexOf('vec4 worldPosition = vec4(displacedWorld, 1.0);') < vs.indexOf('#include <shadowmap_vertex>'),
+      'shadow coordinates follow the displaced swell');
+    const fs = ocean.material.fragmentShader;
+    assert.ok(fs.includes('#include <shadowmask_pars_fragment>'));
+    assert.ok(fs.includes('getShadowMask()'));
+  });
+
   await t.test('ultraLow quality switches to 64x64 flat mesh (preventing 36km near-plane clipping), keeps decoupled snapStep and sets WATER_FLAT define', () => {
     const ocean = new WaterOcean(36000, 180);
     assert.equal(ocean.segments, 180);

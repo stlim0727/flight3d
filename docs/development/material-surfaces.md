@@ -13,6 +13,12 @@ fades below the horizon. Reflections remain an approximate sky gradient, rather
 than reflections of aircraft, terrain or ships; coastal depth/shore foam is not
 implemented.
 
+The ocean receives the sun's shadow map on every tier that has one (#648), so an
+aircraft skimming the sea casts the same shadow it casts on land: the glint goes
+and the lit surface dims to 55%. Fragments outside the sun's shadow box skip the
+lookup. ultraLow has no shadow map; its contact-shadow cue lies on the water
+surface rather than on the seabed the terrain reports below it.
+
 Terrain uses independently hashed periodic lattice noise instead of correlated
 permutation rows. High quality blends offset texture samples using varying tile
 weights and explicit gradients; low quality keeps single-sample mapping. Both

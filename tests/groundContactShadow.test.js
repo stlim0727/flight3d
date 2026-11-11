@@ -17,6 +17,7 @@ import {
   GroundContactShadow,
   contactShadowAppearance,
   planformYaw,
+  contactShadowSurfaceHeight,
   CONTACT_SHADOW_CEILING_M,
 } from '../src/environment/GroundContactShadow.js';
 
@@ -97,4 +98,15 @@ test('contact shadow is only enabled for ultraLow quality tier in exterior views
   assert.equal(isEnabled(false, 'performance'), false, 'Performance tier uses directional shadow map');
   assert.equal(isEnabled(false, 'balanced'), false, 'Balanced tier uses directional shadow map');
   assert.equal(isEnabled(false, 'high'), false, 'High tier uses directional shadow map');
+});
+
+test('contact shadow lies on the sea surface, not the seabed under it (#648)', () => {
+  const coastal = { getHeight: (x) => (x < 0 ? 12 : -45) };
+  const ocean = { waterLevel: 0, mesh: { visible: true } };
+  assert.equal(contactShadowSurfaceHeight(coastal, ocean, 400, 4200), 0, 'open sea: water surface');
+  assert.equal(contactShadowSurfaceHeight(coastal, ocean, -10, 0), 12, 'land above sea level wins');
+  ocean.mesh.visible = false;
+  assert.equal(contactShadowSurfaceHeight(coastal, ocean, 400, 4200), -45, 'no ocean shown: terrain only');
+  const neon = { getHeight: () => -30, getWaterLevel: () => -14 };
+  assert.equal(contactShadowSurfaceHeight(neon, ocean, 0, 0), -14, "a terrain's own water wins");
 });
