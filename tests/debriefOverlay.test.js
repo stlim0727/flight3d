@@ -165,3 +165,12 @@ test('every debrief action names a button that exists in the overlay markup', ()
     assert.match(action, /^[a-z_]+$/, 'action values are snake_case event properties');
   }
 });
+
+test('debrief download emits flight3d.sortie.v1 unifying telemetry report and track', () => {
+  const source = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
+  assert.match(source, /createSortie\(this\.report,\s*this\.replay\)/, 'download handler must call createSortie');
+  assert.match(source, /import\s*\{[^}]*createSortie[^}]*\}\s*from '\.\.\/replay\/ReplayStore\.js'/,
+    'DebriefOverlay must import createSortie from ReplayStore');
+  assert.match(enDebrief['debrief.saveReplay'], /library/i, 'save replay caption should indicate library');
+  assert.match(koDebrief['debrief.saveReplay'], /라이브러리/, 'korean save replay caption should indicate library');
+});

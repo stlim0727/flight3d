@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ReplayStore, replayLabel, AUTO_SAVE_LABEL } from '../src/replay/ReplayStore.js';
+import { ReplayStore, replayLabel, AUTO_SAVE_LABEL, extractReportSummary, createSortie, SORTIE_KIND, LEGACY_REPLAY_KIND } from '../src/replay/ReplayStore.js';
 import { decodeTrack, fromBase64 } from '../src/replay/ReplayCodec.js';
 
 const INDEX_KEY = 'flight3d.replays.v1';
@@ -205,31 +205,49 @@ test('a save whose payload vanished reads as missing rather than as a crash', ()
   assert.equal(store.exportJson(entry.id), null);
 });
 
-test('export and import move a replay between storages', () => {
+test('export and import move a replay between storages (flight3d.sortie.v1 and legacy v1)', () => {
   const source = storeFor();
-  const { entry } = source.save(track(40), { label: 'Sunset pattern' });
+  const summary = { reason: 'landed', peakG: 1.8, peakAltFt: 3200, touchdown: { sinkRateFpm: -120, contactG: 1.15 } };
+  const { entry } = source.save(track(40), { label: 'Sunset pattern', summary });
   const parsed = JSON.parse(source.exportJson(entry.id));
-  assert.equal(parsed.kind, 'flight3d.replay.v1');
-  assert.equal(parsed.entry.label, 'Sunset pattern');
+  assert.equal(parsed.kind, 'flight3d.sortie.v1');
+  assert.equal(parsed.report.label, 'Sunset pattern');
+  assert.deepEqual(parsed.report.summary, summary);
+  assert.equal(typeof parsed.track, 'string');
 
   const target = storeFor(new MockStorage());
   const imported = target.importJson(JSON.stringify(parsed));
   assert.equal(imported.error, null);
   assert.equal(imported.entry.label, 'Sunset pattern');
+  assert.deepEqual(imported.entry.summary, summary);
   assert.equal(imported.entry.sampleCount, 40);
   assert.notEqual(imported.entry.id, entry.id);
   assert.equal(target.get(imported.entry.id).track.samples.length, 40);
 
+  // Legacy flight3d.replay.v1 files still import cleanly
+  const legacy = {
+    kind: 'flight3d.replay.v1',
+    entry: { label: 'Old flight', durationSec: 10 },
+    payload: parsed.track,
+  };
+  const legacyImported = target.importJson(JSON.stringify(legacy));
+  assert.equal(legacyImported.error, null);
+  assert.equal(legacyImported.entry.label, 'Old flight');
+  assert.equal(target.get(legacyImported.entry.id).track.samples.length, 40);
+
   for (const junk of ['[', 'not json at all', JSON.stringify({ kind: 'other', payload: 'abc' }),
     JSON.stringify({ kind: 'flight3d.replay.v1' }),
     JSON.stringify({ kind: 'flight3d.replay.v1', payload: '!!!' }),
-    JSON.stringify({ kind: 'flight3d.replay.v1', payload: parsed.payload.slice(0, 40) })]) {
+    JSON.stringify({ kind: 'flight3d.replay.v1', payload: parsed.track.slice(0, 40) }),
+    JSON.stringify({ kind: 'flight3d.sortie.v1' }),
+    JSON.stringify({ kind: 'flight3d.sortie.v1', track: '!!!' }),
+    JSON.stringify({ kind: 'flight3d.sortie.v1', track: parsed.track.slice(0, 40) })]) {
     const refused = target.importJson(junk);
     assert.equal(refused.entry, null, `accepted ${junk.slice(0, 24)}`);
     assert.equal(typeof refused.error, 'string');
     assert.notEqual(refused.error, '');
   }
-  assert.equal(target.list().length, 1, 'a failed import must not touch the library');
+  assert.equal(target.list().length, 2, 'a failed import must not touch the library');
 });
 
 test('the store degrades quietly when the platform has no storage', () => {
@@ -350,4 +368,99 @@ test('an auto save coexists with manual saves in the same library', () => {
   const auto = store.saveAuto(track(20)).entry;
   assert.deepEqual(store.list().map(row => row.id).sort(), [auto.id, manual.id].sort());
   assert.equal(store.get(manual.id).meta.auto, undefined);
+});
+
+test('extractReportSummary extracts compact stats and skips heavy samples', () => {
+  assert.equal(extractReportSummary(null), null);
+  assert.equal(extractReportSummary({}), null);
+
+  const fullReport = {
+    version: 2,
+    reason: 'landed',
+    durationSec: 120.5,
+    metadata: { aircraft: 'b738', airport: 'incheon', scenario: 'pattern' },
+    peaks: {
+      gForce: { gForce: 2.148, timeSec: 45.2 },
+      altitudeFt: { altitudeFt: 3450.2, timeSec: 60.1 },
+      iasKnots: { iasKnots: 275.8, timeSec: 50.0 },
+    },
+    touchdowns: [
+      { sinkRateFpm: -130.4, contactG: 1.182 },
+    ],
+    crash: null,
+    samples: new Array(500).fill({ alt: 100 }), // large telemetry array
+  };
+
+  const summary = extractReportSummary(fullReport);
+  assert.deepEqual(summary, {
+    reason: 'landed',
+    peakG: 2.15,
+    peakAltFt: 3450,
+    peakIasKnots: 276,
+    touchdown: {
+      sinkRateFpm: -130,
+      contactG: 1.18,
+    },
+  });
+  assert.equal(summary.samples, undefined, 'summary must omit full sample dumps');
+
+  const crashReport = {
+    reason: 'crash',
+    peaks: { gForce: { gForce: 4.8 } },
+    crash: { type: 'TERRAIN', speedKnots: 280.2 },
+  };
+  assert.deepEqual(extractReportSummary(crashReport), {
+    reason: 'crash',
+    peakG: 4.8,
+    crash: {
+      type: 'TERRAIN',
+      speedKnots: 280,
+    },
+  });
+});
+
+test('createSortie unifies telemetry report and binary track into flight3d.sortie.v1', () => {
+  const t = track(30);
+  const report = { reason: 'landed', durationSec: 30, metadata: t.metadata };
+  const sortie = createSortie(report, t);
+
+  assert.equal(sortie.kind, SORTIE_KIND);
+  assert.equal(sortie.report, report);
+  assert.equal(typeof sortie.track, 'string');
+  assert.equal(decodeTrack(fromBase64(sortie.track)).samples.length, 30);
+
+  // If track is already base64 string
+  const fromStr = createSortie(report, sortie.track);
+  assert.equal(fromStr.kind, SORTIE_KIND);
+  assert.equal(fromStr.track, sortie.track);
+
+  // Unplayable or null track degrades to track: null without throwing
+  assert.equal(createSortie(report, null).track, null);
+  assert.equal(createSortie(report, { samples: [] }).track, null);
+  assert.equal(createSortie(report, { ...t, overflow: true }).track, null);
+});
+
+test('importJson accepts flight3d.sortie.v1 downloaded flight logs carrying full reports', () => {
+  const store = storeFor();
+  const t = track(35);
+  const debriefReport = {
+    version: 2,
+    reason: 'landed',
+    metadata: t.metadata,
+    durationSec: t.durationSec,
+    peaks: { gForce: { gForce: 2.3 } },
+    touchdowns: [{ sinkRateFpm: -140, contactG: 1.25 }],
+    samples: [{ t: 0 }, { t: 1 }],
+  };
+  const sortie = createSortie(debriefReport, t);
+
+  const { entry, error } = store.importJson(JSON.stringify(sortie));
+  assert.equal(error, null);
+  assert.ok(entry);
+  assert.equal(entry.sampleCount, 35);
+  assert.deepEqual(entry.summary, {
+    reason: 'landed',
+    peakG: 2.3,
+    touchdown: { sinkRateFpm: -140, contactG: 1.25 },
+  });
 });

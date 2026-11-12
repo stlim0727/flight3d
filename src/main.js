@@ -817,7 +817,7 @@ class FlightSimulator {
     this.debriefReplay = this.replayRecorder.finish();
     // Keep the latest sortie in the library even when the debrief's manual save is skipped;
     // the fixed auto_save slot is overwritten on the next flight (#645).
-    if (this.debriefReplay) this.replayStore.saveAuto(this.debriefReplay);
+    if (this.debriefReplay) this.replayStore.saveAuto(this.debriefReplay, { report: this.debriefReport });
     // An arena run reports its own end when leaving flight stops the runner.
     if (!this.pilotArena?.active) this.analytics?.trackFlightEnd?.({
       airport: this.activeAirport,
@@ -846,7 +846,7 @@ class FlightSimulator {
   /** Persists the finished sortie's pose track. Returns the store's error token for the debrief to show. */
   saveDebriefReplay() {
     if (!this.debriefReplay) return { ok: false, error: 'tooShort' };
-    const { entry, error } = this.replayStore.save(this.debriefReplay);
+    const { entry, error } = this.replayStore.save(this.debriefReplay, { report: this.debriefReport });
     this.analytics?.trackReplaySaved?.({ result: entry ? 'ok' : error, durationSeconds: this.debriefReplay.durationSec });
     return { ok: Boolean(entry), error: error ?? null };
   }

@@ -69,7 +69,7 @@ export class ReplayPanel {
       const file = e.target.files[0];
       if (!file) return;
       try {
-        if (file.size > 250_000) throw new Error('oversized');
+        if (file.size > 2_000_000) throw new Error('oversized');
         const { entry } = sim.replayStore.importJson(await file.text());
         this.status(entry ? 'replay.imported' : 'replay.importFailed');
         this.track('import', Boolean(entry));
@@ -116,8 +116,43 @@ export class ReplayPanel {
         this.renderList();
       });
       const info = document.createElement('p');
+      info.className = 'replay-entry-info';
       info.textContent = `${flightDuration(entry.durationSec)} · ${new Date(entry.savedAt).toLocaleString()}`;
       row.append(label, info);
+      if (entry.summary) {
+        const summaryEl = document.createElement('p');
+        summaryEl.className = 'replay-entry-summary';
+        const parts = [];
+        if (entry.summary.reason) {
+          const pillKey = `debrief.pill.${entry.summary.reason}`;
+          const reasonKey = `debrief.reason.${entry.summary.reason}`;
+          const pillText = t(pillKey);
+          if (pillText !== pillKey) {
+            parts.push(pillText);
+          } else {
+            const reasonText = t(reasonKey);
+            parts.push(reasonText !== reasonKey ? reasonText : entry.summary.reason);
+          }
+        }
+        if (entry.summary.touchdown?.sinkRateFpm != null) {
+          parts.push(`${Math.round(entry.summary.touchdown.sinkRateFpm).toLocaleString('en-US')} FPM`);
+        }
+        if (entry.summary.touchdown?.contactG != null) {
+          parts.push(`${entry.summary.touchdown.contactG.toFixed(2)} G`);
+        }
+        if (entry.summary.crash?.speedKnots != null) {
+          const crashKey = entry.summary.crash.type ? `debrief.target.${entry.summary.crash.type}` : null;
+          const target = crashKey ? (t(crashKey) === crashKey ? entry.summary.crash.type : t(crashKey)) : null;
+          parts.push(`${target ? target + ' · ' : ''}${Math.round(entry.summary.crash.speedKnots)} KT`);
+        }
+        if (Number.isFinite(entry.summary.peakG) && entry.summary.touchdown?.contactG == null) {
+          parts.push(`${entry.summary.peakG.toFixed(2)} G`);
+        }
+        if (parts.length) {
+          summaryEl.textContent = parts.join(' · ');
+          row.append(summaryEl);
+        }
+      }
       const actions = document.createElement('div'); actions.className = 'replay-entry-actions';
       for (const action of ['watch', 'export', 'delete']) {
         const button = document.createElement('button'); button.className = 'btn'; button.dataset.action = action;
