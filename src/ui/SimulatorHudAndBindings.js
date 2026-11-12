@@ -595,6 +595,9 @@ class SimulatorHudAndBindingsMethods {
       canResume: () => this.gameFlow.canResumeFromLobby() && !this.isCrashed,
       canEnd: () => this.gameFlow.canResumeFromLobby(),
       onResume: () => this.resumeFlight(),
+      onTabChange: id => {
+        if (id === 'lobby-tab-multi') this.multiplayer?.refreshOpenRooms();
+      },
     });
     this.renderDiagnosticsPanel = new RenderDiagnosticsPanel(this);
     this.replayPanel = new ReplayPanel(this);

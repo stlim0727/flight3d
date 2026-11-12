@@ -420,6 +420,16 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
   font-size: calc(11px * var(--ui-scale, 1));
   line-height: 1.4;
 }
+.lobby-multi-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(8px * var(--ui-scale, 1));
+}
+.lobby-multi-actions .btn {
+  min-height: calc(36px * var(--ui-scale, 1));
+  font-size: calc(12px * var(--ui-scale, 1));
+  white-space: normal;
+}
 .lobby-card .btn-mp-launch {
   width: 100%;
   min-height: calc(36px * var(--ui-scale, 1));

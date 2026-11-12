@@ -106,8 +106,9 @@ test('index.html menu items have intuitive icons for lobby and pause navigation'
   const html = readFileSync(resolve('index.html'), 'utf8');
 
   // Lobby menu items have icons
-  assert.ok(html.includes('id="mp-open"'), 'must have mp-open');
-  assert.ok(html.includes('id="mp-open"') && html.includes('👥'), 'mp-open must have 👥 icon');
+  assert.ok(html.includes('id="mp-open-create"'), 'must have mp-open-create');
+  assert.ok(html.includes('id="mp-open-create"') && html.includes('➕'), 'mp-open-create must have ➕ icon');
+  assert.ok(html.includes('id="mp-open-private"') && html.includes('🔑'), 'mp-open-private must have 🔑 icon');
 
   assert.ok(html.includes('id="lobby-tab-scenario"') && html.includes('🎯'), 'scenario tab must have 🎯 icon');
   assert.ok(html.includes('id="lobby-tab-multi"') && html.includes('👥'), 'multi tab must have 👥 icon');
