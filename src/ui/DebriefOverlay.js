@@ -43,7 +43,7 @@ export const SAVE_REPLAY_STATUS = Object.freeze({ tooShort: 'replay.tooShort', t
 /** Debrief button id (after `debrief-`) to the `debrief_action` it reports. Camera and fold are autocaptured. */
 export const DEBRIEF_ACTIONS = Object.freeze({
   lobby: 'lobby', feedback: 'feedback',
-  'watch-replay': 'watch_replay', 'save-replay': 'save_replay', copy: 'copy', export: 'export',
+  'watch-replay': 'watch_replay', 'save-replay': 'save_replay', download: 'download',
 });
 
 export class DebriefOverlay {
@@ -95,13 +95,11 @@ export class DebriefOverlay {
             <p id="debrief-status" role="status" aria-live="polite"></p>
             <textarea id="debrief-preview" readonly aria-hidden="true" tabindex="-1"></textarea>
             <div class="debrief-actions">
-              <button class="btn" id="debrief-copy"><span class="btn-icon" aria-hidden="true">📋</span> <span data-i18n="debrief.copy"></span></button>
-              <button class="btn" id="debrief-export"><span class="btn-icon" aria-hidden="true">💾</span> <span data-i18n="debrief.export"></span></button>
+              <button class="btn" id="debrief-download"><span class="btn-icon" aria-hidden="true">⬇️</span> <span data-i18n="debrief.download"></span></button>
             </div>
             <div class="debrief-replay-actions">
               <button class="btn" id="debrief-save-replay" hidden><span class="btn-icon" aria-hidden="true">💾</span> <span data-i18n="debrief.saveReplay"></span></button>
               <button class="btn" id="debrief-watch-replay" hidden><span class="btn-icon" aria-hidden="true">▶️</span> <span data-i18n="replay.watch"></span></button>
-            </div>
           </div>
         </div>
 
@@ -156,18 +154,23 @@ export class DebriefOverlay {
       this.el('save-replay').disabled = true;
       this.status('replay.saved');
     });
-    this.el('copy').addEventListener('click', () => this.copy());
     // Registered after the handlers above, so telemetry never decides whether an action runs.
     for (const [id, action] of Object.entries(DEBRIEF_ACTIONS)) {
       this.el(id)?.addEventListener('click', () => onAction?.(action, this.report));
     }
-    this.el('export').addEventListener('click', () => {
+    this.el('download').addEventListener('click', () => {
       if (!this.report.sufficient) return;
-      const url = URL.createObjectURL(new Blob([JSON.stringify(this.report, null, 2)], { type: 'application/json' }));
+      const payload = {
+        ...this.report,
+        ...(this.replay ? { replay: { samples: this.replay.samples, metadata: this.replay.metadata, durationSec: this.replay.durationSec } } : {}),
+      };
+      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
       const link = document.createElement('a');
-      link.href = url; link.download = `flight3d-${this.report.metadata.aircraft}-flight.json`;
-      link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-      this.status('debrief.exported');
+      link.href = url;
+      link.download = `flight3d-${this.report.metadata.aircraft}-flight.json`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      this.status('debrief.downloaded');
     });
     // Issue #370: the headline stays on one line; a clipped one reveals its full text on
     // hover, keyboard focus or tap. The h3 keeps the full text for screen readers.
@@ -318,7 +321,7 @@ export class DebriefOverlay {
     });
     this.el('insufficient').hidden = enough;
     this.el('view-record').hidden = !enough;
-    for (const id of ['copy', 'export']) {
+    for (const id of ['download']) {
       const el = this.el(id);
       if (el) {
         el.disabled = !enough;
@@ -383,9 +386,4 @@ export class DebriefOverlay {
     this.el('sample').textContent = `${flightDuration(sample.timeSec)} · ${number(sample.altitudeFt)} FT · ${number(sample.iasKnots)} KT · ${g(sample.gForce)} G`;
   }
 
-  async copy() {
-    if (!this.report.sufficient) return;
-    try { await navigator.clipboard.writeText(reportText(this.report)); this.status('debrief.copied'); }
-    catch { this.status('debrief.copyFailed'); }
-  }
 }
