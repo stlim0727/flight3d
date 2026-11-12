@@ -28,22 +28,31 @@ export class HudView {
     const hudActive = sim.cameraSystem.mode === CameraSystem.MODES.HUD && !sim.isCrashed && !hudFolded;
     // Cockpit and chase views keep a light target/weapon overlay so the player
     // can still see the lock without switching to the full HUD camera.
-    const combatOnly = !hudActive && !sim.isCrashed && !hudFolded
-      && sim.currentAircraftId === 'F16' && Boolean(sim.combatActive?.());
+    const combat = this.combatHudState();
+    const combatOnly = !hudActive && !sim.isCrashed && !hudFolded && Boolean(combat);
     const visible = hudActive || combatOnly;
     if (this.root.hidden === visible) this.root.hidden = !visible;
     document.body.classList.toggle('hud-camera-mode', hudActive);
     if (!visible) return;
     if (!hudActive) {
-      this.drawCombatOnly();
+      this.drawCombatOnly(combat);
       return;
     }
     const heading = ((Math.round(sim.telemetry.headingDeg || 0) % 360) + 360) % 360;
-    this.draw(sim.telemetry, heading);
+    this.draw(sim.telemetry, heading, combat);
+  }
+
+  /** Live F-16 state, or the recorded combat state while a replay owns the scene. */
+  combatHudState() {
+    if (this.sim.replayDirector?.active) return this.sim.replayDirector.combatHudState?.() ?? null;
+    if (this.sim.currentAircraftId === 'F16' && this.sim.combatActive?.()) {
+      return this.sim.missileCombat?.getHudState?.() ?? null;
+    }
+    return null;
   }
 
   /** Transparent target/weapon/RWR layer for cockpit and chase cameras. */
-  drawCombatOnly() {
+  drawCombatOnly(combat) {
     const width = this.root.clientWidth, height = this.root.clientHeight;
     if (!width || !height) return;
     const dpr = Math.min(devicePixelRatio || 1, 2);
@@ -53,11 +62,10 @@ export class HudView {
     const ctx = this.ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
-    const combat = this.sim.missileCombat?.getHudState?.();
     if (combat) this.drawCombat(width, height, Math.min(1, width / 1100), combat, true);
   }
 
-  draw(data, heading) {
+  draw(data, heading, combat) {
     const width = this.root.clientWidth, height = this.root.clientHeight;
     if (!width || !height) return;
     const dpr = Math.min(devicePixelRatio || 1, 2);
@@ -140,10 +148,7 @@ export class HudView {
       if (degree % (narrow ? 30 : 10) === 0) ctx.fillText(String((degree % 360 + 360) % 360).padStart(3, '0'), x, hy + 23);
     }
     ctx.restore(); ctx.fillText(`${String(heading).padStart(3, '0')}°`, cx, hy - 13);
-    if (this.sim.currentAircraftId === 'F16') {
-      const combat = this.sim.missileCombat?.getHudState?.();
-      if (combat) this.drawCombat(width, height, scale, combat);
-    }
+    if (combat) this.drawCombat(width, height, scale, combat);
   }
 
   /** Project a world point into HUD pixels; behind-eye points clamp to the frame. */
@@ -229,8 +234,10 @@ export class HudView {
       ctx.font = `600 ${small}px monospace`;
       ctx.textAlign = 'center';
       ctx.fillText(`${target.callsign}  ${(state.rangeM / 1852).toFixed(1)} NM`, x, y - size - 14);
-      const closure = Math.round(state.closureMps * 1.94384);
-      ctx.fillText(`${closure >= 0 ? '+' : ''}${closure} KT`, x, y + size + 15);
+      if (Number.isFinite(state.closureMps)) {
+        const closure = Math.round(state.closureMps * 1.94384);
+        ctx.fillText(`${closure >= 0 ? '+' : ''}${closure} KT`, x, y + size + 15);
+      }
       if (locked && state.remaining > 0 && state.nextMissileType && state.rangeM <= state.nextMissileType.seekerRangeM) {
         ctx.fillStyle = amber;
         ctx.fillText(t('weapons.shoot'), x, y - size - 31);

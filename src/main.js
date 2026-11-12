@@ -778,7 +778,7 @@ class FlightSimulator {
   updateFlightRecording(dt, { missionOwned = false } = {}) {
     if (this.gameFlow.state !== FLOW.FLIGHT || !this.flightRecorder.active || this.devRunner?.active) return;
     this.flightRecorder.update(dt, this.telemetry);
-    this.replayRecorder.update(dt, this.telemetry, this.quaternion);
+    this.replayRecorder.update(dt, this.telemetry, this.quaternion, this.missileCombat);
     // Playback stages the impact from this marker; the pose track itself ends there (#648).
     if (this.isCrashed) this.replayRecorder.markCrash(this.crashResult);
     // The mission runner owns scoring and its completion UI. Only observe its ticks.
@@ -1254,6 +1254,7 @@ class FlightSimulator {
 
   handleCombatEvent(event) {
     if (!event) return;
+    this.replayRecorder?.recordCombatEvent?.(event);
     if (event.type === 'lock') {
       this.audio.playLockTone();
     } else if (event.type === 'detonation') {

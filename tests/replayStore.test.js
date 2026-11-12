@@ -64,6 +64,34 @@ test('replayLabel summarises a track by what was flown, not when', () => {
   assert.equal(replayLabel(null), 'flight');
 });
 
+test('a combat payload survives save, load and JSON export/import', () => {
+  const storage = new MockStorage();
+  const store = storeFor(storage);
+  const source = track();
+  source.combat = {
+    banditIntervalSec: 0.5,
+    missileIntervalSec: 0.05,
+    targets: [{ id: 1, callsign: 'BANDIT 1' }],
+    banditSamples: [{ timeSec: 0, rails: 0b111110,
+      targets: [{ x: 10, y: 3000, z: -5000, headingRad: 0, alive: true }] }],
+    missileSamples: [],
+    events: [],
+  };
+  const saved = store.save(source);
+  assert.equal(saved.error, null);
+  const loaded = store.get(saved.entry.id);
+  assert.equal(loaded.track.combat.targets[0].callsign, 'BANDIT 1');
+  assert.equal(loaded.track.combat.banditSamples[0].rails, 0b111110);
+
+  const exported = store.exportJson(saved.entry.id);
+  const importStore = storeFor(new MockStorage());
+  const imported = importStore.importJson(exported);
+  assert.equal(imported.error, null);
+  const roundTripped = importStore.get(imported.entry.id);
+  assert.equal(roundTripped.track.combat.targets[0].callsign, 'BANDIT 1');
+  assert.equal(roundTripped.track.combat.banditSamples[0].rails, 0b111110);
+});
+
 test('save stores a playable track and indexes it newest first', () => {
   const storage = new MockStorage();
   const store = storeFor(storage);
