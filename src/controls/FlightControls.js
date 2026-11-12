@@ -78,6 +78,8 @@ export class FlightControls {
     this.onUserInteract = null;
     this.onDeviceConnected = null;
     this.onDeviceDisconnected = null;
+    this.onFireMissile = null;
+    this.onCycleTarget = null;
 
     this.hotas.onDeviceConnected = (info) => this.onDeviceConnected?.(info);
     this.hotas.onDeviceDisconnected = (info) => this.onDeviceDisconnected?.(info);
@@ -160,6 +162,15 @@ export class FlightControls {
         break;
       case 'KeyR':
         if (this.onToggleReverser) this.onToggleReverser();
+        break;
+      case 'Enter':
+        // Fire remains separate from Space so the brake key keeps one meaning.
+        if (!e.repeat && !e.target?.closest?.('button, a, input, textarea, select') && this.onFireMissile) {
+          this.onFireMissile();
+        }
+        break;
+      case 'KeyN':
+        if (!e.repeat && this.onCycleTarget) this.onCycleTarget();
         break;
       case 'KeyK':
         // Cycle simulated engine failure. Deliberately not P: the demo director

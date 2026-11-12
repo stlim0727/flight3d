@@ -79,6 +79,9 @@ export class FlightAudio {
     this.lastRadioAlt = 9999;
     this.calledAltitudes.clear();
     this.stallBeepTime = 0;
+    this.threatLevel = 0;
+    this.threatTimer = 0;
+    this.threatToneFlip = false;
     this.cancelSpeech();
     this.departureRadio.stop();
     this.bangkokRadio?.stop();
@@ -766,6 +769,106 @@ export class FlightAudio {
     }
     if (rAlt > 1000) this.calledAltitudes.clear();
     this.lastRadioAlt = rAlt;
+
+    // 7. RWR three-stage warning: search ping, lock beep, launch siren.
+    this.updateThreatAlert(dt, state.rwrLevel || 0);
+  }
+
+  /** Cadence and timbre encode the RWR stage without a separate audio graph. */
+  updateThreatAlert(dt, level) {
+    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
+    if (level !== this.threatLevel) {
+      this.threatLevel = level;
+      this.threatTimer = 0;
+    }
+    if (!level) return;
+    this.threatTimer -= dt;
+    if (this.threatTimer > 0) return;
+    this.playRwrTone(level);
+    this.threatTimer = level === 3 ? 0.18 : level === 2 ? 0.32 : 1.15;
+  }
+
+  playRwrTone(level) {
+    if (!this.ctx || !this.masterGain) return;
+    const now = this.ctx.currentTime;
+    const launch = level === 3;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = launch ? 'sawtooth' : 'square';
+    if (level === 1) osc.frequency.setValueAtTime(820, now);
+    else if (level === 2) osc.frequency.setValueAtTime(1320, now);
+    else {
+      this.threatToneFlip = !this.threatToneFlip;
+      osc.frequency.setValueAtTime(this.threatToneFlip ? 1040 : 720, now);
+    }
+    const peak = level === 3 ? 0.12 : level === 2 ? 0.07 : 0.035;
+    const duration = launch ? 0.12 : 0.075;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(peak, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + duration + 0.02);
+  }
+
+  /** Two-tone lock confirmation, distinct from the repeating RWR cadence. */
+  playLockTone() {
+    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
+    const now = this.ctx.currentTime;
+    for (const [offset, frequency] of [[0, 980], [0.085, 1460]]) {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(frequency, now + offset);
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.055, now + offset + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.08);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.1);
+    }
+  }
+
+  /** Solid-rocket ignition: broadband whoosh with a low pressure thump. */
+  playMissileLaunch() {
+    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
+    const now = this.ctx.currentTime;
+    const duration = 1.1;
+    const buffer = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * duration), this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      const t = i / this.ctx.sampleRate;
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-t * 2.2);
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = 0.9;
+    filter.frequency.setValueAtTime(220, now);
+    filter.frequency.exponentialRampToValueAtTime(2200, now + 0.35);
+    filter.frequency.exponentialRampToValueAtTime(420, now + duration);
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.22, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(this.masterGain);
+    noise.start(now);
+
+    const thump = this.ctx.createOscillator();
+    const thumpGain = this.ctx.createGain();
+    thump.type = 'sine';
+    thump.frequency.setValueAtTime(110, now);
+    thump.frequency.exponentialRampToValueAtTime(38, now + 0.5);
+    thumpGain.gain.setValueAtTime(0.24, now);
+    thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+    thump.connect(thumpGain);
+    thumpGain.connect(this.masterGain);
+    thump.start(now);
+    thump.stop(now + 0.6);
   }
 
   playExplosion(isWater = false) {

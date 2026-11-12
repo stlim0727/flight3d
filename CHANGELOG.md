@@ -1,6 +1,12 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(combat):** F-16 AIM-9X/AIM-120C rail missiles, TPN guidance, HUD lock and RWR (#612 Sprint 1)
+  - Six procedural rail missiles (4× AIM-9X, 2× AIM-120C) mounted on the F-16 wingtip and underwing stations; fired stations hide their mesh and reload on preset restart.
+  - 120 Hz continuous rocket mass/thrust, atmospheric drag, gravity, 3D true proportional navigation, seeker gimbal limit and closest-approach proximity fuse.
+  - Two patrolling bandit drones, HUD target designator / lock diamond / `SHOOT` cue / off-screen locator, weapon and splash inventory, and a 360° RWR display.
+  - Three-stage RWR audio (search ping, lock beep, launch siren), missile launch whoosh and lock tone.
+  - `Enter` fires, `N` cycles targets, with matching touch buttons; see [air-to-air missiles](docs/development/air-to-air-missiles.md).
 - **feat(ui):** make gradual gaze reset optional (#658)
   - Added a persisted Auto gaze reset option so a released drag or hat-switch glance can hold its off-center view instead of slowly returning to the default.
 - **fix(audio):** boost mobile & Bluetooth headphone loudness, makeup gain, and route recovery

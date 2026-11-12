@@ -53,6 +53,11 @@ class PresetSpawnerMethods {
     const aircraft = requiredAircraft(type);
     if (aircraft && this.currentAircraftId !== aircraft) this.setAircraft(aircraft);
     this.audio?.reset();
+    // A new sortie re-arms all six rails and removes bandits, missiles and
+    // smoke left by the previous one.
+    this.missileCombat?.reset();
+    this.missileCombatView?.clear();
+    this.aircraft?.setMissileLoadout?.(this.missileCombat?.loaded);
     this.flightWarnings?.reset();
     this.pilotPhysiology?.reset?.();
     this.pilotPhysiologyFx?.reset?.();

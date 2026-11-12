@@ -43,6 +43,8 @@ import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
 import { HudView } from './ui/HudView.js';
+import { AirToAirMissileSystem } from './weapons/AirToAirMissileSystem.js';
+import { MissileCombatView } from './weapons/MissileCombatView.js';
 import { RenderPose } from './core/RenderPose.js';
 import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
 import { JoystickCheckDialog } from './ui/JoystickCheckDialog.js';
@@ -341,6 +343,9 @@ class FlightSimulator {
     );
     this.explosionSystem = new ExplosionSystem(this.scene, this.currentTerrain);
     this.aircraftBreakup = new AircraftBreakup(this.scene);
+    this.missileCombat = new AirToAirMissileSystem();
+    this.missileCombatView = new MissileCombatView(this.scene, this.missileCombat);
+    this._combatTerrainHeight = (x, z) => this.currentTerrain?.getHeight(x, z) ?? 0;
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
     this.pilotPhysiologyFx = new PilotPhysiologyFx(this.container);
     this.isCrashed = false;
@@ -1153,6 +1158,7 @@ class FlightSimulator {
       this.scene.remove(this.aircraft.group);
     }
     this.aircraft = instance;
+    if (this.missileCombat) instance.setMissileLoadout?.(this.missileCombat.loaded);
     const currentPreset = RENDER_QUALITY[this.renderQuality];
     if (currentPreset?.flatShading !== undefined) {
       instance.setFlatShading?.(currentPreset.flatShading);
@@ -1183,6 +1189,78 @@ class FlightSimulator {
     }
 
     this.showToast(() => t('notice.aircraft', { name: config.name }));
+  }
+
+  /** Combat exists only in a live, human-flown F-16 sortie; pausing freezes it. */
+  combatActive() {
+    const inSortie = this.gameFlow?.state === FLOW.FLIGHT || this.gameFlow?.state === FLOW.PAUSED;
+    return this.currentAircraftId === 'F16'
+      && inSortie
+      && !this.demoDirector?.isActive
+      && !this.pilotArena?.active
+      && !this.replayDirector?.active
+      && !this.shadowDemo?.active
+      && !this.devRunner?.active
+      && !this.multiplayer?.active
+      && !this.isCrashed
+      && !this.startingFlight
+      && !this.telemetry?.onGround;
+  }
+
+  combatWorld() {
+    return {
+      active: this.combatActive(),
+      position: this.position,
+      velocity: this.linearVelocity,
+      quaternion: this.quaternion,
+      onGround: Boolean(this.telemetry?.onGround),
+      terrainHeight: this._combatTerrainHeight,
+    };
+  }
+
+  syncMissileLoadout() {
+    if (this.missileCombat) this.aircraft?.setMissileLoadout?.(this.missileCombat.loaded);
+  }
+
+  fireMissile() {
+    if (!this.missileCombat || !this.combatActive()) return false;
+    if (this.controls.aircraftControlsDisabled || this.controls.inputBlocked) return false;
+    const missile = this.missileCombat.fire(this.combatWorld());
+    if (!missile) {
+      if (this.missileCombat.lastFireError === 'empty') this.showToast(() => t('weapons.empty'));
+      else if (this.missileCombat.lastFireError === 'ground') this.showToast(() => t('weapons.ground'));
+      return false;
+    }
+    this.syncMissileLoadout();
+    this.audio.playMissileLaunch();
+    this.showToast(() => t('weapons.launch.toast', {
+      type: t(missile.spec.labelKey),
+      fox: missile.spec.fox,
+    }));
+    return true;
+  }
+
+  cycleCombatTarget() {
+    if (!this.missileCombat || !this.combatActive()) return false;
+    const target = this.missileCombat.selectNextTarget();
+    if (!target) {
+      this.showToast(() => t('weapons.noTarget'));
+      return false;
+    }
+    this.showToast(() => t('weapons.target.toast', { callsign: target.callsign }));
+    return true;
+  }
+
+  handleCombatEvent(event) {
+    if (!event) return;
+    if (event.type === 'lock') {
+      this.audio.playLockTone();
+    } else if (event.type === 'detonation') {
+      this.missileCombatView.spawnExplosion(this.explosionSystem, event);
+      this.audio.playRemoteExplosion(this.camera.position.distanceTo(event.position));
+    } else if (event.type === 'kill') {
+      this.showToast(() => t('weapons.splash.toast', { callsign: event.target.callsign }));
+    }
   }
 
   /**
@@ -1229,6 +1307,14 @@ class FlightSimulator {
     this.aircraft.update(frameDelta, this.telemetry);
     this.renderPose.apply(this.aircraft.group, this.position, this.quaternion,
       this.physicsAccumulator / this.physicsDt);
+
+    // 1b. Air-to-air combat advances on its own fixed 120 Hz clock so a slow
+    // render frame cannot tunnel a missile through the proximity fuse.
+    const combatDt = this.gameFlow.isPhysicsFrozen() ? 0 : frameDelta;
+    const combatEvents = this.missileCombat.update(combatDt, this.combatWorld());
+    this.telemetry.rwrLevel = this.missileCombat.rwr.level;
+    this.missileCombatView.sync(combatDt);
+    for (const event of combatEvents) this.handleCombatEvent(event);
 
     // 4. Update Cockpit Visibility & Audio
     let isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;

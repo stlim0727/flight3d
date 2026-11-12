@@ -103,6 +103,8 @@ export class TouchFlightControls {
     this.rudderThumb = null;
     this.brakeBtn = null;
     this.gyroBtn = null;
+    this.fireBtn = null;
+    this.targetBtn = null;
 
     // Auto-detect touchscreen environment or allow explicit toggle
     const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -179,6 +181,10 @@ export class TouchFlightControls {
         <!-- Right Side: Virtual Stick & Secondary Controls -->
         <div class="touch-quadrant touch-right">
           <!-- Device tilt steering (relocated into the environment panel at boot) -->
+          <div class="touch-weapon-row" aria-label="Air-to-air weapons" data-i18n-aria-label="weapons.controls">
+            <button type="button" id="touch-btn-fire" class="btn-touch-pill touch-btn-weapon" title="발사 (Enter)" data-i18n-title="weapons.fire.tip" data-i18n="weapons.fire" hidden>FIRE MSL</button>
+            <button type="button" id="touch-btn-target" class="btn-touch-pill touch-btn-weapon" title="표적 전환 (N)" data-i18n-title="weapons.target.tip" data-i18n="weapons.target" hidden>TGT</button>
+          </div>
           <button type="button" id="touch-btn-gyro" class="btn-touch-pill" title="기기 기울기 자이로 센서 모드" data-i18n-title="gyroscope.device.tilt.mode">
             <span class="pill-icon">📱</span> GYRO
           </button>
@@ -219,6 +225,8 @@ export class TouchFlightControls {
     this.rudderThumb = el.querySelector('#touch-rudder-thumb');
     this.brakeBtn = el.querySelector('#touch-btn-brake');
     this.gyroBtn = el.querySelector('#touch-btn-gyro');
+    this.fireBtn = el.querySelector('#touch-btn-fire');
+    this.targetBtn = el.querySelector('#touch-btn-target');
     this.recenterBtn = el.querySelector('#touch-btn-recenter');
     this.stickTelemetry = el.querySelector('#touch-stick-telemetry');
     this.rudderReadout = el.querySelector('#touch-rudder-val');
@@ -285,10 +293,25 @@ export class TouchFlightControls {
 
     // 5. Gyroscope Toggle Button & Quick Recenter Floating Button
     this.gyroBtn?.addEventListener('click', () => this.toggleGyro());
+    this.fireBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.controls?.onFireMissile?.();
+    });
+    this.targetBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.controls?.onCycleTarget?.();
+    });
     this.recenterBtn?.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       this.quickRecenterGyro();
     });
+  }
+
+  /** Combat buttons only make sense in the F-16; keep other aircraft uncluttered. */
+  setCombatVisible(visible) {
+    const show = Boolean(visible);
+    if (this.fireBtn) this.fireBtn.hidden = !show;
+    if (this.targetBtn) this.targetBtn.hidden = !show;
   }
 
   quickRecenterGyro() {
