@@ -165,6 +165,19 @@ export function initFlightPanels({ onSelectCamera, onCameraOpen, onCameraClose, 
   // takeover unfold leftwards instead of shifting the primary group.
   bar.append(skipDemoButton, cameraButton, fullscreen, moreButton);
 
+  // Issue #638: the wrapped portrait control row dims while the pilot watches
+  // the scene, then returns to full opacity on any pointer, key or focus input.
+  let controlsIdleTimer = 0;
+  const wakeControls = () => {
+    bar.classList.remove('controls-idle');
+    clearTimeout(controlsIdleTimer);
+    controlsIdleTimer = setTimeout(() => bar.classList.add('controls-idle'), 2500);
+  };
+  for (const type of ['pointerdown', 'keydown', 'touchstart', 'focusin']) {
+    document.addEventListener(type, wakeControls, { passive: true });
+  }
+  wakeControls();
+
   for (const [id, key] of Object.entries({
     'btn-cam-reset': 'center.view.o',
     'btn-yokes': 'hide.yokes.j', 'btn-diag': 'physics',

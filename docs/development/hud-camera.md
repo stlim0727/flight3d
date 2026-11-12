@@ -76,10 +76,14 @@ CHROME_PATH=/home/stlim/.local/bin/chrome-headless node scripts/verify-flight-la
 The self-contained harness uses an isolated Chrome profile and Vulkan on Linux.
 Check render-device access in the launcher session first. It verifies a hardware
 WebGL2 renderer and shader pixel readback, then checks stable control rectangles
-across camera modes, the single right-anchored toolbar row whose camera/fullscreen/overflow
-group stays reachable while the aircraft actions unfold to its left and scroll into view,
-native AP/trim/brake/mute interaction, demo
-lockout and one-tap take-control clearance across desktop and phone orientations. Artifacts
+across camera modes, the right-anchored toolbar whose camera/fullscreen/overflow
+group stays reachable, native AP/trim/brake/mute interaction, demo
+lockout and one-tap take-control clearance across desktop and phone orientations.
+Phones in portrait show only the core airspeed, altitude and (from 361px wide)
+heading readouts in the first row. The second row wraps every aircraft control
+instead of scrolling, so landing gear is visible without a drag; it dims to 40%
+after 2.5s without input and returns to full opacity on pointer, key or focus
+activity. Artifacts
 are written to `.cache/flight-layout/` (override with `ARTIFACT_DIR`). These are
 fixed-pose browser checks, not flight or physical-device acceptance. The older
 `verify-responsive-ui.mjs` includes historical toolbar-placement expectations;

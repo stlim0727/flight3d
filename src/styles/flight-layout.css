@@ -388,3 +388,51 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
     max-width: calc(100% - var(--edge-left) - var(--edge-right) - 118px);
   }
 }
+
+/* Issue #638: narrow portrait phones must see every aircraft control without a
+   horizontal drag. Row 1 keeps only the readouts the pilot always needs, and the
+   control row wraps instead of scrolling. Controls dim while idle and return to
+   full opacity on any input so the scene stays readable in flight. */
+@media (max-width: 600px) and (orientation: portrait) {
+  .hud-top-bar .hud-strip {
+    overflow: hidden;
+    touch-action: auto;
+    gap: 4px;
+    padding-inline: 6px;
+  }
+  .hud-top-bar .hud-strip .hud-item { display: none; }
+  .hud-top-bar .hud-strip .hud-item.hud-primary {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
+  }
+  .hud-top-bar .hud-strip .hud-label { font-size: 8px; letter-spacing: .4px; }
+  .hud-top-bar .hud-strip .hud-val { font-size: 12px; }
+
+  .flight-toolbar,
+  .compact-ui .flight-toolbar,
+  .compact-ui.touch-mode .flight-toolbar {
+    left: auto;
+    right: var(--edge-right);
+    transform: none;
+    width: calc(100% - var(--edge-left) - var(--edge-right));
+    max-width: none;
+    height: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    overflow: visible;
+    touch-action: auto;
+    transition: opacity .35s ease;
+  }
+  .flight-toolbar .btn,
+  .compact-ui .flight-toolbar .btn { flex: 0 0 calc(44px * var(--ui-scale, 1)); }
+  .flight-toolbar.controls-idle { opacity: .4; }
+  .flight-toolbar.controls-idle:hover,
+  .flight-toolbar.controls-idle:focus-within { opacity: 1; }
+}
+
+/* Even the three core readouts need the full row on 320px-class screens. */
+@media (max-width: 360px) and (orientation: portrait) {
+  .hud-top-bar .hud-strip .hud-item.hud-primary[data-hud="hdg"] { display: none; }
+}

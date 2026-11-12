@@ -43,7 +43,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
   }
   assert.ok(await evaluate('Boolean(window.simulator?.startupReady)'), 'startup');
   assert.equal(await evaluate('document.getElementById("open-camera").tagName'), 'SELECT', 'CAM opens a native view dropdown');
-  assert.equal(await evaluate('document.querySelectorAll("#open-camera option").length'), 9, 'all views and unified Auto are selectable');
+  assert.equal(await evaluate('document.querySelectorAll("#open-camera option").length'), 10, 'all views, Auto and Director are selectable');
   assert.equal(await evaluate('document.getElementById("btn-auto-camera") === null'), true, 'no duplicate Scenic Auto button');
   await evaluate(() => {
     const select = document.getElementById('open-camera');
@@ -101,15 +101,22 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
           return { sel: `#${n.id}`, ...box(n), center: `${cs.display}/${cs.alignItems}/${cs.justifyContent}`,
             hit: n.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)) };
         });
-        return { chrome, buttons, pinned: Math.ceil(bar.scrollLeft + bar.clientWidth) >= bar.scrollWidth };
+        return { chrome, buttons, pinned: Math.ceil(bar.scrollLeft + bar.clientWidth) >= bar.scrollWidth,
+          fits: bar.scrollWidth <= bar.clientWidth + 1 };
       });
       const bounds = [...layout.chrome, ...layout.buttons];
       assert.ok(layout.chrome.every(r => r.x >= 0 && r.x + r.w <= width + 1 && r.y >= 0 && r.y + r.h <= height), JSON.stringify(layout.chrome));
       assert.ok(bounds.every(r => r.h >= 44 && (r.sel === '.hud-strip' || r.w >= 44)), 'minimum targets');
-      assert.equal(new Set(layout.buttons.map(b => Math.round(b.y))).size, 1, `toolbar stays on one row: ${JSON.stringify(layout.buttons)}`);
+      const wrappedPortrait = width <= 600 && height > width;
+      assert.ok(new Set(layout.buttons.map(b => Math.round(b.y))).size <= (wrappedPortrait ? 2 : 1),
+        `toolbar stays on ${wrappedPortrait ? 'at most two' : 'one'} row(s): ${JSON.stringify(layout.buttons)}`);
+      if (wrappedPortrait) {
+        assert.ok(layout.fits, `portrait toolbar needs no horizontal scroll: ${JSON.stringify(layout.chrome)}`);
+        assert.ok(layout.buttons.every(b => b.hit), `portrait controls stay reachable without scrolling: ${JSON.stringify(layout.buttons)}`);
+      }
       assert.ok(layout.buttons.every(b => b.center === 'flex/center/center'), `labels centred in their buttons: ${layout.buttons.map(b => b.center)}`);
       // Camera, fullscreen and overflow stay pinned to the right edge; the
-      // aircraft actions unfold to their left and scroll into view.
+      // aircraft actions unfold to their left and wrap on portrait phones.
       const primary = layout.buttons.slice(-3);
       assert.deepEqual(primary.map(b => b.sel), ['#open-camera', '#btn-fullscreen', '#open-flight-more'], `primary group order: ${layout.buttons.map(b => b.sel)}`);
       assert.ok(layout.pinned, 'toolbar scrolled to its right end');
@@ -195,12 +202,14 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       s.updateHUD();
     });
     await delay(350);
-    assert.ok(await evaluate(() => {
+    const demoCheck = await evaluate(() => {
       const guide = document.getElementById('demo-banner');
       const warning = document.getElementById('hud-warning');
-      return getComputedStyle(guide).visibility === 'visible'
-        && guide.getBoundingClientRect().top >= warning.getBoundingClientRect().bottom + 4;
-    }), 'expanded demo stays visible below the warning');
+      return { visibility: getComputedStyle(guide).visibility,
+        guideTop: guide.getBoundingClientRect().top, warningBottom: warning.getBoundingClientRect().bottom };
+    });
+    assert.ok(demoCheck.visibility === 'visible' && demoCheck.guideTop >= demoCheck.warningBottom + 4,
+      `expanded demo stays visible below the warning at ${width}x${height}: ${JSON.stringify(demoCheck)}`);
     await evaluate(() => window.simulator.demoDirector.closeBanner());
     await delay(350);
     const folded = await evaluate(() => {
