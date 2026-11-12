@@ -6,10 +6,12 @@ import { t, bindText } from '../src/i18n/index.js';
 import { parseRoom, inviteUrl, inviteCompatibilityFailure } from '../src/multiplayer/protocol.js';
 import { RoomDirectoryClient } from '../src/multiplayer/RoomDirectoryClient.js';
 import { HEARTBEAT_INTERVAL_MS } from '../src/multiplayer/roomDirectory.js';
+import { RoomReplaySession } from '../src/replay/RoomReplaySession.js';
+import { Atmosphere } from '../src/physics/Atmosphere.js';
 
 // Load the production coordinator without importing its browser-only PeerJS adapter.
 const source = readFileSync(new URL('../src/multiplayer/MultiplayerController.js', import.meta.url), 'utf8');
-const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', 'inviteCompatibilityFailure', 'RoomDirectoryClient', 'HEARTBEAT_INTERVAL_MS', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl, inviteCompatibilityFailure, RoomDirectoryClient, HEARTBEAT_INTERVAL_MS);
+const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', 'inviteCompatibilityFailure', 'RoomDirectoryClient', 'HEARTBEAT_INTERVAL_MS', 'Atmosphere', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl, inviteCompatibilityFailure, RoomDirectoryClient, HEARTBEAT_INTERVAL_MS, Atmosphere);
 
 test('invite URL joins automatically; missing or invalid invites never connect', () => {
   const joined = [];
@@ -67,6 +69,35 @@ function fixture(run) {
   });
   try { return run({ controller, gameFlow, airport, preset, restricted }); }
   finally { globalThis.document = previous; }
+}
+
+for (const reason of ['left', 'peer-left', 'timeout', 'pagehide']) {
+  test(`room recorder survives local debrief/restart and saves once on ${reason}`, () => fixture(({ controller, gameFlow }) => {
+    let now = 0;
+    const saved = [];
+    controller.roomReplay = new RoomReplaySession({ saveRoomAuto(track) { saved.push(track); return { entry: { id: 'saved' } }; } }, { now: () => now });
+    Object.assign(controller.sim, { sky: { timeOfDay: 12 }, position: { x: 10, y: 900, z: 20 },
+      quaternion: { x: 0, y: 0, z: 0, w: 1 }, telemetry: { iasKnots: 100, gForce: 1, pitchDeg: 0, rollDeg: 0, headingDeg: 0 } });
+    controller.slot = 0;
+    Object.assign(controller.room.session, { config: { airport: 'coastal', aircraft: 'C172', scenario: 'cruise' },
+      round: 1, epoch: 0, remoteName: 'Wing', track: { sample: () => ({ p: [now / 100, 900, 20],
+        q: [0, 0, 0, 1], round: 1, epoch: 0, gear: 1, flaps: 0 }) } });
+    controller.startTogether();
+    for (let i = 0; i < 30; i++) { now += 200; controller.recordReplay(); }
+    gameFlow.endFlight();
+    for (let i = 0; i < 10; i++) { now += 200; controller.recordReplay(); }
+    controller.room.session.round = 2; controller.startTogether();
+    now += 200; controller.recordReplay();
+    assert.equal(controller.roomReplay.recorder.metadata.room.rounds, 2);
+    // Transport disposal clears the remote buffer before ended.
+    controller.room.session.track.sample = () => null;
+    controller.room.closed = true;
+    if (reason === 'pagehide') controller.roomReplay.finish(reason);
+    controller.ended(reason); controller.ended(reason);
+    assert.equal(saved.length, 1);
+    assert.ok(saved[0].durationSec > 8);
+    assert.ok(saved[0].remotes[0].samples.at(-1).x > 70);
+  }));
 }
 
 test('personal reset keeps continuous voice and microphone mute unchanged', () => fixture(({ controller }) => {

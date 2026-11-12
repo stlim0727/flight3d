@@ -8,6 +8,8 @@ const payloadKey = id => `flight3d.replay.${id}.v1`;
 
 /** Fixed name of the single slot that always holds the most recent flight (#645). */
 export const AUTO_SAVE_LABEL = 'auto_save';
+export const ROOM_AUTO_SAVE_LABEL = 'room_auto_save';
+const ROOM_SAVE_FAILURE_KEY = 'flight3d.roomReplaySaveFailure.v1';
 
 function cleanLabel(label) {
   if (typeof label !== 'string') return null;
@@ -110,7 +112,7 @@ export class ReplayStore {
   }
 
   /** @returns {{entry: object, error: string|null}} */
-  save(track, { label, auto = false, summary = null, report = null } = {}) {
+  save(track, { label, auto = false, autoSlot = 'solo', summary = null, report = null } = {}) {
     if (!track || !Array.isArray(track.samples) || track.samples.length < 2) {
       return { entry: null, error: 'tooShort' };
     }
@@ -136,9 +138,10 @@ export class ReplayStore {
       metadata: { ...track.metadata },
     };
     if (resolvedSummary) entry.summary = resolvedSummary;
-    if (auto) entry.auto = true;
+    if (auto) { entry.auto = true; entry.autoSlot = autoSlot; }
     const rows = this.read();
-    if (!this.writeEntry(entry, base64, rows)) return { entry: null, error: this.error || 'quota' };
+    const replaced = auto ? rows.filter(row => row.auto === true && (row.autoSlot ?? 'solo') === autoSlot) : [];
+    if (!this.writeEntry(entry, base64, rows, replaced)) return { entry: null, error: this.error || 'quota' };
     return { entry, error: null };
   }
 
@@ -149,12 +152,24 @@ export class ReplayStore {
    * @returns {{entry: object, error: string|null}}
    */
   saveAuto(track, { summary = null, report = null } = {}) {
-    const stale = this.read().filter(row => row.auto === true);
-    const { entry, error } = this.save(track, { label: AUTO_SAVE_LABEL, auto: true, summary, report });
-    if (!entry) return { entry: null, error };
-    // Write the replacement first so a refused save cannot drop the flight already kept.
-    for (const row of stale) if (row.id !== entry.id) this.remove(row.id);
-    return { entry, error: null };
+    return this.save(track, { label: AUTO_SAVE_LABEL, auto: true, summary, report });
+  }
+
+  saveRoomAuto(track) {
+    const result = this.save(track, { label: ROOM_AUTO_SAVE_LABEL, auto: true, autoSlot: 'room' });
+    if (!result.entry) {
+      // Best effort: an entirely inaccessible storage cannot persist even a failure notice.
+      try { this.storage.setItem(ROOM_SAVE_FAILURE_KEY, '1'); } catch { /* immediate callback still reports it */ }
+    }
+    return result;
+  }
+
+  consumeRoomSaveFailure() {
+    try {
+      const failed = this.storage.getItem(ROOM_SAVE_FAILURE_KEY) === '1';
+      if (failed) this.storage.removeItem(ROOM_SAVE_FAILURE_KEY);
+      return failed;
+    } catch { return false; }
   }
 
   get(id) {
@@ -180,6 +195,7 @@ export class ReplayStore {
     row.label = clean;
     // Renaming an auto save keeps it: it is no longer the disposable latest-flight slot.
     delete row.auto;
+    delete row.autoSlot;
     return this.writeIndex(rows);
   }
 
@@ -235,7 +251,7 @@ export class ReplayStore {
   }
 
   /** Commit payload and index together, restoring old saves if quota retries fail. */
-  writeEntry(entry, base64, rows) {
+  writeEntry(entry, base64, rows, replaced = []) {
     const backups = new Map();
     try {
       // Read everything we might evict before the first destructive operation.
@@ -244,7 +260,8 @@ export class ReplayStore {
       this.error = error.message;
       return false;
     }
-    const candidates = this.applyBudget([...rows, entry]);
+    const candidates = this.applyBudget([...rows.filter(row => !replaced.includes(row)), entry]);
+    candidates.evicted.push(...replaced);
     const removed = new Set();
     const evict = row => {
       this.storage.removeItem(payloadKey(row.id));

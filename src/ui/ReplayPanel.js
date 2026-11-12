@@ -89,7 +89,8 @@ export class ReplayPanel {
   openLibrary() {
     if (this.sim.startingFlight) return;
     this.previousFocus = document.activeElement;
-    this.status(this.watchBlocked() ? 'replay.multiplayerBlocked' : null); this.renderList();
+    this.status(this.sim.replayStore.consumeRoomSaveFailure?.() ? 'replay.roomSaveFailed'
+      : this.watchBlocked() ? 'replay.multiplayerBlocked' : null); this.renderList();
     this.library.hidden = false;
     this.library.querySelector('[data-close]').focus();
   }
@@ -119,6 +120,14 @@ export class ReplayPanel {
       info.className = 'replay-entry-info';
       info.textContent = `${flightDuration(entry.durationSec)} · ${new Date(entry.savedAt).toLocaleString()}`;
       row.append(label, info);
+      const roomTrack = Array.isArray(entry.metadata?.remotes) && entry.metadata.remotes.length > 0;
+      if (roomTrack) {
+        const roomInfo = document.createElement('p'); roomInfo.className = 'replay-entry-summary';
+        bindText(roomInfo, () => [t('replay.room'), entry.metadata.room?.local?.name,
+          ...entry.metadata.remotes.map(pilot => pilot.name),
+          entry.metadata.room?.partial ? t('replay.partialRoom') : null].filter(Boolean).join(' · '));
+        row.append(roomInfo);
+      }
       if (entry.summary) {
         const summaryEl = document.createElement('p');
         summaryEl.className = 'replay-entry-summary';
@@ -157,7 +166,7 @@ export class ReplayPanel {
       for (const action of ['watch', 'export', 'delete']) {
         const button = document.createElement('button'); button.className = 'btn'; button.dataset.action = action;
         bindText(button, () => t(`replay.${action}`));
-        if (action === 'watch') button.disabled = this.watchBlocked();
+        if (action === 'watch') button.disabled = this.watchBlocked() || roomTrack;
         button.addEventListener('click', async () => {
           if (action === 'watch') {
             const saved = this.sim.replayStore.get(entry.id);

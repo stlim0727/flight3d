@@ -1,6 +1,9 @@
 export default {
   'replay.saved': 'Replay saved to library',
   'replay.saveFailed': 'Could not save the replay',
+  'replay.roomSaveFailed': 'Could not save the multiplayer replay. Check browser storage space and permissions.',
+  'replay.room': 'Multiplayer',
+  'replay.partialRoom': 'Only the recent portion was saved',
   'replay.tooLong': 'This flight is too long to save',
   'replay.tooShort': 'This flight is too short to save',
   'replay.title': "Flight replay",

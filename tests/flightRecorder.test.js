@@ -298,6 +298,21 @@ test('an active arena run leaves flight_ended to its runner instead of reporting
   assert.equal(ended[0].reason, 'manual');
 });
 
+test('room recording suppresses sortie auto-save but preserves the manual debrief track', () => {
+  for (const active of [true, false]) {
+    let saves = 0;
+    const sim = { gameFlow: new GameFlowController(), ...recorders(), devRunner: {},
+      telemetry, quaternion: attitude, isCrashed: false,
+      multiplayer: { roomReplay: { active } }, replayStore: { saveAuto() { saves++; } },
+      debriefOverlay: { show() {} } };
+    sim.gameFlow.enterFlight(); sim.flightRecorder.start(metadata); sim.replayRecorder.start(metadata);
+    for (let i = 0; i < 720; i++) SimulatorClass.prototype.updateFlightRecording.call(sim, 1 / 120);
+    SimulatorClass.prototype.endFlight.call(sim, 'manual');
+    assert.equal(saves, active ? 0 : 1);
+    assert.ok(sim.debriefReplay, 'manual save still receives the completed solo track');
+  }
+});
+
 test('each sortie counts pilot G-LOC on entry and reports it with the peak load', () => {
   const recorder = new FlightRecorder();
   recorder.start(metadata);

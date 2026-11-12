@@ -338,6 +338,42 @@ test('saveAuto keeps exactly one latest-flight entry, replacing the previous one
   assert.equal(store.get(first.id), null);
 });
 
+test('room and legacy solo auto slots replace independently without evicting an extra save', () => {
+  const storage = new MockStorage();
+  const store = storeFor(storage);
+  const manual = store.save(track(), { label: 'Keep' }).entry;
+  const solo = store.saveAuto(track()).entry;
+  // Simulate an existing pre-autoSlot index row.
+  const legacy = store.read(); delete legacy.find(row => row.id === solo.id).autoSlot; store.writeIndex(legacy);
+  const first = store.saveRoomAuto(track()).entry;
+  const next = store.saveRoomAuto(track(24)).entry;
+  assert.equal(next.label, 'room_auto_save');
+  assert.equal(store.list().length, 3);
+  assert.ok(store.get(manual.id)); assert.ok(store.get(solo.id)); assert.equal(store.get(first.id), null);
+  const newSolo = store.saveAuto(track(24)).entry;
+  assert.ok(store.get(next.id)); assert.ok(store.get(manual.id)); assert.ok(store.get(newSolo.id));
+  assert.equal(store.get(solo.id), null);
+  store.rename(next.id, 'Keep room');
+  assert.equal(store.get(next.id).meta.autoSlot, undefined);
+  store.remove(manual.id);
+  store.saveRoomAuto(track());
+  assert.ok(store.get(next.id), 'renamed room is no longer replaced');
+});
+
+test('failed room auto replacement restores the old payload and index', () => {
+  const storage = new MockStorage(); const store = storeFor(storage);
+  const original = store.saveRoomAuto(track()).entry;
+  const before = storage.getItem(INDEX_KEY);
+  const write = storage.setItem.bind(storage);
+  storage.setItem = (key, value) => {
+    if (key === INDEX_KEY) throw new Error('index denied');
+    write(key, value);
+  };
+  assert.equal(store.saveRoomAuto(track(24)).entry, null);
+  assert.equal(storage.getItem(INDEX_KEY), before);
+  assert.equal(store.get(original.id).track.samples.length, 20);
+});
+
 test('saveAuto refuses an unplayable track without disturbing the kept flight', () => {
   const storage = new MockStorage();
   const store = storeFor(storage);

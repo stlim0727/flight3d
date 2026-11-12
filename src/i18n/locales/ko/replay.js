@@ -1,6 +1,9 @@
 export default {
   'replay.saved': '리플레이를 라이브러리에 저장했습니다',
   'replay.saveFailed': '리플레이를 저장하지 못했습니다',
+  'replay.roomSaveFailed': '멀티플레이 리플레이를 저장하지 못했습니다. 브라우저 저장 공간과 권한을 확인하세요.',
+  'replay.room': '멀티플레이',
+  'replay.partialRoom': '최근 구간만 저장됨',
   'replay.tooLong': '저장하기에는 너무 긴 비행입니다',
   'replay.tooShort': '저장하기에는 너무 짧은 비행입니다',
   'replay.title': "비행 다시 보기",
