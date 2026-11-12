@@ -99,8 +99,12 @@ test('replay playback interpolates combat and stages each detonation once', () =
 
   const origin = new Vector3(0, 3000, 0);
   playback.seek(1);
-  assert.equal(playback.getHudState(origin).splash, 0, 'future bursts are not counted yet');
-  assert.equal(playback.getHudState(origin).remaining, 6);
+  const hud = playback.getHudState(origin);
+  assert.equal(hud.splash, 0, 'future bursts are not counted yet');
+  assert.equal(hud.remaining, 6);
+  assert.equal(hud.nextMissileType.id, 'AIM9X');
+  assert.equal(hud.selectedTarget.callsign, 'BANDIT 1');
+  assert.equal(hud.missilesInFlight, 1);
   assert.equal(playback.state.targets.length, 2);
   assert.ok(Math.abs(playback.state.targets[0].position.x - 1001) < 0.2);
   assert.equal(playback.state.missiles.length, 1);
