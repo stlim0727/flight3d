@@ -80,6 +80,7 @@ export class FlightControls {
     this.onDeviceDisconnected = null;
     this.onFireMissile = null;
     this.onCycleTarget = null;
+    this.touchGunTrigger = false;
 
     this.hotas.onDeviceConnected = (info) => this.onDeviceConnected?.(info);
     this.hotas.onDeviceDisconnected = (info) => this.onDeviceDisconnected?.(info);
@@ -211,6 +212,7 @@ export class FlightControls {
   /** Drop all held-key state, e.g. when a menu takes over mid-input. */
   releaseAllKeys() {
     this.keys = {};
+    this.touchGunTrigger = false;
     this.pitchTrimRate = 0.0;
     if (this.hotas) {
       this.hotas.resetOutputs();
@@ -229,6 +231,18 @@ export class FlightControls {
       this.setTouchRudder(0.0);
       this.setTouchBrakes(0.0);
     }
+  }
+
+  /** Hold-to-fire gun trigger; touch buttons set it directly. */
+  setGunTrigger(pressed) {
+    this.touchGunTrigger = Boolean(pressed);
+  }
+
+  /** Space is the airborne gun trigger and the ground wheel-brake key. The
+   * combat system only consumes it while the aircraft is airborne. */
+  get gunTrigger() {
+    return !this.inputBlocked && !this.aircraftControlsDisabled
+      && (Boolean(this.keys['Space']) || this.touchGunTrigger);
   }
 
   update(dt, iasKnots = 140, aircraftId = 'B738') {

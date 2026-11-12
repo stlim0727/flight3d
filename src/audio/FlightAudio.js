@@ -70,6 +70,7 @@ export class FlightAudio {
   }
 
   reset() {
+    this.stopGunFire();
     this.crashed = false;
     this.lastTouchdownTime = -Infinity;
     this.touchdownActive = false;
@@ -550,7 +551,12 @@ export class FlightAudio {
     if (this.volume > 0.0) {
       this.isMuted = false;
     }
-    if (this.volume === 0) { this.cancelSpeech(); this.departureRadio.stop(); this.bangkokRadio?.stop(); }
+    if (this.volume === 0) {
+      this.cancelSpeech();
+      this.stopGunFire();
+      this.departureRadio.stop();
+      this.bangkokRadio?.stop();
+    }
     this.applyMasterGain();
   }
 
@@ -828,6 +834,57 @@ export class FlightAudio {
       gain.connect(this.masterGain);
       osc.start(now + offset);
       osc.stop(now + offset + 0.1);
+    }
+  }
+
+  /**
+   * M61A1 burst: a looping 100 Hz noise pulse shaped by a band-pass filter.
+   * Starting once per trigger avoids scheduling 100 one-shot nodes per second.
+   */
+  startGunFire() {
+    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
+    if (this.gunFireNodes) return;
+    const now = this.ctx.currentTime;
+    const rate = this.ctx.sampleRate;
+    const period = Math.max(1, Math.round(rate / 100));
+    const length = Math.max(period * 10, Math.floor(rate * 0.1));
+    const buffer = this.ctx.createBuffer(1, length, rate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      const phase = i % period;
+      const envelope = phase < period * 0.3 ? 1 - phase / (period * 0.3) : 0.12;
+      data[i] = (Math.random() * 2 - 1) * envelope;
+    }
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(760, now);
+    filter.Q.value = 0.9;
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.14, now + 0.03);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+    source.start(now);
+    this.gunFireNodes = { source, gain };
+  }
+
+  stopGunFire() {
+    const nodes = this.gunFireNodes;
+    if (!nodes) return;
+    this.gunFireNodes = null;
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    try {
+      nodes.gain.gain.cancelScheduledValues(now);
+      nodes.gain.gain.setValueAtTime(nodes.gain.gain.value, now);
+      nodes.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+      nodes.source.stop(now + 0.09);
+    } catch (error) {
+      void error;
     }
   }
 
