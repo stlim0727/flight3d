@@ -88,14 +88,11 @@ knows the frame width; codec v3 is written only for tracks with remote pilots, w
 solo tracks stay v2 for older builds. A room that outlasts the coarsest rung keeps its
 most recent frames instead of being refused, and its timeline is rebased to zero.
 
-### Room lifecycle and release gate (#672 Task 2)
+### Room lifecycle (#672 Tasks 2–3)
 
 `MultiplayerController` connects `RoomReplaySession` to the first `go`, its frame
-updates, and `ended`/`pagehide`. `ROOM_REPLAY_ENABLED` remains **false** until Task 3
-can render every aircraft. Production retains solo recording/auto-save behavior;
-room imports may be exported/renamed/deleted but cannot silently play as solo.
-Task 3 must enable the flag and remove the room watch guards in `ReplayPanel` and
-`ReplayDirector` together with its two-peer playback acceptance.
+updates, and `ended`/`pagehide`. `ROOM_REPLAY_ENABLED` is **true**: the library can
+play both local and remote aircraft, including imported v3 room records.
 
 When enabled, the room clock is `(performance.now() - startedAt) / 1000`, in seconds,
 independent of local physics time. Menu/debrief holds do not stop remote recording.
@@ -111,8 +108,8 @@ Each state contains visible/held/crashed/stale/segment and optional crash type/s
 (knots). Local types come from `crashResult`; remote types are `unknown` without a
 wire change. These are observed state transitions, not an exact crash simulation.
 They survive pose thinning and support repeated crashes/respawns and backwards seek.
-The sampler never interpolates across a retained state transition. Task 3 must
-consume visibility and crash states when rendering, including hidden local poses.
+The sampler never interpolates across a retained state transition. Playback
+consumes visibility and crash states for every aircraft, including hidden local poses.
 
 Blur marks an observation gap. Frame gaps over 500 ms also hide both tracks until
 the next observation; stale remote snapshots are hidden in the timeline. A large
@@ -133,6 +130,29 @@ entry budget. If transitions alone exceed it, the retained pose window is shorte
 along with the history. Pose-window trimming retains the state at its beginning.
 Finalization rebases both poses and timeline, and the library labels partial room
 records. This can retain less than the nominal roughly 30-minute pose budget.
+
+### Room playback
+
+`ReplayDirector` awaits each remote production model before enabling playback.
+Remote actors are visual only: `sampleRemote()` supplies world position and
+quaternion, gear and flaps. The live network clock, remote crash inference and
+collision registration do not run. The camera still follows the local aircraft;
+participant switching and event markers remain separate follow-ups.
+
+`ReplayCrashEffects` reconstructs each pilot's impact from the transition timeline.
+Effect age is `replayTime - impactTime` in seconds. Pause freezes it, speed scales it,
+and seeks rebuild it with steps no larger than 1/60 s (breakup integrates internally
+at 1/120 s). Impact velocity uses adjacent world positions within the same segment,
+optionally scaled by the recorded speed in knots divided by 1.94384. It never derives
+velocity across a respawn. Remote models retain their local transform beneath a
+world-pose wrapper, so breakup applies the world transform exactly once.
+
+Effects are visual approximations, not recorded trajectories. Remote impact type
+stays `unknown`; local water/terrain/ship types come from the recording. Reconstruction
+is bounded to 30 seconds after each impact; after that the crashed airframe stays
+hidden until respawn. Gaps and backwards seeks clear effects. Playback starts with
+live wreckage cleared and disposes remote models, indicators, fragments and explosion
+resources on exit or failed loading. Local contact shadows follow replay visibility.
 
 `ReplayStore` uses a small index and individual localStorage payloads. Debrief download
 and replay library export share one unified format (`flight3d.sortie.v1`):
@@ -159,10 +179,19 @@ Run the Node replay tests with `node --test tests/replay*.test.js
 `node scripts/verify-room-recording.mjs` uses hardware Chrome and the real
 controller/recorder/store/library with a deterministic peer/clock fixture. It checks
 held-local/continuing-remote recording, suspension gaps, one-shot save, import/export,
-library names/watch gating and reload persistence. On Windows start Vite separately
+library names/watch availability and reload persistence. On Windows start Vite separately
 and set `APP_URL` to its origin; the script uses installed Chrome with D3D11.
 Evidence goes to `review-artifacts/room-recording/`. This is not two-peer WebRTC,
-tab-close acceptance or multi-aircraft rendering; those remain Task 3 acceptance.
+tab-close acceptance or multi-aircraft rendering.
+
+`node scripts/verify-room-playback.mjs` runs local signaling and Vite, verifies the
+installed Chrome hardware renderer, and connects actual WebRTC peers in isolated
+storage contexts. It checks menu hold, two injected collisions through production
+crash handling, debrief, personal respawn, round restart, departure, independent
+auto-saves, import/export, two rendered aircraft, seek, pause/3× and disposal. A
+second room closes a real tab and reopens its storage; another expires a heartbeat
+to exercise timeout. Collisions are injected, not flown accidents, and the timeout
+clock is advanced explicitly. Evidence goes to `review-artifacts/room-playback/`.
 
 `npm run test:replay` starts local Vite and isolated hardware Chrome. It invokes
 `scripts/verify-browser-gpu.mjs` against that actual browser before acceptance.

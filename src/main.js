@@ -1355,7 +1355,7 @@ class FlightSimulator {
     this.sky.updateSun(this.position, this.camera.position);
     this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     if (!this.gameFlow.isPhysicsFrozen()) {
-      this.explosionSystem.update(frameDelta);
+      if (!this.replayDirector.roomEffects) this.explosionSystem.update(frameDelta);
       this.tireSmokeSystem.update(frameDelta);
     }
 
@@ -1367,7 +1367,8 @@ class FlightSimulator {
         this.aircraft.cockpit.group.visible = false;
       }
     }
-    this.contactShadow.setEnabled(!isCockpit && this.renderQuality === 'ultraLow');
+    this.contactShadow.setEnabled(!isCockpit && this.renderQuality === 'ultraLow'
+      && (!this.replayDirector.active || this.aircraft.group.visible));
     const { x: shadowX, z: shadowZ } = this.aircraft.group.position;
     this.contactShadow.update(this.aircraft.group.position, this.aircraft.group.quaternion,
       contactShadowSurfaceHeight(this.currentTerrain, this.water, shadowX, shadowZ),

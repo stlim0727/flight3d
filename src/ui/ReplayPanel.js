@@ -166,7 +166,7 @@ export class ReplayPanel {
       for (const action of ['watch', 'export', 'delete']) {
         const button = document.createElement('button'); button.className = 'btn'; button.dataset.action = action;
         bindText(button, () => t(`replay.${action}`));
-        if (action === 'watch') button.disabled = this.watchBlocked() || roomTrack;
+        if (action === 'watch') button.disabled = this.watchBlocked();
         button.addEventListener('click', async () => {
           if (action === 'watch') {
             const saved = this.sim.replayStore.get(entry.id);

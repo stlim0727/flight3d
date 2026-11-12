@@ -26,7 +26,7 @@ await withBrowserSession({ width: 1280, height: 800 }, async ({ origin, cdpPort,
     const { sampleTrack, sampleRemote } = await import('/src/replay/TrackSampler.js');
     const { setLanguage } = await import('/src/i18n/index.js');
     setLanguage('ko');
-    const defaultDisabled = s.multiplayer.roomReplay === null;
+    const defaultEnabled = s.multiplayer.roomReplay !== null;
     Object.assign(s.lobby, { airport: 'coastal', aircraft: 'C172', preset: 'cruise' });
     await s.fly();
     let now = 0, remoteX = 100;
@@ -56,12 +56,12 @@ await withBrowserSession({ width: 1280, height: 800 }, async ({ origin, cdpPort,
     if (!imported.entry) throw new Error('room import failed');
     s.replayStore.rename(imported.entry.id, '함께 비행 · 보관 사본');
     s.replayPanel.openLibrary();
-    return { defaultDisabled, duplicateIgnored: duplicate === null, held: sampleTrack(track, 8).held,
+    return { defaultEnabled, duplicateIgnored: duplicate === null, held: sampleTrack(track, 8).held,
       remoteMoved: sampleRemote(track, 0, 8).x > sampleRemote(track, 0, 6).x,
       gap: !sampleTrack(track, 11).visible && !sampleRemote(track, 0, 11).visible,
       metadataPreserved: JSON.stringify(track.metadata.room) === JSON.stringify(s.replayStore.get(imported.entry.id).track.metadata.room),
       roomCount: s.replayStore.list().filter(entry => entry.metadata.room).length,
-      blocked: [...document.querySelectorAll('[data-action="watch"]')].every(button => button.disabled),
+      playable: [...document.querySelectorAll('[data-action="watch"]')].every(button => !button.disabled),
       namesVisible: document.getElementById('replay-library').textContent.includes('상대 기체') };
   });
   for (const [name, value] of Object.entries(result)) assert.equal(value, name === 'roomCount' ? 2 : true, name);
