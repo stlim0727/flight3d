@@ -4,12 +4,13 @@ Implementation plan (Discussion #509): friends share an invite link, join a priv
 room capped at two pilots including the host, then fly with continuous voice by default.
 Room management is a native modal; invites use six-character codes.
 
-Room replay lifecycle wiring is implemented behind `ROOM_REPLAY_ENABLED = false`
-until multi-aircraft playback ships (#672 Tasks 2/3). The observer uses a separate
+Room recording and multi-aircraft playback are enabled (#672 Tasks 2/3).
+The observer uses a separate
 monotonic session clock across local holds, crashes and round restarts, and saves
 each client's observed tracks once on exit. No snapshot protocol change is needed;
-remote crash types remain unknown. See [room replay](replay.md#room-lifecycle-and-release-gate-672-task-2)
-for state history, gap semantics, storage and activation requirements.
+remote crash types remain unknown. See [room replay](replay.md#room-lifecycle-672-tasks-23)
+for state history, gap semantics, storage and playback. Each participant's library
+can replay both aircraft; participant camera switching is a separate follow-up.
 
 Setup preferences use `flight3d.multiplayer.preferences.v1` in localStorage:
 pilot name, scenery, aircraft, and start selection. Restore them before automatic

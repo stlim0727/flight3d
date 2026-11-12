@@ -1,5 +1,7 @@
-import { sampleTrack, trackDuration, findSpan, STATE_FIELDS, OBJECT_FIELDS } from '../replay/TrackSampler.js';
 import { CombatReplayPlayback } from '../replay/CombatReplayPlayback.js';
+import { sampleTrack, sampleRemote, trackDuration, findSpan, STATE_FIELDS, OBJECT_FIELDS } from '../replay/TrackSampler.js';
+import { RemoteAircraft } from '../multiplayer/RemoteAircraft.js';
+import { ReplayCrashEffects, crashEvents } from '../replay/ReplayCrashEffects.js';
 import { REPLAY_SPEEDS } from '../replay/replayConfig.js';
 import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
 import { isScenarioAvailable } from '../config/scenarioRegistry.js';
@@ -11,7 +13,8 @@ import { FLOW } from '../ui/GameFlowController.js';
  * is instant and a speed change costs nothing.
  */
 export class ReplayDirector {
-  constructor(sim, onChange = () => {}) {
+  constructor(sim, onChange = () => {}, { createRemote = (scene, aircraft) => new RemoteAircraft(scene, aircraft, { createBreakup: null }),
+    createEffects = options => new ReplayCrashEffects(options) } = {}) {
     this.sim = sim;
     this.onChange = onChange;
     this.active = false;
@@ -27,6 +30,10 @@ export class ReplayDirector {
     this._telemetry = null;
     this._view = null;
     this._combat = null;
+    this.createRemote = createRemote;
+    this.createEffects = createEffects;
+    this.remotes = [];
+    this.roomEffects = null;
   }
 
   /**
@@ -37,8 +44,8 @@ export class ReplayDirector {
    */
   async load(track, { entryId = null } = {}) {
     if (!track || !Array.isArray(track.samples) || track.samples.length < 2) return false;
-    // Task 2 records room tracks, but Task 3 must render them before playback is exposed.
-    if (track.remotes?.length) return false;
+    if (track.remotes?.some(pilot => !Object.hasOwn(AIRCRAFT_REGISTRY, pilot.aircraft)
+      || !Array.isArray(pilot.samples) || pilot.samples.length !== track.samples.length)) return false;
     const { airport, aircraft, scenario, demoProfile, timeOfDay, seed } = track.metadata || {};
     const valley = scenario === 'valley';
     if (!Object.hasOwn(AIRCRAFT_REGISTRY, aircraft) || !isScenarioAvailable(airport, scenario)
@@ -59,7 +66,26 @@ export class ReplayDirector {
         await this._scenarioAdapter.prepare({ seed, pilotKind: 'human' });
         sim.gameFlow.enterFlight();
       } else await sim.fly();
+      if (track.remotes?.length && sim.gameFlow.state === FLOW.FLIGHT) {
+        // Live respawns preserve wreckage. A replay starts a different timeline.
+        sim.explosionSystem?.clear();
+        sim.aircraftBreakup?.disposePrepared();
+        for (const pilot of track.remotes) {
+          const visual = this.createRemote(sim.scene, pilot.aircraft);
+          this.remotes.push({ visual, sample: {}, seek: {} });
+        }
+        await Promise.all(this.remotes.map(remote => remote.visual.ready));
+        this.remotes.forEach((remote, index) => {
+          remote.events = crashEvents(track, index + 1);
+          remote.effects = this.createEffects({ scene: sim.scene, aircraft: remote.visual.model,
+            poseRoot: remote.visual.group, terrain: sim.currentTerrain });
+        });
+        this.roomEvents = crashEvents(track, 0);
+        this.roomEffects = this.createEffects({ scene: sim.scene, aircraft: sim.aircraft,
+          terrain: sim.currentTerrain, breakup: sim.aircraftBreakup, explosions: sim.explosionSystem });
+      }
     } catch (error) {
+      this._disposeRoom();
       this._scenarioAdapter?.release(); this._scenarioAdapter = null;
       throw error;
     } finally { this.loading = false; }
@@ -102,7 +128,7 @@ export class ReplayDirector {
     this._combat.load(track.combat);
     this._combat.seek(0);
     this._applyCombatLoadout();
-    this._applyPose();
+    this._applyPose(true);
     this.reseed();
     this.onChange();
     return true;
@@ -132,7 +158,7 @@ export class ReplayDirector {
     if (!this.track) return this.progressSec;
     const time = Number(timeSec);
     this.progressSec = Number.isFinite(time) ? Math.max(0, Math.min(this.durationSec, time)) : 0;
-    this._applyPose();
+    this._applyPose(true);
     this._combat?.seek(this.progressSec);
     this._applyCombatLoadout();
     this.reseed();
@@ -186,7 +212,7 @@ export class ReplayDirector {
     // Replay owns the rendered pose too: physics interpolation has no steps to blend.
     this.sim.renderPose.reset(this.sim.position, this.sim.quaternion);
     // Physics is not stepping, so the staged wreckage advances on the frame clock instead.
-    if (this._crashStaged && Number.isFinite(dt) && dt > 0) {
+    if (!this.roomEffects && this._crashStaged && Number.isFinite(dt) && dt > 0) {
       const sim = this.sim;
       sim.aircraftBreakup?.update(dt, sim.currentTerrain, sim.water?.mesh?.visible ? sim.water.waterLevel : null);
     }
@@ -208,6 +234,8 @@ export class ReplayDirector {
       };
     }
     this._clearCrash();
+    this._disposeRoom();
+    sim.aircraft.group.visible = true;
     if (this._view) this._restoreView(this._view);
     this._view = null;
     this._telemetry = null;
@@ -249,7 +277,7 @@ export class ReplayDirector {
     this.sim.aircraft?.setMissileLoadout?.(loadout);
   }
 
-  _applyPose() {
+  _applyPose(seek = false) {
     const sim = this.sim;
     const sample = sampleTrack(this.track, this.progressSec, this._sample, this._seek);
     if (!sample) return false;
@@ -260,8 +288,44 @@ export class ReplayDirector {
     for (const name of OBJECT_FIELDS) telemetry[name] = sample[name];
     telemetry.warnings = [];
     sim.telemetry = telemetry;
-    this._syncCrash();
+    if (this.roomEffects) {
+      this._applyRoom(sample, seek);
+    } else this._syncCrash();
     return true;
+  }
+
+  _applyRoom(local, seek) {
+    const time = this.progressSec, sim = this.sim;
+    const impact = (events, sample) => sample.crashed
+      ? events.findLast(event => event.timeSec <= time + 1e-6 && event.segment === sample.segment) : null;
+    this.roomEffects.apply(impact(this.roomEvents, local), time, { visible: local.visible !== false, seek });
+    sim.aircraft.group.visible = local.visible !== false && !local.crashed;
+    this.remotes.forEach((remote, index) => {
+      const sample = sampleRemote(this.track, index, time, remote.sample, remote.seek);
+      const visual = remote.visual;
+      const visible = Boolean(sample?.visible);
+      // The live network clock and crash inference never run for replay actors.
+      if (sample) {
+        visual.group.position.set(sample.x, sample.y, sample.z);
+        visual.group.quaternion.fromArray(sample.quat);
+        visual.group.updateMatrixWorld(true);
+        visual.animate({ gear: sample.gearState, flaps: sample.flapDegree }, 0);
+      }
+      remote.effects.apply(sample ? impact(remote.events, sample) : null, time, { visible, seek });
+      visual.group.visible = visible && !sample.crashed;
+      visual.model.group.visible = true;
+      visual.indicator.hide();
+    });
+  }
+
+  _disposeRoom() {
+    this.roomEffects?.dispose(); this.roomEffects = null;
+    this.roomEvents = [];
+    for (const remote of this.remotes) {
+      remote.effects?.dispose();
+      remote.visual.dispose();
+    }
+    this.remotes = [];
   }
 
   /**

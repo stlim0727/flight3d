@@ -26,8 +26,8 @@ function fixture(options = {}) {
     advance(dt) { now += dt * 1000; } };
 }
 
-test('room integration remains disabled until the multi-aircraft viewer ships', () => {
-  assert.equal(ROOM_REPLAY_ENABLED, false);
+test('room integration is enabled together with the multi-aircraft viewer', () => {
+  assert.equal(ROOM_REPLAY_ENABLED, true);
 });
 
 test('room clock continues through local hold, crash, respawn and round restart; saves exactly once', () => {
