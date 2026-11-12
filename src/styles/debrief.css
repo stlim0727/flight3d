@@ -6,9 +6,7 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   background: transparent !important;
   pointer-events: none !important;
 }
-#debrief-overlay.is-folded .debrief-header,
-#debrief-overlay.is-folded .debrief-panels,
-#debrief-overlay.is-folded .debrief-footer {
+#debrief-overlay.is-folded .debrief-overlay {
   display: none !important;
 }
 #debrief-overlay.is-folded .debrief-unfold-pill:not([hidden]) {

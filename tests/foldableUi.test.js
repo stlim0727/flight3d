@@ -21,6 +21,7 @@ test('DebriefOverlay includes fold and unfold affordances', () => {
   const debriefSrc = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
   assert.ok(debriefSrc.includes('id="debrief-fold"'), 'must have debrief-fold button');
   assert.ok(debriefSrc.includes('id="debrief-unfold"'), 'must have debrief-unfold pill');
+  assert.ok(debriefSrc.includes('class="debrief-unfold-actions"'), 'must have debrief-unfold-actions wrapper');
   assert.ok(debriefSrc.includes('setFolded('), 'must have setFolded method');
 });
 
@@ -60,6 +61,7 @@ test('CSS files define .is-folded and .ui-unfold-pill styles for clear plane wat
 
   const debriefCss = readFileSync(resolve('src/styles/debrief.css'), 'utf8');
   assert.ok(debriefCss.includes('#debrief-overlay.is-folded'), 'debrief CSS must define #debrief-overlay.is-folded');
+  assert.ok(debriefCss.includes('#debrief-overlay.is-folded .debrief-overlay'), 'debrief CSS must hide .debrief-overlay when folded');
   assert.ok(debriefCss.includes('.debrief-unfold-pill'), 'debrief CSS must define .debrief-unfold-pill');
   assert.ok(debriefCss.includes('.debrief-unfold-pill[hidden]'), 'debrief CSS must hide .debrief-unfold-pill[hidden]');
 
