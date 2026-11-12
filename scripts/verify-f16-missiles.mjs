@@ -29,6 +29,7 @@ await withBrowserSession({
     s.demoDirector.stop();
     s.gameFlow.enterFlight();
     s.integratePhysics = () => {};
+    s.setTimeOfDay(12, { persist: false, userChoice: false });
     s.position.set(0, 3000, 0);
     s.linearVelocity.set(0, 0, -250);
     s.aircraft.group.position.copy(s.position);
@@ -68,7 +69,9 @@ await withBrowserSession({
   close(hud.rwr.level >= 1, 'RWR sees the bandits on radar');
   await screenshot(path.join(dir, 'hud-lock.png'));
 
-  // Exercise the real keyboard path, then verify the rail separation.
+  // Director camera owns the launch: cut on the rail release, follow the missile
+  // and finish from the targeted bandit's seat.
+  await evaluate('window.simulator.cameraSystem.setMode(9, true)');
   await evaluate('document.activeElement?.blur?.()');
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
@@ -76,6 +79,43 @@ await withBrowserSession({
   close(await evaluate('window.simulator.missileCombat.remaining === 5'), 'one missile left the rail');
   close(await evaluate('!window.simulator.aircraft.missileMeshes[0].visible'), 'fired station mesh hidden');
   close(await evaluate('window.simulator.missileCombat.missiles.length === 1'), 'one missile in flight');
+  close(
+    await evaluate('window.simulator.cameraSystem.cinematicDirector.currentShotType === "missile_launch"'),
+    'director cut to the missile launch',
+  );
+  await screenshot(path.join(dir, 'director-missile-launch.png'));
+
+  for (let i = 0; i < 40; i++) {
+    if (await evaluate('window.simulator.cameraSystem.cinematicDirector.currentShotType === "missile_track"')) break;
+    await delay(100);
+  }
+  close(
+    await evaluate('window.simulator.cameraSystem.cinematicDirector.currentShotType === "missile_track"'),
+    'director follows the missile',
+  );
+  await screenshot(path.join(dir, 'director-missile-track.png'));
+
+  for (let i = 0; i < 120; i++) {
+    if (await evaluate('window.simulator.cameraSystem.cinematicDirector.currentShotType === "bandit_pov"')) break;
+    await delay(100);
+  }
+  close(
+    await evaluate('window.simulator.cameraSystem.cinematicDirector.currentShotType === "bandit_pov"'),
+    'director cuts to the bandit POV',
+  );
+  await screenshot(path.join(dir, 'director-bandit-pov.png'));
+
+  for (let i = 0; i < 50; i++) {
+    const near = await evaluate(`(() => {
+      const s = window.simulator;
+      const missile = s.missileCombat.missiles[0];
+      const target = s.missileCombat.targets.find(candidate => candidate.alive);
+      return Boolean(missile && target && missile.position.distanceTo(target.position) < 180);
+    })()`);
+    if (near) break;
+    await delay(100);
+  }
+  await screenshot(path.join(dir, 'director-bandit-pov-close.png'));
 
   await evaluate('window.simulator.cameraSystem.setMode(1, true)');
   await delay(650);
