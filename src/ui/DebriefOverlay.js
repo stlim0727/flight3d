@@ -108,7 +108,9 @@ export class DebriefOverlay {
             <span class="debrief-back-glyph" aria-hidden="true">↩</span> <span class="debrief-back-caption" data-i18n="debrief.lobby"></span>
           </button>
         </footer>
+      </div>
 
+      <div class="debrief-unfold-actions">
         <button id="debrief-unfold" class="ui-unfold-pill debrief-unfold-pill" type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
           <span class="unfold-glyph" aria-hidden="true">▴</span>
         </button>
