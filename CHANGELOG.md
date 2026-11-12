@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(ui):** make gradual gaze reset optional (#658)
+  - Added a persisted Auto gaze reset option so a released drag or hat-switch glance can hold its off-center view instead of slowly returning to the default.
 - **fix(audio):** boost mobile & Bluetooth headphone loudness, makeup gain, and route recovery
   - Added post-compressor makeup gain (+4.1 dB, 1.6x) and normalized pink noise buffer to reach commercial game loudness standards (~ -14 LUFS RMS).
   - Added 4-stage volume cycling: 100% (Normal) → 150% (Mobile Boost) → 200% (Bluetooth Max Boost) → Muted → 100%.

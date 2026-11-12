@@ -1,6 +1,9 @@
 export default {
   "the.nose.struck.an.airport.control.tower": "The nose struck an airport control tower.",
   "touch.controls": "📱 Touch controls",
+  "gaze.reset.auto": "👁 Auto gaze reset",
+  "gaze.reset.auto.title": "Gradually return gaze to default after drag or hat switch",
+  "gaze.reset.auto.value": "👁 Auto gaze reset: {value}",
   "aircraft.systems.cameras": "⚙️ Aircraft systems & cameras",
   "right.virtual.stick.yoke": "Right virtual stick (yoke)",
   "left.vertical.throttle": "Left vertical throttle",

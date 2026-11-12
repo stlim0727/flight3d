@@ -1,6 +1,9 @@
 export default {
   "the.nose.struck.an.airport.control.tower": "공항 관제탑 시설에 기수 부위가 격돌했습니다.",
   "touch.controls": "📱 터치 조작",
+  "gaze.reset.auto": "👁 자동 시선 복귀",
+  "gaze.reset.auto.title": "드래그/햇 스위치 후 시선을 점진적으로 기본 위치로 되돌립니다",
+  "gaze.reset.auto.value": "👁 자동 시선 복귀: {value}",
   "aircraft.systems.cameras": "⚙️ 항공기 시스템 및 카메라",
   "right.virtual.stick.yoke": "우측 가상 스틱 (Yoke)",
   "left.vertical.throttle": "좌측 수직 스로틀",

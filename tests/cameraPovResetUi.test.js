@@ -224,3 +224,29 @@ test('CameraSystem updatePovReturn smoothly returns POV after drag, preserving P
   assert.equal(cam.lookPitch, defaultPitch);
   assert.equal(cam.isPovModified(), false);
 });
+
+test('CameraSystem autoResetGaze false holds the released POV until the option is turned back on', () => {
+  const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
+  cam.setMode(CameraSystem.MODES.COCKPIT, true);
+  cam.autoResetGaze = false;
+  const aircraft = new THREE.Object3D();
+  const defaultPitch = cam.aircraftLookPitch ?? -0.25;
+
+  cam.isDragging = true;
+  cam.applyDragDelta(100, 50, false);
+  const heldYaw = cam.lookYaw;
+  const heldPitch = cam.lookPitch;
+  assert.equal(cam.isPovModified(), true);
+  assert.equal(cam.userLookOverridden, true);
+
+  cam.isDragging = false;
+  cam.update(0.5, aircraft);
+  assert.equal(cam.lookYaw, heldYaw);
+  assert.equal(cam.lookPitch, heldPitch);
+  assert.equal(cam.userLookOverridden, true);
+
+  cam.autoResetGaze = true;
+  cam.update(0.5, aircraft);
+  assert.ok(Math.abs(cam.lookYaw) < Math.abs(heldYaw));
+  assert.ok(Math.abs(cam.lookPitch - defaultPitch) < Math.abs(heldPitch - defaultPitch));
+});

@@ -191,6 +191,9 @@ export class CameraSystem {
     // Manual look holds automatic framing; touch interruptions in AUTO resume after release.
     this.userLookOverridden = false;
 
+    // After a drag or hat-switch glance, gradually return gaze to the default position.
+    this.autoResetGaze = true;
+
     // Continuous Edge Pan / Edge Look state (화면 끝 도달 시 시선 지속 회전)
     this.enableEdgePan = false; // Grab gestures stop when the pointer/finger stops.
     this.edgePanMargin = 30; // Threshold distance in pixels from screen boundary
@@ -888,7 +891,7 @@ export class CameraSystem {
    * Uses a rapid spring-back rate after a hat switch glance and a gentle settle rate after mouse/touch drag.
    */
   updatePovReturn(dt) {
-    if (this.isDragging || this.pointerLocked || this.isHatLooking || dt <= 0 || !this.povChangedByDrag) return;
+    if (this.isDragging || this.pointerLocked || this.isHatLooking || dt <= 0 || !this.povChangedByDrag || !this.autoResetGaze) return;
 
     const povModes = [
       CameraSystem.MODES.COCKPIT,
