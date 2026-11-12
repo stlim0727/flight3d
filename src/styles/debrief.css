@@ -38,14 +38,19 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   top: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-top) + 8px));
   left: max(calc(16px * var(--ui-scale, 1)), calc(env(safe-area-inset-left) + 8px));
 }
-.debrief-camera-btn {
+.debrief-camera-btn,
+.debrief-feedback-btn,
+.debrief-fold-btn {
   width: calc(36px * var(--ui-scale, 1));
   height: calc(36px * var(--ui-scale, 1));
+  min-height: calc(36px * var(--ui-scale, 1));
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: calc(14px * var(--ui-scale, 1));
+  flex-shrink: 0;
+  border-radius: calc(8px * var(--ui-scale, 1));
 }
 
 .debrief-overlay {
@@ -75,8 +80,11 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 .debrief-header {
   display: flex;
   align-items: center;
-  gap: calc(10px * var(--ui-scale, 1));
+  gap: calc(8px * var(--ui-scale, 1));
   flex-shrink: 0;
+}
+.debrief-header .debrief-camera-btn {
+  margin-left: auto;
 }
 .debrief-header-pill {
   display: inline-block;
@@ -118,9 +126,9 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: calc(6px * var(--ui-scale, 1));
+  gap: calc(8px * var(--ui-scale, 1));
   min-height: calc(34px * var(--ui-scale, 1));
-  padding: calc(6px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+  padding: calc(6px * var(--ui-scale, 1)) calc(12px * var(--ui-scale, 1));
   background: rgba(20, 37, 54, 0.8);
   border: 1px solid #385268;
   border-radius: calc(8px * var(--ui-scale, 1));
@@ -134,13 +142,19 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
   border-color: #538aa4;
 }
 .debrief-back-glyph {
-  font-size: calc(16px * var(--ui-scale, 1));
+  font-size: calc(15px * var(--ui-scale, 1));
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-0.5px);
 }
 .debrief-back-caption {
-  font-size: calc(11px * var(--ui-scale, 1));
+  font-size: calc(12px * var(--ui-scale, 1));
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
 }
 
 .debrief-footer {
@@ -151,29 +165,25 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 }
 .debrief-footer .debrief-lobby-btn { flex: 1 1 auto; justify-content: center; font-weight: 700; }
 
-  .debrief-camera-btn {
-    width: calc(40px * var(--ui-scale, 1));
-    height: calc(40px * var(--ui-scale, 1));
-  }
-  .debrief-feedback-btn {
-    width: calc(40px * var(--ui-scale, 1));
-    height: calc(40px * var(--ui-scale, 1));
-  }
+  .debrief-camera-btn,
+  .debrief-feedback-btn,
   .debrief-fold-btn {
-    width: calc(40px * var(--ui-scale, 1));
-    height: calc(40px * var(--ui-scale, 1));
+    width: calc(36px * var(--ui-scale, 1));
+    height: calc(36px * var(--ui-scale, 1));
+    min-height: calc(36px * var(--ui-scale, 1));
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
-  .debrief-camera-icon {
-    font-size: calc(24px * var(--ui-scale, 1));
-    line-height: 1;
-  }
-  .debrief-feedback-icon {
-    font-size: calc(24px * var(--ui-scale, 1));
-    line-height: 1;
-  }
+  .debrief-camera-icon,
+  .debrief-feedback-icon,
   .fold-glyph {
-    font-size: calc(24px * var(--ui-scale, 1));
+    font-size: calc(20px * var(--ui-scale, 1));
     line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
 .debrief-overlay h2 { font-size: calc(18px * var(--ui-scale, 1)); line-height: calc(27px * var(--ui-scale, 1)); }
@@ -245,19 +255,24 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 .debrief-contact-note { margin: 0; color: #94a3b8; font-size: 10px; }
 
 .debrief-overlay .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(8px * var(--ui-scale, 1));
   min-height: calc(34px * var(--ui-scale, 1));
-  padding: calc(8px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+  padding: calc(8px * var(--ui-scale, 1)) calc(12px * var(--ui-scale, 1));
   border: 1px solid #385268;
   border-radius: calc(7px * var(--ui-scale, 1));
   background: #101c2b;
   color: #e2e8f0;
   font: inherit;
   font-size: calc(11px * var(--ui-scale, 1));
-  line-height: calc(16px * var(--ui-scale, 1));
-  text-align: left;
+  line-height: 1.2;
+  text-align: center;
   letter-spacing: 0;
   box-shadow: none;
   transform: none;
+  box-sizing: border-box;
 }
 .debrief-overlay .btn:hover { background: #263c51; border-color: #538aa4; }
 .debrief-overlay .btn.debrief-primary {
@@ -431,8 +446,14 @@ body[data-flow="debrief"] .btn-reset-pov:not([hidden]) { display: inline-flex !i
     padding: 14px 16px;
   }
   .debrief-overlay .btn { min-height: 42px; }
-  .debrief-overlay .debrief-lobby-btn { min-height: 38px; padding: 0 10px; }
-  .debrief-overlay .debrief-feedback-btn { width: 38px; height: 38px; min-height: 38px; }
+  .debrief-overlay .debrief-lobby-btn { min-height: 42px; padding: 0 12px; }
+  .debrief-overlay .debrief-camera-btn,
+  .debrief-overlay .debrief-feedback-btn,
+  .debrief-overlay .debrief-fold-btn {
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
+  }
 }
 /* Issue #597: phone-width headers squeeze the title column below "Flight3d"; the fold button keeps its glyph and label. */
 @media (max-width: 420px) {

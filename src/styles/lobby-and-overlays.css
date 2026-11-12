@@ -559,7 +559,7 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1em;
+  font-size: 1.15em;
   line-height: 1;
   flex-shrink: 0;
   vertical-align: middle;
@@ -619,13 +619,19 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
   border-color: #538aa4;
 }
 .pause-back-glyph {
-  font-size: calc(16px * var(--ui-scale, 1));
+  font-size: calc(15px * var(--ui-scale, 1));
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-0.5px);
 }
 .pause-back-caption {
   font-size: calc(11px * var(--ui-scale, 1));
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
 }
 .pause-card .btn {
   min-height: calc(44px * var(--ui-scale, 1));
