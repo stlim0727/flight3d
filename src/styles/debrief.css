@@ -153,30 +153,30 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 }
 .debrief-footer .debrief-lobby-btn { flex: 1 1 auto; justify-content: center; font-weight: 700; }
 
-.debrief-overlay .debrief-feedback-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(34px * var(--ui-scale, 1));
-  height: calc(34px * var(--ui-scale, 1));
-  min-height: calc(34px * var(--ui-scale, 1));
-  padding: 0;
-  border: 1px solid #385268;
-  border-radius: calc(8px * var(--ui-scale, 1));
-  background: rgba(20, 37, 54, 0.8);
-  color: #94a3b8;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-.debrief-overlay .debrief-feedback-btn:hover {
-  background: #263c51;
-  border-color: #538aa4;
-  color: #f8fafc;
-}
-.debrief-feedback-icon {
-  font-size: calc(14px * var(--ui-scale, 1));
-  line-height: 1;
-}
+  .debrief-camera-btn {
+    width: calc(40px * var(--ui-scale, 1));
+    height: calc(40px * var(--ui-scale, 1));
+  }
+  .debrief-feedback-btn {
+    width: calc(40px * var(--ui-scale, 1));
+    height: calc(40px * var(--ui-scale, 1));
+  }
+  .debrief-fold-btn {
+    width: calc(40px * var(--ui-scale, 1));
+    height: calc(40px * var(--ui-scale, 1));
+  }
+  .debrief-camera-icon {
+    font-size: calc(24px * var(--ui-scale, 1));
+    line-height: 1;
+  }
+  .debrief-feedback-icon {
+    font-size: calc(24px * var(--ui-scale, 1));
+    line-height: 1;
+  }
+  .fold-glyph {
+    font-size: calc(24px * var(--ui-scale, 1));
+    line-height: 1;
+  }
 
 .debrief-overlay h2 { font-size: calc(18px * var(--ui-scale, 1)); line-height: calc(27px * var(--ui-scale, 1)); }
 .debrief-overlay h3 { font-size: calc(18px * var(--ui-scale, 1)); line-height: calc(27px * var(--ui-scale, 1)); }

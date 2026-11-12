@@ -43,7 +43,7 @@ export const SAVE_REPLAY_STATUS = Object.freeze({ tooShort: 'replay.tooShort', t
 /** Debrief button id (after `debrief-`) to the `debrief_action` it reports. Camera and fold are autocaptured. */
 export const DEBRIEF_ACTIONS = Object.freeze({
   lobby: 'lobby', feedback: 'feedback',
-  'watch-replay': 'watch_replay', 'save-replay': 'save_replay', copy: 'copy', 'native-share': 'share', export: 'export',
+  'watch-replay': 'watch_replay', 'save-replay': 'save_replay', copy: 'copy', export: 'export',
 });
 
 export class DebriefOverlay {
@@ -97,7 +97,6 @@ export class DebriefOverlay {
             <div class="debrief-actions">
               <button class="btn" id="debrief-copy"><span class="btn-icon" aria-hidden="true">📋</span> <span data-i18n="debrief.copy"></span></button>
               <button class="btn" id="debrief-export"><span class="btn-icon" aria-hidden="true">💾</span> <span data-i18n="debrief.export"></span></button>
-              <button class="btn" id="debrief-native-share" hidden><span class="btn-icon" aria-hidden="true">↗️</span> <span data-i18n="debrief.share"></span></button>
             </div>
             <div class="debrief-replay-actions">
               <button class="btn" id="debrief-save-replay" hidden><span class="btn-icon" aria-hidden="true">💾</span> <span data-i18n="debrief.saveReplay"></span></button>
@@ -162,12 +161,6 @@ export class DebriefOverlay {
     for (const [id, action] of Object.entries(DEBRIEF_ACTIONS)) {
       this.el(id)?.addEventListener('click', () => onAction?.(action, this.report));
     }
-    this.el('native-share').hidden = typeof navigator.share !== 'function';
-    this.el('native-share').addEventListener('click', async () => {
-      if (!this.report.sufficient) return;
-      try { await navigator.share({ title: 'Flight3d', text: reportText(this.report) }); this.status('debrief.shared'); }
-      catch (error) { if (error.name !== 'AbortError') this.status('debrief.shareFailed'); }
-    });
     this.el('export').addEventListener('click', () => {
       if (!this.report.sufficient) return;
       const url = URL.createObjectURL(new Blob([JSON.stringify(this.report, null, 2)], { type: 'application/json' }));
@@ -325,7 +318,7 @@ export class DebriefOverlay {
     });
     this.el('insufficient').hidden = enough;
     this.el('view-record').hidden = !enough;
-    for (const id of ['copy', 'export', 'native-share']) {
+    for (const id of ['copy', 'export']) {
       const el = this.el(id);
       if (el) {
         el.disabled = !enough;
