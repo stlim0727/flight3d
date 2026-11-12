@@ -1,4 +1,6 @@
+import { MathUtils, Quaternion, Vector3 } from 'three';
 import { CameraSystem } from '../cameras/CameraSystem.js';
+import { t } from '../i18n/index.js';
 import { hudDirection, projectHudDirection } from './HudProjection.js';
 
 const tapeWidth = (scale) => Math.max(54, 76 * scale);
@@ -15,19 +17,44 @@ export class HudView {
     document.getElementById('hud-overlay').append(this.root);
     this.canvas = this.root.querySelector('canvas');
     this.ctx = this.canvas.getContext('2d');
+    this._hudInverse = new Quaternion();
+    this._hudPoint = new Vector3();
+    this._hudForward = new Vector3();
   }
 
   update() {
     const sim = this.sim;
     const hudFolded = typeof document !== 'undefined' && document.body?.classList.contains('hud-folded');
-    const active = sim.cameraSystem.mode === CameraSystem.MODES.HUD && !sim.isCrashed && !hudFolded;
-    if (this.root.hidden === active) {
-      this.root.hidden = !active;
-      document.body.classList.toggle('hud-camera-mode', active);
+    const hudActive = sim.cameraSystem.mode === CameraSystem.MODES.HUD && !sim.isCrashed && !hudFolded;
+    // Cockpit and chase views keep a light target/weapon overlay so the player
+    // can still see the lock without switching to the full HUD camera.
+    const combatOnly = !hudActive && !sim.isCrashed && !hudFolded
+      && sim.currentAircraftId === 'F16' && Boolean(sim.combatActive?.());
+    const visible = hudActive || combatOnly;
+    if (this.root.hidden === visible) this.root.hidden = !visible;
+    document.body.classList.toggle('hud-camera-mode', hudActive);
+    if (!visible) return;
+    if (!hudActive) {
+      this.drawCombatOnly();
+      return;
     }
-    if (!active) return;
     const heading = ((Math.round(sim.telemetry.headingDeg || 0) % 360) + 360) % 360;
     this.draw(sim.telemetry, heading);
+  }
+
+  /** Transparent target/weapon/RWR layer for cockpit and chase cameras. */
+  drawCombatOnly() {
+    const width = this.root.clientWidth, height = this.root.clientHeight;
+    if (!width || !height) return;
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    if (this.canvas.width !== Math.round(width * dpr) || this.canvas.height !== Math.round(height * dpr)) {
+      this.canvas.width = Math.round(width * dpr); this.canvas.height = Math.round(height * dpr);
+    }
+    const ctx = this.ctx;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    const combat = this.sim.missileCombat?.getHudState?.();
+    if (combat) this.drawCombat(width, height, Math.min(1, width / 1100), combat, true);
   }
 
   draw(data, heading) {
@@ -113,6 +140,175 @@ export class HudView {
       if (degree % (narrow ? 30 : 10) === 0) ctx.fillText(String((degree % 360 + 360) % 360).padStart(3, '0'), x, hy + 23);
     }
     ctx.restore(); ctx.fillText(`${String(heading).padStart(3, '0')}°`, cx, hy - 13);
+    if (this.sim.currentAircraftId === 'F16') {
+      const combat = this.sim.missileCombat?.getHudState?.();
+      if (combat) this.drawCombat(width, height, scale, combat);
+    }
+  }
+
+  /** Project a world point into HUD pixels; behind-eye points clamp to the frame. */
+  projectWorld(point, width, height) {
+    const camera = this.sim.camera;
+    this._hudInverse.copy(camera.quaternion).invert();
+    this._hudPoint.copy(point).sub(camera.position).applyQuaternion(this._hudInverse);
+    const behind = this._hudPoint.z >= -0.001;
+    const focal = height / (2 * Math.tan(MathUtils.degToRad(camera.fov) / 2));
+    if (behind) {
+      const angle = Math.atan2(this._hudPoint.x, -this._hudPoint.z);
+      return { behind, angle, x: width / 2 + Math.sin(angle) * width * .42, y: height / 2 - Math.cos(angle) * height * .38 };
+    }
+    return {
+      behind,
+      angle: Math.atan2(this._hudPoint.x, -this._hudPoint.z),
+      x: width / 2 + this._hudPoint.x / -this._hudPoint.z * focal,
+      y: height / 2 - this._hudPoint.y / -this._hudPoint.z * focal,
+    };
+  }
+
+  drawCombat(width, height, scale, state, light = false) {
+    const ctx = this.ctx;
+    ctx.lineWidth = 1.5;
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = '#142b1c';
+    ctx.shadowBlur = 3;
+    const green = '#b8ff9b';
+    const amber = '#ffcc66';
+    const red = '#ff6b57';
+    const font = Math.max(11, 15 * scale);
+    const small = Math.max(10, 12 * scale);
+    const target = state.selectedTarget;
+
+    // Seeker field-of-view circle follows the aircraft boresight, not the
+    // camera's look offset, so head turns cannot move the acquisition cone.
+    this._hudForward.set(0, 0, -1).applyQuaternion(this.sim.quaternion);
+    const boresight = light ? null : projectHudDirection(this._hudForward, this.sim.camera, width, height);
+    if (boresight) {
+      const radius = height / (2 * Math.tan(MathUtils.degToRad(this.sim.camera.fov) / 2))
+        * Math.tan(MathUtils.degToRad(28));
+      ctx.save();
+      ctx.strokeStyle = target && state.lockProgress > 0 ? amber : green;
+      ctx.globalAlpha = .55;
+      ctx.setLineDash([6, 7]);
+      ctx.beginPath(); ctx.arc(boresight.x, boresight.y, radius, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+
+    if (target) {
+      const screen = this.projectWorld(target.position, width, height);
+      const margin = Math.max(48, 56 * scale);
+      const offscreen = screen.behind || screen.x < margin || screen.x > width - margin
+        || screen.y < margin || screen.y > height - margin;
+      if (offscreen) this.drawTargetLocator(screen, width, height, scale, state, red);
+      const x = MathUtils.clamp(screen.x, margin, width - margin);
+      const y = MathUtils.clamp(screen.y, margin, height - margin);
+      const locked = state.locked;
+      const size = Math.max(16, 22 * scale);
+      ctx.strokeStyle = locked ? amber : green;
+      ctx.fillStyle = locked ? amber : green;
+      ctx.lineWidth = 1.8;
+      if (locked) {
+        ctx.beginPath();
+        ctx.moveTo(x, y - size); ctx.lineTo(x + size, y);
+        ctx.lineTo(x, y + size); ctx.lineTo(x - size, y); ctx.closePath(); ctx.stroke();
+      } else {
+        const tick = size * .55;
+        for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+          ctx.beginPath();
+          ctx.moveTo(x + sx * size, y + sy * size - sy * tick);
+          ctx.lineTo(x + sx * size, y + sy * size);
+          ctx.lineTo(x + sx * size - sx * tick, y + sy * size);
+          ctx.stroke();
+        }
+        if (state.lockProgress > 0) {
+          ctx.beginPath();
+          ctx.arc(x, y, size + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * state.lockProgress);
+          ctx.stroke();
+        }
+      }
+
+      ctx.font = `600 ${small}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${target.callsign}  ${(state.rangeM / 1852).toFixed(1)} NM`, x, y - size - 14);
+      const closure = Math.round(state.closureMps * 1.94384);
+      ctx.fillText(`${closure >= 0 ? '+' : ''}${closure} KT`, x, y + size + 15);
+      if (locked && state.remaining > 0 && state.nextMissileType && state.rangeM <= state.nextMissileType.seekerRangeM) {
+        ctx.fillStyle = amber;
+        ctx.fillText(t('weapons.shoot'), x, y - size - 31);
+      } else if (state.lockProgress > 0 && !locked) {
+        ctx.fillStyle = green;
+        ctx.fillText(t('weapons.acquiring'), x, y - size - 31);
+      }
+    }
+
+    this.drawRwr(width, height, scale, state.rwr);
+
+    // Weapon inventory block: next rail type, remaining rounds and kills.
+    const label = state.nextMissileType ? t(state.nextMissileType.labelKey) : t('weapons.empty');
+    const blockX = width < 700 ? width * .5 : Math.max(90 * scale, width * .12);
+    const blockY = width < 700 ? height * .17 : height * .23;
+    ctx.textAlign = 'left';
+    ctx.font = `600 ${font}px monospace`;
+    ctx.fillStyle = state.remaining > 0 ? green : amber;
+    ctx.fillText(`${label}  ${state.remaining}/${state.total}`, blockX, blockY);
+    ctx.fillStyle = green;
+    ctx.fillText(`${t('weapons.splash')} ${state.splash}`, blockX, blockY + font + 5);
+    if (state.missilesInFlight > 0) {
+      ctx.fillStyle = amber;
+      ctx.fillText(`${t('weapons.inFlight')} ${state.missilesInFlight}`, blockX, blockY + (font + 5) * 2);
+    }
+  }
+
+  drawTargetLocator(screen, width, height, scale, state, redColor) {
+    const ctx = this.ctx;
+    const angle = screen.angle || 0;
+    const radius = Math.min(width, height) * .43;
+    const x = width / 2 + Math.sin(angle) * radius;
+    const y = height / 2 - Math.cos(angle) * radius;
+    const size = Math.max(7, 10 * scale);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.fillStyle = state.locked ? '#ffcc66' : redColor;
+    ctx.beginPath();
+    ctx.moveTo(0, -size); ctx.lineTo(-size * .65, size * .55); ctx.lineTo(size * .65, size * .55); ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawRwr(width, height, scale, rwr) {
+    if (!rwr) return;
+    const ctx = this.ctx;
+    const radius = Math.max(34, 46 * scale);
+    const narrow = width < 700;
+    const cx = narrow ? width * .85 : width - radius - 26;
+    const cy = narrow ? height * .23 : height - radius - 26;
+    const level = rwr.level || 0;
+    const color = level >= 3 ? '#ff6b57' : level === 2 ? '#ffcc66' : level === 1 ? '#b8ff9b' : '#6f8f76';
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = level ? .95 : .45;
+    ctx.lineWidth = level >= 3 ? 2.2 : 1.3;
+    ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, radius * .16, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - radius); ctx.lineTo(cx, cy - radius * .82);
+    ctx.stroke();
+    for (const contact of rwr.contacts || []) {
+      const a = contact.bearingRad;
+      const r0 = radius * .38, r1 = radius * .9;
+      ctx.strokeStyle = contact.level >= 3 ? '#ff6b57' : contact.level === 2 ? '#ffcc66' : '#b8ff9b';
+      ctx.lineWidth = contact.level >= 2 ? 2 : 1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.sin(a) * r0, cy - Math.cos(a) * r0);
+      ctx.lineTo(cx + Math.sin(a) * r1, cy - Math.cos(a) * r1);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.fillStyle = color;
+    ctx.font = `600 ${Math.max(9, 11 * scale)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('RWR', cx, cy + radius + 12);
+    if (level) ctx.fillText(String(rwr.levelName || '').toUpperCase(), cx, cy + radius + 12 + Math.max(10, 12 * scale));
   }
 
   tape(x, y, value, step, unit, scale) {

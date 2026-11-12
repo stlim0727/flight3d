@@ -35,6 +35,9 @@ class SimulatorHudAndBindingsMethods {
       }
     };
 
+    this.controls.onFireMissile = () => this.fireMissile();
+    this.controls.onCycleTarget = () => this.cycleCombatTarget();
+
     this.controls.onToggleGear = () => {
       if (this.devRunner?.active) return;
       this.gear.toggleGear();
@@ -201,6 +204,7 @@ class SimulatorHudAndBindingsMethods {
       parkingBrake: this.controls.parkingBrake,
     });
     this.hudView.update();
+    this.touchControls?.setCombatVisible?.(this.currentAircraftId === 'F16');
     this.valleyVisualizer?.update();
   }
 

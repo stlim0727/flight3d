@@ -121,15 +121,19 @@ export class ExplosionSystem {
       p.vel.multiplyScalar(spread * 0.45).addScaledVector(velocity, 0.12);
       p.vel.y = Math.max(1, p.vel.y);
     }
-    const groundWreckage = {
-      pos: pos.clone(),
-      timer: 0,
-      duration: 30.0,
-      smokeInterval: 0.25,
-      isWater: false
-    };
-    this.persistentWreckages.push(groundWreckage);
-    this.persistentWreckage = groundWreckage;
+    // Mid-air detonations leave no ground wreck; a persistent smoke column
+    // suspended in the sky would outlive the fireball at the wrong position.
+    if (crashResult.type !== 'AIR') {
+      const groundWreckage = {
+        pos: pos.clone(),
+        timer: 0,
+        duration: 30.0,
+        smokeInterval: 0.25,
+        isWater: false
+      };
+      this.persistentWreckages.push(groundWreckage);
+      this.persistentWreckage = groundWreckage;
+    }
   }
 
   spawnShockwave(pos, isWater, spread = 1) {

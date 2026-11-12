@@ -360,6 +360,22 @@
   gap: calc(6 * var(--tc));
 }
 
+.touch-weapon-row {
+  display: flex;
+  gap: calc(6 * var(--tc));
+}
+
+.touch-btn-weapon {
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #fde68a;
+}
+
+.touch-btn-weapon:active {
+  border-color: #fbbf24;
+  color: #fef3c7;
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.55);
+}
+
 .touch-stick-card {
   background: rgba(15, 23, 42, 0.32);
   backdrop-filter: blur(6px);

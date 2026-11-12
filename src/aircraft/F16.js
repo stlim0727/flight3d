@@ -7,6 +7,8 @@ import { JetExhaust } from '../effects/JetExhaust.js';
 import { applyFlatShading } from '../config/renderQuality.js';
 import { CockpitHudCanvas, configureF16HudMesh } from './CockpitHudCanvas.js';
 import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
+import { createMissileMesh } from '../weapons/missileGeometry.js';
+import { F16_MISSILE_STATIONS } from '../weapons/missileSpecs.js';
 
 // The supplied asset is +X forward, with a 93.94-unit wingspan. Its authored
 // hierarchy supplies the Z-up conversion; mount it in our metre/-Z-forward frame.
@@ -165,6 +167,18 @@ export class F16 {
     }
     this.lightsGroup = new THREE.Group();
     this.gltfGroup.add(this.lightsGroup);
+    // Six rail stations keep their missiles resident; launch only toggles the
+    // mesh until a preset reset re-arms every station.
+    this.missilesGroup = new THREE.Group();
+    this.missilesGroup.name = 'F16_Missiles';
+    this.gltfGroup.add(this.missilesGroup);
+    this.missileMeshes = F16_MISSILE_STATIONS.map(station => {
+      const mesh = createMissileMesh(station.type);
+      mesh.position.set(...station.position);
+      this.missilesGroup.add(mesh);
+      return mesh;
+    });
+    this.missileLoaded = F16_MISSILE_STATIONS.map(() => true);
     this.lightsOn = true;
     this.useGltf = false;
     this.loadingGltf = true;
@@ -322,9 +336,29 @@ export class F16 {
   triggerCrashVisuals() {
     this.isCrashed = true;
     this.lightsGroup.visible = false;
+    this.missilesGroup.visible = false;
     if (this.exhaust) { this.exhaust.power = 0; this.exhaust.group.visible = false; }
   }
-  resetCrashVisuals() { this.isCrashed = false; this.lightsGroup.visible = this.lightsOn; }
+  resetCrashVisuals() {
+    this.isCrashed = false;
+    this.lightsGroup.visible = this.lightsOn;
+    this.missilesGroup.visible = true;
+  }
+
+  /** Rail state is shared with the guidance core: fired stations hide their mesh. */
+  setMissileLoaded(index, loaded) {
+    if (!this.missileMeshes?.[index]) return false;
+    this.missileLoaded[index] = Boolean(loaded);
+    this.missileMeshes[index].visible = this.missileLoaded[index];
+    return true;
+  }
+
+  setMissileLoadout(loadout = []) {
+    if (!Array.isArray(loadout)) return;
+    for (let index = 0; index < this.missileMeshes?.length; index++) {
+      this.setMissileLoaded(index, Boolean(loadout[index]));
+    }
+  }
 
   setFlatShading(flatShading) {
     this.flatShading = Boolean(flatShading);
