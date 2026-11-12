@@ -585,7 +585,7 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
     // 20. Multiplayer Host Modal
     await evaluate(() => {
       const mpDialog = document.getElementById('mp-dialog');
-      if (mpDialog) { mpDialog.showModal(); document.querySelector('#mp-choose-host')?.click(); }
+      if (mpDialog) { mpDialog.showModal(); window.simulator?.multiplayer?.chooseSetup('host'); }
     });
     await delay(300);
     await recordScreen(screenshot, {
@@ -601,7 +601,7 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
     });
 
     // 21. Multiplayer Join Modal
-    await evaluate(() => { document.querySelector('#mp-choose-join')?.click(); });
+    await evaluate(() => { window.simulator?.multiplayer?.chooseSetup('join'); });
     await delay(300);
     await recordScreen(screenshot, {
       id: '21_multiplayer_join_modal',

@@ -24,7 +24,8 @@ export class MultiplayerController {
     this.soloControls = new Map();
     this.dialog = document.getElementById('mp-dialog');
     this.modal = new MultiplayerDialog(sim, this.dialog, () => this.dismissDialog());
-    document.getElementById('mp-open').onclick = () => this.openDialog();
+    document.getElementById('mp-open-create').onclick = () => this.openDialog('host');
+    document.getElementById('mp-open-private').onclick = () => this.openDialog('join');
     document.getElementById('mp-room-menu').onclick = () => this.openDialog();
     document.getElementById('mp-dialog-close').onclick = () => this.dismissDialog();
     document.getElementById('mp-keep-waiting').onclick = () => this.room?.keepWaiting();
@@ -47,17 +48,10 @@ export class MultiplayerController {
     if (typeof BroadcastChannel !== 'undefined') {
       try {
         this.directoryChannel = new BroadcastChannel('flight3d-directory-channel');
-        this.directoryChannel.onmessage = () => {
-          const joinPanel = document.getElementById('mp-join-panel');
-          if (this.dialog?.open && joinPanel && !joinPanel.hidden && !this.active) {
-            this.refreshOpenRooms();
-          }
-        };
+        this.directoryChannel.onmessage = () => this.refreshRoomListIfVisible();
       } catch {}
     }
     this.preferences = bindMultiplayerPreferences();
-    document.getElementById('mp-choose-host').onclick = () => this.chooseSetup('host');
-    document.getElementById('mp-choose-join').onclick = () => this.chooseSetup('join');
     document.getElementById('mp-create').onclick = () => this.connect();
     document.getElementById('mp-join').onclick = () => {
       this.lastJoinMethod = 'code';
@@ -123,16 +117,18 @@ export class MultiplayerController {
     for (const path of ['host', 'join']) {
       const panel = document.getElementById(`mp-${path}-panel`);
       if (panel) panel.hidden = path !== mode;
-      const btn = document.getElementById(`mp-choose-${path}`);
-      if (btn) btn.setAttribute('aria-pressed', String(path === mode));
     }
-    if (mode === 'join') this.refreshOpenRooms();
   }
   get modalOpen() { return this.dialog.open; }
-  openDialog() {
+  openDialog(mode) {
+    if (mode) this.chooseSetup(mode);
     this.modal.open();
     this.refresh();
-    this.refreshOpenRooms();
+  }
+  /** The room browser lives in the lobby's multi tab, so refresh it only while that tab is showing. */
+  refreshRoomListIfVisible() {
+    const tab = document.getElementById('lobby-tab-multi');
+    if (!this.active && tab?.getAttribute('aria-selected') === 'true') this.refreshOpenRooms();
   }
   dismissDialog() {
     if (this.active && this.room.session.state !== 'flying') {
@@ -143,6 +139,7 @@ export class MultiplayerController {
       this.room.close('cancelled');
     }
     this.modal.close();
+    this.refreshRoomListIfVisible();
   }
   async copyInvite(kind) {
     if (!this.active) return;
@@ -583,6 +580,7 @@ export class MultiplayerController {
         joinBtn.onclick = () => {
           this.lastJoinMethod = 'directory';
           if (this.roomInput) this.roomInput.value = room.roomCode;
+          this.openDialog('join');
           this.connectInvite(room.roomCode);
         };
 

@@ -358,8 +358,16 @@
             <span class="lobby-label" data-i18n="mp.title">함께 비행</span>
             <p class="lobby-multi-desc" data-i18n="mp.tabDesc">실시간 P2P WebRTC로 다른 조종사와 함께 편대 비행을 즐기세요.</p>
           </div>
-          <div class="lobby-buttons">
-            <button id="mp-open" class="btn btn-mp-launch" type="button" aria-haspopup="dialog" aria-controls="mp-dialog"><span class="btn-icon" aria-hidden="true">👥</span> <span data-i18n="mp.openDialog">함께 비행 (방 만들기 / 참여)</span></button>
+          <div class="mp-browser-header">
+            <h4 id="mp-browser-title" data-i18n="mp.openRooms"></h4>
+            <button id="mp-refresh-rooms" class="btn btn-sm" type="button" data-i18n="mp.refresh"></button>
+          </div>
+          <div id="mp-room-list" class="mp-room-list" role="region" aria-live="polite">
+            <p class="mp-room-list-empty" data-i18n="mp.noOpenRooms"></p>
+          </div>
+          <div class="lobby-multi-actions">
+            <button id="mp-open-create" class="btn btn-mp-launch" type="button" aria-haspopup="dialog" aria-controls="mp-dialog"><span class="btn-icon" aria-hidden="true">➕</span> <span data-i18n="mp.createRoom">방 만들기</span></button>
+            <button id="mp-open-private" class="btn" type="button" aria-haspopup="dialog" aria-controls="mp-dialog"><span class="btn-icon" aria-hidden="true">🔑</span> <span data-i18n="mp.joinPrivate">비밀방 들어가기</span></button>
           </div>
           <div class="lobby-group lobby-multi-info" role="group">
             <span class="lobby-label" data-i18n="mp.featuresTitle">주요 기능</span>
@@ -631,10 +639,6 @@
           </section>
           <fieldset id="mp-connect">
             <div class="mp-pilot-field"><label for="mp-name" data-i18n="mp.name"></label><input id="mp-name" maxlength="12" autocomplete="nickname" value="Pilot"></div>
-            <div class="mp-path-choice" role="group" data-i18n-aria-label="mp.setupChoice">
-              <button id="mp-choose-host" class="btn" type="button" aria-pressed="true" aria-controls="mp-host-panel" data-i18n="mp.hostTitle"></button>
-              <button id="mp-choose-join" class="btn" type="button" aria-pressed="false" aria-controls="mp-join-panel" data-i18n="mp.joinTitle"></button>
-            </div>
             <div class="mp-setup-paths">
             <section id="mp-host-panel" class="mp-setup-path" aria-labelledby="mp-host-title">
             <h3 id="mp-host-title" data-i18n="mp.hostTitle"></h3>
@@ -654,14 +658,6 @@
             <section id="mp-join-panel" class="mp-setup-path mp-join-path" aria-labelledby="mp-join-title" hidden>
             <h3 id="mp-join-title" data-i18n="mp.joinTitle"></h3>
             <p class="mp-path-help" data-i18n="mp.joinHelp"></p>
-            <div class="mp-browser-header">
-              <h4 id="mp-browser-title" data-i18n="mp.openRooms"></h4>
-              <button id="mp-refresh-rooms" class="btn btn-sm" type="button" data-i18n="mp.refresh"></button>
-            </div>
-            <div id="mp-room-list" class="mp-room-list" role="region" aria-live="polite">
-              <p class="mp-room-list-empty" data-i18n="mp.noOpenRooms"></p>
-            </div>
-            <div class="mp-divider"><span data-i18n="mp.orDirectCode"></span></div>
             <label for="mp-room" data-i18n="mp.invite"></label><input id="mp-room" autocomplete="off" spellcheck="false">
             <button id="mp-join" class="btn" type="button" data-i18n="mp.join"></button>
             </section>

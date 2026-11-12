@@ -8,7 +8,7 @@ import { GameFlowController } from '/src/ui/GameFlowController.js';
 import { initLocalization, setLanguage } from '/src/i18n/index.js';
 // Use the shipping modal markup, without starting a WebGL simulator in hosted CI.
 const source = new DOMParser().parseFromString(await (await fetch('/')).text(), 'text/html');
-for (const id of ['mp-dialog', 'mp-open', 'mp-room-menu', 'mp-audio']) document.body.append(source.getElementById(id));
+for (const id of ['mp-dialog', 'mp-open-create', 'mp-open-private', 'mp-room-menu', 'mp-audio']) document.body.append(source.getElementById(id));
 initLocalization(); setLanguage('en');
 const controls = new FlightControls(document.body);
 const gameFlow = new GameFlowController(); gameFlow.enterFlight();
@@ -54,7 +54,7 @@ window.uiFixture = {
   },
   join(code) {
     controller.room.dispose(); controller.room = null; controller.voice = null;
-    controller.openDialog(); document.getElementById('mp-room').value = code; document.getElementById('mp-join').click();
+    controller.openDialog('join'); document.getElementById('mp-room').value = code; document.getElementById('mp-join').click();
   }
 };
 </script></html>

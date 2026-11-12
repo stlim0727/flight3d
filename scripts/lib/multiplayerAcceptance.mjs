@@ -96,11 +96,16 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
     await c.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     await c.evaluate('sim.setRenderQuality("ultraLow"); sim.setBrowserActive(true)');
   }
-  async function open(c) {
-    await c.evaluate(`if (!sim.multiplayer.modalOpen) {
+  async function open(c, mode = 'create') {
+    await c.evaluate(`(() => {
       if (!sim.multiplayer.active && sim.gameFlow.state !== 'lobby') sim.gameFlow.returnToLobby(true);
-      document.getElementById(sim.multiplayer.active ? 'mp-room-menu' : 'mp-open').click();
-    }`);
+      if (sim.multiplayer.active) {
+        if (!sim.multiplayer.modalOpen) document.getElementById('mp-room-menu').click();
+        return;
+      }
+      if (sim.multiplayer.modalOpen) document.getElementById('mp-dialog-close').click();
+      document.getElementById('${mode === 'join' ? 'mp-open-private' : 'mp-open-create'}').click();
+    })()`);
     assert.equal(await c.evaluate('document.getElementById("mp-dialog").matches(":modal")'), true);
     assert.equal(await c.evaluate('sim.controls.inputBlocked'), true);
   }
@@ -117,13 +122,12 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   await host.evaluate('sim.cameraSystem.setMode(1, true); sim.gameFlow.returnToLobby(true)');
   async function create(airport = 'coastal', aircraft = 'C172', scenario = 'runway') {
     for (const c of [host, guest]) await open(c);
-    await host.evaluate('document.getElementById("mp-choose-host").click()');
     await host.evaluate(`document.getElementById('mp-airport').value=${JSON.stringify(airport)}; document.getElementById('mp-aircraft').value=${JSON.stringify(aircraft)}; document.getElementById('mp-scenario').value=${JSON.stringify(scenario)}; document.getElementById('mp-name').value='Lead'; document.getElementById('mp-create').click()`);
     await until(() => host.evaluate('sim.multiplayer.room?.registered'), 'creator registered');
     return host.evaluate('({code:sim.multiplayer.room.room,invite:document.getElementById("mp-invite").value})');
   }
   async function join(code) {
-    await guest.evaluate('document.getElementById("mp-choose-join").click()');
+    await open(guest, 'join');
     await guest.evaluate(`document.getElementById('mp-room').value=${JSON.stringify(code)}; document.getElementById('mp-name').value='Wing'; document.getElementById('mp-join').click()`);
     for (const c of [host, guest]) await until(() => c.evaluate('sim.multiplayer.room?.session.state === "connected"'), 'two pilots connected');
   }
@@ -170,10 +174,10 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   await swipeDialog('#mp-host-panel', 1);
   await capture(host, 'mobile-scrolled');
   await host.evaluate('document.getElementById("mp-dialog").scrollTop=0');
-  await host.evaluate('document.getElementById("mp-choose-join").click()');
+  await host.evaluate('sim.multiplayer.chooseSetup("join")');
   await capture(host, 'mobile-join');
   assert.equal(await host.evaluate('document.getElementById("mp-host-panel").hidden && !document.getElementById("mp-join-panel").hidden'), true, 'joining hides host-only stage and aircraft choices');
-  await host.evaluate('document.getElementById("mp-choose-host").click()');
+  await host.evaluate('sim.multiplayer.chooseSetup("host")');
   const setupBounds = await host.evaluate('(() => { const d=document.getElementById("mp-dialog"),r=d.getBoundingClientRect(); return {left:r.left,right:r.right,w:innerWidth,scroll:d.scrollWidth,client:d.clientWidth}; })()');
   assert.ok(setupBounds.left >= 0 && setupBounds.right <= setupBounds.w && setupBounds.scroll <= setupBounds.client + 2, 'host/join setup fits phone width');
   await host.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -258,7 +262,7 @@ export async function verifyMultiplayerSimulator({ page, cdpPort, browsers }) {
   assert.equal(await host.evaluate('sim.multiplayer.active'), true, 'creator renewal survives original deadline');
   await until(() => host.evaluate('sim.multiplayer.room.closed && sim.multiplayer.message === "cancelled"'), 'sixty-second missed press cancellation', 32000);
   assert.equal(await host.evaluate('sim.multiplayer.room.keepWaiting()'), false);
-  await guest.evaluate('document.getElementById("mp-choose-join").click()');
+  await open(guest, 'join');
   await guest.evaluate(`document.getElementById('mp-room').value=${JSON.stringify(cancelled.code)}; document.getElementById('mp-join').click()`);
   await until(() => guest.evaluate('sim.multiplayer.message === "cancelled" && sim.multiplayer.room.closed'), 'late join explicitly cancelled');
   assert.equal(await guest.evaluate('document.getElementById("mp-dialog").matches(":modal")'), true);

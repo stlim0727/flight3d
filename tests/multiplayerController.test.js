@@ -230,6 +230,7 @@ test('refreshOpenRooms renders rooms and allows joining', async () => {
         },
       },
       connectInvite(code) { joined.push(code); },
+      openDialog(mode) { this.openedMode = mode; },
     });
 
     await controller.refreshOpenRooms();
@@ -241,6 +242,7 @@ test('refreshOpenRooms renders rooms and allows joining', async () => {
     assert.equal(joinBtn.disabled, false);
     joinBtn.onclick();
     assert.deepEqual(joined, ['K7M2QX']);
+    assert.equal(controller.openedMode, 'join', 'joining a listed room opens its status dialog');
     assert.equal(controller.roomInput.value, 'K7M2QX');
 
     // Full room button is disabled
