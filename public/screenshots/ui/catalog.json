@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-11-07T12:53:30.106Z",
-  "branch": "feat/debrief-overlay-streamline",
-  "commit": "dd83c454efcf8b4293619a3065e49fa7f80bb9e9",
-  "commitShort": "dd83c45",
+  "generatedAt": "2026-11-12T09:26:58.603Z",
+  "branch": "main",
+  "commit": "40afe133ef9a15fc10a233f47f134848a2fe526f",
+  "commitShort": "40afe13",
   "commitDate": "2026-11-07T12:42:32Z",
   "viewport": "desktop",
-  "dimensions": "1440x900",
+  "dimensions": "1280x720",
   "screens": [
     {
       "id": "01_startup_loading",
@@ -308,8 +308,8 @@
       "id": "28_debrief_flight_summary",
       "category": "debrief",
       "file": "28_debrief_flight_summary.png",
-      "title_ko": "디브리프 — 비행 종합 요약 탭",
-      "title_en": "Debrief Overlay — Flight Summary Tab",
+      "title_ko": "디브리프 — 비행 종합 요약",
+      "title_en": "Debrief Overlay — Flight Summary",
       "description_ko": "비행 종합 결과: 총 비행 시간, 최고 도달 고도, 최고 대기속도, 최대 하중(G-Force)",
       "description_en": "Flight summary: duration, peak altitude, top airspeed, and maximum G-force",
       "selector": "#debrief-overlay",
