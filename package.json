@@ -55,7 +55,7 @@
   },
   "devDependencies": {
     "jpeg-js": "^0.4.4",
-    "peer": "1.0.2",
+    "peer": "^1.0.2",
     "postject": "1.0.0-alpha.6",
     "three-mesh-bvh": "^0.9.17",
     "vite": "^8.3.4",

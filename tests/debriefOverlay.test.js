@@ -159,7 +159,7 @@ test('header outcome pill shows a short single-line label instead of a sentence 
 test('every debrief action names a button that exists in the overlay markup', () => {
   const source = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
   const actions = Object.entries(DEBRIEF_ACTIONS);
-  assert.ok(actions.length >= 7);
+  assert.ok(actions.length >= 5);
   for (const [id, action] of actions) {
     assert.match(source, new RegExp(`id="debrief-${id}"`), `${action} must be bound to #debrief-${id}`);
     assert.match(action, /^[a-z_]+$/, 'action values are snake_case event properties');

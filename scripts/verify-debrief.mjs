@@ -95,29 +95,23 @@ try {
   await shot('record');
   await send('Browser.setPermission', { permission: { name: 'clipboard-write' }, setting: 'granted', origin: new URL(url).origin });
   await send('Browser.setPermission', { permission: { name: 'clipboard-read' }, setting: 'granted', origin: new URL(url).origin });
-  await click('#debrief-copy');
-  // Clipboard writes resolve asynchronously; wait for the status instead of racing it.
-  for (let n = 0; n < 20 && !(await ev('document.querySelector("#debrief-status").textContent')); n++) {
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  assert.match(await ev('document.querySelector("#debrief-status").textContent'), /복사했습니다/);
-  assert.match(await ev('await navigator.clipboard.readText()'), /Flight3d.*\nCessna/s);
-  // Capture the export blob in the page instead of relying on Browser download permissions.
-  await ev(`window.__exports=[];const origCreateObjectURL=URL.createObjectURL.bind(URL);URL.createObjectURL=blob=>{blob.text().then(text=>window.__exports.push(text));return origCreateObjectURL(blob);};`);
-  await click('#debrief-export');
-  let exported;
-  for (let n = 0; n < 20 && !exported; n++) {
-    const text = await ev('window.__exports[0]');
-    if (text) exported = JSON.parse(text);
+  // Capture the download blob in the page instead of relying on Browser download permissions.
+  await ev(`window.__downloads=[];const origCreateObjectURL=URL.createObjectURL.bind(URL);URL.createObjectURL=blob=>{blob.text().then(text=>window.__downloads.push(text));return origCreateObjectURL(blob);};`);
+  await click('#debrief-download');
+  let downloaded;
+  for (let n = 0; n < 20 && !downloaded; n++) {
+    const text = await ev('window.__downloads[0]');
+    if (text) downloaded = JSON.parse(text);
     else await new Promise(resolve => setTimeout(resolve, 100));
   }
-  assert.equal(exported?.metadata.aircraft, 'C172');
-  assert.ok(exported?.samples.length > 1);
-  await shot('share');
+  assert.equal(downloaded?.metadata.aircraft, 'C172');
+  assert.ok(downloaded?.samples.length > 1);
+  assert.ok(downloaded?.replay?.durationSec > 0, 'the single file contains the replay track');
+  await shot('download');
+  // Download does not touch the clipboard; permission policy is irrelevant.
   await ev(`navigator.clipboard.writeText=async()=>{throw new Error('Denied')};`);
-  await click('#debrief-copy');
-  assert.match(await ev('document.querySelector("#debrief-status").textContent'), /권한/);
-  await shot('copy-failed');
+  await click('#debrief-download');
+  assert.match(await ev('document.querySelector("#debrief-status").textContent'), /다운로드했습니다/);
   for (const [width, height] of [[390, 844], [320, 568], [844, 390], [568, 320]]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
     assert.equal(await ev(`document.querySelector('.debrief-overlay').getBoundingClientRect().right <= innerWidth`), true);
@@ -131,7 +125,7 @@ try {
   assert.equal(await ev('s.currentAircraftId'), 'C172');
   await click('#btn-pause-end');
   assert.equal(await ev('s.debriefReport.sufficient'), false);
-  assert.equal(await ev('document.querySelector("#debrief-copy").disabled'), true);
+  assert.equal(await ev('document.querySelector("#debrief-download").disabled'), true);
   assert.deepEqual(await ev('(h => [h.classList.contains("is-truncated"), h.tabIndex])(document.querySelector("#debrief-outcome"))'), [false, -1], 'short headlines stay plain');
   assert.equal(await ev('getComputedStyle(document.querySelector("#hud-warning")).display'), 'none');
   assert.equal(await ev('getComputedStyle(document.querySelector("#toast-msg")).display'), 'none');
