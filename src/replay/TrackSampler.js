@@ -83,7 +83,7 @@ export function sampleTrack(track, timeSec, out = {}, state = {}) {
   state.hint = index;
   const a = samples[index];
   const b = samples[index + 1] ?? a;
-  const alpha = spanAlpha(a, b, time);
+  const alpha = roomSpanAlpha(track, 0, a, b, time);
   out.timeSec = time;
   for (const name of LINEAR_FIELDS) out[name] = lerp(num(a[name]), num(b[name]), alpha);
   out.headingDeg = lerpDegrees(num(a.headingDeg), num(b.headingDeg), alpha);
@@ -108,7 +108,32 @@ export function sampleTrack(track, timeSec, out = {}, state = {}) {
     for (const name of ENGINE_SCALARS) target[name] = lerp(num(from[name]), num(to[name]), alpha);
     target.failed = (discrete[`engine${engine}`]?.failed) === true;
   }
+  applyRoomState(out, roomStateAt(track, 0, timeSec));
   return out;
+}
+
+/** Pilot 0 is local; pilot 1..N follows metadata.remotes. States survive pose thinning. */
+export function roomStateAt(track, pilot, time) {
+  const timeline = track?.metadata?.room?.timeline;
+  if (!Array.isArray(timeline)) return undefined;
+  return (timeline.findLast(event => event.timeSec <= time) ?? timeline[0])?.states?.[pilot];
+}
+
+function applyRoomState(out, state) {
+  if (!state) return;
+  for (const key of ['visible', 'held', 'crashed', 'stale', 'segment', 'crash']) out[key] = state[key];
+}
+
+function roomSpanAlpha(track, pilot, a, b, time) {
+  const alpha = spanAlpha(a, b, time);
+  if (time >= b.timeSec) return alpha;
+  const timeline = track?.metadata?.room?.timeline;
+  const initial = JSON.stringify(roomStateAt(track, pilot, a.timeSec));
+  // A transition can fall between retained samples after thinning. Hold the earlier pose
+  // until the next observation, while roomStateAt supplies the exact visibility/state.
+  if (timeline?.some(event => event.timeSec > a.timeSec && event.timeSec <= b.timeSec
+    && JSON.stringify(event.states[pilot]) !== initial)) return 0;
+  return alpha;
 }
 
 /**
@@ -136,7 +161,7 @@ export function sampleRemote(track, remoteIndex, timeSec, out = {}, state = {}) 
   state.hint = index;
   const a = samples[index];
   const b = samples[index + 1] ?? a;
-  let alpha = spanAlpha(a, b, time);
+  let alpha = roomSpanAlpha(track, remoteIndex + 1, a, b, time);
   // Appearing or vanishing is a step: an unseen sample has no pose to blend toward.
   if (!(a.visible && b.visible) && alpha < 1) alpha = 0;
   const discrete = alpha < 0.5 ? a : b;
@@ -151,6 +176,7 @@ export function sampleRemote(track, remoteIndex, timeSec, out = {}, state = {}) 
   out.flapDegree = lerp(num(a.flapDegree), num(b.flapDegree), alpha);
   for (const name of ['crashed', 'held', 'stale']) out[name] = discrete[name] === true;
   out.segment = discrete.segment ?? 0;
+  applyRoomState(out, roomStateAt(track, remoteIndex + 1, timeSec));
   return out;
 }
 

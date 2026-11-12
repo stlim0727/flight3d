@@ -67,8 +67,51 @@ knows the frame width; codec v3 is written only for tracks with remote pilots, w
 solo tracks stay v2 for older builds. A room that outlasts the coarsest rung keeps its
 most recent frames instead of being refused, and its timeline is rebased to zero.
 
-Recording the room and saving it when the room ends is wired in a later step; this
-format and recorder are not yet used by the multiplayer controller.
+### Room lifecycle and release gate (#672 Task 2)
+
+`MultiplayerController` connects `RoomReplaySession` to the first `go`, its frame
+updates, and `ended`/`pagehide`. `ROOM_REPLAY_ENABLED` remains **false** until Task 3
+can render every aircraft. Production retains solo recording/auto-save behavior;
+room imports may be exported/renamed/deleted but cannot silently play as solo.
+Task 3 must enable the flag and remove the room watch guards in `ReplayPanel` and
+`ReplayDirector` together with its two-peer playback acceptance.
+
+When enabled, the room clock is `(performance.now() - startedAt) / 1000`, in seconds,
+independent of local physics time. Menu/debrief holds do not stop remote recording.
+Round restarts preserve the recorder; each aircraft has its own segment counter.
+The controller observes world positions (metres) and authoritative unit quaternions;
+remote positions already include `RemoteTrack`'s arrival-clock interpolation.
+It does not simulate remote physics or apply network delay a second time.
+
+`metadata.room` contains the local pilot, room code, rounds, end reason,
+`sessionDurationSec`, `startOffsetSec`, `partial` and a `timeline`. Timeline entries
+are `{timeSec, states}`, with local pilot at index 0 and remotes at indices 1..N.
+Each state contains visible/held/crashed/stale/segment and optional crash type/speed
+(knots). Local types come from `crashResult`; remote types are `unknown` without a
+wire change. These are observed state transitions, not an exact crash simulation.
+They survive pose thinning and support repeated crashes/respawns and backwards seek.
+The sampler never interpolates across a retained state transition. Task 3 must
+consume visibility and crash states when rendering, including hidden local poses.
+
+Blur marks an observation gap. Frame gaps over 500 ms also hide both tracks until
+the next observation; stale remote snapshots are hidden in the timeline. A large
+gap advances room time without inventing frames or counting it as valid flight
+duration. End callbacks use previously observed poses because the transport may
+have cleared its remote buffer. `finish` is idempotent, including pagehide + ended.
+
+`room_auto_save` is independent of the legacy solo `auto_save`; both share storage
+budgets and ordinary eviction. Renaming promotes either to a manual save. Slot
+replacement excludes the old slot before budget calculation and restores old
+payloads on failed writes. With room recording active, sortie auto-save is skipped;
+manual debrief saves remain solo. Save errors produce a toast and a best-effort
+next-library-visit notice. Inaccessible storage cannot persist that notice;
+pagehide does not guarantee recovery from browser/OS termination.
+
+State history is bounded to the smaller of 16 KB or a quarter of the decoded
+entry budget. If transitions alone exceed it, the retained pose window is shortened
+along with the history. Pose-window trimming retains the state at its beginning.
+Finalization rebases both poses and timeline, and the library labels partial room
+records. This can retain less than the nominal roughly 30-minute pose budget.
 
 `ReplayStore` uses a small index and individual localStorage payloads. Debrief download
 and replay library export share one unified format (`flight3d.sortie.v1`):
@@ -89,8 +132,16 @@ These files contain no executable pilot code.
 ## Verification
 
 Run the Node replay tests with `node --test tests/replay*.test.js
- tests/roomReplay.test.js tests/trackSampler.test.js tests/poseOwnership.test.js`
+ tests/roomReplay*.test.js tests/trackSampler.test.js tests/poseOwnership.test.js`
 (on one line).
+
+`node scripts/verify-room-recording.mjs` uses hardware Chrome and the real
+controller/recorder/store/library with a deterministic peer/clock fixture. It checks
+held-local/continuing-remote recording, suspension gaps, one-shot save, import/export,
+library names/watch gating and reload persistence. On Windows start Vite separately
+and set `APP_URL` to its origin; the script uses installed Chrome with D3D11.
+Evidence goes to `review-artifacts/room-recording/`. This is not two-peer WebRTC,
+tab-close acceptance or multi-aircraft rendering; those remain Task 3 acceptance.
 
 `npm run test:replay` starts local Vite and isolated hardware Chrome. It invokes
 `scripts/verify-browser-gpu.mjs` against that actual browser before acceptance.

@@ -625,6 +625,7 @@ class FlightSimulator {
     this.clock.getDelta();
     this.physicsAccumulator = 0;
     if (backgrounded) {
+      this.multiplayer?.roomReplay?.gap();
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0, 0);
       this.controls.setTouchRudder(0);
@@ -822,7 +823,7 @@ class FlightSimulator {
     this.debriefReplay = this.replayRecorder.finish();
     // Keep the latest sortie in the library even when the debrief's manual save is skipped;
     // the fixed auto_save slot is overwritten on the next flight (#645).
-    if (this.debriefReplay) this.replayStore.saveAuto(this.debriefReplay, { report: this.debriefReport });
+    if (this.debriefReplay && !this.multiplayer?.roomReplay?.active) this.replayStore.saveAuto(this.debriefReplay, { report: this.debriefReport });
     // An arena run reports its own end when leaving flight stops the runner.
     if (!this.pilotArena?.active) this.analytics?.trackFlightEnd?.({
       airport: this.activeAirport,

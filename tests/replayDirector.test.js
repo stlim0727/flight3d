@@ -6,6 +6,13 @@ import { RenderPose } from '../src/core/RenderPose.js';
 import { sampleTrack, trackDuration } from '../src/replay/TrackSampler.js';
 import { FLOW } from '../src/ui/GameFlowController.js';
 
+test('room tracks cannot silently play as solo before Task 3', async () => {
+  const source = track(); source.remotes = [{ samples: source.samples }];
+  const sim = fakeSim();
+  assert.equal(await new ReplayDirector(sim).load(source), false);
+  assert.equal(sim.calls.fly, 0);
+});
+
 function track(sampleCount = 25, intervalSec = 0.2) {
   const samples = [];
   for (let index = 0; index < sampleCount; index++) {

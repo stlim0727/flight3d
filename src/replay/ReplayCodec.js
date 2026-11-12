@@ -298,6 +298,16 @@ export function decodeTrack(bytes) {
     || pilots.some(pilot => !pilot || typeof pilot !== 'object' || Array.isArray(pilot))) {
     throw new Error('replay track metadata is corrupt');
   }
+  const timeline = metadata.room?.timeline;
+  if (timeline !== undefined && (!Array.isArray(timeline) || timeline.some((event, index) =>
+    !event || !Number.isFinite(event.timeSec) || event.timeSec < 0
+    || (index > 0 && event.timeSec < timeline[index - 1].timeSec)
+    || !Array.isArray(event.states) || event.states.length !== pilots.length + 1
+    || event.states.some(state => !state || typeof state !== 'object'
+      || !['visible', 'held', 'crashed', 'stale'].every(key => typeof state[key] === 'boolean')
+      || !Number.isSafeInteger(state.segment) || state.segment < 0)))) {
+    throw new Error('replay room timeline is corrupt');
+  }
   const frame = frameBytes(pilots.length);
   const expected = HEADER_BYTES + metadataLength + count * frame;
   if (bytes.length !== expected) throw new Error(`replay track length ${bytes.length} does not match ${expected}`);

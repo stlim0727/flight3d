@@ -1,5 +1,7 @@
 // Budgets are expressed in base64 bytes because that is what localStorage stores.
 export const REPLAY_INTERVAL_SEC = 0.2;
+// Enable only with Task 3's multi-aircraft viewer (#672). No partial feature in production.
+export const ROOM_REPLAY_ENABLED = false;
 export const REPLAY_INTERVAL_LADDER = Object.freeze([0.2, 0.4, 0.8, 1.6]);
 export const RECORD_BYTES = 80;
 // A multiplayer room track adds one pose-only record per remote aircraft to every frame.

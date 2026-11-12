@@ -35,6 +35,8 @@ export class ReplayDirector {
    */
   async load(track, { entryId = null } = {}) {
     if (!track || !Array.isArray(track.samples) || track.samples.length < 2) return false;
+    // Task 2 records room tracks, but Task 3 must render them before playback is exposed.
+    if (track.remotes?.length) return false;
     const { airport, aircraft, scenario, demoProfile, timeOfDay, seed } = track.metadata || {};
     const valley = scenario === 'valley';
     if (!Object.hasOwn(AIRCRAFT_REGISTRY, aircraft) || !isScenarioAvailable(airport, scenario)

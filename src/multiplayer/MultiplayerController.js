@@ -8,6 +8,9 @@ import { setSimulationWind } from '../physics/WindField.js';
 import { bindMultiplayerPreferences } from './preferences.js';
 import { RoomDirectoryClient } from './RoomDirectoryClient.js';
 import { HEARTBEAT_INTERVAL_MS } from './roomDirectory.js';
+import { RoomReplaySession } from '../replay/RoomReplaySession.js';
+import { ROOM_REPLAY_ENABLED } from '../replay/replayConfig.js';
+import { Atmosphere } from '../physics/Atmosphere.js';
 
 const PRODUCTION_DIRECTORY_URL = 'https://flight3d-room-directory.stlim0727.workers.dev';
 
@@ -20,6 +23,11 @@ const DEFAULT_DIRECTORY_URL = typeof window !== 'undefined'
 export class MultiplayerController {
   constructor(sim) {
     this.sim = sim; this.preparing = false; this.preparationHold = false;
+    this.roomReplay = ROOM_REPLAY_ENABLED ? new RoomReplaySession(sim.replayStore, {
+      onSaved: result => {
+        if (!result.entry) sim.showToast(() => t('replay.roomSaveFailed'));
+      },
+    }) : null;
     this.remoteCrashed = false;
     this.soloControls = new Map();
     this.dialog = document.getElementById('mp-dialog');
@@ -88,6 +96,7 @@ export class MultiplayerController {
       this.refresh();
     };
     window.addEventListener('pagehide', () => {
+      this.roomReplay?.finish('pagehide');
       this.registrationGeneration++;
       this.registeringHost = false;
       this.hostDirectoryClient?.unregister();
@@ -227,6 +236,11 @@ export class MultiplayerController {
     this.remoteCrashed = false;
     this.modal.close({ resume: false });
     this.sim.gameFlow.enterFlight(); this.sim.syncFlowUi();
+    const session = this.room?.session;
+    this.roomReplay?.start({ ...session.config, timeOfDay: this.sim.sky.timeOfDay,
+      room: { code: this.room.room, local: { name: session.name, slot: this.slot,
+        aircraft: session.config.aircraft } } },
+    [{ name: session.remoteName, slot: 1 - this.slot, aircraft: session.config.aircraft }]);
     this.sim.ensureAudio?.();
     this.playAudio();
     this.sim.analytics?.trackMultiplayerRoundStarted?.({
@@ -314,7 +328,24 @@ export class MultiplayerController {
       crashed: sample.crashed === true,
     }];
   }
+  recordReplay() {
+    if (!this.roomReplay?.active) return;
+    const sim = this.sim, session = this.room.session;
+    const visible = session.state === 'flying' && !this.preparing && !sim.browserBackgrounded;
+    const crash = sim.crashResult;
+    this.roomReplay.observe({
+      telemetry: { ...sim.telemetry, x: sim.position.x, z: sim.position.z,
+        altitudeFt: Atmosphere.metersToFeet(sim.position.y) },
+      quaternion: sim.quaternion,
+      segment: `${session.round}:${session.epoch}`,
+      round: session.round,
+      local: { visible, held: this.modalOpen || sim.gameFlow.isPhysicsFrozen(), crashed: sim.isCrashed,
+        crash: crash ? { type: crash.type ?? 'unknown', speedKnots: Number.isFinite(crash.speedKnots) ? crash.speedKnots : null } : undefined },
+      remotes: [visible ? session.track.sample(performance.now()) : null],
+    });
+  }
   update() {
+    this.recordReplay();
     if (!this.remote || !this.active) return;
     if (!this.remote.terrain && this.sim.currentTerrain) this.remote.terrain = this.sim.currentTerrain;
     if (!this.remote.explosionSystem && this.sim.explosionSystem) this.remote.explosionSystem = this.sim.explosionSystem;
@@ -366,6 +397,7 @@ export class MultiplayerController {
     this.refresh();
   }
   ended(reason) {
+    this.roomReplay?.finish(reason);
     this.remoteCrashed = false;
     const durationSeconds = this.connectStartedAt ? Number(((performance.now() - this.connectStartedAt) / 1000).toFixed(1)) : 0;
     const roundsPlayed = this.room?.session?.round ?? 0;
