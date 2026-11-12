@@ -345,6 +345,10 @@ class FlightSimulator {
     this.aircraftBreakup = new AircraftBreakup(this.scene);
     this.missileCombat = new AirToAirMissileSystem();
     this.missileCombatView = new MissileCombatView(this.scene, this.missileCombat);
+    this.cameraSystem.setCombatStateProvider(() => ({
+      missiles: this.missileCombat.missiles,
+      targets: this.missileCombat.targets,
+    }));
     this._combatTerrainHeight = (x, z) => this.currentTerrain?.getHeight(x, z) ?? 0;
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
     this.pilotPhysiologyFx = new PilotPhysiologyFx(this.container);

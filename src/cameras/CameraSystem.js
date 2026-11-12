@@ -53,6 +53,9 @@ export class CameraSystem {
     this.autoSwitchTimer = 0;
     this.autoContext = null;
     this.customViewUpdater = null;
+    // Optional live combat feed for the director's missile cinematic. main.js
+    // supplies { missiles, targets } from the air-to-air system.
+    this.combatStateProvider = null;
     this.cinematicDirector = new CinematicCameraDirector({
       camera: this.camera,
       queryGroundHeight: (x, z) => this.queryGroundHeight(x, z),
@@ -1084,6 +1087,14 @@ export class CameraSystem {
     }
   }
 
+  /**
+   * Feed the cinematic director the live air-to-air arrays so a rail release
+   * can cut to its launch/follow/bandit-POV sequence.
+   */
+  setCombatStateProvider(provider) {
+    this.combatStateProvider = typeof provider === 'function' ? provider : null;
+  }
+
   setTerrain(terrain) {
     this.terrainObj = terrain;
     if (typeof terrain === 'function') {
@@ -2055,6 +2066,7 @@ export class CameraSystem {
       }
       case CameraSystem.MODES.DIRECTOR: {
         this.cinematicDirector.setTerrainQuery((x, z) => this.queryGroundHeight(x, z));
+        const combat = this.combatStateProvider ? this.combatStateProvider() : null;
         this.cinematicDirector.update({
           dt,
           camera: this.camera,
@@ -2063,6 +2075,8 @@ export class CameraSystem {
           aircraftMesh,
           flightState,
           queryGroundHeight: (x, z) => this.queryGroundHeight(x, z),
+          missiles: combat?.missiles ?? [],
+          targets: combat?.targets ?? [],
         });
         break;
       }

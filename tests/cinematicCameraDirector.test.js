@@ -498,3 +498,141 @@ test('Camera on ground maintains ground clearance and fuselage clearance simulta
     );
   }
 });
+
+function fakeMissile({ id = 1, position, velocity, target = null, alive = true } = {}) {
+  return {
+    id,
+    alive,
+    position: position.clone(),
+    prevPosition: position.clone(),
+    velocity: velocity.clone(),
+    target,
+  };
+}
+
+test('Director cuts to missile launch, follows the missile, then shows the bandit POV', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1000, 0);
+  const planeQuat = new THREE.Quaternion();
+  const flightState = { iasKnots: 260, gForce: 1.0, rollDeg: 0, onGround: false };
+  const target = {
+    id: 7,
+    alive: true,
+    position: new THREE.Vector3(0, 1000, -3000),
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const missile = fakeMissile({
+    id: 41,
+    position: new THREE.Vector3(5, 1000, 2),
+    velocity: new THREE.Vector3(0, 0, -400),
+    target,
+  });
+
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState, missiles: [], targets: [target] });
+  assert.notEqual(director.currentShotType, CINEMATIC_SHOTS.MISSILE_LAUNCH, 'No launch before a missile exists');
+
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [target] });
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_LAUNCH, 'Fresh rail release cuts immediately');
+  assert.ok(camera.position.distanceTo(planePos) < 20, 'Launch camera rides beside the launcher');
+
+  for (let frame = 0; frame < 12; frame++) {
+    missile.position.z -= 40;
+    director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [target] });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_TRACK, 'Launch beat hands off to the missile follow');
+  assert.ok(
+    camera.position.distanceTo(missile.position) < 25,
+    `Follow camera must ride the missile, was ${camera.position.distanceTo(missile.position).toFixed(1)}m away`,
+  );
+
+  for (let frame = 0; frame < 30 && director.currentShotType !== CINEMATIC_SHOTS.BANDIT_POV; frame++) {
+    missile.position.z -= 120;
+    director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [target] });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV, 'Close missile hands off to the bandit POV');
+  assert.ok(
+    camera.position.distanceTo(target.position) < 3,
+    `Bandit POV eye sits on the targeted bandit, was ${camera.position.distanceTo(target.position).toFixed(1)}m away`,
+  );
+
+  const toMissile = missile.position.clone().sub(camera.position).normalize();
+  const viewDir = new THREE.Vector3();
+  camera.getWorldDirection(viewDir);
+  assert.ok(viewDir.dot(toMissile) > 0.95, 'Bandit POV looks down the incoming missile bearing');
+});
+
+test('Approach keeps routine shots until the missile is close, then holds the bandit POV through detonation', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1000, 0);
+  const planeQuat = new THREE.Quaternion();
+  const mission = {
+    id: 9,
+    alive: true,
+    position: new THREE.Vector3(0, 1000, -5200),
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const missile = fakeMissile({
+    id: 52,
+    position: new THREE.Vector3(4, 1000, 2),
+    velocity: new THREE.Vector3(0, 0, -450),
+    target: mission,
+  });
+
+  director.update({ dt: 0.05, camera, planePos, planeQuat, missiles: [missile], targets: [mission] });
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_LAUNCH);
+
+  while (director.currentShotType !== CINEMATIC_SHOTS.MISSILE_TRACK) {
+    director.update({ dt: 0.1, camera, planePos, planeQuat, missiles: [missile], targets: [mission] });
+  }
+  // Hold the round far from the bandit so the follow cam times out first.
+  for (let frame = 0; frame < 92; frame++) {
+    director.update({ dt: 0.1, camera, planePos, planeQuat, missiles: [missile], targets: [mission] });
+  }
+  assert.notEqual(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV, 'Far missile leaves the routine shots alone');
+  assert.equal(director.missileSequence.phase, 'approach');
+
+  // Close to the bandit: the final POV cuts in, then holds through the hit.
+  missile.position.copy(mission.position).add(new THREE.Vector3(0, 0, 1200));
+  director.update({ dt: 0.05, camera, planePos, planeQuat, missiles: [missile], targets: [mission] });
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV, 'Close missile cuts to the bandit seat');
+
+  missile.alive = false;
+  director.update({ dt: 0.05, camera, planePos, planeQuat, missiles: [], targets: [mission] });
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV, 'Detonation lingers in the bandit POV');
+
+  for (let frame = 0; frame < 16; frame++) {
+    director.update({ dt: 0.1, camera, planePos, planeQuat, missiles: [], targets: [mission] });
+  }
+  assert.equal(director.missileSequence, null, 'Sequence ends after the detonation lingers');
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY, 'Director returns to routine shots');
+});
+
+test('CameraSystem DIRECTOR mode forwards live combat state to the director', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const cameraSystem = new CameraSystem(camera);
+  const missiles = [];
+  cameraSystem.setCombatStateProvider(() => ({ missiles, targets: [] }));
+  cameraSystem.setMode(CameraSystem.MODES.DIRECTOR, true);
+
+  const mesh = {
+    position: new THREE.Vector3(0, 1200, 0),
+    quaternion: new THREE.Quaternion(),
+    matrixWorld: new THREE.Matrix4(),
+  };
+  cameraSystem.update(0.016, mesh, {});
+
+  missiles.push(fakeMissile({
+    id: 77,
+    position: new THREE.Vector3(5, 1200, 2),
+    velocity: new THREE.Vector3(0, 0, -400),
+  }));
+  cameraSystem.update(0.016, mesh, {});
+
+  assert.equal(
+    cameraSystem.cinematicDirector.currentShotType,
+    CINEMATIC_SHOTS.MISSILE_LAUNCH,
+    'Combat feed reaches the director through CameraSystem',
+  );
+});
