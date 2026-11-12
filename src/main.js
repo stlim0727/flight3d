@@ -57,7 +57,7 @@ import { initUiScale } from './ui/UiScale.js';
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
 import { FlightRecorder } from './core/FlightRecorder.js';
 import { ReplayRecorder } from './core/ReplayRecorder.js';
-import { ReplayStore, extractReportSummary } from './replay/ReplayStore.js';
+import { ReplayStore } from './replay/ReplayStore.js';
 import { LOBBY_AIRCRAFT_IDS } from './ui/LobbyScreen.js';
 import { DeveloperModeController } from './dev/DeveloperModeController.js';
 import { DevScenarioRunner } from './dev/DevScenarioRunner.js';
@@ -815,10 +815,9 @@ class FlightSimulator {
     this.debriefReport = this.isCrashed ? this.flightRecorder.finish('crash', this.crashResult)
       : this.flightRecorder.finish(reason);
     this.debriefReplay = this.replayRecorder.finish();
-    const debriefSummary = extractReportSummary(this.debriefReport);
     // Keep the latest sortie in the library even when the debrief's manual save is skipped;
     // the fixed auto_save slot is overwritten on the next flight (#645).
-    if (this.debriefReplay) this.replayStore.saveAuto(this.debriefReplay, { summary: debriefSummary });
+    if (this.debriefReplay) this.replayStore.saveAuto(this.debriefReplay, { report: this.debriefReport });
     // An arena run reports its own end when leaving flight stops the runner.
     if (!this.pilotArena?.active) this.analytics?.trackFlightEnd?.({
       airport: this.activeAirport,
@@ -847,8 +846,7 @@ class FlightSimulator {
   /** Persists the finished sortie's pose track. Returns the store's error token for the debrief to show. */
   saveDebriefReplay() {
     if (!this.debriefReplay) return { ok: false, error: 'tooShort' };
-    const summary = extractReportSummary(this.debriefReport);
-    const { entry, error } = this.replayStore.save(this.debriefReplay, { summary });
+    const { entry, error } = this.replayStore.save(this.debriefReplay, { report: this.debriefReport });
     this.analytics?.trackReplaySaved?.({ result: entry ? 'ok' : error, durationSeconds: this.debriefReplay.durationSec });
     return { ok: Boolean(entry), error: error ?? null };
   }

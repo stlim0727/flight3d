@@ -110,7 +110,7 @@ export class ReplayStore {
   }
 
   /** @returns {{entry: object, error: string|null}} */
-  save(track, { label, auto = false, summary = null } = {}) {
+  save(track, { label, auto = false, summary = null, report = null } = {}) {
     if (!track || !Array.isArray(track.samples) || track.samples.length < 2) {
       return { entry: null, error: 'tooShort' };
     }
@@ -122,6 +122,9 @@ export class ReplayStore {
       return { entry: null, error: error.message };
     }
     if (base64.length > this.budget.entryBase64Bytes) return { entry: null, error: 'tooLong' };
+    const resolvedSummary = (summary && typeof summary === 'object')
+      ? summary
+      : (report ? extractReportSummary(report) : null);
     const entry = {
       id: crypto.randomUUID(),
       savedAt: new Date().toISOString(),
@@ -132,7 +135,7 @@ export class ReplayStore {
       bytes: base64.length,
       metadata: { ...track.metadata },
     };
-    if (summary && typeof summary === 'object') entry.summary = summary;
+    if (resolvedSummary) entry.summary = resolvedSummary;
     if (auto) entry.auto = true;
     const rows = this.read();
     if (!this.writeEntry(entry, base64, rows)) return { entry: null, error: this.error || 'quota' };
@@ -145,9 +148,9 @@ export class ReplayStore {
    * it into a permanent save that later flights no longer overwrite (#645).
    * @returns {{entry: object, error: string|null}}
    */
-  saveAuto(track, { summary = null } = {}) {
+  saveAuto(track, { summary = null, report = null } = {}) {
     const stale = this.read().filter(row => row.auto === true);
-    const { entry, error } = this.save(track, { label: AUTO_SAVE_LABEL, auto: true, summary });
+    const { entry, error } = this.save(track, { label: AUTO_SAVE_LABEL, auto: true, summary, report });
     if (!entry) return { entry: null, error };
     // Write the replacement first so a refused save cannot drop the flight already kept.
     for (const row of stale) if (row.id !== entry.id) this.remove(row.id);
