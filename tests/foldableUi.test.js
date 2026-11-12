@@ -23,6 +23,11 @@ test('DebriefOverlay includes fold and unfold affordances', () => {
   assert.ok(debriefSrc.includes('id="debrief-unfold"'), 'must have debrief-unfold pill');
   assert.ok(debriefSrc.includes('class="debrief-unfold-actions"'), 'must have debrief-unfold-actions wrapper');
   assert.ok(debriefSrc.includes('setFolded('), 'must have setFolded method');
+
+  const markup = debriefSrc.match(/this\.root\.innerHTML = `([\s\S]*?)`;/)[1];
+  const openDivs = (markup.match(/<div\b/g) || []).length;
+  const closeDivs = (markup.match(/<\/div>/g) || []).length;
+  assert.equal(openDivs, closeDivs, 'all opening div tags in DebriefOverlay markup must have matching closing div tags');
 });
 
 test('ReplayPanel includes fold and unfold affordances and updates mini time', () => {

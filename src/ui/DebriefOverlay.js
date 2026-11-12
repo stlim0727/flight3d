@@ -100,6 +100,7 @@ export class DebriefOverlay {
             <div class="debrief-replay-actions">
               <button class="btn" id="debrief-save-replay" hidden><span class="btn-icon" aria-hidden="true">💾</span> <span data-i18n="debrief.saveReplay"></span></button>
               <button class="btn" id="debrief-watch-replay" hidden><span class="btn-icon" aria-hidden="true">▶️</span> <span data-i18n="replay.watch"></span></button>
+            </div>
           </div>
         </div>
 
@@ -112,6 +113,8 @@ export class DebriefOverlay {
 
       <div class="debrief-unfold-actions">
         <button id="debrief-unfold" class="ui-unfold-pill debrief-unfold-pill" type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
+          <span class="unfold-icon" aria-hidden="true">📋</span>
+          <span class="unfold-caption" data-i18n="debrief.title"></span>
           <span class="unfold-glyph" aria-hidden="true">▴</span>
         </button>
         <button id="debrief-fold-camera" class="ui-unfold-pill debrief-camera-pill" type="button" hidden data-i18n-title="change.camera.c" data-i18n-aria-label="change.camera.c">
