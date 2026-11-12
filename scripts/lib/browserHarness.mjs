@@ -125,7 +125,9 @@ export async function withBrowserSession(options = {}, fn) {
 
   try {
     let target = null;
-    for (let i = 0; i < 150; i++) {
+    const maxRetries = gpuAngle === 'swiftshader' ? 600 : 150;
+    const retryDelayMs = 100;
+    for (let i = 0; i < maxRetries; i++) {
       try {
         const pages = await (await fetch(`http://127.0.0.1:${cdpPort}/json`)).json();
         target = pages.find(p => p.type === 'page');
@@ -135,7 +137,7 @@ export async function withBrowserSession(options = {}, fn) {
         }
       } catch { /* starting */ }
       if (target) break;
-      await delay(100);
+      await delay(retryDelayMs);
     }
     if (!target) throw new Error(`Chrome CDP page target not available on port ${cdpPort}. Chrome stderr:\n${chromeStderr}`);
 
