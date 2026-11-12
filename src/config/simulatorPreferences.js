@@ -11,7 +11,7 @@ function validateSimulatorPreferences(value) {
   const result = {};
   if (typeof value.timeOfDay === 'number' && Number.isFinite(value.timeOfDay)
       && value.timeOfDay >= 0 && value.timeOfDay < 24) result.timeOfDay = value.timeOfDay;
-  for (const key of ['audioMuted', 'touchControls', 'gyroEnabled']) {
+  for (const key of ['audioMuted', 'touchControls', 'gyroEnabled', 'autoResetGaze']) {
     if (typeof value[key] === 'boolean') result[key] = value[key];
   }
   if (typeof value.engineVolume === 'number' && Number.isFinite(value.engineVolume)
@@ -133,6 +133,9 @@ export function restoreSimulatorPreferences(sim, preferences, { now = new Date()
   if (shouldRestoreGyro) sim.touchControls?.restoreGyroSettings?.();
   if (preferences.joystick && sim.controls?.hotas) {
     sim.controls.hotas.applyConfig(preferences.joystick);
+  }
+  if (sim.cameraSystem) {
+    sim.cameraSystem.autoResetGaze = preferences.autoResetGaze !== false;
   }
   sim.lobby.demoProfile = preferences.demoProfile;
 }

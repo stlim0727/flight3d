@@ -454,6 +454,23 @@ class SimulatorHudAndBindingsMethods {
       const state = this.touchControls.enabled ? 'state.on' : 'state.off';
       this.showToast(() => t('touch.controls.value', { value: t(state) }));
     });
+    const gazeResetButton = document.getElementById('btn-gaze-reset');
+    if (gazeResetButton && this.cameraSystem) {
+      const syncGazeReset = () => {
+        const enabled = Boolean(this.cameraSystem?.autoResetGaze);
+        gazeResetButton.setAttribute('aria-pressed', String(enabled));
+        bindText(gazeResetButton, () => t('gaze.reset.auto.value', { value: t(enabled ? 'state.on' : 'state.off') }));
+        bindText(gazeResetButton, () => t('gaze.reset.auto.title'), 'title');
+      };
+      gazeResetButton.addEventListener('click', () => {
+        this.cameraSystem.autoResetGaze = !this.cameraSystem.autoResetGaze;
+        saveSimulatorPreferences({ autoResetGaze: this.cameraSystem.autoResetGaze });
+        syncGazeReset();
+        const state = this.cameraSystem.autoResetGaze ? 'state.on' : 'state.off';
+        this.showToast(() => t('gaze.reset.auto.value', { value: t(state) }));
+      });
+      syncGazeReset();
+    }
     document.getElementById('incheon-attribution-chip')?.addEventListener('click', (event) => {
       const aside = event.currentTarget.closest('#incheon-attribution');
       const expanded = aside.classList.toggle('expanded');

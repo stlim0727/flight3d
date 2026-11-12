@@ -159,6 +159,25 @@ test('engine volume persists as a 0..1 level, rejects malformed values and resto
   assert.equal(sim.audio.engineVolume, 0.35);
 });
 
+test('auto gaze reset persists as a camera preference and restores into the camera system', () => {
+  const storage = memoryStorage();
+  saveSimulatorPreferences({ autoResetGaze: false }, storage);
+  assert.equal(loadSimulatorPreferences(storage).autoResetGaze, false);
+  saveSimulatorPreferences({ autoResetGaze: 'false' }, storage);
+  assert.equal(loadSimulatorPreferences(storage).autoResetGaze, false, 'invalid updates must not drop a saved toggle');
+
+  const sim = {
+    lobby: {},
+    cameraSystem: { autoResetGaze: true },
+  };
+  restoreSimulatorPreferences(sim, loadSimulatorPreferences(storage));
+  assert.equal(sim.cameraSystem.autoResetGaze, false);
+
+  const fresh = { lobby: {}, cameraSystem: { autoResetGaze: true } };
+  restoreSimulatorPreferences(fresh, {});
+  assert.equal(fresh.cameraSystem.autoResetGaze, true, 'a first visit keeps the gradual return on');
+});
+
 test('partial joystick saves preserve calibration and reject invalid sibling updates', () => {
   const storage = memoryStorage();
   saveSimulatorPreferences({ joystick: { axesLayout: 'legacy', pitchInverted: true,
