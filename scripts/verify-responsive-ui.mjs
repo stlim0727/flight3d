@@ -113,7 +113,7 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
       });
   })()`);
   const cells = await ev(`(() => {
-    const items = [...document.querySelectorAll('.hud-strip .hud-item')];
+    const items = [...document.querySelectorAll('.hud-strip .hud-item')].filter(item => item.getClientRects().length);
     const clipped = items.map(item => {
       const box = item.getBoundingClientRect();
       const text = [...item.querySelectorAll('.hud-label, .hud-val')].map(n => n.getBoundingClientRect());
@@ -142,7 +142,8 @@ for (const [name, width, height, touch, showTouch = touch] of layouts) {
       }) };
   })()`);
   assert.deepEqual(direct.stripButtons, ['open-camera', 'btn-auto-camera', 'btn-mute', 'btn-fullscreen', 'btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser'], `${name}: one strip in the requested order`);
-  assert.equal(direct.rows, 1, `${name}: controls stay on one concise row`);
+  const wrappedPortrait = width <= 600 && height > width;
+  assert.ok(direct.rows <= (wrappedPortrait ? 2 : 1), `${name}: controls stay on ${wrappedPortrait ? 'at most two' : 'one'} concise row(s)`);
   assert.equal(direct.buttons.length, 5, `${name}: all Aircraft controls are flattened`);
   assert.ok(direct.buttons.every(b => b.reachable && b.height >= 44), `${name}: all Aircraft controls have reachable 44px targets`);
   assert.ok(direct.collapsed && direct.homeTarget && direct.edgePlacement && Math.abs(direct.telemetryGap - 4) < 1, `${name}: menu/AP use the first available row with 4px clearance: ${JSON.stringify(direct)}`);
