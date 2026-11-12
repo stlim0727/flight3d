@@ -73,6 +73,25 @@ After landing, the turnaround requires ground stop below 5 kt on pavement with
 gear down and no failed hull part. It takes 5 s and then reloads all six rails
 and the 510-round magazine; a preset restart also reloads everything.
 
+## Director camera
+
+Camera mode `9` (CINEMATIC DIRECTOR) cuts on an actual rail release instead of
+waiting for a telemetry trend. The sequence is:
+
+1. **Launch** — a wing-mounted action cam holds the F-16 in frame while the
+   round separates and its smoke crosses the nose.
+2. **Follow** — a rigid chase cam rides 16 m behind the missile, so a 700 m/s
+   body stays locked in frame and the smoke trail streams past.
+3. **Bandit POV** — once the missile is within 1.6 km of its target, the eye
+   moves above and beside the bandit's canopy, looking back down the bearing.
+   A proximity-driven telephoto widens the round from a speck into the frame;
+   the shot lingers 1.4 s through detonation before routine shots resume.
+
+If the round is still far after 9 s of follow, routine shots run until the POV
+entry range, and the sequence aborts cleanly if the missile expires or misses.
+Replays keep their own director timeline and never trigger this sequence.
+`CameraSystem.setCombatStateProvider()` supplies the live missile/target arrays.
+
 ## Verification
 
 ```sh

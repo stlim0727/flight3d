@@ -34,7 +34,20 @@ export const CINEMATIC_SHOTS = {
   TOUCHDOWN_SPOTTER: 'touchdown_spotter',
   LEAD_IN_TRACKING: 'lead_in_tracking',
   COCKPIT_HERO: 'cockpit_hero',
+  MISSILE_LAUNCH: 'missile_launch',
+  MISSILE_TRACK: 'missile_track',
+  BANDIT_POV: 'bandit_pov',
 };
+
+/** Scripted cut sequence when the player releases a rail missile. */
+const MISSILE_SEQUENCE_EXIT_SHOT = CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY;
+const MISSILE_LAUNCH_SECONDS = 1.1;
+// The follow cam holds as long as the round is still closing. If it is still
+// far at the cap, routine shots take over until the final cut is in range.
+const MISSILE_TRACK_MAX_SECONDS = 9.0;
+const MISSILE_POV_ENTRY_RANGE_M = 1600;
+const MISSILE_BANDIT_MAX_SECONDS = 6.0;
+const MISSILE_POV_LINGER_SECONDS = 1.4;
 
 const SHOT_LIST_NORMAL = [
   CINEMATIC_SHOTS.TELEPHOTO_FLYBY,
@@ -98,6 +111,11 @@ export class CinematicCameraDirector {
     // Pre-planned replay timeline (when driven from recorded sortie)
     this.replayPlan = null;
     this.replayCursor = 0;
+
+    // Live missile cinematics: launch → follow the missile → bandit POV.
+    this.missileSequence = null;
+    this.knownMissileIds = new Set();
+    this.missileChaseDir = new THREE.Vector3(0, 0, -1);
   }
 
   reset() {
@@ -116,6 +134,8 @@ export class CinematicCameraDirector {
     this.replayCursor = 0;
     this.flybySet = false;
     this.flybyWorldPos.set(0, 0, 0);
+    this.missileSequence = null;
+    this.knownMissileIds.clear();
   }
 
   /**
@@ -409,11 +429,125 @@ export class CinematicCameraDirector {
   }
 
   /**
+   * A rail release is an event, not a telemetry trend: cut immediately into the
+   * launch beat, then follow the missile and finish from the bandit's seat.
+   */
+  detectMissileLaunch(missiles, targets) {
+    if (!Array.isArray(missiles) || !missiles.length) return;
+    for (const missile of missiles) {
+      if (!missile?.alive || this.knownMissileIds.has(missile.id)) continue;
+      this.knownMissileIds.add(missile.id);
+      // A missile already downrange when DIRECTOR is selected is not a launch.
+      if ((missile.age ?? 0) > 2.0) continue;
+      // Replays own their timeline, and one launch sequence plays at a time.
+      if (this.missileSequence || this.replayPlan?.shots?.length) continue;
+      this.beginMissileSequence(missile, targets);
+    }
+  }
+
+  beginMissileSequence(missile, targets) {
+    const target = missile.target?.alive ? missile.target : this.nearestAliveTarget(missile, targets);
+    this.missileSequence = {
+      missile,
+      target,
+      phase: 'launch',
+      phaseTime: 0,
+      missileDeathTime: null,
+      lastMissilePos: missile.position.clone(),
+      lastTargetPos: target ? target.position.clone() : null,
+    };
+    this.missileChaseDir.copy(missile.velocity || new THREE.Vector3(0, 0, -1));
+    if (this.missileChaseDir.lengthSq() < 1e-6) this.missileChaseDir.set(0, 0, -1);
+    else this.missileChaseDir.normalize();
+    this.switchShot(CINEMATIC_SHOTS.MISSILE_LAUNCH);
+  }
+
+  nearestAliveTarget(missile, targets) {
+    let nearest = null;
+    let nearestRangeSq = Infinity;
+    for (const candidate of targets || []) {
+      if (!candidate?.alive || !candidate.position) continue;
+      const rangeSq = candidate.position.distanceToSquared(missile.position);
+      if (rangeSq < nearestRangeSq) {
+        nearest = candidate;
+        nearestRangeSq = rangeSq;
+      }
+    }
+    return nearest;
+  }
+
+  advanceMissileSequence(dt) {
+    const sequence = this.missileSequence;
+    if (!sequence) return;
+    sequence.phaseTime += dt;
+    if (sequence.missile?.position) sequence.lastMissilePos.copy(sequence.missile.position);
+    if (sequence.target?.position) {
+      if (!sequence.lastTargetPos) sequence.lastTargetPos = sequence.target.position.clone();
+      else sequence.lastTargetPos.copy(sequence.target.position);
+    }
+    // The system splices dead missiles out of its live array; keep our own
+    // reference so the shot still has geometry for the final frames.
+    if (sequence.missile && !sequence.missile.alive && sequence.missileDeathTime === null) {
+      sequence.missileDeathTime = 0;
+    }
+    if (sequence.missileDeathTime !== null) sequence.missileDeathTime += dt;
+
+    if (sequence.phase === 'launch') {
+      if (sequence.phaseTime >= MISSILE_LAUNCH_SECONDS) this.setMissileSequencePhase('track');
+    } else if (sequence.phase === 'track') {
+      const range = sequence.target && sequence.lastTargetPos
+        ? sequence.lastMissilePos.distanceTo(sequence.lastTargetPos)
+        : Infinity;
+      if (sequence.missileDeathTime !== null) {
+        this.endMissileSequence();
+      } else if (range <= MISSILE_POV_ENTRY_RANGE_M) {
+        this.setMissileSequencePhase('bandit');
+      } else if (sequence.phaseTime >= MISSILE_TRACK_MAX_SECONDS) {
+        if (sequence.target && sequence.lastTargetPos) this.setMissileSequencePhase('approach');
+        else this.endMissileSequence();
+      }
+    } else if (sequence.phase === 'approach') {
+      if (sequence.missileDeathTime !== null || !sequence.target || !sequence.lastTargetPos) {
+        this.endMissileSequence();
+        return;
+      }
+      if (sequence.lastMissilePos.distanceTo(sequence.lastTargetPos) <= MISSILE_POV_ENTRY_RANGE_M) {
+        this.setMissileSequencePhase('bandit');
+      }
+    } else if (sequence.phase === 'bandit') {
+      const expired = sequence.missileDeathTime !== null
+        ? sequence.missileDeathTime >= MISSILE_POV_LINGER_SECONDS
+        : sequence.phaseTime >= MISSILE_BANDIT_MAX_SECONDS;
+      if (expired) this.endMissileSequence();
+    }
+  }
+
+  setMissileSequencePhase(phase) {
+    this.missileSequence.phase = phase;
+    this.missileSequence.phaseTime = 0;
+    if (phase === 'track') this.switchShot(CINEMATIC_SHOTS.MISSILE_TRACK);
+    else if (phase === 'bandit') this.switchShot(CINEMATIC_SHOTS.BANDIT_POV);
+    else this.switchShot(MISSILE_SEQUENCE_EXIT_SHOT);
+  }
+
+  endMissileSequence() {
+    this.missileSequence = null;
+    this.switchShot(MISSILE_SEQUENCE_EXIT_SHOT);
+  }
+
+  /**
    * Evaluate whether a shot transition should occur right now.
    */
   evaluateShotCut(flightState, dt) {
     this.shotTimer += dt;
     this.totalTimer += dt;
+
+    // A launch sequence owns the cut rhythm through launch, follow and the
+    // final bandit POV. While the missile is still closing, routine shots run.
+    if (this.missileSequence) {
+      this.advanceMissileSequence(dt);
+      if (!this.missileSequence || this.missileSequence.phase !== 'approach') return;
+    }
 
     // If driven by a replay plan, cut when the plan timeline advances
     if (this.replayPlan?.shots?.length) {
@@ -501,6 +635,8 @@ export class CinematicCameraDirector {
     aircraftMesh,
     flightState = {},
     queryGroundHeight = this.queryGroundHeight,
+    missiles = [],
+    targets = [],
   }) {
     if (!camera || !planePos || !planeQuat) return false;
     const safeDt = Math.min(2.0, Math.max(0.0001, dt ?? 0.016));
@@ -513,6 +649,10 @@ export class CinematicCameraDirector {
       this.prevPlanePosInitialized = true;
     }
     this.prevPlanePos.copy(planePos);
+
+    // A fresh rail release cuts to its own three-beat sequence before the
+    // routine shot grammar gets a chance to choose a cut.
+    this.detectMissileLaunch(missiles, targets);
 
     // Evaluate cut and timing
     this.evaluateShotCut(flightState, safeDt);
@@ -789,6 +929,83 @@ export class CinematicCameraDirector {
 
         targetLook.copy(planePos).addScaledVector(up, 1.0);
         targetUp.copy(new THREE.Vector3(0, 1, 0)).addScaledVector(up, 0.15).normalize();
+        break;
+      }
+
+      case CINEMATIC_SHOTS.MISSILE_LAUNCH: {
+        // Wing-mounted action cam: the airframe stays rigid in frame while the
+        // missile separates from its rail and tracks away.
+        isRigidMount = true;
+        targetFov = 55.0;
+        const missilePos = this.missileSequence?.lastMissilePos ?? planePos;
+        const stationSide = missilePos.clone().sub(planePos).dot(right) >= 0 ? 1 : -1;
+        targetCamPos.copy(planePos)
+          .addScaledVector(right, stationSide * 11.0)
+          .addScaledVector(up, 3.2)
+          .addScaledVector(forward, -5.0);
+        // Hold the aircraft in frame instead of chasing the round away: the
+        // missile crosses the nose, so its smoke reads against the jet.
+        targetLook.copy(planePos).addScaledVector(up, 0.8).addScaledVector(forward, 9.0);
+        targetUp.copy(up);
+        break;
+      }
+
+      case CINEMATIC_SHOTS.MISSILE_TRACK: {
+        // Rigid follow cam: the eye rides the missile's own frame so a 700 m/s
+        // body stays locked in frame instead of lagging behind the dolly.
+        isRigidMount = true;
+        targetFov = 62.0;
+        const sequence = this.missileSequence;
+        const missilePos = sequence?.lastMissilePos ?? planePos;
+        const velocityDir = sequence?.missile?.velocity
+          ? sequence.missile.velocity.clone().normalize()
+          : new THREE.Vector3(0, 0, -1);
+        if (velocityDir.lengthSq() > 1e-6) {
+          this.missileChaseDir.lerp(velocityDir, 1 - Math.exp(-safeDt * 8.0)).normalize();
+        }
+        const dir = this.missileChaseDir;
+        const side = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
+        if (side.lengthSq() < 1e-4) side.set(1, 0, 0);
+        else side.normalize();
+        targetCamPos.copy(missilePos)
+          .addScaledVector(dir, -16.0)
+          .addScaledVector(side, 3.0)
+          .addScaledVector(new THREE.Vector3(0, 1, 0), 3.5);
+        targetLook.copy(missilePos).addScaledVector(dir, 5.0);
+        targetUp.set(0, 1, 0);
+        break;
+      }
+
+      case CINEMATIC_SHOTS.BANDIT_POV: {
+        // Head-out-of-canopy eye of the targeted bandit watching the missile
+        // close. The eye sits above and beside the canopy so the tail fin does
+        // not cover the inbound round.
+        isRigidMount = true;
+        const sequence = this.missileSequence;
+        const targetPos = sequence?.lastTargetPos ?? sequence?.target?.position ?? planePos;
+        const missilePos = sequence?.lastMissilePos ?? targetPos;
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        const bearing = missilePos.clone().sub(targetPos);
+        bearing.y = 0;
+        if (bearing.lengthSq() > 1) bearing.normalize();
+        const side = new THREE.Vector3(-bearing.z, 0, bearing.x);
+        targetCamPos.copy(targetPos)
+          .addScaledVector(worldUp, 1.35)
+          .addScaledVector(side, 2.4);
+
+        // Telephoto the last kilometres: the round stays readable as it grows
+        // from a speck into the frame instead of ending the beat as a dot.
+        const range = missilePos.distanceTo(targetPos);
+        targetFov = THREE.MathUtils.clamp(58.0 - (MISSILE_POV_ENTRY_RANGE_M - range) * 0.02, 28.0, 58.0);
+
+        // Proximity shake rises as the missile closes on the bandit.
+        const proximity = THREE.MathUtils.clamp(1 - range / MISSILE_POV_ENTRY_RANGE_M, 0, 1);
+        const shake = proximity * 0.05;
+        targetCamPos.x += Math.sin(this.totalTimer * 47.0) * shake;
+        targetCamPos.y += Math.cos(this.totalTimer * 61.0) * shake;
+
+        targetLook.copy(missilePos);
+        targetUp.copy(worldUp);
         break;
       }
 

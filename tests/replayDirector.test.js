@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { Vector3, Quaternion, Object3D } from 'three';
 import { ReplayDirector } from '../src/director/ReplayDirector.js';
 import { RenderPose } from '../src/core/RenderPose.js';
-import { sampleTrack, trackDuration } from '../src/replay/TrackSampler.js';
+import { sampleTrack, sampleRemote, trackDuration } from '../src/replay/TrackSampler.js';
 import { FLOW } from '../src/ui/GameFlowController.js';
 
-test('room tracks cannot silently play as solo before Task 3', async () => {
-  const source = track(); source.remotes = [{ samples: source.samples }];
+test('invalid remote aircraft is rejected before preparing the replay scene', async () => {
+  const source = track(); source.remotes = [{ aircraft: 'unknown', samples: source.samples }];
   const sim = fakeSim();
   assert.equal(await new ReplayDirector(sim).load(source), false);
   assert.equal(sim.calls.fly, 0);
@@ -97,6 +97,85 @@ function poseOf(sim) {
     qx: sim.quaternion.x, qw: sim.quaternion.w,
     group: [sim.aircraft.group.position.x, sim.aircraft.group.position.y, sim.aircraft.group.position.z] };
 }
+
+function roomFixture() {
+  const sim = fakeSim(), source = track(15, 1), visuals = [], effects = [];
+  const state = (segment = 0, crashed = false, visible = true) => ({ segment, crashed, visible, held: false, stale: false });
+  source.metadata.room = { timeline: [
+    { timeSec: 0, states: [state(), state()] },
+    { timeSec: 2, states: [state(), state(0, true)] },
+    { timeSec: 3, states: [state(), state(0, true, false)] },
+    { timeSec: 4, states: [state(), state(1)] },
+    { timeSec: 5, states: [{ ...state(0, true), crash: { type: 'WATER' } }, state(1)] },
+    { timeSec: 7, states: [state(1), state(1)] },
+    { timeSec: 8, states: [{ ...state(1, true), crash: { type: 'SHIP' } }, state(1)] },
+    { timeSec: 10, states: [state(1, true, false), state(1, false, false)] },
+    { timeSec: 11, states: [state(2), state(1)] },
+  ] };
+  source.remotes = [{ aircraft: 'F16', name: 'Wing', samples: source.samples.map(s => ({ ...s,
+    x: s.x + 60, visible: true, crashed: s.timeSec >= 2 && s.timeSec < 4, segment: s.timeSec < 4 ? 0 : 1 })) }];
+  const director = new ReplayDirector(sim, () => {}, {
+    createRemote() {
+      const visual = { group: new Object3D(), model: { group: new Object3D() }, ready: Promise.resolve(),
+        indicator: { hide() {} }, animate(value) { this.configuration = value; }, dispose() { this.disposed = true; } };
+      visual.group.add(visual.model.group); visuals.push(visual); return visual;
+    },
+    createEffects() {
+      const effect = { apply(event, time, options) { Object.assign(this, { event, time, options }); },
+        dispose() { this.disposed = true; } };
+      effects.push(effect); return effect;
+    },
+  });
+  return { sim, source, director, visuals, effects };
+}
+
+test('room playback renders remote poses, hides gaps/crashes and restores repeated respawns on seek', async () => {
+  const f = roomFixture();
+  assert.equal(await f.director.load(f.source), true);
+  assert.equal(f.visuals.length, 1);
+  f.director.seek(1);
+  assert.equal(f.visuals[0].group.visible, true);
+  assert.equal(f.visuals[0].group.position.x, 70);
+  f.director.seek(2.5);
+  assert.equal(f.visuals[0].group.visible, false);
+  assert.equal(f.effects[0].event.timeSec, 2);
+  f.director.seek(3.5); assert.equal(f.effects[0].options.visible, false);
+  f.director.seek(4.5); assert.equal(f.visuals[0].group.visible, true);
+  f.director.seek(5.5); assert.equal(f.sim.aircraft.group.visible, false);
+  assert.equal(f.effects[1].event.type, 'WATER');
+  f.director.seek(7.5); assert.equal(f.sim.aircraft.group.visible, true);
+  f.director.seek(8.5); assert.equal(f.effects[1].event.type, 'SHIP');
+  f.director.seek(10.5);
+  assert.equal(f.visuals[0].group.visible, false); assert.equal(f.sim.aircraft.group.visible, false);
+  f.director.seek(1); assert.equal(f.sim.aircraft.group.visible, true); assert.equal(f.effects[1].event, null);
+  f.director.stop();
+  assert.ok(f.visuals.every(v => v.disposed)); assert.ok(f.effects.every(e => e.disposed));
+  assert.equal(f.director.remotes.length, 0); assert.equal(f.director.roomEffects, null);
+  assert.equal(f.sim.aircraft.group.visible, true);
+});
+
+test('room playback advances pose and effect clocks together at 3x and freezes both on pause', async () => {
+  const f = roomFixture(); await f.director.load(f.source);
+  f.director.play(); f.director.setSpeed(3); f.director.update(0.5);
+  assert.equal(f.director.progressSec, 1.5);
+  assert.equal(f.effects[0].time, 1.5);
+  f.director.pause(); f.director.update(20);
+  assert.equal(f.effects[0].time, 1.5);
+  assert.equal(f.visuals[0].group.position.x, sampleRemote(f.source, 0, 1.5).x);
+  f.director.stop();
+});
+
+test('failed remote loading disposes partially created models and permits a later solo load', async () => {
+  const f = roomFixture();
+  f.director.createRemote = () => {
+    const visual = { ready: Promise.reject(new Error('asset failed')), dispose() { this.disposed = true; } };
+    f.visuals.push(visual); return visual;
+  };
+  await assert.rejects(f.director.load(f.source), /asset failed/);
+  assert.equal(f.visuals[0].disposed, true); assert.equal(f.director.loading, false);
+  assert.equal(f.director.remotes.length, 0);
+  assert.equal(await f.director.load(track()), true);
+});
 
 test('load rebuilds the recorded scenario and arms the first sample without flying a new sortie', async () => {
   const sim = fakeSim();

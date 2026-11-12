@@ -350,6 +350,10 @@ class FlightSimulator {
     this.cannonCombatView = new CannonCombatView(this.scene, this.missileCombat);
     this.rearmSystem = new RearmSystem();
     this._gunAudioActive = false;
+    this.cameraSystem.setCombatStateProvider(() => ({
+      missiles: this.missileCombat.missiles,
+      targets: this.missileCombat.targets,
+    }));
     this._combatTerrainHeight = (x, z) => this.currentTerrain?.getHeight(x, z) ?? 0;
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
     this.pilotPhysiologyFx = new PilotPhysiologyFx(this.container);
@@ -1432,7 +1436,7 @@ class FlightSimulator {
     this.sky.updateSun(this.position, this.camera.position);
     this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     if (!this.gameFlow.isPhysicsFrozen()) {
-      this.explosionSystem.update(frameDelta);
+      if (!this.replayDirector.roomEffects) this.explosionSystem.update(frameDelta);
       this.tireSmokeSystem.update(frameDelta);
     }
 
@@ -1444,7 +1448,8 @@ class FlightSimulator {
         this.aircraft.cockpit.group.visible = false;
       }
     }
-    this.contactShadow.setEnabled(!isCockpit && this.renderQuality === 'ultraLow');
+    this.contactShadow.setEnabled(!isCockpit && this.renderQuality === 'ultraLow'
+      && (!this.replayDirector.active || this.aircraft.group.visible));
     const { x: shadowX, z: shadowZ } = this.aircraft.group.position;
     this.contactShadow.update(this.aircraft.group.position, this.aircraft.group.quaternion,
       contactShadowSurfaceHeight(this.currentTerrain, this.water, shadowX, shadowZ),
