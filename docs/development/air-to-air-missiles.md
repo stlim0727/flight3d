@@ -13,7 +13,8 @@ damage model remain Sprint 2/3 work.
 | Cycle the selected bandit | `N` | `TGT` |
 
 `Space` stays the wheel-brake key. Firing is refused on the ground and when all
-six rails are empty. The launcher releases rails in the order
+six rails are empty. Firing before lock is a Maddog launch: the missile flies
+ballistically until its seeker picks up a bandit inside the 65° gimbal. The launcher releases rails in the order
 `STA 1 → 9 → 2 → 8 → 3 → 7` (4× AIM-9X then 2× AIM-120C). A preset restart
 reloads every rail.
 

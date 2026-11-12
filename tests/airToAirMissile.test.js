@@ -123,6 +123,26 @@ test('3D TPN converges on a crossing target and the proximity fuse kills it', ()
   assert.equal(system.missiles.length, 0, 'spent missile left the scene');
 });
 
+test('an unlocked Maddog launch acquires a target inside the seeker gimbal', () => {
+  const system = new AirToAirMissileSystem();
+  const world = airborneWorld();
+  const target = new BanditTarget({
+    callsign: 'BANDIT 1',
+    position: new Vector3(0, 3100, -4500),
+    velocity: new Vector3(60, 0, 0),
+  });
+  system.addTarget(target);
+  assert.equal(system.lockedTarget, null);
+  const missile = system.fire(world);
+  assert.ok(missile);
+  assert.equal(missile.target, null);
+
+  const events = step(system, world, 14);
+  assert.equal(missile.target, target);
+  assert.equal(system.splashCount, 1);
+  assert.ok(events.some(event => event.type === 'kill'));
+});
+
 test('rocket thrust accelerates during burn, then drag decelerates the airframe', () => {
   const system = new AirToAirMissileSystem();
   const world = airborneWorld({ velocity: new Vector3(0, 0, -280) });

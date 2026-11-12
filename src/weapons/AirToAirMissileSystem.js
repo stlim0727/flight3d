@@ -264,7 +264,6 @@ export class AirToAirMissileSystem {
     };
     this.loaded[stationIndex] = false;
     this.missiles.push(missile);
-    this._events.push({ type: 'launch', missile, stationIndex, stationId: station.id });
     return missile;
   }
 
@@ -416,6 +415,7 @@ export class AirToAirMissileSystem {
       this._accel.addScaledVector(missile.velocity, -dragAccel / speed);
     }
 
+    if (!missile.target?.alive) this._acquireTarget(missile);
     const target = missile.target;
     if (target?.alive) this._applyGuidance(missile, target, spec, dt);
 
@@ -446,6 +446,27 @@ export class AirToAirMissileSystem {
         position: missile.position.clone(), velocity: missile.velocity.clone(), surface: true,
       });
     }
+  }
+
+  /** Maddog: an unlocked launch can still acquire a target inside the seeker
+   * gimbal once the missile has separated from the rail. */
+  _acquireTarget(missile) {
+    const speed = missile.velocity.length();
+    if (speed < 1e-3) return;
+    this._dir.copy(missile.velocity).divideScalar(speed);
+    let best = null;
+    let bestRange = Infinity;
+    for (const candidate of this.targets) {
+      if (!candidate.alive) continue;
+      this._los.copy(candidate.position).sub(missile.position);
+      const range = this._los.length();
+      if (range < 1 || range > missile.spec.seekerRangeM || range >= bestRange) continue;
+      this._rhat.copy(this._los).divideScalar(range);
+      if (this._dir.dot(this._rhat) < Math.cos(THREE.MathUtils.degToRad(missile.spec.gimbalDeg))) continue;
+      best = candidate;
+      bestRange = range;
+    }
+    missile.target = best;
   }
 
   _applyGuidance(missile, target, spec, dt) {
