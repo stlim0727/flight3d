@@ -411,19 +411,12 @@ export class SkyAtmosphere {
    */
   setAirport(airportId) {
     this.activeAirport = airportId;
-    if (airportId === 'lukla') {
-      // Elevate fair-weather cloud deck high above Himalayan peaks (base ~6,200m / 20,300 FT)
-      this.cloudsGroup.position.y = 3400;
-      this.cloudsGroup.visible = true;
-    } else if (airportId === 'neon') {
-      this.cloudsGroup.position.y = 0;
-      this.cloudsGroup.visible = false;
-      this.sky.visible = false;
-    } else {
-      this.cloudsGroup.position.y = 0;
-      this.cloudsGroup.visible = true;
-      this.sky.visible = true;
-    }
+    // Only Neon hides the scattering sky; every other region must restore it (#633).
+    const isNeon = airportId === 'neon';
+    this.sky.visible = !isNeon;
+    this.cloudsGroup.visible = !isNeon;
+    // Elevate fair-weather cloud deck high above Himalayan peaks (base ~6,200m / 20,300 FT)
+    this.cloudsGroup.position.y = airportId === 'lukla' ? 3400 : 0;
     this.updateSun();
   }
 }

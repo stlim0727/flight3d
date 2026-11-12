@@ -106,6 +106,17 @@ describe('SkyAtmosphere (Aerial Perspective Height Fog & Tone Mapping)', () => {
     sky.cloudLayer.dispose();
   });
 
+  it('shows the daytime sky again after leaving Neon Metropolis for any region (#633)', () => {
+    const sky = new SkyAtmosphere(new THREE.Scene());
+    for (const airport of ['lukla', 'coastal', 'incheon', 'valley']) {
+      sky.setAirport('neon');
+      assert.equal(sky.sky.visible, false);
+      sky.setAirport(airport);
+      assert.equal(sky.sky.visible, true, `${airport} must restore the sky hidden by Neon`);
+    }
+    sky.cloudLayer.dispose();
+  });
+
   it('strengthens Lukla daytime sun while retaining weather attenuation and night lighting', () => {
     const sky = new SkyAtmosphere(new THREE.Scene());
     sky.setAirport('coastal');
