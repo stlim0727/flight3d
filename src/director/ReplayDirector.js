@@ -1,4 +1,5 @@
 import { sampleTrack, trackDuration, findSpan, STATE_FIELDS, OBJECT_FIELDS } from '../replay/TrackSampler.js';
+import { CombatReplayPlayback } from '../replay/CombatReplayPlayback.js';
 import { REPLAY_SPEEDS } from '../replay/replayConfig.js';
 import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
 import { isScenarioAvailable } from '../config/scenarioRegistry.js';
@@ -25,6 +26,7 @@ export class ReplayDirector {
     this._seek = { hint: 0 };
     this._telemetry = null;
     this._view = null;
+    this._combat = null;
   }
 
   /**
@@ -66,6 +68,7 @@ export class ReplayDirector {
     if (Number.isFinite(timeOfDay)) sim.setTimeOfDay(timeOfDay, { persist: false, userChoice: false });
     if (sim.gameFlow.state !== FLOW.FLIGHT) {
       this._view = null;
+      this._combat?.stop();
       return false;
     }
     // This sortie exists to host the replay; it is not a flight the pilot flew.
@@ -93,6 +96,12 @@ export class ReplayDirector {
     this._view = view;
     sim.controls.setAircraftControlsDisabled(true);
     this.active = true;
+    // Combat is a separate visual track: it never re-simulates guidance, so a
+    // seek is instant and speed changes cannot alter the recorded outcome.
+    this._combat ??= new CombatReplayPlayback(sim);
+    this._combat.load(track.combat);
+    this._combat.seek(0);
+    this._applyCombatLoadout();
     this._applyPose();
     this.reseed();
     this.onChange();
@@ -124,6 +133,8 @@ export class ReplayDirector {
     const time = Number(timeSec);
     this.progressSec = Number.isFinite(time) ? Math.max(0, Math.min(this.durationSec, time)) : 0;
     this._applyPose();
+    this._combat?.seek(this.progressSec);
+    this._applyCombatLoadout();
     this.reseed();
     this.onChange();
     return this.progressSec;
@@ -170,6 +181,8 @@ export class ReplayDirector {
       if (this.progressSec >= this.durationSec) this.pause();
     }
     this._applyPose();
+    this._combat?.update(this.paused ? 0 : dt * this.speed, this.progressSec);
+    this._applyCombatLoadout();
     // Replay owns the rendered pose too: physics interpolation has no steps to blend.
     this.sim.renderPose.reset(this.sim.position, this.sim.quaternion);
     // Physics is not stepping, so the staged wreckage advances on the frame clock instead.
@@ -198,6 +211,8 @@ export class ReplayDirector {
     if (this._view) this._restoreView(this._view);
     this._view = null;
     this._telemetry = null;
+    this._combat?.stop();
+    this.sim.aircraft?.setMissileLoadout?.([true, true, true, true, true, true]);
     this.track = null;
     this.entryId = null;
     this.progressSec = 0;
@@ -220,6 +235,18 @@ export class ReplayDirector {
     // AUTO and DIRECTOR pick their own shots; a scrubbed pose must not be argued with.
     sim.cameraSystem.userModeSelected = true;
     sim.updateFlightDisplays(true);
+  }
+
+  combatHudState() {
+    return this._combat?.getHudState?.(this.sim.position) ?? null;
+  }
+
+  /** Keep the replay host's rail count in step with the recorded loadout mask. */
+  _applyCombatLoadout() {
+    const mask = this._combat?.state?.rails;
+    if (mask === undefined) return;
+    const loadout = Array.from({ length: 6 }, (_, index) => Boolean(mask & (1 << index)));
+    this.sim.aircraft?.setMissileLoadout?.(loadout);
   }
 
   _applyPose() {

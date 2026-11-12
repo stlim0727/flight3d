@@ -1,6 +1,7 @@
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { REPLAY_INTERVAL_SEC, REPLAY_INTERVAL_LADDER, REPLAY_BUDGET, REPLAY_MIN_DURATION_SEC,
-  maxSamplesFor } from '../replay/replayConfig.js';
+  HEADER_BYTES, RECORD_BYTES, decodedByteBudget } from '../replay/replayConfig.js';
+import { combatByteLength } from '../replay/ReplayCodec.js';
 
 // Observations only: time is integrated in simulation seconds, never wall time.
 const REQUIRED = ['x', 'z', 'altitudeFt', 'iasKnots', 'gForce', 'pitchDeg', 'rollDeg', 'headingDeg'];
@@ -30,13 +31,18 @@ export class ReplayRecorder {
     this.track = null;
     this.gearIds = [];
     this.bodyIds = [];
+    this.combat = null;
+    this._combatTargets = new Map();
+    this._nextBanditSample = 0;
+    this._nextMissileSample = 0;
     this._measureMetadata();
   }
 
   /** @param quaternion the authoritative body attitude; a pose track cannot be rebuilt from attitude angles. */
-  update(dt, telemetry, quaternion) {
+  update(dt, telemetry, quaternion, combat = null) {
     if (!this.active || !Number.isFinite(dt) || dt <= 0) return;
     this.elapsed += dt;
+    this._observeCombat(combat);
     if (!telemetry || !REQUIRED.every(key => Number.isFinite(telemetry[key]))) return;
     if (!isQuaternion(quaternion)) return;
     this.validDuration += dt;
@@ -87,9 +93,139 @@ export class ReplayRecorder {
     })).length;
   }
 
-  /** Frames that still fit the per-entry budget once the metadata is paid for. */
+  /** Frames that still fit the per-entry budget once metadata and combat are paid for. */
   capacity() {
-    return maxSamplesFor(this.maxBase64Bytes, this.metadataBytes);
+    const room = decodedByteBudget(this.maxBase64Bytes) - HEADER_BYTES - this.metadataBytes
+      - (this.combat ? combatByteLength(this.combat) : 0);
+    return Math.max(0, Math.floor(room / RECORD_BYTES));
+  }
+
+  /**
+   * Sample the air-to-air scene independently of the thinned pose track. Bandits
+   * are slow enough for 2 Hz; missiles need 20 Hz to keep linear interpolation
+   * visually smooth and to preserve the launch-to-fuse span.
+   */
+  _observeCombat(combat) {
+    if (!combat) return;
+    const targets = Array.isArray(combat.targets) ? combat.targets : [];
+    const missiles = Array.isArray(combat.missiles) ? combat.missiles.filter(missile => missile.alive) : [];
+    if (!targets.length && !missiles.length) return;
+
+    if (this.elapsed + 1e-9 >= this._nextBanditSample) {
+      const document = this._ensureCombat();
+      const rails = Array.isArray(combat.loaded)
+        ? combat.loaded.reduce((mask, loaded, index) => (loaded ? mask | (1 << index) : mask), 0)
+        : 0b111111;
+      const sample = { timeSec: this.elapsed, rails, targets: [] };
+      for (const target of targets) {
+        const slot = this._combatSlot(target);
+        const vx = target.velocity?.x ?? 0;
+        const vz = target.velocity?.z ?? 0;
+        sample.targets[slot] = {
+          x: target.position.x, y: target.position.y, z: target.position.z,
+          headingRad: Math.atan2(vx, -vz),
+          alive: target.alive !== false,
+        };
+      }
+      for (let slot = 0; slot < document.targets.length; slot++) {
+        sample.targets[slot] ??= { x: 0, y: 0, z: 0, headingRad: 0, alive: false };
+      }
+      document.banditSamples.push(sample);
+      this._nextBanditSample = this.elapsed + document.banditIntervalSec;
+    }
+
+    if (!missiles.length) {
+      this._nextMissileSample = this.elapsed;
+      return;
+    }
+    if (this.elapsed + 1e-9 < this._nextMissileSample) return;
+    const document = this._ensureCombat();
+    for (const missile of missiles) {
+      document.missileSamples.push({
+        timeSec: this.elapsed,
+        id: missile.id & 255,
+        typeId: missile.typeId,
+        x: missile.position.x, y: missile.position.y, z: missile.position.z,
+        quat: [missile.quaternion.x, missile.quaternion.y, missile.quaternion.z, missile.quaternion.w],
+        powered: missile.propellant > 0,
+      });
+    }
+    this._nextMissileSample = this.elapsed + document.missileIntervalSec;
+  }
+
+  _ensureCombat() {
+    if (this.combat) return this.combat;
+    this.combat = {
+      banditIntervalSec: 0.5,
+      missileIntervalSec: 0.05,
+      targets: [],
+      banditSamples: [],
+      missileSamples: [],
+      events: [],
+    };
+    return this.combat;
+  }
+
+  /** Callsigns live once per target; older samples are padded when a slot is added late. */
+  _combatSlot(target) {
+    const known = this._combatTargets.get(target.id);
+    if (known !== undefined) return known;
+    const document = this._ensureCombat();
+    const slot = document.targets.length;
+    document.targets.push({ id: target.id, callsign: target.callsign || `TARGET ${slot + 1}` });
+    this._combatTargets.set(target.id, slot);
+    for (const sample of document.banditSamples) {
+      while (sample.targets.length < document.targets.length) {
+        sample.targets.push({ x: 0, y: 0, z: 0, headingRad: 0, alive: false });
+      }
+    }
+    return slot;
+  }
+
+  /**
+   * Record a live combat event at the current sortie time. Detonation markers
+   * drive replay explosions and remove missiles; expiry markers only remove.
+   */
+  recordCombatEvent(event) {
+    if (!this.active || !event) return;
+    if (event.type !== 'detonation' && event.type !== 'expire') return;
+    const document = this._ensureCombat();
+    const position = event.position || event.missile?.position;
+    const velocity = event.velocity || event.missile?.velocity;
+    document.events.push({
+      timeSec: this.elapsed,
+      kind: event.type,
+      missileId: (event.missile?.id ?? 0) & 255,
+      surface: Boolean(event.surface),
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      vx: velocity?.x ?? 0,
+      vy: velocity?.y ?? 0,
+      vz: velocity?.z ?? 0,
+    });
+  }
+
+  /** Keep the saved/auto entry inside the per-entry budget by thinning combat before pose. */
+  _trimCombat(poseSamples = this.samples.length) {
+    if (!this.combat) return;
+    const poseBytes = HEADER_BYTES + this.metadataBytes + poseSamples * RECORD_BYTES;
+    const available = decodedByteBudget(this.maxBase64Bytes) - poseBytes;
+    while (combatByteLength(this.combat) > available) {
+      const document = this.combat;
+      if (document.missileSamples.length > 1) {
+        document.missileSamples = document.missileSamples.filter((_, index) => index % 2 === 0);
+        document.missileIntervalSec *= 2;
+      } else if (document.banditSamples.length > 1) {
+        document.banditSamples = document.banditSamples.filter((_, index) => index % 2 === 0);
+        document.banditIntervalSec *= 2;
+      } else if (document.events.length) {
+        document.events.length = 0;
+      } else {
+        this.combat = null;
+        return;
+      }
+    }
   }
 
   /** The byte budget, not a sample count, decides when a track is thinned or refused. */
@@ -128,6 +264,7 @@ export class ReplayRecorder {
       // At the final rung retain the endpoint even when the flight is too long to save.
       if (this.samples.at(-1) !== this.latest) this.samples[this.samples.length - 1] = this.latest;
     }
+    this._trimCombat(this.samples.length);
     this.track = {
       intervalSec: this.interval,
       durationSec: this.elapsed,
@@ -137,6 +274,7 @@ export class ReplayRecorder {
       gearIds: this.gearIds,
       bodyIds: this.bodyIds,
     };
+    if (this.combat) this.track.combat = this.combat;
     return this.track;
   }
 }

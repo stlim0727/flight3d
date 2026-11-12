@@ -1,6 +1,11 @@
 # Changelog
 
 ## [Unreleased]
+- **fix(replay):** show F-16 missile launches, bandit targets and bursts in recorded replays
+  - Replay tracks now carry a compact combat section (codec v4) with 2 Hz bandit poses, 20 Hz missile poses, detonation/expiry markers and the rail loadout mask.
+  - Playback interpolates the recorded combat state, stages each detonation once, and restores the fired-rail count and time-correct splash count; it never re-simulates guidance, so seeks and speed changes cannot alter the outcome.
+  - Replay HUD, cockpit and chase overlays show recorded bandits as target designators.
+  - B737/C172 and older v1–v3 tracks remain readable; combat samples are thinned before pose samples when the entry budget is tight.
 - **feat(combat):** F-16 AIM-9X/AIM-120C rail missiles, TPN guidance, HUD lock and RWR (#612 Sprint 1)
   - Six procedural rail missiles (4× AIM-9X, 2× AIM-120C) mounted on the F-16 wingtip and underwing stations; fired stations hide their mesh and reload on preset restart.
   - 120 Hz continuous rocket mass/thrust, atmospheric drag, gravity, 3D true proportional navigation, seeker gimbal limit and closest-approach proximity fuse.

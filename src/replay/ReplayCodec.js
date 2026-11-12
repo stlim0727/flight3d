@@ -3,6 +3,11 @@ import { RECORD_BYTES, REMOTE_RECORD_BYTES, HEADER_BYTES, REPLAY_INTERVAL_SEC, f
 export const REPLAY_TRACK_VERSION = 2;
 // Multiplayer room tracks only: solo flights stay v2 so older builds can still import them.
 export const ROOM_TRACK_VERSION = 3;
+// Combat tracks append a compact missile/bandit section after the pose frames.
+export const COMBAT_TRACK_VERSION = 4;
+export const COMBAT_SECTION_HEADER_BYTES = 18;
+export const COMBAT_EVENT_BYTES = 32;
+export const MISSILE_TYPE_IDS = Object.freeze(['AIM9X', 'AIM120C']);
 export const REPLAY_MAGIC = 'F3DR1';
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
@@ -36,13 +41,14 @@ function finite(value) {
 
 const ACCESSORS = Object.freeze({
   f32: ['setFloat32', 'getFloat32'], i8: ['setInt8', 'getInt8'], u8: ['setUint8', 'getUint8'],
-  i16: ['setInt16', 'getInt16'], u16: ['setUint16', 'getUint16'],
+  i16: ['setInt16', 'getInt16'], u16: ['setUint16', 'getUint16'], u32: ['setUint32', 'getUint32'],
 });
 
 function clampQuantized(value, type) {
   if (type === 'i8') return Math.max(-128, Math.min(127, Math.round(value)));
   if (type === 'u8') return Math.max(0, Math.min(255, Math.round(value)));
   if (type === 'i16') return Math.max(-32768, Math.min(32767, Math.round(value)));
+  if (type === 'u32') return Math.max(0, Math.min(0xffffffff, Math.round(value)));
   return Math.max(0, Math.min(65535, Math.round(value)));
 }
 
@@ -239,7 +245,32 @@ function encodedMetadata(track) {
 
 export function decodedByteLength(track) {
   const samples = track?.samples || [];
-  return HEADER_BYTES + encodedMetadata(track).length + samples.length * frameBytes(remoteTracks(track).length);
+  const combat = hasCombat(track?.combat) ? track.combat : null;
+  return HEADER_BYTES + encodedMetadata(track).length + samples.length * frameBytes(remoteTracks(track).length)
+    + (combat ? combatByteLength(combat) : 0);
+}
+
+/** Bytes one combat section costs: length prefix, fixed header, targets, samples and events. */
+export function combatByteLength(combat) {
+  if (!combat) return 0;
+  const targets = Array.isArray(combat.targets) ? combat.targets : [];
+  const targetBytes = targets.reduce((sum, target) => {
+    const callsign = String(target?.callsign || '').slice(0, 64);
+    return sum + 1 + encoder.encode(callsign).length;
+  }, 0);
+  const banditBytes = (combat.banditSamples?.length || 0) * (5 + targets.length * 15);
+  const missileBytes = (combat.missileSamples?.length || 0) * 26;
+  const eventBytes = (combat.events?.length || 0) * COMBAT_EVENT_BYTES;
+  return 4 + COMBAT_SECTION_HEADER_BYTES + targetBytes + banditBytes + missileBytes + eventBytes;
+}
+
+function hasCombat(combat) {
+  return Boolean(combat
+    && Array.isArray(combat.targets)
+    && Array.isArray(combat.banditSamples)
+    && Array.isArray(combat.missileSamples)
+    && Array.isArray(combat.events)
+    && (combat.banditSamples.length || combat.missileSamples.length || combat.events.length));
 }
 
 export function encodeTrack(track) {
@@ -248,11 +279,13 @@ export function encodeTrack(track) {
   if (remotes.some(remote => !Array.isArray(remote?.samples) || remote.samples.length !== track.samples.length)) {
     throw new Error('replay remote tracks must share the local frames');
   }
-  const version = remotes.length ? ROOM_TRACK_VERSION : REPLAY_TRACK_VERSION;
+  const combat = hasCombat(track.combat) ? track.combat : null;
+  const version = combat ? COMBAT_TRACK_VERSION : remotes.length ? ROOM_TRACK_VERSION : REPLAY_TRACK_VERSION;
   const frame = frameBytes(remotes.length);
   const metadata = encodedMetadata(track);
   if (metadata.length > 0xffff) throw new Error('replay track metadata is too large');
-  const bytes = new Uint8Array(HEADER_BYTES + metadata.length + track.samples.length * frame);
+  const combatSize = combat ? combatByteLength(combat) : 0;
+  const bytes = new Uint8Array(HEADER_BYTES + metadata.length + track.samples.length * frame + combatSize);
   const view = new DataView(bytes.buffer);
   for (let index = 0; index < REPLAY_MAGIC.length; index++) bytes[index] = REPLAY_MAGIC.charCodeAt(index);
   view.setUint8(5, version);
@@ -270,7 +303,77 @@ export function encodeTrack(track) {
       writeRemote(view, frameBase + RECORD_BYTES + slot * REMOTE_RECORD_BYTES, remote.samples[index]);
     });
   }
+  if (combat) writeCombat(view, base + track.samples.length * frame, combat);
   return bytes;
+}
+
+function writeCombat(view, offset, combat) {
+  const targets = combat.targets;
+  const sectionLength = combatByteLength(combat) - 4;
+  view.setUint32(offset, sectionLength);
+  offset += 4;
+  view.setUint16(offset, Math.round(finite(combat.banditIntervalSec ?? 0.5) * 1000));
+  view.setUint16(offset + 2, Math.round(finite(combat.missileIntervalSec ?? 0.05) * 1000));
+  view.setUint8(offset + 4, targets.length);
+  view.setUint8(offset + 5, 0);
+  view.setUint32(offset + 6, combat.banditSamples.length);
+  view.setUint32(offset + 10, combat.missileSamples.length);
+  view.setUint32(offset + 14, combat.events.length);
+  offset += COMBAT_SECTION_HEADER_BYTES;
+
+  for (const target of targets) {
+    const callsign = encoder.encode(String(target?.callsign || '').slice(0, 64));
+    view.setUint8(offset, callsign.length);
+    offset += 1;
+    bytesSet(view, offset, callsign);
+    offset += callsign.length;
+  }
+
+  for (const sample of combat.banditSamples) {
+    writeScalar(view, offset, 'u32', sample.timeSec * 1000, 1);
+    view.setUint8(offset + 4, sample.rails ?? 0x3f);
+    offset += 5;
+    for (let slot = 0; slot < targets.length; slot++) {
+      const target = sample.targets?.[slot];
+      writeScalar(view, offset, 'f32', target?.x, 1);
+      writeScalar(view, offset + 4, 'f32', target?.y, 1);
+      writeScalar(view, offset + 8, 'f32', target?.z, 1);
+      writeScalar(view, offset + 12, 'i16', (target?.headingRad ?? 0) * 5000, 1);
+      view.setUint8(offset + 14, target?.alive ? 1 : 0);
+      offset += 15;
+    }
+  }
+
+  for (const sample of combat.missileSamples) {
+    writeScalar(view, offset, 'u32', sample.timeSec * 1000, 1);
+    view.setUint8(offset + 4, (sample.id ?? 0) & 255);
+    view.setUint8(offset + 5, Math.max(0, MISSILE_TYPE_IDS.indexOf(sample.typeId)));
+    writeScalar(view, offset + 6, 'f32', sample.x, 1);
+    writeScalar(view, offset + 10, 'f32', sample.y, 1);
+    writeScalar(view, offset + 14, 'f32', sample.z, 1);
+    writeQuaternion(view, offset + 18, sample.quat);
+    view.setUint8(offset + 25, sample.powered ? 1 : 0);
+    offset += 26;
+  }
+
+  for (const event of combat.events) {
+    writeScalar(view, offset, 'u32', event.timeSec * 1000, 1);
+    view.setUint8(offset + 4, event.kind === 'expire' ? 1 : 0);
+    view.setUint8(offset + 5, (event.missileId ?? 0) & 255);
+    view.setUint8(offset + 6, event.surface ? 1 : 0);
+    view.setUint8(offset + 7, 0);
+    writeScalar(view, offset + 8, 'f32', event.x, 1);
+    writeScalar(view, offset + 12, 'f32', event.y, 1);
+    writeScalar(view, offset + 16, 'f32', event.z, 1);
+    writeScalar(view, offset + 20, 'f32', event.vx, 1);
+    writeScalar(view, offset + 24, 'f32', event.vy, 1);
+    writeScalar(view, offset + 28, 'f32', event.vz, 1);
+    offset += COMBAT_EVENT_BYTES;
+  }
+}
+
+function bytesSet(view, offset, bytes) {
+  for (let index = 0; index < bytes.length; index++) view.setUint8(offset + index, bytes[index]);
 }
 
 export function decodeTrack(bytes) {
@@ -280,7 +383,7 @@ export function decodeTrack(bytes) {
   const magic = String.fromCharCode(...bytes.subarray(0, 5));
   if (magic !== REPLAY_MAGIC) throw new Error(`not a flight3d replay track (${magic})`);
   const version = view.getUint8(5);
-  if (version < 1 || version > ROOM_TRACK_VERSION) throw new Error(`unsupported replay track version ${version}`);
+  if (version < 1 || version > COMBAT_TRACK_VERSION) throw new Error(`unsupported replay track version ${version}`);
   const count = view.getUint32(8);
   const metadataLength = view.getUint16(16);
   if (bytes.length < HEADER_BYTES + metadataLength) throw new Error('replay track is truncated');
@@ -293,8 +396,9 @@ export function decodeTrack(bytes) {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     throw new Error('replay track metadata is corrupt');
   }
-  const pilots = version >= 3 ? metadata.remotes : [];
-  if (!Array.isArray(pilots) || (version >= 3 && !pilots.length)
+  const pilots = version >= ROOM_TRACK_VERSION && Array.isArray(metadata.remotes) ? metadata.remotes : [];
+  if ((version === ROOM_TRACK_VERSION && !pilots.length)
+    || (metadata.remotes !== undefined && !Array.isArray(metadata.remotes))
     || pilots.some(pilot => !pilot || typeof pilot !== 'object' || Array.isArray(pilot))) {
     throw new Error('replay track metadata is corrupt');
   }
@@ -309,8 +413,13 @@ export function decodeTrack(bytes) {
     throw new Error('replay room timeline is corrupt');
   }
   const frame = frameBytes(pilots.length);
-  const expected = HEADER_BYTES + metadataLength + count * frame;
-  if (bytes.length !== expected) throw new Error(`replay track length ${bytes.length} does not match ${expected}`);
+  const poseEnd = HEADER_BYTES + metadataLength + count * frame;
+  if (version < COMBAT_TRACK_VERSION && bytes.length !== poseEnd) {
+    throw new Error(`replay track length ${bytes.length} does not match ${poseEnd}`);
+  }
+  if (version >= COMBAT_TRACK_VERSION && bytes.length < poseEnd + 4) {
+    throw new Error('replay combat section is truncated');
+  }
   const intervalSec = view.getUint16(6) / 1000;
   const durationSec = view.getFloat32(12);
   if (!(intervalSec > 0) || !Number.isFinite(durationSec) || durationSec < 0) {
@@ -336,7 +445,84 @@ export function decodeTrack(bytes) {
   const decoded = { version, intervalSec, durationSec,
     metadata, samples, gearIds: ids.gear, bodyIds: metadata.bodyIds || [] };
   if (remotes.length) decoded.remotes = remotes;
+  if (version >= COMBAT_TRACK_VERSION) {
+    const combatLength = view.getUint32(poseEnd);
+    if (bytes.length !== poseEnd + 4 + combatLength) {
+      throw new Error('replay combat section length is corrupt');
+    }
+    decoded.combat = readCombat(view, poseEnd + 4, combatLength);
+  }
   return decoded;
+}
+
+function readCombat(view, offset, sectionLength) {
+  const end = offset + sectionLength;
+  if (sectionLength < COMBAT_SECTION_HEADER_BYTES || end > view.byteLength) {
+    throw new Error('replay combat section is truncated');
+  }
+  const banditIntervalSec = view.getUint16(offset) / 1000;
+  const missileIntervalSec = view.getUint16(offset + 2) / 1000;
+  const targetCount = view.getUint8(offset + 4);
+  const banditCount = view.getUint32(offset + 6);
+  const missileCount = view.getUint32(offset + 10);
+  const eventCount = view.getUint32(offset + 14);
+  offset += COMBAT_SECTION_HEADER_BYTES;
+  if (targetCount > 16 || banditCount > 100000 || missileCount > 100000 || eventCount > 100000) {
+    throw new Error('replay combat section is corrupt');
+  }
+  const targets = [];
+  for (let slot = 0; slot < targetCount; slot++) {
+    if (offset >= end) throw new Error('replay combat targets are truncated');
+    const length = view.getUint8(offset++);
+    if (offset + length > end) throw new Error('replay combat targets are truncated');
+    const bytes = new Uint8Array(view.buffer, view.byteOffset + offset, length);
+    targets.push({ callsign: decoder.decode(bytes) });
+    offset += length;
+  }
+  const banditSamples = [];
+  for (let index = 0; index < banditCount; index++) {
+    const timeSec = view.getUint32(offset) / 1000;
+    const rails = view.getUint8(offset + 4);
+    offset += 5;
+    const sampleTargets = [];
+    for (let slot = 0; slot < targetCount; slot++) {
+      if (offset + 15 > end) throw new Error('replay combat bandits are truncated');
+      sampleTargets.push({
+        x: view.getFloat32(offset), y: view.getFloat32(offset + 4), z: view.getFloat32(offset + 8),
+        headingRad: view.getInt16(offset + 12) / 5000, alive: Boolean(view.getUint8(offset + 14)),
+      });
+      offset += 15;
+    }
+    banditSamples.push({ timeSec, rails, targets: sampleTargets });
+  }
+  const missileSamples = [];
+  for (let index = 0; index < missileCount; index++) {
+    if (offset + 26 > end) throw new Error('replay combat missiles are truncated');
+    missileSamples.push({
+      timeSec: view.getUint32(offset) / 1000,
+      id: view.getUint8(offset + 4),
+      typeId: MISSILE_TYPE_IDS[view.getUint8(offset + 5)] || MISSILE_TYPE_IDS[0],
+      x: view.getFloat32(offset + 6), y: view.getFloat32(offset + 10), z: view.getFloat32(offset + 14),
+      quat: readQuaternion(view, offset + 18, [0, 0, 0, 1]),
+      powered: Boolean(view.getUint8(offset + 25)),
+    });
+    offset += 26;
+  }
+  const events = [];
+  for (let index = 0; index < eventCount; index++) {
+    if (offset + COMBAT_EVENT_BYTES > end) throw new Error('replay combat events are truncated');
+    events.push({
+      timeSec: view.getUint32(offset) / 1000,
+      kind: view.getUint8(offset + 4) === 1 ? 'expire' : 'detonation',
+      missileId: view.getUint8(offset + 5),
+      surface: Boolean(view.getUint8(offset + 6)),
+      x: view.getFloat32(offset + 8), y: view.getFloat32(offset + 12), z: view.getFloat32(offset + 16),
+      vx: view.getFloat32(offset + 20), vy: view.getFloat32(offset + 24), vz: view.getFloat32(offset + 28),
+    });
+    offset += COMBAT_EVENT_BYTES;
+  }
+  if (offset !== end) throw new Error('replay combat section has trailing bytes');
+  return { banditIntervalSec, missileIntervalSec, targets, banditSamples, missileSamples, events };
 }
 
 export function toBase64(bytes) {

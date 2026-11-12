@@ -40,6 +40,27 @@ debris and world animations are not recorded. A crashed sortie instead stores a
 `metadata.crash` marker (type, simulation time, impact speed); playback stages the
 explosion and breakup when it reaches that time and removes them on a seek back.
 
+### Air combat tracks
+
+F-16 sorties append an optional combat section after the pose frames (codec v4).
+Solo tracks without combat remain v2, and room tracks remain v3, so older builds
+still import them. The section records:
+
+- bandit poses at 2 Hz (position, heading, alive state) and the six-station rail
+  loadout mask;
+- missile poses at 20 Hz while a missile is alive (position, attitude, motor
+  state);
+- detonation and expiry markers with position and velocity.
+
+Playback interpolates the recorded poses and rail mask; it does not re-simulate
+guidance. This keeps seeks instant and guarantees that speed changes cannot alter
+the recorded outcome. Detonations stage one explosion when crossed and suppress
+events already in the past when seeking. Replay HUD/cockpit/chase views show the
+recorded bandits as target designators, the remaining rail count, missiles in
+flight and the cumulative splash count at the current playback time. Combat is recorded only when the live
+F-16 air-to-air system is active, so B737/C172 tracks are unchanged. The recorder
+thins combat samples before pose samples when the per-entry budget is tight.
+
 `ReplayDirector` owns the pose during playback, interpolating positions and
 quaternions rather than re-simulating pilot input. `activePoseDriver()` is the
 physics ownership seam; the existing shadow rig keeps priority. Replay resets

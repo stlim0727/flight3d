@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { encodeTrack, decodeTrack, toBase64, fromBase64, decodedByteLength,
-  REPLAY_TRACK_VERSION, ROOM_TRACK_VERSION } from '../src/replay/ReplayCodec.js';
+import { encodeTrack, decodeTrack, toBase64, fromBase64, decodedByteLength, combatByteLength,
+  REPLAY_TRACK_VERSION, ROOM_TRACK_VERSION, COMBAT_TRACK_VERSION, COMBAT_EVENT_BYTES } from '../src/replay/ReplayCodec.js';
 import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
 import { RECORD_BYTES, HEADER_BYTES, REPLAY_BUDGET, REPLAY_INTERVAL_LADDER,
   maxSamplesFor, maxTrackSeconds, base64ByteLength } from '../src/replay/replayConfig.js';
@@ -132,7 +132,7 @@ test('corrupt, truncated and foreign payloads are rejected instead of playing no
   foreign[0] = 'X'.charCodeAt(0);
   assert.throws(() => decodeTrack(foreign), /not a flight3d replay track/);
   const future = new Uint8Array(bytes);
-  future[5] = ROOM_TRACK_VERSION + 1;
+  future[5] = COMBAT_TRACK_VERSION + 1;
   assert.throws(() => decodeTrack(future), /unsupported replay track version/);
   const badMeta = new Uint8Array(bytes);
   badMeta[HEADER_BYTES + 1] = 0xff;
@@ -187,6 +187,51 @@ test('valid-length imports reject corrupt timing, metadata and nonfinite poses',
   const firstRecord = HEADER_BYTES + new DataView(bytes.buffer).getUint16(16);
   new DataView(badPose.buffer).setFloat32(firstRecord + 4, NaN);
   assert.throws(() => decodeTrack(badPose), /sample is corrupt/);
+});
+
+test('combat tracks append a compact section and round-trip targets, missiles and markers', () => {
+  const source = track(20);
+  source.combat = {
+    banditIntervalSec: 0.5,
+    missileIntervalSec: 0.05,
+    targets: [{ id: 3, callsign: 'BANDIT 1' }, { id: 7, callsign: 'BANDIT 2' }],
+    banditSamples: Array.from({ length: 8 }, (_, index) => ({
+      timeSec: index * 0.5,
+      rails: 0b111110,
+      targets: [
+        { x: 100 + index, y: 3000, z: -5000, headingRad: 1.25, alive: true },
+        { x: -100, y: 3100, z: -5100, headingRad: -0.5, alive: index < 4 },
+      ],
+    })),
+    missileSamples: Array.from({ length: 10 }, (_, index) => ({
+      timeSec: index * 0.05, id: 1, typeId: 'AIM9X',
+      x: 1 + index, y: 3001, z: -20 - index, quat: [...UNIT_QUAT], powered: index < 6,
+    })),
+    events: [{ timeSec: 1.5, kind: 'detonation', missileId: 1, surface: false,
+      x: 10, y: 3000, z: -4000, vx: 700, vy: 0, vz: 0 }],
+  };
+  const bytes = encodeTrack(source);
+  assert.equal(bytes.length, decodedByteLength(source));
+  assert.ok(bytes.length > encodeTrack(track(20)).length);
+  const decoded = decodeTrack(bytes);
+  assert.equal(decoded.version, COMBAT_TRACK_VERSION);
+  assert.equal(decoded.combat.targets[0].callsign, 'BANDIT 1');
+  assert.equal(decoded.combat.targets[1].callsign, 'BANDIT 2');
+  assert.equal(decoded.combat.banditSamples.length, 8);
+  assert.equal(decoded.combat.banditSamples[0].rails, 0b111110);
+  assert.ok(Math.abs(decoded.combat.banditSamples[2].targets[0].x - 102) < 1e-3);
+  assert.equal(decoded.combat.banditSamples[2].targets[1].alive, true);
+  assert.equal(decoded.combat.banditSamples[5].targets[1].alive, false);
+  assert.ok(Math.abs(decoded.combat.banditSamples[0].targets[0].headingRad - 1.25) < 1e-3);
+  assert.equal(decoded.combat.missileSamples.length, 10);
+  assert.equal(decoded.combat.missileSamples[0].powered, true);
+  assert.ok(Math.abs(decoded.combat.missileSamples[0].quat[3] - UNIT_QUAT[3]) < 1e-3);
+  assert.equal(decoded.combat.events[0].kind, 'detonation');
+  assert.equal(decoded.combat.events[0].missileId, 1);
+  assert.ok(Math.abs(decoded.combat.events[0].vx - 700) < 1e-3);
+  assert.equal(combatByteLength(source.combat), bytes.length - encodeTrack(track(20)).length);
+  const corrupt = bytes.slice(0, bytes.length - COMBAT_EVENT_BYTES - 2);
+  assert.throws(() => decodeTrack(corrupt), /combat section length is corrupt/);
 });
 
 test('selected cruise altitude covers the airliner range without saturation', () => {
