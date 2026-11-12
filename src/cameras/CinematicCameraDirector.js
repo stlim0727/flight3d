@@ -432,7 +432,7 @@ export class CinematicCameraDirector {
    * A rail release is an event, not a telemetry trend: cut immediately into the
    * launch beat, then follow the missile and finish from the bandit's seat.
    */
-  detectMissileLaunch(missiles, targets) {
+  detectMissileLaunch(missiles, targets, planePos = null, planeQuat = null) {
     if (!Array.isArray(missiles) || !missiles.length) return;
     for (const missile of missiles) {
       if (!missile?.alive || this.knownMissileIds.has(missile.id)) continue;
@@ -441,18 +441,28 @@ export class CinematicCameraDirector {
       if ((missile.age ?? 0) > 2.0) continue;
       // Replays own their timeline, and one launch sequence plays at a time.
       if (this.missileSequence || this.replayPlan?.shots?.length) continue;
-      this.beginMissileSequence(missile, targets);
+      this.beginMissileSequence(missile, targets, planePos, planeQuat);
     }
   }
 
-  beginMissileSequence(missile, targets) {
+  beginMissileSequence(missile, targets, planePos = null, planeQuat = null) {
     const target = missile.target?.alive ? missile.target : this.nearestAliveTarget(missile, targets);
+    // Latch the launch rail side once. Recomputing it from the live missile
+    // offset can flip the camera across the fuselage if the round crosses the
+    // centreline or the jet rolls immediately after release.
+    let stationSide = null;
+    if (planePos && planeQuat) {
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(planeQuat);
+      const offset = missile.position.clone().sub(planePos);
+      if (offset.lengthSq() > 1e-6) stationSide = offset.dot(right) >= 0 ? 1 : -1;
+    }
     this.missileSequence = {
       missile,
       target,
       phase: 'launch',
       phaseTime: 0,
       missileDeathTime: null,
+      stationSide,
       lastMissilePos: missile.position.clone(),
       lastTargetPos: target ? target.position.clone() : null,
     };
@@ -652,7 +662,7 @@ export class CinematicCameraDirector {
 
     // A fresh rail release cuts to its own three-beat sequence before the
     // routine shot grammar gets a chance to choose a cut.
-    this.detectMissileLaunch(missiles, targets);
+    this.detectMissileLaunch(missiles, targets, planePos, planeQuat);
 
     // Evaluate cut and timing
     this.evaluateShotCut(flightState, safeDt);
@@ -938,7 +948,13 @@ export class CinematicCameraDirector {
         isRigidMount = true;
         targetFov = 55.0;
         const missilePos = this.missileSequence?.lastMissilePos ?? planePos;
-        const stationSide = missilePos.clone().sub(planePos).dot(right) >= 0 ? 1 : -1;
+        if (this.missileSequence && this.missileSequence.stationSide == null) {
+          const offset = missilePos.clone().sub(planePos);
+          if (offset.lengthSq() > 1e-6) {
+            this.missileSequence.stationSide = offset.dot(right) >= 0 ? 1 : -1;
+          }
+        }
+        const stationSide = this.missileSequence?.stationSide ?? 1;
         targetCamPos.copy(planePos)
           .addScaledVector(right, stationSide * 11.0)
           .addScaledVector(up, 3.2)
@@ -987,8 +1003,16 @@ export class CinematicCameraDirector {
         const worldUp = new THREE.Vector3(0, 1, 0);
         const bearing = missilePos.clone().sub(targetPos);
         bearing.y = 0;
-        if (bearing.lengthSq() > 1) bearing.normalize();
-        const side = new THREE.Vector3(-bearing.z, 0, bearing.x);
+        const side = new THREE.Vector3();
+        const horizontal = bearing.length();
+        if (horizontal > 1e-2) {
+          bearing.divideScalar(horizontal);
+          side.set(-bearing.z, 0, bearing.x);
+        } else {
+          // Directly above/below or at impact: keep a unit lateral offset so
+          // the camera cannot collapse inside the bandit mesh.
+          side.set(1, 0, 0);
+        }
         targetCamPos.copy(targetPos)
           .addScaledVector(worldUp, 1.35)
           .addScaledVector(side, 2.4);

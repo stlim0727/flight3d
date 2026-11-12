@@ -225,3 +225,16 @@ test('airborne or paused states decay turnaround progress without reloading', ()
   stepRearm(rearmer, { ...input, active: false }, 1 / 120);
   assert.equal(rearmer.progress, 0, 'pause cancels the ground-service request');
 });
+
+test('a frozen frame clears the gun firing flag without consuming ammunition', () => {
+  const system = new AirToAirMissileSystem();
+  const pose = world();
+  system.addTarget(new BanditTarget({ callsign: 'BANDIT 1', position: new Vector3(0, 3000, -800) }));
+  system.setGunTrigger(true);
+  stepSystem(system, pose, 0.1);
+  assert.equal(system.cannon.firing, true);
+
+  system.update(0, pose);
+  assert.equal(system.cannon.firing, false, 'pause cannot leave a stale muzzle flash/audio flag');
+  assert.ok(system.cannon.rounds < 510, 'rounds already fired stay spent');
+});

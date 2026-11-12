@@ -228,6 +228,12 @@ export class AirToAirMissileSystem {
       return this._events;
     }
 
+    if (dt <= 0) {
+      // A frozen frame must not leave the gun's visual/audio firing flag latched.
+      this.cannon.firing = false;
+      return this._events;
+    }
+
     this._ensureTargets(world);
     this.accumulator += dt;
     while (this.accumulator >= this.fixedDt) {

@@ -636,3 +636,71 @@ test('CameraSystem DIRECTOR mode forwards live combat state to the director', ()
     'Combat feed reaches the director through CameraSystem',
   );
 });
+
+test('launch camera latches the rail side instead of flipping across the centreline', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1000, 0);
+  const planeQuat = new THREE.Quaternion();
+  const target = {
+    id: 3,
+    alive: true,
+    position: new THREE.Vector3(0, 1000, -3000),
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const missile = fakeMissile({
+    id: 61,
+    position: new THREE.Vector3(5, 1000, 2),
+    velocity: new THREE.Vector3(0, 0, -400),
+    target,
+  });
+
+  director.update({ dt: 0.016, camera, planePos, planeQuat, missiles: [missile], targets: [target] });
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_LAUNCH);
+  assert.ok(camera.position.x > 0, 'launch camera starts on the occupied rail side');
+  assert.equal(director.missileSequence.stationSide, 1);
+
+  // The round crosses the fuselage immediately after release. The latched side
+  // must keep the camera on the same wing instead of jumping 22 m.
+  missile.position.x = -5;
+  director.update({ dt: 0.016, camera, planePos, planeQuat, missiles: [missile], targets: [target] });
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_LAUNCH);
+  assert.ok(camera.position.x > 0, 'launch camera does not cross the centreline');
+});
+
+test('bandit POV keeps a unit lateral offset when the missile is directly overhead', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1000, 0);
+  const planeQuat = new THREE.Quaternion();
+  const target = {
+    id: 4,
+    alive: true,
+    position: new THREE.Vector3(0, 1000, -3000),
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const missile = fakeMissile({
+    id: 62,
+    position: new THREE.Vector3(4, 1000, 2),
+    velocity: new THREE.Vector3(0, 0, -450),
+    target,
+  });
+  const state = { missile, target, camera, planePos, planeQuat, missiles: [missile], targets: [target] };
+
+  director.update({ dt: 0.05, ...state });
+  for (let frame = 0; frame < 20 && director.currentShotType !== CINEMATIC_SHOTS.MISSILE_TRACK; frame++) {
+    director.update({ dt: 0.1, ...state });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_TRACK);
+
+  // Zero horizontal bearing: the missile is directly above the bandit.
+  missile.position.copy(target.position).add(new THREE.Vector3(0, 800, 0));
+  director.update({ dt: 0.05, ...state });
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV);
+
+  const horizontal = Math.hypot(
+    camera.position.x - target.position.x,
+    camera.position.z - target.position.z,
+  );
+  assert.ok(horizontal > 2.0, `bandit eye keeps the 2.4 m lateral offset, was ${horizontal.toFixed(2)}`);
+});
