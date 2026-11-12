@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { RWRSystem } from '../systems/RWRSystem.js';
+import { addDamage, blastDamage, combatDamageState } from '../physics/combatDamage.js';
+import { VulcanCannon } from './VulcanCannon.js';
 import { F16_MISSILE_STATIONS, MISSILE_TYPES } from './missileSpecs.js';
 
 const GRAVITY = 9.80665;
@@ -26,6 +28,8 @@ export class BanditTarget {
     this.orbit = orbit;
     this.alive = true;
     this.respawnTimer = 0;
+    this.damage = 0;
+    this.damageState = 'normal';
     this.hostile = true;
     this.radar = true;
   }
@@ -35,16 +39,19 @@ export class BanditTarget {
     if (!this.alive) return;
     if (this.orbit) {
       const o = this.orbit;
-      o.angle += o.omega * dt;
+      // Structural damage degrades the drone's turn rate and lifts its orbit
+      // continuously; it is not a behavior switch at a damage threshold.
+      const agility = 1 - 0.55 * this.damage;
+      o.angle += o.omega * agility * dt;
       this.position.set(
         o.center.x + Math.cos(o.angle) * o.radius,
-        o.altitudeM + Math.sin(o.angle * 2) * 35,
+        o.altitudeM - 160 * this.damage + Math.sin(o.angle * 2) * 35,
         o.center.z + Math.sin(o.angle) * o.radius,
       );
-      const tangential = o.radius * o.omega;
+      const tangential = o.radius * o.omega * agility;
       this.velocity.set(
         -Math.sin(o.angle) * tangential,
-        Math.cos(o.angle * 2) * 70 * o.omega,
+        Math.cos(o.angle * 2) * 70 * o.omega * agility,
         Math.cos(o.angle) * tangential,
       );
     } else {
@@ -58,6 +65,8 @@ export class BanditTarget {
     this.orbit = orbit;
     this.alive = true;
     this.respawnTimer = 0;
+    this.damage = 0;
+    this.damageState = 'normal';
     const o = orbit;
     if (o) {
       const tangential = o.radius * o.omega;
@@ -84,6 +93,7 @@ export class AirToAirMissileSystem {
     this.specs = specs;
     this.fixedDt = fixedDt;
     this.rwr = rwr;
+    this.cannon = new VulcanCannon();
     this.loaded = stations.map(() => true);
     this.missiles = [];
     this.targets = [];
@@ -124,7 +134,18 @@ export class AirToAirMissileSystem {
     this.splashCount = 0;
     this.lastFireError = null;
     this.accumulator = 0;
+    this.cannon.reset();
     this.rwr.reset();
+  }
+
+  /** Ground-crew turnaround: full rails and a full gun magazine, no new sortie. */
+  rearm() {
+    this.loaded.fill(true);
+    this.cannon.reload();
+  }
+
+  setGunTrigger(pressed) {
+    this.cannon.setTrigger(pressed);
   }
 
   get remaining() {
@@ -200,8 +221,16 @@ export class AirToAirMissileSystem {
         this.missiles.length = 0;
         this.clearTargets();
       }
+      this.cannon.clearBullets();
+      this.cannon.setTrigger(false);
       this.rwr.reset();
       this.accumulator = 0;
+      return this._events;
+    }
+
+    if (dt <= 0) {
+      // A frozen frame must not leave the gun's visual/audio firing flag latched.
+      this.cannon.firing = false;
       return this._events;
     }
 
@@ -294,6 +323,13 @@ export class AirToAirMissileSystem {
       infraRed: nextType ? nextType.fox === 2 : true,
       rwr: this.rwr.state(),
       missilesInFlight: this.missiles.length,
+      gun: {
+        rounds: this.cannon.rounds,
+        capacity: this.cannon.capacity,
+        firing: this.cannon.firing,
+        bullets: this.cannon.bullets.length,
+        aim: target ? this.cannon.aimPoint(this.world, target) : null,
+      },
     };
   }
 
@@ -346,6 +382,7 @@ export class AirToAirMissileSystem {
       }
     }
 
+    this._updateGun(dt, world, events);
     this._updateLock(dt, world, events);
 
     for (const missile of this.missiles) {
@@ -426,9 +463,12 @@ export class AirToAirMissileSystem {
       missile.quaternion.setFromUnitVectors(FORWARD, this._dir);
     }
 
-    if (target?.alive && this._closestApproach(missile, target) <= spec.fuseRadiusM) {
-      this._detonate(missile, target, events);
-      return;
+    if (target?.alive) {
+      const distance = this._closestApproach(missile, target);
+      if (distance <= spec.fuseRadiusM) {
+        this._detonate(missile, target, events, distance);
+        return;
+      }
     }
 
     if (missile.age >= spec.maxLifeSeconds) {
@@ -509,18 +549,53 @@ export class AirToAirMissileSystem {
     return this._closest.length();
   }
 
-  _detonate(missile, target, events) {
-    missile.alive = false;
-    events.push({
-      type: 'detonation', missile, target, surface: false,
-      position: missile.position.clone(), velocity: missile.velocity.clone(),
-    });
-    if (!target?.alive) return;
+  _updateGun(dt, world, events) {
+    const gunEvents = this.cannon.update(dt, world, this.targets);
+    for (const event of gunEvents) {
+      if (event.type !== 'bulletHit') {
+        events.push(event);
+        continue;
+      }
+      this._damageTarget(event.target, event.damage, events, {
+        source: 'gun',
+        position: event.position,
+        velocity: event.target.velocity,
+      });
+    }
+  }
+
+  /**
+   * One monotonic damage integration for guns and warhead fragments. A target
+   * survives until cumulative damage reaches full failure; the kill path emits
+   * the same respawn, splash and lock-reset contract as a direct hit.
+   */
+  _damageTarget(target, amount, events, {
+    source = 'gun', missile = null, position = target.position, velocity = target.velocity,
+    detonationEmitted = false,
+  } = {}) {
+    if (!target?.alive || amount <= 0) return;
+    target.damage = addDamage(target.damage, amount);
+    target.damageState = combatDamageState(target.damage);
+    if (target.damage < 1) {
+      events.push({
+        type: 'damage', target, source, missile,
+        damage: target.damage,
+        position: position.clone(),
+      });
+      return;
+    }
+
     target.alive = false;
     target.respawnTimer = BANDIT_RESPAWN_SECONDS;
     this.splashCount++;
+    if (!detonationEmitted) {
+      events.push({
+        type: 'detonation', missile, target, surface: false,
+        position: target.position.clone(), velocity: target.velocity.clone(),
+      });
+    }
     events.push({
-      type: 'kill', target, missile,
+      type: 'kill', target, missile, source,
       position: target.position.clone(), velocity: target.velocity.clone(),
     });
     if (this.lockedTarget === target) {
@@ -529,5 +604,26 @@ export class AirToAirMissileSystem {
     }
     const nextIndex = this.targets.findIndex(candidate => candidate.alive);
     this.selectedTargetIndex = nextIndex;
+  }
+
+  _detonate(missile, target, events, distanceM) {
+    missile.alive = false;
+    events.push({
+      type: 'detonation', missile, target, surface: false,
+      position: missile.position.clone(), velocity: missile.velocity.clone(),
+    });
+    if (!target?.alive) return;
+    // The fuse radius is the warhead's lethal radius for a light drone. The
+    // fragmentation model in combatDamage.js applies graded damage to larger
+    // airframes once hostile fragments can reach the player.
+    this._damageTarget(target, blastDamage(distanceM, {
+      lethalRadiusM: missile.spec.fuseRadiusM,
+      fragmentRadiusM: missile.spec.fuseRadiusM,
+    }), events, {
+      source: 'missile', missile,
+      position: target.position,
+      velocity: target.velocity,
+      detonationEmitted: true,
+    });
   }
 }

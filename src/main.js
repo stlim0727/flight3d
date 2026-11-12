@@ -44,7 +44,9 @@ import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
 import { HudView } from './ui/HudView.js';
 import { AirToAirMissileSystem } from './weapons/AirToAirMissileSystem.js';
+import { CannonCombatView } from './weapons/CannonCombatView.js';
 import { MissileCombatView } from './weapons/MissileCombatView.js';
+import { RearmSystem } from './systems/RearmSystem.js';
 import { RenderPose } from './core/RenderPose.js';
 import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
 import { JoystickCheckDialog } from './ui/JoystickCheckDialog.js';
@@ -345,6 +347,9 @@ class FlightSimulator {
     this.aircraftBreakup = new AircraftBreakup(this.scene);
     this.missileCombat = new AirToAirMissileSystem();
     this.missileCombatView = new MissileCombatView(this.scene, this.missileCombat);
+    this.cannonCombatView = new CannonCombatView(this.scene, this.missileCombat);
+    this.rearmSystem = new RearmSystem();
+    this._gunAudioActive = false;
     this.cameraSystem.setCombatStateProvider(() => ({
       missiles: this.missileCombat.missiles,
       targets: this.missileCombat.targets,
@@ -1245,6 +1250,70 @@ class FlightSimulator {
     return true;
   }
 
+  /** Turnaround runs only in a live F-16 sortie; pause freezes its timer. */
+  rearmActive() {
+    return this.currentAircraftId === 'F16'
+      && this.gameFlow?.state === FLOW.FLIGHT
+      && !this.demoDirector?.isActive
+      && !this.pilotArena?.active
+      && !this.replayDirector?.active
+      && !this.shadowDemo?.active
+      && !this.devRunner?.active
+      && !this.multiplayer?.active
+      && !this.isCrashed
+      && !this.startingFlight;
+  }
+
+  updateRearm(dt) {
+    if (!this.rearmSystem || !this.missileCombat || !this.rearmActive()) return;
+    const gearDamage = this.telemetry.gearDamage || {};
+    const bodyDamage = this.telemetry.bodyDamage || {};
+    const onPavement = this.currentAirport?.isOnRunway
+      ? this.currentAirport.isOnRunway(this.position.x, this.position.z)
+      : true;
+    const events = this.rearmSystem.update(dt, {
+      active: true,
+      onGround: Boolean(this.telemetry.onGround),
+      groundSpeedKnots: this.telemetry.groundSpeedKnots || 0,
+      onPavement,
+      gearDown: (this.telemetry.gearState ?? 1) > 0.9,
+      gearCollapsed: Object.values(gearDamage).some(state => state === 'collapsed'),
+      bodyFailed: Object.values(bodyDamage).some(damage => damage >= 1),
+      missilesRemaining: this.missileCombat.remaining,
+      missileCapacity: this.missileCombat.totalStations,
+      gunRounds: this.missileCombat.cannon.rounds,
+      gunCapacity: this.missileCombat.cannon.capacity,
+    });
+    for (const event of events) this.handleRearmEvent(event);
+  }
+
+  handleRearmEvent(event) {
+    if (!event) return;
+    if (event.type === 'rearm') {
+      this.missileCombat.rearm();
+      this.syncMissileLoadout();
+      this.audio.playGpwsCallout('Rearm complete');
+      this.showToast(() => t('weapons.rearm.complete'));
+    } else if (event.type === 'rearmStart') {
+      this.showToast(() => t('weapons.rearm.start'));
+    } else if (event.type === 'rearmBlocked') {
+      const key = event.reason === 'gear'
+        ? 'weapons.rearm.blocked.gear'
+        : event.reason === 'damage'
+          ? 'weapons.rearm.blocked.damage'
+          : 'weapons.rearm.blocked.pavement';
+      this.showToast(() => t(key));
+    }
+  }
+
+  syncGunAudio() {
+    const firing = Boolean(this.missileCombat?.cannon?.firing);
+    if (firing === this._gunAudioActive) return;
+    this._gunAudioActive = firing;
+    if (firing) this.audio.startGunFire();
+    else this.audio.stopGunFire();
+  }
+
   cycleCombatTarget() {
     if (!this.missileCombat || !this.combatActive()) return false;
     const target = this.missileCombat.selectNextTarget();
@@ -1266,6 +1335,8 @@ class FlightSimulator {
       this.audio.playRemoteExplosion(this.camera.position.distanceTo(event.position));
     } else if (event.type === 'kill') {
       this.showToast(() => t('weapons.splash.toast', { callsign: event.target.callsign }));
+    } else if (event.type === 'gunEmpty') {
+      this.showToast(() => t('weapons.gun.empty'));
     }
   }
 
@@ -1316,10 +1387,16 @@ class FlightSimulator {
 
     // 1b. Air-to-air combat advances on its own fixed 120 Hz clock so a slow
     // render frame cannot tunnel a missile through the proximity fuse.
+    this.updateRearm(frameDelta);
     const combatDt = this.gameFlow.isPhysicsFrozen() ? 0 : frameDelta;
+    this.missileCombat.setGunTrigger(
+      this.combatActive() && !this.gameFlow.isPhysicsFrozen() && this.controls.gunTrigger,
+    );
     const combatEvents = this.missileCombat.update(combatDt, this.combatWorld());
     this.telemetry.rwrLevel = this.missileCombat.rwr.level;
     this.missileCombatView.sync(combatDt);
+    this.cannonCombatView.sync(combatDt);
+    this.syncGunAudio();
     for (const event of combatEvents) this.handleCombatEvent(event);
 
     // 4. Update Cockpit Visibility & Audio

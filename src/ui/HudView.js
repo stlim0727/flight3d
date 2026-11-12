@@ -247,22 +247,88 @@ export class HudView {
       }
     }
 
+    this.drawGunSight(width, height, scale, state);
     this.drawRwr(width, height, scale, state.rwr);
 
-    // Weapon inventory block: next rail type, remaining rounds and kills.
+    // Weapon inventory block: next rail type, gun rounds, kills and missiles in flight.
     const label = state.nextMissileType ? t(state.nextMissileType.labelKey) : t('weapons.empty');
     const blockX = width < 700 ? width * .5 : Math.max(90 * scale, width * .12);
     const blockY = width < 700 ? height * .17 : height * .23;
+    let line = 0;
     ctx.textAlign = 'left';
     ctx.font = `600 ${font}px monospace`;
     ctx.fillStyle = state.remaining > 0 ? green : amber;
     ctx.fillText(`${label}  ${state.remaining}/${state.total}`, blockX, blockY);
+    line++;
+    if (state.gun) {
+      ctx.fillStyle = state.gun.rounds > 0 ? green : amber;
+      ctx.fillText(`${t('weapons.gun')}  ${state.gun.rounds}/${state.gun.capacity}`, blockX, blockY + (font + 5) * line);
+      line++;
+    }
     ctx.fillStyle = green;
-    ctx.fillText(`${t('weapons.splash')} ${state.splash}`, blockX, blockY + font + 5);
+    ctx.fillText(`${t('weapons.splash')} ${state.splash}`, blockX, blockY + (font + 5) * line);
+    line++;
     if (state.missilesInFlight > 0) {
       ctx.fillStyle = amber;
-      ctx.fillText(`${t('weapons.inFlight')} ${state.missilesInFlight}`, blockX, blockY + (font + 5) * 2);
+      ctx.fillText(`${t('weapons.inFlight')} ${state.missilesInFlight}`, blockX, blockY + (font + 5) * line);
     }
+  }
+
+  /**
+   * Gun reticle and LCOS pipper. The fixed cross marks the boresight; when a
+   * bandit is inside gun range the pipper sits at the lead point that puts the
+   * projectile on the target after gravity drop.
+   */
+  drawGunSight(width, height, scale, state) {
+    const gun = state.gun;
+    if (!gun) return;
+    const ctx = this.ctx;
+    const green = '#b8ff9b';
+    const amber = '#ffcc66';
+    // The fixed cross follows the aircraft boresight, not the camera centre,
+    // so cockpit head turns do not move the gun line.
+    this._hudForward.set(0, 0, -1).applyQuaternion(this.sim.quaternion);
+    const bore = projectHudDirection(this._hudForward, this.sim.camera, width, height);
+    const bx = bore ? MathUtils.clamp(bore.x, 24, width - 24) : width / 2;
+    const by = bore ? MathUtils.clamp(bore.y, 24, height - 24) : height / 2;
+    ctx.save();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = gun.rounds > 0 ? green : amber;
+    ctx.globalAlpha = .85;
+    const size = Math.max(5, 6 * scale);
+    ctx.beginPath(); ctx.moveTo(bx - size, by); ctx.lineTo(bx - size * .35, by);
+    ctx.moveTo(bx + size * .35, by); ctx.lineTo(bx + size, by);
+    ctx.moveTo(bx, by - size); ctx.lineTo(bx, by - size * .35);
+    ctx.moveTo(bx, by + size * .35); ctx.lineTo(bx, by + size);
+    ctx.stroke();
+    ctx.restore();
+
+    const aim = gun.aim;
+    if (!aim) return;
+    const pipper = this.projectWorld(aim.point, width, height);
+    if (pipper.behind) return;
+    const px = MathUtils.clamp(pipper.x, 24, width - 24);
+    const py = MathUtils.clamp(pipper.y, 24, height - 24);
+    ctx.save();
+    ctx.strokeStyle = amber;
+    ctx.fillStyle = amber;
+    ctx.globalAlpha = .9;
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([4, 5]);
+    const spread = Math.max(18, 24 * scale);
+    ctx.beginPath();
+    ctx.moveTo(bx - spread, by + 70 * scale); ctx.lineTo(px - 3, py + 3);
+    ctx.moveTo(bx + spread, by + 70 * scale); ctx.lineTo(px + 3, py + 3);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const radius = Math.max(7, 9 * scale);
+    ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(px, py, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.font = `600 ${Math.max(10, 12 * scale)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${Math.round(aim.rangeM)} m`, px, py + radius + 13);
+    if (gun.firing) ctx.fillText(t('weapons.gun'), px, py - radius - 12);
+    ctx.restore();
   }
 
   drawTargetLocator(screen, width, height, scale, state, redColor) {

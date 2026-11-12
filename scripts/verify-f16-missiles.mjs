@@ -131,8 +131,89 @@ await withBrowserSession({
   await delay(120);
   await screenshot(path.join(dir, 'bandit-splash.png'));
 
+  // Gun pass: put the surviving bandit inside the LCOS envelope, then hold the
+  // airborne trigger (Space) through the real keyboard path.
+  await evaluate(`(() => {
+    const s = window.simulator;
+    const target = s.missileCombat.targets.find(t => t.alive);
+    if (!target) return;
+    target.orbit = null;
+    target.velocity.set(0, 0, 0);
+    target.position.set(s.position.x, s.position.y, s.position.z - 260);
+    target.prevPosition.copy(target.position);
+    target.damage = 0;
+    target.damageState = 'normal';
+    s.missileCombat.selectedTargetIndex = s.missileCombat.targets.indexOf(target);
+    s.cameraSystem.setMode(8, true);
+  })()`);
+  await delay(250);
+  const gunHud = await evaluate('window.simulator.missileCombat.getHudState()');
+  close(gunHud.gun.rounds === 510 && gunHud.gun.capacity === 510, 'HUD gun magazine is 510/510');
+  close(Boolean(gunHud.gun.aim), 'LCOS pipper exists inside gun range');
+  await screenshot(path.join(dir, 'hud-gun-lcos.png'));
+
+  await evaluate('document.activeElement?.blur?.()');
+  await send('Input.dispatchKeyEvent', {
+    type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32,
+  });
+  await delay(80);
+  close(await evaluate('window.simulator.controls.gunTrigger === true'), 'Space arms the gun trigger');
+  await delay(300);
+  await screenshot(path.join(dir, 'gun-tracers.png'));
+  await send('Input.dispatchKeyEvent', {
+    type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32,
+  });
+  await delay(600);
+  const gun = await evaluate(`(() => {
+    const s = window.simulator;
+    return {
+      rounds: s.missileCombat.cannon.rounds,
+      splash: s.missileCombat.splashCount,
+      firing: s.missileCombat.cannon.firing,
+      tracers: s.missileCombat.cannon.bullets.length,
+    };
+  })()`);
+  close(gun.rounds < 510, `gun consumed rounds: ${gun.rounds}`);
+  close(gun.splash >= 2, `gun destroyed the bandit: splash ${gun.splash}`);
+  close(gun.firing === false, 'released trigger stops the gun');
+
+  // Turnaround: stopped on pavement with partial ammunition rearms after 5 s.
+  await evaluate(`(() => {
+    const s = window.simulator;
+    s.currentAirport.isOnRunway = () => true;
+    Object.assign(s.telemetry, {
+      onGround: true, groundSpeedKnots: 0, gearState: 1,
+      gearDamage: {}, bodyDamage: {}, rwrLevel: 0,
+    });
+    s.linearVelocity.set(0, 0, 0);
+  })()`);
+  await delay(5600);
+  const rearmed = await evaluate(`(() => {
+    const s = window.simulator;
+    return {
+      rounds: s.missileCombat.cannon.rounds,
+      remaining: s.missileCombat.remaining,
+      state: s.rearmSystem.state,
+      rails: s.aircraft.missileMeshes.filter(mesh => mesh.visible).length,
+    };
+  })()`);
+  close(rearmed.rounds === 510, `turnaround reloaded the gun: ${rearmed.rounds}`);
+  close(rearmed.remaining === 6, `turnaround reloaded all six rails: ${rearmed.remaining}`);
+  close(rearmed.rails === 6, `six rail meshes are visible after rearming: ${rearmed.rails}`);
+  await evaluate('window.simulator.cameraSystem.setMode(1, true)');
+  await delay(300);
+  await screenshot(path.join(dir, 'f16-rearmed.png'));
+
   // Deterministic lock tone: aim a bandit's nose at the player and observe the
   // RWR track stage independently of its circular patrol.
+  await evaluate(`(() => {
+    const s = window.simulator;
+    Object.assign(s.telemetry, { onGround: false, groundSpeedKnots: 250, iasKnots: 350 });
+  })()`);
+  for (let i = 0; i < 100; i++) {
+    if (await evaluate('window.simulator.missileCombat.targets.some(t => t.alive)')) break;
+    await delay(100);
+  }
   await evaluate(`(() => {
     const s = window.simulator;
     const target = s.missileCombat.targets.find(t => t.alive);
@@ -147,6 +228,10 @@ await withBrowserSession({
   close(rwr.level >= 2, 'RWR escalates to a tracking lock');
   close(exceptions.length === 0, `no page exceptions: ${JSON.stringify(exceptions)}`);
 
-  fs.writeFileSync(path.join(dir, 'result.json'), JSON.stringify({ gpuAngle, hud, rwr, exceptions }, null, 2));
-  console.log('F-16 air-to-air verification passed', { gpuAngle, remaining: hud.remaining, splash: 1, rwr: rwr.levelName });
+  fs.writeFileSync(path.join(dir, 'result.json'),
+    JSON.stringify({ gpuAngle, hud, gunHud, gun, rearmed, rwr, exceptions }, null, 2));
+  console.log('F-16 air-to-air verification passed', {
+    gpuAngle, remaining: hud.remaining, gunRounds: gun.rounds, splash: gun.splash,
+    rearmed: rearmed.remaining, rwr: rwr.levelName,
+  });
 });

@@ -57,6 +57,8 @@ class PresetSpawnerMethods {
     // smoke left by the previous one.
     this.missileCombat?.reset();
     this.missileCombatView?.clear();
+    this.cannonCombatView?.clear();
+    this.rearmSystem?.reset();
     this.aircraft?.setMissileLoadout?.(this.missileCombat?.loaded);
     this.flightWarnings?.reset();
     this.pilotPhysiology?.reset?.();

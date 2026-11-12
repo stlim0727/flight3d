@@ -183,6 +183,7 @@ export class TouchFlightControls {
           <!-- Device tilt steering (relocated into the environment panel at boot) -->
           <div class="touch-weapon-row" aria-label="Air-to-air weapons" data-i18n-aria-label="weapons.controls">
             <button type="button" id="touch-btn-fire" class="btn-touch-pill touch-btn-weapon" title="발사 (Enter)" data-i18n-title="weapons.fire.tip" data-i18n="weapons.fire" hidden>FIRE MSL</button>
+            <button type="button" id="touch-btn-gun" class="btn-touch-pill touch-btn-weapon" title="기관총 (공중 Space)" data-i18n-title="weapons.gun.tip" data-i18n="weapons.gun.fire" hidden>GUN</button>
             <button type="button" id="touch-btn-target" class="btn-touch-pill touch-btn-weapon" title="표적 전환 (N)" data-i18n-title="weapons.target.tip" data-i18n="weapons.target" hidden>TGT</button>
           </div>
           <button type="button" id="touch-btn-gyro" class="btn-touch-pill" title="기기 기울기 자이로 센서 모드" data-i18n-title="gyroscope.device.tilt.mode">
@@ -226,6 +227,7 @@ export class TouchFlightControls {
     this.brakeBtn = el.querySelector('#touch-btn-brake');
     this.gyroBtn = el.querySelector('#touch-btn-gyro');
     this.fireBtn = el.querySelector('#touch-btn-fire');
+    this.gunBtn = el.querySelector('#touch-btn-gun');
     this.targetBtn = el.querySelector('#touch-btn-target');
     this.recenterBtn = el.querySelector('#touch-btn-recenter');
     this.stickTelemetry = el.querySelector('#touch-stick-telemetry');
@@ -297,6 +299,21 @@ export class TouchFlightControls {
       e.stopPropagation();
       this.controls?.onFireMissile?.();
     });
+    const startGun = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.controls?.onUserInteract?.();
+      this.controls?.setGunTrigger?.(true);
+      this.triggerHaptic(18);
+    };
+    const stopGun = (e) => {
+      e.preventDefault();
+      this.controls?.setGunTrigger?.(false);
+    };
+    this.gunBtn?.addEventListener('pointerdown', startGun);
+    this.gunBtn?.addEventListener('pointerup', stopGun);
+    this.gunBtn?.addEventListener('pointercancel', stopGun);
+    this.gunBtn?.addEventListener('pointerleave', stopGun);
     this.targetBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.controls?.onCycleTarget?.();
@@ -311,7 +328,9 @@ export class TouchFlightControls {
   setCombatVisible(visible) {
     const show = Boolean(visible);
     if (this.fireBtn) this.fireBtn.hidden = !show;
+    if (this.gunBtn) this.gunBtn.hidden = !show;
     if (this.targetBtn) this.targetBtn.hidden = !show;
+    if (!show) this.controls?.setGunTrigger?.(false);
   }
 
   quickRecenterGyro() {

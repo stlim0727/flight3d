@@ -31,8 +31,9 @@ function disposeGeometry(object) {
 
 /** Bounded white smoke trail behind a boosted missile. */
 class SmokeTrail {
-  constructor(scene) {
-    this.max = 96;
+  constructor(scene, { max = 96, size = 4.2, color = 0xf2f2f2, opacity = 0.5 } = {}) {
+    this.max = max;
+    this.opacity = opacity;
     this.positions = new Float32Array(this.max * 3);
     this.geometry = new THREE.BufferGeometry();
     const attribute = new THREE.BufferAttribute(this.positions, 3);
@@ -40,11 +41,11 @@ class SmokeTrail {
     this.geometry.setAttribute('position', attribute);
     this.geometry.setDrawRange(0, 0);
     this.material = new THREE.PointsMaterial({
-      color: 0xf2f2f2,
+      color,
       map: smokeMap(),
-      size: 4.2,
+      size,
       transparent: true,
-      opacity: 0.5,
+      opacity,
       alphaTest: 0.02,
       depthWrite: false,
       sizeAttenuation: true,
@@ -83,7 +84,7 @@ class SmokeTrail {
       }
     } else {
       this.fade += dt;
-      this.material.opacity = Math.max(0, 0.55 * (1 - this.fade / 2.2));
+      this.material.opacity = Math.max(0, this.opacity * (1 - this.fade / 2.2));
       if (this.fade > 2.2) this.done = true;
     }
   }
@@ -116,15 +117,34 @@ export class MissileCombatView {
       if (!view) {
         const mesh = createBanditMesh(target.callsign);
         this.scene.add(mesh);
-        view = { mesh };
+        view = { mesh, trail: null };
         this.targetViews.set(target.id, view);
       }
       view.mesh.visible = target.alive;
-      if (!target.alive) continue;
+      if (!target.alive) {
+        if (view.trail) {
+          view.trail.update(dt, null, false);
+          if (view.trail.done) {
+            view.trail.dispose();
+            view.trail = null;
+          }
+        }
+        continue;
+      }
       view.mesh.position.copy(target.position);
       if (target.velocity.lengthSq() > 1) {
         scratchDirection.copy(target.velocity).normalize();
         view.mesh.quaternion.setFromUnitVectors(FORWARD, scratchDirection);
+      }
+      // A damaged drone bleeds dark smoke until it is destroyed; the trail is a
+      // continuous visual function of accumulated damage, not a state label.
+      if (target.damage > 0.15) {
+        if (!view.trail) {
+          view.trail = new SmokeTrail(this.scene, {
+            max: 72, size: 3.0, color: 0x4b4b4b, opacity: 0.42,
+          });
+        }
+        view.trail.update(dt, target.position, true);
       }
     }
     for (const [id, view] of this.targetViews) {
@@ -191,6 +211,7 @@ export class MissileCombatView {
     for (const view of this.targetViews.values()) {
       this.scene.remove(view.mesh);
       disposeGeometry(view.mesh);
+      view.trail?.dispose();
     }
     for (const view of this.missileViews.values()) {
       this.scene.remove(view.mesh);
