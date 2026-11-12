@@ -95,18 +95,18 @@ export class DebriefOverlay {
             <p id="debrief-status" role="status" aria-live="polite"></p>
             <textarea id="debrief-preview" readonly aria-hidden="true" tabindex="-1"></textarea>
             <div class="debrief-actions">
-              <button class="btn" id="debrief-download"><span class="btn-icon" aria-hidden="true">⬇️</span> <span data-i18n="debrief.download"></span></button>
+              <button class="btn" id="debrief-download"><span class="btn-icon" aria-hidden="true">⬇️</span><span data-i18n="debrief.download"></span></button>
             </div>
             <div class="debrief-replay-actions">
-              <button class="btn" id="debrief-save-replay" hidden><span class="btn-icon" aria-hidden="true">💾</span> <span data-i18n="debrief.saveReplay"></span></button>
-              <button class="btn" id="debrief-watch-replay" hidden><span class="btn-icon" aria-hidden="true">▶️</span> <span data-i18n="replay.watch"></span></button>
+              <button class="btn" id="debrief-save-replay" hidden><span class="btn-icon" aria-hidden="true">💾</span><span data-i18n="debrief.saveReplay"></span></button>
+              <button class="btn" id="debrief-watch-replay" hidden><span class="btn-icon" aria-hidden="true">▶️</span><span data-i18n="replay.watch"></span></button>
             </div>
           </div>
         </div>
 
         <footer class="debrief-footer">
           <button class="btn debrief-primary debrief-lobby-btn" id="debrief-lobby" type="button" data-i18n-title="debrief.lobby" data-i18n-aria-label="debrief.lobby">
-            <span class="debrief-back-glyph" aria-hidden="true">↩</span> <span class="debrief-back-caption" data-i18n="debrief.lobby"></span>
+            <span class="debrief-back-glyph" aria-hidden="true">↩</span><span class="debrief-back-caption" data-i18n="debrief.lobby"></span>
           </button>
         </footer>
       </div>
