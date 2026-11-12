@@ -2,6 +2,7 @@ import { bindText, t, translateDOM } from '../i18n/index.js';
 import { flightDuration } from '../core/FlightRecorder.js';
 import { AIRCRAFT_REGISTRY, getAircraftSpecs, classifyLanding } from '../config/aircraftConfigs.js';
 import { scenarioLabelKey } from '../config/scenarioRegistry.js';
+import { createSortie } from '../replay/ReplayStore.js';
 
 const airportKeys = { coastal: 'coastal.airport', incheon: 'incheon.airport', lukla: 'lukla.vnlk',
   neon: 'neon.metropolis', valley: 'valley.region' };
@@ -165,14 +166,11 @@ export class DebriefOverlay {
     }
     this.el('download').addEventListener('click', () => {
       if (!this.report.sufficient) return;
-      const payload = {
-        ...this.report,
-        ...(this.replay ? { replay: { samples: this.replay.samples, metadata: this.replay.metadata, durationSec: this.replay.durationSec } } : {}),
-      };
-      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+      const sortie = createSortie(this.report, this.replay);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(sortie, null, 2)], { type: 'application/json' }));
       const link = document.createElement('a');
       link.href = url;
-      link.download = `flight3d-${this.report.metadata.aircraft}-flight.json`;
+      link.download = `flight3d-${this.report.metadata?.aircraft ?? 'flight'}-flight.json`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       this.status('debrief.downloaded');

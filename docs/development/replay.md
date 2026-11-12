@@ -70,8 +70,20 @@ most recent frames instead of being refused, and its timeline is rebased to zero
 Recording the room and saving it when the room ends is wired in a later step; this
 format and recorder are not yet used by the multiplayer controller.
 
-`ReplayStore` uses a small index and individual localStorage payloads. Import
-reuses the decoder and storage budgets; the library renders names as plain text.
+`ReplayStore` uses a small index and individual localStorage payloads. Debrief download
+and replay library export share one unified format (`flight3d.sortie.v1`):
+```json
+{
+  "kind": "flight3d.sortie.v1",
+  "report": { "...": "telemetry report or index summary" },
+  "track": "<base64 encoded binary track (v2 solo or v3 room)>"
+}
+```
+Debrief download emits this file with the full telemetry report and the encoded track;
+library export emits it with a compact debrief summary (`reason`, `touchdown`, `crash`, `peakG`).
+Saved replays in the lobby library display this summary badge alongside duration and timestamp.
+Import reuses the decoder and storage budgets, accepting both `flight3d.sortie.v1` and legacy
+`flight3d.replay.v1` files; the library renders names as plain text.
 These files contain no executable pilot code.
 
 ## Verification
