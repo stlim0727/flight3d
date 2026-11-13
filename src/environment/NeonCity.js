@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { NEON_TOWERS, towerRecord } from '../config/neonBuildings.js';
 import { NEON_RIVER, bridgeWorldBoxes, isLand, riverCenter, riverGroundHeight } from '../config/neonRiver.js';
 import { isStreet, neonStreets } from '../config/neonRoads.js';
 import { EXTENT as SEA_EXTENT, createNeonRiver } from './NeonRiver.js';
@@ -588,97 +589,8 @@ export class NeonCity {
     const neonPinkEdgePoints = [];
     const beaconPositions = [];
 
-    // Organic, varied architectural definition table
-    // Intentionally breaks Cartesian alignment and mirror symmetry!
-    const buildingsConfig = [
-      // === Iconic Central Megatowers ===
-      // 1. The Grand Art Deco Spire (Stepped pyramid, 440m tall with 36m spire)
-      { x: 1950, z: 165, w: 75, d: 75, h: 440, type: 'stepped-spire', facade: 'fin', rot: -0.08 },
-      // 2. The Chrysler Crown Tower (420m tall)
-      { x: 2500, z: -175, w: 70, d: 70, h: 420, type: 'stepped-spire', facade: 'ribbon', rot: 0.12 },
-      // 3. Citigroup Chiseled Wedge Tower (45° angled roof, 380m tall)
-      { x: 1420, z: -160, w: 68, d: 68, h: 380, type: 'wedge-chisel', facade: 'monolith', rot: -0.18 },
-      // 4. Cylindrical Landmark Tower with glowing circular observation ring (370m tall)
-      { x: 2850, z: 185, w: 65, d: 65, h: 370, type: 'cylinder', facade: 'ribbon', rot: 0 },
-      // 5. Asymmetric Gateway Towers flanking canyon entrance
-      { x: 920, z: 135, w: 55, d: 50, h: 320, type: 'blade-slab', facade: 'ribbon', rot: 0.15 },
-      { x: 860, z: -140, w: 58, d: 52, h: 350, type: 'wedge-chisel', facade: 'fin', rot: -0.22 },
-
-      // === Asymmetric North Midtown Cluster (Z = 120 to 480) ===
-      { x: 650,  z: 145, w: 48, d: 48, h: 220, type: 'blade-slab', facade: 'monolith', rot: 0.05 },
-      { x: 790,  z: 280, w: 65, d: 55, h: 290, type: 'wedge-chisel', facade: 'ribbon', rot: -0.25 },
-      { x: 1140, z: 210, w: 70, d: 65, h: 340, type: 'stepped-spire', facade: 'fin', rot: 0.18 },
-      { x: 1290, z: 390, w: 55, d: 75, h: 260, type: 'blade-slab', facade: 'monolith', rot: -0.10 },
-      { x: 1620, z: 230, w: 65, d: 65, h: 360, type: 'cylinder', facade: 'ribbon', rot: 0 },
-      { x: 1780, z: 380, w: 75, d: 60, h: 310, type: 'wedge-chisel', facade: 'fin', rot: 0.32 },
-      { x: 2080, z: 240, w: 60, d: 70, h: 350, type: 'blade-slab', facade: 'ribbon', rot: -0.15 },
-      { x: 2560, z: 430, w: 70, d: 65, h: 280, type: 'stepped-spire', facade: 'monolith', rot: 0.22 },
-      { x: 2620, z: 225, w: 68, d: 60, h: 340, type: 'wedge-chisel', facade: 'ribbon', rot: -0.12 },
-      { x: 2790, z: 400, w: 58, d: 68, h: 290, type: 'cylinder', facade: 'fin', rot: 0 },
-      { x: 3100, z: 210, w: 62, d: 62, h: 330, type: 'stepped-spire', facade: 'ribbon', rot: 0.16 },
-      { x: 3280, z: 360, w: 70, d: 58, h: 270, type: 'blade-slab', facade: 'monolith', rot: -0.20 },
-      { x: 3550, z: 220, w: 60, d: 60, h: 300, type: 'wedge-chisel', facade: 'fin', rot: 0.1 },
-
-      // === Asymmetric South Waterfront Cluster (Z = -130 to -480) ===
-      { x: 580,  z: -170, w: 52, d: 50, h: 200, type: 'cylinder', facade: 'ribbon', rot: 0 },
-      { x: 740,  z: -310, w: 68, d: 60, h: 280, type: 'stepped-spire', facade: 'monolith', rot: 0.25 },
-      { x: 1080, z: -210, w: 60, d: 72, h: 330, type: 'blade-slab', facade: 'fin', rot: -0.18 },
-      { x: 1240, z: -410, w: 75, d: 58, h: 270, type: 'wedge-chisel', facade: 'ribbon', rot: 0.28 },
-      { x: 1650, z: -220, w: 68, d: 62, h: 360, type: 'stepped-spire', facade: 'ribbon', rot: -0.14 },
-      { x: 1820, z: -380, w: 62, d: 72, h: 310, type: 'cylinder', facade: 'monolith', rot: 0 },
-      { x: 2060, z: -235, w: 72, d: 62, h: 350, type: 'wedge-chisel', facade: 'fin', rot: 0.19 },
-      { x: 2560, z: -440, w: 58, d: 68, h: 290, type: 'blade-slab', facade: 'ribbon', rot: -0.24 },
-      { x: 2650, z: -215, w: 65, d: 65, h: 330, type: 'stepped-spire', facade: 'monolith', rot: 0.15 },
-      { x: 2820, z: -370, w: 72, d: 58, h: 280, type: 'blade-slab', facade: 'fin', rot: -0.12 },
-      { x: 3150, z: -220, w: 68, d: 68, h: 320, type: 'cylinder', facade: 'ribbon', rot: 0 },
-      { x: 3320, z: -390, w: 62, d: 62, h: 270, type: 'wedge-chisel', facade: 'monolith', rot: 0.22 },
-      { x: 3600, z: -210, w: 58, d: 58, h: 310, type: 'stepped-spire', facade: 'ribbon', rot: -0.08 },
-
-      // === Deep Background Skyline Silhouettes (Far North, Z = 580 to 1150) ===
-      { x: 800,  z: 650,  w: 90, d: 80, h: 250, type: 'blade-slab', facade: 'monolith', rot: 0.12 },
-      { x: 1200, z: 720,  w: 75, d: 75, h: 290, type: 'stepped-spire', facade: 'ribbon', rot: -0.22 },
-      { x: 1600, z: 640,  w: 80, d: 85, h: 310, type: 'cylinder', facade: 'monolith', rot: 0 },
-      { x: 2050, z: 730,  w: 95, d: 75, h: 320, type: 'wedge-chisel', facade: 'fin', rot: 0.18 },
-      { x: 2600, z: 760,  w: 85, d: 80, h: 290, type: 'stepped-spire', facade: 'monolith', rot: -0.14 },
-      { x: 2880, z: 740,  w: 80, d: 90, h: 280, type: 'blade-slab', facade: 'ribbon', rot: 0.25 },
-      { x: 3280, z: 670,  w: 85, d: 75, h: 260, type: 'cylinder', facade: 'monolith', rot: 0 },
-      { x: 1050, z: 980,  w: 110, d: 90, h: 220, type: 'blade-slab', facade: 'monolith', rot: 0 },
-      { x: 1550, z: 1020, w: 90, d: 95, h: 240, type: 'stepped-spire', facade: 'ribbon', rot: 0.28 },
-      { x: 2080, z: 990,  w: 105, d: 85, h: 260, type: 'wedge-chisel', facade: 'monolith', rot: -0.16 },
-      { x: 2580, z: 1040, w: 95, d: 100, h: 230, type: 'cylinder', facade: 'monolith', rot: 0 },
-      { x: 3080, z: 1000, w: 100, d: 85, h: 210, type: 'blade-slab', facade: 'fin', rot: 0.12 },
-
-      // === Deep Background Skyline Silhouettes (Far South, Z = -580 to -1150) ===
-      { x: 820,  z: -660,  w: 85, d: 80, h: 260, type: 'cylinder', facade: 'monolith', rot: 0 },
-      { x: 1220, z: -730,  w: 90, d: 75, h: 300, type: 'wedge-chisel', facade: 'fin', rot: 0.22 },
-      { x: 1620, z: -650,  w: 80, d: 85, h: 320, type: 'stepped-spire', facade: 'monolith', rot: -0.18 },
-      { x: 2080, z: -740,  w: 95, d: 80, h: 310, type: 'blade-slab', facade: 'ribbon', rot: 0.12 },
-      // Set back from the light bridge's east approach (#579)
-      { x: 2560, z: -760,  w: 85, d: 90, h: 290, type: 'cylinder', facade: 'monolith', rot: 0 },
-      { x: 2910, z: -750,  w: 90, d: 75, h: 280, type: 'stepped-spire', facade: 'ribbon', rot: -0.22 },
-      { x: 3310, z: -680,  w: 80, d: 85, h: 250, type: 'wedge-chisel', facade: 'monolith', rot: 0.14 },
-      { x: 1080, z: -990,  w: 105, d: 90, h: 230, type: 'blade-slab', facade: 'fin', rot: 0 },
-      { x: 1580, z: -1030, w: 95, d: 100, h: 250, type: 'cylinder', facade: 'monolith', rot: 0 },
-      { x: 2050, z: -1000, w: 100, d: 85, h: 260, type: 'stepped-spire', facade: 'ribbon', rot: 0.22 },
-      { x: 2610, z: -1050, w: 90, d: 95, h: 220, type: 'wedge-chisel', facade: 'monolith', rot: -0.18 },
-      { x: 3110, z: -1010, w: 110, d: 85, h: 210, type: 'blade-slab', facade: 'monolith', rot: 0.1 },
-
-      // === Varied Asymmetric Urban Podiums / Terraces (Plazas & Setbacks) ===
-      { x: 420,  z: 160,  w: 42, d: 40, h: 75,  type: 'podium', facade: 'monolith', rot: 0.12 },
-      { x: 580,  z: -175, w: 46, d: 42, h: 95,  type: 'podium', facade: 'ribbon', rot: -0.18 },
-      { x: 1020, z: 145,  w: 50, d: 38, h: 105, type: 'podium', facade: 'fin', rot: -0.08 },
-      { x: 1150, z: -150, w: 45, d: 44, h: 115, type: 'podium', facade: 'monolith', rot: 0.15 },
-      { x: 1460, z: 155,  w: 52, d: 40, h: 135, type: 'podium', facade: 'ribbon', rot: 0.22 },
-      { x: 1580, z: -140, w: 48, d: 45, h: 120, type: 'podium', facade: 'monolith', rot: -0.12 },
-      { x: 1980, z: 140,  w: 50, d: 42, h: 145, type: 'podium', facade: 'fin', rot: -0.16 },
-      { x: 2120, z: -155, w: 54, d: 40, h: 130, type: 'podium', facade: 'ribbon', rot: 0.14 },
-      { x: 2490, z: 190,  w: 44, d: 46, h: 115, type: 'podium', facade: 'monolith', rot: 0.08 },
-      { x: 2580, z: -145, w: 48, d: 42, h: 125, type: 'podium', facade: 'fin', rot: -0.20 },
-      { x: 2880, z: 135,  w: 46, d: 40, h: 95,  type: 'podium', facade: 'ribbon', rot: 0.18 },
-      { x: 3020, z: -150, w: 50, d: 44, h: 105, type: 'podium', facade: 'monolith', rot: -0.15 },
-    ];
-
-    for (const b of buildingsConfig) {
+    // One table for meshes and collision (#695): src/config/neonBuildings.js.
+    for (const b of NEON_TOWERS) {
       const { x: posX, z: posZ, w: width, d: depth, h: height, type, facade, rot: rotationY } = b;
       const targetBucket = facade === 'ribbon' ? ribbonGeometries : (facade === 'fin' ? finGeometries : monolithGeometries);
 
@@ -784,24 +696,7 @@ export class NeonCity {
         beaconPositions.push(new THREE.Vector3(posX, height + 4, posZ));
       }
 
-      // Compute accurate world-space bounding dimensions including rotation
-      const cosR = Math.abs(Math.cos(rotationY));
-      const sinR = Math.abs(Math.sin(rotationY));
-      const worldW = cosR * width + sinR * depth;
-      const worldD = sinR * width + cosR * depth;
-
-      this.buildingData.push({
-        x: posX,
-        y: 0,
-        z: posZ,
-        width: worldW,
-        height: height + 8,
-        visualY: 0,
-        depth: worldD,
-        localWidth: width,
-        localDepth: depth,
-        rotationY,
-      });
+      this.buildingData.push(towerRecord(b));
     }
 
     const facades = [['ribbon', ribbonGeometries, ribbonMat], ['fin', finGeometries, finMat], ['monolith', monolithGeometries, monolithMat]];

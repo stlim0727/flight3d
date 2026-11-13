@@ -109,11 +109,60 @@ junctions and corners are fully paved.
   at the runway's height (y = 0.04) and violet curb lines (0.08) along every edge that does
   not open onto another street, the runway or a bridge foot, all cut into pieces of at
   most 100 m. Highway lamps that would stand in a street are left out.
-- The streets are flat decals on the street; they add no collision. The south tower at
+- The streets are flat decals on the street; they add no collision. The north tower at
   x = 2560 moved from z = -670 to -760 to clear the light bridge's east approach.
   `tests/neonRoads.test.js` keeps every street 10 m from every tower and off the water,
   each ramp foot on an approach of the deck width, and the runway, streets and bridges
   one connected network.
+
+## Towers and wind comparison sites
+
+Related: #693 (city wind plan), #694 (background turbulence), #696 (stage 3 settings).
+
+`src/config/neonBuildings.js` (`NEON_TOWERS`) is the one tower table. `NeonCity` builds
+every tower mesh from it and appends `towerRecord()` for each to `buildingData`, so
+drawing and collision cannot drift and no second list exists. Each record keeps a
+stable `id` and the true roof height (`roofHeight`) next to the collision `height`, which
+pads the roof by `ROOF_MARGIN` (8 m) for spires and roof caps. Bridge boxes stay
+separate records carrying `bridge`. Note +Z is south: the clusters at z > 0 are the
+south side of the canyon.
+
+The layout was reviewed (#695) so one straight flight compares different urban
+settings. The canyon flight (east along z = 0 at 110 m from x = 200) passes, in order,
+the sites in `NEON_WIND_SITES`:
+
+| Site | Centre x | Setting |
+|---|---|---|
+| `open` | 300 | West waterfront: no tower in the envelope or upwind to the north shore |
+| `wide-canyon` | 1050 | At least 200 m between the nearest towers (gateway towers, podiums) |
+| `slot` | 1560 | 124 m between continuous 150 m and 170 m walls for 240 m: height/width above 1 |
+| `canal` | 2300 | Open water 14 m below the street, along the design wind |
+| `lee` | 2520 | Directly downwind of the 420 m crown tower on the east quay |
+| `rooftop` | 2970 | 30 m above an 80 m roof to the south, 35 m below a 145 m terrace to the north |
+
+Each `region` is a layout envelope in the WindField region shape (centre at the flight
+height, radius, fade = radius / 2); envelopes do not overlap. They are not tuned winds.
+The sites assume a design wind from the north (`DESIGN_WIND_FROM_DEG` = 0): across the
+canyon, along the canal, a crosswind on the 090° runway. Nothing configures a wind from
+it here; #696 chooses the field.
+
+Only four towers changed; the rest of the skyline, the runway, causeway, canal, bridges
+and streets are unchanged:
+
+- The podiums at (1460, 155) and (1580, -140) became the slot walls `slot-south` and
+  `slot-north` (240 x 36 m, centred at x = 1560, z = ±80).
+- The podiums at (2880, 135) 95 m and (3020, -150) 105 m were drawn in to the avenue as
+  `terrace-south` (2900, 72) 80 m and `terrace-north` (3040, -75) 145 m.
+
+The existing WindField cannot make wakes, channelling or roof shear from these towers:
+the sites only give stage 3 places to apply its existing settings and a route to compare
+them on. `tests/neonBuildings.test.js` keeps the table and records one-to-one, the
+footprints matching THREE's rotation, each site's geometry (open fetch, slot and wide
+widths, open water, lee tower upwind, roofs above and below), and the whole canyon line
+clear at 110 m with at least 43 m to every tower beside it. `node
+scripts/neon-city-map.mjs <out.svg> [title] [root]` draws the map; the review's
+[before](../design/neon-695-layout-before.png) and
+[after](../design/neon-695-layout-after.png) maps are kept in `docs/design`.
 
 ## Collision
 
@@ -152,7 +201,16 @@ and **Space / R / Enter → main menu → Fly** apply.
 ## Verification
 
 Node 22.23.2: `npm run check`, `npm test`, `npm run build`.
-Focused coverage: `node --test tests/bridgeFlight.test.js tests/neonRiver.test.js tests/neonCity.test.js tests/neonRoads.test.js`.
+Focused coverage: `node --test tests/bridgeFlight.test.js tests/neonRiver.test.js tests/neonCity.test.js tests/neonRoads.test.js tests/neonBuildings.test.js`.
+
+With Vite and a checked hardware-GPU Chrome ([browser GPU](browser-gpu.md)), `CDP_URL=…
+SIM_URL=… node scripts/verify-neon-canyon.mjs` starts the canyon flight from the lobby
+in a C172, B738 and F16 and flies the whole line through every wind comparison site with
+production physics and the background wind; a test pilot sets only virtual control
+inputs (the jets accelerate to 180 kt from their 70 m/s spawn). It fails on a crash, a
+pass within 30 m of a tower, or a page exception, captures the slot, canal, lee and
+rooftop, and prints the wind RMS inside each site. Evidence goes to
+`review-artifacts/neon-canyon/`.
 
 Start Vite, then run `node scripts/verify-neon-bridge.mjs` (`SIM_URL`, `CHROME_PATH`,
 `CDP_PORT` and `ARTIFACT_DIR` are optional overrides). It picks Neon Metropolis and the
