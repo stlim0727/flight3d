@@ -37,13 +37,37 @@ class PhysicsIntegratorMethods {
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.gear.bodySupportPoints = this.currentAircraftConfig?.landingGear?.bodySupportPoints
       ?? (this.aircraft.useGltf ? BODY_SUPPORT_POINTS : FALLBACK_BODY_SUPPORT_POINTS);
-    // If crashed, damp out velocities and rest on terrain
+    // If crashed, damp out velocities, rest on terrain, and keep kinematic telemetry current
     if (this.isCrashed) {
+      const velocityBeforeStep = this._gVelocityBefore ??= new THREE.Vector3();
+      const rotationBeforeStep = this._gRotationBefore ??= new THREE.Quaternion();
+      velocityBeforeStep.copy(this.linearVelocity);
+      rotationBeforeStep.copy(this.quaternion);
       this.linearVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 2.8));
       this.angularVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 3.5));
       this.position.addScaledVector(this.linearVelocity, dt);
       this.resolveBodyPenetration();
       this.aircraft.group.position.copy(this.position);
+      const rawGForce = normalLoadFactor(velocityBeforeStep, this.linearVelocity,
+        rotationBeforeStep, this.quaternion, dt);
+      this.gForceFilter ??= new GForceFilter(8.0);
+      const measuredGForce = this.gForceFilter.update(rawGForce, dt);
+      if (this.telemetry) {
+        const groundSpeed = Math.hypot(this.linearVelocity.x, this.linearVelocity.z);
+        const groundHeight = this.currentTerrain?.getHeight?.(this.position.x, this.position.z) ?? 0;
+        const wind = this.aero?.windWorld;
+        const tas = wind
+          ? Math.hypot(this.linearVelocity.x - wind.x, this.linearVelocity.y - wind.y, this.linearVelocity.z - wind.z)
+          : this.linearVelocity.length();
+        const densityRatio = Atmosphere.getConditions(this.position.y).densityRatio;
+        this.telemetry.gForce = measuredGForce;
+        this.telemetry.rawGForce = rawGForce;
+        this.telemetry.altitudeFt = Atmosphere.metersToFeet(this.position.y);
+        this.telemetry.radioAltFt = Atmosphere.metersToFeet(Math.max(0, this.position.y - groundHeight));
+        this.telemetry.groundSpeedKnots = Atmosphere.msToKnots(groundSpeed);
+        this.telemetry.iasKnots = Atmosphere.msToKnots(tas * Math.sqrt(Math.max(0, densityRatio)));
+        this.telemetry.vsiFpm = Atmosphere.metersToFeet(this.linearVelocity.y) * 60.0;
+      }
       return;
     }
 
