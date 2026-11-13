@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sampleControlResponse } from '../scripts/audit-control-response.mjs';
+import { sampleControlResponse as sampleProtectedResponse } from '../scripts/audit-control-response.mjs';
+
+// Audit input shaping and raw actuator authority independently of the asymmetric
+// -3/+9g envelope. Production protection is exercised by gLimiter.test.js.
+const sampleControlResponse = options => sampleProtectedResponse({ ...options, gLimiter: false });
 
 for (const axis of ['pitch', 'roll']) {
   test(`F16 ${axis} response retains small-input resolution and full authority across airspeeds`, () => {

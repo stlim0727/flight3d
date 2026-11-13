@@ -83,11 +83,45 @@ baseline, measured results, reproduction steps and remaining limitations.
 
 ## Normal load and impact contact
 
-`telemetry.gForce` is unfiltered normal specific force at the instantaneous CG,
+`telemetry.rawGForce` is unfiltered normal specific force at the instantaneous CG,
 not resultant acceleration or a cockpit/seat sensor. `normalLoadFactor` measures
 `(deltaVelocity / dt - gravity) / g0` projected onto the midpoint body-up axis.
 The velocity interval starts after the moving-CG reference rebase and ends after
 body contact constraint impulses. At rest this reads +1g; free fall reads 0g.
+
+### F-16 normal-load protection
+
+`F16_FALCON.flightControls.gLimiter` enables a simplified pitch-envelope
+controller in `Aerodynamics`, shared by manual, AP and director commands.
+It uses the aircraft's `specs.limitLoad` (-3/+9g). Other aircraft retain their
+existing surface response. This is a game control law, not a reproduction of
+the complete F-16 FLCS or its stores/AoA/landing gain schedules.
+
+The controller estimates normal load and its rate from current airflow, gravity
+and body angular velocity, rather than delayed HUD telemetry. It bounds requested
+pitch acceleration with a critically damped approach to the load boundary,
+then converts the permitted moment into a bounded tail deflection. Trim goes
+through the same protection. Forces and moments are recomputed from that
+deflection; velocity, measured G and recorded peaks are never clipped.
+A 0.35g reserve plus the neutral-tail estimate makes sustained maximum pull
+conservative (about 8g in the high-speed regression cases).
+
+Protection operates with forward airflow above 30 m/s, including low flight;
+below that, the original surface command is retained. Physical surface authority
+still limits recovery from an already excessive load or external disturbance.
+Contact impulses are measured normally and are not covered by a manoeuvre
+limiter. The controller has no persistent state to carry across reset or swap.
+
+`tests/gLimiter.test.js` exercises production 120 Hz integration at 200–650 KIAS,
+banked/inverted holds, releases, push/pull reversals, trim, AP and reset. The
+input-shaping audit disables envelope protection explicitly to check raw actuator
+resolution and symmetry independently of the asymmetric G limits.
+
+Hardware Chrome verification:
+`GPU_ANGLE=vulkan CHROME_PATH=/home/stlim/.local/bin/chrome-headless node scripts/verify-g-limiter.mjs`.
+The script runs the required GPU preflight, then compares protected/unprotected
+650 KIAS pull/push and release sequences in the live simulator. Reports and a
+scene screenshot are saved under `review-artifacts/g-limiter/`.
 Constraint impulses are physical velocity changes and must be included. Their
 step-averaged peaks can depend on the physics timestep; they are not certified
 real-aircraft crash measurements. Do not clamp or smooth them to hide solver errors.

@@ -159,6 +159,7 @@ export const BOEING_737_800 = {
 
 export const F16_FALCON = {
   id: 'F16',
+  flightControls: { gLimiter: true },
   massDistribution: F16_MASS_DISTRIBUTION,
   name: 'F-16 Fighting Falcon',
   description: 'Single-engine supersonic multirole fighter aircraft with afterburning turbofan',
