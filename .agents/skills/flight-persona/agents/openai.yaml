@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flight3d Flight Persona"
+  short_description: "Free-play Flight3d and report unnatural consequences"
+  default_prompt: "Use $flight-persona to freely play Flight3d, explore the UI and scenarios, detect unnatural consequences, and give structured feedback."
