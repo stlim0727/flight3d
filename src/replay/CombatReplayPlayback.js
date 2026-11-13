@@ -7,6 +7,10 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function lerp(a, b, alpha) {
+  return a + (b - a) * alpha;
+}
+
 function slerp(out, a, b, alpha) {
   let dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
   const sign = dot < 0 ? -1 : 1;
@@ -261,11 +265,20 @@ export class CombatReplayPlayback {
         target.alive = false;
         continue;
       }
-      const blend = from.alive && to.alive ? alpha : alpha < 0.5 ? 0 : 1;
+      // Bandit samples arrive at 2 Hz, so switching the whole pose at the
+      // midpoint reads as hopping. Two live samples describe one continuous
+      // orbit, so blend them. A death or respawn between samples is a
+      // teleport, not a flight path, and keeps snapping at the midpoint.
+      const continuous = from.alive && to.alive;
+      const blend = continuous ? alpha : alpha < 0.5 ? 0 : 1;
       const pose = blend < 0.5 ? from : to;
       target.alive = Boolean(pose.alive);
-      target.position.set(pose.x, pose.y, pose.z);
-      const heading = from.alive && to.alive ? shortestAngle(from.headingRad, to.headingRad, alpha) : pose.headingRad;
+      target.position.set(
+        continuous ? lerp(from.x, to.x, blend) : pose.x,
+        continuous ? lerp(from.y, to.y, blend) : pose.y,
+        continuous ? lerp(from.z, to.z, blend) : pose.z,
+      );
+      const heading = continuous ? shortestAngle(from.headingRad, to.headingRad, alpha) : pose.headingRad;
       target.velocity.set(Math.sin(heading), 0, -Math.cos(heading));
     }
   }

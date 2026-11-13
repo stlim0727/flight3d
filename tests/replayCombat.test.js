@@ -143,3 +143,52 @@ test('replay playback interpolates combat and stages each detonation once', () =
   assert.equal(playback.state.targets.length, 0);
   assert.equal(playback.state.missiles.length, 0);
 });
+
+test('replayed bandits slide between 2 Hz samples instead of hopping at the midpoint', () => {
+  const combat = decodeTrack(encodeTrack(recordCombat(5).finish())).combat;
+  const playback = new CombatReplayPlayback({ scene: new Scene() });
+  assert.equal(playback.load(combat), true);
+  const [a, b] = [combat.banditSamples[1], combat.banditSamples[2]];
+  const span = b.timeSec - a.timeSec;
+  assert.ok(span > 0, 'consecutive bandit samples advance in time');
+
+  const positionAt = alpha => {
+    playback.seek(a.timeSec + span * alpha);
+    const { x, y, z } = playback.state.targets[0].position;
+    return { x, y, z };
+  };
+  const expected = alpha => {
+    const from = a.targets[0];
+    const to = b.targets[0];
+    return {
+      x: from.x + (to.x - from.x) * alpha,
+      y: from.y + (to.y - from.y) * alpha,
+      z: from.z + (to.z - from.z) * alpha,
+    };
+  };
+  for (const alpha of [0.25, 0.5, 0.75]) {
+    const actual = positionAt(alpha);
+    const want = expected(alpha);
+    for (const axis of ['x', 'y', 'z']) {
+      assert.ok(Math.abs(actual[axis] - want[axis]) < 1e-3,
+        `bandit ${axis} at alpha ${alpha} is ${actual[axis]}, expected ${want[axis]}`);
+    }
+  }
+  playback.stop();
+});
+
+test('a bandit death between samples still snaps instead of sliding a wreck', () => {
+  const combat = decodeTrack(encodeTrack(recordCombat(5).finish())).combat;
+  const samples = combat.banditSamples;
+  for (const sample of samples.slice(2)) sample.targets[0].alive = false;
+  const playback = new CombatReplayPlayback({ scene: new Scene() });
+  assert.equal(playback.load(combat), true);
+  const a = samples[1];
+  const b = samples[2];
+  playback.seek(a.timeSec + (b.timeSec - a.timeSec) * 0.25);
+  assert.equal(playback.state.targets[0].position.x, a.targets[0].x);
+  playback.seek(a.timeSec + (b.timeSec - a.timeSec) * 0.75);
+  assert.equal(playback.state.targets[0].position.x, b.targets[0].x);
+  assert.equal(playback.state.targets[0].alive, false);
+  playback.stop();
+});

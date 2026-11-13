@@ -87,6 +87,42 @@ await withBrowserSession({
   assert.ok(loaded.combat, 'replay combat playback active');
   assert.equal(loaded.mode, 9, 'a combat track opens in the cinematic director');
 
+  // Bandit poses are recorded at 2 Hz; playback must slide the airframe between
+  // samples instead of switching a whole pose at the midpoint (reported hop).
+  const banditMotion = await evaluate(`(() => {
+    const s = window.simulator;
+    const combat = s.replayDirector._combat;
+    const samples = combat.track.banditSamples;
+    let slot = -1;
+    let a = null;
+    let b = null;
+    for (let index = 0; index + 1 < samples.length && slot < 0; index++) {
+      for (let candidate = 0; candidate < combat.track.targets.length; candidate++) {
+        if (samples[index].targets[candidate]?.alive && samples[index + 1].targets[candidate]?.alive) {
+          slot = candidate;
+          a = samples[index];
+          b = samples[index + 1];
+          break;
+        }
+      }
+    }
+    if (!a) return { maxStep: 0, meanStep: 0, span: 0, slots: combat.track.targets.length };
+    const span = b.timeSec - a.timeSec;
+    const steps = [];
+    let previous = null;
+    for (let step = 0; step <= 30; step++) {
+      s.replayDirector.seek(a.timeSec + span * step / 30);
+      const position = combat.state.targets[slot].position.clone();
+      if (previous) steps.push(position.distanceTo(previous));
+      previous = position;
+    }
+    return { maxStep: Math.max(...steps), meanStep: steps.reduce((sum, v) => sum + v, 0) / steps.length, span };
+  })()`);
+  assert.ok(banditMotion.span > 0, `the recorded track has a live bandit span (${banditMotion.slots} slots)`);
+  assert.ok(banditMotion.meanStep > 0.05, 'the sampled bandit actually moves');
+  assert.ok(banditMotion.maxStep < 4 * banditMotion.meanStep,
+    `bandit motion is continuous (max ${banditMotion.maxStep.toFixed(1)} m vs mean ${banditMotion.meanStep.toFixed(1)} m per 0.017 s)`);
+
   // The recorded combat track must drive the same director cinematics as a
   // live launch: launch, missile follow, then the bandit shot.
   const replayShots = await evaluate(`(async () => {
