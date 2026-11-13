@@ -121,7 +121,7 @@ await withBrowserSession({
       if (!sequence) break;
       const missile = sequence.missile;
       const target = sequence.target;
-      if (missile?.alive && target && missile.position.distanceTo(target.position) < 120) {
+      if (missile?.alive && target?.alive && missile.position.distanceTo(target.position) < 600) {
         close = true;
         break;
       }

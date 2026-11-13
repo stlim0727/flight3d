@@ -64,7 +64,8 @@ export function createMissileMesh(type) {
     new THREE.ConeGeometry(radius, noseLength, 18, 1, false),
     isSidewinder ? domeMaterial() : radomeMaterial(),
   );
-  nose.rotation.x = Math.PI / 2;
+  // ConeGeometry's apex is +Y; the missile nose points forward (-Z).
+  nose.rotation.x = -Math.PI / 2;
   nose.position.z = -length / 2 + noseLength / 2;
   nose.castShadow = true;
   group.add(nose);
@@ -108,7 +109,7 @@ export function createBanditMesh(callsign = 'BANDIT') {
   group.add(fuselage);
 
   const nose = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.8, 10), dark);
-  nose.rotation.x = Math.PI / 2;
+  nose.rotation.x = -Math.PI / 2;
   nose.position.z = -4.7;
   nose.castShadow = true;
   group.add(nose);

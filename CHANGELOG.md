@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+- **fix(weapons):** point missile and bandit noses forward
+  - AIM-9X/AIM-120C and air-combat bandit nose cones were rotated so their apex trailed the fuselage; they now lead along the local -Z forward axis.
+  - The canyon-chase bandit's cone fuselage uses the same corrected orientation.
 - **fix(replay):** make recorded bandit kills visible and audible
   - Combat replays open in the DIRECTOR camera, so the launch → missile-follow → bandit shot plays without hunting for a view.
   - The bandit shot now frames the target airframe from behind and beside it with the inbound round, replacing the canopy-side eye that showed only the missile.

@@ -27,7 +27,9 @@ reloads every rail.
 - `src/weapons/missileSpecs.js` — missile data and F-16 station coordinates in
   the aircraft frame (+X starboard, +Y up, -Z nose).
 - `src/weapons/missileGeometry.js` — procedural AIM-9X / AIM-120C and bandit
-  meshes. No new binary assets.
+  meshes. No new binary assets. All weapon meshes use local forward `-Z`;
+  `ConeGeometry` apexes point `+Y`, so nose cones rotate `-90°` about X to lead
+  the airframe instead of trailing into it.
 - `src/weapons/AirToAirMissileSystem.js` — pure combat state: seeker lock
   integration, 120 Hz rocket mass/thrust, atmospheric drag, gravity, seeker
   gimbal limit, TPN guidance and closest-approach proximity fuse. It owns the

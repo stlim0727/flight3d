@@ -219,10 +219,10 @@ export class ExplosionSystem {
     for (let i = 0; i < count && this.smokePuffs.length < 120; i++) {
       const spriteMat = createFlipbookMaterial(this.dustTexture, {
         transparent: true,
-        // An air-burst plume has no ground behind it; a dark, opaque core keeps
-        // the kill readable against bright cloud and haze.
-        opacity: isAir ? 0.86 : 0.65,
-        color: type === 'TERRAIN' ? 0xa28b6c : isAir ? 0x3f4044 : 0xa3a5a7,
+        // An air-burst plume has no ground behind it; a darker core keeps the
+        // kill readable against bright cloud without becoming a black wall.
+        opacity: isAir ? 0.74 : 0.65,
+        color: type === 'TERRAIN' ? 0xa28b6c : isAir ? 0x5a5c60 : 0xa3a5a7,
         depthWrite: false
       });
 

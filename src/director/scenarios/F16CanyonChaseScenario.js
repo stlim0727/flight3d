@@ -42,7 +42,8 @@ class CanyonChaseTarget {
 
     // Low-poly delta adversary airframe
     const fuseGeo = new THREE.ConeGeometry(1.2, 12, 6);
-    fuseGeo.rotateX(Math.PI * 0.5);
+    // The cone apex must lead along the aircraft's forward -Z axis.
+    fuseGeo.rotateX(-Math.PI * 0.5);
     const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.3, metalness: 0.8 });
     const fuse = new THREE.Mesh(fuseGeo, darkMat);
     this.group.add(fuse);
