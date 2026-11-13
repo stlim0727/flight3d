@@ -1,11 +1,65 @@
 # F-16 air-to-air combat (Sprints 1-2)
 
-Discussion #612 splits the air-combat work into three sprints. Sprint 1 covers
+Discussion #612 originally split the air-combat work into three sprints. Sprint 1 covers
 Milestones 1 and 2: six rail missiles, 3D true proportional navigation (TPN),
 HUD lock symbology and the three-stage radar warning receiver. Sprint 2 adds
 Milestones 3 and 4: the M61A1 Vulcan cannon with an LCOS pipper, progressive
-combat damage, and the landed rearm turnaround. IFF, SAM sites and autonomous
-bandit airfields remain Sprint 3 work.
+combat damage, and the landed rearm turnaround. The remaining work is now split
+between Sprints 3 and 4 as specified below; the original Sprint 3 summary did
+not include every detail in the discussion.
+
+## Revised remaining scope (Discussion #612)
+
+Baseline: `4b86b7f` (including #702's F-16-based bandit flight dynamics).
+Sprints 1-2 deliver the core firing loop, not the full original damage model or
+an end-to-end hostile radar/launch loop. Drone damage already reduces engine
+performance and increases drag; per-part damage and player combat damage remain.
+The incoming RWR contact direction fix in this change corrects both bearing and
+elevation without changing the approach gate.
+
+Difficulty is relative implementation/integration risk, not a duration estimate.
+
+### Sprint 3: single-player combat contracts and integration
+
+| ID | Work / acceptance | Difficulty | Dependencies |
+| --- | --- | --- | --- |
+| S3-1 | Shared target identity, faction and IFF: friendly/hostile/unknown HUD symbols; identification progression; friendly lock/launch inhibition, including autonomous seeker acquisition. Define gun no-fire behavior explicitly. | Medium | Existing target/HUD interfaces |
+| S3-2 | Explicit radar emitter search/track/off state, range/FOV and terrain LOS; distinguish aircraft radar, missile seeker lock and RWR. Define IR vs active-radar seeker state and lock loss/reacquisition rather than treating both missile types identically. | High | S3-1 |
+| S3-3 | Airborne bandit engagement and hostile missile ownership/targeting; actual search → track → launch → inbound → lost/expired state drives RWR and audio. IR-only missiles must not fabricate a radar emission. | High | S3-1, S3-2 |
+| S3-4 | Connect 5 m lethal / 5-14 m fragment falloff to real detonations for player and AI; route per-part damage into controls, engine, fire/smoke and breakup. Preserve monotonic accumulation and single kill/respawn events. Audit CPA detonation position against damage distance. | High | Existing damage/physics; S3-3 for live incoming acceptance |
+| S3-5 | HOTAS/gamepad missile fire, gun hold and target cycle; retain ground brakes, block modal input, clear held triggers on pause/reset/disconnect; physical cannon recoil force/moment. | Medium | Existing controls/cannon |
+| S3-6 | Complete runway/apron service-area eligibility, resupply feedback and lifecycle checks; verify departure, landing, interrupted stop, 5 s completion and next sortie. | Medium | Existing turnaround; S3-4 damage policy |
+
+Sprint 3 exit: a human-flown F-16 can identify a target, engage, receive a real
+hostile radar/launch warning, take graded damage, and land/rearm. Friendly
+protection, terrain lock break, reacquisition, destruction, pause and reset need
+sequence tests. This is not completion of all Discussion #612 requirements.
+
+### Sprint 4: countermeasures, battlefield operations and multiplayer
+
+| ID | Work / acceptance | Difficulty | Dependencies |
+| --- | --- | --- | --- |
+| S4-1 | Flare/chaff inventory, keyboard/touch/HOTAS dispensing, FX, HUD and ground resupply. Flares influence IR seekers; chaff influences radar tracking/seekers through continuous signal/geometry state, with loss/reacquisition tests rather than a guaranteed random lock break. | High | S3-2, S3-3, S3-6 |
+| S4-2 | SAM sites in explicitly enabled Incheon/Sihwa/valley combat scenarios; site geometry, search/track/launch, threat envelope, terrain masking and player damage/RWR integration. Protect ordinary demos/missions from unintended combat. | High | S3-1 through S3-4; S4-1 for complete defensive loop |
+| S4-3 | Faction-assigned airfields, player/AI runway starts, scramble and waypoint CAP; use current F-16 flight dynamics instead of a second kinematic controller. Terrain-safe takeoff, return/service and respawn/reset lifecycle. | High | S3-1, S3-4, S3-6; current bandit dynamics |
+| S4-4 | Multiplayer team tags/IFF, remote target adapters, authoritative launch/hit/damage ownership, event IDs/deduplication and network synchronization; preserve existing room/voice/replay contracts and handle disconnect/rejoin. | Very high | Stable S3 combat contracts; S4-1 countermeasure replication |
+| S4-5 | Minimal ownship radar contact display with IFF symbols, range, target designation and lock state, backed by S3 sensor data. Full realistic F-16 radar modes are a separate future proposal. | Medium | S3-1, S3-2 |
+| S4-6 | End-to-end battlefield regression: airfield → takeoff → identify → engage → RWR → countermeasure/terrain evade → damage → land/rearm; record/replay new actors, threats and countermeasure events, including multiplayer. | High | S4-1 through S4-5 |
+
+Sequence: identity/IFF → sensor/seeker contracts → hostile engagement and damage
+→ countermeasures/SAM/airfield operations → multiplayer → final acceptance.
+HOTAS/recoil can proceed independently; multiplayer comes after stable combat
+ownership rather than simply removing the current multiplayer exclusion.
+
+Completion requires focused physics/state tests and hardware Chrome evidence
+for HUD/FX, controls, audio and the full lifecycle, following browser-gpu.md.
+The original seven extension requests plus flare/chaff, remote-aircraft targeting,
+HOTAS and the minimal radar display are assigned above. Sprints 3-4 close that
+scope only after their acceptance criteria pass; this plan does not mark them
+implemented. Original Enter/Space behavior has deliberately become Enter for
+missiles and airborne Space for guns; retain N for cycling instead of stealing
+browser Tab navigation. Countermeasures need a dedicated binding: C already
+cycles cameras and must not be silently reassigned.
 
 ## Controls
 

@@ -81,6 +81,39 @@ test('contacts report bearing clockwise from the nose', () => {
   assert.ok(Math.abs(Math.abs(state.contacts[0].bearingRad) - Math.PI) < 1e-6);
 });
 
+test('incoming missile bearings and elevations locate the threat, including after a heading change', () => {
+  const rwr = new RWRSystem();
+  for (const heading of [0, Math.PI / 2]) {
+    const quaternion = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), heading);
+    for (const [offset, bearing, elevation] of [
+      [new Vector3(0, 0, -1000), 0, 0],
+      [new Vector3(1000, 0, 0), Math.PI / 2, 0],
+      [new Vector3(-1000, 0, 0), -Math.PI / 2, 0],
+      [new Vector3(0, 0, 1000), Math.PI, 0],
+      [new Vector3(0, 1000, -1000), 0, Math.PI / 4],
+      [new Vector3(0, -1000, -1000), 0, -Math.PI / 4],
+    ]) {
+      const worldOffset = offset.clone().applyQuaternion(quaternion);
+      const missile = {
+        alive: true,
+        position: player.position.clone().add(worldOffset),
+        velocity: worldOffset.clone().normalize().multiplyScalar(-700),
+      };
+      let state = rwr.update(1 / 60, { ...player, quaternion, incoming: [missile] });
+      assert.equal(state.level, 3);
+      const contact = state.contacts[0];
+      const bearingError = Math.atan2(Math.sin(contact.bearingRad - bearing), Math.cos(contact.bearingRad - bearing));
+      assert.ok(Math.abs(bearingError) < 1e-6, `heading ${heading}: bearing ${contact.bearingRad}, expected ${bearing}`);
+      assert.ok(Math.abs(contact.elevationRad - elevation) < 1e-6);
+      // Reversing course must still suppress the warning after fixing display direction.
+      missile.velocity.negate();
+      state = rwr.update(1 / 60, { ...player, quaternion, incoming: [missile] });
+      assert.equal(state.level, 0);
+      assert.equal(state.contacts.length, 0);
+    }
+  }
+});
+
 test('threats outside detection range and dead emitters are silent', () => {
   const rwr = new RWRSystem();
   const far = { position: new Vector3(0, 3000, -30000), velocity: new Vector3(), alive: true };
