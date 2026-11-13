@@ -95,6 +95,19 @@ scenarios and debrief time are excluded. Aerodynamic/contact forces are unchange
 Max altitude, IAS and signed cabin-axis load are accumulated every tick;
 trajectory observations normally sample every 0.2 seconds.
 
+The flight log shows separate altitude (blue, FT) and signed G-load (amber)
+charts on a shared timeline. Selecting either chart or the common slider moves
+both cursors and updates the time/altitude/IAS/G readout. The G chart has its own
+range, includes negative loads and shows a dashed 1g reference. Its scale always
+includes 0–2g so steady 1g flight remains readable.
+
+The all-tick maximum-G observation is merged into the display timeline when it
+falls between retained trajectory samples; selection can therefore inspect that
+peak without modifying the report or export. Other G points retain the recorded
+sample resolution. Maximum G in the summary and shared text is the measured
+record value, even above the aircraft's structural limits. Existing touchdown
+classification/contact-G processing is unchanged.
+
 - Coordinates are Three.js +Y up, x/z horizontal, in meters. MSL altitude is
   world Y / 0.3048 in ft; pitch, roll and heading are degrees.
 - Speed is indicated airspeed in knots. G is the existing integrator measurement

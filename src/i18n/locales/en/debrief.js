@@ -52,6 +52,7 @@ export default {
   'debrief.viewRecord': 'View flight log',
   'debrief.history': 'Your flight at a glance',
   'debrief.altitudeAxis': 'Altitude (FT)',
+  'debrief.gAxis': 'G load',
   'debrief.inspect': 'Select recorded time',
   'debrief.inspectHint': 'Select a point to inspect its speed, altitude and G.',
   'debrief.started': 'Flight started',

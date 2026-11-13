@@ -17,13 +17,20 @@ const crashTarget = crash => {
   return text === key ? crash.type : text;
 };
 
+// Preserve the all-tick peak even when trajectory sampling/compaction skipped
+// that instant. These are report observations, never reconstructed G values.
+export function debriefChartSamples(report) {
+  const samples = new Map(report.samples.map(sample => [sample.timeSec, sample]));
+  const peak = report.peaks.gForce;
+  if (peak && ['timeSec', 'altitudeFt', 'gForce'].every(key => Number.isFinite(peak[key]))
+    && peak.timeSec >= 0 && peak.timeSec <= report.durationSec) samples.set(peak.timeSec, peak);
+  return [...samples.values()].sort((a, b) => a.timeSec - b.timeSec);
+}
+
 export function reportText(report) {
   const m = report.metadata;
   const specs = getAircraftSpecs(m?.aircraft);
-  const rawPeakG = report.peaks.gForce?.gForce;
-  const peakG = Number.isFinite(rawPeakG)
-    ? Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(specs.ultimateLoad?.min ?? -1.5, rawPeakG))
-    : rawPeakG;
+  const peakG = report.peaks.gForce?.gForce;
   const touchdown = report.touchdowns.at(-1);
   const contactG = touchdown && Number.isFinite(touchdown.contactG)
     ? Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(0, touchdown.contactG))
@@ -85,7 +92,16 @@ export class DebriefOverlay {
           <p id="debrief-insufficient" class="debrief-insufficient" data-i18n="debrief.insufficient" hidden></p>
 
           <div id="debrief-view-record" class="debrief-record-section">
+            <div class="debrief-chart-heading debrief-altitude-heading" data-i18n="debrief.altitudeAxis"></div>
             <svg id="debrief-chart" viewBox="0 0 320 90" role="img" data-i18n-aria-label="debrief.altitudeAxis"><defs><linearGradient id="debrief-altitude-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.32"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0.0"/></linearGradient></defs><path d="M0 85 H320" stroke="#385268"/><polygon class="debrief-chart-area" fill="url(#debrief-altitude-gradient)"/><polyline fill="none" stroke="#38bdf8" stroke-width="2"/><circle id="debrief-impact-marker" r="4" fill="#ef4444" stroke="#e2e8f0" hidden/><circle id="debrief-cursor" r="3" fill="#e2e8f0"/></svg>
+            <div class="debrief-chart-heading debrief-g-heading"><span data-i18n="debrief.gAxis"></span><span id="debrief-g-range"></span></div>
+            <svg id="debrief-g-chart" viewBox="0 0 320 90" role="img" data-i18n-aria-label="debrief.gAxis">
+              <path d="M0 85 H320" stroke="#385268"/>
+              <line id="debrief-g-reference" x1="0" x2="320" stroke="#64748b" stroke-dasharray="3 4"/>
+              <text id="debrief-g-reference-label" x="318" text-anchor="end" fill="#94a3b8" font-size="9">1 G</text>
+              <polyline fill="none" stroke="#fbbf24" stroke-width="2"/>
+              <circle id="debrief-g-cursor" r="3" fill="#fef3c7"/>
+            </svg>
             <input id="debrief-scrub" type="range" min="0" value="0" step="1" data-i18n-aria-label="debrief.inspect" />
             <div id="debrief-axis" class="debrief-axis" aria-hidden="true"></div>
             <p id="debrief-sample" class="debrief-sample" aria-live="polite">—</p>
@@ -126,10 +142,10 @@ export class DebriefOverlay {
     translateDOM(this.root);
     for (const el of this.root.querySelectorAll('[data-debrief-label]')) bindText(el, () => t(`debrief.${el.dataset.debriefLabel}`));
     this.el('scrub').addEventListener('input', () => this.inspect(Number(this.el('scrub').value)));
-    this.el('chart').addEventListener('pointerdown', event => {
-      const rect = this.el('chart').getBoundingClientRect();
+    for (const chart of ['chart', 'g-chart']) this.el(chart).addEventListener('pointerdown', event => {
+      const rect = event.currentTarget.getBoundingClientRect();
       const time = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * this.report.durationSec;
-      const index = this.report.samples.reduce((best, sample, i, samples) =>
+      const index = this.chartSamples.reduce((best, sample, i, samples) =>
         Math.abs(sample.timeSec - time) < Math.abs(samples[best].timeSec - time) ? i : best, 0);
       this.inspect(index);
     });
@@ -291,11 +307,7 @@ export class DebriefOverlay {
     this.el('stat-duration').textContent = flightDuration(report.durationSec);
     this.el('stat-altitude').textContent = `${number(report.peaks.altitudeFt?.altitudeFt)} FT`;
     this.el('stat-speed').textContent = `${number(report.peaks.iasKnots?.iasKnots)} KT`;
-    const rawPeakG = report.peaks.gForce?.gForce;
-    const clampedPeakG = Number.isFinite(rawPeakG)
-      ? Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(specs.ultimateLoad?.min ?? -1.5, rawPeakG))
-      : rawPeakG;
-    this.el('stat-g').textContent = `${g(clampedPeakG)} G`;
+    this.el('stat-g').textContent = `${g(report.peaks.gForce?.gForce)} G`;
     for (const key of ['altitude', 'speed', 'g']) this.root.querySelector(`[data-stat="${key}"]`).hidden = !enough;
     const touchdown = report.touchdowns.at(-1);
     const clampedContactG = touchdown && Number.isFinite(touchdown.contactG)
@@ -342,7 +354,8 @@ export class DebriefOverlay {
   }
 
   drawChart() {
-    const { samples, peaks, durationSec, reason, crash } = this.report;
+    const { peaks, durationSec, reason, crash } = this.report;
+    const samples = this.chartSamples = debriefChartSamples(this.report);
     const low = Math.min(...samples.map(s => s.altitudeFt), 0);
     const high = Math.max(peaks.altitudeFt?.altitudeFt ?? 1, low + 1);
     this.point = s => [s.timeSec / (durationSec || 1) * 320, 80 - (s.altitudeFt - low) / (high - low) * 65];
@@ -356,6 +369,16 @@ export class DebriefOverlay {
     } else if (area) {
       area.removeAttribute('points');
     }
+    const gSamples = samples.filter(s => Number.isFinite(s.gForce));
+    const gLow = Math.floor(Math.min(0, ...gSamples.map(s => s.gForce)));
+    const gHigh = Math.ceil(Math.max(2, ...gSamples.map(s => s.gForce)));
+    this.gPoint = s => [s.timeSec / (durationSec || 1) * 320, 80 - (s.gForce - gLow) / (gHigh - gLow) * 65];
+    this.el('g-chart').querySelector('polyline').setAttribute('points', gSamples.map(s => this.gPoint(s).join(',')).join(' '));
+    this.el('g-range').textContent = gSamples.length ? `${g(gLow)} – ${g(gHigh)} G` : '—';
+    const referenceY = this.gPoint({ timeSec: 0, gForce: 1 })[1];
+    this.el('g-reference').setAttribute('y1', referenceY);
+    this.el('g-reference').setAttribute('y2', referenceY);
+    this.el('g-reference-label').setAttribute('y', referenceY - 4);
     this.el('axis').replaceChildren(...[0, durationSec / 2, durationSec].map(time => {
       const span = document.createElement('span'); span.textContent = flightDuration(time); return span;
     }));
@@ -381,11 +404,16 @@ export class DebriefOverlay {
 
   inspect(index) {
     this.el('scrub').value = index;
-    const sample = this.report.samples[index];
+    const sample = this.chartSamples[index];
     const circle = this.el('cursor');
     circle.style.display = sample ? '' : 'none';
+    const gCircle = this.el('g-cursor');
+    gCircle.toggleAttribute('hidden', !sample || !Number.isFinite(sample.gForce));
     if (!sample) { this.el('sample').textContent = '—'; return; }
     const [x, y] = this.point(sample); circle.setAttribute('cx', x); circle.setAttribute('cy', y);
+    if (Number.isFinite(sample.gForce)) {
+      const [gx, gy] = this.gPoint(sample); gCircle.setAttribute('cx', gx); gCircle.setAttribute('cy', gy);
+    }
     this.el('sample').textContent = `${flightDuration(sample.timeSec)} · ${number(sample.altitudeFt)} FT · ${number(sample.iasKnots)} KT · ${g(sample.gForce)} G`;
   }
 

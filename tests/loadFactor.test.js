@@ -187,7 +187,7 @@ test('classifyLanding dynamically evaluates landing ratings per aircraft', () =>
   assert.equal(classifyLanding('C172', 2.70).rating, 'crash');
 });
 
-test('Debrief and FlightRecorder clamp abnormal 40G spikes to aircraft ultimate structural limit', () => {
+test('Debrief preserves measured peak G while touchdown classification retains its existing envelope', () => {
   const recorder = new FlightRecorder();
   recorder.start({ aircraft: 'B738', airport: 'coastal', scenario: 'approach' });
 
@@ -215,9 +215,9 @@ test('Debrief and FlightRecorder clamp abnormal 40G spikes to aircraft ultimate 
   assert.ok(report.touchdowns[0].contactG <= b738UltimateMax,
     `contactG ${report.touchdowns[0].contactG} exceeded ultimate load ${b738UltimateMax}`);
 
-  // Debrief summary report text must clamp contact G and peak G to structural envelope
+  // A manoeuvre/impact limit is not a measurement: report the stored maximum.
   const text = reportText(report);
-  assert.ok(!text.includes('40.00 G'), 'Debrief text should not contain raw 40G spike');
+  assert.ok(text.includes('40.00 G'), 'Debrief peak must match the recorded measurement');
 });
 
 test('post-crash physics ticks decay telemetry gForce instead of freezing at impact spike', async () => {

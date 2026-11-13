@@ -52,6 +52,7 @@ export default {
   'debrief.viewRecord': '비행 기록 보기',
   'debrief.history': '비행의 흐름',
   'debrief.altitudeAxis': '고도 (FT)',
+  'debrief.gAxis': 'G 하중',
   'debrief.inspect': '기록 시점 선택',
   'debrief.inspectHint': '구간을 선택하면 해당 시점의 속도·고도·G를 확인합니다.',
   'debrief.started': '비행 시작',
