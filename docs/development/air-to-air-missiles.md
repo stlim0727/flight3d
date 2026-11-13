@@ -63,6 +63,12 @@ cycles cameras and must not be silently reassigned.
 
 ## Controls
 
+Bandit patrol pilots now react to observable incoming rocket plumes using a
+bounded trial optical-warning model, then return to patrol through the existing
+F-16 flight dynamics. See [bandit evasion](bandit-evasion.md) for detection/reaction
+assumptions, non-evasive comparison controls, actual outcomes and verification.
+This does not complete S3-2/S3-3 sensor/hostile-engagement work or S4 countermeasures.
+
 | Action | Keyboard | Touch |
 | --- | --- | --- |
 | Fire the next loaded missile | `Enter` | `FIRE MSL` |
