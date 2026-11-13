@@ -44,7 +44,7 @@ I run the **`src/persona/flight_persona.js`** persona (imported by the game in b
 - **Lobby UI**: switches tabs (scenario, multi, settings, dev), selects each aircraft (B738, C172, F16), each airport (coastal, incheon, lukla, neon, valley), each preset (takeoff, approach, challenge, cruise, bridge, cliff, valley, demo), the demo route select, time-of-day, pilot mode (human/AI), gyro toggles, replay library, feedback dialog, multiplayer dialog.
 - **Flights**: starts new flights, uses the in-flight menu toggle, pausing/restoring via ESC menu, camera switching, ending flights for the debrief overlay.
 
-Each runner invocation flies one lobby configuration end to end; pass different `PERSONA_*` values to explore another aircraft, airport, or scenario. Sampling begins only after the requested sortie is verified: the start hold is released, the game flow is in `FLIGHT`, the recorder is active, and its aircraft/airport match the lobby choice. A start that returns to the lobby aborts the run instead of sampling the previous scene.
+Each runner invocation flies one lobby configuration end to end; pass different `PERSONA_*` values to explore another aircraft, airport, or scenario. Sampling begins only after the requested sortie is verified: the start hold is released, the game flow is in `FLIGHT`, the recorder is active, and its aircraft/airport match the lobby choice. A start that returns to the lobby aborts the run instead of sampling the previous scene. A preset may force an aircraft (Valley → F16); the runner reports `aircraft_forced` and gates on the resolved lobby selection, and a preset that resolves differently than requested also aborts.
 
 ## Anomaly detection (the "give feedback" part)
 

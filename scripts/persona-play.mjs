@@ -23,7 +23,7 @@ if (!scenario.airports.includes(config.airport)) {
   throw new Error(`${config.scenario} is not available at ${config.airport}`);
 }
 // A scenario that requires one aircraft overrides the requested one in the lobby.
-const aircraft = scenario.aircraft ?? config.aircraft;
+let aircraft = scenario.aircraft ?? config.aircraft;
 // Repo policy: WebGL runs use hardware acceleration. detectGpuAngle() reports
 // swiftshader when the render node is missing, and Chrome can also fail over after
 // launch, so refuse to sample (or publish) this reduced-confidence evidence unless
@@ -127,12 +127,29 @@ await withBrowserSession({ path: '/?telemetry=0', width: 1280, height: 720 },
       feedback.flight.demoRoute = selected;
     }
 
+    // A preset can force an aircraft (Valley → F16) and the lobby may resolve a
+    // different preset than requested. Wait for what will actually fly, not the request.
+    const resolved = await evaluate(() => ({
+      aircraft: window.simulator?.lobby?.aircraft ?? null,
+      airport: window.simulator?.lobby?.airport ?? null,
+      scenario: window.simulator?.lobby?.preset ?? null,
+    }));
+    if (resolved.scenario && resolved.scenario !== config.scenario) {
+      throw new Error(`Lobby resolved scenario "${resolved.scenario}" for requested "${config.scenario}"`);
+    }
+    if (resolved.aircraft && resolved.aircraft !== aircraft) {
+      feedback.observations.push({ note: 'aircraft_forced', requested: aircraft, actual: resolved.aircraft });
+      aircraft = resolved.aircraft;
+    }
+    feedback.flight.aircraft = aircraft;
+    if (resolved.airport) feedback.flight.airport = resolved.airport;
+
     const started = await click(evaluate, 'btn-fly', { action: 'start-flight', target: 'btn-fly' }, delay);
     if (!started) throw new Error('Missing lobby control: btn-fly');
     // fly() may await a scene rebuild for an airport/aircraft swap, and a failed start
     // returns to the lobby. Wait for the start hold to clear, the flow to enter FLIGHT,
     // and the recorder to carry the requested aircraft and airport before sampling.
-    const expected = { aircraft, airport: config.airport };
+    const expected = { aircraft, airport: resolved.airport ?? config.airport };
     let launch = null;
     const launchDeadline = Date.now() + 120000;
     while (Date.now() < launchDeadline) {
