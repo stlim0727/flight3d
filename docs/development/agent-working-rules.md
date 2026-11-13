@@ -22,6 +22,13 @@ Adapted from Keepory's CLAUDE.md and docs/development/agent-working-rules.md.
 - Do not retry the same failing approach or browser script past two attempts without
   isolating the cause in a small reproducer. Keep transient screenshots and JSON
   dumps in ignored directories (`.tmp/`, `.cache/`, `review-artifacts/`).
+- Locate before reading: `rg -n '<symbol>'` then read only the matching span. Do not
+  `cat` files beyond roughly 200 lines; oversized tool output is summarized into
+  artifacts and then paid for a second time when it is read back.
+- A new browser probe should return its raw shape or diagnostics on the first run,
+  so the second run is the assertion run and GPU minutes are not spent guessing.
+- `npm run pr:mac` waits for pending checks and merges in one call. Do not poll
+  `gh pr checks` from separate turns.
 - Verify the behavior affected by the change. Avoid running the long full test suite
   (`npm test`) locally when almost identical tests run in remote CI. Run fast focused unit
   tests (`node --test tests/<name>.test.js`) and syntax checks (`npm run check`) locally,

@@ -2,8 +2,9 @@
 // One-shot agent workflow helper for worktree creation (wt:new), review inspection (pr:arc), and merge+cleanup (pr:mac).
 // Collapses 15-25 individual git/gh shell turns per PR into a single deterministic command.
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, symlinkSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 function run(cmd, args, options = {}) {
   return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options }).trim();
@@ -15,6 +16,11 @@ function tryRun(cmd, args, options = {}) {
   } catch (err) {
     return { ok: false, out: (err.stdout || '') + (err.stderr || '') || err.message };
   }
+}
+
+function mainCheckoutPath() {
+  const first = run('git', ['worktree', 'list', '--porcelain']).split('\n\n')[0] || '';
+  return first.split('\n').find(line => line.startsWith('worktree '))?.slice(9) || process.cwd();
 }
 
 function getRepoInfo() {
@@ -38,6 +44,18 @@ function cmdWtNew(branch, customPath) {
   }
   run('git', ['worktree', 'add', '-b', branch, targetPath, 'origin/main']);
   console.log(`✔ Created worktree: ${targetPath} (branch: ${branch} from origin/main)`);
+  // A fresh worktree has no dependencies, so the first test run would fail on
+  // ERR_MODULE_NOT_FOUND and burn a turn. Share the installed tree instead.
+  const modules = resolve(mainCheckoutPath(), 'node_modules');
+  const link = resolve(targetPath, 'node_modules');
+  if (existsSync(modules) && !existsSync(link)) {
+    try {
+      symlinkSync(modules, link, 'dir');
+      console.log('✔ Linked node_modules from the shared checkout');
+    } catch (err) {
+      console.warn(`! Could not link node_modules (${err.message}); run npm ci in the worktree`);
+    }
+  }
 }
 
 function cmdPrArc(prArg, extraArgs = []) {
@@ -103,27 +121,42 @@ function cmdPrArc(prArg, extraArgs = []) {
   }
 }
 
+export function checkGate(pr) {
+  const rollup = pr.statusCheckRollup || [];
+  return {
+    failing: rollup.filter(c => c.conclusion && !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(c.conclusion)),
+    pending: rollup.filter(c => !c.conclusion && c.status !== 'COMPLETED'),
+  };
+}
+
 function cmdPrMac(prArg) {
-  const prJson = run('gh', [
+  const viewArgs = [
     'pr', 'view', ...(prArg ? [prArg] : []),
     '--json', 'number,title,url,state,mergeStateStatus,headRefName,statusCheckRollup'
-  ]);
-  const pr = JSON.parse(prJson);
+  ];
+  let pr = JSON.parse(run('gh', viewArgs));
   if (pr.state !== 'OPEN') {
     console.log(`PR #${pr.number} is already ${pr.state}. Proceeding to cleanup.`);
   } else {
-    const failing = (pr.statusCheckRollup || []).filter(
-      c => c.conclusion && !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(c.conclusion)
-    );
-    const pending = (pr.statusCheckRollup || []).filter(
-      c => !c.conclusion && c.status !== 'COMPLETED'
-    );
-    if (failing.length > 0 || pending.length > 0) {
-      console.error(`✖ Cannot merge PR #${pr.number}: failing=${failing.length}, pending=${pending.length}`);
-      process.exit(1);
+    let gate = checkGate(pr);
+    // Wait for in-flight CI in this call instead of exiting and making the agent
+    // poll the PR from fresh model turns.
+    if (gate.failing.length === 0 && gate.pending.length > 0) {
+      console.log(`… waiting for ${gate.pending.length} check(s) on PR #${pr.number}`);
+      tryRun('gh', ['pr', 'checks', String(pr.number), '--watch', '--interval', '20'],
+        { timeout: 30 * 60 * 1000 });
+      pr = JSON.parse(run('gh', viewArgs));
+      gate = checkGate(pr);
     }
-    run('gh', ['pr', 'merge', String(pr.number), '--merge', '--delete-branch']);
-    console.log(`✔ Merged PR #${pr.number} (${pr.headRefName})`);
+    if (pr.state !== 'OPEN') {
+      console.log(`PR #${pr.number} became ${pr.state} while waiting. Proceeding to cleanup.`);
+    } else if (gate.failing.length > 0 || gate.pending.length > 0) {
+      console.error(`✖ Cannot merge PR #${pr.number}: failing=${gate.failing.length}, pending=${gate.pending.length}`);
+      process.exit(1);
+    } else {
+      run('gh', ['pr', 'merge', String(pr.number), '--merge', '--delete-branch']);
+      console.log(`✔ Merged PR #${pr.number} (${pr.headRefName})`);
+    }
   }
 
   // Locate and remove worktree for this branch if present
@@ -152,11 +185,14 @@ function cmdPrMac(prArg) {
   }
 }
 
-const [, , action, firstArg, ...rest] = process.argv;
-if (action === 'wt:new') cmdWtNew(firstArg, rest[0]);
-else if (action === 'pr:arc') cmdPrArc(firstArg?.startsWith('--') ? null : firstArg, firstArg?.startsWith('--') ? [firstArg, ...rest] : rest);
-else if (action === 'pr:mac') cmdPrMac(firstArg);
-else {
-  console.error('Usage: node scripts/agent-workflow.mjs <wt:new|pr:arc|pr:mac> [args]');
-  process.exit(1);
+// Exported helpers stay importable in tests without running a workflow command.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const [, , action, firstArg, ...rest] = process.argv;
+  if (action === 'wt:new') cmdWtNew(firstArg, rest[0]);
+  else if (action === 'pr:arc') cmdPrArc(firstArg?.startsWith('--') ? null : firstArg, firstArg?.startsWith('--') ? [firstArg, ...rest] : rest);
+  else if (action === 'pr:mac') cmdPrMac(firstArg);
+  else {
+    console.error('Usage: node scripts/agent-workflow.mjs <wt:new|pr:arc|pr:mac> [args]');
+    process.exit(1);
+  }
 }
