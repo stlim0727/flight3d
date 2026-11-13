@@ -154,7 +154,7 @@ test('transient stall, G-LOC, damage and engine failure cannot earn a safe-cruis
   }
 });
 
-for (const aircraftId of Object.keys(AIRCRAFT_REGISTRY)) test(`${aircraftId}: all three levels fly 60 s, wing gusts above light`, () => {
+for (const aircraftId of Object.keys(AIRCRAFT_REGISTRY)) test(`${aircraftId}: all three levels fly 60 s, spatial wind gradients at every level`, () => {
   let previousRollRange = 0;
   for (const [id] of levels) {
     const sim = flight(undefined, id, aircraftId);
@@ -167,7 +167,7 @@ for (const aircraftId of Object.keys(AIRCRAFT_REGISTRY)) test(`${aircraftId}: al
       maxWingDifference = Math.max(maxWingDifference, sim.aero.windRightWorld.distanceTo(sim.aero.windLeftWorld));
     }
     assert.equal(sim.devRunner.result.status, 'passed', `${aircraftId} ${id}`);
-    assert.equal(maxWingDifference > 0, id !== 'turbulence', `${aircraftId} ${id}: wing gusts only above light`);
+    assert.ok(maxWingDifference > 0, `${aircraftId} ${id}: spatial wind sampled at both wings`);
     assert.ok(maxRoll - minRoll > previousRollRange, `${aircraftId} ${id}`);
     previousRollRange = maxRoll - minRoll;
   }

@@ -12,7 +12,7 @@ function fixture(quaternion = new THREE.Quaternion()) {
 }
 
 function gradient(sim, slope, uniform = 0) {
-  const field = new WindField(); field.sampleWings = true;
+  const field = new WindField();
   const right = new THREE.Vector3(1, 0, 0).applyQuaternion(sim.quaternion);
   const up = new THREE.Vector3(0, 1, 0).applyQuaternion(sim.quaternion);
   field.sample = (position, time, target) => {
@@ -69,7 +69,7 @@ test('wing samples match direct field queries at one time and clear on opt-out/r
     assert.deepEqual(actual, field.sample(point, 7, new THREE.Vector3()));
   }
   assert.equal(sim.windTimeSeconds, 7 + 1 / 120, 'Three samples advance the clock only once');
-  for (const profile of ['light-turbulence-v1', 'incheon-crosswind-v1', 'calm-debug-v1']) {
+  for (const profile of ['calm-debug-v1']) {
     setSimulationWind(sim, new WindField({ profile })); advanceSimulationWind(sim, 1 / 120);
     assert.deepEqual(sim.aero.windLeftWorld, sim.aero.windWorld);
     assert.deepEqual(sim.aero.windRightWorld, sim.aero.windWorld);
@@ -88,4 +88,35 @@ test('zero airspeed and separated flow keep the gradient correction finite and a
   sim.aero.separation = .9;
   const separated = compute(sim).wingGustRollMoment;
   assert.ok(Number.isFinite(separated) && Math.abs(separated) < Math.abs(attached) / 5);
+});
+
+test('every profile samples actual wing positions, including light and Incheon', () => {
+  for (const profile of ['light-turbulence-v1', 'incheon-crosswind-v1', 'mild-disturbance-v1']) {
+    const sim = fixture();
+    const field = new WindField({ profile, seed: 9 });
+    setSimulationWind(sim, field); advanceSimulationWind(sim, 1 / 120);
+    for (const [sign, actual] of [[-1, sim.aero.windLeftWorld], [1, sim.aero.windRightWorld]]) {
+      const position = sim.position.clone().add(new THREE.Vector3(sign * sim.aero.wingspan / 4, 0, 0));
+      assert.deepEqual(actual, field.sample(position, 0, new THREE.Vector3()));
+    }
+    assert.notEqual(compute(sim).wingGustRollMoment, 0);
+  }
+});
+
+test('uniform strong wind gives no gradient roll; regional edge is sampled per wing', () => {
+  const sim = fixture();
+  setSimulationWind(sim, new WindField({ mean: [5, 20, 2] }));
+  advanceSimulationWind(sim, 1 / 120);
+  assert.deepEqual(sim.aero.windLeftWorld, sim.aero.windRightWorld);
+  assert.equal(compute(sim).wingGustRollMoment, 0);
+  const center = { x: sim.position.x - 100, y: sim.position.y, z: sim.position.z };
+  const field = new WindField({ mean: [5, 20, 2], gust: [0, 0, 2], seed: 3,
+    region: { center, radius: 100, fade: 20 } });
+  setSimulationWind(sim, field); advanceSimulationWind(sim, 1 / 120);
+  assert.deepEqual(sim.aero.windWorld, field.mean(new THREE.Vector3()));
+  assert.deepEqual(sim.aero.windRightWorld, sim.aero.windWorld);
+  assert.notDeepEqual(sim.aero.windLeftWorld, sim.aero.windWorld);
+  assert.notEqual(compute(sim).wingGustRollMoment, 0);
+  setSimulationWind(sim);
+  assert.equal(compute(sim).wingGustRollMoment, 0);
 });

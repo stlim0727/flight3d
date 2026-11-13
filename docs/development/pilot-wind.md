@@ -4,6 +4,50 @@ Discussion [#356](https://github.com/stlim0727/flight3d/discussions/356), plan v
 requires physical disturbances separately from noisy observations. This change
 adds only the wind foundation; it does not calibrate or claim completed missions.
 
+## Unified wind field (#680)
+
+This section supersedes historical center-only sampling and measured flight ranges
+below. All active fields now sample the center and both half-wing centroids.
+Light, mild and Incheon receive rolling moments from their existing spatial
+gradients; Moderate/Strong retain their extra short cross-track vertical modes.
+Profile amplitudes, seeds and scales remain unchanged (roundoff aside).
+Trajectories of formerly center-only profiles intentionally change.
+
+```js
+setSimulationWind(sim, new WindField({
+  profile: 'strong-turbulence-v1', // defaults, independently overridable below
+  seed: 'weather-1', runwayHeadingDeg: 63,
+  mean: [0, 9.5, 0], // along/right/up m/s; overrides signed profile crosswind
+  gust: [1.8, 3.6, 1.2], wingGust: 1.6,
+  spatialScale: 1, // positive wavelength multiplier
+  timeScale: 1, // positive temporal frequency multiplier
+  region: { center: { x: 0, y: 750, z: 0 }, radius: 1000, fade: 200 },
+}));
+```
+
+The model is `wind(x,t) = mean + weight(x) * disturbance(x,t)`.
+Omit region for a global field. The optional world-space sphere has full strength
+through `radius - fade`; its shell uses `s = clamp((radius-distance)/fade,0,1)`
+and `weight = s*s*(3-2*s)`. Both disturbance and its boundary slope fade to zero.
+Background mean persists outside. Center, radius and fade use meters.
+Each wing evaluates its own weight, including when the center is outside.
+This training envelope is not a divergence-free fluid solver or atmospheric
+spectrum. Region placement UI and overlapping regions remain future work.
+
+The 120 Hz clock advances once after three samples. The physical quaternion
+transforms body offsets (+/- wingspan/4,0,0) into world positions. Render pose
+interpolation does not enter physics. Uniform mean wind produces zero additional
+gradient moment. Relative-airflow and two-panel lift/moment equations are unchanged.
+
+Node 22.23.2 focused wind, wing, turbulence, preset-reset and Incheon tests pass
+(46 tests), including every aircraft/strength for 60 seconds, restart, reset,
+frame grouping, scales and region exit/reentry. Check and build pass. Comparing
+all six profile fields against the base at five headings and 240 time/position
+samples each gives maximum component difference 3.56e-15 m/s.
+Historical browser evidence below was not remeasured for this revision and does
+not establish current browser acceptance.
+
+
 ## Existing behavior inspected
 
 At base `d4f6af4`, `Aerodynamics.computeAero()` already computes relative airflow

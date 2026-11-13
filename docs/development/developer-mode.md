@@ -28,8 +28,8 @@ menu holds a run; closing it resumes. Results survive exit and clear on next run
 
 **Light / Moderate / Strong turbulence cruise (60 s)** are adjacent manual
 Coastal/B738 flights. All use the same trimmed coastal cruise start and wind seed.
-Base gust amplitudes are 1x / 3x / 6x; Moderate and Strong additionally sample
-spatial gusts at both wings, producing alternating banks from lift differences.
+Base gust amplitudes are 1x / 3x / 6x. All levels sample both wings for
+spatial lift differences; Moderate and Strong add shorter cross-track vertical modes.
 Strong's complete wind field is twice Moderate's. The profiles are
 `light-turbulence-v1`, `moderate-turbulence-v1`, and `strong-turbulence-v1`.
 Pitch/roll/yaw, throttle and trim remain pilot-controlled; autopilot stays off.
