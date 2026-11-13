@@ -219,3 +219,26 @@ test('Debrief and FlightRecorder clamp abnormal 40G spikes to aircraft ultimate 
   const text = reportText(report);
   assert.ok(!text.includes('40.00 G'), 'Debrief text should not contain raw 40G spike');
 });
+
+test('post-crash physics ticks decay telemetry gForce instead of freezing at impact spike', async () => {
+  const { createHeadlessSimulation } = await import('../src/core/HeadlessSimulation.js');
+  const sim = createHeadlessSimulation({ aircraftId: 'B738' });
+  sim.position.set(0, 1.5, 0);
+  sim.linearVelocity.set(0, -35, -80);
+  sim.quaternion.set(0, 0, 0, 1);
+
+  const dt = 1 / 120;
+  for (let i = 0; i < 60 && !sim.isCrashed; i++) {
+    sim.integratePhysics(dt);
+  }
+  assert.equal(sim.isCrashed, true, 'expected high-sink ground impact to trigger crash');
+  const impactG = sim.telemetry.gForce;
+  assert.ok(impactG > 8, `expected impact spike > 8G, got ${impactG}`);
+
+  // Subsequent crashed ticks must decay telemetry.gForce toward resting ~1G
+  for (let i = 0; i < 120; i++) {
+    sim.integratePhysics(dt);
+  }
+  assert.ok(sim.telemetry.gForce < 2.0,
+    `telemetry.gForce stayed elevated after crash: ${sim.telemetry.gForce}`);
+});
