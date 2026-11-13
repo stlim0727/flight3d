@@ -121,6 +121,28 @@ describe('F16 Canyon Chase Scenario', () => {
     assert.deepEqual(sim.quaternion, attitude);
   });
 
+  it('flies the bandit independently of player progress without pose jumps', () => {
+    const sim = fakeSimulator();
+    const director = new DemoFlightDirector(sim);
+    director.start('lukla', 'canyon-chase');
+    const scenario = director.f16CanyonScenario;
+    const target = scenario.target;
+    const start = target.group.position.clone();
+    let previous = start.clone();
+    for (let i = 0; i < 30 * 60; i++) {
+      director.update(1 / 60);
+      assert.ok(target.alive);
+      assert.ok(target.group.position.distanceTo(previous) < 5, 'continuous F16 travel');
+      assert.ok(target.flight.aero.gForce < 9);
+      previous.copy(target.group.position);
+    }
+    assert.ok(target.group.position.distanceTo(start) > 2000);
+    assert.ok(target.progress > 0.1);
+    assert.ok(target.group.quaternion.equals(target.flight.quaternion));
+    assert.equal(director.currentStage, F16CanyonChaseScenario.STAGES.INGRESS);
+    director.stop();
+  });
+
   it('fails and disposes the bandit on unsafe terrain clearance', () => {
     const sim = fakeSimulator();
     const director = new DemoFlightDirector(sim);

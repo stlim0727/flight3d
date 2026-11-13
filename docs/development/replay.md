@@ -42,15 +42,18 @@ explosion and breakup when it reaches that time and removes them on a seek back.
 
 ### Air combat tracks
 
-F-16 sorties append an optional combat section after the pose frames (codec v4).
+F-16 sorties append an optional combat section after the pose frames (codec v5; v4 remains readable).
 Solo tracks without combat remain v2, and room tracks remain v3, so older builds
 still import them. The section records:
 
-- bandit poses at 2 Hz (position, heading, alive state) and the six-station rail
+- bandit poses at 2 Hz (position, heading, quaternion, alive state) and the six-station rail
   loadout mask;
 - missile poses at 20 Hz while a missile is alive (position, attitude, motor
   state);
 - detonation and expiry markers with position and velocity.
+
+Version 5 adds an 8-byte quantized quaternion to each bandit sample so bank and
+pitch survive playback. Version 4 uses the previous heading-only presentation.
 
 Playback interpolates the recorded poses and rail mask; it does not re-simulate
 guidance. This keeps seeks instant and guarantees that speed changes cannot alter

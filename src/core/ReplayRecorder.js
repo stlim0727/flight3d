@@ -124,6 +124,7 @@ export class ReplayRecorder {
         sample.targets[slot] = {
           x: target.position.x, y: target.position.y, z: target.position.z,
           headingRad: Math.atan2(vx, -vz),
+          quaternion: target.quaternion?.toArray(),
           alive: target.alive !== false,
         };
       }
