@@ -200,50 +200,53 @@ export class HudView {
 
     if (target) {
       const screen = this.projectWorld(target.position, width, height);
-      const margin = Math.max(48, 56 * scale);
-      const offscreen = screen.behind || screen.x < margin || screen.x > width - margin
-        || screen.y < margin || screen.y > height - margin;
-      if (offscreen) this.drawTargetLocator(screen, width, height, scale, state, red);
-      const x = MathUtils.clamp(screen.x, margin, width - margin);
-      const y = MathUtils.clamp(screen.y, margin, height - margin);
-      const locked = state.locked;
-      const size = Math.max(16, 22 * scale);
-      ctx.strokeStyle = locked ? amber : green;
-      ctx.fillStyle = locked ? amber : green;
-      ctx.lineWidth = 1.8;
-      if (locked) {
-        ctx.beginPath();
-        ctx.moveTo(x, y - size); ctx.lineTo(x + size, y);
-        ctx.lineTo(x, y + size); ctx.lineTo(x - size, y); ctx.closePath(); ctx.stroke();
+      const offscreen = screen.behind || screen.x < 0 || screen.x > width
+        || screen.y < 0 || screen.y > height;
+      if (offscreen) {
+        this.drawTargetLocator(screen, width, height, scale, state, red);
       } else {
-        const tick = size * .55;
-        for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        // Conformal symbols follow the actual line of sight, including near the edge.
+        const x = screen.x;
+        const y = screen.y;
+        const locked = state.locked;
+        const size = Math.max(16, 22 * scale);
+        ctx.strokeStyle = locked ? amber : green;
+        ctx.fillStyle = locked ? amber : green;
+        ctx.lineWidth = 1.8;
+        if (locked) {
           ctx.beginPath();
-          ctx.moveTo(x + sx * size, y + sy * size - sy * tick);
-          ctx.lineTo(x + sx * size, y + sy * size);
-          ctx.lineTo(x + sx * size - sx * tick, y + sy * size);
-          ctx.stroke();
+          ctx.moveTo(x, y - size); ctx.lineTo(x + size, y);
+          ctx.lineTo(x, y + size); ctx.lineTo(x - size, y); ctx.closePath(); ctx.stroke();
+        } else {
+          const tick = size * .55;
+          for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+            ctx.beginPath();
+            ctx.moveTo(x + sx * size, y + sy * size - sy * tick);
+            ctx.lineTo(x + sx * size, y + sy * size);
+            ctx.lineTo(x + sx * size - sx * tick, y + sy * size);
+            ctx.stroke();
+          }
+          if (state.lockProgress > 0) {
+            ctx.beginPath();
+            ctx.arc(x, y, size + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * state.lockProgress);
+            ctx.stroke();
+          }
         }
-        if (state.lockProgress > 0) {
-          ctx.beginPath();
-          ctx.arc(x, y, size + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * state.lockProgress);
-          ctx.stroke();
-        }
-      }
 
-      ctx.font = `600 ${small}px monospace`;
-      ctx.textAlign = 'center';
-      ctx.fillText(`${target.callsign}  ${(state.rangeM / 1852).toFixed(1)} NM`, x, y - size - 14);
-      if (Number.isFinite(state.closureMps)) {
-        const closure = Math.round(state.closureMps * 1.94384);
-        ctx.fillText(`${closure >= 0 ? '+' : ''}${closure} KT`, x, y + size + 15);
-      }
-      if (locked && state.remaining > 0 && state.nextMissileType && state.rangeM <= state.nextMissileType.seekerRangeM) {
-        ctx.fillStyle = amber;
-        ctx.fillText(t('weapons.shoot'), x, y - size - 31);
-      } else if (state.lockProgress > 0 && !locked) {
-        ctx.fillStyle = green;
-        ctx.fillText(t('weapons.acquiring'), x, y - size - 31);
+        ctx.font = `600 ${small}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`${target.callsign}  ${(state.rangeM / 1852).toFixed(1)} NM`, x, y - size - 14);
+        if (Number.isFinite(state.closureMps)) {
+          const closure = Math.round(state.closureMps * 1.94384);
+          ctx.fillText(`${closure >= 0 ? '+' : ''}${closure} KT`, x, y + size + 15);
+        }
+        if (locked && state.remaining > 0 && state.nextMissileType && state.rangeM <= state.nextMissileType.seekerRangeM) {
+          ctx.fillStyle = amber;
+          ctx.fillText(t('weapons.shoot'), x, y - size - 31);
+        } else if (state.lockProgress > 0 && !locked) {
+          ctx.fillStyle = green;
+          ctx.fillText(t('weapons.acquiring'), x, y - size - 31);
+        }
       }
     }
 
@@ -333,7 +336,9 @@ export class HudView {
 
   drawTargetLocator(screen, width, height, scale, state, redColor) {
     const ctx = this.ctx;
-    const angle = screen.angle || 0;
+    const angle = screen.behind
+      ? screen.angle || 0
+      : Math.atan2(screen.x - width / 2, height / 2 - screen.y);
     const radius = Math.min(width, height) * .43;
     const x = width / 2 + Math.sin(angle) * radius;
     const y = height / 2 - Math.cos(angle) * radius;
