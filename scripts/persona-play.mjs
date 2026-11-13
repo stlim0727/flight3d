@@ -48,7 +48,8 @@ const feedback = {
   flight: {
     aircraft, airport: config.airport, scenario: config.scenario,
     durationSec: null, peakG: null, peakIas: null, peakAltitudeFt: null,
-    glocIncidents: 0, touchdowns: [], crash: null,
+    glocIncidents: 0, touchdowns: [], crash: null, endReason: null,
+    demoRoute: null,
   },
   observations: [],
   limitations: [],
@@ -123,11 +124,41 @@ await withBrowserSession({ path: '/?telemetry=0', width: 1280, height: 720 },
         throw new Error(`Demo route "${choice.requested}" resolved to "${selected}" instead`);
       }
       feedback.flow.push({ step: feedback.flow.length + 1, action: 'select-demo-route', value: selected });
+      feedback.flight.demoRoute = selected;
     }
 
     const started = await click(evaluate, 'btn-fly', { action: 'start-flight', target: 'btn-fly' }, delay);
     if (!started) throw new Error('Missing lobby control: btn-fly');
-    feedback.observations.push({ note: 'flight_started', value: true });
+    // fly() may await a scene rebuild for an airport/aircraft swap, and a failed start
+    // returns to the lobby. Wait for the start hold to clear, the flow to enter FLIGHT,
+    // and the recorder to carry the requested aircraft and airport before sampling.
+    const expected = { aircraft, airport: config.airport };
+    let launch = null;
+    const launchDeadline = Date.now() + 120000;
+    while (Date.now() < launchDeadline) {
+      launch = await evaluate((target) => {
+        const sim = window.simulator;
+        if (!sim) return { ok: false, reason: 'simulator unavailable' };
+        const state = {
+          startingFlight: Boolean(sim.startingFlight),
+          flow: sim.gameFlow?.state ?? null,
+          recording: Boolean(sim.flightRecorder?.active),
+          aircraft: sim.currentAircraftId ?? null,
+          airport: sim.activeAirport ?? null,
+        };
+        state.ok = !state.startingFlight && state.flow === 'flight' && state.recording
+          && state.aircraft === target.aircraft && state.airport === target.airport;
+        return state;
+      }, expected);
+      if (launch?.ok) break;
+      await delay(250);
+    }
+    if (!launch?.ok) {
+      throw new Error(`Flight did not start for ${aircraft} @ ${config.airport}: ${JSON.stringify(launch)}`);
+    }
+    feedback.observations.push({
+      note: 'flight_started', value: true, aircraft: launch.aircraft, airport: launch.airport,
+    });
 
     const allStates = [];
     let state = null;
@@ -154,8 +185,11 @@ await withBrowserSession({ path: '/?telemetry=0', width: 1280, height: 720 },
 
     for (const message of consoleMessages ?? []) {
       const text = message?.args?.map?.(arg => arg?.value ?? arg?.description ?? '').join(' ') ?? '';
-      if (String(message?.type) === 'error' && String(text).length < 400) {
-        feedback.anomalies.push({ code: 'CONSOLE_ERR', value: text, severity: 'P3', message: text, source: 'console' });
+      if (String(message?.type) === 'error') {
+        // A handled error logged with console.error may be the only evidence: keep it,
+        // clipped, instead of dropping it because a stack made the text long.
+        const value = text.length > 400 ? `${text.slice(0, 400)}…` : text;
+        feedback.anomalies.push({ code: 'CONSOLE_ERR', value, severity: 'P3', message: value, source: 'console' });
       }
     }
     for (const exception of exceptions ?? []) {
@@ -166,9 +200,11 @@ await withBrowserSession({ path: '/?telemetry=0', width: 1280, height: 720 },
     const maxOf = key => (values(key).length ? Math.max(...values(key)) : null);
     const minOf = key => (values(key).length ? Math.min(...values(key)) : null);
     feedback.flight.durationSec ??= allStates.length * config.intervalMs / 1000;
-    feedback.flight.peakG = maxOf('gForce');
-    feedback.flight.peakIas = maxOf('iasKnots');
-    feedback.flight.peakAltitudeFt = maxOf('altitudeFt');
+    // The recorder samples at 5 Hz and holds the true peaks; these persona samples are
+    // sparse, so only fill a peak the recorder/debrief did not report.
+    feedback.flight.peakG ??= maxOf('gForce');
+    feedback.flight.peakIas ??= maxOf('iasKnots');
+    feedback.flight.peakAltitudeFt ??= maxOf('altitudeFt');
     feedback.observations.push({ trajectory: {
       maxG: feedback.flight.peakG, maxIAS: feedback.flight.peakIas,
       minAltFt: minOf('altitudeFt'), minClearanceFt: minOf('radioAltFt'),
@@ -178,6 +214,10 @@ await withBrowserSession({ path: '/?telemetry=0', width: 1280, height: 720 },
 
     report = {
       ...feedback,
+      settings: {
+        aircraft, airport: config.airport, scenario: config.scenario,
+        demoRoute: feedback.flight.demoRoute, ticks: config.ticks, intervalMs: config.intervalMs,
+      },
       consoleErrorCount: (consoleMessages ?? []).filter(m => m?.type === 'error').length,
       exceptionCount: (exceptions ?? []).length,
     };

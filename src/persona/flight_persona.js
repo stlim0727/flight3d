@@ -156,8 +156,10 @@ export function summarizeFlight(sim) {
       : Number.isFinite(recorder?.glocIncidents) ? recorder.glocIncidents
       : 0,
     touchdowns: Array.isArray(report?.touchdowns) ? report.touchdowns : liveTouchdowns,
+    // A normal stop ('landed', 'manual') is not a crash and must not be read as one.
+    endReason: report?.reason ?? null,
     crash: report
-      ? (report.reason === 'crash' ? (report.crash ?? true) : report.reason ?? null)
+      ? (report.reason === 'crash' ? (report.crash ?? true) : null)
       : sim?.crashResult ?? null,
   };
 }

@@ -44,7 +44,7 @@ I run the **`src/persona/flight_persona.js`** persona (imported by the game in b
 - **Lobby UI**: switches tabs (scenario, multi, settings, dev), selects each aircraft (B738, C172, F16), each airport (coastal, incheon, lukla, neon, valley), each preset (takeoff, approach, challenge, cruise, bridge, cliff, valley, demo), the demo route select, time-of-day, pilot mode (human/AI), gyro toggles, replay library, feedback dialog, multiplayer dialog.
 - **Flights**: starts new flights, uses the in-flight menu toggle, pausing/restoring via ESC menu, camera switching, ending flights for the debrief overlay.
 
-Each runner invocation flies one lobby configuration end to end; pass different `PERSONA_*` values to explore another aircraft, airport, or scenario.
+Each runner invocation flies one lobby configuration end to end; pass different `PERSONA_*` values to explore another aircraft, airport, or scenario. Sampling begins only after the requested sortie is verified: the start hold is released, the game flow is in `FLIGHT`, the recorder is active, and its aircraft/airport match the lobby choice. A start that returns to the lobby aborts the run instead of sampling the previous scene.
 
 ## Anomaly detection (the "give feedback" part)
 
@@ -60,7 +60,7 @@ While flying I **sample the simulator state each tick** (`window.simulator`) and
 | `BREAKUP` | `sim.isCrashed` true or `aircraftBreakup.pieces` non-empty | airframe failure |
 | `STALL` | `hud-stall` banner visible | unexpected stall warning |
 | `UI_MISSING` | an expected lobby/flight ID is not attached when it should be | menu tree broken |
-| `CONSOLE_ERR` | any `console.error` captured from the page | any JS error during the flow |
+| `CONSOLE_ERR` | any `console.error` captured from the page (clipped to 400 characters, never dropped) | any JS error during the flow |
 
 `altitudeFt` is height above mean sea level; `radioAltFt` is height above the terrain.
 Neon Metropolis canal flights are legitimately below sea level (the water sits at
@@ -96,7 +96,13 @@ I return a **JSON feedback object** so it can be saved/linked:
     "peakG": 50.25, "peakIas": 320, "peakAltitudeFt": 6000,
     "touchdowns": [{ "timeSec": 119, "sinkRateFpm": 600, "contactG": 2.9 }],
     "glocIncidents": 0,
+    "endReason": null,
+    "demoRoute": "canyon-slalom",
     "crash": null
+  },
+  "settings": {
+    "aircraft": "F16", "airport": "lukla", "scenario": "demo",
+    "demoRoute": "canyon-slalom", "ticks": 40, "intervalMs": 1000
   },
   "observations": [ "...", "..." ],
   "limitations": [ "...", "..." ]

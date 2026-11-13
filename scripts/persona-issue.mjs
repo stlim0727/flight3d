@@ -11,8 +11,10 @@ export function buildSignature(report) {
   const keys = new Set();
   for (const a of report.anomalies ?? []) keys.add(`${a.code}:${a.severity}`);
   const flight = report.flight ?? {};
+  const demoRoute = report.settings?.demoRoute ?? flight.demoRoute ?? '';
   return crypto.createHash('sha1')
-    .update([...keys].sort().join('|') + ':' + flight.aircraft + ':' + flight.airport + ':' + flight.scenario)
+    .update([...keys].sort().join('|') + ':' + flight.aircraft + ':' + flight.airport + ':' + flight.scenario
+      + ':' + demoRoute)
     .digest('hex').slice(0, 12);
 }
 
@@ -21,6 +23,8 @@ export function formatIssue(report, { commit, repo }) {
   for (const a of report.anomalies ?? []) seen.set(`${a.code}|${a.value}|${a.message}`, a);
   const signature = buildSignature(report);
   const f = report.flight ?? {};
+  const settings = report.settings ?? {};
+  const demoRoute = settings.demoRoute ?? f.demoRoute ?? null;
   const flightLine = [f.aircraft, f.airport, f.scenario].filter(Boolean).join(' @ ') || 'unknown';
   const lines = [
     '## Flight Persona anomaly report',
@@ -30,9 +34,11 @@ export function formatIssue(report, { commit, repo }) {
     `- Commit: \`${commit}\``,
     `- Repo: ${repo ?? 'unknown'}`,
     `- Scenario: ${flightLine}`,
+    ...(demoRoute ? [`- Demo route: \`${demoRoute}\``] : []),
     `- Duration: ${Number.isFinite(f.durationSec) ? f.durationSec.toFixed(1) + ' s' : 'unknown'}`,
     `- Peak values: G=${f.peakG ?? 'n/a'}, IAS=${f.peakIas ?? 'n/a'} kt, alt=${f.peakAltitudeFt ?? 'n/a'} ft`,
     `- Crash: ${f.crash ? JSON.stringify(f.crash) : 'none'}`,
+    ...(f.endReason ? [`- End reason: ${f.endReason}`] : []),
     '',
     `### Anomalies (${report.anomalies?.length ?? 0} samples, ${seen.size} distinct)`,
     '',
@@ -46,7 +52,24 @@ export function formatIssue(report, { commit, repo }) {
   for (const obs of report.observations ?? []) {
     lines.push(`- ${JSON.stringify(obs)}`);
   }
-  lines.push('', '### Reproduction', '', '```bash', 'node scripts/persona-play.mjs', '```');
+  // Reproduce the flight that was actually flown, not the runner defaults.
+  const env = [
+    `PERSONA_AIRCRAFT=${settings.aircraft ?? f.aircraft ?? 'C172'}`,
+    `PERSONA_AIRPORT=${settings.airport ?? f.airport ?? 'neon'}`,
+    `PERSONA_SCENARIO=${settings.scenario ?? f.scenario ?? 'bridge'}`,
+  ];
+  if (demoRoute) env.push(`PERSONA_DEMO_ROUTE=${demoRoute}`);
+  if (Number.isFinite(settings.ticks)) env.push(`PERSONA_TICKS=${settings.ticks}`);
+  if (Number.isFinite(settings.intervalMs)) env.push(`PERSONA_INTERVAL_MS=${settings.intervalMs}`);
+  lines.push('', '### Reproduction', '', '```bash', `${env.join(' ')} node scripts/persona-play.mjs`, '```');
+  if ((report.flow ?? []).length) {
+    lines.push('', '### Flow', '');
+    for (const step of report.flow) {
+      const target = step.target ? ` (\`${step.target}\`)` : '';
+      const value = step.value != null ? ` → \`${step.value}\`` : '';
+      lines.push(`- ${step.step ?? '?'}. ${step.action ?? 'step'}${value}${target}`);
+    }
+  }
   lines.push('', '### Limitations', '');
   if ((report.limitations ?? []).length) {
     for (const l of report.limitations) lines.push(`- ${l}`);

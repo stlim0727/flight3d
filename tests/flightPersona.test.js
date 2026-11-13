@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ANOMALY_CODES, detectAnomalies, sample, summarizeFlight } from '../src/persona/flight_persona.js';
 import { NEON_RIVER, riverGroundHeight } from '../src/config/neonRiver.js';
+import { buildSignature, formatIssue } from '../scripts/persona-issue.mjs';
 
 const feet = meters => meters / 0.3048;
 
@@ -92,4 +93,29 @@ test('summarizeFlight preserves incidents recorded before a debrief exists', () 
   assert.equal(finished.aircraft, 'C172');
   assert.equal(finished.durationSec, 30);
   assert.equal(finished.glocIncidents, 2);
+  // A normal stop is reported as an end reason, never as a crash.
+  assert.equal(finished.endReason, 'manual');
+  assert.equal(finished.crash, null);
+});
+
+
+test('published issues keep the flown demo route, sampling settings and flow', () => {
+  const report = {
+    timestamp: '2026-11-13T00:00:00Z',
+    anomalies: [{ code: 'STALL', severity: 'P2', message: 'stall warning' }],
+    flight: { aircraft: 'F16', airport: 'lukla', scenario: 'demo', demoRoute: 'canyon-chase', durationSec: 12 },
+    flow: [{ step: 1, action: 'select-demo-route', value: 'canyon-chase' }],
+    settings: {
+      aircraft: 'F16', airport: 'lukla', scenario: 'demo', demoRoute: 'canyon-chase',
+      ticks: 40, intervalMs: 1000,
+    },
+    observations: [], limitations: [],
+  };
+  const body = formatIssue(report, { commit: 'abc1234', repo: 'o/r' });
+  assert.match(body, /Demo route: `canyon-chase`/);
+  assert.match(body, /PERSONA_AIRCRAFT=F16 PERSONA_AIRPORT=lukla PERSONA_SCENARIO=demo PERSONA_DEMO_ROUTE=canyon-chase PERSONA_TICKS=40 PERSONA_INTERVAL_MS=1000 node scripts\/persona-play\.mjs/);
+  assert.match(body, /select-demo-route → `canyon-chase`/);
+  // Different choreography in the same aircraft/airport must not share an issue signature.
+  const other = { ...report, settings: { ...report.settings, demoRoute: 'low-pass' } };
+  assert.notEqual(buildSignature(report), buildSignature(other));
 });
