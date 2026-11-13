@@ -4,6 +4,7 @@ import { BOEING_737_800 } from '../config/aircraftConfigs.js';
 import { TRIM_WHEEL_AUTHORITY } from './trimWheel.js';
 import { MassProperties } from './MassProperties.js';
 import { longitudinalForces } from './longitudinalForces.js';
+import { limitedPitchMoment, incidenceRate, loadSlope } from './gLimiter.js';
 
 export function createAeroResult() {
   return { forceWorld: new THREE.Vector3(), momentBody: new THREE.Vector3() };
@@ -17,6 +18,10 @@ export function createAeroResult() {
 export class Aerodynamics {
   constructor(config = BOEING_737_800) {
     this._longitudinal = {};
+    this._limiterNeutral = {};
+    this._limiterProbe = {};
+    this._limiterGravity = new THREE.Vector3();
+    this._limiterForceDelta = new THREE.Vector3();
     this.loadConfig(config);
 
     // Dynamic Live Tuning Overrides
@@ -74,6 +79,7 @@ export class Aerodynamics {
   }
 
   loadConfig(config) {
+    this.gLimiterLimits = config.flightControls?.gLimiter ? config.specs.limitLoad : null;
     const aero = config.aerodynamics || {};
     const mass = config.massProperties || {};
 
@@ -363,7 +369,7 @@ export class Aerodynamics {
     // As separation spreads outboard the horizontal tail buries itself in the
     // wake and progressively loses authority (continuous with the state).
     const elevatorEffectiveness = 1.0 - 0.8 * this.separation;
-    const elevatorEffective = (elevatorRad + trimRad) * elevatorEffectiveness;
+    let elevatorEffective = (elevatorRad + trimRad) * elevatorEffectiveness;
     // In Three.js body frame, positive Mx lifts nose UP, so stick back (-Cm_de > 0) creates positive pitch moment
     let cm = this.Cm0 + this.Cma * this.alpha - this.Cm_de * elevatorEffective + this.Cmq * qHat;
 
@@ -412,6 +418,38 @@ export class Aerodynamics {
       (this.Cm0 + this.Cma * this.alpha - this.Cm_de * elevatorEffective) + thrustPitchMoment);
     result.momentBody.y += this.cg.x * (longitudinal.z - engineThrustTotal) - this.cg.z * sideForce;
     result.momentBody.z += this.cg.y * sideForce - this.cg.x * longitudinal.y;
+    // All input sources (pilot, AP and director), including trim, reach this
+    // common tail command. Protect the airborne manoeuvre envelope by changing
+    // that command; contact impulses and measured G remain untouched.
+    if (this.gLimiterLimits && u > 30) {
+      const neutral = longitudinalForces(this, qDyn, this.alpha, cl, cd, 0,
+        engineThrustTotal, this._limiterNeutral);
+      const gravityBody = this._limiterGravity.set(0, -Atmosphere.G0, 0).applyQuaternion(invQuat);
+      const alphaRate = incidenceRate(u, v, w, angularVelocityBody,
+        neutral.y / this.mass + gravityBody.y,
+        (neutral.z - engineThrustTotal) / this.mass + gravityBody.z);
+      const permittedMoment = limitedPitchMoment({ requestedMoment: result.momentBody.x,
+        inertia: this.Iyy, pitchRate: angularVelocityBody.x, alphaRate,
+        normalG: neutral.y / (this.mass * Atmosphere.G0),
+        gPerAlpha: loadSlope(this, qDyn, this.alpha), limits: this.gLimiterLimits });
+      const probe = longitudinalForces(this, qDyn, this.alpha, cl, cd,
+        elevatorEffective + 0.001, engineThrustTotal, this._limiterProbe);
+      const momentPerRadian = (probe.pitch - longitudinal.pitch) / 0.001;
+      if (momentPerRadian > 1 && permittedMoment !== result.momentBody.x) {
+        const limited = THREE.MathUtils.clamp(elevatorEffective
+          + (permittedMoment - result.momentBody.x) / momentPerRadian,
+        -maxElevatorRad * elevatorEffectiveness, maxElevatorRad * elevatorEffectiveness);
+        const previousY = longitudinal.y, previousZ = longitudinal.z, previousPitch = longitudinal.pitch;
+        longitudinalForces(this, qDyn, this.alpha, cl, cd, limited, engineThrustTotal, longitudinal);
+        result.forceWorld.add(this._limiterForceDelta.set(0, longitudinal.y - previousY,
+          longitudinal.z - previousZ).applyQuaternion(aircraftMesh.quaternion));
+        result.momentBody.x += longitudinal.pitch - previousPitch;
+        result.momentBody.y += this.cg.x * (longitudinal.z - previousZ);
+        result.momentBody.z -= this.cg.x * (longitudinal.y - previousY);
+        elevatorEffective = limited;
+      }
+    }
+    result.elevatorEffective = elevatorEffective;
     // First-order antisymmetric wing-gust lift, not another roll-rate damper.
     // Existing whole-aircraft lift owns common-mode heave and Cl_p owns damping.
     // alpha = atan2(w,u); d(alpha) = (u*d(w) - w*d(u)) / (u²+w²).

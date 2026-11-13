@@ -12,7 +12,7 @@ import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
  * relative to neutral. Use the live integrator's pitch/roll inertia convention.
  */
 export function sampleControlResponse({ input, axis = 'roll', legacyGyro = false,
-  iasKnots = 350, altitudeMeters = 3000, source = 'touch', aircraftId = 'F16' } = {}) {
+  iasKnots = 350, altitudeMeters = 3000, source = 'touch', aircraftId = 'F16', gLimiter = true } = {}) {
   const previousWindow = globalThis.window;
   globalThis.window ??= { addEventListener() {} };
   try {
@@ -28,6 +28,7 @@ export function sampleControlResponse({ input, axis = 'roll', legacyGyro = false
     }
     for (let i = 0; i < 240; i++) controls.update(1 / 120, iasKnots, aircraftId);
     const aero = new Aerodynamics(AIRCRAFT_REGISTRY[aircraftId]);
+    if (!gLimiter) aero.gLimiterLimits = null;
     aero.pitchTrim = 0;
     const densityRatio = Atmosphere.getConditions(altitudeMeters).densityRatio;
     const tas = Atmosphere.iasToTas(Atmosphere.knotsToMs(iasKnots), densityRatio);
