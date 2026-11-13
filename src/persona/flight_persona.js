@@ -81,8 +81,14 @@ export function detectAnomalies(state, sim) {
       `airborne ${state.radioAltFt.toFixed(1)} ft above terrain${msl} — possible terrain mesh clipping`);
   }
 
-  if (sim?.aircraftBreakup?.active === true) {
-    push(ANOMALY_CODES.BREAKUP, true, 'aircraft breakup flagged by simulator');
+  // AircraftBreakup has no `active` flag: spawn() fills the debris list and
+  // PhysicsIntegrator.triggerCrash() marks `isCrashed` before spawning it.
+  const debris = Array.isArray(sim?.aircraftBreakup?.pieces) ? sim.aircraftBreakup.pieces.length : 0;
+  if (sim?.isCrashed === true || debris > 0) {
+    const kind = sim?.crashResult?.type ?? sim?.crashResult?.name ?? null;
+    const detail = [debris > 0 ? `${debris} debris pieces` : null, kind].filter(Boolean).join(', ');
+    push(ANOMALY_CODES.BREAKUP, true,
+      `aircraft breakup flagged by simulator${detail ? ` (${detail})` : ''}`);
   }
 
   // undefined (no document or no banner element) is not a visible banner.
@@ -126,19 +132,32 @@ export function createAnomalyEvaluator({ sampleIntervalMs = 500, onAnomaly } = {
 
 export function summarizeFlight(sim) {
   const report = sim?.debriefReport ?? null;
-  const latest = sim?.flightRecorder?.latest ?? null;
+  const recorder = sim?.flightRecorder ?? null;
+  const latest = recorder?.latest ?? null;
+  // An active sortie has no debriefReport yet, but FlightRecorder already counts
+  // G-LOC entries and touchdowns. Fall back to those counters so sampling that
+  // ends mid-flight does not erase events that have already been recorded.
+  const liveTouchdowns = Array.isArray(recorder?.touchdowns)
+    ? recorder.touchdowns.map(({ _tdRecord, ...touchdown }) => touchdown)
+    : [];
+  const peaks = report?.peaks ?? recorder?.peaks ?? null;
   return {
     aircraft: report?.metadata?.aircraft ?? sim?.lobby?.aircraft ?? null,
     airport: report?.metadata?.airport ?? sim?.lobby?.airport ?? null,
     scenario: report?.metadata?.scenario ?? sim?.lobby?.preset ?? null,
     durationSec: Number.isFinite(report?.durationSec) ? report.durationSec
+      : Number.isFinite(recorder?.elapsed) ? recorder.elapsed
       : Number.isFinite(latest?.timeSec) ? latest.timeSec
       : null,
-    peakG: Number.isFinite(report?.peaks?.gForce?.gForce) ? report.peaks.gForce.gForce : null,
-    peakIas: Number.isFinite(report?.peaks?.iasKnots?.iasKnots) ? report.peaks.iasKnots.iasKnots : null,
-    peakAltitudeFt: Number.isFinite(report?.peaks?.altitudeFt?.altitudeFt) ? report.peaks.altitudeFt.altitudeFt : null,
-    glocIncidents: Number.isFinite(report?.glocIncidents) ? report.glocIncidents : 0,
-    touchdowns: Array.isArray(report?.touchdowns) ? report.touchdowns : [],
-    crash: report?.reason === 'crash' ? (report?.crash ?? true) : report?.reason ?? null,
+    peakG: Number.isFinite(peaks?.gForce?.gForce) ? peaks.gForce.gForce : null,
+    peakIas: Number.isFinite(peaks?.iasKnots?.iasKnots) ? peaks.iasKnots.iasKnots : null,
+    peakAltitudeFt: Number.isFinite(peaks?.altitudeFt?.altitudeFt) ? peaks.altitudeFt.altitudeFt : null,
+    glocIncidents: Number.isFinite(report?.glocIncidents) ? report.glocIncidents
+      : Number.isFinite(recorder?.glocIncidents) ? recorder.glocIncidents
+      : 0,
+    touchdowns: Array.isArray(report?.touchdowns) ? report.touchdowns : liveTouchdowns,
+    crash: report
+      ? (report.reason === 'crash' ? (report.crash ?? true) : report.reason ?? null)
+      : sim?.crashResult ?? null,
   };
 }

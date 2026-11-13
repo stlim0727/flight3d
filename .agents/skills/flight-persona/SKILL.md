@@ -26,11 +26,16 @@ It defaults to the C172 on the Neon Metropolis bridge flight (issue #690), sampl
 40 s, writes `.tmp/persona-play/personas-feedback.json`, and prints the report. Override
 the flight with `PERSONA_AIRCRAFT`, `PERSONA_AIRPORT`, `PERSONA_SCENARIO`,
 `PERSONA_DEMO_ROUTE`, `PERSONA_TICKS`, and `PERSONA_INTERVAL_MS`. Anomalies are only
-published as GitHub issues when `PERSONA_PUBLISH=1` is set.
+published as GitHub issues when `PERSONA_PUBLISH=1` is set. The demo route defaults to
+`canyon-slalom` when that profile exists, otherwise to the first available profile; an
+explicit `PERSONA_DEMO_ROUTE` that the selected aircraft/airport does not offer aborts the
+run and lists the available profiles.
 
 Browser/WebGL scenarios require a hardware GPU (see
-[`docs/development/browser-gpu.md`](../../../docs/development/browser-gpu.md)); the runner
-records a limitation when it falls back to software rendering.
+[`docs/development/browser-gpu.md`](../../../docs/development/browser-gpu.md)). The runner
+refuses to sample when `detectGpuAngle()` is not `vulkan`, or when the page reports a
+software/unknown renderer. Software rendering needs explicit task approval and is enabled
+only with `PERSONA_ALLOW_SOFTWARE_GPU=1`, which also records the limitation in the report.
 
 ## How I play
 
@@ -52,7 +57,7 @@ While flying I **sample the simulator state each tick** (`window.simulator`) and
 | `GLOC` | `telemetry.pilot?.isGLOC` becomes true | loss-of-consciousness incident on the runway |
 | `NEG_ALT` | `altitudeFt < -200` ft MSL while airborne | implausibly deep below the sea-level reference |
 | `TERRAIN_CLIP` | `radioAltFt < 1` ft above the terrain while `onGround === false` | mesh penetration |
-| `BREAKUP` | `aircraftBreakup.active` true or `gameFlow` state jumps unexpectedly | airframe failure |
+| `BREAKUP` | `sim.isCrashed` true or `aircraftBreakup.pieces` non-empty | airframe failure |
 | `STALL` | `hud-stall` banner visible | unexpected stall warning |
 | `UI_MISSING` | an expected lobby/flight ID is not attached when it should be | menu tree broken |
 | `CONSOLE_ERR` | any `console.error` captured from the page | any JS error during the flow |
@@ -61,7 +66,9 @@ While flying I **sample the simulator state each tick** (`window.simulator`) and
 Neon Metropolis canal flights are legitimately below sea level (the water sits at
 -14 m), so negative MSL altitude alone is not a clip (#690).
 
-I also read `window.simulator.debriefReport` after a flight ends and pull peaks (`gForce`, `iasKnots`, `altitudeFt`), touchdowns, and `crash` reason.
+I also read `window.simulator.debriefReport` after a flight ends and pull peaks (`gForce`, `iasKnots`, `altitudeFt`), touchdowns, and `crash` reason. While the sortie is
+still active there is no debrief yet, so the summary falls back to the live
+`flightRecorder` counters (elapsed time, peaks, G-LOC incidents, recorded touchdowns).
 
 ## Feedback format
 
@@ -109,5 +116,6 @@ I return a **JSON feedback object** so it can be saved/linked:
 
 ## Limitations
 
-- Depends on a GPU-enabled Chrome (Vulkan) for the flight to behave like production; without it, physics evidence is weaker.
+- Depends on a GPU-enabled Chrome (Vulkan) for the flight to behave like production; the
+  runner aborts without one unless a software run was explicitly approved.
 - Random exploration may miss a particular code path; report any specific failure to me and I will run a targeted flight for it.

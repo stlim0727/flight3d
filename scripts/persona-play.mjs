@@ -24,6 +24,16 @@ if (!scenario.airports.includes(config.airport)) {
 }
 // A scenario that requires one aircraft overrides the requested one in the lobby.
 const aircraft = scenario.aircraft ?? config.aircraft;
+// Repo policy: WebGL runs use hardware acceleration. detectGpuAngle() reports
+// swiftshader when the render node is missing, and Chrome can also fail over after
+// launch, so refuse to sample (or publish) this reduced-confidence evidence unless
+// the task was explicitly approved for software rendering.
+const gpuAngle = detectGpuAngle();
+const allowSoftwareGpu = process.env.PERSONA_ALLOW_SOFTWARE_GPU === '1';
+if (gpuAngle !== 'vulkan' && !allowSoftwareGpu) {
+  throw new Error(`Hardware GPU required: detectGpuAngle() returned "${gpuAngle}". `
+    + 'Set PERSONA_ALLOW_SOFTWARE_GPU=1 only with explicit approval for software rendering.');
+}
 const artifacts = '.tmp/persona-play';
 await mkdir(artifacts, { recursive: true });
 
@@ -43,8 +53,8 @@ const feedback = {
   observations: [],
   limitations: [],
 };
-if (detectGpuAngle() !== 'vulkan') {
-  feedback.limitations.push('Software rasterizer: physics evidence is weaker than on a hardware GPU.');
+if (gpuAngle !== 'vulkan') {
+  feedback.limitations.push(`Software rasterizer "${gpuAngle}" approved via PERSONA_ALLOW_SOFTWARE_GPU=1; physics evidence is weaker than on a hardware GPU.`);
 }
 
 const click = async (evaluate, id, step, delay) => {
@@ -76,7 +86,10 @@ await withBrowserSession({ path: '/?telemetry=0', width: 1280, height: 720 },
     })()`);
     feedback.observations.push({ note: 'webgl_renderer', value: renderer });
     if (!renderer || /swiftshader|llvmpipe|software/i.test(renderer)) {
-      feedback.limitations.push('WebGL renderer is software or unknown; physics evidence is weaker than on a hardware GPU.');
+      if (!allowSoftwareGpu) {
+        throw new Error(`WebGL fell back to software rendering (${renderer ?? 'unknown renderer'}); hardware GPU evidence is required.`);
+      }
+      feedback.limitations.push(`WebGL renderer is software or unknown (${renderer ?? 'unknown'}); physics evidence is weaker than on a hardware GPU.`);
     }
 
     await click(evaluate, 'lobby-tab-scenario', { action: 'open-scenario-tab', target: 'lobby-tab-scenario' }, delay);
@@ -89,10 +102,27 @@ await withBrowserSession({ path: '/?telemetry=0', width: 1280, height: 720 },
       if (!await click(evaluate, id, step, delay)) throw new Error(`Missing lobby control: ${id}`);
     }
     if (config.scenario === 'demo') {
-      const route = process.env.PERSONA_DEMO_ROUTE ?? 'canyon-slalom';
-      await evaluate(`const s = document.getElementById('lobby-demo-select'); if (s) { s.value = ${JSON.stringify(route)}; s.dispatchEvent(new Event('change')); }`);
-      feedback.flow.push({ step: feedback.flow.length + 1, action: 'select-demo-route', value: route });
+      const requested = process.env.PERSONA_DEMO_ROUTE ?? null;
+      const choice = await evaluate((route) => {
+        const select = document.getElementById('lobby-demo-select');
+        if (!select) return { ok: false, reason: 'demo route selector missing' };
+        const options = [...select.options].map(option => option.value);
+        const value = route ?? (options.includes('canyon-slalom') ? 'canyon-slalom' : options[0] ?? null);
+        if (!value) return { ok: false, reason: 'no demo routes available for this configuration', options };
+        if (!options.includes(value)) return { ok: false, reason: `demo route "${value}" is not available`, options };
+        select.value = value;
+        select.dispatchEvent(new Event('change'));
+        return { ok: true, requested: value, options };
+      }, requested);
+      if (!choice.ok) {
+        throw new Error(`${choice.reason}; available: [${(choice.options ?? []).join(', ')}]`);
+      }
       await delay(500);
+      const selected = await evaluate(`document.getElementById('lobby-demo-select')?.value ?? null`);
+      if (selected !== choice.requested) {
+        throw new Error(`Demo route "${choice.requested}" resolved to "${selected}" instead`);
+      }
+      feedback.flow.push({ step: feedback.flow.length + 1, action: 'select-demo-route', value: selected });
     }
 
     const started = await click(evaluate, 'btn-fly', { action: 'start-flight', target: 'btn-fly' }, delay);

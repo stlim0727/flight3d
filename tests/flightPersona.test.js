@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ANOMALY_CODES, detectAnomalies, sample } from '../src/persona/flight_persona.js';
+import { ANOMALY_CODES, detectAnomalies, sample, summarizeFlight } from '../src/persona/flight_persona.js';
 import { NEON_RIVER, riverGroundHeight } from '../src/config/neonRiver.js';
 
 const feet = meters => meters / 0.3048;
@@ -46,4 +46,50 @@ test('sample reads clearance and weight-on-wheels from the simulator telemetry',
   assert.equal(s.altitudeFt, -13.1);
   assert.equal(s.radioAltFt, 32.8);
   assert.equal(s.wow, false);
+});
+
+test('breakup detection reads the debris list and crash state the simulator exposes', () => {
+  const breakups = sim => detectAnomalies(state(), sim).filter(a => a.code === ANOMALY_CODES.BREAKUP);
+  assert.deepEqual(breakups({}), []);
+  assert.deepEqual(breakups({ aircraftBreakup: { pieces: [] } }), []);
+  // triggerCrash() marks the sortie before AircraftBreakup.spawn() fills `pieces`.
+  assert.equal(breakups({ isCrashed: true })[0]?.severity, 'P1');
+  const [debris] = breakups({
+    isCrashed: true,
+    aircraftBreakup: { pieces: [{}, {}] },
+    crashResult: { type: 'TERRAIN' },
+  });
+  assert.match(debris.message, /2 debris pieces, TERRAIN/);
+});
+
+test('summarizeFlight preserves incidents recorded before a debrief exists', () => {
+  const recorder = {
+    elapsed: 12.5,
+    latest: { timeSec: 12.4 },
+    peaks: { gForce: { gForce: 4.2 }, iasKnots: { iasKnots: 210 }, altitudeFt: { altitudeFt: 5000 } },
+    glocIncidents: 1,
+    touchdowns: [{ timeSec: 9, sinkRateFpm: 180, contactG: 1.3, _tdRecord: { finalized: false } }],
+  };
+  const live = summarizeFlight({
+    flightRecorder: recorder,
+    lobby: { aircraft: 'F16', airport: 'lukla', preset: 'demo' },
+    crashResult: { type: 'TERRAIN' },
+  });
+  assert.equal(live.durationSec, 12.5);
+  assert.equal(live.glocIncidents, 1);
+  assert.equal(live.peakG, 4.2);
+  assert.deepEqual(live.touchdowns, [{ timeSec: 9, sinkRateFpm: 180, contactG: 1.3 }]);
+  assert.deepEqual(live.crash, { type: 'TERRAIN' });
+
+  // A finished debrief is authoritative once the sortie stops.
+  const finished = summarizeFlight({
+    debriefReport: {
+      metadata: { aircraft: 'C172' }, durationSec: 30, peaks: {}, touchdowns: [],
+      glocIncidents: 2, reason: 'manual',
+    },
+    flightRecorder: recorder,
+  });
+  assert.equal(finished.aircraft, 'C172');
+  assert.equal(finished.durationSec, 30);
+  assert.equal(finished.glocIncidents, 2);
 });
