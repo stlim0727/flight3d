@@ -280,6 +280,10 @@ export class CombatReplayPlayback {
       );
       const heading = continuous ? shortestAngle(from.headingRad, to.headingRad, alpha) : pose.headingRad;
       target.velocity.set(Math.sin(heading), 0, -Math.cos(heading));
+      if (from.quaternion && to.quaternion) {
+        target.quaternion ??= new THREE.Quaternion();
+        target.quaternion.fromArray(slerp([], from.quaternion, to.quaternion, blend));
+      } else target.quaternion = null;
     }
   }
 }

@@ -192,3 +192,21 @@ test('a bandit death between samples still snaps instead of sliding a wreck', ()
   assert.equal(playback.state.targets[0].alive, false);
   playback.stop();
 });
+
+test('combat playback interpolates recorded bandit bank instead of leveling the wings', () => {
+  const playback = new CombatReplayPlayback({ scene: new Scene() });
+  const halfBank = Math.PI / 6;
+  const combat = { targets: [{ callsign: 'BANKED' }], missiles: [], missileSamples: [], events: [],
+    banditSamples: [0, 0.5].map((timeSec, index) => ({ timeSec, targets: [{
+      x: index * 50, y: 3000, z: 0, headingRad: 0, alive: true,
+      quaternion: [0, 0, Math.sin(index * halfBank), Math.cos(index * halfBank)],
+    }] })) };
+  playback.load(combat);
+  playback.seek(0.25);
+  const q = playback.state.targets[0].quaternion;
+  assert.ok(Math.abs(q.z - Math.sin(halfBank / 2)) < 1e-6);
+  assert.ok(Math.abs(q.w - Math.cos(halfBank / 2)) < 1e-6);
+  const mesh = playback.view.targetViews.get(0).mesh;
+  assert.ok(mesh.quaternion.equals(q));
+  playback.stop();
+});

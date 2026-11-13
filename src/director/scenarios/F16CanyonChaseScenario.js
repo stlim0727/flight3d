@@ -3,6 +3,8 @@ import { t } from '../../i18n/index.js';
 import { CameraSystem } from '../../cameras/CameraSystem.js';
 import { Atmosphere } from '../../physics/Atmosphere.js';
 import { TRIM_WHEEL_AUTHORITY } from '../../physics/trimWheel.js';
+import { BanditFlightModel } from '../../weapons/BanditFlightModel.js';
+import { BanditAircraftView } from '../../weapons/BanditAircraftView.js';
 import { CessnaDemoScenario } from './CessnaDemoScenario.js';
 
 const clamp = THREE.MathUtils.clamp;
@@ -37,66 +39,52 @@ const STAGES = {
 class CanyonChaseTarget {
   constructor(scene) {
     this.scene = scene;
-    this.group = new THREE.Group();
+    this.visual = new BanditAircraftView('CANYON BANDIT');
+    this.group = this.visual.mesh;
     this.group.name = 'CanyonChaseTargetBandit';
-
-    // Low-poly delta adversary airframe
-    const fuseGeo = new THREE.ConeGeometry(1.2, 12, 6);
-    // The cone apex must lead along the aircraft's forward -Z axis.
-    fuseGeo.rotateX(-Math.PI * 0.5);
-    const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.3, metalness: 0.8 });
-    const fuse = new THREE.Mesh(fuseGeo, darkMat);
-    this.group.add(fuse);
-
-    const wingShape = new THREE.Shape();
-    wingShape.moveTo(0, 3.5);
-    wingShape.lineTo(4.8, -3.5);
-    wingShape.lineTo(0, -1.8);
-    wingShape.lineTo(-4.8, -3.5);
-    wingShape.closePath();
-    const wingGeo = new THREE.ShapeGeometry(wingShape);
-    wingGeo.rotateX(-Math.PI * 0.5);
-    const wingMat = new THREE.MeshStandardMaterial({ color: 0xd63031, roughness: 0.4 });
-    const wings = new THREE.Mesh(wingGeo, wingMat);
-    wings.position.y = 0.05;
-    this.group.add(wings);
-
-    const finShape = new THREE.Shape();
-    finShape.moveTo(0, 0);
-    finShape.lineTo(0, 1.8);
-    finShape.lineTo(-1.8, 0);
-    finShape.closePath();
-    const finGeo = new THREE.ShapeGeometry(finShape);
-    finGeo.rotateY(Math.PI * 0.5);
-    const fin = new THREE.Mesh(finGeo, darkMat);
-    fin.position.set(0, 0.3, -2.0);
-    this.group.add(fin);
-
-    // Glowing afterburner plume
-    const glowGeo = new THREE.SphereGeometry(0.4, 8, 8);
-    const glowMat = new THREE.MeshBasicMaterial({ color: 0xff7675 });
-    const glow = new THREE.Mesh(glowGeo, glowMat);
-    glow.position.set(0, 0, -5.5);
-    this.group.add(glow);
+    this.progress = 0.055;
+    this.alive = true;
 
     if (scene) {
       scene.add(this.group);
     }
   }
 
-  update(pos, quat) {
-    this.group.position.copy(pos);
-    this.group.quaternion.copy(quat);
+  update(dt, scenario, terrain) {
+    if (!this.alive) return;
+    // Progress belongs to the bandit's own physical position, not the player.
+    let nearest = this.progress, distance = Infinity;
+    for (let p = Math.max(0, this.progress - 0.02); p <= Math.min(1, this.progress + 0.08); p += 0.002) {
+      const point = scenario.pathPoint(p);
+      const d = point.distanceToSquared(this.flight.position);
+      if (d < distance) { distance = d; nearest = p; }
+    }
+    this.progress = Math.max(this.progress, nearest);
+    const goal = scenario.pathPoint(Math.min(1, this.progress + 0.045));
+    const steps = Math.max(1, Math.ceil(dt * 120));
+    for (let i = 0; i < steps; i++) {
+      const pos = this.flight.position;
+      const heading = Math.atan2(goal.x - pos.x, -(goal.z - pos.z));
+      const ground = terrain?.getHeight?.(pos.x, pos.z) ?? 0;
+      const aheadGround = terrain?.getHeight?.(goal.x, goal.z) ?? 0;
+      this.flight.guide(heading, Math.max(goal.y, ground + 120, aheadGround + 120), 180);
+      this.flight.step(dt / steps, 0, pos.y - ground);
+      if (pos.y <= (terrain?.getHeight?.(pos.x, pos.z) ?? 0) + 2) {
+        this.alive = false;
+        this.group.visible = false;
+        break;
+      }
+    }
+    this.visual.update(dt, this.flight);
+    this.group.position.copy(this.flight.position);
+    this.group.quaternion.copy(this.flight.quaternion);
   }
 
   dispose() {
     if (this.scene) {
       this.scene.remove(this.group);
     }
-    this.group.traverse(obj => {
-      if (obj.geometry) obj.geometry.dispose();
-      if (obj.material) obj.material.dispose();
-    });
+    this.visual.dispose();
   }
 }
 
@@ -154,6 +142,11 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
       // Create bandit adversary target
       this.target?.dispose();
       this.target = new CanyonChaseTarget(sim.scene);
+      const banditPosition = this.pathPoint(this.target.progress);
+      const banditVelocity = this.curve.getTangent(this.target.progress).normalize().multiplyScalar(180);
+      this.target.flight = new BanditFlightModel(banditPosition, banditVelocity);
+      this.target.group.position.copy(banditPosition);
+      this.target.group.quaternion.copy(this.target.flight.quaternion);
     }
 
     this.lastCutIndex = -1;
@@ -211,22 +204,7 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
     const targetPos = this.pathPoint(progress);
     const tangent = this.curve.getTangent(progress);
 
-    // Update target bandit aircraft leading ahead by ~0.03 progress (~300m)
-    if (this.target) {
-      const leadP = clamp(progress + 0.03, 0, 1);
-      const leadPos = this.pathPoint(leadP);
-      const leadTan = this.curve.getTangent(leadP);
-      const leadHdg = (Math.atan2(leadTan.x, -leadTan.z) * 180 / Math.PI + 360) % 360;
-
-      // Bandit banks into turns along spline curvature
-      const leadTanAhead = this.curve.getTangent(clamp(leadP + 0.015, 0, 1));
-      const dh = Math.atan2(leadTanAhead.x, -leadTanAhead.z) - Math.atan2(leadTan.x, -leadTan.z);
-      const leadBank = clamp(dh * 300, -Math.PI * 0.42, Math.PI * 0.42);
-
-      const targetEuler = new THREE.Euler(0, -leadHdg * Math.PI / 180, leadBank, 'YXZ');
-      const targetQuat = new THREE.Quaternion().setFromEuler(targetEuler);
-      this.target.update(leadPos, targetQuat);
-    }
+    this.target?.update(dt, this, sim.currentTerrain);
 
     // Steering guidance toward spline target corridor
     const dx = sim.position.x - targetPos.x;

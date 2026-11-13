@@ -285,3 +285,26 @@ test('v1 files still decode their original one-byte fuel flow', () => {
   assert.equal(decoded.samples[0].engine1.ff, 1180);
   assert.equal(decoded.samples[0].engine2.ff, 2550);
 });
+
+test('combat v5 preserves bandit attitude and v4 heading-only tracks still decode', () => {
+  const source = track(2);
+  source.combat = {
+    targets: [{ callsign: 'BANDIT' }],
+    banditSamples: [{ timeSec: 0, targets: [{ x: 1, y: 3000, z: -50, headingRad: 0.7,
+      alive: true, quaternion: UNIT_QUAT }] }],
+    missileSamples: [], events: [],
+  };
+  const bytes = encodeTrack(source);
+  const target = decodeTrack(bytes).combat.banditSamples[0].targets[0];
+  target.quaternion.forEach((value, index) => assert.ok(Math.abs(value - UNIT_QUAT[index]) < 1 / 32767));
+  // The v4 wire format has the same header/pose data, without the final 8-byte attitude.
+  const legacy = bytes.slice(0, -8);
+  legacy[5] = 4;
+  const view = new DataView(legacy.buffer);
+  const poseEnd = HEADER_BYTES + view.getUint16(16) + source.samples.length * RECORD_BYTES;
+  view.setUint32(poseEnd, view.getUint32(poseEnd) - 8);
+  const decoded = decodeTrack(legacy);
+  assert.equal(decoded.version, 4);
+  assert.equal(decoded.combat.banditSamples[0].targets[0].headingRad, 0.7);
+  assert.equal(decoded.combat.banditSamples[0].targets[0].quaternion, undefined);
+});

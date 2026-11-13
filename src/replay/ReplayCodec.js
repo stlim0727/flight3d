@@ -4,7 +4,7 @@ export const REPLAY_TRACK_VERSION = 2;
 // Multiplayer room tracks only: solo flights stay v2 so older builds can still import them.
 export const ROOM_TRACK_VERSION = 3;
 // Combat tracks append a compact missile/bandit section after the pose frames.
-export const COMBAT_TRACK_VERSION = 4;
+export const COMBAT_TRACK_VERSION = 5;
 export const COMBAT_SECTION_HEADER_BYTES = 18;
 export const COMBAT_EVENT_BYTES = 32;
 export const MISSILE_TYPE_IDS = Object.freeze(['AIM9X', 'AIM120C']);
@@ -258,7 +258,7 @@ export function combatByteLength(combat) {
     const callsign = String(target?.callsign || '').slice(0, 64);
     return sum + 1 + encoder.encode(callsign).length;
   }, 0);
-  const banditBytes = (combat.banditSamples?.length || 0) * (5 + targets.length * 15);
+  const banditBytes = (combat.banditSamples?.length || 0) * (5 + targets.length * 23);
   const missileBytes = (combat.missileSamples?.length || 0) * 26;
   const eventBytes = (combat.events?.length || 0) * COMBAT_EVENT_BYTES;
   return 4 + COMBAT_SECTION_HEADER_BYTES + targetBytes + banditBytes + missileBytes + eventBytes;
@@ -340,7 +340,9 @@ function writeCombat(view, offset, combat) {
       writeScalar(view, offset + 8, 'f32', target?.z, 1);
       writeScalar(view, offset + 12, 'i16', (target?.headingRad ?? 0) * 5000, 1);
       view.setUint8(offset + 14, target?.alive ? 1 : 0);
-      offset += 15;
+      const q = target?.quaternion ?? [0, -Math.sin((target?.headingRad ?? 0) / 2), 0, Math.cos((target?.headingRad ?? 0) / 2)];
+      for (let axis = 0; axis < 4; axis++) writeScalar(view, offset + 15 + axis * 2, 'i16', q[axis] * 32767, 1);
+      offset += 23;
     }
   }
 
@@ -414,10 +416,10 @@ export function decodeTrack(bytes) {
   }
   const frame = frameBytes(pilots.length);
   const poseEnd = HEADER_BYTES + metadataLength + count * frame;
-  if (version < COMBAT_TRACK_VERSION && bytes.length !== poseEnd) {
+  if (version < 4 && bytes.length !== poseEnd) {
     throw new Error(`replay track length ${bytes.length} does not match ${poseEnd}`);
   }
-  if (version >= COMBAT_TRACK_VERSION && bytes.length < poseEnd + 4) {
+  if (version >= 4 && bytes.length < poseEnd + 4) {
     throw new Error('replay combat section is truncated');
   }
   const intervalSec = view.getUint16(6) / 1000;
@@ -445,17 +447,17 @@ export function decodeTrack(bytes) {
   const decoded = { version, intervalSec, durationSec,
     metadata, samples, gearIds: ids.gear, bodyIds: metadata.bodyIds || [] };
   if (remotes.length) decoded.remotes = remotes;
-  if (version >= COMBAT_TRACK_VERSION) {
+  if (version >= 4) {
     const combatLength = view.getUint32(poseEnd);
     if (bytes.length !== poseEnd + 4 + combatLength) {
       throw new Error('replay combat section length is corrupt');
     }
-    decoded.combat = readCombat(view, poseEnd + 4, combatLength);
+    decoded.combat = readCombat(view, poseEnd + 4, combatLength, version);
   }
   return decoded;
 }
 
-function readCombat(view, offset, sectionLength) {
+function readCombat(view, offset, sectionLength, version) {
   const end = offset + sectionLength;
   if (sectionLength < COMBAT_SECTION_HEADER_BYTES || end > view.byteLength) {
     throw new Error('replay combat section is truncated');
@@ -486,12 +488,14 @@ function readCombat(view, offset, sectionLength) {
     offset += 5;
     const sampleTargets = [];
     for (let slot = 0; slot < targetCount; slot++) {
-      if (offset + 15 > end) throw new Error('replay combat bandits are truncated');
+      const targetBytes = version >= 5 ? 23 : 15;
+      if (offset + targetBytes > end) throw new Error('replay combat bandits are truncated');
       sampleTargets.push({
         x: view.getFloat32(offset), y: view.getFloat32(offset + 4), z: view.getFloat32(offset + 8),
         headingRad: view.getInt16(offset + 12) / 5000, alive: Boolean(view.getUint8(offset + 14)),
       });
-      offset += 15;
+      if (version >= 5) sampleTargets.at(-1).quaternion = Array.from({ length: 4 }, (_, axis) => view.getInt16(offset + 15 + axis * 2) / 32767);
+      offset += targetBytes;
     }
     banditSamples.push({ timeSec, rails, targets: sampleTargets });
   }

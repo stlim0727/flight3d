@@ -34,7 +34,7 @@ reloads every rail.
   integration, 120 Hz rocket mass/thrust, atmospheric drag, gravity, seeker
   gimbal limit, TPN guidance and closest-approach proximity fuse. It owns the
   cannon step and the shared damage/respawn path. Bandit targets patrol
-  circular orbits and respawn 8 s after a kill.
+  a commanded circular route and respawn 8 s after a kill or terrain impact.
 - `src/weapons/VulcanCannon.js` — 510-round M61A1 state: 100 rounds/s,
   projectile inheritance of aircraft velocity, gravity and atmospheric drag,
   segment-to-sphere hit tests, projectile life, and the LCOS lead point.
@@ -127,3 +127,35 @@ cycling, TPN intercept of a crossing target, powered acceleration versus
 coasting drag, ground/empty launch refusal, all three RWR stages, gun rate and
 magazine limit, projectile drag/gravity/life, LCOS lead and drop, progressive
 gun damage, damage falloff, and every rearm accept/block path.
+
+## F-16-equivalent bandit flight
+
+`BanditFlightModel` uses the same `F16_FALCON` configuration, `Aerodynamics`,
+`EngineModel`, fuel/CG/inertia model and airborne integration equations as the
+player aircraft. Patrol and canyon guidance command elevator, aileron, rudder
+and throttle; positions and velocities are integrated from forces. Rendered bank
+and pitch come from the integrated quaternion. `BanditAircraftView` loads the same F-16 exterior asset as the player, with gear
+retracted and control surfaces driven by flight state. A procedural proxy covers
+asset loading and remains available if loading fails.
+
+The patrol circle is a requested route, not a positional constraint. Guidance
+reserves lift margin at 12 degrees AoA, limits commanded normal load to 7G and
+pitch demand to 13.5 degrees AoA. These are conservative AI operating limits,
+not manufacturer performance claims. Low dynamic pressure widens the turn.
+Insufficient thrust or lift can cause speed/altitude loss instead of an enforced
+path. Fuel burn, engine spool, induced drag, flow separation and aerodynamic
+moments use the shared player models. Damage continuously increases parasite
+drag and reduces engine thrust without changing position or velocity directly.
+
+Patrol terrain lookahead commands clearance; an unavoidable impact kills the
+target. Canyon targets track their own path progress independently of the player
+and use the same airborne plant; they disappear on terrain impact. Neither target
+simulates landing gear contacts or takeoff/landing. This is parity with the game's
+F-16 model, not validation against a real aircraft's flight-test envelope.
+
+Regression checks: `node --test tests/banditFlightModel.test.js
+ tests/f16CanyonChase.test.js tests/airToAirMissile.test.js
+ tests/replayCodec.test.js tests/replayCombat.test.js` (one shell command).
+The patrol test covers three simulated minutes for each spawn speed, while
+separate tests cover damage continuity, low-speed bank limits, unpowered energy
+loss, terrain impact and fresh-airframe respawn.

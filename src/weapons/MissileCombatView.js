@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { createBanditMesh, createMissileMesh } from './missileGeometry.js';
+import { BanditAircraftView } from './BanditAircraftView.js';
+import { createMissileMesh } from './missileGeometry.js';
 
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const scratchDirection = new THREE.Vector3();
@@ -115,9 +116,10 @@ export class MissileCombatView {
       liveTargets.add(target.id);
       let view = this.targetViews.get(target.id);
       if (!view) {
-        const mesh = createBanditMesh(target.callsign);
+        const aircraft = new BanditAircraftView(target.callsign);
+        const mesh = aircraft.mesh;
         this.scene.add(mesh);
-        view = { mesh, trail: null };
+        view = { mesh, aircraft, trail: null };
         this.targetViews.set(target.id, view);
       }
       view.mesh.visible = target.alive;
@@ -131,8 +133,11 @@ export class MissileCombatView {
         }
         continue;
       }
+      view.aircraft.update(dt, target.flight);
       view.mesh.position.copy(target.position);
-      if (target.velocity.lengthSq() > 1) {
+      if (target.quaternion) {
+        view.mesh.quaternion.copy(target.quaternion);
+      } else if (target.velocity.lengthSq() > 1) {
         scratchDirection.copy(target.velocity).normalize();
         view.mesh.quaternion.setFromUnitVectors(FORWARD, scratchDirection);
       }
@@ -150,7 +155,8 @@ export class MissileCombatView {
     for (const [id, view] of this.targetViews) {
       if (liveTargets.has(id)) continue;
       this.scene.remove(view.mesh);
-      disposeGeometry(view.mesh);
+      view.aircraft.dispose();
+      view.trail?.dispose();
       this.targetViews.delete(id);
     }
 
@@ -210,7 +216,7 @@ export class MissileCombatView {
   clear() {
     for (const view of this.targetViews.values()) {
       this.scene.remove(view.mesh);
-      disposeGeometry(view.mesh);
+      view.aircraft.dispose();
       view.trail?.dispose();
     }
     for (const view of this.missileViews.values()) {

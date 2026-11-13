@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BanditFlightModel } from './BanditFlightModel.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { RWRSystem } from '../systems/RWRSystem.js';
 import { addDamage, blastDamage, combatDamageState } from '../physics/combatDamage.js';
@@ -32,30 +33,43 @@ export class BanditTarget {
     this.damageState = 'normal';
     this.hostile = true;
     this.radar = true;
+    this.flight = null;
+    this.quaternion = null;
+    if (orbit) this.respawn(position, orbit);
   }
 
-  update(dt) {
+  update(dt, terrainHeight = () => 0) {
     this.prevPosition.copy(this.position);
     if (!this.alive) return;
-    if (this.orbit) {
-      const o = this.orbit;
-      // Structural damage degrades the drone's turn rate and lifts its orbit
-      // continuously; it is not a behavior switch at a damage threshold.
-      const agility = 1 - 0.55 * this.damage;
-      o.angle += o.omega * agility * dt;
-      this.position.set(
-        o.center.x + Math.cos(o.angle) * o.radius,
-        o.altitudeM - 160 * this.damage + Math.sin(o.angle * 2) * 35,
-        o.center.z + Math.sin(o.angle) * o.radius,
-      );
-      const tangential = o.radius * o.omega * agility;
-      this.velocity.set(
-        -Math.sin(o.angle) * tangential,
-        Math.cos(o.angle * 2) * 70 * o.omega * agility,
-        Math.cos(o.angle) * tangential,
-      );
-    } else {
+    if (!this.flight) {
+      // Explicit ballistic fixtures used by weapon callers have no patrol AI.
       this.position.addScaledVector(this.velocity, dt);
+      return;
+    }
+    const o = this.orbit;
+    const dx = this.position.x - o.center.x;
+    const dz = this.position.z - o.center.z;
+    const radial = Math.atan2(dz, dx);
+    const direction = Math.sign(o.omega) || 1;
+    const correction = Math.atan2(Math.hypot(dx, dz) - o.radius, Math.max(300, o.radius * 0.5));
+    const course = radial + direction * (Math.PI / 2 + correction);
+    const speed = Math.abs(o.radius * o.omega);
+    const lookahead = Math.max(500, this.velocity.length() * 8);
+    const ground = Math.max(terrainHeight(this.position.x, this.position.z),
+      terrainHeight(this.position.x + Math.cos(course) * lookahead,
+        this.position.z + Math.sin(course) * lookahead));
+    const altitude = Math.max(o.altitudeM, ground + 420);
+    // Fixed substeps also make direct callers independent of render cadence.
+    const steps = Math.max(1, Math.ceil(dt * 120));
+    for (let i = 0; i < steps; i++) {
+      this.flight.guide(Math.atan2(Math.cos(course), -Math.sin(course)), altitude, speed);
+      this.flight.step(dt / steps, this.damage,
+        this.position.y - terrainHeight(this.position.x, this.position.z));
+      if (this.position.y <= terrainHeight(this.position.x, this.position.z) + 2) {
+        this.alive = false;
+        this.respawnTimer = BANDIT_RESPAWN_SECONDS;
+        break;
+      }
     }
   }
 
@@ -74,6 +88,8 @@ export class BanditTarget {
     } else {
       this.velocity.set(0, 0, -180);
     }
+    this.flight = o ? new BanditFlightModel(this.position, this.velocity) : null;
+    this.quaternion = this.flight?.quaternion ?? null;
   }
 }
 
@@ -375,7 +391,7 @@ export class AirToAirMissileSystem {
 
   _step(dt, world, events) {
     for (const target of this.targets) {
-      target.update(dt);
+      target.update(dt, world.terrainHeight);
       if (!target.alive) {
         target.respawnTimer -= dt;
         if (target.respawnTimer <= 0) this._placeBandit(target, world, this.targets.indexOf(target));
