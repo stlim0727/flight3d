@@ -52,7 +52,7 @@ export class F16CanyonSlalomScenario extends F16CanyonChaseScenario {
         floor = Math.max(floor, this.sim.currentTerrain.getHeight(p.x + side, p.z));
       }
     }
-    point.y = floor + 40 + 400 * THREE.MathUtils.smoothstep(progress, .8, 1);
+    point.y = floor + 80 + 400 * THREE.MathUtils.smoothstep(progress, .8, 1);
     return point;
   }
 

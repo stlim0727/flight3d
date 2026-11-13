@@ -93,11 +93,15 @@ The additional **F-16 · Extreme canyon slalom** (`canyon-slalom`) is separate
 from the low-pass-and-landing and canyon-chase profiles. Inspired by the supplied
 Maverick reference, it alternates steep banks along the measured Dudh Kosi
 corridor, follows terrain without scripted barrel rolls, then climbs out into
-manual flight. Production-physics regression measures about 62 seconds,
-23 m minimum clearance, 78° peak bank and 7.5 G peak load, without collision,
-stall or gear damage. At least five seconds must be below 100 m AGL, and both
-left and right banks must exceed 60°. Aircraft pose and velocity remain physical
-after the initial spawn; the actual velocity corridor receives terrain lookahead.
+manual flight. Production-physics regression measures about 74 seconds,
+32 m minimum clearance, 81° peak bank and 6.6 G peak load, without entering the
+stall-warning band, collision or gear damage. At least five seconds must be below
+100 m AGL, and both left and right banks must exceed 60°. Aircraft pose and
+velocity remain physical after the initial spawn; the actual velocity corridor
+receives terrain lookahead. `flyAttitude` bounds its load demand by the lift the
+wing can produce below the F16 shaker threshold (issue #691), so the corridor is
+authored 80 m above the sampled canyon floor instead of 40 m: a lift-limited pull
+cannot hold the old line through the S-turns.
 
 The F16 canopy uses a weaker interior tint/reflection than the exterior and
 no inverse-opacity specular amplification. The procedural aft exhaust plume

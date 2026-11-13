@@ -80,7 +80,7 @@ export function flyF16Lukla({ Scenario = F16LuklaScenario, maxSeconds = 300 } = 
   sim.demoDirector = director;
   const scenario = new Scenario(director, sim);
   director.setStage(Scenario.STAGES.ESTABLISH ?? Scenario.STAGES.INGRESS);
-  let gearDown = null, touchdown = null, finite = true, stallFrames = 0;
+  let gearDown = null, touchdown = null, finite = true, stallFrames = 0, stallWarningFrames = 0;
   let runwayPassMin = Infinity, runwayPassMax = -Infinity;
   for (let tick = 0; tick < maxSeconds * 120 && director.isActive; tick++) {
     director.totalTimer += 1 / 120;
@@ -94,6 +94,9 @@ export function flyF16Lukla({ Scenario = F16LuklaScenario, maxSeconds = 300 } = 
     if (!gearDown && sim.gear.targetGearState > .5) gearDown = { stage: director.currentStage, ...state };
     if (!touchdown && scenario.result.touchdown) touchdown = state;
     if (sim.aero.isStalled && !sim.gear.onGround) stallFrames++;
+    // Stick-shaker annunciation precedes the aerodynamic break; a route that promises
+    // to stay inside the envelope must not enter that band either.
+    if (sim.aero.isStallWarning && !sim.gear.onGround) stallWarningFrames++;
     if ([Scenario.STAGES.ESTABLISH, Scenario.STAGES.LOW_PASS].includes(director.currentStage)
       && Math.abs(state.along) < 265) {
       runwayPassMin = Math.min(runwayPassMin, state.agl);
@@ -109,6 +112,7 @@ export function flyF16Lukla({ Scenario = F16LuklaScenario, maxSeconds = 300 } = 
   }
   return {
     result: scenario.result, stages, cameras, gearDown, touchdown, finite, stallFrames,
+    stallWarningFrames,
     runwayPassMin, runwayPassMax, final: snapshot(), crash: sim.crashResult,
     incident: Boolean(sim.landingIncident),
     gearDamage: sim.gear.contacts.map(c => ({ id: c.id, damage: c.damage, state: c.damageState })),
