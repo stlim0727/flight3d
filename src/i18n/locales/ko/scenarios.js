@@ -43,6 +43,8 @@ export default {
   "departure.speaker.crew": "지상요원",
   "departure.speaker.ground": "지상 관제",
   "departure.speaker.tower": "관제탑",
+  "departure.speaker.traffic": "대한항공 653",
+  "departure.traffic.waiting": "선행 출발 항공기(대한항공 653) 대기 중.",
   "departure.name": "인천 탑승구 → 푸시백 → 이륙",
   "departure.briefing": "제주항공 B737-800 관제 시나리오: 훈련 비행 허가와 복창, 계류장 푸시백, 지상 활주, 타워 이륙 허가, 출발 관제 교신. 추가 교신은 자막으로 제공됩니다. 실제 RKSI 공시 절차가 아닌 창작 훈련 시나리오입니다.",
   "departure.complete": "출발 완료 · 조종을 이어받으세요",

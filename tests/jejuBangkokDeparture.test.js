@@ -7,6 +7,9 @@ import { DEPARTURE_GATE, DEPARTURE_LINEUP_ROUTE, DEPARTURE_RUNWAY, departurePush
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { resolveDemoProfile } from '../src/director/demoProfiles.js';
 import { INCHEON_AIRFIELD } from '../src/geospatial/IncheonFlightSurface.js';
+import { TRAFFIC_WATCHDOG_SECONDS } from '../src/director/scenarios/JejuBangkokDepartureScenario.js';
+import { TRAFFIC_PHASES } from '../src/environment/PrecedingFlight.js';
+import { TRAFFIC_SPACING } from '../src/config/precedingTraffic.js';
 
 const S = JejuBangkokDepartureScenario.STAGES;
 
@@ -226,4 +229,104 @@ test('takeoff and climb stages execute tower handoff and heading 210 turn toward
   scenario.update(0.1);
   assert.equal(director.currentStage, S.COMPLETED);
   assert.equal(director.stopped, true);
+});
+
+test('KE653 waits at its head start through the gate and starts taxiing with the player taxi stage', () => {
+  const { director, scenario } = fixture();
+  assert.equal(scenario.traffic.length, 1);
+  const [flight] = scenario.traffic;
+  assert.equal(flight.id, 'KE653');
+  assert.equal(flight.phase, TRAFFIC_PHASES.STANDBY);
+  assert.equal(scenario.result.traffic.flight, 'KE653');
+  director.setStage(S.TAXI);
+  assert.equal(flight.phase, TRAFFIC_PHASES.TAXI);
+  assert.ok(scenario.result.radio.at(-1).includes('Korean Air Six-Five-Three, request taxi'));
+});
+
+test('HOLD does not advance on a fixed timer while KE653 has not started its takeoff roll', () => {
+  const { director, scenario } = fixture();
+  const [flight] = scenario.traffic;
+  director.setStage(S.HOLD);
+  finishAtc(scenario);
+  assert.equal(flight.cleared, true, 'the voiced KE653 takeoff clearance clears the traffic');
+  director.stageTimer = 9;
+  scenario.update(0.1);
+  assert.equal(director.currentStage, S.HOLD, 'the old 8 s timer no longer releases the player');
+  flight.phase = TRAFFIC_PHASES.ROLL;
+  scenario.update(0.1);
+  assert.equal(director.currentStage, S.LINEUP, 'advances once KE653 is rolling');
+});
+
+test('HOLD and CLEARANCE traffic gates are bounded by the 120 s watchdog', () => {
+  const { director, scenario } = fixture();
+  director.setStage(S.HOLD);
+  finishAtc(scenario);
+  director.stageTimer = TRAFFIC_WATCHDOG_SECONDS - 1;
+  scenario.update(0.1);
+  assert.equal(director.currentStage, S.HOLD);
+  director.stageTimer = TRAFFIC_WATCHDOG_SECONDS + 1;
+  scenario.update(0.1);
+  assert.equal(director.currentStage, S.LINEUP);
+
+  director.setStage(S.CLEARANCE);
+  finishAtc(scenario);
+  director.stageTimer = TRAFFIC_WATCHDOG_SECONDS + 1;
+  scenario.update(0.1);
+  assert.equal(director.currentStage, S.TAKEOFF);
+});
+
+test('CLEARANCE waits until KE653 has rotated and spaced 15 s ahead', () => {
+  const { director, scenario } = fixture();
+  const [flight] = scenario.traffic;
+  director.setStage(S.CLEARANCE);
+  finishAtc(scenario);
+  director.stageTimer = 9;
+  scenario.update(0.1);
+  assert.equal(director.currentStage, S.CLEARANCE, 'the old 6 s timer no longer clears the player');
+  flight.rotationStarted = true; flight.rotationElapsed = 10;
+  scenario.update(0.1);
+  assert.equal(director.currentStage, S.CLEARANCE);
+  flight.rotationElapsed = 15;
+  scenario.update(0.1);
+  assert.equal(director.currentStage, S.TAKEOFF);
+});
+
+test('the player gives way to KE653 on the ground and releases it from hold short on approach', () => {
+  const { director, scenario, sim, inputs } = fixture();
+  const [flight] = scenario.traffic;
+  director.setStage(S.TAXI);
+  finishAtc(scenario);
+  const place = distance => {
+    const { x, z, heading } = flight.pose;
+    sim.position.set(x - Math.sin(heading) * distance, sim.position.y, z + Math.cos(heading) * distance);
+    sim.telemetry.headingDeg = heading * 180 / Math.PI;
+  };
+  flight.phase = TRAFFIC_PHASES.STANDBY; // Freeze KE653 to isolate the give-way rule.
+  place(30);
+  scenario.update(0.1);
+  assert.equal(inputs.throttle, 0);
+  assert.equal(inputs.brakes, 1);
+  assert.equal(scenario.yieldToTraffic(), true);
+  place(-30);
+  assert.equal(scenario.yieldToTraffic(), false, 'traffic behind the player does not stop it');
+  place(80);
+  assert.equal(scenario.yieldToTraffic(), false);
+
+  flight.phase = TRAFFIC_PHASES.HOLD_SHORT; flight.released = false;
+  place(TRAFFIC_SPACING.releaseMeters + 20);
+  scenario.update(0.1);
+  assert.equal(flight.released, false, 'KE653 holds short while the player is far behind');
+  place(TRAFFIC_SPACING.releaseMeters - 20);
+  scenario.update(0.1);
+  assert.equal(flight.released, true);
+});
+
+test('stopping the scenario disposes KE653', () => {
+  const { director, scenario } = fixture();
+  const [flight] = scenario.traffic;
+  let disposed = false;
+  flight.dispose = () => { disposed = true; };
+  director.stop(() => 'stopped');
+  assert.equal(disposed, true);
+  assert.deepEqual(scenario.traffic, []);
 });

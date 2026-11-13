@@ -128,3 +128,45 @@ The takeoff-roll narration clip remains in the asset bundle for compatibility
 but is no longer played; the runway-heading/3000-ft instruction stays visible.
 The aircraft hands over below the assigned altitude and the pilot continues the
 climb. The landing-traffic delay remains scripted, not traffic separation logic.
+
+## Preceding traffic in the Jeju Air 2503 departure
+
+`jeju-bangkok-2503` adds Korean Air 653 (`KE653`, squawk 5108, B737 in the `korean`
+parked livery) ahead of the player on the same mapped route
+(`src/config/precedingTraffic.js`). It is a kinematic actor
+(`src/environment/PrecedingFlight.js`), not a second physics integrator: its pose
+follows arc length along `buildDepartureTakeoffPath()` (pushback end → taxi route →
+hold short → runway entry → runway axis → climb-out extension), with speed limited by
+taxi cruise, `v = sqrt(a_lat / curvature)` in turns and the stopping distance to the
+next hold point. The scenario queries it through `this.traffic`, the same shape as a
+remote aircraft pose.
+
+Sequence: KE653 waits 250 m ahead in standby, starts taxiing with the player's taxi
+stage, and holds short until the player taxis within 120 m. It then lines up and waits
+at the runway entry until its voiced takeoff clearance plays during the player's hold
+stage, rolls, rotates at 72 m/s, retracts gear above 15 m and is removed above 900 m.
+The player brakes whenever ground traffic is within 60 m ahead. Hold → line-up waits for
+KE653's roll, the player's takeoff clearance waits for KE653's rotation, and clearance →
+takeoff waits until 15 s after rotation or a vacated runway; each wait, and each
+`waitForTraffic` radio block in `DepartureAtc`, is bounded at 120 s.
+
+Visuals reuse the airport's already-parsed parked-airliner geometry, decals, livery and
+gear material (`src/environment/PrecedingFlightVisuals.js`); there is no extra GLTF parse,
+and disposal only detaches the meshes. The model pivots about the main gear so rotation
+does not sink the tail through the runway.
+
+KE653's exchanges (`src/config/trafficDepartureRadio.js`) share the frequency: a traffic
+block waits until neither the Jeju Air nor the traffic clip is playing. Captions work
+without clips; voiced clips come from the `traffic` profile of
+`scripts/build-gemini-departure-radio.mjs` (`public/audio/traffic/`), synthesized by the
+"Generate Departure Audio" workflow.
+
+```sh
+node --test tests/departureRoutePath.test.js tests/precedingFlight.test.js tests/jejuBangkokDeparture.test.js tests/departureAtc.test.js
+APP_URL=http://127.0.0.1:5283 CHROME_PATH=<chrome> GPU_ANGLE=<vulkan|d3d11|metal> node scripts/verify-incheon-preceding-flight.mjs
+```
+
+The browser check requires a hardware renderer, steps the whole departure with real
+physics, asserts the traffic gates, a minimum 60 m ground separation, completion and
+cleanup, and writes `hold-short-ke653.png`, `ke653-climb-out.png` and `summary.json`
+under `.cache/incheon-preceding-flight`.

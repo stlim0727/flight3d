@@ -1,6 +1,7 @@
 import { DepartureRadio } from './DepartureRadio.js';
 import { DEPARTURE_RADIO } from '../config/departureRadio.js';
 import { BANGKOK_DEPARTURE_RADIO } from '../config/bangkokDepartureRadio.js';
+import { TRAFFIC_RADIO } from '../config/trafficDepartureRadio.js';
 import { pistonSoundState } from './pistonSoundState.js';
 import { exteriorDistanceGain, exteriorAirCutoff } from './distanceAcoustics.js';
 import { t } from '../i18n/index.js';
@@ -36,6 +37,15 @@ export class FlightAudio {
       baseUrl: import.meta.env?.BASE_URL ?? '/',
       audioDir: 'audio/bangkok',
       radioConfig: BANGKOK_DEPARTURE_RADIO,
+    });
+
+    // Preceding Korean Air 653 departure on the same frequency.
+    this.trafficRadio = new DepartureRadio({
+      context: () => this.ctx, output: () => this.masterGain,
+      muted: () => this.isMuted || this.volume === 0,
+      baseUrl: import.meta.env?.BASE_URL ?? '/',
+      audioDir: 'audio/traffic',
+      radioConfig: TRAFFIC_RADIO,
     });
 
     // Callout tracking
@@ -86,6 +96,7 @@ export class FlightAudio {
     this.cancelSpeech();
     this.departureRadio.stop();
     this.bangkokRadio?.stop();
+    this.trafficRadio?.stop();
     if (this.packGain) this.packGain.gain.setTargetAtTime(this.isPiston ? 0 : 0.16, this.ctx.currentTime, 0.04);
     if (this.warningGain) this.warningGain.gain.setValueAtTime(0, this.ctx.currentTime);
     if (this.gStrainGain) this.gStrainGain.gain.setValueAtTime(0, this.ctx.currentTime);
@@ -504,6 +515,12 @@ export class FlightAudio {
     return radio.play(stage);
   }
 
+  /** Voiced exchange of the preceding traffic; shares master gain with the departure radio. */
+  playTrafficRadio(key) {
+    this.ensureContextRunning();
+    return this.trafficRadio.play(key);
+  }
+
   // Real GPWS/RADALT pronounceers are English-language devices. Browser speech
   // synthesis otherwise follows the OS locale, so pin an en voice explicitly.
   pickSynthVoice(synthesis) {
@@ -556,6 +573,7 @@ export class FlightAudio {
       this.stopGunFire();
       this.departureRadio.stop();
       this.bangkokRadio?.stop();
+      this.trafficRadio?.stop();
     }
     this.applyMasterGain();
   }
@@ -570,13 +588,14 @@ export class FlightAudio {
 
   setMuted(muted) {
     this.isMuted = !!muted;
-    if (this.isMuted) { this.cancelSpeech(); this.departureRadio.stop(); this.bangkokRadio?.stop(); }
+    if (this.isMuted) { this.cancelSpeech(); this.departureRadio.stop(); this.bangkokRadio?.stop(); this.trafficRadio?.stop(); }
     this.applyMasterGain();
   }
 
   setRadioPaused(paused) {
     this.departureRadio.setPaused(paused);
     this.bangkokRadio?.setPaused(paused);
+    this.trafficRadio?.setPaused(paused);
   }
 
   /** Silence the bus while the sim is held off-screen, without touching the user's setting. */
@@ -933,6 +952,7 @@ export class FlightAudio {
     this.cancelSpeech();
     this.departureRadio.stop();
     this.bangkokRadio?.stop();
+    this.trafficRadio?.stop();
     if (this.ctx) {
       for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'windGain', 'rumbleGain', 'packGain', 'warningGain', 'gStrainGain']) {
         this[name]?.gain.setValueAtTime(0, this.ctx.currentTime);

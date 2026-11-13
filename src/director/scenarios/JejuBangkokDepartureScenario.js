@@ -9,11 +9,17 @@ import { t } from '../../i18n/index.js';
 import { DepartureAtc } from '../DepartureAtc.js';
 import { BANGKOK_DEPARTURE_ATC, BANGKOK_CLEARANCE } from '../../config/bangkokDepartureAtc.js';
 import { BANGKOK_DEPARTURE_RADIO } from '../../config/bangkokDepartureRadio.js';
+import { TRAFFIC_RADIO, TRAFFIC_DEPARTURE_ATC } from '../../config/trafficDepartureRadio.js';
+import { TRAFFIC_SPACING } from '../../config/precedingTraffic.js';
+import { PrecedingFlight, TRAFFIC_PHASES } from '../../environment/PrecedingFlight.js';
+import { loadPrecedingFlightVisuals } from '../../environment/PrecedingFlightVisuals.js';
 
 const clamp = THREE.MathUtils.clamp;
 const STAGES = IncheonDepartureScenario.STAGES;
 const names = ['gate', 'pushback', 'disconnect', 'taxi', 'hold', 'lineup', 'clearance', 'takeoff'];
 const pushbackEnd = departurePushbackPose(1);
+export const TRAFFIC_WATCHDOG_SECONDS = TRAFFIC_SPACING.watchdogSeconds;
+const TRAFFIC = { plan: TRAFFIC_DEPARTURE_ATC, radio: TRAFFIC_RADIO };
 
 export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
   enterStage(stage) {
@@ -21,23 +27,23 @@ export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
     if (stage === STAGES.GATE) {
       super.enterStage(stage);
       sim.audio?.bangkokRadio?.preload();
+      sim.audio?.trafficRadio?.preload();
+      this.createTraffic();
       // Replace default atc with Bangkok departure atc and radio
-      this.atc = new DepartureAtc('gate', voice => sim.audio?.playDepartureRadio(voice, 'bangkok'), BANGKOK_DEPARTURE_ATC, BANGKOK_DEPARTURE_RADIO);
-      const caption = () => this.atc?.caption(speaker => t(`departure.speaker.${speaker}`)) || t('departure.climbInstruction');
+      this.atc = this.createAtc('gate');
       this.result.radio = [this.atc.blocks.flatMap(block => block.lines).map(([speaker, text]) => `${speaker}: ${text}`).join(' ')];
-      this.director.updateBanner(() => t('departure.stage.gate'), caption);
+      this.director.updateBanner(() => t('departure.stage.gate'), () => this.caption());
       return;
     }
-    if (stage === STAGES.TAXI) { this.index = 0; }
+    if (stage === STAGES.TAXI) { this.index = 0; this.traffic?.forEach(flight => flight.start()); }
     if (stage === STAGES.LINEUP) { this.index = 0; this.lineupBraking = false; }
     const name = stage === STAGES.DEPARTURE ? 'departure' : names[stage - STAGES.GATE];
     if (name) {
       this.result.stages.push(name);
       // For Bangkok, takeoff stage has explicit tower handoff exchanges
-      this.atc = new DepartureAtc(name, voice => sim.audio?.playDepartureRadio(voice, 'bangkok'), BANGKOK_DEPARTURE_ATC, BANGKOK_DEPARTURE_RADIO);
-      const caption = () => this.atc?.caption(speaker => t(`departure.speaker.${speaker}`)) || t('departure.climbInstruction');
+      this.atc = this.createAtc(name);
       this.result.radio.push(this.atc.blocks.flatMap(block => block.lines).map(([speaker, text]) => `${speaker}: ${text}`).join(' '));
-      this.director.updateBanner(() => t(`departure.stage.${name}`), caption);
+      this.director.updateBanner(() => t(`departure.stage.${name}`), () => this.caption());
       if (stage === STAGES.GATE && !this.director.userCameraOverridden) sim.cameraSystem?.resetDroneOrbit?.(-1.3, 60, 17);
       if (!this.director.userCameraOverridden) sim.cameraSystem?.setMode(stage === STAGES.GATE || stage === STAGES.PUSHBACK
         ? CameraSystem.MODES.DRONE : CameraSystem.MODES.CHASE);
@@ -52,6 +58,74 @@ export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
   stop() {
     super.stop();
     this.sim.audio?.bangkokRadio?.stop();
+    this.sim.audio?.trafficRadio?.stop();
+    this.disposeTraffic();
+  }
+
+  createAtc(name) {
+    return new DepartureAtc(name, voice => this.playVoice(voice), BANGKOK_DEPARTURE_ATC, BANGKOK_DEPARTURE_RADIO, TRAFFIC);
+  }
+
+  /** One frequency: KE653's exchanges route to the traffic clips, the rest to Jeju Air 2503's. */
+  playVoice(voice) {
+    if (!voice.startsWith('traffic:')) return this.sim.audio?.playDepartureRadio(voice, 'bangkok');
+    const key = voice.slice('traffic:'.length);
+    if (key === 'clearance') this.traffic?.forEach(flight => flight.clearForTakeoff());
+    return this.sim.audio?.playTrafficRadio?.(key);
+  }
+
+  caption() {
+    return this.atc?.caption(speaker => t(`departure.speaker.${speaker}`))
+      || t(this.atc?.waitingForTraffic ? 'departure.traffic.waiting' : 'departure.climbInstruction');
+  }
+
+  /** Kinematic KE653 on the player's route; visuals reuse the airport's parsed parked 737s. */
+  createTraffic() {
+    this.disposeTraffic();
+    const flight = new PrecedingFlight();
+    this.traffic = [flight];
+    this.result.traffic = { flight: flight.id, phase: flight.phase };
+    const generation = this.trafficGeneration;
+    loadPrecedingFlightVisuals(this.sim.currentAirport?.parked, this.sim.scene)
+      .then(visuals => {
+        if (!visuals) return;
+        if (generation !== this.trafficGeneration || !this.traffic.includes(flight)) visuals.dispose();
+        else flight.attachVisuals(visuals);
+      })
+      .catch(error => console.warn('Preceding traffic visuals unavailable:', error.message));
+  }
+
+  disposeTraffic() {
+    this.trafficGeneration = (this.trafficGeneration ?? 0) + 1;
+    this.traffic?.forEach(flight => flight.dispose());
+    this.traffic = [];
+  }
+
+  trafficReady(key) {
+    return (this.traffic ?? []).every(flight => key === 'rotated' ? flight.hasRotated || flight.runwayVacated : flight.phaseAtLeast(key));
+  }
+
+  trafficClearForLineUp() { return this.trafficReady(TRAFFIC_PHASES.ROLL); }
+  trafficSpacedForTakeoff() { return (this.traffic ?? []).every(flight => flight.hasSpacedForPlayer()); }
+
+  /** Ground give-way: hold position while traffic on the ground is close ahead. */
+  yieldToTraffic() {
+    const sim = this.sim;
+    if (!sim.gear.onGround) return false;
+    const heading = (sim.telemetry.headingDeg ?? 0) * Math.PI / 180;
+    return (this.traffic ?? []).some(flight => flight.onGround && flight.phase !== TRAFFIC_PHASES.VACATED
+      && flight.isAheadOf(sim.position, heading)
+      && flight.separationFrom(sim.position).horizontal < TRAFFIC_SPACING.giveWayMeters);
+  }
+
+  updateTraffic(dt, stage) {
+    const sim = this.sim;
+    for (const flight of this.traffic ?? []) {
+      const near = flight.separationFrom(sim.position).horizontal < TRAFFIC_SPACING.releaseMeters;
+      if (stage >= STAGES.HOLD || (stage === STAGES.TAXI && near)) flight.release();
+      flight.update(dt);
+    }
+    if (this.traffic?.length && this.result.traffic) this.result.traffic.phase = this.traffic[0].phase;
   }
 
   update(dt) {
@@ -61,12 +135,13 @@ export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
     sim.controls.setVirtualInput('elevator', 0);
     sim.controls.setVirtualInput('aileron', 0);
     sim.controls.setVirtualInput('rudder', 0);
-    const exchange = this.atc?.index;
-    this.atc?.update(dt, sim.audio?.bangkokRadio?.busy ?? false, this.tug?.userData.animation.clear ?? false);
-    if (exchange !== this.atc?.index) {
+    this.updateTraffic(dt, stage);
+    const exchange = this.atc?.index, waiting = this.atc?.waitingForTraffic;
+    const voiceBusy = (sim.audio?.bangkokRadio?.busy ?? false) || (sim.audio?.trafficRadio?.busy ?? false);
+    this.atc?.update(dt, voiceBusy, this.tug?.userData.animation.clear ?? false, key => this.trafficReady(key));
+    if (exchange !== this.atc?.index || waiting !== this.atc?.waitingForTraffic) {
       const name = stage === STAGES.DEPARTURE ? 'departure' : names[stage - STAGES.GATE];
-      this.director.updateBanner(() => t(`departure.stage.${name}`),
-        () => this.atc?.caption(speaker => t(`departure.speaker.${speaker}`)) || t('departure.climbInstruction'));
+      this.director.updateBanner(() => t(`departure.stage.${name}`), () => this.caption());
     }
     const radioBusy = this.atc?.busy ?? false;
     if (stage === STAGES.GATE) sim.currentAirport?.departureBridge?.setExtension(clamp(1 - (d.stageTimer - 2) / 4, 0, 1));
@@ -90,7 +165,8 @@ export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
     } else if (stage === STAGES.TAXI) {
       if (!radioBusy && this.taxi(DEPARTURE_TAXI_ROUTE, true)) d.setStage(STAGES.HOLD);
       this.result.taxiPoints = this.index;
-    } else if (stage === STAGES.HOLD && d.stageTimer > 8 && !radioBusy) d.setStage(STAGES.LINEUP);
+    } else if (stage === STAGES.HOLD && !radioBusy
+      && (this.trafficClearForLineUp() || d.stageTimer > TRAFFIC_WATCHDOG_SECONDS)) d.setStage(STAGES.LINEUP);
     else if (stage === STAGES.LINEUP) {
       const runway = DEPARTURE_RUNWAY;
       const angle = runway.headingDeg * Math.PI / 180;
@@ -107,7 +183,8 @@ export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
           else this.lineupBraking = false;
         }
       } else if (!radioBusy) this.taxi(DEPARTURE_LINEUP_ROUTE, false);
-    } else if (stage === STAGES.CLEARANCE && d.stageTimer > 6 && !radioBusy) d.setStage(STAGES.TAKEOFF);
+    } else if (stage === STAGES.CLEARANCE && !radioBusy
+      && (this.trafficSpacedForTakeoff() || d.stageTimer > TRAFFIC_WATCHDOG_SECONDS)) d.setStage(STAGES.TAKEOFF);
     else if ((stage === STAGES.TAKEOFF || stage === STAGES.DEPARTURE)) {
       const runwayHeading = DEPARTURE_RUNWAY.headingDeg;
       const heightFt = (sim.position.y - INCHEON_AIRFIELD.elevationM) / .3048;
@@ -136,6 +213,10 @@ export class JejuBangkokDepartureScenario extends IncheonDepartureScenario {
           d.setStage(STAGES.COMPLETED);
         }
       }
+    }
+    if ((stage === STAGES.TAXI || stage === STAGES.LINEUP) && this.yieldToTraffic()) {
+      sim.controls.setVirtualInput('throttle', 0);
+      sim.controls.setVirtualInput('brakes', 1);
     }
     if (d.stageTimer > 1500 || d.totalTimer > 1800) {
       this.result.status = 'failed'; this.result.reason = 'Guidance timeout';

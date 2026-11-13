@@ -43,6 +43,8 @@ export default {
   "departure.speaker.crew": "Ground crew",
   "departure.speaker.ground": "Ground",
   "departure.speaker.tower": "Tower",
+  "departure.speaker.traffic": "Korean Air 653",
+  "departure.traffic.waiting": "Holding for departing traffic, Korean Air 653.",
   "departure.name": "Incheon gate → pushback → takeoff",
   "departure.briefing": "Jeju Air Boeing 737-800 scripted ATC departure: training clearance and readback, apron pushback, Ground taxi, Tower runway clearance and Departure check-in. Additional exchanges use captions. Authored training scenario; gate, route and clearances are not published RKSI procedures.",
   "departure.complete": "Departure complete · manual control",

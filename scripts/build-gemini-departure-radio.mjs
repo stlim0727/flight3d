@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { DEPARTURE_RADIO } from '../src/config/departureRadio.js';
 import { BANGKOK_DEPARTURE_RADIO } from '../src/config/bangkokDepartureRadio.js';
+import { TRAFFIC_RADIO } from '../src/config/trafficDepartureRadio.js';
 
 const model = process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview';
 if (!['gemini-2.5-flash-preview-tts', 'gemini-3.1-flash-tts-preview'].includes(model)) {
@@ -28,7 +29,17 @@ const PROFILES = {
     cache: path.resolve('.cache/gemini-bangkok'),
     voices: { pilot: 'Charon', crew: 'Fenrir', delivery: 'Kore', apron: 'Kore', ground: 'Kore', tower: 'Kore', departure: 'Kore' },
   },
+  traffic: {
+    name: 'traffic',
+    radio: TRAFFIC_RADIO,
+    output: path.resolve('public/audio/traffic'),
+    cache: path.resolve('.cache/gemini-traffic'),
+    // KE653's crew needs a voice distinct from the Jeju Air 2503 pilot (Charon).
+    voices: { traffic: 'Orus', ground: 'Kore', tower: 'Kore' },
+    roles: 'Traffic is the pilot of another airliner, Korean Air, other roles are air traffic controllers.',
+  },
 };
+const DEFAULT_ROLES = 'Pilot is an airline pilot, crew is a ground crew member, other roles are air traffic controllers.';
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -60,7 +71,7 @@ function printUsage() {
 Usage: node scripts/build-gemini-departure-radio.mjs [options]
 
 Options:
-  --profile <name> Target profile: 'incheon', 'bangkok', or 'all' (default: all)
+  --profile <name> Target profile: 'incheon', 'bangkok', 'traffic', or 'all' (default: all)
   --stage <name>   Target only a specific stage (e.g. --stage taxi)
   --check          Check if manifest.json and audio files are in sync with radio configs (exits 0 or 1)
   --dry-run        Analyze which stages need synthesis without calling the API or writing files
@@ -254,7 +265,7 @@ async function processProfile(profileConfig, options, apiKey) {
       for (const [index, group] of groups.entries()) {
         const speakers = [...new Set(group.map(([speaker]) => speaker))];
         const spoken = group.map(([speaker, text]) => `${speaker}: ${formatPhonetic(text)}`).join('\n');
-        const prompt = `Read this scripted English aviation radio exchange exactly, with no introduction or additional dialogue. Calm professional voices, natural conversational intonation, brisk but clearly intelligible. Pilot is an airline pilot, crew is a ground crew member, other roles are air traffic controllers. Brief pauses between turns. No music, radio noise or sound effects.\n${spoken}`;
+        const prompt = `Read this scripted English aviation radio exchange exactly, with no introduction or additional dialogue. Calm professional voices, natural conversational intonation, brisk but clearly intelligible. ${profileConfig.roles ?? DEFAULT_ROLES} Brief pauses between turns. No music, radio noise or sound effects.\n${spoken}`;
         const speechConfig = speakers.length === 1
           ? { voiceConfig: { prebuiltVoiceConfig: { voiceName: voices[speakers[0]] || 'Kore' } } }
           : { multiSpeakerVoiceConfig: { speakerVoiceConfigs: speakers.map(speaker => ({ speaker, voiceConfig: { prebuiltVoiceConfig: { voiceName: voices[speaker] || 'Kore' } } })) } };

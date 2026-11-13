@@ -66,10 +66,10 @@ jobs:
 
       - name: Commit and push updated audio clips
         run: |
-          if [ -n "$(git status --porcelain public/audio/departure)" ]; then
+          if [ -n "$(git status --porcelain public/audio)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add public/audio/departure
+            git add public/audio
             git commit -m "chore(audio): regenerate departure radio audio clips [skip ci]"
             git push
           else
@@ -81,4 +81,4 @@ jobs:
         if: always()
         with:
           name: departure-audio
-          path: public/audio/departure/
+          path: public/audio/
