@@ -89,8 +89,19 @@ waiting for a telemetry trend. The sequence is:
 
 If the round is still far after 9 s of follow, routine shots run until the POV
 entry range, and the sequence aborts cleanly if the missile expires or misses.
-Replays keep their own director timeline and never trigger this sequence.
-`CameraSystem.setCombatStateProvider()` supplies the live missile/target arrays.
+
+Recorded sessions use the same sequence. `CombatReplayPlayback` exposes its
+interpolated missile and bandit state to the director, deriving each missile's
+velocity from sample deltas and marking the reused missile object dead when
+playback crosses its detonation. Shot pacing follows the replay clock, so pause
+freezes the current beat and every replay speed (0.3x–3x) stays in sync with
+the missile.
+Seeking resets the director; a seek that lands mid-flight does not replay the
+launch beat because the missile's recorded age is already past 2 s. Tracks
+recorded before the combat codec (v1–v3) carry no missile poses and stay on
+routine shots.
+`CameraSystem.setCombatStateProvider()` selects replay combat while a replay is
+active and the live arrays otherwise.
 
 ## Verification
 

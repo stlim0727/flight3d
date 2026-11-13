@@ -110,17 +110,22 @@ test('replay playback interpolates combat and stages each detonation once', () =
   assert.equal(playback.state.missiles.length, 1);
   assert.equal(playback.state.rails, 0x3f);
   assert.equal(explosions, 0, 'seeking past a detonation does not stage it');
+  const inFlight = playback.state.missiles[0];
+  assert.ok(inFlight.velocity.x > 50 && inFlight.velocity.z < 0, 'sample deltas restore missile velocity');
+  assert.ok(inFlight.age >= 0.9, 'replay missiles expose their flight age to the director');
 
   playback.update(0.1, 5.1);
   assert.equal(playback.getHudState(origin).splash, 1);
   assert.equal(explosions, 1, 'crossing the detonation stages one explosion');
   assert.equal(playback.state.missiles.length, 0, 'the detonated missile leaves the scene');
+  assert.equal(playback.missiles.get(7).alive, false, 'the held missile reference reports the detonation');
   playback.update(0.1, 5.2);
   assert.equal(explosions, 1, 'the same detonation is not staged twice');
 
   playback.seek(0.5);
   assert.equal(playback.getHudState(origin).splash, 0, 'seeking back rewinds the burst count');
   assert.equal(playback.state.missiles.length, 1, 'seeking back restores the in-flight missile');
+  assert.equal(playback.missiles.get(7).alive, true, 'seeking back revives the reused missile object');
   assert.equal(explosions, 1, 'seeking back does not replay past explosions');
   playback.stop();
   assert.equal(playback.state.targets.length, 0);

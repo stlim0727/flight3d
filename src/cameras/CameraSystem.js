@@ -2067,8 +2067,10 @@ export class CameraSystem {
       case CameraSystem.MODES.DIRECTOR: {
         this.cinematicDirector.setTerrainQuery((x, z) => this.queryGroundHeight(x, z));
         const combat = this.combatStateProvider ? this.combatStateProvider() : null;
+        const clockDt = Number.isFinite(combat?.timeScale) ? dt * combat.timeScale : dt;
         this.cinematicDirector.update({
           dt,
+          clockDt,
           camera: this.camera,
           planePos,
           planeQuat,

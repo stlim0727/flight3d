@@ -4,7 +4,8 @@
 - **feat(camera):** director camera missile cinematics
   - A rail release in `DIRECTOR` mode cuts immediately to a wing-mounted launch shot, then a rigid follow cam on the missile, then the targeted bandit's POV as it closes.
   - The bandit POV waits for a 1.6 km entry range and uses a proximity telephoto so the round grows from a speck through detonation.
-  - `CameraSystem.setCombatStateProvider()` feeds the live missile and bandit arrays; replays keep their own director timeline.
+  - Recorded sessions feed the same sequence from the replay combat track; shot pacing follows replay speed and pause, and seeking mid-flight skips the launch beat.
+  - `CameraSystem.setCombatStateProvider()` selects recorded combat during replay playback and the live missile/bandit arrays otherwise.
 - **fix(replay):** show F-16 missile launches, bandit targets and bursts in recorded replays
   - Replay tracks now carry a compact combat section (codec v4) with 2 Hz bandit poses, 20 Hz missile poses, detonation/expiry markers and the rail loadout mask.
   - Playback interpolates the recorded combat state, stages each detonation once, and restores the fired-rail count and time-correct splash count; it never re-simulates guidance, so seeks and speed changes cannot alter the outcome.

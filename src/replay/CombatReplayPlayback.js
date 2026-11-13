@@ -180,6 +180,9 @@ export class CombatReplayPlayback {
   _updateState(timeSec) {
     this._updateTargets(timeSec);
     this.state.missiles.length = 0;
+    // Objects are reused across seeks so a consumer (the director) can hold a
+    // missile reference and see it die when playback crosses its detonation.
+    for (const missile of this.missiles.values()) missile.alive = false;
     for (const [id, group] of this.groups) {
       const samples = group.samples;
       if (!samples.length || timeSec + 1e-9 < samples[0].timeSec) continue;
@@ -195,14 +198,15 @@ export class CombatReplayPlayback {
       let missile = this.missiles.get(id);
       if (!missile) {
         missile = {
-          id, typeId: group.typeId, alive: true,
-          position: new THREE.Vector3(), quaternion: new THREE.Quaternion(),
-          propellant: 0,
+          id, typeId: group.typeId, alive: true, age: 0,
+          position: new THREE.Vector3(), velocity: new THREE.Vector3(),
+          quaternion: new THREE.Quaternion(), propellant: 0,
         };
         this.missiles.set(id, missile);
       }
       missile.typeId = group.typeId;
       missile.alive = true;
+      missile.age = Math.max(0, clamped - samples[0].timeSec);
       missile.position.set(
         a.x + (b.x - a.x) * alpha,
         a.y + (b.y - a.y) * alpha,
@@ -211,6 +215,21 @@ export class CombatReplayPlayback {
       const quat = slerp([0, 0, 0, 1], a.quat, b.quat, alpha);
       missile.quaternion.set(quat[0], quat[1], quat[2], quat[3]);
       missile.propellant = a.powered ? 1 : 0;
+      // Recorded samples carry pose only; the pose delta restores the flight
+      // direction the director needs for its follow cam.
+      const previous = index > 0 ? samples[index - 1] : a;
+      const from = b.timeSec > a.timeSec ? a : previous;
+      const to = b.timeSec > a.timeSec ? b : a;
+      const span = to.timeSec - from.timeSec;
+      if (span > 1e-6) {
+        missile.velocity.set(
+          (to.x - from.x) / span,
+          (to.y - from.y) / span,
+          (to.z - from.z) / span,
+        );
+      } else {
+        missile.velocity.set(0, 0, -1).applyQuaternion(missile.quaternion).multiplyScalar(600);
+      }
       this.state.missiles.push(missile);
     }
   }

@@ -269,6 +269,19 @@ export class ReplayDirector {
     return this._combat?.getHudState?.(this.sim.position) ?? null;
   }
 
+  /**
+   * Recorded combat feed for the cinematic director. Shot timing follows the
+   * replay's own clock so pause and speed changes keep the beats in sync.
+   */
+  combatState() {
+    if (!this.active || !this._combat) return null;
+    return {
+      missiles: this._combat.state.missiles,
+      targets: this._combat.state.targets,
+      timeScale: this.paused ? 0 : this.speed,
+    };
+  }
+
   /** Keep the replay host's rail count in step with the recorded loadout mask. */
   _applyCombatLoadout() {
     const mask = this._combat?.state?.rails;
