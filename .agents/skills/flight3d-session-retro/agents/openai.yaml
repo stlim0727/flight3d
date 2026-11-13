@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flight3d Session Retro"
+  short_description: "Measure agent token and wall-time waste in a session"
+  default_prompt: "Use $flight3d-session-retro to retro this Flight3d session and rank durable efficiency fixes."
