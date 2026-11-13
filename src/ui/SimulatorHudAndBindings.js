@@ -218,12 +218,21 @@ class SimulatorHudAndBindingsMethods {
   }
 
   updateAutopilotUI() {
-    const isDemo = Boolean(this.demoDirector?.isActive);
+    const isReplaying = Boolean(this.replayDirector?.active);
+    const apDisabled = Boolean(this.demoDirector?.isActive) || isReplaying;
     const btnToggle = document.getElementById('btn-ap-toggle');
     if (btnToggle) {
-      btnToggle.disabled = isDemo;
+      btnToggle.disabled = apDisabled;
       btnToggle.setAttribute('data-ap-state', this.autopilot.master ? 'ON' : 'OFF');
       btnToggle.classList.toggle('ap-active', this.autopilot.master);
+    }
+    if (isReplaying) {
+      const apPanel = document.getElementById('ap-panel');
+      if (apPanel && !apPanel.hidden) {
+        apPanel.hidden = true;
+        document.getElementById('ap-bar')?.classList.add('ap-collapsed');
+        btnToggle?.setAttribute('aria-expanded', 'false');
+      }
     }
     const elPhase = document.getElementById('hud-phase');
     if (elPhase) {
@@ -245,7 +254,7 @@ class SimulatorHudAndBindingsMethods {
     for (const [id, on] of Object.entries(pressed)) {
       const btn = document.getElementById(id);
       if (!btn) continue;
-      btn.disabled = isDemo;
+      btn.disabled = apDisabled;
       btn.classList.toggle('ap-active', on);
       btn.classList.toggle('ap-armed', id === 'btn-ap-app' && this.autopilot.appArmed);
       btn.setAttribute('aria-pressed', String(on));

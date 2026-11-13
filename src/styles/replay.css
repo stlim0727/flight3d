@@ -83,7 +83,20 @@
   border-color: #38bdf8;
   color: #38bdf8;
 }
-body.replaying #touch-controls, body.replaying #btn-lobby-end { display: none !important; }
+body.replaying :is(
+  #touch-controls,
+  #btn-lobby-end,
+  .flight-toolbar,
+  #flight-more-panel,
+  #ap-bar,
+  #ap-panel,
+  .hud-item[data-hud="fuel"],
+  #btn-touch-toggle,
+  #touch-btn-gyro,
+  #gyro-settings,
+  #btn-diag,
+  #btn-joystick-check
+) { display: none !important; }
 body:not([data-flow="flight"]) #replay-panel { display: none; }
 @media (max-width: 480px) {
   #replay-panel { padding: 8px; }
