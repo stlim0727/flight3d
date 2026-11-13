@@ -314,9 +314,20 @@ export class F16CanyonChaseScenario extends CessnaDemoScenario {
       (aero.Cl_da * 1.05 * Math.PI / 9 * stiffness), -1, 1));
     const cosBank = Math.cos(tel.rollDeg * Math.PI / 180);
     const vz = clamp((altitude - sim.position.y) * 0.5, -maxDescent, 65);
-    const normalG = load ?? clamp((1 + (vz - sim.linearVelocity.y) * 0.15) / Math.max(0.13, cosBank), -1, 8);
+    // A load command the wing cannot deliver saturates alpha instead: the 8 g pull in a
+    // low-q canyon turn pitched through the F16's 26° shaker threshold with CL already
+    // at its attached-flow limit. Bound the request by the lift available at a safe alpha
+    // (the shaker threshold minus 2°) so the pitch loop chases a flyable load factor.
+    const warningAlphaDeg = aero.stallWarningAlphaDeg
+      ?? THREE.MathUtils.radToDeg(aero.alphaStallClean ?? 0.4) - 2;
+    const alphaLimit = Math.min(0.40, THREE.MathUtils.degToRad(warningAlphaDeg - 2));
+    const clLimit = aero.CL0_clean + aero.CLa * alphaLimit;
+    const feasibleG = clLimit * Math.max(1, aero.qDyn) * aero.wingArea / (aero.mass * 9.80665);
+    const requestedG = load
+      ?? clamp((1 + (vz - sim.linearVelocity.y) * 0.15) / Math.max(0.13, cosBank), -1, 8);
+    const normalG = clamp(requestedG, -Math.min(8, feasibleG), Math.min(8, feasibleG));
     const desiredCl = normalG * aero.mass * 9.80665 / Math.max(1, aero.qDyn * aero.wingArea);
-    const alpha = clamp((desiredCl - aero.CL0_clean) / aero.CLa, -0.10, 0.40);
+    const alpha = clamp((desiredCl - aero.CL0_clean) / aero.CLa, -0.10, alphaLimit);
     const rate = (alpha - aero.alpha) * 3 + 9.80665 * (normalG - cosBank) / Math.max(40, aero.tas);
     const qSc = Math.max(1, aero.qDyn * aero.wingArea * aero.meanChord);
     const thrustMoment = sim.engines.thrust.reduce((sum, thrust) => sum + thrust, 0) * aero.thrustPitchArmM;

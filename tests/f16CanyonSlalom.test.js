@@ -11,6 +11,9 @@ test('extreme canyon slalom flies low, reverses steep banks and escapes without 
   assert.equal(r.crash, undefined);
   assert.equal(r.incident, false);
   assert.equal(r.stallFrames, 0);
+  // Issue #691: the guidance asked for more load than the wing could produce at that
+  // speed, so alpha crossed the 26° shaker threshold without a real stall.
+  assert.equal(r.stallWarningFrames, 0, 'slalom must stay inside the F16 stall margin');
   assert.equal(r.gearDown, null);
   assert.ok(r.result.elapsedSeconds < 100);
   assert.ok(r.result.minClearanceM >= 20 && r.result.minClearanceM < 50);
