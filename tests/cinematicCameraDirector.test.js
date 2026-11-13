@@ -551,15 +551,16 @@ test('Director cuts to missile launch, follows the missile, then shows the bandi
     director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [target] });
   }
   assert.equal(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV, 'Close missile hands off to the bandit POV');
+  const banditRange = camera.position.distanceTo(target.position);
   assert.ok(
-    camera.position.distanceTo(target.position) < 3,
-    `Bandit POV eye sits on the targeted bandit, was ${camera.position.distanceTo(target.position).toFixed(1)}m away`,
+    banditRange > 12 && banditRange < 50,
+    `Bandit shot frames the airframe instead of sitting inside it, was ${banditRange.toFixed(1)}m away`,
   );
 
   const toMissile = missile.position.clone().sub(camera.position).normalize();
   const viewDir = new THREE.Vector3();
   camera.getWorldDirection(viewDir);
-  assert.ok(viewDir.dot(toMissile) > 0.95, 'Bandit POV looks down the incoming missile bearing');
+  assert.ok(viewDir.dot(toMissile) > 0.9, 'Bandit shot looks down the incoming missile bearing');
 });
 
 test('Approach keeps routine shots until the missile is close, then holds the bandit POV through detonation', () => {
@@ -737,4 +738,43 @@ test('Director shot pacing follows the supplied replay clock', () => {
     director.update({ dt: 0.016, clockDt: 0.2, camera, planePos, planeQuat, missiles: [missile], targets: [target] });
   }
   assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_TRACK, 'Scaled clock advances the sequence');
+});
+
+test('bandit shot keeps the target airframe and the inbound round in frame', () => {
+  const camera = new THREE.PerspectiveCamera(46, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const targetPos = new THREE.Vector3(0, 1000, -3000);
+  const target = {
+    id: 5,
+    alive: true,
+    position: targetPos.clone(),
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const missile = {
+    id: 66,
+    alive: true,
+    age: 4.0,
+    position: targetPos.clone().add(new THREE.Vector3(0, 0, -900)),
+    velocity: new THREE.Vector3(0, 0, 450),
+    target,
+  };
+  director.missileSequence = {
+    missile, target, phase: 'bandit', phaseTime: 0, missileDeathTime: null, stationSide: null,
+    lastMissilePos: missile.position.clone(), lastTargetPos: targetPos.clone(),
+  };
+  director.switchShot(CINEMATIC_SHOTS.BANDIT_POV);
+  director.update({
+    dt: 1 / 60, camera, planePos: new THREE.Vector3(0, 500, 0), planeQuat: new THREE.Quaternion(),
+    missiles: [missile], targets: [target], flightState: {},
+  });
+  camera.updateMatrixWorld(true);
+
+  const distance = camera.position.distanceTo(targetPos);
+  assert.ok(distance > 12 && distance < 50, `bandit airframe fills a readable close-up (${distance.toFixed(1)} m)`);
+  const projectedTarget = targetPos.clone().project(camera);
+  assert.ok(Math.abs(projectedTarget.x) < 0.85 && Math.abs(projectedTarget.y) < 0.85,
+    'the target airframe is inside the frame');
+  const projectedMissile = missile.position.clone().project(camera);
+  assert.ok(Math.abs(projectedMissile.x) < 1 && Math.abs(projectedMissile.y) < 1,
+    'the inbound missile is inside the frame');
 });

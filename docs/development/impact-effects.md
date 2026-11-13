@@ -10,6 +10,9 @@ bounded particle counts; emitted dust and fragments inherit world momentum.
 - Terrain uses brown dust; structures use grey dust. Dust slows and settles.
   Solid impacts emit small, non-additive fragments, with a short heat flash and
   limited fire at high speed. No horizontal shockwave floats at building height.
+- Air bursts (`type: 'AIR'`) blend fire normally and use a darker, more opaque
+  smoke core. Additive fire washes out against a bright sky; normal blending keeps
+  a missile kill readable above cloud and haze.
 - Reset disposes particle materials/ring geometry and clears lights. Shared
   atlases are retained until system disposal. Particle counts remain bounded.
 

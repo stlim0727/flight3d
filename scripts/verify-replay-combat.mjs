@@ -80,17 +80,26 @@ await withBrowserSession({
     // sortie in daylight so the missile and bandit are legible in screenshots.
     if (track?.metadata) track.metadata.timeOfDay = 12;
     const ok = await s.replayDirector.load(track);
-    return { ok, active: s.replayDirector.active, combat: Boolean(s.replayDirector._combat?.active) };
+    return { ok, active: s.replayDirector.active, mode: s.cameraSystem.mode,
+      combat: Boolean(s.replayDirector._combat?.active) };
   })()`);
   assert.ok(loaded.ok, 'replay loaded');
   assert.ok(loaded.combat, 'replay combat playback active');
+  assert.equal(loaded.mode, 9, 'a combat track opens in the cinematic director');
 
   // The recorded combat track must drive the same director cinematics as a
-  // live launch: launch, missile follow, then the bandit POV.
+  // live launch: launch, missile follow, then the bandit shot.
   const replayShots = await evaluate(`(async () => {
     const s = window.simulator;
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     s.replayPanel?.setFolded?.(true);
+    window.replayBursts = 0;
+    const playExplosion = s.audio.playRemoteExplosion.bind(s.audio);
+    s.audio.playRemoteExplosion = (...args) => {
+      window.replayBursts++;
+      window.replayBurstDistance = args[0];
+      return playExplosion(...args);
+    };
     s.replayDirector.seek(${recorded.combat.firstMissileTime} + 0.02);
     s.cameraSystem.setMode(9, true);
     s.replayDirector.play();
@@ -104,31 +113,67 @@ await withBrowserSession({
     const launch = await waitShot('missile_launch', 20);
     const track = await waitShot('missile_track', 40);
     const pov = await waitShot('bandit_pov', 160);
+    // Hold the bandit shot while the round is still inbound, so its airframe
+    // and the closing missile are judged before the fireball hides them.
     let close = false;
     for (let i = 0; i < 120; i++) {
       const sequence = s.cameraSystem.cinematicDirector.missileSequence;
       if (!sequence) break;
       const missile = sequence.missile;
       const target = sequence.target;
-      if (missile?.alive && target && missile.position.distanceTo(target.position) < 80) {
+      if (missile?.alive && target?.alive && missile.position.distanceTo(target.position) < 600) {
         close = true;
         break;
       }
       await delay(100);
     }
     s.replayDirector.pause();
+    const sequence = s.cameraSystem.cinematicDirector.missileSequence;
     return {
       launch, track, pov, close,
       shot: s.cameraSystem.cinematicDirector.currentShotType,
-      phase: s.cameraSystem.cinematicDirector.missileSequence?.phase ?? null,
+      phase: sequence?.phase ?? null,
+      camera: s.camera.position.toArray(),
+      cameraDir: s.camera.getWorldDirection(new window.THREE.Vector3()).toArray(),
+      target: sequence?.lastTargetPos?.toArray() ?? null,
+      missile: sequence?.lastMissilePos?.toArray() ?? null,
       timeSec: s.replayDirector.progressSec,
     };
   })()`);
   assert.ok(replayShots.launch, 'recorded launch cuts to the launch shot');
   assert.ok(replayShots.track, 'recorded missile gets the follow cam');
-  assert.ok(replayShots.pov, `recorded missile reaches the bandit POV (${replayShots.shot})`);
-  assert.ok(replayShots.close, 'recorded POV follows the missile down to impact range');
-  await screenshot(path.join(dir, 'replay-director-pov.png'));
+  assert.ok(replayShots.pov, `recorded missile reaches the bandit shot (${replayShots.shot})`);
+  assert.ok(replayShots.close, 'recorded bandit shot follows the missile down to impact range');
+  await screenshot(path.join(dir, 'replay-director-bandit.png'));
+
+  // Resume through the recorded detonation: it must stage a burst and be
+  // audible from the replay camera, not just in the live sortie.
+  const destruction = await evaluate(`(async () => {
+    const s = window.simulator;
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+    s.replayDirector.play();
+    for (let i = 0; i < 60 && window.replayBursts < 1; i++) await delay(100);
+    await delay(350);
+    s.replayDirector.pause();
+    const sequence = s.cameraSystem.cinematicDirector.missileSequence;
+    return {
+      bursts: window.replayBursts,
+      burstDistance: window.replayBurstDistance,
+      shot: s.cameraSystem.cinematicDirector.currentShotType,
+      phase: sequence?.phase ?? null,
+      camera: s.camera.position.toArray(),
+      cameraDir: s.camera.getWorldDirection(new window.THREE.Vector3()).toArray(),
+      explosionChildren: s.explosionSystem.group.children.length,
+      fireballs: s.explosionSystem.fireballs.length,
+      smoke: s.explosionSystem.smokePuffs.length,
+      timeSec: s.replayDirector.progressSec,
+    };
+  })()`);
+  assert.ok(destruction.bursts >= 1, 'the recorded detonation is audible in playback');
+  assert.ok(destruction.burstDistance < 100,
+    `the replay mixes the burst from the camera, not the sortie (${destruction.burstDistance.toFixed(1)} m)`);
+  assert.ok(destruction.fireballs + destruction.smoke > 0, 'the recorded detonation stages particles');
+  await screenshot(path.join(dir, 'replay-director-burst.png'));
 
   const flightTime = recorded.combat.firstMissileTime + 1.2;
   const duringFlight = await evaluate(`(async () => {
@@ -180,6 +225,6 @@ await withBrowserSession({
   assert.equal(afterBurst.viewMissiles, 0, 'detonated missile mesh is removed after the burst');
   assert.equal(exceptions.length, 0, JSON.stringify(exceptions));
 
-  fs.writeFileSync(path.join(dir, 'result.json'), JSON.stringify({ recorded, loaded, replayShots, duringFlight, exceptions }, null, 2));
-  console.log('Replay combat verification passed', { recorded: recorded.combat, replayShots, duringFlight, gpuAngle });
+  fs.writeFileSync(path.join(dir, 'result.json'), JSON.stringify({ recorded, loaded, replayShots, destruction, duringFlight, exceptions }, null, 2));
+  console.log('Replay combat verification passed', { recorded: recorded.combat, replayShots, destruction, duringFlight, gpuAngle });
 });

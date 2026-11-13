@@ -93,7 +93,13 @@ test('replay playback interpolates combat and stages each detonation once', () =
   });
   const combat = decodeTrack(encodeTrack(recorder.finish())).combat;
   let explosions = 0;
-  const sim = { scene: new Scene(), explosionSystem: { spawnExplosion() { explosions++; } } };
+  const sounds = [];
+  const sim = {
+    scene: new Scene(),
+    camera: { position: new Vector3(0, 3000, 0) },
+    explosionSystem: { spawnExplosion() { explosions++; } },
+    audio: { playRemoteExplosion(distance, isWater) { sounds.push({ distance, isWater }); } },
+  };
   const playback = new CombatReplayPlayback(sim);
   assert.equal(playback.load(combat), true);
 
@@ -117,16 +123,22 @@ test('replay playback interpolates combat and stages each detonation once', () =
   playback.update(0.1, 5.1);
   assert.equal(playback.getHudState(origin).splash, 1);
   assert.equal(explosions, 1, 'crossing the detonation stages one explosion');
+  assert.equal(sounds.length, 1, 'crossing the detonation plays one burst');
+  const burstDistance = Math.hypot(300, 1200);
+  assert.ok(Math.abs(sounds[0].distance - burstDistance) < 1e-3, 'the burst is mixed from the camera distance');
+  assert.equal(sounds[0].isWater, false);
   assert.equal(playback.state.missiles.length, 0, 'the detonated missile leaves the scene');
   assert.equal(playback.missiles.get(7).alive, false, 'the held missile reference reports the detonation');
   playback.update(0.1, 5.2);
   assert.equal(explosions, 1, 'the same detonation is not staged twice');
+  assert.equal(sounds.length, 1, 'the same detonation is not heard twice');
 
   playback.seek(0.5);
   assert.equal(playback.getHudState(origin).splash, 0, 'seeking back rewinds the burst count');
   assert.equal(playback.state.missiles.length, 1, 'seeking back restores the in-flight missile');
   assert.equal(playback.missiles.get(7).alive, true, 'seeking back revives the reused missile object');
   assert.equal(explosions, 1, 'seeking back does not replay past explosions');
+  assert.equal(sounds.length, 1, 'seeking back does not replay past bursts');
   playback.stop();
   assert.equal(playback.state.targets.length, 0);
   assert.equal(playback.state.missiles.length, 0);

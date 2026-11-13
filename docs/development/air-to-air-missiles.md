@@ -27,7 +27,9 @@ reloads every rail.
 - `src/weapons/missileSpecs.js` — missile data and F-16 station coordinates in
   the aircraft frame (+X starboard, +Y up, -Z nose).
 - `src/weapons/missileGeometry.js` — procedural AIM-9X / AIM-120C and bandit
-  meshes. No new binary assets.
+  meshes. No new binary assets. All weapon meshes use local forward `-Z`;
+  `ConeGeometry` apexes point `+Y`, so nose cones rotate `-90°` about X to lead
+  the airframe instead of trailing into it.
 - `src/weapons/AirToAirMissileSystem.js` — pure combat state: seeker lock
   integration, 120 Hz rocket mass/thrust, atmospheric drag, gravity, seeker
   gimbal limit, TPN guidance and closest-approach proximity fuse. It owns the
@@ -82,18 +84,21 @@ waiting for a telemetry trend. The sequence is:
    round separates and its smoke crosses the nose.
 2. **Follow** — a rigid chase cam rides 16 m behind the missile, so a 700 m/s
    body stays locked in frame and the smoke trail streams past.
-3. **Bandit POV** — once the missile is within 1.6 km of its target, the eye
-   moves above and beside the bandit's canopy, looking back down the bearing.
-   A proximity-driven telephoto widens the round from a speck into the frame;
-   the shot lingers 1.4 s through detonation before routine shots resume.
+3. **Bandit shot** — once the missile is within 1.6 km of its target, the eye
+   moves behind and beside the bandit on the side opposite the inbound bearing.
+   The airframe fills the foreground while the round closes past it, so the
+   detonation reads as a fireball around the target rather than a distant dot.
+   The shot lingers 1.4 s through the burst before routine shots resume.
 
 If the round is still far after 9 s of follow, routine shots run until the POV
 entry range, and the sequence aborts cleanly if the missile expires or misses.
 
-Recorded sessions use the same sequence. `CombatReplayPlayback` exposes its
-interpolated missile and bandit state to the director, deriving each missile's
-velocity from sample deltas and marking the reused missile object dead when
-playback crosses its detonation. Shot pacing follows the replay clock, so pause
+Recorded sessions use the same sequence and open in DIRECTOR by default, so a
+combat replay shows the bandit airframe and the kill without hunting through the
+camera menu. Staged detonations also play a distance-scaled burst from the replay
+camera. `CombatReplayPlayback` exposes its interpolated missile and bandit state
+to the director, deriving each missile's velocity from sample deltas and marking
+the reused missile object dead when playback crosses its detonation. Shot pacing follows the replay clock, so pause
 freezes the current beat and every replay speed (0.3x–3x) stays in sync with
 the missile.
 Seeking resets the director; a seek that lands mid-flight does not replay the

@@ -92,6 +92,7 @@ export class ExplosionSystem {
       return; // No combustion, glowing sparks or persistent smoke on water.
     }
 
+    const isAir = crashResult.type === 'AIR';
     const fireStart = this.fireballs.length;
     const smokeStart = this.smokePuffs.length;
     const debrisStart = this.debrisParticles.length;
@@ -105,13 +106,13 @@ export class ExplosionSystem {
       flash.light.visible = true;
       flash.life = 0;
       flash.maxLife = 0.25;
-      this.spawnFireballCore(pos, Math.ceil(12 * heat), false);
+      this.spawnFireballCore(pos, Math.ceil(12 * heat), false, isAir);
       for (const f of this.fireballs.slice(fireStart)) {
         f.vel.multiplyScalar(0.3);
-        f.scale *= 0.45;
+        f.scale *= isAir ? 0.85 : 0.45;
         f.sprite.scale.set(f.scale, f.scale, 1);
-        f.growth *= 0.3;
-        f.maxLife = Math.min(f.maxLife, 0.65);
+        f.growth *= isAir ? 0.7 : 0.3;
+        f.maxLife = Math.min(f.maxLife, isAir ? 1.1 : 0.65);
       }
     }
     this.spawnSmokePlume(pos, Math.ceil(20 + 30 * spread), crashResult.type);
@@ -172,12 +173,14 @@ export class ExplosionSystem {
     });
   }
 
-  spawnFireballCore(pos, count, isWater) {
+  spawnFireballCore(pos, count, isWater, isAir = false) {
     for (let i = 0; i < count && this.fireballs.length < 60; i++) {
+      // Additive fire disappears against a bright sky. Air bursts blend
+      // normally so the fireball keeps its colour above cloud and haze.
       const spriteMat = createFlipbookMaterial(isWater ? this.waterTexture : this.fireTexture, {
         transparent: true,
-        opacity: 0.95,
-        blending: isWater ? THREE.NormalBlending : THREE.AdditiveBlending,
+        opacity: isAir ? 0.98 : 0.95,
+        blending: isWater || isAir ? THREE.NormalBlending : THREE.AdditiveBlending,
         depthWrite: false
       });
 
@@ -212,11 +215,14 @@ export class ExplosionSystem {
   }
 
   spawnSmokePlume(pos, count, type) {
+    const isAir = type === 'AIR';
     for (let i = 0; i < count && this.smokePuffs.length < 120; i++) {
       const spriteMat = createFlipbookMaterial(this.dustTexture, {
         transparent: true,
-        opacity: 0.65,
-        color: type === 'TERRAIN' ? 0xa28b6c : 0xa3a5a7,
+        // An air-burst plume has no ground behind it; a darker core keeps the
+        // kill readable against bright cloud without becoming a black wall.
+        opacity: isAir ? 0.74 : 0.65,
+        color: type === 'TERRAIN' ? 0xa28b6c : isAir ? 0x5a5c60 : 0xa3a5a7,
         depthWrite: false
       });
 

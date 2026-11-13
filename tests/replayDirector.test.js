@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Vector3, Quaternion, Object3D } from 'three';
+import { Vector3, Quaternion, Object3D, Scene } from 'three';
 import { ReplayDirector } from '../src/director/ReplayDirector.js';
 import { RenderPose } from '../src/core/RenderPose.js';
 import { sampleTrack, sampleRemote, trackDuration } from '../src/replay/TrackSampler.js';
@@ -46,6 +46,7 @@ function fakeSim(options = {}) {
     currentAircraftId: 'C172',
     lastPresetType: 'runway',
     gameFlow: { state: FLOW.FLIGHT },
+    scene: new Scene(),
     flightRecorder: { active: true, finish() { return null; } },
     replayRecorder: { active: true },
     debriefReport: { reason: 'landed' },
@@ -487,4 +488,47 @@ test('a track without a crash marker never stages one', async () => {
   director.update(0.1);
   director.stop();
   assert.deepEqual(log, []);
+});
+
+test('a combat track opens in the director so the bandit shot plays without hunting for a camera', async () => {
+  const sim = fakeSim();
+  const director = new ReplayDirector(sim);
+  const source = track();
+  source.combat = {
+    targets: [{ id: 1, callsign: 'BANDIT 1' }],
+    banditSamples: [], missileSamples: [], events: [],
+  };
+  assert.equal(await director.load(source), true);
+  assert.equal(sim.cameraSystem.mode, 9, 'recorded combat starts on the cinematic director');
+  director.stop();
+});
+
+test('a replayed crash plays one distance-scaled burst per impact crossing', async () => {
+  const sim = fakeSim();
+  const log = crashStage(sim);
+  sim.camera = { position: new Vector3(0, 0, 0) };
+  const sounds = [];
+  sim.audio = {
+    playRemoteExplosion(distance, isWater) { sounds.push({ distance, isWater }); },
+  };
+  const director = new ReplayDirector(sim);
+  const source = track();
+  source.metadata.crash = { type: 'WATER', timeSec: 2.0, speedKnots: 200 };
+  await director.load(source);
+  assert.equal(sounds.length, 0, 'nothing is heard before the impact');
+
+  director.seek(2.0);
+  assert.equal(sounds.length, 1, 'reaching the marker plays the impact');
+  assert.equal(sounds[0].isWater, true, 'water impacts use the water timbre');
+  const expected = sim.camera.position.distanceTo(sim.position);
+  assert.ok(Math.abs(sounds[0].distance - expected) < 1e-6, 'the mix uses the replay camera distance');
+
+  director.update(0.1);
+  assert.equal(sounds.length, 1, 'a resting playhead does not repeat the burst');
+
+  director.seek(1);
+  log.length = 0;
+  director.seek(2.0);
+  assert.equal(sounds.length, 2, 'scrubbing back and across the impact stages it again');
+  director.stop();
 });
