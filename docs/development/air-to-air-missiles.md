@@ -8,6 +8,14 @@ combat damage, and the landed rearm turnaround. The remaining work is now split
 between Sprints 3 and 4 as specified below; the original Sprint 3 summary did
 not include every detail in the discussion.
 
+## Missile realism review (#713)
+
+See [missile realism: model review and acceptance](missile-realism.md) for the
+current hit-rate limitations, research provenance rules, force/sensor/fuze
+invariants and required sequence checks. It is design guidance, not implemented
+or validated behavior. The damage distances below are project model targets,
+not verified real-world weapon specifications.
+
 ## Revised remaining scope (Discussion #612)
 
 Baseline: `4b86b7f` (including #702's F-16-based bandit flight dynamics).
