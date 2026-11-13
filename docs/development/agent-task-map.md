@@ -37,6 +37,7 @@ context, while the current implementation defines actual behavior.
 | Developer mode, scenarios, build identity, render comparisons | src/dev/; src/ui/DeveloperPanel.js; RenderDiagnosticsPanel.js; [developer mode](developer-mode.md); [render comparisons](render-diagnostics.md) | tests/developerMode.test.js; renderDiagnostics.test.js; scripts/verify-developer-mode.mjs and verify-render-diagnostics.mjs |
 | CI and agent guidance | [browser GPU policy](browser-gpu.md); scripts/verify-browser-gpu.mjs; package.json; .github/workflows/ci.yml; scripts/check-*.mjs; scripts/agent-workflow.mjs; scripts/lib/browserHarness.mjs; scripts/lib/compactReporter.mjs; AGENTS.md | npm run check; npm test; npm run build |
 | PR self-feedback | .agents/skills/flight3d-pr-feedback/SKILL.md; .github/workflows/pr-feedback.yml; scripts/pr-feedback.mjs; [setup and usage](pr-feedback.md) | tests/prFeedback.test.js; npm run check; npm test; npm run build; configured PR smoke test |
+| Agent session retro and token efficiency | .agents/skills/flight3d-session-retro/SKILL.md; docs/development/agent-working-rules.md; scripts/agent-workflow.mjs | session-retro metrics script run against a real session; npm run check |
 
 Paths separated by semicolons within one directory refer to that same directory.
 Browser scenario prerequisites and limitations are in [ci.md](ci.md).
