@@ -99,6 +99,9 @@ export class RWRSystem {
         if (scratchThreatForward.dot(scratchMissileToPlayer) < this.launchFovCos) continue;
       }
       this.launchWarning = true;
+      // Approach uses missile-to-player; display uses player-to-missile,
+      // matching emitter contacts above (including elevation).
+      scratchToThreat.negate();
       const horizontal = Math.hypot(scratchToThreat.x, scratchToThreat.z);
       const bearingRad = Math.atan2(
         scratchToThreat.x * scratchRight.x + scratchToThreat.z * scratchRight.z,
