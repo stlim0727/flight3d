@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
-import { LuklaCircuitScenario } from '../src/director/scenarios/LuklaCircuitScenario.js';
+import { LuklaCircuitScenario, luklaCenterlineClosure } from '../src/director/scenarios/LuklaCircuitScenario.js';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { LandingGear } from '../src/physics/LandingGear.js';
@@ -219,6 +219,45 @@ describe('Lukla continuous circuit and truthful completion', () => {
     // A demanded push-over is never limited
     assert.equal(scenario.alphaGuarded(-0.6, 9.0), -0.6);
     assert.equal(scenario.alphaGuarded(-0.6, 14.5), -0.6);
+  });
+
+  it('joins the final centerline no faster than a turn can still roll out (#292)', () => {
+    const turnAccel = 2.5;
+    assert.equal(luklaCenterlineClosure(0), 0);
+    for (const w of [-1170, -300, -40, -5, 5, 40, 300, 1170]) {
+      const rate = luklaCenterlineClosure(w, { turnAccel });
+      assert.equal(Math.sign(rate), -Math.sign(w), `closure at w=${w} must head for the centerline`);
+      assert.ok(Math.abs(rate) <= 50, `closure at w=${w} stays inside the intercept limit`);
+      // The remaining offset always covers the distance needed to stop closing.
+      assert.ok(rate ** 2 / (2 * turnAccel) <= Math.abs(w) + 1e-9, `w=${w} leaves room to roll out`);
+    }
+    // Close in, the law is the plain proportional capture.
+    assert.equal(luklaCenterlineClosure(5), -1);
+    // A kilometre out it is held to the intercept limit instead of growing with w.
+    assert.equal(luklaCenterlineClosure(1170), -50);
+  });
+
+  it('arms ground spoilers and reverse on main-gear contact, and brakes once the nose is down', () => {
+    const { sim, director, scenario, place, inputs } = setup();
+    scenario.result.airborne = true;
+    director.touchdownConfirmed = true;
+    sim.telemetry.pitchDeg = 12;
+    sim.telemetry.iasKnots = 105;
+    director.setStage(STAGES.UPHILL_TOUCHDOWN);
+    place(-200, 2816, 0);
+    sim.linearVelocity.set(45, 6, -28);
+    sim.gear.contacts[0].isGrounded = false;
+    for (const c of sim.gear.contacts.slice(1)) c.isGrounded = true;
+    director.update(0.05);
+    assert.equal(sim.aero.spoilers, 1, 'Spoilers deploy with the mains on the runway');
+    assert.equal(sim.engines.reverserActive, true, 'Reverse is selected on main-gear contact');
+    assert.equal(inputs.brakes, 0, 'Wheel brakes wait for the nose gear');
+    sim.gear.contacts[0].isGrounded = true;
+    director.update(0.05);
+    assert.equal(inputs.brakes, 1);
+    sim.telemetry.iasKnots = 20;
+    director.update(0.05);
+    assert.equal(sim.engines.reverserActive, false, 'Reverse is cancelled below 25 KIAS');
   });
 });
 

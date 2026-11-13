@@ -43,10 +43,19 @@ terrain without terrain carving or pose/velocity corrections. A 5 m takeoff
 lateral offset gives the wide wing clearance from the modeled raised apron.
 Climb/turn altitude and speed guidance use aerodynamic force/moment balance.
 Final lateral guidance uses actual world velocity; the previous `sim.velocity`
-reference was undefined. A curved flare starts 650 m before the aim point,
-turning descent into uphill flight before wheel contact. Full landing flaps and
-a 112 KIAS target reduce energy; observed contact is about 108 KIAS. Nose lowering
-precedes maximum braking/reverse, and reverse is discontinued below 25 KIAS.
+reference was undefined. The approach starts about 1.2 km right of the
+centerline, so the closure rate toward it is capped at 50 m/s and by
+`sqrt(2 * 2.5 m/s² * |w|)` (`luklaCenterlineClosure`), the rate a coordinated
+turn can still remove before the centerline. Chasing the offset proportionally
+overshot it and S-turned at 26° of bank down the final, sinking the airplane
+into the cliff below the threshold (#292). Bank is limited to 15° inside 900 m
+and 8° inside 400 m of the threshold. A curved flare starts 650 m before the aim
+point, turning descent into uphill flight before wheel contact. Full landing
+flaps and a 112 KIAS target reduce energy; observed contact is about 108 KIAS.
+Ground spoilers and reverse are selected on main-gear contact, wheel braking
+waits for the lowered nose, and reverse is discontinued below 25 KIAS. The
+measured sweep flight touches down 40 m past the threshold and stops with about
+115 m of runway left.
 
 Elapsed time, low IAS, low radio altitude, and proximity to the cliff cannot
 independently prove success. Completion requires recorded airborne departure,

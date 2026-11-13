@@ -190,7 +190,13 @@ async function startChrome() {
     closePage: async target => { await fetch(`http://127.0.0.1:${port}/json/close/${target.id}`).catch(() => {}); },
     stop() {
       try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
-      fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      // Windows has no process groups, so Chrome's helpers can still hold the profile
+      // open here; a leftover temp profile must not cost the report that follows.
+      try {
+        fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      } catch (error) {
+        log(`· could not remove Chrome profile ${profileDir}: ${error.code || error.message}`);
+      }
     },
   };
 }
