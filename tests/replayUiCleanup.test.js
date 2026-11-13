@@ -58,22 +58,16 @@ function withMockDocument(ids, fn) {
   }
 }
 
-test('replay.css hides meaningless flight controls, AP, stale fuel, and diagnostics while preserving #btn-fullscreen', () => {
+test('replay.css hides touch-controls-overlay, flight-toolbar strip, AP, stale fuel, and diagnostics during replay', () => {
   const css = fs.readFileSync(new URL('../src/styles/replay.css', import.meta.url), 'utf8');
   const ruleMatch = css.match(/body\.replaying[\s\S]*?\{[^}]*display:\s*none\s*!important;/);
   assert.ok(ruleMatch, 'expected body.replaying display: none !important rule in replay.css');
   const rule = ruleMatch[0];
   for (const selector of [
-    '#touch-controls',
+    '#touch-controls-overlay',
+    '.touch-controls-overlay',
     '#btn-lobby-end',
-    '#btn-gear',
-    '#btn-flaps-ret',
-    '#btn-flaps-ext',
-    '#btn-spoilers',
-    '#btn-reverser',
-    '#btn-skip-demo',
-    '#open-camera',
-    '#open-flight-more',
+    '.flight-toolbar',
     '#flight-more-panel',
     '#ap-bar',
     '#ap-panel',
@@ -87,8 +81,6 @@ test('replay.css hides meaningless flight controls, AP, stale fuel, and diagnost
   ]) {
     assert.ok(rule.includes(selector), `expected replay.css body.replaying rule to hide ${selector}`);
   }
-  assert.ok(!rule.includes('.flight-toolbar'), 'should not hide .flight-toolbar wholesale so #btn-fullscreen stays available');
-  assert.ok(!rule.includes('#btn-fullscreen'), 'should not hide #btn-fullscreen during replay');
 });
 
 test('updateControlState disables bottom flight control buttons when controlsDisabled is true', () => {

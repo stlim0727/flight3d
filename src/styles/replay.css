@@ -84,16 +84,10 @@
   color: #38bdf8;
 }
 body.replaying :is(
-  #touch-controls,
+  #touch-controls-overlay,
+  .touch-controls-overlay,
   #btn-lobby-end,
-  #btn-gear,
-  #btn-flaps-ret,
-  #btn-flaps-ext,
-  #btn-spoilers,
-  #btn-reverser,
-  #btn-skip-demo,
-  #open-camera,
-  #open-flight-more,
+  .flight-toolbar,
   #flight-more-panel,
   #ap-bar,
   #ap-panel,
