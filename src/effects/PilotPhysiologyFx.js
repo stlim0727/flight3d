@@ -88,7 +88,6 @@ export class PilotPhysiologyFx {
     this.viewScale = isCockpit ? 1.0 : 0.25;
 
     const c = Number.isFinite(pilotSnapshot.consciousness) ? pilotSnapshot.consciousness : 1.0;
-    const gZ = Number.isFinite(pilotSnapshot.gZ) ? pilotSnapshot.gZ : 1.0;
     const isGLOC = Boolean(pilotSnapshot.isGLOC);
 
     // 1. Positive G: Tunnel Vision, Grayout, Blackout
@@ -106,16 +105,10 @@ export class PilotPhysiologyFx {
     const innerRadius = Math.max(0, (1.0 - effectiveTunnel * 0.9) * 85);
     const outerRadius = Math.max(innerRadius + 5, innerRadius + (45 * (1.0 - effectiveTunnel * 0.45)));
 
-    // 2. Negative G: Redout & Peripheral Blur
-    if (gZ < -1.8) {
-      const excessNegG = -gZ - 1.8;
-      const rawRedout = Math.min(1.0, (excessNegG / 1.5) + (1.0 - c) * 0.6);
-      this.redoutAlpha = Math.max(0.0, Math.min(1.0, rawRedout * this.viewScale));
-      this.blurPx = this.redoutAlpha * 8.0;
-    } else {
-      this.redoutAlpha = 0.0;
-      this.blurPx = 0.0;
-    }
+    // Consume the accumulated physiology state, including recovery after unloading.
+    const rawRedout = Number.isFinite(pilotSnapshot.redout) ? pilotSnapshot.redout : 0;
+    this.redoutAlpha = Math.max(0.0, Math.min(1.0, rawRedout * this.viewScale));
+    this.blurPx = this.redoutAlpha * 8.0;
 
     const hasEffect = this.blackoutAlpha > 0.01 || effectiveTunnel > 0.05 ||
       this.grayoutAlpha > 0.01 || this.redoutAlpha > 0.01;

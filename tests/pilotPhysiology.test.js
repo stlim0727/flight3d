@@ -21,7 +21,7 @@ test('high positive G depletes consciousness and triggers G-LOC with mandatory d
 
   // Pull +7.0 G sustained
   let ticks = 0;
-  while (!pilot.isGLOC && ticks < 1200) {
+  while (!pilot.isGLOC && ticks < 2400) {
     pilot.update(dt, 7.0, { elevator: 1.0, aileron: 0, rudder: 0 }, ticks * dt);
     ticks++;
   }
@@ -52,14 +52,15 @@ test('high positive G depletes consciousness and triggers G-LOC with mandatory d
   assert.ok(pilot.effectiveElevator > 0 && pilot.effectiveElevator <= 0.6, 'Control authority should be attenuated during stupor');
 });
 
-test('negative G causes redout, peripheral blur and consciousness drain', () => {
+test('negative G accumulates redout without positive-G consciousness loss', () => {
   const pilot = new PilotPhysiology();
   const dt = 1 / 120;
 
   pilot.update(dt, -2.5, { elevator: -0.5, aileron: 0, rudder: 0 });
   assert.ok(pilot.redout > 0, 'Redout should develop at -2.5G');
   assert.ok(pilot.blur > 0, 'Blur should develop with redout');
-  assert.ok(pilot.consciousness < 1.0, 'Consciousness should drain under negative G');
+  assert.equal(pilot.consciousness, 1.0);
+  assert.ok(pilot.redout < 0.01, 'One physics tick must not flash a strong redout');
 });
 
 test('mild negative G (-1.0G to -1.5G) does not trigger redout or drain consciousness', () => {
@@ -154,4 +155,56 @@ test('relaxed thresholds: sustained +5.0 G does not deplete consciousness and bl
   // Recovery is fast (1.5s time constant)
   pilot.update(0.75, 1.0); // 0.75s recovery at 1G
   assert.ok(pilot.consciousness >= 0.5, 'Consciousness should recover quickly (>= 0.5 after 0.75s)');
+});
+
+const hold = (pilot, seconds, g, hz = 120) => {
+  for (let i = 0; i < Math.round(seconds * hz); i++) pilot.update(1 / hz, g);
+};
+
+test('brief high-G pull preserves vision, sustained load still causes G-LOC', () => {
+  const pilot = new PilotPhysiology();
+  hold(pilot, 1, 9);
+  assert.equal(pilot.grayout, 0);
+  assert.equal(pilot.blackout, 0);
+  hold(pilot, 1, 1);
+  assert.equal(pilot.consciousness, 1);
+  hold(pilot, 6.1, 9);
+  assert.equal(pilot.isGLOC, true);
+});
+
+test('redout accumulates across pulses, recovers, and resets independently', () => {
+  const pilot = new PilotPhysiology();
+  hold(pilot, 0.2, -3.5);
+  assert.ok(pilot.redout < 0.07);
+  hold(pilot, 0.2, 1);
+  assert.equal(pilot.redout, 0);
+  hold(pilot, 2, -3.5);
+  assert.ok(pilot.redout > 0.65);
+  const before = pilot.redout;
+  hold(pilot, 0.1, 1);
+  assert.ok(pilot.redout < before && pilot.redout > 0);
+  hold(pilot, 1, -3.5);
+  assert.ok(pilot.redout > before);
+  hold(pilot, 30, -3.5);
+  assert.equal(pilot.consciousness, 1);
+  assert.equal(pilot.blackout, 0);
+  assert.equal(pilot.grayout, 0);
+  assert.equal(pilot.tunnelVision, 0);
+  assert.equal(pilot.isGLOC, false);
+  pilot.reset();
+  assert.equal(pilot.redout, 0);
+});
+
+test('exposure and recovery are independent of physics frequency', () => {
+  const pilots = [60, 120, 240].map(hz => {
+    const pilot = new PilotPhysiology();
+    hold(pilot, 2, 9, hz);
+    hold(pilot, 1, -2.5, hz);
+    hold(pilot, 0.1, 1, hz);
+    return pilot;
+  });
+  for (const pilot of pilots) {
+    assert.ok(Math.abs(pilot.redout - pilots[0].redout) < 1e-10);
+    assert.ok(Math.abs(pilot.consciousness - pilots[0].consciousness) < 1e-10);
+  }
 });
