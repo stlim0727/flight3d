@@ -47,12 +47,12 @@ test('negative G creates redout and blur', () => {
   const fx = new PilotPhysiologyFx();
 
   // Negative G: -2.5 G
-  fx.update('cockpit', { consciousness: 0.9, gZ: -2.5, isGLOC: false });
+  fx.update('cockpit', { consciousness: 1, gZ: -2.5, redout: 0.5, isGLOC: false });
   assert.ok(fx.redoutAlpha > 0.4, 'Redout should develop at -2.5 G');
   assert.ok(fx.blurPx > 3.0, 'Peripheral blur should develop during redout');
 
   // Exterior view has 25% redout intensity
-  fx.update('orbit', { consciousness: 0.9, gZ: -2.5, isGLOC: false });
+  fx.update('orbit', { consciousness: 1, gZ: -2.5, redout: 0.5, isGLOC: false });
   assert.ok(fx.redoutAlpha <= 0.25, 'Exterior redout should be scaled to 25%');
 
   // Mild negative G: -1.5 G should not produce redout
@@ -98,4 +98,15 @@ test('exterior view preserves wide visual aperture and low vignette opacity duri
 
   assert.ok(chaseInner > cockpitInner * 4, `Chase view inner radius (${chaseInner}%) should be much wider than cockpit (${cockpitInner}%)`);
   assert.ok(chaseEdgeAlpha < cockpitEdgeAlpha * 0.5, `Chase view edge opacity (${chaseEdgeAlpha}) should be much lower than cockpit (${cockpitEdgeAlpha})`);
+});
+
+test('renderer follows accumulated redout during unloading without adding blackout', () => {
+  const fx = new PilotPhysiologyFx();
+  fx.update('cockpit', { consciousness: 1, gZ: 1, redout: 0.4 });
+  assert.equal(fx.redoutAlpha, 0.4);
+  assert.equal(fx.blackoutAlpha, 0);
+  assert.equal(fx.grayoutAlpha, 0);
+  assert.equal(fx.tunnelRatio, 0);
+  fx.update('cockpit', { consciousness: 1, gZ: -3.5, redout: 0 });
+  assert.equal(fx.redoutAlpha, 0);
 });

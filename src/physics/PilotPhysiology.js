@@ -3,7 +3,7 @@
  *
  * Implements:
  * 1. Pilot vertical load factor (G_z) and cerebral perfusion / consciousness buffer (1.0 to 0.0).
- * 2. Positive G ischemic drain (> +5.5 G) and negative G congestion drain (< -1.8 G).
+ * 2. Positive G ischemic drain (> +5.5 G) and independent negative G congestion (< -1.8 G).
  * 3. G-LOC (Loss of Consciousness) state machine with mandatory lockout and stupor phase.
  * 4. Control responsiveness degradation:
  *    - 1st-order low-pass filtering with increased time constant (1.5x on pitch axis).
@@ -22,6 +22,7 @@ export class PilotPhysiology {
   reset() {
     this.gZ = 1.0;
     this.consciousness = 1.0;
+    this.negativeGExposure = 0.0;
     this.isGLOC = false;
     this.glocTimer = 0.0;
     this.stuporTimer = 0.0;
@@ -52,25 +53,21 @@ export class PilotPhysiology {
     const rawAileron = Number.isFinite(rawInputs.aileron) ? rawInputs.aileron : 0.0;
     const rawRudder = Number.isFinite(rawInputs.rudder) ? rawInputs.rudder : 0.0;
 
-    // 1. Consciousness Buffer Dynamics
-    if (this.gZ > 5.5) {
-      // Positive G ischemia (blood pulled away from head into lower body)
-      // Drains with time constant ~2.5s scaled by excess G over threshold (+5.5 G)
-      const excessG = this.gZ - 5.5;
-      const drainRate = excessG / (3.5 * 2.5); // e.g. at +9.0G drains in ~2.5s, at +7.0G drains in ~5.8s
-      this.consciousness = Math.max(0.0, this.consciousness - drainRate * dt);
-    } else if (this.gZ < -1.8) {
-      // Negative G congestion / redout (blood forced into head)
-      const excessG = -1.8 - this.gZ;
-      const drainRate = excessG / (1.7 * 1.5); // e.g. at -3.5G drains in ~1.5s
-      this.consciousness = Math.max(0.0, this.consciousness - drainRate * dt);
+    // Independent exposure buffers: head congestion must not masquerade as
+    // positive-G perfusion loss. These are gameplay timings, not a medical model.
+    if (this.gZ < -1.8) {
+      this.negativeGExposure = clamp(this.negativeGExposure + (-1.8 - this.gZ) * dt / 5.1, 0, 1);
     } else {
-      // Safe G buffer (-1.8 G <= gZ <= +5.5 G) -> recover consciousness towards 1.0
-      if (!this.isGLOC) {
-        const recoveryTimeConstant = 1.5; // Fast recovery when unloading G (1.5s)
-        const recoveryRate = 1.0 / recoveryTimeConstant;
-        this.consciousness = Math.min(1.0, this.consciousness + recoveryRate * dt);
-      }
+      this.negativeGExposure = Math.max(0, this.negativeGExposure - dt / 2);
+    }
+
+    // Sustained +9 G exhausts a fresh buffer in 6 seconds. Brief pulls retain
+    // useful vision; repeated pulls still accumulate until the pilot unloads.
+    if (this.gZ > 5.5) {
+      const drainRate = (this.gZ - 5.5) / (3.5 * 6);
+      this.consciousness = Math.max(0.0, this.consciousness - drainRate * dt);
+    } else if (!this.isGLOC) {
+      this.consciousness = Math.min(1.0, this.consciousness + dt / 1.5);
     }
 
     if (this.consciousness < 0.8) {
@@ -176,10 +173,7 @@ export class PilotPhysiology {
   }
 
   get redout() {
-    if (this.gZ >= -1.8) return 0.0;
-    const gFactor = clamp((-this.gZ - 1.8) / 1.5, 0.0, 1.0);
-    const cFactor = (1.0 - this.consciousness) * 0.6;
-    return clamp(gFactor + cFactor, 0.0, 1.0);
+    return this.negativeGExposure;
   }
 
   get blur() {
