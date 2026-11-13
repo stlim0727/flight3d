@@ -92,6 +92,8 @@ try {
   await shot('summary');
   await ev(`document.querySelector('#debrief-scrub').value=10;document.querySelector('#debrief-scrub').dispatchEvent(new Event('input'));`);
   assert.match(await ev('document.querySelector("#debrief-sample").textContent'), /FT.*KT.*G/);
+  assert.ok(await ev('document.querySelector("#debrief-g-chart polyline").getAttribute("points").length > 0'));
+  assert.equal(await ev('document.querySelector("#debrief-cursor").getAttribute("cx") === document.querySelector("#debrief-g-cursor").getAttribute("cx")'), true);
   await shot('record');
   await send('Browser.setPermission', { permission: { name: 'clipboard-write' }, setting: 'granted', origin: new URL(url).origin });
   await send('Browser.setPermission', { permission: { name: 'clipboard-read' }, setting: 'granted', origin: new URL(url).origin });
@@ -112,12 +114,38 @@ try {
   await ev(`navigator.clipboard.writeText=async()=>{throw new Error('Denied')};`);
   await click('#debrief-download');
   assert.match(await ev('document.querySelector("#debrief-status").textContent'), /다운로드했습니다/);
+  // A signed G fixture verifies separate scaling and an all-tick maximum that
+  // fell between the regular trajectory observations. Keep the real report intact.
+  await ev(`window.__gChartReport=structuredClone(s.debriefReport);
+    const base=window.__gChartReport.samples[0];
+    window.__gChartReport.durationSec=10;
+    window.__gChartReport.samples=[[0,4000,1],[2,3500,-2.5],[6,5000,6],[10,4500,1]].map(([timeSec,altitudeFt,gForce])=>({...base,timeSec,altitudeFt,gForce}));
+    window.__gChartReport.peaks.gForce={...base,timeSec:5.1,altitudeFt:4800,gForce:27.15};
+    window.__gChartReport.peaks.altitudeFt=window.__gChartReport.samples[2];
+    s.debriefOverlay.show(window.__gChartReport);`);
+  assert.equal(await ev('document.querySelector("#debrief-stat-g").textContent'), '27.15 G');
+  assert.equal(await ev('document.querySelector("#debrief-g-range").textContent'), '-3.00 – 28.00 G');
+  assert.equal(await ev('document.querySelector("#debrief-scrub").max'), '4');
+  assert.equal(await ev('document.querySelector("#debrief-g-chart").getAttribute("aria-label")'), 'G 하중');
+  await click('#debrief-g-chart');
+  assert.match(await ev('document.querySelector("#debrief-sample").textContent'), /27\.15 G/);
+  assert.equal(await ev('document.querySelector("#debrief-cursor").getAttribute("cx") === document.querySelector("#debrief-g-cursor").getAttribute("cx")'), true);
+  await shot('g-peak');
+  await ev(`document.querySelector('#debrief-scrub').value=1;document.querySelector('#debrief-scrub').dispatchEvent(new Event('input'));`);
+  assert.match(await ev('document.querySelector("#debrief-sample").textContent'), /-2\.50 G/);
+  assert.equal(await ev(`document.querySelector('#debrief-g-chart polyline').getAttribute('points').split(' ').every(point=>{const [x,y]=point.split(',').map(Number);return Number.isFinite(x)&&Number.isFinite(y)&&y>=15&&y<=80;})`), true);
+  await ev(`(await import('/src/i18n/index.js')).setLanguage('en');`);
+  assert.equal(await ev('document.querySelector("#debrief-g-chart").getAttribute("aria-label")'), 'G load');
+  await ev(`(await import('/src/i18n/index.js')).setLanguage('ko');`);
   for (const [width, height] of [[390, 844], [320, 568], [844, 390], [568, 320]]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
     assert.equal(await ev(`document.querySelector('.debrief-overlay').getBoundingClientRect().right <= innerWidth`), true);
+    assert.equal(await ev(`document.querySelector('.debrief-panels').scrollWidth <= document.querySelector('.debrief-panels').clientWidth`), true);
+    await ev(`document.querySelector('#debrief-g-chart').scrollIntoView({block:'center'});`);
     await shot(`debrief-${width}x${height}`);
   }
   await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+  await ev('s.debriefOverlay.show(s.debriefReport,s.debriefReplay)');
   await click('#debrief-lobby');
   await click('#btn-fly');
   await ev('s.gameFlow.pause()');

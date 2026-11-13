@@ -4,9 +4,29 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import en from '../src/i18n/en.js';
 import ko from '../src/i18n/ko.js';
-import { SAVE_REPLAY_STATUS, DEBRIEF_ACTIONS } from '../src/ui/DebriefOverlay.js';
+import { SAVE_REPLAY_STATUS, DEBRIEF_ACTIONS, debriefChartSamples } from '../src/ui/DebriefOverlay.js';
 import enDebrief from '../src/i18n/locales/en/debrief.js';
 import koDebrief from '../src/i18n/locales/ko/debrief.js';
+
+test('chart retains a between-sample G peak without modifying the report timeline', () => {
+  const first = { timeSec: 0, altitudeFt: 4000, gForce: -2.5 };
+  const last = { timeSec: 10, altitudeFt: 5000, gForce: 1 };
+  const peak = { timeSec: 5.1, altitudeFt: 4800, gForce: 27.15 };
+  const report = { samples: [first, last], peaks: { gForce: peak }, durationSec: 10 };
+  assert.deepEqual(debriefChartSamples(report), [first, peak, last]);
+  assert.deepEqual(report.samples, [first, last]);
+  report.samples = [first, peak, last];
+  assert.equal(debriefChartSamples(report).length, 3, 'sampled peak must not be duplicated');
+});
+
+test('chart omits missing, nonfinite and out-of-flight peak observations', () => {
+  const samples = [{ timeSec: 0, altitudeFt: 0, gForce: 1 }];
+  for (const gForce of [undefined, { timeSec: 11, altitudeFt: 50, gForce: 27 },
+    { timeSec: 5, altitudeFt: 50, gForce: NaN }]) {
+    assert.deepEqual(debriefChartSamples({ samples, peaks: { gForce }, durationSec: 10 }), samples);
+  }
+  assert.deepEqual(debriefChartSamples({ samples: [], peaks: {}, durationSec: 0 }), []);
+});
 
 test('debrief overlay positions main menu back button in the footer with u-turn arrow and caption', () => {
   const debriefSource = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
