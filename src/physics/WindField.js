@@ -28,13 +28,38 @@ function seededRandom(seed) {
  * consumes random numbers, so a replay follows the same field on a new path.
  */
 export class WindField {
-  constructor({ profile = 'calm-debug-v1', seed = 0, runwayHeadingDeg = 90, crosswindSign = 1 } = {}) {
+  constructor({ profile = 'calm-debug-v1', seed = 0, runwayHeadingDeg = 90, crosswindSign = 1,
+    mean, gust, wingGust, spatialScale = 1, timeScale = 1, region = null } = {}) {
     if (!Object.hasOwn(WIND_PROFILES, profile)) throw new RangeError('Unknown wind profile');
     if (!Number.isFinite(runwayHeadingDeg)) throw new TypeError('Invalid runway heading');
     if (crosswindSign !== -1 && crosswindSign !== 1) throw new RangeError('Crosswind sign must be -1 or 1');
     if (!['string', 'number'].includes(typeof seed) || (typeof seed === 'number' && !Number.isFinite(seed))) {
       throw new TypeError('Wind seed must be a finite number or string');
     }
+    const preset = WIND_PROFILES[profile];
+    // Components are along/right/up m/s in the fixed heading basis.
+    mean ??= [0, preset.crosswind * crosswindSign, 0];
+    gust ??= preset.gust;
+    wingGust ??= preset.wingGust ?? 0;
+    for (const [name, vector] of [['mean', mean], ['gust', gust]]) {
+      if (!Array.isArray(vector) || vector.length !== 3
+        || !Array.from(vector).every(value => Number.isFinite(value) && (name === 'mean' || value >= 0))) {
+        throw new TypeError(`Invalid ${name} wind components`);
+      }
+    }
+    if (!Number.isFinite(wingGust) || wingGust < 0
+      || !Number.isFinite(spatialScale) || spatialScale <= 0
+      || !Number.isFinite(timeScale) || timeScale <= 0) throw new RangeError('Invalid wind scales');
+    if (region !== null) {
+      if (!['x', 'y', 'z'].every(axis => Number.isFinite(region.center?.[axis]))
+        || !Number.isFinite(region.radius) || region.radius <= 0
+        || !Number.isFinite(region.fade) || region.fade <= 0 || region.fade > region.radius) {
+        throw new RangeError('Invalid wind region');
+      }
+      this.region = Object.freeze({ center: Object.freeze({ ...region.center }),
+        radius: region.radius, fade: region.fade });
+    } else this.region = null;
+    this._mean = Object.freeze([...mean]);
     this.profile = profile;
     this.seed = seed;
     this.runwayHeadingDeg = runwayHeadingDeg;
@@ -42,40 +67,39 @@ export class WindField {
     const heading = runwayHeadingDeg * Math.PI / 180;
     this._sinHeading = Math.sin(heading);
     this._cosHeading = Math.cos(heading);
-    this._meanRight = WIND_PROFILES[profile].crosswind * crosswindSign;
     const random = seededRandom(seed);
-    this._modes = WIND_PROFILES[profile].gust.map(amplitude => Array.from({ length: 3 }, () => {
+    this._modes = gust.map(amplitude => Array.from({ length: 3 }, () => {
       const azimuth = random() * Math.PI * 2;
       const vertical = random() * 2 - 1;
       const horizontal = Math.sqrt(1 - vertical * vertical);
       const waveNumber = Math.PI * 2 / (300 + random() * 700);
       return Object.freeze({
         amplitude: amplitude / 3,
-        kx: horizontal * Math.cos(azimuth) * waveNumber,
-        ky: vertical * waveNumber,
-        kz: horizontal * Math.sin(azimuth) * waveNumber,
-        omega: Math.PI * 2 / (4 + random() * 8),
+        kx: horizontal * Math.cos(azimuth) * waveNumber / spatialScale,
+        ky: vertical * waveNumber / spatialScale,
+        kz: horizontal * Math.sin(azimuth) * waveNumber / spatialScale,
+        omega: Math.PI * 2 / (4 + random() * 8) * timeScale,
         phase: random() * Math.PI * 2,
       });
     }));
-    this.sampleWings = Boolean(WIND_PROFILES[profile].wingGust);
     // Long along-track coherence, shorter cross-track scale: nearby wings can
     // encounter different updrafts. Anchored in world space, never to the aircraft.
     const wingRandom = seededRandom(`${seed}:wing-gust`);
-    this._wingModes = this.sampleWings ? Array.from({ length: 3 }, () => ({
-      amplitude: (WIND_PROFILES[profile].wingGust ?? 0) / 3,
-      alongWaveNumber: Math.PI * 2 / (1500 + wingRandom() * 1000),
-      rightWaveNumber: Math.PI * 2 / (70 + wingRandom() * 80),
-      omega: Math.PI * 2 / (5 + wingRandom() * 5),
+    this._wingModes = wingGust > 0 ? Array.from({ length: 3 }, () => ({
+      amplitude: wingGust / 3,
+      alongWaveNumber: Math.PI * 2 / (1500 + wingRandom() * 1000) / spatialScale,
+      rightWaveNumber: Math.PI * 2 / (70 + wingRandom() * 80) / spatialScale,
+      omega: Math.PI * 2 / (5 + wingRandom() * 5) * timeScale,
       phase: wingRandom() * Math.PI * 2,
     })) : [];
   }
 
   /** Mean world wind for preparing a steady approach before gust response. */
   mean(target = {}) {
-    target.x = this._meanRight * this._cosHeading;
-    target.y = 0;
-    target.z = this._meanRight * this._sinHeading;
+    const [along, right, up] = this._mean;
+    target.x = along * this._sinHeading + right * this._cosHeading;
+    target.y = up;
+    target.z = -along * this._cosHeading + right * this._sinHeading;
     return target;
   }
 
@@ -84,7 +108,7 @@ export class WindField {
     if (![position?.x, position?.y, position?.z, simTimeSeconds].every(Number.isFinite)) {
       throw new TypeError('Wind sampling requires finite position and simulation time');
     }
-    const values = [0, this._meanRight, 0];
+    const values = [0, 0, 0];
     for (let axis = 0; axis < 3; axis++) {
       for (const mode of this._modes[axis]) {
         values[axis] += mode.amplitude * Math.sin(mode.kx * position.x + mode.ky * position.y
@@ -98,6 +122,17 @@ export class WindField {
       up += mode.amplitude * Math.sin(mode.alongWaveNumber * alongPosition
         + mode.rightWaveNumber * rightPosition + mode.omega * simTimeSeconds + mode.phase);
     }
+    // Localize only disturbances: the background mean persists outside the region.
+    let weight = 1;
+    if (this.region) {
+      const { center, radius, fade } = this.region;
+      const distance = Math.hypot(position.x - center.x, position.y - center.y, position.z - center.z);
+      const t = Math.max(0, Math.min(1, (radius - distance) / fade));
+      weight = t * t * (3 - 2 * t);
+    }
+    along = this._mean[0] + weight * along;
+    right = this._mean[1] + weight * right;
+    up = this._mean[2] + weight * up;
     target.x = along * this._sinHeading + right * this._cosHeading;
     target.y = up;
     target.z = -along * this._cosHeading + right * this._sinHeading;
@@ -115,23 +150,19 @@ export function setSimulationWind(simulation, field = null) {
   simulation.aero.windRightWorld?.set(0, 0, 0);
 }
 
-/** One sample per integrated physics tick, independent of the render clock. */
+/** Sample center and wings at one physics time; advance the clock once per tick. */
 export function advanceSimulationWind(simulation, dt) {
   if (!simulation.windField) return;
   if (!Number.isFinite(dt) || dt <= 0) throw new RangeError('Invalid wind timestep');
   simulation.windField.sample(simulation.position, simulation.windTimeSeconds ?? 0, simulation.aero.windWorld);
   const aero = simulation.aero;
   if (aero.windLeftWorld && aero.windRightWorld) {
-    aero.windLeftWorld.copy(aero.windWorld);
-    aero.windRightWorld.copy(aero.windWorld);
-    if (simulation.windField.sampleWings) {
-      // Half-wing area centroids for the two-panel approximation, in body axes.
-      // Reuse the wind output vectors as sample positions before overwriting them.
-      const arm = aero.wingspan / 4;
-      for (const [target, sign] of [[aero.windLeftWorld, -1], [aero.windRightWorld, 1]]) {
-        target.set(sign * arm, 0, 0).applyQuaternion(simulation.quaternion).add(simulation.position);
-        simulation.windField.sample(target, simulation.windTimeSeconds ?? 0, target);
-      }
+    // Half-wing area centroids for the two-panel approximation, in body axes.
+    // Reuse the wind output vectors as sample positions before overwriting them.
+    const arm = aero.wingspan / 4;
+    for (const [target, sign] of [[aero.windLeftWorld, -1], [aero.windRightWorld, 1]]) {
+      target.set(sign * arm, 0, 0).applyQuaternion(simulation.quaternion).add(simulation.position);
+      simulation.windField.sample(target, simulation.windTimeSeconds ?? 0, target);
     }
   }
   simulation.windTimeSeconds = (simulation.windTimeSeconds ?? 0) + dt;
