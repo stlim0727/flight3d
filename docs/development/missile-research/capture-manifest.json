@@ -1,0 +1,59 @@
+{
+  "capturedOn": "2026-11-13",
+  "browser": "Obscura",
+  "scope": "Rendered shared-page text plus extracted pre code blocks, TeX annotations and links; not linked-page or attachment contents.",
+  "captures": [
+    {
+      "file": "01-initial-research.md",
+      "sourceUrl": "https://share.gemini.google/XwO8Isutc9dQ",
+      "resolvedUrl": "https://gemini.google.com/share/2158d5ddc2ac?social_preview=true&skid=3d8104a9-1630-45aa-9823-69819b66c1de",
+      "renderedTextCharacters": 23096,
+      "codeBlockCharacters": [
+        3703,
+        376,
+        2091
+      ],
+      "texAnnotationCount": 82,
+      "linkCount": 10,
+      "sha256": "47d07450f4a40251338fbe1e65eeafb37cae44ebc070244913d705304daf70ca"
+    },
+    {
+      "file": "02-provenance-revision.md",
+      "sourceUrl": "https://share.gemini.google/78hnvVreueiF",
+      "resolvedUrl": "https://gemini.google.com/share/97a88c425ac8?social_preview=true&skid=dd4129c9-2b76-46c6-9936-3ddbaf5a858d",
+      "renderedTextCharacters": 34641,
+      "codeBlockCharacters": [
+        3703,
+        376,
+        2091
+      ],
+      "texAnnotationCount": 141,
+      "linkCount": 10,
+      "sha256": "ff2acbeae06cabbb630e05c0bdd877bacde05d4699e7e67a61b483a6ce3d0759"
+    },
+    {
+      "file": "03-guidance-cpa-revision.md",
+      "sourceUrl": "https://share.gemini.google/MmsXMVRuk7Z3",
+      "resolvedUrl": "https://gemini.google.com/share/d9430c4f7d90?social_preview=true&skid=c98883a6-f4f3-4054-be7e-e22cf3c418aa",
+      "renderedTextCharacters": 19091,
+      "codeBlockCharacters": [
+        7968
+      ],
+      "texAnnotationCount": 45,
+      "linkCount": 10,
+      "sha256": "ee81be18512d0084a6c91e084df93ae18dbddb6fc96b7b4b12576f3aa3b06411"
+    },
+    {
+      "file": "04-gravity-tvc-fuze-revision.md",
+      "sourceUrl": "https://share.gemini.google/Emf3m94rBCFt",
+      "resolvedUrl": "https://gemini.google.com/share/4732e922ab81?social_preview=true&skid=8f949a6e-4ad9-44ff-b24e-6d713e078825",
+      "renderedTextCharacters": 15990,
+      "codeBlockCharacters": [
+        8600
+      ],
+      "texAnnotationCount": 39,
+      "linkCount": 10,
+      "sha256": "15323a53cf126ca3e1b5fc2a99a6bf320bf707555bb59a972ccdce58fe947743"
+    }
+  ]
+}

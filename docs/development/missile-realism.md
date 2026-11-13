@@ -25,6 +25,13 @@ The project uses Three.js and ES modules; the missile core has its own 120 Hz
 accumulator. The supplied research's claims of an existing Rapier engine,
 240 Hz missile loop and drop-in TypeScript interfaces are not repository facts.
 
+## Full research archive
+
+The [versioned research archive](missile-research/README.md) retains all four
+supplied shared pages, including numeric tables, equations, example code, source
+links and scenario proposals. Its confidence and correction register distinguishes
+source claims from repository facts, assumptions and known errors.
+
 ## Evidence and parameter provenance
 
 Keep three categories separate for every parameter:
