@@ -64,6 +64,9 @@ and half-wing samples feed relative airflow and the existing differential roll
 moment. Neither camera nor aircraft pose receives an artificial disturbance.
 Buildings do not affect the field yet; rearranging buildings cannot create wakes
 in this model. Follow-ups #695-#697 cover layout, supported settings and acceptance.
+#695 laid out the comparison sites along the canyon flight (`NEON_WIND_SITES` in
+`src/config/neonBuildings.js`, see [neon-river.md](neon-river.md#towers-and-wind-comparison-sites));
+it installs no wind of its own.
 
 Every ordinary preset reset recreates the same field/time; airport departure
 clears it through the existing preset path. Explicit mission preparation skips
