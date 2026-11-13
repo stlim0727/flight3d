@@ -1,0 +1,118 @@
+name: Manual Verification Suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Test suite to run (not part of CI gate)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - mobile
+          - flight
+          - crash
+          - landing
+          - pilot
+          - valley
+          - slalom
+          - demo
+          - lukla
+          - cockpit
+          - camera
+          - bake
+          - replay
+          - ghost-native
+
+env:
+  # Hosted runners have no /dev/dri, so SwiftShader is used instead of Vulkan.
+  # This matches the demo-sweep PR-gate choice (FORCE_GPU=0).
+  FORCE_GPU: '0'
+
+jobs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Flight Scenarios
+        if: ${{ github.event.inputs.suite == 'flight' }}
+        run: node scripts/test-flight-agent.js --screenshots
+
+      - name: Run Crash Scenarios
+        if: ${{ github.event.inputs.suite == 'crash' }}
+        run: node scripts/test-crash-scenarios.js
+
+      - name: Run Landing Damage Tests
+        if: ${{ github.event.inputs.suite == 'landing' }}
+        run: node scripts/test-landing-damage.js
+
+      - name: Run Pilot Missions
+        if: ${{ github.event.inputs.suite == 'pilot' }}
+        run: node scripts/test-pilot-missions.mjs
+
+      - name: Run Valley Pilot Missions
+        if: ${{ github.event.inputs.suite == 'valley' }}
+        run: node scripts/test-valley-pilot.mjs
+
+      - name: Run Slalom Missions
+        if: ${{ github.event.inputs.suite == 'slalom' }}
+        run: node scripts/test-slalom.mjs
+
+      - name: Run Demo Stepping
+        if: ${{ github.event.inputs.suite == 'demo' }}
+        run: node scripts/test-demo-stepping.js
+
+      - name: Run Lukla Benchmark
+        if: ${{ github.event.inputs.suite == 'lukla' }}
+        run: node scripts/test-lukla-demo-benchmark.mjs
+
+      - name: Run Cockpit Verification
+        if: ${{ github.event.inputs.suite == 'cockpit' }}
+        run: node scripts/verify-cockpit-startup.js
+
+      - name: Run Camera Look Verification
+        if: ${{ github.event.inputs.suite == 'camera' }}
+        run: node scripts/verify-camera-look.mjs
+
+      - name: Run Bake Cockpit Transfer
+        if: ${{ github.event.inputs.suite == 'bake' }}
+        run: node scripts/bake-cockpit-transfer.mjs && node scripts/bake-cockpit-binding.mjs
+
+      - name: Run Replay Verification
+        if: ${{ github.event.inputs.suite == 'replay' }}
+        run: node scripts/verify-replay.mjs
+
+      - name: Build and Test Ghost Native
+        if: ${{ github.event.inputs.suite == 'ghost-native' }}
+        run: |
+          npm run build:ghost
+          npm run test:ghost-package
+
+      - name: Run All Manual Suites (non-mandatory)
+        if: ${{ github.event.inputs.suite == 'all' }}
+        run: |
+          node scripts/test-mobile-touch.js
+          node scripts/test-flight-agent.js --screenshots
+          node scripts/test-crash-scenarios.js
+          node scripts/test-landing-damage.js
+          node scripts/test-pilot-missions.mjs
+          node scripts/test-valley-pilot.mjs
+          node scripts/test-slalom.mjs
+          node scripts/test-demo-stepping.js
+          node scripts/test-lukla-demo-benchmark.mjs
+          node scripts/verify-cockpit-startup.js
+          node scripts/verify-camera-look.mjs
+          node scripts/bake-cockpit-transfer.mjs && node scripts/bake-cockpit-binding.mjs
+          node scripts/verify-replay.mjs
