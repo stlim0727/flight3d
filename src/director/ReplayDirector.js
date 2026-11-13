@@ -5,6 +5,7 @@ import { ReplayCrashEffects, crashEvents } from '../replay/ReplayCrashEffects.js
 import { REPLAY_SPEEDS } from '../replay/replayConfig.js';
 import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
 import { isScenarioAvailable } from '../config/scenarioRegistry.js';
+import { CameraSystem } from '../cameras/CameraSystem.js';
 import { FLOW } from '../ui/GameFlowController.js';
 
 /**
@@ -130,6 +131,10 @@ export class ReplayDirector {
     this._applyCombatLoadout();
     this._applyPose(true);
     this.reseed();
+    // A recorded air-combat sortie is a film: the director already cuts from
+    // rail release to the bandit shot, which is the only view that shows the
+    // target airframe and its destruction instead of a distant HUD symbol.
+    if (this._combat.active) sim.cameraSystem.setMode(CameraSystem.MODES.DIRECTOR, true);
     this.onChange();
     return true;
   }
@@ -362,6 +367,11 @@ export class ReplayDirector {
     sim.aircraft.group.updateMatrixWorld(true);
     sim.explosionSystem?.spawnExplosion({ type: crash.type, point: sim.position.clone(),
       speedKnots: crash.speedKnots ?? 0 }, velocity);
+    // Distance-scaled like a live impact; playExplosion() would latch the audio
+    // into its crashed state and mute the replay's own engine mix.
+    const camera = sim.camera?.position;
+    sim.audio?.playRemoteExplosion?.(camera ? camera.distanceTo(sim.position) : 0,
+      crash.type === 'WATER');
     sim.aircraft.triggerCrashVisuals?.(crash.type);
     sim.aircraftBreakup?.spawn(sim.aircraft, velocity);
   }

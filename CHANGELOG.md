@@ -1,9 +1,14 @@
 # Changelog
 
 ## [Unreleased]
+- **fix(replay):** make recorded bandit kills visible and audible
+  - Combat replays open in the DIRECTOR camera, so the launch → missile-follow → bandit shot plays without hunting for a view.
+  - The bandit shot now frames the target airframe from behind and beside it with the inbound round, replacing the canopy-side eye that showed only the missile.
+  - Detonations and the replay's own crash play a distance-scaled burst from the replay camera; seeking back still suppresses past bursts.
+  - Air bursts blend fire normally and use a darker smoke core so the explosion reads against bright sky and cloud.
 - **feat(camera):** director camera missile cinematics
-  - A rail release in `DIRECTOR` mode cuts immediately to a wing-mounted launch shot, then a rigid follow cam on the missile, then the targeted bandit's POV as it closes.
-  - The bandit POV waits for a 1.6 km entry range and uses a proximity telephoto so the round grows from a speck through detonation.
+  - A rail release in `DIRECTOR` mode cuts immediately to a wing-mounted launch shot, then a rigid follow cam on the missile, then an over-the-shoulder bandit shot as it closes.
+  - The bandit shot waits for a 1.6 km entry range, frames the target airframe and the inbound round, and holds through detonation.
   - Recorded sessions feed the same sequence from the replay combat track; shot pacing follows replay speed and pause, and seeking mid-flight skips the launch beat.
   - `CameraSystem.setCombatStateProvider()` selects recorded combat during replay playback and the live missile/bandit arrays otherwise.
 - **fix(replay):** show F-16 missile launches, bandit targets and bursts in recorded replays

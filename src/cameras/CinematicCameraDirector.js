@@ -997,9 +997,10 @@ export class CinematicCameraDirector {
       }
 
       case CINEMATIC_SHOTS.BANDIT_POV: {
-        // Head-out-of-canopy eye of the targeted bandit watching the missile
-        // close. The eye sits above and beside the canopy so the tail fin does
-        // not cover the inbound round.
+        // Over-the-shoulder kill shot: sit behind and beside the targeted
+        // bandit, on the side opposite its bearing to the missile. The airframe
+        // stays in the foreground while the round closes from beyond it, so the
+        // detonation reads as a fireball around the target instead of a dot.
         isRigidMount = true;
         const sequence = this.missileSequence;
         const targetPos = sequence?.lastTargetPos ?? sequence?.target?.position ?? planePos;
@@ -1015,16 +1016,25 @@ export class CinematicCameraDirector {
         } else {
           // Directly above/below or at impact: keep a unit lateral offset so
           // the camera cannot collapse inside the bandit mesh.
+          bearing.set(0, 0, -1);
           side.set(1, 0, 0);
         }
-        targetCamPos.copy(targetPos)
-          .addScaledVector(worldUp, 1.35)
-          .addScaledVector(side, 2.4);
 
-        // Telephoto the last kilometres: the round stays readable as it grows
-        // from a speck into the frame instead of ending the beat as a dot.
         const range = missilePos.distanceTo(targetPos);
-        targetFov = THREE.MathUtils.clamp(58.0 - (MISSILE_POV_ENTRY_RANGE_M - range) * 0.02, 28.0, 58.0);
+        // Pull back with range so the strike starts as a wide three-quarter
+        // framing of the bandit and tightens as the missile arrives.
+        const backM = 18.0 + THREE.MathUtils.clamp(range * 0.006, 0, 14.0);
+        const sideM = 7.0 + THREE.MathUtils.clamp(range * 0.002, 0, 4.0);
+        targetCamPos.copy(targetPos)
+          .addScaledVector(bearing, -backM)
+          .addScaledVector(side, sideM)
+          .addScaledVector(worldUp, 5.0);
+
+        // Keep the bandit centred and the incoming bearing readable past it.
+        targetLook.copy(targetPos)
+          .addScaledVector(bearing, 6.0)
+          .addScaledVector(worldUp, 1.0);
+        targetFov = 46.0;
 
         // Proximity shake rises as the missile closes on the bandit.
         const proximity = THREE.MathUtils.clamp(1 - range / MISSILE_POV_ENTRY_RANGE_M, 0, 1);
@@ -1032,7 +1042,6 @@ export class CinematicCameraDirector {
         targetCamPos.x += Math.sin(this.totalTimer * 47.0) * shake;
         targetCamPos.y += Math.cos(this.totalTimer * 61.0) * shake;
 
-        targetLook.copy(missilePos);
         targetUp.copy(worldUp);
         break;
       }

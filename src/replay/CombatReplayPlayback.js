@@ -115,10 +115,15 @@ export class CombatReplayPlayback {
       if (this.staged.has(event)) continue;
       this.staged.add(event);
       if (event.kind === 'detonation') {
+        const position = new THREE.Vector3(event.x, event.y, event.z);
         this.view.spawnExplosion(this.sim.explosionSystem, {
-          position: new THREE.Vector3(event.x, event.y, event.z),
+          position,
           velocity: new THREE.Vector3(event.vx, event.vy, event.vz),
         });
+        // Playback owns its audio too: the recorded burst must sound where the
+        // camera is, not only where the live sortie heard it (#682).
+        const camera = this.sim.camera?.position;
+        this.sim.audio?.playRemoteExplosion?.(camera ? camera.distanceTo(position) : 0, false);
       }
     }
   }

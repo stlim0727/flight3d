@@ -55,11 +55,18 @@ still import them. The section records:
 Playback interpolates the recorded poses and rail mask; it does not re-simulate
 guidance. This keeps seeks instant and guarantees that speed changes cannot alter
 the recorded outcome. Detonations stage one explosion when crossed and suppress
-events already in the past when seeking. Replay HUD/cockpit/chase views show the
-recorded bandits as target designators, the remaining rail count, missiles in
-flight and the cumulative splash count at the current playback time. Combat is recorded only when the live
-F-16 air-to-air system is active, so B737/C172 tracks are unchanged. The recorder
-thins combat samples before pose samples when the per-entry budget is tight.
+events already in the past when seeking. Each staged burst plays a distance-scaled
+explosion from the replay camera, so a kill is audible where the viewer is, not
+where the live sortie heard it; seeking back never replays a burst, and replay
+audio never latches the crash state that would mute the engine mix.
+Replay HUD/cockpit/chase views show the recorded bandits as target designators,
+the remaining rail count, missiles in flight and the cumulative splash count at
+the current playback time. A track with recorded combat opens in the DIRECTOR
+camera: the existing launch → missile-follow → bandit-shot sequence is the view
+that shows the target airframe and its destruction instead of a distant symbol.
+Combat is recorded only when the live F-16 air-to-air system is active, so B737/C172
+tracks are unchanged. The recorder thins combat samples before pose samples when
+the per-entry budget is tight.
 
 `ReplayDirector` owns the pose during playback, interpolating positions and
 quaternions rather than re-simulating pilot input. `activePoseDriver()` is the
