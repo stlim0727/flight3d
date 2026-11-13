@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { t } from '../i18n/index.js';
 import { BridgeFlightScenario } from '../director/BridgeFlightScenario.js';
 import { NEON_RIVER } from '../config/neonRiver.js';
+import { NEON_WIND } from '../config/neonWind.js';
 import { BOEING_737_800 } from '../config/aircraftConfigs.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { solveTrim } from '../physics/TrimSolver.js';
@@ -455,6 +456,12 @@ class PresetSpawnerMethods {
       this.gear.setBrakes(0.0);
     }
     this.physicsAccumulator = 0;
+
+    // Install the regional default after aircraft reload, bridge setup and trim.
+    // Explicit missions own their wind; multiplayer retains its calm contract.
+    if (this.activeAirport === 'neon' && !pilotPreparation && !this.multiplayer?.active) {
+      setSimulationWind(this, new WindField(NEON_WIND));
+    }
 
     this.multiplayer?.respawn();
     this.renderPose.reset(this.position, this.quaternion);
