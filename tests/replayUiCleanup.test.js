@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { updateControlState } from '../src/ui/FlightPanels.js';
 import { installSimulatorHudAndBindings } from '../src/ui/SimulatorHudAndBindings.js';
+import { DiagnosticsInspector } from '../src/ui/DiagnosticsInspector.js';
 
 class FakeSim {}
 installSimulatorHudAndBindings(FakeSim);
@@ -57,7 +58,7 @@ function withMockDocument(ids, fn) {
   }
 }
 
-test('replay.css hides meaningless flight controls, AP, stale fuel, and live-input settings during replay', () => {
+test('replay.css hides meaningless flight controls, AP, stale fuel, and diagnostics while preserving #btn-fullscreen', () => {
   const css = fs.readFileSync(new URL('../src/styles/replay.css', import.meta.url), 'utf8');
   const ruleMatch = css.match(/body\.replaying[\s\S]*?\{[^}]*display:\s*none\s*!important;/);
   assert.ok(ruleMatch, 'expected body.replaying display: none !important rule in replay.css');
@@ -65,7 +66,14 @@ test('replay.css hides meaningless flight controls, AP, stale fuel, and live-inp
   for (const selector of [
     '#touch-controls',
     '#btn-lobby-end',
-    '.flight-toolbar',
+    '#btn-gear',
+    '#btn-flaps-ret',
+    '#btn-flaps-ext',
+    '#btn-spoilers',
+    '#btn-reverser',
+    '#btn-skip-demo',
+    '#open-camera',
+    '#open-flight-more',
     '#flight-more-panel',
     '#ap-bar',
     '#ap-panel',
@@ -75,9 +83,12 @@ test('replay.css hides meaningless flight controls, AP, stale fuel, and live-inp
     '#gyro-settings',
     '#btn-diag',
     '#btn-joystick-check',
+    '#diagnostics-panel',
   ]) {
     assert.ok(rule.includes(selector), `expected replay.css body.replaying rule to hide ${selector}`);
   }
+  assert.ok(!rule.includes('.flight-toolbar'), 'should not hide .flight-toolbar wholesale so #btn-fullscreen stays available');
+  assert.ok(!rule.includes('#btn-fullscreen'), 'should not hide #btn-fullscreen during replay');
 });
 
 test('updateControlState disables bottom flight control buttons when controlsDisabled is true', () => {
@@ -97,7 +108,7 @@ test('updateControlState disables bottom flight control buttons when controlsDis
   });
 });
 
-test('updateAutopilotUI disables AP controls and collapses #ap-panel during replay', () => {
+test('updateAutopilotUI disables AP controls and collapses #ap-panel via updateApToggleUI during replay', () => {
   const ids = ['btn-ap-toggle', 'ap-panel', 'ap-bar', 'hud-phase', 'hud-ap-modes',
     'btn-ap', 'btn-ap-hdg', 'btn-ap-alt', 'btn-ap-spd', 'btn-ap-app'];
   withMockDocument(ids, (elements) => {
@@ -116,14 +127,37 @@ test('updateAutopilotUI disables AP controls and collapses #ap-panel during repl
         annunciation: () => '',
       },
       flightPhase: FakeSim.prototype.flightPhase,
+      updateApToggleUI: FakeSim.prototype.updateApToggleUI,
     };
     FakeSim.prototype.updateAutopilotUI.call(fakeSim);
     assert.equal(elements.get('btn-ap-toggle').disabled, true);
     assert.equal(elements.get('btn-ap-toggle').getAttribute('aria-expanded'), 'false');
+    assert.ok(elements.get('btn-ap-toggle').getAttribute('aria-label'));
+    assert.ok(elements.get('btn-ap-toggle').getAttribute('title'));
     assert.equal(elements.get('ap-panel').hidden, true);
     assert.equal(elements.get('ap-bar').classList.contains('ap-collapsed'), true);
     for (const id of ['btn-ap', 'btn-ap-hdg', 'btn-ap-alt', 'btn-ap-spd', 'btn-ap-app']) {
       assert.equal(elements.get(id).disabled, true, `expected ${id} to be disabled during replay`);
     }
   });
+});
+
+test('DiagnosticsInspector refuses to open during replay', () => {
+  const classes = new Set(['visible']);
+  const inspector = Object.create(DiagnosticsInspector.prototype);
+  inspector.sim = { replayDirector: { active: true } };
+  inspector.visible = true;
+  inspector.panel = {
+    classList: {
+      add(c) { classes.add(c); },
+      remove(c) { classes.delete(c); },
+      contains(c) { return classes.has(c); },
+    },
+  };
+  inspector.toggle();
+  assert.equal(inspector.visible, false);
+  assert.equal(classes.has('visible'), false);
+  inspector.show();
+  assert.equal(inspector.visible, false);
+  assert.equal(classes.has('visible'), false);
 });

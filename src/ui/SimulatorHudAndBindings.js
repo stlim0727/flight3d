@@ -229,9 +229,8 @@ class SimulatorHudAndBindingsMethods {
     if (isReplaying) {
       const apPanel = document.getElementById('ap-panel');
       if (apPanel && !apPanel.hidden) {
-        apPanel.hidden = true;
         document.getElementById('ap-bar')?.classList.add('ap-collapsed');
-        btnToggle?.setAttribute('aria-expanded', 'false');
+        this.updateApToggleUI();
       }
     }
     const elPhase = document.getElementById('hud-phase');

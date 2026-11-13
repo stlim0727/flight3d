@@ -86,7 +86,14 @@
 body.replaying :is(
   #touch-controls,
   #btn-lobby-end,
-  .flight-toolbar,
+  #btn-gear,
+  #btn-flaps-ret,
+  #btn-flaps-ext,
+  #btn-spoilers,
+  #btn-reverser,
+  #btn-skip-demo,
+  #open-camera,
+  #open-flight-more,
   #flight-more-panel,
   #ap-bar,
   #ap-panel,
@@ -95,7 +102,8 @@ body.replaying :is(
   #touch-btn-gyro,
   #gyro-settings,
   #btn-diag,
-  #btn-joystick-check
+  #btn-joystick-check,
+  #diagnostics-panel
 ) { display: none !important; }
 body:not([data-flow="flight"]) #replay-panel { display: none; }
 @media (max-width: 480px) {

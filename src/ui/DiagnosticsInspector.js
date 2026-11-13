@@ -139,6 +139,7 @@ export class DiagnosticsInspector {
     // Toggle key: Backtick (`) or F3
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Backquote' || e.code === 'F3') {
+        if (this.sim.replayDirector?.active) return;
         e.preventDefault();
         this.toggle();
       }
@@ -227,6 +228,10 @@ export class DiagnosticsInspector {
   }
 
   toggle() {
+    if (this.sim.replayDirector?.active) {
+      this.hide();
+      return;
+    }
     this.visible = !this.visible;
     if (this.visible) {
       this.panel.classList.add('visible');
@@ -241,6 +246,7 @@ export class DiagnosticsInspector {
   }
 
   show() {
+    if (this.sim.replayDirector?.active) return;
     this.visible = true;
     this.panel.classList.add('visible');
   }
