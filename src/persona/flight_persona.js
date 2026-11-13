@@ -86,12 +86,13 @@ export function detectAnomalies(state, sim) {
     push(ANOMALY_CODES.NEG_ALT, state.altitudeFt, `alt ${state.altitudeFt.toFixed(0)} ft below terrain reference`);
   }
 
-  if (Number.isFinite(state.altitudeFt) && !state.wow && state.altitudeFt < 5) {
-    push(ANOMALY_CODES.TERRAIN_CLIP, state.altitudeFt,
-      `airborne at ${state.altitudeFt.toFixed(1)} ft — possible terrain mesh clipping`);
+  // Use radar altitude (height above terrain) instead of MSL altitude so elevated terrain such as Lukla/valley is handled.
+  if (Number.isFinite(state.radioAltFt) && !state.wow && state.radioAltFt < 5) {
+    push(ANOMALY_CODES.TERRAIN_CLIP, state.radioAltFt,
+      `airborne at ${state.radioAltFt.toFixed(1)} ft above terrain — possible terrain mesh clipping`);
   }
 
-  if (sim?.aircraftBreakup?.active === true) {
+  if ((sim?.aircraftBreakup?.pieces?.length ?? 0) > 0) {
     push(ANOMALY_CODES.BREAKUP, true, 'aircraft breakup flagged by simulator');
   }
 

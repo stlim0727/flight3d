@@ -64,6 +64,9 @@ await withBrowserSession({ path: '/?telemetry=0', width: 1280, height: 720 },
     const startClicked = await evaluate(`(() => { const el = document.getElementById(${JSON.stringify(startId)}); if (!el) return false; el.click(); return true; })()`);
     if (startClicked) {
       feedback.flow.push({ step: feedback.flow.length + 1, action: `select-${preset}`, target: startId });
+      // Re-apply the demo profile since the LobbyScreen preset click resets demoProfile to the first choice.
+      await evaluate(`(() => { const s = window.simulator; if (!s) return false; s.lobby.demoProfile = ${JSON.stringify(demoRoute)}; s.lobbyScreen?.refresh?.(); return true; })()`);
+      await delay(300);
     }
     await delay(500);
     await evaluate(`document.getElementById('btn-fly')?.click()`);
@@ -98,8 +101,9 @@ await withBrowserSession({ path: '/?telemetry=0', width: 1280, height: 720 },
 
     for (const msg of consoleMessages ?? []) {
       const text = msg?.args?.map?.(a => a?.value ?? a?.description ?? '').join(' ') ?? '';
-      if (String(msg?.type) === 'error' && String(text).length < 400) {
-        feedback.anomalies.push({ code: 'CONSOLE_ERR', value: text, severity: 'P3', message: text, source: 'console' });
+      if (String(msg?.type) === 'error') {
+        const truncated = String(text).slice(0, 400);
+        feedback.anomalies.push({ code: 'CONSOLE_ERR', value: truncated, severity: 'P3', message: truncated, source: 'console' });
       }
     }
     for (const e of exceptions ?? []) {
