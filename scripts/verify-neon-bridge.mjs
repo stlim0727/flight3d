@@ -136,7 +136,8 @@ try {
     return {crashed:s.isCrashed,contact:s.bridgeFlight.collision.contact};
   });
   await delay(300);await capture('failure');
-  const retry = await evaluate(()=>{
+  const retry = await evaluate(async()=>{
+    const {NEON_RIVER}=await import('/src/config/neonRiver.js');
     const s=window.simulator;
     // The player watches the crash scene (#362) before the debrief, the only crash report (#454).
     const crashScene=!document.getElementById('crash-overlay')
@@ -146,9 +147,15 @@ try {
     const crashToMenu=s.gameFlow.state==='lobby' && s.gameFlow.canResumeFromLobby() && s.isCrashed
       && s.crashDebriefRemaining===null && document.getElementById('btn-lobby-resume').hidden;
     document.getElementById('btn-fly').click();
+    // Fly installs the spawn inside the click but holds physics until the start settles;
+    // a step before then is parked and leaves the wreck's telemetry in place.
+    for(let i=0;i<600 && s.startingFlight;i++) await new Promise(resolve=>setTimeout(resolve,50));
+    const startZ=s.position.z;
     s.stepSimulation(0.1);
     return {crashScene,crashToMenu,healthy:!s.isCrashed && !s.aero.isStalled, trauma:s.cameraSystem.trauma,
-      reset:s.bridgeFlight.collision.contact===null, altitude:s.telemetry.radioAltFt,
+      reset:s.bridgeFlight.collision.contact===null, started:!s.startingFlight, advanced:startZ-s.position.z,
+      // Radio altitude is in feet; the bridge spawn is 10 m above the water.
+      aglM:s.telemetry.radioAltFt*0.3048, spawnAglM:NEON_RIVER.spawn[1]-NEON_RIVER.waterLevel,
       preset:s.lastPresetType, position:s.position.toArray(), crashed:s.isCrashed, stalled:s.aero.isStalled, state:s.gameFlow.state};
   });
   await send('Emulation.setDeviceMetricsOverride',{width:412,height:915,deviceScaleFactor:1,mobile:true});
@@ -178,7 +185,11 @@ try {
   assert.equal(flight.bridges.contact,null);assert.equal(flight.bridges.crashed,false);assert.ok(flight.bridges.position[2]<=-1900);
   assert.equal(flight.contact,null);assert.equal(flight.crashed,false);assert.ok(flight.active);assert.ok(flight.height>30);
   assert.ok(Object.values(lifecycle).every(Boolean));assert.equal(exceptions.length,0);
-  assert.ok(retry.crashScene && retry.crashToMenu && retry.healthy && retry.reset);assert.equal(retry.trauma,0);assert.ok(retry.altitude>25);
+  assert.ok(retry.crashScene && retry.crashToMenu && retry.healthy && retry.reset);assert.equal(retry.trauma,0);
+  // The retry flies again from the bridge spawn: physics stepped (~4.6 m north in 0.1 s at
+  // 46 m/s) and the radio altitude is fresh, not the wreck's height above the water.
+  assert.ok(retry.started && retry.advanced>3,`retry stepped from the spawn: ${JSON.stringify(retry)}`);
+  assert.ok(Math.abs(retry.aglM-retry.spawnAglM)<1,`retry radio altitude ${retry.aglM} m vs spawn ${retry.spawnAglM} m`);
 } finally {
   socket?.close();chrome.kill();
   await delay(1500);
