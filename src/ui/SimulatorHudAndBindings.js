@@ -110,8 +110,13 @@ class SimulatorHudAndBindingsMethods {
     };
 
     this.controls.onToggleLights = () => {
-      this.aircraft.lightsOn = !this.aircraft.lightsOn;
-      this.aircraft.lightsGroup.visible = this.aircraft.lightsOn;
+      const on = !this.aircraft.lightsOn;
+      // Aircraft with real light sources switch them by intensity (issue #83).
+      if (this.aircraft.setLightsOn) this.aircraft.setLightsOn(on);
+      else {
+        this.aircraft.lightsOn = on;
+        this.aircraft.lightsGroup.visible = on;
+      }
       this.showToast(() => t('notice.lights', { state: t(this.aircraft.lightsOn ? 'state.on' : 'state.off') }));
     };
 

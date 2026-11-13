@@ -774,18 +774,36 @@ export class Boeing737 {
     this.landingLights.push(landL, landR);
     this.lightsGroup.add(landL, landR);
 
-    this.scopeAirframeLamps();
+    for (const light of [...this.navLights, ...this.landingLights]) light.userData.litIntensity = light.intensity;
+    this.updateLamps();
     this.group.add(this.lightsGroup);
   }
 
   /**
-   * Three compiles every visible punctual light into the light loop of every
-   * material. Wingtip navigation and strobe lamps only ever shine on the
-   * airframe skin, which the pilot seat does not render and which sits outside
-   * the cockpit view, so they cost the whole loop and shade nothing.
+   * Three compiles the number of visible punctual lights into every lit program,
+   * so showing or hiding a single lamp recompiles every material on screen in one
+   * blocking frame (issue #83: 6-13 s on a cold shader cache). The lamps therefore
+   * stay visible and switch by intensity. The master switch and crash power loss
+   * darken all of them; the cockpit seat darkens the wingtip navigation and strobe
+   * lamps, which only shade the airframe skin that view does not render.
    */
-  scopeAirframeLamps() {
-    for (const light of [...this.navLights, ...this.strobeLights]) light.visible = !this.isCockpit;
+  updateLamps(now = performance.now() * 0.001) {
+    const powered = this.lightsOn && !this.isCrashed;
+    const airframe = powered && !this.isCockpit;
+    // Strobe double-pulses every 1.2 s; the beacon flashes every 1.0 s.
+    const strobePhase = now % 1.2;
+    const strobeActive = strobePhase < 0.08 || (strobePhase > 0.16 && strobePhase < 0.24);
+    const beaconActive = now % 1.0 < 0.15;
+    for (const light of this.navLights) light.intensity = airframe ? light.userData.litIntensity : 0;
+    for (const light of this.strobeLights) light.intensity = airframe && strobeActive ? 8.0 : 0.0;
+    for (const light of this.beaconLights) light.intensity = powered ? (beaconActive ? 6.0 : 0.1) : 0.0;
+    for (const light of this.landingLights) light.intensity = powered ? light.userData.litIntensity : 0;
+  }
+
+  /** Master exterior light switch; see updateLamps for why lamps are never hidden. */
+  setLightsOn(on) {
+    this.lightsOn = on;
+    this.updateLamps();
   }
 
   /**
@@ -898,20 +916,7 @@ export class Boeing737 {
     }
 
     // 4. Strobe & Beacon Flashing Animation
-    const now = performance.now() * 0.001;
-    // Strobe flashes every 1.2 seconds with double pulse
-    const strobePhase = (now % 1.2);
-    const strobeActive = (strobePhase < 0.08) || (strobePhase > 0.16 && strobePhase < 0.24);
-    this.strobeLights.forEach(light => {
-      light.intensity = strobeActive ? 8.0 : 0.0;
-    });
-
-    // Beacon flashes every 1.0s
-    const beaconPhase = (now % 1.0);
-    const beaconActive = beaconPhase < 0.15;
-    this.beaconLights.forEach(light => {
-      light.intensity = beaconActive ? 6.0 : 0.1;
-    });
+    this.updateLamps();
 
     // 5. Update Cockpit Interior Controls
     this.cockpit?.updateControls(flightState);
@@ -1127,12 +1132,12 @@ export class Boeing737 {
     if (this.cockpit && this.cockpit.group) {
       this.cockpit.group.visible = isCockpit && showInterior;
     }
-    this.scopeAirframeLamps();
+    this.updateLamps();
   }
 
   triggerCrashVisuals(collisionType) {
     this.isCrashed = true;
-    if (this.lightsGroup) this.lightsGroup.visible = false;
+    this.updateLamps();
 
     // Keep the visible airframe aligned with the physical terrain contacts.
     // Explosion/light effects convey the crash without rotating geometry underground.
@@ -1140,7 +1145,7 @@ export class Boeing737 {
 
   resetCrashVisuals() {
     this.isCrashed = false;
-    if (this.lightsGroup) this.lightsGroup.visible = this.lightsOn;
+    this.updateLamps();
 
     if (this.gltfGroup) {
       this.gltfGroup.rotation.z = 0;

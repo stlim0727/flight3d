@@ -67,26 +67,51 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     assert.strictEqual(aircraft.cockpit.group.visible, false, 'Cockpit must be hidden in exterior view');
   });
 
-  it('scopes airframe-only lamps out of the compiled light set in cockpit view', () => {
+  it('switches lamps by intensity so view, switch and crash changes never recompile materials', () => {
+    // Three compiles the visible light set (as traverseVisible reaches it) into every lit
+    // program; a changed count recompiles every material on screen in one frame (issue #83).
+    const lightSet = root => {
+      const counts = {};
+      root.traverseVisible(node => { if (node.isLight) counts[node.type] = (counts[node.type] ?? 0) + 1; });
+      return counts;
+    };
     const aircraft = new Boeing737(new PFDCanvas(256, 256), new NDCanvas(256, 256), new EICASCanvas(256, 256));
-    const lamps = [...aircraft.navLights, ...aircraft.strobeLights];
-    assert.equal(lamps.length, 6, 'Three navigation and three strobe lamps are airframe-only');
-    assert.ok(lamps.every(light => light.visible), 'Exterior view must keep every lamp compiled');
+    // The interior is revealed only after the light-transfer bake, which leaves its floods hidden.
+    aircraft.cockpit.floods.forEach(flood => { flood.visible = false; });
+    aircraft.setCockpitMode(false);
+    const airframeLamps = [...aircraft.navLights, ...aircraft.strobeLights];
+    assert.equal(airframeLamps.length, 6, 'Three navigation and three strobe lamps are airframe-only');
+    const exterior = lightSet(aircraft.group);
+    const steady = () => [...aircraft.navLights, ...aircraft.beaconLights, ...aircraft.landingLights];
+    assert.ok(steady().every(light => light.intensity > 0), 'Exterior view lights the steady lamps');
 
+    // Cockpit seat: wingtip lamps shade only the hidden skin, so they go dark.
     aircraft.setCockpitMode(true);
-    assert.ok(lamps.every(light => !light.visible), 'Cockpit view must drop the lamps that shade nothing');
-    assert.ok([...aircraft.beaconLights, ...aircraft.landingLights].every(light => light.visible),
-      'Beacons and landing lights reach visible surfaces and must stay');
+    assert.deepEqual(lightSet(aircraft.group), exterior, 'Entering the cockpit keeps the compiled light set');
+    for (const now of [0.02, 0.5]) {
+      aircraft.updateLamps(now);
+      assert.ok(airframeLamps.every(light => light.intensity === 0), `Wingtip lamps stay dark in the cockpit at ${now}s`);
+    }
+    assert.ok([...aircraft.beaconLights, ...aircraft.landingLights].every(light => light.intensity > 0),
+      'Beacons and landing lights reach visible surfaces and stay lit');
 
     aircraft.setCockpitMode(false);
-    assert.ok(lamps.every(light => light.visible), 'Returning outside must restore every lamp');
+    aircraft.updateLamps(0.02);
+    assert.ok(airframeLamps.every(light => light.intensity > 0), 'Returning outside relights nav lamps and the strobe pulse');
 
-    // Crash recovery restores the lamp group, so per-lamp scoping must survive it.
+    // Master switch and crash power loss: dark, but still the same compiled light set.
+    aircraft.setLightsOn(false);
+    assert.ok(steady().every(light => light.intensity === 0), 'The master switch darkens every lamp');
+    assert.deepEqual(lightSet(aircraft.group), exterior, 'Switching lamps off keeps the compiled light set');
+    aircraft.setLightsOn(true);
     aircraft.setCockpitMode(true);
     aircraft.triggerCrashVisuals('gear');
+    assert.ok(steady().every(light => light.intensity === 0), 'Impact cuts lamp power');
+    assert.deepEqual(lightSet(aircraft.group), exterior, 'A crash keeps the compiled light set');
     aircraft.resetCrashVisuals();
-    assert.ok(lamps.every(light => !light.visible), 'Crash recovery must not undo cockpit scoping');
-    assert.ok(aircraft.lightsGroup.visible, 'The lamp group keeps following the master switch');
+    assert.ok(airframeLamps.every(light => light.intensity === 0), 'Crash recovery keeps the cockpit wingtip lamps dark');
+    assert.ok(aircraft.landingLights.every(light => light.intensity > 0), 'Crash recovery restores lamp power');
+    assert.deepEqual(lightSet(aircraft.group), exterior, 'Crash recovery keeps the compiled light set');
   });
 
   it('should hide the procedural tail when the asynchronous model loads in cockpit view', (t) => {

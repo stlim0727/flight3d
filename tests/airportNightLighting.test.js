@@ -103,6 +103,25 @@ test('instrument flood follows sunset, crash power loss, reset and sunrise witho
   assert.ok(light.distance < 2, 'Shielded flood must not illuminate terrain outside the aircraft');
 });
 
+test('instrument flood leaves the compiled light set unchanged when views hide the interior', () => {
+  // Hiding a light recompiles every lit material on screen (issue #83), so the flood
+  // must stay reachable by traverseVisible and go dark by intensity instead.
+  const aircraft = new THREE.Group();
+  const cockpit = { group: new THREE.Group() };
+  aircraft.add(cockpit.group);
+  const light = installInstrumentLighting(cockpit, { x: -.22, y: .72, z: -1.18 }, 0xffb46b, () => true);
+  const spotCount = () => { let n = 0; aircraft.traverseVisible(node => { if (node.isSpotLight) n++; }); return n; };
+  const night = () => cockpit.syncLighting({ sunPosition: new THREE.Vector3(0, -1, 0) });
+
+  night(); assert.ok(light.intensity > 0, 'Cockpit view lights the panel at night');
+  assert.equal(spotCount(), 1);
+  cockpit.group.visible = false;
+  night(); assert.equal(light.intensity, 0, 'An exterior view darkens the hidden panel flood');
+  assert.equal(spotCount(), 1, 'Hiding the interior must not drop the flood from the light set');
+  cockpit.group.visible = true;
+  night(); assert.ok(light.intensity > 0, 'Returning to the cockpit relights the panel');
+});
+
 
 test('occupied-room palette varies brightness, colour temperature and vacancy without flickering', () => {
   const a = createRoomLightTexture(), b = createRoomLightTexture();
