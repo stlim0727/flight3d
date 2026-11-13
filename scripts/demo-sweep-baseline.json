@@ -183,5 +183,25 @@
       "sink-rate": 3.3
     },
     "elapsedSeconds": 358
+  },
+  "b738-lukla-classic": {
+    "maxRollDeg": 42,
+    "maxIasKnots": 143.3,
+    "maxMach": 0.257,
+    "maxAbsG": 1.5,
+    "maxSinkFpm": 2627,
+    "maxAngularRateRadS": 0.3,
+    "maxHeadingRateDegPerS": 7.2,
+    "maxBankRateDegPerS": 14,
+    "minAglM": 4,
+    "warningSeconds": {
+      "pull-up": 20.3,
+      "dont-sink": 5.3,
+      "sink-rate": 1.8,
+      "terrain": 22.8,
+      "bank": 9.8,
+      "takeoff-config": 5.8
+    },
+    "elapsedSeconds": 138
   }
 }

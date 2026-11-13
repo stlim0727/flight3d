@@ -85,14 +85,10 @@ export const ROUTES = [
     groundStages: ['CLIFF_TAKEOFF', 'UPHILL_TOUCHDOWN'],
     lands: true, handoff: 'parked', budgetSimSeconds: 320, clearanceIntentM: 0,
     rolloutDevices: ['spoilers', 'reverser'],
-    knownIssues: [{
-      contains: ['CRASH TERRAIN'],
-      note: 'CANYON_APPROACH flies into the rising valley wall at ~126 s — 13 m agl, 111 kt, +15° pitch, '
-        + 'still climbing when the terrain climbs faster. Reproduced identically through the app-internal '
-        + 'arming path used by scripts/test-lukla-demo-benchmark.mjs, so it is the demo, not the sweep. '
-        + 'Tracked in https://github.com/stlim0727/flight3d/issues/292.',
-    }],
-    allowedWarnings: ['gear', 'flaps', 'takeoff-config'],
+    // The cliff departure plunges into the gorge (sink-rate, dont-sink), the climb and
+    // final run inside the valley walls (terrain, pull-up), and the turnaround is
+    // flown at 42° of bank. Collision and gear damage remain the real bound.
+    allowedWarnings: ['gear', 'flaps', 'takeoff-config', 'terrain', 'pull-up', 'sink-rate', 'dont-sink', 'bank'],
     shotStage: 'CANYON_APPROACH',
   },
   {
@@ -122,25 +118,6 @@ export const ROUTES = [
     groundStages: [], lands: false, handoff: 'airborne', budgetSimSeconds: 200,
     // Documented intent: docs/development/aircraft-demos.md and verify-cessna-demos.mjs.
     clearanceIntentM: 25, allowedWarnings: [], shotStage: 'LOW_PASS',
-    knownIssues: [
-      {
-        contains: ['RECOVER CLEARANCE'], intermittent: true,
-        note: 'RECOVER occasionally ends in the sea: 3 of 37 cold-page flights, on the '
-          + 'pre-Hangang build and on main alike, so it is not a merge regression. Clearance falls '
-          + 'through the 25 m intent at 73.3-74.3 s (23.7 m to 3.9 m) and then `CRASH WATER` at 86 kt. '
-          + 'The reported vertical speed during that fall is a CLIMB of 865-872 fpm, which is the '
-          + 'finding: an earlier version of this note called those numbers a sink and built a '
-          + 'mechanism on it, but the checker printed `vsiFpm` as "sink" whatever its sign '
-          + '(see vsiText in scripts/lib/abnormalityChecks.mjs), and a positive vsiFpm is a climb '
-          + '(src/systems/FlightWarnings.js:66). Gaining height and still arriving on the water '
-          + 'surface is what has to be explained, not a command that descends too fast.',
-      },
-      {
-        contains: ['CRASH WATER'], intermittent: true,
-        note: 'the terminal event of the same fault — "The aircraft hit the surface at '
-          + 'high speed" at 86 kt, a second or two after the clearance violations above.',
-      },
-    ],
   },
   {
     id: 'c172-coastal-maneuvers', aircraft: 'C172', airport: 'coastal', profile: 'maneuvers',

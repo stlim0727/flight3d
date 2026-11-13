@@ -532,8 +532,10 @@ test('without an instrumented stage trace the live stage is still followed', () 
 });
 
 test('a declared known issue absorbs its own fault and nothing else', () => {
-  const lukla = routeById('b738-lukla-classic');
-  assert.ok(lukla.knownIssues?.length, 'the Lukla circuit must declare the crash it is known to make');
+  // The circuit no longer crashes (#292); the declaration is restated here so the
+  // absorption rule keeps a test of its own.
+  const lukla = { ...routeById('b738-lukla-classic'),
+    knownIssues: [{ contains: ['CRASH TERRAIN'], note: 'documented for the test' }] };
   const table = SCENARIO_STAGES.lukla;
   const crashed = fly(lukla, [...fullFlight(lukla), {
     stage: table.COMPLETED, active: false, crashed: true, crashType: 'TERRAIN',
@@ -564,10 +566,12 @@ test('a known issue that no longer happens asks to be removed', () => {
 });
 
 test('an intermittent known issue absorbs every line of one fault and stays quiet when it misses', () => {
-  const scenic = routeById('c172-coastal-scenic');
-  const declared = scenic.knownIssues ?? [];
-  assert.ok(declared.length && declared.every(entry => entry.intermittent),
-    'the coastal scenic route must declare its water arrival as intermittent');
+  // The water arrival was fixed by the deterministic coastal environment (#292); the
+  // intermittent declaration it used is restated so the rule keeps a test of its own.
+  const scenic = { ...routeById('c172-coastal-scenic'), knownIssues: [
+    { contains: ['RECOVER CLEARANCE'], intermittent: true, note: 'documented for the test' },
+    { contains: ['CRASH WATER'], intermittent: true, note: 'documented for the test' },
+  ] };
   const table = SCENARIO_STAGES.cessna;
   const recover = { stage: table.RECOVER, aglM: 20, vsiFpm: -870, iasKnots: 86 };
   const outcome = fly(scenic, [...fullFlight(scenic), recover, {

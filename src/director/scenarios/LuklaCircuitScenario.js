@@ -10,6 +10,21 @@ import {
 } from '../PilotControlLaws.js';
 
 /**
+ * Cross-track closure rate (m/s, along +w) for joining the RW06 centerline.
+ *
+ * A proportional rate alone asks for full intercept speed until the aircraft
+ * is too close to turn onto the centerline, so it overshoots and S-turns down
+ * the final. The rate is also bounded by sqrt(2 a |w|): the closure that a
+ * coordinated turn of lateral acceleration `turnAccel` can still remove before
+ * reaching the centerline, which starts the roll-out early enough.
+ */
+export function luklaCenterlineClosure(w, { gain = 0.20, turnAccel = 2.5, maxRate = 50 } = {}) {
+  const distance = Math.abs(w);
+  const rate = Math.min(gain * distance, Math.sqrt(2 * turnAccel * distance), maxRate);
+  return w > 0 ? -rate : rate;
+}
+
+/**
  * Autonomous Nepal Tenzing-Hillary Airport (Lukla VNLK) Continuous Circuit Scenario
  * 
  * Continuous entertainment circuit with explicit 43t loading; not a validated
@@ -361,8 +376,11 @@ export class LuklaCircuitScenario {
         // Only when actually crossing over runway tarmac (s >= -260m) and low (heightAboveRunwayM <= 10m or radioAlt <= 28ft),
         // keep wings level (max bank 3.5°) to prevent engine cowling / wingtip strike.
         const isTouchdownRoll = s >= -260.0 && (heightAboveRunwayM <= 10.0 || tel.radioAltFt <= 28.0);
-        const maxBankDeg = isTouchdownRoll ? 3.5 : (distToThreshold > 600.0 ? 26.0 : 18.0);
-        const desiredVW = THREE.MathUtils.clamp(-w * 0.10, -60, 60);
+        // Chasing w at up to 60 m/s from a kilometre out overshot the centerline,
+        // and the late S-turns at the bank limit cost the height that the final
+        // path over the cliff has no room to lose (#292).
+        const maxBankDeg = isTouchdownRoll ? 3.5 : (distToThreshold > 900.0 ? 26.0 : distToThreshold > 400.0 ? 15.0 : 8.0);
+        const desiredVW = luklaCenterlineClosure(w);
         const lateralAcceleration = (desiredVW - vW) * 0.8;
         const targetRoll = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(Math.atan2(lateralAcceleration, 9.80665)), -maxBankDeg, maxBankDeg);
         this.flyBank(targetRoll, tel);
@@ -427,11 +445,16 @@ export class LuklaCircuitScenario {
         const rolloutRudder = THREE.MathUtils.clamp(hdgErr * 0.025 - yawRateDeg * 0.035, -maxRudder, maxRudder);
         this.sim.controls.setVirtualInput('rudder', rolloutRudder);
 
-        if (this.sim.aero) this.sim.aero.spoilers = noseDown ? 1 : 0;
+        // Ground spoilers and reverse are armed by main-gear contact, as on the
+        // real airplane; wheel braking still waits for the nose gear. Waiting for
+        // the nose before any of them left under 40 m of runway at the stop.
+        const mainsDown = this.sim.gear.contacts.slice(1).every(c => c.isGrounded);
+        const reverse = mainsDown && tel.iasKnots > 25;
+        if (this.sim.aero) this.sim.aero.spoilers = mainsDown ? 1 : 0;
         this.sim.controls.setVirtualInput('brakes', noseDown ? 1 : 0);
         this.sim.gear.setBrakes(noseDown ? 1 : 0);
-        this.sim.engines.setReverser(noseDown && tel.iasKnots > 25, tel.onGround);
-        this.sim.controls.setVirtualInput('throttle', noseDown && tel.iasKnots > 25 ? 1 : 0);
+        this.sim.engines.setReverser(reverse, tel.onGround);
+        this.sim.controls.setVirtualInput('throttle', reverse ? 1 : 0);
 
         // Switch to exterior chase camera at 3.0s after showcasing touchdown impact
         if (!this.stageCameraCutDone && !this.director.userCameraOverridden && this.director.stageTimer > 3.0) {
