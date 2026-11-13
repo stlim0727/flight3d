@@ -350,10 +350,12 @@ class FlightSimulator {
     this.cannonCombatView = new CannonCombatView(this.scene, this.missileCombat);
     this.rearmSystem = new RearmSystem();
     this._gunAudioActive = false;
-    this.cameraSystem.setCombatStateProvider(() => ({
+    // A replay owns the combat feed: its recorded missile poses and bandit
+    // states drive the director instead of the inactive live system.
+    this.cameraSystem.setCombatStateProvider(() => this.replayDirector?.combatState() ?? {
       missiles: this.missileCombat.missiles,
       targets: this.missileCombat.targets,
-    }));
+    });
     this._combatTerrainHeight = (x, z) => this.currentTerrain?.getHeight(x, z) ?? 0;
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
     this.pilotPhysiologyFx = new PilotPhysiologyFx(this.container);

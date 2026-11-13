@@ -639,6 +639,7 @@ export class CinematicCameraDirector {
    */
   update({
     dt,
+    clockDt = dt,
     camera = this.camera,
     planePos,
     planeQuat,
@@ -650,6 +651,9 @@ export class CinematicCameraDirector {
   }) {
     if (!camera || !planePos || !planeQuat) return false;
     const safeDt = Math.min(2.0, Math.max(0.0001, dt ?? 0.016));
+    // Shot pacing follows the caller's clock (replay speed/pause), while camera
+    // damping keeps using the real frame delta so it stays responsive.
+    const shotDt = Math.min(2.0, Math.max(0, Number.isFinite(clockDt) ? clockDt : safeDt));
 
     // Calculate frame-to-frame translation delta to eliminate world-space lag stutter
     const planePosDelta = new THREE.Vector3();
@@ -665,7 +669,7 @@ export class CinematicCameraDirector {
     this.detectMissileLaunch(missiles, targets, planePos, planeQuat);
 
     // Evaluate cut and timing
-    this.evaluateShotCut(flightState, safeDt);
+    this.evaluateShotCut(flightState, shotDt);
 
     // Extract aircraft coordinate axes
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(planeQuat);

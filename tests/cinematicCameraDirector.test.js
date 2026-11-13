@@ -704,3 +704,37 @@ test('bandit POV keeps a unit lateral offset when the missile is directly overhe
   );
   assert.ok(horizontal > 2.0, `bandit eye keeps the 2.4 m lateral offset, was ${horizontal.toFixed(2)}`);
 });
+
+test('Director shot pacing follows the supplied replay clock', () => {
+  const camera = new THREE.PerspectiveCamera();
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1000, 0);
+  const planeQuat = new THREE.Quaternion();
+  const target = {
+    id: 21,
+    alive: true,
+    position: new THREE.Vector3(0, 1000, -4000),
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const missile = fakeMissile({
+    id: 91,
+    position: new THREE.Vector3(4, 1000, 2),
+    velocity: new THREE.Vector3(0, 0, -450),
+    target,
+  });
+
+  director.update({ dt: 0.016, clockDt: 0.016, camera, planePos, planeQuat, missiles: [missile], targets: [target] });
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_LAUNCH);
+
+  // A paused replay freezes the launch beat instead of letting wall-clock time finish it.
+  for (let frame = 0; frame < 100; frame++) {
+    director.update({ dt: 0.016, clockDt: 0, camera, planePos, planeQuat, missiles: [missile], targets: [target] });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_LAUNCH, 'Paused clock holds the launch shot');
+
+  // A 2x replay advances two seconds of shot time per second of frame time.
+  for (let frame = 0; frame < 6; frame++) {
+    director.update({ dt: 0.016, clockDt: 0.2, camera, planePos, planeQuat, missiles: [missile], targets: [target] });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_TRACK, 'Scaled clock advances the sequence');
+});
