@@ -6,10 +6,22 @@ route; Esc releases the demo controls. A selected camera or mouse-look keeps
 priority over automatic camera cuts.
 
 - Boeing 737: existing airport cinematic demos, including takeoff and landing.
+- Boeing 737, Neon Metropolis: runway 09 departure. The takeoff roll steers onto
+  the centreline against the urban crosswind, the climb tracks the canyon line
+  (z = 0) through the city and out over the eastern sea, and control is handed
+  over at the 760 m skyline cruise altitude. No landing: the runway points into
+  the city, and the coastal choreography it used to fly there has no runway to
+  land on (#697).
 - Cessna 172, coastal: airborne city corridor pass followed by climb-out.
+- Cessna 172, Neon Metropolis: the same corridor search over the Neon street grid;
+  it currently picks the ew-540 avenue westbound at 50 m and climbs out over the
+  western sea.
 - Cessna 172, Lukla: airborne valley pass followed by a climbing turnaround.
-- Cessna 172, either airport: extra-altitude left/right steep turns, a climbing
-  wingover and wings-level recovery. No loop, roll or inverted flight is offered.
+- Cessna 172, any of these airports: extra-altitude left/right steep turns, a climbing
+  wingover and wings-level recovery, at least 100 m above the highest roof. No loop,
+  roll or inverted flight is offered.
+- Cessna 172 proximity montage: coastal only, because its scenes buzz the coastal
+  cargo ship, forest, lake and tower.
 
 The Cessna scenarios use one initial airborne spawn. Subsequent movement uses
 virtual elevator/aileron/rudder/throttle inputs through the normal 120 Hz physics
@@ -24,8 +36,14 @@ its clearance and roll intent, the warnings its choreography is allowed to sound
 any known issue it is carrying, so a new demo route is a table edit rather than
 another single-purpose browser script.
 
-City corridors are selected against the current generated building footprints,
-including buildings tall enough to intersect the flight altitude. The proximity
+City corridors are selected against the building footprints the collision detector
+tests (`collisionBuildings`), including buildings tall enough to intersect the flight
+altitude. At Neon that is the Neon city: `sim.foliage` there still holds the hidden
+coastal city, and planning against it routed the pass through Neon towers (#697).
+The 1.9 km climb-out after the pass must clear every building too, at the altitude
+it has gained by then (planned at 0.08 m per metre, below the climb the Cessna flies),
+and the climb and recovery keep tracking the route line so wind drift stays inside
+that clearance. The proximity
 montage's skyscraper scene resolves its spawn, heading and altitude from the
 same corridor selection at scene entry, and its ledge camera sits on a real
 flanking tower, so random building placement cannot put the flight path inside

@@ -18,18 +18,17 @@ export function demoProfiles(aircraftId = 'B738', airport = 'coastal') {
       { id: 'incheon-tour', labelKey: 'demo.incheon.name', briefingKey: 'demo.incheon.briefing' },
       sihwa,
     ];
-    if (airport === 'lukla') {
-      return [
-        { id: 'scenic', labelKey: 'demo.c172.canyon', briefingKey: 'demo.c172.canyon.briefing' },
-        { id: 'maneuvers', labelKey: 'demo.c172.maneuvers', briefingKey: 'demo.c172.maneuvers.briefing' },
-      ];
-    }
-    return [
-      { id: 'proximity', labelKey: 'demo.c172.proximity', briefingKey: 'demo.c172.proximity.briefing' },
-      { id: 'scenic', labelKey: 'demo.c172.city', briefingKey: 'demo.c172.city.briefing' },
-      { id: 'maneuvers', labelKey: 'demo.c172.maneuvers', briefingKey: 'demo.c172.maneuvers.briefing' },
-    ];
+    const scenic = airport === 'lukla'
+      ? { id: 'scenic', labelKey: 'demo.c172.canyon', briefingKey: 'demo.c172.canyon.briefing' }
+      : { id: 'scenic', labelKey: 'demo.c172.city', briefingKey: 'demo.c172.city.briefing' };
+    const maneuvers = { id: 'maneuvers', labelKey: 'demo.c172.maneuvers', briefingKey: 'demo.c172.maneuvers.briefing' };
+    // The proximity montage buzzes coastal landmarks (ship, forest, lake, tower) that
+    // Lukla and Neon do not have; their valley/city pass and manoeuvres fly anywhere.
+    if (airport === 'lukla' || airport === 'neon') return [scenic, maneuvers];
+    return [{ id: 'proximity', labelKey: 'demo.c172.proximity', briefingKey: 'demo.c172.proximity.briefing' }, scenic, maneuvers];
   }
+  // The coastal choreography lands on a runway the Neon city does not have (#697).
+  if (airport === 'neon') return [{ id: 'neon-departure', labelKey: 'demo.b738.neon', briefingKey: 'demo.b738.neon.briefing' }];
   return [{ id: 'classic', labelKey: 'demo.b738.classic', briefingKey: 'lobby.briefing.scenario.demo' }];
 }
 

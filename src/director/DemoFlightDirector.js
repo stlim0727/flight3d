@@ -12,6 +12,7 @@ import { CessnaDemoScenario } from './scenarios/CessnaDemoScenario.js';
 import { CessnaProximityScenario } from './scenarios/CessnaProximityScenario.js';
 import { resolveDemoProfile } from './demoProfiles.js';
 import { CoastalDemoScenario } from './scenarios/CoastalDemoScenario.js';
+import { NeonDepartureScenario } from './scenarios/NeonDepartureScenario.js';
 
 /**
  * Autonomous Cinematic Demo Flight Director
@@ -63,6 +64,7 @@ export class DemoFlightDirector {
     this.f16SlalomScenario = new F16CanyonSlalomScenario(this, simulator);
     this.cessnaScenario = new CessnaDemoScenario(this, simulator);
     this.cessnaProximityScenario = new CessnaProximityScenario(this, simulator);
+    this.neonDepartureScenario = new NeonDepartureScenario(this, simulator);
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
     this.profile = 'classic';
 
@@ -110,6 +112,7 @@ export class DemoFlightDirector {
       if (this.activeDemoAirport === 'incheon') return this.incheonCessnaScenario;
       return this.profile === 'proximity' ? this.cessnaProximityScenario : this.cessnaScenario;
     }
+    if (this.activeDemoAirport === 'neon') return this.neonDepartureScenario;
     return this.activeDemoAirport === 'lukla' ? this.luklaScenario : this.coastalScenario;
   }
 
@@ -415,6 +418,8 @@ export class DemoFlightDirector {
       } else {
         this.setStage(CessnaDemoScenario.STAGES.ESTABLISH);
       }
+    } else if (this.activeDemoAirport === 'neon') {
+      this.setStage(NeonDepartureScenario.STAGES.LINEUP);
     } else if (this.activeDemoAirport === 'lukla') {
       this.setStage(DemoFlightDirector.LUKLA_STAGES.CLIFF_TAKEOFF);
     } else {
@@ -422,7 +427,8 @@ export class DemoFlightDirector {
     }
 
     if (this.sim.showToast) {
-      const airportKey = this.activeDemoAirport === 'incheon' ? 'incheon.airport' : this.activeDemoAirport === 'lukla' ? 'airport.lukla.name' : 'coastal.airport.09l';
+      const airportKey = this.activeDemoAirport === 'incheon' ? 'incheon.airport' : this.activeDemoAirport === 'lukla' ? 'airport.lukla.name'
+        : this.activeDemoAirport === 'neon' ? 'neon.metropolis' : 'coastal.airport.09l';
       this.sim.showToast(() => t('starting.value.cinematic.demo.flight', { value: t(airportKey) }));
     }
   }

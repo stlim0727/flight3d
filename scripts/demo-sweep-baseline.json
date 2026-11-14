@@ -203,5 +203,47 @@
       "takeoff-config": 5.8
     },
     "elapsedSeconds": 138
+  },
+  "c172-neon-scenic": {
+    "maxRollDeg": 5.6,
+    "maxIasKnots": 90.3,
+    "maxMach": 0.137,
+    "maxAbsG": 1.2,
+    "maxSinkFpm": 235,
+    "maxAngularRateRadS": 0.2,
+    "maxHeadingRateDegPerS": 2,
+    "maxBankRateDegPerS": 6.5,
+    "minAglM": 50,
+    "warningSeconds": {},
+    "elapsedSeconds": 77
+  },
+  "c172-neon-maneuvers": {
+    "maxRollDeg": 52,
+    "maxIasKnots": 91.1,
+    "maxMach": 0.142,
+    "maxAbsG": 1.5,
+    "maxSinkFpm": 255,
+    "maxAngularRateRadS": 0.4,
+    "maxHeadingRateDegPerS": 11.2,
+    "maxBankRateDegPerS": 18,
+    "minAglM": 548,
+    "warningSeconds": {},
+    "elapsedSeconds": 75
+  },
+  "b738-neon-departure": {
+    "maxRollDeg": 0.7,
+    "maxIasKnots": 190.5,
+    "maxMach": 0.288,
+    "maxAbsG": 1.4,
+    "maxSinkFpm": 40,
+    "maxAngularRateRadS": 0.1,
+    "maxHeadingRateDegPerS": 0.9,
+    "maxBankRateDegPerS": 1.2,
+    "minAglM": 19.7,
+    "warningSeconds": {
+      "pull-up": 1.8,
+      "terrain": 1.3
+    },
+    "elapsedSeconds": 115
   }
 }
