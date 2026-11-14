@@ -7,12 +7,13 @@ import { MISSILE_TYPES } from '../../src/weapons/missileSpecs.js';
  * Shared by the Node regression and the hardware-browser acceptance check.
  */
 export function runBanditEngagement({ rangeM, aspect, evasion, type = 'AIM9X',
-  altitudeM = 3000, launchSpeedMps = 250, targetSpeedMps = 180, orbitRadiusM = 780, idealSensor = false }) {
+  altitudeM = 3000, launchSpeedMps = 250, targetSpeedMps = 180, orbitRadiusM = 780, idealSensor = false, countermeasures = true }) {
   const dt = 1 / 120;
   const target = new BanditTarget({ callsign: 'COMPARISON', evasion,
     position: new Vector3(orbitRadiusM, altitudeM, 0),
     orbit: { center: new Vector3(), radius: orbitRadiusM, angle: 0,
       omega: targetSpeedMps / orbitRadiusM, altitudeM } });
+  if (!countermeasures) { target.flare.remaining = 0; target.chaff.remaining = 0; }
   const offset = aspect === 'tail' ? new Vector3(0, 0, -rangeM)
     : aspect === 'head' ? new Vector3(0, 0, rangeM) : new Vector3(rangeM, 0, 0);
   const position = target.position.clone().add(offset);
@@ -33,7 +34,7 @@ export function runBanditEngagement({ rangeM, aspect, evasion, type = 'AIM9X',
   }
   if (!combat.lockedTarget) {
     // This matrix requires a rail lock; refusal is not a fired missile miss.
-    return { rangeM, aspect, type, evasion, altitudeM, launchSpeedMps, sensorModel: idealSensor ? 'ideal-fixture' : 'default', launched: false,
+    return { rangeM, aspect, type, evasion, altitudeM, launchSpeedMps, sensorModel: idealSensor ? 'ideal-fixture' : 'default', countermeasures, launched: false,
       terminal: 'no-lock', terminalSeconds: 0,
       minSampledSeparationM: target.position.distanceTo(position), reactionSeconds: null,
       maxLoadG: target.flight.aero.gForce, controlLimitedSeconds: 0,
@@ -66,17 +67,17 @@ export function runBanditEngagement({ rangeM, aspect, evasion, type = 'AIM9X',
       break;
     }
   }
-  return { rangeM, aspect, type, evasion, altitudeM, launchSpeedMps, sensorModel: idealSensor ? 'ideal-fixture' : 'default', launched: true, terminal, terminalSeconds,
+  return { rangeM, aspect, type, evasion, altitudeM, launchSpeedMps, sensorModel: idealSensor ? 'ideal-fixture' : 'default', countermeasures, launched: true, terminal, terminalSeconds,
     minSampledSeparationM, reactionSeconds, maxLoadG, controlLimitedSeconds,
     maneuverDragWorkJPerKg, terminalMissileSpeedMps: missile.velocity.length() };
 }
 
-export function compareBanditEngagements() {
+export function compareBanditEngagements({ countermeasures = true } = {}) {
   const results = [];
   for (const rangeM of [1800, 3500, 5500]) {
     for (const aspect of ['tail', 'head', 'beam']) {
       for (const evasion of [false, true]) {
-        results.push(runBanditEngagement({ rangeM, aspect, evasion }));
+        results.push(runBanditEngagement({ rangeM, aspect, evasion, countermeasures }));
       }
     }
   }

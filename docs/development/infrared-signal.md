@@ -62,7 +62,7 @@ spectral response/noise and target discrimination remain outside this increment.
 
 ## Channel integration and controlled comparisons
 
-The default IR path uses this model; default active radar remains ideal quality 1.
+The default IR path uses this model; active radar uses its [separate signal model](radar-signal.md).
 `world.seekerSignalQuality(...)` remains an **explicit complete override** for
 controlled sensor fixtures/extensions. It is not silently multiplied into the IR
 model. Callers choosing that override must provide the observation policy they
