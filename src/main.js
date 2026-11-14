@@ -42,6 +42,7 @@ import { NeonCity } from './environment/NeonCity.js';
 import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
+import { pickGazeTarget } from './cameras/gazeTargetPicker.js';
 import { HudView } from './ui/HudView.js';
 import { AirToAirMissileSystem } from './weapons/AirToAirMissileSystem.js';
 import { CannonCombatView } from './weapons/CannonCombatView.js';
@@ -293,6 +294,7 @@ class FlightSimulator {
     this.cameraSystem.onResetLook = () => {
       this.showToast(() => t('camera.view.centered'));
     };
+    this.cameraSystem.onGazeClick = (clientX, clientY) => this.handleGazeCanvasClick(clientX, clientY);
     this.loadAircraftConfig(AIRCRAFT_REGISTRY[savedSelection.aircraft] || BOEING_737_800);
     this.diagnostics = new DiagnosticsInspector(this);
     this.joystickDialog = new JoystickCheckDialog(this);
@@ -1517,6 +1519,91 @@ class FlightSimulator {
       this.cockpitPhotoOverlay.render(this.renderer);
     }
     this.updateCrashDebrief(frameDelta);
+  }
+
+  handleGazeCanvasClick(clientX, clientY) {
+    if (this.gameFlow?.state === 'lobby' || this.gameFlow?.isPaused?.()) return;
+    const rect = this.renderer?.domElement?.getBoundingClientRect?.();
+    if (!rect) return;
+    const replayCombat = this.replayDirector?.combatState();
+    const combat = replayCombat ?? {
+      targets: this.missileCombat?.targets,
+    };
+    const combatView = replayCombat ? this.replayDirector?.combatView?.() : this.missileCombatView;
+    const bandits = [];
+    for (const target of combat?.targets ?? []) {
+      if (!target?.alive || !target.position) continue;
+      const view = combatView?.targetViews?.get(target.id);
+      bandits.push({
+        id: target.id,
+        label: target.callsign || t('gaze.target.bandit'),
+        mesh: view?.mesh ?? null,
+        getPosition: () => (target.alive ? target.position : null),
+      });
+    }
+    const aircraft = [];
+    const remoteCandidates = [];
+    if (this.multiplayer?.remote) remoteCandidates.push({ id: 'remote', visual: this.multiplayer.remote });
+    if (this.replayDirector?.active && Array.isArray(this.replayDirector.remotes)) {
+      this.replayDirector.remotes.forEach((entry, index) => {
+        if (entry?.visual) remoteCandidates.push({ id: `replay-remote-${index}`, visual: entry.visual });
+      });
+    }
+    for (const { id, visual } of remoteCandidates) {
+      if (!visual || visual.disposed || !visual.group?.visible) continue;
+      aircraft.push({
+        id,
+        label: visual.group.userData?.name || visual.aircraft || t('gaze.target.aircraft'),
+        mesh: visual.group,
+        getPosition: () => (!visual.disposed && visual.group?.visible ? visual.group.position : null),
+      });
+    }
+    const parkedAircraft = this.currentAirport?.parked?.group ? [this.currentAirport.parked.group] : [];
+    const buildings = [];
+    for (const entry of this.currentAirport?.getGazeTargets?.() ?? []) {
+      buildings.push({
+        object: entry.object,
+        kind: entry.kind || 'building',
+        label: t(`gaze.target.${entry.kind || 'building'}`),
+      });
+    }
+    if (this.ships?.group?.visible) {
+      const shipRecords = [...(this.ships.vessels ?? []), ...(this.ships.speedboats ?? [])];
+      if (shipRecords.length > 0) {
+        for (const ship of shipRecords) {
+          if (!ship?.mesh) continue;
+          buildings.push({
+            object: ship.mesh,
+            kind: 'ship',
+            label: t('gaze.target.ship'),
+            dynamic: true,
+          });
+        }
+      } else {
+        buildings.push({
+          object: this.ships.group,
+          kind: 'ship',
+          label: t('gaze.target.ship'),
+        });
+      }
+    }
+    const picked = pickGazeTarget({
+      clientX,
+      clientY,
+      rect,
+      camera: this.camera,
+      sources: {
+        bandits,
+        aircraft,
+        parkedAircraft,
+        parkedLabel: t('gaze.target.parkedAircraft'),
+        buildings,
+      },
+    });
+    if (picked) {
+      this.cameraSystem.setGazeTarget(picked);
+      this.showToast(() => t('notice.gaze.on', { target: picked.label || t('gaze.target.building') }));
+    }
   }
 }
 

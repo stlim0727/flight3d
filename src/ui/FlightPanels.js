@@ -330,4 +330,16 @@ export function updateControlState(telemetry, camera, options = {}) {
       }
     }
   }
+  const gazeExitBtn = document.getElementById('btn-gaze-exit');
+  if (gazeExitBtn) {
+    const gazeActive = Boolean(camera && typeof camera.isGazeActive === 'function' && camera.isGazeActive());
+    gazeExitBtn.hidden = !gazeActive;
+    if (gazeActive) {
+      const labelEl = document.getElementById('gaze-exit-label');
+      const targetLabel = typeof camera.getGazeTargetLabel === 'function' ? camera.getGazeTargetLabel() : '';
+      if (labelEl) {
+        labelEl.textContent = targetLabel ? t('gaze.exit.target', { target: targetLabel }) : t('gaze.exit');
+      }
+    }
+  }
 }

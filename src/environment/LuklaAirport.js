@@ -424,7 +424,12 @@ export class LuklaAirport {
     termGroup.add(beaconLight);
     this.beaconLights.push(beaconLight);
 
+    this.terminalGroup = termGroup;
     this.group.add(termGroup);
+  }
+
+  getGazeTargets() {
+    return this.terminalGroup ? [{ object: this.terminalGroup, kind: 'terminal' }] : [];
   }
 
   /**

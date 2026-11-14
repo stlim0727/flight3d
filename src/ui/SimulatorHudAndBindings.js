@@ -440,6 +440,7 @@ class SimulatorHudAndBindingsMethods {
     document.getElementById('btn-cam-reset')?.addEventListener('click', () => {
       this.cameraSystem.resetLook();
       this.showToast(() => t('camera.view.centered'));
+      this.syncGazeExitButton();
     });
     document.getElementById('btn-reset-pov')?.addEventListener('click', (e) => {
       e?.stopPropagation?.();
@@ -447,7 +448,19 @@ class SimulatorHudAndBindingsMethods {
       this.showToast(() => t('camera.view.centered'));
       const btn = document.getElementById('btn-reset-pov');
       if (btn) btn.hidden = true;
+      this.syncGazeExitButton();
     });
+    document.getElementById('btn-gaze-exit')?.addEventListener('click', (e) => {
+      e?.stopPropagation?.();
+      if (this.cameraSystem?.clearGaze?.()) {
+        this.showToast(() => t('notice.gaze.off'));
+      }
+      this.syncGazeExitButton();
+    });
+    if (this.cameraSystem) {
+      this.cameraSystem.onGazeChange = () => this.syncGazeExitButton();
+      this.syncGazeExitButton();
+    }
     document.getElementById('btn-mute')?.addEventListener('click', () => {
       this.audio.setMuted(!this.audio.isMuted);
       saveSimulatorPreferences({ audioMuted: this.audio.isMuted });
@@ -852,6 +865,20 @@ class SimulatorHudAndBindingsMethods {
         this.showToast(() => t(`notice.bandit.${locked ? 'on' : 'off'}`));
       }
     });
+  }
+
+  syncGazeExitButton() {
+    const btn = document.getElementById('btn-gaze-exit');
+    if (!btn) return;
+    const active = Boolean(this.cameraSystem?.isGazeActive?.());
+    btn.hidden = !active;
+    if (active) {
+      const labelEl = document.getElementById('gaze-exit-label');
+      const targetLabel = this.cameraSystem?.getGazeTargetLabel?.() || '';
+      if (labelEl) {
+        labelEl.textContent = targetLabel ? t('gaze.exit.target', { target: targetLabel }) : t('gaze.exit');
+      }
+    }
   }
 
   handleResize() {
