@@ -4,6 +4,7 @@ import { CloudLayer } from './CloudLayer.js';
 import { createScreenSky } from './ScreenSky.js';
 import { CockpitSunShadow } from './CockpitSunShadow.js';
 import { SunShadowRefresh } from './SunShadowRefresh.js';
+import { FarSunShadow } from './FarSunShadow.js';
 
 const OVERCAST_GREY = new THREE.Color(0.55, 0.57, 0.60);
 
@@ -79,6 +80,9 @@ export class SkyAtmosphere {
     this.sunLight.shadow.autoUpdate = false;
     this.sunShadowRefresh = new SunShadowRefresh(this.sunLight);
     this.shadowFocus = new THREE.Vector3();
+    // Ridges, trees and buildings beyond the airframe's box (#745). Off until a quality
+    // preset gives it a map size.
+    this.farSunShadow = new FarSunShadow();
     this.scene.add(this.sunLight);
     this.scene.add(this.sunLight.target);
 
@@ -376,7 +380,24 @@ export class SkyAtmosphere {
     shadow.needsUpdate = true;
   }
 
-  prepareRender(camera, aircraftPosition = this.sunLight.target.position) {
+  /** Coarse sun shadows out to `range` metres from the camera; a zero size turns them off. */
+  setFarShadowQuality(mapSize, range) {
+    this.farSunShadow.setQuality(mapSize, range);
+  }
+
+  prepareRender(camera, aircraftPosition = this.sunLight.target.position, groundHeightAt = null) {
+    // Before the near map's refresh decision: this draws the scene with its own camera and
+    // must not consume a refresh that decision is about to request.
+    if (this.renderer) {
+      this.farSunShadow.update({
+        renderer: this.renderer,
+        scene: this.scene,
+        camera,
+        sunDirection: this.sunPosition,
+        strength: this.sunLight.castShadow ? this.sunLight.shadow.intensity : 0,
+        groundHeightAt,
+      });
+    }
     // Use the displayed aircraft pose, including interpolation, at the final
     // render boundary. Close views retain ~3 cm texels at balanced quality;
     // distant tower/flyby views expand continuously up to the old world coverage.
@@ -411,6 +432,7 @@ export class SkyAtmosphere {
    */
   setAirport(airportId) {
     this.activeAirport = airportId;
+    this.farSunShadow.invalidate(); // a different region's casters
     // Only Neon hides the scattering sky; every other region must restore it (#633).
     const isNeon = airportId === 'neon';
     this.sky.visible = !isNeon;

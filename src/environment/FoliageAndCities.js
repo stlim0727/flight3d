@@ -6,6 +6,7 @@ import { cityWindowIntensity, createCityBuildingAssets } from './CityBuildingAss
 import { planNorthDistrict } from './NorthCityDistrict.js';
 import { surfaceGeometry } from './CitySurface.js';
 import { applyLogDepthOffset } from './RunwayMarkings.js';
+import { applyFarSunShadow, castFarSunShadow } from './FarSunShadow.js';
 
 /** Instanced vegetation and cities; collision metadata is independent of visual LOD. */
 export class FoliageAndCities {
@@ -30,7 +31,7 @@ export class FoliageAndCities {
     this.districtRoadsMesh = createDistrictRoads(terrain);
     this.group.add(this.districtRoadsMesh);
     const roads = new THREE.Mesh(surfaceGeometry(terrain, this.northDistrict.polygons),
-      applyLogDepthOffset(new THREE.MeshStandardMaterial({ color: 0x444a4c, roughness: .95 }), 2));
+      applyFarSunShadow(applyLogDepthOffset(new THREE.MeshStandardMaterial({ color: 0x444a4c, roughness: .95 }), 2)));
     roads.name = 'north-district-roads'; roads.receiveShadow = true;
     this.northRoadsMesh = roads;
     this.roadTerrainSegments = terrain.segments;
@@ -54,7 +55,7 @@ export class FoliageAndCities {
   initFoliage() {
     const treeCount = 3500;
 
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+    const material = applyFarSunShadow(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
     this.treeBatches = TREE_SPECIES.map(species => {
       const geometries = [createTreeGeometry(species, true), createTreeGeometry(species, false)];
       const meshes = geometries.map((geometry, level) => {
@@ -65,7 +66,8 @@ export class FoliageAndCities {
         // Closed opaque crowns avoid alpha sorting and leaf-card overdraw.
         mesh.castShadow = level === 0;
         mesh.receiveShadow = true;
-        this.group.add(mesh);
+        // Every tree is in exactly one of the two levels, so both draw into the far map.
+        this.group.add(castFarSunShadow(mesh));
         return mesh;
       });
       const box = geometries[0].boundingBox.clone().union(geometries[1].boundingBox);
@@ -202,7 +204,7 @@ export class FoliageAndCities {
       near.frustumCulled = false;
       far.frustumCulled = false;
       near.count = far.count = 0;
-      this.group.add(near, far);
+      this.group.add(castFarSunShadow(near), castFarSunShadow(far));
       return { near, far, records: [] };
     });
 

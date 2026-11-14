@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { applyLogDepthOffset } from './RunwayMarkings.js';
+import { applyFarSunShadow } from './FarSunShadow.js';
 
 // Airports stay allocated for the lifetime of the simulator. Share maps across
 // both airports; preset changes never allocate another texture set.
@@ -30,6 +31,7 @@ export function createPavementMaterial(kind, polygonOffset = -1) {
     polygonOffsetUnits: polygonOffset
   });
   material.name = `pavement-${kind}`;
+  applyFarSunShadow(material);
   // Keep a usable solid material in headless tests and if any local map fails.
   if (typeof window === 'undefined' || typeof document === 'undefined') return material;
   const loader = new THREE.TextureLoader();

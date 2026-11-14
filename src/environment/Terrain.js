@@ -2,6 +2,7 @@ import { mulberry32 } from '../core/random.js';
 import * as THREE from 'three';
 import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
 import { TerrainTextures } from './TerrainTextures.js';
+import { applyFarSunShadow, castFarSunShadow } from './FarSunShadow.js';
 
 /**
  * Procedural Terrain with Rolling Hills, Coastal Mountains, and Flat Airport Mesa
@@ -616,8 +617,9 @@ export class Terrain {
       );
     };
 
+    applyFarSunShadow(terrainMat);
     this.material = terrainMat;
-    this.mesh = new THREE.Mesh(this.geometry, terrainMat);
+    this.mesh = castFarSunShadow(new THREE.Mesh(this.geometry, terrainMat));
     this.mesh.receiveShadow = this.quality !== 'ultraLow';
   }
 

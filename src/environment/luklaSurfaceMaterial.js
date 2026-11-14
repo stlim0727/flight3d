@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyFarSunShadow } from './FarSunShadow.js';
 
 /** Render-only metre-scale detail; satellite UVs and measured heights stay intact. */
 export function luklaSurfaceMaterial(map = null) {
@@ -50,5 +51,5 @@ export function luklaSurfaceMaterial(map = null) {
         normal = normalize(abs(det) * normal - sign(det) * (dFdx(relief) * rx + dFdy(relief) * ry));`);
   };
   material.customProgramCacheKey = () => 'lukla-surface-v1';
-  return material;
+  return applyFarSunShadow(material);
 }

@@ -325,7 +325,8 @@ class SimulatorHudAndBindingsMethods {
     if (this.renderQuality !== 'ultraLow') {
       prepareCockpitShadowDepth(this.aircraft.group);
     }
-    this.sky.prepareRender(this.camera, this.aircraft.group.position);
+    this.farShadowGround ??= (x, z) => this.currentTerrain?.getHeight(x, z);
+    this.sky.prepareRender(this.camera, this.aircraft.group.position, this.farShadowGround);
     this.renderer.render(this.scene, this.camera);
     const preset = RENDER_QUALITY[this.renderQuality];
     if (preset?.ao !== false &&
@@ -367,6 +368,7 @@ class SimulatorHudAndBindingsMethods {
       this.renderer.shadowMap.enabled = preset.shadows ?? (preset.shadowMapSize > 0);
     }
     this.sky?.setShadowMapSize(preset.shadowMapSize);
+    this.sky?.setFarShadowQuality?.(preset.farShadowMapSize, preset.farShadowRange);
     if (this.sky?.setCloudsVisible) {
       this.sky.setCloudsVisible(preset.clouds ?? true);
     } else {
