@@ -1542,13 +1542,20 @@ class FlightSimulator {
       });
     }
     const aircraft = [];
-    const remote = this.multiplayer?.remote;
-    if (remote && !remote.disposed && remote.group?.visible) {
+    const remoteCandidates = [];
+    if (this.multiplayer?.remote) remoteCandidates.push({ id: 'remote', visual: this.multiplayer.remote });
+    if (this.replayDirector?.active && Array.isArray(this.replayDirector.remotes)) {
+      this.replayDirector.remotes.forEach((entry, index) => {
+        if (entry?.visual) remoteCandidates.push({ id: `replay-remote-${index}`, visual: entry.visual });
+      });
+    }
+    for (const { id, visual } of remoteCandidates) {
+      if (!visual || visual.disposed || !visual.group?.visible) continue;
       aircraft.push({
-        id: 'remote',
-        label: remote.group.userData?.name || remote.aircraft || t('gaze.target.aircraft'),
-        mesh: remote.group,
-        getPosition: () => (!remote.disposed && remote.group?.visible ? remote.group.position : null),
+        id,
+        label: visual.group.userData?.name || visual.aircraft || t('gaze.target.aircraft'),
+        mesh: visual.group,
+        getPosition: () => (!visual.disposed && visual.group?.visible ? visual.group.position : null),
       });
     }
     const parkedAircraft = this.currentAirport?.parked?.group ? [this.currentAirport.parked.group] : [];
