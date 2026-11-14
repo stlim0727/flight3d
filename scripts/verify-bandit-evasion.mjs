@@ -29,6 +29,9 @@ await withBrowserSession({ width: 1440, height: 900 }, async ({
 
   const scene = await evaluate(async () => {
     const s = window.simulator;
+    // This is a controlled-pose check: stop scheduling normal scene frames
+    // while advancing bounded physics samples and rendering explicit snapshots.
+    s.animate = () => {};
     s.demoDirector.stop();
     s.gameFlow.enterFlight();
     s.integratePhysics = () => {};
@@ -85,20 +88,32 @@ await withBrowserSession({ width: 1440, height: 900 }, async ({
   await delay(500); // Allow exterior assets to settle before the screenshot.
   await evaluate('window.banditEvasionProbe.frame()');
   await screenshot(path.join(dir, 'bandit-evade.png'));
+  console.log('Rendered evasion pose passed', JSON.stringify(scene));
 
+  await evaluate('window.banditEvasionProbe.combat.missiles.length = 0');
+  // Bound each CDP evaluation; a long simulation must not monopolize the page.
+  for (let i = 0; i < 11; i++) {
+    await evaluate(() => {
+      for (let j = 0; j < 10 * 120; j++) window.banditEvasionProbe.target.update(1 / 120);
+    });
+  }
   const recovery = await evaluate(() => {
-    const { target, combat, frame } = window.banditEvasionProbe;
-    combat.missiles.length = 0;
-    // Follow the same physical pilot through memory expiry and orbit recovery.
-    for (let i = 0; i < 110 * 120; i++) target.update(1 / 120);
-    frame();
+    const { target } = window.banditEvasionProbe;
     return { phase: target.threatResponse.phase, weight: target.threatResponse.weight,
       altitudeM: target.position.y, alive: target.alive };
   });
   assert.equal(recovery.phase, 'patrol');
   assert.ok(recovery.alive && recovery.weight < 0.01);
+  console.log('Physical patrol recovery passed', JSON.stringify(recovery));
+  await evaluate('window.banditEvasionProbe.frame()');
   await screenshot(path.join(dir, 'bandit-recovered.png'));
 
+  // Rendered-scene assertions are complete. Run the bounded numerical matrix
+  // in a lightweight same-origin page so scene rendering cannot stall CDP.
+  await send('Page.navigate', { url: `${origin}/scripts/lib/banditEvasionScenario.mjs` });
+  await send('Page.bringToFront');
+  await delay(200);
+  console.log('Rendered evasion/recovery passed; running isolated numerical comparisons');
   const comparison = await evaluate(async () => {
     const { compareBanditEngagements } = await import('/scripts/lib/banditEvasionScenario.mjs');
     return compareBanditEngagements();
@@ -106,8 +121,21 @@ await withBrowserSession({ width: 1440, height: 900 }, async ({
   assert.equal(comparison.length, 18);
   assert.ok(comparison.some(r => r.evasion && r.reactionSeconds !== null));
   assert.ok(comparison.every(r => Number.isFinite(r.minSampledSeparationM)));
+  const energy = await evaluate(async () => {
+    const { compareMissileEnergyEnvelope, measureMissileCoast } = await import('/scripts/lib/banditEvasionScenario.mjs');
+    return { ...measureMissileCoast(), envelope: compareMissileEnergyEnvelope() };
+  });
+  assert.ok(energy.turnSpeedMps < energy.straightSpeedMps - 40, 'maneuver energy loss in browser');
+  assert.ok(energy.thinDeliveredMps2 <= energy.thinAvailableMps2, 'current aerodynamic authority');
+  assert.equal(energy.envelope.length, 24);
+  assert.ok(energy.envelope.some(r => r.terminal === 'hit'));
+  assert.ok(energy.envelope.some(r => r.terminal === 'miss-expired'));
+  assert.ok(energy.envelope.some(r => r.controlLimitedSeconds > 0.5));
   assert.deepEqual(exceptions, [], 'no browser runtime exceptions');
-  const report = { gpu, scene, recovery, comparison, exceptions };
+  const report = { gpu, scene, recovery, comparison, energy, exceptions };
   writeFileSync(path.join(dir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
-  console.log(JSON.stringify({ scene, recovery, cases: comparison.length, artifacts: dir }, null, 2));
+  console.log(JSON.stringify({ scene, recovery, cases: comparison.length,
+    energy: { straightSpeedMps: energy.straightSpeedMps, turnSpeedMps: energy.turnSpeedMps,
+      envelopeCases: energy.envelope.length,
+      envelopeHits: energy.envelope.filter(r => r.terminal === 'hit').length }, artifacts: dir }, null, 2));
 });

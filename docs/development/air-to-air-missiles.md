@@ -77,6 +77,10 @@ F-16 flight dynamics. See [bandit evasion](bandit-evasion.md) for detection/reac
 assumptions, non-evasive comparison controls, actual outcomes and verification.
 This does not complete S3-2/S3-3 sensor/hostile-engagement work or S4 countermeasures.
 
+Missile control now uses pressure-limited aerodynamic authority, actuator-response
+memory and delivered-force maneuver drag. See [missile energy](missile-energy.md)
+for assumptions, integration invariants and launch-envelope comparisons.
+
 | Action | Keyboard | Touch |
 | --- | --- | --- |
 | Fire the next loaded missile | `Enter` | `FIRE MSL` |
@@ -100,7 +104,7 @@ reloads every rail.
   the airframe instead of trailing into it.
 - `src/weapons/AirToAirMissileSystem.js` — pure combat state: seeker lock
   integration, 120 Hz rocket mass/thrust, atmospheric drag, gravity, seeker
-  gimbal limit, TPN guidance and closest-approach proximity fuse. It owns the
+  gimbal limit, pressure-limited projected PN and closest-approach proximity fuse. It owns the
   cannon step and the shared damage/respawn path. Bandit targets patrol
   a commanded circular route and respawn 8 s after a kill or terrain impact.
 - `src/weapons/VulcanCannon.js` — 510-round M61A1 state: 100 rounds/s,

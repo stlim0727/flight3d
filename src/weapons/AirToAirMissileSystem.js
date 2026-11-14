@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { BanditThreatResponse } from './BanditThreatResponse.js';
+import { MissileFlightModel } from './MissileFlightModel.js';
 import { BanditFlightModel } from './BanditFlightModel.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { RWRSystem } from '../systems/RWRSystem.js';
@@ -7,7 +8,6 @@ import { addDamage, blastDamage, combatDamageState } from '../physics/combatDama
 import { VulcanCannon } from './VulcanCannon.js';
 import { F16_MISSILE_STATIONS, MISSILE_TYPES } from './missileSpecs.js';
 
-const GRAVITY = 9.80665;
 const LOCK_SECONDS = 0.75;
 const UNLOCK_SECONDS = 0.9;
 const BANDIT_RESPAWN_SECONDS = 8;
@@ -104,8 +104,8 @@ export class BanditTarget {
 }
 
 /**
- * F-16 air-to-air combat: six rail stations, seeker lock progression, 3D true
- * proportional navigation, continuous rocket mass/thrust and a proximity fuse.
+ * F-16 air-to-air combat: six rail stations, seeker lock progression, projected
+ * PN requests, pressure-limited missile dynamics and a proximity fuse.
  * The system advances at a fixed 120 Hz irrespective of render rate.
  */
 export class AirToAirMissileSystem {
@@ -138,7 +138,6 @@ export class AirToAirMissileSystem {
     this._forward = new THREE.Vector3();
     this._right = new THREE.Vector3();
     this._up = new THREE.Vector3();
-    this._accel = new THREE.Vector3();
     this._los = new THREE.Vector3();
     this._rel = new THREE.Vector3();
     this._omega = new THREE.Vector3();
@@ -315,6 +314,7 @@ export class AirToAirMissileSystem {
       target,
       targetIsPlayer: false,
       source: 'player',
+      flight: new MissileFlightModel(),
       propellant: 1,
       age: 0,
       alive: true,
@@ -463,34 +463,23 @@ export class AirToAirMissileSystem {
     const spec = missile.spec;
     missile.prevPosition.copy(missile.position);
     missile.age += dt;
-    const speed = missile.velocity.length();
     const mass = spec.dryMassKg + spec.propellantMassKg * missile.propellant;
-    this._accel.set(0, -GRAVITY, 0);
-
+    let thrustN = 0;
     if (missile.propellant > 0) {
       missile.propellant = Math.max(0, missile.propellant - dt / spec.burnSeconds);
       const taper = THREE.MathUtils.clamp(missile.propellant / 0.06, 0, 1);
-      if (speed > 1e-3) this._dir.copy(missile.velocity).divideScalar(speed);
-      else this._dir.copy(FORWARD).applyQuaternion(missile.quaternion);
-      this._accel.addScaledVector(this._dir, spec.maxThrustN * taper / mass);
-    }
-
-    if (speed > 1e-3) {
-      const density = Atmosphere.getConditions(missile.position.y).density;
-      const dragAccel = 0.5 * density * speed * speed * spec.dragCoefficient * spec.crossSectionM2 / mass;
-      this._accel.addScaledVector(missile.velocity, -dragAccel / speed);
+      thrustN = spec.maxThrustN * taper;
     }
 
     if (!missile.target?.alive) this._acquireTarget(missile);
     const target = missile.target;
-    if (target?.alive) this._applyGuidance(missile, target, spec, dt);
-
-    missile.velocity.addScaledVector(this._accel, dt);
-    missile.position.addScaledVector(missile.velocity, dt);
-    if (missile.velocity.lengthSq() > 1e-6) {
-      this._dir.copy(missile.velocity).normalize();
-      missile.quaternion.setFromUnitVectors(FORWARD, this._dir);
-    }
+    this._lateral.set(0, 0, 0);
+    const tracking = target?.alive ? this._applyGuidance(missile, target, spec) : false;
+    missile.flight.step(dt, missile, {
+      massKg: mass, thrustN,
+      density: Atmosphere.getConditions(missile.position.y).density,
+      command: this._lateral, tracking,
+    });
 
     if (target?.alive) {
       const distance = this._closestApproach(missile, target);
@@ -538,32 +527,30 @@ export class AirToAirMissileSystem {
     missile.target = best;
   }
 
-  _applyGuidance(missile, target, spec, dt) {
-    void dt;
+  _applyGuidance(missile, target, spec) {
     this._los.copy(target.position).sub(missile.position);
     const rangeSq = this._los.lengthSq();
-    if (rangeSq < 1) return;
+    if (rangeSq < 1) return false;
     const range = Math.sqrt(rangeSq);
     const speed = missile.velocity.length();
-    if (speed < 1e-3) return;
+    if (speed < 1e-3) return false;
 
     // Seeker gimbal limit: the body must keep the line of sight inside its
-    // field of regard. Loss of lock leaves the missile ballistic.
+    // field of regard. Invalid tracking stops new commands; the actuator unloads.
     this._dir.copy(missile.velocity).divideScalar(speed);
     this._rhat.copy(this._los).divideScalar(range);
     if (Math.acos(THREE.MathUtils.clamp(this._dir.dot(this._rhat), -1, 1)) >
-        THREE.MathUtils.degToRad(spec.gimbalDeg)) return;
+        THREE.MathUtils.degToRad(spec.gimbalDeg)) return false;
 
     this._rel.copy(target.velocity).sub(missile.velocity);
     const closing = -this._los.dot(this._rel) / range;
-    if (closing <= 0) return;
+    if (closing <= 0) return false;
 
-    // True proportional navigation: a = N' * Vc * (Omega_LOS x r_hat).
+    // LOS-normal PN request. The flight model projects onto the velocity-normal
+    // plane, applies actuator lag/authority and charges the delivered maneuver drag.
     this._omega.crossVectors(this._los, this._rel).divideScalar(rangeSq);
     this._lateral.crossVectors(this._omega, this._rhat).multiplyScalar(spec.navigationConstant * closing);
-    const maxAccel = spec.maxLateralG * GRAVITY;
-    if (this._lateral.lengthSq() > maxAccel * maxAccel) this._lateral.setLength(maxAccel);
-    this._accel.add(this._lateral);
+    return true;
   }
 
   _closestApproach(missile, target) {

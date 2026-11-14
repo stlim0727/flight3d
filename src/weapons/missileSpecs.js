@@ -16,6 +16,11 @@ export const MISSILE_TYPES = {
     maxThrustN: 9000,
     dragCoefficient: 0.32,
     maxLateralG: 35,
+    // Frontal-area coefficients and response lag: simulation assumptions,
+    // not source-confirmed AIM-9X aerodynamic or actuator specifications.
+    maxLiftCoefficient: 12,
+    inducedDragFactor: 0.025,
+    autopilotTimeConstantS: 0.12,
     seekerFovDeg: 28,
     seekerRangeM: 8500,
     gimbalDeg: 65,
@@ -35,6 +40,10 @@ export const MISSILE_TYPES = {
     maxThrustN: 16000,
     dragCoefficient: 0.28,
     maxLateralG: 35,
+    // Same bounded aerodynamic approximation; no manufacturer calibration.
+    maxLiftCoefficient: 12,
+    inducedDragFactor: 0.025,
+    autopilotTimeConstantS: 0.12,
     seekerFovDeg: 28,
     seekerRangeM: 8500,
     gimbalDeg: 65,
