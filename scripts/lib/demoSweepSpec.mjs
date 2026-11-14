@@ -13,6 +13,9 @@
  * than intent (bank, speed, G, warning frequency) is measured into
  * `scripts/demo-sweep-baseline.json` instead of being declared here.
  *
+ * Neon Metropolis routes fly the urban wind field the lobby installs there (#696); the
+ * still-air control is `tests/neonDemos.test.js`, headless with tower collision.
+ *
  * The Neon Metropolis bridge flight is deliberately absent: `DemoFlightDirector.start()`
  * returns false there because it is flown by hand, not an autonomous demo, so there is
  * no choreography for the sweep to fast-play. It is covered by
@@ -28,6 +31,7 @@ import { F16LuklaScenario } from '../../src/director/scenarios/F16LuklaScenario.
 import { F16CanyonSlalomScenario } from '../../src/director/scenarios/F16CanyonSlalomScenario.js';
 import { F16CanyonChaseScenario } from '../../src/director/scenarios/F16CanyonChaseScenario.js';
 import { SihwaTourScenario } from '../../src/director/scenarios/SihwaTourScenario.js';
+import { NeonDepartureScenario } from '../../src/director/scenarios/NeonDepartureScenario.js';
 import { demoProfiles } from '../../src/director/demoProfiles.js';
 import { AIRCRAFT_REGISTRY } from '../../src/config/aircraftConfigs.js';
 import { SPAWN_SCENARIOS } from '../../src/config/scenarioRegistry.js';
@@ -43,6 +47,7 @@ export const SCENARIO_STAGES = {
   f16Slalom: F16CanyonSlalomScenario.STAGES,
   f16Canyon: F16CanyonChaseScenario.STAGES,
   sihwa: SihwaTourScenario.STAGES,
+  neonDeparture: NeonDepartureScenario.STAGES,
 };
 
 /** Derived from the app's own registries so the sweep cannot quietly fall behind. */
@@ -148,6 +153,33 @@ export const ROUTES = [
     stages: ['ESTABLISH', 'LEFT_TURN', 'RIGHT_TURN', 'WINGOVER', 'RECOVER', 'COMPLETED'],
     groundStages: [], lands: false, handoff: 'airborne', budgetSimSeconds: 200,
     clearanceIntentM: 25, allowedWarnings: ['bank'], shotStage: 'WINGOVER',
+  },
+  {
+    id: 'c172-neon-scenic', aircraft: 'C172', airport: 'neon', profile: 'scenic',
+    tier: 'full', scenario: 'cessna',
+    stages: ['ESTABLISH', 'LOW_PASS', 'CLIMB', 'RECOVER', 'COMPLETED'],
+    groundStages: [], lands: false, handoff: 'airborne', budgetSimSeconds: 200,
+    // A street pass at 50 m between towers; the towers themselves are collision-checked.
+    clearanceIntentM: 25, allowedWarnings: [], shotStage: 'LOW_PASS',
+  },
+  {
+    id: 'c172-neon-maneuvers', aircraft: 'C172', airport: 'neon', profile: 'maneuvers',
+    tier: 'full', scenario: 'cessna',
+    stages: ['ESTABLISH', 'LEFT_TURN', 'RIGHT_TURN', 'WINGOVER', 'RECOVER', 'COMPLETED'],
+    groundStages: [], lands: false, handoff: 'airborne', budgetSimSeconds: 200,
+    clearanceIntentM: 25, allowedWarnings: ['bank'], shotStage: 'WINGOVER',
+  },
+  {
+    id: 'b738-neon-departure', aircraft: 'B738', airport: 'neon', profile: 'neon-departure',
+    tier: 'full', scenario: 'neonDeparture',
+    stages: ['LINEUP', 'TAKEOFF', 'CANYON_CLIMB', 'SKYLINE', 'COMPLETED'],
+    groundStages: ['LINEUP', 'TAKEOFF'], lands: false, handoff: 'airborne', budgetSimSeconds: 200,
+    clearanceIntentM: 0,
+    // Both from the warning model, not the flight: the predictive check sees less than
+    // 10 m ahead for the first seconds after liftoff (as on the coastal departure), and
+    // the radio altitude steps 14 m up where the climb crosses the canal's east bank
+    // (water -14 m to street 0 m), which reads as terrain closure. The baseline caps both.
+    allowedWarnings: ['gear', 'flaps', 'takeoff-config', 'pull-up', 'terrain'], shotStage: 'CANYON_CLIMB',
   },
   {
     id: 'c172-incheon-tour', aircraft: 'C172', airport: 'incheon', profile: 'incheon-tour',

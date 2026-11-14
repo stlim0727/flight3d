@@ -10,6 +10,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { demoProfiles } from '../src/director/demoProfiles.js';
 
 const cdp = process.env.CDP_URL || 'http://127.0.0.1:9441';
 const url = process.env.SIM_URL || 'http://127.0.0.1:5173';
@@ -151,9 +152,11 @@ try {
     }
   }
 
-  // 2. Neon demos fly the same environment wind (C172 city routes, B738 classic). The
-  // still-air control removes the field after every preset the demo itself applies.
-  for (const [aircraft, profile, windOn] of PARTS.has('demo') ? [['C172', 'proximity'], ['C172', 'scenic'], ['C172', 'maneuvers'], ['B738', 'classic']]
+  // 2. Every demo the lobby offers at Neon flies the same environment wind (C172 city
+  // pass and manoeuvres, B738 departure). The still-air control removes the field after
+  // every preset the demo itself applies.
+  const neonDemos = ['C172', 'B738', 'F16'].flatMap(a => demoProfiles(a, 'neon').map(p => [a, p.id]));
+  for (const [aircraft, profile, windOn] of PARTS.has('demo') ? neonDemos
     .flatMap(([a, p]) => [[a, p, true], [a, p, false]]) : []) {
     const armed = await evaluate(async (aircraft, profile, windOn) => {
       const s = window.simulator, d = s.demoDirector;
@@ -326,21 +329,16 @@ for (const r of report.takeoff) {
   assert.ok(r.liftoffS !== null, `${r.aircraft} lifted off (wind ${r.wind})`);
   assert.ok(r.parkedDrift < 0.5, `${r.aircraft} parked drift ${r.parkedDrift} m`);
 }
-// Known before any Neon wind (origin/main 359813e, still air): the C172 city route and
-// the B738 classic demo (the coastal choreography flown at Neon) hit a tower. They are
-// reported, not asserted; the demo sweep does not cover Neon.
-const KNOWN_DEMO_FAULTS = new Set(['C172/scenic', 'B738/classic']);
+// The C172 city pass and the B738 demo used to hit towers here (#697); every Neon demo
+// now has to complete in both conditions without a crash or gear damage.
+if (PARTS.has('demo')) assert.ok(report.demos.length >= 6, `Neon demos flown: ${report.demos.length}`);
 for (const d of report.demos) {
   const id = `${d.aircraft}/${d.profile}`;
   assert.ok(d.armed.started, `${id} demo started`);
+  assert.equal(d.armed.profile, d.profile, `${id} demo profile`);
   assert.equal(Boolean(d.armed.wind?.urban), d.wind, `${id} demo wind ${d.wind}`);
-  if (KNOWN_DEMO_FAULTS.has(id)) {
-    if (d.result?.status !== 'completed') {
-      console.log(`known demo fault ${id} (wind ${d.wind}): ${d.crash ?? d.result?.reason ?? d.result?.status} at ${d.simSeconds} s`);
-    }
-    continue;
-  }
   assert.equal(d.crashed, false, `${id} demo crashed (wind ${d.wind}): ${d.crash}`);
+  assert.ok(d.gear.every(state => state === 'normal'), `${id} gear ${d.gear} (wind ${d.wind})`);
   // A scenario can stop itself as failed without a crash (stage timeout, invalid
   // command), and a demo still active at the step limit has not finished either.
   assert.equal(d.active, false, `${id} demo still active at ${d.simSeconds} s (wind ${d.wind})`);

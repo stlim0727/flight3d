@@ -27,19 +27,66 @@ export function buildingClearance(start, direction, length, altitude, buildings)
   return clearance;
 }
 
-/** Choose a straight, flyable corridor through the actual generated city, never move buildings. */
-export function cityRoute(terrain, buildings) {
+/**
+ * The buildings the collision detector actually tests. At Neon this is the Neon city,
+ * while `sim.foliage` still holds the hidden coastal city, so planning against
+ * `sim.foliage` there routes through towers it cannot see.
+ */
+export function collisionBuildings(sim) {
+  // Lukla and Incheon index no city buildings, so an environment without them is empty.
+  if (sim.collisionDetector) return sim.collisionDetector.foliage?.buildingData ?? [];
+  return sim.foliage?.buildingData ?? [];
+}
+
+// Corridor search centres. The coastal city sits around (2800, 1400); Neon's street grid
+// spans the island (x 150..4000), so three east-west bands cover it within the
+// +/-350 m offset sweep.
+export const CITY_ROUTE_CENTERS = Object.freeze({
+  default: Object.freeze([Object.freeze({ x: 2800, z: 1400 })]),
+  neon: Object.freeze([-400, 0, 400].map(z => Object.freeze({ x: 2075, z }))),
+});
+
+// After the pass the demo climbs 170 m on the same line for 30 s and then holds level for
+// 12 s: about 1.9 km at the Cessna's 82-90 kt. The climb is planned at 0.08 m per metre,
+// below the 0.1 m/m it flies, so the planned altitude never runs ahead of the aircraft.
+export const CITY_CLIMB_OUT = Object.freeze({ length: 1900, gradient: 0.08, gain: 170, step: 200 });
+
+/** Clearance beyond `end` along `direction` while the altitude rises with the climb-out. */
+export function climbOutClearance(end, direction, altitude, buildings, climbOut = CITY_CLIMB_OUT) {
+  let clearance = Infinity;
+  for (let from = 0; from < climbOut.length; from += climbOut.step) {
+    const floor = altitude + Math.min(climbOut.gain, from * climbOut.gradient);
+    const to = Math.min(climbOut.length, from + climbOut.step);
+    for (const building of buildings) {
+      if (building.y + building.height < floor - 18) continue;
+      const dx = building.x - end.x, dz = building.z - end.z;
+      const along = clamp(dx * direction.x + dz * direction.z, from, to);
+      const distance = Math.hypot(dx - along * direction.x, dz - along * direction.z);
+      clearance = Math.min(clearance, distance - Math.hypot(building.width, building.depth) / 2);
+    }
+  }
+  return clearance;
+}
+
+/**
+ * Choose a straight, flyable corridor through the actual generated city, never move
+ * buildings. The corridor and the climb-out that follows it must both clear every
+ * building the aircraft could reach.
+ */
+export function cityRoute(terrain, buildings, { centers = CITY_ROUTE_CENTERS.default, climbOut = CITY_CLIMB_OUT } = {}) {
   let best = null;
-  for (let angle = 0; angle < Math.PI; angle += Math.PI / 12) {
+  for (const center of centers) for (let angle = 0; angle < Math.PI; angle += Math.PI / 12) {
     const direction = { x: Math.cos(angle), z: Math.sin(angle) };
     for (let offset = -350; offset <= 350; offset += 70) {
       const length = 1600;
-      const start = { x: 2800 - direction.x * length / 2 - direction.z * offset,
-        z: 1400 - direction.z * length / 2 + direction.x * offset };
+      const start = { x: center.x - direction.x * length / 2 - direction.z * offset,
+        z: center.z - direction.z * length / 2 + direction.x * offset };
       const floor = corridorHeight(terrain, start, direction, length) + 50;
       for (let altitude = floor; altitude <= floor + 150; altitude += 15) {
         const clearance = buildingClearance(start, direction, length, altitude, buildings);
         if (clearance < 40) continue;
+        // The route is flown from the far end back to `start`, then climbs out past it.
+        if (climbOut && climbOutClearance(start, { x: -direction.x, z: -direction.z }, altitude, buildings, climbOut) < 40) continue;
         let left = 0, right = 0;
         const neighbors = buildings.filter(b => {
           const along = (b.x - start.x) * direction.x + (b.z - start.z) * direction.z;

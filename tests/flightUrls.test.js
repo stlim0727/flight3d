@@ -18,7 +18,8 @@ test('invalid values and unsupported combinations resolve safely', () => {
 });
 test('every listed combination round trips without substitution', () => {
   const rows = flightCombinations();
-  assert.equal(rows.length, 52);
+  // Includes the Neon B738 and C172 demos (#697); the F16 has no Neon demo.
+  assert.equal(rows.length, 54);
   assert.equal(new Set(rows.map(row => flightUrl(row))).size, rows.length);
   for (const row of rows) {
     const url = new URL(flightUrl(row));

@@ -105,6 +105,9 @@ function findChrome() {
 
 /** The real GPU when this account may open it, SwiftShader when it may not. */
 function gpuFlags() {
+  // Windows has no render node to probe; its hardware path is ANGLE on Direct3D 11
+  // (docs/development/browser-gpu.md). Software still needs an explicit FORCE_GPU=0.
+  if (process.platform === 'win32' && process.env.FORCE_GPU !== '0') return ['--use-gl=angle', '--use-angle=d3d11'];
   const device = '/dev/dri/renderD128';
   let usable = false;
   try { fs.accessSync(device, fs.constants.W_OK); usable = true; } catch { /* container without a render node */ }

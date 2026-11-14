@@ -183,6 +183,32 @@ The wind changes how B738 classic fails: its takeoff roll holds the rudder at ze
 the 2.4 m/s crosswind weathervanes it off the runway before it reaches the tower. The
 C172 city route completing in wind is incidental, not a fix.
 
+Both faults are fixed in the demo choreography, with no physics, wind or preset change:
+
+- The C172 city route was planned against `sim.foliage`, which at Neon is the hidden
+  coastal city, and searched around the coastal city centre. It now plans against the
+  collision detector's buildings over the Neon street grid and requires the climb-out
+  after the pass to clear every tower; the climb and recovery track the route line.
+  The pass is the ew-540 avenue westbound at 50 m, out over the western sea.
+- The B738 no longer flies the coastal choreography at Neon. Its Neon demo is a runway
+  09 departure that steers the takeoff roll onto the centreline (rudder and nosewheel
+  share the pedal input, with yaw-rate damping), tracks the canyon line by ground
+  track through the city, and hands over at 760 m over the eastern sea.
+- The Neon lobby now offers the demo; the C172 proximity montage stays coastal only.
+
+Hardware Chrome, `verify-neon-urban-wind.mjs` (`PARTS=demo`), same browser and GPU as
+above:
+
+| Demo | Urban wind | Still air |
+|---|---|---|
+| C172 `scenic` (ew-540 pass) | completes, 77.3 s, max roll 5.6 deg, min AGL 50 m | completes, 77.3 s, roll 0 |
+| C172 `maneuvers` | completes, 75.3 s, min AGL 548 m | completes, 75.3 s |
+| B738 `neon-departure` | completes, 115 s, liftoff x -227, centreline within 2.2 m on the roll and 2.4 m in the climb | completes, 115 s, on the line |
+
+All gear normal, no crash. `tests/neonDemos.test.js` flies the same six in the
+headless physics with the Neon towers in the collision detector, and the demo sweep
+covers the three Neon routes in the urban wind.
+
 ### Cost
 
 Headless, wind's three samples per tick: p50 0.005-0.008 ms, p95 0.009-0.017 ms across

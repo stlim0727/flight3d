@@ -4,7 +4,7 @@ import { Atmosphere } from '../../physics/Atmosphere.js';
 import { TRIM_WHEEL_AUTHORITY } from '../../physics/trimWheel.js';
 import { CameraSystem } from '../../cameras/CameraSystem.js';
 import { flyBank, alphaGuarded } from '../PilotControlLaws.js';
-import { cityRoute, canyonRoute } from './cessnaRoutes.js';
+import { cityRoute, canyonRoute, collisionBuildings, CITY_ROUTE_CENTERS } from './cessnaRoutes.js';
 
 const clamp = THREE.MathUtils.clamp;
 const STAGES = { IDLE: -1, ESTABLISH: 20, LOW_PASS: 21, CLIMB: 22, LEFT_TURN: 23, RIGHT_TURN: 24, WINGOVER: 25, RECOVER: 26, COMPLETED: 27 };
@@ -25,12 +25,15 @@ export class CessnaDemoScenario {
       this.result = { status: 'running', minClearanceM: Infinity, maxBankDeg: 0 };
       // Reset damage, fuel, control histories and timing through the normal preset lifecycle.
       sim.setPreset('cruise', true);
-      this.route = this.director.activeDemoAirport === 'lukla'
-        ? canyonRoute(sim.currentTerrain) : cityRoute(sim.currentTerrain, sim.foliage.buildingData);
+      const airport = this.director.activeDemoAirport;
+      this.route = airport === 'lukla' ? canyonRoute(sim.currentTerrain)
+        : cityRoute(sim.currentTerrain, collisionBuildings(sim), { centers: CITY_ROUTE_CENTERS[airport] ?? CITY_ROUTE_CENTERS.default });
       const { start, direction, altitude } = this.route;
       this.heading = Math.atan2(direction.x, -direction.z) * 180 / Math.PI;
       this.maneuvers = this.director.profile === 'maneuvers';
-      this.baseAltitude = altitude + (this.maneuvers ? 400 : 0);
+      // Manoeuvres turn freely off the route line, so they stay 100 m above every roof.
+      const skyline = collisionBuildings(sim).reduce((top, b) => Math.max(top, b.y + b.height), -Infinity);
+      this.baseAltitude = this.maneuvers ? Math.max(altitude + 400, skyline + 100) : altitude;
       sim.position.set(start.x, this.baseAltitude, start.z);
       const density = Atmosphere.getConditions(sim.position.y).densityRatio;
       const speed = 90 * 0.514444 / Math.sqrt(density);
@@ -100,6 +103,13 @@ export class CessnaDemoScenario {
     flyBank(this.sim, clamp(difference * 1.2, -maxBank, maxBank), tel);
   }
 
+  /** Bank toward the route line extended past its end, so wind cannot drift the climb-out off the planned clearance. */
+  trackRouteLine(maxBank) {
+    const { start, direction } = this.route;
+    const cross = (this.sim.position.x - start.x) * -direction.z + (this.sim.position.z - start.z) * direction.x;
+    this.holdHeading(this.heading - Math.atan2(cross, 250) * 180 / Math.PI, maxBank);
+  }
+
   update(dt) {
     const sim = this.sim, tel = sim.telemetry;
     const stage = this.director.currentStage, time = this.director.stageTimer;
@@ -114,15 +124,14 @@ export class CessnaDemoScenario {
 
     if (stage === STAGES.ESTABLISH || stage === STAGES.LOW_PASS) {
       const { start, direction, length } = this.route;
-      const dx = sim.position.x - start.x, dz = sim.position.z - start.z;
-      const cross = dx * -direction.z + dz * direction.x;
-      const along = dx * direction.x + dz * direction.z;
-      this.holdHeading(this.heading - Math.atan2(cross, 250) * 180 / Math.PI, 20);
+      const along = (sim.position.x - start.x) * direction.x + (sim.position.z - start.z) * direction.z;
+      this.trackRouteLine(20);
       if (stage === STAGES.ESTABLISH && time >= 7) this.director.setStage(this.maneuvers ? STAGES.LEFT_TURN : STAGES.LOW_PASS);
       if (stage === STAGES.LOW_PASS && along >= length) this.director.setStage(STAGES.CLIMB);
     } else if (stage === STAGES.CLIMB) {
       altitude = this.climbAltitude;
-      this.holdHeading(this.director.activeDemoAirport === 'lukla' ? this.heading - 180 : this.heading, 35);
+      if (this.director.activeDemoAirport === 'lukla') this.holdHeading(this.heading - 180, 35);
+      else this.trackRouteLine(35);
       speed = 85;
       if (time >= 30) this.director.setStage(STAGES.RECOVER);
     } else if (stage === STAGES.LEFT_TURN || stage === STAGES.RIGHT_TURN) {
@@ -142,7 +151,9 @@ export class CessnaDemoScenario {
       if (time >= 24) this.director.setStage(STAGES.RECOVER);
     } else if (stage === STAGES.RECOVER) {
       altitude = this.recoveryAltitude;
-      this.holdHeading(this.recoveryHeading, 15);
+      // The city climb-out was planned along the route line; manoeuvres recover on their heading.
+      if (this.maneuvers || this.director.activeDemoAirport === 'lukla') this.holdHeading(this.recoveryHeading, 15);
+      else this.trackRouteLine(15);
       if (time >= 12) this.director.setStage(STAGES.COMPLETED);
     }
     if (!this.director.isActive) return;
