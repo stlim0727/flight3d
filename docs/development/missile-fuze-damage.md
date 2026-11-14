@@ -38,3 +38,10 @@ Bandit and countermeasure tests cover integration. The previous sensor-denial
 case now records a survivable proximity burst rather than assuming all fuze-range
 bursts kill. Full human-flown scene, player damage and realistic lethality remain
 unverified.
+
+Verification on 2026-11-14: focused Node tests, `npm run check` and `npm run
+build` passed. Hardware Chrome 156 / Intel ADL-N Vulkan passed WebGL2 shader
+pixel `[255, 0, 0, 255]` with GL error 0, existing terrain/IR seeker scenarios
+and missile mesh drawing. A browser probe checked one explosion and simultaneous
+multi-target positions and damage; it did not validate the complete game scene
+or explosion effects. Logs and the probe are in the task worktree `.cache/fuze/`.
