@@ -48,7 +48,8 @@ test('combat advances one cloud per confirmed threat, clears it on reset, and re
   const { AirToAirMissileSystem, BanditTarget } = await import('../src/weapons/AirToAirMissileSystem.js');
   const system = new AirToAirMissileSystem();
   const bandit = new BanditTarget({ callsign: 'TEST', position: new Vector3(0, 3000, -5000) });
-  bandit.update = () => { bandit.threatResponse.confirmedId = 7; };
+  let threatId = 7;
+  bandit.update = () => { bandit.threatResponse.confirmedId = threatId; };
   system.addTarget(bandit);
   const activeWorld = { ...world, active: true, onGround: false, position: observer.position,
     quaternion: observer.quaternion, velocity: new Vector3() };
@@ -58,7 +59,14 @@ test('combat advances one cloud per confirmed threat, clears it on reset, and re
   system.update(1 / 60, activeWorld);
   assert.equal(system.chaffClouds.length, 1);
   assert.ok(system.chaffClouds[0].age > 0);
+  threatId = 8; system.update(1 / 60, activeWorld);
+  assert.equal(bandit.chaff.remaining, CHAFF_MODEL.capacity - 2);
+  threatId = 7; system.update(1 / 60, activeWorld);
+  assert.equal(bandit.chaff.remaining, CHAFF_MODEL.capacity - 2, 'returning to A does not dispense twice');
+  assert.equal(system.chaffClouds.length, 2);
   bandit.respawn(new Vector3(0, 3000, -5000), null);
   assert.equal(bandit.chaff.remaining, CHAFF_MODEL.capacity);
+  system.update(1 / 60, activeWorld);
+  assert.equal(bandit.chaff.remaining, CHAFF_MODEL.capacity - 1, 'respawn starts a new threat history');
   system.reset(); assert.equal(system.chaffClouds.length, 0);
 });

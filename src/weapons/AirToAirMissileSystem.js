@@ -56,7 +56,7 @@ export class BanditTarget {
     this.infraredAfterburnerLevel = 0;
     this.threatResponse = new BanditThreatResponse(evasion);
     this.chaff = new ChaffDispenser();
-    this.chaffThreatId = null;
+    this.chaffThreatIds = new Set();
     this.flight = null;
     this.quaternion = null;
     if (orbit) this.respawn(position, orbit);
@@ -120,7 +120,7 @@ export class BanditTarget {
     this.lastHitZone = null;
     this.threatResponse.reset();
     this.chaff.reset();
-    this.chaffThreatId = null;
+    this.chaffThreatIds.clear();
     const o = orbit;
     if (o) {
       const tangential = o.radius * o.omega;
@@ -445,10 +445,12 @@ export class AirToAirMissileSystem {
     for (const target of this.targets) {
       target.update(dt, world.terrainHeight, this.missiles);
       const threatId = target.threatResponse.confirmedId;
-      if (target.alive && threatId !== null && threatId !== target.chaffThreatId) {
-        target.chaffThreatId = threatId;
+      if (target.alive && threatId !== null && !target.chaffThreatIds.has(threatId)) {
         const cloud = target.chaff.dispense(target.position, target.velocity);
-        if (cloud) this.chaffClouds.push(cloud);
+        if (cloud) {
+          target.chaffThreatIds.add(threatId);
+          this.chaffClouds.push(cloud);
+        }
       }
       if (!target.alive) {
         target.respawnTimer -= dt;
