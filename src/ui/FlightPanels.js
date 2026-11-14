@@ -1,7 +1,20 @@
 import { t, bindText, getLanguage, setLanguage } from '../i18n/index.js';
 
+export const CAMERA_MODES = [
+  [1, 'chase'],
+  [6, 'drone'],
+  [4, 'flyby'],
+  [2, 'wing'],
+  [0, 'cockpit'],
+  [8, 'hud'],
+  [3, 'tower'],
+  [5, 'gear'],
+  [7, 'auto'],
+  [9, 'director'],
+];
+
 export function touchLabel(text) {
-  return window.matchMedia('(pointer: coarse)').matches
+  return typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches
     ? text.replace(/\s*\[[^\]]*\]/g, '') : text;
 }
 
@@ -12,7 +25,7 @@ export function commitFlightCamera(select, onSelectCamera) {
 }
 
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
-export function initFlightPanels({ onSelectCamera, onCameraOpen, onCameraClose, onAdjustTrim, onToggleParkingBrake }) {
+export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParkingBrake }) {
   const hud = document.getElementById('hud-overlay');
   // Let keyboard users scroll the full telemetry row as well as touch users.
   const strip = document.querySelector('.hud-strip');
@@ -78,13 +91,23 @@ export function initFlightPanels({ onSelectCamera, onCameraOpen, onCameraClose, 
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
   hud.append(bar);
-  const cameraButton = document.createElement('select');
-  cameraButton.id = 'open-camera';
-  cameraButton.className = 'btn';
-  bindText(cameraButton, () => t('ui.camera.select'), 'aria-label');
-  cameraButton.addEventListener('focus', () => onCameraOpen?.());
-  cameraButton.addEventListener('blur', () => onCameraClose?.());
-  cameraButton.addEventListener('change', () => commitFlightCamera(cameraButton, onSelectCamera));
+  const cameraButtons = CAMERA_MODES.map(([mode, name], index) => {
+    const button = document.createElement('button');
+    button.id = `btn-cam-${name}`;
+    button.className = index === 0 ? 'btn flight-camera-btn flight-camera-start' : 'btn flight-camera-btn';
+    button.type = 'button';
+    button.dataset.cameraMode = String(mode);
+    button.setAttribute('aria-pressed', 'false');
+    bindText(button, () => touchLabel(t(`ui.camera.${name}`)));
+    bindText(button, () => t(`ui.strip.camera.${name}`), 'data-short-label');
+    bindText(button, () => touchLabel(t(`ui.camera.${name}`)), 'aria-label');
+    bindText(button, () => touchLabel(t(`ui.camera.${name}`)), 'title');
+    button.addEventListener('click', () => {
+      onSelectCamera(mode);
+      button.blur();
+    });
+    return button;
+  });
   // Taking over must remain available when the guide is collapsed or yields to
   // warnings. Keep the existing button/handler outside the notification tree.
   const skipDemoButton = document.getElementById('btn-skip-demo');
@@ -140,16 +163,11 @@ export function initFlightPanels({ onSelectCamera, onCameraOpen, onCameraClose, 
   cameraSelect.id = 'camera-select';
   cameraSelect.className = 'btn';
   // Match the quick cycle, then list specialist views and automatic viewing.
-  for (const [mode, name] of [[1, 'chase'], [6, 'drone'], [4, 'flyby'],
-    [2, 'wing'], [0, 'cockpit'], [8, 'hud'], [3, 'tower'], [5, 'gear'], [7, 'auto'], [9, 'director']]) {
+  for (const [mode, name] of CAMERA_MODES) {
     const option = document.createElement('option');
     option.value = String(mode);
     bindText(option, () => touchLabel(t(`ui.camera.${name}`)));
     cameraSelect.append(option);
-    const quickOption = document.createElement('option');
-    quickOption.value = String(mode);
-    bindText(quickOption, () => `CAM · ${touchLabel(t(`ui.camera.${name}`))}`);
-    cameraButton.append(quickOption);
   }
   cameraSelect.addEventListener('change', () => onSelectCamera(Number(cameraSelect.value)));
   cameraLabel.append(caption, cameraSelect);
@@ -163,7 +181,7 @@ export function initFlightPanels({ onSelectCamera, onCameraOpen, onCameraClose, 
   }
   // The row is anchored to the right edge, so the aircraft actions that follow
   // takeover unfold leftwards instead of shifting the primary group.
-  bar.append(skipDemoButton, cameraButton, fullscreen, moreButton);
+  bar.append(skipDemoButton, ...cameraButtons, fullscreen, moreButton);
 
   // Issue #638: the wrapped portrait control row dims while the pilot watches
   // the scene, then returns to full opacity on any pointer, key or focus input.
@@ -279,15 +297,22 @@ export function updateControlState(telemetry, camera, options = {}) {
   const mode = camera.autoSwitch ? 7 : camera.mode;
   const cameraSelect = document.getElementById('camera-select');
   if (cameraSelect) cameraSelect.value = String(mode);
-  const quickCamera = document.getElementById('open-camera');
-  if (quickCamera) quickCamera.value = String(mode);
-  const cameraName = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto', 'hud', 'director'][mode];
-  const viewName = t(`ui.camera.${cameraName}`).replace(/ · [0-9]$/, '');
   // Optical zoom only exists in the fixed eye-point views, so chase and drone
   // framing changes stay unlabelled.
   const zoomed = camera.opticalZoom > 1.01;
   const zoomValue = zoomed ? `${camera.opticalZoom.toFixed(1)}×` : '';
-  quickCamera?.setAttribute('title', t('ui.camera.current', { name: zoomed ? `${viewName} · ${zoomValue}` : viewName }));
+  for (const [camMode, name] of CAMERA_MODES) {
+    const camButton = document.getElementById(`btn-cam-${name}`);
+    if (!camButton) continue;
+    const active = camMode === mode;
+    camButton.setAttribute('aria-pressed', String(active));
+    const fullLabel = touchLabel(t(`ui.camera.${name}`));
+    const viewName = t(`ui.camera.${name}`).replace(/ · [0-9]$/, '');
+    const titleText = active
+      ? t('ui.camera.current', { name: zoomed ? `${viewName} · ${zoomValue}` : viewName })
+      : fullLabel;
+    camButton.setAttribute('title', titleText);
+  }
   const toggle = document.getElementById('btn-touch-toggle');
   toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('touch-mode')));
   const resetPovBtn = document.getElementById('btn-reset-pov');

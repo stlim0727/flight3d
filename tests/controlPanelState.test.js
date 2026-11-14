@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { updateControlState } from '../src/ui/FlightPanels.js';
+import { CAMERA_MODES, updateControlState } from '../src/ui/FlightPanels.js';
 import { setLanguage } from '../src/i18n/index.js';
 
 test('shared controls track deployment, damage, keyboard changes and input mode switches', () => {
   const previous = globalThis.document;
-  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'open-camera', 'camera-select', 'flight-trim-less', 'flight-trim-more', 'flight-park-brake', 'flight-trim-value'];
+  const cameraIds = CAMERA_MODES.map(([, name]) => `btn-cam-${name}`);
+  const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'camera-select', 'flight-trim-less', 'flight-trim-more', 'flight-park-brake', 'flight-trim-value', ...cameraIds];
   const nodes = Object.fromEntries(ids.map(id => [id, { textContent: '', setAttribute(key, value) { this[key] = value; } }]));
   let touch = true;
   globalThis.document = {
@@ -22,19 +23,21 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-gear']['aria-pressed'], 'true');
     assert.equal(nodes['btn-flaps-ret'].disabled, false);
     assert.equal(nodes['camera-select'].value, '0');
-    assert.equal(nodes['open-camera'].value, '0');
-    assert.equal(nodes['open-camera'].title, 'Camera: Cockpit');
+    assert.equal(nodes['btn-cam-cockpit']['aria-pressed'], 'true');
+    assert.equal(nodes['btn-cam-chase']['aria-pressed'], 'false');
+    assert.equal(nodes['btn-cam-cockpit'].title, 'Camera: Cockpit');
     camera.autoSwitch = true;
     updateControlState(telemetry, camera);
-    assert.equal(nodes['open-camera'].value, '7');
+    assert.equal(nodes['btn-cam-auto']['aria-pressed'], 'true');
+    assert.equal(nodes['btn-cam-cockpit']['aria-pressed'], 'false');
     assert.equal(nodes['camera-select'].value, '7');
     camera.autoSwitch = false;
     camera.opticalZoom = 2;
     updateControlState(telemetry, camera);
-    assert.equal(nodes['open-camera'].title, 'Camera: Cockpit · 2.0×');
+    assert.equal(nodes['btn-cam-cockpit'].title, 'Camera: Cockpit · 2.0×');
     camera.opticalZoom = 1;
     updateControlState(telemetry, camera);
-    assert.equal(nodes['open-camera'].title, 'Camera: Cockpit');
+    assert.equal(nodes['btn-cam-cockpit'].title, 'Camera: Cockpit');
     Object.assign(telemetry, { gearState: .5, flapDegree: 12, flapIndex: 6, spoilers: 1, reverserActive: true, engine1: {} });
     camera.autoSwitch = true;
     updateControlState(telemetry, camera);
@@ -44,7 +47,7 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.match(nodes['btn-flaps-ext'].textContent, /12°/);
     assert.equal(nodes['btn-spoilers']['aria-pressed'], 'true');
     assert.equal(nodes['btn-reverser']['aria-pressed'], 'true');
-    assert.equal(nodes['open-camera'].title, 'Camera: Auto');
+    assert.equal(nodes['btn-cam-auto'].title, 'Camera: Auto');
     Object.assign(telemetry, { gearState: 0, gearDamage: { left: 'collapsed' }, flapIndex: 0, spoilers: 0, reverserActive: false, engine1: {} });
     camera.autoSwitch = false;
     camera.mode = 6;
@@ -55,10 +58,12 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-spoilers']['aria-pressed'], 'false');
     assert.equal(nodes['btn-reverser']['aria-pressed'], 'false');
     assert.equal(nodes['btn-touch-toggle']['aria-pressed'], 'false');
-    assert.equal(nodes['open-camera'].title, 'Camera: Drone');
+    assert.equal(nodes['btn-cam-drone']['aria-pressed'], 'true');
+    assert.equal(nodes['btn-cam-drone'].title, 'Camera: Drone');
     camera.mode = 9;
     updateControlState(telemetry, camera);
-    assert.equal(nodes['open-camera'].title, 'Camera: Director');
+    assert.equal(nodes['btn-cam-director']['aria-pressed'], 'true');
+    assert.equal(nodes['btn-cam-director'].title, 'Camera: Director');
     assert.equal(nodes['camera-select'].value, '9');
     delete telemetry.gearDamage;
     telemetry.gearState = 1;
