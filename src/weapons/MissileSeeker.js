@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { infraredSignalQuality } from './InfraredSignal.js';
+import { radarSignalQuality } from './RadarSignal.js';
 
 /** Height-field LOS at <=150 m spacing; narrow ridges, buildings and clouds
  * are outside this bounded model. Missing terrain means a clear-space fixture.
@@ -26,10 +27,11 @@ export function seekerCanObserve(spec, observer, target, world, halfAngleDeg = s
     }
   }
   // Explicit callbacks override the default channel model for controlled sensor
-  // fixtures/extensions. Radar remains ideal; IR uses the physical emitter state.
+  // fixtures/extensions. Default channels use their respective signal models.
   const quality = world?.seekerSignalQuality
     ? world.seekerSignalQuality({ type: spec.seekerType, observer, target, rangeM: range })
-    : spec.seekerType === 'IR' ? infraredSignalQuality(observer, target, range) : 1;
+    : spec.seekerType === 'IR' ? infraredSignalQuality(observer, target, range)
+      : spec.seekerType === 'ACTIVE_RADAR' ? radarSignalQuality(observer, target, range, world) : 0;
   return Number.isFinite(quality) && quality >= spec.seekerMinSignalQuality;
 }
 
