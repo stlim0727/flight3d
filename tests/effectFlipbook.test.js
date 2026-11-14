@@ -145,3 +145,37 @@ test('persistent wreckage maintains smoke and water foam for 30 seconds across c
     ExplosionSystem.prototype.createSparkTexture = original;
   }
 });
+
+test('exaggerated air explosions spawn comet-like flame tails within budgets and clear cleanly', () => {
+  const original = ExplosionSystem.prototype.createSparkTexture;
+  ExplosionSystem.prototype.createSparkTexture = () => new THREE.Texture();
+  let system;
+  try {
+    system = new ExplosionSystem(new THREE.Scene());
+    // Water must never emit comet debris
+    system.spawnExplosion({ type: 'WATER', point: new THREE.Vector3(0, 0, 0) }, new THREE.Vector3(100, -30, 0), { exaggerated: true });
+    assert.equal(system.cometDebris.length, 0);
+    assert.equal(system.cometTailParticles.length, 0);
+    system.clear();
+
+    // Exaggerated AIR detonation spawns 3D shockwave + comet debris that shed flame & smoke tails
+    system.spawnExplosion({ type: 'AIR', point: new THREE.Vector3(0, 1000, 0) }, new THREE.Vector3(0, 0, -220), { exaggerated: true, intensity: 1.5 });
+    assert.ok(system.cometDebris.length > 0 && system.cometDebris.length <= 28);
+    assert.equal(system.shockwaves.length, 1);
+
+    // Step forward so comets shed flame and soot tails
+    for (let i = 0; i < 6; i++) system.update(0.05);
+    assert.ok(system.cometTailParticles.length > 0 && system.cometTailParticles.length <= 240);
+    assert.ok(system.cometTailParticles.some(p => !p.isSmoke), 'comet emits flame tail particles');
+    assert.ok(system.cometTailParticles.some(p => p.isSmoke), 'comet emits soot tail particles');
+
+    // Clear removes all comet debris & tails
+    system.clear();
+    assert.equal(system.cometDebris.length, 0);
+    assert.equal(system.cometTailParticles.length, 0);
+    assert.equal(system.group.children.length, 4);
+    system.dispose();
+  } finally {
+    ExplosionSystem.prototype.createSparkTexture = original;
+  }
+});

@@ -158,7 +158,7 @@ export class VulcanCannon {
             type: 'bulletHit',
             target,
             damage: this.spec.damagePerHit,
-            position: bullet.position.clone(),
+            position: this._closest.clone(),
             distanceM: this._closest.distanceTo(target.position),
           });
           break;
