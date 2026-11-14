@@ -68,8 +68,9 @@ Initial Node comparison: **9/9 patrol shots and 9/9 evasive shots hit**. Eight
 evasive cases reacted and seven changed termination time by more than 0.01 s.
 The 5,500 m tail shot did not provide enough visible plume time to confirm before
 burnout. This establishes observable, physical reaction, not a reduced or
-real-world-calibrated hit rate. The existing ideal missile guidance, fixed 35G
-authority and simplified damage remain separate follow-up work. No random miss
+real-world-calibrated hit rate. The ideal sensor input and simplified damage remain
+separate work. The subsequent [missile energy model](missile-energy.md) replaces
+fixed 35G authority with pressure-dependent control and maneuver drag. No random miss
 chance or guaranteed survival is added.
 
 ## Verification
