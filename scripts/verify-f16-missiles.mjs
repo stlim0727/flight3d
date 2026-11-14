@@ -29,6 +29,10 @@ await withBrowserSession({
     s.demoDirector.stop();
     s.gameFlow.enterFlight();
     s.integratePhysics = () => {};
+    // This smoke isolates rail/HUD/director/FX behavior from signal calibration.
+    // Actual default IR acquisition/loss is checked by verify-missile-seeker.mjs.
+    const combatWorld = s.combatWorld.bind(s);
+    s.combatWorld = () => ({ ...combatWorld(), seekerSignalQuality: () => 1 });
     s.setTimeOfDay(12, { persist: false, userChoice: false });
     s.position.set(0, 3000, 0);
     s.linearVelocity.set(0, 0, -250);

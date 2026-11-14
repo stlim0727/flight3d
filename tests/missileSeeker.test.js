@@ -8,7 +8,8 @@ import { compareSeekerTerrainEngagements } from '../scripts/lib/missileSeekerSce
 
 const dt = 1 / 120;
 const own = () => ({ position: new Vector3(0, 3000, 0), quaternion: new Quaternion() });
-const contact = (id = 1) => ({ id, alive: true, position: new Vector3(0, 3000, -4000), velocity: new Vector3(80, 0, 0) });
+const contact = (id = 1) => ({ id, alive: true, position: new Vector3(0, 3000, -4000), velocity: new Vector3(80, 0, 0),
+  infraredSignature: { enginePower: 1, heat: 1, afterburner: 0, omnidirectional: true } });
 const flat = { terrainHeight: () => 0 };
 const ridge = { terrainHeight: (x, z) => z < -1500 && z > -2500 ? 4000 : 0 };
 function step(s, o, targets, seconds, world = flat) {

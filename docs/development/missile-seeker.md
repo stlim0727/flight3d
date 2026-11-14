@@ -36,9 +36,10 @@ for camera presentation and physical collision, never directly for PN guidance.
 These are model assumptions, not manufacturer data. An optional world callback
 `seekerSignalQuality({ type, observer, target, rangeM })` provides independent `IR`
 and `ACTIVE_RADAR` observation inputs to both the rail and airborne gates.
-Absent the callback, quality is an idealized 1; nonfinite/below-threshold quality
-is rejected. The callback should be pure. This does not implement heat signatures,
-RCS, clutter, flares/chaff, sensor noise or radar emissions. The active-radar
+Absent the callback, IR uses the [relative engine/aspect/range model](infrared-signal.md)
+and radar remains idealized quality 1. An explicit callback overrides the channel
+model. Nonfinite/below-threshold quality is rejected; the callback should be pure.
+RCS, clutter, flares/chaff, sensor noise and radar emissions remain unmodeled. The active-radar
 profile is autonomous from release; midcourse data links and activation timing
 remain separate work. Visible velocity is still an ideal measurement.
 

@@ -32,6 +32,16 @@ try {
       assert.deepEqual(r.phases, r.masking === 'open' ? ['track']
         : r.masking === 'brief' ? ['track', 'memory', 'track'] : ['track', 'memory', 'lost']);
     }
+    const infrared = await evaluate(async () => {
+      const { runInfraredScenario } = await import('/scripts/lib/infraredScenario.mjs');
+      const { compareBanditEngagements } = await import('/scripts/lib/banditEvasionScenario.mjs');
+      return { ...runInfraredScenario(), engagements: compareBanditEngagements() };
+    });
+    assert.deepEqual(infrared.snapshots.map(s => s.ir), ['track', 'memory', 'lost', 'lost', 'acquire', 'track']);
+    assert.ok(infrared.snapshots.every(s => s.radar === 'track'));
+    assert.ok(Math.abs(infrared.ranges[1].received / infrared.ranges[2].received - 4) < 1e-10);
+    assert.ok(infrared.engagements.some(r => r.terminal === 'no-lock'));
+    assert.ok(infrared.engagements.some(r => r.terminal === 'hit'));
     const pose = results.find(r => r.type === 'AIM9X' && r.masking === 'brief').memoryPose;
     const drawing = await evaluate(async p => window.seekerScenario.renderSeekerPose(p), pose);
     assert.match(drawing.renderer, /Intel|NVIDIA|AMD|Radeon|GeForce/);
@@ -39,7 +49,8 @@ try {
     assert.ok(drawing.drawnPixels > 1000); assert.equal(drawing.error, 0);
     assert.deepEqual(exceptions, []);
     await screenshot(path.join(dir, 'missile-memory-pose.png'));
-    writeFileSync(path.join(dir, 'report.json'), `${JSON.stringify({ gpu, results, drawing, exceptions }, null, 2)}\n`);
-    console.log(JSON.stringify({ results, drawing }, null, 2));
+    writeFileSync(path.join(dir, 'report.json'), `${JSON.stringify({ gpu, results, infrared, drawing, exceptions }, null, 2)}\n`);
+    console.log(JSON.stringify({ results, infrared: infrared.snapshots,
+      defaultIRNoLock: infrared.engagements.filter(r => r.terminal === 'no-lock').length, drawing }, null, 2));
   });
 } finally { await server.close(); }

@@ -123,7 +123,7 @@ await withBrowserSession({ width: 1440, height: 900 }, async ({
   assert.ok(comparison.every(r => Number.isFinite(r.minSampledSeparationM)));
   const energy = await evaluate(async () => {
     const { compareMissileEnergyEnvelope, measureMissileCoast } = await import('/scripts/lib/banditEvasionScenario.mjs');
-    return { ...measureMissileCoast(), envelope: compareMissileEnergyEnvelope() };
+    return { ...measureMissileCoast(), envelope: compareMissileEnergyEnvelope({ idealSensor: true }), sensorModel: 'ideal-fixture' };
   });
   assert.ok(energy.turnSpeedMps < energy.straightSpeedMps - 40, 'maneuver energy loss in browser');
   assert.ok(energy.thinDeliveredMps2 <= energy.thinAvailableMps2, 'current aerodynamic authority');

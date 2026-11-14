@@ -91,6 +91,11 @@ See [missile seeker](missile-seeker.md) for terrain-gated observations, finite
 track memory and confirmed reacquisition. IR/radar timing and signal inputs are
 explicit model assumptions; full sensor physics and countermeasures remain pending.
 
+The default IR channel now uses [relative engine/aspect/range signal](infrared-signal.md)
+from live N1/EGT. Its coefficients and explicit AB input are model assumptions;
+the existing engine has no independent afterburner dynamics. Radar signal modeling
+and countermeasures remain separate work.
+
 | Action | Keyboard | Touch |
 | --- | --- | --- |
 | Fire the next loaded missile | `Enter` | `FIRE MSL` |
