@@ -1067,3 +1067,25 @@ describe('HotasController - Custom Mapping (Calibration Wizard Profile)', () => 
     assert.strictEqual(hotas.throttle, 1.0, 'Throttle inverted maps idle (+1.0) to 1.0');
   });
 });
+
+describe('HOTAS combat button assignments', () => {
+  it('fires once per press, holds the gun, suppresses the old action, and stops on disconnect', () => {
+    let missiles = 0, spoilers = 0, targets = 0, chaff = 0, flare = 0;
+    const controls = { onFireMissile: () => missiles++, onToggleSpoilers: () => spoilers++, onCycleTarget: () => targets++, onDispenseChaff: () => chaff++, onDispenseFlare: () => flare++ };
+    let pad = { id: 'T.Flight Hotas One', index: 0, axes: [0, 0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })) };
+    const hotas = new HotasController(controls, { getGamepads: () => pad ? [pad] : [] });
+    hotas.applyConfig({ combatButtons: { missile: 1, gun: 0, target: 2, chaff: 3, flare: 4 } });
+    hotas.update();
+    for (const i of [0, 1, 2, 3, 4]) pad.buttons[i] = { pressed: true, value: 1 };
+    hotas.update(); hotas.update();
+    assert.equal(missiles, 1); assert.equal(targets, 1); assert.equal(spoilers, 0);
+    assert.equal(chaff, 1); assert.equal(flare, 1);
+    assert.equal(hotas.gunTrigger, true); assert.equal(hotas.brakes, 0);
+    pad.buttons[1] = { pressed: false, value: 0 }; hotas.update();
+    pad.buttons[1] = { pressed: true, value: 1 }; hotas.update();
+    assert.equal(missiles, 2);
+    hotas.diagnosticActive = true; hotas.update(); assert.equal(hotas.gunTrigger, false);
+    hotas.diagnosticActive = false; hotas.update(); assert.equal(hotas.gunTrigger, true);
+    pad = null; hotas.update(); assert.equal(hotas.gunTrigger, false);
+  });
+});

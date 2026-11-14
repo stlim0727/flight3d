@@ -90,6 +90,18 @@ export class JoystickCheckDialog {
           </select>
         </div>
 
+        <div class="joystick-section">
+          <h3 class="joystick-section-title">전투 버튼 매핑 (Combat buttons)</h3>
+          <p>아래 버튼 번호는 실시간 버튼 표시에서 확인하세요. 지정한 버튼의 기존 기능은 해제됩니다.</p>
+          ${[['missile', '미사일 발사'], ['gun', '기관포 (누르고 유지)'], ['target', '표적 전환'], ['chaff', '채프 (미구현)'], ['flare', '플레어 (미구현)']].map(([action, label]) => `
+            <label class="joystick-field-label">${label}
+              <select class="joystick-select" data-combat-button="${action}">
+                <option value="-1">미지정</option>
+                ${Array.from({ length: 65 }, (_, i) => `<option value="${i}">Button ${i}</option>`).join('')}
+              </select>
+            </label>`).join('')}
+        </div>
+
         <!-- Flight Control Surfaces Real-time Meters -->
         <div class="joystick-section">
           <h3 class="joystick-section-title">주요 비행 조종면 실시간 상태 (Flight Controls)</h3>
@@ -375,6 +387,20 @@ export class JoystickCheckDialog {
       }
     });
 
+    for (const select of this.dialog.querySelectorAll('[data-combat-button]')) {
+      select.addEventListener('change', () => {
+        const mapping = { ...this.hotas.getConfig().combatButtons };
+        const selected = Number(select.value);
+        if (selected >= 0) {
+          for (const action of Object.keys(mapping)) if (mapping[action] === selected) mapping[action] = -1;
+        }
+        mapping[select.getAttribute('data-combat-button')] = selected;
+        this.hotas.applyConfig({ combatButtons: mapping });
+        for (const field of this.dialog.querySelectorAll('[data-combat-button]')) field.value = String(mapping[field.getAttribute('data-combat-button')]);
+        this.savePreferences();
+      });
+    }
+
     // Profile selector
     this.profileSelect?.addEventListener('change', () => {
       this.hotas?.applyConfig({ profileOverride: this.profileSelect.value });
@@ -429,6 +455,7 @@ export class JoystickCheckDialog {
 
     // Populate current config
     const config = this.hotas?.getConfig() || {};
+    for (const field of this.dialog.querySelectorAll('[data-combat-button]')) field.value = String(config.combatButtons?.[field.getAttribute('data-combat-button')] ?? -1);
     if (this.profileSelect) this.profileSelect.value = config.profileOverride || 'auto';
     if (this.axesLayoutSelect) this.axesLayoutSelect.value = config.axesLayout || 'auto';
     if (this.throttleInvertCheck) this.throttleInvertCheck.checked = Boolean(config.throttleInverted);
@@ -736,9 +763,11 @@ export class JoystickCheckDialog {
       deadzoneStick: 0.04,
       deadzoneRudder: 0.05,
       customMapping: null,
+      combatButtons: { missile: -1, gun: -1, target: -1, chaff: -1, flare: -1 },
     };
     this.hotas.applyConfig(defaults);
 
+    for (const field of this.dialog.querySelectorAll('[data-combat-button]')) field.value = '-1';
     if (this.profileSelect) this.profileSelect.value = 'auto';
     if (this.axesLayoutSelect) this.axesLayoutSelect.value = 'auto';
     if (this.throttleInvertCheck) this.throttleInvertCheck.checked = false;

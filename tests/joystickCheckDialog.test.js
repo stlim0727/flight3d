@@ -355,6 +355,24 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     dialog.close();
   });
 
+  it('saves combat button assignments and removes duplicate assignments', () => {
+    const dialog = new JoystickCheckDialog(sim);
+    dialog.open();
+    const missile = dialog.dialog.querySelector('[data-combat-button="missile"]');
+    const chaff = dialog.dialog.querySelector('[data-combat-button="chaff"]');
+    assert.ok(missile.querySelector('option[value="64"]'));
+    missile.value = '64'; missile.dispatchEvent(new Event('change'));
+    assert.strictEqual(sim.controls.hotas.getConfig().combatButtons.missile, 64);
+    missile.value = '3'; missile.dispatchEvent(new Event('change'));
+    assert.strictEqual(sim.controls.hotas.getConfig().combatButtons.missile, 3);
+    chaff.value = '3'; chaff.dispatchEvent(new Event('change'));
+    assert.strictEqual(missile.value, '-1');
+    const saved = JSON.parse(mockStorage.getItem('flight3d.preferences.v1'));
+    assert.strictEqual(saved.joystick.combatButtons.chaff, 3);
+    assert.strictEqual(saved.joystick.combatButtons.missile, -1);
+    dialog.close();
+  });
+
   it('restores default configuration on reset button click', () => {
     sim.controls.hotas.applyConfig({
       profileOverride: 'hotas-one-xbox',

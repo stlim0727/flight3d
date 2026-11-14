@@ -79,6 +79,9 @@ export class FlightControls {
     this.onDeviceConnected = null;
     this.onDeviceDisconnected = null;
     this.onFireMissile = null;
+    // Reserved callbacks: player countermeasures are not implemented yet.
+    this.onDispenseChaff = null;
+    this.onDispenseFlare = null;
     this.onCycleTarget = null;
     this.touchGunTrigger = false;
 
@@ -243,7 +246,7 @@ export class FlightControls {
    * combat system only consumes it while the aircraft is airborne. */
   get gunTrigger() {
     return !this.inputBlocked && !this.aircraftControlsDisabled
-      && (Boolean(this.keys['Space']) || this.touchGunTrigger);
+      && (Boolean(this.keys['Space']) || this.touchGunTrigger || this.hotas?.gunTrigger);
   }
 
   update(dt, iasKnots = 140, aircraftId = 'B738') {
