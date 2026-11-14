@@ -109,6 +109,19 @@ body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
   overscroll-behavior-x: contain;
   touch-action: pan-x;
 }
+.flight-toolbar .flight-camera-strip {
+  flex: 0 1 auto;
+  min-width: calc(44px * var(--ui-scale, 1));
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+}
+.flight-toolbar .flight-camera-strip::-webkit-scrollbar { display: none; }
 .flight-toolbar .btn, .compact-ui .flight-toolbar .btn {
   flex: 0 0 calc(44px * var(--ui-scale, 1));
   width: calc(44px * var(--ui-scale, 1));

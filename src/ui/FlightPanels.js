@@ -91,10 +91,10 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
   hud.append(bar);
-  const cameraButtons = CAMERA_MODES.map(([mode, name], index) => {
+  const cameraButtons = CAMERA_MODES.map(([mode, name]) => {
     const button = document.createElement('button');
     button.id = `btn-cam-${name}`;
-    button.className = index === 0 ? 'btn flight-camera-btn flight-camera-start' : 'btn flight-camera-btn';
+    button.className = 'btn flight-camera-btn';
     button.type = 'button';
     button.dataset.cameraMode = String(mode);
     if (mode < 9) button.dataset.keyHint = String(mode === 0 ? 1 : mode === 7 ? 8 : mode === 8 ? 9 : mode + 1);
@@ -109,6 +109,12 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     });
     return button;
   });
+  const cameraStrip = document.createElement('div');
+  cameraStrip.id = 'camera-strip';
+  cameraStrip.className = 'flight-camera-strip';
+  cameraStrip.setAttribute('role', 'group');
+  bindText(cameraStrip, () => t('ui.camera.select'), 'aria-label');
+  cameraStrip.append(...cameraButtons);
   // Taking over must remain available when the guide is collapsed or yields to
   // warnings. Keep the existing button/handler outside the notification tree.
   const skipDemoButton = document.getElementById('btn-skip-demo');
@@ -182,7 +188,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   }
   // The row is anchored to the right edge, so the aircraft actions that follow
   // takeover unfold leftwards instead of shifting the primary group.
-  bar.append(skipDemoButton, ...cameraButtons, fullscreen, moreButton);
+  bar.append(skipDemoButton, cameraStrip, fullscreen, moreButton);
   for (const [id, key] of Object.entries({ 'btn-gear': 'G', 'btn-flaps-ret': 'V', 'btn-flaps-ext': 'F', 'btn-spoilers': 'B', 'btn-reverser': 'R', 'flight-trim-less': 'T', 'flight-trim-more': 'Y', 'flight-park-brake': '.' })) {
     document.getElementById(id)?.setAttribute('data-key-hint', key);
   }

@@ -297,7 +297,7 @@ body.demo-active #touch-controls-overlay {
 }
 .flight-toolbar .btn + .btn { border-left: 1px solid #334155; }
 /* Divider between the aircraft actions, camera group, and utility actions. */
-.flight-toolbar .flight-camera-start,
+.flight-toolbar .flight-camera-strip,
 .flight-toolbar #btn-fullscreen { border-left: 2px solid #64748b; }
 .flight-toolbar .btn[data-short-label] { font-size: 0; }
 .flight-toolbar .btn[data-short-label]::after {
