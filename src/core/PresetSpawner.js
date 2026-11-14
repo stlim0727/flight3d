@@ -10,6 +10,8 @@ import { rebaseCgVelocity } from '../physics/massKinematics.js';
 import { takeoffPerformance } from '../physics/TakeoffPerformance.js';
 import { stallSpeedEstimate } from '../physics/stallSpeedEstimate.js';
 import { setSimulationWind, WindField } from '../physics/WindField.js';
+import { UrbanWindField } from '../physics/UrbanWindField.js';
+import { alignSpawnToWind } from './windSpawn.js';
 import { loadIncheonAirport } from '../environment/IncheonAirport.js';
 import { incheonSpawn } from '../geospatial/IncheonFlightSurface.js';
 import { LuklaTerrain } from '../environment/LuklaTerrain.js';
@@ -460,7 +462,16 @@ class PresetSpawnerMethods {
     // Install the regional default after aircraft reload, bridge setup and trim.
     // Explicit missions own their wind; multiplayer retains its calm contract.
     if (this.activeAirport === 'neon' && !pilotPreparation && !this.multiplayer?.active) {
-      setSimulationWind(this, new WindField(NEON_WIND));
+      const field = new UrbanWindField(NEON_WIND);
+      setSimulationWind(this, field);
+      if (!isGroundSpawn) {
+        // The presets author still-air spawns. Keep the track and airspeed in the local
+        // mean wind and point the nose along the relative wind, so the trim stays valid.
+        const spawn = alignSpawnToWind(this.linearVelocity, field.meanAt(this.position));
+        this.linearVelocity.x = spawn.x;
+        this.linearVelocity.z = spawn.z;
+        this.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), spawn.yaw));
+      }
     }
 
     this.multiplayer?.respawn();

@@ -14,10 +14,10 @@ const server = await createServer({ ...config, configFile: false,
 await server.listen();
 try {
   const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
-  await withBrowserSession({ origin, startVite: false, width: 800, height: 600 }, async ({ cdpPort, send, evaluate, screenshot, delay, exceptions }) => {
+  await withBrowserSession({ origin, startVite: false, width: 800, height: 600, timeoutMs: 20000 }, async ({ cdpPort, send, evaluate, screenshot, delay, exceptions }) => {
     const gpuFile = path.join(dir, 'gpu.json');
     execFileSync(process.execPath, ['scripts/verify-browser-gpu.mjs', `http://127.0.0.1:${cdpPort}`],
-      { env: { ...process.env, GPU_REPORT: gpuFile }, stdio: 'inherit' });
+      { env: { ...process.env, GPU_REPORT: gpuFile }, stdio: 'inherit', timeout: 30000 });
     const gpu = JSON.parse(readFileSync(gpuFile, 'utf8'));
     assert.equal(gpu.passed, true);
     await send('Page.navigate', { url: `${origin}/scripts/lib/missileSeekerScenario.mjs` });
