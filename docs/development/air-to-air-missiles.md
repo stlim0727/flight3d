@@ -1,5 +1,11 @@
 # F-16 air-to-air combat (Sprints 1-2)
 
+Current missile-realism **Done / In progress / Todo** is maintained in
+[issue #713](https://github.com/stlim0727/flight3d/issues/713). Update that tracker
+when work starts and after merge, with implementation/evidence links and remaining
+limits. The S3/S4 tables below define broader scope and dependencies; a completed
+bounded realism item does not mark an entire sprint milestone complete.
+
 Discussion #612 originally split the air-combat work into three sprints. Sprint 1 covers
 Milestones 1 and 2: six rail missiles, 3D true proportional navigation (TPN),
 HUD lock symbology and the three-stage radar warning receiver. Sprint 2 adds

@@ -73,7 +73,7 @@ affects physical collision too, so that miss cannot be attributed to sensing alo
 
 ```sh
 node --test tests/missileSeeker.test.js tests/airToAirMissile.test.js tests/missileFlightModel.test.js
-GPU_ANGLE=vulkan CHROME_PATH=/home/stlim/.local/bin/chrome-headless node scripts/verify-missile-seeker.mjs
+timeout --signal=TERM --kill-after=10s 180s env GPU_ANGLE=vulkan CHROME_PATH=/home/stlim/.local/bin/chrome-headless node scripts/verify-missile-seeker.mjs
 ```
 
 Follow [hardware GPU setup](browser-gpu.md). The dedicated browser check uses a
@@ -84,6 +84,10 @@ plus JSON under `.cache/missile-seeker/`. This is model-level rendering/numerica
 evidence, not the full simulator scene, a rendered terrain ridge, a human defensive
 sortie or a real-world probability-of-kill measurement. The earlier full-scene
 verification timed out and is not claimed as passing for this change.
+
+GPU preflight has a 30 s process timeout and CDP commands have a 20 s timeout.
+The command above adds a 180 s overall process-group guard with a 10 s kill grace.
+Record the failing stage if a deadline expires; do not treat partial output as a pass.
 
 Recorded recovery-build validation on 2026-11-14: 78 focused tests, syntax/action
 checks and production build passed. Chrome 156.0.8078.73 used Intel ADL-N Vulkan;
