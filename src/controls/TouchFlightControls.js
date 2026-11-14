@@ -114,7 +114,7 @@ export class TouchFlightControls {
     this.initGyroSettings();
     this.syncGyroUI();
 
-    if (isTouch) {
+    if (isTouch || (window.matchMedia?.('(min-width: 1025px)').matches && gyroPreferences.touchControls !== false)) {
       this.enable();
     }
   }
@@ -132,7 +132,7 @@ export class TouchFlightControls {
         <div class="touch-quadrant touch-left">
           <div class="touch-throttle-card">
             <div class="touch-card-header">
-              <span class="touch-label">THROTTLE</span>
+              <span class="touch-label" data-key-hint="= / − · X / Z">THROTTLE</span>
               <span id="touch-thr-val" class="touch-value cyan">0%</span>
             </div>
             <div class="touch-throttle-body">
@@ -161,12 +161,12 @@ export class TouchFlightControls {
           <!-- Hydraulic Wheel Brake Button -->
           <button type="button" id="touch-btn-brake" class="btn-touch-brake" title="휠 브레이크 (Hold to Brake)" data-i18n-title="wheel.brakes.hold.to.brake">
             <span class="brake-label">BRAKE</span>
-            <span class="brake-sub">HOLD</span>
+            <span class="brake-sub" data-key-hint="SPACE">HOLD</span>
           </button>
 
           <!-- Rudder Slider -->
           <div class="touch-rudder-card">
-            <div class="rudder-label-strip">
+            <div class="rudder-label-strip" data-key-hint="Q / E">
               <span>◄ L</span>
               <span id="touch-rudder-val">0°</span>
               <span>R ►</span>
@@ -182,9 +182,9 @@ export class TouchFlightControls {
         <div class="touch-quadrant touch-right">
           <!-- Device tilt steering (relocated into the environment panel at boot) -->
           <div class="touch-weapon-row" aria-label="Air-to-air weapons" data-i18n-aria-label="weapons.controls">
-            <button type="button" id="touch-btn-fire" class="btn-touch-pill touch-btn-weapon" title="발사 (Enter)" data-i18n-title="weapons.fire.tip" data-i18n="weapons.fire" hidden>FIRE MSL</button>
-            <button type="button" id="touch-btn-gun" class="btn-touch-pill touch-btn-weapon" title="기관총 (공중 Space)" data-i18n-title="weapons.gun.tip" data-i18n="weapons.gun.fire" hidden>GUN</button>
-            <button type="button" id="touch-btn-target" class="btn-touch-pill touch-btn-weapon" title="표적 전환 (N)" data-i18n-title="weapons.target.tip" data-i18n="weapons.target" hidden>TGT</button>
+            <button type="button" id="touch-btn-fire" class="btn-touch-pill touch-btn-weapon" title="발사 (Enter)" data-i18n-title="weapons.fire.tip" data-i18n="weapons.fire" data-key-hint="ENTER" hidden>FIRE MSL</button>
+            <button type="button" id="touch-btn-gun" class="btn-touch-pill touch-btn-weapon" title="기관총 (공중 Space)" data-i18n-title="weapons.gun.tip" data-i18n="weapons.gun.fire" data-key-hint="SPACE" hidden>GUN</button>
+            <button type="button" id="touch-btn-target" class="btn-touch-pill touch-btn-weapon" title="표적 전환 (N)" data-i18n-title="weapons.target.tip" data-i18n="weapons.target" data-key-hint="N" hidden>TGT</button>
           </div>
           <button type="button" id="touch-btn-gyro" class="btn-touch-pill" title="기기 기울기 자이로 센서 모드" data-i18n-title="gyroscope.device.tilt.mode">
             <span class="pill-icon">📱</span> GYRO
@@ -196,7 +196,7 @@ export class TouchFlightControls {
           <!-- Virtual Flight Stick Yoke -->
           <div class="touch-stick-card">
             <div class="touch-card-header">
-              <span class="touch-label">FLIGHT YOKE</span>
+              <span class="touch-label" data-key-hint="W A S D / ↑ ← ↓ →">FLIGHT YOKE</span>
               <span id="touch-stick-telemetry" class="touch-value">P: 0° | R: 0°</span>
             </div>
             <div id="touch-stick-zone" class="touch-stick-zone">
