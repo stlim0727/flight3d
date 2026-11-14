@@ -143,8 +143,8 @@ the sites in `NEON_WIND_SITES`:
 Each `region` is a layout envelope in the WindField region shape (centre at the flight
 height, radius, fade = radius / 2); envelopes do not overlap. They are not tuned winds.
 The sites assume a design wind from the north (`DESIGN_WIND_FROM_DEG` = 0): across the
-canyon, along the canal, a crosswind on the 090° runway. Nothing configures a wind from
-it here; #696 chooses the field.
+canyon, along the canal, a crosswind on the 090° runway. `src/config/neonWind.js` uses
+it as the mean wind direction of the urban field (#696).
 
 Only four towers changed; the rest of the skyline, the runway, causeway, canal, bridges
 and streets are unchanged:
@@ -154,9 +154,9 @@ and streets are unchanged:
 - The podiums at (2880, 135) 95 m and (3020, -150) 105 m were drawn in to the avenue as
   `terrace-south` (2900, 72) 80 m and `terrace-north` (3040, -75) 145 m.
 
-The existing WindField cannot make wakes, channelling or roof shear from these towers:
-the sites only give stage 3 places to apply its existing settings and a route to compare
-them on. `tests/neonBuildings.test.js` keeps the table and records one-to-one, the
+`UrbanWindField` (#696) derives wakes and roof shear from this tower table; see
+[pilot-wind.md](pilot-wind.md#neon-urban-wind-696). It does not model channelling
+between towers. `tests/neonBuildings.test.js` keeps the table and records one-to-one, the
 footprints matching THREE's rotation, each site's geometry (open fetch, slot and wide
 widths, open water, lee tower upwind, roofs above and below), and the whole canyon line
 clear at 110 m with at least 43 m to every tower beside it. `node
