@@ -273,6 +273,10 @@ export class AirToAirMissileSystem {
     this.lockedTarget = null;
   }
 
+  getInFlightMissiles() {
+    return this.missiles.filter(m => m.alive);
+  }
+
   /**
    * @param {number} dt render delta
    * @param {{active:boolean, position:THREE.Vector3, velocity:THREE.Vector3,
@@ -342,6 +346,8 @@ export class AirToAirMissileSystem {
       .addScaledVector(this._forward, 22)
       .addScaledVector(this._up, -3);
     const target = this.lockedTarget?.alive ? this.lockedTarget : null;
+    const launchLocked = Boolean(this.lockedTarget?.alive && this.lockProgress >= 1);
+    const selected = this.selectedTarget();
     const quaternion = new THREE.Quaternion().setFromUnitVectors(FORWARD, this._dir.copy(velocity).normalize());
     const missile = {
       id: ++nextMissileId,
@@ -361,11 +367,29 @@ export class AirToAirMissileSystem {
       propellant: 1,
       age: 0,
       alive: true,
+      firedAt: this.elapsed,
+      launchPosition: this._launchPos.clone(),
+      launchVelocity: velocity.clone(),
+      launchLocked,
+      launchLockProgress: this.lockProgress,
+      launchTargetId: target?.id ?? (selected?.id ?? null),
+      launchTargetCallsign: target?.callsign ?? (selected?.callsign ?? null),
+      closestApproaches: {},
+      lastGuidance: { active: false, reason: null },
+      finalOutcome: null,
     };
     if (target) missile.seeker.seed(target, missile, world);
     missile.target = missile.seeker.target;
     this.loaded[stationIndex] = false;
     this.missiles.push(missile);
+    this._events.push({
+      type: 'launch',
+      missile,
+      timeSec: this.elapsed,
+      locked: launchLocked,
+      lockProgress: this.lockProgress,
+      target: missile.target,
+    });
     return missile;
   }
 
@@ -452,17 +476,31 @@ export class AirToAirMissileSystem {
       target.update(dt, world.terrainHeight, this.missiles);
       const threatId = target.threatResponse.confirmedId;
       if (target.alive && threatId !== null && !target.chaffThreatIds.has(threatId)) {
-        const cloud = target.chaff.dispense(target.position, target.velocity);
+        const cloud = target.chaff.dispense(target.position, target.velocity, { sourceId: target.id });
         if (cloud) {
           target.chaffThreatIds.add(threatId);
           this.chaffClouds.push(cloud);
+          events.push({
+            type: 'chaff_dispense',
+            chaff: cloud,
+            target,
+            remaining: target.chaff.remaining,
+            timeSec: this.elapsed,
+          });
         }
       }
       if (target.alive && threatId !== null && !target.flareThreatIds.has(threatId)) {
-        const flare = target.flare.dispense(target.position, target.velocity);
+        const flare = target.flare.dispense(target.position, target.velocity, { sourceId: target.id });
         if (flare) {
           target.flareThreatIds.add(threatId);
           this.flares.push(flare);
+          events.push({
+            type: 'flare_dispense',
+            flare,
+            target,
+            remaining: target.flare.remaining,
+            timeSec: this.elapsed,
+          });
         }
       }
       if (!target.alive) {
@@ -471,9 +509,19 @@ export class AirToAirMissileSystem {
       }
     }
 
-    for (const flare of this.flares) flare.update(dt);
+    for (const flare of this.flares) {
+      flare.update(dt);
+      if (!flare.alive) {
+        events.push({ type: 'flare_expire', flareId: flare.id, sourceId: flare.sourceId, timeSec: this.elapsed });
+      }
+    }
     this.flares = this.flares.filter(flare => flare.alive);
-    for (const cloud of this.chaffClouds) cloud.update(dt);
+    for (const cloud of this.chaffClouds) {
+      cloud.update(dt);
+      if (!cloud.alive) {
+        events.push({ type: 'chaff_expire', chaffId: cloud.id, sourceId: cloud.sourceId, timeSec: this.elapsed });
+      }
+    }
     this.chaffClouds = this.chaffClouds.filter(cloud => cloud.alive);
     this._updateGun(dt, world, events);
     this._updateLock(dt, world, events);
@@ -535,14 +583,46 @@ export class AirToAirMissileSystem {
       ? [...this.targets, ...this.chaffClouds] : missile.spec.seekerType === 'IR'
         ? [...this.targets, ...this.flares] : this.targets, world);
     missile.target = missile.seeker.target;
+
+    if (missile.seeker?.seekerEvents?.length) {
+      for (const seekerEvent of missile.seeker.seekerEvents) {
+        events.push({
+          ...seekerEvent,
+          missile,
+          timeSec: this.elapsed,
+        });
+      }
+      missile.seeker.seekerEvents.length = 0;
+    }
+
     this._lateral.set(0, 0, 0);
-    const tracking = missile.seeker.hasEstimate
+    const tracking = missile.seeker?.hasEstimate
       ? this._applyGuidance(missile, missile.seeker.estimate, spec) : false;
+    const guidanceReason = tracking ? null : (missile.seeker?.hasEstimate ? missile._lastGuidanceCutoffReason : 'no_estimate');
+    missile.lastGuidance = { active: tracking, reason: guidanceReason };
+
     missile.flight.step(dt, missile, {
       massKg: mass, thrustN,
       density: Atmosphere.getConditions(missile.position.y).density,
       command: this._lateral, tracking,
     });
+
+    // Track minimum separation distance to each airborne target
+    missile.closestApproaches ??= {};
+    for (const candidate of this.targets) {
+      if (!candidate.alive) continue;
+      const dist = missile.position.distanceTo(candidate.position);
+      const prev = missile.closestApproaches[candidate.id];
+      if (!prev || dist < prev.distanceM) {
+        missile.closestApproaches[candidate.id] = {
+          distanceM: dist,
+          timeSec: this.elapsed,
+          method: 'step_sampling',
+          targetCallsign: candidate.callsign,
+          targetId: candidate.id,
+        };
+      }
+    }
 
     // Select the earliest same-time closest-approach trigger across targets.
     let triggerTarget = null, triggerTime = Infinity;
@@ -552,13 +632,36 @@ export class AirToAirMissileSystem {
       if (time !== null && time < triggerTime) { triggerTarget = candidate; triggerTime = time; }
     }
     if (triggerTarget) {
+      const burstPos = missile.prevPosition.clone().lerp(missile.position, triggerTime);
+      const targetPos = triggerTarget.prevPosition.clone().lerp(triggerTarget.position, triggerTime);
+      const cpaDist = burstPos.distanceTo(targetPos);
+      missile.closestApproaches[triggerTarget.id] = {
+        distanceM: cpaDist,
+        timeSec: this.elapsed,
+        method: 'continuous_fuze',
+        targetCallsign: triggerTarget.callsign,
+        targetId: triggerTarget.id,
+      };
+      missile.finalOutcome = {
+        reason: 'fuze_burst',
+        timeSec: this.elapsed,
+        targetId: triggerTarget.id,
+        distanceM: cpaDist,
+      };
       this._detonate(missile, triggerTarget, events, triggerTime);
       return;
     }
 
     if (missile.age >= spec.maxLifeSeconds) {
       missile.alive = false;
-      events.push({ type: 'expire', missile, position: missile.position.clone() });
+      missile.finalOutcome = { reason: 'life_expiry', timeSec: this.elapsed };
+      events.push({
+        type: 'expire',
+        missile,
+        position: missile.position.clone(),
+        timeSec: this.elapsed,
+        reason: 'life_expiry',
+      });
       return;
     }
 
@@ -566,9 +669,11 @@ export class AirToAirMissileSystem {
     if (missile.position.y <= ground + 1) {
       missile.position.y = ground + 1;
       missile.alive = false;
+      missile.finalOutcome = { reason: 'surface_collision', timeSec: this.elapsed };
       events.push({
         type: 'detonation', missile, target: null,
         position: missile.position.clone(), velocity: missile.velocity.clone(), surface: true,
+        timeSec: this.elapsed, reason: 'surface_collision',
       });
     }
   }
@@ -576,26 +681,39 @@ export class AirToAirMissileSystem {
   _applyGuidance(missile, target, spec) {
     this._los.copy(target.position).sub(missile.position);
     const rangeSq = this._los.lengthSq();
-    if (rangeSq < 1) return false;
+    if (rangeSq < 1) {
+      missile._lastGuidanceCutoffReason = 'range_too_close';
+      return false;
+    }
     const range = Math.sqrt(rangeSq);
     const speed = missile.velocity.length();
-    if (speed < 1e-3) return false;
+    if (speed < 1e-3) {
+      missile._lastGuidanceCutoffReason = 'low_speed';
+      return false;
+    }
 
     // Seeker gimbal limit: the body must keep the line of sight inside its
     // field of regard. Invalid tracking stops new commands; the actuator unloads.
     this._dir.copy(missile.velocity).divideScalar(speed);
     this._rhat.copy(this._los).divideScalar(range);
     if (Math.acos(THREE.MathUtils.clamp(this._dir.dot(this._rhat), -1, 1)) >
-        THREE.MathUtils.degToRad(spec.gimbalDeg)) return false;
+        THREE.MathUtils.degToRad(spec.gimbalDeg)) {
+      missile._lastGuidanceCutoffReason = 'gimbal_limit';
+      return false;
+    }
 
     this._rel.copy(target.velocity).sub(missile.velocity);
     const closing = -this._los.dot(this._rel) / range;
-    if (closing <= 0) return false;
+    if (closing <= 0) {
+      missile._lastGuidanceCutoffReason = 'negative_closure';
+      return false;
+    }
 
     // LOS-normal PN request. The flight model projects onto the velocity-normal
     // plane, applies actuator lag/authority and charges the delivered maneuver drag.
     this._omega.crossVectors(this._los, this._rel).divideScalar(rangeSq);
     this._lateral.crossVectors(this._omega, this._rhat).multiplyScalar(spec.navigationConstant * closing);
+    missile._lastGuidanceCutoffReason = null;
     return true;
   }
 

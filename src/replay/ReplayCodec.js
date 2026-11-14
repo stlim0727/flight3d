@@ -4,10 +4,24 @@ export const REPLAY_TRACK_VERSION = 2;
 // Multiplayer room tracks only: solo flights stay v2 so older builds can still import them.
 export const ROOM_TRACK_VERSION = 3;
 // Combat tracks append a compact missile/bandit section after the pose frames.
-export const COMBAT_TRACK_VERSION = 6;
+export const COMBAT_TRACK_VERSION = 7;
 export const COMBAT_SECTION_HEADER_BYTES = 18;
 export const COMBAT_EVENT_BYTES = 32;
+export const COMBAT_DIAGNOSTIC_BYTES = 28;
 export const MISSILE_TYPE_IDS = Object.freeze(['AIM9X', 'AIM120C']);
+export const COMBAT_EVENT_KINDS = Object.freeze([
+  'detonation', 'expire', 'kill', 'launch', 'seeker_state',
+  'decoy_dispense', 'decoy_transfer', 'damage', 'unresolved_end',
+]);
+export const SEEKER_STATES = Object.freeze(['unknown', 'search', 'acquire', 'track', 'memory', 'lost']);
+export const SEEKER_LOSS_REASONS = Object.freeze([
+  'none', 'fov_limit', 'range_limit', 'terrain_occlusion', 'low_signal', 'invalid_geometry',
+  'target_destroyed', 'incompatible_decoy',
+]);
+export const GUIDANCE_CUTOFF_REASONS = Object.freeze([
+  'none', 'no_estimate', 'gimbal_limit', 'negative_closure', 'low_speed', 'range_too_close',
+]);
+export const HIT_ZONES = Object.freeze(['unknown', 'nose', 'cockpit', 'leftWing', 'rightWing', 'engine', 'tail', 'fuselage']);
 export const REPLAY_MAGIC = 'F3DR1';
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
@@ -246,12 +260,20 @@ function encodedMetadata(track) {
 export function decodedByteLength(track) {
   const samples = track?.samples || [];
   const combat = hasCombat(track?.combat) ? track.combat : null;
+  const version = combat ? resolveCombatVersion(track) : (track?.remotes?.length ? ROOM_TRACK_VERSION : REPLAY_TRACK_VERSION);
   return HEADER_BYTES + encodedMetadata(track).length + samples.length * frameBytes(remoteTracks(track).length)
-    + (combat ? combatByteLength(combat) : 0);
+    + (combat ? combatByteLength(combat, version) : 0);
+}
+
+function resolveCombatVersion(track) {
+  if (track?.combat?.killEventsRecorded === false) return 5;
+  if (track?.combat?.v6Legacy === true) return 6;
+  if (track?.combat?.version !== undefined) return track.combat.version;
+  return COMBAT_TRACK_VERSION;
 }
 
 /** Bytes one combat section costs: length prefix, fixed header, targets, samples and events. */
-export function combatByteLength(combat) {
+export function combatByteLength(combat, version = COMBAT_TRACK_VERSION) {
   if (!combat) return 0;
   const targets = Array.isArray(combat.targets) ? combat.targets : [];
   const targetBytes = targets.reduce((sum, target) => {
@@ -261,7 +283,9 @@ export function combatByteLength(combat) {
   const banditBytes = (combat.banditSamples?.length || 0) * (5 + targets.length * 23);
   const missileBytes = (combat.missileSamples?.length || 0) * 26;
   const eventBytes = (combat.events?.length || 0) * COMBAT_EVENT_BYTES;
-  return 4 + COMBAT_SECTION_HEADER_BYTES + targetBytes + banditBytes + missileBytes + eventBytes;
+  const hasDiag = version >= 7 && Array.isArray(combat.diagnosticSamples) && combat.diagnosticSamples.length > 0;
+  const diagnosticBytes = hasDiag ? (6 + combat.diagnosticSamples.length * COMBAT_DIAGNOSTIC_BYTES) : 0;
+  return 4 + COMBAT_SECTION_HEADER_BYTES + targetBytes + banditBytes + missileBytes + eventBytes + diagnosticBytes;
 }
 
 function hasCombat(combat) {
@@ -270,7 +294,8 @@ function hasCombat(combat) {
     && Array.isArray(combat.banditSamples)
     && Array.isArray(combat.missileSamples)
     && Array.isArray(combat.events)
-    && (combat.banditSamples.length || combat.missileSamples.length || combat.events.length));
+    && (combat.banditSamples.length || combat.missileSamples.length || combat.events.length
+      || (Array.isArray(combat.diagnosticSamples) && combat.diagnosticSamples.length)));
 }
 
 export function encodeTrack(track) {
@@ -280,12 +305,12 @@ export function encodeTrack(track) {
     throw new Error('replay remote tracks must share the local frames');
   }
   const combat = hasCombat(track.combat) ? track.combat : null;
-  const version = combat ? (combat.killEventsRecorded === false ? 5 : COMBAT_TRACK_VERSION)
+  const version = combat ? resolveCombatVersion(track)
     : remotes.length ? ROOM_TRACK_VERSION : REPLAY_TRACK_VERSION;
   const frame = frameBytes(remotes.length);
   const metadata = encodedMetadata(track);
   if (metadata.length > 0xffff) throw new Error('replay track metadata is too large');
-  const combatSize = combat ? combatByteLength(combat) : 0;
+  const combatSize = combat ? combatByteLength(combat, version) : 0;
   const bytes = new Uint8Array(HEADER_BYTES + metadata.length + track.samples.length * frame + combatSize);
   const view = new DataView(bytes.buffer);
   for (let index = 0; index < REPLAY_MAGIC.length; index++) bytes[index] = REPLAY_MAGIC.charCodeAt(index);
@@ -304,13 +329,13 @@ export function encodeTrack(track) {
       writeRemote(view, frameBase + RECORD_BYTES + slot * REMOTE_RECORD_BYTES, remote.samples[index]);
     });
   }
-  if (combat) writeCombat(view, base + track.samples.length * frame, combat);
+  if (combat) writeCombat(view, base + track.samples.length * frame, combat, version);
   return bytes;
 }
 
-function writeCombat(view, offset, combat) {
+function writeCombat(view, offset, combat, version = COMBAT_TRACK_VERSION) {
   const targets = combat.targets;
-  const sectionLength = combatByteLength(combat) - 4;
+  const sectionLength = combatByteLength(combat, version) - 4;
   view.setUint32(offset, sectionLength);
   offset += 4;
   view.setUint16(offset, Math.round(finite(combat.banditIntervalSec ?? 0.5) * 1000));
@@ -361,17 +386,86 @@ function writeCombat(view, offset, combat) {
 
   for (const event of combat.events) {
     writeScalar(view, offset, 'u32', event.timeSec * 1000, 1);
-    view.setUint8(offset + 4, event.kind === 'expire' ? 1 : event.kind === 'kill' ? 2 : 0);
+    const kindIdx = COMBAT_EVENT_KINDS.indexOf(event.kind);
+    const kindCode = version >= 7 && kindIdx >= 0
+      ? kindIdx
+      : (event.kind === 'expire' ? 1 : event.kind === 'kill' ? 2 : 0);
+    view.setUint8(offset + 4, kindCode);
     view.setUint8(offset + 5, (event.missileId ?? 0) & 255);
-    view.setUint8(offset + 6, event.surface ? 1 : 0);
-    view.setUint8(offset + 7, 0);
+
+    let flags = event.surface ? 1 : 0;
+    let extra = 0;
+    if (version >= 7) {
+      if (event.kind === 'launch') {
+        flags = event.locked ? 1 : 0;
+        extra = (event.targetId ?? 0) & 255;
+      } else if (event.kind === 'seeker_state') {
+        const lossIdx = SEEKER_LOSS_REASONS.indexOf(event.lossReason);
+        flags = lossIdx >= 0 ? lossIdx : 0;
+        const stateIdx = SEEKER_STATES.indexOf(event.state);
+        extra = stateIdx >= 0 ? stateIdx : 0;
+      } else if (event.kind === 'decoy_dispense' || event.kind === 'decoy_transfer') {
+        flags = event.decoyType === 'chaff' ? 2 : 1;
+        extra = (event.remaining ?? event.decoyId ?? 0) & 255;
+      } else if (event.kind === 'damage' || event.kind === 'kill') {
+        const zoneIdx = HIT_ZONES.indexOf(event.hitZone);
+        extra = zoneIdx >= 0 ? zoneIdx : 0;
+      } else if (event.kind === 'detonation') {
+        extra = event.reason === 'surface_collision' ? 2 : 1;
+      }
+    }
+    view.setUint8(offset + 6, flags);
+    view.setUint8(offset + 7, extra);
+
     writeScalar(view, offset + 8, 'f32', event.x, 1);
     writeScalar(view, offset + 12, 'f32', event.y, 1);
     writeScalar(view, offset + 16, 'f32', event.z, 1);
-    writeScalar(view, offset + 20, 'f32', event.vx, 1);
-    writeScalar(view, offset + 24, 'f32', event.vy, 1);
-    writeScalar(view, offset + 28, 'f32', event.vz, 1);
+    writeScalar(view, offset + 20, 'f32', event.vx ?? event.signalQuality ?? event.amount ?? event.lockProgress ?? 0, 1);
+    writeScalar(view, offset + 24, 'f32', event.vy ?? event.distanceM ?? event.aspectAngleDeg ?? event.separationAngleDeg ?? 0, 1);
+    writeScalar(view, offset + 28, 'f32', event.vz ?? event.observationAgeSec ?? 0, 1);
     offset += COMBAT_EVENT_BYTES;
+  }
+
+  if (version >= 7 && Array.isArray(combat.diagnosticSamples) && combat.diagnosticSamples.length > 0) {
+    view.setUint16(offset, Math.round(finite(combat.diagnosticIntervalSec ?? 0.2) * 1000));
+    view.setUint32(offset + 2, combat.diagnosticSamples.length);
+    offset += 6;
+    for (const diag of combat.diagnosticSamples) {
+      writeScalar(view, offset, 'u32', diag.timeSec * 1000, 1);
+      view.setUint8(offset + 4, (diag.missileId ?? 0) & 255);
+      const cutoff = diag.guidanceCutoffReason ?? diag.cutoffReason ?? 'none';
+      const cutoffIdx = GUIDANCE_CUTOFF_REASONS.indexOf(cutoff);
+      const isGuided = diag.guidanceActive ?? diag.guided ?? false;
+      const isPowered = diag.powered ?? true;
+      const isTracking = diag.tracking ?? (diag.seekerState === 'track');
+      let flags = (isGuided ? 1 : 0) | (isPowered ? 2 : 0) | (isTracking ? 4 : 0);
+      if (cutoffIdx > 0) flags |= (cutoffIdx & 0x1f) << 3;
+      view.setUint8(offset + 5, flags);
+      const stateIdx = SEEKER_STATES.indexOf(diag.seekerState);
+      view.setUint8(offset + 6, stateIdx >= 0 ? stateIdx : 0);
+      const lossIdx = SEEKER_LOSS_REASONS.indexOf(diag.seekerLossReason);
+      view.setUint8(offset + 7, lossIdx >= 0 ? lossIdx : 0);
+      const speed = diag.speedMps ?? (diag.mach ? diag.mach * 340 : 0);
+      writeScalar(view, offset + 8, 'u16', speed, 10);
+      writeScalar(view, offset + 10, 'i16', diag.altitudeM ?? 0, 1);
+      const qBar = diag.dynamicPressurePa ?? diag.qBarPa ?? 0;
+      writeScalar(view, offset + 12, 'u16', qBar / 1000, 100);
+      const reqG = diag.requestedLateralG ?? diag.demandedG ?? 0;
+      const availG = diag.availableLateralG ?? diag.availableG ?? 0;
+      const delivG = diag.deliveredLateralG ?? diag.actualG ?? 0;
+      writeScalar(view, offset + 14, 'u16', reqG, 100);
+      writeScalar(view, offset + 16, 'u16', availG, 100);
+      writeScalar(view, offset + 18, 'u16', delivG, 100);
+      const mDrag = diag.maneuverDragN ?? (diag.dragN != null ? diag.dragN * 0.7 : 0);
+      const bDrag = diag.baseDragN ?? (diag.dragN != null ? diag.dragN * 0.3 : 0);
+      writeScalar(view, offset + 20, 'u16', mDrag, 0.1);
+      writeScalar(view, offset + 22, 'u16', bDrag, 0.1);
+      writeScalar(view, offset + 24, 'u8', diag.propellant ?? (isPowered ? 1.0 : 0), 255);
+      writeScalar(view, offset + 25, 'u8', diag.signalQuality ?? 1.0, 100);
+      const range = diag.targetRangeM ?? diag.separationM ?? 0;
+      writeScalar(view, offset + 26, 'u16', range, 1);
+      offset += COMBAT_DIAGNOSTIC_BYTES;
+    }
   }
 }
 
@@ -470,6 +564,7 @@ function readCombat(view, offset, sectionLength, version) {
   const missileCount = view.getUint32(offset + 10);
   const eventCount = view.getUint32(offset + 14);
   offset += COMBAT_SECTION_HEADER_BYTES;
+
   if (targetCount > 16 || banditCount > 100000 || missileCount > 100000 || eventCount > 100000) {
     throw new Error('replay combat section is corrupt');
   }
@@ -516,20 +611,144 @@ function readCombat(view, offset, sectionLength, version) {
   const events = [];
   for (let index = 0; index < eventCount; index++) {
     if (offset + COMBAT_EVENT_BYTES > end) throw new Error('replay combat events are truncated');
-    events.push({
-      timeSec: view.getUint32(offset) / 1000,
-      kind: view.getUint8(offset + 4) === 1 ? 'expire'
-        : version >= 6 && view.getUint8(offset + 4) === 2 ? 'kill' : 'detonation',
-      missileId: view.getUint8(offset + 5),
-      surface: Boolean(view.getUint8(offset + 6)),
-      x: view.getFloat32(offset + 8), y: view.getFloat32(offset + 12), z: view.getFloat32(offset + 16),
-      vx: view.getFloat32(offset + 20), vy: view.getFloat32(offset + 24), vz: view.getFloat32(offset + 28),
-    });
+    const timeSec = view.getUint32(offset) / 1000;
+    const rawKind = view.getUint8(offset + 4);
+    const missileId = view.getUint8(offset + 5);
+    const flags = view.getUint8(offset + 6);
+    const extra = view.getUint8(offset + 7);
+    const x = view.getFloat32(offset + 8);
+    const y = view.getFloat32(offset + 12);
+    const z = view.getFloat32(offset + 16);
+    const vx = view.getFloat32(offset + 20);
+    const vy = view.getFloat32(offset + 24);
+    const vz = view.getFloat32(offset + 28);
+
+    let kind = 'detonation';
+    if (version >= 7 && rawKind < COMBAT_EVENT_KINDS.length) {
+      kind = COMBAT_EVENT_KINDS[rawKind];
+    } else if (rawKind === 1) {
+      kind = 'expire';
+    } else if (version >= 6 && rawKind === 2) {
+      kind = 'kill';
+    }
+
+    const eventObj = {
+      timeSec,
+      kind,
+      missileId,
+      surface: Boolean(flags & 1),
+      x, y, z, vx, vy, vz,
+    };
+
+    if (version >= 7) {
+      if (kind === 'launch') {
+        eventObj.locked = Boolean(flags & 1);
+        eventObj.targetId = extra;
+        eventObj.lockProgress = vx;
+      } else if (kind === 'seeker_state') {
+        eventObj.state = SEEKER_STATES[extra] || 'unknown';
+        eventObj.lossReason = SEEKER_LOSS_REASONS[flags] || 'none';
+        eventObj.signalQuality = vx;
+        eventObj.aspectAngleDeg = vy;
+        eventObj.observationAgeSec = vz;
+      } else if (kind === 'decoy_dispense' || kind === 'decoy_transfer') {
+        eventObj.decoyType = flags === 2 ? 'chaff' : 'flare';
+        if (kind === 'decoy_dispense') eventObj.remaining = extra;
+        else {
+          eventObj.decoyId = extra;
+          eventObj.signalQuality = vx;
+          eventObj.separationAngleDeg = vy;
+        }
+      } else if (kind === 'damage' || kind === 'kill') {
+        eventObj.hitZone = HIT_ZONES[extra] || 'unknown';
+        if (kind === 'damage') eventObj.amount = vx;
+      } else if (kind === 'unresolved_end') {
+        eventObj.reason = 'unresolved_sortie_ended';
+      } else if (kind === 'detonation') {
+        eventObj.reason = extra === 2 ? 'surface_collision' : 'proximity_fuze';
+      }
+    }
+    events.push(eventObj);
     offset += COMBAT_EVENT_BYTES;
   }
+
+  const diagnosticSamples = [];
+  let diagnosticIntervalSec = 0.2;
+  let diagnosticCount = 0;
+  if (version >= 7 && offset < end) {
+    diagnosticIntervalSec = view.getUint16(offset) / 1000;
+    diagnosticCount = view.getUint32(offset + 2);
+    offset += 6;
+  }
+  if (version >= 7 && diagnosticCount > 0) {
+    for (let index = 0; index < diagnosticCount; index++) {
+      if (offset + COMBAT_DIAGNOSTIC_BYTES > end) throw new Error('replay combat diagnostics are truncated');
+      const timeSec = view.getUint32(offset) / 1000;
+      const missileId = view.getUint8(offset + 4);
+      const flags = view.getUint8(offset + 5);
+      const seekerStateCode = view.getUint8(offset + 6);
+      const seekerLossReasonCode = view.getUint8(offset + 7);
+      const cutoffIdx = (flags >> 3) & 0x1f;
+
+      const isGuided = Boolean(flags & 1);
+      const cutoffReason = GUIDANCE_CUTOFF_REASONS[cutoffIdx] || 'none';
+      const speed = readScalar(view, offset + 8, 'u16', 10);
+      const qBar = readScalar(view, offset + 12, 'u16', 100) * 1000;
+      const reqG = readScalar(view, offset + 14, 'u16', 100);
+      const availG = readScalar(view, offset + 16, 'u16', 100);
+      const delivG = readScalar(view, offset + 18, 'u16', 100);
+      const mDrag = readScalar(view, offset + 20, 'u16', 0.1);
+      const bDrag = readScalar(view, offset + 22, 'u16', 0.1);
+      const range = readScalar(view, offset + 26, 'u16', 1);
+
+      diagnosticSamples.push({
+        timeSec,
+        missileId,
+        guidanceActive: isGuided,
+        guided: isGuided,
+        powered: Boolean(flags & 2),
+        tracking: Boolean(flags & 4),
+        guidanceCutoffReason: cutoffReason,
+        cutoffReason,
+        seekerState: SEEKER_STATES[seekerStateCode] || 'unknown',
+        seekerLossReason: SEEKER_LOSS_REASONS[seekerLossReasonCode] || 'none',
+        speedMps: speed,
+        mach: Number((speed / 340).toFixed(2)),
+        altitudeM: readScalar(view, offset + 10, 'i16', 1),
+        dynamicPressurePa: qBar,
+        qBarPa: qBar,
+        requestedLateralG: reqG,
+        demandedG: reqG,
+        availableLateralG: availG,
+        availableG: availG,
+        deliveredLateralG: delivG,
+        actualG: delivG,
+        maneuverDragN: mDrag,
+        baseDragN: bDrag,
+        dragN: Number((mDrag + bDrag).toFixed(1)),
+        propellant: readScalar(view, offset + 24, 'u8', 255),
+        signalQuality: readScalar(view, offset + 25, 'u8', 100),
+        targetRangeM: range,
+        separationM: range,
+      });
+      offset += COMBAT_DIAGNOSTIC_BYTES;
+    }
+  }
+
   if (offset !== end) throw new Error('replay combat section has trailing bytes');
-  return { banditIntervalSec, missileIntervalSec, targets, banditSamples, missileSamples, events,
-    killEventsRecorded: version >= 6 };
+  return {
+    version,
+    banditIntervalSec,
+    missileIntervalSec,
+    diagnosticIntervalSec,
+    targets,
+    banditSamples,
+    missileSamples,
+    diagnosticSamples,
+    events,
+    killEventsRecorded: version >= 6,
+    diagnosticRecorded: version >= 7,
+  };
 }
 
 export function toBase64(bytes) {

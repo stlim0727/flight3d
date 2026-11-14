@@ -1,5 +1,6 @@
 import { REPLAY_BUDGET } from './replayConfig.js';
 import { encodeTrack, decodeTrack, toBase64, fromBase64 } from './ReplayCodec.js';
+import { analyzeCombatEngagement } from '../weapons/engagementAnalysis.js';
 
 const INDEX_KEY = 'flight3d.replays.v1';
 export const SORTIE_KIND = 'flight3d.sortie.v1';
@@ -56,15 +57,31 @@ export function extractReportSummary(report) {
 /** Unite telemetry report and encoded pose track into one flight3d.sortie.v1 artifact. */
 export function createSortie(report, trackOrReplay) {
   let track = null;
+  let decodedTrack = null;
   if (typeof trackOrReplay === 'string') {
     track = trackOrReplay;
+    try {
+      decodedTrack = decodeTrack(fromBase64(trackOrReplay));
+    } catch {
+      decodedTrack = null;
+    }
   } else if (trackOrReplay && Array.isArray(trackOrReplay.samples) && trackOrReplay.samples.length >= 2 && !trackOrReplay.overflow) {
     try {
+      decodedTrack = trackOrReplay;
       track = toBase64(encodeTrack(trackOrReplay));
     } catch {
       track = null;
     }
   }
+
+  if (report && !report.engagement && decodedTrack?.combat) {
+    try {
+      report.engagement = analyzeCombatEngagement({ report, track: decodedTrack });
+    } catch {
+      // non-fatal
+    }
+  }
+
   return {
     kind: SORTIE_KIND,
     report: report ?? null,

@@ -2,8 +2,12 @@
 export const CHAFF_MODEL = Object.freeze({ capacity: 8, lifetimeS: 12, dragTimeS: 2,
   settlingMps: 4, peakRcsM2: 8, buildTimeS: 0.5, decayTimeS: 4 });
 
+let nextChaffId = 0;
+
 export class ChaffCloud {
-  constructor(position, velocity) {
+  constructor(position, velocity, { sourceId = null } = {}) {
+    this.id = ++nextChaffId;
+    this.sourceId = sourceId;
     this.type = 'chaff';
     this.alive = true;
     this.position = position.clone();
@@ -29,9 +33,9 @@ export class ChaffCloud {
 export class ChaffDispenser {
   constructor(capacity = CHAFF_MODEL.capacity) { this.capacity = capacity; this.reset(); }
   reset() { this.remaining = this.capacity; }
-  dispense(position, velocity) {
+  dispense(position, velocity, { sourceId = null } = {}) {
     if (this.remaining <= 0) return null;
     this.remaining--;
-    return new ChaffCloud(position, velocity);
+    return new ChaffCloud(position, velocity, { sourceId });
   }
 }

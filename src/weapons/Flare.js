@@ -2,8 +2,12 @@
 export const FLARE_MODEL = Object.freeze({ capacity: 8, lifetimeS: 6, dragTimeS: 2,
   gravityMps2: 9.81, peakEmission: 6, riseTimeS: 0.15, decayTimeS: 2 });
 
+let nextFlareId = 0;
+
 export class Flare {
-  constructor(position, velocity) {
+  constructor(position, velocity, { sourceId = null } = {}) {
+    this.id = ++nextFlareId;
+    this.sourceId = sourceId;
     this.type = 'flare';
     this.alive = true;
     this.position = position.clone();
@@ -30,9 +34,9 @@ export class Flare {
 export class FlareDispenser {
   constructor(capacity = FLARE_MODEL.capacity) { this.capacity = capacity; this.reset(); }
   reset() { this.remaining = this.capacity; }
-  dispense(position, velocity) {
+  dispense(position, velocity, { sourceId = null } = {}) {
     if (this.remaining <= 0) return null;
     this.remaining--;
-    return new Flare(position, velocity);
+    return new Flare(position, velocity, { sourceId });
   }
 }

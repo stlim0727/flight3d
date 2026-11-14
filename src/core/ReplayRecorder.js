@@ -1,7 +1,7 @@
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { REPLAY_INTERVAL_SEC, REPLAY_INTERVAL_LADDER, REPLAY_BUDGET, REPLAY_MIN_DURATION_SEC,
   HEADER_BYTES, RECORD_BYTES, decodedByteBudget } from '../replay/replayConfig.js';
-import { combatByteLength } from '../replay/ReplayCodec.js';
+import { combatByteLength, COMBAT_TRACK_VERSION } from '../replay/ReplayCodec.js';
 
 // Observations only: time is integrated in simulation seconds, never wall time.
 const REQUIRED = ['x', 'z', 'altitudeFt', 'iasKnots', 'gForce', 'pitchDeg', 'rollDeg', 'headingDeg'];
@@ -35,6 +35,8 @@ export class ReplayRecorder {
     this._combatTargets = new Map();
     this._nextBanditSample = 0;
     this._nextMissileSample = 0;
+    this._nextDiagnosticSample = 0;
+    this._lastCombatSystem = null;
     this._measureMetadata();
   }
 
@@ -42,6 +44,7 @@ export class ReplayRecorder {
   update(dt, telemetry, quaternion, combat = null) {
     if (!this.active || !Number.isFinite(dt) || dt <= 0) return;
     this.elapsed += dt;
+    this._lastCombatSystem = combat;
     this._observeCombat(combat);
     if (!telemetry || !REQUIRED.every(key => Number.isFinite(telemetry[key]))) return;
     if (!isQuaternion(quaternion)) return;
@@ -137,33 +140,76 @@ export class ReplayRecorder {
 
     if (!missiles.length) {
       this._nextMissileSample = this.elapsed;
+      this._nextDiagnosticSample = this.elapsed;
       return;
     }
-    if (this.elapsed + 1e-9 < this._nextMissileSample) return;
     const document = this._ensureCombat();
-    for (const missile of missiles) {
-      document.missileSamples.push({
-        timeSec: this.elapsed,
-        id: missile.id & 255,
-        typeId: missile.typeId,
-        x: missile.position.x, y: missile.position.y, z: missile.position.z,
-        quat: [missile.quaternion.x, missile.quaternion.y, missile.quaternion.z, missile.quaternion.w],
-        powered: missile.propellant > 0,
-      });
+
+    if (this.elapsed + 1e-9 >= this._nextMissileSample) {
+      for (const missile of missiles) {
+        document.missileSamples.push({
+          timeSec: this.elapsed,
+          id: missile.id & 255,
+          typeId: missile.typeId,
+          x: missile.position.x, y: missile.position.y, z: missile.position.z,
+          quat: [missile.quaternion.x, missile.quaternion.y, missile.quaternion.z, missile.quaternion.w],
+          powered: missile.propellant > 0,
+        });
+      }
+      this._nextMissileSample = this.elapsed + document.missileIntervalSec;
     }
-    this._nextMissileSample = this.elapsed + document.missileIntervalSec;
+
+    if (this.elapsed + 1e-9 >= this._nextDiagnosticSample) {
+      for (const missile of missiles) {
+        const obs = missile.seeker?.lastObservation;
+        const flight = missile.flight;
+        document.diagnosticSamples.push({
+          timeSec: this.elapsed,
+          missileId: (missile.id ?? 0) & 255,
+          guidanceActive: Boolean(missile.lastGuidance?.active),
+          powered: missile.propellant > 0,
+          tracking: Boolean(missile.seeker?.hasEstimate),
+          guidanceCutoffReason: missile.lastGuidance?.reason ?? 'none',
+          seekerState: missile.seeker?.state ?? 'unknown',
+          seekerLossReason: obs?.lossReason ?? 'none',
+          speedMps: missile.velocity?.length() ?? 0,
+          altitudeM: missile.position?.y ?? 0,
+          dynamicPressurePa: flight?.dynamicPressurePa ?? 0,
+          requestedLateralG: (flight?.requestedLateralMps2 ?? 0) / 9.80665,
+          availableLateralG: (flight?.availableLateralMps2 ?? 0) / 9.80665,
+          deliveredLateralG: (flight?.deliveredLateralMps2 ?? 0) / 9.80665,
+          maneuverDragN: flight?.maneuverDragN ?? 0,
+          baseDragN: flight?.baseDragN ?? 0,
+          propellant: missile.propellant ?? 0,
+          signalQuality: obs?.signalQuality ?? 0,
+          targetRangeM: obs?.rangeM ?? 0,
+        });
+      }
+      this._nextDiagnosticSample = this.elapsed + document.diagnosticIntervalSec;
+    }
   }
 
   _ensureCombat() {
     if (this.combat) return this.combat;
     this.combat = {
+      version: COMBAT_TRACK_VERSION,
       banditIntervalSec: 0.5,
       missileIntervalSec: 0.05,
+      diagnosticIntervalSec: 0.2,
       targets: [],
       banditSamples: [],
       missileSamples: [],
+      diagnosticSamples: [],
       events: [],
       killEventsRecorded: true,
+      diagnosticRecorded: true,
+      fidelity: {
+        downsampled: false,
+        eventsPreserved: true,
+        missileIntervalSec: 0.05,
+        banditIntervalSec: 0.5,
+        diagnosticIntervalSec: 0.2,
+      },
     };
     return this.combat;
   }
@@ -185,20 +231,30 @@ export class ReplayRecorder {
   }
 
   /**
-   * Record a live combat event at the current sortie time. Detonation markers
-   * drive replay explosions and remove missiles; expiry markers only remove.
-   * Kill markers independently count each destroyed target, including gun kills.
+   * Record a live combat event at the current sortie time.
    */
   recordCombatEvent(event) {
     if (!this.active || !event) return;
-    if (event.type !== 'detonation' && event.type !== 'expire' && event.type !== 'kill') return;
+    const allowed = ['detonation', 'expire', 'kill', 'launch', 'seeker_state', 'decoy_dispense', 'decoy_transfer', 'damage', 'unresolved_end', 'flare_dispense', 'chaff_dispense'];
+    if (!allowed.includes(event.type)) return;
     const document = this._ensureCombat();
-    const position = event.position || event.missile?.position;
-    const velocity = event.velocity || event.missile?.velocity;
-    document.events.push({
-      timeSec: this.elapsed,
-      kind: event.type,
-      missileId: (event.missile?.id ?? 0) & 255,
+    const position = event.position || event.missile?.position || event.flare?.position || event.chaff?.position;
+    const velocity = event.velocity || event.missile?.velocity || event.flare?.velocity || event.chaff?.velocity;
+
+    let normalizedKind = event.type;
+    let decoyType = event.decoyType;
+    if (event.type === 'flare_dispense') {
+      normalizedKind = 'decoy_dispense';
+      decoyType = 'flare';
+    } else if (event.type === 'chaff_dispense') {
+      normalizedKind = 'decoy_dispense';
+      decoyType = 'chaff';
+    }
+
+    const eventRecord = {
+      timeSec: event.timeSec ?? this.elapsed,
+      kind: normalizedKind,
+      missileId: (event.missile?.id ?? event.missileId ?? 0) & 255,
       surface: Boolean(event.surface),
       x: position?.x ?? 0,
       y: position?.y ?? 0,
@@ -206,7 +262,45 @@ export class ReplayRecorder {
       vx: velocity?.x ?? 0,
       vy: velocity?.y ?? 0,
       vz: velocity?.z ?? 0,
-    });
+    };
+
+    if (normalizedKind === 'launch') {
+      eventRecord.locked = Boolean(event.locked);
+      eventRecord.lockProgress = event.lockProgress ?? 0;
+      eventRecord.targetId = (event.missile?.launchTargetId ?? event.target?.id ?? 0) & 255;
+      eventRecord.vx = eventRecord.lockProgress;
+    } else if (normalizedKind === 'seeker_state') {
+      eventRecord.state = event.state ?? 'unknown';
+      eventRecord.lossReason = event.lastObservation?.lossReason ?? 'none';
+      eventRecord.signalQuality = event.lastObservation?.signalQuality ?? 0;
+      eventRecord.aspectAngleDeg = event.lastObservation?.aspectAngleDeg ?? 0;
+      eventRecord.observationAgeSec = event.observationAge ?? 0;
+      eventRecord.vx = eventRecord.signalQuality;
+      eventRecord.vy = eventRecord.aspectAngleDeg;
+      eventRecord.vz = eventRecord.observationAgeSec;
+    } else if (normalizedKind === 'decoy_dispense') {
+      eventRecord.decoyType = decoyType;
+      eventRecord.remaining = event.remaining ?? 0;
+    } else if (normalizedKind === 'decoy_transfer') {
+      eventRecord.decoyType = event.decoyType ?? 'flare';
+      eventRecord.decoyId = (event.decoy?.id ?? event.decoyId ?? 0) & 255;
+      eventRecord.signalQuality = event.signalQuality ?? 0;
+      eventRecord.separationAngleDeg = event.separationAngleDeg ?? 0;
+      eventRecord.vx = eventRecord.signalQuality;
+      eventRecord.vy = eventRecord.separationAngleDeg;
+    } else if (normalizedKind === 'damage' || normalizedKind === 'kill') {
+      eventRecord.hitZone = event.hitZone ?? 'unknown';
+      eventRecord.amount = event.damage ?? 0;
+      if (normalizedKind === 'damage') eventRecord.vx = eventRecord.amount;
+    } else if (normalizedKind === 'unresolved_end') {
+      eventRecord.reason = 'unresolved_sortie_ended';
+    } else if (normalizedKind === 'detonation') {
+      eventRecord.reason = event.surface ? 'surface_collision' : 'proximity_fuze';
+    } else if (normalizedKind === 'expire') {
+      eventRecord.reason = event.reason ?? 'life_expiry';
+    }
+
+    document.events.push(eventRecord);
   }
 
   /** Keep the saved/auto entry inside the per-entry budget by thinning combat before pose. */
@@ -214,16 +308,26 @@ export class ReplayRecorder {
     if (!this.combat) return;
     const poseBytes = HEADER_BYTES + this.metadataBytes + poseSamples * RECORD_BYTES;
     const available = decodedByteBudget(this.maxBase64Bytes) - poseBytes;
-    while (combatByteLength(this.combat) > available) {
+    while (combatByteLength(this.combat, this.combat.version ?? COMBAT_TRACK_VERSION) > available) {
       const document = this.combat;
-      if (document.missileSamples.length > 1) {
+      if (document.diagnosticSamples?.length > 1) {
+        document.diagnosticSamples = document.diagnosticSamples.filter((_, index) => index % 2 === 0);
+        document.diagnosticIntervalSec *= 2;
+        document.fidelity.downsampled = true;
+        document.fidelity.diagnosticIntervalSec = document.diagnosticIntervalSec;
+      } else if (document.missileSamples.length > 1) {
         document.missileSamples = document.missileSamples.filter((_, index) => index % 2 === 0);
         document.missileIntervalSec *= 2;
+        document.fidelity.downsampled = true;
+        document.fidelity.missileIntervalSec = document.missileIntervalSec;
       } else if (document.banditSamples.length > 1) {
         document.banditSamples = document.banditSamples.filter((_, index) => index % 2 === 0);
         document.banditIntervalSec *= 2;
+        document.fidelity.downsampled = true;
+        document.fidelity.banditIntervalSec = document.banditIntervalSec;
       } else if (document.events.length) {
         document.events.length = 0;
+        document.fidelity.eventsPreserved = false;
       } else {
         this.combat = null;
         return;
@@ -270,6 +374,29 @@ export class ReplayRecorder {
       // At the final rung retain the endpoint even when the flight is too long to save.
       if (this.samples.at(-1) !== this.latest) this.samples[this.samples.length - 1] = this.latest;
     }
+
+    // Mark alive missiles as unresolved because the sortie ended while they were in flight
+    if (this.combat && this._lastCombatSystem?.missiles) {
+      const resolvedMissileIds = new Set(
+        this.combat.events
+          .filter(e => e.kind === 'detonation' || e.kind === 'expire')
+          .map(e => e.missileId)
+      );
+      for (const missile of this._lastCombatSystem.missiles) {
+        if (missile.alive && !resolvedMissileIds.has((missile.id ?? 0) & 255)) {
+          missile.finalOutcome = { reason: 'unresolved_sortie_ended', timeSec: this.elapsed };
+          this.recordCombatEvent({
+            type: 'unresolved_end',
+            missile,
+            position: missile.position,
+            velocity: missile.velocity,
+            timeSec: this.elapsed,
+            reason: 'unresolved_sortie_ended',
+          });
+        }
+      }
+    }
+
     this._trimCombat(this.samples.length);
     this.track = {
       intervalSec: this.interval,
