@@ -394,9 +394,9 @@ export class JoystickCheckDialog {
         if (selected >= 0) {
           for (const action of Object.keys(mapping)) if (mapping[action] === selected) mapping[action] = -1;
         }
-        mapping[select.dataset.combatButton] = selected;
+        mapping[select.getAttribute('data-combat-button')] = selected;
         this.hotas.applyConfig({ combatButtons: mapping });
-        for (const field of this.dialog.querySelectorAll('[data-combat-button]')) field.value = String(mapping[field.dataset.combatButton]);
+        for (const field of this.dialog.querySelectorAll('[data-combat-button]')) field.value = String(mapping[field.getAttribute('data-combat-button')]);
         this.savePreferences();
       });
     }
@@ -455,7 +455,7 @@ export class JoystickCheckDialog {
 
     // Populate current config
     const config = this.hotas?.getConfig() || {};
-    for (const field of this.dialog.querySelectorAll('[data-combat-button]')) field.value = String(config.combatButtons?.[field.dataset.combatButton] ?? -1);
+    for (const field of this.dialog.querySelectorAll('[data-combat-button]')) field.value = String(config.combatButtons?.[field.getAttribute('data-combat-button')] ?? -1);
     if (this.profileSelect) this.profileSelect.value = config.profileOverride || 'auto';
     if (this.axesLayoutSelect) this.axesLayoutSelect.value = config.axesLayout || 'auto';
     if (this.throttleInvertCheck) this.throttleInvertCheck.checked = Boolean(config.throttleInverted);
