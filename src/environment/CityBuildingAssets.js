@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyFarSunShadow } from './FarSunShadow.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Original 2 x 2 atlas: three facades and a shared rooftop. Kept in source so
@@ -152,6 +153,8 @@ export function createCityBuildingAssets() {
     return geometry;
   });
   const farGeometry = box(1, 1, 1, 0, 0);
+  applyFarSunShadow(nearMaterial);
+  applyFarSunShadow(farMaterial);
   return { atlas, nearMaterial, farMaterial, nearGeometries, farGeometry };
 }
 

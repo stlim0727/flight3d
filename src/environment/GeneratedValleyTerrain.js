@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createTreeGeometry } from './TreeModels.js';
+import { applyFarSunShadow, castFarSunShadow } from './FarSunShadow.js';
 import { planValleyTrees } from './valleyTrees.js';
 
 const VALLEY_FLOOR_REFERENCE_M = 2100; // course start floor elevation
@@ -266,8 +267,10 @@ export class GeneratedValleyTerrain {
         metalness: 0.05,
         flatShading: false,
       });
+      applyFarSunShadow(mat);
 
-      this.mesh = new THREE.Mesh(geom, mat);
+      // The walls cast into the coarse far map only; the trees stay out of both passes.
+      this.mesh = castFarSunShadow(new THREE.Mesh(geom, mat));
       this.mesh.receiveShadow = true;
       this.group.add(this.mesh);
 
@@ -284,7 +287,7 @@ export class GeneratedValleyTerrain {
   buildTreeInstances() {
     const trees = planValleyTrees(this.terrain, { floorReferenceM: VALLEY_FLOOR_REFERENCE_M });
     if (!trees.length) return;
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+    const material = applyFarSunShadow(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
     const dummy = new THREE.Object3D();
     for (const species of new Set(trees.map(tree => tree.species))) {
       const batch = trees.filter(tree => tree.species === species);
@@ -393,7 +396,8 @@ export class GeneratedValleyTerrain {
     geometry.computeBoundingSphere();
 
     this.ribbonRings = rings.length;
-    this.ribbonMesh = new THREE.Mesh(geometry, material);
+    // The coarse mesh is culled beneath this corridor; its walls must cast too.
+    this.ribbonMesh = castFarSunShadow(new THREE.Mesh(geometry, material));
     this.ribbonMesh.receiveShadow = true;
     this.ribbonMesh.castShadow = false;
     this.mesh.add(this.ribbonMesh);

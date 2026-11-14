@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { castFarSunShadow } from './FarSunShadow.js';
 
 export const AIRPORT_KIT_URL = `${import.meta.env?.BASE_URL ?? '/'}models/airport/airport-kit.glb`;
 let kitPromise;
@@ -44,5 +45,6 @@ export function createAirportBuildings(kit, airport, { terminal = true } = {}) {
     for (const h of airport.hangarsData) place('Hangar', h.x, h.y, h.z);
   }
   group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
+  castFarSunShadow(group);
   return { group, tower, radar, beacon, lods };
 }

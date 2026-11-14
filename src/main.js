@@ -258,6 +258,7 @@ class FlightSimulator {
 
     this.sky = new SkyAtmosphere(this.scene, this.renderer, this.water);
     this.sky.setShadowMapSize(initialPreset.shadowMapSize);
+    this.sky.setFarShadowQuality(initialPreset.farShadowMapSize, initialPreset.farShadowRange);
     if (this.sky?.setCloudsVisible) {
       this.sky.setCloudsVisible(initialPreset.clouds ?? true);
     }

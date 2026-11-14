@@ -3,6 +3,7 @@ import { AirportNightLighting } from './AirportNightLighting.js';
 import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs, createRunwaySurfaceWear } from './Pavement.js';
 import { loadAirportKit, createAirportBuildings } from './AirportBuildings.js';
 import { applyLogDepthOffset, createRunwayMarkingMaterial } from './RunwayMarkings.js';
+import { applyFarSunShadow } from './FarSunShadow.js';
 
 /**
  * International Airport Environment (Runway 09L/27R, Control Tower, Terminal, Hangars, Lighting)
@@ -110,6 +111,7 @@ export class Airport {
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1
     }), 1);
+    applyFarSunShadow(concreteMat);
 
     const towerGlassMat = new THREE.MeshStandardMaterial({
       name: 'tower-window-glass',

@@ -1,4 +1,5 @@
 import { luklaSurfaceMaterial } from './luklaSurfaceMaterial.js';
+import { castFarSunShadow } from './FarSunShadow.js';
 import * as THREE from 'three';
 import grid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 
@@ -81,6 +82,7 @@ export class LuklaTerrain {
     this.localTerraceMesh = new THREE.Mesh(this.localTerraceGeometry, defaultColorMat);
     this.localTerraceMesh.receiveShadow = true;
     this.mesh.add(this.localTerraceMesh);
+    castFarSunShadow(this.mesh);
 
     // Load real DEM and satellite imagery if in browser environment
     if (!this.isLoaded) {
