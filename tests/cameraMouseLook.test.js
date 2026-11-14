@@ -951,8 +951,6 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       assert.strictEqual(camSys.mode, CameraSystem.MODES.HUD);
       assert.equal(nextModeName, 'HUD');
       camSys.cycleMode();
-      assert.strictEqual(camSys.mode, CameraSystem.MODES.BANDIT_POV);
-      camSys.cycleMode();
       assert.strictEqual(camSys.mode, CameraSystem.MODES.CHASE);
 
       // 3. User drags in CHASE mode

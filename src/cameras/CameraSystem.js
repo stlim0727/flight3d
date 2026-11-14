@@ -32,8 +32,8 @@ export class CameraSystem {
   };
 
   // Keep digit shortcuts stable; the quick cycle follows viewing intent instead.
-  // Keep digit shortcuts stable; the quick cycle follows viewing intent instead.
-  static QUICK_CYCLE = [1, 6, 4, 2, 0, 8, 10];
+  // Specialist views (DIRECTOR 9, BANDIT_POV 10) stay off the cycle and use their digits.
+  static QUICK_CYCLE = [1, 6, 4, 2, 0, 8];
   // Crash views exclude cockpit (0), wing (2), gear (5), HUD (8) - exterior vantage points only
   static CRASH_MODES = [1, 6, 4, 3];
 
