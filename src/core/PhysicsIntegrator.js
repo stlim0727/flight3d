@@ -135,6 +135,9 @@ class PhysicsIntegratorMethods {
     if (this.engines.numEngines > 1 && this.gear.bodyDamage?.engineR !== undefined) {
       this.engines.contactDamage[1] = this.gear.bodyDamage.engineR;
     }
+    if (this.gear.bodyDamage) {
+      this.aero.damageZones = this.gear.bodyDamage;
+    }
     this._cgBefore.copy(this.aero.cg);
     this.engines.bindMassProperties(this.aero.massProperties);
     this.gear.advanceConfiguration(dt);

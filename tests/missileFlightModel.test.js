@@ -129,12 +129,18 @@ test('burnout, pause and reset preserve the normal combat lifecycle with indepen
 });
 
 test('envelope comparison retains favorable hits and records physical control and energy costs', () => {
-  const results = compareMissileEnergyEnvelope();
+  // Isolate aerodynamic energy from the separately tested IR observation model.
+  const results = compareMissileEnergyEnvelope({ idealSensor: true });
   assert.ok(results.some(r => r.terminal === 'hit'));
   assert.ok(results.some(r => r.terminal === 'miss-expired'));
   assert.ok(results.some(r => r.controlLimitedSeconds > 0.5));
   for (const result of results) {
     assert.notEqual(result.terminal, 'timeout', JSON.stringify(result));
+    if (!result.launched) {
+      assert.equal(result.terminal, 'no-lock');
+      assert.equal(result.maneuverDragWorkJPerKg, 0);
+      continue;
+    }
     assert.ok(Number.isFinite(result.terminalMissileSpeedMps));
     assert.ok(result.maneuverDragWorkJPerKg > 0);
   }

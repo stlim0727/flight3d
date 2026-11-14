@@ -14,6 +14,8 @@ export class ExplosionSystem {
     this.fireballs = [];
     this.smokePuffs = [];
     this.debrisParticles = [];
+    this.cometDebris = [];
+    this.cometTailParticles = [];
     this.waterPlumes = [];
     this.shockwaves = [];
     this.persistentWreckage = null;
@@ -70,10 +72,11 @@ export class ExplosionSystem {
   /**
    * Spawns an explosion at the given collision result
    */
-  spawnExplosion(crashResult, velocity = new THREE.Vector3()) {
+  spawnExplosion(crashResult, velocity = new THREE.Vector3(), options = {}) {
     const pos = (crashResult.point || new THREE.Vector3()).clone();
     const isWater = crashResult.type === 'WATER';
     const speed = Math.max(velocity.length(), (crashResult.speedKnots || 0) / 1.94384);
+    const intensity = THREE.MathUtils.clamp(options.intensity ?? (options.exaggerated ? 1.45 : 1.0), 0.5, 2.2);
     const energy = THREE.MathUtils.clamp(speed * speed / (90 * 90), 0.04, 1.5);
     const spread = Math.sqrt(energy);
     if (isWater) {
@@ -96,24 +99,31 @@ export class ExplosionSystem {
     const fireStart = this.fireballs.length;
     const smokeStart = this.smokePuffs.length;
     const debrisStart = this.debrisParticles.length;
-    const heat = THREE.MathUtils.smoothstep(speed, 55, 120);
+    const baseHeat = THREE.MathUtils.smoothstep(speed, 55, 120);
+    const heat = baseHeat > 0 ? Math.min(1.6, baseHeat * intensity) : 0;
     if (heat > 0) {
       const flash = this.getAvailableLight();
       flash.light.position.copy(pos);
       flash.light.color.set(0xffaa66);
-      flash.light.intensity = 12 * heat;
-      flash.light.distance = 60;
+      flash.light.intensity = 16 * heat;
+      flash.light.distance = 110;
       flash.light.visible = true;
       flash.life = 0;
-      flash.maxLife = 0.25;
-      this.spawnFireballCore(pos, Math.ceil(12 * heat), false, isAir);
-      for (const f of this.fireballs.slice(fireStart)) {
-        f.vel.multiplyScalar(0.3);
-        f.scale *= isAir ? 0.85 : 0.45;
-        f.sprite.scale.set(f.scale, f.scale, 1);
-        f.growth *= isAir ? 0.7 : 0.3;
-        f.maxLife = Math.min(f.maxLife, isAir ? 1.1 : 0.65);
+      flash.maxLife = 0.32;
+      if (isAir) {
+        this.spawnShockwave(pos, false, spread * intensity, velocity);
       }
+      this.spawnFireballCore(pos, Math.ceil(14 * heat), false, isAir);
+      for (const f of this.fireballs.slice(fireStart)) {
+        f.vel.multiplyScalar(isAir ? 0.35 : 0.32);
+        if (isAir) f.vel.addScaledVector(velocity, 0.14);
+        f.scale *= (isAir ? 0.95 : 0.55) * Math.min(1.35, intensity);
+        f.sprite.scale.set(f.scale, f.scale, 1);
+        f.growth *= (isAir ? 0.8 : 0.4) * Math.min(1.3, intensity);
+        f.maxLife = Math.min(f.maxLife, isAir ? 1.25 : 0.78);
+      }
+      const cometCount = Math.min(12, Math.ceil((isAir ? 8 : 6) * heat));
+      this.spawnCometDebris(pos, cometCount, velocity, spread, isAir, intensity);
     }
     this.spawnSmokePlume(pos, Math.ceil(20 + 30 * spread), crashResult.type);
     this.spawnShrapnel(pos, Math.ceil(15 + 25 * spread), false);
@@ -137,7 +147,7 @@ export class ExplosionSystem {
     }
   }
 
-  spawnShockwave(pos, isWater, spread = 1) {
+  spawnShockwave(pos, isWater, spread = 1, velocity = null) {
     if (this.shockwaves.length >= 4) return;
     const geo = new THREE.RingGeometry(0.82, 1.0, 64);
     geo.rotateX(-Math.PI * 0.5);
@@ -145,7 +155,7 @@ export class ExplosionSystem {
     const mat = new THREE.MeshBasicMaterial({
       color: isWater ? 0xd0f0fd : 0xffddaa,
       transparent: true,
-      opacity: 0.3,
+      opacity: isWater ? 0.3 : 0.42,
       side: THREE.DoubleSide,
       depthWrite: false
     });
@@ -160,16 +170,21 @@ export class ExplosionSystem {
     };
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(pos);
-    mesh.position.y += 0.25;
+    if (isWater) {
+      mesh.position.y += 0.25;
+    } else if (velocity && velocity.lengthSq() > 1) {
+      const normal = velocity.clone().normalize();
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+    }
 
     this.group.add(mesh);
     this.shockwaves.push({
       mesh,
       scale: 1.0,
-      maxScale: 12 + 18 * spread,
-      opacity: 0.3,
+      maxScale: isWater ? 12 + 18 * spread : 22 + 24 * spread,
+      opacity: isWater ? 0.3 : 0.42,
       life: 0.0,
-      maxLife: 4.0
+      maxLife: isWater ? 4.0 : 0.85
     });
   }
 
@@ -257,10 +272,11 @@ export class ExplosionSystem {
   }
 
   spawnShrapnel(pos, count, isWater) {
+    const emberPalette = [0xffc255, 0xff7b29, 0x8a7d72];
     for (let i = 0; i < count && this.debrisParticles.length < 70; i++) {
       const spriteMat = new THREE.SpriteMaterial({
         map: this.sparkTexture,
-        color: 0x77716a,
+        color: emberPalette[i % emberPalette.length],
         transparent: true,
         opacity: 1.0,
         blending: THREE.NormalBlending,
@@ -293,6 +309,82 @@ export class ExplosionSystem {
         maxLife: 2.5 + Math.random() * 2.0
       });
     }
+  }
+
+  spawnCometDebris(pos, count, velocity = new THREE.Vector3(), spread = 1, isAir = false, intensity = 1) {
+    for (let i = 0; i < count && this.cometDebris.length < 28; i++) {
+      const spriteMat = new THREE.SpriteMaterial({
+        map: this.sparkTexture,
+        color: 0xffe8a3,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      const sprite = new THREE.Sprite(spriteMat);
+      sprite.position.copy(pos);
+
+      const phi = Math.random() * Math.PI * 2;
+      const theta = isAir
+        ? Math.acos(1 - 2 * Math.random())
+        : 0.14 * Math.PI + Math.random() * 0.34 * Math.PI;
+      const burstSpeed = (24 + Math.random() * 38) * Math.max(0.75, spread) * Math.min(1.4, intensity);
+      const vel = new THREE.Vector3(
+        Math.sin(theta) * Math.cos(phi) * burstSpeed,
+        Math.cos(theta) * burstSpeed * (isAir ? 1.0 : 1.25),
+        Math.sin(theta) * Math.sin(phi) * burstSpeed
+      );
+      vel.addScaledVector(velocity, isAir ? 0.55 : 0.22);
+      if (!isAir) vel.y = Math.max(10, vel.y);
+
+      const baseScale = (1.5 + Math.random() * 1.4) * Math.min(1.4, intensity);
+      sprite.scale.set(baseScale, baseScale, 1.0);
+
+      this.group.add(sprite);
+      this.cometDebris.push({
+        sprite,
+        vel,
+        scale: baseScale,
+        isAir,
+        tailTimer: 0,
+        tailStep: 0,
+        life: 0.0,
+        maxLife: 1.3 + Math.random() * 1.2
+      });
+    }
+  }
+
+  spawnCometTailParticle(pos, cometVel, isSmoke, isAir, baseScale) {
+    if (this.cometTailParticles.length >= 240) return;
+    const spriteMat = createFlipbookMaterial(isSmoke ? this.dustTexture : this.fireTexture, {
+      transparent: true,
+      opacity: isSmoke ? 0.52 : 0.92,
+      color: isSmoke ? 0x3b3835 : 0xffb844,
+      blending: isSmoke || isAir ? THREE.NormalBlending : THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.position.copy(pos);
+    const scale = isSmoke ? baseScale * (1.1 + Math.random() * 0.6) : baseScale * (0.95 + Math.random() * 0.55);
+    sprite.scale.set(scale, scale, 1.0);
+
+    const vel = cometVel.clone().multiplyScalar(0.18);
+    vel.x += (Math.random() - 0.5) * 3.0;
+    vel.y += (Math.random() - 0.5) * 3.0 + (isSmoke ? 2.0 : 0.5);
+    vel.z += (Math.random() - 0.5) * 3.0;
+
+    this.group.add(sprite);
+    this.cometTailParticles.push({
+      sprite,
+      vel,
+      scale,
+      growth: isSmoke ? 3.2 : 1.4,
+      isSmoke,
+      life: 0.0,
+      maxLife: isSmoke ? (0.9 + Math.random() * 0.5) : (0.42 + Math.random() * 0.28)
+    });
   }
 
   spawnWaterGeyser(pos, count, velocity = new THREE.Vector3(), spread = 1) {
@@ -440,6 +532,68 @@ export class ExplosionSystem {
         }
 
         d.sprite.material.opacity = Math.max(0.0, 1.0 - t);
+      }
+    }
+
+    // 5b. Update comet-like flaming debris and shed flame/smoke tails
+    for (let i = this.cometDebris.length - 1; i >= 0; i--) {
+      const c = this.cometDebris[i];
+      c.life += dt;
+      const t = c.life / c.maxLife;
+      if (t >= 1.0) {
+        this.group.remove(c.sprite);
+        c.sprite.material.dispose();
+        this.cometDebris.splice(i, 1);
+      } else {
+        c.vel.y -= 9.81 * dt;
+        c.vel.multiplyScalar(Math.exp(-0.22 * dt));
+        c.sprite.position.addScaledVector(c.vel, dt);
+
+        if (!c.isAir) {
+          const groundY = this.terrain ? this.terrain.getHeight(c.sprite.position.x, c.sprite.position.z) : 0.0;
+          if (c.sprite.position.y < groundY + 0.3) {
+            c.sprite.position.y = groundY + 0.3;
+            c.vel.y = -c.vel.y * 0.32;
+            c.vel.x *= 0.68;
+            c.vel.z *= 0.68;
+          }
+        }
+
+        c.tailTimer += dt;
+        while (c.tailTimer >= 0.028) {
+          c.tailTimer -= 0.028;
+          this.spawnCometTailParticle(c.sprite.position, c.vel, false, c.isAir, c.scale);
+          if ((c.tailStep++ % 2) === 0) {
+            this.spawnCometTailParticle(c.sprite.position, c.vel, true, c.isAir, c.scale);
+          }
+        }
+
+        const fade = Math.max(0.0, 1.0 - t * t);
+        c.sprite.scale.set(c.scale * (0.6 + 0.4 * fade), c.scale * (0.6 + 0.4 * fade), 1.0);
+        c.sprite.material.opacity = fade;
+      }
+    }
+
+    // 5c. Update comet tail flame and soot particles
+    for (let i = this.cometTailParticles.length - 1; i >= 0; i--) {
+      const p = this.cometTailParticles[i];
+      p.life += dt;
+      updateFlipbook(p);
+      const t = p.life / p.maxLife;
+      if (t >= 1.0) {
+        this.group.remove(p.sprite);
+        p.sprite.material.dispose();
+        this.cometTailParticles.splice(i, 1);
+      } else {
+        p.sprite.position.addScaledVector(p.vel, dt);
+        p.vel.multiplyScalar(Math.exp(-2.4 * dt));
+        p.scale += p.growth * dt;
+        p.sprite.scale.set(p.scale, p.scale, 1.0);
+        if (!p.isSmoke) {
+          // Cool incandescent yellow-orange -> deep red as the tail ages
+          p.sprite.material.color.setRGB(1.0, Math.max(0.18, 0.72 * (1.0 - t)), Math.max(0.04, 0.27 * (1.0 - t * 1.4)));
+        }
+        p.sprite.material.opacity = Math.max(0.0, (1.0 - t) * (p.isSmoke ? 0.52 : 0.92));
       }
     }
 
@@ -599,6 +753,18 @@ export class ExplosionSystem {
       d.sprite.material.dispose();
     }
     this.debrisParticles = [];
+
+    for (const c of this.cometDebris) {
+      this.group.remove(c.sprite);
+      c.sprite.material.dispose();
+    }
+    this.cometDebris = [];
+
+    for (const p of this.cometTailParticles) {
+      this.group.remove(p.sprite);
+      p.sprite.material.dispose();
+    }
+    this.cometTailParticles = [];
 
     if (!preservePersistent) {
       for (const w of this.waterPlumes) {

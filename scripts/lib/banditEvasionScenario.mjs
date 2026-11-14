@@ -7,7 +7,7 @@ import { MISSILE_TYPES } from '../../src/weapons/missileSpecs.js';
  * Shared by the Node regression and the hardware-browser acceptance check.
  */
 export function runBanditEngagement({ rangeM, aspect, evasion, type = 'AIM9X',
-  altitudeM = 3000, launchSpeedMps = 250, targetSpeedMps = 180, orbitRadiusM = 780 }) {
+  altitudeM = 3000, launchSpeedMps = 250, targetSpeedMps = 180, orbitRadiusM = 780, idealSensor = false }) {
   const dt = 1 / 120;
   const target = new BanditTarget({ callsign: 'COMPARISON', evasion,
     position: new Vector3(orbitRadiusM, altitudeM, 0),
@@ -20,7 +20,8 @@ export function runBanditEngagement({ rangeM, aspect, evasion, type = 'AIM9X',
   const world = { active: true, onGround: false, position,
     velocity: direction.clone().multiplyScalar(launchSpeedMps),
     quaternion: new Quaternion().setFromUnitVectors(new Vector3(0, 0, -1), direction),
-    terrainHeight: () => 0 };
+    terrainHeight: () => 0,
+    ...(idealSensor ? { seekerSignalQuality: () => 1 } : {}) };
   const combat = new AirToAirMissileSystem({ stations: [{ id: 'TEST', type, position: [-5.04, 0.04, 2.45] }] });
   combat.addTarget(target);
   // Hold boresight on the target while acquiring, identically in both runs.
@@ -30,7 +31,14 @@ export function runBanditEngagement({ rangeM, aspect, evasion, type = 'AIM9X',
     world.velocity.copy(direction).multiplyScalar(launchSpeedMps);
     combat.update(dt, world);
   }
-  if (!combat.lockedTarget) throw new Error('Comparison launch must be locked');
+  if (!combat.lockedTarget) {
+    // This matrix requires a rail lock; refusal is not a fired missile miss.
+    return { rangeM, aspect, type, evasion, altitudeM, launchSpeedMps, sensorModel: idealSensor ? 'ideal-fixture' : 'default', launched: false,
+      terminal: 'no-lock', terminalSeconds: 0,
+      minSampledSeparationM: target.position.distanceTo(position), reactionSeconds: null,
+      maxLoadG: target.flight.aero.gForce, controlLimitedSeconds: 0,
+      maneuverDragWorkJPerKg: 0, terminalMissileSpeedMps: null };
+  }
   const missile = combat.fire(world);
   let minSampledSeparationM = Infinity;
   let reactionSeconds = null;
@@ -58,7 +66,7 @@ export function runBanditEngagement({ rangeM, aspect, evasion, type = 'AIM9X',
       break;
     }
   }
-  return { rangeM, aspect, type, evasion, altitudeM, launchSpeedMps, terminal, terminalSeconds,
+  return { rangeM, aspect, type, evasion, altitudeM, launchSpeedMps, sensorModel: idealSensor ? 'ideal-fixture' : 'default', launched: true, terminal, terminalSeconds,
     minSampledSeparationM, reactionSeconds, maxLoadG, controlLimitedSeconds,
     maneuverDragWorkJPerKg, terminalMissileSpeedMps: missile.velocity.length() };
 }
@@ -76,7 +84,7 @@ export function compareBanditEngagements() {
 }
 
 /** Envelope samples vary physical initial conditions, never outcome probabilities. */
-export function compareMissileEnergyEnvelope() {
+export function compareMissileEnergyEnvelope({ idealSensor = false } = {}) {
   const results = [];
   const conditions = [
     { rangeM: 1800, aspect: 'head', altitudeM: 1000, launchSpeedMps: 300 },
@@ -89,7 +97,7 @@ export function compareMissileEnergyEnvelope() {
   for (const type of ['AIM9X', 'AIM120C']) {
     for (const condition of conditions) {
       for (const evasion of [false, true]) {
-        results.push(runBanditEngagement({ ...condition, type, evasion,
+        results.push(runBanditEngagement({ ...condition, type, evasion, idealSensor,
           targetSpeedMps: 240, orbitRadiusM: 1500 }));
       }
     }
