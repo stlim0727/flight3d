@@ -13,6 +13,7 @@ import { Aerodynamics, createAeroResult } from '../src/physics/Aerodynamics.js';
 import { F16_FALCON } from '../src/config/aircraftConfigs.js';
 import { BanditFlightModel } from '../src/weapons/BanditFlightModel.js';
 import { AirToAirMissileSystem, BanditTarget } from '../src/weapons/AirToAirMissileSystem.js';
+import { VulcanCannon } from '../src/weapons/VulcanCannon.js';
 
 test('zone classification and body-frame offset map hits to nose, wings, tail, engine, and fuselage', () => {
   const targetPos = new THREE.Vector3(100, 1000, 200);
@@ -63,7 +64,44 @@ test('computeAeroDamageEffects is neutral when undamaged and induces asymmetric 
 
   assert.ok(aeroDamaged.drag > aeroClean.drag, 'damaged airframe produces higher drag');
   assert.ok(aeroDamaged.lift < aeroClean.lift, 'wing damage reduces lift');
-  assert.ok(resDmg.momentBody.z > resClean.momentBody.z, 'left wing damage induces left-wing-down (+Z) roll moment');
+  assert.ok(resDmg.momentBody.z > resClean.momentBody.z, 'left wing damage induces left-wing-down (+Z) roll moment under positive lift');
+
+  // Negative-G push-over (cl < 0): left wing damage loses downward lift, so intact right wing rolls -Z
+  const velNeg = new THREE.Vector3(0, 45, -220);
+  const resNegClean = aeroClean.computeAero(1 / 120, mesh, velNeg, ang, 1000, 1000, 30000, 0, createAeroResult());
+  const resNegDmg = aeroDamaged.computeAero(1 / 120, mesh, velNeg, ang, 1000, 1000, 30000, 0, createAeroResult());
+  assert.ok(resNegClean.cl < 0, 'push-over produces negative lift');
+  assert.ok(resNegDmg.momentBody.z < resNegClean.momentBody.z, 'left wing damage reverses roll moment sign under negative lift');
+});
+
+test('VulcanCannon reports the swept segment hit point rather than the end-of-step bullet endpoint', () => {
+  const cannon = new VulcanCannon();
+  const target = new BanditTarget({
+    callsign: 'VIPER-2',
+    position: new THREE.Vector3(0, 1500, 0),
+    velocity: new THREE.Vector3(0, 0, 0),
+  });
+  // Bullet starts on the left wing (-3.2m) and steps 12m past the target in one frame.
+  cannon.bullets.push({
+    position: new THREE.Vector3(-3.2, 1500, -4),
+    prevPosition: new THREE.Vector3(-3.2, 1500, -4),
+    velocity: new THREE.Vector3(0, 0, 1000),
+    age: 0,
+    alive: true,
+  });
+  const events = cannon.update(0.012, {
+    active: true,
+    position: new THREE.Vector3(0, 1500, 500),
+    quaternion: new THREE.Quaternion(),
+    velocity: new THREE.Vector3(0, 0, -200),
+    terrainHeight: () => 0,
+  }, [target]);
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, 'bulletHit');
+  // End-of-step z would be +8 (tail/engine), while swept closest point is z = 0 (wingL).
+  assert.ok(Math.abs(events[0].position.z) < 0.2, `expected swept z near 0, got ${events[0].position.z}`);
+  assert.equal(classifyHitZone(toBodyOffset(events[0].position, target.position, target.quaternion, new THREE.Vector3(0, 0, -200))), 'wingL');
 });
 
 test('BanditTarget and BanditFlightModel track zone damage and reset cleanly on respawn', () => {

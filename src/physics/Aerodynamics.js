@@ -410,7 +410,7 @@ export class Aerodynamics {
     // +Y (Yaw): negative rotation yaws nose RIGHT
     // +Z (Roll): negative rotation banks RIGHT
     const pitchMoment = qDyn * this.wingArea * this.meanChord * cm + thrustPitchMoment;
-    const rollAsymmetry = dmg ? dmg.rollAsymmetry * Math.max(0.15, Math.abs(cl)) : 0;
+    const rollAsymmetry = dmg ? dmg.rollAsymmetry * cl : 0;
     const yawAsymmetry = dmg ? dmg.yawAsymmetry : 0;
     const rollMoment = -(qDyn * this.wingArea * this.wingspan * cl_roll)
       + qDyn * this.wingArea * this.wingspan * rollAsymmetry;
