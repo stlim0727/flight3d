@@ -106,13 +106,8 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       const bounds = [...layout.chrome, ...layout.buttons];
       assert.ok(layout.chrome.every(r => r.x >= 0 && r.x + r.w <= width + 1 && r.y >= 0 && r.y + r.h <= height), JSON.stringify(layout.chrome));
       assert.ok(bounds.every(r => r.h >= 44 && (r.sel === '.hud-strip' || r.w >= 44)), 'minimum targets');
-      const wrappedPortrait = width <= 600 && height > width;
-      assert.ok(new Set(layout.buttons.map(b => Math.round(b.y))).size <= (wrappedPortrait ? 3 : 1),
-        `toolbar stays on ${wrappedPortrait ? 'at most three' : 'one'} row(s): ${JSON.stringify(layout.buttons)}`);
-      if (wrappedPortrait) {
-        assert.ok(layout.fits, `portrait toolbar needs no horizontal scroll: ${JSON.stringify(layout.chrome)}`);
-        assert.ok(layout.buttons.every(b => b.hit), `portrait controls stay reachable without scrolling: ${JSON.stringify(layout.buttons)}`);
-      }
+      assert.equal(new Set(layout.buttons.map(b => Math.round(b.y))).size, 1,
+        `toolbar stays on one row: ${JSON.stringify(layout.buttons)}`);
       assert.ok(layout.buttons.every(b => b.center === 'flex/center/center'), `labels centred in their buttons: ${layout.buttons.map(b => b.center)}`);
       // Camera, fullscreen and overflow stay pinned to the right edge; the
       // aircraft actions unfold to their left and wrap on portrait phones.
