@@ -36,8 +36,21 @@ export class MissileFlightModel {
     this.thrustN = thrustN;
     this.dynamicPressurePa = 0.5 * density * speed * speed;
     const qArea = this.dynamicPressurePa * spec.crossSectionM2;
+
+    // TVC enables high-alpha trimming during motor burn, elevating effective body CLmax
+    const burnFraction = (spec.tvc && spec.maxThrustN > 0) ? Math.max(0, thrustN) / spec.maxThrustN : 0;
+    const maxCl = spec.tvc
+      ? spec.maxLiftCoefficient + ((spec.tvcMaxLiftCoefficient ?? spec.maxLiftCoefficient) - spec.maxLiftCoefficient) * burnFraction
+      : spec.maxLiftCoefficient;
+    const aeroLateralMps2 = massKg > 0 ? (qArea * maxCl) / massKg : 0;
+
+    // Direct nozzle vane lateral thrust component: F_tvc = thrustN * sin(delta_max)
+    const maxDeflectionRad = THREE.MathUtils.degToRad(spec.tvcMaxDeflectionDeg ?? 20);
+    const sinMaxDeflection = Math.sin(maxDeflectionRad);
+    const maxTvcLatMps2 = (spec.tvc && massKg > 0 && thrustN > 0) ? (thrustN * sinMaxDeflection) / massKg : 0;
+
     this.availableLateralMps2 = Math.min(spec.maxLateralG * GRAVITY,
-      qArea * spec.maxLiftCoefficient / massKg);
+      aeroLateralMps2 + maxTvcLatMps2);
 
     this.request.copy(command);
     // Guidance compensates gravity only while tracking, and pays for that lift.
@@ -53,16 +66,27 @@ export class MissileFlightModel {
     // yesterday's force when dynamic pressure or the structural limit falls.
     this.lateralAcceleration.clampLength(0, this.availableLateralMps2);
     this.deliveredLateralMps2 = this.lateralAcceleration.length();
-    const liftN = massKg * this.deliveredLateralMps2;
-    const liftCoefficient = qArea > 0 ? liftN / qArea : 0;
+
+    // Partition lateral acceleration between aerodynamic lift and direct nozzle thrust vectoring
+    const aeroDemandMps2 = Math.min(this.deliveredLateralMps2, aeroLateralMps2);
+    const tvcDemandMps2 = Math.min(maxTvcLatMps2, Math.max(0, this.deliveredLateralMps2 - aeroDemandMps2));
+
+    const liftCoefficient = qArea > 0 ? (massKg * aeroDemandMps2) / qArea : 0;
     this.baseDragN = qArea * spec.dragCoefficient;
     this.maneuverDragN = qArea * spec.inducedDragFactor * liftCoefficient * liftCoefficient;
+
+    // Axial thrust loss corresponds exactly to nozzle vane deflection: T_axial = T * cos(delta)
+    const sinDeflection = (thrustN > 0 && massKg > 0)
+      ? Math.min(sinMaxDeflection, (massKg * tvcDemandMps2) / thrustN)
+      : 0;
+    const cosDeflection = Math.sqrt(Math.max(0, 1 - sinDeflection * sinDeflection));
+    const effectiveThrustN = thrustN * cosDeflection;
 
     // Positive, dissipative scalar drag update (no drag-induced reversal).
     // Rotate velocity for lateral control instead of an Euler vector kick:
     // normal force must not manufacture kinetic energy during a discrete turn.
     const dragRate = speed > 0 ? (this.baseDragN + this.maneuverDragN) / (massKg * speed) : 0;
-    const nextSpeed = (speed + thrustN * dt / massKg) / (1 + dragRate * dt);
+    const nextSpeed = (speed + effectiveThrustN * dt / massKg) / (1 + dragRate * dt);
     this.turnAxis.crossVectors(this.direction, this.lateralAcceleration);
     const angle = this.deliveredLateralMps2 * dt / Math.max((speed + nextSpeed) * 0.5, 1e-6);
     velocity.copy(this.direction);

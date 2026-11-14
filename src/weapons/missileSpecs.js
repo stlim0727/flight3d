@@ -21,6 +21,11 @@ export const MISSILE_TYPES = {
     maxLiftCoefficient: 12,
     inducedDragFactor: 0.025,
     autopilotTimeConstantS: 0.12,
+    // Jet vane thrust vector control (TVC): active during rocket motor burn.
+    // Deflects exhaust plume up to 20° and trims missile to high angle-of-attack (CLmax 42).
+    tvc: true,
+    tvcMaxDeflectionDeg: 20,
+    tvcMaxLiftCoefficient: 42,
     // Sensor-state simulation assumptions, not measured weapon specifications.
     seekerType: 'IR',
     seekerAcquireSeconds: 0.15,

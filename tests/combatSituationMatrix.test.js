@@ -41,18 +41,35 @@ test('combat situation: off-boresight angle respects 28-degree seeker FOV rail b
   assert.equal(outsideFov.terminal, 'no-lock');
 });
 
-test('combat situation: short-range crossing beam exposes lack of early boost TVC', () => {
-  const beamResult = simulateCombatSituation({
+test('combat situation: short-range crossing beam demonstrates early boost TVC capability', () => {
+  // With TVC enabled (default on AIM-9X), missile pulls high-G off the rail and intercepts crossing target
+  const tvcResult = simulateCombatSituation({
     type: 'AIM9X',
     rangeM: 400,
     aspectDeg: 90,
     shooterAltM: 1500,
     targetAltM: 1500,
     targetBehavior: 'straight',
+    tvc: true,
   });
-  assert.equal(beamResult.launched, true);
-  assert.notEqual(beamResult.terminal, 'hit', 'Aerodynamically limited missile should miss beam target at 400m');
-  assert.ok(beamResult.guidanceLossReasons.includes('gimbal_limit') || beamResult.seekerLossReasons.includes('fov_limit'));
+  assert.equal(tvcResult.launched, true);
+  assert.equal(tvcResult.terminal, 'hit', 'TVC-capable AIM-9X should intercept crossing beam target at 400m');
+  assert.ok(tvcResult.minSeparationM < 5.0, `Expected lethal proximity burst, got ${tvcResult.minSeparationM}`);
+  assert.ok(tvcResult.maxMissileLateralG > 24, `Expected high TVC turn rate >24G, got ${tvcResult.maxMissileLateralG}G`);
+
+  // Without TVC (e.g. AIM-120C or baseline tvc: false), missile is aerodynamically limited and misses
+  const nonTvcResult = simulateCombatSituation({
+    type: 'AIM9X',
+    rangeM: 400,
+    aspectDeg: 90,
+    shooterAltM: 1500,
+    targetAltM: 1500,
+    targetBehavior: 'straight',
+    tvc: false,
+  });
+  assert.equal(nonTvcResult.launched, true);
+  assert.notEqual(nonTvcResult.terminal, 'hit', 'Aerodynamically limited missile should miss beam target at 400m');
+  assert.ok(nonTvcResult.guidanceLossReasons.includes('gimbal_limit') || nonTvcResult.seekerLossReasons.includes('fov_limit'));
 });
 
 test('combat situation: countermeasure flares cause decoy transfers on AIM-9X', () => {
@@ -68,7 +85,7 @@ test('combat situation: countermeasure flares cause decoy transfers on AIM-9X', 
 });
 
 test('combat situation: anomaly detector identifies BVR coasting and short-range beam patterns', () => {
-  // Baseline without RWR exposes the BVR burnout blindness anomaly
+  // Baseline without RWR and TVC exposes both anomalies
   const baselineMatrix = sweepCombatSituationMatrix({
     types: ['AIM9X', 'AIM120C'],
     ranges: [400, 7000],
@@ -77,6 +94,7 @@ test('combat situation: anomaly detector identifies BVR coasting and short-range
     behaviors: ['straight', 'evasive_ai'],
     cms: [false, true],
     rwr: false,
+    tvc: false,
   });
 
   assert.ok(baselineMatrix.length >= 24);
@@ -84,7 +102,7 @@ test('combat situation: anomaly detector identifies BVR coasting and short-range
   const baselineIds = baselineAnomalies.map(a => a.id);
 
   assert.ok(baselineIds.includes('BVR_BURNOUT_BLINDNESS_ALWAYS_HIT'), 'Should identify BVR burnout blindness anomaly without RWR');
-  assert.ok(baselineIds.includes('SHORT_RANGE_BEAM_ALWAYS_MISS'), 'Should identify short-range beam always-miss anomaly');
+  assert.ok(baselineIds.includes('SHORT_RANGE_BEAM_ALWAYS_MISS'), 'Should identify short-range beam always-miss anomaly without TVC');
   assert.ok(!baselineIds.includes('EXTREME_RANGE_IMPOSSIBLE_HIT'), 'Should not have impossible hits beyond envelope');
 
   // With RWR enabled, the BVR active radar burnout blindness is mitigated
@@ -100,4 +118,18 @@ test('combat situation: anomaly detector identifies BVR coasting and short-range
   const rwrAnomalies = detectMissileAnomalies(rwrMatrix);
   const rwrIds = rwrAnomalies.map(a => a.id);
   assert.ok(!rwrIds.includes('BVR_BURNOUT_BLINDNESS_ALWAYS_HIT'), 'RWR defense should mitigate BVR always-hit anomaly');
+
+  // With TVC enabled on AIM-9X, the short-range beam always-miss anomaly is mitigated
+  const tvcMatrix = sweepCombatSituationMatrix({
+    types: ['AIM9X'],
+    ranges: [400],
+    aspects: [90],
+    altitudes: [3000],
+    behaviors: ['straight'],
+    cms: [false],
+    tvc: true,
+  });
+  const tvcAnomalies = detectMissileAnomalies(tvcMatrix);
+  const tvcIds = tvcAnomalies.map(a => a.id);
+  assert.ok(!tvcIds.includes('SHORT_RANGE_BEAM_ALWAYS_MISS'), 'TVC should mitigate short-range beam always-miss anomaly on AIM-9X');
 });
