@@ -1,10 +1,41 @@
 import * as THREE from 'three';
 import { BanditAircraftView } from './BanditAircraftView.js';
 import { createMissileMesh } from './missileGeometry.js';
+import { ZONE_LOCAL_CENTERS } from '../physics/combatDamage.js';
 
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const scratchDirection = new THREE.Vector3();
+const scratchOffset = new THREE.Vector3();
+const scratchQuat = new THREE.Quaternion();
+const scratchEmitPos = new THREE.Vector3();
 let smokeTexture = null;
+
+function mostDamagedZone(damageZones) {
+  if (!damageZones) return null;
+  let bestZone = null;
+  let bestValue = 0;
+  for (const [zone, value] of Object.entries(damageZones)) {
+    if (value > bestValue && ZONE_LOCAL_CENTERS[zone]) {
+      bestValue = value;
+      bestZone = zone;
+    }
+  }
+  return bestZone;
+}
+
+function zoneEmitWorldPosition(target, zone, out) {
+  const local = zone ? ZONE_LOCAL_CENTERS[zone] : null;
+  if (!local) return out.copy(target.position);
+  scratchOffset.set(local.x, local.y, local.z);
+  if (target.quaternion) {
+    scratchOffset.applyQuaternion(target.quaternion);
+  } else if (target.velocity?.lengthSq() > 1) {
+    scratchDirection.copy(target.velocity).normalize();
+    scratchQuat.setFromUnitVectors(FORWARD, scratchDirection);
+    scratchOffset.applyQuaternion(scratchQuat);
+  }
+  return out.copy(target.position).add(scratchOffset);
+}
 
 /** Soft circular puff: PointsMaterial without a map renders hard squares. */
 function smokeMap() {
@@ -119,7 +150,7 @@ export class MissileCombatView {
         const aircraft = new BanditAircraftView(target.callsign);
         const mesh = aircraft.mesh;
         this.scene.add(mesh);
-        view = { mesh, aircraft, trail: null };
+        view = { mesh, aircraft, trail: null, fireTrail: null };
         this.targetViews.set(target.id, view);
       }
       view.mesh.visible = target.alive;
@@ -129,6 +160,13 @@ export class MissileCombatView {
           if (view.trail.done) {
             view.trail.dispose();
             view.trail = null;
+          }
+        }
+        if (view.fireTrail) {
+          view.fireTrail.update(dt, null, false);
+          if (view.fireTrail.done) {
+            view.fireTrail.dispose();
+            view.fireTrail = null;
           }
         }
         continue;
@@ -141,15 +179,37 @@ export class MissileCombatView {
         scratchDirection.copy(target.velocity).normalize();
         view.mesh.quaternion.setFromUnitVectors(FORWARD, scratchDirection);
       }
-      // A damaged drone bleeds dark smoke until it is destroyed; the trail is a
-      // continuous visual function of accumulated damage, not a state label.
-      if (target.damage > 0.15) {
+      // A damaged drone bleeds dark smoke (and fire on heavy/engine damage)
+      // from its most damaged zone until it is destroyed.
+      if (target.damage > 0.12) {
+        const zone = mostDamagedZone(target.damageZones);
+        const emitPos = zoneEmitWorldPosition(target, zone, scratchEmitPos);
         if (!view.trail) {
           view.trail = new SmokeTrail(this.scene, {
-            max: 72, size: 3.0, color: 0x4b4b4b, opacity: 0.42,
+            max: 72, size: 3.0 + target.damage * 1.4, color: 0x3f3f3f, opacity: 0.48,
           });
         }
-        view.trail.update(dt, target.position, true);
+        view.trail.update(dt, emitPos, true);
+        const onFire = target.damage > 0.55 || (target.damageZones?.engine ?? 0) > 0.45 || (target.damageZones?.fuselage ?? 0) > 0.55;
+        if (onFire) {
+          if (!view.fireTrail) {
+            view.fireTrail = new SmokeTrail(this.scene, {
+              max: 48, size: 2.4, color: 0xff7722, opacity: 0.78, life: 0.65,
+            });
+          }
+          view.fireTrail.update(dt, emitPos, true);
+        } else if (view.fireTrail) {
+          view.fireTrail.update(dt, null, false);
+        }
+      } else {
+        if (view.trail) {
+          view.trail.update(dt, null, false);
+          if (view.trail.done) { view.trail.dispose(); view.trail = null; }
+        }
+        if (view.fireTrail) {
+          view.fireTrail.update(dt, null, false);
+          if (view.fireTrail.done) { view.fireTrail.dispose(); view.fireTrail = null; }
+        }
       }
     }
     for (const [id, view] of this.targetViews) {
@@ -157,6 +217,7 @@ export class MissileCombatView {
       this.scene.remove(view.mesh);
       view.aircraft.dispose();
       view.trail?.dispose();
+      view.fireTrail?.dispose();
       this.targetViews.delete(id);
     }
 
@@ -205,12 +266,16 @@ export class MissileCombatView {
   spawnExplosion(explosionSystem, event) {
     if (!explosionSystem || !event?.position) return;
     const velocity = event.velocity || new THREE.Vector3();
+    const isKill = Boolean(event.target);
     explosionSystem.spawnExplosion({
       point: event.position,
       type: 'AIR',
       name: 'MISSILE DETONATION',
       speedKnots: velocity.length() * 1.94384,
-    }, velocity);
+    }, velocity, {
+      exaggerated: isKill,
+      intensity: isKill ? 1.5 : 1.1,
+    });
   }
 
   clear() {
@@ -218,6 +283,7 @@ export class MissileCombatView {
       this.scene.remove(view.mesh);
       view.aircraft.dispose();
       view.trail?.dispose();
+      view.fireTrail?.dispose();
     }
     for (const view of this.missileViews.values()) {
       this.scene.remove(view.mesh);

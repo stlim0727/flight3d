@@ -78,6 +78,11 @@ or sensor observations supplied to the bandit pilot.
 The original 18-run paired matrix remains at 9/9 hits for patrol targets and
 9/9 for evasive targets. A force model does not require favorable shots to miss.
 
+Those are pre-IR acceptance results. The subsequent [IR model](infrared-signal.md)
+can reject rail acquisition; current default comparisons report `no-lock` separately.
+The aerodynamic regression now explicitly requests `{ idealSensor: true }` to keep
+its sensor-independent control, rather than overriding the default model silently.
+
 `compareMissileEnergyEnvelope()` adds 24 runs: both missile types and patrol/evasive
 targets for each set below. Target speed is 240 m/s and commanded orbit radius
 1,500 m. The launcher retains the stationary-position fixture and acquisition

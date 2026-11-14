@@ -97,16 +97,19 @@ export class BanditFlightModel {
     this.aero.rudder = clamp(this.aero.beta * 2 + this.angularVelocity.y * 0.6, -0.6, 0.6);
   }
 
-  step(dt, damage = 0, clearance = 1000) {
+  step(dt, damage = 0, clearance = 1000, damageZones = null) {
     this.oldCg.copy(this.aero.cg);
-    this.engines.contactDamage[0] = damage;
+    this.aero.damageZones = damageZones;
+    this.engines.contactDamage[0] = damageZones
+      ? Math.max(damage, damageZones.engine ?? 0)
+      : damage;
     this.engines.setThrottle(this.controls.throttle);
     const atmosphere = Atmosphere.getConditions(this.position.y);
     const engine = this.engines.update(dt, this.position.y, this.linearVelocity.length(), atmosphere.densityRatio);
     this.aero.syncMassProperties();
     rebaseCgVelocity(this.linearVelocity, this.angularVelocity, this.quaternion, this.oldCg, this.aero.cg);
     // Damage increases drag continuously; the shared engine model loses thrust.
-    this.aero.CD0 = F16_FALCON.aerodynamics.cd0Clean * (1 + damage * 2);
+    this.aero.CD0 = F16_FALCON.aerodynamics.cd0Clean * (1 + damage * (damageZones ? 0.8 : 2));
     const result = this.measure(dt, engine.totalThrust, clearance);
     this.force.set(0, 0, -engine.totalThrust).applyQuaternion(this.quaternion)
       .add(result.forceWorld);

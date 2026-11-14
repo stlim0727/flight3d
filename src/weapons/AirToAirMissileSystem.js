@@ -1,11 +1,21 @@
 import * as THREE from 'three';
 import { BanditThreatResponse } from './BanditThreatResponse.js';
 import { MissileSeeker, seekerCanObserve } from './MissileSeeker.js';
+import { sampleEngineInfrared } from './InfraredSignal.js';
 import { MissileFlightModel } from './MissileFlightModel.js';
 import { BanditFlightModel } from './BanditFlightModel.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { RWRSystem } from '../systems/RWRSystem.js';
-import { addDamage, blastDamage, combatDamageState } from '../physics/combatDamage.js';
+import {
+  addDamage,
+  applyBlastZoneDamage,
+  applyZoneDamage,
+  blastDamage,
+  classifyHitZone,
+  combatDamageState,
+  createDamageZones,
+  toBodyOffset,
+} from '../physics/combatDamage.js';
 import { VulcanCannon } from './VulcanCannon.js';
 import { F16_MISSILE_STATIONS, MISSILE_TYPES } from './missileSpecs.js';
 
@@ -33,8 +43,16 @@ export class BanditTarget {
     this.respawnTimer = 0;
     this.damage = 0;
     this.damageState = 'normal';
+    this.damageZones = createDamageZones();
+    this.lastHitZone = null;
+    this.damageZones = createDamageZones();
+    this.lastHitZone = null;
     this.hostile = true;
     this.radar = true;
+    // Kinematic test targets are explicit hot omnidirectional emitters. Live
+    // patrol aircraft publish measured engine state and use their actual attitude.
+    this.infraredSignature = { enginePower: 1, heat: 1, afterburner: 0, omnidirectional: true };
+    this.infraredAfterburnerLevel = 0;
     this.threatResponse = new BanditThreatResponse(evasion);
     this.flight = null;
     this.quaternion = null;
@@ -63,18 +81,20 @@ export class BanditTarget {
     for (let i = 0; i < steps; i++) {
       this.threatResponse.update(dt / steps, this, missiles, terrainHeight);
       const response = this.threatResponse;
+      const avionicsIntegrity = Math.max(0.25, 1 - 0.6 * (this.damageZones?.nose ?? 0));
       const headingError = Math.atan2(Math.sin(response.heading - patrolHeading),
         Math.cos(response.heading - patrolHeading));
-      const heading = patrolHeading + headingError * response.weight;
+      const heading = patrolHeading + headingError * response.weight * avionicsIntegrity;
       const lookahead = Math.max(500, this.velocity.length() * 8);
       const ground = Math.max(terrainHeight(this.position.x, this.position.z),
         terrainHeight(this.position.x + Math.sin(heading) * lookahead,
           this.position.z - Math.cos(heading) * lookahead));
       const altitude = Math.max(o.altitudeM, ground + 420);
-      const commandedSpeed = speed + (Math.max(speed, 250) - speed) * response.weight;
+      const commandedSpeed = speed + (Math.max(speed, 250) - speed) * response.weight * avionicsIntegrity;
       this.flight.guide(heading, altitude, commandedSpeed);
       this.flight.step(dt / steps, this.damage,
-        this.position.y - terrainHeight(this.position.x, this.position.z));
+        this.position.y - terrainHeight(this.position.x, this.position.z), this.damageZones);
+      sampleEngineInfrared(this.flight.engines, this.infraredAfterburnerLevel, this.infraredSignature);
       if (this.position.y <= terrainHeight(this.position.x, this.position.z) + 2) {
         this.alive = false;
         this.respawnTimer = BANDIT_RESPAWN_SECONDS;
@@ -91,6 +111,10 @@ export class BanditTarget {
     this.respawnTimer = 0;
     this.damage = 0;
     this.damageState = 'normal';
+    this.damageZones = createDamageZones();
+    this.lastHitZone = null;
+    this.damageZones = createDamageZones();
+    this.lastHitZone = null;
     this.threatResponse.reset();
     const o = orbit;
     if (o) {
@@ -101,6 +125,9 @@ export class BanditTarget {
     }
     this.flight = o ? new BanditFlightModel(this.position, this.velocity) : null;
     this.quaternion = this.flight?.quaternion ?? null;
+    this.infraredAfterburnerLevel = 0;
+    if (this.flight) sampleEngineInfrared(this.flight.engines, 0, this.infraredSignature);
+    else Object.assign(this.infraredSignature, { enginePower: 1, heat: 1, afterburner: 0, omnidirectional: true });
   }
 }
 
@@ -575,12 +602,24 @@ export class AirToAirMissileSystem {
     detonationEmitted = false,
   } = {}) {
     if (!target?.alive || amount <= 0) return;
+    const localOffset = toBodyOffset(position, target.position, target.quaternion, target.velocity);
+    const hitZone = classifyHitZone(localOffset);
+    if (target.damageZones) {
+      if (source === 'missile') {
+        applyBlastZoneDamage(target.damageZones, localOffset, amount);
+      } else {
+        applyZoneDamage(target.damageZones, hitZone, amount * 1.35);
+      }
+      target.lastHitZone = hitZone;
+    }
     target.damage = addDamage(target.damage, amount);
     target.damageState = combatDamageState(target.damage);
     if (target.damage < 1) {
       events.push({
         type: 'damage', target, source, missile,
         damage: target.damage,
+        hitZone,
+        damageZones: target.damageZones ? { ...target.damageZones } : null,
         position: position.clone(),
       });
       return;
@@ -597,6 +636,8 @@ export class AirToAirMissileSystem {
     }
     events.push({
       type: 'kill', target, missile, source,
+      hitZone,
+      damageZones: target.damageZones ? { ...target.damageZones } : null,
       position: target.position.clone(), velocity: target.velocity.clone(),
     });
     if (this.lockedTarget === target) {
@@ -622,7 +663,7 @@ export class AirToAirMissileSystem {
       fragmentRadiusM: missile.spec.fuseRadiusM,
     }), events, {
       source: 'missile', missile,
-      position: target.position,
+      position: missile.position,
       velocity: target.velocity,
       detonationEmitted: true,
     });
