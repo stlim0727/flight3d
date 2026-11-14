@@ -1,7 +1,7 @@
 # Chaff: bounded Bandit and missile seeker model
 
 This S4-1 slice models Bandit chaff against the existing player-fired active
-radar missile. Bandits dispense one cloud per newly confirmed optical plume
+radar missile. Bandits dispense one cloud per missile ID after a confirmed optical plume
 warning, independent of the missile type; this is an assumed pilot response,
 not knowledge of a missile's seeker or a claim about an F-16 warning system.
 Each Bandit has eight assumed charges and respawn restores them. Clouds persist
@@ -32,6 +32,11 @@ these game parameters, the selection heuristic, or effectiveness. See also the
 
 `tests/chaff.test.js` covers inventory, cloud lifecycle, angular/range separation,
 radar diversion and reacquisition, IR isolation, reset and Bandit release.
+Hardware Chrome 156 / Intel ADL-N Vulkan passed WebGL2 shader draw and pixel
+readback, the existing terrain/IR seeker regressions, and a bounded browser
+probe of chaff diversion and reacquisition. The probe does not render chaff or
+exercise the complete game. Logs and the probe are in `.cache/chaff/`.
+
 This is not full S4-1: player-controlled dispensing, keyboard/touch/HOTAS, HUD,
 visual effects, player ground resupply, flares, replay/networking and a hostile
 missile/player-target path remain unimplemented. There is no full game-scene or

@@ -1,5 +1,3 @@
-import * as THREE from 'three';
-
 // Illustrative simulation parameters, not an aircraft's real dispenser or RCS.
 export const CHAFF_MODEL = Object.freeze({ capacity: 8, lifetimeS: 12, dragTimeS: 2,
   settlingMps: 4, peakRcsM2: 8, buildTimeS: 0.5, decayTimeS: 4 });
