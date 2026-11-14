@@ -287,6 +287,11 @@ export class ReplayDirector {
     };
   }
 
+  combatView() {
+    if (!this.active || !this._combat) return null;
+    return this._combat.view ?? null;
+  }
+
   /** Keep the replay host's rail count in step with the recorded loadout mask. */
   _applyCombatLoadout() {
     const mask = this._combat?.state?.rails;

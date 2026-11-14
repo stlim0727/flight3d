@@ -1525,13 +1525,15 @@ class FlightSimulator {
     if (this.gameFlow?.state === 'lobby' || this.gameFlow?.isPaused?.()) return;
     const rect = this.renderer?.domElement?.getBoundingClientRect?.();
     if (!rect) return;
-    const combat = this.replayDirector?.combatState() ?? {
+    const replayCombat = this.replayDirector?.combatState();
+    const combat = replayCombat ?? {
       targets: this.missileCombat?.targets,
     };
+    const combatView = replayCombat ? this.replayDirector?.combatView?.() : this.missileCombatView;
     const bandits = [];
     for (const target of combat?.targets ?? []) {
       if (!target?.alive || !target.position) continue;
-      const view = this.missileCombatView?.targetViews?.get(target.id);
+      const view = combatView?.targetViews?.get(target.id);
       bandits.push({
         id: target.id,
         label: target.callsign || t('gaze.target.bandit'),

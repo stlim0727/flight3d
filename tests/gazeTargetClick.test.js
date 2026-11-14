@@ -130,9 +130,10 @@ test('CameraSystem triggers onGazeClick on click without drag, tracks target, an
     winListeners.mouseup({ button: 0, clientX: 502, clientY: 301, target: dom });
     assert.deepEqual(clicks, [{ x: 502, y: 301 }]);
 
-    // Drag (>6px) does not trigger onGazeClick
+    // Drag (>6px) does not trigger onGazeClick, even if returning to start before mouseup
     listeners.mousedown({ button: 0, clientX: 500, clientY: 300, target: dom });
-    winListeners.mouseup({ button: 0, clientX: 540, clientY: 300, target: dom });
+    winListeners.mousemove({ clientX: 540, clientY: 300, target: dom });
+    winListeners.mouseup({ button: 0, clientX: 501, clientY: 300, target: dom });
     assert.equal(clicks.length, 1);
 
     // Gaze target tracking in update()
@@ -273,6 +274,14 @@ test('pickGazeTarget tracks moving dynamic objects and CameraSystem suppresses p
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.camera.quaternion);
     const toTarget = targetPos.clone().sub(cam.camera.position).normalize();
     assert.ok(forward.dot(toTarget) > 0.999, 'active gaze overrides customViewUpdater lookAt');
+
+    // Crash view also honors active gaze target
+    cam.setCustomViewUpdater(null);
+    cam.crashView = { target: new THREE.Vector3(0, 0, 0), radius: 20 };
+    cam.update(1 / 60, aircraft, { speed: 0, velocity: new THREE.Vector3() });
+    const crashForward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.camera.quaternion);
+    const crashToTarget = targetPos.clone().sub(cam.camera.position).normalize();
+    assert.ok(crashForward.dot(crashToTarget) > 0.999, 'active gaze overrides crashView lookAt');
   } finally {
     if (prevWin === undefined) delete globalThis.window;
     else globalThis.window = prevWin;

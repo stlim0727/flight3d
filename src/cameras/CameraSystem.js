@@ -206,6 +206,7 @@ export class CameraSystem {
     this.onGazeClick = null;
     this.onGazeChange = null;
     this._mouseDownClient = { x: 0, y: 0, button: -1 };
+    this._mouseMoved = false;
 
     // Continuous Edge Pan / Edge Look state (화면 끝 도달 시 시선 지속 회전)
     this.enableEdgePan = false; // Grab gestures stop when the pointer/finger stops.
@@ -255,6 +256,7 @@ export class CameraSystem {
         this.prevMouse.y = e.clientY;
         if (e.button === 0 && !this.pointerLocked) {
           this._mouseDownClient = { x: e.clientX, y: e.clientY, button: 0 };
+          this._mouseMoved = false;
         }
         if (this.domElement && this.domElement.style) {
           this.domElement.style.cursor = 'grabbing';
@@ -290,6 +292,7 @@ export class CameraSystem {
           wasDragging
           && !this.pointerLocked
           && this._mouseDownClient.button === 0
+          && !this._mouseMoved
           && (!e || e.button === 0)
           && !this.isInteractiveUI(e?.target)
         ) {
@@ -299,6 +302,7 @@ export class CameraSystem {
           }
         }
         this._mouseDownClient.button = -1;
+        this._mouseMoved = false;
       });
 
       // Suppress context menu on right-click drag so free look is unhindered
@@ -315,6 +319,11 @@ export class CameraSystem {
 
         // Active mouse look during drag or pointer lock
         if (this.isDragging || this.pointerLocked) {
+          if (this.isDragging && !this.pointerLocked && this._mouseDownClient.button === 0) {
+            if (Math.hypot(e.clientX - this._mouseDownClient.x, e.clientY - this._mouseDownClient.y) > 6) {
+              this._mouseMoved = true;
+            }
+          }
           const dx = this.pointerLocked && typeof e.movementX === 'number' ? e.movementX : (e.clientX - this.prevMouse.x);
           const dy = this.pointerLocked && typeof e.movementY === 'number' ? e.movementY : (e.clientY - this.prevMouse.y);
           this.prevMouse.x = e.clientX;
@@ -1768,6 +1777,7 @@ export class CameraSystem {
   update(dt, aircraftMesh, flightState = {}, getTerrainHeight = null) {
     if (this.crashView) {
       this.updateCrashView(dt);
+      this.applyActiveGaze(this.crashView.target || aircraftMesh?.position);
       return;
     }
     this.updateSpeedSensation(dt, flightState);
