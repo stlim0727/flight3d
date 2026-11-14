@@ -48,7 +48,38 @@ Historical browser evidence below was not remeasured for this revision and does
 not establish current browser acceptance.
 
 
-## Existing behavior inspected
+## Neon background wind (#694)
+
+Ordinary single-player Neon flights install `NEON_WIND` from
+`src/config/neonWind.js` after preset/aircraft reload, bridge setup and trim.
+Runway, urban canyon (`approach`), skyline cruise and the C172-only bridge flight
+share `light-turbulence-v1`, seed `neon-background-v1`, heading basis 090 degrees.
+The mean is zero; existing along/right/up amplitude caps are 0.3/0.6/0.2 m/s
+(not RMS), corresponding to world X/Z/Y at this heading. No region mask is used,
+so the same field exists outside the island and below street level as well.
+
+This is configuration and preset wiring only. WindField, aerodynamics, moments,
+collision and integration equations are unchanged. Existing world-space center
+and half-wing samples feed relative airflow and the existing differential roll
+moment. Neither camera nor aircraft pose receives an artificial disturbance.
+Buildings do not affect the field yet; rearranging buildings cannot create wakes
+in this model. Follow-ups #695-#697 cover layout, supported settings and acceptance.
+#695 laid out the comparison sites along the canyon flight (`NEON_WIND_SITES` in
+`src/config/neonBuildings.js`, see [neon-river.md](neon-river.md#towers-and-wind-comparison-sites));
+it installs no wind of its own.
+
+Every ordinary preset reset recreates the same field/time; airport departure
+clears it through the existing preset path. Explicit mission preparation skips
+the regional default and may install its own field afterward. Multiplayer keeps
+its existing calm environment, including respawns. Replay playback still consumes
+recorded pose/telemetry with physics inactive, not a wind-driven re-simulation.
+
+`tests/neonWind.test.js` covers all supported aircraft/presets, distant/low/high
+samples, restart/exit/reentry, explicit wind ownership, calm room respawns,
+frame grouping, and 60 s production-physics cruise for C172/B738/F16. Node tests
+do not establish full city collision or browser route acceptance.
+
+## Historical behavior inspected
 
 At base `d4f6af4`, `Aerodynamics.computeAero()` already computes relative airflow
 as aircraft world velocity minus `aero.windWorld`. That drives sideslip, side
