@@ -48,6 +48,70 @@ Historical browser evidence below was not remeasured for this revision and does
 not establish current browser acceptance.
 
 
+## Neon urban wind (#696)
+
+This section supersedes the zero mean wind and the "buildings do not affect the field"
+statements of the #694 section below. Ordinary single-player Neon flights now install
+`UrbanWindField` (`src/physics/UrbanWindField.js`) from `NEON_WIND`. `WindField.js`,
+aerodynamics, moments, collision and integration are unchanged: the new field only
+changes what the existing centre and half-wing samples read.
+
+```text
+e = (-sin from, 0, cos from)   n = (cos from, 0, sin from)
+W(x,t) = U(y) * S(x) * e + u_bg(x,t) + sigma_city(x) * psi(x,t)   (vertical part times g(y))
+```
+
+- `U(y)`: mean speed, 4 m/s at 110 m from 000 degrees, power law with exponent 0.25
+  measured from the water level (-14 m) plus 2 m: 1.4 m/s at the water, 2.4 at the
+  street, 5.4 at 400 m, constant above 500 m.
+- `S(x)`: product over towers of `1 - D`. Each wake `D` peaks at 0.6 behind the lee
+  face, decays as `1 / (1 + xi / 4)` with `xi` in reference lengths (the smaller of the
+  projected width and the height), ends smoothly between 8 and 12 lengths, is Gaussian
+  across the wind and fades out through a shear layer at the roof.
+- `sigma_city`: wake turbulence scale, strongest in the wake's side and roof shear
+  layers, capped at 0.35 of `U(y)`. `psi` is three seeded sine modes per component with
+  40-160 m wavelengths drifting downwind at the reference speed.
+- `g(y)`: vertical wind fades in over the first 30 m above the street and is zero at and
+  below street level, including the canal.
+- `u_bg`: the #694 light background field, unchanged.
+
+Airborne presets are authored for still air. `alignSpawnToWind` (`src/core/windSpawn.js`)
+keeps their ground track and airspeed in the local mean wind and yaws the nose along the
+relative wind (about 5 degrees for the C172 canyon spawn), so they start without sideslip
+and the still-air trim stays valid. Parked spawns are not changed; the runway sees about
+2.4 m/s of crosswind. Mission preparation, multiplayer, region exit, restart and replay
+keep the #694 behaviour.
+
+Design wind, 110 m, canyon line (`node scripts/neon-wind-map.mjs <out.svg> [from deg]`):
+
+| Site | Mean (m/s) | Wake turbulence scale (m/s) |
+|---|---|---|
+| `open` | 4.00 | 0.00 |
+| `wide-canyon` | 2.01 | 0.76 |
+| `slot` | 1.19 | 0.92 |
+| `canal` | 3.52 | 0.45 |
+| `lee` | 1.20 | 0.91 |
+| `rooftop` | 2.53 | 0.71 |
+
+One tick's three samples cost p50 0.0055 ms, p95 0.0113 ms over 12,000 ticks (Node
+24.18.0, development PC; all 77 towers evaluated per sample, no spatial grid).
+
+`tests/urbanWindField.test.js` covers the profile, single-tower wake and its reversal,
+rotated footprints, site contrast, purity, continuity (at most 0.3 m/s between samples
+0.5 m apart), zero vertical wind at street level, overlap bounds and input validation.
+`tests/windSpawn.test.js` covers the spawn alignment. `tests/neonWind.test.js` covers all
+presets, spawn sideslip, the parked runway, a 60 s hands-off C172 canyon flight and 60 s
+cruise for C172/B738/F16.
+
+Limits: a real-time approximation, not CFD or a turbulence spectrum. No channelling
+between towers, corner acceleration, roof updraught, flow reversal or bridge vortices.
+The field is not divergence-free. Wake turbulence feeds the existing roll response only
+through the half-wing samples; gust-gradient pitch and yaw are not modelled. With fixed
+controls the B738 and F16 canyon presets lose height with or without this wind (on
+origin/main 5d612d3 the B738 reaches the ground 6.7 s after the spawn and the F16
+descends from 110 m to 34 m within 60 s), so only the C172 canyon flight is asserted.
+Node tests do not establish browser acceptance; hardware Chrome flights belong to #697.
+
 ## Neon background wind (#694)
 
 Ordinary single-player Neon flights install `NEON_WIND` from
