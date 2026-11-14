@@ -81,7 +81,7 @@ test('combat situation: anomaly detector identifies BVR coasting and short-range
   const anomalies = detectMissileAnomalies(miniMatrix);
   const anomalyIds = anomalies.map(a => a.id);
 
-  assert.ok(anomalyIds.includes('BVR_GHOST_COAST_ALWAYS_HIT'), 'Should identify BVR burnout blindness anomaly');
+  assert.ok(anomalyIds.includes('BVR_BURNOUT_BLINDNESS_ALWAYS_HIT'), 'Should identify BVR burnout blindness anomaly');
   assert.ok(anomalyIds.includes('SHORT_RANGE_BEAM_ALWAYS_MISS'), 'Should identify short-range beam always-miss anomaly');
   assert.ok(!anomalyIds.includes('EXTREME_RANGE_IMPOSSIBLE_HIT'), 'Should not have impossible hits beyond envelope');
 });

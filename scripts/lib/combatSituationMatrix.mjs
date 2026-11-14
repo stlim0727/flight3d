@@ -83,7 +83,7 @@ export function simulateCombatSituation({
         center: new Vector3(-orbitRadiusM, targetAltM, 0),
         radius: orbitRadiusM,
         angle: 0,
-        omega: targetSpeedMps / orbitRadiusM,
+        omega: -targetSpeedMps / orbitRadiusM,
         altitudeM: targetAltM,
       },
       evasion: false,
@@ -98,7 +98,7 @@ export function simulateCombatSituation({
         center: new Vector3(-orbitRadiusM, targetAltM, 0),
         radius: orbitRadiusM,
         angle: 0,
-        omega: targetSpeedMps / orbitRadiusM,
+        omega: -targetSpeedMps / orbitRadiusM,
         altitudeM: targetAltM,
       },
       evasion: true,
@@ -113,7 +113,7 @@ export function simulateCombatSituation({
         center: new Vector3(-orbitRadiusM, targetAltM, 0),
         radius: orbitRadiusM,
         angle: 0,
-        omega: targetSpeedMps / orbitRadiusM,
+        omega: -targetSpeedMps / orbitRadiusM,
         altitudeM: targetAltM,
       },
       evasion: false,
@@ -150,6 +150,7 @@ export function simulateCombatSituation({
     }
     world.quaternion.setFromUnitVectors(new Vector3(0, 0, -1), currentDir);
     world.velocity.copy(currentDir).multiplyScalar(shooterSpeedMps);
+    world.position.addScaledVector(world.velocity, dt);
     combat.update(dt, world);
     if (combat.lockedTarget && combat.lockProgress >= 1) {
       locked = true;
@@ -282,6 +283,15 @@ export function simulateCombatSituation({
     }
   }
 
+  // Incorporate terminal closest approach recorded by the continuous fuze or final outcome
+  const terminalCpa = missile.closestApproaches?.[target.id]?.distanceM;
+  if (Number.isFinite(terminalCpa) && terminalCpa < minSeparationM) {
+    minSeparationM = terminalCpa;
+  }
+  if (Number.isFinite(missile.finalOutcome?.distanceM) && missile.finalOutcome.distanceM < minSeparationM) {
+    minSeparationM = missile.finalOutcome.distanceM;
+  }
+
   return {
     type,
     rangeM,
@@ -353,23 +363,26 @@ export function sweepCombatSituationMatrix({
 export function detectMissileAnomalies(results) {
   const anomalies = [];
 
-  // Anomaly A: BVR Ghost Coast Always-Hit (AIM-120C at range >= 6500m with evasion & CM)
-  const bvrCoastHits = results.filter(r =>
+  // Anomaly A: BVR Motor Burnout Blindness / Stern Always-Hit
+  const bvrSternCohort = results.filter(r =>
     r.type === 'AIM120C' &&
     r.rangeM >= 6000 &&
     r.rangeM <= 8000 &&
+    r.aspectDeg <= 45 &&
     r.targetBehavior === 'evasive_ai' &&
     r.countermeasures &&
-    r.terminal === 'hit'
+    r.launched
   );
-  if (bvrCoastHits.length > 0) {
+  const bvrSternHits = bvrSternCohort.filter(r => r.terminal === 'hit');
+  if (bvrSternCohort.length > 0 && bvrSternHits.length === bvrSternCohort.length) {
     anomalies.push({
-      id: 'BVR_GHOST_COAST_ALWAYS_HIT',
+      id: 'BVR_BURNOUT_BLINDNESS_ALWAYS_HIT',
       severity: 'high',
-      title: 'BVR Motor Burnout Blindness (Always Hit Anomaly)',
-      description: 'AIM-120C at ranges >= 6000m burns out beyond the bandit 4000m optical detection range. Bandit AI only checks active propellant plumes and lacks RWR radar threat detection, remaining completely oblivious and defenseless against coasting active radar missiles.',
-      count: bvrCoastHits.length,
-      sample: bvrCoastHits[0],
+      title: 'BVR Motor Burnout Blindness (Always Hit in Stern Chases)',
+      description: 'AIM-120C launched at range >= 6000m in stern/tail aspects burns out beyond the bandit 4000m optical detection range. Bandit AI only checks active propellant plumes and lacks RWR radar threat detection, remaining completely oblivious and defenseless against coasting active radar missiles.',
+      count: bvrSternHits.length,
+      totalCohort: bvrSternCohort.length,
+      sample: bvrSternHits[0],
     });
   }
 
