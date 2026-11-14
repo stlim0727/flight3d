@@ -75,6 +75,8 @@ export default {
   "gear.collapsed": "붕괴",
   "gear.damaged": "손상",
   "notice.camera": "카메라: {name}",
+  "notice.bandit.on": "밴딧 시선 고정 (G)",
+  "notice.bandit.off": "밴딧 시선 해제 (G)",
   "notice.cockpit.loading": "기내 환경을 불러오는 중입니다…",
   "notice.cockpit.unavailable": "기내 환경을 불러올 수 없어 외부 시점을 표시합니다",
   "notice.lights": "조명: {state}",

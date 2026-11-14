@@ -102,18 +102,33 @@ export function createBanditMesh(callsign = 'BANDIT') {
   group.name = `Bandit_${callsign}`;
   const dark = material('bandit-dark', { color: 0x3a4148, roughness: 0.62, metalness: 0.3 });
   const trim = material('bandit-trim', { color: 0xd07b32, roughness: 0.5, metalness: 0.2 });
-
   const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.28, 7.6, 10), dark);
   fuselage.rotation.x = Math.PI / 2;
   fuselage.castShadow = true;
   group.add(fuselage);
-
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.8, 10), dark);
-  nose.rotation.x = -Math.PI / 2;
-  nose.position.z = -4.7;
-  nose.castShadow = true;
-  group.add(nose);
-
+  // Customize bandit appearance based on callsign
+  if (callsign.includes('HEAVY')) {
+    // Heavy bandit: larger, more angular fuselage
+    fuselage.geometry.scale(1.2, 1.1, 1.5);
+    fuselage.geometry.parameters.heightSegments = 16;
+    fuselage.geometry.parameters.radiusSegments = 16;
+  } else if (callsign.includes('B-1')) {
+    // B-1 bandit: sleek, swept-wing design
+    fuselage.geometry = new THREE.CylinderGeometry(0.3, 0.15, 8.2, 12, 8);
+    fuselage.scale.set(0.8, 1.2, 1.0);
+  } else if (callsign.includes('F-') || callsign.includes('Fighter')) {
+    // Fighter bandit: more aerodynamic
+    fuselage.rotation.x = Math.PI / 2 - 0.1;
+    fuselage.geometry = new THREE.CylinderGeometry(0.35, 0.2, 8.0, 12);
+  }
+  // Add custom trim color for specific callsigns
+  if (callsign.includes('RED')) {
+    trim.color.set(0xff0000);
+  } else if (callsign.includes('BLUE')) {
+    trim.color.set(0x0000ff);
+  } else if (callsign.includes('GREEN')) {
+    trim.color.set(0x00ff00);
+  }
   const wing = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.12, 2.1), dark);
   wing.position.set(0, -0.05, 0.55);
   wing.rotation.z = 0.04;

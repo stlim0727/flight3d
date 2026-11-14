@@ -27,11 +27,13 @@ export class CameraSystem {
     DRONE: 6,
     AUTO: 7,
     HUD: 8,
-    DIRECTOR: 9
+    DIRECTOR: 9,
+    BANDIT_POV: 10,
   };
 
   // Keep digit shortcuts stable; the quick cycle follows viewing intent instead.
-  static QUICK_CYCLE = [1, 6, 4, 2, 0, 8];
+  // Keep digit shortcuts stable; the quick cycle follows viewing intent instead.
+  static QUICK_CYCLE = [1, 6, 4, 2, 0, 8, 10];
   // Crash views exclude cockpit (0), wing (2), gear (5), HUD (8) - exterior vantage points only
   static CRASH_MODES = [1, 6, 4, 3];
 
@@ -196,6 +198,10 @@ export class CameraSystem {
 
     // After a drag or hat-switch glance, gradually return gaze to the default position.
     this.autoResetGaze = true;
+    // Gaze lock on nearest live bandit (#722): the exterior look target overrides
+    // each mode's default target so the bandit always stays in frame.
+    this.banditGaze = false;
+    this.banditGazeTarget = new THREE.Vector3();
 
     // Continuous Edge Pan / Edge Look state (화면 끝 도달 시 시선 지속 회전)
     this.enableEdgePan = false; // Grab gestures stop when the pointer/finger stops.
@@ -1388,6 +1394,12 @@ export class CameraSystem {
     this.photoCockpit = !!enabled;
   }
 
+  /** Toggle sticky tracking of the nearest live bandit (#722). */
+  toggleBanditGaze() {
+    this.banditGaze = !this.banditGaze;
+    return this.banditGaze;
+  }
+
   getCockpitSubmodeName() {
     return (this.photoCockpit && this.supportsPhotoCockpit) ? 'PHOTO 2D' : '3D VIRTUAL';
   }
@@ -1425,6 +1437,7 @@ export class CameraSystem {
       case CameraSystem.MODES.DRONE: return 'DRONE (ORBIT VIEW)';
       case CameraSystem.MODES.HUD: return 'HUD';
       case CameraSystem.MODES.DIRECTOR: return 'CINEMATIC DIRECTOR';
+      case CameraSystem.MODES.BANDIT_POV: return 'BANDIT POV';
       default: return 'CAMERA';
     }
   }
@@ -2081,6 +2094,60 @@ export class CameraSystem {
           targets: combat?.targets ?? [],
         });
         break;
+      }
+      case CameraSystem.MODES.BANDIT_POV: {
+        // Over-the-shoulder bandit framing: sit behind and beside the nearest
+        // live bandit, on the side opposite the player's bearing, so the
+        // airframe stays readable in the foreground.
+        const combat = this.combatStateProvider ? this.combatStateProvider() : null;
+        const bandit = (combat?.targets ?? []).find(t => t?.alive && t.position);
+        if (!bandit) {
+          // No bandit in the scene: fall back to chase view
+          this.mode = CameraSystem.MODES.CHASE;
+          const planeForward = new THREE.Vector3(0, 0, -1).applyQuaternion(planeQuat);
+          this.chasePos.copy(planePos).addScaledVector(planeForward, -this.chaseDistance);
+          this.chasePos.y += this.chaseHeight;
+          this.camera.position.copy(this.chasePos);
+          this.camera.up.set(0, 1, 0);
+          this.camera.lookAt(planePos.clone().add(new THREE.Vector3(0, 1.5, 0)));
+          break;
+        }
+        const banditPos = bandit.position.clone();
+        const playerBearing = planePos.clone().sub(banditPos);
+        playerBearing.y = 0;
+        const side = new THREE.Vector3();
+        if (playerBearing.lengthSq() > 1e-6) {
+          playerBearing.normalize();
+          side.set(-playerBearing.z, 0, playerBearing.x);
+        } else {
+          playerBearing.set(0, 0, -1);
+          side.set(1, 0, 0);
+        }
+        const range = planePos.distanceTo(banditPos);
+        const backM = 22.0 + THREE.MathUtils.clamp(range * 0.01, 0, 20.0);
+        const sideM = 8.0 + THREE.MathUtils.clamp(range * 0.003, 0, 6.0);
+        this.camera.position.copy(banditPos)
+          .addScaledVector(playerBearing, -backM)
+          .addScaledVector(side, sideM)
+          .addScaledVector(new THREE.Vector3(0, 1, 0), 5.0);
+        this.camera.up.set(0, 1, 0);
+        this.camera.lookAt(banditPos.clone().addScaledVector(playerBearing, 6.0)
+          .addScaledVector(new THREE.Vector3(0, 1, 0), 1.0));
+        break;
+      }
+    }
+    // Override camera lookAt target for bandit gaze lock (#722):
+    // if banditGaze is sticky, the camera's lookAt target follows the nearest
+    // live bandit regardless of current mode, so the bandit always stays in frame.
+    if (this.banditGaze) {
+      const combat = this.combatStateProvider ? this.combatStateProvider() : null;
+      const bandit = (combat?.targets ?? []).find(t => t?.alive && t.position);
+      if (bandit) {
+        this.banditGazeTarget.copy(bandit.position);
+        this.camera.lookAt(this.banditGazeTarget);
+      } else if (this.camera.lookAt !== undefined) {
+        // No bandit found; restore to the mode's natural target on the next frame
+        this.banditGaze = false;
       }
     }
 

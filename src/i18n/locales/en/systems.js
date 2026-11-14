@@ -75,6 +75,8 @@ export default {
   "gear.collapsed": "collapsed",
   "gear.damaged": "damaged",
   "notice.camera": "Camera: {name}",
+  "notice.bandit.on": "Bandit gaze locked (G)",
+  "notice.bandit.off": "Bandit gaze unlocked (G)",
   "notice.cockpit.loading": "Loading cockpit interior…",
   "notice.cockpit.unavailable": "Cockpit interior unavailable — showing exterior view",
   "notice.lights": "Lights: {state}",
