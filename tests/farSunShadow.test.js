@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { generateValley } from '../src/arena/generatedValley.js';
+import { GeneratedValleyTerrain } from '../src/environment/GeneratedValleyTerrain.js';
+import { FoliageAndCities } from '../src/environment/FoliageAndCities.js';
 import {
   FAR_SUN_SHADOW_LAYER, FarSunShadow, applyFarSunShadow, castFarSunShadow,
   farSunShadowLightsChunk, farSunShadowPlacement, farSunShadowUniforms,
@@ -249,4 +253,65 @@ test('casters opt in per mesh without leaving the default layer', () => {
   assert.ok(!group.layers.isEnabled(FAR_SUN_SHADOW_LAYER));
   castFarSunShadow(group, false);
   assert.ok(!mesh.layers.isEnabled(FAR_SUN_SHADOW_LAYER));
+});
+
+test('the generated corridor casts after it replaces the coarse valley surface', () => {
+  const { terrain } = generateValley({ seed: 2 });
+  const sim = { scene: new THREE.Scene() };
+  const valley = new GeneratedValleyTerrain(terrain, sim);
+  try {
+    assert.ok(valley.ribbonMesh.geometry.index.count > 0);
+    assert.equal(valley.ribbonMesh.parent, valley.mesh);
+    for (const mesh of [valley.mesh, valley.ribbonMesh]) {
+      assert.ok(mesh.layers.isEnabled(FAR_SUN_SHADOW_LAYER), 'both terrain surfaces cast into the far map');
+      assert.equal(mesh.castShadow, false, 'terrain stays out of the near shadow pass');
+    }
+    for (const tree of valley.treeMeshes) {
+      assert.ok(!tree.layers.isEnabled(FAR_SUN_SHADOW_LAYER), 'trees remain excluded');
+    }
+  } finally {
+    valley.dispose(sim);
+  }
+});
+
+test('loaded district materials receive far shadows through near/far LOD transitions', async (t) => {
+  const kit = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+    mesh.name = `District${i}`;
+    kit.add(mesh);
+  }
+  let completeLoad;
+  t.mock.method(GLTFLoader.prototype, 'loadAsync', () => new Promise(resolve => { completeLoad = resolve; }));
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { value: {}, configurable: true });
+  try {
+    const city = new FoliageAndCities({ getHeight: () => 25 });
+    const districts = city.cityArchetypes.slice(3);
+    assert.ok(districts.every(({ near }) => near.material.userData.farSunShadow));
+    completeLoad({ scene: kit });
+    assert.equal(await city.districtReady, true);
+    for (const [i, { near, far, records }] of districts.entries()) {
+      assert.equal(near.material, kit.getObjectByName(`District${i}`).material);
+      const record = records[0];
+      for (const [camera, active] of [
+        [new THREE.Vector3(record.x, record.y, record.z), near],
+        [new THREE.Vector3(100000, 100000, 100000), far],
+        [new THREE.Vector3(record.x, record.y, record.z), near],
+      ]) {
+        city.updateCityLod(camera);
+        assert.ok(active.count > 0);
+        const shader = {
+          uniforms: {}, vertexShader: THREE.ShaderLib.standard.vertexShader,
+          fragmentShader: THREE.ShaderLib.standard.fragmentShader,
+        };
+        active.material.onBeforeCompile(shader, null);
+        assert.equal(shader.uniforms.uFarSunShadowMap, farSunShadowUniforms.uFarSunShadowMap);
+        assert.match(shader.fragmentShader, /directLight\.color \*= farSunShadowTerm/);
+      }
+    }
+  } finally {
+    if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+    else delete globalThis.window;
+  }
 });

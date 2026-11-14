@@ -396,7 +396,8 @@ export class GeneratedValleyTerrain {
     geometry.computeBoundingSphere();
 
     this.ribbonRings = rings.length;
-    this.ribbonMesh = new THREE.Mesh(geometry, material);
+    // The coarse mesh is culled beneath this corridor; its walls must cast too.
+    this.ribbonMesh = castFarSunShadow(new THREE.Mesh(geometry, material));
     this.ribbonMesh.receiveShadow = true;
     this.ribbonMesh.castShadow = false;
     this.mesh.add(this.ribbonMesh);

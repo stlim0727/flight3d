@@ -41,7 +41,7 @@ export class FoliageAndCities {
         meshes.forEach((mesh, i) => {
           const near = this.cityArchetypes[i + 3].near;
           near.geometry = mesh.geometry;
-          near.material = mesh.material;
+          near.material = applyFarSunShadow(mesh.material);
         });
         this.districtLoaded = true;
         this.setTimeOfDay(this.cityHour);
