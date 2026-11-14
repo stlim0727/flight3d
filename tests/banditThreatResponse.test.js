@@ -147,7 +147,8 @@ test('combat system feeds airborne plumes to patrol pilots and offers an explici
 });
 
 test('fixed launch matrix records outcomes without granting immunity or omniscient awareness', () => {
-  const results = compareBanditEngagements();
+  // Isolate the original maneuver-only experiment from decoy effects.
+  const results = compareBanditEngagements({ countermeasures: false });
   assert.equal(results.length, 18);
   let changed = 0;
   for (let i = 0; i < results.length; i += 2) {

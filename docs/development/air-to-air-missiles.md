@@ -81,7 +81,7 @@ Bandit patrol pilots now react to observable incoming rocket plumes using a
 bounded trial optical-warning model, then return to patrol through the existing
 F-16 flight dynamics. See [bandit evasion](bandit-evasion.md) for detection/reaction
 assumptions, non-evasive comparison controls, actual outcomes and verification.
-A bounded Bandit chaff and active missile seeker model is described in [chaff](chaff.md). This does not complete S3-2/S3-3 sensor/hostile-engagement work or S4 countermeasures.
+Bounded Bandit countermeasure models are described in [chaff](chaff.md) and [flare](flare.md). This does not complete S3-2/S3-3 sensor/hostile-engagement work or S4 countermeasures.
 
 Missile control now uses pressure-limited aerodynamic authority, actuator-response
 memory and delivered-force maneuver drag. See [missile energy](missile-energy.md)

@@ -27,6 +27,14 @@ export function sampleEngineInfrared(engines, afterburner, output) {
  */
 export function infraredSignalQuality(observer, target, rangeM, diagnostics) {
   if (diagnostics) Object.assign(diagnostics, { emission: 0, received: 0, quality: 0, aspectGain: 0 });
+  if (target.type === 'flare') {
+    const emission = target.infraredEmission;
+    if (!Number.isFinite(emission) || emission < 0 || !Number.isFinite(rangeM) || rangeM <= 0) return 0;
+    const received = emission / IR_MODEL.referenceEmission * IR_MODEL.referenceRangeM ** 2 / Math.max(1, rangeM * rangeM);
+    const quality = received / (1 + received);
+    if (diagnostics) Object.assign(diagnostics, { emission, received, quality, aspectGain: 1 });
+    return quality;
+  }
   const signature = target.infraredSignature;
   if (!signature || !Number.isFinite(rangeM) || rangeM <= 0) return 0;
   const { enginePower, heat, afterburner } = signature;
