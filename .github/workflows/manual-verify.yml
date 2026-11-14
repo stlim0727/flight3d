@@ -46,61 +46,49 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-
+      - name: Start Vite dev server
+        run: nohup npm run dev > /tmp/vite.log 2>&1 &
       - name: Run Flight Scenarios
         if: ${{ github.event.inputs.suite == 'flight' }}
         run: node scripts/test-flight-agent.js --screenshots
-
       - name: Run Crash Scenarios
         if: ${{ github.event.inputs.suite == 'crash' }}
         run: node scripts/test-crash-scenarios.js
-
       - name: Run Landing Damage Tests
         if: ${{ github.event.inputs.suite == 'landing' }}
         run: node scripts/test-landing-damage.js
-
       - name: Run Pilot Missions
         if: ${{ github.event.inputs.suite == 'pilot' }}
         run: node scripts/test-pilot-missions.mjs
-
       - name: Run Valley Pilot Missions
         if: ${{ github.event.inputs.suite == 'valley' }}
         run: node scripts/test-valley-pilot.mjs
-
       - name: Run Slalom Missions
         if: ${{ github.event.inputs.suite == 'slalom' }}
         run: node scripts/test-slalom.mjs
-
       - name: Run Demo Stepping
         if: ${{ github.event.inputs.suite == 'demo' }}
         run: node scripts/test-demo-stepping.js
-
       - name: Run Lukla Benchmark
         if: ${{ github.event.inputs.suite == 'lukla' }}
         run: node scripts/test-lukla-demo-benchmark.mjs
-
       - name: Run Cockpit Verification
         if: ${{ github.event.inputs.suite == 'cockpit' }}
         run: node scripts/verify-cockpit-startup.js
-
       - name: Run Camera Look Verification
         if: ${{ github.event.inputs.suite == 'camera' }}
         run: node scripts/verify-camera-look.mjs
-
       - name: Run Bake Cockpit Transfer
         if: ${{ github.event.inputs.suite == 'bake' }}
         run: node scripts/bake-cockpit-transfer.mjs && node scripts/bake-cockpit-binding.mjs
-
       - name: Run Replay Verification
         if: ${{ github.event.inputs.suite == 'replay' }}
         run: node scripts/verify-replay.mjs
-
       - name: Build and Test Ghost Native
         if: ${{ github.event.inputs.suite == 'ghost-native' }}
         run: |
           npm run build:ghost
           npm run test:ghost-package
-
       - name: Run All Manual Suites (non-mandatory)
         if: ${{ github.event.inputs.suite == 'all' }}
         run: |
