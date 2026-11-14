@@ -48,6 +48,164 @@ Historical browser evidence below was not remeasured for this revision and does
 not establish current browser acceptance.
 
 
+## Neon urban wind acceptance (#697)
+
+Integrated checks of #694-#696 on origin/main 00b6d10. No physics, wind or preset code
+changed; this section adds two measurement scripts and records what they found.
+
+- `node scripts/neon-urban-wind-report.mjs [out.json]`: headless, production physics at
+  120 Hz. Fixed-point wind statistics for north and south wind, and C172/B738/F16 paths
+  (canyon line, 60 s cruise held and hands off, C172 bridge) each repeated in still air
+  as the control. The control is the authored spawn with no field, as a multiplayer room
+  flies it. Also a 4 s hands-off upset in the slot and the lee, then recovery.
+- `node scripts/verify-neon-urban-wind.mjs` (`CDP_URL`, `SIM_URL`, `PARTS`): hardware
+  Chrome. Runway ground roll and climb-out for all three aircraft with a still-air
+  control, the Neon demos with and without wind, pause/restart/aircraft/region changes,
+  replay of a Neon sortie, real-time frame and tick time with and without wind.
+- Existing `verify-neon-canyon.mjs`, `verify-neon-bridge.mjs`, `verify-neon-city.mjs`.
+
+A test pilot sets only ordinary virtual control inputs (`flyBank`, `flyVerticalPath`,
+rudder against sideslip). No teleport, force, pose override or wind suppression is used
+to make a path pass. Headless runs do not simulate tower collision; they report the
+gap to tower walls beside the path. Browser runs collide with towers and bridges.
+
+Browser: Chrome 157 headless, `ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (8GB)
+Direct3D11)`, `verify-browser-gpu.mjs` pixel `[255,0,0,255]`, GL error 0.
+Node 24.18.0 on the same Windows 11 laptop. Values are from one run each.
+
+### Wind at fixed points
+
+Same seed, 120 s at 120 Hz, 110 m unless noted. RMS about the mean, m/s, world
+east/up/south. With the design north wind:
+
+| Point | Mean speed | RMS E/U/S | Max speed | Vertical range |
+|---|---|---|---|---|
+| sea west (x -3000) | 4.00 | 0.12/0.09/0.26 | 4.60 | -0.20..0.20 |
+| `open` | 4.01 | 0.13/0.10/0.26 | 4.60 | -0.19..0.20 |
+| `wide-canyon` | 2.09 | 0.30/0.23/0.40 | 2.84 | -0.58..0.36 |
+| `slot` | 1.36 | 0.42/0.28/0.46 | 2.70 | -0.54..0.72 |
+| `slot` at 30 m | 1.03 | 0.34/0.22/0.41 | 1.97 | -0.47..0.46 |
+| `canal` | 3.51 | 0.25/0.16/0.34 | 4.37 | -0.35..0.42 |
+| `lee` | 1.29 | 0.41/0.28/0.47 | 2.40 | -0.51..0.53 |
+| `rooftop` | 2.59 | 0.35/0.21/0.41 | 3.55 | -0.43..0.43 |
+| above `lee` at 600 m | 5.69 | 0.12/0.08/0.26 | 6.29 | -0.19..0.20 |
+
+The background disturbance is present everywhere, including the open sea. Wake points
+have two to three times its horizontal RMS and a lower mean, and the field returns to the
+background above the towers. Reversing the wind moves the shelter across the 420 m crown
+tower (2500, -175): 175 m south of it the mean is 1.47 m/s in a north wind and 2.00 m/s
+in a south wind; 175 m north of it, 2.28 and 1.63 m/s.
+
+### Canyon line, per site (headless)
+
+Wind RMS E/U/S (m/s), peak wing-gust rolling moment (kN m), roll RMS (deg) and G range
+inside each site envelope; still air gives zero wind, zero gust moment and zero roll at
+every site.
+
+| Site | C172 wind RMS | C172 gust moment / roll RMS / G | B738 wind RMS | B738 gust moment | F16 wind RMS | F16 gust moment |
+|---|---|---|---|---|---|---|
+| `open` | 0.08/0.05/0.06 | 0.03 / 2.6 / 0.98-1.02 | 0.08/0.01/0.22 | 5.3 | 0.08/0.01/0.19 | 0.07 |
+| `wide-canyon` | 0.29/0.19/0.32 | 0.50 / 3.9 / 0.93-1.06 | 0.30/0.24/0.44 | 81 | 0.39/0.19/0.42 | 1.1 |
+| `slot` | 0.43/0.21/0.63 | 0.77 / 5.9 / 0.95-1.09 | 0.47/0.27/0.23 | 88 | 0.31/0.26/0.33 | 1.6 |
+| `canal` | 0.18/0.13/0.28 | 0.36 / 2.4 / 0.96-1.03 | 0.22/0.12/0.18 | 52 | 0.26/0.14/0.31 | 0.7 |
+| `lee` | 0.44/0.22/0.29 | 0.42 / 0.9 / 0.95-1.04 | 0.52/0.28/1.11 | 92 | 0.37/0.29/0.88 | 1.2 |
+| `rooftop` | 0.24/0.24/0.39 | 0.50 / 4.2 / 0.97-1.07 | 0.19/0.25/0.35 | 81 | 0.23/0.26/0.64 | 1.3 |
+
+Whole line (wind vs still air): C172 86 kt, roll -12.6..8.5 deg (calm 0), altitude
+108.6-111.3 m (calm 110.0-110.3), lateral deviation 24 m (calm 0), nearest tower wall
+48.8 m, sideslip under 2.8 deg, G 0.92-1.09. B738 and F16 at 180 kt: roll within
+-3.6..5.4 deg, lateral deviation 10 m, G and IAS ranges equal to still air because both
+are dominated by the preset's acceleration from 136 kt. No stall, G-LOC or crash.
+
+### Hardware Chrome flights
+
+| Path | C172 | B738 | F16 |
+|---|---|---|---|
+| Canyon line to x 4100 (`verify-neon-canyon`) | no collision, max \|z\| 24.1 m, 108.6-111.3 m, tower gap 48.9 m | no collision, \|z\| 10.4 m, 62.4-110.5 m, gap 51.9 m | no collision, \|z\| 10.1 m, 103.6-114.6 m, gap 51.9 m |
+| Parked on the runway, 10 s | 0 m drift | 0 m | 0 m |
+| Ground roll and climb-out on 090 | liftoff 13.5 s (calm 13.5), 35 m off the extended centreline after 30 s of climb, roll < 4.1 deg | liftoff 32.9 s (calm 32.9), 8.8 m, roll < 1.8 deg | liftoff 11.0 s (calm 11.0), 66 m, roll < 8.9 deg |
+| Bridge flight (`verify-neon-bridge`, C172) | three bridges, no contact; restart, crash/retry, menu, reload pass | - | - |
+
+Lateral offsets after liftoff are crosswind drift of a pilot holding heading toward a
+point 300 m ahead; the ground roll itself stays on the runway. The canyon RMS reported by
+`verify-neon-canyon` is about the site mean along a moving path, so it includes the
+mean-wind change across each site.
+
+60 s cruise from the 760 m preset (headless, pilot holding heading, height and speed):
+C172 IAS 90.9-97.3 kt, height 760-771 m (still air 760-769 m), roll within 0.7 deg,
+G 0.98-1.03; B738 and F16 roll within 0.2 deg, height within 0.9 m, G 0.98-1.01. Hands off
+for 60 s: roll within 1.1 deg and height within 3.2 m for all three, versus 0 deg and
+1.1 m in still air.
+
+Hands off for 4 s entering a wake, then the pilot resumes (headless):
+
+| Aircraft | Slot: max roll / max \|z\| / min height | Lee: max roll / max \|z\| / min height |
+|---|---|---|
+| C172 | 6.7 deg / 16.7 m / 106.1 m | 3.2 deg / 18.3 m / 108.1 m |
+| B738 | 1.8 deg / 9.8 m / (sinks with the preset, as in still air) | 1.5 deg / 10.0 m / (as still air) |
+| F16 | 2.4 deg / 14.5 m / 112.0 m | 0.7 deg / 16.7 m / 112.3 m |
+
+The slot walls are 62 m either side of the line. No case stalled or crashed, and the pilot
+returned every aircraft inside 15 m of the line. B738 height loss and F16 climb after the
+release happen equally in still air (preset trim, see the #696 limits), not from wind.
+
+### Lifecycle, demos, replay, multiplayer
+
+- Pause: 1.5 s of real frames while paused leaves `windTimeSeconds` at 5.000.
+- Restart from the pause menu: wind time 0, same seed, and the sample after 5 s equals
+  the first run to 1e-9 m/s.
+- B738 cruise, F16 canyon and C172 bridge after aircraft changes keep `UrbanWindField`
+  (`neon-background-v1`, 4 m/s from 000). Coastal runway: no field, zero wind sample.
+- Replay of a 20 s Neon cruise: wind time stays at its load value (0) during playback,
+  the pose at 10 s matches the recording within 3e-5 m. Replay is pose playback; the
+  track records no wind and needs none.
+- Multiplayer: rooms keep the calm contract (`PresetSpawner` skips the Neon field while
+  `multiplayer.active`; `MultiplayerController` clears it at round preparation), covered
+  by `tests/neonWind.test.js`. Both peers fly still air, so their environments agree.
+  No two-browser Neon room was flown here.
+
+Neon demos, stepped to completion with the urban wind and in still air (the field
+removed after every preset the demo applies), and on origin/main 359813e before any Neon
+wind:
+
+| Demo | Urban wind | Still air (current) | Before #694 (359813e) |
+|---|---|---|---|
+| C172 `proximity` | completes, 37.5 s | completes | completes |
+| C172 `scenic` (city route) | completes, 78.3 s | hits a tower at 70.3 s | hits a tower at 70.3 s |
+| C172 `maneuvers` | completes, 75.3 s | completes | completes |
+| B738 `classic` | ends at 23 s: rolls 31 m left of the centreline (heading 076), nose and left main gear collapse | hits a tower at 49.8 s | hits a tower at 49.8 s |
+
+The C172 city route and the B738 classic demo (the coastal choreography flown at Neon)
+already failed in still air before the Neon wind; the demo sweep does not cover Neon.
+The wind changes how B738 classic fails: its takeoff roll holds the rudder at zero, so
+the 2.4 m/s crosswind weathervanes it off the runway before it reaches the tower. The
+C172 city route completing in wind is incidental, not a fix.
+
+### Cost
+
+Headless, wind's three samples per tick: p50 0.005-0.008 ms, p95 0.009-0.017 ms across
+all paths (timed per call, including the timer). A whole 120 Hz tick: p95 0.05-0.14 ms
+with wind, 0.02-0.07 ms in still air.
+
+In the hardware Chrome page, 12,000 ticks of three samples along the canyon line take
+0.0084-0.0097 ms per tick (five runs), well inside the 0.5 ms target. The page timer has
+about 0.1 ms resolution, so per-call timing in live flight only bounds the wind at p95
+0.1 ms per tick. Real-time flight for 600 frames (1440x900, balanced quality), wind vs
+still air, two runs:
+
+| Flight | Frame p50 (ms) | Frame p95 (ms) | Physics tick p95 (ms) |
+|---|---|---|---|
+| C172 canyon | 11.2 / 11.1; 11.0 / 11.0 | 22.6 / 22.1; 12.9 / 13.1 | 0.7 / 0.6; 0.5 / 0.5 |
+| B738 cruise | 19.8 / 20.1; 14.7 / 14.8 | 29.6 / 26.2; 23.5 / 23.3 | 0.6 / 0.4; 0.4 / 0.4 |
+| F16 canyon | 23.2 / 23.2; 22.8 / 22.8 | 34.2 / 34.4; 34.2 / 34.4 | 0.5 / 0.4; 0.6 / 0.5 |
+
+Frame time does not change measurably with the wind; the run-to-run spread is larger.
+
+Limits of this acceptance: no person flew it by hand; the test pilot shows the paths are
+flyable with ordinary control inputs, not how difficult they feel. Single runs on one
+laptop. Headless runs do not collide with towers. Real-time frame times are dominated by
+rendering and vary run to run by more than the wind's cost.
+
 ## Neon urban wind (#696)
 
 This section supersedes the zero mean wind and the "buildings do not affect the field"
