@@ -349,5 +349,9 @@ if (report.replay) {
   assert.equal(report.replay.windAfterPlay, report.replay.windAtLoad, 'replay does not advance the wind');
   assert.ok(report.replay.poseError10s < 1, `replay pose at 10 s within 1 m (${report.replay.poseError10s})`);
 }
-for (const r of report.realtime) assert.ok(r.windSeconds > 0 && !r.crashed, `${r.aircraft} real-time flight advanced`);
+// Still air has no field, so only the wind run advances wind time.
+for (const r of report.realtime) {
+  assert.ok(r.ticks > 0 && !r.crashed && (r.wind ? r.windSeconds > 0 : r.windSeconds === 0),
+    `${r.aircraft} real-time flight advanced (wind ${r.wind})`);
+}
 assert.equal(report.exceptions.length, 0, 'page exceptions');

@@ -50,8 +50,10 @@ not establish current browser acceptance.
 
 ## Neon urban wind acceptance (#697)
 
-Integrated checks of #694-#696 on origin/main 00b6d10. No physics, wind or preset code
-changed; this section adds two measurement scripts and records what they found.
+Integrated checks of #694-#696 on origin/main 00b6d10; the final full
+`verify-neon-urban-wind.mjs` run was repeated on 90a8be2 (later commits touch only
+`src/weapons`). No physics, wind or preset code changed; this section adds two
+measurement scripts and records what they found.
 
 - `node scripts/neon-urban-wind-report.mjs [out.json]`: headless, production physics at
   120 Hz. Fixed-point wind statistics for north and south wind, and C172/B738/F16 paths
@@ -188,7 +190,7 @@ all paths (timed per call, including the timer). A whole 120 Hz tick: p95 0.05-0
 with wind, 0.02-0.07 ms in still air.
 
 In the hardware Chrome page, 12,000 ticks of three samples along the canyon line take
-0.0084-0.0097 ms per tick (five runs), well inside the 0.5 ms target. The page timer has
+0.0084-0.0115 ms per tick (five runs, three sessions), well inside the 0.5 ms target. The page timer has
 about 0.1 ms resolution, so per-call timing in live flight only bounds the wind at p95
 0.1 ms per tick. Real-time flight for 600 frames (1440x900, balanced quality), wind vs
 still air, two runs:
