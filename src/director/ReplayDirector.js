@@ -318,7 +318,7 @@ export class ReplayDirector {
       ? events.findLast(event => event.timeSec <= time + 1e-6 && event.segment === sample.segment) : null;
     const localImpact = impact(this.roomEvents, local);
     this.roomEffects.apply(localImpact, time, { visible: local.visible !== false, seek });
-    this._playRoomImpact(localImpact, this, seek);
+    this._playRoomImpact(localImpact, this);
     sim.aircraft.group.visible = local.visible !== false && !local.crashed;
     this.remotes.forEach((remote, index) => {
       const sample = sampleRemote(this.track, index, time, remote.sample, remote.seek);
@@ -333,7 +333,7 @@ export class ReplayDirector {
       }
       const remoteImpact = sample ? impact(remote.events, sample) : null;
       remote.effects.apply(remoteImpact, time, { visible, seek });
-      this._playRoomImpact(remoteImpact, remote, seek);
+      this._playRoomImpact(remoteImpact, remote);
       visual.group.visible = visible && !sample.crashed;
       visual.model.group.visible = true;
       visual.indicator.hide();
@@ -342,11 +342,13 @@ export class ReplayDirector {
 
   /**
    * Room replays stage crashes through ReplayCrashEffects, which only draws them. Play the
-   * distance-scaled impact burst on the same crossing the solo path uses (#724).
+   * distance-scaled impact burst on the same crossing the solo path uses (#724). A seek
+   * inside the wreckage reconstructs the scene; it is not a new impact, so the guard holds
+   * until the playhead leaves the impact and the event identity is rearmed.
    */
-  _playRoomImpact(event, owner, seek) {
+  _playRoomImpact(event, owner) {
     if (!event) { owner._impactSound = null; return; }
-    if (!seek && owner._impactSound === event) return;
+    if (owner._impactSound === event) return;
     owner._impactSound = event;
     const camera = this.sim.camera?.position;
     this.sim.audio?.playRemoteExplosion?.(
@@ -354,6 +356,7 @@ export class ReplayDirector {
   }
 
   _disposeRoom() {
+    this._impactSound = null;
     this.roomEffects?.dispose(); this.roomEffects = null;
     this.roomEvents = [];
     for (const remote of this.remotes) {

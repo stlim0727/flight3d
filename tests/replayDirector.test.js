@@ -545,21 +545,23 @@ test('a legacy crash marker rounded past the last sample still stages at the end
   director.stop();
 });
 
-test('room replay crashes play a distance-scaled impact burst (#724)', () => {
-  const sim = fakeSim();
+test('room replay crashes sound once per impact crossing, not once per seek (#724)', async () => {
+  const f = roomFixture();
   const sounds = [];
-  sim.camera = { position: new Vector3(0, 0, 0) };
-  sim.audio = { playRemoteExplosion(distance, isWater) { sounds.push({ distance, isWater }); } };
-  const director = new ReplayDirector(sim);
-  const event = { timeSec: 2, segment: 0, type: 'WATER', position: new Vector3(30, 0, 40) };
-  const owner = {};
-  director._playRoomImpact(event, owner, false);
-  assert.equal(sounds.length, 1, 'the impact plays once');
+  f.sim.camera = { position: new Vector3(0, 0, 0) };
+  f.sim.audio = { playRemoteExplosion(distance, isWater) { sounds.push({ distance, isWater }); } };
+  await f.director.load(f.source);
+  f.director.seek(5.5);
+  assert.equal(sounds.length, 1, 'reaching the crash plays one burst');
   assert.equal(sounds[0].isWater, true, 'water impacts use the water timbre');
-  assert.ok(Math.abs(sounds[0].distance - 50) < 1e-6, 'the mix uses the replay camera distance');
-  director._playRoomImpact(event, owner, false);
-  assert.equal(sounds.length, 1, 'a resting playhead does not repeat the burst');
-  director._playRoomImpact(null, owner, false);
-  director._playRoomImpact(event, owner, false);
-  assert.equal(sounds.length, 2, 're-crossing the impact stages it again');
+  const event = f.effects[1].event;
+  const expected = f.sim.camera.position.distanceTo(event.position);
+  assert.ok(Math.abs(sounds[0].distance - expected) < 1e-6, 'the mix uses the replay camera distance');
+  f.director.seek(5.7);
+  f.director.seek(5.2);
+  assert.equal(sounds.length, 1, 'seeks inside the wreckage rebuild visuals without replaying audio');
+  f.director.seek(1);
+  f.director.seek(5.5);
+  assert.equal(sounds.length, 2, 'leaving the impact and crossing it again stages it again');
+  f.director.stop();
 });
