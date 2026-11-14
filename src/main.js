@@ -341,7 +341,6 @@ class FlightSimulator {
     this.missileCombatView = new MissileCombatView(this.scene, this.missileCombat);
     this.cannonCombatView = new CannonCombatView(this.scene, this.missileCombat);
     this.rearmSystem = new RearmSystem();
-    this._gunAudioActive = false;
     // A replay owns the combat feed: its recorded missile poses and bandit
     // states drive the director instead of the inactive live system.
     this.cameraSystem.setCombatStateProvider(() => this.replayDirector?.combatState() ?? {
@@ -1301,10 +1300,10 @@ class FlightSimulator {
   }
 
   syncGunAudio() {
-    const firing = Boolean(this.missileCombat?.cannon?.firing);
-    if (firing === this._gunAudioActive) return;
-    this._gunAudioActive = firing;
-    if (firing) this.audio.startGunFire();
+    // Both calls are idempotent. Do not cache the trigger state: a burst that
+    // began while audio was muted or locked must start as soon as the graph can
+    // play, without waiting for the player to release and press the trigger.
+    if (this.missileCombat?.cannon?.firing) this.audio.startGunFire();
     else this.audio.stopGunFire();
   }
 
