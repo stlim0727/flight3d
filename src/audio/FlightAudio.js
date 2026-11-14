@@ -1022,6 +1022,32 @@ export class FlightAudio {
     bassFilter.connect(bassGain);
     bassGain.connect(this.masterGain);
     noiseSrc.start(now);
+
+    // 2. Close-range crack and debris. Air absorption removes high frequencies
+    // first, so a 250 m bandit kill must not use the same dull rumble as a
+    // multi-kilometre replay impact. Fade the crack out with distance.
+    const proximity = Math.max(0, 1 - safeDistance / 4000);
+    if (proximity > 0.01) {
+      const crackSize = Math.floor(this.ctx.sampleRate * 0.6);
+      const crackBuffer = this.ctx.createBuffer(1, crackSize, this.ctx.sampleRate);
+      const crackData = crackBuffer.getChannelData(0);
+      for (let i = 0; i < crackSize; i++) {
+        crackData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.12));
+      }
+      const crackSrc = this.ctx.createBufferSource();
+      crackSrc.buffer = crackBuffer;
+      const crackFilter = this.ctx.createBiquadFilter();
+      crackFilter.type = 'highpass';
+      crackFilter.frequency.setValueAtTime(isWater ? 1000 : 2200, now);
+      crackFilter.frequency.exponentialRampToValueAtTime(isWater ? 220 : 400, now + 0.55);
+      const crackGain = this.ctx.createGain();
+      crackGain.gain.setValueAtTime((isWater ? 0.55 : 0.9) * volume * proximity, now);
+      crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      crackSrc.connect(crackFilter);
+      crackFilter.connect(crackGain);
+      crackGain.connect(this.masterGain);
+      crackSrc.start(now);
+    }
   }
 
   playWaterSplash() {
