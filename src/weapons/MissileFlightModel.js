@@ -36,8 +36,11 @@ export class MissileFlightModel {
     this.thrustN = thrustN;
     this.dynamicPressurePa = 0.5 * density * speed * speed;
     const qArea = this.dynamicPressurePa * spec.crossSectionM2;
+    const aeroLateralMps2 = massKg > 0 ? (qArea * spec.maxLiftCoefficient) / massKg : 0;
+    const tvcScale = (spec.tvc && spec.maxThrustN > 0) ? Math.max(0, thrustN) / spec.maxThrustN : 0;
+    const tvcLateralMps2 = tvcScale * (spec.maxTvcG ?? spec.maxLateralG) * GRAVITY;
     this.availableLateralMps2 = Math.min(spec.maxLateralG * GRAVITY,
-      qArea * spec.maxLiftCoefficient / massKg);
+      aeroLateralMps2 + tvcLateralMps2);
 
     this.request.copy(command);
     // Guidance compensates gravity only while tracking, and pays for that lift.
@@ -53,16 +56,27 @@ export class MissileFlightModel {
     // yesterday's force when dynamic pressure or the structural limit falls.
     this.lateralAcceleration.clampLength(0, this.availableLateralMps2);
     this.deliveredLateralMps2 = this.lateralAcceleration.length();
-    const liftN = massKg * this.deliveredLateralMps2;
-    const liftCoefficient = qArea > 0 ? liftN / qArea : 0;
+
+    // Aerodynamic lift is bounded by airflow limit; excess lateral force is vectored thrust.
+    const deliveredForceN = massKg * this.deliveredLateralMps2;
+    const maxAeroLiftN = qArea * spec.maxLiftCoefficient;
+    const aeroLiftN = Math.min(deliveredForceN, maxAeroLiftN);
+    const liftCoefficient = qArea > 0 ? aeroLiftN / qArea : 0;
     this.baseDragN = qArea * spec.dragCoefficient;
     this.maneuverDragN = qArea * spec.inducedDragFactor * liftCoefficient * liftCoefficient;
+
+    // Vane deflection cosine loss reduces axial thrust during TVC turning
+    const tvcMps2 = Math.max(0, this.deliveredLateralMps2 - aeroLateralMps2);
+    const maxTvcMps2 = (spec.maxLateralG ?? 35) * GRAVITY;
+    const sinDeflection = maxTvcMps2 > 0 ? (tvcMps2 / maxTvcMps2) * 0.342 : 0;
+    const cosDeflection = Math.sqrt(Math.max(0, 1 - sinDeflection * sinDeflection));
+    const effectiveThrustN = thrustN * cosDeflection;
 
     // Positive, dissipative scalar drag update (no drag-induced reversal).
     // Rotate velocity for lateral control instead of an Euler vector kick:
     // normal force must not manufacture kinetic energy during a discrete turn.
     const dragRate = speed > 0 ? (this.baseDragN + this.maneuverDragN) / (massKg * speed) : 0;
-    const nextSpeed = (speed + thrustN * dt / massKg) / (1 + dragRate * dt);
+    const nextSpeed = (speed + effectiveThrustN * dt / massKg) / (1 + dragRate * dt);
     this.turnAxis.crossVectors(this.direction, this.lateralAcceleration);
     const angle = this.deliveredLateralMps2 * dt / Math.max((speed + nextSpeed) * 0.5, 1e-6);
     velocity.copy(this.direction);

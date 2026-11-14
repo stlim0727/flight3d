@@ -145,3 +145,22 @@ test('envelope comparison retains favorable hits and records physical control an
     assert.ok(result.maneuverDragWorkJPerKg > 0);
   }
 });
+
+test('AIM-9X thrust vectoring control delivers high lateral G during motor burn and tapers at burnout', () => {
+  const g = 9.80665;
+  const aim9x = body(250, MISSILE_TYPES.AIM9X);
+  const aim120c = body(250, MISSILE_TYPES.AIM120C);
+  const command = new Vector3(0, 500, 0);
+
+  // During rocket motor burn (thrustN = maxThrustN), AIM-9X TVC provides full 35G capability
+  advance(aim9x, { thrustN: MISSILE_TYPES.AIM9X.maxThrustN, command, massKg: MISSILE_TYPES.AIM9X.massAtLaunchKg });
+  assert.equal(aim9x.flight.availableLateralMps2, MISSILE_TYPES.AIM9X.maxLateralG * g);
+
+  // AIM-120C lacks TVC, so its lateral acceleration at 250 m/s is aerodynamically limited (<12G)
+  advance(aim120c, { thrustN: MISSILE_TYPES.AIM120C.maxThrustN, command, massKg: MISSILE_TYPES.AIM120C.massAtLaunchKg });
+  assert.ok(aim120c.flight.availableLateralMps2 < 12 * g);
+
+  // After burnout (thrustN = 0), AIM-9X TVC ceases and authority reverts purely to aerodynamic airflow
+  advance(aim9x, { thrustN: 0, command, massKg: MISSILE_TYPES.AIM9X.dryMassKg });
+  assert.ok(aim9x.flight.availableLateralMps2 < 12 * g);
+});

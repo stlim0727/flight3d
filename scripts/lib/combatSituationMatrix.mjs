@@ -36,6 +36,7 @@ export function simulateCombatSituation({
   offBoresightDeg = 0,
   countermeasures = false,
   rwr = true,
+  tvc = true,
   terrainHeight = () => 0,
   maxSimTimeSec = 25,
 }) {
@@ -130,8 +131,16 @@ export function simulateCombatSituation({
     target.chaff.remaining = 0;
   }
 
+  const specs = tvc
+    ? MISSILE_TYPES
+    : {
+        ...MISSILE_TYPES,
+        [type]: { ...MISSILE_TYPES[type], tvc: false },
+      };
+
   const combat = new AirToAirMissileSystem({
     stations: [{ id: 'STA_TEST', type, position: [-5.04, 0.04, 2.45] }],
+    specs,
     banditEvasion: targetBehavior === 'evasive_ai',
     banditRwr: rwr,
   });
@@ -334,6 +343,7 @@ export function sweepCombatSituationMatrix({
   behaviors = ['straight', 'orbit', 'break_turn', 'evasive_ai'],
   cms = [false, true],
   rwr = true,
+  tvc = true,
 } = {}) {
   const results = [];
   for (const type of types) {
@@ -351,6 +361,7 @@ export function sweepCombatSituationMatrix({
                 targetBehavior,
                 countermeasures,
                 rwr,
+                tvc,
               }));
             }
           }
