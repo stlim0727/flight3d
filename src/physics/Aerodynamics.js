@@ -5,6 +5,7 @@ import { TRIM_WHEEL_AUTHORITY } from './trimWheel.js';
 import { MassProperties } from './MassProperties.js';
 import { longitudinalForces } from './longitudinalForces.js';
 import { limitedPitchMoment, incidenceRate, loadSlope } from './gLimiter.js';
+import { computeAeroDamageEffects } from './combatDamage.js';
 
 export function createAeroResult() {
   return { forceWorld: new THREE.Vector3(), momentBody: new THREE.Vector3() };
@@ -22,6 +23,8 @@ export class Aerodynamics {
     this._limiterProbe = {};
     this._limiterGravity = new THREE.Vector3();
     this._limiterForceDelta = new THREE.Vector3();
+    this._damageEffects = {};
+    this.damageZones = null;
     this.loadConfig(config);
 
     // Dynamic Live Tuning Overrides
@@ -297,6 +300,9 @@ export class Aerodynamics {
     // Spoiler lift dump
     cl -= 0.38 * this.spoilers;
 
+    const dmg = this.damageZones ? computeAeroDamageEffects(this.damageZones, this._damageEffects) : null;
+    if (dmg) cl *= dmg.liftScale;
+
     // --- Ground Effect on Lift and Drag ---
     // Ground effect reduces induced drag significantly and adds slight cushion lift
     let geFactor = 1.0;
@@ -322,6 +328,7 @@ export class Aerodynamics {
     if (this.mach > this.transonicMachBuffet) {
       cdParasitic += Math.pow(this.mach - this.transonicMachBuffet, 3.5) * 8.0;
     }
+    if (dmg) cdParasitic += dmg.parasiticDragDelta;
 
     // Induced drag: C_Di = (C_L^2) / (pi * AR * e) * geFactor
     const cdInduced = ((cl * cl) / (Math.PI * this.aspectRatio * this.oswaldEfficiency)) * geFactor;
@@ -368,10 +375,11 @@ export class Aerodynamics {
     const trimRad = THREE.MathUtils.degToRad(this.pitchTrim) * TRIM_WHEEL_AUTHORITY;
     // As separation spreads outboard the horizontal tail buries itself in the
     // wake and progressively loses authority (continuous with the state).
-    const elevatorEffectiveness = 1.0 - 0.8 * this.separation;
+    const elevatorEffectiveness = (1.0 - 0.8 * this.separation) * (dmg ? dmg.elevatorAuthority : 1.0);
     let elevatorEffective = (elevatorRad + trimRad) * elevatorEffectiveness;
+    const stabilityScale = dmg ? dmg.stabilityScale : 1.0;
     // In Three.js body frame, positive Mx lifts nose UP, so stick back (-Cm_de > 0) creates positive pitch moment
-    let cm = this.Cm0 + this.Cma * this.alpha - this.Cm_de * elevatorEffective + this.Cmq * qHat;
+    let cm = this.Cm0 + this.Cma * stabilityScale * this.alpha - this.Cm_de * elevatorEffective + this.Cmq * qHat;
 
     // Pitch break: outboard lift collapse pushes the nose down continuously
     // with the separated area, stronger as the wing deepens into the stall.
@@ -382,7 +390,7 @@ export class Aerodynamics {
 
     // Rolling moment coefficient Cl:
     // Includes dihedral effect (Cl_b), aileron input, roll damping (Cl_p), and differential spoiler roll
-    const aileronRad = this.aileron * maxAileronRad * this.tuning.aileronSensitivity;
+    const aileronRad = this.aileron * maxAileronRad * this.tuning.aileronSensitivity * (dmg ? dmg.aileronAuthority : 1.0);
     const spoilerRoll = aileronRad > 0.02 ? aileronRad * 0.05 : (aileronRad < -0.02 ? aileronRad * 0.05 : 0);
     // Separation weakens the dihedral weathervane damping progressively:
     // a partly-separated wing feeds sideslip into a wing drop instead of
@@ -392,9 +400,9 @@ export class Aerodynamics {
 
     // Yawing moment coefficient Cn:
     // Directional stability (Cn_b), rudder input, yaw damping (Cn_r), and adverse yaw from ailerons
-    const rudderRad = this.rudder * maxRudderRad * this.tuning.rudderSensitivity;
+    const rudderRad = this.rudder * maxRudderRad * this.tuning.rudderSensitivity * (dmg ? dmg.rudderAuthority : 1.0);
     const adverseYaw = 0.025 * aileronRad;
-    const cn = this.Cn_b * this.beta + this.Cn_dr * rudderRad + this.Cn_r * rHat + adverseYaw;
+    const cn = this.Cn_b * stabilityScale * this.beta + this.Cn_dr * rudderRad + this.Cn_r * rHat + adverseYaw;
 
     // Moments in Body Frame (Newton-meters)
     // Note in Three.js aircraft:
@@ -402,8 +410,11 @@ export class Aerodynamics {
     // +Y (Yaw): negative rotation yaws nose RIGHT
     // +Z (Roll): negative rotation banks RIGHT
     const pitchMoment = qDyn * this.wingArea * this.meanChord * cm + thrustPitchMoment;
-    const rollMoment = -(qDyn * this.wingArea * this.wingspan * cl_roll);
-    const yawMoment = qDyn * this.wingArea * this.wingspan * cn;
+    const rollAsymmetry = dmg ? dmg.rollAsymmetry * Math.max(0.15, Math.abs(cl)) : 0;
+    const yawAsymmetry = dmg ? dmg.yawAsymmetry : 0;
+    const rollMoment = -(qDyn * this.wingArea * this.wingspan * cl_roll)
+      + qDyn * this.wingArea * this.wingspan * rollAsymmetry;
+    const yawMoment = qDyn * this.wingArea * this.wingspan * (cn + yawAsymmetry);
 
     result.momentBody.set(
       pitchMoment, // Rotation around X (Pitch: positive pitch up)
