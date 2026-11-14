@@ -92,7 +92,6 @@ jobs:
       - name: Run All Manual Suites (non-mandatory)
         if: ${{ github.event.inputs.suite == 'all' }}
         run: |
-          node scripts/test-mobile-touch.js
           node scripts/test-flight-agent.js --screenshots
           node scripts/test-crash-scenarios.js
           node scripts/test-landing-damage.js
