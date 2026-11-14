@@ -1540,10 +1540,10 @@ class FlightSimulator {
       });
     }
     const aircraft = [];
-    for (const [peerId, remote] of this.multiplayer?.remotes ?? []) {
-      if (!remote || remote.disposed || !remote.group?.visible) continue;
+    const remote = this.multiplayer?.remote;
+    if (remote && !remote.disposed && remote.group?.visible) {
       aircraft.push({
-        id: peerId,
+        id: 'remote',
         label: remote.group.userData?.name || remote.aircraft || t('gaze.target.aircraft'),
         mesh: remote.group,
         getPosition: () => (!remote.disposed && remote.group?.visible ? remote.group.position : null),
@@ -1559,11 +1559,24 @@ class FlightSimulator {
       });
     }
     if (this.ships?.group?.visible) {
-      buildings.push({
-        object: this.ships.group,
-        kind: 'ship',
-        label: t('gaze.target.ship'),
-      });
+      const shipRecords = [...(this.ships.vessels ?? []), ...(this.ships.speedboats ?? [])];
+      if (shipRecords.length > 0) {
+        for (const ship of shipRecords) {
+          if (!ship?.mesh) continue;
+          buildings.push({
+            object: ship.mesh,
+            kind: 'ship',
+            label: t('gaze.target.ship'),
+            dynamic: true,
+          });
+        }
+      } else {
+        buildings.push({
+          object: this.ships.group,
+          kind: 'ship',
+          label: t('gaze.target.ship'),
+        });
+      }
     }
     const picked = pickGazeTarget({
       clientX,

@@ -100,11 +100,26 @@ export function pickGazeTarget({
     if (!entry?.object) continue;
     const hit = resolveHitDistance(entry.object, raycaster);
     if (hit) {
-      considerDirect(hit.distance, {
-        kind: entry.kind || 'building',
-        label: entry.label || '',
-        position: hit.point.clone(),
-      });
+      if (entry.dynamic) {
+        entry.object.updateMatrixWorld(true);
+        const localPoint = entry.object.worldToLocal(hit.point.clone());
+        const trackedWorld = new THREE.Vector3();
+        considerDirect(hit.distance, {
+          kind: entry.kind || 'building',
+          label: entry.label || '',
+          getPosition: () => {
+            if (!isObjectVisible(entry.object)) return null;
+            entry.object.updateMatrixWorld(true);
+            return trackedWorld.copy(localPoint).applyMatrix4(entry.object.matrixWorld);
+          },
+        });
+      } else {
+        considerDirect(hit.distance, {
+          kind: entry.kind || 'building',
+          label: entry.label || '',
+          position: hit.point.clone(),
+        });
+      }
     }
   }
 

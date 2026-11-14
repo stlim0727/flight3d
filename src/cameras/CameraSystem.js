@@ -383,6 +383,7 @@ export class CameraSystem {
       const t1 = cameraTouches[1];
       this.pinchDistance = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
       this.isPinching = true;
+      this.touchMoved = true;
       this.activeTouchId = null;
       this.isDragging = false;
       this.lastTapTime = 0;
@@ -500,6 +501,7 @@ export class CameraSystem {
         if (cameraTouches.length === 1) {
           this.activeTouchId = cameraTouches[0].identifier;
           this.isDragging = true;
+          this.touchMoved = true;
           this.prevMouse.x = cameraTouches[0].clientX;
           this.prevMouse.y = cameraTouches[0].clientY;
         } else {
@@ -1460,6 +1462,32 @@ export class CameraSystem {
     }
   }
 
+  /**
+   * Apply active clicked-target or bandit gaze lookAt override if enabled.
+   */
+  applyActiveGaze(planePos) {
+    if (this.gazeTarget) {
+      const targetPos = typeof this.gazeTarget.getPosition === 'function'
+        ? this.gazeTarget.getPosition()
+        : this.gazeTarget.position;
+      if (targetPos) {
+        this.banditGazeTarget.copy(targetPos);
+        this.camera.lookAt(this.banditGazeTarget);
+      } else {
+        this.clearGaze();
+      }
+    } else if (this.banditGaze) {
+      const bandit = this.nearestLiveBandit(planePos);
+      if (bandit) {
+        this.banditGazeTarget.copy(bandit.position);
+        this.camera.lookAt(this.banditGazeTarget);
+      } else {
+        // No bandit found; restore to the mode's natural target on the next frame
+        this.clearGaze();
+      }
+    }
+  }
+
   /** Toggle sticky tracking of the nearest live bandit (#722). */
   toggleBanditGaze() {
     if (this.gazeTarget) {
@@ -1850,7 +1878,10 @@ export class CameraSystem {
         flightState,
         queryGroundHeight: (x, z) => this.queryGroundHeight(x, z)
       });
-      if (handled) return;
+      if (handled) {
+        this.applyActiveGaze(planePos);
+        return;
+      }
     }
 
     switch (this.mode) {
@@ -2225,26 +2256,7 @@ export class CameraSystem {
     // Override camera lookAt target for clicked target gaze or bandit gaze lock (#722):
     // if gaze is sticky, the camera's lookAt target follows the target regardless of
     // current mode so it always stays in frame.
-    if (this.gazeTarget) {
-      const targetPos = typeof this.gazeTarget.getPosition === 'function'
-        ? this.gazeTarget.getPosition()
-        : this.gazeTarget.position;
-      if (targetPos) {
-        this.banditGazeTarget.copy(targetPos);
-        this.camera.lookAt(this.banditGazeTarget);
-      } else {
-        this.clearGaze();
-      }
-    } else if (this.banditGaze) {
-      const bandit = this.nearestLiveBandit(planePos);
-      if (bandit) {
-        this.banditGazeTarget.copy(bandit.position);
-        this.camera.lookAt(this.banditGazeTarget);
-      } else {
-        // No bandit found; restore to the mode's natural target on the next frame
-        this.clearGaze();
-      }
-    }
+    this.applyActiveGaze(planePos);
 
     // Apply catastrophic impact / explosion camera trauma shake
     if (this.trauma > 0) {

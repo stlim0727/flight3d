@@ -213,3 +213,68 @@ test('updateControlState synchronizes btn-gaze-exit visibility and label', () =>
     else globalThis.document = prevDoc;
   }
 });
+
+test('pickGazeTarget tracks moving dynamic objects and CameraSystem suppresses pinch-release taps and overrides custom views', () => {
+  const camera = createCameraLookingAt(new THREE.Vector3(0, 20, 0), new THREE.Vector3(0, 20, -100));
+  const rect = { left: 0, top: 0, width: 800, height: 600 };
+
+  const shipMesh = new THREE.Mesh(new THREE.BoxGeometry(8, 4, 20), new THREE.MeshBasicMaterial());
+  shipMesh.position.set(0, 20, -100);
+  shipMesh.updateMatrixWorld(true);
+
+  const shipHit = pickGazeTarget({
+    clientX: 400,
+    clientY: 300,
+    rect,
+    camera,
+    sources: {
+      buildings: [{ object: shipMesh, kind: 'ship', label: 'Ship', dynamic: true }],
+    },
+  });
+  assert.equal(shipHit?.kind, 'ship');
+  assert.equal(typeof shipHit?.getPosition, 'function');
+  const firstPos = shipHit.getPosition().clone();
+  shipMesh.position.set(50, 20, -120);
+  const movedPos = shipHit.getPosition();
+  assert.ok(movedPos.x - firstPos.x > 49, 'dynamic ship gaze target follows mesh movement');
+
+  // Pinch gesture release should not trigger a tap, and customViewUpdater still honors active gaze
+  const prevWin = globalThis.window;
+  globalThis.window = { innerWidth: 800, innerHeight: 600, addEventListener: () => {} };
+  try {
+    const dom = { style: {}, addEventListener: () => {} };
+    const cam = new CameraSystem(new THREE.PerspectiveCamera(), dom);
+    const taps = [];
+    cam.onGazeClick = (x, y) => taps.push({ x, y });
+
+    cam.handleTouchStart({
+      touches: [
+        { identifier: 1, clientX: 200, clientY: 200, target: dom },
+        { identifier: 2, clientX: 300, clientY: 200, target: dom },
+      ],
+    });
+    cam.handleTouchEnd({
+      type: 'touchend',
+      touches: [{ identifier: 1, clientX: 200, clientY: 200, target: dom }],
+    });
+    cam.handleTouchEnd({ type: 'touchend', touches: [] });
+    assert.equal(taps.length, 0, 'releasing a pinch does not trigger a gaze click');
+
+    const targetPos = new THREE.Vector3(200, 30, -200);
+    cam.setGazeTarget({ kind: 'ship', label: 'Ship', position: targetPos });
+    cam.setCustomViewUpdater(({ camera: c }) => {
+      c.position.set(0, 50, 0);
+      c.lookAt(0, 0, 0);
+      return true;
+    });
+    const aircraft = new THREE.Object3D();
+    aircraft.updateMatrixWorld(true);
+    cam.update(1 / 60, aircraft, { speed: 40, velocity: new THREE.Vector3(0, 0, -40) });
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.camera.quaternion);
+    const toTarget = targetPos.clone().sub(cam.camera.position).normalize();
+    assert.ok(forward.dot(toTarget) > 0.999, 'active gaze overrides customViewUpdater lookAt');
+  } finally {
+    if (prevWin === undefined) delete globalThis.window;
+    else globalThis.window = prevWin;
+  }
+});
