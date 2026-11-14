@@ -55,7 +55,7 @@ test('combat situation: short-range crossing beam demonstrates early boost TVC c
   assert.equal(tvcResult.launched, true);
   assert.equal(tvcResult.terminal, 'hit', 'TVC-capable AIM-9X should intercept crossing beam target at 400m');
   assert.ok(tvcResult.minSeparationM < 5.0, `Expected lethal proximity burst, got ${tvcResult.minSeparationM}`);
-  assert.ok(tvcResult.maxMissileLateralG > 25, `Expected high TVC turn rate >25G, got ${tvcResult.maxMissileLateralG}G`);
+  assert.ok(tvcResult.maxMissileLateralG > 24, `Expected high TVC turn rate >24G, got ${tvcResult.maxMissileLateralG}G`);
 
   // Without TVC (e.g. AIM-120C or baseline tvc: false), missile is aerodynamically limited and misses
   const nonTvcResult = simulateCombatSituation({

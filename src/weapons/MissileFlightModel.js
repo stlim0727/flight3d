@@ -36,11 +36,21 @@ export class MissileFlightModel {
     this.thrustN = thrustN;
     this.dynamicPressurePa = 0.5 * density * speed * speed;
     const qArea = this.dynamicPressurePa * spec.crossSectionM2;
-    const aeroLateralMps2 = massKg > 0 ? (qArea * spec.maxLiftCoefficient) / massKg : 0;
-    const tvcScale = (spec.tvc && spec.maxThrustN > 0) ? Math.max(0, thrustN) / spec.maxThrustN : 0;
-    const tvcLateralMps2 = tvcScale * (spec.maxTvcG ?? spec.maxLateralG) * GRAVITY;
+
+    // TVC enables high-alpha trimming during motor burn, elevating effective body CLmax
+    const burnFraction = (spec.tvc && spec.maxThrustN > 0) ? Math.max(0, thrustN) / spec.maxThrustN : 0;
+    const maxCl = spec.tvc
+      ? spec.maxLiftCoefficient + ((spec.tvcMaxLiftCoefficient ?? spec.maxLiftCoefficient) - spec.maxLiftCoefficient) * burnFraction
+      : spec.maxLiftCoefficient;
+    const aeroLateralMps2 = massKg > 0 ? (qArea * maxCl) / massKg : 0;
+
+    // Direct nozzle vane lateral thrust component: F_tvc = thrustN * sin(delta_max)
+    const maxDeflectionRad = THREE.MathUtils.degToRad(spec.tvcMaxDeflectionDeg ?? 20);
+    const sinMaxDeflection = Math.sin(maxDeflectionRad);
+    const maxTvcLatMps2 = (spec.tvc && massKg > 0 && thrustN > 0) ? (thrustN * sinMaxDeflection) / massKg : 0;
+
     this.availableLateralMps2 = Math.min(spec.maxLateralG * GRAVITY,
-      aeroLateralMps2 + tvcLateralMps2);
+      aeroLateralMps2 + maxTvcLatMps2);
 
     this.request.copy(command);
     // Guidance compensates gravity only while tracking, and pays for that lift.
@@ -57,18 +67,18 @@ export class MissileFlightModel {
     this.lateralAcceleration.clampLength(0, this.availableLateralMps2);
     this.deliveredLateralMps2 = this.lateralAcceleration.length();
 
-    // Aerodynamic lift is bounded by airflow limit; excess lateral force is vectored thrust.
-    const deliveredForceN = massKg * this.deliveredLateralMps2;
-    const maxAeroLiftN = qArea * spec.maxLiftCoefficient;
-    const aeroLiftN = Math.min(deliveredForceN, maxAeroLiftN);
-    const liftCoefficient = qArea > 0 ? aeroLiftN / qArea : 0;
+    // Partition lateral acceleration between aerodynamic lift and direct nozzle thrust vectoring
+    const aeroDemandMps2 = Math.min(this.deliveredLateralMps2, aeroLateralMps2);
+    const tvcDemandMps2 = Math.min(maxTvcLatMps2, Math.max(0, this.deliveredLateralMps2 - aeroDemandMps2));
+
+    const liftCoefficient = qArea > 0 ? (massKg * aeroDemandMps2) / qArea : 0;
     this.baseDragN = qArea * spec.dragCoefficient;
     this.maneuverDragN = qArea * spec.inducedDragFactor * liftCoefficient * liftCoefficient;
 
-    // Vane deflection cosine loss reduces axial thrust during TVC turning
-    const tvcMps2 = Math.max(0, this.deliveredLateralMps2 - aeroLateralMps2);
-    const maxTvcMps2 = (spec.maxLateralG ?? 35) * GRAVITY;
-    const sinDeflection = maxTvcMps2 > 0 ? (tvcMps2 / maxTvcMps2) * 0.342 : 0;
+    // Axial thrust loss corresponds exactly to nozzle vane deflection: T_axial = T * cos(delta)
+    const sinDeflection = (thrustN > 0 && massKg > 0)
+      ? Math.min(sinMaxDeflection, (massKg * tvcDemandMps2) / thrustN)
+      : 0;
     const cosDeflection = Math.sqrt(Math.max(0, 1 - sinDeflection * sinDeflection));
     const effectiveThrustN = thrustN * cosDeflection;
 
