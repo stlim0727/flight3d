@@ -123,7 +123,8 @@ export class FlightControls {
           e.target?.isContentEditable || e.target?.closest?.('input, textarea, select')) return;
       if (cameraDigit) {
         const val = Number(cameraDigit[1]);
-        if (this.onSelectCamera) this.onSelectCamera(val === 0 ? 9 : val - 1);
+        // Zero is the tenth mode: BANDIT_POV, the bandit's own cockpit view (#722).
+        if (this.onSelectCamera) this.onSelectCamera(val === 0 ? 10 : val - 1);
       } else if (this.onCycleCamera) this.onCycleCamera();
       return;
     }

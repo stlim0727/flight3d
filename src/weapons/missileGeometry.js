@@ -96,25 +96,51 @@ export function createMissileMesh(type) {
   return group;
 }
 
+const BANDIT_TRIM_COLORS = Object.freeze({ RED: 0xff0000, BLUE: 0x0000ff, GREEN: 0x00ff00 });
+const BANDIT_DEFAULT_TRIM = 0xd07b32;
+
+/** Callsign palette and proportions, shared by the procedural proxy and the loaded airframe. */
+export function banditSkin(callsign = 'BANDIT') {
+  let trim = BANDIT_DEFAULT_TRIM;
+  for (const [name, color] of Object.entries(BANDIT_TRIM_COLORS)) {
+    if (callsign.includes(name)) { trim = color; break; }
+  }
+  const scale = callsign.includes('HEAVY') ? [1.18, 1.08, 1.3]
+    : callsign.includes('B-1') ? [0.86, 1.04, 1.12] : [1, 1, 1];
+  return { trim, scale };
+}
+
 /** Cheap delta-wing target drone used for the two airborne bandits. */
 export function createBanditMesh(callsign = 'BANDIT') {
   const group = new THREE.Group();
   group.name = `Bandit_${callsign}`;
   const dark = material('bandit-dark', { color: 0x3a4148, roughness: 0.62, metalness: 0.3 });
-  const trim = material('bandit-trim', { color: 0xd07b32, roughness: 0.5, metalness: 0.2 });
+  // Materials are cached by key, so the trim key carries the color: recoloring one callsign
+  // must never repaint the bandits that share the default orange.
+  const { trim } = banditSkin(callsign);
+  const trimMaterial = material(`bandit-trim-${trim.toString(16)}`,
+    { color: trim, roughness: 0.5, metalness: 0.2 });
 
-  const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.28, 7.6, 10), dark);
+  const heavy = callsign.includes('HEAVY'), bomber = callsign.includes('B-1');
+  const fighter = callsign.includes('F-') || callsign.includes('Fighter');
+  const length = heavy ? 8.8 : bomber ? 8.2 : fighter ? 8.0 : 7.6;
+  const radius = heavy ? 0.54 : bomber ? 0.3 : fighter ? 0.35 : 0.45;
+  const fuselage = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, heavy ? 0.34 : bomber ? 0.15 : fighter ? 0.2 : 0.28,
+      length, heavy ? 16 : 10), dark);
   fuselage.rotation.x = Math.PI / 2;
   fuselage.castShadow = true;
   group.add(fuselage);
 
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.8, 10), dark);
+  // Every airframe keeps its pointed nose; variants only change its size with the fuselage.
+  const noseLength = heavy ? 2.2 : 1.8;
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(radius, noseLength, heavy ? 16 : 10), dark);
   nose.rotation.x = -Math.PI / 2;
-  nose.position.z = -4.7;
+  nose.position.z = -length / 2 - noseLength / 2;
   nose.castShadow = true;
   group.add(nose);
 
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.12, 2.1), dark);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(bomber ? 9.6 : 8.4, 0.12, bomber ? 2.6 : 2.1), dark);
   wing.position.set(0, -0.05, 0.55);
   wing.rotation.z = 0.04;
   wing.castShadow = true;
@@ -131,7 +157,7 @@ export function createBanditMesh(callsign = 'BANDIT') {
   group.add(fin);
 
   for (const side of [-1, 1]) {
-    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.13, 1.1), trim);
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.13, 1.1), trimMaterial);
     tip.position.set(side * 4.1, -0.04, 0.55);
     group.add(tip);
   }
