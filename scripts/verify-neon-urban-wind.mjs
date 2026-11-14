@@ -6,14 +6,14 @@
 //   CDP_URL=http://127.0.0.1:9441 SIM_URL=http://127.0.0.1:5173 node scripts/verify-neon-urban-wind.mjs
 // Physics is stepped with stepSimulation while the wall clock is held, except in the
 // real-time measurements. A test pilot sets only ordinary virtual control inputs.
-// Evidence goes to ARTIFACT_DIR (default review-artifacts/neon-urban-wind/).
+// Evidence goes to ARTIFACT_DIR (default review-artifacts/neon-urban-wind/browser/).
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const cdp = process.env.CDP_URL || 'http://127.0.0.1:9441';
 const url = process.env.SIM_URL || 'http://127.0.0.1:5173';
-const directory = process.env.ARTIFACT_DIR || 'review-artifacts/neon-urban-wind';
+const directory = process.env.ARTIFACT_DIR || 'review-artifacts/neon-urban-wind/browser';
 // PARTS=takeoff,demo,lifecycle,replay,realtime selects sections; default all.
 const PARTS = new Set((process.env.PARTS || 'takeoff,demo,lifecycle,replay,realtime').split(','));
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -187,7 +187,10 @@ try {
         wind.min = Math.min(wind.min, w); wind.max = Math.max(wind.max, w);
         if (Math.abs(t - 40) < 0.01) window.__w.midShot = true;
       }
-      return { simSeconds: t, active: d.isActive, crashed: Boolean(s.isCrashed), crash: s.crashResult?.type ?? null,
+      // The scenario's own outcome, read before stop() would turn a running result into 'cancelled'.
+      const result = d.getActiveScenario?.()?.result ?? null;
+      return { simSeconds: t, active: d.isActive, result: result ? { status: result.status, reason: result.reason ?? null } : null,
+        crashed: Boolean(s.isCrashed), crash: s.crashResult?.type ?? null,
         stages: [...stages], maxRoll: +maxRoll.toFixed(1), minAglM: Number.isFinite(minAgl) ? +minAgl.toFixed(1) : null, stalled,
         heading: +s.telemetry.headingDeg.toFixed(1), position: s.position.toArray().map(v => +v.toFixed(1)),
         gear: s.gear.contacts.map(c => c.damageState),
@@ -332,10 +335,16 @@ for (const d of report.demos) {
   assert.ok(d.armed.started, `${id} demo started`);
   assert.equal(Boolean(d.armed.wind?.urban), d.wind, `${id} demo wind ${d.wind}`);
   if (KNOWN_DEMO_FAULTS.has(id)) {
-    if (d.crashed || d.simSeconds < 30) console.log(`known demo fault ${id} (wind ${d.wind}): ${d.crash ?? `ended at ${d.simSeconds} s`}`);
+    if (d.result?.status !== 'completed') {
+      console.log(`known demo fault ${id} (wind ${d.wind}): ${d.crash ?? d.result?.reason ?? d.result?.status} at ${d.simSeconds} s`);
+    }
     continue;
   }
   assert.equal(d.crashed, false, `${id} demo crashed (wind ${d.wind}): ${d.crash}`);
+  // A scenario can stop itself as failed without a crash (stage timeout, invalid
+  // command), and a demo still active at the step limit has not finished either.
+  assert.equal(d.active, false, `${id} demo still active at ${d.simSeconds} s (wind ${d.wind})`);
+  assert.equal(d.result?.status, 'completed', `${id} demo result ${JSON.stringify(d.result)} (wind ${d.wind})`);
 }
 const l = report.lifecycle;
 if (l) {

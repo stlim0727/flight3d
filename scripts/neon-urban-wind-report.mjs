@@ -5,7 +5,7 @@
 // sets only ordinary virtual control inputs; nothing teleports, forces or poses the
 // aircraft after the preset. Usage:
 //   node scripts/neon-urban-wind-report.mjs [out.json]
-// Default output: review-artifacts/neon-urban-wind/report.json. Tower collision is not
+// Default output: review-artifacts/neon-urban-wind/headless/report.json. Tower collision is not
 // simulated headless; the minimum gap to tower walls beside the path is reported.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -19,7 +19,7 @@ import { setSimulationWind } from '../src/physics/WindField.js';
 import { stepPhysics } from '../src/core/physicsTiming.js';
 import { flyBank, flyVerticalPath } from '../src/director/PilotControlLaws.js';
 
-const out = process.argv[2] || 'review-artifacts/neon-urban-wind/report.json';
+const out = process.argv[2] || 'review-artifacts/neon-urban-wind/headless/report.json';
 const HZ = 120, CONTROL_TICKS = 6; // the pilot updates every 0.05 s, as the browser scripts do
 const KT = 1.943844, DEG = 180 / Math.PI;
 const round = (v, d = 2) => Number.isFinite(v) ? +v.toFixed(d) : v;
