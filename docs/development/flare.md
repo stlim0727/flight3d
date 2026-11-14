@@ -39,3 +39,11 @@ sample is not a real-world success rate and should not be read as proof of immun
 Player controls, HUD, flare/chaff effects, resupply, hostile missiles targeting the
 player, replay/networking and complete game-scene/human-flown validation remain
 open. This slice does not complete S4-1.
+
+Verification on 2026-11-14: focused Node sensor/combat tests, `npm run check`
+and `npm run build` passed. Hardware Chrome 156 / Intel ADL-N Vulkan passed
+WebGL2 shader draw with pixel `[255, 0, 0, 255]`, GL error 0, the existing
+terrain/IR seeker scenarios and missile mesh drawing. A bounded browser probe
+confirmed flare diversion, radar isolation and IR reacquisition; it does not
+render a flare or exercise a human-flown scene. Logs and probe are retained in
+`.cache/flare/` in the task worktree.
