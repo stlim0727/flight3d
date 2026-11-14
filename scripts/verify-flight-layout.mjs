@@ -109,10 +109,10 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       assert.equal(new Set(layout.buttons.map(b => Math.round(b.y))).size, 1,
         `toolbar stays on one row: ${JSON.stringify(layout.buttons)}`);
       assert.ok(layout.buttons.every(b => b.center === 'flex/center/center'), `labels centred in their buttons: ${layout.buttons.map(b => b.center)}`);
-      // Camera, fullscreen and overflow stay pinned to the right edge; the
-      // aircraft actions unfold to their left and wrap on portrait phones.
-      const primary = layout.buttons.slice(-3);
-      assert.deepEqual(primary.map(b => b.sel), ['#btn-cam-director', '#btn-fullscreen', '#open-flight-more'], `primary group order: ${layout.buttons.map(b => b.sel)}`);
+      // Fullscreen and overflow stay pinned to the right edge; only the camera
+      // strip scrolls horizontally when the viewport is narrower than all buttons.
+      const primary = layout.buttons.slice(-2);
+      assert.deepEqual(primary.map(b => b.sel), ['#btn-fullscreen', '#open-flight-more'], `primary group order: ${layout.buttons.map(b => b.sel)}`);
       assert.ok(layout.pinned, 'toolbar scrolled to its right end');
       assert.ok(primary.every(b => b.x >= 0 && b.x + b.w <= width + 1 && b.hit), `primary group reachable: ${JSON.stringify(primary)}`);
       const row = layout.chrome.find(r => r.sel === '.flight-toolbar');
