@@ -29,7 +29,10 @@ export const MISSILE_TYPES = {
     seekerFovDeg: 28,
     seekerRangeM: 8500,
     gimbalDeg: 65,
+    // Simulation assumptions, independent sensing and damage distances.
     fuseRadiusM: 14,
+    lethalRadiusM: 5,
+    fragmentRadiusM: 14,
     navigationConstant: 4.0,
     maxLifeSeconds: 20,
   },
@@ -56,7 +59,10 @@ export const MISSILE_TYPES = {
     seekerFovDeg: 28,
     seekerRangeM: 8500,
     gimbalDeg: 65,
+    // Simulation assumptions, independent sensing and damage distances.
     fuseRadiusM: 14,
+    lethalRadiusM: 5,
+    fragmentRadiusM: 14,
     navigationConstant: 4.0,
     maxLifeSeconds: 24,
   },

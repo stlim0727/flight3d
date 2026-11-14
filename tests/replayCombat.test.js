@@ -91,6 +91,7 @@ test('replay playback interpolates combat and stages each detonation once', () =
     type: 'detonation', missile: { id: 7 },
     position: { x: 300, y: 3000, z: -1200 }, velocity: { x: 600, y: 0, z: 0 },
   });
+  recorder.recordCombatEvent({ type: 'kill', position: { x: 300, y: 3000, z: -1200 } });
   const combat = decodeTrack(encodeTrack(recorder.finish())).combat;
   let explosions = 0;
   const sounds = [];
@@ -209,4 +210,36 @@ test('combat playback interpolates recorded bandit bank instead of leveling the 
   const mesh = playback.view.targetViews.get(0).mesh;
   assert.ok(mesh.quaternion.equals(q));
   playback.stop();
+});
+
+test('recorded kill events count actual kills independently of explosions and seek', () => {
+  const recorder = recordCombat(5);
+  recorder.recordCombatEvent({ type: 'detonation', missile: { id: 7 }, position: { x: 0, y: 0, z: 0 } });
+  recorder.update(1, TELEMETRY, QUAT, combatAt(6));
+  recorder.recordCombatEvent({ type: 'detonation', missile: { id: 8 }, position: { x: 1, y: 0, z: 0 } });
+  recorder.recordCombatEvent({ type: 'kill', missile: { id: 8 }, position: { x: 1, y: 0, z: 0 } });
+  recorder.recordCombatEvent({ type: 'kill', missile: { id: 8 }, position: { x: 2, y: 0, z: 0 } });
+  recorder.update(1, TELEMETRY, QUAT, combatAt(7));
+  recorder.recordCombatEvent({ type: 'kill', position: { x: 3, y: 0, z: 0 } });
+  const track = decodeTrack(encodeTrack(recorder.finish()));
+  assert.equal(track.combat.killEventsRecorded, true);
+  assert.deepEqual(track.combat.events.map(e => e.kind), ['detonation', 'detonation', 'kill', 'kill', 'kill']);
+  const playback = new CombatReplayPlayback({ scene: new Scene() }); playback.load(track.combat);
+  const origin = new Vector3();
+  playback.seek(5.5); assert.equal(playback.getHudState(origin).splash, 0, 'surviving burst');
+  playback.seek(6.5); assert.equal(playback.getHudState(origin).splash, 2, 'two kills from one burst');
+  playback.seek(7.1); assert.equal(playback.getHudState(origin).splash, 3, 'gun kill counts');
+  playback.seek(5.5); assert.equal(playback.getHudState(origin).splash, 0, 'rewind restores count');
+});
+
+test('legacy combat tracks preserve the historic detonation count across re-encoding', () => {
+  const recorder = recordCombat(5);
+  recorder.recordCombatEvent({ type: 'detonation', position: { x: 0, y: 0, z: 0 } });
+  const track = recorder.finish(); track.combat.killEventsRecorded = false;
+  const decoded = decodeTrack(encodeTrack(track));
+  assert.equal(decoded.version, 5); assert.equal(decoded.combat.killEventsRecorded, false);
+  const restored = decodeTrack(encodeTrack(decoded));
+  assert.equal(restored.version, 5);
+  const playback = new CombatReplayPlayback({ scene: new Scene() }); playback.load(restored.combat);
+  playback.seek(6); assert.equal(playback.getHudState(new Vector3()).splash, 1);
 });

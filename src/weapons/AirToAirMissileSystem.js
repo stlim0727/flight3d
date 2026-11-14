@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ChaffDispenser } from './Chaff.js';
 import { FlareDispenser } from './Flare.js';
 import { BanditThreatResponse } from './BanditThreatResponse.js';
+import { fuzeClosestApproach } from './MissileFuze.js';
 import { MissileSeeker, seekerCanObserve } from './MissileSeeker.js';
 import { sampleEngineInfrared } from './InfraredSignal.js';
 import { MissileFlightModel } from './MissileFlightModel.js';
@@ -185,9 +186,6 @@ export class AirToAirMissileSystem {
     this._lateral = new THREE.Vector3();
     this._dir = new THREE.Vector3();
     this._r0 = new THREE.Vector3();
-    this._r1 = new THREE.Vector3();
-    this._rv = new THREE.Vector3();
-    this._closest = new THREE.Vector3();
     this._launchPos = new THREE.Vector3();
   }
 
@@ -546,16 +544,15 @@ export class AirToAirMissileSystem {
       command: this._lateral, tracking,
     });
 
-    // Physical proximity is independent of acquisition; truth never feeds PN.
-    let hit = null;
-    let closest = spec.fuseRadiusM;
+    // Select the earliest same-time closest-approach trigger across targets.
+    let triggerTarget = null, triggerTime = Infinity;
     for (const candidate of this.targets) {
       if (!candidate.alive) continue;
-      const distance = this._closestApproach(missile, candidate);
-      if (distance <= closest) { hit = candidate; closest = distance; }
+      const time = fuzeClosestApproach(missile, candidate, spec.fuseRadiusM);
+      if (time !== null && time < triggerTime) { triggerTarget = candidate; triggerTime = time; }
     }
-    if (hit) {
-      this._detonate(missile, hit, events, closest);
+    if (triggerTarget) {
+      this._detonate(missile, triggerTarget, events, triggerTime);
       return;
     }
 
@@ -602,18 +599,6 @@ export class AirToAirMissileSystem {
     return true;
   }
 
-  _closestApproach(missile, target) {
-    this._r0.copy(target.prevPosition).sub(missile.prevPosition);
-    this._r1.copy(target.position).sub(missile.position);
-    this._rv.copy(this._r1).sub(this._r0);
-    const lengthSq = this._rv.lengthSq();
-    const t = lengthSq > 1e-9
-      ? THREE.MathUtils.clamp(-this._r0.dot(this._rv) / lengthSq, 0, 1)
-      : 0;
-    this._closest.copy(this._rv).multiplyScalar(t).add(this._r0);
-    return this._closest.length();
-  }
-
   _updateGun(dt, world, events) {
     const gunEvents = this.cannon.update(dt, world, this.targets);
     for (const event of gunEvents) {
@@ -636,10 +621,10 @@ export class AirToAirMissileSystem {
    */
   _damageTarget(target, amount, events, {
     source = 'gun', missile = null, position = target.position, velocity = target.velocity,
-    detonationEmitted = false,
+    detonationEmitted = false, targetPosition = target.position,
   } = {}) {
     if (!target?.alive || amount <= 0) return;
-    const localOffset = toBodyOffset(position, target.position, target.quaternion, target.velocity);
+    const localOffset = toBodyOffset(position, targetPosition, target.quaternion, target.velocity);
     const hitZone = classifyHitZone(localOffset);
     if (target.damageZones) {
       if (source === 'missile') {
@@ -675,7 +660,7 @@ export class AirToAirMissileSystem {
       type: 'kill', target, missile, source,
       hitZone,
       damageZones: target.damageZones ? { ...target.damageZones } : null,
-      position: target.position.clone(), velocity: target.velocity.clone(),
+      position: targetPosition.clone(), velocity: target.velocity.clone(),
     });
     if (this.lockedTarget === target) {
       this.lockedTarget = null;
@@ -685,24 +670,26 @@ export class AirToAirMissileSystem {
     this.selectedTargetIndex = nextIndex;
   }
 
-  _detonate(missile, target, events, distanceM) {
+  _detonate(missile, target, events, time) {
+    missile.position.lerpVectors(missile.prevPosition, missile.position, time);
     missile.alive = false;
     events.push({
       type: 'detonation', missile, target, surface: false,
       position: missile.position.clone(), velocity: missile.velocity.clone(),
     });
-    if (!target?.alive) return;
-    // The fuse radius is the warhead's lethal radius for a light drone. The
-    // fragmentation model in combatDamage.js applies graded damage to larger
-    // airframes once hostile fragments can reach the player.
-    this._damageTarget(target, blastDamage(distanceM, {
-      lethalRadiusM: missile.spec.fuseRadiusM,
-      fragmentRadiusM: missile.spec.fuseRadiusM,
-    }), events, {
-      source: 'missile', missile,
-      position: missile.position,
-      velocity: target.velocity,
-      detonationEmitted: true,
-    });
+    // Every affected target is evaluated at the same interpolated instant.
+    for (const candidate of this.targets) {
+      if (!candidate.alive) continue;
+      const position = candidate.prevPosition.clone().lerp(candidate.position, time);
+      const distance = position.distanceTo(missile.position);
+      const amount = blastDamage(distance, {
+        lethalRadiusM: missile.spec.lethalRadiusM,
+        fragmentRadiusM: missile.spec.fragmentRadiusM,
+      });
+      this._damageTarget(candidate, amount, events, {
+        source: 'missile', missile, position: missile.position,
+        targetPosition: position, velocity: candidate.velocity, detonationEmitted: true,
+      });
+    }
   }
 }

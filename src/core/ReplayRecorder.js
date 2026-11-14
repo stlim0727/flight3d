@@ -163,6 +163,7 @@ export class ReplayRecorder {
       banditSamples: [],
       missileSamples: [],
       events: [],
+      killEventsRecorded: true,
     };
     return this.combat;
   }
@@ -186,10 +187,11 @@ export class ReplayRecorder {
   /**
    * Record a live combat event at the current sortie time. Detonation markers
    * drive replay explosions and remove missiles; expiry markers only remove.
+   * Kill markers independently count each destroyed target, including gun kills.
    */
   recordCombatEvent(event) {
     if (!this.active || !event) return;
-    if (event.type !== 'detonation' && event.type !== 'expire') return;
+    if (event.type !== 'detonation' && event.type !== 'expire' && event.type !== 'kill') return;
     const document = this._ensureCombat();
     const position = event.position || event.missile?.position;
     const velocity = event.velocity || event.missile?.velocity;

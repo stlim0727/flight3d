@@ -121,12 +121,13 @@ test('different hidden maneuvers produce identical missile trajectories and memo
   assert.equal(a.m.seeker.state, 'lost'); assert.equal(a.m.flight.requestedLateralMps2, 0);
 });
 
-test('sensor denial does not grant physical immunity to a ballistic impact', () => {
+test('sensor denial does not grant physical immunity to a ballistic proximity burst', () => {
   const world = { ...own(), ...flat, active: true, onGround: false, velocity: new Vector3(0, 0, -250), seekerSignalQuality: () => 0 };
   const combat = new AirToAirMissileSystem(), t = new BanditTarget({ callsign: 'CLOSE', position: new Vector3(0, 3000, -300) });
   combat.addTarget(t); const m = combat.fire(world);
   for (let i = 0; i < 240 && m.alive; i++) combat.update(dt, world);
-  assert.equal(m.seeker.everTracked, false); assert.equal(t.alive, false); assert.equal(combat.splashCount, 1);
+  assert.equal(m.seeker.everTracked, false); assert.ok(t.damage > 0 && t.damage < 1);
+  assert.equal(t.alive, true); assert.equal(combat.splashCount, 0);
 });
 
 test('exposed, briefly masked and persistently masked combat produce distinct state histories', () => {
