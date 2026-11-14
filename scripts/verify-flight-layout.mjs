@@ -42,21 +42,20 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     await delay(500);
   }
   assert.ok(await evaluate('Boolean(window.simulator?.startupReady)'), 'startup');
-  assert.equal(await evaluate('document.getElementById("open-camera").tagName'), 'SELECT', 'CAM opens a native view dropdown');
-  assert.equal(await evaluate('document.querySelectorAll("#open-camera option").length'), 10, 'all views, Auto and Director are selectable');
+  assert.equal(await evaluate('document.getElementById("open-camera") === null'), true, 'camera dropdown replaced by strip buttons');
+  assert.equal(await evaluate('document.querySelectorAll(".flight-toolbar .flight-camera-btn").length'), 10, 'all views, Auto and Director are selectable on the strip');
   assert.equal(await evaluate('document.getElementById("btn-auto-camera") === null'), true, 'no duplicate Scenic Auto button');
   await evaluate(() => {
-    const select = document.getElementById('open-camera');
-    select.focus();
-    select.value = '7'; select.dispatchEvent(new Event('change', { bubbles: true }));
+    const autoBtn = document.getElementById('btn-cam-auto');
+    autoBtn.focus();
+    autoBtn.click();
   });
-  assert.ok(await evaluate('window.simulator.cameraSystem.autoSwitch'), 'dropdown Auto enables automatic framing');
-  assert.ok(await evaluate('document.activeElement !== document.getElementById("open-camera")'), 'committed CAM selection releases keyboard focus');
+  assert.ok(await evaluate('window.simulator.cameraSystem.autoSwitch'), 'strip Auto enables automatic framing');
+  assert.ok(await evaluate('document.activeElement !== document.getElementById("btn-cam-auto")'), 'clicked camera button releases keyboard focus');
   await evaluate(() => {
-    const select = document.getElementById('open-camera');
-    select.value = '1'; select.dispatchEvent(new Event('change', { bubbles: true }));
+    document.getElementById('btn-cam-chase').click();
   });
-  assert.equal(await evaluate('window.simulator.cameraSystem.autoSwitch'), false, 'explicit dropdown view returns to manual');
+  assert.equal(await evaluate('window.simulator.cameraSystem.autoSwitch'), false, 'explicit strip view returns to manual');
   await evaluate(() => {
     const s = window.simulator;
     s.demoDirector.stop(); s.gameFlow.enterFlight();
@@ -108,8 +107,8 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       assert.ok(layout.chrome.every(r => r.x >= 0 && r.x + r.w <= width + 1 && r.y >= 0 && r.y + r.h <= height), JSON.stringify(layout.chrome));
       assert.ok(bounds.every(r => r.h >= 44 && (r.sel === '.hud-strip' || r.w >= 44)), 'minimum targets');
       const wrappedPortrait = width <= 600 && height > width;
-      assert.ok(new Set(layout.buttons.map(b => Math.round(b.y))).size <= (wrappedPortrait ? 2 : 1),
-        `toolbar stays on ${wrappedPortrait ? 'at most two' : 'one'} row(s): ${JSON.stringify(layout.buttons)}`);
+      assert.ok(new Set(layout.buttons.map(b => Math.round(b.y))).size <= (wrappedPortrait ? 3 : 1),
+        `toolbar stays on ${wrappedPortrait ? 'at most three' : 'one'} row(s): ${JSON.stringify(layout.buttons)}`);
       if (wrappedPortrait) {
         assert.ok(layout.fits, `portrait toolbar needs no horizontal scroll: ${JSON.stringify(layout.chrome)}`);
         assert.ok(layout.buttons.every(b => b.hit), `portrait controls stay reachable without scrolling: ${JSON.stringify(layout.buttons)}`);
@@ -118,7 +117,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       // Camera, fullscreen and overflow stay pinned to the right edge; the
       // aircraft actions unfold to their left and wrap on portrait phones.
       const primary = layout.buttons.slice(-3);
-      assert.deepEqual(primary.map(b => b.sel), ['#open-camera', '#btn-fullscreen', '#open-flight-more'], `primary group order: ${layout.buttons.map(b => b.sel)}`);
+      assert.deepEqual(primary.map(b => b.sel), ['#btn-cam-director', '#btn-fullscreen', '#open-flight-more'], `primary group order: ${layout.buttons.map(b => b.sel)}`);
       assert.ok(layout.pinned, 'toolbar scrolled to its right end');
       assert.ok(primary.every(b => b.x >= 0 && b.x + b.w <= width + 1 && b.hit), `primary group reachable: ${JSON.stringify(primary)}`);
       const row = layout.chrome.find(r => r.sel === '.flight-toolbar');
@@ -193,7 +192,12 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
         row: [...document.querySelectorAll('.flight-toolbar button, .flight-toolbar select')].filter(n => getComputedStyle(n).display !== 'none').map(n => n.id) };
     });
     assert.ok(demo.width && demo.top >= demo.toolbarBottom + 4 && demo.locked, `demo clearance and lockout: ${JSON.stringify(demo)}`);
-    assert.deepEqual(demo.row, ['btn-skip-demo', 'open-camera', 'btn-fullscreen', 'open-flight-more'], `demo row: ${demo.row}`);
+    assert.deepEqual(demo.row, [
+      'btn-skip-demo',
+      'btn-cam-chase', 'btn-cam-drone', 'btn-cam-flyby', 'btn-cam-wing', 'btn-cam-cockpit',
+      'btn-cam-hud', 'btn-cam-tower', 'btn-cam-gear', 'btn-cam-auto', 'btn-cam-director',
+      'btn-fullscreen', 'open-flight-more',
+    ], `demo row: ${demo.row}`);
     await screenshot(`${out}/${width}x${height}-demo.png`);
     // Warnings coexist with both guide states, without covering demo controls.
     await evaluate(() => {

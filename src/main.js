@@ -272,16 +272,6 @@ class FlightSimulator {
     this.touchControls.onOptionsChange = () => this.lobby?.refresh?.();
     initFlightPanels({
       onSelectCamera: mode => this.controls.onSelectCamera(mode),
-      onCameraOpen: () => {
-        if (!this.multiplayer?.active && this.gameFlow.state === FLOW.FLIGHT) {
-          this.gameFlow.holdCameraSelection();
-        }
-      },
-      onCameraClose: () => {
-        if (!this.multiplayer?.active) {
-          this.gameFlow.releaseCameraSelection();
-        }
-      },
       onAdjustTrim: delta => {
         if (this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed) return;
         this.aero.setTrim(delta);
