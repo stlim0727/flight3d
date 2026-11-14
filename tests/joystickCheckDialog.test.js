@@ -360,6 +360,9 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     dialog.open();
     const missile = dialog.dialog.querySelector('[data-combat-button="missile"]');
     const chaff = dialog.dialog.querySelector('[data-combat-button="chaff"]');
+    assert.ok(missile.querySelector('option[value="64"]'));
+    missile.value = '64'; missile.dispatchEvent(new Event('change'));
+    assert.strictEqual(sim.controls.hotas.getConfig().combatButtons.missile, 64);
     missile.value = '3'; missile.dispatchEvent(new Event('change'));
     assert.strictEqual(sim.controls.hotas.getConfig().combatButtons.missile, 3);
     chaff.value = '3'; chaff.dispatchEvent(new Event('change'));

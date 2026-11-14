@@ -97,7 +97,7 @@ export class JoystickCheckDialog {
             <label class="joystick-field-label">${label}
               <select class="joystick-select" data-combat-button="${action}">
                 <option value="-1">미지정</option>
-                ${Array.from({ length: 32 }, (_, i) => `<option value="${i}">Button ${i}</option>`).join('')}
+                ${Array.from({ length: 65 }, (_, i) => `<option value="${i}">Button ${i}</option>`).join('')}
               </select>
             </label>`).join('')}
         </div>
