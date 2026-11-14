@@ -1,4 +1,5 @@
 import { RECORD_BYTES, REMOTE_RECORD_BYTES, HEADER_BYTES, REPLAY_INTERVAL_SEC, frameBytes } from './replayConfig.js';
+import { COMBAT_DAMAGE_ZONES } from '../physics/combatDamage.js';
 
 export const REPLAY_TRACK_VERSION = 2;
 // Multiplayer room tracks only: solo flights stay v2 so older builds can still import them.
@@ -11,7 +12,7 @@ export const COMBAT_DIAGNOSTIC_BYTES = 28;
 export const MISSILE_TYPE_IDS = Object.freeze(['AIM9X', 'AIM120C']);
 export const COMBAT_EVENT_KINDS = Object.freeze([
   'detonation', 'expire', 'kill', 'launch', 'seeker_state',
-  'decoy_dispense', 'decoy_transfer', 'damage', 'unresolved_end',
+  'decoy_dispense', 'decoy_transfer', 'damage', 'unresolved_end', 'decoy_expire',
 ]);
 export const SEEKER_STATES = Object.freeze(['unknown', 'search', 'acquire', 'track', 'memory', 'lost']);
 export const SEEKER_LOSS_REASONS = Object.freeze([
@@ -21,7 +22,7 @@ export const SEEKER_LOSS_REASONS = Object.freeze([
 export const GUIDANCE_CUTOFF_REASONS = Object.freeze([
   'none', 'no_estimate', 'gimbal_limit', 'negative_closure', 'low_speed', 'range_too_close',
 ]);
-export const HIT_ZONES = Object.freeze(['unknown', 'nose', 'cockpit', 'leftWing', 'rightWing', 'engine', 'tail', 'fuselage']);
+export const HIT_ZONES = Object.freeze(['unknown', ...COMBAT_DAMAGE_ZONES]);
 export const REPLAY_MAGIC = 'F3DR1';
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
@@ -282,20 +283,26 @@ export function combatByteLength(combat, version = COMBAT_TRACK_VERSION) {
   }, 0);
   const banditBytes = (combat.banditSamples?.length || 0) * (5 + targets.length * 23);
   const missileBytes = (combat.missileSamples?.length || 0) * 26;
-  const eventBytes = (combat.events?.length || 0) * COMBAT_EVENT_BYTES;
+  const rawEvents = Array.isArray(combat.events) ? combat.events : [];
+  const events = version >= 7 ? rawEvents : rawEvents.filter(e => {
+    if (e.kind === 'detonation' || e.kind === 'expire') return true;
+    if (version >= 6 && e.kind === 'kill') return true;
+    return false;
+  });
+  const eventBytes = events.length * COMBAT_EVENT_BYTES;
   const hasDiag = version >= 7 && Array.isArray(combat.diagnosticSamples) && combat.diagnosticSamples.length > 0;
   const diagnosticBytes = hasDiag ? (6 + combat.diagnosticSamples.length * COMBAT_DIAGNOSTIC_BYTES) : 0;
   return 4 + COMBAT_SECTION_HEADER_BYTES + targetBytes + banditBytes + missileBytes + eventBytes + diagnosticBytes;
 }
 
 function hasCombat(combat) {
-  return Boolean(combat
-    && Array.isArray(combat.targets)
-    && Array.isArray(combat.banditSamples)
-    && Array.isArray(combat.missileSamples)
-    && Array.isArray(combat.events)
-    && (combat.banditSamples.length || combat.missileSamples.length || combat.events.length
-      || (Array.isArray(combat.diagnosticSamples) && combat.diagnosticSamples.length)));
+  if (!combat) return false;
+  const hasBandit = Array.isArray(combat.banditSamples) && combat.banditSamples.length > 0;
+  const hasMissile = Array.isArray(combat.missileSamples) && combat.missileSamples.length > 0;
+  const hasEvents = Array.isArray(combat.events) && combat.events.length > 0;
+  const hasDiag = Array.isArray(combat.diagnosticSamples) && combat.diagnosticSamples.length > 0;
+  const hasTargets = Array.isArray(combat.targets) && combat.targets.length > 0;
+  return Boolean(hasBandit || hasMissile || hasEvents || hasDiag || hasTargets);
 }
 
 export function encodeTrack(track) {
@@ -344,7 +351,13 @@ function writeCombat(view, offset, combat, version = COMBAT_TRACK_VERSION) {
   view.setUint8(offset + 5, 0);
   view.setUint32(offset + 6, combat.banditSamples.length);
   view.setUint32(offset + 10, combat.missileSamples.length);
-  view.setUint32(offset + 14, combat.events.length);
+  const rawEvents = Array.isArray(combat.events) ? combat.events : [];
+  const events = version >= 7 ? rawEvents : rawEvents.filter(e => {
+    if (e.kind === 'detonation' || e.kind === 'expire') return true;
+    if (version >= 6 && e.kind === 'kill') return true;
+    return false;
+  });
+  view.setUint32(offset + 14, events.length);
   offset += COMBAT_SECTION_HEADER_BYTES;
 
   for (const target of targets) {
@@ -384,7 +397,7 @@ function writeCombat(view, offset, combat, version = COMBAT_TRACK_VERSION) {
     offset += 26;
   }
 
-  for (const event of combat.events) {
+  for (const event of events) {
     writeScalar(view, offset, 'u32', event.timeSec * 1000, 1);
     const kindIdx = COMBAT_EVENT_KINDS.indexOf(event.kind);
     const kindCode = version >= 7 && kindIdx >= 0
@@ -404,14 +417,16 @@ function writeCombat(view, offset, combat, version = COMBAT_TRACK_VERSION) {
         flags = lossIdx >= 0 ? lossIdx : 0;
         const stateIdx = SEEKER_STATES.indexOf(event.state);
         extra = stateIdx >= 0 ? stateIdx : 0;
-      } else if (event.kind === 'decoy_dispense' || event.kind === 'decoy_transfer') {
+      } else if (event.kind === 'decoy_dispense' || event.kind === 'decoy_transfer' || event.kind === 'decoy_expire') {
         flags = event.decoyType === 'chaff' ? 2 : 1;
-        extra = (event.remaining ?? event.decoyId ?? 0) & 255;
+        extra = (event.remaining ?? event.decoyId ?? event.flareId ?? event.chaffId ?? 0) & 255;
       } else if (event.kind === 'damage' || event.kind === 'kill') {
-        const zoneIdx = HIT_ZONES.indexOf(event.hitZone);
+        const rawZone = event.hitZone ?? event.zone;
+        const normZone = rawZone === 'leftWing' ? 'wingL' : rawZone === 'rightWing' ? 'wingR' : rawZone;
+        const zoneIdx = HIT_ZONES.indexOf(normZone);
         extra = zoneIdx >= 0 ? zoneIdx : 0;
       } else if (event.kind === 'detonation') {
-        extra = event.reason === 'surface_collision' ? 2 : 1;
+        extra = (event.reason === 'surface_collision' || event.surface) ? 2 : 1;
       }
     }
     view.setUint8(offset + 6, flags);
@@ -420,7 +435,7 @@ function writeCombat(view, offset, combat, version = COMBAT_TRACK_VERSION) {
     writeScalar(view, offset + 8, 'f32', event.x, 1);
     writeScalar(view, offset + 12, 'f32', event.y, 1);
     writeScalar(view, offset + 16, 'f32', event.z, 1);
-    writeScalar(view, offset + 20, 'f32', event.vx ?? event.signalQuality ?? event.amount ?? event.lockProgress ?? 0, 1);
+    writeScalar(view, offset + 20, 'f32', event.vx ?? event.signalQuality ?? event.amount ?? event.damage ?? event.lockProgress ?? 0, 1);
     writeScalar(view, offset + 24, 'f32', event.vy ?? event.distanceM ?? event.aspectAngleDeg ?? event.separationAngleDeg ?? 0, 1);
     writeScalar(view, offset + 28, 'f32', event.vz ?? event.observationAgeSec ?? 0, 1);
     offset += COMBAT_EVENT_BYTES;
@@ -651,9 +666,10 @@ function readCombat(view, offset, sectionLength, version) {
         eventObj.signalQuality = vx;
         eventObj.aspectAngleDeg = vy;
         eventObj.observationAgeSec = vz;
-      } else if (kind === 'decoy_dispense' || kind === 'decoy_transfer') {
+      } else if (kind === 'decoy_dispense' || kind === 'decoy_transfer' || kind === 'decoy_expire') {
         eventObj.decoyType = flags === 2 ? 'chaff' : 'flare';
         if (kind === 'decoy_dispense') eventObj.remaining = extra;
+        else if (kind === 'decoy_expire') eventObj.decoyId = extra;
         else {
           eventObj.decoyId = extra;
           eventObj.signalQuality = vx;
@@ -661,11 +677,15 @@ function readCombat(view, offset, sectionLength, version) {
         }
       } else if (kind === 'damage' || kind === 'kill') {
         eventObj.hitZone = HIT_ZONES[extra] || 'unknown';
-        if (kind === 'damage') eventObj.amount = vx;
+        if (kind === 'damage') {
+          eventObj.amount = vx;
+          eventObj.damage = vx;
+        }
       } else if (kind === 'unresolved_end') {
         eventObj.reason = 'unresolved_sortie_ended';
       } else if (kind === 'detonation') {
         eventObj.reason = extra === 2 ? 'surface_collision' : 'proximity_fuze';
+        eventObj.distanceM = vy;
       }
     }
     events.push(eventObj);

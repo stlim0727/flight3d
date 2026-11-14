@@ -235,7 +235,11 @@ export class ReplayRecorder {
    */
   recordCombatEvent(event) {
     if (!this.active || !event) return;
-    const allowed = ['detonation', 'expire', 'kill', 'launch', 'seeker_state', 'decoy_dispense', 'decoy_transfer', 'damage', 'unresolved_end', 'flare_dispense', 'chaff_dispense'];
+    const allowed = [
+      'detonation', 'expire', 'kill', 'launch', 'seeker_state',
+      'decoy_dispense', 'decoy_transfer', 'damage', 'unresolved_end',
+      'flare_dispense', 'chaff_dispense', 'flare_expire', 'chaff_expire', 'decoy_expire',
+    ];
     if (!allowed.includes(event.type)) return;
     const document = this._ensureCombat();
     const position = event.position || event.missile?.position || event.flare?.position || event.chaff?.position;
@@ -248,6 +252,12 @@ export class ReplayRecorder {
       decoyType = 'flare';
     } else if (event.type === 'chaff_dispense') {
       normalizedKind = 'decoy_dispense';
+      decoyType = 'chaff';
+    } else if (event.type === 'flare_expire') {
+      normalizedKind = 'decoy_expire';
+      decoyType = 'flare';
+    } else if (event.type === 'chaff_expire') {
+      normalizedKind = 'decoy_expire';
       decoyType = 'chaff';
     }
 
@@ -288,14 +298,19 @@ export class ReplayRecorder {
       eventRecord.separationAngleDeg = event.separationAngleDeg ?? 0;
       eventRecord.vx = eventRecord.signalQuality;
       eventRecord.vy = eventRecord.separationAngleDeg;
+    } else if (normalizedKind === 'decoy_expire') {
+      eventRecord.decoyType = decoyType;
+      eventRecord.decoyId = (event.decoy?.id ?? event.decoyId ?? event.flareId ?? event.chaffId ?? 0) & 255;
     } else if (normalizedKind === 'damage' || normalizedKind === 'kill') {
-      eventRecord.hitZone = event.hitZone ?? 'unknown';
-      eventRecord.amount = event.damage ?? 0;
+      eventRecord.hitZone = event.hitZone ?? event.zone ?? 'fuselage';
+      eventRecord.amount = event.amount ?? event.damage ?? 0;
       if (normalizedKind === 'damage') eventRecord.vx = eventRecord.amount;
     } else if (normalizedKind === 'unresolved_end') {
       eventRecord.reason = 'unresolved_sortie_ended';
     } else if (normalizedKind === 'detonation') {
       eventRecord.reason = event.surface ? 'surface_collision' : 'proximity_fuze';
+      eventRecord.distanceM = event.distanceM ?? event.dist ?? 0;
+      eventRecord.vy = eventRecord.distanceM;
     } else if (normalizedKind === 'expire') {
       eventRecord.reason = event.reason ?? 'life_expiry';
     }
@@ -367,8 +382,10 @@ export class ReplayRecorder {
 
   finish() {
     if (this.track) return this.track;
-    this.active = false;
-    if (this.samples.length < 2 || this.validDuration + 1e-9 < REPLAY_MIN_DURATION_SEC) return null;
+    if (this.samples.length < 2 || this.validDuration + 1e-9 < REPLAY_MIN_DURATION_SEC) {
+      this.active = false;
+      return null;
+    }
     if (this.latest && this.samples.at(-1) !== this.latest) {
       this._append(this.latest);
       // At the final rung retain the endpoint even when the flight is too long to save.
@@ -397,6 +414,7 @@ export class ReplayRecorder {
       }
     }
 
+    this.active = false;
     this._trimCombat(this.samples.length);
     this.track = {
       intervalSec: this.interval,

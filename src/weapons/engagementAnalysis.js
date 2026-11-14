@@ -116,16 +116,17 @@ export function analyzeCombatEngagement(sortieOrTrack, options = {}) {
     diagByMissile.get(mid).push(d);
   }
 
-  // Discover all missile IDs from events, samples, and diagnostics
+  // Discover all missile IDs from events, samples, and diagnostics.
+  // Missiles have id >= 1. id == 0 represents gun rounds or system events without a missile.
   const allMissileIds = new Set();
   for (const ev of rawEvents) {
-    if (ev.missileId != null) allMissileIds.add(ev.missileId);
+    if (ev.missileId != null && ev.missileId > 0) allMissileIds.add(ev.missileId);
   }
   for (const mid of samplesByMissile.keys()) {
-    allMissileIds.add(mid);
+    if (mid > 0) allMissileIds.add(mid);
   }
   for (const mid of diagByMissile.keys()) {
-    allMissileIds.add(mid);
+    if (mid > 0) allMissileIds.add(mid);
   }
 
   // Process missile lifecycle and diagnostics
@@ -246,7 +247,8 @@ export function analyzeCombatEngagement(sortieOrTrack, options = {}) {
     let damageApplied = 0;
 
     for (const dmg of damageEvents) {
-      damageApplied += dmg.damage ?? 0;
+      const dmgVal = dmg.amount ?? dmg.damage ?? 0;
+      damageApplied += dmgVal <= 1.0 ? dmgVal * 100 : dmgVal;
     }
 
     if (killEvent) {
@@ -256,16 +258,25 @@ export function analyzeCombatEngagement(sortieOrTrack, options = {}) {
       termPos = detEvent?.position ?? killEvent.position ?? null;
       termTargetPos = killEvent.targetPosition ?? null;
       termDist = detEvent?.distanceM ?? killEvent.distanceM ?? 0;
-      fuzeTriggered = Boolean(detEvent?.fuzePolicy);
+      fuzeTriggered = Boolean(
+        detEvent?.fuzePolicy ||
+        detEvent?.reason === 'proximity_fuze' ||
+        (detEvent && !detEvent.surface && detEvent.reason !== 'surface_collision')
+      );
       summaryOutcomes.kill++;
     } else if (detEvent) {
-      fuzeTriggered = Boolean(detEvent.fuzePolicy);
+      const isFuze = Boolean(
+        detEvent.fuzePolicy ||
+        detEvent.reason === 'proximity_fuze' ||
+        (!detEvent.surface && detEvent.reason !== 'surface_collision')
+      );
+      fuzeTriggered = isFuze;
       termTime = detEvent.timeSec;
       termPos = detEvent.position ?? null;
       termDist = detEvent.distanceM ?? null;
       termTargetPos = detEvent.targetPosition ?? null;
 
-      if (detEvent.fuzePolicy) {
+      if (isFuze) {
         outcome = 'survived_fuze_blast';
         termReason = `Proximity fuze triggered at ${termDist?.toFixed(1) ?? 'N/A'}m but bandit survived`;
         summaryOutcomes.survived_fuze_blast++;
@@ -387,8 +398,9 @@ export function analyzeCombatEngagement(sortieOrTrack, options = {}) {
     });
   }
 
-  // Gun kills vs missile kills
-  const gunKills = rawEvents.filter(ev => ev.kind === 'kill' && ev.source === 'gun').length;
+  // Gun kills vs missile kills.
+  // Gun kills carry missileId: 0 (or no missileId) or source: 'gun'.
+  const gunKills = rawEvents.filter(ev => ev.kind === 'kill' && (!ev.missileId || ev.source === 'gun')).length;
   const missileKills = summaryOutcomes.kill;
   const totalKills = gunKills + missileKills;
 
@@ -477,12 +489,19 @@ function formatEventDetails(ev) {
     case 'flare_dispense':
     case 'chaff_dispense':
       return `${ev.decoyType || (ev.kind.includes('flare') ? 'flare' : 'chaff')} dispensed by ${ev.sourceId || 'bandit'}`;
+    case 'decoy_expire':
+    case 'flare_expire':
+    case 'chaff_expire':
+      return `${ev.decoyType || (ev.kind.includes('flare') ? 'flare' : 'chaff')} #${ev.decoyId ?? ''} expired`;
     case 'decoy_transfer':
       return `Seeker seduced by ${ev.decoyType} #${ev.decoyId}`;
     case 'detonation':
-      return `Detonation at ${ev.distanceM != null ? ev.distanceM.toFixed(1) + 'm' : 'surface'} (${ev.fuzePolicy || 'impact'})`;
-    case 'damage':
-      return `Applied ${ev.damage?.toFixed(1) ?? 'N/A'} damage to ${ev.targetId} (${ev.zone || 'general'})`;
+      return `Detonation at ${ev.distanceM != null ? ev.distanceM.toFixed(1) + 'm' : 'surface'} (${ev.fuzePolicy || ev.reason || 'impact'})`;
+    case 'damage': {
+      const dmgVal = ev.amount ?? ev.damage ?? 0;
+      const pct = dmgVal <= 1.0 ? (dmgVal * 100).toFixed(1) + '%' : dmgVal.toFixed(1);
+      return `Applied ${pct} damage to ${ev.targetId || 'bandit'} (${ev.hitZone || ev.zone || 'fuselage'})`;
+    }
     case 'kill':
       return `Confirmed kill on ${ev.targetId}`;
     case 'expire':

@@ -433,3 +433,149 @@ test('AirToAirMissileSystem: recording preserves exact physics without side effe
   assert.ok(Math.abs(simWithout.vel.z - simWith.vel.z) < 1e-6);
   assert.equal(simWithout.alive, simWith.alive);
 });
+
+test('ReplayRecorder: records unresolved_end when sortie finishes with alive missiles', () => {
+  const recorder = new ReplayRecorder();
+  recorder.start({ aircraft: 'F16' });
+
+  const quat = new THREE.Quaternion();
+  const telemetry = {
+    x: 0, z: 0, altitudeFt: 3000, iasKnots: 250, gForce: 1, pitchDeg: 0, rollDeg: 0, headingDeg: 0,
+  };
+
+  const fakeSystem = {
+    missiles: [
+      {
+        id: 1,
+        alive: true,
+        position: new THREE.Vector3(100, 1000, -500),
+        velocity: new THREE.Vector3(0, 0, -300),
+        quaternion: new THREE.Quaternion(),
+      },
+    ],
+  };
+
+  for (let i = 0; i < 30; i++) {
+    recorder.update(0.4, telemetry, quat, fakeSystem);
+  }
+
+  const finishedTrack = recorder.finish();
+  assert.ok(finishedTrack);
+  assert.ok(finishedTrack.combat);
+
+  const unresolvedEvents = finishedTrack.combat.events.filter(e => e.kind === 'unresolved_end');
+  assert.equal(unresolvedEvents.length, 1);
+  assert.equal(unresolvedEvents[0].missileId, 1);
+});
+
+test('ReplayCodec: HIT_ZONES roundtrips wingL, wingR, and damages without unknown', () => {
+  const t = baseTrack(20);
+  t.combat = {
+    version: 7,
+    targets: [],
+    banditSamples: [],
+    missileSamples: [],
+    diagnosticIntervalSec: 0.2,
+    diagnosticSamples: [],
+    events: [
+      { timeSec: 2.0, kind: 'launch', missileId: 1, typeId: 'AIM9X', targetId: 'bandit', locked: true },
+      { timeSec: 4.0, kind: 'damage', missileId: 1, hitZone: 'wingL', amount: 0.42 },
+      { timeSec: 4.1, kind: 'damage', missileId: 1, hitZone: 'wingR', amount: 0.35 },
+      { timeSec: 4.2, kind: 'kill', missileId: 1, hitZone: 'engine' },
+    ],
+  };
+
+  const encoded = encodeTrack(t);
+  const decoded = decodeTrack(encoded);
+
+  const evs = decoded.combat.events;
+  assert.equal(evs[1].kind, 'damage');
+  assert.equal(evs[1].hitZone, 'wingL');
+  assert.ok(Math.abs(evs[1].amount - 0.42) < 0.01);
+  assert.equal(evs[2].kind, 'damage');
+  assert.equal(evs[2].hitZone, 'wingR');
+  assert.ok(Math.abs(evs[2].amount - 0.35) < 0.01);
+  assert.equal(evs[3].kind, 'kill');
+  assert.equal(evs[3].hitZone, 'engine');
+});
+
+test('ReplayRecorder & ReplayCodec: records and preserves decoy_expire for flare and chaff', () => {
+  const recorder = new ReplayRecorder();
+  recorder.start({ aircraft: 'F16' });
+
+  recorder.recordCombatEvent({ type: 'chaff_dispense', decoyId: 11, sourceId: 'target_1' });
+  recorder.recordCombatEvent({ type: 'chaff_expire', chaffId: 11, sourceId: 'target_1' });
+  recorder.recordCombatEvent({ type: 'flare_dispense', decoyId: 22, sourceId: 'target_1' });
+  recorder.recordCombatEvent({ type: 'flare_expire', flareId: 22, sourceId: 'target_1' });
+
+  assert.equal(recorder.combat.events.length, 4);
+  assert.equal(recorder.combat.events[0].kind, 'decoy_dispense');
+  assert.equal(recorder.combat.events[1].kind, 'decoy_expire');
+  assert.equal(recorder.combat.events[1].decoyType, 'chaff');
+  assert.equal(recorder.combat.events[2].kind, 'decoy_dispense');
+  assert.equal(recorder.combat.events[3].kind, 'decoy_expire');
+  assert.equal(recorder.combat.events[3].decoyType, 'flare');
+
+  const t = baseTrack(10);
+  t.combat = recorder.combat;
+  const decoded = decodeTrack(encodeTrack(t));
+  assert.equal(decoded.combat.events[1].kind, 'decoy_expire');
+  assert.equal(decoded.combat.events[1].decoyType, 'chaff');
+  assert.equal(decoded.combat.events[3].kind, 'decoy_expire');
+  assert.equal(decoded.combat.events[3].decoyType, 'flare');
+});
+
+test('analyzeCombatEngagement: gun-only kill avoids phantom missile 0 and correctly attributes kills', () => {
+  const t = baseTrack(20);
+  t.combat = {
+    version: 7,
+    targets: [],
+    banditSamples: [],
+    missileSamples: [],
+    diagnosticIntervalSec: 0.2,
+    diagnosticSamples: [],
+    events: [
+      { timeSec: 5.0, kind: 'damage', missileId: 0, hitZone: 'fuselage', amount: 0.8 },
+      { timeSec: 5.2, kind: 'kill', missileId: 0, targetId: 'bandit_1', hitZone: 'fuselage' },
+    ],
+  };
+
+  const analysis = analyzeCombatEngagement(t);
+  assert.equal(analysis.summary.totalLaunches, 0, 'No missiles launched');
+  assert.equal(analysis.summary.gunKills, 1, 'Gun kill must be attributed');
+  assert.equal(analysis.summary.missileKills, 0, 'Missile kills must be 0');
+  assert.equal(analysis.summary.totalKills, 1, 'Total kills must be 1');
+  assert.equal(analysis.missiles.length, 0, 'Phantom missile 0 must not be created');
+});
+
+test('analyzeCombatEngagement: decoded track with detonation proximity_fuze triggers survived_fuze_blast', () => {
+  const t = baseTrack(20);
+  t.combat = {
+    version: 7,
+    targets: [],
+    banditSamples: [],
+    missileSamples: [
+      { id: 1, typeId: 'AIM9X', timeSec: 2.0, x: 0, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    ],
+    diagnosticIntervalSec: 0.2,
+    diagnosticSamples: [],
+    events: [
+      { timeSec: 2.0, kind: 'launch', missileId: 1, typeId: 'AIM9X', targetId: 'bandit_1', locked: true },
+      { timeSec: 6.0, kind: 'detonation', missileId: 1, distanceM: 8.5, surface: false, reason: 'proximity_fuze' },
+      { timeSec: 6.0, kind: 'damage', missileId: 1, amount: 0.45, hitZone: 'wingL' },
+    ],
+  };
+
+  // Roundtrip through codec to simulate real decoded track
+  const decoded = decodeTrack(encodeTrack(t));
+  const analysis = analyzeCombatEngagement(decoded);
+
+  assert.equal(analysis.summary.totalLaunches, 1);
+  assert.equal(analysis.summary.outcomes.survived_fuze_blast, 1);
+  const m = analysis.missiles[0];
+  assert.equal(m.termination.outcome, 'survived_fuze_blast');
+  assert.equal(m.termination.fuzeTriggered, true);
+  assert.ok(Math.abs(m.termination.damageApplied - 45.0) < 0.1);
+  assert.ok(m.causalSummary.includes('survived'));
+  assert.ok(m.causalSummary.includes('45.0'));
+});
