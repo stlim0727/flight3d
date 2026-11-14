@@ -823,7 +823,8 @@ class SimulatorHudAndBindingsMethods {
           const cameraDigit = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
           if (cameraDigit) {
             const val = Number(cameraDigit[1]);
-            this.controls?.onSelectCamera?.(val === 0 ? 10 : val - 1);
+            // Crash views only accept the exterior crash modes; zero has no crash meaning.
+            if (val !== 0) this.controls?.onSelectCamera?.(val - 1);
             return;
           }
         }
@@ -846,7 +847,7 @@ class SimulatorHudAndBindingsMethods {
         this.cameraSystem.resetLook();
         this.showToast(() => t('camera.view.centered'));
       }
-      if (e.code === 'KeyG' && !e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      if (e.code === 'KeyH' && !e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey) {
         const locked = this.cameraSystem.toggleBanditGaze?.();
         this.showToast(() => t(`notice.bandit.${locked ? 'on' : 'off'}`));
       }

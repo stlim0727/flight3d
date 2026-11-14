@@ -1400,6 +1400,21 @@ export class CameraSystem {
     return this.banditGaze;
   }
 
+  /**
+   * Nearest live bandit to the player. The combat feed keeps insertion order, so both the
+   * BANDIT_POV framing and the gaze lock must scan for distance instead of taking the first.
+   */
+  nearestLiveBandit(planePos) {
+    const combat = this.combatStateProvider ? this.combatStateProvider() : null;
+    let best = null, bestDistance = Infinity;
+    for (const target of combat?.targets ?? []) {
+      if (!target?.alive || !target.position) continue;
+      const distance = planePos.distanceToSquared(target.position);
+      if (distance < bestDistance) { bestDistance = distance; best = target; }
+    }
+    return best;
+  }
+
   getCockpitSubmodeName() {
     return (this.photoCockpit && this.supportsPhotoCockpit) ? 'PHOTO 2D' : '3D VIRTUAL';
   }
@@ -2099,8 +2114,7 @@ export class CameraSystem {
         // Over-the-shoulder bandit framing: sit behind and beside the nearest
         // live bandit, on the side opposite the player's bearing, so the
         // airframe stays readable in the foreground.
-        const combat = this.combatStateProvider ? this.combatStateProvider() : null;
-        const bandit = (combat?.targets ?? []).find(t => t?.alive && t.position);
+        const bandit = this.nearestLiveBandit(planePos);
         if (!bandit) {
           // No bandit in the scene: fall back to chase view
           this.mode = CameraSystem.MODES.CHASE;
@@ -2140,12 +2154,11 @@ export class CameraSystem {
     // if banditGaze is sticky, the camera's lookAt target follows the nearest
     // live bandit regardless of current mode, so the bandit always stays in frame.
     if (this.banditGaze) {
-      const combat = this.combatStateProvider ? this.combatStateProvider() : null;
-      const bandit = (combat?.targets ?? []).find(t => t?.alive && t.position);
+      const bandit = this.nearestLiveBandit(planePos);
       if (bandit) {
         this.banditGazeTarget.copy(bandit.position);
         this.camera.lookAt(this.banditGazeTarget);
-      } else if (this.camera.lookAt !== undefined) {
+      } else {
         // No bandit found; restore to the mode's natural target on the next frame
         this.banditGaze = false;
       }

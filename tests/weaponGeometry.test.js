@@ -43,3 +43,21 @@ test('bandit nose points along its velocity instead of trailing it', () => {
   assert.ok(front.radius < 1e-6, `forward tip is pointed, radius ${front.radius}`);
   assert.ok(rear.radius > 0.2, `base is wide, radius ${rear.radius}`);
 });
+
+/** The wing-tip markers are the only meshes that carry the callsign trim color. */
+function trimColor(group) {
+  let color = null;
+  group.traverse(node => {
+    if (node.isMesh && node.geometry?.parameters?.width === 0.55) color = node.material.color.getHex();
+  });
+  return color;
+}
+
+test('callsign trim colors never leak between bandits (#722)', () => {
+  const red = createBanditMesh('BANDIT RED');
+  assert.equal(trimColor(red), 0xff0000);
+  const blue = createBanditMesh('BANDIT BLUE');
+  assert.equal(trimColor(blue), 0x0000ff);
+  assert.equal(trimColor(red), 0xff0000, 'a later blue bandit must not repaint the red one');
+  assert.equal(trimColor(createBanditMesh('BANDIT 2')), 0xd07b32, 'defaults stay orange');
+});
