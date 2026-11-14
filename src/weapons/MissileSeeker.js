@@ -6,7 +6,7 @@ import { radarSignalQuality } from './RadarSignal.js';
  * are outside this bounded model. Missing terrain means a clear-space fixture.
  */
 export function seekerCanObserve(spec, observer, target, world, halfAngleDeg = spec.gimbalDeg) {
-  if (!target?.alive) return false;
+  if (!target?.alive || (target.type === 'chaff' && spec.seekerType !== 'ACTIVE_RADAR')) return false;
   const from = observer.position, to = target.position;
   const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
   const range = Math.hypot(dx, dy, dz);
@@ -74,6 +74,26 @@ export class MissileSeeker {
         if (candidate === this.target || !seekerCanObserve(this.spec, observer, candidate, world)) continue;
         const range = observer.position.distanceToSquared(candidate.position);
         if (range < nearest) { observed = candidate; nearest = range; }
+      }
+    }
+    // A competing return must lie near the current line of sight and range.
+    // The Gaussian resolution weights are deterministic model assumptions.
+    if (observed && this.spec.seekerType === 'ACTIVE_RADAR' && !world?.seekerSignalQuality) {
+      const reference = observed;
+      const origin = observer.position;
+      const line = reference.position.clone().sub(origin);
+      const referenceRange = line.length();
+      let strongest = radarSignalQuality(observer, reference, referenceRange, world);
+      for (const candidate of targets) {
+        if (candidate === reference || (reference.type !== 'chaff' && candidate.type !== 'chaff')
+          || !seekerCanObserve(this.spec, observer, candidate, world)) continue;
+        const other = candidate.position.clone().sub(origin);
+        const range = other.length();
+        const angle = line.angleTo(other);
+        const rangeOffset = (range - referenceRange) / 300;
+        const weight = Math.exp(-0.5 * ((angle / 0.05) ** 2 + rangeOffset ** 2));
+        const quality = radarSignalQuality(observer, candidate, range, world) * weight;
+        if (quality > strongest) { observed = candidate; strongest = quality; }
       }
     }
     if (observed && this.state === 'track' && observed === this.target) {

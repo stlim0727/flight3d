@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ChaffDispenser } from './Chaff.js';
 import { BanditThreatResponse } from './BanditThreatResponse.js';
 import { MissileSeeker, seekerCanObserve } from './MissileSeeker.js';
 import { sampleEngineInfrared } from './InfraredSignal.js';
@@ -54,6 +55,8 @@ export class BanditTarget {
     this.infraredSignature = { enginePower: 1, heat: 1, afterburner: 0, omnidirectional: true };
     this.infraredAfterburnerLevel = 0;
     this.threatResponse = new BanditThreatResponse(evasion);
+    this.chaff = new ChaffDispenser();
+    this.chaffThreatIds = new Set();
     this.flight = null;
     this.quaternion = null;
     if (orbit) this.respawn(position, orbit);
@@ -116,6 +119,8 @@ export class BanditTarget {
     this.damageZones = createDamageZones();
     this.lastHitZone = null;
     this.threatResponse.reset();
+    this.chaff.reset();
+    this.chaffThreatIds.clear();
     const o = orbit;
     if (o) {
       const tangential = o.radius * o.omega;
@@ -152,6 +157,7 @@ export class AirToAirMissileSystem {
     this.cannon = new VulcanCannon();
     this.loaded = stations.map(() => true);
     this.missiles = [];
+    this.chaffClouds = [];
     this.targets = [];
     this.selectedTargetIndex = -1;
     this.lockProgress = 0;
@@ -182,6 +188,7 @@ export class AirToAirMissileSystem {
   reset() {
     this.loaded.fill(true);
     this.missiles.length = 0;
+    this.chaffClouds.length = 0;
     this.targets.length = 0;
     this.selectedTargetIndex = -1;
     this.lockProgress = 0;
@@ -276,6 +283,7 @@ export class AirToAirMissileSystem {
         this.missiles.length = 0;
         this.clearTargets();
       }
+      this.chaffClouds.length = 0;
       this.cannon.clearBullets();
       this.cannon.setTrigger(false);
       this.rwr.reset();
@@ -436,12 +444,22 @@ export class AirToAirMissileSystem {
   _step(dt, world, events) {
     for (const target of this.targets) {
       target.update(dt, world.terrainHeight, this.missiles);
+      const threatId = target.threatResponse.confirmedId;
+      if (target.alive && threatId !== null && !target.chaffThreatIds.has(threatId)) {
+        const cloud = target.chaff.dispense(target.position, target.velocity);
+        if (cloud) {
+          target.chaffThreatIds.add(threatId);
+          this.chaffClouds.push(cloud);
+        }
+      }
       if (!target.alive) {
         target.respawnTimer -= dt;
         if (target.respawnTimer <= 0) this._placeBandit(target, world, this.targets.indexOf(target));
       }
     }
 
+    for (const cloud of this.chaffClouds) cloud.update(dt);
+    this.chaffClouds = this.chaffClouds.filter(cloud => cloud.alive);
     this._updateGun(dt, world, events);
     this._updateLock(dt, world, events);
 
@@ -498,7 +516,8 @@ export class AirToAirMissileSystem {
       thrustN = spec.maxThrustN * taper;
     }
 
-    missile.seeker.update(dt, missile, this.targets, world);
+    missile.seeker.update(dt, missile, missile.spec.seekerType === 'ACTIVE_RADAR'
+      ? [...this.targets, ...this.chaffClouds] : this.targets, world);
     missile.target = missile.seeker.target;
     this._lateral.set(0, 0, 0);
     const tracking = missile.seeker.hasEstimate
