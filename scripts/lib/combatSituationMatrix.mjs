@@ -35,6 +35,7 @@ export function simulateCombatSituation({
   targetBehavior = 'orbit',
   offBoresightDeg = 0,
   countermeasures = false,
+  rwr = true,
   terrainHeight = () => 0,
   maxSimTimeSec = 25,
 }) {
@@ -70,6 +71,7 @@ export function simulateCombatSituation({
       position: targetPos,
       velocity: new Vector3(0, 0, -targetSpeedMps),
       evasion: false,
+      rwr,
     });
     target.velocity.set(0, 0, -targetSpeedMps);
     target.quaternion = new Quaternion().setFromUnitVectors(new Vector3(0, 0, -1), target.velocity.clone().normalize());
@@ -87,6 +89,7 @@ export function simulateCombatSituation({
         altitudeM: targetAltM,
       },
       evasion: false,
+      rwr,
     });
   } else if (targetBehavior === 'evasive_ai') {
     const orbitRadiusM = 1000;
@@ -102,6 +105,7 @@ export function simulateCombatSituation({
         altitudeM: targetAltM,
       },
       evasion: true,
+      rwr,
     });
   } else {
     const orbitRadiusM = 1200;
@@ -117,6 +121,7 @@ export function simulateCombatSituation({
         altitudeM: targetAltM,
       },
       evasion: false,
+      rwr,
     });
   }
 
@@ -128,6 +133,7 @@ export function simulateCombatSituation({
   const combat = new AirToAirMissileSystem({
     stations: [{ id: 'STA_TEST', type, position: [-5.04, 0.04, 2.45] }],
     banditEvasion: targetBehavior === 'evasive_ai',
+    banditRwr: rwr,
   });
   combat.addTarget(target);
 
@@ -327,6 +333,7 @@ export function sweepCombatSituationMatrix({
   altitudes = [1500, 8000],
   behaviors = ['straight', 'orbit', 'break_turn', 'evasive_ai'],
   cms = [false, true],
+  rwr = true,
 } = {}) {
   const results = [];
   for (const type of types) {
@@ -343,6 +350,7 @@ export function sweepCombatSituationMatrix({
                 targetAltM: alt,
                 targetBehavior,
                 countermeasures,
+                rwr,
               }));
             }
           }

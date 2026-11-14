@@ -34,7 +34,7 @@ let nextMissileId = 0;
 
 /** Airborne bandit with a circular patrol. Pure state: no DOM, scene or audio. */
 export class BanditTarget {
-  constructor({ callsign, position, velocity = new THREE.Vector3(), orbit = null, evasion = true }) {
+  constructor({ callsign, position, velocity = new THREE.Vector3(), orbit = null, evasion = true, rwr = true }) {
     this.id = ++nextTargetId;
     this.type = 'bandit';
     this.callsign = callsign;
@@ -56,7 +56,7 @@ export class BanditTarget {
     // patrol aircraft publish measured engine state and use their actual attitude.
     this.infraredSignature = { enginePower: 1, heat: 1, afterburner: 0, omnidirectional: true };
     this.infraredAfterburnerLevel = 0;
-    this.threatResponse = new BanditThreatResponse(evasion);
+    this.threatResponse = new BanditThreatResponse(evasion, { rwr });
     this.chaff = new ChaffDispenser();
     this.flare = new FlareDispenser();
     this.flareThreatIds = new Set();
@@ -154,12 +154,14 @@ export class AirToAirMissileSystem {
     fixedDt = 1 / 120,
     rwr = new RWRSystem(),
     banditEvasion = true,
+    banditRwr = true,
   } = {}) {
     this.stations = stations;
     this.specs = specs;
     this.fixedDt = fixedDt;
     this.rwr = rwr;
     this.banditEvasion = banditEvasion;
+    this.banditRwr = banditRwr;
     this.cannon = new VulcanCannon();
     this.loaded = stations.map(() => true);
     this.missiles = [];
@@ -436,6 +438,7 @@ export class AirToAirMissileSystem {
       const target = new BanditTarget({
         callsign: `BANDIT ${index + 1}`,
         evasion: this.banditEvasion,
+        rwr: this.banditRwr,
         position: new THREE.Vector3(),
       });
       this._placeBandit(target, world, index);
