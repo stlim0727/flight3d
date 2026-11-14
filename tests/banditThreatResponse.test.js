@@ -169,3 +169,53 @@ test('fixed launch matrix records outcomes without granting immunity or omniscie
   assert.equal(results.find(r => r.evasion && r.rangeM === 5500 && r.aspect === 'tail').reactionSeconds,
     null, 'a long-range coast-inbound outside plume visibility does not grant awareness');
 });
+
+test('RWR detects active radar missile illumination even after motor burnout, while respecting beam, range and terrain', () => {
+  const own = aircraft();
+  const radarMissile = (overrides = {}) => ({
+    id: 10,
+    alive: true,
+    propellant: 0, // motor burned out
+    position: new Vector3(0, 3000, 6000), // 6000m range (outside optical 4000m)
+    velocity: new Vector3(0, 0, -800), // flying directly towards own aircraft
+    spec: { seekerType: 'ACTIVE_RADAR', gimbalDeg: 65 },
+    ...overrides,
+  });
+
+  // Case 1: Standard inbound active radar missile with burned-out motor is detected by RWR
+  const rwrResponse = new BanditThreatResponse(true, { rwr: true });
+  observe(rwrResponse, own, [radarMissile()], 1.0);
+  assert.equal(rwrResponse.phase, 'evade', 'coasting active radar missile should trigger RWR evasion');
+  assert.equal(rwrResponse.confirmedId, 10);
+  assert.ok(rwrResponse.weight > 0);
+
+  // Case 2: Coasting IR missile (no radar emissions) is NOT detected by RWR
+  const irMissile = radarMissile({ spec: { seekerType: 'IR', gimbalDeg: 65 } });
+  const noRwrResponse = new BanditThreatResponse(true, { rwr: true });
+  observe(noRwrResponse, own, [irMissile], 1.0);
+  assert.equal(noRwrResponse.phase, 'patrol', 'coasting IR missile emits no RF and should not trigger RWR');
+  assert.equal(noRwrResponse.weight, 0);
+
+  // Case 3: Coasting radar missile beyond RWR range (e.g. 9000m > 8000m) is NOT detected
+  const outOfRange = radarMissile({ position: new Vector3(0, 3000, 9500) });
+  const rangeResponse = new BanditThreatResponse(true, { rwr: true });
+  observe(rangeResponse, own, [outOfRange], 1.0);
+  assert.equal(rangeResponse.phase, 'patrol', 'missile outside RWR detection range should not be detected');
+
+  // Case 4: Coasting radar missile pointing away (outside seeker beam/gimbal) is NOT detected
+  const pointingAway = radarMissile({ velocity: new Vector3(800, 0, 0) }); // perpendicular crossing / pointing away
+  const beamResponse = new BanditThreatResponse(true, { rwr: true });
+  observe(beamResponse, own, [pointingAway], 1.0);
+  assert.equal(beamResponse.phase, 'patrol', 'radar missile not illuminating target should not trigger RWR');
+
+  // Case 5: Coasting radar missile occluded by mountain ridge is NOT detected
+  const ridge = (x, z) => (z > 2000 && z < 4000 ? 5000 : 0);
+  const terrainResponse = new BanditThreatResponse(true, { rwr: true });
+  observe(terrainResponse, own, [radarMissile()], 1.0, ridge);
+  assert.equal(terrainResponse.phase, 'patrol', 'terrain occlusion blocks RWR RF signals');
+
+  // Case 6: RWR explicitly disabled falls back to optical plume only
+  const disabledRwrResponse = new BanditThreatResponse(true, { rwr: false });
+  observe(disabledRwrResponse, own, [radarMissile()], 1.0);
+  assert.equal(disabledRwrResponse.phase, 'patrol', 'when RWR is disabled, burnout missile is not observed');
+});

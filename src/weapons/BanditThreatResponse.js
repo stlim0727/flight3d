@@ -12,11 +12,13 @@ export const BANDIT_WARNING_MODEL = Object.freeze({
   responseSeconds: 0.45,
   recoverySeconds: 1.5,
   terrainSampleM: 150,
+  rwrRangeM: 8000,
 });
 
 export class BanditThreatResponse {
-  constructor(enabled = true) {
+  constructor(enabled = true, { rwr = true } = {}) {
     this.enabled = enabled;
+    this.rwr = rwr;
     this._relative = new THREE.Vector3();
     this._velocity = new THREE.Vector3();
     this.reset();
@@ -42,15 +44,29 @@ export class BanditThreatResponse {
     let observed = null;
     let urgency = Infinity;
     for (const missile of missiles) {
-      // Only burning plumes are visible in this fixture. A spent missile may
-      // remain dangerous, but the pilot gets only finite last-observation memory.
-      if (!missile.alive || !(missile.propellant > 0)) continue;
+      if (!missile.alive) continue;
       this._relative.subVectors(missile.position, aircraft.position);
       const range = this._relative.length();
-      if (range < 1 || range > model.rangeM) continue;
+      if (range < 1) continue;
       this._velocity.subVectors(missile.velocity, aircraft.velocity);
       const closing = -this._relative.dot(this._velocity) / range;
       if (closing < model.minClosingMps) continue;
+
+      // Detection source: Optical MAWS (burning plume) or Radar Warning Receiver (active radar seeker)
+      const hasPlume = missile.propellant > 0 && range <= model.rangeM;
+      let hasRadarWarning = false;
+      if (this.rwr && missile.spec?.seekerType === 'ACTIVE_RADAR' && range <= model.rwrRangeM) {
+        const speed = missile.velocity.length();
+        if (speed > 1e-3) {
+          const dot = (-missile.velocity.x * this._relative.x
+            - missile.velocity.y * this._relative.y
+            - missile.velocity.z * this._relative.z) / (speed * range);
+          const gimbalDeg = missile.spec?.gimbalDeg ?? 65;
+          hasRadarWarning = dot >= Math.cos(gimbalDeg * Math.PI / 180);
+        }
+      }
+
+      if (!hasPlume && !hasRadarWarning) continue;
       const time = range / closing;
       if (time >= urgency || !this._visible(aircraft.position, missile.position, range, terrainHeight)) continue;
       observed = missile;

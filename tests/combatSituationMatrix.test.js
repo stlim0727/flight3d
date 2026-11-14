@@ -68,20 +68,36 @@ test('combat situation: countermeasure flares cause decoy transfers on AIM-9X', 
 });
 
 test('combat situation: anomaly detector identifies BVR coasting and short-range beam patterns', () => {
-  const miniMatrix = sweepCombatSituationMatrix({
+  // Baseline without RWR exposes the BVR burnout blindness anomaly
+  const baselineMatrix = sweepCombatSituationMatrix({
     types: ['AIM9X', 'AIM120C'],
     ranges: [400, 7000],
     aspects: [0, 90, 180],
     altitudes: [3000],
     behaviors: ['straight', 'evasive_ai'],
     cms: [false, true],
+    rwr: false,
   });
 
-  assert.ok(miniMatrix.length >= 24);
-  const anomalies = detectMissileAnomalies(miniMatrix);
-  const anomalyIds = anomalies.map(a => a.id);
+  assert.ok(baselineMatrix.length >= 24);
+  const baselineAnomalies = detectMissileAnomalies(baselineMatrix);
+  const baselineIds = baselineAnomalies.map(a => a.id);
 
-  assert.ok(anomalyIds.includes('BVR_BURNOUT_BLINDNESS_ALWAYS_HIT'), 'Should identify BVR burnout blindness anomaly');
-  assert.ok(anomalyIds.includes('SHORT_RANGE_BEAM_ALWAYS_MISS'), 'Should identify short-range beam always-miss anomaly');
-  assert.ok(!anomalyIds.includes('EXTREME_RANGE_IMPOSSIBLE_HIT'), 'Should not have impossible hits beyond envelope');
+  assert.ok(baselineIds.includes('BVR_BURNOUT_BLINDNESS_ALWAYS_HIT'), 'Should identify BVR burnout blindness anomaly without RWR');
+  assert.ok(baselineIds.includes('SHORT_RANGE_BEAM_ALWAYS_MISS'), 'Should identify short-range beam always-miss anomaly');
+  assert.ok(!baselineIds.includes('EXTREME_RANGE_IMPOSSIBLE_HIT'), 'Should not have impossible hits beyond envelope');
+
+  // With RWR enabled, the BVR active radar burnout blindness is mitigated
+  const rwrMatrix = sweepCombatSituationMatrix({
+    types: ['AIM120C'],
+    ranges: [7000],
+    aspects: [0],
+    altitudes: [3000],
+    behaviors: ['evasive_ai'],
+    cms: [true],
+    rwr: true,
+  });
+  const rwrAnomalies = detectMissileAnomalies(rwrMatrix);
+  const rwrIds = rwrAnomalies.map(a => a.id);
+  assert.ok(!rwrIds.includes('BVR_BURNOUT_BLINDNESS_ALWAYS_HIT'), 'RWR defense should mitigate BVR always-hit anomaly');
 });
