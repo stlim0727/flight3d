@@ -532,3 +532,34 @@ test('a replayed crash plays one distance-scaled burst per impact crossing', asy
   assert.equal(sounds.length, 2, 'scrubbing back and across the impact stages it again');
   director.stop();
 });
+
+test('a legacy crash marker rounded past the last sample still stages at the end (#724)', async () => {
+  const sim = fakeSim();
+  const log = crashStage(sim);
+  const director = new ReplayDirector(sim);
+  const source = track();
+  source.metadata.crash = { type: 'TERRAIN', timeSec: trackDuration(source) + 0.0005, speedKnots: 250 };
+  await director.load(source);
+  director.seek(trackDuration(source));
+  assert.ok(log.some(entry => entry[0] === 'explode'), 'the impact still stages at the end of playback');
+  director.stop();
+});
+
+test('room replay crashes play a distance-scaled impact burst (#724)', () => {
+  const sim = fakeSim();
+  const sounds = [];
+  sim.camera = { position: new Vector3(0, 0, 0) };
+  sim.audio = { playRemoteExplosion(distance, isWater) { sounds.push({ distance, isWater }); } };
+  const director = new ReplayDirector(sim);
+  const event = { timeSec: 2, segment: 0, type: 'WATER', position: new Vector3(30, 0, 40) };
+  const owner = {};
+  director._playRoomImpact(event, owner, false);
+  assert.equal(sounds.length, 1, 'the impact plays once');
+  assert.equal(sounds[0].isWater, true, 'water impacts use the water timbre');
+  assert.ok(Math.abs(sounds[0].distance - 50) < 1e-6, 'the mix uses the replay camera distance');
+  director._playRoomImpact(event, owner, false);
+  assert.equal(sounds.length, 1, 'a resting playhead does not repeat the burst');
+  director._playRoomImpact(null, owner, false);
+  director._playRoomImpact(event, owner, false);
+  assert.equal(sounds.length, 2, 're-crossing the impact stages it again');
+});
