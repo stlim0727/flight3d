@@ -14,7 +14,7 @@ The combat row in [the task map](agent-task-map.md) and the
 | `_guide()` / `_applyGuidance()` | Rocket thrust, propellant mass, atmospheric drag, gravity and proportional navigation are integrated at a fixed 120 Hz. Guidance reads exact target position and velocity. |
 | `src/weapons/missileSpecs.js` | AIM-9X and AIM-120C have different propulsion parameters but share 35G, 8.5 km seeker range, 65° gimbal, navigation constant 4 and 14 m fuse radius. These are game-calibrated values. |
 | `_applyGuidance()` | A fixed acceleration cap and gimbal gate exist; dynamic-pressure-dependent authority, actuator response and maneuver drag are absent. |
-| `_closestApproach()` / `_detonate()` | Same-time relative interpolation prevents tunneling. Damage uses the closest distance, but the explosion event uses the end-of-step missile position. Both lethal and fragment radius are set to the 14 m fuse radius. |
+| Fuze / detonation | See [missile fuze and damage](missile-fuze-damage.md) for the current same-time closest-approach policy, independent damage distances and remaining limitations. |
 
 IR/radar-specific signal quality, terrain sensor occlusion, countermeasures and
 threat-driven evasion are not implemented in this path. High hit rates against

@@ -87,6 +87,8 @@ Missile control now uses pressure-limited aerodynamic authority, actuator-respon
 memory and delivered-force maneuver drag. See [missile energy](missile-energy.md)
 for assumptions, integration invariants and launch-envelope comparisons.
 
+See [missile fuze and damage](missile-fuze-damage.md) for trigger and damage assumptions.
+
 See [radar signal](radar-signal.md) for the active missile seeker observation model and its limits.
 
 See [missile seeker](missile-seeker.md) for terrain-gated observations, finite
