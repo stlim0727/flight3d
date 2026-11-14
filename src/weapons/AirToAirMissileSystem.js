@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BanditThreatResponse } from './BanditThreatResponse.js';
 import { BanditFlightModel } from './BanditFlightModel.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { RWRSystem } from '../systems/RWRSystem.js';
@@ -19,7 +20,7 @@ let nextMissileId = 0;
 
 /** Airborne bandit with a circular patrol. Pure state: no DOM, scene or audio. */
 export class BanditTarget {
-  constructor({ callsign, position, velocity = new THREE.Vector3(), orbit = null }) {
+  constructor({ callsign, position, velocity = new THREE.Vector3(), orbit = null, evasion = true }) {
     this.id = ++nextTargetId;
     this.type = 'bandit';
     this.callsign = callsign;
@@ -33,12 +34,13 @@ export class BanditTarget {
     this.damageState = 'normal';
     this.hostile = true;
     this.radar = true;
+    this.threatResponse = new BanditThreatResponse(evasion);
     this.flight = null;
     this.quaternion = null;
     if (orbit) this.respawn(position, orbit);
   }
 
-  update(dt, terrainHeight = () => 0) {
+  update(dt, terrainHeight = () => 0, missiles = []) {
     this.prevPosition.copy(this.position);
     if (!this.alive) return;
     if (!this.flight) {
@@ -54,15 +56,22 @@ export class BanditTarget {
     const correction = Math.atan2(Math.hypot(dx, dz) - o.radius, Math.max(300, o.radius * 0.5));
     const course = radial + direction * (Math.PI / 2 + correction);
     const speed = Math.abs(o.radius * o.omega);
-    const lookahead = Math.max(500, this.velocity.length() * 8);
-    const ground = Math.max(terrainHeight(this.position.x, this.position.z),
-      terrainHeight(this.position.x + Math.cos(course) * lookahead,
-        this.position.z + Math.sin(course) * lookahead));
-    const altitude = Math.max(o.altitudeM, ground + 420);
-    // Fixed substeps also make direct callers independent of render cadence.
+    const patrolHeading = Math.atan2(Math.cos(course), -Math.sin(course));
+    // Threat state and pilot commands advance through the same physical steps.
     const steps = Math.max(1, Math.ceil(dt * 120));
     for (let i = 0; i < steps; i++) {
-      this.flight.guide(Math.atan2(Math.cos(course), -Math.sin(course)), altitude, speed);
+      this.threatResponse.update(dt / steps, this, missiles, terrainHeight);
+      const response = this.threatResponse;
+      const headingError = Math.atan2(Math.sin(response.heading - patrolHeading),
+        Math.cos(response.heading - patrolHeading));
+      const heading = patrolHeading + headingError * response.weight;
+      const lookahead = Math.max(500, this.velocity.length() * 8);
+      const ground = Math.max(terrainHeight(this.position.x, this.position.z),
+        terrainHeight(this.position.x + Math.sin(heading) * lookahead,
+          this.position.z - Math.cos(heading) * lookahead));
+      const altitude = Math.max(o.altitudeM, ground + 420);
+      const commandedSpeed = speed + (Math.max(speed, 250) - speed) * response.weight;
+      this.flight.guide(heading, altitude, commandedSpeed);
       this.flight.step(dt / steps, this.damage,
         this.position.y - terrainHeight(this.position.x, this.position.z));
       if (this.position.y <= terrainHeight(this.position.x, this.position.z) + 2) {
@@ -81,6 +90,7 @@ export class BanditTarget {
     this.respawnTimer = 0;
     this.damage = 0;
     this.damageState = 'normal';
+    this.threatResponse.reset();
     const o = orbit;
     if (o) {
       const tangential = o.radius * o.omega;
@@ -104,11 +114,13 @@ export class AirToAirMissileSystem {
     specs = MISSILE_TYPES,
     fixedDt = 1 / 120,
     rwr = new RWRSystem(),
+    banditEvasion = true,
   } = {}) {
     this.stations = stations;
     this.specs = specs;
     this.fixedDt = fixedDt;
     this.rwr = rwr;
+    this.banditEvasion = banditEvasion;
     this.cannon = new VulcanCannon();
     this.loaded = stations.map(() => true);
     this.missiles = [];
@@ -354,6 +366,7 @@ export class AirToAirMissileSystem {
     for (let index = 0; index < 2; index++) {
       const target = new BanditTarget({
         callsign: `BANDIT ${index + 1}`,
+        evasion: this.banditEvasion,
         position: new THREE.Vector3(),
       });
       this._placeBandit(target, world, index);
@@ -391,7 +404,7 @@ export class AirToAirMissileSystem {
 
   _step(dt, world, events) {
     for (const target of this.targets) {
-      target.update(dt, world.terrainHeight);
+      target.update(dt, world.terrainHeight, this.missiles);
       if (!target.alive) {
         target.respawnTimer -= dt;
         if (target.respawnTimer <= 0) this._placeBandit(target, world, this.targets.indexOf(target));
