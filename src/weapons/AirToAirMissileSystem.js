@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { BanditThreatResponse } from './BanditThreatResponse.js';
+import { MissileSeeker, seekerCanObserve } from './MissileSeeker.js';
 import { MissileFlightModel } from './MissileFlightModel.js';
 import { BanditFlightModel } from './BanditFlightModel.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
@@ -315,10 +316,13 @@ export class AirToAirMissileSystem {
       targetIsPlayer: false,
       source: 'player',
       flight: new MissileFlightModel(),
+      seeker: new MissileSeeker(spec),
       propellant: 1,
       age: 0,
       alive: true,
     };
+    if (target) missile.seeker.seed(target, missile, world);
+    missile.target = missile.seeker.target;
     this.loaded[stationIndex] = false;
     this.missiles.push(missile);
     return missile;
@@ -434,12 +438,8 @@ export class AirToAirMissileSystem {
       return;
     }
     const spec = this.nextMissileType() || this.specs.AIM9X;
-    this._los.copy(target.position).sub(world.position);
-    const range = this._los.length();
-    this._forward.copy(FORWARD).applyQuaternion(world.quaternion);
-    const cosine = range > 1e-3 ? this._los.dot(this._forward) / range : -1;
-    const angleDeg = Math.acos(THREE.MathUtils.clamp(cosine, -1, 1)) * 180 / Math.PI;
-    const inCone = angleDeg <= spec.seekerFovDeg && range <= spec.seekerRangeM && this.selectedTargetIndex >= 0;
+    const inCone = this.selectedTargetIndex >= 0
+      && seekerCanObserve(spec, world, target, world, spec.seekerFovDeg);
 
     const wasLocked = this.lockProgress >= 1;
     this.lockProgress = THREE.MathUtils.clamp(
@@ -471,22 +471,28 @@ export class AirToAirMissileSystem {
       thrustN = spec.maxThrustN * taper;
     }
 
-    if (!missile.target?.alive) this._acquireTarget(missile);
-    const target = missile.target;
+    missile.seeker.update(dt, missile, this.targets, world);
+    missile.target = missile.seeker.target;
     this._lateral.set(0, 0, 0);
-    const tracking = target?.alive ? this._applyGuidance(missile, target, spec) : false;
+    const tracking = missile.seeker.hasEstimate
+      ? this._applyGuidance(missile, missile.seeker.estimate, spec) : false;
     missile.flight.step(dt, missile, {
       massKg: mass, thrustN,
       density: Atmosphere.getConditions(missile.position.y).density,
       command: this._lateral, tracking,
     });
 
-    if (target?.alive) {
-      const distance = this._closestApproach(missile, target);
-      if (distance <= spec.fuseRadiusM) {
-        this._detonate(missile, target, events, distance);
-        return;
-      }
+    // Physical proximity is independent of acquisition; truth never feeds PN.
+    let hit = null;
+    let closest = spec.fuseRadiusM;
+    for (const candidate of this.targets) {
+      if (!candidate.alive) continue;
+      const distance = this._closestApproach(missile, candidate);
+      if (distance <= closest) { hit = candidate; closest = distance; }
+    }
+    if (hit) {
+      this._detonate(missile, hit, events, closest);
+      return;
     }
 
     if (missile.age >= spec.maxLifeSeconds) {
@@ -504,27 +510,6 @@ export class AirToAirMissileSystem {
         position: missile.position.clone(), velocity: missile.velocity.clone(), surface: true,
       });
     }
-  }
-
-  /** Maddog: an unlocked launch can still acquire a target inside the seeker
-   * gimbal once the missile has separated from the rail. */
-  _acquireTarget(missile) {
-    const speed = missile.velocity.length();
-    if (speed < 1e-3) return;
-    this._dir.copy(missile.velocity).divideScalar(speed);
-    let best = null;
-    let bestRange = Infinity;
-    for (const candidate of this.targets) {
-      if (!candidate.alive) continue;
-      this._los.copy(candidate.position).sub(missile.position);
-      const range = this._los.length();
-      if (range < 1 || range > missile.spec.seekerRangeM || range >= bestRange) continue;
-      this._rhat.copy(this._los).divideScalar(range);
-      if (this._dir.dot(this._rhat) < Math.cos(THREE.MathUtils.degToRad(missile.spec.gimbalDeg))) continue;
-      best = candidate;
-      bestRange = range;
-    }
-    missile.target = best;
   }
 
   _applyGuidance(missile, target, spec) {
