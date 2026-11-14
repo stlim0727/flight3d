@@ -439,7 +439,8 @@ body[data-flow="debrief"] #debrief-overlay { display: flex; }
 
 .debrief-overlay [hidden] { display: none !important; }
 body[data-flow="debrief"] :is(.menu-toggle, .hud-strip, .hud-top-actions, .ap-bar, .flight-toolbar, .flight-panel, .quick-mute, .presets-bar, .action-panel, #demo-banner, .demo-pill-btn, .touch-controls-overlay, .dev-live, .flight-warning, .stall-banner, .audio-start-hint, .toast) { display: none !important; }
-body[data-flow="debrief"] .btn-reset-pov:not([hidden]) { display: inline-flex !important; pointer-events: auto !important; z-index: 100 !important; }
+body[data-flow="debrief"] .btn-reset-pov:not([hidden]),
+body[data-flow="debrief"] .btn-gaze-exit:not([hidden]) { display: inline-flex !important; pointer-events: auto !important; z-index: 100 !important; }
 
 @media (max-width: 600px) {
   #debrief-overlay { justify-content: center; padding: 12px; }

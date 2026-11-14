@@ -74,7 +74,8 @@ export async function loadIncheonAirport(base) {
   const tower = createControlTower(height);
   colliders.push(tower.collider);
   group.add(tower.group);
-  group.add(createTexturedBuildings(records,createBuildingMaterials()));
+  const texturedBuildings = createTexturedBuildings(records,createBuildingMaterials());
+  group.add(texturedBuildings);
   records.forEach(r=>r.geometry.dispose());
   group.add(createPlantingInstances(trees,height));
   group.add(createIncheonPavement(INCHEON_AIRFIELD));
@@ -110,6 +111,7 @@ export async function loadIncheonAirport(base) {
   const terminalPoly = patch.features.find(f=>f.id==='relation/3917466')?.parts[0];
   const nearbyTerminalStands = parkedStands.filter(s => s.area === 'terminal'
     && Math.hypot(s.x - DEPARTURE_GATE.x, s.z - DEPARTURE_GATE.z) < 300);
+  const standBridgeGroups = [];
   for (const stand of nearbyTerminalStands) {
     const tz = terminalPoly ? findTerminalZ(stand, terminalPoly) : -48;
     const standBridge = createDepartureJetBridge(INCHEON_AIRFIELD.elevationM, stand, {
@@ -119,11 +121,19 @@ export async function loadIncheonAirport(base) {
       materials: bridgeMaterials,
     });
     group.add(standBridge.group);
+    standBridgeGroups.push(standBridge.group);
   }
   const parked=new IncheonParkedAirliners(parkedStands,INCHEON_AIRFIELD.elevationM);
   group.add(parked.group);parked.load(import.meta.env?.BASE_URL??'/');
+  const gazeTargets = [
+    { object: tower.group, kind: 'tower' },
+    { object: texturedBuildings, kind: 'building' },
+    { object: departureBridge.group, kind: 'building' },
+    ...standBridgeGroups.map(bridgeGroup => ({ object: bridgeGroup, kind: 'building' })),
+  ];
   return {terrain,group,nightLighting,departureBridge,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,parked,
     towerCab:tower.cab,
+    getGazeTargets(){return gazeTargets;},
     resetTraffic(){traffic.reset();},
     update(dt,position,time,options={}){traffic.update(dt,options.cameraPosition??position,options.quality,options.paused);parked.update(options.cameraPosition??position,options.quality);},
     checkBuildingCollision(probes) {

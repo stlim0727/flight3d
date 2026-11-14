@@ -565,6 +565,14 @@ export class Airport {
     this.group.add(termGroup);
   }
 
+  getGazeTargets() {
+    const targets = [];
+    if (this.towerGroup) targets.push({ object: this.towerGroup, kind: 'tower' });
+    if (this.terminalGroup) targets.push({ object: this.terminalGroup, kind: 'terminal' });
+    if (this.buildings?.group) targets.push({ object: this.buildings.group, kind: 'building' });
+    return targets;
+  }
+
   update(dt, aircraftPos = null) {
     // 1. Rotate Airport Radar Antenna (1 revolution every 3.5 seconds)
     if (this.radarDish) {

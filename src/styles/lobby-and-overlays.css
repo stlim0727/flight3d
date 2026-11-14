@@ -685,6 +685,9 @@ body:is([data-flow="lobby"], .booting) #demo-banner,
 body:is([data-flow="lobby"], .booting) .demo-pill-btn,
 body:is([data-flow="lobby"], .booting) .btn-reset-pov,
 body:is([data-flow="lobby"], .booting) #btn-reset-pov,
+body:is([data-flow="lobby"], .booting) .btn-gaze-exit,
+body:is([data-flow="lobby"], .booting) #btn-gaze-exit,
+body:is([data-flow="lobby"], .booting) .pov-actions-bar,
 body:is([data-flow="lobby"], .booting) .touch-controls-overlay { display: none !important; }
 /* Keep the menu affordance available during play; hide it until startup ends. */
 body.booting .menu-toggle { display: none !important; }

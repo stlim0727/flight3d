@@ -286,12 +286,21 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
 }
 .demo-actions .btn-demo-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
 
-/* Immediate Reset POV Button & Default Indicator Arrow */
-.btn-reset-pov {
+/* Immediate Reset POV & Gaze Exit Controls */
+.pov-actions-bar {
   position: fixed;
   top: calc(var(--edge-top, 8px) + (54px * var(--ui-scale, 1)));
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(8px * var(--ui-scale, 1));
+  pointer-events: none;
+  z-index: 75;
+}
+.btn-reset-pov,
+.btn-gaze-exit {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -308,10 +317,15 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(56, 189, 248, 0.35);
   cursor: pointer;
   pointer-events: auto;
-  z-index: 75;
+  white-space: nowrap;
   transition: opacity 0.2s ease, transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
   user-select: none;
   -webkit-user-select: none;
+}
+.btn-gaze-exit {
+  border-color: rgba(251, 191, 36, 0.72);
+  color: #fef3c7;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(251, 191, 36, 0.3);
 }
 .btn-reset-pov:hover {
   background: rgba(30, 41, 59, 0.95);
@@ -319,11 +333,23 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   color: #ffffff;
   box-shadow: 0 4px 20px rgba(56, 189, 248, 0.55);
 }
-.btn-reset-pov:active {
-  transform: translateX(-50%) scale(0.96);
+.btn-gaze-exit:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: #fde68a;
+  color: #ffffff;
+  box-shadow: 0 4px 20px rgba(251, 191, 36, 0.48);
 }
-.btn-reset-pov[hidden] {
+.btn-reset-pov:active,
+.btn-gaze-exit:active {
+  transform: scale(0.96);
+}
+.btn-reset-pov[hidden],
+.btn-gaze-exit[hidden] {
   display: none !important;
+}
+.btn-gaze-exit .gaze-exit-close {
+  font-size: calc(11px * var(--ui-scale, 1));
+  opacity: 0.85;
 }
 .btn-reset-pov .pov-arrow-icon {
   display: inline-flex;
@@ -341,8 +367,11 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   height: 100%;
   display: block;
 }
-.compact-ui .btn-reset-pov {
+.compact-ui .pov-actions-bar {
   top: calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)));
+}
+.compact-ui .btn-reset-pov,
+.compact-ui .btn-gaze-exit {
   font-size: calc(11px * var(--ui-scale, 1));
   padding: calc(5px * var(--ui-scale, 1)) calc(12px * var(--ui-scale, 1));
 }

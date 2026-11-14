@@ -198,10 +198,14 @@ export class CameraSystem {
 
     // After a drag or hat-switch glance, gradually return gaze to the default position.
     this.autoResetGaze = true;
-    // Gaze lock on nearest live bandit (#722): the exterior look target overrides
-    // each mode's default target so the bandit always stays in frame.
+    // Gaze lock on nearest live bandit (#722) or clicked 3D target: the exterior
+    // look target overrides each mode's default target so it always stays in frame.
     this.banditGaze = false;
     this.banditGazeTarget = new THREE.Vector3();
+    this.gazeTarget = null;
+    this.onGazeClick = null;
+    this.onGazeChange = null;
+    this._mouseDownClient = { x: 0, y: 0, button: -1 };
 
     // Continuous Edge Pan / Edge Look state (화면 끝 도달 시 시선 지속 회전)
     this.enableEdgePan = false; // Grab gestures stop when the pointer/finger stops.
@@ -226,7 +230,7 @@ export class CameraSystem {
   isInteractiveUI(target) {
     if (!target || typeof target.closest !== 'function') return false;
     return !!target.closest(
-      '#pilot-arena, #pilot-score-overlay, .flight-panel, .flight-toolbar, dialog, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #btn-reset-pov, .btn-reset-pov, #help-modal, #demo-restart-dialog, #diagnostics-overlay, .menu-backdrop, .debrief-overlay'
+      '#pilot-arena, #pilot-score-overlay, .flight-panel, .flight-toolbar, dialog, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #btn-reset-pov, .btn-reset-pov, #btn-gaze-exit, .btn-gaze-exit, #help-modal, #demo-restart-dialog, #diagnostics-overlay, .menu-backdrop, .debrief-overlay'
     );
   }
 
@@ -249,6 +253,9 @@ export class CameraSystem {
         this.isDragging = true;
         this.prevMouse.x = e.clientX;
         this.prevMouse.y = e.clientY;
+        if (e.button === 0 && !this.pointerLocked) {
+          this._mouseDownClient = { x: e.clientX, y: e.clientY, button: 0 };
+        }
         if (this.domElement && this.domElement.style) {
           this.domElement.style.cursor = 'grabbing';
         }
@@ -272,12 +279,26 @@ export class CameraSystem {
     }
 
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-      window.addEventListener('mouseup', () => {
+      window.addEventListener('mouseup', (e) => {
         if (this.activeTouchId !== null) return;
+        const wasDragging = this.isDragging;
         this.isDragging = false;
         if (this.domElement && this.domElement.style && !this.pointerLocked) {
           this.domElement.style.cursor = 'grab';
         }
+        if (
+          wasDragging
+          && !this.pointerLocked
+          && this._mouseDownClient.button === 0
+          && (!e || e.button === 0)
+          && !this.isInteractiveUI(e?.target)
+        ) {
+          const dist = e ? Math.hypot(e.clientX - this._mouseDownClient.x, e.clientY - this._mouseDownClient.y) : Infinity;
+          if (dist <= 6) {
+            this.handleCanvasTap(e.clientX, e.clientY);
+          }
+        }
+        this._mouseDownClient.button = -1;
       });
 
       // Suppress context menu on right-click drag so free look is unhindered
@@ -492,6 +513,9 @@ export class CameraSystem {
     if (this.activeTouchId !== null) {
       const stillActive = cameraTouches.some(t => t.identifier === this.activeTouchId);
       if (!stillActive) {
+        if (e.type === 'touchend' && !this.touchMoved) {
+          this.handleCanvasTap(this.touchStartX, this.touchStartY);
+        }
         this.activeTouchId = null;
         this.isDragging = false;
       }
@@ -970,7 +994,10 @@ export class CameraSystem {
     this.updatePovButtonState();
   }
 
-  resetLook() {
+  resetLook(options = {}) {
+    if (!options?.keepGaze) {
+      this.clearGaze();
+    }
     this.povChangedByDrag = false;
     this.povChangedByHat = false;
     this.isHatLooking = false;
@@ -1301,7 +1328,7 @@ export class CameraSystem {
       if (!isUserAction) return false;
       if (!CameraSystem.CRASH_MODES.includes(m)) return false;
       this.#applyMode(m);
-      this.resetLook();
+      this.resetLook({ keepGaze: true });
       return true;
     }
     if ((this.userLookOverridden || this.userModeSelected) && !isUserAction) {
@@ -1357,7 +1384,7 @@ export class CameraSystem {
     this.autoPaused = false;
     this.autoSwitchTimer = 0;
     this.mode = this.autoSwitch ? CameraSystem.MODES.CHASE : m;
-    this.resetLook();
+    this.resetLook({ keepGaze: true });
     if (this.camera) {
       this.camera.near = (this.mode === CameraSystem.MODES.COCKPIT) ? 0.08 : 0.25;
       if (typeof this.camera.updateProjectionMatrix === 'function') {
@@ -1394,9 +1421,54 @@ export class CameraSystem {
     this.photoCockpit = !!enabled;
   }
 
+  handleCanvasTap(clientX, clientY) {
+    if (typeof this.onGazeClick === 'function') {
+      this.onGazeClick(clientX, clientY);
+    }
+  }
+
+  /** Lock gaze onto a specific clicked target (bandit, aircraft, or building). */
+  setGazeTarget(target) {
+    this.gazeTarget = target || null;
+    this.banditGaze = false;
+    this.notifyGazeChange();
+    return Boolean(this.gazeTarget);
+  }
+
+  /** Exit any active gaze lock (clicked target or bandit gaze). */
+  clearGaze() {
+    const hadGaze = this.isGazeActive();
+    this.gazeTarget = null;
+    this.banditGaze = false;
+    if (hadGaze) this.notifyGazeChange();
+    return hadGaze;
+  }
+
+  isGazeActive() {
+    return Boolean(this.gazeTarget || this.banditGaze);
+  }
+
+  getGazeTargetLabel() {
+    if (this.gazeTarget?.label) return this.gazeTarget.label;
+    if (this.banditGaze) return 'Bandit';
+    return '';
+  }
+
+  notifyGazeChange() {
+    if (typeof this.onGazeChange === 'function') {
+      this.onGazeChange(this.isGazeActive(), this.getGazeTargetLabel());
+    }
+  }
+
   /** Toggle sticky tracking of the nearest live bandit (#722). */
   toggleBanditGaze() {
-    this.banditGaze = !this.banditGaze;
+    if (this.gazeTarget) {
+      this.gazeTarget = null;
+      this.banditGaze = true;
+    } else {
+      this.banditGaze = !this.banditGaze;
+    }
+    this.notifyGazeChange();
     return this.banditGaze;
   }
 
@@ -2150,17 +2222,27 @@ export class CameraSystem {
         break;
       }
     }
-    // Override camera lookAt target for bandit gaze lock (#722):
-    // if banditGaze is sticky, the camera's lookAt target follows the nearest
-    // live bandit regardless of current mode, so the bandit always stays in frame.
-    if (this.banditGaze) {
+    // Override camera lookAt target for clicked target gaze or bandit gaze lock (#722):
+    // if gaze is sticky, the camera's lookAt target follows the target regardless of
+    // current mode so it always stays in frame.
+    if (this.gazeTarget) {
+      const targetPos = typeof this.gazeTarget.getPosition === 'function'
+        ? this.gazeTarget.getPosition()
+        : this.gazeTarget.position;
+      if (targetPos) {
+        this.banditGazeTarget.copy(targetPos);
+        this.camera.lookAt(this.banditGazeTarget);
+      } else {
+        this.clearGaze();
+      }
+    } else if (this.banditGaze) {
       const bandit = this.nearestLiveBandit(planePos);
       if (bandit) {
         this.banditGazeTarget.copy(bandit.position);
         this.camera.lookAt(this.banditGazeTarget);
       } else {
         // No bandit found; restore to the mode's natural target on the next frame
-        this.banditGaze = false;
+        this.clearGaze();
       }
     }
 

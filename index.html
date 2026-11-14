@@ -93,15 +93,22 @@
       </div>
     </div>
 
-    <!-- Immediate POV Reset Button & Default Indicator Arrow -->
-    <button id="btn-reset-pov" class="btn btn-reset-pov" type="button" hidden title="카메라 시선 정면 초기화 (O)" data-i18n-title="reset.pov.title">
-      <span class="pov-arrow-icon" id="pov-arrow-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-          <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
-        </svg>
-      </span>
-      <span id="pov-reset-label" class="pov-label" data-i18n="reset.pov">Reset POV</span>
-    </button>
+    <!-- Immediate POV Reset & Gaze Exit Controls -->
+    <div id="pov-actions-bar" class="pov-actions-bar">
+      <button id="btn-reset-pov" class="btn btn-reset-pov" type="button" hidden title="카메라 시선 정면 초기화 (O)" data-i18n-title="reset.pov.title">
+        <span class="pov-arrow-icon" id="pov-arrow-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
+          </svg>
+        </span>
+        <span id="pov-reset-label" class="pov-label" data-i18n="reset.pov">Reset POV</span>
+      </button>
+      <button id="btn-gaze-exit" class="btn btn-gaze-exit" type="button" hidden title="시선 고정 모드 나가기" data-i18n-title="gaze.exit.title">
+        <span class="gaze-exit-icon" aria-hidden="true">👁</span>
+        <span id="gaze-exit-label" class="gaze-exit-label" data-i18n="gaze.exit">시선 고정 해제</span>
+        <span class="gaze-exit-close" aria-hidden="true">✕</span>
+      </button>
+    </div>
 
     <!-- Minimized Demo Flight Showcase Pill (Tap to Reopen) -->
     <button id="btn-demo-open" class="demo-pill-btn" style="display: none;" title="데모 비행 안내 팝업 열기" aria-label="데모 비행 안내 팝업 열기" data-i18n-title="open.demo.flight.guide" data-i18n-aria-label="open.demo.flight.guide">
