@@ -431,3 +431,16 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
 @media (max-width: 360px) and (orientation: portrait) {
   .hud-top-bar .hud-strip .hud-item.hud-primary[data-hud="hdg"] { display: none; }
 }
+
+@media (min-width: 1025px) {
+  .flight-toolbar .btn[data-key-hint] { flex-direction: column; gap: 2px; }
+  .flight-toolbar .btn[data-key-hint]::before {
+    content: attr(data-key-hint);
+    order: 1;
+    color: #bae6fd;
+    font: 700 9px/1 monospace;
+  }
+  .flight-more-panel .btn[data-key-hint]::after {
+    content: ' [' attr(data-key-hint) ']';
+  }
+}

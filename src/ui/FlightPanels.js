@@ -97,6 +97,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     button.className = index === 0 ? 'btn flight-camera-btn flight-camera-start' : 'btn flight-camera-btn';
     button.type = 'button';
     button.dataset.cameraMode = String(mode);
+    if (mode < 9) button.dataset.keyHint = String(mode === 0 ? 1 : mode === 7 ? 8 : mode === 8 ? 9 : mode + 1);
     button.setAttribute('aria-pressed', 'false');
     bindText(button, () => touchLabel(t(`ui.camera.${name}`)));
     bindText(button, () => t(`ui.strip.camera.${name}`), 'data-short-label');
@@ -182,6 +183,9 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   // The row is anchored to the right edge, so the aircraft actions that follow
   // takeover unfold leftwards instead of shifting the primary group.
   bar.append(skipDemoButton, ...cameraButtons, fullscreen, moreButton);
+  for (const [id, key] of Object.entries({ 'btn-gear': 'G', 'btn-flaps-ret': 'V', 'btn-flaps-ext': 'F', 'btn-spoilers': 'B', 'btn-reverser': 'R', 'flight-trim-less': 'T', 'flight-trim-more': 'Y', 'flight-park-brake': '.' })) {
+    document.getElementById(id)?.setAttribute('data-key-hint', key);
+  }
 
   // Issue #638: the wrapped portrait control row dims while the pilot watches
   // the scene, then returns to full opacity on any pointer, key or focus input.
