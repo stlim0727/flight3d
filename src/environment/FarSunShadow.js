@@ -185,15 +185,24 @@ export function farSunShadowLightsChunk(chunk = THREE.ShaderChunk.lights_fragmen
 
 let warned = false;
 
+// Which materials carry the hook. Not a `userData` flag: `material.clone()` copies
+// userData but not `onBeforeCompile`, so a clone would claim a hook it does not have and
+// applying to it would silently do nothing.
+const receivers = new WeakSet();
+
+/** Whether `applyFarSunShadow` has hooked this very material (a clone has to be hooked again). */
+export function receivesFarSunShadow(material) {
+  return receivers.has(material);
+}
+
 /**
  * Make a lit built-in material receive the far map. Chains any existing `onBeforeCompile`
  * and program cache key. A shader without the expected anchors is left untouched rather
  * than half-patched.
  */
 export function applyFarSunShadow(material) {
-  if (!material || material.userData?.farSunShadow) return material;
-  material.userData = material.userData || {};
-  material.userData.farSunShadow = true;
+  if (!material || receivers.has(material)) return material;
+  receivers.add(material);
   const previousCompile = material.onBeforeCompile;
   const previousKey = typeof material.customProgramCacheKey === 'function'
     ? material.customProgramCacheKey.bind(material) : null;
@@ -202,6 +211,8 @@ export function applyFarSunShadow(material) {
     if (typeof previousCompile === 'function') previousCompile.call(this, shader, renderer);
     const lights = farSunShadowLightsChunk();
     const { vertexShader: vertex, fragmentShader: fragment } = shader;
+    // Already patched by a hook this one chains; declaring the uniforms twice does not compile.
+    if (vertex?.includes('vFarSunShadowCoord')) return;
     if (!lights || !vertex?.includes(COMMON) || !vertex.includes(PROJECT)
       || !fragment?.includes(COMMON) || !fragment.includes(LIGHTS)) {
       if (!warned) console.warn('[FarSunShadow] shader anchors missing; material left unshadowed', this.name || this.type);

@@ -7,7 +7,7 @@ import { GeneratedValleyTerrain } from '../src/environment/GeneratedValleyTerrai
 import { FoliageAndCities } from '../src/environment/FoliageAndCities.js';
 import {
   FAR_SUN_SHADOW_LAYER, FarSunShadow, applyFarSunShadow, castFarSunShadow,
-  farSunShadowLightsChunk, farSunShadowPlacement, farSunShadowUniforms,
+  farSunShadowLightsChunk, farSunShadowPlacement, farSunShadowUniforms, receivesFarSunShadow,
 } from '../src/environment/FarSunShadow.js';
 import { SkyAtmosphere } from '../src/environment/SkyAtmosphere.js';
 import { RENDER_QUALITY } from '../src/config/renderQuality.js';
@@ -239,6 +239,44 @@ test('receivers get the far term on the sun and keep the hook they already had',
   assert.deepEqual(custom, { uniforms: {}, vertexShader: 'void main() {}', fragmentShader: 'void main() {}' });
 });
 
+test('a cloned receiver is hooked again, and a shader is never patched twice', () => {
+  const standardShader = () => ({
+    uniforms: {},
+    vertexShader: THREE.ShaderLib.standard.vertexShader,
+    fragmentShader: THREE.ShaderLib.standard.fragmentShader,
+  });
+  const count = (text, part) => text.split(part).length - 1;
+
+  const original = applyFarSunShadow(new THREE.MeshStandardMaterial());
+  assert.ok(receivesFarSunShadow(original));
+
+  // three copies userData on clone but not onBeforeCompile, so the clone starts unhooked.
+  const clone = original.clone();
+  assert.notEqual(clone.onBeforeCompile, original.onBeforeCompile);
+  assert.ok(!receivesFarSunShadow(clone), 'a clone must not inherit the claim without the hook');
+  const unhooked = standardShader();
+  clone.onBeforeCompile(unhooked, null);
+  assert.ok(!unhooked.fragmentShader.includes('farSunShadowTerm'));
+
+  applyFarSunShadow(clone);
+  assert.ok(receivesFarSunShadow(clone));
+  const hooked = standardShader();
+  clone.onBeforeCompile(hooked, null);
+  assert.equal(hooked.uniforms.uFarSunShadowMap, farSunShadowUniforms.uFarSunShadowMap);
+  assert.equal(count(hooked.fragmentShader, 'directLight.color *= farSunShadowTerm;'), 1);
+
+  // A hook that already ran earlier in the chain must not declare everything a second time.
+  const earlier = applyFarSunShadow(new THREE.MeshStandardMaterial());
+  const outer = new THREE.MeshStandardMaterial();
+  outer.onBeforeCompile = earlier.onBeforeCompile;
+  applyFarSunShadow(outer);
+  const twice = standardShader();
+  outer.onBeforeCompile(twice, null);
+  assert.equal(count(twice.vertexShader, 'varying vec3 vFarSunShadowCoord;'), 1);
+  assert.equal(count(twice.fragmentShader, 'float farSunShadowVisibility()'), 1);
+  assert.equal(count(twice.fragmentShader, 'directLight.color *= farSunShadowTerm;'), 1);
+});
+
 test('casters opt in per mesh without leaving the default layer', () => {
   const group = new THREE.Group();
   const mesh = new THREE.Mesh();
@@ -288,7 +326,7 @@ test('loaded district materials receive far shadows through near/far LOD transit
   try {
     const city = new FoliageAndCities({ getHeight: () => 25 });
     const districts = city.cityArchetypes.slice(3);
-    assert.ok(districts.every(({ near }) => near.material.userData.farSunShadow));
+    assert.ok(districts.every(({ near }) => receivesFarSunShadow(near.material)));
     completeLoad({ scene: kit });
     assert.equal(await city.districtReady, true);
     for (const [i, { near, far, records }] of districts.entries()) {
