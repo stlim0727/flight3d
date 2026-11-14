@@ -171,7 +171,8 @@ export class CombatReplayPlayback {
     return {
       remaining,
       total: F16_MISSILE_STATIONS.length,
-      splash: this.events.filter(event => event.kind === 'detonation' && !event.surface
+      splash: this.events.filter(event => (this.track.killEventsRecorded === false
+        ? event.kind === 'detonation' && !event.surface : event.kind === 'kill')
         && event.timeSec <= this.timeSec + 1e-9).length,
       lockProgress: 0,
       locked: false,

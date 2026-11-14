@@ -4,7 +4,7 @@ export const REPLAY_TRACK_VERSION = 2;
 // Multiplayer room tracks only: solo flights stay v2 so older builds can still import them.
 export const ROOM_TRACK_VERSION = 3;
 // Combat tracks append a compact missile/bandit section after the pose frames.
-export const COMBAT_TRACK_VERSION = 5;
+export const COMBAT_TRACK_VERSION = 6;
 export const COMBAT_SECTION_HEADER_BYTES = 18;
 export const COMBAT_EVENT_BYTES = 32;
 export const MISSILE_TYPE_IDS = Object.freeze(['AIM9X', 'AIM120C']);
@@ -280,7 +280,8 @@ export function encodeTrack(track) {
     throw new Error('replay remote tracks must share the local frames');
   }
   const combat = hasCombat(track.combat) ? track.combat : null;
-  const version = combat ? COMBAT_TRACK_VERSION : remotes.length ? ROOM_TRACK_VERSION : REPLAY_TRACK_VERSION;
+  const version = combat ? (combat.killEventsRecorded === false ? 5 : COMBAT_TRACK_VERSION)
+    : remotes.length ? ROOM_TRACK_VERSION : REPLAY_TRACK_VERSION;
   const frame = frameBytes(remotes.length);
   const metadata = encodedMetadata(track);
   if (metadata.length > 0xffff) throw new Error('replay track metadata is too large');
@@ -360,7 +361,7 @@ function writeCombat(view, offset, combat) {
 
   for (const event of combat.events) {
     writeScalar(view, offset, 'u32', event.timeSec * 1000, 1);
-    view.setUint8(offset + 4, event.kind === 'expire' ? 1 : 0);
+    view.setUint8(offset + 4, event.kind === 'expire' ? 1 : event.kind === 'kill' ? 2 : 0);
     view.setUint8(offset + 5, (event.missileId ?? 0) & 255);
     view.setUint8(offset + 6, event.surface ? 1 : 0);
     view.setUint8(offset + 7, 0);
@@ -517,7 +518,8 @@ function readCombat(view, offset, sectionLength, version) {
     if (offset + COMBAT_EVENT_BYTES > end) throw new Error('replay combat events are truncated');
     events.push({
       timeSec: view.getUint32(offset) / 1000,
-      kind: view.getUint8(offset + 4) === 1 ? 'expire' : 'detonation',
+      kind: view.getUint8(offset + 4) === 1 ? 'expire'
+        : version >= 6 && view.getUint8(offset + 4) === 2 ? 'kill' : 'detonation',
       missileId: view.getUint8(offset + 5),
       surface: Boolean(view.getUint8(offset + 6)),
       x: view.getFloat32(offset + 8), y: view.getFloat32(offset + 12), z: view.getFloat32(offset + 16),
@@ -526,7 +528,8 @@ function readCombat(view, offset, sectionLength, version) {
     offset += COMBAT_EVENT_BYTES;
   }
   if (offset !== end) throw new Error('replay combat section has trailing bytes');
-  return { banditIntervalSec, missileIntervalSec, targets, banditSamples, missileSamples, events };
+  return { banditIntervalSec, missileIntervalSec, targets, banditSamples, missileSamples, events,
+    killEventsRecorded: version >= 6 };
 }
 
 export function toBase64(bytes) {

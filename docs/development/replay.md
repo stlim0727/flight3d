@@ -42,7 +42,7 @@ explosion and breakup when it reaches that time and removes them on a seek back.
 
 ### Air combat tracks
 
-F-16 sorties append an optional combat section after the pose frames (codec v5; v4 remains readable).
+F-16 sorties append an optional combat section after the pose frames (codec v6; v4 and v5 remain readable).
 Solo tracks without combat remain v2, and room tracks remain v3, so older builds
 still import them. The section records:
 
@@ -50,8 +50,13 @@ still import them. The section records:
   loadout mask;
 - missile poses at 20 Hz while a missile is alive (position, attitude, motor
   state);
-- detonation and expiry markers with position and velocity.
+- detonation, expiry and individual kill markers with position and velocity.
 
+Version 6 records actual kill events separately from detonations, including gun kills
+and multiple kills from one burst. Version 4/5 tracks lack kill events, so playback
+retains their historical non-surface detonation count; re-encoding preserves v5
+semantics. Older builds cannot import v6 combat tracks. If the size budget forces
+the recorder to discard all combat events, the count cannot be reconstructed.
 Version 5 adds an 8-byte quantized quaternion to each bandit sample so bank and
 pitch survive playback. Version 4 uses the previous heading-only presentation.
 
