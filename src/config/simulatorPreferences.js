@@ -37,6 +37,13 @@ function validateSimulatorPreferences(value) {
     if (typeof value.joystick.deadzoneRudder === 'number' && Number.isFinite(value.joystick.deadzoneRudder)) {
       joy.deadzoneRudder = Math.max(0, Math.min(0.2, value.joystick.deadzoneRudder));
     }
+    if (value.joystick.combatButtons && typeof value.joystick.combatButtons === 'object') {
+      joy.combatButtons = {};
+      for (const action of ['missile', 'gun', 'target', 'chaff', 'flare']) {
+        const index = value.joystick.combatButtons[action];
+        if (Number.isInteger(index) && index >= -1 && index <= 64) joy.combatButtons[action] = index;
+      }
+    }
     if (value.joystick.customMapping && typeof value.joystick.customMapping === 'object' && !Array.isArray(value.joystick.customMapping)) {
       const cm = value.joystick.customMapping;
       const validAxis = (idx) => typeof idx === 'number' && Number.isInteger(idx) && idx >= -1 && idx <= 32;

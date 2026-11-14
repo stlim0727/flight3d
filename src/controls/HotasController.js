@@ -81,6 +81,8 @@ export class HotasController {
     this.throttleAxis = 3;
     this.rudderAxis = 2;
     this.customMapping = options.customMapping || null;
+    this.combatButtons = { missile: -1, gun: -1, target: -1, chaff: -1, flare: -1, ...options.combatButtons };
+    this.gunTrigger = false;
 
     // Internal state tracking
     this.lastRawThrottle = null;
@@ -112,6 +114,12 @@ export class HotasController {
     if (typeof cfg.deadzoneRudder === 'number' && Number.isFinite(cfg.deadzoneRudder)) {
       this.deadzoneRudder = Math.max(0, Math.min(0.2, cfg.deadzoneRudder));
     }
+    if (cfg.combatButtons && typeof cfg.combatButtons === 'object') {
+      for (const action of ['missile', 'gun', 'target', 'chaff', 'flare']) {
+        const index = cfg.combatButtons[action];
+        if (Number.isInteger(index) && index >= -1 && index <= 64) this.combatButtons[action] = index;
+      }
+    }
     if (cfg.customMapping !== undefined) {
       this.customMapping = cfg.customMapping;
     }
@@ -122,6 +130,7 @@ export class HotasController {
       profileOverride: this.profileOverride,
       axesLayout: this.axesLayout,
       customMapping: this.customMapping,
+      combatButtons: { ...this.combatButtons },
       throttleInverted: this.throttleInverted,
       pitchInverted: this.pitchInverted,
       rudderMode: this.rudderMode,
@@ -207,6 +216,7 @@ export class HotasController {
   }
 
   resetOutputs() {
+    this.gunTrigger = false;
     this.elevator = 0.0;
     this.aileron = 0.0;
     this.rudder = 0.0;
@@ -294,6 +304,7 @@ export class HotasController {
   update(dt = 1 / 60) {
     const gp = this.findActiveGamepad();
     if (!gp) {
+      this.gunTrigger = false;
       if (this.connectedDevice) {
         this.handleGamepadDisconnected({ index: this.connectedDevice.index, id: this.connectedDevice.id });
       }
@@ -307,7 +318,16 @@ export class HotasController {
 
     const activeProfile = this.resolveProfile(gp);
     const axes = gp.axes || [];
-    const buttons = gp.buttons || [];
+    const rawButtons = gp.buttons || [];
+    const buttons = rawButtons.map((button, index) => Object.values(this.combatButtons).includes(index)
+      ? { pressed: false, value: 0 } : button);
+    const combatLive = !this.controls?.inputBlocked && !this.controls?.aircraftControlsDisabled && !this.diagnosticActive;
+    this.gunTrigger = combatLive && this.combatButtons.gun >= 0 && this.isButtonPressed(rawButtons, this.combatButtons.gun);
+    if (combatLive && this.combatButtons.missile >= 0 && this.wasJustPressed(rawButtons, this.combatButtons.missile)) this.controls?.onFireMissile?.();
+    if (combatLive && this.combatButtons.target >= 0 && this.wasJustPressed(rawButtons, this.combatButtons.target)) this.controls?.onCycleTarget?.();
+    // Hooks reserved for player countermeasures; no dispenser exists yet.
+    if (combatLive && this.combatButtons.chaff >= 0 && this.wasJustPressed(rawButtons, this.combatButtons.chaff)) this.controls?.onDispenseChaff?.();
+    if (combatLive && this.combatButtons.flare >= 0 && this.wasJustPressed(rawButtons, this.combatButtons.flare)) this.controls?.onDispenseFlare?.();
 
     let userInteracted = false;
 
@@ -339,7 +359,7 @@ export class HotasController {
     }
 
     // Save button states for next frame edge detection
-    this.prevButtons = buttons.map(b => Boolean(b && (b.pressed || b.value > 0.5)));
+    this.prevButtons = rawButtons.map(b => Boolean(b && (b.pressed || b.value > 0.5)));
   }
 
   isButtonPressed(buttons, index) {
