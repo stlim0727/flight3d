@@ -154,7 +154,7 @@ test('fixed launch matrix records outcomes without granting immunity or omniscie
     const baseline = results[i], defensive = results[i + 1];
     assert.equal(baseline.reactionSeconds, null);
     for (const result of [baseline, defensive]) {
-      assert.ok(['hit', 'miss-expired', 'miss-terrain'].includes(result.terminal), JSON.stringify(result));
+      assert.ok(['hit', 'miss-expired', 'miss-terrain', 'no-lock'].includes(result.terminal), JSON.stringify(result));
       assert.ok(Number.isFinite(result.minSampledSeparationM));
       assert.ok(result.maxLoadG < 9, `load ${result.maxLoadG}`);
     }

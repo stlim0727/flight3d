@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BanditThreatResponse } from './BanditThreatResponse.js';
 import { MissileSeeker, seekerCanObserve } from './MissileSeeker.js';
+import { sampleEngineInfrared } from './InfraredSignal.js';
 import { MissileFlightModel } from './MissileFlightModel.js';
 import { BanditFlightModel } from './BanditFlightModel.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
@@ -35,6 +36,10 @@ export class BanditTarget {
     this.damageState = 'normal';
     this.hostile = true;
     this.radar = true;
+    // Kinematic test targets are explicit hot omnidirectional emitters. Live
+    // patrol aircraft publish measured engine state and use their actual attitude.
+    this.infraredSignature = { enginePower: 1, heat: 1, afterburner: 0, omnidirectional: true };
+    this.infraredAfterburnerLevel = 0;
     this.threatResponse = new BanditThreatResponse(evasion);
     this.flight = null;
     this.quaternion = null;
@@ -75,6 +80,7 @@ export class BanditTarget {
       this.flight.guide(heading, altitude, commandedSpeed);
       this.flight.step(dt / steps, this.damage,
         this.position.y - terrainHeight(this.position.x, this.position.z));
+      sampleEngineInfrared(this.flight.engines, this.infraredAfterburnerLevel, this.infraredSignature);
       if (this.position.y <= terrainHeight(this.position.x, this.position.z) + 2) {
         this.alive = false;
         this.respawnTimer = BANDIT_RESPAWN_SECONDS;
@@ -101,6 +107,9 @@ export class BanditTarget {
     }
     this.flight = o ? new BanditFlightModel(this.position, this.velocity) : null;
     this.quaternion = this.flight?.quaternion ?? null;
+    this.infraredAfterburnerLevel = 0;
+    if (this.flight) sampleEngineInfrared(this.flight.engines, 0, this.infraredSignature);
+    else Object.assign(this.infraredSignature, { enginePower: 1, heat: 1, afterburner: 0, omnidirectional: true });
   }
 }
 
