@@ -440,13 +440,12 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
     left: auto;
     right: var(--edge-right);
     transform: none;
-    width: calc(100% - var(--edge-left) - var(--edge-right));
-    max-width: none;
-    height: auto;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    overflow: visible;
-    touch-action: auto;
+    width: max-content;
+    max-width: calc(100% - var(--edge-left) - var(--edge-right));
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    touch-action: pan-x;
     transition: opacity .35s ease;
   }
   .flight-toolbar .btn,
