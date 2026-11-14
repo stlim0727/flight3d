@@ -4,6 +4,7 @@ import { Quaternion, Vector3 } from 'three';
 import { MissileSeeker, seekerCanObserve } from '../src/weapons/MissileSeeker.js';
 import { MISSILE_TYPES } from '../src/weapons/missileSpecs.js';
 import { AirToAirMissileSystem, BanditTarget } from '../src/weapons/AirToAirMissileSystem.js';
+import { compareSeekerTerrainEngagements } from '../scripts/lib/missileSeekerScenario.mjs';
 
 const dt = 1 / 120;
 const own = () => ({ position: new Vector3(0, 3000, 0), quaternion: new Quaternion() });
@@ -125,4 +126,12 @@ test('sensor denial does not grant physical immunity to a ballistic impact', () 
   combat.addTarget(t); const m = combat.fire(world);
   for (let i = 0; i < 240 && m.alive; i++) combat.update(dt, world);
   assert.equal(m.seeker.everTracked, false); assert.equal(t.alive, false); assert.equal(combat.splashCount, 1);
+});
+
+test('exposed, briefly masked and persistently masked combat produce distinct state histories', () => {
+  for (const result of compareSeekerTerrainEngagements()) {
+    assert.equal(result.terminal, result.masking === 'permanent' ? 'miss-terrain' : 'hit');
+    assert.deepEqual(result.phases, result.masking === 'open' ? ['track']
+      : result.masking === 'brief' ? ['track', 'memory', 'track'] : ['track', 'memory', 'lost']);
+  }
 });

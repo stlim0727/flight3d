@@ -81,6 +81,10 @@ Missile control now uses pressure-limited aerodynamic authority, actuator-respon
 memory and delivered-force maneuver drag. See [missile energy](missile-energy.md)
 for assumptions, integration invariants and launch-envelope comparisons.
 
+See [missile seeker](missile-seeker.md) for terrain-gated observations, finite
+track memory and confirmed reacquisition. IR/radar timing and signal inputs are
+explicit model assumptions; full sensor physics and countermeasures remain pending.
+
 | Action | Keyboard | Touch |
 | --- | --- | --- |
 | Fire the next loaded missile | `Enter` | `FIRE MSL` |
@@ -90,7 +94,7 @@ for assumptions, integration invariants and launch-envelope comparisons.
 `Space` remains the wheel-brake key on the ground; the combat system consumes
 it as a trigger only while airborne. Missile firing is refused on the ground
 and when all six rails are empty. Firing before lock is a Maddog launch: the missile flies
-ballistically until its seeker picks up a bandit inside the 65° gimbal. The launcher releases rails in the order
+ballistically until a visible bandit inside the 65° gimbal meets seeker confirmation. The launcher releases rails in the order
 `STA 1 → 9 → 2 → 8 → 3 → 7` (4× AIM-9X then 2× AIM-120C). A preset restart
 reloads every rail.
 
