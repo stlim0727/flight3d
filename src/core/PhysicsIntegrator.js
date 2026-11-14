@@ -600,6 +600,7 @@ class PhysicsIntegratorMethods {
     this.explosionSystem.spawnExplosion(crashResult, impactVelocity);
 
     // 2. Procedural Audio Detonation & Metal Crunch Sound
+    // The flag selects the water timbre; both branches start the detonation.
     this.audio.playExplosion(crashResult.type === 'WATER');
 
     // 3. Aircraft Structural Damage Visuals

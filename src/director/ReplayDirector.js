@@ -316,7 +316,9 @@ export class ReplayDirector {
     const time = this.progressSec, sim = this.sim;
     const impact = (events, sample) => sample.crashed
       ? events.findLast(event => event.timeSec <= time + 1e-6 && event.segment === sample.segment) : null;
-    this.roomEffects.apply(impact(this.roomEvents, local), time, { visible: local.visible !== false, seek });
+    const localImpact = impact(this.roomEvents, local);
+    this.roomEffects.apply(localImpact, time, { visible: local.visible !== false, seek });
+    this._playRoomImpact(localImpact, this);
     sim.aircraft.group.visible = local.visible !== false && !local.crashed;
     this.remotes.forEach((remote, index) => {
       const sample = sampleRemote(this.track, index, time, remote.sample, remote.seek);
@@ -329,14 +331,32 @@ export class ReplayDirector {
         visual.group.updateMatrixWorld(true);
         visual.animate({ gear: sample.gearState, flaps: sample.flapDegree }, 0);
       }
-      remote.effects.apply(sample ? impact(remote.events, sample) : null, time, { visible, seek });
+      const remoteImpact = sample ? impact(remote.events, sample) : null;
+      remote.effects.apply(remoteImpact, time, { visible, seek });
+      this._playRoomImpact(remoteImpact, remote);
       visual.group.visible = visible && !sample.crashed;
       visual.model.group.visible = true;
       visual.indicator.hide();
     });
   }
 
+  /**
+   * Room replays stage crashes through ReplayCrashEffects, which only draws them. Play the
+   * distance-scaled impact burst on the same crossing the solo path uses (#724). A seek
+   * inside the wreckage reconstructs the scene; it is not a new impact, so the guard holds
+   * until the playhead leaves the impact and the event identity is rearmed.
+   */
+  _playRoomImpact(event, owner) {
+    if (!event) { owner._impactSound = null; return; }
+    if (owner._impactSound === event) return;
+    owner._impactSound = event;
+    const camera = this.sim.camera?.position;
+    this.sim.audio?.playRemoteExplosion?.(
+      camera ? camera.distanceTo(event.position) : 0, event.type === 'WATER');
+  }
+
   _disposeRoom() {
+    this._impactSound = null;
     this.roomEffects?.dispose(); this.roomEffects = null;
     this.roomEvents = [];
     for (const remote of this.remotes) {
@@ -352,7 +372,9 @@ export class ReplayDirector {
    */
   _syncCrash() {
     const crash = this.track?.metadata?.crash;
-    const due = Number.isFinite(crash?.timeSec) && this.progressSec + 1e-6 >= crash.timeSec;
+    // Legacy tracks rounded the marker to milliseconds, which can sit up to 0.5 ms past the
+    // last sample; playback caps at the duration, so tolerate that rounding (#724).
+    const due = Number.isFinite(crash?.timeSec) && this.progressSec + 1e-3 >= crash.timeSec;
     if (due === Boolean(this._crashStaged)) return;
     if (!due) {
       this._clearCrash();

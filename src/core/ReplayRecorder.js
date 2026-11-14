@@ -251,7 +251,10 @@ export class ReplayRecorder {
   markCrash(crashResult) {
     if (!this.active || !crashResult || this.metadata.crash) return;
     const speedKnots = Number(crashResult.speedKnots);
-    this.metadata.crash = { type: crashResult.type ?? null, timeSec: Math.round(this.elapsed * 1000) / 1000,
+    // Milliseconds rounding can land past the recorded elapsed time, and playback caps at
+    // the recorded duration, so an over-rounded marker would never become due (#724).
+    const timeSec = Math.min(this.elapsed, Math.round(this.elapsed * 1000) / 1000);
+    this.metadata.crash = { type: crashResult.type ?? null, timeSec,
       speedKnots: Number.isFinite(speedKnots) ? Math.round(speedKnots) : null };
     this._measureMetadata();
   }

@@ -218,6 +218,17 @@ test('production engine fuelFlow survives immediate and stored replay', () => {
   assert.equal(stored.samples[0].engine2.ff, 720);
 });
 
+test('a crash marker never rounds past the recorded elapsed time (#724)', () => {
+  const recorder = started();
+  record(6, recorder);
+  // Half a millisecond past the last sample is exactly where rounding up used to put the
+  // marker beyond the recorded duration, so playback could never reach it.
+  recorder.elapsed = 6.0006;
+  recorder.markCrash({ type: 'TERRAIN', speedKnots: 120 });
+  assert.ok(recorder.metadata.crash.timeSec <= recorder.elapsed,
+    `marker ${recorder.metadata.crash.timeSec} must not exceed elapsed ${recorder.elapsed}`);
+});
+
 test('a crash is marked once at its simulation time, survives storage and never leaks into the next sortie (#648)', () => {
   const recorder = started();
   record(6, recorder);
