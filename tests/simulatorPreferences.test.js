@@ -190,3 +190,21 @@ test('partial joystick saves preserve calibration and reject invalid sibling upd
   assert.deepEqual(loadSimulatorPreferences(storage).joystick,
     { ...original, deadzoneStick: 0.05, customMapping: null });
 });
+
+test('HOTAS missile attempts report the actual fire result without recording keyboard attempts', () => {
+  class Sim {}
+  installSimulatorHudAndBindings(Sim);
+  const sim = new Sim();
+  const events = [];
+  sim.controls = { hotas: { getDiagnostics: () => ({ activeProfile: 'hotas-one', config: { combatButtons: { missile: 1 } } }) } };
+  sim.analytics = { trackEvent: (name, props) => events.push({ name, props }) };
+  sim.fireMissile = () => false;
+  sim.initControls();
+  assert.equal(sim.controls.onFireMissile('hotas'), false);
+  assert.deepEqual(events, [{ name: 'joystick_missile_attempted', props: { fired: false, button: 1, profile: 'hotas-one' } }]);
+  sim.fireMissile = () => true;
+  assert.equal(sim.controls.onFireMissile('hotas'), true);
+  assert.equal(events[1].props.fired, true);
+  sim.controls.onFireMissile();
+  assert.equal(events.length, 2);
+});

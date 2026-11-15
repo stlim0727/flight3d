@@ -323,7 +323,7 @@ export class HotasController {
       ? { pressed: false, value: 0 } : button);
     const combatLive = !this.controls?.inputBlocked && !this.controls?.aircraftControlsDisabled && !this.diagnosticActive;
     this.gunTrigger = combatLive && this.combatButtons.gun >= 0 && this.isButtonPressed(rawButtons, this.combatButtons.gun);
-    if (combatLive && this.combatButtons.missile >= 0 && this.wasJustPressed(rawButtons, this.combatButtons.missile)) this.controls?.onFireMissile?.();
+    if (combatLive && this.combatButtons.missile >= 0 && this.wasJustPressed(rawButtons, this.combatButtons.missile)) this.controls?.onFireMissile?.('hotas');
     if (combatLive && this.combatButtons.target >= 0 && this.wasJustPressed(rawButtons, this.combatButtons.target)) this.controls?.onCycleTarget?.();
     // Hooks reserved for player countermeasures; no dispenser exists yet.
     if (combatLive && this.combatButtons.chaff >= 0 && this.wasJustPressed(rawButtons, this.combatButtons.chaff)) this.controls?.onDispenseChaff?.();
