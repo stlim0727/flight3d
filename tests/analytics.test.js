@@ -554,3 +554,14 @@ test('flight_ended reports G-LOC incidents and peak load only when measured', ()
   assert.deepEqual(captured.map(event => [event.properties.glocIncidents, event.properties.maxG]),
     [[2, 9], [null, null], [1, null]]);
 });
+
+test('performance flush preserves measured context instead of live flight state', async () => {
+  const { trackFlightPerformance } = await import('../src/analytics/posthog.js');
+  const events = [];
+  _resetAnalyticsForTesting({ capture: (event, payload, options) => events.push({ event, payload, options }) });
+  trackFlightPerformance({ aircraft: 'B738', camera: 'cockpit', frames: 20, fps: 30 });
+  assert.equal(events[0].event, 'flight_performance');
+  assert.equal(events[0].payload.aircraft, 'B738');
+  assert.equal(events[0].payload.fps, 30);
+  assert.equal(events[0].options.send_instantly, true);
+});

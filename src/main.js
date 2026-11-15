@@ -1,5 +1,6 @@
 import { StartupProgressView } from './ui/StartupProgressView.js';
 import { compileVisibleScene } from './core/sceneShaderWarmup.js';
+import { FlightPerformanceMonitor, FlightGpuTimer } from './core/FlightPerformanceMonitor.js';
 import { FrameTransitionMonitor } from './core/FrameTransitionMonitor.js';
 import { longTaskSummary } from './core/inputLatency.js';
 import { createSimulatorScenarioStart } from './core/simulatorScenarioStart.js';
@@ -89,7 +90,9 @@ import { installPhysicsIntegrator } from './core/PhysicsIntegrator.js';
 import { installSimulatorHudAndBindings } from './ui/SimulatorHudAndBindings.js';
 import {
   initAnalytics,
+  getPostHogConfig,
   trackEvent,
+  trackFlightPerformance,
   trackFlightStart,
   trackFlightEnd,
   trackFlightCrash,
@@ -167,6 +170,12 @@ class FlightSimulator {
     const savedSelection = resolveFlightUrl(window.location.search, loadSavedFlightSelection());
     // Pinned now: by emit time the lobby context may already describe a flight the user started.
     startupTrace?.noteSelection(savedSelection);
+    this.performanceTelemetryEnabled = getPostHogConfig().enabled;
+    this.flightPerformance = new FlightPerformanceMonitor({ emit: report => trackFlightPerformance({
+      ...report, device: readDevice(globalThis), gpu: this.performanceGpuClass,
+      gpuTimerSupported: Boolean(this.flightGpuTimer?.extension),
+      longTasks: inputLatency ? longTaskSummary(inputLatency.state, report.windowStartMs, report.windowEndMs) : null,
+    }) });
     this.container = document.getElementById('canvas-container');
     this.inputLatency = inputLatency;
     this.frameTransitions = new FrameTransitionMonitor({
@@ -680,6 +689,9 @@ class FlightSimulator {
     const backgrounded = !active;
     if (this.browserBackgrounded === backgrounded) return;
     this.browserBackgrounded = backgrounded;
+    this.flightPerformance?.flush('browser-activity');
+    this.flightGpuTimer?.clear();
+    this.lastFrameDelta = null;
     // Discard wall time and any fractional physics debt on both edges.
     this.clock.getDelta();
     this.physicsAccumulator = 0;
@@ -696,6 +708,11 @@ class FlightSimulator {
   }
 
   syncAudioPause() {
+    if (this.gameFlow.state !== FLOW.FLIGHT) {
+      this.flightPerformance?.flush('flight-held');
+      this.flightGpuTimer?.clear();
+      this.lastFrameDelta = null;
+    }
     const backgrounded = this.browserBackgrounded === true;
     const held = this.gameFlow.state === FLOW.DEBRIEF || this.gameFlow.state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby() || Boolean(this.demoDirector?.isRestartConfirmOpen);
     const radioPaused = backgrounded || this.gameFlow.state !== FLOW.FLIGHT || Boolean(this.demoDirector?.isRestartConfirmOpen);
@@ -1403,8 +1420,17 @@ class FlightSimulator {
   animate() {
     requestAnimationFrame(this.animate);
 
+    const frameStart = performance.now();
     const elapsed = this.clock.getDelta();
     if (this.browserBackgrounded) return;
+    this.lastFrameDelta = Number.isFinite(elapsed) && elapsed > 0 ? elapsed : null;
+    const measureFlight = this.flightPerformance.begin(frameStart,
+      this.performanceTelemetryEnabled && this.startupReady && this.gameFlow.state === FLOW.FLIGHT && !this.startingFlight
+        && !this.multiplayer?.modalOpen && !this.devRunner?.active && !this.renderDiagnostics?.active && !this.demoDirector?.isRestartConfirmOpen
+        ? { aircraft: this.currentAircraftId, airport: this.activeAirport, scenario: this.lastPresetType,
+          camera: this.cameraSystem.mode, renderQuality: this.renderQuality,
+          pixelRatio: this.renderer.getPixelRatio(), width: this.renderer.domElement.width,
+          height: this.renderer.domElement.height, isMultiplayer: Boolean(this.multiplayer?.active) } : null);
     const frameDelta = this.startupReady ? clampFrameDelta(elapsed) : 0;
     // Also covers model swaps and failed-load procedural fallbacks. Preparation
     // precedes physics so the first impact after loading can reuse the fragments.
@@ -1571,25 +1597,41 @@ class FlightSimulator {
     this.multiplayer?.update();
 
     // 8. Render 3D Scene
-    const measuredRender = !this.hasRenderedFirstFrame || Boolean(this.frameTransitions?.pending);
+    const measuredRender = measureFlight || !this.hasRenderedFirstFrame || Boolean(this.frameTransitions?.pending);
     const renderStart = measuredRender ? performance.now() : 0;
     if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-render-start');
-    this.renderScene();
-    if (measuredRender) {
-      this.frameTransitions?.rendered(performance.now() - renderStart, { camera: this.cameraSystem.mode });
+    if (measureFlight && !this.flightGpuTimer) {
+      this.performanceGpuClass = readGpuClass(globalThis);
+      this.flightGpuTimer = new FlightGpuTimer(this.renderer.getContext(), (ms, context) => this.flightPerformance.addGpu(ms, context));
     }
-    if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-render-end');
-    if (!this.hasRenderedFirstFrame) {
-      this.hasRenderedFirstFrame = true;
-      document.getElementById('startup-overlay').classList.add('scene-ready');
-      inputLatency?.mark('first-frame');
-      this.scheduleAircraftPreload();
-    }
+    const previousAutoReset = this.renderer.info.autoReset;
+    if (measureFlight) { this.renderer.info.reset(); this.renderer.info.autoReset = false; }
+    const gpuQuery = measureFlight && !this.renderDiagnostics?.active
+      ? this.flightGpuTimer.begin(this.flightPerformance.context) : null;
+    try {
+      this.renderScene();
+      if (measuredRender) {
+        this.frameTransitions?.rendered(performance.now() - renderStart, { camera: this.cameraSystem.mode });
+      }
+      if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-render-end');
+      if (!this.hasRenderedFirstFrame) {
+        this.hasRenderedFirstFrame = true;
+        document.getElementById('startup-overlay').classList.add('scene-ready');
+        inputLatency?.mark('first-frame');
+        this.scheduleAircraftPreload();
+      }
 
-    // 9. Render 2D Photorealistic Cockpit Overlay (when in photo cockpit mode)
-    if (isPhotoCockpit && this.cockpitPhotoOverlay) {
-      this.cockpitPhotoOverlay.render(this.renderer);
+      // 9. Render 2D Photorealistic Cockpit Overlay (when in photo cockpit mode)
+      if (isPhotoCockpit && this.cockpitPhotoOverlay) {
+        this.cockpitPhotoOverlay.render(this.renderer);
+      }
+    } finally {
+      this.flightGpuTimer?.end(gpuQuery);
+      this.renderer.info.autoReset = previousAutoReset;
     }
+    if (measureFlight) this.flightPerformance.end({ updateMs: renderStart - frameStart,
+      renderMs: performance.now() - renderStart, calls: this.renderer.info.render.calls,
+      triangles: this.renderer.info.render.triangles });
     this.updateCrashDebrief(frameDelta);
   }
 

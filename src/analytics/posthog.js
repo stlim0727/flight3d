@@ -218,6 +218,11 @@ export function trackEvent(eventName, properties = {}, options = {}) {
   sendEvent(eventName, { ...gatherFlightContext(), ...properties }, options);
 }
 
+/** Window context belongs to the measured flight, including page-hide flushes. */
+export function trackFlightPerformance(report) {
+  sendEvent('flight_performance', report, { send_instantly: true });
+}
+
 /** Capture exceptions with game context */
 export function captureException(error, additionalContext = {}) {
   const errorObj = error instanceof Error ? error : new Error(String(error));
