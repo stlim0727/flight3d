@@ -81,7 +81,9 @@ test('WaterOcean (Camera Anchoring, Grid Snapping & Gerstner Waves)', async (t) 
     const fs = ocean.material.fragmentShader;
     assert.ok(fs.includes('uEdgeFadeStart'), 'Fragment shader must declare uEdgeFadeStart uniform');
     assert.ok(fs.includes('uEdgeFadeEnd'), 'Fragment shader must declare uEdgeFadeEnd uniform');
-    assert.ok(fs.includes('max(abs(vLocalPos.x), abs(vLocalPos.y))'), 'Fragment shader must compute edgeDist from vLocalPos');
+    assert.ok(fs.includes('smoothstep(uEdgeFadeStart, uEdgeFadeEnd, length(vLocalPos))'), 'Fragment shader must fade on a circle around the mesh centre');
+    assert.ok(fs.includes('if (length(vLocalPos) > uEdgeFadeEnd) discard;'), 'Fragment shader must not draw the square corners past the rim circle');
+    assert.ok(!fs.includes('max(abs(vLocalPos.x), abs(vLocalPos.y))'), 'The rim must not follow the square mesh outline (#751)');
   });
 
   await t.test('receives the sun shadow map so a low aircraft shadows the sea (#648)', () => {

@@ -4,6 +4,13 @@ import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
 import { TerrainTextures } from './TerrainTextures.js';
 import { applyFarSunShadow, castFarSunShadow } from './FarSunShadow.js';
 
+// The seabed is not drawn. The sea is opaque, so below it the terrain is only ever seen
+// by mistake: through the sea's depth bias from high altitude, or uncovered where the
+// camera-following sea mesh does not reach, which showed this mesh's square outline
+// (#751). The cut sits below the deepest swell trough (~1 m). Physics is unaffected:
+// getHeight still describes the seabed.
+const SEABED_CUT_Y = -2;
+
 /**
  * Procedural Terrain with Rolling Hills, Coastal Mountains, and Flat Airport Mesa
  * Features multi-layer PBR texture splatting, slope-dependent triplanar cliff projection,
@@ -412,6 +419,7 @@ export class Terrain {
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <clipping_planes_fragment>',
         `#include <clipping_planes_fragment>
+        if (vTerrainWorldPos.y < ${SEABED_CUT_Y.toFixed(1)}) discard;
         #if PAVEMENT_BOUNDS_COUNT > 0
           for (int i = 0; i < PAVEMENT_BOUNDS_COUNT; i++) {
             vec4 bounds = uPavementBounds[i];
@@ -604,16 +612,6 @@ export class Terrain {
         '#include <normal_fragment_maps>',
         `#include <normal_fragment_maps>
         normal = transformDirection(tFinalWorldNormal, viewMatrix);`
-      );
-
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <fog_fragment>',
-        `#include <fog_fragment>
-        #ifdef USE_FOG
-          float tEdge = max(abs(vTerrainWorldPos.x), abs(vTerrainWorldPos.z));
-          float tFade = smoothstep(8800.0, 10700.0, tEdge);
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, tFade);
-        #endif`
       );
     };
 
