@@ -789,7 +789,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .joystick-meter-head { flex-wrap: wrap; gap: 4px 8px; }
-.joystick-meter-sub span:nth-child(2) { display: none; }
+.joystick-meter-sub { gap: 6px; }
 .joystick-advanced {
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 8px;
@@ -803,7 +803,7 @@
   font-size: 0.9rem;
   font-weight: 600;
 }
-.joystick-advanced > summary span {
+.joystick-advanced > summary .joystick-advanced-subtitle {
   color: #94a3b8;
   font-size: 0.75rem;
   font-weight: 400;
@@ -820,7 +820,7 @@
 @media (max-width: 600px) {
   .joystick-meters-grid { grid-template-columns: 1fr; }
   .joystick-combat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .joystick-advanced > summary span { display: block; margin: 4px 0 0 18px; }
+  .joystick-advanced > summary .joystick-advanced-subtitle { display: block; margin: 4px 0 0 18px; }
 }
 
 .joystick-combat-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }

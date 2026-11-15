@@ -2,6 +2,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { JoystickCheckDialog } from '../src/ui/JoystickCheckDialog.js';
 import { HotasController } from '../src/controls/HotasController.js';
+import { setLanguage } from '../src/i18n/index.js';
 
 class MockElement {
   constructor(tagName = 'div') {
@@ -204,6 +205,7 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     const mockBody = new MockElement('body');
     globalThis.document = {
       body: mockBody,
+      documentElement: { lang: '' },
       createElement: (tag) => new MockElement(tag),
       getElementById: (id) => docElements.get(id) || (mockBody.id === id ? mockBody : mockBody.querySelector(`#${id}`)),
       addEventListener: (event, fn) => {
@@ -278,6 +280,27 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
 
     // Hardware tips
     assert.ok(dialog.dialog.querySelector('.joystick-tips-card'));
+  });
+
+  it('keeps every axis direction hint translated in English', () => {
+    setLanguage('en', mockStorage);
+    try {
+      const dialog = new JoystickCheckDialog(sim);
+      const hints = dialog.dialog.querySelectorAll('[data-i18n]')
+        .filter(el => el.getAttribute('data-i18n').startsWith('joystick.axis.'));
+      const keys = new Set(hints.map(el => el.getAttribute('data-i18n')));
+      for (const axis of ['pitch', 'roll', 'throttle', 'rudder', 'brakes']) {
+        for (const bound of ['min', 'max']) {
+          assert.ok(keys.has(`joystick.axis.${axis}.${bound}`), `${axis} ${bound} hint must be translated`);
+        }
+      }
+      for (const hint of hints) {
+        assert.ok(hint.textContent.trim(), `${hint.getAttribute('data-i18n')} must render text`);
+        assert.doesNotMatch(hint.textContent, /[가-힣]/, `${hint.getAttribute('data-i18n')} must be English`);
+      }
+    } finally {
+      setLanguage('ko', mockStorage);
+    }
   });
 
   it('opens and closes cleanly, syncing hotas config with form controls', () => {

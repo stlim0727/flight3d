@@ -118,9 +118,8 @@ export class JoystickCheckDialog {
                 <div class="joystick-meter-fill" data-bar-pitch style="left: 50%; width: 0%;"></div>
               </div>
               <div class="joystick-meter-sub">
-                <span>◀ 하강(밀기)</span>
-                <span data-i18n="joystick.axis.pitch.desc">밀기(하강) ◀ ▶ 당기기(상승)</span>
-                <span>상승(당기기) ▶</span>
+                <span data-i18n="joystick.axis.pitch.min">◀ 하강(밀기)</span>
+                <span data-i18n="joystick.axis.pitch.max">상승(당기기) ▶</span>
               </div>
             </div>
 
@@ -135,9 +134,8 @@ export class JoystickCheckDialog {
                 <div class="joystick-meter-fill" data-bar-roll style="left: 50%; width: 0%;"></div>
               </div>
               <div class="joystick-meter-sub">
-                <span>◀ 좌측 롤</span>
-                <span data-i18n="joystick.axis.roll.desc">좌측 선회 ◀ ▶ 우측 선회</span>
-                <span>우측 롤 ▶</span>
+                <span data-i18n="joystick.axis.roll.min">◀ 좌측 롤</span>
+                <span data-i18n="joystick.axis.roll.max">우측 롤 ▶</span>
               </div>
             </div>
 
@@ -152,9 +150,8 @@ export class JoystickCheckDialog {
                 <div class="joystick-meter-fill throttle" data-bar-throttle style="left: 0; width: 0%;"></div>
               </div>
               <div class="joystick-meter-sub">
-                <span>아이들 (0% Idle)</span>
-                <span data-i18n="joystick.axis.throttle.desc">아이들(0%) ~ 최대추력(100% TOGA)</span>
-                <span>최대 추력 (100% TOGA)</span>
+                <span data-i18n="joystick.axis.throttle.min">아이들 (0% Idle)</span>
+                <span data-i18n="joystick.axis.throttle.max">최대 추력 (100% TOGA)</span>
               </div>
             </div>
 
@@ -170,9 +167,8 @@ export class JoystickCheckDialog {
                 <div class="joystick-meter-fill" data-bar-rudder style="left: 50%; width: 0%;"></div>
               </div>
               <div class="joystick-meter-sub">
-                <span>◀ 좌측 요</span>
-                <span data-i18n="joystick.axis.rudder.desc">좌측 요 ◀ ▶ 우측 요 (트위스트/로커 패들)</span>
-                <span>우측 요 ▶</span>
+                <span data-i18n="joystick.axis.rudder.min">◀ 좌측 요</span>
+                <span data-i18n="joystick.axis.rudder.max">우측 요 ▶</span>
               </div>
             </div>
 
@@ -186,16 +182,16 @@ export class JoystickCheckDialog {
                 <div class="joystick-meter-fill brakes" data-bar-brakes style="left: 0; width: 0%;"></div>
               </div>
               <div class="joystick-meter-sub">
-                <span>해제 (0%)</span>
+                <span data-i18n="joystick.axis.brakes.min">해제 (0%)</span>
                 <span data-i18n="joystick.axis.brakes.desc">메인 트리거</span>
-                <span>최대 제동 (100%)</span>
+                <span data-i18n="joystick.axis.brakes.max">최대 제동 (100%)</span>
               </div>
             </div>
           </div>
         </div>
 
         <details class="joystick-advanced">
-          <summary>고급 설정 및 보정 <span>프로필 · 축 보정 · 반전</span></summary>
+          <summary><span data-i18n="joystick.advanced.summary">고급 설정 및 보정</span> <span class="joystick-advanced-subtitle" data-i18n="joystick.advanced.subtitle">프로필 · 축 보정 · 반전</span></summary>
           <div class="joystick-advanced-content">
         <!-- Profile Selection -->
         <div class="joystick-section joystick-advanced-section">
@@ -296,7 +292,7 @@ export class JoystickCheckDialog {
 
         <!-- Hardware Troubleshooting Guide -->
         <details class="joystick-tips-card">
-          <summary>하드웨어 도움말</summary>
+          <summary data-i18n="joystick.tips.summary">하드웨어 도움말</summary>
           <h4 data-i18n="joystick.hw.tips">💡 T.Flight Hotas One 하드웨어 팁 & 문제 해결</h4>
           <ul>
             <li data-i18n="joystick.tip.switch">스위치 위치: T.Flight Hotas One 본체 뒤쪽 'PC / XBOX' 스위치가 PC에 있어야 5축 원시 HID로 작동합니다. XBOX 모드인 경우 위 프로필에서 'XBOX 모드'를 선택하면 스로틀과 러더가 자동 정렬됩니다.</li>
