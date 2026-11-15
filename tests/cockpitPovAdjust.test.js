@@ -277,10 +277,13 @@ test('CockpitPovPanel keyboard interactions on sliders do not trigger flight con
     }
   };
 
+  const docListeners = {};
   const elements = new Map([['cockpit-pov-panel', mockPanel]]);
   globalThis.document = {
     getElementById: (id) => elements.get(id) || null,
-    addEventListener() {},
+    addEventListener(event, fn) {
+      docListeners[event] = fn;
+    },
   };
 
   try {
@@ -321,6 +324,20 @@ test('CockpitPovPanel keyboard interactions on sliders do not trigger flight con
     controls.keys.KeyD = true;
     controls.handleKeyUp({ code: 'KeyD' });
     assert.equal(controls.keys.KeyD, false, 'Keyup propagates to FlightControls and releases keys');
+
+    // 4. Escape dismisses panel, prevents default, and stops propagation so demo director isn't cancelled
+    povPanel.open();
+    assert.equal(povPanel.isOpen(), true, 'Panel should be open before Escape');
+    let escapePrevented = false;
+    let escapeDocStopped = false;
+    docListeners.keydown?.({
+      key: 'Escape',
+      preventDefault() { escapePrevented = true; },
+      stopPropagation() { escapeDocStopped = true; },
+    });
+    assert.equal(escapePrevented, true, 'Escape must call preventDefault()');
+    assert.equal(escapeDocStopped, true, 'Escape must call stopPropagation() to prevent demo cancellation');
+    assert.equal(povPanel.isOpen(), false, 'Escape must close the panel');
   } finally {
     globalThis.document = prevDoc;
     if (prevWindow === undefined) delete globalThis.window;

@@ -94,6 +94,7 @@ export class CockpitPovPanel {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.isOpen()) {
         e.preventDefault();
+        e.stopPropagation();
         this.close();
       }
     });
