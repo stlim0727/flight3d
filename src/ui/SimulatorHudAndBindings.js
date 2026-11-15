@@ -35,7 +35,17 @@ class SimulatorHudAndBindingsMethods {
       }
     };
 
-    this.controls.onFireMissile = () => this.fireMissile();
+    this.controls.onFireMissile = (source) => {
+      const fired = this.fireMissile();
+      if (source === 'hotas') {
+        const diag = this.controls.hotas?.getDiagnostics();
+        this.analytics?.trackEvent?.('joystick_missile_attempted', {
+          fired, button: diag?.config?.combatButtons?.missile ?? -1,
+          profile: diag?.activeProfile ?? 'none',
+        });
+      }
+      return fired;
+    };
     this.controls.onCycleTarget = () => this.cycleCombatTarget();
 
     this.controls.onToggleGear = () => {

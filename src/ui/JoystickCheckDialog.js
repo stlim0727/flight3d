@@ -13,6 +13,7 @@ export class JoystickCheckDialog {
     this.dialog = null;
     this.isOpen = false;
     this.rafId = null;
+    this.testedButtons = new Set();
     this.storage = simulator?.storage || (typeof globalThis !== 'undefined' ? globalThis.localStorage : null);
 
     this.wizardActive = false;
@@ -92,7 +93,7 @@ export class JoystickCheckDialog {
 
         <div class="joystick-section">
           <h3 class="joystick-section-title">전투 버튼 매핑 (Combat buttons)</h3>
-          <p>아래 버튼 번호는 실시간 버튼 표시에서 확인하세요. 지정한 버튼의 기존 기능은 해제됩니다.</p>
+          <p>아래 버튼 번호는 실시간 버튼 표시에서 확인하세요. 지정한 버튼의 기존 기능은 해제됩니다. 이 창에서는 버튼 입력만 점검하며 무기는 발사되지 않습니다.</p>
           ${[['missile', '미사일 발사'], ['gun', '기관포 (누르고 유지)'], ['target', '표적 전환'], ['chaff', '채프 (미구현)'], ['flare', '플레어 (미구현)']].map(([action, label]) => `
             <label class="joystick-field-label">${label}
               <select class="joystick-select" data-combat-button="${action}">
@@ -396,6 +397,12 @@ export class JoystickCheckDialog {
         }
         mapping[select.getAttribute('data-combat-button')] = selected;
         this.hotas.applyConfig({ combatButtons: mapping });
+        const diag = this.hotas.getDiagnostics();
+        this.sim?.analytics?.trackEvent?.('joystick_combat_mapping_changed', {
+          action: select.getAttribute('data-combat-button'), button: selected,
+          profile: diag.activeProfile, connected: diag.connected,
+          buttonCount: diag.buttons.length, mapping: { ...mapping },
+        });
         for (const field of this.dialog.querySelectorAll('[data-combat-button]')) field.value = String(mapping[field.getAttribute('data-combat-button')]);
         this.savePreferences();
       });
@@ -449,6 +456,7 @@ export class JoystickCheckDialog {
     if (this.isOpen || !this.dialog) return;
     this.isOpen = true;
     this.dialog.hidden = false;
+    this.testedButtons.clear();
     // Keep controller outputs mapped from live axes while the meters poll,
     // without writing anything through to the aircraft.
     if (this.hotas) this.hotas.diagnosticActive = true;
@@ -514,6 +522,8 @@ export class JoystickCheckDialog {
   }
 
   getButtonActionLabel(index, profile) {
+    const assigned = Object.entries(this.hotas?.getConfig()?.combatButtons || {}).find(([, button]) => button === index);
+    if (assigned) return { missile: '미사일 발사', gun: '기관포', target: '표적 전환', chaff: '채프 (미구현)', flare: '플레어 (미구현)' }[assigned[0]] || `Button ${index}`;
     if (profile === 'hotas-one-xbox') {
       const xboxActions = {
         0: 'A (스포일러)',
@@ -561,6 +571,15 @@ export class JoystickCheckDialog {
   updateTelemetry() {
     if (!this.hotas) return;
     const diag = this.hotas.getDiagnostics();
+    const pressed = new Set(diag.buttons.filter(button => button.pressed).map(button => button.index));
+    for (const [action, index] of Object.entries(diag.config?.combatButtons || {})) {
+      if (index >= 0 && pressed.has(index) && !this.testedButtons.has(index)) {
+        this.sim?.analytics?.trackEvent?.('joystick_combat_button_tested', {
+          action, button: index, profile: diag.activeProfile, buttonCount: diag.buttons.length,
+        });
+      }
+    }
+    this.testedButtons = pressed;
 
     // 0. Update Wizard Telemetry if active
     if (this.wizardActive) {

@@ -365,11 +365,34 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     assert.strictEqual(sim.controls.hotas.getConfig().combatButtons.missile, 64);
     missile.value = '3'; missile.dispatchEvent(new Event('change'));
     assert.strictEqual(sim.controls.hotas.getConfig().combatButtons.missile, 3);
+    assert.strictEqual(dialog.getButtonActionLabel(3, 'hotas-one'), '미사일 발사');
+    assert.strictEqual(dialog.getButtonActionLabel(3, 'hotas-one-xbox'), '미사일 발사');
     chaff.value = '3'; chaff.dispatchEvent(new Event('change'));
     assert.strictEqual(missile.value, '-1');
+    assert.strictEqual(dialog.getButtonActionLabel(3, 'hotas-one'), '채프 (미구현)');
     const saved = JSON.parse(mockStorage.getItem('flight3d.preferences.v1'));
     assert.strictEqual(saved.joystick.combatButtons.chaff, 3);
     assert.strictEqual(saved.joystick.combatButtons.missile, -1);
+    dialog.close();
+  });
+
+  it('reports mapping changes and one diagnostic event per button press', () => {
+    const events = [];
+    sim.analytics = { trackEvent: (name, props) => events.push({ name, props }) };
+    const pad = { id: 'T.Flight Hotas One', index: 0, axes: [0, 0, 0, 0, 0], buttons: [{ pressed: false, value: 0 }, { pressed: false, value: 0 }] };
+    sim.controls.hotas.getGamepadsFn = () => [pad];
+    const dialog = new JoystickCheckDialog(sim);
+    dialog.open();
+    const missile = dialog.dialog.querySelector('[data-combat-button="missile"]');
+    missile.value = '1'; missile.dispatchEvent(new Event('change'));
+    assert.strictEqual(events[0].name, 'joystick_combat_mapping_changed');
+    assert.strictEqual(events[0].props.button, 1);
+    pad.buttons[1] = { pressed: true, value: 1 };
+    dialog.updateTelemetry(); dialog.updateTelemetry();
+    assert.strictEqual(events.filter(e => e.name === 'joystick_combat_button_tested').length, 1);
+    pad.buttons[1] = { pressed: false, value: 0 }; dialog.updateTelemetry();
+    pad.buttons[1] = { pressed: true, value: 1 }; dialog.updateTelemetry();
+    assert.strictEqual(events.filter(e => e.name === 'joystick_combat_button_tested').length, 2);
     dialog.close();
   });
 
