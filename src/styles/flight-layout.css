@@ -313,7 +313,8 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   z-index: 75;
 }
 .btn-reset-pov,
-.btn-gaze-exit {
+.btn-gaze-exit,
+.btn-cockpit-pov {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -340,7 +341,13 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   color: #fef3c7;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(251, 191, 36, 0.3);
 }
-.btn-reset-pov:hover {
+.btn-cockpit-pov {
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #e0f2fe;
+}
+.btn-reset-pov:hover,
+.btn-cockpit-pov:hover,
+.btn-cockpit-pov[aria-expanded="true"] {
   background: rgba(30, 41, 59, 0.95);
   border-color: #7dd3fc;
   color: #ffffff;
@@ -353,12 +360,154 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   box-shadow: 0 4px 20px rgba(251, 191, 36, 0.48);
 }
 .btn-reset-pov:active,
-.btn-gaze-exit:active {
+.btn-gaze-exit:active,
+.btn-cockpit-pov:active {
   transform: scale(0.96);
 }
 .btn-reset-pov[hidden],
-.btn-gaze-exit[hidden] {
+.btn-gaze-exit[hidden],
+.btn-cockpit-pov[hidden] {
   display: none !important;
+}
+
+/* Cockpit POV Eyepoint Adjustment Panel */
+.cockpit-pov-panel {
+  position: fixed;
+  top: calc(var(--edge-top, 8px) + (96px * var(--ui-scale, 1)));
+  right: calc(var(--edge-right, 12px) + 8px);
+  width: min(calc(260px * var(--ui-scale, 1)), calc(100vw - 24px));
+  background: var(--flight-control-surface, rgba(15, 23, 42, 0.92));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(181, 211, 234, .35);
+  border-radius: calc(10px * var(--ui-scale, 1));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 16px rgba(56, 189, 248, 0.15);
+  padding: calc(10px * var(--ui-scale, 1));
+  z-index: 96;
+  color: #e0f2fe;
+  font-family: inherit;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cockpit-pov-panel[hidden] {
+  display: none !important;
+}
+.cockpit-pov-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: calc(8px * var(--ui-scale, 1));
+  padding-bottom: calc(6px * var(--ui-scale, 1));
+  border-bottom: 1px solid rgba(181, 211, 234, 0.2);
+}
+.cockpit-pov-title-group {
+  display: flex;
+  align-items: center;
+  gap: calc(6px * var(--ui-scale, 1));
+}
+.cockpit-pov-icon {
+  font-size: calc(14px * var(--ui-scale, 1));
+}
+.cockpit-pov-title {
+  margin: 0;
+  font-size: calc(12px * var(--ui-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f0f9ff;
+}
+.cockpit-pov-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: calc(16px * var(--ui-scale, 1));
+  line-height: 1;
+  padding: calc(2px * var(--ui-scale, 1)) calc(6px * var(--ui-scale, 1));
+  cursor: pointer;
+  border-radius: calc(4px * var(--ui-scale, 1));
+  min-height: unset;
+}
+.cockpit-pov-close:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+.cockpit-pov-body {
+  display: grid;
+  gap: calc(8px * var(--ui-scale, 1));
+}
+.cockpit-pov-row {
+  display: grid;
+  gap: calc(3px * var(--ui-scale, 1));
+}
+.cockpit-pov-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: calc(11px * var(--ui-scale, 1));
+  color: #bae6fd;
+}
+.cockpit-pov-val {
+  font-family: monospace;
+  font-weight: 700;
+  color: #38bdf8;
+  font-size: calc(11px * var(--ui-scale, 1));
+}
+.cockpit-pov-control-group {
+  display: grid;
+  grid-template-columns: calc(28px * var(--ui-scale, 1)) 1fr calc(28px * var(--ui-scale, 1));
+  gap: calc(4px * var(--ui-scale, 1));
+  align-items: center;
+}
+.cockpit-pov-step {
+  min-height: calc(26px * var(--ui-scale, 1));
+  max-height: calc(26px * var(--ui-scale, 1));
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(181, 211, 234, 0.3);
+  border-radius: calc(4px * var(--ui-scale, 1));
+  color: #f0f9ff;
+  font-size: calc(14px * var(--ui-scale, 1));
+  font-weight: 700;
+  cursor: pointer;
+}
+.cockpit-pov-step:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+}
+.cockpit-pov-step:active {
+  transform: scale(0.94);
+}
+.cockpit-pov-slider {
+  width: 100%;
+  margin: 0;
+  accent-color: #38bdf8;
+  cursor: pointer;
+  height: calc(16px * var(--ui-scale, 1));
+}
+.cockpit-pov-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: calc(4px * var(--ui-scale, 1));
+  padding-top: calc(6px * var(--ui-scale, 1));
+  border-top: 1px solid rgba(181, 211, 234, 0.15);
+}
+.cockpit-pov-btn-reset {
+  min-height: calc(26px * var(--ui-scale, 1));
+  padding: calc(3px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(181, 211, 234, 0.3);
+  border-radius: calc(6px * var(--ui-scale, 1));
+  color: #94a3b8;
+  font-size: calc(11px * var(--ui-scale, 1));
+  cursor: pointer;
+}
+.cockpit-pov-btn-reset:hover {
+  background: rgba(56, 189, 248, 0.15);
+  color: #f0f9ff;
+  border-color: #38bdf8;
 }
 .btn-gaze-exit .gaze-exit-close {
   font-size: calc(11px * var(--ui-scale, 1));

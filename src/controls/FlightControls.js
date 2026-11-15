@@ -118,7 +118,7 @@ export class FlightControls {
 
   handleKeyDown(e) {
     this.onUserInteract?.();
-    if (e.target?.closest?.('select')) return;
+    if (e.target?.closest?.('select, .cockpit-pov-panel')) return;
     if (this.inputBlocked) return;
     const cameraDigit = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
     if (cameraDigit || e.code === 'KeyC') {
