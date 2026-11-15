@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
-  EARTH_RADIUS_M, HAZE_HEIGHT_FALLOFF, erfcx, horizonDrop, seaDistance, seaReach, strikesSea,
+  EARTH_RADIUS_M, HAZE_HEIGHT_FALLOFF, erfcx, horizonDrop, meanDensityRatio, seaDistance, seaReach, strikesSea,
 } from '../src/environment/AerialPerspective.js';
 import { SkyAtmosphere } from '../src/environment/SkyAtmosphere.js';
 import { WaterOcean } from '../src/environment/WaterOcean.js';
@@ -110,10 +110,55 @@ test('sky pass draws the far sea below the horizon and leaves the sky above it a
 test('sea mesh becomes that same far sea at its rim and paints no fog-coloured ring', () => {
   const ocean = new WaterOcean(36000, 8);
   const { fragmentShader } = ocean.material;
-  assert.ok(fragmentShader.includes('float rim = smoothstep(uEdgeFadeStart, uEdgeFadeEnd, length(vLocalPos));'));
+  assert.ok(fragmentShader.includes('float rim = strikes * smoothstep(uEdgeFadeStart, uEdgeFadeEnd, length(vLocalPos));'));
+  // The blend is gated on the unclamped discriminant, with the sky pass's one-pixel edge,
+  // and the derivative is taken outside the branch that uses it.
+  assert.ok(fragmentShader.includes('float grazing2 = viewDir.y * viewDir.y - 2.0 * eyeY / AERIAL_EARTH_RADIUS;'));
+  assert.ok(fragmentShader.includes('float strikes = viewDir.y > 0.0 ? clamp(grazing2 / max(fwidth(grazing2), 1e-12), 0.0, 1.0) : 0.0;'));
+  assert.ok(fragmentShader.indexOf('fwidth(grazing2)') < fragmentShader.indexOf('if (rim > 0.0) {'));
   assert.ok(fragmentShader.includes('oceanFarColor(-viewDir, grazing2, lightDir, uSunColor, uFogColor, uDeepColor, uShallowColor)'));
   assert.ok(fragmentShader.includes('uBaseFogDensity * aerialSeaReach(eyeY, -viewDir.y, grazing2)'));
   assert.ok(fragmentShader.includes('float eyeY = max(cameraPosition.y, 0.5);'));
   assert.ok(fragmentShader.includes('if (length(vLocalPos) > uEdgeFadeEnd) discard;'), 'the sky pass owns everything past the rim');
   assert.ok(!fragmentShader.includes('edgeFade'));
+});
+
+// The sea mesh is flat and ends 17.1 km out; the far sea lies on a sphere. Review of #777:
+// from 2 m the rim band's sight lines pass over the sphere's horizon (5 km off), and
+// feeding them to the far-sea integral cleared the haze from 99% to 3% along the rim.
+test('the rim blend never thins the haze the sea mesh already has', () => {
+  const seaLevel = 0.00018; // noon
+  const band = [12600, 13500, 15000, 16000, 17100];
+  const own = (eyeY, d) => {
+    const slant = Math.hypot(d, eyeY);
+    return fogFactor(seaLevel * density(eyeY) * slant * meanDensityRatio(eyeY, 0));
+  };
+
+  // Low down no line through the band strikes the sphere, so the mesh keeps its own fog.
+  for (const eyeY of [2, 10, 30, 49]) {
+    for (const d of band) assert.equal(strikesSea(eyeY, -eyeY / Math.hypot(d, eyeY)), false, `eye ${eyeY} m, ${d} m`);
+  }
+  // That fog only thickens with distance. What the unguarded blend produced at 2 m did not.
+  for (const eyeY of [2, 10]) {
+    for (let i = 1; i < band.length; i++) assert.ok(own(eyeY, band[i]) >= own(eyeY, band[i - 1]));
+    const slant = Math.hypot(17100, eyeY);
+    assert.ok(fogFactor(seaLevel * seaReach(eyeY, -eyeY / slant)) < 0.5 && own(eyeY, 17100) > 0.99,
+      'the integral is not valid for a line that misses the sphere');
+  }
+
+  // Where a line does strike, the sphere's sea is farther along it than the flat mesh,
+  // so the far sea is at least as hazed and the blend can only thicken.
+  let blended = 0;
+  for (const eyeY of [50, 70, 92, 150, 300, 1000, 3000, 10000]) {
+    for (const d of band) {
+      const dy = -eyeY / Math.hypot(d, eyeY);
+      if (!strikesSea(eyeY, dy)) continue;
+      blended++;
+      assert.ok(fogFactor(seaLevel * seaReach(eyeY, dy)) >= own(eyeY, d) - 1e-3, `eye ${eyeY} m, ${d} m`);
+    }
+  }
+  assert.ok(blended >= 25);
+  // The whole band strikes from 92 m up, none of it below 50 m.
+  assert.equal(strikesSea(92, -92 / Math.hypot(17100, 92)), true);
+  assert.equal(strikesSea(91, -91 / Math.hypot(17100, 91)), false);
 });

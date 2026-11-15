@@ -250,10 +250,17 @@ export class WaterOcean {
           // for pixel, so the rim cannot be seen. Local mesh coordinates keep the blend on
           // the rim wherever the camera has carried the mesh; the rim is a circle so that it
           // sits at one depression angle on every heading (#751).
-          float rim = smoothstep(uEdgeFadeStart, uEdgeFadeEnd, length(vLocalPos));
-          if (rim > 0.0 && viewDir.y > 0.0) {
-            float eyeY = max(cameraPosition.y, 0.5);
-            float grazing2 = max(viewDir.y * viewDir.y - 2.0 * eyeY / AERIAL_EARTH_RADIUS, 0.0);
+          //
+          // Only where the sight line strikes the sphere's sea, which is where the sky pass
+          // draws it, with the same one-pixel edge. Below about 90 m the flat mesh runs on
+          // past the sphere's horizon: those lines strike nothing, the far-sea integral has
+          // no meaning for them, and the mesh keeps its own shading and fog out to the rim.
+          float eyeY = max(cameraPosition.y, 0.5);
+          float grazing2 = viewDir.y * viewDir.y - 2.0 * eyeY / AERIAL_EARTH_RADIUS;
+          float strikes = viewDir.y > 0.0 ? clamp(grazing2 / max(fwidth(grazing2), 1e-12), 0.0, 1.0) : 0.0;
+          float rim = strikes * smoothstep(uEdgeFadeStart, uEdgeFadeEnd, length(vLocalPos));
+          if (rim > 0.0) {
+            grazing2 = max(grazing2, 0.0);
             float farReach = uBaseFogDensity * aerialSeaReach(eyeY, -viewDir.y, grazing2);
             finalColor = mix(finalColor, oceanFarColor(-viewDir, grazing2, lightDir, uSunColor, uFogColor, uDeepColor, uShallowColor), rim);
             fogFactor = mix(fogFactor, 1.0 - exp(-farReach * farReach), rim);
