@@ -52,6 +52,7 @@ import { HudView } from './ui/HudView.js';
 import { AirToAirMissileSystem } from './weapons/AirToAirMissileSystem.js';
 import { CannonCombatView } from './weapons/CannonCombatView.js';
 import { MissileCombatView } from './weapons/MissileCombatView.js';
+import { presentCombatEvent } from './weapons/combatPresentation.js';
 import { RearmSystem } from './systems/RearmSystem.js';
 import { RenderPose } from './core/RenderPose.js';
 import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
@@ -1327,7 +1328,6 @@ class FlightSimulator {
       return false;
     }
     this.syncMissileLoadout();
-    this.audio.playMissileLaunch();
     this.showToast(() => t('weapons.launch.toast', {
       type: t(missile.spec.labelKey),
       fox: missile.spec.fox,
@@ -1413,16 +1413,14 @@ class FlightSimulator {
   handleCombatEvent(event) {
     if (!event) return;
     this.replayRecorder?.recordCombatEvent?.(event);
-    if (event.type === 'lock') {
-      this.audio.playLockTone();
-    } else if (event.type === 'detonation') {
-      this.missileCombatView.spawnExplosion(this.explosionSystem, event);
-      this.audio.playRemoteExplosion(this.camera.position.distanceTo(event.position));
-    } else if (event.type === 'kill') {
-      this.showToast(() => t('weapons.splash.toast', { callsign: event.target.callsign }));
-    } else if (event.type === 'gunEmpty') {
-      this.showToast(() => t('weapons.gun.empty'));
-    }
+    presentCombatEvent(event, {
+      view: this.missileCombatView,
+      explosionSystem: this.explosionSystem,
+      audio: this.audio,
+      camera: this.camera,
+      onKill: ev => this.showToast(() => t('weapons.splash.toast', { callsign: ev.target.callsign })),
+      onGunEmpty: () => this.showToast(() => t('weapons.gun.empty')),
+    });
   }
 
   /**

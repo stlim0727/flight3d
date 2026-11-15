@@ -421,6 +421,7 @@ function writeCombat(view, offset, combat, version = COMBAT_TRACK_VERSION) {
         flags = event.decoyType === 'chaff' ? 2 : 1;
         extra = (event.remaining ?? event.decoyId ?? event.flareId ?? event.chaffId ?? 0) & 255;
       } else if (event.kind === 'damage' || event.kind === 'kill') {
+        flags = (event.targetId ?? 0) & 255;
         const rawZone = event.hitZone ?? event.zone;
         const normZone = rawZone === 'leftWing' ? 'wingL' : rawZone === 'rightWing' ? 'wingR' : rawZone;
         const zoneIdx = HIT_ZONES.indexOf(normZone);
@@ -676,6 +677,7 @@ function readCombat(view, offset, sectionLength, version) {
           eventObj.separationAngleDeg = vy;
         }
       } else if (kind === 'damage' || kind === 'kill') {
+        if (flags > 0) eventObj.targetId = flags;
         eventObj.hitZone = HIT_ZONES[extra] || 'unknown';
         if (kind === 'damage') {
           eventObj.amount = vx;

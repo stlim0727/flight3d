@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MissileCombatView } from '../weapons/MissileCombatView.js';
+import { presentCombatEvent } from '../weapons/combatPresentation.js';
 import { F16_MISSILE_STATIONS, MISSILE_TYPES } from '../weapons/missileSpecs.js';
 import { findSpan } from './TrackSampler.js';
 
@@ -118,17 +119,12 @@ export class CombatReplayPlayback {
       if (event.timeSec > timeSec + 1e-9) break;
       if (this.staged.has(event)) continue;
       this.staged.add(event);
-      if (event.kind === 'detonation') {
-        const position = new THREE.Vector3(event.x, event.y, event.z);
-        this.view.spawnExplosion(this.sim.explosionSystem, {
-          position,
-          velocity: new THREE.Vector3(event.vx, event.vy, event.vz),
-        });
-        // Playback owns its audio too: the recorded burst must sound where the
-        // camera is, not only where the live sortie heard it (#682).
-        const camera = this.sim.camera?.position;
-        this.sim.audio?.playRemoteExplosion?.(camera ? camera.distanceTo(position) : 0, false);
-      }
+      presentCombatEvent(event, {
+        view: this.view,
+        explosionSystem: this.sim.explosionSystem,
+        audio: this.sim.audio,
+        camera: this.sim.camera,
+      });
     }
   }
 
