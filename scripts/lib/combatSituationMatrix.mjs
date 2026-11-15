@@ -2,7 +2,8 @@ import { Quaternion, Vector3, MathUtils } from 'three';
 import { AirToAirMissileSystem, BanditTarget } from '../../src/weapons/AirToAirMissileSystem.js';
 import { MISSILE_TYPES } from '../../src/weapons/missileSpecs.js';
 
-const dt = 1 / 120;
+export const COMBAT_MATRIX_TIMESTEP_S = 1 / 120;
+const dt = COMBAT_MATRIX_TIMESTEP_S;
 
 /**
  * Runs a single parameterized air-to-air engagement scenario for F-16 combat.
@@ -40,6 +41,14 @@ export function simulateCombatSituation({
   terrainHeight = () => 0,
   maxSimTimeSec = 25,
 }) {
+  if (!Number.isFinite(rangeM) || rangeM <= 0 ||
+      !Number.isFinite(shooterAltM) || !Number.isFinite(targetAltM) ||
+      Math.abs(targetAltM - shooterAltM) > rangeM) {
+    throw new RangeError('Range must be positive and at least the absolute altitude difference');
+  }
+  const inputs = { type, rangeM, aspectDeg, shooterAltM, targetAltM,
+    shooterSpeedMps, targetSpeedMps, targetBehavior, offBoresightDeg,
+    countermeasures, rwr, tvc, maxSimTimeSec };
   const targetPos = new Vector3(0, targetAltM, 0);
 
   // Target base heading is along -Z (north).
@@ -183,6 +192,9 @@ export function simulateCombatSituation({
       targetBehavior,
       offBoresightDeg,
       countermeasures,
+      inputs,
+      launchState: null,
+      defense: null,
       launched: false,
       terminal: 'no-lock',
       terminalSeconds: 0,
@@ -198,6 +210,14 @@ export function simulateCombatSituation({
     };
   }
 
+  const launchState = {
+    elapsedSeconds: combat.elapsed,
+    rangeM: world.position.distanceTo(target.position),
+    shooterPosition: world.position.toArray(),
+    targetPosition: target.position.toArray(),
+    shooterVelocity: world.velocity.toArray(),
+    targetVelocity: target.velocity.toArray(),
+  };
   const missile = combat.fire(world);
   if (!missile) {
     return {
@@ -209,6 +229,9 @@ export function simulateCombatSituation({
       targetBehavior,
       offBoresightDeg,
       countermeasures,
+      inputs,
+      launchState: null,
+      defense: null,
       launched: false,
       terminal: 'fire-failed',
       terminalSeconds: 0,
@@ -232,6 +255,9 @@ export function simulateCombatSituation({
   let maxTargetG = 0;
   let decoyTransfers = 0;
   let damageInflicted = 0;
+  const defense = { chaffDispensed: 0, flaresDispensed: 0,
+    firstWarningSeconds: null, firstConfirmedThreatSeconds: null,
+    firstEvasionSeconds: null, evasionSeconds: 0 };
   const guidanceLossReasons = new Set();
   const seekerLossReasons = new Set();
 
@@ -241,6 +267,17 @@ export function simulateCombatSituation({
 
     const events = combat.update(dt, world);
     terminalSeconds = (step + 1) * dt;
+    const response = target.threatResponse;
+    if (response.observedId !== null && defense.firstWarningSeconds === null) {
+      defense.firstWarningSeconds = terminalSeconds;
+    }
+    if (response.confirmedId !== null && defense.firstConfirmedThreatSeconds === null) {
+      defense.firstConfirmedThreatSeconds = terminalSeconds;
+    }
+    if (response.weight > 0.01) {
+      if (defense.firstEvasionSeconds === null) defense.firstEvasionSeconds = terminalSeconds;
+      defense.evasionSeconds += dt;
+    }
 
     if (missile.alive) {
       const dist = missile.position.distanceTo(target.position);
@@ -266,6 +303,8 @@ export function simulateCombatSituation({
     }
 
     for (const ev of events) {
+      if (ev.type === 'chaff_dispense' && ev.target === target) defense.chaffDispensed++;
+      if (ev.type === 'flare_dispense' && ev.target === target) defense.flaresDispensed++;
       if (ev.type === 'decoy_transfer') decoyTransfers++;
       if (ev.type === 'damage' && ev.target === target) {
         damageInflicted = Math.max(damageInflicted, ev.damage);
@@ -316,6 +355,9 @@ export function simulateCombatSituation({
     targetBehavior,
     offBoresightDeg,
     countermeasures,
+    inputs,
+    launchState,
+    defense,
     launched: true,
     terminal,
     terminalSeconds: Number(terminalSeconds.toFixed(3)),
@@ -372,83 +414,35 @@ export function sweepCombatSituationMatrix({
   return results;
 }
 
-/**
- * Analyzes engagement outcomes to detect missile anomalies:
- * - Always-hit anomalies (impossible/unrealistic hit conditions)
- * - Always-miss anomalies (conditions where missile unexpectedly fails)
- * - Hard boundaries (e.g. off-boresight rail lock cliff)
- * - Proximity fuze non-lethal detonations
- */
+/** Patterns for investigation, not proof of a defect or its physical cause. */
 export function detectMissileAnomalies(results) {
-  const anomalies = [];
-
-  // Anomaly A: BVR Motor Burnout Blindness / Stern Always-Hit
-  const bvrSternCohort = results.filter(r =>
-    r.type === 'AIM120C' &&
-    r.rangeM >= 6000 &&
-    r.rangeM <= 8000 &&
-    r.aspectDeg <= 45 &&
-    r.targetBehavior === 'evasive_ai' &&
-    r.countermeasures &&
-    r.launched
-  );
-  const bvrSternHits = bvrSternCohort.filter(r => r.terminal === 'hit');
-  if (bvrSternCohort.length > 0 && bvrSternHits.length === bvrSternCohort.length) {
-    anomalies.push({
-      id: 'BVR_BURNOUT_BLINDNESS_ALWAYS_HIT',
-      severity: 'high',
-      title: 'BVR Motor Burnout Blindness (Always Hit in Stern Chases)',
-      description: 'AIM-120C launched at range >= 6000m in stern/tail aspects burns out beyond the bandit 4000m optical detection range. Bandit AI only checks active propellant plumes and lacks RWR radar threat detection, remaining completely oblivious and defenseless against coasting active radar missiles.',
-      count: bvrSternHits.length,
-      totalCohort: bvrSternCohort.length,
-      sample: bvrSternHits[0],
+  const findings = [];
+  const stern = results.filter(r => r.type === 'AIM120C' &&
+    r.rangeM >= 6000 && r.rangeM <= 8000 && r.aspectDeg <= 45 &&
+    r.targetBehavior === 'evasive_ai' && r.countermeasures && r.launched);
+  if (stern.length && stern.every(r => r.terminal === 'hit')) {
+    findings.push({
+      id: 'BVR_STERN_ALL_HIT', type: 'AIM120C', severity: 'investigate',
+      title: 'All sampled defended BVR stern launches killed the target',
+      description: 'Inspect warning, reaction, countermeasure and energy histories before assigning a cause.',
+      count: stern.length, totalCohort: stern.length, sample: stern[0],
     });
   }
-
-  // Anomaly B: Short-Range Beam Always-Miss (400m - 800m beam 90°)
-  const shortBeamLaunches = results.filter(r =>
-    r.rangeM <= 800 &&
-    r.aspectDeg === 90 &&
-    r.launched
-  );
-  const shortBeamHits = shortBeamLaunches.filter(r => r.terminal === 'hit');
-  if (shortBeamLaunches.length > 0 && shortBeamHits.length === 0) {
-    anomalies.push({
-      id: 'SHORT_RANGE_BEAM_ALWAYS_MISS',
-      severity: 'high',
-      title: 'Aerodynamic Launch Inflexibility (Always Miss Anomaly at Beam 90°)',
-      description: 'At short range (400-800m), crossing targets exceed line-of-sight rate. Because missile lateral G is purely aerodynamic (proportional to q = 0.5*rho*v^2) without thrust-vectoring in early boost, the missile can only pull ~8-10G, loses gimbal lock, and suffers a 0% hit rate.',
-      count: shortBeamLaunches.length,
-      hitRate: 0,
-      sample: shortBeamLaunches[0],
-    });
+  for (const type of new Set(results.map(r => r.type))) {
+    const cohort = results.filter(r => r.type === type && r.rangeM >= 400 &&
+      r.rangeM <= 800 && r.aspectDeg === 90 && r.launched);
+    // A live missile at timeout is unresolved, not a confirmed miss.
+    if (cohort.length && cohort.every(r =>
+      ['miss-expired', 'miss-ground', 'miss-other', 'detonation-non-lethal'].includes(r.terminal))) {
+      findings.push({
+        id: 'SHORT_RANGE_BEAM_ALWAYS_MISS', type, severity: 'investigate',
+        title: `${type}: no kills in sampled short-range beam launches`,
+        description: 'Inspect launch geometry, guidance, control limits and minimum engagement range; this pattern alone does not establish a defect.',
+        count: cohort.length, totalCohort: cohort.length, hitRate: 0, sample: cohort[0],
+      });
+    }
   }
-
-  // Anomaly C: Non-Lethal Fuze Detonation
-  const nonLethalDetonations = results.filter(r => r.terminal === 'detonation-non-lethal');
-  if (nonLethalDetonations.length > 0) {
-    anomalies.push({
-      id: 'FUZE_BURST_NON_LETHAL_DUD',
-      severity: 'medium',
-      title: 'Proximity Burst Non-Lethal Dud (Damage without Splash)',
-      description: 'Missile proximity fuze triggers at up to 14m, but lethal radius is only 5m. Detonations between 10m-14m inflict only 10-30% partial damage, destroying the missile while leaving the target airborne, logged as a miss.',
-      count: nonLethalDetonations.length,
-      sample: nonLethalDetonations[0],
-    });
-  }
-
-  // Anomaly D: Extreme Range Hit Check (>= 10,000m)
-  const extremeHits = results.filter(r => r.rangeM >= 10000 && r.terminal === 'hit');
-  if (extremeHits.length > 0) {
-    anomalies.push({
-      id: 'EXTREME_RANGE_IMPOSSIBLE_HIT',
-      severity: 'critical',
-      title: 'Extreme Range Out-of-Envelope Hit',
-      description: 'Missile achieved a hit beyond 10,000m where physical fuel or seeker envelope should have expired.',
-      count: extremeHits.length,
-      sample: extremeHits[0],
-    });
-  }
-
-  return anomalies;
+  // A non-lethal detonation is an outcome, not a dud. Range alone also cannot
+  // establish an impossible hit; both remain visible in the report rows.
+  return findings;
 }
