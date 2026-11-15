@@ -343,6 +343,19 @@ export class SkyAtmosphere {
     if (this.water && typeof this.water.syncWithAtmosphere === 'function') {
       this.water.syncWithAtmosphere(this);
     }
+
+    // 7. Haze and the surface beyond the meshes, drawn by the sky pass out to the horizon.
+    // Regions that hide the sea mesh are inland: the far surface there is land.
+    uniforms.uHazeColor.value.copy(this.fogColor);
+    uniforms.uHazeDensity.value = this.baseDensity;
+    uniforms.uSunColor.value.copy(this.sunLight.color);
+    uniforms.uSeaBelow.value = this.water?.mesh && !this.water.mesh.visible ? 0 : 1;
+    const sea = this.water?.material?.uniforms;
+    if (sea) {
+      uniforms.uSeaRim.value = sea.uEdgeFadeEnd.value;
+      uniforms.uDeepColor.value.copy(sea.uDeepColor.value);
+      uniforms.uShallowColor.value.copy(sea.uShallowColor.value);
+    }
   }
 
   initClouds() {
