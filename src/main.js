@@ -85,6 +85,7 @@ import { installPhysicsIntegrator } from './core/PhysicsIntegrator.js';
 import { installSimulatorHudAndBindings } from './ui/SimulatorHudAndBindings.js';
 import {
   initAnalytics,
+  trackEvent,
   trackFlightStart,
   trackFlightEnd,
   trackFlightCrash,
@@ -454,6 +455,7 @@ class FlightSimulator {
     // Telemetry & Feedback
     this.analytics = {
       initAnalytics,
+      trackEvent,
       trackFlightStart,
       trackFlightEnd,
       trackFlightCrash,
