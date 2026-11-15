@@ -1,3 +1,6 @@
+import { compileVisibleScene } from './core/sceneShaderWarmup.js';
+import { FrameTransitionMonitor } from './core/FrameTransitionMonitor.js';
+import { longTaskSummary } from './core/inputLatency.js';
 import { createSimulatorScenarioStart } from './core/simulatorScenarioStart.js';
 import { createSimulatorFlightStart } from './core/simulatorFlightStart.js';
 import { MultiplayerController } from './multiplayer/MultiplayerController.js';
@@ -79,12 +82,13 @@ import { TouchFlightControls } from './controls/TouchFlightControls.js';
 import { CockpitPhotoOverlay } from './aircraft/CockpitPhotoOverlay.js';
 import { initBuildInfo } from './ui/BuildInfo.js';
 import { installInputLatencyMonitor } from './ui/InputLatencyMonitor.js';
-import { installStartupLoadMonitor } from './ui/StartupLoadMonitor.js';
+import { installStartupLoadMonitor, readDevice, readGpuClass } from './ui/StartupLoadMonitor.js';
 import { installPresetSpawner } from './core/PresetSpawner.js';
 import { installPhysicsIntegrator } from './core/PhysicsIntegrator.js';
 import { installSimulatorHudAndBindings } from './ui/SimulatorHudAndBindings.js';
 import {
   initAnalytics,
+  trackEvent,
   trackFlightStart,
   trackFlightEnd,
   trackFlightCrash,
@@ -154,6 +158,16 @@ class FlightSimulator {
     startupTrace?.noteSelection(savedSelection);
     this.container = document.getElementById('canvas-container');
     this.inputLatency = inputLatency;
+    this.frameTransitions = new FrameTransitionMonitor({
+      clock: () => performance.now(),
+      afterPaint: callback => requestAnimationFrame(() => requestAnimationFrame(callback)),
+      isHidden: () => document.hidden || this.browserBackgrounded === true,
+      emit: report => trackEvent('frame_transition', { ...report, device: readDevice(globalThis), gpu: readGpuClass(globalThis) }),
+      longTasks: (start, end) => inputLatency ? longTaskSummary(inputLatency.state, start, end) : null,
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.frameTransitions.cancel();
+    });
 
     // 1. Scene, Camera, Renderer
     this.scene = new THREE.Scene();
@@ -471,10 +485,14 @@ class FlightSimulator {
     };
     this._openFeedbackDialog = openFeedbackDialog;
 
+    inputLatency?.mark('startup-ui-start');
     restoreSimulatorPreferences(this, loadSimulatorPreferences());
     this.initControls();
     this.initUI();
+    inputLatency?.mark('startup-ui-end');
+    inputLatency?.mark('startup-airport-start');
     await this.setAirport(savedSelection.airport);
+    inputLatency?.mark('startup-airport-end');
 
     // Resize handler
     window.addEventListener('resize', () => this.handleResize());
@@ -566,11 +584,6 @@ class FlightSimulator {
     });
     ensureAudio();
 
-    // Begin Animation Loop
-    this.hasRenderedFirstFrame = false;
-    this.animate = this.animate.bind(this);
-    requestAnimationFrame(this.animate);
-
     // Initialize analytics/error reporting asynchronously without delaying startup
     if (typeof window !== 'undefined') {
       const initTelemetry = () => initAnalytics(this);
@@ -608,6 +621,27 @@ class FlightSimulator {
       const { installPilotArena } = await import('./ui/PilotArenaPanel.js');
       installPilotArena(this);
     }
+
+    // Link visible scene programs before the first draw. compileAsync polls
+    // KHR_parallel_shader_compile instead of blocking getUniforms in render().
+    inputLatency?.mark('startup-shaders-start');
+    let shaderTimeout;
+    try {
+      await Promise.race([
+        compileVisibleScene(this.renderer, this.scene, this.camera),
+        new Promise((_, reject) => {
+          shaderTimeout = setTimeout(() => reject(new Error('Scene shaders timed out')), 60000);
+        }),
+      ]);
+    } finally {
+      clearTimeout(shaderTimeout);
+      inputLatency?.mark('startup-shaders-end');
+    }
+    // Do not draw while scene programs are still linking.
+    this.clock.getDelta();
+    this.hasRenderedFirstFrame = false;
+    this.animate = this.animate.bind(this);
+    requestAnimationFrame(this.animate);
   }
   /** Browser activity is a separate hold, so returning cannot undo menu/pause state. */
   initBrowserActivity() {
@@ -628,6 +662,7 @@ class FlightSimulator {
     this.clock.getDelta();
     this.physicsAccumulator = 0;
     if (backgrounded) {
+      this.frameTransitions?.cancel();
       this.multiplayer?.roomReplay?.gap();
       this.controls.releaseAllKeys();
       this.controls.setTouchStick(0, 0);
@@ -650,6 +685,9 @@ class FlightSimulator {
   /** Apply the game-flow state to the DOM: menu visibility, input blocking. */
   syncFlowUi() {
     const state = this.gameFlow.state;
+    this.frameTransitions?.flowChanged(state, this.gameFlow.canResumeFromLobby(), {
+      renderQuality: this.renderQuality, camera: this.cameraSystem.mode,
+    });
     if (state === FLOW.LOBBY) this.crashDebriefRemaining = null;
     // Pause retains the judged attempt; leaving flight for a menu ends it.
     // The arena runner gates every physics step on flow/background state.
@@ -1345,7 +1383,9 @@ class FlightSimulator {
     const frameDelta = this.startupReady ? clampFrameDelta(elapsed) : 0;
     // Also covers model swaps and failed-load procedural fallbacks. Preparation
     // precedes physics so the first impact after loading can reuse the fragments.
+    if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-crash-start');
     this.prepareCrashVisuals();
+    if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-crash-end');
     this.replayPanel?.refresh();
     this.totalSimTime += frameDelta;
     if (!this.gameFlow.isPhysicsFrozen()) this.devRunner.updatePreparation(frameDelta);
@@ -1506,7 +1546,12 @@ class FlightSimulator {
     this.multiplayer?.update();
 
     // 8. Render 3D Scene
+    const measuredRender = !this.hasRenderedFirstFrame || Boolean(this.frameTransitions?.pending);
+    const renderStart = measuredRender ? performance.now() : 0;
+    if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-render-start');
     this.renderScene();
+    if (measuredRender) this.frameTransitions?.rendered(performance.now() - renderStart);
+    if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-render-end');
     if (!this.hasRenderedFirstFrame) {
       this.hasRenderedFirstFrame = true;
       document.getElementById('startup-overlay').classList.add('scene-ready');

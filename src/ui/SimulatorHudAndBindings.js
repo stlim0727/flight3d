@@ -360,6 +360,10 @@ class SimulatorHudAndBindingsMethods {
   }
 
   setRenderQuality(value) {
+    this.frameTransitions?.begin('quality-change', {
+      previousQuality: this.renderQuality, renderQuality: resolveRenderQuality(value),
+      camera: this.cameraSystem?.mode,
+    });
     this.renderDiagnosticsPanel?.close();
     const prevPreset = RENDER_QUALITY[this.renderQuality];
     this.renderQuality = resolveRenderQuality(value);

@@ -54,6 +54,40 @@ Add `VITE_POSTHOG_KEY` as a GitHub Actions repository secret or variable.
      during page hide is not silently discarded. When telemetry is disabled or unconfigured the
      queue is cleared instead, so an opted-out load sends nothing later.
 
+### Transition performance
+
+`frame_transition` records a resume from a held lobby/pause menu and a graphics quality
+change. It emits once after the next completed simulator render and two animation-frame
+callbacks, with `kind` (`resume` or `quality-change`), `firstFrameMs`, `renderMs`,
+`paintOpportunityMs`, and the existing bounded long-task summary. `firstFrameMs` starts at
+the flow-state callback (or the quality setter), not the physical input timestamp;
+`paintOpportunityMs` is a browser paint opportunity, not proof of display scanout.
+The event includes build/flight context, quality, camera, browser device capabilities and
+coarse GPU class. It does not collect a PC model name or raw GPU renderer string.
+Hidden/blurred tabs, cancelled resumes and superseded actions discard pending samples.
+This adds no per-frame events or extra PerformanceObserver.
+
+`startup_trace.boot.operationsMs` splits the broad controls stage into UI binding,
+airport activation, scene shader preparation, first-frame crash preparation and the first
+scene render (`ui`, `airport`, `shaders`, `crash`, `render`). Missing timings are null.
+These operation durations can overlap the existing stages; do not sum both groups.
+Compare build commits and matching airport/aircraft/quality/device populations when
+checking a regression. Startup wall time and first-frame time can include user or tab
+waiting; operation durations distinguish that from the synchronous draw itself.
+
+Validate with the focused `frameTransitionMonitor`, `sceneShaderWarmup`, and
+`startupTrace` Node tests, then build and run the hardware browser check:
+
+```sh
+npm run build
+GPU_ANGLE=vulkan CHROME_PATH=/home/stlim/.local/bin/chrome-headless node scripts/verify-frame-transitions.mjs
+```
+
+The browser check runs the GPU draw/readback preflight, repeated held-lobby and pause-menu
+returns, a real quality-selector change, and cancellation on backgrounding. It intercepts
+reports locally with telemetry disabled and saves the report/screenshot under
+`.cache/frame-transitions/`; it does not send synthetic production events.
+
 ### `startup_trace` (v2)
 
 Collected by `src/ui/StartupLoadMonitor.js`, aggregated by the pure `src/core/startupTrace.js`
