@@ -100,10 +100,6 @@ export class CloudLayer extends THREE.InstancedMesh {
           vec4 mvPosition = viewMatrix * world * vec4(position, 1.);
           gl_Position = projectionMatrix * mvPosition;
           #include <fog_vertex>
-          #ifdef USE_FOG
-            // Most of the sightline to a cloud is above the observer's aerosol layer.
-            vFogDepth *= exp(-0.00034 * max(world[3].y - cameraPosition.y, 0.));
-          #endif
         }`,
       fragmentShader: `
         precision highp sampler3D;

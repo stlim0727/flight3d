@@ -4,6 +4,9 @@ import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
 import { TerrainTextures } from './TerrainTextures.js';
 import { applyFarSunShadow, castFarSunShadow } from './FarSunShadow.js';
 
+// Drawn depth of the submerged perimeter: deeper than the sea's depth bias at any altitude flown.
+const PERIMETER_SEABED_Y = -60;
+
 /**
  * Procedural Terrain with Rolling Hills, Coastal Mountains, and Flat Airport Mesa
  * Features multi-layer PBR texture splatting, slope-dependent triplanar cliff projection,
@@ -233,7 +236,14 @@ export class Terrain {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
-      const y = this.getHeight(x, z);
+      let y = this.getHeight(x, z);
+      // The sea draws behind land within 0.2% of its range (WaterOcean depth bias), so
+      // from above ~9 km the 18 m deep seabed around the perimeter showed through as a
+      // line. Sink what is already submerged there; physics keeps reading getHeight.
+      if (y < 0) {
+        const edge = Math.max(Math.abs(x), Math.abs(z));
+        y = THREE.MathUtils.lerp(y, PERIMETER_SEABED_Y, THREE.MathUtils.smoothstep(edge, 10400, 10800));
+      }
       pos.setY(i, y);
 
       // Height and slope based color splatting
@@ -604,16 +614,6 @@ export class Terrain {
         '#include <normal_fragment_maps>',
         `#include <normal_fragment_maps>
         normal = transformDirection(tFinalWorldNormal, viewMatrix);`
-      );
-
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <fog_fragment>',
-        `#include <fog_fragment>
-        #ifdef USE_FOG
-          float tEdge = max(abs(vTerrainWorldPos.x), abs(vTerrainWorldPos.z));
-          float tFade = smoothstep(8800.0, 10700.0, tEdge);
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, tFade);
-        #endif`
       );
     };
 

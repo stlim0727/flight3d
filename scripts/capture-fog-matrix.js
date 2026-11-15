@@ -23,6 +23,17 @@ const ALTITUDES = [
     altName: 'high_6000ft',
     y: 1828.8, // 6,000ft
     label: '고고도 (6,000ft / 1,828m)'
+  },
+  // Above the haze layer, where mesh edges and the horizon are in view (#751)
+  {
+    altName: 'cruise_3000m',
+    y: 3000,
+    label: '순항 (9,843ft / 3,000m)'
+  },
+  {
+    altName: 'ceiling_10000m',
+    y: 10000,
+    label: '고고도 한계 (32,808ft / 10,000m)'
   }
 ];
 
@@ -106,7 +117,7 @@ async function main() {
     `);
     await new Promise(r => setTimeout(r, 600));
 
-    console.log('\n=================== 4대 시간대 × 고도 2단계 검증 시작 ===================');
+    console.log('\n=================== 4대 시간대 × 고도 ${ALTITUDES.length}단계 검증 시작 ===================');
     const matrixResults = [];
 
     for (const time of SCENARIOS) {

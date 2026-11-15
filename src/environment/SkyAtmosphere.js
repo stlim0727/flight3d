@@ -5,8 +5,11 @@ import { createScreenSky } from './ScreenSky.js';
 import { CockpitSunShadow } from './CockpitSunShadow.js';
 import { SunShadowRefresh } from './SunShadowRefresh.js';
 import { FarSunShadow } from './FarSunShadow.js';
+import { DEFAULT_VISIBILITY_M, HAZE_HEIGHT_FALLOFF, installHeightFog } from './AerialPerspective.js';
 
 const OVERCAST_GREY = new THREE.Color(0.55, 0.57, 0.60);
+const MIN_VISIBILITY_M = 50;
+const MAX_VISIBILITY_M = 300000;
 
 // Tail height of the tallest shipped airliner (737-800, 12.6 m), used to size the
 // sun-shadow box so a low sun's projected airframe shadow stays inside the map.
@@ -42,10 +45,13 @@ export class SkyAtmosphere {
     this.water = water;
 
     // Atmospheric Exponential Height Fog parameters
+    installHeightFog();
     this.fogColor = new THREE.Color(0xc8def4);
     this.baseDensity = 0.00020;
-    this.heightFalloff = 0.00068; // lambda: density drops to ~28% by 1,828m (6,000ft)
+    this.heightFalloff = HAZE_HEIGHT_FALLOFF;
     this.currentDensity = 0.00020;
+    // Sea-level visibility in metres. The time-of-day haze below is tuned at the default.
+    this.visibilityM = DEFAULT_VISIBILITY_M;
     this.currentExposure = 1.05;
 
     // Time of day (hours: 0.0 to 24.0, default 16.5 = Golden Hour Afternoon)
@@ -163,6 +169,16 @@ export class SkyAtmosphere {
    */
   setCloudCover(value) {
     this.cloudCover = Math.min(1, Math.max(0, value));
+  }
+
+  /**
+   * Set sea-level visibility in metres: haze density everywhere follows from it, from
+   * fog (hundreds of metres) to clear air (tens of kilometres). Takes effect on the next
+   * updateSun.
+   */
+  setVisibility(metres) {
+    if (!(metres > 0)) throw new RangeError('visibility must be a positive distance');
+    this.visibilityM = Math.min(MAX_VISIBILITY_M, Math.max(MIN_VISIBILITY_M, metres));
   }
 
   /**
@@ -318,6 +334,8 @@ export class SkyAtmosphere {
     }
 
     // 3. Exponential Height Falloff: Density(y) = baseDensity * exp(-lambda * max(0, y))
+    const tunedDensity = this.baseDensity;
+    this.baseDensity *= DEFAULT_VISIBILITY_M / this.visibilityM;
     const heightFactor = Math.exp(-this.heightFalloff * Math.max(0, altitude));
     this.currentDensity = this.baseDensity * heightFactor;
     this.currentExposure = exposure;
@@ -340,6 +358,20 @@ export class SkyAtmosphere {
     // 6. Synchronize Water Ocean Atmospheric Shaders
     if (this.water && typeof this.water.syncWithAtmosphere === 'function') {
       this.water.syncWithAtmosphere(this);
+    }
+
+    // 7. Haze and the surface beyond the meshes, drawn by the sky pass out to the horizon.
+    // Regions that hide the sea mesh are inland: the far surface there is land.
+    uniforms.uHazeColor.value.copy(this.fogColor);
+    uniforms.uHazeDensity.value = this.baseDensity;
+    uniforms.uSkyHazeDensity.value = Math.max(0, this.baseDensity - tunedDensity);
+    uniforms.uSunColor.value.copy(this.sunLight.color);
+    uniforms.uSeaBelow.value = this.water?.mesh && !this.water.mesh.visible ? 0 : 1;
+    const sea = this.water?.material?.uniforms;
+    if (sea) {
+      uniforms.uSeaRim.value = this.water.size * Math.SQRT1_2;
+      uniforms.uDeepColor.value.copy(sea.uDeepColor.value);
+      uniforms.uShallowColor.value.copy(sea.uShallowColor.value);
     }
   }
 

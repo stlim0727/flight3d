@@ -1,4 +1,48 @@
 import * as THREE from 'three';
+import { AERIAL_GLSL } from './AerialPerspective.js';
+
+// Roughness of the sea once every ripple is below a pixel: the slope variance the
+// fragment shader's eight waves fold into the BRDF when none of them is resolved.
+export const OCEAN_FAR_ROUGHNESS = 0.252;
+
+/**
+ * Sea colour, shared with the sky pass, which carries the same sea from the mesh rim to
+ * the horizon (#751). `skyColor` is the haze colour the reflection is built on.
+ */
+export const OCEAN_SURFACE_GLSL = /* glsl */`
+  ${AERIAL_GLSL}
+
+  vec3 oceanSurfaceColor(vec3 viewDir, vec3 normal, float roughness, float sunVisibility,
+      vec3 sunDir, vec3 sunColor, vec3 skyColor, vec3 deepColor, vec3 shallowColor) {
+    // Water is a dielectric (F0 ~ 0.02), with stronger sky reflection at grazing angles.
+    float cosTheta = clamp(dot(viewDir, normal), 0.0, 1.0);
+    float fresnel = 0.02 + 0.98 * pow(1.0 - cosTheta, 5.0);
+    float nDotH = max(0.0, dot(normal, normalize(sunDir + viewDir)));
+    float daylight = smoothstep(-0.04, 0.15, sunDir.y);
+    // Unresolved ripples broaden the sun reflection instead of sparkling at subpixel scale.
+    float alpha2 = pow(roughness, 4.0);
+    float denominator = nDotH * nDotH * (alpha2 - 1.0) + 1.0;
+    float distribution = alpha2 / max(0.00001, 3.14159265 * denominator * denominator);
+    float sunGlint = min(8.0, distribution * 0.02) * daylight * sunVisibility;
+    float skyHeight = clamp(reflect(-viewDir, normal).y, 0.0, 1.0);
+    vec3 skyReflection = mix(skyColor, skyColor * vec3(0.42, 0.62, 0.85), sqrt(skyHeight));
+    vec3 waterColor = mix(deepColor, shallowColor, 0.12) * mix(0.08, 0.7, daylight);
+    // Shadowed water loses the sun glint and the sunlight scattered back out of the
+    // water body and unresolved ripples. The sky reflection dims with them: it is most
+    // of what a chase camera sees, and left alone it would hide the height cue (#648).
+    return mix(waterColor, skyReflection, fresnel) * mix(0.55, 1.0, sunVisibility) + sunColor * sunGlint;
+  }
+
+  // The sea where a sight line leaving the eye along "direction" strikes the sphere, every
+  // ripple unresolved. grazing2 is aerialSeaReach's, clamped to the horizon.
+  vec3 oceanFarColor(vec3 direction, float grazing2,
+      vec3 sunDir, vec3 sunColor, vec3 skyColor, vec3 deepColor, vec3 shallowColor) {
+    float curve = - direction.y - sqrt(grazing2); // distance to the sea over the earth's radius
+    vec3 seaNormal = normalize(vec3(direction.x * curve, 1.0, direction.z * curve));
+    return oceanSurfaceColor(-direction, seaNormal, ${OCEAN_FAR_ROUGHNESS}, 1.0,
+      sunDir, sunColor, skyColor, deepColor, shallowColor);
+  }
+`;
 
 /**
  * Realistic Sunlight-Reflecting Ocean Water with Gerstner Waves
@@ -120,6 +164,8 @@ export class WaterOcean {
         varying vec3 vWorldPos;
         varying vec2 vLocalPos;
 
+        ${OCEAN_SURFACE_GLSL}
+
         // Integrate unresolved wave slopes into roughness instead of displaying
         // metre-scale rings from altitude. Derivatives include perspective,
         // viewing direction, resolution and the phase modulation itself.
@@ -161,7 +207,6 @@ export class WaterOcean {
           vec3 viewDir = normalize(cameraPosition - vWorldPos);
           #if defined(WATER_FLAT) && WATER_FLAT == 1
             vec3 waves = vec3(0.0);
-            vec3 normal = vec3(0.0, 1.0, 0.0);
           #else
             // Fine wind ripples (16cm–1.1m) sit over gentle metre-scale waves.
             // Physical wavelengths stay in world metres; never scale UVs by camera distance.
@@ -173,32 +218,14 @@ export class WaterOcean {
                        + waveSlope(vec2(0.8, 0.6), 0.032, 0.57, 0.9)
                        + waveSlope(vec2(-0.9, 0.3), 0.040, 0.31, 0.8)
                        + waveSlope(vec2(0.5, -0.9), 0.045, 0.16, 0.7);
-            vec3 normal = normalize(vec3(-waves.x, 1.0, -waves.y));
           #endif
 
-          // Water is a dielectric (F0 ~ 0.02), with stronger sky reflection at grazing angles.
-          float cosTheta = clamp(dot(viewDir, normal), 0.0, 1.0);
-          float fresnel = 0.02 + 0.98 * pow(1.0 - cosTheta, 5.0);
-          vec3 lightDir = normalize(uSunDir);
-          vec3 halfVector = normalize(lightDir + viewDir);
-          float nDotH = max(0.0, dot(normal, halfVector));
-          float daylight = smoothstep(-0.04, 0.15, lightDir.y);
-          // Unresolved ripples broaden the sun reflection instead of sparkling at subpixel scale.
+          vec3 normal = normalize(vec3(-waves.x, 1.0, -waves.y));
           float roughness = pow(pow(0.18, 4.0) + waves.z, 0.25);
-          float alpha2 = pow(roughness, 4.0);
-          float denominator = nDotH * nDotH * (alpha2 - 1.0) + 1.0;
-          float distribution = alpha2 / max(0.00001, PI * denominator * denominator);
-          // Shadowed water loses the sun glint and the sunlight scattered back out of the
-          // water body and unresolved ripples. The sky reflection dims with them: it is most
-          // of what a chase camera sees, and left alone it would hide the height cue (#648).
-          float sunVisibility = mix(1.0, getShadowMask(), daylight);
-          float sunGlint = min(8.0, distribution * 0.02) * daylight * sunVisibility;
-          vec3 reflected = reflect(-viewDir, normal);
-          float skyHeight = clamp(reflected.y, 0.0, 1.0);
-          vec3 skyReflection = mix(uFogColor, uFogColor * vec3(0.42, 0.62, 0.85), sqrt(skyHeight));
-          vec3 waterColor = mix(uDeepColor, uShallowColor, 0.12) * mix(0.08, 0.7, daylight);
-          vec3 finalColor = mix(waterColor, skyReflection, fresnel) * mix(0.55, 1.0, sunVisibility);
-          finalColor += uSunColor * sunGlint;
+          vec3 lightDir = normalize(uSunDir);
+          float sunVisibility = mix(1.0, getShadowMask(), smoothstep(-0.04, 0.15, lightDir.y));
+          vec3 finalColor = oceanSurfaceColor(viewDir, normal, roughness, sunVisibility,
+            lightDir, uSunColor, uFogColor, uDeepColor, uShallowColor);
 
           // Synchronized atmospheric aerial perspective fog
           float dist = length(cameraPosition - vWorldPos);
@@ -215,17 +242,24 @@ export class WaterOcean {
           float fogExp = effDensity * dist;
           float fogFactor = clamp(1.0 - exp(-fogExp * fogExp), 0.0, 1.0);
 
-          // Far edge blending: ensure ocean water completely melts into horizon sky fog before boundary
-          // Uses local mesh coordinates so the fade stays anchored to the far outer rim regardless of camera position
-          float edgeDist = max(abs(vLocalPos.x), abs(vLocalPos.y));
-          float edgeFade = smoothstep(uEdgeFadeStart, uEdgeFadeEnd, edgeDist);
-          fogFactor = max(fogFactor, edgeFade);
-
-          finalColor = mix(finalColor, uFogColor, fogFactor);
+          // Toward the rim the mesh becomes the far sea the sky pass draws beyond it, pixel
+          // for pixel, so the square mesh has no edge to see. Local mesh coordinates keep
+          // the blend on the rim wherever the camera has carried the mesh.
+          float rim = smoothstep(uEdgeFadeStart, uEdgeFadeEnd, length(vLocalPos));
+          if (rim > 0.0 && viewDir.y > 0.0) {
+            float eyeY = max(cameraPosition.y, 0.5);
+            float grazing2 = max(viewDir.y * viewDir.y - 2.0 * eyeY / AERIAL_EARTH_RADIUS, 0.0);
+            float farReach = uBaseFogDensity * aerialSeaReach(eyeY, -viewDir.y, grazing2);
+            finalColor = mix(finalColor, oceanFarColor(-viewDir, grazing2, lightDir, uSunColor, uFogColor, uDeepColor, uShallowColor), rim);
+            fogFactor = mix(fogFactor, 1.0 - exp(-farReach * farReach), rim);
+          }
 
           gl_FragColor = vec4(finalColor, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
+          // Haze goes on after tone mapping, in display space, as three's fog chunk puts it
+          // on every other material, so sea and land fade to one colour.
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, linearToOutputTexel(vec4(uFogColor, 1.0)).rgb, fogFactor);
         }
       `,
       transparent: false,
