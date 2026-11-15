@@ -1,6 +1,6 @@
 ---
 name: flight-persona
-description: Free-play persona: fly Flight3d, explore UI and scenarios, detect unnatural consequences (crashes, NaN physics, G-LOC, airframe breakup), and give structured feedback.
+description: Investigate Flight3d behavior with numerical combat experiments or browser free play; choose the smallest verification layer and report anomalies.
 ---
 
 # Flight Persona — free play with anomaly detection
@@ -15,6 +15,27 @@ Use this skill when you want to **freely play the Flight3d simulator** (not revi
 - Do exploratory "adversarial" play to surface defects.
 
 ## Setup
+
+Choose the verification layer before launching a browser:
+
+- Missile hit/miss, lock, countermeasures or state/physics comparisons: start
+  with `npm run combat:experiment`. This runs Node physics without rendering,
+  Chrome, Vite or GPU. See [combat experiment commands](../../../docs/development/combat-experiments.md)
+  for a single locked shot, paired defense controls and diagnostic output.
+- Player flight physics/preset/control questions: reuse
+  `src/core/HeadlessSimulation.js` and existing numerical mission runners before
+  creating a new host. Combat geometry fixtures do not exercise player controls
+  or the actual Coastal Cruise start; use the production headless host when
+  those differences matter.
+- UI, actual input flow, camera, rendering or visual anomalies: use the browser
+  runner below. A numerical pass is not browser or human-sortie evidence.
+
+For reported post-lock misses, make confirmed-lock launches the denominator;
+report withheld no-lock separately. Read the compact `.summary.json` first and
+select individual failed cases from the full report. Add `--diagnostics` only
+when time histories are needed; do not dump full matrices into chat or rewrite
+the same experimental loops in temporary scripts. The numerical runner has a
+60 s worker deadline by default; a timeout is incomplete evidence.
 
 Run the runner; it starts Vite and a headless Chrome session itself:
 
