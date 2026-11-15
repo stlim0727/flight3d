@@ -454,8 +454,9 @@ export function gatherUserFeedbackContext(sim = activeSim) {
 }
 
 /** Capture now, rather than after an SDK load or a later retry. */
-export function prepareUserFeedback({ message, contact = '', category = 'bug', includeContext = true, context, sim = activeSim }) {
-  return createFeedbackReport({ message, contact, category,
+export function prepareUserFeedback({ message, contact = '', category = 'bug', severity = 'major',
+  expected = '', steps = '', includeContext = true, context, sim = activeSim }) {
+  return createFeedbackReport({ message, contact, category, severity, expected, steps,
     context: includeContext ? (context ?? gatherUserFeedbackContext(sim)) : {},
   });
 }

@@ -667,6 +667,7 @@ class SimulatorHudAndBindingsMethods {
     this.cockpitPovPanel = new CockpitPovPanel(this);
     document.getElementById('btn-pause-resume')?.addEventListener('click', () => this.gameFlow.resume());
     document.getElementById('btn-pause-restart')?.addEventListener('click', restartFlight);
+    document.getElementById('btn-pause-report')?.addEventListener('click', () => this.openFeedbackDialog?.());
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
     document.getElementById('btn-pause-exit')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));
     const pauseMenu = document.getElementById('pause-menu');
@@ -842,6 +843,16 @@ class SimulatorHudAndBindingsMethods {
 
     window.addEventListener('keydown', (e) => {
       if (e.target?.closest?.('select, input, textarea, [contenteditable]')) return;
+      // Report the anomaly while it is still the current moment: the report dialog
+      // freezes physics and captures the sortie's flight log on open.
+      if (e.code === 'F8' && !e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // The debrief/pause overlays are report targets themselves; only a real modal blocks.
+        const blocking = document.querySelector('dialog[open], .modal-backdrop.visible, #replay-library:not([hidden]), #feedback-dialog-overlay:not([hidden]), #demo-restart-dialog:not([hidden]), #joystick-dialog-overlay:not([hidden])');
+        if (blocking) return;
+        e.preventDefault();
+        this.openFeedbackDialog?.();
+        return;
+      }
       if (this.isCrashed || document.body.dataset.flow === 'debrief') {
         if (e.code === 'KeyO') {
           this.cameraSystem.resetLook();

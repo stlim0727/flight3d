@@ -162,7 +162,10 @@ GROUP BY event
 average silently drops the loads this feature was added to capture.
 
 3. **In-Game Bug Report Dialog**:
-   - Available on the mission score overlay (`[data-score-report]`) and flight debrief (`#debrief-feedback`).
+   - Available mid-flight via <kbd>F8</kbd> and the pause menu (`#btn-pause-report`), plus the
+     mission score overlay (`[data-score-report]`) and flight debrief (`#debrief-feedback`).
+     An in-flight report freezes physics (the recorder stops at the reported moment) and
+     resumes the flight when the dialog closes; a report opened while already paused stays paused.
    - Explicit user reports use a direct POST to the configured PostHog ingestion host's
      `/i/v0/e/` endpoint, independently of the lazy analytics SDK and automatic telemetry
      opt-out. Clicking Send is an explicit request; it does not re-enable automatic analytics.
@@ -170,8 +173,11 @@ average silently drops the loads this feature was added to capture.
      acknowledgement (`{"status":"Ok"}`, legacy `1` / `{"status":1}`). Queueing,
      `capture()` return values, opaque responses and beacons are not confirmation.
    - There is one `user_feedback_submitted` event per report, with `reportId` as the
-     event UUID and a fixed creation timestamp. Explicit retries reuse the same snapshot
-     and ID; editing the message, contact, or diagnostics checkbox creates a new report.
+     event UUID and a fixed creation timestamp. Fields carry `feedback_category`,
+     `feedback_severity` (`blocker`/`major`/`minor`), `feedback_expected` and
+     `feedback_steps`. Explicit retries reuse the same snapshot and ID; editing the
+     message, contact, category, severity, expected behavior, steps, or the diagnostics
+     checkbox creates a new report.
    - Network failures, rejected/invalid acknowledgements and a 12-second deadline keep
      the dialog open with the draft, an error, Retry and Save report file. Closing/reopening
      preserves an unsent draft within the page. A reload does not; save the JSON first.
@@ -179,8 +185,14 @@ average silently drops the loads this feature was added to capture.
      bypass a blocked host: use the exported JSON, or retry after choosing to allow the
      request. GitHub Pages has no first-party server relay. A first-party proxy would
      require hosting/DNS configuration; see [PostHog proxy guidance](https://posthog.com/docs/advanced/proxy).
-   - Optional diagnostics are frozen when the dialog opens and include current G, exact
-     recorded peak G/time/sample, 21 samples around the peak, the latest 30 samples,
+   - Optional diagnostics are frozen when the dialog opens and include a `flightLog`
+     attachment (metadata, peaks, touchdowns, crash, G-LOC count, units/coordinates and
+     the sortie trace). A live sortie's log is cut at the moment the dialog opened; a
+     debrief report's own trace is used instead. The log is bounded to 400 kB; a longer
+     trace is evenly decimated while keeping the peak-G window and the final sample, and
+     `sampling.originalCount`/`retainedCount`/`stride`/`decimated` describe the cut.
+     Diagnostics also include current G, exact recorded peak G/time/sample, 21 samples
+     around the peak, the latest 30 samples,
      up to 10 touchdowns with contact G and sink rate, speeds/attitude/altitude, position,
      linear/angular velocity, gear failure/contact state, body damage, aircraft/airport,
      duration, build and browser/viewport data. A completed debrief's sortie metadata,

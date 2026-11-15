@@ -398,6 +398,8 @@ export default {
   "pause.title": "Paused",
   "pause.resume": "Resume",
   "pause.restart": "Restart scenario",
+  "pause.report": "Report an issue",
+  "pause.report.hint": "Attach the current state and flight log (F8)",
   "pause.exit": "Exit to Lobby",
   "pause.lobby": "Return to main menu",
   "pause.open": "Pause flight",

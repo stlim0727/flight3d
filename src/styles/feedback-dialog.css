@@ -29,7 +29,7 @@
   border-radius: 14px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
   width: 100%;
-  max-width: 460px;
+  max-width: 580px;
   max-height: 90vh;
   max-height: 90dvh;
   overflow-y: auto;
@@ -80,10 +80,45 @@
   line-height: 1.45;
 }
 
+.feedback-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.feedback-context-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  font-size: 0.76rem;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+.feedback-context-item b {
+  color: #7dd3fc;
+  font-weight: 600;
+}
+
 .feedback-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.feedback-row {
+  display: flex;
+  gap: 10px;
+}
+
+.feedback-row .feedback-field {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .feedback-field {
@@ -121,6 +156,10 @@
   box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25);
 }
 
+.feedback-textarea-short {
+  min-height: 52px;
+}
+
 .feedback-input {
   background: rgba(10, 15, 22, 0.8);
   border: 1px solid rgba(148, 163, 184, 0.25);
@@ -130,6 +169,56 @@
   font-size: 0.9rem;
   font-family: inherit;
   transition: border-color 0.15s ease;
+}
+
+select.feedback-input {
+  cursor: pointer;
+  min-height: 38px;
+}
+
+.feedback-extra {
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  padding-top: 10px;
+}
+
+.feedback-extra summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #93c5fd;
+  user-select: none;
+}
+
+.feedback-extra[open] summary {
+  margin-bottom: 10px;
+}
+
+.feedback-log-summary {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #a7f3d0;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.feedback-log-summary[data-empty="true"] {
+  color: #94a3b8;
+}
+
+.feedback-preview-toggle {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #93c5fd;
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.feedback-preview-toggle:hover {
+  color: #bfdbfe;
 }
 
 .feedback-diag-row {
@@ -165,6 +254,7 @@
 
 .feedback-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
   margin-top: 8px;
@@ -245,6 +335,7 @@
 @media (max-width: 480px) {
   #feedback-dialog-overlay { padding: 8px; }
   .feedback-card { padding: 16px; max-height: calc(100dvh - 16px); }
+  .feedback-row { flex-direction: column; gap: 12px; }
   .feedback-actions { flex-wrap: wrap; }
   .feedback-actions button { min-height: 44px; flex: 1; }
 }
