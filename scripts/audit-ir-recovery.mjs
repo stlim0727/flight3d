@@ -31,6 +31,10 @@ function metrics(result) {
   }
   let closest = null;
   for (const sample of detail) if (!closest || sample.rangeM < closest.rangeM) closest = sample;
+  let flareTrackSeconds = 0;
+  for (const sample of detail) {
+    if (sample.seekerState === 'track' && sample.seekerTargetType === 'flare') flareTrackSeconds += dt;
+  }
   let saturatedSeconds = 0;
   let maxRequested = 0;
   for (let i = reacq >= 0 ? reacq : detail.length; i < detail.length; i++) {
@@ -45,8 +49,7 @@ function metrics(result) {
     minSeparationM: result.minSeparationM,
     decoyTransfers: result.decoyTransfers,
     flareDispenseSeconds: result.defense?.firstConfirmedThreatSeconds ?? null,
-    flareTrackSeconds: lastFlare >= 0
-      ? Number((detail[lastFlare].seconds - (result.defense?.firstConfirmedThreatSeconds ?? 0)).toFixed(2)) : 0,
+    flareTrackSeconds: Number(flareTrackSeconds.toFixed(2)),
     reacquired: reacq >= 0,
     reacquiredSeconds: reacq >= 0 ? Number(detail[reacq].seconds.toFixed(2)) : null,
     reacquiredRangeM: reacq >= 0 ? Math.round(detail[reacq].rangeM) : null,

@@ -46,14 +46,19 @@ about 2.5 seconds on this host.
 
 ## Results
 
-| Control | Kills / 20 | Terminals | Aircraft reacquired | Mean confirmed flare track |
+| Control | Kills / 20 | Terminals | Aircraft reacquired | Mean tracked flare time |
 | --- | ---: | --- | ---: | ---: |
 | Evasion only | **20** | 20 hits | — | 0 s |
-| Flare only, no evasion | 2 | 2 hits, 18 timeouts | 8 | 5.31 s |
-| Reaction + flare | 2 | 2 hits, 18 timeouts | 8 | 4.51 s |
-| Flare hidden at 0.2 s | **20** | 20 hits | 20 | 0.19 s |
-| Flare hidden at 2 s | 18 | 18 hits, 2 nonlethal bursts | 20 | 1.99 s |
-| Flare hidden at 4 s | 8 | 8 hits, 12 timeouts | 10 | 3.86 s |
+| Flare only, no evasion | 2 | 2 hits, 18 timeouts | 8 | 4.38 s |
+| Reaction + flare | 2 | 2 hits, 18 timeouts | 8 | 4.38 s |
+| Flare hidden at 0.2 s | **20** | 20 hits | 20 | 0.06 s |
+| Flare hidden at 2 s | 18 | 18 hits, 2 nonlethal bursts | 20 | 1.86 s |
+| Flare hidden at 4 s | 8 | 8 hits, 12 timeouts | 10 | 3.72 s |
+
+Tracked flare time sums the 120 Hz samples where the seeker state is `track`
+and the target type is `flare`; it does not count time from launch or from
+dispense before capture. The flare-only and reaction+flare controls therefore
+report the same 4.38 s despite different `firstConfirmedThreatSeconds` bookkeeping.
 
 The two reaction+flare hits are aspect 0 and 45 degrees, low-speed shooter at the
 750/1210 m altitude pair. The flare-only control hits aspect 45 degrees at both
