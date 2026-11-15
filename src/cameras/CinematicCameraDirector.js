@@ -115,6 +115,8 @@ export class CinematicCameraDirector {
     // Live missile cinematics: launch → follow the missile → bandit POV.
     this.missileSequence = null;
     this.knownMissileIds = new Set();
+    this.queuedMissiles = [];
+    this.lastCombatTargets = null;
     this.missileChaseDir = new THREE.Vector3(0, 0, -1);
   }
 
@@ -136,6 +138,8 @@ export class CinematicCameraDirector {
     this.flybyWorldPos.set(0, 0, 0);
     this.missileSequence = null;
     this.knownMissileIds.clear();
+    this.queuedMissiles = [];
+    this.lastCombatTargets = null;
   }
 
   /**
@@ -433,14 +437,25 @@ export class CinematicCameraDirector {
    * launch beat, then follow the missile and finish from the bandit's seat.
    */
   detectMissileLaunch(missiles, targets, planePos = null, planeQuat = null) {
+    this.lastCombatTargets = Array.isArray(targets) ? targets : null;
     if (!Array.isArray(missiles) || !missiles.length) return;
+    if (this.replayPlan?.shots?.length) return;
     for (const missile of missiles) {
       if (!missile?.alive || this.knownMissileIds.has(missile.id)) continue;
       this.knownMissileIds.add(missile.id);
       // A missile already downrange when DIRECTOR is selected is not a launch.
       if ((missile.age ?? 0) > 2.0) continue;
       // Replays own their timeline, and one launch sequence plays at a time.
-      if (this.missileSequence || this.replayPlan?.shots?.length) continue;
+      // Queue follow-up salvo launches so a missed lead missile never hides a
+      // subsequent kill (#782).
+      if (this.missileSequence) {
+        this.queuedMissiles.push({
+          missile,
+          planePos: planePos?.clone?.() ?? null,
+          planeQuat: planeQuat?.clone?.() ?? null,
+        });
+        continue;
+      }
       this.beginMissileSequence(missile, targets, planePos, planeQuat);
     }
   }
@@ -541,6 +556,19 @@ export class CinematicCameraDirector {
   }
 
   endMissileSequence() {
+    while (this.queuedMissiles.length) {
+      const next = this.queuedMissiles.shift();
+      if (!next?.missile?.alive) continue;
+      this.beginMissileSequence(next.missile, this.lastCombatTargets, next.planePos, next.planeQuat);
+      if ((next.missile.age ?? 0) >= MISSILE_LAUNCH_SECONDS) {
+        const seq = this.missileSequence;
+        const range = seq.target && seq.lastTargetPos
+          ? next.missile.position.distanceTo(seq.lastTargetPos)
+          : Infinity;
+        this.setMissileSequencePhase(range <= MISSILE_POV_ENTRY_RANGE_M ? 'bandit' : 'track');
+      }
+      return;
+    }
     this.missileSequence = null;
     this.switchShot(MISSILE_SEQUENCE_EXIT_SHOT);
   }
