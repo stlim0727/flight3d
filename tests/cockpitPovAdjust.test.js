@@ -254,3 +254,65 @@ test('updateControlState restricts cockpit POV adjustment controls to cockpit mo
     globalThis.document = prevDoc;
   }
 });
+
+test('CockpitPovPanel keyboard interactions on sliders do not trigger flight controls', async () => {
+  const prevWindow = globalThis.window;
+  globalThis.window = { addEventListener() {}, removeEventListener() {}, innerWidth: 1920, innerHeight: 1080 };
+  const prevDoc = globalThis.document;
+
+  const { FlightControls } = await import('../src/controls/FlightControls.js');
+  const domElement = { addEventListener() {}, removeEventListener() {}, style: {} };
+  const controls = new FlightControls(domElement);
+
+  let stoppedPropagation = false;
+  const mockPanel = {
+    addEventListener(event, fn) {
+      this[event] = fn;
+    },
+    querySelectorAll() {
+      return [];
+    },
+    closest(selector) {
+      return selector.includes('.cockpit-pov-panel') ? mockPanel : null;
+    }
+  };
+
+  const elements = new Map([['cockpit-pov-panel', mockPanel]]);
+  globalThis.document = {
+    getElementById: (id) => elements.get(id) || null,
+    addEventListener() {},
+  };
+
+  try {
+    const povPanel = new CockpitPovPanel({ cameraSystem: { mode: 0 } });
+
+    // 1. Panel stops propagation for arrow keys
+    const arrowEvent = {
+      key: 'ArrowLeft',
+      code: 'ArrowLeft',
+      stopPropagation() { stoppedPropagation = true; }
+    };
+    mockPanel.keydown(arrowEvent);
+    assert.equal(stoppedPropagation, true, 'Arrow key on panel must stop propagation');
+
+    // Escape does not stop propagation (so document listener can handle it)
+    let escapeStopped = false;
+    mockPanel.keydown({
+      key: 'Escape',
+      code: 'Escape',
+      stopPropagation() { escapeStopped = true; }
+    });
+    assert.equal(escapeStopped, false, 'Escape should not have propagation stopped');
+
+    // 2. FlightControls ignores any event targeting cockpit-pov-panel
+    controls.handleKeyDown({
+      code: 'ArrowLeft',
+      target: mockPanel,
+    });
+    assert.equal(controls.keys.ArrowLeft, undefined, 'FlightControls must not record keys when target is in cockpit-pov-panel');
+  } finally {
+    globalThis.document = prevDoc;
+    if (prevWindow === undefined) delete globalThis.window;
+    else globalThis.window = prevWindow;
+  }
+});

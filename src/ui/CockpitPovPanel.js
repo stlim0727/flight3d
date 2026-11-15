@@ -59,6 +59,14 @@ export class CockpitPovPanel {
     this.sliderY?.addEventListener('input', handleSliderInput);
     this.sliderZ?.addEventListener('input', handleSliderInput);
 
+    // Isolate slider & button keyboard interactions from flight controls
+    const stopFlightKeyPropagation = (e) => {
+      if (e.key === 'Escape') return; // Allow Escape to dismiss panel
+      e.stopPropagation();
+    };
+    this.panel.addEventListener('keydown', stopFlightKeyPropagation);
+    this.panel.addEventListener('keyup', stopFlightKeyPropagation);
+
     // Step buttons (+ / -)
     const stepButtons = this.panel.querySelectorAll('.cockpit-pov-step');
     for (const btn of stepButtons) {
