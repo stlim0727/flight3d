@@ -10,6 +10,7 @@ import { ReplayPanel } from './ReplayPanel.js';
 import { DebriefOverlay } from './DebriefOverlay.js';
 import { initLobbyScreen } from './LobbyScreen.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
+import { CockpitPovPanel } from './CockpitPovPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
 import { defaultScenarioForRegion, requiredAircraft } from '../config/scenarioRegistry.js';
 import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
@@ -647,6 +648,7 @@ class SimulatorHudAndBindingsMethods {
     document.getElementById('btn-pause-end')?.addEventListener('click', () => this.endFlight());
     document.getElementById('btn-lobby-end')?.addEventListener('click', () => this.endFlight());
     this.developerPanel = new DeveloperPanel(this);
+    this.cockpitPovPanel = new CockpitPovPanel(this);
     document.getElementById('btn-pause-resume')?.addEventListener('click', () => this.gameFlow.resume());
     document.getElementById('btn-pause-restart')?.addEventListener('click', restartFlight);
     document.getElementById('btn-pause-lobby')?.addEventListener('click', () => this.gameFlow.returnToLobby(true));

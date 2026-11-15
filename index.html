@@ -108,7 +108,65 @@
         <span id="gaze-exit-label" class="gaze-exit-label" data-i18n="gaze.exit">시선 고정 해제</span>
         <span class="gaze-exit-close" aria-hidden="true">✕</span>
       </button>
+      <button id="btn-cockpit-pov" class="btn btn-cockpit-pov" type="button" hidden title="조종석 시점 조절" data-i18n-title="ui.cockpitPov.title" aria-controls="cockpit-pov-panel" aria-expanded="false">
+        <span class="btn-icon" aria-hidden="true">👁️</span>
+        <span id="cockpit-pov-label" class="pov-label" data-i18n="ui.camera.cockpitPov">시점 조절</span>
+      </button>
     </div>
+
+    <!-- Cockpit POV (Eyepoint) Adjustment Panel -->
+    <section id="cockpit-pov-panel" class="cockpit-pov-panel" hidden aria-label="Cockpit POV Adjustment">
+      <div class="cockpit-pov-header">
+        <div class="cockpit-pov-title-group">
+          <span class="cockpit-pov-icon" aria-hidden="true">👁️</span>
+          <h3 id="cockpit-pov-title" class="cockpit-pov-title" data-i18n="ui.cockpitPov.title">조종석 시점(POV) 조절</h3>
+        </div>
+        <button id="btn-cockpit-pov-close" class="btn cockpit-pov-close" type="button" aria-label="닫기" data-i18n-aria-label="ui.cockpitPov.close">&times;</button>
+      </div>
+      <div class="cockpit-pov-body">
+        <div class="cockpit-pov-row" data-axis="y">
+          <div class="cockpit-pov-label-row">
+            <label for="cockpit-pov-y" data-i18n="ui.cockpitPov.height">높이 (상/하)</label>
+            <output id="cockpit-pov-y-val" class="cockpit-pov-val">0.00 m</output>
+          </div>
+          <div class="cockpit-pov-control-group">
+            <button type="button" class="btn cockpit-pov-step" data-axis="y" data-dir="-1" title="아래로" aria-label="아래로">−</button>
+            <input id="cockpit-pov-y" type="range" class="cockpit-pov-slider" min="-0.20" max="0.30" step="0.005" value="0">
+            <button type="button" class="btn cockpit-pov-step" data-axis="y" data-dir="1" title="위로" aria-label="위로">+</button>
+          </div>
+        </div>
+
+        <div class="cockpit-pov-row" data-axis="z">
+          <div class="cockpit-pov-label-row">
+            <label for="cockpit-pov-z" data-i18n="ui.cockpitPov.distance">전후 거리 (앞/뒤)</label>
+            <output id="cockpit-pov-z-val" class="cockpit-pov-val">0.00 m</output>
+          </div>
+          <div class="cockpit-pov-control-group">
+            <button type="button" class="btn cockpit-pov-step" data-axis="z" data-dir="-1" title="앞으로" aria-label="앞으로">−</button>
+            <input id="cockpit-pov-z" type="range" class="cockpit-pov-slider" min="-0.40" max="0.40" step="0.005" value="0">
+            <button type="button" class="btn cockpit-pov-step" data-axis="z" data-dir="1" title="뒤로" aria-label="뒤로">+</button>
+          </div>
+        </div>
+
+        <div class="cockpit-pov-row" data-axis="x">
+          <div class="cockpit-pov-label-row">
+            <label for="cockpit-pov-x" data-i18n="ui.cockpitPov.lateral">좌우 위치</label>
+            <output id="cockpit-pov-x-val" class="cockpit-pov-val">0.00 m</output>
+          </div>
+          <div class="cockpit-pov-control-group">
+            <button type="button" class="btn cockpit-pov-step" data-axis="x" data-dir="-1" title="좌측" aria-label="좌측">−</button>
+            <input id="cockpit-pov-x" type="range" class="cockpit-pov-slider" min="-0.25" max="0.25" step="0.005" value="0">
+            <button type="button" class="btn cockpit-pov-step" data-axis="x" data-dir="1" title="우측" aria-label="우측">+</button>
+          </div>
+        </div>
+
+        <div class="cockpit-pov-actions">
+          <button id="btn-cockpit-pov-reset" type="button" class="btn cockpit-pov-btn-reset" data-i18n="ui.cockpitPov.reset">
+            시점 기본값 복원
+          </button>
+        </div>
+      </div>
+    </section>
 
     <!-- Minimized Demo Flight Showcase Pill (Tap to Reopen) -->
     <button id="btn-demo-open" class="demo-pill-btn" style="display: none;" title="데모 비행 안내 팝업 열기" aria-label="데모 비행 안내 팝업 열기" data-i18n-title="open.demo.flight.guide" data-i18n-aria-label="open.demo.flight.guide">

@@ -135,7 +135,8 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     <span data-flight-label="hud.trim"></span><output id="flight-trim-value"></output>
     <button id="flight-trim-less" class="btn" type="button">−</button>
     <button id="flight-trim-more" class="btn" type="button">+</button>
-    </div><button id="flight-park-brake" class="btn" type="button" aria-pressed="false" data-flight-label="hud.brake"></button>`;
+    </div><button id="flight-park-brake" class="btn" type="button" aria-pressed="false" data-flight-label="hud.brake"></button>
+    <button id="btn-open-cockpit-pov" class="btn" type="button" aria-controls="cockpit-pov-panel" aria-expanded="false" data-flight-label="ui.camera.cockpitPov" hidden></button>`;
   for (const node of more.querySelectorAll('[data-flight-label]')) bindText(node, () => t(node.dataset.flightLabel));
   for (const [id, sign, key] of [['flight-trim-less', -1, 'hud.trim.less'], ['flight-trim-more', 1, 'hud.trim.more']]) {
     const button = more.querySelector(`#${id}`);
@@ -358,6 +359,19 @@ export function updateControlState(telemetry, camera, options = {}) {
       if (labelEl) {
         labelEl.textContent = targetLabel ? t('gaze.exit.target', { target: targetLabel }) : t('gaze.exit');
       }
+    }
+  }
+  const isCockpit = Boolean(camera && camera.mode === 0);
+  const povAdjustBtn = document.getElementById('btn-open-cockpit-pov');
+  if (povAdjustBtn) povAdjustBtn.hidden = !isCockpit;
+  const povPillBtn = document.getElementById('btn-cockpit-pov');
+  if (povPillBtn) povPillBtn.hidden = !isCockpit;
+  if (!isCockpit) {
+    const povPanel = document.getElementById('cockpit-pov-panel');
+    if (povPanel && !povPanel.hidden) {
+      povPanel.hidden = true;
+      povAdjustBtn?.setAttribute('aria-expanded', 'false');
+      povPillBtn?.setAttribute('aria-expanded', 'false');
     }
   }
 }

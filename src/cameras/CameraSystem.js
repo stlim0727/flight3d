@@ -74,6 +74,8 @@ export class CameraSystem {
     this.cockpitPortraitEyeX = -0.34;
     this.cockpitPortraitEyeY = null;
     this.cockpitHeadOffset = new THREE.Vector3(-0.31, 0.85, -12.35); // Default unconfigured captain eye
+    // User-adjustable Cockpit Eyepoint (POV) Offset (strictly for cockpit view: X lateral, Y height, Z fore-aft)
+    this.cockpitUserOffset = new THREE.Vector3(0, 0, 0);
     this.headGForceOffset = new THREE.Vector3();
     this.touchJoltOffset = 0;
     this.lookYaw = 0;
@@ -231,7 +233,7 @@ export class CameraSystem {
   isInteractiveUI(target) {
     if (!target || typeof target.closest !== 'function') return false;
     return !!target.closest(
-      '#pilot-arena, #pilot-score-overlay, .flight-panel, .flight-toolbar, dialog, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #btn-reset-pov, .btn-reset-pov, #btn-gaze-exit, .btn-gaze-exit, #help-modal, #demo-restart-dialog, #diagnostics-overlay, .menu-backdrop, .debrief-overlay'
+      '#pilot-arena, #pilot-score-overlay, .flight-panel, .flight-toolbar, dialog, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #btn-reset-pov, .btn-reset-pov, #btn-cockpit-pov, .btn-cockpit-pov, #cockpit-pov-panel, .cockpit-pov-panel, #btn-gaze-exit, .btn-gaze-exit, #help-modal, #demo-restart-dialog, #diagnostics-overlay, .menu-backdrop, .debrief-overlay'
     );
   }
 
@@ -820,6 +822,89 @@ export class CameraSystem {
   }
 
   /**
+   * Set user-adjusted cockpit POV offset (X = lateral, Y = vertical, Z = longitudinal).
+   * Strictly affects cockpit view.
+   */
+  setCockpitUserOffset(x, y, z) {
+    if (typeof x === 'number' && !Number.isNaN(x)) this.cockpitUserOffset.x = x;
+    if (typeof y === 'number' && !Number.isNaN(y)) this.cockpitUserOffset.y = y;
+    if (typeof z === 'number' && !Number.isNaN(z)) this.cockpitUserOffset.z = z;
+    this.saveCockpitUserOffset();
+    if (typeof this.onCockpitUserOffsetChange === 'function') {
+      this.onCockpitUserOffsetChange(this.getCockpitUserOffset());
+    }
+  }
+
+  /**
+   * Get a copy of current user-adjusted cockpit POV offset.
+   */
+  getCockpitUserOffset() {
+    return this.cockpitUserOffset.clone();
+  }
+
+  /**
+   * Reset user cockpit POV offset to 0 (default aircraft position).
+   */
+  resetCockpitUserOffset() {
+    this.cockpitUserOffset.set(0, 0, 0);
+    this.saveCockpitUserOffset();
+    if (typeof this.onCockpitUserOffsetChange === 'function') {
+      this.onCockpitUserOffsetChange(this.getCockpitUserOffset());
+    }
+  }
+
+  /**
+   * Whether user has customized the cockpit POV position.
+   */
+  isCockpitUserOffsetModified() {
+    return this.cockpitUserOffset.lengthSq() > 1e-6;
+  }
+
+  saveCockpitUserOffset() {
+    try {
+      const id = this.aircraftConfig?.id || 'default';
+      const key = `flight3d.cockpitUserOffset.${id}`;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify({
+          x: Number(this.cockpitUserOffset.x.toFixed(4)),
+          y: Number(this.cockpitUserOffset.y.toFixed(4)),
+          z: Number(this.cockpitUserOffset.z.toFixed(4)),
+        }));
+      }
+    } catch {
+      // Session-only or private browsing
+    }
+  }
+
+  loadCockpitUserOffset() {
+    try {
+      const id = this.aircraftConfig?.id || 'default';
+      const key = `flight3d.cockpitUserOffset.${id}`;
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const data = JSON.parse(stored);
+          this.cockpitUserOffset.set(
+            typeof data.x === 'number' && !Number.isNaN(data.x) ? data.x : 0,
+            typeof data.y === 'number' && !Number.isNaN(data.y) ? data.y : 0,
+            typeof data.z === 'number' && !Number.isNaN(data.z) ? data.z : 0
+          );
+          if (typeof this.onCockpitUserOffsetChange === 'function') {
+            this.onCockpitUserOffsetChange(this.getCockpitUserOffset());
+          }
+          return;
+        }
+      }
+    } catch {
+      // Storage unavailable or parse error
+    }
+    this.cockpitUserOffset.set(0, 0, 0);
+    if (typeof this.onCockpitUserOffsetChange === 'function') {
+      this.onCockpitUserOffsetChange(this.getCockpitUserOffset());
+    }
+  }
+
+  /**
    * Synchronize DOM button visibility, indicator arrow orientation, and callback
    * when POV modification state changes.
    */
@@ -1129,6 +1214,7 @@ export class CameraSystem {
       const gt = cockpit.gearLookTarget;
       this.gearLookTarget.set(gt.x, gt.y, gt.z);
     }
+    this.loadCockpitUserOffset();
   }
 
   /**
@@ -1188,6 +1274,7 @@ export class CameraSystem {
           eyeLocal.y += 0.03;
         }
       }
+      eyeLocal.add(this.cockpitUserOffset);
       const eyeWorld = eyeLocal.applyMatrix4(aircraftMesh.matrixWorld);
       this.camera.position.copy(eyeWorld);
       const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraftMesh.quaternion);
@@ -1932,6 +2019,7 @@ export class CameraSystem {
         if (this.photoCockpit && this.supportsPhotoCockpit) {
           eyeLocal.set(-0.48, 0.88, -12.02);
         }
+        eyeLocal.add(this.cockpitUserOffset);
         // Saturate the lean early so the first wheel/pinch movement feels like
         // leaning out to see; further zoom retains optical magnification. The
         // offset stays in aircraft space even while looking sideways or down.
