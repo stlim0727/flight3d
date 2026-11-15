@@ -203,6 +203,7 @@ export class AirToAirMissileSystem {
     this.splashCount = 0;
     this.lastFireError = null;
     this.accumulator = 0;
+    this.elapsed = 0;
     this.cannon.reset();
     this.rwr.reset();
     this._events.length = 0;
