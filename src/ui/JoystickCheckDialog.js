@@ -13,6 +13,7 @@ export class JoystickCheckDialog {
     this.dialog = null;
     this.isOpen = false;
     this.rafId = null;
+    this.buttonLearning = null;
     this.testedButtons = new Set();
     this.storage = simulator?.storage || (typeof globalThis !== 'undefined' ? globalThis.localStorage : null);
 
@@ -78,29 +79,29 @@ export class JoystickCheckDialog {
           </div>
         </div>
 
-        <!-- Profile Selection -->
-        <div class="joystick-section">
-          <label class="joystick-field-label" for="joystick-profile-select" data-i18n="joystick.profile.label">조종간 매핑 프로필</label>
-          <select id="joystick-profile-select" class="joystick-select" data-profile-select>
-            <option value="auto" data-i18n="joystick.profile.auto">자동 감지 (Auto-Detect)</option>
-            <option value="hotas-one" data-i18n="joystick.profile.hotas_one_pc">Thrustmaster T.Flight Hotas One (PC 모드 - 5축 원시 HID)</option>
-            <option value="hotas-one-xbox" data-i18n="joystick.profile.hotas_one_xbox">Thrustmaster T.Flight Hotas One (XBOX 모드 / XInput)</option>
-            <option value="hotas-tflight" data-i18n="joystick.profile.hotas_tflight">Thrustmaster T.Flight Hotas 4 / X</option>
-            <option value="flight-stick" data-i18n="joystick.profile.flight_stick">일반 비행 조종간 (Generic Flight Stick)</option>
-            <option value="standard-gamepad" data-i18n="joystick.profile.standard_gamepad">표준 게임패드 (Standard Gamepad / Xbox)</option>
-          </select>
-        </div>
-
         <div class="joystick-section">
           <h3 class="joystick-section-title">전투 버튼 매핑 (Combat buttons)</h3>
-          <p>아래 버튼 번호는 실시간 버튼 표시에서 확인하세요. 지정한 버튼의 기존 기능은 해제됩니다. 이 창에서는 버튼 입력만 점검하며 무기는 발사되지 않습니다.</p>
+          <p>동작의 “버튼 지정”을 누른 뒤 조이스틱 버튼을 누르세요. 지정한 버튼의 기존 기능은 해제됩니다. 이 창에서는 버튼 입력만 점검하며 무기는 발사되지 않습니다.</p>
+          <p class="joystick-learn-status" data-learn-status role="status" aria-live="polite"></p>
+          <div class="joystick-combat-grid">
           ${[['missile', '미사일 발사'], ['gun', '기관포 (누르고 유지)'], ['target', '표적 전환'], ['chaff', '채프 (미구현)'], ['flare', '플레어 (미구현)']].map(([action, label]) => `
-            <label class="joystick-field-label">${label}
-              <select class="joystick-select" data-combat-button="${action}">
+            <div class="joystick-combat-field">
+              <label class="joystick-field-label" for="joystick-combat-${action}">${label}</label>
+              <select id="joystick-combat-${action}" class="joystick-select" data-combat-button="${action}">
                 <option value="-1">미지정</option>
                 ${Array.from({ length: 65 }, (_, i) => `<option value="${i}">Button ${i}</option>`).join('')}
               </select>
-            </label>`).join('')}
+              <button type="button" class="joystick-learn-button" data-learn-button="${action}" aria-label="${label}: 조이스틱 버튼 지정">버튼 지정</button>
+            </div>`).join('')}
+          </div>
+        </div>
+
+        <!-- Buttons & Hat Switch Inspector -->
+        <div class="joystick-section">
+          <h3 class="joystick-section-title" data-i18n="joystick.buttons.title">버튼 및 햇 스위치 실시간 점검</h3>
+          <div class="joystick-buttons-grid" data-buttons-grid>
+            <!-- Generated dynamically -->
+          </div>
         </div>
 
         <!-- Flight Control Surfaces Real-time Meters -->
@@ -118,9 +119,8 @@ export class JoystickCheckDialog {
                 <div class="joystick-meter-fill" data-bar-pitch style="left: 50%; width: 0%;"></div>
               </div>
               <div class="joystick-meter-sub">
-                <span>◀ 하강(밀기)</span>
-                <span data-i18n="joystick.axis.pitch.desc">밀기(하강) ◀ ▶ 당기기(상승)</span>
-                <span>상승(당기기) ▶</span>
+                <span data-i18n="joystick.axis.pitch.min">◀ 하강(밀기)</span>
+                <span data-i18n="joystick.axis.pitch.max">상승(당기기) ▶</span>
               </div>
             </div>
 
@@ -135,9 +135,8 @@ export class JoystickCheckDialog {
                 <div class="joystick-meter-fill" data-bar-roll style="left: 50%; width: 0%;"></div>
               </div>
               <div class="joystick-meter-sub">
-                <span>◀ 좌측 롤</span>
-                <span data-i18n="joystick.axis.roll.desc">좌측 선회 ◀ ▶ 우측 선회</span>
-                <span>우측 롤 ▶</span>
+                <span data-i18n="joystick.axis.roll.min">◀ 좌측 롤</span>
+                <span data-i18n="joystick.axis.roll.max">우측 롤 ▶</span>
               </div>
             </div>
 
@@ -152,9 +151,8 @@ export class JoystickCheckDialog {
                 <div class="joystick-meter-fill throttle" data-bar-throttle style="left: 0; width: 0%;"></div>
               </div>
               <div class="joystick-meter-sub">
-                <span>아이들 (0% Idle)</span>
-                <span data-i18n="joystick.axis.throttle.desc">아이들(0%) ~ 최대추력(100% TOGA)</span>
-                <span>최대 추력 (100% TOGA)</span>
+                <span data-i18n="joystick.axis.throttle.min">아이들 (0% Idle)</span>
+                <span data-i18n="joystick.axis.throttle.max">최대 추력 (100% TOGA)</span>
               </div>
             </div>
 
@@ -170,9 +168,8 @@ export class JoystickCheckDialog {
                 <div class="joystick-meter-fill" data-bar-rudder style="left: 50%; width: 0%;"></div>
               </div>
               <div class="joystick-meter-sub">
-                <span>◀ 좌측 요</span>
-                <span data-i18n="joystick.axis.rudder.desc">좌측 요 ◀ ▶ 우측 요 (트위스트/로커 패들)</span>
-                <span>우측 요 ▶</span>
+                <span data-i18n="joystick.axis.rudder.min">◀ 좌측 요</span>
+                <span data-i18n="joystick.axis.rudder.max">우측 요 ▶</span>
               </div>
             </div>
 
@@ -186,12 +183,28 @@ export class JoystickCheckDialog {
                 <div class="joystick-meter-fill brakes" data-bar-brakes style="left: 0; width: 0%;"></div>
               </div>
               <div class="joystick-meter-sub">
-                <span>해제 (0%)</span>
+                <span data-i18n="joystick.axis.brakes.min">해제 (0%)</span>
                 <span data-i18n="joystick.axis.brakes.desc">메인 트리거</span>
-                <span>최대 제동 (100%)</span>
+                <span data-i18n="joystick.axis.brakes.max">최대 제동 (100%)</span>
               </div>
             </div>
           </div>
+        </div>
+
+        <details class="joystick-advanced">
+          <summary><span data-i18n="joystick.advanced.summary">고급 설정 및 보정</span> <span class="joystick-advanced-subtitle" data-i18n="joystick.advanced.subtitle">프로필 · 축 보정 · 반전</span></summary>
+          <div class="joystick-advanced-content">
+        <!-- Profile Selection -->
+        <div class="joystick-section joystick-advanced-section">
+          <label class="joystick-field-label" for="joystick-profile-select" data-i18n="joystick.profile.label">조종간 매핑 프로필</label>
+          <select id="joystick-profile-select" class="joystick-select" data-profile-select>
+            <option value="auto" data-i18n="joystick.profile.auto">자동 감지 (Auto-Detect)</option>
+            <option value="hotas-one" data-i18n="joystick.profile.hotas_one_pc">Thrustmaster T.Flight Hotas One (PC 모드 - 5축 원시 HID)</option>
+            <option value="hotas-one-xbox" data-i18n="joystick.profile.hotas_one_xbox">Thrustmaster T.Flight Hotas One (XBOX 모드 / XInput)</option>
+            <option value="hotas-tflight" data-i18n="joystick.profile.hotas_tflight">Thrustmaster T.Flight Hotas 4 / X</option>
+            <option value="flight-stick" data-i18n="joystick.profile.flight_stick">일반 비행 조종간 (Generic Flight Stick)</option>
+            <option value="standard-gamepad" data-i18n="joystick.profile.standard_gamepad">표준 게임패드 (Standard Gamepad / Xbox)</option>
+          </select>
         </div>
 
         <!-- Calibration Wizard Card -->
@@ -270,14 +283,6 @@ export class JoystickCheckDialog {
           </div>
         </div>
 
-        <!-- Buttons & Hat Switch Inspector -->
-        <div class="joystick-section">
-          <h3 class="joystick-section-title" data-i18n="joystick.buttons.title">버튼 및 햇 스위치 실시간 점검</h3>
-          <div class="joystick-buttons-grid" data-buttons-grid>
-            <!-- Generated dynamically -->
-          </div>
-        </div>
-
         <!-- Raw Axes Details -->
         <details class="joystick-raw-details">
           <summary data-i18n="joystick.raw.title">🔍 원시 입력 데이터 상세 (Raw Gamepad Axes & Buttons)</summary>
@@ -287,7 +292,8 @@ export class JoystickCheckDialog {
         </details>
 
         <!-- Hardware Troubleshooting Guide -->
-        <div class="joystick-tips-card">
+        <details class="joystick-tips-card">
+          <summary data-i18n="joystick.tips.summary">하드웨어 도움말</summary>
           <h4 data-i18n="joystick.hw.tips">💡 T.Flight Hotas One 하드웨어 팁 & 문제 해결</h4>
           <ul>
             <li data-i18n="joystick.tip.switch">스위치 위치: T.Flight Hotas One 본체 뒤쪽 'PC / XBOX' 스위치가 PC에 있어야 5축 원시 HID로 작동합니다. XBOX 모드인 경우 위 프로필에서 'XBOX 모드'를 선택하면 스로틀과 러더가 자동 정렬됩니다.</li>
@@ -295,7 +301,10 @@ export class JoystickCheckDialog {
             <li data-i18n="joystick.tip.rudder">러더 고정 현상: TFRP 페달이 연결되지 않은 경우 Axis 4(RJ12 단자)가 +1.0/-1.0으로 고정될 수 있습니다. 시스템이 부유 핀을 자동 차단하여 스틱 트위스트로 정상 비행할 수 있으며, 필요 시 '러더 입력 소스'를 '스틱 트위스트 전용'으로 설정할 수 있습니다.</li>
             <li data-i18n="joystick.tip.browser">브라우저 보안: 웹 브라우저는 보안상 조종간 레버를 움직이거나 버튼을 누르기 전까지 입력을 노출하지 않습니다.</li>
           </ul>
-        </div>
+        </details>
+
+          </div>
+        </details>
 
         <!-- Actions -->
         <div class="joystick-actions">
@@ -384,7 +393,8 @@ export class JoystickCheckDialog {
       if (e.key === 'Escape' && this.isOpen) {
         e.preventDefault();
         e.stopPropagation();
-        this.close();
+        if (this.buttonLearning) this.cancelButtonLearning();
+        else this.close();
       }
     });
 
@@ -392,10 +402,26 @@ export class JoystickCheckDialog {
       select.addEventListener('change', () => {
         const mapping = { ...this.hotas.getConfig().combatButtons };
         const selected = Number(select.value);
+        const action = select.getAttribute('data-combat-button');
+        const previous = mapping[action];
+        if (selected !== previous && selected >= 0) {
+          const other = Object.keys(mapping).find(key => key !== action && mapping[key] === selected);
+          const labels = { missile: '미사일 발사', gun: '기관포', target: '표적 전환', chaff: '채프 (미구현)', flare: '플레어 (미구현)' };
+          const diag = this.hotas.getDiagnostics();
+          let oldAction = other ? labels[other] : null;
+          if (!oldAction && diag.connected && ['hotas-one', 'hotas-one-xbox', 'hotas-tflight', 'flight-stick'].includes(diag.activeProfile)) {
+            const defaultLabel = this.getButtonActionLabel(selected, diag.activeProfile);
+            if (defaultLabel !== `Button ${selected}`) oldAction = defaultLabel;
+          }
+          if (oldAction && !globalThis.window?.confirm?.(`Button ${selected}의 기존 기능은 ${oldAction}입니다. 새 기능을 ${labels[action]}(으)로 지정하면 기존 기능이 해제됩니다. 변경하시겠습니까?`)) {
+            select.value = String(previous ?? -1);
+            return;
+          }
+        }
         if (selected >= 0) {
           for (const action of Object.keys(mapping)) if (mapping[action] === selected) mapping[action] = -1;
         }
-        mapping[select.getAttribute('data-combat-button')] = selected;
+        mapping[action] = selected;
         this.hotas.applyConfig({ combatButtons: mapping });
         const diag = this.hotas.getDiagnostics();
         this.sim?.analytics?.trackEvent?.('joystick_combat_mapping_changed', {
@@ -405,6 +431,19 @@ export class JoystickCheckDialog {
         });
         for (const field of this.dialog.querySelectorAll('[data-combat-button]')) field.value = String(mapping[field.getAttribute('data-combat-button')]);
         this.savePreferences();
+      });
+    }
+
+    for (const button of this.dialog.querySelectorAll('[data-learn-button]')) {
+      button.addEventListener('click', () => {
+        const action = button.getAttribute('data-learn-button');
+        if (this.buttonLearning?.action === action) {
+          this.cancelButtonLearning();
+          return;
+        }
+        const diag = this.hotas?.getDiagnostics();
+        this.buttonLearning = { action, held: new Set((diag?.buttons || []).filter(b => b.pressed).map(b => b.index)) };
+        this.updateButtonLearningUI();
       });
     }
 
@@ -496,6 +535,7 @@ export class JoystickCheckDialog {
     this.isOpen = false;
     this.dialog.hidden = true;
     if (this.wizardActive) this.cancelWizard();
+    this.cancelButtonLearning();
     if (this.hotas) this.hotas.diagnosticActive = false;
     if (this.rafId) {
       this._cancelFrame(this.rafId);
@@ -519,6 +559,36 @@ export class JoystickCheckDialog {
       this.rafId = this._requestFrame(step);
     };
     this.rafId = this._requestFrame(step);
+  }
+
+  updateButtonLearningUI() {
+    const status = this.dialog?.querySelector('[data-learn-status]');
+    if (status) status.textContent = this.buttonLearning ? '지정할 조이스틱 버튼을 누르세요. 취소하려면 다시 누르세요.' : '';
+    for (const button of this.dialog?.querySelectorAll('[data-learn-button]') || []) {
+      const active = button.getAttribute('data-learn-button') === this.buttonLearning?.action;
+      button.textContent = active ? '취소' : '버튼 지정';
+      button.setAttribute('aria-pressed', String(active));
+    }
+  }
+
+  cancelButtonLearning() {
+    this.buttonLearning = null;
+    this.updateButtonLearningUI();
+  }
+
+  processButtonLearning(diag) {
+    const learning = this.buttonLearning;
+    if (!learning || !diag.connected) return;
+    const pressed = new Set(diag.buttons.filter(b => b.pressed).map(b => b.index));
+    for (const index of learning.held) if (!pressed.has(index)) learning.held.delete(index);
+    const index = [...pressed].find(i => i <= 64 && !learning.held.has(i));
+    if (index === undefined) return;
+    const select = this.dialog.querySelector(`[data-combat-button="${learning.action}"]`);
+    if (select) {
+      select.value = String(index);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    this.cancelButtonLearning();
   }
 
   getButtonActionLabel(index, profile) {
@@ -571,6 +641,7 @@ export class JoystickCheckDialog {
   updateTelemetry() {
     if (!this.hotas) return;
     const diag = this.hotas.getDiagnostics();
+    this.processButtonLearning(diag);
     const pressed = new Set(diag.buttons.filter(button => button.pressed).map(button => button.index));
     for (const [action, index] of Object.entries(diag.config?.combatButtons || {})) {
       if (index >= 0 && pressed.has(index) && !this.testedButtons.has(index)) {
@@ -773,6 +844,7 @@ export class JoystickCheckDialog {
 
   resetDefaults() {
     if (!this.hotas) return;
+    this.cancelButtonLearning();
     const defaults = {
       profileOverride: 'auto',
       axesLayout: 'auto',
@@ -816,6 +888,7 @@ export class JoystickCheckDialog {
   }
 
   startWizard() {
+    this.cancelButtonLearning();
     this.wizardActive = true;
     this.wizardStep = 1;
     this.wizardBaseline = null;

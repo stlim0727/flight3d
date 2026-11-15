@@ -2,6 +2,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { JoystickCheckDialog } from '../src/ui/JoystickCheckDialog.js';
 import { HotasController } from '../src/controls/HotasController.js';
+import { setLanguage } from '../src/i18n/index.js';
 
 class MockElement {
   constructor(tagName = 'div') {
@@ -204,6 +205,7 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     const mockBody = new MockElement('body');
     globalThis.document = {
       body: mockBody,
+      documentElement: { lang: '' },
       createElement: (tag) => new MockElement(tag),
       getElementById: (id) => docElements.get(id) || (mockBody.id === id ? mockBody : mockBody.querySelector(`#${id}`)),
       addEventListener: (event, fn) => {
@@ -220,6 +222,7 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
       cancelAnimationFrame: (id) => clearTimeout(id),
       addEventListener: () => {},
       removeEventListener: () => {},
+      confirm: () => true,
     };
 
     const controls = {
@@ -277,6 +280,27 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
 
     // Hardware tips
     assert.ok(dialog.dialog.querySelector('.joystick-tips-card'));
+  });
+
+  it('keeps every axis direction hint translated in English', () => {
+    setLanguage('en', mockStorage);
+    try {
+      const dialog = new JoystickCheckDialog(sim);
+      const hints = dialog.dialog.querySelectorAll('[data-i18n]')
+        .filter(el => el.getAttribute('data-i18n').startsWith('joystick.axis.'));
+      const keys = new Set(hints.map(el => el.getAttribute('data-i18n')));
+      for (const axis of ['pitch', 'roll', 'throttle', 'rudder', 'brakes']) {
+        for (const bound of ['min', 'max']) {
+          assert.ok(keys.has(`joystick.axis.${axis}.${bound}`), `${axis} ${bound} hint must be translated`);
+        }
+      }
+      for (const hint of hints) {
+        assert.ok(hint.textContent.trim(), `${hint.getAttribute('data-i18n')} must render text`);
+        assert.doesNotMatch(hint.textContent, /[가-힣]/, `${hint.getAttribute('data-i18n')} must be English`);
+      }
+    } finally {
+      setLanguage('ko', mockStorage);
+    }
   });
 
   it('opens and closes cleanly, syncing hotas config with form controls', () => {
@@ -373,6 +397,54 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     const saved = JSON.parse(mockStorage.getItem('flight3d.preferences.v1'));
     assert.strictEqual(saved.joystick.combatButtons.chaff, 3);
     assert.strictEqual(saved.joystick.combatButtons.missile, -1);
+    dialog.close();
+  });
+
+  it('learns a fresh controller button press, ignores held buttons, and cancels safely', () => {
+    const pad = { id: 'T.Flight Hotas One', index: 0, axes: [0, 0, 0, 0, 0], buttons: Array.from({ length: 4 }, () => ({ pressed: false, value: 0 })) };
+    sim.controls.hotas.getGamepadsFn = () => [pad];
+    sim.controls.hotas.applyConfig({ combatButtons: { target: 2 } });
+    const dialog = new JoystickCheckDialog(sim);
+    dialog.open();
+    const learn = dialog.dialog.querySelector('[data-learn-button="missile"]');
+    pad.buttons[1] = { pressed: true, value: 1 };
+    learn.click(); dialog.updateTelemetry();
+    assert.equal(sim.controls.hotas.combatButtons.missile, -1, 'already held input must not be captured');
+    pad.buttons[1] = { pressed: false, value: 0 }; dialog.updateTelemetry();
+    pad.buttons[2] = { pressed: true, value: 1 }; dialog.updateTelemetry();
+    assert.equal(sim.controls.hotas.combatButtons.missile, 2);
+    assert.equal(sim.controls.hotas.combatButtons.target, -1, 'duplicate assignment is removed');
+    assert.equal(JSON.parse(mockStorage.getItem('flight3d.preferences.v1')).joystick.combatButtons.missile, 2);
+    assert.equal(dialog.buttonLearning, null);
+    learn.click(); learn.click();
+    pad.buttons[3] = { pressed: true, value: 1 }; dialog.updateTelemetry();
+    assert.equal(sim.controls.hotas.combatButtons.missile, 2, 'cancel keeps the old mapping');
+    learn.click(); dialog.close();
+    assert.equal(dialog.buttonLearning, null);
+  });
+
+  it('asks before replacing existing combat and default assignments and keeps them on cancel', () => {
+    const pad = { id: 'T.Flight Hotas One', index: 0, axes: [0, 0, 0, 0, 0], buttons: Array.from({ length: 4 }, () => ({ pressed: false, value: 0 })) };
+    sim.controls.hotas.getGamepadsFn = () => [pad];
+    sim.controls.hotas.applyConfig({ combatButtons: { target: 2 } });
+    let prompt = '';
+    window.confirm = text => { prompt = text; return false; };
+    const dialog = new JoystickCheckDialog(sim);
+    dialog.open();
+    const missile = dialog.dialog.querySelector('[data-combat-button="missile"]');
+    missile.value = '2'; missile.dispatchEvent(new Event('change'));
+    assert.match(prompt, /표적 전환/);
+    assert.equal(missile.value, '-1');
+    assert.equal(sim.controls.hotas.combatButtons.target, 2);
+    assert.equal(sim.controls.hotas.combatButtons.missile, -1);
+    const learn = dialog.dialog.querySelector('[data-learn-button="missile"]');
+    learn.click(); pad.buttons[1] = { pressed: true, value: 1 }; dialog.updateTelemetry();
+    assert.match(prompt, /스포일러/);
+    assert.equal(sim.controls.hotas.combatButtons.missile, -1);
+    window.confirm = () => true;
+    pad.buttons[1] = { pressed: false, value: 0 }; dialog.updateTelemetry();
+    learn.click(); pad.buttons[1] = { pressed: true, value: 1 }; dialog.updateTelemetry();
+    assert.equal(sim.controls.hotas.combatButtons.missile, 1);
     dialog.close();
   });
 
