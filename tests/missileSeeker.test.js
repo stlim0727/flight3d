@@ -63,13 +63,30 @@ test('hidden velocity is never sampled and memory predicts only the last observa
 
 test('memory diagnostics keep the incumbent loss reason when a competitor is visible', () => {
   const s = new MissileSeeker(MISSILE_TYPES.AIM9X), o = own(), t = contact();
-  const flare = { type: 'flare', position: new Vector3(0, 3000, -1000), velocity: new Vector3(0, 0, 0),
-    infraredEmission: 6 };
+  const flare = { type: 'flare', alive: true, position: new Vector3(0, 3000, -1000),
+    velocity: new Vector3(0, 0, 0), infraredEmission: 6 };
+  assert.equal(seekerCanObserve(MISSILE_TYPES.AIM9X, o, flare, flat), true,
+    'the competitor must be a genuinely visible contact, not a gated one');
   assert.equal(s.seed(t, o, flat), true);
   s.update(dt, o, [t, flare], ridge);
   assert.equal(s.state, 'memory');
   assert.equal(s.lastObservation.canObserve, false);
   assert.equal(s.lastObservation.lossReason, 'terrain_occlusion');
+});
+
+test('memory diagnostics keep the incumbent loss reason when the incumbent leaves the candidate list', () => {
+  const s = new MissileSeeker(MISSILE_TYPES.AIM9X), o = own(), t = contact();
+  const flare = { type: 'flare', alive: true, position: new Vector3(0, 3000, -1000),
+    velocity: new Vector3(0, 0, 0), infraredEmission: 6 };
+  assert.equal(s.seed(flare, o, flat), true);
+  assert.equal(seekerCanObserve(MISSILE_TYPES.AIM9X, o, t, flat), true,
+    'the aircraft competitor must be genuinely visible');
+  flare.alive = false;
+  s.update(dt, o, [t], flat);
+  assert.equal(s.state, 'memory');
+  assert.equal(s.target, flare);
+  assert.equal(s.lastObservation.canObserve, false);
+  assert.equal(s.lastObservation.lossReason, 'target_destroyed');
 });
 
 test('both types reacquire changed truth only after a new confirmation interval', () => {

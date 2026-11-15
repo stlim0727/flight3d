@@ -114,7 +114,7 @@ export class MissileSeeker {
     let observedEval = null;
 
     let incumbentFailure = null;
-    if (targets.includes(this.target)) {
+    if (this.target && targets.includes(this.target)) {
       const evalResult = evaluateSeekerObservation(this.spec, observer, this.target, world);
       if (evalResult.canObserve) {
         observed = this.target;
@@ -123,6 +123,12 @@ export class MissileSeeker {
         this.lastObservation = evalResult;
         incumbentFailure = evalResult;
       }
+    } else if (this.target && this.hasEstimate) {
+      // The incumbent dropped out of the candidate list (expired decoys are
+      // removed upstream). Evaluate it directly so memory diagnostics keep its
+      // loss reason instead of a visible competitor's observation.
+      incumbentFailure = evaluateSeekerObservation(this.spec, observer, this.target, world);
+      this.lastObservation = incumbentFailure;
     }
     if (!observed) {
       let nearest = Infinity;

@@ -111,7 +111,10 @@ Both are diagnostic-contract defects; neither changes missile behaviour.
    the estimate-referenced angle is 178.2° (estimate 29 m from the missile);
    at aspect 135° it is 76.3° versus 2.3° (estimate 338 m). Fixed by adding
    `seekerLosAngleDeg` and `seekerEstimateRangeM` to the trace sample and to
-   the audit metrics.
+   the audit metrics. The production guidance step records both values in
+   `missile.lastGuidance` before the flight model integrates, so a trace row
+   reports the same instant as the `gimbal_limit` decision; recomputing after
+   integration can differ by up to 169° in the 2.5 km control.
 2. **`lastObservation` described the competitor during memory.** When the
    incumbent was hidden but a competitor was visible, the memory branch kept
    the competitor's observation while the estimate still aged from the
@@ -121,9 +124,12 @@ Both are diagnostic-contract defects; neither changes missile behaviour.
    evaluation when it keeps the track.
 
 Regression coverage: `tests/missileSeeker.test.js` asserts that a memory state
-with a visible competitor reports the incumbent's terrain loss reason. The
-20-condition 2.5 km audit re-run produces identical terminals and summary rows
-before and after the change; only the new diagnostic fields differ.
+with a genuinely visible competitor reports the incumbent's terrain loss reason.
+`tests/combatSituationMatrix.test.js` recomputes the guidance-instant angle from
+the previous row's missile state and asserts the trace row matches it, while a
+`gimbal_limit` row carries an angle above the 65° limit. The 20-condition 2.5 km
+audit re-run produces identical terminals and summary rows before and after the
+change; only the diagnostic fields differ.
 
 ## Target and non-goals
 

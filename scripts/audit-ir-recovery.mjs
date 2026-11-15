@@ -157,6 +157,10 @@ function timeline(settings) {
         state: key,
         rangeM: Number(sample.rangeM.toFixed(1)),
         losAngleDeg: Number(sample.losAngleDeg.toFixed(1)),
+        seekerLosAngleDeg: sample.seekerLosAngleDeg == null
+          ? null : Number(sample.seekerLosAngleDeg.toFixed(1)),
+        seekerEstimateRangeM: sample.seekerEstimateRangeM == null
+          ? null : Number(sample.seekerEstimateRangeM.toFixed(1)),
         missileSpeedMps: Number(sample.missileSpeedMps.toFixed(0)),
         propellant: Number(sample.propellant.toFixed(2)),
         requestedLateralMps2: Math.round(sample.requestedLateralMps2),

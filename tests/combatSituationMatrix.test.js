@@ -170,3 +170,38 @@ test('combat situation: diagnostic flare controls observe without changing the l
   assert.equal(manual.defense.evasionSeconds, 0, 'manual control keeps the target out of evasion');
   assert.equal(manual.decoyTransfers, 1);
 });
+
+test('combat situation: trace LOS is sampled at the guidance instant, not after integration', () => {
+  const result = simulateCombatSituation({
+    type: 'AIM9X', rangeM: 2500, targetSpeedMps: 180, targetBehavior: 'evasive_ai',
+    shooterSpeedMps: Math.hypot(96, 49), shooterAltM: 750, targetAltM: 1210, aspectDeg: 0,
+    countermeasures: false, chaff: false, flares: true, threatResponseEnabled: true,
+    recordDetail: true, maxSimTimeSec: 20,
+  });
+  const detail = result.detail || [];
+  assert.ok(detail.length > 0, 'expected a recorded trace');
+  const angle = (velocity, from, to) => {
+    const dx = to[0] - from[0], dy = to[1] - from[1], dz = to[2] - from[2];
+    const range = Math.hypot(dx, dy, dz);
+    const speed = Math.hypot(velocity[0], velocity[1], velocity[2]);
+    if (!(range > 1e-6 && speed > 1e-6)) return null;
+    return Math.acos(Math.max(-1, Math.min(1,
+      (velocity[0] * dx + velocity[1] * dy + velocity[2] * dz) / (speed * range)))) * (180 / Math.PI);
+  };
+  let compared = 0, maxPostStepDelta = 0, gimbal = null;
+  for (let i = 1; i < detail.length; i++) {
+    const row = detail[i], prev = detail[i - 1];
+    if (row.seekerLosAngleDeg == null || !row.estimatePosition) continue;
+    const guidanceInstant = angle(prev.missileVelocity, prev.missilePosition, row.estimatePosition);
+    const postStep = angle(row.missileVelocity, row.missilePosition, row.estimatePosition);
+    assert.ok(Math.abs(guidanceInstant - row.seekerLosAngleDeg) < 1e-6,
+      `row ${i} reports the pre-integration angle`);
+    maxPostStepDelta = Math.max(maxPostStepDelta, Math.abs(postStep - row.seekerLosAngleDeg));
+    compared++;
+    if (row.guidanceReason === 'gimbal_limit') gimbal = row;
+  }
+  assert.ok(compared > 100, `expected a long guided trace, got ${compared}`);
+  assert.ok(maxPostStepDelta > 1, `post-integration recomputation should differ, got ${maxPostStepDelta}`);
+  assert.ok(gimbal, 'expected a gimbal_limit row');
+  assert.ok(gimbal.seekerLosAngleDeg > 65, `gimbal row angle ${gimbal.seekerLosAngleDeg} should exceed the limit`);
+});

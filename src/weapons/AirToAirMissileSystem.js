@@ -377,7 +377,9 @@ export class AirToAirMissileSystem {
       launchTargetId: target?.id ?? (selected?.id ?? null),
       launchTargetCallsign: target?.callsign ?? (selected?.callsign ?? null),
       closestApproaches: {},
-      lastGuidance: { active: false, reason: null },
+      lastGuidance: { active: false, reason: null, losAngleDeg: null, rangeM: null },
+      _lastGuidanceLosAngleDeg: null,
+      _lastGuidanceRangeM: null,
       finalOutcome: null,
     };
     if (target) missile.seeker.seed(target, missile, world);
@@ -602,7 +604,16 @@ export class AirToAirMissileSystem {
     const tracking = missile.seeker?.hasEstimate
       ? this._applyGuidance(missile, missile.seeker.estimate, spec) : false;
     const guidanceReason = tracking ? null : (missile.seeker?.hasEstimate ? missile._lastGuidanceCutoffReason : 'no_estimate');
-    missile.lastGuidance = { active: tracking, reason: guidanceReason };
+    const guided = Boolean(missile.seeker?.hasEstimate);
+    // LOS angle/range are sampled in _applyGuidance, before the flight model
+    // integrates this step, so the diagnostic row explains the same instant
+    // the gimbal decision used.
+    missile.lastGuidance = {
+      active: tracking,
+      reason: guidanceReason,
+      losAngleDeg: guided ? missile._lastGuidanceLosAngleDeg ?? null : null,
+      rangeM: guided ? missile._lastGuidanceRangeM ?? null : null,
+    };
 
     missile.flight.step(dt, missile, {
       massKg: mass, thrustN,
@@ -682,6 +693,8 @@ export class AirToAirMissileSystem {
   }
 
   _applyGuidance(missile, target, spec) {
+    missile._lastGuidanceLosAngleDeg = null;
+    missile._lastGuidanceRangeM = null;
     this._los.copy(target.position).sub(missile.position);
     const rangeSq = this._los.lengthSq();
     if (rangeSq < 1) {
@@ -699,8 +712,10 @@ export class AirToAirMissileSystem {
     // field of regard. Invalid tracking stops new commands; the actuator unloads.
     this._dir.copy(missile.velocity).divideScalar(speed);
     this._rhat.copy(this._los).divideScalar(range);
-    if (Math.acos(THREE.MathUtils.clamp(this._dir.dot(this._rhat), -1, 1)) >
-        THREE.MathUtils.degToRad(spec.gimbalDeg)) {
+    const losAngleDeg = Math.acos(THREE.MathUtils.clamp(this._dir.dot(this._rhat), -1, 1)) * (180 / Math.PI);
+    missile._lastGuidanceLosAngleDeg = losAngleDeg;
+    missile._lastGuidanceRangeM = range;
+    if (losAngleDeg > spec.gimbalDeg) {
       missile._lastGuidanceCutoffReason = 'gimbal_limit';
       return false;
     }
