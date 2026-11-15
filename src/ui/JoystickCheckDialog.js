@@ -77,22 +77,10 @@ export class JoystickCheckDialog {
           </div>
         </div>
 
-        <!-- Profile Selection -->
-        <div class="joystick-section">
-          <label class="joystick-field-label" for="joystick-profile-select" data-i18n="joystick.profile.label">조종간 매핑 프로필</label>
-          <select id="joystick-profile-select" class="joystick-select" data-profile-select>
-            <option value="auto" data-i18n="joystick.profile.auto">자동 감지 (Auto-Detect)</option>
-            <option value="hotas-one" data-i18n="joystick.profile.hotas_one_pc">Thrustmaster T.Flight Hotas One (PC 모드 - 5축 원시 HID)</option>
-            <option value="hotas-one-xbox" data-i18n="joystick.profile.hotas_one_xbox">Thrustmaster T.Flight Hotas One (XBOX 모드 / XInput)</option>
-            <option value="hotas-tflight" data-i18n="joystick.profile.hotas_tflight">Thrustmaster T.Flight Hotas 4 / X</option>
-            <option value="flight-stick" data-i18n="joystick.profile.flight_stick">일반 비행 조종간 (Generic Flight Stick)</option>
-            <option value="standard-gamepad" data-i18n="joystick.profile.standard_gamepad">표준 게임패드 (Standard Gamepad / Xbox)</option>
-          </select>
-        </div>
-
         <div class="joystick-section">
           <h3 class="joystick-section-title">전투 버튼 매핑 (Combat buttons)</h3>
           <p>아래 버튼 번호는 실시간 버튼 표시에서 확인하세요. 지정한 버튼의 기존 기능은 해제됩니다.</p>
+          <div class="joystick-combat-grid">
           ${[['missile', '미사일 발사'], ['gun', '기관포 (누르고 유지)'], ['target', '표적 전환'], ['chaff', '채프 (미구현)'], ['flare', '플레어 (미구현)']].map(([action, label]) => `
             <label class="joystick-field-label">${label}
               <select class="joystick-select" data-combat-button="${action}">
@@ -100,6 +88,15 @@ export class JoystickCheckDialog {
                 ${Array.from({ length: 65 }, (_, i) => `<option value="${i}">Button ${i}</option>`).join('')}
               </select>
             </label>`).join('')}
+          </div>
+        </div>
+
+        <!-- Buttons & Hat Switch Inspector -->
+        <div class="joystick-section">
+          <h3 class="joystick-section-title" data-i18n="joystick.buttons.title">버튼 및 햇 스위치 실시간 점검</h3>
+          <div class="joystick-buttons-grid" data-buttons-grid>
+            <!-- Generated dynamically -->
+          </div>
         </div>
 
         <!-- Flight Control Surfaces Real-time Meters -->
@@ -193,6 +190,22 @@ export class JoystickCheckDialog {
           </div>
         </div>
 
+        <details class="joystick-advanced">
+          <summary>고급 설정 및 보정 <span>프로필 · 축 보정 · 반전</span></summary>
+          <div class="joystick-advanced-content">
+        <!-- Profile Selection -->
+        <div class="joystick-section joystick-advanced-section">
+          <label class="joystick-field-label" for="joystick-profile-select" data-i18n="joystick.profile.label">조종간 매핑 프로필</label>
+          <select id="joystick-profile-select" class="joystick-select" data-profile-select>
+            <option value="auto" data-i18n="joystick.profile.auto">자동 감지 (Auto-Detect)</option>
+            <option value="hotas-one" data-i18n="joystick.profile.hotas_one_pc">Thrustmaster T.Flight Hotas One (PC 모드 - 5축 원시 HID)</option>
+            <option value="hotas-one-xbox" data-i18n="joystick.profile.hotas_one_xbox">Thrustmaster T.Flight Hotas One (XBOX 모드 / XInput)</option>
+            <option value="hotas-tflight" data-i18n="joystick.profile.hotas_tflight">Thrustmaster T.Flight Hotas 4 / X</option>
+            <option value="flight-stick" data-i18n="joystick.profile.flight_stick">일반 비행 조종간 (Generic Flight Stick)</option>
+            <option value="standard-gamepad" data-i18n="joystick.profile.standard_gamepad">표준 게임패드 (Standard Gamepad / Xbox)</option>
+          </select>
+        </div>
+
         <!-- Calibration Wizard Card -->
         <div class="joystick-wizard-card">
           <div class="joystick-wizard-info">
@@ -269,14 +282,6 @@ export class JoystickCheckDialog {
           </div>
         </div>
 
-        <!-- Buttons & Hat Switch Inspector -->
-        <div class="joystick-section">
-          <h3 class="joystick-section-title" data-i18n="joystick.buttons.title">버튼 및 햇 스위치 실시간 점검</h3>
-          <div class="joystick-buttons-grid" data-buttons-grid>
-            <!-- Generated dynamically -->
-          </div>
-        </div>
-
         <!-- Raw Axes Details -->
         <details class="joystick-raw-details">
           <summary data-i18n="joystick.raw.title">🔍 원시 입력 데이터 상세 (Raw Gamepad Axes & Buttons)</summary>
@@ -286,7 +291,8 @@ export class JoystickCheckDialog {
         </details>
 
         <!-- Hardware Troubleshooting Guide -->
-        <div class="joystick-tips-card">
+        <details class="joystick-tips-card">
+          <summary>하드웨어 도움말</summary>
           <h4 data-i18n="joystick.hw.tips">💡 T.Flight Hotas One 하드웨어 팁 & 문제 해결</h4>
           <ul>
             <li data-i18n="joystick.tip.switch">스위치 위치: T.Flight Hotas One 본체 뒤쪽 'PC / XBOX' 스위치가 PC에 있어야 5축 원시 HID로 작동합니다. XBOX 모드인 경우 위 프로필에서 'XBOX 모드'를 선택하면 스로틀과 러더가 자동 정렬됩니다.</li>
@@ -294,7 +300,10 @@ export class JoystickCheckDialog {
             <li data-i18n="joystick.tip.rudder">러더 고정 현상: TFRP 페달이 연결되지 않은 경우 Axis 4(RJ12 단자)가 +1.0/-1.0으로 고정될 수 있습니다. 시스템이 부유 핀을 자동 차단하여 스틱 트위스트로 정상 비행할 수 있으며, 필요 시 '러더 입력 소스'를 '스틱 트위스트 전용'으로 설정할 수 있습니다.</li>
             <li data-i18n="joystick.tip.browser">브라우저 보안: 웹 브라우저는 보안상 조종간 레버를 움직이거나 버튼을 누르기 전까지 입력을 노출하지 않습니다.</li>
           </ul>
-        </div>
+        </details>
+
+          </div>
+        </details>
 
         <!-- Actions -->
         <div class="joystick-actions">

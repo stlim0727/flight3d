@@ -764,3 +764,61 @@
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   }
 }
+
+/* Keep the common mapping and live checks visible; group calibration separately. */
+.joystick-combat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.joystick-combat-grid .joystick-field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.joystick-combat-grid .joystick-select { width: 100%; }
+.joystick-section > p {
+  color: #aebdce;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin: 0 0 3px;
+}
+.joystick-meters-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.joystick-meter-head { flex-wrap: wrap; gap: 4px 8px; }
+.joystick-meter-sub span:nth-child(2) { display: none; }
+.joystick-advanced {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.45);
+}
+.joystick-advanced > summary,
+.joystick-tips-card > summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.joystick-advanced > summary span {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 400;
+  margin-left: 8px;
+}
+.joystick-advanced-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 14px 14px;
+}
+.joystick-tips-card { display: block; padding: 0 14px 10px; }
+.joystick-tips-card > summary { padding: 12px 0; }
+@media (max-width: 600px) {
+  .joystick-meters-grid { grid-template-columns: 1fr; }
+  .joystick-combat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .joystick-advanced > summary span { display: block; margin: 4px 0 0 18px; }
+}
