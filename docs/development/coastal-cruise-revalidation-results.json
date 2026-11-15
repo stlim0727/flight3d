@@ -1,0 +1,1264 @@
+{
+  "status": "complete",
+  "error": null,
+  "commit": "d738799e007eab143ace1ffa4a804a842e5c4024",
+  "dirty": false,
+  "dt": 0.008333333333333333,
+  "simulationSeconds": 100,
+  "wallSeconds": 11.766519920999999,
+  "results": [
+    {
+      "policy": "locked",
+      "countermeasures": true,
+      "commandedSpeed": 107.78218776773832,
+      "launchState": {
+        "position": [
+          1519.681956037374,
+          1777.4669240656722,
+          1050.6541081868638
+        ],
+        "velocity": [
+          45.42763968678045,
+          41.19006783918704,
+          -99.19709148166667
+        ],
+        "quaternion": [
+          0.16058443561337343,
+          -0.23735703707836364,
+          0.2577657617039241,
+          0.9227302358118056
+        ],
+        "targetPosition": [
+          1921.6023407382795,
+          1923.225755427149,
+          -1967.8029347834138
+        ],
+        "targetVelocity": [
+          -107.31543884129356,
+          -1.032524473326306,
+          144.26338277188887
+        ],
+        "targetQuaternion": [
+          0.535448211802833,
+          0.8044327812505113,
+          0.1167297888560605,
+          0.22925372258773696
+        ],
+        "targetAspectDeg": 157.1327963837682,
+        "time": 27.55,
+        "rangeM": 3048.5846802762194,
+        "observation": {
+          "canObserve": true,
+          "lossReason": null,
+          "rangeM": 3048.58468027622,
+          "signalQuality": 0.2761544521534098,
+          "minSignalQuality": 0.25,
+          "aspectAngleDeg": 26.575694325575057
+        }
+      },
+      "firstLockSeconds": 27.55,
+      "terminal": "life_expiry",
+      "shots": [
+        {
+          "launchTime": 27.55,
+          "type": "AIM9X",
+          "locked": true,
+          "rangeM": 3048.5846802762194,
+          "firstTrackTime": 27.55,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 1,
+          "transferEvents": [
+            {
+              "time": 28.333333333333332,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 1,
+              "toId": 1
+            }
+          ],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 47.56666666666461
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 122.69754453432793,
+              "timeSec": 32.899999999998776,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 1
+            },
+            {
+              "distanceM": 5325.598225232843,
+              "timeSec": 29.233333333332315,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 2
+            }
+          ],
+          "terminalSpeedMps": 481.2412033350691
+        }
+      ],
+      "events": {
+        "lock": 1,
+        "chaff_dispense": 1,
+        "flare_dispense": 1,
+        "decoy_transfer": 1,
+        "unlock": 1,
+        "seeker_state": 2,
+        "flare_expire": 1,
+        "chaff_expire": 1,
+        "expire": 1
+      },
+      "transitions": [
+        {
+          "time": 27.55,
+          "sinceLaunch": 0,
+          "phase": "track:bandit:active",
+          "alive": true,
+          "rangeM": 3046.419464698853,
+          "missileSpeedMps": 139.63830022577508,
+          "propellant": 0.9981481481481481,
+          "losAngleDeg": 24.210964871018525,
+          "requestedMps2": 44.90406181684577,
+          "availableMps2": 98.27864512636148,
+          "qBarPa": 9915.561341616974,
+          "observation": {
+            "canObserve": true,
+            "lossReason": null,
+            "rangeM": 3047.4774555380413,
+            "signalQuality": 0.27632253639045423,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 24.23098653396878
+          },
+          "targetPosition": [
+            1920.7092501077473,
+            1923.2171548643032,
+            -1966.599863198423
+          ],
+          "missilePosition": [
+            1515.4460029500858,
+            1774.8609380470089,
+            1049.0963563056127
+          ]
+        },
+        {
+          "time": 28.333333333333332,
+          "sinceLaunch": 0.7833333333333314,
+          "phase": "track:flare:active",
+          "alive": true,
+          "rangeM": 2794.257800341533,
+          "missileSpeedMps": 204.78389237160198,
+          "propellant": 0.8240740740740712,
+          "losAngleDeg": 16.419655403034668,
+          "requestedMps2": 50.2454179249113,
+          "availableMps2": 175.21683835932077,
+          "qBarPa": 21347.414539932626,
+          "observation": {
+            "canObserve": true,
+            "lossReason": null,
+            "rangeM": 2795.582944166567,
+            "signalQuality": 0.8491220453049945,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 16.511881946197658
+          },
+          "targetPosition": [
+            1842.4103612180036,
+            1922.4286656982208,
+            -1849.7136127614867
+          ],
+          "missilePosition": [
+            1557.5382619414509,
+            1817.970915719575,
+            928.0216374545356
+          ]
+        },
+        {
+          "time": 33.875,
+          "sinceLaunch": 6.324999999999999,
+          "phase": "memory:flare:range_too_close",
+          "alive": true,
+          "rangeM": 785.4306432670527,
+          "missileSpeedMps": 571.5633269527735,
+          "propellant": 0,
+          "losAngleDeg": 167.80869918419205,
+          "requestedMps2": 0,
+          "availableMps2": 343.23274999999995,
+          "qBarPa": 167009.26666953258,
+          "observation": {
+            "canObserve": false,
+            "lossReason": "range_limit",
+            "rangeM": 0.5033209451319604,
+            "signalQuality": 0,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 0
+          },
+          "targetPosition": [
+            1456.8252109578873,
+            1930.8369958140233,
+            -840.3932554996236
+          ],
+          "missilePosition": [
+            1676.7657848396855,
+            1845.5967373472336,
+            -1589.5671589959722
+          ]
+        },
+        {
+          "time": 33.88333333333333,
+          "sinceLaunch": 6.333333333333332,
+          "phase": "memory:flare:gimbal_limit",
+          "alive": true,
+          "rangeM": 791.8574222726727,
+          "missileSpeedMps": 571.4880851311444,
+          "propellant": 0,
+          "losAngleDeg": 167.88362340975274,
+          "requestedMps2": 0,
+          "availableMps2": 343.23274999999995,
+          "qBarPa": 166971.01933645346,
+          "observation": {
+            "canObserve": false,
+            "lossReason": "fov_limit",
+            "rangeM": 4.328003296759163,
+            "signalQuality": 0,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 178.04742744774322
+          },
+          "targetPosition": [
+            1456.243922727961,
+            1930.835436829468,
+            -838.707211325741
+          ],
+          "missilePosition": [
+            1677.121850461674,
+            1845.2509933935241,
+            -1594.3039432470366
+          ]
+        },
+        {
+          "time": 34.475,
+          "sinceLaunch": 6.925000000000001,
+          "phase": "lost:none:no_estimate",
+          "alive": true,
+          "rangeM": 1249.7217765777596,
+          "missileSpeedMps": 566.2542537408865,
+          "propellant": 0,
+          "losAngleDeg": 170.98951366482464,
+          "requestedMps2": 0,
+          "availableMps2": 343.23274999999995,
+          "qBarPa": 164348.69558921392,
+          "observation": {
+            "canObserve": false,
+            "lossReason": "fov_limit",
+            "rangeM": 172.83217051847188,
+            "signalQuality": 0,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 177.9306084783954
+          },
+          "targetPosition": [
+            1413.948731013422,
+            1930.5184389532164,
+            -718.0791783958916
+          ],
+          "missilePosition": [
+            1702.648915340194,
+            1819.4729811095524,
+            -1928.9159257382619
+          ]
+        }
+      ],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 5
+    },
+    {
+      "policy": "close-locked",
+      "countermeasures": true,
+      "commandedSpeed": 107.78218776773832,
+      "launchState": {
+        "position": [
+          1607.2117165780978,
+          1853.5499411280396,
+          845.8545297550694
+        ],
+        "velocity": [
+          39.796992134815525,
+          33.03706194755948,
+          -100.49746340874596
+        ],
+        "quaternion": [
+          0.13665026357837817,
+          -0.20761139997377123,
+          0.2739952362588924,
+          0.9290591060703964
+        ],
+        "targetPosition": [
+          1742.7319702240177,
+          1921.3353710688727,
+          -1647.6605295490663
+        ],
+        "targetVelocity": [
+          -65.28331044078016,
+          -0.7382498446573755,
+          166.663212493403
+        ],
+        "targetQuaternion": [
+          0.565804272352974,
+          0.8160925889772899,
+          0.03929402823172928,
+          0.11097022550571885
+        ],
+        "targetAspectDeg": 168.83207979823104,
+        "time": 29.599999999999998,
+        "rangeM": 2498.114880192067,
+        "observation": {
+          "canObserve": true,
+          "lossReason": null,
+          "rangeM": 2498.114880192067,
+          "signalQuality": 0.37254686597664705,
+          "minSignalQuality": 0.25,
+          "aspectAngleDeg": 25.620665129152933
+        }
+      },
+      "firstLockSeconds": 27.55,
+      "terminal": "life_expiry",
+      "shots": [
+        {
+          "launchTime": 29.599999999999998,
+          "type": "AIM9X",
+          "locked": true,
+          "rangeM": 2498.114880192067,
+          "firstTrackTime": 29.599999999999998,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 1,
+          "transferEvents": [
+            {
+              "time": 30.383333333333333,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 2
+            }
+          ],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 49.61666666666449
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 37.95195316504453,
+              "timeSec": 34.208333333332035,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 3
+            },
+            {
+              "distanceM": 5054.471343348065,
+              "timeSec": 31.191666666665537,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 4
+            }
+          ],
+          "terminalSpeedMps": 482.9203991171175
+        }
+      ],
+      "events": {
+        "lock": 1,
+        "chaff_dispense": 1,
+        "flare_dispense": 1,
+        "decoy_transfer": 1,
+        "seeker_state": 2,
+        "unlock": 1,
+        "flare_expire": 1,
+        "chaff_expire": 1,
+        "expire": 1
+      },
+      "transitions": [
+        {
+          "time": 29.599999999999998,
+          "sinceLaunch": 0,
+          "phase": "track:bandit:active",
+          "alive": true,
+          "rangeM": 2495.837488255234,
+          "missileSpeedMps": 136.0610738589991,
+          "propellant": 0.9981481481481481,
+          "losAngleDeg": 23.72372228949076,
+          "requestedMps2": 43.4729807060008,
+          "availableMps2": 94.67002172530478,
+          "qBarPa": 9339.042011773397,
+          "observation": {
+            "canObserve": true,
+            "lossReason": null,
+            "rangeM": 2496.8721887279107,
+            "signalQuality": 0.3728305935191472,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 23.741482667880003
+          },
+          "targetPosition": [
+            1742.189565629615,
+            1921.3292369711019,
+            -1646.271059378633
+          ],
+          "missilePosition": [
+            1602.9826266916466,
+            1850.7247594999426,
+            844.6808076177446
+          ]
+        },
+        {
+          "time": 30.383333333333333,
+          "sinceLaunch": 0.783333333333335,
+          "phase": "track:flare:active",
+          "alive": true,
+          "rangeM": 2235.739681781855,
+          "missileSpeedMps": 202.28647967087034,
+          "propellant": 0.8240740740740712,
+          "losAngleDeg": 14.909257305005374,
+          "requestedMps2": 48.43058287298457,
+          "availableMps2": 170.94359442433176,
+          "qBarPa": 20685.686226630256,
+          "observation": {
+            "canObserve": true,
+            "lossReason": null,
+            "rangeM": 2236.9903052974073,
+            "signalQuality": 0.8978490439109704,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 15.017978369560435
+          },
+          "targetPosition": [
+            1698.6529336187623,
+            1920.8358710260452,
+            -1513.2036282071413
+          ],
+          "missilePosition": [
+            1639.1363391907153,
+            1884.375204374444,
+            721.4463039900783
+          ]
+        },
+        {
+          "time": 34.93333333333333,
+          "sinceLaunch": 5.333333333333332,
+          "phase": "memory:flare:range_too_close",
+          "alive": true,
+          "rangeM": 587.7426494145005,
+          "missileSpeedMps": 581.9575352096397,
+          "propellant": 0,
+          "losAngleDeg": 177.34649840178955,
+          "requestedMps2": 0,
+          "availableMps2": 343.23274999999995,
+          "qBarPa": 172843.3288475206,
+          "observation": {
+            "canObserve": false,
+            "lossReason": "range_limit",
+            "rangeM": 0.012708108612133201,
+            "signalQuality": 0,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 0
+          },
+          "targetPosition": [
+            1631.8837499932515,
+            1930.8713247651515,
+            -648.86098940187
+          ],
+          "missilePosition": [
+            1615.8294816298367,
+            1862.7505610064527,
+            -1232.4218208093794
+          ]
+        },
+        {
+          "time": 34.94166666666666,
+          "sinceLaunch": 5.341666666666665,
+          "phase": "memory:flare:gimbal_limit",
+          "alive": true,
+          "rangeM": 594.2926243936128,
+          "missileSpeedMps": 581.8778202745137,
+          "propellant": 0,
+          "losAngleDeg": 177.3821885729388,
+          "requestedMps2": 0,
+          "availableMps2": 343.23274999999995,
+          "qBarPa": 172801.91342264053,
+          "observation": {
+            "canObserve": false,
+            "lossReason": "fov_limit",
+            "rangeM": 4.9643132971224135,
+            "signalQuality": 0,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 178.13682184485464
+          },
+          "targetPosition": [
+            1631.8472335596553,
+            1930.8812150568515,
+            -647.1432006121717
+          ],
+          "missilePosition": [
+            1615.7803323971752,
+            1862.3962318054232,
+            -1237.2579226491112
+          ]
+        },
+        {
+          "time": 35.53333333333333,
+          "sinceLaunch": 5.933333333333334,
+          "phase": "lost:none:no_estimate",
+          "alive": true,
+          "rangeM": 1059.338466087818,
+          "missileSpeedMps": 576.4330541354656,
+          "propellant": 0,
+          "losAngleDeg": 179.31153671076865,
+          "requestedMps2": 0,
+          "availableMps2": 343.23274999999995,
+          "qBarPa": 170024.40660583123,
+          "observation": {
+            "canObserve": false,
+            "lossReason": "fov_limit",
+            "rangeM": 355.33446296870727,
+            "signalQuality": 0,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 177.86151109184033
+          },
+          "targetPosition": [
+            1629.0708492467552,
+            1931.3541562227506,
+            -523.9628167632977
+          ],
+          "missilePosition": [
+            1613.1273724891162,
+            1836.302837462081,
+            -1578.9078570777338
+          ]
+        }
+      ],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 5
+    },
+    {
+      "policy": "near-locked",
+      "countermeasures": true,
+      "commandedSpeed": 107.78218776773832,
+      "launchState": {
+        "position": [
+          1730.4663998280646,
+          1946.8462294795088,
+          480.4931982792631
+        ],
+        "velocity": [
+          28.617579889933427,
+          18.964624805541956,
+          -102.52083721248316
+        ],
+        "quaternion": [
+          0.10054721711077864,
+          -0.14327261693482085,
+          0.2632174832355034,
+          0.9487253400679744
+        ],
+        "targetPosition": [
+          1672.6169182891529,
+          1920.435777939303,
+          -1016.9659460266297
+        ],
+        "targetVelocity": [
+          27.977286640585323,
+          0.1697333865593631,
+          175.76023250010118
+        ],
+        "targetQuaternion": [
+          0.5665859587470478,
+          0.8081178743727463,
+          -0.11794781176460298,
+          -0.10960915185286665
+        ],
+        "targetAspectDeg": 163.83444829253645,
+        "time": 33.2,
+        "rangeM": 1498.808848162505,
+        "observation": {
+          "canObserve": true,
+          "lossReason": null,
+          "rangeM": 1498.808848162505,
+          "signalQuality": 0.6398083447791191,
+          "minSignalQuality": 0.25,
+          "aspectAngleDeg": 22.37073225513464
+        }
+      },
+      "firstLockSeconds": 27.55,
+      "terminal": "kill",
+      "shots": [
+        {
+          "launchTime": 33.2,
+          "type": "AIM9X",
+          "locked": true,
+          "rangeM": 1498.808848162505,
+          "firstTrackTime": 33.2,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 36.46666666666524,
+            "targetId": 5,
+            "distanceM": 0.9452258438247189
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 0.9452258438247189,
+              "timeSec": 36.46666666666524,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 5
+            },
+            {
+              "distanceM": 4557.466740987252,
+              "timeSec": 34.833333333332,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 6
+            }
+          ],
+          "terminalSpeedMps": 484.25315834265484
+        }
+      ],
+      "events": {
+        "lock": 1,
+        "chaff_dispense": 1,
+        "flare_dispense": 1,
+        "detonation": 1,
+        "kill": 1
+      },
+      "transitions": [
+        {
+          "time": 33.2,
+          "sinceLaunch": 0,
+          "phase": "track:bandit:active",
+          "alive": true,
+          "rangeM": 1496.7620905119488,
+          "missileSpeedMps": 131.17361841390098,
+          "propellant": 0.9981481481481481,
+          "losAngleDeg": 20.76255268914602,
+          "requestedMps2": 16.840802949348454,
+          "availableMps2": 90.00473300390982,
+          "qBarPa": 8593.708174388807,
+          "observation": {
+            "canObserve": true,
+            "lossReason": null,
+            "rangeM": 1497.780822216538,
+            "signalQuality": 0.640148352729919,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 20.769505244310437
+          },
+          "targetPosition": [
+            1672.8519083410774,
+            1920.437203898513,
+            -1015.5015726787794
+          ],
+          "missilePosition": [
+            1726.0669799113655,
+            1944.0417654776275,
+            480.12797250416
+          ]
+        }
+      ],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 1,
+      "remaining": 5
+    },
+    {
+      "policy": "locked",
+      "countermeasures": false,
+      "commandedSpeed": 107.78218776773832,
+      "launchState": {
+        "position": [
+          1519.681956037374,
+          1777.4669240656722,
+          1050.6541081868638
+        ],
+        "velocity": [
+          45.42763968678045,
+          41.19006783918704,
+          -99.19709148166667
+        ],
+        "quaternion": [
+          0.16058443561337343,
+          -0.23735703707836364,
+          0.2577657617039241,
+          0.9227302358118056
+        ],
+        "targetPosition": [
+          1921.6023407382795,
+          1923.225755427149,
+          -1967.8029347834138
+        ],
+        "targetVelocity": [
+          -107.31543884129356,
+          -1.032524473326306,
+          144.26338277188887
+        ],
+        "targetQuaternion": [
+          0.535448211802833,
+          0.8044327812505113,
+          0.1167297888560605,
+          0.22925372258773696
+        ],
+        "targetAspectDeg": 157.1327963837682,
+        "time": 27.55,
+        "rangeM": 3048.5846802762194,
+        "observation": {
+          "canObserve": true,
+          "lossReason": null,
+          "rangeM": 3048.58468027622,
+          "signalQuality": 0.2761544521534098,
+          "minSignalQuality": 0.25,
+          "aspectAngleDeg": 26.575694325575057
+        }
+      },
+      "firstLockSeconds": 27.55,
+      "terminal": "kill",
+      "shots": [
+        {
+          "launchTime": 27.55,
+          "type": "AIM9X",
+          "locked": true,
+          "rangeM": 3048.5846802762194,
+          "firstTrackTime": 27.55,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 32.94166666666544,
+            "targetId": 7,
+            "distanceM": 0.4405406274403589
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 0.4405406274403589,
+              "timeSec": 32.94166666666544,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 7
+            },
+            {
+              "distanceM": 5326.9588630765775,
+              "timeSec": 29.19166666666565,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 8
+            }
+          ],
+          "terminalSpeedMps": 576.3099789717646
+        }
+      ],
+      "events": {
+        "lock": 1,
+        "detonation": 1,
+        "kill": 1
+      },
+      "transitions": [
+        {
+          "time": 27.55,
+          "sinceLaunch": 0,
+          "phase": "track:bandit:active",
+          "alive": true,
+          "rangeM": 3046.419464698853,
+          "missileSpeedMps": 139.63830022577508,
+          "propellant": 0.9981481481481481,
+          "losAngleDeg": 24.210964871018525,
+          "requestedMps2": 44.90406181684577,
+          "availableMps2": 98.27864512636148,
+          "qBarPa": 9915.561341616974,
+          "observation": {
+            "canObserve": true,
+            "lossReason": null,
+            "rangeM": 3047.4774555380413,
+            "signalQuality": 0.27632253639045423,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 24.23098653396878
+          },
+          "targetPosition": [
+            1920.7092501077473,
+            1923.2171548643032,
+            -1966.599863198423
+          ],
+          "missilePosition": [
+            1515.4460029500858,
+            1774.8609380470089,
+            1049.0963563056127
+          ]
+        }
+      ],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 1,
+      "remaining": 5
+    },
+    {
+      "policy": "close-locked",
+      "countermeasures": false,
+      "commandedSpeed": 107.78218776773832,
+      "launchState": {
+        "position": [
+          1607.2117165780978,
+          1853.5499411280396,
+          845.8545297550694
+        ],
+        "velocity": [
+          39.796992134815525,
+          33.03706194755948,
+          -100.49746340874596
+        ],
+        "quaternion": [
+          0.13665026357837817,
+          -0.20761139997377123,
+          0.2739952362588924,
+          0.9290591060703964
+        ],
+        "targetPosition": [
+          1742.7319702240177,
+          1921.3353710688727,
+          -1647.6605295490663
+        ],
+        "targetVelocity": [
+          -65.28331044078016,
+          -0.7382498446573755,
+          166.663212493403
+        ],
+        "targetQuaternion": [
+          0.565804272352974,
+          0.8160925889772899,
+          0.03929402823172928,
+          0.11097022550571885
+        ],
+        "targetAspectDeg": 168.83207979823104,
+        "time": 29.599999999999998,
+        "rangeM": 2498.114880192067,
+        "observation": {
+          "canObserve": true,
+          "lossReason": null,
+          "rangeM": 2498.114880192067,
+          "signalQuality": 0.37254686597664705,
+          "minSignalQuality": 0.25,
+          "aspectAngleDeg": 25.620665129152933
+        }
+      },
+      "firstLockSeconds": 27.55,
+      "terminal": "kill",
+      "shots": [
+        {
+          "launchTime": 29.599999999999998,
+          "type": "AIM9X",
+          "locked": true,
+          "rangeM": 2498.114880192067,
+          "firstTrackTime": 29.599999999999998,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 34.208333333332035,
+            "targetId": 9,
+            "distanceM": 0.04097670659614318
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 0.04097670659614318,
+              "timeSec": 34.208333333332035,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 9
+            },
+            {
+              "distanceM": 5054.766549891807,
+              "timeSec": 31.183333333332204,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 10
+            }
+          ],
+          "terminalSpeedMps": 588.8682552804976
+        }
+      ],
+      "events": {
+        "lock": 1,
+        "detonation": 1,
+        "kill": 1
+      },
+      "transitions": [
+        {
+          "time": 29.599999999999998,
+          "sinceLaunch": 0,
+          "phase": "track:bandit:active",
+          "alive": true,
+          "rangeM": 2495.837488255234,
+          "missileSpeedMps": 136.0610738589991,
+          "propellant": 0.9981481481481481,
+          "losAngleDeg": 23.72372228949076,
+          "requestedMps2": 43.4729807060008,
+          "availableMps2": 94.67002172530478,
+          "qBarPa": 9339.042011773397,
+          "observation": {
+            "canObserve": true,
+            "lossReason": null,
+            "rangeM": 2496.8721887279107,
+            "signalQuality": 0.3728305935191472,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 23.741482667880003
+          },
+          "targetPosition": [
+            1742.189565629615,
+            1921.3292369711019,
+            -1646.271059378633
+          ],
+          "missilePosition": [
+            1602.9826266916466,
+            1850.7247594999426,
+            844.6808076177446
+          ]
+        }
+      ],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 1,
+      "remaining": 5
+    },
+    {
+      "policy": "near-locked",
+      "countermeasures": false,
+      "commandedSpeed": 107.78218776773832,
+      "launchState": {
+        "position": [
+          1730.4663998280646,
+          1946.8462294795088,
+          480.4931982792631
+        ],
+        "velocity": [
+          28.617579889933427,
+          18.964624805541956,
+          -102.52083721248316
+        ],
+        "quaternion": [
+          0.10054721711077864,
+          -0.14327261693482085,
+          0.2632174832355034,
+          0.9487253400679744
+        ],
+        "targetPosition": [
+          1672.6169182891529,
+          1920.435777939303,
+          -1016.9659460266297
+        ],
+        "targetVelocity": [
+          27.977286640585323,
+          0.1697333865593631,
+          175.76023250010118
+        ],
+        "targetQuaternion": [
+          0.5665859587470478,
+          0.8081178743727463,
+          -0.11794781176460298,
+          -0.10960915185286665
+        ],
+        "targetAspectDeg": 163.83444829253645,
+        "time": 33.2,
+        "rangeM": 1498.808848162505,
+        "observation": {
+          "canObserve": true,
+          "lossReason": null,
+          "rangeM": 1498.808848162505,
+          "signalQuality": 0.6398083447791191,
+          "minSignalQuality": 0.25,
+          "aspectAngleDeg": 22.37073225513464
+        }
+      },
+      "firstLockSeconds": 27.55,
+      "terminal": "kill",
+      "shots": [
+        {
+          "launchTime": 33.2,
+          "type": "AIM9X",
+          "locked": true,
+          "rangeM": 1498.808848162505,
+          "firstTrackTime": 33.2,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 36.46666666666524,
+            "targetId": 11,
+            "distanceM": 0.9452258438247189
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 0.9452258438247189,
+              "timeSec": 36.46666666666524,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 11
+            },
+            {
+              "distanceM": 4557.466740987252,
+              "timeSec": 34.833333333332,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 12
+            }
+          ],
+          "terminalSpeedMps": 484.25315834265484
+        }
+      ],
+      "events": {
+        "lock": 1,
+        "detonation": 1,
+        "kill": 1
+      },
+      "transitions": [
+        {
+          "time": 33.2,
+          "sinceLaunch": 0,
+          "phase": "track:bandit:active",
+          "alive": true,
+          "rangeM": 1496.7620905119488,
+          "missileSpeedMps": 131.17361841390098,
+          "propellant": 0.9981481481481481,
+          "losAngleDeg": 20.76255268914602,
+          "requestedMps2": 16.840802949348454,
+          "availableMps2": 90.00473300390982,
+          "qBarPa": 8593.708174388807,
+          "observation": {
+            "canObserve": true,
+            "lossReason": null,
+            "rangeM": 1497.780822216538,
+            "signalQuality": 0.640148352729919,
+            "minSignalQuality": 0.25,
+            "aspectAngleDeg": 20.769505244310437
+          },
+          "targetPosition": [
+            1672.8519083410774,
+            1920.437203898513,
+            -1015.5015726787794
+          ],
+          "missilePosition": [
+            1726.0669799113655,
+            1944.0417654776275,
+            480.12797250416
+          ]
+        }
+      ],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 1,
+      "remaining": 5
+    },
+    {
+      "policy": "locked",
+      "countermeasures": true,
+      "commandedSpeed": 180,
+      "launchState": null,
+      "firstLockSeconds": 84.4,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {
+        "lock": 1,
+        "unlock": 1
+      },
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    },
+    {
+      "policy": "close-locked",
+      "countermeasures": true,
+      "commandedSpeed": 180,
+      "launchState": null,
+      "firstLockSeconds": 84.4,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {
+        "lock": 1,
+        "unlock": 1
+      },
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    },
+    {
+      "policy": "near-locked",
+      "countermeasures": true,
+      "commandedSpeed": 180,
+      "launchState": null,
+      "firstLockSeconds": 84.4,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {
+        "lock": 1,
+        "unlock": 1
+      },
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    },
+    {
+      "policy": "locked",
+      "countermeasures": false,
+      "commandedSpeed": 180,
+      "launchState": null,
+      "firstLockSeconds": 84.4,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {
+        "lock": 1,
+        "unlock": 1
+      },
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    },
+    {
+      "policy": "close-locked",
+      "countermeasures": false,
+      "commandedSpeed": 180,
+      "launchState": null,
+      "firstLockSeconds": 84.4,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {
+        "lock": 1,
+        "unlock": 1
+      },
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    },
+    {
+      "policy": "near-locked",
+      "countermeasures": false,
+      "commandedSpeed": 180,
+      "launchState": null,
+      "firstLockSeconds": 84.4,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {
+        "lock": 1,
+        "unlock": 1
+      },
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    },
+    {
+      "policy": "locked",
+      "countermeasures": true,
+      "commandedSpeed": 250,
+      "launchState": null,
+      "firstLockSeconds": null,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {},
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    },
+    {
+      "policy": "close-locked",
+      "countermeasures": true,
+      "commandedSpeed": 250,
+      "launchState": null,
+      "firstLockSeconds": null,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {},
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    },
+    {
+      "policy": "near-locked",
+      "countermeasures": true,
+      "commandedSpeed": 250,
+      "launchState": null,
+      "firstLockSeconds": null,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {},
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    },
+    {
+      "policy": "locked",
+      "countermeasures": false,
+      "commandedSpeed": 250,
+      "launchState": null,
+      "firstLockSeconds": null,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {},
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    },
+    {
+      "policy": "close-locked",
+      "countermeasures": false,
+      "commandedSpeed": 250,
+      "launchState": null,
+      "firstLockSeconds": null,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {},
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    },
+    {
+      "policy": "near-locked",
+      "countermeasures": false,
+      "commandedSpeed": 250,
+      "launchState": null,
+      "firstLockSeconds": null,
+      "terminal": "withheld-no-lock-or-range",
+      "shots": [],
+      "events": {},
+      "transitions": [],
+      "crashed": false,
+      "minClearanceM": 749.9915521621331,
+      "kills": 0,
+      "remaining": 6
+    }
+  ],
+  "productionBaseline": "f8e2215"
+}
