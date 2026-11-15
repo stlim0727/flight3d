@@ -1,6 +1,7 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildFlightLog, createFeedbackReport, deliverFeedbackReport, gatherFeedbackDiagnostics } from '../src/analytics/feedbackReport.js';
+import { buildFlightLog, createFeedbackReport, deliverFeedbackReport, FLIGHT_LOG_BUDGET_BYTES,
+  gatherFeedbackDiagnostics } from '../src/analytics/feedbackReport.js';
 import { prepareUserFeedback, sendUserFeedback, _resetAnalyticsForTesting } from '../src/analytics/posthog.js';
 
 const originalWindow = globalThis.window, originalFetch = globalThis.fetch;
@@ -154,6 +155,24 @@ test('long flight logs are decimated under the payload budget with the peak and 
   assert.equal(log.samples[0].timeSec, 0);
   assert.equal(log.samples.at(-1).timeSec, samples.at(-1).timeSec);
   assert.ok(log.samples.some(sample => sample.gForce === 12.5), 'peak-G moment survives decimation');
+});
+
+test('final budget thinning keeps the peak-G sample and final sample', () => {
+  const samples = Array.from({ length: 4270 }, (_, i) => ({ timeSec: i / 5,
+    x: 1234.5678901234 + i * 1.234567890123, z: -9876.5432109876 + i * 1.987654321098,
+    altitudeFt: 1000.123456789 + i * 3.141592653589, iasKnots: 120.123456789 + i * 0.0123456789,
+    gForce: i === 1000 ? 50.123456789 : 1.000000001, pitchDeg: 2.123456789,
+    rollDeg: -1.987654321, headingDeg: 180.123456789 }));
+  const sim = { flightRecorder: { active: true, elapsed: 854, interval: 0.2,
+    metadata: { aircraft: 'B738', airport: 'incheon', scenario: 'approach' }, samples,
+    peaks: { gForce: samples[1000] }, touchdowns: [], glocIncidents: 0 } };
+  for (const budgetBytes of [FLIGHT_LOG_BUDGET_BYTES, 20000]) {
+    const log = buildFlightLog(sim, { budgetBytes });
+    assert.ok(new TextEncoder().encode(JSON.stringify(log)).length <= budgetBytes, `${budgetBytes} B budget`);
+    const peak = log.samples.find(sample => sample.timeSec === samples[1000].timeSec);
+    assert.equal(peak?.gForce, 50.123456789, `${budgetBytes} B keeps the peak sample`);
+    assert.equal(log.samples.at(-1).timeSec, samples.at(-1).timeSec, `${budgetBytes} B keeps the final sample`);
+  }
 });
 
 test('report payload carries category, severity, expectations and reproduction steps', () => {

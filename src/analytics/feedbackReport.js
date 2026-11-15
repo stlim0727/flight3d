@@ -59,23 +59,38 @@ function boundFlightLog(log, budgetBytes) {
   const costPerSample = Math.max(1, (byteLength(JSON.stringify(samples)) - 2) / Math.max(1, samples.length));
   const capacity = Math.max(2, Math.floor((budgetBytes - overhead) / costPerSample));
   const stride = Math.max(1, Math.ceil(samples.length / capacity));
-  const keep = new Set();
-  for (let index = 0; index < samples.length; index += stride) keep.add(index);
-  keep.add(samples.length - 1);
   let peakIndex = -1;
   samples.forEach((entry, index) => {
     if (Number.isFinite(entry.gForce) && (peakIndex < 0 || entry.gForce > samples[peakIndex].gForce)) peakIndex = index;
   });
-  if (peakIndex >= 0) {
-    for (let index = Math.max(0, peakIndex - 10); index <= Math.min(samples.length - 1, peakIndex + 10); index += 1) keep.add(index);
-  }
-  let retained = [...keep].sort((a, b) => a - b).map(index => samples[index]);
-  const bounded = () => ({ ...log, samples: retained,
-    sampling: { ...log.sampling, retainedCount: retained.length,
-      stride: Math.max(1, Math.round(samples.length / retained.length)), decimated: true } });
+  // The peak and the final sample are never thinned away, even when the window
+  // around the peak has to shrink to make room for the rest of the trace.
+  const protectedIndices = new Set(peakIndex >= 0 ? [peakIndex, samples.length - 1] : [samples.length - 1]);
+  const select = radius => {
+    const keep = new Set();
+    for (let index = 0; index < samples.length; index += stride) keep.add(index);
+    keep.add(samples.length - 1);
+    if (peakIndex >= 0) {
+      for (let index = Math.max(0, peakIndex - radius); index <= Math.min(samples.length - 1, peakIndex + radius); index += 1) keep.add(index);
+    }
+    return [...keep].sort((a, b) => a - b);
+  };
+  let radius = 10;
+  let indices = select(radius);
+  const bounded = () => ({ ...log, samples: indices.map(index => samples[index]),
+    sampling: { ...log.sampling, retainedCount: indices.length,
+      stride: Math.max(1, Math.round(samples.length / Math.max(1, indices.length))), decimated: true } });
   let result = bounded();
-  while (retained.length > 2 && byteLength(JSON.stringify(result)) > budgetBytes) {
-    retained = retained.filter((_, index) => index % 2 === 0 || index === retained.length - 1);
+  while (byteLength(JSON.stringify(result)) > budgetBytes) {
+    if (radius > 0) {
+      radius = radius > 2 ? Math.floor(radius / 2) : radius - 1;
+      indices = select(radius);
+    } else {
+      const next = indices.filter((index, position) => protectedIndices.has(index)
+        || position % 2 === 0 || position === indices.length - 1);
+      if (next.length === indices.length) break;
+      indices = next;
+    }
     result = bounded();
   }
   return result;
