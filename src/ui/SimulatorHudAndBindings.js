@@ -371,6 +371,10 @@ class SimulatorHudAndBindingsMethods {
   }
 
   setRenderQuality(value) {
+    this.frameTransitions?.begin('quality-change', {
+      previousQuality: this.renderQuality, renderQuality: resolveRenderQuality(value),
+      camera: this.cameraSystem?.mode,
+    });
     this.renderDiagnosticsPanel?.close();
     const prevPreset = RENDER_QUALITY[this.renderQuality];
     this.renderQuality = resolveRenderQuality(value);
@@ -578,6 +582,8 @@ class SimulatorHudAndBindingsMethods {
     this.demoDirector.initUI();
 
     const restartFlight = () => {
+      // Respawn, not resume: keep reset/mission-preparation cost out of resume reports.
+      this.frameTransitions?.expectRestart();
       this.gameFlow.enterFlight();
       if (this.devRunner.active) { this.devRunner.restart(); return; }
       if (this.lastPresetType === 'valley') {

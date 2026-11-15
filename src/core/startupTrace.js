@@ -398,6 +398,10 @@ export function buildStartupTraceReport(state, { marks = {}, longTasks = null, n
     boot: {
       marks: { ...marks },
       stagesMs: stageSpans(state, marks),
+      operationsMs: Object.fromEntries(['ui', 'airport', 'shaders', 'crash', 'render'].map(key => {
+        const start = marks[`startup-${key}-start`], end = marks[`startup-${key}-end`];
+        return [key, Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : null];
+      })),
       moduleStartToReadyMs: span('module-start', ready),
     },
     longTasks: longTasks || { count: 0, totalMs: 0, maxMs: 0 },

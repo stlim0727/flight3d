@@ -288,7 +288,7 @@ function collectSnapshot(g, state) {
   }
 }
 
-function readDevice(g) {
+export function readDevice(g) {
   const nav = g.navigator || {};
   const conn = nav.connection || {};
   return {
@@ -309,7 +309,7 @@ function readDevice(g) {
  * low-cardinality and let insights exclude software-rendered CI traffic from real-user
  * percentiles. Reads the app's existing context, so no GL context is created for telemetry.
  */
-function readGpuClass(g) {
+export function readGpuClass(g) {
   try {
     const context = g.sim?.renderer?.getContext?.();
     if (!context) return { softwareGpu: null, gpuClass: null };

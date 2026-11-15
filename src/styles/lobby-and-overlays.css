@@ -973,7 +973,7 @@ body[data-flow="lobby"] #incheon-attribution-chip { display: none; }
 .startup-overlay { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; background: #09111f; color: #e8eef7; padding: 24px; }
 .startup-overlay[hidden] { display: none; }
 .startup-overlay.scene-ready { background: rgb(9 17 31 / 22%); }
-.startup-card { width: min(340px, 100%); box-sizing: border-box; padding: 28px; border: 1px solid rgb(148 163 184 / 25%); border-radius: 16px; background: rgb(9 17 31 / 88%); box-shadow: 0 16px 48px rgb(0 0 0 / 25%); text-align: center; }
+.startup-card { width: min(480px, 100%); max-height: calc(100dvh - 48px); overflow-y: auto; box-sizing: border-box; padding: 24px; border: 1px solid rgb(148 163 184 / 25%); border-radius: 16px; background: rgb(9 17 31 / 88%); box-shadow: 0 16px 48px rgb(0 0 0 / 25%); text-align: center; }
 .startup-card h1 { margin: 0 0 24px; font-size: 28px; letter-spacing: 2px; }
 .startup-card p { min-height: 1.5em; line-height: 1.5; }
 .startup-card progress { width: 100%; height: 12px; accent-color: #60a5fa; }
@@ -1173,3 +1173,22 @@ body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display
   }
 }
 
+
+/* Loading details stay readable on short/mobile displays; history scrolls independently. */
+.startup-progress-meta { text-align: left; color: #a5cfff; font-size: 12px; }
+.startup-card .startup-detail { margin: 10px 0 4px; font-size: 14px; }
+.startup-card .startup-elapsed { margin: 0 0 12px; color: #94a3b8; font-size: 12px; font-variant-numeric: tabular-nums; }
+.startup-card .startup-wait { color: #fde68a; font-size: 12px; text-align: left; }
+.startup-details { text-align: left; border-top: 1px solid #334155; padding-top: 12px; }
+.startup-details summary { cursor: pointer; color: #bae6fd; font-size: 13px; padding: 6px 0; }
+.startup-details summary:focus-visible, .startup-log:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
+.startup-log { max-height: min(180px, 28dvh); overflow-y: auto; overscroll-behavior: contain; margin: 8px 0 0; padding: 0 4px; list-style: none; }
+.startup-log li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #1e293b; color: #a5b4c8; font-size: 12px; }
+.startup-log li[data-state="active"] { color: #e0f2fe; }
+.startup-log li[data-state="failed"] { color: #fca5a5; }
+.startup-log-time { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+@media (max-width: 480px), (max-height: 520px) {
+  .startup-overlay { padding: 12px; }
+  .startup-card { padding: 18px; max-height: calc(100dvh - 24px); }
+  .startup-card h1 { margin-bottom: 12px; }
+}

@@ -50,3 +50,29 @@ Preparation rejection/cancellation propagates to the outer start transaction.
 Ordinary presets, demos and mission adapters each own their own fresh recording;
 commitment must not reset the prepared mission seed. Failed coordinated starts
 stop recording and discard old crash/debrief presentation state.
+
+
+## Loading presentation
+
+`StartupProgressView` shares the startup card between initial boot and coordinated scene
+changes. The primary bar counts milestones, not estimated download percentages. Details
+show the active operation and total/current-task elapsed time. The expandable history
+retains at most 40 completed/active operations with durations and its own scroll region;
+new entries follow the bottom only while the user is already there. The eight-second
+notice says the task is taking time, without diagnosing a hang or inventing progress.
+History and the 500 ms display timer reset for a new scene change and stop on completion
+or failure. Failures expand history to keep the interrupted operation visible. Labels
+are localized in Korean and English; URLs, raw console messages and stack traces do not
+appear in this user-facing history. Synchronous work can still pause the elapsed display;
+recorded durations catch up after the browser can update again.
+
+After `npm run build`, run the browser check with hardware GPU access:
+
+```sh
+GPU_ANGLE=vulkan CHROME_PATH=/home/stlim/.local/bin/chrome-headless node scripts/verify-loading-progress.mjs
+```
+
+It holds an actual boot await boundary to exercise the long-wait notice, keyboard disclosure,
+mobile/landscape layout and scrollable history, then releases boot and changes scenery to
+check reset/completion. Test telemetry is disabled. Reports and screenshots are saved in
+`.cache/loading-progress/`.
