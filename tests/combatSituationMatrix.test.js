@@ -141,3 +141,32 @@ test('combat situation: anomaly detector identifies BVR coasting and short-range
   const tvcIds = tvcAnomalies.map(a => a.id);
   assert.ok(!tvcIds.includes('SHORT_RANGE_BEAM_ALWAYS_MISS'), 'TVC should mitigate short-range beam always-miss anomaly on AIM-9X');
 });
+
+test('combat situation: diagnostic flare controls observe without changing the launch', () => {
+  const base = { type: 'AIM9X', rangeM: 2500, aspectDeg: 0, shooterAltM: 1500,
+    targetAltM: 1500, shooterSpeedMps: 250, targetSpeedMps: 180,
+    targetBehavior: 'evasive_ai', countermeasures: false, chaff: false };
+  const control = simulateCombatSituation({ ...base, flares: true, threatResponseEnabled: true });
+  const detailed = simulateCombatSituation({ ...base, flares: true, threatResponseEnabled: true,
+    recordDetail: true });
+  assert.equal(detailed.terminal, control.terminal);
+  assert.equal(detailed.minSeparationM, control.minSeparationM);
+  assert.ok(detailed.detail.length > 0, 'detail trace retains 120 Hz samples');
+  assert.ok(detailed.detail.some(s => s.seekerTargetType === 'flare' && s.seekerState === 'track'),
+    'the representative geometry captures the flare');
+  assert.ok(control.decoyTransfers > 0);
+
+  const cutoff = simulateCombatSituation({ ...base, flares: true, threatResponseEnabled: true,
+    flareObservationCutoffSeconds: 0.2, recordDetail: true });
+  assert.equal(JSON.stringify(cutoff.launchState), JSON.stringify(control.launchState));
+  assert.equal(cutoff.decoyTransfers, 1, 'the flare transfer is still confirmed before the cutoff');
+  assert.ok(cutoff.detail.some(s => s.seconds > 0.85 && s.seekerTargetType === 'bandit'),
+    'hiding the flare allows a prompt aircraft reacquisition');
+
+  const manual = simulateCombatSituation({ ...base, flares: true, threatResponseEnabled: false,
+    manualFlareAtSeconds: 0.65 });
+  assert.equal(JSON.stringify(manual.launchState), JSON.stringify(control.launchState));
+  assert.equal(manual.defense.flaresDispensed, 1, 'manual control dispenses exactly one flare');
+  assert.equal(manual.defense.evasionSeconds, 0, 'manual control keeps the target out of evasion');
+  assert.equal(manual.decoyTransfers, 1);
+});

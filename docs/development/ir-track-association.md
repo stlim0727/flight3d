@@ -95,3 +95,8 @@ terrain/memory, IR emission, physics, combat and replay contracts.
 
 No rendering/UI effects changed. All evidence here is Node numerical testing;
 full game-scene, human sortie and real weapon performance are not verified.
+
+The later [2.5 km recovery audit](ir-recovery-25km.md) separates flare capture,
+aircraft reacquisition and terminal guidance with paired controls. It finds the
+remaining 2.5 km misses are sustained decoy-track geometry, not a seeker-state
+or event defect.

@@ -25,6 +25,9 @@ const dt = COMBAT_MATRIX_TIMESTEP_S;
  * - chaff / flares: independently override inventory permission
  * - threatResponseEnabled: warning/reaction override on the same flight fixture
  * - recordTrajectory: retain 5 Hz observed target/missile state, plus terminal state
+ * - recordDetail: retain 120 Hz seeker/guidance/energy state for diagnosis
+ * - manualFlareAtSeconds: diagnostic intervention, dispense one flare without evasion
+ * - flareObservationCutoffSeconds: diagnostic intervention, hide flares after this age
  * - terrainHeight: optional terrain elevation function
  * - maxSimTimeSec: maximum simulation duration before timeout
  */
@@ -43,6 +46,9 @@ export function simulateCombatSituation({
   flares = countermeasures,
   threatResponseEnabled = targetBehavior === 'evasive_ai',
   recordTrajectory = false,
+  recordDetail = false,
+  manualFlareAtSeconds = null,
+  flareObservationCutoffSeconds = null,
   rwr = true,
   tvc = true,
   terrainHeight = () => 0,
@@ -207,6 +213,8 @@ export function simulateCombatSituation({
       launchState: null,
       defense: null,
       trajectory: null,
+      detail: null,
+      decoyTransferSeconds: [],
       launched: false,
       terminal: 'no-lock',
       terminalSeconds: 0,
@@ -245,6 +253,8 @@ export function simulateCombatSituation({
       launchState: null,
       defense: null,
       trajectory: null,
+      detail: null,
+      decoyTransferSeconds: [],
       launched: false,
       terminal: 'fire-failed',
       terminalSeconds: 0,
@@ -290,13 +300,84 @@ export function simulateCombatSituation({
   sampleTrajectory();
   const guidanceLossReasons = new Set();
   const seekerLossReasons = new Set();
+  const detail = recordDetail ? [] : null;
+  const decoyTransferSeconds = [];
+  let manualFlareDispensed = false;
+  const sampleDetail = () => {
+    if (!detail || !missile.alive) return;
+    const range = missile.position.distanceTo(target.position);
+    const speed = missile.velocity.length();
+    const los = target.position.clone().sub(missile.position);
+    const losAngleDeg = speed > 1e-6 ? Math.acos(Math.max(-1, Math.min(1,
+      missile.velocity.dot(los) / (speed * range)))) * (180 / Math.PI) : 180;
+    const closing = range > 1e-6
+      ? -los.dot(target.velocity.clone().sub(missile.velocity)) / range : 0;
+    const seeker = missile.seeker;
+    const estimateErrorM = seeker?.hasEstimate && seeker.target
+      ? seeker.estimate.position.distanceTo(seeker.target.position) : null;
+    const flight = missile.flight;
+    detail.push({
+      seconds: terminalSeconds,
+      targetPosition: target.position.toArray(),
+      targetVelocity: target.velocity.toArray(),
+      targetSpeedMps: target.velocity.length(),
+      targetG: target.flight?.aero.gForce ?? null,
+      warningPhase: target.threatResponse.phase,
+      responseWeight: target.threatResponse.weight,
+      missilePosition: missile.position.toArray(),
+      missileVelocity: missile.velocity.toArray(),
+      missileSpeedMps: speed,
+      propellant: missile.propellant,
+      rangeM: range,
+      losAngleDeg,
+      closingMps: closing,
+      seekerState: seeker?.state ?? null,
+      seekerTargetType: seeker?.target?.type ?? null,
+      seekerTargetId: seeker?.target?.id ?? null,
+      observationLossReason: seeker?.lastObservation?.lossReason ?? null,
+      observationRangeM: seeker?.lastObservation?.rangeM ?? null,
+      observationQuality: seeker?.lastObservation?.signalQuality ?? null,
+      estimateErrorM,
+      estimatePosition: seeker?.hasEstimate ? seeker.estimate.position.toArray() : null,
+      guidanceActive: missile.lastGuidance?.active ?? null,
+      guidanceReason: missile.lastGuidance?.reason ?? null,
+      requestedLateralMps2: flight.requestedLateralMps2,
+      availableLateralMps2: flight.availableLateralMps2,
+      deliveredLateralMps2: flight.deliveredLateralMps2,
+      dynamicPressurePa: flight.dynamicPressurePa,
+      flares: combat.flares.map(flare => ({
+        id: flare.id,
+        age: flare.age,
+        rangeM: flare.position.distanceTo(missile.position),
+        emission: flare.infraredEmission,
+        position: flare.position.toArray(),
+      })),
+    });
+  };
 
   const maxSteps = Math.round(maxSimTimeSec / dt);
   for (let step = 0; step < maxSteps; step++) {
+    const stepSeconds = (step + 1) * dt;
+    if (manualFlareAtSeconds !== null && !manualFlareDispensed
+      && stepSeconds + 1e-9 >= manualFlareAtSeconds) {
+      const flare = target.flare.dispense(target.position, target.velocity, { sourceId: target.id });
+      if (flare) {
+        target.flareThreatIds.add('manual');
+        combat.flares.push(flare);
+        defense.flaresDispensed++;
+      }
+      manualFlareDispensed = true;
+    }
+    if (flareObservationCutoffSeconds !== null) {
+      for (const flare of combat.flares) {
+        if (flare.age + 1e-9 >= flareObservationCutoffSeconds) flare.alive = false;
+      }
+    }
     world.position.addScaledVector(world.velocity, dt);
 
     const events = combat.update(dt, world);
-    terminalSeconds = (step + 1) * dt;
+    terminalSeconds = stepSeconds;
+    sampleDetail();
     const response = target.threatResponse;
     if (response.observedId !== null && defense.firstWarningSeconds === null) {
       defense.firstWarningSeconds = terminalSeconds;
@@ -335,7 +416,10 @@ export function simulateCombatSituation({
     for (const ev of events) {
       if (ev.type === 'chaff_dispense' && ev.target === target) defense.chaffDispensed++;
       if (ev.type === 'flare_dispense' && ev.target === target) defense.flaresDispensed++;
-      if (ev.type === 'decoy_transfer') decoyTransfers++;
+      if (ev.type === 'decoy_transfer') {
+        decoyTransfers++;
+        decoyTransferSeconds.push(terminalSeconds);
+      }
       if (ev.type === 'damage' && ev.target === target) {
         damageInflicted = Math.max(damageInflicted, ev.damage);
       }
@@ -393,6 +477,8 @@ export function simulateCombatSituation({
     launchState,
     defense,
     trajectory,
+    detail,
+    decoyTransferSeconds,
     launched: true,
     terminal,
     terminalSeconds: Number(terminalSeconds.toFixed(3)),
