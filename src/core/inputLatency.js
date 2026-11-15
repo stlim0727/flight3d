@@ -158,7 +158,9 @@ export function windowSummary(state, fromMs, toMs) {
 }
 
 export function longTaskSummary(state, fromMs, toMs) {
-  const items = inWindow(state.longTasks, fromMs, toMs, t => t.startMs);
+  // Overlap, not start time: a transition can begin inside the long task that runs its
+  // synchronous setters, and a start-only filter would report that stall as zero.
+  const items = state.longTasks.filter(t => t.startMs <= toMs && t.startMs + t.durationMs >= fromMs);
   if (!items.length) return { count: 0, totalMs: 0, maxMs: 0 };
   return {
     count: items.length,

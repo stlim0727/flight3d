@@ -30,6 +30,27 @@ test('resume measures state change through render and a paint opportunity, once'
     firstFrameMs: 500, renderMs: 450, paintOpportunityMs: 550, longTasks: { start: 100, end: 650 } }]);
 });
 
+test('a restart respawn is not measured as a resume and the intent does not leak', () => {
+  const f = fixture();
+  f.monitor.flowChanged('paused', false);
+  f.monitor.expectRestart();
+  f.monitor.flowChanged('flight', false);
+  assert.equal(f.monitor.pending, null);
+  f.monitor.flowChanged('paused', false);
+  f.monitor.flowChanged('flight', false);
+  assert.equal(f.monitor.pending?.kind, 'resume');
+});
+
+test('render-time context supersedes the state-change snapshot', () => {
+  const f = fixture();
+  f.monitor.flowChanged('paused', false);
+  f.monitor.flowChanged('flight', false, { camera: 6 });
+  f.time(20);
+  f.monitor.rendered(10, { camera: 1 });
+  f.paints.shift()();
+  assert.equal(f.reports[0].camera, 1, 'pause view already restored by the measured render');
+});
+
 test('hide, leave, and superseded transitions cannot emit stale paint samples', () => {
   for (const cancel of [f => f.monitor.cancel(), f => f.hide(true), f => f.monitor.flowChanged('paused', false)]) {
     const f = fixture();

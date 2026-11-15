@@ -1574,7 +1574,9 @@ class FlightSimulator {
     const renderStart = measuredRender ? performance.now() : 0;
     if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-render-start');
     this.renderScene();
-    if (measuredRender) this.frameTransitions?.rendered(performance.now() - renderStart);
+    if (measuredRender) {
+      this.frameTransitions?.rendered(performance.now() - renderStart, { camera: this.cameraSystem.mode });
+    }
     if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-render-end');
     if (!this.hasRenderedFirstFrame) {
       this.hasRenderedFirstFrame = true;

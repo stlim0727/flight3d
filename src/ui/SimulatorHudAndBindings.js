@@ -571,6 +571,8 @@ class SimulatorHudAndBindingsMethods {
     this.demoDirector.initUI();
 
     const restartFlight = () => {
+      // Respawn, not resume: keep reset/mission-preparation cost out of resume reports.
+      this.frameTransitions?.expectRestart();
       this.gameFlow.enterFlight();
       if (this.devRunner.active) { this.devRunner.restart(); return; }
       if (this.lastPresetType === 'valley') {

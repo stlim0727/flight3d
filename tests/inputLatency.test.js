@@ -51,6 +51,10 @@ test('window summaries report count, worst, p95, processing wait and long-task a
   addLongTask(s, { startTime: 9000, duration: 400 });
   assert.deepEqual(longTaskSummary(s, 0, 500), { count: 1, totalMs: 7000, maxMs: 7000 });
   assert.deepEqual(longTaskSummary(s, -Infinity, 10_000), { count: 2, totalMs: 7400, maxMs: 7000 });
+  const overlap = createInputLatencyState();
+  addLongTask(overlap, { startTime: 90, duration: 400 });
+  assert.deepEqual(longTaskSummary(overlap, 100, 600), { count: 1, totalMs: 400, maxMs: 400 });
+  assert.deepEqual(longTaskSummary(overlap, 500, 600), { count: 0, totalMs: 0, maxMs: 0 });
 });
 
 test('first-seconds summary anchors on first-frame and reports the first input after boot', () => {

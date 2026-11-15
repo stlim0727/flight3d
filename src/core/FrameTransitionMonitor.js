@@ -4,12 +4,19 @@ export class FrameTransitionMonitor {
     Object.assign(this, { clock, afterPaint, isHidden, emit, longTasks });
     this.pending = null;
     this.previous = null;
+    this.restartPending = false;
   }
+
+  /** The next flight transition respawns the aircraft; it is a restart, not a resume. */
+  expectRestart() { this.restartPending = true; }
 
   flowChanged(state, resumable, context = {}) {
     const previous = this.previous;
     this.previous = { state, resumable };
+    const restart = this.restartPending;
+    this.restartPending = false;
     if (state !== 'flight') { this.cancel(); return; }
+    if (restart) { this.cancel(); return; }
     if (previous?.state === 'paused' || (previous?.state === 'lobby' && previous.resumable)) {
       this.begin('resume', { from: previous.state, ...context });
     }
@@ -22,10 +29,13 @@ export class FrameTransitionMonitor {
 
   cancel() { this.pending = null; }
 
-  rendered(renderMs) {
+  /** Context passed here describes the rendered frame, so it supersedes the state-change
+   * snapshot (a resume restores its flight camera after `flowChanged`). */
+  rendered(renderMs, context = {}) {
     const pending = this.pending;
     if (!pending || pending.rendered !== undefined) return;
     if (this.isHidden()) { this.cancel(); return; }
+    Object.assign(pending.context, context);
     pending.rendered = this.clock();
     this.afterPaint(() => {
       if (this.pending !== pending) return;
