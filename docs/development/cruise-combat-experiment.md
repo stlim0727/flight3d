@@ -1,5 +1,11 @@
 # Coastal Cruise virtual-pilot experiment
 
+> Historical baseline. Its pursuit adapter omitted the player's virtual
+> elevator/rudder routing, so the acceleration/controller conclusions below
+> are provisional. See [latest-main revalidation](coastal-cruise-revalidation.md)
+> for the corrected adapter and confirmed-lock single-shot results. Current
+> `probe-cruise-combat.mjs` runs that corrected 18-case experiment.
+
 2026-11-15, main `c2331901b5cbdd7f581a36573825e74395a6ea8d`, issue #713.
 This is a deterministic numerical reproduction of a reported difficult start,
 not a real-world missile success-rate estimate or a browser acceptance test.
@@ -14,7 +20,8 @@ timeout --signal=TERM --kill-after=5s 60s node scripts/probe-cruise-combat.mjs
 Twelve sorties, 100 simulated seconds each, 120 Hz. Local outputs:
 `.cache/cruise-combat/report.json` (full trajectories) and `summary.json`
 (initial conditions, individual missiles, guidance, outcomes and event records).
-The recorded summary is [cruise-combat-results.json](cruise-combat-results.json).
+The historical recorded summary is preserved at
+[commit 367af0a](https://github.com/stlim0727/flight3d/blob/367af0a/docs/development/cruise-combat-results.json).
 The final run completed in approximately 11 seconds on this host.
 
 ## Scope and controls
