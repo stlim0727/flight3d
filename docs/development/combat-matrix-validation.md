@@ -4,6 +4,9 @@ The authoritative implementation status and follow-up order remain in
 [issue #713](https://github.com/stlim0727/flight3d/issues/713).
 This tool checks model behavior; its scenario fractions are not real-world kill probabilities.
 
+For comparisons with independently controlled chaff, flares and warning/reaction
+on the same initial flight fixture, see [controlled defense audit](combat-defense-audit.md).
+
 ## Reproduce a report
 
 From a clean checkout with installed dependencies:

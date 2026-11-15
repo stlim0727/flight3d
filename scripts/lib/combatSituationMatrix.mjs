@@ -1,4 +1,4 @@
-import { Quaternion, Vector3, MathUtils } from 'three';
+import { Euler, Quaternion, Vector3, MathUtils } from 'three';
 import { AirToAirMissileSystem, BanditTarget } from '../../src/weapons/AirToAirMissileSystem.js';
 import { MISSILE_TYPES } from '../../src/weapons/missileSpecs.js';
 
@@ -21,7 +21,10 @@ const dt = COMBAT_MATRIX_TIMESTEP_S;
  * - targetSpeedMps: true airspeed of target
  * - targetBehavior: 'straight' | 'orbit' | 'break_turn' | 'evasive_ai'
  * - offBoresightDeg: shooter heading offset relative to target line-of-sight
- * - countermeasures: boolean, whether bandit drops chaff/flares
+ * - countermeasures: default inventory permission for both decoy types
+ * - chaff / flares: independently override inventory permission
+ * - threatResponseEnabled: warning/reaction override on the same flight fixture
+ * - recordTrajectory: retain 5 Hz observed target/missile state, plus terminal state
  * - terrainHeight: optional terrain elevation function
  * - maxSimTimeSec: maximum simulation duration before timeout
  */
@@ -36,6 +39,10 @@ export function simulateCombatSituation({
   targetBehavior = 'orbit',
   offBoresightDeg = 0,
   countermeasures = false,
+  chaff = countermeasures,
+  flares = countermeasures,
+  threatResponseEnabled = targetBehavior === 'evasive_ai',
+  recordTrajectory = false,
   rwr = true,
   tvc = true,
   terrainHeight = () => 0,
@@ -48,7 +55,7 @@ export function simulateCombatSituation({
   }
   const inputs = { type, rangeM, aspectDeg, shooterAltM, targetAltM,
     shooterSpeedMps, targetSpeedMps, targetBehavior, offBoresightDeg,
-    countermeasures, rwr, tvc, maxSimTimeSec };
+    countermeasures, chaff, flares, threatResponseEnabled, recordTrajectory, rwr, tvc, maxSimTimeSec };
   const targetPos = new Vector3(0, targetAltM, 0);
 
   // Target base heading is along -Z (north).
@@ -135,10 +142,14 @@ export function simulateCombatSituation({
     });
   }
 
-  if (!countermeasures) {
-    target.flare.remaining = 0;
-    target.chaff.remaining = 0;
+  // Keep warning/reaction and inventory independent for paired experiments.
+  // The straight fixture has no flight controller and cannot react to warnings.
+  if (threatResponseEnabled && !target.flight) {
+    throw new TypeError('Threat response requires a physical flight target');
   }
+  target.threatResponse.enabled = threatResponseEnabled;
+  if (!flares) target.flare.remaining = 0;
+  if (!chaff) target.chaff.remaining = 0;
 
   const specs = tvc
     ? MISSILE_TYPES
@@ -150,7 +161,7 @@ export function simulateCombatSituation({
   const combat = new AirToAirMissileSystem({
     stations: [{ id: 'STA_TEST', type, position: [-5.04, 0.04, 2.45] }],
     specs,
-    banditEvasion: targetBehavior === 'evasive_ai',
+    banditEvasion: threatResponseEnabled,
     banditRwr: rwr,
   });
   combat.addTarget(target);
@@ -195,6 +206,7 @@ export function simulateCombatSituation({
       inputs,
       launchState: null,
       defense: null,
+      trajectory: null,
       launched: false,
       terminal: 'no-lock',
       terminalSeconds: 0,
@@ -232,6 +244,7 @@ export function simulateCombatSituation({
       inputs,
       launchState: null,
       defense: null,
+      trajectory: null,
       launched: false,
       terminal: 'fire-failed',
       terminalSeconds: 0,
@@ -258,6 +271,23 @@ export function simulateCombatSituation({
   const defense = { chaffDispensed: 0, flaresDispensed: 0,
     firstWarningSeconds: null, firstConfirmedThreatSeconds: null,
     firstEvasionSeconds: null, evasionSeconds: 0 };
+  const trajectory = recordTrajectory ? [] : null;
+  const attitude = new Euler(0, 0, 0, 'YXZ');
+  const sampleTrajectory = () => {
+    if (!trajectory) return;
+    const bankDeg = target.quaternion
+      ? -MathUtils.radToDeg(attitude.setFromQuaternion(target.quaternion, 'YXZ').z) : null;
+    trajectory.push({ seconds: terminalSeconds,
+      targetPosition: target.position.toArray(), targetVelocity: target.velocity.toArray(),
+      targetSpeedMps: target.velocity.length(), targetG: target.flight?.aero.gForce ?? null,
+      targetBankDeg: bankDeg, warningPhase: target.threatResponse.phase,
+      responseWeight: target.threatResponse.weight,
+      missilePosition: missile.position.toArray(), missileSpeedMps: missile.velocity.length(),
+      seekerState: missile.seeker?.state ?? null,
+      seekerTargetType: missile.seeker?.target?.type ?? null,
+    });
+  };
+  sampleTrajectory();
   const guidanceLossReasons = new Set();
   const seekerLossReasons = new Set();
 
@@ -315,6 +345,10 @@ export function simulateCombatSituation({
         break;
       }
     }
+    // Fixed 5 Hz history plus terminal state; no simulation state is changed.
+    if ((step + 1) % 24 === 0 || terminal === 'hit' || !target.alive || !missile.alive || step === maxSteps - 1) {
+      sampleTrajectory();
+    }
     if (terminal === 'hit') break;
 
     if (!target.alive) {
@@ -358,6 +392,7 @@ export function simulateCombatSituation({
     inputs,
     launchState,
     defense,
+    trajectory,
     launched: true,
     terminal,
     terminalSeconds: Number(terminalSeconds.toFixed(3)),
