@@ -27,8 +27,10 @@ test('nearby strong chaff competes after confirmation; IR ignores it and radar r
   cloud.update(0.5);
   const radar = new MissileSeeker(MISSILE_TYPES.AIM120C), ir = new MissileSeeker(MISSILE_TYPES.AIM9X);
   assert.ok(radar.seed(t, observer, world)); assert.ok(ir.seed(t, observer, world));
-  radar.update(0.1, observer, [t, cloud], world); assert.equal(radar.state, 'memory');
+  radar.update(0.1, observer, [t, cloud], world); assert.equal(radar.state, 'track');
+  assert.equal(radar.seekerEvents.filter(e => e.type === 'decoy_transfer').length, 0);
   radar.update(0.2, observer, [t, cloud], world); assert.equal(radar.target, cloud);
+  assert.equal(radar.seekerEvents.filter(e => e.type === 'decoy_transfer').length, 1);
   ir.update(0.5, observer, [t, cloud], world); assert.equal(ir.target, t);
   cloud.update(CHAFF_MODEL.lifetimeS);
   radar.update(0.1, observer, [t, cloud], world);

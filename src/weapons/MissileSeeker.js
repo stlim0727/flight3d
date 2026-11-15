@@ -2,6 +2,16 @@ import * as THREE from 'three';
 import { infraredSignalQuality } from './InfraredSignal.js';
 import { radarSignalQuality } from './RadarSignal.js';
 
+// Optical association assumptions, not measured AIM-9X image-processing limits.
+export const IR_ASSOCIATION = Object.freeze({ angularMeasurementRad: 0.001 });
+
+function angularRate(observer, position, velocity, out) {
+  const line = position.clone().sub(observer.position);
+  const rangeSq = Math.max(1, line.lengthSq());
+  const relative = velocity.clone().sub(observer.velocity ?? new THREE.Vector3());
+  return out.crossVectors(line, relative).divideScalar(rangeSq);
+}
+
 /**
  * Detailed evaluation of seeker visibility conditions.
  * Returns both the boolean result and the first failing constraint reason.
@@ -137,7 +147,20 @@ export class MissileSeeker {
       const origin = observer.position;
       const line = reference.position.clone().sub(origin);
       const referenceRange = line.length();
-      let strongest = qualityAt(reference, referenceRange);
+      // Associate visible returns with the measured track's angular motion.
+      // Apply the same continuous likelihood to every source, including the
+      // current source: no contact type, sourceId or hidden target exception.
+      const predictedRate = new THREE.Vector3();
+      const candidateRate = new THREE.Vector3();
+      if (isIR && this.hasEstimate) angularRate(observer, this.estimate.position, this.estimate.velocity, predictedRate);
+      const association = contact => {
+        if (!isIR || !this.hasEstimate) return 1;
+        angularRate(observer, contact.position, contact.velocity, candidateRate);
+        const sigma = (this.spec.seekerAngularResolutionRad ?? IR_ASSOCIATION.angularMeasurementRad)
+          / this.spec.seekerAcquireSeconds;
+        return Math.exp(-0.5 * candidateRate.distanceToSquared(predictedRate) / (sigma * sigma));
+      };
+      let strongest = qualityAt(reference, referenceRange) * association(reference);
       for (const candidate of targets) {
         if (candidate === reference || (reference.type !== decoyType && candidate.type !== decoyType)
           || !seekerCanObserve(this.spec, observer, candidate, world)) continue;
@@ -146,7 +169,7 @@ export class MissileSeeker {
         const angle = line.angleTo(other);
         const rangeOffset = isIR ? 0 : (range - referenceRange) / 300;
         const weight = Math.exp(-0.5 * ((angle / 0.05) ** 2 + rangeOffset ** 2));
-        const quality = qualityAt(candidate, range) * weight;
+        const quality = qualityAt(candidate, range) * weight * association(candidate);
         if (quality > strongest) {
           const decoyEval = evaluateSeekerObservation(this.spec, observer, candidate, world);
           observed = candidate;
@@ -160,19 +183,6 @@ export class MissileSeeker {
       this.lastObservation = observedEval;
     }
 
-    // Check if decoy seduced lock from a real target
-    if (observed && prevTarget && prevTarget.type !== 'flare' && prevTarget.type !== 'chaff'
-      && (observed.type === 'flare' || observed.type === 'chaff') && observed !== prevTarget) {
-      this.seekerEvents.push({
-        type: 'decoy_transfer',
-        decoy: observed,
-        decoyType: observed.type,
-        prevTarget,
-        separationAngleDeg: observedEval?.aspectAngleDeg ?? 0,
-        signalQuality: observedEval?.signalQuality ?? 0,
-      });
-    }
-
     if (observed && this.state === 'track' && observed === this.target) {
       this._measure(observed);
       return;
@@ -181,7 +191,24 @@ export class MissileSeeker {
       ? (observed === this.pendingTarget ? this.confirmationSeconds + dt : dt) : 0;
     this.pendingTarget = observed;
     if (observed && this.confirmationSeconds + 1e-9 >= this.spec.seekerAcquireSeconds) {
+      if (prevTarget && prevTarget.type !== 'flare' && prevTarget.type !== 'chaff'
+        && (observed.type === 'flare' || observed.type === 'chaff') && observed !== prevTarget) {
+        this.seekerEvents.push({ type: 'decoy_transfer', decoy: observed, decoyType: observed.type,
+          prevTarget, separationAngleDeg: observedEval?.aspectAngleDeg ?? 0,
+          signalQuality: observedEval?.signalQuality ?? 0 });
+      }
       this._measure(observed);
+      this._recordStateChange(prevState);
+      return;
+    }
+    // A competing hypothesis must not freeze a still-visible confirmed track.
+    // Keep its fresh measurement while confirmation of the candidate proceeds.
+    if (this.target && this.hasEstimate && targets.includes(this.target)
+      && evaluateSeekerObservation(this.spec, observer, this.target, world).canObserve) {
+      this.estimate.position.copy(this.target.position);
+      this.estimate.velocity.copy(this.target.velocity);
+      this.observationAgeSeconds = 0;
+      this.state = 'track';
       this._recordStateChange(prevState);
       return;
     }

@@ -22,7 +22,11 @@ IR seekers compare the target and eligible flare signal using a Gaussian angular
 weight with assumed 0.05 rad scale. Unlike the radar channel, IR competition does
 not use range resolution; range still affects signal intensity and existing seeker
 range/LOS gates. A stronger return must satisfy the existing acquisition delay;
-finite memory and reacquisition are unchanged. Radar ignores flares, IR ignores
+visible incumbent measurements continue while a competing return is confirmed.
+Confirmed replacement emits one transfer event. The IR channel additionally
+uses [angular-motion association](ir-track-association.md); its measurement
+uncertainty is an explicit assumption and sensitivity is recorded there.
+Finite memory still applies to unavailable observations. Radar ignores flares, IR ignores
 chaff, and the explicit signal callback overrides channel modeling and decoy
 competition. There is no random success or guaranteed lock break. Spectral
 filtering, background, real seeker discrimination and beam shape remain unmodeled.
@@ -31,8 +35,8 @@ filtering, background, real seeker discrimination and beam shape remain unmodele
 signal, invalid values, motion, geometry/terrain, IR diversion/reacquisition, radar
 isolation, multiple warning IDs and reset. Existing focused sensor and combat
 regressions also run. The existing maneuver-only comparison explicitly disables
-countermeasures; the default comparison includes them. In the current 18-case
-matrix, the three launched defensive cases expire and twelve cases never obtain a
+countermeasures; the default comparison includes them. In the historical
+pre-association 18-case matrix, the three launched defensive cases expire and twelve cases never obtain a
 launch lock; the three non-evasive launched cases hit. This tiny, assumed-parameter
 sample is not a real-world success rate and should not be read as proof of immunity.
 

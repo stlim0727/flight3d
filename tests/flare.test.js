@@ -28,8 +28,10 @@ test('IR diverts after confirmation and reacquires after flare fades; radar igno
   const ir = new MissileSeeker(MISSILE_TYPES.AIM9X), radar = new MissileSeeker(MISSILE_TYPES.AIM120C);
   assert.ok(ir.seed(t, o, world)); assert.ok(radar.seed(t, o, world));
   assert.equal(seekerCanObserve(MISSILE_TYPES.AIM120C, o, f, world), false);
-  ir.update(0.05, o, [t, f], world); assert.equal(ir.state, 'memory');
+  ir.update(0.05, o, [t, f], world); assert.equal(ir.state, 'track');
+  assert.equal(ir.target, t); assert.equal(ir.seekerEvents.filter(e => e.type === 'decoy_transfer').length, 0);
   ir.update(0.1, o, [t, f], world); assert.equal(ir.target, f);
+  assert.equal(ir.seekerEvents.filter(e => e.type === 'decoy_transfer').length, 1);
   radar.update(1, o, [t, f], world); assert.equal(radar.target, t);
   f.update(FLARE_MODEL.lifetimeS); ir.update(0.05, o, [t, f], world);
   ir.update(0.1, o, [t, f], world); assert.equal(ir.target, t);
@@ -45,6 +47,73 @@ test('far off-axis, occluded and weak flares do not divert the seeker', () => {
     const seeker = new MissileSeeker(MISSILE_TYPES.AIM9X); seeker.seed(t, o, w);
     seeker.update(1, o, [t, f], w); assert.equal(seeker.target, t, mode);
   }
+});
+
+test('IR association keeps a continuous track when a brighter return has different angular motion', () => {
+  const t = target(); t.position.z = -1500; t.velocity.x = 180;
+  const f = new FlareDispenser().dispense(t.position, new Vector3()); f.update(0.5);
+  const seeker = new MissileSeeker(MISSILE_TYPES.AIM9X); seeker.seed(t, o, world);
+  for (let i = 0; i < 60; i++) {
+    t.position.addScaledVector(t.velocity, 1 / 120);
+    seeker.update(1 / 120, o, [t, f], world);
+    assert.equal(seeker.target, t); assert.equal(seeker.state, 'track');
+  }
+  assert.equal(seeker.seekerEvents.filter(e => e.type === 'decoy_transfer').length, 0);
+});
+
+test('matching-motion flare can still capture; confirmation emits once and reset clears association', () => {
+  const t = target(); t.velocity.x = 120;
+  const f = new FlareDispenser().dispense(t.position, t.velocity);
+  f.infraredEmission = 6;
+  const seeker = new MissileSeeker(MISSILE_TYPES.AIM9X); seeker.seed(t, o, world);
+  for (let i = 0; i < 120; i++) {
+    t.position.addScaledVector(t.velocity, 1 / 120);
+    f.position.addScaledVector(f.velocity, 1 / 120);
+    seeker.update(1 / 120, o, [t, f], world);
+    if (i < 17) assert.equal(seeker.target, t);
+  }
+  assert.equal(seeker.target, f);
+  assert.equal(seeker.seekerEvents.filter(e => e.type === 'decoy_transfer').length, 1);
+  f.alive = false;
+  for (let i = 0; i < 18; i++) seeker.update(1 / 120, o, [t, f], world);
+  assert.equal(seeker.target, t);
+  seeker.reset(); assert.equal(seeker.hasEstimate, false); assert.equal(seeker.seekerEvents.length, 0);
+});
+
+test('candidate confirmation continues measuring a moving visible incumbent', () => {
+  const t = target(), f = new FlareDispenser().dispense(t.position, t.velocity); f.infraredEmission = 6;
+  const seeker = new MissileSeeker(MISSILE_TYPES.AIM9X); seeker.seed(t, o, world);
+  seeker.update(0.05, o, [t, f], world);
+  t.position.x += 2;
+  seeker.update(0.05, o, [t, f], world);
+  assert.equal(seeker.state, 'track'); assert.equal(seeker.target, t);
+  assert.equal(seeker.estimate.position.x, 2); assert.equal(seeker.observationAgeSeconds, 0);
+  f.alive = false; seeker.update(0.05, o, [t, f], world);
+  assert.equal(seeker.pendingTarget, null); assert.equal(seeker.confirmationSeconds, 0);
+  assert.equal(seeker.seekerEvents.filter(e => e.type === 'decoy_transfer').length, 0);
+});
+
+test('IR association follows angular evidence rather than privileging aircraft identity', () => {
+  const t = target(); t.position.z = -1500;
+  const f = new FlareDispenser().dispense(t.position, t.velocity); f.infraredEmission = 6;
+  f.velocity.x = 180; f.infraredEmission = 0.5;
+  const seeker = new MissileSeeker(MISSILE_TYPES.AIM9X); seeker.seed(f, o, world);
+  // A weaker flare already owns the confirmed motion track. A brighter
+  // aircraft with different angular motion does not get a type exemption.
+  for (let i = 0; i < 60; i++) {
+    f.position.addScaledVector(f.velocity, 1 / 120);
+    seeker.update(1 / 120, o, [t, f], world);
+  }
+  assert.equal(seeker.target, f);
+});
+
+test('IR association does not read motion from a terrain-hidden return', () => {
+  const t = target(), f = new FlareDispenser().dispense(t.position.clone().add(new Vector3(400, 0, 0)), t.velocity);
+  f.infraredEmission = 6;
+  Object.defineProperty(f, 'velocity', { get() { throw new Error('hidden velocity read'); } });
+  const w = { terrainHeight: (x, z) => x > 100 && z < -1000 && z > -3000 ? 4000 : 0 };
+  const seeker = new MissileSeeker(MISSILE_TYPES.AIM9X); seeker.seed(t, o, w);
+  seeker.update(1, o, [t, f], w); assert.equal(seeker.target, t);
 });
 
 test('Bandit dispenses once for A-B-A and respawn and combat reset clear state', () => {
