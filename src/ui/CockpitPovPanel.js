@@ -9,6 +9,7 @@ export class CockpitPovPanel {
   constructor(simulator) {
     this.simulator = simulator;
     this.cameraSystem = simulator?.cameraSystem || simulator;
+    this.controls = simulator?.controls || null;
 
     this.panel = typeof document !== 'undefined' ? document.getElementById('cockpit-pov-panel') : null;
     this.toggleBtn = typeof document !== 'undefined' ? document.getElementById('btn-cockpit-pov') : null;
@@ -59,13 +60,18 @@ export class CockpitPovPanel {
     this.sliderY?.addEventListener('input', handleSliderInput);
     this.sliderZ?.addEventListener('input', handleSliderInput);
 
-    // Isolate slider & button keyboard interactions from flight controls
+    // Isolate slider & button keyboard interactions from flight controls (keydown only).
+    // keyup is permitted to propagate to window so any flight control keys released
+    // while interacting with the panel are cleanly cleared by FlightControls.handleKeyUp.
     const stopFlightKeyPropagation = (e) => {
       if (e.key === 'Escape') return; // Allow Escape to dismiss panel
       e.stopPropagation();
     };
     this.panel.addEventListener('keydown', stopFlightKeyPropagation);
-    this.panel.addEventListener('keyup', stopFlightKeyPropagation);
+
+    // Drop held keys when switching focus or pointer interaction into the adjustment panel
+    this.panel.addEventListener('pointerdown', () => this.controls?.releaseAllKeys?.());
+    this.panel.addEventListener('focusin', () => this.controls?.releaseAllKeys?.());
 
     // Step buttons (+ / -)
     const stepButtons = this.panel.querySelectorAll('.cockpit-pov-step');
@@ -104,6 +110,7 @@ export class CockpitPovPanel {
     // Strictly available in cockpit view
     if (this.cameraSystem && this.cameraSystem.mode !== 0) return;
 
+    this.controls?.releaseAllKeys?.();
     this.panel.hidden = false;
     this.toggleBtn?.setAttribute('aria-expanded', 'true');
     this.moreToggleBtn?.setAttribute('aria-expanded', 'true');

@@ -284,9 +284,9 @@ test('CockpitPovPanel keyboard interactions on sliders do not trigger flight con
   };
 
   try {
-    const povPanel = new CockpitPovPanel({ cameraSystem: { mode: 0 } });
+    const povPanel = new CockpitPovPanel({ cameraSystem: { mode: 0 }, controls });
 
-    // 1. Panel stops propagation for arrow keys
+    // 1. Panel stops propagation for arrow keys on keydown
     const arrowEvent = {
       key: 'ArrowLeft',
       code: 'ArrowLeft',
@@ -304,12 +304,23 @@ test('CockpitPovPanel keyboard interactions on sliders do not trigger flight con
     });
     assert.equal(escapeStopped, false, 'Escape should not have propagation stopped');
 
-    // 2. FlightControls ignores any event targeting cockpit-pov-panel
+    // 2. FlightControls ignores any keydown event targeting cockpit-pov-panel
     controls.handleKeyDown({
       code: 'ArrowLeft',
       target: mockPanel,
     });
     assert.equal(controls.keys.ArrowLeft, undefined, 'FlightControls must not record keys when target is in cockpit-pov-panel');
+
+    // 3. Keyup is allowed to propagate and clears held flight keys
+    controls.keys.KeyA = true;
+    controls.keys.ArrowUp = true;
+    mockPanel.pointerdown?.({});
+    assert.equal(controls.keys.KeyA, undefined, 'Interacting with panel releases existing held keys');
+    assert.equal(controls.keys.ArrowUp, undefined, 'Interacting with panel releases existing held arrow keys');
+
+    controls.keys.KeyD = true;
+    controls.handleKeyUp({ code: 'KeyD' });
+    assert.equal(controls.keys.KeyD, false, 'Keyup propagates to FlightControls and releases keys');
   } finally {
     globalThis.document = prevDoc;
     if (prevWindow === undefined) delete globalThis.window;
