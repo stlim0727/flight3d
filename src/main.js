@@ -937,8 +937,19 @@ class FlightSimulator {
     return { ok: Boolean(entry), error: error ?? null };
   }
 
-  openFeedbackDialog() {
-    this._openFeedbackDialog?.(this);
+  /** An in-flight report freezes physics behind the dialog and resumes on close. */
+  openFeedbackDialog(options = {}) {
+    const holdFlight = this.gameFlow.state === FLOW.FLIGHT;
+    if (holdFlight) this.gameFlow.pause('feedback');
+    const opened = this._openFeedbackDialog?.(this, {
+      ...options,
+      onClose: () => {
+        if (holdFlight) this.gameFlow.resume('feedback');
+        options.onClose?.();
+      },
+    });
+    if (opened === false && holdFlight) this.gameFlow.resume('feedback');
+    return opened;
   }
 
   openJoystickCheckDialog() {

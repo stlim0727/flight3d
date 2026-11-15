@@ -2,6 +2,99 @@ const finite = value => Number.isFinite(value) ? value : null;
 const vector = value => value ? ['x', 'y', 'z'].map(axis => finite(value[axis])) : null;
 const sample = value => value ? Object.fromEntries(['timeSec', 'x', 'z', 'altitudeFt', 'iasKnots',
   'gForce', 'pitchDeg', 'rollDeg', 'headingDeg'].map(key => [key, finite(value[key])])) : null;
+const byteLength = text => new TextEncoder().encode(text).length;
+
+/** One ingestion event must stay well below the analytics payload limit. */
+export const FLIGHT_LOG_BUDGET_BYTES = 400_000;
+const LOG_UNITS = { time: 's', x: 'm', z: 'm', altitude: 'ft MSL', airspeed: 'kt IAS', attitude: 'deg',
+  gForce: 'g (simulator measured load)', sinkRate: 'ft/min positive down',
+  impactSpeed: 'kt (world velocity magnitude at collision)' };
+const LOG_COORDINATES = 'Three.js world: +Y up; x/z horizontal; altitudeFt = world Y / 0.3048';
+const touchdown = value => ({ timeSec: finite(value?.timeSec), sinkRateFpm: finite(value?.sinkRateFpm),
+  contactG: finite(value?.contactG) });
+
+/**
+ * The sortie's own flight log, attached to a report so the anomaly can be replayed
+ * offline. It is bounded by `budgetBytes`; decimation always keeps the peak-G window
+ * and the final sample, and describes what it dropped in `sampling`.
+ */
+export function buildFlightLog(sim, { budgetBytes = FLIGHT_LOG_BUDGET_BYTES } = {}) {
+  const recorder = sim?.flightRecorder;
+  const held = !recorder?.active ? sim?.debriefReport : null;
+  const source = held ?? recorder;
+  if (!source) return null;
+  const samples = Array.isArray(source.samples) ? source.samples.map(sample) : [];
+  const elapsed = finite(held?.durationSec ?? recorder?.elapsed);
+  const interval = finite(recorder?.active ? recorder.interval : null)
+    ?? (samples.length > 1 ? finite(samples[1].timeSec - samples[0].timeSec) : null);
+  const log = {
+    version: 1,
+    source: held ? 'held-sortie' : 'live-sortie',
+    capturedAtSec: elapsed,
+    metadata: { ...(held?.metadata ?? recorder?.metadata ?? {}) },
+    reason: held?.reason ?? null,
+    durationSec: finite(held?.durationSec ?? recorder?.elapsed),
+    peaks: Object.fromEntries(Object.entries(source.peaks ?? {}).map(([key, value]) => [key, sample(value)])),
+    touchdowns: (source.touchdowns ?? []).map(touchdown),
+    glocIncidents: finite(source.glocIncidents) ?? 0,
+    crash: held?.crash ?? (sim?.isCrashed && sim.crashResult ? {
+      type: sim.crashResult.type ?? null, name: sim.crashResult.name ?? null,
+      description: sim.crashResult.description ?? null,
+    } : null),
+    sufficient: held?.sufficient ?? null,
+    units: held?.units ?? LOG_UNITS,
+    coordinates: held?.coordinates ?? LOG_COORDINATES,
+    samples,
+    sampling: { intervalSec: interval, originalCount: samples.length,
+      retainedCount: samples.length, stride: 1, decimated: false },
+  };
+  return boundFlightLog(log, budgetBytes);
+}
+
+function boundFlightLog(log, budgetBytes) {
+  if (!Number.isFinite(budgetBytes) || budgetBytes <= 0 || byteLength(JSON.stringify(log)) <= budgetBytes) return log;
+  const samples = log.samples;
+  if (samples.length < 3) return log;
+  const overhead = byteLength(JSON.stringify({ ...log, samples: [] }));
+  const costPerSample = Math.max(1, (byteLength(JSON.stringify(samples)) - 2) / Math.max(1, samples.length));
+  const capacity = Math.max(2, Math.floor((budgetBytes - overhead) / costPerSample));
+  const stride = Math.max(1, Math.ceil(samples.length / capacity));
+  let peakIndex = -1;
+  samples.forEach((entry, index) => {
+    if (Number.isFinite(entry.gForce) && (peakIndex < 0 || entry.gForce > samples[peakIndex].gForce)) peakIndex = index;
+  });
+  // The peak and the final sample are never thinned away, even when the window
+  // around the peak has to shrink to make room for the rest of the trace.
+  const protectedIndices = new Set(peakIndex >= 0 ? [peakIndex, samples.length - 1] : [samples.length - 1]);
+  const select = radius => {
+    const keep = new Set();
+    for (let index = 0; index < samples.length; index += stride) keep.add(index);
+    keep.add(samples.length - 1);
+    if (peakIndex >= 0) {
+      for (let index = Math.max(0, peakIndex - radius); index <= Math.min(samples.length - 1, peakIndex + radius); index += 1) keep.add(index);
+    }
+    return [...keep].sort((a, b) => a - b);
+  };
+  let radius = 10;
+  let indices = select(radius);
+  const bounded = () => ({ ...log, samples: indices.map(index => samples[index]),
+    sampling: { ...log.sampling, retainedCount: indices.length,
+      stride: Math.max(1, Math.round(samples.length / Math.max(1, indices.length))), decimated: true } });
+  let result = bounded();
+  while (byteLength(JSON.stringify(result)) > budgetBytes) {
+    if (radius > 0) {
+      radius = radius > 2 ? Math.floor(radius / 2) : radius - 1;
+      indices = select(radius);
+    } else {
+      const next = indices.filter((index, position) => protectedIndices.has(index)
+        || position % 2 === 0 || position === indices.length - 1);
+      if (next.length === indices.length) break;
+      indices = next;
+    }
+    result = bounded();
+  }
+  return result;
+}
 
 /** A bounded snapshot of the sortie being reported, including the exact recorded peak. */
 export function gatherFeedbackDiagnostics(sim) {
@@ -15,7 +108,8 @@ export function gatherFeedbackDiagnostics(sim) {
   const peakIndex = samples.findIndex(value => value.timeSec >= peak?.timeSec);
   const pick = keys => Object.fromEntries(keys.map(key => [key, finite(telemetry[key])]));
   const diagnostics = {
-    diagnosticsVersion: 1,
+    diagnosticsVersion: 2,
+    flightLog: buildFlightLog(sim),
     aircraft: held?.metadata?.aircraft ?? sim.currentAircraftId ?? null,
     airport: held?.metadata?.airport ?? sim.activeAirport ?? null,
     scenario: held?.metadata?.scenario ?? sim.lastPresetType ?? null,
@@ -49,7 +143,8 @@ export function gatherFeedbackDiagnostics(sim) {
   return JSON.parse(JSON.stringify(diagnostics));
 }
 
-export function createFeedbackReport({ message, contact = '', category = 'bug', context = {} }) {
+export function createFeedbackReport({ message, contact = '', category = 'bug', severity = 'major',
+  expected = '', steps = '', context = {} }) {
   const reportId = globalThis.crypto.randomUUID();
   return {
     reportId, createdAt: new Date().toISOString(),
@@ -57,6 +152,7 @@ export function createFeedbackReport({ message, contact = '', category = 'bug', 
       buildCommit: typeof __BUILD_INFO__ !== 'undefined' ? __BUILD_INFO__.revision : 'dev',
       buildVersion: typeof __BUILD_INFO__ !== 'undefined' ? __BUILD_INFO__.version : 'dev',
       feedback_message: message.trim(), feedback_contact: contact.trim(), feedback_category: category,
+      feedback_severity: severity, feedback_expected: expected.trim(), feedback_steps: steps.trim(),
       reportId, clientTimeMs: Date.now() })),
   };
 }

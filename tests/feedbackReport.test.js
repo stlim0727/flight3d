@@ -1,6 +1,7 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFeedbackReport, deliverFeedbackReport, gatherFeedbackDiagnostics } from '../src/analytics/feedbackReport.js';
+import { buildFlightLog, createFeedbackReport, deliverFeedbackReport, FLIGHT_LOG_BUDGET_BYTES,
+  gatherFeedbackDiagnostics } from '../src/analytics/feedbackReport.js';
 import { prepareUserFeedback, sendUserFeedback, _resetAnalyticsForTesting } from '../src/analytics/posthog.js';
 
 const originalWindow = globalThis.window, originalFetch = globalThis.fetch;
@@ -103,6 +104,9 @@ test('snapshot includes held sortie peak, touchdown G, context samples, dynamics
   assert.equal(diagnostics.peakSample.gForce, 51.8);
   assert.equal(diagnostics.recentSamples.length, 30);
   assert.equal(diagnostics.peakSamples.length, 21);
+  assert.equal(diagnostics.flightLog.source, 'held-sortie');
+  assert.equal(diagnostics.flightLog.samples.length, 100);
+  assert.equal(diagnostics.flightLog.crash.timeSec, 19.9);
   assert.equal(diagnostics.gearFailure.sinkRate, 6);
   sim.telemetry.gearDamage.nose = 'normal';
   assert.equal(diagnostics.telemetry.gearDamage.nose, 'collapsed', 'dialog-open diagnostics own their data');
@@ -113,4 +117,70 @@ test('snapshot includes held sortie peak, touchdown G, context samples, dynamics
   assert.equal(live.aircraft, 'C172');
   assert.equal(live.flightDurationSec, 2);
   assert.equal(live.peakG, null, 'new flight must not inherit previous peak');
+});
+
+test('report attaches the live sortie flight log with its metadata and touchdown records', () => {
+  const samples = Array.from({ length: 25 }, (_, i) => ({ timeSec: i / 5, x: i, z: -i, altitudeFt: 1000 + i,
+    iasKnots: 90, gForce: i === 12 ? 4.5 : 1, pitchDeg: 2, rollDeg: 0, headingDeg: 180 }));
+  const sim = { flightRecorder: { active: true, elapsed: 4.8, interval: 0.2,
+    metadata: { aircraft: 'C172', airport: 'coastal', scenario: 'demo' },
+    samples, peaks: { gForce: samples[12] }, touchdowns: [{ timeSec: 4, sinkRateFpm: 120, contactG: 1.4,
+      _tdRecord: { finalized: true } }], glocIncidents: 0 } };
+  const log = buildFlightLog(sim);
+  assert.equal(log.source, 'live-sortie');
+  assert.equal(log.metadata.aircraft, 'C172');
+  assert.equal(log.capturedAtSec, 4.8);
+  assert.equal(log.samples.length, 25);
+  assert.equal(log.samples[12].gForce, 4.5);
+  assert.equal(log.sampling.intervalSec, 0.2);
+  assert.equal(log.sampling.decimated, false);
+  assert.equal(log.touchdowns[0].contactG, 1.4);
+  assert.equal(log.touchdowns[0]._tdRecord, undefined, 'recorder internals stay out of the report');
+  assert.equal(gatherFeedbackDiagnostics(sim).flightLog.samples.length, 25);
+  assert.equal(buildFlightLog({}), null, 'no sortie means no attachable log');
+});
+
+test('long flight logs are decimated under the payload budget with the peak and final samples kept', () => {
+  const samples = Array.from({ length: 4000 }, (_, i) => ({ timeSec: i / 5, x: i * 3, z: -i * 2,
+    altitudeFt: 1000 + i, iasKnots: 120, gForce: i === 2000 ? 12.5 : 1, pitchDeg: 0, rollDeg: 0,
+    headingDeg: 90 }));
+  const log = buildFlightLog({ flightRecorder: { active: true, elapsed: 800, interval: 0.2,
+    metadata: { aircraft: 'F16', airport: 'valley', scenario: 'demo' }, samples,
+    peaks: { gForce: samples[2000] }, touchdowns: [], glocIncidents: 0 } }, { budgetBytes: 60000 });
+  assert.ok(new TextEncoder().encode(JSON.stringify(log)).length <= 60000);
+  assert.equal(log.sampling.decimated, true);
+  assert.equal(log.sampling.originalCount, 4000);
+  assert.equal(log.sampling.retainedCount, log.samples.length);
+  assert.ok(log.samples.length < 4000 && log.samples.length > 100);
+  assert.equal(log.samples[0].timeSec, 0);
+  assert.equal(log.samples.at(-1).timeSec, samples.at(-1).timeSec);
+  assert.ok(log.samples.some(sample => sample.gForce === 12.5), 'peak-G moment survives decimation');
+});
+
+test('final budget thinning keeps the peak-G sample and final sample', () => {
+  const samples = Array.from({ length: 4270 }, (_, i) => ({ timeSec: i / 5,
+    x: 1234.5678901234 + i * 1.234567890123, z: -9876.5432109876 + i * 1.987654321098,
+    altitudeFt: 1000.123456789 + i * 3.141592653589, iasKnots: 120.123456789 + i * 0.0123456789,
+    gForce: i === 1000 ? 50.123456789 : 1.000000001, pitchDeg: 2.123456789,
+    rollDeg: -1.987654321, headingDeg: 180.123456789 }));
+  const sim = { flightRecorder: { active: true, elapsed: 854, interval: 0.2,
+    metadata: { aircraft: 'B738', airport: 'incheon', scenario: 'approach' }, samples,
+    peaks: { gForce: samples[1000] }, touchdowns: [], glocIncidents: 0 } };
+  for (const budgetBytes of [FLIGHT_LOG_BUDGET_BYTES, 20000]) {
+    const log = buildFlightLog(sim, { budgetBytes });
+    assert.ok(new TextEncoder().encode(JSON.stringify(log)).length <= budgetBytes, `${budgetBytes} B budget`);
+    const peak = log.samples.find(sample => sample.timeSec === samples[1000].timeSec);
+    assert.equal(peak?.gForce, 50.123456789, `${budgetBytes} B keeps the peak sample`);
+    assert.equal(log.samples.at(-1).timeSec, samples.at(-1).timeSec, `${budgetBytes} B keeps the final sample`);
+  }
+});
+
+test('report payload carries category, severity, expectations and reproduction steps', () => {
+  const draft = createFeedbackReport({ message: ' 50g on landing ', category: 'collision',
+    severity: 'blocker', expected: ' soft touchdown ', steps: ' F16 valley ring 2 ' });
+  assert.equal(draft.properties.feedback_message, '50g on landing');
+  assert.equal(draft.properties.feedback_category, 'collision');
+  assert.equal(draft.properties.feedback_severity, 'blocker');
+  assert.equal(draft.properties.feedback_expected, 'soft touchdown');
+  assert.equal(draft.properties.feedback_steps, 'F16 valley ring 2');
 });
