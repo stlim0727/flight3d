@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { MissileCombatView } from '../weapons/MissileCombatView.js';
 import { presentCombatEvent } from '../weapons/combatPresentation.js';
+import { Flare, FLARE_MODEL } from '../weapons/Flare.js';
+import { ChaffCloud, CHAFF_MODEL } from '../weapons/Chaff.js';
 import { F16_MISSILE_STATIONS, MISSILE_TYPES } from '../weapons/missileSpecs.js';
 import { findSpan } from './TrackSampler.js';
 
@@ -46,11 +48,12 @@ export class CombatReplayPlayback {
     this.track = null;
     this.active = false;
     this.timeSec = 0;
-    this.state = { targets: [], missiles: [], rails: 0x3f };
+    this.state = { targets: [], missiles: [], flares: [], chaffClouds: [], rails: 0x3f };
     this.view = new MissileCombatView(sim.scene, this.state);
     this.targets = [];
     this.groups = new Map();
     this.missiles = new Map();
+    this.decoys = new Map();
     this.events = [];
     this.staged = new Set();
     this._banditHint = 0;
@@ -88,6 +91,7 @@ export class CombatReplayPlayback {
     this.active = true;
     this.timeSec = 0;
     this._banditHint = 0;
+    this.decoys.clear();
     this.staged.clear();
     return true;
   }
@@ -99,6 +103,7 @@ export class CombatReplayPlayback {
     this._banditHint = 0;
     for (const group of this.groups.values()) group.hint = 0;
     this.staged = new Set(this.events.filter(event => event.timeSec <= timeSec + 1e-9));
+    this.decoys.clear();
     this.view.clear();
     this._updateState(timeSec);
     this.view.sync(0);
@@ -108,6 +113,7 @@ export class CombatReplayPlayback {
     if (!this.active) return;
     if (timeSec < this.timeSec - 1e-9) {
       this.staged.clear();
+      this.decoys.clear();
       this.view.clear();
       this._banditHint = 0;
       for (const group of this.groups.values()) group.hint = 0;
@@ -136,9 +142,12 @@ export class CombatReplayPlayback {
     this.targets.length = 0;
     this.state.targets.length = 0;
     this.state.missiles.length = 0;
+    this.state.flares.length = 0;
+    this.state.chaffClouds.length = 0;
     this.state.rails = 0x3f;
     this.groups.clear();
     this.missiles.clear();
+    this.decoys.clear();
     this.events.length = 0;
     this.staged.clear();
   }
@@ -185,6 +194,7 @@ export class CombatReplayPlayback {
 
   _updateState(timeSec) {
     this._updateTargets(timeSec);
+    this._updateDecoys(timeSec);
     this.state.missiles.length = 0;
     // Objects are reused across seeks so a consumer (the director) can hold a
     // missile reference and see it die when playback crosses its detonation.
@@ -237,6 +247,37 @@ export class CombatReplayPlayback {
         missile.velocity.set(0, 0, -1).applyQuaternion(missile.quaternion).multiplyScalar(600);
       }
       this.state.missiles.push(missile);
+    }
+  }
+
+  _updateDecoys(timeSec) {
+    this.state.flares.length = 0;
+    this.state.chaffClouds.length = 0;
+    for (const event of this.events) {
+      if (event.timeSec > timeSec + 1e-9) break;
+      if (event.kind !== 'decoy_dispense') continue;
+      const isChaff = event.decoyType === 'chaff';
+      const lifetimeS = isChaff ? CHAFF_MODEL.lifetimeS : FLARE_MODEL.lifetimeS;
+      if (timeSec - event.timeSec >= lifetimeS) {
+        this.decoys.delete(event);
+        continue;
+      }
+      let entry = this.decoys.get(event);
+      if (!entry) {
+        const pos = new THREE.Vector3(event.x, event.y, event.z);
+        const vel = new THREE.Vector3(event.vx, event.vy, event.vz);
+        const decoy = isChaff ? new ChaffCloud(pos, vel) : new Flare(pos, vel);
+        entry = { decoy, simTime: event.timeSec };
+        this.decoys.set(event, entry);
+      }
+      while (entry.simTime + 1e-6 < timeSec && entry.decoy.alive) {
+        const step = Math.min(0.05, timeSec - entry.simTime);
+        entry.decoy.update(step);
+        entry.simTime += step;
+      }
+      if (!entry.decoy.alive) continue;
+      if (isChaff) this.state.chaffClouds.push(entry.decoy);
+      else this.state.flares.push(entry.decoy);
     }
   }
 

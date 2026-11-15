@@ -9,6 +9,7 @@ const scratchOffset = new THREE.Vector3();
 const scratchQuat = new THREE.Quaternion();
 const scratchEmitPos = new THREE.Vector3();
 let smokeTexture = null;
+let flareTexture = null;
 
 function mostDamagedZone(damageZones) {
   if (!damageZones) return null;
@@ -52,6 +53,52 @@ function smokeMap() {
   smokeTexture = new THREE.CanvasTexture(canvas);
   smokeTexture.needsUpdate = true;
   return smokeTexture;
+}
+
+/** Warm additive glow sprite map for ejected IR flares. */
+function flareMap() {
+  if (flareTexture || typeof document === 'undefined') return flareTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(32, 32, 1, 32, 32, 31);
+  gradient.addColorStop(0, 'rgba(255,255,245,1)');
+  gradient.addColorStop(0.25, 'rgba(255,195,90,0.92)');
+  gradient.addColorStop(0.6, 'rgba(255,110,20,0.38)');
+  gradient.addColorStop(1, 'rgba(255,80,0,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 64, 64);
+  flareTexture = new THREE.CanvasTexture(canvas);
+  flareTexture.needsUpdate = true;
+  return flareTexture;
+}
+
+function createChaffCloudPoints() {
+  const count = 14;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const radius = 0.6 + (i % 3) * 0.45;
+    positions[i * 3] = Math.cos(angle) * radius;
+    positions[i * 3 + 1] = ((i % 5) - 2) * 0.25;
+    positions[i * 3 + 2] = Math.sin(angle) * radius;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    color: 0xd8e0ea,
+    map: smokeMap(),
+    size: 2.8,
+    transparent: true,
+    opacity: 0.65,
+    alphaTest: 0.02,
+    depthWrite: false,
+    sizeAttenuation: true,
+  });
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false;
+  points.name = 'ChaffCloud';
+  return points;
 }
 
 /** Materials are shared; only the per-model geometry is owned by a view. */
@@ -138,6 +185,8 @@ export class MissileCombatView {
     this.system = system;
     this.targetViews = new Map();
     this.missileViews = new Map();
+    this.flareViews = new Map();
+    this.chaffViews = new Map();
     this.trails = [];
   }
 
@@ -245,6 +294,9 @@ export class MissileCombatView {
       this.missileViews.delete(id);
     }
 
+    this._syncFlares(dt);
+    this._syncChaff(dt);
+
     for (let index = this.trails.length - 1; index >= 0; index--) {
       const trail = this.trails[index];
       if (!this.trailsBeingEmitted(trail)) trail.update(dt, null, false);
@@ -255,9 +307,79 @@ export class MissileCombatView {
     }
   }
 
+  _syncFlares(dt) {
+    const liveFlares = new Set();
+    for (const flare of this.system.flares || []) {
+      if (!flare.alive) continue;
+      liveFlares.add(flare.id);
+      let view = this.flareViews.get(flare.id);
+      if (!view) {
+        const material = new THREE.SpriteMaterial({
+          map: flareMap(),
+          color: 0xffd27d,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const sprite = new THREE.Sprite(material);
+        sprite.name = 'CountermeasureFlare';
+        this.scene.add(sprite);
+        const trail = new SmokeTrail(this.scene, {
+          max: 40, size: 2.0, color: 0xffe8c2, opacity: 0.42,
+        });
+        this.trails.push(trail);
+        view = { sprite, trail };
+        this.flareViews.set(flare.id, view);
+      }
+      const glow = Math.max(0.25, Math.min(1.2, (flare.infraredEmission ?? 4) / 5));
+      const scale = 6 + glow * 5;
+      view.sprite.position.copy(flare.position);
+      view.sprite.scale.set(scale, scale, 1);
+      view.sprite.material.opacity = Math.min(1, 0.55 + glow * 0.45);
+      view.trail.update(dt, flare.position, true);
+    }
+    for (const [id, view] of this.flareViews) {
+      if (liveFlares.has(id)) continue;
+      this.scene.remove(view.sprite);
+      view.sprite.material.dispose();
+      this.flareViews.delete(id);
+    }
+  }
+
+  _syncChaff(dt) {
+    const liveChaff = new Set();
+    for (const cloud of this.system.chaffClouds || []) {
+      if (!cloud.alive) continue;
+      liveChaff.add(cloud.id);
+      let view = this.chaffViews.get(cloud.id);
+      if (!view) {
+        const points = createChaffCloudPoints();
+        this.scene.add(points);
+        view = { points };
+        this.chaffViews.set(cloud.id, view);
+      }
+      const age = cloud.age ?? 0;
+      const spread = 1 + Math.min(3.5, age * 0.45);
+      const fade = Math.max(0, 1 - age / 12);
+      view.points.position.copy(cloud.position);
+      view.points.scale.setScalar(spread);
+      view.points.material.opacity = 0.65 * fade;
+    }
+    for (const [id, view] of this.chaffViews) {
+      if (liveChaff.has(id)) continue;
+      this.scene.remove(view.points);
+      view.points.geometry.dispose();
+      view.points.material.dispose();
+      this.chaffViews.delete(id);
+    }
+  }
+
   trailsBeingEmitted(trail) {
-    // Trails still owned by a live missile are already advanced in the loop above.
+    // Trails still owned by a live missile or flare are already advanced in sync().
     for (const view of this.missileViews.values()) {
+      if (view.trail === trail) return true;
+    }
+    for (const view of this.flareViews.values()) {
       if (view.trail === trail) return true;
     }
     return false;
@@ -289,9 +411,20 @@ export class MissileCombatView {
       this.scene.remove(view.mesh);
       disposeGeometry(view.mesh);
     }
+    for (const view of this.flareViews.values()) {
+      this.scene.remove(view.sprite);
+      view.sprite.material.dispose();
+    }
+    for (const view of this.chaffViews.values()) {
+      this.scene.remove(view.points);
+      view.points.geometry.dispose();
+      view.points.material.dispose();
+    }
     for (const trail of this.trails) trail.dispose();
     this.targetViews.clear();
     this.missileViews.clear();
+    this.flareViews.clear();
+    this.chaffViews.clear();
     this.trails.length = 0;
   }
 }
