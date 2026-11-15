@@ -1,6 +1,7 @@
 import { Euler, Quaternion, Vector3, MathUtils } from 'three';
 import { AirToAirMissileSystem, BanditTarget } from '../../src/weapons/AirToAirMissileSystem.js';
 import { MISSILE_TYPES } from '../../src/weapons/missileSpecs.js';
+import { CombatDiagnosticEvents } from './combatDiagnosticEvents.mjs';
 
 export const COMBAT_MATRIX_TIMESTEP_S = 1 / 120;
 const dt = COMBAT_MATRIX_TIMESTEP_S;
@@ -25,6 +26,7 @@ const dt = COMBAT_MATRIX_TIMESTEP_S;
  * - chaff / flares: independently override inventory permission
  * - threatResponseEnabled: warning/reaction override on the same flight fixture
  * - recordTrajectory: retain 5 Hz observed target/missile state, plus terminal state
+ * - recordDiagnostics: retain transition events and feed the shared engagement analyzer
  * - recordDetail: retain 120 Hz seeker/guidance/energy state for diagnosis
  * - manualFlareAtSeconds: diagnostic intervention, dispense one flare without evasion
  * - flareObservationCutoffSeconds: diagnostic intervention, hide flares after this age
@@ -47,6 +49,7 @@ export function simulateCombatSituation({
   threatResponseEnabled = targetBehavior === 'evasive_ai',
   recordTrajectory = false,
   recordDetail = false,
+  recordDiagnostics = false,
   manualFlareAtSeconds = null,
   flareObservationCutoffSeconds = null,
   rwr = true,
@@ -61,7 +64,8 @@ export function simulateCombatSituation({
   }
   const inputs = { type, rangeM, aspectDeg, shooterAltM, targetAltM,
     shooterSpeedMps, targetSpeedMps, targetBehavior, offBoresightDeg,
-    countermeasures, chaff, flares, threatResponseEnabled, recordTrajectory, rwr, tvc, maxSimTimeSec };
+    countermeasures, chaff, flares, threatResponseEnabled, recordTrajectory, recordDiagnostics,
+    recordDetail, manualFlareAtSeconds, flareObservationCutoffSeconds, rwr, tvc, maxSimTimeSec };
   const targetPos = new Vector3(0, targetAltM, 0);
 
   // Target base heading is along -Z (north).
@@ -213,6 +217,7 @@ export function simulateCombatSituation({
       launchState: null,
       defense: null,
       trajectory: null,
+      diagnostics: null,
       detail: null,
       decoyTransferSeconds: [],
       launched: false,
@@ -253,6 +258,7 @@ export function simulateCombatSituation({
       launchState: null,
       defense: null,
       trajectory: null,
+      diagnostics: null,
       detail: null,
       decoyTransferSeconds: [],
       launched: false,
@@ -270,6 +276,7 @@ export function simulateCombatSituation({
     };
   }
 
+  const diagnosticRecorder = recordDiagnostics ? new CombatDiagnosticEvents(missile, target) : null;
   let minSeparationM = Infinity;
   let terminal = 'timeout';
   let terminalSeconds = 0;
@@ -365,18 +372,25 @@ export function simulateCombatSituation({
         target.flareThreatIds.add('manual');
         combat.flares.push(flare);
         defense.flaresDispensed++;
+        diagnosticRecorder?.recordEvent({ type: 'flare_dispense', flare, target,
+          remaining: target.flare.remaining, intervention: true }, combat.elapsed);
       }
       manualFlareDispensed = true;
     }
     if (flareObservationCutoffSeconds !== null) {
       for (const flare of combat.flares) {
-        if (flare.age + 1e-9 >= flareObservationCutoffSeconds) flare.alive = false;
+        if (flare.alive && flare.age + 1e-9 >= flareObservationCutoffSeconds) {
+          diagnosticRecorder?.emit('diagnostic_intervention', terminalSeconds,
+            { reason: 'flare_observation_cutoff', decoyId: diagnosticRecorder.id(flare) });
+          flare.alive = false;
+        }
       }
     }
     world.position.addScaledVector(world.velocity, dt);
 
     const events = combat.update(dt, world);
     terminalSeconds = stepSeconds;
+    diagnosticRecorder?.observe(combat.elapsed, events);
     sampleDetail();
     const response = target.threatResponse;
     if (response.observedId !== null && defense.firstWarningSeconds === null) {
@@ -479,6 +493,7 @@ export function simulateCombatSituation({
     trajectory,
     detail,
     decoyTransferSeconds,
+    diagnostics: diagnosticRecorder?.finish(combat.elapsed) ?? null,
     launched: true,
     terminal,
     terminalSeconds: Number(terminalSeconds.toFixed(3)),

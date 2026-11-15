@@ -188,10 +188,13 @@ export function analyzeCombatEngagement(sortieOrTrack, options = {}) {
     // Seeker timeline
     const seekerTimeline = [];
     for (const ev of mEvents) {
-      if (ev.kind === 'seeker_state') {
+      if (['seeker_state', 'seeker_target', 'seeker_observation'].includes(ev.kind)) {
         seekerTimeline.push({
           timeSec: ev.timeSec,
           state: ev.state,
+          eventKind: ev.kind,
+          targetType: ev.targetType ?? null,
+          prevTargetId: ev.prevTargetId ?? null,
           targetId: ev.targetId ?? null,
           lossReason: ev.lossReason ?? 'none',
           signalQuality: ev.signalQuality ?? null,
@@ -251,6 +254,11 @@ export function analyzeCombatEngagement(sortieOrTrack, options = {}) {
       damageApplied += dmgVal <= 1.0 ? dmgVal * 100 : dmgVal;
     }
 
+    if (Number.isFinite(killEvent?.amount)) {
+      const amount = killEvent.amount;
+      damageApplied = Math.max(damageApplied, amount <= 1 ? amount * 100 : amount);
+    }
+
     if (killEvent) {
       outcome = 'kill';
       termReason = 'Direct blast kill against bandit';
@@ -308,7 +316,13 @@ export function analyzeCombatEngagement(sortieOrTrack, options = {}) {
     let cpaTimeSec = null;
     let cpaMethod = 'unknown';
 
-    if (detEvent && Number.isFinite(detEvent.distanceM)) {
+    const measuredCpa = mEvents.find(ev => ev.kind === 'closest_approach'
+      && Number.isFinite(ev.distanceM) && ev.distanceM >= 0);
+    if (measuredCpa) {
+      minSeparationM = measuredCpa.distanceM;
+      cpaTimeSec = measuredCpa.timeSec;
+      cpaMethod = measuredCpa.method ?? 'step_sampling';
+    } else if (detEvent && Number.isFinite(detEvent.distanceM)) {
       minSeparationM = detEvent.distanceM;
       cpaTimeSec = detEvent.timeSec;
       cpaMethod = detEvent.fuzePolicy ? 'continuous_fuze' : 'step_sampling';
@@ -481,8 +495,24 @@ function findClosestBanditSample(banditSamples, timeSec) {
 
 function formatEventDetails(ev) {
   switch (ev.kind) {
+    case 'warning_state':
+      return `Warning ${ev.phase}: observed=${ev.observed}, confirmed=${ev.confirmed}, reacting=${ev.reacting}`;
+    case 'guidance_state':
+      return ev.active ? 'Guidance active' : `Guidance inactive: ${ev.reason ?? 'unspecified'}`;
+    case 'control_limit':
+      return `Control ${ev.limited ? 'limited' : 'within available authority'}: demand ${ev.demandedG?.toFixed(1) ?? 'unknown'}G, available ${ev.availableG?.toFixed(1) ?? 'unknown'}G`;
+    case 'propulsion_state':
+      return `Propellant ${ev.powered ? 'remaining' : 'depleted'}`;
+    case 'closest_approach':
+      return `Closest approach ${ev.distanceM?.toFixed(2) ?? 'unknown'}m (${ev.method ?? 'unknown'})`;
+    case 'diagnostic_intervention':
+      return `Diagnostic intervention: ${ev.reason}`;
     case 'launch':
       return `Launched ${ev.typeId || 'missile'} against ${ev.targetId || 'target'} (locked: ${ev.locked})`;
+    case 'seeker_target':
+      return `Seeker target changed to ${ev.targetType ?? 'none'} #${ev.targetId ?? 'none'}`;
+    case 'seeker_observation':
+      return `Seeker observation changed: ${ev.lossReason ?? 'none'}`;
     case 'seeker_state':
       return `Seeker transition to ${ev.state}${ev.lossReason ? ` (loss: ${ev.lossReason})` : ''}`;
     case 'decoy_dispense':
@@ -576,7 +606,7 @@ function generateCausalSummary({
   } else if (outcome === 'ground_impact') {
     parts.push('Missile impacted terrain or surface before reaching proximity threshold.');
   } else if (outcome === 'expired') {
-    parts.push('Missile kinematic energy and rocket motor duration were exhausted before reaching intercept.');
+    parts.push('Configured missile flight lifetime elapsed before an intercept was recorded.');
   } else {
     parts.push(termReason);
   }

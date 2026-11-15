@@ -30,7 +30,9 @@ test('no-lock controls retain denominators and paired launch state, and diagnost
   assert.deepEqual(ordinary.summary, traced.summary);
   assert.equal(ordinary.results.length, 6);
   for (const row of ordinary.summary) { assert.equal(row.total, 2); assert.equal(row.launched, 1); assert.equal(row.noLock, 1); }
-  assert.ok(ordinary.results.every(r => r.trajectory === null));
+  assert.ok(ordinary.results.every(r => r.trajectory === null && r.diagnostics === null));
+  assert.ok(traced.results.filter(r => r.launched).every(r => r.diagnostics.analysis.summary.totalLaunches === 1));
+  assert.ok(traced.results.filter(r => !r.launched).every(r => r.diagnostics === null));
   assert.ok(traced.results.filter(r => r.launched).every(r => r.trajectory.length > 1));
   assert.throws(() => runCombatExperiment({ geometries: [], variants: [] }), /Empty experiment/);
 });
@@ -69,6 +71,9 @@ test('successful CLI emits compact cohorts and preserves detailed diagnostics on
     const detailed = JSON.parse(readFileSync(output));
     assert.equal(detailed.results.length, 1);
     assert.ok(detailed.results[0].trajectory.length > 1);
+    assert.equal(detailed.results[0].diagnostics.analysis.summary.totalLaunches, 1);
+    assert.ok(detailed.results[0].diagnostics.track.combat.events.length > 0);
+    assert.equal(summary.config.recordDiagnostics, true);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
