@@ -178,3 +178,33 @@ test('ground and empty states refuse launch without mutating the loadout', () =>
   assert.equal(system.fire(world), null);
   assert.equal(system.lastFireError, 'empty');
 });
+
+test('locked launch event queued by fire() is emitted on the next update() and drained', () => {
+  const system = new AirToAirMissileSystem();
+  const world = airborneWorld();
+  const target = new BanditTarget({
+    callsign: 'BANDIT-1',
+    position: new Vector3(0, 3000, -3500),
+    velocity: new Vector3(0, 0, -160),
+    evasion: false,
+  });
+  system.addTarget(target);
+  system.selectTarget(target);
+  step(system, world, 1.5);
+  assert.equal(system.lockedTarget, target);
+  assert.equal(system.lockProgress, 1);
+
+  const missile = system.fire(world);
+  assert.ok(missile);
+
+  const firstUpdateEvents = system.update(1 / 120, world);
+  const launches = firstUpdateEvents.filter(event => event.type === 'launch');
+  assert.equal(launches.length, 1);
+  assert.equal(launches[0].missile, missile);
+  assert.equal(launches[0].locked, true);
+  assert.equal(launches[0].lockProgress, 1);
+  assert.equal(launches[0].target, target);
+
+  const secondUpdateEvents = system.update(1 / 120, world);
+  assert.equal(secondUpdateEvents.filter(event => event.type === 'launch').length, 0);
+});

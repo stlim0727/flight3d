@@ -205,6 +205,7 @@ export class AirToAirMissileSystem {
     this.accumulator = 0;
     this.cannon.reset();
     this.rwr.reset();
+    this._events.length = 0;
   }
 
   /** Ground-crew turnaround: full rails and a full gun magazine, no new sortie. */
@@ -286,7 +287,6 @@ export class AirToAirMissileSystem {
    * @returns {Array<object>} events for audio, HUD and effects
    */
   update(dt, world) {
-    this._events.length = 0;
     this.world = world;
     this.elapsed += dt;
     if (!world?.active) {
@@ -300,13 +300,13 @@ export class AirToAirMissileSystem {
       this.cannon.setTrigger(false);
       this.rwr.reset();
       this.accumulator = 0;
-      return this._events;
+      return this._events.splice(0);
     }
 
     if (dt <= 0) {
       // A frozen frame must not leave the gun's visual/audio firing flag latched.
       this.cannon.firing = false;
-      return this._events;
+      return this._events.splice(0);
     }
 
     this._ensureTargets(world);
@@ -321,7 +321,7 @@ export class AirToAirMissileSystem {
       threats: this.targets.filter(target => target.alive),
       incoming: this.missiles.filter(missile => missile.targetIsPlayer && missile.alive),
     });
-    return this._events;
+    return this._events.splice(0);
   }
 
   fire(world = this.world) {
