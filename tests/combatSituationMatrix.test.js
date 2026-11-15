@@ -81,6 +81,9 @@ test('combat situation: countermeasure flares cause decoy transfers on AIM-9X', 
     countermeasures: true,
   });
   assert.equal(cmResult.launched, true);
+  assert.ok(cmResult.defense.flaresDispensed > 0);
+  assert.ok(cmResult.defense.firstConfirmedThreatSeconds >= cmResult.defense.firstWarningSeconds);
+  assert.ok(cmResult.defense.evasionSeconds > 0);
   assert.ok(cmResult.decoyTransfers > 0, `Expected decoy transfers from flare dispenser, got ${cmResult.decoyTransfers}`);
 });
 
@@ -101,7 +104,7 @@ test('combat situation: anomaly detector identifies BVR coasting and short-range
   const baselineAnomalies = detectMissileAnomalies(baselineMatrix);
   const baselineIds = baselineAnomalies.map(a => a.id);
 
-  assert.ok(baselineIds.includes('BVR_BURNOUT_BLINDNESS_ALWAYS_HIT'), 'Should identify BVR burnout blindness anomaly without RWR');
+  assert.ok(baselineIds.includes('BVR_STERN_ALL_HIT'), 'Should identify BVR burnout blindness anomaly without RWR');
   assert.ok(baselineIds.includes('SHORT_RANGE_BEAM_ALWAYS_MISS'), 'Should identify short-range beam always-miss anomaly without TVC');
   assert.ok(!baselineIds.includes('EXTREME_RANGE_IMPOSSIBLE_HIT'), 'Should not have impossible hits beyond envelope');
 
@@ -117,7 +120,7 @@ test('combat situation: anomaly detector identifies BVR coasting and short-range
   });
   const rwrAnomalies = detectMissileAnomalies(rwrMatrix);
   const rwrIds = rwrAnomalies.map(a => a.id);
-  assert.ok(!rwrIds.includes('BVR_BURNOUT_BLINDNESS_ALWAYS_HIT'), 'RWR defense should mitigate BVR always-hit anomaly');
+  assert.ok(!rwrIds.includes('BVR_STERN_ALL_HIT'), 'RWR defense should mitigate BVR always-hit anomaly');
 
   // With TVC enabled on AIM-9X, the short-range beam always-miss anomaly is mitigated
   const tvcMatrix = sweepCombatSituationMatrix({

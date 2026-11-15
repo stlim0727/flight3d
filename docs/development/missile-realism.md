@@ -3,6 +3,9 @@
 Status: design and verification guidance for [issue #713](https://github.com/stlim0727/flight3d/issues/713), not implemented or flight-validated behavior.
 Code baseline: `359813e`. This review inspected source; it did not measure a hit rate or run browser combat scenarios.
 
+For the current numeric matrix, report format and historical result correction,
+see [combat matrix evidence](combat-matrix-validation.md).
+
 ## Current behavior and why hits are easy
 
 The combat row in [the task map](agent-task-map.md) and the
