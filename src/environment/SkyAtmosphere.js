@@ -5,6 +5,7 @@ import { createScreenSky } from './ScreenSky.js';
 import { CockpitSunShadow } from './CockpitSunShadow.js';
 import { SunShadowRefresh } from './SunShadowRefresh.js';
 import { FarSunShadow } from './FarSunShadow.js';
+import { HAZE_HEIGHT_FALLOFF, installHeightFog } from './AerialPerspective.js';
 
 const OVERCAST_GREY = new THREE.Color(0.55, 0.57, 0.60);
 
@@ -42,9 +43,10 @@ export class SkyAtmosphere {
     this.water = water;
 
     // Atmospheric Exponential Height Fog parameters
+    installHeightFog();
     this.fogColor = new THREE.Color(0xc8def4);
     this.baseDensity = 0.00020;
-    this.heightFalloff = 0.00068; // lambda: density drops to ~28% by 1,828m (6,000ft)
+    this.heightFalloff = HAZE_HEIGHT_FALLOFF;
     this.currentDensity = 0.00020;
     this.currentExposure = 1.05;
 

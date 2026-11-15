@@ -224,11 +224,13 @@ export class WaterOcean {
           float edgeFade = smoothstep(uEdgeFadeStart, uEdgeFadeEnd, length(vLocalPos));
           fogFactor = max(fogFactor, edgeFade);
 
-          finalColor = mix(finalColor, uFogColor, fogFactor);
-
           gl_FragColor = vec4(finalColor, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
+          // Haze goes on after tone mapping, in display space, as three's fog chunk puts it
+          // on every other material. Blended before, the sea faded to a greyer colour than
+          // the land beside it (#751).
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, linearToOutputTexel(vec4(uFogColor, 1.0)).rgb, fogFactor);
         }
       `,
       transparent: false,
