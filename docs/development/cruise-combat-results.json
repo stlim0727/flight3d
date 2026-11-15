@@ -1,0 +1,3337 @@
+{
+  "commit": "c2331901b5cbdd7f581a36573825e74395a6ea8d",
+  "dt": 0.008333333333333333,
+  "simulationSeconds": 100,
+  "wallSeconds": 10.990051801,
+  "results": [
+    {
+      "policy": "immediate",
+      "countermeasures": true,
+      "commandedSpeed": 107.78218776773832,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [
+        {
+          "launchTime": 0,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5460.560550343976,
+          "states": {
+            "search": 2.999999999999992,
+            "acquire": 0.14166666666666666,
+            "track": 16.5749999999997,
+            "memory": 0.2833333333333334
+          },
+          "guidance": {
+            "no_estimate": 3.141666666666658,
+            "active": 16.858333333333018
+          },
+          "firstTrackTime": 3.1416666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.016666666666172
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 896.6260814578548,
+              "timeSec": 15.658333333333085,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 1
+            },
+            {
+              "distanceM": 2076.9307546273935,
+              "timeSec": 20.016666666666172,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 2
+            }
+          ],
+          "terminalSpeedMps": 419.73723925537007
+        },
+        {
+          "launchTime": 0.35,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5484.045804463797,
+          "states": {
+            "search": 2.6499999999999932,
+            "acquire": 0.14166666666666666,
+            "track": 16.92499999999968,
+            "memory": 0.2833333333333334
+          },
+          "guidance": {
+            "no_estimate": 2.7916666666666594,
+            "active": 17.208333333332998
+          },
+          "firstTrackTime": 3.1416666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.366666666666152
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 985.289423968482,
+              "timeSec": 15.658333333333085,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 1
+            },
+            {
+              "distanceM": 2011.4085263276468,
+              "timeSec": 20.366666666666152,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 2
+            }
+          ],
+          "terminalSpeedMps": 423.81154159745313
+        },
+        {
+          "launchTime": 0.7,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5507.179774335624,
+          "states": {
+            "search": 2.2999999999999945,
+            "acquire": 0.14166666666666666,
+            "track": 17.27499999999966,
+            "memory": 0.2833333333333334
+          },
+          "guidance": {
+            "no_estimate": 2.4416666666666607,
+            "active": 17.55833333333298
+          },
+          "firstTrackTime": 3.1416666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.716666666666132
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1062.1705795892283,
+              "timeSec": 15.658333333333085,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 1
+            },
+            {
+              "distanceM": 1935.1597311049454,
+              "timeSec": 20.716666666666132,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 2
+            }
+          ],
+          "terminalSpeedMps": 428.10311264276777
+        },
+        {
+          "launchTime": 1.05,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5529.697702165721,
+          "states": {
+            "search": 1.9499999999999955,
+            "acquire": 0.14166666666666666,
+            "track": 17.62499999999964,
+            "memory": 0.2833333333333334
+          },
+          "guidance": {
+            "no_estimate": 2.091666666666662,
+            "active": 17.90833333333296
+          },
+          "firstTrackTime": 3.1416666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 21.066666666666112
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1139.5908931512924,
+              "timeSec": 15.658333333333085,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 1
+            },
+            {
+              "distanceM": 1855.7958602067786,
+              "timeSec": 21.066666666666112,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 2
+            }
+          ],
+          "terminalSpeedMps": 432.4034831070073
+        },
+        {
+          "launchTime": 1.4,
+          "type": "AIM120C",
+          "locked": false,
+          "rangeM": 5551.457638918612,
+          "states": {
+            "acquire": 0.24166666666666664,
+            "track": 13.51666666666654,
+            "memory": 0.483333333333334
+          },
+          "guidance": {
+            "no_estimate": 0.24166666666666664,
+            "negative_closure": 0.18333333333333332,
+            "active": 13.57499999999987,
+            "gimbal_limit": 0.24166666666666664
+          },
+          "firstTrackTime": 1.6416666666666666,
+          "controlLimitedSeconds": 1.6666666666666632,
+          "decoyTransferEventCount": 30,
+          "transferEvents": [
+            {
+              "time": 3.05,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.058333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.0666666666666664,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.075,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.0833333333333335,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.091666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1083333333333334,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1166666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.125,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1333333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1416666666666666,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.15,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.158333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1666666666666665,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.175,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.183333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1916666666666664,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2083333333333335,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.216666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.225,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2333333333333334,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2416666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.25,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2583333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2666666666666666,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.275,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.283333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2916666666666665,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            }
+          ],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 15.658333333333085,
+            "targetId": 1,
+            "distanceM": 1.0530804532479272
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1.0530804532479272,
+              "timeSec": 15.658333333333085,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 1
+            },
+            {
+              "distanceM": 2947.6377900228563,
+              "timeSec": 15.658333333333085,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 2
+            }
+          ],
+          "terminalSpeedMps": 559.982743719492
+        },
+        {
+          "launchTime": 1.75,
+          "type": "AIM120C",
+          "locked": false,
+          "rangeM": 5572.430914042826,
+          "states": {
+            "acquire": 0.24166666666666664,
+            "track": 19.94999999999951,
+            "memory": 0.7333333333333332
+          },
+          "guidance": {
+            "no_estimate": 0.24166666666666664,
+            "negative_closure": 0.15833333333333333,
+            "active": 20.283333333332823,
+            "range_too_close": 0.008333333333333333,
+            "gimbal_limit": 0.2333333333333333
+          },
+          "firstTrackTime": 1.9916666666666667,
+          "controlLimitedSeconds": 1.716666666666663,
+          "decoyTransferEventCount": 31,
+          "transferEvents": [
+            {
+              "time": 3.05,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.058333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.0666666666666664,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.075,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.0833333333333335,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.091666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1083333333333334,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1166666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.125,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1333333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1416666666666666,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.15,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.158333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1666666666666665,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.175,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.183333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.1916666666666664,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2083333333333335,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.216666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.225,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2333333333333334,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2416666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.25,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2583333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2666666666666666,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.275,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.283333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 3.2916666666666665,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 1
+            },
+            {
+              "time": 15.641666666666666,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 1,
+              "toId": 3
+            }
+          ],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 22.69166666666602,
+            "targetId": 2,
+            "distanceM": 2.0665796138650734
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 123.52490273722061,
+              "timeSec": 15.649999999999752,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 1
+            },
+            {
+              "distanceM": 2.0665796138650734,
+              "timeSec": 22.69166666666602,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 2
+            }
+          ],
+          "terminalSpeedMps": 481.13645823062706
+        }
+      ],
+      "events": {
+        "seeker_state": 38,
+        "chaff_dispense": 3,
+        "flare_dispense": 3,
+        "decoy_transfer": 61,
+        "lock": 2,
+        "flare_expire": 3,
+        "unlock": 2,
+        "chaff_expire": 3,
+        "detonation": 2,
+        "kill": 2,
+        "expire": 4
+      },
+      "crashed": false,
+      "minClearanceM": 750.0000007312475,
+      "kills": 2,
+      "remaining": 0,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 366.73432070727114,
+      "maxSampledLock": 1
+    },
+    {
+      "policy": "locked",
+      "countermeasures": true,
+      "commandedSpeed": 107.78218776773832,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [
+        {
+          "launchTime": 27.275,
+          "type": "AIM9X",
+          "locked": true,
+          "rangeM": 3045.499939719761,
+          "states": {
+            "track": 6.175000000000097,
+            "memory": 0.7416666666666665,
+            "lost": 13.083333333333231
+          },
+          "guidance": {
+            "active": 6.31666666666677,
+            "range_too_close": 0.008333333333333333,
+            "gimbal_limit": 0.591666666666667,
+            "no_estimate": 13.083333333333231
+          },
+          "firstTrackTime": 27.275,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 18,
+          "transferEvents": [
+            {
+              "time": 27.916666666666668,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 27.925,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 27.933333333333334,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 27.941666666666666,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 27.95,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 27.958333333333332,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 27.966666666666665,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 27.974999999999998,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 27.983333333333334,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 27.991666666666667,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 28,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 28.008333333333333,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 28.016666666666666,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 28.025,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 28.03333333333333,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 28.041666666666668,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 28.05,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            },
+            {
+              "time": 28.058333333333334,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 3,
+              "toId": 4
+            }
+          ],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 47.291666666664625
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 210.56419022136456,
+              "timeSec": 32.633333333332125,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 3
+            },
+            {
+              "distanceM": 5411.120287737528,
+              "timeSec": 28.874999999999,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 4
+            }
+          ],
+          "terminalSpeedMps": 463.75540672627676
+        }
+      ],
+      "events": {
+        "lock": 1,
+        "chaff_dispense": 1,
+        "flare_dispense": 1,
+        "decoy_transfer": 18,
+        "seeker_state": 4,
+        "flare_expire": 1,
+        "unlock": 1,
+        "chaff_expire": 1,
+        "expire": 1
+      },
+      "crashed": true,
+      "minClearanceM": 3.856044185456865,
+      "kills": 0,
+      "remaining": 5,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 724.8147209077987,
+      "maxSampledLock": 1
+    },
+    {
+      "policy": "close-locked",
+      "countermeasures": true,
+      "commandedSpeed": 107.78218776773832,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [
+        {
+          "launchTime": 29.3,
+          "type": "AIM9X",
+          "locked": true,
+          "rangeM": 2499.236872170379,
+          "states": {
+            "track": 5.191666666666714,
+            "memory": 0.7416666666666665,
+            "lost": 14.066666666666508
+          },
+          "guidance": {
+            "active": 5.333333333333388,
+            "gimbal_limit": 0.6000000000000003,
+            "no_estimate": 14.066666666666508
+          },
+          "firstTrackTime": 29.3,
+          "controlLimitedSeconds": 0.008333333333333333,
+          "decoyTransferEventCount": 18,
+          "transferEvents": [
+            {
+              "time": 29.941666666666666,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 29.95,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 29.958333333333332,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 29.966666666666665,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 29.974999999999998,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 29.983333333333334,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 29.991666666666667,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 30,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 30.008333333333333,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 30.016666666666666,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 30.025,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 30.03333333333333,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 30.041666666666668,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 30.05,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 30.058333333333334,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 30.066666666666666,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 30.075,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            },
+            {
+              "time": 30.083333333333332,
+              "fromType": "bandit",
+              "toType": "flare",
+              "fromId": 5,
+              "toId": 5
+            }
+          ],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 49.31666666666451
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 126.94293743580083,
+              "timeSec": 33.916666666665385,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 5
+            },
+            {
+              "distanceM": 5167.037696781348,
+              "timeSec": 30.841666666665557,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 6
+            }
+          ],
+          "terminalSpeedMps": 464.93731122881604
+        }
+      ],
+      "events": {
+        "lock": 1,
+        "chaff_dispense": 1,
+        "flare_dispense": 1,
+        "decoy_transfer": 18,
+        "seeker_state": 4,
+        "flare_expire": 1,
+        "unlock": 1,
+        "chaff_expire": 1,
+        "expire": 1
+      },
+      "crashed": true,
+      "minClearanceM": 3.4312338625684635,
+      "kills": 0,
+      "remaining": 5,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 351.3841734723524,
+      "maxSampledLock": 1
+    },
+    {
+      "policy": "immediate",
+      "countermeasures": false,
+      "commandedSpeed": 107.78218776773832,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [
+        {
+          "launchTime": 0,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5460.560550343976,
+          "states": {
+            "search": 3.3749999999999907,
+            "acquire": 0.2833333333333334,
+            "track": 14.68333333333314,
+            "memory": 0.7416666666666665,
+            "lost": 0.9166666666666659
+          },
+          "guidance": {
+            "no_estimate": 4.575000000000017,
+            "active": 15.424999999999764
+          },
+          "firstTrackTime": 3.5166666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.016666666666172
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1292.0362267741625,
+              "timeSec": 14.33333333333316,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 7
+            },
+            {
+              "distanceM": 1993.371541053482,
+              "timeSec": 20.016666666666172,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 8
+            }
+          ],
+          "terminalSpeedMps": 433.97753818514633
+        },
+        {
+          "launchTime": 0.35,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5484.045804463797,
+          "states": {
+            "search": 3.058333333333325,
+            "acquire": 0.2833333333333334,
+            "track": 14.758333333333136,
+            "memory": 0.7416666666666665,
+            "lost": 1.1583333333333317
+          },
+          "guidance": {
+            "no_estimate": 4.500000000000013,
+            "active": 15.49999999999976
+          },
+          "firstTrackTime": 3.55,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.366666666666152
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1408.067379527479,
+              "timeSec": 14.33333333333316,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 7
+            },
+            {
+              "distanceM": 1887.4631657298305,
+              "timeSec": 20.366666666666152,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 8
+            }
+          ],
+          "terminalSpeedMps": 435.23211216191055
+        },
+        {
+          "launchTime": 0.7,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5507.179774335624,
+          "states": {
+            "search": 2.7333333333333263,
+            "acquire": 0.2833333333333334,
+            "track": 14.866666666666463,
+            "memory": 0.7416666666666665,
+            "lost": 1.3749999999999976
+          },
+          "guidance": {
+            "no_estimate": 4.391666666666675,
+            "active": 15.608333333333087
+          },
+          "firstTrackTime": 3.5749999999999997,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.716666666666132
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1508.2594878134478,
+              "timeSec": 14.33333333333316,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 7
+            },
+            {
+              "distanceM": 1765.964405250196,
+              "timeSec": 20.716666666666132,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 8
+            }
+          ],
+          "terminalSpeedMps": 436.44995251766835
+        },
+        {
+          "launchTime": 1.05,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5529.697702165721,
+          "states": {
+            "search": 2.4166666666666607,
+            "acquire": 0.2833333333333334,
+            "track": 14.999999999999789,
+            "memory": 0.7416666666666665,
+            "lost": 1.5583333333333302
+          },
+          "guidance": {
+            "no_estimate": 4.258333333333335,
+            "active": 15.741666666666413
+          },
+          "firstTrackTime": 3.6083333333333334,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 21.066666666666112
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1607.6733138108177,
+              "timeSec": 14.33333333333316,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 7
+            },
+            {
+              "distanceM": 1632.896249735935,
+              "timeSec": 21.066666666666112,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 8
+            }
+          ],
+          "terminalSpeedMps": 437.2772045262312
+        },
+        {
+          "launchTime": 1.4,
+          "type": "AIM120C",
+          "locked": false,
+          "rangeM": 5551.457638918612,
+          "states": {
+            "acquire": 0.24166666666666664,
+            "track": 12.67499999999992
+          },
+          "guidance": {
+            "no_estimate": 0.24166666666666664,
+            "negative_closure": 0.18333333333333332,
+            "active": 12.491666666666598
+          },
+          "firstTrackTime": 1.6416666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 14.33333333333316,
+            "targetId": 7,
+            "distanceM": 1.6783950888460122
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1.6783950888460122,
+              "timeSec": 14.33333333333316,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 7
+            },
+            {
+              "distanceM": 3269.7923766264544,
+              "timeSec": 14.33333333333316,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 8
+            }
+          ],
+          "terminalSpeedMps": 692.4686179123678
+        },
+        {
+          "launchTime": 1.75,
+          "type": "AIM120C",
+          "locked": false,
+          "rangeM": 5572.430914042826,
+          "states": {
+            "acquire": 0.24166666666666664,
+            "track": 12.32499999999994,
+            "memory": 1.4999999999999971,
+            "lost": 9.93333333333341
+          },
+          "guidance": {
+            "no_estimate": 10.175000000000063,
+            "negative_closure": 0.15833333333333333,
+            "active": 12.49999999999993,
+            "gimbal_limit": 1.166666666666665
+          },
+          "firstTrackTime": 1.9916666666666667,
+          "controlLimitedSeconds": 0.016666666666666666,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 25.766666666665845
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 174.96937765508602,
+              "timeSec": 14.324999999999827,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 7
+            },
+            {
+              "distanceM": 2821.9044434659045,
+              "timeSec": 18.73333333333291,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 8
+            }
+          ],
+          "terminalSpeedMps": 549.9694782113353
+        }
+      ],
+      "events": {
+        "seeker_state": 38,
+        "lock": 1,
+        "unlock": 1,
+        "detonation": 1,
+        "kill": 1,
+        "expire": 5
+      },
+      "crashed": false,
+      "minClearanceM": 750.0000007312475,
+      "kills": 1,
+      "remaining": 0,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 2344.758898247891,
+      "maxSampledLock": 1
+    },
+    {
+      "policy": "locked",
+      "countermeasures": false,
+      "commandedSpeed": 107.78218776773832,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [
+        {
+          "launchTime": 27.275,
+          "type": "AIM9X",
+          "locked": true,
+          "rangeM": 3045.499939719761,
+          "states": {
+            "track": 5.433333333333393
+          },
+          "guidance": {
+            "active": 5.433333333333393
+          },
+          "firstTrackTime": 27.275,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 32.724999999998786,
+            "targetId": 9,
+            "distanceM": 0.6244433893706637
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 0.6244433893706637,
+              "timeSec": 32.724999999998786,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 9
+            },
+            {
+              "distanceM": 5411.737868843061,
+              "timeSec": 28.858333333332336,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 10
+            }
+          ],
+          "terminalSpeedMps": 570.3796050418091
+        }
+      ],
+      "events": {
+        "lock": 2,
+        "seeker_state": 1,
+        "detonation": 1,
+        "kill": 1,
+        "unlock": 1
+      },
+      "crashed": false,
+      "minClearanceM": 750.0000007312475,
+      "kills": 1,
+      "remaining": 5,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 1169.9403530174995,
+      "maxSampledLock": 1
+    },
+    {
+      "policy": "close-locked",
+      "countermeasures": false,
+      "commandedSpeed": 107.78218776773832,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [
+        {
+          "launchTime": 29.3,
+          "type": "AIM9X",
+          "locked": true,
+          "rangeM": 2499.236872170379,
+          "states": {
+            "track": 4.633333333333353
+          },
+          "guidance": {
+            "active": 4.633333333333353
+          },
+          "firstTrackTime": 29.3,
+          "controlLimitedSeconds": 0.008333333333333333,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 33.94999999999872,
+            "targetId": 11,
+            "distanceM": 0.369957299208774
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 0.369957299208774,
+              "timeSec": 33.94999999999872,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 11
+            },
+            {
+              "distanceM": 5166.742402899944,
+              "timeSec": 30.84999999999889,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 12
+            }
+          ],
+          "terminalSpeedMps": 583.6243421479766
+        }
+      ],
+      "events": {
+        "lock": 1,
+        "detonation": 1,
+        "kill": 1
+      },
+      "crashed": false,
+      "minClearanceM": 651.8207728793035,
+      "kills": 1,
+      "remaining": 5,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 1279.679239607425,
+      "maxSampledLock": 1
+    },
+    {
+      "policy": "immediate",
+      "countermeasures": true,
+      "commandedSpeed": 250,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [
+        {
+          "launchTime": 0,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5460.560550343976,
+          "states": {
+            "search": 2.999999999999992,
+            "acquire": 0.14166666666666666,
+            "track": 16.5749999999997,
+            "memory": 0.2833333333333334
+          },
+          "guidance": {
+            "no_estimate": 3.141666666666658,
+            "active": 16.858333333333018
+          },
+          "firstTrackTime": 3.1416666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.016666666666172
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 896.6261095291602,
+              "timeSec": 15.658333333333085,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 13
+            },
+            {
+              "distanceM": 2075.7242296083314,
+              "timeSec": 20.016666666666172,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 14
+            }
+          ],
+          "terminalSpeedMps": 419.73459938214313
+        },
+        {
+          "launchTime": 0.35,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5484.045804463797,
+          "states": {
+            "search": 2.6499999999999932,
+            "acquire": 0.14166666666666666,
+            "track": 16.92499999999968,
+            "memory": 0.2833333333333334
+          },
+          "guidance": {
+            "no_estimate": 2.7916666666666594,
+            "active": 17.208333333332998
+          },
+          "firstTrackTime": 3.1416666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.366666666666152
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 985.2894530945227,
+              "timeSec": 15.658333333333085,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 13
+            },
+            {
+              "distanceM": 2010.1474671840633,
+              "timeSec": 20.366666666666152,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 14
+            }
+          ],
+          "terminalSpeedMps": 423.8088512819206
+        },
+        {
+          "launchTime": 0.7,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5507.179774335624,
+          "states": {
+            "search": 2.2999999999999945,
+            "acquire": 0.14166666666666666,
+            "track": 17.27499999999966,
+            "memory": 0.2833333333333334
+          },
+          "guidance": {
+            "no_estimate": 2.4416666666666607,
+            "active": 17.55833333333298
+          },
+          "firstTrackTime": 3.1416666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.716666666666132
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1062.1706094848632,
+              "timeSec": 15.658333333333085,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 13
+            },
+            {
+              "distanceM": 1933.843741079884,
+              "timeSec": 20.716666666666132,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 14
+            }
+          ],
+          "terminalSpeedMps": 428.1003282863701
+        },
+        {
+          "launchTime": 1.05,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5529.697702165721,
+          "states": {
+            "search": 1.9499999999999955,
+            "acquire": 0.14166666666666666,
+            "track": 17.62499999999964,
+            "memory": 0.2833333333333334
+          },
+          "guidance": {
+            "no_estimate": 2.091666666666662,
+            "active": 17.90833333333296
+          },
+          "firstTrackTime": 3.1416666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 21.066666666666112
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1139.5909238513798,
+              "timeSec": 15.658333333333085,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 13
+            },
+            {
+              "distanceM": 1854.425446879852,
+              "timeSec": 21.066666666666112,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 14
+            }
+          ],
+          "terminalSpeedMps": 432.4006220354668
+        },
+        {
+          "launchTime": 1.4,
+          "type": "AIM120C",
+          "locked": false,
+          "rangeM": 5551.456916845742,
+          "states": {
+            "acquire": 0.24166666666666664,
+            "track": 13.51666666666654,
+            "memory": 0.483333333333334
+          },
+          "guidance": {
+            "no_estimate": 0.24166666666666664,
+            "negative_closure": 0.18333333333333332,
+            "active": 13.57499999999987,
+            "gimbal_limit": 0.24166666666666664
+          },
+          "firstTrackTime": 1.6416666666666666,
+          "controlLimitedSeconds": 1.6666666666666632,
+          "decoyTransferEventCount": 30,
+          "transferEvents": [
+            {
+              "time": 3.05,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.058333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.0666666666666664,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.075,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.0833333333333335,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.091666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1083333333333334,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1166666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.125,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1333333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1416666666666666,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.15,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.158333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1666666666666665,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.175,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.183333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1916666666666664,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2083333333333335,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.216666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.225,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2333333333333334,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2416666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.25,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2583333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2666666666666666,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.275,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.283333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2916666666666665,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            }
+          ],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 15.658333333333085,
+            "targetId": 13,
+            "distanceM": 1.0526441752196014
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1.0526441752196014,
+              "timeSec": 15.658333333333085,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 13
+            },
+            {
+              "distanceM": 2947.2715292084404,
+              "timeSec": 15.658333333333085,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 14
+            }
+          ],
+          "terminalSpeedMps": 559.9425573375912
+        },
+        {
+          "launchTime": 1.75,
+          "type": "AIM120C",
+          "locked": false,
+          "rangeM": 5572.386220433994,
+          "states": {
+            "acquire": 0.24166666666666664,
+            "track": 19.966666666666175,
+            "memory": 0.7249999999999999
+          },
+          "guidance": {
+            "no_estimate": 0.24166666666666664,
+            "negative_closure": 0.15833333333333333,
+            "active": 20.291666666666156,
+            "gimbal_limit": 0.24166666666666664
+          },
+          "firstTrackTime": 1.9916666666666667,
+          "controlLimitedSeconds": 1.7333333333333296,
+          "decoyTransferEventCount": 30,
+          "transferEvents": [
+            {
+              "time": 3.05,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.058333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.0666666666666664,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.075,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.0833333333333335,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.091666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1083333333333334,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1166666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.125,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1333333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1416666666666666,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.15,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.158333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1666666666666665,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.175,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.183333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.1916666666666664,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2083333333333335,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.216666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.225,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2333333333333334,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2416666666666667,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.25,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2583333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2666666666666666,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.275,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.283333333333333,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            },
+            {
+              "time": 3.2916666666666665,
+              "fromType": "bandit",
+              "toType": "chaff",
+              "fromId": 13,
+              "toId": 6
+            }
+          ],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 22.699999999999353,
+            "targetId": 14,
+            "distanceM": 2.066038387166564
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 122.8625977467703,
+              "timeSec": 15.649999999999752,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 13
+            },
+            {
+              "distanceM": 2.066038387166564,
+              "timeSec": 22.699999999999353,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 14
+            }
+          ],
+          "terminalSpeedMps": 480.3925300655122
+        }
+      ],
+      "events": {
+        "seeker_state": 38,
+        "chaff_dispense": 3,
+        "flare_dispense": 3,
+        "decoy_transfer": 60,
+        "lock": 1,
+        "flare_expire": 3,
+        "unlock": 1,
+        "chaff_expire": 3,
+        "detonation": 2,
+        "kill": 2,
+        "expire": 4
+      },
+      "crashed": false,
+      "minClearanceM": 750.0000007312475,
+      "kills": 2,
+      "remaining": 0,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 4723.361555328229,
+      "maxSampledLock": 1
+    },
+    {
+      "policy": "locked",
+      "countermeasures": true,
+      "commandedSpeed": 250,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [],
+      "events": {},
+      "crashed": false,
+      "minClearanceM": 750.0000007312475,
+      "kills": 0,
+      "remaining": 6,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 3218.6626367047825,
+      "maxSampledLock": 0
+    },
+    {
+      "policy": "close-locked",
+      "countermeasures": true,
+      "commandedSpeed": 250,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [],
+      "events": {},
+      "crashed": false,
+      "minClearanceM": 750.0000007312475,
+      "kills": 0,
+      "remaining": 6,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 3218.6626367047825,
+      "maxSampledLock": 0
+    },
+    {
+      "policy": "immediate",
+      "countermeasures": false,
+      "commandedSpeed": 250,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [
+        {
+          "launchTime": 0,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5460.560550343976,
+          "states": {
+            "search": 3.3749999999999907,
+            "acquire": 0.2833333333333334,
+            "track": 14.666666666666474,
+            "memory": 0.7416666666666665,
+            "lost": 0.9333333333333325
+          },
+          "guidance": {
+            "no_estimate": 4.5916666666666845,
+            "active": 15.408333333333099
+          },
+          "firstTrackTime": 3.5166666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.016666666666172
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1292.0356955608434,
+              "timeSec": 14.33333333333316,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 19
+            },
+            {
+              "distanceM": 1993.5554216495088,
+              "timeSec": 20.016666666666172,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 20
+            }
+          ],
+          "terminalSpeedMps": 433.95612668036404
+        },
+        {
+          "launchTime": 0.35,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5484.045804463797,
+          "states": {
+            "search": 3.058333333333325,
+            "acquire": 0.2833333333333334,
+            "track": 14.749999999999803,
+            "memory": 0.7416666666666665,
+            "lost": 1.166666666666665
+          },
+          "guidance": {
+            "no_estimate": 4.508333333333347,
+            "active": 15.491666666666427
+          },
+          "firstTrackTime": 3.55,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.366666666666152
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1408.0668436299425,
+              "timeSec": 14.33333333333316,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 19
+            },
+            {
+              "distanceM": 1887.056590641064,
+              "timeSec": 20.366666666666152,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 20
+            }
+          ],
+          "terminalSpeedMps": 435.1976948436919
+        },
+        {
+          "launchTime": 0.7,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5507.179774335624,
+          "states": {
+            "search": 2.7333333333333263,
+            "acquire": 0.2833333333333334,
+            "track": 14.85833333333313,
+            "memory": 0.7416666666666665,
+            "lost": 1.3833333333333309
+          },
+          "guidance": {
+            "no_estimate": 4.400000000000008,
+            "active": 15.599999999999755
+          },
+          "firstTrackTime": 3.5749999999999997,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 20.716666666666132
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1508.2589498416846,
+              "timeSec": 14.33333333333316,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 19
+            },
+            {
+              "distanceM": 1765.3702660940091,
+              "timeSec": 20.716666666666132,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 20
+            }
+          ],
+          "terminalSpeedMps": 436.3972773983591
+        },
+        {
+          "launchTime": 1.05,
+          "type": "AIM9X",
+          "locked": false,
+          "rangeM": 5529.697702165721,
+          "states": {
+            "search": 2.4166666666666607,
+            "acquire": 0.2833333333333334,
+            "track": 14.991666666666456,
+            "memory": 0.7416666666666665,
+            "lost": 1.5666666666666635
+          },
+          "guidance": {
+            "no_estimate": 4.266666666666668,
+            "active": 15.73333333333308
+          },
+          "firstTrackTime": 3.6083333333333334,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 21.066666666666112
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1607.6727728980247,
+              "timeSec": 14.33333333333316,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 19
+            },
+            {
+              "distanceM": 1632.1132437357671,
+              "timeSec": 21.066666666666112,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 20
+            }
+          ],
+          "terminalSpeedMps": 437.1989136113496
+        },
+        {
+          "launchTime": 1.4,
+          "type": "AIM120C",
+          "locked": false,
+          "rangeM": 5551.456916845742,
+          "states": {
+            "acquire": 0.24166666666666664,
+            "track": 12.67499999999992
+          },
+          "guidance": {
+            "no_estimate": 0.24166666666666664,
+            "negative_closure": 0.18333333333333332,
+            "active": 12.491666666666598
+          },
+          "firstTrackTime": 1.6416666666666666,
+          "controlLimitedSeconds": 0,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "fuze_burst",
+            "timeSec": 14.33333333333316,
+            "targetId": 19,
+            "distanceM": 1.6783638792266031
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 1.6783638792266031,
+              "timeSec": 14.33333333333316,
+              "method": "continuous_fuze",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 19
+            },
+            {
+              "distanceM": 3269.9776791039585,
+              "timeSec": 14.33333333333316,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 20
+            }
+          ],
+          "terminalSpeedMps": 692.4772512265471
+        },
+        {
+          "launchTime": 1.75,
+          "type": "AIM120C",
+          "locked": false,
+          "rangeM": 5572.386220433994,
+          "states": {
+            "acquire": 0.24166666666666664,
+            "track": 12.32499999999994,
+            "memory": 1.4999999999999971,
+            "lost": 9.93333333333341
+          },
+          "guidance": {
+            "no_estimate": 10.175000000000063,
+            "negative_closure": 0.15833333333333333,
+            "active": 12.491666666666598,
+            "gimbal_limit": 1.1749999999999983
+          },
+          "firstTrackTime": 1.9916666666666667,
+          "controlLimitedSeconds": 0.016666666666666666,
+          "decoyTransferEventCount": 0,
+          "transferEvents": [],
+          "outcome": {
+            "reason": "life_expiry",
+            "timeSec": 25.766666666665845
+          },
+          "alive": false,
+          "closest": [
+            {
+              "distanceM": 171.57491294463816,
+              "timeSec": 14.324999999999827,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 1",
+              "targetId": 19
+            },
+            {
+              "distanceM": 2823.882431879298,
+              "timeSec": 18.72499999999958,
+              "method": "step_sampling",
+              "targetCallsign": "BANDIT 2",
+              "targetId": 20
+            }
+          ],
+          "terminalSpeedMps": 550.1737720477614
+        }
+      ],
+      "events": {
+        "seeker_state": 38,
+        "lock": 1,
+        "unlock": 1,
+        "detonation": 1,
+        "kill": 1,
+        "expire": 5
+      },
+      "crashed": false,
+      "minClearanceM": 750.0000007312475,
+      "kills": 1,
+      "remaining": 0,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 4399.108701180308,
+      "maxSampledLock": 1
+    },
+    {
+      "policy": "locked",
+      "countermeasures": false,
+      "commandedSpeed": 250,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [],
+      "events": {},
+      "crashed": false,
+      "minClearanceM": 750.0000007312475,
+      "kills": 0,
+      "remaining": 6,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 3218.6626367047825,
+      "maxSampledLock": 0
+    },
+    {
+      "policy": "close-locked",
+      "countermeasures": false,
+      "commandedSpeed": 250,
+      "initial": {
+        "position": [
+          -600,
+          750,
+          3200
+        ],
+        "velocity": [
+          96,
+          0,
+          -49
+        ],
+        "quaternion": [
+          0.058778411522855185,
+          -0.5212555504302706,
+          0.03601945690681891,
+          0.850611749394883
+        ],
+        "targets": [
+          {
+            "callsign": "BANDIT 1",
+            "position": [
+              3207.773599907509,
+              1920.8665536648286,
+              -535.8795352808705
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 5461.39763950346,
+              "signalQuality": 0.08613835602177855,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 17.74746804388615
+            }
+          },
+          {
+            "callsign": "BANDIT 2",
+            "position": [
+              5439.006589234367,
+              2173.4222636480836,
+              1918.6944333355182
+            ],
+            "observation": {
+              "canObserve": false,
+              "lossReason": "low_signal",
+              "rangeM": 6335.414389022279,
+              "signalQuality": 0.06676628943120502,
+              "minSignalQuality": 0.25,
+              "aspectAngleDeg": 15.614267101597305
+            }
+          }
+        ]
+      },
+      "shots": [],
+      "events": {},
+      "crashed": false,
+      "minClearanceM": 750.0000007312475,
+      "kills": 0,
+      "remaining": 6,
+      "targets": [
+        {
+          "callsign": "BANDIT 1",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        },
+        {
+          "callsign": "BANDIT 2",
+          "alive": true,
+          "damage": 0,
+          "damageState": "normal"
+        }
+      ],
+      "minSampledRangeM": 3218.6626367047825,
+      "maxSampledLock": 0
+    }
+  ]
+}
