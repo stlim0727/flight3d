@@ -44,6 +44,7 @@ export function combatExperimentConfig(values = {}) {
   const timeoutSeconds = Number(values.timeout ?? 60);
   if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) throw new Error('Timeout must be positive seconds');
   return { scenario, geometries, variants, recordTrajectory: Boolean(values.diagnostics),
+    recordDiagnostics: Boolean(values.diagnostics),
     targetSpeedMps: defense ? 200 : 180, timeoutSeconds };
 }
 
@@ -52,7 +53,7 @@ export function runCombatExperiment(config, progress = () => {}) {
   for (const geometry of config.geometries) {
     const group = config.variants.map(({ id, ...controls }) => ({ variant: id,
       ...simulateCombatSituation({ ...geometry, ...controls, targetBehavior: 'evasive_ai',
-        targetSpeedMps: config.targetSpeedMps, countermeasures: false, recordTrajectory: config.recordTrajectory }),
+        targetSpeedMps: config.targetSpeedMps, countermeasures: false, recordTrajectory: config.recordTrajectory, recordDiagnostics: config.recordDiagnostics }),
     }));
     const launch = JSON.stringify(group[0].launchState);
     assert.ok(group.every(r => JSON.stringify(r.launchState) === launch), 'Paired launch states differ');

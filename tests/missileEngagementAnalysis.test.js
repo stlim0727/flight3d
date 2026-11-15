@@ -195,7 +195,8 @@ test('analyzeCombatEngagement: captures guidance cutoffs and aerodynamic limits'
   assert.equal(m.guidanceTimeline.length, 2);
   assert.equal(m.guidanceTimeline[1].cutoffReason, 'gimbal_limit');
   assert.ok(m.causalSummary.includes('gimbal_limit'));
-  assert.ok(m.causalSummary.includes('exhausted'));
+  assert.ok(m.causalSummary.includes('flight lifetime elapsed'));
+  assert.doesNotMatch(m.causalSummary, /energy.*exhausted/);
 });
 
 test('analyzeCombatEngagement: distinguishes survived proximity blast vs lethal direct blast', () => {

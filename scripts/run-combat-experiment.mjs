@@ -72,6 +72,7 @@ export async function main(args = process.argv.slice(2)) {
     expectedCases = config.geometries.length * config.variants.length;
     compactConfig = { scenario: config.scenario, geometryCount: config.geometries.length,
       variants: config.variants.map(v => v.id), recordTrajectory: config.recordTrajectory,
+      recordDiagnostics: config.recordDiagnostics,
       targetSpeedMps: config.targetSpeedMps, timeoutSeconds: config.timeoutSeconds };
     metadata.revision = git(['rev-parse', 'HEAD']);
     metadata.dirty = Boolean(git(['status', '--porcelain']));

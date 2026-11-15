@@ -11,7 +11,7 @@ npm run combat:experiment
 # Existing 48-geometry defense grid × all five defense controls = 240 cases
 npm run combat:experiment -- --scenario defense
 
-# One confirmed-lock attempt, with 5 Hz target/missile histories
+# One confirmed-lock attempt, with histories, diagnostic events and analysis
 npm run combat:experiment -- --scenario single --ranges 2500 --aspects 0 \
   --speeds 108 --altitude-pairs 750:1210 --defense reaction-flare --diagnostics
 
@@ -46,7 +46,9 @@ gameplay coefficient change is made.
 The command prints one compact JSON result with per-type/defense denominators
 and artifact paths. By default it saves `.cache/combat-experiment/<scenario>.json`
 and `<scenario>.summary.json`. Read the summary first, then inspect selected
-full-report cases. Histories are omitted unless `--diagnostics` is set.
+full-report cases. Histories and diagnostic events/analysis are omitted unless
+`--diagnostics` is set. See [diagnostic event bridge](combat-diagnostic-events.md)
+for the event clock, measured CPA, analyzer contract and fidelity limits.
 Metadata includes source revision, dirty state, Node version, fixed timestep,
 flat-terrain fixture and resolved inputs. Dirty results are provisional.
 
