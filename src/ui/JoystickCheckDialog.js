@@ -13,6 +13,7 @@ export class JoystickCheckDialog {
     this.dialog = null;
     this.isOpen = false;
     this.rafId = null;
+    this.buttonLearning = null;
     this.storage = simulator?.storage || (typeof globalThis !== 'undefined' ? globalThis.localStorage : null);
 
     this.wizardActive = false;
@@ -79,15 +80,18 @@ export class JoystickCheckDialog {
 
         <div class="joystick-section">
           <h3 class="joystick-section-title">전투 버튼 매핑 (Combat buttons)</h3>
-          <p>아래 버튼 번호는 실시간 버튼 표시에서 확인하세요. 지정한 버튼의 기존 기능은 해제됩니다.</p>
+          <p>동작의 “버튼 지정”을 누른 뒤 조이스틱 버튼을 누르세요. 지정한 버튼의 기존 기능은 해제됩니다.</p>
+          <p class="joystick-learn-status" data-learn-status role="status" aria-live="polite"></p>
           <div class="joystick-combat-grid">
           ${[['missile', '미사일 발사'], ['gun', '기관포 (누르고 유지)'], ['target', '표적 전환'], ['chaff', '채프 (미구현)'], ['flare', '플레어 (미구현)']].map(([action, label]) => `
-            <label class="joystick-field-label">${label}
-              <select class="joystick-select" data-combat-button="${action}">
+            <div class="joystick-combat-field">
+              <label class="joystick-field-label" for="joystick-combat-${action}">${label}</label>
+              <select id="joystick-combat-${action}" class="joystick-select" data-combat-button="${action}">
                 <option value="-1">미지정</option>
                 ${Array.from({ length: 65 }, (_, i) => `<option value="${i}">Button ${i}</option>`).join('')}
               </select>
-            </label>`).join('')}
+              <button type="button" class="joystick-learn-button" data-learn-button="${action}" aria-label="${label}: 조이스틱 버튼 지정">버튼 지정</button>
+            </div>`).join('')}
           </div>
         </div>
 
@@ -392,7 +396,8 @@ export class JoystickCheckDialog {
       if (e.key === 'Escape' && this.isOpen) {
         e.preventDefault();
         e.stopPropagation();
-        this.close();
+        if (this.buttonLearning) this.cancelButtonLearning();
+        else this.close();
       }
     });
 
@@ -407,6 +412,19 @@ export class JoystickCheckDialog {
         this.hotas.applyConfig({ combatButtons: mapping });
         for (const field of this.dialog.querySelectorAll('[data-combat-button]')) field.value = String(mapping[field.getAttribute('data-combat-button')]);
         this.savePreferences();
+      });
+    }
+
+    for (const button of this.dialog.querySelectorAll('[data-learn-button]')) {
+      button.addEventListener('click', () => {
+        const action = button.getAttribute('data-learn-button');
+        if (this.buttonLearning?.action === action) {
+          this.cancelButtonLearning();
+          return;
+        }
+        const diag = this.hotas?.getDiagnostics();
+        this.buttonLearning = { action, held: new Set((diag?.buttons || []).filter(b => b.pressed).map(b => b.index)) };
+        this.updateButtonLearningUI();
       });
     }
 
@@ -497,6 +515,7 @@ export class JoystickCheckDialog {
     this.isOpen = false;
     this.dialog.hidden = true;
     if (this.wizardActive) this.cancelWizard();
+    this.cancelButtonLearning();
     if (this.hotas) this.hotas.diagnosticActive = false;
     if (this.rafId) {
       this._cancelFrame(this.rafId);
@@ -520,6 +539,36 @@ export class JoystickCheckDialog {
       this.rafId = this._requestFrame(step);
     };
     this.rafId = this._requestFrame(step);
+  }
+
+  updateButtonLearningUI() {
+    const status = this.dialog?.querySelector('[data-learn-status]');
+    if (status) status.textContent = this.buttonLearning ? '지정할 조이스틱 버튼을 누르세요. 취소하려면 다시 누르세요.' : '';
+    for (const button of this.dialog?.querySelectorAll('[data-learn-button]') || []) {
+      const active = button.getAttribute('data-learn-button') === this.buttonLearning?.action;
+      button.textContent = active ? '취소' : '버튼 지정';
+      button.setAttribute('aria-pressed', String(active));
+    }
+  }
+
+  cancelButtonLearning() {
+    this.buttonLearning = null;
+    this.updateButtonLearningUI();
+  }
+
+  processButtonLearning(diag) {
+    const learning = this.buttonLearning;
+    if (!learning || !diag.connected) return;
+    const pressed = new Set(diag.buttons.filter(b => b.pressed).map(b => b.index));
+    for (const index of learning.held) if (!pressed.has(index)) learning.held.delete(index);
+    const index = [...pressed].find(i => i <= 64 && !learning.held.has(i));
+    if (index === undefined) return;
+    const select = this.dialog.querySelector(`[data-combat-button="${learning.action}"]`);
+    if (select) {
+      select.value = String(index);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    this.cancelButtonLearning();
   }
 
   getButtonActionLabel(index, profile) {
@@ -570,6 +619,7 @@ export class JoystickCheckDialog {
   updateTelemetry() {
     if (!this.hotas) return;
     const diag = this.hotas.getDiagnostics();
+    this.processButtonLearning(diag);
 
     // 0. Update Wizard Telemetry if active
     if (this.wizardActive) {
@@ -763,6 +813,7 @@ export class JoystickCheckDialog {
 
   resetDefaults() {
     if (!this.hotas) return;
+    this.cancelButtonLearning();
     const defaults = {
       profileOverride: 'auto',
       axesLayout: 'auto',
@@ -806,6 +857,7 @@ export class JoystickCheckDialog {
   }
 
   startWizard() {
+    this.cancelButtonLearning();
     this.wizardActive = true;
     this.wizardStep = 1;
     this.wizardBaseline = null;

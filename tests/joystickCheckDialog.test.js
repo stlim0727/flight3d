@@ -373,6 +373,29 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     dialog.close();
   });
 
+  it('learns a fresh controller button press, ignores held buttons, and cancels safely', () => {
+    const pad = { id: 'T.Flight Hotas One', index: 0, axes: [0, 0, 0, 0, 0], buttons: Array.from({ length: 4 }, () => ({ pressed: false, value: 0 })) };
+    sim.controls.hotas.getGamepadsFn = () => [pad];
+    sim.controls.hotas.applyConfig({ combatButtons: { target: 2 } });
+    const dialog = new JoystickCheckDialog(sim);
+    dialog.open();
+    const learn = dialog.dialog.querySelector('[data-learn-button="missile"]');
+    pad.buttons[1] = { pressed: true, value: 1 };
+    learn.click(); dialog.updateTelemetry();
+    assert.equal(sim.controls.hotas.combatButtons.missile, -1, 'already held input must not be captured');
+    pad.buttons[1] = { pressed: false, value: 0 }; dialog.updateTelemetry();
+    pad.buttons[2] = { pressed: true, value: 1 }; dialog.updateTelemetry();
+    assert.equal(sim.controls.hotas.combatButtons.missile, 2);
+    assert.equal(sim.controls.hotas.combatButtons.target, -1, 'duplicate assignment is removed');
+    assert.equal(JSON.parse(mockStorage.getItem('flight3d.preferences.v1')).joystick.combatButtons.missile, 2);
+    assert.equal(dialog.buttonLearning, null);
+    learn.click(); learn.click();
+    pad.buttons[3] = { pressed: true, value: 1 }; dialog.updateTelemetry();
+    assert.equal(sim.controls.hotas.combatButtons.missile, 2, 'cancel keeps the old mapping');
+    learn.click(); dialog.close();
+    assert.equal(dialog.buttonLearning, null);
+  });
+
   it('restores default configuration on reset button click', () => {
     sim.controls.hotas.applyConfig({
       profileOverride: 'hotas-one-xbox',

@@ -822,3 +822,16 @@
   .joystick-combat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .joystick-advanced > summary span { display: block; margin: 4px 0 0 18px; }
 }
+
+.joystick-combat-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.joystick-learn-button {
+  color: #d6eefa;
+  background: #17364c;
+  border: 1px solid #3b7795;
+  border-radius: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+.joystick-learn-button:hover, .joystick-learn-button:focus-visible { background: #21516e; }
+.joystick-learn-button[aria-pressed="true"] { background: #036a93; border-color: #7dd3fc; }
+.joystick-learn-status:empty { display: none; }
