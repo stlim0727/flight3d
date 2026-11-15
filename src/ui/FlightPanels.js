@@ -234,6 +234,18 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   // Keep the top header bar, control dock, AP panel, and notice slot aligned.
   function positionEdgeButtons() {
     if (!strip.getClientRects().length || !bar.getClientRects().length) return;
+    // Stack the camera strip onto a second row only when the first row cannot
+    // fit at least three camera buttons alongside the fixed flight/utility controls.
+    const maxToolbarWidth = Number.parseFloat(getComputedStyle(bar).maxWidth)
+      || (document.documentElement.clientWidth - 16);
+    let fixedWidth = 2;
+    for (const child of bar.children) {
+      if (child === cameraStrip || getComputedStyle(child).display === 'none') continue;
+      fixedWidth += child.getBoundingClientRect().width;
+    }
+    const buttonWidth = fullscreen.getBoundingClientRect().width || 44;
+    const stackCameraStrip = (maxToolbarWidth - fixedWidth) < buttonWidth * 3;
+    bar.classList.toggle('camera-strip-stacked', stackCameraStrip);
     // The folded compact notice narrows this row. Keep takeover visible there;
     // elsewhere pin the camera/fullscreen/overflow end to the right edge.
     const foldedCompactDemo = document.body.classList.contains('demo-active')
