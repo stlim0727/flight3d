@@ -349,3 +349,13 @@ test('HARD_DEADLINE_MS bounds a boot that never lifts the overlay', () => {
   assert.equal(shouldEmitTrace(s, HARD_DEADLINE_MS), true);
   assert.equal(s.readySource, 'timeout');
 });
+
+
+test('startup operation spans distinguish missing, completed and invalid timing pairs', () => {
+  const report = buildStartupTraceReport(state(), { marks: {
+    'startup-ui-start': 100, 'startup-ui-end': 350,
+    'startup-airport-start': 360,
+    'startup-render-start': 400, 'startup-render-end': 380,
+  } });
+  assert.deepEqual(report.boot.operationsMs, { ui: 250, airport: null, shaders: null, crash: null, render: 0 });
+});
