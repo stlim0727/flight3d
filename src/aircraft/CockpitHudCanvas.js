@@ -150,7 +150,7 @@ export class CockpitHudCanvas {
     const w = this.width;
     const h = this.height;
     const cx = w * 0.5;
-    const cy = h * 0.52;
+    const cy = this.variant === 'b738' ? h * 0.50 : h * 0.52;
 
     ctx.clearRect(0, 0, w, h);
 
@@ -696,40 +696,40 @@ export function createB737HudCombiner(hudCanvas) {
 
   // Captain line-of-sight mount X aligned directly with the Captain eye, yoke, and seat center
   const mountX = -0.303;
-  const mountY = 0.820;
-  const mountZ = -12.740;
+  const mountY = 0.880;
+  const mountZ = -12.720;
 
-  // Overhead projector housing & hinge bracket attached to the Captain ceiling mount
+  // Overhead projector housing & hinge bracket attached to the Captain ceiling mount header
   const housingGeo = new THREE.BoxGeometry(0.12, 0.020, 0.075);
   const housingMesh = new THREE.Mesh(housingGeo, frameMat);
   housingMesh.name = 'B737_HGS_Housing';
-  housingMesh.position.set(mountX, 0.955, -12.685);
+  housingMesh.position.set(mountX, 1.050, -12.680);
   housingMesh.castShadow = false;
   housingMesh.receiveShadow = false;
   group.add(housingMesh);
 
   // Dual support struts connecting ceiling mount to combiner top hinge bracket
-  const strutGeo = new THREE.BoxGeometry(0.008, 0.075, 0.009);
+  const strutGeo = new THREE.BoxGeometry(0.008, 0.104, 0.009);
   for (const side of [-1, 1]) {
     const strut = new THREE.Mesh(strutGeo, frameMat);
     strut.name = side < 0 ? 'B737_HGS_Strut_L' : 'B737_HGS_Strut_R';
-    strut.position.set(mountX + side * 0.042, 0.925, -12.700);
-    strut.rotation.x = 0.30;
+    strut.position.set(mountX + side * 0.044, 1.002, -12.700);
+    strut.rotation.x = 0.395;
     strut.castShadow = false;
     strut.receiveShadow = false;
     group.add(strut);
   }
 
-  // Combiner assembly pivot in the Captain's forward windshield above the yoke and glareshield
+  // Combiner assembly pivot in the Captain's forward windshield aligned with eye POV and foresight
   const combinerPivot = new THREE.Group();
   combinerPivot.name = 'B737_HGS_Lens_Pivot';
   combinerPivot.position.set(mountX, mountY, mountZ);
-  combinerPivot.rotation.x = -0.12;
+  combinerPivot.rotation.x = 0;
   group.add(combinerPivot);
 
   // Official Boeing 737 Rockwell Collins HGS-4000 round/oval combiner lens
-  const rx = 0.080; // 16.0 cm total width
-  const ry = 0.064; // 12.8 cm total height
+  const rx = 0.088; // 17.6 cm total width
+  const ry = 0.070; // 14.0 cm total height
   const rimW = 0.0035; // 3.5 mm sleek black protective bezel
 
   // Optical combiner glass geometry with normalized UVs

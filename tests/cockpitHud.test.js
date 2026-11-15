@@ -195,4 +195,18 @@ test('Boeing737 mounts 3D overhead HGS combiner in cockpit.group without polluti
       assert.equal(node.material.isMeshBasicMaterial, true);
     }
   });
+
+  // Verify alignment with Captain eye POV and forward foresight line
+  const pivot = b737.hudCombiner.getObjectByName('B737_HGS_Lens_Pivot');
+  assert.ok(pivot instanceof THREE.Group, 'Lens pivot must exist');
+  assert.equal(pivot.position.x, -0.303, 'HGS combiner X must align with Captain eye X');
+  assert.equal(pivot.position.y, 0.880, 'HGS combiner Y must align with Captain eye Y (foresight level)');
+  assert.equal(pivot.rotation.x, 0, 'HGS combiner lens must be normal to foresight line');
+
+  // Verify ray from Captain eye (-0.303, 0.88, -12.35) to combiner center is parallel to aircraft Z foresight
+  const eyePos = new THREE.Vector3(-0.303, 0.88, -12.35);
+  const sightRay = pivot.position.clone().sub(eyePos);
+  assert.equal(Math.abs(sightRay.x) < 1e-5, true, 'Sightline to HUD center must have zero lateral deflection');
+  assert.equal(Math.abs(sightRay.y) < 1e-5, true, 'Sightline to HUD center must have zero vertical deflection (foresight datum)');
+  assert.equal(sightRay.z < 0, true, 'HUD combiner must be placed forward in front of the Captain');
 });
