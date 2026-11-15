@@ -1491,11 +1491,13 @@ class FlightSimulator {
     this.missileCombatView.sync(combatDt);
     this.cannonCombatView.sync(combatDt);
     this.syncGunAudio();
-    syncCombatAudio(this.missileCombat, {
-      audio: this.audio,
-      camera: this.camera,
-      paused: combatDt <= 0 || this.replayDirector?.active,
-    });
+    if (!this.replayDirector?.active) {
+      syncCombatAudio(this.missileCombat, {
+        audio: this.audio,
+        camera: this.camera,
+        paused: combatDt <= 0,
+      });
+    }
     for (const event of combatEvents) this.handleCombatEvent(event);
 
     // 4. Update Cockpit Visibility & Audio

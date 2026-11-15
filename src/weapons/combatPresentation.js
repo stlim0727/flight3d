@@ -23,9 +23,10 @@ export function presentCombatEvent(event, context = {}) {
   const { view, explosionSystem, audio, camera, onKill, onGunEmpty } = context;
 
   if (kind === 'launch') {
-    const hasCoords = event.position?.x !== undefined || event.x !== undefined;
+    const launchPos = event.position ?? event.missile?.position ?? null;
+    const hasCoords = launchPos?.x !== undefined || event.x !== undefined;
     const distance = hasCoords && camera?.position?.distanceTo
-      ? camera.position.distanceTo(resolveVector(event.position, event.x, event.y, event.z))
+      ? camera.position.distanceTo(resolveVector(launchPos, event.x, event.y, event.z))
       : 0;
     audio?.playMissileLaunch?.(distance);
     return kind;

@@ -139,7 +139,8 @@ test('syncCombatAudio forwards missiles only when unpaused and launch passes cam
   };
   const camera = { position: new THREE.Vector3(0, 0, 0) };
   presentCombatEvent({ kind: 'launch', x: 300, y: 400, z: 0 }, { audio, camera });
-  assert.equal(launchDists[0], 500);
+  presentCombatEvent({ type: 'launch', missile: { position: new THREE.Vector3(0, 600, 800) } }, { audio, camera });
+  assert.deepEqual(launchDists, [500, 1000]);
 
   syncCombatAudio({ missiles: [{ alive: true }] }, { audio, camera, paused: false });
   syncCombatAudio({ missiles: [{ alive: true }] }, { audio, camera, paused: true });
