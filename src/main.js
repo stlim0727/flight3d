@@ -52,7 +52,7 @@ import { HudView } from './ui/HudView.js';
 import { AirToAirMissileSystem } from './weapons/AirToAirMissileSystem.js';
 import { CannonCombatView } from './weapons/CannonCombatView.js';
 import { MissileCombatView } from './weapons/MissileCombatView.js';
-import { presentCombatEvent } from './weapons/combatPresentation.js';
+import { presentCombatEvent, syncCombatAudio } from './weapons/combatPresentation.js';
 import { RearmSystem } from './systems/RearmSystem.js';
 import { RenderPose } from './core/RenderPose.js';
 import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
@@ -1491,6 +1491,11 @@ class FlightSimulator {
     this.missileCombatView.sync(combatDt);
     this.cannonCombatView.sync(combatDt);
     this.syncGunAudio();
+    syncCombatAudio(this.missileCombat, {
+      audio: this.audio,
+      camera: this.camera,
+      paused: combatDt <= 0 || this.replayDirector?.active,
+    });
     for (const event of combatEvents) this.handleCombatEvent(event);
 
     // 4. Update Cockpit Visibility & Audio

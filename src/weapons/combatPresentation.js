@@ -23,7 +23,11 @@ export function presentCombatEvent(event, context = {}) {
   const { view, explosionSystem, audio, camera, onKill, onGunEmpty } = context;
 
   if (kind === 'launch') {
-    audio?.playMissileLaunch?.();
+    const hasCoords = event.position?.x !== undefined || event.x !== undefined;
+    const distance = hasCoords && camera?.position?.distanceTo
+      ? camera.position.distanceTo(resolveVector(event.position, event.x, event.y, event.z))
+      : 0;
+    audio?.playMissileLaunch?.(distance);
     return kind;
   }
 
@@ -53,4 +57,12 @@ export function presentCombatEvent(event, context = {}) {
   }
 
   return null;
+}
+
+/**
+ * Sync continuous combat audio (in-flight missile rocket/whoosh) from either
+ * live AirToAirMissileSystem or CombatReplayPlayback.state.
+ */
+export function syncCombatAudio(system, { audio, camera = null, paused = false } = {}) {
+  audio?.syncMissileFlight?.(paused ? [] : (system?.missiles || []), camera?.position ?? null);
 }

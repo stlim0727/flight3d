@@ -71,6 +71,7 @@ export class FlightAudio {
 
   reset() {
     this.stopGunFire();
+    this.stopMissileFlight();
     this.crashed = false;
     this.lastTouchdownTime = -Infinity;
     this.touchdownActive = false;
@@ -554,6 +555,7 @@ export class FlightAudio {
     if (this.volume === 0) {
       this.cancelSpeech();
       this.stopGunFire();
+      this.stopMissileFlight();
       this.departureRadio.stop();
       this.bangkokRadio?.stop();
     }
@@ -889,9 +891,11 @@ export class FlightAudio {
   }
 
   /** Solid-rocket ignition: broadband whoosh with a low pressure thump. */
-  playMissileLaunch() {
+  playMissileLaunch(distance = 0) {
     if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
     const now = this.ctx.currentTime;
+    const safeDistance = Math.max(0, Number.isFinite(distance) ? distance : 0);
+    const attenuation = Math.min(1.0, Math.max(0.05, 1 / (1 + safeDistance / 400)));
     const duration = 1.1;
     const buffer = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * duration), this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -908,7 +912,7 @@ export class FlightAudio {
     filter.frequency.exponentialRampToValueAtTime(2200, now + 0.35);
     filter.frequency.exponentialRampToValueAtTime(420, now + duration);
     const noiseGain = this.ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.22, now);
+    noiseGain.gain.setValueAtTime(0.22 * attenuation, now);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
     noise.connect(filter);
     filter.connect(noiseGain);
@@ -920,12 +924,87 @@ export class FlightAudio {
     thump.type = 'sine';
     thump.frequency.setValueAtTime(110, now);
     thump.frequency.exponentialRampToValueAtTime(38, now + 0.5);
-    thumpGain.gain.setValueAtTime(0.24, now);
+    thumpGain.gain.setValueAtTime(0.24 * attenuation, now);
     thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
     thump.connect(thumpGain);
     thumpGain.connect(this.masterGain);
     thump.start(now);
     thump.stop(now + 0.6);
+  }
+
+  /**
+   * Continuous missile rocket-motor roar and aerodynamic whoosh, driven by the
+   * nearest airborne round's distance to the active camera.
+   */
+  syncMissileFlight(missiles, cameraPosition = null) {
+    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0 || !Array.isArray(missiles)) {
+      this.stopMissileFlight();
+      return;
+    }
+    let nearest = null;
+    let nearestDist = Infinity;
+    for (const missile of missiles) {
+      if (!missile?.alive || !missile.position) continue;
+      const dist = cameraPosition?.distanceTo ? cameraPosition.distanceTo(missile.position) : 0;
+      if (dist < nearestDist) {
+        nearest = missile;
+        nearestDist = dist;
+      }
+    }
+    if (!nearest || nearestDist > 2500) {
+      this.stopMissileFlight();
+      return;
+    }
+
+    const powered = (nearest.propellant ?? 0) > 0;
+    const attenuation = 1 / (1 + Math.pow(nearestDist / 220, 1.6));
+    const targetGain = (powered ? 0.16 : 0.065) * attenuation;
+    if (targetGain < 0.002) {
+      this.stopMissileFlight();
+      return;
+    }
+
+    const now = this.ctx.currentTime;
+    if (!this.missileFlightNodes) {
+      const rate = this.ctx.sampleRate;
+      const buffer = this.ctx.createBuffer(1, rate, rate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, now);
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+      source.start(now);
+      this.missileFlightNodes = { source, filter, gain };
+    }
+
+    const proximity = Math.max(0, 1 - nearestDist / 1600);
+    const cutoff = (powered ? 550 : 340) + proximity * (powered ? 750 : 500);
+    this.missileFlightNodes.filter.Q.setTargetAtTime(powered ? 0.7 : 1.15, now, 0.05);
+    this.missileFlightNodes.filter.frequency.setTargetAtTime(cutoff, now, 0.05);
+    this.missileFlightNodes.gain.gain.setTargetAtTime(targetGain, now, 0.05);
+  }
+
+  stopMissileFlight() {
+    const nodes = this.missileFlightNodes;
+    if (!nodes) return;
+    this.missileFlightNodes = null;
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    try {
+      nodes.gain.gain.cancelScheduledValues(now);
+      nodes.gain.gain.setValueAtTime(nodes.gain.gain.value, now);
+      nodes.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+      nodes.source.stop(now + 0.1);
+    } catch (error) {
+      void error;
+    }
   }
 
   playExplosion(isWater = false) {
