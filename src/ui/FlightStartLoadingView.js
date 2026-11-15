@@ -1,10 +1,11 @@
 /** Browser presentation for a scene swap; the coordinator owns its lifetime. */
 export class FlightStartLoadingView {
-  constructor({ stage, setBusy, latency, document = globalThis.document }) {
-    Object.assign(this, { paintStage: stage, setBusy, latency, document });
+  constructor({ stage, setBusy, latency, progress, document = globalThis.document }) {
+    Object.assign(this, { paintStage: stage, setBusy, latency, progress, document });
   }
 
   open() {
+    this.progress?.reset({ max: 3, steps: 3 });
     this.latency?.noteSelectionStart();
     this.overlay = this.document.getElementById('startup-overlay');
     const progress = this.document.getElementById('startup-progress');
@@ -25,6 +26,7 @@ export class FlightStartLoadingView {
   ready() { return this.stage(3, 'startup.ready'); }
 
   close() {
+    this.progress?.finish();
     if (this.overlay) this.overlay.hidden = true;
     this.setBusy(false);
     this.latency?.noteSelectionApplied();

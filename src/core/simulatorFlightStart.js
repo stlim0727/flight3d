@@ -7,6 +7,7 @@ export function createSimulatorFlightStart(sim, stage) {
   const loading = new FlightStartLoadingView({
     stage,
     latency: sim.inputLatency,
+    progress: sim.startupProgress,
     setBusy: busy => sim.lobbyScreen?.setSelectionBusy(busy),
   });
   return new FlightStartCoordinator({

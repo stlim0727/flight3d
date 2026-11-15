@@ -1,3 +1,4 @@
+import { StartupProgressView } from './ui/StartupProgressView.js';
 import { compileVisibleScene } from './core/sceneShaderWarmup.js';
 import { FrameTransitionMonitor } from './core/FrameTransitionMonitor.js';
 import { longTaskSummary } from './core/inputLatency.js';
@@ -113,10 +114,13 @@ if (typeof window !== 'undefined') {
 
 initLocalization();
 initBuildInfo();
+const startupProgress = new StartupProgressView();
+// Loading disclosure and scrolling keep native keys without reaching flight shortcuts.
+document.getElementById('startup-overlay').addEventListener('keydown', event => event.stopPropagation());
 
 // Window-level flight shortcuts must not run behind the loading screen.
 window.addEventListener('keydown', event => {
-  if (document.body.classList.contains('booting') && event.target?.id !== 'startup-retry') {
+  if (document.body.classList.contains('booting') && !event.target?.closest?.('#startup-overlay')) {
     if (event.key !== 'Tab') event.preventDefault();
     event.stopImmediatePropagation();
   }
@@ -124,14 +128,19 @@ window.addEventListener('keydown', event => {
 
 async function startupStage(value, message) {
   startupTrace?.noteStage(value);
-  document.getElementById('startup-progress').value = value;
-  bindText(document.getElementById('startup-status'), () => t(message));
+  startupProgress.stage(value, message);
   // Two frames ensure the updated stage paints before synchronous construction.
   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 }
 
+async function startupDetail(key) {
+  startupProgress.detail(key);
+  if (!document.hidden) await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
 function showStartupError(error) {
   startupTrace?.noteFailed();
+  startupProgress.fail();
   console.error('Simulator startup failed:', error);
   bindText(document.getElementById('startup-status'), () => t('startup.failed'));
   document.getElementById('startup-progress').hidden = true;
@@ -151,6 +160,8 @@ const startupTrace = installStartupLoadMonitor(inputLatency);
  */
 class FlightSimulator {
   async initialize() {
+    startupProgress.reset();
+    this.startupProgress = startupProgress;
     initUiScale();
     await startupStage(0, 'startup.scene');
     const savedSelection = resolveFlightUrl(window.location.search, loadSavedFlightSelection());
@@ -237,6 +248,7 @@ class FlightSimulator {
     await startupStage(2, 'startup.world');
 
     // 5. Procedural World & Real-World Environments
+    await startupDetail('startup.detail.terrain');
     this.terrain = new Terrain(22000, initialPreset.terrainSegments ?? 256, { quality: initialPreset.terrain });
     this.scene.add(this.terrain.mesh);
 
@@ -247,10 +259,12 @@ class FlightSimulator {
     this.water = new WaterOcean(36000, initialPreset.waterSegments ?? 180, { quality: this.renderQuality });
     this.scene.add(this.water.mesh);
 
+    await startupDetail('startup.detail.airport');
     this.airport = new Airport();
     this.scene.add(this.airport.group);
     this.terrain.excludePavement(this.airport.group);
 
+    await startupDetail('startup.detail.foliage');
     this.foliage = new FoliageAndCities(this.terrain);
     this.foliage.setQuality?.(this.renderQuality);
     this.scene.add(this.foliage.group);
@@ -262,6 +276,7 @@ class FlightSimulator {
     // and satellite requests. Hidden scenery must not compete with startup.
 
     // Neon Metropolis 80s Synthwave City & Flight Canyons
+    await startupDetail('startup.detail.city');
     this.neonCity = new NeonCity();
     this.neonCity.group.visible = false;
     this.scene.add(this.neonCity.group);
@@ -270,6 +285,7 @@ class FlightSimulator {
     this.currentTerrain = this.terrain;
     this.currentAirport = this.airport;
 
+    await startupDetail('startup.detail.sky');
     this.sky = new SkyAtmosphere(this.scene, this.renderer, this.water);
     this.sky.setShadowMapSize(initialPreset.shadowMapSize);
     this.sky.setFarShadowQuality(initialPreset.farShadowMapSize, initialPreset.farShadowRange);
@@ -281,6 +297,7 @@ class FlightSimulator {
 
     await startupStage(3, 'startup.controls');
 
+    await startupDetail('startup.detail.systems');
     // 6. Audio & Controls & Camera & Diagnostics
     this.audio = new FlightAudio();
     this.controls = new FlightControls(this.renderer.domElement);
@@ -485,11 +502,13 @@ class FlightSimulator {
     };
     this._openFeedbackDialog = openFeedbackDialog;
 
+    await startupDetail('startup.detail.ui');
     inputLatency?.mark('startup-ui-start');
     restoreSimulatorPreferences(this, loadSimulatorPreferences());
     this.initControls();
     this.initUI();
     inputLatency?.mark('startup-ui-end');
+    await startupDetail('startup.detail.selectedAirport');
     inputLatency?.mark('startup-airport-start');
     await this.setAirport(savedSelection.airport);
     inputLatency?.mark('startup-airport-end');
@@ -624,6 +643,7 @@ class FlightSimulator {
 
     // Link visible scene programs before the first draw. compileAsync polls
     // KHR_parallel_shader_compile instead of blocking getUniforms in render().
+    await startupDetail('startup.detail.shaders');
     inputLatency?.mark('startup-shaders-start');
     let shaderTimeout;
     try {
@@ -637,6 +657,7 @@ class FlightSimulator {
       clearTimeout(shaderTimeout);
       inputLatency?.mark('startup-shaders-end');
     }
+    await startupDetail('startup.detail.firstFrame');
     // Do not draw while scene programs are still linking.
     this.clock.getDelta();
     this.hasRenderedFirstFrame = false;
@@ -1119,6 +1140,7 @@ class FlightSimulator {
   async finishStartup() {
     await startupStage(4, 'startup.preload');
     await startupStage(5, 'startup.cockpit');
+    await startupDetail('startup.detail.airframe');
     const deadline = performance.now() + 60000;
     // Boot waits for the airframe only. The streamed interior belongs to the cockpit view, not
     // to the lobby, and aircraft whose cabin ships inside the airframe model still land here.
@@ -1126,6 +1148,7 @@ class FlightSimulator {
       if (performance.now() > deadline) throw new Error('Startup assets timed out');
       await new Promise(resolve => setTimeout(resolve, 100));
     }
+    await startupDetail('startup.detail.effects');
     this.prepareCrashVisuals();
     let timeout;
     try {
@@ -1147,6 +1170,7 @@ class FlightSimulator {
     // Loading time must not turn into accumulated simulation time.
     this.clock.getDelta();
     inputLatency?.mark('startup-complete');
+    startupProgress.finish();
     // Paint the usable lobby before preparing optional aircraft. Each subsequent
     // model gets its own task so background work cannot delay overlay removal.
     const remaining = LOBBY_AIRCRAFT_IDS.filter(id => id !== this.currentAircraftId);
