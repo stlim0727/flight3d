@@ -146,6 +146,8 @@ export class WaterOcean {
         }
 
         void main() {
+          // Nothing is drawn past the rim circle, where the square mesh would show its corners.
+          if (length(vLocalPos) > uEdgeFadeEnd) discard;
           #include <logdepthbuf_fragment>
           #ifdef USE_LOGARITHMIC_DEPTH_BUFFER
             if (vIsPerspective != 0.0) {
@@ -216,9 +218,10 @@ export class WaterOcean {
           float fogFactor = clamp(1.0 - exp(-fogExp * fogExp), 0.0, 1.0);
 
           // Far edge blending: ensure ocean water completely melts into horizon sky fog before boundary
-          // Uses local mesh coordinates so the fade stays anchored to the far outer rim regardless of camera position
-          float edgeDist = max(abs(vLocalPos.x), abs(vLocalPos.y));
-          float edgeFade = smoothstep(uEdgeFadeStart, uEdgeFadeEnd, edgeDist);
+          // Uses local mesh coordinates so the fade stays anchored to the far outer rim regardless of camera position.
+          // The rim is a circle: measured along the axes, the square mesh's corners stood 3 degrees
+          // higher against the sky than its sides from 3,000 m (#751).
+          float edgeFade = smoothstep(uEdgeFadeStart, uEdgeFadeEnd, length(vLocalPos));
           fogFactor = max(fogFactor, edgeFade);
 
           finalColor = mix(finalColor, uFogColor, fogFactor);
