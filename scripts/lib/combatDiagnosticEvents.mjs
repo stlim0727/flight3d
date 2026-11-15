@@ -92,7 +92,8 @@ export class CombatDiagnosticEvents {
     const current = {
       seekerTarget: seeker?.target ?? null,
       lossReason: seeker?.lastObservation?.lossReason ?? 'none',
-      guidance: JSON.stringify(missile.lastGuidance),
+      // Compare only discrete guidance state; losAngleDeg/rangeM vary every guided tick.
+      guidance: JSON.stringify([missile.lastGuidance?.active ?? false, missile.lastGuidance?.reason ?? null]),
       controlLimited: flight.requestedLateralMps2 > flight.availableLateralMps2 + 1e-4,
       powered: missile.propellant > 0,
       warning: JSON.stringify([response.phase, response.observedId !== null,

@@ -113,14 +113,22 @@ export class MissileSeeker {
     let observed = null;
     let observedEval = null;
 
-    if (targets.includes(this.target)) {
+    let incumbentFailure = null;
+    if (this.target && targets.includes(this.target)) {
       const evalResult = evaluateSeekerObservation(this.spec, observer, this.target, world);
       if (evalResult.canObserve) {
         observed = this.target;
         observedEval = evalResult;
       } else {
         this.lastObservation = evalResult;
+        incumbentFailure = evalResult;
       }
+    } else if (this.target && this.hasEstimate) {
+      // The incumbent dropped out of the candidate list (expired decoys are
+      // removed upstream). Evaluate it directly so memory diagnostics keep its
+      // loss reason instead of a visible competitor's observation.
+      incumbentFailure = evaluateSeekerObservation(this.spec, observer, this.target, world);
+      this.lastObservation = incumbentFailure;
     }
     if (!observed) {
       let nearest = Infinity;
@@ -203,18 +211,26 @@ export class MissileSeeker {
     }
     // A competing hypothesis must not freeze a still-visible confirmed track.
     // Keep its fresh measurement while confirmation of the candidate proceeds.
-    if (this.target && this.hasEstimate && targets.includes(this.target)
-      && evaluateSeekerObservation(this.spec, observer, this.target, world).canObserve) {
-      this.estimate.position.copy(this.target.position);
-      this.estimate.velocity.copy(this.target.velocity);
-      this.observationAgeSeconds = 0;
-      this.state = 'track';
-      this._recordStateChange(prevState);
-      return;
+    // The incumbent's own evaluation replaces the competitor's so diagnostics
+    // report the source the estimate is actually built from.
+    if (this.target && this.hasEstimate && targets.includes(this.target)) {
+      const incumbentEval = evaluateSeekerObservation(this.spec, observer, this.target, world);
+      if (incumbentEval.canObserve) {
+        this.lastObservation = incumbentEval;
+        this.estimate.position.copy(this.target.position);
+        this.estimate.velocity.copy(this.target.velocity);
+        this.observationAgeSeconds = 0;
+        this.state = 'track';
+        this._recordStateChange(prevState);
+        return;
+      }
     }
     if (this.hasEstimate) {
       this.observationAgeSeconds += dt;
       if (this.observationAgeSeconds <= this.spec.seekerMemorySeconds + 1e-9) {
+        // The estimate still ages from the incumbent; report its loss reason,
+        // not a competitor's observation seen while the incumbent was hidden.
+        if (incumbentFailure) this.lastObservation = incumbentFailure;
         this.estimate.position.addScaledVector(this.estimate.velocity, dt);
         this.state = 'memory';
         this._recordStateChange(prevState);

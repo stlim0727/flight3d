@@ -88,6 +88,19 @@ test('non-lethal fuze explosion remains survival with measured partial damage', 
   assert.equal(result.closestApproach.method, 'continuous_fuze');
 });
 
+test('continuous LOS fields do not duplicate guidance_state events', () => {
+  const run = simulateCombatSituation({ rangeM: 2500, targetBehavior: 'straight',
+    recordDiagnostics: true });
+  const guidance = run.diagnostics.track.combat.events.filter(e => e.kind === 'guidance_state');
+  assert.ok(guidance.length >= 2, 'expected launch and tracking transitions');
+  assert.ok(guidance.length < 20, `guidance_state log grew to ${guidance.length} events`);
+  for (let i = 1; i < guidance.length; i++) {
+    assert.notDeepEqual([guidance[i - 1].active, guidance[i - 1].reason],
+      [guidance[i].active, guidance[i].reason],
+      'consecutive guidance_state events must differ in active/reason');
+  }
+});
+
 test('manual flare and sensor cutoff intervention inputs are preserved', () => {
   const run = simulateCombatSituation({ rangeM: 2500, targetBehavior: 'evasive_ai',
     threatResponseEnabled: false, flares: true, manualFlareAtSeconds: 0.65,

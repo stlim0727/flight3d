@@ -57,6 +57,8 @@ function metrics(result) {
     closestSeconds: closest ? Number(closest.seconds.toFixed(2)) : null,
     closestRangeM: closest ? Number(closest.rangeM.toFixed(1)) : null,
     closestLosDeg: closest ? Number(closest.losAngleDeg.toFixed(1)) : null,
+    closestSeekerLosDeg: closest?.seekerLosAngleDeg != null ? Number(closest.seekerLosAngleDeg.toFixed(1)) : null,
+    closestSeekerEstimateRangeM: closest?.seekerEstimateRangeM != null ? Math.round(closest.seekerEstimateRangeM) : null,
     closestSpeedMps: closest ? Number(closest.missileSpeedMps.toFixed(0)) : null,
     closestPropellant: closest ? Number(closest.propellant.toFixed(2)) : null,
     closestAvailableMps2: closest ? Math.round(closest.availableLateralMps2) : null,
@@ -155,6 +157,10 @@ function timeline(settings) {
         state: key,
         rangeM: Number(sample.rangeM.toFixed(1)),
         losAngleDeg: Number(sample.losAngleDeg.toFixed(1)),
+        seekerLosAngleDeg: sample.seekerLosAngleDeg == null
+          ? null : Number(sample.seekerLosAngleDeg.toFixed(1)),
+        seekerEstimateRangeM: sample.seekerEstimateRangeM == null
+          ? null : Number(sample.seekerEstimateRangeM.toFixed(1)),
         missileSpeedMps: Number(sample.missileSpeedMps.toFixed(0)),
         propellant: Number(sample.propellant.toFixed(2)),
         requestedLateralMps2: Math.round(sample.requestedLateralMps2),
