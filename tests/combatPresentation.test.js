@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
-import { presentCombatEvent } from '../src/weapons/combatPresentation.js';
+import { presentCombatEvent, syncCombatAudio } from '../src/weapons/combatPresentation.js';
 import { CombatReplayPlayback } from '../src/replay/CombatReplayPlayback.js';
 import { AirToAirMissileSystem } from '../src/weapons/AirToAirMissileSystem.js';
 import { ReplayRecorder } from '../src/core/ReplayRecorder.js';
@@ -128,4 +128,21 @@ test('ReplayRecorder and ReplayCodec round-trip targetId on kill events', () => 
   const killEvent = decoded.combat.events.find(e => e.kind === 'kill');
   assert.ok(killEvent);
   assert.equal(killEvent.targetId, 2);
+});
+
+test('syncCombatAudio forwards missiles only when unpaused and launch passes camera distance (#784)', () => {
+  const flightCalls = [];
+  const launchDists = [];
+  const audio = {
+    syncMissileFlight(missiles, pos) { flightCalls.push({ count: missiles.length, pos }); },
+    playMissileLaunch(dist) { launchDists.push(dist); },
+  };
+  const camera = { position: new THREE.Vector3(0, 0, 0) };
+  presentCombatEvent({ kind: 'launch', x: 300, y: 400, z: 0 }, { audio, camera });
+  presentCombatEvent({ type: 'launch', missile: { position: new THREE.Vector3(0, 600, 800) } }, { audio, camera });
+  assert.deepEqual(launchDists, [500, 1000]);
+
+  syncCombatAudio({ missiles: [{ alive: true }] }, { audio, camera, paused: false });
+  syncCombatAudio({ missiles: [{ alive: true }] }, { audio, camera, paused: true });
+  assert.deepEqual(flightCalls.map(c => c.count), [1, 0]);
 });

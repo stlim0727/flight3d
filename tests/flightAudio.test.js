@@ -688,4 +688,35 @@ describe('Engine volume', () => {
       if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
     }
   });
+
+  it('syncMissileFlight modulates rocket/whoosh gain by proximity and burn state (#784)', async () => {
+    const previous = globalThis.window;
+    const MockAudioContext = createMockAudioContext();
+    globalThis.window = { AudioContext: MockAudioContext };
+    try {
+      const THREE = await import('three');
+      const audio = new FlightAudio(CESSNA_172);
+      audio.init();
+      const cameraPos = new THREE.Vector3(0, 1000, 0);
+
+      audio.syncMissileFlight([
+        { alive: true, propellant: 1, position: new THREE.Vector3(0, 1000, -50) },
+      ], cameraPos);
+      assert.ok(audio.missileFlightNodes, 'nearby powered missile starts flight loop');
+      const poweredGain = audio.missileFlightNodes.gain.gain.value;
+
+      audio.syncMissileFlight([
+        { alive: true, propellant: 0, position: new THREE.Vector3(0, 1000, -50) },
+      ], cameraPos);
+      const coastGain = audio.missileFlightNodes.gain.gain.value;
+      assert.ok(poweredGain > coastGain && coastGain > 0, 'rocket burn is louder than coasting whoosh');
+
+      audio.syncMissileFlight([
+        { alive: true, propellant: 1, position: new THREE.Vector3(0, 1000, -3000) },
+      ], cameraPos);
+      assert.strictEqual(audio.missileFlightNodes, null, 'out-of-range missile stops flight loop');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
 });

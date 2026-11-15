@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { MissileCombatView } from '../weapons/MissileCombatView.js';
-import { presentCombatEvent } from '../weapons/combatPresentation.js';
+import { presentCombatEvent, syncCombatAudio } from '../weapons/combatPresentation.js';
 import { Flare, FLARE_MODEL } from '../weapons/Flare.js';
 import { ChaffCloud, CHAFF_MODEL } from '../weapons/Chaff.js';
 import { F16_MISSILE_STATIONS, MISSILE_TYPES } from '../weapons/missileSpecs.js';
@@ -107,6 +107,7 @@ export class CombatReplayPlayback {
     this.view.clear();
     this._updateState(timeSec);
     this.view.sync(0);
+    syncCombatAudio(this.state, { audio: this.sim.audio, camera: this.sim.camera, paused: true });
   }
 
   update(dt, timeSec) {
@@ -121,6 +122,7 @@ export class CombatReplayPlayback {
     this.timeSec = timeSec;
     this._updateState(timeSec);
     this.view.sync(dt);
+    syncCombatAudio(this.state, { audio: this.sim.audio, camera: this.sim.camera, paused: dt <= 0 });
     for (const event of this.events) {
       if (event.timeSec > timeSec + 1e-9) break;
       if (this.staged.has(event)) continue;
@@ -136,6 +138,7 @@ export class CombatReplayPlayback {
 
   stop() {
     this.view.clear();
+    syncCombatAudio(null, { audio: this.sim.audio, paused: true });
     this.track = null;
     this.active = false;
     this.timeSec = 0;
