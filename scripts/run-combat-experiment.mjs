@@ -53,8 +53,7 @@ export async function main(args = process.argv.slice(2)) {
       '  [--altitude-pairs 750:1210,1500:1500] [--diagnostics] [--timeout 60] [--output path.json]');
     return;
   }
-  const config = combatExperimentConfig(values);
-  const output = resolve(values.output ?? `.cache/combat-experiment/${config.scenario}.json`);
+  const output = resolve(values.output ?? `.cache/combat-experiment/${values.scenario ?? 'locked-ir'}.json`);
   const summaryPath = output.replace(/\.json$/i, '') + '.summary.json';
   if (output === summaryPath) throw new Error('Report and summary paths must differ');
   const root = fileURLToPath(new URL('../', import.meta.url));
@@ -64,14 +63,16 @@ export async function main(args = process.argv.slice(2)) {
     launchPolicy: 'confirmed-lock-single', fixture: 'evasive_ai', randomSeed: null };
   const started = performance.now();
   let completedCases = 0;
-  const expectedCases = config.geometries.length * config.variants.length;
-  const compactConfig = { scenario: config.scenario, geometryCount: config.geometries.length,
-    variants: config.variants.map(v => v.id), recordTrajectory: config.recordTrajectory,
-    targetSpeedMps: config.targetSpeedMps, timeoutSeconds: config.timeoutSeconds };
-  const running = { status: 'running', metadata, config, expectedCases };
+  let config = null, compactConfig = null, expectedCases = null;
+  const running = { status: 'running', metadata, requested: values, config, expectedCases };
   save(output, running);
   save(summaryPath, { ...running, config: compactConfig });
   try {
+    config = combatExperimentConfig(values);
+    expectedCases = config.geometries.length * config.variants.length;
+    compactConfig = { scenario: config.scenario, geometryCount: config.geometries.length,
+      variants: config.variants.map(v => v.id), recordTrajectory: config.recordTrajectory,
+      targetSpeedMps: config.targetSpeedMps, timeoutSeconds: config.timeoutSeconds };
     metadata.revision = git(['rev-parse', 'HEAD']);
     metadata.dirty = Boolean(git(['status', '--porcelain']));
     const report = await runBoundedCombat(config, completed => { completedCases = completed; });
@@ -86,7 +87,7 @@ export async function main(args = process.argv.slice(2)) {
         launches: s.launched, kills: s.kills, noLock: s.noLock, unresolved: s.unresolved })),
       output, summaryPath }));
   } catch (error) {
-    const failed = { status: 'incomplete', metadata, config, expectedCases, completedCases, error: error.message };
+    const failed = { status: 'incomplete', metadata, requested: values, config, expectedCases, completedCases, error: error.message };
     save(output, failed);
     save(summaryPath, { ...failed, config: compactConfig });
     throw error;

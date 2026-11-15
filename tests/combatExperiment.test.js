@@ -85,3 +85,25 @@ test('metadata executor failures cannot leave an older success summary', () => {
     assert.equal(JSON.parse(readFileSync(summary)).metadata.revision, null);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('invalid experiment inputs replace both successful artifacts before rejecting the rerun', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'flight-combat-invalid-rerun-'));
+  const output = join(dir, 'report.json'), summary = join(dir, 'report.summary.json');
+  const run = args => spawnSync(process.execPath, ['scripts/run-combat-experiment.mjs',
+    '--scenario', 'single', '--output', output, ...args], { encoding: 'utf8', timeout: 10000 });
+  try {
+    for (const invalid of [['--ranges', '0'], ['--defense', 'unknown']]) {
+      assert.equal(run([]).status, 0);
+      assert.equal(JSON.parse(readFileSync(summary)).status, 'complete');
+      const failed = run(invalid);
+      assert.equal(failed.status, 1);
+      for (const path of [output, summary]) {
+        const report = JSON.parse(readFileSync(path));
+        assert.equal(report.status, 'incomplete');
+        assert.equal(report.completedCases, 0);
+        assert.equal(report.config, null);
+        assert.match(report.error, /Invalid ranges|Unknown defense/);
+      }
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
