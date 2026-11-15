@@ -823,7 +823,9 @@ test('follow-up salvo missile takes over BANDIT_POV when decoyed lead missile ti
   }
   director.update({ dt: 0.1, clockDt: 0.1, camera, planePos, planeQuat, missiles: [lead, followup], targets: [target] });
 
-  // Advance until lead's 6.0s BANDIT_POV expires; followup is within 1600m and closing.
+  // Advance until lead's 6.0s BANDIT_POV expires; even if followup's seeker transfers
+  // to a flare while queued, BANDIT_POV still frames the original bandit target.
+  followup.target = { id: 99, type: 'flare', alive: true, position: new THREE.Vector3(500, 1800, -500) };
   followup.position.set(0, 2000, -600);
   for (let i = 0; i < 28; i++) {
     lead.age += 0.1;
@@ -831,5 +833,6 @@ test('follow-up salvo missile takes over BANDIT_POV when decoyed lead missile ti
     director.update({ dt: 0.1, clockDt: 0.1, camera, planePos, planeQuat, missiles: [lead, followup], targets: [target] });
   }
   assert.equal(director.missileSequence?.missile?.id, 6, 'Follow-up missile takes over the sequence');
+  assert.equal(director.missileSequence?.target?.id, 2, 'Queued handoff preserves the bandit target over decoys');
   assert.equal(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV, 'Camera stays in BANDIT_POV for follow-up kill');
 });

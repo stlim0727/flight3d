@@ -449,8 +449,12 @@ export class CinematicCameraDirector {
       // Queue follow-up salvo launches so a missed lead missile never hides a
       // subsequent kill (#782).
       if (this.missileSequence) {
+        const queuedTarget = (missile.target?.alive && missile.target.type !== 'flare' && missile.target.type !== 'chaff')
+          ? missile.target
+          : this.nearestAliveTarget(missile, targets);
         this.queuedMissiles.push({
           missile,
+          target: queuedTarget,
           planePos: planePos?.clone?.() ?? null,
           planeQuat: planeQuat?.clone?.() ?? null,
         });
@@ -460,8 +464,11 @@ export class CinematicCameraDirector {
     }
   }
 
-  beginMissileSequence(missile, targets, planePos = null, planeQuat = null) {
-    const target = missile.target?.alive ? missile.target : this.nearestAliveTarget(missile, targets);
+  beginMissileSequence(missile, targets, planePos = null, planeQuat = null, initialTarget = null) {
+    const missileTarget = missile.target?.alive && missile.target.type !== 'flare' && missile.target.type !== 'chaff'
+      ? missile.target
+      : null;
+    const target = initialTarget?.alive ? initialTarget : (missileTarget || this.nearestAliveTarget(missile, targets));
     // Latch the launch rail side once. Recomputing it from the live missile
     // offset can flip the camera across the fuselage if the round crosses the
     // centreline or the jet rolls immediately after release.
@@ -559,7 +566,7 @@ export class CinematicCameraDirector {
     while (this.queuedMissiles.length) {
       const next = this.queuedMissiles.shift();
       if (!next?.missile?.alive) continue;
-      this.beginMissileSequence(next.missile, this.lastCombatTargets, next.planePos, next.planeQuat);
+      this.beginMissileSequence(next.missile, this.lastCombatTargets, next.planePos, next.planeQuat, next.target);
       if ((next.missile.age ?? 0) >= MISSILE_LAUNCH_SECONDS) {
         const seq = this.missileSequence;
         const range = seq.target && seq.lastTargetPos
