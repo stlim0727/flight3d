@@ -71,6 +71,11 @@ test('CombatReplayPlayback reconstructs flares and chaff from decoy_dispense eve
   assert.equal(playback.view.chaffViews.size, 1);
   assert.ok(playback.state.flares[0].position.z < -50, 'flare advected along velocity');
 
+  const playedPos = playback.state.flares[0].position.clone();
+  playback.seek(6.0);
+  assert.ok(playback.state.flares[0].position.distanceTo(playedPos) < 1e-9,
+    'seek and forward playback produce identical decoy positions');
+
   // After 6s flare lifetime (t=12s), flare expires while 12s chaff remains alive.
   playback.seek(12.0);
   assert.equal(playback.state.flares.length, 0);

@@ -257,27 +257,40 @@ export class CombatReplayPlayback {
       if (event.timeSec > timeSec + 1e-9) break;
       if (event.kind !== 'decoy_dispense') continue;
       const isChaff = event.decoyType === 'chaff';
-      const lifetimeS = isChaff ? CHAFF_MODEL.lifetimeS : FLARE_MODEL.lifetimeS;
-      if (timeSec - event.timeSec >= lifetimeS) {
+      const model = isChaff ? CHAFF_MODEL : FLARE_MODEL;
+      const age = timeSec - event.timeSec;
+      if (age >= model.lifetimeS) {
         this.decoys.delete(event);
         continue;
       }
-      let entry = this.decoys.get(event);
-      if (!entry) {
+      let decoy = this.decoys.get(event);
+      if (!decoy) {
         const pos = new THREE.Vector3(event.x, event.y, event.z);
         const vel = new THREE.Vector3(event.vx, event.vy, event.vz);
-        const decoy = isChaff ? new ChaffCloud(pos, vel) : new Flare(pos, vel);
-        entry = { decoy, simTime: event.timeSec };
-        this.decoys.set(event, entry);
+        decoy = isChaff ? new ChaffCloud(pos, vel) : new Flare(pos, vel);
+        this.decoys.set(event, decoy);
       }
-      while (entry.simTime + 1e-6 < timeSec && entry.decoy.alive) {
-        const step = Math.min(0.05, timeSec - entry.simTime);
-        entry.decoy.update(step);
-        entry.simTime += step;
+      // Evaluate the continuous drag/settling trajectory directly from age so
+      // normal playback and seek() produce identical positions at any framerate.
+      const tau = model.dragTimeS;
+      const expTerm = 1 - Math.exp(-age / tau);
+      const terminalY = isChaff ? -CHAFF_MODEL.settlingMps : -FLARE_MODEL.gravityMps2 * tau;
+      decoy.age = age;
+      decoy.alive = true;
+      decoy.position.set(
+        event.x + event.vx * tau * expTerm,
+        event.y + terminalY * age + (event.vy - terminalY) * tau * expTerm,
+        event.z + event.vz * tau * expTerm,
+      );
+      if (isChaff) {
+        decoy.radarCrossSectionM2 = CHAFF_MODEL.peakRcsM2 * (1 - Math.exp(-age / CHAFF_MODEL.buildTimeS))
+          * Math.exp(-age / CHAFF_MODEL.decayTimeS);
+        this.state.chaffClouds.push(decoy);
+      } else {
+        decoy.infraredEmission = FLARE_MODEL.peakEmission * (1 - Math.exp(-age / FLARE_MODEL.riseTimeS))
+          * Math.exp(-age / FLARE_MODEL.decayTimeS);
+        this.state.flares.push(decoy);
       }
-      if (!entry.decoy.alive) continue;
-      if (isChaff) this.state.chaffClouds.push(entry.decoy);
-      else this.state.flares.push(entry.decoy);
     }
   }
 
