@@ -61,6 +61,17 @@ test('hidden velocity is never sampled and memory predicts only the last observa
   }
 });
 
+test('memory diagnostics keep the incumbent loss reason when a competitor is visible', () => {
+  const s = new MissileSeeker(MISSILE_TYPES.AIM9X), o = own(), t = contact();
+  const flare = { type: 'flare', position: new Vector3(0, 3000, -1000), velocity: new Vector3(0, 0, 0),
+    infraredEmission: 6 };
+  assert.equal(s.seed(t, o, flat), true);
+  s.update(dt, o, [t, flare], ridge);
+  assert.equal(s.state, 'memory');
+  assert.equal(s.lastObservation.canObserve, false);
+  assert.equal(s.lastObservation.lossReason, 'terrain_occlusion');
+});
+
 test('both types reacquire changed truth only after a new confirmation interval', () => {
   for (const spec of Object.values(MISSILE_TYPES)) {
     const s = new MissileSeeker(spec), o = own(), t = contact();

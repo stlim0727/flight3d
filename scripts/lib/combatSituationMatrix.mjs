@@ -322,6 +322,15 @@ export function simulateCombatSituation({
     const seeker = missile.seeker;
     const estimateErrorM = seeker?.hasEstimate && seeker.target
       ? seeker.estimate.position.distanceTo(seeker.target.position) : null;
+    // Estimate-referenced LOS: the angle the guidance gimbal check actually uses.
+    // The bandit-referenced losAngleDeg above cannot reveal a decoy-induced gimbal
+    // trigger because the seeker estimate follows the decoy, not the aircraft.
+    const seekerEstimateRangeM = seeker?.hasEstimate
+      ? seeker.estimate.position.distanceTo(missile.position) : null;
+    const seekerLosAngleDeg = seekerEstimateRangeM > 1e-6 && speed > 1e-6
+      ? Math.acos(Math.max(-1, Math.min(1, missile.velocity.dot(
+        seeker.estimate.position.clone().sub(missile.position)) / (speed * seekerEstimateRangeM)
+      ))) * (180 / Math.PI) : null;
     const flight = missile.flight;
     detail.push({
       seconds: terminalSeconds,
@@ -337,6 +346,8 @@ export function simulateCombatSituation({
       propellant: missile.propellant,
       rangeM: range,
       losAngleDeg,
+      seekerLosAngleDeg,
+      seekerEstimateRangeM,
       closingMps: closing,
       seekerState: seeker?.state ?? null,
       seekerTargetType: seeker?.target?.type ?? null,

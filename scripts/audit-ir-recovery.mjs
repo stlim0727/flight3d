@@ -57,6 +57,8 @@ function metrics(result) {
     closestSeconds: closest ? Number(closest.seconds.toFixed(2)) : null,
     closestRangeM: closest ? Number(closest.rangeM.toFixed(1)) : null,
     closestLosDeg: closest ? Number(closest.losAngleDeg.toFixed(1)) : null,
+    closestSeekerLosDeg: closest?.seekerLosAngleDeg != null ? Number(closest.seekerLosAngleDeg.toFixed(1)) : null,
+    closestSeekerEstimateRangeM: closest?.seekerEstimateRangeM != null ? Math.round(closest.seekerEstimateRangeM) : null,
     closestSpeedMps: closest ? Number(closest.missileSpeedMps.toFixed(0)) : null,
     closestPropellant: closest ? Number(closest.propellant.toFixed(2)) : null,
     closestAvailableMps2: closest ? Math.round(closest.availableLateralMps2) : null,

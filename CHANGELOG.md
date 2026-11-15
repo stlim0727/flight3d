@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **fix(diagnostics):** report the seeker's own estimate in IR tracking traces
+  - The combat-situation trace now records the estimate-referenced line of sight and estimate range (`seekerLosAngleDeg`, `seekerEstimateRangeM`), so a decoy-induced gimbal trigger is visible; the existing bandit-referenced angle could not show it.
+  - A memory-state seeker now reports the incumbent's loss reason when a competitor is visible, instead of the competitor's observation; the guidance estimate itself is unchanged.
+  - No missile coefficient, flare parameter or gameplay behaviour changed; the 2.5 km audit produces identical terminals before and after. See [IR observation model review](docs/development/ir-observation-model-review.md).
 - **fix(weapons):** point missile and bandit noses forward
   - AIM-9X/AIM-120C and air-combat bandit nose cones were rotated so their apex trailed the fuselage; they now lead along the local -Z forward axis.
   - The canyon-chase bandit's cone fuselage uses the same corrected orientation.
