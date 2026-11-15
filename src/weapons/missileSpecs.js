@@ -29,6 +29,8 @@ export const MISSILE_TYPES = {
     // Sensor-state simulation assumptions, not measured weapon specifications.
     seekerType: 'IR',
     seekerAcquireSeconds: 0.15,
+    // Optical association uncertainty assumption, not a published AIM-9X value.
+    seekerAngularResolutionRad: 0.001,
     seekerMemorySeconds: 0.6,
     seekerMinSignalQuality: 0.25,
     seekerFovDeg: 28,
