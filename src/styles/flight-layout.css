@@ -468,6 +468,20 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   .flight-toolbar.controls-idle:focus-within { opacity: 1; }
 }
 
+.flight-toolbar.camera-strip-stacked,
+.compact-ui .flight-toolbar.camera-strip-stacked,
+.compact-ui.touch-mode .flight-toolbar.camera-strip-stacked {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.flight-toolbar.camera-strip-stacked .flight-camera-strip {
+  order: 10;
+  flex: 1 0 100%;
+  width: 100%;
+  border-left: 0;
+  border-top: 1px solid #334155;
+}
+
 /* Even the three core readouts need the full row on 320px-class screens. */
 @media (max-width: 360px) and (orientation: portrait) {
   .hud-top-bar .hud-strip .hud-item.hud-primary[data-hud="hdg"] { display: none; }

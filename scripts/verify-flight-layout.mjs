@@ -100,14 +100,15 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
           return { sel: `#${n.id}`, ...box(n), center: `${cs.display}/${cs.alignItems}/${cs.justifyContent}`,
             hit: n.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)) };
         });
-        return { chrome, buttons, pinned: Math.ceil(bar.scrollLeft + bar.clientWidth) >= bar.scrollWidth,
+        return { chrome, buttons, stacked: bar.classList.contains('camera-strip-stacked'),
+          pinned: Math.ceil(bar.scrollLeft + bar.clientWidth) >= bar.scrollWidth,
           fits: bar.scrollWidth <= bar.clientWidth + 1 };
       });
       const bounds = [...layout.chrome, ...layout.buttons];
       assert.ok(layout.chrome.every(r => r.x >= 0 && r.x + r.w <= width + 1 && r.y >= 0 && r.y + r.h <= height), JSON.stringify(layout.chrome));
       assert.ok(bounds.every(r => r.h >= 44 && (r.sel === '.hud-strip' || r.w >= 44)), 'minimum targets');
-      assert.equal(new Set(layout.buttons.map(b => Math.round(b.y))).size, 1,
-        `toolbar stays on one row: ${JSON.stringify(layout.buttons)}`);
+      assert.equal(new Set(layout.buttons.map(b => Math.round(b.y))).size, layout.stacked ? 2 : 1,
+        `toolbar stays on ${layout.stacked ? 'two' : 'one'} row(s): ${JSON.stringify(layout.buttons)}`);
       assert.ok(layout.buttons.every(b => b.center === 'flex/center/center'), `labels centred in their buttons: ${layout.buttons.map(b => b.center)}`);
       // Fullscreen and overflow stay pinned to the right edge; only the camera
       // strip scrolls horizontally when the viewport is narrower than all buttons.
