@@ -220,6 +220,7 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
       cancelAnimationFrame: (id) => clearTimeout(id),
       addEventListener: () => {},
       removeEventListener: () => {},
+      confirm: () => true,
     };
 
     const controls = {
@@ -394,6 +395,31 @@ describe('JoystickCheckDialog - Initialization & DOM Structure', () => {
     assert.equal(sim.controls.hotas.combatButtons.missile, 2, 'cancel keeps the old mapping');
     learn.click(); dialog.close();
     assert.equal(dialog.buttonLearning, null);
+  });
+
+  it('asks before replacing existing combat and default assignments and keeps them on cancel', () => {
+    const pad = { id: 'T.Flight Hotas One', index: 0, axes: [0, 0, 0, 0, 0], buttons: Array.from({ length: 4 }, () => ({ pressed: false, value: 0 })) };
+    sim.controls.hotas.getGamepadsFn = () => [pad];
+    sim.controls.hotas.applyConfig({ combatButtons: { target: 2 } });
+    let prompt = '';
+    window.confirm = text => { prompt = text; return false; };
+    const dialog = new JoystickCheckDialog(sim);
+    dialog.open();
+    const missile = dialog.dialog.querySelector('[data-combat-button="missile"]');
+    missile.value = '2'; missile.dispatchEvent(new Event('change'));
+    assert.match(prompt, /표적 전환/);
+    assert.equal(missile.value, '-1');
+    assert.equal(sim.controls.hotas.combatButtons.target, 2);
+    assert.equal(sim.controls.hotas.combatButtons.missile, -1);
+    const learn = dialog.dialog.querySelector('[data-learn-button="missile"]');
+    learn.click(); pad.buttons[1] = { pressed: true, value: 1 }; dialog.updateTelemetry();
+    assert.match(prompt, /스포일러/);
+    assert.equal(sim.controls.hotas.combatButtons.missile, -1);
+    window.confirm = () => true;
+    pad.buttons[1] = { pressed: false, value: 0 }; dialog.updateTelemetry();
+    learn.click(); pad.buttons[1] = { pressed: true, value: 1 }; dialog.updateTelemetry();
+    assert.equal(sim.controls.hotas.combatButtons.missile, 1);
+    dialog.close();
   });
 
   it('restores default configuration on reset button click', () => {

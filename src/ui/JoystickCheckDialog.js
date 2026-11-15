@@ -405,10 +405,26 @@ export class JoystickCheckDialog {
       select.addEventListener('change', () => {
         const mapping = { ...this.hotas.getConfig().combatButtons };
         const selected = Number(select.value);
+        const action = select.getAttribute('data-combat-button');
+        const previous = mapping[action];
+        if (selected !== previous && selected >= 0) {
+          const other = Object.keys(mapping).find(key => key !== action && mapping[key] === selected);
+          const labels = { missile: '미사일 발사', gun: '기관포', target: '표적 전환', chaff: '채프 (미구현)', flare: '플레어 (미구현)' };
+          const diag = this.hotas.getDiagnostics();
+          let oldAction = other ? labels[other] : null;
+          if (!oldAction && diag.connected && ['hotas-one', 'hotas-one-xbox', 'hotas-tflight', 'flight-stick'].includes(diag.activeProfile)) {
+            const defaultLabel = this.getButtonActionLabel(selected, diag.activeProfile);
+            if (defaultLabel !== `Button ${selected}`) oldAction = defaultLabel;
+          }
+          if (oldAction && !globalThis.window?.confirm?.(`Button ${selected}의 기존 기능은 ${oldAction}입니다. 새 기능을 ${labels[action]}(으)로 지정하면 기존 기능이 해제됩니다. 변경하시겠습니까?`)) {
+            select.value = String(previous ?? -1);
+            return;
+          }
+        }
         if (selected >= 0) {
           for (const action of Object.keys(mapping)) if (mapping[action] === selected) mapping[action] = -1;
         }
-        mapping[select.getAttribute('data-combat-button')] = selected;
+        mapping[action] = selected;
         this.hotas.applyConfig({ combatButtons: mapping });
         for (const field of this.dialog.querySelectorAll('[data-combat-button]')) field.value = String(mapping[field.getAttribute('data-combat-button')]);
         this.savePreferences();
