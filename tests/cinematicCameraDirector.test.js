@@ -778,3 +778,61 @@ test('bandit shot keeps the target airframe and the inbound round in frame', () 
   assert.ok(Math.abs(projectedMissile.x) < 1 && Math.abs(projectedMissile.y) < 1,
     'the inbound missile is inside the frame');
 });
+
+test('follow-up salvo missile takes over BANDIT_POV when decoyed lead missile times out (#782)', () => {
+  const camera = new THREE.PerspectiveCamera(46, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const target = {
+    id: 2,
+    alive: true,
+    position: new THREE.Vector3(0, 2000, -1400),
+    velocity: new THREE.Vector3(0, 0, -200),
+  };
+  const lead = {
+    id: 5,
+    alive: true,
+    age: 0.05,
+    position: new THREE.Vector3(0, 1500, -50),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target,
+  };
+  const followup = {
+    id: 6,
+    alive: true,
+    age: 0.05,
+    position: new THREE.Vector3(0, 1500, -50),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target,
+  };
+
+  // Lead missile launches and enters BANDIT_POV at t=1.2s.
+  director.update({ dt: 0.1, clockDt: 0.1, camera, planePos, planeQuat, missiles: [lead], targets: [target] });
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_LAUNCH);
+  for (let i = 0; i < 12; i++) {
+    lead.age += 0.1;
+    director.update({ dt: 0.1, clockDt: 0.1, camera, planePos, planeQuat, missiles: [lead], targets: [target] });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV);
+
+  // Follow-up missile launches while lead is still in BANDIT_POV.
+  for (let i = 0; i < 32; i++) {
+    lead.age += 0.1;
+    director.update({ dt: 0.1, clockDt: 0.1, camera, planePos, planeQuat, missiles: [lead], targets: [target] });
+  }
+  director.update({ dt: 0.1, clockDt: 0.1, camera, planePos, planeQuat, missiles: [lead, followup], targets: [target] });
+
+  // Advance until lead's 6.0s BANDIT_POV expires; even if followup's seeker transfers
+  // to a flare while queued, BANDIT_POV still frames the original bandit target.
+  followup.target = { id: 99, type: 'flare', alive: true, position: new THREE.Vector3(500, 1800, -500) };
+  followup.position.set(0, 2000, -600);
+  for (let i = 0; i < 28; i++) {
+    lead.age += 0.1;
+    followup.age += 0.1;
+    director.update({ dt: 0.1, clockDt: 0.1, camera, planePos, planeQuat, missiles: [lead, followup], targets: [target] });
+  }
+  assert.equal(director.missileSequence?.missile?.id, 6, 'Follow-up missile takes over the sequence');
+  assert.equal(director.missileSequence?.target?.id, 2, 'Queued handoff preserves the bandit target over decoys');
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV, 'Camera stays in BANDIT_POV for follow-up kill');
+});
