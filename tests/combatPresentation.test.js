@@ -12,7 +12,7 @@ test('presentCombatEvent handles live and replay event shapes uniformly', () => 
   const calls = [];
   const view = {
     spawnExplosion(sys, payload) {
-      calls.push(['explosion', sys, payload.position.toArray(), payload.velocity.toArray()]);
+      calls.push(['explosion', sys, payload.position.toArray(), payload.velocity.toArray(), payload.target?.id ?? null]);
     },
   };
   const audio = {
@@ -34,6 +34,7 @@ test('presentCombatEvent handles live and replay event shapes uniformly', () => 
   }, { view, explosionSystem, audio, camera }), 'detonation');
   assert.equal(presentCombatEvent({
     type: 'detonation',
+    target: { id: 7 },
     position: new THREE.Vector3(0, 0, 10),
     velocity: new THREE.Vector3(1, 2, 3),
     surface: true,
@@ -43,9 +44,9 @@ test('presentCombatEvent handles live and replay event shapes uniformly', () => 
     ['launch'],
     ['launch'],
     ['lock'],
-    ['explosion', explosionSystem, [3, 4, 0], [10, 20, 30]],
+    ['explosion', explosionSystem, [3, 4, 0], [10, 20, 30], null],
     ['remoteExplosion', 5, false],
-    ['explosion', explosionSystem, [0, 0, 10], [1, 2, 3]],
+    ['explosion', explosionSystem, [0, 0, 10], [1, 2, 3], 7],
     ['remoteExplosion', 10, true],
   ]);
 });

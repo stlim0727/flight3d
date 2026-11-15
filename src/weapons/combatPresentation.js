@@ -30,7 +30,7 @@ export function presentCombatEvent(event, context = {}) {
   if (kind === 'detonation') {
     const position = resolveVector(event.position, event.x, event.y, event.z);
     const velocity = resolveVector(event.velocity, event.vx, event.vy, event.vz);
-    view?.spawnExplosion?.(explosionSystem, { position, velocity });
+    view?.spawnExplosion?.(explosionSystem, { ...event, position, velocity });
     const cameraPos = camera?.position;
     const distance = cameraPos?.distanceTo ? cameraPos.distanceTo(position) : 0;
     audio?.playRemoteExplosion?.(distance, Boolean(event.surface));
