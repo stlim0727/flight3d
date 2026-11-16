@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Vector3 } from 'three';
-import { createMissileMesh, createBanditMesh } from '../src/weapons/missileGeometry.js';
+import { createMissileMesh, createBanditMesh, banditSkin } from '../src/weapons/missileGeometry.js';
 
 /**
  * The model's forward axis is -Z. A nose cone must therefore present its
@@ -54,10 +54,20 @@ function trimColor(group) {
 }
 
 test('callsign trim colors never leak between bandits (#722)', () => {
-  const red = createBanditMesh('BANDIT RED');
-  assert.equal(trimColor(red), 0xff0000);
-  const blue = createBanditMesh('BANDIT BLUE');
-  assert.equal(trimColor(blue), 0x0000ff);
-  assert.equal(trimColor(red), 0xff0000, 'a later blue bandit must not repaint the red one');
-  assert.equal(trimColor(createBanditMesh('BANDIT 2')), 0xd07b32, 'defaults stay orange');
+  const one = createBanditMesh('BANDIT 1');
+  assert.equal(trimColor(one), banditSkin('BANDIT 1').trim);
+  const two = createBanditMesh('BANDIT 2');
+  assert.notEqual(trimColor(one), trimColor(two));
+  assert.equal(trimColor(one), banditSkin('BANDIT 1').trim, 'a later bandit must not repaint slot 1');
+  assert.equal(trimColor(createBanditMesh('CANYON BANDIT')), banditSkin('CANYON BANDIT').trim);
+});
+
+test('patrol slots and the canyon bandit use distinct liveries', () => {
+  const one = banditSkin('BANDIT 1');
+  const two = banditSkin('BANDIT 2');
+  const canyon = banditSkin('CANYON BANDIT');
+  assert.notEqual(one.body, two.body, 'wingmen are separable by body paint');
+  assert.notEqual(one.trim, two.trim, 'wingmen are separable by accent');
+  assert.equal(canyon.key, 'lizard');
+  assert.equal(banditSkin('BANDIT 1').body, one.body, 'a callsign keeps its scheme across respawns');
 });
