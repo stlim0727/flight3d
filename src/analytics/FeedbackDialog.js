@@ -24,7 +24,12 @@ export function captureFeedbackScreenshot(sim = null) {
   const source = sim?.renderer?.domElement ?? document.querySelector?.('canvas');
   if (!source || !source.width || !source.height) return null;
   try {
-    if (sim?.renderer?.render && sim?.scene && sim?.camera) {
+    if (typeof sim?.renderScene === 'function') {
+      sim.renderScene();
+      if (sim.cockpitPhotoOverlay?.enabled) {
+        sim.cockpitPhotoOverlay.render(sim.renderer);
+      }
+    } else if (sim?.renderer?.render && sim?.scene && sim?.camera) {
       sim.renderer.render(sim.scene, sim.camera);
     }
     const scale = Math.min(1, SCREENSHOT_MAX_WIDTH / source.width);

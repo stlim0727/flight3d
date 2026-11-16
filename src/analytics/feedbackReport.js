@@ -171,22 +171,53 @@ export function gatherFeedbackFullReport(sim, { budgetBytes = FULL_REPORT_BUDGET
     samples: Array.isArray(recorder.samples) ? [...recorder.samples] : [],
   };
   let sortie = JSON.parse(JSON.stringify(createSortie(rawReport, held ? (sim.debriefReplay ?? null) : null)));
-  if (Number.isFinite(budgetBytes) && budgetBytes > 0 && byteLength(JSON.stringify(sortie)) > budgetBytes) {
-    if (sortie.track) {
-      sortie = { ...sortie, track: null, trackOmittedForBudget: true };
-    }
-    if (byteLength(JSON.stringify(sortie)) > budgetBytes && Array.isArray(sortie.report?.samples)) {
-      const samples = sortie.report.samples;
-      const stride = Math.max(2, Math.ceil(samples.length / Math.max(1, Math.floor(samples.length / 2))));
+  if (Number.isFinite(budgetBytes) && budgetBytes > 0) {
+    sortie = boundFullReport(sortie, budgetBytes);
+  }
+  return sortie;
+}
+
+function boundFullReport(sortie, budgetBytes) {
+  if (byteLength(JSON.stringify(sortie)) <= budgetBytes) return sortie;
+  if (sortie.track) {
+    sortie = { ...sortie, track: null, trackOmittedForBudget: true };
+    if (byteLength(JSON.stringify(sortie)) <= budgetBytes) return sortie;
+  }
+  if (Array.isArray(sortie.report?.samples) && sortie.report.samples.length > 0) {
+    let samples = sortie.report.samples;
+    let peakIndex = -1;
+    samples.forEach((entry, index) => {
+      if (Number.isFinite(entry?.gForce) && (peakIndex < 0 || entry.gForce > samples[peakIndex].gForce)) peakIndex = index;
+    });
+    const peakTime = peakIndex >= 0 ? samples[peakIndex].timeSec : null;
+    while (samples.length > 0 && byteLength(JSON.stringify(sortie)) > budgetBytes) {
+      const next = samples.length <= 2
+        ? []
+        : samples.filter((entry, index) =>
+          index === 0 || index === samples.length - 1 || index % 2 === 0
+          || (peakTime !== null && entry?.timeSec === peakTime));
+      samples = next.length === samples.length ? samples.slice(0, Math.floor(samples.length / 2)) : next;
       sortie = {
         ...sortie,
         report: {
           ...sortie.report,
-          samples: samples.filter((_, index) => index % stride === 0 || index === samples.length - 1),
+          samples,
           samplesDecimatedForBudget: true,
         },
       };
     }
+  }
+  if (byteLength(JSON.stringify(sortie)) > budgetBytes && sortie.report) {
+    sortie = {
+      ...sortie,
+      report: {
+        label: sortie.report.label ?? null,
+        reason: sortie.report.reason ?? null,
+        durationSec: sortie.report.durationSec ?? null,
+        metadata: sortie.report.metadata ?? null,
+        truncatedForBudget: true,
+      },
+    };
   }
   return sortie;
 }

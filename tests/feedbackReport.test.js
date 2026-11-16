@@ -220,6 +220,28 @@ test('gatherFeedbackFullReport builds flight3d.sortie.v1 from held debrief and l
   assert.equal(liveFull.report.source, 'live-sortie');
   assert.equal(liveFull.report.durationSec, 12.5);
   assert.equal(gatherFeedbackFullReport({}), null);
+
+  // Large 18,000-sample sortie is decimated iteratively until it fits the budget
+  const largeSamples = Array.from({ length: 18000 }, (_, i) => ({
+    timeSec: i * 0.2, x: i * 1.1, z: -i * 1.3, altitudeFt: 1000 + i,
+    iasKnots: 250, gForce: i === 5000 ? 9.5 : 1.0, pitchDeg: 1.5, rollDeg: 0, headingDeg: 90,
+  }));
+  const largeSim = {
+    flightRecorder: {
+      active: true,
+      elapsed: 3600,
+      metadata: { aircraft: 'F16', airport: 'incheon', scenario: 'free' },
+      samples: largeSamples,
+      peaks: { gForce: largeSamples[5000] },
+      touchdowns: [],
+      glocIncidents: 0,
+    },
+  };
+  const bounded = gatherFeedbackFullReport(largeSim, { budgetBytes: 40_000 });
+  assert.ok(new TextEncoder().encode(JSON.stringify(bounded)).length <= 40_000);
+  assert.equal(bounded.report.samplesDecimatedForBudget, true);
+  assert.ok(bounded.report.samples.some(entry => entry.gForce === 9.5), 'peak-G sample kept');
+  assert.equal(bounded.report.samples.at(-1).timeSec, largeSamples.at(-1).timeSec, 'final sample kept');
 });
 
 test('createFeedbackReport attaches fullReport and screenshot only when provided', () => {
