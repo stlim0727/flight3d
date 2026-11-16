@@ -25,6 +25,7 @@ export function combatExperimentConfig(values = {}) {
     if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 300) throw new Error('seconds must be within (0, 300]');
     if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) throw new Error('Timeout must be positive seconds');
     return { scenario, seconds, timeoutSeconds, geometries: [], variants: [], recordTrajectory: Boolean(values.diagnostics),
+      recordDiagnostics: Boolean(values.diagnostics),
       skills: { attack: combatSkill('attack', values['attack-skill'] ?? 'pursuit'),
         evasion: combatSkill('evasion', values['evasion-skill'] ?? 'legacy-break'),
         countermeasure: combatSkill('countermeasure', values['countermeasure-policy'] ?? 'single') } };

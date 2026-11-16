@@ -88,6 +88,11 @@ export async function main(args = process.argv.slice(2)) {
     const complete = { status: 'complete', metadata: { ...metadata, durationSeconds: (performance.now() - started) / 1000 },
       config, expectedCases, completedCases: report.results.length, ...report };
     save(output, complete);
+    let sortiePath = null;
+    if (config.scenario === 'coastal' && config.recordDiagnostics && report.results[0]?.diagnostics?.sortie) {
+      sortiePath = output.replace(/\.json$/i, '') + '.sortie.json';
+      save(sortiePath, report.results[0].diagnostics.sortie);
+    }
     const { results, ...summary } = complete;
     save(summaryPath, { ...summary, config: compactConfig });
     console.log(JSON.stringify({ status: complete.status, completedCases: complete.completedCases,
@@ -96,7 +101,7 @@ export async function main(args = process.argv.slice(2)) {
         launches: s.launched, kills: s.kills, noLock: s.noLock, unresolved: s.unresolved,
         ...(config.scenario === 'coastal' ? { noLaunch: s.noLaunch, crashed: s.crashed,
           elapsedSeconds: s.elapsedSeconds, termination: s.termination, remaining: s.remaining } : {}) })),
-      output, summaryPath }));
+      output, summaryPath, ...(sortiePath ? { sortiePath } : {}) }));
   } catch (error) {
     const failed = { status: 'incomplete', metadata, requested: values, config, expectedCases, completedCases, error: error.message };
     save(output, failed);
