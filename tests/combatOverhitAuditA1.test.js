@@ -169,3 +169,64 @@ test('A1 audit: unfavorable off-axis/long-range geometries fail while B-conditio
   assert.equal(flare.total, 2);
   assert.ok(passive.kills >= flare.kills);
 });
+
+test('A1 regression: burst-instant closest approach is recorded for secondary targets killed in the same blast', () => {
+  const combat = new AirToAirMissileSystem({ evasionSkill: 'hold', countermeasurePolicy: 'none' });
+  const world = {
+    active: true,
+    onGround: false,
+    position: new THREE.Vector3(0, 2000, 0),
+    velocity: new THREE.Vector3(0, 0, -250),
+    quaternion: new THREE.Quaternion(),
+    terrainHeight: () => 0,
+  };
+  combat.update(1 / 120, world);
+  const [primary, secondary] = combat.targets;
+  primary.position.set(0, 2000, -104);
+  primary.prevPosition.copy(primary.position);
+  primary.velocity.set(0, 0, 0);
+  primary.damage = 0;
+
+  secondary.position.set(3, 2000, -104);
+  secondary.prevPosition.copy(secondary.position);
+  secondary.velocity.set(0, 0, 0);
+  secondary.damage = 0;
+
+  const spec = MISSILE_TYPES.AIM9X;
+  const missile = {
+    id: 902,
+    stationIndex: 0,
+    stationId: 'STA 1',
+    typeId: 'AIM9X',
+    spec,
+    position: new THREE.Vector3(0, 2000, -100),
+    prevPosition: new THREE.Vector3(0, 2000, -100),
+    velocity: new THREE.Vector3(0, 0, -900),
+    quaternion: new THREE.Quaternion(),
+    target: null,
+    targetIsPlayer: false,
+    source: 'player',
+    flight: new MissileFlightModel(),
+    seeker: new MissileSeeker(spec),
+    propellant: 0,
+    age: 1,
+    alive: true,
+    firedAt: 0,
+    launchPosition: new THREE.Vector3(0, 2000, 0),
+    launchVelocity: new THREE.Vector3(0, 0, -250),
+    launchLocked: true,
+    launchLockProgress: 1,
+    closestApproaches: {},
+    lastGuidance: { active: false, reason: null, losAngleDeg: null, rangeM: null },
+    finalOutcome: null,
+  };
+  combat.missiles.push(missile);
+
+  const events = [];
+  combat._guide(missile, 1 / 120, world, events);
+
+  assert.equal(primary.alive, false);
+  assert.equal(secondary.alive, false);
+  assert.ok(missile.closestApproaches[secondary.id]);
+  assert.ok(missile.closestApproaches[secondary.id].distanceM <= 3.5);
+});

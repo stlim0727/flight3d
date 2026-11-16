@@ -698,13 +698,13 @@ export class AirToAirMissileSystem {
     });
 
     missile.closestApproaches ??= {};
-    const recordStepClosestApproaches = (endFraction = 1) => {
+    const recordStepClosestApproaches = (endFraction = 1, missilePos = missile.position) => {
       for (const candidate of this.targets) {
         if (!candidate.alive) continue;
         const targetPos = endFraction < 1
           ? candidate.prevPosition.clone().lerp(candidate.position, endFraction)
           : candidate.position;
-        const dist = missile.position.distanceTo(targetPos);
+        const dist = missilePos.distanceTo(targetPos);
         const prev = missile.closestApproaches[candidate.id];
         if (!prev || dist < prev.distanceM) {
           missile.closestApproaches[candidate.id] = {
@@ -748,6 +748,7 @@ export class AirToAirMissileSystem {
       const burstPos = missile.prevPosition.clone().lerp(missile.position, triggerTime);
       const targetPos = triggerTarget.prevPosition.clone().lerp(triggerTarget.position, triggerTime);
       const cpaDist = burstPos.distanceTo(targetPos);
+      recordStepClosestApproaches(triggerTime, burstPos);
       missile.closestApproaches[triggerTarget.id] = {
         distanceM: cpaDist,
         timeSec: this.elapsed,
@@ -762,7 +763,6 @@ export class AirToAirMissileSystem {
         distanceM: cpaDist,
       };
       this._detonate(missile, triggerTarget, events, triggerTime);
-      recordStepClosestApproaches(triggerTime);
       return;
     }
     recordStepClosestApproaches(1);
