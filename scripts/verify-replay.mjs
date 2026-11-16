@@ -27,7 +27,8 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   assert.equal(await ev('s.gameFlow.state'), 'debrief');
   assert.ok(await ev('s.debriefReplay?.samples.length > 2'));
   await click('#debrief-save-replay');
-  assert.equal(await ev('s.replayStore.list().length'), 1);
+  // The debrief auto-saves once on open (#645), so the manual save adds the second row.
+  assert.equal(await ev('s.replayStore.list().length'), 2);
   await ev('window.replayExport=s.replayStore.exportJson(s.replayStore.list()[0].id);window.recordedTrack=s.debriefReplay;');
   await click('#debrief-watch-replay');
   await until(() => ev('s.replayDirector.active'), 'watch');
@@ -45,11 +46,11 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   assert.ok(await ev('s.replayDirector.progressSec > 0 && s.replayDirector.paused'));
   // Exercise every available camera, including asynchronous cockpit entry.
   for (let mode = 0; mode < 10; mode++) {
-    await click(`[data-camera="${mode}"]`);
+    await click(`[data-camera-mode="${mode}"]`);
     await until(() => ev(mode === 7 ? 's.cameraSystem.autoSwitch' : `s.cameraSystem.mode === ${mode}`), `camera ${mode}`, 45000);
     await delay(100);
   }
-  await click('[data-camera="1"]');
+  await click('[data-camera-mode="1"]');
   await screenshot(`${output}/desktop.png`);
   for (const [width, height, name] of [[390, 844, 'mobile'], [844, 390, 'landscape']]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
@@ -63,6 +64,9 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   assert.equal(await ev('s.replayDirector.speed'), .5);
   await click('[data-exit]');
+  // A replay opened from the debrief returns there (#648); leave the debrief for the lobby.
+  assert.equal(await ev('s.gameFlow.state'), 'debrief');
+  await click('#debrief-lobby');
   assert.equal(await ev('s.gameFlow.state'), 'lobby');
   assert.equal(await ev('s.replayDirector.active'), false);
   assert.equal(await ev('s.controls.aircraftControlsDisabled'), false);
@@ -73,16 +77,17 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   await ev(`document.querySelector('.replay-entry input').value='My approach';document.querySelector('.replay-entry input').dispatchEvent(new Event('change'));`);
   assert.equal(await ev('s.replayStore.list()[0].label'), 'My approach');
   await click('[data-action="delete"]');
-  assert.equal(await ev('s.replayStore.list().length'), 0);
+  // Only the newest (manual) row is deleted; the auto-save slot remains.
+  assert.equal(await ev('s.replayStore.list().length'), 1);
   await ev(`(() => {const file=new File([window.replayExport],'replay.json',{type:'application/json'});const files=new DataTransfer();files.items.add(file);const input=document.querySelector('[data-import]');input.files=files.files;input.dispatchEvent(new Event('change'));})()`);
-  await until(() => ev('s.replayStore.list().length === 1'), 'import');
+  await until(() => ev('s.replayStore.list().length === 2'), 'import');
   await ev(`(() => {const files=new DataTransfer();files.items.add(new File(['bad json'],'bad.json'));const input=document.querySelector('[data-import]');input.files=files.files;input.dispatchEvent(new Event('change'));})()`);
   await until(() => ev('document.querySelector("[data-status]").textContent.includes("Could not import")'), 'invalid import');
   await click('[data-close]');
   await ev('window.replayReloadMarker=true');
   await send('Page.reload');
   await until(() => ev('!window.replayReloadMarker && !!window.simulator && !document.body.classList.contains("booting")'), 'reload', 90000);
-  assert.equal(await ev('window.simulator.replayStore.list().length'), 1, 'library persists across reload');
+  assert.equal(await ev('window.simulator.replayStore.list().length'), 2, 'library persists across reload');
   // A real Lukla track restores the DEM scene and keeps deterministic replay poses.
   await ev(`(async()=>{window.s=window.simulator;s.lobby.airport='lukla';s.lobby.aircraft='C172';s.lobby.preset='cruise';await s.fly();})()`);
   await until(() => ev('s.currentTerrain.isLoaded'), 'Lukla terrain', 90000);
