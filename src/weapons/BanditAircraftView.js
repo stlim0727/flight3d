@@ -174,7 +174,7 @@ export class BanditAircraftView {
     const texture = numberTexture(number);
     const numberMaterial = new THREE.MeshStandardMaterial({
       map: texture, transparent: true, alphaTest: 0.08, roughness: 0.6, metalness: 0.1,
-      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4,
+      depthWrite: false,
     });
     numberMaterial.userData.banditOwnedMap = true;
     const plane = new THREE.PlaneGeometry(size.z * 0.045, size.z * 0.05);
