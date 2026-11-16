@@ -1,8 +1,7 @@
 import { bindText, t, translateDOM } from '../i18n/index.js';
 import { REPLAY_SPEEDS } from '../replay/replayConfig.js';
 import { flightDuration } from '../core/FlightRecorder.js';
-
-const CAMERAS = ['cockpit', 'chase', 'wing', 'tower', 'flyby', 'gear', 'drone', 'auto', 'hud', 'director'];
+import { createCameraButtons } from './FlightPanels.js';
 
 export class ReplayPanel {
   constructor(sim) {
@@ -28,7 +27,7 @@ export class ReplayPanel {
       </div>
       <input data-seek type="range" min="0" max="1" step="0.01" value="0" data-i18n-aria-label="replay.seek">
       <div class="replay-speeds" role="group" data-i18n-aria-label="replay.speed">${REPLAY_SPEEDS.map(speed => `<button class="btn" data-speed="${speed}" aria-pressed="false">${speed * 100}%</button>`).join('')}</div>
-      <div class="replay-cameras" role="group" data-i18n-aria-label="replay.camera">${CAMERAS.map((name, mode) => `<button class="btn" data-camera="${mode}" aria-pressed="false"></button>`).join('')}</div>
+      <div class="replay-cameras" role="group" data-i18n-aria-label="replay.camera"></div>
       <p data-wait role="status" data-i18n="replay.waiting" hidden></p>
       <button class="btn ui-unfold-pill replay-unfold-pill" data-unfold type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
         <span class="unfold-icon">▶</span>
@@ -42,7 +41,10 @@ export class ReplayPanel {
       <label class="btn replay-import"><span data-i18n="replay.import"></span><input type="file" accept=".json,application/json" data-import></label>
       <p data-status role="status" aria-live="polite"></p><div data-list></div></div>`;
     translateDOM(this.root); translateDOM(this.library);
-    for (const [mode, name] of CAMERAS.entries()) bindText(this.root.querySelector(`[data-camera="${mode}"]`), () => t(`ui.camera.${name}`));
+    this.root.querySelector('.replay-cameras').append(...createCameraButtons((mode) => {
+      sim.controls.onSelectCamera(mode);
+      this.refresh();
+    }, { idPrefix: 'btn-replay-cam-' }));
     bindText(this.root.querySelector('[data-play]'), () => t(sim.replayDirector.paused ? 'replay.play' : 'replay.pause'));
     this.root.querySelector('[data-play]').addEventListener('click', () => sim.replayDirector.togglePause());
     this.root.querySelector('[data-exit]').addEventListener('click', () => this.exit());
@@ -52,9 +54,6 @@ export class ReplayPanel {
     this.root.querySelector('[data-seek]').addEventListener('input', e => sim.replayDirector.seek(e.target.value));
     for (const el of this.root.querySelectorAll('[data-step]')) el.addEventListener('click', () => sim.replayDirector.stepFrame(Number(el.dataset.step)));
     for (const el of this.root.querySelectorAll('[data-speed]')) el.addEventListener('click', () => sim.replayDirector.setSpeed(el.dataset.speed));
-    for (const el of this.root.querySelectorAll('[data-camera]')) el.addEventListener('click', () => {
-      sim.controls.onSelectCamera(Number(el.dataset.camera)); this.refresh();
-    });
     this.library.querySelector('[data-close]').addEventListener('click', () => this.closeLibrary());
     this.library.addEventListener('click', e => { if (e.target === this.library) this.closeLibrary(); });
     this.library.addEventListener('keydown', e => {
@@ -260,6 +259,6 @@ export class ReplayPanel {
     if (timeMini) timeMini.textContent = ` (${timeFormatted})`;
     this.root.querySelector('[data-wait]').hidden = !director.waitingTerrain;
     for (const el of this.root.querySelectorAll('[data-speed]')) el.setAttribute('aria-pressed', String(Number(el.dataset.speed) === director.speed));
-    for (const el of this.root.querySelectorAll('[data-camera]')) el.setAttribute('aria-pressed', String(Number(el.dataset.camera) === (this.sim.cameraSystem.autoSwitch ? 7 : this.sim.cameraSystem.mode)));
+    for (const el of this.root.querySelectorAll('[data-camera-mode]')) el.setAttribute('aria-pressed', String(Number(el.dataset.cameraMode) === (this.sim.cameraSystem.autoSwitch ? 7 : this.sim.cameraSystem.mode)));
   }
 }

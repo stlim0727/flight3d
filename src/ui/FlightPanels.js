@@ -18,6 +18,31 @@ export function touchLabel(text) {
     ? text.replace(/\s*\[[^\]]*\]/g, '') : text;
 }
 
+/**
+ * The one camera button set shared by the in-flight toolbar and the replay
+ * transport. Replay omits the id because the toolbar already owns those ids.
+ */
+export function createCameraButtons(onSelectCamera, { idPrefix = 'btn-cam-' } = {}) {
+  return CAMERA_MODES.map(([mode, name]) => {
+    const button = document.createElement('button');
+    if (idPrefix) button.id = `${idPrefix}${name}`;
+    button.className = 'btn flight-camera-btn';
+    button.type = 'button';
+    button.dataset.cameraMode = String(mode);
+    if (mode < 9) button.dataset.keyHint = String(mode === 0 ? 1 : mode === 7 ? 8 : mode === 8 ? 9 : mode + 1);
+    button.setAttribute('aria-pressed', 'false');
+    bindText(button, () => touchLabel(t(`ui.camera.${name}`)));
+    bindText(button, () => t(`ui.strip.camera.${name}`), 'data-short-label');
+    bindText(button, () => touchLabel(t(`ui.camera.${name}`)), 'aria-label');
+    bindText(button, () => touchLabel(t(`ui.camera.${name}`)), 'title');
+    button.addEventListener('click', () => {
+      onSelectCamera(mode);
+      button.blur();
+    });
+    return button;
+  });
+}
+
 /** A committed in-flight view choice must release native select keyboard capture. */
 export function commitFlightCamera(select, onSelectCamera) {
   onSelectCamera(Number(select.value));
@@ -91,24 +116,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
   hud.append(bar);
-  const cameraButtons = CAMERA_MODES.map(([mode, name]) => {
-    const button = document.createElement('button');
-    button.id = `btn-cam-${name}`;
-    button.className = 'btn flight-camera-btn';
-    button.type = 'button';
-    button.dataset.cameraMode = String(mode);
-    if (mode < 9) button.dataset.keyHint = String(mode === 0 ? 1 : mode === 7 ? 8 : mode === 8 ? 9 : mode + 1);
-    button.setAttribute('aria-pressed', 'false');
-    bindText(button, () => touchLabel(t(`ui.camera.${name}`)));
-    bindText(button, () => t(`ui.strip.camera.${name}`), 'data-short-label');
-    bindText(button, () => touchLabel(t(`ui.camera.${name}`)), 'aria-label');
-    bindText(button, () => touchLabel(t(`ui.camera.${name}`)), 'title');
-    button.addEventListener('click', () => {
-      onSelectCamera(mode);
-      button.blur();
-    });
-    return button;
-  });
+  const cameraButtons = createCameraButtons(onSelectCamera);
   const cameraStrip = document.createElement('div');
   cameraStrip.id = 'camera-strip';
   cameraStrip.className = 'flight-camera-strip';
