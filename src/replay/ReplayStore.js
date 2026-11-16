@@ -95,9 +95,56 @@ export function replayLabel(track) {
   return [aircraft, airport, scenario].filter(Boolean).join(' · ') || 'flight';
 }
 
+function parseStoredPayload(raw) {
+  if (typeof raw !== 'string') return null;
+  if (raw.trimStart().startsWith('{')) {
+    const parsed = JSON.parse(raw);
+    if (parsed?.kind !== SORTIE_KIND || typeof parsed.track !== 'string') {
+      throw new Error('Invalid stored sortie payload');
+    }
+    return { kind: SORTIE_KIND, report: parsed.report ?? null, trackBase64: parsed.track };
+  }
+  return { kind: null, report: null, trackBase64: raw };
+}
+
 /**
- * Saved replay library in localStorage. Payloads are stored one key per entry so a single
- * oversized write cannot lose the whole library, and quota pressure evicts the oldest saves.
+ * Keep the stored flight3d.sortie.v1 JSON within the per-entry localStorage budget without
+ * rejecting a valid track that ReplayRecorder already sized to entryBase64Bytes.
+ */
+function boundStoredSortie(report, base64, compactReport, entryBudget) {
+  let currentReport = report;
+  let serialized = JSON.stringify(createSortie(currentReport, base64));
+  if (!Number.isFinite(entryBudget) || entryBudget <= 0 || serialized.length <= entryBudget) {
+    return serialized;
+  }
+  if (Array.isArray(currentReport?.samples) && currentReport.samples.length > 0) {
+    let samples = currentReport.samples;
+    let peakIndex = -1;
+    samples.forEach((entry, index) => {
+      if (Number.isFinite(entry?.gForce) && (peakIndex < 0 || entry.gForce > samples[peakIndex].gForce)) peakIndex = index;
+    });
+    const peakTime = peakIndex >= 0 ? samples[peakIndex].timeSec : null;
+    while (samples.length > 0 && serialized.length > entryBudget) {
+      const next = samples.length <= 2
+        ? []
+        : samples.filter((entry, index) =>
+          index === 0 || index === samples.length - 1 || index % 2 === 0
+          || (peakTime !== null && entry?.timeSec === peakTime));
+      samples = next.length === samples.length ? samples.slice(0, Math.floor(samples.length / 2)) : next;
+      currentReport = { ...currentReport, samples, samplesDecimatedForBudget: true };
+      serialized = JSON.stringify(createSortie(currentReport, base64));
+    }
+  }
+  if (serialized.length > entryBudget && currentReport !== compactReport) {
+    serialized = JSON.stringify(createSortie({ ...compactReport, reportTruncatedForBudget: true }, base64));
+  }
+  return serialized;
+}
+
+/**
+ * Saved replay library in localStorage. Payloads are stored one key per entry as
+ * flight3d.sortie.v1 JSON so a single oversized write cannot lose the whole library,
+ * and quota pressure evicts the oldest saves.
  */
 export class ReplayStore {
   constructor(storage, { budget = REPLAY_BUDGET } = {}) {
@@ -141,24 +188,35 @@ export class ReplayStore {
       return { entry: null, error: error.message };
     }
     if (base64.length > this.budget.entryBase64Bytes) return { entry: null, error: 'tooLong' };
+    const resolvedLabel = cleanLabel(label) || replayLabel(track);
     const resolvedSummary = (summary && typeof summary === 'object')
       ? summary
       : (report ? extractReportSummary(report) : null);
+    const compactReport = {
+      label: resolvedLabel,
+      durationSec: track.durationSec,
+      metadata: { ...track.metadata },
+      ...(resolvedSummary ? { summary: resolvedSummary } : {}),
+    };
+    const storedReport = report
+      ? { ...report, label: report.label ?? resolvedLabel }
+      : compactReport;
+    const storedPayload = boundStoredSortie(storedReport, base64, compactReport, this.budget.entryBase64Bytes);
     const entry = {
       id: crypto.randomUUID(),
       savedAt: new Date().toISOString(),
-      label: cleanLabel(label) || replayLabel(track),
+      label: resolvedLabel,
       durationSec: track.durationSec,
       intervalSec: track.intervalSec,
       sampleCount: track.samples.length,
-      bytes: base64.length,
+      bytes: storedPayload.length,
       metadata: { ...track.metadata },
     };
     if (resolvedSummary) entry.summary = resolvedSummary;
     if (auto) { entry.auto = true; entry.autoSlot = autoSlot; }
     const rows = this.read();
     const replaced = auto ? rows.filter(row => row.auto === true && (row.autoSlot ?? 'solo') === autoSlot) : [];
-    if (!this.writeEntry(entry, base64, rows, replaced)) return { entry: null, error: this.error || 'quota' };
+    if (!this.writeEntry(entry, storedPayload, rows, replaced)) return { entry: null, error: this.error || 'quota' };
     return { entry, error: null };
   }
 
@@ -196,7 +254,8 @@ export class ReplayStore {
     try { payload = this.storage.getItem(payloadKey(id)); } catch { payload = null; }
     if (typeof payload !== 'string') { this.error = 'missingPayload'; return null; }
     try {
-      return { meta: row, track: decodeTrack(fromBase64(payload)) };
+      const parsed = parseStoredPayload(payload);
+      return { meta: row, track: decodeTrack(fromBase64(parsed.trackBase64)), report: parsed.report };
     } catch (error) {
       this.error = error.message;
       return null;
@@ -230,12 +289,20 @@ export class ReplayStore {
     let payload = null;
     try { payload = this.storage.getItem(payloadKey(id)); } catch { payload = null; }
     if (typeof payload !== 'string') return null;
-    return JSON.stringify(createSortie({
-      label: row.label,
-      durationSec: row.durationSec,
-      metadata: row.metadata,
-      ...(row.summary ? { summary: row.summary } : {}),
-    }, payload));
+    try {
+      const parsed = parseStoredPayload(payload);
+      const report = parsed.report
+        ? { ...parsed.report, label: row.label }
+        : {
+          label: row.label,
+          durationSec: row.durationSec,
+          metadata: row.metadata,
+          ...(row.summary ? { summary: row.summary } : {}),
+        };
+      return JSON.stringify(createSortie(report, parsed.trackBase64));
+    } catch {
+      return null;
+    }
   }
 
   importJson(text) {
@@ -244,11 +311,13 @@ export class ReplayStore {
     let base64;
     let label = null;
     let summary = null;
+    let report = null;
     if (parsed?.kind === SORTIE_KIND) {
       if (typeof parsed.track !== 'string') return { entry: null, error: 'notAReplay' };
       base64 = parsed.track;
       label = parsed.report?.label ?? parsed.entry?.label ?? null;
       summary = extractReportSummary(parsed.report);
+      report = parsed.report ?? null;
     } else if (parsed?.kind === LEGACY_REPLAY_KIND) {
       if (typeof parsed.payload !== 'string') return { entry: null, error: 'notAReplay' };
       base64 = parsed.payload;
@@ -264,7 +333,7 @@ export class ReplayStore {
     } catch (error) {
       return { entry: null, error: error.message };
     }
-    return this.save(track, { label, summary });
+    return this.save(track, { label, summary, report });
   }
 
   /** Commit payload and index together, restoring old saves if quota retries fail. */
