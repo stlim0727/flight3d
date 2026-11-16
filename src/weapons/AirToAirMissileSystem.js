@@ -38,6 +38,34 @@ const UP = new THREE.Vector3(0, 1, 0);
 let nextTargetId = 0;
 let nextMissileId = 0;
 
+function terrainImpactFraction(prevPosition, position, terrainHeight) {
+  if (!terrainHeight) return null;
+  const samples = 8;
+  const dx = position.x - prevPosition.x;
+  const dy = position.y - prevPosition.y;
+  const dz = position.z - prevPosition.z;
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const x = prevPosition.x + dx * t;
+    const y = prevPosition.y + dy * t;
+    const z = prevPosition.z + dz * t;
+    const ground = terrainHeight(x, z);
+    if (!Number.isFinite(ground) || y <= ground + 1) {
+      if (i === 0) return 0;
+      let lo = (i - 1) / samples;
+      let hi = t;
+      for (let iter = 0; iter < 6; iter++) {
+        const mid = (lo + hi) * 0.5;
+        const mg = terrainHeight(prevPosition.x + dx * mid, prevPosition.z + dz * mid);
+        if (!Number.isFinite(mg) || prevPosition.y + dy * mid <= mg + 1) hi = mid;
+        else lo = mid;
+      }
+      return hi;
+    }
+  }
+  return null;
+}
+
 /** Airborne bandit with a circular patrol. Pure state: no DOM, scene or audio. */
 export class BanditTarget {
   constructor({ callsign, position, velocity = new THREE.Vector3(), orbit = null, evasion = true, rwr = true, evasionSkill = 'legacy-break' }) {
@@ -693,6 +721,24 @@ export class AirToAirMissileSystem {
       const time = fuzeClosestApproach(missile, candidate, spec.fuseRadiusM);
       if (time !== null && time < triggerTime) { triggerTarget = candidate; triggerTime = time; }
     }
+    const groundEnd = world.terrainHeight ? world.terrainHeight(missile.position.x, missile.position.z) : 0;
+    const groundTime = world.terrainHeight
+      && (triggerTarget !== null || !Number.isFinite(groundEnd) || missile.position.y <= groundEnd + 1)
+      ? terrainImpactFraction(missile.prevPosition, missile.position, world.terrainHeight)
+      : (!Number.isFinite(groundEnd) || missile.position.y <= groundEnd + 1 ? 1 : null);
+    if (groundTime !== null && (triggerTarget === null || groundTime <= triggerTime)) {
+      missile.position.lerpVectors(missile.prevPosition, missile.position, groundTime);
+      const impactGround = world.terrainHeight ? world.terrainHeight(missile.position.x, missile.position.z) : 0;
+      missile.position.y = (Number.isFinite(impactGround) ? impactGround : 0) + 1;
+      missile.alive = false;
+      missile.finalOutcome = { reason: 'surface_collision', timeSec: this.elapsed };
+      events.push({
+        type: 'detonation', missile, target: null,
+        position: missile.position.clone(), velocity: missile.velocity.clone(), surface: true,
+        timeSec: this.elapsed, reason: 'surface_collision',
+      });
+      return;
+    }
     if (triggerTarget) {
       const burstPos = missile.prevPosition.clone().lerp(missile.position, triggerTime);
       const targetPos = triggerTarget.prevPosition.clone().lerp(triggerTarget.position, triggerTime);
@@ -725,18 +771,6 @@ export class AirToAirMissileSystem {
         reason: 'life_expiry',
       });
       return;
-    }
-
-    const ground = world.terrainHeight ? world.terrainHeight(missile.position.x, missile.position.z) : 0;
-    if (missile.position.y <= ground + 1) {
-      missile.position.y = ground + 1;
-      missile.alive = false;
-      missile.finalOutcome = { reason: 'surface_collision', timeSec: this.elapsed };
-      events.push({
-        type: 'detonation', missile, target: null,
-        position: missile.position.clone(), velocity: missile.velocity.clone(), surface: true,
-        timeSec: this.elapsed, reason: 'surface_collision',
-      });
     }
   }
 
