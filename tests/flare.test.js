@@ -139,6 +139,6 @@ test('Bandit dispenses a fanned 3-flare and 3-chaff burst over 0.5s for a sustai
   assert.equal(system.chaffClouds.length, 3);
   assert.equal(b.flare.remaining, FLARE_MODEL.capacity - 3);
   assert.equal(b.chaff.remaining, CHAFF_MODEL.capacity - 3);
-  assert.ok(system.flares[0].velocity.x > 0 && system.flares[1].velocity.x < 0, 'burst fans laterally');
-  assert.ok(system.flares[0].velocity.y < 0, 'burst ejects downward');
+  assert.ok(system.flares[1].velocity.x > 0 && system.flares[2].velocity.x < 0, 'burst fans laterally');
+  assert.ok(system.flares[1].velocity.y < 0, 'burst ejects downward');
 });

@@ -29,9 +29,8 @@ const DECOY_BURST_COUNT = 3;
 const DECOY_BURST_INTERVAL_S = 0.25;
 const DECOY_EJECT_LATERAL_MPS = 22;
 const DECOY_EJECT_VERTICAL_MPS = -12;
-const EVASION_DIVE_M = 450;
-const EVASION_MIN_ALTITUDE_M = 500;
-const EVASION_MIN_SPEED_MPS = 275;
+const EVASION_CLIMB_M = 350;
+const EVASION_MIN_SPEED_MPS = 260;
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const RIGHT = new THREE.Vector3(1, 0, 0);
 const UP = new THREE.Vector3(0, 1, 0);
@@ -66,6 +65,8 @@ export class BanditTarget {
     this.threatResponse = new BanditThreatResponse(evasion, { rwr });
     this.chaff = new ChaffDispenser();
     this.flare = new FlareDispenser();
+    this.flareThreatIds = new Set();
+    this.chaffThreatIds = new Set();
     this.flareBursts = new Map();
     this.chaffBursts = new Map();
     this.flight = null;
@@ -103,8 +104,8 @@ export class BanditTarget {
       const ground = Math.max(terrainHeight(this.position.x, this.position.z),
         terrainHeight(this.position.x + Math.sin(heading) * lookahead,
           this.position.z - Math.cos(heading) * lookahead));
-      const evadeDrop = EVASION_DIVE_M * response.weight * avionicsIntegrity;
-      const altitude = Math.max(Math.max(EVASION_MIN_ALTITUDE_M, o.altitudeM - evadeDrop), ground + 420);
+      const evadeClimb = EVASION_CLIMB_M * response.weight * avionicsIntegrity;
+      const altitude = Math.max(o.altitudeM + evadeClimb, ground + 420);
       const commandedSpeed = speed + (Math.max(speed, EVASION_MIN_SPEED_MPS) - speed) * response.weight * avionicsIntegrity;
       this.flight.guide(heading, altitude, commandedSpeed);
       this.flight.step(dt / steps, this.damage,
@@ -133,6 +134,8 @@ export class BanditTarget {
     this.threatResponse.reset();
     this.chaff.reset();
     this.flare.reset();
+    this.flareThreatIds.clear();
+    this.chaffThreatIds.clear();
     this.flareBursts.clear();
     this.chaffBursts.clear();
     const o = orbit;
@@ -486,10 +489,11 @@ export class AirToAirMissileSystem {
   }
 
   _decoyEjectVelocity(target, shotIndex) {
+    if (shotIndex === 0) return target.velocity;
     const vx = target.velocity.x;
     const vz = target.velocity.z;
     const horiz = Math.hypot(vx, vz);
-    const side = shotIndex % 2 === 0 ? 1 : -1;
+    const side = shotIndex % 2 === 1 ? 1 : -1;
     const lx = horiz > 1e-3 ? -vz / horiz : 1;
     const lz = horiz > 1e-3 ? vx / horiz : 0;
     return new THREE.Vector3(
@@ -499,10 +503,12 @@ export class AirToAirMissileSystem {
     );
   }
 
-  _stepDecoyBurst(target, threatId, bursts, dispenser, list, type, eventKey, events) {
+  _stepDecoyBurst(target, threatId, threatIds, bursts, dispenser, list, type, eventKey, events) {
     if (!target.alive || threatId === null || !bursts || !dispenser) return;
     let burst = bursts.get(threatId);
     if (!burst) {
+      if (threatIds?.has(threatId)) return;
+      threatIds?.add(threatId);
       burst = { remaining: DECOY_BURST_COUNT, nextTimeSec: this.elapsed, shotIndex: 0 };
       bursts.set(threatId, burst);
     }
@@ -531,9 +537,9 @@ export class AirToAirMissileSystem {
     for (const target of this.targets) {
       target.update(dt, world.terrainHeight, this.missiles);
       const threatId = target.threatResponse.confirmedId;
-      this._stepDecoyBurst(target, threatId, target.chaffBursts, target.chaff,
+      this._stepDecoyBurst(target, threatId, target.chaffThreatIds, target.chaffBursts, target.chaff,
         this.chaffClouds, 'chaff_dispense', 'chaff', events);
-      this._stepDecoyBurst(target, threatId, target.flareBursts, target.flare,
+      this._stepDecoyBurst(target, threatId, target.flareThreatIds, target.flareBursts, target.flare,
         this.flares, 'flare_dispense', 'flare', events);
       if (!target.alive) {
         target.respawnTimer -= dt;
