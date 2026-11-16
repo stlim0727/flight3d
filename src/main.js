@@ -380,7 +380,9 @@ class FlightSimulator {
     this.explosionSystem = new ExplosionSystem(this.scene, this.currentTerrain);
     this.aircraftBreakup = new AircraftBreakup(this.scene);
     this.missileCombat = new AirToAirMissileSystem();
-    this.missileCombatView = new MissileCombatView(this.scene, this.missileCombat);
+    this.missileCombatView = new MissileCombatView(this.scene, this.missileCombat, {
+      terrainHeight: (x, z) => this.currentTerrain?.getHeight(x, z) ?? 0,
+    });
     this.cannonCombatView = new CannonCombatView(this.scene, this.missileCombat);
     this.rearmSystem = new RearmSystem();
     // A replay owns the combat feed: its recorded missile poses and bandit

@@ -130,6 +130,27 @@ test('ReplayRecorder and ReplayCodec round-trip targetId on kill events', () => 
   assert.equal(killEvent.targetId, 2);
 });
 
+test('live and recorded countermeasure dispensers play distance-scaled flare and chaff audio', () => {
+  const calls = [];
+  const audio = {
+    playFlareDispense(distance) { calls.push(['flare', Math.round(distance)]); },
+    playChaffDispense(distance) { calls.push(['chaff', Math.round(distance)]); },
+  };
+  const camera = { position: new THREE.Vector3(0, 0, 0) };
+  // Live events carry the decoy object; nothing in the cockpit is silent about it.
+  const flare = { type: 'flare', position: new THREE.Vector3(0, 0, -300) };
+  assert.equal(presentCombatEvent({ type: 'flare_dispense', flare, target: { id: 1 } }, { audio, camera }),
+    'flare_dispense');
+  const chaff = { type: 'chaff', position: new THREE.Vector3(0, 0, -400) };
+  assert.equal(presentCombatEvent({ type: 'chaff_dispense', chaff }, { audio, camera }), 'chaff_dispense');
+  // Recorded events are scalars with a decoy type.
+  assert.equal(presentCombatEvent({ kind: 'decoy_dispense', decoyType: 'flare', x: 0, y: 0, z: -500 }, { audio, camera }),
+    'decoy_dispense');
+  assert.equal(presentCombatEvent({ kind: 'decoy_dispense', decoyType: 'chaff', x: 0, y: 0, z: -1200 }, { audio, camera }),
+    'decoy_dispense');
+  assert.deepEqual(calls, [['flare', 300], ['chaff', 400], ['flare', 500], ['chaff', 1200]]);
+});
+
 test('syncCombatAudio forwards missiles only when unpaused and launch passes camera distance (#784)', () => {
   const flightCalls = [];
   const launchDists = [];

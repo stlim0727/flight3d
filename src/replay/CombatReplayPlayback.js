@@ -49,7 +49,9 @@ export class CombatReplayPlayback {
     this.active = false;
     this.timeSec = 0;
     this.state = { targets: [], missiles: [], flares: [], chaffClouds: [], rails: 0x3f };
-    this.view = new MissileCombatView(sim.scene, this.state);
+    this.view = new MissileCombatView(sim.scene, this.state, {
+      terrainHeight: (x, z) => sim.currentTerrain?.getHeight(x, z) ?? 0,
+    });
     this.targets = [];
     this.groups = new Map();
     this.missiles = new Map();
@@ -57,6 +59,11 @@ export class CombatReplayPlayback {
     this.events = [];
     this.staged = new Set();
     this._banditHint = 0;
+    // Launch presentation waits one playback tick. The new missile appears in
+    // the same tick, and the DIRECTOR camera only cuts to its launch shot later
+    // in that frame, so an immediate launch sound would be scored against the
+    // previous orbit camera kilometres away and arrive attenuated to silence.
+    this.pendingLaunches = [];
   }
 
   load(combat) {
@@ -93,6 +100,7 @@ export class CombatReplayPlayback {
     this._banditHint = 0;
     this.decoys.clear();
     this.staged.clear();
+    this.pendingLaunches.length = 0;
     return true;
   }
 
@@ -103,6 +111,7 @@ export class CombatReplayPlayback {
     this._banditHint = 0;
     for (const group of this.groups.values()) group.hint = 0;
     this.staged = new Set(this.events.filter(event => event.timeSec <= timeSec + 1e-9));
+    this.pendingLaunches.length = 0;
     this.decoys.clear();
     this.view.clear();
     this._updateState(timeSec);
@@ -123,17 +132,26 @@ export class CombatReplayPlayback {
     this._updateState(timeSec);
     this.view.sync(dt);
     syncCombatAudio(this.state, { audio: this.sim.audio, camera: this.sim.camera, paused: dt <= 0 });
+    if (this.pendingLaunches.length) {
+      const deferred = this.pendingLaunches.splice(0);
+      for (const event of deferred) this._present(event);
+    }
     for (const event of this.events) {
       if (event.timeSec > timeSec + 1e-9) break;
       if (this.staged.has(event)) continue;
       this.staged.add(event);
-      presentCombatEvent(event, {
-        view: this.view,
-        explosionSystem: this.sim.explosionSystem,
-        audio: this.sim.audio,
-        camera: this.sim.camera,
-      });
+      if (event.kind === 'launch') this.pendingLaunches.push(event);
+      else this._present(event);
     }
+  }
+
+  _present(event) {
+    presentCombatEvent(event, {
+      view: this.view,
+      explosionSystem: this.sim.explosionSystem,
+      audio: this.sim.audio,
+      camera: this.sim.camera,
+    });
   }
 
   stop() {
@@ -153,6 +171,7 @@ export class CombatReplayPlayback {
     this.decoys.clear();
     this.events.length = 0;
     this.staged.clear();
+    this.pendingLaunches.length = 0;
   }
 
   /** HUD state for playback: recorded rail count, nearest live bandit and bursts. */

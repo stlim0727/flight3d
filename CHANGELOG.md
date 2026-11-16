@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **fix(combat):** audible missile launch and countermeasure ejection, and downed bandits that stay visible
+  - Missile ignition now plays a highpass report over a broad rocket roar and low thump, loud enough to read over the engine/wind bed; replay launches are scored after the DIRECTOR camera has cut to the launch shot instead of against the previous orbit camera kilometres away.
+  - Bandit flare and chaff ejection have their own distance-scaled synthesized voices (flare crack plus burn hiss, chaff pneumatic puff) in live sorties and replays; these stems did not exist before.
+  - A killed bandit no longer blinks out: its airframe keeps the last measured flight velocity, tumbles and burns until terrain impact (or 20 s), then hides until the 8 s respawn. Presentation only; target state, damage, kill and respawn contracts are unchanged.
 - **feat(weapons):** give each bandit a distinct aggressor livery
   - Patrol `BANDIT 1` and `BANDIT 2` now fly desert-sand and blue-gray airframes with slot numbers on the nose; the canyon chase aircraft uses the lizard scheme and an orange flash.
   - Wingtips and fin tips carry the callsign accent, and the loaded F-16 airframe, moving control surfaces and empty rails are repainted instead of matching the player's gray aircraft.

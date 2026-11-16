@@ -138,7 +138,12 @@ reloads every rail.
 - `src/systems/RWRSystem.js` — search / lock / launch stages derived from
   emitter position and velocity plus inbound hostile missiles.
 - `src/weapons/MissileCombatView.js` — scene mirror for bandits, released
-  missiles, soft smoke trails, damage smoke and explosion handoff.
+  missiles, soft smoke trails, damage smoke, falling burning wrecks and
+  explosion handoff. A killed bandit keeps its airframe: the view inherits the
+  last measured flight velocity and integrates drag, gravity and tumble until
+  terrain impact (or 20 s), then hides the slot until the 8 s respawn. This is
+  presentation only; the pure target state, respawn and recorded samples are
+  unchanged, and tracking a seek straight past a kill draws no phantom wreck.
 - `src/weapons/CannonCombatView.js` — tracers and muzzle flash; the gun's
   physics stays in `VulcanCannon`.
 - `src/aircraft/F16.js` — six rail meshes; `setMissileLoadout()` hides fired
@@ -146,8 +151,11 @@ reloads every rail.
 - `src/ui/HudView.js` — seeker field-of-view circle, TD box / lock diamond,
   `SHOOT` cue, range and closure, off-screen locator, gun cross, LCOS pipper
   and funnel, gun ammunition, weapon inventory and RWR azimuth display.
-- `src/audio/FlightAudio.js` — synthesized launch whoosh, gun burst loop, lock
-  tone and the three RWR beep cadences.
+- `src/audio/FlightAudio.js` — synthesized launch ignition crack and rocket
+  roar, flare ejection crack plus burn hiss, chaff pneumatic puff, gun burst
+  loop, lock tone and the three RWR beep cadences. Every one-shot is scaled by
+  the camera-to-event range, so a bandit dispensing flares 4 km away stays
+  quiet while the player's own rail release is loud.
 
 The system advances on its own fixed 120 Hz accumulator inside the render
 frame, so missile motion, projectiles, damage and the proximity fuse do not

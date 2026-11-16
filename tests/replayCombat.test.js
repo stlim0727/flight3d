@@ -85,6 +85,19 @@ test('a short entry budget thins combat samples before refusing the track', () =
   assert.ok((track.combat?.banditSamples.length ?? 0) >= 1);
 });
 
+test('combat event times follow the replay clock, not the combat system clock', () => {
+  const recorder = recordCombat(5);
+  recorder.elapsed = 12.5;
+  // Combat systems integrate their own render-frame clock, which drifts from
+  // the pose/sample timeline; the stored event must land on the replay timeline.
+  recorder.recordCombatEvent({
+    type: 'launch', timeSec: 4.2, missile: { id: 3, position: { x: 1, y: 2, z: 3 } },
+  });
+  const decoded = decodeTrack(encodeTrack(recorder.finish())).combat;
+  const launch = decoded.events.find(event => event.kind === 'launch');
+  assert.equal(launch.timeSec, 12.5);
+});
+
 test('replay playback interpolates combat and stages each detonation once', () => {
   const recorder = recordCombat(5);
   recorder.recordCombatEvent({

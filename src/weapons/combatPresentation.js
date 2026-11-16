@@ -32,6 +32,20 @@ export function presentCombatEvent(event, context = {}) {
     return kind;
   }
 
+  if (kind === 'flare_dispense' || kind === 'chaff_dispense' || kind === 'decoy_dispense') {
+    // Live events carry the decoy object; recorded events carry scalars and decoyType.
+    const decoy = event.flare ?? event.chaff ?? event.decoy ?? null;
+    const position = event.position ?? decoy?.position ?? null;
+    const hasCoords = position?.x !== undefined || event.x !== undefined;
+    const distance = hasCoords && camera?.position?.distanceTo
+      ? camera.position.distanceTo(resolveVector(position, event.x, event.y, event.z))
+      : 0;
+    const decoyType = event.decoyType ?? decoy?.type ?? (kind === 'chaff_dispense' ? 'chaff' : 'flare');
+    if (decoyType === 'chaff') audio?.playChaffDispense?.(distance);
+    else audio?.playFlareDispense?.(distance);
+    return kind;
+  }
+
   if (kind === 'detonation') {
     const position = resolveVector(event.position, event.x, event.y, event.z);
     const velocity = resolveVector(event.velocity, event.vx, event.vy, event.vz);

@@ -262,7 +262,10 @@ export class ReplayRecorder {
     }
 
     const eventRecord = {
-      timeSec: event.timeSec ?? this.elapsed,
+      // The recorder's clock is the replay's timeline. Combat systems advance on
+      // their own render-frame clock, so trusting event.timeSec can stamp a
+      // launch seconds away from the pose and missile samples recorded beside it.
+      timeSec: this.elapsed,
       kind: normalizedKind,
       missileId: (event.missile?.id ?? event.missileId ?? 0) & 255,
       surface: Boolean(event.surface),
