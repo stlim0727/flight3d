@@ -6,6 +6,12 @@ touch-control visibility, and the demo profile of the last flight started. The
 existing airport/aircraft/scenario, graphics-quality and language storage keys
 remain in place; URL flight choices still override saved flight selection.
 
+`toolbarHidden` lists the optional top-menu buttons the pilot unchecked in the
+Option tab (`cam-<view>` and `fullscreen`, issue #798). It stores the hidden set,
+so a camera added later appears by default, and an empty list is a saved
+"show all". `initFlightPanels` reads it when it builds the toolbar; ids the
+toolbar does not own are ignored, so aircraft controls cannot be hidden.
+
 Preferences restore before UI binding and automatic flight start. Restored time
 updates sky, foliage and water, and marks the demo director's user-time override
 so its first stage cannot immediately replace the saved hour. Menu and keyboard

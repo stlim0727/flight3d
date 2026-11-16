@@ -83,7 +83,14 @@ Phones in portrait show only the core airspeed, altitude and (from 361px wide)
 heading readouts in the first row. The second row wraps every aircraft control
 instead of scrolling, so landing gear is visible without a drag; it dims to 40%
 after 2.5s without input and returns to full opacity on pointer, key or focus
-activity. Artifacts
+activity. The row order is aircraft controls, overflow (trim and parking brake),
+demo takeover, cameras, fullscreen. Camera buttons and fullscreen are optional:
+the Option tab's "Top menu items" checkboxes hide them (`toolbarHidden`), and the
+harness checks that an empty selection leaves one undragged row in both
+orientations, that seven cameras fit a 390px portrait second row, that a hidden
+camera stays selectable without its button returning, and that the selection
+survives a reload. `src/ui/toolbarVisibility.js` holds the DOM-independent rules
+(`tests/toolbarVisibility.test.js`). Artifacts
 are written to `.cache/flight-layout/` (override with `ARTIFACT_DIR`). These are
 fixed-pose browser checks, not flight or physical-device acceptance. The older
 `verify-responsive-ui.mjs` includes historical toolbar-placement expectations;
