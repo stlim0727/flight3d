@@ -1,13 +1,52 @@
 import '../styles/feedback-dialog.css';
-import { gatherUserFeedbackContext, prepareUserFeedback, sendUserFeedback } from './posthog.js';
+import {
+  gatherUserFeedbackContext,
+  gatherUserFeedbackFullReport,
+  prepareUserFeedback,
+  sendUserFeedback,
+} from './posthog.js';
 
 let feedbackOverlay = null;
 let currentSim = null;
 let closeHandler = null;
 let sending = false;
 let diagnosticsSnapshot = null;
+let fullReportSnapshot = null;
+let screenshotSnapshot = null;
 let pendingReport = null;
 let pendingSignature = null;
+
+const SCREENSHOT_MAX_WIDTH = 960;
+const SCREENSHOT_JPEG_QUALITY = 0.72;
+
+export function captureFeedbackScreenshot(sim = null) {
+  if (typeof document === 'undefined') return null;
+  const source = sim?.renderer?.domElement ?? document.querySelector?.('canvas');
+  if (!source || !source.width || !source.height) return null;
+  try {
+    if (typeof sim?.renderScene === 'function') {
+      sim.renderScene();
+      if (sim.cockpitPhotoOverlay?.enabled) {
+        sim.cockpitPhotoOverlay.render(sim.renderer);
+      }
+    } else if (sim?.renderer?.render && sim?.scene && sim?.camera) {
+      sim.renderer.render(sim.scene, sim.camera);
+    }
+    const scale = Math.min(1, SCREENSHOT_MAX_WIDTH / source.width);
+    const width = Math.max(1, Math.round(source.width * scale));
+    const height = Math.max(1, Math.round(source.height * scale));
+    const target = document.createElement('canvas');
+    target.width = width;
+    target.height = height;
+    const ctx = target.getContext?.('2d');
+    if (!ctx) return null;
+    ctx.drawImage(source, 0, 0, width, height);
+    const dataUrl = target.toDataURL('image/jpeg', SCREENSHOT_JPEG_QUALITY);
+    return typeof dataUrl === 'string' && dataUrl.startsWith('data:image/') ? dataUrl : null;
+  } catch {
+    return null;
+  }
+}
 
 const CATEGORY_OPTIONS = [
   ['bug', '버그/오작동 (일반)'],
@@ -55,9 +94,12 @@ export function openFeedbackDialog(sim = null, options = {}) {
   // Closing a failed report must not erase its text or replace the incident snapshot.
   if (!diagnosticsSnapshot || !textarea.value.trim()) {
     diagnosticsSnapshot = gatherUserFeedbackContext(currentSim);
+    fullReportSnapshot = gatherUserFeedbackFullReport(currentSim);
+    screenshotSnapshot = captureFeedbackScreenshot(currentSim);
     resetFormState(feedbackOverlay);
     renderContext(feedbackOverlay, diagnosticsSnapshot);
     renderFlightLogSummary(feedbackOverlay, diagnosticsSnapshot);
+    renderAttachmentOptions(feedbackOverlay, fullReportSnapshot, screenshotSnapshot);
     feedbackOverlay.querySelector('[data-feedback-status]').textContent = '';
     feedbackOverlay.querySelector('[data-feedback-status]').dataset.failed = 'false';
     pendingReport = null;
@@ -81,9 +123,47 @@ function closeFeedbackDialog() {
 function resetFormState(overlay) {
   overlay.querySelector('[data-feedback-category]').value = 'bug';
   overlay.querySelector('[data-feedback-severity]').value = 'major';
+  overlay.querySelector('[data-feedback-include-diag]').checked = true;
+  overlay.querySelector('[data-feedback-include-full-report]').checked = false;
+  overlay.querySelector('[data-feedback-include-screenshot]').checked = false;
+  overlay.querySelector('[data-feedback-screenshot-preview]').hidden = true;
+  overlay.querySelector('[data-feedback-screenshot-preview]').removeAttribute('src');
   overlay.querySelector('[data-feedback-preview-toggle]').setAttribute('aria-expanded', 'false');
   overlay.querySelector('[data-feedback-preview-toggle]').textContent = '진단 정보 미리보기';
   overlay.querySelector('[data-feedback-diag-preview]').hidden = true;
+}
+
+function renderAttachmentOptions(overlay, fullReport, screenshot) {
+  const fullReportInput = overlay.querySelector('[data-feedback-include-full-report]');
+  const fullReportSummary = overlay.querySelector('[data-feedback-full-report-summary]');
+  fullReportInput.disabled = !fullReport;
+  if (!fullReport) {
+    fullReportSummary.dataset.empty = 'true';
+    fullReportSummary.textContent = '첨부할 전체 리포트가 없습니다.';
+  } else {
+    fullReportSummary.dataset.empty = 'false';
+    const bytes = new TextEncoder().encode(JSON.stringify(fullReport)).length;
+    const parts = [formatBytes(bytes)];
+    if (fullReport.track) parts.push('3D 리플레이 트랙 포함');
+    else if (fullReport.trackOmittedForBudget) parts.push('트랙 제외(전송 한도)');
+    fullReportSummary.textContent = `전체 리포트 (${fullReport.kind}): ${parts.join(' · ')}`;
+  }
+
+  const screenshotInput = overlay.querySelector('[data-feedback-include-screenshot]');
+  const screenshotSummary = overlay.querySelector('[data-feedback-screenshot-summary]');
+  const screenshotPreview = overlay.querySelector('[data-feedback-screenshot-preview]');
+  screenshotInput.disabled = !screenshot;
+  if (!screenshot) {
+    screenshotSummary.dataset.empty = 'true';
+    screenshotSummary.textContent = '캡처 가능한 화면이 없습니다.';
+    screenshotPreview.hidden = true;
+    screenshotPreview.removeAttribute('src');
+  } else {
+    screenshotSummary.dataset.empty = 'false';
+    screenshotSummary.textContent = `스크린샷 준비됨 (${formatBytes(screenshot.length)})`;
+    screenshotPreview.src = screenshot;
+    screenshotPreview.hidden = !screenshotInput.checked;
+  }
 }
 
 /** Only a readable ingestion acknowledgement counts; the local file is the fallback. */
@@ -225,6 +305,17 @@ function createFeedbackOverlay(getSim) {
           <span>현재 비행 진단 정보 및 비행 로그 함께 전송</span>
         </label>
         <p class="feedback-log-summary" data-feedback-log-summary></p>
+        <label class="feedback-diag-row">
+          <input type="checkbox" data-feedback-include-full-report />
+          <span>전체 리포트 함께 첨부 (flight3d.sortie.v1)</span>
+        </label>
+        <p class="feedback-log-summary" data-feedback-full-report-summary></p>
+        <label class="feedback-diag-row">
+          <input type="checkbox" data-feedback-include-screenshot />
+          <span>현재 화면 스크린샷 함께 첨부</span>
+        </label>
+        <p class="feedback-log-summary" data-feedback-screenshot-summary></p>
+        <img class="feedback-screenshot-preview" data-feedback-screenshot-preview alt="제보에 첨부할 현재 화면 스크린샷 미리보기" hidden />
         <button type="button" class="feedback-preview-toggle" data-feedback-preview-toggle aria-expanded="false">진단 정보 미리보기</button>
         <pre class="feedback-diag-preview" data-feedback-diag-preview aria-label="진단 정보 미리보기" hidden></pre>
         <p class="feedback-status" data-feedback-status role="status" aria-live="polite"></p>
@@ -253,6 +344,9 @@ function createFeedbackOverlay(getSim) {
   const categoryInput = overlay.querySelector('[data-feedback-category]');
   const severityInput = overlay.querySelector('[data-feedback-severity]');
   const includeInput = overlay.querySelector('[data-feedback-include-diag]');
+  const includeFullReportInput = overlay.querySelector('[data-feedback-include-full-report]');
+  const includeScreenshotInput = overlay.querySelector('[data-feedback-include-screenshot]');
+  const screenshotPreview = overlay.querySelector('[data-feedback-screenshot-preview]');
   const previewToggle = overlay.querySelector('[data-feedback-preview-toggle]');
   const preview = overlay.querySelector('[data-feedback-diag-preview]');
   const submitBtn = overlay.querySelector('[data-feedback-submit]');
@@ -264,18 +358,24 @@ function createFeedbackOverlay(getSim) {
   const syncPreview = () => {
     previewToggle.hidden = !includeInput.checked;
     preview.hidden = !includeInput.checked || previewToggle.getAttribute('aria-expanded') !== 'true';
+    screenshotPreview.hidden = !includeScreenshotInput.checked || !screenshotSnapshot;
   };
   syncPreview();
   const reportForForm = () => {
     const message = messageInput.value.trim();
     if (!message) { messageInput.focus(); return null; }
+    const includeFullReport = includeFullReportInput.checked && Boolean(fullReportSnapshot);
+    const includeScreenshot = includeScreenshotInput.checked && Boolean(screenshotSnapshot);
     const signature = JSON.stringify([message, contactInput.value.trim(), categoryInput.value,
-      severityInput.value, expectedInput.value.trim(), stepsInput.value.trim(), includeInput.checked]);
+      severityInput.value, expectedInput.value.trim(), stepsInput.value.trim(), includeInput.checked,
+      includeFullReport, includeScreenshot]);
     if (!pendingReport || signature !== pendingSignature) {
       pendingReport = prepareUserFeedback({ message, contact: contactInput.value,
         category: categoryInput.value, severity: severityInput.value,
         expected: expectedInput.value, steps: stepsInput.value,
-        includeContext: includeInput.checked, context: diagnosticsSnapshot });
+        includeContext: includeInput.checked, context: diagnosticsSnapshot,
+        fullReport: includeFullReport ? fullReportSnapshot : null,
+        screenshot: includeScreenshot ? screenshotSnapshot : null });
       pendingSignature = signature;
     }
     return pendingReport;
@@ -287,6 +387,7 @@ function createFeedbackOverlay(getSim) {
     }
     syncPreview();
   });
+  includeScreenshotInput.addEventListener('change', syncPreview);
   previewToggle.addEventListener('click', () => {
     const expanded = previewToggle.getAttribute('aria-expanded') !== 'true';
     previewToggle.setAttribute('aria-expanded', String(expanded));
@@ -322,11 +423,14 @@ function createFeedbackOverlay(getSim) {
       messageInput.value = ''; expectedInput.value = ''; stepsInput.value = ''; contactInput.value = '';
       categoryInput.value = 'bug'; severityInput.value = 'major';
       pendingReport = null; pendingSignature = null; diagnosticsSnapshot = null;
+      fullReportSnapshot = null; screenshotSnapshot = null;
     } catch (error) {
       setStatus(`${error.message} 신고 ID: ${report.reportId}`, true);
     } finally {
       sending = false;
       for (const element of overlay.querySelectorAll('button, input, textarea, select')) element.disabled = false;
+      if (!fullReportSnapshot) includeFullReportInput.disabled = true;
+      if (!screenshotSnapshot) includeScreenshotInput.disabled = true;
       submitBtn.textContent = accepted ? '제보 보내기' : '다시 보내기';
       if (accepted) closeFeedbackDialog();
     }
