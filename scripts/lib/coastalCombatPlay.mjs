@@ -1,8 +1,54 @@
-import { Euler, Vector3 } from 'three';
+import { Euler, MathUtils, Vector3 } from 'three';
 import { createHeadlessSimulation } from '../../src/core/HeadlessSimulation.js';
-import { BanditFlightModel } from '../../src/weapons/BanditFlightModel.js';
+import { Atmosphere } from '../../src/physics/Atmosphere.js';
 import { AirToAirMissileSystem } from '../../src/weapons/AirToAirMissileSystem.js';
 import { createAttackSkill } from '../../src/pilot/CombatSkills.js';
+
+function guideCoastalPilot(sim, { headingRad, altitudeM, speedMps }) {
+  sim.euler.setFromQuaternion(sim.quaternion, 'YXZ');
+  const forward = sim.forward.set(0, 0, -1).applyQuaternion(sim.quaternion);
+  const currentHeading = Math.atan2(forward.x, -forward.z);
+  const headingErr = Math.atan2(Math.sin(headingRad - currentHeading), Math.cos(headingRad - currentHeading));
+  const aero = sim.aero;
+  const g0 = Atmosphere.G0;
+  const availableLoad = aero.qDyn * aero.wingArea * (aero.CL0_clean + aero.CLa * 12 * Math.PI / 180) / (aero.mass * g0);
+  const bankLimit = MathUtils.radToDeg(Math.acos(1 / Math.max(1, Math.min(7, availableLoad))));
+  const targetRollDeg = MathUtils.clamp(MathUtils.radToDeg(headingErr) * 2.5, -bankLimit, bankLimit);
+  const rollDeg = -MathUtils.radToDeg(sim.euler.z);
+  const rollRate = sim.angularVelocity.z;
+  const desiredRollRate = -MathUtils.clamp(MathUtils.degToRad(targetRollDeg - rollDeg) * 2.5, -1.8, 1.8);
+  const rollAcc = (desiredRollRate - rollRate) * 4.5;
+  const qSb = Math.max(1, aero.qDyn * aero.wingArea * aero.wingspan);
+  const pHat = rollRate * aero.wingspan / (2 * Math.max(10, aero.tas));
+  const coeffRoll = -aero.Ixx * rollAcc / qSb;
+  const aileron = (coeffRoll - aero.Cl_b * aero.beta - Math.abs(aero.Cl_p) * pHat) / (aero.Cl_da * 1.05 * MathUtils.degToRad(20));
+  sim.controls.setVirtualInput('aileron', MathUtils.clamp(aileron, -1, 1));
+
+  const altErr = altitudeM - sim.position.y;
+  const hSpeed = Math.max(30, Math.hypot(sim.linearVelocity.x, sim.linearVelocity.z));
+  const tas = Math.max(30, aero.tas);
+  const targetVz = MathUtils.clamp(altErr * 0.15, -35, 35);
+  const gamma = Math.atan2(sim.linearVelocity.y, hSpeed);
+  const bank = -sim.euler.z;
+  const vertAcc = MathUtils.clamp((targetVz - sim.linearVelocity.y) * 1.0, -15, 15);
+  const load = MathUtils.clamp((Math.cos(gamma) + vertAcc / g0) / Math.max(0.2, Math.cos(bank)), -1.5, 7);
+  const requiredCl = load * aero.mass * g0 / Math.max(1, aero.qDyn * aero.wingArea);
+  const targetAlpha = MathUtils.clamp((requiredCl - aero.CL0_clean) / aero.CLa, -6 * Math.PI / 180, 14 * Math.PI / 180);
+  const desiredPitchRate = (load - Math.cos(bank) * Math.cos(gamma)) * g0 / tas + (targetAlpha - aero.alpha) * 2.5;
+  const desiredMoment = aero.Iyy * (desiredPitchRate - sim.angularVelocity.x) * 6.0;
+  const qSc = Math.max(1, aero.qDyn * aero.wingArea * aero.meanChord);
+  const qHat = sim.angularVelocity.x * aero.meanChord / (2 * tas);
+  const requiredCm = desiredMoment / qSc;
+  const effectiveElevRad = (requiredCm - aero.Cm0 - aero.Cma * aero.alpha - aero.Cmq * qHat) / -aero.Cm_de;
+  const stickElev = (effectiveElevRad - MathUtils.degToRad(aero.pitchTrim) * 0.25) / MathUtils.degToRad(20);
+  sim.controls.setVirtualInput('elevator', MathUtils.clamp(stickElev, -0.9, 0.9));
+
+  const density = Atmosphere.getConditions(sim.position.y).densityRatio;
+  const targetIas = Atmosphere.msToKnots(speedMps * Math.sqrt(density));
+  const iasKnots = Atmosphere.msToKnots(aero.ias);
+  sim.controls.setVirtualInput('throttle', MathUtils.clamp(0.55 + (targetIas - iasKnots) * 0.025, 0.05, 1.0));
+  sim.controls.setVirtualInput('rudder', MathUtils.clamp(aero.beta * 2 + sim.angularVelocity.y * 0.6, -0.6, 0.6));
+}
 
 /** Actual F16/Coastal/Cruise plant and weapons, with an idealized contact sensor.
  * Contact positions are sampled at 5 Hz within 12 km and terrain line of sight.
@@ -38,18 +84,14 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
           if (p.y <= terrainHeight(p.x, p.z)) { visible = false; break; }
         }
         if (visible) contact = { x: target.position.x, y: target.position.y, z: target.position.z,
-          rangeM: target.position.distanceTo(pilot.position) };
+          rangeM: target.position.distanceTo(pilot.position), time };
       }
       const forward = new Vector3(0, 0, -1).applyQuaternion(pilot.quaternion);
       command = attack.update({ own: { x: pilot.position.x, y: pilot.position.y, z: pilot.position.z,
         headingRad: Math.atan2(forward.x, -forward.z) }, contact,
       locked: Boolean(target?.alive && combat.lockedTarget === target && combat.lockProgress >= 1), speedMps: 250 });
     }
-    if (command) {
-      BanditFlightModel.prototype.guide.call(pilot, command.headingRad, command.altitudeM, command.speedMps);
-      pilot.controls.setVirtualInput('elevator', pilot.aero.elevator);
-      pilot.controls.setVirtualInput('rudder', pilot.aero.rudder);
-    }
+    if (command) guideCoastalPilot(pilot, command);
     pilot.integratePhysics(dt);
     if (![...pilot.position.toArray(), ...pilot.linearVelocity.toArray()].every(Number.isFinite)) throw new Error('Non-finite pilot state');
     world.onGround = Boolean(pilot.telemetry.onGround);

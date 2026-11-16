@@ -65,3 +65,26 @@ test('renderless coastal play preserves initial conditions across policy changes
   assert.equal(b.skills.countermeasure.id, 'none');
   assert.equal(b.shots.length, 0);
 });
+
+test('pursuit estimates lead from consecutive contact snapshots and clears history on reset or lost contact', () => {
+  const pursuit = createAttackSkill('pursuit');
+  const own = { x: 0, y: 2000, z: 0, headingRad: 0 };
+  const first = pursuit.update({ own, contact: { x: 0, y: 2000, z: -2000, rangeM: 2000, time: 1.0 }, locked: false, speedMps: 250 });
+  assert.equal(Math.abs(first.headingRad) < 1e-9, true);
+  const second = pursuit.update({ own, contact: { x: 40, y: 2000, z: -2000, rangeM: 2000, time: 1.2 }, locked: false, speedMps: 250 });
+  assert.ok(second.headingRad > Math.atan2(40, 2000));
+  pursuit.update({ own, contact: null, locked: false, speedMps: 250 });
+  const afterLoss = pursuit.update({ own, contact: { x: 0, y: 2000, z: -2000, rangeM: 2000, time: 1.6 }, locked: false, speedMps: 250 });
+  assert.equal(Math.abs(afterLoss.headingRad) < 1e-9, true);
+});
+
+test('observation-limited pursuit achieves lock and launch in 300s coastal play while hold does not', () => {
+  const run = values => runCombatExperiment(combatExperimentConfig({ scenario: 'coastal', seconds: '300', ...values })).results[0];
+  const pursuit = run({ 'attack-skill': 'pursuit', 'evasion-skill': 'legacy-break', 'countermeasure-policy': 'single' });
+  const hold = run({ 'attack-skill': 'hold', 'evasion-skill': 'legacy-break', 'countermeasure-policy': 'single' });
+  assert.equal(pursuit.crashed, false);
+  assert.notEqual(pursuit.firstLockSeconds, null);
+  assert.ok(pursuit.shots.length >= 1);
+  assert.equal(hold.firstLockSeconds, null);
+  assert.equal(hold.shots.length, 0);
+});
