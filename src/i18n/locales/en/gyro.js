@@ -1,6 +1,6 @@
 export default {
   "gyro.resume": "📱 Resume gyro",
-  "gyro.resume.help": "Your gyro settings are restored. Tap Resume gyro to enable sensors; allow access if prompted.",
+  "gyro.resume.help": "Tap Resume gyro above (or start flight) to enable tilt sensors; allow access if prompted.",
 
   "gyro.orientation.label": "Gyro screen orientation",
   "gyro.orientation.auto": "Follow screen",
@@ -14,8 +14,8 @@ export default {
   "gyro.orientation.lock.unavailable": "This browser could not lock the screen. Use your device’s rotation lock to keep the selected orientation. Gyro works once the screen matches; tap Re-center after adjusting your grip.",
 
   "gyro.checking": "Checking sensors…",
-  "gyro.off": "📱 GYRO",
-  "gyro.on": "📱 TILT: ON",
+  "gyro.off": "📱 Gyro: Off",
+  "gyro.on": "📱 Gyro: On",
   "gyro.help.title": "Enable tilt controls",
   "gyro.browser.label": "Choose your browser for instructions",
   "gyro.browser.other": "Other browser",

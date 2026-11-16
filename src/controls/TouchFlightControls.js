@@ -365,7 +365,13 @@ export class TouchFlightControls {
     this.gyroOrientationSelect.addEventListener('change', () => {
       this.setGyroOrientation(this.gyroOrientationSelect.value);
     });
-    settings.querySelector('.gyro-recenter').addEventListener('click', () => this.recenterGyro());
+    settings.querySelector('.gyro-recenter').addEventListener('click', () => {
+      if (!this.gyroActive && this.gyroRequested) {
+        this.toggleGyro({ userGesture: true });
+        return;
+      }
+      this.recenterGyro();
+    });
   }
 
   saveGyroSettings() {
@@ -732,6 +738,7 @@ export class TouchFlightControls {
     const active = Boolean(this.gyroActive || (this.gyroRequested && this.label !== 'gyro.off'));
     if (this.gyroBtn) {
       this.gyroBtn.classList.toggle('active', active);
+      this.gyroBtn.classList.toggle('gyro-standby', active && !this.gyroActive);
       this.gyroBtn.setAttribute('aria-pressed', String(active));
       const key = this.label || (active ? 'gyro.on' : 'gyro.off');
       bindText(this.gyroBtn, () => t(key));
@@ -806,7 +813,11 @@ export class TouchFlightControls {
         updateGuide();
       });
       dialog.querySelector('.gyro-retry').addEventListener('click', () => this.toggleGyro());
-      dialog.querySelector('.gyro-close').addEventListener('click', () => dialog.close());
+      dialog.querySelector('.gyro-close').addEventListener('click', () => {
+        this.gyroRequested = false;
+        this.saveGyroSettings();
+        dialog.close();
+      });
       // Brave deliberately resembles Chrome; detect it when possible, allow correction.
       detectGyroBrowser(navigator).then(browser => {
         if (manuallySelected) return;

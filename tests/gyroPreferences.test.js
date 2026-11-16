@@ -94,6 +94,7 @@ test('enable and orientation survive reload; explicit off survives the next relo
   assert.equal(reloaded.gyroOrientationSelect.value, 'landscape');
   assert.equal(reloaded.gyroSettings.hidden, false);
   assert.equal(reloaded.gyroBtn.classList.contains('active'), true);
+  assert.equal(reloaded.gyroBtn.classList.contains('gyro-standby'), false);
   assert.equal(reloaded.gyroBtn.getAttribute('aria-pressed'), 'true');
   assert.equal(reloaded.gyroCalibration, null);
   assert.deepEqual(locks, ['landscape', 'landscape']);
@@ -103,6 +104,7 @@ test('enable and orientation survive reload; explicit off survives the next relo
   assert.equal(off.gyroActive, false);
   assert.equal(off.gyroOrientationSelect.value, 'landscape');
   assert.equal(off.gyroBtn.classList.contains('active'), false);
+  assert.equal(off.gyroBtn.classList.contains('gyro-standby'), false);
   assert.equal(off.gyroBtn.getAttribute('aria-pressed'), 'false');
 });
 
@@ -113,11 +115,14 @@ test('gesture-only browsers restore settings without prompting and resume on tap
   assert.equal(prompts, 0);
   assert.equal(reloaded.label, 'gyro.resume');
   assert.equal(reloaded.gyroActive, false);
+  assert.equal(reloaded.gyroBtn.classList.contains('active'), true);
+  assert.equal(reloaded.gyroBtn.classList.contains('gyro-standby'), true);
   assert.equal(reloaded.gyroSettings.hidden, false);
   assert.equal(reloaded.gyroOrientationSelect.value, 'portrait');
   await reloaded.toggleGyro();
   assert.equal(prompts, 1);
   assert.equal(reloaded.gyroActive, true);
+  assert.equal(reloaded.gyroBtn.classList.contains('gyro-standby'), false);
 });
 
 test('a blocked sensor on reload preserves preference and offers inline retry without a modal', async t => {
@@ -288,4 +293,36 @@ test('gyro-supported mobile device enables tilt by default on first visit withou
   assert.equal(reloaded.gyroRequested, false, 'Saved gyroEnabled: false must override mobile default');
   restoreSimulatorPreferences({ touchControls: reloaded, lobby: {} }, loadSimulatorPreferences(s));
   assert.equal(reloaded.gyroActive, false);
+});
+
+test('choosing touch controls in gyro help clears gyroRequested and persists gyroEnabled: false', t => {
+  const oldDocument = globalThis.document;
+  const oldNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const { create, s } = environment(t, { gyroEnabled: true, gyroOrientation: 'auto' });
+  const element = () => ({
+    textContent: '', value: '', events: {},
+    addEventListener(type, fn) { this.events[type] = fn; },
+  });
+  const nodes = Object.fromEntries(['select', '.gyro-help-guide', '.gyro-help-reason', '.gyro-retry', '.gyro-close'].map(key => [key, element()]));
+  const dialog = {
+    open: false, setAttribute() {}, querySelectorAll: () => [],
+    querySelector: key => nodes[key],
+    showModal() { this.open = true; }, close() { this.open = false; },
+  };
+  globalThis.document = { createElement: () => dialog, body: { appendChild() {} } };
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'Android Chrome/130' } });
+  t.after(() => {
+    globalThis.document = oldDocument;
+    if (oldNavigator) Object.defineProperty(globalThis, 'navigator', oldNavigator);
+    else delete globalThis.navigator;
+  });
+
+  const controls = create();
+  assert.equal(controls.gyroRequested, true);
+  TouchFlightControls.prototype.showGyroHelp.call(controls, 'gyro.no.readings');
+  assert.equal(dialog.open, true);
+  nodes['.gyro-close'].events.click();
+  assert.equal(dialog.open, false);
+  assert.equal(controls.gyroRequested, false);
+  assert.equal(loadSimulatorPreferences(s).gyroEnabled, false);
 });
