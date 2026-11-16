@@ -697,22 +697,26 @@ export class AirToAirMissileSystem {
       command: this._lateral, tracking,
     });
 
-    // Track minimum separation distance to each airborne target
     missile.closestApproaches ??= {};
-    for (const candidate of this.targets) {
-      if (!candidate.alive) continue;
-      const dist = missile.position.distanceTo(candidate.position);
-      const prev = missile.closestApproaches[candidate.id];
-      if (!prev || dist < prev.distanceM) {
-        missile.closestApproaches[candidate.id] = {
-          distanceM: dist,
-          timeSec: this.elapsed,
-          method: 'step_sampling',
-          targetCallsign: candidate.callsign,
-          targetId: candidate.id,
-        };
+    const recordStepClosestApproaches = (endFraction = 1) => {
+      for (const candidate of this.targets) {
+        if (!candidate.alive) continue;
+        const targetPos = endFraction < 1
+          ? candidate.prevPosition.clone().lerp(candidate.position, endFraction)
+          : candidate.position;
+        const dist = missile.position.distanceTo(targetPos);
+        const prev = missile.closestApproaches[candidate.id];
+        if (!prev || dist < prev.distanceM) {
+          missile.closestApproaches[candidate.id] = {
+            distanceM: dist,
+            timeSec: this.elapsed,
+            method: 'step_sampling',
+            targetCallsign: candidate.callsign,
+            targetId: candidate.id,
+          };
+        }
       }
-    }
+    };
 
     // Select the earliest same-time closest-approach trigger across targets.
     let triggerTarget = null, triggerTime = Infinity;
@@ -730,6 +734,7 @@ export class AirToAirMissileSystem {
       missile.position.lerpVectors(missile.prevPosition, missile.position, groundTime);
       const impactGround = world.terrainHeight ? world.terrainHeight(missile.position.x, missile.position.z) : 0;
       missile.position.y = (Number.isFinite(impactGround) ? impactGround : 0) + 1;
+      recordStepClosestApproaches(groundTime);
       missile.alive = false;
       missile.finalOutcome = { reason: 'surface_collision', timeSec: this.elapsed };
       events.push({
@@ -757,8 +762,10 @@ export class AirToAirMissileSystem {
         distanceM: cpaDist,
       };
       this._detonate(missile, triggerTarget, events, triggerTime);
+      recordStepClosestApproaches(triggerTime);
       return;
     }
+    recordStepClosestApproaches(1);
 
     if (missile.age >= spec.maxLifeSeconds) {
       missile.alive = false;

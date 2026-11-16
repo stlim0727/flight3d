@@ -61,6 +61,7 @@ test('A1 regression: missile hitting terrain before fuze CPA terminates as surfa
 
   assert.equal(missile.alive, false);
   assert.equal(missile.finalOutcome?.reason, 'surface_collision');
+  assert.ok(missile.closestApproaches[target.id].distanceM >= 3);
   assert.equal(target.damage, 0);
   assert.equal(target.alive, true);
   assert.ok(events.some(e => e.type === 'detonation' && e.surface === true));
