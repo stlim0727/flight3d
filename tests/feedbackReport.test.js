@@ -1,7 +1,7 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildFlightLog, createFeedbackReport, deliverFeedbackReport, FLIGHT_LOG_BUDGET_BYTES,
-  gatherFeedbackDiagnostics } from '../src/analytics/feedbackReport.js';
+  gatherFeedbackDiagnostics, gatherFeedbackFullReport } from '../src/analytics/feedbackReport.js';
 import { prepareUserFeedback, sendUserFeedback, _resetAnalyticsForTesting } from '../src/analytics/posthog.js';
 
 const originalWindow = globalThis.window, originalFetch = globalThis.fetch;
@@ -183,4 +183,59 @@ test('report payload carries category, severity, expectations and reproduction s
   assert.equal(draft.properties.feedback_severity, 'blocker');
   assert.equal(draft.properties.feedback_expected, 'soft touchdown');
   assert.equal(draft.properties.feedback_steps, 'F16 valley ring 2');
+  assert.equal(draft.properties.fullReport, undefined);
+  assert.equal(draft.properties.screenshot, undefined);
+});
+
+test('gatherFeedbackFullReport builds flight3d.sortie.v1 from held debrief and live recorder', () => {
+  const heldSim = {
+    flightRecorder: { active: false },
+    debriefReport: {
+      version: 2,
+      reason: 'landed',
+      durationSec: 42,
+      metadata: { aircraft: 'B738', airport: 'incheon', scenario: 'approach' },
+      samples: [{ timeSec: 0, altitudeFt: 500 }, { timeSec: 42, altitudeFt: 20 }],
+      touchdowns: [{ timeSec: 40, sinkRateFpm: -120, contactG: 1.2 }],
+    },
+  };
+  const heldFull = gatherFeedbackFullReport(heldSim);
+  assert.equal(heldFull.kind, 'flight3d.sortie.v1');
+  assert.equal(heldFull.report.reason, 'landed');
+  assert.equal(heldFull.report.samples.length, 2);
+
+  const liveSim = {
+    flightRecorder: {
+      active: true,
+      elapsed: 12.5,
+      metadata: { aircraft: 'F16', airport: 'coastal', scenario: 'free' },
+      samples: [{ timeSec: 0 }, { timeSec: 12.5 }],
+      peaks: { gForce: { timeSec: 5, gForce: 4.2 } },
+      touchdowns: [],
+      glocIncidents: 0,
+    },
+  };
+  const liveFull = gatherFeedbackFullReport(liveSim);
+  assert.equal(liveFull.kind, 'flight3d.sortie.v1');
+  assert.equal(liveFull.report.source, 'live-sortie');
+  assert.equal(liveFull.report.durationSec, 12.5);
+  assert.equal(gatherFeedbackFullReport({}), null);
+});
+
+test('createFeedbackReport attaches fullReport and screenshot only when provided', () => {
+  const fullReport = { kind: 'flight3d.sortie.v1', report: { reason: 'landed' }, track: null };
+  const screenshot = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+  const withBoth = createFeedbackReport({
+    message: 'wing visual glitch',
+    fullReport,
+    screenshot,
+  });
+  assert.deepEqual(withBoth.properties.fullReport, fullReport);
+  assert.equal(withBoth.properties.screenshot, screenshot);
+
+  const invalidShot = createFeedbackReport({
+    message: 'invalid shot',
+    screenshot: 'not-a-data-uri',
+  });
+  assert.equal(invalidShot.properties.screenshot, undefined);
 });

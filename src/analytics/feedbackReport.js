@@ -1,3 +1,5 @@
+import { createSortie } from '../replay/ReplayStore.js';
+
 const finite = value => Number.isFinite(value) ? value : null;
 const vector = value => value ? ['x', 'y', 'z'].map(axis => finite(value[axis])) : null;
 const sample = value => value ? Object.fromEntries(['timeSec', 'x', 'z', 'altitudeFt', 'iasKnots',
@@ -6,6 +8,7 @@ const byteLength = text => new TextEncoder().encode(text).length;
 
 /** One ingestion event must stay well below the analytics payload limit. */
 export const FLIGHT_LOG_BUDGET_BYTES = 400_000;
+export const FULL_REPORT_BUDGET_BYTES = 400_000;
 const LOG_UNITS = { time: 's', x: 'm', z: 'm', altitude: 'ft MSL', airspeed: 'kt IAS', attitude: 'deg',
   gForce: 'g (simulator measured load)', sinkRate: 'ft/min positive down',
   impactSpeed: 'kt (world velocity magnitude at collision)' };
@@ -143,12 +146,60 @@ export function gatherFeedbackDiagnostics(sim) {
   return JSON.parse(JSON.stringify(diagnostics));
 }
 
+/**
+ * Optional full sortie report (`flight3d.sortie.v1`) captured on user opt-in.
+ * Returns null when no flight report or recorder data is available.
+ */
+export function gatherFeedbackFullReport(sim, { budgetBytes = FULL_REPORT_BUDGET_BYTES } = {}) {
+  if (!sim) return null;
+  const recorder = sim.flightRecorder;
+  const held = !recorder?.active ? sim.debriefReport : null;
+  if (!held && !recorder) return null;
+  const rawReport = held ?? {
+    version: 1,
+    source: 'live-sortie',
+    metadata: { ...(recorder.metadata ?? {}) },
+    durationSec: finite(recorder.elapsed),
+    peaks: recorder.peaks ?? {},
+    touchdowns: Array.isArray(recorder.touchdowns) ? [...recorder.touchdowns] : [],
+    glocIncidents: finite(recorder.glocIncidents) ?? 0,
+    crash: sim.isCrashed && sim.crashResult ? {
+      type: sim.crashResult.type ?? null,
+      name: sim.crashResult.name ?? null,
+      description: sim.crashResult.description ?? null,
+    } : null,
+    samples: Array.isArray(recorder.samples) ? [...recorder.samples] : [],
+  };
+  let sortie = JSON.parse(JSON.stringify(createSortie(rawReport, held ? (sim.debriefReplay ?? null) : null)));
+  if (Number.isFinite(budgetBytes) && budgetBytes > 0 && byteLength(JSON.stringify(sortie)) > budgetBytes) {
+    if (sortie.track) {
+      sortie = { ...sortie, track: null, trackOmittedForBudget: true };
+    }
+    if (byteLength(JSON.stringify(sortie)) > budgetBytes && Array.isArray(sortie.report?.samples)) {
+      const samples = sortie.report.samples;
+      const stride = Math.max(2, Math.ceil(samples.length / Math.max(1, Math.floor(samples.length / 2))));
+      sortie = {
+        ...sortie,
+        report: {
+          ...sortie.report,
+          samples: samples.filter((_, index) => index % stride === 0 || index === samples.length - 1),
+          samplesDecimatedForBudget: true,
+        },
+      };
+    }
+  }
+  return sortie;
+}
+
 export function createFeedbackReport({ message, contact = '', category = 'bug', severity = 'major',
-  expected = '', steps = '', context = {} }) {
+  expected = '', steps = '', context = {}, fullReport = null, screenshot = null }) {
   const reportId = globalThis.crypto.randomUUID();
+  const attachments = {};
+  if (fullReport && typeof fullReport === 'object') attachments.fullReport = fullReport;
+  if (typeof screenshot === 'string' && screenshot.startsWith('data:image/')) attachments.screenshot = screenshot;
   return {
     reportId, createdAt: new Date().toISOString(),
-    properties: JSON.parse(JSON.stringify({ ...context, app: 'flight3d',
+    properties: JSON.parse(JSON.stringify({ ...context, ...attachments, app: 'flight3d',
       buildCommit: typeof __BUILD_INFO__ !== 'undefined' ? __BUILD_INFO__.revision : 'dev',
       buildVersion: typeof __BUILD_INFO__ !== 'undefined' ? __BUILD_INFO__.version : 'dev',
       feedback_message: message.trim(), feedback_contact: contact.trim(), feedback_category: category,
