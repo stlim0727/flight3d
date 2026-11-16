@@ -13,13 +13,13 @@ Separate actual implementation defects, intended model limits, missing observati
 
 ## 1. Locked-IR Cohort (`300` Runs, `68` Locked Launches Each)
 
-Command: `combatExperimentConfig({ scenario: 'locked-ir' })`
+Command: `combatExperimentConfig({ scenario: 'locked-ir', diagnostics: true })`
 
 | Variant | Locked / Total | Kills | Non-Lethal Blast (`intended_model_limit`) | Flare Dispensed | Confirmed Transfers | `missing_observation_discrimination` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `passive` | 68 / 100 | **66** | 2 | 0 | 0 | 0 |
 | `reaction-only` | 68 / 100 | **64** | 4 | 0 | 0 | 0 |
-| `reaction-flare` | 68 / 100 | **33** | 4 | 68 | 35 | **31** (`23` G-saturated late reacquire, `7` FOV loss, `1` degraded non-lethal blast) |
+| `reaction-flare` | 68 / 100 | **33** | 4 | 68 | 35 | **31** (`14` G-saturated late reacquire, `3` late reacquire miss, `13` FOV loss, `1` degraded non-lethal blast) |
 
 *(The `32` `no-lock` geometries remain outside the launch denominator.)*
 
@@ -51,13 +51,13 @@ Command: `runCombatDefenseAudit()`
 | `AIM9X` | `passive` | 18 / 24 | **18** | 0 / 0 | 0 | 0 | 0 |
 | `AIM9X` | `reaction-only` | 18 / 24 | **18** | 0 / 0 | 0 | 0 | 0 |
 | `AIM9X` | `reaction-chaff` | 18 / 24 | **18** | 0 / 18 | **0** | 0 | 0 |
-| `AIM9X` | `reaction-flare` | 18 / 24 | **6** | 18 / 0 | **12** | 0 | **12** (`7` G-sat, `3` FOV loss, `2` non-lethal) |
-| `AIM9X` | `reaction-both` | 18 / 24 | **6** | 18 / 18 | **12** | 0 | **12** (`7` G-sat, `3` FOV loss, `2` non-lethal) |
+| `AIM9X` | `reaction-flare` | 18 / 24 | **6** | 18 / 0 | **12** | 0 | **12** (`10` untraced post-decoy terminal, `2` non-lethal) |
+| `AIM9X` | `reaction-both` | 18 / 24 | **6** | 18 / 18 | **12** | 0 | **12** (`10` untraced post-decoy terminal, `2` non-lethal) |
 | `AIM120C` | `passive` | 24 / 24 | **21** | 0 / 0 | 0 | 3 (`2` 800m beam G-sat, `1` terrain) | 0 |
 | `AIM120C` | `reaction-only` | 24 / 24 | **21** | 0 / 0 | 0 | 3 (`2` 800m beam G-sat, `1` terrain) | 0 |
 | `AIM120C` | `reaction-flare` | 24 / 24 | **21** | 24 / 0 | **0** | 3 (`2` 800m beam G-sat, `1` terrain) | 0 |
-| `AIM120C` | `reaction-chaff` | 24 / 24 | **5** | 0 / 24 | **16** | 3 | **16** (`8` G-sat, `6` FOV loss, `2` non-lethal) |
-| `AIM120C` | `reaction-both` | 24 / 24 | **5** | 24 / 24 | **16** | 3 | **16** (`8` G-sat, `6` FOV loss, `2` non-lethal) |
+| `AIM120C` | `reaction-chaff` | 24 / 24 | **5** | 0 / 24 | **16** | 3 | **16** (`14` untraced post-decoy terminal, `2` non-lethal) |
+| `AIM120C` | `reaction-both` | 24 / 24 | **5** | 24 / 24 | **16** | 3 | **16** (`14` untraced post-decoy terminal, `2` non-lethal) |
 
 **Key structural observations:**
 - Cross-channel isolation holds cleanly: `AIM-9X` rejects all `18` chaff releases (`0` transfers), and `AIM-120C` rejects all `24` flare releases (`0` transfers).

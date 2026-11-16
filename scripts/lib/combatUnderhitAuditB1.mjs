@@ -10,8 +10,63 @@ export const B1_FAILURE_CATEGORIES = Object.freeze([
   'unresolved',
 ]);
 
+function evaluatePostDecoyReacquisition(row, analyzed = null) {
+  if (typeof row.reacquired === 'boolean') {
+    return {
+      known: true,
+      reacquired: row.reacquired,
+      saturatedAfterReacquire: Boolean(row.reacquired && ((row.saturatedSeconds ?? 0) > 0 || row.saturatedAfterReacquire)),
+    };
+  }
+  if (Array.isArray(row.detail) && row.detail.length > 0) {
+    let lastDecoy = -1;
+    let reacq = -1;
+    for (let i = 0; i < row.detail.length; i++) {
+      const sample = row.detail[i];
+      if (sample.seekerState === 'track' && (sample.seekerTargetType === 'flare' || sample.seekerTargetType === 'chaff')) {
+        lastDecoy = i;
+      }
+      if (lastDecoy >= 0 && reacq < 0 && i > lastDecoy
+        && sample.seekerState === 'track' && sample.seekerTargetType === 'bandit') {
+        reacq = i;
+      }
+    }
+    let saturatedAfterReacquire = false;
+    if (reacq >= 0) {
+      for (let i = reacq; i < row.detail.length; i++) {
+        const sample = row.detail[i];
+        if (sample.seekerTargetType === 'bandit'
+          && sample.requestedLateralMps2 > sample.availableLateralMps2 + 1e-4) {
+          saturatedAfterReacquire = true;
+          break;
+        }
+      }
+    }
+    return { known: true, reacquired: reacq >= 0, saturatedAfterReacquire };
+  }
+  const missileAnalysis = analyzed ?? row.diagnostics?.analysis?.missiles?.[0] ?? null;
+  if (missileAnalysis && Array.isArray(missileAnalysis.seekerTimeline)) {
+    const transfers = missileAnalysis.decoyTransfers ?? [];
+    const tDecoy = transfers.length ? transfers[0].timeSec : 0;
+    const reacqEntry = missileAnalysis.seekerTimeline.find(
+      ev => ev.timeSec > tDecoy && ev.state === 'track' && ev.targetType !== 'flare' && ev.targetType !== 'chaff',
+    );
+    let saturatedAfterReacquire = false;
+    if (reacqEntry) {
+      const timeline = missileAnalysis.guidanceTimeline ?? [];
+      saturatedAfterReacquire = timeline.some(
+        g => g.timeSec >= reacqEntry.timeSec
+          && Number.isFinite(g.demandedG) && Number.isFinite(g.availableG)
+          && g.demandedG > g.availableG + 1e-3,
+      );
+    }
+    return { known: true, reacquired: Boolean(reacqEntry), saturatedAfterReacquire };
+  }
+  return { known: false, reacquired: false, saturatedAfterReacquire: false };
+}
+
 /** Classify a single launched shot from matrix/defense or coastal sortie records. */
-export function classifyLockedShotOutcome(row) {
+export function classifyLockedShotOutcome(row, analyzed = null) {
   if (!row || (row.launched === false)) {
     throw new TypeError('classifyLockedShotOutcome requires a launched shot record');
   }
@@ -30,10 +85,23 @@ export function classifyLockedShotOutcome(row) {
         subreason: 'decoy_degraded_nonlethal_blast',
       };
     }
-    if ((row.controlLimitedSec ?? 0) > 0) {
+    const postDecoy = evaluatePostDecoyReacquisition(row, analyzed);
+    if (!postDecoy.known) {
+      return {
+        category: 'missing_observation_discrimination',
+        subreason: 'decoy_transfer_untraced_terminal',
+      };
+    }
+    if (postDecoy.reacquired && postDecoy.saturatedAfterReacquire) {
       return {
         category: 'missing_observation_discrimination',
         subreason: 'decoy_late_reacquire_g_saturated',
+      };
+    }
+    if (postDecoy.reacquired) {
+      return {
+        category: 'missing_observation_discrimination',
+        subreason: 'decoy_late_reacquire_miss',
       };
     }
     return {
@@ -108,18 +176,33 @@ export function classifyCoastalSortieShots(result) {
   const classifiedShots = shots.map(shot => {
     const trackId = trackMap[shot.missileId];
     const analyzed = analysisMissiles.get(trackId ?? shot.missileId) ?? null;
-    const decoyTransfers = analyzed?.decoyTransfers?.length ?? 0;
-    const guidanceSamples = analyzed?.guidanceTimeline ?? [];
-    const controlLimitedSec = guidanceSamples.filter(
-      g => Number.isFinite(g.demandedG) && Number.isFinite(g.availableG) && g.demandedG > g.availableG + 1e-3,
-    ).length * 0.2;
 
+    if (!analyzed) {
+      const category = shot.outcomeCategory === 'kill' ? 'kill' : 'unresolved';
+      const subreason = shot.outcomeCategory === 'kill'
+        ? 'lethal_hit'
+        : shot.outcomeCategory === 'unresolved'
+          ? 'window_ended_in_flight'
+          : 'diagnostics_unavailable';
+      return {
+        shotIndex: shot.shotIndex,
+        missileId: shot.missileId,
+        type: shot.type,
+        rangeM: shot.rangeM,
+        duplicateFollowUp: Boolean(shot.duplicateFollowUp),
+        outcomeCategory: shot.outcomeCategory,
+        decoyTransfers: null,
+        category,
+        subreason,
+      };
+    }
+
+    const decoyTransfers = analyzed.decoyTransfers?.length ?? 0;
     const classification = classifyLockedShotOutcome({
       launched: true,
       outcomeCategory: shot.outcomeCategory,
       decoyTransfers,
-      controlLimitedSec,
-    });
+    }, analyzed);
 
     return {
       shotIndex: shot.shotIndex,

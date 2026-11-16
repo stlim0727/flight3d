@@ -124,3 +124,53 @@ test('B1 coastal Cruise comparison separates single-shot close-pursuit from mult
     + multiShot.categories.unresolved;
   assert.equal(totalClassified, multiShot.launched);
 });
+
+test('B1 classifier requires post-decoy reacquisition evidence and preserves missing diagnostics as unresolved', () => {
+  const untraced = classifyLockedShotOutcome({
+    launched: true,
+    terminal: 'miss-expired',
+    decoyTransfers: 1,
+    controlLimitedSec: 0.8,
+  });
+  assert.equal(untraced.category, 'missing_observation_discrimination');
+  assert.equal(untraced.subreason, 'decoy_transfer_untraced_terminal');
+
+  const noReacqWithPreSaturation = classifyLockedShotOutcome({
+    launched: true,
+    terminal: 'miss-expired',
+    decoyTransfers: 1,
+    controlLimitedSec: 0.8,
+    detail: [
+      { seekerState: 'track', seekerTargetType: 'bandit', requestedLateralMps2: 500, availableLateralMps2: 343 },
+      { seekerState: 'track', seekerTargetType: 'flare', requestedLateralMps2: 100, availableLateralMps2: 343 },
+      { seekerState: 'lost', seekerTargetType: null, requestedLateralMps2: 0, availableLateralMps2: 343 },
+    ],
+  });
+  assert.equal(noReacqWithPreSaturation.subreason, 'decoy_sustained_fov_loss');
+
+  const postReacqSaturated = classifyLockedShotOutcome({
+    launched: true,
+    terminal: 'miss-expired',
+    decoyTransfers: 1,
+    controlLimitedSec: 0.8,
+    detail: [
+      { seekerState: 'track', seekerTargetType: 'flare', requestedLateralMps2: 100, availableLateralMps2: 343 },
+      { seekerState: 'track', seekerTargetType: 'bandit', requestedLateralMps2: 800, availableLateralMps2: 343 },
+    ],
+  });
+  assert.equal(postReacqSaturated.subreason, 'decoy_late_reacquire_g_saturated');
+
+  const withoutDiagnostics = classifyCoastalSortieShots({
+    caseId: 'coastal-0',
+    diagnostics: null,
+    shots: [
+      { shotIndex: 0, missileId: 1, type: 'AIM9X', rangeM: 2200, duplicateFollowUp: false, outcomeCategory: 'expired' },
+      { shotIndex: 1, missileId: 2, type: 'AIM9X', rangeM: 1800, duplicateFollowUp: true, outcomeCategory: 'kill' },
+    ],
+  });
+  assert.equal(withoutDiagnostics.shots[0].decoyTransfers, null);
+  assert.equal(withoutDiagnostics.shots[0].category, 'unresolved');
+  assert.equal(withoutDiagnostics.shots[0].subreason, 'diagnostics_unavailable');
+  assert.equal(withoutDiagnostics.shots[1].decoyTransfers, null);
+  assert.equal(withoutDiagnostics.shots[1].category, 'kill');
+});
