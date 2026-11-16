@@ -311,13 +311,13 @@ export class ReplayRecorder {
       eventRecord.damage = event.damage ?? event.target?.damage ?? 0;
       eventRecord.damageZones = event.damageZones ? { ...event.damageZones } : null;
       eventRecord.hitZone = event.hitZone ?? event.zone ?? 'fuselage';
-      eventRecord.amount = event.amount ?? event.damage ?? 0;
+      eventRecord.amount = event.amount ?? null;
       if (normalizedKind === 'damage') eventRecord.vx = eventRecord.amount;
     } else if (normalizedKind === 'unresolved_end') {
       eventRecord.reason = 'unresolved_sortie_ended';
     } else if (normalizedKind === 'detonation') {
       eventRecord.reason = event.surface ? 'surface_collision' : 'proximity_fuze';
-      eventRecord.distanceM = event.distanceM ?? event.dist ?? 0;
+      eventRecord.distanceM = event.distanceM ?? event.dist ?? null;
       eventRecord.vy = eventRecord.distanceM;
     } else if (normalizedKind === 'expire') {
       eventRecord.reason = event.reason ?? 'life_expiry';

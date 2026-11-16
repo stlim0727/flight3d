@@ -864,7 +864,7 @@ export class AirToAirMissileSystem {
     if (target.damage < 1) {
       events.push({
         type: 'damage', target, source, missile,
-        damage: target.damage,
+        amount, damage: target.damage,
         hitZone,
         damageZones: target.damageZones ? { ...target.damageZones } : null,
         position: position.clone(),
@@ -882,7 +882,7 @@ export class AirToAirMissileSystem {
       });
     }
     events.push({
-      type: 'kill', target, missile, source,
+      type: 'kill', target, missile, source, amount,
       hitZone,
       damageZones: target.damageZones ? { ...target.damageZones } : null,
       position: targetPosition.clone(), velocity: target.velocity.clone(),
@@ -900,6 +900,7 @@ export class AirToAirMissileSystem {
     missile.alive = false;
     events.push({
       type: 'detonation', missile, target, surface: false,
+      distanceM: missile.position.distanceTo(target.prevPosition.clone().lerp(target.position, time)),
       position: missile.position.clone(), velocity: missile.velocity.clone(),
     });
     // Every affected target is evaluated at the same interpolated instant.
