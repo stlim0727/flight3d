@@ -27,8 +27,11 @@ export function evaluateSeekerObservation(spec, observer, target, world, halfAng
   const from = observer.position, to = target.position;
   const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
   const range = Math.hypot(dx, dy, dz);
-  if (!Number.isFinite(range) || range < 1 || range > spec.seekerRangeM) {
+  if (!Number.isFinite(range) || range > spec.seekerRangeM) {
     return { canObserve: false, lossReason: 'range_limit', rangeM: range, signalQuality: 0, minSignalQuality: spec.seekerMinSignalQuality, aspectAngleDeg: 0 };
+  }
+  if (range < 1) {
+    return { canObserve: false, lossReason: 'min_range', rangeM: range, signalQuality: 0, minSignalQuality: spec.seekerMinSignalQuality, aspectAngleDeg: 0 };
   }
   const q = observer.quaternion;
   const norm = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;

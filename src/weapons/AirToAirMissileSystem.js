@@ -25,6 +25,13 @@ import { F16_MISSILE_STATIONS, MISSILE_TYPES } from './missileSpecs.js';
 const LOCK_SECONDS = 0.75;
 const UNLOCK_SECONDS = 0.9;
 const BANDIT_RESPAWN_SECONDS = 8;
+const DECOY_BURST_COUNT = 3;
+const DECOY_BURST_INTERVAL_S = 0.25;
+const DECOY_EJECT_LATERAL_MPS = 22;
+const DECOY_EJECT_VERTICAL_MPS = -12;
+const EVASION_DIVE_M = 450;
+const EVASION_MIN_ALTITUDE_M = 500;
+const EVASION_MIN_SPEED_MPS = 275;
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const RIGHT = new THREE.Vector3(1, 0, 0);
 const UP = new THREE.Vector3(0, 1, 0);
@@ -59,8 +66,8 @@ export class BanditTarget {
     this.threatResponse = new BanditThreatResponse(evasion, { rwr });
     this.chaff = new ChaffDispenser();
     this.flare = new FlareDispenser();
-    this.flareThreatIds = new Set();
-    this.chaffThreatIds = new Set();
+    this.flareBursts = new Map();
+    this.chaffBursts = new Map();
     this.flight = null;
     this.quaternion = null;
     if (orbit) this.respawn(position, orbit);
@@ -96,8 +103,9 @@ export class BanditTarget {
       const ground = Math.max(terrainHeight(this.position.x, this.position.z),
         terrainHeight(this.position.x + Math.sin(heading) * lookahead,
           this.position.z - Math.cos(heading) * lookahead));
-      const altitude = Math.max(o.altitudeM, ground + 420);
-      const commandedSpeed = speed + (Math.max(speed, 250) - speed) * response.weight * avionicsIntegrity;
+      const evadeDrop = EVASION_DIVE_M * response.weight * avionicsIntegrity;
+      const altitude = Math.max(Math.max(EVASION_MIN_ALTITUDE_M, o.altitudeM - evadeDrop), ground + 420);
+      const commandedSpeed = speed + (Math.max(speed, EVASION_MIN_SPEED_MPS) - speed) * response.weight * avionicsIntegrity;
       this.flight.guide(heading, altitude, commandedSpeed);
       this.flight.step(dt / steps, this.damage,
         this.position.y - terrainHeight(this.position.x, this.position.z), this.damageZones);
@@ -125,8 +133,8 @@ export class BanditTarget {
     this.threatResponse.reset();
     this.chaff.reset();
     this.flare.reset();
-    this.flareThreatIds.clear();
-    this.chaffThreatIds.clear();
+    this.flareBursts.clear();
+    this.chaffBursts.clear();
     const o = orbit;
     if (o) {
       const tangential = o.radius * o.omega;
@@ -477,38 +485,56 @@ export class AirToAirMissileSystem {
     });
   }
 
+  _decoyEjectVelocity(target, shotIndex) {
+    const vx = target.velocity.x;
+    const vz = target.velocity.z;
+    const horiz = Math.hypot(vx, vz);
+    const side = shotIndex % 2 === 0 ? 1 : -1;
+    const lx = horiz > 1e-3 ? -vz / horiz : 1;
+    const lz = horiz > 1e-3 ? vx / horiz : 0;
+    return new THREE.Vector3(
+      vx + lx * side * DECOY_EJECT_LATERAL_MPS,
+      target.velocity.y + DECOY_EJECT_VERTICAL_MPS,
+      vz + lz * side * DECOY_EJECT_LATERAL_MPS,
+    );
+  }
+
+  _stepDecoyBurst(target, threatId, bursts, dispenser, list, type, eventKey, events) {
+    if (!target.alive || threatId === null || !bursts || !dispenser) return;
+    let burst = bursts.get(threatId);
+    if (!burst) {
+      burst = { remaining: DECOY_BURST_COUNT, nextTimeSec: this.elapsed, shotIndex: 0 };
+      bursts.set(threatId, burst);
+    }
+    if (burst.remaining <= 0 || this.elapsed + 1e-9 < burst.nextTimeSec) return;
+    const decoy = dispenser.dispense(target.position, this._decoyEjectVelocity(target, burst.shotIndex), {
+      sourceId: target.id,
+    });
+    if (!decoy) {
+      burst.remaining = 0;
+      return;
+    }
+    burst.remaining--;
+    burst.shotIndex++;
+    burst.nextTimeSec = this.elapsed + DECOY_BURST_INTERVAL_S;
+    list.push(decoy);
+    events.push({
+      type,
+      [eventKey]: decoy,
+      target,
+      remaining: dispenser.remaining,
+      timeSec: this.elapsed,
+    });
+  }
+
   _step(dt, world, events) {
     for (const target of this.targets) {
       target.update(dt, world.terrainHeight, this.missiles);
       const threatId = target.threatResponse.confirmedId;
-      if (target.alive && threatId !== null && !target.chaffThreatIds.has(threatId)) {
-        const cloud = target.chaff.dispense(target.position, target.velocity, { sourceId: target.id });
-        if (cloud) {
-          target.chaffThreatIds.add(threatId);
-          this.chaffClouds.push(cloud);
-          events.push({
-            type: 'chaff_dispense',
-            chaff: cloud,
-            target,
-            remaining: target.chaff.remaining,
-            timeSec: this.elapsed,
-          });
-        }
-      }
-      if (target.alive && threatId !== null && !target.flareThreatIds.has(threatId)) {
-        const flare = target.flare.dispense(target.position, target.velocity, { sourceId: target.id });
-        if (flare) {
-          target.flareThreatIds.add(threatId);
-          this.flares.push(flare);
-          events.push({
-            type: 'flare_dispense',
-            flare,
-            target,
-            remaining: target.flare.remaining,
-            timeSec: this.elapsed,
-          });
-        }
-      }
+      this._stepDecoyBurst(target, threatId, target.chaffBursts, target.chaff,
+        this.chaffClouds, 'chaff_dispense', 'chaff', events);
+      this._stepDecoyBurst(target, threatId, target.flareBursts, target.flare,
+        this.flares, 'flare_dispense', 'flare', events);
       if (!target.alive) {
         target.respawnTimer -= dt;
         if (target.respawnTimer <= 0) this._placeBandit(target, world, this.targets.indexOf(target));

@@ -219,3 +219,16 @@ test('RWR detects active radar missile illumination even after motor burnout, wh
   observe(disabledRwrResponse, own, [radarMissile()], 1.0);
   assert.equal(disabledRwrResponse.phase, 'patrol', 'when RWR is disabled, burnout missile is not observed');
 });
+
+test('evading patrol bandit executes a defensive dive while preserving terrain clearance', () => {
+  const bandit = patrol(true);
+  const startY = bandit.position.y;
+  const missile = plume({ id: 9, position: new Vector3(780, 3000, 3200), velocity: new Vector3(0, 0, -650) });
+  for (let i = 0; i < Math.round(5 / dt); i++) {
+    missile.position.addScaledVector(missile.velocity, dt);
+    bandit.update(dt, flat, [missile]);
+  }
+  assert.equal(bandit.threatResponse.phase, 'evade');
+  assert.ok(bandit.position.y < startY - 30, `expected defensive dive, got startY=${startY}, endY=${bandit.position.y}`);
+  assert.ok(bandit.position.y > 420, 'bandit maintains terrain clearance during dive');
+});

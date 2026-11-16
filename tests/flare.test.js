@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Quaternion, Vector3 } from 'three';
 import { FlareDispenser, FLARE_MODEL } from '../src/weapons/Flare.js';
+import { CHAFF_MODEL } from '../src/weapons/Chaff.js';
 import { infraredSignalQuality } from '../src/weapons/InfraredSignal.js';
 import { MissileSeeker, seekerCanObserve } from '../src/weapons/MissileSeeker.js';
 import { MISSILE_TYPES } from '../src/weapons/missileSpecs.js';
@@ -125,4 +126,19 @@ test('Bandit dispenses once for A-B-A and respawn and combat reset clear state',
   b.respawn(target().position, null); system.update(1 / 60, w);
   assert.equal(b.flare.remaining, FLARE_MODEL.capacity - 1);
   system.reset(); assert.equal(system.flares.length, 0);
+});
+
+test('Bandit dispenses a fanned 3-flare and 3-chaff burst over 0.5s for a sustained threat', () => {
+  const system = new AirToAirMissileSystem(), b = new BanditTarget({ callsign: 'BURST', position: target().position });
+  b.velocity.set(0, 0, -180);
+  b.update = () => { b.threatResponse.confirmedId = 42; };
+  system.addTarget(b);
+  const w = { ...world, ...o, velocity: new Vector3(), active: true, onGround: false };
+  for (let i = 0; i < 40; i++) system.update(1 / 60, w);
+  assert.equal(system.flares.length, 3);
+  assert.equal(system.chaffClouds.length, 3);
+  assert.equal(b.flare.remaining, FLARE_MODEL.capacity - 3);
+  assert.equal(b.chaff.remaining, CHAFF_MODEL.capacity - 3);
+  assert.ok(system.flares[0].velocity.x > 0 && system.flares[1].velocity.x < 0, 'burst fans laterally');
+  assert.ok(system.flares[0].velocity.y < 0, 'burst ejects downward');
 });
