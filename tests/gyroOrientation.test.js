@@ -164,6 +164,16 @@ test('the menu orientation selector and re-center button invoke gyro actions', t
   assert.equal(mode, 'landscape');
   button.click();
   assert.equal(centered, true);
+
+  // In standby (!gyroActive && gyroRequested), the button resumes gyro with userGesture.
+  centered = false;
+  c.gyroActive = false;
+  c.gyroRequested = true;
+  let resumedWith;
+  c.toggleGyro = opts => { resumedWith = opts; };
+  button.click();
+  assert.equal(centered, false);
+  assert.deepEqual(resumedWith, { userGesture: true });
 });
 
 

@@ -738,15 +738,38 @@ body.compact-ui {
 .gyro-help .gyro-retry { background: #075985; }
 
 .gyro-settings:not([hidden]) {
-  display: flex;
-  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
-  gap: 8px;
+  gap: calc(6px * var(--ui-scale, 1)) calc(8px * var(--ui-scale, 1));
   width: 100%;
+  padding: calc(8px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+  border-radius: calc(8px * var(--ui-scale, 1));
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(16, 185, 129, 0.28);
 }
-.gyro-settings label { flex-basis: 100%; }
-.gyro-settings select, .gyro-settings button { min-height: 44px; max-width: 100%; }
-.gyro-settings p { flex-basis: 100%; margin: 0; font-size: 12px; line-height: 1.5; }
+.gyro-settings label {
+  grid-column: 1 / -1;
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 500;
+  color: #94a3b8;
+}
+.gyro-settings select,
+.gyro-settings button {
+  width: 100%;
+  min-width: 0;
+  min-height: calc(34px * var(--ui-scale, 1));
+  max-width: 100%;
+}
+.gyro-settings p {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: calc(11px * var(--ui-scale, 1));
+  line-height: 1.45;
+  color: #cbd5e1;
+}
 
 /* Keyboard cues are useful where the full desktop controls have room. */
 @media (min-width: 1025px) {

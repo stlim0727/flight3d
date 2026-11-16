@@ -1,6 +1,6 @@
 export default {
   "gyro.resume": "📱 자이로 다시 켜기",
-  "gyro.resume.help": "저장된 자이로 설정을 불러왔습니다. 자이로 다시 켜기를 누르고 권한 창이 나타나면 허용하세요.",
+  "gyro.resume.help": "위의 자이로 다시 켜기를 누르거나 비행을 시작해 기울기 센서를 켜고, 권한 창이 나타나면 허용하세요.",
 
   "gyro.orientation.label": "자이로 화면 방향",
   "gyro.orientation.auto": "화면 방향 따르기",
@@ -14,8 +14,8 @@ export default {
   "gyro.orientation.lock.unavailable": "브라우저에서 화면 방향을 잠그지 못했습니다. 기기의 회전 잠금으로 선택한 방향을 유지하세요. 화면 방향이 일치하면 자이로가 작동합니다. 잡는 자세를 바꾼 후 중심 재설정을 누르세요.",
 
   "gyro.checking": "센서 확인 중…",
-  "gyro.off": "📱 GYRO",
-  "gyro.on": "📱 기울기: 켜짐",
+  "gyro.off": "📱 자이로: 꺼짐",
+  "gyro.on": "📱 자이로: 켜짐",
   "gyro.help.title": "기울기 조작 활성화",
   "gyro.browser.label": "안내를 볼 브라우저 선택",
   "gyro.browser.other": "다른 브라우저",

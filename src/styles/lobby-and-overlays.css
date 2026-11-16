@@ -367,6 +367,28 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
   white-space: normal;
   border-radius: calc(8px * var(--ui-scale, 1));
 }
+.lobby-settings #gyro-settings,
+.lobby-settings #btn-gaze-reset,
+.lobby-settings #btn-sound {
+  grid-column: 1 / -1;
+}
+.lobby-settings #touch-btn-gyro {
+  height: auto;
+  min-height: calc(34px * var(--ui-scale, 1));
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 600;
+  padding: calc(4px * var(--ui-scale, 1)) calc(8px * var(--ui-scale, 1));
+  border-radius: calc(8px * var(--ui-scale, 1));
+}
+.lobby-settings #touch-btn-gyro:not(.active) {
+  box-shadow: none;
+}
+.btn-touch-pill.active.gyro-standby {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+  color: #fde68a;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
+}
 .lobby-dev-section {
   display: flex;
   flex-direction: column;
@@ -813,7 +835,8 @@ body[data-flow="lobby"] .menu-toggle {
   padding: 16px 18px;
   gap: 12px;
 }
-.compact-ui .lobby-card .btn { min-height: 44px; }
+.compact-ui .lobby-card .btn,
+.compact-ui .lobby-settings #touch-btn-gyro { min-height: 44px; }
 .compact-ui .lobby-card .lobby-header { gap: 8px; }
 .compact-ui .lobby-header-actions { gap: 6px; }
 .compact-ui .lobby-language {
@@ -873,7 +896,8 @@ body[data-flow="lobby"] .menu-toggle {
   .compact-ui .lobby-card .lobby-header { gap: 6px; }
   .compact-ui .lobby-card .lobby-title { font-size: 15px; }
   .compact-ui .lobby-card .lobby-tab-panel { gap: 10px; }
-  .compact-ui .lobby-card .btn { min-height: 36px; padding: 5px 8px; }
+  .compact-ui .lobby-card .btn,
+  .compact-ui .lobby-settings #touch-btn-gyro { min-height: 36px; padding: 5px 8px; }
 }
 /* Keep the comparison controls below the HUD without covering the panel face. */
 .shadow-demo {
