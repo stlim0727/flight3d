@@ -136,11 +136,11 @@ export function createContactObservation({
   });
 }
 
-/** Returns null when a contact is missing, marked lost, or expired at `now`. */
+/** Returns null when a contact is missing, not yet observed, marked lost/stale, or expired at `now`. */
 export function resolveContactObservation(contact, now = null) {
-  if (!contact || contact.status === 'lost') return null;
+  if (!contact || contact.status === 'lost' || contact.status === 'stale') return null;
+  if (now != null && contact.observedAt != null && contact.observedAt > now) return null;
   if (now != null && contact.expiresAt != null && now > contact.expiresAt) return null;
-  if (contact.status === 'stale') return null;
   return contact;
 }
 
@@ -220,12 +220,18 @@ export function createPilotObservation({
   speedMps = 250,
   mode = OBSERVATION_MODES.LIMITED,
 }) {
+  const frozenContact = contact && typeof contact === 'object'
+    ? (Object.isFrozen(contact) ? contact : Object.freeze({ ...contact }))
+    : contact;
+  const frozenWarnings = Array.isArray(warnings)
+    ? Object.freeze(warnings.map(w => (w && typeof w === 'object' && !Object.isFrozen(w) ? Object.freeze({ ...w }) : w)))
+    : warnings;
   const observation = Object.freeze({
     mode,
     time,
     own: Object.freeze({ ...own }),
-    contact,
-    warnings: Object.freeze([...warnings]),
+    contact: frozenContact,
+    warnings: frozenWarnings,
     locked: Boolean(locked),
     speedMps,
   });

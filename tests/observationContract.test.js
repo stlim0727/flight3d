@@ -119,3 +119,22 @@ test('coastal play records observation-limited mode in results and summary', () 
   assert.equal(out.results[0].observationMode, OBSERVATION_MODES.LIMITED);
   assert.equal(out.summary[0].observationMode, OBSERVATION_MODES.LIMITED);
 });
+
+test('future contacts are rejected and plain contact/warning entries are copied and frozen', () => {
+  const mutableContact = { x: 10, y: 2000, z: -2000, rangeM: 2000, observedAt: 5.0, expiresAt: 5.5, quality: 1, status: 'active' };
+  const mutableWarning = { id: 'w1', channel: 'optical', bearingRad: 0.1, observedAt: 5.0, expiresAt: 5.5, quality: 0.9, status: 'active' };
+  const snapshot = createPilotObservation({
+    time: 4.0,
+    own: { x: 0, y: 2000, z: 0, headingRad: 0 },
+    contact: mutableContact,
+    warnings: [mutableWarning],
+  });
+  assert.equal(Object.isFrozen(snapshot.contact), true);
+  assert.equal(Object.isFrozen(snapshot.warnings[0]), true);
+  mutableContact.x = 9999;
+  mutableWarning.bearingRad = 2.5;
+  assert.equal(snapshot.contact.x, 10);
+  assert.equal(snapshot.warnings[0].bearingRad, 0.1);
+  assert.equal(resolveContactObservation(snapshot.contact, 4.0), null);
+  assert.equal(resolveContactObservation(snapshot.contact, 5.2), snapshot.contact);
+});
