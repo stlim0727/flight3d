@@ -161,7 +161,10 @@ export function analyzeCombatEngagement(sortieOrTrack, options = {}) {
   for (const missileId of Array.from(allMissileIds).sort((a, b) => a - b)) {
     const mSamples = samplesByMissile.get(missileId) || [];
     const mDiags = diagByMissile.get(missileId) || [];
-    const mEvents = rawEvents.filter(ev => ev.missileId === missileId);
+    const mEvents = rawEvents.filter(ev => ev.missileId === missileId).map(ev => ({
+      ...ev,
+      position: ev.position ?? (['x', 'y', 'z'].every(key => Number.isFinite(ev[key])) ? [ev.x, ev.y, ev.z] : null),
+    }));
 
     const launchEvent = mEvents.find(ev => ev.kind === 'launch');
     const detEvent = mEvents.find(ev => ev.kind === 'detonation');
@@ -247,16 +250,16 @@ export function analyzeCombatEngagement(sortieOrTrack, options = {}) {
     let termTargetPos = null;
     let termDist = null;
     let fuzeTriggered = false;
-    let damageApplied = 0;
+    let damageApplied = null;
 
     for (const dmg of damageEvents) {
-      const dmgVal = dmg.amount ?? dmg.damage ?? 0;
-      damageApplied += dmgVal <= 1.0 ? dmgVal * 100 : dmgVal;
+      const dmgVal = dmg.amount;
+      if (Number.isFinite(dmgVal)) damageApplied = (damageApplied ?? 0) + (dmgVal <= 1.0 ? dmgVal * 100 : dmgVal);
     }
 
     if (Number.isFinite(killEvent?.amount)) {
       const amount = killEvent.amount;
-      damageApplied = Math.max(damageApplied, amount <= 1 ? amount * 100 : amount);
+      damageApplied = (damageApplied ?? 0) + (amount <= 1 ? amount * 100 : amount);
     }
 
     if (killEvent) {
@@ -265,7 +268,7 @@ export function analyzeCombatEngagement(sortieOrTrack, options = {}) {
       termTime = killEvent.timeSec;
       termPos = detEvent?.position ?? killEvent.position ?? null;
       termTargetPos = killEvent.targetPosition ?? null;
-      termDist = detEvent?.distanceM ?? killEvent.distanceM ?? 0;
+      termDist = detEvent?.distanceM ?? killEvent.distanceM ?? null;
       fuzeTriggered = Boolean(
         detEvent?.fuzePolicy ||
         detEvent?.reason === 'proximity_fuze' ||
@@ -397,7 +400,7 @@ export function analyzeCombatEngagement(sortieOrTrack, options = {}) {
         targetPosition: termTargetPos,
         distanceM: termDist != null ? Number(termDist.toFixed(2)) : null,
         fuzeTriggered,
-        damageApplied: Number(damageApplied.toFixed(1)),
+        damageApplied: damageApplied === null ? null : Number(damageApplied.toFixed(1)),
       },
       closestApproach: {
         minSeparationM,
@@ -599,7 +602,7 @@ function generateCausalSummary({
     parts.push(`Successful interception: proximity fuze detonated at ${termDist?.toFixed(1) ?? 'N/A'}m causing fatal structural damage.`);
   } else if (outcome === 'survived_fuze_blast') {
     parts.push(
-      `Fuze detonated at ${termDist?.toFixed(1) ?? 'N/A'}m (min separation ${minSeparationM?.toFixed(1) ?? 'N/A'}m), applying ${damageApplied.toFixed(1)} damage, but the target survived the fragment blast.`
+      `Fuze detonated at ${termDist?.toFixed(1) ?? 'N/A'}m (min separation ${minSeparationM?.toFixed(1) ?? 'N/A'}m), applying ${damageApplied?.toFixed(1) ?? 'N/A'} damage, but the target survived the fragment blast.`
     );
   } else if (outcome === 'unresolved_sortie_ended') {
     parts.push('Sortie was aborted or concluded while the missile was in mid-trajectory; engagement outcome is unresolved.');

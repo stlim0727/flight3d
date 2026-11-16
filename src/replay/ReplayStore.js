@@ -74,9 +74,9 @@ export function createSortie(report, trackOrReplay) {
     }
   }
 
-  if (report && !report.engagement && decodedTrack?.combat) {
+  if (report && decodedTrack?.combat) {
     try {
-      report.engagement = analyzeCombatEngagement({ report, track: decodedTrack });
+      report = { ...report, engagement: analyzeCombatEngagement({ report, track: decodedTrack }) };
     } catch {
       // non-fatal
     }
