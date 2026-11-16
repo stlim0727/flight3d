@@ -72,7 +72,8 @@ export class CombatReplayPlayback {
     if (!combat || !Array.isArray(combat.targets)) return false;
     this.track = combat;
     this.targets = combat.targets.map((target, index) => ({
-      id: target.id ?? index,
+      // Event IDs use the compact byte namespace even before codec export.
+      id: (target.id ?? index) & 255,
       callsign: target.callsign || `TARGET ${index + 1}`,
       alive: true,
       position: new THREE.Vector3(),

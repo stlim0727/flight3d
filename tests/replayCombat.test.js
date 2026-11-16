@@ -361,3 +361,29 @@ test('launch, damage and kill preserve one live target identity across encoding'
   assert.equal(playback.targets[1].id, 12);
   playback.stop();
 });
+
+
+test('in-memory and encoded damage playback share byte IDs after repeated sorties', () => {
+  const recorder = new ReplayRecorder();
+  recorder.start(METADATA);
+  const system = combatAt(0);
+  system.targets[1].id = 268; // The live counter persists across sortie resets.
+  for (let tick = 0; tick < 600; tick++) recorder.update(TICK, TELEMETRY, QUAT, system);
+  const target = system.targets[1];
+  const missile = { id: 7, launchTargetId: 268 };
+  recorder.recordCombatEvent({ type: 'launch', missile });
+  recorder.recordCombatEvent({ type: 'damage', missile, target, damage: 0.7, damageZones: { engine: 0.8 } });
+  const track = recorder.finish();
+  for (const combat of [track.combat, decodeTrack(encodeTrack(track)).combat]) {
+    assert.equal(combat.events.find(event => event.kind === 'launch').targetId, 12);
+    const playback = new CombatReplayPlayback({ scene: new Scene() });
+    playback.load(combat);
+    playback.seek(recorder.elapsed);
+    assert.equal(playback.targets[1].id, 12);
+    assert.ok(Math.abs(playback.targets[1].damage - 0.7) < 1 / 254);
+    assert.ok(Math.abs(playback.targets[1].damageZones.engine - 0.8) < 1 / 254);
+    assert.ok(playback.view.targetViews.get(12).fireTrail.count > 0);
+    assert.equal(playback.targets[0].damage, 0);
+    playback.stop();
+  }
+});
