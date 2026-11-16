@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { COMBAT_SKILLS } from '../src/pilot/CombatSkills.js';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -42,12 +43,16 @@ function save(path, report) {
 
 export async function main(args = process.argv.slice(2)) {
   const { values } = parseArgs({ args, options: {
+    'attack-skill': { type: 'string' }, 'evasion-skill': { type: 'string' },
+    'countermeasure-policy': { type: 'string' }, seconds: { type: 'string' }, 'list-skills': { type: 'boolean' },
     scenario: { type: 'string' }, defense: { type: 'string' }, types: { type: 'string' },
     ranges: { type: 'string' }, aspects: { type: 'string' }, speeds: { type: 'string' },
     'altitude-pairs': { type: 'string' }, timeout: { type: 'string' },
     diagnostics: { type: 'boolean' }, output: { type: 'string' }, help: { type: 'boolean' },
   } });
+  if (values['list-skills']) { console.log(JSON.stringify(COMBAT_SKILLS)); return; }
   if (values.help) {
+    console.log('Coastal/F16/Cruise: --scenario coastal --seconds 300 --attack-skill pursuit|close-pursuit|hold --evasion-skill legacy-break|hold --countermeasure-policy single|none; --list-skills');
     console.log('npm run combat:experiment -- [--scenario locked-ir|defense|single] [--defense all|passive|reaction-only|reaction-flare|reaction-chaff|reaction-both]\n' +
       '  [--types AIM9X,AIM120C] [--ranges 1500,2500] [--aspects 0,90] [--speeds 108,250]\n' +
       '  [--altitude-pairs 750:1210,1500:1500] [--diagnostics] [--timeout 60] [--output path.json]');
@@ -69,8 +74,11 @@ export async function main(args = process.argv.slice(2)) {
   save(summaryPath, { ...running, config: compactConfig });
   try {
     config = combatExperimentConfig(values);
-    expectedCases = config.geometries.length * config.variants.length;
-    compactConfig = { scenario: config.scenario, geometryCount: config.geometries.length,
+    expectedCases = config.scenario === 'coastal' ? 1 : config.geometries.length * config.variants.length;
+    if (config.scenario === 'coastal') Object.assign(metadata, { terrain: 'coastal', fixture: 'F16-cruise',
+      launchPolicy: 'confirmed-lock-one-in-flight', contactSensor: 'ideal-position-5Hz-12km-terrain-LOS',
+      warningSensor: 'existing-plume-rwr-fixture', skills: config.skills });
+    compactConfig = { scenario: config.scenario, seconds: config.seconds, skills: config.skills, geometryCount: config.geometries.length,
       variants: config.variants.map(v => v.id), recordTrajectory: config.recordTrajectory,
       recordDiagnostics: config.recordDiagnostics,
       targetSpeedMps: config.targetSpeedMps, timeoutSeconds: config.timeoutSeconds };
@@ -85,7 +93,9 @@ export async function main(args = process.argv.slice(2)) {
     console.log(JSON.stringify({ status: complete.status, completedCases: complete.completedCases,
       durationSeconds: complete.metadata.durationSeconds,
       cohorts: report.summary.map(s => ({ variant: s.variant, type: s.type, cases: s.total,
-        launches: s.launched, kills: s.kills, noLock: s.noLock, unresolved: s.unresolved })),
+        launches: s.launched, kills: s.kills, noLock: s.noLock, unresolved: s.unresolved,
+        ...(config.scenario === 'coastal' ? { noLaunch: s.noLaunch, crashed: s.crashed,
+          elapsedSeconds: s.elapsedSeconds, termination: s.termination, remaining: s.remaining } : {}) })),
       output, summaryPath }));
   } catch (error) {
     const failed = { status: 'incomplete', metadata, requested: values, config, expectedCases, completedCases, error: error.message };

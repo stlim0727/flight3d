@@ -1,3 +1,4 @@
+import { combatSkill, evasionDemand } from '../pilot/CombatSkills.js';
 import * as THREE from 'three';
 import { ChaffDispenser } from './Chaff.js';
 import { FlareDispenser } from './Flare.js';
@@ -34,7 +35,7 @@ let nextMissileId = 0;
 
 /** Airborne bandit with a circular patrol. Pure state: no DOM, scene or audio. */
 export class BanditTarget {
-  constructor({ callsign, position, velocity = new THREE.Vector3(), orbit = null, evasion = true, rwr = true }) {
+  constructor({ callsign, position, velocity = new THREE.Vector3(), orbit = null, evasion = true, rwr = true, evasionSkill = 'legacy-break' }) {
     this.id = ++nextTargetId;
     this.type = 'bandit';
     this.callsign = callsign;
@@ -59,6 +60,7 @@ export class BanditTarget {
     this.threatResponse = new BanditThreatResponse(evasion, { rwr });
     this.chaff = new ChaffDispenser();
     this.flare = new FlareDispenser();
+    this.evasionSkill = combatSkill('evasion', evasionSkill).id;
     this.flareThreatIds = new Set();
     this.chaffThreatIds = new Set();
     this.flight = null;
@@ -89,15 +91,15 @@ export class BanditTarget {
       this.threatResponse.update(dt / steps, this, missiles, terrainHeight);
       const response = this.threatResponse;
       const avionicsIntegrity = Math.max(0.25, 1 - 0.6 * (this.damageZones?.nose ?? 0));
-      const headingError = Math.atan2(Math.sin(response.heading - patrolHeading),
-        Math.cos(response.heading - patrolHeading));
-      const heading = patrolHeading + headingError * response.weight * avionicsIntegrity;
+      const demand = evasionDemand(this.evasionSkill, { patrolHeading,
+        warningHeading: response.heading, weight: response.weight, integrity: avionicsIntegrity, speedMps: speed });
+      const heading = demand.headingRad;
       const lookahead = Math.max(500, this.velocity.length() * 8);
       const ground = Math.max(terrainHeight(this.position.x, this.position.z),
         terrainHeight(this.position.x + Math.sin(heading) * lookahead,
           this.position.z - Math.cos(heading) * lookahead));
       const altitude = Math.max(o.altitudeM, ground + 420);
-      const commandedSpeed = speed + (Math.max(speed, 250) - speed) * response.weight * avionicsIntegrity;
+      const commandedSpeed = demand.speedMps;
       this.flight.guide(heading, altitude, commandedSpeed);
       this.flight.step(dt / steps, this.damage,
         this.position.y - terrainHeight(this.position.x, this.position.z), this.damageZones);
@@ -155,6 +157,8 @@ export class AirToAirMissileSystem {
     rwr = new RWRSystem(),
     banditEvasion = true,
     banditRwr = true,
+    evasionSkill = 'legacy-break',
+    countermeasurePolicy = 'single',
   } = {}) {
     this.stations = stations;
     this.specs = specs;
@@ -162,6 +166,8 @@ export class AirToAirMissileSystem {
     this.rwr = rwr;
     this.banditEvasion = banditEvasion;
     this.banditRwr = banditRwr;
+    this.evasionSkill = combatSkill('evasion', evasionSkill).id;
+    this.countermeasurePolicy = combatSkill('countermeasure', countermeasurePolicy).id;
     this.cannon = new VulcanCannon();
     this.loaded = stations.map(() => true);
     this.missiles = [];
@@ -441,6 +447,7 @@ export class AirToAirMissileSystem {
       const target = new BanditTarget({
         callsign: `BANDIT ${index + 1}`,
         evasion: this.banditEvasion,
+        evasionSkill: this.evasionSkill,
         rwr: this.banditRwr,
         position: new THREE.Vector3(),
       });
@@ -481,7 +488,7 @@ export class AirToAirMissileSystem {
     for (const target of this.targets) {
       target.update(dt, world.terrainHeight, this.missiles);
       const threatId = target.threatResponse.confirmedId;
-      if (target.alive && threatId !== null && !target.chaffThreatIds.has(threatId)) {
+      if (this.countermeasurePolicy === 'single' && target.alive && threatId !== null && !target.chaffThreatIds.has(threatId)) {
         const cloud = target.chaff.dispense(target.position, target.velocity, { sourceId: target.id });
         if (cloud) {
           target.chaffThreatIds.add(threatId);
@@ -495,7 +502,7 @@ export class AirToAirMissileSystem {
           });
         }
       }
-      if (target.alive && threatId !== null && !target.flareThreatIds.has(threatId)) {
+      if (this.countermeasurePolicy === 'single' && target.alive && threatId !== null && !target.flareThreatIds.has(threatId)) {
         const flare = target.flare.dispense(target.position, target.velocity, { sourceId: target.id });
         if (flare) {
           target.flareThreatIds.add(threatId);
