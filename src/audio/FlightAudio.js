@@ -138,7 +138,9 @@ export class FlightAudio {
       const initialGain = this.effectiveVolume;
       this.masterGain.gain.setValueAtTime(initialGain, this.ctx.currentTime);
 
-      // Mastering signal chain: sources -> cockpitFilter -> distanceGain -> masterGain -> compressor -> makeupGain -> destination
+      // Mastering signal chain: sources -> cockpitFilter -> ambientBus -> distanceGain
+      // -> masterGain -> compressor -> makeupGain -> destination. The ambient bus
+      // is the sidechain target for combat transients; one-shots bypass it.
       this.masterGain.connect(this.compressor);
       this.compressor.connect(this.makeupGain);
       this.makeupGain.connect(this.ctx.destination);
@@ -152,7 +154,10 @@ export class FlightAudio {
       // so a distant tower view hears a quieter, duller flyby than chase cam.
       this.distanceGain = this.ctx.createGain();
       this.distanceGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
-      this.cockpitFilter.connect(this.distanceGain);
+      this.ambientBus = this.ctx.createGain();
+      this.ambientBus.gain.setValueAtTime(1.0, this.ctx.currentTime);
+      this.cockpitFilter.connect(this.ambientBus);
+      this.ambientBus.connect(this.distanceGain);
       this.distanceGain.connect(this.masterGain);
 
       // 4c. Engine bus: the pilot's engine volume scales jet and piston/propeller
@@ -890,46 +895,179 @@ export class FlightAudio {
     }
   }
 
-  /** Solid-rocket ignition: broadband whoosh with a low pressure thump. */
+  /**
+   * Shared white-noise source. One-shots allocate their filters and gain stages
+   * per event, so the sample buffer must be built once per audio context.
+   */
+  whiteNoiseSource() {
+    if (!this._whiteNoise || this._whiteNoiseContext !== this.ctx) {
+      const rate = this.ctx.sampleRate;
+      const buffer = this.ctx.createBuffer(1, rate * 2, rate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      this._whiteNoise = buffer;
+      this._whiteNoiseContext = this.ctx;
+    }
+    const source = this.ctx.createBufferSource();
+    source.buffer = this._whiteNoise;
+    return source;
+  }
+
+  /** Distance falloff for one-shot effects; `distance` is camera-to-source metres. */
+  effectAttenuation(distance, referenceM) {
+    const safeDistance = Math.max(0, Number.isFinite(distance) ? distance : 0);
+    return Math.min(1.0, Math.max(0.04, 1 / (1 + safeDistance / referenceM)));
+  }
+
+  /**
+   * Sidechain duck of the continuous engine/wind/pack bed so a close combat
+   * transient is not buried under a near-full-scale ambient mix. Warnings,
+   * radio and other one-shots stay outside this bus. `depth` is the gain the
+   * bed falls to; it recovers to unity after `holdSeconds`.
+   */
+  duckAmbient(depth = 0.3, holdSeconds = 0.4) {
+    if (!this.ambientBus || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    const gain = this.ambientBus.gain;
+    gain.cancelScheduledValues?.(now);
+    gain.setValueAtTime(gain.value ?? 1, now);
+    gain.linearRampToValueAtTime(Math.max(0.05, Math.min(1, depth)), now + 0.02);
+    gain.setTargetAtTime(1, now + holdSeconds, 0.2);
+  }
+
+  /**
+   * Solid-rocket ignition: a highpass report over a broadband whoosh and a low
+   * pressure thump. The crack and the roar share one noise source.
+   */
   playMissileLaunch(distance = 0) {
     if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
     const now = this.ctx.currentTime;
-    const safeDistance = Math.max(0, Number.isFinite(distance) ? distance : 0);
-    const attenuation = Math.min(1.0, Math.max(0.05, 1 / (1 + safeDistance / 400)));
-    const duration = 1.1;
-    const buffer = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * duration), this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      const t = i / this.ctx.sampleRate;
-      data[i] = (Math.random() * 2 - 1) * Math.exp(-t * 2.2);
-    }
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.Q.value = 0.9;
-    filter.frequency.setValueAtTime(220, now);
-    filter.frequency.exponentialRampToValueAtTime(2200, now + 0.35);
-    filter.frequency.exponentialRampToValueAtTime(420, now + duration);
-    const noiseGain = this.ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.22 * attenuation, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-    noise.connect(filter);
-    filter.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
+    const attenuation = this.effectAttenuation(distance, 400);
+    const duration = 1.6;
+    // A nearby launch momentarily dominates the aircraft's own ambient bed; a
+    // distant one must not duck it.
+    this.duckAmbient(1 - 0.7 * attenuation, 0.45);
+    const noise = this.whiteNoiseSource();
+
+    const crack = this.ctx.createBiquadFilter();
+    crack.type = 'highpass';
+    crack.frequency.setValueAtTime(1800, now);
+    const crackGain = this.ctx.createGain();
+    crackGain.gain.setValueAtTime(2.0 * attenuation, now);
+    crackGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+    noise.connect(crack);
+    crack.connect(crackGain);
+    crackGain.connect(this.masterGain);
+
+    const roar = this.ctx.createBiquadFilter();
+    roar.type = 'bandpass';
+    roar.Q.setValueAtTime(0.7, now);
+    roar.frequency.setValueAtTime(240, now);
+    roar.frequency.exponentialRampToValueAtTime(2600, now + 0.3);
+    roar.frequency.exponentialRampToValueAtTime(380, now + duration);
+    const roarGain = this.ctx.createGain();
+    roarGain.gain.setValueAtTime(2.2 * attenuation, now);
+    roarGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    noise.connect(roar);
+    roar.connect(roarGain);
+    roarGain.connect(this.masterGain);
     noise.start(now);
+    noise.stop(now + duration);
 
     const thump = this.ctx.createOscillator();
     const thumpGain = this.ctx.createGain();
     thump.type = 'sine';
-    thump.frequency.setValueAtTime(110, now);
-    thump.frequency.exponentialRampToValueAtTime(38, now + 0.5);
-    thumpGain.gain.setValueAtTime(0.24 * attenuation, now);
-    thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+    thump.frequency.setValueAtTime(120, now);
+    thump.frequency.exponentialRampToValueAtTime(34, now + 0.6);
+    thumpGain.gain.setValueAtTime(1.7 * attenuation, now);
+    thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
     thump.connect(thumpGain);
     thumpGain.connect(this.masterGain);
     thump.start(now);
-    thump.stop(now + 0.6);
+    thump.stop(now + 0.7);
+  }
+
+  /** Pyrotechnic flare ejection: a bright report over a short burning hiss. */
+  playFlareDispense(distance = 0) {
+    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
+    const now = this.ctx.currentTime;
+    const attenuation = this.effectAttenuation(distance, 500);
+    const duration = 0.9;
+    const noise = this.whiteNoiseSource();
+
+    const crack = this.ctx.createBiquadFilter();
+    crack.type = 'bandpass';
+    crack.Q.setValueAtTime(0.9, now);
+    crack.frequency.setValueAtTime(3200, now);
+    crack.frequency.exponentialRampToValueAtTime(900, now + 0.35);
+    const crackGain = this.ctx.createGain();
+    crackGain.gain.setValueAtTime(2.0 * attenuation, now);
+    crackGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+    noise.connect(crack);
+    crack.connect(crackGain);
+    crackGain.connect(this.masterGain);
+
+    // Burning propellant keeps hissing after the ejection charge.
+    const burn = this.ctx.createBiquadFilter();
+    burn.type = 'bandpass';
+    burn.Q.setValueAtTime(0.6, now);
+    burn.frequency.setValueAtTime(1400, now);
+    burn.frequency.exponentialRampToValueAtTime(700, now + duration);
+    const burnGain = this.ctx.createGain();
+    burnGain.gain.setValueAtTime(0.0001, now);
+    burnGain.gain.exponentialRampToValueAtTime(0.7 * attenuation, now + 0.03);
+    burnGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    noise.connect(burn);
+    burn.connect(burnGain);
+    burnGain.connect(this.masterGain);
+    noise.start(now);
+    noise.stop(now + duration);
+
+    const thump = this.ctx.createOscillator();
+    const thumpGain = this.ctx.createGain();
+    thump.type = 'sine';
+    thump.frequency.setValueAtTime(180, now);
+    thump.frequency.exponentialRampToValueAtTime(60, now + 0.18);
+    thumpGain.gain.setValueAtTime(1.5 * attenuation, now);
+    thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+    thump.connect(thumpGain);
+    thumpGain.connect(this.masterGain);
+    thump.start(now);
+    thump.stop(now + 0.22);
+  }
+
+  /** Chaff ejection: a dull pneumatic thump and a short metallic flutter. */
+  playChaffDispense(distance = 0) {
+    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
+    const now = this.ctx.currentTime;
+    const attenuation = this.effectAttenuation(distance, 500);
+    const duration = 0.28;
+    const noise = this.whiteNoiseSource();
+
+    const puff = this.ctx.createBiquadFilter();
+    puff.type = 'lowpass';
+    puff.frequency.setValueAtTime(1800, now);
+    puff.frequency.exponentialRampToValueAtTime(420, now + duration);
+    const puffGain = this.ctx.createGain();
+    puffGain.gain.setValueAtTime(1.2 * attenuation, now);
+    puffGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    noise.connect(puff);
+    puff.connect(puffGain);
+    puffGain.connect(this.masterGain);
+    noise.start(now);
+    noise.stop(now + duration);
+
+    const thump = this.ctx.createOscillator();
+    const thumpGain = this.ctx.createGain();
+    thump.type = 'sine';
+    thump.frequency.setValueAtTime(95, now);
+    thump.frequency.exponentialRampToValueAtTime(45, now + 0.14);
+    thumpGain.gain.setValueAtTime(1.2 * attenuation, now);
+    thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+    thump.connect(thumpGain);
+    thumpGain.connect(this.masterGain);
+    thump.start(now);
+    thump.stop(now + 0.18);
   }
 
   /**

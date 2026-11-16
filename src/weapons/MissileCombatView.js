@@ -4,10 +4,21 @@ import { createMissileMesh } from './missileGeometry.js';
 import { ZONE_LOCAL_CENTERS } from '../physics/combatDamage.js';
 
 const FORWARD = new THREE.Vector3(0, 0, -1);
+const UP = new THREE.Vector3(0, 1, 0);
 const scratchDirection = new THREE.Vector3();
 const scratchOffset = new THREE.Vector3();
 const scratchQuat = new THREE.Quaternion();
 const scratchEmitPos = new THREE.Vector3();
+const scratchVelocity = new THREE.Vector3();
+
+// A destroyed bandit keeps flying as a burning wreck instead of blinking out.
+// Its launch velocity is the airframe's measured frame-to-frame motion, so the
+// fall continues the last visible trajectory; these are presentation values.
+const WRECK_GRAVITY_MPS2 = 9.81;
+const WRECK_DRAG_TIME_S = 8;
+const WRECK_SPIN_RAD_PER_S = 2.6;
+const WRECK_MAX_AGE_S = 20;
+const WRECK_GROUND_CLEARANCE_M = 2;
 let smokeTexture = null;
 let flareTexture = null;
 
@@ -180,9 +191,15 @@ class SmokeTrail {
  * missiles, smoke trails and explosion handoff. No gameplay state lives here.
  */
 export class MissileCombatView {
-  constructor(scene, system) {
+  /**
+   * @param {object} [options]
+   * @param {(x:number, z:number)=>number} [options.terrainHeight] ground under the
+   *   wreck; a wreck ends on impact, and without it the wreck ends at sea level.
+   */
+  constructor(scene, system, { terrainHeight = null } = {}) {
     this.scene = scene;
     this.system = system;
+    this.terrainHeight = terrainHeight;
     this.targetViews = new Map();
     this.missileViews = new Map();
     this.flareViews = new Map();
@@ -199,27 +216,17 @@ export class MissileCombatView {
         const aircraft = new BanditAircraftView(target.callsign);
         const mesh = aircraft.mesh;
         this.scene.add(mesh);
-        view = { mesh, aircraft, trail: null, fireTrail: null };
+        view = { mesh, aircraft, trail: null, fireTrail: null,
+          lastPosition: null, velocity: new THREE.Vector3(), wreck: null };
         this.targetViews.set(target.id, view);
       }
-      view.mesh.visible = target.alive;
       if (!target.alive) {
-        if (view.trail) {
-          view.trail.update(dt, null, false);
-          if (view.trail.done) {
-            view.trail.dispose();
-            view.trail = null;
-          }
-        }
-        if (view.fireTrail) {
-          view.fireTrail.update(dt, null, false);
-          if (view.fireTrail.done) {
-            view.fireTrail.dispose();
-            view.fireTrail = null;
-          }
-        }
+        this._syncWreck(view, target, dt);
         continue;
       }
+      // A respawn (or a replay seek back before the kill) restores the airframe.
+      view.wreck = null;
+      view.mesh.visible = true;
       view.aircraft.update(dt, target.flight);
       view.mesh.position.copy(target.position);
       if (target.quaternion) {
@@ -260,6 +267,7 @@ export class MissileCombatView {
           if (view.fireTrail.done) { view.fireTrail.dispose(); view.fireTrail = null; }
         }
       }
+      this._observeMotion(view, target, dt);
     }
     for (const [id, view] of this.targetViews) {
       if (liveTargets.has(id)) continue;
@@ -304,6 +312,78 @@ export class MissileCombatView {
         trail.dispose();
         this.trails.splice(index, 1);
       }
+    }
+  }
+
+  /** Frame-to-frame airframe motion: the wreck inherits the last visible velocity. */
+  _observeMotion(view, target, dt) {
+    if (!view.lastPosition) {
+      view.lastPosition = target.position.clone();
+      return;
+    }
+    if (dt > 1e-4) {
+      scratchVelocity.subVectors(target.position, view.lastPosition).divideScalar(dt);
+      const speed = scratchVelocity.length();
+      // Replay seeks and respawns teleport; only flap-free flight speed is motion.
+      if (speed > 1 && speed < 1200) view.velocity.copy(scratchVelocity);
+    }
+    view.lastPosition.copy(target.position);
+  }
+
+  /**
+   * A killed bandit keeps its airframe: it tumbles, drags, falls and burns until
+   * it hits the ground, so a kill reads as a downing instead of a deletion. Only
+   * a target observed alive can become a wreck; a seek that lands after the kill
+   * has no motion history and stays hidden.
+   */
+  _syncWreck(view, target, dt) {
+    if (!view.wreck) {
+      if (!view.lastPosition || view.velocity.lengthSq() < 1) {
+        this._fadeWreckTrails(view, dt, true);
+        return;
+      }
+      const heading = view.velocity.clone().normalize();
+      const axis = new THREE.Vector3().crossVectors(UP, heading);
+      if (axis.lengthSq() < 1e-6) axis.set(1, 0, 0); else axis.normalize();
+      view.wreck = { age: 0, velocity: view.velocity.clone(), axis };
+      view.mesh.position.copy(target.position);
+      view.lastPosition = null;
+    }
+    view.mesh.visible = true;
+    if (dt <= 0) return;
+    const wreck = view.wreck;
+    wreck.age += dt;
+    wreck.velocity.y -= WRECK_GRAVITY_MPS2 * dt;
+    wreck.velocity.multiplyScalar(Math.exp(-dt / WRECK_DRAG_TIME_S));
+    view.mesh.position.addScaledVector(wreck.velocity, dt);
+    scratchQuat.setFromAxisAngle(wreck.axis, WRECK_SPIN_RAD_PER_S * dt);
+    view.mesh.quaternion.multiply(scratchQuat);
+    if (!view.fireTrail) {
+      view.fireTrail = new SmokeTrail(this.scene, { max: 64, size: 4.2, color: 0xff7722, opacity: 0.85 });
+    }
+    view.fireTrail.update(dt, view.mesh.position, true);
+    if (!view.trail) {
+      view.trail = new SmokeTrail(this.scene, { max: 96, size: 7, color: 0x242424, opacity: 0.62 });
+    }
+    view.trail.update(dt, view.mesh.position, true);
+    const ground = this.terrainHeight?.(view.mesh.position.x, view.mesh.position.z) ?? 0;
+    if (view.mesh.position.y <= ground + WRECK_GROUND_CLEARANCE_M || wreck.age >= WRECK_MAX_AGE_S) {
+      view.wreck = null;
+      view.lastPosition = null;
+      this._fadeWreckTrails(view, dt, true);
+    }
+  }
+
+  /** Fade a wreck's smoke after impact, or the damage trail of a dead target. */
+  _fadeWreckTrails(view, dt, hide) {
+    if (hide) view.mesh.visible = false;
+    for (const key of ['trail', 'fireTrail']) {
+      const trail = view[key];
+      if (!trail) continue;
+      trail.update(dt, null, false);
+      if (!trail.done) continue;
+      trail.dispose();
+      view[key] = null;
     }
   }
 

@@ -38,6 +38,95 @@ test('MissileCombatView renders and cleans up live flares and chaff clouds (#783
   assert.equal(scene.objects.size, 0);
 });
 
+test('a killed bandit falls as a burning wreck instead of vanishing instantly', () => {
+  const scene = createMockScene();
+  const target = {
+    id: 1, callsign: 'BANDIT 1', alive: true,
+    position: new THREE.Vector3(0, 1200, 0), velocity: new THREE.Vector3(0, 0, -250),
+    quaternion: new THREE.Quaternion(), damage: 0.9, damageZones: {},
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, { terrainHeight: () => 1150 });
+  for (let i = 0; i < 4; i++) {
+    target.position.z -= 5;
+    view.sync(0.02);
+  }
+  const mesh = view.targetViews.get(1).mesh;
+  const deathZ = target.position.z;
+  const deathY = mesh.position.y;
+
+  target.alive = false;
+  view.sync(0.02);
+  assert.equal(mesh.visible, true, 'the airframe survives the kill');
+  assert.ok(view.targetViews.get(1).wreck, 'a wreck starts from the last flight state');
+
+  for (let i = 0; i < 100; i++) view.sync(0.02);
+  assert.equal(mesh.visible, true);
+  assert.ok(mesh.position.z < deathZ - 100, 'the wreck keeps the airframe momentum');
+  assert.ok(mesh.position.y < deathY - 5, 'the wreck falls under gravity');
+
+  // It burns until the ground, then stops drawing.
+  for (let i = 0; i < 320; i++) view.sync(0.02);
+  assert.equal(mesh.visible, false, 'the wreck ends on terrain impact');
+  assert.equal(view.targetViews.get(1).wreck, null);
+
+  // A respawn restores the airframe at the new patrol point.
+  target.position.set(0, 1200, -3000);
+  target.alive = true;
+  view.sync(0.02);
+  assert.equal(mesh.visible, true);
+  assert.ok(mesh.position.distanceTo(target.position) < 1e-6);
+  view.clear();
+});
+
+test('a target that was never seen alive does not fabricate a wreck', () => {
+  const scene = createMockScene();
+  const target = {
+    id: 2, callsign: 'BANDIT 2', alive: false,
+    position: new THREE.Vector3(0, 1200, 0), velocity: new THREE.Vector3(0, 0, -200),
+    quaternion: new THREE.Quaternion(), damage: 1, damageZones: {},
+  };
+  const view = new MissileCombatView(scene, { targets: [target], missiles: [], flares: [], chaffClouds: [] });
+  for (let i = 0; i < 5; i++) view.sync(0.02);
+  assert.equal(view.targetViews.get(2).mesh.visible, false);
+  view.clear();
+});
+
+test('replay playback shows the recorded bandit kill as a falling wreck', () => {
+  const scene = createMockScene();
+  const playback = new CombatReplayPlayback({
+    scene,
+    camera: { position: new THREE.Vector3() },
+    explosionSystem: { spawnExplosion() {} },
+    audio: {},
+  });
+  playback.load({
+    targets: [{ callsign: 'BANDIT 1' }],
+    banditSamples: [0, 0.5, 1, 1.5].map((timeSec, index) => ({
+      timeSec,
+      targets: [{ x: 0, y: 1000, z: -index * 120, headingRad: 0, alive: index < 2 }],
+    })),
+    missileSamples: [],
+    events: [],
+  });
+  for (let time = 0; time <= 1.4; time += 1 / 60) playback.update(1 / 60, time);
+  const view = playback.view.targetViews.get(0);
+  const target = playback.state.targets[0];
+  assert.equal(target.alive, false);
+  assert.ok(view.wreck, 'the dead bandit keeps falling from its last flight state');
+  assert.equal(view.mesh.visible, true);
+  const fallY = view.mesh.position.y;
+  const fallZ = view.mesh.position.z;
+  for (let i = 0; i < 30; i++) playback.update(1 / 60, 1.4 + i / 60);
+  assert.ok(view.mesh.position.y < fallY, 'the recorded airframe falls');
+  assert.ok(view.mesh.position.z < fallZ, 'the recorded airframe keeps its momentum');
+
+  // A seek after the kill has no motion history, so no phantom wreck is drawn.
+  playback.seek(1.4);
+  assert.equal(playback.view.targetViews.get(0).mesh.visible, false);
+  playback.stop();
+});
+
 test('CombatReplayPlayback reconstructs flares and chaff from decoy_dispense events (#783)', () => {
   const scene = createMockScene();
   const playback = new CombatReplayPlayback({

@@ -418,7 +418,8 @@ describe('Exterior camera distance attenuation in the audio graph', () => {
     try {
       const audio = new FlightAudio();
       audio.init();
-      assert.ok(audio.cockpitFilter.connectedTo.includes(audio.distanceGain), 'cockpit filter should feed the distance stage');
+      assert.ok(audio.cockpitFilter.connectedTo.includes(audio.ambientBus), 'cockpit filter should feed the ambient bus');
+      assert.ok(audio.ambientBus.connectedTo.includes(audio.distanceGain), 'ambient bus should feed the distance stage');
       assert.ok(audio.distanceGain.connectedTo.includes(audio.masterGain), 'distance stage should feed master gain');
 
       audio.update(0.016, jetState, true, 140);
