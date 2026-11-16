@@ -132,7 +132,7 @@ test('the frame width scales with the room so more pilots fit the same format', 
   assert.ok(decoded.remotes[1].samples.at(-1).x === 2000 && decoded.remotes[0].samples.at(-1).x === 1000);
 });
 
-test('a room longer than the coarsest rung keeps its most recent frames and still saves', () => {
+test('a room longer than the coarsest rung keeps its most recent frames and still saves', async () => {
   // Room for 30 frames: the ladder reaches its coarsest rung after a minute, then slides.
   const budget = base64ByteLength(HEADER_BYTES + 400 + 30 * frameBytes(1));
   const recorder = started(PILOTS, { maxBase64Bytes: budget });
@@ -148,9 +148,9 @@ test('a room longer than the coarsest rung keeps its most recent frames and stil
   assert.ok(base64ByteLength(encodeTrack(track).length) <= budget, 'a full window fits its budget');
   const store = new ReplayStore(new MockStorage(),
     { budget: { entryBase64Bytes: budget, entries: 8, totalBase64Bytes: budget * 8 } });
-  const { entry, error } = store.save(track);
+  const { entry, error } = await store.save(track);
   assert.equal(error, null);
-  assert.equal(store.get(entry.id).track.remotes[0].samples.length, track.samples.length);
+  assert.equal((await store.get(entry.id)).track.remotes[0].samples.length, track.samples.length);
 });
 
 test('playback never blends across a respawn or toward an unseen pilot', () => {

@@ -38,7 +38,7 @@ export class ReplayPanel {
     this.library.innerHTML = `<div class="replay-library-card">
       <header><h2 id="replay-library-title" data-i18n="replay.library"></h2><button class="btn" data-close data-i18n="ui.close"></button></header>
       <p data-i18n="replay.storageHint"></p>
-      <label class="btn replay-import"><span data-i18n="replay.import"></span><input type="file" accept=".json,application/json" data-import></label>
+      <label class="btn replay-import"><span data-i18n="replay.import"></span><input type="file" accept=".f3dr.gz,.gz,.json,application/gzip,application/x-gzip,application/json" data-import></label>
       <p data-status role="status" aria-live="polite"></p><div data-list></div></div>`;
     translateDOM(this.root); translateDOM(this.library);
     this.root.querySelector('.replay-cameras').append(...createCameraButtons((mode) => {
@@ -68,8 +68,7 @@ export class ReplayPanel {
       const file = e.target.files[0];
       if (!file) return;
       try {
-        if (file.size > 2_000_000) throw new Error('oversized');
-        const { entry } = sim.replayStore.importJson(await file.text());
+        const { entry } = await sim.replayStore.importFile(file);
         this.status(entry ? 'replay.imported' : 'replay.importFailed');
         this.track('import', Boolean(entry));
         this.renderList();
@@ -92,6 +91,9 @@ export class ReplayPanel {
       : this.watchBlocked() ? 'replay.multiplayerBlocked' : null); this.renderList();
     this.library.hidden = false;
     this.library.querySelector('[data-close]').focus();
+    void this.sim.replayStore.ready?.().then(() => {
+      if (!this.library.hidden) this.renderList();
+    });
   }
 
   closeLibrary() {
@@ -111,8 +113,8 @@ export class ReplayPanel {
       const row = document.createElement('article'); row.className = 'replay-entry';
       const label = document.createElement('input'); label.value = entry.label; label.maxLength = 64;
       bindText(label, () => t('replay.name'), 'aria-label');
-      label.addEventListener('change', () => {
-        if (!this.sim.replayStore.rename(entry.id, label.value)) this.status('replay.saveFailed');
+      label.addEventListener('change', async () => {
+        if (!await this.sim.replayStore.rename(entry.id, label.value)) this.status('replay.saveFailed');
         this.renderList();
       });
       const info = document.createElement('p');
@@ -168,7 +170,7 @@ export class ReplayPanel {
         if (action === 'watch') button.disabled = this.watchBlocked();
         button.addEventListener('click', async () => {
           if (action === 'watch') {
-            const saved = this.sim.replayStore.get(entry.id);
+            const saved = await this.sim.replayStore.get(entry.id);
             if (!saved) { this.status('replay.loadFailed'); return; }
             button.disabled = true;
             if (await this.watch(saved.track, entry.id)) {
@@ -177,14 +179,14 @@ export class ReplayPanel {
             else this.status('replay.loadFailed');
             button.disabled = false;
           } else if (action === 'export') {
-            const json = this.sim.replayStore.exportJson(entry.id);
-            this.track('export', Boolean(json));
-            if (!json) { this.status('replay.loadFailed'); return; }
-            const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-            const link = document.createElement('a'); link.href = url; link.download = `flight3d-replay-${entry.id}.json`; link.click();
+            const blob = await this.sim.replayStore.exportBlob(entry.id);
+            this.track('export', Boolean(blob));
+            if (!blob) { this.status('replay.loadFailed'); return; }
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a'); link.href = url; link.download = `flight3d-replay-${entry.id}.f3dr.gz`; link.click();
             setTimeout(() => URL.revokeObjectURL(url), 1000);
           } else {
-            const removed = this.sim.replayStore.remove(entry.id);
+            const removed = await this.sim.replayStore.remove(entry.id);
             this.track('delete', removed);
             if (!removed) this.status('replay.saveFailed');
             this.renderList(); this.library.querySelector('[data-close]').focus();

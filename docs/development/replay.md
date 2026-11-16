@@ -3,15 +3,20 @@
 Flights automatically collect a pose track alongside the debrief's telemetry report.
 After at least five valid simulation seconds, the debrief offers **Watch replay**;
 its Share tab offers **Save replay**. The lobby's **Saved replays** opens the device's
-library. Flights can be renamed, watched, exported as JSON, imported or deleted.
+library. Flights can be renamed, watched, exported as `.f3dr.gz`, imported (`.f3dr.gz` or
+legacy `.json`) or deleted.
 
 Every finished sortie is also written to a single `auto_save` slot, so the most
 recent flight is always in the library without a manual save. Each new flight replaces
 it; renaming it converts it into an ordinary save that later flights no longer
 overwrite, and the eight-entry budget still applies.
 
-Storage is local to the browser origin: at most eight saves, 160 KB base64 per
-flight and 1 MB total. The oldest saves are evicted under budget or quota pressure.
+Storage is local to the browser origin in IndexedDB (`flight3d.replays.v1`) as
+gzip-compressed binary containers: at most eight saves, 120 KB compressed per
+flight (up to 120 KB binary track + 240 KB UTF-8 report / 360 KB decompressed
+before compression), and 750 KB compressed total. The oldest saves are evicted
+under budget or quota pressure. Existing `localStorage` entries migrate safely
+to IndexedDB on startup, preserving originals until IndexedDB commits succeed.
 Export files to retain copies outside that browser.
 
 Playback has play/pause, previous/next recorded sample, a time scrubber, all ten
@@ -180,21 +185,32 @@ hidden until respawn. Gaps and backwards seeks clear effects. Playback starts wi
 live wreckage cleared and disposes remote models, indicators, fragments and explosion
 resources on exit or failed loading. Local contact shadows follow replay visibility.
 
-`ReplayStore` uses a small index and individual localStorage payloads. Debrief download
-and replay library export share one unified format (`flight3d.sortie.v1`):
-```json
-{
-  "kind": "flight3d.sortie.v1",
-  "report": { "...": "telemetry report or index summary" },
-  "track": "<base64 encoded binary track (v2 solo or v3 room)>"
-}
+`ReplayStore` stores metadata rows in the `entries` object store and gzip-compressed
+containers (`Blob`/`ArrayBuffer`) in the `payloads` object store of IndexedDB
+(`flight3d.replays.v1`), while automatically migrating any existing `localStorage`
+saves without deleting originals until the IndexedDB commit succeeds (making
+interrupted migrations retryable without duplicates).
+
+Debrief download and replay library export share the `.f3dr.gz` gzip-compressed
+binary container (`F3DC`, container version `1`, independent of `ReplayCodec` track
+versions `1..8`):
+```text
+[0..3]    "F3DC"  (4-byte magic)
+[4]       version (1 byte u8, currently 1)
+[5..8]    reportByteLength (u32 big-endian)
+[9..12]   trackByteLength  (u32 big-endian)
+[13..]    UTF-8 report JSON (reportByteLength bytes)
+[..]      ReplayCodec binary payload ('F3DR1', trackByteLength bytes)
 ```
-Debrief download emits this file with the full telemetry report and the encoded track;
-library export emits it with a compact debrief summary (`reason`, `touchdown`, `crash`, `peakG`).
-Saved replays in the lobby library display this summary badge alongside duration and timestamp.
-Import reuses the decoder and storage budgets, accepting both `flight3d.sortie.v1` and legacy
-`flight3d.replay.v1` files; the library renders names as plain text.
-These files contain no executable pilot code.
+The entire container is compressed with Web Streams `CompressionStream('gzip')` and
+validated during streaming `DecompressionStream('gzip')` against separate compressed
+(120 KB) and decompressed (240 KB report / 120 KB track / 360 KB total) limits before
+allocating or decoding large payloads. Debrief download embeds the full bounded
+telemetry report; library export embeds the stored report or compact debrief summary
+(`reason`, `touchdown`, `crash`, `peakG`). Import accepts `.f3dr.gz` containers,
+uncompressed `F3DC` containers, and legacy `flight3d.sortie.v1` / `flight3d.replay.v1`
+JSON files (up to 2 MB); the library renders names as plain text. These files contain
+no executable pilot code.
 
 ## Verification
 

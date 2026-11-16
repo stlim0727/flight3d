@@ -98,17 +98,22 @@ try {
   await send('Browser.setPermission', { permission: { name: 'clipboard-write' }, setting: 'granted', origin: new URL(url).origin });
   await send('Browser.setPermission', { permission: { name: 'clipboard-read' }, setting: 'granted', origin: new URL(url).origin });
   // Capture the download blob in the page instead of relying on Browser download permissions.
-  await ev(`window.__downloads=[];const origCreateObjectURL=URL.createObjectURL.bind(URL);URL.createObjectURL=blob=>{blob.text().then(text=>window.__downloads.push(text));return origCreateObjectURL(blob);};`);
+  await ev(`window.__downloads=[];const origCreateObjectURL=URL.createObjectURL.bind(URL);URL.createObjectURL=blob=>{blob.arrayBuffer().then(buf=>window.__downloads.push(Array.from(new Uint8Array(buf))));return origCreateObjectURL(blob);};`);
   await click('#debrief-download');
   let downloaded;
   for (let n = 0; n < 20 && !downloaded; n++) {
-    const text = await ev('window.__downloads[0]');
-    if (text) downloaded = JSON.parse(text);
-    else await new Promise(resolve => setTimeout(resolve, 100));
+    const bytes = await ev('window.__downloads[0]');
+    if (bytes) {
+      downloaded = await ev(`await (async () => {
+        const { decodeCompressedContainer } = await import('/src/replay/ReplayCodec.js');
+        const decoded = await decodeCompressedContainer(new Uint8Array(${JSON.stringify(bytes)}));
+        return { version: decoded.version, report: decoded.report, track: decoded.track };
+      })()`);
+    } else await new Promise(resolve => setTimeout(resolve, 100));
   }
-  assert.equal(downloaded?.metadata.aircraft, 'C172');
-  assert.ok(downloaded?.samples.length > 1);
-  assert.ok(downloaded?.replay?.durationSec > 0, 'the single file contains the replay track');
+  assert.equal(downloaded?.report?.metadata?.aircraft, 'C172');
+  assert.ok(downloaded?.report?.samples?.length > 1);
+  assert.ok(downloaded?.track?.durationSec > 0, 'the single file contains the replay track');
   await shot('download');
   // Download does not touch the clipboard; permission policy is irrelevant.
   await ev(`navigator.clipboard.writeText=async()=>{throw new Error('Denied')};`);

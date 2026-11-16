@@ -33,7 +33,7 @@ test('coastal diagnostics invariance preserves summary and outcome fields across
   assert.ok(traced.summary[0].caseIds.includes(traced.results[0].caseId));
 });
 
-test('coastal diagnostics produces an importable flight3d.sortie.v1 replay and consistent metrics', () => {
+test('coastal diagnostics produces an importable flight3d.sortie.v1 replay and consistent metrics', async () => {
   const traced = runCombatExperiment(combatExperimentConfig({
     scenario: 'coastal', seconds: '5', 'attack-skill': 'pursuit', diagnostics: true,
   }));
@@ -43,11 +43,11 @@ test('coastal diagnostics produces an importable flight3d.sortie.v1 replay and c
   assert.equal(result.diagnostics.sortie.kind, 'flight3d.sortie.v1');
 
   const store = new ReplayStore(createMemoryStorage());
-  const imported = store.importJson(JSON.stringify(result.diagnostics.sortie));
+  const imported = await store.importJson(JSON.stringify(result.diagnostics.sortie));
   assert.equal(imported.error, null);
   assert.ok(imported.entry);
 
-  const loaded = store.get(imported.entry.id);
+  const loaded = await store.get(imported.entry.id);
   assert.ok(loaded);
   assert.equal(loaded.track.metadata.scenario, 'cruise');
   assert.ok(loaded.track.samples.length >= 2);
@@ -69,7 +69,7 @@ test('coastal diagnostics produces an importable flight3d.sortie.v1 replay and c
   assert.ok(Number.isFinite(metrics.controlLoss.controlLossTotalSeconds));
 });
 
-test('300s coastal pursuit sortie links shots to engagement analysis and round-trips through ReplayStore and CLI', () => {
+test('300s coastal pursuit sortie links shots to engagement analysis and round-trips through ReplayStore and CLI', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'flight-coastal-t2-'));
   const output = join(dir, 'coastal-t2.json');
   try {
@@ -96,11 +96,11 @@ test('300s coastal pursuit sortie links shots to engagement analysis and round-t
     assert.equal(sortie.kind, 'flight3d.sortie.v1');
 
     const store = new ReplayStore(createMemoryStorage());
-    const imported = store.importJson(sortiePayload);
+    const imported = await store.importJson(sortiePayload);
     assert.equal(imported.error, null);
     assert.ok(imported.entry);
 
-    const loaded = store.get(imported.entry.id);
+    const loaded = await store.get(imported.entry.id);
     assert.equal(loaded.track.metadata.scenario, 'cruise');
     for (const ev of loaded.track.combat.events) {
       assert.ok(ev.timeSec <= loaded.track.durationSec + 1e-6);

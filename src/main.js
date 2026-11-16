@@ -933,9 +933,9 @@ class FlightSimulator {
   }
 
   /** Persists the finished sortie's pose track. Returns the store's error token for the debrief to show. */
-  saveDebriefReplay() {
+  async saveDebriefReplay() {
     if (!this.debriefReplay) return { ok: false, error: 'tooShort' };
-    const { entry, error } = this.replayStore.save(this.debriefReplay, { report: this.debriefReport });
+    const { entry, error } = await this.replayStore.save(this.debriefReplay, { report: this.debriefReport });
     this.analytics?.trackReplaySaved?.({ result: entry ? 'ok' : error, durationSeconds: this.debriefReplay.durationSec });
     return { ok: Boolean(entry), error: error ?? null };
   }

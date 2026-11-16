@@ -28,8 +28,8 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   assert.ok(await ev('s.debriefReplay?.samples.length > 2'));
   await click('#debrief-save-replay');
   // The debrief auto-saves once on open (#645), so the manual save adds the second row.
-  assert.equal(await ev('s.replayStore.list().length'), 2);
-  await ev('window.replayExport=s.replayStore.exportJson(s.replayStore.list()[0].id);window.recordedTrack=s.debriefReplay;');
+  await until(() => ev('s.replayStore.ready().then(() => s.replayStore.list().length === 2)'), 'manual save');
+  await ev('(async()=>{window.replayExport=await s.replayStore.exportContainer(s.replayStore.list()[0].id);window.recordedTrack=s.debriefReplay;})()');
   await click('#debrief-watch-replay');
   await until(() => ev('s.replayDirector.active'), 'watch');
   await click('[data-play]');
@@ -75,11 +75,11 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   assert.equal(await ev('document.querySelector("#replay-library").hidden'), false);
   await screenshot(`${output}/library.png`);
   await ev(`document.querySelector('.replay-entry input').value='My approach';document.querySelector('.replay-entry input').dispatchEvent(new Event('change'));`);
-  assert.equal(await ev('s.replayStore.list()[0].label'), 'My approach');
+  await until(() => ev('s.replayStore.list()[0]?.label === "My approach"'), 'rename');
   await click('[data-action="delete"]');
   // Only the newest (manual) row is deleted; the auto-save slot remains.
-  assert.equal(await ev('s.replayStore.list().length'), 1);
-  await ev(`(() => {const file=new File([window.replayExport],'replay.json',{type:'application/json'});const files=new DataTransfer();files.items.add(file);const input=document.querySelector('[data-import]');input.files=files.files;input.dispatchEvent(new Event('change'));})()`);
+  await until(() => ev('s.replayStore.list().length === 1'), 'delete');
+  await ev(`(() => {const file=new File([window.replayExport],'replay.f3dr.gz',{type:'application/gzip'});const files=new DataTransfer();files.items.add(file);const input=document.querySelector('[data-import]');input.files=files.files;input.dispatchEvent(new Event('change'));})()`);
   await until(() => ev('s.replayStore.list().length === 2'), 'import');
   await ev(`(() => {const files=new DataTransfer();files.items.add(new File(['bad json'],'bad.json'));const input=document.querySelector('[data-import]');input.files=files.files;input.dispatchEvent(new Event('change'));})()`);
   await until(() => ev('document.querySelector("[data-status]").textContent.includes("Could not import")'), 'invalid import');
@@ -87,7 +87,7 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   await ev('window.replayReloadMarker=true');
   await send('Page.reload');
   await until(() => ev('!window.replayReloadMarker && !!window.simulator && !document.body.classList.contains("booting")'), 'reload', 90000);
-  assert.equal(await ev('window.simulator.replayStore.list().length'), 2, 'library persists across reload');
+  assert.equal(await ev('window.simulator.replayStore.ready().then(() => window.simulator.replayStore.list().length)'), 2, 'library persists across reload');
   // A real Lukla track restores the DEM scene and keeps deterministic replay poses.
   await ev(`(async()=>{window.s=window.simulator;s.lobby.airport='lukla';s.lobby.aircraft='C172';s.lobby.preset='cruise';await s.fly();})()`);
   await until(() => ev('s.currentTerrain.isLoaded'), 'Lukla terrain', 90000);
@@ -101,7 +101,7 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
     s.replayPanel.exit();
     const {SlalomMissionAdapter}=await import('/src/arena/SlalomMissionAdapter.js');
     const adapter=new SlalomMissionAdapter(s);await adapter.prepare({seed:42,pilotKind:'human'});
-    const first={...s.replayStore.get(s.replayStore.list()[0].id).track.samples[0],timeSec:0,x:s.position.x,y:s.position.y,z:s.position.z,quat:s.quaternion.toArray()};
+    const first={...(await s.replayStore.get(s.replayStore.list()[0].id)).track.samples[0],timeSec:0,x:s.position.x,y:s.position.y,z:s.position.z,quat:s.quaternion.toArray()};
     const fixture={metadata:{airport:'valley',aircraft:'F16',scenario:'valley',seed:42,timeOfDay:12},durationSec:8,intervalSec:.2,samples:[first,{...first,timeSec:8,z:first.z-30}]};
     adapter.release();
     if(!await s.replayPanel.watch(fixture))throw new Error('seeded valley load failed');
@@ -127,9 +127,9 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
     assert.equal(await ev('s.replayRecorder.metadata.airport'), 'valley');
     await ev('s.endFlight();');
     assert.ok(await ev('s.debriefReplay.samples.length >= 30'));
-    const saved = await ev('s.saveDebriefReplay()');
+    const saved = await ev('(async () => s.saveDebriefReplay())()');
     assert.equal(saved.ok,true);
-    await ev('(async()=>{await s.replayPanel.watch(s.replayStore.get(s.replayStore.list()[0].id).track);s.replayDirector.pause();s.replayDirector.seek(3);})()');
+    await ev('(async()=>{await s.replayPanel.watch((await s.replayStore.get(s.replayStore.list()[0].id)).track);s.replayDirector.pause();s.replayDirector.seek(3);})()');
     assert.equal(await ev('s.replayDirector.active'), true);
     assert.equal(await ev('s.replayDirector._scenarioAdapter.activeSeed'), 1);
     await ev('s.replayPanel.exit()');
@@ -144,7 +144,7 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   await until(() => ev('s.replayRecorder.elapsed >= 6'), 'results retry recording', 30000);
   await ev('s.endFlight()');
   assert.equal(await ev('s.debriefReplay !== window.previousResultTrack'), true);
-  assert.equal(await ev('s.saveDebriefReplay().ok'), true);
+  assert.equal(await ev('(async () => (await s.saveDebriefReplay()).ok)()'), true);
   await ev('(async()=>{await s.replayPanel.watch(s.debriefReplay);s.replayDirector.pause();s.replayDirector.seek(3);})()');
   assert.equal(await ev('s.replayDirector.active'), true);
   await screenshot(`${output}/real-valley-recording.png`);

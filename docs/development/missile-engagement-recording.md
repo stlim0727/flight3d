@@ -38,7 +38,8 @@ reactions, guidance cutoff, aerodynamic limits, proximity fuzing, damage, and te
 2. **Compact Binary Encoding (`COMBAT_TRACK_VERSION = 7`)**: High-rate state transition events and
    rate-limited diagnostic samples (5 Hz) are encoded in a backwards-compatible binary format.
 3. **Structured Engagement Debrief (`flight3d.engagement.v1`)**: Analyzed engagement summaries
-   (`analyzeCombatEngagement`) are embedded directly into `report.engagement` in exported sorties.
+   (`analyzeCombatEngagement`) are embedded directly into `report.engagement` in exported
+   `.f3dr.gz` binary containers and `flight3d.sortie.v1` JSON artifacts.
 
 ---
 

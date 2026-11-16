@@ -67,7 +67,7 @@ try {
       await until(() => c.evaluate(`sim.multiplayer.roomReplay.recorder.validDuration > ${seconds}`), 'recorded flight', 30000);
     }
     async function saved(c) {
-      return until(() => c.evaluate(`sim.replayStore.list().find(e => e.autoSlot === 'room')`), 'saved room');
+      return until(() => c.evaluate(`sim.replayStore.ready().then(() => sim.replayStore.list().find(e => e.autoSlot === 'room'))`), 'saved room');
     }
     try {
       const hostContext = (await browser.send('Target.createBrowserContext')).browserContextId;
@@ -102,10 +102,10 @@ try {
         await writeFile(`${output}/${name}.sortie.json`, json);
         results[name] = await c.evaluate(`(async () => {
           if (sim.multiplayer.modalOpen) document.getElementById('mp-dialog-close').click();
-          const stored = sim.replayStore.get(${JSON.stringify(entry.id)}).track;
-          const imported = sim.replayStore.importJson(sim.replayStore.exportJson(${JSON.stringify(entry.id)}));
+          const stored = (await sim.replayStore.get(${JSON.stringify(entry.id)})).track;
+          const imported = await sim.replayStore.importReplay(await sim.replayStore.exportContainer(${JSON.stringify(entry.id)}));
           if (!imported.entry) throw Error('import failed');
-          const track = sim.replayStore.get(imported.entry.id).track;
+          const track = (await sim.replayStore.get(imported.entry.id)).track;
           if (JSON.stringify(stored.metadata.room) !== JSON.stringify(track.metadata.room)) throw Error('metadata roundtrip');
           if (!await sim.replayPanel.watch(track, imported.entry.id)) throw Error('watch failed');
           const d = sim.replayDirector; d.pause();
@@ -158,13 +158,13 @@ try {
       await until(() => host.evaluate('sim.multiplayer.room.closed'), 'tab departure', 30000);
       const reopened = await page(guestContext);
       results.tabClose = { host: (await saved(host)).id, guest: (await saved(reopened)).id,
-        guestReason: await reopened.evaluate('sim.replayStore.get(sim.replayStore.list().find(e=>e.autoSlot==="room").id).track.metadata.room.endReason') };
+        guestReason: await reopened.evaluate('(async () => (await sim.replayStore.get(sim.replayStore.list().find(e=>e.autoSlot==="room").id)).track.metadata.room.endReason)()') };
       assert.equal(results.tabClose.guestReason, 'pagehide');
       if (await host.evaluate('sim.multiplayer.modalOpen')) await host.evaluate('document.getElementById("mp-dialog-close").click()');
       await room(host, reopened); await waitRecording(host);
       await host.evaluate('sim.multiplayer.room.session.lastSeen=performance.now()-20001; sim.multiplayer.room.session.tick()');
       await until(() => host.evaluate('sim.multiplayer.room.closed'), 'heartbeat timeout');
-      results.timeout = await host.evaluate('sim.replayStore.get(sim.replayStore.list().find(e=>e.autoSlot==="room").id).track.metadata.room.endReason');
+      results.timeout = await host.evaluate('(async () => { await sim.replayStore.ready(); const row = sim.replayStore.list().find(e=>e.autoSlot==="room"); return (await sim.replayStore.get(row.id)).track.metadata.room.endReason; })()');
       assert.equal(results.timeout, 'timeout');
       for (const c of [host,reopened]) assert.deepEqual(c.errors, []);
       await writeFile(`${output}/result.json`, JSON.stringify(results, null, 2));

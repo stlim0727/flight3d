@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { encodeTrack, decodeTrack, toBase64, fromBase64, decodedByteLength, combatByteLength,
-  REPLAY_TRACK_VERSION, ROOM_TRACK_VERSION, COMBAT_TRACK_VERSION, COMBAT_EVENT_BYTES } from '../src/replay/ReplayCodec.js';
+  REPLAY_TRACK_VERSION, ROOM_TRACK_VERSION, COMBAT_TRACK_VERSION, COMBAT_EVENT_BYTES,
+  REPLAY_CONTAINER_MAGIC, REPLAY_CONTAINER_VERSION, CONTAINER_HEADER_BYTES,
+  inspectContainerHeader, encodeReplayContainer, decodeReplayContainer,
+  compressGzip, decompressGzip, encodeCompressedContainer, decodeCompressedContainer,
+  isGzipBytes, isContainerBytes } from '../src/replay/ReplayCodec.js';
 import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
 import { RECORD_BYTES, HEADER_BYTES, REPLAY_BUDGET, REPLAY_INTERVAL_LADDER,
-  maxSamplesFor, maxTrackSeconds, base64ByteLength } from '../src/replay/replayConfig.js';
+  maxSamplesFor, maxSamplesForTrack, maxTrackSeconds, base64ByteLength, resolveReplayBudget } from '../src/replay/replayConfig.js';
 
 const UNIT_QUAT = (() => {
   const raw = [0.0123, 0.9876, -0.1234, 0.0869];
@@ -308,4 +312,179 @@ test('combat v5 preserves bandit attitude and v4 heading-only tracks still decod
   assert.equal(decoded.version, 4);
   assert.equal(decoded.combat.banditSamples[0].targets[0].headingRad, 0.7);
   assert.equal(decoded.combat.banditSamples[0].targets[0].quaternion, undefined);
+});
+
+test('container round-trips solo, combat, and multiplayer room tracks with independent container version', async () => {
+  // 1. Solo v2 track with Unicode UTF-8 report
+  const soloTrack = track(25);
+  const soloReport = { label: '김포 · Approach ✈️', reason: 'landed', durationSec: soloTrack.durationSec,
+    samples: [{ timeSec: 0, altitudeFt: 3000, gForce: 1.0 }, { timeSec: 4.8, altitudeFt: 100, gForce: 1.3 }] };
+  const container = encodeReplayContainer({ report: soloReport, track: soloTrack });
+  assert.equal(isContainerBytes(container), true);
+  assert.equal(String.fromCharCode(...container.subarray(0, 4)), REPLAY_CONTAINER_MAGIC);
+  assert.equal(container[4], REPLAY_CONTAINER_VERSION);
+  const header = inspectContainerHeader(container);
+  assert.equal(header.version, REPLAY_CONTAINER_VERSION);
+  assert.equal(header.totalByteLength, container.byteLength);
+  assert.equal(container.byteLength, CONTAINER_HEADER_BYTES + header.reportByteLength + header.trackByteLength);
+  const decodedRaw = decodeReplayContainer(container);
+  assert.equal(decodedRaw.version, REPLAY_CONTAINER_VERSION);
+  assert.equal(decodedRaw.track.version, REPLAY_TRACK_VERSION);
+  assert.deepEqual(decodedRaw.report, soloReport);
+  assert.equal(decodedRaw.track.samples.length, 25);
+
+  // Gzip compressed solo container
+  const gzSolo = await encodeCompressedContainer({ report: soloReport, track: soloTrack });
+  assert.equal(isGzipBytes(gzSolo), true);
+  const decGzSolo = await decodeCompressedContainer(gzSolo);
+  assert.equal(decGzSolo.version, REPLAY_CONTAINER_VERSION);
+  assert.equal(decGzSolo.track.version, REPLAY_TRACK_VERSION);
+  assert.deepEqual(decGzSolo.report, soloReport);
+  assert.ok(Math.abs(decGzSolo.track.samples[10].x - soloTrack.samples[10].x) < 1e-3);
+
+  // 2. Combat v8 track
+  const combatTrack = track(15);
+  combatTrack.metadata.aircraft = 'F16';
+  combatTrack.combat = {
+    version: COMBAT_TRACK_VERSION,
+    banditIntervalSec: 0.5,
+    missileIntervalSec: 0.05,
+    targets: [{ id: 9, callsign: 'BANDIT 1' }],
+    banditSamples: [{ timeSec: 0, rails: 0x3e, targets: [{ x: 100, y: 3000, z: -5000, headingRad: 1.1, alive: true, damage: 0.4, damageZones: { wingL: 0.5 } }] }],
+    missileSamples: [{ timeSec: 0.2, id: 1, typeId: 'AIM9X', x: 50, y: 3000, z: -100, quat: [...UNIT_QUAT], powered: true }],
+    events: [{ timeSec: 0.2, kind: 'launch', missileId: 1, targetId: 9, locked: true, x: 50, y: 3000, z: -100 }],
+  };
+  const decCombat = await decodeCompressedContainer(await encodeCompressedContainer({ report: { label: 'Combat' }, track: combatTrack }));
+  assert.equal(decCombat.version, REPLAY_CONTAINER_VERSION);
+  assert.equal(decCombat.track.version, COMBAT_TRACK_VERSION);
+  assert.equal(decCombat.track.combat.targets[0].id, 9);
+  assert.equal(decCombat.track.combat.events[0].kind, 'launch');
+  assert.equal(decCombat.track.combat.events[0].targetId, 9);
+
+  // 3. Multiplayer room v3 track
+  const roomTrack = {
+    intervalSec: 0.2,
+    durationSec: 2,
+    metadata: {
+      airport: 'coastal', aircraft: 'C172', scenario: 'cruise',
+      room: { code: 'ROOM1', rounds: 1, endReason: 'left', partial: false, sessionDurationSec: 2, startOffsetSec: 0,
+        local: { name: 'Lead', slot: 0, aircraft: 'C172' },
+        timeline: [{ timeSec: 0, states: [
+          { visible: true, held: false, crashed: false, stale: false, segment: 0 },
+          { visible: true, held: false, crashed: false, stale: false, segment: 0 },
+        ] }] },
+    },
+    samples: Array.from({ length: 10 }, (_, idx) => ({ ...sample(idx * 0.2, idx), segment: 0 })),
+    remotes: [{
+      name: 'Wing', slot: 1, aircraft: 'C172',
+      samples: Array.from({ length: 10 }, (_, idx) => ({
+        timeSec: idx * 0.2, x: 200 + idx, y: 900, z: 0, quat: [...UNIT_QUAT],
+        gearState: 1, flapDegree: 0, visible: true, crashed: false, held: false, stale: false, segment: 0,
+      })),
+    }],
+  };
+  const decRoom = await decodeCompressedContainer(await encodeCompressedContainer({ report: { label: 'Room' }, track: roomTrack }));
+  assert.equal(decRoom.version, REPLAY_CONTAINER_VERSION);
+  assert.equal(decRoom.track.version, ROOM_TRACK_VERSION);
+  assert.deepEqual(decRoom.track.metadata.room, roomTrack.metadata.room);
+  assert.equal(decRoom.track.remotes[0].samples.length, 10);
+});
+
+test('container rejects truncated, corrupt, wrong-version, and oversized header payloads before decoding', () => {
+  const valid = encodeReplayContainer({ report: { label: 'test' }, track: track(5) });
+  assert.throws(() => inspectContainerHeader(valid.subarray(0, CONTAINER_HEADER_BYTES - 1)), /truncated/);
+  const badMagic = valid.slice();
+  badMagic[0] = 0x58;
+  assert.throws(() => decodeReplayContainer(badMagic), /not a flight3d replay container/);
+
+  for (const version of [0, REPLAY_CONTAINER_VERSION + 1]) {
+    const badVer = valid.slice();
+    badVer[4] = version;
+    assert.throws(() => decodeReplayContainer(badVer), /unsupported replay container version/);
+  }
+
+  // Oversized length prefix in header must fail before allocation or JSON/track decoding.
+  const hugeReport = valid.slice();
+  new DataView(hugeReport.buffer).setUint32(5, 0xffffffff);
+  assert.throws(() => inspectContainerHeader(hugeReport), /exceeds decompressed size limit/);
+  const hugeTrack = valid.slice();
+  new DataView(hugeTrack.buffer).setUint32(9, 0xffffffff);
+  assert.throws(() => inspectContainerHeader(hugeTrack), /exceeds decompressed size limit/);
+
+  assert.throws(() => decodeReplayContainer(valid.subarray(0, valid.length - 3)), /truncated/);
+  const trailing = new Uint8Array(valid.length + 2);
+  trailing.set(valid);
+  assert.throws(() => decodeReplayContainer(trailing), /does not match/);
+
+  // Non-object report JSON and invalid UTF-8 bytes are rejected.
+  const arrayReport = encodeReplayContainer({ report: { label: 'a' }, track: track(2) });
+  const view = new DataView(arrayReport.buffer);
+  const repLen = view.getUint32(5);
+  arrayReport.set(new TextEncoder().encode('[' + ' '.repeat(repLen - 2) + ']'), CONTAINER_HEADER_BYTES);
+  assert.throws(() => decodeReplayContainer(arrayReport), /report is corrupt/);
+
+  const badUtf8 = valid.slice();
+  badUtf8[CONTAINER_HEADER_BYTES] = 0xff;
+  assert.throws(() => decodeReplayContainer(badUtf8), /report is corrupt/);
+
+  const noTrack = encodeReplayContainer({ report: { label: 'only report' }, track: null });
+  assert.equal(decodeReplayContainer(noTrack).track, null);
+  assert.throws(() => decodeReplayContainer(noTrack, { requireTrack: true }), /no track/);
+});
+
+test('gzip streaming validates compressed limits, corrupt streams, and decompressed limits early', async () => {
+  const validGz = await encodeCompressedContainer({ report: { label: 'flight' }, track: track(10) });
+  await assert.rejects(() => decompressGzip(new Uint8Array(0)), /empty/);
+  await assert.rejects(() => decompressGzip(new TextEncoder().encode('{"kind":"json"}')), /not gzip/);
+  await assert.rejects(() => decompressGzip(validGz.subarray(0, validGz.length - 4)), /corrupt or truncated/);
+
+  const badCrc = validGz.slice();
+  badCrc[badCrc.length - 6] ^= 0xff;
+  await assert.rejects(() => decompressGzip(badCrc), /corrupt or truncated/);
+
+  const trailingGz = new Uint8Array(validGz.length + 4);
+  trailingGz.set(validGz);
+  trailingGz.set([1, 2, 3, 4], validGz.length);
+  await assert.rejects(() => decompressGzip(trailingGz), /corrupt or truncated/);
+
+  // Oversized compressed input (and Blob) rejected against maxCompressedBytes.
+  await assert.rejects(
+    () => decompressGzip(validGz, { maxCompressedBytes: validGz.byteLength - 1 }),
+    /compressed size limit/,
+  );
+  const bigBlob = new Blob([validGz], { type: 'application/gzip' });
+  await assert.rejects(
+    () => decompressGzip(bigBlob, { maxCompressedBytes: validGz.byteLength - 1 }),
+    /compressed size limit/,
+  );
+
+  // Zip bomb: small gzip payload that expands past maxDecompressedBytes aborts during streaming.
+  const bombPlain = new Uint8Array(200_000);
+  const bombGz = await compressGzip(bombPlain);
+  assert.ok(bombGz.byteLength < 2_000, 'highly compressible payload stays small on wire');
+  await assert.rejects(
+    () => decompressGzip(bombGz, { maxCompressedBytes: 10_000, maxDecompressedBytes: 32_768 }),
+    /decompressed size limit/,
+  );
+
+  // Malicious container inside valid gzip declaring huge header sizes aborts at first 13 bytes.
+  const spoofedHeader = new Uint8Array(100);
+  spoofedHeader.set([0x46, 0x33, 0x44, 0x43, REPLAY_CONTAINER_VERSION]);
+  new DataView(spoofedHeader.buffer).setUint32(5, 50_000_000);
+  const spoofedGz = await compressGzip(spoofedHeader);
+  await assert.rejects(
+    () => decodeCompressedContainer(spoofedGz),
+    /decompressed size limit/,
+  );
+});
+
+test('resolveReplayBudget separates compressed and decompressed limits cleanly', () => {
+  assert.ok(REPLAY_BUDGET.entryTrackBytes === 120_000);
+  assert.ok(REPLAY_BUDGET.entryCompressedBytes === 120_000);
+  assert.ok(REPLAY_BUDGET.entryDecompressedBytes > REPLAY_BUDGET.entryTrackBytes);
+  assert.equal(maxSamplesForTrack(REPLAY_BUDGET.entryTrackBytes, 0), maxSamplesFor(REPLAY_BUDGET.entryBase64Bytes, 0));
+  const custom = resolveReplayBudget({ entryCompressedBytes: 50_000, totalCompressedBytes: 250_000, entryDecompressedBytes: 180_000 });
+  assert.equal(custom.entryCompressedBytes, 50_000);
+  assert.equal(custom.totalCompressedBytes, 250_000);
+  assert.equal(custom.entryDecompressedBytes, 180_000);
 });

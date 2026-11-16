@@ -2,7 +2,7 @@ import { bindText, t, translateDOM } from '../i18n/index.js';
 import { flightDuration } from '../core/FlightRecorder.js';
 import { AIRCRAFT_REGISTRY, getAircraftSpecs, classifyLanding } from '../config/aircraftConfigs.js';
 import { scenarioLabelKey } from '../config/scenarioRegistry.js';
-import { createSortie } from '../replay/ReplayStore.js';
+import { createCompressedSortie, REPLAY_FILE_EXTENSION, REPLAY_MIME_TYPE } from '../replay/ReplayStore.js';
 
 const airportKeys = { coastal: 'coastal.airport', incheon: 'incheon.airport', lukla: 'lukla.vnlk',
   neon: 'neon.metropolis', valley: 'valley.region' };
@@ -167,29 +167,38 @@ export class DebriefOverlay {
     this.isFolded = false;
     this.el('fold')?.addEventListener('click', () => this.setFolded(true));
     this.el('unfold')?.addEventListener('click', () => this.setFolded(false));
-    this.el('save-replay').addEventListener('click', () => {
+    this.el('save-replay').addEventListener('click', async () => {
       if (this.replaySaved) return;
-      const { ok, error } = onSaveReplay?.() ?? { ok: false };
-      if (!ok) { this.status(SAVE_REPLAY_STATUS[error] ?? 'replay.saveFailed'); return; }
+      const saveBtn = this.el('save-replay');
+      saveBtn.disabled = true;
+      const { ok, error } = (await onSaveReplay?.()) ?? { ok: false };
+      if (!ok) {
+        saveBtn.disabled = false;
+        this.status(SAVE_REPLAY_STATUS[error] ?? 'replay.saveFailed');
+        return;
+      }
       // One save per sortie: a second click would only duplicate the row.
       this.replaySaved = true;
-      this.el('save-replay').disabled = true;
       this.status('replay.saved');
     });
     // Registered after the handlers above, so telemetry never decides whether an action runs.
     for (const [id, action] of Object.entries(DEBRIEF_ACTIONS)) {
       this.el(id)?.addEventListener('click', () => onAction?.(action, this.report));
     }
-    this.el('download').addEventListener('click', () => {
+    this.el('download').addEventListener('click', async () => {
       if (!this.report.sufficient) return;
-      const sortie = createSortie(this.report, this.replay);
-      const url = URL.createObjectURL(new Blob([JSON.stringify(sortie, null, 2)], { type: 'application/json' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `flight3d-${this.report.metadata?.aircraft ?? 'flight'}-flight.json`;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      this.status('debrief.downloaded');
+      try {
+        const bytes = await createCompressedSortie(this.report, this.replay);
+        const url = URL.createObjectURL(new Blob([bytes], { type: REPLAY_MIME_TYPE }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `flight3d-${this.report.metadata?.aircraft ?? 'flight'}-flight${REPLAY_FILE_EXTENSION}`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        this.status('debrief.downloaded');
+      } catch {
+        this.status('replay.saveFailed');
+      }
     });
     // Issue #370: the headline stays on one line; a clipped one reveals its full text on
     // hover, keyboard focus or tap. The h3 keeps the full text for screen readers.

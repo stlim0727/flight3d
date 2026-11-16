@@ -186,11 +186,13 @@ test('every debrief action names a button that exists in the overlay markup', ()
   }
 });
 
-test('debrief download emits flight3d.sortie.v1 unifying telemetry report and track', () => {
+test('debrief download emits gzipped binary container (.f3dr.gz) unifying telemetry report and track', () => {
   const source = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
-  assert.match(source, /createSortie\(this\.report,\s*this\.replay\)/, 'download handler must call createSortie');
-  assert.match(source, /import\s*\{[^}]*createSortie[^}]*\}\s*from '\.\.\/replay\/ReplayStore\.js'/,
-    'DebriefOverlay must import createSortie from ReplayStore');
+  assert.match(source, /createCompressedSortie\(this\.report,\s*this\.replay\)/, 'download handler must call createCompressedSortie');
+  assert.match(source, /import\s*\{[^}]*createCompressedSortie[^}]*\}\s*from '\.\.\/replay\/ReplayStore\.js'/,
+    'DebriefOverlay must import createCompressedSortie from ReplayStore');
+  assert.match(enDebrief['debrief.download'], /\.f3dr\.gz/, 'english download caption should reference .f3dr.gz');
+  assert.match(koDebrief['debrief.download'], /\.f3dr\.gz/, 'korean download caption should reference .f3dr.gz');
   assert.match(enDebrief['debrief.saveReplay'], /library/i, 'save replay caption should indicate library');
   assert.match(koDebrief['debrief.saveReplay'], /라이브러리/, 'korean save replay caption should indicate library');
 });
