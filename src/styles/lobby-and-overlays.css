@@ -613,6 +613,8 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
   padding: calc(4px * var(--ui-scale, 1)) calc(8px * var(--ui-scale, 1));
   font-size: calc(11px * var(--ui-scale, 1));
 }
+/* Phone and tablet layouts keep the 44px touch target used by the flight controls. */
+.compact-ui .lobby-card .lobby-actions .btn { min-height: calc(44px * var(--ui-scale, 1)); }
 .lobby-card .lobby-actions #btn-fly {
   flex: 1.4 1 calc(130px * var(--ui-scale, 1));
 }
