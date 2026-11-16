@@ -7,6 +7,30 @@ import { spawnSync } from 'node:child_process';
 import { combatExperimentConfig, runCombatExperiment } from '../scripts/lib/combatExperiment.mjs';
 import { runBoundedCombat } from '../scripts/run-combat-experiment.mjs';
 
+test('coastal CLI selects skills and persists provenance; deadline fails closed', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'flight-coastal-skills-'));
+  const output = join(dir, 'play.json');
+  const args = ['scripts/run-combat-experiment.mjs', '--scenario', 'coastal', '--seconds', '2',
+    '--attack-skill', 'hold', '--evasion-skill', 'hold', '--countermeasure-policy', 'none', '--output', output];
+  try {
+    const run = spawnSync(process.execPath, args, { encoding: 'utf8', timeout: 10000 });
+    assert.equal(run.status, 0, run.stderr);
+    const report = JSON.parse(readFileSync(output)), summary = JSON.parse(readFileSync(join(dir, 'play.summary.json')));
+    assert.equal(report.status, 'complete');
+    assert.equal(report.completedCases, 1);
+    assert.equal(report.metadata.renderer, 'none');
+    assert.equal(report.metadata.terrain, 'coastal');
+    assert.equal(summary.config.skills.attack.id, 'hold');
+    assert.equal(summary.config.skills.evasion.id, 'hold');
+    assert.equal(summary.config.skills.countermeasure.id, 'none');
+    assert.deepEqual(summary.metadata.skills, report.results[0].skills);
+    const failed = spawnSync(process.execPath, [...args, '--timeout', '0.000001'], { encoding: 'utf8', timeout: 10000 });
+    assert.notEqual(failed.status, 0);
+    assert.equal(JSON.parse(readFileSync(output)).status, 'incomplete');
+    assert.equal(JSON.parse(readFileSync(join(dir, 'play.summary.json'))).status, 'incomplete');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('default grids preserve locked-IR and existing defense case counts', () => {
   const ir = combatExperimentConfig(), defense = combatExperimentConfig({ scenario: 'defense' });
   assert.equal(ir.geometries.length * ir.variants.length, 300);

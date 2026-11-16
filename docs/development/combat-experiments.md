@@ -66,3 +66,49 @@ simulate a human pilot, player control response, the Coastal Cruise preset,
 UI, rendered images or real-world weapon probabilities. Use the existing
 `HeadlessSimulation` for actual player/preset physics, and browser verification
 only for behavior that needs a browser.
+# Swappable Coastal combat pilot
+
+Use the production F16/Coastal/Cruise physics and weapons without a renderer:
+
+```sh
+npm run combat:experiment -- --list-skills
+npm run combat:experiment -- --scenario coastal --seconds 300 --timeout 60 \
+  --attack-skill pursuit --evasion-skill legacy-break --countermeasure-policy single \
+  --diagnostics --output .cache/combat-experiment/coastal-reference.json
+# Change one factor; keep the other arguments identical.
+npm run combat:experiment -- --scenario coastal --seconds 300 --timeout 60 \
+  --attack-skill pursuit --evasion-skill hold --countermeasure-policy single \
+  --output .cache/combat-experiment/coastal-hold.json
+```
+
+Selectors apply to `--scenario coastal`; matrix modes reject them rather than
+silently ignoring them. `pursuit` fires at confirmed lock within 2500 m;
+`close-pursuit` uses 1500 m; `hold` holds the current heading/altitude and never
+fires. Evasion `legacy-break` preserves existing warning-driven guidance;
+`hold` follows patrol while keeping warning perception active. Countermeasure
+`single` preserves one flare and chaff per confirmed threat, with finite stock
+and existing reset/respawn handling; `none` suppresses dispensing independently
+of perception and evasion. No PR is treated as the realism reference.
+
+Policy IDs and versions appear in report/summary configuration and metadata.
+The initial state is saved for paired comparisons. The sortie ends at the
+simulation limit (maximum 300 seconds), crash, or resolved final missile.
+Only one missile is allowed in flight at a time. The existing worker wall-clock
+deadline terminates runaway physics; timed-out/failed runs remain `incomplete`.
+Use distinct output paths to keep comparisons. `--diagnostics` saves sampled
+position, contact, guidance and lock state; this is numerical telemetry, not an
+importable visual replay.
+
+`src/pilot/CombatSkills.js` is the local observation-to-guidance policy boundary.
+Add identifiers and implementations there, and bump a policy's version when its
+behavior changes. Attack receives plain own/contact/lock snapshots, never the
+world, missile truth or seeker internals. The experimental contact sensor uses
+ideal position samples at 5 Hz within 12 km with sampled terrain line of sight;
+it is not a validated F16 radar/visual model. Defender warnings retain the
+existing simplified optical-plume/RWR perception. Guidance flows through the
+normal force model and player virtual controls. These policies are experiment
+fixtures, not validated realistic evasion/counterattack skills. A zero-launch
+sortie cannot establish missile hit probability; inspect `firstLockSeconds`,
+crash state and launch records before interpreting kill counts. Developing
+effective attack/evasion policies and missile-model calibration remain separate
+tasks in #794.

@@ -1,3 +1,5 @@
+import { combatSkill } from '../../src/pilot/CombatSkills.js';
+import { runCoastalCombatPlay } from './coastalCombatPlay.mjs';
 import assert from 'node:assert/strict';
 import { simulateCombatSituation } from './combatSituationMatrix.mjs';
 import { DEFENSE_VARIANTS } from './combatDefenseAudit.mjs';
@@ -15,6 +17,21 @@ function numbers(text, fallback, valid, label) {
 
 export function combatExperimentConfig(values = {}) {
   const scenario = values.scenario ?? 'locked-ir';
+  if (scenario === 'coastal') {
+    for (const key of ['defense', 'types', 'ranges', 'aspects', 'speeds', 'altitude-pairs']) {
+      if (values[key] !== undefined) throw new Error(`${key} is not supported for coastal`);
+    }
+    const seconds = Number(values.seconds ?? 300), timeoutSeconds = Number(values.timeout ?? 60);
+    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 300) throw new Error('seconds must be within (0, 300]');
+    if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) throw new Error('Timeout must be positive seconds');
+    return { scenario, seconds, timeoutSeconds, geometries: [], variants: [], recordTrajectory: Boolean(values.diagnostics),
+      skills: { attack: combatSkill('attack', values['attack-skill'] ?? 'pursuit'),
+        evasion: combatSkill('evasion', values['evasion-skill'] ?? 'legacy-break'),
+        countermeasure: combatSkill('countermeasure', values['countermeasure-policy'] ?? 'single') } };
+  }
+  for (const key of ['seconds', 'attack-skill', 'evasion-skill', 'countermeasure-policy']) {
+    if (values[key] !== undefined) throw new Error(`${key} requires --scenario coastal`);
+  }
   if (!['locked-ir', 'defense', 'single'].includes(scenario)) throw new Error('Unknown scenario');
   const single = scenario === 'single', defense = scenario === 'defense';
   const types = list(values.types, defense ? ['AIM9X', 'AIM120C'] : ['AIM9X']);
@@ -49,6 +66,7 @@ export function combatExperimentConfig(values = {}) {
 }
 
 export function runCombatExperiment(config, progress = () => {}) {
+  if (config.scenario === 'coastal') return runCoastalCombatPlay(config, progress);
   const results = [];
   for (const geometry of config.geometries) {
     const group = config.variants.map(({ id, ...controls }) => ({ variant: id,
