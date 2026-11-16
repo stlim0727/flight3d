@@ -105,7 +105,7 @@ export class BanditTarget {
       const ground = Math.max(terrainHeight(this.position.x, this.position.z),
         terrainHeight(this.position.x + Math.sin(heading) * lookahead,
           this.position.z - Math.cos(heading) * lookahead));
-      const evadeClimb = this.evasionSkill !== 'none'
+      const evadeClimb = this.evasionSkill !== 'hold'
         ? EVASION_CLIMB_M * response.weight * avionicsIntegrity
         : 0;
       const altitude = Math.max(o.altitudeM + evadeClimb, ground + 420);
@@ -170,7 +170,7 @@ export class AirToAirMissileSystem {
     banditEvasion = true,
     banditRwr = true,
     evasionSkill = 'legacy-break',
-    countermeasurePolicy = 'single',
+    countermeasurePolicy = 'burst',
   } = {}) {
     this.stations = stations;
     this.specs = specs;
@@ -511,13 +511,13 @@ export class AirToAirMissileSystem {
     );
   }
 
-  _stepDecoyBurst(dt, target, threatId, threatIds, bursts, dispenser, list, type, eventKey, events) {
+  _stepDecoyBurst(dt, target, threatId, burstCount, threatIds, bursts, dispenser, list, type, eventKey, events) {
     if (!target.alive || threatId === null || !bursts || !dispenser) return;
     let burst = bursts.get(threatId);
     if (!burst) {
       if (threatIds?.has(threatId)) return;
       threatIds?.add(threatId);
-      burst = { remaining: DECOY_BURST_COUNT, cooldownSec: 0, shotIndex: 0 };
+      burst = { remaining: burstCount, cooldownSec: 0, shotIndex: 0 };
       bursts.set(threatId, burst);
     } else if (burst.remaining > 0) {
       burst.cooldownSec = Math.max(0, burst.cooldownSec - dt);
@@ -544,13 +544,16 @@ export class AirToAirMissileSystem {
   }
 
   _step(dt, world, events) {
+    const burstCount = this.countermeasurePolicy === 'burst'
+      ? DECOY_BURST_COUNT
+      : this.countermeasurePolicy === 'single' ? 1 : 0;
     for (const target of this.targets) {
       target.update(dt, world.terrainHeight, this.missiles);
       const threatId = target.threatResponse.confirmedId;
-      if (this.countermeasurePolicy === 'single') {
-        this._stepDecoyBurst(dt, target, threatId, target.chaffThreatIds, target.chaffBursts, target.chaff,
+      if (burstCount > 0) {
+        this._stepDecoyBurst(dt, target, threatId, burstCount, target.chaffThreatIds, target.chaffBursts, target.chaff,
           this.chaffClouds, 'chaff_dispense', 'chaff', events);
-        this._stepDecoyBurst(dt, target, threatId, target.flareThreatIds, target.flareBursts, target.flare,
+        this._stepDecoyBurst(dt, target, threatId, burstCount, target.flareThreatIds, target.flareBursts, target.flare,
           this.flares, 'flare_dispense', 'flare', events);
       }
       if (!target.alive) {

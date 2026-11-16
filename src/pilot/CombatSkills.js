@@ -4,7 +4,7 @@
 export const COMBAT_SKILLS = Object.freeze({
   attack: Object.freeze(['pursuit', 'close-pursuit', 'hold']),
   evasion: Object.freeze(['legacy-break', 'hold']),
-  countermeasure: Object.freeze(['single', 'none']),
+  countermeasure: Object.freeze(['burst', 'single', 'none']),
 });
 
 export function combatSkill(kind, id) {
