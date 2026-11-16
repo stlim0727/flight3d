@@ -96,28 +96,46 @@ export function createMissileMesh(type) {
   return group;
 }
 
-const BANDIT_TRIM_COLORS = Object.freeze({ RED: 0xff0000, BLUE: 0x0000ff, GREEN: 0x00ff00 });
-const BANDIT_DEFAULT_TRIM = 0xd07b32;
+/**
+ * Aggressor liveries are keyed by callsign so the two patrol slots, the canyon
+ * chase and recorded callbacks keep the same paint across respawns and replays.
+ * Slots 1/2 are deliberately separated in hue; the canyon aircraft borrows the
+ * lizard scheme and an orange flash.
+ */
+const BANDIT_LIVERIES = Object.freeze([
+  { key: 'desert', body: 0xd9c49b, trim: 0x6b3a24, number: '1' },
+  { key: 'blue', body: 0x93a8bc, trim: 0xe8eef5, number: '2' },
+  { key: 'lizard', body: 0x7e876b, trim: 0xd07b32, number: 'C' },
+]);
+
+function banditLivery(callsign) {
+  const text = String(callsign).toUpperCase();
+  if (text.includes('CANYON')) return BANDIT_LIVERIES[2];
+  const slot = text.match(/BANDIT\s*([1-9]\d*)/);
+  if (slot) return BANDIT_LIVERIES[(Number(slot[1]) - 1) % BANDIT_LIVERIES.length];
+  // Prepare/arena callers can invent callsigns; hash them into a stable scheme.
+  let hash = 0;
+  for (const character of text) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  return BANDIT_LIVERIES[hash % BANDIT_LIVERIES.length];
+}
 
 /** Callsign palette and proportions, shared by the procedural proxy and the loaded airframe. */
 export function banditSkin(callsign = 'BANDIT') {
-  let trim = BANDIT_DEFAULT_TRIM;
-  for (const [name, color] of Object.entries(BANDIT_TRIM_COLORS)) {
-    if (callsign.includes(name)) { trim = color; break; }
-  }
+  const livery = banditLivery(callsign);
   const scale = callsign.includes('HEAVY') ? [1.18, 1.08, 1.3]
     : callsign.includes('B-1') ? [0.86, 1.04, 1.12] : [1, 1, 1];
-  return { trim, scale };
+  return { ...livery, scale };
 }
 
 /** Cheap delta-wing target drone used for the two airborne bandits. */
 export function createBanditMesh(callsign = 'BANDIT') {
   const group = new THREE.Group();
   group.name = `Bandit_${callsign}`;
-  const dark = material('bandit-dark', { color: 0x3a4148, roughness: 0.62, metalness: 0.3 });
-  // Materials are cached by key, so the trim key carries the color: recoloring one callsign
-  // must never repaint the bandits that share the default orange.
-  const { trim } = banditSkin(callsign);
+  // Materials are cached by key, so every key carries its color: recoloring one
+  // callsign must never repaint the bandits that share the default scheme.
+  const { body, trim } = banditSkin(callsign);
+  const dark = material(`bandit-body-${body.toString(16)}`,
+    { color: body, roughness: 0.62, metalness: 0.3 });
   const trimMaterial = material(`bandit-trim-${trim.toString(16)}`,
     { color: trim, roughness: 0.5, metalness: 0.2 });
 

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
+import { banditSkin } from '../src/weapons/missileGeometry.js';
 
 /** Bandit targets keep the missile system's insertion order, never a distance order. */
 function combatState(targets) {
@@ -68,16 +69,17 @@ test('bandit gaze lock tracks the nearest bandit and releases when every target 
 test('a loaded bandit airframe keeps the callsign skin after the proxy is hidden (#722)', async () => {
   const { BanditAircraftView } = await import('../src/weapons/BanditAircraftView.js');
   const view = Object.create(BanditAircraftView.prototype);
-  view.callsign = 'BANDIT RED';
+  view.callsign = 'BANDIT 1';
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(), material);
+  mesh.name = 'F-16-airframe_0';
   const group = new THREE.Group();
   group.add(mesh);
   view.airframe = { group };
 
   view._skinAirframe();
   assert.notEqual(mesh.material, material, 'the loaded airframe gets its own materials');
-  assert.equal(mesh.material.color.getHex(), 0xff0000);
+  assert.equal(mesh.material.color.getHex(), banditSkin('BANDIT 1').body);
 
   view.callsign = 'BANDIT HEAVY';
   view._skinAirframe();
