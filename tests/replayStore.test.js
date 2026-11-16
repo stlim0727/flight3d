@@ -27,8 +27,10 @@ import {
   REPLAY_CONTAINER_VERSION,
   isGzipBytes,
 } from '../src/replay/ReplayCodec.js';
+import { SimulatorClass } from './helpers/simulatorClass.js';
 
 const INDEX_KEY = 'flight3d.replays.v1';
+const ROOM_STAGING_KEY = 'flight3d.roomReplayStaging.v1';
 const payloadKey = id => `flight3d.replay.${id}.v1`;
 
 class MockStorage {
@@ -748,6 +750,11 @@ test('failed or interrupted localStorage migration preserves originals and retri
   assert.equal(firstAttempt.migrated, 1);
   assert.equal(firstAttempt.remaining, 2);
   assert.ok(firstAttempt.error);
+  assert.deepEqual(
+    store.list().map(r => r.id),
+    ['mig-1'],
+    'already-migrated entries must appear in store.list() immediately after mid-migration failure',
+  );
 
   // mig-1 migrated and was cleaned up; mig-2 and mig-3 originals remain untouched in localStorage.
   assert.equal(storage.getItem(payloadKey('mig-1')), null);
@@ -936,4 +943,155 @@ test('exported file size comparison across representative synthetic solo, combat
     });
   }
   console.log('Replay size comparison (bytes):', JSON.stringify(results));
+});
+
+test('multi-tab ReplayStore instances sync live IndexedDB rows for saveAuto, budget eviction, rename, and remove', async () => {
+  const idb = createMemoryIndexedDB();
+  const tabA = storeFor(new MockStorage(), BUDGET, { indexedDB: idb });
+  const tabB = storeFor(new MockStorage(), BUDGET, { indexedDB: idb });
+  await Promise.all([tabA.ready(), tabB.ready()]);
+
+  // Auto-save slot replacement across tabs leaves only one auto_save entry in IndexedDB.
+  const autoA = (await tabA.saveAuto(track(20))).entry;
+  const autoB = (await tabB.saveAuto(track(24))).entry;
+  assert.equal(getIdbEntry(idb, autoA.id), null, 'tabB saveAuto must evict tabA auto_save metadata');
+  assert.equal(getIdbPayload(idb, autoA.id), null, 'tabB saveAuto must evict tabA auto_save payload');
+  assert.ok(getIdbEntry(idb, autoB.id));
+  assert.deepEqual(tabB.list().map(row => row.id), [autoB.id]);
+
+  // Cross-tab rename promotes an entry without tabB knowing about tabA writes upfront.
+  const manA1 = (await tabA.save(track(20), { label: 'TabA-1', savedAt: '2999-01-01T00:00:01.000Z' })).entry;
+  assert.equal(await tabB.rename(manA1.id, 'TabB Renamed'), true);
+  assert.equal((await tabA.get(manA1.id)).meta.label, 'TabB Renamed');
+
+  // Budget limit (entries: 3) is enforced across combined entries from both tabs.
+  const manA2 = (await tabA.save(track(22), { label: 'TabA-2', savedAt: '2999-01-01T00:00:02.000Z' })).entry;
+  const manB1 = (await tabB.save(track(26), { label: 'TabB-1', savedAt: '2999-01-01T00:00:03.000Z' })).entry;
+  assert.equal(manA2.label, 'TabA-2');
+  const liveIds = [...idb._databases.get(REPLAY_DB_NAME).stores.get(REPLAY_ENTRIES_STORE).data.keys()];
+  assert.equal(liveIds.length, 3, 'combined entries across tabs must not exceed budget.entries');
+  assert.equal(getIdbEntry(idb, autoB.id), null, 'oldest combined entry across tabs must be evicted');
+  assert.equal(getIdbPayload(idb, autoB.id), null);
+  assert.ok(liveIds.includes(manA1.id) && liveIds.includes(manA2.id) && liveIds.includes(manB1.id));
+
+  // Cross-tab remove + stale rename must not resurrect deleted rows.
+  assert.equal(await tabB.remove(manA1.id), true);
+  assert.equal(await tabA.rename(manA1.id, 'Ghost'), false);
+  assert.equal(getIdbEntry(idb, manA1.id), null);
+  assert.equal(await tabA.remove(manA1.id), false);
+});
+
+test('overlapping saveRoomAuto calls preserve newer ROOM_STAGING_KEY until the newer save settles', async () => {
+  const storage = new MockStorage();
+  const idb = createMemoryIndexedDB();
+  const store = storeFor(storage, BUDGET, { indexedDB: idb });
+  await store.ready();
+
+  const firstSave = store.saveRoomAuto(track(20));
+  const firstStaged = JSON.parse(storage.getItem(ROOM_STAGING_KEY));
+  const secondSave = store.saveRoomAuto(track(26));
+  const secondStaged = JSON.parse(storage.getItem(ROOM_STAGING_KEY));
+  assert.notEqual(firstStaged.id, secondStaged.id);
+
+  const firstResult = await firstSave;
+  assert.ok(firstResult.entry);
+  const remainingStaged = JSON.parse(storage.getItem(ROOM_STAGING_KEY));
+  assert.equal(remainingStaged.id, secondStaged.id, 'older save completion must not clear newer room staging entry');
+
+  const secondResult = await secondSave;
+  assert.ok(secondResult.entry);
+  assert.equal(storage.getItem(ROOM_STAGING_KEY), null);
+  assert.equal((await store.get(secondResult.entry.id)).track.samples.length, 26);
+});
+
+test('FlightSimulator.saveDebriefReplay keeps snapshot if debriefReplay clears while awaiting save', async () => {
+  let resolveSave;
+  const analyticsCalls = [];
+  const replay = track(20);
+  const sim = {
+    debriefReplay: replay,
+    debriefReport: { label: 'Debrief', durationSec: replay.durationSec, metadata: { aircraft: 'B738' } },
+    replayStore: {
+      save: () => new Promise(resolve => { resolveSave = resolve; }),
+    },
+    analytics: {
+      trackReplaySaved(payload) { analyticsCalls.push(payload); },
+    },
+  };
+
+  const pending = SimulatorClass.prototype.saveDebriefReplay.call(sim);
+  sim.debriefReplay = null;
+  sim.debriefReport = null;
+  resolveSave({ entry: { id: 'saved-1' }, error: null });
+
+  const outcome = await pending;
+  assert.deepEqual(outcome, { ok: true, error: null });
+  assert.deepEqual(analyticsCalls, [{ result: 'ok', durationSeconds: replay.durationSec }]);
+});
+
+test('createCompressedSortie enforces compressed byte limits even when uncompressed inputs fit', async () => {
+  const t = track(45);
+  // Deterministic high-entropy pseudo-random characters keep JSON poorly compressible while staying < entryReportBytes.
+  let seed = 1337;
+  const nextRand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed;
+  };
+  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_+=!@#$%^&*';
+  const noisyToken = len => Array.from({ length: len }, () => alphabet[nextRand() % alphabet.length]).join('');
+
+  const largeSamples = Array.from({ length: 420 }, (_, i) => ({
+    timeSec: Number((i * 0.2).toFixed(2)),
+    gForce: i === 123 ? 5.9 : 1.0 + (i % 7) * 0.1,
+    altitudeFt: 2000 + i,
+    note: noisyToken(42),
+  }));
+  const strictBudget = {
+    ...BUDGET,
+    entryTrackBytes: 12_000,
+    entryReportBytes: 200_000,
+    entryDecompressedBytes: 215_000,
+    entryCompressedBytes: 6_500,
+  };
+  const heavyReport = {
+    label: 'Heavy Debrief',
+    reason: 'landed',
+    durationSec: t.durationSec,
+    metadata: t.metadata,
+    peaks: { gForce: largeSamples[123] },
+    samples: largeSamples,
+  };
+
+  const uncompressedContainer = createSortieContainer(heavyReport, t, strictBudget);
+  const naiveCompressed = await compressGzip(uncompressedContainer);
+  assert.ok(naiveCompressed.byteLength > strictBudget.entryCompressedBytes,
+    `expected naive gzip (${naiveCompressed.byteLength}) to exceed compressed budget`);
+
+  const boundedGz = await createCompressedSortie(heavyReport, t, strictBudget);
+  assert.ok(boundedGz.byteLength <= strictBudget.entryCompressedBytes,
+    `expected bounded gzip (${boundedGz.byteLength}) <= ${strictBudget.entryCompressedBytes}`);
+
+  const importer = storeFor(new MockStorage(), strictBudget);
+  const imported = await importer.importReplay(boundedGz);
+  assert.equal(imported.error, null);
+  assert.ok(imported.entry);
+
+  // Reports without decimateable samples fall back to compact summary metadata when gzipped size exceeds limit.
+  const noSamplesHeavyReport = {
+    label: 'Summary Fallback',
+    reason: 'landed',
+    durationSec: t.durationSec,
+    metadata: t.metadata,
+    extraBlob: noisyToken(9_000),
+  };
+  const fallbackGz = await createCompressedSortie(noSamplesHeavyReport, t, strictBudget);
+  assert.ok(fallbackGz.byteLength <= strictBudget.entryCompressedBytes);
+  const importedFallback = await importer.importReplay(fallbackGz);
+  assert.equal(importedFallback.error, null);
+  assert.equal((await importer.get(importedFallback.entry.id)).report.reportTruncatedForBudget, true);
+
+  await assert.rejects(
+    () => createCompressedSortie(heavyReport, t, { ...strictBudget, entryCompressedBytes: 40 }),
+    RangeError,
+  );
 });

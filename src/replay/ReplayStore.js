@@ -250,14 +250,19 @@ export function extractReportSummary(report) {
   return Object.keys(summary).length ? summary : null;
 }
 
-function maybeAttachEngagement(report, decodedTrack) {
-  if (report && !report.engagement && decodedTrack?.combat) {
+function withAttachedEngagement(report, decodedTrack) {
+  if (!report) return null;
+  if (decodedTrack?.combat) {
     try {
-      report.engagement = analyzeCombatEngagement({ report, track: decodedTrack });
+      return {
+        ...report,
+        engagement: analyzeCombatEngagement({ report, track: decodedTrack }),
+      };
     } catch {
-      // non-fatal
+      return report;
     }
   }
+  return report;
 }
 
 function encodePlayableTrackBytes(trackOrReplay) {
@@ -293,13 +298,34 @@ export function createSortie(report, trackOrReplay) {
     }
   }
 
-  maybeAttachEngagement(report, decodedTrack);
+  report = withAttachedEngagement(report, decodedTrack);
 
   return {
     kind: SORTIE_KIND,
     report: report ?? null,
     track,
   };
+}
+
+function findPeakGSampleTime(samples) {
+  let peakIndex = -1;
+  samples.forEach((entry, index) => {
+    if (Number.isFinite(entry?.gForce) && (peakIndex < 0 || entry.gForce > samples[peakIndex].gForce)) peakIndex = index;
+  });
+  return peakIndex >= 0 ? samples[peakIndex].timeSec : null;
+}
+
+function decimateReportSamplesOnce(report, peakTime = null) {
+  if (!report || !Array.isArray(report.samples) || report.samples.length === 0) return report;
+  const samples = report.samples;
+  const targetPeakTime = peakTime ?? findPeakGSampleTime(samples);
+  const next = samples.length <= 2
+    ? []
+    : samples.filter((entry, index) =>
+      index === 0 || index === samples.length - 1 || index % 2 === 0
+      || (targetPeakTime !== null && entry?.timeSec === targetPeakTime));
+  const halved = next.length === samples.length ? samples.slice(0, Math.floor(samples.length / 2)) : next;
+  return { ...report, samples: halved, samplesDecimatedForBudget: true };
 }
 
 /**
@@ -319,20 +345,9 @@ function boundReportForContainer(report, trackBytes, compactReport, budget) {
   if (fits(currentReport)) return currentReport;
 
   if (Array.isArray(currentReport.samples) && currentReport.samples.length > 0) {
-    let samples = currentReport.samples;
-    let peakIndex = -1;
-    samples.forEach((entry, index) => {
-      if (Number.isFinite(entry?.gForce) && (peakIndex < 0 || entry.gForce > samples[peakIndex].gForce)) peakIndex = index;
-    });
-    const peakTime = peakIndex >= 0 ? samples[peakIndex].timeSec : null;
-    while (samples.length > 0 && !fits(currentReport)) {
-      const next = samples.length <= 2
-        ? []
-        : samples.filter((entry, index) =>
-          index === 0 || index === samples.length - 1 || index % 2 === 0
-          || (peakTime !== null && entry?.timeSec === peakTime));
-      samples = next.length === samples.length ? samples.slice(0, Math.floor(samples.length / 2)) : next;
-      currentReport = { ...currentReport, samples, samplesDecimatedForBudget: true };
+    const peakTime = findPeakGSampleTime(currentReport.samples);
+    while (Array.isArray(currentReport.samples) && currentReport.samples.length > 0 && !fits(currentReport)) {
+      currentReport = decimateReportSamplesOnce(currentReport, peakTime);
     }
   }
 
@@ -342,8 +357,16 @@ function boundReportForContainer(report, trackBytes, compactReport, budget) {
   return currentReport;
 }
 
-/** Build an uncompressed F3DC binary container from a report and playable track. */
-export function createSortieContainer(report, trackOrReplay, limits = {}) {
+function resolveContainerLimits(limits = {}) {
+  return {
+    maxCompressedBytes: limits.maxCompressedBytes ?? limits.entryCompressedBytes ?? REPLAY_BUDGET.entryCompressedBytes,
+    maxDecompressedBytes: limits.maxDecompressedBytes ?? limits.entryDecompressedBytes ?? REPLAY_BUDGET.entryDecompressedBytes,
+    maxReportBytes: limits.maxReportBytes ?? limits.entryReportBytes ?? REPLAY_BUDGET.entryReportBytes,
+    maxTrackBytes: limits.maxTrackBytes ?? limits.entryTrackBytes ?? REPLAY_BUDGET.entryTrackBytes,
+  };
+}
+
+function prepareSortiePayload(report, trackOrReplay) {
   let trackBytes = null;
   let decodedTrack = null;
   if (typeof trackOrReplay === 'string') {
@@ -364,8 +387,7 @@ export function createSortieContainer(report, trackOrReplay, limits = {}) {
     }
   }
 
-  const resolvedReport = report ? { ...report } : null;
-  maybeAttachEngagement(resolvedReport, decodedTrack);
+  const resolvedReport = withAttachedEngagement(report ? { ...report } : null, decodedTrack);
   const compactReport = resolvedReport ? {
     label: resolvedReport.label ?? null,
     reason: resolvedReport.reason ?? null,
@@ -373,11 +395,69 @@ export function createSortieContainer(report, trackOrReplay, limits = {}) {
     metadata: resolvedReport.metadata ?? decodedTrack?.metadata ?? {},
     ...(extractReportSummary(resolvedReport) ? { summary: extractReportSummary(resolvedReport) } : {}),
   } : null;
-  const resolvedLimits = {
-    maxReportBytes: limits.maxReportBytes ?? limits.entryReportBytes ?? REPLAY_BUDGET.entryReportBytes,
-    maxTrackBytes: limits.maxTrackBytes ?? limits.entryTrackBytes ?? REPLAY_BUDGET.entryTrackBytes,
-    maxDecompressedBytes: limits.maxDecompressedBytes ?? limits.entryDecompressedBytes ?? REPLAY_BUDGET.entryDecompressedBytes,
+  return { trackBytes, resolvedReport, compactReport };
+}
+
+async function compressBoundedSortieContainer({ report, compactReport, trackBytes, limits = {} }) {
+  const resolvedLimits = resolveContainerLimits(limits);
+  const containerBudget = {
+    entryReportBytes: resolvedLimits.maxReportBytes,
+    entryTrackBytes: resolvedLimits.maxTrackBytes,
+    entryDecompressedBytes: resolvedLimits.maxDecompressedBytes,
   };
+  let activeReport = boundReportForContainer(report, trackBytes, compactReport, containerBudget);
+  let container = encodeReplayContainer({ report: activeReport, trackBytes }, resolvedLimits);
+  let compressed = await compressGzip(container);
+  const peakTime = Array.isArray(activeReport?.samples) ? findPeakGSampleTime(activeReport.samples) : null;
+
+  while (compressed.byteLength > resolvedLimits.maxCompressedBytes
+    && Array.isArray(activeReport?.samples) && activeReport.samples.length > 0) {
+    activeReport = decimateReportSamplesOnce(activeReport, peakTime);
+    container = encodeReplayContainer({ report: activeReport, trackBytes }, resolvedLimits);
+    compressed = await compressGzip(container);
+  }
+
+  if (compressed.byteLength > resolvedLimits.maxCompressedBytes && compactReport && activeReport !== compactReport) {
+    activeReport = boundReportForContainer(
+      { ...compactReport, reportTruncatedForBudget: true },
+      trackBytes,
+      compactReport,
+      containerBudget,
+    );
+    container = encodeReplayContainer({ report: activeReport, trackBytes }, resolvedLimits);
+    compressed = await compressGzip(container);
+  }
+
+  if (compressed.byteLength > resolvedLimits.maxCompressedBytes && activeReport !== null) {
+    const minimalReport = {
+      label: activeReport.label ?? null,
+      durationSec: activeReport.durationSec ?? null,
+      metadata: activeReport.metadata ?? {},
+      reportTruncatedForBudget: true,
+    };
+    const boundedMinimal = boundReportForContainer(minimalReport, trackBytes, null, containerBudget);
+    const minimalCompressed = await compressGzip(
+      encodeReplayContainer({ report: boundedMinimal, trackBytes }, resolvedLimits),
+    );
+    if (minimalCompressed.byteLength <= resolvedLimits.maxCompressedBytes) {
+      compressed = minimalCompressed;
+    } else {
+      const trackOnlyCompressed = await compressGzip(
+        encodeReplayContainer({ report: null, trackBytes }, resolvedLimits),
+      );
+      if (trackOnlyCompressed.byteLength <= resolvedLimits.maxCompressedBytes) {
+        compressed = trackOnlyCompressed;
+      }
+    }
+  }
+
+  return { compressed, maxCompressedBytes: resolvedLimits.maxCompressedBytes };
+}
+
+/** Build an uncompressed F3DC binary container from a report and playable track. */
+export function createSortieContainer(report, trackOrReplay, limits = {}) {
+  const { trackBytes, resolvedReport, compactReport } = prepareSortiePayload(report, trackOrReplay);
+  const resolvedLimits = resolveContainerLimits(limits);
   const boundedReport = boundReportForContainer(resolvedReport, trackBytes, compactReport, {
     entryReportBytes: resolvedLimits.maxReportBytes,
     entryTrackBytes: resolvedLimits.maxTrackBytes,
@@ -388,8 +468,17 @@ export function createSortieContainer(report, trackOrReplay, limits = {}) {
 
 /** Build a gzip-compressed `.f3dr.gz` binary container ready for download or storage. */
 export async function createCompressedSortie(report, trackOrReplay, limits = {}) {
-  const container = createSortieContainer(report, trackOrReplay, limits);
-  return compressGzip(container);
+  const { trackBytes, resolvedReport, compactReport } = prepareSortiePayload(report, trackOrReplay);
+  const { compressed, maxCompressedBytes } = await compressBoundedSortieContainer({
+    report: resolvedReport,
+    compactReport,
+    trackBytes,
+    limits,
+  });
+  if (compressed.byteLength > maxCompressedBytes) {
+    throw new RangeError('Replay compressed payload exceeds size limit');
+  }
+  return compressed;
 }
 
 /** Default label is what the player remembers the flight by, not a timestamp. */
@@ -580,20 +669,19 @@ export class ReplayStore {
     };
   }
 
-  async _commitIdbChanges(db, { putEntry = null, putPayload = null, deleteIds = [] } = {}) {
-    const stores = putPayload !== null || deleteIds.length > 0
-      ? [REPLAY_ENTRIES_STORE, REPLAY_PAYLOADS_STORE]
-      : [REPLAY_ENTRIES_STORE];
+  async _withLiveEntriesTx(db, stores, handler) {
     const tx = db.transaction(stores, 'readwrite');
     const entriesStore = tx.objectStore(REPLAY_ENTRIES_STORE);
     const payloadsStore = stores.includes(REPLAY_PAYLOADS_STORE) ? tx.objectStore(REPLAY_PAYLOADS_STORE) : null;
-    for (const id of deleteIds) {
-      entriesStore.delete(id);
-      payloadsStore?.delete(id);
-    }
-    if (putEntry) entriesStore.put(putEntry);
-    if (putPayload !== null && putEntry) payloadsStore.put(putPayload, putEntry.id);
+    let outcome;
+    const getAllReq = entriesStore.getAll();
+    getAllReq.onsuccess = event => {
+      const raw = event?.target?.result ?? getAllReq.result;
+      const liveRows = Array.isArray(raw) ? raw.filter(validRow) : [];
+      outcome = handler({ liveRows, entriesStore, payloadsStore });
+    };
     await idbTransactionPromise(tx);
+    return outcome;
   }
 
   async _initialize() {
@@ -623,43 +711,79 @@ export class ReplayStore {
   }
 
   async _buildCompressedPayload(trackBytes, report, compactReport) {
-    const limits = this._containerLimits();
-    let activeReport = boundReportForContainer(report, trackBytes, compactReport, this.budget);
-    let container = encodeReplayContainer({ report: activeReport, trackBytes }, limits);
-    let compressed = await compressGzip(container);
-    if (compressed.byteLength > this.budget.entryCompressedBytes && activeReport !== compactReport && compactReport) {
-      activeReport = boundReportForContainer({ ...compactReport, reportTruncatedForBudget: true }, trackBytes, compactReport, this.budget);
-      container = encodeReplayContainer({ report: activeReport, trackBytes }, limits);
-      compressed = await compressGzip(container);
-    }
-    if (compressed.byteLength > this.budget.entryCompressedBytes) {
+    const { compressed, maxCompressedBytes } = await compressBoundedSortieContainer({
+      report,
+      compactReport,
+      trackBytes,
+      limits: this._containerLimits(),
+    });
+    if (compressed.byteLength > maxCompressedBytes) {
       return { error: 'tooLong', compressed: null };
     }
     return { error: null, compressed };
   }
 
-  async _commitWithBudget(db, entry, compressedBytes, replaced = []) {
+  async _commitWithBudget(db, entry, compressedBytes, replaced = [], { preserveNewerAuto = false } = {}) {
     const payload = this._packStoredPayload(compressedBytes);
-    const replacedIds = new Set(replaced.map(row => row.id));
-    const surviving = this._committedRows.filter(row => !replacedIds.has(row.id) && row.id !== entry.id);
-    const candidates = this.applyBudget([...surviving, entry], entry.id);
-    candidates.evicted.push(...replaced);
+    const extraEvictedIds = new Set();
 
     for (;;) {
+      let lastRows = null;
       try {
-        const deleteIds = candidates.evicted.map(row => row.id);
-        await this._commitIdbChanges(db, { putEntry: entry, putPayload: payload, deleteIds });
-        this._committedRows = candidates.rows;
+        const result = await this._withLiveEntriesTx(
+          db,
+          [REPLAY_ENTRIES_STORE, REPLAY_PAYLOADS_STORE],
+          ({ liveRows, entriesStore, payloadsStore }) => {
+            if (preserveNewerAuto && entry.auto === true) {
+              const targetSlot = entry.autoSlot ?? 'solo';
+              const newerAuto = liveRows.find(row =>
+                row.auto === true && (row.autoSlot ?? 'solo') === targetSlot
+                && row.id !== entry.id && String(row.savedAt) > String(entry.savedAt));
+              if (newerAuto) {
+                lastRows = liveRows;
+                return { rows: liveRows, skipped: true };
+              }
+            }
+            const replacedIds = new Set(replaced.map(row => row.id));
+            if (entry.auto === true) {
+              const targetSlot = entry.autoSlot ?? 'solo';
+              for (const row of liveRows) {
+                if (row.auto === true && (row.autoSlot ?? 'solo') === targetSlot && row.id !== entry.id) {
+                  replacedIds.add(row.id);
+                }
+              }
+            }
+            const surviving = liveRows.filter(
+              row => !replacedIds.has(row.id) && !extraEvictedIds.has(row.id) && row.id !== entry.id,
+            );
+            const candidates = this.applyBudget([...surviving, entry], entry.id);
+            lastRows = candidates.rows;
+            const deleteIds = new Set([
+              ...replacedIds,
+              ...extraEvictedIds,
+              ...candidates.evicted.map(row => row.id),
+            ]);
+            deleteIds.delete(entry.id);
+            for (const deleteId of deleteIds) {
+              entriesStore.delete(deleteId);
+              payloadsStore.delete(deleteId);
+            }
+            entriesStore.put(entry);
+            payloadsStore.put(payload, entry.id);
+            return { rows: candidates.rows, skipped: false };
+          },
+        );
+        this._committedRows = result.rows;
         this.error = null;
-        return true;
+        return { ok: true, skipped: result.skipped };
       } catch (error) {
-        const victim = candidates.rows.find(row => row.id !== entry.id);
+        const isQuota = error?.name === 'QuotaExceededError' || /quota/i.test(error?.message || '');
+        const victim = isQuota ? lastRows?.find(row => row.id !== entry.id) : null;
         if (!victim) {
           this.error = error?.message || 'QuotaExceededError';
-          return false;
+          return { ok: false, skipped: false };
         }
-        candidates.evicted.push(victim);
-        candidates.rows = candidates.rows.filter(row => row.id !== victim.id);
+        extraEvictedIds.add(victim.id);
       }
     }
   }
@@ -670,186 +794,194 @@ export class ReplayStore {
       const db = await this._openDb();
       const snapshot = await this._readIdbSnapshot(db);
       this._committedRows = snapshot.rows;
-      const result = await this._migrateLegacyEntries(db, snapshot);
-      this._recomputeRows();
-      return result;
+      return this._migrateLegacyEntries(db, snapshot);
     });
   }
 
   async _migrateLegacyEntries(db, snapshot) {
     let migrated = 0;
-    let rawIndex = null;
-    try { rawIndex = this.storage.getItem(INDEX_KEY); } catch { rawIndex = null; }
+    try {
+      let rawIndex = null;
+      try { rawIndex = this.storage.getItem(INDEX_KEY); } catch { rawIndex = null; }
 
-    const rowById = new Map(this._committedRows.map(row => [row.id, row]));
-    const payloadIds = new Set(snapshot.payloadKeys);
+      const rowById = new Map(this._committedRows.map(row => [row.id, row]));
+      const payloadIds = new Set(snapshot.payloadKeys);
 
-    if (rawIndex !== null) {
-      let parsedIndex;
-      try {
-        parsedIndex = JSON.parse(rawIndex);
-      } catch (error) {
-        this.error = error.message;
-        return { migrated: 0, remaining: 0, error: error.message };
-      }
-      if (!Array.isArray(parsedIndex)) {
-        this.error = 'Invalid replay index';
-        return { migrated: 0, remaining: 0, error: this.error };
-      }
-      const validLegacyRows = parsedIndex
-        .filter(validRow)
-        .sort((a, b) => String(a.savedAt).localeCompare(String(b.savedAt)));
-      let remaining = [...validLegacyRows];
-
-      const persistRemainingIndex = () => {
+      if (rawIndex !== null) {
+        let parsedIndex;
         try {
-          if (remaining.length === 0) {
-            this.storage.removeItem(INDEX_KEY);
-          } else {
-            this.storage.setItem(INDEX_KEY, JSON.stringify(remaining));
-          }
-        } catch {
-          // Non-fatal if localStorage cleanup is blocked after IndexedDB commit succeeded.
+          parsedIndex = JSON.parse(rawIndex);
+        } catch (error) {
+          this.error = error.message;
+          return { migrated: 0, remaining: 0, error: error.message };
         }
-      };
+        if (!Array.isArray(parsedIndex)) {
+          this.error = 'Invalid replay index';
+          return { migrated: 0, remaining: 0, error: this.error };
+        }
+        const validLegacyRows = parsedIndex
+          .filter(validRow)
+          .sort((a, b) => String(a.savedAt).localeCompare(String(b.savedAt)));
+        let remaining = [...validLegacyRows];
 
-      for (const row of validLegacyRows) {
-        const dropFromLegacy = () => {
-          remaining = remaining.filter(candidate => candidate.id !== row.id);
-          try { this.storage.removeItem(payloadKey(row.id)); } catch { /* ignore */ }
-          persistRemainingIndex();
+        const persistRemainingIndex = () => {
+          try {
+            if (remaining.length === 0) {
+              this.storage.removeItem(INDEX_KEY);
+            } else {
+              this.storage.setItem(INDEX_KEY, JSON.stringify(remaining));
+            }
+          } catch {
+            // Non-fatal if localStorage cleanup is blocked after IndexedDB commit succeeded.
+          }
         };
 
-        if (rowById.has(row.id) && payloadIds.has(row.id)) {
-          // Previously committed to IndexedDB before localStorage cleanup completed.
-          dropFromLegacy();
-          continue;
-        }
+        for (const row of validLegacyRows) {
+          const dropFromLegacy = () => {
+            remaining = remaining.filter(candidate => candidate.id !== row.id);
+            try { this.storage.removeItem(payloadKey(row.id)); } catch { /* ignore */ }
+            persistRemainingIndex();
+          };
 
-        let replaced = [];
-        if (row.auto === true) {
-          const slot = row.autoSlot ?? 'solo';
-          const existingAuto = this._committedRows.find(
-            candidate => candidate.auto === true && (candidate.autoSlot ?? 'solo') === slot && candidate.id !== row.id,
-          );
-          if (existingAuto && String(existingAuto.savedAt) > String(row.savedAt)) {
+          if (rowById.has(row.id) && payloadIds.has(row.id)) {
+            // Previously committed to IndexedDB before localStorage cleanup completed.
             dropFromLegacy();
             continue;
           }
-          if (existingAuto) replaced = [existingAuto];
-        }
 
-        let rawPayload = null;
-        try { rawPayload = this.storage.getItem(payloadKey(row.id)); } catch { rawPayload = null; }
-        if (typeof rawPayload !== 'string') {
-          dropFromLegacy();
-          continue;
-        }
-
-        let trackBytes;
-        let parsed;
-        try {
-          parsed = parseStoredPayload(rawPayload);
-          trackBytes = fromBase64(parsed.trackBase64);
-          decodeTrack(trackBytes);
-        } catch (error) {
-          this.error = error.message;
-          continue;
-        }
-
-        const compactReport = {
-          label: row.label,
-          durationSec: row.durationSec,
-          metadata: { ...row.metadata },
-          ...(row.summary ? { summary: row.summary } : {}),
-        };
-        const storedReport = parsed.report ? { ...parsed.report, label: row.label } : compactReport;
-        const built = await this._buildCompressedPayload(trackBytes, storedReport, compactReport);
-        if (built.error || !built.compressed) {
-          this.error = built.error || 'tooLong';
-          continue;
-        }
-
-        const migratedEntry = {
-          ...row,
-          bytes: built.compressed.byteLength,
-        };
-        const ok = await this._commitWithBudget(db, migratedEntry, built.compressed, replaced);
-        if (!ok) {
-          // Preserve unmigrated localStorage entries untouched for retry.
-          return { migrated, remaining: remaining.length, error: this.error || 'Migration failed' };
-        }
-        rowById.clear();
-        for (const r of this._committedRows) rowById.set(r.id, r);
-        payloadIds.add(migratedEntry.id);
-        dropFromLegacy();
-        migrated++;
-      }
-      if (remaining.length === 0) {
-        try { this.storage.removeItem(INDEX_KEY); } catch { /* ignore */ }
-      }
-    }
-
-    // Recover any synchronous pagehide room staging entry if present.
-    let rawStaged = null;
-    try { rawStaged = this.storage.getItem(ROOM_STAGING_KEY); } catch { rawStaged = null; }
-    if (typeof rawStaged === 'string') {
-      try {
-        const staged = JSON.parse(rawStaged);
-        if (staged?.id && staged?.sortie?.track) {
-          if (rowById.has(staged.id) && payloadIds.has(staged.id)) {
-            this.storage.removeItem(ROOM_STAGING_KEY);
-          } else {
-            const trackBytes = fromBase64(staged.sortie.track);
-            const track = decodeTrack(trackBytes);
-            const existingRoomAuto = this._committedRows.find(
-              candidate => candidate.auto === true && (candidate.autoSlot ?? 'solo') === 'room' && candidate.id !== staged.id,
+          let replaced = [];
+          if (row.auto === true) {
+            const slot = row.autoSlot ?? 'solo';
+            const existingAuto = this._committedRows.find(
+              candidate => candidate.auto === true && (candidate.autoSlot ?? 'solo') === slot && candidate.id !== row.id,
             );
-            if (existingRoomAuto && String(existingRoomAuto.savedAt) > String(staged.savedAt)) {
+            if (existingAuto && String(existingAuto.savedAt) > String(row.savedAt)) {
+              dropFromLegacy();
+              continue;
+            }
+            if (existingAuto) replaced = [existingAuto];
+          }
+
+          let rawPayload = null;
+          try { rawPayload = this.storage.getItem(payloadKey(row.id)); } catch { rawPayload = null; }
+          if (typeof rawPayload !== 'string') {
+            dropFromLegacy();
+            continue;
+          }
+
+          let trackBytes;
+          let parsed;
+          try {
+            parsed = parseStoredPayload(rawPayload);
+            trackBytes = fromBase64(parsed.trackBase64);
+            decodeTrack(trackBytes);
+          } catch (error) {
+            this.error = error.message;
+            continue;
+          }
+
+          const compactReport = {
+            label: row.label,
+            durationSec: row.durationSec,
+            metadata: { ...row.metadata },
+            ...(row.summary ? { summary: row.summary } : {}),
+          };
+          const storedReport = parsed.report ? { ...parsed.report, label: row.label } : compactReport;
+          const built = await this._buildCompressedPayload(trackBytes, storedReport, compactReport);
+          if (built.error || !built.compressed) {
+            this.error = built.error || 'tooLong';
+            continue;
+          }
+
+          const migratedEntry = {
+            ...row,
+            bytes: built.compressed.byteLength,
+          };
+          const commit = await this._commitWithBudget(
+            db,
+            migratedEntry,
+            built.compressed,
+            replaced,
+            { preserveNewerAuto: true },
+          );
+          if (!commit.ok) {
+            // Preserve unmigrated localStorage entries untouched for retry.
+            return { migrated, remaining: remaining.length, error: this.error || 'Migration failed' };
+          }
+          rowById.clear();
+          for (const r of this._committedRows) rowById.set(r.id, r);
+          if (!commit.skipped) payloadIds.add(migratedEntry.id);
+          dropFromLegacy();
+          if (!commit.skipped) migrated++;
+        }
+        if (remaining.length === 0) {
+          try { this.storage.removeItem(INDEX_KEY); } catch { /* ignore */ }
+        }
+      }
+
+      // Recover any synchronous pagehide room staging entry if present.
+      let rawStaged = null;
+      try { rawStaged = this.storage.getItem(ROOM_STAGING_KEY); } catch { rawStaged = null; }
+      if (typeof rawStaged === 'string') {
+        try {
+          const staged = JSON.parse(rawStaged);
+          if (staged?.id && staged?.sortie?.track) {
+            if (rowById.has(staged.id) && payloadIds.has(staged.id)) {
               this.storage.removeItem(ROOM_STAGING_KEY);
             } else {
-              const compactReport = staged.sortie.report ?? {
-                label: staged.label || ROOM_AUTO_SAVE_LABEL,
-                durationSec: track.durationSec,
-                metadata: { ...track.metadata },
-              };
-              const built = await this._buildCompressedPayload(trackBytes, compactReport, compactReport);
-              if (!built.error && built.compressed) {
-                const stagedEntry = {
-                  id: staged.id,
-                  savedAt: staged.savedAt,
-                  label: cleanLabel(staged.label) || ROOM_AUTO_SAVE_LABEL,
+              const trackBytes = fromBase64(staged.sortie.track);
+              const track = decodeTrack(trackBytes);
+              const existingRoomAuto = this._committedRows.find(
+                candidate => candidate.auto === true && (candidate.autoSlot ?? 'solo') === 'room' && candidate.id !== staged.id,
+              );
+              if (existingRoomAuto && String(existingRoomAuto.savedAt) > String(staged.savedAt)) {
+                this.storage.removeItem(ROOM_STAGING_KEY);
+              } else {
+                const compactReport = staged.sortie.report ?? {
+                  label: staged.label || ROOM_AUTO_SAVE_LABEL,
                   durationSec: track.durationSec,
-                  intervalSec: track.intervalSec,
-                  sampleCount: track.samples.length,
-                  bytes: built.compressed.byteLength,
                   metadata: { ...track.metadata },
-                  auto: true,
-                  autoSlot: 'room',
                 };
-                const ok = await this._commitWithBudget(
-                  db,
-                  stagedEntry,
-                  built.compressed,
-                  existingRoomAuto ? [existingRoomAuto] : [],
-                );
-                if (ok) {
-                  this.storage.removeItem(ROOM_STAGING_KEY);
-                  migrated++;
+                const built = await this._buildCompressedPayload(trackBytes, compactReport, compactReport);
+                if (!built.error && built.compressed) {
+                  const stagedEntry = {
+                    id: staged.id,
+                    savedAt: staged.savedAt,
+                    label: cleanLabel(staged.label) || ROOM_AUTO_SAVE_LABEL,
+                    durationSec: track.durationSec,
+                    intervalSec: track.intervalSec,
+                    sampleCount: track.samples.length,
+                    bytes: built.compressed.byteLength,
+                    metadata: { ...track.metadata },
+                    auto: true,
+                    autoSlot: 'room',
+                  };
+                  const commit = await this._commitWithBudget(
+                    db,
+                    stagedEntry,
+                    built.compressed,
+                    existingRoomAuto ? [existingRoomAuto] : [],
+                    { preserveNewerAuto: true },
+                  );
+                  if (commit.ok) {
+                    this.storage.removeItem(ROOM_STAGING_KEY);
+                    if (!commit.skipped) migrated++;
+                  }
                 }
               }
             }
+          } else {
+            this.storage.removeItem(ROOM_STAGING_KEY);
           }
-        } else {
-          this.storage.removeItem(ROOM_STAGING_KEY);
+        } catch {
+          // Leave staged entry intact unless corrupt JSON makes it unrecoverable.
         }
-      } catch {
-        // Leave staged entry intact unless corrupt JSON makes it unrecoverable.
       }
-    }
 
-    this._recomputeRows();
-    return { migrated, remaining: 0, error: null };
+      return { migrated, remaining: 0, error: null };
+    } finally {
+      this._recomputeRows();
+    }
   }
 
   /** @returns {Promise<{entry: object|null, error: string|null}>} */
@@ -880,10 +1012,10 @@ export class ReplayStore {
       metadata: { ...track.metadata },
       ...(resolvedSummary ? { summary: resolvedSummary } : {}),
     };
-    const storedReport = report
-      ? { ...report, label: report.label ?? resolvedLabel }
-      : compactReport;
-    maybeAttachEngagement(storedReport, track);
+    const storedReport = withAttachedEngagement(
+      report ? { ...report, label: report.label ?? resolvedLabel } : compactReport,
+      track,
+    );
 
     const entry = {
       id: id ?? crypto.randomUUID(),
@@ -911,11 +1043,8 @@ export class ReplayStore {
         }
         entry.bytes = built.compressed.byteLength;
         const db = await this._openDb();
-        const replaced = auto
-          ? this._committedRows.filter(row => row.auto === true && (row.autoSlot ?? 'solo') === autoSlot)
-          : [];
-        const ok = await this._commitWithBudget(db, entry, built.compressed, replaced);
-        if (!ok) return { entry: null, error: this.error || 'quota' };
+        const commit = await this._commitWithBudget(db, entry, built.compressed);
+        if (!commit.ok) return { entry: null, error: this.error || 'quota' };
         return { entry: { ...entry }, error: null };
       } catch (error) {
         this.error = error?.message || 'Storage error';
@@ -974,7 +1103,17 @@ export class ReplayStore {
       autoSlot: 'room',
     });
     if (staged) {
-      try { this.storage.removeItem(ROOM_STAGING_KEY); } catch { /* ignore */ }
+      try {
+        const currentRaw = this.storage.getItem(ROOM_STAGING_KEY);
+        if (currentRaw !== null) {
+          const current = JSON.parse(currentRaw);
+          if (!current || current.id === id) {
+            this.storage.removeItem(ROOM_STAGING_KEY);
+          }
+        }
+      } catch {
+        try { this.storage.removeItem(ROOM_STAGING_KEY); } catch { /* ignore */ }
+      }
     }
     if (!result.entry) {
       // Best effort: an entirely inaccessible storage cannot persist even a failure notice.
@@ -1041,60 +1180,79 @@ export class ReplayStore {
   rename(id, label) {
     const clean = cleanLabel(label);
     if (!clean) return Promise.resolve(false);
-    if (!this.idb) return Promise.resolve(false);
-    const exists = this._rows.some(row => row.id === id);
-    if (!exists) return Promise.resolve(false);
+    if (!this.idb || typeof id !== 'string' || !id) return Promise.resolve(false);
 
-    const pendingOp = { type: 'rename', id, label: clean };
-    this._pendingOps.push(pendingOp);
-    this._recomputeRows();
+    const exists = this._rows.some(row => row.id === id);
+    const pendingOp = exists ? { type: 'rename', id, label: clean } : null;
+    if (pendingOp) {
+      this._pendingOps.push(pendingOp);
+      this._recomputeRows();
+    }
 
     return this._enqueue(async () => {
       try {
-        const target = this._committedRows.find(row => row.id === id);
-        if (!target) return false;
-        const updated = { ...target, label: clean };
-        // Renaming an auto save keeps it: it is no longer the disposable latest-flight slot.
-        delete updated.auto;
-        delete updated.autoSlot;
         const db = await this._openDb();
-        await this._commitIdbChanges(db, { putEntry: updated });
-        this._committedRows = this._committedRows.map(row => (row.id === id ? updated : row));
+        const result = await this._withLiveEntriesTx(db, [REPLAY_ENTRIES_STORE], ({ liveRows, entriesStore }) => {
+          const target = liveRows.find(row => row.id === id);
+          if (!target) return { rows: liveRows, renamed: false };
+          const updated = { ...target, label: clean };
+          // Renaming an auto save keeps it: it is no longer the disposable latest-flight slot.
+          delete updated.auto;
+          delete updated.autoSlot;
+          entriesStore.put(updated);
+          return {
+            rows: liveRows.map(row => (row.id === id ? updated : row)),
+            renamed: true,
+          };
+        });
+        this._committedRows = result.rows;
         this.error = null;
-        return true;
+        return result.renamed;
       } catch (error) {
         this.error = error?.message || 'Storage error';
         return false;
       } finally {
-        this._pendingOps = this._pendingOps.filter(op => op !== pendingOp);
+        if (pendingOp) this._pendingOps = this._pendingOps.filter(op => op !== pendingOp);
         this._recomputeRows();
       }
     });
   }
 
   remove(id) {
-    if (!this.idb) return Promise.resolve(false);
+    if (!this.idb || typeof id !== 'string' || !id) return Promise.resolve(false);
     const exists = this._rows.some(row => row.id === id);
-    if (!exists) return Promise.resolve(false);
-
-    const pendingOp = { type: 'remove', id };
-    this._pendingOps.push(pendingOp);
-    this._recomputeRows();
+    const pendingOp = exists ? { type: 'remove', id } : null;
+    if (pendingOp) {
+      this._pendingOps.push(pendingOp);
+      this._recomputeRows();
+    }
 
     return this._enqueue(async () => {
       try {
-        const existsCommitted = this._committedRows.some(row => row.id === id);
-        if (!existsCommitted) return false;
         const db = await this._openDb();
-        await this._commitIdbChanges(db, { deleteIds: [id] });
-        this._committedRows = this._committedRows.filter(row => row.id !== id);
+        const result = await this._withLiveEntriesTx(
+          db,
+          [REPLAY_ENTRIES_STORE, REPLAY_PAYLOADS_STORE],
+          ({ liveRows, entriesStore, payloadsStore }) => {
+            const found = liveRows.some(row => row.id === id);
+            if (found) {
+              entriesStore.delete(id);
+              payloadsStore.delete(id);
+            }
+            return {
+              rows: liveRows.filter(row => row.id !== id),
+              removed: found,
+            };
+          },
+        );
+        this._committedRows = result.rows;
         this.error = null;
-        return true;
+        return result.removed;
       } catch (error) {
         this.error = error?.message || 'Storage error';
         return false;
       } finally {
-        this._pendingOps = this._pendingOps.filter(op => op !== pendingOp);
+        if (pendingOp) this._pendingOps = this._pendingOps.filter(op => op !== pendingOp);
         this._recomputeRows();
       }
     });

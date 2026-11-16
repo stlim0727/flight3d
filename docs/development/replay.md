@@ -78,7 +78,7 @@ the current playback time. A track with recorded combat opens in the DIRECTOR
 camera: the existing launch → missile-follow → bandit-shot sequence is the view
 that shows the target airframe and its destruction instead of a distant symbol.
 Combat is recorded only when the live F-16 air-to-air system is active, so B737/C172
-tracks are unchanged. Combat track format version 8 (`COMBAT_TRACK_VERSION = 8`) records
+tracks are unchanged. Combat track format version 9 (`COMBAT_TRACK_VERSION = 9`) records
 seeker state transitions, countermeasure transfers, aerodynamic guidance diagnostics,
 fuze proximity bursts, and damage history. Version 8 adds total and six-zone damage
 snapshots to bandit samples and hit events (7 bytes each, quantized to 1/254).
@@ -192,8 +192,8 @@ saves without deleting originals until the IndexedDB commit succeeds (making
 interrupted migrations retryable without duplicates).
 
 Debrief download and replay library export share the `.f3dr.gz` gzip-compressed
-binary container (`F3DC`, container version `1`, independent of `ReplayCodec` track
-versions `1..8`):
+binary container (`F3DC`, container version `1`, independent of `ReplayCodec`
+track/combat versions):
 ```text
 [0..3]    "F3DC"  (4-byte magic)
 [4]       version (1 byte u8, currently 1)
@@ -248,3 +248,11 @@ reload persistence, a real Lukla recording/replay, and seeded valley terrain
 restoration using a pose fixture, plus two real valley mission recordings with
 save/playback across a retry. Screenshots, GPU evidence and a result file
 are written under ignored `review-artifacts/replay/`.
+
+
+Combat v9 appends two float32 values to each combat event: incremental hit damage
+and detonation distance in meters (`-1` means unknown). These are independent of
+velocity and cumulative airframe damage. Older tracks remain readable; a zero
+blast distance in v8 or earlier is treated as unknown because those recorders
+used zero for missing measurements. Engagement analysis reports unavailable hit
+damage as `null`, rather than inferring it from cumulative structural damage.

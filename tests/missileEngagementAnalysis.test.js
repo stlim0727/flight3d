@@ -6,6 +6,7 @@ import * as THREE from 'three';
 
 import { analyzeCombatEngagement, ENGAGEMENT_SCHEMA_VERSION } from '../src/weapons/engagementAnalysis.js';
 import { encodeTrack, decodeTrack, toBase64, fromBase64 } from '../src/replay/ReplayCodec.js';
+import { createSortie } from '../src/replay/ReplayStore.js';
 import { ReplayRecorder } from '../src/core/ReplayRecorder.js';
 import { AirToAirMissileSystem } from '../src/weapons/AirToAirMissileSystem.js';
 import { Flare, FlareDispenser } from '../src/weapons/Flare.js';
@@ -211,12 +212,12 @@ test('analyzeCombatEngagement: distinguishes survived proximity blast vs lethal 
       // Missile 1: Proximity blast at 9m, damage 35%, bandit survives
       { timeSec: 2.0, kind: 'launch', missileId: 1, typeId: 'AIM9X', targetId: 'bandit_1', locked: true },
       { timeSec: 6.0, kind: 'detonation', missileId: 1, distanceM: 9.2, fuzePolicy: 'continuous_fuze_cpa' },
-      { timeSec: 6.0, kind: 'damage', missileId: 1, targetId: 'bandit_1', damage: 35, zone: 'wing' },
+      { timeSec: 6.0, kind: 'damage', missileId: 1, targetId: 'bandit_1', amount: 0.35, zone: 'wing' },
 
       // Missile 2: Lethal blast at 2.5m, damage 100%, bandit killed
       { timeSec: 10.0, kind: 'launch', missileId: 2, typeId: 'AIM9X', targetId: 'bandit_1', locked: true },
       { timeSec: 14.0, kind: 'detonation', missileId: 2, distanceM: 2.5, fuzePolicy: 'continuous_fuze_cpa' },
-      { timeSec: 14.0, kind: 'damage', missileId: 2, targetId: 'bandit_1', damage: 95, zone: 'fuselage' },
+      { timeSec: 14.0, kind: 'damage', missileId: 2, targetId: 'bandit_1', amount: 0.95, zone: 'fuselage' },
       { timeSec: 14.0, kind: 'kill', missileId: 2, targetId: 'bandit_1', source: 'missile', distanceM: 2.5 },
     ],
   };
@@ -579,4 +580,71 @@ test('analyzeCombatEngagement: decoded track with detonation proximity_fuze trig
   assert.ok(Math.abs(m.termination.damageApplied - 45.0) < 0.1);
   assert.ok(m.causalSummary.includes('survived'));
   assert.ok(m.causalSummary.includes('45.0'));
+});
+
+
+test('v9 recorder roundtrip preserves lethal hit amount independently of cumulative damage and velocity', () => {
+  const recorder = new ReplayRecorder();
+  recorder.start({ aircraft: 'F16' });
+  const target = { id: 1, damage: 1 };
+  recorder.recordCombatEvent({ type: 'launch', missileId: 1, target, locked: true });
+  recorder.recordCombatEvent({ type: 'detonation', missileId: 1,
+    position: { x: 12, y: 1000, z: 20 }, distanceM: 1.75 });
+  recorder.recordCombatEvent({ type: 'kill', missileId: 1, target, amount: 0.6,
+    damageZones: { fuselage: 1 }, position: { x: 13, y: 1000, z: 20 },
+    velocity: { x: 180, y: 3, z: 20 } });
+  const decoded = decodeTrack(encodeTrack({ ...baseTrack(), combat: recorder.combat }));
+  const kill = decoded.combat.events.find(e => e.kind === 'kill');
+  assert.equal(kill.damage, 1);
+  assert.equal(kill.vx, 180);
+  assert.ok(Math.abs(kill.amount - 0.6) < 1e-6);
+  const result = analyzeCombatEngagement(decoded).missiles[0];
+  assert.equal(result.termination.damageApplied, 60);
+  assert.equal(result.termination.distanceM, 1.75);
+  assert.deepEqual(result.termination.position, [12, 1000, 20]);
+});
+
+test('missing and legacy zero blast distances remain unknown without changing kill count', () => {
+  for (const version of [8, 9]) {
+    const track = baseTrack();
+    track.combat = { version, targets: [], banditSamples: [], missileSamples: [], events: [
+      { kind: 'launch', missileId: 1, timeSec: 1, locked: true },
+      { kind: 'detonation', missileId: 1, timeSec: 2, ...(version === 8 ? { distanceM: 0 } : {}) },
+      { kind: 'kill', missileId: 1, timeSec: 2, damage: 1, damageZones: { fuselage: 1 } },
+    ] };
+    const result = analyzeCombatEngagement(decodeTrack(encodeTrack(track)));
+    assert.equal(result.summary.totalKills, 1);
+    assert.equal(result.missiles[0].termination.distanceM, null);
+    assert.equal(result.missiles[0].termination.damageApplied, null);
+    assert.ok(!result.missiles[0].causalSummary.includes('at 0.0m'));
+  }
+});
+
+
+test('sortie export replaces stale analysis without mutating the supplied report', () => {
+  const track = baseTrack();
+  track.combat = { version: 8, targets: [], banditSamples: [], missileSamples: [], events: [
+    { kind: 'launch', missileId: 1, timeSec: 1, locked: true },
+    { kind: 'detonation', missileId: 1, timeSec: 2, distanceM: 0 },
+    { kind: 'kill', missileId: 1, timeSec: 2 },
+  ] };
+  const report = { engagement: { stale: true } };
+  const result = createSortie(report, toBase64(encodeTrack(track)));
+  assert.equal(result.report.engagement.missiles[0].termination.distanceM, null);
+  assert.deepEqual(report.engagement, { stale: true });
+});
+
+test('physics blast events supply measured distance and incremental fatal damage', () => {
+  const system = new AirToAirMissileSystem();
+  const target = { alive: true, damage: 0.8, position: new THREE.Vector3(3, 1000, 0),
+    prevPosition: new THREE.Vector3(3, 1000, 0), velocity: new THREE.Vector3() };
+  system.targets = [target];
+  const missile = { alive: true, position: new THREE.Vector3(0, 1000, 0),
+    prevPosition: new THREE.Vector3(0, 1000, 0), velocity: new THREE.Vector3(),
+    spec: { lethalRadiusM: 5, fragmentRadiusM: 15 } };
+  const events = [];
+  system._detonate(missile, target, events, 1);
+  assert.equal(events.find(e => e.type === 'detonation').distanceM, 3);
+  assert.equal(events.find(e => e.type === 'kill').amount, 1);
+  assert.equal(target.damage, 1);
 });
