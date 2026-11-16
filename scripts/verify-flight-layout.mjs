@@ -130,6 +130,24 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       baseline = bounds;
       if ([0, 8].includes(mode)) await screenshot(`${out}/${width}x${height}-camera-${mode}.png`);
     }
+    // The cockpit eyepoint pill and its panel follow the measured bottom of the
+    // control rows. Cockpit entry waits for the interior to load, so wait for the
+    // view itself: a pill that never appeared must not count as clear.
+    await evaluate(() => window.simulator.controls.onSelectCamera(0));
+    for (let i = 0; i < 80 && await evaluate('window.simulator.cameraSystem.mode') !== 0; i++) await delay(250);
+    assert.equal(await evaluate('window.simulator.cameraSystem.mode'), 0, 'cockpit view entered once its interior loaded');
+    await delay(150);
+    const pov = await evaluate(() => {
+      const box = n => { const r = n.getBoundingClientRect(); return { top: r.top, h: r.height }; };
+      const pill = document.getElementById('btn-cockpit-pov');
+      const result = { toolbarBottom: document.querySelector('.flight-toolbar').getBoundingClientRect().bottom, pill: box(pill) };
+      pill.click();
+      result.panel = box(document.getElementById('cockpit-pov-panel'));
+      document.getElementById('btn-cockpit-pov-close').click();
+      return result;
+    });
+    assert.ok(pov.pill.h > 0 && pov.pill.top >= pov.toolbarBottom + 4, `cockpit POV pill clears the control rows: ${JSON.stringify(pov)}`);
+    assert.ok(pov.panel.h > 0 && pov.panel.top >= pov.toolbarBottom + 4, `cockpit POV panel clears the control rows: ${JSON.stringify(pov)}`);
     await click('#btn-ap-toggle');
     assert.ok(await evaluate('!document.getElementById("ap-panel").hidden'), 'AP opens');
     await click('#btn-ap');
