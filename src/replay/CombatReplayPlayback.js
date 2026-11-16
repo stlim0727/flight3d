@@ -4,6 +4,7 @@ import { presentCombatEvent, syncCombatAudio } from '../weapons/combatPresentati
 import { Flare, FLARE_MODEL } from '../weapons/Flare.js';
 import { ChaffCloud, CHAFF_MODEL } from '../weapons/Chaff.js';
 import { F16_MISSILE_STATIONS, MISSILE_TYPES } from '../weapons/missileSpecs.js';
+import { createDamageZones, combatDamageState } from '../physics/combatDamage.js';
 import { findSpan } from './TrackSampler.js';
 
 function clamp(value, min, max) {
@@ -346,6 +347,21 @@ export class CombatReplayPlayback {
       const blend = continuous ? alpha : alpha < 0.5 ? 0 : 1;
       const pose = blend < 0.5 ? from : to;
       target.alive = Boolean(pose.alive);
+      // Damage is a discrete hit history, never interpolated ahead of a hit.
+      // Start from the preceding snapshot so respawns clear every zone on seek.
+      const damageSample = clamped >= b.timeSec ? b : a;
+      const damagePose = damageSample.targets?.[slot];
+      target.damage = Math.max(0, damagePose?.damage ?? 0);
+      target.damageZones = { ...createDamageZones(), ...damagePose?.damageZones };
+      if (this.track.version >= 8) {
+        for (const event of this.events) {
+          if (event.timeSec > timeSec + 1e-9) break;
+          if (event.timeSec < damageSample.timeSec || event.targetId !== slot || !event.damageZones) continue;
+          target.damage = event.damage;
+          target.damageZones = { ...event.damageZones };
+        }
+      }
+      target.damageState = combatDamageState(target.damage);
       target.position.set(
         continuous ? lerp(from.x, to.x, blend) : pose.x,
         continuous ? lerp(from.y, to.y, blend) : pose.y,

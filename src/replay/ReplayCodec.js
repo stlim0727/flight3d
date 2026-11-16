@@ -5,7 +5,7 @@ export const REPLAY_TRACK_VERSION = 2;
 // Multiplayer room tracks only: solo flights stay v2 so older builds can still import them.
 export const ROOM_TRACK_VERSION = 3;
 // Combat tracks append a compact missile/bandit section after the pose frames.
-export const COMBAT_TRACK_VERSION = 7;
+export const COMBAT_TRACK_VERSION = 8;
 export const COMBAT_SECTION_HEADER_BYTES = 18;
 export const COMBAT_EVENT_BYTES = 32;
 export const COMBAT_DIAGNOSTIC_BYTES = 28;
@@ -281,7 +281,7 @@ export function combatByteLength(combat, version = COMBAT_TRACK_VERSION) {
     const callsign = String(target?.callsign || '').slice(0, 64);
     return sum + 1 + encoder.encode(callsign).length;
   }, 0);
-  const banditBytes = (combat.banditSamples?.length || 0) * (5 + targets.length * 23);
+  const banditBytes = (combat.banditSamples?.length || 0) * (5 + targets.length * (version >= 8 ? 30 : 23));
   const missileBytes = (combat.missileSamples?.length || 0) * 26;
   const rawEvents = Array.isArray(combat.events) ? combat.events : [];
   const events = version >= 7 ? rawEvents : rawEvents.filter(e => {
@@ -289,7 +289,7 @@ export function combatByteLength(combat, version = COMBAT_TRACK_VERSION) {
     if (version >= 6 && e.kind === 'kill') return true;
     return false;
   });
-  const eventBytes = events.length * COMBAT_EVENT_BYTES;
+  const eventBytes = events.length * (COMBAT_EVENT_BYTES + (version >= 8 ? 7 : 0));
   const hasDiag = version >= 7 && Array.isArray(combat.diagnosticSamples) && combat.diagnosticSamples.length > 0;
   const diagnosticBytes = hasDiag ? (6 + combat.diagnosticSamples.length * COMBAT_DIAGNOSTIC_BYTES) : 0;
   return 4 + COMBAT_SECTION_HEADER_BYTES + targetBytes + banditBytes + missileBytes + eventBytes + diagnosticBytes;
@@ -340,6 +340,22 @@ export function encodeTrack(track) {
   return bytes;
 }
 
+// Seven bytes retain total damage and six localized structural budgets.
+// 255 in the first byte marks an event without a damage snapshot.
+function writeCombatDamage(view, offset, state) {
+  view.setUint8(offset, state ? Math.round(Math.max(0, Math.min(1, state.damage ?? 0)) * 254) : 255);
+  COMBAT_DAMAGE_ZONES.forEach((zone, index) => {
+    view.setUint8(offset + 1 + index, Math.round(Math.max(0, Math.min(1, state?.damageZones?.[zone] ?? 0)) * 254));
+  });
+}
+
+function readCombatDamage(view, offset) {
+  const value = view.getUint8(offset);
+  if (value === 255) return { damage: -1 };
+  return { damage: value / 254, damageZones: Object.fromEntries(COMBAT_DAMAGE_ZONES.map((zone, index) =>
+    [zone, view.getUint8(offset + 1 + index) / 254])) };
+}
+
 function writeCombat(view, offset, combat, version = COMBAT_TRACK_VERSION) {
   const targets = combat.targets;
   const sectionLength = combatByteLength(combat, version) - 4;
@@ -381,7 +397,8 @@ function writeCombat(view, offset, combat, version = COMBAT_TRACK_VERSION) {
       view.setUint8(offset + 14, target?.alive ? 1 : 0);
       const q = target?.quaternion ?? [0, -Math.sin((target?.headingRad ?? 0) / 2), 0, Math.cos((target?.headingRad ?? 0) / 2)];
       for (let axis = 0; axis < 4; axis++) writeScalar(view, offset + 15 + axis * 2, 'i16', q[axis] * 32767, 1);
-      offset += 23;
+      if (version >= 8) writeCombatDamage(view, offset + 23, target);
+      offset += version >= 8 ? 30 : 23;
     }
   }
 
@@ -439,7 +456,8 @@ function writeCombat(view, offset, combat, version = COMBAT_TRACK_VERSION) {
     writeScalar(view, offset + 20, 'f32', event.vx ?? event.signalQuality ?? event.amount ?? event.damage ?? event.lockProgress ?? 0, 1);
     writeScalar(view, offset + 24, 'f32', event.vy ?? event.distanceM ?? event.aspectAngleDeg ?? event.separationAngleDeg ?? 0, 1);
     writeScalar(view, offset + 28, 'f32', event.vz ?? event.observationAgeSec ?? 0, 1);
-    offset += COMBAT_EVENT_BYTES;
+    if (version >= 8) writeCombatDamage(view, offset + COMBAT_EVENT_BYTES, event.damageZones ? event : null);
+    offset += COMBAT_EVENT_BYTES + (version >= 8 ? 7 : 0);
   }
 
   if (version >= 7 && Array.isArray(combat.diagnosticSamples) && combat.diagnosticSamples.length > 0) {
@@ -600,13 +618,14 @@ function readCombat(view, offset, sectionLength, version) {
     offset += 5;
     const sampleTargets = [];
     for (let slot = 0; slot < targetCount; slot++) {
-      const targetBytes = version >= 5 ? 23 : 15;
+      const targetBytes = version >= 8 ? 30 : version >= 5 ? 23 : 15;
       if (offset + targetBytes > end) throw new Error('replay combat bandits are truncated');
       sampleTargets.push({
         x: view.getFloat32(offset), y: view.getFloat32(offset + 4), z: view.getFloat32(offset + 8),
         headingRad: view.getInt16(offset + 12) / 5000, alive: Boolean(view.getUint8(offset + 14)),
       });
       if (version >= 5) sampleTargets.at(-1).quaternion = Array.from({ length: 4 }, (_, axis) => view.getInt16(offset + 15 + axis * 2) / 32767);
+      if (version >= 8) Object.assign(sampleTargets.at(-1), readCombatDamage(view, offset + 23));
       offset += targetBytes;
     }
     banditSamples.push({ timeSec, rails, targets: sampleTargets });
@@ -626,7 +645,7 @@ function readCombat(view, offset, sectionLength, version) {
   }
   const events = [];
   for (let index = 0; index < eventCount; index++) {
-    if (offset + COMBAT_EVENT_BYTES > end) throw new Error('replay combat events are truncated');
+    if (offset + COMBAT_EVENT_BYTES + (version >= 8 ? 7 : 0) > end) throw new Error('replay combat events are truncated');
     const timeSec = view.getUint32(offset) / 1000;
     const rawKind = view.getUint8(offset + 4);
     const missileId = view.getUint8(offset + 5);
@@ -677,7 +696,7 @@ function readCombat(view, offset, sectionLength, version) {
           eventObj.separationAngleDeg = vy;
         }
       } else if (kind === 'damage' || kind === 'kill') {
-        if (flags > 0) eventObj.targetId = flags;
+        if (version >= 8 || flags > 0) eventObj.targetId = flags;
         eventObj.hitZone = HIT_ZONES[extra] || 'unknown';
         if (kind === 'damage') {
           eventObj.amount = vx;
@@ -690,8 +709,12 @@ function readCombat(view, offset, sectionLength, version) {
         eventObj.distanceM = vy;
       }
     }
+    if (version >= 8) {
+      const damage = readCombatDamage(view, offset + COMBAT_EVENT_BYTES);
+      if (damage.damage >= 0) Object.assign(eventObj, damage);
+    }
     events.push(eventObj);
-    offset += COMBAT_EVENT_BYTES;
+    offset += COMBAT_EVENT_BYTES + (version >= 8 ? 7 : 0);
   }
 
   const diagnosticSamples = [];
