@@ -208,3 +208,19 @@ test('HOTAS missile attempts report the actual fire result without recording key
   sim.controls.onFireMissile();
   assert.equal(events.length, 2);
 });
+
+test('hidden top-menu items persist as a validated list and an empty list restores every item', () => {
+  const storage = memoryStorage();
+  saveSimulatorPreferences({ audioMuted: true, toolbarHidden: ['cam-flyby', 'fullscreen', 'cam-flyby'] }, storage);
+  assert.deepEqual(loadSimulatorPreferences(storage).toolbarHidden, ['cam-flyby', 'fullscreen'], 'duplicates collapse');
+  for (const toolbarHidden of ['cam-wing', { 0: 'cam-wing' }, null, 7]) saveSimulatorPreferences({ toolbarHidden }, storage);
+  assert.deepEqual(loadSimulatorPreferences(storage).toolbarHidden, ['cam-flyby', 'fullscreen'],
+    'a malformed update must not drop the saved selection');
+  saveSimulatorPreferences({ toolbarHidden: ['cam-wing', 7, 'Bad Id', '', 'x'.repeat(33)] }, storage);
+  assert.deepEqual(loadSimulatorPreferences(storage).toolbarHidden, ['cam-wing'], 'malformed entries are dropped');
+  saveSimulatorPreferences({ timeOfDay: 6 }, storage);
+  assert.deepEqual(loadSimulatorPreferences(storage), { audioMuted: true, timeOfDay: 6, toolbarHidden: ['cam-wing'] },
+    'unrelated updates keep the selection');
+  saveSimulatorPreferences({ toolbarHidden: [] }, storage);
+  assert.deepEqual(loadSimulatorPreferences(storage).toolbarHidden, [], 'show-all is a saved choice, not a missing one');
+});

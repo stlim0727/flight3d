@@ -1,4 +1,5 @@
 import { t, bindText, getLanguage, setLanguage } from '../i18n/index.js';
+import { toolbarOptionalItems, normalizeToolbarHidden, applyToolbarVisibility } from './toolbarVisibility.js';
 
 export const CAMERA_MODES = [
   [1, 'chase'],
@@ -50,7 +51,7 @@ export function commitFlightCamera(select, onSelectCamera) {
 }
 
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
-export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParkingBrake }) {
+export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParkingBrake, toolbarHidden, onToolbarHiddenChange }) {
   const hud = document.getElementById('hud-overlay');
   // Let keyboard users scroll the full telemetry row as well as touch users.
   const strip = document.querySelector('.hud-strip');
@@ -187,7 +188,54 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   }
   cameraSelect.addEventListener('change', () => onSelectCamera(Number(cameraSelect.value)));
   cameraLabel.append(caption, cameraSelect);
-  settings.append(cameraLabel);
+  // Issue #798: the pilot chooses which optional top-menu buttons stay visible.
+  // The camera select above always lists every view, so a hidden one stays reachable.
+  const optionalItems = toolbarOptionalItems(CAMERA_MODES.map(([, name]) => name));
+  const toolbarOptions = document.createElement('details');
+  toolbarOptions.id = 'toolbar-options';
+  toolbarOptions.className = 'toolbar-options';
+  const toolbarSummary = document.createElement('summary');
+  const toolbarHint = document.createElement('p');
+  toolbarHint.className = 'toolbar-options-hint';
+  bindText(toolbarHint, () => t('toolbar.custom.hint'));
+  const toolbarList = document.createElement('div');
+  toolbarList.className = 'toolbar-options-list';
+  const toolbarChecks = optionalItems.map(id => {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.dataset.toolbarItem = id;
+    const text = document.createElement('span');
+    bindText(text, () => (id === 'fullscreen' ? t('fullscreen.enter') : touchLabel(t(`ui.camera.${id.slice(4)}`))));
+    label.append(input, text);
+    toolbarList.append(label);
+    return input;
+  });
+  const toolbarReset = document.createElement('button');
+  toolbarReset.id = 'toolbar-options-reset';
+  toolbarReset.className = 'btn';
+  toolbarReset.type = 'button';
+  bindText(toolbarReset, () => t('toolbar.custom.reset'));
+  toolbarOptions.append(toolbarSummary, toolbarHint, toolbarList, toolbarReset);
+  const showToolbarItems = hidden => {
+    const hiddenItems = normalizeToolbarHidden(hidden, optionalItems);
+    applyToolbarVisibility(hiddenItems, optionalItems);
+    for (const input of toolbarChecks) input.checked = !hiddenItems.includes(input.dataset.toolbarItem);
+    bindText(toolbarSummary, () => t('toolbar.custom.title', {
+      shown: optionalItems.length - hiddenItems.length, total: optionalItems.length,
+    }));
+    return hiddenItems;
+  };
+  const chooseToolbarItems = hidden => {
+    onToolbarHiddenChange?.(showToolbarItems(hidden));
+    positionEdgeButtons();
+  };
+  for (const input of toolbarChecks) {
+    input.addEventListener('change', () => chooseToolbarItems(
+      toolbarChecks.filter(check => !check.checked).map(check => check.dataset.toolbarItem)));
+  }
+  toolbarReset.addEventListener('click', () => chooseToolbarItems([]));
+  settings.append(cameraLabel, toolbarOptions);
   for (const selector of ['#btn-gaze-reset', '.language-control[for="render-quality"]', '.language-control[for="cockpit-quality"]', '#btn-sound', '.language-control[for="engine-volume"]', '#btn-touch-toggle', '#touch-btn-gyro', '#gyro-settings', '#btn-cam-reset', '#btn-yokes', '#btn-diag', '#btn-joystick-check', '#btn-help']) {
     const node = document.querySelector(selector);
     if (node) settings.append(node);
@@ -195,9 +243,11 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   for (const id of ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']) {
     bar.append(document.getElementById(id));
   }
-  // The row is anchored to the right edge, so the aircraft actions that follow
-  // takeover unfold leftwards instead of shifting the primary group.
-  bar.append(skipDemoButton, cameraStrip, fullscreen, moreButton);
+  // Trim and parking brake are aircraft controls, so their overflow button stays
+  // beside the control group in both orientations. The row is anchored to the right
+  // edge, so the aircraft actions that follow takeover unfold leftwards.
+  bar.append(moreButton, skipDemoButton, cameraStrip, fullscreen);
+  showToolbarItems(toolbarHidden);
   for (const [id, key] of Object.entries({ 'btn-gear': 'G', 'btn-flaps-ret': 'V', 'btn-flaps-ext': 'F', 'btn-spoilers': 'B', 'btn-reverser': 'R', 'flight-trim-less': 'T', 'flight-trim-more': 'Y', 'flight-park-brake': '.' })) {
     document.getElementById(id)?.setAttribute('data-key-hint', key);
   }
@@ -244,7 +294,8 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   function positionEdgeButtons() {
     if (!strip.getClientRects().length || !bar.getClientRects().length) return;
     // Stack the camera strip onto a second row only when the first row cannot
-    // fit at least three camera buttons alongside the fixed flight/utility controls.
+    // fit the visible camera buttons (at most three are required) alongside the
+    // fixed flight/utility controls. With every camera hidden there is one row.
     const maxToolbarWidth = Number.parseFloat(getComputedStyle(bar).maxWidth)
       || (document.documentElement.clientWidth - 16);
     let fixedWidth = 2;
@@ -252,8 +303,10 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
       if (child === cameraStrip || getComputedStyle(child).display === 'none') continue;
       fixedWidth += child.getBoundingClientRect().width;
     }
-    const buttonWidth = fullscreen.getBoundingClientRect().width || 44;
-    const stackCameraStrip = (maxToolbarWidth - fixedWidth) < buttonWidth * 3;
+    const buttonWidth = moreButton.getBoundingClientRect().width || 44;
+    const visibleCameras = cameraButtons.filter(button => !button.hidden).length;
+    const stackCameraStrip = visibleCameras > 0
+      && (maxToolbarWidth - fixedWidth) < buttonWidth * Math.min(3, visibleCameras);
     bar.classList.toggle('camera-strip-stacked', stackCameraStrip);
     // The folded compact notice narrows this row. Keep takeover visible there;
     // elsewhere pin the camera/fullscreen/overflow end to the right edge.

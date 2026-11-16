@@ -110,10 +110,13 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       assert.equal(new Set(layout.buttons.map(b => Math.round(b.y))).size, layout.stacked ? 2 : 1,
         `toolbar stays on ${layout.stacked ? 'two' : 'one'} row(s): ${JSON.stringify(layout.buttons)}`);
       assert.ok(layout.buttons.every(b => b.center === 'flex/center/center'), `labels centred in their buttons: ${layout.buttons.map(b => b.center)}`);
-      // Fullscreen and overflow stay pinned to the right edge; only the camera
-      // strip scrolls horizontally when the viewport is narrower than all buttons.
-      const primary = layout.buttons.slice(-2);
-      assert.deepEqual(primary.map(b => b.sel), ['#btn-fullscreen', '#open-flight-more'], `primary group order: ${layout.buttons.map(b => b.sel)}`);
+      // Overflow (trim, parking brake) sits beside the aircraft controls and
+      // fullscreen closes the row; only the camera strip scrolls horizontally
+      // when the viewport is narrower than all buttons.
+      const order = layout.buttons.map(b => b.sel);
+      assert.equal(order.indexOf('#open-flight-more'), order.indexOf('#btn-reverser') + 1, `overflow follows the aircraft controls: ${order}`);
+      assert.equal(order.at(-1), '#btn-fullscreen', `fullscreen closes the row: ${order}`);
+      const primary = layout.buttons.filter(b => ['#open-flight-more', '#btn-fullscreen'].includes(b.sel));
       assert.ok(layout.pinned, 'toolbar scrolled to its right end');
       assert.ok(primary.every(b => b.x >= 0 && b.x + b.w <= width + 1 && b.hit), `primary group reachable: ${JSON.stringify(primary)}`);
       const row = layout.chrome.find(r => r.sel === '.flight-toolbar');
@@ -189,10 +192,10 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     });
     assert.ok(demo.width && demo.top >= demo.toolbarBottom + 4 && demo.locked, `demo clearance and lockout: ${JSON.stringify(demo)}`);
     assert.deepEqual(demo.row, [
-      'btn-skip-demo',
+      'open-flight-more', 'btn-skip-demo',
       'btn-cam-chase', 'btn-cam-drone', 'btn-cam-flyby', 'btn-cam-wing', 'btn-cam-cockpit',
       'btn-cam-hud', 'btn-cam-tower', 'btn-cam-gear', 'btn-cam-auto', 'btn-cam-director',
-      'btn-fullscreen', 'open-flight-more',
+      'btn-fullscreen',
     ], `demo row: ${demo.row}`);
     await screenshot(`${out}/${width}x${height}-demo.png`);
     // Warnings coexist with both guide states, without covering demo controls.
@@ -237,6 +240,71 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     results.push({ width, height, cameraModes: 8, bounds: baseline, demo });
     console.log(`${width}x${height}: camera parity, AP, more, trim/brake, mute and demo passed`);
   }
+  // Issue #798: the Option-tab checkboxes choose the optional top-menu buttons.
+  const CONTROLS = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'open-flight-more'];
+  const CAMERAS = ['chase', 'drone', 'flyby', 'wing', 'cockpit', 'hud', 'tower', 'gear', 'auto', 'director'];
+  const chooseToolbar = async shown => {
+    await evaluate(shown => {
+      for (const input of document.querySelectorAll('#toolbar-options [data-toolbar-item]')) {
+        if (input.checked !== shown.includes(input.dataset.toolbarItem)) input.click();
+      }
+    }, shown);
+    await delay(150);
+  };
+  const toolbarState = () => evaluate(() => {
+    const bar = document.querySelector('.flight-toolbar');
+    const strip = document.getElementById('camera-strip');
+    const visible = [...bar.querySelectorAll('button')].filter(n => n.getClientRects().length);
+    return {
+      ids: visible.map(n => n.id),
+      rows: new Set(visible.map(n => Math.round(n.getBoundingClientRect().y))).size,
+      stacked: bar.classList.contains('camera-strip-stacked'),
+      fits: bar.scrollWidth <= bar.clientWidth + 1 && (strip.hidden || strip.scrollWidth <= strip.clientWidth + 1),
+      small: visible.filter(n => { const r = n.getBoundingClientRect(); return r.width < 44 || r.height < 44; }).map(n => n.id),
+      summary: document.querySelector('#toolbar-options summary').textContent,
+      saved: JSON.parse(localStorage.getItem('flight3d.preferences.v1') || '{}').toolbarHidden,
+    };
+  });
+  const seven = CAMERAS.filter(name => !['flyby', 'wing', 'tower'].includes(name));
+  for (const [width, height] of [[390, 844], [320, 568], [926, 428]]) {
+    const portrait = height > width;
+    await send('Emulation.setDeviceMetricsOverride', { width, height, mobile: true, deviceScaleFactor: 1 });
+    await delay(150);
+    await chooseToolbar([]);
+    const none = await toolbarState();
+    assert.deepEqual(none.ids, CONTROLS, `${width}x${height}: only aircraft controls and overflow remain`);
+    assert.ok(none.rows === 1 && !none.stacked && none.fits && !none.small.length,
+      `${width}x${height}: an empty selection is one undragged row: ${JSON.stringify(none)}`);
+    assert.equal(none.saved.length, 11, 'every optional item is saved as hidden');
+    await screenshot(`${out}/${width}x${height}-toolbar-none.png`);
+    await chooseToolbar(['cam-chase']);
+    const one = await toolbarState();
+    assert.deepEqual(one.ids, [...CONTROLS, 'btn-cam-chase'], `${width}x${height}: one camera follows the controls`);
+    // A 320px row holds the six fixed buttons only, so its single camera wraps.
+    assert.ok(one.rows === (width >= 390 ? 1 : 2) && one.fits, `${width}x${height}: one camera row count: ${JSON.stringify(one)}`);
+    await chooseToolbar([...seven.map(name => `cam-${name}`), 'fullscreen']);
+    const some = await toolbarState();
+    assert.deepEqual(some.ids.filter(id => id.startsWith('btn-cam-')), seven.map(name => `btn-cam-${name}`), 'chosen cameras keep toolbar order');
+    // At 320px the six fixed buttons plus fullscreen exceed one row, as the seven
+    // fixed buttons did before #798, so row and drag expectations start at 390px.
+    if (width >= 390) {
+      assert.equal(some.rows, portrait ? 2 : 1, `${width}x${height}: rows ${JSON.stringify(some)}`);
+      assert.ok(some.fits, `${width}x${height}: seven cameras need no drag: ${JSON.stringify(some)}`);
+    }
+    assert.ok(!some.small.length, `minimum targets: ${some.small}`);
+    assert.match(some.summary, /8\/11/, 'summary counts the shown items');
+    assert.deepEqual(some.saved, ['cam-flyby', 'cam-wing', 'cam-tower'], 'hidden items are saved in toolbar order');
+    await screenshot(`${out}/${width}x${height}-toolbar-seven.png`);
+    await evaluate(() => window.simulator.controls.onSelectCamera(4));
+    await delay(150);
+    assert.deepEqual((await toolbarState()).ids, some.ids, 'selecting a hidden camera does not bring its button back');
+    assert.equal(await evaluate('window.simulator.cameraSystem.mode'), 4, 'a hidden camera stays selectable');
+  }
+  await evaluate(() => document.getElementById('toolbar-options-reset').click());
+  await delay(150);
+  const all = await toolbarState();
+  assert.equal(all.ids.filter(id => id.startsWith('btn-cam-')).length, 10, 'show all restores every camera');
+  assert.ok(all.ids.includes('btn-fullscreen') && all.saved.length === 0, 'show all restores fullscreen and saves an empty list');
   // Preserve HUD selection across aircraft resets and menu transitions.
   for (const aircraft of ['C172', 'F16', 'B738']) {
     await evaluate(aircraft => {
@@ -284,6 +352,21 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
   await click('#btn-fly');
   assert.equal(await evaluate('window.simulator.gameFlow.state'), 'flight', 'start new leaves main menu');
   assert.equal(await evaluate('window.simulator.__menuStarts'), 1, 'start new explicitly respawns');
+  // A saved selection is restored by startup, before any option is touched.
+  await chooseToolbar(['cam-chase', 'cam-cockpit']);
+  await send('Page.reload');
+  await delay(1000);
+  for (let i = 0; i < 120; i++) {
+    if (await evaluate('Boolean(window.simulator?.startupReady)').catch(() => false)) break;
+    await delay(500);
+  }
+  const restored = await evaluate(() => ({
+    cameras: [...document.querySelectorAll('#camera-strip .flight-camera-btn')].filter(n => !n.hidden).map(n => n.id),
+    fullscreenHidden: document.getElementById('btn-fullscreen').hidden,
+    checked: [...document.querySelectorAll('#toolbar-options [data-toolbar-item]')].filter(n => n.checked).map(n => n.dataset.toolbarItem),
+  }));
+  assert.deepEqual(restored, { cameras: ['btn-cam-chase', 'btn-cam-cockpit'], fullscreenHidden: true, checked: ['cam-chase', 'cam-cockpit'] },
+    `reload restores the selection: ${JSON.stringify(restored)}`);
   assert.deepEqual(exceptions, [], 'no browser exceptions');
   await writeFile(`${out}/results.json`, JSON.stringify({ gpu, results }, null, 2));
 });
