@@ -15,18 +15,49 @@ export function combatSkill(kind, id) {
 export function createAttackSkill(id = 'pursuit') {
   const descriptor = combatSkill('attack', id);
   let active = true;
+  let prevContact = null;
   return {
     ...descriptor,
-    reset() { active = true; },
-    abort() { active = false; },
+    reset() { active = true; prevContact = null; },
+    abort() { active = false; prevContact = null; },
     update({ own, contact, locked, speedMps }) {
       if (!active) return null;
       const pursue = id !== 'hold' && contact;
+      if (!pursue) {
+        prevContact = null;
+        return {
+          headingRad: own.headingRad,
+          altitudeM: own.y,
+          speedMps,
+          fire: false,
+        };
+      }
+      let aimX = contact.x, aimY = contact.y, aimZ = contact.z;
+      if (prevContact) {
+        const cDt = (contact.time != null && prevContact.time != null)
+          ? contact.time - prevContact.time
+          : 0.2;
+        if (cDt > 0.05 && cDt <= 1.0) {
+          const vx = (contact.x - prevContact.x) / cDt;
+          const vy = (contact.y - prevContact.y) / cDt;
+          const vz = (contact.z - prevContact.z) / cDt;
+          if (Math.hypot(vx, vy, vz) <= 450) {
+            const leadT = Math.min(2.5, Math.max(0, contact.rangeM / 550));
+            aimX += vx * leadT;
+            aimY += vy * leadT;
+            aimZ += vz * leadT;
+          }
+        }
+      }
+      prevContact = { ...contact };
+      const headingRad = Math.atan2(aimX - own.x, -(aimZ - own.z));
+      const hErr = Math.abs(Math.atan2(Math.sin(headingRad - own.headingRad), Math.cos(headingRad - own.headingRad)));
+      const targetSpeedMps = hErr > 0.45 ? 205 : contact.rangeM < 2200 ? 215 : Math.max(speedMps, 260);
       return {
-        headingRad: pursue ? Math.atan2(contact.x - own.x, -(contact.z - own.z)) : own.headingRad,
-        altitudeM: pursue ? Math.max(750, contact.y) : own.y,
-        speedMps,
-        fire: Boolean(pursue && locked && contact.rangeM <= (id === 'close-pursuit' ? 1500 : 2500)),
+        headingRad,
+        altitudeM: Math.max(750, aimY),
+        speedMps: targetSpeedMps,
+        fire: Boolean(locked && contact.rangeM <= (id === 'close-pursuit' ? 1500 : 2500)),
       };
     },
   };
