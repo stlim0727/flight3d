@@ -89,12 +89,18 @@ the Option tab's "Top menu items" checkboxes hide them (`toolbarHidden`), and th
 harness checks that an empty selection leaves one undragged row in both
 orientations, that seven cameras fit a 390px portrait second row, that a hidden
 camera stays selectable without its button returning, and that the selection
-survives a reload. `src/ui/toolbarVisibility.js` holds the DOM-independent rules
+survives a reload. On 320px-class screens even the five aircraft controls,
+overflow and fullscreen (7 × 44px) exceed one row, so `fullscreen-wrapped` moves
+fullscreen to the end of the second row, beside the camera strip or alone, and the
+toolbar never needs a third row. `src/ui/toolbarVisibility.js` holds the DOM-independent rules
 (`tests/toolbarVisibility.test.js`). The cockpit eyepoint pill (`#pov-actions-bar`)
 and its panel take their top from `--flight-panels-top`, the measured bottom of
 the control rows, so they clear a wrapped camera strip; the harness waits for the
 cockpit view to load at each viewport and checks both against the toolbar's
-bottom edge. Artifacts
+bottom edge. With live touch controls it also checks that a warning row keeps the
+pill above every touch card beneath it. On short screens the expanded demo guide
+can push the pill over those cards, which is accepted: the demo disables them
+(`aircraftControlsDisabled`) and the guide leaves on takeover. Artifacts
 are written to `.cache/flight-layout/` (override with `ARTIFACT_DIR`). These are
 fixed-pose browser checks, not flight or physical-device acceptance. The older
 `verify-responsive-ui.mjs` includes historical toolbar-placement expectations;
