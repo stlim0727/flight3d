@@ -289,6 +289,7 @@ test('v1 files still decode their original one-byte fuel flow', () => {
 test('combat v5 preserves bandit attitude and v4 heading-only tracks still decode', () => {
   const source = track(2);
   source.combat = {
+    version: 5,
     targets: [{ callsign: 'BANDIT' }],
     banditSamples: [{ timeSec: 0, targets: [{ x: 1, y: 3000, z: -50, headingRad: 0.7,
       alive: true, quaternion: UNIT_QUAT }] }],

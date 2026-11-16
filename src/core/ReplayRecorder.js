@@ -129,6 +129,8 @@ export class ReplayRecorder {
           headingRad: Math.atan2(vx, -vz),
           quaternion: target.quaternion?.toArray(),
           alive: target.alive !== false,
+          damage: target.damage ?? 0,
+          damageZones: { ...target.damageZones },
         };
       }
       for (let slot = 0; slot < document.targets.length; slot++) {
@@ -306,6 +308,8 @@ export class ReplayRecorder {
       eventRecord.decoyId = (event.decoy?.id ?? event.decoyId ?? event.flareId ?? event.chaffId ?? 0) & 255;
     } else if (normalizedKind === 'damage' || normalizedKind === 'kill') {
       eventRecord.targetId = (event.target?.id ?? event.targetId ?? 0) & 255;
+      eventRecord.damage = event.damage ?? event.target?.damage ?? 0;
+      eventRecord.damageZones = event.damageZones ? { ...event.damageZones } : null;
       eventRecord.hitZone = event.hitZone ?? event.zone ?? 'fuselage';
       eventRecord.amount = event.amount ?? event.damage ?? 0;
       if (normalizedKind === 'damage') eventRecord.vx = eventRecord.amount;

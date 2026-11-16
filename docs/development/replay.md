@@ -73,9 +73,16 @@ the current playback time. A track with recorded combat opens in the DIRECTOR
 camera: the existing launch → missile-follow → bandit-shot sequence is the view
 that shows the target airframe and its destruction instead of a distant symbol.
 Combat is recorded only when the live F-16 air-to-air system is active, so B737/C172
-tracks are unchanged. Combat track format version 7 (`COMBAT_TRACK_VERSION = 7`) records
+tracks are unchanged. Combat track format version 8 (`COMBAT_TRACK_VERSION = 8`) records
 seeker state transitions, countermeasure transfers, aerodynamic guidance diagnostics,
-fuze proximity bursts, and damage history. The recorder thins combat diagnostic samples
+fuze proximity bursts, and damage history. Version 8 adds total and six-zone damage
+snapshots to bandit samples and hit events (7 bytes each, quantized to 1/254).
+The target table also retains each live target ID (1 byte), keeping launch, hit,
+kill and exported engagement identities consistent.
+Playback restores the preceding snapshot and subsequent hit snapshots at their recorded
+times, driving the same localized smoke/fire renderer as live combat. It follows recorded
+poses rather than rerunning damaged flight physics. Seeks, rewind and respawns rebuild
+these states; v4–v7 files remain readable but lack the full localized damage snapshots. The recorder thins combat diagnostic samples
 before pose samples when the per-entry budget is tight. See
 [Missile Engagement Recording](missile-engagement-recording.md) for full causal telemetry
 specifications and the `flight3d.engagement.v1` schema.
