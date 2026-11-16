@@ -1,3 +1,4 @@
+import { combatSkill, evasionDemand } from '../pilot/CombatSkills.js';
 import * as THREE from 'three';
 import { ChaffDispenser } from './Chaff.js';
 import { FlareDispenser } from './Flare.js';
@@ -30,7 +31,6 @@ const DECOY_BURST_INTERVAL_S = 0.25;
 const DECOY_EJECT_LATERAL_MPS = 22;
 const DECOY_EJECT_VERTICAL_MPS = -12;
 const EVASION_CLIMB_M = 350;
-const EVASION_MIN_SPEED_MPS = 260;
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const RIGHT = new THREE.Vector3(1, 0, 0);
 const UP = new THREE.Vector3(0, 1, 0);
@@ -40,7 +40,7 @@ let nextMissileId = 0;
 
 /** Airborne bandit with a circular patrol. Pure state: no DOM, scene or audio. */
 export class BanditTarget {
-  constructor({ callsign, position, velocity = new THREE.Vector3(), orbit = null, evasion = true, rwr = true }) {
+  constructor({ callsign, position, velocity = new THREE.Vector3(), orbit = null, evasion = true, rwr = true, evasionSkill = 'legacy-break' }) {
     this.id = ++nextTargetId;
     this.type = 'bandit';
     this.callsign = callsign;
@@ -65,6 +65,7 @@ export class BanditTarget {
     this.threatResponse = new BanditThreatResponse(evasion, { rwr });
     this.chaff = new ChaffDispenser();
     this.flare = new FlareDispenser();
+    this.evasionSkill = combatSkill('evasion', evasionSkill).id;
     this.flareThreatIds = new Set();
     this.chaffThreatIds = new Set();
     this.flareBursts = new Map();
@@ -97,16 +98,18 @@ export class BanditTarget {
       this.threatResponse.update(dt / steps, this, missiles, terrainHeight);
       const response = this.threatResponse;
       const avionicsIntegrity = Math.max(0.25, 1 - 0.6 * (this.damageZones?.nose ?? 0));
-      const headingError = Math.atan2(Math.sin(response.heading - patrolHeading),
-        Math.cos(response.heading - patrolHeading));
-      const heading = patrolHeading + headingError * response.weight * avionicsIntegrity;
+      const demand = evasionDemand(this.evasionSkill, { patrolHeading,
+        warningHeading: response.heading, weight: response.weight, integrity: avionicsIntegrity, speedMps: speed });
+      const heading = demand.headingRad;
       const lookahead = Math.max(500, this.velocity.length() * 8);
       const ground = Math.max(terrainHeight(this.position.x, this.position.z),
         terrainHeight(this.position.x + Math.sin(heading) * lookahead,
           this.position.z - Math.cos(heading) * lookahead));
-      const evadeClimb = EVASION_CLIMB_M * response.weight * avionicsIntegrity;
+      const evadeClimb = this.evasionSkill !== 'none'
+        ? EVASION_CLIMB_M * response.weight * avionicsIntegrity
+        : 0;
       const altitude = Math.max(o.altitudeM + evadeClimb, ground + 420);
-      const commandedSpeed = speed + (Math.max(speed, EVASION_MIN_SPEED_MPS) - speed) * response.weight * avionicsIntegrity;
+      const commandedSpeed = demand.speedMps;
       this.flight.guide(heading, altitude, commandedSpeed);
       this.flight.step(dt / steps, this.damage,
         this.position.y - terrainHeight(this.position.x, this.position.z), this.damageZones);
@@ -166,6 +169,8 @@ export class AirToAirMissileSystem {
     rwr = new RWRSystem(),
     banditEvasion = true,
     banditRwr = true,
+    evasionSkill = 'legacy-break',
+    countermeasurePolicy = 'single',
   } = {}) {
     this.stations = stations;
     this.specs = specs;
@@ -173,6 +178,8 @@ export class AirToAirMissileSystem {
     this.rwr = rwr;
     this.banditEvasion = banditEvasion;
     this.banditRwr = banditRwr;
+    this.evasionSkill = combatSkill('evasion', evasionSkill).id;
+    this.countermeasurePolicy = combatSkill('countermeasure', countermeasurePolicy).id;
     this.cannon = new VulcanCannon();
     this.loaded = stations.map(() => true);
     this.missiles = [];
@@ -452,6 +459,7 @@ export class AirToAirMissileSystem {
       const target = new BanditTarget({
         callsign: `BANDIT ${index + 1}`,
         evasion: this.banditEvasion,
+        evasionSkill: this.evasionSkill,
         rwr: this.banditRwr,
         position: new THREE.Vector3(),
       });
@@ -539,10 +547,12 @@ export class AirToAirMissileSystem {
     for (const target of this.targets) {
       target.update(dt, world.terrainHeight, this.missiles);
       const threatId = target.threatResponse.confirmedId;
-      this._stepDecoyBurst(dt, target, threatId, target.chaffThreatIds, target.chaffBursts, target.chaff,
-        this.chaffClouds, 'chaff_dispense', 'chaff', events);
-      this._stepDecoyBurst(dt, target, threatId, target.flareThreatIds, target.flareBursts, target.flare,
-        this.flares, 'flare_dispense', 'flare', events);
+      if (this.countermeasurePolicy === 'single') {
+        this._stepDecoyBurst(dt, target, threatId, target.chaffThreatIds, target.chaffBursts, target.chaff,
+          this.chaffClouds, 'chaff_dispense', 'chaff', events);
+        this._stepDecoyBurst(dt, target, threatId, target.flareThreatIds, target.flareBursts, target.flare,
+          this.flares, 'flare_dispense', 'flare', events);
+      }
       if (!target.alive) {
         target.respawnTimer -= dt;
         if (target.respawnTimer <= 0) this._placeBandit(target, world, this.targets.indexOf(target));

@@ -10,7 +10,12 @@
  * - Automatic analytics safely no-op when unconfigured; explicit reports require acknowledgement
  */
 
-import { createFeedbackReport, deliverFeedbackReport, gatherFeedbackDiagnostics } from './feedbackReport.js';
+import {
+  createFeedbackReport,
+  deliverFeedbackReport,
+  gatherFeedbackDiagnostics,
+  gatherFeedbackFullReport,
+} from './feedbackReport.js';
 import { inLanguage } from '../i18n/index.js';
 
 let posthogInstance = null;
@@ -453,11 +458,17 @@ export function gatherUserFeedbackContext(sim = activeSim) {
   };
 }
 
+export function gatherUserFeedbackFullReport(sim = activeSim) {
+  return gatherFeedbackFullReport(sim);
+}
+
 /** Capture now, rather than after an SDK load or a later retry. */
 export function prepareUserFeedback({ message, contact = '', category = 'bug', severity = 'major',
-  expected = '', steps = '', includeContext = true, context, sim = activeSim }) {
+  expected = '', steps = '', includeContext = true, context, fullReport = null, screenshot = null, sim = activeSim }) {
   return createFeedbackReport({ message, contact, category, severity, expected, steps,
     context: includeContext ? (context ?? gatherUserFeedbackContext(sim)) : {},
+    fullReport,
+    screenshot,
   });
 }
 

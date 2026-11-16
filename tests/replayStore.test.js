@@ -101,10 +101,12 @@ test('save stores a playable track and indexes it newest first', () => {
   assert.equal(entry.sampleCount, 20);
   assert.equal(entry.intervalSec, 0.2);
   assert.ok(Math.abs(entry.durationSec - 3.8) < 1e-9, entry.durationSec);
-  assert.equal(entry.bytes, 2239);
+  assert.equal(entry.bytes, storage.getItem(payloadKey(entry.id)).length);
   assert.match(entry.savedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   assert.equal(entry.metadata.airport, 'coastal');
-  assert.equal(storage.getItem(payloadKey(entry.id)).length, 2239);
+  const storedSortie = JSON.parse(storage.getItem(payloadKey(entry.id)));
+  assert.equal(storedSortie.kind, SORTIE_KIND);
+  assert.equal(storedSortie.report.label, 'B738 · coastal · approach');
 
   const listed = store.list();
   assert.equal(listed.length, 1);
@@ -184,7 +186,7 @@ test('the entry count budget evicts the oldest saves and drops their payloads', 
 
 test('the total byte budget evicts oldest until the library fits', () => {
   const storage = new MockStorage();
-  const store = storeFor(storage, { ...BUDGET, entries: 8, totalBase64Bytes: 6000 });
+  const store = storeFor(storage, { ...BUDGET, entries: 8, totalBase64Bytes: 6500 });
   const oldest = store.save(track(20)).entry;
   const middle = store.save(track(24)).entry;
   const newest = store.save(track(30)).entry;
@@ -290,13 +292,15 @@ test('the store degrades quietly when the platform has no storage', () => {
   assert.equal(refused.error, 'Storage unavailable');
 });
 
-test('stored payloads are padding-free base64url', () => {
+test('stored payloads are flight3d.sortie.v1 JSON with padding-free base64url tracks', () => {
   const storage = new MockStorage();
   const store = storeFor(storage);
   const { entry } = store.save(track());
   const raw = storage.getItem(payloadKey(entry.id));
-  assert.match(raw, /^[A-Za-z0-9_-]+$/);
-  assert.equal(decodeTrack(fromBase64(raw)).samples.length, 20);
+  const parsed = JSON.parse(raw);
+  assert.equal(parsed.kind, SORTIE_KIND);
+  assert.match(parsed.track, /^[A-Za-z0-9_-]+$/);
+  assert.equal(decodeTrack(fromBase64(parsed.track)).samples.length, 20);
 });
 
 test('a successful quota retry removes already purged payloads from the index', () => {
@@ -527,4 +531,66 @@ test('importJson accepts flight3d.sortie.v1 downloaded flight logs carrying full
     peakG: 2.3,
     touchdown: { sinkRateFpm: -140, contactG: 1.25 },
   });
+
+  // Full report survives importJson -> localStorage -> get / rename / exportJson
+  assert.deepEqual(store.get(entry.id).report.samples, debriefReport.samples);
+  assert.ok(store.rename(entry.id, 'Coastal Approach'));
+  const exported = JSON.parse(store.exportJson(entry.id));
+  assert.equal(exported.kind, SORTIE_KIND);
+  assert.equal(exported.report.label, 'Coastal Approach');
+  assert.deepEqual(exported.report.samples, debriefReport.samples);
+  assert.deepEqual(exported.report.touchdowns, debriefReport.touchdowns);
+});
+
+test('legacy raw base64url payloads in localStorage remain readable and exportable', () => {
+  const storage = new MockStorage();
+  const store = storeFor(storage);
+  const t = track(20);
+  const { entry } = store.save(t);
+  const parsed = JSON.parse(storage.getItem(payloadKey(entry.id)));
+  // Simulate an older browser entry that stored raw base64url without the JSON wrapper
+  storage.setItem(payloadKey(entry.id), parsed.track);
+
+  const loaded = store.get(entry.id);
+  assert.equal(loaded.track.samples.length, 20);
+  assert.equal(loaded.report, null);
+
+  const exported = JSON.parse(store.exportJson(entry.id));
+  assert.equal(exported.kind, SORTIE_KIND);
+  assert.equal(exported.track, parsed.track);
+  assert.equal(exported.report.label, entry.label);
+});
+
+test('large full report samples are decimated to fit entryBase64Bytes without rejecting a valid track', () => {
+  const storage = new MockStorage();
+  const store = storeFor(storage, { entryBase64Bytes: 8192, entries: 3, totalBase64Bytes: 1_000_000 });
+  const t = track(30); // ~3.3 KB base64 track, well within 8192 B
+  const reportSamples = Array.from({ length: 900 }, (_, i) => ({
+    timeSec: i * 0.2,
+    altitudeFt: 1000 + i,
+    iasKnots: 150,
+    gForce: i === 250 ? 6.4 : 1.0,
+    pitchDeg: 2.0,
+    rollDeg: 0,
+    headingDeg: 90,
+  }));
+  const fullReport = {
+    version: 2,
+    reason: 'landed',
+    metadata: t.metadata,
+    durationSec: 180,
+    peaks: { gForce: reportSamples[250] },
+    touchdowns: [{ sinkRateFpm: -120, contactG: 1.15 }],
+    samples: reportSamples,
+  };
+  const { entry, error } = store.save(t, { report: fullReport });
+  assert.equal(error, null);
+  assert.ok(entry);
+  assert.ok(entry.bytes <= 8192, `expected <= 8192 bytes, got ${entry.bytes}`);
+
+  const loaded = store.get(entry.id);
+  assert.equal(loaded.track.samples.length, 30);
+  assert.equal(loaded.report.samplesDecimatedForBudget, true);
+  assert.ok(loaded.report.samples.some(s => s.gForce === 6.4), 'peak-G sample kept');
+  assert.equal(loaded.report.samples.at(-1).timeSec, reportSamples.at(-1).timeSec, 'final sample kept');
 });
