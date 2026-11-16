@@ -299,10 +299,13 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
 }
 .demo-actions .btn-demo-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
 
-/* Immediate Reset POV & Gaze Exit Controls */
+/* Immediate Reset POV & Gaze Exit Controls. They follow the measured bottom of
+   the control rows, like the AP and overflow panels, so they clear the toolbar
+   whether the camera strip shares its row or wraps onto a second one, and drop
+   below the demo guide while it occupies that row. */
 .pov-actions-bar {
   position: fixed;
-  top: calc(var(--edge-top, 8px) + (54px * var(--ui-scale, 1)));
+  top: calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)))) + var(--flight-alert-space, 0px) + var(--demo-guide-space, 0px));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -373,7 +376,7 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
 /* Cockpit POV Eyepoint Adjustment Panel */
 .cockpit-pov-panel {
   position: fixed;
-  top: calc(var(--edge-top, 8px) + (96px * var(--ui-scale, 1)));
+  top: calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)))) + var(--flight-alert-space, 0px));
   right: calc(var(--edge-right, 12px) + 8px);
   width: min(calc(260px * var(--ui-scale, 1)), calc(100vw - 24px));
   background: var(--flight-control-surface, rgba(15, 23, 42, 0.92));
@@ -528,9 +531,6 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   width: 100%;
   height: 100%;
   display: block;
-}
-.compact-ui .pov-actions-bar {
-  top: calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)));
 }
 .compact-ui .btn-reset-pov,
 .compact-ui .btn-gaze-exit {
