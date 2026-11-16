@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { F16 } from '../aircraft/F16.js';
 import { createBanditMesh, banditSkin } from './missileGeometry.js';
 
-const SKIN_MESH_PATTERN = /^F-16-(?:airframe|rails)/;
 const PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
 
 function findAirframeMesh(gltfGroup) {
@@ -73,6 +72,21 @@ function noseSideAnchor(mesh, side, size) {
   return { x: surfaceX + side * size.z * 0.004, y, z };
 }
 
+/**
+ * `bindGltfControlSurfaces()` splits elevators, flaperons and the rudder into
+ * unnamed child meshes before the skin is painted. They share the parent
+ * material, so paint the whole mesh tree with one cloned material instead of
+ * leaving the moving surfaces in the player's original gray.
+ */
+function tintMeshTree(mesh, tint) {
+  if (!mesh?.isMesh || !mesh.material || Array.isArray(mesh.material)) return;
+  const material = mesh.material.clone();
+  material.color.copy(tint);
+  mesh.traverse(node => {
+    if (node.isMesh && !Array.isArray(node.material)) node.material = material;
+  });
+}
+
 function numberTexture(number) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -125,15 +139,13 @@ export class BanditAircraftView {
   _skinAirframe() {
     const { body, trim, number, scale } = banditSkin(this.callsign);
     this.airframe.group.scale.set(scale[0], scale[1], scale[2]);
-    // The GLB airframe is one material; repaint only the exterior skin and the
-    // empty weapon rails. Canopy, HUD and landing lights keep their own look.
+    // Repaint the exterior skin and its moving surfaces, plus the empty weapon
+    // rails. Canopy, HUD and landing lights keep their own materials.
     const tint = new THREE.Color(body);
-    this.airframe.group.traverse(node => {
-      if (!node.isMesh || !SKIN_MESH_PATTERN.test(node.name) || Array.isArray(node.material)) return;
-      const material = node.material.clone();
-      material.color.copy(tint);
-      node.material = material;
-    });
+    const gltfGroup = this.airframe.gltfGroup ?? this.airframe.group;
+    tintMeshTree(findAirframeMesh(gltfGroup), tint);
+    const rails = this.airframe.gltfGroup?.getObjectByName('F-16-rails_8');
+    if (rails) tintMeshTree(rails, tint);
     if (typeof document === 'undefined' || !this.airframe.gltfGroup) return;
     this._addIdentificationMarks(trim, number);
   }

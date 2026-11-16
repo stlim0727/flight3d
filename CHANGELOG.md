@@ -3,7 +3,7 @@
 ## [Unreleased]
 - **feat(weapons):** give each bandit a distinct aggressor livery
   - Patrol `BANDIT 1` and `BANDIT 2` now fly desert-sand and blue-gray airframes with slot numbers on the nose; the canyon chase aircraft uses the lizard scheme and an orange flash.
-  - Wingtips and fin tips carry the callsign accent, and the loaded F-16 is repainted instead of matching the player's gray airframe.
+  - Wingtips and fin tips carry the callsign accent, and the loaded F-16 airframe, moving control surfaces and empty rails are repainted instead of matching the player's gray aircraft.
   - Livery selection is deterministic from the callsign, so respawns and recorded replays keep the same colors.
 - **fix(diagnostics):** report the seeker's own estimate in IR tracking traces
   - The combat-situation trace now records the estimate-referenced line of sight and estimate range (`seekerLosAngleDeg`, `seekerEstimateRangeM`), so a decoy-induced gimbal trigger is visible; the existing bandit-referenced angle could not show it.
