@@ -141,4 +141,12 @@ test('Bandit dispenses a fanned 3-flare and 3-chaff burst over 0.5s for a sustai
   assert.equal(b.chaff.remaining, CHAFF_MODEL.capacity - 3);
   assert.ok(system.flares[1].velocity.x > 0 && system.flares[2].velocity.x < 0, 'burst fans laterally');
   assert.ok(system.flares[1].velocity.y < 0, 'burst ejects downward');
+
+  const coarse = new AirToAirMissileSystem(), bCoarse = new BanditTarget({ callsign: 'COARSE', position: target().position });
+  bCoarse.velocity.set(0, 0, -180);
+  bCoarse.update = () => { bCoarse.threatResponse.confirmedId = 42; };
+  coarse.addTarget(bCoarse);
+  coarse.update(0.6, w);
+  assert.equal(coarse.flares.length, 3, 'coarse render frame advances burst on fixed substeps');
+  assert.equal(coarse.chaffClouds.length, 3);
 });

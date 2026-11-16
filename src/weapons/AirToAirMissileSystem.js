@@ -503,16 +503,18 @@ export class AirToAirMissileSystem {
     );
   }
 
-  _stepDecoyBurst(target, threatId, threatIds, bursts, dispenser, list, type, eventKey, events) {
+  _stepDecoyBurst(dt, target, threatId, threatIds, bursts, dispenser, list, type, eventKey, events) {
     if (!target.alive || threatId === null || !bursts || !dispenser) return;
     let burst = bursts.get(threatId);
     if (!burst) {
       if (threatIds?.has(threatId)) return;
       threatIds?.add(threatId);
-      burst = { remaining: DECOY_BURST_COUNT, nextTimeSec: this.elapsed, shotIndex: 0 };
+      burst = { remaining: DECOY_BURST_COUNT, cooldownSec: 0, shotIndex: 0 };
       bursts.set(threatId, burst);
+    } else if (burst.remaining > 0) {
+      burst.cooldownSec = Math.max(0, burst.cooldownSec - dt);
     }
-    if (burst.remaining <= 0 || this.elapsed + 1e-9 < burst.nextTimeSec) return;
+    if (burst.remaining <= 0 || burst.cooldownSec > 1e-9) return;
     const decoy = dispenser.dispense(target.position, this._decoyEjectVelocity(target, burst.shotIndex), {
       sourceId: target.id,
     });
@@ -522,7 +524,7 @@ export class AirToAirMissileSystem {
     }
     burst.remaining--;
     burst.shotIndex++;
-    burst.nextTimeSec = this.elapsed + DECOY_BURST_INTERVAL_S;
+    burst.cooldownSec = DECOY_BURST_INTERVAL_S;
     list.push(decoy);
     events.push({
       type,
@@ -537,9 +539,9 @@ export class AirToAirMissileSystem {
     for (const target of this.targets) {
       target.update(dt, world.terrainHeight, this.missiles);
       const threatId = target.threatResponse.confirmedId;
-      this._stepDecoyBurst(target, threatId, target.chaffThreatIds, target.chaffBursts, target.chaff,
+      this._stepDecoyBurst(dt, target, threatId, target.chaffThreatIds, target.chaffBursts, target.chaff,
         this.chaffClouds, 'chaff_dispense', 'chaff', events);
-      this._stepDecoyBurst(target, threatId, target.flareThreatIds, target.flareBursts, target.flare,
+      this._stepDecoyBurst(dt, target, threatId, target.flareThreatIds, target.flareBursts, target.flare,
         this.flares, 'flare_dispense', 'flare', events);
       if (!target.alive) {
         target.respawnTimer -= dt;
