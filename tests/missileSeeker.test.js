@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Quaternion, Vector3 } from 'three';
-import { MissileSeeker, seekerCanObserve } from '../src/weapons/MissileSeeker.js';
+import { MissileSeeker, evaluateSeekerObservation, seekerCanObserve } from '../src/weapons/MissileSeeker.js';
 import { MISSILE_TYPES } from '../src/weapons/missileSpecs.js';
 import { AirToAirMissileSystem, BanditTarget } from '../src/weapons/AirToAirMissileSystem.js';
 import { compareSeekerTerrainEngagements } from '../scripts/lib/missileSeekerScenario.mjs';
@@ -164,4 +164,12 @@ test('exposed, briefly masked and persistently masked combat produce distinct st
     assert.deepEqual(result.phases, result.masking === 'open' ? ['track']
       : result.masking === 'brief' ? ['track', 'memory', 'track'] : ['track', 'memory', 'lost']);
   }
+});
+
+test('evaluateSeekerObservation distinguishes sub-meter min_range from max range_limit', () => {
+  const spec = MISSILE_TYPES.AIM9X, o = own();
+  const near = { ...contact(), position: new Vector3(0, 3000, -0.5) };
+  const far = { ...contact(), position: new Vector3(0, 3000, -(spec.seekerRangeM + 100)) };
+  assert.equal(evaluateSeekerObservation(spec, o, near, flat).lossReason, 'min_range');
+  assert.equal(evaluateSeekerObservation(spec, o, far, flat).lossReason, 'range_limit');
 });

@@ -325,14 +325,14 @@ export class MissileCombatView {
         sprite.name = 'CountermeasureFlare';
         this.scene.add(sprite);
         const trail = new SmokeTrail(this.scene, {
-          max: 40, size: 2.0, color: 0xffe8c2, opacity: 0.42,
+          max: 40, size: 3.5, color: 0xffe8c2, opacity: 0.55,
         });
         this.trails.push(trail);
         view = { sprite, trail };
         this.flareViews.set(flare.id, view);
       }
       const glow = Math.max(0.25, Math.min(1.2, (flare.infraredEmission ?? 4) / 5));
-      const scale = 6 + glow * 5;
+      const scale = 12 + glow * 10;
       view.sprite.position.copy(flare.position);
       view.sprite.scale.set(scale, scale, 1);
       view.sprite.material.opacity = Math.min(1, 0.55 + glow * 0.45);
@@ -359,11 +359,11 @@ export class MissileCombatView {
         this.chaffViews.set(cloud.id, view);
       }
       const age = cloud.age ?? 0;
-      const spread = 1 + Math.min(3.5, age * 0.45);
+      const spread = 1.6 + Math.min(5.0, age * 0.65);
       const fade = Math.max(0, 1 - age / 12);
       view.points.position.copy(cloud.position);
       view.points.scale.setScalar(spread);
-      view.points.material.opacity = 0.65 * fade;
+      view.points.material.opacity = 0.78 * fade;
     }
     for (const [id, view] of this.chaffViews) {
       if (liveChaff.has(id)) continue;

@@ -26,6 +26,11 @@ import { F16_MISSILE_STATIONS, MISSILE_TYPES } from './missileSpecs.js';
 const LOCK_SECONDS = 0.75;
 const UNLOCK_SECONDS = 0.9;
 const BANDIT_RESPAWN_SECONDS = 8;
+const DECOY_BURST_COUNT = 3;
+const DECOY_BURST_INTERVAL_S = 0.25;
+const DECOY_EJECT_LATERAL_MPS = 22;
+const DECOY_EJECT_VERTICAL_MPS = -12;
+const EVASION_CLIMB_M = 350;
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const RIGHT = new THREE.Vector3(1, 0, 0);
 const UP = new THREE.Vector3(0, 1, 0);
@@ -63,6 +68,8 @@ export class BanditTarget {
     this.evasionSkill = combatSkill('evasion', evasionSkill).id;
     this.flareThreatIds = new Set();
     this.chaffThreatIds = new Set();
+    this.flareBursts = new Map();
+    this.chaffBursts = new Map();
     this.flight = null;
     this.quaternion = null;
     if (orbit) this.respawn(position, orbit);
@@ -98,7 +105,10 @@ export class BanditTarget {
       const ground = Math.max(terrainHeight(this.position.x, this.position.z),
         terrainHeight(this.position.x + Math.sin(heading) * lookahead,
           this.position.z - Math.cos(heading) * lookahead));
-      const altitude = Math.max(o.altitudeM, ground + 420);
+      const evadeClimb = this.evasionSkill !== 'hold'
+        ? EVASION_CLIMB_M * response.weight * avionicsIntegrity
+        : 0;
+      const altitude = Math.max(o.altitudeM + evadeClimb, ground + 420);
       const commandedSpeed = demand.speedMps;
       this.flight.guide(heading, altitude, commandedSpeed);
       this.flight.step(dt / steps, this.damage,
@@ -129,6 +139,8 @@ export class BanditTarget {
     this.flare.reset();
     this.flareThreatIds.clear();
     this.chaffThreatIds.clear();
+    this.flareBursts.clear();
+    this.chaffBursts.clear();
     const o = orbit;
     if (o) {
       const tangential = o.radius * o.omega;
@@ -158,7 +170,7 @@ export class AirToAirMissileSystem {
     banditEvasion = true,
     banditRwr = true,
     evasionSkill = 'legacy-break',
-    countermeasurePolicy = 'single',
+    countermeasurePolicy = 'burst',
   } = {}) {
     this.stations = stations;
     this.specs = specs;
@@ -484,37 +496,65 @@ export class AirToAirMissileSystem {
     });
   }
 
+  _decoyEjectVelocity(target, shotIndex) {
+    if (shotIndex === 0) return target.velocity;
+    const vx = target.velocity.x;
+    const vz = target.velocity.z;
+    const horiz = Math.hypot(vx, vz);
+    const side = shotIndex % 2 === 1 ? 1 : -1;
+    const lx = horiz > 1e-3 ? -vz / horiz : 1;
+    const lz = horiz > 1e-3 ? vx / horiz : 0;
+    return new THREE.Vector3(
+      vx + lx * side * DECOY_EJECT_LATERAL_MPS,
+      target.velocity.y + DECOY_EJECT_VERTICAL_MPS,
+      vz + lz * side * DECOY_EJECT_LATERAL_MPS,
+    );
+  }
+
+  _stepDecoyBurst(dt, target, threatId, burstCount, threatIds, bursts, dispenser, list, type, eventKey, events) {
+    if (!target.alive || threatId === null || !bursts || !dispenser) return;
+    let burst = bursts.get(threatId);
+    if (!burst) {
+      if (threatIds?.has(threatId)) return;
+      threatIds?.add(threatId);
+      burst = { remaining: burstCount, cooldownSec: 0, shotIndex: 0 };
+      bursts.set(threatId, burst);
+    } else if (burst.remaining > 0) {
+      burst.cooldownSec = Math.max(0, burst.cooldownSec - dt);
+    }
+    if (burst.remaining <= 0 || burst.cooldownSec > 1e-9) return;
+    const decoy = dispenser.dispense(target.position, this._decoyEjectVelocity(target, burst.shotIndex), {
+      sourceId: target.id,
+    });
+    if (!decoy) {
+      burst.remaining = 0;
+      return;
+    }
+    burst.remaining--;
+    burst.shotIndex++;
+    burst.cooldownSec = DECOY_BURST_INTERVAL_S;
+    list.push(decoy);
+    events.push({
+      type,
+      [eventKey]: decoy,
+      target,
+      remaining: dispenser.remaining,
+      timeSec: this.elapsed,
+    });
+  }
+
   _step(dt, world, events) {
+    const burstCount = this.countermeasurePolicy === 'burst'
+      ? DECOY_BURST_COUNT
+      : this.countermeasurePolicy === 'single' ? 1 : 0;
     for (const target of this.targets) {
       target.update(dt, world.terrainHeight, this.missiles);
       const threatId = target.threatResponse.confirmedId;
-      if (this.countermeasurePolicy === 'single' && target.alive && threatId !== null && !target.chaffThreatIds.has(threatId)) {
-        const cloud = target.chaff.dispense(target.position, target.velocity, { sourceId: target.id });
-        if (cloud) {
-          target.chaffThreatIds.add(threatId);
-          this.chaffClouds.push(cloud);
-          events.push({
-            type: 'chaff_dispense',
-            chaff: cloud,
-            target,
-            remaining: target.chaff.remaining,
-            timeSec: this.elapsed,
-          });
-        }
-      }
-      if (this.countermeasurePolicy === 'single' && target.alive && threatId !== null && !target.flareThreatIds.has(threatId)) {
-        const flare = target.flare.dispense(target.position, target.velocity, { sourceId: target.id });
-        if (flare) {
-          target.flareThreatIds.add(threatId);
-          this.flares.push(flare);
-          events.push({
-            type: 'flare_dispense',
-            flare,
-            target,
-            remaining: target.flare.remaining,
-            timeSec: this.elapsed,
-          });
-        }
+      if (burstCount > 0) {
+        this._stepDecoyBurst(dt, target, threatId, burstCount, target.chaffThreatIds, target.chaffBursts, target.chaff,
+          this.chaffClouds, 'chaff_dispense', 'chaff', events);
+        this._stepDecoyBurst(dt, target, threatId, burstCount, target.flareThreatIds, target.flareBursts, target.flare,
+          this.flares, 'flare_dispense', 'flare', events);
       }
       if (!target.alive) {
         target.respawnTimer -= dt;

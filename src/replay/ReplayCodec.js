@@ -17,7 +17,7 @@ export const COMBAT_EVENT_KINDS = Object.freeze([
 export const SEEKER_STATES = Object.freeze(['unknown', 'search', 'acquire', 'track', 'memory', 'lost']);
 export const SEEKER_LOSS_REASONS = Object.freeze([
   'none', 'fov_limit', 'range_limit', 'terrain_occlusion', 'low_signal', 'invalid_geometry',
-  'target_destroyed', 'incompatible_decoy',
+  'target_destroyed', 'incompatible_decoy', 'min_range',
 ]);
 export const GUIDANCE_CUTOFF_REASONS = Object.freeze([
   'none', 'no_estimate', 'gimbal_limit', 'negative_closure', 'low_speed', 'range_too_close',
