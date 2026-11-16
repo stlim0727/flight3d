@@ -95,9 +95,22 @@ export function replayLabel(track) {
   return [aircraft, airport, scenario].filter(Boolean).join(' · ') || 'flight';
 }
 
+function parseStoredPayload(raw) {
+  if (typeof raw !== 'string') return null;
+  if (raw.trimStart().startsWith('{')) {
+    const parsed = JSON.parse(raw);
+    if (parsed?.kind !== SORTIE_KIND || typeof parsed.track !== 'string') {
+      throw new Error('Invalid stored sortie payload');
+    }
+    return { kind: SORTIE_KIND, report: parsed.report ?? null, trackBase64: parsed.track };
+  }
+  return { kind: null, report: null, trackBase64: raw };
+}
+
 /**
- * Saved replay library in localStorage. Payloads are stored one key per entry so a single
- * oversized write cannot lose the whole library, and quota pressure evicts the oldest saves.
+ * Saved replay library in localStorage. Payloads are stored one key per entry as
+ * flight3d.sortie.v1 JSON so a single oversized write cannot lose the whole library,
+ * and quota pressure evicts the oldest saves.
  */
 export class ReplayStore {
   constructor(storage, { budget = REPLAY_BUDGET } = {}) {
@@ -140,25 +153,35 @@ export class ReplayStore {
     } catch (error) {
       return { entry: null, error: error.message };
     }
-    if (base64.length > this.budget.entryBase64Bytes) return { entry: null, error: 'tooLong' };
+    const resolvedLabel = cleanLabel(label) || replayLabel(track);
     const resolvedSummary = (summary && typeof summary === 'object')
       ? summary
       : (report ? extractReportSummary(report) : null);
+    const storedReport = report
+      ? { ...report, label: report.label ?? resolvedLabel }
+      : {
+        label: resolvedLabel,
+        durationSec: track.durationSec,
+        metadata: { ...track.metadata },
+        ...(resolvedSummary ? { summary: resolvedSummary } : {}),
+      };
+    const storedPayload = JSON.stringify(createSortie(storedReport, base64));
+    if (storedPayload.length > this.budget.entryBase64Bytes) return { entry: null, error: 'tooLong' };
     const entry = {
       id: crypto.randomUUID(),
       savedAt: new Date().toISOString(),
-      label: cleanLabel(label) || replayLabel(track),
+      label: resolvedLabel,
       durationSec: track.durationSec,
       intervalSec: track.intervalSec,
       sampleCount: track.samples.length,
-      bytes: base64.length,
+      bytes: storedPayload.length,
       metadata: { ...track.metadata },
     };
     if (resolvedSummary) entry.summary = resolvedSummary;
     if (auto) { entry.auto = true; entry.autoSlot = autoSlot; }
     const rows = this.read();
     const replaced = auto ? rows.filter(row => row.auto === true && (row.autoSlot ?? 'solo') === autoSlot) : [];
-    if (!this.writeEntry(entry, base64, rows, replaced)) return { entry: null, error: this.error || 'quota' };
+    if (!this.writeEntry(entry, storedPayload, rows, replaced)) return { entry: null, error: this.error || 'quota' };
     return { entry, error: null };
   }
 
@@ -196,7 +219,8 @@ export class ReplayStore {
     try { payload = this.storage.getItem(payloadKey(id)); } catch { payload = null; }
     if (typeof payload !== 'string') { this.error = 'missingPayload'; return null; }
     try {
-      return { meta: row, track: decodeTrack(fromBase64(payload)) };
+      const parsed = parseStoredPayload(payload);
+      return { meta: row, track: decodeTrack(fromBase64(parsed.trackBase64)), report: parsed.report };
     } catch (error) {
       this.error = error.message;
       return null;
@@ -230,12 +254,20 @@ export class ReplayStore {
     let payload = null;
     try { payload = this.storage.getItem(payloadKey(id)); } catch { payload = null; }
     if (typeof payload !== 'string') return null;
-    return JSON.stringify(createSortie({
-      label: row.label,
-      durationSec: row.durationSec,
-      metadata: row.metadata,
-      ...(row.summary ? { summary: row.summary } : {}),
-    }, payload));
+    try {
+      const parsed = parseStoredPayload(payload);
+      const report = parsed.report
+        ? { ...parsed.report, label: row.label }
+        : {
+          label: row.label,
+          durationSec: row.durationSec,
+          metadata: row.metadata,
+          ...(row.summary ? { summary: row.summary } : {}),
+        };
+      return JSON.stringify(createSortie(report, parsed.trackBase64));
+    } catch {
+      return null;
+    }
   }
 
   importJson(text) {
@@ -244,11 +276,13 @@ export class ReplayStore {
     let base64;
     let label = null;
     let summary = null;
+    let report = null;
     if (parsed?.kind === SORTIE_KIND) {
       if (typeof parsed.track !== 'string') return { entry: null, error: 'notAReplay' };
       base64 = parsed.track;
       label = parsed.report?.label ?? parsed.entry?.label ?? null;
       summary = extractReportSummary(parsed.report);
+      report = parsed.report ?? null;
     } else if (parsed?.kind === LEGACY_REPLAY_KIND) {
       if (typeof parsed.payload !== 'string') return { entry: null, error: 'notAReplay' };
       base64 = parsed.payload;
@@ -264,7 +298,7 @@ export class ReplayStore {
     } catch (error) {
       return { entry: null, error: error.message };
     }
-    return this.save(track, { label, summary });
+    return this.save(track, { label, summary, report });
   }
 
   /** Commit payload and index together, restoring old saves if quota retries fail. */
