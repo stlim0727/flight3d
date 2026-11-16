@@ -196,3 +196,14 @@ test('debrief download emits gzipped binary container (.f3dr.gz) unifying teleme
   assert.match(enDebrief['debrief.saveReplay'], /library/i, 'save replay caption should indicate library');
   assert.match(koDebrief['debrief.saveReplay'], /라이브러리/, 'korean save replay caption should indicate library');
 });
+
+test('DebriefOverlay guards async save completion by debrief generation and ReplayPanel subscribes to store updates', () => {
+  const debriefSource = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
+  assert.match(debriefSource, /_debriefGeneration/, 'DebriefOverlay must track debrief generation across async saves');
+  assert.match(debriefSource, /if\s*\(\s*\(this\._debriefGeneration\s*\?\?\s*0\)\s*!==\s*generation\s*\)\s*return/,
+    'DebriefOverlay must ignore stale save completions after show() displays a new sortie');
+
+  const panelSource = readFileSync(resolve('src/ui/ReplayPanel.js'), 'utf8');
+  assert.match(panelSource, /replayStore\?\.subscribe\?\./,
+    'ReplayPanel must subscribe to replayStore updates so in-flight save commits/rollbacks refresh the open library');
+});

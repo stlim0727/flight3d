@@ -170,8 +170,10 @@ export class DebriefOverlay {
     this.el('save-replay').addEventListener('click', async () => {
       if (this.replaySaved) return;
       const saveBtn = this.el('save-replay');
+      const generation = this._debriefGeneration ?? 0;
       saveBtn.disabled = true;
       const { ok, error } = (await onSaveReplay?.()) ?? { ok: false };
+      if ((this._debriefGeneration ?? 0) !== generation) return;
       if (!ok) {
         saveBtn.disabled = false;
         this.status(SAVE_REPLAY_STATUS[error] ?? 'replay.saveFailed');
@@ -271,6 +273,7 @@ export class DebriefOverlay {
   }
 
   show(report, replay = null) {
+    this._debriefGeneration = (this._debriefGeneration ?? 0) + 1;
     this.report = report;
     this.replay = replay;
     this.replaySaved = false;

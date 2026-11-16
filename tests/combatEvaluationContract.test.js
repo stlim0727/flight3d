@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { ReplayStore } from '../src/replay/ReplayStore.js';
+import { ReplayStore, createMemoryIndexedDB } from '../src/replay/ReplayStore.js';
 import { combatExperimentConfig, runCombatExperiment } from '../scripts/lib/combatExperiment.mjs';
 
 function createMemoryStorage() {
@@ -42,7 +42,7 @@ test('coastal diagnostics produces an importable flight3d.sortie.v1 replay and c
   assert.equal(result.diagnostics.caseId, result.caseId);
   assert.equal(result.diagnostics.sortie.kind, 'flight3d.sortie.v1');
 
-  const store = new ReplayStore(createMemoryStorage());
+  const store = new ReplayStore(createMemoryStorage(), { indexedDB: createMemoryIndexedDB() });
   const imported = await store.importJson(JSON.stringify(result.diagnostics.sortie));
   assert.equal(imported.error, null);
   assert.ok(imported.entry);
@@ -95,7 +95,7 @@ test('300s coastal pursuit sortie links shots to engagement analysis and round-t
     const sortie = JSON.parse(sortiePayload);
     assert.equal(sortie.kind, 'flight3d.sortie.v1');
 
-    const store = new ReplayStore(createMemoryStorage());
+    const store = new ReplayStore(createMemoryStorage(), { indexedDB: createMemoryIndexedDB() });
     const imported = await store.importJson(sortiePayload);
     assert.equal(imported.error, null);
     assert.ok(imported.entry);

@@ -164,7 +164,8 @@ test('room timeline and partial metadata survive unified export/import; corrupt 
   f.session.finish('left');
   const data = new Map();
   const store = new ReplayStore({ getItem: key => data.get(key) ?? null,
-    setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key) });
+    setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key) },
+  { indexedDB: createMemoryIndexedDB() });
   const first = (await store.saveRoomAuto(f.saved[0])).entry;
   const json = await store.exportJson(first.id);
   assert.equal(JSON.parse(json).kind, 'flight3d.sortie.v1');

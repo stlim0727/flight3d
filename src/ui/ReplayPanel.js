@@ -75,6 +75,9 @@ export class ReplayPanel {
       } catch { this.status('replay.importFailed'); this.track('import', false); }
       e.target.value = '';
     });
+    this.sim.replayStore?.subscribe?.(() => {
+      if (!this.library.hidden) this.renderList();
+    });
   }
 
   status(key) { bindText(this.library.querySelector('[data-status]'), () => key ? t(key) : ''); }

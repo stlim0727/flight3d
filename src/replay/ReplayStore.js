@@ -539,9 +539,6 @@ export class ReplayStore {
     let resolvedIdb = customIdb;
     if (resolvedIdb === undefined) {
       try { resolvedIdb = globalThis.indexedDB ?? null; } catch { resolvedIdb = null; }
-      if (!resolvedIdb && storage !== undefined && storage !== null) {
-        resolvedIdb = createMemoryIndexedDB();
-      }
     }
     this.hasStorage = Boolean(storage);
     this.storage = storage ?? {
@@ -557,6 +554,7 @@ export class ReplayStore {
     this._committedRows = this._seedLegacyIndex();
     this._pendingOps = [];
     this._rows = [...this._committedRows];
+    this._listeners = new Set();
     this._dbPromise = null;
     this._queue = Promise.resolve();
     this._readyPromise = this._enqueue(() => this._initialize());
@@ -622,6 +620,17 @@ export class ReplayStore {
       }
     }
     this._rows = rows;
+    for (const listener of this._listeners) {
+      try { listener(); } catch { /* ignore listener errors */ }
+    }
+  }
+
+  subscribe(listener) {
+    if (typeof listener !== 'function') return () => {};
+    this._listeners.add(listener);
+    return () => {
+      this._listeners.delete(listener);
+    };
   }
 
   async _openDb() {
@@ -723,7 +732,7 @@ export class ReplayStore {
     return { error: null, compressed };
   }
 
-  async _commitWithBudget(db, entry, compressedBytes, replaced = [], { preserveNewerAuto = false } = {}) {
+  async _commitWithBudget(db, entry, compressedBytes, { preserveNewerAuto = false } = {}) {
     const payload = this._packStoredPayload(compressedBytes);
     const extraEvictedIds = new Set();
 
@@ -744,7 +753,7 @@ export class ReplayStore {
                 return { rows: liveRows, skipped: true };
               }
             }
-            const replacedIds = new Set(replaced.map(row => row.id));
+            const replacedIds = new Set();
             if (entry.auto === true) {
               const targetSlot = entry.autoSlot ?? 'solo';
               for (const row of liveRows) {
@@ -901,7 +910,6 @@ export class ReplayStore {
             db,
             migratedEntry,
             built.compressed,
-            replaced,
             { preserveNewerAuto: true },
           );
           if (!commit.ok) {
@@ -960,7 +968,6 @@ export class ReplayStore {
                     db,
                     stagedEntry,
                     built.compressed,
-                    existingRoomAuto ? [existingRoomAuto] : [],
                     { preserveNewerAuto: true },
                   );
                   if (commit.ok) {

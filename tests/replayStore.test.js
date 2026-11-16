@@ -90,7 +90,8 @@ const BUDGET = Object.freeze({
 });
 
 function storeFor(storage = new MockStorage(), budget = BUDGET, options = {}) {
-  return new ReplayStore(storage, { budget, ...options });
+  const { indexedDB = createMemoryIndexedDB(), ...rest } = options;
+  return new ReplayStore(storage, { budget, indexedDB, ...rest });
 }
 
 function getIdbEntry(idb, id) {
@@ -1094,4 +1095,93 @@ test('createCompressedSortie enforces compressed byte limits even when uncompres
     () => createCompressedSortie(heavyReport, t, { ...strictBudget, entryCompressedBytes: 40 }),
     RangeError,
   );
+});
+
+test('missing IndexedDB does not fall back to volatile memory DB and preserves legacy localStorage entries', async () => {
+  const storage = new MockStorage();
+  const t1 = track(20);
+  const legacyRow = {
+    id: 'keep-local', savedAt: '2026-01-01T00:00:00.000Z', label: 'Keep Local',
+    durationSec: t1.durationSec, intervalSec: t1.intervalSec, sampleCount: t1.samples.length,
+    bytes: 2000, metadata: t1.metadata,
+  };
+  storage.setItem(INDEX_KEY, JSON.stringify([legacyRow]));
+  storage.setItem(payloadKey(legacyRow.id), JSON.stringify(createSortie({ label: 'Keep Local' }, t1)));
+
+  const store = new ReplayStore(storage, { budget: BUDGET });
+  assert.equal(store.idb, null);
+  const mig = await store.ready();
+  assert.equal(mig.migrated, 0);
+  assert.ok(storage.getItem(INDEX_KEY), 'legacy index must remain intact when IndexedDB is unavailable');
+  assert.ok(storage.getItem(payloadKey(legacyRow.id)), 'legacy payload must remain intact');
+
+  const saveAttempt = await store.save(track(20));
+  assert.equal(saveAttempt.entry, null);
+  assert.equal(saveAttempt.error, 'Storage unavailable');
+});
+
+test('migration re-validates auto replacement inside the write transaction after compression', async () => {
+  const idb = createMemoryIndexedDB();
+  const seedStore = storeFor(new MockStorage(), { ...BUDGET, entries: 8 }, { indexedDB: idb });
+  const existingAuto = (await seedStore.saveAuto(track(20))).entry;
+
+  // Prepare legacy storage with a newer auto_save so migration plans to replace existingAuto.
+  const storage = new MockStorage();
+  const newerTrack = track(24);
+  const legacyRow = {
+    id: 'mig-auto-new', savedAt: '2999-01-01T00:00:00.000Z', label: AUTO_SAVE_LABEL,
+    durationSec: newerTrack.durationSec, intervalSec: newerTrack.intervalSec, sampleCount: newerTrack.samples.length,
+    bytes: 2000, metadata: newerTrack.metadata, auto: true, autoSlot: 'solo',
+  };
+  storage.setItem(INDEX_KEY, JSON.stringify([legacyRow]));
+  storage.setItem(payloadKey(legacyRow.id), JSON.stringify(createSortie({ label: AUTO_SAVE_LABEL }, newerTrack)));
+
+  const migrator = storeFor(storage, { ...BUDGET, entries: 8 }, { indexedDB: idb });
+  // Delay compression so another tab can promote existingAuto before migration commits.
+  const origBuild = migrator._buildCompressedPayload.bind(migrator);
+  let releaseCompression;
+  const compressionStarted = new Promise(resolve => {
+    migrator._buildCompressedPayload = async (...args) => {
+      resolve();
+      await new Promise(done => { releaseCompression = done; });
+      return origBuild(...args);
+    };
+  });
+
+  await compressionStarted;
+  assert.equal(await seedStore.rename(existingAuto.id, 'Promoted During Migration'), true);
+  releaseCompression();
+
+  const migResult = await migrator.ready();
+  assert.equal(migResult.error, null);
+  assert.equal(migResult.migrated, 1);
+  assert.ok(getIdbEntry(idb, existingAuto.id), 'promoted entry must not be deleted by stale migration replacement');
+  assert.ok(getIdbPayload(idb, existingAuto.id));
+  assert.equal((await seedStore.get(existingAuto.id)).meta.label, 'Promoted During Migration');
+  assert.ok(getIdbEntry(idb, legacyRow.id));
+});
+
+test('ReplayStore.subscribe notifies listeners when an in-flight save fails and rolls back', async () => {
+  let failWrite = false;
+  const idb = createMemoryIndexedDB({
+    failOnWrite: () => (failWrite ? Object.assign(new Error('disk full'), { name: 'AbortError' }) : null),
+  });
+  const store = storeFor(new MockStorage(), BUDGET, { indexedDB: idb });
+  const initial = (await store.saveAuto(track(20))).entry;
+
+  const snapshots = [];
+  const unsubscribe = store.subscribe(() => {
+    snapshots.push(store.list().map(row => row.id));
+  });
+
+  failWrite = true;
+  const pending = store.saveAuto(track(24));
+  // Optimistically hides previous auto_save while save is pending.
+  assert.deepEqual(snapshots.at(-1), [store.list()[0].id]);
+  assert.notEqual(snapshots.at(-1)[0], initial.id);
+
+  const failed = await pending;
+  assert.equal(failed.entry, null);
+  assert.deepEqual(snapshots.at(-1), [initial.id], 'rollback must notify subscribers with restored row');
+  unsubscribe();
 });
