@@ -261,7 +261,7 @@ test('localized damage survives recording, codec, playback, seek, rewind and res
   const recorder = new ReplayRecorder();
   recorder.start(METADATA);
   const system = combatAt(0);
-  const target = system.targets[1]; // Live ID 12 must map to replay slot 1.
+  const target = system.targets[1]; // Live ID 12 belongs to replay slot 1.
   recorder.update(0.1, TELEMETRY, QUAT, system);
   recorder.elapsed = 0.2;
   Object.assign(target, { damage: 0.4, damageZones: { wingL: 0.7, fuselage: 0.1 } });
@@ -286,7 +286,7 @@ test('localized damage survives recording, codec, playback, seek, rewind and res
   near(playback.targets[1].damage, 0.4);
   near(playback.targets[1].damageZones.wingL, 0.7);
   assert.equal(playback.targets[0].damage, 0);
-  let view = playback.view.targetViews.get(1);
+  let view = playback.view.targetViews.get(12);
   assert.ok(view.trail.count > 0, 'damaged wing emits smoke');
   assert.equal(view.fireTrail, null);
   playback.update(0.1, 0.35);
@@ -294,10 +294,10 @@ test('localized damage survives recording, codec, playback, seek, rewind and res
   assert.ok(view.fireTrail.count > 0, 'engine damage emits fire');
   playback.seek(0.9);
   near(playback.targets[1].damageZones.engine, 0.8);
-  assert.ok(playback.view.targetViews.get(1).fireTrail.count > 0, 'seek restores fire');
+  assert.ok(playback.view.targetViews.get(12).fireTrail.count > 0, 'seek restores fire');
   playback.update(0.1, 0.15);
   assert.equal(playback.targets[1].damage, 0, 'rewind clears future damage');
-  assert.equal(playback.view.targetViews.get(1).trail, null);
+  assert.equal(playback.view.targetViews.get(12).trail, null);
   playback.seek(1.4);
   assert.equal(playback.targets[1].damage, 0, 'respawn clears total damage');
   assert.ok(Object.values(playback.targets[1].damageZones).every(value => value === 0));
@@ -316,5 +316,48 @@ test('damage at a pose timestamp and the final snapshot restore without a one-sa
   playback.seek(1);
   assert.equal(playback.targets[0].damage, 0.8);
   assert.equal(playback.targets[0].damageZones.engine, 0.9);
+  playback.stop();
+});
+
+test('a respawn switches damage with its pose across a thinned sampling interval', () => {
+  const playback = new CombatReplayPlayback({ scene: new Scene() });
+  const pose = { x: 0, y: 3000, z: 0, headingRad: 0, alive: false, damage: 1, damageZones: { engine: 1 } };
+  playback.load({ version: 8, targets: [{ id: 12, callsign: 'BANDIT' }], missileSamples: [],
+    banditSamples: [{ timeSec: 10, targets: [pose] },
+      { timeSec: 12, targets: [{ ...pose, x: 500, alive: true, damage: 0, damageZones: {} }] }],
+    events: [{ timeSec: 10.2, kind: 'kill', targetId: 12, damage: 1, damageZones: { engine: 1 } }] });
+  playback.seek(10.9);
+  assert.equal(playback.targets[0].alive, false);
+  assert.equal(playback.targets[0].damage, 1);
+  playback.update(0.2, 11.1);
+  assert.equal(playback.targets[0].alive, true);
+  assert.equal(playback.targets[0].position.x, 500);
+  assert.equal(playback.targets[0].damage, 0);
+  assert.equal(playback.targets[0].damageState, 'normal');
+  assert.ok(Object.values(playback.targets[0].damageZones).every(value => value === 0));
+  assert.equal(playback.view.targetViews.get(12).fireTrail, null);
+  playback.seek(11.1);
+  assert.equal(playback.targets[0].damage, 0, 'seek matches forward playback');
+  assert.equal(playback.view.targetViews.get(12).trail, null);
+  playback.seek(10.9);
+  assert.equal(playback.targets[0].damage, 1, 'rewind recovers wreck damage');
+  playback.stop();
+});
+
+test('launch, damage and kill preserve one live target identity across encoding', () => {
+  const recorder = recordCombat(5);
+  const target = { ...combatAt(5).targets[1], damage: 0.7, damageZones: { engine: 0.8 } };
+  const missile = { id: 7, launchTargetId: 12 };
+  recorder.recordCombatEvent({ type: 'launch', missile });
+  recorder.recordCombatEvent({ type: 'damage', missile, target, damage: 0.7, damageZones: target.damageZones });
+  recorder.recordCombatEvent({ type: 'kill', missile, target });
+  const combat = decodeTrack(encodeTrack(recorder.finish())).combat;
+  assert.equal(combat.targets[1].id, 12);
+  for (const kind of ['launch', 'damage', 'kill']) {
+    assert.equal(combat.events.find(event => event.kind === kind).targetId, 12, kind);
+  }
+  const playback = new CombatReplayPlayback({ scene: new Scene() });
+  playback.load(combat);
+  assert.equal(playback.targets[1].id, 12);
   playback.stop();
 });

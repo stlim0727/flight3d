@@ -279,7 +279,7 @@ export function combatByteLength(combat, version = COMBAT_TRACK_VERSION) {
   const targets = Array.isArray(combat.targets) ? combat.targets : [];
   const targetBytes = targets.reduce((sum, target) => {
     const callsign = String(target?.callsign || '').slice(0, 64);
-    return sum + 1 + encoder.encode(callsign).length;
+    return sum + 1 + encoder.encode(callsign).length + (version >= 8 ? 1 : 0);
   }, 0);
   const banditBytes = (combat.banditSamples?.length || 0) * (5 + targets.length * (version >= 8 ? 30 : 23));
   const missileBytes = (combat.missileSamples?.length || 0) * 26;
@@ -376,7 +376,8 @@ function writeCombat(view, offset, combat, version = COMBAT_TRACK_VERSION) {
   view.setUint32(offset + 14, events.length);
   offset += COMBAT_SECTION_HEADER_BYTES;
 
-  for (const target of targets) {
+  for (const [slot, target] of targets.entries()) {
+    if (version >= 8) view.setUint8(offset++, (target.id ?? slot) & 255);
     const callsign = encoder.encode(String(target?.callsign || '').slice(0, 64));
     view.setUint8(offset, callsign.length);
     offset += 1;
@@ -604,11 +605,12 @@ function readCombat(view, offset, sectionLength, version) {
   }
   const targets = [];
   for (let slot = 0; slot < targetCount; slot++) {
-    if (offset >= end) throw new Error('replay combat targets are truncated');
+    if (offset + (version >= 8 ? 1 : 0) >= end) throw new Error('replay combat targets are truncated');
+    const id = version >= 8 ? view.getUint8(offset++) : slot;
     const length = view.getUint8(offset++);
     if (offset + length > end) throw new Error('replay combat targets are truncated');
     const bytes = new Uint8Array(view.buffer, view.byteOffset + offset, length);
-    targets.push({ callsign: decoder.decode(bytes) });
+    targets.push({ callsign: decoder.decode(bytes), ...(version >= 8 ? { id } : {}) });
     offset += length;
   }
   const banditSamples = [];

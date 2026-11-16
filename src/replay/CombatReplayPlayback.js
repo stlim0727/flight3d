@@ -72,7 +72,7 @@ export class CombatReplayPlayback {
     if (!combat || !Array.isArray(combat.targets)) return false;
     this.track = combat;
     this.targets = combat.targets.map((target, index) => ({
-      id: index,
+      id: target.id ?? index,
       callsign: target.callsign || `TARGET ${index + 1}`,
       alive: true,
       position: new THREE.Vector3(),
@@ -348,15 +348,17 @@ export class CombatReplayPlayback {
       const pose = blend < 0.5 ? from : to;
       target.alive = Boolean(pose.alive);
       // Damage is a discrete hit history, never interpolated ahead of a hit.
-      // Start from the preceding snapshot so respawns clear every zone on seek.
-      const damageSample = clamped >= b.timeSec ? b : a;
+      // Continuous flight uses the preceding snapshot; a respawn switches
+      // damage together with the pose so the new airframe cannot inherit fire.
+      const respawned = !from.alive && to.alive && blend === 1;
+      const damageSample = respawned || clamped >= b.timeSec ? b : a;
       const damagePose = damageSample.targets?.[slot];
       target.damage = Math.max(0, damagePose?.damage ?? 0);
       target.damageZones = { ...createDamageZones(), ...damagePose?.damageZones };
       if (this.track.version >= 8) {
         for (const event of this.events) {
           if (event.timeSec > timeSec + 1e-9) break;
-          if (event.timeSec < damageSample.timeSec || event.targetId !== slot || !event.damageZones) continue;
+          if (event.timeSec < damageSample.timeSec || event.targetId !== target.id || !event.damageZones) continue;
           target.damage = event.damage;
           target.damageZones = { ...event.damageZones };
         }

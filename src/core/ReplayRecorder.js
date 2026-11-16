@@ -307,7 +307,7 @@ export class ReplayRecorder {
       eventRecord.decoyType = decoyType;
       eventRecord.decoyId = (event.decoy?.id ?? event.decoyId ?? event.flareId ?? event.chaffId ?? 0) & 255;
     } else if (normalizedKind === 'damage' || normalizedKind === 'kill') {
-      eventRecord.targetId = event.target ? this._combatSlot(event.target) : (this._combatTargets.get(event.targetId) ?? 0);
+      eventRecord.targetId = (event.target?.id ?? event.targetId ?? 0) & 255;
       eventRecord.damage = event.damage ?? event.target?.damage ?? 0;
       eventRecord.damageZones = event.damageZones ? { ...event.damageZones } : null;
       eventRecord.hitZone = event.hitZone ?? event.zone ?? 'fuselage';
