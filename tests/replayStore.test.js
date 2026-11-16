@@ -560,3 +560,37 @@ test('legacy raw base64url payloads in localStorage remain readable and exportab
   assert.equal(exported.track, parsed.track);
   assert.equal(exported.report.label, entry.label);
 });
+
+test('large full report samples are decimated to fit entryBase64Bytes without rejecting a valid track', () => {
+  const storage = new MockStorage();
+  const store = storeFor(storage, { entryBase64Bytes: 8192, entries: 3, totalBase64Bytes: 1_000_000 });
+  const t = track(30); // ~3.3 KB base64 track, well within 8192 B
+  const reportSamples = Array.from({ length: 900 }, (_, i) => ({
+    timeSec: i * 0.2,
+    altitudeFt: 1000 + i,
+    iasKnots: 150,
+    gForce: i === 250 ? 6.4 : 1.0,
+    pitchDeg: 2.0,
+    rollDeg: 0,
+    headingDeg: 90,
+  }));
+  const fullReport = {
+    version: 2,
+    reason: 'landed',
+    metadata: t.metadata,
+    durationSec: 180,
+    peaks: { gForce: reportSamples[250] },
+    touchdowns: [{ sinkRateFpm: -120, contactG: 1.15 }],
+    samples: reportSamples,
+  };
+  const { entry, error } = store.save(t, { report: fullReport });
+  assert.equal(error, null);
+  assert.ok(entry);
+  assert.ok(entry.bytes <= 8192, `expected <= 8192 bytes, got ${entry.bytes}`);
+
+  const loaded = store.get(entry.id);
+  assert.equal(loaded.track.samples.length, 30);
+  assert.equal(loaded.report.samplesDecimatedForBudget, true);
+  assert.ok(loaded.report.samples.some(s => s.gForce === 6.4), 'peak-G sample kept');
+  assert.equal(loaded.report.samples.at(-1).timeSec, reportSamples.at(-1).timeSec, 'final sample kept');
+});

@@ -108,6 +108,40 @@ function parseStoredPayload(raw) {
 }
 
 /**
+ * Keep the stored flight3d.sortie.v1 JSON within the per-entry localStorage budget without
+ * rejecting a valid track that ReplayRecorder already sized to entryBase64Bytes.
+ */
+function boundStoredSortie(report, base64, compactReport, entryBudget) {
+  let currentReport = report;
+  let serialized = JSON.stringify(createSortie(currentReport, base64));
+  if (!Number.isFinite(entryBudget) || entryBudget <= 0 || serialized.length <= entryBudget) {
+    return serialized;
+  }
+  if (Array.isArray(currentReport?.samples) && currentReport.samples.length > 0) {
+    let samples = currentReport.samples;
+    let peakIndex = -1;
+    samples.forEach((entry, index) => {
+      if (Number.isFinite(entry?.gForce) && (peakIndex < 0 || entry.gForce > samples[peakIndex].gForce)) peakIndex = index;
+    });
+    const peakTime = peakIndex >= 0 ? samples[peakIndex].timeSec : null;
+    while (samples.length > 0 && serialized.length > entryBudget) {
+      const next = samples.length <= 2
+        ? []
+        : samples.filter((entry, index) =>
+          index === 0 || index === samples.length - 1 || index % 2 === 0
+          || (peakTime !== null && entry?.timeSec === peakTime));
+      samples = next.length === samples.length ? samples.slice(0, Math.floor(samples.length / 2)) : next;
+      currentReport = { ...currentReport, samples, samplesDecimatedForBudget: true };
+      serialized = JSON.stringify(createSortie(currentReport, base64));
+    }
+  }
+  if (serialized.length > entryBudget && currentReport !== compactReport) {
+    serialized = JSON.stringify(createSortie({ ...compactReport, reportTruncatedForBudget: true }, base64));
+  }
+  return serialized;
+}
+
+/**
  * Saved replay library in localStorage. Payloads are stored one key per entry as
  * flight3d.sortie.v1 JSON so a single oversized write cannot lose the whole library,
  * and quota pressure evicts the oldest saves.
@@ -153,20 +187,21 @@ export class ReplayStore {
     } catch (error) {
       return { entry: null, error: error.message };
     }
+    if (base64.length > this.budget.entryBase64Bytes) return { entry: null, error: 'tooLong' };
     const resolvedLabel = cleanLabel(label) || replayLabel(track);
     const resolvedSummary = (summary && typeof summary === 'object')
       ? summary
       : (report ? extractReportSummary(report) : null);
+    const compactReport = {
+      label: resolvedLabel,
+      durationSec: track.durationSec,
+      metadata: { ...track.metadata },
+      ...(resolvedSummary ? { summary: resolvedSummary } : {}),
+    };
     const storedReport = report
       ? { ...report, label: report.label ?? resolvedLabel }
-      : {
-        label: resolvedLabel,
-        durationSec: track.durationSec,
-        metadata: { ...track.metadata },
-        ...(resolvedSummary ? { summary: resolvedSummary } : {}),
-      };
-    const storedPayload = JSON.stringify(createSortie(storedReport, base64));
-    if (storedPayload.length > this.budget.entryBase64Bytes) return { entry: null, error: 'tooLong' };
+      : compactReport;
+    const storedPayload = boundStoredSortie(storedReport, base64, compactReport, this.budget.entryBase64Bytes);
     const entry = {
       id: crypto.randomUUID(),
       savedAt: new Date().toISOString(),
