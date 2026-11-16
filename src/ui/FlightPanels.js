@@ -322,9 +322,21 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     document.documentElement.style.setProperty('--demo-pill-top', `${topBarRect.bottom + 4}px`);
     document.documentElement.style.setProperty('--demo-row-top', `${noticeTop}px`);
     document.documentElement.style.setProperty('--flight-panels-top', `${noticeTop}px`);
+    // The demo guide owns the notice row under the controls: the expanded banner
+    // always, the folded pill only on wide layouts (compact ones dock it beside the
+    // first strip). The POV pills then take the row beneath it. Height alone is
+    // reserved because the guide's own offset already follows warnings.
+    const guide = [demoBanner, demoPill].find(node => node?.getClientRects().length);
+    const guideSpace = guide && (guide === demoBanner || !compact.matches)
+      ? guide.getBoundingClientRect().height + 6 : 0;
+    document.documentElement.style.setProperty('--demo-guide-space', `${guideSpace}px`);
   }
+  const demoBanner = document.getElementById('demo-banner');
+  const demoPill = document.getElementById('btn-demo-open');
   const observer = new ResizeObserver(positionEdgeButtons);
-  for (const node of [topBar, strip, bar, menu, ap, document.documentElement]) observer.observe(node);
+  for (const node of [topBar, strip, bar, menu, ap, demoBanner, demoPill, document.documentElement]) {
+    if (node) observer.observe(node);
+  }
   new MutationObserver(() => {
     if (document.body.dataset.flow !== 'flight') {
       setMoreOpen(false);

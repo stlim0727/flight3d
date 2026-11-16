@@ -226,11 +226,18 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     const demoCheck = await evaluate(() => {
       const guide = document.getElementById('demo-banner');
       const warning = document.getElementById('hud-warning');
+      const pill = document.getElementById('btn-cockpit-pov');
       return { visibility: getComputedStyle(guide).visibility,
-        guideTop: guide.getBoundingClientRect().top, warningBottom: warning.getBoundingClientRect().bottom };
+        guideTop: guide.getBoundingClientRect().top, guideBottom: guide.getBoundingClientRect().bottom,
+        warningBottom: warning.getBoundingClientRect().bottom,
+        cockpit: window.simulator.cameraSystem.mode === 0, pillTop: pill.getBoundingClientRect().top, pillHeight: pill.getBoundingClientRect().height };
     });
     assert.ok(demoCheck.visibility === 'visible' && demoCheck.guideTop >= demoCheck.warningBottom + 4,
       `expanded demo stays visible below the warning at ${width}x${height}: ${JSON.stringify(demoCheck)}`);
+    // The demo keeps the cockpit view chosen above, so the eyepoint pill is on
+    // screen and has to take the row beneath the guide.
+    assert.ok(demoCheck.cockpit && demoCheck.pillHeight > 0 && demoCheck.pillTop >= demoCheck.guideBottom + 4,
+      `cockpit POV pill sits below the expanded demo guide at ${width}x${height}: ${JSON.stringify(demoCheck)}`);
     await evaluate(() => window.simulator.demoDirector.closeBanner());
     await delay(350);
     const folded = await evaluate(() => {
@@ -240,9 +247,15 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       const toolbar = document.querySelector('.flight-toolbar').getBoundingClientRect();
       return { visible: getComputedStyle(pill).visibility === 'visible', left: r.left,
         top: r.top, bottom: r.bottom, right: r.right, headerLeft: header.left,
-        headerBottom: header.bottom, toolbarLeft: toolbar.left };
+        headerBottom: header.bottom, toolbarLeft: toolbar.left,
+        pillTop: document.getElementById('btn-cockpit-pov').getBoundingClientRect().top,
+        warningBottom: document.getElementById('hud-warning').getBoundingClientRect().bottom };
     });
     assert.ok(folded.visible, 'folded demo stays visible with a warning');
+    // Wide layouts keep the folded guide in the notice row; compact ones dock it
+    // beside the first strip, which frees that row for the pill.
+    assert.ok(folded.pillTop >= (width <= 1024 ? folded.warningBottom : folded.bottom) + 4,
+      `cockpit POV pill clears the folded demo guide and warning at ${width}x${height}: ${JSON.stringify(folded)}`);
     if (width <= 1024) {
       assert.equal(folded.left, folded.headerLeft, 'folded demo aligns left in both mobile orientations');
       assert.ok(Math.abs(folded.top - folded.headerBottom - 4) <= 1, 'folded demo sits below first strip');

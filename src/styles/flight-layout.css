@@ -301,10 +301,11 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
 
 /* Immediate Reset POV & Gaze Exit Controls. They follow the measured bottom of
    the control rows, like the AP and overflow panels, so they clear the toolbar
-   whether the camera strip shares its row or wraps onto a second one. */
+   whether the camera strip shares its row or wraps onto a second one, and drop
+   below the demo guide while it occupies that row. */
 .pov-actions-bar {
   position: fixed;
-  top: calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)))) + var(--flight-alert-space, 0px));
+  top: calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)))) + var(--flight-alert-space, 0px) + var(--demo-guide-space, 0px));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
