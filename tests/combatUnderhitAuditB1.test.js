@@ -173,4 +173,41 @@ test('B1 classifier requires post-decoy reacquisition evidence and preserves mis
   assert.equal(withoutDiagnostics.shots[0].subreason, 'diagnostics_unavailable');
   assert.equal(withoutDiagnostics.shots[1].decoyTransfers, null);
   assert.equal(withoutDiagnostics.shots[1].category, 'kill');
+
+  const replayNullTargetTypeAndNonDecoySat = classifyCoastalSortieShots({
+    caseId: 'coastal-0',
+    diagnostics: {
+      trackMissileIds: { 1: 1, 2: 2 },
+      analysis: {
+        missiles: [
+          {
+            missileId: 1,
+            decoyTransfers: [{ timeSec: 1.0, decoyType: 'flare' }],
+            seekerTimeline: [
+              { timeSec: 1.2, state: 'track', targetType: null },
+            ],
+            guidanceTimeline: [
+              { timeSec: 1.4, demandedG: 40, availableG: 35 },
+            ],
+          },
+          {
+            missileId: 2,
+            decoyTransfers: [],
+            seekerTimeline: [],
+            guidanceTimeline: [
+              { timeSec: 2.0, demandedG: 42, availableG: 35 },
+            ],
+          },
+        ],
+      },
+    },
+    shots: [
+      { shotIndex: 0, missileId: 1, type: 'AIM9X', rangeM: 2200, duplicateFollowUp: false, outcomeCategory: 'expired' },
+      { shotIndex: 1, missileId: 2, type: 'AIM9X', rangeM: 1800, duplicateFollowUp: true, outcomeCategory: 'expired' },
+    ],
+  });
+  assert.equal(replayNullTargetTypeAndNonDecoySat.shots[0].category, 'missing_observation_discrimination');
+  assert.equal(replayNullTargetTypeAndNonDecoySat.shots[0].subreason, 'decoy_transfer_untraced_terminal');
+  assert.equal(replayNullTargetTypeAndNonDecoySat.shots[1].category, 'intended_model_limit');
+  assert.equal(replayNullTargetTypeAndNonDecoySat.shots[1].subreason, 'kinematic_g_saturation');
 });

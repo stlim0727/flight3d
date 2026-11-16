@@ -46,10 +46,15 @@ function evaluatePostDecoyReacquisition(row, analyzed = null) {
   }
   const missileAnalysis = analyzed ?? row.diagnostics?.analysis?.missiles?.[0] ?? null;
   if (missileAnalysis && Array.isArray(missileAnalysis.seekerTimeline)) {
+    const hasTargetIdentity = missileAnalysis.seekerTimeline.some(ev => ev.targetType != null);
+    if (!hasTargetIdentity) {
+      return { known: false, reacquired: false, saturatedAfterReacquire: false };
+    }
     const transfers = missileAnalysis.decoyTransfers ?? [];
     const tDecoy = transfers.length ? transfers[0].timeSec : 0;
     const reacqEntry = missileAnalysis.seekerTimeline.find(
-      ev => ev.timeSec > tDecoy && ev.state === 'track' && ev.targetType !== 'flare' && ev.targetType !== 'chaff',
+      ev => ev.timeSec > tDecoy && ev.state === 'track'
+        && (ev.targetType === 'bandit' || ev.targetType === 'aircraft'),
     );
     let saturatedAfterReacquire = false;
     if (reacqEntry) {
@@ -115,9 +120,15 @@ export function classifyLockedShotOutcome(row, analyzed = null) {
   if (terminal === 'miss-ground' || outcomeCategory === 'ground_impact') {
     return { category: 'intended_model_limit', subreason: 'kinematic_terrain_impact' };
   }
+  const missileAnalysis = analyzed ?? row.diagnostics?.analysis?.missiles?.[0] ?? null;
+  const saturated = (row.controlLimitedSec ?? 0) > 0 || Boolean(
+    missileAnalysis?.guidanceTimeline?.some(
+      g => Number.isFinite(g.demandedG) && Number.isFinite(g.availableG) && g.demandedG > g.availableG + 1e-3,
+    ),
+  );
   return {
     category: 'intended_model_limit',
-    subreason: (row.controlLimitedSec ?? 0) > 0 ? 'kinematic_g_saturation' : 'kinematic_fov_or_energy_limit',
+    subreason: saturated ? 'kinematic_g_saturation' : 'kinematic_fov_or_energy_limit',
   };
 }
 
@@ -198,10 +209,14 @@ export function classifyCoastalSortieShots(result) {
     }
 
     const decoyTransfers = analyzed.decoyTransfers?.length ?? 0;
+    const controlLimitedSec = (analyzed.guidanceTimeline ?? []).filter(
+      g => Number.isFinite(g.demandedG) && Number.isFinite(g.availableG) && g.demandedG > g.availableG + 1e-3,
+    ).length * 0.2;
     const classification = classifyLockedShotOutcome({
       launched: true,
       outcomeCategory: shot.outcomeCategory,
       decoyTransfers,
+      controlLimitedSec,
     }, analyzed);
 
     return {
