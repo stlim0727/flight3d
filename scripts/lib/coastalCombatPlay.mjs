@@ -3,6 +3,11 @@ import { createHeadlessSimulation } from '../../src/core/HeadlessSimulation.js';
 import { Atmosphere } from '../../src/physics/Atmosphere.js';
 import { AirToAirMissileSystem } from '../../src/weapons/AirToAirMissileSystem.js';
 import { createAttackSkill } from '../../src/pilot/CombatSkills.js';
+import {
+  OBSERVATION_MODES,
+  createContactObservation,
+  createPilotObservation,
+} from '../../src/pilot/ObservationContract.js';
 
 function guideCoastalPilot(sim, { headingRad, altitudeM, speedMps }) {
   sim.euler.setFromQuaternion(sim.quaternion, 'YXZ');
@@ -83,13 +88,34 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
           const p = pilot.position.clone().lerp(target.position, i / 20);
           if (p.y <= terrainHeight(p.x, p.z)) { visible = false; break; }
         }
-        if (visible) contact = { x: target.position.x, y: target.position.y, z: target.position.z,
-          rangeM: target.position.distanceTo(pilot.position), time };
+        if (visible) {
+          const rangeM = target.position.distanceTo(pilot.position);
+          contact = createContactObservation({
+            x: target.position.x,
+            y: target.position.y,
+            z: target.position.z,
+            rangeM,
+            observedAt: time,
+            ttlSeconds: 0.45,
+            quality: Math.max(0.2, Math.min(1, 1 - rangeM / 15000)),
+            status: 'active',
+          });
+        }
       }
       const forward = new Vector3(0, 0, -1).applyQuaternion(pilot.quaternion);
-      command = attack.update({ own: { x: pilot.position.x, y: pilot.position.y, z: pilot.position.z,
-        headingRad: Math.atan2(forward.x, -forward.z) }, contact,
-      locked: Boolean(target?.alive && combat.lockedTarget === target && combat.lockProgress >= 1), speedMps: 250 });
+      command = attack.update(createPilotObservation({
+        mode: OBSERVATION_MODES.LIMITED,
+        time,
+        own: {
+          x: pilot.position.x,
+          y: pilot.position.y,
+          z: pilot.position.z,
+          headingRad: Math.atan2(forward.x, -forward.z),
+        },
+        contact,
+        locked: Boolean(target?.alive && combat.lockedTarget === target && combat.lockProgress >= 1),
+        speedMps: 250,
+      }));
     }
     if (command) guideCoastalPilot(pilot, command);
     pilot.integratePhysics(dt);
@@ -116,12 +142,14 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
   attack.abort();
   const termination = crashed ? 'pilot-crash' : combat.remaining ? 'simulation-limit'
     : shots.some(s => s.missile.alive) ? 'simulation-limit' : 'loadout-resolved';
-  const result = { variant: 'coastal-play', type: 'mixed-loadout', skills: config.skills, initialState,
+  const result = { variant: 'coastal-play', type: 'mixed-loadout', observationMode: OBSERVATION_MODES.LIMITED,
+    skills: config.skills, initialState,
     elapsedSeconds, termination, crashed, firstLockSeconds, kills: combat.splashCount, remaining: combat.remaining,
     shots: shots.map(({ missile, ...shot }) => ({ ...shot, type: missile.typeId, locked: missile.launchLocked,
       unresolved: missile.alive, outcome: missile.finalOutcome })), events, samples };
   progress(1);
-  return { results: [result], summary: [{ variant: result.variant, type: result.type, total: 1,
+  return { results: [result], summary: [{ variant: result.variant, type: result.type,
+    observationMode: OBSERVATION_MODES.LIMITED, total: 1,
     launched: shots.length, kills: result.kills, noLock: firstLockSeconds === null ? 1 : 0,
     noLaunch: shots.length === 0, crashed, elapsedSeconds, termination, remaining: combat.remaining,
     unresolved: shots.filter(s => s.missile.alive).length }] };

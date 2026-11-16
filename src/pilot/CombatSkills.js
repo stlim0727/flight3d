@@ -1,3 +1,9 @@
+import {
+  OBSERVATION_MODES,
+  assertObservationBoundary,
+  resolveContactObservation,
+} from './ObservationContract.js';
+
 /** Local guidance policies, not calibrated claims about real combat effectiveness.
  * Inputs are observation snapshots; policies never receive the simulator/missiles.
  */
@@ -20,8 +26,11 @@ export function createAttackSkill(id = 'pursuit') {
     ...descriptor,
     reset() { active = true; prevContact = null; },
     abort() { active = false; prevContact = null; },
-    update({ own, contact, locked, speedMps }) {
+    update(observation) {
       if (!active) return null;
+      assertObservationBoundary(observation, { expectedMode: OBSERVATION_MODES.LIMITED });
+      const { own, locked, speedMps } = observation;
+      const contact = resolveContactObservation(observation.contact, observation.time);
       const pursue = id !== 'hold' && contact;
       if (!pursue) {
         prevContact = null;
@@ -34,8 +43,10 @@ export function createAttackSkill(id = 'pursuit') {
       }
       let aimX = contact.x, aimY = contact.y, aimZ = contact.z;
       if (prevContact) {
-        const cDt = (contact.time != null && prevContact.time != null)
-          ? contact.time - prevContact.time
+        const curTime = contact.observedAt ?? contact.time;
+        const prevTime = prevContact.observedAt ?? prevContact.time;
+        const cDt = (curTime != null && prevTime != null)
+          ? curTime - prevTime
           : 0.2;
         if (cDt > 0.05 && cDt <= 1.0) {
           const vx = (contact.x - prevContact.x) / cDt;
