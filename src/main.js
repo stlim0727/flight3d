@@ -314,6 +314,8 @@ class FlightSimulator {
     this.touchControls = new TouchFlightControls(this.controls);
     this.touchControls.onOptionsChange = () => this.lobby?.refresh?.();
     initFlightPanels({
+      toolbarHidden: loadSimulatorPreferences().toolbarHidden,
+      onToolbarHiddenChange: toolbarHidden => saveSimulatorPreferences({ toolbarHidden }),
       onSelectCamera: mode => this.controls.onSelectCamera(mode),
       onAdjustTrim: delta => {
         if (this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed) return;

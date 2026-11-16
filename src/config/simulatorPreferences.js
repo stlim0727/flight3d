@@ -20,6 +20,12 @@ function validateSimulatorPreferences(value) {
   if (typeof value.demoProfile === 'string' && /^[a-z0-9-]{1,64}$/.test(value.demoProfile)) {
     result.demoProfile = value.demoProfile;
   }
+  // Optional top-menu buttons the pilot chose to hide. Storing the hidden set lets
+  // newly added buttons appear by default; the toolbar ignores ids it does not own.
+  if (Array.isArray(value.toolbarHidden)) {
+    result.toolbarHidden = [...new Set(value.toolbarHidden
+      .filter(id => typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id)))].slice(0, 32);
+  }
   if (value.joystick && typeof value.joystick === 'object' && !Array.isArray(value.joystick)) {
     const joy = {};
     if (typeof value.joystick.profileOverride === 'string' && /^[a-z0-9-]{1,32}$/.test(value.joystick.profileOverride)) {

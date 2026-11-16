@@ -296,6 +296,13 @@ body.demo-active #touch-controls-overlay {
   white-space: nowrap;
 }
 .flight-toolbar .btn + .btn { border-left: 1px solid #334155; }
+/* Issue #798: optional buttons the pilot hid. The layout rules set an explicit
+   display, so the hidden attribute has to win here. */
+.flight-toolbar [hidden] { display: none !important; }
+/* Inside the camera group only a visible button that follows another visible
+   one draws a divider, so a hidden first camera leaves no doubled edge. */
+.flight-toolbar .flight-camera-strip .btn { border-left: 0; }
+.flight-toolbar .flight-camera-strip .btn:not([hidden]) ~ .btn:not([hidden]) { border-left: 1px solid #334155; }
 /* Divider between the aircraft actions, camera group, and utility actions. */
 .flight-toolbar .flight-camera-strip,
 .flight-toolbar #btn-fullscreen { border-left: 2px solid #64748b; }

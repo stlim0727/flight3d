@@ -383,6 +383,37 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
 .lobby-settings #touch-btn-gyro:not(.active) {
   box-shadow: none;
 }
+/* Issue #798: checkboxes choosing the optional top-menu buttons. */
+.lobby-settings .toolbar-options {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: calc(6px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+  border-radius: calc(8px * var(--ui-scale, 1));
+  background: rgba(0, 0, 0, .2);
+  border: 1px solid rgba(148, 163, 184, .12);
+  font-size: calc(11px * var(--ui-scale, 1));
+  color: #94a3b8;
+}
+.toolbar-options summary {
+  padding-block: calc(8px * var(--ui-scale, 1));
+  font-weight: 500;
+  cursor: pointer;
+}
+.toolbar-options-hint { margin: 0 0 calc(6px * var(--ui-scale, 1)); line-height: 1.4; }
+.toolbar-options-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: calc(8px * var(--ui-scale, 1));
+}
+.toolbar-options-list label {
+  display: flex;
+  align-items: center;
+  gap: calc(8px * var(--ui-scale, 1));
+  min-height: calc(34px * var(--ui-scale, 1));
+  color: #e2e8f0;
+  cursor: pointer;
+}
+.toolbar-options .btn { margin-top: calc(6px * var(--ui-scale, 1)); }
 .btn-touch-pill.active.gyro-standby {
   background: rgba(245, 158, 11, 0.2);
   border-color: #f59e0b;
