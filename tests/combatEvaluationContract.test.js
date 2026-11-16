@@ -49,10 +49,13 @@ test('coastal diagnostics produces an importable flight3d.sortie.v1 replay and c
 
   const loaded = store.get(imported.entry.id);
   assert.ok(loaded);
+  assert.equal(loaded.track.metadata.scenario, 'cruise');
   assert.ok(loaded.track.samples.length >= 2);
   assert.ok(Math.abs(loaded.track.durationSec - result.elapsedSeconds) < 0.05);
 
   const { shotBreakdown, metrics, targetLifecycles } = result;
+  assert.equal(metrics.selfDamage.gearDamagedParts, 0);
+  assert.equal(metrics.selfDamage.bodyDamagedParts, 0);
   assert.equal(shotBreakdown.lockedLaunches + shotBreakdown.unlockedLaunches, result.shots.length);
   assert.equal(
     shotBreakdown.kills + shotBreakdown.survivedFuzeBlasts + shotBreakdown.groundImpacts
@@ -96,6 +99,12 @@ test('300s coastal pursuit sortie links shots to engagement analysis and round-t
     const imported = store.importJson(sortiePayload);
     assert.equal(imported.error, null);
     assert.ok(imported.entry);
+
+    const loaded = store.get(imported.entry.id);
+    assert.equal(loaded.track.metadata.scenario, 'cruise');
+    for (const ev of loaded.track.combat.events) {
+      assert.ok(ev.timeSec <= loaded.track.durationSec + 1e-6);
+    }
 
     const report = JSON.parse(readFileSync(output, 'utf8'));
     const result = report.results[0];

@@ -90,7 +90,7 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
     targets: combat.targets.map(t => t.position.toArray()) };
   const caseId = 'coastal-0';
   const recorder = config.recordDiagnostics ? new ReplayRecorder() : null;
-  if (recorder) recorder.start({ airport: 'coastal', aircraft: 'F16', scenario: 'coastal' });
+  if (recorder) recorder.start({ airport: 'coastal', aircraft: 'F16', scenario: 'cruise' });
   const localTargetIds = new Map();
   const localMissileIds = new Map();
   const trackMissileIds = {};
@@ -152,8 +152,7 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
         if (life) life.peakDamage = Math.max(life.peakDamage, t.damage ?? 0);
       } else if (activeLifeByTarget.has(t.id)) {
         const life = activeLifeByTarget.get(t.id);
-        life.outcome = 'killed';
-        life.killedTimeSec ??= time;
+        life.outcome = 'terrain_crash';
         activeLifeByTarget.delete(t.id);
       }
     }
@@ -207,7 +206,9 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
     if (altM > maxAltitudeM) maxAltitudeM = altM;
     if (spdMps < minSpeedMps) minSpeedMps = spdMps;
     if (spdMps > maxSpeedMps) maxSpeedMps = spdMps;
-    const outOfControl = Boolean(pilot.telemetry?.isStalled || pilot.telemetry?.pilot?.isGLoc);
+    const outOfControl = Boolean(
+      pilot.telemetry?.isStalled || pilot.telemetry?.pilot?.isGLOC || pilot.telemetry?.pilot?.isGLoc,
+    );
     if (outOfControl) {
       if (controlLossStartSec === null) {
         controlLossEvents += 1;
@@ -238,7 +239,9 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
         });
       }
     }
-    for (const event of combat.update(dt, world)) {
+    const stepEvents = combat.update(dt, world);
+    if (recorder) recorder.update(dt, pilot.telemetry, pilot.quaternion, combat);
+    for (const event of stepEvents) {
       events[event.type] = (events[event.type] ?? 0) + 1;
       if (event.type === 'flare_dispense' && event.target) {
         const life = activeLifeByTarget.get(event.target.id);
@@ -257,9 +260,8 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
           activeLifeByTarget.delete(event.target.id);
         }
       }
-      if (recorder) recorder.recordCombatEvent(event);
+      if (recorder) recorder.recordCombatEvent({ ...event, timeSec: elapsedSeconds });
     }
-    if (recorder) recorder.update(dt, pilot.telemetry, pilot.quaternion, combat);
     if (combat.lockProgress >= 1 && firstLockSeconds === null) firstLockSeconds = time;
     if (tick % 120 === 0) {
       if (config.recordTrajectory) samples.push({ time, position: pilot.position.toArray(), lock: combat.lockProgress,
@@ -305,9 +307,9 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
     uniqueOpponentsTotal: combat.targets.length,
     selfDamage: {
       structuralDamage: pilot.telemetry?.structuralDamage ?? 0,
-      gLocCount: pilot.telemetry?.pilot?.gLocCount ?? 0,
-      bodyDamagedParts: Object.values(pilot.telemetry?.bodyDamage ?? {}).filter(Boolean).length,
-      gearDamagedParts: Object.values(pilot.telemetry?.gearDamage ?? {}).filter(Boolean).length,
+      gLocCount: pilot.telemetry?.pilot?.glocIncidents ?? pilot.telemetry?.pilot?.gLocCount ?? 0,
+      bodyDamagedParts: Object.values(pilot.telemetry?.bodyDamage ?? {}).filter(v => v && v !== 'normal').length,
+      gearDamagedParts: Object.values(pilot.telemetry?.gearDamage ?? {}).filter(v => v && v !== 'normal').length,
     },
     expenditure: {
       missilesFired: serializedShots.length,
