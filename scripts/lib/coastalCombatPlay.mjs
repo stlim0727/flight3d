@@ -1,13 +1,27 @@
 import { Euler, MathUtils, Vector3 } from 'three';
 import { createHeadlessSimulation } from '../../src/core/HeadlessSimulation.js';
+import { ReplayRecorder } from '../../src/core/ReplayRecorder.js';
 import { Atmosphere } from '../../src/physics/Atmosphere.js';
+import { createSortie } from '../../src/replay/ReplayStore.js';
 import { AirToAirMissileSystem } from '../../src/weapons/AirToAirMissileSystem.js';
+import { analyzeCombatEngagement } from '../../src/weapons/engagementAnalysis.js';
 import { createAttackSkill } from '../../src/pilot/CombatSkills.js';
 import {
   OBSERVATION_MODES,
   createContactObservation,
   createPilotObservation,
 } from '../../src/pilot/ObservationContract.js';
+
+function classifyShotOutcome(missile, killedMissileIds) {
+  if (missile.alive) return 'unresolved';
+  if (killedMissileIds.has(missile.id) || missile.finalOutcome?.outcome === 'kill') return 'kill';
+  const outcome = missile.finalOutcome?.outcome;
+  const reason = missile.finalOutcome?.reason;
+  if (outcome === 'survived_fuze_blast' || reason === 'fuze_burst') return 'survived_fuze_blast';
+  if (outcome === 'ground_impact' || reason === 'surface_collision') return 'ground_impact';
+  if (outcome === 'expired' || reason === 'life_expiry') return 'expired';
+  return 'other';
+}
 
 function guideCoastalPilot(sim, { headingRad, altitudeM, speedMps }) {
   sim.euler.setFromQuaternion(sim.quaternion, 'YXZ');
@@ -74,10 +88,74 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
   combat.selectNextTarget();
   const initialState = { position: pilot.position.toArray(), velocity: pilot.linearVelocity.toArray(),
     targets: combat.targets.map(t => t.position.toArray()) };
+  const caseId = 'coastal-0';
+  const recorder = config.recordDiagnostics ? new ReplayRecorder() : null;
+  if (recorder) recorder.start({ airport: 'coastal', aircraft: 'F16', scenario: 'cruise' });
+  const localTargetIds = new Map();
+  const localMissileIds = new Map();
+  const trackMissileIds = {};
+  const localTargetId = rawId => {
+    if (!localTargetIds.has(rawId)) localTargetIds.set(rawId, localTargetIds.size + 1);
+    return localTargetIds.get(rawId);
+  };
+  const localMissileId = rawId => {
+    if (!localMissileIds.has(rawId)) {
+      const id = localMissileIds.size + 1;
+      localMissileIds.set(rawId, id);
+      trackMissileIds[id] = rawId & 255;
+    }
+    return localMissileIds.get(rawId);
+  };
+  const activeLifeByTarget = new Map();
+  const lifeCounts = new Map();
+  const targetLifecycles = [];
+  const ensureLifecycle = (target, timeSec) => {
+    if (!target || !target.alive) return null;
+    if (activeLifeByTarget.has(target.id)) return activeLifeByTarget.get(target.id);
+    const targetId = localTargetId(target.id);
+    const lifeIndex = (lifeCounts.get(targetId) ?? 0) + 1;
+    lifeCounts.set(targetId, lifeIndex);
+    const life = {
+      targetId,
+      lifeIndex,
+      spawnTimeSec: timeSec,
+      killedTimeSec: null,
+      killedByMissileId: null,
+      peakDamage: target.damage ?? 0,
+      flaresDispensed: 0,
+      chaffDispensed: 0,
+      shotsAtTarget: 0,
+      outcome: 'survived',
+    };
+    activeLifeByTarget.set(target.id, life);
+    targetLifecycles.push(life);
+    return life;
+  };
+  for (const t of combat.targets) ensureLifecycle(t, 0);
+
+  const initialAltitudeM = pilot.position.y;
+  const initialSpeedMps = pilot.linearVelocity.length();
+  const initialSpecificEnergyM = initialAltitudeM + (initialSpeedMps ** 2) / (2 * Atmosphere.G0);
+  let minAltitudeM = initialAltitudeM, maxAltitudeM = initialAltitudeM;
+  let minSpeedMps = initialSpeedMps, maxSpeedMps = initialSpeedMps;
+  let controlLossEvents = 0, controlLossTotalSeconds = 0, maxRecoverySeconds = 0;
+  let controlLossStartSec = null;
+
   const shots = [], events = {}, samples = [];
+  const killedMissileIds = new Set();
   let contact = null, command = null, crashed = false, elapsedSeconds = 0, firstLockSeconds = null;
   for (let tick = 0; tick < Math.ceil(config.seconds * 120); tick++) {
     const time = tick * dt;
+    for (const t of combat.targets) {
+      if (t.alive) {
+        const life = ensureLifecycle(t, time);
+        if (life) life.peakDamage = Math.max(life.peakDamage, t.damage ?? 0);
+      } else if (activeLifeByTarget.has(t.id)) {
+        const life = activeLifeByTarget.get(t.id);
+        life.outcome = 'terrain_crash';
+        activeLifeByTarget.delete(t.id);
+      }
+    }
     let target = combat.selectedTarget();
     if (!target?.alive) { combat.selectNextTarget(); target = combat.selectedTarget(); contact = null; command = null; }
     if (tick % 24 === 0) {
@@ -122,14 +200,68 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
     if (![...pilot.position.toArray(), ...pilot.linearVelocity.toArray()].every(Number.isFinite)) throw new Error('Non-finite pilot state');
     world.onGround = Boolean(pilot.telemetry.onGround);
     elapsedSeconds = (tick + 1) * dt;
+    const altM = pilot.position.y;
+    const spdMps = pilot.linearVelocity.length();
+    if (altM < minAltitudeM) minAltitudeM = altM;
+    if (altM > maxAltitudeM) maxAltitudeM = altM;
+    if (spdMps < minSpeedMps) minSpeedMps = spdMps;
+    if (spdMps > maxSpeedMps) maxSpeedMps = spdMps;
+    const outOfControl = Boolean(
+      pilot.telemetry?.isStalled || pilot.telemetry?.pilot?.isGLOC || pilot.telemetry?.pilot?.isGLoc,
+    );
+    if (outOfControl) {
+      if (controlLossStartSec === null) {
+        controlLossEvents += 1;
+        controlLossStartSec = time;
+      }
+      controlLossTotalSeconds += dt;
+    } else if (controlLossStartSec !== null) {
+      maxRecoverySeconds = Math.max(maxRecoverySeconds, elapsedSeconds - controlLossStartSec);
+      controlLossStartSec = null;
+    }
     if (pilot.isCrashed || pilot.position.y <= terrainHeight(pilot.position.x, pilot.position.z) + 1) { crashed = true; break; }
     // One unresolved shot at a time avoids wasting the loadout on a dying target.
     if (command?.fire && target?.alive && combat.lockedTarget === target && combat.lockProgress >= 1 &&
         combat.remaining && !shots.some(s => s.missile.alive)) {
       const missile = combat.fire(world);
-      if (missile) shots.push({ missile, time, rangeM: target.position.distanceTo(pilot.position) });
+      if (missile) {
+        const life = ensureLifecycle(target, time);
+        if (life) life.shotsAtTarget += 1;
+        shots.push({
+          shotIndex: shots.length,
+          missile,
+          missileId: localMissileId(missile.id),
+          targetId: localTargetId(target.id),
+          targetLifeIndex: life?.lifeIndex ?? 1,
+          duplicateFollowUp: Boolean((life?.shotsAtTarget ?? 1) > 1 || !target.alive),
+          time,
+          rangeM: target.position.distanceTo(pilot.position),
+        });
+      }
     }
-    for (const event of combat.update(dt, world)) events[event.type] = (events[event.type] ?? 0) + 1;
+    const stepEvents = combat.update(dt, world);
+    if (recorder) recorder.update(dt, pilot.telemetry, pilot.quaternion, combat);
+    for (const event of stepEvents) {
+      events[event.type] = (events[event.type] ?? 0) + 1;
+      if (event.type === 'flare_dispense' && event.target) {
+        const life = activeLifeByTarget.get(event.target.id);
+        if (life) life.flaresDispensed += 1;
+      } else if (event.type === 'chaff_dispense' && event.target) {
+        const life = activeLifeByTarget.get(event.target.id);
+        if (life) life.chaffDispensed += 1;
+      } else if (event.type === 'kill' && event.target) {
+        if (event.missile?.id != null) killedMissileIds.add(event.missile.id);
+        const life = activeLifeByTarget.get(event.target.id);
+        if (life) {
+          life.outcome = 'killed';
+          life.killedTimeSec = elapsedSeconds;
+          life.killedByMissileId = event.missile?.id != null ? localMissileId(event.missile.id) : null;
+          life.peakDamage = Math.max(life.peakDamage, event.target.damage ?? 0);
+          activeLifeByTarget.delete(event.target.id);
+        }
+      }
+      if (recorder) recorder.recordCombatEvent({ ...event, timeSec: elapsedSeconds });
+    }
     if (combat.lockProgress >= 1 && firstLockSeconds === null) firstLockSeconds = time;
     if (tick % 120 === 0) {
       if (config.recordTrajectory) samples.push({ time, position: pilot.position.toArray(), lock: combat.lockProgress,
@@ -142,15 +274,93 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
   attack.abort();
   const termination = crashed ? 'pilot-crash' : combat.remaining ? 'simulation-limit'
     : shots.some(s => s.missile.alive) ? 'simulation-limit' : 'loadout-resolved';
-  const result = { variant: 'coastal-play', type: 'mixed-loadout', observationMode: OBSERVATION_MODES.LIMITED,
+  const serializedShots = shots.map(({ missile, ...shot }) => ({
+    ...shot,
+    type: missile.typeId,
+    locked: missile.launchLocked,
+    unresolved: missile.alive,
+    outcomeCategory: classifyShotOutcome(missile, killedMissileIds),
+    outcome: missile.finalOutcome,
+  }));
+  const shotBreakdown = {
+    noLockCount: firstLockSeconds === null ? 1 : 0,
+    noLaunch: serializedShots.length === 0,
+    lockedLaunches: serializedShots.filter(s => s.locked).length,
+    unlockedLaunches: serializedShots.filter(s => !s.locked).length,
+    duplicateFollowUpShots: serializedShots.filter(s => s.duplicateFollowUp).length,
+    kills: serializedShots.filter(s => s.outcomeCategory === 'kill').length,
+    survivedFuzeBlasts: serializedShots.filter(s => s.outcomeCategory === 'survived_fuze_blast').length,
+    groundImpacts: serializedShots.filter(s => s.outcomeCategory === 'ground_impact').length,
+    expiredMisses: serializedShots.filter(s => s.outcomeCategory === 'expired').length,
+    unresolved: serializedShots.filter(s => s.outcomeCategory === 'unresolved').length,
+  };
+  const uniqueOpponentsKilled = new Set(targetLifecycles.filter(l => l.outcome === 'killed').map(l => l.targetId)).size;
+  const finalAltitudeM = pilot.position.y;
+  const finalSpeedMps = pilot.linearVelocity.length();
+  const finalSpecificEnergyM = finalAltitudeM + (finalSpeedMps ** 2) / (2 * Atmosphere.G0);
+  const metrics = {
+    survived: !crashed,
+    crashed,
+    elapsedSeconds,
+    kills: combat.splashCount,
+    uniqueOpponentsKilled,
+    uniqueOpponentsTotal: combat.targets.length,
+    selfDamage: {
+      structuralDamage: pilot.telemetry?.structuralDamage ?? 0,
+      gLocCount: pilot.telemetry?.pilot?.glocIncidents ?? pilot.telemetry?.pilot?.gLocCount ?? 0,
+      bodyDamagedParts: Object.values(pilot.telemetry?.bodyDamage ?? {}).filter(v => v && v !== 'normal').length,
+      gearDamagedParts: Object.values(pilot.telemetry?.gearDamage ?? {}).filter(v => v && v !== 'normal').length,
+    },
+    expenditure: {
+      missilesFired: serializedShots.length,
+      missilesRemaining: combat.remaining,
+      banditFlaresDispensed: events.flare_dispense ?? 0,
+      banditChaffDispensed: events.chaff_dispense ?? 0,
+    },
+    energyAndAltitude: {
+      initialAltitudeM,
+      finalAltitudeM,
+      minAltitudeM,
+      maxAltitudeM,
+      initialSpeedMps,
+      finalSpeedMps,
+      minSpeedMps,
+      maxSpeedMps,
+      initialSpecificEnergyM,
+      finalSpecificEnergyM,
+      specificEnergyDeltaM: finalSpecificEnergyM - initialSpecificEnergyM,
+    },
+    controlLoss: {
+      controlLossEvents,
+      controlLossTotalSeconds,
+      maxRecoverySeconds,
+    },
+  };
+  let diagnostics = null;
+  if (recorder) {
+    if (crashed) {
+      recorder.markCrash(pilot.crashResult ?? { type: 'terrain', speedKnots: pilot.telemetry?.iasKnots ?? 0 });
+    }
+    const track = recorder.finish();
+    const sortie = track ? createSortie({
+      label: 'F16 · coastal · combat',
+      reason: termination,
+      durationSec: elapsedSeconds,
+      metadata: track.metadata,
+    }, track) : null;
+    const analysis = track ? analyzeCombatEngagement(sortie ?? track) : null;
+    diagnostics = { caseId, trackMissileIds, analysis, sortie };
+  }
+  const result = { caseId, variant: 'coastal-play', type: 'mixed-loadout', observationMode: OBSERVATION_MODES.LIMITED,
     skills: config.skills, initialState,
-    elapsedSeconds, termination, crashed, firstLockSeconds, kills: combat.splashCount, remaining: combat.remaining,
-    shots: shots.map(({ missile, ...shot }) => ({ ...shot, type: missile.typeId, locked: missile.launchLocked,
-      unresolved: missile.alive, outcome: missile.finalOutcome })), events, samples };
+    elapsedSeconds, termination, crashed, firstLockSeconds, kills: combat.splashCount,
+    uniqueOpponentsKilled, remaining: combat.remaining,
+    shots: serializedShots, shotBreakdown, targetLifecycles, metrics, events, samples, diagnostics };
   progress(1);
   return { results: [result], summary: [{ variant: result.variant, type: result.type,
-    observationMode: OBSERVATION_MODES.LIMITED, total: 1,
-    launched: shots.length, kills: result.kills, noLock: firstLockSeconds === null ? 1 : 0,
-    noLaunch: shots.length === 0, crashed, elapsedSeconds, termination, remaining: combat.remaining,
-    unresolved: shots.filter(s => s.missile.alive).length }] };
+    observationMode: OBSERVATION_MODES.LIMITED, caseIds: [caseId], total: 1,
+    launched: serializedShots.length, kills: result.kills, uniqueOpponentsKilled,
+    noLock: shotBreakdown.noLockCount, noLaunch: shotBreakdown.noLaunch,
+    crashed, elapsedSeconds, termination, remaining: combat.remaining,
+    unresolved: shotBreakdown.unresolved, shotBreakdown, metrics }] };
 }
