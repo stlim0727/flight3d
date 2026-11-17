@@ -1,0 +1,1559 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flight3d — 3D Asset Gallery (GLB)</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      --bg-dark: #0a111c;
+      --bg-surface: #111d2e;
+      --bg-card: #162438;
+      --bg-card-hover: #1c2e47;
+      --border-subtle: #24354c;
+      --border-focus: #38bdf8;
+      --text-main: #f0f6fc;
+      --text-muted: #8b9bb4;
+      --text-dim: #64748b;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --badge-bg: #1e3a5f;
+      --badge-text: #7dd3fc;
+      color-scheme: dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(17, 29, 46, 0.94);
+      border-bottom: 1px solid var(--border-subtle);
+      backdrop-filter: blur(14px);
+    }
+    .header-inner {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 16px 32px;
+      padding-top: calc(16px + env(safe-area-inset-top, 0px));
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+    .back-link:hover { border-color: var(--border-focus); background: var(--bg-card-hover); }
+    .brand h1 {
+      font-size: 1.2rem;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .brand-sub {
+      font-size: 0.78rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      letter-spacing: 0;
+    }
+    .header-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 12px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .nav-link:hover { color: var(--text-main); background: var(--bg-card); }
+    .nav-link.active {
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.1);
+      border-color: rgba(56, 189, 248, 0.45);
+    }
+    .asset-count {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
+      padding-left: 6px;
+      white-space: nowrap;
+    }
+
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .filter-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+    .filter-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+    .filter-pill:hover { color: var(--text-main); border-color: #355070; }
+    .filter-pill.active {
+      color: #04121f;
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 14px var(--accent-glow);
+    }
+    .filter-icon { font-size: 0.85em; }
+    .search-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+      min-width: min(320px, 100%);
+      flex: 0 1 360px;
+    }
+    .search-icon {
+      position: absolute;
+      left: 11px;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      padding: 8px 12px 8px 32px;
+      border-radius: 9px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      color: var(--text-main);
+      font-size: 0.85rem;
+      font-family: inherit;
+      outline: none;
+    }
+    .search-input::placeholder { color: var(--text-dim); }
+    .search-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+    main { flex: 1; width: 100%; }
+    .asset-grid {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 24px 32px 64px;
+      padding-left: calc(32px + env(safe-area-inset-left, 0px));
+      padding-right: calc(32px + env(safe-area-inset-right, 0px));
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .asset-card {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .asset-card:hover, .asset-card:focus-visible {
+      transform: translateY(-3px);
+      border-color: rgba(56, 189, 248, 0.5);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+      outline: none;
+    }
+    .thumb-wrap {
+      position: relative;
+      aspect-ratio: 16 / 10;
+      background: radial-gradient(circle at 50% 42%, #1b2c44 0%, #0b1421 72%);
+      border-bottom: 1px solid var(--border-subtle);
+      overflow: hidden;
+    }
+    .card-thumb { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .thumb-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--text-dim);
+      font-size: 0.78rem;
+    }
+    .thumb-placeholder.is-error { color: #fca5a5; }
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid rgba(56, 189, 248, 0.22);
+      border-top-color: var(--accent);
+      animation: spin 0.9s linear infinite;
+    }
+    .thumb-placeholder.is-error .spinner { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .card-body { display: flex; flex-direction: column; gap: 7px; padding: 14px 16px 16px; flex: 1; }
+    .card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+    .card-badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--badge-bg);
+      color: var(--badge-text);
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .card-file {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.66rem;
+      color: var(--text-dim);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: right;
+    }
+    .card-title-ko { font-size: 0.98rem; font-weight: 650; line-height: 1.3; }
+    .card-title-en { font-size: 0.76rem; color: var(--text-muted); }
+    .card-desc {
+      font-size: 0.78rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-stats { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 4px; }
+    .stat-chip {
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(10, 17, 28, 0.65);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 64px 20px;
+      color: var(--text-muted);
+    }
+    .empty-state h2 { font-size: 1.1rem; margin-bottom: 8px; color: var(--text-main); }
+
+    footer {
+      border-top: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      padding: 18px 32px;
+      padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+      color: var(--text-dim);
+      font-size: 0.76rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .build-info { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .build-info code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: var(--text-muted);
+    }
+
+    /* Full-screen 3D viewer */
+    .viewer {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: none;
+      flex-direction: column;
+      background: rgba(6, 12, 20, 0.98);
+      backdrop-filter: blur(8px);
+    }
+    .viewer.open { display: flex; }
+    .viewer-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(17, 29, 46, 0.7);
+    }
+    .viewer-heading { min-width: 0; }
+    .viewer-title { font-size: 1.05rem; font-weight: 650; }
+    .viewer-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+    .viewer-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .btn-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      color: var(--text-main);
+      font-size: 0.95rem;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .btn-icon:hover { border-color: var(--border-focus); color: var(--accent); }
+
+    .viewer-body {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+    }
+    .viewer-stage { position: relative; min-height: 0; overflow: hidden; }
+    #viewer-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    .viewer-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: rgba(6, 12, 20, 0.72);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      z-index: 2;
+      transition: opacity 0.2s ease;
+    }
+    .viewer-loading[hidden] { display: none; }
+    .loading-bar {
+      width: min(280px, 60%);
+      height: 4px;
+      border-radius: 999px;
+      background: var(--border-subtle);
+      overflow: hidden;
+    }
+    .loading-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.15s ease;
+    }
+    .viewer-error {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      color: #fca5a5;
+      font-size: 0.85rem;
+      background: rgba(6, 12, 20, 0.9);
+      z-index: 3;
+    }
+    .viewer-error[hidden] { display: none; }
+    .viewer-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 42px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      background: rgba(22, 36, 56, 0.78);
+      color: var(--text-main);
+      font-size: 1.4rem;
+      cursor: pointer;
+      z-index: 4;
+    }
+    .viewer-nav:hover { border-color: var(--border-focus); color: var(--accent); }
+    .viewer-prev { left: 14px; }
+    .viewer-next { right: 14px; }
+    .viewer-toolbar {
+      position: absolute;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      background: rgba(17, 29, 46, 0.88);
+      backdrop-filter: blur(10px);
+      z-index: 4;
+      max-width: calc(100% - 28px);
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .tool-btn {
+      padding: 6px 11px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.74rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tool-btn:hover { background: var(--bg-card-hover); color: var(--text-main); }
+    .tool-btn[aria-pressed="true"] {
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+    .tool-btn kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.85em;
+      opacity: 0.6;
+      margin-left: 3px;
+    }
+
+    .viewer-info {
+      border-left: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      padding: 18px 18px 28px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-height: 0;
+    }
+    .info-section h3 {
+      font-size: 0.7rem;
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 9px;
+    }
+    .info-section p { font-size: 0.78rem; line-height: 1.6; color: var(--text-muted); }
+    .info-section a { color: var(--accent); text-decoration: none; }
+    .info-section a:hover { text-decoration: underline; }
+    .stat-list { display: flex; flex-direction: column; gap: 1px; }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(36, 53, 76, 0.55);
+      font-size: 0.76rem;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row dt { color: var(--text-dim); flex-shrink: 0; }
+    .stat-row dd {
+      color: var(--text-main);
+      text-align: right;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.72rem;
+      overflow-wrap: anywhere;
+    }
+    .hint-keys { display: flex; flex-direction: column; gap: 6px; }
+    kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      border: 1px solid var(--border-subtle);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: var(--bg-card);
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.68rem;
+    }
+
+    @media (max-width: 900px) {
+      .header-inner { padding: 14px 18px; padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
+      .asset-grid {
+        padding: 18px;
+        padding-left: calc(18px + env(safe-area-inset-left, 0px));
+        padding-right: calc(18px + env(safe-area-inset-right, 0px));
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 14px;
+      }
+      .viewer-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+      .viewer-info {
+        border-left: none;
+        border-top: 1px solid var(--border-subtle);
+        max-height: 38vh;
+        padding: 14px 16px 20px;
+      }
+      .viewer-header { padding: 12px 14px; }
+      .viewer-nav { width: 34px; height: 48px; }
+      .viewer-prev { left: 8px; }
+      .viewer-next { right: 8px; }
+    }
+    @media (max-width: 560px) {
+      .brand h1 { font-size: 1rem; }
+      .asset-grid { grid-template-columns: 1fr; }
+      .search-box { flex: 1 1 100%; }
+      .viewer-toolbar { bottom: 8px; }
+      .tool-btn kbd { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="header-top">
+        <div class="brand">
+          <a class="back-link" href="./">← 시뮬레이터</a>
+          <h1>
+            3D 에셋 갤러리
+            <span class="brand-sub">GLB 모델 프리뷰 · 라이브 3D 뷰어</span>
+          </h1>
+        </div>
+        <nav class="header-nav" aria-label="쇼케이스 페이지 이동">
+          <a class="nav-link active" href="./assets.html" aria-current="page">🧊 3D 에셋</a>
+          <a class="nav-link" href="./screens.html">🖥️ UI 스크린</a>
+          <a class="nav-link" href="./flights.html">✈️ 기체 선택</a>
+          <span class="asset-count" id="asset-count">-</span>
+        </nav>
+      </div>
+      <div class="controls-bar">
+        <div class="filter-pills" id="category-filters" role="group" aria-label="에셋 카테고리 필터">
+          <button class="filter-pill active" data-category="all"><span class="filter-icon" aria-hidden="true">✨</span> 전체 (All)</button>
+          <button class="filter-pill" data-category="aircraft"><span class="filter-icon" aria-hidden="true">✈️</span> 항공기 (Aircraft)</button>
+          <button class="filter-pill" data-category="cockpit"><span class="filter-icon" aria-hidden="true">🎛️</span> 콕핏 (Cockpit)</button>
+          <button class="filter-pill" data-category="environment"><span class="filter-icon" aria-hidden="true">🏙️</span> 환경 (Environment)</button>
+          <button class="filter-pill" data-category="ships"><span class="filter-icon" aria-hidden="true">🚢</span> 선박 (Ships)</button>
+        </div>
+        <div class="search-box">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input type="search" id="search-input" class="search-input" placeholder="에셋 이름, 파일, 설명 검색…" autocomplete="off" aria-label="3D 에셋 검색">
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="asset-grid" id="asset-grid"></div>
+    <div class="empty-state" id="empty-state" hidden>
+      <h2>일치하는 에셋이 없습니다</h2>
+      <p>검색어를 변경하거나 다른 카테고리를 선택해 보세요.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="build-info" id="build-info">
+      <span>🌿 <code id="build-branch">-</code></span>
+      <span>·</span>
+      <span>🔖 <a id="build-commit" href="#" target="_blank" rel="noopener">-</a></span>
+    </div>
+    <p>Flight3d Simulation Engine · GLB Asset Preview · <a href="./">Flight Simulator</a> · <a href="./screens.html">UI Screens</a> · <a href="https://github.com/stlim0727/flight3d/blob/main/CREDITS.md" target="_blank" rel="noopener">Asset Credits</a></p>
+  </footer>
+
+  <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="3D 에셋 뷰어" aria-hidden="true">
+    <div class="viewer-header">
+      <div class="viewer-heading">
+        <h2 class="viewer-title" id="viewer-title">-</h2>
+        <p class="viewer-sub" id="viewer-sub">-</p>
+      </div>
+      <div class="viewer-actions">
+        <a id="viewer-raw" class="btn-icon" target="_blank" rel="noopener" title="GLB 원본 열기">↗</a>
+        <button id="viewer-close" class="btn-icon" type="button" title="닫기 (ESC)" aria-label="뷰어 닫기">×</button>
+      </div>
+    </div>
+    <div class="viewer-body">
+      <div class="viewer-stage" id="viewer-stage">
+        <canvas id="viewer-canvas"></canvas>
+        <div class="viewer-loading" id="viewer-loading" hidden>
+          <div class="spinner" aria-hidden="true"></div>
+          <span id="viewer-loading-text">모델 로딩 중…</span>
+          <div class="loading-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-labelledby="viewer-loading-text">
+            <div class="loading-bar-fill" id="viewer-loading-fill"></div>
+          </div>
+        </div>
+        <div class="viewer-error" id="viewer-error" hidden></div>
+        <button class="viewer-nav viewer-prev" id="viewer-prev" type="button" title="이전 에셋 (←)" aria-label="이전 에셋">‹</button>
+        <button class="viewer-nav viewer-next" id="viewer-next" type="button" title="다음 에셋 (→)" aria-label="다음 에셋">›</button>
+        <div class="viewer-toolbar" role="toolbar" aria-label="3D 뷰어 도구">
+          <button class="tool-btn" id="tool-reset" type="button">리셋 <kbd>R</kbd></button>
+          <button class="tool-btn" id="tool-autorotate" type="button" aria-pressed="true">자동 회전 <kbd>A</kbd></button>
+          <button class="tool-btn" id="tool-wireframe" type="button" aria-pressed="false">와이어프레임 <kbd>W</kbd></button>
+          <button class="tool-btn" id="tool-grid" type="button" aria-pressed="true">그리드 <kbd>G</kbd></button>
+        </div>
+      </div>
+      <aside class="viewer-info">
+        <section class="info-section">
+          <h3>파일 정보</h3>
+          <dl class="stat-list" id="viewer-stats"></dl>
+        </section>
+        <section class="info-section">
+          <h3>라이선스</h3>
+          <p id="viewer-license">-</p>
+        </section>
+        <section class="info-section">
+          <h3>조작</h3>
+          <div class="hint-keys">
+            <p>드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동</p>
+            <p><kbd>R</kbd> 리셋 · <kbd>A</kbd> 자동 회전 · <kbd>W</kbd> 와이어프레임 · <kbd>G</kbd> 그리드</p>
+            <p><kbd>←</kbd> <kbd>→</kbd> 에셋 이동 · <kbd>Esc</kbd> 닫기</p>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+    const BASE_URL = (import.meta.env && import.meta.env.BASE_URL) || './';
+    const ROOT_URL = new URL(BASE_URL, window.location.href);
+    const assetUrl = path => new URL(path.replace(/^\/+/, ''), ROOT_URL).href;
+
+    const CATEGORIES = {
+      all: '전체',
+      aircraft: '항공기',
+      cockpit: '콕핏',
+      environment: '환경',
+      ships: '선박',
+    };
+
+    const MODEL_CATALOG = [
+      {
+        id: 'b737-800',
+        file: 'models/b737-800.glb',
+        category: 'aircraft',
+        title_ko: '보잉 737-800 정적 기체',
+        title_en: 'Boeing 737-800 Static Airframe',
+        description_ko: '공항 주기장과 배경 연출에 사용하는 실물 스케일 737-800 외기 모델. 날개와 터빈 팬 애니메이션을 포함합니다.',
+        license: { label: 'CC BY 4.0 — amvlab/aircraft-models', url: 'https://github.com/amvlab/aircraft-models' },
+      },
+      {
+        id: 'c172',
+        file: 'models/c172.glb',
+        category: 'aircraft',
+        title_ko: '세스나 172SP 스카이호크',
+        title_en: 'Cessna 172SP Skyhawk',
+        description_ko: '플레이어 기본 기체. 고익·고정 착륙장치 외형과 조종석 내부, 프로펠러 및 조종면 애니메이션을 포함합니다. Draco 압축.',
+        license: { label: 'CC BY 4.0 — NLM', url: assetUrl('models/c172.LICENSE.txt') },
+      },
+      {
+        id: 'f-16',
+        file: 'models/f-16.glb',
+        category: 'aircraft',
+        title_ko: 'F-16 파이팅 팰컨',
+        title_en: 'F-16 Fighting Falcon',
+        description_ko: '파일럿 아레나와 전투 시나리오용 전투기 기체. 무장 파일런과 조종석을 포함한 외기 모델입니다.',
+        license: { label: 'CC BY-NC-SA 4.0 — bohmerang', url: assetUrl('models/f-16.LICENSE.txt') },
+      },
+      {
+        id: 'b737-cockpit-medium',
+        file: 'models/b737-cockpit-medium.glb',
+        category: 'cockpit',
+        title_ko: '보잉 737-800 콕핏 (고해상도)',
+        title_en: 'Boeing 737-800 Cockpit (Medium)',
+        description_ko: '비행 시뮬레이터의 기본 콕핏 인테리어. PFD/ND/EICAS 라이브 계기와 조명 전달 베이크가 결합되는 고해상도 모델입니다.',
+        license: { label: 'CC BY 4.0 — hakai315', url: assetUrl('models/b737-cockpit.LICENSE.txt') },
+        preview: { position: [0, 2.25, 0.65], target: [0, 1.9, 1.5], gridY: 0.9, autoRotate: false, showGrid: false },
+      },
+      {
+        id: 'b737-cockpit-draco',
+        file: 'models/b737-cockpit-draco.glb',
+        category: 'cockpit',
+        title_ko: '보잉 737-800 콕핏 (Draco 경량)',
+        title_en: 'Boeing 737-800 Cockpit (Draco / Lite)',
+        description_ko: '고해상도 콕핏 로딩 실패 시 사용하는 Draco 압축 경량 폴백 모델. 동일한 계기 레이아웃을 유지합니다.',
+        license: { label: 'CC BY 4.0 — hakai315', url: assetUrl('models/b737-cockpit.LICENSE.txt') },
+        preview: { position: [0, 2.25, 0.65], target: [0, 1.9, 1.5], gridY: 0.9, autoRotate: false, showGrid: false },
+      },
+      {
+        id: 'airport-kit',
+        file: 'models/airport/airport-kit.glb',
+        category: 'environment',
+        title_ko: '모듈형 공항 키트',
+        title_en: 'Modular Airport Kit',
+        description_ko: '터미널·격납고·관제탑·에이프런 장비를 조합하는 공항 건축 키트. 인천공항 주변 구조물 배치에 사용합니다.',
+        license: { label: 'MIT — Flight3d contributors', url: assetUrl('models/airport/LICENSE.txt') },
+      },
+      {
+        id: 'district-kit',
+        file: 'models/city/district-kit.glb',
+        category: 'environment',
+        title_ko: '도시 지구 빌딩 키트',
+        title_en: 'City District Building Kit',
+        description_ko: '저폴리곤 건물·창문·옥상 모듈로 구성된 도시 지구 키트. 네온 메트로폴리스와 해안 도시 경관에 사용합니다.',
+        license: { label: 'MIT — Flight3d contributors', url: 'https://github.com/stlim0727/flight3d/blob/main/scripts/build-city-assets.mjs' },
+      },
+      {
+        id: 'cargo',
+        file: 'models/ships/cargo.glb',
+        category: 'ships',
+        title_ko: '화물선',
+        title_en: 'Cargo Ship',
+        description_ko: '항구와 해상 교통에 배치하는 화물선 모델. 컨테이너 적재 갑판과 선교를 포함합니다.',
+        license: { label: 'MIT — Flight3d contributors', url: assetUrl('models/ships/LICENSE.txt') },
+      },
+      {
+        id: 'cruise',
+        file: 'models/ships/cruise.glb',
+        category: 'ships',
+        title_ko: '크루즈선',
+        title_en: 'Cruise Ship',
+        description_ko: '해안 관광 시나리오용 대형 크루즈선. 다층 객실 데크와 선수·선교 형상을 포함합니다.',
+        license: { label: 'MIT — Flight3d contributors', url: assetUrl('models/ships/LICENSE.txt') },
+      },
+      {
+        id: 'speedboat',
+        file: 'models/ships/speedboat.glb',
+        category: 'ships',
+        title_ko: '고속정',
+        title_en: 'Speedboat',
+        description_ko: '항만 순찰과 근거리 해상 교통에 사용하는 소형 고속정 모델. 선체와 조종석을 포함합니다.',
+        license: { label: 'MIT — Flight3d contributors', url: assetUrl('models/ships/LICENSE.txt') },
+      },
+      {
+        id: 'tanker',
+        file: 'models/ships/tanker.glb',
+        category: 'ships',
+        title_ko: '유조선',
+        title_en: 'Oil Tanker',
+        description_ko: '대형 유조선 모델. 장축 선체와 갑판 배관·선교 구조를 갖춰 항로 배경 연출에 사용합니다.',
+        license: { label: 'MIT — Flight3d contributors', url: assetUrl('models/ships/LICENSE.txt') },
+      },
+    ];
+
+    for (const model of MODEL_CATALOG) {
+      model.url = assetUrl(model.file);
+      model.size = null;
+      model.stats = null;
+      model.thumbStatus = 'idle';
+      model.thumbDataUrl = null;
+    }
+    const catalogById = new Map(MODEL_CATALOG.map(model => [model.id, model]));
+
+    const grid = document.getElementById('asset-grid');
+    const emptyState = document.getElementById('empty-state');
+    const assetCount = document.getElementById('asset-count');
+    const searchInput = document.getElementById('search-input');
+    const filterPills = Array.from(document.querySelectorAll('.filter-pill'));
+    const viewer = document.getElementById('viewer');
+    const viewerStage = document.getElementById('viewer-stage');
+    const viewerTitle = document.getElementById('viewer-title');
+    const viewerSub = document.getElementById('viewer-sub');
+    const viewerRaw = document.getElementById('viewer-raw');
+    const viewerStats = document.getElementById('viewer-stats');
+    const viewerLicense = document.getElementById('viewer-license');
+    const viewerLoading = document.getElementById('viewer-loading');
+    const viewerLoadingText = document.getElementById('viewer-loading-text');
+    const viewerLoadingFill = document.getElementById('viewer-loading-fill');
+    const viewerError = document.getElementById('viewer-error');
+    const viewerClose = document.getElementById('viewer-close');
+    const viewerPrev = document.getElementById('viewer-prev');
+    const viewerNext = document.getElementById('viewer-next');
+    const toolReset = document.getElementById('tool-reset');
+    const toolAutorotate = document.getElementById('tool-autorotate');
+    const toolWireframe = document.getElementById('tool-wireframe');
+    const toolGrid = document.getElementById('tool-grid');
+
+    let allAssets = MODEL_CATALOG;
+    let filteredAssets = MODEL_CATALOG;
+    let activeCategory = 'all';
+    const numberFormat = new Intl.NumberFormat('en-US');
+
+    function formatBytes(bytes) {
+      if (!Number.isFinite(bytes) || bytes <= 0) return '—';
+      if (bytes < 1024) return `${bytes} B`;
+      const units = ['KB', 'MB', 'GB'];
+      let value = bytes / 1024;
+      let unit = 0;
+      while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+      return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
+    }
+
+    function formatCompact(number) {
+      if (!Number.isFinite(number)) return '—';
+      if (number < 1000) return String(number);
+      if (number < 1e6) return `${(number / 1e3).toFixed(number < 1e4 ? 1 : 0)}K`;
+      return `${(number / 1e6).toFixed(1)}M`;
+    }
+
+    function formatDim(value) {
+      if (!Number.isFinite(value)) return '—';
+      if (value >= 100) return value.toFixed(0);
+      if (value >= 10) return value.toFixed(1);
+      return value.toFixed(2);
+    }
+
+    function statChips(model) {
+      const size = model.size != null ? formatBytes(model.size) : '—';
+      const tris = model.stats ? `${formatCompact(model.stats.triangles)} tris` : '—';
+      return `<span class="stat-chip">${size}</span><span class="stat-chip">${tris}</span>`;
+    }
+
+    function thumbPlaceholderHtml(status) {
+      if (status === 'error') {
+        return '<div class="thumb-placeholder is-error"><span>프리뷰를 생성할 수 없습니다</span></div>';
+      }
+      const label = status === 'loading' ? '3D 프리뷰 렌더링 중…' : status === 'queued' ? '프리뷰 대기 중…' : '스크롤하면 3D 프리뷰를 생성합니다';
+      return `<div class="thumb-placeholder"><span class="spinner" aria-hidden="true"></span><span>${label}</span></div>`;
+    }
+
+    function renderGrid() {
+      grid.innerHTML = '';
+      if (!filteredAssets.length) {
+        emptyState.hidden = false;
+        updateCount();
+        return;
+      }
+      emptyState.hidden = true;
+
+      const fragment = document.createDocumentFragment();
+      for (const model of filteredAssets) {
+        const card = document.createElement('article');
+        card.className = 'asset-card';
+        card.tabIndex = 0;
+        card.dataset.assetId = model.id;
+        card.innerHTML = `
+          <div class="thumb-wrap" data-thumb-id="${model.id}">
+            ${model.thumbStatus === 'ready' && model.thumbDataUrl
+              ? `<img class="card-thumb" src="${model.thumbDataUrl}" alt="${model.title_en} 3D 프리뷰" loading="lazy">`
+              : thumbPlaceholderHtml(model.thumbStatus)}
+          </div>
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="card-badge">${CATEGORIES[model.category]}</span>
+              <span class="card-file" title="${model.file}">${model.file}</span>
+            </div>
+            <h3 class="card-title-ko">${model.title_ko}</h3>
+            <p class="card-title-en">${model.title_en}</p>
+            <p class="card-desc">${model.description_ko}</p>
+            <div class="card-stats" data-stats-id="${model.id}">${statChips(model)}</div>
+          </div>
+        `;
+        card.addEventListener('click', () => openViewerForId(model.id));
+        card.addEventListener('keydown', event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openViewerForId(model.id);
+          }
+        });
+        fragment.appendChild(card);
+      }
+      grid.appendChild(fragment);
+
+      for (const wrap of grid.querySelectorAll('.thumb-wrap')) {
+        const model = catalogById.get(wrap.dataset.thumbId);
+        if (!model || model.thumbStatus === 'ready') continue;
+        thumbObserver.observe(wrap);
+      }
+      updateCount();
+    }
+
+    function updateCount() {
+      assetCount.textContent = `${filteredAssets.length} / ${allAssets.length} Assets`;
+    }
+
+    function updateCardThumb(model) {
+      const wrap = grid.querySelector(`[data-thumb-id="${model.id}"]`);
+      if (!wrap) return;
+      if (model.thumbStatus === 'ready' && model.thumbDataUrl) {
+        wrap.innerHTML = `<img class="card-thumb" src="${model.thumbDataUrl}" alt="${model.title_en} 3D 프리뷰" loading="lazy">`;
+      } else {
+        wrap.innerHTML = thumbPlaceholderHtml(model.thumbStatus);
+      }
+    }
+
+    function updateCardStats(model) {
+      const stats = grid.querySelector(`[data-stats-id="${model.id}"]`);
+      if (stats) stats.innerHTML = statChips(model);
+    }
+
+    function applyFilter() {
+      const query = searchInput.value.trim().toLowerCase();
+      filteredAssets = allAssets.filter(model => {
+        const matchesCategory = activeCategory === 'all' || model.category === activeCategory;
+        if (!matchesCategory) return false;
+        if (!query) return true;
+        return [
+          model.title_ko,
+          model.title_en,
+          model.description_ko,
+          model.file,
+          model.id,
+          CATEGORIES[model.category],
+        ].some(value => value && value.toLowerCase().includes(query));
+      });
+      renderGrid();
+    }
+
+    /* ---------- Thumbnail renderer (one shared WebGL context) ---------- */
+    const THUMB_WIDTH = 720;
+    const THUMB_HEIGHT = 450;
+    const thumbQueue = [];
+    let thumbBusy = false;
+    let thumbView = null;
+
+    function ensureThumbView() {
+      if (thumbView) return thumbView;
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: true,
+        powerPreference: 'high-performance',
+      });
+      renderer.setPixelRatio(1);
+      renderer.setSize(THUMB_WIDTH, THUMB_HEIGHT, false);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.15;
+      renderer.setClearColor(0x000000, 0);
+
+      const scene = new THREE.Scene();
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      scene.environmentIntensity = 0.85;
+      pmrem.dispose();
+
+      scene.add(new THREE.HemisphereLight(0xdbeafe, 0x0a111c, 1.1));
+      const key = new THREE.DirectionalLight(0xffffff, 2.6);
+      key.position.set(3.5, 6, 4.5);
+      const fill = new THREE.DirectionalLight(0x7dd3fc, 0.9);
+      fill.position.set(-5, 2.5, -4);
+      const rim = new THREE.DirectionalLight(0xffffff, 0.7);
+      rim.position.set(0, -3, -5);
+      scene.add(key, fill, rim);
+
+      const camera = new THREE.PerspectiveCamera(38, THUMB_WIDTH / THUMB_HEIGHT, 0.01, 20000);
+      const captureCanvas = document.createElement('canvas');
+      captureCanvas.width = THUMB_WIDTH;
+      captureCanvas.height = THUMB_HEIGHT;
+      const captureCtx = captureCanvas.getContext('2d');
+
+      thumbView = { renderer, scene, camera, captureCanvas, captureCtx };
+      return thumbView;
+    }
+
+    function enqueueThumbnail(model) {
+      if (model.thumbStatus === 'queued' || model.thumbStatus === 'loading' || model.thumbStatus === 'ready') return;
+      model.thumbStatus = 'queued';
+      updateCardThumb(model);
+      thumbQueue.push(model);
+      pumpThumbnails();
+    }
+
+    async function pumpThumbnails() {
+      if (thumbBusy) return;
+      const model = thumbQueue.shift();
+      if (!model) return;
+      thumbBusy = true;
+      model.thumbStatus = 'loading';
+      updateCardThumb(model);
+      try {
+        const gltf = await loadGltf(model.url);
+        try {
+          model.stats = analyzeModel(gltf);
+          const view = ensureThumbView();
+          frameCamera(view.camera, gltf.scene, THUMB_WIDTH / THUMB_HEIGHT, 1.28, model.preview);
+          view.scene.add(gltf.scene);
+          view.renderer.render(view.scene, view.camera);
+          view.scene.remove(gltf.scene);
+          view.captureCtx.clearRect(0, 0, THUMB_WIDTH, THUMB_HEIGHT);
+          view.captureCtx.drawImage(view.renderer.domElement, 0, 0, THUMB_WIDTH, THUMB_HEIGHT);
+          model.thumbDataUrl = view.captureCanvas.toDataURL('image/webp', 0.92);
+          model.thumbStatus = 'ready';
+        } finally {
+          disposeModel(gltf.scene);
+        }
+        updateCardThumb(model);
+        updateCardStats(model);
+        if (currentViewerModel === model) renderViewerStats(model);
+        fetchFileSize(model);
+      } catch (error) {
+        console.warn(`Failed to render thumbnail for ${model.file}`, error);
+        model.thumbStatus = 'error';
+        updateCardThumb(model);
+      } finally {
+        thumbBusy = false;
+        if (thumbQueue.length) setTimeout(pumpThumbnails, 0);
+      }
+    }
+
+    const thumbObserver = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const model = catalogById.get(entry.target.dataset.thumbId);
+        if (model) enqueueThumbnail(model);
+        thumbObserver.unobserve(entry.target);
+      }
+    }, { rootMargin: '500px 0px', threshold: 0.01 });
+
+    async function fetchFileSize(model) {
+      if (model.size != null) return;
+      try {
+        const response = await fetch(model.url, { method: 'HEAD' });
+        if (!response.ok) return;
+        const length = Number(response.headers.get('content-length'));
+        if (!Number.isFinite(length) || length <= 0) return;
+        model.size = length;
+        updateCardStats(model);
+        if (currentViewerModel === model) renderViewerStats(model);
+      } catch {
+        // Static hosts may not answer HEAD; the size chip stays empty.
+      }
+    }
+
+    /* ---------- GLTF loading, analysis and disposal ---------- */
+    let gltfLoader = null;
+    let dracoLoader = null;
+
+    function getLoader() {
+      if (gltfLoader) return gltfLoader;
+      dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath(assetUrl('draco/gltf/'));
+      gltfLoader = new GLTFLoader();
+      gltfLoader.setDRACOLoader(dracoLoader);
+      return gltfLoader;
+    }
+
+    function loadGltf(url, onProgress) {
+      return new Promise((resolve, reject) => {
+        getLoader().load(
+          url,
+          resolve,
+          event => {
+            if (!onProgress) return;
+            const ratio = event.total > 0 ? event.loaded / event.total : null;
+            onProgress(ratio);
+          },
+          reject,
+        );
+      });
+    }
+
+    const TEXTURE_KEYS = [
+      'map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap',
+      'alphaMap', 'bumpMap', 'displacementMap', 'lightMap', 'specularMap',
+      'clearcoatMap', 'clearcoatNormalMap', 'clearcoatRoughnessMap', 'sheenColorMap',
+      'sheenRoughnessMap', 'transmissionMap', 'thicknessMap', 'iridescenceMap',
+      'iridescenceThicknessMap', 'anisotropyMap', 'envMap',
+    ];
+
+    function analyzeModel(gltf) {
+      const root = gltf.scene;
+      let meshes = 0;
+      let triangles = 0;
+      let nodes = 0;
+      const materials = new Set();
+      const textures = new Set();
+
+      root.traverse(object => {
+        nodes += 1;
+        if (!object.isMesh) return;
+        meshes += 1;
+        const geometry = object.geometry;
+        if (geometry) {
+          const count = geometry.index ? geometry.index.count : (geometry.attributes.position?.count || 0);
+          triangles += Math.floor(count / 3);
+        }
+        const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of objectMaterials) {
+          if (!material) continue;
+          materials.add(material);
+          for (const key of TEXTURE_KEYS) {
+            if (material[key]) textures.add(material[key]);
+          }
+        }
+      });
+
+      const box = new THREE.Box3().setFromObject(root);
+      const size = box.getSize(new THREE.Vector3());
+      return {
+        triangles,
+        meshes,
+        nodes,
+        materials: materials.size,
+        textures: textures.size,
+        animations: gltf.animations?.length || 0,
+        box,
+        size,
+      };
+    }
+
+    function disposeModel(root) {
+      if (!root) return;
+      const geometries = new Set();
+      const materials = new Set();
+      const textures = new Set();
+      root.traverse(object => {
+        if (object.geometry) geometries.add(object.geometry);
+        const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of objectMaterials) {
+          if (!material) continue;
+          materials.add(material);
+          for (const key of TEXTURE_KEYS) {
+            if (material[key]) textures.add(material[key]);
+          }
+        }
+      });
+      geometries.forEach(geometry => geometry.dispose());
+      textures.forEach(texture => texture.dispose());
+      materials.forEach(material => material.dispose());
+      root.removeFromParent();
+    }
+
+    function frameCamera(camera, object, aspect, padding, preset = null) {
+      const box = new THREE.Box3().setFromObject(object);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z, 0.001);
+
+      if (preset) {
+        const position = new THREE.Vector3().fromArray(preset.position);
+        const target = new THREE.Vector3().fromArray(preset.target);
+        camera.position.copy(position);
+        camera.near = 0.01;
+        camera.far = Math.max(maxDim * 4, 200);
+        camera.updateProjectionMatrix();
+        camera.lookAt(target);
+        return {
+          box,
+          size,
+          center: target,
+          maxDim: Math.max(preset.gridExtent ?? 4, 0.1),
+          distance: position.distanceTo(target),
+          gridY: preset.gridY ?? box.min.y,
+          preset: true,
+        };
+      }
+
+      const fitHeight = maxDim / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+      const fitWidth = fitHeight / Math.max(aspect, 0.001);
+      const distance = Math.max(fitHeight, fitWidth) * padding;
+      const direction = new THREE.Vector3(0.9, 0.52, 1).normalize();
+      camera.position.copy(center).addScaledVector(direction, distance);
+      camera.near = Math.max(distance / 2000, maxDim / 2000, 0.001);
+      camera.far = Math.max(distance * 12, maxDim * 12, 100);
+      camera.updateProjectionMatrix();
+      camera.lookAt(center);
+      return { box, size, center, maxDim, distance, gridY: box.min.y - maxDim * 0.002, preset: false };
+    }
+
+    /* ---------- Full-screen viewer ---------- */
+    const viewerState = {
+      renderer: null,
+      scene: null,
+      camera: null,
+      controls: null,
+      root: null,
+      grid: null,
+      mixer: null,
+      timer: null,
+      raf: 0,
+      frame: null,
+      loadToken: 0,
+      model: null,
+      autoRotate: true,
+      wireframe: false,
+      showGrid: true,
+    };
+    let currentViewerModel = null;
+
+    function ensureViewer() {
+      if (viewerState.renderer) return viewerState;
+      const canvas = document.getElementById('viewer-canvas');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a111c);
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      scene.environmentIntensity = 0.72;
+      pmrem.dispose();
+
+      scene.add(new THREE.HemisphereLight(0xdbeafe, 0x0a111c, 1.2));
+      const key = new THREE.DirectionalLight(0xffffff, 2.6);
+      key.position.set(5, 8, 6);
+      const fill = new THREE.DirectionalLight(0x7dd3fc, 0.9);
+      fill.position.set(-6, 3, -4);
+      const rim = new THREE.DirectionalLight(0xffffff, 0.7);
+      rim.position.set(0, -4, -6);
+      scene.add(key, fill, rim);
+
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20000);
+      const controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      controls.screenSpacePanning = true;
+      controls.autoRotateSpeed = 1.1;
+      controls.autoRotate = viewerState.autoRotate;
+
+      viewerState.renderer = renderer;
+      viewerState.scene = scene;
+      viewerState.camera = camera;
+      viewerState.controls = controls;
+      viewerState.timer = new THREE.Timer();
+      return viewerState;
+    }
+
+    function resizeViewer() {
+      if (!viewerState.renderer) return;
+      const width = viewerStage.clientWidth;
+      const height = viewerStage.clientHeight;
+      if (!width || !height) return;
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      viewerState.renderer.setPixelRatio(pixelRatio);
+      viewerState.renderer.setSize(width, height, false);
+      viewerState.camera.aspect = width / height;
+      viewerState.camera.updateProjectionMatrix();
+    }
+
+    function clearViewerModel() {
+      if (viewerState.mixer) {
+        viewerState.mixer.stopAllAction();
+        viewerState.mixer = null;
+      }
+      if (viewerState.root) {
+        disposeModel(viewerState.root);
+        viewerState.root = null;
+      }
+      if (viewerState.grid) {
+        viewerState.grid.removeFromParent();
+        viewerState.grid.geometry.dispose();
+        viewerState.grid.material.dispose();
+        viewerState.grid = null;
+      }
+      viewerState.model = null;
+      viewerState.frame = null;
+    }
+
+    function applyWireframe() {
+      if (!viewerState.root) return;
+      viewerState.root.traverse(object => {
+        if (!object.isMesh) return;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) {
+          if (material && 'wireframe' in material) material.wireframe = viewerState.wireframe;
+        }
+      });
+    }
+
+    function updateViewerGrid() {
+      const state = viewerState;
+      if (state.grid) {
+        state.grid.removeFromParent();
+        state.grid.geometry.dispose();
+        state.grid.material.dispose();
+        state.grid = null;
+      }
+      if (!state.showGrid || !state.frame) return;
+      const extent = Math.max(state.frame.maxDim * (state.frame.preset ? 1 : 1.7), 1);
+      const gridHelper = new THREE.GridHelper(extent, 20, 0x38bdf8, 0x2b405c);
+      gridHelper.position.set(state.frame.center.x, state.frame.gridY, state.frame.center.z);
+      gridHelper.material.transparent = true;
+      gridHelper.material.opacity = 0.38;
+      gridHelper.material.depthWrite = false;
+      state.scene.add(gridHelper);
+      state.grid = gridHelper;
+    }
+
+    function resetViewerCamera() {
+      const state = viewerState;
+      if (!state.root) return;
+      state.frame = frameCamera(
+        state.camera,
+        state.root,
+        Math.max(state.camera.aspect, 0.001),
+        1.32,
+        currentViewerModel?.preview,
+      );
+      state.controls.target.copy(state.frame.center);
+      state.controls.minDistance = state.frame.preset
+        ? Math.max(state.frame.distance * 0.15, 0.05)
+        : Math.max(state.frame.maxDim * 0.02, 0.01);
+      state.controls.maxDistance = state.frame.preset
+        ? Math.max(state.frame.distance * 8, 5)
+        : Math.max(state.frame.maxDim * 12, 10);
+      state.controls.update();
+      updateViewerGrid();
+    }
+
+    function tickViewer() {
+      const state = viewerState;
+      if (!state.renderer || !viewer.classList.contains('open')) {
+        state.raf = 0;
+        return;
+      }
+      state.raf = requestAnimationFrame(tickViewer);
+      state.timer.update();
+      state.controls.update();
+      state.mixer?.update(state.timer.getDelta());
+      state.renderer.render(state.scene, state.camera);
+    }
+
+    function showViewerError(message) {
+      viewerLoading.hidden = true;
+      viewerError.hidden = false;
+      viewerError.textContent = message;
+    }
+
+    async function loadViewerModel(model) {
+      const state = viewerState;
+      clearViewerModel();
+      currentViewerModel = model;
+      const token = ++state.loadToken;
+      viewerError.hidden = true;
+      viewerLoading.hidden = false;
+      viewerLoadingText.textContent = '모델 로딩 중…';
+      viewerLoadingFill.style.width = '0%';
+
+      try {
+        const gltf = await loadGltf(model.url, ratio => {
+          if (token !== state.loadToken) return;
+          if (ratio == null) {
+            viewerLoadingText.textContent = '모델 로딩 중…';
+            return;
+          }
+          const percent = Math.min(100, Math.round(ratio * 100));
+          viewerLoadingText.textContent = `모델 로딩 중… ${percent}%`;
+          viewerLoadingFill.style.width = `${percent}%`;
+          viewerLoadingFill.parentElement.setAttribute('aria-valuenow', String(percent));
+        });
+        if (token !== state.loadToken) {
+          disposeModel(gltf.scene);
+          return;
+        }
+
+        const stats = analyzeModel(gltf);
+        model.stats = stats;
+        state.root = gltf.scene;
+        state.model = gltf.scene;
+        state.scene.add(gltf.scene);
+
+        state.autoRotate = model.preview?.autoRotate ?? true;
+        state.controls.autoRotate = state.autoRotate;
+        setToggle(toolAutorotate, state.autoRotate);
+        state.showGrid = model.preview?.showGrid ?? true;
+        setToggle(toolGrid, state.showGrid);
+
+        state.mixer = null;
+        if (gltf.animations?.length) {
+          state.mixer = new THREE.AnimationMixer(gltf.scene);
+          for (const clip of gltf.animations) state.mixer.clipAction(clip).play();
+        }
+
+        resizeViewer();
+        resetViewerCamera();
+        applyWireframe();
+        renderViewerStats(model);
+        viewerLoading.hidden = true;
+        state.timer.update();
+        if (!state.raf) tickViewer();
+      } catch (error) {
+        if (token !== state.loadToken) return;
+        console.warn(`Failed to load ${model.file}`, error);
+        showViewerError(`${model.file} 로딩에 실패했습니다. GLB 파일과 네트워크 상태를 확인하세요.`);
+      }
+    }
+
+    function renderViewerStats(model) {
+      if (currentViewerModel !== model) return;
+      const stats = model.stats;
+      const rows = [
+        ['파일', model.file],
+        ['용량', model.size != null ? formatBytes(model.size) : '측정 중…'],
+      ];
+      if (stats) {
+        rows.push(['삼각형', numberFormat.format(stats.triangles)]);
+        rows.push(['메시 / 노드', `${numberFormat.format(stats.meshes)} / ${numberFormat.format(stats.nodes)}`]);
+        rows.push(['머티리얼 / 텍스처', `${numberFormat.format(stats.materials)} / ${numberFormat.format(stats.textures)}`]);
+        rows.push(['치수 (모델 단위)', `${formatDim(stats.size.x)} × ${formatDim(stats.size.y)} × ${formatDim(stats.size.z)}`]);
+        rows.push(['애니메이션', stats.animations ? `${stats.animations}개 클립` : '없음']);
+      } else {
+        rows.push(['삼각형', '분석 중…']);
+      }
+      viewerStats.innerHTML = rows
+        .map(([label, value]) => `<div class="stat-row"><dt>${label}</dt><dd>${value}</dd></div>`)
+        .join('');
+      viewerTitle.textContent = model.title_ko;
+      viewerSub.textContent = `${model.title_en} · ${CATEGORIES[model.category]}`;
+      viewerRaw.href = model.url;
+      viewerLicense.innerHTML = `<a href="${model.license.url}" target="_blank" rel="noopener">${model.license.label}</a>`;
+    }
+
+    function openViewerForId(id) {
+      const index = filteredAssets.findIndex(model => model.id === id);
+      if (index >= 0) openViewer(index);
+    }
+
+    function openViewer(index) {
+      if (index < 0 || index >= filteredAssets.length) return;
+      const model = filteredAssets[index];
+      ensureViewer();
+      viewer.classList.add('open');
+      viewer.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      viewerTitle.textContent = model.title_ko;
+      viewerSub.textContent = `${model.title_en} · ${CATEGORIES[model.category]}`;
+      viewerRaw.href = model.url;
+      viewerLicense.innerHTML = `<a href="${model.license.url}" target="_blank" rel="noopener">${model.license.label}</a>`;
+      viewerStats.innerHTML = '';
+      resizeViewer();
+      loadViewerModel(model);
+      viewerClose.focus({ preventScroll: true });
+    }
+
+    function closeViewer() {
+      if (!viewer.classList.contains('open')) return;
+      viewerState.loadToken += 1;
+      viewer.classList.remove('open');
+      viewer.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+      if (viewerState.raf) {
+        cancelAnimationFrame(viewerState.raf);
+        viewerState.raf = 0;
+      }
+      clearViewerModel();
+      currentViewerModel = null;
+      viewerLoading.hidden = true;
+      viewerError.hidden = true;
+    }
+
+    function navigateViewer(delta) {
+      if (!filteredAssets.length) return;
+      const currentIndex = currentViewerModel ? filteredAssets.indexOf(currentViewerModel) : -1;
+      const nextIndex = currentIndex < 0 ? 0 : (currentIndex + delta + filteredAssets.length) % filteredAssets.length;
+      openViewer(nextIndex);
+    }
+
+    function setToggle(button, pressed) {
+      button.setAttribute('aria-pressed', String(pressed));
+    }
+
+    /* ---------- Events ---------- */
+    filterPills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        activeCategory = pill.dataset.category;
+        filterPills.forEach(option => option.classList.toggle('active', option === pill));
+        applyFilter();
+      });
+    });
+
+    searchInput.addEventListener('input', applyFilter);
+
+    viewerClose.addEventListener('click', closeViewer);
+    viewerPrev.addEventListener('click', () => navigateViewer(-1));
+    viewerNext.addEventListener('click', () => navigateViewer(1));
+
+    toolReset.addEventListener('click', resetViewerCamera);
+    toolAutorotate.addEventListener('click', () => {
+      viewerState.autoRotate = !viewerState.autoRotate;
+      if (viewerState.controls) viewerState.controls.autoRotate = viewerState.autoRotate;
+      setToggle(toolAutorotate, viewerState.autoRotate);
+    });
+    toolWireframe.addEventListener('click', () => {
+      viewerState.wireframe = !viewerState.wireframe;
+      setToggle(toolWireframe, viewerState.wireframe);
+      applyWireframe();
+    });
+    toolGrid.addEventListener('click', () => {
+      viewerState.showGrid = !viewerState.showGrid;
+      setToggle(toolGrid, viewerState.showGrid);
+      updateViewerGrid();
+    });
+
+    window.addEventListener('keydown', event => {
+      if (!viewer.classList.contains('open')) return;
+      if (event.key === 'Escape') { closeViewer(); return; }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); navigateViewer(-1); return; }
+      if (event.key === 'ArrowRight') { event.preventDefault(); navigateViewer(1); return; }
+      const target = event.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      if (event.key === 'r' || event.key === 'R') { resetViewerCamera(); return; }
+      if (event.key === 'a' || event.key === 'A') { toolAutorotate.click(); return; }
+      if (event.key === 'w' || event.key === 'W') { toolWireframe.click(); return; }
+      if (event.key === 'g' || event.key === 'G') { toolGrid.click(); }
+    });
+
+    viewer.addEventListener('click', event => {
+      if (event.target === viewer) closeViewer();
+    });
+
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(() => { if (viewer.classList.contains('open')) resizeViewer(); }).observe(viewerStage);
+    } else {
+      window.addEventListener('resize', () => { if (viewer.classList.contains('open')) resizeViewer(); });
+    }
+
+    /* ---------- Build metadata footer ---------- */
+    function renderBuildInfo() {
+      const info = (typeof __BUILD_INFO__ !== 'undefined' && __BUILD_INFO__) ? __BUILD_INFO__ : null;
+      const branch = info?.branch || 'unknown';
+      const commit = info?.commit || 'unknown';
+      const shortCommit = info?.revision || (commit.length >= 7 ? commit.slice(0, 7) : commit);
+      const branchEl = document.getElementById('build-branch');
+      const commitEl = document.getElementById('build-commit');
+      branchEl.textContent = branch;
+      commitEl.textContent = shortCommit;
+      if (/^[a-f0-9]{7,40}$/i.test(commit)) {
+        commitEl.href = `https://github.com/stlim0727/flight3d/commit/${commit}`;
+      } else {
+        commitEl.removeAttribute('href');
+      }
+    }
+
+    renderBuildInfo();
+    renderGrid();
+
+    // Warm the file-size chips without downloading the GLBs.
+    for (const model of MODEL_CATALOG) fetchFileSize(model);
+  </script>
+</body>
+</html>

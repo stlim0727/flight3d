@@ -71,6 +71,7 @@ export default defineConfig({
         incheon: 'incheon.html',
         flights: 'flights.html',
         screens: 'screens.html',
+        assets: 'assets.html',
         screensMobilePortrait: 'screens-mobile-portrait.html',
         screensMobileLandscape: 'screens-mobile-landscape.html',
       }
