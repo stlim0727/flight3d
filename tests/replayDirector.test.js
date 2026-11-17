@@ -522,6 +522,27 @@ test('a crashed sortie stages its impact at the marker and undoes it on a seek b
     'leaving playback never strands replay wreckage in the scene');
 });
 
+test('the final crash impact is staged after the playback parks, so its burst is audible', async () => {
+  const sim = fakeSim();
+  const log = crashStage(sim);
+  const audio = [];
+  sim.audio = {
+    setReplayPaused(paused) { audio.push(['park', paused]); },
+    playRemoteExplosion(distance, isWater) { audio.push(['impact', isWater]); },
+  };
+  const director = new ReplayDirector(sim);
+  const source = track();
+  source.metadata.crash = { type: 'WATER', timeSec: trackDuration(source), speedKnots: 300 };
+  await director.load(source);
+  director.play();
+  director.update(60);
+
+  assert.equal(director.paused, true);
+  assert.ok(log.some(entry => entry[0] === 'explode'), 'the impact still stages');
+  assert.deepEqual(audio, [['park', true], ['park', false], ['park', true], ['impact', true]],
+    'parking silences the bed before the impact burst, not the burst itself');
+});
+
 test('a track without a crash marker never stages one', async () => {
   const sim = fakeSim();
   const log = crashStage(sim);
