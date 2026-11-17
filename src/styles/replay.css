@@ -23,16 +23,14 @@
   position: static;
   margin: 0 auto;
 }
-#replay-panel .btn:not(.flight-camera-btn),
+#replay-panel .btn,
 #replay-library .btn { min-height: 44px; margin: 0; padding: 8px 12px; font-size: 13px; }
 #replay-panel [data-play] { min-width: 85px; }
 #replay-panel [data-time] { margin-left: auto; font-variant-numeric: tabular-nums; }
 #replay-panel [data-seek] { width: 100%; min-height: 36px; accent-color: #67d5a3; }
 .replay-transport { margin-top: 8px; justify-content: start; }
-.replay-speeds, .replay-cameras { display: flex; gap: 4px; margin-top: 6px; }
+.replay-speeds { display: flex; gap: 4px; margin-top: 6px; }
 .replay-speeds > .btn { flex: 1; }
- .replay-cameras { overflow-x: auto; padding-bottom: 4px; }
- .replay-cameras .flight-camera-btn { flex: 0 0 auto; }
 #replay-panel [aria-pressed="true"] { background: #205342; border-color: #67d5a3; color: #fff; }
 #replay-library {
   position: fixed;
@@ -88,7 +86,6 @@ body.replaying :is(
   #touch-controls-overlay,
   .touch-controls-overlay,
   #btn-lobby-end,
-  .flight-toolbar,
   #flight-more-panel,
   #ap-bar,
   #ap-panel,
@@ -111,3 +108,11 @@ body:not([data-flow="flight"]) #replay-panel { display: none; }
   #replay-panel .btn { min-height: 36px; }
 }
 #replay-panel, #replay-library { pointer-events: auto; }
+
+/* Size the live toolbar to the camera controls actually shown in replay. */
+body.replaying .flight-toolbar > :not(.flight-camera-strip) {
+  display: none !important;
+}
+body.replaying .flight-toolbar .flight-camera-strip {
+  border-left: 0;
+}

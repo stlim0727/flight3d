@@ -58,16 +58,16 @@ function withMockDocument(ids, fn) {
   }
 }
 
-test('replay.css hides touch-controls-overlay, flight-toolbar strip, AP, stale fuel, and diagnostics during replay', () => {
+test('replay.css hides touch-controls-overlay, AP, stale fuel, and diagnostics during replay', () => {
   const css = fs.readFileSync(new URL('../src/styles/replay.css', import.meta.url), 'utf8');
   const ruleMatch = css.match(/body\.replaying[\s\S]*?\{[^}]*display:\s*none\s*!important;/);
   assert.ok(ruleMatch, 'expected body.replaying display: none !important rule in replay.css');
   const rule = ruleMatch[0];
+  assert.ok(!rule.includes('.flight-toolbar'), 'the live camera toolbar must remain visible');
   for (const selector of [
     '#touch-controls-overlay',
     '.touch-controls-overlay',
     '#btn-lobby-end',
-    '.flight-toolbar',
     '#flight-more-panel',
     '#ap-bar',
     '#ap-panel',
