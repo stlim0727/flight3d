@@ -1,3 +1,4 @@
+import { nextGpwsCallout } from '../systems/FlightWarningsCore.js';
 import { DepartureRadio } from './DepartureRadio.js';
 import { DEPARTURE_RADIO } from '../config/departureRadio.js';
 import { BANGKOK_DEPARTURE_RADIO } from '../config/bangkokDepartureRadio.js';
@@ -786,25 +787,8 @@ export class FlightAudio {
     } else this.warningOsc.frequency.setValueAtTime(680, now);
 
     // 6. Boeing GPWS Altitude Voice Callouts
-    const rAlt = state.radioAltFt;
-    if (this.aircraftId === 'B738' && !alert && rAlt !== undefined && !state.onGround && state.vsiFpm < -100) {
-      // RADALT pronounce-up spelling; 500 and 100 are doubled like the real device.
-      const callouts = [
-        ['Five hundred, five hundred', 500],
-        ['One hundred, one hundred', 100],
-        ['Fifty', 50], ['Forty', 40], ['Thirty', 30], ['Twenty', 20], ['Ten', 10],
-      ];
-      for (const [text, call] of callouts) {
-        if (this.lastRadioAlt > call && rAlt <= call && !this.calledAltitudes.has(call)) {
-          this.calledAltitudes.add(call);
-          this.playGpwsCallout(text);
-          break;
-        }
-      }
-
-    }
-    if (rAlt > 1000) this.calledAltitudes.clear();
-    this.lastRadioAlt = rAlt;
+    const callout = nextGpwsCallout(this, state, this.aircraftId, Boolean(alert));
+    if (callout) this.playGpwsCallout(callout.text);
 
     // 7. RWR three-stage warning: search ping, lock beep, launch siren.
     this.updateThreatAlert(dt, state.rwrLevel || 0);
