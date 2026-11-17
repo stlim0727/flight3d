@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **fix(ui):** keep the cockpit eyepoint panel out of the forward sight
+  - The panel now docks to the bottom edge over the lower console instead of opening under the toolbar across the windshield and HUD; its height is capped below the measured control rows and it scrolls internally when needed.
+  - Viewports shorter than 560px get a thin three-column strip (axis labels above their values, no optional step buttons) and the cockpit POV pill becomes a 44px eye icon, so the horizon and HUD stay visible on landscape phones.
+  - Verified at 1440×900, 926×428, 390×660, 390×844, 320×568, 568×320 and 320×400: the pill clears the toolbar and the panel stays below the upper 35% sight band, bottom-docked.
 - **feat(render):** make quality tiers differ in real geometry (#815)
   - `performance` now caps the framebuffer at 1280 × 720 and uses 128 terrain / 96 water segments; `balanced` uses 192 / 144 instead of sharing the high tier's 256 / 180.
   - Quality changes rebuild the terrain and sea grids and let the foliage layer rebuild its roads against the new grid; the sea keeps its fixed 200 m camera snap step.
