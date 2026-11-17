@@ -650,3 +650,66 @@ test('CombatReplayPlayback bounds missile extrapolation when termination event i
 
   playback.stop();
 });
+
+test('MissileSmokeTrail preserves full trajectory over long flight without premature buffer eviction', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene); // default max=7200, spacing=3.0, lifetime=26.0
+
+  // Simulate missile flying 15 km at 600 m/s for 25 seconds
+  const pos = new Vector3(0, 2000, 0);
+  trail.update(0.016, pos, true, true);
+  const launchPos = { x: trail.positions[0], y: trail.positions[1], z: trail.positions[2] };
+
+  const dt = 0.1; // 100ms steps
+  const speed = 600; // 600 m/s
+  for (let t = 0; t < 25.0; t += dt) {
+    pos.x += speed * dt;
+    trail.update(dt, pos, true, t < 4.5); // powered for first 4.5s
+  }
+
+  // The launch position particle (at x=0) should still be in the buffer after 25s (< 26s lifetime)
+  assert.ok(trail.count > 4500, `Buffer should hold dense trail points (got ${trail.count})`);
+  const oldestX = trail.positions[0];
+  assert.ok(
+    Math.abs(oldestX - launchPos.x) < 5.0,
+    `Launch position particle (x=0) must not be prematurely evicted after 25s (got x=${oldestX})`
+  );
+
+  trail.dispose();
+});
+
+test('prepopulateFromSamples respects powered vs unpowered particle lifetime matching normal update playback', () => {
+  const scene = new Scene();
+  const trailSeek = new MissileSmokeTrail(scene); // lifetime = 26.0
+
+  // Boost phase at t = 0.0s (powered: true, lifetime = 26.0s)
+  // Coast phase at t = 5.0s (powered: false, lifetime = 26.0 * 0.85 = 22.1s)
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 1.0, x: 600, y: 1000, z: 0, powered: true },
+    { timeSec: 5.0, x: 3000, y: 1000, z: 0, powered: false },
+    { timeSec: 6.0, x: 3600, y: 1000, z: 0, powered: false },
+  ];
+
+  // At currentTime = 27.5s:
+  // - Boost samples (t=0..1s) are aged 26.5..27.5s -> expired (> 26.0s)
+  // - Coast samples (t=5..6s) are aged 21.5..22.5s:
+  //   Coast sample at t=5.0s is aged 22.5s -> expired for unpowered (> 22.1s)
+  //   Coast sample at t=6.0s is aged 21.5s -> still alive for unpowered (< 22.1s)
+  trailSeek.prepopulateFromSamples(samples, 27.5);
+
+  // Boost smoke at x=0..600 should not exist
+  for (let i = 0; i < trailSeek.count; i++) {
+    const x = trailSeek.positions[i * 3];
+    assert.ok(x >= 3000, `Expired boost smoke (x < 3000) must not appear (found x=${x})`);
+  }
+
+  // At currentTime = 28.5s:
+  // - Coast sample at t=6.0s is aged 22.5s -> also expired (> 22.1s)
+  const trailSeekExpired = new MissileSmokeTrail(scene);
+  trailSeekExpired.prepopulateFromSamples(samples, 28.5);
+  assert.equal(trailSeekExpired.count, 0, 'All particles should be expired after 28.5s');
+
+  trailSeek.dispose();
+  trailSeekExpired.dispose();
+});

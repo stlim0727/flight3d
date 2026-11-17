@@ -212,11 +212,11 @@ export class SmokeTrail {
  */
 export class MissileSmokeTrail {
   constructor(scene, {
-    max = 3600,
-    size = 6.8,
+    max = 7200,
+    size = 7.5,
     opacity = 0.90,
     lifetime = 26.0,
-    spacing = 1.6,
+    spacing = 3.0,
   } = {}) {
     this.scene = scene;
     this.max = max;
@@ -342,7 +342,7 @@ export class MissileSmokeTrail {
           this.lastPosition.copy(position);
           this.emit(position, { alpha: initialAlpha, lifetime: initialLife });
         } else if (dist >= this.spacing) {
-          const steps = Math.min(80, Math.floor(dist / this.spacing));
+          const steps = Math.min(120, Math.floor(dist / this.spacing));
           for (let i = 1; i <= steps; i++) {
             const alpha = i / steps;
             scratchInterpPos.lerpVectors(this.lastPosition, position, alpha);
@@ -389,34 +389,42 @@ export class MissileSmokeTrail {
     for (let i = 0; i < relevant.length; i++) {
       const curr = relevant[i];
       const next = (i + 1 < relevant.length) ? relevant[i + 1] : null;
-      const isPowered = curr.powered !== false;
-      const baseAlpha = isPowered ? 0.92 : 0.62;
+      const isPoweredCurr = curr.powered !== false;
+      const currLife = isPoweredCurr ? this.lifetime : this.lifetime * 0.85;
+      const baseAlpha = isPoweredCurr ? 0.92 : 0.62;
 
       if (!next) {
         const age = Math.max(0, currentTime - curr.timeSec);
-        const progress = Math.min(1.0, age / this.lifetime);
-        const alpha = baseAlpha * Math.max(0, 1.0 - progress * progress);
-        scratchEmitPos.set(curr.x, curr.y, curr.z);
-        this.emit(scratchEmitPos, { alpha, lifetime: this.lifetime });
-        this.ages[this.count - 1] = age;
-        this.lastPosition = scratchEmitPos.clone();
+        if (age < currLife) {
+          const progress = Math.min(1.0, age / currLife);
+          const alpha = baseAlpha * Math.max(0, 1.0 - progress * progress);
+          scratchInterpPos.set(curr.x, curr.y, curr.z);
+          this.emit(scratchInterpPos, { alpha, lifetime: currLife });
+          this.ages[this.count - 1] = age;
+          this.lastPosition = scratchInterpPos.clone();
+        }
         break;
       }
 
       scratchFrom.set(curr.x, curr.y, curr.z);
       scratchTo.set(next.x, next.y, next.z);
       const dist = scratchFrom.distanceTo(scratchTo);
-      const steps = Math.min(80, Math.max(1, Math.floor(dist / this.spacing)));
+      const steps = Math.min(120, Math.max(1, Math.floor(dist / this.spacing)));
+      const isPoweredNext = next.powered !== false;
 
       for (let s = 0; s < steps; s++) {
         const t = s / steps;
         scratchInterpPos.lerpVectors(scratchFrom, scratchTo, t);
         const sampleTime = curr.timeSec + t * (next.timeSec - curr.timeSec);
         const age = Math.max(0, currentTime - sampleTime);
-        if (age <= this.lifetime) {
-          const progress = age / this.lifetime;
-          const alpha = baseAlpha * Math.max(0, 1.0 - progress * progress);
-          this.emit(scratchInterpPos, { alpha, lifetime: this.lifetime });
+        const isPowered = t < 0.5 ? isPoweredCurr : isPoweredNext;
+        const particleLife = isPowered ? this.lifetime : this.lifetime * 0.85;
+        const segAlpha = isPowered ? 0.92 : 0.62;
+
+        if (age < particleLife) {
+          const progress = Math.min(1.0, age / particleLife);
+          const alpha = segAlpha * Math.max(0, 1.0 - progress * progress);
+          this.emit(scratchInterpPos, { alpha, lifetime: particleLife });
           this.ages[this.count - 1] = age;
         }
       }
