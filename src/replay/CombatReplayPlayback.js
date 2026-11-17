@@ -80,6 +80,18 @@ export class CombatReplayPlayback {
       velocity: new THREE.Vector3(0, 0, -1),
     }));
     this.state.targets = this.targets;
+    this.lethalMissileIds = new Set();
+    this.hitMissileIds = new Set();
+    for (const event of combat.events || []) {
+      const mid = event.missileId ?? event.missile?.id;
+      if (mid != null) {
+        if (event.kind === 'kill') {
+          this.lethalMissileIds.add(mid & 255);
+        } else if (event.kind === 'damage' || (event.kind === 'detonation' && !event.surface)) {
+          this.hitMissileIds.add(mid & 255);
+        }
+      }
+    }
     this.groups = new Map();
     for (const sample of combat.missileSamples || []) {
       let group = this.groups.get(sample.id);
@@ -171,6 +183,8 @@ export class CombatReplayPlayback {
     this.groups.clear();
     this.missiles.clear();
     this.decoys.clear();
+    this.lethalMissileIds?.clear?.();
+    this.hitMissileIds?.clear?.();
     this.events.length = 0;
     this.staged.clear();
     this.pendingLaunches.length = 0;
@@ -247,6 +261,8 @@ export class CombatReplayPlayback {
       missile.typeId = group.typeId;
       missile.alive = true;
       missile.age = Math.max(0, clamped - samples[0].timeSec);
+      missile.lethal = Boolean(this.lethalMissileIds?.has?.(id & 255));
+      missile.hit = Boolean(this.hitMissileIds?.has?.(id & 255));
       missile.position.set(
         a.x + (b.x - a.x) * alpha,
         a.y + (b.y - a.y) * alpha,

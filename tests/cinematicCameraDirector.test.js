@@ -1144,3 +1144,134 @@ test('Review fixes: stale far chaff is ignored, wreck ground position is preserv
   }
   assert.equal(director.currentShotType, CINEMATIC_SHOTS.TELEPHOTO_FLYBY, 'Replay plan shot is not overwritten by dogfight framing');
 });
+
+test('Director prioritizes lethal missile over dud missile when multiple missiles are launched', () => {
+  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const flightState = { onGround: false };
+  const target = {
+    id: 5,
+    alive: true,
+    damage: 0,
+    position: new THREE.Vector3(0, 1500, -2000),
+    velocity: new THREE.Vector3(0, 0, -200),
+  };
+
+  const dudMissile = fakeMissile({
+    id: 101,
+    position: new THREE.Vector3(-5, 1498, -10),
+    velocity: new THREE.Vector3(0, 0, -500),
+    target,
+  });
+  dudMissile.lethal = false;
+
+  const lethalMissile = fakeMissile({
+    id: 102,
+    position: new THREE.Vector3(5, 1498, -10),
+    velocity: new THREE.Vector3(0, 0, -500),
+    target,
+  });
+  lethalMissile.lethal = true;
+
+  // When both missiles are presented simultaneously, director selects the lethal one
+  director.update({
+    dt: 0.016, camera, planePos, planeQuat, flightState,
+    missiles: [dudMissile, lethalMissile], targets: [target],
+  });
+
+  assert.equal(director.missileSequence?.missile?.id, 102, 'Director selects lethal missile over dud');
+
+  // If dud missile was launched first, follow-up lethal missile release promotes to active sequence
+  const director2 = new CinematicCameraDirector({ camera });
+  director2.update({
+    dt: 0.016, camera, planePos, planeQuat, flightState,
+    missiles: [dudMissile], targets: [target],
+  });
+  assert.equal(director2.missileSequence?.missile?.id, 101);
+
+  director2.update({
+    dt: 0.016, camera, planePos, planeQuat, flightState,
+    missiles: [dudMissile, lethalMissile], targets: [target],
+  });
+  assert.equal(director2.missileSequence?.missile?.id, 102, 'Lethal round promotes over active non-lethal sequence');
+});
+
+test('Target hit during missile track immediately cuts camera to bandit explosion', () => {
+  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const flightState = { onGround: false };
+  const target = {
+    id: 6,
+    alive: true,
+    damage: 0,
+    position: new THREE.Vector3(0, 1500, -3000),
+    velocity: new THREE.Vector3(0, 0, -200),
+  };
+  const missile = fakeMissile({
+    id: 201,
+    position: new THREE.Vector3(0, 1500, -500),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target,
+  });
+
+  // Launch and advance to track phase
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [target] });
+  for (let i = 0; i < 10; i++) {
+    director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [target] });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_TRACK);
+
+  // Target takes lethal damage while missile is still 2000m away
+  target.alive = false;
+  target.damage = 1.0;
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [target] });
+
+  assert.equal(director.missileSequence?.hitDetected, true, 'Hit is detected when target dies');
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV, 'Camera immediately cuts to bandit explosion, not waiting in track');
+});
+
+test('Respawned bandit does not cancel ongoing crash observation of the destroyed wreck', () => {
+  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const target = {
+    id: 7,
+    alive: false,
+    damage: 1.0,
+    position: new THREE.Vector3(0, 1500, -2500),
+  };
+  const wreckPos = target.position.clone().add(new THREE.Vector3(0, -50, 100));
+  const targetViews = new Map([
+    [7, { wreck: { age: 1.0 }, mesh: { position: wreckPos } }],
+  ]);
+
+  director.crashObserveTarget = target;
+  director.crashObserveTimer = 4.0;
+  director.switchShot(CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT);
+
+  // Bandit respawns in the slot with alive = true and jumps to a new spawn position 5000m away
+  target.alive = true;
+  target.position.set(2000, 3000, 5000);
+
+  director.update({
+    dt: 0.1, camera, planePos, planeQuat,
+    targets: [target], targetViews, flightState: { onGround: false },
+  });
+
+  assert.ok(director.crashObserveTimer > 3.8, 'Crash observe timer does not cancel upon target respawn');
+  assert.equal(director.crashObserveTarget, target);
+
+  // Camera should look toward the wreck position, not the newly spawned bandit position
+  camera.updateMatrixWorld(true);
+  const viewDir = new THREE.Vector3();
+  camera.getWorldDirection(viewDir);
+  const toWreck = wreckPos.clone().sub(planePos).normalize();
+  const toNewSpawn = target.position.clone().sub(planePos).normalize();
+  assert.ok(viewDir.dot(toWreck) > 0.85, 'Camera looks at the crashing wreck');
+  assert.ok(viewDir.dot(toNewSpawn) < 0.5, 'Camera does NOT snap to the newly spawned bandit');
+});

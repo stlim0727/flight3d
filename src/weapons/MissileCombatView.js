@@ -204,6 +204,7 @@ export class MissileCombatView {
     this.missileViews = new Map();
     this.flareViews = new Map();
     this.chaffViews = new Map();
+    this.detachedWrecks = [];
     this.trails = [];
   }
 
@@ -224,7 +225,29 @@ export class MissileCombatView {
         this._syncWreck(view, target, dt);
         continue;
       }
-      // A respawn (or a replay seek back before the kill) restores the airframe.
+      // A respawn restores the airframe. Preserve active falling wreckage so it
+      // doesn't vanish while camera or observer is watching it crash.
+      if (view.wreck) {
+        const detached = {
+          mesh: view.mesh,
+          wreck: view.wreck,
+          trail: view.trail,
+          fireTrail: view.fireTrail,
+        };
+        view.detachedWreck = detached;
+        this.detachedWrecks.push(detached);
+        const aircraft = new BanditAircraftView(target.callsign);
+        view.mesh = aircraft.mesh;
+        view.aircraft = aircraft;
+        this.scene.add(view.mesh);
+        view.trail = null;
+        view.fireTrail = null;
+        view.wreck = null;
+        view.lastPosition = null;
+        view.velocity.set(0, 0, 0);
+      } else {
+        view.detachedWreck = null;
+      }
       view.wreck = null;
       view.mesh.visible = true;
       view.aircraft.update(dt, target.flight);
@@ -304,6 +327,15 @@ export class MissileCombatView {
 
     this._syncFlares(dt);
     this._syncChaff(dt);
+
+    for (let i = this.detachedWrecks.length - 1; i >= 0; i--) {
+      const detached = this.detachedWrecks[i];
+      this._syncWreck(detached, null, dt);
+      if (!detached.wreck && !detached.trail && !detached.fireTrail) {
+        this.scene.remove(detached.mesh);
+        this.detachedWrecks.splice(i, 1);
+      }
+    }
 
     for (let index = this.trails.length - 1; index >= 0; index--) {
       const trail = this.trails[index];
@@ -501,6 +533,12 @@ export class MissileCombatView {
       view.points.material.dispose();
     }
     for (const trail of this.trails) trail.dispose();
+    for (const detached of this.detachedWrecks) {
+      this.scene.remove(detached.mesh);
+      detached.trail?.dispose?.();
+      detached.fireTrail?.dispose?.();
+    }
+    this.detachedWrecks.length = 0;
     this.targetViews.clear();
     this.missileViews.clear();
     this.flareViews.clear();

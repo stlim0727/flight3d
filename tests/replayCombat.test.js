@@ -387,3 +387,25 @@ test('in-memory and encoded damage playback share byte IDs after repeated sortie
     playback.stop();
   }
 });
+
+test('CombatReplayPlayback tags missiles as lethal based on kill events', () => {
+  const playback = new CombatReplayPlayback({ scene: new Scene() });
+  playback.load({
+    version: 8,
+    targets: [{ id: 1, callsign: 'BANDIT' }],
+    missileSamples: [
+      { id: 10, typeId: 'AIM9X', timeSec: 1.0, x: 0, y: 1000, z: -500, quat: [0, 0, 0, 1], powered: true },
+      { id: 20, typeId: 'AIM9X', timeSec: 1.5, x: 0, y: 1000, z: -400, quat: [0, 0, 0, 1], powered: true },
+    ],
+    events: [
+      { timeSec: 2.0, kind: 'expire', missileId: 10 },
+      { timeSec: 2.5, kind: 'kill', missileId: 20, targetId: 1 },
+    ],
+  });
+  playback.seek(1.6);
+  const m10 = playback.state.missiles.find(m => m.id === 10);
+  const m20 = playback.state.missiles.find(m => m.id === 20);
+  assert.equal(m10?.lethal, false, 'Expired missile 10 is not lethal');
+  assert.equal(m20?.lethal, true, 'Missile 20 scoring a kill is marked lethal');
+  playback.stop();
+});
