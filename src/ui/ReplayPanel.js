@@ -96,8 +96,10 @@ export class ReplayPanel {
       : this.watchBlocked() ? 'replay.multiplayerBlocked' : null); this.renderList();
     this.library.hidden = false;
     this.library.querySelector('[data-close]').focus();
-    void this.sim.replayStore.ready?.().then(() => {
-      if (!this.library.hidden) this.renderList();
+    const session = this._librarySession;
+    const syncPromise = this.sim.replayStore.refresh?.() ?? this.sim.replayStore.ready?.();
+    void syncPromise?.then(() => {
+      if (!this.library.hidden && this._librarySession === session) this.renderList();
     });
   }
 

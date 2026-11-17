@@ -210,4 +210,6 @@ test('DebriefOverlay guards async save completion by debrief generation and Repl
     'ReplayPanel must invalidate pending watch requests when the library closes');
   assert.match(panelSource, /if\s*\(\s*this\._librarySession\s*!==\s*session\s*\|\|\s*this\.library\.hidden\s*\)/,
     'ReplayPanel watch click must abort before starting playback if library closed while loading');
+  assert.match(panelSource, /replayStore\.refresh\?\.\(\)/,
+    'ReplayPanel.openLibrary must refresh metadata from IndexedDB when reopening the library');
 });

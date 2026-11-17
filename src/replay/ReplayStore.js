@@ -711,6 +711,22 @@ export class ReplayStore {
     return this._readyPromise;
   }
 
+  async refresh() {
+    return this._enqueue(async () => {
+      if (!this.idb) return this.list();
+      try {
+        const db = await this._openDb();
+        const snapshot = await this._readIdbSnapshot(db);
+        this._committedRows = snapshot.rows;
+        this._recomputeRows();
+        this.error = null;
+      } catch (error) {
+        this.error = error?.message || 'Storage error';
+      }
+      return this.list();
+    });
+  }
+
   read() {
     return this._rows.filter(validRow).map(row => ({ ...row }));
   }
@@ -1142,7 +1158,7 @@ export class ReplayStore {
       auto: true,
       autoSlot: 'room',
     });
-    if (staged) {
+    if (staged && result.entry) {
       this._clearRoomStagingIfMatches(id);
     }
     if (!result.entry) {

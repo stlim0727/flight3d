@@ -1278,3 +1278,46 @@ test('concurrent migration does not overwrite an entry already migrated and prom
   assert.equal(stored.auto, undefined);
   assert.equal(tabB.list().find(r => r.id === legacyRow.id)?.label, 'Kept Permanent');
 });
+
+test('ReplayStore.refresh syncs cross-tab saves, renames, and deletions', async () => {
+  const idb = createMemoryIndexedDB();
+  const tabA = storeFor(new MockStorage(), BUDGET, { indexedDB: idb });
+  const tabB = storeFor(new MockStorage(), BUDGET, { indexedDB: idb });
+  await Promise.all([tabA.ready(), tabB.ready()]);
+
+  const saved = (await tabA.save(track(20), { label: 'From Tab A' })).entry;
+  assert.deepEqual(tabB.list(), []);
+  await tabB.refresh();
+  assert.deepEqual(tabB.list().map(r => r.label), ['From Tab A']);
+
+  await tabA.rename(saved.id, 'Renamed in A');
+  await tabB.refresh();
+  assert.deepEqual(tabB.list().map(r => r.label), ['Renamed in A']);
+
+  await tabA.remove(saved.id);
+  await tabB.refresh();
+  assert.deepEqual(tabB.list(), []);
+});
+
+test('failed saveRoomAuto retains ROOM_STAGING_KEY so next startup recovers the recording', async () => {
+  const storage = new MockStorage();
+  let failWrite = true;
+  const idb = createMemoryIndexedDB({
+    failOnWrite: () => (failWrite ? Object.assign(new Error('disk error'), { name: 'AbortError' }) : null),
+  });
+  const store = storeFor(storage, BUDGET, { indexedDB: idb });
+  await store.ready();
+
+  const failed = await store.saveRoomAuto(track(25));
+  assert.equal(failed.entry, null);
+  assert.ok(storage.getItem(ROOM_STAGING_KEY), 'failed IndexedDB write must retain staged room recording');
+
+  failWrite = false;
+  const recoveredStore = storeFor(storage, BUDGET, { indexedDB: idb });
+  const mig = await recoveredStore.ready();
+  assert.equal(mig.error, null);
+  assert.equal(mig.migrated, 1);
+  assert.equal(storage.getItem(ROOM_STAGING_KEY), null);
+  assert.equal(recoveredStore.list().length, 1);
+  assert.equal((await recoveredStore.get(recoveredStore.list()[0].id)).track.samples.length, 25);
+});
