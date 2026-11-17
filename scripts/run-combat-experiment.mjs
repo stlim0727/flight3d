@@ -52,7 +52,7 @@ export async function main(args = process.argv.slice(2)) {
   } });
   if (values['list-skills']) { console.log(JSON.stringify(COMBAT_SKILLS)); return; }
   if (values.help) {
-    console.log('Coastal/F16/Cruise: --scenario coastal --seconds 300 [--bandit-count 1|2] --attack-skill pursuit|close-pursuit|hold --evasion-skill legacy-break|hold --countermeasure-policy single|none; --list-skills');
+    console.log('Coastal/F16/Cruise: --scenario coastal --seconds 300 [--bandit-count 1..16] --attack-skill pursuit|close-pursuit|hold --evasion-skill legacy-break|hold --countermeasure-policy single|none; --list-skills');
     console.log('npm run combat:experiment -- [--scenario locked-ir|defense|single] [--defense all|passive|reaction-only|reaction-flare|reaction-chaff|reaction-both]\n' +
       '  [--types AIM9X,AIM120C] [--ranges 1500,2500] [--aspects 0,90] [--speeds 108,250]\n' +
       '  [--altitude-pairs 750:1210,1500:1500] [--diagnostics] [--timeout 60] [--output path.json]');

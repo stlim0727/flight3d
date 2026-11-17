@@ -25,8 +25,8 @@ export function combatExperimentConfig(values = {}) {
     if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 300) throw new Error('seconds must be within (0, 300]');
     if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) throw new Error('Timeout must be positive seconds');
     const banditCount = values['bandit-count'] !== undefined ? Number(values['bandit-count']) : undefined;
-    if (banditCount !== undefined && (!Number.isInteger(banditCount) || banditCount <= 0)) {
-      throw new Error('bandit-count must be a positive integer');
+    if (banditCount !== undefined && (!Number.isInteger(banditCount) || banditCount <= 0 || banditCount > 16)) {
+      throw new Error('bandit-count must be an integer between 1 and 16');
     }
     return { scenario, seconds, timeoutSeconds, geometries: [], variants: [], recordTrajectory: Boolean(values.diagnostics),
       recordDiagnostics: Boolean(values.diagnostics), banditCount,

@@ -44,7 +44,13 @@ test('invalid selections and ambiguous single-shot requests fail before simulati
     { types: 'other' }, { aspects: '181' }, { speeds: '0' }, { defense: 'other' },
     { 'altitude-pairs': '750:' }, { 'altitude-pairs': '750:2000', ranges: '800' },
     { timeout: '0' }, { timeout: 'Infinity' }, { scenario: 'single', ranges: '800,1500' },
-    { scenario: 'single', defense: 'all' }]) assert.throws(() => combatExperimentConfig(values));
+    { scenario: 'single', defense: 'all' },
+    { scenario: 'coastal', 'bandit-count': '0' },
+    { scenario: 'coastal', 'bandit-count': '17' },
+    { scenario: 'coastal', 'bandit-count': '2.5' },
+    { scenario: 'coastal', 'bandit-count': 'bad' },
+    { scenario: 'locked-ir', 'bandit-count': '2' }]) assert.throws(() => combatExperimentConfig(values));
+  assert.equal(combatExperimentConfig({ scenario: 'coastal', 'bandit-count': '16' }).banditCount, 16);
 });
 
 test('no-lock controls retain denominators and paired launch state, and diagnostics do not change outcomes', () => {
