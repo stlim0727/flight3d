@@ -8,6 +8,8 @@ import { applyKoreanAirLivery } from './KoreanAirLivery.js';
 import { applyJejuAirLivery } from './JejuAirLivery.js';
 import { applyFlatShading } from '../config/renderQuality.js';
 import { CockpitHudCanvas, createB737HudCombiner } from './CockpitHudCanvas.js';
+import { applyDeflection, applyDeflectionPair, getControlInput } from './common/ControlSurfaceRig.js';
+import { clampGearExtension, calculateGearFold, isGearCollapsed } from './common/GearKinematicsRig.js';
 
 /**
  * Boeing 737-800 Airliner 3D Model
@@ -815,45 +817,36 @@ export class Boeing737 {
     // 2. Control Surface Deflections
     updateGltfControlSurfaces(this.gltfControlSurfaces, flightState);
     // Ailerons (Roll)
-    const aileronVal = flightState.aileron || 0;
-    if (this.aileronL) this.aileronL.rotation.x = aileronVal * 0.35;
-    if (this.aileronR) this.aileronR.rotation.x = -aileronVal * 0.35;
+    const aileronVal = getControlInput(flightState, 'aileron');
+    applyDeflectionPair(this.aileronL, this.aileronR, 'x', aileronVal * 0.35, true);
 
     // Flaps (Fractions 0° to 40°)
     const flapAngleRad = THREE.MathUtils.degToRad(flightState.flapDegree || 0);
-    if (this.flapL) {
-      this.flapL.rotation.x = flapAngleRad;
-      this.flapL.position.y = 0.35 - Math.sin(flapAngleRad) * 0.4;
-      this.flapL.position.z = 2.5 + Math.cos(flapAngleRad) * 0.3;
-    }
-    if (this.flapR) {
-      this.flapR.rotation.x = flapAngleRad;
-      this.flapR.position.y = 0.35 - Math.sin(flapAngleRad) * 0.4;
-      this.flapR.position.z = 2.5 + Math.cos(flapAngleRad) * 0.3;
+    for (const flap of [this.flapL, this.flapR]) {
+      if (!flap) continue;
+      applyDeflection(flap, 'x', flapAngleRad);
+      flap.position.y = 0.35 - Math.sin(flapAngleRad) * 0.4;
+      flap.position.z = 2.5 + Math.cos(flapAngleRad) * 0.3;
     }
 
     // Spoilers (Pop up on upper wing)
-    const spoilerVal = flightState.spoilers || 0;
-    const spAngle = spoilerVal * THREE.MathUtils.degToRad(-50.0);
-    this.spoilersL.forEach(sp => { sp.rotation.x = spAngle; });
-    this.spoilersR.forEach(sp => { sp.rotation.x = spAngle; });
+    const spAngle = getControlInput(flightState, 'spoilers') * THREE.MathUtils.degToRad(-50.0);
+    for (const sp of [...this.spoilersL, ...this.spoilersR]) applyDeflection(sp, 'x', spAngle);
 
     // Elevators (Pitch)
-    const elevVal = flightState.elevator || 0;
-    if (this.elevatorL) this.elevatorL.rotation.x = elevVal * 0.45;
-    if (this.elevatorR) this.elevatorR.rotation.x = elevVal * 0.45;
+    const elevVal = getControlInput(flightState, 'elevator');
+    applyDeflectionPair(this.elevatorL, this.elevatorR, 'x', elevVal * 0.45);
 
     // Rudder (Yaw)
-    const rudderVal = flightState.rudder || 0;
-    if (this.rudder) this.rudder.rotation.y = rudderVal * 0.45;
+    const rudderVal = getControlInput(flightState, 'rudder');
+    applyDeflection(this.rudder, 'y', rudderVal * 0.45);
 
     // 3. Landing Gear Retraction & Dynamic Suspension Compression Animation
-    const gearState = flightState.gearState !== undefined ? flightState.gearState : 1.0;
+    const extension = clampGearExtension(flightState.gearState);
     // Hold doors open before moving rigid legs. This mapping is reversible:
     // changing direction in transit retraces the same clearance-safe path.
-    const extension = THREE.MathUtils.clamp(gearState, 0, 1);
     const legExtension = THREE.MathUtils.smoothstep(extension, 0.18, 0.88);
-    const fold = (1 - legExtension) * Math.PI * 0.5;
+    const fold = calculateGearFold(legExtension);
     if (this.noseGearGroup) this.noseGearGroup.rotation.x = this.gearProfile === 'loaded' ? fold : -fold;
     for (const [leg, truck, side] of [[this.mainGearLGroup, this.mainTruckL, -1], [this.mainGearRGroup, this.mainTruckR, 1]]) {
       if (!leg) continue;
@@ -868,13 +861,13 @@ export class Boeing737 {
       ['mainRight', this.mainGearRGroup, 'z', 1],
     ]) {
       if (!group || !damage[id] || damage[id] === 'normal') continue;
-      group.rotation[axis] += sign * (damage[id] === 'collapsed' ? 1.1 : 0.15);
+      group.rotation[axis] += sign * (isGearCollapsed(damage, id) ? 1.1 : 0.15);
     }
     const doorOpen = THREE.MathUtils.smoothstep(extension, 0, 0.18);
     for (const item of this.gearDoors) item.obj.rotation[item.axis] = item.side * doorOpen * item.maxAngle;
 
     // Dynamic Oleo Strut Suspension Squat ("털썩" 하중 압축)
-    if (gearState > 0.8 && flightState.compressions) {
+    if (extension > 0.8 && flightState.compressions) {
       const compNose = Math.min(0.9, Math.max(0, flightState.compressions.nose || 0));
       const compL = Math.min(0.9, Math.max(0, flightState.compressions.mainLeft || 0));
       const compR = Math.min(0.9, Math.max(0, flightState.compressions.mainRight || 0));
