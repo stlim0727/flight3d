@@ -1,5 +1,6 @@
 import { t, bindText, getLanguage, setLanguage } from '../i18n/index.js';
 import { toolbarOptionalItems, normalizeToolbarHidden, applyToolbarVisibility } from './toolbarVisibility.js';
+import { gearIconName, setToolbarIcon } from './toolbarIcons.js';
 
 export const CAMERA_MODES = [
   [1, 'chase'],
@@ -76,6 +77,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   mute.textContent = '🔊';
   const fullscreen = document.getElementById('btn-fullscreen');
   fullscreen.setAttribute('data-short-label', '⛶');
+  setToolbarIcon(fullscreen, fullscreen.getAttribute('aria-pressed') === 'true' ? 'fullscreen-exit' : 'fullscreen-enter');
   const ap = document.getElementById('ap-bar');
   const apPanel = document.getElementById('ap-panel');
   const hudFold = document.createElement('button');
@@ -383,7 +385,16 @@ export function updateControlState(telemetry, camera, options = {}) {
   set('btn-flaps-ret', 'ui.flaps.less', { angle: Math.round(telemetry.flapDegree || 0) }, undefined, `${t('ui.strip.flaps')}−${Math.round(telemetry.flapDegree || 0)}°`);
   set('btn-flaps-ext', 'ui.flaps.more', { angle: Math.round(telemetry.flapDegree || 0) }, undefined, `${t('ui.strip.flaps')}+${Math.round(telemetry.flapDegree || 0)}°`);
   const gearBtn = document.getElementById('btn-gear');
+  setToolbarIcon(gearBtn, gearIconName(state));
   if (gearBtn) gearBtn.disabled = disabled;
+  // Flaps keep their angle as text under the icon (`data-icon-value`).
+  const flapAngle = Math.round(telemetry.flapDegree || 0);
+  for (const [id, sign] of [['btn-flaps-ret', '−'], ['btn-flaps-ext', '+']]) {
+    const button = document.getElementById(id);
+    if (!button) continue;
+    setToolbarIcon(button, 'flaps');
+    button.setAttribute('data-icon-value', `${sign}${flapAngle}°`);
+  }
   const flapsRetBtn = document.getElementById('btn-flaps-ret');
   if (flapsRetBtn) flapsRetBtn.disabled = disabled || telemetry.flapIndex <= 0;
   const flapsExtBtn = document.getElementById('btn-flaps-ext');
@@ -391,6 +402,7 @@ export function updateControlState(telemetry, camera, options = {}) {
   set('btn-spoilers', telemetry.spoilers > .1 ? 'ui.spoilers.on' : 'ui.spoilers.off', {}, telemetry.spoilers > .1, t('ui.strip.spoilers'));
   set('btn-reverser', telemetry.reverserActive ? 'ui.reverse.on' : 'ui.reverse.off', {}, !!telemetry.reverserActive, t('ui.strip.reverse'));
   const spoilersBtn = document.getElementById('btn-spoilers');
+  setToolbarIcon(spoilersBtn, 'spoilers');
   if (spoilersBtn) spoilersBtn.disabled = disabled;
   const reverserBtn = document.getElementById('btn-reverser');
   if (reverserBtn) reverserBtn.disabled = disabled;

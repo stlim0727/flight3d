@@ -21,6 +21,8 @@ function withMockDocument(ids, fn) {
       disabled: false,
       textContent: '',
       value: '',
+      dataset: {},
+      style: { setProperty() {} },
       classList: {
         add(c) { classes.add(c); },
         remove(c) { classes.delete(c); },

@@ -93,7 +93,15 @@ survives a reload. On 320px-class screens even the five aircraft controls,
 overflow and fullscreen (7 × 44px) exceed one row, so `fullscreen-wrapped` moves
 fullscreen to the end of the second row, beside the camera strip or alone, and the
 toolbar never needs a third row. `src/ui/toolbarVisibility.js` holds the DOM-independent rules
-(`tests/toolbarVisibility.test.js`). The cockpit eyepoint pill (`#pov-actions-bar`)
+(`tests/toolbarVisibility.test.js`). Issue #808 draws gear (state arrow per
+`updateControlState`), spoilers (an airfoil like the flap icon with its
+upper-surface panel raised; the pressed state shows whether they are out) and fullscreen (enter/exit) as icons from
+`src/ui/toolbarIcons.js`. Flaps show a smaller icon over the angle (`data-icon-value`
+on `::before`; at 1025px and wider the key hint joins the angle there). The reverser
+reads `REV` in every language, as cockpit engine displays print it; takeover and
+all camera views keep their text labels. Icons are `currentColor` CSS masks on `::after`
+(`data-icon`, `--toolbar-icon`), so disabled grey/opacity and idle dimming apply to
+them unchanged, and the accessible name stays the full text. The cockpit eyepoint pill (`#pov-actions-bar`)
 follows `--flight-panels-top`, the measured bottom of the control rows, so it
 clears a wrapped camera strip. Its adjustment panel is docked to the bottom edge
 (right-aligned, or a thin three-column strip when the viewport is shorter than

@@ -1,6 +1,11 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(ui):** draw the aircraft-control and fullscreen buttons as icons (#808)
+  - Landing gear (with its down/up/moving/failed arrow), spoilers (a wing section with its upper panel raised, matching the flap icon; the highlighted button shows when they are out) and fullscreen (enter/exit) now show icons instead of short text.
+  - Flaps show a wing-and-flap icon above their angle; on desktop the key hint sits beside the angle.
+  - Reverse thrust reads `REV` in Korean too, as cockpit engine displays print it. Take control and the camera views keep their text labels.
+  - Icons follow the button colour, so disabled controls and the idle portrait row dim exactly as the text labels did; screen readers still hear the full label.
 - **fix(replay):** stop the aircraft after playback ends
   - A parked replay (end of track, manual pause, or a terrain wait) now silences the continuous engine/wind/pack bed, clears cockpit vibration and stall buffet, and freezes propeller/fan/strobe animation instead of droning and shaking over the final frame.
   - Crash impacts and other one-shots stay audible, because a replay can stage its final impact on the same frame that parks playback; resuming, scrubbing away from the end sample, or restarting restores the recorded mix and motion.
