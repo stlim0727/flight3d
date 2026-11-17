@@ -11,6 +11,9 @@ const SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fi
 // Landing gear: strut and wheel under the fuselage line, with a state mark on the right.
 const GEAR_BODY = '<path d="M2.5 4h12"/><path d="M8.5 4v8"/><circle cx="8.5" cy="16" r="4"/><circle cx="8.5" cy="16" r="1" fill="#000"/>';
 
+// Full airfoil for the spoiler states.
+const WING = '<path d="M2 16c0-3.2 4-5.5 9-5.5 5 0 9 2 11 5.5z"/>';
+
 export const TOOLBAR_ICONS = Object.freeze({
   'gear-down': `${GEAR_BODY}<path d="M19 7v12M16 16l3 3 3-3"/>`,
   'gear-up': `${GEAR_BODY}<path d="M19 19V7M16 10l3-3 3 3"/>`,
@@ -18,10 +21,10 @@ export const TOOLBAR_ICONS = Object.freeze({
   'gear-fail': `${GEAR_BODY}<path d="M19 7v7"/><circle cx="19" cy="18.5" r="1.2" fill="#000" stroke="none"/>`,
   // Flaps: airfoil with the trailing-edge flap lowered; the angle is drawn as text.
   flaps: '<path d="M2 13c0-3 4-5.5 8.5-5.5 3.5 0 6 2 6.5 5.5z"/><path d="M19 14.5l3 4"/>',
-  // Spoilers, after the Airbus ECAM flight-control page: a line on the wing while
-  // stowed, an up-pointing triangle once the panels are deflected.
-  'spoilers-off': '<path d="M2 17h20"/><path d="M8.5 17 12 12l3.5 5"/>',
-  'spoilers-on': '<path d="M2 17h20"/><path d="M12 15V9"/><path d="M8 9l4-5.5L16 9z" fill="#000"/>',
+  // Spoilers: the same airfoil family as the flap icon, with the upper-surface
+  // panel lying flush while stowed and hinged up into the airflow once deployed.
+  'spoilers-off': `${WING}<path d="M10 9.6l6 .4"/>`,
+  'spoilers-on': `${WING}<path d="M10 10.5 16 4"/>`,
   'fullscreen-enter': '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
   'fullscreen-exit': '<path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/>',
 });

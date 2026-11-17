@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 - **feat(ui):** draw the aircraft-control and fullscreen buttons as icons (#808)
-  - Landing gear (with its down/up/moving/failed arrow), spoilers (stowed line or deployed triangle, as on the Airbus ECAM flight-control page) and fullscreen (enter/exit) now show icons instead of short text.
+  - Landing gear (with its down/up/moving/failed arrow), spoilers (a wing section whose upper panel lies flush or stands up, matching the flap icon) and fullscreen (enter/exit) now show icons instead of short text.
   - Flaps show a wing-and-flap icon above their angle; on desktop the key hint sits beside the angle.
   - Reverse thrust reads `REV` in Korean too, as cockpit engine displays print it. Take control and the camera views keep their text labels.
   - Icons follow the button colour, so disabled controls and the idle portrait row dim exactly as the text labels did; screen readers still hear the full label.
