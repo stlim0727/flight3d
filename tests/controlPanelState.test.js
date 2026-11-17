@@ -7,7 +7,7 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
   const previous = globalThis.document;
   const cameraIds = CAMERA_MODES.map(([, name]) => `btn-cam-${name}`);
   const ids = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser', 'btn-touch-toggle', 'camera-select', 'flight-trim-less', 'flight-trim-more', 'flight-park-brake', 'flight-trim-value', ...cameraIds];
-  const nodes = Object.fromEntries(ids.map(id => [id, { textContent: '', setAttribute(key, value) { this[key] = value; } }]));
+  const nodes = Object.fromEntries(ids.map(id => [id, { textContent: '', dataset: {}, style: { setProperty(key, value) { this[key] = value; } }, setAttribute(key, value) { this[key] = value; } }]));
   let touch = true;
   globalThis.document = {
     getElementById: id => nodes[id],
@@ -21,6 +21,8 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     updateControlState(telemetry, camera);
     assert.equal(nodes['btn-gear'].textContent, 'Gear down');
     assert.equal(nodes['btn-gear']['aria-pressed'], 'true');
+    assert.equal(nodes['btn-gear'].dataset.icon, 'gear-down');
+    assert.match(nodes['btn-gear'].style['--toolbar-icon'], /^url\("data:image\/svg\+xml,/);
     assert.equal(nodes['btn-flaps-ret'].disabled, false);
     assert.equal(nodes['camera-select'].value, '0');
     assert.equal(nodes['btn-cam-cockpit']['aria-pressed'], 'true');
@@ -43,6 +45,7 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     updateControlState(telemetry, camera);
     assert.equal(nodes['camera-select'].value, '7');
     assert.equal(nodes['btn-gear'].textContent, 'Gear moving');
+    assert.equal(nodes['btn-gear'].dataset.icon, 'gear-transit');
     assert.equal(nodes['btn-flaps-ext'].disabled, true, 'limit follows commanded detent while flaps are moving');
     assert.match(nodes['btn-flaps-ext'].textContent, /12°/);
     assert.equal(nodes['btn-spoilers']['aria-pressed'], 'true');
@@ -54,6 +57,7 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     touch = false;
     updateControlState(telemetry, camera);
     assert.equal(nodes['btn-gear'].textContent, 'Gear failed');
+    assert.equal(nodes['btn-gear'].dataset.icon, 'gear-fail');
     assert.equal(nodes['btn-flaps-ret'].disabled, true);
     assert.equal(nodes['btn-spoilers']['aria-pressed'], 'false');
     assert.equal(nodes['btn-reverser']['aria-pressed'], 'false');

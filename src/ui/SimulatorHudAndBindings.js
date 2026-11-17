@@ -5,6 +5,7 @@ import { prepareCockpitShadowDepth } from '../aircraft/CockpitDepth.js';
 import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality, renderPixelRatio, applyFlatShading } from '../config/renderQuality.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { updateControlState, touchLabel } from './FlightPanels.js';
+import { setToolbarIcon } from './toolbarIcons.js';
 import { FLOW } from './GameFlowController.js';
 import { ReplayPanel } from './ReplayPanel.js';
 import { DebriefOverlay } from './DebriefOverlay.js';
@@ -525,6 +526,7 @@ class SimulatorHudAndBindingsMethods {
       const active = Boolean(document.fullscreenElement);
       bindText(fullscreenButton, () => t(active ? 'fullscreen.exit' : 'fullscreen.enter'));
       fullscreenButton.setAttribute('aria-pressed', String(active));
+      setToolbarIcon(fullscreenButton, active ? 'fullscreen-exit' : 'fullscreen-enter');
     };
     fullscreenButton?.addEventListener('click', async () => {
       try {

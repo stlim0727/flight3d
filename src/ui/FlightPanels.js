@@ -1,5 +1,6 @@
 import { t, bindText, getLanguage, setLanguage } from '../i18n/index.js';
 import { toolbarOptionalItems, normalizeToolbarHidden, applyToolbarVisibility } from './toolbarVisibility.js';
+import { CAMERA_ICONS, gearIconName, setToolbarIcon } from './toolbarIcons.js';
 
 export const CAMERA_MODES = [
   [1, 'chase'],
@@ -35,6 +36,7 @@ export function createCameraButtons(onSelectCamera, { idPrefix = 'btn-cam-' } = 
     bindText(button, () => t(`ui.strip.camera.${name}`), 'data-short-label');
     bindText(button, () => touchLabel(t(`ui.camera.${name}`)), 'aria-label');
     bindText(button, () => touchLabel(t(`ui.camera.${name}`)), 'title');
+    if (CAMERA_ICONS[name]) setToolbarIcon(button, CAMERA_ICONS[name]);
     button.addEventListener('click', () => {
       onSelectCamera(mode);
       button.blur();
@@ -76,6 +78,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   mute.textContent = '🔊';
   const fullscreen = document.getElementById('btn-fullscreen');
   fullscreen.setAttribute('data-short-label', '⛶');
+  setToolbarIcon(fullscreen, fullscreen.getAttribute('aria-pressed') === 'true' ? 'fullscreen-exit' : 'fullscreen-enter');
   const ap = document.getElementById('ap-bar');
   const apPanel = document.getElementById('ap-panel');
   const hudFold = document.createElement('button');
@@ -383,6 +386,7 @@ export function updateControlState(telemetry, camera, options = {}) {
   set('btn-flaps-ret', 'ui.flaps.less', { angle: Math.round(telemetry.flapDegree || 0) }, undefined, `${t('ui.strip.flaps')}−${Math.round(telemetry.flapDegree || 0)}°`);
   set('btn-flaps-ext', 'ui.flaps.more', { angle: Math.round(telemetry.flapDegree || 0) }, undefined, `${t('ui.strip.flaps')}+${Math.round(telemetry.flapDegree || 0)}°`);
   const gearBtn = document.getElementById('btn-gear');
+  setToolbarIcon(gearBtn, gearIconName(state));
   if (gearBtn) gearBtn.disabled = disabled;
   const flapsRetBtn = document.getElementById('btn-flaps-ret');
   if (flapsRetBtn) flapsRetBtn.disabled = disabled || telemetry.flapIndex <= 0;
