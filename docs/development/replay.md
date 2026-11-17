@@ -88,6 +88,10 @@ the remaining rail count, missiles in flight and the cumulative splash count at
 the current playback time. A track with recorded combat opens in the DIRECTOR
 camera: the existing launch → missile-follow → bandit-shot sequence is the view
 that shows the target airframe and its destruction instead of a distant symbol.
+While DIRECTOR is active, the replay overlay labels the host aircraft and every
+live missile from the interpolated poses. Subjects outside the current shot get
+an edge arrow with range; markers disappear when the host is hidden or the round
+expires, and seeking rebuilds them from the same sampled state.
 Combat is recorded only when the live F-16 air-to-air system is active, so B737/C172
 tracks are unchanged. Combat track format version 9 (`COMBAT_TRACK_VERSION = 9`) records
 seeker state transitions, countermeasure transfers, aerodynamic guidance diagnostics,

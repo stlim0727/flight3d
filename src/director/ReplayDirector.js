@@ -316,6 +316,23 @@ export class ReplayDirector {
     return this._combat.view ?? null;
   }
 
+  /**
+   * Identity markers for the replay camera: the host airframe and every live
+   * recorded round. A hidden host pose (room crash/respawn gap) is omitted so
+   * the marker never floats over an empty point.
+   */
+  markerState() {
+    if (!this.active) return null;
+    const markers = [];
+    if (this.sim.aircraft?.group?.visible !== false) {
+      markers.push({ kind: 'player', position: this.sim.position });
+    }
+    for (const missile of this._combat?.state?.missiles ?? []) {
+      if (missile.alive) markers.push({ kind: 'missile', typeId: missile.typeId, position: missile.position });
+    }
+    return markers;
+  }
+
   /** Keep the replay host's rail count in step with the recorded loadout mask. */
   _applyCombatLoadout() {
     const mask = this._combat?.state?.rails;
