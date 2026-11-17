@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CAMERA_ICONS, TOOLBAR_ICONS, gearIconName, spoilerIconName, setToolbarIcon, toolbarIconUrl } from '../src/ui/toolbarIcons.js';
-import { CAMERA_MODES } from '../src/ui/FlightPanels.js';
+import { TOOLBAR_ICONS, gearIconName, spoilerIconName, setToolbarIcon, toolbarIconUrl } from '../src/ui/toolbarIcons.js';
 
 test('every gear state maps to a drawn icon, damage included', () => {
   assert.equal(gearIconName('down'), 'gear-down');
@@ -17,14 +16,11 @@ test('spoilers switch between the stowed line and the deployed triangle', () => 
   assert.ok(TOOLBAR_ICONS['spoilers-off'] && TOOLBAR_ICONS['spoilers-on'] && TOOLBAR_ICONS.flaps);
 });
 
-test('camera icons name existing views and drawings; ambiguous views keep text', () => {
-  const views = new Set(CAMERA_MODES.map(([, name]) => name));
-  for (const [view, icon] of Object.entries(CAMERA_ICONS)) {
-    assert.ok(views.has(view), `${view} is a camera view`);
-    assert.ok(TOOLBAR_ICONS[icon], `${icon} is drawn`);
-  }
-  assert.equal(CAMERA_ICONS.auto, 'camera-auto');
-  for (const view of ['flyby', 'wing', 'hud', 'gear']) assert.equal(CAMERA_ICONS[view], undefined);
+test('camera views keep their text labels; only gear, flaps, spoilers and fullscreen are drawn', () => {
+  assert.deepEqual(Object.keys(TOOLBAR_ICONS).sort(), [
+    'flaps', 'fullscreen-enter', 'fullscreen-exit', 'gear-down', 'gear-fail', 'gear-transit', 'gear-up',
+    'spoilers-off', 'spoilers-on',
+  ]);
 });
 
 test('icons are self-contained SVG data URLs usable as a CSS mask', () => {

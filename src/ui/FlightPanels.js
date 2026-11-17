@@ -1,6 +1,6 @@
 import { t, bindText, getLanguage, setLanguage } from '../i18n/index.js';
 import { toolbarOptionalItems, normalizeToolbarHidden, applyToolbarVisibility } from './toolbarVisibility.js';
-import { CAMERA_ICONS, gearIconName, spoilerIconName, setToolbarIcon } from './toolbarIcons.js';
+import { gearIconName, spoilerIconName, setToolbarIcon } from './toolbarIcons.js';
 
 export const CAMERA_MODES = [
   [1, 'chase'],
@@ -36,7 +36,6 @@ export function createCameraButtons(onSelectCamera, { idPrefix = 'btn-cam-' } = 
     bindText(button, () => t(`ui.strip.camera.${name}`), 'data-short-label');
     bindText(button, () => touchLabel(t(`ui.camera.${name}`)), 'aria-label');
     bindText(button, () => touchLabel(t(`ui.camera.${name}`)), 'title');
-    if (CAMERA_ICONS[name]) setToolbarIcon(button, CAMERA_ICONS[name]);
     button.addEventListener('click', () => {
       onSelectCamera(mode);
       button.blur();

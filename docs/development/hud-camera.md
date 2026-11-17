@@ -95,11 +95,11 @@ fullscreen to the end of the second row, beside the camera strip or alone, and t
 toolbar never needs a third row. `src/ui/toolbarVisibility.js` holds the DOM-independent rules
 (`tests/toolbarVisibility.test.js`). Issue #808 draws gear (state arrow per
 `updateControlState`), spoilers (stowed line / deployed triangle, after the Airbus
-ECAM flight-control page), chase, drone, cockpit, tower, auto, director and
-fullscreen (enter/exit) as icons from `src/ui/toolbarIcons.js`. Flaps show a smaller
-icon over the angle (`data-icon-value` on `::before`; at 1025px and wider the key
-hint joins the angle there). Reverser (cockpits also print `REV`), takeover and the
-fly-by, wing, HUD and gear-view cameras keep text because an icon would be ambiguous. Icons are `currentColor` CSS masks on `::after`
+ECAM flight-control page) and fullscreen (enter/exit) as icons from
+`src/ui/toolbarIcons.js`. Flaps show a smaller icon over the angle (`data-icon-value`
+on `::before`; at 1025px and wider the key hint joins the angle there). The reverser
+reads `REV` in every language, as cockpit engine displays print it; takeover and
+all camera views keep their text labels. Icons are `currentColor` CSS masks on `::after`
 (`data-icon`, `--toolbar-icon`), so disabled grey/opacity and idle dimming apply to
 them unchanged, and the accessible name stays the full text. The cockpit eyepoint pill (`#pov-actions-bar`)
 follows `--flight-panels-top`, the measured bottom of the control rows, so it
