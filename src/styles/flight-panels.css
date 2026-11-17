@@ -341,6 +341,40 @@ body.demo-active #touch-controls-overlay {
 /* Divider between the aircraft actions, camera group, and utility actions. */
 .flight-toolbar .flight-camera-strip,
 .flight-toolbar #btn-fullscreen { border-left: 2px solid #64748b; }
+.flight-toolbar .flight-camera-toggle-btn {
+  flex: 0 0 calc(28px * var(--ui-scale, 1));
+  width: calc(28px * var(--ui-scale, 1));
+  min-width: calc(28px * var(--ui-scale, 1));
+  height: calc(44px * var(--ui-scale, 1));
+  padding: 0;
+  color: #94a3b8;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid #334155;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.flight-toolbar .flight-camera-toggle-btn:hover {
+  color: #f8fafc;
+  background: rgba(56, 189, 248, 0.2);
+}
+.flight-toolbar .flight-camera-toggle-btn::after {
+  display: none !important;
+}
+.flight-toolbar .flight-camera-toggle-btn .camera-toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.flight-toolbar .flight-camera-toggle-btn svg {
+  width: calc(16px * var(--ui-scale, 1));
+  height: calc(16px * var(--ui-scale, 1));
+  pointer-events: none;
+}
 .flight-toolbar .btn[data-short-label], .flight-camera-btn[data-short-label] { font-size: 0; }
 .flight-toolbar .btn[data-short-label]::after, .flight-camera-btn[data-short-label]::after {
   content: attr(data-short-label);
