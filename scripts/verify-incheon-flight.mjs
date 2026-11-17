@@ -93,11 +93,8 @@ try {
   await waitApplied();
   await check('Fly applies it: incheon scenery and manual scenarios only',`({airport:sim.activeAirport,city:sim.incheonAirport.group.visible,terrain:sim.incheonAirport.terrain.mesh.visible,coastal:sim.airport.group.visible,lukla:sim.luklaAirport?.group.visible ?? false,demo:getComputedStyle(document.querySelector('#lobby-preset-demo')).display,attribution:!document.querySelector('#incheon-attribution').hidden,stored:localStorage.getItem('flight3d.airport')})`,v=>{assert.equal(v.airport,'incheon');assert.ok(v.city&&v.terrain&&v.attribution);assert.equal(v.coastal,false);assert.equal(v.lukla,false);assert.equal(v.demo,'none');assert.equal(v.stored,'incheon');});
   await evaluate("sim.gameFlow.pause();sim.setPreset('runway');sim.setTimeOfDay(12.5);sim.cameraSystem.setMode(1,true);true");
-  // The pilot laws run as an injected source string, so their import lines are
-  // dropped: splice in the same declarations the app's modules would resolve.
-  const lawDeps=(await readFile('src/physics/trimWheel.js','utf8')).replace(/^export /gm,'');
-  const laws=(await readFile('src/director/PilotControlLaws.js','utf8')).replace(/^import .*;$/gm,'').replaceAll('export function','function');
-  await evaluate(`(()=>{const THREE=window.THREE;${lawDeps}${laws};window.flightPilot={flyBank,flyVerticalPath};window.incheonField=${JSON.stringify(field)};return true;})()`);
+  // Let Vite resolve the production module graph, including package reexports.
+  await evaluate(`(async()=>{const {flyBank,flyVerticalPath}=await import(new URL('src/director/PilotControlLaws.js',document.baseURI).href);window.flightPilot={flyBank,flyVerticalPath};window.incheonField=${JSON.stringify(field)};return true;})()`);
   await check('10 second ground hold',`(()=>{sim.stepSimulation(10);return ${snapshot};})()`,v=>{assert.equal(v.crashed,false);assert.equal(v.grounded,true);assert.ok(v.speed<.5);assert.ok(Object.values(v.gear).every(s=>s==='normal'));});
   await evaluate('sim.stepSimulation(.01);true');await settle();await capture('runway');
   results.gpu=await evaluate(`(()=>{const gl=sim.renderer.getContext(),e=gl.getExtension('WEBGL_debug_renderer_info');return e?gl.getParameter(e.UNMASKED_RENDERER_WEBGL):'unknown';})()`);
