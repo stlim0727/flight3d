@@ -122,6 +122,9 @@ body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
   touch-action: pan-x;
 }
 .flight-toolbar .flight-camera-strip::-webkit-scrollbar { display: none; }
+.flight-toolbar .flight-camera-strip.is-collapsed .flight-camera-btn:not([aria-pressed="true"]):not(.flight-camera-toggle-btn) {
+  display: none !important;
+}
  .flight-toolbar .btn, .compact-ui .flight-toolbar .btn, .flight-camera-btn, .compact-ui .flight-camera-btn {
    flex: 0 0 calc(44px * var(--ui-scale, 1));
    width: calc(44px * var(--ui-scale, 1));
@@ -306,11 +309,11 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
 .pov-actions-bar {
   position: fixed;
   top: calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)))) + var(--flight-alert-space, 0px) + var(--demo-guide-space, 0px));
-  left: 50%;
-  transform: translateX(-50%);
+  left: max(var(--edge-left, 16px), calc(16px * var(--ui-scale, 1)));
+  transform: none;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: calc(8px * var(--ui-scale, 1));
   pointer-events: none;
   z-index: 75;
@@ -321,17 +324,17 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: calc(8px * var(--ui-scale, 1));
-  background: rgba(15, 23, 42, 0.88);
+  gap: calc(6px * var(--ui-scale, 1));
+  background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(56, 189, 248, 0.6);
   color: #e0f2fe;
-  font-size: calc(13px * var(--ui-scale, 1));
-  font-weight: 700;
-  padding: calc(6px * var(--ui-scale, 1)) calc(16px * var(--ui-scale, 1));
+  font-size: calc(12px * var(--ui-scale, 1));
+  font-weight: 600;
+  padding: calc(5px * var(--ui-scale, 1)) calc(12px * var(--ui-scale, 1));
   border-radius: 9999px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(56, 189, 248, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 10px rgba(56, 189, 248, 0.25);
   cursor: pointer;
   pointer-events: auto;
   white-space: nowrap;
@@ -527,14 +530,9 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
     width: min(calc(260px * var(--ui-scale, 1)), calc(100vw - 24px));
   }
   .btn-cockpit-pov {
-    width: calc(44px * var(--ui-scale, 1));
-    min-width: calc(44px * var(--ui-scale, 1));
-    height: calc(44px * var(--ui-scale, 1));
-    min-height: calc(44px * var(--ui-scale, 1));
-    padding: 0;
-    border-radius: 50%;
+    padding: calc(4px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+    font-size: calc(11px * var(--ui-scale, 1));
   }
-  .btn-cockpit-pov .pov-label { display: none; }
   .cockpit-pov-body {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: calc(6px * var(--ui-scale, 1));
