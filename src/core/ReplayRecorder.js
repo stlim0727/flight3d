@@ -1,6 +1,6 @@
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { REPLAY_INTERVAL_SEC, REPLAY_INTERVAL_LADDER, REPLAY_BUDGET, REPLAY_MIN_DURATION_SEC,
-  HEADER_BYTES, RECORD_BYTES, decodedByteBudget } from '../replay/replayConfig.js';
+  HEADER_BYTES, RECORD_BYTES, base64ByteLength, decodedByteBudget } from '../replay/replayConfig.js';
 import { combatByteLength, COMBAT_TRACK_VERSION } from '../replay/ReplayCodec.js';
 
 // Observations only: time is integrated in simulation seconds, never wall time.
@@ -12,8 +12,13 @@ const FLAG_FIELDS = ['onGround', 'isTransit', 'touchdown', 'isStalled', 'isPreSt
   'reverserActive', 'apEngaged', 'parkBrake'];
 
 export class ReplayRecorder {
-  constructor({ maxBase64Bytes = REPLAY_BUDGET.entryBase64Bytes } = {}) {
-    this.maxBase64Bytes = maxBase64Bytes;
+  constructor({ maxTrackBytes, maxBase64Bytes } = {}) {
+    this.maxTrackBytes = Number.isFinite(maxTrackBytes)
+      ? maxTrackBytes
+      : (Number.isFinite(maxBase64Bytes) ? decodedByteBudget(maxBase64Bytes) : REPLAY_BUDGET.entryTrackBytes);
+    this.maxBase64Bytes = Number.isFinite(maxBase64Bytes)
+      ? maxBase64Bytes
+      : base64ByteLength(this.maxTrackBytes);
   }
 
   start(metadata) {
@@ -98,7 +103,7 @@ export class ReplayRecorder {
 
   /** Frames that still fit the per-entry budget once metadata and combat are paid for. */
   capacity() {
-    const room = decodedByteBudget(this.maxBase64Bytes) - HEADER_BYTES - this.metadataBytes
+    const room = this.maxTrackBytes - HEADER_BYTES - this.metadataBytes
       - (this.combat ? combatByteLength(this.combat) : 0);
     return Math.max(0, Math.floor(room / RECORD_BYTES));
   }
@@ -330,7 +335,7 @@ export class ReplayRecorder {
   _trimCombat(poseSamples = this.samples.length) {
     if (!this.combat) return;
     const poseBytes = HEADER_BYTES + this.metadataBytes + poseSamples * RECORD_BYTES;
-    const available = decodedByteBudget(this.maxBase64Bytes) - poseBytes;
+    const available = this.maxTrackBytes - poseBytes;
     while (combatByteLength(this.combat, this.combat.version ?? COMBAT_TRACK_VERSION) > available) {
       const document = this.combat;
       if (document.diagnosticSamples?.length > 1) {

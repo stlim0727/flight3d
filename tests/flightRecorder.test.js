@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FlightRecorder, flightDuration } from '../src/core/FlightRecorder.js';
 import { ReplayRecorder } from '../src/core/ReplayRecorder.js';
-import { ReplayStore, AUTO_SAVE_LABEL } from '../src/replay/ReplayStore.js';
+import { ReplayStore, AUTO_SAVE_LABEL, createMemoryIndexedDB } from '../src/replay/ReplayStore.js';
 import { reportText } from '../src/ui/DebriefOverlay.js';
 import { setLanguage } from '../src/i18n/index.js';
 import { SimulatorClass } from './helpers/simulatorClass.js';
@@ -27,7 +27,7 @@ function memoryStorage() {
 // The production simulator owns both recorders and the replay library, so every fake sortie has to as well.
 const attitude = { x: 0, y: 0, z: 0, w: 1 };
 const recorders = () => ({ flightRecorder: new FlightRecorder(), replayRecorder: new ReplayRecorder(),
-  replayStore: new ReplayStore(memoryStorage()) });
+  replayStore: new ReplayStore(memoryStorage(), { indexedDB: createMemoryIndexedDB() }) });
 
 test('fixed-step sampling retains peaks between samples and owns immutable sortie data', () => {
   const recorder = new FlightRecorder(); recorder.start(metadata);

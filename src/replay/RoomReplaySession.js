@@ -61,6 +61,12 @@ export class RoomReplaySession {
     if (!track) return null;
     track.metadata.room.endReason = String(reason).slice(0, 32);
     const result = this.store.saveRoomAuto(track);
+    if (result && typeof result.then === 'function') {
+      return result.then(resolved => {
+        this.onSaved(resolved);
+        return resolved;
+      });
+    }
     this.onSaved(result);
     return result;
   }

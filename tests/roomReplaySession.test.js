@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RoomReplaySession } from '../src/replay/RoomReplaySession.js';
 import { RoomReplayRecorder } from '../src/core/RoomReplayRecorder.js';
-import { ReplayStore } from '../src/replay/ReplayStore.js';
+import { ReplayStore, createMemoryIndexedDB } from '../src/replay/ReplayStore.js';
 import { encodeTrack, decodeTrack, toBase64 } from '../src/replay/ReplayCodec.js';
 import { sampleTrack, sampleRemote, roomStateAt } from '../src/replay/TrackSampler.js';
 import { ROOM_REPLAY_ENABLED } from '../src/replay/replayConfig.js';
@@ -144,33 +144,37 @@ test('unobserved tail remains hidden through the real session end and a new room
   assert.equal(f.saved[1].metadata.room.partial, false);
 });
 
-test('save errors reach the caller and survive as a next-visit notice when storage allows it', () => {
+test('save errors reach the caller and survive as a next-visit notice when storage allows it', async () => {
   const data = new Map();
   const storage = { getItem: key => data.get(key) ?? null, removeItem: key => data.delete(key),
-    setItem(key, value) { if (key.startsWith('flight3d.replay.')) throw new Error('quota'); data.set(key, value); } };
-  const store = new ReplayStore(storage);
+    setItem(key, value) { data.set(key, value); } };
+  const store = new ReplayStore(storage, { indexedDB: createMemoryIndexedDB({ failOnWrite: true }) });
   const f = fixture(); f.session.store = store; f.session.start(metadata, pilots);
   for (let i = 0; i < 30; i++) f.tick(0.2, pose(i));
-  const result = f.session.finish('pagehide');
+  const result = await f.session.finish('pagehide');
   assert.equal(result.entry, null); assert.ok(result.error);
   assert.equal(f.results.length, 1);
   assert.equal(store.consumeRoomSaveFailure(), true);
   assert.equal(store.consumeRoomSaveFailure(), false);
 });
 
-test('room timeline and partial metadata survive unified export/import; corrupt states are rejected', () => {
+test('room timeline and partial metadata survive unified export/import; corrupt states are rejected', async () => {
   const f = fixture(); f.session.start(metadata, pilots);
   for (let i = 0; i < 30; i++) f.tick(0.2, pose(i, { held: i > 15 }));
   f.session.finish('left');
   const data = new Map();
   const store = new ReplayStore({ getItem: key => data.get(key) ?? null,
-    setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key) });
-  const first = store.saveRoomAuto(f.saved[0]).entry;
-  const json = store.exportJson(first.id);
+    setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key) },
+  { indexedDB: createMemoryIndexedDB() });
+  const first = (await store.saveRoomAuto(f.saved[0])).entry;
+  const json = await store.exportJson(first.id);
   assert.equal(JSON.parse(json).kind, 'flight3d.sortie.v1');
-  const imported = store.importJson(json).entry;
-  assert.deepEqual(store.get(imported.id).track.metadata.room, f.saved[0].metadata.room);
+  const imported = (await store.importJson(json)).entry;
+  assert.deepEqual((await store.get(imported.id)).track.metadata.room, f.saved[0].metadata.room);
   assert.equal(imported.auto, undefined);
+  const exportedContainer = await store.exportContainer(first.id);
+  const importedContainer = (await store.importReplay(exportedContainer)).entry;
+  assert.deepEqual((await store.get(importedContainer.id)).track.metadata.room, f.saved[0].metadata.room);
   const broken = structuredClone(f.saved[0]);
   broken.metadata.room.timeline[0].states = [];
   assert.throws(() => decodeTrack(encodeTrack(broken)), /timeline is corrupt/);
