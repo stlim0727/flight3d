@@ -4,6 +4,7 @@ import { Scene, Vector3 } from 'three';
 import { ReplayRecorder } from '../src/core/ReplayRecorder.js';
 import { encodeTrack, decodeTrack, COMBAT_TRACK_VERSION } from '../src/replay/ReplayCodec.js';
 import { CombatReplayPlayback } from '../src/replay/CombatReplayPlayback.js';
+import { MissileCombatView } from '../src/weapons/MissileCombatView.js';
 import { REPLAY_BUDGET, base64ByteLength } from '../src/replay/replayConfig.js';
 
 const QUAT = { x: 0.01, y: 0.7, z: -0.02, w: 0.7139 };
@@ -386,4 +387,71 @@ test('in-memory and encoded damage playback share byte IDs after repeated sortie
     assert.equal(playback.targets[0].damage, 0);
     playback.stop();
   }
+});
+
+test('CombatReplayPlayback tags missiles as lethal based on kill events', () => {
+  const playback = new CombatReplayPlayback({ scene: new Scene() });
+  playback.load({
+    version: 8,
+    targets: [{ id: 1, callsign: 'BANDIT' }],
+    missileSamples: [
+      { id: 10, typeId: 'AIM9X', timeSec: 1.0, x: 0, y: 1000, z: -500, quat: [0, 0, 0, 1], powered: true },
+      { id: 20, typeId: 'AIM9X', timeSec: 1.5, x: 0, y: 1000, z: -400, quat: [0, 0, 0, 1], powered: true },
+    ],
+    events: [
+      { timeSec: 2.0, kind: 'expire', missileId: 10 },
+      { timeSec: 2.5, kind: 'kill', missileId: 20, targetId: 1 },
+    ],
+  });
+  playback.seek(1.6);
+  const m10 = playback.state.missiles.find(m => m.id === 10);
+  const m20 = playback.state.missiles.find(m => m.id === 20);
+  assert.equal(m10?.lethal, false, 'Expired missile 10 is not lethal');
+  assert.equal(m20?.lethal, true, 'Missile 20 scoring a kill is marked lethal');
+  playback.stop();
+});
+
+test('MissileCombatView preserves detached wreck reference across multiple sync frames after respawn', () => {
+  const scene = new Scene();
+  const combatView = new MissileCombatView(scene, { targets: [], missiles: [] }, { terrainHeight: () => 0 });
+  const target = {
+    id: 33,
+    callsign: 'BANDIT 1',
+    alive: true,
+    position: new Vector3(0, 1500, -2000),
+    velocity: new Vector3(0, 0, -200),
+    damage: 0,
+  };
+  combatView.system.targets = [target];
+
+  // 1. Initial frames alive with motion to establish velocity
+  combatView.sync(0.016);
+  target.position.z -= 10;
+  combatView.sync(0.016);
+  const view = combatView.targetViews.get(33);
+  assert.ok(view);
+
+  // 2. Kill target -> creates wreck
+  target.alive = false;
+  combatView.sync(0.016);
+  assert.ok(view.wreck, 'Wreck active after kill');
+
+  // 3. Respawn target -> detaches wreck and creates fresh airframe
+  target.alive = true;
+  target.position.set(500, 2000, 1000);
+  combatView.sync(0.016);
+  assert.ok(view.detachedWreck, 'Wreck detached on respawn frame');
+  const detachedWreckObj = view.detachedWreck;
+
+  // 4. Multiple subsequent frames while target is alive: detachedWreck reference must persist
+  for (let frame = 0; frame < 10; frame++) {
+    combatView.sync(0.016);
+    assert.equal(view.detachedWreck, detachedWreckObj, `detachedWreck must survive frame ${frame + 1}`);
+  }
+
+  // 5. Cleanup disposes detached aircraft resources
+  let disposed = false;
+  detachedWreckObj.aircraft.dispose = () => { disposed = true; };
+  combatView.clear();
+  assert.equal(disposed, true, 'Detached aircraft view was disposed on clear');
 });

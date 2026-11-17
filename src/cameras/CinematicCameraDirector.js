@@ -466,11 +466,36 @@ export class CinematicCameraDirector {
     this.lastCombatTargets = Array.isArray(targets) ? targets : null;
     if (!Array.isArray(missiles) || !missiles.length) return;
     if (this.replayPlan?.shots?.length) return;
-    for (const missile of missiles) {
+
+    // Prioritize candidate missiles: lethal > hit > age
+    const candidates = [...missiles].sort((a, b) => {
+      const aScore = a?.lethal ? 2 : (a?.hit ? 1 : 0);
+      const bScore = b?.lethal ? 2 : (b?.hit ? 1 : 0);
+      if (aScore !== bScore) return bScore - aScore;
+      return (a?.age ?? 0) - (b?.age ?? 0);
+    });
+
+    for (const missile of candidates) {
       if (!missile?.alive || this.knownMissileIds.has(missile.id)) continue;
       this.knownMissileIds.add(missile.id);
       // A missile already downrange when DIRECTOR is selected is not a launch.
       if ((missile.age ?? 0) > 2.0) continue;
+
+      // If a lethal round launches while tracking a non-lethal round, take over immediately!
+      if (this.missileSequence && missile.lethal && !this.missileSequence.missile?.lethal) {
+        const oldSeq = this.missileSequence;
+        if (oldSeq.missile?.alive) {
+          this.queuedMissiles.push({
+            missile: oldSeq.missile,
+            target: oldSeq.target,
+            planePos: oldSeq.planePos,
+            planeQuat: oldSeq.planeQuat,
+          });
+        }
+        this.beginMissileSequence(missile, targets, planePos, planeQuat);
+        continue;
+      }
+
       // Replays own their timeline, and one launch sequence plays at a time.
       // Queue follow-up salvo launches so a missed lead missile never hides a
       // subsequent kill (#782).
@@ -490,19 +515,21 @@ export class CinematicCameraDirector {
     }
   }
 
-  resolveTargetPosition(target) {
+  resolveTargetPosition(target, preferWreck = false) {
     if (!target) return null;
-    if (target.alive) {
+    const isObservingWreck = preferWreck || (this.crashObserveTimer > 0 && this.crashObserveTarget?.id === target.id);
+    if (!isObservingWreck && target.alive) {
       if (target.id != null) this.lastWreckPositions.delete(target.id);
       return target.position ?? null;
     }
     if (this.lastTargetViews) {
       const view = this.lastTargetViews.get?.(target.id);
-      if (view?.wreck && view.mesh?.position) {
+      const wreckObj = view?.wreck ? view : (view?.detachedWreck?.wreck ? view.detachedWreck : null);
+      if (wreckObj?.mesh?.position) {
         if (target.id != null) {
-          this.lastWreckPositions.set(target.id, view.mesh.position.clone());
+          this.lastWreckPositions.set(target.id, wreckObj.mesh.position.clone());
         }
-        return view.mesh.position;
+        return wreckObj.mesh.position;
       }
     }
     if (target.id != null && this.lastWreckPositions.has(target.id)) {
@@ -579,6 +606,17 @@ export class CinematicCameraDirector {
       if (offset.lengthSq() > 1e-6) stationSide = offset.dot(right) >= 0 ? 1 : -1;
     }
     const targetPos = this.resolveTargetPosition(target);
+    const targetStates = new Map();
+    if (Array.isArray(targets)) {
+      for (const t of targets) {
+        if (t?.id != null) {
+          targetStates.set(t.id, {
+            damage: t.damage ?? 0,
+            alive: Boolean(t.alive),
+          });
+        }
+      }
+    }
     this.missileSequence = {
       missile,
       target,
@@ -590,6 +628,7 @@ export class CinematicCameraDirector {
       lastTargetPos: targetPos ? targetPos.clone() : null,
       lastTargetDamage: target?.damage ?? 0,
       lastTargetAlive: Boolean(target?.alive),
+      targetStates,
       hitDetected: false,
       hitTime: 0,
       hitPos: null,
@@ -609,24 +648,60 @@ export class CinematicCameraDirector {
     if (!sequence) return;
     sequence.phaseTime += dt;
     if (sequence.missile?.position) sequence.lastMissilePos.copy(sequence.missile.position);
-    const resolvedTargetPos = this.resolveTargetPosition(sequence.target);
+    const resolvedTargetPos = this.resolveTargetPosition(sequence.target, Boolean(sequence.hitDetected));
     if (resolvedTargetPos) {
       if (!sequence.lastTargetPos) sequence.lastTargetPos = resolvedTargetPos.clone();
       else sequence.lastTargetPos.copy(resolvedTargetPos);
     }
 
     // Detect impact/damage/kill so we follow the burning bandit & trailing fireball.
-    if (sequence.target && !sequence.hitDetected) {
-      const targetDamage = sequence.target.damage ?? 0;
-      const killed = sequence.lastTargetAlive && !sequence.target.alive;
-      const damaged = targetDamage > sequence.lastTargetDamage + 1e-4;
-      if (killed || damaged) {
-        sequence.hitDetected = true;
-        sequence.hitTime = 0;
-        sequence.hitPos = sequence.lastTargetPos ? sequence.lastTargetPos.clone() : sequence.lastMissilePos.clone();
+    if (!sequence.hitDetected) {
+      if (sequence.target) {
+        const targetDamage = sequence.target.damage ?? 0;
+        const killed = sequence.lastTargetAlive && !sequence.target.alive;
+        const damaged = targetDamage > sequence.lastTargetDamage + 1e-4;
+        if (killed || damaged) {
+          sequence.hitDetected = true;
+          sequence.hitTime = 0;
+          sequence.hitPos = sequence.lastTargetPos ? sequence.lastTargetPos.clone() : sequence.lastMissilePos.clone();
+        }
+        sequence.lastTargetDamage = targetDamage;
+        sequence.lastTargetAlive = Boolean(sequence.target.alive);
+        if (sequence.target.id != null && sequence.targetStates) {
+          sequence.targetStates.set(sequence.target.id, {
+            damage: targetDamage,
+            alive: sequence.lastTargetAlive,
+          });
+        }
       }
-      sequence.lastTargetDamage = targetDamage;
-      sequence.lastTargetAlive = Boolean(sequence.target.alive);
+      if (!sequence.hitDetected && Array.isArray(this.lastCombatTargets)) {
+        if (!sequence.targetStates) sequence.targetStates = new Map();
+        for (const candidate of this.lastCombatTargets) {
+          if (!candidate || candidate.id == null || candidate === sequence.target) continue;
+          const previous = sequence.targetStates.get(candidate.id);
+          const currentDamage = candidate.damage ?? 0;
+          const currentAlive = Boolean(candidate.alive);
+          if (previous) {
+            const freshKilled = previous.alive && !currentAlive;
+            const freshDamaged = currentDamage > previous.damage + 1e-4;
+            if (freshKilled || freshDamaged) {
+              const pos = this.resolveTargetPosition(candidate, true);
+              if (pos && sequence.lastMissilePos.distanceTo(pos) < 2500) {
+                sequence.target = candidate;
+                sequence.lastTargetPos = pos.clone();
+                sequence.hitDetected = true;
+                sequence.hitTime = 0;
+                sequence.hitPos = pos.clone();
+                sequence.lastTargetDamage = currentDamage;
+                sequence.lastTargetAlive = currentAlive;
+                sequence.targetStates.set(candidate.id, { damage: currentDamage, alive: currentAlive });
+                break;
+              }
+            }
+          }
+          sequence.targetStates.set(candidate.id, { damage: currentDamage, alive: currentAlive });
+        }
+      }
     }
     if (sequence.hitDetected) sequence.hitTime += dt;
 
@@ -638,26 +713,43 @@ export class CinematicCameraDirector {
     if (sequence.missileDeathTime !== null) sequence.missileDeathTime += dt;
 
     if (sequence.phase === 'launch') {
-      if (sequence.phaseTime >= MISSILE_LAUNCH_SECONDS) this.setMissileSequencePhase('track');
+      if (sequence.hitDetected) {
+        this.setMissileSequencePhase('bandit');
+      } else if (sequence.phaseTime >= MISSILE_LAUNCH_SECONDS) {
+        this.setMissileSequencePhase('track');
+      }
     } else if (sequence.phase === 'track') {
       const range = sequence.target && sequence.lastTargetPos
         ? sequence.lastMissilePos.distanceTo(sequence.lastTargetPos)
         : Infinity;
-      if (sequence.missileDeathTime !== null) {
+      if (sequence.hitDetected) {
+        this.setMissileSequencePhase('bandit');
+      } else if (sequence.missileDeathTime !== null) {
         this.endMissileSequence();
       } else if (range <= MISSILE_POV_ENTRY_RANGE_M) {
         this.setMissileSequencePhase('bandit');
-      } else if (sequence.phaseTime >= MISSILE_TRACK_MAX_SECONDS) {
-        if (sequence.target && sequence.lastTargetPos) this.setMissileSequencePhase('approach');
-        else this.endMissileSequence();
+      } else {
+        if (!sequence.missile?.lethal && this.queuedMissiles.length) {
+          const betterIdx = this.queuedMissiles.findIndex(q => q.missile?.alive && (q.missile.lethal || (q.target && q.missile.position.distanceTo(q.target.position) < range - 300)));
+          if (betterIdx !== -1) {
+            const better = this.queuedMissiles.splice(betterIdx, 1)[0];
+            this.beginMissileSequence(better.missile, this.lastCombatTargets, better.planePos, better.planeQuat, better.target);
+            return;
+          }
+        }
+        if (sequence.phaseTime >= MISSILE_TRACK_MAX_SECONDS) {
+          if (sequence.target && sequence.lastTargetPos) this.setMissileSequencePhase('approach');
+          else this.endMissileSequence();
+        }
       }
     } else if (sequence.phase === 'approach') {
+      if (sequence.hitDetected || (sequence.lastTargetPos && sequence.lastMissilePos.distanceTo(sequence.lastTargetPos) <= MISSILE_POV_ENTRY_RANGE_M)) {
+        this.setMissileSequencePhase('bandit');
+        return;
+      }
       if (sequence.missileDeathTime !== null || !sequence.target || !sequence.lastTargetPos) {
         this.endMissileSequence();
         return;
-      }
-      if (sequence.lastMissilePos.distanceTo(sequence.lastTargetPos) <= MISSILE_POV_ENTRY_RANGE_M) {
-        this.setMissileSequencePhase('bandit');
       }
     } else if (sequence.phase === 'bandit') {
       const lingerSeconds = sequence.hitDetected ? MISSILE_HIT_LINGER_SECONDS : MISSILE_POV_LINGER_SECONDS;
@@ -677,6 +769,12 @@ export class CinematicCameraDirector {
   }
 
   endMissileSequence() {
+    this.queuedMissiles.sort((a, b) => {
+      const aScore = a.missile?.lethal ? 2 : (a.missile?.hit ? 1 : 0);
+      const bScore = b.missile?.lethal ? 2 : (b.missile?.hit ? 1 : 0);
+      return bScore - aScore;
+    });
+
     while (this.queuedMissiles.length) {
       const next = this.queuedMissiles.shift();
       if (!next?.missile?.alive) continue;
@@ -710,7 +808,7 @@ export class CinematicCameraDirector {
 
     if (this.crashObserveTimer > 0) {
       this.crashObserveTimer -= dt;
-      if (this.crashObserveTimer <= 0 || this.crashObserveTarget?.alive) {
+      if (this.crashObserveTimer <= 0) {
         this.crashObserveTimer = 0;
         this.crashObserveTarget = null;
       }
@@ -1204,7 +1302,7 @@ export class CinematicCameraDirector {
         // trailing hit fireball in frame.
         isRigidMount = true;
         const sequence = this.missileSequence;
-        const targetPos = sequence?.lastTargetPos ?? this.resolveTargetPosition(sequence?.target) ?? planePos;
+        const targetPos = sequence?.lastTargetPos ?? this.resolveTargetPosition(sequence?.target, Boolean(sequence?.hitDetected)) ?? planePos;
         const missilePos = sequence?.lastMissilePos ?? targetPos;
         const worldUp = new THREE.Vector3(0, 1, 0);
         const bearing = missilePos.clone().sub(targetPos);
@@ -1289,10 +1387,11 @@ export class CinematicCameraDirector {
         isChasingDolly = true;
         targetFov = 52.0;
         const worldUp = new THREE.Vector3(0, 1, 0);
-        const bandit = (this.crashObserveTarget && this.crashObserveTimer > 0)
+        const observingCrash = Boolean(this.crashObserveTarget && this.crashObserveTimer > 0);
+        const bandit = observingCrash
           ? this.crashObserveTarget
           : this.nearestAliveTargetToPoint(planePos, targets);
-        const banditPos = this.resolveTargetPosition(bandit);
+        const banditPos = this.resolveTargetPosition(bandit, observingCrash);
         if (banditPos) {
           const dir = banditPos.clone().sub(planePos);
           if (dir.lengthSq() > 1e-4) dir.normalize();
