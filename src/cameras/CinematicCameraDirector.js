@@ -52,6 +52,7 @@ const MISSILE_BANDIT_MAX_SECONDS = 6.0;
 const MISSILE_POV_LINGER_SECONDS = 1.4;
 const MISSILE_HIT_LINGER_SECONDS = 3.2;
 const MISSILE_HIT_PROXIMITY_M = 120;
+const CRASH_OBSERVE_SECONDS = 4.0;
 const DECOY_MATCH_RADIUS_M = 450;
 const DECOY_ZOOM_SPREAD_CAP_M = 180;
 
@@ -134,6 +135,8 @@ export class CinematicCameraDirector {
     this.missileChaseDir = new THREE.Vector3(0, 0, -1);
     this.dogfightDir = new THREE.Vector3(0, 0, -1);
     this.dogfightShotIndex = 0;
+    this.crashObserveTarget = null;
+    this.crashObserveTimer = 0;
   }
 
   reset() {
@@ -160,6 +163,8 @@ export class CinematicCameraDirector {
     this.lastCombatChaff = [];
     this.lastTargetViews = null;
     this.dogfightShotIndex = 0;
+    this.crashObserveTarget = null;
+    this.crashObserveTimer = 0;
   }
 
   /**
@@ -671,9 +676,15 @@ export class CinematicCameraDirector {
       }
       return;
     }
+    const finishedSeq = this.missileSequence;
+    if (finishedSeq?.hitDetected && finishedSeq.target) {
+      this.crashObserveTarget = finishedSeq.target;
+      this.crashObserveTimer = CRASH_OBSERVE_SECONDS;
+    }
     this.missileSequence = null;
     this.dogfightShotIndex = 0;
-    this.switchShot(this.hasAliveTargets() ? CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT : MISSILE_SEQUENCE_EXIT_SHOT);
+    const stayInDogfight = this.hasAliveTargets() || Boolean(this.crashObserveTarget);
+    this.switchShot(stayInDogfight ? CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT : MISSILE_SEQUENCE_EXIT_SHOT);
   }
 
   /**
@@ -682,6 +693,14 @@ export class CinematicCameraDirector {
   evaluateShotCut(flightState, dt) {
     this.shotTimer += dt;
     this.totalTimer += dt;
+
+    if (this.crashObserveTimer > 0) {
+      this.crashObserveTimer -= dt;
+      if (this.crashObserveTimer <= 0 || this.crashObserveTarget?.alive) {
+        this.crashObserveTimer = 0;
+        this.crashObserveTarget = null;
+      }
+    }
 
     // A launch sequence owns the cut rhythm through launch, follow and the
     // final bandit POV. While the missile is still closing, routine shots run.
@@ -709,7 +728,16 @@ export class CinematicCameraDirector {
     const rollDeg = Math.abs(flightState.rollDeg ?? 0);
     const ias = flightState.iasKnots ?? 0;
     const agl = flightState.altitudeFt ?? 1000;
-    const inDogfight = !onGround && this.hasAliveTargets();
+    const observingCrash = Boolean(!onGround && this.crashObserveTarget && this.crashObserveTimer > 0);
+    const inDogfight = !onGround && (this.hasAliveTargets() || observingCrash);
+
+    // Hold user-to-bandit POV while watching the downed bandit crash.
+    if (observingCrash) {
+      if (this.currentShotType !== CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT) {
+        this.switchShot(CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT, flightState);
+      }
+      return;
+    }
 
     // Dramatic Instant Cut Triggers (only if minimum hold time satisfied)
     if (this.shotTimer >= this.minShotDuration) {
@@ -1239,11 +1267,14 @@ export class CinematicCameraDirector {
       }
 
       case CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT: {
-        // Over-the-shoulder view from behind the player's jet toward the bandit.
+        // Over-the-shoulder view from behind the player's jet toward the bandit
+        // (or the downed bandit's burning wreck during post-hit observation).
         isChasingDolly = true;
         targetFov = 52.0;
         const worldUp = new THREE.Vector3(0, 1, 0);
-        const bandit = this.nearestAliveTargetToPoint(planePos, targets);
+        const bandit = (this.crashObserveTarget && this.crashObserveTimer > 0)
+          ? this.crashObserveTarget
+          : this.nearestAliveTargetToPoint(planePos, targets);
         const banditPos = this.resolveTargetPosition(bandit);
         if (banditPos) {
           const dir = banditPos.clone().sub(planePos);

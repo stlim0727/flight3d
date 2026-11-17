@@ -1024,3 +1024,55 @@ test('BANDIT_POV follows burning wreck on hit, frames trailing fire, and returns
   assert.equal(director.missileSequence, null);
   assert.equal(director.currentShotType, CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT);
 });
+
+test('After killing the only bandit, user POV observes the crashing wreck before exiting dogfight', () => {
+  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const target = {
+    id: 16,
+    alive: true,
+    damage: 0,
+    position: new THREE.Vector3(0, 1500, -2500),
+    velocity: new THREE.Vector3(0, 0, -200),
+  };
+  const missile = fakeMissile({
+    id: 104,
+    position: new THREE.Vector3(0, 1500, -1700),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target,
+  });
+  director.missileSequence = {
+    missile, target, phase: 'bandit', phaseTime: 0, missileDeathTime: null, stationSide: null,
+    lastMissilePos: missile.position.clone(), lastTargetPos: target.position.clone(),
+    lastTargetDamage: 0, lastTargetAlive: true, hitDetected: false, hitTime: 0, hitPos: null,
+  };
+  director.switchShot(CINEMATIC_SHOTS.BANDIT_POV);
+
+  target.alive = false;
+  missile.alive = false;
+  missile.position.copy(target.position);
+  const wreckPos = target.position.clone().add(new THREE.Vector3(300, -250, -300));
+  const targetViews = new Map([
+    [16, { wreck: { age: 1.0 }, mesh: { position: wreckPos } }],
+  ]);
+
+  // Finish the 3.2s hit linger with no other alive bandits.
+  for (let i = 0; i < 34; i++) {
+    wreckPos.y -= 10;
+    director.update({
+      dt: 0.1, camera, planePos, planeQuat,
+      missiles: [], targets: [target], targetViews,
+    });
+  }
+  assert.equal(director.missileSequence, null);
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT, 'Switches to user POV to watch crash');
+
+  // Verify user POV is looking at the crashing wreck.
+  camera.updateMatrixWorld(true);
+  const viewDir = new THREE.Vector3();
+  camera.getWorldDirection(viewDir);
+  const toWreck = wreckPos.clone().sub(planePos).normalize();
+  assert.ok(viewDir.dot(toWreck) > 0.9, 'User POV looks directly at the crashing wreck');
+});
