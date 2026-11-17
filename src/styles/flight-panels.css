@@ -357,6 +357,26 @@ body.demo-active #touch-controls-overlay {
   -webkit-mask: var(--toolbar-icon) center / contain no-repeat;
   mask: var(--toolbar-icon) center / contain no-repeat;
 }
+/* Flaps: a smaller icon above the angle, which stays readable as text. On wide
+   layouts the key hint joins the angle because both pseudo-elements are in use. */
+.flight-toolbar .btn[data-icon][data-icon-value] { flex-direction: column; gap: 2px; }
+.flight-toolbar .btn[data-icon][data-icon-value]::after {
+  width: calc(16px * var(--ui-scale, 1));
+  height: calc(16px * var(--ui-scale, 1));
+}
+.flight-toolbar .btn[data-icon][data-icon-value]::before {
+  content: attr(data-icon-value);
+  order: 1;
+  color: inherit;
+  font: 600 calc(10px * var(--ui-scale, 1)) / 1 system-ui;
+}
+@media (min-width: 1025px) {
+  .flight-toolbar .btn[data-icon][data-icon-value][data-key-hint]::before {
+    content: attr(data-icon-value) " " attr(data-key-hint);
+    color: inherit;
+    font: 600 9px / 1 system-ui;
+  }
+}
 /* The AP trigger stays anchored; its dropdown clears both control strips. */
 .ap-bar, .compact-ui .ap-bar {
   position: absolute;

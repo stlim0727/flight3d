@@ -2,8 +2,9 @@
 
 ## [Unreleased]
 - **feat(ui):** draw the clear top-menu buttons as icons (#808)
-  - Landing gear (with its down/up/moving/failed arrow), the chase, drone, cockpit, tower and director cameras, and fullscreen (enter/exit) now show icons instead of short text.
-  - Flaps (the angle matters), spoilers, reverse thrust, take control, and the fly-by, wing, HUD, gear-view and auto cameras keep text because an icon would be ambiguous.
+  - Landing gear (with its down/up/moving/failed arrow), spoilers (stowed line or deployed triangle, as on the Airbus ECAM flight-control page), the chase, drone, cockpit, tower, auto and director cameras, and fullscreen (enter/exit) now show icons instead of short text.
+  - Flaps show a wing-and-flap icon above their angle; on desktop the key hint sits beside the angle.
+  - Reverse thrust (cockpits print `REV` too), take control, and the fly-by, wing, HUD and gear-view cameras keep text because an icon would be ambiguous.
   - Icons follow the button colour, so disabled controls and the idle portrait row dim exactly as the text labels did; screen readers still hear the full label.
 - **fix(replay):** stop the aircraft after playback ends
   - A parked replay (end of track, manual pause, or a terrain wait) now silences the continuous engine/wind/pack bed, clears cockpit vibration and stall buffet, and freezes propeller/fan/strobe animation instead of droning and shaking over the final frame.

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CAMERA_ICONS, TOOLBAR_ICONS, gearIconName, setToolbarIcon, toolbarIconUrl } from '../src/ui/toolbarIcons.js';
+import { CAMERA_ICONS, TOOLBAR_ICONS, gearIconName, spoilerIconName, setToolbarIcon, toolbarIconUrl } from '../src/ui/toolbarIcons.js';
 import { CAMERA_MODES } from '../src/ui/FlightPanels.js';
 
 test('every gear state maps to a drawn icon, damage included', () => {
@@ -11,13 +11,20 @@ test('every gear state maps to a drawn icon, damage included', () => {
   assert.equal(gearIconName('damaged'), 'gear-fail');
 });
 
+test('spoilers switch between the stowed line and the deployed triangle', () => {
+  assert.equal(spoilerIconName(false), 'spoilers-off');
+  assert.equal(spoilerIconName(true), 'spoilers-on');
+  assert.ok(TOOLBAR_ICONS['spoilers-off'] && TOOLBAR_ICONS['spoilers-on'] && TOOLBAR_ICONS.flaps);
+});
+
 test('camera icons name existing views and drawings; ambiguous views keep text', () => {
   const views = new Set(CAMERA_MODES.map(([, name]) => name));
   for (const [view, icon] of Object.entries(CAMERA_ICONS)) {
     assert.ok(views.has(view), `${view} is a camera view`);
     assert.ok(TOOLBAR_ICONS[icon], `${icon} is drawn`);
   }
-  for (const view of ['flyby', 'wing', 'hud', 'gear', 'auto']) assert.equal(CAMERA_ICONS[view], undefined);
+  assert.equal(CAMERA_ICONS.auto, 'camera-auto');
+  for (const view of ['flyby', 'wing', 'hud', 'gear']) assert.equal(CAMERA_ICONS[view], undefined);
 });
 
 test('icons are self-contained SVG data URLs usable as a CSS mask', () => {
