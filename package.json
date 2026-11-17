@@ -52,6 +52,7 @@
     "test:ghost-native": "node scripts/test-ghost-native.mjs"
   },
   "dependencies": {
+    "@stlim0727/flightsim-core": "git+https://github.com/stlim0727/flightsim-core.git#0593d0a9745d7f23e1b1525eef78f472e46bb8ca",
     "peerjs": "1.5.5",
     "posthog-js": "^1.445.1",
     "three": "^0.186.0"

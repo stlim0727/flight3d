@@ -81,6 +81,8 @@ are opt-in via `--screenshots` (`npm run test:flight:visual`).
 
 ## Simulation changes
 
+- Before changing flight behavior, use the [core change guide](docs/development/flightsim-core-change-guide.md)
+  to choose flightsim-core, the Flight3d adapter, or coordinated changes in both repositories.
 - Derive visible behavior from continuous physics state, not behavior-switch
   conditionals; see [modeling principles](docs/development/physics-modeling-principles.md).
 - Check coordinate frames, units, force/moment signs, and timestep assumptions in

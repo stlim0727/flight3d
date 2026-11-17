@@ -73,3 +73,31 @@ presentation side effects. `FlightWarnings` retains the old array return API.
 cadence, preserving muted/paused playback behavior. Reset/configure clears the
 core's warning and crossing history. Consumers should treat returned warnings as
 read-only; copy snapshots when keeping historical records.
+
+## Package ownership and updates
+
+See the [core change guide](flightsim-core-change-guide.md) for ownership decisions,
+examples, coordinated changes, and verification/release steps.
+
+The implementation is owned by the independent public repository
+[stlim0727/flightsim-core](https://github.com/stlim0727/flightsim-core), distributed
+as the npm-compatible `@stlim0727/flightsim-core` package. Flight3d's package.json
+and lockfile pin the full v0.1.0 commit over HTTPS. No submodule initialization,
+registry credentials, or sibling checkout is needed for `npm ci`.
+
+The package is initially distributed from GitHub, not npmjs.com. It has explicit
+root/subpath exports, a math-only Three.js peer dependency, its own CI and tests,
+and a packed-install check running all aircraft outside the source checkout.
+
+The local physics/config/control-core modules are compatibility reexports;
+change algorithms and aircraft parameters in flightsim-core, release a new
+version, then update Flight3d's dependency commit and lockfile in a focused PR.
+Preserve the HTTPS URL if npm normalizes it to a GitHub shorthand during update.
+Run focused integration tests and Flight3d CI; browser-sensitive changes also
+require the hardware GPU acceptance scenarios.
+
+Airport/scenery data remains in Flight3d. The local AutopilotController adapter
+injects `approachDeviation(airportKey, state)`. The standalone controller accepts
+this callback through its constructor, and the package exports generic
+`approachDeviation(approachGeometry, state)` math for other consumers. Without a
+navigation callback APP stays armed; HDG/ALT/VS/SPD/PITCH remain available.
