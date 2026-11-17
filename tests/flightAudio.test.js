@@ -402,6 +402,21 @@ describe('C172 piston sound and lifecycle', () => {
     assert.equal(audio.masterGain.gain.value, 1);
   }));
 
+  it('keeps ambientBus silent when audio initializes while replay is already paused', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.setReplayPaused(true);
+      audio.init();
+      assert.equal(audio.ambientBus.gain.value, 0, 'ambient bus should start at 0 gain when replay paused');
+      audio.setReplayPaused(false);
+      assert.equal(audio.ambientBus.gain.value, 1, 'resuming replay restores ambient bus');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
   it('does not restart continuous sounds after a crash, including a muted crash and preset reset', () => withPiston(audio => {
     audio.update(0.1, pistonState(100, { iasKnots: 90 }), false);
     audio.setMuted(true); audio.playExplosion(); audio.setMuted(false);

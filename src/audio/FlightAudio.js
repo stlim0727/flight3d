@@ -15,7 +15,7 @@ import { GpwsCalloutSystem } from './nodes/GpwsCalloutSystem.js';
 export class FlightAudio {
   constructor() {
     this.ctx = null;
-    this.isMuted = this.isPaused = this.isInitialized = this.crashed = this.touchdownActive = false;
+    this.isMuted = this.isPaused = this.isInitialized = this.crashed = this.touchdownActive = this.isReplayPaused = false;
     this.volume = this.engineVolume = 1.0;
     this.lastTouchdownTime = -Infinity;
     const rOpts = (dir, cfg) => ({
@@ -80,7 +80,7 @@ export class FlightAudio {
           }
         };
       }
-      Object.assign(this, MasterMixerChain.create(this.ctx, this.effectiveVolume, this.engineVolume));
+      Object.assign(this, MasterMixerChain.create(this.ctx, this.effectiveVolume, this.engineVolume, this.isReplayPaused));
       this.airflow = new AirflowSynthesizer(this.ctx, this.cockpitFilter);
       this.turbofan = new TurbofanSynthesizer(this.ctx, this.engineBus);
       this.piston = new PistonSynthesizer(this.ctx, this.engineBus, this.turbofan.engineNoiseBuffer);

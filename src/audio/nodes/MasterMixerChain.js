@@ -4,7 +4,7 @@
  * and interior cockpit acoustics -> ambient bus -> distance attenuation stage.
  */
 export class MasterMixerChain {
-  static create(ctx, effectiveVolume, engineVolume) {
+  static create(ctx, effectiveVolume, engineVolume, isReplayPaused = false) {
     const compressor = ctx.createDynamicsCompressor();
     compressor.threshold.setValueAtTime(-12, ctx.currentTime);
     compressor.knee.setValueAtTime(8, ctx.currentTime);
@@ -28,7 +28,7 @@ export class MasterMixerChain {
     const distanceGain = ctx.createGain();
     distanceGain.gain.setValueAtTime(1.0, ctx.currentTime);
     const ambientBus = ctx.createGain();
-    ambientBus.gain.setValueAtTime(1.0, ctx.currentTime);
+    ambientBus.gain.setValueAtTime(isReplayPaused ? 0.0 : 1.0, ctx.currentTime);
     cockpitFilter.connect(ambientBus);
     ambientBus.connect(distanceGain);
     distanceGain.connect(masterGain);
