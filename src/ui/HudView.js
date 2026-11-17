@@ -261,7 +261,13 @@ export class HudView {
     const behind = this._hudPoint.z >= -0.001;
     const focal = height / (2 * Math.tan(MathUtils.degToRad(camera.fov) / 2));
     if (behind) {
-      const angle = Math.atan2(this._hudPoint.x, -this._hudPoint.z);
+      // Behind the camera there is no perspective projection, so point along the
+      // camera-relative side/up offset. A target on the rear axis itself has no
+      // screen direction; keep the azimuth fallback (bottom edge) for that case.
+      const offset = Math.hypot(this._hudPoint.x, this._hudPoint.y);
+      const angle = offset > Math.abs(this._hudPoint.z) * 1e-4
+        ? Math.atan2(this._hudPoint.x, this._hudPoint.y)
+        : Math.atan2(this._hudPoint.x, -this._hudPoint.z);
       return { behind, angle, x: width / 2 + Math.sin(angle) * width * .42, y: height / 2 - Math.cos(angle) * height * .38 };
     }
     return {

@@ -66,6 +66,29 @@ test('director replay labels on-screen subjects and locates the off-screen round
   assert.match(locators[0][1], /m$/);
 });
 
+test('rear replay locators follow camera-relative elevation, not azimuth alone', () => {
+  const locators = [];
+  const camera = new PerspectiveCamera(60, 16 / 9);
+  camera.updateMatrixWorld();
+  const hud = Object.assign(Object.create(HudView.prototype), {
+    ctx: new Proxy({}, { get: () => () => {} }),
+    sim: { camera },
+    _hudInverse: new Quaternion(), _hudPoint: new Vector3(),
+    drawReplayLocator(screen) { locators.push(screen); },
+  });
+
+  hud.drawReplayMarkers([
+    { kind: 'player', position: new Vector3(0, 100, 10) },
+    { kind: 'missile', typeId: 'AIM9X', position: new Vector3(0, -100, 10) },
+    { kind: 'missile', typeId: 'AIM120C', position: new Vector3(0, 0, 10) },
+  ], 1600, 900);
+
+  assert.equal(locators.length, 3);
+  assert.ok(Math.abs(locators[0].angle) < 1e-9, 'above the camera points up');
+  assert.ok(Math.abs(locators[1].angle - Math.PI) < 1e-9, 'below the camera points down');
+  assert.ok(Math.abs(locators[2].angle - Math.PI) < 1e-9, 'directly behind stays at the bottom');
+});
+
 test('off-screen replay locators keep both label lines inside the frame', () => {
   const calls = [];
   const ctx = new Proxy({}, { get: (_, key) => key === 'fillText'
