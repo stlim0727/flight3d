@@ -597,15 +597,60 @@ class FlightSimulator {
   }
   /** Browser activity is a separate hold, so returning cannot undo menu/pause state. */
   initBrowserActivity() {
-    this.inputCoordinator.bindBrowserActivity(this);
+    if (this.inputCoordinator) {
+      this.inputCoordinator.bindBrowserActivity(this);
+    } else {
+      const sync = () => this.setBrowserActive(!document.hidden && document.hasFocus());
+      window.addEventListener('blur', () => this.setBrowserActive(false));
+      window.addEventListener('focus', sync);
+      document.addEventListener('visibilitychange', sync);
+      window.addEventListener('pagehide', () => this.setBrowserActive(false));
+      window.addEventListener('pageshow', sync);
+      sync();
+    }
   }
 
   setBrowserActive(active) {
-    this.inputCoordinator.syncBrowserActive(this, active);
+    if (this.inputCoordinator) {
+      this.inputCoordinator.syncBrowserActive(this, active);
+    } else {
+      const backgrounded = !active;
+      if (this.browserBackgrounded === backgrounded) return;
+      this.browserBackgrounded = backgrounded;
+      this.flightPerformance?.flush('browser-activity');
+      this.flightGpuTimer?.clear();
+      this.lastFrameDelta = null;
+      this.clock?.getDelta();
+      this.physicsAccumulator = 0;
+      if (backgrounded) {
+        this.frameTransitions?.cancel();
+        this.multiplayer?.roomReplay?.gap();
+        this.controls?.releaseAllKeys();
+        this.controls?.setTouchStick(0, 0);
+        this.controls?.setTouchRudder(0);
+        this.controls?.setTouchBrakes(0);
+      }
+      this.syncAudioPause();
+      if (active) this.audio?.ensureContextRunning();
+    }
   }
 
   syncAudioPause() {
-    this.audioCoordinator.syncAudioPause();
+    if (this.audioCoordinator) {
+      this.audioCoordinator.syncAudioPause();
+    } else {
+      if (this.gameFlow && this.gameFlow.state !== FLOW.FLIGHT) {
+        this.flightPerformance?.flush('flight-held');
+        this.flightGpuTimer?.clear();
+        this.lastFrameDelta = null;
+      }
+      const backgrounded = this.browserBackgrounded === true;
+      const held = this.gameFlow?.state === FLOW.DEBRIEF || this.gameFlow?.state === FLOW.PAUSED || this.gameFlow?.canResumeFromLobby?.() || Boolean(this.demoDirector?.isRestartConfirmOpen);
+      const radioPaused = backgrounded || this.gameFlow?.state !== FLOW.FLIGHT || Boolean(this.demoDirector?.isRestartConfirmOpen);
+      if (this.audio?.setRadioPaused) this.audio.setRadioPaused(radioPaused);
+      else if (this.audio?.departureRadio?.setPaused) this.audio.departureRadio.setPaused(radioPaused);
+      this.audio?.setPaused?.(backgrounded || held);
+    }
   }
 
   /** Apply the game-flow state to the DOM: menu visibility, input blocking. */
@@ -633,9 +678,20 @@ class FlightSimulator {
     }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
     document.body.dataset.devManualFlight = String(Boolean(this.devRunner?.active?.definition.pilotControlled));
-    this.inputCoordinator.updateInputBlocked(this);
+    if (this.inputCoordinator) {
+      this.inputCoordinator.updateInputBlocked(this);
+    } else {
+      this.controls.inputBlocked = this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow?.blocksFlightInput?.() || this.shadowDemo?.active || Boolean(this.devRunner?.blocksInput) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human') || Boolean(this.demoDirector?.isRestartConfirmOpen);
+    }
     if (state !== FLOW.FLIGHT) {
-      this.inputCoordinator.releaseAllControls(this.controls);
+      if (this.inputCoordinator) {
+        this.inputCoordinator.releaseAllControls(this.controls);
+      } else if (this.controls) {
+        this.controls.releaseAllKeys();
+        this.controls.setTouchStick(0.0, 0.0);
+        this.controls.setTouchRudder(0.0);
+        this.controls.setTouchBrakes(0.0);
+      }
       if (document.pointerLockElement && document.pointerLockElement === this.renderer.domElement) {
         document.exitPointerLock();
       }

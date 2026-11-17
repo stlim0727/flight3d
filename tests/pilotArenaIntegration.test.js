@@ -11,6 +11,8 @@ import { DevScenarioRunner } from '../src/dev/DevScenarioRunner.js';
 import { SimulatorClass } from './helpers/simulatorClass.js';
 import { GameFlowController, FLOW } from '../src/ui/GameFlowController.js';
 
+import { SimulatorInputCoordinator } from '../src/core/SimulatorInputCoordinator.js';
+
 function mockFlowDocument(t) {
   const saved = globalThis.document;
   globalThis.document = { body: { dataset: {} }, getElementById: () => null };
@@ -18,6 +20,7 @@ function mockFlowDocument(t) {
 }
 
 function attachFlowUi(sim) {
+  sim.inputCoordinator = new SimulatorInputCoordinator(sim);
   sim.gameFlow = new GameFlowController();
   sim.gameFlow.enterFlight();
   sim.shadowDemo = { active: false, stop() {} };

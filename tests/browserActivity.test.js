@@ -6,6 +6,9 @@ import { FlightAudio } from '../src/audio/FlightAudio.js';
 import { MissionRunner } from '../src/arena/MissionRunner.js';
 import { createMissionManifest } from '../src/arena/missionConfig.js';
 
+import { SimulatorAudioCoordinator } from '../src/core/SimulatorAudioCoordinator.js';
+import { SimulatorInputCoordinator } from '../src/core/SimulatorInputCoordinator.js';
+
 function fixture() {
   const audio = new FlightAudio();
   let clockReads = 0, released = 0, resumes = 0;
@@ -17,6 +20,8 @@ function fixture() {
       releaseAllKeys() { released++; }, setTouchStick() {}, setTouchRudder() {}, setTouchBrakes() {},
     },
   });
+  sim.audioCoordinator = new SimulatorAudioCoordinator(sim.audio, sim);
+  sim.inputCoordinator = new SimulatorInputCoordinator(sim);
   sim.gameFlow.enterFlight();
   return { sim, audio, counts: () => ({ clockReads, released, resumes }) };
 }
