@@ -1,5 +1,10 @@
 # Fixed-step physics core
 
+The implementation now lives in [flightsim-core](https://github.com/stlim0727/flightsim-core).
+Local `src/physics` and aircraft-config modules retain compatibility reexports.
+Flight3d pins a full Git release commit through npm; see
+[package ownership and updates](headless-flight-systems.md#package-ownership-and-updates).
+
 Task 1-1 (#185, following #131) retains the custom JavaScript integrator at
 120 Hz. This is a compatibility choice, not evidence that 120 Hz is more
 accurate than 240 Hz. Rapier adoption and changing integration algorithms are
