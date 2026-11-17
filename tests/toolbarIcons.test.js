@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TOOLBAR_ICONS, gearIconName, spoilerIconName, setToolbarIcon, toolbarIconUrl } from '../src/ui/toolbarIcons.js';
+import { TOOLBAR_ICONS, gearIconName, setToolbarIcon, toolbarIconUrl } from '../src/ui/toolbarIcons.js';
 
 test('every gear state maps to a drawn icon, damage included', () => {
   assert.equal(gearIconName('down'), 'gear-down');
@@ -10,16 +10,10 @@ test('every gear state maps to a drawn icon, damage included', () => {
   assert.equal(gearIconName('damaged'), 'gear-fail');
 });
 
-test('spoilers switch between the stowed line and the deployed triangle', () => {
-  assert.equal(spoilerIconName(false), 'spoilers-off');
-  assert.equal(spoilerIconName(true), 'spoilers-on');
-  assert.ok(TOOLBAR_ICONS['spoilers-off'] && TOOLBAR_ICONS['spoilers-on'] && TOOLBAR_ICONS.flaps);
-});
-
 test('camera views keep their text labels; only gear, flaps, spoilers and fullscreen are drawn', () => {
   assert.deepEqual(Object.keys(TOOLBAR_ICONS).sort(), [
     'flaps', 'fullscreen-enter', 'fullscreen-exit', 'gear-down', 'gear-fail', 'gear-transit', 'gear-up',
-    'spoilers-off', 'spoilers-on',
+    'spoilers',
   ]);
 });
 

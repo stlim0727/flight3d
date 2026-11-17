@@ -95,7 +95,7 @@ fullscreen to the end of the second row, beside the camera strip or alone, and t
 toolbar never needs a third row. `src/ui/toolbarVisibility.js` holds the DOM-independent rules
 (`tests/toolbarVisibility.test.js`). Issue #808 draws gear (state arrow per
 `updateControlState`), spoilers (an airfoil like the flap icon with its
-upper-surface panel flush or raised) and fullscreen (enter/exit) as icons from
+upper-surface panel raised; the pressed state shows whether they are out) and fullscreen (enter/exit) as icons from
 `src/ui/toolbarIcons.js`. Flaps show a smaller icon over the angle (`data-icon-value`
 on `::before`; at 1025px and wider the key hint joins the angle there). The reverser
 reads `REV` in every language, as cockpit engine displays print it; takeover and

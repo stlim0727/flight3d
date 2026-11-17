@@ -51,7 +51,7 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-flaps-ext'].dataset.icon, 'flaps');
     assert.equal(nodes['btn-flaps-ext']['data-icon-value'], '+12°');
     assert.equal(nodes['btn-flaps-ret']['data-icon-value'], '−12°');
-    assert.equal(nodes['btn-spoilers'].dataset.icon, 'spoilers-on');
+    assert.equal(nodes['btn-spoilers'].dataset.icon, 'spoilers');
     assert.equal(nodes['btn-spoilers']['aria-pressed'], 'true');
     assert.equal(nodes['btn-reverser']['aria-pressed'], 'true');
     assert.equal(nodes['btn-cam-auto'].title, 'Camera: Auto');
@@ -64,7 +64,6 @@ test('shared controls track deployment, damage, keyboard changes and input mode 
     assert.equal(nodes['btn-gear'].dataset.icon, 'gear-fail');
     assert.equal(nodes['btn-flaps-ret'].disabled, true);
     assert.equal(nodes['btn-spoilers']['aria-pressed'], 'false');
-    assert.equal(nodes['btn-spoilers'].dataset.icon, 'spoilers-off');
     assert.equal(nodes['btn-reverser']['aria-pressed'], 'false');
     assert.equal(nodes['btn-touch-toggle']['aria-pressed'], 'false');
     assert.equal(nodes['btn-cam-drone']['aria-pressed'], 'true');
