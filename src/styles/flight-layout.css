@@ -299,10 +299,10 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
 }
 .demo-actions .btn-demo-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
 
-/* Immediate Reset POV & Gaze Exit Controls. They follow the measured bottom of
-   the control rows, like the AP and overflow panels, so they clear the toolbar
-   whether the camera strip shares its row or wraps onto a second one, and drop
-   below the demo guide while it occupies that row. */
+/* Immediate Reset POV, Gaze Exit and Cockpit POV Adjust controls. They follow
+   the measured bottom of the control rows, like the AP and overflow panels, so
+   they clear the toolbar whether the camera strip shares its row or wraps onto
+   a second one, and drop below the demo guide while it occupies that row. */
 .pov-actions-bar {
   position: fixed;
   top: calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)))) + var(--flight-alert-space, 0px) + var(--demo-guide-space, 0px));
@@ -373,12 +373,19 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   display: none !important;
 }
 
-/* Cockpit POV Eyepoint Adjustment Panel */
+/* Cockpit POV Eyepoint Adjustment Panel. It opens along the bottom edge, over
+   the lower console, and scrolls inside the remaining height, so the windshield,
+   horizon and HUD stay clear while the eyepoint is being set. */
 .cockpit-pov-panel {
   position: fixed;
-  top: calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)))) + var(--flight-alert-space, 0px));
+  top: auto;
+  bottom: calc(var(--edge-bottom, 8px) + (8px * var(--ui-scale, 1)));
   right: calc(var(--edge-right, 12px) + 8px);
   width: min(calc(260px * var(--ui-scale, 1)), calc(100vw - 24px));
+  max-height: calc(100dvh - var(--flight-panels-top, calc(var(--edge-top, 8px) + (100px * var(--ui-scale, 1)))) - var(--edge-bottom, 8px) - (12px * var(--ui-scale, 1)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   background: var(--flight-control-surface, rgba(15, 23, 42, 0.92));
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -511,6 +518,39 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   background: rgba(56, 189, 248, 0.15);
   color: #f0f9ff;
   border-color: #38bdf8;
+}
+/* Landscape phones are too short for the vertical stack above the bottom row.
+   Spread the three axes into columns and drop the optional step buttons so the
+   panel stays a thin strip below the horizon instead of covering it. */
+@media (max-height: 560px) {
+  .cockpit-pov-panel {
+    width: min(calc(260px * var(--ui-scale, 1)), calc(100vw - 24px));
+  }
+  .btn-cockpit-pov {
+    width: calc(44px * var(--ui-scale, 1));
+    min-width: calc(44px * var(--ui-scale, 1));
+    height: calc(44px * var(--ui-scale, 1));
+    min-height: calc(44px * var(--ui-scale, 1));
+    padding: 0;
+    border-radius: 50%;
+  }
+  .btn-cockpit-pov .pov-label { display: none; }
+  .cockpit-pov-body {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: calc(6px * var(--ui-scale, 1));
+  }
+  .cockpit-pov-header { margin-bottom: calc(5px * var(--ui-scale, 1)); }
+  .cockpit-pov-label-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(1px * var(--ui-scale, 1));
+    font-size: calc(10px * var(--ui-scale, 1));
+    line-height: 1.2;
+  }
+  .cockpit-pov-val { font-size: calc(10px * var(--ui-scale, 1)); }
+  .cockpit-pov-control-group { grid-template-columns: minmax(0, 1fr); }
+  .cockpit-pov-step { display: none; }
+  .cockpit-pov-actions { grid-column: 1 / -1; margin-top: 0; }
 }
 .btn-gaze-exit .gaze-exit-close {
   font-size: calc(11px * var(--ui-scale, 1));

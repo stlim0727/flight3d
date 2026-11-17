@@ -91,10 +91,13 @@ orientations, that seven cameras fit a 390px portrait second row, that a hidden
 camera stays selectable without its button returning, and that the selection
 survives a reload. `src/ui/toolbarVisibility.js` holds the DOM-independent rules
 (`tests/toolbarVisibility.test.js`). The cockpit eyepoint pill (`#pov-actions-bar`)
-and its panel take their top from `--flight-panels-top`, the measured bottom of
-the control rows, so they clear a wrapped camera strip; the harness waits for the
-cockpit view to load at each viewport and checks both against the toolbar's
-bottom edge. Artifacts
+follows `--flight-panels-top`, the measured bottom of the control rows, so it
+clears a wrapped camera strip. Its adjustment panel is docked to the bottom edge
+(right-aligned, or a thin three-column strip when the viewport is shorter than
+560px) with its height capped below `--flight-panels-top`, so the windshield,
+horizon and HUD stay visible while the eyepoint is adjusted. The harness waits
+for the cockpit view to load at each viewport and checks the pill against the
+toolbar and the panel against the toolbar and lower console band. Artifacts
 are written to `.cache/flight-layout/` (override with `ARTIFACT_DIR`). These are
 fixed-pose browser checks, not flight or physical-device acceptance. The older
 `verify-responsive-ui.mjs` includes historical toolbar-placement expectations;
