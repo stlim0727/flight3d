@@ -283,6 +283,8 @@ export class ReplayDirector {
     return {
       missiles: this._combat.state.missiles,
       targets: this._combat.state.targets,
+      flares: this._combat.state.flares,
+      chaffClouds: this._combat.state.chaffClouds,
       timeScale: this.paused ? 0 : this.speed,
     };
   }
