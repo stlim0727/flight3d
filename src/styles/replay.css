@@ -109,9 +109,10 @@ body:not([data-flow="flight"]) #replay-panel { display: none; }
 }
 #replay-panel, #replay-library { pointer-events: auto; }
 
-/* Keep the live camera strip in its original toolbar slots. Invisible flight
-   actions retain their space, so entering replay never shifts the cameras. */
+/* Size the live toolbar to the camera controls actually shown in replay. */
 body.replaying .flight-toolbar > :not(.flight-camera-strip) {
-  visibility: hidden;
-  pointer-events: none;
+  display: none !important;
+}
+body.replaying .flight-toolbar .flight-camera-strip {
+  border-left: 0;
 }

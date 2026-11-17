@@ -1,4 +1,4 @@
-// Hardware Chrome acceptance: keep the live camera toolbar through replay and exit.
+// Hardware Chrome acceptance: reuse the live cameras in a toolbar sized to its visible controls.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -53,10 +53,19 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   await ev('s.replayDirector.pause();s.controls.onSelectCamera(1)');
   for (const [width,height,name] of sizes) {
     await resize(width,height);
-    assert.deepEqual(await snapshot(), snapshots[name], `${name}: exact live camera geometry and styles`);
+    const appearance = rows => rows.map(({x,y,...rest}) => rest);
+    assert.deepEqual(appearance(await snapshot()), appearance(snapshots[name]), `${name}: live button dimensions and styles`);
+    const bounds = await ev(`(() => {
+      const bar=document.querySelector('.flight-toolbar'),strip=document.querySelector('#camera-strip');
+      const b=bar.getBoundingClientRect(),s=strip.getBoundingClientRect();
+      return {left:s.left-b.left,right:b.right-s.right,top:s.top-b.top,bottom:b.bottom-s.bottom,
+        children:[...bar.children].filter(c=>getComputedStyle(c).display!=='none').map(c=>c.id)};
+    })()`);
+    assert.deepEqual(bounds.children,['camera-strip']);
+    for (const edge of ['left','right','top','bottom']) assert.ok(bounds[edge]<=1.1, `${name}: no empty toolbar ${edge}: ${bounds[edge]}`);
     assert.equal(await ev('liveCameraButtons.every((b,i)=>b===document.querySelectorAll("#camera-strip button")[i])'),true);
     assert.equal(await ev('document.querySelectorAll("#replay-panel [data-camera-mode]").length'),0);
-    assert.equal(await ev('getComputedStyle(document.querySelector("#btn-gear")).visibility'),'hidden');
+    assert.equal(await ev('getComputedStyle(document.querySelector("#btn-gear")).display'),'none');
     await click('#btn-cam-drone');
     await until(() => ev('s.cameraSystem.mode===6 && document.querySelector("#btn-cam-drone").getAttribute("aria-pressed")==="true"'), 'shared camera click');
     await click('#btn-cam-chase');
@@ -66,7 +75,7 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   assert.equal(await ev('s.replayDirector.active'),false);
   await ev('s.gameFlow.returnToLobby(false);s.fly()');
   await until(() => ev('s.gameFlow.state === "flight"'), 'return to live flight');
-  assert.equal(await ev('getComputedStyle(document.querySelector("#btn-gear")).visibility'),'visible');
+  assert.equal(await ev('getComputedStyle(document.querySelector("#btn-gear")).display')!=='none',true);
   assert.deepEqual(exceptions,[]);
-  await writeFile(`${output}/result.json`,JSON.stringify({passed:true,snapshots,checks:['same DOM nodes','exact live geometry and styles at three sizes','no duplicate cameras','native camera clicks and pressed state','flight controls hidden and restored']},null,2));
+  await writeFile(`${output}/result.json`,JSON.stringify({passed:true,snapshots,checks:['same DOM nodes','live dimensions and styles at three sizes; toolbar fits visible cameras','no duplicate cameras','native camera clicks and pressed state','flight controls hidden and restored']},null,2));
 });
