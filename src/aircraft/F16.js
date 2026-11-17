@@ -9,7 +9,7 @@ import { JetExhaust } from '../effects/JetExhaust.js';
 import { applyFlatShading } from '../config/renderQuality.js';
 import { CockpitHudCanvas, configureF16HudMesh } from './CockpitHudCanvas.js';
 import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
-import { createMissileMesh } from '../weapons/missileGeometry.js';
+import { createMissileMesh, preloadMissileModels } from '../weapons/missileGeometry.js';
 import { F16_MISSILE_STATIONS } from '../weapons/missileSpecs.js';
 
 // The supplied asset is +X forward, with a 93.94-unit wingspan. Its authored
@@ -167,6 +167,7 @@ export class F16 {
     }
     this.lightsGroup = new THREE.Group();
     this.gltfGroup.add(this.lightsGroup);
+    preloadMissileModels();
     // Six rail stations keep their missiles resident; launch only toggles the
     // mesh until a preset reset re-arms every station.
     this.missilesGroup = new THREE.Group();

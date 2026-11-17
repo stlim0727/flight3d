@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BanditAircraftView } from './BanditAircraftView.js';
-import { createMissileMesh } from './missileGeometry.js';
+import { createMissileMesh, preloadMissileModels } from './missileGeometry.js';
 import { ZONE_LOCAL_CENTERS } from '../physics/combatDamage.js';
 
 const FORWARD = new THREE.Vector3(0, 0, -1);
@@ -206,6 +206,7 @@ export class MissileCombatView {
     this.chaffViews = new Map();
     this.detachedWrecks = [];
     this.trails = [];
+    preloadMissileModels();
   }
 
   sync(dt) {

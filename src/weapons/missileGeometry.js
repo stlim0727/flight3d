@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { missileSpec } from './missileSpecs.js';
 
 const sharedMaterials = new Map();
@@ -18,8 +19,48 @@ const domeMaterial = () => material('missile-dome', { color: 0x20262a, roughness
 const radomeMaterial = () => material('missile-radome', { color: 0xecece5, roughness: 0.62, metalness: 0.05 });
 const bandMaterial = () => material('missile-band', { color: 0x8d5b2b, roughness: 0.7, metalness: 0.1 });
 
+// Caches for high-detail GLB models
+const gltfTemplates = new Map();
+const gltfLoadingPromises = new Map();
+
+export function getMissileModelUrl(type) {
+  const baseUrl = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
+  const filename = type === 'AIM120C' ? 'aim-120c.glb' : 'aim-9x.glb';
+  return `${baseUrl}models/missiles/${filename}`;
+}
+
+export async function loadMissileModel(type) {
+  if (gltfTemplates.has(type)) {
+    return gltfTemplates.get(type);
+  }
+  if (gltfLoadingPromises.has(type)) {
+    return gltfLoadingPromises.get(type);
+  }
+  const promise = (async () => {
+    try {
+      const url = getMissileModelUrl(type);
+      const loader = new GLTFLoader();
+      const gltf = await loader.loadAsync(url);
+      const scene = gltf.scene || gltf.scenes?.[0];
+      if (scene) {
+        gltfTemplates.set(type, scene);
+        return scene;
+      }
+    } catch {
+      // In non-browser / test environments, fallback to procedural mesh
+    }
+    return null;
+  })();
+  gltfLoadingPromises.set(type, promise);
+  return promise;
+}
+
+export function preloadMissileModels() {
+  return Promise.all(['AIM9X', 'AIM120C'].map(loadMissileModel));
+}
+
 /** Four radial fins around the Z axis, nose toward -Z. */
-function addFinRing(group, { z, chord, span, thickness, radius, phase = Math.PI / 4 }) {
+function addFinRing(group, { z, chord, span, thickness, radius, phase = Math.PI / 4 }, outList = null) {
   for (let i = 0; i < 4; i++) {
     const fin = new THREE.Mesh(new THREE.BoxGeometry(thickness, span, chord), finMaterial());
     fin.position.set(0, radius + span / 2, 0);
@@ -30,6 +71,7 @@ function addFinRing(group, { z, chord, span, thickness, radius, phase = Math.PI 
     pivot.add(fin);
     fin.castShadow = true;
     group.add(pivot);
+    if (outList) outList.push(pivot);
   }
 }
 
@@ -51,6 +93,8 @@ export function createMissileMesh(type) {
   const bodyLength = length - noseLength;
   const isSidewinder = type === 'AIM9X';
 
+  const proceduralMeshes = [];
+
   const body = new THREE.Mesh(
     new THREE.CylinderGeometry(radius, radius, bodyLength, 18, 1, false),
     isSidewinder ? bodyMaterial() : radomeMaterial(),
@@ -59,6 +103,7 @@ export function createMissileMesh(type) {
   body.position.z = noseLength / 2;
   body.castShadow = true;
   group.add(body);
+  proceduralMeshes.push(body);
 
   const nose = new THREE.Mesh(
     new THREE.ConeGeometry(radius, noseLength, 18, 1, false),
@@ -69,6 +114,7 @@ export function createMissileMesh(type) {
   nose.position.z = -length / 2 + noseLength / 2;
   nose.castShadow = true;
   group.add(nose);
+  proceduralMeshes.push(nose);
 
   if (isSidewinder) {
     const seekerBand = new THREE.Mesh(
@@ -78,11 +124,12 @@ export function createMissileMesh(type) {
     seekerBand.rotation.x = Math.PI / 2;
     seekerBand.position.z = -length / 2 + noseLength + 0.05;
     group.add(seekerBand);
-    addFinRing(group, { z: -length / 2 + noseLength + 0.34, chord: 0.2, span: 0.1, thickness: 0.008, radius });
-    addFinRing(group, { z: length / 2 - 0.26, chord: 0.24, span: 0.13, thickness: 0.008, radius });
+    proceduralMeshes.push(seekerBand);
+    addFinRing(group, { z: -length / 2 + noseLength + 0.34, chord: 0.2, span: 0.1, thickness: 0.008, radius }, proceduralMeshes);
+    addFinRing(group, { z: length / 2 - 0.26, chord: 0.24, span: 0.13, thickness: 0.008, radius }, proceduralMeshes);
   } else {
-    addFinRing(group, { z: -0.08, chord: 0.42, span: 0.17, thickness: 0.01, radius, phase: 0 });
-    addFinRing(group, { z: length / 2 - 0.3, chord: 0.34, span: 0.2, thickness: 0.01, radius, phase: 0 });
+    addFinRing(group, { z: -0.08, chord: 0.42, span: 0.17, thickness: 0.01, radius, phase: 0 }, proceduralMeshes);
+    addFinRing(group, { z: length / 2 - 0.3, chord: 0.34, span: 0.2, thickness: 0.01, radius, phase: 0 }, proceduralMeshes);
   }
 
   const tail = new THREE.Mesh(
@@ -92,6 +139,33 @@ export function createMissileMesh(type) {
   tail.rotation.x = Math.PI / 2;
   tail.position.z = length / 2 - 0.02;
   group.add(tail);
+  proceduralMeshes.push(tail);
+
+  const attachGltf = (template) => {
+    if (!template || group.userData.gltfAttached) return;
+    const gltfInstance = template.clone(true);
+    gltfInstance.name = `GLTF_${type}`;
+    gltfInstance.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    group.add(gltfInstance);
+    group.userData.gltfAttached = true;
+    group.userData.gltfInstance = gltfInstance;
+    for (const mesh of proceduralMeshes) {
+      mesh.visible = false;
+    }
+  };
+
+  if (gltfTemplates.has(type)) {
+    attachGltf(gltfTemplates.get(type));
+  } else if (typeof window !== 'undefined') {
+    loadMissileModel(type).then(template => {
+      if (template) attachGltf(template);
+    });
+  }
 
   return group;
 }
