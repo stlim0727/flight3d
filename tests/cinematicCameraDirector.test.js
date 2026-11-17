@@ -1348,3 +1348,51 @@ test('Unpromoted queued missile does not block track timeout to approach phase',
   }
   assert.equal(director.missileSequence?.phase, 'approach', 'Track timeout switches to approach even with queued missile');
 });
+
+test('Out-of-range candidate damage baseline updates every frame without triggering premature hit later', () => {
+  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const flightState = { onGround: false };
+  const targetA = {
+    id: 101,
+    alive: true,
+    damage: 0,
+    position: new THREE.Vector3(0, 1500, -8000),
+    velocity: new THREE.Vector3(0, 0, -200),
+  };
+  const targetB = {
+    id: 102,
+    alive: true,
+    damage: 0,
+    position: new THREE.Vector3(5000, 1500, -2000),
+    velocity: new THREE.Vector3(0, 0, 0),
+  };
+  const missile = fakeMissile({
+    id: 501,
+    position: new THREE.Vector3(0, 1500, -10),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target: targetA,
+  });
+
+  // Launch frame
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [targetA, targetB] });
+  assert.equal(director.missileSequence?.hitDetected, false);
+
+  // Target B takes damage while far out of range (>2500m)
+  targetB.damage = 0.5;
+  director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [targetA, targetB] });
+  assert.equal(director.missileSequence?.hitDetected, false, 'Damage out of range does not trigger hit');
+
+  // Next frame, missile moves close to Target B (<2500m) but Target B takes NO new damage
+  missile.position.set(4000, 1500, -2000); // 1000m from targetB
+  director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [targetA, targetB] });
+  assert.equal(director.missileSequence?.hitDetected, false, 'Old out-of-range damage does not linger and falsely trigger hit when approaching');
+
+  // Next frame, Target B takes fresh damage while within range
+  targetB.damage = 0.9;
+  director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [targetA, targetB] });
+  assert.equal(director.missileSequence?.hitDetected, true, 'Fresh damage within range triggers hit on candidate');
+  assert.equal(director.missileSequence?.target, targetB, 'Sequence switches target to candidate that was hit');
+});

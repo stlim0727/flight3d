@@ -667,27 +667,39 @@ export class CinematicCameraDirector {
         }
         sequence.lastTargetDamage = targetDamage;
         sequence.lastTargetAlive = Boolean(sequence.target.alive);
+        if (sequence.target.id != null && sequence.targetStates) {
+          sequence.targetStates.set(sequence.target.id, {
+            damage: targetDamage,
+            alive: sequence.lastTargetAlive,
+          });
+        }
       }
       if (!sequence.hitDetected && Array.isArray(this.lastCombatTargets)) {
+        if (!sequence.targetStates) sequence.targetStates = new Map();
         for (const candidate of this.lastCombatTargets) {
           if (!candidate || candidate.id == null || candidate === sequence.target) continue;
-          const initial = sequence.targetStates?.get(candidate.id);
+          const previous = sequence.targetStates.get(candidate.id);
           const currentDamage = candidate.damage ?? 0;
-          const freshKilled = initial ? (initial.alive && !candidate.alive) : false;
-          const freshDamaged = initial ? (currentDamage > initial.damage + 1e-4) : false;
-          if (freshKilled || freshDamaged) {
-            const pos = this.resolveTargetPosition(candidate, true);
-            if (pos && sequence.lastMissilePos.distanceTo(pos) < 2500) {
-              sequence.target = candidate;
-              sequence.lastTargetPos = pos.clone();
-              sequence.hitDetected = true;
-              sequence.hitTime = 0;
-              sequence.hitPos = pos.clone();
-              sequence.lastTargetDamage = currentDamage;
-              sequence.lastTargetAlive = Boolean(candidate.alive);
-              break;
+          const currentAlive = Boolean(candidate.alive);
+          if (previous) {
+            const freshKilled = previous.alive && !currentAlive;
+            const freshDamaged = currentDamage > previous.damage + 1e-4;
+            if (freshKilled || freshDamaged) {
+              const pos = this.resolveTargetPosition(candidate, true);
+              if (pos && sequence.lastMissilePos.distanceTo(pos) < 2500) {
+                sequence.target = candidate;
+                sequence.lastTargetPos = pos.clone();
+                sequence.hitDetected = true;
+                sequence.hitTime = 0;
+                sequence.hitPos = pos.clone();
+                sequence.lastTargetDamage = currentDamage;
+                sequence.lastTargetAlive = currentAlive;
+                sequence.targetStates.set(candidate.id, { damage: currentDamage, alive: currentAlive });
+                break;
+              }
             }
           }
+          sequence.targetStates.set(candidate.id, { damage: currentDamage, alive: currentAlive });
         }
       }
     }
