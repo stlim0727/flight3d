@@ -29,6 +29,13 @@ The viewer waits for terrain to load. Recorded time of day and generated valley
 course seeds are restored without starting another scored attempt. Playback cannot
 start during a multiplayer room or an in-progress scene swap.
 
+A parked replay is not a flying aircraft. When the track ends, playback is paused,
+or terrain is still loading, the replay holds the pose but silences the engine/wind
+mix, clears cockpit vibration and stall buffet, and freezes propeller, fan and
+strobe animation. Resuming or scrubbing while playing restores the recorded mix;
+`ReplayDirector.playbackHeld` is the seam the host reads for frame-clocked model
+animation.
+
 ## Representation and ownership
 
 `ReplayRecorder` observes telemetry plus the authoritative quaternion at 5 Hz.

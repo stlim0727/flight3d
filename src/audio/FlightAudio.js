@@ -17,6 +17,7 @@ export class FlightAudio {
     this.ctx = null;
     this.isMuted = false;
     this.isPaused = false;
+    this.isReplayPaused = false;
     this.isInitialized = false;
 
     this.volume = 1.0;
@@ -100,7 +101,7 @@ export class FlightAudio {
   }
 
   get effectiveVolume() {
-    if (this.isMuted || this.isPaused) return 0.0;
+    if (this.isMuted || this.isPaused || this.isReplayPaused) return 0.0;
     return this.volume;
   }
 
@@ -590,6 +591,17 @@ export class FlightAudio {
   setPaused(paused) {
     this.isPaused = !!paused;
     if (this.isPaused) this.cancelSpeech();
+    this.applyMasterGain();
+  }
+
+  /**
+   * A replay owns the pose and its recorded state, but it does not step physics. A
+   * parked replay must be as silent as a held sortie so the frozen engine mix does
+   * not drone behind the viewer; resuming playback restores the pilot's mix.
+   */
+  setReplayPaused(paused) {
+    this.isReplayPaused = !!paused;
+    if (this.isReplayPaused) this.cancelSpeech();
     this.applyMasterGain();
   }
 

@@ -383,6 +383,19 @@ describe('C172 piston sound and lifecycle', () => {
     assert.equal(audio.masterGain.gain.value, 0, 'unpausing must not unmute for the pilot');
   }));
 
+  it('silences a parked replay and restores the pilot mix only when playback resumes', () => withPiston(audio => {
+    audio.update(0.1, pistonState(100), false);
+    audio.setReplayPaused(true);
+    assert.equal(audio.effectiveVolume, 0);
+    assert.equal(audio.masterGain.gain.value, 0);
+    assert.equal(audio.volume, 1, 'a replay pause is not a volume setting');
+    audio.setMuted(true);
+    audio.setReplayPaused(false);
+    assert.equal(audio.masterGain.gain.value, 0, 'resuming must not unmute for the pilot');
+    audio.setMuted(false);
+    assert.equal(audio.masterGain.gain.value, 1);
+  }));
+
   it('does not restart continuous sounds after a crash, including a muted crash and preset reset', () => withPiston(audio => {
     audio.update(0.1, pistonState(100, { iasKnots: 90 }), false);
     audio.setMuted(true); audio.playExplosion(); audio.setMuted(false);

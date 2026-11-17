@@ -35,6 +35,22 @@ export class ReplayDirector {
     this.createEffects = createEffects;
     this.remotes = [];
     this.roomEffects = null;
+    this._playbackHeld = false;
+  }
+
+  /**
+   * A parked replay keeps rendering its frozen state, but nothing in the aircraft
+   * is moving any more: the engine mix and cockpit vibration must stop with the
+   * clock, and a scrub or resume must restart them.
+   */
+  get playbackHeld() { return this._playbackHeld; }
+
+  _syncPlaybackHeld() {
+    const held = this.active && (this.paused || this.waitingTerrain);
+    if (held === this._playbackHeld) return;
+    this._playbackHeld = held;
+    this.sim.audio?.setReplayPaused?.(held);
+    this.sim.cameraSystem?.setMotionFrozen?.(held);
   }
 
   /**
@@ -136,6 +152,7 @@ export class ReplayDirector {
     // target airframe and its destruction instead of a distant HUD symbol.
     if (this._combat.active) sim.cameraSystem.setMode(CameraSystem.MODES.DIRECTOR, true);
     this.onChange();
+    this._syncPlaybackHeld();
     return true;
   }
 
@@ -144,6 +161,7 @@ export class ReplayDirector {
     if (this.progressSec >= this.durationSec - 1e-9) this.seek(0);
     this.paused = false;
     this.onChange();
+    this._syncPlaybackHeld();
     return true;
   }
 
@@ -151,6 +169,7 @@ export class ReplayDirector {
     if (!this.active || this.paused) return this.paused;
     this.paused = true;
     this.onChange();
+    this._syncPlaybackHeld();
     return true;
   }
 
@@ -168,6 +187,7 @@ export class ReplayDirector {
     this._applyCombatLoadout();
     this.reseed();
     this.onChange();
+    this._syncPlaybackHeld();
     return this.progressSec;
   }
 
@@ -204,6 +224,7 @@ export class ReplayDirector {
     if (waiting !== this.waitingTerrain) {
       this.waitingTerrain = waiting;
       this.onChange();
+      this._syncPlaybackHeld();
     }
     if (waiting) return;
     if (!this.paused) {
@@ -254,6 +275,7 @@ export class ReplayDirector {
     this.speed = 1;
     this.waitingTerrain = false;
     this.onChange();
+    this._syncPlaybackHeld();
   }
 
   /** Freeze the pose, drop the render interpolation, and put the camera back on the target. */

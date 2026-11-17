@@ -287,6 +287,50 @@ test('mandated sequence: play, seek backwards, 3x, pause, step back, resume, run
   assert.equal(sim.sky.timeOfDay, 12, 'the pre-replay sky comes back');
   assert.equal(sim.sky.cloudCover, 0.5);
   assert.ok(seen.length >= 6);
+  assert.equal(director.playbackHeld, false, 'leaving a replay releases the parked effects');
+});
+
+test('parking playback stops the engine mix and cockpit motion until playback resumes', async () => {
+  const sim = fakeSim();
+  const audio = [], motion = [];
+  sim.audio = { setReplayPaused(value) { audio.push(value); } };
+  sim.cameraSystem.setMotionFrozen = value => motion.push(value);
+  const director = new ReplayDirector(sim);
+  const source = track();
+
+  assert.equal(await director.load(source), true);
+  assert.deepEqual(audio, [true], 'an armed replay is parked before it starts rolling');
+  assert.deepEqual(motion, [true]);
+  assert.equal(director.playbackHeld, true);
+
+  director.play();
+  assert.deepEqual(audio.at(-1), false, 'playback restarts the recorded engine mix');
+  assert.deepEqual(motion.at(-1), false);
+
+  director.pause();
+  assert.deepEqual(audio.at(-1), true, 'a manual pause is silent too');
+  assert.deepEqual(motion.at(-1), true);
+
+  director.play();
+  director.update(60);
+  assert.equal(director.progressSec, director.durationSec);
+  assert.equal(director.paused, true);
+  assert.equal(director.active, true, 'the viewer stays open after the end');
+  assert.equal(director.playbackHeld, true, 'the parked end frame is not still flying');
+  assert.deepEqual(audio.at(-1), true, 'the engine cannot drone over the final frame');
+  assert.deepEqual(motion.at(-1), true);
+
+  director.seek(0);
+  assert.equal(director.playbackHeld, true, 'scrubbing a parked track keeps the effects stopped');
+  assert.equal(audio.length, 5, 'no redundant mute writes while parked');
+
+  director.play();
+  assert.equal(director.playbackHeld, false);
+  assert.deepEqual(audio.at(-1), false);
+  assert.deepEqual(motion.at(-1), false);
+  director.stop();
+  assert.equal(director.playbackHeld, false);
+  assert.deepEqual(audio.at(-1), false, 'leaving while playing releases the held state without a mute blip');
 });
 
 test('backwards and forwards seeks are reproducible, so scrubbing never loses a pose', async () => {
