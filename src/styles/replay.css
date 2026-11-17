@@ -109,8 +109,9 @@ body:not([data-flow="flight"]) #replay-panel { display: none; }
 }
 #replay-panel, #replay-library { pointer-events: auto; }
 
-/* Size the live toolbar to the camera controls actually shown in replay. */
-body.replaying .flight-toolbar > :not(.flight-camera-strip) {
+/* Size the live toolbar to the camera controls actually shown in replay, keeping
+   fullscreen available so playback can be watched without browser chrome. */
+body.replaying .flight-toolbar > :not(.flight-camera-strip):not(#btn-fullscreen) {
   display: none !important;
 }
 body.replaying .flight-toolbar .flight-camera-strip {

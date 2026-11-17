@@ -56,12 +56,13 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
     const appearance = rows => rows.map(({x,y,...rest}) => rest);
     assert.deepEqual(appearance(await snapshot()), appearance(snapshots[name]), `${name}: live button dimensions and styles`);
     const bounds = await ev(`(() => {
-      const bar=document.querySelector('.flight-toolbar'),strip=document.querySelector('#camera-strip');
-      const b=bar.getBoundingClientRect(),s=strip.getBoundingClientRect();
-      return {left:s.left-b.left,right:b.right-s.right,top:s.top-b.top,bottom:b.bottom-s.bottom,
+      const bar=document.querySelector('.flight-toolbar'),strip=document.querySelector('#camera-strip'),full=document.querySelector('#btn-fullscreen');
+      const b=bar.getBoundingClientRect(),s=strip.getBoundingClientRect(),f=full.getBoundingClientRect();
+      return {left:s.left-b.left,right:b.right-f.right,top:s.top-b.top,bottom:b.bottom-s.bottom,
         children:[...bar.children].filter(c=>getComputedStyle(c).display!=='none').map(c=>c.id)};
     })()`);
-    assert.deepEqual(bounds.children,['camera-strip']);
+    assert.deepEqual(bounds.children,['camera-strip','btn-fullscreen']);
+    assert.equal(await ev('getComputedStyle(document.querySelector("#btn-fullscreen")).display'),'flex');
     for (const edge of ['left','right','top','bottom']) assert.ok(bounds[edge]<=1.1, `${name}: no empty toolbar ${edge}: ${bounds[edge]}`);
     assert.equal(await ev('liveCameraButtons.every((b,i)=>b===document.querySelectorAll("#camera-strip button")[i])'),true);
     assert.equal(await ev('document.querySelectorAll("#replay-panel [data-camera-mode]").length'),0);

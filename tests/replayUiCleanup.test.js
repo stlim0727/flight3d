@@ -85,6 +85,17 @@ test('replay.css hides touch-controls-overlay, AP, stale fuel, and diagnostics d
   }
 });
 
+test('replay.css keeps the camera strip and fullscreen button in the live toolbar', () => {
+  const css = fs.readFileSync(new URL('../src/styles/replay.css', import.meta.url), 'utf8');
+  const rule = css.match(/body\.replaying \.flight-toolbar > :not\([^)]*\):not\([^)]*\)\s*\{[^}]*display:\s*none\s*!important;/);
+  assert.ok(rule, 'expected a body.replaying rule that shrinks the live toolbar');
+  assert.ok(rule[0].includes(':not(.flight-camera-strip)'), 'the camera strip must remain visible');
+  assert.ok(rule[0].includes(':not(#btn-fullscreen)'), 'fullscreen must remain available during replay');
+  const withoutExclusions = css.replace(/:not\(#btn-fullscreen\)/g, '');
+  assert.ok(!/body\.replaying[^{]*#btn-fullscreen[^{]*\{[^}]*display:\s*none/.test(withoutExclusions),
+    'no replay rule may hide the fullscreen button');
+});
+
 test('updateControlState disables bottom flight control buttons when controlsDisabled is true', () => {
   const ids = [
     'flight-trim-less', 'flight-trim-more', 'flight-park-brake',
