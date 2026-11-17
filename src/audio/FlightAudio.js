@@ -1,119 +1,78 @@
-import { nextGpwsCallout } from '../systems/FlightWarningsCore.js';
 import { DepartureRadio } from './DepartureRadio.js';
 import { DEPARTURE_RADIO } from '../config/departureRadio.js';
 import { BANGKOK_DEPARTURE_RADIO } from '../config/bangkokDepartureRadio.js';
-import { pistonSoundState } from './pistonSoundState.js';
 import { exteriorDistanceGain, exteriorAirCutoff } from './distanceAcoustics.js';
 import { t } from '../i18n/index.js';
-/**
- * Aircraft-specific procedural Web Audio: turbofan or piston/propeller.
- * Synthesizes twin turbofan engines (combustion roar + N1/N2 turbine whine), aerodynamic airflow slipstream,
- * cockpit air conditioning & avionics cooling pack blower, runway rumble, touchdown tire screech & oleo thump,
- * stall horn, and Boeing GPWS voice callouts.
- * Uses dynamic range compression with normal-volume and muted output states.
- * Exterior camera views attenuate this mix by camera-to-aircraft distance.
- */
+import { MasterMixerChain } from './nodes/MasterMixerChain.js';
+import { TurbofanSynthesizer } from './nodes/TurbofanSynthesizer.js';
+import { PistonSynthesizer } from './nodes/PistonSynthesizer.js';
+import { AirflowSynthesizer } from './nodes/AirflowSynthesizer.js';
+import { AirframeSoundEffects } from './nodes/AirframeSoundEffects.js';
+import { WarningSynthesizer } from './nodes/WarningSynthesizer.js';
+import { CombatSoundEffects } from './nodes/CombatSoundEffects.js';
+import { GpwsCalloutSystem } from './nodes/GpwsCalloutSystem.js';
+
 export class FlightAudio {
   constructor() {
     this.ctx = null;
-    this.isMuted = false;
-    this.isPaused = false;
-    this.isReplayPaused = false;
-    this.isInitialized = false;
-
-    this.volume = 1.0;
-    this.engineVolume = 1.0;
-
-    this.departureRadio = new DepartureRadio({
+    this.isMuted = this.isPaused = this.isInitialized = this.crashed = this.touchdownActive = false;
+    this.volume = this.engineVolume = 1.0;
+    this.lastTouchdownTime = -Infinity;
+    const rOpts = (dir, cfg) => ({
       context: () => this.ctx, output: () => this.masterGain,
       muted: () => this.isMuted || this.volume === 0,
-      baseUrl: import.meta.env?.BASE_URL ?? '/',
-      audioDir: 'audio/departure',
-      radioConfig: DEPARTURE_RADIO,
+      baseUrl: import.meta.env?.BASE_URL ?? '/', audioDir: dir, radioConfig: cfg,
     });
-
-    this.bangkokRadio = new DepartureRadio({
-      context: () => this.ctx, output: () => this.masterGain,
-      muted: () => this.isMuted || this.volume === 0,
-      baseUrl: import.meta.env?.BASE_URL ?? '/',
-      audioDir: 'audio/bangkok',
-      radioConfig: BANGKOK_DEPARTURE_RADIO,
-    });
-
-    // Callout tracking
-    this.lastRadioAlt = 9999;
-    this.calledAltitudes = new Set();
-    this.stallBeepTime = 0;
+    this.departureRadio = new DepartureRadio(rOpts('audio/departure', DEPARTURE_RADIO));
+    this.bangkokRadio = new DepartureRadio(rOpts('audio/bangkok', BANGKOK_DEPARTURE_RADIO));
+    this.gpws = new GpwsCalloutSystem(this);
     this.loadAircraftConfig();
   }
 
-  loadAircraftConfig(config = {}) {
-    this.aircraftId = config.id || 'B738';
-    const settings = config.audio || {};
-    this.profile = {
-      engineType: settings.engineType || 'jet',
-      idleN1: config.propulsion?.idleN1Percent ?? 22,
-      maxN1: config.propulsion?.togaN1Percent ?? 100,
-      idleRpm: settings.idleRpm ?? 700,
-      maxRpm: settings.maxRpm ?? 2700,
-      cylinders: settings.cylinders ?? 4,
-      propellerBlades: settings.propellerBlades ?? 2,
-    };
-    this.reset();
-    // Do not wait for the next render frame to remove the previous aircraft's
-    // signature. The same audio graph is reused across any number of switches.
-    this.silenceEngines();
-  }
-
+  get lastRadioAlt() { return this.gpws.lastRadioAlt; }
+  set lastRadioAlt(v) { this.gpws.lastRadioAlt = v; }
+  get calledAltitudes() { return this.gpws.calledAltitudes; }
   get isPiston() { return this.profile.engineType === 'piston'; }
+  get effectiveVolume() { return (this.isMuted || this.isPaused) ? 0.0 : this.volume; }
+  get gunFireNodes() { return this.combat?.gunFireNodes ?? null; }
+  set gunFireNodes(v) { if (this.combat) this.combat.gunFireNodes = v; }
+  get missileFlightNodes() { return this.combat?.missileFlightNodes ?? null; }
+  set missileFlightNodes(v) { if (this.combat) this.combat.missileFlightNodes = v; }
 
-  cancelSpeech() {
-    if (typeof window !== 'undefined') window.speechSynthesis?.cancel?.();
-  }
+  cancelSpeech() { this.gpws.cancelSpeech(); }
+  pickSynthVoice(s) { return this.gpws.pickSynthVoice(s); }
+  playGpwsCallout(t) { this.gpws.playGpwsCallout(t); }
 
   reset() {
-    this.stopGunFire();
-    this.stopMissileFlight();
-    this.crashed = false;
-    this.lastTouchdownTime = -Infinity;
-    this.touchdownActive = false;
-    this.alertId = null;
-    this.alertTimer = 0;
-    this.alertElapsed = 0;
-    this.lastRadioAlt = 9999;
-    this.calledAltitudes.clear();
-    this.stallBeepTime = 0;
-    this.threatLevel = 0;
-    this.threatTimer = 0;
-    this.threatToneFlip = false;
-    this.cancelSpeech();
-    this.departureRadio.stop();
-    this.bangkokRadio?.stop();
-    if (this.packGain) this.packGain.gain.setTargetAtTime(this.isPiston ? 0 : 0.16, this.ctx.currentTime, 0.04);
-    if (this.warningGain) this.warningGain.gain.setValueAtTime(0, this.ctx.currentTime);
-    if (this.gStrainGain) this.gStrainGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    this.combat?.reset(); this.crashed = this.touchdownActive = false; this.lastTouchdownTime = -Infinity;
+    this.gpws?.reset(); this.departureRadio.stop(); this.bangkokRadio?.stop(); this.warnings?.reset();
+    if (this.packGain) this.packGain.gain.setTargetAtTime(this.isPiston ? 0 : 0.16, this.ctx?.currentTime ?? 0, 0.04);
   }
 
   silenceEngines() {
     if (!this.ctx) return;
-    for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'gStrainGain']) {
-      this[name]?.gain.setTargetAtTime(0, this.ctx.currentTime, 0.04);
-    }
+    const now = this.ctx.currentTime;
+    this.turbofan?.silence(now); this.piston?.silence(now); this.warnings?.silence(now);
   }
 
-  get effectiveVolume() {
-    if (this.isMuted || this.isPaused) return 0.0;
-    return this.volume;
+  loadAircraftConfig(config = {}) {
+    this.aircraftId = config.id || 'B738';
+    const s = config.audio || {};
+    this.profile = {
+      engineType: s.engineType || 'jet',
+      idleN1: config.propulsion?.idleN1Percent ?? 22, maxN1: config.propulsion?.togaN1Percent ?? 100,
+      idleRpm: s.idleRpm ?? 700, maxRpm: s.maxRpm ?? 2700,
+      cylinders: s.cylinders ?? 4, propellerBlades: s.propellerBlades ?? 2,
+    };
+    this.reset();
+    this.silenceEngines();
   }
 
   init(context = null) {
     if (this.isInitialized) return;
-
     try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      this.ctx = context || new AudioContext();
-
-      // Listen for audio route changes (e.g. Bluetooth connection/interruption)
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      this.ctx = context || new AudioCtx();
       if (typeof this.ctx.onstatechange !== 'undefined') {
         this.ctx.onstatechange = () => {
           if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
@@ -121,75 +80,18 @@ export class FlightAudio {
           }
         };
       }
-
-      // 1. Dynamic Range Compressor (Studio Mastering Limiter)
-      // Controls loud transients (touchdown, explosions) while allowing overall mix to be loud
-      this.compressor = this.ctx.createDynamicsCompressor();
-      this.compressor.threshold.setValueAtTime(-12, this.ctx.currentTime);
-      this.compressor.knee.setValueAtTime(8, this.ctx.currentTime);
-      this.compressor.ratio.setValueAtTime(6, this.ctx.currentTime);
-      this.compressor.attack.setValueAtTime(0.002, this.ctx.currentTime);
-      this.compressor.release.setValueAtTime(0.18, this.ctx.currentTime);
-
-      // 2. Unity output stage (no volume boost)
-      this.makeupGain = this.ctx.createGain();
-      this.makeupGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
-
-      // 3. Master Gain Node (user volume control)
-      this.masterGain = this.ctx.createGain();
-      const initialGain = this.effectiveVolume;
-      this.masterGain.gain.setValueAtTime(initialGain, this.ctx.currentTime);
-
-      // Mastering signal chain: sources -> cockpitFilter -> ambientBus -> distanceGain
-      // -> masterGain -> compressor -> makeupGain -> destination. The ambient bus
-      // is the sidechain target for combat transients; one-shots bypass it.
-      this.masterGain.connect(this.compressor);
-      this.compressor.connect(this.makeupGain);
-      this.makeupGain.connect(this.ctx.destination);
-
-      // 4. Cockpit Interior Acoustic Filter (muffles exterior roar inside cockpit)
-      this.cockpitFilter = this.ctx.createBiquadFilter();
-      this.cockpitFilter.type = 'lowpass';
-      this.cockpitFilter.frequency.setValueAtTime(2800, this.ctx.currentTime);
-
-      // 4b. Distance stage: exterior views attenuate with camera-to-aircraft range,
-      // so a distant tower view hears a quieter, duller flyby than chase cam.
-      this.distanceGain = this.ctx.createGain();
-      this.distanceGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
-      this.ambientBus = this.ctx.createGain();
-      this.ambientBus.gain.setValueAtTime(this.isReplayPaused ? 0.0 : 1.0, this.ctx.currentTime);
-      this.cockpitFilter.connect(this.ambientBus);
-      this.ambientBus.connect(this.distanceGain);
-      this.distanceGain.connect(this.masterGain);
-
-      // 4c. Engine bus: the pilot's engine volume scales jet and piston/propeller
-      // sources only, so warnings, wind and radio keep their level.
-      this.engineBus = this.ctx.createGain();
-      this.engineBus.gain.setValueAtTime(this.engineVolume, this.ctx.currentTime);
-      this.engineBus.connect(this.cockpitFilter);
-
-      // 5. Cockpit Avionics Cooling Fan & Air Conditioning Packs (Continuous ambient hum)
-      this.initPackSynth();
-
-      // 6. Turbofan Jet Engine Synthesizer (Pink Noise Roar + Twin Spool Whine)
-      this.initEngineSynth();
-      this.initPistonSynth();
-
-      // 7. Airflow / Wind Slipstream Synthesizer
-      this.initWindSynth();
-
-      // 8. Ground Roll Rumble & Touchdown Screech
-      this.initGroundSynth();
-
-      // 9. Cockpit Warning Tone Oscillator
-      this.initWarningSynth();
-
-      // 10. Pilot High-G Straining Maneuver Breath Synthesizer
-      this.initGStrainSynth();
+      Object.assign(this, MasterMixerChain.create(this.ctx, this.effectiveVolume, this.engineVolume));
+      this.airflow = new AirflowSynthesizer(this.ctx, this.cockpitFilter);
+      this.turbofan = new TurbofanSynthesizer(this.ctx, this.engineBus);
+      this.piston = new PistonSynthesizer(this.ctx, this.engineBus, this.turbofan.engineNoiseBuffer);
+      this.airframe = new AirframeSoundEffects(this.ctx, this.cockpitFilter);
+      this.warnings = new WarningSynthesizer(this.ctx, this.masterGain, this.cockpitFilter);
+      this.combat = new CombatSoundEffects(this.ctx, this.masterGain, this.ambientBus, () => this.silenceOnCrash());
+      Object.assign(this, this.airflow, this.turbofan, this.piston, this.airframe, this.warnings);
 
       this.isInitialized = true;
-      for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'gStrainGain']) {
-        this[name]?.gain.setValueAtTime(0, this.ctx.currentTime);
+      for (const n of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'gStrainGain']) {
+        this[n]?.gain.setValueAtTime(0, this.ctx.currentTime);
       }
       this.packGain.gain.setValueAtTime(this.isPiston || this.crashed ? 0 : 0.16, this.ctx.currentTime);
     } catch (e) {
@@ -198,378 +100,21 @@ export class FlightAudio {
   }
 
   ensureContextRunning() {
-    if (this.ctx) {
-      // iOS WebKit can be in 'interrupted' state on Bluetooth route switches
-      if (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted') {
-        this.ctx.resume().catch(() => {});
-      }
-    }
-  }
-
-  initPackSynth() {
-    // Continuous cockpit air conditioning and avionics cooling fan airflow
-    // Prevents dead silence when parked or at low idle on headphones/Bluetooth
-    const bufferSize = this.ctx.sampleRate * 2;
-    const packBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = packBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.45;
-    }
-
-    this.packNoise = this.ctx.createBufferSource();
-    this.packNoise.buffer = packBuffer;
-    this.packNoise.loop = true;
-
-    this.packFilter = this.ctx.createBiquadFilter();
-    this.packFilter.type = 'bandpass';
-    this.packFilter.frequency.setValueAtTime(580, this.ctx.currentTime);
-    this.packFilter.Q.setValueAtTime(0.8, this.ctx.currentTime);
-
-    this.packGain = this.ctx.createGain();
-    this.packGain.gain.setValueAtTime(0.16, this.ctx.currentTime);
-
-    this.packNoise.connect(this.packFilter);
-    this.packFilter.connect(this.packGain);
-    this.packGain.connect(this.cockpitFilter);
-    this.packNoise.start();
-  }
-
-  initEngineSynth() {
-    // Generate pink noise buffer for turbofan combustion & bypass exhaust roar
-    const bufferSize = this.ctx.sampleRate * 2;
-    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-
-    let maxVal = 0;
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      b0 = 0.99886 * b0 + white * 0.0555179;
-      b1 = 0.99332 * b1 + white * 0.0750759;
-      b2 = 0.96900 * b2 + white * 0.1538520;
-      b3 = 0.86650 * b3 + white * 0.3104856;
-      b4 = 0.55000 * b4 + white * 0.5329522;
-      b5 = -0.7616 * b5 - white * 0.0168980;
-      output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
-      b6 = white * 0.115926;
-      if (Math.abs(output[i]) > maxVal) maxVal = Math.abs(output[i]);
-    }
-    // Normalize to peak 0.92 for robust healthy signal level across all audio gear
-    if (maxVal > 0) {
-      const norm = 0.92 / maxVal;
-      for (let i = 0; i < bufferSize; i++) {
-        output[i] *= norm;
-      }
-    }
-
-    this.engineNoiseBuffer = noiseBuffer;
-
-    // Engine Roar Source
-    this.engineNoise = this.ctx.createBufferSource();
-    this.engineNoise.buffer = noiseBuffer;
-    this.engineNoise.loop = true;
-
-    // Combustion low-pass filter: 280 Hz (idle) up to 950 Hz (TOGA)
-    this.engineFilter = this.ctx.createBiquadFilter();
-    this.engineFilter.type = 'lowpass';
-    this.engineFilter.frequency.setValueAtTime(320, this.ctx.currentTime);
-    this.engineFilter.Q.setValueAtTime(2.0, this.ctx.currentTime);
-
-    this.engineGain = this.ctx.createGain();
-    this.engineGain.gain.setValueAtTime(0.38, this.ctx.currentTime);
-
-    this.engineNoise.connect(this.engineFilter);
-    this.engineFilter.connect(this.engineGain);
-    this.engineGain.connect(this.engineBus);
-    this.engineNoise.start();
-
-    // Primary N1 Low-Pressure Fan Compressor Whine (Sine Oscillator)
-    this.turbineWhine = this.ctx.createOscillator();
-    this.turbineWhine.type = 'sine';
-    this.turbineWhine.frequency.setValueAtTime(450, this.ctx.currentTime);
-
-    this.turbineGain = this.ctx.createGain();
-    this.turbineGain.gain.setValueAtTime(0.08, this.ctx.currentTime);
-
-    this.turbineWhine.connect(this.turbineGain);
-    this.turbineGain.connect(this.engineBus);
-    this.turbineWhine.start();
-
-    // Secondary N2 High-Pressure Core Compressor Whine & Harmonics (Triangle Oscillator)
-    // Adds characteristic twin-spool buzz & harmonic clarity on mobile & Bluetooth headphones
-    this.turbineWhine2 = this.ctx.createOscillator();
-    this.turbineWhine2.type = 'triangle';
-    this.turbineWhine2.frequency.setValueAtTime(900, this.ctx.currentTime);
-
-    this.turbineGain2 = this.ctx.createGain();
-    this.turbineGain2.gain.setValueAtTime(0.04, this.ctx.currentTime);
-
-    this.turbineWhine2.connect(this.turbineGain2);
-    this.turbineGain2.connect(this.engineBus);
-    this.turbineWhine2.start();
-  }
-
-  initPistonSynth() {
-    // A short pressure pulse repeated at the four-stroke firing rate. Harmonics
-    // provide the exhaust's throaty "putter", without N1/N2 whistle oscillators.
-    const real = new Float32Array(33), imaginary = new Float32Array(33);
-    for (let harmonic = 1; harmonic < real.length; harmonic++) {
-      real[harmonic] = 1 / (1 + (harmonic / 5) ** 2);
-      imaginary[harmonic] = -0.35 * real[harmonic];
-    }
-    this.pistonPulse = this.ctx.createOscillator();
-    this.pistonPulse.setPeriodicWave(this.ctx.createPeriodicWave(real, imaginary));
-    this.pistonPulse.frequency.setValueAtTime(24, this.ctx.currentTime);
-    this.pistonFilter = this.ctx.createBiquadFilter();
-    this.pistonFilter.type = 'lowpass';
-    this.pistonFilter.frequency.setValueAtTime(1800, this.ctx.currentTime);
-    this.pistonFilter.Q.setValueAtTime(0.7, this.ctx.currentTime);
-    this.pistonGain = this.ctx.createGain();
-    this.pistonGain.gain.setValueAtTime(0, this.ctx.currentTime);
-    this.pistonPulse.connect(this.pistonFilter);
-    this.pistonFilter.connect(this.pistonGain);
-    this.pistonGain.connect(this.engineBus);
-    this.pistonPulse.start();
-
-    // Propeller air noise is amplitude-modulated by blade passage, not pitched
-    // up into a turbine whine. Reuse the existing noise buffer, without a download.
-    this.propNoise = this.ctx.createBufferSource();
-    this.propNoise.buffer = this.engineNoiseBuffer;
-    this.propNoise.loop = true;
-    this.propFilter = this.ctx.createBiquadFilter();
-    this.propFilter.type = 'bandpass';
-    this.propFilter.frequency.setValueAtTime(550, this.ctx.currentTime);
-    this.propFilter.Q.setValueAtTime(0.6, this.ctx.currentTime);
-    this.propGain = this.ctx.createGain();
-    this.propGain.gain.setValueAtTime(0, this.ctx.currentTime);
-    this.propNoise.connect(this.propFilter);
-    this.propFilter.connect(this.propGain);
-    this.propGain.connect(this.engineBus);
-    this.propBeat = this.ctx.createOscillator();
-    this.propBeat.type = 'sine';
-    this.propBeat.frequency.setValueAtTime(24, this.ctx.currentTime);
-    this.propModGain = this.ctx.createGain();
-    this.propModGain.gain.setValueAtTime(0, this.ctx.currentTime);
-    this.propBeat.connect(this.propModGain);
-    this.propModGain.connect(this.propGain.gain);
-    this.propBeat.start();
-    this.propNoise.start();
-  }
-
-  updatePiston(state, now) {
-    const sound = pistonSoundState(state.engine1, state.iasKnots || 0, this.profile);
-    const rotor = Math.min(1, sound.rpm / this.profile.maxRpm);
-    this.pistonPulse.frequency.setTargetAtTime(Math.max(1, sound.firingHz), now, 0.06);
-    this.pistonFilter.frequency.setTargetAtTime(1100 + sound.power * 1500, now, 0.08);
-    this.pistonGain.gain.setTargetAtTime(sound.combustion * (0.32 + sound.power * 0.40), now, 0.10);
-    this.propBeat.frequency.setTargetAtTime(Math.max(1, sound.bladeHz), now, 0.06);
-    this.propFilter.frequency.setTargetAtTime(350 + rotor * 700, now, 0.10);
-    const air = rotor * (sound.combustion ? 1 : 0.2);
-    this.propGain.gain.setTargetAtTime(air * (0.08 + sound.power * 0.12), now, 0.10);
-    this.propModGain.gain.setTargetAtTime(air * (0.04 + sound.power * 0.06), now, 0.10);
-  }
-
-  initWindSynth() {
-    // Airflow noise buffer
-    const bufferSize = this.ctx.sampleRate * 2;
-    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.55;
-    }
-
-    this.windNoise = this.ctx.createBufferSource();
-    this.windNoise.buffer = noiseBuffer;
-    this.windNoise.loop = true;
-
-    this.windFilter = this.ctx.createBiquadFilter();
-    this.windFilter.type = 'bandpass';
-    this.windFilter.frequency.setValueAtTime(800, this.ctx.currentTime);
-    this.windFilter.Q.setValueAtTime(1.0, this.ctx.currentTime);
-
-    this.windGain = this.ctx.createGain();
-    this.windGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
-
-    this.windNoise.connect(this.windFilter);
-    this.windFilter.connect(this.windGain);
-    this.windGain.connect(this.cockpitFilter);
-    this.windNoise.start();
-  }
-
-  initGroundSynth() {
-    // Runway rolling rumble noise source
-    const bufferSize = this.ctx.sampleRate * 2;
-    const rumbleBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const rData = rumbleBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      rData[i] = (Math.random() * 2 - 1) * 0.6;
-    }
-
-    this.rumbleNoise = this.ctx.createBufferSource();
-    this.rumbleNoise.buffer = rumbleBuffer;
-    this.rumbleNoise.loop = true;
-
-    this.rumbleFilter = this.ctx.createBiquadFilter();
-    this.rumbleFilter.type = 'lowpass';
-    this.rumbleFilter.frequency.setValueAtTime(260, this.ctx.currentTime);
-    this.rumbleFilter.Q.setValueAtTime(1.5, this.ctx.currentTime);
-
-    this.rumbleGain = this.ctx.createGain();
-    this.rumbleGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
-
-    this.rumbleNoise.connect(this.rumbleFilter);
-    this.rumbleFilter.connect(this.rumbleGain);
-    this.rumbleGain.connect(this.cockpitFilter);
-    this.rumbleNoise.start();
-  }
-
-  initWarningSynth() {
-    this.warningOsc = this.ctx.createOscillator();
-    this.warningOsc.type = 'sawtooth';
-    this.warningOsc.frequency.setValueAtTime(680, this.ctx.currentTime);
-
-    this.warningGain = this.ctx.createGain();
-    this.warningGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
-
-    this.warningOsc.connect(this.warningGain);
-    this.warningGain.connect(this.masterGain);
-    this.warningOsc.start();
-  }
-
-  initGStrainSynth() {
-    // Continuous strained breathing airflow buffer for G-straining maneuvers
-    const bufferSize = this.ctx.sampleRate * 2;
-    const strainBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = strainBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.5;
-    }
-
-    this.gStrainNoise = this.ctx.createBufferSource();
-    this.gStrainNoise.buffer = strainBuffer;
-    this.gStrainNoise.loop = true;
-
-    this.gStrainFilter = this.ctx.createBiquadFilter();
-    this.gStrainFilter.type = 'bandpass';
-    this.gStrainFilter.frequency.setValueAtTime(650, this.ctx.currentTime);
-    this.gStrainFilter.Q.setValueAtTime(1.8, this.ctx.currentTime);
-
-    this.gStrainGain = this.ctx.createGain();
-    this.gStrainGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
-
-    this.gStrainNoise.connect(this.gStrainFilter);
-    this.gStrainFilter.connect(this.gStrainGain);
-    this.gStrainGain.connect(this.cockpitFilter);
-    this.gStrainNoise.start();
-  }
-
-  // Broadband friction/structural transients: no pitched oscillators or
-  // frequency sweeps, which sound like laser chirps rather than wheel contact.
-  playContactNoise(duration, frequency, level, type = 'lowpass') {
-    if (!this.ctx || this.effectiveVolume === 0) return;
-    const now = this.ctx.currentTime;
-    const source = this.ctx.createBufferSource();
-    const buffer = this.ctx.createBuffer(1, Math.ceil(this.ctx.sampleRate * duration), this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    const attack = 0.008;
-    for (let i = 0; i < data.length; i++) {
-      const time = i / this.ctx.sampleRate;
-      const envelope = Math.min(1, time / attack) * Math.exp(-6 * time / duration);
-      data[i] = (Math.random() * 2 - 1) * envelope;
-    }
-    source.buffer = buffer;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = type;
-    filter.frequency.setValueAtTime(frequency, now);
-    filter.Q.setValueAtTime(0.7, now);
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(level, now);
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.cockpitFilter);
-    source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
-    source.start(now);
-    source.stop(now + duration);
-  }
-
-  playTouchdownScreech(groundSpeedKnots = 100) {
-    // Wheel spin-up is a brief dry scrub; at taxi speed it is barely audible.
-    const speed = Math.min(1, Math.max(0, groundSpeedKnots) / 100);
-    if (speed === 0) return;
-    this.playContactNoise(0.12 + 0.08 * speed, 1800, 0.32 * speed, 'bandpass');
-  }
-
-  playTouchdownThump(sinkRate = 1.5) {
-    const severity = Math.min(1, Math.max(0, sinkRate) / 3);
-    if (severity === 0) return;
-    this.playContactNoise(0.28, 180, 1.2 * severity);
-    this.playContactNoise(0.09, 650, 0.35 * severity);
-  }
-
-  playDepartureRadio(stage, profile = 'departure') {
-    this.ensureContextRunning();
-    const radio = profile === 'bangkok' ? this.bangkokRadio : this.departureRadio;
-    return radio.play(stage);
-  }
-
-  // Real GPWS/RADALT pronounceers are English-language devices. Browser speech
-  // synthesis otherwise follows the OS locale, so pin an en voice explicitly.
-  pickSynthVoice(synthesis) {
-    let voices = [];
-    try { voices = synthesis.getVoices() ?? []; } catch (e) { return null; }
-    if (!voices.length) return null;
-    const score = (v) => {
-      const lang = (v.lang || '').toLowerCase().replace('_', '-');
-      if (!lang.startsWith('en')) return -1;
-      const google = (v.name || '').toLowerCase().includes('google');
-      const network = v.localService === false;
-      return ((lang === 'en-us' || lang === 'en-gb') ? 4 : 2) + (google && network ? 2 : 0);
-    };
-    let best = null, bestScore = -1;
-    for (const v of voices) {
-      const s = score(v);
-      if (s > bestScore) { best = v; bestScore = s; }
-    }
-    return bestScore >= 0 ? best : null;
-  }
-
-  playGpwsCallout(text) {
-    if (this.isMuted || this.effectiveVolume === 0 || this.isPiston || this.crashed) return;
-    if ('speechSynthesis' in window) {
-      try {
-        const synthesis = window.speechSynthesis;
-        if (this.synthVoice === undefined) this.synthVoice = this.pickSynthVoice(synthesis);
-        if (!this.synthVoice && synthesis.onvoiceschanged === null) {
-          synthesis.onvoiceschanged = () => { this.synthVoice = undefined; };
-        }
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'en-US';
-        if (this.synthVoice) u.voice = this.synthVoice;
-        // Boeing pronouncer: measured cadence, low flat timbre.
-        u.rate = 0.95;
-        u.pitch = 0.5;
-        u.volume = this.effectiveVolume;
-        synthesis.speak(u);
-      } catch (e) {}
+    if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
+      this.ctx.resume().catch(() => {});
     }
   }
 
   setVolume(vol) {
     this.volume = Math.max(0.0, Math.min(1.0, vol));
-    if (this.volume > 0.0) {
-      this.isMuted = false;
-    }
+    if (this.volume > 0.0) this.isMuted = false;
     if (this.volume === 0) {
-      this.cancelSpeech();
-      this.stopGunFire();
-      this.stopMissileFlight();
-      this.departureRadio.stop();
-      this.bangkokRadio?.stop();
+      this.cancelSpeech(); this.stopGunFire(); this.stopMissileFlight();
+      this.departureRadio.stop(); this.bangkokRadio?.stop();
     }
     this.applyMasterGain();
   }
 
-  /** Scale only engine sounds (0..1); invalid input keeps the current level. */
   setEngineVolume(level) {
     if (!Number.isFinite(level)) return this.engineVolume;
     this.engineVolume = Math.max(0, Math.min(1, level));
@@ -577,758 +122,122 @@ export class FlightAudio {
     return this.engineVolume;
   }
 
-  setMuted(muted) {
-    this.isMuted = !!muted;
+  setMuted(m) {
+    this.isMuted = !!m;
     if (this.isMuted) { this.cancelSpeech(); this.departureRadio.stop(); this.bangkokRadio?.stop(); }
     this.applyMasterGain();
   }
 
-  setRadioPaused(paused) {
-    this.departureRadio.setPaused(paused);
-    this.bangkokRadio?.setPaused(paused);
-  }
+  setRadioPaused(p) { this.departureRadio.setPaused(p); this.bangkokRadio?.setPaused(p); }
+  setPaused(p) { this.isPaused = !!p; if (this.isPaused) this.cancelSpeech(); this.applyMasterGain(); }
 
-  /** Silence the bus while the sim is held off-screen, without touching the user's setting. */
-  setPaused(paused) {
-    this.isPaused = !!paused;
-    if (this.isPaused) this.cancelSpeech();
-    this.applyMasterGain();
-  }
-
-  /**
-   * A replay owns the pose and its recorded state, but it does not step physics. A
-   * parked replay must lose its continuous engine/wind/pack bed so it cannot drone
-   * behind the viewer. Only the ambient bus is silenced: one-shot impacts and
-   * explosions still reach the master bus, because a replay can stage its final
-   * crash or a scrubbed impact on the same frame that parks the playback.
-   */
   setReplayPaused(paused) {
     this.isReplayPaused = !!paused;
     if (this.isReplayPaused) {
-      this.cancelSpeech();
-      this.stopGunFire();
-      this.stopMissileFlight();
-      this.departureRadio.stop();
-      this.bangkokRadio?.stop();
+      this.cancelSpeech(); this.stopGunFire(); this.stopMissileFlight();
+      this.departureRadio.stop(); this.bangkokRadio?.stop();
       this.warningGain?.gain.setValueAtTime(0, this.ctx?.currentTime ?? 0);
     }
-    if (this.ambientBus && this.ctx) {
-      this.ambientBus.gain.setTargetAtTime(this.isReplayPaused ? 0 : 1, this.ctx.currentTime, 0.05);
-    }
+    if (this.ambientBus && this.ctx) this.ambientBus.gain.setTargetAtTime(this.isReplayPaused ? 0 : 1, this.ctx.currentTime, 0.05);
   }
 
   applyMasterGain() {
     if (this.masterGain && this.ctx) {
-      const targetGain = this.effectiveVolume;
-      if (typeof this.masterGain.gain.setTargetAtTime === 'function') {
-        this.masterGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.05);
-      } else {
-        this.masterGain.gain.setValueAtTime(targetGain, this.ctx.currentTime);
-      }
+      const g = this.effectiveVolume;
+      if (typeof this.masterGain.gain.setTargetAtTime === 'function') this.masterGain.gain.setTargetAtTime(g, this.ctx.currentTime, 0.05);
+      else this.masterGain.gain.setValueAtTime(g, this.ctx.currentTime);
     }
   }
 
   cycleVolume() {
-    this.setMuted(!this.isMuted);
-    this.volume = 1.0;
-    this.applyMasterGain();
+    this.setMuted(!this.isMuted); this.volume = 1.0; this.applyMasterGain();
     return this.getVolumeState();
   }
 
   getVolumeState() {
-    if (this.isMuted) {
-      return { muted: true, level: 0, mode: 'muted', text: t('audio.muted'), icon: '🔇' };
-    }
+    if (this.isMuted) return { muted: true, level: 0, mode: 'muted', text: t('audio.muted'), icon: '🔇' };
     return { muted: false, level: 1.0, mode: 'normal', text: t('normal.volume.100'), icon: '🔊' };
   }
 
   update(dt, state, isCockpitCam, cameraDistanceMeters = 0) {
     if (!this.isInitialized || !this.ctx || this.crashed) return;
-
     const now = this.ctx.currentTime;
-    const pilot = state.pilot;
-    const gZ = pilot?.gZ ?? state.gForce ?? 1.0;
-    const consciousness = pilot?.consciousness ?? 1.0;
-    const isGLOC = Boolean(pilot?.isGLOC);
-
-    // Interior vs Exterior camera acoustics: the cockpit keeps a fixed muffled
-    // level; exterior views attenuate volume and treble with camera-to-aircraft distance.
     if (isCockpitCam) {
-      const baseFreq = 2700;
-      // High-G or consciousness loss muffles hearing (low-pass filter down to ~380Hz)
-      const muffleRatio = isGLOC ? 0.14 : Math.max(0.14, Math.min(1.0, consciousness));
-      this.cockpitFilter.frequency.setTargetAtTime(baseFreq * muffleRatio, now, 0.1);
+      const consciousness = state.pilot?.consciousness ?? 1.0;
+      const muffle = state.pilot?.isGLOC ? 0.14 : Math.max(0.14, Math.min(1.0, consciousness));
+      this.cockpitFilter.frequency.setTargetAtTime(2700 * muffle, now, 0.1);
       this.distanceGain.gain.setTargetAtTime(1.0, now, 0.1);
     } else {
       this.cockpitFilter.frequency.setTargetAtTime(exteriorAirCutoff(cameraDistanceMeters), now, 0.1);
       this.distanceGain.gain.setTargetAtTime(exteriorDistanceGain(cameraDistanceMeters), now, 0.1);
     }
 
-    // Pilot G-straining maneuver breathing sound
-    if (this.gStrainGain && this.gStrainFilter) {
-      if (isCockpitCam && !isGLOC && (Math.abs(gZ) > 3.0 || consciousness < 0.9) && consciousness > 0.0) {
-        const cycle = (now % 2.5) / 2.5;
-        const breathShape = cycle < 0.25
-          ? Math.sin(cycle / 0.25 * Math.PI)
-          : 0.35 + 0.35 * Math.sin((cycle - 0.25) / 0.75 * Math.PI);
-        const gExcess = Math.max(0.0, (Math.abs(gZ) - 3.0) / 4.0);
-        const fatigueExcess = Math.max(0.0, (1.0 - consciousness) * 0.7);
-        const severity = Math.max(0.0, Math.min(1.0, gExcess + fatigueExcess));
-        const targetVol = Math.max(0.0, Math.min(0.70, severity * breathShape * 0.65));
-        const targetFreq = 500 + severity * 400 + (cycle < 0.25 ? 300 : 0);
-        this.gStrainGain.gain.setTargetAtTime(targetVol, now, 0.05);
-        this.gStrainFilter.frequency.setTargetAtTime(targetFreq, now, 0.05);
-      } else {
-        this.gStrainGain.gain.setTargetAtTime(0.0, now, 0.08);
-      }
-    }
+    this.warnings?.updateGStrain(state, now, isCockpitCam);
+    if (this.isPiston) this.piston?.update(state, now, this.profile);
+    else this.turbofan?.update(state, now);
+    this.airflow?.update(state, now);
+    this.airframe?.update(state, now);
 
-    if (this.isPiston) {
-      this.updatePiston(state, now);
-    } else {
-      // 1. Turbofan Engines Pitch and Roar based on N1%
-      const n1 = Math.max(20, (state.engine1 ? state.engine1.n1 : 22));
-      const n1Ratio = Math.max(0.0, Math.min(1.0, (n1 - 20) / 80.0)); // 0.0 to 1.0
-
-      // Cutoff: 280 Hz (idle) to 950 Hz (TOGA) -> directly in mobile & earphone sweet spot!
-      const engineFreq = 280 + n1Ratio * 670;
-      // Volume: 0.38 (idle) to 1.15 (TOGA) -> loud, powerful, audible on all Bluetooth gear
-      const engineVol = 0.38 + Math.pow(n1Ratio, 1.3) * 0.77;
-      this.engineFilter.frequency.setTargetAtTime(engineFreq, now, 0.08);
-      this.engineGain.gain.setTargetAtTime(engineVol, now, 0.08);
-
-      // Primary N1 Fan Compressor Whine: 420 Hz to 1800 Hz
-      const turbineFreq = 420 + Math.pow(n1Ratio, 1.2) * 1380;
-      const turbineVol = 0.08 + n1Ratio * 0.22;
-      this.turbineWhine.frequency.setTargetAtTime(turbineFreq, now, 0.08);
-      this.turbineGain.gain.setTargetAtTime(turbineVol, now, 0.08);
-
-      // Secondary N2 Core Whine & Harmonics: 840 Hz to 3200 Hz
-      if (this.turbineWhine2 && this.turbineGain2) {
-        const turbineFreq2 = 840 + Math.pow(n1Ratio, 1.1) * 2360;
-        const turbineVol2 = 0.04 + n1Ratio * 0.12;
-        this.turbineWhine2.frequency.setTargetAtTime(turbineFreq2, now, 0.08);
-        this.turbineGain2.gain.setTargetAtTime(turbineVol2, now, 0.08);
-      }
-    }
-
-    // 2. Wind Slipstream Noise proportional to IAS
-    const ias = state.iasKnots || 0;
-    const windVol = Math.min(0.75, Math.pow(ias / 270.0, 1.5) * 0.70);
-    const windCutoff = 450 + Math.min(3200, ias * 9.5);
-    this.windGain.gain.setTargetAtTime(windVol, now, 0.1);
-    this.windFilter.frequency.setTargetAtTime(windCutoff, now, 0.1);
-
-    // 3. Ground Roll Rumble (Active when wheels on ground and aircraft moving)
-    if (this.rumbleGain && this.rumbleFilter) {
-      const gndSpeed = state.groundSpeedKnots !== undefined ? state.groundSpeedKnots : (state.onGround ? (state.iasKnots || 0) : 0);
-      if (state.onGround && gndSpeed > 3) {
-        const roughness = state.groundRoughness || 0; // soft-ground engagement 0..1
-        const rumbleVol = Math.min(0.60, (gndSpeed / 110.0) * 0.55 * (1 + 0.5 * roughness));
-        const rumbleCutoff = 180 + Math.min(260, gndSpeed * 1.8 + roughness * 200);
-        this.rumbleGain.gain.setTargetAtTime(rumbleVol, now, 0.08);
-        this.rumbleFilter.frequency.setTargetAtTime(rumbleCutoff, now, 0.08);
-      } else {
-        this.rumbleGain.gain.setTargetAtTime(0.0, now, 0.08);
-      }
-    }
-
-    // Coalesce near-simultaneous gear contacts and contact chatter, while
-    // allowing a later genuine bounce to produce another impact.
     if (state.touchdown && !this.touchdownActive && now - this.lastTouchdownTime >= 0.25) {
       this.lastTouchdownTime = now;
       this.playTouchdownScreech(state.groundSpeedKnots ?? state.iasKnots ?? 0);
-      const sinkRate = state.touchdownSinkRate ?? Math.abs(state.vsiFpm ?? 0) / 196.85;
-      this.playTouchdownThump(sinkRate);
+      this.playTouchdownThump(state.touchdownSinkRate ?? Math.abs(state.vsiFpm ?? 0) / 196.85);
     }
     this.touchdownActive = !!state.touchdown;
 
-    // 5. Sensor warning is independent of the physical separation diagnostic.
-    const stallWarning = state.isStallWarning ?? (state.isStalled || state.isPreStall);
-    // Existing synthesized timbres approximate the warning devices.
-    if (this.isPiston) {
-      const horn = !state.onGround && stallWarning;
-      this.warningGain.gain.setValueAtTime(horn ? 0.30 : 0, now);
-    } else if (stallWarning && state.isStalled && !state.onGround) {
-      this.stallBeepTime += dt;
-      // Pulsing tone: 4 beeps per second
-      const beepActive = (this.stallBeepTime % 0.25) < 0.14;
-      this.warningGain.gain.setValueAtTime(beepActive ? 0.50 : 0.0, now);
-    } else if (stallWarning && !state.onGround) {
-      this.stallBeepTime += dt;
-      // Shaker activation: rapid low-volume double chirp
-      const chirpActive = (this.stallBeepTime % 0.3) < 0.05 || ((this.stallBeepTime % 0.3) > 0.09 && (this.stallBeepTime % 0.3) < 0.14);
-      this.warningGain.gain.setValueAtTime(chirpActive ? 0.18 : 0.0, now);
-    } else {
-      this.stallBeepTime = 0;
-      this.warningGain.gain.setValueAtTime(0.0, now);
-    }
-
-    const alert = state.warnings?.[0];
-    this.alertTimer += dt;
-    this.alertElapsed += dt;
-    if (alert?.id !== this.alertId) {
-      if (this.alertId || alert) this.cancelSpeech();
-      this.alertId = alert?.id;
-      this.alertTimer = 99;
-      this.alertElapsed = 0;
-    }
-    if (alert?.voice && this.alertTimer >= 4) {
-      this.cancelSpeech();
-      this.playGpwsCallout(alert.voice);
-      this.alertTimer = 0;
-    }
-    if ((alert?.id === 'overspeed' || alert?.id === 'takeoff-config') && !this.isPiston) {
-      this.warningOsc.frequency.setValueAtTime(800, now);
-      this.warningGain.gain.setValueAtTime((this.alertElapsed % 0.16) < 0.08 ? 0.35 : 0, now);
-    } else if (alert?.id === 'engine' && this.aircraftId === 'B738' && this.alertElapsed < 0.18) {
-      this.warningOsc.frequency.setValueAtTime(1000, now);
-      this.warningGain.gain.setValueAtTime(0.25, now);
-    } else this.warningOsc.frequency.setValueAtTime(680, now);
-
-    // 6. Boeing GPWS Altitude Voice Callouts
-    const callout = nextGpwsCallout(this, state, this.aircraftId, Boolean(alert));
-    if (callout) this.playGpwsCallout(callout.text);
-
-    // 7. RWR three-stage warning: search ping, lock beep, launch siren.
-    this.updateThreatAlert(dt, state.rwrLevel || 0);
+    const alert = this.warnings?.updateWarnings(dt, state, now, this.isPiston, this.aircraftId, v => {
+      this.cancelSpeech(); if (v) this.playGpwsCallout(v);
+    });
+    this.gpws.update(state, alert);
+    this.warnings?.updateThreatAlert(dt, state.rwrLevel || 0, this.isMuted, this.volume);
   }
 
-  /** Cadence and timbre encode the RWR stage without a separate audio graph. */
-  updateThreatAlert(dt, level) {
-    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
-    if (level !== this.threatLevel) {
-      this.threatLevel = level;
-      this.threatTimer = 0;
-    }
-    if (!level) return;
-    this.threatTimer -= dt;
-    if (this.threatTimer > 0) return;
-    this.playRwrTone(level);
-    this.threatTimer = level === 3 ? 0.18 : level === 2 ? 0.32 : 1.15;
+  playDepartureRadio(stage, profile = 'departure') {
+    this.ensureContextRunning();
+    return (profile === 'bangkok' ? this.bangkokRadio : this.departureRadio).play(stage);
   }
 
-  playRwrTone(level) {
-    if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
-    const launch = level === 3;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = launch ? 'sawtooth' : 'square';
-    if (level === 1) osc.frequency.setValueAtTime(820, now);
-    else if (level === 2) osc.frequency.setValueAtTime(1320, now);
-    else {
-      this.threatToneFlip = !this.threatToneFlip;
-      osc.frequency.setValueAtTime(this.threatToneFlip ? 1040 : 720, now);
-    }
-    const peak = level === 3 ? 0.12 : level === 2 ? 0.07 : 0.035;
-    const duration = launch ? 0.12 : 0.075;
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(peak, now + 0.008);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    osc.connect(gain);
-    gain.connect(this.masterGain);
-    osc.start(now);
-    osc.stop(now + duration + 0.02);
+  playContactNoise(d, f, l, t = 'lowpass') {
+    if (this.ctx && this.effectiveVolume !== 0) AirframeSoundEffects.playContactNoise(this.ctx, this.cockpitFilter, d, f, l, t);
+  }
+  playTouchdownScreech(spd = 100) {
+    const s = Math.min(1, Math.max(0, spd) / 100);
+    if (s > 0) this.playContactNoise(0.12 + 0.08 * s, 1800, 0.32 * s, 'bandpass');
+  }
+  playTouchdownThump(snk = 1.5) {
+    const s = Math.min(1, Math.max(0, snk) / 3);
+    if (s > 0) { this.playContactNoise(0.28, 180, 1.2 * s); this.playContactNoise(0.09, 650, 0.35 * s); }
   }
 
-  /** Two-tone lock confirmation, distinct from the repeating RWR cadence. */
-  playLockTone() {
-    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
-    const now = this.ctx.currentTime;
-    for (const [offset, frequency] of [[0, 980], [0.085, 1460]]) {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(frequency, now + offset);
-      gain.gain.setValueAtTime(0.0001, now + offset);
-      gain.gain.exponentialRampToValueAtTime(0.055, now + offset + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.08);
-      osc.connect(gain);
-      gain.connect(this.masterGain);
-      osc.start(now + offset);
-      osc.stop(now + offset + 0.1);
-    }
-  }
-
-  /**
-   * M61A1 burst: a looping 100 Hz noise pulse shaped by a band-pass filter.
-   * Starting once per trigger avoids scheduling 100 one-shot nodes per second.
-   */
-  startGunFire() {
-    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
-    if (this.gunFireNodes) return;
-    const now = this.ctx.currentTime;
-    const rate = this.ctx.sampleRate;
-    const period = Math.max(1, Math.round(rate / 100));
-    const length = Math.max(period * 10, Math.floor(rate * 0.1));
-    const buffer = this.ctx.createBuffer(1, length, rate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < length; i++) {
-      const phase = i % period;
-      const envelope = phase < period * 0.3 ? 1 - phase / (period * 0.3) : 0.12;
-      data[i] = (Math.random() * 2 - 1) * envelope;
-    }
-    const source = this.ctx.createBufferSource();
-    source.buffer = buffer;
-    source.loop = true;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(760, now);
-    filter.Q.value = 0.9;
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.14, now + 0.03);
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterGain);
-    source.start(now);
-    this.gunFireNodes = { source, gain };
-  }
-
-  stopGunFire() {
-    const nodes = this.gunFireNodes;
-    if (!nodes) return;
-    this.gunFireNodes = null;
-    if (!this.ctx) return;
-    const now = this.ctx.currentTime;
-    try {
-      nodes.gain.gain.cancelScheduledValues(now);
-      nodes.gain.gain.setValueAtTime(nodes.gain.gain.value, now);
-      nodes.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
-      nodes.source.stop(now + 0.09);
-    } catch (error) {
-      void error;
-    }
-  }
-
-  /**
-   * Shared white-noise source. One-shots allocate their filters and gain stages
-   * per event, so the sample buffer must be built once per audio context.
-   */
-  whiteNoiseSource() {
-    if (!this._whiteNoise || this._whiteNoiseContext !== this.ctx) {
-      const rate = this.ctx.sampleRate;
-      const buffer = this.ctx.createBuffer(1, rate * 2, rate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      this._whiteNoise = buffer;
-      this._whiteNoiseContext = this.ctx;
-    }
-    const source = this.ctx.createBufferSource();
-    source.buffer = this._whiteNoise;
-    return source;
-  }
-
-  /** Distance falloff for one-shot effects; `distance` is camera-to-source metres. */
-  effectAttenuation(distance, referenceM) {
-    const safeDistance = Math.max(0, Number.isFinite(distance) ? distance : 0);
-    return Math.min(1.0, Math.max(0.04, 1 / (1 + safeDistance / referenceM)));
-  }
-
-  /**
-   * Sidechain duck of the continuous engine/wind/pack bed so a close combat
-   * transient is not buried under a near-full-scale ambient mix. Warnings,
-   * radio and other one-shots stay outside this bus. `depth` is the gain the
-   * bed falls to; it recovers to unity after `holdSeconds`.
-   */
-  duckAmbient(depth = 0.3, holdSeconds = 0.4) {
-    if (!this.ambientBus || !this.ctx || this.isReplayPaused) return;
-    const now = this.ctx.currentTime;
-    const gain = this.ambientBus.gain;
-    gain.cancelScheduledValues?.(now);
-    gain.setValueAtTime(gain.value ?? 1, now);
-    gain.linearRampToValueAtTime(Math.max(0.05, Math.min(1, depth)), now + 0.02);
-    gain.setTargetAtTime(1, now + holdSeconds, 0.2);
-  }
-
-  /**
-   * Solid-rocket ignition: a highpass report over a broadband whoosh and a low
-   * pressure thump. The crack and the roar share one noise source.
-   */
-  playMissileLaunch(distance = 0) {
-    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
-    const now = this.ctx.currentTime;
-    const attenuation = this.effectAttenuation(distance, 400);
-    const duration = 1.6;
-    // A nearby launch momentarily dominates the aircraft's own ambient bed; a
-    // distant one must not duck it.
-    this.duckAmbient(1 - 0.7 * attenuation, 0.45);
-    const noise = this.whiteNoiseSource();
-
-    const crack = this.ctx.createBiquadFilter();
-    crack.type = 'highpass';
-    crack.frequency.setValueAtTime(1800, now);
-    const crackGain = this.ctx.createGain();
-    crackGain.gain.setValueAtTime(2.0 * attenuation, now);
-    crackGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
-    noise.connect(crack);
-    crack.connect(crackGain);
-    crackGain.connect(this.masterGain);
-
-    const roar = this.ctx.createBiquadFilter();
-    roar.type = 'bandpass';
-    roar.Q.setValueAtTime(0.7, now);
-    roar.frequency.setValueAtTime(240, now);
-    roar.frequency.exponentialRampToValueAtTime(2600, now + 0.3);
-    roar.frequency.exponentialRampToValueAtTime(380, now + duration);
-    const roarGain = this.ctx.createGain();
-    roarGain.gain.setValueAtTime(2.2 * attenuation, now);
-    roarGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-    noise.connect(roar);
-    roar.connect(roarGain);
-    roarGain.connect(this.masterGain);
-    noise.start(now);
-    noise.stop(now + duration);
-
-    const thump = this.ctx.createOscillator();
-    const thumpGain = this.ctx.createGain();
-    thump.type = 'sine';
-    thump.frequency.setValueAtTime(120, now);
-    thump.frequency.exponentialRampToValueAtTime(34, now + 0.6);
-    thumpGain.gain.setValueAtTime(1.7 * attenuation, now);
-    thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
-    thump.connect(thumpGain);
-    thumpGain.connect(this.masterGain);
-    thump.start(now);
-    thump.stop(now + 0.7);
-  }
-
-  /** Pyrotechnic flare ejection: a bright report over a short burning hiss. */
-  playFlareDispense(distance = 0) {
-    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
-    const now = this.ctx.currentTime;
-    const attenuation = this.effectAttenuation(distance, 500);
-    const duration = 0.9;
-    const noise = this.whiteNoiseSource();
-
-    const crack = this.ctx.createBiquadFilter();
-    crack.type = 'bandpass';
-    crack.Q.setValueAtTime(0.9, now);
-    crack.frequency.setValueAtTime(3200, now);
-    crack.frequency.exponentialRampToValueAtTime(900, now + 0.35);
-    const crackGain = this.ctx.createGain();
-    crackGain.gain.setValueAtTime(2.0 * attenuation, now);
-    crackGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
-    noise.connect(crack);
-    crack.connect(crackGain);
-    crackGain.connect(this.masterGain);
-
-    // Burning propellant keeps hissing after the ejection charge.
-    const burn = this.ctx.createBiquadFilter();
-    burn.type = 'bandpass';
-    burn.Q.setValueAtTime(0.6, now);
-    burn.frequency.setValueAtTime(1400, now);
-    burn.frequency.exponentialRampToValueAtTime(700, now + duration);
-    const burnGain = this.ctx.createGain();
-    burnGain.gain.setValueAtTime(0.0001, now);
-    burnGain.gain.exponentialRampToValueAtTime(0.7 * attenuation, now + 0.03);
-    burnGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    noise.connect(burn);
-    burn.connect(burnGain);
-    burnGain.connect(this.masterGain);
-    noise.start(now);
-    noise.stop(now + duration);
-
-    const thump = this.ctx.createOscillator();
-    const thumpGain = this.ctx.createGain();
-    thump.type = 'sine';
-    thump.frequency.setValueAtTime(180, now);
-    thump.frequency.exponentialRampToValueAtTime(60, now + 0.18);
-    thumpGain.gain.setValueAtTime(1.5 * attenuation, now);
-    thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
-    thump.connect(thumpGain);
-    thumpGain.connect(this.masterGain);
-    thump.start(now);
-    thump.stop(now + 0.22);
-  }
-
-  /** Chaff ejection: a dull pneumatic thump and a short metallic flutter. */
-  playChaffDispense(distance = 0) {
-    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0) return;
-    const now = this.ctx.currentTime;
-    const attenuation = this.effectAttenuation(distance, 500);
-    const duration = 0.28;
-    const noise = this.whiteNoiseSource();
-
-    const puff = this.ctx.createBiquadFilter();
-    puff.type = 'lowpass';
-    puff.frequency.setValueAtTime(1800, now);
-    puff.frequency.exponentialRampToValueAtTime(420, now + duration);
-    const puffGain = this.ctx.createGain();
-    puffGain.gain.setValueAtTime(1.2 * attenuation, now);
-    puffGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    noise.connect(puff);
-    puff.connect(puffGain);
-    puffGain.connect(this.masterGain);
-    noise.start(now);
-    noise.stop(now + duration);
-
-    const thump = this.ctx.createOscillator();
-    const thumpGain = this.ctx.createGain();
-    thump.type = 'sine';
-    thump.frequency.setValueAtTime(95, now);
-    thump.frequency.exponentialRampToValueAtTime(45, now + 0.14);
-    thumpGain.gain.setValueAtTime(1.2 * attenuation, now);
-    thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-    thump.connect(thumpGain);
-    thumpGain.connect(this.masterGain);
-    thump.start(now);
-    thump.stop(now + 0.18);
-  }
-
-  /**
-   * Continuous missile rocket-motor roar and aerodynamic whoosh, driven by the
-   * nearest airborne round's distance to the active camera.
-   */
-  syncMissileFlight(missiles, cameraPosition = null) {
-    if (!this.isInitialized || !this.ctx || this.isMuted || this.volume === 0 || !Array.isArray(missiles)) {
-      this.stopMissileFlight();
-      return;
-    }
-    let nearest = null;
-    let nearestDist = Infinity;
-    for (const missile of missiles) {
-      if (!missile?.alive || !missile.position) continue;
-      const dist = cameraPosition?.distanceTo ? cameraPosition.distanceTo(missile.position) : 0;
-      if (dist < nearestDist) {
-        nearest = missile;
-        nearestDist = dist;
-      }
-    }
-    if (!nearest || nearestDist > 2500) {
-      this.stopMissileFlight();
-      return;
-    }
-
-    const powered = (nearest.propellant ?? 0) > 0;
-    const attenuation = 1 / (1 + Math.pow(nearestDist / 220, 1.6));
-    const targetGain = (powered ? 0.16 : 0.065) * attenuation;
-    if (targetGain < 0.002) {
-      this.stopMissileFlight();
-      return;
-    }
-
-    const now = this.ctx.currentTime;
-    if (!this.missileFlightNodes) {
-      const rate = this.ctx.sampleRate;
-      const buffer = this.ctx.createBuffer(1, rate, rate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      const source = this.ctx.createBufferSource();
-      source.buffer = buffer;
-      source.loop = true;
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, now);
-      source.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.masterGain);
-      source.start(now);
-      this.missileFlightNodes = { source, filter, gain };
-    }
-
-    const proximity = Math.max(0, 1 - nearestDist / 1600);
-    const cutoff = (powered ? 550 : 340) + proximity * (powered ? 750 : 500);
-    this.missileFlightNodes.filter.Q.setTargetAtTime(powered ? 0.7 : 1.15, now, 0.05);
-    this.missileFlightNodes.filter.frequency.setTargetAtTime(cutoff, now, 0.05);
-    this.missileFlightNodes.gain.gain.setTargetAtTime(targetGain, now, 0.05);
-  }
-
-  stopMissileFlight() {
-    const nodes = this.missileFlightNodes;
-    if (!nodes) return;
-    this.missileFlightNodes = null;
-    if (!this.ctx) return;
-    const now = this.ctx.currentTime;
-    try {
-      nodes.gain.gain.cancelScheduledValues(now);
-      nodes.gain.gain.setValueAtTime(nodes.gain.gain.value, now);
-      nodes.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
-      nodes.source.stop(now + 0.1);
-    } catch (error) {
-      void error;
-    }
-  }
-
-  playExplosion(isWater = false) {
-    this.crashed = true;
-    this.cancelSpeech();
-    this.departureRadio.stop();
-    this.bangkokRadio?.stop();
+  silenceOnCrash() {
+    this.crashed = true; this.cancelSpeech(); this.departureRadio.stop(); this.bangkokRadio?.stop();
     if (this.ctx) {
-      for (const name of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'windGain', 'rumbleGain', 'packGain', 'warningGain', 'gStrainGain']) {
-        this[name]?.gain.setValueAtTime(0, this.ctx.currentTime);
-      }
-    }
-    if (!this.isInitialized || !this.ctx || this.isMuted) return;
-    const now = this.ctx.currentTime;
-
-    // 1. Deep Low-Frequency Subwoofer Detonation Thump
-    const bufferSize = Math.floor(this.ctx.sampleRate * 3.5);
-    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.7));
-    }
-
-    const noiseSrc = this.ctx.createBufferSource();
-    noiseSrc.buffer = noiseBuffer;
-
-    const bassFilter = this.ctx.createBiquadFilter();
-    bassFilter.type = 'lowpass';
-    bassFilter.frequency.setValueAtTime(isWater ? 180 : 320, now);
-    bassFilter.frequency.exponentialRampToValueAtTime(32, now + 2.8);
-
-    const bassGain = this.ctx.createGain();
-    bassGain.gain.setValueAtTime(1.4, now);
-    bassGain.gain.exponentialRampToValueAtTime(0.001, now + 3.2);
-
-    noiseSrc.connect(bassFilter);
-    bassFilter.connect(bassGain);
-    bassGain.connect(this.masterGain);
-    noiseSrc.start(now);
-
-    // 2. High-Frequency Metal Crunch / Debris Shatter (or Water Rush)
-    const crunchBuffer = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 1.5), this.ctx.sampleRate);
-    const cData = crunchBuffer.getChannelData(0);
-    for (let i = 0; i < cData.length; i++) {
-      cData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.3));
-    }
-
-    const crunchSrc = this.ctx.createBufferSource();
-    crunchSrc.buffer = crunchBuffer;
-
-    const crunchFilter = this.ctx.createBiquadFilter();
-    crunchFilter.type = isWater ? 'bandpass' : 'highpass';
-    crunchFilter.frequency.setValueAtTime(isWater ? 600 : 2200, now);
-    crunchFilter.frequency.exponentialRampToValueAtTime(isWater ? 180 : 350, now + 1.2);
-
-    const crunchGain = this.ctx.createGain();
-    crunchGain.gain.setValueAtTime(isWater ? 1.0 : 0.85, now);
-    crunchGain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
-
-    crunchSrc.connect(crunchFilter);
-    crunchFilter.connect(crunchGain);
-    crunchGain.connect(this.masterGain);
-    crunchSrc.start(now);
-  }
-
-  playRemoteExplosion(distance = 0, isWater = false) {
-    if (!this.isInitialized || !this.ctx || this.isMuted) return;
-    const now = this.ctx.currentTime;
-    const safeDistance = Math.max(0, Number.isFinite(distance) ? distance : 0);
-    const volume = Math.min(1.0, Math.max(0.02, 1 / (1 + safeDistance / 1500)));
-
-    // 1. Distance-muffled low-frequency rumble
-    const bufferSize = Math.floor(this.ctx.sampleRate * 2.5);
-    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.6));
-    }
-
-    const noiseSrc = this.ctx.createBufferSource();
-    noiseSrc.buffer = noiseBuffer;
-
-    const bassFilter = this.ctx.createBiquadFilter();
-    bassFilter.type = 'lowpass';
-    const cutoff = Math.max(50, (isWater ? 180 : 300) - (safeDistance / 4000) * 140);
-    bassFilter.frequency.setValueAtTime(cutoff, now);
-    bassFilter.frequency.exponentialRampToValueAtTime(26, now + 2.0);
-
-    const bassGain = this.ctx.createGain();
-    bassGain.gain.setValueAtTime(1.2 * volume, now);
-    bassGain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
-
-    noiseSrc.connect(bassFilter);
-    bassFilter.connect(bassGain);
-    bassGain.connect(this.masterGain);
-    noiseSrc.start(now);
-
-    // 2. Close-range crack and debris. Air absorption removes high frequencies
-    // first, so a 250 m bandit kill must not use the same dull rumble as a
-    // multi-kilometre replay impact. Fade the crack out with distance.
-    const proximity = Math.max(0, 1 - safeDistance / 4000);
-    if (proximity > 0.01) {
-      const crackSize = Math.floor(this.ctx.sampleRate * 0.6);
-      const crackBuffer = this.ctx.createBuffer(1, crackSize, this.ctx.sampleRate);
-      const crackData = crackBuffer.getChannelData(0);
-      for (let i = 0; i < crackSize; i++) {
-        crackData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.12));
-      }
-      const crackSrc = this.ctx.createBufferSource();
-      crackSrc.buffer = crackBuffer;
-      const crackFilter = this.ctx.createBiquadFilter();
-      crackFilter.type = 'highpass';
-      crackFilter.frequency.setValueAtTime(isWater ? 1000 : 2200, now);
-      crackFilter.frequency.exponentialRampToValueAtTime(isWater ? 220 : 400, now + 0.55);
-      const crackGain = this.ctx.createGain();
-      crackGain.gain.setValueAtTime((isWater ? 0.55 : 0.9) * volume * proximity, now);
-      crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-      crackSrc.connect(crackFilter);
-      crackFilter.connect(crackGain);
-      crackGain.connect(this.masterGain);
-      crackSrc.start(now);
+      for (const n of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'windGain', 'rumbleGain', 'packGain', 'warningGain', 'gStrainGain']) this[n]?.gain.setValueAtTime(0, this.ctx.currentTime);
     }
   }
 
+  playExplosion(w = false) {
+    this.silenceOnCrash();
+    this.combat?.playExplosion(w, this.isMuted);
+  }
+
+  playRwrTone(lvl) { this.warnings?.playRwrTone(lvl); }
+  playLockTone() { this.warnings?.playLockTone(this.isMuted, this.volume); }
+  updateThreatAlert(dt, lvl) { this.warnings?.updateThreatAlert(dt, lvl, this.isMuted, this.volume); }
+  startGunFire() { this.combat?.startGunFire(this.isMuted, this.volume); }
+  stopGunFire() { this.combat?.stopGunFire(); }
+  playMissileLaunch(d = 0) { this.combat?.playMissileLaunch(d, this.isMuted, this.volume); }
+  playFlareDispense(d = 0) { this.combat?.playFlareDispense(d, this.isMuted, this.volume); }
+  playChaffDispense(d = 0) { this.combat?.playChaffDispense(d, this.isMuted, this.volume); }
+  syncMissileFlight(m, c = null) { this.combat?.syncMissileFlight(m, c, this.isMuted, this.volume); }
+  stopMissileFlight() { this.combat?.stopMissileFlight(); }
+  playRemoteExplosion(d = 0, w = false) { this.combat?.playRemoteExplosion(d, w, this.isMuted); }
   playWaterSplash() {
     this.cancelSpeech();
-    if (!this.ctx || this.isMuted) return;
-    const now = this.ctx.currentTime;
-
-    // Fade out engine noise smoothly on water contact
-    if (this.engineGain) this.engineGain.gain.setTargetAtTime(0, now, 0.4);
-    if (this.windGain) this.windGain.gain.setTargetAtTime(0.05, now, 0.8);
-
-    // Deep water displacement thump
-    const bufferSize = Math.floor(this.ctx.sampleRate * 2.5);
-    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.9));
-    }
-
-    const noiseSrc = this.ctx.createBufferSource();
-    noiseSrc.buffer = noiseBuffer;
-
-    const splashFilter = this.ctx.createBiquadFilter();
-    splashFilter.type = 'lowpass';
-    splashFilter.frequency.setValueAtTime(380, now);
-    splashFilter.frequency.exponentialRampToValueAtTime(80, now + 2.2);
-
-    const splashGain = this.ctx.createGain();
-    splashGain.gain.setValueAtTime(0.9, now);
-    splashGain.gain.exponentialRampToValueAtTime(0.001, now + 2.4);
-
-    noiseSrc.connect(splashFilter);
-    splashFilter.connect(splashGain);
-    splashGain.connect(this.masterGain);
-    noiseSrc.start(now);
-
-    // Continuous water wash / planing rush
-    const washBuffer = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 3.0), this.ctx.sampleRate);
-    const wData = washBuffer.getChannelData(0);
-    for (let i = 0; i < wData.length; i++) {
-      wData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 1.5));
-    }
-    const washSrc = this.ctx.createBufferSource();
-    washSrc.buffer = washBuffer;
-
-    const washFilter = this.ctx.createBiquadFilter();
-    washFilter.type = 'bandpass';
-    washFilter.frequency.setValueAtTime(550, now);
-    washFilter.frequency.exponentialRampToValueAtTime(220, now + 2.8);
-
-    const washGain = this.ctx.createGain();
-    washGain.gain.setValueAtTime(0.65, now);
-    washGain.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
-
-    washSrc.connect(washFilter);
-    washFilter.connect(washGain);
-    washGain.connect(this.masterGain);
-    washSrc.start(now);
+    this.combat?.playWaterSplash(this.isMuted, () => {
+      this.engineGain?.gain.setTargetAtTime(0, this.ctx?.currentTime ?? 0, 0.4);
+      this.windGain?.gain.setTargetAtTime(0.05, this.ctx?.currentTime ?? 0, 0.8);
+    });
   }
+  duckAmbient(d = 0.3, h = 0.4) { this.combat?.duckAmbient(d, h); }
 }
