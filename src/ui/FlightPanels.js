@@ -307,6 +307,11 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     const stackCameraStrip = visibleCameras > 0
       && (maxToolbarWidth - fixedWidth) < buttonWidth * Math.min(3, visibleCameras);
     bar.classList.toggle('camera-strip-stacked', stackCameraStrip);
+    // 320px-class rows cannot hold the five aircraft controls, overflow and
+    // fullscreen (7 x 44px) either. Fullscreen then closes the second row instead
+    // of wrapping onto a third one or pushing the gear out of a scrolled row.
+    const fullscreenShown = getComputedStyle(fullscreen).display !== 'none';
+    bar.classList.toggle('fullscreen-wrapped', fullscreenShown && fixedWidth > maxToolbarWidth + 0.5);
     // The folded compact notice narrows this row. Keep takeover visible there;
     // elsewhere pin the camera/fullscreen/overflow end to the right edge.
     const foldedCompactDemo = document.body.classList.contains('demo-active')

@@ -670,6 +670,25 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   border-left: 0;
   border-top: 1px solid #334155;
 }
+/* When even the fixed buttons overflow one row, fullscreen moves to the end of
+   the second row (beside the camera strip, or alone when no camera is shown). */
+.flight-toolbar.fullscreen-wrapped,
+.compact-ui .flight-toolbar.fullscreen-wrapped,
+.compact-ui.touch-mode .flight-toolbar.fullscreen-wrapped {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* The strip draws its divider inside its own box; a 1px offset plus a shadow in
+   that gap keeps fullscreen level with the camera buttons under the same line. */
+.flight-toolbar.fullscreen-wrapped #btn-fullscreen {
+  order: 11;
+  margin-top: 1px;
+  box-shadow: 0 -1px 0 #334155;
+}
+.flight-toolbar.fullscreen-wrapped.camera-strip-stacked .flight-camera-strip {
+  flex: 1 0 calc(100% - (44px * var(--ui-scale, 1)));
+  width: auto;
+}
 
 /* Even the three core readouts need the full row on 320px-class screens. */
 @media (max-width: 360px) and (orientation: portrait) {

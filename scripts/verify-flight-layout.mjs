@@ -100,7 +100,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
           return { sel: `#${n.id}`, ...box(n), center: `${cs.display}/${cs.alignItems}/${cs.justifyContent}`,
             hit: n.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)) };
         });
-        return { chrome, buttons, stacked: bar.classList.contains('camera-strip-stacked'),
+        return { chrome, buttons, strip: box(document.getElementById('camera-strip')), stacked: bar.classList.contains('camera-strip-stacked'),
           pinned: Math.ceil(bar.scrollLeft + bar.clientWidth) >= bar.scrollWidth,
           fits: bar.scrollWidth <= bar.clientWidth + 1 };
       });
@@ -122,7 +122,13 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       const row = layout.chrome.find(r => r.sel === '.flight-toolbar');
       assert.ok(width - (row.x + row.w) <= 16, `toolbar hugs the right edge: ${JSON.stringify(row)}`);
       if (baseline) assert.deepEqual(bounds, baseline, `stable controls across camera ${mode}`);
-      const targets = bounds.filter(r => r.sel !== '.flight-toolbar');
+      // Camera buttons scrolled past the strip's edge are clipped by it, so only
+      // their visible part can overlap a neighbour such as a wrapped fullscreen.
+      const targets = bounds.filter(r => r.sel !== '.flight-toolbar').map(r => {
+        if (!r.sel.startsWith('#btn-cam-')) return r;
+        const x = Math.max(r.x, layout.strip.x), right = Math.min(r.x + r.w, layout.strip.x + layout.strip.w);
+        return { ...r, x, w: Math.max(0, right - x) };
+      }).filter(r => r.w > 0);
       for (let i = 0; i < targets.length; i++) for (let j = i + 1; j < targets.length; j++) {
         const a = targets[i], b = targets[j];
         assert.ok(a.x + a.w <= b.x + .5 || b.x + b.w <= a.x + .5 || a.y + a.h <= b.y + .5 || b.y + b.h <= a.y + .5, `${a.sel} overlaps ${b.sel}`);
@@ -152,6 +158,24 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     assert.ok(pov.panel.h > 0 && pov.panel.top >= pov.toolbarBottom + 4, `cockpit POV panel clears the control rows: ${JSON.stringify(pov)}`);
     assert.ok(pov.panel.top > pov.height * .35 && pov.panel.bottom >= pov.height - 40,
       `cockpit POV panel stays in the lower console band, out of the forward sight: ${JSON.stringify(pov)}`);
+    if (touch) {
+      // With live controls (no demo guide) even a warning row keeps the pill
+      // above every touch card beneath it. During the demo the guide can push it
+      // over those cards, but they are inert then and the guide leaves on takeover.
+      await evaluate(() => { const s = window.simulator; s.telemetry.warnings = [{ text: 'BANK ANGLE', priority: 50 }]; s.updateHUD(); });
+      await delay(350);
+      const live = await evaluate(() => {
+        const p = document.getElementById('btn-cockpit-pov').getBoundingClientRect();
+        const cards = [...document.querySelectorAll('.touch-throttle-card, .touch-rudder-card, #touch-btn-brake, .touch-stick-card')]
+          .map(n => n.getBoundingClientRect()).filter(r => r.height && r.left < p.right && r.right > p.left);
+        return { pillTop: p.top, pillBottom: p.bottom, warningBottom: document.getElementById('hud-warning').getBoundingClientRect().bottom,
+          cardsTop: Math.min(...cards.map(r => r.top)) };
+      });
+      await evaluate(() => { const s = window.simulator; s.telemetry.warnings = []; s.updateHUD(); });
+      await delay(350);
+      assert.ok(live.pillTop >= live.warningBottom + 4, `cockpit POV pill clears the warning: ${JSON.stringify(live)}`);
+      assert.ok(live.pillBottom + 4 <= live.cardsTop, `cockpit POV pill clears the live touch controls under a warning: ${JSON.stringify(live)}`);
+    }
     await click('#btn-ap-toggle');
     assert.ok(await evaluate('!document.getElementById("ap-panel").hidden'), 'AP opens');
     await click('#btn-ap');
@@ -317,15 +341,19 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     assert.deepEqual(one.ids, [...CONTROLS, 'btn-cam-chase'], `${width}x${height}: one camera follows the controls`);
     // A 320px row holds the six fixed buttons only, so its single camera wraps.
     assert.ok(one.rows === (width >= 390 ? 1 : 2) && one.fits, `${width}x${height}: one camera row count: ${JSON.stringify(one)}`);
+    // Without cameras, fullscreen alone takes the second 320px row rather than
+    // scrolling the gear lever out of the first one.
+    await chooseToolbar(['fullscreen']);
+    const full = await toolbarState();
+    assert.ok(full.rows === (width >= 390 ? 1 : 2) && full.fits && !full.small.length && full.ids.at(-1) === 'btn-fullscreen',
+      `${width}x${height}: fullscreen without cameras: ${JSON.stringify(full)}`);
     await chooseToolbar([...seven.map(name => `cam-${name}`), 'fullscreen']);
     const some = await toolbarState();
     assert.deepEqual(some.ids.filter(id => id.startsWith('btn-cam-')), seven.map(name => `btn-cam-${name}`), 'chosen cameras keep toolbar order');
-    // At 320px the six fixed buttons plus fullscreen exceed one row, as the seven
-    // fixed buttons did before #798, so row and drag expectations start at 390px.
-    if (width >= 390) {
-      assert.equal(some.rows, portrait ? 2 : 1, `${width}x${height}: rows ${JSON.stringify(some)}`);
-      assert.ok(some.fits, `${width}x${height}: seven cameras need no drag: ${JSON.stringify(some)}`);
-    }
+    // At 320px the six fixed buttons plus fullscreen exceed one row, so fullscreen
+    // closes the camera row instead of opening a third; only that strip drags.
+    assert.equal(some.rows, portrait ? 2 : 1, `${width}x${height}: rows ${JSON.stringify(some)}`);
+    if (width >= 390) assert.ok(some.fits, `${width}x${height}: seven cameras need no drag: ${JSON.stringify(some)}`);
     assert.ok(!some.small.length, `minimum targets: ${some.small}`);
     assert.match(some.summary, /8\/11/, 'summary counts the shown items');
     assert.deepEqual(some.saved, ['cam-flyby', 'cam-wing', 'cam-tower'], 'hidden items are saved in toolbar order');
@@ -369,8 +397,13 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
   await click('#menu-toggle');
   assert.equal(await evaluate('window.simulator.gameFlow.state'), 'lobby', 'menu button opens main menu directly');
   assert.ok(await evaluate('!document.getElementById("btn-lobby-resume").hidden'), 'main menu offers resume');
+  // The menu button is a one-click toggle (1b46d29f): from the main menu it resumes
+  // the held sortie rather than starting a new one.
   await evaluate(() => document.getElementById('menu-toggle').click());
-  assert.equal(await evaluate('window.simulator.gameFlow.state'), 'lobby', 'repeated menu press cannot start or resume');
+  assert.equal(await evaluate('window.simulator.gameFlow.state'), 'flight', 'repeated menu press resumes the held flight');
+  assert.deepEqual(await evaluate('window.simulator.position.toArray()'), heldPosition, 'menu toggle resume preserves held position');
+  await click('#menu-toggle');
+  assert.equal(await evaluate('window.simulator.gameFlow.state'), 'lobby', 'menu button reopens main menu');
   await click('#btn-lobby-resume');
   assert.equal(await evaluate('window.simulator.gameFlow.state'), 'flight', 'resume returns to flight');
   assert.deepEqual(await evaluate('window.simulator.position.toArray()'), heldPosition, 'resume preserves held position');
@@ -381,12 +414,15 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     s.lobby.aircraft = s.currentAircraftId;
     s.lobby.preset = 'runway';
     s.lobbyScreen.refresh();
-    const start = s.startFlight;
-    s.startFlight = function () { this.__menuStarts = (this.__menuStarts || 0) + 1; return start.call(this); };
+    const respawn = s.setPreset;
+    s.setPreset = function (...args) { this.__menuStarts = (this.__menuStarts || 0) + 1; return respawn.apply(this, args); };
   });
-  await click('#btn-fly');
-  assert.equal(await evaluate('window.simulator.gameFlow.state'), 'flight', 'start new leaves main menu');
-  assert.equal(await evaluate('window.simulator.__menuStarts'), 1, 'start new explicitly respawns');
+  // With a held sortie the menu replaces "start new" with an explicit restart
+  // (UI state contract, 9596335a).
+  assert.ok(await evaluate('document.getElementById("btn-fly").hidden'), 'held sortie hides start new');
+  await click('#btn-lobby-restart');
+  assert.equal(await evaluate('window.simulator.gameFlow.state'), 'flight', 'restart leaves main menu');
+  assert.equal(await evaluate('window.simulator.__menuStarts'), 1, 'restart explicitly respawns');
   // A saved selection is restored by startup, before any option is touched.
   await chooseToolbar(['cam-chase', 'cam-cockpit']);
   await send('Page.reload');
