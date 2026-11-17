@@ -395,11 +395,12 @@ class SimulatorHudAndBindingsMethods {
       const cockpitQuality = document.getElementById('cockpit-quality');
       if (cockpitQuality) cockpitQuality.value = 'performance';
     }
-    if (this.terrain && this.terrain.getQuality() !== preset.terrain) {
-      this.terrain.setQuality(preset.terrain);
+    if (this.terrain && (this.terrain.getQuality() !== preset.terrain ||
+        this.terrain.segments !== preset.terrainSegments)) {
+      this.terrain.setQuality(preset.terrain, preset.terrainSegments);
     }
     if (this.water?.setQuality) {
-      this.water.setQuality(this.renderQuality);
+      this.water.setQuality(this.renderQuality, preset.waterSegments);
     }
     if (this.foliage?.setQuality) {
       this.foliage.setQuality(this.renderQuality);

@@ -158,7 +158,7 @@ export class Terrain {
     return finalHeight;
   }
 
-  setQuality(quality) {
+  setQuality(quality, segments) {
     if (quality !== 'high' && quality !== 'low' && quality !== 'ultraLow') {
       throw new Error(`Invalid quality preset: ${quality}. Expected 'high', 'low', or 'ultraLow'.`);
     }
@@ -172,7 +172,10 @@ export class Terrain {
     if (this.mesh) {
       this.mesh.receiveShadow = quality !== 'ultraLow';
     }
-    const targetSegments = quality === 'ultraLow' ? 64 : 256;
+    // The render-quality preset owns mesh density; callers that switch only the
+    // shader tier keep the historical default.
+    const targetSegments = Number.isInteger(segments) && segments > 0
+      ? segments : (quality === 'ultraLow' ? 64 : 256);
     if (this.segments !== targetSegments) {
       this.rebuildGeometry(targetSegments);
     }
