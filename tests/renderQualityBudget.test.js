@@ -36,6 +36,21 @@ test('resize and quality transitions restore clarity within each budget', () => 
   assert.equal(renderPixelRatio('performance', 390, 844, 3), 1);
 });
 
+test('lower tiers reduce real geometry and framebuffer work', () => {
+  const tiers = ['high', 'balanced', 'performance', 'ultraLow'];
+  for (let i = 1; i < tiers.length; i++) {
+    const previous = RENDER_QUALITY[tiers[i - 1]];
+    const current = RENDER_QUALITY[tiers[i]];
+    assert.ok(current.terrainSegments < previous.terrainSegments, `${tiers[i]} terrain density`);
+    assert.ok(current.waterSegments < previous.waterSegments, `${tiers[i]} water density`);
+    assert.ok(current.maxPixels <= previous.maxPixels, `${tiers[i]} framebuffer budget`);
+  }
+  const balanced = renderPixelRatio('balanced', 1440, 900, 1);
+  const performance = renderPixelRatio('performance', 1440, 900, 1);
+  assert.ok(performance < balanced, 'performance renders fewer physical pixels on a 1440x900 desktop');
+  assert.ok(performance >= 0.75 && performance <= 0.9);
+});
+
 test('missing dimensions and invalid DPR remain finite', () => {
   for (const dpr of [NaN, Infinity, 0, -1]) {
     assert.equal(renderPixelRatio('invalid', 390, 844, dpr), 1);
