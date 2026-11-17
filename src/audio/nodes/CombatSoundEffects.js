@@ -4,11 +4,12 @@
  * flare/chaff dispense pyrotechnics, ordnance detonation / explosion, and water impact.
  */
 export class CombatSoundEffects {
-  constructor(ctx, masterGain, ambientBus, onExplosion) {
+  constructor(ctx, masterGain, ambientBus, onExplosion, isReplayPaused = null) {
     this.ctx = ctx;
     this.masterGain = masterGain;
     this.ambientBus = ambientBus;
     this.onExplosion = onExplosion;
+    this.isReplayPaused = isReplayPaused;
 
     this.gunFireNodes = null;
     this.missileFlightNodes = null;
@@ -41,7 +42,7 @@ export class CombatSoundEffects {
   }
 
   duckAmbient(depth = 0.3, holdSeconds = 0.4) {
-    if (!this.ambientBus || !this.ctx) return;
+    if (!this.ambientBus || !this.ctx || this.isReplayPaused?.()) return;
     const now = this.ctx.currentTime;
     const gain = this.ambientBus.gain;
     gain.cancelScheduledValues?.(now);

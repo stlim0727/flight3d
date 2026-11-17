@@ -86,7 +86,7 @@ export class FlightAudio {
       this.piston = new PistonSynthesizer(this.ctx, this.engineBus, this.turbofan.engineNoiseBuffer);
       this.airframe = new AirframeSoundEffects(this.ctx, this.cockpitFilter);
       this.warnings = new WarningSynthesizer(this.ctx, this.masterGain, this.cockpitFilter);
-      this.combat = new CombatSoundEffects(this.ctx, this.masterGain, this.ambientBus, () => this.silenceOnCrash());
+      this.combat = new CombatSoundEffects(this.ctx, this.masterGain, this.ambientBus, () => this.silenceOnCrash(), () => this.isReplayPaused);
       Object.assign(this, this.airflow, this.turbofan, this.piston, this.airframe, this.warnings);
 
       this.isInitialized = true;
