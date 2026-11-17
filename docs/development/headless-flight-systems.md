@@ -76,6 +76,9 @@ read-only; copy snapshots when keeping historical records.
 
 ## Package ownership and updates
 
+See the [core change guide](flightsim-core-change-guide.md) for ownership decisions,
+examples, coordinated changes, and verification/release steps.
+
 The implementation is owned by the independent public repository
 [stlim0727/flightsim-core](https://github.com/stlim0727/flightsim-core), distributed
 as the npm-compatible `@stlim0727/flightsim-core` package. Flight3d's package.json
