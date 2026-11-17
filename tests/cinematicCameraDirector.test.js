@@ -1076,3 +1076,55 @@ test('After killing the only bandit, user POV observes the crashing wreck before
   const toWreck = wreckPos.clone().sub(planePos).normalize();
   assert.ok(viewDir.dot(toWreck) > 0.9, 'User POV looks directly at the crashing wreck');
 });
+
+test('Review fixes: stale far chaff is ignored, wreck ground position is preserved, and undamaged expiry is not a hit', () => {
+  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const targetPos = new THREE.Vector3(0, 1500, -3000);
+  const target = {
+    id: 25,
+    alive: true,
+    damage: 0,
+    position: targetPos.clone(),
+    velocity: new THREE.Vector3(0, 0, -200),
+  };
+
+  // 1. Far same-source chaff (> 450m) is ignored in collectBanditDecoys.
+  director.lastCombatChaff = [
+    { id: 1, sourceId: 25, alive: true, position: targetPos.clone().add(new THREE.Vector3(0, 0, 2000)) },
+  ];
+  const farDecoys = director.collectBanditDecoys(target, targetPos);
+  assert.equal(farDecoys.count, 0, 'Far chaff beyond match radius is ignored');
+
+  // 2. Wreck ground position is preserved after view.wreck is cleared on impact.
+  target.alive = false;
+  const groundWreckPos = new THREE.Vector3(100, 12, -3200);
+  const view = { wreck: { age: 2.0 }, mesh: { position: groundWreckPos.clone() } };
+  director.lastTargetViews = new Map([[25, view]]);
+  assert.ok(director.resolveTargetPosition(target).equals(groundWreckPos));
+  view.wreck = null; // Ground impact clears wreck
+  assert.ok(director.resolveTargetPosition(target).equals(groundWreckPos), 'Preserves last wreck position after ground impact');
+
+  // 3. Undamaged missile expiry within 120m does not trigger hitDetected.
+  const undamagedTarget = {
+    id: 26,
+    alive: true,
+    damage: 0,
+    position: targetPos.clone(),
+    velocity: new THREE.Vector3(0, 0, -200),
+  };
+  const missMissile = fakeMissile({
+    id: 205,
+    position: targetPos.clone().add(new THREE.Vector3(0, 0, 50)),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target: undamagedTarget,
+  });
+  director.missileSequence = {
+    missile: missMissile, target: undamagedTarget, phase: 'bandit', phaseTime: 0, missileDeathTime: null,
+    stationSide: null, lastMissilePos: missMissile.position.clone(), lastTargetPos: targetPos.clone(),
+    lastTargetDamage: 0, lastTargetAlive: true, hitDetected: false, hitTime: 0, hitPos: null,
+  };
+  missMissile.alive = false;
+  director.advanceMissileSequence(0.1);
+  assert.equal(director.missileSequence.hitDetected, false, 'Undamaged miss within 120m is not marked as hit');
+});

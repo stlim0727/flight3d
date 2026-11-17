@@ -51,7 +51,6 @@ const MISSILE_POV_ENTRY_RANGE_M = 1600;
 const MISSILE_BANDIT_MAX_SECONDS = 6.0;
 const MISSILE_POV_LINGER_SECONDS = 1.4;
 const MISSILE_HIT_LINGER_SECONDS = 3.2;
-const MISSILE_HIT_PROXIMITY_M = 120;
 const CRASH_OBSERVE_SECONDS = 4.0;
 const DECOY_MATCH_RADIUS_M = 450;
 const DECOY_ZOOM_SPREAD_CAP_M = 180;
@@ -132,6 +131,7 @@ export class CinematicCameraDirector {
     this.lastCombatFlares = [];
     this.lastCombatChaff = [];
     this.lastTargetViews = null;
+    this.lastWreckPositions = new Map();
     this.missileChaseDir = new THREE.Vector3(0, 0, -1);
     this.dogfightDir = new THREE.Vector3(0, 0, -1);
     this.dogfightShotIndex = 0;
@@ -162,6 +162,7 @@ export class CinematicCameraDirector {
     this.lastCombatFlares = [];
     this.lastCombatChaff = [];
     this.lastTargetViews = null;
+    this.lastWreckPositions.clear();
     this.dogfightShotIndex = 0;
     this.crashObserveTarget = null;
     this.crashObserveTimer = 0;
@@ -491,11 +492,21 @@ export class CinematicCameraDirector {
 
   resolveTargetPosition(target) {
     if (!target) return null;
-    if (!target.alive && this.lastTargetViews) {
+    if (target.alive) {
+      if (target.id != null) this.lastWreckPositions.delete(target.id);
+      return target.position ?? null;
+    }
+    if (this.lastTargetViews) {
       const view = this.lastTargetViews.get?.(target.id);
       if (view?.wreck && view.mesh?.position) {
+        if (target.id != null) {
+          this.lastWreckPositions.set(target.id, view.mesh.position.clone());
+        }
         return view.mesh.position;
       }
+    }
+    if (target.id != null && this.lastWreckPositions.has(target.id)) {
+      return this.lastWreckPositions.get(target.id);
     }
     return target.position ?? null;
   }
@@ -530,20 +541,25 @@ export class CinematicCameraDirector {
       if (!Array.isArray(list)) continue;
       for (const decoy of list) {
         if (!decoy?.alive || !decoy.position) continue;
-        const matchesSource = decoy.sourceId != null && target?.id != null
-          ? decoy.sourceId === target.id
-          : decoy.position.distanceToSquared(targetPos) <= radiusSq;
-        if (!matchesSource) continue;
-        const dist = decoy.position.distanceTo(targetPos);
+        if (decoy.sourceId != null && target?.id != null && decoy.sourceId !== target.id) continue;
+        const distSq = decoy.position.distanceToSquared(targetPos);
+        if (distSq > radiusSq) continue;
+        const dist = Math.sqrt(distSq);
         if (dist > maxDist) maxDist = dist;
         sum.add(decoy.position);
         count++;
       }
     }
     if (!count) return { spread: 0, centroid: null, count: 0 };
+    const centroid = sum.divideScalar(count);
+    const offset = centroid.clone().sub(targetPos);
+    if (offset.lengthSq() > DECOY_ZOOM_SPREAD_CAP_M * DECOY_ZOOM_SPREAD_CAP_M) {
+      offset.setLength(DECOY_ZOOM_SPREAD_CAP_M);
+      centroid.copy(targetPos).add(offset);
+    }
     return {
       spread: Math.min(DECOY_ZOOM_SPREAD_CAP_M, maxDist),
-      centroid: sum.divideScalar(count),
+      centroid,
       count,
     };
   }
@@ -604,9 +620,7 @@ export class CinematicCameraDirector {
       const targetDamage = sequence.target.damage ?? 0;
       const killed = sequence.lastTargetAlive && !sequence.target.alive;
       const damaged = targetDamage > sequence.lastTargetDamage + 1e-4;
-      const closeImpact = sequence.missile && !sequence.missile.alive && sequence.lastTargetPos
-        && sequence.lastMissilePos.distanceTo(sequence.lastTargetPos) <= MISSILE_HIT_PROXIMITY_M;
-      if (killed || damaged || closeImpact) {
+      if (killed || damaged) {
         sequence.hitDetected = true;
         sequence.hitTime = 0;
         sequence.hitPos = sequence.lastTargetPos ? sequence.lastTargetPos.clone() : sequence.lastMissilePos.clone();
