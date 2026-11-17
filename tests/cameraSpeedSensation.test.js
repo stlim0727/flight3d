@@ -139,6 +139,31 @@ describe('CameraSystem Physical Speed Sensation & Dynamics', () => {
     assert.ok(maxSpoilerVibe > 0.0003, `spoiler extension should trigger turbulence buffet, got max ${maxSpoilerVibe}`);
   });
 
+  it('should stop speed sensation and cockpit buffet while playback is parked', () => {
+    const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+    const cam = new CameraSystem(camera, null);
+    cam.setMode(CameraSystem.MODES.COCKPIT);
+    const aircraft = createMockAircraft();
+    const stalledHighSpeed = { onGround: false, iasKnots: 360, groundSpeedKnots: 360,
+      isStalled: true, isPreStall: true, buffetVibration: 1, gForce: 2 };
+
+    for (let i = 0; i < 30; i++) cam.update(0.05, aircraft, stalledHighSpeed);
+    assert.ok(cam.speedFov > 3.0, 'the moving replay expands the cockpit FOV');
+    assert.ok(cam.vibrationOffset.length() > 0, 'the moving replay shakes the cockpit');
+
+    cam.setMotionFrozen(true);
+    const frozenFov = cam.speedFov;
+    assert.equal(cam.vibrationOffset.length(), 0, 'freezing clears the current shake');
+    assert.equal(cam.chaseVibration.length(), 0);
+    for (let i = 0; i < 30; i++) cam.update(0.05, aircraft, stalledHighSpeed);
+    assert.equal(cam.speedFov, frozenFov, 'the parked frame keeps its FOV without drifting');
+    assert.equal(cam.vibrationOffset.length(), 0, 'a frozen state cannot keep vibrating the cockpit');
+
+    cam.setMotionFrozen(false);
+    for (let i = 0; i < 30; i++) cam.update(0.05, aircraft, stalledHighSpeed);
+    assert.ok(cam.vibrationOffset.length() > 0, 'resuming playback restarts the motion');
+  });
+
   it('should reset all speed sensation state variables on resetLook()', () => {
     const camera = new THREE.PerspectiveCamera(54, 16 / 9, 0.1, 1000);
     const cam = new CameraSystem(camera, null);

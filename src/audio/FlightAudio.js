@@ -17,6 +17,7 @@ export class FlightAudio {
     this.ctx = null;
     this.isMuted = false;
     this.isPaused = false;
+    this.isReplayPaused = false;
     this.isInitialized = false;
 
     this.volume = 1.0;
@@ -155,7 +156,7 @@ export class FlightAudio {
       this.distanceGain = this.ctx.createGain();
       this.distanceGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
       this.ambientBus = this.ctx.createGain();
-      this.ambientBus.gain.setValueAtTime(1.0, this.ctx.currentTime);
+      this.ambientBus.gain.setValueAtTime(this.isReplayPaused ? 0.0 : 1.0, this.ctx.currentTime);
       this.cockpitFilter.connect(this.ambientBus);
       this.ambientBus.connect(this.distanceGain);
       this.distanceGain.connect(this.masterGain);
@@ -593,6 +594,28 @@ export class FlightAudio {
     this.applyMasterGain();
   }
 
+  /**
+   * A replay owns the pose and its recorded state, but it does not step physics. A
+   * parked replay must lose its continuous engine/wind/pack bed so it cannot drone
+   * behind the viewer. Only the ambient bus is silenced: one-shot impacts and
+   * explosions still reach the master bus, because a replay can stage its final
+   * crash or a scrubbed impact on the same frame that parks the playback.
+   */
+  setReplayPaused(paused) {
+    this.isReplayPaused = !!paused;
+    if (this.isReplayPaused) {
+      this.cancelSpeech();
+      this.stopGunFire();
+      this.stopMissileFlight();
+      this.departureRadio.stop();
+      this.bangkokRadio?.stop();
+      this.warningGain?.gain.setValueAtTime(0, this.ctx?.currentTime ?? 0);
+    }
+    if (this.ambientBus && this.ctx) {
+      this.ambientBus.gain.setTargetAtTime(this.isReplayPaused ? 0 : 1, this.ctx.currentTime, 0.05);
+    }
+  }
+
   applyMasterGain() {
     if (this.masterGain && this.ctx) {
       const targetGain = this.effectiveVolume;
@@ -926,7 +949,7 @@ export class FlightAudio {
    * bed falls to; it recovers to unity after `holdSeconds`.
    */
   duckAmbient(depth = 0.3, holdSeconds = 0.4) {
-    if (!this.ambientBus || !this.ctx) return;
+    if (!this.ambientBus || !this.ctx || this.isReplayPaused) return;
     const now = this.ctx.currentTime;
     const gain = this.ambientBus.gain;
     gain.cancelScheduledValues?.(now);

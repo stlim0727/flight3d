@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **fix(replay):** stop the aircraft after playback ends
+  - A parked replay (end of track, manual pause, or a terrain wait) now silences the continuous engine/wind/pack bed, clears cockpit vibration and stall buffet, and freezes propeller/fan/strobe animation instead of droning and shaking over the final frame.
+  - Crash impacts and other one-shots stay audible, because a replay can stage its final impact on the same frame that parks playback; resuming, scrubbing away from the end sample, or restarting restores the recorded mix and motion.
+  - Leaving the replay releases the held state.
 - **fix(ui):** keep the cockpit eyepoint panel out of the forward sight
   - The panel now docks to the bottom edge over the lower console instead of opening under the toolbar across the windshield and HUD; its height is capped below the measured control rows and it scrolls internally when needed.
   - Viewports shorter than 560px get a thin three-column strip (axis labels above their values, no optional step buttons) and the cockpit POV pill becomes a 44px eye icon, so the horizon and HUD stay visible on landscape phones.

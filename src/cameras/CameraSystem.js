@@ -102,6 +102,7 @@ export class CameraSystem {
     this.speedSensationTime = 0; // Deterministic simulation time accumulator for physical vibrations
     this.vibrationOffset = new THREE.Vector3(); // High-frequency runway roll & aerodynamic jitter (head views)
     this.chaseVibration = new THREE.Vector3(); // High-frequency subtle exterior look-target vibration
+    this.motionFrozen = false; // A held replay cannot keep shaking over a frozen state
 
     // Wing View Parameters
     this.wingLookYaw = 0;
@@ -1654,12 +1655,27 @@ export class CameraSystem {
   }
 
   /**
+   * Stop the physical motion that a stale flight state would otherwise keep
+   * generating: replay playback is parked, so a frozen airspeed must not keep
+   * vibrating the cockpit or chasing the airframe. Camera placement and framing
+   * still run, because a seek while parked must reframe the recorded pose.
+   */
+  setMotionFrozen(frozen) {
+    this.motionFrozen = Boolean(frozen);
+    if (this.motionFrozen) {
+      this.vibrationOffset.set(0, 0, 0);
+      this.chaseVibration.set(0, 0, 0);
+    }
+  }
+
+  /**
    * Continuous physical speed sensation:
    * 1. Dynamic FOV expansion (optical flow peripheral expansion proportional to IAS / dynamic pressure)
    * 2. Chase camera dynamic inertial lag and distance breathing
    * 3. High-frequency physical vibrations (runway roll rumble & aerodynamic transonic / spoiler buffet)
    */
   updateSpeedSensation(dt, flightState) {
+    if (this.motionFrozen) return;
     if (!flightState) {
       this.speedFov = 0;
       this.chaseSpeedLag = 0;
@@ -1996,12 +2012,12 @@ export class CameraSystem {
 
         // Stall Buffeting Shake (airborne only) + pre-stall stick shaker buzz
         let buffetX = 0, buffetY = 0;
-        if (flightState.isStalled && !flightState.onGround) {
+        if (!this.motionFrozen && flightState.isStalled && !flightState.onGround) {
           const t = performance.now() * 0.03;
           const severity = flightState.buffetVibration || 0.5;
           buffetX = (Math.sin(t * 1.7) + Math.cos(t * 3.1)) * 0.015 * severity;
           buffetY = (Math.cos(t * 2.3) + Math.sin(t * 4.2)) * 0.015 * severity;
-        } else if (flightState.isPreStall && !flightState.onGround) {
+        } else if (!this.motionFrozen && flightState.isPreStall && !flightState.onGround) {
           // Control-column shaker: tight high-frequency buzz, no vertical component
           const t = performance.now() * 0.09;
           buffetX = Math.sin(t) * 0.0035;

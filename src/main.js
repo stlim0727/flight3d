@@ -1493,7 +1493,9 @@ class FlightSimulator {
     }
 
     // 1. Update 3D Aircraft Model & Articulations
-    this.aircraft.update(frameDelta, this.telemetry);
+    // A parked replay still draws its frozen pose; spinning fans, propellers and
+    // strobes over that pose would be motion the recorded clock no longer has.
+    this.aircraft.update(this.replayDirector?.playbackHeld ? 0 : frameDelta, this.telemetry);
     this.renderPose.apply(this.aircraft.group, this.position, this.quaternion,
       this.physicsAccumulator / this.physicsDt);
 
