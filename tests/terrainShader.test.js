@@ -172,6 +172,14 @@ test('Terrain & PBR Texture Splatting System', async (t) => {
     assert.equal(terrain.material.defines.QUALITY_ULTRALOW, 0);
     assert.equal(terrain.mesh.receiveShadow, true);
 
+    terrain.setQuality('low', 128);
+    assert.equal(terrain.segments, 128, 'the quality preset supplies the mesh density');
+    assert.equal(terrain.geometry.attributes.position.count, 129 * 129);
+    assert.ok(terrain.mesh.geometry === terrain.geometry);
+
+    terrain.setQuality('high', 64);
+    assert.equal(terrain.segments, 64);
+
     assert.throws(() => {
       terrain.setQuality('ultra');
     }, /Invalid quality preset/);
