@@ -178,13 +178,21 @@ test('camera toolbar collapse/expand toggle button lifecycle and interaction', (
     assert.equal(toggleBtn.getAttribute('aria-expanded'), 'false');
     assert.equal(globalThis.localStorage.getItem('flight3d_camera_strip_collapsed'), 'true');
 
-    // Clicking the active camera button while collapsed expands it
+    // Clicking the active camera button while collapsed expands it without selecting camera
+    selectedMode = null;
     const chaseBtn = elements.get('btn-cam-chase');
     assert.ok(chaseBtn, 'chase camera button exists');
     chaseBtn.click();
     assert.equal(cameraStrip.classList.contains('is-collapsed'), false);
     assert.equal(toggleBtn.getAttribute('aria-expanded'), 'true');
     assert.equal(globalThis.localStorage.getItem('flight3d_camera_strip_collapsed'), 'false');
+    assert.equal(selectedMode, null, 'onSelectCamera must not be invoked when uncollapsing via camera button click');
+
+    // Clicking camera button when already expanded selects the camera
+    const cockpitBtn = elements.get('btn-cam-cockpit');
+    assert.ok(cockpitBtn, 'cockpit camera button exists');
+    cockpitBtn.click();
+    assert.equal(selectedMode, 0, 'onSelectCamera is invoked when selecting camera in expanded strip');
   } finally {
     globalThis.document = prevDoc;
     globalThis.window = prevWindow;

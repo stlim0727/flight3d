@@ -118,7 +118,31 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
   hud.append(bar);
-  const cameraButtons = createCameraButtons(onSelectCamera);
+  let cameraStripCollapsed = false;
+  try {
+    const saved = localStorage.getItem('flight3d_camera_strip_collapsed');
+    if (saved !== null) {
+      cameraStripCollapsed = saved === 'true';
+    } else if (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 1024px)')?.matches) {
+      cameraStripCollapsed = true;
+    }
+  } catch {}
+
+  const setCameraStripCollapsed = (collapsed) => {
+    cameraStripCollapsed = Boolean(collapsed);
+    try {
+      localStorage.setItem('flight3d_camera_strip_collapsed', String(cameraStripCollapsed));
+    } catch {}
+    updateCameraToggleState();
+  };
+
+  const cameraButtons = createCameraButtons(mode => {
+    if (cameraStripCollapsed) {
+      setCameraStripCollapsed(false);
+    } else {
+      onSelectCamera(mode);
+    }
+  });
   const defaultCam = cameraButtons.find(b => b.dataset.cameraMode === '1');
   if (defaultCam) defaultCam.setAttribute('aria-pressed', 'true');
 
@@ -135,16 +159,6 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   cameraToggleBtn.type = 'button';
   cameraStrip.append(cameraToggleBtn);
 
-  let cameraStripCollapsed = false;
-  try {
-    const saved = localStorage.getItem('flight3d_camera_strip_collapsed');
-    if (saved !== null) {
-      cameraStripCollapsed = saved === 'true';
-    } else if (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 1024px)')?.matches) {
-      cameraStripCollapsed = true;
-    }
-  } catch {}
-
   const updateCameraToggleState = () => {
     cameraStrip.classList.toggle('is-collapsed', cameraStripCollapsed);
     bar.classList.toggle('camera-strip-collapsed', cameraStripCollapsed);
@@ -159,27 +173,11 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     positionEdgeButtons();
   };
 
-  const setCameraStripCollapsed = (collapsed) => {
-    cameraStripCollapsed = Boolean(collapsed);
-    try {
-      localStorage.setItem('flight3d_camera_strip_collapsed', String(cameraStripCollapsed));
-    } catch {}
-    updateCameraToggleState();
-  };
-
   cameraToggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     setCameraStripCollapsed(!cameraStripCollapsed);
     cameraToggleBtn.blur();
   });
-
-  for (const button of cameraButtons) {
-    button.addEventListener('click', () => {
-      if (cameraStripCollapsed) {
-        setCameraStripCollapsed(false);
-      }
-    });
-  }
   // Taking over must remain available when the guide is collapsed or yields to
   // warnings. Keep the existing button/handler outside the notification tree.
   const skipDemoButton = document.getElementById('btn-skip-demo');
