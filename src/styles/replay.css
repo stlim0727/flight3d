@@ -23,15 +23,16 @@
   position: static;
   margin: 0 auto;
 }
-#replay-panel .btn, #replay-library .btn { min-height: 44px; margin: 0; padding: 8px 12px; font-size: 13px; }
+#replay-panel .btn:not(.flight-camera-btn),
+#replay-library .btn { min-height: 44px; margin: 0; padding: 8px 12px; font-size: 13px; }
 #replay-panel [data-play] { min-width: 85px; }
 #replay-panel [data-time] { margin-left: auto; font-variant-numeric: tabular-nums; }
 #replay-panel [data-seek] { width: 100%; min-height: 36px; accent-color: #67d5a3; }
 .replay-transport { margin-top: 8px; justify-content: start; }
 .replay-speeds, .replay-cameras { display: flex; gap: 4px; margin-top: 6px; }
 .replay-speeds > .btn { flex: 1; }
-.replay-cameras { overflow-x: auto; padding-bottom: 4px; }
-.replay-cameras .btn { flex-shrink: 0; white-space: nowrap; }
+ .replay-cameras { overflow-x: auto; padding-bottom: 4px; }
+ .replay-cameras .flight-camera-btn { flex: 0 0 auto; }
 #replay-panel [aria-pressed="true"] { background: #205342; border-color: #67d5a3; color: #fff; }
 #replay-library {
   position: fixed;
