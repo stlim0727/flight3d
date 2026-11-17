@@ -1275,3 +1275,76 @@ test('Respawned bandit does not cancel ongoing crash observation of the destroye
   assert.ok(viewDir.dot(toWreck) > 0.85, 'Camera looks at the crashing wreck');
   assert.ok(viewDir.dot(toNewSpawn) < 0.5, 'Camera does NOT snap to the newly spawned bandit');
 });
+
+test('Pre-existing bandit damage does not trigger premature hit detection on fresh launch', () => {
+  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const flightState = { onGround: false };
+  const damagedTarget = {
+    id: 8,
+    alive: true,
+    damage: 0.6,
+    position: new THREE.Vector3(0, 1500, -2000),
+    velocity: new THREE.Vector3(0, 0, -200),
+  };
+  const missile = fakeMissile({
+    id: 301,
+    position: new THREE.Vector3(0, 1500, -10),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target: damagedTarget,
+  });
+
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [damagedTarget] });
+  assert.equal(director.missileSequence?.hitDetected, false, 'Pre-existing damage does not trigger hit on release');
+
+  for (let i = 0; i < 10; i++) {
+    director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, missiles: [missile], targets: [damagedTarget] });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_TRACK);
+  assert.equal(director.missileSequence?.hitDetected, false, 'Pre-existing damage does not trigger hit during track');
+});
+
+test('Unpromoted queued missile does not block track timeout to approach phase', () => {
+  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const flightState = { onGround: false };
+  const target = {
+    id: 9,
+    alive: true,
+    damage: 0,
+    position: new THREE.Vector3(0, 1500, -10000),
+    velocity: new THREE.Vector3(0, 0, -200),
+  };
+  const leadMissile = fakeMissile({
+    id: 401,
+    position: new THREE.Vector3(0, 1500, -1000),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target,
+  });
+  const deadQueuedMissile = fakeMissile({
+    id: 402,
+    position: new THREE.Vector3(0, 1500, -500),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target,
+  });
+  deadQueuedMissile.alive = false;
+
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState, missiles: [leadMissile], targets: [target] });
+  director.queuedMissiles.push({ missile: deadQueuedMissile, target });
+
+  // Advance 1s past launch beat into track
+  for (let i = 0; i < 10; i++) {
+    director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, missiles: [leadMissile], targets: [target] });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_TRACK);
+
+  // Advance 9.2s in track; with dead queued missile, timeout still fires and switches to approach
+  for (let i = 0; i < 92; i++) {
+    director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, missiles: [leadMissile], targets: [target] });
+  }
+  assert.equal(director.missileSequence?.phase, 'approach', 'Track timeout switches to approach even with queued missile');
+});

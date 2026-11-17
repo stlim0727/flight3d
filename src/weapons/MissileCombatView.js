@@ -230,6 +230,7 @@ export class MissileCombatView {
       if (view.wreck) {
         const detached = {
           mesh: view.mesh,
+          aircraft: view.aircraft,
           wreck: view.wreck,
           trail: view.trail,
           fireTrail: view.fireTrail,
@@ -245,8 +246,6 @@ export class MissileCombatView {
         view.wreck = null;
         view.lastPosition = null;
         view.velocity.set(0, 0, 0);
-      } else {
-        view.detachedWreck = null;
       }
       view.wreck = null;
       view.mesh.visible = true;
@@ -333,7 +332,11 @@ export class MissileCombatView {
       this._syncWreck(detached, null, dt);
       if (!detached.wreck && !detached.trail && !detached.fireTrail) {
         this.scene.remove(detached.mesh);
+        detached.aircraft?.dispose?.();
         this.detachedWrecks.splice(i, 1);
+        for (const v of this.targetViews.values()) {
+          if (v.detachedWreck === detached) v.detachedWreck = null;
+        }
       }
     }
 
@@ -535,6 +538,7 @@ export class MissileCombatView {
     for (const trail of this.trails) trail.dispose();
     for (const detached of this.detachedWrecks) {
       this.scene.remove(detached.mesh);
+      detached.aircraft?.dispose?.();
       detached.trail?.dispose?.();
       detached.fireTrail?.dispose?.();
     }

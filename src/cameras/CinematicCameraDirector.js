@@ -606,6 +606,17 @@ export class CinematicCameraDirector {
       if (offset.lengthSq() > 1e-6) stationSide = offset.dot(right) >= 0 ? 1 : -1;
     }
     const targetPos = this.resolveTargetPosition(target);
+    const targetStates = new Map();
+    if (Array.isArray(targets)) {
+      for (const t of targets) {
+        if (t?.id != null) {
+          targetStates.set(t.id, {
+            damage: t.damage ?? 0,
+            alive: Boolean(t.alive),
+          });
+        }
+      }
+    }
     this.missileSequence = {
       missile,
       target,
@@ -617,6 +628,7 @@ export class CinematicCameraDirector {
       lastTargetPos: targetPos ? targetPos.clone() : null,
       lastTargetDamage: target?.damage ?? 0,
       lastTargetAlive: Boolean(target?.alive),
+      targetStates,
       hitDetected: false,
       hitTime: 0,
       hitPos: null,
@@ -658,10 +670,12 @@ export class CinematicCameraDirector {
       }
       if (!sequence.hitDetected && Array.isArray(this.lastCombatTargets)) {
         for (const candidate of this.lastCombatTargets) {
-          if (!candidate) continue;
-          const candDamage = candidate.damage ?? 0;
-          const candDied = !candidate.alive && candidate.id != null;
-          if (candDied || candDamage > 0.1) {
+          if (!candidate || candidate.id == null || candidate === sequence.target) continue;
+          const initial = sequence.targetStates?.get(candidate.id);
+          const currentDamage = candidate.damage ?? 0;
+          const freshKilled = initial ? (initial.alive && !candidate.alive) : false;
+          const freshDamaged = initial ? (currentDamage > initial.damage + 1e-4) : false;
+          if (freshKilled || freshDamaged) {
             const pos = this.resolveTargetPosition(candidate, true);
             if (pos && sequence.lastMissilePos.distanceTo(pos) < 2500) {
               sequence.target = candidate;
@@ -669,7 +683,7 @@ export class CinematicCameraDirector {
               sequence.hitDetected = true;
               sequence.hitTime = 0;
               sequence.hitPos = pos.clone();
-              sequence.lastTargetDamage = candDamage;
+              sequence.lastTargetDamage = currentDamage;
               sequence.lastTargetAlive = Boolean(candidate.alive);
               break;
             }
@@ -702,16 +716,19 @@ export class CinematicCameraDirector {
         this.endMissileSequence();
       } else if (range <= MISSILE_POV_ENTRY_RANGE_M) {
         this.setMissileSequencePhase('bandit');
-      } else if (!sequence.missile?.lethal && this.queuedMissiles.length) {
-        const betterIdx = this.queuedMissiles.findIndex(q => q.missile?.alive && (q.missile.lethal || (q.target && q.missile.position.distanceTo(q.target.position) < range - 300)));
-        if (betterIdx !== -1) {
-          const better = this.queuedMissiles.splice(betterIdx, 1)[0];
-          this.beginMissileSequence(better.missile, this.lastCombatTargets, better.planePos, better.planeQuat, better.target);
-          return;
+      } else {
+        if (!sequence.missile?.lethal && this.queuedMissiles.length) {
+          const betterIdx = this.queuedMissiles.findIndex(q => q.missile?.alive && (q.missile.lethal || (q.target && q.missile.position.distanceTo(q.target.position) < range - 300)));
+          if (betterIdx !== -1) {
+            const better = this.queuedMissiles.splice(betterIdx, 1)[0];
+            this.beginMissileSequence(better.missile, this.lastCombatTargets, better.planePos, better.planeQuat, better.target);
+            return;
+          }
         }
-      } else if (sequence.phaseTime >= MISSILE_TRACK_MAX_SECONDS) {
-        if (sequence.target && sequence.lastTargetPos) this.setMissileSequencePhase('approach');
-        else this.endMissileSequence();
+        if (sequence.phaseTime >= MISSILE_TRACK_MAX_SECONDS) {
+          if (sequence.target && sequence.lastTargetPos) this.setMissileSequencePhase('approach');
+          else this.endMissileSequence();
+        }
       }
     } else if (sequence.phase === 'approach') {
       if (sequence.hitDetected || (sequence.lastTargetPos && sequence.lastMissilePos.distanceTo(sequence.lastTargetPos) <= MISSILE_POV_ENTRY_RANGE_M)) {
