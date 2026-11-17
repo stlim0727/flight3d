@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MissileCombatView } from '../weapons/MissileCombatView.js';
+import { MissileCombatView, MissileSmokeTrail } from '../weapons/MissileCombatView.js';
 import { presentCombatEvent, syncCombatAudio } from '../weapons/combatPresentation.js';
 import { Flare, FLARE_MODEL } from '../weapons/Flare.js';
 import { ChaffCloud, CHAFF_MODEL } from '../weapons/Chaff.js';
@@ -36,6 +36,17 @@ function slerp(out, a, b, alpha) {
 function shortestAngle(a, b, alpha) {
   const delta = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
   return a + delta * alpha;
+}
+
+function catmullRom(p0, p1, p2, p3, t) {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return 0.5 * (
+    (2 * p1) +
+    (-p0 + p2) * t +
+    (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+    (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+  );
 }
 
 /**
@@ -130,6 +141,23 @@ export class CombatReplayPlayback {
     this.view.clear();
     this._updateState(timeSec);
     this.view.sync(0);
+
+    // Reconstruct lingering smoke trails for recently detonated missiles within 26s
+    for (const group of this.groups.values()) {
+      if (!group.samples?.length) continue;
+      const launchTime = group.samples[0].timeSec;
+      const removeTime = Number.isFinite(group.removeAt) ? group.removeAt : group.samples.at(-1).timeSec;
+      if (timeSec >= removeTime && timeSec <= removeTime + 26.0 && timeSec >= launchTime) {
+        const trail = new MissileSmokeTrail(this.sim.scene);
+        trail.prepopulateFromSamples(group.samples, timeSec);
+        if (trail.count > 0) {
+          this.view.trails.push(trail);
+        } else {
+          trail.dispose();
+        }
+      }
+    }
+
     syncCombatAudio(this.state, { audio: this.sim.audio, camera: this.sim.camera, paused: true });
   }
 
@@ -249,6 +277,11 @@ export class CombatReplayPlayback {
       const alpha = b.timeSec > a.timeSec
         ? clamp((clamped - a.timeSec) / (b.timeSec - a.timeSec), 0, 1)
         : 0;
+      const p0 = index > 0 ? samples[index - 1] : { x: 2 * a.x - b.x, y: 2 * a.y - b.y, z: 2 * a.z - b.z };
+      const p1 = a;
+      const p2 = b;
+      const p3 = (index + 2 < samples.length) ? samples[index + 2] : { x: 2 * b.x - a.x, y: 2 * b.y - a.y, z: 2 * b.z - a.z };
+
       let missile = this.missiles.get(id);
       if (!missile) {
         missile = {
@@ -260,13 +293,15 @@ export class CombatReplayPlayback {
       }
       missile.typeId = group.typeId;
       missile.alive = true;
+      missile.historySamples = samples;
+      missile.timeSec = timeSec;
       missile.age = Math.max(0, clamped - samples[0].timeSec);
       missile.lethal = Boolean(this.lethalMissileIds?.has?.(id & 255));
       missile.hit = Boolean(this.hitMissileIds?.has?.(id & 255));
       missile.position.set(
-        a.x + (b.x - a.x) * alpha,
-        a.y + (b.y - a.y) * alpha,
-        a.z + (b.z - a.z) * alpha,
+        catmullRom(p0.x, p1.x, p2.x, p3.x, alpha),
+        catmullRom(p0.y, p1.y, p2.y, p3.y, alpha),
+        catmullRom(p0.z, p1.z, p2.z, p3.z, alpha),
       );
       const quat = slerp([0, 0, 0, 1], a.quat, b.quat, alpha);
       missile.quaternion.set(quat[0], quat[1], quat[2], quat[3]);
@@ -285,6 +320,10 @@ export class CombatReplayPlayback {
         );
       } else {
         missile.velocity.set(0, 0, -1).applyQuaternion(missile.quaternion).multiplyScalar(600);
+      }
+      if (timeSec > samples.at(-1).timeSec) {
+        const extraDt = timeSec - samples.at(-1).timeSec;
+        missile.position.addScaledVector(missile.velocity, extraDt);
       }
       this.state.missiles.push(missile);
     }

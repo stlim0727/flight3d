@@ -4,7 +4,7 @@ import { Scene, Vector3 } from 'three';
 import { ReplayRecorder } from '../src/core/ReplayRecorder.js';
 import { encodeTrack, decodeTrack, COMBAT_TRACK_VERSION } from '../src/replay/ReplayCodec.js';
 import { CombatReplayPlayback } from '../src/replay/CombatReplayPlayback.js';
-import { MissileCombatView } from '../src/weapons/MissileCombatView.js';
+import { MissileCombatView, MissileSmokeTrail } from '../src/weapons/MissileCombatView.js';
 import { REPLAY_BUDGET, base64ByteLength } from '../src/replay/replayConfig.js';
 
 const QUAT = { x: 0.01, y: 0.7, z: -0.02, w: 0.7139 };
@@ -454,4 +454,136 @@ test('MissileCombatView preserves detached wreck reference across multiple sync 
   detachedWreckObj.aircraft.dispose = () => { disposed = true; };
   combatView.clear();
   assert.equal(disposed, true, 'Detached aircraft view was disposed on clear');
+});
+
+test('MissileSmokeTrail interpolates dense points along flight path without gaps even with large dt', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { spacing: 1.6, max: 2000 });
+
+  // Missile moves 64 meters in a single frame (e.g. 800 m/s * 0.08s)
+  const pos1 = new Vector3(0, 1000, 0);
+  trail.update(0.016, pos1, true, true);
+  assert.equal(trail.count, 1, 'Initial point emitted');
+
+  const pos2 = new Vector3(64, 1000, 0);
+  trail.update(0.08, pos2, true, true);
+
+  // 64 meters / 1.6m spacing = 40 steps -> 1 + 40 = 41 points
+  assert.ok(trail.count >= 40, `Trail count ${trail.count} should be densely interpolated without gaps`);
+
+  // Verify distance between consecutive particles does not exceed spacing + jitter tolerance
+  for (let i = 0; i < trail.count - 1; i++) {
+    const x1 = trail.positions[i * 3];
+    const y1 = trail.positions[i * 3 + 1];
+    const z1 = trail.positions[i * 3 + 2];
+    const x2 = trail.positions[(i + 1) * 3];
+    const y2 = trail.positions[(i + 1) * 3 + 1];
+    const z2 = trail.positions[(i + 1) * 3 + 2];
+    const d = Math.hypot(x2 - x1, y2 - y1, z2 - z1);
+    assert.ok(d < 3.0, `Consecutive puff distance ${d.toFixed(2)}m must not leave gaps`);
+  }
+
+  trail.dispose();
+});
+
+test('MissileSmokeTrail lingers for 20+ seconds after missile burnout and detonation', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { lifetime: 26.0, spacing: 2.0 });
+
+  const pos1 = new Vector3(0, 1000, 0);
+  const pos2 = new Vector3(100, 1000, 0);
+  trail.update(0.016, pos1, true, true);
+  trail.update(0.1, pos2, true, true);
+  const initialCount = trail.count;
+  assert.ok(initialCount > 10);
+
+  // Coasting with propellant=0: continues emitting visible trail
+  const pos3 = new Vector3(200, 1000, 0);
+  trail.update(0.1, pos3, true, false);
+  assert.ok(trail.count > initialCount, 'Coasting missile continues to emit visible trajectory trail');
+
+  // Missile detonated / stopped emitting: smoke must persist, not vanish in 2-3 seconds
+  for (let s = 0; s < 15; s++) {
+    trail.update(1.0, null, false);
+    assert.equal(trail.done, false, `Trail must not be done at ${s + 1}s`);
+    assert.ok(trail.count > 0, `Puffs must still exist at ${s + 1}s`);
+  }
+
+  // After 28 seconds (exceeding 26s lifetime), particles have aged out
+  for (let s = 0; s < 15; s++) {
+    trail.update(1.0, null, false);
+  }
+  assert.equal(trail.done, true, 'Trail should be done after full 26s lifetime expires');
+  trail.dispose();
+});
+
+test('CombatReplayPlayback seek reconstructs lingering and active missile smoke trails', () => {
+  const scene = new Scene();
+  const playback = new CombatReplayPlayback({ scene });
+  const missileSamples = [
+    { timeSec: 10.0, id: 5, typeId: 'AIM9X', x: 0, y: 3000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 10.5, id: 5, typeId: 'AIM9X', x: 300, y: 3000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 11.0, id: 5, typeId: 'AIM9X', x: 600, y: 3000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 11.5, id: 5, typeId: 'AIM9X', x: 900, y: 3000, z: 0, quat: [0, 0, 0, 1], powered: false },
+    { timeSec: 12.0, id: 5, typeId: 'AIM9X', x: 1200, y: 3000, z: 0, quat: [0, 0, 0, 1], powered: false },
+  ];
+  const events = [
+    { timeSec: 12.0, kind: 'detonation', missileId: 5, x: 1200, y: 3000, z: 0 },
+  ];
+
+  playback.load({
+    version: 8,
+    targets: [],
+    missileSamples,
+    banditSamples: [],
+    events,
+  });
+
+  // 1. Seek to mid-flight (11.0s): missile is active, trajectory smoke should be pre-populated
+  playback.seek(11.0);
+  assert.equal(playback.state.missiles.length, 1);
+  const view = playback.view.missileViews.get(5);
+  assert.ok(view?.trail, 'Active missile has smoke trail');
+  assert.ok(view.trail.count > 50, `Smoke trail should be pre-populated along flight path (count: ${view.trail.count})`);
+
+  // 2. Seek to 14.0s (2s after detonation): missile is dead, lingering smoke trail reconstructed
+  playback.seek(14.0);
+  assert.equal(playback.state.missiles.length, 0, 'Detonated missile mesh is gone');
+  assert.ok(playback.view.trails.length > 0, 'Lingering smoke trail remains in scene after detonation');
+  assert.ok(playback.view.trails[0].count > 50, 'Lingering trail contains dense trajectory puffs');
+
+  playback.stop();
+});
+
+test('CombatReplayPlayback uses Catmull-Rom spline for smooth missile position between samples', () => {
+  const scene = new Scene();
+  const playback = new CombatReplayPlayback({ scene });
+  // Turning missile trajectory (curves in X and Z)
+  const missileSamples = [
+    { timeSec: 0.0, id: 1, typeId: 'AIM9X', x: 0, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.1, id: 1, typeId: 'AIM9X', x: 70, y: 1000, z: 10, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.2, id: 1, typeId: 'AIM9X', x: 130, y: 1000, z: 35, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.3, id: 1, typeId: 'AIM9X', x: 180, y: 1000, z: 75, quat: [0, 0, 0, 1], powered: true },
+  ];
+
+  playback.load({
+    version: 8,
+    targets: [],
+    missileSamples,
+    banditSamples: [],
+    events: [],
+  });
+
+  // Evaluate midpoint between samples 1 and 2 (timeSec = 0.15)
+  playback.seek(0.15);
+  const m = playback.state.missiles[0];
+  assert.ok(m);
+
+  // Linear midpoint would be: x = (70 + 130) / 2 = 100, z = (10 + 35) / 2 = 22.5
+  // Catmull-Rom spline accounts for incoming curvature, smoothly interpolating position
+  assert.ok(Math.abs(m.position.y - 1000) < 1e-4);
+  assert.ok(m.position.x > 70 && m.position.x < 130);
+  assert.ok(m.position.z > 10 && m.position.z < 35);
+
+  playback.stop();
 });
