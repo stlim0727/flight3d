@@ -732,59 +732,79 @@ export class ReplayStore {
     return { error: null, compressed };
   }
 
-  async _commitWithBudget(db, entry, compressedBytes, { preserveNewerAuto = false } = {}) {
+  async _commitWithBudget(db, entry, compressedBytes, { preserveNewerAuto = false, skipIfExists = false } = {}) {
     const payload = this._packStoredPayload(compressedBytes);
     const extraEvictedIds = new Set();
 
     for (;;) {
       let lastRows = null;
+      let txResult = null;
       try {
-        const result = await this._withLiveEntriesTx(
+        await this._withLiveEntriesTx(
           db,
           [REPLAY_ENTRIES_STORE, REPLAY_PAYLOADS_STORE],
           ({ liveRows, entriesStore, payloadsStore }) => {
-            if (preserveNewerAuto && entry.auto === true) {
-              const targetSlot = entry.autoSlot ?? 'solo';
-              const newerAuto = liveRows.find(row =>
-                row.auto === true && (row.autoSlot ?? 'solo') === targetSlot
-                && row.id !== entry.id && String(row.savedAt) > String(entry.savedAt));
-              if (newerAuto) {
-                lastRows = liveRows;
-                return { rows: liveRows, skipped: true };
-              }
-            }
-            const replacedIds = new Set();
-            if (entry.auto === true) {
-              const targetSlot = entry.autoSlot ?? 'solo';
-              for (const row of liveRows) {
-                if (row.auto === true && (row.autoSlot ?? 'solo') === targetSlot && row.id !== entry.id) {
-                  replacedIds.add(row.id);
+            const performWrite = () => {
+              if (preserveNewerAuto && entry.auto === true) {
+                const targetSlot = entry.autoSlot ?? 'solo';
+                const newerAuto = liveRows.find(row =>
+                  row.auto === true && (row.autoSlot ?? 'solo') === targetSlot
+                  && row.id !== entry.id && String(row.savedAt) > String(entry.savedAt));
+                if (newerAuto) {
+                  lastRows = liveRows;
+                  txResult = { rows: liveRows, skipped: true };
+                  return;
                 }
               }
+              const replacedIds = new Set();
+              if (entry.auto === true) {
+                const targetSlot = entry.autoSlot ?? 'solo';
+                for (const row of liveRows) {
+                  if (row.auto === true && (row.autoSlot ?? 'solo') === targetSlot && row.id !== entry.id) {
+                    replacedIds.add(row.id);
+                  }
+                }
+              }
+              const surviving = liveRows.filter(
+                row => !replacedIds.has(row.id) && !extraEvictedIds.has(row.id) && row.id !== entry.id,
+              );
+              const candidates = this.applyBudget([...surviving, entry], entry.id);
+              lastRows = candidates.rows;
+              const deleteIds = new Set([
+                ...replacedIds,
+                ...extraEvictedIds,
+                ...candidates.evicted.map(row => row.id),
+              ]);
+              deleteIds.delete(entry.id);
+              for (const deleteId of deleteIds) {
+                entriesStore.delete(deleteId);
+                payloadsStore.delete(deleteId);
+              }
+              entriesStore.put(entry);
+              payloadsStore.put(payload, entry.id);
+              txResult = { rows: candidates.rows, skipped: false };
+            };
+
+            if (skipIfExists && liveRows.some(row => row.id === entry.id)) {
+              const payloadReq = payloadsStore.get(entry.id);
+              payloadReq.onsuccess = event => {
+                const existingPayload = event?.target?.result ?? payloadReq.result;
+                if (existingPayload !== undefined && existingPayload !== null) {
+                  lastRows = liveRows;
+                  txResult = { rows: liveRows, skipped: true };
+                  return;
+                }
+                performWrite();
+              };
+              return;
             }
-            const surviving = liveRows.filter(
-              row => !replacedIds.has(row.id) && !extraEvictedIds.has(row.id) && row.id !== entry.id,
-            );
-            const candidates = this.applyBudget([...surviving, entry], entry.id);
-            lastRows = candidates.rows;
-            const deleteIds = new Set([
-              ...replacedIds,
-              ...extraEvictedIds,
-              ...candidates.evicted.map(row => row.id),
-            ]);
-            deleteIds.delete(entry.id);
-            for (const deleteId of deleteIds) {
-              entriesStore.delete(deleteId);
-              payloadsStore.delete(deleteId);
-            }
-            entriesStore.put(entry);
-            payloadsStore.put(payload, entry.id);
-            return { rows: candidates.rows, skipped: false };
+
+            performWrite();
           },
         );
-        this._committedRows = result.rows;
+        this._committedRows = txResult.rows;
         this.error = null;
-        return { ok: true, skipped: result.skipped };
+        return { ok: true, skipped: txResult.skipped };
       } catch (error) {
         const isQuota = error?.name === 'QuotaExceededError' || /quota/i.test(error?.message || '');
         const victim = isQuota ? lastRows?.find(row => row.id !== entry.id) : null;
@@ -923,7 +943,7 @@ export class ReplayStore {
             db,
             migratedEntry,
             built.compressed,
-            { preserveNewerAuto: true },
+            { preserveNewerAuto: true, skipIfExists: true },
           );
           if (!commit.ok) {
             // Preserve unmigrated localStorage entries untouched for retry.
@@ -981,7 +1001,7 @@ export class ReplayStore {
                     db,
                     stagedEntry,
                     built.compressed,
-                    { preserveNewerAuto: true },
+                    { preserveNewerAuto: true, skipIfExists: true },
                   );
                   if (commit.ok) {
                     this._clearRoomStagingIfMatches(staged.id);

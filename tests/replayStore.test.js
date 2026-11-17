@@ -1230,3 +1230,51 @@ test('startup room staging recovery preserves a newer staging entry written duri
   const remaining = JSON.parse(storage.getItem(ROOM_STAGING_KEY));
   assert.equal(remaining.id, 'new-staged-room', 'startup recovery must not delete a newer room staging entry');
 });
+
+test('concurrent migration does not overwrite an entry already migrated and promoted by another tab', async () => {
+  const storage = new MockStorage();
+  const idb = createMemoryIndexedDB();
+  const t1 = track(20);
+  const legacyRow = {
+    id: 'shared-mig-auto',
+    savedAt: '2026-01-01T00:00:00.000Z',
+    label: AUTO_SAVE_LABEL,
+    durationSec: t1.durationSec,
+    intervalSec: t1.intervalSec,
+    sampleCount: t1.samples.length,
+    bytes: 2000,
+    metadata: t1.metadata,
+    auto: true,
+    autoSlot: 'solo',
+  };
+  storage.setItem(INDEX_KEY, JSON.stringify([legacyRow]));
+  storage.setItem(payloadKey(legacyRow.id), JSON.stringify(createSortie({ label: AUTO_SAVE_LABEL }, t1)));
+
+  // Tab B starts migrating first and stalls during compression.
+  const tabB = storeFor(storage, BUDGET, { indexedDB: idb });
+  const origBuild = tabB._buildCompressedPayload.bind(tabB);
+  let releaseTabB;
+  const tabBStalled = new Promise(resolve => {
+    tabB._buildCompressedPayload = async (...args) => {
+      resolve();
+      await new Promise(done => { releaseTabB = done; });
+      return origBuild(...args);
+    };
+  });
+  await tabBStalled;
+
+  // Meanwhile Tab A finishes migrating the same entry and promotes it via rename.
+  const tabA = storeFor(storage, BUDGET, { indexedDB: idb });
+  await tabA.ready();
+  assert.equal(await tabA.rename(legacyRow.id, 'Kept Permanent'), true);
+
+  // Tab B resumes and commits: must not overwrite Tab A's promoted label/auto flag.
+  releaseTabB();
+  const tabBResult = await tabB.ready();
+  assert.equal(tabBResult.error, null);
+  assert.equal(tabBResult.migrated, 0);
+  const stored = getIdbEntry(idb, legacyRow.id);
+  assert.equal(stored.label, 'Kept Permanent');
+  assert.equal(stored.auto, undefined);
+  assert.equal(tabB.list().find(r => r.id === legacyRow.id)?.label, 'Kept Permanent');
+});
