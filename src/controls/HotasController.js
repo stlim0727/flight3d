@@ -11,13 +11,8 @@
  * @param {number} deadzone Deadzone threshold (0 to 1)
  * @returns {number} Filtered and rescaled value (-1 to 1)
  */
-export function applyDeadzone(value, deadzone = 0.04) {
-  if (value === undefined || value === null || Number.isNaN(value)) return 0.0;
-  if (Math.abs(value) <= deadzone) return 0.0;
-  const sign = Math.sign(value);
-  const scaled = (Math.abs(value) - deadzone) / (1.0 - deadzone);
-  return sign * Math.min(1.0, Math.max(0.0, scaled));
-}
+export { applyDeadzone } from './FlightControlLaws.js';
+import { applyDeadzone } from './FlightControlLaws.js';
 
 /**
  * Identify controller profile type from gamepad object.
