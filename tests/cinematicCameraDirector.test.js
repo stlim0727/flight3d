@@ -607,7 +607,7 @@ test('Approach keeps routine shots until the missile is close, then holds the ba
     director.update({ dt: 0.1, camera, planePos, planeQuat, missiles: [], targets: [mission] });
   }
   assert.equal(director.missileSequence, null, 'Sequence ends after the detonation lingers');
-  assert.equal(director.currentShotType, CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY, 'Director returns to routine shots');
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT, 'Director returns to player-to-bandit dogfight framing');
 });
 
 test('CameraSystem DIRECTOR mode forwards live combat state to the director', () => {
@@ -835,4 +835,192 @@ test('follow-up salvo missile takes over BANDIT_POV when decoyed lead missile ti
   assert.equal(director.missileSequence?.missile?.id, 6, 'Follow-up missile takes over the sequence');
   assert.equal(director.missileSequence?.target?.id, 2, 'Queued handoff preserves the bandit target over decoys');
   assert.equal(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV, 'Camera stays in BANDIT_POV for follow-up kill');
+});
+
+test('Dogfight mode alternates between player-to-bandit and bandit-to-player shots', () => {
+  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const bandit = {
+    id: 11,
+    alive: true,
+    position: new THREE.Vector3(200, 1600, -1800),
+    velocity: new THREE.Vector3(0, 0, 180),
+  };
+  const flightState = { onGround: false, iasKnots: 380, gForce: 4.0, rollDeg: 65, altitudeFt: 5000 };
+
+  // Advance past initial 0.25s entry window: dogfight mode cuts to player->bandit.
+  for (let i = 0; i < 6; i++) {
+    director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, targets: [bandit] });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT);
+  camera.updateMatrixWorld(true);
+  const viewDir1 = new THREE.Vector3();
+  camera.getWorldDirection(viewDir1);
+  const playerToBandit = bandit.position.clone().sub(planePos).normalize();
+  assert.ok(viewDir1.dot(playerToBandit) > 0.9, 'Player-to-bandit shot looks toward the bandit');
+
+  // Advance past maxShotDuration (6.5s): alternates to bandit->player.
+  for (let i = 0; i < 70; i++) {
+    director.update({ dt: 0.1, camera, planePos, planeQuat, flightState, targets: [bandit] });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.DOGFIGHT_BANDIT_TO_PLAYER);
+  camera.updateMatrixWorld(true);
+  const viewDir2 = new THREE.Vector3();
+  camera.getWorldDirection(viewDir2);
+  const banditToPlayer = planePos.clone().sub(bandit.position).normalize();
+  assert.ok(viewDir2.dot(banditToPlayer) > 0.9, 'Bandit-to-player shot looks toward the player');
+});
+
+test('MISSILE_TRACK rides right behind missile tail fins looking down its flight path', () => {
+  const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const target = {
+    id: 12,
+    alive: true,
+    position: new THREE.Vector3(0, 1500, -4000),
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const missile = fakeMissile({
+    id: 101,
+    position: new THREE.Vector3(5, 1500, -10),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target,
+  });
+
+  director.update({ dt: 0.05, camera, planePos, planeQuat, missiles: [missile], targets: [target] });
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_LAUNCH);
+
+  for (let i = 0; i < 12; i++) {
+    missile.position.z -= 60;
+    director.update({ dt: 0.1, camera, planePos, planeQuat, missiles: [missile], targets: [target] });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_TRACK);
+  const distToMissile = camera.position.distanceTo(missile.position);
+  assert.ok(distToMissile < 5.0, `Tail-fin POV sits close behind missile (${distToMissile.toFixed(2)}m)`);
+  camera.updateMatrixWorld(true);
+  const viewDir = new THREE.Vector3();
+  camera.getWorldDirection(viewDir);
+  assert.ok(viewDir.dot(new THREE.Vector3(0, 0, -1)) > 0.95, 'Tail-fin POV looks straight down missile flight path');
+});
+
+test('BANDIT_POV zooms out when bandit dispenses chaff and flares to keep trajectories in frame', () => {
+  const camera = new THREE.PerspectiveCamera(46, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const targetPos = new THREE.Vector3(0, 1500, -3000);
+  const target = {
+    id: 13,
+    alive: true,
+    position: targetPos.clone(),
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const missile = fakeMissile({
+    id: 102,
+    position: targetPos.clone().add(new THREE.Vector3(0, 0, 900)),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target,
+  });
+  director.missileSequence = {
+    missile, target, phase: 'bandit', phaseTime: 0, missileDeathTime: null, stationSide: null,
+    lastMissilePos: missile.position.clone(), lastTargetPos: targetPos.clone(),
+    lastTargetDamage: 0, lastTargetAlive: true, hitDetected: false, hitTime: 0, hitPos: null,
+  };
+  director.switchShot(CINEMATIC_SHOTS.BANDIT_POV);
+
+  director.update({
+    dt: 0.016, camera, planePos: new THREE.Vector3(0, 1500, 0), planeQuat: new THREE.Quaternion(),
+    missiles: [missile], targets: [target], flares: [], chaffClouds: [],
+  });
+  const baseDist = camera.position.distanceTo(targetPos);
+  const baseFov = camera.fov;
+
+  const flares = [
+    { id: 1, sourceId: 13, alive: true, position: targetPos.clone().add(new THREE.Vector3(-40, -30, 120)) },
+  ];
+  const chaffClouds = [
+    { id: 2, sourceId: 13, alive: true, position: targetPos.clone().add(new THREE.Vector3(50, -20, 140)) },
+  ];
+  for (let i = 0; i < 10; i++) {
+    director.update({
+      dt: 0.1, camera, planePos: new THREE.Vector3(0, 1500, 0), planeQuat: new THREE.Quaternion(),
+      missiles: [missile], targets: [target], flares, chaffClouds,
+    });
+  }
+  const decoyDist = camera.position.distanceTo(targetPos);
+  assert.ok(decoyDist > baseDist + 15, `Camera zooms out for decoys (${baseDist.toFixed(1)}m -> ${decoyDist.toFixed(1)}m)`);
+  assert.ok(camera.fov > baseFov + 3, `FOV widens for decoys (${baseFov.toFixed(1)} -> ${camera.fov.toFixed(1)})`);
+});
+
+test('BANDIT_POV follows burning wreck on hit, frames trailing fire, and returns to player-to-bandit', () => {
+  const camera = new THREE.PerspectiveCamera(46, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const target = {
+    id: 14,
+    alive: true,
+    damage: 0,
+    position: new THREE.Vector3(0, 1500, -2500),
+    velocity: new THREE.Vector3(0, 0, -200),
+  };
+  const spareBandit = {
+    id: 15,
+    alive: true,
+    position: new THREE.Vector3(800, 1500, -3500),
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const missile = fakeMissile({
+    id: 103,
+    position: new THREE.Vector3(0, 1500, -1700),
+    velocity: new THREE.Vector3(0, 0, -600),
+    target,
+  });
+  director.missileSequence = {
+    missile, target, phase: 'bandit', phaseTime: 0, missileDeathTime: null, stationSide: null,
+    lastMissilePos: missile.position.clone(), lastTargetPos: target.position.clone(),
+    lastTargetDamage: 0, lastTargetAlive: true, hitDetected: false, hitTime: 0, hitPos: null,
+  };
+  director.switchShot(CINEMATIC_SHOTS.BANDIT_POV);
+
+  // Impact: target killed, wreck mesh tumbles forward & downward in targetViews.
+  target.alive = false;
+  missile.alive = false;
+  missile.position.copy(target.position);
+  const wreckPos = target.position.clone().add(new THREE.Vector3(0, -30, -220));
+  const targetViews = new Map([
+    [14, { wreck: { age: 1.0 }, mesh: { position: wreckPos } }],
+  ]);
+
+  director.update({
+    dt: 0.1, camera, planePos, planeQuat,
+    missiles: [], targets: [target, spareBandit], targetViews,
+  });
+  assert.equal(director.missileSequence.hitDetected, true, 'Hit is detected on kill');
+  assert.ok(
+    camera.position.distanceTo(wreckPos) < 60,
+    `Camera follows moving wreck position (${camera.position.distanceTo(wreckPos).toFixed(1)}m away)`,
+  );
+
+  // At 2.0s after impact (> 1.4s normal linger), hit linger keeps BANDIT_POV active.
+  for (let i = 0; i < 19; i++) {
+    wreckPos.z -= 15;
+    director.update({
+      dt: 0.1, camera, planePos, planeQuat,
+      missiles: [], targets: [target, spareBandit], targetViews,
+    });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.BANDIT_POV, 'Extended hit linger holds BANDIT_POV past 1.4s');
+
+  // After 3.2s hit linger finishes, returns to player-to-bandit framing.
+  for (let i = 0; i < 15; i++) {
+    director.update({
+      dt: 0.1, camera, planePos, planeQuat,
+      missiles: [], targets: [target, spareBandit], targetViews,
+    });
+  }
+  assert.equal(director.missileSequence, null);
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT);
 });

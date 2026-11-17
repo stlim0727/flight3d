@@ -37,17 +37,23 @@ export const CINEMATIC_SHOTS = {
   MISSILE_LAUNCH: 'missile_launch',
   MISSILE_TRACK: 'missile_track',
   BANDIT_POV: 'bandit_pov',
+  DOGFIGHT_PLAYER_TO_BANDIT: 'dogfight_player_to_bandit',
+  DOGFIGHT_BANDIT_TO_PLAYER: 'dogfight_bandit_to_player',
 };
 
 /** Scripted cut sequence when the player releases a rail missile. */
 const MISSILE_SEQUENCE_EXIT_SHOT = CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY;
-const MISSILE_LAUNCH_SECONDS = 1.1;
+const MISSILE_LAUNCH_SECONDS = 0.9;
 // The follow cam holds as long as the round is still closing. If it is still
 // far at the cap, routine shots take over until the final cut is in range.
 const MISSILE_TRACK_MAX_SECONDS = 9.0;
 const MISSILE_POV_ENTRY_RANGE_M = 1600;
 const MISSILE_BANDIT_MAX_SECONDS = 6.0;
 const MISSILE_POV_LINGER_SECONDS = 1.4;
+const MISSILE_HIT_LINGER_SECONDS = 3.2;
+const MISSILE_HIT_PROXIMITY_M = 120;
+const DECOY_MATCH_RADIUS_M = 450;
+const DECOY_ZOOM_SPREAD_CAP_M = 180;
 
 const SHOT_LIST_NORMAL = [
   CINEMATIC_SHOTS.TELEPHOTO_FLYBY,
@@ -55,6 +61,11 @@ const SHOT_LIST_NORMAL = [
   CINEMATIC_SHOTS.WINGTIP_ACTION,
   CINEMATIC_SHOTS.LEAD_IN_TRACKING,
   CINEMATIC_SHOTS.COCKPIT_HERO,
+];
+
+const SHOT_LIST_DOGFIGHT = [
+  CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT,
+  CINEMATIC_SHOTS.DOGFIGHT_BANDIT_TO_PLAYER,
 ];
 
 export class CinematicCameraDirector {
@@ -117,7 +128,12 @@ export class CinematicCameraDirector {
     this.knownMissileIds = new Set();
     this.queuedMissiles = [];
     this.lastCombatTargets = null;
+    this.lastCombatFlares = [];
+    this.lastCombatChaff = [];
+    this.lastTargetViews = null;
     this.missileChaseDir = new THREE.Vector3(0, 0, -1);
+    this.dogfightDir = new THREE.Vector3(0, 0, -1);
+    this.dogfightShotIndex = 0;
   }
 
   reset() {
@@ -140,6 +156,10 @@ export class CinematicCameraDirector {
     this.knownMissileIds.clear();
     this.queuedMissiles = [];
     this.lastCombatTargets = null;
+    this.lastCombatFlares = [];
+    this.lastCombatChaff = [];
+    this.lastTargetViews = null;
+    this.dogfightShotIndex = 0;
   }
 
   /**
@@ -464,6 +484,65 @@ export class CinematicCameraDirector {
     }
   }
 
+  resolveTargetPosition(target) {
+    if (!target) return null;
+    if (!target.alive && this.lastTargetViews) {
+      const view = this.lastTargetViews.get?.(target.id);
+      if (view?.wreck && view.mesh?.position) {
+        return view.mesh.position;
+      }
+    }
+    return target.position ?? null;
+  }
+
+  hasAliveTargets(targets = this.lastCombatTargets) {
+    if (!Array.isArray(targets) || !targets.length) return false;
+    return targets.some(t => Boolean(t?.alive && t.position));
+  }
+
+  nearestAliveTargetToPoint(point, targets = this.lastCombatTargets) {
+    if (!point || !Array.isArray(targets)) return null;
+    let nearest = null;
+    let nearestRangeSq = Infinity;
+    for (const candidate of targets) {
+      if (!candidate?.alive || !candidate.position) continue;
+      const rangeSq = candidate.position.distanceToSquared(point);
+      if (rangeSq < nearestRangeSq) {
+        nearest = candidate;
+        nearestRangeSq = rangeSq;
+      }
+    }
+    return nearest;
+  }
+
+  collectBanditDecoys(target, targetPos) {
+    if (!targetPos) return { spread: 0, centroid: null, count: 0 };
+    const radiusSq = DECOY_MATCH_RADIUS_M * DECOY_MATCH_RADIUS_M;
+    let maxDist = 0;
+    let count = 0;
+    const sum = new THREE.Vector3();
+    for (const list of [this.lastCombatFlares, this.lastCombatChaff]) {
+      if (!Array.isArray(list)) continue;
+      for (const decoy of list) {
+        if (!decoy?.alive || !decoy.position) continue;
+        const matchesSource = decoy.sourceId != null && target?.id != null
+          ? decoy.sourceId === target.id
+          : decoy.position.distanceToSquared(targetPos) <= radiusSq;
+        if (!matchesSource) continue;
+        const dist = decoy.position.distanceTo(targetPos);
+        if (dist > maxDist) maxDist = dist;
+        sum.add(decoy.position);
+        count++;
+      }
+    }
+    if (!count) return { spread: 0, centroid: null, count: 0 };
+    return {
+      spread: Math.min(DECOY_ZOOM_SPREAD_CAP_M, maxDist),
+      centroid: sum.divideScalar(count),
+      count,
+    };
+  }
+
   beginMissileSequence(missile, targets, planePos = null, planeQuat = null, initialTarget = null) {
     const missileTarget = missile.target?.alive && missile.target.type !== 'flare' && missile.target.type !== 'chaff'
       ? missile.target
@@ -478,6 +557,7 @@ export class CinematicCameraDirector {
       const offset = missile.position.clone().sub(planePos);
       if (offset.lengthSq() > 1e-6) stationSide = offset.dot(right) >= 0 ? 1 : -1;
     }
+    const targetPos = this.resolveTargetPosition(target);
     this.missileSequence = {
       missile,
       target,
@@ -486,7 +566,12 @@ export class CinematicCameraDirector {
       missileDeathTime: null,
       stationSide,
       lastMissilePos: missile.position.clone(),
-      lastTargetPos: target ? target.position.clone() : null,
+      lastTargetPos: targetPos ? targetPos.clone() : null,
+      lastTargetDamage: target?.damage ?? 0,
+      lastTargetAlive: Boolean(target?.alive),
+      hitDetected: false,
+      hitTime: 0,
+      hitPos: null,
     };
     this.missileChaseDir.copy(missile.velocity || new THREE.Vector3(0, 0, -1));
     if (this.missileChaseDir.lengthSq() < 1e-6) this.missileChaseDir.set(0, 0, -1);
@@ -495,17 +580,7 @@ export class CinematicCameraDirector {
   }
 
   nearestAliveTarget(missile, targets) {
-    let nearest = null;
-    let nearestRangeSq = Infinity;
-    for (const candidate of targets || []) {
-      if (!candidate?.alive || !candidate.position) continue;
-      const rangeSq = candidate.position.distanceToSquared(missile.position);
-      if (rangeSq < nearestRangeSq) {
-        nearest = candidate;
-        nearestRangeSq = rangeSq;
-      }
-    }
-    return nearest;
+    return this.nearestAliveTargetToPoint(missile?.position, targets);
   }
 
   advanceMissileSequence(dt) {
@@ -513,10 +588,29 @@ export class CinematicCameraDirector {
     if (!sequence) return;
     sequence.phaseTime += dt;
     if (sequence.missile?.position) sequence.lastMissilePos.copy(sequence.missile.position);
-    if (sequence.target?.position) {
-      if (!sequence.lastTargetPos) sequence.lastTargetPos = sequence.target.position.clone();
-      else sequence.lastTargetPos.copy(sequence.target.position);
+    const resolvedTargetPos = this.resolveTargetPosition(sequence.target);
+    if (resolvedTargetPos) {
+      if (!sequence.lastTargetPos) sequence.lastTargetPos = resolvedTargetPos.clone();
+      else sequence.lastTargetPos.copy(resolvedTargetPos);
     }
+
+    // Detect impact/damage/kill so we follow the burning bandit & trailing fireball.
+    if (sequence.target && !sequence.hitDetected) {
+      const targetDamage = sequence.target.damage ?? 0;
+      const killed = sequence.lastTargetAlive && !sequence.target.alive;
+      const damaged = targetDamage > sequence.lastTargetDamage + 1e-4;
+      const closeImpact = sequence.missile && !sequence.missile.alive && sequence.lastTargetPos
+        && sequence.lastMissilePos.distanceTo(sequence.lastTargetPos) <= MISSILE_HIT_PROXIMITY_M;
+      if (killed || damaged || closeImpact) {
+        sequence.hitDetected = true;
+        sequence.hitTime = 0;
+        sequence.hitPos = sequence.lastTargetPos ? sequence.lastTargetPos.clone() : sequence.lastMissilePos.clone();
+      }
+      sequence.lastTargetDamage = targetDamage;
+      sequence.lastTargetAlive = Boolean(sequence.target.alive);
+    }
+    if (sequence.hitDetected) sequence.hitTime += dt;
+
     // The system splices dead missiles out of its live array; keep our own
     // reference so the shot still has geometry for the final frames.
     if (sequence.missile && !sequence.missile.alive && sequence.missileDeathTime === null) {
@@ -547,8 +641,9 @@ export class CinematicCameraDirector {
         this.setMissileSequencePhase('bandit');
       }
     } else if (sequence.phase === 'bandit') {
+      const lingerSeconds = sequence.hitDetected ? MISSILE_HIT_LINGER_SECONDS : MISSILE_POV_LINGER_SECONDS;
       const expired = sequence.missileDeathTime !== null
-        ? sequence.missileDeathTime >= MISSILE_POV_LINGER_SECONDS
+        ? sequence.missileDeathTime >= lingerSeconds
         : sequence.phaseTime >= MISSILE_BANDIT_MAX_SECONDS;
       if (expired) this.endMissileSequence();
     }
@@ -559,7 +654,7 @@ export class CinematicCameraDirector {
     this.missileSequence.phaseTime = 0;
     if (phase === 'track') this.switchShot(CINEMATIC_SHOTS.MISSILE_TRACK);
     else if (phase === 'bandit') this.switchShot(CINEMATIC_SHOTS.BANDIT_POV);
-    else this.switchShot(MISSILE_SEQUENCE_EXIT_SHOT);
+    else this.switchShot(this.hasAliveTargets() ? CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT : MISSILE_SEQUENCE_EXIT_SHOT);
   }
 
   endMissileSequence() {
@@ -577,7 +672,8 @@ export class CinematicCameraDirector {
       return;
     }
     this.missileSequence = null;
-    this.switchShot(MISSILE_SEQUENCE_EXIT_SHOT);
+    this.dogfightShotIndex = 0;
+    this.switchShot(this.hasAliveTargets() ? CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT : MISSILE_SEQUENCE_EXIT_SHOT);
   }
 
   /**
@@ -613,6 +709,7 @@ export class CinematicCameraDirector {
     const rollDeg = Math.abs(flightState.rollDeg ?? 0);
     const ias = flightState.iasKnots ?? 0;
     const agl = flightState.altitudeFt ?? 1000;
+    const inDogfight = !onGround && this.hasAliveTargets();
 
     // Dramatic Instant Cut Triggers (only if minimum hold time satisfied)
     if (this.shotTimer >= this.minShotDuration) {
@@ -623,28 +720,43 @@ export class CinematicCameraDirector {
         return;
       }
 
-      // 2. High-G maneuver or knife-edge bank
-      if ((gForce > 2.4 || rollDeg > 45) && this.currentShotType !== CINEMATIC_SHOTS.HIGH_G_BANK_HERO) {
-        this.switchShot(CINEMATIC_SHOTS.HIGH_G_BANK_HERO, flightState);
-        this.wasOnGround = onGround;
-        return;
-      }
+      if (!inDogfight) {
+        // 2. High-G maneuver or knife-edge bank (non-dogfight aerobatic drama)
+        if ((gForce > 2.4 || rollDeg > 45) && this.currentShotType !== CINEMATIC_SHOTS.HIGH_G_BANK_HERO) {
+          this.switchShot(CINEMATIC_SHOTS.HIGH_G_BANK_HERO, flightState);
+          this.wasOnGround = onGround;
+          return;
+        }
 
-      // 3. Low-altitude high-speed terrain skimming (only in active low trench)
-      if (agl < 180 && ias > 220 && !onGround && this.currentShotType !== CINEMATIC_SHOTS.TERRAIN_CANYON_SKIM) {
-        this.switchShot(CINEMATIC_SHOTS.TERRAIN_CANYON_SKIM, flightState);
-        this.wasOnGround = onGround;
-        return;
+        // 3. Low-altitude high-speed terrain skimming (only in active low trench)
+        if (agl < 180 && ias > 220 && !onGround && this.currentShotType !== CINEMATIC_SHOTS.TERRAIN_CANYON_SKIM) {
+          this.switchShot(CINEMATIC_SHOTS.TERRAIN_CANYON_SKIM, flightState);
+          this.wasOnGround = onGround;
+          return;
+        }
       }
     }
 
     this.wasOnGround = onGround;
 
+    // In dogfight mode, immediately adopt player<->bandit framing if currently on a non-dogfight shot.
+    if (inDogfight && !SHOT_LIST_DOGFIGHT.includes(this.currentShotType) && this.shotTimer >= 0.25) {
+      this.dogfightShotIndex = 0;
+      this.switchShot(SHOT_LIST_DOGFIGHT[0], flightState);
+      return;
+    }
+
     // Paced Cut Rhythm (maxShotDuration reached)
     if (this.shotTimer >= this.maxShotDuration) {
-      const candidateList = SHOT_LIST_NORMAL.filter(s => s !== this.currentShotType);
-      const nextType = candidateList[(this.shotIndex++) % candidateList.length];
-      this.switchShot(nextType, flightState);
+      if (inDogfight) {
+        this.dogfightShotIndex = (this.dogfightShotIndex + 1) % SHOT_LIST_DOGFIGHT.length;
+        const nextDogfight = SHOT_LIST_DOGFIGHT[this.dogfightShotIndex];
+        this.switchShot(nextDogfight, flightState);
+      } else {
+        const candidateList = SHOT_LIST_NORMAL.filter(s => s !== this.currentShotType);
+        const nextType = candidateList[(this.shotIndex++) % candidateList.length];
+        this.switchShot(nextType, flightState);
+      }
     }
   }
 
@@ -683,8 +795,14 @@ export class CinematicCameraDirector {
     queryGroundHeight = this.queryGroundHeight,
     missiles = [],
     targets = [],
+    flares = [],
+    chaffClouds = [],
+    targetViews = null,
   }) {
     if (!camera || !planePos || !planeQuat) return false;
+    this.lastCombatFlares = Array.isArray(flares) ? flares : [];
+    this.lastCombatChaff = Array.isArray(chaffClouds) ? chaffClouds : [];
+    this.lastTargetViews = targetViews ?? null;
     const safeDt = Math.min(2.0, Math.max(0.0001, dt ?? 0.016));
     // Shot pacing follows the caller's clock (replay speed/pause), while camera
     // damping keeps using the real frame delta so it stays responsive.
@@ -1006,39 +1124,42 @@ export class CinematicCameraDirector {
       }
 
       case CINEMATIC_SHOTS.MISSILE_TRACK: {
-        // Rigid follow cam: the eye rides the missile's own frame so a 700 m/s
-        // body stays locked in frame instead of lagging behind the dolly.
+        // Tail-fin POV: ride right behind the missile's tail fins looking
+        // straight down its flight path toward the target.
         isRigidMount = true;
-        targetFov = 62.0;
+        targetFov = 70.0;
         const sequence = this.missileSequence;
         const missilePos = sequence?.lastMissilePos ?? planePos;
         const velocityDir = sequence?.missile?.velocity
           ? sequence.missile.velocity.clone().normalize()
           : new THREE.Vector3(0, 0, -1);
         if (velocityDir.lengthSq() > 1e-6) {
-          this.missileChaseDir.lerp(velocityDir, 1 - Math.exp(-safeDt * 8.0)).normalize();
+          this.missileChaseDir.lerp(velocityDir, 1 - Math.exp(-safeDt * 12.0)).normalize();
         }
         const dir = this.missileChaseDir;
-        const side = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        const side = new THREE.Vector3().crossVectors(dir, worldUp);
         if (side.lengthSq() < 1e-4) side.set(1, 0, 0);
         else side.normalize();
+        const missileUp = new THREE.Vector3().crossVectors(side, dir).normalize();
         targetCamPos.copy(missilePos)
-          .addScaledVector(dir, -16.0)
-          .addScaledVector(side, 3.0)
-          .addScaledVector(new THREE.Vector3(0, 1, 0), 3.5);
-        targetLook.copy(missilePos).addScaledVector(dir, 5.0);
-        targetUp.set(0, 1, 0);
+          .addScaledVector(dir, -3.2)
+          .addScaledVector(side, 0.55)
+          .addScaledVector(missileUp, 0.75);
+        targetLook.copy(missilePos).addScaledVector(dir, 60.0);
+        targetUp.copy(missileUp);
         break;
       }
 
       case CINEMATIC_SHOTS.BANDIT_POV: {
         // Over-the-shoulder kill shot: sit behind and beside the targeted
-        // bandit, on the side opposite its bearing to the missile. The airframe
-        // stays in the foreground while the round closes from beyond it, so the
-        // detonation reads as a fireball around the target instead of a dot.
+        // bandit, on the side opposite its bearing to the missile. Zooms out
+        // when the bandit pops chaff/flares so decoy trajectories stay visible,
+        // and swings broadside/ahead on impact to keep both the bandit and its
+        // trailing hit fireball in frame.
         isRigidMount = true;
         const sequence = this.missileSequence;
-        const targetPos = sequence?.lastTargetPos ?? sequence?.target?.position ?? planePos;
+        const targetPos = sequence?.lastTargetPos ?? this.resolveTargetPosition(sequence?.target) ?? planePos;
         const missilePos = sequence?.lastMissilePos ?? targetPos;
         const worldUp = new THREE.Vector3(0, 1, 0);
         const bearing = missilePos.clone().sub(targetPos);
@@ -1055,21 +1176,57 @@ export class CinematicCameraDirector {
           side.set(1, 0, 0);
         }
 
+        if (sequence?.hitDetected) {
+          // Follow the hit bandit/wreck from ahead and beside so both the
+          // airframe and the trailing fireball/smoke plume remain in frame.
+          const travelDir = new THREE.Vector3();
+          if (sequence.target?.velocity && sequence.target.velocity.lengthSq() > 1) {
+            travelDir.copy(sequence.target.velocity);
+            travelDir.y = 0;
+          }
+          if (travelDir.lengthSq() < 1e-2 && sequence.hitPos) {
+            travelDir.copy(targetPos).sub(sequence.hitPos);
+            travelDir.y = 0;
+          }
+          if (travelDir.lengthSq() < 1e-2) travelDir.copy(bearing);
+          else travelDir.normalize();
+
+          const travelSide = new THREE.Vector3(-travelDir.z, 0, travelDir.x);
+          targetCamPos.copy(targetPos)
+            .addScaledVector(travelDir, 22.0)
+            .addScaledVector(travelSide, 26.0)
+            .addScaledVector(worldUp, 8.0);
+          targetLook.copy(targetPos)
+            .addScaledVector(travelDir, -14.0)
+            .addScaledVector(worldUp, 1.5);
+          targetFov = 54.0;
+          targetUp.copy(worldUp);
+          break;
+        }
+
         const range = missilePos.distanceTo(targetPos);
-        // Pull back with range so the strike starts as a wide three-quarter
-        // framing of the bandit and tightens as the missile arrives.
-        const backM = 18.0 + THREE.MathUtils.clamp(range * 0.006, 0, 14.0);
-        const sideM = 7.0 + THREE.MathUtils.clamp(range * 0.002, 0, 4.0);
+        const decoys = this.collectBanditDecoys(sequence?.target, targetPos);
+        const decoyZoomOut = decoys.spread * 0.25;
+        const decoySide = decoys.spread * 0.10;
+        const decoyUp = decoys.spread * 0.06;
+
+        // Pull back with range and active chaff/flare spread so the strike and
+        // countermeasure arcs remain readable together.
+        const backM = 18.0 + THREE.MathUtils.clamp(range * 0.006, 0, 14.0) + decoyZoomOut;
+        const sideM = 7.0 + THREE.MathUtils.clamp(range * 0.002, 0, 4.0) + decoySide;
         targetCamPos.copy(targetPos)
           .addScaledVector(bearing, -backM)
           .addScaledVector(side, sideM)
-          .addScaledVector(worldUp, 5.0);
+          .addScaledVector(worldUp, 5.0 + decoyUp);
 
-        // Keep the bandit centred and the incoming bearing readable past it.
+        // Keep the bandit centred and the incoming bearing (plus decoys) readable.
         targetLook.copy(targetPos)
           .addScaledVector(bearing, 6.0)
           .addScaledVector(worldUp, 1.0);
-        targetFov = 46.0;
+        if (decoys.centroid) {
+          targetLook.lerp(decoys.centroid, 0.18);
+        }
+        targetFov = THREE.MathUtils.clamp(46.0 + decoys.spread * 0.08, 46.0, 60.0);
 
         // Proximity shake rises as the missile closes on the bandit.
         const proximity = THREE.MathUtils.clamp(1 - range / MISSILE_POV_ENTRY_RANGE_M, 0, 1);
@@ -1077,6 +1234,71 @@ export class CinematicCameraDirector {
         targetCamPos.x += Math.sin(this.totalTimer * 47.0) * shake;
         targetCamPos.y += Math.cos(this.totalTimer * 61.0) * shake;
 
+        targetUp.copy(worldUp);
+        break;
+      }
+
+      case CINEMATIC_SHOTS.DOGFIGHT_PLAYER_TO_BANDIT: {
+        // Over-the-shoulder view from behind the player's jet toward the bandit.
+        isChasingDolly = true;
+        targetFov = 52.0;
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        const bandit = this.nearestAliveTargetToPoint(planePos, targets);
+        const banditPos = this.resolveTargetPosition(bandit);
+        if (banditPos) {
+          const dir = banditPos.clone().sub(planePos);
+          if (dir.lengthSq() > 1e-4) dir.normalize();
+          else dir.copy(forward);
+          const side = new THREE.Vector3().crossVectors(dir, worldUp);
+          if (side.lengthSq() < 1e-4) side.copy(right);
+          else side.normalize();
+          targetCamPos.copy(planePos)
+            .addScaledVector(dir, -20.0)
+            .addScaledVector(side, 6.5)
+            .addScaledVector(worldUp, 4.2);
+          targetLook.copy(banditPos);
+        } else {
+          targetCamPos.copy(planePos)
+            .addScaledVector(forward, -22.0)
+            .addScaledVector(right, 6.0)
+            .addScaledVector(worldUp, 4.5);
+          targetLook.copy(planePos).addScaledVector(forward, 60.0);
+        }
+        targetUp.copy(worldUp);
+        break;
+      }
+
+      case CINEMATIC_SHOTS.DOGFIGHT_BANDIT_TO_PLAYER: {
+        // Over-the-shoulder view from behind the bandit looking toward the player.
+        isRigidMount = true;
+        targetFov = 52.0;
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        const bandit = this.nearestAliveTargetToPoint(planePos, targets);
+        const banditPos = this.resolveTargetPosition(bandit);
+        if (banditPos) {
+          const dir = planePos.clone().sub(banditPos);
+          if (dir.lengthSq() > 1e-4) dir.normalize();
+          else dir.copy(forward).negate();
+          const side = new THREE.Vector3().crossVectors(dir, worldUp);
+          if (side.lengthSq() < 1e-4) side.set(1, 0, 0);
+          else side.normalize();
+          const decoys = this.collectBanditDecoys(bandit, banditPos);
+          const decoyZoom = decoys.spread * 0.22;
+          targetCamPos.copy(banditPos)
+            .addScaledVector(dir, -(20.0 + decoyZoom))
+            .addScaledVector(side, 6.5 + decoys.spread * 0.08)
+            .addScaledVector(worldUp, 4.2 + decoys.spread * 0.05);
+          targetLook.copy(planePos);
+          if (decoys.centroid) {
+            targetFov = THREE.MathUtils.clamp(52.0 + decoys.spread * 0.06, 52.0, 62.0);
+          }
+        } else {
+          targetCamPos.copy(planePos)
+            .addScaledVector(forward, 26.0)
+            .addScaledVector(right, 5.0)
+            .addScaledVector(worldUp, 4.0);
+          targetLook.copy(planePos);
+        }
         targetUp.copy(worldUp);
         break;
       }

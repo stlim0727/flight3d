@@ -2308,6 +2308,9 @@ export class CameraSystem {
           queryGroundHeight: (x, z) => this.queryGroundHeight(x, z),
           missiles: combat?.missiles ?? [],
           targets: combat?.targets ?? [],
+          flares: combat?.flares ?? [],
+          chaffClouds: combat?.chaffClouds ?? [],
+          targetViews: combat?.targetViews ?? null,
         });
         break;
       }

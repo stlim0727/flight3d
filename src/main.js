@@ -389,9 +389,21 @@ class FlightSimulator {
     this.rearmSystem = new RearmSystem();
     // A replay owns the combat feed: its recorded missile poses and bandit
     // states drive the director instead of the inactive live system.
-    this.cameraSystem.setCombatStateProvider(() => this.replayDirector?.combatState() ?? {
-      missiles: this.missileCombat.missiles,
-      targets: this.missileCombat.targets,
+    this.cameraSystem.setCombatStateProvider(() => {
+      const replayCombat = this.replayDirector?.combatState();
+      if (replayCombat) {
+        return {
+          ...replayCombat,
+          targetViews: this.replayDirector?.combatView?.()?.targetViews ?? null,
+        };
+      }
+      return {
+        missiles: this.missileCombat.missiles,
+        targets: this.missileCombat.targets,
+        flares: this.missileCombat.flares,
+        chaffClouds: this.missileCombat.chaffClouds,
+        targetViews: this.missileCombatView?.targetViews ?? null,
+      };
     });
     this._combatTerrainHeight = (x, z) => this.currentTerrain?.getHeight(x, z) ?? 0;
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
