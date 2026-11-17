@@ -53,10 +53,10 @@ await withBrowserSession({
   })()`);
 
   for (let i = 0; i < 120; i++) {
-    if (await evaluate('window.simulator.missileCombat.targets.length === 2')) break;
+    if (await evaluate('window.simulator.missileCombat.targets.length === 1')) break;
     await delay(100);
   }
-  close(await evaluate('window.simulator.missileCombat.targets.length === 2'), 'two bandits spawned');
+  close(await evaluate('window.simulator.missileCombat.targets.length === 1'), 'one bandit spawned');
   close(await evaluate('window.simulator.aircraft.missileMeshes.every(mesh => mesh.visible)'), 'six rail missiles visible');
   await delay(300);
   await screenshot(path.join(dir, 'f16-rail-loadout.png'));

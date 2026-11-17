@@ -104,6 +104,7 @@ test('B1 coastal Cruise comparison separates single-shot close-pursuit from mult
     'attack-skill': attackSkill,
     'evasion-skill': 'legacy-break',
     'countermeasure-policy': countermeasurePolicy,
+    'bandit-count': 2,
     diagnostics: true,
   })).results[0];
 

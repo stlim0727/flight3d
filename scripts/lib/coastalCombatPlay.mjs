@@ -79,8 +79,11 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
   pilot.setPreset('cruise');
   pilot.euler = new Euler(); pilot.forward = new Vector3(); pilot.result = pilot._aeroResult;
   const terrainHeight = pilot.currentTerrain.getHeight.bind(pilot.currentTerrain);
-  const combat = new AirToAirMissileSystem({ evasionSkill: config.skills.evasion.id,
-    countermeasurePolicy: config.skills.countermeasure.id });
+  const combat = new AirToAirMissileSystem({
+    evasionSkill: config.skills.evasion.id,
+    countermeasurePolicy: config.skills.countermeasure.id,
+    ...(config.banditCount !== undefined ? { banditCount: config.banditCount } : {}),
+  });
   const attack = createAttackSkill(config.skills.attack.id);
   const world = { active: true, onGround: false, position: pilot.position, velocity: pilot.linearVelocity,
     quaternion: pilot.quaternion, terrainHeight };
