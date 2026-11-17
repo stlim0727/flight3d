@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { installInstrumentLighting } from './InstrumentLighting.js';
 import { F16_FALCON } from '../config/aircraftConfigs.js';
-import { gearSupportHeight, tireContact } from './gearVisualContact.js';
+import { tireContact } from './gearVisualContact.js';
+import { getControlInput } from './common/ControlSurfaceRig.js';
+import { clampGearExtension, calculateGearFold, isGearCollapsed, computeGearContactOffset } from './common/GearKinematicsRig.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { JetExhaust } from '../effects/JetExhaust.js';
 import { applyFlatShading } from '../config/renderQuality.js';
@@ -21,8 +23,6 @@ export const F16_CENTER_X = 25.935216903686523;
 const glbPoint = (x, y, z) => [y * F16_SCALE, -z * F16_SCALE, (F16_CENTER_X - x) * F16_SCALE];
 const glbAxis = (x, y, z) => [y, -z, -x];
 const glbPlane = (x, y, z, constant) => ({ x: y, y: -z, z: -x, constant: (x * F16_CENTER_X + constant) * F16_SCALE });
-const finite = value => (Number.isFinite(value) ? value : 0);
-const stick = (state, name) => THREE.MathUtils.clamp(finite(state[name]), -1, 1);
 const deg = THREE.MathUtils.degToRad;
 
 /** All-moving stabilators (pitch, differential roll), flaperons (roll, 20° flaps) and rudder. */
@@ -33,19 +33,19 @@ export function f16ControlSurfaceSpecs() {
     specs.push(
       { name: `stabilator${side}`, boundaries: [glbPlane(0, sign, 0, -10.66), glbPlane(-1, 0, 0, -15)],
         origin: glbPoint(-34, sign * 10.66, 0.2), axis: glbAxis(0, 17.15, 3.6 * sign),
-        deflection: state => -deg(20) * stick(state, 'elevator') - deg(5) * sign * stick(state, 'aileron') },
+        deflection: state => -deg(20) * getControlInput(state, 'elevator') - deg(5) * sign * getControlInput(state, 'aileron') },
       { name: `flaperon${side}`, boundaries: [glbPlane(0, sign, 0, -13.64), glbPlane(0, -sign, 0, 34.75),
         glbPlane(-0.9873, -0.159 * sign, 0, 0.244), glbPlane(1, 0, 0, 12)],
         origin: glbPoint(-1.95, sign * 13.64, -0.52), axis: glbAxis(-3.4 * sign, 21.11, -0.4 * sign),
         deflection: state => THREE.MathUtils.clamp(
-          deg(THREE.MathUtils.clamp(finite(state.flapDegree), 0, 20)) - deg(20) * sign * stick(state, 'aileron'),
+          deg(getControlInput(state, 'flapDegree', 0, 0, 20)) - deg(20) * sign * getControlInput(state, 'aileron'),
           -deg(23), deg(20)) }
     );
   }
   // The hinge axis points up, so a positive angle swings the trailing edge starboard.
   specs.push({ name: 'rudder', boundaries: [glbPlane(-0.8178, 0, 0.5758, -19.27), glbPlane(0, 0, -1, -11.6), glbPlane(0, 0, 1, 30.55)],
     origin: glbPoint(-31.62, 0, -11.45), axis: glbAxis(-13.4, 0, -19.03),
-    deflection: state => deg(26) * stick(state, 'rudder') });
+    deflection: state => deg(26) * getControlInput(state, 'rudder') });
   return specs;
 }
 
@@ -304,18 +304,15 @@ export class F16 {
   update(dt, state = {}) {
     this.exhaust?.update(dt, state, this.isCrashed);
     updateGltfControlSurfaces(this.controlSurfaces, state);
-    const extension = THREE.MathUtils.clamp(state.gearState ?? this.gearExtension, 0, 1);
+    const extension = clampGearExtension(state.gearState, this.gearExtension);
     this.gearExtension = extension;
-    const fold = (1 - extension) * Math.PI / 2;
+    const fold = calculateGearFold(extension);
     for (const [id, leg] of Object.entries(this.gearLegs)) {
       const contact = leg.userData.tireContact;
-      leg.position.y = leg.userData.pivotY + extension * (
-        gearSupportHeight(F16_FALCON.landingGear.contacts, state.compressions, contact.x, contact.z) - contact.y);
-      leg.visible = extension > 0.001;
+      leg.position.y = leg.userData.pivotY + extension * computeGearContactOffset(F16_FALCON.landingGear.contacts, state.compressions, contact);
+      leg.visible = extension > 0.001 && !isGearCollapsed(state.gearDamage, id);
       if (id === 'nose') leg.rotation.x = -fold;
       else leg.rotation.z = (id === 'mainLeft' ? -1 : 1) * fold;
-      const failed = state.gearDamage?.[id] === 'collapsed';
-      if (failed) leg.visible = false;
     }
     if (this.stowedGear) this.stowedGear.visible = extension < 0.999;
     if (this.landingLight) this.landingLight.visible = this.lightsOn && !this.isCrashed && extension > 0.95;

@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { installInstrumentLighting } from './InstrumentLighting.js';
 import { CESSNA_172 } from '../config/aircraftConfigs.js';
-import { gearSupportHeight, tireContact } from './gearVisualContact.js';
+import { tireContact } from './gearVisualContact.js';
+import { applyDeflection, applyDeflectionPair, getControlInput } from './common/ControlSurfaceRig.js';
+import { computeGearContactOffset } from './common/GearKinematicsRig.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { applyFlatShading } from '../config/renderQuality.js';
@@ -679,7 +681,7 @@ export class Cessna172 {
   updateVisualGear(compressions) {
     for (const gear of this.visualGear) {
       const { contact, meshes } = gear;
-      const offset = gearSupportHeight(CESSNA_172.landingGear.contacts, compressions, contact.x, contact.z) - contact.y;
+      const offset = computeGearContactOffset(CESSNA_172.landingGear.contacts, compressions, contact);
       if (gear.offset === offset) continue;
       gear.offset = offset;
       for (const mesh of meshes) {
@@ -704,9 +706,9 @@ export class Cessna172 {
     this.updateVisualGear(flightState.compressions);
 
     const n1 = flightState.engine1?.n1 ?? flightState.engine1N1 ?? 25.0; // Piston engine RPM indicator
-    const aileron = flightState.aileron ?? 0.0;
-    const elevator = flightState.elevator ?? 0.0;
-    const rudder = flightState.rudder ?? 0.0;
+    const aileron = getControlInput(flightState, 'aileron');
+    const elevator = getControlInput(flightState, 'elevator');
+    const rudder = getControlInput(flightState, 'rudder');
     const flapDeg = flightState.flapDegree ?? 0.0;
     const onGround = flightState.onGround ?? false;
 
@@ -739,27 +741,22 @@ export class Cessna172 {
       // Ailerons (opposite deflections, ~15 deg max)
       // Positive aileron input commands right roll: left aileron trailing edge down (+X), right aileron up (-X)
       const aileronRad = aileron * THREE.MathUtils.degToRad(16.0);
-      if (this.aileronL) this.aileronL.rotation.x = aileronRad;
-      if (this.aileronR) this.aileronR.rotation.x = -aileronRad;
+      applyDeflectionPair(this.aileronL, this.aileronR, 'x', aileronRad, true);
 
       // Elevators (pitch control, ~20 deg max)
       const elevRad = -elevator * THREE.MathUtils.degToRad(20.0);
-      if (this.elevatorL) this.elevatorL.rotation.x = elevRad;
-      if (this.elevatorR) this.elevatorR.rotation.x = elevRad;
+      applyDeflectionPair(this.elevatorL, this.elevatorR, 'x', elevRad);
 
       // Rudder (yaw control, ~22 deg max)
       const rudderRad = -rudder * THREE.MathUtils.degToRad(22.0);
-      if (this.rudder) this.rudder.rotation.y = rudderRad;
+      applyDeflection(this.rudder, 'y', rudderRad);
 
       // Flaps (deflects downward 0 to 30 deg)
       const flapRad = THREE.MathUtils.degToRad(flapDeg);
-      if (this.flapL) this.flapL.rotation.x = flapRad;
-      if (this.flapR) this.flapR.rotation.x = flapRad;
+      applyDeflectionPair(this.flapL, this.flapR, 'x', flapRad);
 
       // Nose Wheel Steering
-      if (this.noseFork) {
-        this.noseFork.rotation.y = onGround ? -rudder * THREE.MathUtils.degToRad(30.0) : 0.0;
-      }
+      applyDeflection(this.noseFork, 'y', onGround ? -rudder * THREE.MathUtils.degToRad(30.0) : 0.0);
     }
 
     // 3. Flashing Beacon & Strobes
