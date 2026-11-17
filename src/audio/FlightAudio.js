@@ -18,6 +18,8 @@ export class FlightAudio {
     this.isMuted = this.isPaused = this.isInitialized = this.crashed = this.touchdownActive = this.isReplayPaused = false;
     this.volume = this.engineVolume = 1.0;
     this.lastTouchdownTime = -Infinity;
+    this._alertId = null;
+    this._threatLevel = 0;
     const rOpts = (dir, cfg) => ({
       context: () => this.ctx, output: () => this.masterGain,
       muted: () => this.isMuted || this.volume === 0,
@@ -32,6 +34,10 @@ export class FlightAudio {
   get lastRadioAlt() { return this.gpws.lastRadioAlt; }
   set lastRadioAlt(v) { this.gpws.lastRadioAlt = v; }
   get calledAltitudes() { return this.gpws.calledAltitudes; }
+  get alertId() { return this.warnings ? this.warnings.alertId : this._alertId; }
+  set alertId(v) { if (this.warnings) this.warnings.alertId = v; else this._alertId = v; }
+  get threatLevel() { return this.warnings ? this.warnings.threatLevel : this._threatLevel; }
+  set threatLevel(v) { if (this.warnings) this.warnings.threatLevel = v; else this._threatLevel = v; }
   get isPiston() { return this.profile.engineType === 'piston'; }
   get effectiveVolume() { return (this.isMuted || this.isPaused) ? 0.0 : this.volume; }
   get gunFireNodes() { return this.combat?.gunFireNodes ?? null; }
@@ -45,6 +51,7 @@ export class FlightAudio {
 
   reset() {
     this.combat?.reset(); this.crashed = this.touchdownActive = false; this.lastTouchdownTime = -Infinity;
+    this.alertId = null; this.threatLevel = 0;
     this.gpws?.reset(); this.departureRadio.stop(); this.bangkokRadio?.stop(); this.warnings?.reset();
     if (this.packGain) this.packGain.gain.setTargetAtTime(this.isPiston ? 0 : 0.16, this.ctx?.currentTime ?? 0, 0.04);
   }
@@ -75,9 +82,7 @@ export class FlightAudio {
       this.ctx = context || new AudioCtx();
       if (typeof this.ctx.onstatechange !== 'undefined') {
         this.ctx.onstatechange = () => {
-          if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
-            this.ctx.resume().catch(() => {});
-          }
+          if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) this.ctx.resume().catch(() => {});
         };
       }
       Object.assign(this, MasterMixerChain.create(this.ctx, this.effectiveVolume, this.engineVolume, this.isReplayPaused));
@@ -88,6 +93,9 @@ export class FlightAudio {
       this.warnings = new WarningSynthesizer(this.ctx, this.masterGain, this.cockpitFilter);
       this.combat = new CombatSoundEffects(this.ctx, this.masterGain, this.ambientBus, () => this.silenceOnCrash(), () => this.isReplayPaused);
       Object.assign(this, this.airflow, this.turbofan, this.piston, this.airframe, this.warnings);
+      delete this.alertId; delete this.threatLevel;
+      if (this._alertId !== null) this.warnings.alertId = this._alertId;
+      if (this._threatLevel !== 0) this.warnings.threatLevel = this._threatLevel;
 
       this.isInitialized = true;
       for (const n of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'gStrainGain']) {
@@ -100,17 +108,14 @@ export class FlightAudio {
   }
 
   ensureContextRunning() {
-    if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
-      this.ctx.resume().catch(() => {});
-    }
+    if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) this.ctx.resume().catch(() => {});
   }
 
   setVolume(vol) {
     this.volume = Math.max(0.0, Math.min(1.0, vol));
     if (this.volume > 0.0) this.isMuted = false;
     if (this.volume === 0) {
-      this.cancelSpeech(); this.stopGunFire(); this.stopMissileFlight();
-      this.departureRadio.stop(); this.bangkokRadio?.stop();
+      this.cancelSpeech(); this.stopGunFire(); this.stopMissileFlight(); this.departureRadio.stop(); this.bangkokRadio?.stop();
     }
     this.applyMasterGain();
   }
@@ -118,7 +123,7 @@ export class FlightAudio {
   setEngineVolume(level) {
     if (!Number.isFinite(level)) return this.engineVolume;
     this.engineVolume = Math.max(0, Math.min(1, level));
-    if (this.engineBus && this.ctx) this.engineBus.gain.setTargetAtTime(this.engineVolume, this.ctx.currentTime, 0.05);
+    this.engineBus?.gain.setTargetAtTime(this.engineVolume, this.ctx?.currentTime ?? 0, 0.05);
     return this.engineVolume;
   }
 

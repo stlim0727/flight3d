@@ -511,12 +511,15 @@ describe('warning audio arbitration', () => {
     const warning = { id: 'pull-up', voice: 'Whoop whoop, pull up' };
     const state = pistonState(70, { onGround: false, radioAltFt: 490, vsiFpm: -1500, warnings: [warning] });
     audio.update(0.1, state, true);
+    assert.strictEqual(audio.alertId, 'pull-up');
     audio.update(0.1, state, true);
     assert.deepEqual(spoken, ['Whoop whoop, pull up']);
     audio.update(4, state, true);
     assert.equal(spoken.length, 2);
     audio.update(0.1, { ...state, warnings: [], radioAltFt: 480 }, true);
-    assert.equal(audio.alertId, undefined);
+    assert.strictEqual(audio.alertId, undefined);
+    audio.reset();
+    assert.strictEqual(audio.alertId, null);
   }));
   it('sounds overspeed clacker and engine caution chime, then restores the horn frequency', () => withPiston(audio => {
     audio.loadAircraftConfig(BOEING_737_800);
