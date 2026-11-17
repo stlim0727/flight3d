@@ -12,6 +12,7 @@ const scratchEmitPos = new THREE.Vector3();
 const scratchVelocity = new THREE.Vector3();
 const scratchFrom = new THREE.Vector3();
 const scratchTo = new THREE.Vector3();
+const scratchInterpPos = new THREE.Vector3();
 
 // A destroyed bandit keeps flying as a burning wreck instead of blinking out.
 // Its launch velocity is the airframe's measured frame-to-frame motion, so the
@@ -182,8 +183,8 @@ export class SmokeTrail {
         } else if (dist >= this.spacing) {
           const steps = Math.min(32, Math.floor(dist / this.spacing));
           for (let i = 1; i <= steps; i++) {
-            scratchEmitPos.lerpVectors(this.lastPosition, position, i / steps);
-            this.emit(scratchEmitPos);
+            scratchInterpPos.lerpVectors(this.lastPosition, position, i / steps);
+            this.emit(scratchInterpPos);
           }
           this.lastPosition.copy(position);
         }
@@ -344,11 +345,11 @@ export class MissileSmokeTrail {
           const steps = Math.min(80, Math.floor(dist / this.spacing));
           for (let i = 1; i <= steps; i++) {
             const alpha = i / steps;
-            scratchEmitPos.lerpVectors(this.lastPosition, position, alpha);
-            scratchEmitPos.x += (Math.random() - 0.5) * 0.25;
-            scratchEmitPos.y += (Math.random() - 0.5) * 0.25;
-            scratchEmitPos.z += (Math.random() - 0.5) * 0.25;
-            this.emit(scratchEmitPos, { alpha: initialAlpha, lifetime: initialLife });
+            scratchInterpPos.lerpVectors(this.lastPosition, position, alpha);
+            scratchInterpPos.x += (Math.random() - 0.5) * 0.25;
+            scratchInterpPos.y += (Math.random() - 0.5) * 0.25;
+            scratchInterpPos.z += (Math.random() - 0.5) * 0.25;
+            this.emit(scratchInterpPos, { alpha: initialAlpha, lifetime: initialLife });
           }
           this.lastPosition.copy(position);
         }
@@ -409,13 +410,13 @@ export class MissileSmokeTrail {
 
       for (let s = 0; s < steps; s++) {
         const t = s / steps;
-        scratchEmitPos.lerpVectors(scratchFrom, scratchTo, t);
+        scratchInterpPos.lerpVectors(scratchFrom, scratchTo, t);
         const sampleTime = curr.timeSec + t * (next.timeSec - curr.timeSec);
         const age = Math.max(0, currentTime - sampleTime);
         if (age <= this.lifetime) {
           const progress = age / this.lifetime;
           const alpha = baseAlpha * Math.max(0, 1.0 - progress * progress);
-          this.emit(scratchEmitPos, { alpha, lifetime: this.lifetime });
+          this.emit(scratchInterpPos, { alpha, lifetime: this.lifetime });
           this.ages[this.count - 1] = age;
         }
       }

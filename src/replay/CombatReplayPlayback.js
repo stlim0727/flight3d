@@ -39,14 +39,27 @@ function shortestAngle(a, b, alpha) {
 }
 
 function catmullRom(p0, p1, p2, p3, t) {
+  const d = p2 - p1;
+  if (Math.abs(d) < 1e-4) return p1;
+  let m1 = 0.5 * (p2 - p0);
+  let m2 = 0.5 * (p3 - p1);
+  if (d * m1 <= 0) m1 = 0;
+  if (d * m2 <= 0) m2 = 0;
+  const s1 = m1 / d;
+  const s2 = m2 / d;
+  const sumSq = s1 * s1 + s2 * s2;
+  if (sumSq > 9) {
+    const tau = 3 / Math.sqrt(sumSq);
+    m1 = tau * s1 * d;
+    m2 = tau * s2 * d;
+  }
   const t2 = t * t;
   const t3 = t2 * t;
-  return 0.5 * (
-    (2 * p1) +
-    (-p0 + p2) * t +
-    (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-    (-p0 + 3 * p1 - 3 * p2 + p3) * t3
-  );
+  const h00 = 2 * t3 - 3 * t2 + 1;
+  const h10 = t3 - 2 * t2 + t;
+  const h01 = -2 * t3 + 3 * t2;
+  const h11 = t3 - t2;
+  return h00 * p1 + h10 * m1 + h01 * p2 + h11 * m2;
 }
 
 /**
@@ -321,9 +334,15 @@ export class CombatReplayPlayback {
       } else {
         missile.velocity.set(0, 0, -1).applyQuaternion(missile.quaternion).multiplyScalar(600);
       }
-      if (timeSec > samples.at(-1).timeSec) {
-        const extraDt = timeSec - samples.at(-1).timeSec;
-        missile.position.addScaledVector(missile.velocity, extraDt);
+      const lastSampleTime = samples.at(-1).timeSec;
+      if (timeSec > lastSampleTime) {
+        const maxExtrapolateS = Number.isFinite(group.removeAt)
+          ? Math.min(0.2, Math.max(0, group.removeAt - lastSampleTime))
+          : 0.1;
+        const extraDt = Math.min(maxExtrapolateS, timeSec - lastSampleTime);
+        if (extraDt > 0) {
+          missile.position.addScaledVector(missile.velocity, extraDt);
+        }
       }
       this.state.missiles.push(missile);
     }

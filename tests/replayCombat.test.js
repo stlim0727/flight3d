@@ -587,3 +587,66 @@ test('CombatReplayPlayback uses Catmull-Rom spline for smooth missile position b
 
   playback.stop();
 });
+
+test('SmokeTrail and MissileSmokeTrail interpolation does not mutate caller position vector', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { spacing: 1.6 });
+  const emitVector = new Vector3(0, 100, 0);
+
+  trail.update(0.016, emitVector, true);
+  emitVector.set(10, 100, 0);
+
+  // If internal scratch vector mutates emitVector, emitVector.x will be corrupted
+  trail.update(0.016, emitVector, true);
+  assert.equal(emitVector.x, 10, 'Caller position vector must remain untouched by interpolation');
+  assert.equal(emitVector.y, 100);
+  assert.equal(emitVector.z, 0);
+
+  assert.equal(trail.lastPosition.x, 10, 'lastPosition must accurately store target destination');
+  trail.dispose();
+});
+
+test('CombatReplayPlayback monotonic spline prevents oscillation on repeated identical positions', () => {
+  const scene = new Scene();
+  const playback = new CombatReplayPlayback({ scene });
+  const missileSamples = [
+    { timeSec: 0.0, id: 1, typeId: 'AIM9X', x: 0, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.1, id: 1, typeId: 'AIM9X', x: 60, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.2, id: 1, typeId: 'AIM9X', x: 60, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.3, id: 1, typeId: 'AIM9X', x: 120, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+  ];
+
+  playback.load({ version: 8, targets: [], missileSamples, banditSamples: [], events: [] });
+
+  // In the span [0.1, 0.2], missile should stay exactly at x=60 without wiggling
+  for (let t = 0.10; t <= 0.20; t += 0.02) {
+    playback.seek(t);
+    const m = playback.state.missiles[0];
+    assert.ok(Math.abs(m.position.x - 60) < 1e-4, `At t=${t.toFixed(2)}, x must stay at 60 (got ${m.position.x})`);
+  }
+
+  playback.stop();
+});
+
+test('CombatReplayPlayback bounds missile extrapolation when termination event is absent', () => {
+  const scene = new Scene();
+  const playback = new CombatReplayPlayback({ scene });
+  const missileSamples = [
+    { timeSec: 0.0, id: 1, typeId: 'AIM9X', x: 0, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.1, id: 1, typeId: 'AIM9X', x: 60, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+  ];
+
+  // No detonation or expire event recorded (removeAt = Infinity)
+  playback.load({ version: 8, targets: [], missileSamples, banditSamples: [], events: [] });
+
+  playback.seek(10.0); // 9.9 seconds past the last sample
+  const m = playback.state.missiles[0];
+  assert.ok(m);
+
+  // Velocity is (60 - 0) / 0.1 = 600 m/s in X.
+  // Without bounding, it would have moved to x = 60 + 600 * 9.9 = 6000m!
+  // With 0.1s cap, it stops at x = 60 + 600 * 0.1 = 120m.
+  assert.ok(m.position.x <= 130, `Unterminated missile must not extrapolate indefinitely (got x=${m.position.x})`);
+
+  playback.stop();
+});
