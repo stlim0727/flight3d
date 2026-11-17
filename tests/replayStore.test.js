@@ -1185,3 +1185,48 @@ test('ReplayStore.subscribe notifies listeners when an in-flight save fails and 
   assert.deepEqual(snapshots.at(-1), [initial.id], 'rollback must notify subscribers with restored row');
   unsubscribe();
 });
+
+test('startup room staging recovery preserves a newer staging entry written during compression', async () => {
+  const storage = new MockStorage();
+  const idb = createMemoryIndexedDB();
+  const oldTrack = track(20);
+  const oldSortie = createSortie({ label: ROOM_AUTO_SAVE_LABEL, durationSec: oldTrack.durationSec, metadata: oldTrack.metadata }, oldTrack);
+  storage.setItem(ROOM_STAGING_KEY, JSON.stringify({
+    id: 'old-staged-room',
+    savedAt: '2026-01-01T00:00:00.000Z',
+    label: ROOM_AUTO_SAVE_LABEL,
+    auto: true,
+    autoSlot: 'room',
+    sortie: oldSortie,
+  }));
+
+  const store = storeFor(storage, BUDGET, { indexedDB: idb });
+  const origBuild = store._buildCompressedPayload.bind(store);
+  let releaseCompression;
+  const compressionStarted = new Promise(resolve => {
+    store._buildCompressedPayload = async (...args) => {
+      resolve();
+      await new Promise(done => { releaseCompression = done; });
+      return origBuild(...args);
+    };
+  });
+
+  await compressionStarted;
+  const newerTrack = track(24);
+  const newerSortie = createSortie({ label: ROOM_AUTO_SAVE_LABEL, durationSec: newerTrack.durationSec, metadata: newerTrack.metadata }, newerTrack);
+  storage.setItem(ROOM_STAGING_KEY, JSON.stringify({
+    id: 'new-staged-room',
+    savedAt: '2026-01-02T00:00:00.000Z',
+    label: ROOM_AUTO_SAVE_LABEL,
+    auto: true,
+    autoSlot: 'room',
+    sortie: newerSortie,
+  }));
+  releaseCompression();
+
+  const mig = await store.ready();
+  assert.equal(mig.error, null);
+  assert.equal(mig.migrated, 1);
+  const remaining = JSON.parse(storage.getItem(ROOM_STAGING_KEY));
+  assert.equal(remaining.id, 'new-staged-room', 'startup recovery must not delete a newer room staging entry');
+});

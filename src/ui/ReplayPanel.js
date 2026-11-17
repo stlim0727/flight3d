@@ -75,6 +75,7 @@ export class ReplayPanel {
       } catch { this.status('replay.importFailed'); this.track('import', false); }
       e.target.value = '';
     });
+    this._librarySession = 0;
     this.sim.replayStore?.subscribe?.(() => {
       if (!this.library.hidden) this.renderList();
     });
@@ -89,6 +90,7 @@ export class ReplayPanel {
 
   openLibrary() {
     if (this.sim.startingFlight) return;
+    this._librarySession++;
     this.previousFocus = document.activeElement;
     this.status(this.sim.replayStore.consumeRoomSaveFailure?.() ? 'replay.roomSaveFailed'
       : this.watchBlocked() ? 'replay.multiplayerBlocked' : null); this.renderList();
@@ -100,6 +102,7 @@ export class ReplayPanel {
   }
 
   closeLibrary() {
+    this._librarySession++;
     if (this.library.hidden) return;
     this.library.hidden = true;
     this.previousFocus?.focus();
@@ -173,14 +176,24 @@ export class ReplayPanel {
         if (action === 'watch') button.disabled = this.watchBlocked();
         button.addEventListener('click', async () => {
           if (action === 'watch') {
-            const saved = await this.sim.replayStore.get(entry.id);
-            if (!saved) { this.status('replay.loadFailed'); return; }
+            const session = ++this._librarySession;
             button.disabled = true;
+            const saved = await this.sim.replayStore.get(entry.id);
+            if (this._librarySession !== session || this.library.hidden) {
+              button.disabled = this.watchBlocked();
+              return;
+            }
+            if (!saved) {
+              button.disabled = this.watchBlocked();
+              this.status('replay.loadFailed');
+              return;
+            }
             if (await this.watch(saved.track, entry.id)) {
               this.closeLibrary(); this.root.querySelector('[data-play]').focus();
+            } else {
+              this.status('replay.loadFailed');
             }
-            else this.status('replay.loadFailed');
-            button.disabled = false;
+            button.disabled = this.watchBlocked();
           } else if (action === 'export') {
             const blob = await this.sim.replayStore.exportBlob(entry.id);
             this.track('export', Boolean(blob));

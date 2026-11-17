@@ -807,6 +807,19 @@ export class ReplayStore {
     });
   }
 
+  _clearRoomStagingIfMatches(id) {
+    try {
+      const currentRaw = this.storage.getItem(ROOM_STAGING_KEY);
+      if (currentRaw === null) return;
+      const current = JSON.parse(currentRaw);
+      if (!current || current.id === id) {
+        this.storage.removeItem(ROOM_STAGING_KEY);
+      }
+    } catch {
+      try { this.storage.removeItem(ROOM_STAGING_KEY); } catch { /* ignore */ }
+    }
+  }
+
   async _migrateLegacyEntries(db, snapshot) {
     let migrated = 0;
     try {
@@ -935,7 +948,7 @@ export class ReplayStore {
           const staged = JSON.parse(rawStaged);
           if (staged?.id && staged?.sortie?.track) {
             if (rowById.has(staged.id) && payloadIds.has(staged.id)) {
-              this.storage.removeItem(ROOM_STAGING_KEY);
+              this._clearRoomStagingIfMatches(staged.id);
             } else {
               const trackBytes = fromBase64(staged.sortie.track);
               const track = decodeTrack(trackBytes);
@@ -943,7 +956,7 @@ export class ReplayStore {
                 candidate => candidate.auto === true && (candidate.autoSlot ?? 'solo') === 'room' && candidate.id !== staged.id,
               );
               if (existingRoomAuto && String(existingRoomAuto.savedAt) > String(staged.savedAt)) {
-                this.storage.removeItem(ROOM_STAGING_KEY);
+                this._clearRoomStagingIfMatches(staged.id);
               } else {
                 const compactReport = staged.sortie.report ?? {
                   label: staged.label || ROOM_AUTO_SAVE_LABEL,
@@ -971,7 +984,7 @@ export class ReplayStore {
                     { preserveNewerAuto: true },
                   );
                   if (commit.ok) {
-                    this.storage.removeItem(ROOM_STAGING_KEY);
+                    this._clearRoomStagingIfMatches(staged.id);
                     if (!commit.skipped) migrated++;
                   }
                 }
@@ -1110,17 +1123,7 @@ export class ReplayStore {
       autoSlot: 'room',
     });
     if (staged) {
-      try {
-        const currentRaw = this.storage.getItem(ROOM_STAGING_KEY);
-        if (currentRaw !== null) {
-          const current = JSON.parse(currentRaw);
-          if (!current || current.id === id) {
-            this.storage.removeItem(ROOM_STAGING_KEY);
-          }
-        }
-      } catch {
-        try { this.storage.removeItem(ROOM_STAGING_KEY); } catch { /* ignore */ }
-      }
+      this._clearRoomStagingIfMatches(id);
     }
     if (!result.entry) {
       // Best effort: an entirely inaccessible storage cannot persist even a failure notice.

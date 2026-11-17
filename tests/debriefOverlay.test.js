@@ -206,4 +206,8 @@ test('DebriefOverlay guards async save completion by debrief generation and Repl
   const panelSource = readFileSync(resolve('src/ui/ReplayPanel.js'), 'utf8');
   assert.match(panelSource, /replayStore\?\.subscribe\?\./,
     'ReplayPanel must subscribe to replayStore updates so in-flight save commits/rollbacks refresh the open library');
+  assert.match(panelSource, /this\._librarySession/,
+    'ReplayPanel must invalidate pending watch requests when the library closes');
+  assert.match(panelSource, /if\s*\(\s*this\._librarySession\s*!==\s*session\s*\|\|\s*this\.library\.hidden\s*\)/,
+    'ReplayPanel watch click must abort before starting playback if library closed while loading');
 });
