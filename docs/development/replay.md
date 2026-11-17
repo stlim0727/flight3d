@@ -20,7 +20,10 @@ to IndexedDB on startup, preserving originals until IndexedDB commits succeed.
 Export files to retain copies outside that browser.
 
 Playback has play/pause, previous/next recorded sample, a time scrubber, all ten
-existing camera views, and 30/50/100/200/300 percent speeds. Camera digit shortcuts
+existing camera views, and 30/50/100/200/300 percent speeds. Playback uses the
+live camera toolbar in its original position, with the same buttons, styling and
+visibility preferences; the transport panel has no separate camera row. Other
+toolbar actions are invisible but retain their layout slots to avoid shifting cameras. Camera digit shortcuts
 and mouse look continue to work while aircraft inputs are disabled. Exit or Escape
 returns to the debrief that opened the playback, so its save and share actions stay
 reachable (#648); library playback returns to the lobby. Neither hands the recorded

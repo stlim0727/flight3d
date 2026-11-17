@@ -46,11 +46,11 @@ await withBrowserSession({ width: 1280, height: 800, navigate: false }, async ({
   assert.ok(await ev('s.replayDirector.progressSec > 0 && s.replayDirector.paused'));
   // Exercise every available camera, including asynchronous cockpit entry.
   for (let mode = 0; mode < 10; mode++) {
-    await click(`[data-camera-mode="${mode}"]`);
+    await click(`#camera-strip [data-camera-mode="${mode}"]`);
     await until(() => ev(mode === 7 ? 's.cameraSystem.autoSwitch' : `s.cameraSystem.mode === ${mode}`), `camera ${mode}`, 45000);
     await delay(100);
   }
-  await click('[data-camera-mode="1"]');
+  await click('#camera-strip [data-camera-mode="1"]');
   await screenshot(`${output}/desktop.png`);
   for (const [width, height, name] of [[390, 844, 'mobile'], [844, 390, 'landscape']]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });

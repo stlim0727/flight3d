@@ -1,7 +1,6 @@
 import { bindText, t, translateDOM } from '../i18n/index.js';
 import { REPLAY_SPEEDS } from '../replay/replayConfig.js';
 import { flightDuration } from '../core/FlightRecorder.js';
-import { createCameraButtons } from './FlightPanels.js';
 
 export class ReplayPanel {
   constructor(sim) {
@@ -27,7 +26,6 @@ export class ReplayPanel {
       </div>
       <input data-seek type="range" min="0" max="1" step="0.01" value="0" data-i18n-aria-label="replay.seek">
       <div class="replay-speeds" role="group" data-i18n-aria-label="replay.speed">${REPLAY_SPEEDS.map(speed => `<button class="btn" data-speed="${speed}" aria-pressed="false">${speed * 100}%</button>`).join('')}</div>
-      <div class="replay-cameras" role="group" data-i18n-aria-label="replay.camera"></div>
       <p data-wait role="status" data-i18n="replay.waiting" hidden></p>
       <button class="btn ui-unfold-pill replay-unfold-pill" data-unfold type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
         <span class="unfold-icon">▶</span>
@@ -41,10 +39,6 @@ export class ReplayPanel {
       <label class="btn replay-import"><span data-i18n="replay.import"></span><input type="file" accept=".f3dr.gz,.gz,.json,application/gzip,application/x-gzip,application/json" data-import></label>
       <p data-status role="status" aria-live="polite"></p><div data-list></div></div>`;
     translateDOM(this.root); translateDOM(this.library);
-    this.root.querySelector('.replay-cameras').append(...createCameraButtons((mode) => {
-      sim.controls.onSelectCamera(mode);
-      this.refresh();
-    }, { idPrefix: 'btn-replay-cam-' }));
     bindText(this.root.querySelector('[data-play]'), () => t(sim.replayDirector.paused ? 'replay.play' : 'replay.pause'));
     this.root.querySelector('[data-play]').addEventListener('click', () => sim.replayDirector.togglePause());
     this.root.querySelector('[data-exit]').addEventListener('click', () => this.exit());
@@ -279,6 +273,5 @@ export class ReplayPanel {
     if (timeMini) timeMini.textContent = ` (${timeFormatted})`;
     this.root.querySelector('[data-wait]').hidden = !director.waitingTerrain;
     for (const el of this.root.querySelectorAll('[data-speed]')) el.setAttribute('aria-pressed', String(Number(el.dataset.speed) === director.speed));
-    for (const el of this.root.querySelectorAll('[data-camera-mode]')) el.setAttribute('aria-pressed', String(Number(el.dataset.cameraMode) === (this.sim.cameraSystem.autoSwitch ? 7 : this.sim.cameraSystem.mode)));
   }
 }
