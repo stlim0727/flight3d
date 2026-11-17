@@ -122,21 +122,21 @@ body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
   touch-action: pan-x;
 }
 .flight-toolbar .flight-camera-strip::-webkit-scrollbar { display: none; }
-.flight-toolbar .btn, .compact-ui .flight-toolbar .btn {
-  flex: 0 0 calc(44px * var(--ui-scale, 1));
-  width: calc(44px * var(--ui-scale, 1));
-  min-width: calc(44px * var(--ui-scale, 1));
-  height: calc(44px * var(--ui-scale, 1));
-  min-height: calc(44px * var(--ui-scale, 1));
-  padding: 0 1px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
+ .flight-camera-btn, .compact-ui .flight-camera-btn {
+   flex: 0 0 calc(44px * var(--ui-scale, 1));
+   width: calc(44px * var(--ui-scale, 1));
+   min-width: calc(44px * var(--ui-scale, 1));
+   height: calc(44px * var(--ui-scale, 1));
+   min-height: calc(44px * var(--ui-scale, 1));
+   padding: 0 1px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   line-height: 1;
 }
 .flight-toolbar #btn-fullscreen[data-short-label]::after { font-size: calc(15px * var(--ui-scale, 1)); }
 .flight-toolbar #open-flight-more { font: 700 calc(20px * var(--ui-scale, 1)) system-ui; }
-.flight-toolbar .btn[data-short-label]::after { font-size: calc(10px * var(--ui-scale, 1)); line-height: 1; }
+ .flight-toolbar .btn[data-short-label]::after, .flight-camera-btn[data-short-label]::after { font-size: calc(10px * var(--ui-scale, 1)); line-height: 1; }
 .flight-more-panel, .ap-panel {
   position: fixed;
   top: calc(var(--flight-panels-top, calc(var(--edge-top) + (100px * var(--ui-scale, 1)))) + var(--flight-alert-space, 0px));
@@ -636,15 +636,15 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   .hud-top-bar .hud-strip .hud-item.hud-primary[data-hud="hdg"] { display: none; }
 }
 
-@media (min-width: 1025px) {
-  .flight-toolbar .btn[data-key-hint] { flex-direction: column; gap: 2px; }
-  .flight-toolbar .btn[data-key-hint]::before {
-    content: attr(data-key-hint);
-    order: 1;
-    color: #bae6fd;
-    font: 700 9px/1 monospace;
-  }
-  .flight-more-panel .btn[data-key-hint]::after {
-    content: ' [' attr(data-key-hint) ']';
-  }
-}
+ @media (min-width: 1025px) {
+   .flight-toolbar .btn[data-key-hint], .flight-camera-btn[data-key-hint] { flex-direction: column; gap: 2px; }
+   .flight-toolbar .btn[data-key-hint]::before, .flight-camera-btn[data-key-hint]::before {
+     content: attr(data-key-hint);
+     order: 1;
+     color: #bae6fd;
+     font: 700 9px/1 monospace;
+   }
+   .flight-more-panel .btn[data-key-hint]::after {
+     content: ' [' attr(data-key-hint) ']';
+   }
+ }
