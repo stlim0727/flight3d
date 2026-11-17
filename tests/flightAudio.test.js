@@ -402,6 +402,36 @@ describe('C172 piston sound and lifecycle', () => {
     assert.equal(audio.masterGain.gain.value, 1);
   }));
 
+  it('keeps ambientBus silent when audio initializes while replay is already paused', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.setReplayPaused(true);
+      audio.init();
+      assert.equal(audio.ambientBus.gain.value, 0, 'ambient bus should start at 0 gain when replay paused');
+      audio.setReplayPaused(false);
+      assert.equal(audio.ambientBus.gain.value, 1, 'resuming replay restores ambient bus');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('does not duck ambientBus on playMissileLaunch when replay is paused', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      audio.setReplayPaused(true);
+      assert.equal(audio.ambientBus.gain.value, 0);
+      audio.playMissileLaunch(0);
+      assert.equal(audio.ambientBus.gain.value, 0, 'ambient bus should remain at 0 gain when replay is paused');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
   it('does not restart continuous sounds after a crash, including a muted crash and preset reset', () => withPiston(audio => {
     audio.update(0.1, pistonState(100, { iasKnots: 90 }), false);
     audio.setMuted(true); audio.playExplosion(); audio.setMuted(false);
@@ -481,12 +511,15 @@ describe('warning audio arbitration', () => {
     const warning = { id: 'pull-up', voice: 'Whoop whoop, pull up' };
     const state = pistonState(70, { onGround: false, radioAltFt: 490, vsiFpm: -1500, warnings: [warning] });
     audio.update(0.1, state, true);
+    assert.strictEqual(audio.alertId, 'pull-up');
     audio.update(0.1, state, true);
     assert.deepEqual(spoken, ['Whoop whoop, pull up']);
     audio.update(4, state, true);
     assert.equal(spoken.length, 2);
     audio.update(0.1, { ...state, warnings: [], radioAltFt: 480 }, true);
-    assert.equal(audio.alertId, undefined);
+    assert.strictEqual(audio.alertId, undefined);
+    audio.reset();
+    assert.strictEqual(audio.alertId, null);
   }));
   it('sounds overspeed clacker and engine caution chime, then restores the horn frequency', () => withPiston(audio => {
     audio.loadAircraftConfig(BOEING_737_800);
