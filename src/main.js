@@ -47,12 +47,11 @@ import { NeonCity } from './environment/NeonCity.js';
 import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
-import { pickGazeTarget } from './cameras/gazeTargetPicker.js';
 import { HudView } from './ui/HudView.js';
 import { AirToAirMissileSystem } from './weapons/AirToAirMissileSystem.js';
 import { CannonCombatView } from './weapons/CannonCombatView.js';
 import { MissileCombatView } from './weapons/MissileCombatView.js';
-import { presentCombatEvent, syncCombatAudio } from './weapons/combatPresentation.js';
+import { presentCombatEvent } from './weapons/combatPresentation.js';
 import { RearmSystem } from './systems/RearmSystem.js';
 import { RenderPose } from './core/RenderPose.js';
 import { DiagnosticsInspector } from './ui/DiagnosticsInspector.js';
@@ -63,7 +62,6 @@ import { CollisionDetector } from './physics/CollisionDetector.js';
 import { ExplosionSystem } from './effects/ExplosionSystem.js';
 import { TireSmokeSystem } from './effects/TireSmokeSystem.js';
 import { PilotPhysiologyFx } from './effects/PilotPhysiologyFx.js';
-import { initFlightPanels } from './ui/FlightPanels.js';
 import { initUiScale } from './ui/UiScale.js';
 import { GameFlowController, FLOW } from './ui/GameFlowController.js';
 import { FlightRecorder } from './core/FlightRecorder.js';
@@ -89,6 +87,8 @@ import { installStartupLoadMonitor, readDevice, readGpuClass } from './ui/Startu
 import { installPresetSpawner } from './core/PresetSpawner.js';
 import { installPhysicsIntegrator } from './core/PhysicsIntegrator.js';
 import { installSimulatorHudAndBindings } from './ui/SimulatorHudAndBindings.js';
+import { SimulatorAudioCoordinator } from './core/SimulatorAudioCoordinator.js';
+import { SimulatorInputCoordinator } from './core/SimulatorInputCoordinator.js';
 import {
   initAnalytics,
   getPostHogConfig,
@@ -120,15 +120,7 @@ initLocalization();
 initBuildInfo();
 const startupProgress = new StartupProgressView();
 // Loading disclosure and scrolling keep native keys without reaching flight shortcuts.
-document.getElementById('startup-overlay').addEventListener('keydown', event => event.stopPropagation());
-
-// Window-level flight shortcuts must not run behind the loading screen.
-window.addEventListener('keydown', event => {
-  if (document.body.classList.contains('booting') && !event.target?.closest?.('#startup-overlay')) {
-    if (event.key !== 'Tab') event.preventDefault();
-    event.stopImmediatePropagation();
-  }
-}, { capture: true });
+SimulatorInputCoordinator.installStartupInputShield();
 
 async function startupStage(value, message) {
   startupTrace?.noteStage(value);
@@ -310,24 +302,15 @@ class FlightSimulator {
     await startupDetail('startup.detail.systems');
     // 6. Audio & Controls & Camera & Diagnostics
     this.audio = new FlightAudio();
+    this.audioCoordinator = new SimulatorAudioCoordinator(this.audio, this);
     this.controls = new FlightControls(this.renderer.domElement);
     this.touchControls = new TouchFlightControls(this.controls);
     this.touchControls.onOptionsChange = () => this.lobby?.refresh?.();
-    initFlightPanels({
-      toolbarHidden: loadSimulatorPreferences().toolbarHidden,
-      onToolbarHiddenChange: toolbarHidden => saveSimulatorPreferences({ toolbarHidden }),
-      onSelectCamera: mode => this.controls.onSelectCamera(mode),
-      onAdjustTrim: delta => {
-        if (this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed) return;
-        this.aero.setTrim(delta);
-        this.controls.pitchTrim = this.aero.pitchTrim;
-      },
-      onToggleParkingBrake: () => {
-        if (this.controls.onToggleParkingBrake) this.controls.onToggleParkingBrake();
-        else if (!this.controls.aircraftControlsDisabled && !this.controls.inputBlocked && !this.isCrashed) {
-          this.controls.setParkingBrake(!this.controls.parkingBrake);
-        }
-      },
+    this.inputCoordinator = new SimulatorInputCoordinator(this);
+    this.inputCoordinator.bindFlightPanels({
+      controls: this.controls,
+      aero: this.aero,
+      isCrashedGetter: () => this.isCrashed,
     });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
     this.cameraSystem.setTerrain(this.terrain);
@@ -547,88 +530,9 @@ class FlightSimulator {
 
     // Start with the flight when autoplay is permitted. Otherwise the browser
     // keeps the context suspended until the first flight/menu interaction.
-    const audioHint = document.getElementById('audio-start-hint');
-    const interactionEvents = ['touchstart', 'touchend', 'pointerdown', 'pointerup', 'mousedown', 'click', 'keydown'];
-    let listenersAttached = false;
-
-    const attachInteractionListeners = () => {
-      if (listenersAttached) return;
-      interactionEvents.forEach(evt => {
-        window.addEventListener(evt, ensureAudio, { passive: true, capture: true });
-      });
-      listenersAttached = true;
-    };
-
-    const detachInteractionListeners = () => {
-      if (!listenersAttached) return;
-      interactionEvents.forEach(evt => {
-        window.removeEventListener(evt, ensureAudio, { capture: true });
-      });
-      listenersAttached = false;
-    };
-
-    const isMultiplayerVoiceBlocked = () => Boolean(
-      this.multiplayer?.playbackBlocked ||
-      (this.multiplayer?.active && this.multiplayer?.audio?.srcObject && this.multiplayer?.audio?.paused) ||
-      (this.multiplayer?.active && this.multiplayer?.voice?.context && this.multiplayer?.voice?.context?.state !== 'running')
-    );
-
-    const syncAudioHint = () => {
-      const state = this.audio.ctx?.state;
-      const isRunning = state === 'running';
-      const isVoiceBlocked = isMultiplayerVoiceBlocked();
-      if (audioHint) {
-        if ((isRunning && !isVoiceBlocked) || this.audio.isMuted) {
-          audioHint.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
-          audioHint.style.opacity = '0';
-          audioHint.style.transform = 'translate(-50%, 8px)';
-          setTimeout(() => {
-            const stillRunning = this.audio.ctx?.state === 'running';
-            const stillBlocked = isMultiplayerVoiceBlocked();
-            if ((stillRunning && !stillBlocked) || this.audio.isMuted) {
-              audioHint.hidden = true;
-            }
-          }, 250);
-        } else {
-          audioHint.hidden = false;
-          audioHint.style.opacity = '1';
-          audioHint.style.transform = 'translate(-50%, 0)';
-        }
-      }
-      if (isRunning && !isVoiceBlocked) {
-        detachInteractionListeners();
-      } else if (!this.audio.isMuted && (!isRunning || isVoiceBlocked)) {
-        attachInteractionListeners();
-      }
-    };
-
-    let hintContext;
-    const ensureAudio = () => {
-      if (this.browserBackgrounded && !document.hidden && document.hasFocus?.()) {
-        this.setBrowserActive(true);
-      }
-      if (!this.audio.isInitialized) {
-        this.audio.init();
-      }
-      this.audio.ensureContextRunning();
-      this.multiplayer?.playAudio();
-      if (this.audio.ctx && hintContext !== this.audio.ctx) {
-        hintContext?.removeEventListener('statechange', syncAudioHint);
-        hintContext = this.audio.ctx;
-        hintContext.addEventListener('statechange', syncAudioHint);
-      }
-      syncAudioHint();
-    };
-
-    this.ensureAudio = ensureAudio;
-    this.syncAudioHint = syncAudioHint;
-
-    attachInteractionListeners();
-    audioHint?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      ensureAudio();
-    });
-    ensureAudio();
+    this.ensureAudio = () => this.audioCoordinator.ensureAudio();
+    this.syncAudioHint = () => this.audioCoordinator.syncAudioHint();
+    this.audioCoordinator.initInteractionListeners();
 
     // Initialize analytics/error reporting asynchronously without delaying startup
     if (typeof window !== 'undefined') {
@@ -693,49 +597,15 @@ class FlightSimulator {
   }
   /** Browser activity is a separate hold, so returning cannot undo menu/pause state. */
   initBrowserActivity() {
-    const sync = () => this.setBrowserActive(!document.hidden && document.hasFocus());
-    window.addEventListener('blur', () => this.setBrowserActive(false));
-    window.addEventListener('focus', sync);
-    document.addEventListener('visibilitychange', sync);
-    window.addEventListener('pagehide', () => this.setBrowserActive(false));
-    window.addEventListener('pageshow', sync);
-    sync();
+    this.inputCoordinator.bindBrowserActivity(this);
   }
 
   setBrowserActive(active) {
-    const backgrounded = !active;
-    if (this.browserBackgrounded === backgrounded) return;
-    this.browserBackgrounded = backgrounded;
-    this.flightPerformance?.flush('browser-activity');
-    this.flightGpuTimer?.clear();
-    this.lastFrameDelta = null;
-    // Discard wall time and any fractional physics debt on both edges.
-    this.clock.getDelta();
-    this.physicsAccumulator = 0;
-    if (backgrounded) {
-      this.frameTransitions?.cancel();
-      this.multiplayer?.roomReplay?.gap();
-      this.controls.releaseAllKeys();
-      this.controls.setTouchStick(0, 0);
-      this.controls.setTouchRudder(0);
-      this.controls.setTouchBrakes(0);
-    }
-    this.syncAudioPause();
-    if (active) this.audio?.ensureContextRunning();
+    this.inputCoordinator.syncBrowserActive(this, active);
   }
 
   syncAudioPause() {
-    if (this.gameFlow.state !== FLOW.FLIGHT) {
-      this.flightPerformance?.flush('flight-held');
-      this.flightGpuTimer?.clear();
-      this.lastFrameDelta = null;
-    }
-    const backgrounded = this.browserBackgrounded === true;
-    const held = this.gameFlow.state === FLOW.DEBRIEF || this.gameFlow.state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby() || Boolean(this.demoDirector?.isRestartConfirmOpen);
-    const radioPaused = backgrounded || this.gameFlow.state !== FLOW.FLIGHT || Boolean(this.demoDirector?.isRestartConfirmOpen);
-    if (this.audio?.setRadioPaused) this.audio.setRadioPaused(radioPaused);
-    else this.audio?.departureRadio.setPaused(radioPaused);
-    this.audio?.setPaused(backgrounded || held);
+    this.audioCoordinator.syncAudioPause();
   }
 
   /** Apply the game-flow state to the DOM: menu visibility, input blocking. */
@@ -763,12 +633,9 @@ class FlightSimulator {
     }
     document.body.dataset.devScenario = String(Boolean(this.devRunner?.active));
     document.body.dataset.devManualFlight = String(Boolean(this.devRunner?.active?.definition.pilotControlled));
-    this.controls.inputBlocked = this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.blocksFlightInput() || this.shadowDemo.active || Boolean(this.devRunner?.blocksInput) || Boolean(this.pilotArena?.active && this.pilotArena?.record?.pilotKind !== 'human') || Boolean(this.demoDirector?.isRestartConfirmOpen);
+    this.inputCoordinator.updateInputBlocked(this);
     if (state !== FLOW.FLIGHT) {
-      this.controls.releaseAllKeys();
-      this.controls.setTouchStick(0.0, 0.0);
-      this.controls.setTouchRudder(0.0);
-      this.controls.setTouchBrakes(0.0);
+      this.inputCoordinator.releaseAllControls(this.controls);
       if (document.pointerLockElement && document.pointerLockElement === this.renderer.domElement) {
         document.exitPointerLock();
       }
@@ -1410,11 +1277,7 @@ class FlightSimulator {
   }
 
   syncGunAudio() {
-    // Both calls are idempotent. Do not cache the trigger state: a burst that
-    // began while audio was muted or locked must start as soon as the graph can
-    // play, without waiting for the player to release and press the trigger.
-    if (this.missileCombat?.cannon?.firing) this.audio.startGunFire();
-    else this.audio.stopGunFire();
+    this.audioCoordinator.syncGunAudio(this.missileCombat?.cannon?.firing);
   }
 
   cycleCombatTarget() {
@@ -1512,11 +1375,7 @@ class FlightSimulator {
     this.cannonCombatView.sync(combatDt);
     this.syncGunAudio();
     if (!this.replayDirector?.active) {
-      syncCombatAudio(this.missileCombat, {
-        audio: this.audio,
-        camera: this.camera,
-        paused: combatDt <= 0,
-      });
+      this.audioCoordinator.syncCombatAudio(this.missileCombat, this.camera, combatDt <= 0);
     }
     for (const event of combatEvents) this.handleCombatEvent(event);
 
@@ -1604,7 +1463,7 @@ class FlightSimulator {
       }
     }
     const cameraToAircraftMeters = this.camera.position.distanceTo(this.aircraft.group.position);
-    this.audio.update(frameDelta, this.telemetry, isCockpit, cameraToAircraftMeters);
+    this.audioCoordinator.update(frameDelta, this.telemetry, isCockpit, cameraToAircraftMeters);
 
     // 6. Update Camera System & Dynamic FOV (60° in cockpit eliminates fisheye speed distortion)
     let targetFov = isCockpit ? 60 : 54;
@@ -1672,88 +1531,7 @@ class FlightSimulator {
   }
 
   handleGazeCanvasClick(clientX, clientY) {
-    if (this.gameFlow?.state === 'lobby' || this.gameFlow?.isPaused?.()) return;
-    const rect = this.renderer?.domElement?.getBoundingClientRect?.();
-    if (!rect) return;
-    const replayCombat = this.replayDirector?.combatState();
-    const combat = replayCombat ?? {
-      targets: this.missileCombat?.targets,
-    };
-    const combatView = replayCombat ? this.replayDirector?.combatView?.() : this.missileCombatView;
-    const bandits = [];
-    for (const target of combat?.targets ?? []) {
-      if (!target?.alive || !target.position) continue;
-      const view = combatView?.targetViews?.get(target.id);
-      bandits.push({
-        id: target.id,
-        label: target.callsign || t('gaze.target.bandit'),
-        mesh: view?.mesh ?? null,
-        getPosition: () => (target.alive ? target.position : null),
-      });
-    }
-    const aircraft = [];
-    const remoteCandidates = [];
-    if (this.multiplayer?.remote) remoteCandidates.push({ id: 'remote', visual: this.multiplayer.remote });
-    if (this.replayDirector?.active && Array.isArray(this.replayDirector.remotes)) {
-      this.replayDirector.remotes.forEach((entry, index) => {
-        if (entry?.visual) remoteCandidates.push({ id: `replay-remote-${index}`, visual: entry.visual });
-      });
-    }
-    for (const { id, visual } of remoteCandidates) {
-      if (!visual || visual.disposed || !visual.group?.visible) continue;
-      aircraft.push({
-        id,
-        label: visual.group.userData?.name || visual.aircraft || t('gaze.target.aircraft'),
-        mesh: visual.group,
-        getPosition: () => (!visual.disposed && visual.group?.visible ? visual.group.position : null),
-      });
-    }
-    const parkedAircraft = this.currentAirport?.parked?.group ? [this.currentAirport.parked.group] : [];
-    const buildings = [];
-    for (const entry of this.currentAirport?.getGazeTargets?.() ?? []) {
-      buildings.push({
-        object: entry.object,
-        kind: entry.kind || 'building',
-        label: t(`gaze.target.${entry.kind || 'building'}`),
-      });
-    }
-    if (this.ships?.group?.visible) {
-      const shipRecords = [...(this.ships.vessels ?? []), ...(this.ships.speedboats ?? [])];
-      if (shipRecords.length > 0) {
-        for (const ship of shipRecords) {
-          if (!ship?.mesh) continue;
-          buildings.push({
-            object: ship.mesh,
-            kind: 'ship',
-            label: t('gaze.target.ship'),
-            dynamic: true,
-          });
-        }
-      } else {
-        buildings.push({
-          object: this.ships.group,
-          kind: 'ship',
-          label: t('gaze.target.ship'),
-        });
-      }
-    }
-    const picked = pickGazeTarget({
-      clientX,
-      clientY,
-      rect,
-      camera: this.camera,
-      sources: {
-        bandits,
-        aircraft,
-        parkedAircraft,
-        parkedLabel: t('gaze.target.parkedAircraft'),
-        buildings,
-      },
-    });
-    if (picked) {
-      this.cameraSystem.setGazeTarget(picked);
-      this.showToast(() => t('notice.gaze.on', { target: picked.label || t('gaze.target.building') }));
-    }
+    this.inputCoordinator.handleGazeCanvasClick(this, clientX, clientY);
   }
 }
 
