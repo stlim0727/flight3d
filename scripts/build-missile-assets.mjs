@@ -745,6 +745,117 @@ export function buildAim120cModel() {
   return builder.buildGroup();
 }
 
+/**
+ * Build High-Detail LAU-129 Wingtip Launcher Rail Model
+ */
+export function buildWingtipPylonModel() {
+  const builder = new MissileModelBuilder('LAU129_Wingtip_Pylon');
+  const railLength = 2.8;
+  const railHeight = 0.08;
+  const railWidth = 0.075;
+
+  // Rail body
+  const railGeo = new THREE.BoxGeometry(railWidth, railHeight, railLength);
+  railGeo.translate(0, railHeight / 2, 0);
+  builder.addGeometry('missile-fin', railGeo);
+
+  // Aerodynamic nose wedge at front (-Z)
+  const noseGeo = new THREE.ConeGeometry(railWidth * 0.7, 0.22, 4);
+  noseGeo.rotateX(-Math.PI / 2);
+  noseGeo.rotateZ(Math.PI / 4);
+  noseGeo.translate(0, railHeight / 2, -railLength / 2 - 0.11);
+  builder.addGeometry('missile-body', noseGeo);
+
+  // Bottom empty missile launch guide slot (recessed dark channel)
+  const slotGeo = new THREE.BoxGeometry(0.026, 0.016, railLength * 0.88);
+  slotGeo.translate(0, 0.008, 0);
+  builder.addGeometry('missile-dark', slotGeo);
+
+  // Empty detent shoes (forward and aft)
+  for (const z of [-0.65, 0.65]) {
+    const shoeGeo = new THREE.BoxGeometry(railWidth * 0.92, 0.02, 0.065);
+    shoeGeo.translate(0, 0.01, z);
+    builder.addGeometry('missile-steel', shoeGeo);
+  }
+
+  // Aft cable bumper
+  const aftGeo = new THREE.BoxGeometry(railWidth * 0.85, railHeight * 0.85, 0.14);
+  aftGeo.translate(0, railHeight / 2, railLength / 2 + 0.07);
+  builder.addGeometry('missile-steel', aftGeo);
+
+  // Wingtip adapter mounting flange
+  const adapterGeo = new THREE.BoxGeometry(0.035, railHeight * 1.1, railLength * 0.45);
+  adapterGeo.translate(railWidth * 0.45, railHeight / 2, 0.1);
+  builder.addGeometry('missile-body', adapterGeo);
+
+  return builder.buildGroup();
+}
+
+/**
+ * Build High-Detail F-16 Underwing Pylon & Launcher Rail Model
+ */
+export function buildUnderwingPylonModel() {
+  const builder = new MissileModelBuilder('F16_Underwing_Pylon');
+  const railLength = 3.0;
+  const railHeight = 0.08;
+  const railWidth = 0.08;
+
+  // 1. Bottom LAU-129 launcher rail
+  const railGeo = new THREE.BoxGeometry(railWidth, railHeight, railLength);
+  railGeo.translate(0, railHeight / 2, 0);
+  builder.addGeometry('missile-fin', railGeo);
+
+  // Aerodynamic nose wedge (-Z)
+  const noseGeo = new THREE.ConeGeometry(railWidth * 0.7, 0.22, 4);
+  noseGeo.rotateX(-Math.PI / 2);
+  noseGeo.rotateZ(Math.PI / 4);
+  noseGeo.translate(0, railHeight / 2, -railLength / 2 - 0.11);
+  builder.addGeometry('missile-body', noseGeo);
+
+  // Empty launch guide track
+  const slotGeo = new THREE.BoxGeometry(0.028, 0.016, railLength * 0.88);
+  slotGeo.translate(0, 0.008, 0);
+  builder.addGeometry('missile-dark', slotGeo);
+
+  // Empty launch detents
+  for (const z of [-0.7, 0.7]) {
+    const shoeGeo = new THREE.BoxGeometry(railWidth * 0.95, 0.022, 0.075);
+    shoeGeo.translate(0, 0.011, z);
+    builder.addGeometry('missile-steel', shoeGeo);
+  }
+
+  // Sway brace pads flanking the rail
+  for (const z of [-0.55, 0.55]) {
+    for (const side of [-1, 1]) {
+      const padGeo = new THREE.BoxGeometry(0.02, 0.045, 0.035);
+      padGeo.translate(side * (railWidth / 2 + 0.01), railHeight / 2, z);
+      builder.addGeometry('missile-steel', padGeo);
+    }
+  }
+
+  // 2. Swept underwing pylon strut
+  const strutHeight = 0.42;
+  const strutChord = 1.25;
+  const strutThickness = 0.085;
+  const strutCenterY = railHeight + strutHeight / 2;
+
+  const strutGeo = new THREE.BoxGeometry(strutThickness, strutHeight, strutChord);
+  strutGeo.translate(0, strutCenterY, 0.05);
+  builder.addGeometry('missile-body', strutGeo);
+
+  // Wing mounting upper flange
+  const flangeGeo = new THREE.BoxGeometry(strutThickness * 1.5, 0.02, strutChord * 1.2);
+  flangeGeo.translate(0, railHeight + strutHeight + 0.01, 0);
+  builder.addGeometry('missile-steel', flangeGeo);
+
+  // Aft fairing
+  const aftGeo = new THREE.BoxGeometry(railWidth * 0.85, railHeight * 0.85, 0.15);
+  aftGeo.translate(0, railHeight / 2, railLength / 2 + 0.075);
+  builder.addGeometry('missile-steel', aftGeo);
+
+  return builder.buildGroup();
+}
+
 async function exportGlb(group, filename) {
   const exporter = new GLTFExporter();
   const arrayBuffer = await exporter.parseAsync(group, { binary: true });
@@ -764,12 +875,16 @@ async function exportGlb(group, filename) {
   return { filename, bytes: buffer.length, triangles };
 }
 
-// Build both models
+// Build missile models
 const aim9xGroup = buildAim9xModel();
 const aim120cGroup = buildAim120cModel();
+const wingtipPylonGroup = buildWingtipPylonModel();
+const underwingPylonGroup = buildUnderwingPylonModel();
 
 await exportGlb(aim9xGroup, 'aim-9x.glb');
 await exportGlb(aim120cGroup, 'aim-120c.glb');
+await exportGlb(wingtipPylonGroup, 'pylon-wingtip.glb');
+await exportGlb(underwingPylonGroup, 'pylon-underwing.glb');
 
 // Also export aim-9x as default missile.glb in public/models/
 const defaultMissilePath = new URL('../public/models/missile.glb', import.meta.url);

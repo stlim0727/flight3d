@@ -9,7 +9,7 @@ import { JetExhaust } from '../effects/JetExhaust.js';
 import { applyFlatShading } from '../config/renderQuality.js';
 import { CockpitHudCanvas, configureF16HudMesh } from './CockpitHudCanvas.js';
 import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
-import { createMissileMesh, preloadMissileModels } from '../weapons/missileGeometry.js';
+import { createMissileMesh, createPylonMesh, preloadMissileModels } from '../weapons/missileGeometry.js';
 import { F16_MISSILE_STATIONS } from '../weapons/missileSpecs.js';
 
 // The supplied asset is +X forward, with a 93.94-unit wingspan. Its authored
@@ -168,6 +168,17 @@ export class F16 {
     this.lightsGroup = new THREE.Group();
     this.gltfGroup.add(this.lightsGroup);
     preloadMissileModels();
+    // Pylons remain permanently attached to the airframe; when missiles are
+    // fired or unloaded, the stations visibly remain as empty launcher pylons.
+    this.pylonsGroup = new THREE.Group();
+    this.pylonsGroup.name = 'F16_Pylons';
+    this.gltfGroup.add(this.pylonsGroup);
+    this.pylonMeshes = F16_MISSILE_STATIONS.map(station => {
+      const pylon = createPylonMesh(station);
+      pylon.position.set(...station.position);
+      this.pylonsGroup.add(pylon);
+      return pylon;
+    });
     // Six rail stations keep their missiles resident; launch only toggles the
     // mesh until a preset reset re-arms every station.
     this.missilesGroup = new THREE.Group();
@@ -341,6 +352,7 @@ export class F16 {
     this.isCrashed = false;
     this.lightsGroup.visible = this.lightsOn;
     this.missilesGroup.visible = true;
+    this.pylonsGroup.visible = true;
   }
 
   /** Rail state is shared with the guidance core: fired stations hide their mesh. */

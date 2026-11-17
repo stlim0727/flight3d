@@ -4,8 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MISSILE_TYPES } from '../src/weapons/missileSpecs.js';
-import { createMissileMesh, getMissileModelUrl } from '../src/weapons/missileGeometry.js';
+import { MISSILE_TYPES, F16_MISSILE_STATIONS } from '../src/weapons/missileSpecs.js';
+import { createMissileMesh, createPylonMesh, getMissileModelUrl } from '../src/weapons/missileGeometry.js';
+import { F16 } from '../src/aircraft/F16.js';
 
 function parseGlbBuffer(filePath) {
   const buf = fs.readFileSync(filePath);
@@ -115,3 +116,58 @@ test('createMissileMesh maintains backward compatibility and provides asset URL 
     assert.ok(url.endsWith('.glb'), `URL must point to glb: ${url}`);
   }
 });
+
+test('pylon GLB models parse and validate geometry', async () => {
+  for (const filename of ['pylon-wingtip.glb', 'pylon-underwing.glb']) {
+    const gltf = await parseGlbBuffer(`public/models/missiles/${filename}`);
+    assert.ok(gltf.scene, `${filename} must have scene`);
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    assert.ok(size.z > 2.0, `${filename} must have rail length > 2m, got ${size.z}`);
+  }
+});
+
+test('createPylonMesh creates authentic pylons for all 6 F-16 stations', () => {
+  assert.equal(F16_MISSILE_STATIONS.length, 6);
+  for (const station of F16_MISSILE_STATIONS) {
+    const pylon = createPylonMesh(station);
+    assert.ok(pylon instanceof THREE.Group);
+    assert.equal(pylon.userData.stationId, station.id);
+    assert.equal(pylon.userData.stationType, station.type);
+    assert.ok(pylon.children.length >= 3, `Station ${station.id} pylon must have multiple sub-meshes`);
+  }
+});
+
+test('F-16 transforms into empty pylons after missile launch', () => {
+  const f16 = new F16({ exteriorOnly: true });
+  assert.equal(f16.pylonMeshes.length, 6, 'F16 must have 6 pylon meshes');
+  assert.equal(f16.missileMeshes.length, 6, 'F16 must have 6 missile meshes');
+  assert.ok(f16.pylonsGroup.visible, 'Pylons group must be visible');
+
+  // Initially all 6 missiles loaded
+  assert.ok(f16.missileLoaded.every(loaded => loaded === true));
+  assert.ok(f16.missileMeshes.every(m => m.visible === true));
+  assert.ok(f16.pylonMeshes.every(p => p.visible === true));
+
+  // Fire station 0 (STA 1): missile disappears, empty pylon remains!
+  f16.setMissileLoaded(0, false);
+  assert.equal(f16.missileLoaded[0], false);
+  assert.equal(f16.missileMeshes[0].visible, false, 'Fired missile must be hidden');
+  assert.equal(f16.pylonMeshes[0].visible, true, 'Empty pylon must stay visible at station 0');
+
+  // Fire all remaining missiles: all stations remain as empty pylons
+  f16.setMissileLoadout([]);
+  for (let i = 0; i < 6; i++) {
+    assert.equal(f16.missileMeshes[i].visible, false, `Missile ${i} must be hidden`);
+    assert.equal(f16.pylonMeshes[i].visible, true, `Pylon ${i} must remain visible as empty pylon`);
+  }
+
+  // Rearm: missiles return onto the pylons
+  f16.setMissileLoadout([true, true, true, true, true, true]);
+  for (let i = 0; i < 6; i++) {
+    assert.equal(f16.missileMeshes[i].visible, true, `Missile ${i} visible after rearm`);
+    assert.equal(f16.pylonMeshes[i].visible, true, `Pylon ${i} visible`);
+  }
+});
+
