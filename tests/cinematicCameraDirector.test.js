@@ -1127,4 +1127,20 @@ test('Review fixes: stale far chaff is ignored, wreck ground position is preserv
   missMissile.alive = false;
   director.advanceMissileSequence(0.1);
   assert.equal(director.missileSequence.hitDetected, false, 'Undamaged miss within 120m is not marked as hit');
+
+  // 4. Replay plan retains shot ownership even when alive targets are present.
+  director.loadReplayPlan({
+    durationSec: 6.0,
+    shots: [
+      { type: CINEMATIC_SHOTS.TELEPHOTO_FLYBY, startTime: 0, endTime: 3.0 },
+      { type: CINEMATIC_SHOTS.WINGTIP_ACTION, startTime: 3.0, endTime: 6.0 },
+    ],
+  });
+  for (let i = 0; i < 10; i++) {
+    director.update({
+      dt: 0.1, camera, planePos: new THREE.Vector3(0, 1500, 0), planeQuat: new THREE.Quaternion(),
+      targets: [undamagedTarget], flightState: { onGround: false },
+    });
+  }
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.TELEPHOTO_FLYBY, 'Replay plan shot is not overwritten by dogfight framing');
 });

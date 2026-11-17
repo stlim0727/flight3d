@@ -724,12 +724,15 @@ export class CinematicCameraDirector {
     }
 
     // If driven by a replay plan, cut when the plan timeline advances
-    if (this.replayPlan?.shots?.length) {
+    const hasReplayPlan = Boolean(this.replayPlan?.shots?.length);
+    if (hasReplayPlan) {
       const planShot = this.replayPlan.shots.find(
         s => this.totalTimer >= s.startTime && this.totalTimer < s.endTime
       );
-      if (planShot && planShot.type !== this.currentShotType) {
-        this.switchShot(planShot.type, flightState);
+      if (planShot) {
+        if (planShot.type !== this.currentShotType) {
+          this.switchShot(planShot.type, flightState);
+        }
         return;
       }
       if (this.totalTimer >= this.replayPlan.durationSec) {
@@ -743,7 +746,7 @@ export class CinematicCameraDirector {
     const ias = flightState.iasKnots ?? 0;
     const agl = flightState.altitudeFt ?? 1000;
     const observingCrash = Boolean(!onGround && this.crashObserveTarget && this.crashObserveTimer > 0);
-    const inDogfight = !onGround && (this.hasAliveTargets() || observingCrash);
+    const inDogfight = !onGround && !hasReplayPlan && (this.hasAliveTargets() || observingCrash);
 
     // Hold user-to-bandit POV while watching the downed bandit crash.
     if (observingCrash) {
