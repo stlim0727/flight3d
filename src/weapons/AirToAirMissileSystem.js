@@ -26,6 +26,7 @@ import { F16_MISSILE_STATIONS, MISSILE_TYPES } from './missileSpecs.js';
 const LOCK_SECONDS = 0.75;
 const UNLOCK_SECONDS = 0.9;
 export const BANDIT_RESPAWN_SECONDS = 20;
+export const DEFAULT_BANDIT_COUNT = 1;
 const DECOY_BURST_COUNT = 3;
 const DECOY_BURST_INTERVAL_S = 0.25;
 const DECOY_EJECT_LATERAL_MPS = 22;
@@ -199,6 +200,7 @@ export class AirToAirMissileSystem {
     banditRwr = true,
     evasionSkill = 'legacy-break',
     countermeasurePolicy = 'burst',
+    banditCount = DEFAULT_BANDIT_COUNT,
   } = {}) {
     this.stations = stations;
     this.specs = specs;
@@ -206,6 +208,7 @@ export class AirToAirMissileSystem {
     this.rwr = rwr;
     this.banditEvasion = banditEvasion;
     this.banditRwr = banditRwr;
+    this.banditCount = banditCount;
     this.evasionSkill = combatSkill('evasion', evasionSkill).id;
     this.countermeasurePolicy = combatSkill('countermeasure', countermeasurePolicy).id;
     this.cannon = new VulcanCannon();
@@ -483,7 +486,7 @@ export class AirToAirMissileSystem {
 
   _ensureTargets(world) {
     if (this.targets.length) return;
-    for (let index = 0; index < 2; index++) {
+    for (let index = 0; index < this.banditCount; index++) {
       const target = new BanditTarget({
         callsign: `BANDIT ${index + 1}`,
         evasion: this.banditEvasion,
