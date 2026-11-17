@@ -389,9 +389,21 @@ class FlightSimulator {
     this.rearmSystem = new RearmSystem();
     // A replay owns the combat feed: its recorded missile poses and bandit
     // states drive the director instead of the inactive live system.
-    this.cameraSystem.setCombatStateProvider(() => this.replayDirector?.combatState() ?? {
-      missiles: this.missileCombat.missiles,
-      targets: this.missileCombat.targets,
+    this.cameraSystem.setCombatStateProvider(() => {
+      const replayCombat = this.replayDirector?.combatState();
+      if (replayCombat) {
+        return {
+          ...replayCombat,
+          targetViews: this.replayDirector?.combatView?.()?.targetViews ?? null,
+        };
+      }
+      return {
+        missiles: this.missileCombat.missiles,
+        targets: this.missileCombat.targets,
+        flares: this.missileCombat.flares,
+        chaffClouds: this.missileCombat.chaffClouds,
+        targetViews: this.missileCombatView?.targetViews ?? null,
+      };
     });
     this._combatTerrainHeight = (x, z) => this.currentTerrain?.getHeight(x, z) ?? 0;
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
@@ -935,10 +947,12 @@ class FlightSimulator {
   }
 
   /** Persists the finished sortie's pose track. Returns the store's error token for the debrief to show. */
-  saveDebriefReplay() {
-    if (!this.debriefReplay) return { ok: false, error: 'tooShort' };
-    const { entry, error } = this.replayStore.save(this.debriefReplay, { report: this.debriefReport });
-    this.analytics?.trackReplaySaved?.({ result: entry ? 'ok' : error, durationSeconds: this.debriefReplay.durationSec });
+  async saveDebriefReplay() {
+    const replay = this.debriefReplay;
+    const report = this.debriefReport;
+    if (!replay) return { ok: false, error: 'tooShort' };
+    const { entry, error } = await this.replayStore.save(replay, { report });
+    this.analytics?.trackReplaySaved?.({ result: entry ? 'ok' : error, durationSeconds: replay.durationSec });
     return { ok: Boolean(entry), error: error ?? null };
   }
 
@@ -1479,7 +1493,9 @@ class FlightSimulator {
     }
 
     // 1. Update 3D Aircraft Model & Articulations
-    this.aircraft.update(frameDelta, this.telemetry);
+    // A parked replay still draws its frozen pose; spinning fans, propellers and
+    // strobes over that pose would be motion the recorded clock no longer has.
+    this.aircraft.update(this.replayDirector?.playbackHeld ? 0 : frameDelta, this.telemetry);
     this.renderPose.apply(this.aircraft.group, this.position, this.quaternion,
       this.physicsAccumulator / this.physicsDt);
 

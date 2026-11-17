@@ -2,20 +2,21 @@ import * as THREE from 'three';
 import { t } from '../i18n/index.js';
 import { terrainConflictSeconds } from '../systems/FlightWarnings.js';
 import { cockpitCasterState } from '../aircraft/CockpitLighting.js';
-import { normalLoadFactor, GForceFilter } from '../physics/loadFactor.js';
-import { Atmosphere } from '../physics/Atmosphere.js';
-import { asymmetricThrustYawMoment } from '../physics/EngineModel.js';
+import { GForceFilter } from '../physics/loadFactor.js';
 import { BODY_SUPPORT_POINTS, FALLBACK_BODY_SUPPORT_POINTS } from '../physics/groundContacts.js';
-import { constrainBodyContact } from '../physics/bodyContactConstraint.js';
-import { rebaseCgVelocity, translateModelOrigin } from '../physics/massKinematics.js';
-import { stallSpeedEstimate } from '../physics/stallSpeedEstimate.js';
-import { advanceSimulationWind } from '../physics/WindField.js';
+import { FlightPhysicsCore } from '../physics/FlightPhysicsCore.js';
 import { stepPhysics } from './physicsTiming.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { FLOW } from '../ui/GameFlowController.js';
 import { trackFlightCrash } from '../analytics/posthog.js';
 import { PilotPhysiology } from '../physics/PilotPhysiology.js';
 import { WaterDitching } from '../physics/WaterDitching.js';
+
+const GEAR_LABELS = {
+  nose: 'nose.gear',
+  mainLeft: 'left.main.gear',
+  mainRight: 'right.main.gear',
+};
 
 class PhysicsIntegratorMethods {
   /**
@@ -24,6 +25,90 @@ class PhysicsIntegratorMethods {
    */
   activePoseDriver() {
     return this.poseDrivers?.find(driver => driver?.active) ?? null;
+  }
+
+  ensurePhysicsCore() {
+    this.waterDitching ??= new WaterDitching();
+    this.pilotPhysiology ??= new PilotPhysiology();
+    this.gForceFilter ??= new GForceFilter(8.0);
+    this.bodyContactNotices ??= new Set();
+
+    if (!this._physicsCore) {
+      this._physicsCore = new FlightPhysicsCore({
+        config: this.currentAircraftConfig,
+        position: this.position,
+        quaternion: this.quaternion,
+        linearVelocity: this.linearVelocity,
+        angularVelocity: this.angularVelocity,
+        aero: this.aero,
+        engines: this.engines,
+        gear: this.gear,
+        waterDitching: this.waterDitching,
+        pilotPhysiology: this.pilotPhysiology,
+        gForceFilter: this.gForceFilter,
+        bodyContactNotices: this.bodyContactNotices,
+        telemetry: this.telemetry,
+        aeroResult: this._aeroResult,
+      });
+    } else {
+      const core = this._physicsCore;
+      core.config = this.currentAircraftConfig;
+      core.position = this.position;
+      core.quaternion = this.quaternion;
+      core.linearVelocity = this.linearVelocity;
+      core.angularVelocity = this.angularVelocity;
+      core.aero = this.aero;
+      core.engines = this.engines;
+      core.gear = this.gear;
+      core.waterDitching = this.waterDitching;
+      core.pilotPhysiology = this.pilotPhysiology;
+      core.gForceFilter = this.gForceFilter;
+      core.bodyContactNotices = this.bodyContactNotices;
+      core.telemetry = this.telemetry;
+    }
+
+    const core = this._physicsCore;
+    core.isCrashed = Boolean(this.isCrashed);
+    core.windTimeSeconds = this.windTimeSeconds ?? 0;
+    core.airborneTime = this.airborneTime ?? 0;
+    core.hasTouchedDownThisFlight = Boolean(this.hasTouchedDownThisFlight);
+    core.lastOnGround = this.lastOnGround ?? true;
+    core.lastGearTarget = this.lastGearTarget ?? (this.gear?.targetGearState > 0.5);
+    core.actualTakeoffMassKg = this.actualTakeoffMassKg ?? null;
+    core.stallSpeedKnots = this.stallSpeedKnots;
+    core.takeoff = this.takeoff ?? null;
+    core._hasGroundContact = Boolean(this._hasGroundContact);
+    core._performanceClock = this._performanceClock ?? 0;
+    core.landingIncident = Boolean(this.landingIncident);
+    core.landingRestTime = this.landingRestTime ?? 0;
+    core.landingStopped = Boolean(this.landingStopped);
+    core.waterDitchingNoticed = Boolean(this.waterDitchingNoticed);
+    core.waterSinkingNoticed = Boolean(this.waterSinkingNoticed);
+    core.waterSubmergedNoticed = Boolean(this.waterSubmergedNoticed);
+    core.excursionAnnounced = Boolean(this.excursionAnnounced);
+    core.bodyContactStarted = Boolean(this.bodyContactStarted);
+    return core;
+  }
+
+  syncFromPhysicsCore(core) {
+    this.windTimeSeconds = core.windTimeSeconds;
+    this.airborneTime = core.airborneTime;
+    this.hasTouchedDownThisFlight = core.hasTouchedDownThisFlight;
+    this.lastOnGround = core.lastOnGround;
+    this.lastGearTarget = core.lastGearTarget;
+    this.actualTakeoffMassKg = core.actualTakeoffMassKg;
+    this.stallSpeedKnots = core.stallSpeedKnots;
+    this.takeoff = core.takeoff;
+    this._hasGroundContact = core._hasGroundContact;
+    this._performanceClock = core._performanceClock;
+    this.landingIncident = core.landingIncident;
+    this.landingRestTime = core.landingRestTime;
+    this.landingStopped = core.landingStopped;
+    this.waterDitchingNoticed = core.waterDitchingNoticed;
+    this.waterSinkingNoticed = core.waterSinkingNoticed;
+    this.waterSubmergedNoticed = core.waterSubmergedNoticed;
+    this.excursionAnnounced = core.excursionAnnounced;
+    this.bodyContactStarted = core.bodyContactStarted;
   }
 
   /**
@@ -37,245 +122,118 @@ class PhysicsIntegratorMethods {
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.gear.bodySupportPoints = this.currentAircraftConfig?.landingGear?.bodySupportPoints
       ?? (this.aircraft.useGltf ? BODY_SUPPORT_POINTS : FALLBACK_BODY_SUPPORT_POINTS);
-    // If crashed, damp out velocities, rest on terrain, and keep kinematic telemetry current
+
+    const core = this.ensurePhysicsCore();
+    const environment = this._envCallbacks ??= {
+      getGroundHeight: (x, z) => this.currentTerrain?.getHeight?.(x, z) ?? 0,
+      getGroundNormal: (x, z) => this.currentTerrain?.getNormal?.(x, z) ?? null,
+      isOnRunway: (x, z) => (this.currentAirport?.isOnRunway ? this.currentAirport.isOnRunway(x, z) : true),
+      isRunwaySafetyArea: (x, z) => (this.currentAirport?.isRunwaySafetyArea ? this.currentAirport.isRunwaySafetyArea(x, z) : true),
+      getWaterLevel: (x, z) => this.currentTerrain?.getWaterLevel?.(x, z) ?? 0.0,
+      getWindWorld: null,
+    };
+    environment.getWindWorld = this.windField
+      ? (pos, time, out) => this.windField.sample(pos, time, out)
+      : null;
+
     if (this.isCrashed) {
-      const velocityBeforeStep = this._gVelocityBefore ??= new THREE.Vector3();
-      const rotationBeforeStep = this._gRotationBefore ??= new THREE.Quaternion();
-      velocityBeforeStep.copy(this.linearVelocity);
-      rotationBeforeStep.copy(this.quaternion);
-      this.linearVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 2.8));
-      this.angularVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 3.5));
-      this.position.addScaledVector(this.linearVelocity, dt);
-      this.resolveBodyPenetration();
+      core.integrateSubstep(dt, {}, environment);
+      this.syncFromPhysicsCore(core);
       this.aircraft.group.position.copy(this.position);
-      const rawGForce = normalLoadFactor(velocityBeforeStep, this.linearVelocity,
-        rotationBeforeStep, this.quaternion, dt);
-      this.gForceFilter ??= new GForceFilter(8.0);
-      const measuredGForce = this.gForceFilter.update(rawGForce, dt);
-      if (this.telemetry) {
-        const groundSpeed = Math.hypot(this.linearVelocity.x, this.linearVelocity.z);
-        const groundHeight = this.currentTerrain?.getHeight?.(this.position.x, this.position.z) ?? 0;
-        const wind = this.aero?.windWorld;
-        const tas = wind
-          ? Math.hypot(this.linearVelocity.x - wind.x, this.linearVelocity.y - wind.y, this.linearVelocity.z - wind.z)
-          : this.linearVelocity.length();
-        const densityRatio = Atmosphere.getConditions(this.position.y).densityRatio;
-        this.telemetry.gForce = measuredGForce;
-        this.telemetry.rawGForce = rawGForce;
-        this.telemetry.altitudeFt = Atmosphere.metersToFeet(this.position.y);
-        this.telemetry.radioAltFt = Atmosphere.metersToFeet(Math.max(0, this.position.y - groundHeight));
-        this.telemetry.groundSpeedKnots = Atmosphere.msToKnots(groundSpeed);
-        this.telemetry.iasKnots = Atmosphere.msToKnots(tas * Math.sqrt(Math.max(0, densityRatio)));
-        this.telemetry.vsiFpm = Atmosphere.metersToFeet(this.linearVelocity.y) * 60.0;
-      }
       return;
     }
 
-    // Arena wind is opt-in and advances only with integrated physics ticks.
-    advanceSimulationWind(this, dt);
-
-    // 1. Controls processing
+    // 1. Controls & Autopilot
     this.controls.update(dt, this.telemetry.iasKnots, this.currentAircraftId);
-    if (!this.pilotPhysiology) {
-      this.pilotPhysiology = new PilotPhysiology();
-    }
-    const rawInputs = {
-      elevator: this.controls.elevator,
-      aileron: this.controls.aileron,
-      rudder: this.controls.rudder
-    };
     const isAutonomousDemo = Boolean(this.demoDirector?.isActive);
-    if (!isAutonomousDemo) {
-      this.pilotPhysiology.update(dt, this.telemetry.gForce ?? 1.0, rawInputs);
-      this.aero.elevator = this.pilotPhysiology.effectiveElevator;
-      this.aero.aileron = this.pilotPhysiology.effectiveAileron;
-      this.aero.rudder = this.pilotPhysiology.effectiveRudder;
-    } else {
-      this.pilotPhysiology.reset();
-      this.pilotPhysiology.effectiveElevator = this.controls.elevator;
-      this.pilotPhysiology.effectiveAileron = this.controls.aileron;
-      this.pilotPhysiology.effectiveRudder = this.controls.rudder;
-      this.aero.elevator = this.controls.elevator;
-      this.aero.aileron = this.controls.aileron;
-      this.aero.rudder = this.controls.rudder;
-    }
-    this.aero.pitchTrim = this.controls.pitchTrim;
 
-    // Autopilot control laws. Pilot yoke input above the gate overrides the
-    // axes; the AP commands surfaces directly, bypassing yoke rate limiters.
     if (this.bridgeFlight?.active && this.autopilot.master) {
       this.autopilot.disengage();
       this.showToast(() => t('bridge.manual'));
     }
+
+    let autopilotElevator;
+    let autopilotAileron;
     if (this.autopilot.master) {
       const apCmd = this.autopilot.update(this.readAutopilotState(), dt);
       if (Math.abs(this.controls.elevator) < 0.075 && Math.abs(this.controls.aileron) < 0.075) {
-        this.aero.elevator = apCmd.elevator;
-        this.aero.aileron = apCmd.aileron;
+        autopilotElevator = apCmd.elevator;
+        autopilotAileron = apCmd.aileron;
         if (this.autopilot.speedMode) this.controls.throttle = apCmd.throttle;
       }
     }
 
-    // Ground steering & brakes
-    const groundSpeed = Math.sqrt(this.linearVelocity.x * this.linearVelocity.x + this.linearVelocity.z * this.linearVelocity.z);
-    const steeringRudder = isAutonomousDemo ? this.controls.rudder : this.pilotPhysiology.effectiveRudder;
-    this.gear.setSteering(steeringRudder, groundSpeed);
-    this.gear.setBrakes(this.controls.brakes);
+    const towing = isAutonomousDemo
+      ? this.demoDirector.getActiveScenario()?.towingForces?.()
+      : null;
 
-    // 2. Turbofan Engines Update
-    this.engines.setThrottle(this.controls.throttle);
-    const altitudeMeters = this.position.y;
-    const atmos = Atmosphere.getConditions(altitudeMeters);
-    const tas = Math.hypot(this.linearVelocity.x - this.aero.windWorld.x,
-      this.linearVelocity.y - this.aero.windWorld.y, this.linearVelocity.z - this.aero.windWorld.z);
-    // Damage remains until repair, even if an engine restart is commanded.
-    if (this.gear.bodyDamage?.engineL !== undefined) {
-      this.engines.contactDamage[0] = this.gear.bodyDamage.engineL;
-    }
-    if (this.engines.numEngines > 1 && this.gear.bodyDamage?.engineR !== undefined) {
-      this.engines.contactDamage[1] = this.gear.bodyDamage.engineR;
-    }
-    if (this.gear.bodyDamage) {
-      this.aero.damageZones = this.gear.bodyDamage;
-    }
-    this._cgBefore.copy(this.aero.cg);
-    this.engines.bindMassProperties(this.aero.massProperties);
-    this.gear.advanceConfiguration(dt);
-    this.aero.advanceFlaps(dt);
-    const engineData = this.engines.update(dt, altitudeMeters, tas, atmos.densityRatio);
+    const inputs = {
+      elevator: this.controls.elevator,
+      aileron: this.controls.aileron,
+      rudder: this.controls.rudder,
+      throttle: this.controls.throttle,
+      brakes: this.controls.brakes,
+      pitchTrim: this.controls.pitchTrim,
+      bypassPilotPhysiology: isAutonomousDemo,
+      autopilotElevator,
+      autopilotAileron,
+      externalForceWorld: towing?.force,
+      externalMomentBody: towing?.moment,
+    };
 
-    this.aero.massProperties.setConfiguration(this.gear.gearState, this.aero.currentFlapAngle / (this.aero.flapAngles.at(-1) || 1));
-    this.aero.syncMassProperties();
-    rebaseCgVelocity(this.linearVelocity, this.angularVelocity, this.quaternion, this._cgBefore, this.aero.cg);
+    const previousTelemetry = this.telemetry;
+    const result = core.integrateSubstep(dt, inputs, environment);
+    this.syncFromPhysicsCore(core);
 
-    // Capture after a moving-CG velocity rebase, before physical forces and
-    // contact impulses. A change of reference point is not an acceleration.
-    const velocityBeforeStep = this._gVelocityBefore ??= new THREE.Vector3();
-    const rotationBeforeStep = this._gRotationBefore ??= new THREE.Quaternion();
-    velocityBeforeStep.copy(this.linearVelocity);
-    rotationBeforeStep.copy(this.quaternion);
-
-    // 3. Terrain Height & Ground Clearance
-    const groundHeight = this.currentTerrain.getHeight(this.position.x, this.position.z);
-    const heightAboveGround = Math.max(0, this.position.y - groundHeight);
-
-    // Physics may run several substeps before rendering. Refresh the root world
-    // matrix so gear contacts use this substep's pose rather than the last frame.
-    this.aircraft.group.updateWorldMatrix(true, false);
-
-    // 4. Landing Gear Forces & Ground Friction
-    const gearResult = this.gear.update(
-      dt,
-      this.aircraft.group,
-      this.linearVelocity,
-      this.angularVelocity,
-      (x, z) => this.currentTerrain.getHeight(x, z),
-      (x, z) => (this.currentTerrain.getNormal ? this.currentTerrain.getNormal(x, z) : null),
-      (x, z) => (this.currentAirport?.isOnRunway ? this.currentAirport.isOnRunway(x, z) : true),
-      this.aero.cg, true,
-      (x, z) => (this.currentAirport?.isRunwaySafetyArea ? this.currentAirport.isRunwaySafetyArea(x, z) : true),
-      { mass: this.aero.mass, inverseInertia: { x: this.aero.invIyy, y: this.aero.invIzz, z: this.aero.invIxx } }
-    );
     // Preserve this substep's contact kinematics for local mission judging.
-    // This stays on the trusted host; it is never a pilot observation.
-    this.missionPhysicsFrame = { gearResult };
+    this.missionPhysicsFrame = { gearResult: result.gearResult };
 
-    // 4b. Hydrodynamic Water Ditching & Sinking Forces
-    this.waterDitching ??= new WaterDitching();
-    const stepEuler = this._intEuler.setFromQuaternion(this.quaternion, 'YXZ');
-    const stepPitchDeg = THREE.MathUtils.radToDeg(stepEuler.x);
-    const stepRollDeg = THREE.MathUtils.radToDeg(-stepEuler.z);
+    if (result.parkingBrakeEngaged) {
+      this.controls.setParkingBrake?.(true);
+    }
 
-    const waterResult = this.waterDitching.update(
-      dt,
-      this.aircraft.group,
-      this.linearVelocity,
-      this.angularVelocity,
-      this.currentTerrain,
-      this.aero,
-      this.gear.supportedBodyPoints,
-      gearResult.gearState,
-      stepPitchDeg,
-      stepRollDeg,
-      { mass: this.aero.mass, inverseInertia: { x: this.aero.invIyy, y: this.aero.invIzz, z: this.aero.invIxx } }
-    );
-    gearResult.waterDitching = this.waterDitching;
-    gearResult.waterResult = waterResult;
+    // Sync Three.js aircraft mesh transform
+    this.aircraft.group.position.copy(this.position);
+    this.aircraft.group.quaternion.copy(this.quaternion);
 
-    if (waterResult.onWater && waterResult.ditchingContact) {
-      if (!this.waterDitchingNoticed) {
-        this.waterDitchingNoticed = true;
-        this.landingIncident = true;
-        if (this.demoDirector?.isActive) this.demoDirector.stop();
-        this.autopilot.disengage();
-        this.engines.setThrottle(0.0);
-        this.controls.throttle = 0.0;
-        this.audio?.playWaterSplash?.();
-        this.showToast(() => t('notice.waterDitching'));
-      }
-      if (waterResult.ditchingPhase === 'sinking' && !this.waterSinkingNoticed) {
-        this.waterSinkingNoticed = true;
-        this.showToast(() => t('notice.waterSinking'));
-      }
-      if (waterResult.submerged && !this.waterSubmergedNoticed) {
-        this.waterSubmergedNoticed = true;
-        this.showToast(() => t('notice.waterSunken'));
-      }
+    // Enrich telemetry with simulator/app-level fields
+    this.telemetry = result.telemetry;
+    this.telemetry.apEngaged = this.autopilot.master;
+    this.telemetry.airportKey = this.activeAirport;
+    this.telemetry.apModes = this.autopilot.annunciation();
+    this.telemetry.apArmed = this.autopilot.appArmed;
+    this.telemetry.selectedHeading = this.autopilot.master ? Math.round(this.autopilot.targets.headingDeg) : previousTelemetry?.selectedHeading;
+    this.telemetry.selectedAltitude = this.autopilot.master ? Math.round(this.autopilot.targets.altitudeFt) : previousTelemetry?.selectedAltitude;
+    this.telemetry.selectedSpeed = this.autopilot.master && this.autopilot.speedMode ? Math.round(this.autopilot.targets.iasKnots) : previousTelemetry?.selectedSpeed;
+    this.telemetry.demoActive = isAutonomousDemo;
+    this.telemetry.parkBrake = Boolean(this.controls.parkingBrake || result.telemetry.parkBrake);
+    this.telemetry.warnings = this.isCrashed ? [] : this.flightWarnings.update(dt, this.telemetry,
+      terrainConflictSeconds(this.position, this.linearVelocity, this.currentTerrain,
+        this.telemetry.gearState > 0.95 && this.telemetry.flapDegree >= (this.currentAircraftConfig.id === 'B738' ? 15 : 0)));
 
-      // Visual water spray and ripples
-      if (this.tireSmokeSystem) {
-        if (waterResult.sprayIntensity > 0.04 && groundSpeed > 3.0) {
-          this.waterSprayClock = (this.waterSprayClock || 0) + dt;
-          if (this.waterSprayClock >= 0.08) {
-            this.waterSprayClock = 0;
-            const pointsToEmit = waterResult.contactPoints.length > 0 ? waterResult.contactPoints.slice(0, 4) : [this.position];
-            for (const pt of pointsToEmit) {
-              this.tireSmokeSystem.emitWaterSprayBurst(pt, this.linearVelocity, groundSpeed, 3);
-            }
+    // Presentation: water spray/ripples, slide dust, audio, toasts, and camera cuts
+    const { gearResult, waterResult, groundSpeed } = result;
+    if (waterResult.onWater && waterResult.ditchingContact && this.tireSmokeSystem) {
+      if (waterResult.sprayIntensity > 0.04 && groundSpeed > 3.0) {
+        this.waterSprayClock = (this.waterSprayClock || 0) + dt;
+        if (this.waterSprayClock >= 0.08) {
+          this.waterSprayClock = 0;
+          const pointsToEmit = waterResult.contactPoints.length > 0 ? waterResult.contactPoints.slice(0, 4) : [this.position];
+          for (const pt of pointsToEmit) {
+            this.tireSmokeSystem.emitWaterSprayBurst(pt, this.linearVelocity, groundSpeed, 3);
           }
-        } else if (waterResult.ditchingPhase === 'sinking' && !waterResult.submerged) {
-          this.waterRippleClock = (this.waterRippleClock || 0) + dt;
-          if (this.waterRippleClock >= 0.35) {
-            this.waterRippleClock = 0;
-            this.tireSmokeSystem.emitWaterRipples(this.position, 2);
-          }
+        }
+      } else if (waterResult.ditchingPhase === 'sinking' && !waterResult.submerged) {
+        this.waterRippleClock = (this.waterRippleClock || 0) + dt;
+        if (this.waterRippleClock >= 0.35) {
+          this.waterRippleClock = 0;
+          this.tireSmokeSystem.emitWaterRipples(this.position, 2);
         }
       }
     }
 
-    if (gearResult.damageEvents.length || (gearResult.bodyContacts.length && !this.bodyContactStarted)) {
-      this.landingIncident = true;
-      if (this.demoDirector?.isActive) this.demoDirector.stop();
-      const labels = { nose: 'nose.gear', mainLeft: 'left.main.gear', mainRight: 'right.main.gear' };
-      for (const event of gearResult.damageEvents) {
-        this.showToast(() => t('notice.gearDamage', { value1: t(labels[event.id]), value2: event.state === 'collapsed' ? t('gear.collapsed') : t('gear.damaged') }));
-      }
-    }
-    const newContacts = [...new Map(gearResult.bodyContacts.map(c => [c.id, c])).values()]
-      .filter(c => !this.bodyContactNotices.has(c.id));
-    for (const contact of newContacts) this.bodyContactNotices.add(contact.id);
-    if (newContacts.length) {
-      this.bodyContactStarted = true;
-      this.showToast(() => t('notice.bodyContact', {
-        parts: newContacts.map(c => t(`body.part.${c.id}`)).join(', '),
-      }));
-    }
-    for (const event of gearResult.bodyDamageEvents) {
-      this.showToast(() => t('notice.bodyDamage', {
-        part: t(`body.part.${event.id}`), state: t(`body.state.${event.state}`),
-      }));
-    }
-    // Excursion announcement and soft-ground dust: presentation derived from the
-    // engagement state; never feeds back into forces or control authority.
     const groundRoughness = gearResult.groundRoughness || 0;
-    if (groundRoughness > 0.5 && !this.excursionAnnounced) {
-      this.excursionAnnounced = true;
-      this.showToast(() => t('notice.excursion'));
-    } else if (groundRoughness < 0.2) {
-      this.excursionAnnounced = false;
-    }
-    if (groundRoughness > 0.3 && groundSpeed > 5 && gearResult.bodyContacts.length > 0
-      && this.tireSmokeSystem) {
+    if (groundRoughness > 0.3 && groundSpeed > 5 && gearResult.bodyContacts.length > 0 && this.tireSmokeSystem) {
       this.slideEmitClock = (this.slideEmitClock || 0) + dt;
       if (this.slideEmitClock >= 0.1) {
         this.slideEmitClock = 0;
@@ -286,300 +244,100 @@ class PhysicsIntegratorMethods {
     } else {
       this.slideEmitClock = 0;
     }
-    const resting = (gearResult.onGround || (waterResult.onWater && waterResult.ditchingContact)) && this.linearVelocity.length() < 0.5 && this.angularVelocity.length() < 0.02;
-    this.landingRestTime = resting ? this.landingRestTime + dt : 0;
-    if (!resting) this.landingStopped = false;
-    if (this.landingIncident && !this.landingStopped && this.landingRestTime >= 1) {
-      this.landingStopped = true;
-      this.showToast(() => t('emergency.landing.stopped.select.a.preset.to'));
-    }
 
-    this.aero.gearHandleDown = this.gear.targetGearState > 0.5;
-
-    // 5. Aerodynamic Forces & Moments
-    const aeroResult = this.aero.computeAero(
-      dt,
-      this.aircraft.group,
-      this.linearVelocity,
-      this.angularVelocity,
-      altitudeMeters,
-      heightAboveGround,
-      engineData.totalThrust,
-      gearResult.gearState,
-      this._aeroResult, true
-    );
-
-    // Engine-out asymmetric thrust: the surviving engine's moment about the
-    // centerline yaws the nose toward the dead engine. Body +Y is positive
-    // yaw-left, so the sign follows directly from (T_right - T_left).
-    aeroResult.momentBody.y += asymmetricThrustYawMoment(
-      engineData.engine1.thrust, engineData.engine2.thrust, this.engines.momentArmMeters);
-
-    // 6. Thrust Force in World Space
-    // Engine thrust acts along forward longitudinal axis (-Z in Three.js aircraft space)
-    const thrustWorld = this._intThrust.set(0, 0, -engineData.totalThrust).applyQuaternion(this.quaternion);
-
-    // 7. Gravity Force
-    const gravityWorld = this._intGravity.set(0, -this.aero.mass * Atmosphere.G0, 0);
-
-    // 8. Total Forces Integration: F = m * a
-    const netForceWorld = this._intNetForce.set(0, 0, 0)
-      .add(gravityWorld)
-      .add(thrustWorld)
-      .add(aeroResult.forceWorld)
-      .add(gearResult.forces)
-      .add(waterResult.forces);
-
-    // A connected ground tug contributes forces through the normal integrator.
-    const towing = this.demoDirector?.isActive
-      ? this.demoDirector.getActiveScenario()?.towingForces?.() : null;
-    if (towing) netForceWorld.add(towing.force);
-    const accelerationWorld = netForceWorld.divideScalar(this.aero.mass);
-    this.linearVelocity.addScaledVector(accelerationWorld, dt);
-
-    // Clamp near-zero velocity when parked on ground with brakes
-    if (gearResult.onGround && this.controls.brakes > 0.5 && this.linearVelocity.length() < 0.4 && this.controls.throttle < 0.1) {
-      this.linearVelocity.set(0, 0, 0);
-      this.controls.setParkingBrake?.(true);
-    }
-
-    this._rotationBefore.copy(this.quaternion);
-
-    // 9. Total Moments Integration: M = I * alpha
-    // Moment in body frame: aero moment + landing gear moment + water hydrodynamic moment
-    const netMomentBody = this._intNetMoment.set(0, 0, 0)
-      .add(aeroResult.momentBody)
-      .add(gearResult.moments)
-      .add(waterResult.moments);
-
-    if (towing) netMomentBody.add(towing.moment);
-
-    // Angular acceleration: [p_dot, q_dot, r_dot] = [Mx/Ixx, My/Iyy, Mz/Izz]
-    const angAccBody = this._intAngAcc.set(
-      netMomentBody.x * this.aero.invIyy, // Pitch (around X)
-      netMomentBody.y * this.aero.invIzz, // Yaw (around Y)
-      netMomentBody.z * this.aero.invIxx  // Roll (around Z)
-    );
-
-    this.angularVelocity.addScaledVector(angAccBody, dt);
-
-    // Natural rotational damping (heavy transport inertia dissipation)
-    this.angularVelocity.multiplyScalar(Math.max(0.0, 1.0 - dt * 0.35));
-
-    // Update Aircraft Orientation Quaternion
-    // Delta rotation from body angular velocity: omega x dt
-    const deltaRot = this._intDeltaRot.set(
-      this.angularVelocity.x * dt * 0.5,
-      this.angularVelocity.y * dt * 0.5,
-      this.angularVelocity.z * dt * 0.5,
-      1.0
-    ).normalize();
-
-    this.quaternion.multiply(deltaRot).normalize();
-    translateModelOrigin(this.position, this.linearVelocity, this._rotationBefore, this.quaternion, this.aero.cg, dt);
-
-    // Preserve the incoming pose for obstacle/off-runway collision policy; the
-    // terrain constraint must not lift an aircraft out of a fatal collision.
-    const collisionPosition = this.position.clone();
-    const collisionVelocity = this.linearVelocity.clone();
-    this.resolveBodyPenetration();
-
-    // Sync Three.js aircraft mesh transform
-    this.aircraft.group.position.copy(this.position);
-    this.aircraft.group.quaternion.copy(this.quaternion);
-
-    // 10. Update Telemetry State
-    const euler = this._intEuler.setFromQuaternion(this.quaternion, 'YXZ');
-    const pitchDeg = THREE.MathUtils.radToDeg(euler.x);
-    const rollDeg = THREE.MathUtils.radToDeg(-euler.z);
-    // Heading: forward vector (-Z in aircraft local space) projected to horizontal XZ plane
-    const forwardVec = this._intForward.set(0, 0, -1).applyQuaternion(this.quaternion);
-    const headingDeg = (THREE.MathUtils.radToDeg(Math.atan2(forwardVec.x, -forwardVec.z)) + 360) % 360;
-
-    // Track
-    const trackDeg = (THREE.MathUtils.radToDeg(Math.atan2(this.linearVelocity.x, -this.linearVelocity.z)) + 360) % 360;
-
-    // CG normal specific force averaged over this physics step, including
-    // resolveBodyPenetration impulses and using the interval's midpoint axis.
-    // 8.0 Hz 1st-order EMA low-pass filter eliminates discrete solver spike noise (Δv / Δt)
-    // while preserving sustained aerodynamic and landing loads.
-    const rawGForce = normalLoadFactor(velocityBeforeStep, this.linearVelocity,
-      rotationBeforeStep, this.quaternion, dt);
-    this.gForceFilter ??= new GForceFilter(8.0);
-    const measuredGForce = this.gForceFilter.update(rawGForce, dt);
-    if (this.pilotPhysiology) this.pilotPhysiology.gZ = measuredGForce;
-
-    if (this._hasGroundContact && this.lastOnGround && !gearResult.onGround && this.actualTakeoffMassKg === null) {
-      this.actualTakeoffMassKg = this.aero.mass;
-      this.refreshTakeoffPerformance();
-    }
-    this._hasGroundContact ||= gearResult.onGround;
-    this._performanceClock += dt;
-    if (this._performanceClock >= 1 || this.stallSpeedKnots === undefined) {
-      if (gearResult.onGround) this.refreshTakeoffPerformance();
-      else this.stallSpeedKnots = stallSpeedEstimate(this.aero, gearResult.gearState);
-      this._performanceClock = 0;
-    }
-    this.telemetry = {
-      massRevision: this.aero.massProperties.revision,
-      massKg: this.aero.mass,
-      zeroFuelMassKg: this.aero.massProperties.zeroFuelMassKg,
-      cgBody: { ...this.aero.cg },
-      inertiaBody: { ...this.aero.massProperties.inertia },
-      takeoff: this.takeoff,
-      actualTakeoffMassKg: this.actualTakeoffMassKg,
-      stallSpeedKnots: this.stallSpeedKnots,
-      pitchDeg,
-      rollDeg,
-      headingDeg,
-      trackDeg,
-      altitudeFt: Atmosphere.metersToFeet(this.position.y),
-      radioAltFt: Atmosphere.metersToFeet(heightAboveGround),
-      iasKnots: aeroResult.iasKnots,
-      tasKnots: aeroResult.tasKnots,
-      groundSpeedKnots: Atmosphere.msToKnots(groundSpeed),
-      vsiFpm: Atmosphere.metersToFeet(this.linearVelocity.y) * 60.0,
-      mach: aeroResult.mach,
-      gForce: measuredGForce,
-      rawGForce,
-      wow: Boolean(gearResult.contacts?.slice(1).some(c => c.isGrounded)),
-      isStalled: aeroResult.isStalled,
-      isPreStall: aeroResult.isPreStall,
-      isStallWarning: aeroResult.isStallWarning,
-      stallSeverity: aeroResult.stallSeverity,
-      buffetVibration: aeroResult.buffetVibration,
-      engine1: engineData.engine1,
-      engine2: engineData.engine2,
-      reverserActive: engineData.reverserActive,
-      fuelKg: engineData.fuelKg,
-      gearState: gearResult.gearState,
-      isTransit: gearResult.isTransit,
-      compressions: gearResult.compressions,
-      gearDamage: gearResult.gearDamage,
-      bodyContacts: [...new Set(gearResult.bodyContacts.map(c => c.id))],
-      structuralDamage: gearResult.structuralDamage,
-      groundRoughness: gearResult.groundRoughness || 0,
-      bodyDamage: gearResult.bodyDamage,
-      flapDegree: this.aero.currentFlapAngle,
-      flapIndex: this.aero.flapsIndex,
-      spoilers: this.aero.spoilers,
-      onWater: Boolean(waterResult.onWater),
-      ditchingPhase: waterResult.ditchingPhase,
-      flooding: waterResult.flooding,
-      touchdown: gearResult.touchdown || (waterResult.onWater && waterResult.ditchingContact),
-      touchdownSinkRate: Math.max(0, ...gearResult.touchdownContacts.map(contact => contact.sinkRate), waterResult.ditchingContact ? waterResult.touchdownVsi : 0),
-      onGround: gearResult.onGround || (waterResult.onWater && waterResult.ditchingContact),
-      apEngaged: this.autopilot.master,
-      airportKey: this.activeAirport,
-      apModes: this.autopilot.annunciation(),
-      apArmed: this.autopilot.appArmed,
-      selectedHeading: this.autopilot.master ? Math.round(this.autopilot.targets.headingDeg) : this.telemetry.selectedHeading,
-      selectedAltitude: this.autopilot.master ? Math.round(this.autopilot.targets.altitudeFt) : this.telemetry.selectedAltitude,
-      selectedSpeed: this.autopilot.master && this.autopilot.speedMode ? Math.round(this.autopilot.targets.iasKnots) : this.telemetry.selectedSpeed,
-      rawElevator: this.controls.elevator,
-      rawAileron: this.controls.aileron,
-      rawRudder: this.controls.rudder,
-      elevator: isAutonomousDemo ? this.controls.elevator : (this.pilotPhysiology ? this.pilotPhysiology.effectiveElevator : this.controls.elevator),
-      aileron: isAutonomousDemo ? this.controls.aileron : (this.pilotPhysiology ? this.pilotPhysiology.effectiveAileron : this.controls.aileron),
-      rudder: isAutonomousDemo ? this.controls.rudder : (this.pilotPhysiology ? this.pilotPhysiology.effectiveRudder : this.controls.rudder),
-      throttle: this.controls.throttle,
-      pitchTrim: this.aero.pitchTrim,
-      pilot: this.pilotPhysiology ? this.pilotPhysiology.getSnapshot() : {
-        gZ: measuredGForce, consciousness: 1.0, responsiveness: 1.0, isGLOC: false,
-        blackout: 0, redout: 0, tunnelVision: 0, grayout: 0, blur: 0, glocIncidents: 0, gFatigueSeconds: 0
-      },
-      x: this.position.x,
-      z: this.position.z,
-      demoActive: Boolean(this.demoDirector?.isActive),
-      parkBrake: Boolean(this.controls.parkingBrake || (gearResult.onGround && this.controls.brakes > 0.8 && Atmosphere.msToKnots(groundSpeed) < 1.0))
-    };
-
-    this.telemetry.warnings = this.isCrashed ? [] : this.flightWarnings.update(dt, this.telemetry,
-      terrainConflictSeconds(this.position, this.linearVelocity, this.currentTerrain,
-        this.telemetry.gearState > 0.95 && this.telemetry.flapDegree >= (this.currentAircraftConfig.id === 'B738' ? 15 : 0)));
-
-    // 11. Touchdown Tire Smoke & Landing Contact Gate
-    const gsKnots = Atmosphere.msToKnots(groundSpeed);
-    let genuineLandingTouchdown = false;
-
-    if (!gearResult.onGround) {
-      this.airborneTime += dt;
-      if (this.airborneTime > 2.0) {
-        // Once aircraft has climbed out and sustained flight, prime for next landing
-        this.hasTouchedDownThisFlight = false;
-      }
-    } else {
-      // Aircraft has gear on ground
-      // Genuine touchdown requires coming from sustained flight (> 1.5s), with landing airspeed (> 45 knots),
-      // and only triggers on the initial touchdown frame of this landing.
-      const isGenuineTouchdown = this.airborneTime >= 1.5 && gsKnots > 45 && !this.hasTouchedDownThisFlight;
-      if (isGenuineTouchdown && (gearResult.touchdown || !this.lastOnGround)) {
-        genuineLandingTouchdown = true;
-        this.hasTouchedDownThisFlight = true;
-        const contactsToSmoke = (gearResult.touchdownContacts && gearResult.touchdownContacts.length > 0)
-          ? gearResult.touchdownContacts
-          : this.gear.contacts.filter(c => c.id !== 'nose');
-        this.tireSmokeSystem.spawnTouchdownSmoke(contactsToSmoke, this.linearVelocity);
-      }
-      this.airborneTime = 0.0;
-    }
-
-    // 12. Cinematic Camera Cuts: Automatic temporary gear view for Takeoff, Touchdown, and Gear Retract/Extend
     const allowAutoCut = !this.cameraSystem.autoPaused
       && (!this.cameraSystem.userModeSelected || this.cameraSystem.autoSwitch)
       && !this.cameraSystem.userLookOverridden
       && !(this.demoDirector && this.demoDirector.isActive && this.demoDirector.userCameraOverridden);
-    if (allowAutoCut && !this.landingIncident && this.lastOnGround && !gearResult.onGround && gsKnots > 75) {
-      // Takeoff liftoff
-      this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
-      this.showToast(() => t('landing.gear.view.takeoff.climb'));
-    } else if (allowAutoCut && !this.landingIncident && genuineLandingTouchdown && this.totalSimTime > 2.0) {
-      // Touchdown landing (only on genuine landing touchdown)
-      this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 5.0);
-      this.showToast(() => t('landing.gear.view.touchdown.suspension.compression'));
-    }
 
-    const currentGearTarget = this.gear.targetGearState > 0.5;
-    if (this.lastGearTarget !== currentGearTarget && this.totalSimTime > 1.0) {
-      if (allowAutoCut) {
-        if (!currentGearTarget) {
-          // Gear retracting
-          this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
-          this.showToast(() => t('landing.gear.view.retracting'));
-        } else {
-          // Gear extending
-          this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
-          this.showToast(() => t('landing.gear.view.extending'));
-        }
+    for (const event of result.events) {
+      switch (event.type) {
+        case 'waterDitching':
+          if (this.demoDirector?.isActive) this.demoDirector.stop();
+          this.autopilot.disengage();
+          this.engines.setThrottle(0.0);
+          this.controls.throttle = 0.0;
+          this.audio?.playWaterSplash?.();
+          this.showToast(() => t('notice.waterDitching'));
+          break;
+        case 'waterSinking':
+          this.showToast(() => t('notice.waterSinking'));
+          break;
+        case 'waterSubmerged':
+          this.showToast(() => t('notice.waterSunken'));
+          break;
+        case 'gearDamage':
+          if (this.demoDirector?.isActive) this.demoDirector.stop();
+          this.showToast(() => t('notice.gearDamage', {
+            value1: t(GEAR_LABELS[event.id]),
+            value2: event.state === 'collapsed' ? t('gear.collapsed') : t('gear.damaged'),
+          }));
+          break;
+        case 'bodyContact':
+          if (this.demoDirector?.isActive) this.demoDirector.stop();
+          this.showToast(() => t('notice.bodyContact', {
+            parts: event.contacts.map(c => t(`body.part.${c.id}`)).join(', '),
+          }));
+          break;
+        case 'bodyDamage':
+          this.showToast(() => t('notice.bodyDamage', {
+            part: t(`body.part.${event.id}`),
+            state: t(`body.state.${event.state}`),
+          }));
+          break;
+        case 'excursion':
+          this.showToast(() => t('notice.excursion'));
+          break;
+        case 'landingStopped':
+          this.showToast(() => t('emergency.landing.stopped.select.a.preset.to'));
+          break;
+        case 'touchdown':
+          this.tireSmokeSystem.spawnTouchdownSmoke(event.contacts, this.linearVelocity);
+          if (allowAutoCut && !this.landingIncident && this.totalSimTime > 2.0) {
+            this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 5.0);
+            this.showToast(() => t('landing.gear.view.touchdown.suspension.compression'));
+          }
+          break;
+        case 'liftoff':
+          if (allowAutoCut && !this.landingIncident) {
+            this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
+            this.showToast(() => t('landing.gear.view.takeoff.climb'));
+          }
+          break;
+        case 'gearTransit':
+          if (allowAutoCut && this.totalSimTime > 1.0) {
+            this.cameraSystem.showTemporaryView(CameraSystem.MODES.GEAR, 4.5);
+            this.showToast(() => t(event.extending ? 'landing.gear.view.extending' : 'landing.gear.view.retracting'));
+          }
+          break;
       }
-      this.lastGearTarget = currentGearTarget;
     }
-    this.lastOnGround = gearResult.onGround;
 
     // 13. Check Multi-Obstacle Collisions (Terrain, Water, Tower, Buildings, Trees, Ships)
     this.bridgeFlight?.update(dt);
     if (!this.isCrashed) {
       const crash = this.collisionDetector.checkCollision(
-        collisionPosition,
+        result.collisionPosition,
         this.quaternion,
-        collisionVelocity,
+        result.collisionVelocity,
         gearResult.gearState,
-        pitchDeg,
-        rollDeg,
+        result.pitchDeg,
+        result.rollDeg,
         gearResult
       );
 
       if (crash) {
-        this.triggerCrash(crash, collisionVelocity);
+        this.triggerCrash(crash, result.collisionVelocity);
       }
     }
   }
 
   resolveBodyPenetration() {
-    constrainBodyContact(this.position, this.quaternion, this.linearVelocity, this.angularVelocity,
-      this.aero.mass, { x: this.aero.invIyy, y: this.aero.invIzz, z: this.aero.invIxx },
+    const core = this.ensurePhysicsCore();
+    core.resolveBodyPenetration(
       (x, z) => this.currentTerrain.getHeight(x, z),
-      (x, z) => this.currentTerrain.getNormal?.(x, z), this.gear.supportedBodyPoints, this.aero.cg);
+      (x, z) => this.currentTerrain.getNormal?.(x, z)
+    );
   }
 
   triggerCrash(crashResult, impactVelocity = this.linearVelocity) {

@@ -3,19 +3,28 @@
 Flights automatically collect a pose track alongside the debrief's telemetry report.
 After at least five valid simulation seconds, the debrief offers **Watch replay**;
 its Share tab offers **Save replay**. The lobby's **Saved replays** opens the device's
-library. Flights can be renamed, watched, exported as JSON, imported or deleted.
+library. Flights can be renamed, watched, exported as `.f3dr.gz`, imported (`.f3dr.gz` or
+legacy `.json`) or deleted.
 
 Every finished sortie is also written to a single `auto_save` slot, so the most
 recent flight is always in the library without a manual save. Each new flight replaces
 it; renaming it converts it into an ordinary save that later flights no longer
 overwrite, and the eight-entry budget still applies.
 
-Storage is local to the browser origin: at most eight saves, 160 KB base64 per
-flight and 1 MB total. The oldest saves are evicted under budget or quota pressure.
+Storage is local to the browser origin in IndexedDB (`flight3d.replays.v1`) as
+gzip-compressed binary containers: at most eight saves, 120 KB compressed per
+flight (up to 120 KB binary track + 240 KB UTF-8 report / 360 KB decompressed
+before compression), and 750 KB compressed total. The oldest saves are evicted
+under budget or quota pressure. Existing `localStorage` entries migrate safely
+to IndexedDB on startup, preserving originals until IndexedDB commits succeed.
 Export files to retain copies outside that browser.
 
 Playback has play/pause, previous/next recorded sample, a time scrubber, all ten
-existing camera views, and 30/50/100/200/300 percent speeds. Camera digit shortcuts
+existing camera views, and 30/50/100/200/300 percent speeds. Playback uses the
+live camera toolbar at its usual screen anchor, with the same buttons, styling and
+visibility preferences; the transport panel has no separate camera row. Other
+toolbar actions are removed from the layout so the toolbar fits the visible
+camera controls without empty slots. Camera digit shortcuts
 and mouse look continue to work while aircraft inputs are disabled. Exit or Escape
 returns to the debrief that opened the playback, so its save and share actions stay
 reachable (#648); library playback returns to the lobby. Neither hands the recorded
@@ -23,6 +32,13 @@ aircraft pose to a live flight.
 The viewer waits for terrain to load. Recorded time of day and generated valley
 course seeds are restored without starting another scored attempt. Playback cannot
 start during a multiplayer room or an in-progress scene swap.
+
+A parked replay is not a flying aircraft. When the track ends, playback is paused,
+or terrain is still loading, the replay holds the pose but silences the engine/wind
+mix, clears cockpit vibration and stall buffet, and freezes propeller, fan and
+strobe animation. Resuming or scrubbing while playing restores the recorded mix;
+`ReplayDirector.playbackHeld` is the seam the host reads for frame-clocked model
+animation.
 
 ## Representation and ownership
 
@@ -180,21 +196,32 @@ hidden until respawn. Gaps and backwards seeks clear effects. Playback starts wi
 live wreckage cleared and disposes remote models, indicators, fragments and explosion
 resources on exit or failed loading. Local contact shadows follow replay visibility.
 
-`ReplayStore` uses a small index and individual localStorage payloads. Debrief download
-and replay library export share one unified format (`flight3d.sortie.v1`):
-```json
-{
-  "kind": "flight3d.sortie.v1",
-  "report": { "...": "telemetry report or index summary" },
-  "track": "<base64 encoded binary track (v2 solo or v3 room)>"
-}
+`ReplayStore` stores metadata rows in the `entries` object store and gzip-compressed
+containers (`Blob`/`ArrayBuffer`) in the `payloads` object store of IndexedDB
+(`flight3d.replays.v1`), while automatically migrating any existing `localStorage`
+saves without deleting originals until the IndexedDB commit succeeds (making
+interrupted migrations retryable without duplicates).
+
+Debrief download and replay library export share the `.f3dr.gz` gzip-compressed
+binary container (`F3DC`, container version `1`, independent of `ReplayCodec`
+track/combat versions):
+```text
+[0..3]    "F3DC"  (4-byte magic)
+[4]       version (1 byte u8, currently 1)
+[5..8]    reportByteLength (u32 big-endian)
+[9..12]   trackByteLength  (u32 big-endian)
+[13..]    UTF-8 report JSON (reportByteLength bytes)
+[..]      ReplayCodec binary payload ('F3DR1', trackByteLength bytes)
 ```
-Debrief download emits this file with the full telemetry report and the encoded track;
-library export emits it with a compact debrief summary (`reason`, `touchdown`, `crash`, `peakG`).
-Saved replays in the lobby library display this summary badge alongside duration and timestamp.
-Import reuses the decoder and storage budgets, accepting both `flight3d.sortie.v1` and legacy
-`flight3d.replay.v1` files; the library renders names as plain text.
-These files contain no executable pilot code.
+The entire container is compressed with Web Streams `CompressionStream('gzip')` and
+validated during streaming `DecompressionStream('gzip')` against separate compressed
+(120 KB) and decompressed (240 KB report / 120 KB track / 360 KB total) limits before
+allocating or decoding large payloads. Debrief download embeds the full bounded
+telemetry report; library export embeds the stored report or compact debrief summary
+(`reason`, `touchdown`, `crash`, `peakG`). Import accepts `.f3dr.gz` containers,
+uncompressed `F3DC` containers, and legacy `flight3d.sortie.v1` / `flight3d.replay.v1`
+JSON files (up to 2 MB); the library renders names as plain text. These files contain
+no executable pilot code.
 
 ## Verification
 

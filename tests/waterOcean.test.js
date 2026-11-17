@@ -118,6 +118,15 @@ test('WaterOcean (Camera Anchoring, Grid Snapping & Gerstner Waves)', async (t) 
     assert.equal(ocean.snapStep, 200);
     assert.equal(ocean.material.defines.WATER_FLAT, 0);
 
+    ocean.setQuality('performance', 96);
+    assert.equal(ocean.segments, 96, 'the quality preset supplies the mesh density');
+    assert.equal(ocean.geometry.attributes.position.count, 97 * 97);
+    assert.equal(ocean.snapStep, 200, 'camera snapping stays decoupled from mesh density');
+
+    const directPerformance = new WaterOcean(36000, 96, { quality: 'performance' });
+    assert.equal(directPerformance.segments, 96);
+    assert.equal(directPerformance.snapStep, 200);
+
     const directUltraLow = new WaterOcean(36000, 64, { quality: 'ultraLow' });
     assert.equal(directUltraLow.segments, 64);
     assert.equal(directUltraLow.snapStep, 200, 'snapStep must be 200m when constructed directly with ultraLow');

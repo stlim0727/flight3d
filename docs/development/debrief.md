@@ -124,8 +124,8 @@ classification/contact-G processing is unchanged.
   five valid simulation seconds and two observations. Short records are visible
   but cannot be copied or exported.
 
-JSON exports are versioned immutable snapshots containing metadata, units, end
-reason, duration, extrema, touchdowns and trajectory. Replay/import is outside
+JSON and `.f3dr.gz` container exports are versioned immutable snapshots containing metadata,
+units, end reason, duration, extrema, touchdowns and trajectory. Replay/import is outside
 this feature.
 
 ## Verification

@@ -47,19 +47,19 @@ await withBrowserSession({ width: 1280, height: 800 }, async ({ origin, cdpPort,
     for (let i = 0; i < 15; i++) { now += 200; remoteX += 10; controller.recordReplay(); }
     now += 5000; remoteX += 1000; controller.recordReplay();
     now += 200; controller.recordReplay();
-    const saved = recorder.finish('left');
-    const duplicate = recorder.finish('pagehide');
+    const saved = await recorder.finish('left');
+    const duplicate = await recorder.finish('pagehide');
     if (!saved?.entry) throw new Error(`room save failed: ${saved?.error}`);
-    const track = s.replayStore.get(saved.entry.id).track;
-    const exported = s.replayStore.exportJson(saved.entry.id);
-    const imported = s.replayStore.importJson(exported);
+    const track = (await s.replayStore.get(saved.entry.id)).track;
+    const exported = await s.replayStore.exportContainer(saved.entry.id);
+    const imported = await s.replayStore.importReplay(exported);
     if (!imported.entry) throw new Error('room import failed');
-    s.replayStore.rename(imported.entry.id, '함께 비행 · 보관 사본');
+    await s.replayStore.rename(imported.entry.id, '함께 비행 · 보관 사본');
     s.replayPanel.openLibrary();
     return { defaultEnabled, duplicateIgnored: duplicate === null, held: sampleTrack(track, 8).held,
       remoteMoved: sampleRemote(track, 0, 8).x > sampleRemote(track, 0, 6).x,
       gap: !sampleTrack(track, 11).visible && !sampleRemote(track, 0, 11).visible,
-      metadataPreserved: JSON.stringify(track.metadata.room) === JSON.stringify(s.replayStore.get(imported.entry.id).track.metadata.room),
+      metadataPreserved: JSON.stringify(track.metadata.room) === JSON.stringify((await s.replayStore.get(imported.entry.id)).track.metadata.room),
       roomCount: s.replayStore.list().filter(entry => entry.metadata.room).length,
       playable: [...document.querySelectorAll('[data-action="watch"]')].every(button => !button.disabled),
       namesVisible: document.getElementById('replay-library').textContent.includes('상대 기체') };
@@ -69,7 +69,7 @@ await withBrowserSession({ width: 1280, height: 800 }, async ({ origin, cdpPort,
   await evaluate('window.roomReloadMarker = true');
   await send('Page.reload');
   await until(() => evaluate('!window.roomReloadMarker && !!window.simulator && !document.body.classList.contains("booting")'), 'reload', 90000);
-  assert.equal(await evaluate('window.simulator.replayStore.list().filter(entry => entry.metadata.room).length'), 2);
+  assert.equal(await evaluate('window.simulator.replayStore.ready().then(() => window.simulator.replayStore.list().filter(entry => entry.metadata.room).length)'), 2);
   assert.deepEqual(exceptions, []);
   await writeFile(`${output}/result.json`, JSON.stringify({ ...result, persistedAfterReload: true, exceptions }, null, 2));
   console.log('Room recording controller fixture, storage, import/export and library acceptance passed.');

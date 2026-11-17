@@ -55,7 +55,9 @@ export class WaterOcean {
     this.size = size;
     this.quality = options.quality ?? 'high';
     this.segments = this.quality === 'ultraLow' ? 64 : segments;
-    const baseSegments = options.snapSegments ?? (segments > 64 ? segments : 180);
+    // Camera snapping stays on a fixed 200 m grid: mesh density changes must not
+    // make the camera-following sea jump farther as the tier drops.
+    const baseSegments = options.snapSegments ?? 180;
     this.snapStep = options.snapStep ?? (this.size / baseSegments);
     this.waterLevel = 0.0;
     this.sunDirection = new THREE.Vector3(0.5, 0.6, 0.4).normalize();
@@ -285,14 +287,15 @@ export class WaterOcean {
     this.mesh.receiveShadow = true;
   }
 
-  setQuality(quality) {
+  setQuality(quality, segments) {
     this.quality = quality;
     const isUltraLow = quality === 'ultraLow';
     if (this.material?.defines) {
       this.material.defines.WATER_FLAT = isUltraLow ? 1 : 0;
       this.material.needsUpdate = true;
     }
-    const targetSegments = isUltraLow ? 64 : 180;
+    const targetSegments = isUltraLow ? 64
+      : Number.isInteger(segments) && segments > 0 ? segments : 180;
     if (this.segments !== targetSegments) {
       this.segments = targetSegments;
       const oldGeom = this.geometry;

@@ -1,3 +1,4 @@
+import { nextGpwsCallout } from '../systems/FlightWarningsCore.js';
 import { DepartureRadio } from './DepartureRadio.js';
 import { DEPARTURE_RADIO } from '../config/departureRadio.js';
 import { BANGKOK_DEPARTURE_RADIO } from '../config/bangkokDepartureRadio.js';
@@ -17,6 +18,7 @@ export class FlightAudio {
     this.ctx = null;
     this.isMuted = false;
     this.isPaused = false;
+    this.isReplayPaused = false;
     this.isInitialized = false;
 
     this.volume = 1.0;
@@ -155,7 +157,7 @@ export class FlightAudio {
       this.distanceGain = this.ctx.createGain();
       this.distanceGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
       this.ambientBus = this.ctx.createGain();
-      this.ambientBus.gain.setValueAtTime(1.0, this.ctx.currentTime);
+      this.ambientBus.gain.setValueAtTime(this.isReplayPaused ? 0.0 : 1.0, this.ctx.currentTime);
       this.cockpitFilter.connect(this.ambientBus);
       this.ambientBus.connect(this.distanceGain);
       this.distanceGain.connect(this.masterGain);
@@ -593,6 +595,28 @@ export class FlightAudio {
     this.applyMasterGain();
   }
 
+  /**
+   * A replay owns the pose and its recorded state, but it does not step physics. A
+   * parked replay must lose its continuous engine/wind/pack bed so it cannot drone
+   * behind the viewer. Only the ambient bus is silenced: one-shot impacts and
+   * explosions still reach the master bus, because a replay can stage its final
+   * crash or a scrubbed impact on the same frame that parks the playback.
+   */
+  setReplayPaused(paused) {
+    this.isReplayPaused = !!paused;
+    if (this.isReplayPaused) {
+      this.cancelSpeech();
+      this.stopGunFire();
+      this.stopMissileFlight();
+      this.departureRadio.stop();
+      this.bangkokRadio?.stop();
+      this.warningGain?.gain.setValueAtTime(0, this.ctx?.currentTime ?? 0);
+    }
+    if (this.ambientBus && this.ctx) {
+      this.ambientBus.gain.setTargetAtTime(this.isReplayPaused ? 0 : 1, this.ctx.currentTime, 0.05);
+    }
+  }
+
   applyMasterGain() {
     if (this.masterGain && this.ctx) {
       const targetGain = this.effectiveVolume;
@@ -763,25 +787,8 @@ export class FlightAudio {
     } else this.warningOsc.frequency.setValueAtTime(680, now);
 
     // 6. Boeing GPWS Altitude Voice Callouts
-    const rAlt = state.radioAltFt;
-    if (this.aircraftId === 'B738' && !alert && rAlt !== undefined && !state.onGround && state.vsiFpm < -100) {
-      // RADALT pronounce-up spelling; 500 and 100 are doubled like the real device.
-      const callouts = [
-        ['Five hundred, five hundred', 500],
-        ['One hundred, one hundred', 100],
-        ['Fifty', 50], ['Forty', 40], ['Thirty', 30], ['Twenty', 20], ['Ten', 10],
-      ];
-      for (const [text, call] of callouts) {
-        if (this.lastRadioAlt > call && rAlt <= call && !this.calledAltitudes.has(call)) {
-          this.calledAltitudes.add(call);
-          this.playGpwsCallout(text);
-          break;
-        }
-      }
-
-    }
-    if (rAlt > 1000) this.calledAltitudes.clear();
-    this.lastRadioAlt = rAlt;
+    const callout = nextGpwsCallout(this, state, this.aircraftId, Boolean(alert));
+    if (callout) this.playGpwsCallout(callout.text);
 
     // 7. RWR three-stage warning: search ping, lock beep, launch siren.
     this.updateThreatAlert(dt, state.rwrLevel || 0);
@@ -926,7 +933,7 @@ export class FlightAudio {
    * bed falls to; it recovers to unity after `holdSeconds`.
    */
   duckAmbient(depth = 0.3, holdSeconds = 0.4) {
-    if (!this.ambientBus || !this.ctx) return;
+    if (!this.ambientBus || !this.ctx || this.isReplayPaused) return;
     const now = this.ctx.currentTime;
     const gain = this.ambientBus.gain;
     gain.cancelScheduledValues?.(now);

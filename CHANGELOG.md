@@ -1,6 +1,18 @@
 # Changelog
 
 ## [Unreleased]
+- **fix(replay):** stop the aircraft after playback ends
+  - A parked replay (end of track, manual pause, or a terrain wait) now silences the continuous engine/wind/pack bed, clears cockpit vibration and stall buffet, and freezes propeller/fan/strobe animation instead of droning and shaking over the final frame.
+  - Crash impacts and other one-shots stay audible, because a replay can stage its final impact on the same frame that parks playback; resuming, scrubbing away from the end sample, or restarting restores the recorded mix and motion.
+  - Leaving the replay releases the held state.
+- **fix(ui):** keep the cockpit eyepoint panel out of the forward sight
+  - The panel now docks to the bottom edge over the lower console instead of opening under the toolbar across the windshield and HUD; its height is capped below the measured control rows and it scrolls internally when needed.
+  - Viewports shorter than 560px get a thin three-column strip (axis labels above their values, no optional step buttons) and the cockpit POV pill becomes a 44px eye icon, so the horizon and HUD stay visible on landscape phones.
+  - Verified at 1440×900, 926×428, 390×660, 390×844, 320×568, 568×320 and 320×400: the pill clears the toolbar and the panel stays below the upper 35% sight band, bottom-docked.
+- **feat(render):** make quality tiers differ in real geometry (#815)
+  - `performance` now caps the framebuffer at 1280 × 720 and uses 128 terrain / 96 water segments; `balanced` uses 192 / 144 instead of sharing the high tier's 256 / 180.
+  - Quality changes rebuild the terrain and sea grids and let the foliage layer rebuild its roads against the new grid; the sea keeps its fixed 200 m camera snap step.
+  - On a 1440 × 900 desktop, `performance` therefore renders about 28% fewer pixels and 40% fewer world triangles than before; the cockpit geometry and its shadow cost are unchanged.
 - **fix(combat):** audible missile launch and countermeasure ejection, and downed bandits that stay visible
   - Missile ignition now plays a highpass report over a broad rocket roar and low thump, loud enough to read over the engine/wind bed; replay launches are scored after the DIRECTOR camera has cut to the launch shot instead of against the previous orbit camera kilometres away.
   - Bandit flare and chaff ejection have their own distance-scaled synthesized voices (flare crack plus burn hiss, chaff pneumatic puff) in live sorties and replays; these stems did not exist before.

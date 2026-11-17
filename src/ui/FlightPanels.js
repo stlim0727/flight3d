@@ -20,8 +20,7 @@ export function touchLabel(text) {
 }
 
 /**
- * The one camera button set shared by the in-flight toolbar and the replay
- * transport. Replay omits the id because the toolbar already owns those ids.
+ * The live camera toolbar owns these buttons during both flight and replay.
  */
 export function createCameraButtons(onSelectCamera, { idPrefix = 'btn-cam-' } = {}) {
   return CAMERA_MODES.map(([mode, name]) => {

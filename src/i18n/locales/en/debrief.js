@@ -58,7 +58,7 @@ export default {
   'debrief.started': 'Flight started',
   'debrief.shareReport': 'Share report',
   'debrief.report': 'Flight report',
-  'debrief.download': 'Download flight log (.json)',
+  'debrief.download': 'Download flight log (.f3dr.gz)',
   'debrief.saveReplay': 'Save to library',
   'debrief.shareHint': 'The report includes aircraft, scenario, flight statistics and any collision.',
   'debrief.downloaded': 'Flight log downloaded.',

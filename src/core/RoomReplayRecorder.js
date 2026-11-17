@@ -1,5 +1,5 @@
 import { ReplayRecorder } from './ReplayRecorder.js';
-import { REPLAY_INTERVAL_LADDER, maxSamplesFor } from '../replay/replayConfig.js';
+import { REPLAY_INTERVAL_LADDER, maxSamplesForTrack } from '../replay/replayConfig.js';
 
 /**
  * Records a whole multiplayer room on one clock: the local aircraft with its full telemetry,
@@ -55,9 +55,9 @@ export class RoomReplayRecorder extends ReplayRecorder {
   }
 
   _boundTimeline() {
-    // Reserve at most a quarter of the binary budget for transition history. If state
+    // Reserve at most a quarter of the binary track budget for transition history. If state
     // changes alone fill it, shorten the retained window instead of dropping its events.
-    const budget = Math.min(16_000, this.maxBase64Bytes * 3 / 16);
+    const budget = Math.min(16_000, Math.floor(this.maxTrackBytes / 4));
     while (this.timeline.length > 1 && new TextEncoder().encode(JSON.stringify(this.timeline)).length > budget) {
       this.timeline.shift();
       this.samples = this.samples.filter(sample => sample.timeSec >= this.timeline[0].timeSec);
@@ -69,7 +69,7 @@ export class RoomReplayRecorder extends ReplayRecorder {
 
   capacity() {
     // Space for finalized duration, offset and end reason, added at finish.
-    return maxSamplesFor(this.maxBase64Bytes, this.metadataBytes + (this.metadata.room ? 256 : 0), this.remoteCount);
+    return maxSamplesForTrack(this.maxTrackBytes, this.metadataBytes + (this.metadata.room ? 256 : 0), this.remoteCount);
   }
 
   /** A room can outlast the coarsest rung; it keeps the most recent frames instead of refusing. */

@@ -1,4 +1,5 @@
-import { RECORD_BYTES, REMOTE_RECORD_BYTES, HEADER_BYTES, REPLAY_INTERVAL_SEC, frameBytes } from './replayConfig.js';
+import { RECORD_BYTES, REMOTE_RECORD_BYTES, HEADER_BYTES, CONTAINER_HEADER_BYTES,
+  REPLAY_BUDGET, REPLAY_INTERVAL_SEC, frameBytes } from './replayConfig.js';
 import { COMBAT_DAMAGE_ZONES } from '../physics/combatDamage.js';
 
 export const REPLAY_TRACK_VERSION = 2;
@@ -24,6 +25,11 @@ export const GUIDANCE_CUTOFF_REASONS = Object.freeze([
 ]);
 export const HIT_ZONES = Object.freeze(['unknown', ...COMBAT_DAMAGE_ZONES]);
 export const REPLAY_MAGIC = 'F3DR1';
+export const REPLAY_CONTAINER_MAGIC = 'F3DC';
+export const REPLAY_CONTAINER_VERSION = 1;
+export const REPLAY_FILE_EXTENSION = '.f3dr.gz';
+export const REPLAY_MIME_TYPE = 'application/gzip';
+export { CONTAINER_HEADER_BYTES };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 const BOOL_FIELDS = Object.freeze(['onGround', 'isTransit', 'touchdown', 'isStalled', 'isPreStall',
@@ -49,6 +55,7 @@ const COMPRESSION_LEGS = Object.freeze(['nose', 'mainLeft', 'mainRight']);
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+const containerDecoder = new TextDecoder('utf-8', { fatal: true });
 
 function finite(value) {
   return Number.isFinite(value) ? value : 0;
@@ -852,6 +859,285 @@ export function fromBase64(text) {
   }
   if (cursor === 0) throw new Error('replay payload is empty');
   return bytes.subarray(0, cursor);
+}
+
+export function isGzipBytes(bytes) {
+  return bytes instanceof Uint8Array && bytes.byteLength >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+}
+
+export function isContainerBytes(bytes) {
+  return bytes instanceof Uint8Array && bytes.byteLength >= 4
+    && bytes[0] === 0x46 && bytes[1] === 0x33 && bytes[2] === 0x44 && bytes[3] === 0x43;
+}
+
+function resolveContainerLimits(limits = {}) {
+  const maxReportBytes = Number.isFinite(limits.maxReportBytes) ? limits.maxReportBytes : REPLAY_BUDGET.entryReportBytes;
+  const maxTrackBytes = Number.isFinite(limits.maxTrackBytes) ? limits.maxTrackBytes : REPLAY_BUDGET.entryTrackBytes;
+  const maxDecompressedBytes = Number.isFinite(limits.maxDecompressedBytes)
+    ? limits.maxDecompressedBytes
+    : REPLAY_BUDGET.entryDecompressedBytes;
+  return { maxReportBytes, maxTrackBytes, maxDecompressedBytes };
+}
+
+/**
+ * Inspect and validate a container header before allocating or decoding payloads.
+ * Layout (13 bytes, big-endian):
+ *   0..3  ASCII 'F3DC'
+ *   4     u8  container version (separate from ReplayCodec track version)
+ *   5..8  u32 UTF-8 report JSON byte length
+ *   9..12 u32 ReplayCodec binary payload byte length
+ */
+export function inspectContainerHeader(bytes, limits = {}) {
+  if (!(bytes instanceof Uint8Array)) throw new Error('replay container requires bytes');
+  if (bytes.byteLength < CONTAINER_HEADER_BYTES) throw new Error('replay container is truncated');
+  const magic = String.fromCharCode(...bytes.subarray(0, 4));
+  if (magic !== REPLAY_CONTAINER_MAGIC) throw new Error(`not a flight3d replay container (${magic})`);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const version = view.getUint8(4);
+  if (version < 1 || version > REPLAY_CONTAINER_VERSION) {
+    throw new Error(`unsupported replay container version ${version}`);
+  }
+  const reportByteLength = view.getUint32(5);
+  const trackByteLength = view.getUint32(9);
+  const totalByteLength = CONTAINER_HEADER_BYTES + reportByteLength + trackByteLength;
+  const { maxReportBytes, maxTrackBytes, maxDecompressedBytes } = resolveContainerLimits(limits);
+  if (reportByteLength > maxReportBytes
+    || trackByteLength > maxTrackBytes
+    || totalByteLength > maxDecompressedBytes) {
+    throw new Error('replay container exceeds decompressed size limit');
+  }
+  return { version, reportByteLength, trackByteLength, totalByteLength };
+}
+
+/** Encode a report JSON object and ReplayCodec binary track into a versioned binary container. */
+export function encodeReplayContainer({ report = null, track = null, trackBytes = null } = {}, limits = {}) {
+  let resolvedTrackBytes;
+  if (trackBytes instanceof Uint8Array) {
+    resolvedTrackBytes = trackBytes;
+  } else if (track !== null && track !== undefined) {
+    resolvedTrackBytes = encodeTrack(track);
+  } else {
+    resolvedTrackBytes = new Uint8Array(0);
+  }
+
+  let reportBytes;
+  if (report === null || report === undefined) {
+    reportBytes = new Uint8Array(0);
+  } else if (typeof report === 'object' && !Array.isArray(report)) {
+    reportBytes = encoder.encode(JSON.stringify(report));
+  } else {
+    throw new Error('replay container report must be an object or null');
+  }
+
+  const { maxReportBytes, maxTrackBytes, maxDecompressedBytes } = resolveContainerLimits(limits);
+  const totalByteLength = CONTAINER_HEADER_BYTES + reportBytes.byteLength + resolvedTrackBytes.byteLength;
+  if (reportBytes.byteLength > maxReportBytes
+    || resolvedTrackBytes.byteLength > maxTrackBytes
+    || totalByteLength > maxDecompressedBytes) {
+    throw new Error('replay container exceeds decompressed size limit');
+  }
+
+  const bytes = new Uint8Array(totalByteLength);
+  for (let index = 0; index < REPLAY_CONTAINER_MAGIC.length; index++) {
+    bytes[index] = REPLAY_CONTAINER_MAGIC.charCodeAt(index);
+  }
+  const view = new DataView(bytes.buffer);
+  view.setUint8(4, REPLAY_CONTAINER_VERSION);
+  view.setUint32(5, reportBytes.byteLength);
+  view.setUint32(9, resolvedTrackBytes.byteLength);
+  bytes.set(reportBytes, CONTAINER_HEADER_BYTES);
+  bytes.set(resolvedTrackBytes, CONTAINER_HEADER_BYTES + reportBytes.byteLength);
+  return bytes;
+}
+
+/** Validate and decode a versioned binary container back into `{ version, report, track, trackBytes }`. */
+export function decodeReplayContainer(bytes, options = {}) {
+  const { version, reportByteLength, trackByteLength, totalByteLength } = inspectContainerHeader(bytes, options);
+  if (bytes.byteLength < totalByteLength) throw new Error('replay container is truncated');
+  if (bytes.byteLength !== totalByteLength) {
+    throw new Error(`replay container length ${bytes.byteLength} does not match ${totalByteLength}`);
+  }
+  let report = null;
+  if (reportByteLength > 0) {
+    try {
+      const reportSlice = bytes.subarray(CONTAINER_HEADER_BYTES, CONTAINER_HEADER_BYTES + reportByteLength);
+      report = JSON.parse(containerDecoder.decode(reportSlice));
+    } catch {
+      throw new Error('replay container report is corrupt');
+    }
+    if (!report || typeof report !== 'object' || Array.isArray(report)) {
+      throw new Error('replay container report is corrupt');
+    }
+  }
+  const trackStart = CONTAINER_HEADER_BYTES + reportByteLength;
+  const trackSlice = bytes.subarray(trackStart, totalByteLength);
+  if (trackByteLength === 0) {
+    if (options.requireTrack) throw new Error('replay container has no track');
+    return { version, report, track: null, trackBytes: new Uint8Array(0) };
+  }
+  const track = decodeTrack(trackSlice);
+  return { version, report, track, trackBytes: trackSlice.slice() };
+}
+
+function concatChunks(chunks, total) {
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output;
+}
+
+export async function toReplayBytes(input, maxBytes = Infinity) {
+  if (input instanceof Uint8Array) {
+    if (input.byteLength > maxBytes) throw new Error('replay payload exceeds compressed size limit');
+    return input;
+  }
+  if (input instanceof ArrayBuffer) {
+    if (input.byteLength > maxBytes) throw new Error('replay payload exceeds compressed size limit');
+    return new Uint8Array(input);
+  }
+  if (ArrayBuffer.isView(input)) {
+    if (input.byteLength > maxBytes) throw new Error('replay payload exceeds compressed size limit');
+    return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+  }
+  if (input && typeof input.arrayBuffer === 'function') {
+    if (Number.isFinite(input.size) && input.size > maxBytes) {
+      throw new Error('replay payload exceeds compressed size limit');
+    }
+    const bytes = new Uint8Array(await input.arrayBuffer());
+    if (bytes.byteLength > maxBytes) throw new Error('replay payload exceeds compressed size limit');
+    return bytes;
+  }
+  throw new Error('replay payload requires bytes');
+}
+
+/** Compress a Uint8Array with the browser/Node Web Streams CompressionStream('gzip'). */
+export async function compressGzip(bytes) {
+  if (!(bytes instanceof Uint8Array)) throw new Error('compressGzip requires a Uint8Array');
+  if (typeof CompressionStream !== 'function') throw new Error('CompressionStream is unavailable');
+  const stream = new CompressionStream('gzip');
+  const writer = stream.writable.getWriter();
+  const writePromise = (async () => {
+    const chunkBytes = 16384;
+    for (let offset = 0; offset < bytes.byteLength; offset += chunkBytes) {
+      await writer.write(bytes.subarray(offset, Math.min(bytes.byteLength, offset + chunkBytes)));
+    }
+    await writer.close();
+  })();
+  writePromise.catch(() => {});
+  const reader = stream.readable.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.byteLength;
+    }
+    await writePromise;
+  } finally {
+    reader.releaseLock();
+  }
+  return concatChunks(chunks, total);
+}
+
+/**
+ * Decompress a gzip-compressed Blob/ArrayBuffer/Uint8Array with streaming byte-budget and
+ * early container-header checks before allocating the full output buffer.
+ */
+export async function decompressGzip(input, options = {}) {
+  if (typeof DecompressionStream !== 'function') throw new Error('DecompressionStream is unavailable');
+  const maxCompressedBytes = Number.isFinite(options.maxCompressedBytes)
+    ? options.maxCompressedBytes
+    : REPLAY_BUDGET.entryCompressedBytes;
+  const maxDecompressedBytes = Number.isFinite(options.maxDecompressedBytes)
+    ? options.maxDecompressedBytes
+    : REPLAY_BUDGET.entryDecompressedBytes;
+  const bytes = await toReplayBytes(input, maxCompressedBytes);
+  if (bytes.byteLength === 0) throw new Error('replay payload is empty');
+  // Minimum RFC 1952 gzip member is 10-byte header + 8-byte trailer = 18 bytes.
+  if (bytes.byteLength < 18 || !isGzipBytes(bytes)) throw new Error('replay payload is not gzip compressed');
+
+  const stream = new DecompressionStream('gzip');
+  const writer = stream.writable.getWriter();
+  let aborted = false;
+  const writePromise = (async () => {
+    const chunkBytes = 4096;
+    for (let offset = 0; offset < bytes.byteLength; offset += chunkBytes) {
+      if (aborted) return;
+      await writer.write(bytes.subarray(offset, Math.min(bytes.byteLength, offset + chunkBytes)));
+    }
+    if (!aborted) await writer.close();
+  })();
+  writePromise.catch(() => {});
+  const reader = stream.readable.getReader();
+  const chunks = [];
+  let total = 0;
+  let headerInfo = null;
+  try {
+    for (;;) {
+      let readResult;
+      try {
+        readResult = await reader.read();
+      } catch (error) {
+        aborted = true;
+        throw new Error(error?.message || 'replay gzip stream is corrupt or truncated');
+      }
+      const { done, value } = readResult;
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxDecompressedBytes) {
+        aborted = true;
+        await reader.cancel().catch(() => {});
+        throw new Error('replay container exceeds decompressed size limit');
+      }
+      chunks.push(value);
+      if (options.expectContainer && !headerInfo && total >= CONTAINER_HEADER_BYTES) {
+        const prefix = new Uint8Array(CONTAINER_HEADER_BYTES);
+        let copied = 0;
+        for (const chunk of chunks) {
+          const take = Math.min(chunk.byteLength, CONTAINER_HEADER_BYTES - copied);
+          prefix.set(chunk.subarray(0, take), copied);
+          copied += take;
+          if (copied === CONTAINER_HEADER_BYTES) break;
+        }
+        try {
+          headerInfo = inspectContainerHeader(prefix, options);
+        } catch (error) {
+          aborted = true;
+          await reader.cancel().catch(() => {});
+          throw error;
+        }
+      }
+      if (headerInfo && total > headerInfo.totalByteLength) {
+        aborted = true;
+        await reader.cancel().catch(() => {});
+        throw new Error('replay container exceeds declared container size');
+      }
+    }
+    try {
+      await writePromise;
+    } catch (error) {
+      throw new Error(error?.message || 'replay gzip stream is corrupt or truncated');
+    }
+  } finally {
+    aborted = true;
+    reader.releaseLock();
+  }
+  return concatChunks(chunks, total);
+}
+
+export async function encodeCompressedContainer(payload, limits = {}) {
+  const container = encodeReplayContainer(payload, limits);
+  return compressGzip(container);
+}
+
+export async function decodeCompressedContainer(input, options = {}) {
+  const decompressed = await decompressGzip(input, { ...options, expectContainer: true });
+  return decodeReplayContainer(decompressed, options);
 }
 
 export { BOOL_FIELDS, COMPRESSION_LEGS };

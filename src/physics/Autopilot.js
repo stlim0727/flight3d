@@ -11,6 +11,36 @@ function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
 
+/** Normalize a FlightPhysicsCore snapshot without requiring vector/quaternion classes.
+ * Position is metres in world axes (+Y up, forward -Z at identity); quaternion
+ * is {x,y,z,w}. Angles are degrees, speeds knots and VSI feet/minute.
+ * Telemetry supplies IAS/TAS, throttle and optional airportKey for APP.
+ * Pose/velocity override telemetry so engage can capture the current substep.
+ * Flat telemetry remains supported for existing simulator callers.
+ */
+export function autopilotState(input, out = {}) {
+  if (!input.telemetry) return input;
+  for (const key of Object.keys(out)) delete out[key];
+  Object.assign(out, input.telemetry);
+  const { position: p, quaternion: q, linearVelocity: v } = input;
+  if (p) {
+    out.x = p.x; out.z = p.z;
+    out.altitudeFt = p.y / 0.3048;
+  }
+  if (v) out.vsiFpm = v.y / 0.3048 * 60;
+  if (q) {
+    const { x, y, z, w } = q;
+    const m23 = 2 * (y * z - w * x);
+    out.pitchDeg = Math.asin(-clamp(m23, -1, 1)) * 180 / Math.PI;
+    out.rollDeg = Math.abs(m23) < 0.9999999
+      ? -Math.atan2(2 * (x * y + w * z), 1 - 2 * (x * x + z * z)) * 180 / Math.PI : 0;
+    const forwardX = w * (-2 * y) - z * (2 * x);
+    const forwardZ = -1 + x * (2 * x) - y * (-2 * y);
+    out.headingDeg = (Math.atan2(forwardX, -forwardZ) * 180 / Math.PI + 360) % 360;
+  }
+  return out;
+}
+
 /**
  * Pure autopilot control laws (no THREE/DOM). Consumes the telemetry snapshot
  * and produces surface/throttle commands in FlightControls conventions:
@@ -26,6 +56,7 @@ function clamp(v, lo, hi) {
  */
 export class AutopilotController {
   constructor(options = {}) {
+    this._snapshot = {};
     this.master = false;
     this.lateralMode = null;   // 'HDG' | 'APP'
     this.verticalMode = null;  // 'PITCH' | 'ALT' | 'VS' | 'APP'
@@ -68,6 +99,7 @@ export class AutopilotController {
 
   /** @param {'MASTER'|'HDG'|'ALT'|'VS'|'SPD'|'APP'} mode */
   engage(mode, telemetry) {
+    telemetry = autopilotState(telemetry, this._snapshot);
     if (mode === 'MASTER') {
       if (this.master) {
         this.disengage();
@@ -213,13 +245,14 @@ export class AutopilotController {
   }
 
   /**
-   * @param {object} telemetry sim snapshot (headingDeg, rollDeg, pitchDeg,
+   * @param {object} telemetry FlightPhysicsCore snapshot or flat sim snapshot (headingDeg, rollDeg, pitchDeg,
    *   altitudeFt, vsiFpm, iasKnots, throttle, x, z, altitude, airportKey)
    * @param {number} dt seconds
    * @returns {{aileron:number, elevator:number, throttle:number}} zero axes when
    *   master is off; throttle passes through unless speed mode is active.
    */
   update(telemetry, dt) {
+    telemetry = autopilotState(telemetry, this._snapshot);
     const out = this.output;
     out.aileron = 0;
     out.elevator = 0;

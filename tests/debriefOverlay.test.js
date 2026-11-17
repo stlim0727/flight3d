@@ -186,11 +186,30 @@ test('every debrief action names a button that exists in the overlay markup', ()
   }
 });
 
-test('debrief download emits flight3d.sortie.v1 unifying telemetry report and track', () => {
+test('debrief download emits gzipped binary container (.f3dr.gz) unifying telemetry report and track', () => {
   const source = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
-  assert.match(source, /createSortie\(this\.report,\s*this\.replay\)/, 'download handler must call createSortie');
-  assert.match(source, /import\s*\{[^}]*createSortie[^}]*\}\s*from '\.\.\/replay\/ReplayStore\.js'/,
-    'DebriefOverlay must import createSortie from ReplayStore');
+  assert.match(source, /createCompressedSortie\(this\.report,\s*this\.replay\)/, 'download handler must call createCompressedSortie');
+  assert.match(source, /import\s*\{[^}]*createCompressedSortie[^}]*\}\s*from '\.\.\/replay\/ReplayStore\.js'/,
+    'DebriefOverlay must import createCompressedSortie from ReplayStore');
+  assert.match(enDebrief['debrief.download'], /\.f3dr\.gz/, 'english download caption should reference .f3dr.gz');
+  assert.match(koDebrief['debrief.download'], /\.f3dr\.gz/, 'korean download caption should reference .f3dr.gz');
   assert.match(enDebrief['debrief.saveReplay'], /library/i, 'save replay caption should indicate library');
   assert.match(koDebrief['debrief.saveReplay'], /라이브러리/, 'korean save replay caption should indicate library');
+});
+
+test('DebriefOverlay guards async save completion by debrief generation and ReplayPanel subscribes to store updates', () => {
+  const debriefSource = readFileSync(resolve('src/ui/DebriefOverlay.js'), 'utf8');
+  assert.match(debriefSource, /_debriefGeneration/, 'DebriefOverlay must track debrief generation across async saves');
+  assert.match(debriefSource, /if\s*\(\s*\(this\._debriefGeneration\s*\?\?\s*0\)\s*!==\s*generation\s*\)\s*return/,
+    'DebriefOverlay must ignore stale save completions after show() displays a new sortie');
+
+  const panelSource = readFileSync(resolve('src/ui/ReplayPanel.js'), 'utf8');
+  assert.match(panelSource, /replayStore\?\.subscribe\?\./,
+    'ReplayPanel must subscribe to replayStore updates so in-flight save commits/rollbacks refresh the open library');
+  assert.match(panelSource, /this\._librarySession/,
+    'ReplayPanel must invalidate pending watch requests when the library closes');
+  assert.match(panelSource, /if\s*\(\s*this\._librarySession\s*!==\s*session\s*\|\|\s*this\.library\.hidden\s*\)/,
+    'ReplayPanel watch click must abort before starting playback if library closed while loading');
+  assert.match(panelSource, /replayStore\.refresh\?\.\(\)/,
+    'ReplayPanel.openLibrary must refresh metadata from IndexedDB when reopening the library');
 });
