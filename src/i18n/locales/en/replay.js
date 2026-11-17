@@ -28,4 +28,6 @@ export default {
   'replay.multiplayerBlocked': "Replays can't play while you're in a multiplayer room. Leave the room to watch.",
   'replay.play': "Play",
   'replay.pause': "Pause",
+  'replay.marker.player': "YOUR AIRCRAFT",
+  'replay.marker.missile': "MISSILE",
 };

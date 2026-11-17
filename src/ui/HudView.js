@@ -1,6 +1,8 @@
 import { MathUtils, Quaternion, Vector3 } from 'three';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { t } from '../i18n/index.js';
+import { distanceLabel } from '../multiplayer/remoteIndicator.js';
+import { MISSILE_TYPES } from '../weapons/missileSpecs.js';
 import { hudDirection, projectHudDirection } from './HudProjection.js';
 
 const tapeWidth = (scale) => Math.max(54, 76 * scale);
@@ -30,12 +32,17 @@ export class HudView {
     // can still see the lock without switching to the full HUD camera.
     const combat = this.combatHudState();
     const combatOnly = !hudActive && !sim.isCrashed && !hudFolded && Boolean(combat);
-    const visible = hudActive || combatOnly;
+    // DIRECTOR is the replay's film camera: the jet and each live round carry a
+    // label so the viewer can tell what the shot is following.
+    const markers = this.replayMarkers();
+    const markerOnly = !hudActive && !sim.isCrashed && !hudFolded && Boolean(markers?.length);
+    const visible = hudActive || combatOnly || markerOnly;
     if (this.root.hidden === visible) this.root.hidden = !visible;
     document.body.classList.toggle('hud-camera-mode', hudActive);
     if (!visible) return;
     if (!hudActive) {
       this.drawCombatOnly(combat);
+      if (markers?.length) this.drawReplayMarkers(markers, this.root.clientWidth, this.root.clientHeight);
       return;
     }
     const heading = ((Math.round(sim.telemetry.headingDeg || 0) % 360) + 360) % 360;
@@ -51,6 +58,13 @@ export class HudView {
     return null;
   }
 
+  /** Identity markers belong to the replay's DIRECTOR camera, not live flight. */
+  replayMarkers() {
+    const director = this.sim.replayDirector;
+    if (!director?.active || this.sim.cameraSystem.mode !== CameraSystem.MODES.DIRECTOR) return null;
+    return director.markerState?.() ?? null;
+  }
+
   /** Transparent target/weapon/RWR layer for cockpit and chase cameras. */
   drawCombatOnly(combat) {
     const width = this.root.clientWidth, height = this.root.clientHeight;
@@ -63,6 +77,94 @@ export class HudView {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
     if (combat) this.drawCombat(width, height, Math.min(1, width / 1100), combat, true);
+  }
+
+  /** Labels and edge locators for the replay host aircraft and each live round. */
+  drawReplayMarkers(markers, width, height) {
+    if (!width || !height) return;
+    const ctx = this.ctx;
+    const scale = Math.min(1, width / 1100);
+    const font = Math.max(10, 12 * scale);
+    const camera = this.sim.camera;
+    ctx.save();
+    ctx.font = `600 ${font}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = '#0a141c';
+    ctx.shadowBlur = 4;
+    for (const marker of markers) {
+      if (!marker?.position) continue;
+      const player = marker.kind === 'player';
+      const color = player ? '#b8ff9b' : '#ffcc66';
+      const label = player ? t('replay.marker.player')
+        : t(MISSILE_TYPES[marker.typeId]?.labelKey ?? 'replay.marker.missile');
+      const screen = this.projectWorld(marker.position, width, height);
+      const offscreen = screen.behind || screen.x < 0 || screen.x > width
+        || screen.y < 0 || screen.y > height;
+      if (offscreen) {
+        this.drawReplayLocator(screen, width, height, scale, color, label,
+          distanceLabel(camera.position.distanceTo(marker.position)));
+        continue;
+      }
+      const x = screen.x, y = screen.y;
+      const size = Math.max(9, 13 * scale);
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = player ? 1.8 : 1.5;
+      if (player) {
+        const arm = size * .55;
+        for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+          ctx.beginPath();
+          ctx.moveTo(x + sx * size, y + sy * size - sy * arm);
+          ctx.lineTo(x + sx * size, y + sy * size);
+          ctx.lineTo(x + sx * size - sx * arm, y + sy * size);
+          ctx.stroke();
+        }
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(x, y - size); ctx.lineTo(x + size, y);
+        ctx.lineTo(x, y + size); ctx.lineTo(x - size, y);
+        ctx.closePath(); ctx.stroke();
+      }
+      ctx.fillText(label, x, y - size - font * .75);
+    }
+    ctx.restore();
+  }
+
+  /** Edge arrow plus range for a marker whose subject is outside the shot. */
+  drawReplayLocator(screen, width, height, scale, color, label, range) {
+    const ctx = this.ctx;
+    const angle = screen.behind
+      ? screen.angle || 0
+      : Math.atan2(screen.x - width / 2, height / 2 - screen.y);
+    const radius = Math.min(width, height) * .43;
+    const x = width / 2 + Math.sin(angle) * radius;
+    const y = height / 2 - Math.cos(angle) * radius;
+    const size = Math.max(7, 10 * scale);
+    const font = Math.max(10, 12 * scale);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, -size); ctx.lineTo(-size * .65, size * .55);
+    ctx.lineTo(size * .65, size * .55); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    // Keep both text lines inside the frame, on the sightline side of the arrow.
+    const inset = size + 10 + font * 2.1;
+    const half = Math.max(label.length, range.length) * font * .32 + 6;
+    const tx = MathUtils.clamp(x - Math.sin(angle) * inset, half, width - half);
+    const ty = MathUtils.clamp(y + Math.cos(angle) * inset, font * 1.2, height - font * 1.2);
+    ctx.save();
+    ctx.font = `600 ${font}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = color;
+    ctx.shadowColor = '#0a141c';
+    ctx.shadowBlur = 4;
+    ctx.fillText(label, tx, ty - font * .55);
+    ctx.fillText(range, tx, ty + font * .55);
+    ctx.restore();
   }
 
   draw(data, heading, combat) {
