@@ -206,7 +206,7 @@ export class MissileCombatView {
     this.chaffViews = new Map();
     this.detachedWrecks = [];
     this.trails = [];
-    preloadMissileModels();
+    if (typeof window !== 'undefined') preloadMissileModels();
   }
 
   sync(dt) {

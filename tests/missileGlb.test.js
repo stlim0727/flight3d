@@ -171,3 +171,89 @@ test('F-16 transforms into empty pylons after missile launch', () => {
   }
 });
 
+test('AIM-120C radome normals face outward from missile centerline', async () => {
+  const gltf = await parseGlbBuffer('public/models/missiles/aim-120c.glb');
+  let radomeMesh = null;
+  gltf.scene.traverse(node => {
+    if (node.isMesh && node.material?.name === 'missile-radome') {
+      radomeMesh = node;
+    }
+  });
+  assert.ok(radomeMesh, 'AIM-120C radome mesh must exist');
+  const pos = radomeMesh.geometry.attributes.position;
+  const norm = radomeMesh.geometry.attributes.normal;
+  assert.ok(pos && norm, 'Radome must have position and normal attributes');
+
+  let outwardCount = 0;
+  for (let i = 0; i < pos.count; i++) {
+    const px = pos.getX(i);
+    const py = pos.getY(i);
+    const nx = norm.getX(i);
+    const ny = norm.getY(i);
+    const dot = px * nx + py * ny;
+    if (dot > 0) outwardCount++;
+  }
+  assert.equal(
+    outwardCount,
+    pos.count,
+    `All ${pos.count} radome normals must face outward (got ${outwardCount})`
+  );
+});
+
+test('fin geometries have outward-facing surface normals without inverted winding', async () => {
+  for (const filename of ['aim-9x.glb', 'aim-120c.glb']) {
+    const gltf = await parseGlbBuffer(`public/models/missiles/${filename}`);
+    let finMesh = null;
+    gltf.scene.traverse(node => {
+      if (node.isMesh && node.material?.name === 'missile-fin') {
+        finMesh = node;
+      }
+    });
+    assert.ok(finMesh, `${filename} must have missile-fin mesh`);
+    const pos = finMesh.geometry.attributes.position;
+    const norm = finMesh.geometry.attributes.normal;
+    assert.ok(pos.count >= 100, `${filename} fin mesh must have detailed geometry`);
+
+    for (let i = 0; i < norm.count; i++) {
+      const len = Math.hypot(norm.getX(i), norm.getY(i), norm.getZ(i));
+      assert.ok(Math.abs(len - 1.0) < 0.02, `Normal ${i} should be unit vector, got length ${len}`);
+    }
+  }
+});
+
+test('fuselage main body is continuous beneath hazard warning bands (no gap)', async () => {
+  for (const filename of ['aim-9x.glb', 'aim-120c.glb']) {
+    const gltf = await parseGlbBuffer(`public/models/missiles/${filename}`);
+    let bodyMesh = null;
+    let yellowBand = null;
+    let brownBand = null;
+
+    gltf.scene.traverse(node => {
+      if (node.isMesh) {
+        if (node.material?.name === 'missile-body') bodyMesh = node;
+        if (node.material?.name === 'missile-band-yellow') yellowBand = node;
+        if (node.material?.name === 'missile-band-brown') brownBand = node;
+      }
+    });
+
+    assert.ok(bodyMesh, `${filename} must have body mesh`);
+    assert.ok(yellowBand, `${filename} must have yellow warning band`);
+    assert.ok(brownBand, `${filename} must have brown warning band`);
+
+    const bodyBox = new THREE.Box3().setFromObject(bodyMesh);
+    const yellowBox = new THREE.Box3().setFromObject(yellowBand);
+    const brownBox = new THREE.Box3().setFromObject(brownBand);
+
+    // Both warning bands must be positioned within the continuous body z-span
+    assert.ok(
+      yellowBox.min.z >= bodyBox.min.z - 0.05 && yellowBox.max.z <= bodyBox.max.z + 0.05,
+      `Yellow band [${yellowBox.min.z.toFixed(2)}, ${yellowBox.max.z.toFixed(2)}] must be within body [${bodyBox.min.z.toFixed(2)}, ${bodyBox.max.z.toFixed(2)}]`
+    );
+    assert.ok(
+      brownBox.min.z >= bodyBox.min.z - 0.05 && brownBox.max.z <= bodyBox.max.z + 0.05,
+      `Brown band [${brownBox.min.z.toFixed(2)}, ${brownBox.max.z.toFixed(2)}] must be within body [${bodyBox.min.z.toFixed(2)}, ${bodyBox.max.z.toFixed(2)}]`
+    );
+  }
+});
+
+

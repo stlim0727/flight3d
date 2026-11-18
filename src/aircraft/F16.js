@@ -167,7 +167,7 @@ export class F16 {
     }
     this.lightsGroup = new THREE.Group();
     this.gltfGroup.add(this.lightsGroup);
-    preloadMissileModels();
+    if (typeof window !== 'undefined') preloadMissileModels();
     // Pylons remain permanently attached to the airframe; when missiles are
     // fired or unloaded, the stations visibly remain as empty launcher pylons.
     this.pylonsGroup = new THREE.Group();

@@ -146,6 +146,10 @@ class MissileModelBuilder {
       // We create profile with (radius, y = z) then rotate to align with -Z.
       points.push(new THREE.Vector2(Math.max(0.0005, r), -z));
     }
+    // LatheGeometry expects profile points ordered with non-decreasing Y
+    // (from bottom to top) to generate outward-facing normals.
+    // -z decreases as u increases from 0 (apex) to 1 (base), so reverse the array.
+    points.reverse();
     const geo = new THREE.LatheGeometry(points, radialSegments);
     geo.rotateX(-Math.PI / 2);
     this.addGeometry(matKey, geo);
@@ -242,27 +246,28 @@ class MissileModelBuilder {
       const finGeo = new THREE.BufferGeometry();
 
       // Create faceted fin faces (leading wedge, center body, trailing wedge)
+      // Winding order is counter-clockwise when viewed from outside so all face normals point outward.
       const v = baseVertices;
       const tris = [
         // Leading face (+x side)
-        v[0], v[1], v[5],
-        v[1], v[6], v[5],
+        v[0], v[5], v[1],
+        v[1], v[5], v[6],
         // Leading face (-x side)
-        v[0], v[5], v[2],
-        v[2], v[5], v[7],
+        v[0], v[2], v[5],
+        v[2], v[7], v[5],
         // Center top face (+x side)
-        v[1], v[3], v[6],
-        v[3], v[8], v[6],
+        v[1], v[6], v[3],
+        v[3], v[6], v[8],
         // Center bot face (-x side)
-        v[2], v[7], v[4],
-        v[4], v[7], v[9],
-        // Trailing edge faces
-        v[3], v[4], v[8],
-        v[4], v[9], v[8],
-        // Tip cap
-        v[5], v[6], v[7],
-        v[6], v[8], v[7],
-        v[7], v[8], v[9],
+        v[2], v[4], v[7],
+        v[4], v[9], v[7],
+        // Trailing edge faces (+z side)
+        v[3], v[8], v[4],
+        v[4], v[8], v[9],
+        // Tip cap (+y side)
+        v[5], v[7], v[6],
+        v[6], v[7], v[8],
+        v[7], v[9], v[8],
       ];
 
       for (const pt of tris) {
@@ -472,13 +477,14 @@ export function buildAim9xModel() {
   });
 
   // 6. Hazard Identification Warning Bands
-  // Live HE warhead band (Yellow)
-  const zBands = zGuidanceStart + guidanceLength + 0.02;
+  // Live HE warhead band (Yellow) and Solid rocket motor band (Brown)
+  // Both sit on top of the continuous fuselage tube as collars (no fuselage gap).
+  const zBands = zGuidanceStart + guidanceLength;
   builder.addCylinder('missile-band-yellow', {
     rTop: radius * 1.006,
     rBottom: radius * 1.006,
     height: 0.065,
-    zCenter: zBands + 0.035,
+    zCenter: zBands + 0.05,
     radialSegments: 28,
   });
 
@@ -487,12 +493,12 @@ export function buildAim9xModel() {
     rTop: radius * 1.006,
     rBottom: radius * 1.006,
     height: 0.055,
-    zCenter: zBands + 0.12,
+    zCenter: zBands + 0.13,
     radialSegments: 28,
   });
 
-  // 7. Rocket Motor Main Body Tube
-  const zMotorStart = zBands + 0.16;
+  // 7. Rocket Motor Main Body Tube (continuous from guidance section to aft control section)
+  const zMotorStart = zBands;
   const zMotorEnd = zTail - 0.28;
   const motorLength = zMotorEnd - zMotorStart;
   builder.addCylinder('missile-body', {
@@ -669,8 +675,8 @@ export function buildAim120cModel() {
     hasActuatorBlister: false,
   });
 
-  // 6. Rocket Motor Fuselage Tube
-  const zMotorStart = zBands + 0.22;
+  // 6. Rocket Motor Fuselage Tube (continuous from guidance section to aft control section)
+  const zMotorStart = zBands;
   const zMotorEnd = zTail - 0.42;
   const motorLength = zMotorEnd - zMotorStart;
   builder.addCylinder('missile-body', {
