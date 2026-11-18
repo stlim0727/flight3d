@@ -177,6 +177,23 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
         assert.ok(await evaluate(() => !window.simulator.cameraSystem.isPovModified()));
         await evaluate(() => { document.body.dataset.flow = 'flight'; });
         assert.ok(await evaluate(() => document.querySelector('.hud-top-actions #btn-gaze-exit')));
+        await click('#btn-camera-toggle');
+        const replayLayout = await evaluate(async () => {
+          document.body.classList.add('replaying');
+          await Promise.resolve();
+          const camera = document.getElementById('btn-camera-toggle');
+          const fullscreen = document.getElementById('btn-fullscreen');
+          const replay = {
+            cameraInStrip: camera.parentElement.id === 'camera-strip',
+            cameraVisible: Boolean(camera.getClientRects().length),
+            fullscreenVisible: Boolean(fullscreen.getClientRects().length),
+          };
+          document.body.classList.remove('replaying');
+          await Promise.resolve();
+          return { ...replay, flightRestored: document.body.classList.contains('mobile-flight-layout')
+            && document.querySelector('.flight-toolbar').dataset.mobileGroup === 'closed' };
+        });
+        assert.deepEqual(replayLayout, { cameraInStrip: true, cameraVisible: true, fullscreenVisible: true, flightRestored: true });
       } else {
         await click('#btn-gaze-exit');
         assert.ok(await evaluate(() => !window.simulator.cameraSystem.isGazeActive()));

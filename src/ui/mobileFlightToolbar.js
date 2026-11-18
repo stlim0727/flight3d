@@ -123,7 +123,8 @@ export function createMobileFlightToolbar({ query, bar, cameraStrip, cameraToggl
     visibility.observe(node, { attributes: true, attributeFilter: ['hidden'] });
   }
   function sync() {
-    const useCompactControls = query.matches && document.body.dataset.flow !== 'debrief';
+    const useCompactControls = query.matches && document.body.dataset.flow !== 'debrief'
+      && !document.body.classList.contains('replaying');
     if (enabled === useCompactControls) return;
     if (enabled) setGroup('');
     enabled = useCompactControls;
