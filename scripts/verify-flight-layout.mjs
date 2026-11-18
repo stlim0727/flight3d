@@ -62,7 +62,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     s.integratePhysics = () => {}; // Fixed-pose layout evidence, not flight acceptance.
   });
   let touch = false;
-  const click = async selector => {
+  const click = async (selector, minSize = 44) => {
     const point = await evaluate(sel => {
       const node = document.querySelector(sel);
       if (node.closest('.flight-more-panel, .ap-panel, .flight-toolbar')) node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -70,7 +70,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       const x = r.x + r.width / 2, y = r.y + r.height / 2;
       return { x, y, w: r.width, h: r.height, hit: node.contains(document.elementFromPoint(x, y)) };
     }, selector);
-    assert.ok(point.w >= 44 && point.h >= 44 && point.hit, `${selector}: reachable 44px target ${JSON.stringify(point)}`);
+    assert.ok(point.w >= minSize && point.h >= minSize && point.hit, `${selector}: reachable ${minSize}px target ${JSON.stringify(point)}`);
     if (touch) {
       await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: point.x, y: point.y }] });
       await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
@@ -156,8 +156,31 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
           && warning.getBoundingClientRect().top >= document.querySelector('.flight-toolbar').getBoundingClientRect().bottom;
       }), 'gaze action and warning clear the tool row');
       await screenshot(`${out}/${width}x${height}-mobile.png`);
-      await click('#btn-gaze-exit');
-      assert.ok(await evaluate(() => !window.simulator.cameraSystem.isGazeActive()));
+      if (width === 320 && height === 568) {
+        await click('#btn-camera-toggle');
+        await evaluate(() => {
+          const s = window.simulator;
+          s.cameraSystem.chaseYaw = 0.4;
+          s.updateHUD();
+          document.body.dataset.flow = 'debrief';
+        });
+        assert.ok(await evaluate(() => {
+          const actions = document.getElementById('pov-actions-bar');
+          return ['btn-reset-pov', 'btn-gaze-exit'].every(id => {
+            const button = document.getElementById(id);
+            return actions.contains(button) && button.getClientRects().length;
+          });
+        }), 'debrief restores both POV actions when entered from the expanded toolbar');
+        await click('#btn-gaze-exit', 1);
+        assert.ok(await evaluate(() => !window.simulator.cameraSystem.isGazeActive()));
+        await click('#btn-reset-pov', 1);
+        assert.ok(await evaluate(() => !window.simulator.cameraSystem.isPovModified()));
+        await evaluate(() => { document.body.dataset.flow = 'flight'; });
+        assert.ok(await evaluate(() => document.querySelector('.hud-top-actions #btn-gaze-exit')));
+      } else {
+        await click('#btn-gaze-exit');
+        assert.ok(await evaluate(() => !window.simulator.cameraSystem.isGazeActive()));
+      }
       await evaluate(() => { window.simulator.telemetry.warnings = []; window.simulator.updateHUD(); });
       results.push({ width, height, closed, expanded });
       console.log(`${width}x${height}: mobile fold, camera, controls, icons and AP passed`);

@@ -123,9 +123,10 @@ export function createMobileFlightToolbar({ query, bar, cameraStrip, cameraToggl
     visibility.observe(node, { attributes: true, attributeFilter: ['hidden'] });
   }
   function sync() {
-    if (enabled === query.matches) return;
+    const useCompactControls = query.matches && document.body.dataset.flow !== 'debrief';
+    if (enabled === useCompactControls) return;
     if (enabled) setGroup('');
-    enabled = query.matches;
+    enabled = useCompactControls;
     bar.classList.toggle('mobile-flight-toolbar', enabled);
     document.body.classList.toggle('mobile-flight-layout', enabled);
     bar.dataset.mobileGroup = 'closed';
@@ -157,6 +158,7 @@ export function createMobileFlightToolbar({ query, bar, cameraStrip, cameraToggl
   query.addEventListener('change', sync);
   sync();
   return {
+    sync,
     active: () => enabled,
     cameraOpen: () => group === 'camera',
     toggleCamera: () => setGroup(group === 'camera' ? '' : 'camera'),

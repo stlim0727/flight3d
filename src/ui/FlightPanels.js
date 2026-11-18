@@ -425,6 +425,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     if (node) observer.observe(node);
   }
   new MutationObserver(() => {
+    mobileToolbar?.sync();
     if (document.body.dataset.flow !== 'flight') {
       setMoreOpen(false);
       mobileToolbar?.close();
