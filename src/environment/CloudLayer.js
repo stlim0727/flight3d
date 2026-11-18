@@ -67,11 +67,13 @@ export function createCloudDensity(size = CLOUD_DENSITY_SIZE) {
   return texture;
 }
 
-export class CloudLayer extends THREE.InstancedMesh {
+export class CloudLayer extends THREE.Group {
   constructor() {
+    super();
+    this.name = 'Cumulus density volumes';
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const densityTexture = createCloudDensity();
-    const material = new THREE.ShaderMaterial({
+    const materialOptions = {
       uniforms: {
         ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
         densityTexture: { value: densityTexture },
@@ -82,7 +84,7 @@ export class CloudLayer extends THREE.InstancedMesh {
       },
       vertexShader: `
         uniform vec3 sunDirection;
-        attribute float cloudVariant;
+        uniform float cloudVariant;
         varying vec3 localCamera;
         varying vec3 localPosition;
         varying vec3 localSun;
@@ -90,7 +92,7 @@ export class CloudLayer extends THREE.InstancedMesh {
         varying vec3 worldScale;
         #include <fog_pars_vertex>
         void main() {
-          mat4 world = modelMatrix * instanceMatrix;
+          mat4 world = modelMatrix;
           mat4 local = inverse(world);
           localCamera = (local * vec4(cameraPosition, 1.)).xyz;
           localSun = normalize((local * vec4(sunDirection, 0.)).xyz);
@@ -165,9 +167,15 @@ export class CloudLayer extends THREE.InstancedMesh {
       side: THREE.BackSide,
       depthWrite: false,
       fog: true,
-    });
-    super(geometry, material, 64);
-    this.name = 'Cumulus density volumes';
+    };
+    this.geometry = geometry;
+    this.materials = Array.from({ length: CLOUD_VARIANTS }, (_, variant) =>
+      new THREE.ShaderMaterial({
+        ...materialOptions,
+        uniforms: { ...materialOptions.uniforms, cloudVariant: { value: variant } },
+      })
+    );
+    this.material = this.materials[0];
     this.densityTexture = densityTexture;
     this.clouds = [];
     let seed = 12012;
@@ -177,47 +185,18 @@ export class CloudLayer extends THREE.InstancedMesh {
       const z = (random() - 0.5) * 32000;
       if (Math.abs(x) < 4000 && Math.abs(z) < 2500) continue;
       const width = 1500 + random() * 1800;
-      this.clouds.push({
-        position: new THREE.Vector3(x, 2800 + random() * 800, z),
-        width,
-        height: width * (0.42 + random() * 0.33),
-        depthSize: width * (0.65 + random() * 0.5),
-        variant: i % CLOUD_VARIANTS,
-        yaw: random() * Math.PI * 2,
-        depth: 0,
-      });
+      const altitude = 2800 + random() * 800;
+      const height = width * (0.42 + random() * 0.33);
+      const depth = width * (0.65 + random() * 0.5);
+      const variant = i % CLOUD_VARIANTS;
+      const cloud = new THREE.Mesh(geometry, this.materials[variant]);
+      cloud.position.set(x, altitude, z);
+      cloud.scale.set(width, height, depth);
+      cloud.rotation.y = random() * Math.PI * 2;
+      this.clouds.push(cloud);
+      this.add(cloud);
     }
     this.count = this.clouds.length;
-    this.variants = new THREE.InstancedBufferAttribute(new Float32Array(64), 1);
-    geometry.setAttribute('cloudVariant', this.variants);
-    this.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.variants.setUsage(THREE.DynamicDrawUsage);
-    this.sortMatrix = new THREE.Matrix4();
-    this.cloudMatrix = new THREE.Matrix4();
-    this.cloudScale = new THREE.Vector3();
-    this.sortForCamera(new THREE.PerspectiveCamera());
-    this.computeBoundingSphere();
-  }
-
-  sortForCamera(camera) {
-    camera.updateWorldMatrix(true, false);
-    this.updateWorldMatrix(true, false);
-    this.sortMatrix.multiplyMatrices(camera.matrixWorldInverse, this.matrixWorld);
-    for (const cloud of this.clouds) {
-      const p = cloud.position;
-      const m = this.sortMatrix.elements;
-      cloud.depth = m[2] * p.x + m[6] * p.y + m[10] * p.z + m[14];
-    }
-    this.clouds.sort((a, b) => a.depth - b.depth);
-    this.clouds.forEach((cloud, i) => {
-      this.cloudMatrix.makeRotationY(cloud.yaw);
-      this.cloudMatrix.scale(this.cloudScale.set(cloud.width, cloud.height, cloud.depthSize));
-      this.cloudMatrix.setPosition(cloud.position);
-      this.setMatrixAt(i, this.cloudMatrix);
-      this.variants.setX(i, cloud.variant);
-    });
-    this.instanceMatrix.needsUpdate = true;
-    this.variants.needsUpdate = true;
   }
 
   syncLighting(sun, ambient) {
@@ -229,7 +208,6 @@ export class CloudLayer extends THREE.InstancedMesh {
   dispose() {
     this.densityTexture.dispose();
     this.geometry.dispose();
-    this.material.dispose();
-    super.dispose();
+    this.materials.forEach(material => material.dispose());
   }
 }

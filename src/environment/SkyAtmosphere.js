@@ -431,10 +431,6 @@ export class SkyAtmosphere {
       this.sunLight.position.copy(focus).addScaledVector(this.sunPosition, 600);
       this.sunShadowRefresh.beforeRender(this.scene, camera);
     }
-    // Sort before renderer.render uploads instance buffers, including camera cuts.
-    if (this.cloudLayer?.visible && this.cloudsGroup?.visible !== false) {
-      this.cloudLayer.sortForCamera(camera);
-    }
   }
 
   getSunDirection() {
