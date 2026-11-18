@@ -23,15 +23,10 @@ export function peerOptions(env = (typeof import.meta !== 'undefined' ? import.m
     Object.assign(options, { host: url.hostname, port: Number(url.port || (url.protocol === 'https:' ? 443 : 80)), path: url.pathname, secure: url.protocol === 'https:' });
   }
 
-  // 1. Explicit build environment takes precedence when provided
-  if (env.VITE_MULTIPLAYER_ICE_SERVERS) {
-    try {
-      const parsed = JSON.parse(env.VITE_MULTIPLAYER_ICE_SERVERS);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        options.config = { iceServers: parsed };
-        return options;
-      }
-    } catch {}
+  // 1. Explicit build environment takes precedence when provided (preserves JSON parse & validation errors)
+  if (env.VITE_MULTIPLAYER_ICE_SERVERS !== undefined && env.VITE_MULTIPLAYER_ICE_SERVERS !== null && env.VITE_MULTIPLAYER_ICE_SERVERS !== '') {
+    options.config = { iceServers: JSON.parse(env.VITE_MULTIPLAYER_ICE_SERVERS) };
+    return options;
   }
 
   // 2. Dynamic credentials from directory worker (e.g. Cloudflare Calls TURN)

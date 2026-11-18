@@ -53,7 +53,7 @@ export class MultiplayerController {
     this.lastJoinMethod = 'code';
     this.connectStartedAt = null;
     this.hasConnected = false;
-    this.dynamicIceServers = null;
+    this.connecting = false;
     this.iceServersPromise = null;
     this.ensureIceServers();
     if (this.refreshRoomsBtn) this.refreshRoomsBtn.onclick = () => this.refreshOpenRooms();
@@ -133,13 +133,8 @@ export class MultiplayerController {
     }
   }
   ensureIceServers() {
-    if (this.dynamicIceServers) return Promise.resolve(this.dynamicIceServers);
     if (!this.iceServersPromise) {
       this.iceServersPromise = (this.directoryClient?.getIceServers?.() || Promise.resolve(null))
-        .then(s => {
-          if (s) this.dynamicIceServers = s;
-          return s;
-        })
         .catch(() => null)
         .finally(() => {
           this.iceServersPromise = null;
@@ -160,12 +155,13 @@ export class MultiplayerController {
     if (!this.active && tab?.getAttribute('aria-selected') === 'true') this.refreshOpenRooms();
   }
   dismissDialog() {
-    if (this.active && this.room.session.state !== 'flying') {
+    if (this.connecting || (this.active && this.room.session.state !== 'flying')) {
       this.registrationGeneration++;
+      this.connecting = false;
       this.registeringHost = false;
       this.hostDirectoryClient?.unregister();
       this.hostDirectoryClient = null;
-      this.room.close('cancelled');
+      this.room?.close('cancelled');
     }
     this.modal.close();
     this.refreshRoomListIfVisible();
@@ -188,10 +184,11 @@ export class MultiplayerController {
   get active() { return Boolean(this.room && !this.room.closed); }
   get locked() { return this.active && !this.preparing; }
   async connect(room) {
-    if (this.active || this.preparing || this.sim.startingFlight || this.sim.airportLoading) return;
+    if (this.active || this.connecting || this.preparing || this.sim.startingFlight || this.sim.airportLoading) return;
     this.preferences.save();
     this.message = null;
-    const generation = ++this.registrationGeneration;
+    this.connecting = true;
+    const generation = (this.registrationGeneration = (this.registrationGeneration || 0) + 1);
     this.registeringHost = false;
     this.hostDirectoryClient?.unregister();
     this.hostDirectoryClient = null;
@@ -201,8 +198,16 @@ export class MultiplayerController {
     this.hasConnected = false;
     const config = Object.fromEntries(Object.keys(DEFAULT_CONFIG).map(key => [key, document.getElementById(`mp-${key}`).value]));
 
-    const dynamicServers = this.dynamicIceServers || await this.ensureIceServers();
-    if (generation !== this.registrationGeneration) return;
+    let dynamicServers = null;
+    try {
+      dynamicServers = await this.ensureIceServers();
+    } catch {}
+
+    if (generation !== this.registrationGeneration) {
+      this.connecting = false;
+      return;
+    }
+    this.connecting = false;
 
     try {
       this.voice = new VoiceLink({ changed: () => this.refresh() });
@@ -239,7 +244,11 @@ export class MultiplayerController {
       }
       this.enableVoiceMicrophone();
       this.snapshotTimer = setInterval(() => this.sendSnapshot(), 1000 / 15);
-    } catch { this.voice?.close(); this.message = 'connection'; }
+    } catch {
+      this.connecting = false;
+      this.voice?.close();
+      this.message = 'connection';
+    }
     this.refresh();
   }
   enableVoiceMicrophone() {
@@ -422,6 +431,7 @@ export class MultiplayerController {
     this.refresh();
   }
   ended(reason) {
+    this.connecting = false;
     this.roomReplay?.finish(reason);
     this.remoteCrashed = false;
     const durationSeconds = this.connectStartedAt ? Number(((performance.now() - this.connectStartedAt) / 1000).toFixed(1)) : 0;
