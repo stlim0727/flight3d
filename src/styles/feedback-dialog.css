@@ -1,7 +1,8 @@
 /* In-game Feedback / Bug Report Dialog */
 #feedback-dialog-overlay {
   position: fixed;
-  inset: 0;
+  inset: var(--feedback-viewport-top, 0px) 0 auto;
+  height: var(--feedback-viewport-height, 100%);
   z-index: 10000;
   display: flex;
   align-items: center;
@@ -19,8 +20,8 @@
 }
 
 @keyframes feedbackFadeIn {
-  from { opacity: 0; transform: scale(0.97); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .feedback-card {
@@ -30,9 +31,11 @@
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
   width: 100%;
   max-width: 580px;
-  max-height: 90vh;
-  max-height: 90dvh;
+  max-height: 100%;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  scroll-padding-block: 16px;
   color: #e2e8f0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   padding: 20px 22px;
@@ -343,7 +346,7 @@ select.feedback-input {
 .feedback-status[data-failed="true"] { color: #fca5a5; }
 @media (max-width: 480px) {
   #feedback-dialog-overlay { padding: 8px; }
-  .feedback-card { padding: 16px; max-height: calc(100dvh - 16px); }
+  .feedback-card { padding: 16px; }
   .feedback-row { flex-direction: column; gap: 12px; }
   .feedback-actions { flex-wrap: wrap; }
   .feedback-actions button { min-height: 44px; flex: 1; }

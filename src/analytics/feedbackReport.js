@@ -247,6 +247,9 @@ export async function deliverFeedbackReport(report, { apiKey, host, distinctId, 
   timeoutMs = 12000 }) {
   if (!apiKey || !host) throw new Error('신고 전송 설정이 없습니다. 신고 파일을 저장해 주세요.');
   const controller = new AbortController();
+  const unconfirmed = '서버 수신을 확인하지 못했습니다.';
+  const saveDraft = '신고 파일 저장으로 작성한 내용과 첨부를 보관할 수 있습니다.';
+  let failure = '제보 서버에 연결할 수 없습니다. 네트워크 또는 브라우저의 요청 차단 설정을 확인해 주세요.';
   let timer;
   try {
     const request = (async () => {
@@ -257,7 +260,12 @@ export async function deliverFeedbackReport(report, { apiKey, host, distinctId, 
           distinct_id: distinctId, event: 'user_feedback_submitted', timestamp: report.createdAt,
           properties: report.properties }),
       });
-      if (!response.ok || response.type === 'opaque') throw new Error('rejected');
+      if (response.type === 'opaque') throw new Error('opaque response');
+      if (!response.ok) {
+        failure = `제보 서버가 요청을 거절했습니다 (HTTP ${response.status}).`;
+        throw new Error('rejected');
+      }
+      failure = '제보 서버가 확인 가능한 수신 응답을 보내지 않았습니다.';
       const body = (await response.text()).trim();
       let acknowledgement;
       try { acknowledgement = JSON.parse(body); } catch { throw new Error('invalid acknowledgement'); }
@@ -265,10 +273,14 @@ export async function deliverFeedbackReport(report, { apiKey, host, distinctId, 
       return { reportId: report.reportId, accepted: true };
     })();
     const deadline = new Promise((_, reject) => {
-      timer = setTimeout(() => { controller.abort(); reject(new Error('timeout')); }, timeoutMs);
+      timer = setTimeout(() => {
+        failure = '제보 서버 응답 시간이 초과되었습니다.';
+        reject(new Error('timeout'));
+        controller.abort();
+      }, timeoutMs);
     });
     return await Promise.race([request, deadline]);
   } catch {
-    throw new Error('서버 수신을 확인하지 못했습니다. Brave Shields·네트워크 설정을 확인한 뒤 다시 시도하거나 신고 파일을 저장해 주세요.');
+    throw new Error(`${unconfirmed} ${failure} ${saveDraft}`);
   } finally { clearTimeout(timer); }
 }

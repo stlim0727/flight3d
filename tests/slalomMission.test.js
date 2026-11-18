@@ -140,7 +140,7 @@ test('a climb between gates is allowed, charged, and stops when the line comes b
     `climbing out is not charged: ${small.toFixed(1)} m then ${large.toFixed(1)} m`);
 });
 
-test('speed only costs score (below the minimum, no upper bound) while the clearance floor ends a run', () => {
+test('speed only costs score and flying below 20 m AGL can finish', () => {
   const manifest = createSlalomManifest({ seed: 6 });
   const agl = s => gateValue(manifest.course.gates, s, 'maxAglM') - 10;
   const normal = fly(manifest, { agl }).judge.result();
@@ -150,8 +150,9 @@ test('speed only costs score (below the minimum, no upper bound) while the clear
   assert.ok(slow.metrics.finalScore < normal.metrics.finalScore, 'slow flight is charged');
   assert.equal(fast.status, 'succeeded', fast.reason);
   assert.equal(fast.metrics.speedPenalty, 0, 'no penalty for speed above the old maximum');
-  const low = fly(manifest, { agl: () => manifest.course.clearanceFloorM - 1 });
-  assert.equal(low.judge.reason, 'clearance-floor');
+  const low = fly(manifest, { agl: () => 19 }).judge.result();
+  assert.equal(low.status, 'succeeded', low.reason);
+  assert.equal(low.metrics.minAglM, 19);
 });
 
 test('the judge refuses a snapshot that is not the next physics tick', () => {

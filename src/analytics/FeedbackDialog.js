@@ -16,6 +16,12 @@ let screenshotSnapshot = null;
 let pendingReport = null;
 let pendingSignature = null;
 
+function fitFeedbackViewport() {
+  const viewport = window.visualViewport;
+  feedbackOverlay.style.setProperty('--feedback-viewport-top', `${viewport.offsetTop}px`);
+  feedbackOverlay.style.setProperty('--feedback-viewport-height', `${viewport.height}px`);
+}
+
 const SCREENSHOT_MAX_WIDTH = 960;
 const SCREENSHOT_JPEG_QUALITY = 0.72;
 
@@ -108,13 +114,21 @@ export function openFeedbackDialog(sim = null, options = {}) {
   feedbackOverlay.querySelector('[data-feedback-diag-preview]').textContent = summarizePreview(diagnosticsSnapshot);
 
   feedbackOverlay.hidden = false;
-  setTimeout(() => textarea?.focus(), 50);
+  if (window.visualViewport) {
+    fitFeedbackViewport();
+    window.visualViewport.addEventListener('resize', fitFeedbackViewport);
+    window.visualViewport.addEventListener('scroll', fitFeedbackViewport);
+  }
+  feedbackOverlay.querySelector('.feedback-card').scrollTop = 0;
+  feedbackOverlay.querySelector('[data-feedback-close]').focus({ preventScroll: true });
   return true;
 }
 
 function closeFeedbackDialog() {
   if (!feedbackOverlay || sending) return;
   feedbackOverlay.hidden = true;
+  window.visualViewport?.removeEventListener('resize', fitFeedbackViewport);
+  window.visualViewport?.removeEventListener('scroll', fitFeedbackViewport);
   const handler = closeHandler;
   closeHandler = null;
   handler?.();
@@ -402,7 +416,7 @@ function createFeedbackOverlay(getSim) {
     link.href = url; link.download = `flight3d-report-${report.reportId}.json`;
     document.body.appendChild(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setStatus('비행 로그가 포함된 신고 파일을 저장했습니다. 서버 전송 여부와는 별개입니다.');
+    setStatus('신고 파일 다운로드를 시작했습니다.');
   });
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -426,6 +440,7 @@ function createFeedbackOverlay(getSim) {
       fullReportSnapshot = null; screenshotSnapshot = null;
     } catch (error) {
       setStatus(`${error.message} 신고 ID: ${report.reportId}`, true);
+      status.scrollIntoView({ block: 'nearest' });
     } finally {
       sending = false;
       for (const element of overlay.querySelectorAll('button, input, textarea, select')) element.disabled = false;

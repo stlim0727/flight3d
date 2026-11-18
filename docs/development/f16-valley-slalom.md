@@ -85,7 +85,6 @@ perfect prism and stays exactly reproducible.
 | Passage band | 60 m floor + 40–90 m | a real slab of air above the ground under it |
 | Floor step | −25 m down, up to +72 m on 35% of legs | the shortest leg can sink 143 m and climb 131 m at cruise |
 | Speed envelope | 220–320 KIAS, legs assessed at the 240 kt cruise the spawn declares | turn rate and sink ceiling are both measured, never extrapolated, at that speed |
-| Clearance floor | 20 m AGL | shared with low-v1 |
 | Chart resolution | 100 m along a 25 m sample grid | a route to read, not a terrain array |
 | Timeout | 14 400 ticks = 120 s | same wall clock as low-v1; ~55 s of flying at cruise |
 
@@ -138,9 +137,9 @@ corridor follows the curving centreline, so a straight line across a bend leaves
 the course (`corridor-excursion`) before it saves anything, and the gates alternate
 sides so the middle of the valley is not the short path anyway.
 
-Hard ends: `invalid-snapshot`, `crash`, `body-strike`, `damage`, `timeout`,
-`clearance-floor`, `speed-envelope`, `invalid-spawn`, `discontinuous-flight`,
-`corridor-excursion`.
+Hard ends include `invalid-snapshot`, `crash`, `body-strike`, `damage`, `timeout`,
+`invalid-spawn` and `discontinuous-flight`. Minimum AGL is recorded as a metric.
+Flight below 20 m AGL can continue while the aircraft avoids contact and damage.
 
 Stored scoreboard attempts carry `SCORE_RULES_FINGERPRINT`
 (`ValleyScoreboard.js`) — the frozen rules objects of every scored mission
