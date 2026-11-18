@@ -29,6 +29,9 @@ export function parseGlbBuffer(arrayBuffer) {
 
 export async function validateGlbModel(arrayBuffer, modelName = 'model') {
   const gltf = await parseGlbBuffer(arrayBuffer);
+  // Ensure world matrices are up-to-date across all node transforms
+  gltf.scene.updateMatrixWorld(true);
+
   const errors = [];
   const stats = {
     name: modelName,
@@ -81,7 +84,7 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
 
     if (matName === 'missile-body') bodyMesh = node;
     else if (matName?.startsWith('missile-band-')) warningBands.push(node);
-    else if (matName === 'missile-fin') finMeshes.push(node);
+    else if (matName === 'missile-fin' && !node.name.toLowerCase().includes('pylon') && !modelName.toLowerCase().includes('pylon')) finMeshes.push(node);
     else if (matName === 'missile-radome') radomeMesh = node;
   });
 
@@ -106,7 +109,7 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
     }
   }
 
-  // 3. Fin triangle face normals & winding check
+  // 3. Fin triangle face normals & individual triangle winding check
   for (const fin of finMeshes) {
     const geo = fin.geometry;
     const pos = geo.attributes.position;
@@ -118,54 +121,58 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
       continue;
     }
 
-    // A. Compute signed polyhedron volume across the fin mesh:
-    // For outward-facing CCW triangles, sum(A · (B × C)) / 6 must be positive.
     let totalSignedVolume = 0;
-    let tipFacesChecked = 0;
-    let inwardTipFaces = 0;
-
-    // Find maximum radial distance from centerline for tip face identification
-    let maxRadial = 0;
-    for (let i = 0; i < pos.count; i++) {
-      const r = Math.hypot(pos.getX(i), pos.getY(i));
-      if (r > maxRadial) maxRadial = r;
-    }
-    const tipThreshold = maxRadial * 0.90;
+    let invertedFaces = 0;
 
     for (let i = 0; i < triCount; i++) {
       const i0 = index ? index.getX(i * 3) : i * 3;
       const i1 = index ? index.getX(i * 3 + 1) : i * 3 + 1;
       const i2 = index ? index.getX(i * 3 + 2) : i * 3 + 2;
 
-      const ax = pos.getX(i0), ay = pos.getY(i0), az = pos.getZ(i0);
-      const bx = pos.getX(i1), by = pos.getY(i1), bz = pos.getZ(i1);
-      const cx = pos.getX(i2), cy = pos.getY(i2), cz = pos.getZ(i2);
+      // Transform vertices to world space
+      const a = new THREE.Vector3(pos.getX(i0), pos.getY(i0), pos.getZ(i0)).applyMatrix4(fin.matrixWorld);
+      const b = new THREE.Vector3(pos.getX(i1), pos.getY(i1), pos.getZ(i1)).applyMatrix4(fin.matrixWorld);
+      const c = new THREE.Vector3(pos.getX(i2), pos.getY(i2), pos.getZ(i2)).applyMatrix4(fin.matrixWorld);
 
-      // B x C
-      const crossX = by * cz - bz * cy;
-      const crossY = bz * cx - bx * cz;
-      const crossZ = bx * cy - by * cx;
+      // Signed volume contribution: A · (B × C)
+      const crossX = b.y * c.z - b.z * c.y;
+      const crossY = b.z * c.x - b.x * c.z;
+      const crossZ = b.x * c.y - b.y * c.x;
+      totalSignedVolume += (a.x * crossX + a.y * crossY + a.z * crossZ);
 
-      // A · (B × C)
-      totalSignedVolume += (ax * crossX + ay * crossY + az * crossZ);
+      // Triangle face normal
+      const fn = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
+      const ct = new THREE.Vector3((a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3, (a.z + b.z + c.z) / 3);
 
-      // Face normal: (B - A) × (C - A)
-      const abX = bx - ax, abY = by - ay, abZ = bz - az;
-      const acX = cx - ax, acY = cy - ay, acZ = cz - az;
-      const fnX = abY * acZ - abZ * acY;
-      const fnY = abZ * acX - abX * acZ;
-      const fnZ = abX * acY - abY * acX;
+      // Determine the fin blade orientation (nearest multiple of PI/4 = 45 deg)
+      const angle = Math.atan2(ct.y, ct.x);
+      const bladeAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
 
-      const triCenter = new THREE.Vector3((ax + bx + cx) / 3, (ay + by + cy) / 3, (az + bz + cz) / 3);
-      const rCenter = Math.hypot(triCenter.x, triCenter.y);
+      const rHat = new THREE.Vector3(Math.cos(bladeAngle), Math.sin(bladeAngle), 0);
+      const tHat = new THREE.Vector3(-Math.sin(bladeAngle), Math.cos(bladeAngle), 0);
+      const zHat = new THREE.Vector3(0, 0, 1);
 
-      // B. For tip faces (outer perimeter), normal must point radially outward from centerline:
-      if (rCenter >= tipThreshold) {
-        tipFacesChecked++;
-        const dotRadial = fnX * triCenter.x + fnY * triCenter.y;
-        if (dotRadial < 0) {
-          inwardTipFaces++;
-        }
+      const lateralOffset = ct.dot(tHat);
+      const fnLateral = fn.dot(tHat);
+      const fnRadial = fn.dot(rHat);
+      const fnZ = fn.dot(zHat);
+
+      // An outward face satisfies:
+      // Lateral face: (lateralOffset * fnLateral > 0)
+      // Tip cap: fnRadial > 0.4
+      // Trailing edge: fnZ > 0.4
+      // Leading edge: fnZ < -0.2
+      let outward = false;
+      if (Math.abs(lateralOffset) > 0.0003 && Math.abs(fnLateral) > 0.2) {
+        outward = (lateralOffset * fnLateral > 0);
+      } else if (fnRadial > 0.4) {
+        outward = true;
+      } else if (fnZ > 0.4 || fnZ < -0.2) {
+        outward = true;
+      }
+
+      if (!outward) {
+        invertedFaces++;
       }
     }
 
@@ -173,12 +180,12 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
     if (totalSignedVolume <= 0) {
       errors.push(`Fin mesh "${fin.name}" has negative signed volume (${totalSignedVolume.toExponential(3)}), indicating inverted triangle winding`);
     }
-    if (tipFacesChecked > 0 && inwardTipFaces > 0) {
-      errors.push(`Fin mesh "${fin.name}" has ${inwardTipFaces} tip face(s) pointing inward toward missile centerline`);
+    if (invertedFaces > 0) {
+      errors.push(`Fin mesh "${fin.name}" has ${invertedFaces} triangle face(s) with inverted winding / inward normal`);
     }
   }
 
-  // 4. Fuselage continuity under warning collars (actual longitudinal triangle coverage)
+  // 4. Fuselage continuity under warning collars (actual longitudinal triangle coverage in aligned world coordinates)
   if (bodyMesh && warningBands.length > 0) {
     const bodyGeo = bodyMesh.geometry;
     const bodyPos = bodyGeo.attributes.position;
@@ -186,8 +193,8 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
     const bodyTriCount = (bodyIndex ? bodyIndex.count : bodyPos.count) / 3;
 
     for (const band of warningBands) {
+      // Both the band bounding box and body vertices are evaluated in world coordinates
       const bandBox = new THREE.Box3().setFromObject(band);
-      // Sample 5 test points across the band's longitudinal span
       const numSamples = 5;
       for (let s = 0; s < numSamples; s++) {
         const zTest = bandBox.min.z + (bandBox.max.z - bandBox.min.z) * (s / (numSamples - 1));
@@ -198,9 +205,12 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
           const i1 = bodyIndex ? bodyIndex.getX(i * 3 + 1) : i * 3 + 1;
           const i2 = bodyIndex ? bodyIndex.getX(i * 3 + 2) : i * 3 + 2;
 
-          const z0 = bodyPos.getZ(i0), z1 = bodyPos.getZ(i1), z2 = bodyPos.getZ(i2);
-          const minZ = Math.min(z0, z1, z2);
-          const maxZ = Math.max(z0, z1, z2);
+          const v0 = new THREE.Vector3(bodyPos.getX(i0), bodyPos.getY(i0), bodyPos.getZ(i0)).applyMatrix4(bodyMesh.matrixWorld);
+          const v1 = new THREE.Vector3(bodyPos.getX(i1), bodyPos.getY(i1), bodyPos.getZ(i1)).applyMatrix4(bodyMesh.matrixWorld);
+          const v2 = new THREE.Vector3(bodyPos.getX(i2), bodyPos.getY(i2), bodyPos.getZ(i2)).applyMatrix4(bodyMesh.matrixWorld);
+
+          const minZ = Math.min(v0.z, v1.z, v2.z);
+          const maxZ = Math.max(v0.z, v1.z, v2.z);
 
           if (zTest >= minZ - 0.001 && zTest <= maxZ + 0.001) {
             covered = true;
@@ -210,7 +220,7 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
 
         if (!covered) {
           errors.push(
-            `Warning band "${band.name}" covers a hollow fuselage gap at z = ${zTest.toFixed(3)}m; no continuous body triangle spans this section`
+            `Warning band "${band.name}" covers a hollow fuselage gap at z = ${zTest.toFixed(3)}m in world coordinates; no continuous body triangle spans this section`
           );
           break;
         }

@@ -151,3 +151,88 @@ test('validateGlbModel flags gap between disconnected body cylinders under warni
     `Should detect gap inside merged body bounds, got: ${result.errors.join('; ')}`
   );
 });
+
+test('validateGlbModel flags a single inverted triangle in an otherwise valid fin', async () => {
+  const scene = new THREE.Scene();
+  const yRoot = 0.08, yTip = 0.28;
+  const rootChord = 0.2, tipChord = 0.08;
+  const tMid = 0.003, tEdge = 0.001;
+  const zLead = -0.1, zTrail = 0.1;
+
+  const v = [
+    [0, yRoot, zLead],
+    [tMid, yRoot, zLead + rootChord * 0.35],
+    [-tMid, yRoot, zLead + rootChord * 0.35],
+    [tEdge, yRoot, zTrail],
+    [-tEdge, yRoot, zTrail],
+    [0, yTip, zLead + 0.05],
+    [tMid * 0.7, yTip, zLead + 0.05 + tipChord * 0.35],
+    [-tMid * 0.7, yTip, zLead + 0.05 + tipChord * 0.35],
+    [tEdge * 0.7, yTip, zLead + 0.05 + tipChord],
+    [-tEdge * 0.7, yTip, zLead + 0.05 + tipChord],
+  ];
+
+  // All triangles wound outward EXCEPT triangle 0 which is swapped:
+  const trisWithOneInverted = [
+    // Triangle 0 INVERTED (swapped 5 and 1):
+    v[0], v[1], v[5],
+    // Remaining triangles correctly wound:
+    v[1], v[5], v[6],
+    v[0], v[2], v[5],
+    v[2], v[7], v[5],
+    v[1], v[6], v[3],
+    v[3], v[6], v[8],
+    v[2], v[4], v[7],
+    v[4], v[9], v[7],
+    v[3], v[8], v[4],
+    v[4], v[8], v[9],
+    v[5], v[7], v[6],
+    v[6], v[7], v[8],
+    v[7], v[9], v[8],
+  ];
+
+  const positions = [];
+  for (const pt of trisWithOneInverted) positions.push(...pt);
+  const finGeo = new THREE.BufferGeometry();
+  finGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  finGeo.computeVertexNormals();
+
+  const finMesh = new THREE.Mesh(finGeo, new THREE.MeshBasicMaterial({ name: 'missile-fin' }));
+  finMesh.name = 'SingleInvertedTriFin';
+  scene.add(finMesh);
+
+  const glb = await exportScene(scene);
+  const result = await validateGlbModel(glb, 'test-single-inverted-tri');
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some(e => e.includes('triangle face(s) with inverted winding')),
+    `Should flag single inverted triangle, got: ${result.errors.join('; ')}`
+  );
+});
+
+test('validateGlbModel handles transformed root nodes without false gap errors', async () => {
+  const scene = new THREE.Scene();
+  // Valid continuous body from z = 0.0 to 2.0
+  const bodyGeo = new THREE.CylinderGeometry(0.08, 0.08, 2.0, 16);
+  bodyGeo.rotateX(Math.PI / 2);
+  bodyGeo.translate(0, 0, 1.0);
+  const bodyMesh = new THREE.Mesh(bodyGeo, new THREE.MeshBasicMaterial({ name: 'missile-body' }));
+  scene.add(bodyMesh);
+
+  // Warning collar at z = 0.5 (sitting on top of body)
+  const bandGeo = new THREE.CylinderGeometry(0.081, 0.081, 0.1, 16);
+  bandGeo.rotateX(Math.PI / 2);
+  bandGeo.translate(0, 0, 0.5);
+  const bandMesh = new THREE.Mesh(bandGeo, new THREE.MeshBasicMaterial({ name: 'missile-band-yellow' }));
+  scene.add(bandMesh);
+
+  // Apply significant root transform
+  scene.position.set(15, -25, 40);
+  scene.rotation.y = 0.75;
+  scene.updateMatrixWorld(true);
+
+  const glb = await exportScene(scene);
+  const result = await validateGlbModel(glb, 'test-transformed-root');
+  assert.equal(result.valid, true, `Transformed valid model should pass, got errors: ${result.errors.join('; ')}`);
+});
+
