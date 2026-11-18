@@ -156,11 +156,12 @@ export class CombatReplayPlayback {
     this.view.sync(0);
 
     // Reconstruct lingering smoke trails for recently detonated missiles within 26s
-    for (const group of this.groups.values()) {
+    for (const [id, group] of this.groups) {
       if (!group.samples?.length) continue;
+      if (this.view.missileViews.has(id)) continue;
+      if (!Number.isFinite(group.removeAt)) continue;
       const launchTime = group.samples[0].timeSec;
-      const removeTime = Number.isFinite(group.removeAt) ? group.removeAt : group.samples.at(-1).timeSec;
-      if (timeSec >= removeTime && timeSec <= removeTime + 26.0 && timeSec >= launchTime) {
+      if (timeSec >= group.removeAt && timeSec <= group.removeAt + 26.0 && timeSec >= launchTime) {
         const trail = new MissileSmokeTrail(this.sim.scene);
         trail.prepopulateFromSamples(group.samples, timeSec);
         if (trail.count > 0) {

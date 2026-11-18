@@ -229,6 +229,7 @@ export class MissileSmokeTrail {
     this.colors = new Float32Array(this.max * 4); // [r, g, b, alpha]
     this.ages = new Float32Array(this.max);
     this.lifetimes = new Float32Array(this.max);
+    this.initialAlphas = new Float32Array(this.max);
 
     this.geometry = new THREE.BufferGeometry();
     const posAttr = new THREE.BufferAttribute(this.positions, 3);
@@ -280,6 +281,7 @@ export class MissileSmokeTrail {
       this.colors.copyWithin(0, 4);
       this.ages.copyWithin(0, 1);
       this.lifetimes.copyWithin(0, 1);
+      this.initialAlphas.copyWithin(0, 1);
       index = this.max - 1;
     }
 
@@ -296,6 +298,7 @@ export class MissileSmokeTrail {
 
     this.ages[index] = 0;
     this.lifetimes[index] = lifetime;
+    this.initialAlphas[index] = alpha;
   }
 
   update(dt, position, emitting, isPowered = true) {
@@ -307,8 +310,8 @@ export class MissileSmokeTrail {
         if (this.ages[i] < life) {
           const progress = this.ages[i] / life;
           const fade = Math.max(0, 1.0 - progress * progress);
-          const baseA = this.colors[i * 4 + 3];
-          this.colors[i * 4 + 3] = Math.min(baseA, (baseA > 0.7 ? 0.92 : 0.65) * fade);
+          const initialA = this.initialAlphas[i];
+          this.colors[i * 4 + 3] = initialA * fade;
 
           if (writeIdx !== i) {
             this.positions[writeIdx * 3] = this.positions[i * 3];
@@ -322,6 +325,7 @@ export class MissileSmokeTrail {
 
             this.ages[writeIdx] = this.ages[i];
             this.lifetimes[writeIdx] = this.lifetimes[i];
+            this.initialAlphas[writeIdx] = this.initialAlphas[i];
           }
           writeIdx++;
         }
@@ -401,6 +405,7 @@ export class MissileSmokeTrail {
           scratchInterpPos.set(curr.x, curr.y, curr.z);
           this.emit(scratchInterpPos, { alpha, lifetime: currLife });
           this.ages[this.count - 1] = age;
+          this.initialAlphas[this.count - 1] = baseAlpha;
           this.lastPosition = scratchInterpPos.clone();
         }
         break;
@@ -426,6 +431,7 @@ export class MissileSmokeTrail {
           const alpha = segAlpha * Math.max(0, 1.0 - progress * progress);
           this.emit(scratchInterpPos, { alpha, lifetime: particleLife });
           this.ages[this.count - 1] = age;
+          this.initialAlphas[this.count - 1] = segAlpha;
         }
       }
       this.lastPosition = scratchTo.clone();

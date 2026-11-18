@@ -713,3 +713,60 @@ test('prepopulateFromSamples respects powered vs unpowered particle lifetime mat
   trailSeek.dispose();
   trailSeekExpired.dispose();
 });
+
+test('MissileSmokeTrail alpha decay is consistent between update and prepopulateFromSamples', () => {
+  const scene = new Scene();
+  const trailNormal = new MissileSmokeTrail(scene, { lifetime: 26.0 });
+  const pos = new Vector3(0, 1000, 0);
+
+  // Emit 1 powered point at t=0
+  trailNormal.update(0.016, pos, true, true);
+  // Age by 15.0s in 1.0s increments
+  for (let i = 0; i < 15; i++) {
+    trailNormal.update(1.0, null, false);
+  }
+  const normalAlpha = trailNormal.colors[3]; // alpha of 1st point
+
+  // Expected: 0.92 * (1.0 - (15.016 / 26)^2) = ~0.613
+  const expectedAlpha = 0.92 * (1.0 - (15.016 / 26.0) ** 2);
+  assert.ok(
+    Math.abs(normalAlpha - expectedAlpha) < 0.05,
+    `Normal alpha ${normalAlpha} should match continuous decay around ${expectedAlpha.toFixed(3)}`
+  );
+
+  // Reconstructed via prepopulateFromSamples at t=15.016 with sample at t=0
+  const trailSeek = new MissileSmokeTrail(scene, { lifetime: 26.0 });
+  trailSeek.prepopulateFromSamples([{ timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true }], 15.016);
+  const seekAlpha = trailSeek.colors[3];
+
+  assert.ok(
+    Math.abs(normalAlpha - seekAlpha) < 0.02,
+    `Seek alpha (${seekAlpha.toFixed(3)}) should match normal update alpha (${normalAlpha.toFixed(3)}) without arbitrary threshold drop`
+  );
+
+  trailNormal.dispose();
+  trailSeek.dispose();
+});
+
+test('CombatReplayPlayback seek does not duplicate smoke trails for active missiles without termination event', () => {
+  const scene = new Scene();
+  const playback = new CombatReplayPlayback({ scene });
+  const missileSamples = [
+    { timeSec: 0.0, id: 1, typeId: 'AIM9X', x: 0, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 1.0, id: 1, typeId: 'AIM9X', x: 600, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+  ];
+
+  // No termination event (removeAt = Infinity)
+  playback.load({ version: 8, targets: [], missileSamples, banditSamples: [], events: [] });
+
+  // Seek to 5.0s (past the last sample, but missile is still active in track)
+  playback.seek(5.0);
+
+  // Active missile should have exactly 1 trail associated with its missileView
+  assert.equal(playback.view.trails.length, 1, 'Exactly one smoke trail should exist');
+  const view = playback.view.missileViews.get(1);
+  assert.ok(view?.trail, 'Active missile has its smoke trail');
+  assert.equal(playback.view.trails[0], view.trail, 'Scene trail should be the active missile view trail');
+
+  playback.stop();
+});
