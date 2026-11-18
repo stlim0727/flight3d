@@ -12,6 +12,10 @@ import { MCPCanvas } from './MCPCanvas.js';
 import { ISFDCanvas } from './ISFDCanvas.js';
 import { CDUCanvas } from './CDUCanvas.js';
 
+const cockpitModelDirectory = `${import.meta.env?.BASE_URL ?? '/'}models/`;
+const mediumCockpitUrl = `${cockpitModelDirectory}b737-cockpit-medium.glb`;
+const liteCockpitUrl = `${cockpitModelDirectory}b737-cockpit-draco.glb`;
+
 /**
  * 3D Virtual Cockpit for Boeing Airliner: the photoreal GLTF flight deck with
  * live glass-cockpit displays (PFD, ND, EICAS, ISFD, MCP, CDU) mounted onto the
@@ -74,11 +78,12 @@ export class Cockpit {
    * light-transfer bakes are several megabytes that only the cockpit view ever displays, and
    * the lobby runs in an exterior view. The camera asks for it on first cockpit entry.
    */
-  ensureCockpitModel() {
+  ensureCockpitModel(renderQuality) {
     if (typeof window === 'undefined') return false;
     if (this.cockpitModelRequested || this.gltfCockpitLoaded) return false;
     this.cockpitModelRequested = true;
-    this.loadCockpitModel();
+    const useLite = renderQuality === 'performance' || renderQuality === 'ultraLow';
+    this.loadCockpitModel(useLite ? liteCockpitUrl : mediumCockpitUrl);
     return true;
   }
 
@@ -197,7 +202,7 @@ export class Cockpit {
    * Asynchronously loads the high-detail 3D Boeing 737 cockpit GLTF model
    * and mounts live glass-cockpit flight displays.
    */
-  loadCockpitModel(url = `${import.meta.env?.BASE_URL ?? '/'}models/b737-cockpit-medium.glb`) {
+  loadCockpitModel(url = mediumCockpitUrl, fallbackUrl = url === liteCockpitUrl ? mediumCockpitUrl : liteCockpitUrl) {
     if (typeof window === 'undefined') {
       // Non-browser / Node test environment: no interior is ever displayed.
       return;
@@ -259,9 +264,9 @@ export class Cockpit {
         undefined,
         (error) => {
           transferReady.then(result => result.transfer?.dispose());
-          if (url !== `${import.meta.env?.BASE_URL ?? '/'}models/b737-cockpit-draco.glb`) {
-            console.warn('Falling back to lite draco cockpit model:', error);
-            this.loadCockpitModel(`${import.meta.env?.BASE_URL ?? '/'}models/b737-cockpit-draco.glb`);
+          if (fallbackUrl) {
+            console.warn('Falling back to alternate cockpit model:', error);
+            this.loadCockpitModel(fallbackUrl, null);
             return;
           }
           console.warn('Failed to load 3D GLTF Cockpit model:', error);

@@ -83,9 +83,13 @@ which only the cockpit view can display while the lobby and every exterior camer
 run outside the fuselage. The camera system holds a cockpit request while
 `cockpitInteriorGate()` reports `loading`, then lands the view when the model and
 its shader warmup resolve, so the interior is downloaded on the first cockpit entry
-rather than during boot. `loadCockpitModel()` still takes no URL at that point and
-defaults to `b737-cockpit-medium.glb`; explicitly passing the lite URL bypasses the
-medium default, and the lite Draco asset remains the load fallback. If neither
+rather than during boot. High and Balanced first request the medium asset
+(1,742,391 triangles). Performance and Ultra Low first request the lite Draco
+asset (832,427 triangles). These counts describe the GLB scene instances before
+runtime batching and additional render passes. Each tier retries once with the
+other asset if its preferred model fails to load. The first entry selects the
+asset for that aircraft instance, and quality changes reuse the loaded interior.
+If neither
 asset resolves, `main.js` leaves the cockpit view for chase and toasts that the
 interior is unavailable, because cockpit mode hides the exterior groups — the same
 notice explains a request that was held and then could not land.
