@@ -22,6 +22,13 @@ Flight3d incorporates optimized open-source 3D models and atmospheric environmen
   - **Description**: Real-world scale (~11.0m wingspan, ~8.28m length) general aviation aircraft featuring high wings, fixed tricycle landing gear, articulated propeller, and detailed exterior and 3D cockpit interior with dual yokes and analog flight gauges.
   - **Modifications**: Draco mesh compression, runtime alignment, ground mooring artifact occlusion, articulated control surfaces and yokes, and cockpit eye camera calibration. See [license notice](public/models/c172.LICENSE.txt).
 
+- **Concorde (`public/models/concorde.glb`)**:
+  - **Author**: [manilov.ap](https://sketchfab.com/manilov.ap)
+  - **Source**: [Concorde](https://sketchfab.com/3d-models/concorde-6d95290363474798a429a38bbf9ad49d)
+  - **License**: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+  - **Description**: Real-world scale (25.6m wingspan, 61.1m length) supersonic delta-wing airliner with four Olympus nacelles, modelled gear-up.
+  - **Modifications**: GLB distributed unchanged. Flight3d discards the Sketchfab display rotation, mounts the airframe in the simulator frame, droops the nose ahead of the windscreen at runtime, and adds procedurally generated landing gear. See [license notice](public/models/concorde.LICENSE.txt).
+
 ## Environment Maps & Textures
 - **Kloofendal Partly Cloudy Sky HDR (`public/textures/environment/sky_1k.hdr`)**:
   - **Author**: Greg Zaal ([Poly Haven](https://polyhaven.com/a/kloofendal_48d_partly_cloudy))

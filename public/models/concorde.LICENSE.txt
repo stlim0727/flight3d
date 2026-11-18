@@ -1,0 +1,27 @@
+Concorde
+Author: manilov.ap (https://sketchfab.com/manilov.ap)
+Source: https://sketchfab.com/3d-models/concorde-6d95290363474798a429a38bbf9ad49d
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Applies to concorde.glb.
+Attribution transcribed from the asset.extras metadata embedded in the GLB
+(Sketchfab glTF export, 2048x2048 fuselage texture). The GLB is distributed
+unchanged.
+
+Runtime adaptations by Flight3d contributors:
+- Discard the Sketchfab display rotation and mount the authored 1:1 metre
+  geometry in the simulator frame (+X starboard, +Y up, -Z nose).
+- Droop the nose section ahead of the windscreen frame about a lateral hinge
+  by rotating its vertices at runtime (0, 5 and 12.5 degree positions); the
+  original asset has no articulated nose.
+- Add procedurally generated landing gear (twin-wheel nose leg, four-wheel
+  main bogies); the original asset is modelled gear-up without landing gear.
+
+The livery depicts a real airline's markings as authored in the source model.
+Aircraft and airline names are used descriptively; no endorsement by the
+original creator, the manufacturers or the airline is implied.
+
+CC BY 4.0 permits redistribution (including browser delivery and repository
+inclusion) and adaptation, including commercial use, subject to attribution,
+a license link, indication of changes, and no additional restrictions.

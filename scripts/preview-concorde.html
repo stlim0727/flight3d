@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Concorde airframe preview</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #9fb4c8; font-family: system-ui, sans-serif; }
+    canvas { display: block; }
+    #panel { position: fixed; top: 12px; left: 12px; background: rgba(10, 17, 28, 0.82); color: #f0f6fc;
+      padding: 12px 14px; border-radius: 8px; font-size: 13px; display: grid; gap: 8px; min-width: 240px; }
+    #panel label { display: grid; gap: 4px; }
+    #panel .row { display: flex; gap: 6px; flex-wrap: wrap; }
+    #panel button { background: #1e3a5f; color: #e2f2ff; border: 1px solid #38bdf8; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="panel">
+    <strong>Concorde 외형 미리보기</strong>
+    <label>착륙장치 <span id="gearValue">1.00</span><input id="gear" type="range" min="0" max="1" step="0.01" value="1"></label>
+    <label>노즈 드롭 <span id="droopValue">5.0°</span><input id="droop" type="range" min="0" max="12.5" step="0.5" value="5"></label>
+    <div class="row">
+      <button data-view="side">측면</button><button data-view="front">전방</button>
+      <button data-view="nose">노즈</button><button data-view="below">하부</button>
+    </div>
+  </div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { Concorde, CONCORDE_GEAR_LAYOUT } from '/src/aircraft/Concorde.js';
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x9fb4c8);
+    scene.add(new THREE.HemisphereLight(0xeaf4ff, 0x56606a, 1.6));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+    sun.position.set(-30, 50, -20);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 150 });
+    scene.add(sun);
+
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: 0x6f7378, roughness: 0.95 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = CONCORDE_GEAR_LAYOUT.groundY;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const concorde = new Concorde();
+    scene.add(concorde.group);
+
+    const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.05, 1000);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    const views = {
+      side: [[-70, 2, -2], [0, -1, -2]],
+      front: [[-22, 4, -62], [0, -1, -5]],
+      nose: [[-14, 0.5, -26], [0, -1, -24]],
+      below: [[-18, -4.6, -14], [0, -2.5, -4]]
+    };
+    const setView = name => {
+      const [position, target] = views[name];
+      camera.position.set(...position);
+      controls.target.set(...target);
+      controls.update();
+    };
+    setView('side');
+
+    const state = { gearState: 1, noseDroopDeg: 5, onGround: true };
+    const gear = document.getElementById('gear'), droop = document.getElementById('droop');
+    gear.addEventListener('input', () => { state.gearState = Number(gear.value); document.getElementById('gearValue').textContent = state.gearState.toFixed(2); });
+    droop.addEventListener('input', () => { state.noseDroopDeg = Number(droop.value); document.getElementById('droopValue').textContent = `${state.noseDroopDeg.toFixed(1)}°`; });
+    document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => setView(button.dataset.view)));
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    const clock = new THREE.Clock();
+    const frame = () => {
+      concorde.update(clock.getDelta(), state);
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(frame);
+    };
+    concorde.ready.then(() => { window.__concordeReady = true; });
+    window.__concorde = { concorde, state, setView, camera, controls };
+    frame();
+  </script>
+</body>
+</html>
