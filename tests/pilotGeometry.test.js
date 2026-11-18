@@ -82,19 +82,21 @@ test('setPilotCockpitMode toggles visibility and respects showInterior', () => {
   assert.equal(pilot.userData.body.visible, true);
   assert.equal(pilot.userData.seat.visible, true);
 
-  // Cockpit view with interior
+  // Cockpit view with interior (head hidden by default to avoid clipping)
   setPilotCockpitMode(pilot, true, true);
   assert.equal(pilot.userData.body.visible, true);
   assert.equal(pilot.userData.seat.visible, true);
+  assert.equal(pilot.userData.head.visible, false);
 
   // Cockpit view without interior
   setPilotCockpitMode(pilot, true, false);
   assert.equal(pilot.userData.body.visible, false);
   assert.equal(pilot.userData.seat.visible, false);
-
-  // Explicit hideHead option
-  setPilotCockpitMode(pilot, true, true, { hideHead: true });
   assert.equal(pilot.userData.head.visible, false);
+
+  // Explicit showHead option
+  setPilotCockpitMode(pilot, true, true, { showHead: true });
+  assert.equal(pilot.userData.head.visible, true);
 });
 
 test('updatePilotDynamics responds to G-forces and turn roll rate', () => {
@@ -126,10 +128,14 @@ test('F16_PILOT_OFFSET aligns pilot eye position with F16 captainEyePos', () => 
   const visor = root.getObjectByName('Pilot_Head_Visor');
   assert.ok(visor, 'Pilot visor must exist to determine eye location');
 
-  // Compute visor bounding center in model coordinates
+  // Verify visor is placed on anterior face (negative Z relative to head pivot)
   root.position.set(0, 0, 0);
   root.updateMatrixWorld(true);
+  const head = root.getObjectByName('Pilot_Head');
   const visorBox = new THREE.Box3().setFromObject(visor);
+  assert.ok(visorBox.max.z < head.position.z, `Visor must face forward in negative Z relative to head pivot, got ${visorBox.max.z} vs head Z ${head.position.z}`);
+
+  // Compute visor bounding center in model coordinates
   const modelEyeCenter = visorBox.getCenter(new THREE.Vector3());
 
   // Mount at F16_PILOT_OFFSET and verify world eye position matches captainEyePos

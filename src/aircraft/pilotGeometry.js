@@ -20,8 +20,8 @@ export const SEAT_RECLINE_RAD = THREE.MathUtils.degToRad(SEAT_RECLINE_DEG);
  */
 export const F16_PILOT_OFFSET = Object.freeze({
   x: 0.0,
-  y: 0.276,
-  z: -3.630,
+  y: 0.273,
+  z: -3.693,
 });
 
 const sharedMaterials = new Map();
@@ -364,19 +364,19 @@ export function buildPilotHead(mats) {
   const headGroup = new THREE.Group();
   headGroup.name = 'Pilot_Head';
 
-  // Head pivot point is located at the base of the skull / neck
-  headGroup.position.set(0, 0.48, -0.06);
+  // Head pivot point is located at the base of the skull / neck atop the reclined torso
+  headGroup.position.set(0, 0.483, 0.213);
 
   // 1. Neck cylinder
   const neckGeo = new THREE.CylinderGeometry(0.065, 0.075, 0.10, 14);
-  neckGeo.rotateX(SEAT_RECLINE_RAD * 0.5);
+  neckGeo.rotateX(-0.15); // Forward compensation from 30° reclined torso
   const neck = new THREE.Mesh(neckGeo, mats.suit);
   neck.name = 'Pilot_Head_Neck';
   neck.position.set(0, 0.04, -0.01);
   headGroup.add(neck);
 
   // 2. HGU-55/P Helmet Shell
-  const helmetCenter = new THREE.Vector3(0, 0.16, -0.01);
+  const helmetCenter = new THREE.Vector3(0, 0.16, -0.02);
 
   const domeGeo = new THREE.SphereGeometry(0.125, 20, 16);
   domeGeo.scale(0.96, 1.05, 1.04);
@@ -407,8 +407,9 @@ export function buildPilotHead(mats) {
   nape.position.set(0, helmetCenter.y - 0.09, helmetCenter.z + 0.02);
   headGroup.add(nape);
 
-  // 3. Tinted Mirror Visor
+  // 3. Tinted Mirror Visor (facing forward in negative Z)
   const visorGeo = new THREE.SphereGeometry(0.132, 20, 14, Math.PI * 0.22, Math.PI * 0.56, Math.PI * 0.24, Math.PI * 0.38);
+  visorGeo.rotateY(Math.PI);
   visorGeo.scale(0.98, 1.02, 1.06);
   const visor = new THREE.Mesh(visorGeo, mats.visor);
   visor.name = 'Pilot_Head_Visor';
@@ -444,9 +445,9 @@ export function buildPilotHead(mats) {
   // 5. Corrugated Flexible Oxygen Hose
   const hosePoints = [
     new THREE.Vector3(0, helmetCenter.y - 0.09, helmetCenter.z - 0.12),
-    new THREE.Vector3(-0.02, helmetCenter.y - 0.14, helmetCenter.z - 0.13),
-    new THREE.Vector3(-0.04, helmetCenter.y - 0.20, helmetCenter.z - 0.11),
-    new THREE.Vector3(-0.05, helmetCenter.y - 0.28, helmetCenter.z - 0.09),
+    new THREE.Vector3(-0.02, helmetCenter.y - 0.15, helmetCenter.z - 0.10),
+    new THREE.Vector3(-0.04, helmetCenter.y - 0.22, helmetCenter.z - 0.07),
+    new THREE.Vector3(-0.05, helmetCenter.y - 0.30, helmetCenter.z - 0.05),
   ];
   const hoseCurve = new THREE.CatmullRomCurve3(hosePoints);
   const hoseGeo = new THREE.TubeGeometry(hoseCurve, 20, 0.016, 10, false);
@@ -567,7 +568,7 @@ export function setPilotCockpitMode(pilotGroup, isCockpit, showInterior = true, 
   const seat = pilotGroup.userData.seat;
 
   if (isCockpit) {
-    if (head) head.visible = options.hideHead ? false : true;
+    if (head) head.visible = Boolean(options.showHead);
     if (body) body.visible = showInterior;
     if (seat) seat.visible = showInterior;
   } else {
