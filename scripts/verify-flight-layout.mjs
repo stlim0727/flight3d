@@ -43,7 +43,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
   }
   assert.ok(await evaluate('Boolean(window.simulator?.startupReady)'), 'startup');
   assert.equal(await evaluate('document.getElementById("open-camera") === null'), true, 'camera dropdown replaced by strip buttons');
-  assert.equal(await evaluate('document.querySelectorAll(".flight-toolbar .flight-camera-btn").length'), 10, 'all views, Auto and Director are selectable on the strip');
+  assert.equal(await evaluate('document.querySelectorAll(".flight-toolbar [data-camera-mode]").length'), 10, 'all views, Auto and Director are selectable on the strip');
   assert.equal(await evaluate('document.getElementById("btn-auto-camera") === null'), true, 'no duplicate Scenic Auto button');
   await evaluate(() => {
     const autoBtn = document.getElementById('btn-cam-auto');
@@ -62,7 +62,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     s.integratePhysics = () => {}; // Fixed-pose layout evidence, not flight acceptance.
   });
   let touch = false;
-  const click = async selector => {
+  const click = async (selector, minSize = 44) => {
     const point = await evaluate(sel => {
       const node = document.querySelector(sel);
       if (node.closest('.flight-more-panel, .ap-panel, .flight-toolbar')) node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -70,7 +70,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       const x = r.x + r.width / 2, y = r.y + r.height / 2;
       return { x, y, w: r.width, h: r.height, hit: node.contains(document.elementFromPoint(x, y)) };
     }, selector);
-    assert.ok(point.w >= 44 && point.h >= 44 && point.hit, `${selector}: reachable 44px target ${JSON.stringify(point)}`);
+    assert.ok(point.w >= minSize && point.h >= minSize && point.hit, `${selector}: reachable ${minSize}px target ${JSON.stringify(point)}`);
     if (touch) {
       await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: point.x, y: point.y }] });
       await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
@@ -81,11 +81,128 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     await delay(100);
   };
   const results = [];
-  for (const [width, height] of [[1440, 900], [926, 428], [390, 660], [390, 844], [320, 568], [568, 320], [320, 400]]) {
+  for (const [width, height] of [[320, 568], [390, 660], [568, 320], [926, 428], [390, 844], [320, 400], [1440, 900]]) {
     touch = width <= 1024;
     await send('Emulation.setDeviceMetricsOverride', { width, height, mobile: touch, deviceScaleFactor: 1 });
     await send('Emulation.setTouchEmulationEnabled', { enabled: touch, maxTouchPoints: 5 });
     await evaluate(enabled => { const s = window.simulator; enabled ? s.touchControls.enable() : s.touchControls.disable(); }, touch);
+    await evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    if (width <= 600 || (width <= 950 && height <= 440)) {
+      assert.ok(await evaluate(() => document.body.classList.contains('mobile-flight-layout')));
+      const mobileState = () => evaluate(() => {
+        const bar = document.querySelector('.flight-toolbar');
+        const header = document.querySelector('.hud-top-bar').getBoundingClientRect();
+        const rect = bar.getBoundingClientRect();
+        const row = document.getElementById('mobile-flight-items');
+        return {
+          group: bar.dataset.mobileGroup, y: rect.y, height: rect.height,
+          headerY: header.y, headerBottom: header.bottom, headerRight: header.right, x: rect.x,
+          scroll: getComputedStyle(row).overflowX === 'auto',
+          pager: !bar.querySelector('.mobile-flight-next').hidden,
+          page: [...row.children].filter(node => node.getClientRects().length).map(node => node.id),
+          pills: document.getElementById('pov-actions-bar').getClientRects().length,
+        };
+      });
+      const closed = await mobileState();
+      assert.equal(closed.pills, 0, 'floating POV controls removed from mobile');
+      assert.ok(await evaluate(() => [...document.querySelectorAll('.hud-primary')].every(item => {
+        const value = item.querySelector('.hud-val');
+        return value.getClientRects().length && value.getBoundingClientRect().width <= item.clientWidth + 1;
+      })), 'all primary readouts fit the compact header');
+      if (width >= 550) {
+        assert.equal(closed.y, closed.headerY, 'short landscape uses one row');
+        assert.ok(closed.x >= closed.headerRight, 'toolbar clears the header');
+      } else assert.ok(closed.y >= closed.headerBottom, 'portrait toolbar starts below the header');
+      await click('#btn-camera-toggle');
+      const expanded = await mobileState();
+      assert.equal(expanded.group, 'camera');
+      assert.equal(expanded.y, closed.y);
+      assert.equal(expanded.height, closed.height);
+      assert.equal(expanded.scroll, width === 390 || width === 568);
+      assert.equal(expanded.pager, width === 320);
+      if (expanded.pager) {
+        await click('.mobile-flight-next');
+        assert.notDeepEqual((await mobileState()).page, expanded.page);
+      }
+      await screenshot(`${out}/${width}x${height}-mobile-camera.png`);
+      await click('#btn-camera-toggle');
+      await click('#open-flight-more');
+      assert.equal((await mobileState()).group, 'more');
+      assert.ok(await evaluate(() => document.getElementById('flight-more-panel').hidden));
+      assert.ok(await evaluate(() => {
+        const gear = document.getElementById('btn-gear');
+        return gear.parentElement.id === 'mobile-flight-items' && gear.hasAttribute('data-icon')
+          && getComputedStyle(gear, '::after').maskImage !== 'none';
+      }), 'gear icon is retained in the expanded row');
+      await click('#open-flight-more');
+      await click('#btn-ap-toggle');
+      assert.equal((await mobileState()).group, 'ap');
+      assert.ok(await evaluate(() => document.getElementById('ap-panel').hidden));
+      await click('#btn-ap');
+      assert.ok(await evaluate(() => window.simulator.autopilot.master));
+      await click('#btn-ap-toggle');
+      assert.ok(await evaluate(() => !window.simulator.autopilot.master));
+      assert.equal((await mobileState()).group, 'closed');
+      await evaluate(() => {
+        const s = window.simulator;
+        s.cameraSystem.setGazeTarget({ label: 'Test target', position: s.position.clone().addScalar(20) });
+        s.telemetry.warnings = [{ text: 'PULL UP', priority: 100 }];
+        s.updateHUD();
+      });
+      assert.ok(await evaluate(() => {
+        const gaze = document.getElementById('btn-gaze-exit');
+        const warning = document.getElementById('hud-warning');
+        return !!gaze.closest('.hud-top-actions') && !warning.hidden
+          && warning.getBoundingClientRect().top >= document.querySelector('.flight-toolbar').getBoundingClientRect().bottom;
+      }), 'gaze action and warning clear the tool row');
+      await screenshot(`${out}/${width}x${height}-mobile.png`);
+      if (width === 320 && height === 568) {
+        await click('#btn-camera-toggle');
+        await evaluate(() => {
+          const s = window.simulator;
+          s.cameraSystem.chaseYaw = 0.4;
+          s.updateHUD();
+          document.body.dataset.flow = 'debrief';
+        });
+        assert.ok(await evaluate(() => {
+          const actions = document.getElementById('pov-actions-bar');
+          return ['btn-reset-pov', 'btn-gaze-exit'].every(id => {
+            const button = document.getElementById(id);
+            return actions.contains(button) && button.getClientRects().length;
+          });
+        }), 'debrief restores both POV actions when entered from the expanded toolbar');
+        await click('#btn-gaze-exit', 1);
+        assert.ok(await evaluate(() => !window.simulator.cameraSystem.isGazeActive()));
+        await click('#btn-reset-pov', 1);
+        assert.ok(await evaluate(() => !window.simulator.cameraSystem.isPovModified()));
+        await evaluate(() => { document.body.dataset.flow = 'flight'; });
+        assert.ok(await evaluate(() => document.querySelector('.hud-top-actions #btn-gaze-exit')));
+        await click('#btn-camera-toggle');
+        const replayLayout = await evaluate(async () => {
+          document.body.classList.add('replaying');
+          await Promise.resolve();
+          const camera = document.getElementById('btn-camera-toggle');
+          const fullscreen = document.getElementById('btn-fullscreen');
+          const replay = {
+            cameraInStrip: camera.parentElement.id === 'camera-strip',
+            cameraVisible: Boolean(camera.getClientRects().length),
+            fullscreenVisible: Boolean(fullscreen.getClientRects().length),
+          };
+          document.body.classList.remove('replaying');
+          await Promise.resolve();
+          return { ...replay, flightRestored: document.body.classList.contains('mobile-flight-layout')
+            && document.querySelector('.flight-toolbar').dataset.mobileGroup === 'closed' };
+        });
+        assert.deepEqual(replayLayout, { cameraInStrip: true, cameraVisible: true, fullscreenVisible: true, flightRestored: true });
+      } else {
+        await click('#btn-gaze-exit');
+        assert.ok(await evaluate(() => !window.simulator.cameraSystem.isGazeActive()));
+      }
+      await evaluate(() => { window.simulator.telemetry.warnings = []; window.simulator.updateHUD(); });
+      results.push({ width, height, closed, expanded });
+      console.log(`${width}x${height}: mobile fold, camera, controls, icons and AP passed`);
+      continue;
+    }
     let baseline;
     for (const mode of [1, 0, 8, 6, 4, 2, 3, 5, 0]) {
       await evaluate(mode => window.simulator.controls.onSelectCamera(mode), mode);
@@ -241,17 +358,14 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       'open-flight-more', 'btn-skip-demo',
       'btn-cam-chase', 'btn-cam-drone', 'btn-cam-flyby', 'btn-cam-wing', 'btn-cam-cockpit',
       'btn-cam-hud', 'btn-cam-tower', 'btn-cam-gear', 'btn-cam-auto', 'btn-cam-director',
-      'btn-fullscreen',
+      'btn-camera-toggle', 'btn-fullscreen',
     ], `demo row: ${demo.row}`);
     await screenshot(`${out}/${width}x${height}-demo.png`);
     // Warnings coexist with both guide states, without covering demo controls.
-    await evaluate(() => {
+    const demoCheck = await evaluate(() => {
       const s = window.simulator;
       s.telemetry.warnings = [{ text: 'BANK ANGLE', priority: 50 }];
       s.updateHUD();
-    });
-    await delay(350);
-    const demoCheck = await evaluate(() => {
       const guide = document.getElementById('demo-banner');
       const warning = document.getElementById('hud-warning');
       const pill = document.getElementById('btn-cockpit-pov');
@@ -269,6 +383,9 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     await evaluate(() => window.simulator.demoDirector.closeBanner());
     await delay(350);
     const folded = await evaluate(() => {
+      const s = window.simulator;
+      s.telemetry.warnings = [{ text: 'BANK ANGLE', priority: 50 }];
+      s.updateHUD();
       const pill = document.getElementById('btn-demo-open');
       const r = pill.getBoundingClientRect();
       const header = document.querySelector('.hud-top-bar').getBoundingClientRect();
@@ -313,7 +430,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
   const toolbarState = () => evaluate(() => {
     const bar = document.querySelector('.flight-toolbar');
     const strip = document.getElementById('camera-strip');
-    const visible = [...bar.querySelectorAll('button')].filter(n => n.getClientRects().length);
+    const visible = [...bar.querySelectorAll('button')].filter(n => n.id !== 'btn-camera-toggle' && n.getClientRects().length);
     return {
       ids: visible.map(n => n.id),
       rows: new Set(visible.map(n => Math.round(n.getBoundingClientRect().y))).size,
@@ -325,8 +442,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     };
   });
   const seven = CAMERAS.filter(name => !['flyby', 'wing', 'tower'].includes(name));
-  for (const [width, height] of [[390, 844], [320, 568], [926, 428]]) {
-    const portrait = height > width;
+  for (const [width, height] of [[720, 844], [926, 540]]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, mobile: true, deviceScaleFactor: 1 });
     await delay(150);
     await chooseToolbar([]);
@@ -339,21 +455,16 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
     await chooseToolbar(['cam-chase']);
     const one = await toolbarState();
     assert.deepEqual(one.ids, [...CONTROLS, 'btn-cam-chase'], `${width}x${height}: one camera follows the controls`);
-    // A 320px row holds the six fixed buttons only, so its single camera wraps.
-    assert.ok(one.rows === (width >= 390 ? 1 : 2) && one.fits, `${width}x${height}: one camera row count: ${JSON.stringify(one)}`);
-    // Without cameras, fullscreen alone takes the second 320px row rather than
-    // scrolling the gear lever out of the first one.
+    assert.ok(one.rows === 1 && one.fits, `${width}x${height}: one camera row count: ${JSON.stringify(one)}`);
     await chooseToolbar(['fullscreen']);
     const full = await toolbarState();
-    assert.ok(full.rows === (width >= 390 ? 1 : 2) && full.fits && !full.small.length && full.ids.at(-1) === 'btn-fullscreen',
+    assert.ok(full.rows === 1 && full.fits && !full.small.length && full.ids.at(-1) === 'btn-fullscreen',
       `${width}x${height}: fullscreen without cameras: ${JSON.stringify(full)}`);
     await chooseToolbar([...seven.map(name => `cam-${name}`), 'fullscreen']);
     const some = await toolbarState();
     assert.deepEqual(some.ids.filter(id => id.startsWith('btn-cam-')), seven.map(name => `btn-cam-${name}`), 'chosen cameras keep toolbar order');
-    // At 320px the six fixed buttons plus fullscreen exceed one row, so fullscreen
-    // closes the camera row instead of opening a third; only that strip drags.
-    assert.equal(some.rows, portrait ? 2 : 1, `${width}x${height}: rows ${JSON.stringify(some)}`);
-    if (width >= 390) assert.ok(some.fits, `${width}x${height}: seven cameras need no drag: ${JSON.stringify(some)}`);
+    assert.equal(some.rows, 1, `${width}x${height}: rows ${JSON.stringify(some)}`);
+    assert.ok(some.fits, `${width}x${height}: seven cameras need no drag: ${JSON.stringify(some)}`);
     assert.ok(!some.small.length, `minimum targets: ${some.small}`);
     assert.match(some.summary, /8\/11/, 'summary counts the shown items');
     assert.deepEqual(some.saved, ['cam-flyby', 'cam-wing', 'cam-tower'], 'hidden items are saved in toolbar order');

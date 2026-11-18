@@ -1,3 +1,4 @@
+import { createMobileFlightToolbar } from './mobileFlightToolbar.js';
 import { t, bindText, getLanguage, setLanguage } from '../i18n/index.js';
 import { toolbarOptionalItems, normalizeToolbarHidden, applyToolbarVisibility } from './toolbarVisibility.js';
 import { gearIconName, setToolbarIcon } from './toolbarIcons.js';
@@ -104,7 +105,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     hudUnfold.hidden = !isFolded;
     if (focus) {
       if (isFolded) hudUnfold.focus();
-      else hudFold.focus();
+      else (hudFold.getClientRects().length ? hudFold : moreButton).focus();
     }
   };
   hudFold.addEventListener('click', () => setHudFolded(true));
@@ -118,6 +119,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
   hud.append(bar);
+  let mobileToolbar;
   let cameraStripCollapsed = false;
   try {
     const saved = localStorage.getItem('flight3d_camera_strip_collapsed');
@@ -137,7 +139,13 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   };
 
   const cameraButtons = createCameraButtons(mode => {
-    if (cameraStripCollapsed) {
+    if (mobileToolbar?.active()) {
+      if (mobileToolbar.cameraOpen()) {
+        onSelectCamera(mode);
+        mobileToolbar.close();
+        cameraToggleBtn.focus({ preventScroll: true });
+      } else mobileToolbar.toggleCamera();
+    } else if (cameraStripCollapsed) {
       setCameraStripCollapsed(false);
     } else {
       onSelectCamera(mode);
@@ -160,14 +168,15 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   cameraStrip.append(cameraToggleBtn);
 
   const updateCameraToggleState = () => {
-    cameraStrip.classList.toggle('is-collapsed', cameraStripCollapsed);
-    bar.classList.toggle('camera-strip-collapsed', cameraStripCollapsed);
-    cameraToggleBtn.setAttribute('aria-expanded', String(!cameraStripCollapsed));
-    const titleKey = cameraStripCollapsed ? 'ui.camera.expand' : 'ui.camera.collapse';
+    const collapsed = mobileToolbar?.active() ? !mobileToolbar.cameraOpen() : cameraStripCollapsed;
+    cameraStrip.classList.toggle('is-collapsed', collapsed);
+    bar.classList.toggle('camera-strip-collapsed', collapsed);
+    cameraToggleBtn.setAttribute('aria-expanded', String(!collapsed));
+    const titleKey = collapsed ? 'ui.camera.expand' : 'ui.camera.collapse';
     cameraToggleBtn.title = t(titleKey);
     cameraToggleBtn.setAttribute('aria-label', t(titleKey));
-    cameraToggleBtn.setAttribute('data-short-label', cameraStripCollapsed ? '›' : '‹');
-    cameraToggleBtn.innerHTML = cameraStripCollapsed
+    cameraToggleBtn.setAttribute('data-short-label', collapsed ? '›' : '‹');
+    cameraToggleBtn.innerHTML = collapsed
       ? '<span class="camera-toggle-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></span>'
       : '<span class="camera-toggle-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></span>';
     positionEdgeButtons();
@@ -175,6 +184,10 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
 
   cameraToggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (mobileToolbar?.active()) {
+      mobileToolbar.toggleCamera();
+      return;
+    }
     setCameraStripCollapsed(!cameraStripCollapsed);
     cameraToggleBtn.blur();
   });
@@ -215,12 +228,23 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     moreButton.setAttribute('aria-expanded', String(open));
     if (open) more.querySelector('button').focus({ preventScroll: true });
   };
-  moreButton.addEventListener('click', () => setMoreOpen(more.hidden));
+  moreButton.addEventListener('click', () => {
+    if (mobileToolbar?.active()) mobileToolbar.toggleMore();
+    else setMoreOpen(more.hidden);
+  });
   document.addEventListener('pointerdown', event => {
+    if (mobileToolbar?.active()) return;
     if (!event.target.closest('#flight-more-panel, #open-flight-more')) setMoreOpen(false);
   });
   document.addEventListener('keydown', event => {
-    if (event.key !== 'Escape' || more.hidden) return;
+    if (event.key !== 'Escape') return;
+    if (mobileToolbar?.isOpen()) {
+      event.preventDefault(); event.stopPropagation();
+      mobileToolbar.activeTrigger().focus({ preventScroll: true });
+      mobileToolbar.close();
+      return;
+    }
+    if (more.hidden) return;
     event.preventDefault(); event.stopPropagation();
     setMoreOpen(false);
     moreButton.focus({ preventScroll: true });
@@ -296,9 +320,9 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     const node = document.querySelector(selector);
     if (node) settings.append(node);
   }
-  for (const id of ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']) {
-    bar.append(document.getElementById(id));
-  }
+  const aircraft = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']
+    .map(id => document.getElementById(id));
+  bar.append(...aircraft);
   // Trim and parking brake are aircraft controls, so their overflow button stays
   // beside the control group in both orientations. The row is anchored to the right
   // edge, so the aircraft actions that follow takeover unfold leftwards.
@@ -364,20 +388,21 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     const buttonWidth = moreButton.getBoundingClientRect().width || 44;
     const isCollapsed = cameraStrip.classList.contains('is-collapsed');
     const visibleCameras = isCollapsed ? 1 : cameraButtons.filter(button => !button.hidden).length;
-    const stackCameraStrip = !isCollapsed && visibleCameras > 0
+    const stackCameraStrip = !mobileToolbar?.active() && !isCollapsed && visibleCameras > 0
       && (maxToolbarWidth - fixedWidth) < buttonWidth * Math.min(3, visibleCameras);
     bar.classList.toggle('camera-strip-stacked', stackCameraStrip);
     // 320px-class rows cannot hold the five aircraft controls, overflow and
     // fullscreen (7 x 44px) either. Fullscreen then closes the second row instead
     // of wrapping onto a third one or pushing the gear out of a scrolled row.
     const fullscreenShown = getComputedStyle(fullscreen).display !== 'none';
-    bar.classList.toggle('fullscreen-wrapped', fullscreenShown && fixedWidth > maxToolbarWidth + 0.5);
+    bar.classList.toggle('fullscreen-wrapped', !mobileToolbar?.active() && fullscreenShown && fixedWidth > maxToolbarWidth + 0.5);
     // The folded compact notice narrows this row. Keep takeover visible there;
     // elsewhere pin the camera/fullscreen/overflow end to the right edge.
     const foldedCompactDemo = document.body.classList.contains('demo-active')
       && compact.matches
       && document.getElementById('btn-demo-open')?.style.display === 'inline-flex';
-    bar.scrollLeft = foldedCompactDemo ? 0 : bar.scrollWidth;
+    if (mobileToolbar?.active()) mobileToolbar.update();
+    else bar.scrollLeft = foldedCompactDemo ? 0 : bar.scrollWidth;
     const topBarRect = topBar.getBoundingClientRect();
     const controlsBottom = bar.getBoundingClientRect().bottom;
     const noticeTop = Math.max(topBarRect.bottom, controlsBottom) + 6;
@@ -400,8 +425,10 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     if (node) observer.observe(node);
   }
   new MutationObserver(() => {
+    mobileToolbar?.sync();
     if (document.body.dataset.flow !== 'flight') {
       setMoreOpen(false);
+      mobileToolbar?.close();
       setHudFolded(false, false);
     }
     positionEdgeButtons();
@@ -409,6 +436,18 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     attributes: true, attributeFilter: ['class', 'data-flow'],
   });
   window.addEventListener('resize', positionEdgeButtons);
+  const mobileQuery = window.matchMedia('(max-width: 600px), (max-width: 950px) and (max-height: 440px)');
+  const initMobileToolbar = () => {
+    if (mobileToolbar || !mobileQuery.matches) return;
+    mobileToolbar = createMobileFlightToolbar({
+      query: mobileQuery, bar, cameraStrip, cameraToggle: cameraToggleBtn, cameraButtons, more, moreButton,
+      topActions, mute, hudFold, aircraft, fullscreen,
+      onLayoutChange: updateCameraToggleState,
+    });
+    updateCameraToggleState();
+  };
+  mobileQuery.addEventListener('change', initMobileToolbar);
+  initMobileToolbar();
   positionEdgeButtons();
 }
 

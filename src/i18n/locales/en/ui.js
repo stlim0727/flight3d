@@ -64,6 +64,7 @@ export default {
   "ui.camera.expand": "Expand camera list",
   "ui.camera.collapse": "Collapse camera list",
   "ui.camera.current": "Camera: {name}",
+  "ui.strip.nextPage": "Next control page ({page}/{total})",
   "ui.more": "More flight controls",
   "ui.controls": "Flight controls",
   "toolbar.custom.title": "Top menu items ({shown}/{total})",
