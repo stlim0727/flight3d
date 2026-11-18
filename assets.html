@@ -564,6 +564,7 @@
           <button class="filter-pill active" data-category="all"><span class="filter-icon" aria-hidden="true">✨</span> 전체 (All)</button>
           <button class="filter-pill" data-category="aircraft"><span class="filter-icon" aria-hidden="true">✈️</span> 항공기 (Aircraft)</button>
           <button class="filter-pill" data-category="cockpit"><span class="filter-icon" aria-hidden="true">🎛️</span> 콕핏 (Cockpit)</button>
+          <button class="filter-pill" data-category="weapons"><span class="filter-icon" aria-hidden="true">🚀</span> 무장 (Weapons)</button>
           <button class="filter-pill" data-category="environment"><span class="filter-icon" aria-hidden="true">🏙️</span> 환경 (Environment)</button>
           <button class="filter-pill" data-category="ships"><span class="filter-icon" aria-hidden="true">🚢</span> 선박 (Ships)</button>
         </div>
@@ -659,6 +660,7 @@
       all: '전체',
       aircraft: '항공기',
       cockpit: '콕핏',
+      weapons: '무장',
       environment: '환경',
       ships: '선박',
     };
@@ -690,6 +692,42 @@
         title_en: 'F-16 Fighting Falcon',
         description_ko: '파일럿 아레나와 전투 시나리오용 전투기 기체. 무장 파일런과 조종석을 포함한 외기 모델입니다.',
         license: { label: 'CC BY-NC-SA 4.0 — bohmerang', url: assetUrl('models/f-16.LICENSE.txt') },
+      },
+      {
+        id: 'aim-9x',
+        file: 'models/missiles/aim-9x.glb',
+        category: 'weapons',
+        title_ko: 'AIM-9X 사이드와인더',
+        title_en: 'AIM-9X Sidewinder Air-to-Air Missile',
+        description_ko: '단거리 적외선 유도 공대공 미사일. 사파이어 광학 돔, 내부 센서 짐벌, 전방 제어 카나드, 고폭탄/추진제 위험 띠, 척추 전선관, 배기 노즐 및 TVC 제트 베인을 포함합니다.',
+        license: { label: 'MIT — Flight3d contributors', url: 'https://github.com/stlim0727/flight3d/blob/main/scripts/build-missile-assets.mjs' },
+      },
+      {
+        id: 'aim-120c',
+        file: 'models/missiles/aim-120c.glb',
+        category: 'weapons',
+        title_ko: 'AIM-120C 암람',
+        title_en: 'AIM-120C AMRAAM Air-to-Air Missile',
+        description_ko: '중거리 능동 레이더 유도 공대공 미사일. 공력 오자이브 세라믹 레이돔, TDD 근접신관 안테나, 크롭트 델타 주익, 배선 터널, 후방 방향타 및 티타늄 배기 노즐을 포함합니다.',
+        license: { label: 'MIT — Flight3d contributors', url: 'https://github.com/stlim0727/flight3d/blob/main/scripts/build-missile-assets.mjs' },
+      },
+      {
+        id: 'pylon-wingtip',
+        file: 'models/missiles/pylon-wingtip.glb',
+        category: 'weapons',
+        title_ko: 'LAU-129 윙팁 런처 레일',
+        title_en: 'LAU-129 Wingtip Launcher Rail',
+        description_ko: 'F-16 주익 끝단(STA 1/9)에 고정 장착되는 공대공 미사일 발사대 레일. 미사일 발사 후 노출되는 가이드 홈, 디텐트 래치, 케이블 범퍼를 포함합니다.',
+        license: { label: 'MIT — Flight3d contributors', url: 'https://github.com/stlim0727/flight3d/blob/main/scripts/build-missile-assets.mjs' },
+      },
+      {
+        id: 'pylon-underwing',
+        file: 'models/missiles/pylon-underwing.glb',
+        category: 'weapons',
+        title_ko: 'F-16 주익 하부 파일런 & 런처',
+        title_en: 'F-16 Underwing Pylon & Launcher Rail',
+        description_ko: 'F-16 주익 하부(STA 2/8, STA 3/7)에 장착되는 후퇴익 파일런 스트럿 및 LAU-129 발사대 레일. 미사일 발사 후 빈 파일런 형태로 날개 밑에 남습니다.',
+        license: { label: 'MIT — Flight3d contributors', url: 'https://github.com/stlim0727/flight3d/blob/main/scripts/build-missile-assets.mjs' },
       },
       {
         id: 'b737-cockpit-medium',
