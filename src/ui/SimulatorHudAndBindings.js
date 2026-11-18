@@ -276,10 +276,13 @@ class SimulatorHudAndBindingsMethods {
     const bar = document.getElementById('ap-bar');
     const btn = document.getElementById('btn-ap-toggle');
     if (!bar || !btn) return;
-    const collapsed = bar.classList.contains('ap-collapsed');
+    const mobile = document.body.classList.contains('mobile-flight-layout');
+    const collapsed = mobile
+      ? document.querySelector('.flight-toolbar')?.dataset.mobileGroup !== 'ap'
+      : bar.classList.contains('ap-collapsed');
     btn.setAttribute('aria-expanded', String(!collapsed));
     btn.textContent = 'AP';
-    document.getElementById('ap-panel').hidden = collapsed;
+    document.getElementById('ap-panel').hidden = mobile || collapsed;
     bindText(btn, () => t(collapsed ? 'ap.expand' : 'ap.collapse'), 'aria-label');
     bindText(btn, () => t(collapsed ? 'ap.expand.tip' : 'ap.collapse.tip'), 'title');
     btn.classList.toggle('ap-active', this.autopilot.master);
@@ -471,7 +474,7 @@ class SimulatorHudAndBindingsMethods {
     });
     document.getElementById('btn-gaze-exit')?.addEventListener('click', (e) => {
       e?.stopPropagation?.();
-      if (this.cameraSystem?.clearGaze?.()) {
+      if (this.cameraSystem?.clearGaze?.() && !document.body.classList.contains('mobile-flight-layout')) {
         this.showToast(() => t('notice.gaze.off'));
       }
       this.syncGazeExitButton();
@@ -551,19 +554,31 @@ class SimulatorHudAndBindingsMethods {
         if (this.demoDirector?.isActive) return;
         const on = this.autopilot.toggle(mode, this.telemetry);
         if (mode === 'MASTER') {
-          this.showToast(() => t('notice.autopilot', { state: t(on ? 'state.on' : 'state.off') }));
+          if (!document.body.classList.contains('mobile-flight-layout')) {
+            this.showToast(() => t('notice.autopilot', { state: t(on ? 'state.on' : 'state.off') }));
+          }
         } else {
           this.showToast(() => t('notice.ap.modes', { modes: this.autopilot.annunciation() || t('state.off') }));
         }
         this.updateAutopilotUI();
       });
     }
-    document.getElementById('btn-ap-toggle')?.addEventListener('click', () => {
+    document.getElementById('btn-ap-toggle')?.addEventListener('click', event => {
       if (this.demoDirector?.isActive) return;
+      if (document.body.classList.contains('mobile-flight-layout')) {
+        if (this.autopilot.master) {
+          document.getElementById('btn-ap').click();
+          if (event.currentTarget.getAttribute('aria-expanded') !== 'true') return;
+        }
+        event.currentTarget.dispatchEvent(new Event('mobile-ap-toggle'));
+        this.updateApToggleUI();
+        return;
+      }
       document.getElementById('ap-bar')?.classList.toggle('ap-collapsed');
       this.updateApToggleUI();
     });
     const closeApPanel = () => {
+      if (document.body.classList.contains('mobile-flight-layout')) return;
       const bar = document.getElementById('ap-bar');
       if (bar.classList.contains('ap-collapsed')) return;
       bar.classList.add('ap-collapsed');

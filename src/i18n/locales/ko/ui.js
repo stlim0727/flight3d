@@ -64,6 +64,7 @@ export default {
   "ui.camera.expand": "카메라 목록 펼치기",
   "ui.camera.collapse": "카메라 목록 접기",
   "ui.camera.current": "카메라: {name}",
+  "ui.strip.nextPage": "다음 조작 페이지 ({page}/{total})",
   "ui.more": "추가 비행 조작",
   "ui.controls": "비행 조작",
   "toolbar.custom.title": "상단 메뉴 표시 항목 ({shown}/{total})",
