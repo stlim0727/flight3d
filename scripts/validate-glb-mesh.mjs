@@ -196,51 +196,57 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
   }
 
   // 4. Fuselage continuity under warning collars (evaluated in common missile scene frame)
-  if (bodyMesh && warningBands.length > 0) {
-    const bodyGeo = bodyMesh.geometry;
-    const bodyPos = bodyGeo.attributes.position;
-    const bodyIndex = bodyGeo.index;
-    const bodyTriCount = (bodyIndex ? bodyIndex.count : bodyPos.count) / 3;
-    const bodyToScene = new THREE.Matrix4().multiplyMatrices(invScene, bodyMesh.matrixWorld);
+  if (warningBands.length > 0) {
+    if (!bodyMesh) {
+      errors.push(
+        `GLB contains ${warningBands.length} warning band(s) but no missile-body mesh to provide continuous fuselage beneath them`
+      );
+    } else {
+      const bodyGeo = bodyMesh.geometry;
+      const bodyPos = bodyGeo.attributes.position;
+      const bodyIndex = bodyGeo.index;
+      const bodyTriCount = (bodyIndex ? bodyIndex.count : bodyPos.count) / 3;
+      const bodyToScene = new THREE.Matrix4().multiplyMatrices(invScene, bodyMesh.matrixWorld);
 
-    for (const band of warningBands) {
-      // Compute bounding box in missile scene space
-      const bandToScene = new THREE.Matrix4().multiplyMatrices(invScene, band.matrixWorld);
-      const bandBox = new THREE.Box3();
-      const bPos = band.geometry.attributes.position;
-      for (let i = 0; i < bPos.count; i++) {
-        const v = new THREE.Vector3(bPos.getX(i), bPos.getY(i), bPos.getZ(i)).applyMatrix4(bandToScene);
-        bandBox.expandByPoint(v);
-      }
-
-      const numSamples = 5;
-      for (let s = 0; s < numSamples; s++) {
-        const zTest = bandBox.min.z + (bandBox.max.z - bandBox.min.z) * (s / (numSamples - 1));
-        let covered = false;
-
-        for (let i = 0; i < bodyTriCount; i++) {
-          const i0 = bodyIndex ? bodyIndex.getX(i * 3) : i * 3;
-          const i1 = bodyIndex ? bodyIndex.getX(i * 3 + 1) : i * 3 + 1;
-          const i2 = bodyIndex ? bodyIndex.getX(i * 3 + 2) : i * 3 + 2;
-
-          const v0 = new THREE.Vector3(bodyPos.getX(i0), bodyPos.getY(i0), bodyPos.getZ(i0)).applyMatrix4(bodyToScene);
-          const v1 = new THREE.Vector3(bodyPos.getX(i1), bodyPos.getY(i1), bodyPos.getZ(i1)).applyMatrix4(bodyToScene);
-          const v2 = new THREE.Vector3(bodyPos.getX(i2), bodyPos.getY(i2), bodyPos.getZ(i2)).applyMatrix4(bodyToScene);
-
-          const minZ = Math.min(v0.z, v1.z, v2.z);
-          const maxZ = Math.max(v0.z, v1.z, v2.z);
-
-          if (zTest >= minZ - 0.001 && zTest <= maxZ + 0.001) {
-            covered = true;
-            break;
-          }
+      for (const band of warningBands) {
+        // Compute bounding box in missile scene space
+        const bandToScene = new THREE.Matrix4().multiplyMatrices(invScene, band.matrixWorld);
+        const bandBox = new THREE.Box3();
+        const bPos = band.geometry.attributes.position;
+        for (let i = 0; i < bPos.count; i++) {
+          const v = new THREE.Vector3(bPos.getX(i), bPos.getY(i), bPos.getZ(i)).applyMatrix4(bandToScene);
+          bandBox.expandByPoint(v);
         }
 
-        if (!covered) {
-          errors.push(
-            `Warning band "${band.name}" covers a hollow fuselage gap at z = ${zTest.toFixed(3)}m in missile frame; no continuous body triangle spans this section`
-          );
-          break;
+        const numSamples = 5;
+        for (let s = 0; s < numSamples; s++) {
+          const zTest = bandBox.min.z + (bandBox.max.z - bandBox.min.z) * (s / (numSamples - 1));
+          let covered = false;
+
+          for (let i = 0; i < bodyTriCount; i++) {
+            const i0 = bodyIndex ? bodyIndex.getX(i * 3) : i * 3;
+            const i1 = bodyIndex ? bodyIndex.getX(i * 3 + 1) : i * 3 + 1;
+            const i2 = bodyIndex ? bodyIndex.getX(i * 3 + 2) : i * 3 + 2;
+
+            const v0 = new THREE.Vector3(bodyPos.getX(i0), bodyPos.getY(i0), bodyPos.getZ(i0)).applyMatrix4(bodyToScene);
+            const v1 = new THREE.Vector3(bodyPos.getX(i1), bodyPos.getY(i1), bodyPos.getZ(i1)).applyMatrix4(bodyToScene);
+            const v2 = new THREE.Vector3(bodyPos.getX(i2), bodyPos.getY(i2), bodyPos.getZ(i2)).applyMatrix4(bodyToScene);
+
+            const minZ = Math.min(v0.z, v1.z, v2.z);
+            const maxZ = Math.max(v0.z, v1.z, v2.z);
+
+            if (zTest >= minZ - 0.001 && zTest <= maxZ + 0.001) {
+              covered = true;
+              break;
+            }
+          }
+
+          if (!covered) {
+            errors.push(
+              `Warning band "${band.name}" covers a hollow fuselage gap at z = ${zTest.toFixed(3)}m in missile frame; no continuous body triangle spans this section`
+            );
+            break;
+          }
         }
       }
     }

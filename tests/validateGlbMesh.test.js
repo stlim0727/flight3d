@@ -291,4 +291,18 @@ test('validateGlbModel flags GLB scene with no meshes', async () => {
   assert.ok(result.errors.some(e => e.includes('no meshes')), 'Should flag scene with no meshes');
 });
 
+test('validateGlbModel flags warning bands without missile-body mesh', async () => {
+  const scene = new THREE.Scene();
+  const bandGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.05, 16);
+  const bandMesh = new THREE.Mesh(bandGeo, new THREE.MeshBasicMaterial({ name: 'missile-band-yellow' }));
+  bandMesh.name = 'OrphanBand';
+  scene.add(bandMesh);
+
+  const glb = await exportScene(scene);
+  const result = await validateGlbModel(glb, 'test-orphan-band');
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => e.includes('no missile-body mesh')), 'Should flag warning band without body');
+});
+
+
 
