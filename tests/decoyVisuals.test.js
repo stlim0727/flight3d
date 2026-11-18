@@ -421,3 +421,147 @@ test('live target removal disposes breakup resources and cleans scene', () => {
 
   view.clear();
 });
+
+test('nested meshes in SeveredAirframe have cloned materials and geometries during persist clear', () => {
+  const scene = createMockScene();
+  const target = {
+    id: 14, callsign: 'BANDIT 14', alive: true,
+    position: new THREE.Vector3(0, 500, 0), velocity: new THREE.Vector3(0, 0, -200),
+    quaternion: new THREE.Quaternion(), damage: 0.9, lastHitZone: 'wingL',
+    damageZones: { wingL: 0.95, wingR: 0.1, fuselage: 0.2 },
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, { terrainHeight: () => 0 });
+
+  view.sync(0.02);
+  target.position.z -= 4;
+  view.sync(0.02);
+
+  // Kill
+  target.alive = false;
+  view.sync(0.02);
+
+  const targetView = view.targetViews.get(14);
+  const breakup = targetView.breakup;
+  assert.ok(breakup.mainPiece);
+
+  // Clear with persist
+  breakup.clear({ persist: true, duration: 10 });
+  assert.equal(breakup.persistentPieces.length, 2); // 1 detached wing, 1 SeveredAirframe
+
+  const persistentAirframe = breakup.persistentPieces.find(p => p.object.name === 'SeveredAirframe');
+  assert.ok(persistentAirframe);
+
+  // Advance time into the fade window (duration=10, fade is last 2 seconds: t > 8)
+  breakup.update(9.0, null, null);
+
+  // Check persistent piece material has faded
+  let foundPersistentMesh = false;
+  persistentAirframe.object.traverse(node => {
+    if (node.isMesh && node.material) {
+      foundPersistentMesh = true;
+      assert.ok(node.material.opacity < 0.9, 'persistent piece material fades');
+    }
+  });
+  assert.ok(foundPersistentMesh);
+
+  // Respawn target and verify original airframe materials are NOT faded
+  target.alive = true;
+  target.position.set(0, 800, 0);
+  view.sync(0.02);
+
+  let foundFreshMesh = false;
+  targetView.mesh.traverse(node => {
+    if (node.isMesh && node.material) {
+      foundFreshMesh = true;
+      const opacity = node.material.opacity ?? 1;
+      assert.equal(opacity, 1.0, 'original airframe material remains fully opaque');
+    }
+  });
+  assert.ok(foundFreshMesh);
+
+  view.clear();
+});
+
+test('full breakup impact explosion spawns at exact contacting piece position', () => {
+  let impactPoint = null;
+  const explosionSystem = {
+    spawnExplosion: ({ point }) => { impactPoint = point.clone(); },
+  };
+  const scene = createMockScene();
+  const target = {
+    id: 15, callsign: 'BANDIT 15', alive: true,
+    position: new THREE.Vector3(100, 50, 200), velocity: new THREE.Vector3(0, -60, 0),
+    quaternion: new THREE.Quaternion(), damage: 0.95, lastHitZone: 'fuselage',
+    damageZones: { fuselage: 0.95 },
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, {
+    terrainHeight: () => 0,
+    explosionSystem,
+  });
+
+  view.sync(0.02);
+  target.position.y -= 1.2;
+  view.sync(0.02);
+
+  // Kill in full breakup mode (no single wing hit)
+  target.alive = false;
+  view.sync(0.02);
+
+  const targetView = view.targetViews.get(15);
+  assert.equal(targetView.breakup.mainPiece ?? null, null, 'full breakup has no mainPiece');
+  assert.ok(targetView.breakup.pieces.length > 1, 'multiple fragments spawned');
+
+  // Offset one piece to hit the ground first at a distinct location
+  const leadPiece = targetView.breakup.pieces[0];
+  leadPiece.object.position.set(250, 0.5, -400);
+
+  view.sync(0.02);
+
+  assert.ok(impactPoint, 'explosion was triggered');
+  assert.ok(Math.abs(impactPoint.x - 250) < 1.0, 'explosion X matches contacting piece, not bounding center');
+  assert.ok(Math.abs(impactPoint.z - (-400)) < 1.0, 'explosion Z matches contacting piece, not bounding center');
+
+  view.clear();
+});
+
+test('airframe spin rotates on local body axes independent of world heading', () => {
+  const scene = createMockScene();
+  const target = {
+    id: 16, callsign: 'BANDIT 16', alive: true,
+    position: new THREE.Vector3(0, 1000, 0), velocity: new THREE.Vector3(200, 0, 0), // Flying East (heading 90)
+    quaternion: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2),
+    damage: 0.9, lastHitZone: 'wingL',
+    damageZones: { wingL: 0.95, wingR: 0.1, fuselage: 0.2 },
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, { terrainHeight: () => 0 });
+
+  view.sync(0.02);
+  target.position.x += 4;
+  view.sync(0.02);
+
+  // Kill
+  target.alive = false;
+  view.sync(0.02);
+
+  const targetView = view.targetViews.get(16);
+  assert.ok(targetView.breakup.mainPiece);
+  assert.equal(targetView.breakup.mainPiece.localSpin, true);
+
+  const initialQuat = targetView.breakup.mainPiece.object.quaternion.clone();
+
+  // Step physics
+  targetView.breakup.update(0.1, null, null);
+
+  const updatedQuat = targetView.breakup.mainPiece.object.quaternion;
+  assert.ok(!updatedQuat.equals(initialQuat));
+
+  // Forward direction is transformed local -Z. Since roll is around local Z,
+  // the forward direction vector in world space should still point predominantly East (+X).
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(updatedQuat);
+  assert.ok(forward.x > 0.85, 'forward vector remains aligned predominantly East despite roll spin');
+
+  view.clear();
+});

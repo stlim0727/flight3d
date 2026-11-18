@@ -247,6 +247,7 @@ export class AircraftBreakup {
           radius: mainBox.getSize(new THREE.Vector3()).length() * 0.15,
           isMainBody: true,
           severedSide: isLeftMissing ? 'left' : isRightMissing ? 'right' : null,
+          localSpin: true,
         };
         this.pieces.push(mainPiece);
         this.mainPiece = mainPiece;
@@ -292,9 +293,15 @@ export class AircraftBreakup {
       velocity.multiplyScalar(Math.exp(-(0.12 + 2 * immersion) * h));
       spin.multiplyScalar(Math.exp(-2 * immersion * h));
       object.position.addScaledVector(velocity, h);
-      object.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), spin.x * h);
-      object.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), spin.y * h);
-      object.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), spin.z * h);
+      if (piece.localSpin) {
+        object.rotateX(spin.x * h);
+        object.rotateY(spin.y * h);
+        object.rotateZ(spin.z * h);
+      } else {
+        object.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), spin.x * h);
+        object.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), spin.y * h);
+        object.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), spin.z * h);
+      }
       object.quaternion.normalize();
       const contactHeight = (terrain?.getHeight(object.position.x, object.position.z) ?? 0) + radius;
       if (object.position.y < contactHeight) {
@@ -378,13 +385,13 @@ export class AircraftBreakup {
     if (persist && this.pieces.length > 0) {
       for (const piece of this.pieces) {
         const objClone = piece.object.clone(true);
-        objClone.children.forEach(mesh => {
-          if (mesh.isMesh) {
-            if (mesh.geometry) mesh.geometry = mesh.geometry.clone();
-            if (mesh.material) {
-              mesh.material = Array.isArray(mesh.material)
-                ? mesh.material.map(m => m ? m.clone() : m)
-                : mesh.material.clone();
+        objClone.traverse(node => {
+          if (node.isMesh) {
+            if (node.geometry) node.geometry = node.geometry.clone();
+            if (node.material) {
+              node.material = Array.isArray(node.material)
+                ? node.material.map(m => m ? m.clone() : m)
+                : node.material.clone();
             }
           }
         });
@@ -396,6 +403,7 @@ export class AircraftBreakup {
           radius: piece.radius,
           timer: piece.timer ?? 0,
           duration,
+          localSpin: Boolean(piece.localSpin),
         });
       }
     }

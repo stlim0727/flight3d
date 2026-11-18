@@ -818,6 +818,7 @@ export class MissileCombatView {
 
     let isGround = false;
     let isWater = false;
+    let contactPos = null;
     if (view.breakup && view.breakup.pieces.length > 0) {
       if (view.breakup.mainPiece) {
         const p = view.breakup.mainPiece;
@@ -827,8 +828,10 @@ export class MissileCombatView {
           : this.waterLevel;
         if (Number.isFinite(pWater) && pGround < pWater && (p.object.position.y - p.radius) <= pWater + 0.3) {
           isWater = true;
+          contactPos = p.object.position.clone();
         } else if ((p.object.position.y - p.radius) <= pGround + 0.4) {
           isGround = true;
+          contactPos = p.object.position.clone();
         }
       } else {
         for (const p of view.breakup.pieces) {
@@ -838,9 +841,11 @@ export class MissileCombatView {
             : this.waterLevel;
           if (Number.isFinite(pWater) && pGround < pWater && (p.object.position.y - p.radius) <= pWater + 0.3) {
             isWater = true;
+            contactPos = p.object.position.clone();
             break;
           } else if ((p.object.position.y - p.radius) <= pGround + 0.4) {
             isGround = true;
+            contactPos = p.object.position.clone();
             break;
           }
         }
@@ -849,11 +854,12 @@ export class MissileCombatView {
       const ground = this.terrainHeight?.(view.mesh.position.x, view.mesh.position.z) ?? 0;
       isWater = Number.isFinite(waterLevel) && ground < waterLevel && view.mesh.position.y <= waterLevel + WRECK_GROUND_CLEARANCE_M;
       isGround = view.mesh.position.y <= ground + WRECK_GROUND_CLEARANCE_M;
+      contactPos = view.mesh.position.clone();
     }
 
     if (isGround || isWater || wreck.age >= WRECK_MAX_AGE_S) {
       if (isGround || isWater) {
-        this._spawnGroundImpact(view, wreck, isWater);
+        this._spawnGroundImpact(view, wreck, isWater, contactPos);
       }
       view.breakup?.clear({ persist: true, duration: 15 });
       view.wreck = null;
@@ -862,9 +868,9 @@ export class MissileCombatView {
     }
   }
 
-  _spawnGroundImpact(view, wreck, isWater = false) {
+  _spawnGroundImpact(view, wreck, isWater = false, contactPoint = null) {
     const explosionSystem = this.explosionSystem;
-    const impactPos = (view.breakup?.mainPiece?.object?.position ?? view.mesh.position).clone();
+    const impactPos = (contactPoint ?? view.breakup?.mainPiece?.object?.position ?? view.mesh.position).clone();
     const ground = this.terrainHeight?.(impactPos.x, impactPos.z) ?? 0;
     const water = typeof this.waterLevel === 'function'
       ? this.waterLevel(impactPos.x, impactPos.z)
