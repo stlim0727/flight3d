@@ -91,6 +91,10 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
     else if (matName === 'missile-radome') radomeMesh = node;
   });
 
+  if (stats.meshes === 0) {
+    errors.push('GLB scene contains no meshes');
+  }
+
   // 2. Radome outward normal check
   if (radomeMesh) {
     const pos = radomeMesh.geometry.attributes.position;

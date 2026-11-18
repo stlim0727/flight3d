@@ -279,3 +279,16 @@ test('validateGlbModel handles transformed root nodes without false gap or fin w
   assert.equal(result.valid, true, `Transformed valid model should pass, got errors: ${result.errors.join('; ')}`);
 });
 
+test('validateGlbModel flags GLB scene with no meshes', async () => {
+  const scene = new THREE.Scene();
+  const group = new THREE.Group();
+  group.name = 'EmptyGroup';
+  scene.add(group);
+
+  const glb = await exportScene(scene);
+  const result = await validateGlbModel(glb, 'test-empty-scene');
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => e.includes('no meshes')), 'Should flag scene with no meshes');
+});
+
+
