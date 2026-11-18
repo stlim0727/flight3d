@@ -210,7 +210,7 @@ test('validateGlbModel flags a single inverted triangle in an otherwise valid fi
   );
 });
 
-test('validateGlbModel handles transformed root nodes without false gap errors', async () => {
+test('validateGlbModel handles transformed root nodes without false gap or fin winding errors', async () => {
   const scene = new THREE.Scene();
   // Valid continuous body from z = 0.0 to 2.0
   const bodyGeo = new THREE.CylinderGeometry(0.08, 0.08, 2.0, 16);
@@ -226,7 +226,50 @@ test('validateGlbModel handles transformed root nodes without false gap errors',
   const bandMesh = new THREE.Mesh(bandGeo, new THREE.MeshBasicMaterial({ name: 'missile-band-yellow' }));
   scene.add(bandMesh);
 
-  // Apply significant root transform
+  // Valid fin along root centerline
+  const yRoot = 0.08, yTip = 0.28;
+  const rootChord = 0.2, tipChord = 0.08;
+  const tMid = 0.003, tEdge = 0.001;
+  const zLead = 0.5, zTrail = 0.7;
+
+  const v = [
+    [0, yRoot, zLead],
+    [tMid, yRoot, zLead + rootChord * 0.35],
+    [-tMid, yRoot, zLead + rootChord * 0.35],
+    [tEdge, yRoot, zTrail],
+    [-tEdge, yRoot, zTrail],
+    [0, yTip, zLead + 0.05],
+    [tMid * 0.7, yTip, zLead + 0.05 + tipChord * 0.35],
+    [-tMid * 0.7, yTip, zLead + 0.05 + tipChord * 0.35],
+    [tEdge * 0.7, yTip, zLead + 0.05 + tipChord],
+    [-tEdge * 0.7, yTip, zLead + 0.05 + tipChord],
+  ];
+
+  const validTris = [
+    v[0], v[5], v[1],
+    v[1], v[5], v[6],
+    v[0], v[2], v[5],
+    v[2], v[7], v[5],
+    v[1], v[6], v[3],
+    v[3], v[6], v[8],
+    v[2], v[4], v[7],
+    v[4], v[9], v[7],
+    v[3], v[8], v[4],
+    v[4], v[8], v[9],
+    v[5], v[7], v[6],
+    v[6], v[7], v[8],
+    v[7], v[9], v[8],
+  ];
+
+  const positions = [];
+  for (const pt of validTris) positions.push(...pt);
+  const finGeo = new THREE.BufferGeometry();
+  finGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  finGeo.computeVertexNormals();
+  const finMesh = new THREE.Mesh(finGeo, new THREE.MeshBasicMaterial({ name: 'missile-fin' }));
+  scene.add(finMesh);
+
+  // Apply significant root transform (translation + rotation)
   scene.position.set(15, -25, 40);
   scene.rotation.y = 0.75;
   scene.updateMatrixWorld(true);

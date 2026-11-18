@@ -31,6 +31,9 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
   const gltf = await parseGlbBuffer(arrayBuffer);
   // Ensure world matrices are up-to-date across all node transforms
   gltf.scene.updateMatrixWorld(true);
+  // Compute inverse of scene root matrix so all geometric predicates can be
+  // evaluated in the missile's common model frame, invariant to root translation/rotation.
+  const invScene = gltf.scene.matrixWorld.clone().invert();
 
   const errors = [];
   const stats = {
@@ -109,7 +112,7 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
     }
   }
 
-  // 3. Fin triangle face normals & individual triangle winding check
+  // 3. Fin triangle face normals & individual triangle winding check (in missile model frame)
   for (const fin of finMeshes) {
     const geo = fin.geometry;
     const pos = geo.attributes.position;
@@ -121,6 +124,9 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
       continue;
     }
 
+    // Transform from fin local space to missile root scene space
+    const finToScene = new THREE.Matrix4().multiplyMatrices(invScene, fin.matrixWorld);
+
     let totalSignedVolume = 0;
     let invertedFaces = 0;
 
@@ -129,10 +135,10 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
       const i1 = index ? index.getX(i * 3 + 1) : i * 3 + 1;
       const i2 = index ? index.getX(i * 3 + 2) : i * 3 + 2;
 
-      // Transform vertices to world space
-      const a = new THREE.Vector3(pos.getX(i0), pos.getY(i0), pos.getZ(i0)).applyMatrix4(fin.matrixWorld);
-      const b = new THREE.Vector3(pos.getX(i1), pos.getY(i1), pos.getZ(i1)).applyMatrix4(fin.matrixWorld);
-      const c = new THREE.Vector3(pos.getX(i2), pos.getY(i2), pos.getZ(i2)).applyMatrix4(fin.matrixWorld);
+      // Transform vertices to missile root model space
+      const a = new THREE.Vector3(pos.getX(i0), pos.getY(i0), pos.getZ(i0)).applyMatrix4(finToScene);
+      const b = new THREE.Vector3(pos.getX(i1), pos.getY(i1), pos.getZ(i1)).applyMatrix4(finToScene);
+      const c = new THREE.Vector3(pos.getX(i2), pos.getY(i2), pos.getZ(i2)).applyMatrix4(finToScene);
 
       // Signed volume contribution: A · (B × C)
       const crossX = b.y * c.z - b.z * c.y;
@@ -144,7 +150,7 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
       const fn = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
       const ct = new THREE.Vector3((a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3, (a.z + b.z + c.z) / 3);
 
-      // Determine the fin blade orientation (nearest multiple of PI/4 = 45 deg)
+      // Determine the fin blade orientation in missile frame (multiples of PI/4 = 45 deg)
       const angle = Math.atan2(ct.y, ct.x);
       const bladeAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
 
@@ -185,16 +191,24 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
     }
   }
 
-  // 4. Fuselage continuity under warning collars (actual longitudinal triangle coverage in aligned world coordinates)
+  // 4. Fuselage continuity under warning collars (evaluated in common missile scene frame)
   if (bodyMesh && warningBands.length > 0) {
     const bodyGeo = bodyMesh.geometry;
     const bodyPos = bodyGeo.attributes.position;
     const bodyIndex = bodyGeo.index;
     const bodyTriCount = (bodyIndex ? bodyIndex.count : bodyPos.count) / 3;
+    const bodyToScene = new THREE.Matrix4().multiplyMatrices(invScene, bodyMesh.matrixWorld);
 
     for (const band of warningBands) {
-      // Both the band bounding box and body vertices are evaluated in world coordinates
-      const bandBox = new THREE.Box3().setFromObject(band);
+      // Compute bounding box in missile scene space
+      const bandToScene = new THREE.Matrix4().multiplyMatrices(invScene, band.matrixWorld);
+      const bandBox = new THREE.Box3();
+      const bPos = band.geometry.attributes.position;
+      for (let i = 0; i < bPos.count; i++) {
+        const v = new THREE.Vector3(bPos.getX(i), bPos.getY(i), bPos.getZ(i)).applyMatrix4(bandToScene);
+        bandBox.expandByPoint(v);
+      }
+
       const numSamples = 5;
       for (let s = 0; s < numSamples; s++) {
         const zTest = bandBox.min.z + (bandBox.max.z - bandBox.min.z) * (s / (numSamples - 1));
@@ -205,9 +219,9 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
           const i1 = bodyIndex ? bodyIndex.getX(i * 3 + 1) : i * 3 + 1;
           const i2 = bodyIndex ? bodyIndex.getX(i * 3 + 2) : i * 3 + 2;
 
-          const v0 = new THREE.Vector3(bodyPos.getX(i0), bodyPos.getY(i0), bodyPos.getZ(i0)).applyMatrix4(bodyMesh.matrixWorld);
-          const v1 = new THREE.Vector3(bodyPos.getX(i1), bodyPos.getY(i1), bodyPos.getZ(i1)).applyMatrix4(bodyMesh.matrixWorld);
-          const v2 = new THREE.Vector3(bodyPos.getX(i2), bodyPos.getY(i2), bodyPos.getZ(i2)).applyMatrix4(bodyMesh.matrixWorld);
+          const v0 = new THREE.Vector3(bodyPos.getX(i0), bodyPos.getY(i0), bodyPos.getZ(i0)).applyMatrix4(bodyToScene);
+          const v1 = new THREE.Vector3(bodyPos.getX(i1), bodyPos.getY(i1), bodyPos.getZ(i1)).applyMatrix4(bodyToScene);
+          const v2 = new THREE.Vector3(bodyPos.getX(i2), bodyPos.getY(i2), bodyPos.getZ(i2)).applyMatrix4(bodyToScene);
 
           const minZ = Math.min(v0.z, v1.z, v2.z);
           const maxZ = Math.max(v0.z, v1.z, v2.z);
@@ -220,7 +234,7 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
 
         if (!covered) {
           errors.push(
-            `Warning band "${band.name}" covers a hollow fuselage gap at z = ${zTest.toFixed(3)}m in world coordinates; no continuous body triangle spans this section`
+            `Warning band "${band.name}" covers a hollow fuselage gap at z = ${zTest.toFixed(3)}m in missile frame; no continuous body triangle spans this section`
           );
           break;
         }
