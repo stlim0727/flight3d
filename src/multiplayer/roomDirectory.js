@@ -489,10 +489,15 @@ export async function handleDirectoryRequest(request, store, { now = Date.now() 
   // GET /v1/ice-servers
   if (method === 'GET' && (pathname === '/v1/ice-servers' || pathname === '/ice-servers')) {
     if (store && typeof store.getIceServers === 'function') {
-      const iceServers = await store.getIceServers();
-      return jsonResponse({ iceServers: Array.isArray(iceServers) ? iceServers : DEFAULT_ICE_SERVERS });
+      const result = await store.getIceServers();
+      if (result && Array.isArray(result.iceServers)) {
+        return jsonResponse(result);
+      }
+      if (Array.isArray(result)) {
+        return jsonResponse({ iceServers: result, dynamic: true });
+      }
     }
-    return jsonResponse({ iceServers: DEFAULT_ICE_SERVERS });
+    return jsonResponse({ iceServers: DEFAULT_ICE_SERVERS, dynamic: false });
   }
 
   // GET /v1/rooms

@@ -8,10 +8,11 @@ import { RoomDirectoryClient } from '../src/multiplayer/RoomDirectoryClient.js';
 import { HEARTBEAT_INTERVAL_MS } from '../src/multiplayer/roomDirectory.js';
 import { RoomReplaySession } from '../src/replay/RoomReplaySession.js';
 import { Atmosphere } from '../src/physics/Atmosphere.js';
+import { peerOptions } from '../src/multiplayer/peerOptions.js';
 
 // Load the production coordinator without importing its browser-only PeerJS adapter.
 const source = readFileSync(new URL('../src/multiplayer/MultiplayerController.js', import.meta.url), 'utf8');
-const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', 'inviteCompatibilityFailure', 'RoomDirectoryClient', 'HEARTBEAT_INTERVAL_MS', 'Atmosphere', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl, inviteCompatibilityFailure, RoomDirectoryClient, HEARTBEAT_INTERVAL_MS, Atmosphere);
+const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', 'inviteCompatibilityFailure', 'RoomDirectoryClient', 'HEARTBEAT_INTERVAL_MS', 'Atmosphere', 'peerOptions', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl, inviteCompatibilityFailure, RoomDirectoryClient, HEARTBEAT_INTERVAL_MS, Atmosphere, peerOptions);
 
 test('invite URL joins automatically; missing or invalid invites never connect', () => {
   const joined = [];
@@ -566,5 +567,25 @@ test('refresh presents distinct connecting states for guest vs host', () => fixt
   controller.refresh();
   assert.equal(helpEl.textContent, t('mp.hostConnectingHelp'));
   assert.match(statusEl.textContent, new RegExp(t('mp.peerConnecting')));
+}));
+
+test('connect awaits in-flight ensureIceServers before initializing room', () => fixture(async ({ controller }) => {
+  const dynamic = [{ urls: 'turn:turn.cloudflare.com:3478', username: 'u', credential: 'c' }];
+  let resolveServers;
+  controller.directoryClient = {
+    getIceServers: () => new Promise(resolve => { resolveServers = () => resolve(dynamic); }),
+  };
+  controller.ensureIceServers(); // starts query in-flight
+
+  let connectFinished = false;
+  // Stub preferences to avoid touching storage
+  controller.preferences = { save() {} };
+  const connectPromise = controller.connect('K7M2QX').then(() => { connectFinished = true; });
+  assert.equal(connectFinished, false);
+
+  resolveServers();
+  await connectPromise;
+  assert.equal(connectFinished, true);
+  assert.deepEqual(controller.dynamicIceServers, dynamic);
 }));
 

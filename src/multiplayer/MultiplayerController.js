@@ -54,7 +54,8 @@ export class MultiplayerController {
     this.connectStartedAt = null;
     this.hasConnected = false;
     this.dynamicIceServers = null;
-    this.directoryClient?.getIceServers?.().then(s => { this.dynamicIceServers = s; }).catch(() => {});
+    this.iceServersPromise = null;
+    this.ensureIceServers();
     if (this.refreshRoomsBtn) this.refreshRoomsBtn.onclick = () => this.refreshOpenRooms();
     if (typeof BroadcastChannel !== 'undefined') {
       try {
@@ -131,10 +132,25 @@ export class MultiplayerController {
       if (panel) panel.hidden = path !== mode;
     }
   }
+  ensureIceServers() {
+    if (this.dynamicIceServers) return Promise.resolve(this.dynamicIceServers);
+    if (!this.iceServersPromise) {
+      this.iceServersPromise = (this.directoryClient?.getIceServers?.() || Promise.resolve(null))
+        .then(s => {
+          if (s) this.dynamicIceServers = s;
+          return s;
+        })
+        .catch(() => null)
+        .finally(() => {
+          this.iceServersPromise = null;
+        });
+    }
+    return this.iceServersPromise;
+  }
   get modalOpen() { return this.dialog.open; }
   openDialog(mode) {
     if (mode) this.chooseSetup(mode);
-    this.directoryClient?.getIceServers?.().then(s => { this.dynamicIceServers = s; }).catch(() => {});
+    this.ensureIceServers();
     this.modal.open();
     this.refresh();
   }
@@ -171,11 +187,11 @@ export class MultiplayerController {
   }
   get active() { return Boolean(this.room && !this.room.closed); }
   get locked() { return this.active && !this.preparing; }
-  connect(room) {
+  async connect(room) {
     if (this.active || this.preparing || this.sim.startingFlight || this.sim.airportLoading) return;
     this.preferences.save();
     this.message = null;
-    this.registrationGeneration++;
+    const generation = ++this.registrationGeneration;
     this.registeringHost = false;
     this.hostDirectoryClient?.unregister();
     this.hostDirectoryClient = null;
@@ -184,13 +200,17 @@ export class MultiplayerController {
     this.connectStartedAt = performance.now();
     this.hasConnected = false;
     const config = Object.fromEntries(Object.keys(DEFAULT_CONFIG).map(key => [key, document.getElementById(`mp-${key}`).value]));
+
+    const dynamicServers = this.dynamicIceServers || await this.ensureIceServers();
+    if (generation !== this.registrationGeneration) return;
+
     try {
       this.voice = new VoiceLink({ changed: () => this.refresh() });
       // Invite URLs join without a gesture; blocked audio can be enabled in the modal.
       this.voice.context.resume().catch(() => {});
       this.sim.ensureAudio?.();
       this.playAudio();
-      const options = peerOptions(undefined, this.dynamicIceServers);
+      const options = peerOptions(undefined, dynamicServers);
       this.room = new PeerRoom({ room, name: document.getElementById('mp-name').value, config, voice: this.voice, options,
         prepare: (c, slot) => this.prepare(c, slot), fly: () => this.startTogether(),
         changed: () => this.refresh(),

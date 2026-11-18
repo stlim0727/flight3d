@@ -314,18 +314,18 @@ export class RoomDirectoryClient {
         const res = await this.fetchFn(url.href, { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data?.iceServers) && data.iceServers.length > 0) {
+          if (data?.dynamic && Array.isArray(data?.iceServers) && data.iceServers.length > 0) {
             this._cachedIceServers = data.iceServers;
             this._cachedIceServersExpiresAt = Date.now() + 600000;
             return data.iceServers;
           }
         }
       } catch {
-        // Fallback to defaults on timeout or network error
+        // Fallback to null on timeout or network error
       } finally {
         clearTimeout(timer);
       }
     }
-    return DEFAULT_ICE_SERVERS;
+    return null;
   }
 }

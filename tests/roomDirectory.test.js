@@ -534,7 +534,7 @@ test('RoomDirectoryClient fetches and caches dynamic ice servers with fallback',
     directoryUrl: 'https://directory.flight3d',
     fetchFn: async () => {
       fetchCount++;
-      return new Response(JSON.stringify({ iceServers: customServers }), { status: 200 });
+      return new Response(JSON.stringify({ iceServers: customServers, dynamic: true }), { status: 200 });
     },
   });
 
@@ -547,12 +547,17 @@ test('RoomDirectoryClient fetches and caches dynamic ice servers with fallback',
   assert.deepEqual(servers2, customServers);
   assert.equal(fetchCount, 1);
 
-  // Fallback on failure
+  // When directory returns default non-dynamic servers, returns null so build env is preserved
+  const defaultClient = new RoomDirectoryClient({
+    directoryUrl: 'https://directory.flight3d',
+    fetchFn: async () => new Response(JSON.stringify({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }], dynamic: false }), { status: 200 }),
+  });
+  assert.equal(await defaultClient.getIceServers(), null);
+
+  // Fallback to null on failure so build env is preserved
   const failingClient = new RoomDirectoryClient({
     directoryUrl: 'https://directory.flight3d',
     fetchFn: async () => { throw new Error('network-down'); },
   });
-  const fallbackServers = await failingClient.getIceServers();
-  assert.equal(Array.isArray(fallbackServers), true);
-  assert.ok(fallbackServers.some(s => s.urls.includes('cloudflare.com')));
+  assert.equal(await failingClient.getIceServers(), null);
 });

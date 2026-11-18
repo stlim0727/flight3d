@@ -26,13 +26,13 @@ export async function fetchCloudflareTurnIceServers(turnKeyId, turnKeyApiToken, 
 export async function resolveWorkerIceServers(env = {}) {
   if (env.TURN_KEY_ID && env.TURN_KEY_API_TOKEN) {
     if (cachedIceServers && Date.now() < cachedIceServersExpiresAt) {
-      return cachedIceServers;
+      return { iceServers: cachedIceServers, dynamic: true };
     }
     try {
       const servers = await fetchCloudflareTurnIceServers(env.TURN_KEY_ID, env.TURN_KEY_API_TOKEN);
       cachedIceServers = servers;
       cachedIceServersExpiresAt = Date.now() + 3600000; // cache for 1 hour
-      return servers;
+      return { iceServers: servers, dynamic: true };
     } catch (err) {
       console.error('Failed to fetch Cloudflare Calls TURN servers:', err);
     }
@@ -40,10 +40,10 @@ export async function resolveWorkerIceServers(env = {}) {
   if (env.ICE_SERVERS) {
     try {
       const parsed = JSON.parse(env.ICE_SERVERS);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return { iceServers: parsed, dynamic: true };
     } catch {}
   }
-  return DEFAULT_ICE_SERVERS;
+  return { iceServers: DEFAULT_ICE_SERVERS, dynamic: false };
 }
 
 export class D1RoomDirectoryStore {

@@ -8,6 +8,7 @@ test('peerOptions returns default multi-region STUN servers when ICE servers are
   assert.deepEqual(options.config?.iceServers, DEFAULT_ICE_SERVERS);
   assert.ok(DEFAULT_ICE_SERVERS.some(s => s.urls.includes('cloudflare.com')));
   assert.ok(DEFAULT_ICE_SERVERS.some(s => s.urls.includes('google.com')));
+  assert.ok(DEFAULT_ICE_SERVERS.some(s => (typeof s.urls === 'string' && s.urls.includes('peerjs.com')) || (Array.isArray(s.urls) && s.urls.some(u => u.includes('peerjs.com')))));
 });
 
 test('peerOptions parses custom ICE servers from environment', () => {
@@ -16,9 +17,16 @@ test('peerOptions parses custom ICE servers from environment', () => {
   assert.deepEqual(options.config?.iceServers, custom);
 });
 
-test('peerOptions prioritizes dynamicIceServers when provided', () => {
+test('peerOptions preserves build VITE_MULTIPLAYER_ICE_SERVERS over dynamic servers', () => {
+  const buildServers = [{ urls: 'turn:turn.build.example.com:3478', username: 'build', credential: 'pwd' }];
+  const dynamicServers = [{ urls: 'turn:turn.dynamic.example.com:3478', username: 'dyn', credential: 'pwd' }];
+  const options = peerOptions({ VITE_MULTIPLAYER_ICE_SERVERS: JSON.stringify(buildServers) }, dynamicServers);
+  assert.deepEqual(options.config?.iceServers, buildServers);
+});
+
+test('peerOptions uses dynamicIceServers when build environment has no ICE servers', () => {
   const dynamic = [{ urls: 'turn:turn.cloudflare.com:3478', username: 'u', credential: 'c' }];
-  const options = peerOptions({ VITE_MULTIPLAYER_ICE_SERVERS: '[]' }, dynamic);
+  const options = peerOptions({}, dynamic);
   assert.deepEqual(options.config?.iceServers, dynamic);
 });
 
