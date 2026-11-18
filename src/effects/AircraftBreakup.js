@@ -121,7 +121,11 @@ export class AircraftBreakup {
           version: source.geometry.attributes.position.version,
         } : null;
         this.preparedFragments.push({ mesh, source, inverseTransform, matIndex, deformation });
-        if (!regions.has(region)) regions.set(region, new THREE.Group());
+        if (!regions.has(region)) {
+          const group = new THREE.Group();
+          group.name = region;
+          regions.set(region, group);
+        }
         regions.get(region).add(mesh);
       }
       geometry.dispose();
@@ -129,7 +133,7 @@ export class AircraftBreakup {
     for (const object of regions.values()) this.preparedRoot.add(object);
   }
 
-  spawn(aircraft, velocity) {
+  spawn(aircraft, velocity, { detachRegions = null } = {}) {
     this.clear();
     // Direct callers and crashes during asset loading still have a safe fallback.
     this.prepare(aircraft);
@@ -176,27 +180,99 @@ export class AircraftBreakup {
     }
     if (bounds.isEmpty()) return;
     const center = bounds.getCenter(new THREE.Vector3());
-    let n = 0;
     const speed = velocity.length();
-    for (const object of regions) {
-      const box = fragmentBounds(object);
-      if (box.isEmpty()) continue;
-      const pivot = box.getCenter(new THREE.Vector3());
-      const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
-      object.children.forEach(mesh => {
-        mesh.matrix.premultiply(offset);
-        mesh.matrixWorldNeedsUpdate = true;
-      });
-      object.position.copy(pivot).applyMatrix4(root.matrixWorld);
-      object.quaternion.copy(root.getWorldQuaternion(new THREE.Quaternion()));
-      const outward = pivot.clone().sub(center).applyQuaternion(object.quaternion).normalize();
-      const impulse = outward.multiplyScalar(Math.min(16, speed * 0.13));
-      impulse.y += Math.min(7, speed * 0.05);
-      this.scene.add(object);
-      this.pieces.push({ object, velocity: velocity.clone().multiplyScalar(0.55).add(impulse),
-        spin: new THREE.Vector3(0.4 + n * 0.13, (n % 2 ? -1 : 1) * 0.6, 0.3 - n * 0.11),
-        radius: box.getSize(new THREE.Vector3()).length() * 0.12 });
-      n++;
+
+    const detachSet = Array.isArray(detachRegions) && detachRegions.length > 0
+      ? new Set(detachRegions)
+      : null;
+
+    if (detachSet) {
+      const detachedObjects = regions.filter(o => detachSet.has(o.name));
+      const remainingObjects = regions.filter(o => !detachSet.has(o.name));
+
+      for (const object of detachedObjects) {
+        const box = fragmentBounds(object);
+        if (box.isEmpty()) continue;
+        const pivot = box.getCenter(new THREE.Vector3());
+        const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
+        object.children.forEach(mesh => {
+          mesh.matrix.premultiply(offset);
+          mesh.matrixWorldNeedsUpdate = true;
+        });
+        object.position.copy(pivot).applyMatrix4(root.matrixWorld);
+        object.quaternion.copy(root.getWorldQuaternion(new THREE.Quaternion()));
+        const outward = pivot.clone().sub(center).applyQuaternion(object.quaternion).normalize();
+        const impulse = outward.multiplyScalar(Math.min(18, speed * 0.15));
+        impulse.y += Math.min(8, speed * 0.06);
+        this.scene.add(object);
+        this.pieces.push({
+          object,
+          velocity: velocity.clone().multiplyScalar(0.6).add(impulse),
+          spin: new THREE.Vector3((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 3),
+          radius: box.getSize(new THREE.Vector3()).length() * 0.12,
+          isDetachedPart: true,
+          partName: object.name,
+        });
+      }
+
+      if (remainingObjects.length > 0) {
+        const mainGroup = new THREE.Group();
+        mainGroup.name = 'SeveredAirframe';
+        for (const object of remainingObjects) mainGroup.add(object);
+        const mainBox = fragmentBounds(mainGroup);
+        const pivot = mainBox.getCenter(new THREE.Vector3());
+        const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
+        mainGroup.traverse(node => {
+          if (node.isMesh) {
+            node.matrix.premultiply(offset);
+            node.matrixWorldNeedsUpdate = true;
+          }
+        });
+        mainGroup.position.copy(pivot).applyMatrix4(root.matrixWorld);
+        mainGroup.quaternion.copy(root.getWorldQuaternion(new THREE.Quaternion()));
+
+        // Continuous aerodynamic roll & yaw moments from missing wing lift & drag
+        const isLeftMissing = detachSet.has('left');
+        const isRightMissing = detachSet.has('right');
+        const rollRate = isLeftMissing ? 3.6 : isRightMissing ? -3.6 : 0.8;
+        const yawRate = isLeftMissing ? -1.5 : isRightMissing ? 1.5 : 0.4;
+        const pitchRate = 0.5;
+        const spin = new THREE.Vector3(pitchRate, yawRate, rollRate);
+
+        this.scene.add(mainGroup);
+        const mainPiece = {
+          object: mainGroup,
+          velocity: velocity.clone().multiplyScalar(0.7),
+          spin,
+          radius: mainBox.getSize(new THREE.Vector3()).length() * 0.15,
+          isMainBody: true,
+          severedSide: isLeftMissing ? 'left' : isRightMissing ? 'right' : null,
+        };
+        this.pieces.push(mainPiece);
+        this.mainPiece = mainPiece;
+      }
+    } else {
+      let n = 0;
+      for (const object of regions) {
+        const box = fragmentBounds(object);
+        if (box.isEmpty()) continue;
+        const pivot = box.getCenter(new THREE.Vector3());
+        const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
+        object.children.forEach(mesh => {
+          mesh.matrix.premultiply(offset);
+          mesh.matrixWorldNeedsUpdate = true;
+        });
+        object.position.copy(pivot).applyMatrix4(root.matrixWorld);
+        object.quaternion.copy(root.getWorldQuaternion(new THREE.Quaternion()));
+        const outward = pivot.clone().sub(center).applyQuaternion(object.quaternion).normalize();
+        const impulse = outward.multiplyScalar(Math.min(16, speed * 0.13));
+        impulse.y += Math.min(7, speed * 0.05);
+        this.scene.add(object);
+        this.pieces.push({ object, velocity: velocity.clone().multiplyScalar(0.55).add(impulse),
+          spin: new THREE.Vector3(0.4 + n * 0.13, (n % 2 ? -1 : 1) * 0.6, 0.3 - n * 0.11),
+          radius: box.getSize(new THREE.Vector3()).length() * 0.12 });
+        n++;
+      }
     }
     this.aircraft = aircraft;
     root.visible = false;
@@ -280,6 +356,13 @@ export class AircraftBreakup {
 
   updateBounds(terrain, waterLevel = null) {
     if (!this.pieces.length) return;
+    if (this.mainPiece) {
+      this.target.copy(this.mainPiece.object.position);
+      this.radius = Math.max(10, this.mainPiece.radius);
+      const floor = terrain?.getHeight(this.target.x, this.target.z) ?? 0;
+      if (Number.isFinite(waterLevel) && floor < waterLevel) this.target.y = Math.max(waterLevel, this.target.y);
+      return;
+    }
     const box = new THREE.Box3();
     for (const { object } of this.pieces) {
       object.updateWorldMatrix(true, true);
@@ -292,6 +375,7 @@ export class AircraftBreakup {
   }
 
   clear({ persist = false, duration = 30 } = {}) {
+    this.mainPiece = null;
     if (persist && this.pieces.length > 0) {
       for (const piece of this.pieces) {
         const objClone = piece.object.clone(true);

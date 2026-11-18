@@ -721,10 +721,32 @@ export class MissileCombatView {
       }
       view.mesh.updateWorldMatrix(true, true);
       if (view.aircraft) view.aircraft._isDestroyed = true;
+
+      // Classify structural breakup mode:
+      // If hitZone or dominant damage is localized on one wing, shear that wing
+      // and induce an aerodynamic death spiral; otherwise trigger full breakup.
+      const hitZone = target?.lastHitZone ?? null;
+      const damageZones = target?.damageZones ?? null;
+      let detachRegions = null;
+      if (hitZone === 'wingL') {
+        detachRegions = ['left'];
+      } else if (hitZone === 'wingR') {
+        detachRegions = ['right'];
+      } else if (damageZones) {
+        const leftDmg = damageZones.wingL ?? 0;
+        const rightDmg = damageZones.wingR ?? 0;
+        const bodyDmg = Math.max(damageZones.fuselage ?? 0, damageZones.engine ?? 0, damageZones.nose ?? 0);
+        if (leftDmg > 0.65 && leftDmg > rightDmg * 1.4 && leftDmg > bodyDmg) {
+          detachRegions = ['left'];
+        } else if (rightDmg > 0.65 && rightDmg > leftDmg * 1.4 && rightDmg > bodyDmg) {
+          detachRegions = ['right'];
+        }
+      }
+
       if (view.breakup) {
         const source = view.aircraft?.getBreakupSource?.();
         if (source) {
-          view.breakup.spawn(source, view.velocity);
+          view.breakup.spawn(source, view.velocity, { detachRegions });
         }
       }
       view.lastPosition = null;
@@ -760,14 +782,23 @@ export class MissileCombatView {
       }
     }
 
+    let emitPos = view.mesh.position;
+    if (view.breakup?.mainPiece?.severedSide) {
+      const side = view.breakup.mainPiece.severedSide;
+      scratchOffset.set(side === 'left' ? -1.4 : 1.4, 0, 0.6);
+      scratchOffset.applyQuaternion(view.breakup.mainPiece.object.quaternion);
+      scratchEmitPos.copy(view.breakup.mainPiece.object.position).add(scratchOffset);
+      emitPos = scratchEmitPos;
+    }
+
     if (!view.fireTrail) {
       view.fireTrail = new SmokeTrail(this.scene, { max: 64, size: 4.2, color: 0xff7722, opacity: 0.85 });
     }
-    view.fireTrail.update(dt, view.mesh.position, true);
+    view.fireTrail.update(dt, emitPos, true);
     if (!view.trail) {
       view.trail = new SmokeTrail(this.scene, { max: 96, size: 7, color: 0x242424, opacity: 0.62 });
     }
-    view.trail.update(dt, view.mesh.position, true);
+    view.trail.update(dt, emitPos, true);
 
     const ground = this.terrainHeight?.(view.mesh.position.x, view.mesh.position.z) ?? 0;
     const isWater = Number.isFinite(waterLevel) && ground < waterLevel && view.mesh.position.y <= waterLevel + WRECK_GROUND_CLEARANCE_M;

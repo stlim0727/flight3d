@@ -240,3 +240,44 @@ test('a killed bandit breaks apart into structural debris and triggers ground im
 
   view.clear();
 });
+
+test('wing-localized hit shears single wing and induces aerodynamic death spiral with offset trail', () => {
+  const scene = createMockScene();
+  const target = {
+    id: 10, callsign: 'BANDIT 10', alive: true,
+    position: new THREE.Vector3(0, 1000, 0), velocity: new THREE.Vector3(0, 0, -200),
+    quaternion: new THREE.Quaternion(), damage: 0.9, lastHitZone: 'wingL',
+    damageZones: { wingL: 0.95, wingR: 0.1, fuselage: 0.2 },
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, { terrainHeight: () => 0 });
+
+  view.sync(0.02);
+  target.position.z -= 4;
+  view.sync(0.02);
+
+  const targetView = view.targetViews.get(10);
+  assert.ok(targetView);
+
+  // Kill step on left wing
+  target.alive = false;
+  view.sync(0.02);
+
+  assert.ok(targetView.wreck);
+  assert.ok(targetView.breakup);
+  assert.ok(targetView.breakup.mainPiece, 'severed airframe is maintained as mainPiece');
+  assert.equal(targetView.breakup.mainPiece.severedSide, 'left', 'left wing is registered severed');
+  assert.ok(targetView.breakup.mainPiece.spin.z > 2.0, 'strong positive roll induced toward missing wing');
+  assert.ok(targetView.breakup.mainPiece.spin.y < -1.0, 'yaw moment induced into drag of torn wing');
+
+  const detachedWing = targetView.breakup.pieces.find(p => p.isDetachedPart);
+  assert.ok(detachedWing, 'detached wing piece exists');
+  assert.equal(detachedWing.partName, 'left');
+
+  // Verify fire trail updates with offset position
+  assert.ok(targetView.fireTrail);
+  const trailX = targetView.fireTrail.positions[0];
+  assert.ok(Math.abs(trailX - 0) > 0.5, 'trail emits from offset severed wing root');
+
+  view.clear();
+});
