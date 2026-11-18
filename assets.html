@@ -564,6 +564,7 @@
           <button class="filter-pill active" data-category="all"><span class="filter-icon" aria-hidden="true">✨</span> 전체 (All)</button>
           <button class="filter-pill" data-category="aircraft"><span class="filter-icon" aria-hidden="true">✈️</span> 항공기 (Aircraft)</button>
           <button class="filter-pill" data-category="cockpit"><span class="filter-icon" aria-hidden="true">🎛️</span> 콕핏 (Cockpit)</button>
+          <button class="filter-pill" data-category="crew"><span class="filter-icon" aria-hidden="true">🧑‍✈️</span> 조종사 (Crew)</button>
           <button class="filter-pill" data-category="weapons"><span class="filter-icon" aria-hidden="true">🚀</span> 무장 (Weapons)</button>
           <button class="filter-pill" data-category="environment"><span class="filter-icon" aria-hidden="true">🏙️</span> 환경 (Environment)</button>
           <button class="filter-pill" data-category="ships"><span class="filter-icon" aria-hidden="true">🚢</span> 선박 (Ships)</button>
@@ -660,6 +661,7 @@
       all: '전체',
       aircraft: '항공기',
       cockpit: '콕핏',
+      crew: '조종사',
       weapons: '무장',
       environment: '환경',
       ships: '선박',
@@ -728,6 +730,16 @@
         title_en: 'F-16 Underwing Pylon & Launcher Rail',
         description_ko: 'F-16 주익 하부(STA 2/8, STA 3/7)에 장착되는 후퇴익 파일런 스트럿 및 LAU-129 발사대 레일. 미사일 발사 후 빈 파일런 형태로 날개 밑에 남습니다.',
         license: { label: 'MIT — Flight3d contributors', url: 'https://github.com/stlim0727/flight3d/blob/main/scripts/build-missile-assets.mjs' },
+      },
+      {
+        id: 'pilot-f16',
+        file: 'models/pilot-f16.glb',
+        category: 'crew',
+        title_ko: 'F-16 전투 조종사 & 사출좌석',
+        title_en: 'F-16 Fighter Pilot & ACES II Ejection Seat',
+        description_ko: 'F-16 콕핏용 전투 조종사 및 ACES II 사출좌석 모델. 30° 경사 등받이, HGU-55/P 비행 헬멧, 틴티드 미러 바이저, MBU-12/P 산소마스크와 호스, CWU-27/P 비행복, PCU-15/P 하네스, CSU-13B/P 항G 슈트 및 HOTAS 조종간 파지 자세를 포함합니다.',
+        license: { label: 'MIT — Flight3d contributors', url: 'https://github.com/stlim0727/flight3d/blob/main/scripts/build-pilot-assets.mjs' },
+        preview: { position: [0.9, 0.6, 1.2], target: [0, 0.25, -0.1], autoRotate: true, showGrid: true },
       },
       {
         id: 'b737-cockpit-medium',
