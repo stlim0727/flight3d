@@ -647,3 +647,51 @@ test('sub-step contact is captured across large frame dt with ground rebound', (
 
   view.clear();
 });
+
+test('ground impact explosion receives actual accelerated impact velocity and speedKnots', () => {
+  let impactVelocity = null;
+  let impactSpeedKnots = 0;
+  const explosionSystem = {
+    spawnExplosion: ({ speedKnots }, velocity) => {
+      impactSpeedKnots = speedKnots;
+      impactVelocity = velocity.clone();
+    },
+  };
+  const scene = createMockScene();
+  // Target flying slowly at 25 m/s (~48 knots) at 400m altitude
+  const target = {
+    id: 19, callsign: 'BANDIT 19', alive: true,
+    position: new THREE.Vector3(0, 400, 0), velocity: new THREE.Vector3(0, 0, -25),
+    quaternion: new THREE.Quaternion(), damage: 0.9, lastHitZone: 'wingL',
+    damageZones: { wingL: 0.95 },
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, {
+    terrainHeight: () => 0,
+    explosionSystem,
+  });
+
+  view.sync(0.02);
+  target.position.z -= 0.5;
+  view.sync(0.02);
+
+  // Kill: initial wreck velocity is ~25 m/s (~48 knots)
+  target.alive = false;
+  view.sync(0.02);
+
+  const targetView = view.targetViews.get(19);
+  assert.ok(targetView.wreck);
+  assert.ok(targetView.wreck.velocity.length() < 30);
+
+  // Fall under gravity until impact
+  for (let i = 0; i < 300 && targetView.wreck; i++) {
+    view.sync(0.05);
+  }
+
+  assert.ok(impactVelocity, 'explosion was spawned');
+  // At 400m fall, velocity.y accelerates to roughly -50 ~ -80 m/s (~100-160 knots)
+  assert.ok(impactVelocity.y < -40, 'impact velocity reflects downward gravity acceleration');
+  assert.ok(impactSpeedKnots > 90, 'impact speedKnots reflects high impact energy');
+
+  view.clear();
+});

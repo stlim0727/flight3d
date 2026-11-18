@@ -819,10 +819,12 @@ export class MissileCombatView {
     let isGround = false;
     let isWater = false;
     let contactPos = null;
+    let contactVelocity = null;
     if (view.breakup?.firstContact) {
       isWater = view.breakup.firstContact.isWater;
       isGround = view.breakup.firstContact.isGround;
       contactPos = view.breakup.firstContact.point.clone();
+      contactVelocity = view.breakup.firstContact.velocity.clone();
     } else if (view.breakup && view.breakup.pieces.length > 0) {
       if (view.breakup.mainPiece) {
         const p = view.breakup.mainPiece;
@@ -833,9 +835,11 @@ export class MissileCombatView {
         if (Number.isFinite(pWater) && pGround < pWater && (p.object.position.y - p.radius) <= pWater + 0.3) {
           isWater = true;
           contactPos = p.object.position.clone();
+          contactVelocity = p.velocity.clone();
         } else if ((p.object.position.y - p.radius) <= pGround + 0.4) {
           isGround = true;
           contactPos = p.object.position.clone();
+          contactVelocity = p.velocity.clone();
         }
       } else {
         for (const p of view.breakup.pieces) {
@@ -846,10 +850,12 @@ export class MissileCombatView {
           if (Number.isFinite(pWater) && pGround < pWater && (p.object.position.y - p.radius) <= pWater + 0.3) {
             isWater = true;
             contactPos = p.object.position.clone();
+            contactVelocity = p.velocity.clone();
             break;
           } else if ((p.object.position.y - p.radius) <= pGround + 0.4) {
             isGround = true;
             contactPos = p.object.position.clone();
+            contactVelocity = p.velocity.clone();
             break;
           }
         }
@@ -859,11 +865,12 @@ export class MissileCombatView {
       isWater = Number.isFinite(waterLevel) && ground < waterLevel && view.mesh.position.y <= waterLevel + WRECK_GROUND_CLEARANCE_M;
       isGround = view.mesh.position.y <= ground + WRECK_GROUND_CLEARANCE_M;
       contactPos = view.mesh.position.clone();
+      contactVelocity = wreck.velocity.clone();
     }
 
     if (isGround || isWater || wreck.age >= WRECK_MAX_AGE_S) {
       if (isGround || isWater) {
-        this._spawnGroundImpact(view, wreck, isWater, contactPos);
+        this._spawnGroundImpact(view, wreck, isWater, contactPos, contactVelocity);
       }
       view.breakup?.clear({ persist: true, duration: 15 });
       view.wreck = null;
@@ -872,7 +879,7 @@ export class MissileCombatView {
     }
   }
 
-  _spawnGroundImpact(view, wreck, isWater = false, contactPoint = null) {
+  _spawnGroundImpact(view, wreck, isWater = false, contactPoint = null, contactVelocity = null) {
     const explosionSystem = this.explosionSystem;
     const impactPos = (contactPoint ?? view.breakup?.mainPiece?.object?.position ?? view.mesh.position).clone();
     const ground = this.terrainHeight?.(impactPos.x, impactPos.z) ?? 0;
@@ -884,7 +891,7 @@ export class MissileCombatView {
     } else {
       impactPos.y = ground;
     }
-    const velocity = wreck?.velocity ? wreck.velocity.clone() : new THREE.Vector3(0, -30, 0);
+    const velocity = (contactVelocity ?? wreck?.velocity)?.clone?.() ?? new THREE.Vector3(0, -30, 0);
     const speedKnots = velocity.length() * 1.94384;
     explosionSystem?.spawnExplosion?.({
       point: impactPos,

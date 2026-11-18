@@ -314,6 +314,7 @@ export class AircraftBreakup {
         if (isWaterContact) {
           this.firstContact = {
             point: object.position.clone(),
+            velocity: velocity.clone(),
             piece,
             isWater: true,
             isGround: false,
@@ -321,6 +322,7 @@ export class AircraftBreakup {
         } else if (isGroundContact) {
           this.firstContact = {
             point: object.position.clone(),
+            velocity: velocity.clone(),
             piece,
             isWater: false,
             isGround: true,
