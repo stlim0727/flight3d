@@ -1049,6 +1049,12 @@ body[data-flow="lobby"] #incheon-attribution-chip { display: none; }
 .hud-flight-glass { position: absolute; inset: 0; width: 100%; height: 100%; }
 body:is([data-flow="lobby"], [data-flow="paused"], .booting) #hud-view { display: none; }
 
+/* Off-screen bandit indicator arrow: elevated on top of toolbars and panels */
+#hud-locator-glass { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 105; }
+#hud-locator-glass[hidden],
+body:is([data-flow="lobby"], [data-flow="paused"], [data-flow="debrief"], .booting) #hud-locator-glass,
+body.hud-folded #hud-locator-glass { display: none; }
+
 /* ===== Main menu: tactical flight-deck cards (see docs/design/main-menu-redesign-concept.jpg) ===== */
 .lobby-card .btn-aircraft,
 .lobby-card .btn-airport {

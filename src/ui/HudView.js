@@ -5,6 +5,8 @@ import { distanceLabel } from '../multiplayer/remoteIndicator.js';
 import { MISSILE_TYPES } from '../weapons/missileSpecs.js';
 import { hudDirection, projectHudDirection } from './HudProjection.js';
 
+export const MAX_BANDIT_LOCATOR_RANGE_M = 15000;
+
 const tapeWidth = (scale) => Math.max(54, 76 * scale);
 
 /** HUD is a camera presentation; all commands use the existing flight controls. */
@@ -16,9 +18,17 @@ export class HudView {
     this.root.hidden = true;
     this.root.setAttribute('aria-label', 'HUD');
     this.root.innerHTML = '<canvas class="hud-flight-glass" aria-hidden="true"></canvas>';
-    document.getElementById('hud-overlay').append(this.root);
+    document.getElementById('hud-overlay')?.append(this.root);
     this.canvas = this.root.querySelector('canvas');
-    this.ctx = this.canvas.getContext('2d');
+    this.ctx = this.canvas?.getContext('2d');
+    if (typeof document !== 'undefined') {
+      this.arrowCanvas = document.createElement('canvas');
+      this.arrowCanvas.id = 'hud-locator-glass';
+      this.arrowCanvas.setAttribute('aria-hidden', 'true');
+      this.arrowCanvas.hidden = true;
+      document.body?.append(this.arrowCanvas);
+      this.arrowCtx = this.arrowCanvas.getContext?.('2d');
+    }
     this._hudInverse = new Quaternion();
     this._hudPoint = new Vector3();
     this._hudForward = new Vector3();
@@ -38,6 +48,7 @@ export class HudView {
     const markerOnly = !hudActive && !sim.isCrashed && !hudFolded && Boolean(markers?.length);
     const visible = hudActive || combatOnly || markerOnly;
     if (this.root.hidden === visible) this.root.hidden = !visible;
+    if (this.arrowCanvas && this.arrowCanvas.hidden === visible) this.arrowCanvas.hidden = !visible;
     document.body.classList.toggle('hud-camera-mode', hudActive);
     if (!visible) return;
     if (!hudActive) {
@@ -73,9 +84,16 @@ export class HudView {
     if (this.canvas.width !== Math.round(width * dpr) || this.canvas.height !== Math.round(height * dpr)) {
       this.canvas.width = Math.round(width * dpr); this.canvas.height = Math.round(height * dpr);
     }
+    if (this.arrowCanvas && (this.arrowCanvas.width !== Math.round(width * dpr) || this.arrowCanvas.height !== Math.round(height * dpr))) {
+      this.arrowCanvas.width = Math.round(width * dpr); this.arrowCanvas.height = Math.round(height * dpr);
+    }
     const ctx = this.ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
+    if (this.arrowCtx) {
+      this.arrowCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.arrowCtx.clearRect(0, 0, width, height);
+    }
     if (combat) this.drawCombat(width, height, Math.min(1, width / 1100), combat, true);
   }
 
@@ -174,9 +192,16 @@ export class HudView {
     if (this.canvas.width !== Math.round(width * dpr) || this.canvas.height !== Math.round(height * dpr)) {
       this.canvas.width = Math.round(width * dpr); this.canvas.height = Math.round(height * dpr);
     }
+    if (this.arrowCanvas && (this.arrowCanvas.width !== Math.round(width * dpr) || this.arrowCanvas.height !== Math.round(height * dpr))) {
+      this.arrowCanvas.width = Math.round(width * dpr); this.arrowCanvas.height = Math.round(height * dpr);
+    }
     const ctx = this.ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
+    if (this.arrowCtx) {
+      this.arrowCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.arrowCtx.clearRect(0, 0, width, height);
+    }
     const scale = Math.min(1, width / 1100);
     const narrow = width < 700, touch = document.body.classList.contains('touch-mode');
     const hy = height * (touch && (narrow || height < 550) ? .62 : .79);
@@ -310,8 +335,11 @@ export class HudView {
       const screen = this.projectWorld(target.position, width, height);
       const offscreen = screen.behind || screen.x < 0 || screen.x > width
         || screen.y < 0 || screen.y > height;
+      const inLocatorRange = !Number.isFinite(state.rangeM) || state.rangeM <= MAX_BANDIT_LOCATOR_RANGE_M;
       if (offscreen) {
-        this.drawTargetLocator(screen, width, height, scale, state, red);
+        if (inLocatorRange) {
+          this.drawTargetLocator(screen, width, height, scale, state, red);
+        }
       } else {
         // Conformal symbols follow the actual line of sight, including near the edge.
         const x = screen.x;
@@ -443,22 +471,39 @@ export class HudView {
   }
 
   drawTargetLocator(screen, width, height, scale, state, redColor) {
-    const ctx = this.ctx;
+    const ctx = this.arrowCtx || this.ctx;
+    if (!ctx) return;
     const angle = screen.behind
       ? screen.angle || 0
       : Math.atan2(screen.x - width / 2, height / 2 - screen.y);
-    const radius = Math.min(width, height) * .43;
-    const x = width / 2 + Math.sin(angle) * radius;
-    const y = height / 2 - Math.cos(angle) * radius;
+    const padTop = Math.max(54, 64 * scale);
+    const padBottom = Math.max(60, 72 * scale);
+    const padSide = Math.max(28, 36 * scale);
+    const radius = Math.min(
+      width / 2 - padSide,
+      height / 2 - Math.max(padTop, padBottom),
+      Math.min(width, height) * .40
+    );
+    const minX = padSide, maxX = width - padSide;
+    const minY = padTop, maxY = height - padBottom;
+    const x = MathUtils.clamp(width / 2 + Math.sin(angle) * radius, minX, maxX);
+    const y = MathUtils.clamp(height / 2 - Math.cos(angle) * radius, minY, maxY);
     const size = Math.max(7, 10 * scale);
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
     ctx.fillStyle = state.locked ? '#ffcc66' : redColor;
+    ctx.shadowColor = '#142b1c';
+    ctx.shadowBlur = 4;
     ctx.beginPath();
     ctx.moveTo(0, -size); ctx.lineTo(-size * .65, size * .55); ctx.lineTo(size * .65, size * .55); ctx.closePath();
     ctx.fill();
     ctx.restore();
+  }
+
+  dispose() {
+    this.root?.remove();
+    this.arrowCanvas?.remove();
   }
 
   drawRwr(width, height, scale, rwr) {
