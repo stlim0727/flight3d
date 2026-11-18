@@ -46,6 +46,7 @@ capability defaults, saved choices, and resize transitions. Browser acceptance
 must verify actual drawing dimensions, saved selection after reload, and DOM
 size through hardware Chrome after the GPU preflight.
 
-Runtime adaptation, GPU calibration, aircraft LOD variants, and compressed texture
-variants are separate work. Do not infer GPU capacity from these startup hints
+The B738 also streams its [lite cockpit interior](cockpit-assets.md) on first
+entry at Performance or Ultra Low. Runtime adaptation, GPU calibration, and
+compressed texture variants are separate work. Do not infer GPU capacity from these startup hints
 or lower quality in response to isolated loading/compilation stalls.

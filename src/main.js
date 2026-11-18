@@ -1005,7 +1005,7 @@ class FlightSimulator {
     if (!cockpit) return 'ready';
     if (cockpit.gltfCockpitLoaded) return 'ready';
     if (cockpit.cockpitModelFailed) return 'unavailable';
-    if (cockpit.ensureCockpitModel?.()) {
+    if (cockpit.ensureCockpitModel?.(this.renderQuality)) {
       // The only place the interior asset is requested, so this is also the only moment the
       // visitor waits on it: say so rather than appearing to ignore the view change.
       this.showToast(() => t('notice.cockpit.loading'));
