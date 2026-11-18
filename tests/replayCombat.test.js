@@ -770,3 +770,28 @@ test('CombatReplayPlayback seek does not duplicate smoke trails for active missi
 
   playback.stop();
 });
+
+test('prepopulateFromSamples interpolates active span when seeking between thinned samples', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { spacing: 3.0 });
+
+  // Missile flying 600 m/s with wide samples at 0.0s and 1.6s (thinned interval)
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 1.6, x: 960, y: 1000, z: 0, powered: true },
+  ];
+
+  // Seek to 0.9s (midway between 0.0s and 1.6s, where missile is at x = 540m)
+  trail.prepopulateFromSamples(samples, 0.9);
+
+  // Puffs should cover the entire 0 to 540m span
+  assert.ok(trail.count > 100, `Trail count ${trail.count} should densely populate 540m segment`);
+  const firstX = trail.positions[0];
+  const lastX = trail.positions[(trail.count - 1) * 3];
+
+  assert.ok(Math.abs(firstX - 0) < 5.0, `Start of trail should be at x=0 (got ${firstX})`);
+  assert.ok(Math.abs(lastX - 540) < 5.0, `End of trail should be at missile position x=540 (got ${lastX})`);
+  assert.ok(Math.abs(trail.lastPosition.x - 540) < 5.0, `lastPosition should match missile position x=540`);
+
+  trail.dispose();
+});

@@ -382,6 +382,7 @@ export class MissileSmokeTrail {
           relevant.push(s);
         }
       } else {
+        relevant.push(s);
         break;
       }
     }
@@ -392,6 +393,7 @@ export class MissileSmokeTrail {
 
     for (let i = 0; i < relevant.length; i++) {
       const curr = relevant[i];
+      if (curr.timeSec > currentTime + 1e-4) break;
       const next = (i + 1 < relevant.length) ? relevant[i + 1] : null;
       const isPoweredCurr = curr.powered !== false;
       const currLife = isPoweredCurr ? this.lifetime : this.lifetime * 0.85;
@@ -414,13 +416,16 @@ export class MissileSmokeTrail {
       scratchFrom.set(curr.x, curr.y, curr.z);
       scratchTo.set(next.x, next.y, next.z);
       const dist = scratchFrom.distanceTo(scratchTo);
-      const steps = Math.min(120, Math.max(1, Math.floor(dist / this.spacing)));
+      const steps = Math.min(500, Math.max(1, Math.floor(dist / this.spacing)));
       const isPoweredNext = next.powered !== false;
+      const spansCurrentTime = next.timeSec > currentTime + 1e-4;
 
       for (let s = 0; s < steps; s++) {
         const t = s / steps;
-        scratchInterpPos.lerpVectors(scratchFrom, scratchTo, t);
         const sampleTime = curr.timeSec + t * (next.timeSec - curr.timeSec);
+        if (sampleTime > currentTime + 1e-4) break;
+
+        scratchInterpPos.lerpVectors(scratchFrom, scratchTo, t);
         const age = Math.max(0, currentTime - sampleTime);
         const isPowered = t < 0.5 ? isPoweredCurr : isPoweredNext;
         const particleLife = isPowered ? this.lifetime : this.lifetime * 0.85;
@@ -432,9 +437,23 @@ export class MissileSmokeTrail {
           this.emit(scratchInterpPos, { alpha, lifetime: particleLife });
           this.ages[this.count - 1] = age;
           this.initialAlphas[this.count - 1] = segAlpha;
+          this.lastPosition = scratchInterpPos.clone();
         }
       }
-      this.lastPosition = scratchTo.clone();
+
+      if (spansCurrentTime && next.timeSec > curr.timeSec) {
+        const tCurr = Math.max(0, Math.min(1, (currentTime - curr.timeSec) / (next.timeSec - curr.timeSec)));
+        scratchInterpPos.lerpVectors(scratchFrom, scratchTo, tCurr);
+        const isPowered = tCurr < 0.5 ? isPoweredCurr : isPoweredNext;
+        const particleLife = isPowered ? this.lifetime : this.lifetime * 0.85;
+        const segAlpha = isPowered ? 0.92 : 0.62;
+        this.emit(scratchInterpPos, { alpha: segAlpha, lifetime: particleLife });
+        this.ages[this.count - 1] = 0;
+        this.initialAlphas[this.count - 1] = segAlpha;
+        this.lastPosition = scratchInterpPos.clone();
+      } else if (!spansCurrentTime) {
+        this.lastPosition = scratchTo.clone();
+      }
     }
 
     this.geometry.setDrawRange(0, this.count);
