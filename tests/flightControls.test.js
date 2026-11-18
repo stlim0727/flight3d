@@ -518,16 +518,26 @@ describe('Manual precision', () => {
     for (const source of ['hotas', 'virtual', 'aircraft']) {
       const c = makeControls();
       c.keys.KeyS = c.keys.KeyD = true;
-      c.update(1, 140, 'F16');
+      c.update(1, 140, 'C172');
       c.keys = {};
       if (source === 'hotas') c.hotas.elevator = c.hotas.aileron = -.5;
       if (source === 'virtual') {
         c.setVirtualInput('elevator', 0);
         c.setVirtualInput('aileron', 0);
       }
-      c.update(.1, 140, source === 'aircraft' ? 'C172' : 'F16');
+      c.update(.1, 140, source === 'aircraft' ? 'B738' : 'C172');
       assert.ok(Math.abs(c.elevator - .495) < 1e-12);
       assert.ok(Math.abs(c.aileron - .765) < 1e-12);
     }
+  });
+
+  it('applies fast fighter actuator slew rates for F-16 while preventing runaway rates', () => {
+    const c = makeControls();
+    c.hotas.elevator = 1.0;
+    c.hotas.aileron = 1.0;
+    c.update(0.1, 140, 'F16');
+    // F-16: 3.0/s elevator -> 0.30 after 0.1s; 4.0/s aileron -> 0.40 after 0.1s
+    assert.ok(Math.abs(c.elevator - 0.30) < 1e-12);
+    assert.ok(Math.abs(c.aileron - 0.40) < 1e-12);
   });
 });
