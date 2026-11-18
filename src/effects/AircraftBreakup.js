@@ -21,6 +21,7 @@ export class AircraftBreakup {
     this.persistentPieces = [];
     this.target = new THREE.Vector3();
     this.radius = 20;
+    this.firstContact = null;
   }
 
   // Prepare once after the selected airframe loads, never in the impact hot path.
@@ -29,7 +30,7 @@ export class AircraftBreakup {
     if (this.preparedAircraft === aircraft &&
         this.preparedUseGltf === aircraft.useGltf &&
         this.preparedVersion === aircraft.breakupVersion) return false;
-    this.disposePrepared();
+    this.disposePrepared({ clearPersistent: false });
     const wasCockpit = Boolean(aircraft.isCockpit);
     const cockpitVisible = aircraft.cockpit?.group.visible;
     aircraft.setCockpitMode(false);
@@ -135,6 +136,7 @@ export class AircraftBreakup {
 
   spawn(aircraft, velocity, { detachRegions = null } = {}) {
     this.clear();
+    this.firstContact = null;
     // Direct callers and crashes during asset loading still have a safe fallback.
     this.prepare(aircraft);
     aircraft.setCockpitMode(false);
@@ -280,7 +282,7 @@ export class AircraftBreakup {
     this.updateBounds();
   }
 
-  integratePieces(pieces, h, terrain, waterLevel) {
+  integratePieces(pieces, h, terrain, waterLevel, recordContact = false) {
     for (const piece of pieces) {
       const { object, velocity, spin, radius } = piece;
       const floor = terrain?.getHeight(object.position.x, object.position.z) ?? 0;
@@ -304,6 +306,28 @@ export class AircraftBreakup {
       }
       object.quaternion.normalize();
       const contactHeight = (terrain?.getHeight(object.position.x, object.position.z) ?? 0) + radius;
+
+      // Track first contact with water surface or dry ground during sub-stepping
+      if (recordContact && !this.firstContact) {
+        const isWaterContact = Number.isFinite(waterLevel) && floor < waterLevel && (object.position.y - radius <= waterLevel);
+        const isGroundContact = object.position.y <= contactHeight;
+        if (isWaterContact) {
+          this.firstContact = {
+            point: object.position.clone(),
+            piece,
+            isWater: true,
+            isGround: false,
+          };
+        } else if (isGroundContact) {
+          this.firstContact = {
+            point: object.position.clone(),
+            piece,
+            isWater: false,
+            isGround: true,
+          };
+        }
+      }
+
       if (object.position.y < contactHeight) {
         object.position.y = contactHeight;
         if (velocity.y < 0) velocity.y = Math.abs(velocity.y) > 1 ? -velocity.y * 0.18 * (1 - immersion) : 0;
@@ -320,9 +344,9 @@ export class AircraftBreakup {
     while (remaining > 0) {
       const h = Math.min(remaining, 1 / 120);
       remaining -= h;
-      this.integratePieces(this.pieces, h, terrain, waterLevel);
+      this.integratePieces(this.pieces, h, terrain, waterLevel, true);
       if (this.persistentPieces?.length) {
-        this.integratePieces(this.persistentPieces, h, terrain, waterLevel);
+        this.integratePieces(this.persistentPieces, h, terrain, waterLevel, false);
       }
     }
     if (this.aircraft) this.aircraft.group.visible = false;
@@ -382,6 +406,7 @@ export class AircraftBreakup {
   }
 
   clear({ persist = false, duration = 30 } = {}) {
+    this.firstContact = null;
     if (persist && this.pieces.length > 0) {
       for (const piece of this.pieces) {
         const objClone = piece.object.clone(true);
@@ -434,19 +459,21 @@ export class AircraftBreakup {
     this.aircraft = null;
   }
 
-  disposePrepared() {
+  disposePrepared({ clearPersistent = true } = {}) {
     this.clear();
-    for (const piece of this.persistentPieces) {
-      this.scene.remove(piece.object);
-      piece.object.traverse(node => {
-        if (node.isMesh) {
-          node.geometry?.dispose();
-          if (Array.isArray(node.material)) node.material.forEach(m => m?.dispose());
-          else node.material?.dispose();
-        }
-      });
+    if (clearPersistent) {
+      for (const piece of this.persistentPieces) {
+        this.scene.remove(piece.object);
+        piece.object.traverse(node => {
+          if (node.isMesh) {
+            node.geometry?.dispose();
+            if (Array.isArray(node.material)) node.material.forEach(m => m?.dispose());
+            else node.material?.dispose();
+          }
+        });
+      }
+      this.persistentPieces = [];
     }
-    this.persistentPieces = [];
     this.preparedRoot?.traverse(mesh => mesh.geometry?.dispose());
     this.preparedRoot = null;
     this.preparedFragments = [];

@@ -565,3 +565,85 @@ test('airframe spin rotates on local body axes independent of world heading', ()
 
   view.clear();
 });
+
+test('late GLB load after proxy kill and ground impact preserves persistent wreckage', () => {
+  const scene = createMockScene();
+  const target = {
+    id: 17, callsign: 'BANDIT 17', alive: true,
+    position: new THREE.Vector3(0, 10, 0), velocity: new THREE.Vector3(0, -50, 0),
+    quaternion: new THREE.Quaternion(), damage: 0.9, lastHitZone: 'wingL',
+    damageZones: { wingL: 0.95 },
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, { terrainHeight: () => 0 });
+
+  view.sync(0.02);
+  target.position.y -= 1.0;
+  view.sync(0.02);
+
+  // Kill and crash into ground
+  target.alive = false;
+  view.sync(0.02); // kill starts wreck
+  const targetView = view.targetViews.get(17);
+  for (let i = 0; i < 20 && targetView.wreck; i++) {
+    view.sync(0.05); // wreck hits ground, triggers impact & persist clear
+  }
+  assert.equal(targetView.wreck, null, 'wreck state cleared upon impact');
+  assert.ok(targetView.breakup.persistentPieces.length > 0, 'persistent pieces exist on ground');
+  const pieceCount = targetView.breakup.persistentPieces.length;
+
+  // Now simulate GLB loading late and calling onAirframeLoaded
+  assert.ok(targetView.aircraft.onAirframeLoaded);
+  targetView.aircraft.onAirframeLoaded();
+
+  // Verify persistentPieces are NOT destroyed
+  assert.equal(targetView.breakup.persistentPieces.length, pieceCount, 'persistent pieces preserved after late GLB load');
+
+  view.clear();
+});
+
+test('sub-step contact is captured across large frame dt with ground rebound', () => {
+  let explosionTriggered = false;
+  let explosionPoint = null;
+  const explosionSystem = {
+    spawnExplosion: ({ point }) => {
+      explosionTriggered = true;
+      explosionPoint = point.clone();
+    },
+  };
+  const scene = createMockScene();
+  const target = {
+    id: 18, callsign: 'BANDIT 18', alive: true,
+    position: new THREE.Vector3(0, 10, 0), velocity: new THREE.Vector3(0, -80, 0),
+    quaternion: new THREE.Quaternion(), damage: 0.95, lastHitZone: 'fuselage',
+    damageZones: { fuselage: 0.95 },
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, {
+    terrainHeight: () => 0,
+    explosionSystem,
+  });
+
+  view.sync(0.02);
+  target.position.y -= 1.6;
+  view.sync(0.02);
+
+  // Kill
+  target.alive = false;
+  view.sync(0.02);
+
+  // Position a piece just above ground with high downward velocity
+  const targetView = view.targetViews.get(18);
+  const piece = targetView.breakup.pieces[0];
+  piece.object.position.set(0, piece.radius + 0.1, 0);
+  piece.velocity.set(0, -80, 0);
+
+  // Execute a large 0.1s render frame where contact and rebound happen in sub-steps
+  view.sync(0.1);
+
+  assert.ok(explosionTriggered, 'ground impact explosion triggered via sub-step contact detection');
+  assert.ok(explosionPoint, 'contact point recorded');
+  assert.equal(targetView.wreck, null, 'wreck ended upon ground contact');
+
+  view.clear();
+});

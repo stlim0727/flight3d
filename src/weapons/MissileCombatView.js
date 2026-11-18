@@ -527,7 +527,7 @@ export class MissileCombatView {
         if (breakup) {
           breakup.prepare(aircraft.getBreakupSource());
           aircraft.onAirframeLoaded = () => {
-            if (!view.wreck) breakup.prepare(aircraft.getBreakupSource());
+            if (!view.wreck && !view.aircraft?._isDestroyed) breakup.prepare(aircraft.getBreakupSource());
           };
         }
         view = { mesh, aircraft, breakup, trail: null, fireTrail: null,
@@ -559,7 +559,7 @@ export class MissileCombatView {
         if (view.breakup) {
           view.breakup.prepare(aircraft.getBreakupSource());
           aircraft.onAirframeLoaded = () => {
-            if (!view.wreck) view.breakup.prepare(aircraft.getBreakupSource());
+            if (!view.wreck && !view.aircraft?._isDestroyed) view.breakup.prepare(aircraft.getBreakupSource());
           };
         }
         view.trail = null;
@@ -819,7 +819,11 @@ export class MissileCombatView {
     let isGround = false;
     let isWater = false;
     let contactPos = null;
-    if (view.breakup && view.breakup.pieces.length > 0) {
+    if (view.breakup?.firstContact) {
+      isWater = view.breakup.firstContact.isWater;
+      isGround = view.breakup.firstContact.isGround;
+      contactPos = view.breakup.firstContact.point.clone();
+    } else if (view.breakup && view.breakup.pieces.length > 0) {
       if (view.breakup.mainPiece) {
         const p = view.breakup.mainPiece;
         const pGround = this.terrainHeight?.(p.object.position.x, p.object.position.z) ?? 0;
