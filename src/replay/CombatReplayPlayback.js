@@ -5,7 +5,7 @@ import { Flare, FLARE_MODEL } from '../weapons/Flare.js';
 import { ChaffCloud, CHAFF_MODEL } from '../weapons/Chaff.js';
 import { F16_MISSILE_STATIONS, MISSILE_TYPES } from '../weapons/missileSpecs.js';
 import { createDamageZones, combatDamageState } from '../physics/combatDamage.js';
-import { findSpan } from './TrackSampler.js';
+import { findSpan, catmullRom } from './TrackSampler.js';
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -36,30 +36,6 @@ function slerp(out, a, b, alpha) {
 function shortestAngle(a, b, alpha) {
   const delta = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
   return a + delta * alpha;
-}
-
-function catmullRom(p0, p1, p2, p3, t) {
-  const d = p2 - p1;
-  if (Math.abs(d) < 1e-4) return p1;
-  let m1 = 0.5 * (p2 - p0);
-  let m2 = 0.5 * (p3 - p1);
-  if (d * m1 <= 0) m1 = 0;
-  if (d * m2 <= 0) m2 = 0;
-  const s1 = m1 / d;
-  const s2 = m2 / d;
-  const sumSq = s1 * s1 + s2 * s2;
-  if (sumSq > 9) {
-    const tau = 3 / Math.sqrt(sumSq);
-    m1 = tau * s1 * d;
-    m2 = tau * s2 * d;
-  }
-  const t2 = t * t;
-  const t3 = t2 * t;
-  const h00 = 2 * t3 - 3 * t2 + 1;
-  const h10 = t3 - 2 * t2 + t;
-  const h01 = -2 * t3 + 3 * t2;
-  const h11 = t3 - t2;
-  return h00 * p1 + h10 * m1 + h01 * p2 + h11 * m2;
 }
 
 /**

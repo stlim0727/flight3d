@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { BanditAircraftView } from './BanditAircraftView.js';
 import { createMissileMesh } from './missileGeometry.js';
 import { ZONE_LOCAL_CENTERS } from '../physics/combatDamage.js';
+import { catmullRom } from '../replay/TrackSampler.js';
 
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
@@ -373,65 +374,69 @@ export class MissileSmokeTrail {
 
   prepopulateFromSamples(samples, currentTime) {
     if (!samples || samples.length < 1) return;
-    const maxAge = this.lifetime;
-    const relevant = [];
-    for (let i = 0; i < samples.length; i++) {
-      const s = samples[i];
-      if (s.timeSec <= currentTime + 1e-4) {
-        if (currentTime - s.timeSec <= maxAge) {
-          relevant.push(s);
-        }
-      } else {
-        relevant.push(s);
-        break;
-      }
-    }
-    if (relevant.length < 1) return;
-
     this.count = 0;
     this.lastPosition = null;
 
-    for (let i = 0; i < relevant.length; i++) {
-      const curr = relevant[i];
-      if (curr.timeSec > currentTime + 1e-4) break;
-      const next = (i + 1 < relevant.length) ? relevant[i + 1] : null;
-      const isPoweredCurr = curr.powered !== false;
-      const currLife = isPoweredCurr ? this.lifetime : this.lifetime * 0.85;
-      const baseAlpha = isPoweredCurr ? 0.92 : 0.62;
-
-      if (!next) {
-        const age = Math.max(0, currentTime - curr.timeSec);
-        if (age < currLife) {
-          const progress = Math.min(1.0, age / currLife);
-          const alpha = baseAlpha * Math.max(0, 1.0 - progress * progress);
-          scratchInterpPos.set(curr.x, curr.y, curr.z);
-          this.emit(scratchInterpPos, { alpha, lifetime: currLife });
+    if (samples.length === 1) {
+      const s = samples[0];
+      if (s.timeSec <= currentTime + 1e-4) {
+        const age = Math.max(0, currentTime - s.timeSec);
+        const isPowered = s.powered !== false;
+        const particleLife = isPowered ? this.lifetime : this.lifetime * 0.85;
+        if (age < particleLife) {
+          const progress = Math.min(1.0, age / particleLife);
+          const alpha = (isPowered ? 0.92 : 0.62) * Math.max(0, 1.0 - progress * progress);
+          scratchInterpPos.set(s.x, s.y, s.z);
+          this.emit(scratchInterpPos, { alpha, lifetime: particleLife });
           this.ages[this.count - 1] = age;
-          this.initialAlphas[this.count - 1] = baseAlpha;
+          this.initialAlphas[this.count - 1] = isPowered ? 0.92 : 0.62;
           this.lastPosition = scratchInterpPos.clone();
         }
-        break;
       }
+      this.geometry.setDrawRange(0, this.count);
+      this.geometry.attributes.position.needsUpdate = true;
+      this.geometry.attributes.color.needsUpdate = true;
+      return;
+    }
 
-      scratchFrom.set(curr.x, curr.y, curr.z);
-      scratchTo.set(next.x, next.y, next.z);
+    const minTime = currentTime - this.lifetime;
+
+    for (let i = 0; i < samples.length - 1; i++) {
+      const a = samples[i];
+      const b = samples[i + 1];
+
+      if (a.timeSec > currentTime + 1e-4) break;
+      if (b.timeSec < minTime - 1e-4) continue;
+
+      const p0 = i > 0 ? samples[i - 1] : { x: 2 * a.x - b.x, y: 2 * a.y - b.y, z: 2 * a.z - b.z };
+      const p1 = a;
+      const p2 = b;
+      const p3 = (i + 2 < samples.length) ? samples[i + 2] : { x: 2 * b.x - a.x, y: 2 * b.y - a.y, z: 2 * b.z - a.z };
+
+      scratchFrom.set(a.x, a.y, a.z);
+      scratchTo.set(b.x, b.y, b.z);
       const dist = scratchFrom.distanceTo(scratchTo);
       const steps = Math.min(500, Math.max(1, Math.floor(dist / this.spacing)));
-      const isPoweredNext = next.powered !== false;
-      const spansCurrentTime = next.timeSec > currentTime + 1e-4;
+      const isPoweredA = a.powered !== false;
+      const isPoweredB = b.powered !== false;
+      const spansCurrentTime = b.timeSec > currentTime + 1e-4;
 
       for (let s = 0; s < steps; s++) {
         const t = s / steps;
-        const sampleTime = curr.timeSec + t * (next.timeSec - curr.timeSec);
+        const sampleTime = a.timeSec + t * (b.timeSec - a.timeSec);
         if (sampleTime > currentTime + 1e-4) break;
 
-        scratchInterpPos.lerpVectors(scratchFrom, scratchTo, t);
         const age = Math.max(0, currentTime - sampleTime);
-        const isPowered = t < 0.5 ? isPoweredCurr : isPoweredNext;
+        const isPowered = t < 0.5 ? isPoweredA : isPoweredB;
         const particleLife = isPowered ? this.lifetime : this.lifetime * 0.85;
         const segAlpha = isPowered ? 0.92 : 0.62;
 
         if (age < particleLife) {
+          scratchInterpPos.set(
+            catmullRom(p0.x, p1.x, p2.x, p3.x, t),
+            catmullRom(p0.y, p1.y, p2.y, p3.y, t),
+            catmullRom(p0.z, p1.z, p2.z, p3.z, t),
+          );
           const progress = Math.min(1.0, age / particleLife);
           const alpha = segAlpha * Math.max(0, 1.0 - progress * progress);
           this.emit(scratchInterpPos, { alpha, lifetime: particleLife });
@@ -441,10 +446,14 @@ export class MissileSmokeTrail {
         }
       }
 
-      if (spansCurrentTime && next.timeSec > curr.timeSec) {
-        const tCurr = Math.max(0, Math.min(1, (currentTime - curr.timeSec) / (next.timeSec - curr.timeSec)));
-        scratchInterpPos.lerpVectors(scratchFrom, scratchTo, tCurr);
-        const isPowered = tCurr < 0.5 ? isPoweredCurr : isPoweredNext;
+      if (spansCurrentTime && b.timeSec > a.timeSec) {
+        const tCurr = Math.max(0, Math.min(1, (currentTime - a.timeSec) / (b.timeSec - a.timeSec)));
+        scratchInterpPos.set(
+          catmullRom(p0.x, p1.x, p2.x, p3.x, tCurr),
+          catmullRom(p0.y, p1.y, p2.y, p3.y, tCurr),
+          catmullRom(p0.z, p1.z, p2.z, p3.z, tCurr),
+        );
+        const isPowered = tCurr < 0.5 ? isPoweredA : isPoweredB;
         const particleLife = isPowered ? this.lifetime : this.lifetime * 0.85;
         const segAlpha = isPowered ? 0.92 : 0.62;
         this.emit(scratchInterpPos, { alpha: segAlpha, lifetime: particleLife });
@@ -460,7 +469,6 @@ export class MissileSmokeTrail {
     this.geometry.attributes.position.needsUpdate = true;
     this.geometry.attributes.color.needsUpdate = true;
   }
-
   dispose() {
     this.scene.remove(this.points);
     this.geometry.dispose();

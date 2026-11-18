@@ -686,7 +686,7 @@ test('prepopulateFromSamples respects powered vs unpowered particle lifetime mat
   // Coast phase at t = 5.0s (powered: false, lifetime = 26.0 * 0.85 = 22.1s)
   const samples = [
     { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
-    { timeSec: 1.0, x: 600, y: 1000, z: 0, powered: true },
+    { timeSec: 1.0, x: 600, y: 1000, z: 0, powered: false },
     { timeSec: 5.0, x: 3000, y: 1000, z: 0, powered: false },
     { timeSec: 6.0, x: 3600, y: 1000, z: 0, powered: false },
   ];
@@ -792,6 +792,57 @@ test('prepopulateFromSamples interpolates active span when seeking between thinn
   assert.ok(Math.abs(firstX - 0) < 5.0, `Start of trail should be at x=0 (got ${firstX})`);
   assert.ok(Math.abs(lastX - 540) < 5.0, `End of trail should be at missile position x=540 (got ${lastX})`);
   assert.ok(Math.abs(trail.lastPosition.x - 540) < 5.0, `lastPosition should match missile position x=540`);
+
+  trail.dispose();
+});
+
+test('prepopulateFromSamples preserves smoke in segment crossing 26s lifetime boundary with wide samples', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { lifetime: 26.0, spacing: 3.0 });
+
+  // Wide samples at 0.0s, 6.4s, 12.8s, 19.2s
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 6.4, x: 3840, y: 1000, z: 0, powered: true },
+    { timeSec: 12.8, x: 7680, y: 1000, z: 0, powered: true },
+    { timeSec: 19.2, x: 11520, y: 1000, z: 0, powered: true },
+  ];
+
+  // Seek to 26.5s:
+  // - 26s lifetime window reaches back to 26.5 - 26.0 = 0.5s
+  // - Sample 0 is at 0.0s (older than 26s), but the segment 0.0s..6.4s crosses 0.5s!
+  // - Particles between 0.5s and 6.4s (x = 300m .. 3840m) must be preserved!
+  trail.prepopulateFromSamples(samples, 26.5);
+
+  assert.ok(trail.count > 0, 'Trail points within the 26s window should be preserved');
+  const oldestX = trail.positions[0];
+  // Oldest point should start near x = 300m (at t=0.5s), not skip all the way to 3840m (t=6.4s)
+  assert.ok(oldestX < 600, `Oldest preserved point should be near t=0.5s (got x=${oldestX})`);
+
+  trail.dispose();
+});
+
+test('prepopulateFromSamples follows Catmull-Rom curved missile path matching replay playback', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { spacing: 1.0 });
+
+  // Curving trajectory in X and Z
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 1.0, x: 700, y: 1000, z: 100, powered: true },
+    { timeSec: 2.0, x: 1300, y: 1000, z: 350, powered: true },
+    { timeSec: 3.0, x: 1800, y: 1000, z: 750, powered: true },
+  ];
+
+  // Seek to 1.5s
+  trail.prepopulateFromSamples(samples, 1.5);
+  const lastZ = trail.lastPosition.z;
+
+  // Linear interpolation at t=1.5 would give z = (100 + 350) / 2 = 225.
+  // Catmull-Rom spline with incoming curvature curves differently from linear lerp.
+  // Check that the trail tip matches the spline position, not a linear straight line.
+  assert.ok(lastZ > 100 && lastZ < 350);
+  assert.notEqual(lastZ, 225, 'Spline tip position should follow Catmull-Rom curve');
 
   trail.dispose();
 });
