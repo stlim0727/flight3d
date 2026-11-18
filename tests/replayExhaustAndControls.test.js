@@ -35,7 +35,7 @@ test('JetExhaust powers up and remains visible in replay without explicit thrust
   assert.equal(exhaust.group.visible, false);
 });
 
-test('TrackSampler populates synthetic thrust so engine observers stay alive in playback', () => {
+test('TrackSampler sample drives JetExhaust in replay playback', () => {
   const track = {
     samples: [
       { timeSec: 0, x: 0, y: 100, z: 0, quat: [0, 0, 0, 1], throttle: 0.8, engine1: { n1: 85 } },
@@ -44,8 +44,13 @@ test('TrackSampler populates synthetic thrust so engine observers stay alive in 
   };
   const sampled = sampleTrack(track, 0.5);
   assert.ok(sampled);
-  assert.ok(sampled.engine1.thrust > 0, 'synthetic thrust should be positive');
+  assert.equal(sampled.engine1.n1, 90);
   assert.equal(sampled.engine1.failed, false);
+
+  const exhaust = new JetExhaust();
+  exhaust.update(0, sampled);
+  assert.equal(exhaust.power, 0.9);
+  assert.equal(exhaust.group.visible, true);
 });
 
 test('F16 creates exhaust even with exteriorOnly option', () => {
@@ -74,13 +79,26 @@ test('BanditAircraftView supplies throttle and engine parameters to airframe', (
       receivedState = state;
     }
   };
-  bandit.update(0.016, { aero: { elevator: 0.5, aileron: -0.2, rudder: 0.1 }, throttle: 0.9 });
+
+  // 1. Live target with BanditFlightModel shape (controls.throttle and engines)
+  bandit.update(0.016, {
+    aero: { elevator: 0.5, aileron: -0.2, rudder: 0.1 },
+    controls: { throttle: 0.75 },
+    engines: { n1: [80], thrust: [12000], failed: [false] }
+  });
   assert.ok(receivedState);
   assert.equal(receivedState.elevator, 0.5);
   assert.equal(receivedState.aileron, -0.2);
   assert.equal(receivedState.rudder, 0.1);
+  assert.equal(receivedState.throttle, 0.75);
+  assert.equal(receivedState.engine1.n1, 80);
+  assert.equal(receivedState.engine1.thrust, 12000);
+  assert.equal(receivedState.engine1.failed, false);
+
+  // 2. Pose-only target fallback
+  bandit.update(0.016, { throttle: 0.9, elevator: 0.3 });
   assert.equal(receivedState.throttle, 0.9);
-  assert.ok(receivedState.engine1.thrust > 0);
+  assert.equal(receivedState.elevator, 0.3);
   assert.equal(receivedState.engine1.n1, 90);
 });
 
