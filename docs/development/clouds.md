@@ -1,6 +1,6 @@
 # Cumulus cloud rendering (#12)
 
-`CloudLayer` draws a bounded population of instanced 3D density volumes. Cloud
+`CloudLayer` draws a bounded population of 3D density volumes. Cloud
 shape is fixed in world space: flying above, banking, or entering a cloud does
 not turn its silhouette toward the camera. Unequal lobes, density erosion,
 random yaw, and varying width/depth/height replace repeated flat oval outlines.
@@ -25,19 +25,18 @@ immediate departure corridor by center position. The deterministic population
 contains 63 clouds. Center altitude remains 2,800–3,600m with the existing 3,400m
 Lukla offset. Density volumes extend above and below their center according to
 cloud thickness. Airport/preset changes reuse the existing texture and geometry.
-`dispose()` releases texture, geometry, material, and instance buffers.
+`dispose()` releases the shared texture, geometry, and variant materials.
 
-There is one cloud draw call, with 756 bounding-box triangles. The shader intersects
+Each visible cloud uses one draw call and 12 bounding-box triangles. Clouds share
+geometry and are frustum culled individually. The shader intersects
 each viewing ray with a box and integrates at most 24 density samples, stopping
 when transmittance falls below 1.5%. Two additional density samples estimate
 sunlight attenuation at occupied samples. Density shape and noise are baked
 on the CPU, avoiding their repeated evaluation in every fragment. Empty samples
 skip lighting work. Shared texture/material resources keep memory bounded.
 
-`SkyAtmosphere.prepareRender(camera)` sorts bounds and variant indices together
-before `renderer.render` uploads instance buffers. An object `onBeforeRender`
-callback would update those buffers one frame too late. Bounding spheres are
-computed from the initial instance geometry rather than guessed from world size.
+Three.js sorts each cloud by its center depth alongside transparent effects.
+Each cloud keeps its assigned density variant across camera cuts.
 Rendering uses box back faces, so rays also work from inside a volume. Ray/slab
 intersection guards parallel directions against division by zero.
 

@@ -35,36 +35,29 @@ test('shared 3D density is reproducible, varied and bounded in memory', () => {
   a.dispose(); b.dispose();
 });
 
-test('clouds stay bounded, preserve departure corridor, and sort with density identity per camera', () => {
+test('each cloud can sort independently alongside transparent effects', () => {
   const layer = new CloudLayer();
   assert.ok(layer.count > 40 && layer.count <= 64);
-  const camera = new THREE.PerspectiveCamera();
+  assert.equal(layer.children.length, layer.count);
+  const effect = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true }));
   for (const cloud of layer.clouds) {
+    assert.ok(cloud.isMesh);
     assert.ok(Math.abs(cloud.position.x) >= 4000 || Math.abs(cloud.position.z) >= 2500);
     assert.ok(cloud.position.y >= 2800 && cloud.position.y <= 3600);
+    assert.equal(cloud.renderOrder, effect.renderOrder);
+    assert.equal(layer.renderOrder, effect.renderOrder);
+    assert.equal(cloud.material.transparent, true);
+    assert.equal(cloud.material.depthWrite, false);
+    assert.equal(cloud.geometry, layer.geometry);
+    assert.equal(cloud.material.uniforms.densityTexture.value, layer.densityTexture);
   }
-  for (const [x, y, z] of [[0, 0, 0], [12000, 5000, -4000], [-8000, 7000, 3000]]) {
-    layer.position.y = y === 7000 ? 3400 : 0;
-    layer.updateMatrixWorld(true);
-    camera.position.set(x, y, z);
-    camera.lookAt(0, 3200, 0);
-    camera.updateMatrixWorld(true);
-    layer.sortForCamera(camera);
-    for (let i = 0; i < layer.count; i++) {
-      if (i) assert.ok(layer.clouds[i - 1].depth <= layer.clouds[i].depth);
-      assert.equal(layer.variants.getX(i), layer.clouds[i].variant);
-      const matrix = new THREE.Matrix4();
-      layer.getMatrixAt(i, matrix);
-      assert.ok(new THREE.Vector3().setFromMatrixPosition(matrix).distanceTo(layer.clouds[i].position) < 0.002);
-    }
-  }
-  // Repeated camera changes do not create new textures or volume geometry.
-  assert.equal(layer.geometry.type, 'BoxGeometry');
-  const textures = [layer.densityTexture];
+  assert.deepEqual(new Set(layer.clouds.map(cloud => cloud.material.uniforms.cloudVariant.value)),
+    new Set([0, 1, 2, 3]));
   let disposed = 0;
-  textures[0].addEventListener('dispose', () => disposed++);
+  layer.densityTexture.addEventListener('dispose', () => disposed++);
   layer.dispose();
   assert.equal(disposed, 1);
+  effect.material.dispose();
 });
 
 test('cloud lighting follows day, sunset, night and repeated airport changes', () => {

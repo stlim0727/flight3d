@@ -124,6 +124,8 @@ function disposeGeometry(object) {
   });
 }
 
+const scratchTrailCenter = new THREE.Vector3();
+
 /** Bounded smoke trail behind damaged aircraft, flares, and falling wrecks. */
 export class SmokeTrail {
   constructor(scene, { max = 96, size = 4.2, color = 0xf2f2f2, opacity = 0.5, spacing = 2.0 } = {}) {
@@ -136,6 +138,7 @@ export class SmokeTrail {
     attribute.setUsage(THREE.DynamicDrawUsage);
     this.geometry.setAttribute('position', attribute);
     this.geometry.setDrawRange(0, 0);
+    this.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 0);
     this.material = new THREE.PointsMaterial({
       color,
       map: smokeMap(),
@@ -167,6 +170,15 @@ export class SmokeTrail {
     this.positions[offset + 1] = position.y;
     this.positions[offset + 2] = position.z;
     this.count++;
+    // Three.js sorts the whole trail using this center. Only emitted vertices
+    // count, since the unused portion of the particle buffer is at the origin.
+    const middle = (this.count - 1) / 2;
+    this.geometry.boundingSphere.center.fromArray(this.positions, Math.floor(middle) * 3);
+    if (this.count % 2 === 0) {
+      this.geometry.boundingSphere.center.lerp(
+        scratchTrailCenter.fromArray(this.positions, Math.ceil(middle) * 3), 0.5
+      );
+    }
     this.geometry.setDrawRange(0, this.count);
     this.geometry.attributes.position.needsUpdate = true;
   }
