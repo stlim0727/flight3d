@@ -236,11 +236,11 @@ export function buildAcesIISeat(mats) {
     backPivot.add(horn);
   }
 
-  // 4. Center Ejection Pull Loop (between pilot knees)
-  const handleRingGeo = new THREE.TorusGeometry(0.055, 0.015, 10, 20);
+  // 4. Center Ejection Pull Loop (positioned outside pelvis, between pilot thighs)
+  const handleRingGeo = new THREE.TorusGeometry(0.048, 0.012, 10, 20);
   const handleMesh = new THREE.Mesh(handleRingGeo, mats.ejectionHandle);
   handleMesh.name = 'Pilot_Seat_EjectionHandle';
-  handleMesh.position.set(0, 0.06, -0.08);
+  handleMesh.position.set(0, 0.06, -0.31);
   handleMesh.rotation.x = Math.PI / 4;
   seatGroup.add(handleMesh);
 
@@ -643,9 +643,8 @@ export function buildPilotHead(mats) {
   rim.position.set(0, helmetCenter.y - 0.07, helmetCenter.z + 0.01);
   headGroup.add(rim);
 
-  // Helmet brow guard / visor housing cover
-  const browGeo = new THREE.CylinderGeometry(0.127, 0.129, 0.035, 18, 1, false, Math.PI * 0.28, Math.PI * 0.44);
-  browGeo.rotateY(Math.PI);
+  // Helmet brow guard / visor housing cover (facing forward in negative Z)
+  const browGeo = new THREE.CylinderGeometry(0.127, 0.129, 0.035, 18, 1, false, Math.PI * 0.78, Math.PI * 0.44);
   const brow = new THREE.Mesh(browGeo, mats.helmet);
   brow.name = 'Pilot_Head_Brow';
   brow.position.set(0, helmetCenter.y + 0.08, helmetCenter.z);
