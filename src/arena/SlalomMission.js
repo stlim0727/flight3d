@@ -72,7 +72,6 @@ export class SlalomMission {
     }
     if (this.tick >= this.manifest.timeoutTicks) return this.finish('failed', 'timeout');
     const course = this.course;
-    if (snapshot.aglM < course.clearanceFloorM) return this.finish('failed', 'clearance-floor');
     if (!this.previous && Math.hypot(position.x - this.manifest.spawn.x, position.z - this.manifest.spawn.z)
         > this.binSizeM * 2) return this.finish('failed', 'invalid-spawn');
     const maxStepM = Math.max(12, snapshot.groundSpeedKnots * 0.514444 / this.manifest.physicsHz * 3);

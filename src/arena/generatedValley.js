@@ -17,7 +17,7 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
  * regression baseline; slalom scores live in their own version and are never
  * compared against low-v1 numbers. */
 export const VALLEY_SLALOM_RULES = Object.freeze({
-  version: 'valley-slalom-v2',
+  version: 'valley-slalom-v3',
   gates: 7,
   /** Leg length floor comes from the measured bank reversal: at the fast end of
    * the band a full reversal costs about 600 m of straight line. */
@@ -47,7 +47,6 @@ export const VALLEY_SLALOM_RULES = Object.freeze({
   /** The measured turn rate and sink ceiling are both best at the slow end of the
    * band, and a leg assessed at any other speed would be sized on borrowed time. */
   cruiseKnots: 435,
-  clearanceFloorM: 20,
   glocIncidentPenalty: 1500,
   glocPerSecondPenalty: 300,
   gFatiguePerSecondPenalty: 50,
@@ -410,7 +409,7 @@ export function generateValley({ seed, rules = VALLEY_SLALOM_RULES } = {}) {
     halfWidthM: sample.halfWidth, headingDeg: sample.heading / RAD }));
   const course = { version: rules.version, seed, gates, legs, centerline,
     lengthM: samples.at(-1).s, elevationReferenceM: 2100,
-    clearanceFloorM: rules.clearanceFloorM, speedKnots: rules.speedKnots };
+    speedKnots: rules.speedKnots };
   const assessment = assessCourse({ course, terrain, rules });
   return { course, terrain, assessment };
 }

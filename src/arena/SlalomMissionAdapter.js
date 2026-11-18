@@ -127,7 +127,7 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
       navigationProfile: 'gate-finish-bearing-range-v2', sensorNoiseEnabled: noise,
       sensorProfile: { id: 'valley-navigation-v2', correlatedNoise: noise, physicsHz: 120,
         decisionPeriodTicks: 24, reactionDelayTicks: 24 },
-      successConditions: { orderedGates: true, clearanceFloorM: manifest.course.clearanceFloorM,
+      successConditions: { orderedGates: true,
         passageCeilingM: manifest.course.gates.map(gate => gate.maxAglM),
         corridorHalfWidthM: manifest.course.gates.map(gate => gate.halfWidthM),
         minimumIasKnots: manifest.minimumIasKnots, maximumIasKnots: manifest.maximumIasKnots,

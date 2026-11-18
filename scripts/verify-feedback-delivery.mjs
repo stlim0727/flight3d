@@ -42,9 +42,37 @@ await withBrowserSession({ path: '/?telemetry=0', width: 390, height: 844, mobil
         } catch (error) { window.feedbackLiveResponse = { error: String(error) }; throw error; }
       };
       sim.openFeedbackDialog();
-      document.querySelector('[data-feedback-text]').value = 'Mobile blocked request test';
-      document.querySelector('[data-feedback-form]').requestSubmit();
     });
+    const cardScroll = () => evaluate("document.querySelector('.feedback-card').scrollTop");
+    const touch = (type, y, x = 20) => send('Input.dispatchTouchEvent', {
+      type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+    });
+    assert.equal(await cardScroll(), 0, 'report opens at its heading');
+    await touch('touchStart', 650);
+    for (const y of [600, 550, 500, 450, 400]) await touch('touchMove', y);
+    await touch('touchEnd');
+    for (let i = 0; i < 20 && await cardScroll() === 0; i++) await delay(50);
+    assert.ok(await cardScroll() > 0, 'touch drag scrolls the card without engaging the camera');
+    const input = await evaluate(() => {
+      const field = document.querySelector('[data-feedback-text]');
+      field.scrollIntoView({ block: 'center' });
+      const rect = field.getBoundingClientRect();
+      return { x: Math.round(rect.left + 20), y: Math.round(rect.top + 20) };
+    });
+    await touch('touchStart', input.y, input.x);
+    await touch('touchEnd');
+    assert.ok(await evaluate("document.activeElement.matches('[data-feedback-text]')"),
+      'tapping the textarea focuses it');
+    await send('Input.insertText', { text: 'Mobile blocked request test' });
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 450, deviceScaleFactor: 1, mobile: true });
+    assert.ok(await evaluate(() => {
+      const card = document.querySelector('.feedback-card');
+      card.scrollTop = card.scrollHeight;
+      const actions = document.querySelector('.feedback-actions').getBoundingClientRect();
+      return actions.bottom <= window.visualViewport.height && actions.top >= 0;
+    }), 'report actions can be scrolled into a reduced viewport');
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await evaluate(() => document.querySelector('[data-feedback-form]').requestSubmit());
     for (let i = 0; i < 40; i++) {
       if (await evaluate('document.querySelector("[data-feedback-status]").dataset.failed === "true"')) break;
       await delay(50);

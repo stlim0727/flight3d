@@ -46,7 +46,7 @@ export function createSlalomManifest({ seed, rules = VALLEY_SLALOM_RULES,
     course: {
       version: rules.version, route, lengthM: course.lengthM,
       corridorHalfWidthM: rules.corridorHalfWidthM[1],
-      clearanceFloorM: rules.clearanceFloorM, sampleStepM: rules.sampleStepM,
+      sampleStepM: rules.sampleStepM,
       // Chart waypoints: the middle of each passage space, which is also where
       // the shared navigation solution points a pilot. `start` is the departure.
       points: course.gates.map((gate, index) => ({
@@ -77,7 +77,6 @@ function validateSlalomManifest(manifest) {
     && Number.isFinite(course?.lengthM)
     && Array.isArray(course?.gates) && course.gates.length >= 2
     && Array.isArray(course?.route) && course.route.length >= course.gates.length
-    && Number.isFinite(course?.clearanceFloorM) && course.clearanceFloorM > 0
     && Number.isFinite(course?.corridorHalfWidthM) && course.corridorHalfWidthM > 0
     && course.gates.every((gate, index) => gate.index === index
       && !Object.hasOwn(gate, 'floorM')

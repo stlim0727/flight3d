@@ -38,13 +38,14 @@ test('waits for a readable ingestion acknowledgement and sends one stable-id eve
 });
 
 test('blocked requests, HTTP errors, opaque responses and invalid/negative acknowledgements fail', async () => {
-  for (const response of [new Error('net::ERR_BLOCKED_BY_CLIENT'),
-    { ok: false, status: 429 }, { ok: true, type: 'opaque' },
-    ...['', '<html>ok</html>', '0', '{}', '{"status":0}', 'true'].map(text => ({ ok: true, text: async () => text }))]) {
+  for (const [response, reason] of [[new Error('net::ERR_BLOCKED_BY_CLIENT'), /연결할 수 없습니다/],
+    [{ ok: false, status: 429 }, /HTTP 429/], [{ ok: true, type: 'opaque' }, /연결할 수 없습니다/],
+    ...['', '<html>ok</html>', '0', '{}', '{"status":0}', 'true'].map(text =>
+      [{ ok: true, text: async () => text }, /확인 가능한 수신 응답/])]) {
     await assert.rejects(deliverFeedbackReport(report(), options(async () => {
       if (response instanceof Error) throw response;
       return response;
-    })), /수신을 확인하지 못했습니다/);
+    })), reason);
   }
 });
 
@@ -53,7 +54,7 @@ test('times out even if fetch never settles, aborts it, and reuses id on explici
   await assert.rejects(deliverFeedbackReport(draft, { ...options(async (_, request) => {
     signal = request.signal;
     return new Promise(() => {});
-  }), timeoutMs: 5 }), /수신을 확인하지 못했습니다/);
+  }), timeoutMs: 5 }), /응답 시간이 초과/);
   assert.equal(signal.aborted, true);
   const ids = [];
   for (let i = 0; i < 2; i++) await deliverFeedbackReport(draft, options(async (_, request) => {
