@@ -4,6 +4,8 @@ import { Quaternion, Vector3 } from 'three';
 import {
   AirToAirMissileSystem,
   BanditTarget,
+  BANDIT_RESPAWN_SECONDS,
+  DEFAULT_BANDIT_COUNT,
 } from '../src/weapons/AirToAirMissileSystem.js';
 import { F16_MISSILE_STATIONS, MISSILE_TYPES } from '../src/weapons/missileSpecs.js';
 
@@ -207,4 +209,16 @@ test('locked launch event queued by fire() is emitted on the next update() and d
 
   const secondUpdateEvents = system.update(1 / 120, world);
   assert.equal(secondUpdateEvents.filter(event => event.type === 'launch').length, 0);
+});
+
+test('default bandit count is 1 and respawn cooldown is 20 seconds', () => {
+  assert.equal(DEFAULT_BANDIT_COUNT, 1);
+  assert.equal(BANDIT_RESPAWN_SECONDS, 20);
+
+  const system = new AirToAirMissileSystem();
+  assert.equal(system.banditCount, 1);
+  const world = airborneWorld();
+  system.update(1 / 120, world);
+  assert.equal(system.targets.length, 1);
+  assert.equal(system.targets[0].callsign, 'BANDIT 1');
 });

@@ -171,7 +171,7 @@ test('A1 audit: unfavorable off-axis/long-range geometries fail while B-conditio
 });
 
 test('A1 regression: burst-instant closest approach is recorded for secondary targets killed in the same blast', () => {
-  const combat = new AirToAirMissileSystem({ evasionSkill: 'hold', countermeasurePolicy: 'none' });
+  const combat = new AirToAirMissileSystem({ banditCount: 2, evasionSkill: 'hold', countermeasurePolicy: 'none' });
   const world = {
     active: true,
     onGround: false,

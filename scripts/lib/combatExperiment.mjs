@@ -24,13 +24,17 @@ export function combatExperimentConfig(values = {}) {
     const seconds = Number(values.seconds ?? 300), timeoutSeconds = Number(values.timeout ?? 60);
     if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 300) throw new Error('seconds must be within (0, 300]');
     if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) throw new Error('Timeout must be positive seconds');
+    const banditCount = values['bandit-count'] !== undefined ? Number(values['bandit-count']) : undefined;
+    if (banditCount !== undefined && (!Number.isInteger(banditCount) || banditCount <= 0 || banditCount > 16)) {
+      throw new Error('bandit-count must be an integer between 1 and 16');
+    }
     return { scenario, seconds, timeoutSeconds, geometries: [], variants: [], recordTrajectory: Boolean(values.diagnostics),
-      recordDiagnostics: Boolean(values.diagnostics),
+      recordDiagnostics: Boolean(values.diagnostics), banditCount,
       skills: { attack: combatSkill('attack', values['attack-skill'] ?? 'pursuit'),
         evasion: combatSkill('evasion', values['evasion-skill'] ?? 'legacy-break'),
         countermeasure: combatSkill('countermeasure', values['countermeasure-policy'] ?? 'single') } };
   }
-  for (const key of ['seconds', 'attack-skill', 'evasion-skill', 'countermeasure-policy']) {
+  for (const key of ['seconds', 'attack-skill', 'evasion-skill', 'countermeasure-policy', 'bandit-count']) {
     if (values[key] !== undefined) throw new Error(`${key} requires --scenario coastal`);
   }
   if (!['locked-ir', 'defense', 'single'].includes(scenario)) throw new Error('Unknown scenario');

@@ -68,7 +68,7 @@ await withBrowserSession({
     };
   })()`);
   assert.ok(recorded?.combat, 'combat section recorded');
-  assert.ok(recorded.combat.targets >= 2);
+  assert.ok(recorded.combat.targets >= 1);
   assert.ok(recorded.combat.bandits >= 4);
   assert.ok(recorded.combat.missiles >= 20);
   assert.ok(recorded.combat.events >= 1);

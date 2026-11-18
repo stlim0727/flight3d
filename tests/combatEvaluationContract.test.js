@@ -63,8 +63,8 @@ test('coastal diagnostics produces an importable flight3d.sortie.v1 replay and c
     result.shots.length,
   );
   assert.equal(metrics.survived, !result.crashed);
-  assert.equal(metrics.uniqueOpponentsTotal, 2);
-  assert.ok(targetLifecycles.length >= 2);
+  assert.equal(metrics.uniqueOpponentsTotal, 1);
+  assert.ok(targetLifecycles.length >= 1);
   assert.ok(Number.isFinite(metrics.energyAndAltitude.specificEnergyDeltaM));
   assert.ok(Number.isFinite(metrics.controlLoss.controlLossTotalSeconds));
 });

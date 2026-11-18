@@ -53,10 +53,10 @@ await withBrowserSession({
   })()`);
 
   for (let i = 0; i < 120; i++) {
-    if (await evaluate('window.simulator.missileCombat.targets.length === 2')) break;
+    if (await evaluate('window.simulator.missileCombat.targets.length === 1')) break;
     await delay(100);
   }
-  close(await evaluate('window.simulator.missileCombat.targets.length === 2'), 'two bandits spawned');
+  close(await evaluate('window.simulator.missileCombat.targets.length === 1'), 'one bandit spawned');
   close(await evaluate('window.simulator.aircraft.missileMeshes.every(mesh => mesh.visible)'), 'six rail missiles visible');
   await delay(300);
   await screenshot(path.join(dir, 'f16-rail-loadout.png'));
@@ -135,11 +135,16 @@ await withBrowserSession({
   await delay(120);
   await screenshot(path.join(dir, 'bandit-splash.png'));
 
-  // Gun pass: put the surviving bandit inside the LCOS envelope, then hold the
+  // Gun pass: ensure a live bandit is placed inside the LCOS envelope, then hold the
   // airborne trigger (Space) through the real keyboard path.
   await evaluate(`(() => {
     const s = window.simulator;
-    const target = s.missileCombat.targets.find(t => t.alive);
+    let target = s.missileCombat.targets.find(t => t.alive);
+    if (!target && s.missileCombat.targets[0]) {
+      target = s.missileCombat.targets[0];
+      target.alive = true;
+      target.respawnTimer = 0;
+    }
     if (!target) return;
     target.orbit = null;
     target.velocity.set(0, 0, 0);

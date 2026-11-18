@@ -74,7 +74,7 @@ test('terrain collision kills the target and respawn restores a fresh F16', () =
   const target = patrol();
   target.update(1 / 120, () => 4000);
   assert.equal(target.alive, false);
-  assert.equal(target.respawnTimer, 8);
+  assert.equal(target.respawnTimer, 20);
   const position = target.position.clone();
   target.update(1);
   assert.deepEqual(target.position, position);
