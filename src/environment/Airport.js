@@ -83,6 +83,7 @@ export class Airport {
       geometries.forEach(geometry => geometry.dispose());
       materials.forEach(material => material.dispose());
       this.beaconLights = this.beaconLights.filter(light => !oldBeacons.has(light));
+      buildings.beacon.visible = this.localLightsVisible !== false;
       this.beaconLights.push(buildings.beacon);
       this.towerGroup = buildings.tower;
       this.radarDish = buildings.radar;
@@ -573,6 +574,20 @@ export class Airport {
     if (this.terminalGroup) targets.push({ object: this.terminalGroup, kind: 'terminal' });
     if (this.buildings?.group) targets.push({ object: this.buildings.group, kind: 'building' });
     return targets;
+  }
+
+  updateRenderLights(cameraHeight, limitAirborneLights) {
+    // Keep runway emitters and approach indications visible. Above the airfield,
+    // local lights cannot reach the aircraft, but still enter every lit shader.
+    const altitude = cameraHeight - this.elevation;
+    const cutoff = this.localLightsVisible === false ? 400 : 500;
+    const visible = !limitAirborneLights || altitude < cutoff;
+    if (visible === this.localLightsVisible) return;
+    this.localLightsVisible = visible;
+    this.approachLight.visible = visible;
+    for (const { pointLight } of this.papiLights) pointLight.visible = visible;
+    for (const light of this.beaconLights) light.visible = visible;
+    for (const { light } of this.nightLighting.lamps) light.visible = visible;
   }
 
   update(dt, aircraftPos = null) {

@@ -21,12 +21,14 @@ export function initialRenderQuality(saved, { coarsePointer = false, deviceMemor
 }
 
 /** Bound physical framebuffer area as well as DPR; CSS/HUD size stays unchanged. */
-export function renderPixelRatio(quality, width, height, devicePixelRatio = 1) {
-  const preset = RENDER_QUALITY[resolveRenderQuality(quality)];
+export function renderPixelRatio(quality, width, height, devicePixelRatio = 1, aircraftId) {
+  const resolved = resolveRenderQuality(quality);
+  const preset = RENDER_QUALITY[resolved];
   const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
   const area = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0
     ? width * height : 1;
-  return Math.min(dpr, preset.maxDpr, Math.sqrt(preset.maxPixels / area));
+  const ratio = Math.min(dpr, preset.maxDpr, Math.sqrt(preset.maxPixels / area));
+  return resolved === 'balanced' && aircraftId === 'F16' ? ratio * 0.85 : ratio;
 }
 
 /**

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as THREE from 'three';
+import { Airport } from '../src/environment/Airport.js';
 import { AirportNightLighting, nightLightLevel } from '../src/environment/AirportNightLighting.js';
 import { installInstrumentLighting } from '../src/aircraft/InstrumentLighting.js';
 import { createRoomLightTexture } from '../src/environment/WindowRoomLighting.js';
@@ -74,6 +75,23 @@ test('night windows are isolated from shared assets, including late model loads;
   assert.ok(a.material.emissive.equals(material.emissive));
   lights.update(-.3);
   assert.equal(a.material.emissiveIntensity, .75);
+});
+
+test('Coastal airborne light budget preserves emitters and restores nearby lighting', () => {
+  const light = () => ({ visible: true });
+  const airport = {
+    elevation: 12, approachLight: light(), papiLights: [{ pointLight: light() }],
+    beaconLights: [light()], nightLighting: { lamps: [{ light: light() }], points: light() },
+  };
+  const update = (height, limit = true) => Airport.prototype.updateRenderLights.call(airport, height + 12, limit);
+  const sources = [airport.approachLight, airport.papiLights[0].pointLight,
+    airport.beaconLights[0], airport.nightLighting.lamps[0].light];
+  for (const [height, limit, visible] of [[450, true, true], [510, true, false],
+    [450, true, false], [390, true, true], [600, true, false], [600, false, true]]) {
+    update(height, limit);
+    assert.ok(sources.every(source => source.visible === visible));
+    assert.equal(airport.nightLighting.points.visible, true);
+  }
 });
 
 test('Incheon emission masks light windows without illuminating masonry or roofs', () => {

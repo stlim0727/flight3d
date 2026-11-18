@@ -260,12 +260,23 @@ test('loaded F16 configures canopy mesh and responds to cockpit mode transitions
   assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
   assert.equal(aircraft.canopyMaterial.opacity, 0.06);
 
+  aircraft.setCockpitMode(true, true, 'balanced');
+  const balancedGlass = aircraft.canopyMesh.material;
+  assert.ok(balancedGlass.isMeshBasicMaterial);
+  assert.equal(balancedGlass.opacity, 0.06);
+  assert.equal(balancedGlass.depthWrite, false);
+  aircraft.setCockpitMode(true, true, 'high');
+  assert.equal(aircraft.canopyMesh.material, aircraft.canopyMaterial);
+  aircraft.setCockpitMode(true, true, 'balanced');
+  assert.equal(aircraft.canopyMesh.material, balancedGlass);
+
   // Switch back to exterior mode restores normal visibility
   aircraft.cockpit.group.visible = false;
   aircraft.setCockpitMode(false);
   assert.equal(aircraft.cockpit.group.visible, true);
   assert.equal(aircraft.canopyMaterial.side, THREE.DoubleSide);
   assert.equal(aircraft.canopyMaterial.opacity, 0.22);
+  assert.equal(aircraft.canopyMesh.material, aircraft.canopyMaterial);
 });
 
 function surfaceArea(geometry) {

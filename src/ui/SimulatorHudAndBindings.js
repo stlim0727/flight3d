@@ -341,6 +341,8 @@ class SimulatorHudAndBindingsMethods {
       prepareCockpitShadowDepth(this.aircraft.group);
     }
     this.farShadowGround ??= (x, z) => this.currentTerrain?.getHeight(x, z);
+    this.currentAirport?.updateRenderLights?.(this.camera.position.y,
+      this.renderQuality === 'balanced' && this.currentAircraftId === 'F16');
     this.sky.prepareRender(this.camera, this.aircraft.group.position, this.farShadowGround);
     this.renderer.render(this.scene, this.camera);
     const preset = RENDER_QUALITY[this.renderQuality];
@@ -420,7 +422,8 @@ class SimulatorHudAndBindingsMethods {
         applyFlatShading(this.aircraft.group, preset.flatShading);
       }
     }
-    this.renderer.setPixelRatio(renderPixelRatio(this.renderQuality, window.innerWidth, window.innerHeight, window.devicePixelRatio));
+    this.renderer.setPixelRatio(renderPixelRatio(this.renderQuality, window.innerWidth, window.innerHeight,
+      window.devicePixelRatio, this.currentAircraftId));
     const select = document.getElementById('render-quality');
     if (select) select.value = this.renderQuality;
     try { localStorage.setItem(RENDER_QUALITY_KEY, this.renderQuality); } catch { /* Session-only setting. */ }
@@ -944,7 +947,8 @@ class SimulatorHudAndBindingsMethods {
     // The projection must be rebuilt for the new aspect even when the zoomed
     // vertical FOV happens to be unchanged.
     this.camera.updateProjectionMatrix();
-    const ratio = renderPixelRatio(this.renderQuality, window.innerWidth, window.innerHeight, window.devicePixelRatio);
+    const ratio = renderPixelRatio(this.renderQuality, window.innerWidth, window.innerHeight,
+      window.devicePixelRatio, this.currentAircraftId);
     // Keep the comparison's restoration baseline valid after a viewport change.
     if (this.renderDiagnostics?.active) this.renderDiagnostics.saved.ratio = ratio;
     if (!this.renderDiagnostics?.active || this.renderDiagnostics.options.resolution === 'default') {

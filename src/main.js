@@ -200,7 +200,8 @@ class FlightSimulator {
       logarithmicDepthBuffer: true,
       powerPreference: 'high-performance'
     });
-    this.renderer.setPixelRatio(renderPixelRatio(this.renderQuality, window.innerWidth, window.innerHeight, window.devicePixelRatio));
+    this.renderer.setPixelRatio(renderPixelRatio(this.renderQuality, window.innerWidth, window.innerHeight,
+      window.devicePixelRatio, savedSelection.aircraft));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -1199,6 +1200,9 @@ class FlightSimulator {
       this.scene.remove(this.aircraft.group);
     }
     this.aircraft = instance;
+    const ratio = renderPixelRatio(this.renderQuality, window.innerWidth, window.innerHeight,
+      window.devicePixelRatio, aircraftId);
+    if (this.renderer.getPixelRatio() !== ratio) this.renderer.setPixelRatio(ratio);
     if (this.missileCombat) instance.setMissileLoadout?.(this.missileCombat.loaded);
     const currentPreset = RENDER_QUALITY[this.renderQuality];
     if (currentPreset?.flatShading !== undefined) {
@@ -1482,7 +1486,7 @@ class FlightSimulator {
 
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && this.cameraSystem.supportsPhotoCockpit && !isLookingAway;
-    this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
+    this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit, this.renderQuality);
     if (!isCockpit && this.renderQuality === 'ultraLow') {
       if (this.aircraft.cockpit?.group) {
         this.aircraft.cockpit.group.visible = false;

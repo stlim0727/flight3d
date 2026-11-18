@@ -452,7 +452,7 @@ class PhysicsIntegratorMethods {
     const isCockpit = this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     const isLookingAway = isCockpit && this.cameraSystem.isLookingAwayFromCenter();
     const isPhotoCockpit = isCockpit && this.cameraSystem.photoCockpit && this.cameraSystem.supportsPhotoCockpit && !isLookingAway;
-    this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit);
+    this.aircraft.setCockpitMode(isCockpit, !isPhotoCockpit, this.renderQuality);
     if (this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.enabled = isPhotoCockpit && this.cameraSystem.supportsPhotoCockpit;
       if (this.cockpitPhotoOverlay.enabled) {

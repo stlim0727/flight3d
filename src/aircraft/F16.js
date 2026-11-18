@@ -339,13 +339,29 @@ export class F16 {
     updatePilotDynamics(this.pilotMesh, state, dt);
   }
 
-  setCockpitMode(isCockpit, showInterior = true) {
+  setCockpitMode(isCockpit, showInterior = true, renderQuality) {
     this.isCockpit = isCockpit;
     if (this.canopyMaterial) {
       this.canopyMaterial.side = THREE.DoubleSide;
       this.canopyMaterial.opacity = isCockpit ? 0.06 : 0.22;
       this.canopyMaterial.envMapIntensity = isCockpit ? 0.45 : 1.2;
       this.canopyMaterial.userData.cockpitUniform.value = isCockpit ? 1 : 0;
+      const useBalancedCanopy = isCockpit && renderQuality === 'balanced';
+      if (useBalancedCanopy && !this.balancedCanopyMaterial) {
+        this.balancedCanopyMaterial = new THREE.MeshBasicMaterial({
+          name: 'F16-balanced-canopy-glass',
+          color: this.canopyMaterial.color,
+          transparent: true,
+          opacity: 0.06,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          forceSinglePass: true,
+        });
+      }
+      if (useBalancedCanopy !== Boolean(this.usingBalancedCanopy)) {
+        this.canopyMesh.material = useBalancedCanopy ? this.balancedCanopyMaterial : this.canopyMaterial;
+        this.usingBalancedCanopy = useBalancedCanopy;
+      }
     }
     if (this.cockpit && this.cockpit.group) {
       this.cockpit.group.visible = isCockpit ? showInterior : true;
