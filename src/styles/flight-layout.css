@@ -804,13 +804,19 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   top: calc(var(--demo-row-top) + var(--flight-alert-space, 0px));
 }
 @media (min-width: 550px) and (max-width: 950px) and (max-height: 440px) {
-  .mobile-flight-layout .hud-top-bar { right: calc(var(--edge-right) + 230px); }
+  .mobile-flight-layout {
+    --mobile-landscape-controls: clamp(222px, calc(100vw - var(--edge-left) - var(--edge-right) - 308px), 574px);
+  }
+  .mobile-flight-layout .hud-top-bar {
+    right: calc(var(--edge-right) + var(--mobile-landscape-controls) + 8px);
+  }
   .compact-ui .flight-toolbar.mobile-flight-toolbar,
   .compact-ui.touch-mode .flight-toolbar.mobile-flight-toolbar {
     left: auto;
     top: var(--edge-top);
-    width: 222px;
+    width: var(--mobile-landscape-controls);
   }
+  .compact-ui .flight-toolbar.mobile-flight-toolbar[data-mobile-group="closed"] { width: 222px; }
 }
 
 body.demo-active .mobile-flight-toolbar #btn-skip-demo {

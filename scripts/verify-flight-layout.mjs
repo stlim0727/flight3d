@@ -118,7 +118,7 @@ await withBrowserSession({ path: '/?airport=coastal&aircraft=B738&scenario=runwa
       assert.equal(expanded.group, 'camera');
       assert.equal(expanded.y, closed.y);
       assert.equal(expanded.height, closed.height);
-      assert.equal(expanded.scroll, width !== 320);
+      assert.equal(expanded.scroll, width === 390 || width === 568);
       assert.equal(expanded.pager, width === 320);
       if (expanded.pager) {
         await click('.mobile-flight-next');
