@@ -139,7 +139,8 @@ export function updateGltfControlSurfaces(controls, state) {
       control.pivot.quaternion.setFromAxisAngle(control.axis, control.deflection(state));
       continue;
     }
-    const raw = state[control.input];
+    const rawKey = `raw${control.input.charAt(0).toUpperCase() + control.input.slice(1)}`;
+    const raw = state[control.input] ?? state[rawKey];
     const value = Number.isFinite(raw) ? raw : 0;
     const limited = control.input === 'flapDegree'
       ? THREE.MathUtils.clamp(value, 0, 40) : THREE.MathUtils.clamp(value, -1, 1);

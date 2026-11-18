@@ -161,7 +161,7 @@ export class F16 {
     this.gltfGroup = new THREE.Group();
     this.gltfGroup.name = 'GLTF_F16';
     this.group.add(this.gltfGroup);
-    if (!options.exteriorOnly) {
+    if (!options.noExhaust) {
       this.exhaust = new JetExhaust();
       this.group.add(this.exhaust.group);
     }

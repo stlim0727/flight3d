@@ -132,6 +132,9 @@ export function sampleTrack(track, timeSec, out = {}, state = {}) {
     const target = out[`engine${engine}`] || (out[`engine${engine}`] = {});
     for (const name of ENGINE_SCALARS) target[name] = lerp(num(from[name]), num(to[name]), alpha);
     target.failed = (discrete[`engine${engine}`]?.failed) === true;
+    target.thrust = target.failed ? 0 : (from.thrust !== undefined || to.thrust !== undefined
+      ? lerp(num(from.thrust), num(to.thrust), alpha)
+      : (target.n1 > 0 ? target.n1 * 100 : (out.throttle ?? 0) * 10000));
   }
   applyRoomState(out, roomStateAt(track, 0, timeSec));
   return out;
