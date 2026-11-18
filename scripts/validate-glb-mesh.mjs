@@ -43,7 +43,7 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
     materials: new Set(),
   };
 
-  let bodyMesh = null;
+  const bodyMeshes = [];
   const warningBands = [];
   const finMeshes = [];
   let radomeMesh = null;
@@ -85,7 +85,7 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
       }
     }
 
-    if (matName === 'missile-body') bodyMesh = node;
+    if (matName === 'missile-body') bodyMeshes.push(node);
     else if (matName?.startsWith('missile-band-')) warningBands.push(node);
     else if (matName === 'missile-fin' && !node.name.toLowerCase().includes('pylon') && !modelName.toLowerCase().includes('pylon')) finMeshes.push(node);
     else if (matName === 'missile-radome') radomeMesh = node;
@@ -197,17 +197,11 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
 
   // 4. Fuselage continuity under warning collars (evaluated in common missile scene frame)
   if (warningBands.length > 0) {
-    if (!bodyMesh) {
+    if (bodyMeshes.length === 0) {
       errors.push(
         `GLB contains ${warningBands.length} warning band(s) but no missile-body mesh to provide continuous fuselage beneath them`
       );
     } else {
-      const bodyGeo = bodyMesh.geometry;
-      const bodyPos = bodyGeo.attributes.position;
-      const bodyIndex = bodyGeo.index;
-      const bodyTriCount = (bodyIndex ? bodyIndex.count : bodyPos.count) / 3;
-      const bodyToScene = new THREE.Matrix4().multiplyMatrices(invScene, bodyMesh.matrixWorld);
-
       for (const band of warningBands) {
         // Compute bounding box in missile scene space
         const bandToScene = new THREE.Matrix4().multiplyMatrices(invScene, band.matrixWorld);
@@ -223,22 +217,32 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
           const zTest = bandBox.min.z + (bandBox.max.z - bandBox.min.z) * (s / (numSamples - 1));
           let covered = false;
 
-          for (let i = 0; i < bodyTriCount; i++) {
-            const i0 = bodyIndex ? bodyIndex.getX(i * 3) : i * 3;
-            const i1 = bodyIndex ? bodyIndex.getX(i * 3 + 1) : i * 3 + 1;
-            const i2 = bodyIndex ? bodyIndex.getX(i * 3 + 2) : i * 3 + 2;
+          for (const bodyMesh of bodyMeshes) {
+            const bodyGeo = bodyMesh.geometry;
+            const bodyPos = bodyGeo.attributes.position;
+            const bodyIndex = bodyGeo.index;
+            const bodyTriCount = (bodyIndex ? bodyIndex.count : bodyPos.count) / 3;
+            const bodyToScene = new THREE.Matrix4().multiplyMatrices(invScene, bodyMesh.matrixWorld);
 
-            const v0 = new THREE.Vector3(bodyPos.getX(i0), bodyPos.getY(i0), bodyPos.getZ(i0)).applyMatrix4(bodyToScene);
-            const v1 = new THREE.Vector3(bodyPos.getX(i1), bodyPos.getY(i1), bodyPos.getZ(i1)).applyMatrix4(bodyToScene);
-            const v2 = new THREE.Vector3(bodyPos.getX(i2), bodyPos.getY(i2), bodyPos.getZ(i2)).applyMatrix4(bodyToScene);
+            for (let i = 0; i < bodyTriCount; i++) {
+              const i0 = bodyIndex ? bodyIndex.getX(i * 3) : i * 3;
+              const i1 = bodyIndex ? bodyIndex.getX(i * 3 + 1) : i * 3 + 1;
+              const i2 = bodyIndex ? bodyIndex.getX(i * 3 + 2) : i * 3 + 2;
 
-            const minZ = Math.min(v0.z, v1.z, v2.z);
-            const maxZ = Math.max(v0.z, v1.z, v2.z);
+              const v0 = new THREE.Vector3(bodyPos.getX(i0), bodyPos.getY(i0), bodyPos.getZ(i0)).applyMatrix4(bodyToScene);
+              const v1 = new THREE.Vector3(bodyPos.getX(i1), bodyPos.getY(i1), bodyPos.getZ(i1)).applyMatrix4(bodyToScene);
+              const v2 = new THREE.Vector3(bodyPos.getX(i2), bodyPos.getY(i2), bodyPos.getZ(i2)).applyMatrix4(bodyToScene);
 
-            if (zTest >= minZ - 0.001 && zTest <= maxZ + 0.001) {
-              covered = true;
-              break;
+              const minZ = Math.min(v0.z, v1.z, v2.z);
+              const maxZ = Math.max(v0.z, v1.z, v2.z);
+
+              if (zTest >= minZ - 0.001 && zTest <= maxZ + 0.001) {
+                covered = true;
+                break;
+              }
             }
+
+            if (covered) break;
           }
 
           if (!covered) {

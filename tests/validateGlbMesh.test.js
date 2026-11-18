@@ -304,5 +304,37 @@ test('validateGlbModel flags warning bands without missile-body mesh', async () 
   assert.ok(result.errors.some(e => e.includes('no missile-body mesh')), 'Should flag warning band without body');
 });
 
+test('validateGlbModel supports multiple missile-body meshes under warning bands', async () => {
+  const scene = new THREE.Scene();
+  // Forward body section from z = -1.0 to 0.0
+  const forwardGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.0, 16);
+  forwardGeo.rotateX(Math.PI / 2);
+  forwardGeo.translate(0, 0, -0.5);
+  const forwardMesh = new THREE.Mesh(forwardGeo, new THREE.MeshBasicMaterial({ name: 'missile-body' }));
+  forwardMesh.name = 'BodyForward';
+  scene.add(forwardMesh);
+
+  // Aft body section from z = 0.0 to 1.0
+  const aftGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.0, 16);
+  aftGeo.rotateX(Math.PI / 2);
+  aftGeo.translate(0, 0, 0.5);
+  const aftMesh = new THREE.Mesh(aftGeo, new THREE.MeshBasicMaterial({ name: 'missile-body' }));
+  aftMesh.name = 'BodyAft';
+  scene.add(aftMesh);
+
+  // Warning band placed on forward body section around z = -0.5
+  const bandGeo = new THREE.CylinderGeometry(0.082, 0.082, 0.1, 16);
+  bandGeo.rotateX(Math.PI / 2);
+  bandGeo.translate(0, 0, -0.5);
+  const bandMesh = new THREE.Mesh(bandGeo, new THREE.MeshBasicMaterial({ name: 'missile-band-yellow' }));
+  bandMesh.name = 'BandForward';
+  scene.add(bandMesh);
+
+  const glb = await exportScene(scene);
+  const result = await validateGlbModel(glb, 'test-multi-body');
+  assert.equal(result.valid, true, `Multiple body meshes covering the band should pass, got: ${result.errors.join('; ')}`);
+});
+
+
 
 
