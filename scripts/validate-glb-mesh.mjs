@@ -106,24 +106,114 @@ export async function validateGlbModel(arrayBuffer, modelName = 'model') {
     }
   }
 
-  // 3. Fin triangle face normals check
+  // 3. Fin triangle face normals & winding check
   for (const fin of finMeshes) {
-    const pos = fin.geometry.attributes.position;
-    const norm = fin.geometry.attributes.normal;
-    if (pos.count < 30) {
-      errors.push(`Fin mesh "${fin.name}" has unusually few vertices (${pos.count})`);
+    const geo = fin.geometry;
+    const pos = geo.attributes.position;
+    const index = geo.index;
+    const triCount = (index ? index.count : pos.count) / 3;
+
+    if (triCount === 0) {
+      errors.push(`Fin mesh "${fin.name}" has no triangles`);
+      continue;
+    }
+
+    // A. Compute signed polyhedron volume across the fin mesh:
+    // For outward-facing CCW triangles, sum(A · (B × C)) / 6 must be positive.
+    let totalSignedVolume = 0;
+    let tipFacesChecked = 0;
+    let inwardTipFaces = 0;
+
+    // Find maximum radial distance from centerline for tip face identification
+    let maxRadial = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const r = Math.hypot(pos.getX(i), pos.getY(i));
+      if (r > maxRadial) maxRadial = r;
+    }
+    const tipThreshold = maxRadial * 0.90;
+
+    for (let i = 0; i < triCount; i++) {
+      const i0 = index ? index.getX(i * 3) : i * 3;
+      const i1 = index ? index.getX(i * 3 + 1) : i * 3 + 1;
+      const i2 = index ? index.getX(i * 3 + 2) : i * 3 + 2;
+
+      const ax = pos.getX(i0), ay = pos.getY(i0), az = pos.getZ(i0);
+      const bx = pos.getX(i1), by = pos.getY(i1), bz = pos.getZ(i1);
+      const cx = pos.getX(i2), cy = pos.getY(i2), cz = pos.getZ(i2);
+
+      // B x C
+      const crossX = by * cz - bz * cy;
+      const crossY = bz * cx - bx * cz;
+      const crossZ = bx * cy - by * cx;
+
+      // A · (B × C)
+      totalSignedVolume += (ax * crossX + ay * crossY + az * crossZ);
+
+      // Face normal: (B - A) × (C - A)
+      const abX = bx - ax, abY = by - ay, abZ = bz - az;
+      const acX = cx - ax, acY = cy - ay, acZ = cz - az;
+      const fnX = abY * acZ - abZ * acY;
+      const fnY = abZ * acX - abX * acZ;
+      const fnZ = abX * acY - abY * acX;
+
+      const triCenter = new THREE.Vector3((ax + bx + cx) / 3, (ay + by + cy) / 3, (az + bz + cz) / 3);
+      const rCenter = Math.hypot(triCenter.x, triCenter.y);
+
+      // B. For tip faces (outer perimeter), normal must point radially outward from centerline:
+      if (rCenter >= tipThreshold) {
+        tipFacesChecked++;
+        const dotRadial = fnX * triCenter.x + fnY * triCenter.y;
+        if (dotRadial < 0) {
+          inwardTipFaces++;
+        }
+      }
+    }
+
+    totalSignedVolume /= 6.0;
+    if (totalSignedVolume <= 0) {
+      errors.push(`Fin mesh "${fin.name}" has negative signed volume (${totalSignedVolume.toExponential(3)}), indicating inverted triangle winding`);
+    }
+    if (tipFacesChecked > 0 && inwardTipFaces > 0) {
+      errors.push(`Fin mesh "${fin.name}" has ${inwardTipFaces} tip face(s) pointing inward toward missile centerline`);
     }
   }
 
-  // 4. Fuselage continuity under warning collars
+  // 4. Fuselage continuity under warning collars (actual longitudinal triangle coverage)
   if (bodyMesh && warningBands.length > 0) {
-    const bodyBox = new THREE.Box3().setFromObject(bodyMesh);
+    const bodyGeo = bodyMesh.geometry;
+    const bodyPos = bodyGeo.attributes.position;
+    const bodyIndex = bodyGeo.index;
+    const bodyTriCount = (bodyIndex ? bodyIndex.count : bodyPos.count) / 3;
+
     for (const band of warningBands) {
       const bandBox = new THREE.Box3().setFromObject(band);
-      if (bandBox.min.z < bodyBox.min.z - 0.05 || bandBox.max.z > bodyBox.max.z + 0.05) {
-        errors.push(
-          `Warning band "${band.name}" [${bandBox.min.z.toFixed(2)}, ${bandBox.max.z.toFixed(2)}] extends beyond continuous fuselage body [${bodyBox.min.z.toFixed(2)}, ${bodyBox.max.z.toFixed(2)}]`
-        );
+      // Sample 5 test points across the band's longitudinal span
+      const numSamples = 5;
+      for (let s = 0; s < numSamples; s++) {
+        const zTest = bandBox.min.z + (bandBox.max.z - bandBox.min.z) * (s / (numSamples - 1));
+        let covered = false;
+
+        for (let i = 0; i < bodyTriCount; i++) {
+          const i0 = bodyIndex ? bodyIndex.getX(i * 3) : i * 3;
+          const i1 = bodyIndex ? bodyIndex.getX(i * 3 + 1) : i * 3 + 1;
+          const i2 = bodyIndex ? bodyIndex.getX(i * 3 + 2) : i * 3 + 2;
+
+          const z0 = bodyPos.getZ(i0), z1 = bodyPos.getZ(i1), z2 = bodyPos.getZ(i2);
+          const minZ = Math.min(z0, z1, z2);
+          const maxZ = Math.max(z0, z1, z2);
+
+          if (zTest >= minZ - 0.001 && zTest <= maxZ + 0.001) {
+            covered = true;
+            break;
+          }
+        }
+
+        if (!covered) {
+          errors.push(
+            `Warning band "${band.name}" covers a hollow fuselage gap at z = ${zTest.toFixed(3)}m; no continuous body triangle spans this section`
+          );
+          break;
+        }
       }
     }
   }
