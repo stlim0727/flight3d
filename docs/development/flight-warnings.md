@@ -6,6 +6,9 @@ Pull-up overrides stall, terrain, overspeed, sink-rate, departure altitude loss,
 engine failure, landing configuration and bank alerts. Clear conditions must
 hold for 0.8 seconds; touchdown clears airborne alerts immediately. Aircraft
 switches and presets reset history. Overspeed has speed/Mach hysteresis.
+The B738 HUD and clacker clear on the first recovered sample outside that
+hysteresis band. The B738 PFD speed tape shows the lower of 340 kt and
+the indicated speed corresponding to Mach 0.82 at the current altitude.
 
 B738 includes excessive descent (sink rate / pull up), terrain closure and
 20-second terrain sampling along the velocity vector, altitude loss after
