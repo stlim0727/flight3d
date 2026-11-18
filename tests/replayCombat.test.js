@@ -846,3 +846,25 @@ test('prepopulateFromSamples follows Catmull-Rom curved missile path matching re
 
   trail.dispose();
 });
+
+test('prepopulateFromSamples powered state matches CombatReplayPlayback spanning burn transition', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene);
+
+  // Sample 0 (0.0s): powered: true
+  // Sample 1 (4.0s): powered: false (propellant burned out at 4.0s)
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 4.0, x: 2400, y: 1000, z: 0, powered: false },
+  ];
+
+  // Seek to 3.0s (past the midpoint t=0.5, but before burnout at 4.0s)
+  trail.prepopulateFromSamples(samples, 3.0);
+
+  // The tip at 3.0s must be powered (initialAlpha = 0.92, matching normal playback where propellant=1)
+  const lastIdx = trail.count - 1;
+  const tipAlpha = trail.initialAlphas[lastIdx];
+  assert.ok(Math.abs(tipAlpha - 0.92) < 1e-4, 'Tip before 4.0s burnout must be powered with initialAlpha=0.92');
+
+  trail.dispose();
+});

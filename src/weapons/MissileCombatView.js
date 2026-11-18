@@ -427,7 +427,7 @@ export class MissileSmokeTrail {
         if (sampleTime > currentTime + 1e-4) break;
 
         const age = Math.max(0, currentTime - sampleTime);
-        const isPowered = t < 0.5 ? isPoweredA : isPoweredB;
+        const isPowered = isPoweredA;
         const particleLife = isPowered ? this.lifetime : this.lifetime * 0.85;
         const segAlpha = isPowered ? 0.92 : 0.62;
 
@@ -453,7 +453,7 @@ export class MissileSmokeTrail {
           catmullRom(p0.y, p1.y, p2.y, p3.y, tCurr),
           catmullRom(p0.z, p1.z, p2.z, p3.z, tCurr),
         );
-        const isPowered = tCurr < 0.5 ? isPoweredA : isPoweredB;
+        const isPowered = isPoweredA;
         const particleLife = isPowered ? this.lifetime : this.lifetime * 0.85;
         const segAlpha = isPowered ? 0.92 : 0.62;
         this.emit(scratchInterpPos, { alpha: segAlpha, lifetime: particleLife });
