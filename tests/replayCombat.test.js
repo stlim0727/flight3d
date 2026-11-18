@@ -4,7 +4,7 @@ import { Scene, Vector3 } from 'three';
 import { ReplayRecorder } from '../src/core/ReplayRecorder.js';
 import { encodeTrack, decodeTrack, COMBAT_TRACK_VERSION } from '../src/replay/ReplayCodec.js';
 import { CombatReplayPlayback } from '../src/replay/CombatReplayPlayback.js';
-import { MissileCombatView } from '../src/weapons/MissileCombatView.js';
+import { MissileCombatView, MissileSmokeTrail } from '../src/weapons/MissileCombatView.js';
 import { REPLAY_BUDGET, base64ByteLength } from '../src/replay/replayConfig.js';
 
 const QUAT = { x: 0.01, y: 0.7, z: -0.02, w: 0.7139 };
@@ -454,4 +454,443 @@ test('MissileCombatView preserves detached wreck reference across multiple sync 
   detachedWreckObj.aircraft.dispose = () => { disposed = true; };
   combatView.clear();
   assert.equal(disposed, true, 'Detached aircraft view was disposed on clear');
+});
+
+test('MissileSmokeTrail interpolates dense points along flight path without gaps even with large dt', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { spacing: 1.6, max: 2000 });
+
+  // Missile moves 64 meters in a single frame (e.g. 800 m/s * 0.08s)
+  const pos1 = new Vector3(0, 1000, 0);
+  trail.update(0.016, pos1, true, true);
+  assert.equal(trail.count, 1, 'Initial point emitted');
+
+  const pos2 = new Vector3(64, 1000, 0);
+  trail.update(0.08, pos2, true, true);
+
+  // 64 meters / 1.6m spacing = 40 steps -> 1 + 40 = 41 points
+  assert.ok(trail.count >= 40, `Trail count ${trail.count} should be densely interpolated without gaps`);
+
+  // Verify distance between consecutive particles does not exceed spacing + jitter tolerance
+  for (let i = 0; i < trail.count - 1; i++) {
+    const x1 = trail.positions[i * 3];
+    const y1 = trail.positions[i * 3 + 1];
+    const z1 = trail.positions[i * 3 + 2];
+    const x2 = trail.positions[(i + 1) * 3];
+    const y2 = trail.positions[(i + 1) * 3 + 1];
+    const z2 = trail.positions[(i + 1) * 3 + 2];
+    const d = Math.hypot(x2 - x1, y2 - y1, z2 - z1);
+    assert.ok(d < 3.0, `Consecutive puff distance ${d.toFixed(2)}m must not leave gaps`);
+  }
+
+  trail.dispose();
+});
+
+test('MissileSmokeTrail lingers for 20+ seconds after missile burnout and detonation', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { lifetime: 26.0, spacing: 2.0 });
+
+  const pos1 = new Vector3(0, 1000, 0);
+  const pos2 = new Vector3(100, 1000, 0);
+  trail.update(0.016, pos1, true, true);
+  trail.update(0.1, pos2, true, true);
+  const initialCount = trail.count;
+  assert.ok(initialCount > 10);
+
+  // Coasting with propellant=0: continues emitting visible trail
+  const pos3 = new Vector3(200, 1000, 0);
+  trail.update(0.1, pos3, true, false);
+  assert.ok(trail.count > initialCount, 'Coasting missile continues to emit visible trajectory trail');
+
+  // Missile detonated / stopped emitting: smoke must persist, not vanish in 2-3 seconds
+  for (let s = 0; s < 15; s++) {
+    trail.update(1.0, null, false);
+    assert.equal(trail.done, false, `Trail must not be done at ${s + 1}s`);
+    assert.ok(trail.count > 0, `Puffs must still exist at ${s + 1}s`);
+  }
+
+  // After 28 seconds (exceeding 26s lifetime), particles have aged out
+  for (let s = 0; s < 15; s++) {
+    trail.update(1.0, null, false);
+  }
+  assert.equal(trail.done, true, 'Trail should be done after full 26s lifetime expires');
+  trail.dispose();
+});
+
+test('CombatReplayPlayback seek reconstructs lingering and active missile smoke trails', () => {
+  const scene = new Scene();
+  const playback = new CombatReplayPlayback({ scene });
+  const missileSamples = [
+    { timeSec: 10.0, id: 5, typeId: 'AIM9X', x: 0, y: 3000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 10.5, id: 5, typeId: 'AIM9X', x: 300, y: 3000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 11.0, id: 5, typeId: 'AIM9X', x: 600, y: 3000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 11.5, id: 5, typeId: 'AIM9X', x: 900, y: 3000, z: 0, quat: [0, 0, 0, 1], powered: false },
+    { timeSec: 12.0, id: 5, typeId: 'AIM9X', x: 1200, y: 3000, z: 0, quat: [0, 0, 0, 1], powered: false },
+  ];
+  const events = [
+    { timeSec: 12.0, kind: 'detonation', missileId: 5, x: 1200, y: 3000, z: 0 },
+  ];
+
+  playback.load({
+    version: 8,
+    targets: [],
+    missileSamples,
+    banditSamples: [],
+    events,
+  });
+
+  // 1. Seek to mid-flight (11.0s): missile is active, trajectory smoke should be pre-populated
+  playback.seek(11.0);
+  assert.equal(playback.state.missiles.length, 1);
+  const view = playback.view.missileViews.get(5);
+  assert.ok(view?.trail, 'Active missile has smoke trail');
+  assert.ok(view.trail.count > 50, `Smoke trail should be pre-populated along flight path (count: ${view.trail.count})`);
+
+  // 2. Seek to 14.0s (2s after detonation): missile is dead, lingering smoke trail reconstructed
+  playback.seek(14.0);
+  assert.equal(playback.state.missiles.length, 0, 'Detonated missile mesh is gone');
+  assert.ok(playback.view.trails.length > 0, 'Lingering smoke trail remains in scene after detonation');
+  assert.ok(playback.view.trails[0].count > 50, 'Lingering trail contains dense trajectory puffs');
+
+  playback.stop();
+});
+
+test('CombatReplayPlayback uses Catmull-Rom spline for smooth missile position between samples', () => {
+  const scene = new Scene();
+  const playback = new CombatReplayPlayback({ scene });
+  // Turning missile trajectory (curves in X and Z)
+  const missileSamples = [
+    { timeSec: 0.0, id: 1, typeId: 'AIM9X', x: 0, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.1, id: 1, typeId: 'AIM9X', x: 70, y: 1000, z: 10, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.2, id: 1, typeId: 'AIM9X', x: 130, y: 1000, z: 35, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.3, id: 1, typeId: 'AIM9X', x: 180, y: 1000, z: 75, quat: [0, 0, 0, 1], powered: true },
+  ];
+
+  playback.load({
+    version: 8,
+    targets: [],
+    missileSamples,
+    banditSamples: [],
+    events: [],
+  });
+
+  // Evaluate midpoint between samples 1 and 2 (timeSec = 0.15)
+  playback.seek(0.15);
+  const m = playback.state.missiles[0];
+  assert.ok(m);
+
+  // Linear midpoint would be: x = (70 + 130) / 2 = 100, z = (10 + 35) / 2 = 22.5
+  // Catmull-Rom spline accounts for incoming curvature, smoothly interpolating position
+  assert.ok(Math.abs(m.position.y - 1000) < 1e-4);
+  assert.ok(m.position.x > 70 && m.position.x < 130);
+  assert.ok(m.position.z > 10 && m.position.z < 35);
+
+  playback.stop();
+});
+
+test('SmokeTrail and MissileSmokeTrail interpolation does not mutate caller position vector', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { spacing: 1.6 });
+  const emitVector = new Vector3(0, 100, 0);
+
+  trail.update(0.016, emitVector, true);
+  emitVector.set(10, 100, 0);
+
+  // If internal scratch vector mutates emitVector, emitVector.x will be corrupted
+  trail.update(0.016, emitVector, true);
+  assert.equal(emitVector.x, 10, 'Caller position vector must remain untouched by interpolation');
+  assert.equal(emitVector.y, 100);
+  assert.equal(emitVector.z, 0);
+
+  assert.equal(trail.lastPosition.x, 10, 'lastPosition must accurately store target destination');
+  trail.dispose();
+});
+
+test('CombatReplayPlayback monotonic spline prevents oscillation on repeated identical positions', () => {
+  const scene = new Scene();
+  const playback = new CombatReplayPlayback({ scene });
+  const missileSamples = [
+    { timeSec: 0.0, id: 1, typeId: 'AIM9X', x: 0, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.1, id: 1, typeId: 'AIM9X', x: 60, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.2, id: 1, typeId: 'AIM9X', x: 60, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.3, id: 1, typeId: 'AIM9X', x: 120, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+  ];
+
+  playback.load({ version: 8, targets: [], missileSamples, banditSamples: [], events: [] });
+
+  // In the span [0.1, 0.2], missile should stay exactly at x=60 without wiggling
+  for (let t = 0.10; t <= 0.20; t += 0.02) {
+    playback.seek(t);
+    const m = playback.state.missiles[0];
+    assert.ok(Math.abs(m.position.x - 60) < 1e-4, `At t=${t.toFixed(2)}, x must stay at 60 (got ${m.position.x})`);
+  }
+
+  playback.stop();
+});
+
+test('CombatReplayPlayback bounds missile extrapolation when termination event is absent', () => {
+  const scene = new Scene();
+  const playback = new CombatReplayPlayback({ scene });
+  const missileSamples = [
+    { timeSec: 0.0, id: 1, typeId: 'AIM9X', x: 0, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 0.1, id: 1, typeId: 'AIM9X', x: 60, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+  ];
+
+  // No detonation or expire event recorded (removeAt = Infinity)
+  playback.load({ version: 8, targets: [], missileSamples, banditSamples: [], events: [] });
+
+  playback.seek(10.0); // 9.9 seconds past the last sample
+  const m = playback.state.missiles[0];
+  assert.ok(m);
+
+  // Velocity is (60 - 0) / 0.1 = 600 m/s in X.
+  // Without bounding, it would have moved to x = 60 + 600 * 9.9 = 6000m!
+  // With 0.1s cap, it stops at x = 60 + 600 * 0.1 = 120m.
+  assert.ok(m.position.x <= 130, `Unterminated missile must not extrapolate indefinitely (got x=${m.position.x})`);
+
+  playback.stop();
+});
+
+test('MissileSmokeTrail preserves full trajectory over long flight without premature buffer eviction', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene); // default max=7200, spacing=3.0, lifetime=26.0
+
+  // Simulate missile flying 15 km at 600 m/s for 25 seconds
+  const pos = new Vector3(0, 2000, 0);
+  trail.update(0.016, pos, true, true);
+  const launchPos = { x: trail.positions[0], y: trail.positions[1], z: trail.positions[2] };
+
+  const dt = 0.1; // 100ms steps
+  const speed = 600; // 600 m/s
+  for (let t = 0; t < 25.0; t += dt) {
+    pos.x += speed * dt;
+    trail.update(dt, pos, true, t < 4.5); // powered for first 4.5s
+  }
+
+  // The launch position particle (at x=0) should still be in the buffer after 25s (< 26s lifetime)
+  assert.ok(trail.count > 4500, `Buffer should hold dense trail points (got ${trail.count})`);
+  const oldestX = trail.positions[0];
+  assert.ok(
+    Math.abs(oldestX - launchPos.x) < 5.0,
+    `Launch position particle (x=0) must not be prematurely evicted after 25s (got x=${oldestX})`
+  );
+
+  trail.dispose();
+});
+
+test('prepopulateFromSamples respects powered vs unpowered particle lifetime matching normal update playback', () => {
+  const scene = new Scene();
+  const trailSeek = new MissileSmokeTrail(scene); // lifetime = 26.0
+
+  // Boost phase at t = 0.0s (powered: true, lifetime = 26.0s)
+  // Coast phase at t = 5.0s (powered: false, lifetime = 26.0 * 0.85 = 22.1s)
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 1.0, x: 600, y: 1000, z: 0, powered: false },
+    { timeSec: 5.0, x: 3000, y: 1000, z: 0, powered: false },
+    { timeSec: 6.0, x: 3600, y: 1000, z: 0, powered: false },
+  ];
+
+  // At currentTime = 27.5s:
+  // - Boost samples (t=0..1s) are aged 26.5..27.5s -> expired (> 26.0s)
+  // - Coast samples (t=5..6s) are aged 21.5..22.5s:
+  //   Coast sample at t=5.0s is aged 22.5s -> expired for unpowered (> 22.1s)
+  //   Coast sample at t=6.0s is aged 21.5s -> still alive for unpowered (< 22.1s)
+  trailSeek.prepopulateFromSamples(samples, 27.5);
+
+  // Boost smoke at x=0..600 should not exist
+  for (let i = 0; i < trailSeek.count; i++) {
+    const x = trailSeek.positions[i * 3];
+    assert.ok(x >= 3000, `Expired boost smoke (x < 3000) must not appear (found x=${x})`);
+  }
+
+  // At currentTime = 28.5s:
+  // - Coast sample at t=6.0s is aged 22.5s -> also expired (> 22.1s)
+  const trailSeekExpired = new MissileSmokeTrail(scene);
+  trailSeekExpired.prepopulateFromSamples(samples, 28.5);
+  assert.equal(trailSeekExpired.count, 0, 'All particles should be expired after 28.5s');
+
+  trailSeek.dispose();
+  trailSeekExpired.dispose();
+});
+
+test('MissileSmokeTrail alpha decay is consistent between update and prepopulateFromSamples', () => {
+  const scene = new Scene();
+  const trailNormal = new MissileSmokeTrail(scene, { lifetime: 26.0 });
+  const pos = new Vector3(0, 1000, 0);
+
+  // Emit 1 powered point at t=0
+  trailNormal.update(0.016, pos, true, true);
+  // Age by 15.0s in 1.0s increments
+  for (let i = 0; i < 15; i++) {
+    trailNormal.update(1.0, null, false);
+  }
+  const normalAlpha = trailNormal.colors[3]; // alpha of 1st point
+
+  // Expected: 0.92 * (1.0 - (15.016 / 26)^2) = ~0.613
+  const expectedAlpha = 0.92 * (1.0 - (15.016 / 26.0) ** 2);
+  assert.ok(
+    Math.abs(normalAlpha - expectedAlpha) < 0.05,
+    `Normal alpha ${normalAlpha} should match continuous decay around ${expectedAlpha.toFixed(3)}`
+  );
+
+  // Reconstructed via prepopulateFromSamples at t=15.016 with sample at t=0
+  const trailSeek = new MissileSmokeTrail(scene, { lifetime: 26.0 });
+  trailSeek.prepopulateFromSamples([{ timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true }], 15.016);
+  const seekAlpha = trailSeek.colors[3];
+
+  assert.ok(
+    Math.abs(normalAlpha - seekAlpha) < 0.02,
+    `Seek alpha (${seekAlpha.toFixed(3)}) should match normal update alpha (${normalAlpha.toFixed(3)}) without arbitrary threshold drop`
+  );
+
+  trailNormal.dispose();
+  trailSeek.dispose();
+});
+
+test('CombatReplayPlayback seek does not duplicate smoke trails for active missiles without termination event', () => {
+  const scene = new Scene();
+  const playback = new CombatReplayPlayback({ scene });
+  const missileSamples = [
+    { timeSec: 0.0, id: 1, typeId: 'AIM9X', x: 0, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+    { timeSec: 1.0, id: 1, typeId: 'AIM9X', x: 600, y: 1000, z: 0, quat: [0, 0, 0, 1], powered: true },
+  ];
+
+  // No termination event (removeAt = Infinity)
+  playback.load({ version: 8, targets: [], missileSamples, banditSamples: [], events: [] });
+
+  // Seek to 5.0s (past the last sample, but missile is still active in track)
+  playback.seek(5.0);
+
+  // Active missile should have exactly 1 trail associated with its missileView
+  assert.equal(playback.view.trails.length, 1, 'Exactly one smoke trail should exist');
+  const view = playback.view.missileViews.get(1);
+  assert.ok(view?.trail, 'Active missile has its smoke trail');
+  assert.equal(playback.view.trails[0], view.trail, 'Scene trail should be the active missile view trail');
+
+  playback.stop();
+});
+
+test('prepopulateFromSamples interpolates active span when seeking between thinned samples', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { spacing: 3.0 });
+
+  // Missile flying 600 m/s with wide samples at 0.0s and 1.6s (thinned interval)
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 1.6, x: 960, y: 1000, z: 0, powered: true },
+  ];
+
+  // Seek to 0.9s (midway between 0.0s and 1.6s, where missile is at x = 540m)
+  trail.prepopulateFromSamples(samples, 0.9);
+
+  // Puffs should cover the entire 0 to 540m span
+  assert.ok(trail.count > 100, `Trail count ${trail.count} should densely populate 540m segment`);
+  const firstX = trail.positions[0];
+  const lastX = trail.positions[(trail.count - 1) * 3];
+
+  assert.ok(Math.abs(firstX - 0) < 5.0, `Start of trail should be at x=0 (got ${firstX})`);
+  assert.ok(Math.abs(lastX - 540) < 5.0, `End of trail should be at missile position x=540 (got ${lastX})`);
+  assert.ok(Math.abs(trail.lastPosition.x - 540) < 5.0, `lastPosition should match missile position x=540`);
+
+  trail.dispose();
+});
+
+test('prepopulateFromSamples preserves smoke in segment crossing 26s lifetime boundary with wide samples', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { lifetime: 26.0, spacing: 3.0 });
+
+  // Wide samples at 0.0s, 6.4s, 12.8s, 19.2s
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 6.4, x: 3840, y: 1000, z: 0, powered: true },
+    { timeSec: 12.8, x: 7680, y: 1000, z: 0, powered: true },
+    { timeSec: 19.2, x: 11520, y: 1000, z: 0, powered: true },
+  ];
+
+  // Seek to 26.5s:
+  // - 26s lifetime window reaches back to 26.5 - 26.0 = 0.5s
+  // - Sample 0 is at 0.0s (older than 26s), but the segment 0.0s..6.4s crosses 0.5s!
+  // - Particles between 0.5s and 6.4s (x = 300m .. 3840m) must be preserved!
+  trail.prepopulateFromSamples(samples, 26.5);
+
+  assert.ok(trail.count > 0, 'Trail points within the 26s window should be preserved');
+  const oldestX = trail.positions[0];
+  // Oldest point should start near x = 300m (at t=0.5s), not skip all the way to 3840m (t=6.4s)
+  assert.ok(oldestX < 600, `Oldest preserved point should be near t=0.5s (got x=${oldestX})`);
+
+  trail.dispose();
+});
+
+test('prepopulateFromSamples follows Catmull-Rom curved missile path matching replay playback', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { spacing: 1.0 });
+
+  // Curving trajectory in X and Z
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 1.0, x: 700, y: 1000, z: 100, powered: true },
+    { timeSec: 2.0, x: 1300, y: 1000, z: 350, powered: true },
+    { timeSec: 3.0, x: 1800, y: 1000, z: 750, powered: true },
+  ];
+
+  // Seek to 1.5s
+  trail.prepopulateFromSamples(samples, 1.5);
+  const lastZ = trail.lastPosition.z;
+
+  // Linear interpolation at t=1.5 would give z = (100 + 350) / 2 = 225.
+  // Catmull-Rom spline with incoming curvature curves differently from linear lerp.
+  // Check that the trail tip matches the spline position, not a linear straight line.
+  assert.ok(lastZ > 100 && lastZ < 350);
+  assert.notEqual(lastZ, 225, 'Spline tip position should follow Catmull-Rom curve');
+
+  trail.dispose();
+});
+
+test('prepopulateFromSamples powered state matches CombatReplayPlayback spanning burn transition', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene);
+
+  // Sample 0 (0.0s): powered: true
+  // Sample 1 (4.0s): powered: false (propellant burned out at 4.0s)
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 4.0, x: 2400, y: 1000, z: 0, powered: false },
+  ];
+
+  // Seek to 3.0s (past the midpoint t=0.5, but before burnout at 4.0s)
+  trail.prepopulateFromSamples(samples, 3.0);
+
+  // The tip at 3.0s must be powered (initialAlpha = 0.92, matching normal playback where propellant=1)
+  const lastIdx = trail.count - 1;
+  const tipAlpha = trail.initialAlphas[lastIdx];
+  assert.ok(Math.abs(tipAlpha - 0.92) < 1e-4, 'Tip before 4.0s burnout must be powered with initialAlpha=0.92');
+
+  trail.dispose();
+});
+
+test('prepopulateFromSamples maintains spacing without stretching on wide multi-kilometer spans', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { spacing: 3.0, max: 7200 });
+
+  // A 3,000-meter span between samples from aggressive recording thinning
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 5.0, x: 3000, y: 1000, z: 0, powered: true },
+  ];
+
+  trail.prepopulateFromSamples(samples, 5.0);
+
+  // 3,000m / 3.0m = 1000 steps -> should have around 1000 particles, not capped at 500
+  assert.ok(trail.count >= 990, `Trail count ${trail.count} should scale to full distance (expected >= 990)`);
+
+  // Verify distance between consecutive particles does not stretch past spacing + small tolerance
+  for (let i = 0; i < trail.count - 1; i++) {
+    const x1 = trail.positions[i * 3];
+    const x2 = trail.positions[(i + 1) * 3];
+    const d = Math.abs(x2 - x1);
+    assert.ok(d <= 3.5, `Puff spacing ${d.toFixed(2)}m must not stretch across thinned span`);
+  }
+
+  trail.dispose();
 });

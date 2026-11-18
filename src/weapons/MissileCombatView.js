@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { BanditAircraftView } from './BanditAircraftView.js';
 import { createMissileMesh, preloadMissileModels } from './missileGeometry.js';
 import { ZONE_LOCAL_CENTERS } from '../physics/combatDamage.js';
+import { catmullRom } from '../replay/TrackSampler.js';
 
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
@@ -10,6 +11,9 @@ const scratchOffset = new THREE.Vector3();
 const scratchQuat = new THREE.Quaternion();
 const scratchEmitPos = new THREE.Vector3();
 const scratchVelocity = new THREE.Vector3();
+const scratchFrom = new THREE.Vector3();
+const scratchTo = new THREE.Vector3();
+const scratchInterpPos = new THREE.Vector3();
 
 // A destroyed bandit keeps flying as a burning wreck instead of blinking out.
 // Its launch velocity is the airframe's measured frame-to-frame motion, so the
@@ -55,10 +59,11 @@ function smokeMap() {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 64;
   const ctx = canvas.getContext('2d');
-  const gradient = ctx.createRadialGradient(32, 32, 2, 32, 32, 31);
-  gradient.addColorStop(0, 'rgba(255,255,255,0.9)');
-  gradient.addColorStop(0.45, 'rgba(236,236,236,0.45)');
-  gradient.addColorStop(1, 'rgba(220,220,220,0)');
+  const gradient = ctx.createRadialGradient(32, 32, 1, 32, 32, 31);
+  gradient.addColorStop(0, 'rgba(255,255,255,0.96)');
+  gradient.addColorStop(0.35, 'rgba(242,244,248,0.72)');
+  gradient.addColorStop(0.7, 'rgba(225,228,235,0.26)');
+  gradient.addColorStop(1, 'rgba(210,215,220,0)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, 64, 64);
   smokeTexture = new THREE.CanvasTexture(canvas);
@@ -119,11 +124,12 @@ function disposeGeometry(object) {
   });
 }
 
-/** Bounded white smoke trail behind a boosted missile. */
-class SmokeTrail {
-  constructor(scene, { max = 96, size = 4.2, color = 0xf2f2f2, opacity = 0.5 } = {}) {
+/** Bounded smoke trail behind damaged aircraft, flares, and falling wrecks. */
+export class SmokeTrail {
+  constructor(scene, { max = 96, size = 4.2, color = 0xf2f2f2, opacity = 0.5, spacing = 2.0 } = {}) {
     this.max = max;
     this.opacity = opacity;
+    this.spacing = spacing;
     this.positions = new Float32Array(this.max * 3);
     this.geometry = new THREE.BufferGeometry();
     const attribute = new THREE.BufferAttribute(this.positions, 3);
@@ -142,13 +148,13 @@ class SmokeTrail {
     });
     this.points = new THREE.Points(this.geometry, this.material);
     this.points.frustumCulled = false;
-    this.points.name = 'MissileSmokeTrail';
+    this.points.name = 'SmokeTrail';
     scene.add(this.points);
     this.scene = scene;
     this.count = 0;
-    this.emitTimer = 0;
     this.fade = 0;
     this.done = false;
+    this.lastPosition = null;
   }
 
   emit(position) {
@@ -166,19 +172,305 @@ class SmokeTrail {
   }
 
   update(dt, position, emitting) {
-    if (emitting) {
-      this.emitTimer -= dt;
-      if (this.emitTimer <= 0) {
+    if (emitting && position) {
+      if (!this.lastPosition) {
+        this.lastPosition = position.clone();
         this.emit(position);
-        this.emitTimer = 0.028;
+      } else {
+        const dist = position.distanceTo(this.lastPosition);
+        if (dist > 250) {
+          this.lastPosition.copy(position);
+          this.emit(position);
+        } else if (dist >= this.spacing) {
+          const steps = Math.min(32, Math.floor(dist / this.spacing));
+          for (let i = 1; i <= steps; i++) {
+            scratchInterpPos.lerpVectors(this.lastPosition, position, i / steps);
+            this.emit(scratchInterpPos);
+          }
+          this.lastPosition.copy(position);
+        }
       }
     } else {
+      this.lastPosition = null;
       this.fade += dt;
-      this.material.opacity = Math.max(0, this.opacity * (1 - this.fade / 2.2));
-      if (this.fade > 2.2) this.done = true;
+      this.material.opacity = Math.max(0, this.opacity * (1 - this.fade / 3.0));
+      if (this.fade > 3.0) this.done = true;
     }
   }
 
+  dispose() {
+    this.scene.remove(this.points);
+    this.geometry.dispose();
+    this.material.dispose();
+  }
+}
+
+/**
+ * Dense, long-lingering smoke plume behind an air-to-air missile.
+ * Emits continuous overlapping particles along the flight trajectory without
+ * discrete gaps or stuttering, and preserves the full smoke column for 26+ seconds
+ * so the entire launch-to-target arc remains visible across the sky.
+ */
+export class MissileSmokeTrail {
+  constructor(scene, {
+    max = 7200,
+    size = 7.5,
+    opacity = 0.90,
+    lifetime = 26.0,
+    spacing = 3.0,
+  } = {}) {
+    this.scene = scene;
+    this.max = max;
+    this.size = size;
+    this.baseOpacity = opacity;
+    this.lifetime = lifetime;
+    this.spacing = spacing;
+
+    this.positions = new Float32Array(this.max * 3);
+    this.colors = new Float32Array(this.max * 4); // [r, g, b, alpha]
+    this.ages = new Float32Array(this.max);
+    this.lifetimes = new Float32Array(this.max);
+    this.initialAlphas = new Float32Array(this.max);
+
+    this.geometry = new THREE.BufferGeometry();
+    const posAttr = new THREE.BufferAttribute(this.positions, 3);
+    posAttr.setUsage(THREE.DynamicDrawUsage);
+    this.geometry.setAttribute('position', posAttr);
+
+    const colAttr = new THREE.BufferAttribute(this.colors, 4);
+    colAttr.setUsage(THREE.DynamicDrawUsage);
+    this.geometry.setAttribute('color', colAttr);
+
+    this.geometry.setDrawRange(0, 0);
+
+    this.material = new THREE.PointsMaterial({
+      color: 0xffffff,
+      vertexColors: true,
+      map: smokeMap(),
+      size,
+      transparent: true,
+      opacity: 1.0,
+      alphaTest: 0.015,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+
+    this.material.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace(
+        'gl_PointSize = size;',
+        'gl_PointSize = size * (1.0 + (1.0 - vColor.a) * 1.6);',
+      );
+    };
+
+    this.points = new THREE.Points(this.geometry, this.material);
+    this.points.frustumCulled = false;
+    this.points.name = 'MissileSmokeTrail';
+    scene.add(this.points);
+
+    this.count = 0;
+    this.lastPosition = null;
+    this.done = false;
+  }
+
+  emit(pos, { r = 0.96, g = 0.96, b = 0.97, alpha = 0.90, lifetime = this.lifetime } = {}) {
+    let index;
+    if (this.count < this.max) {
+      index = this.count;
+      this.count++;
+    } else {
+      this.positions.copyWithin(0, 3);
+      this.colors.copyWithin(0, 4);
+      this.ages.copyWithin(0, 1);
+      this.lifetimes.copyWithin(0, 1);
+      this.initialAlphas.copyWithin(0, 1);
+      index = this.max - 1;
+    }
+
+    const posOffset = index * 3;
+    this.positions[posOffset] = pos.x;
+    this.positions[posOffset + 1] = pos.y;
+    this.positions[posOffset + 2] = pos.z;
+
+    const colOffset = index * 4;
+    this.colors[colOffset] = r;
+    this.colors[colOffset + 1] = g;
+    this.colors[colOffset + 2] = b;
+    this.colors[colOffset + 3] = alpha;
+
+    this.ages[index] = 0;
+    this.lifetimes[index] = lifetime;
+    this.initialAlphas[index] = alpha;
+  }
+
+  update(dt, position, emitting, isPowered = true) {
+    if (dt > 0 && this.count > 0) {
+      let writeIdx = 0;
+      for (let i = 0; i < this.count; i++) {
+        this.ages[i] += dt;
+        const life = this.lifetimes[i] || this.lifetime;
+        if (this.ages[i] < life) {
+          const progress = this.ages[i] / life;
+          const fade = Math.max(0, 1.0 - progress * progress);
+          const initialA = this.initialAlphas[i];
+          this.colors[i * 4 + 3] = initialA * fade;
+
+          if (writeIdx !== i) {
+            this.positions[writeIdx * 3] = this.positions[i * 3];
+            this.positions[writeIdx * 3 + 1] = this.positions[i * 3 + 1];
+            this.positions[writeIdx * 3 + 2] = this.positions[i * 3 + 2];
+
+            this.colors[writeIdx * 4] = this.colors[i * 4];
+            this.colors[writeIdx * 4 + 1] = this.colors[i * 4 + 1];
+            this.colors[writeIdx * 4 + 2] = this.colors[i * 4 + 2];
+            this.colors[writeIdx * 4 + 3] = this.colors[i * 4 + 3];
+
+            this.ages[writeIdx] = this.ages[i];
+            this.lifetimes[writeIdx] = this.lifetimes[i];
+            this.initialAlphas[writeIdx] = this.initialAlphas[i];
+          }
+          writeIdx++;
+        }
+      }
+      this.count = writeIdx;
+    }
+
+    if (emitting && position) {
+      const initialAlpha = isPowered ? 0.92 : 0.62;
+      const initialLife = isPowered ? this.lifetime : this.lifetime * 0.85;
+
+      if (!this.lastPosition) {
+        this.lastPosition = position.clone();
+        this.emit(position, { alpha: initialAlpha, lifetime: initialLife });
+      } else {
+        const dist = position.distanceTo(this.lastPosition);
+        if (dist > 500) {
+          this.lastPosition.copy(position);
+          this.emit(position, { alpha: initialAlpha, lifetime: initialLife });
+        } else if (dist >= this.spacing) {
+          const steps = Math.min(120, Math.floor(dist / this.spacing));
+          for (let i = 1; i <= steps; i++) {
+            const alpha = i / steps;
+            scratchInterpPos.lerpVectors(this.lastPosition, position, alpha);
+            scratchInterpPos.x += (Math.random() - 0.5) * 0.25;
+            scratchInterpPos.y += (Math.random() - 0.5) * 0.25;
+            scratchInterpPos.z += (Math.random() - 0.5) * 0.25;
+            this.emit(scratchInterpPos, { alpha: initialAlpha, lifetime: initialLife });
+          }
+          this.lastPosition.copy(position);
+        }
+      }
+    } else {
+      this.lastPosition = null;
+    }
+
+    if (!emitting && this.count === 0) {
+      this.done = true;
+    }
+
+    this.geometry.setDrawRange(0, this.count);
+    this.geometry.attributes.position.needsUpdate = true;
+    this.geometry.attributes.color.needsUpdate = true;
+  }
+
+  prepopulateFromSamples(samples, currentTime) {
+    if (!samples || samples.length < 1) return;
+    this.count = 0;
+    this.lastPosition = null;
+
+    if (samples.length === 1) {
+      const s = samples[0];
+      if (s.timeSec <= currentTime + 1e-4) {
+        const age = Math.max(0, currentTime - s.timeSec);
+        const isPowered = s.powered !== false;
+        const particleLife = isPowered ? this.lifetime : this.lifetime * 0.85;
+        if (age < particleLife) {
+          const progress = Math.min(1.0, age / particleLife);
+          const alpha = (isPowered ? 0.92 : 0.62) * Math.max(0, 1.0 - progress * progress);
+          scratchInterpPos.set(s.x, s.y, s.z);
+          this.emit(scratchInterpPos, { alpha, lifetime: particleLife });
+          this.ages[this.count - 1] = age;
+          this.initialAlphas[this.count - 1] = isPowered ? 0.92 : 0.62;
+          this.lastPosition = scratchInterpPos.clone();
+        }
+      }
+      this.geometry.setDrawRange(0, this.count);
+      this.geometry.attributes.position.needsUpdate = true;
+      this.geometry.attributes.color.needsUpdate = true;
+      return;
+    }
+
+    const minTime = currentTime - this.lifetime;
+
+    for (let i = 0; i < samples.length - 1; i++) {
+      const a = samples[i];
+      const b = samples[i + 1];
+
+      if (a.timeSec > currentTime + 1e-4) break;
+      if (b.timeSec < minTime - 1e-4) continue;
+
+      const p0 = i > 0 ? samples[i - 1] : { x: 2 * a.x - b.x, y: 2 * a.y - b.y, z: 2 * a.z - b.z };
+      const p1 = a;
+      const p2 = b;
+      const p3 = (i + 2 < samples.length) ? samples[i + 2] : { x: 2 * b.x - a.x, y: 2 * b.y - a.y, z: 2 * b.z - a.z };
+
+      scratchFrom.set(a.x, a.y, a.z);
+      scratchTo.set(b.x, b.y, b.z);
+      const dist = scratchFrom.distanceTo(scratchTo);
+      const remainingCapacity = Math.max(0, this.max - this.count);
+      if (remainingCapacity <= 0) break;
+      const steps = Math.min(remainingCapacity, Math.max(1, Math.floor(dist / this.spacing)));
+      const isPoweredA = a.powered !== false;
+      const isPoweredB = b.powered !== false;
+      const spansCurrentTime = b.timeSec > currentTime + 1e-4;
+
+      for (let s = 0; s < steps; s++) {
+        const t = s / steps;
+        const sampleTime = a.timeSec + t * (b.timeSec - a.timeSec);
+        if (sampleTime > currentTime + 1e-4) break;
+
+        const age = Math.max(0, currentTime - sampleTime);
+        const isPowered = isPoweredA;
+        const particleLife = isPowered ? this.lifetime : this.lifetime * 0.85;
+        const segAlpha = isPowered ? 0.92 : 0.62;
+
+        if (age < particleLife) {
+          scratchInterpPos.set(
+            catmullRom(p0.x, p1.x, p2.x, p3.x, t),
+            catmullRom(p0.y, p1.y, p2.y, p3.y, t),
+            catmullRom(p0.z, p1.z, p2.z, p3.z, t),
+          );
+          const progress = Math.min(1.0, age / particleLife);
+          const alpha = segAlpha * Math.max(0, 1.0 - progress * progress);
+          this.emit(scratchInterpPos, { alpha, lifetime: particleLife });
+          this.ages[this.count - 1] = age;
+          this.initialAlphas[this.count - 1] = segAlpha;
+          this.lastPosition = scratchInterpPos.clone();
+        }
+      }
+
+      if (spansCurrentTime && b.timeSec > a.timeSec) {
+        const tCurr = Math.max(0, Math.min(1, (currentTime - a.timeSec) / (b.timeSec - a.timeSec)));
+        scratchInterpPos.set(
+          catmullRom(p0.x, p1.x, p2.x, p3.x, tCurr),
+          catmullRom(p0.y, p1.y, p2.y, p3.y, tCurr),
+          catmullRom(p0.z, p1.z, p2.z, p3.z, tCurr),
+        );
+        const isPowered = isPoweredA;
+        const particleLife = isPowered ? this.lifetime : this.lifetime * 0.85;
+        const segAlpha = isPowered ? 0.92 : 0.62;
+        this.emit(scratchInterpPos, { alpha: segAlpha, lifetime: particleLife });
+        this.ages[this.count - 1] = 0;
+        this.initialAlphas[this.count - 1] = segAlpha;
+        this.lastPosition = scratchInterpPos.clone();
+      } else if (!spansCurrentTime) {
+        this.lastPosition = scratchTo.clone();
+      }
+    }
+
+    this.geometry.setDrawRange(0, this.count);
+    this.geometry.attributes.position.needsUpdate = true;
+    this.geometry.attributes.color.needsUpdate = true;
+  }
   dispose() {
     this.scene.remove(this.points);
     this.geometry.dispose();
@@ -309,14 +601,17 @@ export class MissileCombatView {
       if (!view) {
         const mesh = createMissileMesh(missile.typeId);
         this.scene.add(mesh);
-        const trail = new SmokeTrail(this.scene);
+        const trail = new MissileSmokeTrail(this.scene);
         this.trails.push(trail);
         view = { mesh, trail };
         this.missileViews.set(missile.id, view);
+        if (missile.historySamples) {
+          trail.prepopulateFromSamples(missile.historySamples, missile.timeSec ?? 0);
+        }
       }
       view.mesh.position.copy(missile.position);
       view.mesh.quaternion.copy(missile.quaternion);
-      view.trail.update(dt, missile.position, missile.propellant > 0);
+      view.trail.update(dt, missile.position, true, missile.propellant > 0);
     }
     for (const [id, view] of this.missileViews) {
       if (liveMissiles.has(id)) continue;

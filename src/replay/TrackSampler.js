@@ -52,6 +52,31 @@ function slerp(out, a, b, alpha) {
   return out;
 }
 
+/** Monotonic cubic Catmull-Rom spline with Fritsch-Carlson tangent limiting. */
+export function catmullRom(p0, p1, p2, p3, t) {
+  const d = p2 - p1;
+  if (Math.abs(d) < 1e-4) return p1;
+  let m1 = 0.5 * (p2 - p0);
+  let m2 = 0.5 * (p3 - p1);
+  if (d * m1 <= 0) m1 = 0;
+  if (d * m2 <= 0) m2 = 0;
+  const s1 = m1 / d;
+  const s2 = m2 / d;
+  const sumSq = s1 * s1 + s2 * s2;
+  if (sumSq > 9) {
+    const tau = 3 / Math.sqrt(sumSq);
+    m1 = tau * s1 * d;
+    m2 = tau * s2 * d;
+  }
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const h00 = 2 * t3 - 3 * t2 + 1;
+  const h10 = t3 - 2 * t2 + t;
+  const h01 = -2 * t3 + 3 * t2;
+  const h11 = t3 - t2;
+  return h00 * p1 + h10 * m1 + h01 * p2 + h11 * m2;
+}
+
 /** Index of the sample at or before `timeSec`, never the final sample (so i + 1 always exists). */
 export function findSpan(samples, timeSec, hint = 0) {
   let low = 0;
