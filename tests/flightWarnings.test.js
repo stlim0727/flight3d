@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FlightWarnings, terrainConflictSeconds } from '../src/systems/FlightWarnings.js';
+import { b738MaximumSpeedKnots } from '../src/aircraft/PFDCanvas.js';
 const normal = { onGround: false, radioAltFt: 3000, altitudeFt: 3000, vsiFpm: 0,
   iasKnots: 230, mach: 0.4, gearState: 1, flapDegree: 30, rollDeg: 0 };
 const ids = alerts => alerts.map(a => a.id);
@@ -62,6 +63,21 @@ test('priority, overspeed hysteresis, engine failure and takeoff configuration',
   assert.deepEqual(a, []);
   assert.equal(w.update(0.1, { ...normal, onGround: true, throttle: 1, flapDegree: 0 })[0].id, 'takeoff-config');
 });
+test('B738 overspeed recovery and altitude-dependent speed tape', () => {
+  const w = new FlightWarnings('B738');
+  const overspeed = sample => ids(w.update(0.1, { ...normal, ...sample })).includes('overspeed');
+  assert.equal(b738MaximumSpeedKnots(500), 340);
+  assert.equal(overspeed({ altitudeFt: 500, iasKnots: 230 }), false);
+  assert.equal(overspeed({ altitudeFt: 500, iasKnots: 341 }), true);
+  assert.equal(overspeed({ altitudeFt: 500, iasKnots: 230 }), false);
+
+  const altitudeFt = 35000;
+  assert.equal(Math.round(b738MaximumSpeedKnots(altitudeFt)), 263);
+  assert.equal(overspeed({ altitudeFt, iasKnots: 262, mach: 0.819 }), false);
+  assert.equal(overspeed({ altitudeFt, iasKnots: 264, mach: 0.823 }), true);
+  assert.equal(overspeed({ altitudeFt, iasKnots: 259, mach: 0.808 }), false);
+});
+
 test('prediction sees rising terrain but allows a configured runway approach', () => {
   const p = { x: 0, y: 100, z: 0 }, v = { x: 50, y: -5, z: 0 };
   assert.equal(terrainConflictSeconds(p, v, { getHeight: () => 0 }, true), Infinity);

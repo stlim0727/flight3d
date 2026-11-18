@@ -1,4 +1,13 @@
 import * as THREE from 'three';
+import { Atmosphere } from '../physics/Atmosphere.js';
+import { PROFILES } from '../systems/FlightWarningsCore.js';
+
+export function b738MaximumSpeedKnots(altitudeFt) {
+  const { vne, mach } = PROFILES.B738;
+  const { speedOfSound, densityRatio } = Atmosphere.getConditions(Atmosphere.feetToMeters(altitudeFt));
+  const machLimit = Atmosphere.msToKnots(Atmosphere.tasToIas(mach * speedOfSound, densityRatio));
+  return Math.min(vne, machLimit);
+}
 
 /**
  * Boeing 737 / 777 Class Primary Flight Display (PFD)
@@ -342,17 +351,17 @@ export class PFDCanvas {
       }
     }
 
-    // High-speed Barberpole (Vmo = 335 KT, alternating red/white diagonal zebra stripes)
-    const vmoKts = 335;
+    // High-speed barber pole follows the more restrictive VMO/MMO limit.
+    const vmoKts = b738MaximumSpeedKnots(this.altitude);
     const vmoBottomY = cy - (vmoKts - currentIas) * pxPerKnot;
     if (vmoBottomY > y) {
-      const bTop = Math.max(y, vmoBottomY - 120);
       const bBottom = Math.min(y + height, vmoBottomY);
+      const bTop = Math.max(y, bBottom - 120);
       ctx.fillStyle = '#dc2626';
       ctx.fillRect(x + width - 6, bTop, 6, bBottom - bTop);
       ctx.fillStyle = '#ffffff';
       for (let by = bTop; by < bBottom; by += 10) {
-        ctx.fillRect(x + width - 6, by, 6, 5);
+        ctx.fillRect(x + width - 6, by, 6, Math.min(5, bBottom - by));
       }
     }
 
