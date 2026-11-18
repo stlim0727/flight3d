@@ -10,6 +10,7 @@ export class PeerRoom {
   constructor({ room, hostRoom, name, config, voice, options = peerOptions(), prepare, fly, changed = () => {}, remoteStream = () => {}, ended = () => {}, waitingMs = WAITING_TIMEOUT_MS }) {
     if ((room && hostRoom) || (hostRoom && !validRoom(hostRoom)) || (room && !validRoom(room))) throw new Error('invalid-room');
     this.host = !room; this.room = room || hostRoom || newRoom(); this.closed = false; this.disposed = false; this.waitingMs = waitingMs; this.rejections = new Map();
+    this.peerConnecting = false;
     Object.assign(this, { voice, changed, remoteStream, ended });
     this.session = new RoomSession({ host: this.host, name, config, prepare, canStart: () => this.checkWaiting(),
       fly: () => { this.hasStarted = true; fly?.(); },
@@ -26,6 +27,8 @@ export class PeerRoom {
       this.checkWaiting();
       if (this.closed) { this.reject(conn, 'cancelled'); return; }
       if (!this.host || this.connection) { this.reject(conn, 'full'); return; }
+      this.peerConnecting = true;
+      this.changed();
       this.attach(conn);
     });
     this.peer.on('call', call => {
@@ -84,6 +87,7 @@ export class PeerRoom {
   attach(conn) {
     this.connection = conn;
     conn.on('open', () => {
+      this.peerConnecting = false;
       if (!this.checkWaiting()) { conn.close(); return; }
       this.session.opened(); this.changed();
     });
@@ -99,8 +103,14 @@ export class PeerRoom {
         this.attachCall(this.peer.call(conn.peer, this.voice.stream));
       }
     });
-    conn.on('close', () => this.close(this.hasStarted ? 'peer-left' : 'cancelled'));
-    conn.on('error', () => this.close('connection'));
+    conn.on('close', () => {
+      this.peerConnecting = false;
+      this.close(this.hasStarted ? 'peer-left' : 'cancelled');
+    });
+    conn.on('error', () => {
+      this.peerConnecting = false;
+      this.close('connection');
+    });
   }
   attachCall(call) {
     if (!call) return;
@@ -116,6 +126,7 @@ export class PeerRoom {
   }
   close(reason = 'left') {
     if (this.closed) return;
+    this.peerConnecting = false;
     this.send({ type: 'bye', reason: reason === 'cancelled' ? 'cancelled' : 'peer-left' }); this.closed = true; clearInterval(this.timer);
     this.session.end(reason);
     for (const [conn, timer] of this.rejections) { clearTimeout(timer); conn.close(); }

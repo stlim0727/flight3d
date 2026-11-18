@@ -528,3 +528,43 @@ test('ended clears playbackBlocked and synchronizes audio hint', () => fixture((
   assert.equal(controller.playbackBlocked, false);
   assert.equal(hintSynced, 1);
 }));
+
+test('refresh presents distinct connecting states for guest vs host', () => fixture(({ controller }) => {
+  const helpEl = globalThis.document.getElementById('mp-dialog-help');
+  const statusEl = globalThis.document.getElementById('mp-status');
+
+  // 1. Guest in connecting state
+  controller.room = {
+    closed: false,
+    host: false,
+    peerConnecting: false,
+    session: { name: 'Goose', state: 'connecting', config: {} },
+  };
+  controller.refresh();
+  assert.equal(helpEl.textContent, t('mp.guestConnectingHelp'));
+  assert.match(statusEl.textContent, new RegExp(t('mp.guestConnecting')));
+
+  // 2. Guest in connected state
+  controller.room.session.state = 'connected';
+  controller.room.session.remoteName = 'Maverick';
+  controller.refresh();
+  assert.equal(helpEl.textContent, t('mp.guestWaitingHelp'));
+  assert.match(statusEl.textContent, new RegExp(t('mp.state.connected')));
+
+  // 3. Host waiting for friend (idle connecting)
+  controller.room.host = true;
+  controller.room.room = '234567';
+  controller.room.session.state = 'connecting';
+  controller.room.session.remoteName = null;
+  controller.room.peerConnecting = false;
+  controller.refresh();
+  assert.equal(helpEl.textContent, t('mp.hostWaitingHelp'));
+  assert.match(statusEl.textContent, new RegExp(t('mp.state.connecting')));
+
+  // 4. Host while a peer is actively connecting
+  controller.room.peerConnecting = true;
+  controller.refresh();
+  assert.equal(helpEl.textContent, t('mp.hostConnectingHelp'));
+  assert.match(statusEl.textContent, new RegExp(t('mp.peerConnecting')));
+}));
+

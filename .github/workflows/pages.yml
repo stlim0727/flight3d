@@ -42,6 +42,8 @@ jobs:
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY || 'phc_ussf2qgryzxghWApkvG2kcpXarbF4nNGTNEnwCBy8VKj' }}
           VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST || 'https://eu.i.posthog.com' }}
           VITE_MULTIPLAYER_DIRECTORY_URL: ${{ secrets.VITE_MULTIPLAYER_DIRECTORY_URL || vars.VITE_MULTIPLAYER_DIRECTORY_URL || 'https://flight3d-room-directory.stlim0727.workers.dev' }}
+          VITE_MULTIPLAYER_SIGNAL_URL: ${{ secrets.VITE_MULTIPLAYER_SIGNAL_URL || vars.VITE_MULTIPLAYER_SIGNAL_URL || '' }}
+          VITE_MULTIPLAYER_ICE_SERVERS: ${{ secrets.VITE_MULTIPLAYER_ICE_SERVERS || vars.VITE_MULTIPLAYER_ICE_SERVERS || '' }}
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist

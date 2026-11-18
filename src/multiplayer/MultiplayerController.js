@@ -442,7 +442,17 @@ export class MultiplayerController {
     }
     document.getElementById('mp-controls').hidden = !active;
     document.getElementById('mp-intro').hidden = active;
-    bindText(document.getElementById('mp-dialog-help'), () => t(!active ? 'mp.setupHelp' : s.state === 'starting' ? 'mp.state.starting' : s.state !== 'flying' ? (room.host ? (s.state === 'connected' ? 'mp.hostReadyHelp' : 'mp.hostWaitingHelp') : 'mp.guestWaitingHelp') : 'mp.dialogHelp'));
+    bindText(document.getElementById('mp-dialog-help'), () => {
+      if (!active) return t('mp.setupHelp');
+      if (s.state === 'starting') return t('mp.state.starting');
+      if (s.state === 'flying') return t('mp.dialogHelp');
+      if (room.host) {
+        if (s.state === 'connected') return t('mp.hostReadyHelp');
+        if (room.peerConnecting) return t('mp.hostConnectingHelp');
+        return t('mp.hostWaitingHelp');
+      }
+      return s.state === 'connected' ? t('mp.guestWaitingHelp') : t('mp.guestConnectingHelp');
+    });
     document.getElementById('mp-connect').disabled = active;
     document.getElementById('mp-connect').hidden = active;
     document.getElementById('mp-room-menu').hidden = !active;
@@ -454,8 +464,9 @@ export class MultiplayerController {
     document.getElementById('mp-create').disabled = active;
     document.getElementById('mp-join').disabled = active;
     document.getElementById('mp-invite-row').hidden = !active || !room.host || !room.registered;
-    if (active && room.host) {
-      document.getElementById('mp-invite').value = inviteUrl(room.room, location.href);
+    if (active && room.host && room.room) {
+      const base = typeof location !== 'undefined' ? location.href : 'http://localhost/';
+      document.getElementById('mp-invite').value = inviteUrl(room.room, base);
       document.getElementById('mp-code').value = `${room.room.slice(0, 3)} ${room.room.slice(3)}`;
     }
     document.getElementById('mp-respawn').disabled = s?.state !== 'flying';
@@ -469,8 +480,18 @@ export class MultiplayerController {
     this.startReady = ready;
     bindText(start, () => t(s?.state === 'flying' ? 'mp.restart' : 'mp.start'));
     bindText(document.getElementById('mp-status'), () => {
-      if (this.message) return t(`mp.status.${this.message}`);
+      if (this.message) {
+        const msg = t(`mp.status.${this.message}`);
+        if (['timeout', 'connection'].includes(this.message) && !active) {
+          return `${msg} (${t('mp.networkHint')})`;
+        }
+        return msg;
+      }
       if (!active) return t('mp.idle');
+      if (s.state === 'connecting') {
+        if (!room.host) return `${t('mp.guestConnecting')} · 1/2`;
+        if (room.peerConnecting) return `${t('mp.peerConnecting')} · 1/2`;
+      }
       return `${t(`mp.state.${s.state}`)}${s.remoteName ? ` · ${s.remoteName} · 2/2` : ' · 1/2'}`;
     });
     bindText(document.getElementById('mp-roster'), () => active ? `${s.name} + ${s.remoteName || t('mp.waiting')} · ${s.config ? `${t(`mp.${s.config.airport}`)} / ${s.config.aircraft} / ${t(`mp.${s.config.scenario}`)}` : ''}` : '');

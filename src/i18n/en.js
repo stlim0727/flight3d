@@ -14,8 +14,13 @@ export default {
   "mp.joinTitle": "Join a friend",
   "mp.joinHelp": "Enter your friend's code. Their stage and aircraft apply to both pilots. Opening an invite link joins automatically.",
   "mp.hostWaitingHelp": "Share the code, then keep the room open using the button below. Closing cancels this room.",
+  "mp.hostConnectingHelp": "A friend is connecting. Establishing P2P handshake...",
   "mp.hostReadyHelp": "Your friend has joined. Press Start together when ready. Closing cancels this room.",
+  "mp.guestConnecting": "Connecting P2P to host...",
+  "mp.guestConnectingHelp": "Establishing direct P2P connection to host. Shared Wi-Fi loopback blocks or strict browsers (e.g. Brave) may cause delays or failures.",
   "mp.guestWaitingHelp": "Waiting for the creator to start. Closing cancels your participation.",
+  "mp.peerConnecting": "Friend connecting...",
+  "mp.networkHint": "Check Wi-Fi loopback, 5G symmetric NAT, or browser WebRTC policy",
 
   "mp.code": "Room code",
   "mp.copyCode": "Copy code",
