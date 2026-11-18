@@ -873,7 +873,7 @@ test('Dogfight mode alternates between player-to-bandit and bandit-to-player sho
   assert.ok(viewDir2.dot(banditToPlayer) > 0.9, 'Bandit-to-player shot looks toward the player');
 });
 
-test('MISSILE_TRACK rides right behind missile tail fins looking down its flight path', () => {
+test('MISSILE_TRACK rides tight alongside missile airframe looking down its flight path', () => {
   const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.25, 200000);
   const director = new CinematicCameraDirector({ camera });
   const planePos = new THREE.Vector3(0, 1500, 0);
@@ -900,11 +900,11 @@ test('MISSILE_TRACK rides right behind missile tail fins looking down its flight
   }
   assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_TRACK);
   const distToMissile = camera.position.distanceTo(missile.position);
-  assert.ok(distToMissile < 2.5, `Tail-fin POV sits tight to missile body (${distToMissile.toFixed(2)}m)`);
+  assert.ok(distToMissile < 1.0, `Shoulder POV sits tight to missile body (${distToMissile.toFixed(2)}m)`);
   camera.updateMatrixWorld(true);
   const viewDir = new THREE.Vector3();
   camera.getWorldDirection(viewDir);
-  assert.ok(viewDir.dot(new THREE.Vector3(0, 0, -1)) > 0.95, 'Tail-fin POV looks straight down missile flight path');
+  assert.ok(viewDir.dot(new THREE.Vector3(0, 0, -1)) > 0.95, 'Shoulder POV looks straight down missile flight path');
 });
 
 test('BANDIT_POV zooms out when bandit dispenses chaff and flares to keep trajectories in frame', () => {

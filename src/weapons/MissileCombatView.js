@@ -258,7 +258,7 @@ export class MissileSmokeTrail {
     this.material.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader.replace(
         'gl_PointSize = size;',
-        'gl_PointSize = size * (1.0 + (1.0 - vColor.a) * 1.6);',
+        'gl_PointSize = size * (0.35 + (1.0 - vColor.a) * 1.8);',
       );
     };
 
@@ -611,7 +611,9 @@ export class MissileCombatView {
       }
       view.mesh.position.copy(missile.position);
       view.mesh.quaternion.copy(missile.quaternion);
-      view.trail.update(dt, missile.position, true, missile.propellant > 0);
+      // Emit smoke at the rear rocket nozzle (+Z in missile local space, ~1.45m behind centroid)
+      scratchEmitPos.set(0, 0, 1.45).applyQuaternion(missile.quaternion).add(missile.position);
+      view.trail.update(dt, scratchEmitPos, true, missile.propellant > 0);
     }
     for (const [id, view] of this.missileViews) {
       if (liveMissiles.has(id)) continue;
