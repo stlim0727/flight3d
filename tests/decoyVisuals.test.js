@@ -281,3 +281,143 @@ test('wing-localized hit shears single wing and induces aerodynamic death spiral
 
   view.clear();
 });
+
+test('prepared structure hierarchy is restored across consecutive wing shears and respawns', () => {
+  const scene = createMockScene();
+  const target = {
+    id: 11, callsign: 'BANDIT 11', alive: true,
+    position: new THREE.Vector3(0, 500, 0), velocity: new THREE.Vector3(0, 0, -200),
+    quaternion: new THREE.Quaternion(), damage: 0.9, lastHitZone: 'wingL',
+    damageZones: { wingL: 0.95, wingR: 0.1, fuselage: 0.2 },
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, { terrainHeight: () => 0 });
+
+  view.sync(0.02);
+  target.position.z -= 4;
+  view.sync(0.02);
+
+  // Kill 1: left wing shear
+  target.alive = false;
+  view.sync(0.02);
+
+  const targetView1 = view.targetViews.get(11);
+  assert.ok(targetView1.breakup.mainPiece);
+  assert.equal(targetView1.breakup.mainPiece.severedSide, 'left');
+
+  // Trigger impact & persist clear
+  targetView1.breakup.clear({ persist: true, duration: 10 });
+  assert.equal(targetView1.breakup.mainPiece, null);
+
+  // Verify preparedRoot.children has no nested SeveredAirframe
+  const preparedChildren = targetView1.breakup.preparedRoot.children;
+  for (const child of preparedChildren) {
+    assert.notEqual(child.name, 'SeveredAirframe', 'SeveredAirframe must not remain inside preparedRoot');
+  }
+
+  // Respawn same target
+  target.alive = true;
+  target.damage = 0.85;
+  target.lastHitZone = 'wingR';
+  target.damageZones = { wingL: 0.1, wingR: 0.95, fuselage: 0.1 };
+  target.position.set(0, 600, -500);
+  view.sync(0.02);
+  target.position.z -= 4;
+  view.sync(0.02);
+
+  const targetView2 = view.targetViews.get(11);
+  assert.ok(targetView2);
+
+  // Kill 2: right wing shear
+  target.alive = false;
+  view.sync(0.02);
+
+  assert.ok(targetView2.breakup.mainPiece, 'second kill establishes mainPiece');
+  assert.equal(targetView2.breakup.mainPiece.severedSide, 'right', 'right wing is correctly sheared on second kill');
+  const detachedRight = targetView2.breakup.pieces.find(p => p.isDetachedPart);
+  assert.ok(detachedRight);
+  assert.equal(detachedRight.partName, 'right');
+
+  view.clear();
+});
+
+test('ground contact radius triggers impact explosion immediately without waiting 20s', () => {
+  let explosionSpawned = false;
+  const explosionSystem = {
+    spawnExplosion: () => { explosionSpawned = true; },
+  };
+  const scene = createMockScene();
+  const target = {
+    id: 12, callsign: 'BANDIT 12', alive: true,
+    position: new THREE.Vector3(0, 50, 0), velocity: new THREE.Vector3(0, -80, 0),
+    quaternion: new THREE.Quaternion(), damage: 0.9, lastHitZone: 'wingL',
+    damageZones: { wingL: 0.95, wingR: 0.1, fuselage: 0.2 },
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, {
+    terrainHeight: () => 0,
+    explosionSystem,
+  });
+
+  view.sync(0.02);
+  target.position.y -= 1.6;
+  view.sync(0.02);
+
+  // Kill
+  target.alive = false;
+  view.sync(0.02);
+
+  const targetView = view.targetViews.get(12);
+  assert.ok(targetView.breakup?.mainPiece);
+  const radius = targetView.breakup.mainPiece.radius;
+  assert.ok(radius > 0);
+
+  // Advance physics until severed airframe contacts ground (contactHeight = ground + radius)
+  for (let step = 0; step < 100 && !explosionSpawned; step++) {
+    view.sync(0.02);
+  }
+
+  assert.ok(explosionSpawned, 'ground impact explosion spawned upon airframe contact radius');
+  assert.equal(targetView.wreck, null, 'wreck state cleared upon impact');
+  assert.ok(targetView.breakup.persistentPieces.length > 0, 'pieces transitioned to persistent wreckage');
+
+  // Verify persistent pieces continue updating after wreck is null
+  const firstPiece = targetView.breakup.persistentPieces[0];
+  const initialTimer = firstPiece.timer ?? 0;
+  view.sync(0.1);
+  assert.ok((firstPiece.timer ?? 0) > initialTimer, 'persistent pieces continue updating after impact');
+
+  view.clear();
+});
+
+test('live target removal disposes breakup resources and cleans scene', () => {
+  const scene = createMockScene();
+  const target = {
+    id: 13, callsign: 'BANDIT 13', alive: true,
+    position: new THREE.Vector3(0, 100, 0), velocity: new THREE.Vector3(0, 0, -100),
+    quaternion: new THREE.Quaternion(), damage: 0,
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  let disposed = false;
+  const view = new MissileCombatView(scene, system, {
+    createBreakup: (s) => ({
+      prepare: () => {},
+      clear: () => {},
+      disposePrepared: () => { disposed = true; },
+      pieces: [],
+      persistentPieces: [],
+    }),
+  });
+
+  view.sync(0.02);
+  assert.ok(view.targetViews.has(13));
+
+  // Player lands, combat deactivates, system.targets empties
+  system.targets = [];
+  view.sync(0.02);
+
+  assert.equal(view.targetViews.has(13), false);
+  assert.ok(disposed, 'breakup.disposePrepared() was called on target removal');
+
+  view.clear();
+});

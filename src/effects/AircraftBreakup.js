@@ -375,7 +375,6 @@ export class AircraftBreakup {
   }
 
   clear({ persist = false, duration = 30 } = {}) {
-    this.mainPiece = null;
     if (persist && this.pieces.length > 0) {
       for (const piece of this.pieces) {
         const objClone = piece.object.clone(true);
@@ -400,9 +399,27 @@ export class AircraftBreakup {
         });
       }
     }
+    // Restore composite groups (SeveredAirframe) back to direct children of preparedRoot
+    if (this.mainPiece?.object) {
+      const mainGroup = this.mainPiece.object;
+      this.scene.remove(mainGroup);
+      while (mainGroup.children.length > 0) {
+        const child = mainGroup.children[0];
+        child.position.set(0, 0, 0);
+        child.quaternion.identity();
+        child.scale.setScalar(1);
+        this.preparedRoot?.add(child);
+      }
+      this.mainPiece = null;
+    }
     for (const { object } of this.pieces) {
       this.scene.remove(object);
-      this.preparedRoot?.add(object);
+      if (object.name !== 'SeveredAirframe') {
+        object.position.set(0, 0, 0);
+        object.quaternion.identity();
+        object.scale.setScalar(1);
+        this.preparedRoot?.add(object);
+      }
     }
     this.pieces = [];
     if (this.aircraft) this.aircraft.group.visible = true;

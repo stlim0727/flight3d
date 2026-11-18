@@ -568,6 +568,14 @@ export class MissileCombatView {
         view.lastPosition = null;
         view.velocity.set(0, 0, 0);
       }
+      if (view.breakup?.persistentPieces?.length > 0) {
+        const terrainAdapter = this.terrainHeight ? { getHeight: (x, z) => this.terrainHeight(x, z) } : null;
+        const water = typeof this.waterLevel === 'function'
+          ? this.waterLevel(view.mesh.position.x, view.mesh.position.z)
+          : this.waterLevel;
+        const waterLevel = Number.isFinite(water) ? water : null;
+        view.breakup.update(dt, terrainAdapter, waterLevel);
+      }
       view.wreck = null;
       view.mesh.visible = true;
       if (view.breakup && view.breakup.pieces.length > 0) {
@@ -622,6 +630,8 @@ export class MissileCombatView {
       if (liveTargets.has(id)) continue;
       this.scene.remove(view.mesh);
       view.aircraft.dispose();
+      view.breakup?.clear();
+      view.breakup?.disposePrepared?.();
       view.trail?.dispose();
       view.fireTrail?.dispose();
       this.targetViews.delete(id);
@@ -662,7 +672,10 @@ export class MissileCombatView {
     for (let i = this.detachedWrecks.length - 1; i >= 0; i--) {
       const detached = this.detachedWrecks[i];
       this._syncWreck(detached, null, dt);
-      if (!detached.wreck && !detached.trail && !detached.fireTrail) {
+      const hasWreck = Boolean(detached.wreck);
+      const hasTrails = Boolean(detached.trail || detached.fireTrail);
+      const hasBreakup = Boolean(detached.breakup?.pieces?.length || detached.breakup?.persistentPieces?.length);
+      if (!hasWreck && !hasTrails && !hasBreakup) {
         this.scene.remove(detached.mesh);
         detached.breakup?.clear();
         detached.breakup?.disposePrepared?.();
@@ -705,9 +718,18 @@ export class MissileCombatView {
    * trajectory, followed by a ground impact explosion upon terrain/water contact.
    */
   _syncWreck(view, target, dt) {
+    const terrainAdapter = this.terrainHeight ? { getHeight: (x, z) => this.terrainHeight(x, z) } : null;
+    const water = typeof this.waterLevel === 'function'
+      ? this.waterLevel(view.mesh.position.x, view.mesh.position.z)
+      : this.waterLevel;
+    const waterLevel = Number.isFinite(water) ? water : null;
+
     if (!view.wreck) {
+      if (view.breakup?.persistentPieces?.length > 0) {
+        view.breakup.update(dt, terrainAdapter, waterLevel);
+      }
+      this._fadeWreckTrails(view, dt, true);
       if (!view.lastPosition || view.velocity.lengthSq() < 1) {
-        this._fadeWreckTrails(view, dt, true);
         return;
       }
       const heading = view.velocity.clone().normalize();
@@ -756,12 +778,6 @@ export class MissileCombatView {
     const wreck = view.wreck;
     wreck.age += dt;
 
-    const terrainAdapter = this.terrainHeight ? { getHeight: (x, z) => this.terrainHeight(x, z) } : null;
-    const water = typeof this.waterLevel === 'function'
-      ? this.waterLevel(view.mesh.position.x, view.mesh.position.z)
-      : this.waterLevel;
-    const waterLevel = Number.isFinite(water) ? water : null;
-
     if (view.breakup && view.breakup.pieces.length > 0) {
       view.breakup.update(dt, terrainAdapter, waterLevel);
       view.mesh.position.copy(view.breakup.target);
@@ -800,9 +816,40 @@ export class MissileCombatView {
     }
     view.trail.update(dt, emitPos, true);
 
-    const ground = this.terrainHeight?.(view.mesh.position.x, view.mesh.position.z) ?? 0;
-    const isWater = Number.isFinite(waterLevel) && ground < waterLevel && view.mesh.position.y <= waterLevel + WRECK_GROUND_CLEARANCE_M;
-    const isGround = view.mesh.position.y <= ground + WRECK_GROUND_CLEARANCE_M;
+    let isGround = false;
+    let isWater = false;
+    if (view.breakup && view.breakup.pieces.length > 0) {
+      if (view.breakup.mainPiece) {
+        const p = view.breakup.mainPiece;
+        const pGround = this.terrainHeight?.(p.object.position.x, p.object.position.z) ?? 0;
+        const pWater = typeof this.waterLevel === 'function'
+          ? this.waterLevel(p.object.position.x, p.object.position.z)
+          : this.waterLevel;
+        if (Number.isFinite(pWater) && pGround < pWater && (p.object.position.y - p.radius) <= pWater + 0.3) {
+          isWater = true;
+        } else if ((p.object.position.y - p.radius) <= pGround + 0.4) {
+          isGround = true;
+        }
+      } else {
+        for (const p of view.breakup.pieces) {
+          const pGround = this.terrainHeight?.(p.object.position.x, p.object.position.z) ?? 0;
+          const pWater = typeof this.waterLevel === 'function'
+            ? this.waterLevel(p.object.position.x, p.object.position.z)
+            : this.waterLevel;
+          if (Number.isFinite(pWater) && pGround < pWater && (p.object.position.y - p.radius) <= pWater + 0.3) {
+            isWater = true;
+            break;
+          } else if ((p.object.position.y - p.radius) <= pGround + 0.4) {
+            isGround = true;
+            break;
+          }
+        }
+      }
+    } else {
+      const ground = this.terrainHeight?.(view.mesh.position.x, view.mesh.position.z) ?? 0;
+      isWater = Number.isFinite(waterLevel) && ground < waterLevel && view.mesh.position.y <= waterLevel + WRECK_GROUND_CLEARANCE_M;
+      isGround = view.mesh.position.y <= ground + WRECK_GROUND_CLEARANCE_M;
+    }
 
     if (isGround || isWater || wreck.age >= WRECK_MAX_AGE_S) {
       if (isGround || isWater) {
@@ -817,7 +864,7 @@ export class MissileCombatView {
 
   _spawnGroundImpact(view, wreck, isWater = false) {
     const explosionSystem = this.explosionSystem;
-    const impactPos = view.mesh.position.clone();
+    const impactPos = (view.breakup?.mainPiece?.object?.position ?? view.mesh.position).clone();
     const ground = this.terrainHeight?.(impactPos.x, impactPos.z) ?? 0;
     const water = typeof this.waterLevel === 'function'
       ? this.waterLevel(impactPos.x, impactPos.z)
