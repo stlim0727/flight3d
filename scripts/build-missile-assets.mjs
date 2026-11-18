@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { MISSILE_TYPES } from '../src/weapons/missileSpecs.js';
+import { validateGlbModel } from './validate-glb-mesh.mjs';
 
 // GLTFExporter uses the browser FileReader API for its binary buffer in Node.js.
 globalThis.FileReader = class {
@@ -865,6 +866,12 @@ export function buildUnderwingPylonModel() {
 async function exportGlb(group, filename) {
   const exporter = new GLTFExporter();
   const arrayBuffer = await exporter.parseAsync(group, { binary: true });
+  const validation = await validateGlbModel(arrayBuffer, filename);
+  if (!validation.valid) {
+    console.error(`✖ Geometry validation failed for ${filename}:`);
+    for (const err of validation.errors) console.error(`  - ${err}`);
+    throw new Error(`Exported GLB ${filename} failed geometry validation`);
+  }
   const buffer = Buffer.from(arrayBuffer);
   const filePath = new URL(filename, outputDir);
   await writeFile(filePath, buffer);

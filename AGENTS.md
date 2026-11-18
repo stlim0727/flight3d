@@ -10,9 +10,11 @@ Treat these acronyms as instructions when used as commands in a task or PR conte
 
 - **`arc` — address review comments:** run `npm run pr:arc` to inspect the PR's
   current review comments and checks in one call, validate feedback, implement
-  actionable fixes, run relevant checks, push updates, and reply to comments and
-  resolve threads (`npm run pr:arc -- --resolve <threadId>`) when addressed. Explain
-  any feedback that does not warrant a change. Follow the repository's review workflow.
+  actionable fixes, run relevant checks, push updates, reply to comments, and
+  resolve threads (`npm run pr:arc -- --resolve <threadId> ...`) when addressed.
+  Use `--wait` (`npm run pr:arc -- --wait`) to wait for in-flight CI checks in a single
+  call instead of polling across turns. Explain any feedback that does not warrant a change.
+  Follow the repository's review workflow.
 - **`mac` — merge (PR) and clean up (worktree and directory):** run `npm run pr:mac`
   to verify required CI, reviews, and merge gates, merge the intended PR, remove its
   completed task worktree and directory, delete the merged branch, and fast-forward

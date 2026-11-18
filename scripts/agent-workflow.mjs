@@ -58,13 +58,28 @@ function cmdWtNew(branch, customPath) {
   }
 }
 
+export function parseResolveThreadIds(extraArgs = []) {
+  const ids = [];
+  for (let i = 0; i < extraArgs.length; i++) {
+    if (extraArgs[i] === '--resolve' && extraArgs[i + 1]) {
+      ids.push(extraArgs[++i]);
+    }
+  }
+  return ids;
+}
+
+export function shouldWaitChecks(extraArgs = []) {
+  return extraArgs.includes('--wait') || extraArgs.includes('--watch');
+}
+
 function cmdPrArc(prArg, extraArgs = []) {
-  const resolveIdx = extraArgs.indexOf('--resolve');
-  if (resolveIdx !== -1 && extraArgs[resolveIdx + 1]) {
-    const threadId = extraArgs[resolveIdx + 1];
-    const query = `mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id isResolved}}}`;
-    const res = run('gh', ['api', 'graphql', '-f', `query=${query}`, '-F', `id=${threadId}`]);
-    console.log(`✔ Resolved review thread ${threadId}: ${res}`);
+  const resolveIds = parseResolveThreadIds(extraArgs);
+  if (resolveIds.length > 0) {
+    for (const threadId of resolveIds) {
+      const query = `mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id isResolved}}}`;
+      const res = run('gh', ['api', 'graphql', '-f', `query=${query}`, '-F', `id=${threadId}`]);
+      console.log(`✔ Resolved review thread ${threadId}: ${res}`);
+    }
     return;
   }
 
@@ -118,6 +133,24 @@ function cmdPrArc(prArg, extraArgs = []) {
     const latest = issueComments.at(-1);
     console.log(`\nLatest PR comment (@${latest.author?.login}, ${latest.createdAt}):`);
     console.log(latest.body.slice(0, 800));
+  }
+
+  // When --wait or --watch is requested, wait for pending CI checks in a single call
+  // instead of returning immediately and forcing the agent to poll across turns.
+  if (shouldWaitChecks(extraArgs)) {
+    let gate = checkGate(pr);
+    if (gate.failing.length === 0 && gate.pending.length > 0) {
+      console.log(`\n… waiting for ${gate.pending.length} check(s) on PR #${pr.number} (via gh pr checks --watch)`);
+      tryRun('gh', ['pr', 'checks', String(pr.number), '--watch', '--interval', '20'],
+        { timeout: 30 * 60 * 1000 });
+      const refreshedJson = run('gh', [
+        'pr', 'view', ...(prArg ? [prArg] : []),
+        '--json', 'number,title,url,state,mergeStateStatus,reviewDecision,headRefName,statusCheckRollup'
+      ]);
+      const refreshedPr = JSON.parse(refreshedJson);
+      const refreshedChecks = (refreshedPr.statusCheckRollup || []).map(c => `${c.name || c.context}: ${c.conclusion || c.status}`);
+      console.log(`\nRefreshed checks: ${refreshedChecks.join(', ') || 'none'}`);
+    }
   }
 }
 
