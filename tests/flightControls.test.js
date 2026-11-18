@@ -535,9 +535,13 @@ describe('Manual precision', () => {
     const c = makeControls();
     c.hotas.elevator = 1.0;
     c.hotas.aileron = 1.0;
+    c.hotas.rudder = 1.0;
     c.update(0.1, 140, 'F16');
-    // F-16: 3.0/s elevator -> 0.30 after 0.1s; 4.0/s aileron -> 0.40 after 0.1s
-    assert.ok(Math.abs(c.elevator - 0.30) < 1e-12);
+    // F-16: 0.55/s elevator (G-limiter calibrated) -> 0.055 after 0.1s
+    // 4.0/s aileron (responsive roll) -> 0.40 after 0.1s
+    // 2.5/s rudder -> 0.25 after 0.1s
+    assert.ok(Math.abs(c.elevator - 0.055) < 1e-12);
     assert.ok(Math.abs(c.aileron - 0.40) < 1e-12);
+    assert.ok(Math.abs(c.rudder - 0.25) < 1e-12);
   });
 });
