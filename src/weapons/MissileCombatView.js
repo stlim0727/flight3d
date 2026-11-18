@@ -3,6 +3,7 @@ import { BanditAircraftView } from './BanditAircraftView.js';
 import { createMissileMesh, preloadMissileModels } from './missileGeometry.js';
 import { ZONE_LOCAL_CENTERS } from '../physics/combatDamage.js';
 import { catmullRom } from '../replay/TrackSampler.js';
+import { AircraftBreakup } from '../effects/AircraftBreakup.js';
 
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
@@ -488,10 +489,22 @@ export class MissileCombatView {
    * @param {(x:number, z:number)=>number} [options.terrainHeight] ground under the
    *   wreck; a wreck ends on impact, and without it the wreck ends at sea level.
    */
-  constructor(scene, system, { terrainHeight = null } = {}) {
+  constructor(scene, system, {
+    terrainHeight = null,
+    explosionSystem = null,
+    audio = null,
+    camera = null,
+    waterLevel = null,
+    createBreakup = s => new AircraftBreakup(s),
+  } = {}) {
     this.scene = scene;
     this.system = system;
     this.terrainHeight = terrainHeight;
+    this.explosionSystem = explosionSystem;
+    this.audio = audio;
+    this.camera = camera;
+    this.waterLevel = waterLevel;
+    this.createBreakup = createBreakup;
     this.targetViews = new Map();
     this.missileViews = new Map();
     this.flareViews = new Map();
@@ -510,7 +523,14 @@ export class MissileCombatView {
         const aircraft = new BanditAircraftView(target.callsign);
         const mesh = aircraft.mesh;
         this.scene.add(mesh);
-        view = { mesh, aircraft, trail: null, fireTrail: null,
+        const breakup = this.createBreakup ? this.createBreakup(this.scene) : null;
+        if (breakup) {
+          breakup.prepare(aircraft.getBreakupSource());
+          aircraft.onAirframeLoaded = () => {
+            if (!view.wreck) breakup.prepare(aircraft.getBreakupSource());
+          };
+        }
+        view = { mesh, aircraft, breakup, trail: null, fireTrail: null,
           lastPosition: null, velocity: new THREE.Vector3(), wreck: null };
         this.targetViews.set(target.id, view);
       }
@@ -525,6 +545,7 @@ export class MissileCombatView {
           mesh: view.mesh,
           aircraft: view.aircraft,
           wreck: view.wreck,
+          breakup: view.breakup,
           trail: view.trail,
           fireTrail: view.fireTrail,
         };
@@ -534,6 +555,13 @@ export class MissileCombatView {
         view.mesh = aircraft.mesh;
         view.aircraft = aircraft;
         this.scene.add(view.mesh);
+        view.breakup = this.createBreakup ? this.createBreakup(this.scene) : null;
+        if (view.breakup) {
+          view.breakup.prepare(aircraft.getBreakupSource());
+          aircraft.onAirframeLoaded = () => {
+            if (!view.wreck) view.breakup.prepare(aircraft.getBreakupSource());
+          };
+        }
         view.trail = null;
         view.fireTrail = null;
         view.wreck = null;
@@ -542,6 +570,12 @@ export class MissileCombatView {
       }
       view.wreck = null;
       view.mesh.visible = true;
+      if (view.breakup && view.breakup.pieces.length > 0) {
+        view.breakup.clear();
+      }
+      if (view.aircraft) {
+        view.aircraft.restoreVisuals?.();
+      }
       view.aircraft.update(dt, target.flight);
       view.mesh.position.copy(target.position);
       if (target.quaternion) {
@@ -630,6 +664,8 @@ export class MissileCombatView {
       this._syncWreck(detached, null, dt);
       if (!detached.wreck && !detached.trail && !detached.fireTrail) {
         this.scene.remove(detached.mesh);
+        detached.breakup?.clear();
+        detached.breakup?.disposePrepared?.();
         detached.aircraft?.dispose?.();
         this.detachedWrecks.splice(i, 1);
         for (const v of this.targetViews.values()) {
@@ -664,10 +700,9 @@ export class MissileCombatView {
   }
 
   /**
-   * A killed bandit keeps its airframe: it tumbles, drags, falls and burns until
-   * it hits the ground, so a kill reads as a downing instead of a deletion. Only
-   * a target observed alive can become a wreck; a seek that lands after the kill
-   * has no motion history and stays hidden.
+   * A killed bandit breaks apart into structural debris and falls as a burning wreck.
+   * Frame-to-frame airframe motion is preserved so the fall continues the last visible
+   * trajectory, followed by a ground impact explosion upon terrain/water contact.
    */
   _syncWreck(view, target, dt) {
     if (!view.wreck) {
@@ -678,19 +713,53 @@ export class MissileCombatView {
       const heading = view.velocity.clone().normalize();
       const axis = new THREE.Vector3().crossVectors(UP, heading);
       if (axis.lengthSq() < 1e-6) axis.set(1, 0, 0); else axis.normalize();
-      view.wreck = { age: 0, velocity: view.velocity.clone(), axis };
-      view.mesh.position.copy(target.position);
+      const spinVector = new THREE.Vector3(0.6, 2.2, 0.8);
+      view.wreck = { age: 0, velocity: view.velocity.clone(), axis, spinVector };
+      if (target) {
+        view.mesh.position.copy(target.position);
+        if (target.quaternion) view.mesh.quaternion.copy(target.quaternion);
+      }
+      view.mesh.updateWorldMatrix(true, true);
+      if (view.aircraft) view.aircraft._isDestroyed = true;
+      if (view.breakup) {
+        const source = view.aircraft?.getBreakupSource?.();
+        if (source) {
+          view.breakup.spawn(source, view.velocity);
+        }
+      }
       view.lastPosition = null;
     }
     view.mesh.visible = true;
     if (dt <= 0) return;
     const wreck = view.wreck;
     wreck.age += dt;
-    wreck.velocity.y -= WRECK_GRAVITY_MPS2 * dt;
-    wreck.velocity.multiplyScalar(Math.exp(-dt / WRECK_DRAG_TIME_S));
-    view.mesh.position.addScaledVector(wreck.velocity, dt);
-    scratchQuat.setFromAxisAngle(wreck.axis, WRECK_SPIN_RAD_PER_S * dt);
-    view.mesh.quaternion.multiply(scratchQuat);
+
+    const terrainAdapter = this.terrainHeight ? { getHeight: (x, z) => this.terrainHeight(x, z) } : null;
+    const water = typeof this.waterLevel === 'function'
+      ? this.waterLevel(view.mesh.position.x, view.mesh.position.z)
+      : this.waterLevel;
+    const waterLevel = Number.isFinite(water) ? water : null;
+
+    if (view.breakup && view.breakup.pieces.length > 0) {
+      view.breakup.update(dt, terrainAdapter, waterLevel);
+      view.mesh.position.copy(view.breakup.target);
+    } else {
+      wreck.velocity.y -= WRECK_GRAVITY_MPS2 * dt;
+      wreck.velocity.multiplyScalar(Math.exp(-dt / WRECK_DRAG_TIME_S));
+      view.mesh.position.addScaledVector(wreck.velocity, dt);
+      if (wreck.spinVector) {
+        scratchQuat.setFromEuler(new THREE.Euler(
+          wreck.spinVector.x * dt,
+          wreck.spinVector.y * dt,
+          wreck.spinVector.z * dt,
+        ));
+        view.mesh.quaternion.multiply(scratchQuat);
+      } else {
+        scratchQuat.setFromAxisAngle(wreck.axis, WRECK_SPIN_RAD_PER_S * dt);
+        view.mesh.quaternion.multiply(scratchQuat);
+      }
+    }
+
     if (!view.fireTrail) {
       view.fireTrail = new SmokeTrail(this.scene, { max: 64, size: 4.2, color: 0xff7722, opacity: 0.85 });
     }
@@ -699,11 +768,48 @@ export class MissileCombatView {
       view.trail = new SmokeTrail(this.scene, { max: 96, size: 7, color: 0x242424, opacity: 0.62 });
     }
     view.trail.update(dt, view.mesh.position, true);
+
     const ground = this.terrainHeight?.(view.mesh.position.x, view.mesh.position.z) ?? 0;
-    if (view.mesh.position.y <= ground + WRECK_GROUND_CLEARANCE_M || wreck.age >= WRECK_MAX_AGE_S) {
+    const isWater = Number.isFinite(waterLevel) && ground < waterLevel && view.mesh.position.y <= waterLevel + WRECK_GROUND_CLEARANCE_M;
+    const isGround = view.mesh.position.y <= ground + WRECK_GROUND_CLEARANCE_M;
+
+    if (isGround || isWater || wreck.age >= WRECK_MAX_AGE_S) {
+      if (isGround || isWater) {
+        this._spawnGroundImpact(view, wreck, isWater);
+      }
+      view.breakup?.clear({ persist: true, duration: 15 });
       view.wreck = null;
       view.lastPosition = null;
       this._fadeWreckTrails(view, dt, true);
+    }
+  }
+
+  _spawnGroundImpact(view, wreck, isWater = false) {
+    const explosionSystem = this.explosionSystem;
+    const impactPos = view.mesh.position.clone();
+    const ground = this.terrainHeight?.(impactPos.x, impactPos.z) ?? 0;
+    const water = typeof this.waterLevel === 'function'
+      ? this.waterLevel(impactPos.x, impactPos.z)
+      : this.waterLevel;
+    if (isWater && Number.isFinite(water)) {
+      impactPos.y = water;
+    } else {
+      impactPos.y = ground;
+    }
+    const velocity = wreck?.velocity ? wreck.velocity.clone() : new THREE.Vector3(0, -30, 0);
+    const speedKnots = velocity.length() * 1.94384;
+    explosionSystem?.spawnExplosion?.({
+      point: impactPos,
+      type: isWater ? 'WATER' : 'TERRAIN',
+      name: 'BANDIT IMPACT',
+      speedKnots,
+    }, velocity, {
+      exaggerated: true,
+      intensity: 1.5,
+    });
+    if (this.audio) {
+      const distance = this.camera?.position?.distanceTo ? this.camera.position.distanceTo(impactPos) : undefined;
+      this.audio.playRemoteExplosion?.(distance, isWater);
     }
   }
 
@@ -799,6 +905,7 @@ export class MissileCombatView {
   }
 
   spawnExplosion(explosionSystem, event) {
+    if (explosionSystem) this.explosionSystem = explosionSystem;
     if (!explosionSystem || !event?.position) return;
     const velocity = event.velocity || new THREE.Vector3();
     const isKill = Boolean(event.target);
@@ -816,6 +923,8 @@ export class MissileCombatView {
   clear() {
     for (const view of this.targetViews.values()) {
       this.scene.remove(view.mesh);
+      view.breakup?.clear();
+      view.breakup?.disposePrepared?.();
       view.aircraft.dispose();
       view.trail?.dispose();
       view.fireTrail?.dispose();
@@ -836,6 +945,8 @@ export class MissileCombatView {
     for (const trail of this.trails) trail.dispose();
     for (const detached of this.detachedWrecks) {
       this.scene.remove(detached.mesh);
+      detached.breakup?.clear();
+      detached.breakup?.disposePrepared?.();
       detached.aircraft?.dispose?.();
       detached.trail?.dispose?.();
       detached.fireTrail?.dispose?.();

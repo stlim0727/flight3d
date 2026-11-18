@@ -367,6 +367,10 @@ class FlightSimulator {
     this.missileCombat = new AirToAirMissileSystem();
     this.missileCombatView = new MissileCombatView(this.scene, this.missileCombat, {
       terrainHeight: (x, z) => this.currentTerrain?.getHeight(x, z) ?? 0,
+      explosionSystem: this.explosionSystem,
+      audio: this.audio,
+      camera: this.camera,
+      waterLevel: () => (this.water?.mesh?.visible ? this.water.waterLevel : null),
     });
     this.cannonCombatView = new CannonCombatView(this.scene, this.missileCombat);
     this.rearmSystem = new RearmSystem();

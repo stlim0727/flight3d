@@ -177,3 +177,66 @@ test('CombatReplayPlayback reconstructs flares and chaff from decoy_dispense eve
   assert.equal(playback.state.flares.length, 0);
   assert.equal(playback.state.chaffClouds.length, 0);
 });
+
+test('a killed bandit breaks apart into structural debris and triggers ground impact explosion and audio', () => {
+  const scene = createMockScene();
+  const target = {
+    id: 1, callsign: 'BANDIT 1', alive: true,
+    position: new THREE.Vector3(0, 50, 0), velocity: new THREE.Vector3(0, 0, -200),
+    quaternion: new THREE.Quaternion(), damage: 0.9, damageZones: {},
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const explosions = [];
+  const audios = [];
+  const fakeExplosionSystem = {
+    spawnExplosion(config, velocity, options) {
+      explosions.push({ config, velocity, options });
+    },
+  };
+  const fakeAudio = {
+    playRemoteExplosion(distance, isWater) {
+      audios.push({ distance, isWater });
+    },
+  };
+  const camera = { position: new THREE.Vector3(0, 100, 200) };
+
+  const view = new MissileCombatView(scene, system, {
+    terrainHeight: () => 10,
+    explosionSystem: fakeExplosionSystem,
+    audio: fakeAudio,
+    camera,
+  });
+
+  // Alive step
+  view.sync(0.02);
+  target.position.z -= 4;
+  view.sync(0.02);
+
+  const targetView = view.targetViews.get(1);
+  assert.ok(targetView.breakup, 'breakup is initialized for the bandit');
+  assert.equal(targetView.aircraft.proxy.visible, true, 'proxy is visible while alive');
+
+  // Kill step: breakup spawns, intact proxy is hidden, pieces are in scene
+  target.alive = false;
+  view.sync(0.02);
+  assert.ok(targetView.wreck, 'wreck is created');
+  assert.ok(targetView.breakup.pieces.length > 0, 'pieces are spawned');
+  assert.equal(targetView.aircraft.proxy.visible, false, 'intact proxy is hidden during breakup');
+
+  // Fall until terrain impact (terrain height = 10, start y = 50)
+  for (let i = 0; i < 200; i++) {
+    view.sync(0.02);
+    if (!targetView.wreck) break;
+  }
+
+  assert.equal(targetView.wreck, null, 'wreck ended upon ground impact');
+  assert.equal(targetView.mesh.visible, false, 'wreck mesh is hidden');
+  assert.ok(explosions.length >= 1, 'ground impact explosion was spawned');
+  assert.equal(explosions[0].config.type, 'TERRAIN');
+  assert.equal(explosions[0].config.name, 'BANDIT IMPACT');
+  assert.ok(audios.length >= 1, 'remote explosion audio was played');
+  assert.equal(audios[0].isWater, false);
+  assert.ok(audios[0].distance > 100);
+
+  view.clear();
+});

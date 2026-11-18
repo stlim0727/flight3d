@@ -52,6 +52,10 @@ export class CombatReplayPlayback {
     this.state = { targets: [], missiles: [], flares: [], chaffClouds: [], rails: 0x3f };
     this.view = new MissileCombatView(sim.scene, this.state, {
       terrainHeight: (x, z) => sim.currentTerrain?.getHeight(x, z) ?? 0,
+      explosionSystem: sim.explosionSystem,
+      audio: sim.audio,
+      camera: sim.camera,
+      waterLevel: () => (sim.water?.mesh?.visible ? sim.water.waterLevel : null),
     });
     this.targets = [];
     this.groups = new Map();
