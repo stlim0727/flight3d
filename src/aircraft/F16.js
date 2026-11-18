@@ -211,13 +211,16 @@ export class F16 {
     this.cockpit.group.add(this.cockpit.gltfCockpitGroup);
     this.pilotMesh = createPilotMesh('f16');
     this.pilotMesh.position.set(F16_PILOT_OFFSET.x, F16_PILOT_OFFSET.y, F16_PILOT_OFFSET.z);
+    this.pilotMesh.userData.onSwap = () => {
+      this.breakupVersion = (this.breakupVersion || 0) + 1;
+    };
     this.cockpit.group.add(this.pilotMesh);
     this.hudCanvas = options.exteriorOnly
       ? null
       : (options.hudCanvas || new CockpitHudCanvas(512, 512, { variant: 'f16' }));
     this.hudMesh = null;
     if (!options.exteriorOnly) this.instrumentLight = installInstrumentLighting(this.cockpit, F16_FALCON.cockpit.captainEyePos, 0x91ffb5, () => !this.isCrashed);
-    this.ready = new GLTFLoader().loadAsync(`${import.meta.env?.BASE_URL ?? '/'}models/f-16.glb`)
+    const airframePromise = new GLTFLoader().loadAsync(`${import.meta.env?.BASE_URL ?? '/'}models/f-16.glb`)
       .then(gltf => {
         this.installModel(gltf.scene);
         if (this.flatShading) {
@@ -227,10 +230,11 @@ export class F16 {
       .catch(error => {
         this.cockpit.cockpitModelFailed = true;
         console.error('F-16 model failed to load:', error);
-      }).finally(() => {
-        this.loadingGltf = false;
-        this.cockpit.cockpitModelLoading = false;
       });
+    this.ready = Promise.all([airframePromise, this.pilotMesh.ready]).finally(() => {
+      this.loadingGltf = false;
+      this.cockpit.cockpitModelLoading = false;
+    });
   }
 
   installModel(scene) {
@@ -332,7 +336,7 @@ export class F16 {
     }
     if (this.stowedGear) this.stowedGear.visible = extension < 0.999;
     if (this.landingLight) this.landingLight.visible = this.lightsOn && !this.isCrashed && extension > 0.95;
-    updatePilotDynamics(this.pilotMesh, state);
+    updatePilotDynamics(this.pilotMesh, state, dt);
   }
 
   setCockpitMode(isCockpit, showInterior = true) {

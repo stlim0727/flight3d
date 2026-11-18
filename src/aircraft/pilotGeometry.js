@@ -536,7 +536,7 @@ export function createPilotMesh(variant = 'f16') {
 
   // 2. Load authored GLB model asynchronously if available
   if (typeof window !== 'undefined') {
-    loadPilotModel(variant).then(template => {
+    group.ready = loadPilotModel(variant).then(template => {
       if (!template) return;
       // Replace procedural root with cloned authored GLB scene
       group.remove(root);
@@ -547,9 +547,15 @@ export function createPilotMesh(variant = 'f16') {
       group.userData.head = clone.getObjectByName('Pilot_Head');
       group.userData.body = clone.getObjectByName('Pilot_Body');
       group.userData.seat = clone.getObjectByName('Pilot_Seat');
+      if (group.userData.isCockpit !== undefined) {
+        setPilotCockpitMode(group, group.userData.isCockpit, group.userData.showInterior, group.userData.cockpitOptions);
+      }
+      group.userData.onSwap?.();
     }).catch(() => {
       // Procedural fallback remains active
     });
+  } else {
+    group.ready = Promise.resolve();
   }
 
   return group;
@@ -563,6 +569,10 @@ export function createPilotMesh(variant = 'f16') {
  */
 export function setPilotCockpitMode(pilotGroup, isCockpit, showInterior = true, options = {}) {
   if (!pilotGroup || !pilotGroup.userData) return;
+  pilotGroup.userData.isCockpit = isCockpit;
+  pilotGroup.userData.showInterior = showInterior;
+  pilotGroup.userData.cockpitOptions = options;
+
   const head = pilotGroup.userData.head;
   const body = pilotGroup.userData.body;
   const seat = pilotGroup.userData.seat;
@@ -580,9 +590,11 @@ export function setPilotCockpitMode(pilotGroup, isCockpit, showInterior = true, 
 
 /**
  * Dynamic pilot physiology updates (G-force head lag & roll bank head tilt).
+ * Advances using dt and freezes when simulation or replay playback is paused (dt <= 0).
  */
-export function updatePilotDynamics(pilotGroup, state = {}) {
+export function updatePilotDynamics(pilotGroup, state = {}, dt = 0.016) {
   if (!pilotGroup || !pilotGroup.userData) return;
+  if (!dt || dt <= 0) return;
   const head = pilotGroup.userData.head;
   if (!head || !head.visible) return;
 
@@ -591,9 +603,11 @@ export function updatePilotDynamics(pilotGroup, state = {}) {
 
   // High-G head compression / downward pitch under positive G load
   const targetPitch = -THREE.MathUtils.clamp((gZ - 1.0) * 0.018, -0.04, 0.12);
-  head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, targetPitch, 0.2);
+  const pitchDecay = 1 - Math.exp(-12.0 * dt);
+  head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, targetPitch, pitchDecay);
 
   // Turn coordination head roll into the turn
   const targetRoll = -THREE.MathUtils.clamp(rollRate * 0.04, -0.12, 0.12);
-  head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, targetRoll, 0.15);
+  const rollDecay = 1 - Math.exp(-9.0 * dt);
+  head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, targetRoll, rollDecay);
 }

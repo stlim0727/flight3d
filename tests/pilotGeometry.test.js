@@ -108,16 +108,21 @@ test('updatePilotDynamics responds to G-forces and turn roll rate', () => {
   assert.equal(head.rotation.z, 0);
 
   // High G pull (9G) -> downward head pitch
-  updatePilotDynamics(pilot, { gForce: 9.0, rollRate: 0.0 });
+  updatePilotDynamics(pilot, { gForce: 9.0, rollRate: 0.0 }, 0.05);
   assert.ok(head.rotation.x < 0, `Head should pitch downward under high G, got ${head.rotation.x}`);
 
+  // When paused (dt <= 0), head position freezes completely
+  const frozenPitch = head.rotation.x;
+  updatePilotDynamics(pilot, { gForce: 1.0, rollRate: 0.0 }, 0);
+  assert.equal(head.rotation.x, frozenPitch, 'Zero dt should not advance dynamics');
+
   // Right bank roll -> roll tilt into turn
-  updatePilotDynamics(pilot, { gForce: 1.0, rollRate: 2.0 });
+  updatePilotDynamics(pilot, { gForce: 1.0, rollRate: 2.0 }, 0.05);
   assert.ok(head.rotation.z < 0, `Head should tilt into positive roll rate, got ${head.rotation.z}`);
 
   // Neutral state convergence
-  for (let i = 0; i < 20; i++) {
-    updatePilotDynamics(pilot, { gForce: 1.0, rollRate: 0.0 });
+  for (let i = 0; i < 30; i++) {
+    updatePilotDynamics(pilot, { gForce: 1.0, rollRate: 0.0 }, 0.05);
   }
   assert.ok(Math.abs(head.rotation.x) < 0.01, 'Head pitch should settle near 0 at 1G');
   assert.ok(Math.abs(head.rotation.z) < 0.01, 'Head roll should settle near 0 at zero roll rate');
