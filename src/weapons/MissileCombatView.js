@@ -416,7 +416,9 @@ export class MissileSmokeTrail {
       scratchFrom.set(a.x, a.y, a.z);
       scratchTo.set(b.x, b.y, b.z);
       const dist = scratchFrom.distanceTo(scratchTo);
-      const steps = Math.min(500, Math.max(1, Math.floor(dist / this.spacing)));
+      const remainingCapacity = Math.max(0, this.max - this.count);
+      if (remainingCapacity <= 0) break;
+      const steps = Math.min(remainingCapacity, Math.max(1, Math.floor(dist / this.spacing)));
       const isPoweredA = a.powered !== false;
       const isPoweredB = b.powered !== false;
       const spansCurrentTime = b.timeSec > currentTime + 1e-4;

@@ -868,3 +868,29 @@ test('prepopulateFromSamples powered state matches CombatReplayPlayback spanning
 
   trail.dispose();
 });
+
+test('prepopulateFromSamples maintains spacing without stretching on wide multi-kilometer spans', () => {
+  const scene = new Scene();
+  const trail = new MissileSmokeTrail(scene, { spacing: 3.0, max: 7200 });
+
+  // A 3,000-meter span between samples from aggressive recording thinning
+  const samples = [
+    { timeSec: 0.0, x: 0, y: 1000, z: 0, powered: true },
+    { timeSec: 5.0, x: 3000, y: 1000, z: 0, powered: true },
+  ];
+
+  trail.prepopulateFromSamples(samples, 5.0);
+
+  // 3,000m / 3.0m = 1000 steps -> should have around 1000 particles, not capped at 500
+  assert.ok(trail.count >= 990, `Trail count ${trail.count} should scale to full distance (expected >= 990)`);
+
+  // Verify distance between consecutive particles does not stretch past spacing + small tolerance
+  for (let i = 0; i < trail.count - 1; i++) {
+    const x1 = trail.positions[i * 3];
+    const x2 = trail.positions[(i + 1) * 3];
+    const d = Math.abs(x2 - x1);
+    assert.ok(d <= 3.5, `Puff spacing ${d.toFixed(2)}m must not stretch across thinned span`);
+  }
+
+  trail.dispose();
+});
