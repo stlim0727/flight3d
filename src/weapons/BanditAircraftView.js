@@ -202,8 +202,22 @@ export class BanditAircraftView {
   }
 
   update(dt, flight) {
-    this.airframe?.update(dt, { gearState: 0, elevator: flight?.aero.elevator ?? 0,
-      aileron: flight?.aero.aileron ?? 0, rudder: flight?.aero.rudder ?? 0 });
+    const throttle = flight?.controls?.throttle ?? flight?.throttle ?? 0.85;
+    const engine1 = flight?.engines
+      ? {
+          n1: flight.engines.n1?.[0] ?? (throttle * 100),
+          thrust: flight.engines.thrust?.[0] ?? (15000 * throttle),
+          failed: Boolean(flight.engines.failed?.[0]),
+        }
+      : (flight?.engine1 ?? { n1: throttle * 100, thrust: 15000 * throttle, failed: false });
+    this.airframe?.update(dt, {
+      gearState: 0,
+      elevator: flight?.aero?.elevator ?? flight?.elevator ?? 0,
+      aileron: flight?.aero?.aileron ?? flight?.aileron ?? 0,
+      rudder: flight?.aero?.rudder ?? flight?.rudder ?? 0,
+      throttle,
+      engine1,
+    });
   }
 
   disposeAirframe() {

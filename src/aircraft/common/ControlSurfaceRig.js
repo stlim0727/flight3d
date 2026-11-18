@@ -23,7 +23,8 @@ import * as THREE from 'three';
  */
 export function getControlInput(state, name, fallback = 0, min = -1, max = 1) {
   if (!state) return fallback;
-  const val = state[name];
+  const rawKey = `raw${name.charAt(0).toUpperCase() + name.slice(1)}`;
+  const val = state[name] ?? state[rawKey];
   const finiteVal = Number.isFinite(val) ? val : fallback;
   return THREE.MathUtils.clamp(finiteVal, min, max);
 }

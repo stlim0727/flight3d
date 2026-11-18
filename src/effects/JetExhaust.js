@@ -38,12 +38,21 @@ export class JetExhaust {
     this.group.add(this.plume);
   }
 
-  update(dt, state, crashed = false) {
+  update(dt, state = {}, crashed = false) {
     const engine = state.engine1;
-    const n1 = THREE.MathUtils.clamp((engine?.n1 ?? 0) / 100, 0, 1);
-    const thrust = engine?.thrust ?? 0;
-    const target = crashed || thrust <= 0 ? 0 : n1;
-    this.power += (target - this.power) * (1 - Math.exp(-Math.max(0, dt) * 5));
+    const n1Raw = engine?.n1 !== undefined && engine.n1 > 0
+      ? engine.n1
+      : (state.throttle !== undefined ? state.throttle * 100 : 0);
+    const n1 = THREE.MathUtils.clamp(n1Raw / 100, 0, 1);
+    const hasThrust = engine?.thrust !== undefined
+      ? engine.thrust > 0
+      : (!engine?.failed && (n1 > 0.05 || (state.throttle ?? 0) > 0.05));
+    const target = crashed || !hasThrust ? 0 : n1;
+    if (dt <= 0) {
+      this.power = target;
+    } else {
+      this.power += (target - this.power) * (1 - Math.exp(-Math.max(0, dt) * 5));
+    }
     const burner = THREE.MathUtils.smoothstep(this.power, .82, .98);
     this.material.uniforms.time.value += Math.max(0, dt);
     this.material.uniforms.power.value = this.power;

@@ -46,7 +46,16 @@ export class RemoteAircraft {
   }
   animate(sample, dt) {
     if (!sample) return;
-    this.model.update(dt, { gearState: sample.gear, flapDegree: sample.flaps });
+    const state = {
+      gearState: sample.gear ?? sample.gearState,
+      flapDegree: sample.flaps ?? sample.flapDegree,
+    };
+    if (sample.elevator !== undefined) state.elevator = sample.elevator;
+    if (sample.aileron !== undefined) state.aileron = sample.aileron;
+    if (sample.rudder !== undefined) state.rudder = sample.rudder;
+    if (sample.throttle !== undefined) state.throttle = sample.throttle;
+    if (sample.engine1 !== undefined) state.engine1 = sample.engine1;
+    this.model.update(dt, state);
     for (const light of this.lights) light.visible = false;
   }
   update(sample, name, camera, { status = '', showIndicator = true, localPosition, cameraMode } = {}) {

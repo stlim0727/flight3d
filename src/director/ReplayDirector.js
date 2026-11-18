@@ -286,6 +286,7 @@ export class ReplayDirector {
     sim.aircraft.group.position.copy(sim.position);
     sim.aircraft.group.quaternion.copy(sim.quaternion);
     sim.aircraft.group.updateMatrixWorld(true);
+    if (sim.telemetry) sim.aircraft.update?.(0, sim.telemetry);
     sim.cameraSystem.snapToTarget(sim.aircraft.group);
     // AUTO and DIRECTOR pick their own shots; a scrubbed pose must not be argued with.
     sim.cameraSystem.userModeSelected = true;
