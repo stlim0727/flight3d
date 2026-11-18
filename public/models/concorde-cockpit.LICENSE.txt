@@ -1,0 +1,25 @@
+Concorde flight deck (extracted)
+Source model: Concorde free with interior
+Author: Henry Chi (https://sketchfab.com/henrychi)
+Source: https://sketchfab.com/3d-models/concorde-free-with-interior-16bd3e8a17b345caace9449331709f2e
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Applies to concorde-cockpit.glb.
+Attribution is also embedded in the GLB scene extras.
+
+Changes by Flight3d contributors (scripts/build-concorde-cockpit.mjs):
+- Extracted the flight-deck geometry (seats, instrument panel, pedestal and
+  surrounding fittings) from the full aircraft model; the airframe, cabin,
+  livery and glass were not retained.
+- Scaled to the real 61.66 m aircraft length, narrowed 15%, moved, and
+  clipped so it fits inside the manilov.ap Concorde exterior.
+- Replaced the materials with per-vertex colours (the carpet texture became a
+  flat grey), merged everything into one flat-shaded mesh, and added a
+  generated forward bulkhead below the glareshield.
+
+No endorsement by the original creator is implied.
+
+CC BY 4.0 permits redistribution (including browser delivery and repository
+inclusion) and adaptation, including commercial use, subject to attribution,
+a license link, indication of changes, and no additional restrictions.

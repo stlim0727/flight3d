@@ -21,13 +21,13 @@
     <label>노즈 드롭 <span id="droopValue">5.0°</span><input id="droop" type="range" min="0" max="12.5" step="0.5" value="5"></label>
     <div class="row">
       <button data-view="side">측면</button><button data-view="front">전방</button>
-      <button data-view="nose">노즈</button><button data-view="below">하부</button>
+      <button data-view="nose">노즈</button><button data-view="below">하부</button><button data-view="cockpit">조종석</button>
     </div>
   </div>
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { Concorde, CONCORDE_GEAR_LAYOUT } from '/src/aircraft/Concorde.js';
+    import { Concorde, CONCORDE_COCKPIT_EYE as eye, CONCORDE_GEAR_LAYOUT } from '/src/aircraft/Concorde.js';
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -54,16 +54,22 @@
     const concorde = new Concorde();
     scene.add(concorde.group);
 
-    const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.05, 1000);
+    const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.02, 1000);
     const controls = new OrbitControls(camera, renderer.domElement);
     const views = {
       side: [[-70, 2, -2], [0, -1, -2]],
       front: [[-22, 4, -62], [0, -1, -5]],
       nose: [[-14, 0.5, -26], [0, -1, -24]],
-      below: [[-18, -4.6, -14], [0, -2.5, -4]]
+      below: [[-18, -4.6, -14], [0, -2.5, -4]],
+      // Look slightly down along the nose, as from the captain's seat.
+      cockpit: [[eye.x, eye.y, eye.z], [eye.x, eye.y - 0.9, eye.z - 10]]
     };
     const setView = name => {
       const [position, target] = views[name];
+      const cockpit = name === 'cockpit';
+      concorde.setCockpitMode(cockpit);
+      camera.fov = cockpit ? 70 : 35;
+      camera.updateProjectionMatrix();
       camera.position.set(...position);
       controls.target.set(...target);
       controls.update();

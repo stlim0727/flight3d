@@ -210,6 +210,165 @@ export function poseConcordeGear(legs, extension, state = {}) {
   }
 }
 
+/**
+ * Flight deck extracted from Henry Chi's interior model by
+ * scripts/build-concorde-cockpit.mjs and fitted inside this exterior. It loads
+ * on the first cockpit entry, like the 737 interior, but the exterior stays
+ * visible around it so the drooping nose is seen through the windscreen.
+ */
+export const CONCORDE_COCKPIT_FILE = 'models/concorde-cockpit.glb';
+/**
+ * Captain's eye in aircraft metres. It must clear the nose skin at the hinge
+ * (y 0.65, z -24.63) so the nose surface is visible ahead and drops away as it droops.
+ */
+export const CONCORDE_COCKPIT_EYE = Object.freeze({ x: -0.45, y: 0.85, z: -22.15 });
+
+/**
+ * The exterior paints its windscreen and side windows dark on the fuselage
+ * texture. Triangles in the flight-deck region whose texel is dark become glass.
+ */
+export const CONCORDE_WINDSCREEN = Object.freeze({
+  region: Object.freeze({ minZ: -25, maxZ: -22, minY: 0.2 }),
+  // Texture area that holds the flight-deck windows (sampled once at load).
+  uv: Object.freeze({ minU: 0.08, maxU: 0.14, minV: 0.03, maxV: 0.17 }),
+  darkLuminance: 70
+});
+
+/**
+ * Partition an indexed geometry's triangles into airframe and window index
+ * lists. `isWindow(u, v)` classifies a triangle by its UV centroid; only
+ * triangles inside `region` are considered.
+ */
+export function splitWindscreen(geometry, isWindow, region = CONCORDE_WINDSCREEN.region) {
+  const position = geometry.attributes.position, uv = geometry.attributes.uv;
+  const index = geometry.index;
+  const count = index ? index.count : position.count;
+  const vertex = k => (index ? index.getX(k) : k);
+  const frame = [], glass = [];
+  for (let t = 0; t < count; t += 3) {
+    let y = 0, z = 0, u = 0, v = 0;
+    for (let k = 0; k < 3; k++) {
+      const i = vertex(t + k);
+      y += position.getY(i) / 3; z += position.getZ(i) / 3;
+      if (uv) { u += uv.getX(i) / 3; v += uv.getY(i) / 3; }
+    }
+    const candidate = uv && z > region.minZ && z < region.maxZ && y > region.minY;
+    (candidate && isWindow(u, v) ? glass : frame).push(vertex(t), vertex(t + 1), vertex(t + 2));
+  }
+  return { frame, glass };
+}
+
+/**
+ * Build a window classifier from the fuselage texture by reading only the
+ * flight-deck UV area. Returns null where no 2D canvas exists (Node tests).
+ */
+export function textureWindowSampler(texture, settings = CONCORDE_WINDSCREEN) {
+  const image = texture?.image;
+  if (!image?.width || typeof document === 'undefined') return null;
+  const { minU, maxU, minV, maxV } = settings.uv;
+  // glTF textures are not flipped: v = 0 is the top row of the image.
+  const flipped = texture.flipY;
+  const x0 = Math.floor(minU * image.width), x1 = Math.ceil(maxU * image.width);
+  const rowOf = v => (flipped ? 1 - v : v) * image.height;
+  const y0 = Math.floor(Math.min(rowOf(minV), rowOf(maxV))), y1 = Math.ceil(Math.max(rowOf(minV), rowOf(maxV)));
+  const width = Math.max(1, x1 - x0), height = Math.max(1, y1 - y0);
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return null;
+  context.drawImage(image, x0, y0, width, height, 0, 0, width, height);
+  const pixels = context.getImageData(0, 0, width, height).data;
+  return (u, v) => {
+    const x = Math.floor(u * image.width) - x0, y = Math.floor(rowOf(v)) - y0;
+    if (x < 0 || y < 0 || x >= width || y >= height) return false;
+    const o = (y * width + x) * 4;
+    return (pixels[o] + pixels[o + 1] + pixels[o + 2]) / 3 < settings.darkLuminance;
+  };
+}
+
+/**
+ * Visor. The exterior is modelled visor-up: opaque skin rises from the nose
+ * hinge to a narrow windscreen strip, so the pilot sees over the nose top only
+ * through that strip. Lowering the visor (it is fully down by the 5° take-off
+ * nose position) turns that skin into glass and drops it into a well up to
+ * `depth` metres deep, which opens the forward-down view over the drooped nose.
+ */
+export const CONCORDE_VISOR = Object.freeze({
+  // Skin between the hinge frame and the windscreen that becomes glass when down.
+  zone: Object.freeze({ maxZ: -23.5, minY: 0.35, maxX: 1.0 }),
+  // Vertices lowered into the visor well: full depth ahead of `fullZ`, none aft of `maxZ`.
+  well: Object.freeze({ fullZ: -24.3, maxZ: -23.85, minY: 0.3, topY: 0.65, maxX: 1.05, depth: 0.35 }),
+  fullDownDeg: 5
+});
+
+/** Visor travel (0 up, 1 down) for a nose angle in degrees. */
+export function concordeVisorFraction(noseDroopDeg) {
+  return THREE.MathUtils.clamp(noseDroopDeg / CONCORDE_VISOR.fullDownDeg, 0, 1);
+}
+
+/**
+ * Prepare the visor from the windscreen split: index lists for both visor
+ * states and the rest heights of the well vertices behind the nose hinge.
+ */
+export function prepareVisor(geometry, { frame, glass }, hinge = CONCORDE_NOSE_HINGE, visor = CONCORDE_VISOR) {
+  const position = geometry.attributes.position;
+  const { zone, well } = visor;
+  const frameDown = [], zoneTriangles = [];
+  for (let t = 0; t < frame.length; t += 3) {
+    let x = 0, y = 0, z = 0;
+    for (let k = 0; k < 3; k++) {
+      const i = frame[t + k];
+      x += position.getX(i) / 3; y += position.getY(i) / 3; z += position.getZ(i) / 3;
+    }
+    const inZone = z > hinge.z && z < zone.maxZ && y > zone.minY && Math.abs(x) < zone.maxX;
+    (inZone ? zoneTriangles : frameDown).push(frame[t], frame[t + 1], frame[t + 2]);
+  }
+  const vertices = [], restY = [], weights = [];
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i), y = position.getY(i), z = position.getZ(i);
+    // The hinge frame itself belongs to the fixed airframe, so it may move with the well.
+    if (z < hinge.z - 1e-3 || z > well.maxZ || y < well.minY || Math.abs(x) > well.maxX) continue;
+    const along = 1 - THREE.MathUtils.smoothstep(z, well.fullZ, well.maxZ);
+    const up = THREE.MathUtils.smoothstep(y, well.minY, well.topY);
+    const weight = along * up;
+    if (weight <= 0) continue;
+    vertices.push(i); restY.push(y); weights.push(weight);
+  }
+  return {
+    frameUp: frame, glassUp: glass,
+    frameDown, glassDown: [...glass, ...zoneTriangles],
+    zoneTriangleCount: zoneTriangles.length / 3,
+    vertices: Uint32Array.from(vertices), restY: Float32Array.from(restY), weights: Float32Array.from(weights),
+    depth: well.depth, fraction: -1, down: null
+  };
+}
+
+/** Pose the visor: sink the well by `fraction` and switch the zone between skin and glass at half travel. */
+export function applyVisor(fuselageGeometry, glassGeometry, rig, fraction) {
+  if (!rig || rig.fraction === fraction) return false;
+  const position = fuselageGeometry.attributes.position;
+  for (let k = 0; k < rig.vertices.length; k++) {
+    position.setY(rig.vertices[k], rig.restY[k] - rig.depth * fraction * rig.weights[k]);
+  }
+  position.needsUpdate = true;
+  const down = fraction >= 0.5;
+  if (down !== rig.down) {
+    fuselageGeometry.setIndex(down ? rig.frameDown : rig.frameUp);
+    glassGeometry?.setIndex(down ? rig.glassDown : rig.glassUp);
+    rig.down = down;
+  }
+  rig.fraction = fraction;
+  return true;
+}
+
+/** Tinted glass: dark like the painted windows outside, nearly clear from the flight deck. */
+export function createConcordeWindscreenMaterial() {
+  return new THREE.MeshStandardMaterial({
+    name: 'Concorde-windscreen-glass', color: 0x1c2630, roughness: 0.08, metalness: 0.2,
+    transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide
+  });
+}
+
 export class Concorde {
   constructor(options = {}) {
     this.options = options;
@@ -236,14 +395,22 @@ export class Concorde {
     this.gearLegs = gear.legs;
     this.gltfGroup.add(this.gearGroup);
 
-    // No flight-deck interior ships with this asset; the cockpit view sits in the airframe.
+    // The flight deck is a separate small asset loaded on the first cockpit entry.
     this.cockpit = {
       group: new THREE.Group(), gltfCockpitGroup: new THREE.Group(),
-      cockpitModelFailed: false, cockpitModelLoading: true,
+      cockpitModelFailed: false, cockpitModelLoading: false, cockpitModelLoaded: false,
+      captainEyePos: new THREE.Vector3(CONCORDE_COCKPIT_EYE.x, CONCORDE_COCKPIT_EYE.y, CONCORDE_COCKPIT_EYE.z),
       yokesVisible: true, gltfYokes: [], syncLighting() {},
       toggleYokes() { return this.yokesVisible; }
     };
+    this.cockpit.group.name = 'Concorde_Cockpit';
+    this.cockpit.group.visible = false;
+    this.cockpit.group.add(this.cockpit.gltfCockpitGroup);
     this.gltfGroup.add(this.cockpit.group);
+    this.windscreen = null;
+    this.visorRig = null;
+    this.cockpitUrl = options.cockpitUrl ?? `${import.meta.env?.BASE_URL ?? '/'}${CONCORDE_COCKPIT_FILE}`;
+    this.cockpitPromise = null;
 
     const url = options.modelUrl ?? `${import.meta.env?.BASE_URL ?? '/'}models/concorde.glb`;
     this.ready = new GLTFLoader().loadAsync(url)
@@ -257,8 +424,54 @@ export class Concorde {
       })
       .finally(() => {
         this.loadingGltf = false;
-        this.cockpit.cockpitModelLoading = false;
       });
+  }
+
+  /** Start (once) and return the flight-deck download. */
+  ensureCockpitModel() {
+    if (this.cockpitPromise) return this.cockpitPromise;
+    const cockpit = this.cockpit;
+    cockpit.cockpitModelLoading = true;
+    this.cockpitPromise = new GLTFLoader().loadAsync(this.cockpitUrl)
+      .then(gltf => {
+        gltf.scene.traverse(node => {
+          if (node.isMesh) { node.castShadow = false; node.receiveShadow = true; }
+        });
+        cockpit.gltfCockpitGroup.add(gltf.scene);
+        cockpit.cockpitModelLoaded = true;
+        cockpit.onModelReady?.();
+      })
+      .catch(error => {
+        cockpit.cockpitModelFailed = true;
+        console.error('Concorde flight deck failed to load:', error);
+      })
+      .finally(() => { cockpit.cockpitModelLoading = false; });
+    return this.cockpitPromise;
+  }
+
+  /** Move the painted flight-deck windows into a see-through glass mesh sharing the fuselage vertices. */
+  installWindscreen(fuselage) {
+    const isWindow = textureWindowSampler(fuselage.material.map);
+    if (!isWindow) return;
+    const geometry = fuselage.geometry;
+    const split = splitWindscreen(geometry, isWindow);
+    if (!split.glass.length) return;
+    geometry.setIndex(split.frame);
+    const glassGeometry = new THREE.BufferGeometry();
+    for (const [name, attribute] of Object.entries(geometry.attributes)) glassGeometry.setAttribute(name, attribute);
+    glassGeometry.setIndex(split.glass);
+    glassGeometry.boundingSphere = geometry.boundingSphere;
+    this.windscreen = new THREE.Mesh(glassGeometry, createConcordeWindscreenMaterial());
+    this.windscreen.name = 'Concorde_Windscreen';
+    this.windscreen.renderOrder = 2;
+    this.gltfGroup.add(this.windscreen);
+    this.visorRig = prepareVisor(geometry, split);
+  }
+
+  applyNosePose() {
+    if (!this.fuselage) return;
+    applyNoseDroop(this.fuselage.geometry, this.noseRig, this.noseDroopDeg);
+    applyVisor(this.fuselage.geometry, this.windscreen?.geometry, this.visorRig, concordeVisorFraction(this.noseDroopDeg));
   }
 
   /** Bake every authored mesh into the aircraft frame, discarding the Sketchfab display root. */
@@ -284,11 +497,11 @@ export class Concorde {
       if (mesh.name === CONCORDE_FUSELAGE_MESH) {
         this.fuselage = mesh;
         this.noseRig = prepareNoseDroop(geometry);
+        this.installWindscreen(mesh);
       }
     }
     this.modelLoaded = this.useGltf = true;
-    this.cockpit.onModelReady?.();
-    applyNoseDroop(this.fuselage?.geometry, this.noseRig, this.noseDroopDeg);
+    this.applyNosePose();
   }
 
   update(dt, state = {}) {
@@ -297,12 +510,18 @@ export class Concorde {
     poseConcordeGear(this.gearLegs, extension, state);
     const target = concordeNoseDroopTarget(state);
     this.noseDroopDeg = dt > 0 ? stepNoseDroop(this.noseDroopDeg, target, dt) : target;
-    if (this.fuselage) applyNoseDroop(this.fuselage.geometry, this.noseRig, this.noseDroopDeg);
+    this.applyNosePose();
   }
 
+  /**
+   * Unlike the 737, the exterior stays visible in the cockpit view so the nose
+   * droop is seen through the windscreen; only the deck and glass change.
+   */
   setCockpitMode(isCockpit, showInterior = true) {
     this.isCockpit = isCockpit;
-    this.cockpit.group.visible = isCockpit ? showInterior : true;
+    if (isCockpit) this.ensureCockpitModel();
+    this.cockpit.group.visible = isCockpit && showInterior;
+    if (this.windscreen) this.windscreen.material.opacity = isCockpit ? 0.12 : 0.7;
   }
 
   triggerCrashVisuals() {

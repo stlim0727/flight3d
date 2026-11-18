@@ -3,9 +3,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as THREE from 'three';
 import {
-  CONCORDE_GEAR_LAYOUT, CONCORDE_MODEL_MATRIX, CONCORDE_NOSE_HINGE, CONCORDE_NOSE_POSITIONS_DEG,
-  applyNoseDroop, buildConcordeGear, concordeNoseDroopTarget, poseConcordeGear, prepareNoseDroop, stepNoseDroop
+  CONCORDE_COCKPIT_EYE, CONCORDE_GEAR_LAYOUT, CONCORDE_MODEL_MATRIX, CONCORDE_NOSE_HINGE, CONCORDE_NOSE_POSITIONS_DEG,
+  CONCORDE_VISOR, Concorde, applyNoseDroop, applyVisor, buildConcordeGear, concordeNoseDroopTarget, concordeVisorFraction,
+  poseConcordeGear, prepareNoseDroop, prepareVisor, splitWindscreen, stepNoseDroop, textureWindowSampler
 } from '../src/aircraft/Concorde.js';
+import { COCKPIT_SOURCE, fuselageEnvelope } from '../scripts/build-concorde-cockpit.mjs';
 
 const bytes = readFileSync(new URL('../public/models/concorde.glb', import.meta.url));
 const jsonLength = bytes.readUInt32LE(12);
@@ -163,4 +165,115 @@ test('procedural gear rests every tyre on the ground and stows forward / inboard
   assert.equal(legs.mainLeft.visible, true);
   poseConcordeGear(legs, 1, { compressions: { mainLeft: 0.2 } });
   assert.equal(legs.mainLeft.userData.truck.position.y, 0.2);
+});
+
+const exteriorPath = new URL('../public/models/concorde.glb', import.meta.url);
+const cockpitPath = new URL('../public/models/concorde-cockpit.glb', import.meta.url);
+
+function readCockpit() {
+  const data = readFileSync(cockpitPath);
+  const length = data.readUInt32LE(12);
+  const json = JSON.parse(data.subarray(20, 20 + length).toString());
+  const start = 28 + length;
+  const primitive = json.meshes[0].primitives[0];
+  const accessor = json.accessors[primitive.attributes.POSITION];
+  const view = json.bufferViews[accessor.bufferView];
+  const offset = start + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+  const points = Array.from({ length: accessor.count }, (_, i) =>
+    new THREE.Vector3(data.readFloatLE(offset + i * 12), data.readFloatLE(offset + i * 12 + 4), data.readFloatLE(offset + i * 12 + 8)));
+  return { json, primitive, points, size: data.byteLength };
+}
+
+test('flight deck is one small vertex-coloured mesh carrying its CC BY attribution', () => {
+  const { json, primitive, size } = readCockpit();
+  assert.equal(json.meshes.length, 1);
+  assert.equal(json.materials.length, 1);
+  assert.ok(primitive.attributes.COLOR_0 !== undefined, 'vertex colours');
+  assert.equal(primitive.attributes.NORMAL, undefined, 'flat shaded at runtime');
+  const triangles = json.accessors[primitive.indices].count / 3;
+  assert.ok(triangles > 3000 && triangles < 8000, `triangles ${triangles}`);
+  assert.ok(size < 250_000, `bytes ${size}`);
+  const extras = json.scenes[0].extras;
+  assert.equal(extras.author, COCKPIT_SOURCE.author);
+  assert.equal(extras.license, COCKPIT_SOURCE.license);
+  const notice = readFileSync(new URL('../public/models/concorde-cockpit.LICENSE.txt', import.meta.url), 'utf8');
+  assert.match(notice, /Henry Chi[\s\S]*CC BY 4\.0/);
+});
+
+test('flight deck stays inside the exterior fuselage and the eye sits inside it, above the hinge skin', () => {
+  const envelope = fuselageEnvelope(exteriorPath, 0);
+  const { points } = readCockpit();
+  const outside = points.filter(point => !envelope.contains(point));
+  assert.equal(outside.length, 0, `${outside.length} deck vertices outside the skin`);
+  const eye = new THREE.Vector3(CONCORDE_COCKPIT_EYE.x, CONCORDE_COCKPIT_EYE.y, CONCORDE_COCKPIT_EYE.z);
+  assert.ok(envelope.contains(eye));
+  assert.ok(eye.z > CONCORDE_NOSE_HINGE.z, 'eye aft of the hinge');
+  // The pilot sees over the nose skin at the hinge frame (y 0.65).
+  assert.ok(eye.y > 0.65 + 0.1);
+  const ahead = points.filter(point => point.z < eye.z);
+  assert.ok(ahead.length > 100);
+  assert.ok(ahead.every(point => point.y < eye.y), 'nothing ahead of the eye rises into the forward view');
+});
+
+test('windscreen split moves classified triangles in the flight-deck region only', () => {
+  const geometry = meshes.get('S01-FACES').clone();
+  const total = geometry.index.count;
+  const { frame, glass } = splitWindscreen(geometry, () => true);
+  assert.equal(frame.length + glass.length, total);
+  const position = geometry.attributes.position;
+  for (let t = 0; t < glass.length; t += 3) {
+    const z = (position.getZ(glass[t]) + position.getZ(glass[t + 1]) + position.getZ(glass[t + 2])) / 3;
+    assert.ok(z > -25 && z < -22);
+  }
+  assert.equal(splitWindscreen(geometry, () => false).glass.length, 0);
+  assert.equal(textureWindowSampler({ image: { width: 4, height: 4 } }), null, 'no canvas in Node');
+});
+
+test('visor lowers into a well behind the hinge, turns the zone into glass, and restores', () => {
+  const geometry = meshes.get('S01-FACES').clone();
+  const rest = Float32Array.from(geometry.attributes.position.array);
+  const split = splitWindscreen(geometry, () => false);
+  const glassGeometry = new THREE.BufferGeometry();
+  const rig = prepareVisor(geometry, split);
+  assert.ok(rig.zoneTriangleCount > 30, `zone ${rig.zoneTriangleCount}`);
+  assert.ok(rig.vertices.length > 10);
+  const position = geometry.attributes.position;
+  for (const i of rig.vertices) assert.ok(position.getZ(i) >= CONCORDE_NOSE_HINGE.z - 1e-3, 'well never moves drooping nose vertices');
+
+  assert.equal(concordeVisorFraction(0), 0);
+  assert.equal(concordeVisorFraction(CONCORDE_NOSE_POSITIONS_DEG.takeoff), 1);
+  assert.equal(concordeVisorFraction(CONCORDE_NOSE_POSITIONS_DEG.landing), 1);
+
+  applyVisor(geometry, glassGeometry, rig, 1);
+  let deepest = 0;
+  for (let k = 0; k < rig.vertices.length; k++) {
+    const drop = rest[rig.vertices[k] * 3 + 1] - position.getY(rig.vertices[k]);
+    assert.ok(drop >= 0 && drop <= CONCORDE_VISOR.well.depth + 1e-6);
+    deepest = Math.max(deepest, drop);
+  }
+  assert.ok(deepest > 0.25, `well depth ${deepest}`);
+  assert.equal(geometry.index.count + glassGeometry.index.count, split.frame.length + split.glass.length);
+  assert.equal(glassGeometry.index.count / 3, rig.zoneTriangleCount);
+
+  applyVisor(geometry, glassGeometry, rig, 0);
+  for (let i = 0; i < rest.length; i++) assert.equal(position.array[i], rest[i]);
+  assert.equal(geometry.index.count, split.frame.length);
+  assert.equal(glassGeometry.index.count, 0);
+});
+
+test('cockpit mode keeps the exterior and starts the flight-deck download once', () => {
+  const concorde = new Concorde({ modelUrl: 'data:,', cockpitUrl: 'data:,' });
+  concorde.ready.catch(() => {});
+  assert.equal(concorde.cockpit.group.visible, false);
+  concorde.setCockpitMode(true);
+  const first = concorde.cockpitPromise;
+  assert.ok(first);
+  concorde.setCockpitMode(false);
+  concorde.setCockpitMode(true);
+  assert.equal(concorde.cockpitPromise, first);
+  assert.equal(concorde.gltfGroup.visible, true);
+  assert.equal(concorde.cockpit.group.visible, true);
+  concorde.setCockpitMode(true, false);
+  assert.equal(concorde.cockpit.group.visible, false);
+  assert.ok(concorde.cockpit.captainEyePos.equals(new THREE.Vector3(CONCORDE_COCKPIT_EYE.x, CONCORDE_COCKPIT_EYE.y, CONCORDE_COCKPIT_EYE.z)));
 });

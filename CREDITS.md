@@ -27,7 +27,13 @@ Flight3d incorporates optimized open-source 3D models and atmospheric environmen
   - **Source**: [Concorde](https://sketchfab.com/3d-models/concorde-6d95290363474798a429a38bbf9ad49d)
   - **License**: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
   - **Description**: Real-world scale (25.6m wingspan, 61.1m length) supersonic delta-wing airliner with four Olympus nacelles, modelled gear-up.
-  - **Modifications**: GLB distributed unchanged. Flight3d discards the Sketchfab display rotation, mounts the airframe in the simulator frame, droops the nose ahead of the windscreen at runtime, and adds procedurally generated landing gear. See [license notice](public/models/concorde.LICENSE.txt).
+  - **Modifications**: GLB distributed unchanged. Flight3d discards the Sketchfab display rotation, mounts the airframe in the simulator frame, droops the nose ahead of the windscreen at runtime, turns the painted flight-deck windows into glass, lowers a visor well when the nose droops, and adds procedurally generated landing gear. See [license notice](public/models/concorde.LICENSE.txt).
+
+- **Concorde flight deck (`public/models/concorde-cockpit.glb`)**:
+  - **Author**: [Henry Chi](https://sketchfab.com/henrychi)
+  - **Source**: [Concorde free with interior](https://sketchfab.com/3d-models/concorde-free-with-interior-16bd3e8a17b345caace9449331709f2e)
+  - **License**: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+  - **Modifications**: Flight deck extracted by `scripts/build-concorde-cockpit.mjs`, scaled, moved and clipped to fit inside the manilov.ap exterior, recoloured to per-vertex colours in one flat-shaded mesh, with a generated forward bulkhead. See [license notice](public/models/concorde-cockpit.LICENSE.txt).
 
 ## Environment Maps & Textures
 - **Kloofendal Partly Cloudy Sky HDR (`public/textures/environment/sky_1k.hdr`)**:
