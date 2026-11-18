@@ -1267,8 +1267,9 @@ export class CinematicCameraDirector {
       }
 
       case CINEMATIC_SHOTS.MISSILE_TRACK: {
-        // Tail-fin POV: ride right behind the missile's tail fins looking
-        // straight down its flight path toward the target.
+        // Tail-fin POV: ride tight alongside the missile's tail fins looking
+        // straight down its flight path toward the target, sitting ahead of
+        // the rocket exhaust plume so the view stays clear of smoke.
         isRigidMount = true;
         targetFov = 70.0;
         const sequence = this.missileSequence;
@@ -1286,9 +1287,9 @@ export class CinematicCameraDirector {
         else side.normalize();
         const missileUp = new THREE.Vector3().crossVectors(side, dir).normalize();
         targetCamPos.copy(missilePos)
-          .addScaledVector(dir, -3.2)
-          .addScaledVector(side, 0.55)
-          .addScaledVector(missileUp, 0.75);
+          .addScaledVector(dir, -1.6)
+          .addScaledVector(side, 0.38)
+          .addScaledVector(missileUp, 0.50);
         targetLook.copy(missilePos).addScaledVector(dir, 60.0);
         targetUp.copy(missileUp);
         break;

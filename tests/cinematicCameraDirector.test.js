@@ -900,7 +900,7 @@ test('MISSILE_TRACK rides right behind missile tail fins looking down its flight
   }
   assert.equal(director.currentShotType, CINEMATIC_SHOTS.MISSILE_TRACK);
   const distToMissile = camera.position.distanceTo(missile.position);
-  assert.ok(distToMissile < 5.0, `Tail-fin POV sits close behind missile (${distToMissile.toFixed(2)}m)`);
+  assert.ok(distToMissile < 2.5, `Tail-fin POV sits tight to missile body (${distToMissile.toFixed(2)}m)`);
   camera.updateMatrixWorld(true);
   const viewDir = new THREE.Vector3();
   camera.getWorldDirection(viewDir);
