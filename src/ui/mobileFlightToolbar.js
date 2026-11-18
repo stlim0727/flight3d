@@ -2,9 +2,8 @@ import { bindText, t } from '../i18n/index.js';
 
 // Reuse the live controls so their handlers, icons and localized states travel
 // with them when the compact toolbar changes groups.
-export function createMobileFlightToolbar({ bar, cameraStrip, cameraToggle, cameraButtons,
+export function createMobileFlightToolbar({ query, bar, cameraStrip, cameraToggle, cameraButtons,
   more, moreButton, topActions, mute, hudFold, aircraft, fullscreen, onLayoutChange }) {
-  const query = window.matchMedia('(max-width: 600px), (max-width: 950px) and (max-height: 440px)');
   const gaze = document.getElementById('btn-gaze-exit');
   const reset = document.getElementById('btn-reset-pov');
   const pov = document.getElementById('btn-cockpit-pov');

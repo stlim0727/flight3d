@@ -435,12 +435,19 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     attributes: true, attributeFilter: ['class', 'data-flow'],
   });
   window.addEventListener('resize', positionEdgeButtons);
-  mobileToolbar = createMobileFlightToolbar({
-    bar, cameraStrip, cameraToggle: cameraToggleBtn, cameraButtons, more, moreButton,
-    topActions, mute, hudFold, aircraft, fullscreen,
-    onLayoutChange: updateCameraToggleState,
-  });
-  updateCameraToggleState();
+  const mobileQuery = window.matchMedia('(max-width: 600px), (max-width: 950px) and (max-height: 440px)');
+  const initMobileToolbar = () => {
+    if (mobileToolbar || !mobileQuery.matches) return;
+    mobileToolbar = createMobileFlightToolbar({
+      query: mobileQuery, bar, cameraStrip, cameraToggle: cameraToggleBtn, cameraButtons, more, moreButton,
+      topActions, mute, hudFold, aircraft, fullscreen,
+      onLayoutChange: updateCameraToggleState,
+    });
+    updateCameraToggleState();
+  };
+  mobileQuery.addEventListener('change', initMobileToolbar);
+  initMobileToolbar();
+  positionEdgeButtons();
 }
 
 /** Called from telemetry refresh, including keyboard, demo, reset and resize paths. */
