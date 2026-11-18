@@ -17,4 +17,10 @@ try {
   assert.match(execFileSync(binary, ['--help'], options), /Chrome\/Chromium/);
   assert.throws(() => execFileSync(binary, ['--check', '--chrome', join(temp, 'missing-browser')], { ...options, stdio: 'pipe' }), error => String(error.stderr).includes('Chrome/Chromium not found'));
   console.log(`PASS native ${platform}-${process.arch}: standalone executable runs in an empty directory, embedded metadata/help, missing-browser diagnostics.`);
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally {
+  try {
+    await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  } catch {
+    // Non-fatal cleanup on locked binary on Windows
+  }
+}
