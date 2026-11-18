@@ -695,3 +695,116 @@ test('ground impact explosion receives actual accelerated impact velocity and sp
 
   view.clear();
 });
+
+test('detached wing contacting ground first does not terminate main airframe wreck', () => {
+  let explosionTriggered = false;
+  let explosionPoint = null;
+  const explosionSystem = {
+    spawnExplosion: ({ point }) => {
+      explosionTriggered = true;
+      explosionPoint = point?.clone();
+    },
+  };
+  const scene = createMockScene();
+  const target = {
+    id: 20, callsign: 'BANDIT 20', alive: true,
+    position: new THREE.Vector3(0, 200, 0), velocity: new THREE.Vector3(0, 0, 50),
+    quaternion: new THREE.Quaternion(), damage: 0.9, lastHitZone: 'wingL',
+    damageZones: { wingL: 0.95 },
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, {
+    terrainHeight: () => 0,
+    explosionSystem,
+  });
+
+  view.sync(0.02);
+  target.position.z += 1.0;
+  view.sync(0.02);
+
+  // Kill target: triggers single-wing breakup
+  target.alive = false;
+  view.sync(0.02);
+
+  const targetView = view.targetViews.get(20);
+  assert.ok(targetView.wreck, 'wreck started');
+  assert.ok(targetView.breakup.mainPiece, 'single wing breakup created mainPiece');
+
+  // Find the detached wing piece
+  const detachedWing = targetView.breakup.pieces.find(p => p !== targetView.breakup.mainPiece);
+  assert.ok(detachedWing, 'detached wing piece exists');
+
+  // Place detached wing right at ground level (y <= radius) so it contacts immediately
+  detachedWing.object.position.y = detachedWing.radius * 0.5;
+  detachedWing.velocity.set(0, -10, 0);
+
+  // Keep main piece high up
+  targetView.breakup.mainPiece.object.position.y = 150;
+  targetView.breakup.mainPiece.velocity.set(0, -10, 0);
+
+  // Step simulation: detached wing hits ground and bounces/settles
+  view.sync(0.05);
+
+  assert.equal(explosionTriggered, false, 'detached wing contact did NOT trigger ground impact explosion');
+  assert.ok(targetView.wreck, 'main wreck is still active and falling');
+  assert.ok(targetView.trail, 'smoke trail is still active');
+
+  // Now advance time until the main piece hits ground
+  for (let i = 0; i < 200 && targetView.wreck; i++) {
+    view.sync(0.1);
+  }
+
+  assert.equal(targetView.wreck, null, 'wreck ended when mainPiece reached ground');
+  assert.ok(explosionTriggered, 'ground impact explosion triggered upon mainPiece contact');
+  assert.ok(explosionPoint, 'explosion point recorded at mainPiece impact');
+
+  view.clear();
+});
+
+test('late GLB load on killed aircraft after respawn does not clear falling wreck debris', () => {
+  const scene = createMockScene();
+  const target = {
+    id: 21, callsign: 'BANDIT 21', alive: true,
+    position: new THREE.Vector3(0, 100, 0), velocity: new THREE.Vector3(0, 0, 50),
+    quaternion: new THREE.Quaternion(), damage: 0.9, lastHitZone: 'wingL',
+    damageZones: { wingL: 0.95 },
+  };
+  const system = { targets: [target], missiles: [], flares: [], chaffClouds: [] };
+  const view = new MissileCombatView(scene, system, { terrainHeight: () => 0 });
+
+  view.sync(0.02);
+  target.position.z += 1.0;
+  view.sync(0.02);
+
+  const targetView = view.targetViews.get(21);
+  const killedAircraft = targetView.aircraft;
+
+  // Kill target: creates wreck and breakup pieces
+  target.alive = false;
+  view.sync(0.02);
+
+  assert.ok(targetView.wreck, 'wreck active');
+  const killedBreakup = targetView.breakup;
+  assert.ok(killedBreakup.pieces.length > 0, 'falling debris active in killed breakup');
+  const fallingPieceCount = killedBreakup.pieces.length;
+
+  // Respawn target while wreck is still falling
+  target.alive = true;
+  target.position.set(0, 500, 0);
+  view.sync(0.02);
+
+  // Wreck was detached
+  assert.equal(view.detachedWrecks.length, 1, 'wreck moved to detachedWrecks');
+  assert.equal(view.detachedWrecks[0].breakup, killedBreakup);
+  assert.equal(view.detachedWrecks[0].aircraft, killedAircraft);
+  assert.equal(killedAircraft._isDestroyed, true, 'killed aircraft marked destroyed');
+
+  // Now simulate late GLB load on the killed aircraft
+  assert.ok(killedAircraft.onAirframeLoaded);
+  killedAircraft.onAirframeLoaded();
+
+  // Falling debris of the detached wreck must NOT have been cleared/disposed!
+  assert.equal(killedBreakup.pieces.length, fallingPieceCount, 'falling debris was not disposed by late GLB load');
+
+  view.clear();
+});

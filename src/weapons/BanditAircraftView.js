@@ -116,6 +116,7 @@ export class BanditAircraftView {
     this.proxy = createBanditMesh(callsign);
     this.mesh.add(this.proxy);
     this.disposed = false;
+    this._isDestroyed = false;
     // Pure-state/replay Node tests do not fetch browser assets.
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       this.airframe = new F16({ exteriorOnly: true });

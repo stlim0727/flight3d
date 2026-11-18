@@ -527,7 +527,7 @@ export class MissileCombatView {
         if (breakup) {
           breakup.prepare(aircraft.getBreakupSource());
           aircraft.onAirframeLoaded = () => {
-            if (!view.wreck && !view.aircraft?._isDestroyed) breakup.prepare(aircraft.getBreakupSource());
+            if (!aircraft._isDestroyed) breakup.prepare(aircraft.getBreakupSource());
           };
         }
         view = { mesh, aircraft, breakup, trail: null, fireTrail: null,
@@ -555,11 +555,12 @@ export class MissileCombatView {
         view.mesh = aircraft.mesh;
         view.aircraft = aircraft;
         this.scene.add(view.mesh);
-        view.breakup = this.createBreakup ? this.createBreakup(this.scene) : null;
-        if (view.breakup) {
-          view.breakup.prepare(aircraft.getBreakupSource());
+        const breakup = this.createBreakup ? this.createBreakup(this.scene) : null;
+        view.breakup = breakup;
+        if (breakup) {
+          breakup.prepare(aircraft.getBreakupSource());
           aircraft.onAirframeLoaded = () => {
-            if (!view.wreck && !view.aircraft?._isDestroyed) view.breakup.prepare(aircraft.getBreakupSource());
+            if (!aircraft._isDestroyed) breakup.prepare(aircraft.getBreakupSource());
           };
         }
         view.trail = null;
@@ -718,6 +719,7 @@ export class MissileCombatView {
    * trajectory, followed by a ground impact explosion upon terrain/water contact.
    */
   _syncWreck(view, target, dt) {
+    if (view.aircraft) view.aircraft._isDestroyed = true;
     const terrainAdapter = this.terrainHeight ? { getHeight: (x, z) => this.terrainHeight(x, z) } : null;
     const water = typeof this.waterLevel === 'function'
       ? this.waterLevel(view.mesh.position.x, view.mesh.position.z)
@@ -821,10 +823,13 @@ export class MissileCombatView {
     let contactPos = null;
     let contactVelocity = null;
     if (view.breakup?.firstContact) {
-      isWater = view.breakup.firstContact.isWater;
-      isGround = view.breakup.firstContact.isGround;
-      contactPos = view.breakup.firstContact.point.clone();
-      contactVelocity = view.breakup.firstContact.velocity.clone();
+      const fc = view.breakup.firstContact;
+      if (!view.breakup.mainPiece || fc.piece === view.breakup.mainPiece || fc.piece?.isMainBody) {
+        isWater = fc.isWater;
+        isGround = fc.isGround;
+        contactPos = fc.point.clone();
+        contactVelocity = fc.velocity.clone();
+      }
     } else if (view.breakup && view.breakup.pieces.length > 0) {
       if (view.breakup.mainPiece) {
         const p = view.breakup.mainPiece;

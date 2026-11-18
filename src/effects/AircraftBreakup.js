@@ -22,6 +22,7 @@ export class AircraftBreakup {
     this.target = new THREE.Vector3();
     this.radius = 20;
     this.firstContact = null;
+    this.mainPiece = null;
   }
 
   // Prepare once after the selected airframe loads, never in the impact hot path.
@@ -305,28 +306,35 @@ export class AircraftBreakup {
         object.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), spin.z * h);
       }
       object.quaternion.normalize();
-      const contactHeight = (terrain?.getHeight(object.position.x, object.position.z) ?? 0) + radius;
+      const currentFloor = terrain?.getHeight(object.position.x, object.position.z) ?? 0;
+      const contactHeight = currentFloor + radius;
 
       // Track first contact with water surface or dry ground during sub-stepping
       if (recordContact && !this.firstContact) {
-        const isWaterContact = Number.isFinite(waterLevel) && floor < waterLevel && (object.position.y - radius <= waterLevel);
-        const isGroundContact = object.position.y <= contactHeight;
-        if (isWaterContact) {
-          this.firstContact = {
-            point: object.position.clone(),
-            velocity: velocity.clone(),
-            piece,
-            isWater: true,
-            isGround: false,
-          };
-        } else if (isGroundContact) {
-          this.firstContact = {
-            point: object.position.clone(),
-            velocity: velocity.clone(),
-            piece,
-            isWater: false,
-            isGround: true,
-          };
+        // If this breakup has a designated mainPiece (e.g. severed single-wing breakup),
+        // only record firstContact when the main airframe contacts, so detached wings
+        // landing early do not terminate the main wreck prematurely.
+        const canTriggerContact = !this.mainPiece || piece === this.mainPiece || piece.isMainBody;
+        if (canTriggerContact) {
+          const isWaterContact = Number.isFinite(waterLevel) && currentFloor < waterLevel && (object.position.y - radius <= waterLevel);
+          const isGroundContact = object.position.y <= contactHeight;
+          if (isWaterContact) {
+            this.firstContact = {
+              point: object.position.clone(),
+              velocity: velocity.clone(),
+              piece,
+              isWater: true,
+              isGround: false,
+            };
+          } else if (isGroundContact) {
+            this.firstContact = {
+              point: object.position.clone(),
+              velocity: velocity.clone(),
+              piece,
+              isWater: false,
+              isGround: true,
+            };
+          }
         }
       }
 
@@ -409,6 +417,7 @@ export class AircraftBreakup {
 
   clear({ persist = false, duration = 30 } = {}) {
     this.firstContact = null;
+    this.mainPiece = null;
     if (persist && this.pieces.length > 0) {
       for (const piece of this.pieces) {
         const objClone = piece.object.clone(true);
