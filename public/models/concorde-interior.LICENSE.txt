@@ -1,0 +1,26 @@
+Concorde free with interior
+Author: Henry Chi (https://sketchfab.com/henrychi)
+Source: https://sketchfab.com/3d-models/concorde-free-with-interior-16bd3e8a17b345caace9449331709f2e
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Applies to concorde-interior.glb.
+Attribution transcribed from the asset.extras metadata embedded in the GLB
+(Sketchfab glTF export). The GLB is distributed unchanged.
+
+Runtime adaptations by Flight3d contributors:
+- Scale the SketchUp-unit geometry to the real 61.66 m length and mount it in
+  the simulator frame (+X starboard, +Y up, -Z nose).
+- Remove the authored static landing gear and add procedurally generated
+  retractable gear (twin-wheel nose leg, four-wheel main bogies).
+- Droop the nose section ahead of the windscreen frame about a lateral hinge
+  by rotating its vertices at runtime (0, 5 and 12.5 degree positions).
+- Reduce the windscreen glass opacity for flight-deck visibility.
+
+The livery depicts a real airline's markings as authored in the source model.
+Aircraft and airline names are used descriptively; no endorsement by the
+original creator, the manufacturers or the airline is implied.
+
+CC BY 4.0 permits redistribution (including browser delivery and repository
+inclusion) and adaptation, including commercial use, subject to attribution,
+a license link, indication of changes, and no additional restrictions.

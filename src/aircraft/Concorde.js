@@ -48,6 +48,89 @@ export const CONCORDE_GEAR_LAYOUT = Object.freeze({
 });
 
 /**
+ * concorde-interior.glb (Henry Chi, CC BY 4.0) is a SketchUp export in
+ * arbitrary units with a cabin and flight deck. Below the Sketchfab Z-up root
+ * it runs +X aft, +Y up, +Z port. It is scaled to the real 61.66 m length (its
+ * span then reads 28.7 m, 12% wide: the source proportions are approximate) and
+ * placed with the same nose tip (-29.80 m), symmetry plane and 12.2 m static
+ * fin height as the exterior profile so gear and physics layouts are shared.
+ */
+export const CONCORDE_INTERIOR_SCALE = 61.66 / 855.54;
+export const CONCORDE_INTERIOR_MATRIX = new THREE.Matrix4().makeTranslation(2.58, -1.76, -9.99)
+  .multiply(new THREE.Matrix4().makeRotationY(-Math.PI / 2))
+  .multiply(new THREE.Matrix4().makeScale(CONCORDE_INTERIOR_SCALE, CONCORDE_INTERIOR_SCALE, CONCORDE_INTERIOR_SCALE));
+
+const box = (min, max) => Object.freeze(new THREE.Box3(new THREE.Vector3(...min), new THREE.Vector3(...max)));
+
+/** Per-asset mounting, droop hinge, gear and cockpit data. Both share the procedural gear positions. */
+export const CONCORDE_PROFILES = Object.freeze({
+  exterior: Object.freeze({
+    id: 'exterior',
+    file: 'models/concorde.glb',
+    matrix: CONCORDE_MODEL_MATRIX,
+    discardDisplayRoot: true,
+    hinge: CONCORDE_NOSE_HINGE,
+    droopMeshes: Object.freeze([CONCORDE_FUSELAGE_MESH]),
+    gearLayout: CONCORDE_GEAR_LAYOUT,
+    gearStripVolumes: Object.freeze([]),
+    glassMaterials: Object.freeze([]),
+    cockpitEye: null
+  }),
+  interior: Object.freeze({
+    id: 'interior',
+    file: 'models/concorde-interior.glb',
+    matrix: CONCORDE_INTERIOR_MATRIX,
+    discardDisplayRoot: false,
+    // Last fuselage frame ahead of the windscreen (source X -13.84 after scaling).
+    hinge: Object.freeze({ z: -23.83, y: -1.41 }),
+    droopMeshes: 'all',
+    gearLayout: Object.freeze({
+      ...CONCORDE_GEAR_LAYOUT,
+      nose: Object.freeze({ ...CONCORDE_GEAR_LAYOUT.nose, mountY: -1.5 }),
+      main: Object.freeze({ ...CONCORDE_GEAR_LAYOUT.main, mountY: -1.1 })
+    }),
+    // The authored gear is static and 1.3 m short; strip it below the skin for the procedural legs.
+    gearStripVolumes: Object.freeze([
+      box([-1, -4.6, -19.2], [1, -1.5, -16.2]),
+      box([-3.7, -4.6, 9.6], [-1.5, -1.12, 13.0]),
+      box([1.5, -4.6, 9.6], [3.7, -1.12, 13.0])
+    ]),
+    glassMaterials: Object.freeze(['Translucent_Glass_Gray']),
+    // Captain's side, ahead of the seat backs (z -21.67) and over the glareshield (y 0.43, z -22.52).
+    cockpitEye: Object.freeze({ x: -0.7, y: 0.62, z: -22.0 })
+  })
+});
+
+/** Drop triangles whose centroid lies inside any volume; returns null when nothing is left. */
+export function stripTriangles(geometry, volumes) {
+  if (!volumes?.length) return geometry;
+  const source = geometry.index ? geometry.toNonIndexed() : geometry;
+  const position = source.attributes.position;
+  const keep = [];
+  const centroid = new THREE.Vector3();
+  for (let i = 0; i < position.count; i += 3) {
+    centroid.set(
+      (position.getX(i) + position.getX(i + 1) + position.getX(i + 2)) / 3,
+      (position.getY(i) + position.getY(i + 1) + position.getY(i + 2)) / 3,
+      (position.getZ(i) + position.getZ(i + 1) + position.getZ(i + 2)) / 3);
+    if (!volumes.some(volume => volume.containsPoint(centroid))) keep.push(i, i + 1, i + 2);
+  }
+  if (keep.length === position.count) return geometry;
+  if (!keep.length) return null;
+  const result = new THREE.BufferGeometry();
+  for (const [name, attribute] of Object.entries(source.attributes)) {
+    const values = new attribute.array.constructor(keep.length * attribute.itemSize);
+    keep.forEach((vertex, i) => {
+      for (let j = 0; j < attribute.itemSize; j++) values[i * attribute.itemSize + j] = attribute.array[vertex * attribute.itemSize + j];
+    });
+    result.setAttribute(name, new THREE.BufferAttribute(values, attribute.itemSize, attribute.normalized));
+  }
+  result.computeBoundingBox();
+  result.computeBoundingSphere();
+  return result;
+}
+
+/**
  * Select the commanded nose position. An explicit `noseDroopDeg` wins; otherwise
  * the nose follows the gear the way crews flew it: up with the gear retracted,
  * 5° on the ground and 12.5° when airborne with the gear down.
@@ -228,15 +311,17 @@ export class Concorde {
     this.flatShading = false;
     this.gearExtension = 1;
     this.noseDroopDeg = CONCORDE_NOSE_POSITIONS_DEG.takeoff;
-    this.noseRig = null;
+    this.profile = CONCORDE_PROFILES[options.profile ?? 'exterior'] ?? CONCORDE_PROFILES.exterior;
+    /** One rig per mesh with vertices ahead of the hinge. */
+    this.noseRigs = [];
     this.fuselage = null;
 
-    const gear = buildConcordeGear();
+    const gear = buildConcordeGear(this.profile.gearLayout);
     this.gearGroup = gear.group;
     this.gearLegs = gear.legs;
     this.gltfGroup.add(this.gearGroup);
 
-    // No flight-deck interior ships with this asset; the cockpit view sits in the airframe.
+    // The exterior asset has no flight deck; the interior asset's deck stays in the airframe meshes.
     this.cockpit = {
       group: new THREE.Group(), gltfCockpitGroup: new THREE.Group(),
       cockpitModelFailed: false, cockpitModelLoading: true,
@@ -245,7 +330,7 @@ export class Concorde {
     };
     this.gltfGroup.add(this.cockpit.group);
 
-    const url = options.modelUrl ?? `${import.meta.env?.BASE_URL ?? '/'}models/concorde.glb`;
+    const url = options.modelUrl ?? `${import.meta.env?.BASE_URL ?? '/'}${this.profile.file}`;
     this.ready = new GLTFLoader().loadAsync(url)
       .then(gltf => {
         this.installModel(gltf.scene);
@@ -261,10 +346,11 @@ export class Concorde {
       });
   }
 
-  /** Bake every authored mesh into the aircraft frame, discarding the Sketchfab display root. */
+  /** Bake every authored mesh into the aircraft frame using the profile's mount. */
   installModel(scene) {
+    const profile = this.profile;
     const displayRoot = scene.children[0];
-    if (displayRoot) {
+    if (displayRoot && profile.discardDisplayRoot) {
       displayRoot.position.set(0, 0, 0);
       displayRoot.quaternion.identity();
       displayRoot.scale.setScalar(1);
@@ -274,21 +360,36 @@ export class Concorde {
     scene.traverse(node => { if (node.isMesh) meshes.push(node); });
     const toAircraft = new THREE.Matrix4();
     for (const source of meshes) {
-      toAircraft.multiplyMatrices(CONCORDE_MODEL_MATRIX, source.matrixWorld);
-      const geometry = source.geometry.clone().applyMatrix4(toAircraft);
-      const mesh = new THREE.Mesh(geometry, source.material.clone());
-      // GLTFLoader de-duplicates the authored node names with a numeric suffix.
-      mesh.name = source.name.replace(/_\d+$/, '');
-      mesh.castShadow = mesh.receiveShadow = true;
-      this.gltfGroup.add(mesh);
-      if (mesh.name === CONCORDE_FUSELAGE_MESH) {
-        this.fuselage = mesh;
-        this.noseRig = prepareNoseDroop(geometry);
+      toAircraft.multiplyMatrices(profile.matrix, source.matrixWorld);
+      const geometry = stripTriangles(source.geometry.clone().applyMatrix4(toAircraft), profile.gearStripVolumes);
+      if (!geometry) continue;
+      const material = source.material.clone();
+      if (profile.glassMaterials.includes(material.name)) {
+        // Keep the windscreen readable from the flight deck.
+        material.transparent = true;
+        material.opacity = Math.min(material.opacity, 0.18);
+        material.depthWrite = false;
+        material.side = THREE.DoubleSide;
       }
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = source.name;
+      mesh.castShadow = mesh.receiveShadow = !material.transparent;
+      this.gltfGroup.add(mesh);
+      // GLTFLoader de-duplicates a mesh node sharing its parent's name with a numeric suffix.
+      const authoredName = source.parent?.name && source.name.startsWith(source.parent.name) ? source.parent.name : source.name;
+      if (profile.droopMeshes === 'all' || profile.droopMeshes.includes(authoredName)) {
+        const rig = prepareNoseDroop(geometry, profile.hinge);
+        if (rig.indices.length) this.noseRigs.push({ geometry, rig });
+      }
+      if (authoredName === CONCORDE_FUSELAGE_MESH) this.fuselage = mesh;
     }
     this.modelLoaded = this.useGltf = true;
     this.cockpit.onModelReady?.();
-    applyNoseDroop(this.fuselage?.geometry, this.noseRig, this.noseDroopDeg);
+    this.applyNoseDroop();
+  }
+
+  applyNoseDroop() {
+    for (const { geometry, rig } of this.noseRigs) applyNoseDroop(geometry, rig, this.noseDroopDeg);
   }
 
   update(dt, state = {}) {
@@ -297,7 +398,7 @@ export class Concorde {
     poseConcordeGear(this.gearLegs, extension, state);
     const target = concordeNoseDroopTarget(state);
     this.noseDroopDeg = dt > 0 ? stepNoseDroop(this.noseDroopDeg, target, dt) : target;
-    if (this.fuselage) applyNoseDroop(this.fuselage.geometry, this.noseRig, this.noseDroopDeg);
+    this.applyNoseDroop();
   }
 
   setCockpitMode(isCockpit, showInterior = true) {

@@ -17,11 +17,13 @@
 <body>
   <div id="panel">
     <strong>Concorde 외형 미리보기</strong>
+    <div class="row"><button data-model="exterior">manilov.ap (외형)</button><button data-model="interior">Henry Chi (내부 포함)</button></div>
     <label>착륙장치 <span id="gearValue">1.00</span><input id="gear" type="range" min="0" max="1" step="0.01" value="1"></label>
     <label>노즈 드롭 <span id="droopValue">5.0°</span><input id="droop" type="range" min="0" max="12.5" step="0.5" value="5"></label>
     <div class="row">
       <button data-view="side">측면</button><button data-view="front">전방</button>
       <button data-view="nose">노즈</button><button data-view="below">하부</button>
+      <button data-view="cockpit" id="cockpitButton" hidden>조종석</button>
     </div>
   </div>
   <script type="module">
@@ -51,19 +53,29 @@
     ground.receiveShadow = true;
     scene.add(ground);
 
-    const concorde = new Concorde();
+    const profile = new URLSearchParams(location.search).get('model') === 'interior' ? 'interior' : 'exterior';
+    document.querySelectorAll('[data-model]').forEach(button => {
+      button.disabled = button.dataset.model === profile;
+      button.addEventListener('click', () => { location.search = `?model=${button.dataset.model}`; });
+    });
+    const concorde = new Concorde({ profile });
     scene.add(concorde.group);
 
-    const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.05, 1000);
+    const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.02, 1000);
     const controls = new OrbitControls(camera, renderer.domElement);
+    const eye = concorde.profile.cockpitEye;
     const views = {
       side: [[-70, 2, -2], [0, -1, -2]],
       front: [[-22, 4, -62], [0, -1, -5]],
       nose: [[-14, 0.5, -26], [0, -1, -24]],
-      below: [[-18, -4.6, -14], [0, -2.5, -4]]
+      below: [[-18, -4.6, -14], [0, -2.5, -4]],
+      ...(eye ? { cockpit: [[eye.x, eye.y, eye.z], [eye.x, eye.y - 0.25, eye.z - 10]] } : {})
     };
+    document.getElementById('cockpitButton').hidden = !eye;
     const setView = name => {
       const [position, target] = views[name];
+      camera.fov = name === 'cockpit' ? 70 : 35;
+      camera.updateProjectionMatrix();
       camera.position.set(...position);
       controls.target.set(...target);
       controls.update();

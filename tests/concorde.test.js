@@ -3,37 +3,41 @@ import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as THREE from 'three';
 import {
-  CONCORDE_GEAR_LAYOUT, CONCORDE_MODEL_MATRIX, CONCORDE_NOSE_HINGE, CONCORDE_NOSE_POSITIONS_DEG,
-  applyNoseDroop, buildConcordeGear, concordeNoseDroopTarget, poseConcordeGear, prepareNoseDroop, stepNoseDroop
+  CONCORDE_GEAR_LAYOUT, CONCORDE_NOSE_HINGE, CONCORDE_NOSE_POSITIONS_DEG, CONCORDE_PROFILES,
+  applyNoseDroop, buildConcordeGear, concordeNoseDroopTarget, poseConcordeGear, prepareNoseDroop, stepNoseDroop,
+  stripTriangles
 } from '../src/aircraft/Concorde.js';
 
-const bytes = readFileSync(new URL('../public/models/concorde.glb', import.meta.url));
-const jsonLength = bytes.readUInt32LE(12);
-const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString());
-const binaryStart = 28 + jsonLength;
-
-function readAccessor(index) {
-  const accessor = gltf.accessors[index];
-  const view = gltf.bufferViews[accessor.bufferView];
-  const start = binaryStart + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
-  if (accessor.componentType === 5126) {
-    const size = { SCALAR: 1, VEC2: 2, VEC3: 3 }[accessor.type];
-    const stride = (view.byteStride ?? size * 4) / 4;
-    return Float32Array.from({ length: accessor.count * size },
-      (_, i) => bytes.readFloatLE(start + (Math.floor(i / size) * stride + i % size) * 4));
-  }
-  const read = accessor.componentType === 5125 ? (o => bytes.readUInt32LE(o)) : (o => bytes.readUInt16LE(o));
-  const width = accessor.componentType === 5125 ? 4 : 2;
-  return Array.from({ length: accessor.count }, (_, i) => read(start + i * width));
+function readGlb(file) {
+  const bytes = readFileSync(new URL(`../public/${file}`, import.meta.url));
+  const jsonLength = bytes.readUInt32LE(12);
+  const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString());
+  const binaryStart = 28 + jsonLength;
+  const readAccessor = index => {
+    const accessor = gltf.accessors[index];
+    const view = gltf.bufferViews[accessor.bufferView];
+    const start = binaryStart + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+    if (accessor.componentType === 5126) {
+      const size = { SCALAR: 1, VEC2: 2, VEC3: 3 }[accessor.type];
+      const stride = (view.byteStride ?? size * 4) / 4;
+      return Float32Array.from({ length: accessor.count * size },
+        (_, i) => bytes.readFloatLE(start + (Math.floor(i / size) * stride + i % size) * 4));
+    }
+    const read = accessor.componentType === 5125 ? (o => bytes.readUInt32LE(o)) : (o => bytes.readUInt16LE(o));
+    const width = accessor.componentType === 5125 ? 4 : 2;
+    return Array.from({ length: accessor.count }, (_, i) => read(start + i * width));
+  };
+  return { gltf, readAccessor };
 }
 
-/** Mount every authored mesh as Concorde.installModel does: drop the display root, map to aircraft axes. */
-function mountedMeshes() {
+/** Mount every authored mesh as Concorde.installModel does for `profile`, keyed by node name. */
+function mountedMeshes(profile) {
+  const { gltf, readAccessor } = readGlb(profile.file);
   const meshes = new Map();
   const visit = (index, parent, isDisplayRoot) => {
     const node = gltf.nodes[index];
     const local = new THREE.Matrix4();
-    if (!isDisplayRoot && node.matrix) local.fromArray(node.matrix);
+    if (!(isDisplayRoot && profile.discardDisplayRoot) && node.matrix) local.fromArray(node.matrix);
     const world = parent.clone().multiply(local);
     if (node.mesh !== undefined) {
       const geometry = new THREE.BufferGeometry();
@@ -43,21 +47,22 @@ function mountedMeshes() {
         geometry.setAttribute('normal', new THREE.BufferAttribute(readAccessor(primitive.attributes.NORMAL), 3));
       }
       if (primitive.indices !== undefined) geometry.setIndex(readAccessor(primitive.indices));
-      geometry.applyMatrix4(new THREE.Matrix4().multiplyMatrices(CONCORDE_MODEL_MATRIX, world));
+      geometry.applyMatrix4(new THREE.Matrix4().multiplyMatrices(profile.matrix, world));
       meshes.set(node.name, geometry);
     }
     for (const child of node.children ?? []) visit(child, world, false);
   };
   for (const root of gltf.scenes[gltf.scene ?? 0].nodes) visit(root, new THREE.Matrix4(), true);
-  return meshes;
+  return { gltf, meshes };
 }
 
-const meshes = mountedMeshes();
-const airframeBounds = () => {
+const unionBounds = geometries => {
   const box = new THREE.Box3();
-  for (const geometry of meshes.values()) { geometry.computeBoundingBox(); box.union(geometry.boundingBox); }
+  for (const geometry of geometries) { geometry.computeBoundingBox(); box.union(geometry.boundingBox); }
   return box;
 };
+const { gltf, meshes } = mountedMeshes(CONCORDE_PROFILES.exterior);
+const airframeBounds = () => unionBounds(meshes.values());
 
 test('supplied Concorde carries its CC BY 4.0 attribution and ships a matching notice', () => {
   assert.match(gltf.asset.extras.author, /manilov\.ap/);
@@ -163,4 +168,73 @@ test('procedural gear rests every tyre on the ground and stows forward / inboard
   assert.equal(legs.mainLeft.visible, true);
   poseConcordeGear(legs, 1, { compressions: { mainLeft: 0.2 } });
   assert.equal(legs.mainLeft.userData.truck.position.y, 0.2);
+});
+
+test('stripTriangles drops only triangles centred inside a volume', () => {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 5, 5, 6, 5, 5, 5, 6, 5], 3));
+  const inside = new THREE.Box3(new THREE.Vector3(4, 4, 4), new THREE.Vector3(7, 7, 7));
+  const result = stripTriangles(geometry, [inside]);
+  assert.equal(result.attributes.position.count, 3);
+  assert.equal(stripTriangles(geometry, []), geometry);
+  assert.equal(stripTriangles(geometry, [new THREE.Box3(new THREE.Vector3(-9, -9, -9), new THREE.Vector3(9, 9, 9))]), null);
+});
+
+test('interior Concorde shares the exterior frame: 61.66 m, nose tip -29.8 m, 12.2 m fin above ground', () => {
+  const profile = CONCORDE_PROFILES.interior;
+  const { gltf: interior, meshes: parts } = mountedMeshes(profile);
+  assert.match(interior.asset.extras.author, /Henry Chi/);
+  assert.match(interior.asset.extras.license, /CC-BY-4\.0/);
+  const notice = new URL('../public/models/concorde-interior.LICENSE.txt', import.meta.url);
+  assert.ok(existsSync(notice));
+  assert.match(readFileSync(notice, 'utf8'), /Henry Chi[\s\S]*CC BY 4\.0/);
+
+  const box = unionBounds(parts.values());
+  const size = box.getSize(new THREE.Vector3());
+  assert.ok(Math.abs(size.z - 61.66) < 0.05, `length ${size.z}`);
+  assert.ok(Math.abs(box.min.z + 29.8) < 0.05, `nose tip ${box.min.z}`);
+  assert.ok(Math.abs(box.max.y - profile.gearLayout.groundY - 12.2) < 0.05, `fin height ${box.max.y - profile.gearLayout.groundY}`);
+  assert.ok(Math.abs(box.min.x + box.max.x) < 0.6, `span centred ${box.min.x}..${box.max.x}`);
+});
+
+test('interior profile strips the short authored gear and leaves wing and belly skin', () => {
+  const profile = CONCORDE_PROFILES.interior;
+  const { meshes: parts } = mountedMeshes(profile);
+  let removed = 0, lowest = Infinity;
+  for (const geometry of parts.values()) {
+    const before = (geometry.index?.count ?? geometry.attributes.position.count) / 3;
+    const stripped = stripTriangles(geometry, profile.gearStripVolumes);
+    const after = stripped ? stripped.attributes.position.count / 3 : 0;
+    removed += before - after;
+    if (stripped) { stripped.computeBoundingBox(); lowest = Math.min(lowest, stripped.boundingBox.min.y); }
+  }
+  assert.ok(removed > 1000, `removed ${removed} gear triangles`);
+  // Without its gear the airframe sits clear of the ground the procedural legs reach.
+  assert.ok(lowest > profile.gearLayout.groundY + 2, `lowest remaining skin ${lowest}`);
+  const wing = parts.get('Object_6');
+  const kept = stripTriangles(wing, profile.gearStripVolumes);
+  assert.ok(kept.attributes.position.count / 3 > ((wing.index?.count ?? wing.attributes.position.count) / 3) - 12, 'wing skin is kept');
+});
+
+test('interior nose droop pivots on the frame ahead of the windscreen and the deck camera sits inside', () => {
+  const profile = CONCORDE_PROFILES.interior;
+  const { meshes: parts } = mountedMeshes(profile);
+  let frame = 0, ahead = 0;
+  for (const geometry of parts.values()) {
+    const position = geometry.attributes.position;
+    for (let i = 0; i < position.count; i++) {
+      if (Math.abs(position.getZ(i) - profile.hinge.z) < 0.02) frame++;
+      if (position.getZ(i) < profile.hinge.z - 1e-3) ahead++;
+    }
+  }
+  assert.ok(frame >= 8, `hinge frame vertices ${frame}`);
+  assert.ok(ahead > 100, `droop vertices ${ahead}`);
+  const glass = [...parts.entries()].find(([name]) => name === 'Object_25')[1];
+  glass.computeBoundingBox();
+  assert.ok(glass.boundingBox.min.z > profile.hinge.z, 'windscreen stays behind the hinge');
+  const eye = new THREE.Vector3(profile.cockpitEye.x, profile.cockpitEye.y, profile.cockpitEye.z);
+  const skin = parts.get('Object_20');
+  skin.computeBoundingBox();
+  assert.ok(skin.boundingBox.containsPoint(eye), 'eye inside the fuselage');
+  assert.ok(eye.z > profile.hinge.z, 'eye behind the drooping nose');
 });

@@ -29,6 +29,13 @@ Flight3d incorporates optimized open-source 3D models and atmospheric environmen
   - **Description**: Real-world scale (25.6m wingspan, 61.1m length) supersonic delta-wing airliner with four Olympus nacelles, modelled gear-up.
   - **Modifications**: GLB distributed unchanged. Flight3d discards the Sketchfab display rotation, mounts the airframe in the simulator frame, droops the nose ahead of the windscreen at runtime, and adds procedurally generated landing gear. See [license notice](public/models/concorde.LICENSE.txt).
 
+- **Concorde with interior (`public/models/concorde-interior.glb`)**:
+  - **Author**: [Henry Chi](https://sketchfab.com/henrychi)
+  - **Source**: [Concorde free with interior](https://sketchfab.com/3d-models/concorde-free-with-interior-16bd3e8a17b345caace9449331709f2e)
+  - **License**: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+  - **Description**: SketchUp-built Concorde with cabin seating and a flight deck (seats, instrument panel, pedestal); approximate proportions.
+  - **Modifications**: GLB distributed unchanged. Flight3d scales it to the real 61.66m length, removes the authored static gear in favour of procedural retractable gear, droops the nose at runtime and thins the windscreen glass. See [license notice](public/models/concorde-interior.LICENSE.txt).
+
 ## Environment Maps & Textures
 - **Kloofendal Partly Cloudy Sky HDR (`public/textures/environment/sky_1k.hdr`)**:
   - **Author**: Greg Zaal ([Poly Haven](https://polyhaven.com/a/kloofendal_48d_partly_cloudy))
