@@ -111,6 +111,8 @@ export class CinematicCameraDirector {
     this.orbitSpeed = 0.24;
     this.flybyWorldPos = new THREE.Vector3();
     this.flybySet = false;
+    this.flybyTarget = null;
+    this.flybyMissile = null;
     this.wingHardpointIndex = 0;
 
     // Aircraft geometric bounds for fuselage collision avoidance and exterior mounting
@@ -166,6 +168,8 @@ export class CinematicCameraDirector {
     this.replayCursor = 0;
     this.flybySet = false;
     this.flybyWorldPos.set(0, 0, 0);
+    this.flybyTarget = null;
+    this.flybyMissile = null;
     this.missileSequence = null;
     this.knownMissileIds.clear();
     this.queuedMissiles = [];
@@ -974,6 +978,8 @@ export class CinematicCameraDirector {
     this.shotTimer = 0;
     this.flybySet = false;
     this.flybyWorldPos.set(0, 0, 0);
+    this.flybyTarget = null;
+    this.flybyMissile = null;
     this.snapNextFrame = true; // Instant cinematic cut to new camera vantage
 
     if (newType === CINEMATIC_SHOTS.DYNAMIC_ORBIT_DOLLY) {
@@ -1518,7 +1524,15 @@ export class CinematicCameraDirector {
       case CINEMATIC_SHOTS.DOGFIGHT_FLYBY_PLAYER: {
         // Cinematic flyby: Player screams past in close foreground; bandit framed in background.
         const worldUp = new THREE.Vector3(0, 1, 0);
-        const bandit = this.nearestAliveTargetToPoint(planePos, targets);
+
+        if (!this.flybySet || this.flybyWorldPos.lengthSq() < 1) {
+          this.flybyTarget = this.nearestAliveTargetToPoint(planePos, targets);
+        }
+        let bandit = this.flybyTarget;
+        if (!bandit || !bandit.alive) {
+          bandit = this.nearestAliveTargetToPoint(planePos, targets);
+          this.flybyTarget = bandit;
+        }
         const banditPos = this.resolveTargetPosition(bandit);
 
         const forwardHoriz = new THREE.Vector3(forward.x, 0, forward.z);
@@ -1560,23 +1574,31 @@ export class CinematicCameraDirector {
         if (targetCamPos.y < gh + 2.5) targetCamPos.y = gh + 2.5;
         this.camPos.copy(targetCamPos);
 
-        const currentDist = this.camPos.distanceTo(planePos);
         const playerLook = planePos.clone().addScaledVector(up, 1.0);
-        const toPlayer = planePos.clone().sub(this.camPos);
+        const toPlayer = playerLook.clone().sub(this.camPos);
+        const currentDist = toPlayer.length();
+        const dirToPlayer = toPlayer.clone().normalize();
 
         if (banditPos) {
           const toBandit = banditPos.clone().sub(this.camPos);
-          const angleBetween = toPlayer.angleTo(toBandit);
+          const dirToBandit = toBandit.clone().normalize();
+          const angleBetween = dirToPlayer.angleTo(dirToBandit);
 
-          if (angleBetween < Math.PI * 0.5) {
-            const separationDeg = (angleBetween * 180) / Math.PI;
-            const banditWeight = currentDist > 45.0
-              ? THREE.MathUtils.clamp(0.25, 0.1, 0.35)
-              : THREE.MathUtils.clamp(currentDist / 180.0, 0.05, 0.25);
-            targetLook.copy(playerLook).lerp(banditPos, banditWeight);
+          if (angleBetween < Math.PI * 0.55) {
+            // Direction-based slerp interpolation ensures foreground subject is NEVER pushed out of frame
+            const angularWeight = currentDist > 45.0
+              ? THREE.MathUtils.clamp(0.24, 0.08, 0.32)
+              : THREE.MathUtils.clamp((currentDist / 180.0) * 0.24, 0.04, 0.24);
+            const camDir = dirToPlayer.clone().lerp(dirToBandit, angularWeight).normalize();
+            targetLook.copy(this.camPos).addScaledVector(camDir, Math.max(currentDist, 50.0));
+
+            // Guarantee viewport comfortably bounds both foreground and background subjects
+            const angleToPlayer = camDir.angleTo(dirToPlayer);
+            const angleToBandit = camDir.angleTo(dirToBandit);
+            const maxAngleDeg = (Math.max(angleToPlayer, angleToBandit) * 180) / Math.PI;
 
             const passWiden = Math.max(0, 140.0 - currentDist) * 0.18;
-            targetFov = THREE.MathUtils.clamp(Math.max(42.0, separationDeg * 0.95) + passWiden, 42.0, 72.0);
+            targetFov = THREE.MathUtils.clamp(Math.max(42.0, maxAngleDeg * 2.25 + 6.0) + passWiden, 42.0, 78.0);
           } else {
             targetLook.copy(playerLook);
             targetFov = THREE.MathUtils.clamp(38.0 + Math.max(0, 160.0 - currentDist) * 0.18, 38.0, 68.0);
@@ -1599,7 +1621,15 @@ export class CinematicCameraDirector {
       case CINEMATIC_SHOTS.DOGFIGHT_FLYBY_BANDIT: {
         // Cinematic flyby: Bandit screams past in close foreground; player framed in background.
         const worldUp = new THREE.Vector3(0, 1, 0);
-        const bandit = this.nearestAliveTargetToPoint(planePos, targets);
+
+        if (!this.flybySet || this.flybyWorldPos.lengthSq() < 1) {
+          this.flybyTarget = this.nearestAliveTargetToPoint(planePos, targets);
+        }
+        let bandit = this.flybyTarget;
+        if (!bandit || !bandit.alive) {
+          bandit = this.nearestAliveTargetToPoint(planePos, targets);
+          this.flybyTarget = bandit;
+        }
         const banditPos = this.resolveTargetPosition(bandit);
 
         if (!bandit || !banditPos) {
@@ -1641,27 +1671,39 @@ export class CinematicCameraDirector {
         if (targetCamPos.y < gh + 2.5) targetCamPos.y = gh + 2.5;
         this.camPos.copy(targetCamPos);
 
-        const currentDist = this.camPos.distanceTo(banditPos);
         const decoys = this.collectBanditDecoys(bandit, banditPos);
         const banditLook = banditPos.clone();
         if (decoys.centroid) banditLook.lerp(decoys.centroid, 0.15);
 
-        const toBandit = banditPos.clone().sub(this.camPos);
-        const toPlayer = planePos.clone().sub(this.camPos);
-        const angleBetween = toBandit.angleTo(toPlayer);
+        const toBandit = banditLook.clone().sub(this.camPos);
+        const currentDist = toBandit.length();
+        const dirToBandit = toBandit.clone().normalize();
 
-        if (angleBetween < Math.PI * 0.5) {
-          const separationDeg = (angleBetween * 180) / Math.PI;
-          const playerWeight = currentDist > 45.0
-            ? THREE.MathUtils.clamp(0.25, 0.1, 0.35)
-            : THREE.MathUtils.clamp(currentDist / 180.0, 0.05, 0.25);
-          targetLook.copy(banditLook).lerp(planePos, playerWeight);
+        if (planePos) {
+          const toPlayer = planePos.clone().sub(this.camPos);
+          const dirToPlayer = toPlayer.clone().normalize();
+          const angleBetween = dirToBandit.angleTo(dirToPlayer);
 
-          const passWiden = Math.max(0, 140.0 - currentDist) * 0.18 + decoys.spread * 0.06;
-          targetFov = THREE.MathUtils.clamp(Math.max(42.0, separationDeg * 0.95) + passWiden, 42.0, 72.0);
+          if (angleBetween < Math.PI * 0.55) {
+            const angularWeight = currentDist > 45.0
+              ? THREE.MathUtils.clamp(0.24, 0.08, 0.32)
+              : THREE.MathUtils.clamp((currentDist / 180.0) * 0.24, 0.04, 0.24);
+            const camDir = dirToBandit.clone().lerp(dirToPlayer, angularWeight).normalize();
+            targetLook.copy(this.camPos).addScaledVector(camDir, Math.max(currentDist, 50.0));
+
+            const angleToBandit = camDir.angleTo(dirToBandit);
+            const angleToPlayer = camDir.angleTo(dirToPlayer);
+            const maxAngleDeg = (Math.max(angleToBandit, angleToPlayer) * 180) / Math.PI;
+
+            const passWiden = Math.max(0, 140.0 - currentDist) * 0.18 + decoys.spread * 0.06;
+            targetFov = THREE.MathUtils.clamp(Math.max(42.0, maxAngleDeg * 2.25 + 6.0) + passWiden, 42.0, 78.0);
+          } else {
+            targetLook.copy(banditLook);
+            targetFov = THREE.MathUtils.clamp(38.0 + Math.max(0, 160.0 - currentDist) * 0.18 + decoys.spread * 0.06, 38.0, 68.0);
+          }
         } else {
           targetLook.copy(banditLook);
-          targetFov = THREE.MathUtils.clamp(38.0 + Math.max(0, 160.0 - currentDist) * 0.18 + decoys.spread * 0.06, 38.0, 68.0);
+          targetFov = THREE.MathUtils.clamp(38.0 + Math.max(0, 160.0 - currentDist) * 0.18, 38.0, 68.0);
         }
         targetUp.copy(worldUp);
 
@@ -1676,9 +1718,23 @@ export class CinematicCameraDirector {
       case CINEMATIC_SHOTS.MISSILE_FLYBY_BANDIT: {
         // Cinematic flyby: Bandit screams past in close foreground; chasing missile framed in background!
         const worldUp = new THREE.Vector3(0, 1, 0);
-        const bandit = this.nearestAliveTargetToPoint(planePos, targets);
+
+        if (!this.flybySet || this.flybyWorldPos.lengthSq() < 1) {
+          this.flybyTarget = this.nearestAliveTargetToPoint(planePos, targets);
+          this.flybyMissile = this.findActiveChasingMissile(this.flybyTarget, missiles);
+        }
+        let bandit = this.flybyTarget;
+        if (!bandit || !bandit.alive) {
+          bandit = this.nearestAliveTargetToPoint(planePos, targets);
+          this.flybyTarget = bandit;
+        }
         const banditPos = this.resolveTargetPosition(bandit);
-        const chasingMissile = this.findActiveChasingMissile(bandit, missiles);
+
+        let chasingMissile = this.flybyMissile;
+        if (!chasingMissile || !chasingMissile.alive) {
+          chasingMissile = this.findActiveChasingMissile(bandit, missiles);
+          this.flybyMissile = chasingMissile;
+        }
 
         if (!bandit || !banditPos) {
           targetCamPos.copy(planePos).addScaledVector(forward, -22.0).addScaledVector(right, 6.0).addScaledVector(worldUp, 4.5);
@@ -1727,23 +1783,32 @@ export class CinematicCameraDirector {
         if (targetCamPos.y < gh + 2.5) targetCamPos.y = gh + 2.5;
         this.camPos.copy(targetCamPos);
 
-        const currentDist = this.camPos.distanceTo(banditPos);
         const decoys = this.collectBanditDecoys(bandit, banditPos);
         const banditLook = banditPos.clone();
         if (decoys.centroid) banditLook.lerp(decoys.centroid, 0.15);
 
-        if (missilePos) {
-          const toBandit = banditPos.clone().sub(this.camPos);
-          const toMissile = missilePos.clone().sub(this.camPos);
-          const angleBetween = toBandit.angleTo(toMissile);
+        const toBandit = banditLook.clone().sub(this.camPos);
+        const currentDist = toBandit.length();
+        const dirToBandit = toBandit.clone().normalize();
 
-          if (angleBetween < Math.PI * 0.5) {
-            const separationDeg = (angleBetween * 180) / Math.PI;
-            const missileWeight = currentDist > 40.0 ? 0.22 : THREE.MathUtils.clamp(currentDist / 180.0, 0.05, 0.22);
-            targetLook.copy(banditLook).lerp(missilePos, missileWeight);
+        if (missilePos) {
+          const toMissile = missilePos.clone().sub(this.camPos);
+          const dirToMissile = toMissile.clone().normalize();
+          const angleBetween = dirToBandit.angleTo(dirToMissile);
+
+          if (angleBetween < Math.PI * 0.55) {
+            const angularWeight = currentDist > 40.0
+              ? 0.22
+              : THREE.MathUtils.clamp((currentDist / 180.0) * 0.22, 0.04, 0.22);
+            const camDir = dirToBandit.clone().lerp(dirToMissile, angularWeight).normalize();
+            targetLook.copy(this.camPos).addScaledVector(camDir, Math.max(currentDist, 50.0));
+
+            const angleToBandit = camDir.angleTo(dirToBandit);
+            const angleToMissile = camDir.angleTo(dirToMissile);
+            const maxAngleDeg = (Math.max(angleToBandit, angleToMissile) * 180) / Math.PI;
 
             const passWiden = Math.max(0, 140.0 - currentDist) * 0.18 + decoys.spread * 0.06;
-            targetFov = THREE.MathUtils.clamp(Math.max(44.0, separationDeg * 0.92) + passWiden, 44.0, 74.0);
+            targetFov = THREE.MathUtils.clamp(Math.max(44.0, maxAngleDeg * 2.25 + 6.0) + passWiden, 44.0, 78.0);
           } else {
             targetLook.copy(banditLook);
             targetFov = THREE.MathUtils.clamp(38.0 + Math.max(0, 160.0 - currentDist) * 0.18 + decoys.spread * 0.06, 38.0, 68.0);

@@ -1589,3 +1589,65 @@ test('Combat flybys maintain terrain ground clearance and fuselage clearance', (
     assert.ok(camera.position.distanceTo(planePos) >= 10.0, `${shot} enforces fuselage clearance`);
   }
 });
+
+test('DOGFIGHT_FLYBY_PLAYER keeps foreground player safely inside camera FOV when background bandit has large altitude/distance difference', () => {
+  const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion(); // forward: (0, 0, -1)
+  // High altitude background bandit (+1000m altitude delta, distance ~1200m)
+  const bandit = {
+    id: 207,
+    alive: true,
+    position: new THREE.Vector3(0, 2500, 500),
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const flightState = { onGround: false, iasKnots: 350, altitudeFt: 5000 };
+
+  director.switchShot(CINEMATIC_SHOTS.DOGFIGHT_FLYBY_PLAYER, flightState);
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState, targets: [bandit] });
+
+  camera.updateMatrixWorld(true);
+  const viewDir = new THREE.Vector3();
+  camera.getWorldDirection(viewDir);
+  const toPlayer = planePos.clone().sub(camera.position).normalize();
+  const angleToPlayerDeg = (viewDir.angleTo(toPlayer) * 180) / Math.PI;
+
+  // Foreground player must remain well within half-FOV
+  const halfFov = (camera.fov * 0.5);
+  assert.ok(angleToPlayerDeg < halfFov * 0.75,
+    `Player angle from optical axis (${angleToPlayerDeg.toFixed(1)}°) must stay well within half-FOV (${halfFov.toFixed(1)}°)`);
+});
+
+test('Combat flybys latch selected bandit throughout the pass across candidate re-ordering', () => {
+  const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.25, 200000);
+  const director = new CinematicCameraDirector({ camera });
+  const planePos = new THREE.Vector3(0, 1500, 0);
+  const planeQuat = new THREE.Quaternion();
+  const banditA = {
+    id: 301,
+    alive: true,
+    position: new THREE.Vector3(0, 1500, -800), // Initially closer (800m ahead)
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const banditB = {
+    id: 302,
+    alive: true,
+    position: new THREE.Vector3(0, 1500, -1200), // Initially further (1200m ahead)
+    velocity: new THREE.Vector3(0, 0, -180),
+  };
+  const flightState = { onGround: false, iasKnots: 350, altitudeFt: 5000 };
+
+  // First frame latches banditA
+  director.switchShot(CINEMATIC_SHOTS.DOGFIGHT_FLYBY_BANDIT, flightState);
+  director.update({ dt: 0.016, camera, planePos, planeQuat, flightState, targets: [banditA, banditB] });
+  assert.equal(director.flybyTarget?.id, banditA.id, 'Latches initial nearest bandit');
+
+  // Bandit B accelerates and moves closer to player than Bandit A
+  banditB.position.set(0, 1500, -700); // 700m from player, closer than banditA at -800m
+  director.update({ dt: 0.05, camera, planePos, planeQuat, flightState, targets: [banditA, banditB] });
+
+  // Camera must maintain its latched target (banditA) throughout the flyby
+  assert.equal(director.flybyTarget?.id, banditA.id, 'Maintains latched bandit despite candidate distance order change');
+  assert.equal(director.currentShotType, CINEMATIC_SHOTS.DOGFIGHT_FLYBY_BANDIT, 'Does not falsely cut early due to switching to far target');
+});
