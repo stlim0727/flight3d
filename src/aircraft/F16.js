@@ -11,6 +11,7 @@ import { CockpitHudCanvas, configureF16HudMesh } from './CockpitHudCanvas.js';
 import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
 import { createMissileMesh, createPylonMesh, preloadMissileModels } from '../weapons/missileGeometry.js';
 import { F16_MISSILE_STATIONS } from '../weapons/missileSpecs.js';
+import { createPilotMesh, setPilotCockpitMode, updatePilotDynamics, F16_PILOT_OFFSET } from './pilotGeometry.js';
 
 // The supplied asset is +X forward, with a 93.94-unit wingspan. Its authored
 // hierarchy supplies the Z-up conversion; mount it in our metre/-Z-forward frame.
@@ -208,12 +209,18 @@ export class F16 {
     // The cockpit stays in the complete airframe, so exterior views also show it.
     this.gltfGroup.add(this.cockpit.group);
     this.cockpit.group.add(this.cockpit.gltfCockpitGroup);
+    this.pilotMesh = createPilotMesh('f16');
+    this.pilotMesh.position.set(F16_PILOT_OFFSET.x, F16_PILOT_OFFSET.y, F16_PILOT_OFFSET.z);
+    this.pilotMesh.userData.onSwap = () => {
+      this.breakupVersion = (this.breakupVersion || 0) + 1;
+    };
+    this.cockpit.group.add(this.pilotMesh);
     this.hudCanvas = options.exteriorOnly
       ? null
       : (options.hudCanvas || new CockpitHudCanvas(512, 512, { variant: 'f16' }));
     this.hudMesh = null;
     if (!options.exteriorOnly) this.instrumentLight = installInstrumentLighting(this.cockpit, F16_FALCON.cockpit.captainEyePos, 0x91ffb5, () => !this.isCrashed);
-    this.ready = new GLTFLoader().loadAsync(`${import.meta.env?.BASE_URL ?? '/'}models/f-16.glb`)
+    const airframePromise = new GLTFLoader().loadAsync(`${import.meta.env?.BASE_URL ?? '/'}models/f-16.glb`)
       .then(gltf => {
         this.installModel(gltf.scene);
         if (this.flatShading) {
@@ -223,10 +230,11 @@ export class F16 {
       .catch(error => {
         this.cockpit.cockpitModelFailed = true;
         console.error('F-16 model failed to load:', error);
-      }).finally(() => {
-        this.loadingGltf = false;
-        this.cockpit.cockpitModelLoading = false;
       });
+    this.ready = Promise.all([airframePromise, this.pilotMesh.ready]).finally(() => {
+      this.loadingGltf = false;
+      this.cockpit.cockpitModelLoading = false;
+    });
   }
 
   installModel(scene) {
@@ -328,6 +336,7 @@ export class F16 {
     }
     if (this.stowedGear) this.stowedGear.visible = extension < 0.999;
     if (this.landingLight) this.landingLight.visible = this.lightsOn && !this.isCrashed && extension > 0.95;
+    updatePilotDynamics(this.pilotMesh, state, dt);
   }
 
   setCockpitMode(isCockpit, showInterior = true) {
@@ -341,6 +350,7 @@ export class F16 {
     if (this.cockpit && this.cockpit.group) {
       this.cockpit.group.visible = isCockpit ? showInterior : true;
     }
+    setPilotCockpitMode(this.pilotMesh, isCockpit, showInterior);
   }
   triggerCrashVisuals() {
     this.isCrashed = true;

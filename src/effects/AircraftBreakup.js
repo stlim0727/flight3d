@@ -26,7 +26,9 @@ export class AircraftBreakup {
   // Prepare once after the selected airframe loads, never in the impact hot path.
   // Retain source transforms so articulated gear still uses its impact-time pose.
   prepare(aircraft) {
-    if (this.preparedAircraft === aircraft && this.preparedUseGltf === aircraft.useGltf) return false;
+    if (this.preparedAircraft === aircraft &&
+        this.preparedUseGltf === aircraft.useGltf &&
+        this.preparedVersion === aircraft.breakupVersion) return false;
     this.disposePrepared();
     const wasCockpit = Boolean(aircraft.isCockpit);
     const cockpitVisible = aircraft.cockpit?.group.visible;
@@ -35,6 +37,7 @@ export class AircraftBreakup {
       this.buildPrepared(aircraft);
       this.preparedAircraft = aircraft;
       this.preparedUseGltf = aircraft.useGltf;
+      this.preparedVersion = aircraft.breakupVersion;
     } finally {
       aircraft.setCockpitMode(wasCockpit);
       if (aircraft.cockpit && cockpitVisible != null) aircraft.cockpit.group.visible = cockpitVisible;
@@ -339,5 +342,6 @@ export class AircraftBreakup {
     this.preparedRoot = null;
     this.preparedFragments = [];
     this.preparedAircraft = null;
+    this.preparedVersion = null;
   }
 }

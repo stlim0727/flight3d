@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build:missiles": "node scripts/build-missile-assets.mjs",
+    "build:pilot": "node scripts/build-pilot-assets.mjs",
     "validate:missiles": "node scripts/validate-glb-mesh.mjs",
     "bake:cockpit": "node scripts/bake-cockpit-transfer.mjs && node scripts/bake-cockpit-binding.mjs",
     "bake:cockpit-binding": "node scripts/bake-cockpit-binding.mjs",

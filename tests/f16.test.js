@@ -126,7 +126,9 @@ test('loaded F16 breaks into complete wreckage and restores its aircraft/camera 
     aircraft.setCockpitMode(true);
     system.setMode(CameraSystem.MODES.COCKPIT, true);
     aircraft.triggerCrashVisuals();
+    aircraft.setCockpitMode(false);
     const expectedVertices = vertices(aircraft.group);
+    aircraft.setCockpitMode(true);
     assert.ok(expectedVertices > 30000, 'actual airframe and cockpit geometry is present');
     breakup.spawn(aircraft, new THREE.Vector3(50, -8, 0));
     assert.equal(aircraft.group.visible, false, 'the intact F16 must leave the crash view');

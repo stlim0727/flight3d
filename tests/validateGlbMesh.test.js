@@ -18,6 +18,7 @@ test('validateGlbFile validates existing public missile GLBs', async () => {
     'public/models/missile.glb',
     'public/models/missiles/pylon-wingtip.glb',
     'public/models/missiles/pylon-underwing.glb',
+    'public/models/pilot-f16.glb',
   ]) {
     const result = await validateGlbFile(file);
     assert.equal(result.valid, true, `Expected ${file} to be valid, got errors: ${result.errors?.join(', ')}`);
