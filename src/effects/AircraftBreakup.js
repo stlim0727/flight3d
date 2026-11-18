@@ -21,6 +21,8 @@ export class AircraftBreakup {
     this.persistentPieces = [];
     this.target = new THREE.Vector3();
     this.radius = 20;
+    this.firstContact = null;
+    this.mainPiece = null;
   }
 
   // Prepare once after the selected airframe loads, never in the impact hot path.
@@ -29,7 +31,7 @@ export class AircraftBreakup {
     if (this.preparedAircraft === aircraft &&
         this.preparedUseGltf === aircraft.useGltf &&
         this.preparedVersion === aircraft.breakupVersion) return false;
-    this.disposePrepared();
+    this.disposePrepared({ clearPersistent: false });
     const wasCockpit = Boolean(aircraft.isCockpit);
     const cockpitVisible = aircraft.cockpit?.group.visible;
     aircraft.setCockpitMode(false);
@@ -121,7 +123,11 @@ export class AircraftBreakup {
           version: source.geometry.attributes.position.version,
         } : null;
         this.preparedFragments.push({ mesh, source, inverseTransform, matIndex, deformation });
-        if (!regions.has(region)) regions.set(region, new THREE.Group());
+        if (!regions.has(region)) {
+          const group = new THREE.Group();
+          group.name = region;
+          regions.set(region, group);
+        }
         regions.get(region).add(mesh);
       }
       geometry.dispose();
@@ -129,8 +135,9 @@ export class AircraftBreakup {
     for (const object of regions.values()) this.preparedRoot.add(object);
   }
 
-  spawn(aircraft, velocity) {
+  spawn(aircraft, velocity, { detachRegions = null } = {}) {
     this.clear();
+    this.firstContact = null;
     // Direct callers and crashes during asset loading still have a safe fallback.
     this.prepare(aircraft);
     aircraft.setCockpitMode(false);
@@ -176,34 +183,107 @@ export class AircraftBreakup {
     }
     if (bounds.isEmpty()) return;
     const center = bounds.getCenter(new THREE.Vector3());
-    let n = 0;
     const speed = velocity.length();
-    for (const object of regions) {
-      const box = fragmentBounds(object);
-      if (box.isEmpty()) continue;
-      const pivot = box.getCenter(new THREE.Vector3());
-      const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
-      object.children.forEach(mesh => {
-        mesh.matrix.premultiply(offset);
-        mesh.matrixWorldNeedsUpdate = true;
-      });
-      object.position.copy(pivot).applyMatrix4(root.matrixWorld);
-      object.quaternion.copy(root.getWorldQuaternion(new THREE.Quaternion()));
-      const outward = pivot.clone().sub(center).applyQuaternion(object.quaternion).normalize();
-      const impulse = outward.multiplyScalar(Math.min(16, speed * 0.13));
-      impulse.y += Math.min(7, speed * 0.05);
-      this.scene.add(object);
-      this.pieces.push({ object, velocity: velocity.clone().multiplyScalar(0.55).add(impulse),
-        spin: new THREE.Vector3(0.4 + n * 0.13, (n % 2 ? -1 : 1) * 0.6, 0.3 - n * 0.11),
-        radius: box.getSize(new THREE.Vector3()).length() * 0.12 });
-      n++;
+
+    const detachSet = Array.isArray(detachRegions) && detachRegions.length > 0
+      ? new Set(detachRegions)
+      : null;
+
+    if (detachSet) {
+      const detachedObjects = regions.filter(o => detachSet.has(o.name));
+      const remainingObjects = regions.filter(o => !detachSet.has(o.name));
+
+      for (const object of detachedObjects) {
+        const box = fragmentBounds(object);
+        if (box.isEmpty()) continue;
+        const pivot = box.getCenter(new THREE.Vector3());
+        const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
+        object.children.forEach(mesh => {
+          mesh.matrix.premultiply(offset);
+          mesh.matrixWorldNeedsUpdate = true;
+        });
+        object.position.copy(pivot).applyMatrix4(root.matrixWorld);
+        object.quaternion.copy(root.getWorldQuaternion(new THREE.Quaternion()));
+        const outward = pivot.clone().sub(center).applyQuaternion(object.quaternion).normalize();
+        const impulse = outward.multiplyScalar(Math.min(18, speed * 0.15));
+        impulse.y += Math.min(8, speed * 0.06);
+        this.scene.add(object);
+        this.pieces.push({
+          object,
+          velocity: velocity.clone().multiplyScalar(0.6).add(impulse),
+          spin: new THREE.Vector3((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 3),
+          radius: box.getSize(new THREE.Vector3()).length() * 0.12,
+          isDetachedPart: true,
+          partName: object.name,
+        });
+      }
+
+      if (remainingObjects.length > 0) {
+        const mainGroup = new THREE.Group();
+        mainGroup.name = 'SeveredAirframe';
+        for (const object of remainingObjects) mainGroup.add(object);
+        const mainBox = fragmentBounds(mainGroup);
+        const pivot = mainBox.getCenter(new THREE.Vector3());
+        const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
+        mainGroup.traverse(node => {
+          if (node.isMesh) {
+            node.matrix.premultiply(offset);
+            node.matrixWorldNeedsUpdate = true;
+          }
+        });
+        mainGroup.position.copy(pivot).applyMatrix4(root.matrixWorld);
+        mainGroup.quaternion.copy(root.getWorldQuaternion(new THREE.Quaternion()));
+
+        // Continuous aerodynamic roll & yaw moments from missing wing lift & drag
+        const isLeftMissing = detachSet.has('left');
+        const isRightMissing = detachSet.has('right');
+        const rollRate = isLeftMissing ? 3.6 : isRightMissing ? -3.6 : 0.8;
+        const yawRate = isLeftMissing ? -1.5 : isRightMissing ? 1.5 : 0.4;
+        const pitchRate = 0.5;
+        const spin = new THREE.Vector3(pitchRate, yawRate, rollRate);
+
+        this.scene.add(mainGroup);
+        const mainPiece = {
+          object: mainGroup,
+          velocity: velocity.clone().multiplyScalar(0.7),
+          spin,
+          radius: mainBox.getSize(new THREE.Vector3()).length() * 0.15,
+          isMainBody: true,
+          severedSide: isLeftMissing ? 'left' : isRightMissing ? 'right' : null,
+          localSpin: true,
+        };
+        this.pieces.push(mainPiece);
+        this.mainPiece = mainPiece;
+      }
+    } else {
+      let n = 0;
+      for (const object of regions) {
+        const box = fragmentBounds(object);
+        if (box.isEmpty()) continue;
+        const pivot = box.getCenter(new THREE.Vector3());
+        const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
+        object.children.forEach(mesh => {
+          mesh.matrix.premultiply(offset);
+          mesh.matrixWorldNeedsUpdate = true;
+        });
+        object.position.copy(pivot).applyMatrix4(root.matrixWorld);
+        object.quaternion.copy(root.getWorldQuaternion(new THREE.Quaternion()));
+        const outward = pivot.clone().sub(center).applyQuaternion(object.quaternion).normalize();
+        const impulse = outward.multiplyScalar(Math.min(16, speed * 0.13));
+        impulse.y += Math.min(7, speed * 0.05);
+        this.scene.add(object);
+        this.pieces.push({ object, velocity: velocity.clone().multiplyScalar(0.55).add(impulse),
+          spin: new THREE.Vector3(0.4 + n * 0.13, (n % 2 ? -1 : 1) * 0.6, 0.3 - n * 0.11),
+          radius: box.getSize(new THREE.Vector3()).length() * 0.12 });
+        n++;
+      }
     }
     this.aircraft = aircraft;
     root.visible = false;
     this.updateBounds();
   }
 
-  integratePieces(pieces, h, terrain, waterLevel) {
+  integratePieces(pieces, h, terrain, waterLevel, recordContact = false) {
     for (const piece of pieces) {
       const { object, velocity, spin, radius } = piece;
       const floor = terrain?.getHeight(object.position.x, object.position.z) ?? 0;
@@ -216,11 +296,48 @@ export class AircraftBreakup {
       velocity.multiplyScalar(Math.exp(-(0.12 + 2 * immersion) * h));
       spin.multiplyScalar(Math.exp(-2 * immersion * h));
       object.position.addScaledVector(velocity, h);
-      object.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), spin.x * h);
-      object.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), spin.y * h);
-      object.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), spin.z * h);
+      if (piece.localSpin) {
+        object.rotateX(spin.x * h);
+        object.rotateY(spin.y * h);
+        object.rotateZ(spin.z * h);
+      } else {
+        object.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), spin.x * h);
+        object.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), spin.y * h);
+        object.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), spin.z * h);
+      }
       object.quaternion.normalize();
-      const contactHeight = (terrain?.getHeight(object.position.x, object.position.z) ?? 0) + radius;
+      const currentFloor = terrain?.getHeight(object.position.x, object.position.z) ?? 0;
+      const contactHeight = currentFloor + radius;
+
+      // Track first contact with water surface or dry ground during sub-stepping
+      if (recordContact && !this.firstContact) {
+        // If this breakup has a designated mainPiece (e.g. severed single-wing breakup),
+        // only record firstContact when the main airframe contacts, so detached wings
+        // landing early do not terminate the main wreck prematurely.
+        const canTriggerContact = !this.mainPiece || piece === this.mainPiece || piece.isMainBody;
+        if (canTriggerContact) {
+          const isWaterContact = Number.isFinite(waterLevel) && currentFloor < waterLevel && (object.position.y - radius <= waterLevel);
+          const isGroundContact = object.position.y <= contactHeight;
+          if (isWaterContact) {
+            this.firstContact = {
+              point: object.position.clone(),
+              velocity: velocity.clone(),
+              piece,
+              isWater: true,
+              isGround: false,
+            };
+          } else if (isGroundContact) {
+            this.firstContact = {
+              point: object.position.clone(),
+              velocity: velocity.clone(),
+              piece,
+              isWater: false,
+              isGround: true,
+            };
+          }
+        }
+      }
+
       if (object.position.y < contactHeight) {
         object.position.y = contactHeight;
         if (velocity.y < 0) velocity.y = Math.abs(velocity.y) > 1 ? -velocity.y * 0.18 * (1 - immersion) : 0;
@@ -237,9 +354,9 @@ export class AircraftBreakup {
     while (remaining > 0) {
       const h = Math.min(remaining, 1 / 120);
       remaining -= h;
-      this.integratePieces(this.pieces, h, terrain, waterLevel);
+      this.integratePieces(this.pieces, h, terrain, waterLevel, true);
       if (this.persistentPieces?.length) {
-        this.integratePieces(this.persistentPieces, h, terrain, waterLevel);
+        this.integratePieces(this.persistentPieces, h, terrain, waterLevel, false);
       }
     }
     if (this.aircraft) this.aircraft.group.visible = false;
@@ -280,6 +397,13 @@ export class AircraftBreakup {
 
   updateBounds(terrain, waterLevel = null) {
     if (!this.pieces.length) return;
+    if (this.mainPiece) {
+      this.target.copy(this.mainPiece.object.position);
+      this.radius = Math.max(10, this.mainPiece.radius);
+      const floor = terrain?.getHeight(this.target.x, this.target.z) ?? 0;
+      if (Number.isFinite(waterLevel) && floor < waterLevel) this.target.y = Math.max(waterLevel, this.target.y);
+      return;
+    }
     const box = new THREE.Box3();
     for (const { object } of this.pieces) {
       object.updateWorldMatrix(true, true);
@@ -292,16 +416,18 @@ export class AircraftBreakup {
   }
 
   clear({ persist = false, duration = 30 } = {}) {
+    this.firstContact = null;
+    this.mainPiece = null;
     if (persist && this.pieces.length > 0) {
       for (const piece of this.pieces) {
         const objClone = piece.object.clone(true);
-        objClone.children.forEach(mesh => {
-          if (mesh.isMesh) {
-            if (mesh.geometry) mesh.geometry = mesh.geometry.clone();
-            if (mesh.material) {
-              mesh.material = Array.isArray(mesh.material)
-                ? mesh.material.map(m => m ? m.clone() : m)
-                : mesh.material.clone();
+        objClone.traverse(node => {
+          if (node.isMesh) {
+            if (node.geometry) node.geometry = node.geometry.clone();
+            if (node.material) {
+              node.material = Array.isArray(node.material)
+                ? node.material.map(m => m ? m.clone() : m)
+                : node.material.clone();
             }
           }
         });
@@ -313,31 +439,52 @@ export class AircraftBreakup {
           radius: piece.radius,
           timer: piece.timer ?? 0,
           duration,
+          localSpin: Boolean(piece.localSpin),
         });
       }
     }
+    // Restore composite groups (SeveredAirframe) back to direct children of preparedRoot
+    if (this.mainPiece?.object) {
+      const mainGroup = this.mainPiece.object;
+      this.scene.remove(mainGroup);
+      while (mainGroup.children.length > 0) {
+        const child = mainGroup.children[0];
+        child.position.set(0, 0, 0);
+        child.quaternion.identity();
+        child.scale.setScalar(1);
+        this.preparedRoot?.add(child);
+      }
+      this.mainPiece = null;
+    }
     for (const { object } of this.pieces) {
       this.scene.remove(object);
-      this.preparedRoot?.add(object);
+      if (object.name !== 'SeveredAirframe') {
+        object.position.set(0, 0, 0);
+        object.quaternion.identity();
+        object.scale.setScalar(1);
+        this.preparedRoot?.add(object);
+      }
     }
     this.pieces = [];
     if (this.aircraft) this.aircraft.group.visible = true;
     this.aircraft = null;
   }
 
-  disposePrepared() {
+  disposePrepared({ clearPersistent = true } = {}) {
     this.clear();
-    for (const piece of this.persistentPieces) {
-      this.scene.remove(piece.object);
-      piece.object.traverse(node => {
-        if (node.isMesh) {
-          node.geometry?.dispose();
-          if (Array.isArray(node.material)) node.material.forEach(m => m?.dispose());
-          else node.material?.dispose();
-        }
-      });
+    if (clearPersistent) {
+      for (const piece of this.persistentPieces) {
+        this.scene.remove(piece.object);
+        piece.object.traverse(node => {
+          if (node.isMesh) {
+            node.geometry?.dispose();
+            if (Array.isArray(node.material)) node.material.forEach(m => m?.dispose());
+            else node.material?.dispose();
+          }
+        });
+      }
+      this.persistentPieces = [];
     }
-    this.persistentPieces = [];
     this.preparedRoot?.traverse(mesh => mesh.geometry?.dispose());
     this.preparedRoot = null;
     this.preparedFragments = [];

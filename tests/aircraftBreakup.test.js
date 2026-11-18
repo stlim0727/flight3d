@@ -457,3 +457,30 @@ test('persistent breakup pieces survive clear, settle, fade and dispose after 30
   assert.equal(breakup.persistentPieces.length, 0, 'Persistent pieces removed after 30s');
   assert.ok(persistentDisposed > 0, 'Persistent geometries disposed');
 });
+
+test('sub-step shoreline crossing classifies contact using destination terrain height', () => {
+  const { scene, aircraft } = fixture();
+  const breakup = new AircraftBreakup(scene);
+  breakup.spawn(aircraft, new THREE.Vector3(0, 0, 0));
+  assert.ok(breakup.pieces.length > 0);
+
+  // Take a piece with radius 1 and position it moving across shoreline:
+  // x = -0.1 (over water where seabed is -10m) to x ≈ 0.15 (dry land where ground is +5m).
+  const piece = breakup.pieces[0];
+  piece.radius = 1;
+  piece.object.position.set(-0.1, 6, 0);
+  piece.velocity.set(2.5, 0, 0); // dt=0.1s => dx = 0.25 => dest x = 0.15
+
+  const waterLevel = 0;
+  const terrain = {
+    getHeight: (x, z) => (x <= 0 ? -10 : 5),
+  };
+
+  // Run update for 0.1s with contact recording enabled
+  breakup.integratePieces([piece], 0.1, terrain, waterLevel, true);
+
+  assert.ok(breakup.firstContact, 'first contact was recorded');
+  assert.equal(breakup.firstContact.isWater, false, 'not classified as water contact on elevated land');
+  assert.equal(breakup.firstContact.isGround, true, 'classified as dry ground contact at destination');
+  assert.ok(breakup.firstContact.point.x > 0, 'contact point is on land');
+});

@@ -116,6 +116,7 @@ export class BanditAircraftView {
     this.proxy = createBanditMesh(callsign);
     this.mesh.add(this.proxy);
     this.disposed = false;
+    this._isDestroyed = false;
     // Pure-state/replay Node tests do not fetch browser assets.
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       this.airframe = new F16({ exteriorOnly: true });
@@ -126,7 +127,11 @@ export class BanditAircraftView {
           this.airframe.update(0, { gearState: 0 });
           this._skinAirframe();
           this.proxy.visible = false;
+          if (this._isDestroyed) {
+            this.airframe.group.visible = false;
+          }
           this.mesh.add(this.airframe.group);
+          this.onAirframeLoaded?.();
         }
       });
     }
@@ -218,6 +223,28 @@ export class BanditAircraftView {
       throttle,
       engine1,
     });
+  }
+
+  getBreakupSource() {
+    if (this.airframe?.modelLoaded) {
+      return this.airframe;
+    }
+    return {
+      group: this.proxy,
+      proceduralGroup: this.proxy,
+      useGltf: false,
+      setCockpitMode: () => {},
+    };
+  }
+
+  restoreVisuals() {
+    this._isDestroyed = false;
+    if (this.airframe?.modelLoaded) {
+      this.airframe.group.visible = true;
+      this.proxy.visible = false;
+    } else {
+      this.proxy.visible = true;
+    }
   }
 
   disposeAirframe() {
