@@ -269,6 +269,25 @@ test('handleDirectoryRequest handles HTTP routes, CORS, filters and errors', asy
   assert.equal(Array.isArray(asyncGetData.rooms), true);
   assert.equal(asyncGetData.rooms.length, 1);
   assert.equal(asyncGetData.rooms[0].name, 'AsyncHost');
+
+  // GET /v1/ice-servers returns DEFAULT_ICE_SERVERS when store has no custom provider
+  const iceRes = await handleDirectoryRequest(new Request('https://directory.flight3d/v1/ice-servers'), store);
+  assert.equal(iceRes.status, 200);
+  const iceData = await iceRes.json();
+  assert.equal(Array.isArray(iceData.iceServers), true);
+  assert.ok(iceData.iceServers.length > 0);
+
+  // Custom getIceServers on store is invoked
+  const customIceStore = {
+    async listRooms() { return []; },
+    async getIceServers() {
+      return [{ urls: 'turn:turn.cloudflare.com:3478', username: 'u', credential: 'c' }];
+    },
+  };
+  const customIceRes = await handleDirectoryRequest(new Request('https://directory.flight3d/v1/ice-servers'), customIceStore);
+  assert.equal(customIceRes.status, 200);
+  const customIceData = await customIceRes.json();
+  assert.equal(customIceData.iceServers[0].urls, 'turn:turn.cloudflare.com:3478');
 });
 
 test('RoomDirectoryClient handles registration, heartbeat and graceful errors', async () => {
@@ -506,4 +525,34 @@ test('LocalRoomDirectoryStore supports localStorage cross-tab discovery and Room
   await client1.unregister();
   const afterUnreg = await client2.fetchRooms();
   assert.equal(afterUnreg.rooms.length, 0);
+});
+
+test('RoomDirectoryClient fetches and caches dynamic ice servers with fallback', async () => {
+  const customServers = [{ urls: 'turn:turn.cloudflare.com:3478', username: 'u', credential: 'p' }];
+  let fetchCount = 0;
+  const client = new RoomDirectoryClient({
+    directoryUrl: 'https://directory.flight3d',
+    fetchFn: async () => {
+      fetchCount++;
+      return new Response(JSON.stringify({ iceServers: customServers }), { status: 200 });
+    },
+  });
+
+  const servers1 = await client.getIceServers();
+  assert.deepEqual(servers1, customServers);
+  assert.equal(fetchCount, 1);
+
+  // Cached on second call
+  const servers2 = await client.getIceServers();
+  assert.deepEqual(servers2, customServers);
+  assert.equal(fetchCount, 1);
+
+  // Fallback on failure
+  const failingClient = new RoomDirectoryClient({
+    directoryUrl: 'https://directory.flight3d',
+    fetchFn: async () => { throw new Error('network-down'); },
+  });
+  const fallbackServers = await failingClient.getIceServers();
+  assert.equal(Array.isArray(fallbackServers), true);
+  assert.ok(fallbackServers.some(s => s.urls.includes('cloudflare.com')));
 });

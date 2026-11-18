@@ -16,6 +16,12 @@ test('peerOptions parses custom ICE servers from environment', () => {
   assert.deepEqual(options.config?.iceServers, custom);
 });
 
+test('peerOptions prioritizes dynamicIceServers when provided', () => {
+  const dynamic = [{ urls: 'turn:turn.cloudflare.com:3478', username: 'u', credential: 'c' }];
+  const options = peerOptions({ VITE_MULTIPLAYER_ICE_SERVERS: '[]' }, dynamic);
+  assert.deepEqual(options.config?.iceServers, dynamic);
+});
+
 test('peerOptions parses custom signaling URL from environment', () => {
   const options = peerOptions({ VITE_MULTIPLAYER_SIGNAL_URL: 'https://signal.example.com:8443/custom' });
   assert.equal(options.host, 'signal.example.com');

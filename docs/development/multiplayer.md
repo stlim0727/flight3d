@@ -95,8 +95,12 @@ variables (they become public).
 `VITE_MULTIPLAYER_SIGNAL_URL` optionally selects a self-hosted PeerServer URL
 (e.g. `http://127.0.0.1:9000/flight3d` for local testing).
 `VITE_MULTIPLAYER_ICE_SERVERS` optionally contains a JSON RTCIceServer array for
-public configuration or ephemeral credentials (including TURN relays). If unspecified,
+public configuration or fallback credentials (including TURN relays). If unspecified,
 a multi-region STUN list (`stun:stun.cloudflare.com:3478` and Google STUN pools) is used.
+Dynamic ICE servers are fetched by `RoomDirectoryClient.getIceServers()` from
+the room directory worker (`GET /v1/ice-servers`), allowing ephemeral TURN credentials
+from Cloudflare Calls (1,000 GB/month free) to be generated on the fly via Worker secrets
+`TURN_KEY_ID` and `TURN_KEY_API_TOKEN` without exposing secret keys to the browser.
 HTTPS deployments need HTTPS/WSS signaling and microphone access requires a secure context (localhost is allowed).
 No query-string signaling overrides or production test hooks.
 

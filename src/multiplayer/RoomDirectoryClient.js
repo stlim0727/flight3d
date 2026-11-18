@@ -1,5 +1,6 @@
 import { PROTOCOL_VERSION, FLIGHT_REVISION } from './compatibility.js';
 import { HEARTBEAT_INTERVAL_MS, LocalRoomDirectoryStore } from './roomDirectory.js';
+import { DEFAULT_ICE_SERVERS } from './peerOptions.js';
 
 export class RoomDirectoryClient {
   constructor({ directoryUrl, fetchFn = globalThis.fetch, localStore = null } = {}) {
@@ -299,5 +300,32 @@ export class RoomDirectoryClient {
     }
 
     return { ok: true };
+  }
+
+  async getIceServers({ timeoutMs = 4000 } = {}) {
+    if (this._cachedIceServers && Date.now() < this._cachedIceServersExpiresAt) {
+      return this._cachedIceServers;
+    }
+    if (this.directoryUrl !== null) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const url = this._resolveUrl('/v1/ice-servers');
+        const res = await this.fetchFn(url.href, { signal: controller.signal });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data?.iceServers) && data.iceServers.length > 0) {
+            this._cachedIceServers = data.iceServers;
+            this._cachedIceServersExpiresAt = Date.now() + 600000;
+            return data.iceServers;
+          }
+        }
+      } catch {
+        // Fallback to defaults on timeout or network error
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    return DEFAULT_ICE_SERVERS;
   }
 }

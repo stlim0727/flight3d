@@ -1,4 +1,50 @@
 import { MemoryRoomDirectoryStore, handleDirectoryRequest } from '../../src/multiplayer/roomDirectory.js';
+import { DEFAULT_ICE_SERVERS } from '../../src/multiplayer/peerOptions.js';
+
+let cachedIceServers = null;
+let cachedIceServersExpiresAt = 0;
+
+export async function fetchCloudflareTurnIceServers(turnKeyId, turnKeyApiToken, { fetchFn = fetch, ttl = 86400 } = {}) {
+  const res = await fetchFn(`https://rtc.live.cloudflare.com/v1/turn/keys/${turnKeyId}/credentials/generate-ice-servers`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${turnKeyApiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ttl }),
+  });
+  if (!res.ok) {
+    throw new Error(`Cloudflare Calls TURN error: ${res.status}`);
+  }
+  const data = await res.json();
+  if (Array.isArray(data?.iceServers) && data.iceServers.length > 0) {
+    return data.iceServers;
+  }
+  throw new Error('invalid-ice-servers-response');
+}
+
+export async function resolveWorkerIceServers(env = {}) {
+  if (env.TURN_KEY_ID && env.TURN_KEY_API_TOKEN) {
+    if (cachedIceServers && Date.now() < cachedIceServersExpiresAt) {
+      return cachedIceServers;
+    }
+    try {
+      const servers = await fetchCloudflareTurnIceServers(env.TURN_KEY_ID, env.TURN_KEY_API_TOKEN);
+      cachedIceServers = servers;
+      cachedIceServersExpiresAt = Date.now() + 3600000; // cache for 1 hour
+      return servers;
+    } catch (err) {
+      console.error('Failed to fetch Cloudflare Calls TURN servers:', err);
+    }
+  }
+  if (env.ICE_SERVERS) {
+    try {
+      const parsed = JSON.parse(env.ICE_SERVERS);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+  }
+  return DEFAULT_ICE_SERVERS;
+}
 
 export class D1RoomDirectoryStore {
   constructor(db, { ttlMs = 45000, maxRooms = 500 } = {}) {
@@ -222,6 +268,7 @@ let memoryStore;
 export default {
   async fetch(request, env) {
     const store = env?.DB ? new D1RoomDirectoryStore(env.DB) : (memoryStore ??= new MemoryRoomDirectoryStore());
+    store.getIceServers = () => resolveWorkerIceServers(env);
     return handleDirectoryRequest(request, store);
   },
 };

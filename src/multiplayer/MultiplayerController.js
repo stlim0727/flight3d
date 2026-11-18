@@ -1,4 +1,5 @@
 import { PeerRoom } from './PeerRoom.js';
+import { peerOptions } from './peerOptions.js';
 import { VoiceLink } from './VoiceLink.js';
 import { MultiplayerDialog } from './MultiplayerDialog.js';
 import { RemoteAircraft } from './RemoteAircraft.js';
@@ -52,6 +53,8 @@ export class MultiplayerController {
     this.lastJoinMethod = 'code';
     this.connectStartedAt = null;
     this.hasConnected = false;
+    this.dynamicIceServers = null;
+    this.directoryClient?.getIceServers?.().then(s => { this.dynamicIceServers = s; }).catch(() => {});
     if (this.refreshRoomsBtn) this.refreshRoomsBtn.onclick = () => this.refreshOpenRooms();
     if (typeof BroadcastChannel !== 'undefined') {
       try {
@@ -131,6 +134,7 @@ export class MultiplayerController {
   get modalOpen() { return this.dialog.open; }
   openDialog(mode) {
     if (mode) this.chooseSetup(mode);
+    this.directoryClient?.getIceServers?.().then(s => { this.dynamicIceServers = s; }).catch(() => {});
     this.modal.open();
     this.refresh();
   }
@@ -186,7 +190,8 @@ export class MultiplayerController {
       this.voice.context.resume().catch(() => {});
       this.sim.ensureAudio?.();
       this.playAudio();
-      this.room = new PeerRoom({ room, name: document.getElementById('mp-name').value, config, voice: this.voice,
+      const options = peerOptions(undefined, this.dynamicIceServers);
+      this.room = new PeerRoom({ room, name: document.getElementById('mp-name').value, config, voice: this.voice, options,
         prepare: (c, slot) => this.prepare(c, slot), fly: () => this.startTogether(),
         changed: () => this.refresh(),
         remoteStream: stream => {
