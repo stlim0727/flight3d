@@ -1,4 +1,5 @@
 import { validRoom } from './roomCode.js';
+import { DEFAULT_ICE_SERVERS } from './peerOptions.js';
 
 export const DIRECTORY_API_VERSION = 'v1';
 export const HEARTBEAT_INTERVAL_MS = 15000;
@@ -484,6 +485,20 @@ export async function handleDirectoryRequest(request, store, { now = Date.now() 
     const match = /^Bearer\s+(.+)$/i.exec(header.trim());
     return match ? match[1].trim() : null;
   };
+
+  // GET /v1/ice-servers
+  if (method === 'GET' && (pathname === '/v1/ice-servers' || pathname === '/ice-servers')) {
+    if (store && typeof store.getIceServers === 'function') {
+      const result = await store.getIceServers();
+      if (result && Array.isArray(result.iceServers)) {
+        return jsonResponse(result);
+      }
+      if (Array.isArray(result)) {
+        return jsonResponse({ iceServers: result, dynamic: true });
+      }
+    }
+    return jsonResponse({ iceServers: DEFAULT_ICE_SERVERS, dynamic: false });
+  }
 
   // GET /v1/rooms
   if (method === 'GET' && (pathname === '/v1/rooms' || pathname === '/rooms')) {

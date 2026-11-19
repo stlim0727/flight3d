@@ -14,8 +14,13 @@ export default {
   "mp.joinTitle": "친구 방 참가",
   "mp.joinHelp": "친구의 코드를 입력하세요. 무대와 기종은 방장의 선택을 따릅니다. 초대 링크를 열면 자동으로 참가합니다.",
   "mp.hostWaitingHelp": "코드를 공유하고 아래 버튼으로 대기 시간을 연장하세요. 이 창을 닫으면 방이 취소됩니다.",
+  "mp.hostConnectingHelp": "친구가 방에 연결하고 있습니다. P2P 핸드셰이크를 진행 중입니다...",
   "mp.hostReadyHelp": "친구가 들어왔습니다. 준비되면 함께 시작을 누르세요. 이 창을 닫으면 방이 취소됩니다.",
+  "mp.guestConnecting": "호스트에 P2P 연결 중...",
+  "mp.guestConnectingHelp": "호스트와 직접 P2P 연결을 수립하고 있습니다. 동일 Wi-Fi 루프백 차단이나 Brave 등 보안 브라우저 환경에서는 연결이 지연되거나 실패할 수 있습니다.",
   "mp.guestWaitingHelp": "방장이 시작할 때까지 기다려 주세요. 창을 닫으면 참가가 취소됩니다.",
+  "mp.peerConnecting": "친구 접속 시도 중...",
+  "mp.networkHint": "동일 Wi-Fi 루프백 차단, 5G 대칭형 NAT 또는 브라우저 WebRTC 보호 설정 확인",
 
   "mp.code": "방 코드",
   "mp.copyCode": "코드 복사",

@@ -3,15 +3,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { GameFlowController } from '../src/ui/GameFlowController.js';
 import { t, bindText } from '../src/i18n/index.js';
-import { parseRoom, inviteUrl, inviteCompatibilityFailure } from '../src/multiplayer/protocol.js';
+import { parseRoom, inviteUrl, inviteCompatibilityFailure, DEFAULT_CONFIG } from '../src/multiplayer/protocol.js';
 import { RoomDirectoryClient } from '../src/multiplayer/RoomDirectoryClient.js';
 import { HEARTBEAT_INTERVAL_MS } from '../src/multiplayer/roomDirectory.js';
 import { RoomReplaySession } from '../src/replay/RoomReplaySession.js';
 import { Atmosphere } from '../src/physics/Atmosphere.js';
+import { peerOptions } from '../src/multiplayer/peerOptions.js';
 
 // Load the production coordinator without importing its browser-only PeerJS adapter.
 const source = readFileSync(new URL('../src/multiplayer/MultiplayerController.js', import.meta.url), 'utf8');
-const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', 'inviteCompatibilityFailure', 'RoomDirectoryClient', 'HEARTBEAT_INTERVAL_MS', 'Atmosphere', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl, inviteCompatibilityFailure, RoomDirectoryClient, HEARTBEAT_INTERVAL_MS, Atmosphere);
+const Controller = new Function('t', 'bindText', 'parseRoom', 'inviteUrl', 'inviteCompatibilityFailure', 'DEFAULT_CONFIG', 'RoomDirectoryClient', 'HEARTBEAT_INTERVAL_MS', 'Atmosphere', 'peerOptions', `return (${source.slice(source.indexOf('export class ') + 7)});`)(t, bindText, parseRoom, inviteUrl, inviteCompatibilityFailure, DEFAULT_CONFIG, RoomDirectoryClient, HEARTBEAT_INTERVAL_MS, Atmosphere, peerOptions);
 
 test('invite URL joins automatically; missing or invalid invites never connect', () => {
   const joined = [];
@@ -53,7 +54,7 @@ function fixture(run) {
   const previous = globalThis.document;
   const elements = new Map();
   const element = id => {
-    if (!elements.has(id)) elements.set(id, { disabled: false, setAttribute() {} });
+    if (!elements.has(id)) elements.set(id, { disabled: false, value: '', setAttribute() {}, getAttribute() { return null; } });
     return elements.get(id);
   };
   const airport = element('airport'), preset = element('preset'), restricted = element('restricted');
@@ -67,8 +68,17 @@ function fixture(run) {
     room: { closed: false, host: false, session: { name: 'Pilot', state: 'flying' } },
     sim: { gameFlow, syncFlowUi() {}, showToast() {}, lobbyScreen: { setSelectionBusy() {}, refresh() { restricted.disabled = true; } } },
   });
-  try { return run({ controller, gameFlow, airport, preset, restricted }); }
-  finally { globalThis.document = previous; }
+  let asyncCleanup = false;
+  try {
+    const res = run({ controller, gameFlow, airport, preset, restricted });
+    if (res && typeof res.then === 'function') {
+      asyncCleanup = true;
+      return res.finally(() => { globalThis.document = previous; });
+    }
+    return res;
+  } finally {
+    if (!asyncCleanup) globalThis.document = previous;
+  }
 }
 
 for (const reason of ['left', 'peer-left', 'timeout', 'pagehide']) {
@@ -528,3 +538,110 @@ test('ended clears playbackBlocked and synchronizes audio hint', () => fixture((
   assert.equal(controller.playbackBlocked, false);
   assert.equal(hintSynced, 1);
 }));
+
+test('refresh presents distinct connecting states for guest vs host', () => fixture(({ controller }) => {
+  const helpEl = globalThis.document.getElementById('mp-dialog-help');
+  const statusEl = globalThis.document.getElementById('mp-status');
+
+  // 1. Guest in connecting state
+  controller.room = {
+    closed: false,
+    host: false,
+    peerConnecting: false,
+    session: { name: 'Goose', state: 'connecting', config: {} },
+  };
+  controller.refresh();
+  assert.equal(helpEl.textContent, t('mp.guestConnectingHelp'));
+  assert.match(statusEl.textContent, new RegExp(t('mp.guestConnecting')));
+
+  // 2. Guest in connected state
+  controller.room.session.state = 'connected';
+  controller.room.session.remoteName = 'Maverick';
+  controller.refresh();
+  assert.equal(helpEl.textContent, t('mp.guestWaitingHelp'));
+  assert.match(statusEl.textContent, new RegExp(t('mp.state.connected')));
+
+  // 3. Host waiting for friend (idle connecting)
+  controller.room.host = true;
+  controller.room.room = '234567';
+  controller.room.session.state = 'connecting';
+  controller.room.session.remoteName = null;
+  controller.room.peerConnecting = false;
+  controller.refresh();
+  assert.equal(helpEl.textContent, t('mp.hostWaitingHelp'));
+  assert.match(statusEl.textContent, new RegExp(t('mp.state.connecting')));
+
+  // 4. Host while a peer is actively connecting
+  controller.room.peerConnecting = true;
+  controller.refresh();
+  assert.equal(helpEl.textContent, t('mp.hostConnectingHelp'));
+  assert.match(statusEl.textContent, new RegExp(t('mp.peerConnecting')));
+}));
+
+test('connect awaits in-flight ensureIceServers before initializing room', () => fixture(async ({ controller }) => {
+  const dynamic = [{ urls: 'turn:turn.cloudflare.com:3478', username: 'u', credential: 'c' }];
+  let resolveServers;
+  controller.directoryClient = {
+    getIceServers: () => new Promise(resolve => { resolveServers = () => resolve(dynamic); }),
+  };
+  controller.ensureIceServers(); // starts query in-flight
+
+  let connectFinished = false;
+  // Stub preferences to avoid touching storage
+  controller.preferences = { save() {} };
+  controller.room = null;
+  const connectPromise = controller.connect('K7M2QX').then(() => { connectFinished = true; });
+  assert.equal(connectFinished, false);
+  assert.equal(controller.connecting, true);
+
+  resolveServers();
+  await connectPromise;
+  assert.equal(connectFinished, true);
+  assert.equal(controller.connecting, false);
+}));
+
+test('dismissDialog invalidates pending connection before ICE lookup finishes', () => fixture(async ({ controller }) => {
+  let resolveServers;
+  controller.directoryClient = {
+    getIceServers: () => new Promise(resolve => { resolveServers = resolve; }),
+  };
+  controller.preferences = { save() {} };
+  controller.room = null;
+
+  const connectPromise = controller.connect('K7M2QX');
+  assert.equal(controller.connecting, true);
+
+  // User dismisses dialog while ICE query is in flight
+  controller.dismissDialog();
+  assert.equal(controller.connecting, false);
+
+  // When ICE query eventually finishes:
+  resolveServers([{ urls: 'turn:turn.cloudflare.com:3478' }]);
+  await connectPromise;
+
+  // No room should be created
+  assert.equal(controller.room, null);
+  assert.equal(controller.active, false);
+}));
+
+test('ensureIceServers delegates to directoryClient so client manages cache expiration', async () => {
+  let calls = 0;
+  const controller = Object.assign(Object.create(Controller.prototype), {
+    directoryClient: {
+      getIceServers: async () => {
+        calls++;
+        return [{ urls: `turn:turn-${calls}.example.com:3478` }];
+      },
+    },
+  });
+
+  const res1 = await controller.ensureIceServers();
+  assert.equal(calls, 1);
+  assert.equal(res1[0].urls, 'turn:turn-1.example.com:3478');
+
+  // Next ensureIceServers call delegates to directoryClient (which manages 10m TTL)
+  const res2 = await controller.ensureIceServers();
+  assert.equal(calls, 2);
+  assert.equal(res2[0].urls, 'turn:turn-2.example.com:3478');
+});
+

@@ -95,9 +95,20 @@ variables (they become public).
 `VITE_MULTIPLAYER_SIGNAL_URL` optionally selects a self-hosted PeerServer URL
 (e.g. `http://127.0.0.1:9000/flight3d` for local testing).
 `VITE_MULTIPLAYER_ICE_SERVERS` optionally contains a JSON RTCIceServer array for
-public configuration or ephemeral credentials. HTTPS deployments need HTTPS/WSS
-signaling and microphone access requires a secure context (localhost is allowed).
+public configuration or fallback credentials (including TURN relays). If unspecified,
+a multi-region STUN list (`stun:stun.cloudflare.com:3478` and Google STUN pools) is used.
+Dynamic ICE servers are fetched by `RoomDirectoryClient.getIceServers()` from
+the room directory worker (`GET /v1/ice-servers`), allowing ephemeral TURN credentials
+from Cloudflare Calls (1,000 GB/month free) to be generated on the fly via Worker secrets
+`TURN_KEY_ID` and `TURN_KEY_API_TOKEN` without exposing secret keys to the browser.
+HTTPS deployments need HTTPS/WSS signaling and microphone access requires a secure context (localhost is allowed).
 No query-string signaling overrides or production test hooks.
+
+### NAT & Browser Considerations
+
+- **Shared Wi-Fi (NAT Hairpinning / Loopback)**: Many consumer routers (e.g. ipTIME, carrier-supplied Wi-Fi routers) drop packets sent from internal LAN addresses to their own external WAN IP. Without a configured TURN relay server or local mDNS resolution, P2P connections between two devices on the same Wi-Fi may fail.
+- **Symmetric NAT (Cellular 5G/LTE)**: Mobile carrier networks use Carrier-Grade NAT (CGNAT) with symmetric port allocation, requiring a TURN relay for reliable P2P traversal.
+- **Brave Browser (WebRTC IP Handling Policy)**: Brave Shields by default masks private IP addresses and restricts WebRTC candidate interfaces to prevent fingerprinting. When playing between Brave browsers on the same network without a TURN relay, players can temporarily select `Default public and private interfaces` in Brave Settings -> Privacy & Security -> WebRTC IP Handling Policy.
 
 ## Verification plan
 

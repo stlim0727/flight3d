@@ -1,4 +1,5 @@
 import { PeerRoom } from './PeerRoom.js';
+import { peerOptions } from './peerOptions.js';
 import { VoiceLink } from './VoiceLink.js';
 import { MultiplayerDialog } from './MultiplayerDialog.js';
 import { RemoteAircraft } from './RemoteAircraft.js';
@@ -52,6 +53,9 @@ export class MultiplayerController {
     this.lastJoinMethod = 'code';
     this.connectStartedAt = null;
     this.hasConnected = false;
+    this.connecting = false;
+    this.iceServersPromise = null;
+    this.ensureIceServers();
     if (this.refreshRoomsBtn) this.refreshRoomsBtn.onclick = () => this.refreshOpenRooms();
     if (typeof BroadcastChannel !== 'undefined') {
       try {
@@ -128,9 +132,20 @@ export class MultiplayerController {
       if (panel) panel.hidden = path !== mode;
     }
   }
+  ensureIceServers() {
+    if (!this.iceServersPromise) {
+      this.iceServersPromise = (this.directoryClient?.getIceServers?.() || Promise.resolve(null))
+        .catch(() => null)
+        .finally(() => {
+          this.iceServersPromise = null;
+        });
+    }
+    return this.iceServersPromise;
+  }
   get modalOpen() { return this.dialog.open; }
   openDialog(mode) {
     if (mode) this.chooseSetup(mode);
+    this.ensureIceServers();
     this.modal.open();
     this.refresh();
   }
@@ -140,12 +155,13 @@ export class MultiplayerController {
     if (!this.active && tab?.getAttribute('aria-selected') === 'true') this.refreshOpenRooms();
   }
   dismissDialog() {
-    if (this.active && this.room.session.state !== 'flying') {
+    if (this.connecting || (this.active && this.room.session.state !== 'flying')) {
       this.registrationGeneration++;
+      this.connecting = false;
       this.registeringHost = false;
       this.hostDirectoryClient?.unregister();
       this.hostDirectoryClient = null;
-      this.room.close('cancelled');
+      this.room?.close('cancelled');
     }
     this.modal.close();
     this.refreshRoomListIfVisible();
@@ -167,11 +183,12 @@ export class MultiplayerController {
   }
   get active() { return Boolean(this.room && !this.room.closed); }
   get locked() { return this.active && !this.preparing; }
-  connect(room) {
-    if (this.active || this.preparing || this.sim.startingFlight || this.sim.airportLoading) return;
+  async connect(room) {
+    if (this.active || this.connecting || this.preparing || this.sim.startingFlight || this.sim.airportLoading) return;
     this.preferences.save();
     this.message = null;
-    this.registrationGeneration++;
+    this.connecting = true;
+    const generation = (this.registrationGeneration = (this.registrationGeneration || 0) + 1);
     this.registeringHost = false;
     this.hostDirectoryClient?.unregister();
     this.hostDirectoryClient = null;
@@ -180,13 +197,26 @@ export class MultiplayerController {
     this.connectStartedAt = performance.now();
     this.hasConnected = false;
     const config = Object.fromEntries(Object.keys(DEFAULT_CONFIG).map(key => [key, document.getElementById(`mp-${key}`).value]));
+
+    let dynamicServers = null;
+    try {
+      dynamicServers = await this.ensureIceServers();
+    } catch {}
+
+    if (generation !== this.registrationGeneration) {
+      this.connecting = false;
+      return;
+    }
+    this.connecting = false;
+
     try {
       this.voice = new VoiceLink({ changed: () => this.refresh() });
       // Invite URLs join without a gesture; blocked audio can be enabled in the modal.
       this.voice.context.resume().catch(() => {});
       this.sim.ensureAudio?.();
       this.playAudio();
-      this.room = new PeerRoom({ room, name: document.getElementById('mp-name').value, config, voice: this.voice,
+      const options = peerOptions(undefined, dynamicServers);
+      this.room = new PeerRoom({ room, name: document.getElementById('mp-name').value, config, voice: this.voice, options,
         prepare: (c, slot) => this.prepare(c, slot), fly: () => this.startTogether(),
         changed: () => this.refresh(),
         remoteStream: stream => {
@@ -214,7 +244,11 @@ export class MultiplayerController {
       }
       this.enableVoiceMicrophone();
       this.snapshotTimer = setInterval(() => this.sendSnapshot(), 1000 / 15);
-    } catch { this.voice?.close(); this.message = 'connection'; }
+    } catch {
+      this.connecting = false;
+      this.voice?.close();
+      this.message = 'connection';
+    }
     this.refresh();
   }
   enableVoiceMicrophone() {
@@ -397,6 +431,7 @@ export class MultiplayerController {
     this.refresh();
   }
   ended(reason) {
+    this.connecting = false;
     this.roomReplay?.finish(reason);
     this.remoteCrashed = false;
     const durationSeconds = this.connectStartedAt ? Number(((performance.now() - this.connectStartedAt) / 1000).toFixed(1)) : 0;
@@ -442,7 +477,17 @@ export class MultiplayerController {
     }
     document.getElementById('mp-controls').hidden = !active;
     document.getElementById('mp-intro').hidden = active;
-    bindText(document.getElementById('mp-dialog-help'), () => t(!active ? 'mp.setupHelp' : s.state === 'starting' ? 'mp.state.starting' : s.state !== 'flying' ? (room.host ? (s.state === 'connected' ? 'mp.hostReadyHelp' : 'mp.hostWaitingHelp') : 'mp.guestWaitingHelp') : 'mp.dialogHelp'));
+    bindText(document.getElementById('mp-dialog-help'), () => {
+      if (!active) return t('mp.setupHelp');
+      if (s.state === 'starting') return t('mp.state.starting');
+      if (s.state === 'flying') return t('mp.dialogHelp');
+      if (room.host) {
+        if (s.state === 'connected') return t('mp.hostReadyHelp');
+        if (room.peerConnecting) return t('mp.hostConnectingHelp');
+        return t('mp.hostWaitingHelp');
+      }
+      return s.state === 'connected' ? t('mp.guestWaitingHelp') : t('mp.guestConnectingHelp');
+    });
     document.getElementById('mp-connect').disabled = active;
     document.getElementById('mp-connect').hidden = active;
     document.getElementById('mp-room-menu').hidden = !active;
@@ -454,8 +499,9 @@ export class MultiplayerController {
     document.getElementById('mp-create').disabled = active;
     document.getElementById('mp-join').disabled = active;
     document.getElementById('mp-invite-row').hidden = !active || !room.host || !room.registered;
-    if (active && room.host) {
-      document.getElementById('mp-invite').value = inviteUrl(room.room, location.href);
+    if (active && room.host && room.room) {
+      const base = typeof location !== 'undefined' ? location.href : 'http://localhost/';
+      document.getElementById('mp-invite').value = inviteUrl(room.room, base);
       document.getElementById('mp-code').value = `${room.room.slice(0, 3)} ${room.room.slice(3)}`;
     }
     document.getElementById('mp-respawn').disabled = s?.state !== 'flying';
@@ -469,8 +515,18 @@ export class MultiplayerController {
     this.startReady = ready;
     bindText(start, () => t(s?.state === 'flying' ? 'mp.restart' : 'mp.start'));
     bindText(document.getElementById('mp-status'), () => {
-      if (this.message) return t(`mp.status.${this.message}`);
+      if (this.message) {
+        const msg = t(`mp.status.${this.message}`);
+        if (['timeout', 'connection'].includes(this.message) && !active) {
+          return `${msg} (${t('mp.networkHint')})`;
+        }
+        return msg;
+      }
       if (!active) return t('mp.idle');
+      if (s.state === 'connecting') {
+        if (!room.host) return `${t('mp.guestConnecting')} · 1/2`;
+        if (room.peerConnecting) return `${t('mp.peerConnecting')} · 1/2`;
+      }
       return `${t(`mp.state.${s.state}`)}${s.remoteName ? ` · ${s.remoteName} · 2/2` : ' · 1/2'}`;
     });
     bindText(document.getElementById('mp-roster'), () => active ? `${s.name} + ${s.remoteName || t('mp.waiting')} · ${s.config ? `${t(`mp.${s.config.airport}`)} / ${s.config.aircraft} / ${t(`mp.${s.config.scenario}`)}` : ''}` : '');
