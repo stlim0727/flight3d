@@ -870,3 +870,61 @@ describe('Spatial combat audio (#862)', () => {
     }
   });
 });
+
+describe('Delayed explosion lifecycle (#862 review)', () => {
+  function stoppingSources(audio) {
+    const stops = [];
+    const create = audio.ctx.createBufferSource.bind(audio.ctx);
+    audio.ctx.createBufferSource = () => {
+      const source = create();
+      const stop = source.stop.bind(source);
+      source.stop = when => { stops.push(when); stop(when); };
+      return source;
+    };
+    return stops;
+  }
+
+  it('cancels future booms on replay pause, sortie pause and reset', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      audio.ctx.currentTime = 10;
+      const stops = stoppingSources(audio);
+
+      audio.playRemoteExplosion(343);
+      assert.strictEqual(stops.length, 0, 'nothing has arrived yet');
+      audio.setReplayPaused(true);
+      assert.deepStrictEqual(stops, [10, 10], 'both delayed layers stop at the pause');
+
+      stops.length = 0;
+      audio.setReplayPaused(false);
+      audio.playRemoteExplosion(1029);
+      audio.setPaused(true);
+      assert.deepStrictEqual(stops, [10, 10], 'a sortie hold cancels the scheduled boom');
+
+      stops.length = 0;
+      audio.setPaused(false);
+      audio.playRemoteExplosion(1029);
+      audio.reset();
+      assert.deepStrictEqual(stops, [10, 10], 'reset cancels the scheduled boom');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('does not schedule cancellation work for an immediate local blast', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      audio.ctx.currentTime = 10;
+      audio.playRemoteExplosion(0);
+      assert.strictEqual(audio.combat.pendingExplosions.length, 0);
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+});

@@ -426,7 +426,20 @@ export class CombatReplayPlayback {
         continuous ? lerp(from.z, to.z, blend) : pose.z,
       );
       const heading = continuous ? shortestAngle(from.headingRad, to.headingRad, alpha) : pose.headingRad;
-      target.velocity.set(Math.sin(heading), 0, -Math.cos(heading));
+      const span = b.timeSec - a.timeSec;
+      let vx = span > 1e-6 ? (to.x - from.x) / span : 0;
+      let vy = span > 1e-6 ? (to.y - from.y) / span : 0;
+      let vz = span > 1e-6 ? (to.z - from.z) / span : 0;
+      const speed = Math.hypot(vx, vy, vz);
+      if (!(speed > 20 && speed < 1200)) {
+        // Death, respawn and a lone final sample carry no usable pose delta;
+        // heading alone is a direction vector, not a metres-per-second velocity.
+        const cruiseSpeed = 200;
+        vx = Math.sin(heading) * cruiseSpeed;
+        vy = 0;
+        vz = -Math.cos(heading) * cruiseSpeed;
+      }
+      target.velocity.set(vx, vy, vz);
       if (from.quaternion && to.quaternion) {
         target.quaternion ??= new THREE.Quaternion();
         target.quaternion.fromArray(slerp([], from.quaternion, to.quaternion, blend));

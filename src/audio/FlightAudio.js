@@ -126,6 +126,7 @@ export class FlightAudio {
     if (this.volume === 0) {
       this.cancelSpeech(); this.stopGunFire(); this.stopMissileFlight(); this.departureRadio.stop(); this.bangkokRadio?.stop();
       this.remoteEngines?.stopAll();
+      this.combat?.cancelPendingExplosions();
     }
     this.applyMasterGain();
   }
@@ -143,6 +144,7 @@ export class FlightAudio {
     if (this.isMuted) {
       this.cancelSpeech(); this.departureRadio.stop(); this.bangkokRadio?.stop();
       this.remoteEngines?.stopAll();
+      this.combat?.cancelPendingExplosions();
     }
     this.applyMasterGain();
   }
@@ -150,7 +152,7 @@ export class FlightAudio {
   setRadioPaused(p) { this.departureRadio.setPaused(p); this.bangkokRadio?.setPaused(p); }
   setPaused(p) {
     this.isPaused = !!p;
-    if (this.isPaused) { this.cancelSpeech(); this.remoteEngines?.stopAll(); }
+    if (this.isPaused) { this.cancelSpeech(); this.remoteEngines?.stopAll(); this.combat?.cancelPendingExplosions(); }
     this.applyMasterGain();
   }
 
@@ -159,6 +161,7 @@ export class FlightAudio {
     if (this.isReplayPaused) {
       this.cancelSpeech(); this.stopGunFire(); this.stopMissileFlight();
       this.remoteEngines?.stopAll();
+      this.combat?.cancelPendingExplosions();
       this.departureRadio.stop(); this.bangkokRadio?.stop();
       this.warningGain?.gain.setValueAtTime(0, this.ctx?.currentTime ?? 0);
     }
@@ -279,6 +282,7 @@ export class FlightAudio {
   silenceOnCrash() {
     this.crashed = true; this.cancelSpeech(); this.departureRadio.stop(); this.bangkokRadio?.stop();
     this.remoteEngines?.stopAll();
+    this.combat?.cancelPendingExplosions();
     if (this.ctx) {
       for (const n of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'windGain', 'rumbleGain', 'packGain', 'warningGain', 'gStrainGain']) this[n]?.gain.setValueAtTime(0, this.ctx.currentTime);
     }

@@ -19,6 +19,7 @@ export class CombatSoundEffects {
 
     this.gunFireNodes = null;
     this.missileFlightNodes = null;
+    this.pendingExplosions = [];
     this._whiteNoise = null;
     this._whiteNoiseContext = null;
   }
@@ -26,6 +27,23 @@ export class CombatSoundEffects {
   reset() {
     this.stopGunFire();
     this.stopMissileFlight();
+    this.cancelPendingExplosions();
+  }
+
+  /** Pause/reset must silence booms whose sound has not arrived yet. */
+  cancelPendingExplosions() {
+    if (!this.pendingExplosions.length) return;
+    const now = this.ctx?.currentTime ?? 0;
+    for (const pending of this.pendingExplosions) {
+      for (const source of pending.sources) {
+        try {
+          source.stop(now);
+        } catch (error) {
+          void error;
+        }
+      }
+    }
+    this.pendingExplosions.length = 0;
   }
 
   whiteNoiseSource() {
@@ -370,10 +388,14 @@ export class CombatSoundEffects {
   playRemoteExplosion(distance = 0, isWater = false, isMuted = false) {
     if (!this.ctx || isMuted) return;
     const now = this.ctx.currentTime;
+    for (let index = this.pendingExplosions.length - 1; index >= 0; index--) {
+      if (this.pendingExplosions[index].endAt <= now) this.pendingExplosions.splice(index, 1);
+    }
     const safeDistance = Math.max(0, Number.isFinite(distance) ? distance : 0);
     // Light outruns sound: a detonation kilometres away is heard after the flash.
     const at = now + propagationDelaySeconds(safeDistance);
     const volume = Math.min(1.0, Math.max(0.02, 1 / (1 + safeDistance / 1500)));
+    const pendingSources = [];
 
     const bufferSize = Math.floor(this.ctx.sampleRate * 2.5);
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -399,6 +421,7 @@ export class CombatSoundEffects {
     bassFilter.connect(bassGain);
     bassGain.connect(this.masterGain);
     noiseSrc.start(at);
+    pendingSources.push(noiseSrc);
 
     const proximity = Math.max(0, 1 - safeDistance / 4000);
     if (proximity > 0.01) {
@@ -421,7 +444,9 @@ export class CombatSoundEffects {
       crackFilter.connect(crackGain);
       crackGain.connect(this.masterGain);
       crackSrc.start(at);
+      pendingSources.push(crackSrc);
     }
+    if (at > now) this.pendingExplosions.push({ sources: pendingSources, endAt: at + 2.6 });
   }
 
   playWaterSplash(isMuted = false, onSplash = null) {

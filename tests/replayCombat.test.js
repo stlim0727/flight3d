@@ -192,6 +192,35 @@ test('replayed bandits slide between 2 Hz samples instead of hopping at the midp
   playback.stop();
 });
 
+test('replayed bandit velocity carries metres per second for Doppler (#862 review)', () => {
+  const playback = new CombatReplayPlayback({ scene: new Scene() });
+  playback.load({
+    targets: [{ callsign: 'FAST' }], missiles: [], missileSamples: [], events: [],
+    banditSamples: [
+      { timeSec: 0, targets: [{ x: 0, y: 1000, z: 0, headingRad: 0, alive: true }] },
+      { timeSec: 0.5, targets: [{ x: 0, y: 1000, z: -125, headingRad: 0, alive: true }] },
+    ],
+  });
+  playback.update(0.1, 0.25);
+  const velocity = playback.state.targets[0].velocity;
+  assert.ok(Math.abs(velocity.length() - 250) < 1e-6, `expected 250 m/s, got ${velocity.length()}`);
+  assert.ok(velocity.z < 0, 'heading still points along the recorded flight path');
+
+  // A respawn teleport has no usable pose delta; heading supplies a sane
+  // patrol velocity instead of reading the jump as thousands of metres/second.
+  playback.load({
+    targets: [{ callsign: 'FAST' }], missiles: [], missileSamples: [], events: [],
+    banditSamples: [
+      { timeSec: 0, targets: [{ x: 0, y: 1000, z: 0, headingRad: 0, alive: false }] },
+      { timeSec: 0.5, targets: [{ x: 5000, y: 1000, z: -5000, headingRad: 0, alive: true }] },
+    ],
+  });
+  playback.update(0.1, 0.5);
+  const respawnVelocity = playback.state.targets[0].velocity;
+  assert.ok(Math.abs(respawnVelocity.length() - 200) < 1e-6);
+  playback.stop();
+});
+
 test('a bandit death between samples still snaps instead of sliding a wreck', () => {
   const combat = decodeTrack(encodeTrack(recordCombat(5).finish())).combat;
   const samples = combat.banditSamples;

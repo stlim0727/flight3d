@@ -5,7 +5,7 @@ import { SimulatorInputCoordinator } from '../src/core/SimulatorInputCoordinator
 import { FLOW } from '../src/ui/GameFlowController.js';
 
 describe('SimulatorAudioCoordinator', () => {
-  it('delegates update to audio with distance and cockpit mode', () => {
+  it('delegates update to audio with distance, cockpit mode and spatial pose', () => {
     let updateArgs = null;
     const mockAudio = {
       update(...args) {
@@ -13,8 +13,9 @@ describe('SimulatorAudioCoordinator', () => {
       },
     };
     const coordinator = new SimulatorAudioCoordinator(mockAudio);
-    coordinator.update(0.016, { iasKnots: 150 }, true, 25);
-    assert.deepEqual(updateArgs, [0.016, { iasKnots: 150 }, true, 25]);
+    const spatial = { position: { x: 0, y: 1000, z: 0 }, camera: { tag: 'cam' } };
+    coordinator.update(0.016, { iasKnots: 150 }, true, 25, spatial);
+    assert.deepEqual(updateArgs, [0.016, { iasKnots: 150 }, true, 25, spatial]);
   });
 
   it('syncs mute and radio pause on background and game pause', () => {
