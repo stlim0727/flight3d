@@ -120,3 +120,65 @@ test('CorridorTileStreamer clean disposal frees all geometries and meshes withou
   assert.equal(streamer.activeTiles.size, 0);
   assert.equal(streamer.group.children.length, 0);
 });
+
+test('CorridorTileStreamer createTileGeometry produces 0.0m seam gap between adjacent tiles', () => {
+  const surface = new CorridorFlightSurface({ activeOrigin: JEJU_ORIGIN });
+  const streamer = new CorridorTileStreamer(surface, { origin: JEJU_ORIGIN });
+
+  // Test adjacent tiles (434, 202) and (435, 202) near SOSDO
+  const t1 = streamer.createTileGeometry({ x: 434, y: 202, zoom: 9 });
+  const t2 = streamer.createTileGeometry({ x: 435, y: 202, zoom: 9 });
+
+  const pos1 = t1.geo.attributes.position;
+  const pos2 = t2.geo.attributes.position;
+
+  // Segments = 4, gridWidth = 5.
+  // In t1, right edge is col = 4 for rows 0..4 (indices: 4, 9, 14, 19, 24)
+  // In t2, left edge is col = 0 for rows 0..4 (indices: 0, 5, 10, 15, 20)
+  for (let r = 0; r <= 4; r++) {
+    const idx1 = r * 5 + 4;
+    const idx2 = r * 5 + 0;
+
+    const x1 = pos1.getX(idx1), z1 = pos1.getZ(idx1), y1 = pos1.getY(idx1);
+    const x2 = pos2.getX(idx2), z2 = pos2.getZ(idx2), y2 = pos2.getY(idx2);
+
+    const gap = Math.hypot(x1 - x2, y1 - y2, z1 - z2);
+    assert.ok(gap < 1e-4, `Gap between adjacent tile vertices at row ${r} must be ~0m, got ${gap}m`);
+  }
+
+  streamer.dispose();
+});
+
+test('CorridorTileStreamer prunes replaced zoom LOD tiles on altitude transition to eliminate z-fighting', async () => {
+  const surface = new CorridorFlightSurface({ activeOrigin: JEJU_ORIGIN });
+  const streamer = new CorridorTileStreamer(surface, { origin: JEJU_ORIGIN });
+
+  // High altitude cruise (FL260 ~ 8000m) -> Zoom 9
+  await streamer.update({
+    x: 0,
+    z: -100000,
+    altitudeM: 8000,
+    headingDeg: 180,
+  });
+
+  assert.ok(streamer.activeTiles.size > 0);
+  for (const entry of streamer.activeTiles.values()) {
+    assert.equal(entry.tile.zoom, 9, 'All cruise tiles must be Zoom 9');
+  }
+
+  // Descend below 5,000m to 2,000m -> Zoom 10
+  await streamer.update({
+    x: 0,
+    z: -100000,
+    altitudeM: 2000,
+    headingDeg: 180,
+  });
+
+  assert.ok(streamer.activeTiles.size > 0);
+  for (const entry of streamer.activeTiles.values()) {
+    assert.equal(entry.tile.zoom, 10, 'Replaced Zoom 9 tiles must be pruned, leaving only Zoom 10');
+  }
+
+  streamer.dispose();
+});
+

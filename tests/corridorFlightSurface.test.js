@@ -122,3 +122,32 @@ test('CorridorFlightSurface integrates seamlessly with WaterDitching along the c
     assert.equal(result.catastrophic, true, 'Hard water impact must trigger catastrophic crash');
   });
 });
+
+test('CorridorFlightSurface delegates to IncheonFlightSurface using INCHEON_SCENERY_ORIGIN', () => {
+  let queriedLocalX = null;
+  let queriedLocalZ = null;
+  const mockIncheonSurface = {
+    getHeight: (x, z) => {
+      queriedLocalX = x;
+      queriedLocalZ = z;
+      return 7.0;
+    },
+    isOnRunway: (x, z) => true,
+    isRunwaySafetyArea: (x, z) => true,
+  };
+
+  const surface = new CorridorFlightSurface({
+    activeOrigin: JEJU_ORIGIN,
+    incheonSurface: mockIncheonSurface,
+  });
+
+  // Query Incheon scenery origin in Jeju frame
+  const [x, z] = wgs84ToJejuLocal(37.448, 126.455);
+  const h = surface.getHeight(x, z);
+
+  assert.equal(h, 7.0);
+  assert.ok(Math.abs(queriedLocalX) < 1.0, `Scenery local X must be ~0, got ${queriedLocalX}`);
+  assert.ok(Math.abs(queriedLocalZ) < 1.0, `Scenery local Z must be ~0, got ${queriedLocalZ}`);
+  assert.equal(surface.isOnRunway(x, z), true);
+});
+

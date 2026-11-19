@@ -156,6 +156,10 @@ export class CorridorTileStreamer {
 
     // 1. Mark needed tiles and start fetching new ones
     const loadPromises = [];
+    const altitudeM = aircraftState.altitudeM ?? (aircraftState.y ?? 0);
+    const selectedZoom = this.selectZoom(altitudeM);
+    this.currentZoom = selectedZoom;
+
     for (const t of needed) {
       const key = `${t.zoom}/${t.x}/${t.y}`;
       neededKeys.add(key);
@@ -163,23 +167,32 @@ export class CorridorTileStreamer {
       const existing = this.activeTiles.get(key);
       if (existing) {
         existing.lastAccessTime = now;
+        // Retry failed tile images with exponential backoff
+        if (!existing.imageLoaded && !this.inFlightRequests.has(key)) {
+          const retryCount = existing.retryCount || 0;
+          const backoffDelay = Math.min(30000, 2000 * (2 ** retryCount));
+          if (now - (existing.lastFailedTime || 0) >= backoffDelay) {
+            loadPromises.push(this.retryTileImage(existing, key));
+          }
+        }
       } else if (!this.inFlightRequests.has(key)) {
         loadPromises.push(this.loadTile(t, now));
       }
     }
 
-    // 2. Prune trailing tiles exceeding retention radius
+    // 2. Prune trailing tiles exceeding retention radius or replaced LOD zoom levels
     let prunedCount = 0;
     const { x, z } = aircraftState;
 
     for (const [key, entry] of this.activeTiles.entries()) {
       const distM = Math.hypot(entry.centerX - x, entry.centerZ - z);
 
-      // Evict if beyond retention radius or if over hard capacity
+      // Evict if wrong LOD zoom level (to prevent z-fighting), or beyond retention radius, or over capacity
+      const isWrongLOD = entry.tile.zoom !== selectedZoom;
       const isTooFar = distM > this.config.retentionRadiusM && !neededKeys.has(key);
       const isOverCapacity = this.activeTiles.size > this.config.maxActiveTiles;
 
-      if (isTooFar || isOverCapacity) {
+      if (isWrongLOD || isTooFar || isOverCapacity) {
         this.disposeTile(key);
         prunedCount++;
       }
@@ -196,6 +209,74 @@ export class CorridorTileStreamer {
   }
 
   /**
+   * Construct tile grid geometry by directly converting each vertex's fractional
+   * Web Mercator coordinate to WGS84 and the local tangent plane.
+   * Guarantees that adjacent tiles share identical boundary vertices with 0 gap.
+   */
+  createTileGeometry(tileInfo) {
+    const segments = 4;
+    const vertexCount = (segments + 1) * (segments + 1);
+    const positions = new Float32Array(vertexCount * 3);
+    const uvs = new Float32Array(vertexCount * 2);
+    const indices = [];
+
+    let idx = 0;
+    let uvIdx = 0;
+    let sumX = 0;
+    let sumZ = 0;
+
+    for (let r = 0; r <= segments; r++) {
+      const fy = r / segments;
+      const exactY = tileInfo.y + fy;
+
+      for (let c = 0; c <= segments; c++) {
+        const fx = c / segments;
+        const exactX = tileInfo.x + fx;
+
+        const { latitude, longitude } = tileToWgs84(exactX, exactY, tileInfo.zoom);
+        const [vx, vz] = wgs84ToLocal(latitude, longitude, this.origin);
+        const h = this.flightSurface.getHeight(vx, vz);
+
+        positions[idx * 3] = vx;
+        positions[idx * 3 + 1] = h;
+        positions[idx * 3 + 2] = vz;
+
+        uvs[uvIdx * 2] = fx;
+        uvs[uvIdx * 2 + 1] = 1.0 - fy; // Web Mercator Y=0 is North, Three.js V=1 is North
+
+        sumX += vx;
+        sumZ += vz;
+        idx++;
+        uvIdx++;
+      }
+    }
+
+    const gridWidth = segments + 1;
+    for (let r = 0; r < segments; r++) {
+      for (let c = 0; c < segments; c++) {
+        const a = r * gridWidth + c;
+        const b = r * gridWidth + (c + 1);
+        const d = (r + 1) * gridWidth + c;
+        const e = (r + 1) * gridWidth + (c + 1);
+
+        indices.push(a, d, b);
+        indices.push(b, d, e);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+
+    const centerX = sumX / vertexCount;
+    const centerZ = sumZ / vertexCount;
+
+    return { geo, centerX, centerZ };
+  }
+
+  /**
    * Fetch a single tile and attach its textured mesh.
    */
   async loadTile(tileInfo, accessTime) {
@@ -207,25 +288,8 @@ export class CorridorTileStreamer {
     this.inFlightRequests.add(key);
 
     try {
-      const bounds = tileInfo.bounds || tileBoundsLocal(tileInfo.x, tileInfo.y, tileInfo.zoom, this.origin);
-
-      // Create geometry representing the tile with slight skirts
-      const width = bounds.widthMeters;
-      const height = bounds.heightMeters;
-      const segments = 4;
-      const geo = new THREE.PlaneGeometry(width, height, segments, segments);
-      geo.rotateX(-Math.PI / 2);
-      geo.translate(bounds.centerX, 0, bounds.centerZ);
-
-      // Set elevation from analytical flight surface
-      const pos = geo.attributes.position;
-      for (let i = 0; i < pos.count; i++) {
-        const vx = pos.getX(i);
-        const vz = pos.getZ(i);
-        const h = this.flightSurface.getHeight(vx, vz);
-        pos.setY(i, h);
-      }
-      geo.computeVertexNormals();
+      // 1. Construct tile mesh with direct spherical vertex projection (0 gap with neighbors)
+      const { geo, centerX, centerZ } = this.createTileGeometry(tileInfo);
 
       // Fallback procedural material (ocean/land gradient)
       const mat = new THREE.MeshBasicMaterial({
@@ -240,17 +304,19 @@ export class CorridorTileStreamer {
         mesh,
         texture: null,
         tile: tileInfo,
-        centerX: bounds.centerX,
-        centerZ: bounds.centerZ,
+        centerX,
+        centerZ,
         lastAccessTime: accessTime,
+        imageLoaded: false,
+        retryCount: 0,
+        lastFailedTime: 0,
       };
       this.activeTiles.set(key, entry);
 
       // Fetch satellite image through rate-limited cache
       const img = await this.cacheManager.getTileImage(tileInfo.zoom, tileInfo.x, tileInfo.y);
 
-      if (this.disposed) {
-        this.disposeTile(key);
+      if (this.disposed || !this.activeTiles.has(key)) {
         return;
       }
 
@@ -264,10 +330,55 @@ export class CorridorTileStreamer {
         mesh.material.color.setHex(0xffffff);
         mesh.material.needsUpdate = true;
         entry.texture = texture;
+        entry.imageLoaded = true;
         this.tilesLoaded++;
+      } else {
+        entry.imageLoaded = false;
+        entry.lastFailedTime = performance.now();
+        entry.retryCount = 1;
       }
     } catch {
-      // Offline fallback: keep procedural mesh
+      const entry = this.activeTiles.get(key);
+      if (entry) {
+        entry.imageLoaded = false;
+        entry.lastFailedTime = performance.now();
+        entry.retryCount = (entry.retryCount || 0) + 1;
+      }
+    } finally {
+      this.inFlightRequests.delete(key);
+    }
+  }
+
+  /**
+   * Retry loading satellite image for an active tile that initially failed.
+   */
+  async retryTileImage(entry, key) {
+    if (this.disposed || !this.activeTiles.has(key)) return;
+    this.inFlightRequests.add(key);
+
+    try {
+      const img = await this.cacheManager.getTileImage(entry.tile.zoom, entry.tile.x, entry.tile.y);
+      if (this.disposed || !this.activeTiles.has(key)) return;
+
+      if (img && img.width > 0 && typeof document !== 'undefined') {
+        const texture = new THREE.CanvasTexture(img);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+
+        entry.mesh.material.map = texture;
+        entry.mesh.material.color.setHex(0xffffff);
+        entry.mesh.material.needsUpdate = true;
+        entry.texture = texture;
+        entry.imageLoaded = true;
+        this.tilesLoaded++;
+      } else {
+        entry.lastFailedTime = performance.now();
+        entry.retryCount = (entry.retryCount || 0) + 1;
+      }
+    } catch {
+      entry.lastFailedTime = performance.now();
+      entry.retryCount = (entry.retryCount || 0) + 1;
     } finally {
       this.inFlightRequests.delete(key);
     }

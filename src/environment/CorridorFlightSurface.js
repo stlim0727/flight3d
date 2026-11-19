@@ -14,10 +14,13 @@
 
 import * as THREE from 'three';
 import {
+  getCorridorDistanceM,
   INCHEON_ORIGIN,
+  INCHEON_SCENERY_ORIGIN,
   JEJU_ORIGIN,
   MEAN_SEA_LEVEL_M,
   wgs84ToIncheonLocal,
+  wgs84ToIncheonSceneryLocal,
   wgs84ToJejuLocal,
 } from '../geospatial/CorridorCoordinateSystem.js';
 import { localToWgs84, wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
@@ -39,6 +42,19 @@ export class CorridorFlightSurface {
     this.incheonSurface = options.incheonSurface || null;
     this.jejuSurface = options.jejuSurface || null;
     this.isLoaded = true;
+  }
+
+  get corridorLengthM() {
+    return Math.round(getCorridorDistanceM());
+  }
+
+  wgs84ToLocal(latitude, longitude) {
+    const [x, z] = wgs84ToLocal(latitude, longitude, this.activeOrigin);
+    return { x, z };
+  }
+
+  localToWgs84(x, z) {
+    return localToWgs84(x, z, this.activeOrigin);
   }
 
   setActiveOrigin(origin) {
@@ -97,7 +113,7 @@ export class CorridorFlightSurface {
     // 2. Incheon Airport Region (lat 37.38 ~ 37.55, lon 126.35 ~ 126.55)
     if (latitude >= 37.38 && latitude <= 37.55 && longitude >= 126.35 && longitude <= 126.55) {
       if (this.incheonSurface && typeof this.incheonSurface.getHeight === 'function') {
-        const [ix, iz] = wgs84ToIncheonLocal(latitude, longitude);
+        const [ix, iz] = wgs84ToIncheonSceneryLocal(latitude, longitude);
         return this.incheonSurface.getHeight(ix, iz);
       }
       const distIncheonArpM = Math.hypot((longitude - INCHEON_ORIGIN.longitude) * 88000, (latitude - INCHEON_ORIGIN.latitude) * 111000);
@@ -159,7 +175,7 @@ export class CorridorFlightSurface {
     }
 
     if (this.incheonSurface && typeof this.incheonSurface.isOnRunway === 'function') {
-      const [ix, iz] = wgs84ToIncheonLocal(latitude, longitude);
+      const [ix, iz] = wgs84ToIncheonSceneryLocal(latitude, longitude);
       if (Math.hypot(ix, iz) < 6000 && this.incheonSurface.isOnRunway(ix, iz)) return true;
     }
 
@@ -175,7 +191,7 @@ export class CorridorFlightSurface {
     }
 
     if (this.incheonSurface && typeof this.incheonSurface.isRunwaySafetyArea === 'function') {
-      const [ix, iz] = wgs84ToIncheonLocal(latitude, longitude);
+      const [ix, iz] = wgs84ToIncheonSceneryLocal(latitude, longitude);
       if (Math.hypot(ix, iz) < 6000 && this.incheonSurface.isRunwaySafetyArea(ix, iz)) return true;
     }
 
