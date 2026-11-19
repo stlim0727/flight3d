@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { createEffectAtlas, createFlipbookMaterial, updateFlipbook } from './EffectFlipbook.js';
 
+// Idle flash lights stay visible at zero intensity. Three includes the visible
+// point-light count in every material program key, so hiding them on impact
+// would recompile every lit scene material mid-frame.
+const FLASH_LIGHT_POOL_SIZE = 1;
+
 // Bounded impact particles: ballistic spray, surface foam, dust and short-lived heat.
 export class ExplosionSystem {
   constructor(scene, terrain = null) {
@@ -54,19 +59,88 @@ export class ExplosionSystem {
   }
 
   initLightPool() {
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < FLASH_LIGHT_POOL_SIZE; i++) {
       const light = new THREE.PointLight(0xff8822, 0.0, 140, 1.5);
-      light.visible = false;
+      light.visible = true;
+      light.intensity = 0;
       this.group.add(light);
-      this.lightPool.push({ light, life: 0, maxLife: 1.0 });
+      this.lightPool.push({ light, life: 0, maxLife: 0 });
     }
   }
 
   getAvailableLight() {
     for (const item of this.lightPool) {
-      if (!item.light.visible) return item;
+      if (item.life >= item.maxLife) return item;
     }
     return this.lightPool[0];
+  }
+
+  /**
+   * Representative off-scene materials for the one-time particle/shockwave
+   * program link. Kept alive for the system lifetime so the program cache does
+   * not release the variants before the first impact.
+   */
+  createShaderWarmupRoot() {
+    if (this.shaderWarmupRoot) return this.shaderWarmupRoot;
+    const root = new THREE.Group();
+    root.name = 'ExplosionShaderWarmup';
+    root.visible = false;
+    const spriteMaterials = [
+      createFlipbookMaterial(this.fireTexture, {
+        transparent: true, opacity: 0.98, blending: THREE.NormalBlending, depthWrite: false,
+      }),
+      createFlipbookMaterial(this.fireTexture, {
+        transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false,
+      }),
+      createFlipbookMaterial(this.smokeTexture, { transparent: true, opacity: 0.75, depthWrite: false }),
+      createFlipbookMaterial(this.dustTexture, {
+        transparent: true, opacity: 0.65, color: 0xa28b6c, depthWrite: false,
+      }),
+      createFlipbookMaterial(this.waterTexture, {
+        transparent: true, opacity: 0.9, blending: THREE.NormalBlending, depthWrite: false,
+      }),
+      new THREE.SpriteMaterial({
+        map: this.sparkTexture, color: 0xffc255, transparent: true, opacity: 1,
+        blending: THREE.NormalBlending, depthWrite: false,
+      }),
+      new THREE.SpriteMaterial({
+        map: this.sparkTexture, color: 0xffe8a3, transparent: true, opacity: 1,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }),
+    ];
+    for (const material of spriteMaterials) {
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(1, 1, 1);
+      root.add(sprite);
+    }
+    for (const isWater of [false, true]) {
+      const geometry = new THREE.RingGeometry(0.82, 1.0, 64);
+      geometry.rotateX(-Math.PI * 0.5);
+      root.add(new THREE.Mesh(geometry, this.createShockwaveMaterial(isWater)));
+    }
+    this.shaderWarmupRoot = root;
+    return root;
+  }
+
+  /** Shockwave shader variants are shared by live rings and startup warmup. */
+  createShockwaveMaterial(isWater) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: isWater ? 0xd0f0fd : 0xffddaa,
+      transparent: true,
+      opacity: isWater ? 0.3 : 0.42,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+
+    mat.defines = { USE_UV: '' };
+    mat.onBeforeCompile = shader => {
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
+        #include <color_fragment>
+        float radius = length(vUv - 0.5) * 2.0;
+        diffuseColor.a *= smoothstep(0.82, 0.9, radius) * (1.0 - smoothstep(0.92, 1.0, radius));
+      `);
+    };
+    return mat;
   }
 
   /**
@@ -152,23 +226,7 @@ export class ExplosionSystem {
     const geo = new THREE.RingGeometry(0.82, 1.0, 64);
     geo.rotateX(-Math.PI * 0.5);
 
-    const mat = new THREE.MeshBasicMaterial({
-      color: isWater ? 0xd0f0fd : 0xffddaa,
-      transparent: true,
-      opacity: isWater ? 0.3 : 0.42,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-
-    mat.defines = { USE_UV: '' };
-    mat.onBeforeCompile = shader => {
-      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
-        #include <color_fragment>
-        float radius = length(vUv - 0.5) * 2.0;
-        diffuseColor.a *= smoothstep(0.82, 0.9, radius) * (1.0 - smoothstep(0.92, 1.0, radius));
-      `);
-    };
-    const mesh = new THREE.Mesh(geo, mat);
+    const mesh = new THREE.Mesh(geo, this.createShockwaveMaterial(isWater));
     mesh.position.copy(pos);
     if (isWater) {
       mesh.position.y += 0.25;
@@ -433,17 +491,18 @@ export class ExplosionSystem {
   }
 
   update(dt) {
-    // 1. Update point lights
+    // 1. Update point lights. They stay visible at zero intensity so the
+    // scene's point-light count never changes during an impact.
     for (const item of this.lightPool) {
-      if (item.light.visible) {
-        item.life += dt;
-        const progress = item.life / item.maxLife;
-        if (progress >= 1.0) {
-          item.light.visible = false;
-        } else {
-          // Rapid decay
-          item.light.intensity *= Math.max(0.0, 1.0 - dt * 3.2);
-        }
+      if (!(item.maxLife > 0) || item.light.intensity <= 0) continue;
+      item.life += dt;
+      const progress = item.life / item.maxLife;
+      if (progress >= 1.0) {
+        item.light.intensity = 0;
+        item.life = item.maxLife;
+      } else {
+        // Rapid decay
+        item.light.intensity *= Math.max(0.0, 1.0 - dt * 3.2);
       }
     }
 
@@ -729,8 +788,19 @@ export class ExplosionSystem {
    */
   dispose() {
     this.clear();
+    this.disposeShaderWarmup();
     for (const texture of [this.fireTexture, this.smokeTexture, this.waterTexture, this.dustTexture, this.sparkTexture]) texture.dispose();
     this.scene.remove(this.group);
+  }
+
+  disposeShaderWarmup() {
+    if (!this.shaderWarmupRoot) return;
+    this.shaderWarmupRoot.traverse(node => {
+      if (node.isMesh) node.geometry?.dispose();
+      if (!node.isMesh && !node.isSprite) return;
+      for (const material of Array.isArray(node.material) ? node.material : [node.material]) material?.dispose?.();
+    });
+    this.shaderWarmupRoot = null;
   }
 
   clear({ preservePersistent = false } = {}) {
@@ -782,7 +852,8 @@ export class ExplosionSystem {
     this.shockwaves = [];
 
     for (const item of this.lightPool) {
-      item.light.visible = false;
+      item.light.intensity = 0;
+      item.life = item.maxLife;
     }
 
     if (!preservePersistent) {
