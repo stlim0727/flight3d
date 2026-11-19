@@ -1355,7 +1355,9 @@ class FlightSimulator {
   }
 
   syncGunAudio() {
-    this.audioCoordinator.syncGunAudio(this.missileCombat?.cannon?.firing);
+    const camera = this.camera?.position;
+    const muzzleDistance = camera?.distanceTo?.(this.position) ?? 0;
+    this.audioCoordinator.syncGunAudio(this.missileCombat?.cannon?.firing, muzzleDistance);
   }
 
   cycleCombatTarget() {
@@ -1541,7 +1543,11 @@ class FlightSimulator {
       }
     }
     const cameraToAircraftMeters = this.camera.position.distanceTo(this.aircraft.group.position);
-    this.audioCoordinator.update(frameDelta, this.telemetry, isCockpit, cameraToAircraftMeters);
+    this.audioCoordinator.update(frameDelta, this.telemetry, isCockpit, cameraToAircraftMeters, {
+      position: this.position,
+      velocity: this.linearVelocity,
+      camera: this.camera,
+    });
 
     // 6. Update Camera System & Dynamic FOV (60° in cockpit eliminates fisheye speed distortion)
     let targetFov = isCockpit ? 60 : 54;

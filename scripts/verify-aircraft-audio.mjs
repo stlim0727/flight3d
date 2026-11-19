@@ -5,9 +5,12 @@ import { execFileSync } from 'node:child_process';
 
 // Reuse Chrome: chrome-session --project flight3d node scripts/verify-aircraft-audio.mjs
 const output = path.resolve(process.env.ARTIFACT_DIR || '.cache/aircraft-audio');
-await fs.mkdir(output, { recursive: true }); await fs.mkdir('.tmp/audio-review', { recursive: true });
-const baseline = execFileSync('git', ['show', 'origin/main:src/audio/FlightAudio.js'], { encoding: 'utf8' }).replace("'../i18n/index.js'", "'/src/i18n/index.js'");
-await fs.writeFile('.tmp/audio-review/FlightAudio-before.js', baseline);
+await fs.mkdir(output, { recursive: true });
+const baseline = execFileSync('git', ['show', 'origin/main:src/audio/FlightAudio.js'], { encoding: 'utf8' });
+// Vite does not serve dot-directories, and the baseline keeps relative imports;
+// place it beside the live module so `./nodes/...` resolves, then remove it.
+const baselinePath = 'src/audio/FlightAudio-before.js';
+await fs.writeFile(baselinePath, baseline);
 const endpoint = `http://127.0.0.1:${process.env.CHROME_DEBUG_PORT || 9225}`;
 const target = await (await fetch(`${endpoint}/json/new?${encodeURIComponent(process.env.APP_URL || 'http://127.0.0.1:5188/')}`, { method: 'PUT' })).json();
 const ws = new WebSocket(target.webSocketDebuggerUrl);
@@ -75,7 +78,7 @@ try {
   ]) {
     const result = await evaluate(async ({before,n1,failure}) => {
       const {FlightAudio: After}=await import('/src/audio/FlightAudio.js');
-      const {FlightAudio: Before}=await import('/.tmp/audio-review/FlightAudio-before.js');
+      const {FlightAudio: Before}=await import('/src/audio/FlightAudio-before.js');
       const {CESSNA_172}=await import('/src/config/aircraftConfigs.js');
       const rate=48000,ctx=new OfflineAudioContext(1,rate*3,rate),a=new (before?Before:After)();
       if(!before) { a.loadAircraftConfig(CESSNA_172);a.init(ctx); }
@@ -111,7 +114,47 @@ try {
   const idle=clips.find(c=>c.name==='cessna-idle'),full=clips.find(c=>c.name==='cessna-full-power');
   assert.ok(idle.firing23Hz>idle.firing90Hz*10,'idle firing pulse present');
   assert.ok(full.firing90Hz>full.jet1800Hz*20,'propeller harmonics dominate turbine whistle band');
+
+  // Real Web Audio proof for #862: a bandit's engine is in the correct ear and
+  // a 343 m detonation is silent until its sound has crossed the gap.
+  const spatial = await evaluate(async () => {
+    const { FlightAudio } = await import('/src/audio/FlightAudio.js');
+    const rate = 48000;
+    const rms = (data, start, end) => Math.sqrt(
+      data.slice(start * rate, end * rate).reduce((sum, x) => sum + x * x, 0) / ((end - start) * rate));
+    const silenceOwnSources = audio => {
+      for (const name of ['packGain', 'windGain', 'rumbleGain', 'engineGain', 'turbineGain', 'turbineGain2', 'warningGain']) {
+        audio[name]?.gain.setValueAtTime(0, 0);
+      }
+    };
+
+    const panCtx = new OfflineAudioContext(2, rate * 2, rate);
+    const panAudio = new FlightAudio(); panAudio.init(panCtx); silenceOwnSources(panAudio);
+    panAudio.syncRemoteEngines([{
+      id: 1, alive: true, position: { x: 120, y: 0, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 }, flight: { engines: { n1: [100] } },
+    }], { position: { x: 0, y: 0, z: 0 }, quaternion: { x: 0, y: 0, z: 0, w: 1 } });
+    panCtx.onstatechange = null;
+    const panned = await panCtx.startRendering();
+
+    const delayCtx = new OfflineAudioContext(1, rate * 3, rate);
+    const delayAudio = new FlightAudio(); delayAudio.init(delayCtx); silenceOwnSources(delayAudio);
+    delayCtx.onstatechange = null;
+    delayAudio.playRemoteExplosion(343);
+    const delayed = await delayCtx.startRendering();
+    const data = delayed.getChannelData(0);
+    return {
+      left: rms(panned.getChannelData(0), 0.5, 1.5),
+      right: rms(panned.getChannelData(1), 0.5, 1.5),
+      early: rms(data, 0, 0.8),
+      late: rms(data, 1.1, 1.9),
+    };
+  });
+  assert.ok(spatial.right > spatial.left * 1.5, 'starboard bandit engine arrives on the right channel');
+  assert.ok(spatial.late > spatial.early * 10, 'a 343 m explosion is silent until its delayed arrival');
+  console.log('spatial', JSON.stringify(spatial));
+
   assert.equal(errors.length,0,'no browser exceptions');
-  await fs.writeFile(path.join(output,'results.json'),JSON.stringify({live,stopped,clips,errors,note:'Real browser OfflineAudioContext rendering and native mute/unmute clicks. Waveform checks do not replace human listening.'},null,2));
+  await fs.writeFile(path.join(output,'results.json'),JSON.stringify({live,stopped,clips,spatial,errors,note:'Real browser OfflineAudioContext rendering and native mute/unmute clicks. Waveform checks do not replace human listening.'},null,2));
   console.log('PASS: aircraft switching, gesture unlock, idle/full-power/failure recordings');
-} finally { ws.close();await fetch(`${endpoint}/json/close/${target.id}`); }
+} finally { ws.close();await fetch(`${endpoint}/json/close/${target.id}`);await fs.rm(baselinePath, { force: true }); }

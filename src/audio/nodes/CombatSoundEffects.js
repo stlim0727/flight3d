@@ -3,6 +3,12 @@
  * cannon fire (M61A1 burst), missile launch & in-flight rocket motor roar,
  * flare/chaff dispense pyrotechnics, ordnance detonation / explosion, and water impact.
  */
+import { propagationDelaySeconds } from '../distanceAcoustics.js';
+
+const GUN_REFERENCE_M = 900;
+const GUN_AUDIBLE_RANGE_M = 3500;
+const GUN_TARGET_GAIN = 0.14;
+
 export class CombatSoundEffects {
   constructor(ctx, masterGain, ambientBus, onExplosion, isReplayPaused = null) {
     this.ctx = ctx;
@@ -51,10 +57,21 @@ export class CombatSoundEffects {
     gain.setTargetAtTime(1, now + holdSeconds, 0.2);
   }
 
-  startGunFire(isMuted, volume) {
+  startGunFire(isMuted, volume, distance = 0) {
     if (!this.ctx || isMuted || volume === 0) return;
-    if (this.gunFireNodes) return;
     const now = this.ctx.currentTime;
+    const safeDistance = Math.max(0, Number.isFinite(distance) ? distance : 0);
+    const attenuation = safeDistance >= GUN_AUDIBLE_RANGE_M ? 0 : 1 / (1 + safeDistance / GUN_REFERENCE_M);
+    const targetGain = GUN_TARGET_GAIN * attenuation;
+    if (targetGain <= 0.001) {
+      this.stopGunFire();
+      return;
+    }
+    if (this.gunFireNodes) {
+      // The camera can move away from the muzzle while the burst continues.
+      this.gunFireNodes.gain.gain.setTargetAtTime(targetGain, now, 0.06);
+      return;
+    }
     const rate = this.ctx.sampleRate;
     const period = Math.max(1, Math.round(rate / 100));
     const length = Math.max(period * 10, Math.floor(rate * 0.1));
@@ -74,7 +91,7 @@ export class CombatSoundEffects {
     filter.Q.value = 0.9;
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.14, now + 0.03);
+    gain.gain.exponentialRampToValueAtTime(targetGain, now + 0.03);
     source.connect(filter);
     filter.connect(gain);
     gain.connect(this.masterGain);
@@ -354,6 +371,8 @@ export class CombatSoundEffects {
     if (!this.ctx || isMuted) return;
     const now = this.ctx.currentTime;
     const safeDistance = Math.max(0, Number.isFinite(distance) ? distance : 0);
+    // Light outruns sound: a detonation kilometres away is heard after the flash.
+    const at = now + propagationDelaySeconds(safeDistance);
     const volume = Math.min(1.0, Math.max(0.02, 1 / (1 + safeDistance / 1500)));
 
     const bufferSize = Math.floor(this.ctx.sampleRate * 2.5);
@@ -369,17 +388,17 @@ export class CombatSoundEffects {
     const bassFilter = this.ctx.createBiquadFilter();
     bassFilter.type = 'lowpass';
     const cutoff = Math.max(50, (isWater ? 180 : 300) - (safeDistance / 4000) * 140);
-    bassFilter.frequency.setValueAtTime(cutoff, now);
-    bassFilter.frequency.exponentialRampToValueAtTime(26, now + 2.0);
+    bassFilter.frequency.setValueAtTime(cutoff, at);
+    bassFilter.frequency.exponentialRampToValueAtTime(26, at + 2.0);
 
     const bassGain = this.ctx.createGain();
-    bassGain.gain.setValueAtTime(1.2 * volume, now);
-    bassGain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+    bassGain.gain.setValueAtTime(1.2 * volume, at);
+    bassGain.gain.exponentialRampToValueAtTime(0.001, at + 2.2);
 
     noiseSrc.connect(bassFilter);
     bassFilter.connect(bassGain);
     bassGain.connect(this.masterGain);
-    noiseSrc.start(now);
+    noiseSrc.start(at);
 
     const proximity = Math.max(0, 1 - safeDistance / 4000);
     if (proximity > 0.01) {
@@ -393,15 +412,15 @@ export class CombatSoundEffects {
       crackSrc.buffer = crackBuffer;
       const crackFilter = this.ctx.createBiquadFilter();
       crackFilter.type = 'highpass';
-      crackFilter.frequency.setValueAtTime(isWater ? 1000 : 2200, now);
-      crackFilter.frequency.exponentialRampToValueAtTime(isWater ? 220 : 400, now + 0.55);
+      crackFilter.frequency.setValueAtTime(isWater ? 1000 : 2200, at);
+      crackFilter.frequency.exponentialRampToValueAtTime(isWater ? 220 : 400, at + 0.55);
       const crackGain = this.ctx.createGain();
-      crackGain.gain.setValueAtTime((isWater ? 0.55 : 0.9) * volume * proximity, now);
-      crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      crackGain.gain.setValueAtTime((isWater ? 0.55 : 0.9) * volume * proximity, at);
+      crackGain.gain.exponentialRampToValueAtTime(0.001, at + 0.6);
       crackSrc.connect(crackFilter);
       crackFilter.connect(crackGain);
       crackGain.connect(this.masterGain);
-      crackSrc.start(now);
+      crackSrc.start(at);
     }
   }
 

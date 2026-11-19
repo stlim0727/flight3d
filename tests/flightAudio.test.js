@@ -773,3 +773,100 @@ describe('Engine volume', () => {
     }
   });
 });
+
+describe('Spatial combat audio (#862)', () => {
+  function sourceStarts(audio) {
+    const starts = [];
+    const create = audio.ctx.createBufferSource.bind(audio.ctx);
+    audio.ctx.createBufferSource = () => {
+      const source = create();
+      const start = source.start.bind(source);
+      source.start = when => { starts.push(when); start(when); };
+      return source;
+    };
+    return starts;
+  }
+
+  it('schedules a distant explosion after the sound has crossed the gap', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      audio.ctx.currentTime = 10;
+      const starts = sourceStarts(audio);
+      audio.playRemoteExplosion(0);
+      audio.playRemoteExplosion(343);
+      assert.strictEqual(starts[0], 10, 'a nearby blast is immediate');
+      assert.strictEqual(starts[1], 10, 'its debris crack is immediate too');
+      assert.ok(Math.abs(starts[2] - 11) < 1e-9, 'a 343 m blast arrives one second later');
+      audio.stopMissileFlight();
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('attenuates a cannon burst seen from an exterior or bandit camera', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      audio.ctx.currentTime = 10;
+      audio.startGunFire(0);
+      const cockpitGain = audio.gunFireNodes.gain.gain.value;
+      audio.startGunFire(1500);
+      const wingGain = audio.gunFireNodes.gain.gain.value;
+      assert.ok(wingGain < cockpitGain && wingGain > 0, 'a distant muzzle is quieter, not silent');
+      audio.stopGunFire();
+      audio.startGunFire(5000);
+      assert.strictEqual(audio.gunFireNodes, null, 'beyond 3.5 km the cannon leaves the mix');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('bends the player turbine whine toward a closing tower camera but not in the cockpit', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      const state = { engine1: { n1: 100 }, iasKnots: 250, onGround: false };
+      const aircraft = { x: 0, y: 1000, z: 0 };
+      const camera = { position: { x: 1000, y: 1000, z: 0 } };
+      audio.update(1 / 60, state, true, 0, { position: aircraft, velocity: { x: 0, y: 0, z: 0 }, camera });
+      const cockpitHz = audio.turbineWhine.frequency.value;
+
+      audio.update(1 / 60, state, false, 1000, {
+        position: aircraft, velocity: { x: 200, y: 0, z: 0 }, camera,
+      });
+      const exteriorHz = audio.turbineWhine.frequency.value;
+      assert.ok(exteriorHz > cockpitHz * 1.1, 'a closing jet is heard sharpened from the tower');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('feeds live and replayed bandits to the remote engine layer', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      const camera = { position: { x: 0, y: 1000, z: 0, distanceTo: p => Math.hypot(p.x, p.y - 1000, p.z) } };
+      const target = {
+        id: 1, alive: true,
+        position: { x: 200, y: 1000, z: 0 },
+        velocity: { x: -100, y: 0, z: 0 },
+        flight: { engines: { n1: [90] } },
+      };
+      audio.syncRemoteEngines([target], camera);
+      assert.strictEqual(audio.remoteEngines.voices.size, 1);
+      audio.syncRemoteEngines([], camera);
+      assert.strictEqual(audio.remoteEngines.voices.size, 0);
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+});

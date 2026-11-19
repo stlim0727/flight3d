@@ -26,11 +26,32 @@ Engine volume (0–100%) scales one engine bus that carries the jet roar/whine a
 piston/propeller sources before cockpit and distance acoustics. Wind, rumble,
 pack hum, warnings, GPWS, radio and multiplayer voice keep their level. The
 slider appears in flight settings and the multiplayer dialog; both stay in sync.
+The same slider scales opposing-aircraft engines.
+
+## Spatial combat soundscape (#862)
+
+Exterior engine audio is positional, not a fixed bed. The host engine follows
+the camera: the near-field floor keeps tower flybys audible but fades out between
+600 m and 2.4 km, so a camera parked beside a bandit does not inherit the
+cockpit engine. Both the listener and the aircraft contribute to a clamped
+Doppler ratio; chase cameras travel with the aircraft and hear no approach
+shift, while a tower or bandit camera hears the correct rise and fall.
+
+Live and replayed bandits each get an engine voice (shared pink-noise buffer,
+per-voice air-absorption filter, distance gain and stereo pan by camera bearing).
+The voice pitch follows N1 and the closing rate, and retires when the bandit
+dies, leaves range (8 km) or playback pauses.
+
+Transients respect propagation as well: a remote detonation is scheduled at
+`distance / 343 m/s` (capped at 8 s), so the flash and the boom separate at
+range. Cannon bursts are attenuated by the camera-to-muzzle distance and stop
+being scheduled beyond 3.5 km instead of playing at cockpit level from a bandit
+view.
 
 ## Verification
 
 ```sh
-node --test tests/flightAudio.test.js
+node --test tests/flightAudio.test.js tests/audioDistance.test.js tests/remoteEngineAudio.test.js
 npm run dev -- --host 127.0.0.1 --port 5188
 chrome-session --project flight3d node scripts/verify-aircraft-audio.mjs
 ```

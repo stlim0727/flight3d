@@ -56,14 +56,16 @@ export class PistonSynthesizer {
     this.propNoise.start();
   }
 
-  update(state, now, profile) {
+  update(state, now, profile, doppler = 1) {
     const sound = pistonSoundState(state.engine1, state.iasKnots || 0, profile);
     const rotor = Math.min(1, sound.rpm / profile.maxRpm);
-    this.pistonPulse.frequency.setTargetAtTime(Math.max(1, sound.firingHz), now, 0.06);
+    const pitch = Number.isFinite(doppler) ? Math.max(0.5, Math.min(1.5, doppler)) : 1;
+    this.pistonPulse.frequency.setTargetAtTime(Math.max(1, sound.firingHz * pitch), now, 0.06);
     this.pistonFilter.frequency.setTargetAtTime(1100 + sound.power * 1500, now, 0.08);
     this.pistonGain.gain.setTargetAtTime(sound.combustion * (0.32 + sound.power * 0.40), now, 0.10);
-    this.propBeat.frequency.setTargetAtTime(Math.max(1, sound.bladeHz), now, 0.06);
+    this.propBeat.frequency.setTargetAtTime(Math.max(1, sound.bladeHz * pitch), now, 0.06);
     this.propFilter.frequency.setTargetAtTime(350 + rotor * 700, now, 0.10);
+    this.propNoise.playbackRate?.setTargetAtTime(pitch, now, 0.08);
     const air = rotor * (sound.combustion ? 1 : 0.2);
     this.propGain.gain.setTargetAtTime(air * (0.08 + sound.power * 0.12), now, 0.10);
     this.propModGain.gain.setTargetAtTime(air * (0.04 + sound.power * 0.06), now, 0.10);
