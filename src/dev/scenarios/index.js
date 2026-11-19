@@ -62,4 +62,38 @@ export const DEV_SCENARIOS = {
     },
     verdict: o => !o.crashed && o.ditched && o.flooding > 0.3 && o.speed < 2.0,
   },
+  'corridor-cruise': {
+    airports: ['jeju'], aircraft: ['B738'], kind: 'physical', autopilot: true,
+    duration: 30, labelKey: 'dev.scenario.corridor-cruise', descriptionKey: 'dev.expect.corridor-cruise',
+    setup(sim) {
+      // Spawn at FL280 (8,534m MSL) heading 195° South along the corridor towards Chuja & Jeju
+      const x = -15000, y = 8534, z = -70000;
+      const speed = 210; // ~408 kt TAS
+      const headingRad = 195 * (Math.PI / 180);
+      sim.position.set(x, y, z);
+      sim.linearVelocity.set(Math.sin(headingRad) * speed, 0, -Math.cos(headingRad) * speed);
+      sim.quaternion.setFromEuler(new THREE.Euler(0.03, -headingRad, 0, 'YXZ'));
+      sim.gear?.setGearTarget?.(false);
+      if (sim.gear) sim.gear.gearState = 0;
+      if (sim.aero) sim.aero.setFlapPosition(0);
+      if (sim.controls) {
+        sim.controls.throttle = 0.72;
+        sim.controls.setParkingBrake(false);
+      }
+      sim.engines?.setThrottle?.(0.72);
+      if (sim.autopilot) {
+        sim.autopilot.master = true;
+        sim.autopilot.lateralMode = 'LNAV';
+        sim.autopilot.verticalMode = 'ALT';
+        sim.autopilot.targets.altitudeFt = 28000;
+        sim.autopilot.speedMode = true;
+        sim.autopilot.targets.iasKnots = 250;
+      }
+    },
+    observe(sim, observation) {
+      observation.stableFlight = !sim.isCrashed && sim.position.y > 7000;
+      observation.lnavActive = sim.autopilot?.lateralMode === 'LNAV';
+    },
+    verdict: o => o.stableFlight && o.lnavActive,
+  },
 };

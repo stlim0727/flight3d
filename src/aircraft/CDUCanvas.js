@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CorridorFlightPlanManager } from '../geospatial/CorridorFlightPlan.js';
 
 /**
  * Boeing 737 / 777 Class Flight Management Computer (FMC) / Control Display Unit (CDU) Canvas
@@ -23,21 +24,42 @@ export class CDUCanvas {
     this.distNm = 5.2;
     this.takeoff = null;
     this.airportId = 'coastal';
+    this.flightPlan = new CorridorFlightPlanManager(1);
+    this.cduLegs = null;
 
+    this.render();
+  }
+
+  reset() {
+    if (this.flightPlan) this.flightPlan.reset(1);
+    this.cduLegs = null;
     this.render();
   }
 
   setAirport(airportId) {
     this.airportId = airportId;
+    this.reset();
     this.activeWpt = airportId === 'incheon' ? 'RW15R' : (airportId === 'jeju') ? 'RW07' : (airportId === 'lukla') ? 'RW06' : (airportId === 'neon') ? 'RW09' : 'RW09L';
     this.render();
   }
 
   updateData(state = {}) {
     this.takeoff = state.takeoff ?? null;
+    this.simZ = Number.isFinite(state.z) ? state.z : null;
+    this.simX = Number.isFinite(state.x) ? state.x : null;
+
+    if (state.cduLegs) {
+      this.cduLegs = state.cduLegs;
+    } else if (this.simX !== null && this.simZ !== null && (this.airportId === 'incheon' || this.airportId === 'jeju')) {
+      this.flightPlan.updateLocal(this.simX, this.simZ, this.airportId);
+      this.cduLegs = this.flightPlan.getCDULegs();
+    }
+
     const p = this.takeoff;
+    const zBucket = this.simZ !== null ? Math.round(this.simZ / 2000) : 0;
+    const activeIdx = this.flightPlan?.activeIndex ?? 0;
     const key = JSON.stringify([this.airportId, this.activeWpt, this.distNm,
-      p?.zeroFuelMassKg, p?.massKg, p?.vr, p?.v2]);
+      p?.zeroFuelMassKg, p?.massKg, p?.vr, p?.v2, zBucket, activeIdx]);
     if (key !== this.renderKey) {
       this.renderKey = key;
       this.render();
@@ -118,14 +140,40 @@ export class CDUCanvas {
       ctx.fillText(spdAlt, sx + sw - 12, y);
     };
 
-    if (this.airportId === 'jeju') {
-      drawRow(sy + 70, 'TAMNA', '15NM', '210/ 5000');
-      drawRow(sy + 102, 'FINAL', '04NM', '160/ 1500');
-      drawRow(sy + 134, 'RW07', '01NM', '140/  118', true);
+    if ((this.airportId === 'incheon' || this.airportId === 'jeju') && this.cduLegs?.length) {
+      this.cduLegs.slice(0, 3).forEach((row, i) => {
+        drawRow(sy + 70 + i * 32, row.ident, row.distStr, row.spdAltStr, row.isActive);
+      });
+    } else if (this.airportId === 'jeju') {
+      if (this.simZ !== null && this.simZ < -30000) {
+        const distChuja = Math.max(1, Math.round(Math.abs(this.simZ - (-50000)) / 1852));
+        drawRow(sy + 70, 'CHUJA', `${distChuja}NM`, '240/10000', true);
+        drawRow(sy + 102, 'TAMNA', '18NM', '210/ 5000');
+        drawRow(sy + 134, 'RW07', '35NM', '140/  118');
+      } else if (this.simZ !== null && this.simZ < -8000) {
+        const distTamna = Math.max(1, Math.round(Math.abs(this.simZ - (-30000)) / 1852));
+        drawRow(sy + 70, 'TAMNA', `${distTamna}NM`, '210/ 5000', true);
+        drawRow(sy + 102, 'FINAL', '04NM', '160/ 1500');
+        drawRow(sy + 134, 'RW07', '08NM', '140/  118');
+      } else {
+        drawRow(sy + 70, 'TAMNA', '15NM', '210/ 5000');
+        drawRow(sy + 102, 'FINAL', '04NM', '160/ 1500');
+        drawRow(sy + 134, 'RW07', '01NM', '140/  118', true);
+      }
     } else if (this.airportId === 'incheon') {
-      drawRow(sy + 70, 'BOPTA', '42NM', '280/14000');
-      drawRow(sy + 102, 'FINAL', '0.8NM', '3 DEG');
-      drawRow(sy + 134, 'RW15R', '', '23 FT', true);
+      if (this.simZ !== null && this.simZ > 35000) {
+        drawRow(sy + 70, 'OLMEN', '280/FL240');
+        drawRow(sy + 102, 'SOSDO', '22NM', '300/FL280', true);
+        drawRow(sy + 134, 'DOTOL', '45NM', '280/FL180');
+      } else if (this.simZ !== null && this.simZ > 10000) {
+        drawRow(sy + 70, 'BOPTA', '250/14000');
+        drawRow(sy + 102, 'OLMEN', '38NM', '280/FL240', true);
+        drawRow(sy + 134, 'SOSDO', '45NM', '300/FL280');
+      } else {
+        drawRow(sy + 70, 'BOPTA', '42NM', '280/14000');
+        drawRow(sy + 102, 'FINAL', '0.8NM', '3 DEG');
+        drawRow(sy + 134, 'RW15R', '', '23 FT', true);
+      }
     } else if (this.airportId === 'lukla') {
       drawRow(sy + 70, 'SURKE', '08NM', '160/12000');
       drawRow(sy + 102, 'PHAKD', '04NM', '140/10500');

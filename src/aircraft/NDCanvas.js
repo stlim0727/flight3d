@@ -1,6 +1,8 @@
 import { APPROACH_DATA } from '../config/approachData.js';
 import { projectToLocal } from '../geospatial/incheon.js';
 import koreaRoutes from '../config/koreaFlightRoutes.json' with { type: 'json' };
+import { CORRIDOR_WAYPOINTS_EXPANDED, findActiveWaypointIndex } from '../geospatial/CorridorFlightPlan.js';
+import { incheonSceneryLocalToWgs84, jejuLocalToWgs84 } from '../geospatial/CorridorCoordinateSystem.js';
 import * as THREE from 'three';
 
 const jejuOrigin = {
@@ -42,17 +44,32 @@ export class NDCanvas {
     this.airportId = 'coastal';
   }
 
-  setAirport(airportId) {
-    this.airportId = airportId;
+  setRange(rangeNm) {
+    if (typeof rangeNm === 'number' && rangeNm > 0) {
+      this.rangeNm = rangeNm;
+      this.render();
+    }
+  }
+
+  reset() {
+    this.activeWaypoint = null;
     this.render();
   }
 
-  updateData(state) {
+  setAirport(airportId) {
+    this.airportId = airportId;
+    this.reset();
+  }
+
+  updateData(state = {}) {
     this.heading = (state.headingDeg || 0 + 360) % 360;
     this.track = (state.trackDeg || this.heading + 360) % 360;
     this.groundSpeed = state.groundSpeedKnots || 0;
     this.tas = state.tasKnots || 0;
     this.planePos.set(state.x || 0, state.z || 0);
+    if (state.activeWaypoint) {
+      this.activeWaypoint = state.activeWaypoint;
+    }
   }
 
   render() {
@@ -208,25 +225,69 @@ export class NDCanvas {
     if (this.airportId === 'jeju') {
       const a = APPROACH_DATA.jeju, h = a.headingDeg * Math.PI / 180;
       const at = distance => ({ x: a.threshold.x + Math.sin(h) * distance, z: a.threshold.z - Math.cos(h) * distance });
-      activeWpt = 'RW07';
       threshPos = a.threshold;
       rwyStart = projectToScreen(threshPos.x, threshPos.z);
       rwyEnd = projectToScreen(a.end.x, a.end.z);
       const before = at(-6000), after = at(4500);
       extStart = projectToScreen(before.x, before.z); extEnd = projectToScreen(after.x, after.z);
       vor1 = 'RKPC  RW07'; vor2 = 'ILS 109.90';
-      fixes = [{ name: 'TAMNA', x: tamnaWorldX, z: tamnaWorldZ }, { name: 'FINAL', ...at(-3000) }, { name: 'RW07', ...threshPos }];
+
+      const chujaWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'CHUJA');
+      const dotolWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'DOTOL');
+
+      fixes = [
+        ...(dotolWpt ? [{ name: 'DOTOL', x: dotolWpt.jejuX, z: dotolWpt.jejuZ }] : []),
+        ...(chujaWpt ? [{ name: 'CHUJA', x: chujaWpt.jejuX, z: chujaWpt.jejuZ }] : []),
+        { name: 'TAMNA', x: tamnaWorldX, z: tamnaWorldZ },
+        { name: 'FINAL', ...at(-3000) },
+        { name: 'RW07', ...threshPos },
+      ];
+
+      // Determine active waypoint
+      if (this.activeWaypoint) {
+        activeWpt = this.activeWaypoint;
+      } else {
+        const wgs = jejuLocalToWgs84(this.planePos.x, this.planePos.y);
+        const activeIdx = findActiveWaypointIndex(wgs.latitude, wgs.longitude);
+        const candidate = CORRIDOR_WAYPOINTS_EXPANDED[activeIdx]?.ident ?? 'RW07';
+        if (candidate === 'RW07') {
+          // Signed along-course distance: negative = approaching before threshold, positive = past threshold
+          const dx = this.planePos.x - threshPos.x;
+          const dz = this.planePos.y - threshPos.z;
+          const alongCourseM = dx * Math.sin(h) - dz * Math.cos(h);
+          activeWpt = alongCourseM < -1500 ? 'FINAL' : 'RW07';
+        } else {
+          activeWpt = candidate;
+        }
+      }
     } else if (this.airportId === 'incheon') {
-      const a = APPROACH_DATA.incheon, h = a.headingDeg*Math.PI/180;
-      const at = distance => ({ x:a.threshold.x+Math.sin(h)*distance, z:a.threshold.z-Math.cos(h)*distance });
-      activeWpt = 'RW15R';
+      const a = APPROACH_DATA.incheon, h = a.headingDeg * Math.PI / 180;
+      const at = distance => ({ x: a.threshold.x + Math.sin(h) * distance, z: a.threshold.z - Math.cos(h) * distance });
       threshPos = a.threshold;
-      rwyStart = projectToScreen(threshPos.x,threshPos.z);
-      rwyEnd = projectToScreen(a.end.x,a.end.z);
-      const before=at(-6000),after=at(4500);
-      extStart=projectToScreen(before.x,before.z);extEnd=projectToScreen(after.x,after.z);
-      vor1='RKSI  RW15R';vor2='MODEL APPROACH';
-      fixes=[{name:'FINAL',...at(-1500)},{name:'RW15R',...threshPos}];
+      rwyStart = projectToScreen(threshPos.x, threshPos.z);
+      rwyEnd = projectToScreen(a.end.x, a.end.z);
+      const before = at(-6000), after = at(4500);
+      extStart = projectToScreen(before.x, before.z); extEnd = projectToScreen(after.x, after.z);
+      vor1 = 'RKSI  RW15R'; vor2 = 'MODEL APPROACH';
+
+      fixes = [
+        { name: 'FINAL', ...at(-1500) },
+        { name: 'RW15R', ...threshPos },
+        ...CORRIDOR_WAYPOINTS_EXPANDED.slice(1).map(w => ({ name: w.ident, x: w.incheonX, z: w.incheonZ })),
+      ];
+
+      // Determine active waypoint
+      if (this.activeWaypoint) {
+        activeWpt = this.activeWaypoint;
+      } else {
+        const wgs = incheonSceneryLocalToWgs84(this.planePos.x, this.planePos.y);
+        const activeIdx = findActiveWaypointIndex(wgs.latitude, wgs.longitude);
+        if (this.planePos.y > at(-1500).z + 5000) {
+          activeWpt = CORRIDOR_WAYPOINTS_EXPANDED[activeIdx]?.ident ?? 'BOPTA';
+        } else {
+          activeWpt = 'RW15R';
+        }
+      }
     } else if (isLukla) {
       activeWpt = 'RW06';
       threshPos = { x: -223.5, z: 139.6 };
@@ -350,9 +411,30 @@ export class NDCanvas {
     ctx.fillText(activeWpt, w - 24, 46);
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 12px monospace';
-    const distMeters = Math.hypot(this.planePos.x - threshPos.x, this.planePos.y - threshPos.z);
-    const distToThreshold = Math.max(0.1, distMeters / 1852.0);
-    ctx.fillText(`${distToThreshold.toFixed(1)} NM`, w - 24, 62);
+
+    let activePos = null;
+    const activeFix = fixes.find(f => f.name === activeWpt);
+    if (activeFix) {
+      activePos = { x: activeFix.x, z: activeFix.z ?? activeFix.y };
+    } else {
+      const corridorWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === activeWpt);
+      if (corridorWpt) {
+        if (this.airportId === 'incheon') {
+          activePos = { x: corridorWpt.incheonX, z: corridorWpt.incheonZ };
+        } else if (this.airportId === 'jeju') {
+          activePos = { x: corridorWpt.jejuX, z: corridorWpt.jejuZ };
+        }
+      }
+    }
+    if (!activePos) {
+      activePos = { x: threshPos.x, z: threshPos.z ?? threshPos.y };
+    }
+
+    const distMeters = Math.hypot(this.planePos.x - activePos.x, this.planePos.y - activePos.z);
+    const distToWpt = Math.max(0.1, distMeters / 1852.0);
+    this.lastActiveWpt = activeWpt;
+    this.lastDistToWptNm = distToWpt;
+    ctx.fillText(`${distToWpt.toFixed(1)} NM`, w - 24, 62);
 
     // Bottom Left & Right VOR Frequency Data
     ctx.fillStyle = '#10b981';

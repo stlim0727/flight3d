@@ -106,6 +106,8 @@ class PresetSpawnerMethods {
     this.hasTouchedDownThisFlight = false;
     this.gear.resetContacts();
     this.autopilot.reset();
+    this.cduCanvas?.reset?.();
+    this.ndCanvas?.reset?.();
     // A preset reset redoes the aircraft with clean wings: the separation
     // state must not leak across the reset into the new flight.
     this.aero.separation = 0.0;
