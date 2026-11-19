@@ -6,6 +6,9 @@ import { pavementRibbon } from './IncheonPavement.js';
 import { loadIncheonSatelliteTexture } from './IncheonGround.js';
 import { colourJejuGround, jejuSurfaceMaterial } from './JejuGround.js';
 import { JejuTileStreamer } from './JejuTileStreamer.js';
+import { CorridorTileStreamer } from './CorridorTileStreamer.js';
+import { CorridorFlightSurface } from './CorridorFlightSurface.js';
+import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 
 export async function loadJejuAirport(base = '', options = {}) {
   const terrain = new JejuFlightSurface(JEJU_AIRFIELD);
@@ -56,6 +59,14 @@ export async function loadJejuAirport(base = '', options = {}) {
     if (options.autoloadTiles !== false) {
       tileStreamer.loadIslandMacroTiles().catch(() => {});
     }
+  }
+
+  let corridorStreamer = null;
+  if (options.streamCorridor) {
+    const corridorSurface = new CorridorFlightSurface({ activeOrigin: JEJU_ORIGIN, jejuSurface: terrain });
+    corridorStreamer = new CorridorTileStreamer(corridorSurface, { origin: JEJU_ORIGIN, ...options.corridorOptions });
+    group.add(corridorStreamer.group);
+    terrain.corridorStreamer = corridorStreamer;
   }
 
   // 2. Pavement & Cross Runways
@@ -171,11 +182,22 @@ export async function loadJejuAirport(base = '', options = {}) {
     group,
     nightLighting,
     tileStreamer,
+    corridorStreamer,
     towerCab: { position: new THREE.Vector3(-80, JEJU_AIRFIELD.elevationM + 49, 260) },
     isOnRunway: (x, z) => terrain.isOnRunway(x, z),
     isRunwaySafetyArea: (x, z) => terrain.isRunwaySafetyArea(x, z),
     resetTraffic() {},
-    update(dt, position, time, options = {}) {},
+    update(dt, position, time, options = {}) {
+      if (corridorStreamer && position) {
+        corridorStreamer.update({
+          x: position.x,
+          z: position.z,
+          y: position.y,
+          altitudeM: position.y,
+          headingDeg: options.headingDeg,
+        }).catch(() => {});
+      }
+    },
     checkBuildingCollision(probes) {
       for (const p of probes) {
         if (Math.hypot(p.pos.x - (-80), p.pos.z - 260) < 12 && p.pos.y < JEJU_AIRFIELD.elevationM + 55) {
@@ -190,6 +212,7 @@ export async function loadJejuAirport(base = '', options = {}) {
     getGazeTargets() { return gazeTargets; },
     dispose() {
       tileStreamer?.dispose();
+      corridorStreamer?.dispose();
     },
   };
 }

@@ -10,7 +10,9 @@
 const RADIANS = Math.PI / 180;
 const DEGREES = 180 / Math.PI;
 const WGS84_A = 6378137.0; // Semi-major axis in meters
+const WGS84_B = 6356752.314245; // Semi-minor axis in meters
 const WGS84_E2 = 6.6943799901413165e-3; // First eccentricity squared
+const WGS84_E2_PRIME = (WGS84_A ** 2 - WGS84_B ** 2) / WGS84_B ** 2; // Second eccentricity squared
 
 /**
  * Convert WGS84 latitude/longitude to Web Mercator tile indices.
@@ -113,7 +115,27 @@ export function wgs84ToLocal(latitude, longitude, origin) {
 }
 
 /**
+ * Invert ECEF coordinates [X, Y, Z] to WGS84 latitude/longitude using Bowring's algorithm.
+ * @param {number} X
+ * @param {number} Y
+ * @param {number} Z
+ * @returns {{ latitude: number, longitude: number }}
+ */
+export function ecefToWgs84(X, Y, Z) {
+  const p = Math.hypot(X, Y);
+  const theta = Math.atan2(Z * WGS84_A, p * WGS84_B);
+  const lat = Math.atan2(
+    Z + WGS84_E2_PRIME * WGS84_B * Math.sin(theta) ** 3,
+    p - WGS84_E2 * WGS84_A * Math.cos(theta) ** 3
+  );
+  const lon = Math.atan2(Y, X);
+  return { latitude: lat * DEGREES, longitude: lon * DEGREES };
+}
+
+/**
  * Convert local tangent plane [x, z] in meters back to WGS84 latitude/longitude.
+ * Uses exact ellipsoid intersection to maintain sub-millimeter precision across
+ * regional and continental distances (e.g. 450km Incheon-Jeju corridor).
  * @param {number} x - East meters
  * @param {number} z - South meters
  * @param {{ latitude: number, longitude: number }} origin
@@ -123,19 +145,45 @@ export function localToWgs84(x, z, origin) {
   if (!origin || !Number.isFinite(origin.latitude) || !Number.isFinite(origin.longitude)) {
     throw new Error('Invalid origin coordinate');
   }
+  const center = ecef(origin.latitude, origin.longitude);
   const lat0 = origin.latitude * RADIANS;
   const lon0 = origin.longitude * RADIANS;
-  const sinLat = Math.sin(lat0);
-  const Rn = WGS84_A / Math.sqrt(1 - WGS84_E2 * sinLat * sinLat);
-  const Rm = (WGS84_A * (1 - WGS84_E2)) / (1 - WGS84_E2 * sinLat * sinLat) ** 1.5;
 
-  const dLat = -z / Rm;
-  const dLon = x / (Rn * Math.cos(lat0));
+  const east = [-Math.sin(lon0), Math.cos(lon0), 0];
+  const south = [Math.sin(lat0) * Math.cos(lon0), Math.sin(lat0) * Math.sin(lon0), -Math.cos(lat0)];
+  const up = [Math.cos(lat0) * Math.cos(lon0), Math.cos(lat0) * Math.sin(lon0), Math.sin(lat0)];
 
-  return {
-    latitude: (lat0 + dLat) * DEGREES,
-    longitude: (lon0 + dLon) * DEGREES,
-  };
+  const P0 = [
+    center[0] + east[0] * x + south[0] * z,
+    center[1] + east[1] * x + south[1] * z,
+    center[2] + east[2] * x + south[2] * z,
+  ];
+
+  const a2 = WGS84_A ** 2;
+  const b2 = WGS84_B ** 2;
+
+  const A = (up[0] ** 2 + up[1] ** 2) / a2 + (up[2] ** 2) / b2;
+  const B = 2 * ((P0[0] * up[0] + P0[1] * up[1]) / a2 + (P0[2] * up[2]) / b2);
+  const C = (P0[0] ** 2 + P0[1] ** 2) / a2 + (P0[2] ** 2) / b2 - 1.0;
+
+  const disc = B ** 2 - 4 * A * C;
+  if (disc < 0) {
+    // Fallback for points outside horizon
+    const sinLat = Math.sin(lat0);
+    const Rn = WGS84_A / Math.sqrt(1 - WGS84_E2 * sinLat * sinLat);
+    const Rm = (WGS84_A * (1 - WGS84_E2)) / (1 - WGS84_E2 * sinLat * sinLat) ** 1.5;
+    return {
+      latitude: (lat0 - z / Rm) * DEGREES,
+      longitude: (lon0 + x / (Rn * Math.cos(lat0))) * DEGREES,
+    };
+  }
+
+  const y1 = (-B + Math.sqrt(disc)) / (2 * A);
+  const y2 = (-B - Math.sqrt(disc)) / (2 * A);
+  const y = Math.abs(y1) < Math.abs(y2) ? y1 : y2;
+
+  const pos = [P0[0] + up[0] * y, P0[1] + up[1] * y, P0[2] + up[2] * y];
+  return ecefToWgs84(pos[0], pos[1], pos[2]);
 }
 
 /**
