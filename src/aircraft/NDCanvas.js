@@ -1,5 +1,14 @@
 import { APPROACH_DATA } from '../config/approachData.js';
+import { projectToLocal } from '../geospatial/incheon.js';
+import koreaRoutes from '../config/koreaFlightRoutes.json' with { type: 'json' };
 import * as THREE from 'three';
+
+const jejuOrigin = {
+  latitude: koreaRoutes.destination.latitude,
+  longitude: koreaRoutes.destination.longitude,
+};
+const tamnaWpt = koreaRoutes.route.find(w => w.ident === 'TAMNA');
+const [tamnaWorldX, tamnaWorldZ] = projectToLocal(tamnaWpt.latitude, tamnaWpt.longitude, jejuOrigin);
 
 /**
  * Boeing Navigation Display (ND)
@@ -206,7 +215,7 @@ export class NDCanvas {
       const before = at(-6000), after = at(4500);
       extStart = projectToScreen(before.x, before.z); extEnd = projectToScreen(after.x, after.z);
       vor1 = 'RKPC  RW07'; vor2 = 'ILS 109.90';
-      fixes = [{ name: 'TAMNA', ...at(-12000) }, { name: 'FINAL', ...at(-3000) }, { name: 'RW07', ...threshPos }];
+      fixes = [{ name: 'TAMNA', x: tamnaWorldX, z: tamnaWorldZ }, { name: 'FINAL', ...at(-3000) }, { name: 'RW07', ...threshPos }];
     } else if (this.airportId === 'incheon') {
       const a = APPROACH_DATA.incheon, h = a.headingDeg*Math.PI/180;
       const at = distance => ({ x:a.threshold.x+Math.sin(h)*distance, z:a.threshold.z-Math.cos(h)*distance });
@@ -280,9 +289,9 @@ export class NDCanvas {
     // 1 NM tick marks along final approach course
     for (let nm = 1; nm <= 5; nm++) {
       let tickPos;
-      if (this.airportId === 'incheon') {
-        const a=APPROACH_DATA.incheon,h=a.headingDeg*Math.PI/180;
-        tickPos=projectToScreen(a.threshold.x-Math.sin(h)*nm*1852,a.threshold.z+Math.cos(h)*nm*1852);
+      if (this.airportId === 'jeju' || this.airportId === 'incheon') {
+        const a = APPROACH_DATA[this.airportId], h = a.headingDeg * Math.PI / 180;
+        tickPos = projectToScreen(a.threshold.x - Math.sin(h) * nm * 1852, a.threshold.z + Math.cos(h) * nm * 1852);
       } else if (isLukla) {
         const sTick = -263.5 - nm * 1852;
         tickPos = projectToScreen(sTick * sin58, -sTick * cos58);
