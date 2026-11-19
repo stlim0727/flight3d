@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdir, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import draco3d from 'draco3dgltf';
 import {
@@ -10,6 +11,7 @@ import {
   MODELS_DIRECTORY,
   countTriangles,
   createGltfIO,
+  decimateGlbAssets,
 } from '../scripts/decimate-glb-assets.mjs';
 
 async function readDocument(io, file) {
@@ -64,4 +66,20 @@ test('texture-bound c172 is not duplicated as an LOD', async () => {
     false,
     'c172.glb is texture-bound; mesh decimation does not cut its payload enough to ship a duplicate',
   );
+});
+
+test('removes LOD files whose source no longer qualifies', async () => {
+  const modelsDirectory = await mkdtemp(path.join(tmpdir(), 'flight3d-lod-'));
+  const lodDirectory = path.join(modelsDirectory, 'lod');
+  try {
+    await mkdir(lodDirectory, { recursive: true });
+    await writeFile(path.join(lodDirectory, 'stale.glb'), 'stale variant');
+
+    const report = await decimateGlbAssets({ modelsDirectory, lodDirectory });
+
+    assert.deepEqual(report.map(entry => entry.status), ['removed-stale'], 'the stale LOD must be reported as removed');
+    assert.deepEqual(await readdir(lodDirectory), [], 'stale LOD must be removed');
+  } finally {
+    await rm(modelsDirectory, { recursive: true, force: true });
+  }
 });

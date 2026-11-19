@@ -52,20 +52,18 @@ export function countTriangles(document) {
   return Math.round(triangles);
 }
 
-async function listGlbFiles(directory) {
+async function listGlbFiles(directory, { skipDirectory = null } = {}) {
   const entries = await readdir(directory, { recursive: true, withFileTypes: true });
   return entries
     .filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.glb'))
     .map(entry => path.join(entry.parentPath ?? entry.path, entry.name))
-    .filter(file => !file.startsWith(LOD_DIRECTORY + path.sep))
+    .filter(file => !skipDirectory || !file.startsWith(skipDirectory + path.sep))
     .sort();
 }
 
-function lodPathFor(sourcePath) {
-  return path.join(LOD_DIRECTORY, path.relative(MODELS_DIRECTORY, sourcePath));
-}
-
 export async function decimateGlbAssets({
+  modelsDirectory = MODELS_DIRECTORY,
+  lodDirectory = path.join(modelsDirectory, 'lod'),
   ratio = LOD_RATIO,
   error = LOD_ERROR,
   minByteGain = LOD_MIN_BYTE_GAIN,
@@ -79,7 +77,7 @@ export async function decimateGlbAssets({
   const kept = new Set();
   const report = [];
 
-  for (const sourcePath of await listGlbFiles(MODELS_DIRECTORY)) {
+  for (const sourcePath of await listGlbFiles(modelsDirectory, { skipDirectory: lodDirectory })) {
     const sourceBytes = (await stat(sourcePath)).size;
     const entry = { source: path.relative(ROOT_DIR, sourcePath), sourceBytes, lod: null };
     report.push(entry);
@@ -108,7 +106,7 @@ export async function decimateGlbAssets({
         .setEncoderOptions({ method: KHRDracoMeshCompression.EncoderMethod.EDGEBREAKER });
     }
 
-    const lodPath = lodPathFor(sourcePath);
+    const lodPath = path.join(lodDirectory, path.relative(modelsDirectory, sourcePath));
     entry.lod = path.relative(ROOT_DIR, lodPath);
     const bytes = await io.writeBinary(document);
     entry.lodBytes = bytes.byteLength;
@@ -127,13 +125,11 @@ export async function decimateGlbAssets({
   }
 
   if (!dryRun) {
-    let stale = 0;
-    for (const lodPath of await listGlbFiles(LOD_DIRECTORY).catch(() => [])) {
+    for (const lodPath of await listGlbFiles(lodDirectory).catch(() => [])) {
       if (kept.has(lodPath)) continue;
       await rm(lodPath, { force: true });
-      stale++;
+      report.push({ status: 'removed-stale', lod: path.relative(ROOT_DIR, lodPath) });
     }
-    if (stale > 0) log({ status: 'removed-stale', count: stale });
   }
 
   return report;
@@ -175,6 +171,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const report = await decimateGlbAssets(options);
   for (const entry of report) {
     if (entry.status === 'below-threshold') continue;
+    if (entry.status === 'removed-stale') {
+      console.log(`${entry.status.padEnd(20)} ${entry.lod}`);
+      continue;
+    }
     const lod = entry.lodBytes == null
       ? 'no LOD'
       : `${formatBytes(entry.lodBytes)} / ${entry.lodTriangles} tris (${(entry.byteGain * 100).toFixed(1)}% smaller)`;
