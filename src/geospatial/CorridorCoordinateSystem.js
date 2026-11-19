@@ -47,6 +47,44 @@ export const JEJU_ORIGIN = Object.freeze({
 
 export const MEAN_SEA_LEVEL_M = 0.0;
 
+/**
+ * Chuja Island (추자도) Emergency Diversion Strip specifications.
+ * Positioned in the natural coastal valley/beach corridor of Chuja archipelago,
+ * serving as the primary diversion runway along the Incheon ↔ Jeju route.
+ */
+export const CHUJA_EMERGENCY_STRIP = Object.freeze({
+  center: Object.freeze({
+    latitude: 33.9620,
+    longitude: 126.2950,
+  }),
+  elevationM: 12.0,
+  headingDeg: 45.0,
+  lengthM: 900.0,
+  widthM: 45.0,
+  safetyLengthM: 1100.0,
+  safetyWidthM: 80.0,
+});
+
+/**
+ * Check whether a WGS84 coordinate is within the Chuja Emergency Strip or its safety area.
+ * @param {number} latitude
+ * @param {number} longitude
+ * @param {boolean} [useSafetyArea=false]
+ * @returns {boolean}
+ */
+export function isWithinChujaEmergencyStrip(latitude, longitude, useSafetyArea = false) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+  const [dx, dz] = wgs84ToLocal(latitude, longitude, CHUJA_EMERGENCY_STRIP.center);
+
+  const along = (dx - dz) * Math.SQRT1_2;
+  const across = (dx + dz) * Math.SQRT1_2;
+
+  const maxAlong = (useSafetyArea ? CHUJA_EMERGENCY_STRIP.safetyLengthM : CHUJA_EMERGENCY_STRIP.lengthM) * 0.5;
+  const maxAcross = (useSafetyArea ? CHUJA_EMERGENCY_STRIP.safetyWidthM : CHUJA_EMERGENCY_STRIP.widthM) * 0.5;
+
+  return Math.abs(along) <= maxAlong && Math.abs(across) <= maxAcross;
+}
+
 export const CORRIDOR_WAYPOINTS = Object.freeze(koreaRoutes.route.map(w => Object.freeze({ ...w })));
 
 /**

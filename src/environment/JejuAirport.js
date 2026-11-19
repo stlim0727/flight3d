@@ -8,7 +8,11 @@ import { colourJejuGround, jejuSurfaceMaterial } from './JejuGround.js';
 import { JejuTileStreamer } from './JejuTileStreamer.js';
 import { CorridorTileStreamer } from './CorridorTileStreamer.js';
 import { CorridorFlightSurface } from './CorridorFlightSurface.js';
-import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
+import {
+  CHUJA_EMERGENCY_STRIP,
+  JEJU_ORIGIN,
+  wgs84ToJejuLocal,
+} from '../geospatial/CorridorCoordinateSystem.js';
 
 export async function loadJejuAirport(base = '', options = {}) {
   const terrain = new JejuFlightSurface(JEJU_AIRFIELD);
@@ -63,7 +67,7 @@ export async function loadJejuAirport(base = '', options = {}) {
 
   let corridorStreamer = null;
   let activeTerrain = terrain;
-  if (options.streamCorridor) {
+  if (options.streamCorridor !== false) {
     const corridorSurface = new CorridorFlightSurface({ activeOrigin: JEJU_ORIGIN, jejuSurface: terrain });
     corridorStreamer = new CorridorTileStreamer(corridorSurface, { origin: JEJU_ORIGIN, ...options.corridorOptions });
     group.add(corridorStreamer.group);
@@ -140,6 +144,43 @@ export async function loadJejuAirport(base = '', options = {}) {
         }
       }
     }
+  }
+
+  // 2B. Chuja Island Local 3D Terrain & Emergency Diversion Airstrip
+  if (options.streamCorridor !== false) {
+    const [cx, cz] = wgs84ToJejuLocal(CHUJA_EMERGENCY_STRIP.center.latitude, CHUJA_EMERGENCY_STRIP.center.longitude);
+    const patchSize = 5000;
+    const patchSegments = 80;
+    const chujaGeo = new THREE.PlaneGeometry(patchSize, patchSize, patchSegments, patchSegments);
+    chujaGeo.rotateX(-Math.PI / 2);
+    chujaGeo.translate(cx, 0, cz);
+
+    const cPos = chujaGeo.attributes.position;
+    for (let i = 0; i < cPos.count; i++) {
+      const vx = cPos.getX(i);
+      const vz = cPos.getZ(i);
+      const vy = activeTerrain.getHeight(vx, vz);
+      cPos.setY(i, vy);
+    }
+    chujaGeo.computeVertexNormals();
+    colourJejuGround(chujaGeo);
+
+    const chujaMesh = new THREE.Mesh(chujaGeo, groundMaterial);
+    terrain.mesh.add(chujaMesh);
+
+    const halfL = CHUJA_EMERGENCY_STRIP.lengthM * 0.5;
+    const ptA = [cx - halfL * Math.SQRT1_2, cz + halfL * Math.SQRT1_2];
+    const ptB = [cx + halfL * Math.SQRT1_2, cz - halfL * Math.SQRT1_2];
+
+    const chujaRwyGeo = pavementRibbon([ptA, ptB], CHUJA_EMERGENCY_STRIP.widthM);
+    const chujaRwyMesh = new THREE.Mesh(chujaRwyGeo, pavementMat);
+    chujaRwyMesh.position.y = CHUJA_EMERGENCY_STRIP.elevationM + 0.04;
+    group.add(chujaRwyMesh);
+
+    const chujaClGeo = pavementRibbon([ptA, ptB], 1.2, true);
+    const chujaClMesh = new THREE.Mesh(chujaClGeo, markingsMat);
+    chujaClMesh.position.y = CHUJA_EMERGENCY_STRIP.elevationM + 0.05;
+    group.add(chujaClMesh);
   }
 
   // 3. Terminal & Control Tower Buildings

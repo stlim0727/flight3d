@@ -89,7 +89,7 @@ export default {
   "jeju.airport": "Jeju Airport (RKPC)",
   "jeju.runway": "Runway 07 · Ready for takeoff",
   "jeju.approach": "Runway 07 · 3 NM final",
-  "jeju.challenge": "⚡ Runway 07 Crosswind Challenge",
+  "jeju.challenge": "⚡ Chuja & Oceanic Emergency Ditching (Engine-Out)",
   "jeju.cruise": "Mount Hallasan cruise · 3,000 m (10,000 FT)",
   "jeju.loading": "Loading Jeju terrain and airport…",
   "jeju.load.failed": "Jeju assets failed to load. Select the airport to retry.",
