@@ -10,11 +10,22 @@ test('every gear state maps to a drawn icon, damage included', () => {
   assert.equal(gearIconName('damaged'), 'gear-fail');
 });
 
-test('camera views keep their text labels; only gear, flaps, spoilers and fullscreen are drawn', () => {
+test('camera views keep their text labels; gear, flaps, spoilers, fullscreen and the camera menu are drawn', () => {
   assert.deepEqual(Object.keys(TOOLBAR_ICONS).sort(), [
-    'flaps', 'fullscreen-enter', 'fullscreen-exit', 'gear-down', 'gear-fail', 'gear-transit', 'gear-up',
+    'camera', 'flaps', 'fullscreen-enter', 'fullscreen-exit', 'gear-down', 'gear-fail', 'gear-transit', 'gear-up',
     'spoilers',
   ]);
+});
+
+test('issue #880: the in-flight camera menu trigger draws the camera icon, not a CAM text label', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const css = await readFile(new URL('../src/styles/flight-strip.css', import.meta.url), 'utf8');
+  const panels = await readFile(new URL('../src/ui/FlightPanels.js', import.meta.url), 'utf8');
+  assert.match(panels, /setToolbarIcon\(cameraToggleBtn, 'camera'\)/);
+  assert.match(css, /#btn-camera-toggle::after \{[^}]*mask: var\(--toolbar-icon\)/);
+  assert.match(css, /#btn-camera-toggle::before \{[^}]*content: "▾"/, 'menu arrow like 보조 ▾');
+  assert.doesNotMatch(css, /'CAM /);
+  assert.doesNotMatch(panels, /data-(current|compact)-view/);
 });
 
 test('icons are self-contained SVG data URLs usable as a CSS mask', () => {
