@@ -139,6 +139,34 @@ test('loadJejuAirport builds 3D runways, terminal, tower, and lighting', async (
   assert.ok(airport.nightLighting);
   assert.ok(airport.towerCab);
 
+  // 3D terrain mesh validation: vertexColors and whole-island span
+  assert.ok(airport.terrain.mesh.children.length > 0, 'Terrain mesh must be attached');
+  const terrainMesh = airport.terrain.mesh.children[0];
+  assert.ok(terrainMesh.geometry.hasAttribute('color'), 'Jeju terrain mesh must possess vertex colors');
+  assert.equal(terrainMesh.material.vertexColors, true, 'Jeju surface material must have vertexColors enabled');
+
+  terrainMesh.geometry.computeBoundingBox();
+  const bbox = terrainMesh.geometry.boundingBox;
+  assert.ok(bbox.min.x <= -35000, `West bound should reach Gosan (<= -35km), got ${bbox.min.x}`);
+  assert.ok(bbox.max.x >= 40000, `East bound should reach Seongsan (>= +40km), got ${bbox.max.x}`);
+  assert.ok(bbox.min.z <= -10000, `North bound should span coastal waters (<= -10km), got ${bbox.min.z}`);
+  assert.ok(bbox.max.z >= 40000, `South bound should reach Seogwipo (>= +40km), got ${bbox.max.z}`);
+
+  // Color verification: airport plateau vertices around y=36m should be green turf (g > r && g > b)
+  const pos = terrainMesh.geometry.attributes.position;
+  const col = terrainMesh.geometry.attributes.color;
+  let airportTurfSampled = false;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    if (Math.hypot(x, z) < 600 && Math.abs(y - 36.0) < 1.0) {
+      const r = col.getX(i), g = col.getY(i), b = col.getZ(i);
+      assert.ok(g > r && g > b, `Airport turf must be green-dominated, got (${r}, ${g}, ${b})`);
+      airportTurfSampled = true;
+      break;
+    }
+  }
+  assert.ok(airportTurfSampled, 'Should sample airport turf vertices near origin');
+
   // Collision checks with terminal and tower
   const towerProbe = [{ pos: new THREE.Vector3(-80, 50, 260), radius: 2, desc: 'cockpit' }];
   const towerHit = airport.checkBuildingCollision(towerProbe);

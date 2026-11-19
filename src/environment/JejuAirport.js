@@ -3,23 +3,31 @@ import { JEJU_AIRFIELD, JejuFlightSurface } from '../geospatial/JejuFlightSurfac
 import { AirportNightLighting } from './AirportNightLighting.js';
 import { applyLogDepthOffset } from './RunwayMarkings.js';
 import { pavementRibbon } from './IncheonPavement.js';
-import { incheonSurfaceMaterial, loadIncheonSatelliteTexture } from './IncheonGround.js';
+import { loadIncheonSatelliteTexture } from './IncheonGround.js';
+import { colourJejuGround, jejuSurfaceMaterial } from './JejuGround.js';
 
 export async function loadJejuAirport(base = '', options = {}) {
   const terrain = new JejuFlightSurface(JEJU_AIRFIELD);
   terrain.mesh = new THREE.Group();
   const group = new THREE.Group();
 
-  // 1. Terrain Mesh (covers 40 km x 40 km around Jeju airport and Mt. Hallasan)
-  const size = 40000;
-  const segments = 160;
-  const terrainGeo = new THREE.PlaneGeometry(size, size, segments, segments);
+  // 1. Terrain Mesh (covers 80 km x 56 km across the entire island of Jeju)
+  const sizeX = 80000;
+  const sizeZ = 56000;
+  const segmentsX = 200;
+  const segmentsZ = 140;
+  const terrainGeo = new THREE.PlaneGeometry(sizeX, sizeZ, segmentsX, segmentsZ);
   terrainGeo.rotateX(-Math.PI / 2);
+  // Center mesh over central Jeju Island / Mount Hallasan (3,740m East, 16,000m South of RKPC)
+  terrainGeo.translate(3740, 0, 16000);
+
   const pos = terrainGeo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
-    pos.setY(i, terrain.getHeight(x, z));
+    const h = terrain.getHeight(x, z);
+    // Vertices outside island boundary drop to seabed (-10m) beneath water surface (0m)
+    pos.setY(i, h <= 0 ? -10.0 : h);
   }
   terrainGeo.computeVertexNormals();
 
@@ -27,7 +35,11 @@ export async function loadJejuAirport(base = '', options = {}) {
     ? options.satelliteTexture
     : (options.loadSatellite !== false && base ? await loadIncheonSatelliteTexture(base) : null);
 
-  const groundMaterial = incheonSurfaceMaterial({
+  if (!satelliteTexture) {
+    colourJejuGround(terrainGeo);
+  }
+
+  const groundMaterial = jejuSurfaceMaterial({
     satelliteTexture,
   });
 
