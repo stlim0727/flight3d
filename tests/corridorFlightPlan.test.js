@@ -204,6 +204,24 @@ test('NDCanvas and CDUCanvas render dynamic corridor waypoints', () => {
   assert.equal(cdu.flightPlan.activeIndex, 1);
   const row40k = cdu.flightPlan.getCDULegs().find(r => r.isActive);
   assert.equal(row40k.ident, 'BOPTA');
+
+  // Test flight plan restart at Incheon after progressing to Chuja:
+  cdu.flightPlan.update(33.96, 126.29); // near Chuja
+  assert.ok(cdu.flightPlan.activeIndex >= 5);
+  // Re-spawn at Incheon (0, 0)
+  cdu.updateData({ x: 0, z: 0 });
+  assert.equal(cdu.flightPlan.activeIndex, 1);
+  const rowRestart = cdu.flightPlan.getCDULegs().find(r => r.isActive);
+  assert.equal(rowRestart.ident, 'BOPTA');
+
+  // Test ND active waypoint distance calculation past DOTOL in Incheon frame:
+  const dotol = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'DOTOL');
+  const chuja = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'CHUJA');
+  const midX = (dotol.incheonX + chuja.incheonX) / 2;
+  const midZ = (dotol.incheonZ + chuja.incheonZ) / 2;
+  nd.setAirport('incheon');
+  nd.updateData({ headingDeg: 195, trackDeg: 195, x: midX, z: midZ });
+  nd.render();
 });
 
 test('DEV_SCENARIOS.corridor-cruise is registered and configured', () => {

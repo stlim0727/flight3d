@@ -104,6 +104,21 @@ export function findActiveWaypointIndex(latitude, longitude, currentIndex = 1, c
 
   let idx = Math.max(1, Math.min(waypoints.length - 1, currentIndex));
 
+  // If aircraft is behind the current leg's starting waypoint (e.g. preset restart or repositioning),
+  // restart search from 1 so we don't get stuck on downstream waypoints
+  if (idx > 1) {
+    const prevWpt = waypoints[idx - 1];
+    const targetWpt = waypoints[idx];
+    const brgSeg = calculateBearingDeg(prevWpt.latitude, prevWpt.longitude, targetWpt.latitude, targetWpt.longitude);
+    const brgAc = calculateBearingDeg(prevWpt.latitude, prevWpt.longitude, latitude, longitude);
+    const angleDiffRad = (brgAc - brgSeg) * DEG_TO_RAD;
+    const distFromStart = haversineDistanceM(prevWpt.latitude, prevWpt.longitude, latitude, longitude);
+    const alongTrackM = distFromStart * Math.cos(angleDiffRad);
+    if (alongTrackM < -captureRadiusM) {
+      idx = 1;
+    }
+  }
+
   while (idx < waypoints.length - 1) {
     const targetWpt = waypoints[idx];
     const prevWpt = waypoints[idx - 1];

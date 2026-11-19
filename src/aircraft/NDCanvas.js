@@ -51,10 +51,14 @@ export class NDCanvas {
     }
   }
 
-  setAirport(airportId) {
-    this.airportId = airportId;
+  reset() {
     this.activeWaypoint = null;
     this.render();
+  }
+
+  setAirport(airportId) {
+    this.airportId = airportId;
+    this.reset();
   }
 
   updateData(state = {}) {
@@ -266,18 +270,10 @@ export class NDCanvas {
       extStart = projectToScreen(before.x, before.z); extEnd = projectToScreen(after.x, after.z);
       vor1 = 'RKSI  RW15R'; vor2 = 'MODEL APPROACH';
 
-      const boptaWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'BOPTA');
-      const olmenWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'OLMEN');
-      const sosdoWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'SOSDO');
-      const dotolWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'DOTOL');
-
       fixes = [
         { name: 'FINAL', ...at(-1500) },
         { name: 'RW15R', ...threshPos },
-        ...(boptaWpt ? [{ name: 'BOPTA', x: boptaWpt.incheonX, z: boptaWpt.incheonZ }] : []),
-        ...(olmenWpt ? [{ name: 'OLMEN', x: olmenWpt.incheonX, z: olmenWpt.incheonZ }] : []),
-        ...(sosdoWpt ? [{ name: 'SOSDO', x: sosdoWpt.incheonX, z: sosdoWpt.incheonZ }] : []),
-        ...(dotolWpt ? [{ name: 'DOTOL', x: dotolWpt.incheonX, z: dotolWpt.incheonZ }] : []),
+        ...CORRIDOR_WAYPOINTS_EXPANDED.slice(1).map(w => ({ name: w.ident, x: w.incheonX, z: w.incheonZ })),
       ];
 
       // Determine active waypoint
@@ -415,8 +411,22 @@ export class NDCanvas {
     ctx.fillText(activeWpt, w - 24, 46);
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 12px monospace';
-    const activeFix = fixes.find(f => f.name === activeWpt) || threshPos;
-    const distMeters = Math.hypot(this.planePos.x - activeFix.x, this.planePos.y - (activeFix.z ?? activeFix.y));
+
+    let activePos = null;
+    const corridorWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === activeWpt);
+    if (corridorWpt) {
+      if (this.airportId === 'incheon') {
+        activePos = { x: corridorWpt.incheonX, z: corridorWpt.incheonZ };
+      } else if (this.airportId === 'jeju') {
+        activePos = { x: corridorWpt.jejuX, z: corridorWpt.jejuZ };
+      }
+    }
+    if (!activePos) {
+      const activeFix = fixes.find(f => f.name === activeWpt) || threshPos;
+      activePos = { x: activeFix.x, z: activeFix.z ?? activeFix.y };
+    }
+
+    const distMeters = Math.hypot(this.planePos.x - activePos.x, this.planePos.y - activePos.z);
     const distToWpt = Math.max(0.1, distMeters / 1852.0);
     ctx.fillText(`${distToWpt.toFixed(1)} NM`, w - 24, 62);
 

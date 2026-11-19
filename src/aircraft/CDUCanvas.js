@@ -30,10 +30,15 @@ export class CDUCanvas {
     this.render();
   }
 
-  setAirport(airportId) {
-    this.airportId = airportId;
+  reset() {
     if (this.flightPlan) this.flightPlan.reset(1);
     this.cduLegs = null;
+    this.render();
+  }
+
+  setAirport(airportId) {
+    this.airportId = airportId;
+    this.reset();
     this.activeWpt = airportId === 'incheon' ? 'RW15R' : (airportId === 'jeju') ? 'RW07' : (airportId === 'lukla') ? 'RW06' : (airportId === 'neon') ? 'RW09' : 'RW09L';
     this.render();
   }
