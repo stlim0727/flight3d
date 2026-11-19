@@ -13,6 +13,11 @@ import { WarningSynthesizer } from './nodes/WarningSynthesizer.js';
 import { CombatSoundEffects } from './nodes/CombatSoundEffects.js';
 import { GpwsCalloutSystem } from './nodes/GpwsCalloutSystem.js';
 
+// Above any aircraft this simulator flies; teleports are identified by their
+// implausible per-frame displacement instead of a low speed clamp.
+const MAX_LISTENER_SPEED_MPS = 1200;
+const TELEPORT_STEP_MULTIPLIER = 2;
+
 export class FlightAudio {
   constructor() {
     this.ctx = null;
@@ -238,18 +243,29 @@ export class FlightAudio {
       return;
     }
     if (Number.isFinite(dt) && dt > 1e-4) {
-      let vx = (position.x - previous.x) / dt;
-      let vy = (position.y - previous.y) / dt;
-      let vz = (position.z - previous.z) / dt;
-      const speed = Math.hypot(vx, vy, vz);
-      // Replay camera cuts and respawns teleport; do not let that read as Mach 3.
-      if (speed > 400) {
-        const scale = 400 / speed;
-        vx *= scale; vy *= scale; vz *= scale;
+      const dx = position.x - previous.x;
+      const dy = position.y - previous.y;
+      const dz = position.z - previous.z;
+      const displacement = Math.hypot(dx, dy, dz);
+      // Replay cuts, respawns and camera-mode snaps jump farther than any real
+      // aircraft can in one frame. Treat only that as a teleport: a genuine
+      // 500 m/s chase must keep matching its host instead of clamping to 400.
+      const maxStep = Math.max(50, MAX_LISTENER_SPEED_MPS * dt * TELEPORT_STEP_MULTIPLIER);
+      if (displacement > maxStep) {
+        this._listenerVelocity.x = this._listenerVelocity.y = this._listenerVelocity.z = 0;
+      } else {
+        let vx = dx / dt;
+        let vy = dy / dt;
+        let vz = dz / dt;
+        const speed = Math.hypot(vx, vy, vz);
+        if (speed > MAX_LISTENER_SPEED_MPS) {
+          const scale = MAX_LISTENER_SPEED_MPS / speed;
+          vx *= scale; vy *= scale; vz *= scale;
+        }
+        this._listenerVelocity.x = vx;
+        this._listenerVelocity.y = vy;
+        this._listenerVelocity.z = vz;
       }
-      this._listenerVelocity.x = vx;
-      this._listenerVelocity.y = vy;
-      this._listenerVelocity.z = vz;
     }
     previous.x = position.x; previous.y = position.y; previous.z = position.z;
   }

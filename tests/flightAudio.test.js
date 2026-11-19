@@ -874,6 +874,33 @@ describe('Spatial combat audio (#862)', () => {
     }
   });
 
+  it('does not clamp a genuine 500 m/s chase but ignores camera teleports', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      const state = { engine1: { n1: 90 }, iasKnots: 400, onGround: false };
+      const source = { position: { x: 0, y: 1000, z: 0 }, velocity: { x: 500, y: 0, z: 0 } };
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 0, y: 1000, z: 0 } },
+      });
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 500 / 60, y: 1000, z: 0 } },
+      });
+      assert.ok(Math.abs(audio._listenerVelocity.x - 500) < 1e-6,
+        'a chase camera matching its host must not be clamped to 400 m/s');
+
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 10_000, y: 1000, z: 0 } },
+      });
+      assert.strictEqual(audio._listenerVelocity.x, 0,
+        'a camera cut is not a 600 km/s flyby');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
   it('feeds live and replayed bandits to the remote engine layer', () => {
     const previous = globalThis.window;
     globalThis.window = { AudioContext: createMockAudioContext() };
