@@ -247,7 +247,11 @@ export class NDCanvas {
         const activeIdx = findActiveWaypointIndex(wgs.latitude, wgs.longitude);
         const candidate = CORRIDOR_WAYPOINTS_EXPANDED[activeIdx]?.ident ?? 'RW07';
         if (candidate === 'RW07') {
-          activeWpt = this.planePos.y < at(-3000).z + 1000 ? 'FINAL' : 'RW07';
+          // Signed along-course distance: negative = approaching before threshold, positive = past threshold
+          const dx = this.planePos.x - threshPos.x;
+          const dz = this.planePos.y - threshPos.z;
+          const alongCourseM = dx * Math.sin(h) - dz * Math.cos(h);
+          activeWpt = alongCourseM < -1500 ? 'FINAL' : 'RW07';
         } else {
           activeWpt = candidate;
         }

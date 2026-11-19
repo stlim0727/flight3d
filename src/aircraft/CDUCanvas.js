@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CorridorFlightPlanManager } from '../geospatial/CorridorFlightPlan.js';
 
 /**
  * Boeing 737 / 777 Class Flight Management Computer (FMC) / Control Display Unit (CDU) Canvas
@@ -23,12 +24,16 @@ export class CDUCanvas {
     this.distNm = 5.2;
     this.takeoff = null;
     this.airportId = 'coastal';
+    this.flightPlan = new CorridorFlightPlanManager(1);
+    this.cduLegs = null;
 
     this.render();
   }
 
   setAirport(airportId) {
     this.airportId = airportId;
+    if (this.flightPlan) this.flightPlan.reset(1);
+    this.cduLegs = null;
     this.activeWpt = airportId === 'incheon' ? 'RW15R' : (airportId === 'jeju') ? 'RW07' : (airportId === 'lukla') ? 'RW06' : (airportId === 'neon') ? 'RW09' : 'RW09L';
     this.render();
   }
@@ -37,10 +42,19 @@ export class CDUCanvas {
     this.takeoff = state.takeoff ?? null;
     this.simZ = Number.isFinite(state.z) ? state.z : null;
     this.simX = Number.isFinite(state.x) ? state.x : null;
+
+    if (state.cduLegs) {
+      this.cduLegs = state.cduLegs;
+    } else if (this.simX !== null && this.simZ !== null && (this.airportId === 'incheon' || this.airportId === 'jeju')) {
+      this.flightPlan.updateLocal(this.simX, this.simZ, this.airportId);
+      this.cduLegs = this.flightPlan.getCDULegs();
+    }
+
     const p = this.takeoff;
     const zBucket = this.simZ !== null ? Math.round(this.simZ / 2000) : 0;
+    const activeIdx = this.flightPlan?.activeIndex ?? 0;
     const key = JSON.stringify([this.airportId, this.activeWpt, this.distNm,
-      p?.zeroFuelMassKg, p?.massKg, p?.vr, p?.v2, zBucket]);
+      p?.zeroFuelMassKg, p?.massKg, p?.vr, p?.v2, zBucket, activeIdx]);
     if (key !== this.renderKey) {
       this.renderKey = key;
       this.render();
@@ -121,7 +135,11 @@ export class CDUCanvas {
       ctx.fillText(spdAlt, sx + sw - 12, y);
     };
 
-    if (this.airportId === 'jeju') {
+    if ((this.airportId === 'incheon' || this.airportId === 'jeju') && this.cduLegs?.length) {
+      this.cduLegs.slice(0, 3).forEach((row, i) => {
+        drawRow(sy + 70 + i * 32, row.ident, row.distStr, row.spdAltStr, row.isActive);
+      });
+    } else if (this.airportId === 'jeju') {
       if (this.simZ !== null && this.simZ < -30000) {
         const distChuja = Math.max(1, Math.round(Math.abs(this.simZ - (-50000)) / 1852));
         drawRow(sy + 70, 'CHUJA', `${distChuja}NM`, '240/10000', true);

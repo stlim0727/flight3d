@@ -174,14 +174,36 @@ test('NDCanvas and CDUCanvas render dynamic corridor waypoints', () => {
   nd.updateData({ headingDeg: 195, trackDeg: 195, groundSpeedKnots: 250, tasKnots: 400, x: -18000, z: -50000 });
   nd.render();
 
+  // Test Jeju runway 07 approach sequencing toward threshold:
+  // 4 NM before threshold (-1463.6 - 7408 * sin(67°), 621.3 + 7408 * cos(67°)) -> FINAL
+  const rad67 = 67 * Math.PI / 180;
+  nd.updateData({
+    headingDeg: 67, trackDeg: 67,
+    x: -1463.6 - 7408 * Math.sin(rad67),
+    z: 621.3 + 7408 * Math.cos(rad67),
+  });
+  nd.render();
+  // Threshold position -> RW07
+  nd.updateData({ headingDeg: 67, trackDeg: 67, x: -1463.6, z: 621.3 });
+  nd.render();
+
   const cdu = new CDUCanvas(256, 256);
   cdu.setAirport('jeju');
-  cdu.updateData({ z: -50000 });
+  cdu.updateData({ x: 0, z: -50000 });
   assert.doesNotThrow(() => cdu.render());
 
   cdu.setAirport('incheon');
-  cdu.updateData({ z: 20000 });
+  cdu.updateData({ x: 0, z: 20000 });
   assert.doesNotThrow(() => cdu.render());
+  assert.equal(cdu.flightPlan.activeIndex, 1);
+  const row20k = cdu.flightPlan.getCDULegs().find(r => r.isActive);
+  assert.equal(row20k.ident, 'BOPTA');
+
+  cdu.updateData({ x: 0, z: 40000 });
+  assert.doesNotThrow(() => cdu.render());
+  assert.equal(cdu.flightPlan.activeIndex, 1);
+  const row40k = cdu.flightPlan.getCDULegs().find(r => r.isActive);
+  assert.equal(row40k.ident, 'BOPTA');
 });
 
 test('DEV_SCENARIOS.corridor-cruise is registered and configured', () => {
