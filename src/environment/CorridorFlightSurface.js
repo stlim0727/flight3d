@@ -138,16 +138,28 @@ export class CorridorFlightSurface {
       if (isWithinChujaEmergencyStrip(latitude, longitude, false)) {
         return CHUJA_EMERGENCY_STRIP.elevationM;
       }
+
+      // 3B. Coastal Valley Corridor & Runway Safety Area
+      const [dx, dz] = wgs84ToLocal(latitude, longitude, CHUJA_EMERGENCY_STRIP.center);
+      const along = (dx - dz) * Math.SQRT1_2;
+      const across = (dx + dz) * Math.SQRT1_2;
+
       if (isWithinChujaEmergencyStrip(latitude, longitude, true)) {
-        // Smoothly blend from 12.0m runway grade to natural island topography
-        const [dx, dz] = wgs84ToLocal(latitude, longitude, CHUJA_EMERGENCY_STRIP.center);
-        const along = (dx - dz) * Math.SQRT1_2;
-        const across = (dx + dz) * Math.SQRT1_2;
+        // Smoothly blend from 12.0m runway grade to safety area grade
         const dAlong = Math.max(0, Math.abs(along) - CHUJA_EMERGENCY_STRIP.lengthM * 0.5) / 100.0;
         const dAcross = Math.max(0, Math.abs(across) - CHUJA_EMERGENCY_STRIP.widthM * 0.5) / 17.5;
         const blend = Math.min(1, Math.max(dAlong, dAcross));
         const smooth = blend * blend * (3 - 2 * blend);
-        return CHUJA_EMERGENCY_STRIP.elevationM * (1 - smooth) + naturalHeight * smooth;
+        return CHUJA_EMERGENCY_STRIP.elevationM * (1 - smooth) + (CHUJA_EMERGENCY_STRIP.elevationM + 2.0) * smooth;
+      }
+
+      const valleyAcross = Math.abs(across);
+      const valleyAlong = Math.abs(along);
+      if (valleyAcross < 400 && valleyAlong < 1200) {
+        const valleyFloor = CHUJA_EMERGENCY_STRIP.elevationM + Math.min(6.0, (valleyAlong / 1200) * 6.0);
+        const t = Math.max(0, valleyAcross - 40) / 360;
+        const smooth = t * t * (3 - 2 * t);
+        return valleyFloor * (1 - smooth) + naturalHeight * smooth;
       }
 
       return naturalHeight;

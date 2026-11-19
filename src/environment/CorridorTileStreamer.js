@@ -15,6 +15,7 @@ import { TileCacheManager } from './TileCacheManager.js';
 import {
   wgs84ToTile,
   tileToWgs84,
+  tileBoundsWgs84,
   tileBoundsLocal,
   localToWgs84,
   wgs84ToLocal,
@@ -235,7 +236,16 @@ export class CorridorTileStreamer {
 
         const { latitude, longitude } = tileToWgs84(exactX, exactY, tileInfo.zoom);
         const [vx, vz] = wgs84ToLocal(latitude, longitude, this.origin);
-        const h = this.flightSurface.getHeight(vx, vz);
+        let h = this.flightSurface.getHeight(vx, vz);
+
+        // Avoid low-poly background tile vertices bulging through the detailed Chuja 3D island patch
+        const distChujaM = Math.hypot(
+          (longitude - 126.3000) * 88000,
+          (latitude - 33.9600) * 111000
+        );
+        if (distChujaM < 3500) {
+          h = Math.min(h, 12.0);
+        }
 
         positions[idx * 3] = vx;
         positions[idx * 3 + 1] = h;

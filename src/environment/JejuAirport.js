@@ -67,7 +67,7 @@ export async function loadJejuAirport(base = '', options = {}) {
 
   let corridorStreamer = null;
   let activeTerrain = terrain;
-  if (options.streamCorridor) {
+  if (options.streamCorridor !== false) {
     const corridorSurface = new CorridorFlightSurface({ activeOrigin: JEJU_ORIGIN, jejuSurface: terrain });
     corridorStreamer = new CorridorTileStreamer(corridorSurface, { origin: JEJU_ORIGIN, ...options.corridorOptions });
     group.add(corridorStreamer.group);
@@ -146,9 +146,28 @@ export async function loadJejuAirport(base = '', options = {}) {
     }
   }
 
-  // 2B. Chuja Island Emergency Diversion Airstrip (when corridor streaming is active)
-  if (options.streamCorridor) {
+  // 2B. Chuja Island Local 3D Terrain & Emergency Diversion Airstrip
+  if (options.streamCorridor !== false) {
     const [cx, cz] = wgs84ToJejuLocal(CHUJA_EMERGENCY_STRIP.center.latitude, CHUJA_EMERGENCY_STRIP.center.longitude);
+    const patchSize = 5000;
+    const patchSegments = 80;
+    const chujaGeo = new THREE.PlaneGeometry(patchSize, patchSize, patchSegments, patchSegments);
+    chujaGeo.rotateX(-Math.PI / 2);
+    chujaGeo.translate(cx, 0, cz);
+
+    const cPos = chujaGeo.attributes.position;
+    for (let i = 0; i < cPos.count; i++) {
+      const vx = cPos.getX(i);
+      const vz = cPos.getZ(i);
+      const vy = activeTerrain.getHeight(vx, vz);
+      cPos.setY(i, vy);
+    }
+    chujaGeo.computeVertexNormals();
+    colourJejuGround(chujaGeo);
+
+    const chujaMesh = new THREE.Mesh(chujaGeo, groundMaterial);
+    terrain.mesh.add(chujaMesh);
+
     const halfL = CHUJA_EMERGENCY_STRIP.lengthM * 0.5;
     const ptA = [cx - halfL * Math.SQRT1_2, cz + halfL * Math.SQRT1_2];
     const ptB = [cx + halfL * Math.SQRT1_2, cz - halfL * Math.SQRT1_2];

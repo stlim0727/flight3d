@@ -12,6 +12,7 @@ import { CorridorFlightSurface } from '../src/environment/CorridorFlightSurface.
 import { WaterDitching } from '../src/physics/WaterDitching.js';
 import { BODY_SUPPORT_POINTS } from '../src/physics/groundContacts.js';
 import { jejuSpawn } from '../src/geospatial/JejuFlightSurface.js';
+import { loadJejuAirport } from '../src/environment/JejuAirport.js';
 import { DEV_SCENARIOS } from '../src/dev/scenarios/index.js';
 import { setLanguage, t } from '../src/i18n/index.js';
 
@@ -202,3 +203,23 @@ test('DEV_SCENARIOS.corridor-ditching is registered and properly configured', ()
   assert.equal(obs.ditched, true);
   assert.equal(scenario.verdict(obs), true, 'Verdict must pass on safe ditching with flooding');
 });
+
+test('loadJejuAirport defaults to corridor streaming and attaches Chuja island 3D mesh', async () => {
+  const airport = await loadJejuAirport('', { loadSatellite: false });
+  assert.ok(airport.corridorStreamer, 'Corridor streamer must be active by default');
+  assert.ok(airport.terrain.corridorLengthM > 450000);
+
+  // Chuja mesh must be attached to terrain.mesh
+  assert.ok(airport.terrain.mesh.children.length >= 2, 'Must include island terrain and Chuja patch');
+
+  // Verify background tile geometry near Chuja does not bulge above 12.0m on the runway
+  const { geo } = airport.corridorStreamer.createTileGeometry({ x: 871, y: 409, zoom: 10 });
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    if (Math.hypot(x - (-18300), z - (-50007)) < 2500) {
+      assert.ok(y <= 12.0001, `Background tile vertex near Chuja must not exceed 12m, got ${y}m`);
+    }
+  }
+});
+

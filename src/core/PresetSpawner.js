@@ -483,6 +483,12 @@ class PresetSpawnerMethods {
       this.controls.elevator = this.controls.aileron = this.controls.rudder = 0;
       this.aero.massProperties.setConfiguration(this.gear.gearState, this.aero.currentFlapAngle / (this.aero.flapAngles.at(-1) || 1));
       this.aero.syncMassProperties();
+      if (this.activeAirport === 'jeju') {
+        this.engines.setEngineFailure(0, true);
+        this.engines.setEngineFailure(1, true);
+        this.controls.throttle = 0;
+        this.engines.setThrottle(0);
+      }
       this.engines.settleSpool();
     }
 
