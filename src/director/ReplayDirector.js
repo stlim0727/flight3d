@@ -28,6 +28,7 @@ export class ReplayDirector {
     this.waitingTerrain = false;
     this._sample = {};
     this._seek = { hint: 0 };
+    this.hostVelocity = { x: 0, y: 0, z: 0 };
     this._telemetry = null;
     this._view = null;
     this._combat = null;
@@ -274,6 +275,7 @@ export class ReplayDirector {
     this.paused = true;
     this.speed = 1;
     this.waitingTerrain = false;
+    this.hostVelocity.x = this.hostVelocity.y = this.hostVelocity.z = 0;
     this.onChange();
     this._syncPlaybackHeld();
   }
@@ -348,6 +350,16 @@ export class ReplayDirector {
     if (!sample) return false;
     sim.position.set(sample.x, sample.y, sample.z);
     sim.quaternion.set(sample.quat[0], sample.quat[1], sample.quat[2], sample.quat[3]);
+    // Physics is frozen during replay, so the recorded pose delta is the only
+    // true host velocity for Doppler and any other spatial consumer.
+    const samples = this.track.samples;
+    const index = this._seek.hint;
+    const from = samples[index];
+    const to = samples[index + 1] ?? from;
+    const span = Math.max(1e-6, to.timeSec - from.timeSec);
+    this.hostVelocity.x = (to.x - from.x) / span;
+    this.hostVelocity.y = (to.y - from.y) / span;
+    this.hostVelocity.z = (to.z - from.z) / span;
     const telemetry = this._telemetry;
     for (const name of STATE_FIELDS) telemetry[name] = sample[name];
     for (const name of OBJECT_FIELDS) telemetry[name] = sample[name];

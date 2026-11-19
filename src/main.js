@@ -1545,7 +1545,7 @@ class FlightSimulator {
     const cameraToAircraftMeters = this.camera.position.distanceTo(this.aircraft.group.position);
     this.audioCoordinator.update(frameDelta, this.telemetry, isCockpit, cameraToAircraftMeters, {
       position: this.position,
-      velocity: this.linearVelocity,
+      velocity: this.replayDirector?.active ? this.replayDirector.hostVelocity : this.linearVelocity,
       camera: this.camera,
     });
 

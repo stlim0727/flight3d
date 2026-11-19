@@ -290,6 +290,19 @@ test('mandated sequence: play, seek backwards, 3x, pause, step back, resume, run
   assert.equal(director.playbackHeld, false, 'leaving a replay releases the parked effects');
 });
 
+test('replay exposes the recorded host velocity for spatial Doppler (#862 review)', async () => {
+  const sim = fakeSim();
+  const director = new ReplayDirector(sim);
+  assert.equal(await director.load(track()), true);
+  director.seek(0.2);
+  assert.ok(Math.abs(director.hostVelocity.x - 50) < 1e-6);
+  assert.ok(Math.abs(director.hostVelocity.y - 5) < 1e-6);
+  assert.ok(Math.abs(director.hostVelocity.z + 25) < 1e-6,
+    'the frozen physics velocity is not reused as the host speed');
+  director.stop();
+  assert.deepEqual(director.hostVelocity, { x: 0, y: 0, z: 0 });
+});
+
 test('parking playback stops the engine mix and cockpit motion until playback resumes', async () => {
   const sim = fakeSim();
   const audio = [], motion = [];
