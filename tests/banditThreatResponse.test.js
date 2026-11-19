@@ -95,6 +95,28 @@ test('burnout uses finite bearing memory then recovery; disable and reset clear 
   assert.equal(response.memory, 0);
 });
 
+test('default Bandit waits for warning confirmation and a full command delay', () => {
+  const warned = patrol(), clear = patrol();
+  const missile = plume();
+  let responseSeconds = null;
+  for (let tick = 0; tick < 2 / dt; tick++) {
+    missile.position.copy(warned.position).add(new Vector3(0, 0, -2500));
+    warned.update(dt, flat, [missile]);
+    clear.update(dt, flat);
+    const active = warned.flight.command;
+    const baseline = clear.flight.command;
+    if (active.aileron !== baseline.aileron || active.elevator !== baseline.elevator
+      || active.throttle !== baseline.throttle) {
+      responseSeconds = tick * dt;
+      break;
+    }
+  }
+  const earliest = BANDIT_WARNING_MODEL.confirmationSeconds + 0.2;
+  assert.notEqual(responseSeconds, null, 'sustained warning changes an applied command');
+  assert.ok(responseSeconds >= earliest - dt && responseSeconds <= earliest + 0.2 + dt,
+    `applied response at ${responseSeconds}s`);
+});
+
 test('physical pilot reaction changes trajectory without teleportation and recovers to patrol', () => {
   const defensive = patrol(), baseline = patrol(false);
   const missile = plume();

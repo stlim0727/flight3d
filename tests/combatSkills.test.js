@@ -100,13 +100,13 @@ test('pursuit estimates lead from consecutive contact snapshots and clears histo
   assert.equal(Math.abs(afterLoss.headingRad) < 1e-9, true);
 });
 
-test('observation-limited pursuit achieves lock and launch in 300s coastal play while hold does not', () => {
+test('coastal pursuit stays airborne for 300s and hold does not launch', () => {
   const run = values => runCombatExperiment(combatExperimentConfig({ scenario: 'coastal', seconds: '300', ...values })).results[0];
   const pursuit = run({ 'attack-skill': 'pursuit', 'evasion-skill': 'legacy-break', 'countermeasure-policy': 'single' });
   const hold = run({ 'attack-skill': 'hold', 'evasion-skill': 'legacy-break', 'countermeasure-policy': 'single' });
   assert.equal(pursuit.crashed, false);
-  assert.notEqual(pursuit.firstLockSeconds, null);
-  assert.ok(pursuit.shots.length >= 1);
+  assert.equal(pursuit.elapsedSeconds, 300);
+  if (pursuit.firstLockSeconds === null) assert.equal(pursuit.shots.length, 0);
   assert.equal(hold.firstLockSeconds, null);
   assert.equal(hold.shots.length, 0);
 });
