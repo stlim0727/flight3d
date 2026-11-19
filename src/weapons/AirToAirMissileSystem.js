@@ -1,4 +1,4 @@
-import { banditCountermeasureRequest, banditPilotCommand } from '../pilot/BanditPilot.js';
+import { decideBandit } from '../pilot/BanditPilot.js';
 import { PilotPerception } from '../pilot/PilotPerception.js';
 import { TerrainPerception } from '../pilot/TerrainPerception.js';
 import { combatSkill, evasionDemand } from '../pilot/CombatSkills.js';
@@ -72,9 +72,10 @@ function terrainImpactFraction(prevPosition, position, terrainHeight) {
 
 /** Airborne bandit with a circular patrol. Pure state: no DOM, scene or audio. */
 export class BanditTarget {
-  constructor({ callsign, position, velocity = new THREE.Vector3(), orbit = null, evasion = true, rwr = true, evasionSkill = 'legacy-break' }) {
+  constructor({ callsign, position, velocity = new THREE.Vector3(), orbit = null, evasion = true, rwr = true, evasionSkill = 'legacy-break', pilot = decideBandit }) {
     this.id = ++nextTargetId;
     this.type = 'bandit';
+    this.pilot = pilot;
     this.callsign = callsign;
     this.position = position.clone();
     this.velocity = velocity.clone();
@@ -188,14 +189,10 @@ export class BanditTarget {
       quaternion: flight.quaternion,
       getHeight: terrainHeight,
     }, this.pilotSampleTick);
-    return {
-      controls: banditPilotCommand(observation),
-      equipment: banditCountermeasureRequest({
-        warning: response.confirmedId !== null && response.confirmedId === response.observedId
-          ? { trackId: response.confirmedId, channel: response.confirmedChannel } : null,
-        equipment: { chaff: this.chaff.remaining, flare: this.flare.remaining },
-      }),
-    };
+    observation.warning = response.confirmedId !== null && response.confirmedId === response.observedId
+      ? { trackId: response.confirmedId, channel: response.confirmedChannel } : null;
+    observation.equipment = { chaff: this.chaff.remaining, flare: this.flare.remaining };
+    return this.pilot(observation);
   }
 
   respawn(position, orbit) {
@@ -257,6 +254,7 @@ export class AirToAirMissileSystem {
     evasionSkill = 'legacy-break',
     countermeasurePolicy = 'burst',
     banditCount = DEFAULT_BANDIT_COUNT,
+    banditPilot = decideBandit,
   } = {}) {
     this.stations = stations;
     this.specs = specs;
@@ -265,6 +263,7 @@ export class AirToAirMissileSystem {
     this.banditEvasion = banditEvasion;
     this.banditRwr = banditRwr;
     this.banditCount = banditCount;
+    this.banditPilot = banditPilot;
     this.evasionSkill = combatSkill('evasion', evasionSkill).id;
     this.countermeasurePolicy = combatSkill('countermeasure', countermeasurePolicy).id;
     this.cannon = new VulcanCannon();
@@ -546,6 +545,7 @@ export class AirToAirMissileSystem {
       const target = new BanditTarget({
         callsign: `BANDIT ${index + 1}`,
         evasion: this.banditEvasion,
+        pilot: this.banditPilot,
         evasionSkill: this.evasionSkill,
         rwr: this.banditRwr,
         position: new THREE.Vector3(),
@@ -599,6 +599,7 @@ export class AirToAirMissileSystem {
   }
 
   _stepDecoyBurst(dt, target, requestedTrack, burstCount, threatIds, bursts, dispenser, list, type, eventKey, events) {
+    if (!bursts || !dispenser) return;
     if (!target.alive || target.flight?.pilotPhysiology.isGLOC) {
       bursts.clear();
       return;

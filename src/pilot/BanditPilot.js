@@ -34,3 +34,11 @@ export function banditCountermeasureRequest({ warning, equipment }) {
   const type = warning.channel === 'radar' ? 'chaff' : 'flare';
   return equipment[type] > 0 ? { type, trackId: warning.trackId } : null;
 }
+
+/** Default Bandit policy; scenarios may supply a policy with the same interface. */
+export function decideBandit(observation) {
+  return {
+    controls: banditPilotCommand(observation),
+    equipment: banditCountermeasureRequest(observation),
+  };
+}

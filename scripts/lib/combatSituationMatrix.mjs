@@ -1,5 +1,6 @@
 import { Euler, Quaternion, Vector3, MathUtils } from 'three';
 import { AirToAirMissileSystem, BanditTarget } from '../../src/weapons/AirToAirMissileSystem.js';
+import { decideBandit } from '../../src/pilot/BanditPilot.js';
 import { MISSILE_TYPES } from '../../src/weapons/missileSpecs.js';
 import { CombatDiagnosticEvents } from './combatDiagnosticEvents.mjs';
 
@@ -160,6 +161,17 @@ export function simulateCombatSituation({
   target.threatResponse.enabled = threatResponseEnabled;
   if (!flares) target.flare.remaining = 0;
   if (!chaff) target.chaff.remaining = 0;
+
+  // A single-device comparison deliberately requests that device even when
+  // the default pilot would pick the other one. This isolates seeker response.
+  if (chaff !== flares) {
+    const device = chaff ? 'chaff' : 'flare';
+    target.pilot = observation => ({
+      ...decideBandit(observation),
+      equipment: observation.warning && observation.equipment[device] > 0
+        ? { type: device, trackId: observation.warning.trackId } : null,
+    });
+  }
 
   const specs = tvc
     ? MISSILE_TYPES

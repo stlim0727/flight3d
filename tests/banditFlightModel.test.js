@@ -142,3 +142,20 @@ test('Bandit drops queued commands during G-LOC and waits for a fresh decision',
   target.update(dt);
   assert.notEqual(target.flight.command, initial);
 });
+
+test('scenario pilot lambda receives observations and uses the same command delay', () => {
+  const command = { elevator: 0.08, aileron: 0, rudder: 0, throttle: 0.4, brakes: 0 };
+  const target = new BanditTarget({
+    position: new Vector3(780, 3460, 0),
+    orbit: { center: new Vector3(), radius: 780, angle: 0, altitudeM: 3460, omega: 180 / 780 },
+    pilot: observation => {
+      assert.equal(observation.instruments.iasKnots.status, 'available');
+      assert.equal(observation.warning, null);
+      return { controls: command, equipment: null };
+    },
+  });
+  for (let i = 0; i < 24; i++) target.update(1 / 120);
+  assert.notDeepEqual(target.flight.command, command);
+  target.update(1 / 120);
+  assert.deepEqual(target.flight.command, command);
+});
