@@ -33,6 +33,9 @@ export class RemoteEngineAudio {
     this.noiseBuffer = noiseBuffer;
     this.voices = new Map();
     this._seen = new Set();
+    this._considering = new Set();
+    this._selection = Array.from({ length: MAX_VOICES },
+      () => ({ id: null, target: null, distance: 0, gain: 0 }));
     this._right = { x: 0, y: 0, z: 0 };
   }
 
@@ -47,23 +50,42 @@ export class RemoteEngineAudio {
     const listener = camera?.position ?? null;
     const right = this._rightFromCamera(camera);
     const list = Array.isArray(targets) ? targets : [];
-    this._seen.clear();
-
+    this._considering.clear();
+    let count = 0;
     for (const target of list) {
       if (!target?.alive || !target.position) continue;
       const id = target.id ?? target.callsign;
-      if (id == null || this._seen.has(id)) continue;
-      if (this._seen.size >= MAX_VOICES) break;
+      if (id == null || this._considering.has(id)) continue;
+      this._considering.add(id);
       const distance = listener?.distanceTo?.(target.position) ?? this._distance(listener, target.position);
       const gain = remoteEngineGain(distance);
       if (gain < MIN_AUDIBLE_GAIN) continue;
-      this._seen.add(id);
-      const voice = this.voices.get(id) ?? this._createVoice(id, now);
-      voice.synth.update({ engine1: { n1: engineN1(target) } }, now,
-        listener ? dopplerFactor(target.position, target.velocity, listener, listenerVelocity) : 1);
-      voice.filter.frequency.setTargetAtTime(remoteEngineCutoff(distance), now, 0.08);
-      voice.gain.gain.setTargetAtTime(gain, now, 0.08);
-      voice.panner?.pan.setTargetAtTime(stereoPan(target.position, listener, right), now, 0.06);
+      let slot = 0;
+      while (slot < count && this._selection[slot].distance <= distance) slot++;
+      if (slot >= MAX_VOICES) continue;
+      const last = Math.min(count, MAX_VOICES - 1);
+      for (let move = last; move > slot; move--) {
+        const to = this._selection[move];
+        const from = this._selection[move - 1];
+        to.id = from.id; to.target = from.target;
+        to.distance = from.distance; to.gain = from.gain;
+      }
+      const entry = this._selection[slot];
+      entry.id = id; entry.target = target;
+      entry.distance = distance; entry.gain = gain;
+      if (count < MAX_VOICES) count++;
+    }
+
+    this._seen.clear();
+    for (let index = 0; index < count; index++) {
+      const entry = this._selection[index];
+      this._seen.add(entry.id);
+      const voice = this.voices.get(entry.id) ?? this._createVoice(entry.id, now);
+      voice.synth.update({ engine1: { n1: engineN1(entry.target) } }, now,
+        listener ? dopplerFactor(entry.target.position, entry.target.velocity, listener, listenerVelocity) : 1);
+      voice.filter.frequency.setTargetAtTime(remoteEngineCutoff(entry.distance), now, 0.08);
+      voice.gain.gain.setTargetAtTime(entry.gain, now, 0.08);
+      voice.panner?.pan.setTargetAtTime(stereoPan(entry.target.position, listener, right), now, 0.06);
     }
 
     for (const [id, voice] of this.voices) {

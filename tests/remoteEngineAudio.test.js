@@ -108,6 +108,19 @@ describe('Remote aircraft engine audio', () => {
     assert.ok(engineAudio.voices.get('closing').synth.engineNoise.playbackRate.value > 1);
   });
 
+  it('gives voices to the nearest targets instead of array order', () => {
+    const { engineAudio, camera } = makeHarness();
+    const far = Array.from({ length: 4 }, (_, index) => makeTarget(`far-${index}`, 7000, 0));
+    const near = makeTarget('near', 10, 0);
+    engineAudio.update([...far, near], camera, new THREE.Vector3());
+    assert.strictEqual(engineAudio.voices.size, 4);
+    assert.ok(engineAudio.voices.has('near'), 'the close bandit must not be dropped behind distant voices');
+    assert.strictEqual([...engineAudio.voices.keys()].filter(id => id.startsWith('far')).length, 3);
+    const nearGain = engineAudio.voices.get('near').gain.gain.value;
+    const farGain = engineAudio.voices.get('far-0').gain.gain.value;
+    assert.ok(nearGain > farGain * 20, 'priority follows distance, not insertion order');
+  });
+
   it('shares the listener noise buffer and honours the engine volume slider', () => {
     const { engineAudio, output } = makeHarness();
     const buffer = { getChannelData: () => new Float32Array(16) };

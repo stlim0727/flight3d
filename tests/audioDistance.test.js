@@ -62,6 +62,18 @@ describe('Sound propagation', () => {
     assert.strictEqual(dopplerFactor({ x: 0, y: 0, z: 0 }, { x: -400, y: 0, z: 0 }, listener, null), 0.65);
     assert.strictEqual(dopplerFactor({ x: 0, y: 0, z: 0 }, { x: 343, y: 0, z: 0 }, listener, null), 1.4);
   });
+
+  it('keeps formation flight neutral even at or above the speed of sound', () => {
+    // Source and observer fly together, so the closing rate is zero.
+    const source = { x: 0, y: 0, z: 0 };
+    const listener = { x: 55, y: 0, z: 0 };
+    for (const speed of [342, 343, 400, 500]) {
+      const velocity = { x: speed, y: 0, z: 0 };
+      assert.strictEqual(dopplerFactor(source, velocity, listener, velocity), 1, `${speed} m/s formation`);
+    }
+    // Same supersonic source, but a stationary observer: a real closing pass.
+    assert.strictEqual(dopplerFactor(source, { x: 400, y: 0, z: 0 }, listener, null), 1.4);
+  });
 });
 
 describe('Remote aircraft engines', () => {

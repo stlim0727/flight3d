@@ -75,7 +75,13 @@ export function dopplerFactor(sourcePosition, sourceVelocity, listenerPosition, 
   const speed = Number.isFinite(speedOfSound) && speedOfSound > 0 ? speedOfSound : SPEED_OF_SOUND_MPS;
   const observerTerm = speed - listenerToward;
   const sourceTerm = speed - sourceToward;
-  if (sourceTerm <= 1) return DOPPLER_MAX;
+  if (sourceTerm <= 1) {
+    // Both can exceed the speed of sound while holding formation; the radial
+    // closing rate, not either absolute speed, decides the shift.
+    const closing = sourceToward - listenerToward;
+    if (Math.abs(closing) < 1e-9) return 1;
+    return closing > 0 ? DOPPLER_MAX : DOPPLER_MIN;
+  }
   return clamp(observerTerm / sourceTerm, DOPPLER_MIN, DOPPLER_MAX);
 }
 
