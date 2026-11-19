@@ -14,17 +14,17 @@ test('JejuTileStreamer initializes with correct macro grid bounds and origin', (
   const streamer = new JejuTileStreamer(mesh, surface);
   assert.equal(streamer.origin.latitude, JEJU_ORIGIN.latitude);
   assert.equal(streamer.origin.longitude, JEJU_ORIGIN.longitude);
-  assert.equal(JEJU_MACRO_TILES.length, 4);
+  assert.equal(JEJU_MACRO_TILES.length, 8);
 
   const { minX, maxX, minZ, maxZ } = streamer.gridBounds;
   assert.ok(minX < maxX, `minX (${minX}) should be less than maxX (${maxX})`);
   assert.ok(minZ < maxZ, `minZ (${minZ}) should be less than maxZ (${maxZ})`);
 
-  // Bounding box should span approximately 70-90 km East-West and 50-70 km North-South
+  // Bounding box should span approximately 100-140 km East-West and 50-70 km North-South
   const widthM = maxX - minX;
   const heightM = maxZ - minZ;
-  assert.ok(widthM > 60000 && widthM < 100000, `Grid width should be ~78km, got ${widthM}`);
-  assert.ok(heightM > 40000 && heightM < 80000, `Grid height should be ~56km, got ${heightM}`);
+  assert.ok(widthM > 100000 && widthM < 150000, `Grid width should be ~125km, got ${widthM}`);
+  assert.ok(heightM > 40000 && heightM < 80000, `Grid height should be ~65km, got ${heightM}`);
 });
 
 test('JejuTileStreamer strictly delegates all physics and surface queries to JejuFlightSurface', () => {
@@ -86,16 +86,34 @@ test('JejuTileStreamer loadIslandMacroTiles handles offline environment without 
   assert.equal(metrics.tilesLoaded, 0);
 });
 
-test('JejuTileStreamer clean disposal frees resources', () => {
+test('JejuTileStreamer clean disposal frees resources and blocks late async updates', async () => {
   const surface = new JejuFlightSurface(JEJU_AIRFIELD);
   const geo = new THREE.PlaneGeometry(80000, 56000, 2, 2);
-  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+  const initialMat = new THREE.MeshBasicMaterial({ color: 0x228833 });
+  const mesh = new THREE.Mesh(geo, initialMat);
 
-  const streamer = new JejuTileStreamer(mesh, surface);
-  assert.doesNotThrow(() => streamer.dispose());
+  // Mock a slow cache manager
+  const slowCache = {
+    getTileImage() {
+      return new Promise((resolve) => setTimeout(() => resolve({ width: 256, height: 256 }), 50));
+    },
+    getMetrics() { return {}; },
+    dispose() {},
+  };
+
+  const streamer = new JejuTileStreamer(mesh, surface, { cacheManager: slowCache });
+  const loadingPromise = streamer.loadIslandMacroTiles();
+
+  // Dispose immediately while loading is in flight
+  streamer.dispose();
+  assert.equal(streamer.disposed, true);
   assert.equal(streamer.macroTexture, null);
   assert.equal(streamer.canvas, null);
   assert.equal(streamer.isStreaming, false);
+
+  const result = await loadingPromise;
+  assert.equal(result, false, 'Disposed streamer should resolve false');
+  assert.equal(mesh.material.map, null, 'Disposed streamer must never re-attach texture to mesh');
 });
 
 test('loadJejuAirport integrates tileStreamer and exposes lifecycle disposal', async () => {

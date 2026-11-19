@@ -46,6 +46,7 @@ await withBrowserSession(
     await delay(1000);
 
     console.log('Benchmarking frame times and performance metrics...');
+    console.log('Step 1: configure perf monitor');
     await evaluate(`
       window.perfReports = [];
       sim.flightPerformance.emit = r => perfReports.push(r);
@@ -53,14 +54,17 @@ await withBrowserSession(
       sim.flightPerformance.intervalMs = 5000;
     `);
 
-    // Warm up to flush initial asset/shader compilation hitch
+    console.log('Step 2: warmup delay');
     await delay(1500);
+    console.log('Step 3: flush warmup');
     await evaluate(`sim.flightPerformance.flush('warmup'); window.perfReports = [];`);
 
-    // Sample steady state flight loop
+    console.log('Step 4: sample delay');
     await delay(2500);
+    console.log('Step 5: flush verify');
     await evaluate(`sim.flightPerformance.flush('verify');`);
 
+    console.log('Step 6: extract perf');
     const perf = await evaluate(() => {
       const report = window.perfReports.at(-1) || null;
       const streamer = window.sim?.jejuAirport?.tileStreamer;

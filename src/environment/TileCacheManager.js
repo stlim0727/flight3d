@@ -34,6 +34,8 @@ export class TileCacheManager {
     this.inFlight = new Map(); // key -> Promise
     this.requestQueue = [];
     this.activeRequests = 0;
+    this.activeAbortControllers = new Set();
+    this.disposed = false;
 
     this.metrics = {
       hits: 0,
@@ -63,6 +65,7 @@ export class TileCacheManager {
    * @returns {Promise<HTMLImageElement|null>}
    */
   async getTileImage(z, x, y) {
+    if (this.disposed) return null;
     const key = this.getTileKey(z, x, y);
 
     // 1. In-memory LRU Cache hit
@@ -124,6 +127,7 @@ export class TileCacheManager {
   }
 
   async _fetchTile(z, x, y, key) {
+    if (this.disposed) return null;
     this.metrics.misses++;
     const url = this.getTileUrl(z, x, y);
 
@@ -134,7 +138,9 @@ export class TileCacheManager {
         const match = await cache.match(url);
         if (match) {
           const blob = await match.blob();
+          if (this.disposed) return null;
           const img = await this._blobToImage(blob);
+          if (this.disposed) return null;
           this._storeInMemory(key, img);
           return img;
         }
@@ -143,9 +149,12 @@ export class TileCacheManager {
       }
     }
 
+    if (this.disposed) return null;
+
     // 2. Network Fetch with Timeout & Throttling
     this.metrics.networkRequests++;
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    if (controller) this.activeAbortControllers.add(controller);
     const timeoutId = setTimeout(() => controller?.abort(), this.timeoutMs);
 
     try {
@@ -164,6 +173,8 @@ export class TileCacheManager {
         throw new Error(`Tile HTTP ${response.status}`);
       }
 
+      if (this.disposed) return null;
+
       // Clone response to persist into Cache API asynchronously
       if (this.enableBrowserCache && typeof caches !== 'undefined') {
         try {
@@ -173,11 +184,14 @@ export class TileCacheManager {
       }
 
       const blob = await response.blob();
+      if (this.disposed) return null;
       const img = await this._blobToImage(blob);
+      if (this.disposed) return null;
       this._storeInMemory(key, img);
       return img;
     } finally {
       clearTimeout(timeoutId);
+      if (controller) this.activeAbortControllers.delete(controller);
     }
   }
 
@@ -234,9 +248,19 @@ export class TileCacheManager {
    * Dispose all cached assets and abort pending requests.
    */
   dispose() {
+    this.disposed = true;
+    for (const task of this.requestQueue) {
+      task.resolve(null);
+    }
+    this.requestQueue = [];
+    for (const ctrl of this.activeAbortControllers) {
+      try {
+        ctrl.abort();
+      } catch {}
+    }
+    this.activeAbortControllers.clear();
     this.memoryCache.clear();
     this.inFlight.clear();
-    this.requestQueue = [];
     this.activeRequests = 0;
   }
 }

@@ -11,15 +11,20 @@ export const JEJU_ORIGIN = Object.freeze({
 });
 
 /**
- * 4-tile grid at Zoom 10 covering 100% of Jeju Island (72km East-West, 36km North-South).
- * Tile X: 871 (West Jeju), 872 (East Jeju)
- * Tile Y: 410 (North Jeju / RKPC), 411 (South Jeju / Seogwipo)
+ * 8-tile grid at Zoom 10 covering 100% of Jeju Island (72km East-West, 36km North-South)
+ * plus surrounding ocean and outlying islands (Chagwido, Suwolbong, Udo, Seongsan).
+ * Tile X: 870 (West Chagwido/Suwolbong), 871 (Central-West/RKPC), 872 (Central-East/Jeju City), 873 (East Seongsan/Udo)
+ * Tile Y: 410 (North Jeju / Sea), 411 (South Jeju / Seogwipo / South Sea)
  */
 export const JEJU_MACRO_TILES = Object.freeze([
-  { z: 10, x: 871, y: 410, col: 0, row: 0 },
-  { z: 10, x: 872, y: 410, col: 1, row: 0 },
-  { z: 10, x: 871, y: 411, col: 0, row: 1 },
-  { z: 10, x: 872, y: 411, col: 1, row: 1 },
+  { z: 10, x: 870, y: 410, col: 0, row: 0 },
+  { z: 10, x: 871, y: 410, col: 1, row: 0 },
+  { z: 10, x: 872, y: 410, col: 2, row: 0 },
+  { z: 10, x: 873, y: 410, col: 3, row: 0 },
+  { z: 10, x: 870, y: 411, col: 0, row: 1 },
+  { z: 10, x: 871, y: 411, col: 1, row: 1 },
+  { z: 10, x: 872, y: 411, col: 2, row: 1 },
+  { z: 10, x: 873, y: 411, col: 3, row: 1 },
 ]);
 
 export class JejuTileStreamer {
@@ -39,11 +44,12 @@ export class JejuTileStreamer {
     this.tilesLoaded = 0;
     this.isStreaming = false;
     this.activeLOD = 'macro';
+    this.disposed = false;
 
-    // Geographic bounding box of the 4-tile Zoom 10 grid in local Three.js meters
-    // Tile 871..872, 410..411
-    const nw = tileBoundsWgs84(871, 410, 10).nw;
-    const se = tileBoundsWgs84(872, 411, 10).se;
+    // Geographic bounding box of the 8-tile Zoom 10 grid in local Three.js meters
+    // Tile 870..873, 410..411
+    const nw = tileBoundsWgs84(870, 410, 10).nw;
+    const se = tileBoundsWgs84(873, 411, 10).se;
 
     const [nwX, nwZ] = wgs84ToLocal(nw.latitude, nw.longitude, this.origin);
     const [seX, seZ] = wgs84ToLocal(se.latitude, se.longitude, this.origin);
@@ -112,47 +118,55 @@ export class JejuTileStreamer {
    * @returns {Promise<boolean>} Whether satellite streaming successfully applied
    */
   async loadIslandMacroTiles() {
-    if (typeof document === 'undefined') {
-      // In headless test environments without DOM canvas
+    if (this.disposed || typeof document === 'undefined') {
+      // In headless test environments or disposed instance
       return false;
     }
 
     this.isStreaming = true;
 
     try {
-      // Fetch 4 tiles concurrently through the rate-limited CacheManager
+      // Fetch 8 tiles concurrently through the rate-limited CacheManager
       const tilePromises = JEJU_MACRO_TILES.map(async (t) => {
         const img = await this.cacheManager.getTileImage(t.z, t.x, t.y);
         return { ...t, img };
       });
 
       const results = await Promise.all(tilePromises);
+      if (this.disposed) return false;
+
       const successful = results.filter((r) => r.img && r.img.width > 0);
 
-      if (successful.length === 0) {
-        // Full offline fallback: retain procedural vertex colors
+      // Thread 2: Only swap material map when ALL macro tiles successfully load.
+      // If any tile fails or network times out, retain the procedural ground shading
+      // so un-covered regions are never rendered black.
+      if (successful.length !== JEJU_MACRO_TILES.length) {
         return false;
       }
 
       this.tilesLoaded = successful.length;
 
-      // Stitch onto a 512x512 canvas
+      // Stitch onto a 1024x512 canvas (4 columns x 2 rows of 256px tiles)
       if (!this.canvas) {
         this.canvas = document.createElement('canvas');
-        this.canvas.width = 512;
+        this.canvas.width = 1024;
         this.canvas.height = 512;
       }
       const ctx = this.canvas.getContext('2d');
-      if (!ctx) return false;
+      if (!ctx || this.disposed) return false;
 
-      ctx.clearRect(0, 0, 512, 512);
+      ctx.clearRect(0, 0, 1024, 512);
 
       for (const t of successful) {
         ctx.drawImage(t.img, t.col * 256, t.row * 256, 256, 256);
       }
 
+      if (this.disposed) return false;
+
       // Update mesh UV mapping
       this.updateMeshUVs();
+
+      if (this.disposed) return false;
 
       // Create or update Three.js texture
       if (!this.macroTexture) {
@@ -163,8 +177,8 @@ export class JejuTileStreamer {
       }
       this.macroTexture.needsUpdate = true;
 
-      // Apply texture to terrain material
-      if (this.terrainMesh?.material) {
+      // Thread 3: Check disposed state before applying texture to terrain material
+      if (this.terrainMesh?.material && !this.disposed) {
         this.terrainMesh.material.map = this.macroTexture;
         this.terrainMesh.material.vertexColors = false;
         this.terrainMesh.material.needsUpdate = true;
@@ -186,6 +200,7 @@ export class JejuTileStreamer {
       tilesLoaded: this.tilesLoaded,
       isStreaming: this.isStreaming,
       gridBounds: this.gridBounds,
+      disposed: this.disposed,
       cache: this.cacheManager.getMetrics(),
     };
   }
@@ -194,6 +209,7 @@ export class JejuTileStreamer {
    * Cleanly dispose of GPU textures, canvases, and cache resources.
    */
   dispose() {
+    this.disposed = true;
     this.isStreaming = false;
     if (this.macroTexture) {
       this.macroTexture.dispose();

@@ -90,3 +90,27 @@ test('TileCacheManager dispose clears memory and state', () => {
   assert.equal(manager.getMetrics().cachedTilesCount, 0);
   assert.equal(manager.getMetrics().inFlightCount, 0);
 });
+
+test('TileCacheManager dispose aborts in-flight requests and resolves null', async () => {
+  const manager = new TileCacheManager();
+  let aborted = false;
+
+  manager._fetchTile = () => {
+    return new Promise((resolve) => {
+      const ctrl = new AbortController();
+      manager.activeAbortControllers.add(ctrl);
+      ctrl.signal.addEventListener('abort', () => {
+        aborted = true;
+        resolve(null);
+      });
+    });
+  };
+
+  const pending = manager.getTileImage(10, 5, 5);
+  manager.dispose();
+  const res = await pending;
+
+  assert.equal(aborted, true, 'Active controller must be aborted on dispose');
+  assert.equal(res, null);
+  assert.equal(manager.disposed, true);
+});
