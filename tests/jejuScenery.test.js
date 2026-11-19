@@ -205,3 +205,27 @@ test('scenarioRegistry and lobbySpecs expose Jeju scenarios and specs', () => {
   assert.equal(spec, 'RWY 067° · 118 FT · GS 3°');
 });
 
+test('loadJejuAirport integrates CorridorFlightSurface and heading fallback', async () => {
+  const airport = await loadJejuAirport('', { loadSatellite: false, streamCorridor: true });
+  assert.ok(airport.terrain, 'airport.terrain must exist');
+  assert.ok(airport.corridorStreamer, 'airport.corridorStreamer must exist');
+  assert.ok(airport.terrain.corridorLengthM > 450000, `Corridor length should be > 450km, got ${airport.terrain.corridorLengthM}`);
+
+  // Chuja Island elevation query through airport.terrain
+  const chujaLocal = airport.terrain.wgs84ToLocal(33.96, 126.30);
+  const chujaHeight = airport.terrain.getHeight(chujaLocal.x, chujaLocal.z);
+  assert.ok(chujaHeight >= 100, `Chuja Island height via airport.terrain should be >= 100m, got ${chujaHeight}`);
+
+  // Test heading fallback when headingDeg is not provided
+  let lastHeading = null;
+  airport.corridorStreamer.update = async (state) => {
+    lastHeading = state.headingDeg;
+  };
+
+  // Move aircraft north-east (dx = 100, dz = -100) -> 045 deg
+  airport.update(0.1, { x: 0, y: 1000, z: 0 }, 0, {});
+  airport.update(0.1, { x: 100, y: 1000, z: -100 }, 0.1, {});
+  assert.ok(Math.abs(lastHeading - 45) < 1.0, `Heading fallback should be ~45 deg, got ${lastHeading}`);
+});
+
+

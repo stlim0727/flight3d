@@ -62,11 +62,17 @@ export async function loadJejuAirport(base = '', options = {}) {
   }
 
   let corridorStreamer = null;
+  let activeTerrain = terrain;
   if (options.streamCorridor) {
     const corridorSurface = new CorridorFlightSurface({ activeOrigin: JEJU_ORIGIN, jejuSurface: terrain });
     corridorStreamer = new CorridorTileStreamer(corridorSurface, { origin: JEJU_ORIGIN, ...options.corridorOptions });
     group.add(corridorStreamer.group);
-    terrain.corridorStreamer = corridorStreamer;
+    corridorSurface.mesh = terrain.mesh;
+    corridorSurface.tileStreamer = tileStreamer;
+    corridorSurface.corridorStreamer = corridorStreamer;
+    corridorSurface.satelliteTexture = satelliteTexture;
+    corridorSurface.groundMaterial = groundMaterial;
+    activeTerrain = corridorSurface;
   }
 
   // 2. Pavement & Cross Runways
@@ -177,24 +183,37 @@ export async function loadJejuAirport(base = '', options = {}) {
     { object: terminal, kind: 'building' },
   ];
 
+  let lastPos = null;
+
   return {
-    terrain,
+    terrain: activeTerrain,
     group,
     nightLighting,
     tileStreamer,
     corridorStreamer,
     towerCab: { position: new THREE.Vector3(-80, JEJU_AIRFIELD.elevationM + 49, 260) },
-    isOnRunway: (x, z) => terrain.isOnRunway(x, z),
-    isRunwaySafetyArea: (x, z) => terrain.isRunwaySafetyArea(x, z),
+    isOnRunway: (x, z) => activeTerrain.isOnRunway(x, z),
+    isRunwaySafetyArea: (x, z) => activeTerrain.isRunwaySafetyArea(x, z),
     resetTraffic() {},
     update(dt, position, time, options = {}) {
       if (corridorStreamer && position) {
+        let headingDeg = options.headingDeg ?? options.trackDeg;
+        if (headingDeg === undefined && lastPos) {
+          const dx = position.x - lastPos.x;
+          const dz = position.z - lastPos.z;
+          if (Math.hypot(dx, dz) > 0.5) {
+            headingDeg = (Math.atan2(dx, -dz) * (180 / Math.PI) + 360) % 360;
+          }
+        }
+        if (position) {
+          lastPos = { x: position.x, z: position.z };
+        }
         corridorStreamer.update({
           x: position.x,
           z: position.z,
           y: position.y,
           altitudeM: position.y,
-          headingDeg: options.headingDeg,
+          headingDeg,
         }).catch(() => {});
       }
     },

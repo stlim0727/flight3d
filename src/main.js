@@ -1490,7 +1490,11 @@ class FlightSimulator {
     }
     if (this.currentAirport) {
       this.currentAirport.update(frameDelta, this.position, this.totalSimTime, {
-        cameraPosition: this.camera.position, quality: this.renderQuality, paused: this.gameFlow.isPhysicsFrozen(),
+        cameraPosition: this.camera.position,
+        quality: this.renderQuality,
+        paused: this.gameFlow.isPhysicsFrozen(),
+        headingDeg: this.telemetry?.headingDeg,
+        trackDeg: this.telemetry?.trackDeg,
       });
     }
     this.sky.updateSun(this.position, this.camera.position);

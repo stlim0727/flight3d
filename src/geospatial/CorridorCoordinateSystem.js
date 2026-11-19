@@ -28,6 +28,16 @@ export const INCHEON_ORIGIN = Object.freeze({
   icao: 'RKSI',
 });
 
+/**
+ * Incheon 3D Scenery Patch Origin (INCHEON_PATCH.origin from src/geospatial/incheon.js).
+ * The modeled airport airfield pavement, buildings, and ground mesh are centered at this origin.
+ */
+export const INCHEON_SCENERY_ORIGIN = Object.freeze({
+  latitude: 37.448,
+  longitude: 126.455,
+  elevationM: 7.0,
+});
+
 export const JEJU_ORIGIN = Object.freeze({
   latitude: koreaRoutes.destination.latitude,
   longitude: koreaRoutes.destination.longitude,
@@ -69,6 +79,14 @@ export function incheonLocalToWgs84(x, z) {
  */
 export function wgs84ToIncheonLocal(latitude, longitude) {
   return wgs84ToLocal(latitude, longitude, INCHEON_ORIGIN);
+}
+
+/**
+ * Convert WGS84 [latitude, longitude] to Incheon Scenery local tangent plane [x, z]
+ * centered at INCHEON_SCENERY_ORIGIN (37.448, 126.455).
+ */
+export function wgs84ToIncheonSceneryLocal(latitude, longitude) {
+  return wgs84ToLocal(latitude, longitude, INCHEON_SCENERY_ORIGIN);
 }
 
 /**
