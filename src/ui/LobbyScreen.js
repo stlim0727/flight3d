@@ -5,7 +5,7 @@ import { aircraftSpec, airportSpec } from './lobbySpecs.js';
 import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, requiredAircraft, scenarioLabelKey } from '../config/scenarioRegistry.js';
 
-const AIRPORT_BUTTONS = { incheon: 'lobby-airport-incheon', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla', neon: 'lobby-airport-neon', valley: 'lobby-airport-valley' };
+const AIRPORT_BUTTONS = { incheon: 'lobby-airport-incheon', jeju: 'lobby-airport-jeju', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla', neon: 'lobby-airport-neon', valley: 'lobby-airport-valley' };
 const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c172', F16: 'lobby-aircraft-f16' };
 /** Aircraft the lobby offers, so warmup can prepare exactly this set. */
 export const LOBBY_AIRCRAFT_IDS = Object.keys(AIRCRAFT_BUTTONS);
@@ -164,6 +164,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     ['btn-lobby-restart', () => onRestart?.()],
     ['lobby-airport-coastal', () => onAirport('coastal')],
     ['lobby-airport-incheon', () => onAirport('incheon')],
+    ['lobby-airport-jeju', () => onAirport('jeju')],
     ['lobby-airport-lukla', () => onAirport('lukla')],
     ['lobby-airport-neon', () => onAirport('neon')],
     ['lobby-airport-valley', () => onAirport('valley')],

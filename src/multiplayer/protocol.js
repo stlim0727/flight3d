@@ -1,7 +1,7 @@
 import { Quaternion, Vector3 } from 'three';
 
 export { PROTOCOL_VERSION as VERSION } from './compatibility.js';
-export const AIRPORTS = ['coastal', 'incheon', 'neon'];
+export const AIRPORTS = ['coastal', 'incheon', 'jeju', 'neon'];
 export const AIRCRAFT = ['C172', 'B738', 'F16'];
 export const SCENARIOS = ['runway', 'cruise'];
 export const DEFAULT_CONFIG = Object.freeze({ airport: 'coastal', aircraft: 'C172', scenario: 'cruise' });
