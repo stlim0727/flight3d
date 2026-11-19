@@ -125,6 +125,8 @@ export class CombatReplayPlayback {
   /** Pose-only seek: rebuild the visible set and suppress explosions already in the past. */
   seek(timeSec) {
     if (!this.active) return;
+    // A boom scheduled for the old playhead must not arrive in the new scene.
+    this.sim.audio?.cancelPendingExplosions?.();
     this.timeSec = timeSec;
     this._banditHint = 0;
     for (const group of this.groups.values()) group.hint = 0;
@@ -191,6 +193,7 @@ export class CombatReplayPlayback {
   }
 
   stop() {
+    this.sim.audio?.cancelPendingExplosions?.();
     this.view.clear();
     syncCombatAudio(null, { audio: this.sim.audio, paused: true });
     this.track = null;

@@ -848,6 +848,32 @@ describe('Spatial combat audio (#862)', () => {
     }
   });
 
+  it('normalizes replay camera velocity to recorded time', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      const state = { engine1: { n1: 80 }, iasKnots: 200, onGround: false };
+      const source = { position: { x: 0, y: 1000, z: 0 }, velocity: { x: 0, y: 0, z: 0 } };
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 0, y: 1000, z: 0 } },
+      });
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 1, y: 1000, z: 0 } }, timeScale: 0.5,
+      });
+      assert.ok(Math.abs(audio._listenerVelocity.x - 120) < 1e-6,
+        'half-speed playback doubles camera velocity in recorded seconds');
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 2, y: 1000, z: 0 } }, timeScale: 2,
+      });
+      assert.ok(Math.abs(audio._listenerVelocity.x - 30) < 1e-6,
+        'double-speed playback halves camera velocity in recorded seconds');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
   it('feeds live and replayed bandits to the remote engine layer', () => {
     const previous = globalThis.window;
     globalThis.window = { AudioContext: createMockAudioContext() };

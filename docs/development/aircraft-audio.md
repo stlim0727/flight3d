@@ -44,10 +44,12 @@ dies, leaves range (8 km) or playback pauses.
 
 Transients respect propagation as well: a remote detonation is scheduled at
 `distance / 343 m/s` (capped at 8 s), so the flash and the boom separate at
-range. Queued booms are cancelled when playback pauses or the sortie resets,
-rather than firing seconds after the scene stopped. Cannon bursts are
-attenuated by the camera-to-muzzle distance and stop being scheduled beyond
-3.5 km instead of playing at cockpit level from a bandit view.
+range. Queued booms are cancelled when playback pauses, seeks to another
+playhead, or the sortie resets, rather than firing seconds after the scene
+stopped. Cannon bursts are attenuated by the camera-to-muzzle distance and stop
+being scheduled beyond 3.5 km instead of playing at cockpit level from a bandit
+view. Replayed host and listener velocities are expressed in recorded seconds,
+so 0.5x and 2x playback keep the same Doppler ratio.
 
 ## Verification
 

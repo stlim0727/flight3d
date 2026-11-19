@@ -190,7 +190,8 @@ export class FlightAudio {
     if (!this.isInitialized || !this.ctx || this.crashed) return;
     const now = this.ctx.currentTime;
     const listenerPosition = spatial?.camera?.position ?? null;
-    this._trackListener(listenerPosition, dt);
+    const timeScale = Number.isFinite(spatial?.timeScale) && spatial.timeScale > 0 ? spatial.timeScale : 1;
+    this._trackListener(listenerPosition, dt * timeScale);
     const doppler = isCockpitCam || !spatial?.position || !listenerPosition
       ? 1
       : dopplerFactor(spatial.position, spatial.velocity, listenerPosition, this._listenerVelocity);
@@ -260,6 +261,10 @@ export class FlightAudio {
       return;
     }
     this.remoteEngines.update(targets, camera, this._listenerVelocity);
+  }
+
+  cancelPendingExplosions() {
+    this.combat?.cancelPendingExplosions();
   }
 
   playDepartureRadio(stage, profile = 'departure') {

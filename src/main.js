@@ -1547,6 +1547,7 @@ class FlightSimulator {
       position: this.position,
       velocity: this.replayDirector?.active ? this.replayDirector.hostVelocity : this.linearVelocity,
       camera: this.camera,
+      timeScale: this.replayDirector?.active ? this.replayDirector.speed : 1,
     });
 
     // 6. Update Camera System & Dynamic FOV (60° in cockpit eliminates fisheye speed distortion)

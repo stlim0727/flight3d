@@ -221,6 +221,20 @@ test('replayed bandit velocity carries metres per second for Doppler (#862 revie
   playback.stop();
 });
 
+test('seeking a combat replay cancels booms scheduled for the old playhead (#862 review)', () => {
+  let cancels = 0;
+  const playback = new CombatReplayPlayback({
+    scene: new Scene(),
+    audio: { cancelPendingExplosions() { cancels++; } },
+  });
+  playback.load({ targets: [], banditSamples: [], missileSamples: [], events: [] });
+  cancels = 0;
+  playback.seek(1);
+  assert.equal(cancels, 1, 'a scrub drops the old scene\u0027s scheduled boom');
+  playback.stop();
+  assert.equal(cancels, 2, 'leaving playback drops it too');
+});
+
 test('a bandit death between samples still snaps instead of sliding a wreck', () => {
   const combat = decodeTrack(encodeTrack(recordCombat(5).finish())).combat;
   const samples = combat.banditSamples;

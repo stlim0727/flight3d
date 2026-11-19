@@ -182,9 +182,12 @@ export class ReplayDirector {
   seek(timeSec) {
     if (!this.track) return this.progressSec;
     const time = Number(timeSec);
+    this.sim.audio?.cancelPendingExplosions?.();
     this.progressSec = Number.isFinite(time) ? Math.max(0, Math.min(this.durationSec, time)) : 0;
-    this._applyPose(true);
+    // Combat state first: its seek cancels booms attached to the old playhead
+    // before the new pose can schedule this scene's impact sound.
     this._combat?.seek(this.progressSec);
+    this._applyPose(true);
     this._applyCombatLoadout();
     this.reseed();
     this.onChange();
