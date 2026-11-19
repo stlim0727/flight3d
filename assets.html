@@ -696,6 +696,16 @@
         license: { label: 'CC BY-NC-SA 4.0 — bohmerang', url: assetUrl('models/f-16.LICENSE.txt') },
       },
       {
+        id: 'f-16-lod',
+        file: 'models/lod/f-16.glb',
+        category: 'aircraft',
+        lod: true,
+        title_ko: 'F-16 파이팅 팰컨 (LOD)',
+        title_en: 'F-16 Fighting Falcon (Decimated LOD)',
+        description_ko: '갤러리 프리뷰용 메시 감축 LOD. f-16.glb(30,272 tris, 5.25MB)를 meshopt로 11,801 tris, 3.99MB로 감축했습니다. 노드·재질 구조는 원본과 같습니다.',
+        license: { label: 'CC BY-NC-SA 4.0 — bohmerang', url: assetUrl('models/f-16.LICENSE.txt') },
+      },
+      {
         id: 'aim-9x',
         file: 'models/missiles/aim-9x.glb',
         category: 'weapons',
@@ -752,12 +762,34 @@
         preview: { position: [0, 2.25, 0.65], target: [0, 1.9, 1.5], gridY: 0.9, autoRotate: false, showGrid: false },
       },
       {
+        id: 'b737-cockpit-medium-lod',
+        file: 'models/lod/b737-cockpit-medium.glb',
+        category: 'cockpit',
+        lod: true,
+        title_ko: '보잉 737-800 콕핏 (고해상도 · LOD)',
+        title_en: 'Boeing 737-800 Cockpit (Medium Decimated LOD)',
+        description_ko: '고해상도 콕핏의 메시 감축 LOD. b737-cockpit-medium.glb(964,844 tris, 3.66MB)를 357,284 tris, 2.23MB로 감축했습니다. Draco 압축과 계기 배치를 유지합니다.',
+        license: { label: 'CC BY 4.0 — hakai315', url: assetUrl('models/b737-cockpit.LICENSE.txt') },
+        preview: { position: [0, 2.25, 0.65], target: [0, 1.9, 1.5], gridY: 0.9, autoRotate: false, showGrid: false },
+      },
+      {
         id: 'b737-cockpit-draco',
         file: 'models/b737-cockpit-draco.glb',
         category: 'cockpit',
         title_ko: '보잉 737-800 콕핏 (Draco 경량)',
         title_en: 'Boeing 737-800 Cockpit (Draco / Lite)',
         description_ko: '고해상도 콕핏 로딩 실패 시 사용하는 Draco 압축 경량 폴백 모델. 동일한 계기 레이아웃을 유지합니다.',
+        license: { label: 'CC BY 4.0 — hakai315', url: assetUrl('models/b737-cockpit.LICENSE.txt') },
+        preview: { position: [0, 2.25, 0.65], target: [0, 1.9, 1.5], gridY: 0.9, autoRotate: false, showGrid: false },
+      },
+      {
+        id: 'b737-cockpit-draco-lod',
+        file: 'models/lod/b737-cockpit-draco.glb',
+        category: 'cockpit',
+        lod: true,
+        title_ko: '보잉 737-800 콕핏 (Draco 경량 · LOD)',
+        title_en: 'Boeing 737-800 Cockpit (Lite Decimated LOD)',
+        description_ko: 'Draco 경량 콕핏의 메시 감축 LOD. b737-cockpit-draco.glb(832,427 tris, 2.12MB)를 387,349 tris, 1.03MB로 감축했습니다.',
         license: { label: 'CC BY 4.0 — hakai315', url: assetUrl('models/b737-cockpit.LICENSE.txt') },
         preview: { position: [0, 2.25, 0.65], target: [0, 1.9, 1.5], gridY: 0.9, autoRotate: false, showGrid: false },
       },
@@ -916,7 +948,7 @@
           </div>
           <div class="card-body">
             <div class="card-meta">
-              <span class="card-badge">${CATEGORIES[model.category]}</span>
+              <span class="card-badge">${CATEGORIES[model.category]}${model.lod ? ' · LOD' : ''}</span>
               <span class="card-file" title="${model.file}">${model.file}</span>
             </div>
             <h3 class="card-title-ko">${model.title_ko}</h3>

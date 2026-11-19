@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "build:lod": "node scripts/decimate-glb-assets.mjs",
     "build:missiles": "node scripts/build-missile-assets.mjs",
     "build:pilot": "node scripts/build-pilot-assets.mjs",
     "validate:missiles": "node scripts/validate-glb-mesh.mjs",
@@ -61,7 +62,12 @@
     "three": "^0.186.0"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "draco3dgltf": "^1.5.9",
     "jpeg-js": "^0.4.4",
+    "meshoptimizer": "^1.3.0",
     "peer": "^1.0.2",
     "postject": "1.0.0-alpha.6",
     "three-mesh-bvh": "^0.9.17",
