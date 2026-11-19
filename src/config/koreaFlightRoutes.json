@@ -1,0 +1,84 @@
+{
+  "name": "RKSI-RKPC",
+  "title": "인천국제공항 — 제주국제공항 (Incheon to Jeju)",
+  "distanceKm": 451.2,
+  "distanceNm": 243.6,
+  "cruiseAltitudeFt": 28000,
+  "departure": {
+    "icao": "RKSI",
+    "name": "인천국제공항 (Incheon Int'l Airport)",
+    "latitude": 37.4691,
+    "longitude": 126.4506,
+    "elevationM": 7.0,
+    "elevationFt": 23,
+    "primaryRunway": "15R"
+  },
+  "destination": {
+    "icao": "RKPC",
+    "name": "제주국제공항 (Jeju Int'l Airport)",
+    "latitude": 33.5113,
+    "longitude": 126.4930,
+    "elevationM": 36.0,
+    "elevationFt": 118,
+    "primaryRunway": "07",
+    "secondaryRunway": "25"
+  },
+  "route": [
+    {
+      "ident": "RKSI",
+      "type": "airport",
+      "latitude": 37.4691,
+      "longitude": 126.4506,
+      "altitudeFt": 23,
+      "description": "Incheon Runway 15R Departure"
+    },
+    {
+      "ident": "BOPTA",
+      "type": "fix",
+      "latitude": 36.5780,
+      "longitude": 126.2340,
+      "altitudeFt": 14000,
+      "description": "Climb waypoint over Yellow Sea"
+    },
+    {
+      "ident": "OLMEN",
+      "type": "fix",
+      "latitude": 35.8820,
+      "longitude": 126.1550,
+      "altitudeFt": 24000,
+      "description": "West Coast Cruise transition"
+    },
+    {
+      "ident": "SOSDO",
+      "type": "fix",
+      "latitude": 35.1200,
+      "longitude": 125.9800,
+      "altitudeFt": 28000,
+      "description": "Southwest Offshore Cruise fix"
+    },
+    {
+      "ident": "DOTOL",
+      "type": "fix",
+      "latitude": 34.4500,
+      "longitude": 126.1200,
+      "altitudeFt": 18000,
+      "description": "Top of Descent (TOD)"
+    },
+    {
+      "ident": "TAMNA",
+      "type": "fix",
+      "latitude": 33.7800,
+      "longitude": 126.3500,
+      "altitudeFt": 5000,
+      "description": "Jeju North Initial Approach Fix (IAF)"
+    },
+    {
+      "ident": "RW07",
+      "type": "runway",
+      "latitude": 33.5113,
+      "longitude": 126.4930,
+      "altitudeFt": 118,
+      "description": "Jeju Runway 07 Touchdown"
+    }
+  ]
+}
