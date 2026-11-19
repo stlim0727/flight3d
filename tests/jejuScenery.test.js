@@ -91,8 +91,12 @@ test('JejuFlightSurface models airport grade, Hallasan volcanic topography, and 
   assert.equal(surface.isOnRunway(0, 500), false); // 500m south of runway
   assert.equal(surface.isRunwaySafetyArea(-1000, 424), true);
 
-  // Leveled airport grade on runway
+  // Leveled airport grade on runway and thresholds
   assert.equal(surface.getHeight(-1000, 424), 36.0);
+  assert.equal(surface.getHeight(-1463.6, 621.3), 36.0); // RW07 threshold
+  assert.equal(surface.getHeight(1463.6, -621.3), 36.0); // RW25 threshold
+  assert.equal(surface.getHeight(-635.6, -705.9), 36.0); // RW13 threshold
+  assert.equal(surface.getHeight(635.6, 705.9), 36.0); // RW31 threshold
 
   // Hallasan summit elevation (around x=3741, z=16592)
   const summitH = surface.getHeight(3741.4, 16591.7);
@@ -152,7 +156,7 @@ test('loadJejuAirport builds 3D runways, terminal, tower, and lighting', async (
 
 test('scenarioRegistry and lobbySpecs expose Jeju scenarios and specs', () => {
   const scenarios = scenariosForAirport('jeju');
-  assert.deepEqual(scenarios, ['runway', 'approach', 'challenge', 'cruise', 'demo']);
+  assert.deepEqual(scenarios, ['runway', 'approach', 'challenge', 'cruise']);
 
   const spec = airportSpec('jeju');
   assert.equal(spec, 'RWY 067° · 118 FT · GS 3°');

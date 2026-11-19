@@ -54,8 +54,8 @@ export const SPAWN_SCENARIOS = {
     lobbyButtonId: 'lobby-preset-valley',
   },
   demo: {
-    airports: ['coastal', 'lukla', 'incheon', 'neon', 'jeju'],
-    labelKeys: { incheon: 'lobby.preset.demo', jeju: 'lobby.preset.demo', coastal: 'lobby.preset.demo', lukla: 'lobby.preset.demo', neon: 'lobby.preset.demo' },
+    airports: ['coastal', 'lukla', 'incheon', 'neon'],
+    labelKeys: { incheon: 'lobby.preset.demo', coastal: 'lobby.preset.demo', lukla: 'lobby.preset.demo', neon: 'lobby.preset.demo' },
     briefingKey: 'lobby.briefing.scenario.demo',
     lobbyButtonId: 'lobby-preset-demo',
   },

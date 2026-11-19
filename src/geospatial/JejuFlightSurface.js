@@ -46,10 +46,11 @@ export class JejuFlightSurface {
       throw new Error('Invalid flight terrain coordinate');
     }
 
-    // Leveled airport grade for runways and safety zones
+    // Leveled airport grade for runways and safety buffer zone (350m buffer ensures coarse
+    // 250m terrain mesh vertices within runway corridors are completely planar at 36m)
     for (const surface of this.surfaces) {
       const d = this.distance(surface, x, z);
-      if (d <= 60) {
+      if (d <= 350) {
         return this.elevationM;
       }
     }
@@ -74,10 +75,13 @@ export class JejuFlightSurface {
     const baseSlope = 120.0 * coastFactor;
     const naturalHeight = (hallasanShield + baseSlope) * coastFactor;
 
-    // Smooth blending near airport precinct
+    // Smooth blending outside airport precinct (entire airport plateau within 2.4km is leveled at 36m)
     const distToAirport = Math.hypot(x, z);
-    if (distToAirport < 3500) {
-      const t = Math.max(0, Math.min(1, (distToAirport - 1000) / 2500));
+    if (distToAirport < 2400) {
+      return this.elevationM;
+    }
+    if (distToAirport < 5000) {
+      const t = Math.max(0, Math.min(1, (distToAirport - 2400) / 2600));
       const blend = t * t * (3 - 2 * t);
       return this.elevationM * (1 - blend) + naturalHeight * blend;
     }

@@ -19,7 +19,7 @@ test('invalid values and unsupported combinations resolve safely', () => {
 test('every listed combination round trips without substitution', () => {
   const rows = flightCombinations();
   // Includes the Neon B738 and C172 demos (#697); the F16 has no Neon demo.
-  assert.equal(rows.length, 54);
+  assert.equal(rows.length, 66);
   assert.equal(new Set(rows.map(row => flightUrl(row))).size, rows.length);
   for (const row of rows) {
     const url = new URL(flightUrl(row));
@@ -30,7 +30,7 @@ test('every listed combination round trips without substitution', () => {
 
 test('inherited property names in URL scenarios fall back without throwing', () => {
   for (const scenario of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
-    for (const airport of ['coastal', 'lukla', 'incheon', 'neon', 'valley']) {
+    for (const airport of ['coastal', 'lukla', 'incheon', 'neon', 'valley', 'jeju']) {
       const result = resolveFlightUrl(`?terrain=${airport}&scenario=${scenario}`, saved);
       assert.equal(result.airport, airport);
       assert.equal(result.scenario, airport === 'valley' ? 'valley' : 'runway');
