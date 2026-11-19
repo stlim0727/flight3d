@@ -80,4 +80,5 @@ export function presentCombatEvent(event, context = {}) {
  */
 export function syncCombatAudio(system, { audio, camera = null, paused = false } = {}) {
   audio?.syncMissileFlight?.(paused ? [] : (system?.missiles || []), camera?.position ?? null);
+  audio?.syncRemoteEngines?.(paused ? [] : (system?.targets || []), camera);
 }

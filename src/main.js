@@ -1355,7 +1355,9 @@ class FlightSimulator {
   }
 
   syncGunAudio() {
-    this.audioCoordinator.syncGunAudio(this.missileCombat?.cannon?.firing);
+    const camera = this.camera?.position;
+    const muzzleDistance = camera?.distanceTo?.(this.position) ?? 0;
+    this.audioCoordinator.syncGunAudio(this.missileCombat?.cannon?.firing, muzzleDistance);
   }
 
   cycleCombatTarget() {
@@ -1540,9 +1542,6 @@ class FlightSimulator {
         this.cockpitPhotoOverlay.update(this.telemetry);
       }
     }
-    const cameraToAircraftMeters = this.camera.position.distanceTo(this.aircraft.group.position);
-    this.audioCoordinator.update(frameDelta, this.telemetry, isCockpit, cameraToAircraftMeters);
-
     // 6. Update Camera System & Dynamic FOV (60° in cockpit eliminates fisheye speed distortion)
     let targetFov = isCockpit ? 60 : 54;
     const aspect = this.camera.aspect || (window.innerWidth / (window.innerHeight || 1));
@@ -1556,6 +1555,16 @@ class FlightSimulator {
     }
     this.cameraSystem.applyBaseFov(targetFov);
     this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry, (x, z) => this.currentTerrain.getHeight(x, z));
+    // Audio samples the camera after its motion for this frame, so the
+    // listener displacement and frameDelta share one time base.
+    const cameraToAircraftMeters = this.camera.position.distanceTo(this.aircraft.group.position);
+    this.audioCoordinator.update(frameDelta, this.telemetry,
+      this.cameraSystem.mode === CameraSystem.MODES.COCKPIT, cameraToAircraftMeters, {
+        position: this.position,
+        velocity: this.replayDirector?.active ? this.replayDirector.hostVelocity : this.linearVelocity,
+        camera: this.camera,
+        timeScale: this.replayDirector?.active ? this.replayDirector.speed : 1,
+      });
     this.foliage.updateCityLod(this.camera.position);
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls

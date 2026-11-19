@@ -773,3 +773,211 @@ describe('Engine volume', () => {
     }
   });
 });
+
+describe('Spatial combat audio (#862)', () => {
+  function sourceStarts(audio) {
+    const starts = [];
+    const create = audio.ctx.createBufferSource.bind(audio.ctx);
+    audio.ctx.createBufferSource = () => {
+      const source = create();
+      const start = source.start.bind(source);
+      source.start = when => { starts.push(when); start(when); };
+      return source;
+    };
+    return starts;
+  }
+
+  it('schedules a distant explosion after the sound has crossed the gap', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      audio.ctx.currentTime = 10;
+      const starts = sourceStarts(audio);
+      audio.playRemoteExplosion(0);
+      audio.playRemoteExplosion(343);
+      assert.strictEqual(starts[0], 10, 'a nearby blast is immediate');
+      assert.strictEqual(starts[1], 10, 'its debris crack is immediate too');
+      assert.ok(Math.abs(starts[2] - 11) < 1e-9, 'a 343 m blast arrives one second later');
+      audio.stopMissileFlight();
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('attenuates a cannon burst seen from an exterior or bandit camera', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      audio.ctx.currentTime = 10;
+      audio.startGunFire(0);
+      const cockpitGain = audio.gunFireNodes.gain.gain.value;
+      audio.startGunFire(1500);
+      const wingGain = audio.gunFireNodes.gain.gain.value;
+      assert.ok(wingGain < cockpitGain && wingGain > 0, 'a distant muzzle is quieter, not silent');
+      audio.stopGunFire();
+      audio.startGunFire(5000);
+      assert.strictEqual(audio.gunFireNodes, null, 'beyond 3.5 km the cannon leaves the mix');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('bends the player turbine whine toward a closing tower camera but not in the cockpit', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      const state = { engine1: { n1: 100 }, iasKnots: 250, onGround: false };
+      const aircraft = { x: 0, y: 1000, z: 0 };
+      const camera = { position: { x: 1000, y: 1000, z: 0 } };
+      audio.update(1 / 60, state, true, 0, { position: aircraft, velocity: { x: 0, y: 0, z: 0 }, camera });
+      const cockpitHz = audio.turbineWhine.frequency.value;
+
+      audio.update(1 / 60, state, false, 1000, {
+        position: aircraft, velocity: { x: 200, y: 0, z: 0 }, camera,
+      });
+      const exteriorHz = audio.turbineWhine.frequency.value;
+      assert.ok(exteriorHz > cockpitHz * 1.1, 'a closing jet is heard sharpened from the tower');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('normalizes replay camera velocity to recorded time', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      const state = { engine1: { n1: 80 }, iasKnots: 200, onGround: false };
+      const source = { position: { x: 0, y: 1000, z: 0 }, velocity: { x: 0, y: 0, z: 0 } };
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 0, y: 1000, z: 0 } },
+      });
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 1, y: 1000, z: 0 } }, timeScale: 0.5,
+      });
+      assert.ok(Math.abs(audio._listenerVelocity.x - 120) < 1e-6,
+        'half-speed playback doubles camera velocity in recorded seconds');
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 2, y: 1000, z: 0 } }, timeScale: 2,
+      });
+      assert.ok(Math.abs(audio._listenerVelocity.x - 30) < 1e-6,
+        'double-speed playback halves camera velocity in recorded seconds');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('does not clamp a genuine 500 m/s chase but ignores camera teleports', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      const state = { engine1: { n1: 90 }, iasKnots: 400, onGround: false };
+      const source = { position: { x: 0, y: 1000, z: 0 }, velocity: { x: 500, y: 0, z: 0 } };
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 0, y: 1000, z: 0 } },
+      });
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 500 / 60, y: 1000, z: 0 } },
+      });
+      assert.ok(Math.abs(audio._listenerVelocity.x - 500) < 1e-6,
+        'a chase camera matching its host must not be clamped to 400 m/s');
+
+      audio.update(1 / 60, state, false, 100, {
+        ...source, camera: { position: { x: 10_000, y: 1000, z: 0 } },
+      });
+      assert.strictEqual(audio._listenerVelocity.x, 0,
+        'a camera cut is not a 600 km/s flyby');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('feeds live and replayed bandits to the remote engine layer', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      const camera = { position: { x: 0, y: 1000, z: 0, distanceTo: p => Math.hypot(p.x, p.y - 1000, p.z) } };
+      const target = {
+        id: 1, alive: true,
+        position: { x: 200, y: 1000, z: 0 },
+        velocity: { x: -100, y: 0, z: 0 },
+        flight: { engines: { n1: [90] } },
+      };
+      audio.syncRemoteEngines([target], camera);
+      assert.strictEqual(audio.remoteEngines.voices.size, 1);
+      audio.syncRemoteEngines([], camera);
+      assert.strictEqual(audio.remoteEngines.voices.size, 0);
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+});
+
+describe('Delayed explosion lifecycle (#862 review)', () => {
+  function stoppingSources(audio) {
+    const stops = [];
+    const create = audio.ctx.createBufferSource.bind(audio.ctx);
+    audio.ctx.createBufferSource = () => {
+      const source = create();
+      const stop = source.stop.bind(source);
+      source.stop = when => { stops.push(when); stop(when); };
+      return source;
+    };
+    return stops;
+  }
+
+  it('cancels future booms on replay pause, sortie pause and reset', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      audio.ctx.currentTime = 10;
+      const stops = stoppingSources(audio);
+
+      audio.playRemoteExplosion(343);
+      assert.strictEqual(stops.length, 0, 'nothing has arrived yet');
+      audio.setReplayPaused(true);
+      assert.deepStrictEqual(stops, [10, 10], 'both delayed layers stop at the pause');
+
+      stops.length = 0;
+      audio.setReplayPaused(false);
+      audio.playRemoteExplosion(1029);
+      audio.setPaused(true);
+      assert.deepStrictEqual(stops, [10, 10], 'a sortie hold cancels the scheduled boom');
+
+      stops.length = 0;
+      audio.setPaused(false);
+      audio.playRemoteExplosion(1029);
+      audio.reset();
+      assert.deepStrictEqual(stops, [10, 10], 'reset cancels the scheduled boom');
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+
+  it('does not schedule cancellation work for an immediate local blast', () => {
+    const previous = globalThis.window;
+    globalThis.window = { AudioContext: createMockAudioContext() };
+    try {
+      const audio = new FlightAudio();
+      audio.init();
+      audio.ctx.currentTime = 10;
+      audio.playRemoteExplosion(0);
+      assert.strictEqual(audio.combat.pendingExplosions.length, 0);
+    } finally {
+      if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+    }
+  });
+});

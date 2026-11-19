@@ -124,9 +124,9 @@ export class SimulatorAudioCoordinator {
     }
   }
 
-  syncGunAudio(isFiring = Boolean(this.sim?.missileCombat?.cannon?.firing)) {
+  syncGunAudio(isFiring = Boolean(this.sim?.missileCombat?.cannon?.firing), distanceMeters = 0) {
     if (!this.audio) return;
-    if (isFiring) this.audio.startGunFire();
+    if (isFiring) this.audio.startGunFire(distanceMeters);
     else this.audio.stopGunFire();
   }
 
@@ -139,8 +139,8 @@ export class SimulatorAudioCoordinator {
     });
   }
 
-  update(frameDelta, telemetry = this.sim?.telemetry, isCockpit = false, cameraDistanceMeters = 0) {
+  update(frameDelta, telemetry = this.sim?.telemetry, isCockpit = false, cameraDistanceMeters = 0, spatial = null) {
     if (!this.audio) return;
-    this.audio.update(frameDelta, telemetry, isCockpit, cameraDistanceMeters);
+    this.audio.update(frameDelta, telemetry, isCockpit, cameraDistanceMeters, spatial);
   }
 }

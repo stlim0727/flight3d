@@ -167,3 +167,18 @@ test('syncCombatAudio forwards missiles only when unpaused and launch passes cam
   syncCombatAudio({ missiles: [{ alive: true }] }, { audio, camera, paused: true });
   assert.deepEqual(flightCalls.map(c => c.count), [1, 0]);
 });
+
+test('syncCombatAudio feeds bandit engines to the spatial layer and stops them when paused (#862)', () => {
+  const calls = [];
+  const audio = {
+    syncMissileFlight() {},
+    syncRemoteEngines(targets, camera) {
+      calls.push({ count: targets.length, sameCamera: camera?.tag === 'cam' });
+    },
+  };
+  const camera = { tag: 'cam', position: new THREE.Vector3(0, 1000, 0) };
+  const targets = [{ alive: true }, { alive: true }];
+  syncCombatAudio({ missiles: [], targets }, { audio, camera, paused: false });
+  syncCombatAudio({ missiles: [], targets }, { audio, camera, paused: true });
+  assert.deepEqual(calls, [{ count: 2, sameCamera: true }, { count: 0, sameCamera: true }]);
+});

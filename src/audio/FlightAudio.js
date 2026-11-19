@@ -1,16 +1,22 @@
 import { DepartureRadio } from './DepartureRadio.js';
 import { DEPARTURE_RADIO } from '../config/departureRadio.js';
 import { BANGKOK_DEPARTURE_RADIO } from '../config/bangkokDepartureRadio.js';
-import { exteriorDistanceGain, exteriorAirCutoff } from './distanceAcoustics.js';
+import { exteriorDistanceGain, exteriorAirCutoff, dopplerFactor } from './distanceAcoustics.js';
 import { t } from '../i18n/index.js';
 import { MasterMixerChain } from './nodes/MasterMixerChain.js';
 import { TurbofanSynthesizer } from './nodes/TurbofanSynthesizer.js';
 import { PistonSynthesizer } from './nodes/PistonSynthesizer.js';
+import { RemoteEngineAudio } from './nodes/RemoteEngineAudio.js';
 import { AirflowSynthesizer } from './nodes/AirflowSynthesizer.js';
 import { AirframeSoundEffects } from './nodes/AirframeSoundEffects.js';
 import { WarningSynthesizer } from './nodes/WarningSynthesizer.js';
 import { CombatSoundEffects } from './nodes/CombatSoundEffects.js';
 import { GpwsCalloutSystem } from './nodes/GpwsCalloutSystem.js';
+
+// Above any aircraft this simulator flies; teleports are identified by their
+// implausible per-frame displacement instead of a low speed clamp.
+const MAX_LISTENER_SPEED_MPS = 1200;
+const TELEPORT_STEP_MULTIPLIER = 2;
 
 export class FlightAudio {
   constructor() {
@@ -20,6 +26,9 @@ export class FlightAudio {
     this.lastTouchdownTime = -Infinity;
     this._alertId = null;
     this._threatLevel = 0;
+    this.remoteEngines = null;
+    this._listenerPosition = null;
+    this._listenerVelocity = { x: 0, y: 0, z: 0 };
     const rOpts = (dir, cfg) => ({
       context: () => this.ctx, output: () => this.masterGain,
       muted: () => this.isMuted || this.volume === 0,
@@ -51,6 +60,9 @@ export class FlightAudio {
 
   reset() {
     this.combat?.reset(); this.crashed = this.touchdownActive = false; this.lastTouchdownTime = -Infinity;
+    this.remoteEngines?.stopAll();
+    this._listenerPosition = null;
+    this._listenerVelocity.x = this._listenerVelocity.y = this._listenerVelocity.z = 0;
     this.alertId = null; this.threatLevel = 0;
     this.gpws?.reset(); this.departureRadio.stop(); this.bangkokRadio?.stop(); this.warnings?.reset();
     if (this.packGain) this.packGain.gain.setTargetAtTime(this.isPiston ? 0 : 0.16, this.ctx?.currentTime ?? 0, 0.04);
@@ -92,6 +104,8 @@ export class FlightAudio {
       this.airframe = new AirframeSoundEffects(this.ctx, this.cockpitFilter);
       this.warnings = new WarningSynthesizer(this.ctx, this.masterGain, this.cockpitFilter);
       this.combat = new CombatSoundEffects(this.ctx, this.masterGain, this.ambientBus, () => this.silenceOnCrash(), () => this.isReplayPaused);
+      this.remoteEngines = new RemoteEngineAudio(this.ctx, this.masterGain, this.turbofan.engineNoiseBuffer);
+      this.remoteEngines.setEngineVolume(this.engineVolume);
       Object.assign(this, this.airflow, this.turbofan, this.piston, this.airframe, this.warnings);
       delete this.alertId; delete this.threatLevel;
       if (this._alertId !== null) this.warnings.alertId = this._alertId;
@@ -116,6 +130,8 @@ export class FlightAudio {
     if (this.volume > 0.0) this.isMuted = false;
     if (this.volume === 0) {
       this.cancelSpeech(); this.stopGunFire(); this.stopMissileFlight(); this.departureRadio.stop(); this.bangkokRadio?.stop();
+      this.remoteEngines?.stopAll();
+      this.combat?.cancelPendingExplosions();
     }
     this.applyMasterGain();
   }
@@ -124,22 +140,33 @@ export class FlightAudio {
     if (!Number.isFinite(level)) return this.engineVolume;
     this.engineVolume = Math.max(0, Math.min(1, level));
     this.engineBus?.gain.setTargetAtTime(this.engineVolume, this.ctx?.currentTime ?? 0, 0.05);
+    this.remoteEngines?.setEngineVolume(this.engineVolume);
     return this.engineVolume;
   }
 
   setMuted(m) {
     this.isMuted = !!m;
-    if (this.isMuted) { this.cancelSpeech(); this.departureRadio.stop(); this.bangkokRadio?.stop(); }
+    if (this.isMuted) {
+      this.cancelSpeech(); this.departureRadio.stop(); this.bangkokRadio?.stop();
+      this.remoteEngines?.stopAll();
+      this.combat?.cancelPendingExplosions();
+    }
     this.applyMasterGain();
   }
 
   setRadioPaused(p) { this.departureRadio.setPaused(p); this.bangkokRadio?.setPaused(p); }
-  setPaused(p) { this.isPaused = !!p; if (this.isPaused) this.cancelSpeech(); this.applyMasterGain(); }
+  setPaused(p) {
+    this.isPaused = !!p;
+    if (this.isPaused) { this.cancelSpeech(); this.remoteEngines?.stopAll(); this.combat?.cancelPendingExplosions(); }
+    this.applyMasterGain();
+  }
 
   setReplayPaused(paused) {
     this.isReplayPaused = !!paused;
     if (this.isReplayPaused) {
       this.cancelSpeech(); this.stopGunFire(); this.stopMissileFlight();
+      this.remoteEngines?.stopAll();
+      this.combat?.cancelPendingExplosions();
       this.departureRadio.stop(); this.bangkokRadio?.stop();
       this.warningGain?.gain.setValueAtTime(0, this.ctx?.currentTime ?? 0);
     }
@@ -164,9 +191,15 @@ export class FlightAudio {
     return { muted: false, level: 1.0, mode: 'normal', text: t('normal.volume.100'), icon: '🔊' };
   }
 
-  update(dt, state, isCockpitCam, cameraDistanceMeters = 0) {
+  update(dt, state, isCockpitCam, cameraDistanceMeters = 0, spatial = null) {
     if (!this.isInitialized || !this.ctx || this.crashed) return;
     const now = this.ctx.currentTime;
+    const listenerPosition = spatial?.camera?.position ?? null;
+    const timeScale = Number.isFinite(spatial?.timeScale) && spatial.timeScale > 0 ? spatial.timeScale : 1;
+    this._trackListener(listenerPosition, dt * timeScale);
+    const doppler = isCockpitCam || !spatial?.position || !listenerPosition
+      ? 1
+      : dopplerFactor(spatial.position, spatial.velocity, listenerPosition, this._listenerVelocity);
     if (isCockpitCam) {
       const consciousness = state.pilot?.consciousness ?? 1.0;
       const muffle = state.pilot?.isGLOC ? 0.14 : Math.max(0.14, Math.min(1.0, consciousness));
@@ -178,8 +211,8 @@ export class FlightAudio {
     }
 
     this.warnings?.updateGStrain(state, now, isCockpitCam);
-    if (this.isPiston) this.piston?.update(state, now, this.profile);
-    else this.turbofan?.update(state, now);
+    if (this.isPiston) this.piston?.update(state, now, this.profile, doppler);
+    else this.turbofan?.update(state, now, doppler);
     this.airflow?.update(state, now);
     this.airframe?.update(state, now);
 
@@ -195,6 +228,59 @@ export class FlightAudio {
     });
     this.gpws.update(state, alert);
     this.warnings?.updateThreatAlert(dt, state.rwrLevel || 0, this.isMuted, this.volume);
+  }
+
+  _trackListener(position, dt) {
+    if (!position) {
+      this._listenerPosition = null;
+      this._listenerVelocity.x = this._listenerVelocity.y = this._listenerVelocity.z = 0;
+      return;
+    }
+    const previous = this._listenerPosition;
+    if (!previous) {
+      this._listenerPosition = { x: position.x, y: position.y, z: position.z };
+      this._listenerVelocity.x = this._listenerVelocity.y = this._listenerVelocity.z = 0;
+      return;
+    }
+    if (Number.isFinite(dt) && dt > 1e-4) {
+      const dx = position.x - previous.x;
+      const dy = position.y - previous.y;
+      const dz = position.z - previous.z;
+      const displacement = Math.hypot(dx, dy, dz);
+      // Replay cuts, respawns and camera-mode snaps jump farther than any real
+      // aircraft can in one frame. Treat only that as a teleport: a genuine
+      // 500 m/s chase must keep matching its host instead of clamping to 400.
+      const maxStep = Math.max(50, MAX_LISTENER_SPEED_MPS * dt * TELEPORT_STEP_MULTIPLIER);
+      if (displacement > maxStep) {
+        this._listenerVelocity.x = this._listenerVelocity.y = this._listenerVelocity.z = 0;
+      } else {
+        let vx = dx / dt;
+        let vy = dy / dt;
+        let vz = dz / dt;
+        const speed = Math.hypot(vx, vy, vz);
+        if (speed > MAX_LISTENER_SPEED_MPS) {
+          const scale = MAX_LISTENER_SPEED_MPS / speed;
+          vx *= scale; vy *= scale; vz *= scale;
+        }
+        this._listenerVelocity.x = vx;
+        this._listenerVelocity.y = vy;
+        this._listenerVelocity.z = vz;
+      }
+    }
+    previous.x = position.x; previous.y = position.y; previous.z = position.z;
+  }
+
+  syncRemoteEngines(targets, camera = null) {
+    if (!this.ctx || !this.remoteEngines || this.isMuted || this.volume === 0
+      || this.isPaused || this.isReplayPaused || this.crashed) {
+      this.remoteEngines?.stopAll();
+      return;
+    }
+    this.remoteEngines.update(targets, camera, this._listenerVelocity);
+  }
+
+  cancelPendingExplosions() {
+    this.combat?.cancelPendingExplosions();
   }
 
   playDepartureRadio(stage, profile = 'departure') {
@@ -216,6 +302,8 @@ export class FlightAudio {
 
   silenceOnCrash() {
     this.crashed = true; this.cancelSpeech(); this.departureRadio.stop(); this.bangkokRadio?.stop();
+    this.remoteEngines?.stopAll();
+    this.combat?.cancelPendingExplosions();
     if (this.ctx) {
       for (const n of ['engineGain', 'turbineGain', 'turbineGain2', 'pistonGain', 'propGain', 'propModGain', 'windGain', 'rumbleGain', 'packGain', 'warningGain', 'gStrainGain']) this[n]?.gain.setValueAtTime(0, this.ctx.currentTime);
     }
@@ -229,7 +317,7 @@ export class FlightAudio {
   playRwrTone(lvl) { this.warnings?.playRwrTone(lvl); }
   playLockTone() { this.warnings?.playLockTone(this.isMuted, this.volume); }
   updateThreatAlert(dt, lvl) { this.warnings?.updateThreatAlert(dt, lvl, this.isMuted, this.volume); }
-  startGunFire() { this.combat?.startGunFire(this.isMuted, this.volume); }
+  startGunFire(distance = 0) { this.combat?.startGunFire(this.isMuted, this.volume, distance); }
   stopGunFire() { this.combat?.stopGunFire(); }
   playMissileLaunch(d = 0) { this.combat?.playMissileLaunch(d, this.isMuted, this.volume); }
   playFlareDispense(d = 0) { this.combat?.playFlareDispense(d, this.isMuted, this.volume); }
