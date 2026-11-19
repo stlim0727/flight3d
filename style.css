@@ -14,3 +14,15 @@
 @import "./src/styles/pilot-g-effects.css";
 
 @import "./src/styles/flight-strip.css";
+
+#geographic-buildings-attribution {
+  position: fixed;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 15;
+  padding: 3px 6px;
+  background: #152027e6;
+  border-radius: 4px;
+  font: 10px/1.4 system-ui, sans-serif;
+}
+#geographic-buildings-attribution a { color: #fff; }

@@ -1,3 +1,4 @@
+import { updateGeographicBuildings } from './environment/GeographicBuildings.js';
 import { StartupProgressView } from './ui/StartupProgressView.js';
 import { compileVisibleScene } from './core/sceneShaderWarmup.js';
 import { FlightPerformanceMonitor, FlightGpuTimer } from './core/FlightPerformanceMonitor.js';
@@ -1497,6 +1498,7 @@ class FlightSimulator {
         trackDeg: this.telemetry?.trackDeg,
       });
     }
+    updateGeographicBuildings(this);
     this.sky.updateSun(this.position, this.camera.position);
     this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     if (!this.gameFlow.isPhysicsFrozen()) {

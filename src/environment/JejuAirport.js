@@ -226,8 +226,11 @@ export async function loadJejuAirport(base = '', options = {}) {
 
   let lastPos = null;
 
+  const insideTower = (x, z) => Math.hypot(x + 80, z - 260) < 12;
+  const insideTerminal = (x, z) => Math.abs(x - 150) < 230 && Math.abs(z - 320) < 65;
   return {
     terrain: activeTerrain,
+    hasModeledBuilding: (x, z) => insideTower(x, z) || insideTerminal(x, z),
     group,
     nightLighting,
     tileStreamer,
@@ -260,10 +263,10 @@ export async function loadJejuAirport(base = '', options = {}) {
     },
     checkBuildingCollision(probes) {
       for (const p of probes) {
-        if (Math.hypot(p.pos.x - (-80), p.pos.z - 260) < 12 && p.pos.y < JEJU_AIRFIELD.elevationM + 55) {
+        if (insideTower(p.pos.x, p.pos.z) && p.pos.y < JEJU_AIRFIELD.elevationM + 55) {
           return { point: p.pos.clone(), part: 'tower' };
         }
-        if (Math.abs(p.pos.x - 150) < 230 && Math.abs(p.pos.z - 320) < 65 && p.pos.y < JEJU_AIRFIELD.elevationM + 25) {
+        if (insideTerminal(p.pos.x, p.pos.z) && p.pos.y < JEJU_AIRFIELD.elevationM + 25) {
           return { point: p.pos.clone(), part: 'terminal' };
         }
       }
