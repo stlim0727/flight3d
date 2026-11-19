@@ -1,3 +1,5 @@
+import { banditPilotCommand } from '../pilot/BanditPilot.js';
+import { PilotPerception } from '../pilot/PilotPerception.js';
 import { combatSkill, evasionDemand } from '../pilot/CombatSkills.js';
 import * as THREE from 'three';
 import { ChaffDispenser } from './Chaff.js';
@@ -112,36 +114,19 @@ export class BanditTarget {
       this.position.addScaledVector(this.velocity, dt);
       return;
     }
-    const o = this.orbit;
-    const dx = this.position.x - o.center.x;
-    const dz = this.position.z - o.center.z;
-    const radial = Math.atan2(dz, dx);
-    const direction = Math.sign(o.omega) || 1;
-    const correction = Math.atan2(Math.hypot(dx, dz) - o.radius, Math.max(300, o.radius * 0.5));
-    const course = radial + direction * (Math.PI / 2 + correction);
-    const speed = Math.abs(o.radius * o.omega);
-    const patrolHeading = Math.atan2(Math.cos(course), -Math.sin(course));
-    // Threat state and pilot commands advance through the same physical steps.
     const steps = Math.max(1, Math.ceil(dt * 120));
+    const step = dt / steps;
     for (let i = 0; i < steps; i++) {
-      this.threatResponse.update(dt / steps, this, missiles, terrainHeight);
-      const response = this.threatResponse;
-      const avionicsIntegrity = Math.max(0.25, 1 - 0.6 * (this.damageZones?.nose ?? 0));
-      const demand = evasionDemand(this.evasionSkill, { patrolHeading,
-        warningHeading: response.heading, weight: response.weight, integrity: avionicsIntegrity, speedMps: speed });
-      const heading = demand.headingRad;
-      const lookahead = Math.max(500, this.velocity.length() * 8);
-      const ground = Math.max(terrainHeight(this.position.x, this.position.z),
-        terrainHeight(this.position.x + Math.sin(heading) * lookahead,
-          this.position.z - Math.cos(heading) * lookahead));
-      const evadeClimb = this.evasionSkill !== 'hold'
-        ? EVASION_CLIMB_M * response.weight * avionicsIntegrity
-        : 0;
-      const altitude = Math.max(o.altitudeM + evadeClimb, ground + 420);
-      const commandedSpeed = demand.speedMps;
-      this.flight.guide(heading, altitude, commandedSpeed);
-      this.flight.step(dt / steps, this.damage,
-        this.position.y - terrainHeight(this.position.x, this.position.z), this.damageZones);
+      const clearance = this.position.y - terrainHeight(this.position.x, this.position.z);
+      this.threatResponse.update(step, this, missiles, terrainHeight);
+      if (this.pilotDecisionRemaining <= 1e-9) {
+        if (this.pendingPilotCommand) this.flight.applyCommand(this.pendingPilotCommand);
+        this.pendingPilotCommand = this.samplePilotCommand(clearance);
+        this.pilotDecisionRemaining += 0.2;
+        this.pilotSampleTick += 24;
+      }
+      this.pilotDecisionRemaining -= step;
+      this.flight.step(step, this.damage, clearance, this.damageZones);
       sampleEngineInfrared(this.flight.engines, this.infraredAfterburnerLevel, this.infraredSignature);
       if (this.position.y <= terrainHeight(this.position.x, this.position.z) + 2) {
         this.alive = false;
@@ -149,6 +134,47 @@ export class BanditTarget {
         break;
       }
     }
+  }
+
+  samplePilotCommand(clearance) {
+    const flight = this.flight;
+    const attitude = flight.euler.setFromQuaternion(flight.quaternion, 'YXZ');
+    const observation = this.pilotPerception.sample({
+      iasKnots: Atmosphere.msToKnots(flight.aero.ias),
+      pitchDeg: THREE.MathUtils.radToDeg(attitude.x),
+      rollDeg: -THREE.MathUtils.radToDeg(attitude.z),
+      headingDeg: -THREE.MathUtils.radToDeg(attitude.y),
+      pitchRateDegS: THREE.MathUtils.radToDeg(flight.angularVelocity.x),
+      rollRateDegS: -THREE.MathUtils.radToDeg(flight.angularVelocity.z),
+      altitudeFt: this.position.y / 0.3048,
+      radioAltFt: clearance / 0.3048,
+      vsiFpm: this.velocity.y * 60 / 0.3048,
+      throttle: flight.command.throttle,
+      pilot: flight.pilotPhysiology.getSnapshot(),
+    }, this.pilotSampleTick);
+    const orbit = this.orbit;
+    const dx = this.position.x - orbit.center.x;
+    const dz = this.position.z - orbit.center.z;
+    const correction = Math.atan2(Math.hypot(dx, dz) - orbit.radius, Math.max(500, orbit.radius));
+    const course = Math.atan2(dz, dx) + Math.sign(orbit.omega) * (Math.PI / 2 + correction);
+    const response = this.threatResponse;
+    const demand = evasionDemand(this.evasionSkill, {
+      patrolHeading: Math.atan2(Math.cos(course), -Math.sin(course)),
+      warningHeading: response.heading, weight: response.weight, integrity: 1,
+      speedMps: Math.abs(orbit.radius * orbit.omega),
+    });
+    const altitude = observation.instruments.altitudeFt.mean;
+    const radioAltitude = observation.instruments.radioAltFt;
+    const desiredAltitude = (orbit.altitudeM + (this.evasionSkill === 'hold'
+      ? 0 : EVASION_CLIMB_M * response.weight)) / 0.3048;
+    const density = Atmosphere.getConditions(altitude * 0.3048).densityRatio;
+    observation.navigation = {
+      headingRad: demand.headingRad,
+      altitudeFt: Math.max(desiredAltitude, radioAltitude.status === 'available'
+        ? altitude + 1000 - radioAltitude.mean : desiredAltitude),
+      iasKnots: Atmosphere.msToKnots(demand.speedMps * Math.sqrt(density)),
+    };
+    return banditPilotCommand(observation);
   }
 
   respawn(position, orbit) {
@@ -177,6 +203,10 @@ export class BanditTarget {
     } else {
       this.velocity.set(0, 0, -180);
     }
+    this.pilotPerception = new PilotPerception({ mission: 'bandit' });
+    this.pendingPilotCommand = null;
+    this.pilotDecisionRemaining = 0;
+    this.pilotSampleTick = 0;
     this.flight = o ? new BanditFlightModel(this.position, this.velocity) : null;
     this.quaternion = this.flight?.quaternion ?? null;
     this.infraredAfterburnerLevel = 0;

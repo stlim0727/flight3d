@@ -6,7 +6,6 @@ import * as THREE from 'three';
  */
 export const BANDIT_WARNING_MODEL = Object.freeze({
   rangeM: 4000,
-  minClosingMps: 50,
   confirmationSeconds: 0.65,
   memorySeconds: 3,
   responseSeconds: 0.45,
@@ -20,7 +19,6 @@ export class BanditThreatResponse {
     this.enabled = enabled;
     this.rwr = rwr;
     this._relative = new THREE.Vector3();
-    this._velocity = new THREE.Vector3();
     this.reset();
   }
 
@@ -36,43 +34,50 @@ export class BanditThreatResponse {
   }
 
   update(dt, aircraft, missiles, terrainHeight) {
-    if (!this.enabled) {
-      this.reset();
-      return;
-    }
+    const warnings = this.enabled ? this.sampleWarnings(aircraft, missiles, terrainHeight) : [];
+    const courseRad = Math.atan2(aircraft.velocity.x, -aircraft.velocity.z);
+    this.updateFromWarnings(dt, courseRad, warnings);
+  }
+
+  sampleWarnings(aircraft, missiles, terrainHeight) {
     const model = BANDIT_WARNING_MODEL;
-    let observed = null;
-    let urgency = Infinity;
+    const warnings = [];
     for (const missile of missiles) {
       if (!missile.alive) continue;
       this._relative.subVectors(missile.position, aircraft.position);
       const range = this._relative.length();
       if (range < 1) continue;
-      this._velocity.subVectors(missile.velocity, aircraft.velocity);
-      const closing = -this._relative.dot(this._velocity) / range;
-      if (closing < model.minClosingMps) continue;
 
-      // Detection source: Optical MAWS (burning plume) or Radar Warning Receiver (active radar seeker)
       const hasPlume = missile.propellant > 0 && range <= model.rangeM;
       let hasRadarWarning = false;
       if (this.rwr && missile.spec?.seekerType === 'ACTIVE_RADAR' && range <= model.rwrRangeM) {
         const speed = missile.velocity.length();
         if (speed > 1e-3) {
           const dot = (-missile.velocity.x * this._relative.x
-            - missile.velocity.y * this._relative.y
-            - missile.velocity.z * this._relative.z) / (speed * range);
+            - missile.velocity.y * this._relative.y - missile.velocity.z * this._relative.z) / (speed * range);
           const gimbalDeg = missile.spec?.gimbalDeg ?? 65;
           hasRadarWarning = dot >= Math.cos(gimbalDeg * Math.PI / 180);
         }
       }
 
-      if (!hasPlume && !hasRadarWarning) continue;
-      const time = range / closing;
-      if (time >= urgency || !this._visible(aircraft.position, missile.position, range, terrainHeight)) continue;
-      observed = missile;
-      urgency = time;
+      if ((!hasPlume && !hasRadarWarning)
+        || !this._visible(aircraft.position, missile.position, range, terrainHeight)) continue;
+      const bearingRad = Math.hypot(this._relative.x, this._relative.z) < 1
+        ? null : Math.atan2(this._relative.x, -this._relative.z);
+      warnings.push({ id: missile.id, channel: hasPlume ? 'optical' : 'radar', bearingRad });
     }
+    return warnings;
+  }
 
+  updateFromWarnings(dt, courseRad, warnings) {
+    if (!this.enabled) {
+      this.reset();
+      return;
+    }
+    const model = BANDIT_WARNING_MODEL;
+    // Keep an existing track while it remains visible. Track selection uses only
+    // the warnings delivered by the simulated sensor.
+    const observed = warnings.find(warning => warning.id === this.observedId) ?? warnings[0];
     const observedId = observed?.id ?? null;
     this.exposure = observed
       ? (observedId === this.observedId ? this.exposure + dt : dt)
@@ -82,16 +87,11 @@ export class BanditThreatResponse {
     // Maintain the escape side through one encounter; noisy bearing changes
     // must not flip the requested turn back and forth.
     if (observed && this.exposure >= model.confirmationSeconds) {
-      const dx = observed.position.x - aircraft.position.x;
-      const dz = observed.position.z - aircraft.position.z;
-      if (this.confirmedId !== observedId) {
-        this.turnSide = (-dz * aircraft.velocity.x + dx * aircraft.velocity.z) >= 0 ? 1 : -1;
+      const bearing = observed.bearingRad;
+      if (this.confirmedId !== observedId && bearing !== null) {
+        this.turnSide = Math.sin(bearing - courseRad) <= 0 ? 1 : -1;
       }
-      // A near-vertical sightline has no usable horizontal bearing: retain the
-      // aircraft's horizontal course instead of inventing a compass direction.
-      this.heading = Math.hypot(dx, dz) < 1
-        ? Math.atan2(aircraft.velocity.x, -aircraft.velocity.z)
-        : Math.atan2(-dz * this.turnSide, -dx * this.turnSide);
+      this.heading = bearing === null ? courseRad : bearing + this.turnSide * Math.PI / 2;
       this.confirmedId = observedId;
       this.memory = model.memorySeconds;
     } else {
