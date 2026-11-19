@@ -8,7 +8,11 @@ import { colourJejuGround, jejuSurfaceMaterial } from './JejuGround.js';
 import { JejuTileStreamer } from './JejuTileStreamer.js';
 import { CorridorTileStreamer } from './CorridorTileStreamer.js';
 import { CorridorFlightSurface } from './CorridorFlightSurface.js';
-import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
+import {
+  CHUJA_EMERGENCY_STRIP,
+  JEJU_ORIGIN,
+  wgs84ToJejuLocal,
+} from '../geospatial/CorridorCoordinateSystem.js';
 
 export async function loadJejuAirport(base = '', options = {}) {
   const terrain = new JejuFlightSurface(JEJU_AIRFIELD);
@@ -140,6 +144,24 @@ export async function loadJejuAirport(base = '', options = {}) {
         }
       }
     }
+  }
+
+  // 2B. Chuja Island Emergency Diversion Airstrip (when corridor streaming is active)
+  if (options.streamCorridor) {
+    const [cx, cz] = wgs84ToJejuLocal(CHUJA_EMERGENCY_STRIP.center.latitude, CHUJA_EMERGENCY_STRIP.center.longitude);
+    const halfL = CHUJA_EMERGENCY_STRIP.lengthM * 0.5;
+    const ptA = [cx - halfL * Math.SQRT1_2, cz + halfL * Math.SQRT1_2];
+    const ptB = [cx + halfL * Math.SQRT1_2, cz - halfL * Math.SQRT1_2];
+
+    const chujaRwyGeo = pavementRibbon([ptA, ptB], CHUJA_EMERGENCY_STRIP.widthM);
+    const chujaRwyMesh = new THREE.Mesh(chujaRwyGeo, pavementMat);
+    chujaRwyMesh.position.y = CHUJA_EMERGENCY_STRIP.elevationM + 0.04;
+    group.add(chujaRwyMesh);
+
+    const chujaClGeo = pavementRibbon([ptA, ptB], 1.2, true);
+    const chujaClMesh = new THREE.Mesh(chujaClGeo, markingsMat);
+    chujaClMesh.position.y = CHUJA_EMERGENCY_STRIP.elevationM + 0.05;
+    group.add(chujaClMesh);
   }
 
   // 3. Terminal & Control Tower Buildings

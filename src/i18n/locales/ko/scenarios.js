@@ -89,7 +89,7 @@ export default {
   "jeju.airport": "제주공항 (RKPC)",
   "jeju.runway": "07 이륙 준비",
   "jeju.approach": "07 최종 접근 · 3 NM",
-  "jeju.challenge": "⚡ 07 측풍 착륙 챌린지",
+  "jeju.challenge": "⚡ 추자도·해상 비상 불시착 (엔진 고장)",
   "jeju.cruise": "한라산 순항 · 3,000 m (10,000 FT)",
   "jeju.loading": "제주 지형·공항을 불러오는 중…",
   "jeju.load.failed": "제주 데이터를 불러오지 못했습니다. 다시 선택해 주세요.",

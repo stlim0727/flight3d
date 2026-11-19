@@ -14,9 +14,11 @@
 
 import * as THREE from 'three';
 import {
+  CHUJA_EMERGENCY_STRIP,
   getCorridorDistanceM,
   INCHEON_ORIGIN,
   INCHEON_SCENERY_ORIGIN,
+  isWithinChujaEmergencyStrip,
   JEJU_ORIGIN,
   MEAN_SEA_LEVEL_M,
   wgs84ToIncheonLocal,
@@ -130,7 +132,25 @@ export class CorridorFlightSurface {
     );
     if (distChujaM < CHUJA_RADIUS_M) {
       const u = 1 - distChujaM / CHUJA_RADIUS_M;
-      return (u * u * (3 - 2 * u)) * CHUJA_MAX_ELEVATION_M;
+      const naturalHeight = (u * u * (3 - 2 * u)) * CHUJA_MAX_ELEVATION_M;
+
+      // 3A. Leveled Chuja Emergency Diversion Strip (Runway 05/23 at 12m MSL)
+      if (isWithinChujaEmergencyStrip(latitude, longitude, false)) {
+        return CHUJA_EMERGENCY_STRIP.elevationM;
+      }
+      if (isWithinChujaEmergencyStrip(latitude, longitude, true)) {
+        // Smoothly blend from 12.0m runway grade to natural island topography
+        const [dx, dz] = wgs84ToLocal(latitude, longitude, CHUJA_EMERGENCY_STRIP.center);
+        const along = (dx - dz) * Math.SQRT1_2;
+        const across = (dx + dz) * Math.SQRT1_2;
+        const dAlong = Math.max(0, Math.abs(along) - CHUJA_EMERGENCY_STRIP.lengthM * 0.5) / 100.0;
+        const dAcross = Math.max(0, Math.abs(across) - CHUJA_EMERGENCY_STRIP.widthM * 0.5) / 17.5;
+        const blend = Math.min(1, Math.max(dAlong, dAcross));
+        const smooth = blend * blend * (3 - 2 * blend);
+        return CHUJA_EMERGENCY_STRIP.elevationM * (1 - smooth) + naturalHeight * smooth;
+      }
+
+      return naturalHeight;
     }
 
     // 4. Yellow Sea, Dadohae, and open marine waters: Mean Sea Level is 0.0m
@@ -169,11 +189,18 @@ export class CorridorFlightSurface {
   isOnRunway(x, z) {
     const { latitude, longitude } = localToWgs84(x, z, this.activeOrigin);
 
+    // 1. Chuja Emergency Diversion Strip
+    if (isWithinChujaEmergencyStrip(latitude, longitude, false)) {
+      return true;
+    }
+
+    // 2. Jeju Airport
     if (this.jejuSurface && typeof this.jejuSurface.isOnRunway === 'function') {
       const [jx, jz] = wgs84ToJejuLocal(latitude, longitude);
       if (Math.hypot(jx, jz) < 5000 && this.jejuSurface.isOnRunway(jx, jz)) return true;
     }
 
+    // 3. Incheon Airport
     if (this.incheonSurface && typeof this.incheonSurface.isOnRunway === 'function') {
       const [ix, iz] = wgs84ToIncheonSceneryLocal(latitude, longitude);
       if (Math.hypot(ix, iz) < 6000 && this.incheonSurface.isOnRunway(ix, iz)) return true;
@@ -185,11 +212,18 @@ export class CorridorFlightSurface {
   isRunwaySafetyArea(x, z) {
     const { latitude, longitude } = localToWgs84(x, z, this.activeOrigin);
 
+    // 1. Chuja Emergency Diversion Strip Safety Area
+    if (isWithinChujaEmergencyStrip(latitude, longitude, true)) {
+      return true;
+    }
+
+    // 2. Jeju Airport
     if (this.jejuSurface && typeof this.jejuSurface.isRunwaySafetyArea === 'function') {
       const [jx, jz] = wgs84ToJejuLocal(latitude, longitude);
       if (Math.hypot(jx, jz) < 5000 && this.jejuSurface.isRunwaySafetyArea(jx, jz)) return true;
     }
 
+    // 3. Incheon Airport
     if (this.incheonSurface && typeof this.incheonSurface.isRunwaySafetyArea === 'function') {
       const [ix, iz] = wgs84ToIncheonSceneryLocal(latitude, longitude);
       if (Math.hypot(ix, iz) < 6000 && this.incheonSurface.isRunwaySafetyArea(ix, iz)) return true;

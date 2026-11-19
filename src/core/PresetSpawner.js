@@ -232,20 +232,33 @@ class PresetSpawnerMethods {
       this.position.set(spawn.x, spawn.y, spawn.z);
       this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
       this.angularVelocity.set(0, 0, 0);
-      const pitchAttitude = type === 'approach' ? 0.04 : type === 'challenge' ? 0.01 : 0;
+      const isChallenge = type === 'challenge';
+      const pitchAttitude = type === 'approach' ? 0.04 : isChallenge ? 0.02 : 0;
       this.quaternion.setFromEuler(new THREE.Euler(pitchAttitude, spawn.yaw, 0, 'YXZ'));
       const airborne = type !== 'runway';
-      this.controls.throttle = type === 'challenge' ? 0.35 : airborne ? 0.5 : 0;
-      this.engines.setThrottle(this.controls.throttle);
-      this.engines.setReverser(false, true);
-      this.gear.setGearTarget(type !== 'cruise');
-      this.gear.gearState = this.gear.isFixed || type !== 'cruise' ? 1 : 0;
-      this.aero.setFlapPosition(type === 'approach' ? 5 : (type === 'challenge' || type === 'runway') ? 2 : 0);
-      this.aero.spoilers = 0;
-      this.controls.pitchTrim = this.aero.pitchTrim = type === 'challenge' ? 1.4 : 1.6;
-      if (type === 'challenge') {
-        const headingDeg = APPROACH_DATA.jeju?.headingDeg ?? 67;
-        setSimulationWind(this, new WindField({ profile: 'incheon-crosswind-v1', runwayHeadingDeg: headingDeg, seed: 15, crosswindSign: 1 }));
+      if (isChallenge) {
+        // Dual engine failure emergency glide towards Chuja Island / ocean
+        this.engines.setEngineFailure(0, true);
+        this.engines.setEngineFailure(1, true);
+        this.controls.throttle = 0;
+        this.engines.setThrottle(0);
+        this.engines.setReverser(false, true);
+        this.gear.setGearTarget(false);
+        this.gear.gearState = 0;
+        this.aero.setFlapPosition(0);
+        this.aero.spoilers = 0;
+        this.controls.pitchTrim = this.aero.pitchTrim = 1.4;
+      } else {
+        this.engines.setEngineFailure(0, false);
+        this.engines.setEngineFailure(1, false);
+        this.controls.throttle = airborne ? 0.5 : 0;
+        this.engines.setThrottle(this.controls.throttle);
+        this.engines.setReverser(false, true);
+        this.gear.setGearTarget(type !== 'cruise');
+        this.gear.gearState = this.gear.isFixed || type !== 'cruise' ? 1 : 0;
+        this.aero.setFlapPosition(type === 'approach' ? 5 : type === 'runway' ? 2 : 0);
+        this.aero.spoilers = 0;
+        this.controls.pitchTrim = this.aero.pitchTrim = 1.6;
       }
       const label = { runway: 'jeju.runway', approach: 'jeju.approach', cruise: 'jeju.cruise', challenge: 'jeju.challenge' }[type];
       if (label) this.showToast(() => t(label));

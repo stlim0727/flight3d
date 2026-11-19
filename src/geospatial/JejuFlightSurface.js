@@ -124,24 +124,37 @@ export function jejuSpawn(type, groundClearance, aircraftId = 'B738') {
     };
   }
 
-  const distance = isChallenge ? -5000 : isApproach ? -5556 : 100;
-  const offset = isChallenge ? 350 : 0;
-  const interceptAngle = isChallenge ? angle - (20 * Math.PI / 180) : angle;
+  if (isChallenge || type === 'ditching') {
+    // Chuja & Corridor Dual Engine-Out Emergency Glide & Ditching Challenge
+    // Spawns ~15km North of Chuja Island at 2,400m MSL (~7,870 ft), heading South (180°)
+    const speed = aircraftId === 'C172' ? 45 : aircraftId === 'F16' ? 160 : 110;
+    return {
+      x: -18300,
+      z: -65000,
+      y: 2400,
+      yaw: -Math.PI,
+      vx: 0,
+      vy: -2.8,
+      vz: speed,
+    };
+  }
+
+  const distance = isApproach ? -5556 : 100;
+  const offset = 0;
+  const interceptAngle = angle;
   const speed = type === 'runway' ? 0
-    : aircraftId === 'C172' ? (isChallenge ? 42 : isApproach ? 33 : 48)
-    : aircraftId === 'F16' ? (isChallenge ? 105 : isApproach ? 90 : 180)
-    : (isChallenge ? 85 : isApproach ? 74.5 : 108);
+    : aircraftId === 'C172' ? (isApproach ? 33 : 48)
+    : aircraftId === 'F16' ? (isApproach ? 90 : 180)
+    : (isApproach ? 74.5 : 108);
 
   const gs = (3.0 * Math.PI) / 180;
   const y = type === 'runway'
     ? airfield.elevationM + groundClearance
-    : isChallenge
-    ? airfield.elevationM + groundClearance + 5000 * Math.tan(gs) + 60
     : airfield.elevationM + groundClearance + 5556 * Math.tan(gs);
 
-  const vx = speed === 0 ? 0 : (isChallenge ? Math.sin(interceptAngle) * speed : dir.x * speed);
-  const vz = speed === 0 ? 0 : (isChallenge ? -Math.cos(interceptAngle) * speed : dir.z * speed);
-  const vy = speed === 0 ? 0 : (isChallenge ? -2.5 : isApproach ? -speed * Math.tan(gs) : 0);
+  const vx = speed === 0 ? 0 : dir.x * speed;
+  const vz = speed === 0 ? 0 : dir.z * speed;
+  const vy = speed === 0 ? 0 : (isApproach ? -speed * Math.tan(gs) : 0);
 
   return {
     x: a.threshold.x + dir.x * distance + Math.cos(angle) * offset,
