@@ -269,8 +269,16 @@ export class CorridorTileStreamer {
         const d = (r + 1) * gridWidth + c;
         const e = (r + 1) * gridWidth + (c + 1);
 
-        indices.push(a, d, b);
-        indices.push(b, d, e);
+        // Exclude quads covering Jeju Island mainland to prevent low-poly corridor meshes
+        // from obscuring or clipping Jeju's dedicated 80km x 56km high-resolution terrain mesh
+        const cellX = (positions[a * 3] + positions[e * 3]) * 0.5;
+        const cellZ = (positions[a * 3 + 2] + positions[e * 3 + 2]) * 0.5;
+        const isInsideJejuMainland = cellX >= -36000 && cellX <= 44000 && cellZ >= -11000 && cellZ <= 43000;
+
+        if (!isInsideJejuMainland) {
+          indices.push(a, d, b);
+          indices.push(b, d, e);
+        }
       }
     }
 

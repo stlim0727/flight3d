@@ -221,5 +221,22 @@ test('loadJejuAirport defaults to corridor streaming and attaches Chuja island 3
       assert.ok(y <= 12.0001, `Background tile vertex near Chuja must not exceed 12m, got ${y}m`);
     }
   }
+
+  // Verify that tile covering Jeju Island mainland excludes triangles over the high-res mesh
+  const jejuTile = airport.corridorStreamer.createTileGeometry({ x: 871, y: 410, zoom: 10 });
+  const jejuIndices = jejuTile.geo.index.array;
+  const jejuPos = jejuTile.geo.attributes.position;
+  for (let i = 0; i < jejuIndices.length; i += 3) {
+    const idx0 = jejuIndices[i];
+    const idx1 = jejuIndices[i + 1];
+    const idx2 = jejuIndices[i + 2];
+    const triCenterX = (jejuPos.getX(idx0) + jejuPos.getX(idx1) + jejuPos.getX(idx2)) / 3;
+    const triCenterZ = (jejuPos.getZ(idx0) + jejuPos.getZ(idx1) + jejuPos.getZ(idx2)) / 3;
+
+    // No triangle should exist over central Jeju (e.g. Hallasan x=10000, z=15000)
+    const isHallasanTriangle = Math.hypot(triCenterX - 10000, triCenterZ - 15000) < 5000;
+    assert.equal(isHallasanTriangle, false, 'No low-res corridor triangle should exist over Hallasan');
+  }
 });
+
 
