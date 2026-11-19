@@ -46,42 +46,44 @@ export class JejuFlightSurface {
       throw new Error('Invalid flight terrain coordinate');
     }
 
-    // Leveled airport grade for runways and safety buffer zone (350m buffer ensures coarse
-    // 250m terrain mesh vertices within runway corridors are completely planar at 36m)
+    let minRunwayDist = Infinity;
     for (const surface of this.surfaces) {
       const d = this.distance(surface, x, z);
-      if (d <= 350) {
-        return this.elevationM;
-      }
+      if (d < minRunwayDist) minRunwayDist = d;
     }
 
-    // Elliptical boundary of Jeju Island centered near Hallasan
+    // Realistic asymmetric elliptical boundary of Jeju Island centered near Hallasan
+    // East-West: 72 km (from Gosan west coast to Seongsan Ilchulbong east coast)
+    // North: 18.6 km north of Hallasan (coastline meets sea at z ≈ -2,000m north of RKPC)
+    // South: 15.0 km south of Hallasan (coastline reaches Seogwipo at z ≈ +31,500m)
     const hx = this.hallasan.x;
     const hz = this.hallasan.z;
-    const islandDx = (x - hx) / 36000;
-    const islandDz = (z - hz) / 24000;
-    const islandDistSq = islandDx * islandDx + islandDz * islandDz;
+    const rx = 36000;
+    const rzNorth = 18600;
+    const rzSouth = 15000;
+    const dx = (x - hx) / rx;
+    const dz = z < hz ? (z - hz) / rzNorth : (z - hz) / rzSouth;
+    const islandDistSq = dx * dx + dz * dz;
 
-    // Sea level outside island coast
-    if (islandDistSq >= 1.0) {
-      return 0.0;
-    }
-
-    const coastFactor = Math.cos(Math.sqrt(islandDistSq) * (Math.PI * 0.5));
+    const coastFactor = islandDistSq >= 1.0 ? 0.0 : Math.cos(Math.sqrt(islandDistSq) * (Math.PI * 0.5));
 
     // Volcanic shield elevation profile peaking at Mount Hallasan (1,947m)
     const distToPeak = Math.hypot(x - hx, z - hz);
     const hallasanShield = this.hallasan.elevationM * Math.exp(-((distToPeak / 7500) ** 1.6));
-    const baseSlope = 120.0 * coastFactor;
-    const naturalHeight = (hallasanShield + baseSlope) * coastFactor;
+    const baseSlope = 90.0 * coastFactor;
+    const naturalHeight = Math.max(0.0, (hallasanShield + baseSlope) * coastFactor);
 
-    // Smooth blending outside airport precinct (entire airport plateau within 2.4km is leveled at 36m)
+    // Airport precinct & runway safety corridor continuous smooth blending:
+    // Core plateau (within 650m of airport center or 150m of runways) is leveled at 36m.
+    // Beyond the core, smoothly blends to natural volcanic terrain over a 1,600m transition.
     const distToAirport = Math.hypot(x, z);
-    if (distToAirport < 2400) {
+    const blendDist = Math.min(distToAirport - 650, minRunwayDist - 150);
+
+    if (blendDist <= 0) {
       return this.elevationM;
     }
-    if (distToAirport < 5000) {
-      const t = Math.max(0, Math.min(1, (distToAirport - 2400) / 2600));
+    if (blendDist < 1600) {
+      const t = blendDist / 1600;
       const blend = t * t * (3 - 2 * t);
       return this.elevationM * (1 - blend) + naturalHeight * blend;
     }

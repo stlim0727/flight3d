@@ -106,6 +106,21 @@ test('JejuFlightSurface models airport grade, Hallasan volcanic topography, and 
   const oceanH = surface.getHeight(50000, 50000);
   assert.equal(oceanH, 0.0);
 
+  // Continuity: no step discontinuities in northern descent zone
+  const hBefore = surface.getHeight(-1500, -399.999);
+  const hAfter = surface.getHeight(-1500, -400.001);
+  assert.ok(Math.abs(hBefore - hAfter) < 0.001, `Height should be continuous across z=-400, got ${hBefore} and ${hAfter}`);
+
+  // Continuity across northern coast boundary and airport plateau
+  const hCoast1 = surface.getHeight(0, -912.9923);
+  const hCoast2 = surface.getHeight(0, -912.9943);
+  assert.ok(Math.abs(hCoast1 - hCoast2) < 0.001, `Height should be continuous across z=-913 northern boundary, got ${hCoast1} and ${hCoast2}`);
+
+  // Continuity across runway safety buffer outer boundary
+  const hRunway1 = surface.getHeight(1936.099, -621.3);
+  const hRunway2 = surface.getHeight(1936.101, -621.3);
+  assert.ok(Math.abs(hRunway1 - hRunway2) < 0.001, `Height should be continuous across runway buffer outer boundary, got ${hRunway1} and ${hRunway2}`);
+
   // Normal vector calculation
   const normal = surface.getNormal(0, 0);
   assert.ok(normal.y > 0.9, 'Airport surface normal should point nearly vertical');
@@ -138,6 +153,34 @@ test('loadJejuAirport builds 3D runways, terminal, tower, and lighting', async (
   assert.ok(airport.group);
   assert.ok(airport.nightLighting);
   assert.ok(airport.towerCab);
+
+  // 3D terrain mesh validation: vertexColors and whole-island span
+  assert.ok(airport.terrain.mesh.children.length > 0, 'Terrain mesh must be attached');
+  const terrainMesh = airport.terrain.mesh.children[0];
+  assert.ok(terrainMesh.geometry.hasAttribute('color'), 'Jeju terrain mesh must possess vertex colors');
+  assert.equal(terrainMesh.material.vertexColors, true, 'Jeju surface material must have vertexColors enabled');
+
+  terrainMesh.geometry.computeBoundingBox();
+  const bbox = terrainMesh.geometry.boundingBox;
+  assert.ok(bbox.min.x <= -35000, `West bound should reach Gosan (<= -35km), got ${bbox.min.x}`);
+  assert.ok(bbox.max.x >= 40000, `East bound should reach Seongsan (>= +40km), got ${bbox.max.x}`);
+  assert.ok(bbox.min.z <= -10000, `North bound should span coastal waters (<= -10km), got ${bbox.min.z}`);
+  assert.ok(bbox.max.z >= 40000, `South bound should reach Seogwipo (>= +40km), got ${bbox.max.z}`);
+
+  // Color verification: airport plateau vertices around y=36m should be green turf (g > r && g > b)
+  const pos = terrainMesh.geometry.attributes.position;
+  const col = terrainMesh.geometry.attributes.color;
+  let airportTurfSampled = false;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    if (Math.hypot(x, z) < 600 && Math.abs(y - 36.0) < 1.0) {
+      const r = col.getX(i), g = col.getY(i), b = col.getZ(i);
+      assert.ok(g > r && g > b, `Airport turf must be green-dominated, got (${r}, ${g}, ${b})`);
+      airportTurfSampled = true;
+      break;
+    }
+  }
+  assert.ok(airportTurfSampled, 'Should sample airport turf vertices near origin');
 
   // Collision checks with terminal and tower
   const towerProbe = [{ pos: new THREE.Vector3(-80, 50, 260), radius: 2, desc: 'cockpit' }];
