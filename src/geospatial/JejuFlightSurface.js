@@ -46,13 +46,10 @@ export class JejuFlightSurface {
       throw new Error('Invalid flight terrain coordinate');
     }
 
-    // Leveled airport grade for runways and safety buffer zone (450m corridor around
-    // runways guarantees planar pavement and overrun zones at 36m across coarse mesh cells)
+    let minRunwayDist = Infinity;
     for (const surface of this.surfaces) {
       const d = this.distance(surface, x, z);
-      if (d <= 450) {
-        return this.elevationM;
-      }
+      if (d < minRunwayDist) minRunwayDist = d;
     }
 
     // Realistic asymmetric elliptical boundary of Jeju Island centered near Hallasan
@@ -76,19 +73,19 @@ export class JejuFlightSurface {
     const baseSlope = 90.0 * coastFactor;
     const naturalHeight = Math.max(0.0, (hallasanShield + baseSlope) * coastFactor);
 
-    // Airport precinct blending:
-    // Core plateau within 800m is leveled at 36m
+    // Airport precinct & runway safety corridor continuous smooth blending:
+    // Core plateau (within 650m of airport center or 150m of runways) is leveled at 36m.
+    // Beyond the core, smoothly blends to natural volcanic terrain over a 1,600m transition.
     const distToAirport = Math.hypot(x, z);
-    if (distToAirport < 800) {
+    const blendDist = Math.min(distToAirport - 650, minRunwayDist - 150);
+
+    if (blendDist <= 0) {
       return this.elevationM;
     }
-    if (distToAirport < 2400) {
-      const t = Math.max(0, Math.min(1, (distToAirport - 800) / 1600));
+    if (blendDist < 1600) {
+      const t = blendDist / 1600;
       const blend = t * t * (3 - 2 * t);
-      // Northward sea descent: continuous smooth weighting towards sea level
-      const northWeight = Math.max(0, Math.min(1, -z / 1600));
-      const targetHeight = naturalHeight * (1 - northWeight) + Math.max(0.0, this.elevationM * (1 - blend)) * northWeight;
-      return this.elevationM * (1 - blend) + targetHeight * blend;
+      return this.elevationM * (1 - blend) + naturalHeight * blend;
     }
 
     return naturalHeight;
