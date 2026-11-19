@@ -7,7 +7,7 @@ import { DEPARTURE_GATE } from '../config/incheonDeparture.js';
 import { createDepartureStand } from './DepartureStand.js';
 import { createIncheonPavement } from './IncheonPavement.js';
 import { applyLogDepthOffset } from './RunwayMarkings.js';
-import { colourIncheonGround, createIncheonGroundTexture } from './IncheonGround.js';
+import { colourIncheonGround, incheonSurfaceMaterial, loadIncheonSatelliteTexture } from './IncheonGround.js';
 import { IncheonTraffic } from './IncheonTraffic.js';
 import { IncheonParkedAirliners } from './IncheonParkedAirliners.js';
 import { planParkedAirliners } from '../geospatial/incheonParking.js';
@@ -30,9 +30,19 @@ export const INCHEON_APRON_LAMPS = [
 ];
 
 function shape(points) { return new THREE.Shape(points.slice(0,-1).map(([x,z])=>new THREE.Vector2(x,-z))); }
-export async function loadIncheonAirport(base) {
+export async function loadIncheonAirport(base, options = {}) {
   const json=async file=> {const r=await fetch(base+file);if(!r.ok)throw new Error(`${file}: ${r.status}`);return r.json();};
-  const [source,patch,dressing,mask,trafficData,region]=await Promise.all([loadIncheonTerrain(base),json('patch.json'),json('dressing.json'),new THREE.TextureLoader().loadAsync(base+'land-mask.png'),json('traffic.json'),loadSihwaRegion(base)]);
+  const [source,patch,dressing,mask,trafficData,region,satelliteTexture]=await Promise.all([
+    loadIncheonTerrain(base),
+    json('patch.json'),
+    json('dressing.json'),
+    new THREE.TextureLoader().loadAsync(base+'land-mask.png'),
+    json('traffic.json'),
+    loadSihwaRegion(base),
+    options.satelliteTexture !== undefined
+      ? Promise.resolve(options.satelliteTexture)
+      : (options.loadSatellite !== false ? loadIncheonSatelliteTexture(base) : Promise.resolve(null)),
+  ]);
   const terrain=new IncheonFlightSurface(source,region);
   terrain.mesh=new THREE.Group();
   const group=new THREE.Group();
@@ -45,14 +55,30 @@ export async function loadIncheonAirport(base) {
     materials: bridgeMaterials,
   });
   group.add(departureBridge.group);
-  const groundMaterial=new THREE.MeshLambertMaterial({vertexColors:true,map:createIncheonGroundTexture(),alphaMap:mask,alphaTest:.5});
+  const groundMaterial = incheonSurfaceMaterial({
+    satelliteTexture,
+    alphaMap: mask,
+  });
   for(const geometry of [terrainGeometry(12000,480,height,true)]) {
-    colourIncheonGround(geometry);
+    if (!satelliteTexture) colourIncheonGround(geometry);
     terrain.mesh.add(new THREE.Mesh(geometry,groundMaterial));
   }
+  terrain.satelliteTexture = satelliteTexture;
+  terrain.groundMaterial = groundMaterial;
   const trees=generatePlanting(patch,dressing).filter(t=>!terrain.isRunwaySafetyArea(t.x,t.z));
   const local=terrainGeometry(2000,160,height);
-  const city=new THREE.Mesh(local,new THREE.MeshLambertMaterial({map:createCityGround(patch,dressing,trees)}));
+  if (satelliteTexture) {
+    const pos = local.attributes.position;
+    const uv = local.attributes.uv;
+    for (let i = 0; i < pos.count; i++) {
+      uv.setXY(i, pos.getX(i) / 12000 + 0.5, 0.5 - pos.getZ(i) / 12000);
+    }
+    uv.needsUpdate = true;
+  }
+  const cityMaterial = satelliteTexture
+    ? groundMaterial
+    : new THREE.MeshLambertMaterial({ map: createCityGround(patch, dressing, trees) });
+  const city = new THREE.Mesh(local, cityMaterial);
   terrain.mesh.add(city);
   const records=[],colliders=[...sihwa.colliders];
   for(const feature of patch.features.filter(f=>f.kind==='building')) for(const points of feature.parts) {
