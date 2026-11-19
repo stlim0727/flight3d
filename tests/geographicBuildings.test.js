@@ -59,3 +59,68 @@ test('disposal aborts pending tile fetches and ignores their late results', asyn
   assert.equal(layer.group.children.length, 0);
   assert.equal(layer.tiles.size, 0);
 });
+
+test('loaded footprints collide by aircraft position regardless of camera position', async () => {
+  const { Vector3, Quaternion } = await import('three');
+  const { CollisionDetector } = await import('../src/physics/CollisionDetector.js');
+  const terrain = { getHeight: () => 44, getNormal: () => new Vector3(0, 1, 0) };
+  const layer = new GeographicBuildings({
+    origin: { latitude: 0, longitude: 0 },
+    project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
+    terrain,
+    archive: { getZxy: async (_zoom, x, y) => x === 8192 && y === 8192 ? { data: buildingTile() } : undefined },
+  });
+  terrain.geographicBuildingLayer = layer;
+  const position = new Vector3(85, 50, 140);
+  const distantCamera = new Vector3(30000, 100, 30000);
+  const probe = { pos: position, radius: 1 };
+  layer.update(position, distantCamera);
+  assert.equal(layer.checkCollision([probe]), null);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(layer.checkCollision([probe]).point.equals(position), true);
+  assert.equal(layer.checkCollision([{ ...probe, pos: new Vector3(85, 54.1, 140) }]), null);
+
+  const detector = new CollisionDetector(terrain, null);
+  const result = detector.checkCollision(position, new Quaternion(), new Vector3(0, 0, -70), 0, 0, 0);
+  assert.equal(result?.type, 'BUILDING');
+
+  // The tile remains visible to the old camera but no longer participates in collision.
+  layer.update(distantCamera, position);
+  assert.equal(layer.group.children.length, 1);
+  assert.equal(layer.checkCollision([probe]), null);
+  layer.update(distantCamera);
+  assert.equal(layer.group.children.length, 0);
+  layer.dispose();
+  assert.equal(terrain.geographicBuildingLayer, undefined);
+});
+
+test('protects runway safety areas from streamed footprints and probe collisions', async () => {
+  const { Vector3 } = await import('three');
+  const terrain = { getHeight: () => 44 };
+  const protectedPoint = (x, z) => x > 84 && x < 86 && z > 139 && z < 141;
+  const layer = new GeographicBuildings({
+    origin: { latitude: 0, longitude: 0 },
+    project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
+    terrain,
+    isRunwaySafetyArea: protectedPoint,
+    archive: { getZxy: async () => ({ data: buildingTile() }) },
+  });
+  layer.update(new Vector3(85, 50, 140));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(layer.group.children.length, 1, 'building vertices and center are outside the protected point');
+  assert.equal(layer.checkCollision([{ pos: new Vector3(85, 50, 140), radius: 1 }]), null);
+  assert.ok(layer.checkCollision([{ pos: new Vector3(90, 50, 140), radius: 1 }]));
+  layer.dispose();
+
+  const overlapping = new GeographicBuildings({
+    origin: { latitude: 0, longitude: 0 },
+    project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
+    terrain,
+    isRunwaySafetyArea: (x, z) => x < 1 && z > 200,
+    archive: { getZxy: async () => ({ data: buildingTile() }) },
+  });
+  overlapping.update(new Vector3(85, 50, 140));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(overlapping.group.children.length, 0, 'a footprint corner enters the safety area');
+  overlapping.dispose();
+});
