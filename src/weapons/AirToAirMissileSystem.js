@@ -1,5 +1,6 @@
-import { banditPilotCommand } from '../pilot/BanditPilot.js';
+import { banditCountermeasureRequest, banditPilotCommand } from '../pilot/BanditPilot.js';
 import { PilotPerception } from '../pilot/PilotPerception.js';
+import { TerrainPerception } from '../pilot/TerrainPerception.js';
 import { combatSkill, evasionDemand } from '../pilot/CombatSkills.js';
 import * as THREE from 'three';
 import { ChaffDispenser } from './Chaff.js';
@@ -119,9 +120,17 @@ export class BanditTarget {
     for (let i = 0; i < steps; i++) {
       const clearance = this.position.y - terrainHeight(this.position.x, this.position.z);
       this.threatResponse.update(step, this, missiles, terrainHeight);
+      const incapacitated = this.flight.pilotPhysiology.isGLOC;
+      if (incapacitated) {
+        this.pendingPilotCommand = null;
+        this.countermeasureRequest = null;
+      }
       if (this.pilotDecisionRemaining <= 1e-9) {
-        if (this.pendingPilotCommand) this.flight.applyCommand(this.pendingPilotCommand);
-        this.pendingPilotCommand = this.samplePilotCommand(clearance);
+        if (this.pendingPilotCommand) {
+          const { controls, equipment } = this.pendingPilotCommand;
+          if (this.flight.applyCommand(controls)) this.countermeasureRequest = equipment;
+        }
+        if (!incapacitated) this.pendingPilotCommand = this.samplePilotCommand(clearance, terrainHeight);
         this.pilotDecisionRemaining += 0.2;
         this.pilotSampleTick += 24;
       }
@@ -136,7 +145,7 @@ export class BanditTarget {
     }
   }
 
-  samplePilotCommand(clearance) {
+  samplePilotCommand(clearance, terrainHeight) {
     const flight = this.flight;
     const attitude = flight.euler.setFromQuaternion(flight.quaternion, 'YXZ');
     const observation = this.pilotPerception.sample({
@@ -174,7 +183,19 @@ export class BanditTarget {
         ? altitude + 1000 - radioAltitude.mean : desiredAltitude),
       iasKnots: Atmosphere.msToKnots(demand.speedMps * Math.sqrt(density)),
     };
-    return banditPilotCommand(observation);
+    observation.terrain = this.terrainPerception.sample({
+      position: this.position,
+      quaternion: flight.quaternion,
+      getHeight: terrainHeight,
+    }, this.pilotSampleTick);
+    return {
+      controls: banditPilotCommand(observation),
+      equipment: banditCountermeasureRequest({
+        warning: response.confirmedId !== null && response.confirmedId === response.observedId
+          ? { trackId: response.confirmedId, channel: response.confirmedChannel } : null,
+        equipment: { chaff: this.chaff.remaining, flare: this.flare.remaining },
+      }),
+    };
   }
 
   respawn(position, orbit) {
@@ -204,7 +225,12 @@ export class BanditTarget {
       this.velocity.set(0, 0, -180);
     }
     this.pilotPerception = new PilotPerception({ mission: 'bandit' });
+    this.terrainPerception = new TerrainPerception({
+      azimuthsDeg: [-20, 0, 20],
+      elevationsDeg: [-10, 0, 10],
+    });
     this.pendingPilotCommand = null;
+    this.countermeasureRequest = null;
     this.pilotDecisionRemaining = 0;
     this.pilotSampleTick = 0;
     this.flight = o ? new BanditFlightModel(this.position, this.velocity) : null;
@@ -572,36 +598,32 @@ export class AirToAirMissileSystem {
     );
   }
 
-  _stepDecoyBurst(dt, target, threatId, burstCount, threatIds, bursts, dispenser, list, type, eventKey, events) {
-    if (!target.alive || threatId === null || !bursts || !dispenser) return;
-    let burst = bursts.get(threatId);
-    if (!burst) {
-      if (threatIds?.has(threatId)) return;
-      threatIds?.add(threatId);
-      burst = { remaining: burstCount, cooldownSec: 0, shotIndex: 0 };
-      bursts.set(threatId, burst);
-    } else if (burst.remaining > 0) {
-      burst.cooldownSec = Math.max(0, burst.cooldownSec - dt);
-    }
-    if (burst.remaining <= 0 || burst.cooldownSec > 1e-9) return;
-    const decoy = dispenser.dispense(target.position, this._decoyEjectVelocity(target, burst.shotIndex), {
-      sourceId: target.id,
-    });
-    if (!decoy) {
-      burst.remaining = 0;
+  _stepDecoyBurst(dt, target, requestedTrack, burstCount, threatIds, bursts, dispenser, list, type, eventKey, events) {
+    if (!target.alive || target.flight?.pilotPhysiology.isGLOC) {
+      bursts.clear();
       return;
     }
-    burst.remaining--;
-    burst.shotIndex++;
-    burst.cooldownSec = DECOY_BURST_INTERVAL_S;
-    list.push(decoy);
-    events.push({
-      type,
-      [eventKey]: decoy,
-      target,
-      remaining: dispenser.remaining,
-      timeSec: this.elapsed,
-    });
+    if (requestedTrack != null && !threatIds.has(requestedTrack) && dispenser.remaining > 0) {
+      threatIds.add(requestedTrack);
+      bursts.set(requestedTrack, { remaining: burstCount, cooldownSec: 0, shotIndex: 0 });
+    }
+    for (const [track, burst] of bursts) {
+      burst.cooldownSec = Math.max(0, burst.cooldownSec - dt);
+      if (burst.cooldownSec > 1e-9) continue;
+      const decoy = dispenser.dispense(target.position, this._decoyEjectVelocity(target, burst.shotIndex), {
+        sourceId: target.id,
+      });
+      if (!decoy) {
+        bursts.delete(track);
+        continue;
+      }
+      burst.remaining--;
+      burst.shotIndex++;
+      burst.cooldownSec = DECOY_BURST_INTERVAL_S;
+      if (burst.remaining === 0) bursts.delete(track);
+      list.push(decoy);
+      events.push({ type, [eventKey]: decoy, target, remaining: dispenser.remaining, timeSec: this.elapsed });
+    }
   }
 
   _step(dt, world, events) {
@@ -610,11 +632,12 @@ export class AirToAirMissileSystem {
       : this.countermeasurePolicy === 'single' ? 1 : 0;
     for (const target of this.targets) {
       target.update(dt, world.terrainHeight, this.missiles);
-      const threatId = target.threatResponse.confirmedId;
+      const request = target.countermeasureRequest;
+      target.countermeasureRequest = null;
       if (burstCount > 0) {
-        this._stepDecoyBurst(dt, target, threatId, burstCount, target.chaffThreatIds, target.chaffBursts, target.chaff,
+        this._stepDecoyBurst(dt, target, request?.type === 'chaff' ? request.trackId : null, burstCount, target.chaffThreatIds, target.chaffBursts, target.chaff,
           this.chaffClouds, 'chaff_dispense', 'chaff', events);
-        this._stepDecoyBurst(dt, target, threatId, burstCount, target.flareThreatIds, target.flareBursts, target.flare,
+        this._stepDecoyBurst(dt, target, request?.type === 'flare' ? request.trackId : null, burstCount, target.flareThreatIds, target.flareBursts, target.flare,
           this.flares, 'flare_dispense', 'flare', events);
       }
       if (!target.alive) {

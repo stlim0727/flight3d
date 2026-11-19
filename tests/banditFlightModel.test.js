@@ -109,3 +109,36 @@ test('Bandit validates pilot commands and blocks new surface deflection during G
   assert.ok(Math.abs(flight.aero.elevator) <= before);
   assert.notEqual(flight.aero.elevator, -1);
 });
+
+test('forward terrain cues affect Bandit commands only after the pilot delay', () => {
+  const clear = patrol();
+  const ridge = patrol();
+  // The ridge is ahead of the aircraft, while both radio altimeters see flat ground.
+  const terrain = (x, z) => z > 650 && z < 950 ? 3700 : 0;
+  for (let i = 0; i < 24; i++) {
+    clear.update(1 / 120);
+    ridge.update(1 / 120, terrain);
+    assert.deepEqual(ridge.flight.command, clear.flight.command);
+  }
+  clear.update(1 / 120);
+  ridge.update(1 / 120, terrain);
+  assert.ok(ridge.flight.command.elevator > clear.flight.command.elevator);
+});
+
+test('Bandit drops queued commands during G-LOC and waits for a fresh decision', () => {
+  const target = patrol();
+  const dt = 1 / 120;
+  target.update(dt);
+  const initial = target.flight.command;
+  const physiology = target.flight.pilotPhysiology;
+  physiology.isGLOC = true;
+  physiology.glocTimer = 1;
+  for (let i = 0; i < 24; i++) target.update(dt);
+  assert.equal(target.pendingPilotCommand, null);
+  assert.equal(target.flight.command, initial);
+  physiology.isGLOC = false;
+  for (let i = 0; i < 47; i++) target.update(dt);
+  assert.equal(target.flight.command, initial);
+  target.update(dt);
+  assert.notEqual(target.flight.command, initial);
+});

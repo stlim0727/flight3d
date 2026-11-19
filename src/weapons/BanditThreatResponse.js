@@ -26,6 +26,7 @@ export class BanditThreatResponse {
     this.phase = 'patrol';
     this.observedId = null;
     this.confirmedId = null;
+    this.confirmedChannel = null;
     this.exposure = 0;
     this.memory = 0;
     this.weight = 0;
@@ -64,7 +65,7 @@ export class BanditThreatResponse {
         || !this._visible(aircraft.position, missile.position, range, terrainHeight)) continue;
       const bearingRad = Math.hypot(this._relative.x, this._relative.z) < 1
         ? null : Math.atan2(this._relative.x, -this._relative.z);
-      warnings.push({ id: missile.id, channel: hasPlume ? 'optical' : 'radar', bearingRad });
+      warnings.push({ id: missile.id, channel: hasRadarWarning ? 'radar' : 'optical', bearingRad });
     }
     return warnings;
   }
@@ -93,6 +94,7 @@ export class BanditThreatResponse {
       }
       this.heading = bearing === null ? courseRad : bearing + this.turnSide * Math.PI / 2;
       this.confirmedId = observedId;
+      this.confirmedChannel = observed.channel;
       this.memory = model.memorySeconds;
     } else {
       this.memory = Math.max(0, this.memory - dt);
@@ -102,7 +104,10 @@ export class BanditThreatResponse {
     const tau = demand ? model.responseSeconds : model.recoverySeconds;
     this.weight += (demand - this.weight) * (1 - Math.exp(-dt / tau));
     this.phase = demand ? 'evade' : this.weight > 0.01 ? 'recover' : observed ? 'detect' : 'patrol';
-    if (!demand && this.weight <= 0.01) this.confirmedId = null;
+    if (!demand && this.weight <= 0.01) {
+      this.confirmedId = null;
+      this.confirmedChannel = null;
+    }
   }
 
   _visible(from, to, range, terrainHeight) {

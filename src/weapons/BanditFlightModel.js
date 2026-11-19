@@ -27,9 +27,8 @@ export class BanditFlightModel {
     this.engines.bindMassProperties(this.aero.massProperties);
     this.aero.massProperties.setConfiguration(0, 0);
     this.aero.syncMassProperties();
-    this.controls = { setVirtualInput: (axis, value) => { this.demand[axis] = value; } };
+    this.controls = {};
     Object.defineProperty(this.controls, 'throttle', { get: () => this.command.throttle });
-    this.demand = { elevator: 0, aileron: 0, rudder: 0, throttle: 0.5, brakes: 0 };
     this.pilotPhysiology = new PilotPhysiology();
     this.gForceFilter = new GForceFilter();
     this.gForce = 1;
@@ -53,9 +52,8 @@ export class BanditFlightModel {
     this.quaternion.setFromEuler(this.euler.set(gamma + (trim.alphaDeg ?? 4) * Math.PI / 180, -heading, 0));
     this.aero.elevator = trim.elevator;
     this.aero.pitchTrim = trim.pitchTrimDeg;
-    this.demand.elevator = trim.elevator;
-    this.demand.throttle = trim.feasible ? trim.throttle : 0.7;
-    this.command = { ...this.demand };
+    this.command = { elevator: trim.elevator, aileron: 0, rudder: 0,
+      throttle: trim.feasible ? trim.throttle : 0.7, brakes: 0 };
     this.engines.n1.fill(this.engines.idleN1 + this.command.throttle * (this.engines.togaN1 - this.engines.idleN1));
     this.measure(1 / 120, 0, 1000);
   }
@@ -67,6 +65,10 @@ export class BanditFlightModel {
 
   /** Guidance limits are pilot commands, never clamps on velocity or forces. */
   guide(heading, altitude, speed) {
+    this.applyCommand(this.computeGuidance(heading, altitude, speed));
+  }
+
+  computeGuidance(heading, altitude, speed) {
     this.euler.setFromQuaternion(this.quaternion, 'YXZ');
     this.forward.set(0, 0, -1).applyQuaternion(this.quaternion);
     const currentHeading = Math.atan2(this.forward.x, -this.forward.z);
@@ -79,7 +81,10 @@ export class BanditFlightModel {
       * (this.aero.CL0_clean + this.aero.CLa * 12 * Math.PI / 180)
       / (this.aero.mass * Atmosphere.G0);
     const bankLimit = radToDeg(Math.acos(1 / Math.max(1, Math.min(7, availableLoad))));
-    flyBank(this, clamp(radToDeg(error) * 1.8, -bankLimit, bankLimit), tel);
+    let aileron = 0;
+    flyBank({ aero: this.aero, angularVelocity: this.angularVelocity,
+      controls: { setVirtualInput: (_axis, value) => { aileron = value; } },
+    }, clamp(radToDeg(error) * 1.8, -bankLimit, bankLimit), tel);
     const targetVz = clamp((altitude - this.position.y) * 0.18, -35, 45);
     const bank = -this.euler.z;
     const tas = Math.max(30, this.aero.tas);
@@ -97,13 +102,12 @@ export class BanditFlightModel {
     const authority = Math.max(1, this.aero.qDyn * this.aero.wingArea * this.aero.meanChord
       * -this.aero.Cm_de * Math.PI / 9 * (1 - 0.8 * this.aero.separation));
     const elevator = clamp(this.aero.elevator + (desiredMoment - this.result.momentBody.x) / authority, -0.8, 0.8);
-    this.demand.elevator = elevator;
     const density = Atmosphere.getConditions(this.position.y).densityRatio;
     const targetIas = Atmosphere.msToKnots(speed * Math.sqrt(density));
-    this.demand.throttle = clamp(0.5 + (targetIas - tel.iasKnots) * 0.035 + targetVz * 0.02, 0.05, 1);
+    const throttle = clamp(0.5 + (targetIas - tel.iasKnots) * 0.035 + targetVz * 0.02, 0.05, 1);
     // Sideslip and yaw-rate feedback coordinate the turn through the rudder.
-    this.demand.rudder = clamp(this.aero.beta * 2 + this.angularVelocity.y * 0.6, -0.6, 0.6);
-    this.applyCommand(this.demand);
+    const rudder = clamp(this.aero.beta * 2 + this.angularVelocity.y * 0.6, -0.6, 0.6);
+    return { elevator, aileron, rudder, throttle, brakes: 0 };
   }
 
   applyCommand(command) {
