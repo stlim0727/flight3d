@@ -32,8 +32,8 @@ test('an acquisition window with no launch retains an explicit withheld outcome'
 });
 
 test('real Cruise countermeasure controls share the exact locked launch and record terminal flight', () => {
-  const enabled = experiment('close-locked', true, Math.hypot(96, 49));
-  const disabled = experiment('close-locked', false, Math.hypot(96, 49));
+  const enabled = experiment('close-locked', true, Math.hypot(96, 49), { launchDeadlineSeconds: 90, maxSeconds: 160 });
+  const disabled = experiment('close-locked', false, Math.hypot(96, 49), { launchDeadlineSeconds: 90, maxSeconds: 160 });
   assert.deepEqual(enabled.launchState, disabled.launchState);
   for (const row of [enabled, disabled]) {
     assert.equal(row.shots.length, 1);

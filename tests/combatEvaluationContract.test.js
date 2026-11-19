@@ -4,6 +4,8 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { Vector3 } from 'three';
+import { runCoastalCombatPlay } from '../scripts/lib/coastalCombatPlay.mjs';
 import { ReplayStore, createMemoryIndexedDB } from '../src/replay/ReplayStore.js';
 import { combatExperimentConfig, runCombatExperiment } from '../scripts/lib/combatExperiment.mjs';
 
@@ -69,7 +71,7 @@ test('coastal diagnostics produces an importable flight3d.sortie.v1 replay and c
   assert.ok(Number.isFinite(metrics.controlLoss.controlLossTotalSeconds));
 });
 
-test('300s coastal pursuit sortie links shots to engagement analysis and round-trips through ReplayStore and CLI', async () => {
+test('coastal CLI exports a sortie that round-trips through ReplayStore', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'flight-coastal-t2-'));
   const output = join(dir, 'coastal-t2.json');
   try {
@@ -78,7 +80,7 @@ test('300s coastal pursuit sortie links shots to engagement analysis and round-t
       [
         'scripts/run-combat-experiment.mjs',
         '--scenario', 'coastal',
-        '--seconds', '300',
+        '--seconds', '5',
         '--attack-skill', 'pursuit',
         '--evasion-skill', 'legacy-break',
         '--countermeasure-policy', 'single',
@@ -108,21 +110,35 @@ test('300s coastal pursuit sortie links shots to engagement analysis and round-t
 
     const report = JSON.parse(readFileSync(output, 'utf8'));
     const result = report.results[0];
-    assert.ok(result.shots.length >= 1);
     assert.equal(
       result.shotBreakdown.kills + result.shotBreakdown.survivedFuzeBlasts
         + result.shotBreakdown.groundImpacts + result.shotBreakdown.expiredMisses
         + result.shotBreakdown.unresolved,
       result.shots.length,
     );
-    assert.ok(result.diagnostics.analysis.missiles.length >= 1);
-    const analyzedIds = new Set(result.diagnostics.analysis.missiles.map(m => m.missileId));
-    for (const shot of result.shots) {
-      const trackId = result.diagnostics.trackMissileIds[shot.missileId];
-      assert.ok(analyzedIds.has(trackId));
-    }
     assert.ok(result.uniqueOpponentsKilled <= result.kills);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a controlled coastal encounter links recorded shots to engagement analysis', () => {
+  const config = combatExperimentConfig({
+    scenario: 'coastal', seconds: '20', 'attack-skill': 'close-pursuit', diagnostics: true,
+  });
+  const { results: [result] } = runCoastalCombatPlay(config, undefined, {
+    setupEncounter({ combat, world }) {
+      const target = combat.targets[0];
+      const forward = new Vector3(0, 0, -1).applyQuaternion(world.quaternion);
+      const position = world.position.clone().addScaledVector(forward, 1500);
+      target.respawn(position, null);
+      target.velocity.copy(world.velocity);
+      target.quaternion = world.quaternion.clone();
+    },
+  });
+  assert.equal(result.shots.length, 1);
+  const analyzed = new Set(result.diagnostics.analysis.missiles.map(m => m.missileId));
+  for (const shot of result.shots) {
+    assert.ok(analyzed.has(result.diagnostics.trackMissileIds[shot.missileId]));
   }
 });

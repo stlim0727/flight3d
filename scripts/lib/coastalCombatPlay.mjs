@@ -73,7 +73,7 @@ function guideCoastalPilot(sim, { headingRad, altitudeM, speedMps }) {
  * Contact positions are sampled at 5 Hz within 12 km and terrain line of sight.
  * This sensor is an experiment assumption, not a modeled F16 radar/visual system.
  */
-export function runCoastalCombatPlay(config, progress = () => {}) {
+export function runCoastalCombatPlay(config, progress = () => {}, { setupEncounter } = {}) {
   const dt = 1 / 120;
   const pilot = createHeadlessSimulation({ aircraftId: 'F16', airportId: 'coastal' });
   pilot.setPreset('cruise');
@@ -88,6 +88,7 @@ export function runCoastalCombatPlay(config, progress = () => {}) {
   const world = { active: true, onGround: false, position: pilot.position, velocity: pilot.linearVelocity,
     quaternion: pilot.quaternion, terrainHeight };
   combat.update(dt, world);
+  setupEncounter?.({ combat, world });
   combat.selectNextTarget();
   const initialState = { position: pilot.position.toArray(), velocity: pilot.linearVelocity.toArray(),
     targets: combat.targets.map(t => t.position.toArray()) };

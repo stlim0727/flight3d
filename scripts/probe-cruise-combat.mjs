@@ -36,7 +36,7 @@ export function guidePlayer(pilot, target, commandedSpeed) {
   }
 }
 
-export function experiment(policy, countermeasures, commandedSpeed, { maxSeconds = 100 } = {}) {
+export function experiment(policy, countermeasures, commandedSpeed, { maxSeconds = 100, launchDeadlineSeconds = 75 } = {}) {
   assert.ok(['locked', 'close-locked', 'near-locked'].includes(policy));
   assert.ok(Number.isFinite(commandedSpeed) && commandedSpeed > 0);
   assert.ok(Number.isFinite(maxSeconds) && maxSeconds > 0);
@@ -80,7 +80,7 @@ export function experiment(policy, countermeasures, commandedSpeed, { maxSeconds
     const ready = locked && combat.lockedTarget.position.distanceTo(pilot.position) <= rangeLimitM;
     // Isolate one locked IR shot; a second shot at the same soon-dead target
     // would turn a successful first shot into a misleading extra 'miss'.
-    if (ready && combat.remaining && time < 75 && shots.length === 0) {
+    if (ready && combat.remaining && time < launchDeadlineSeconds && shots.length === 0) {
       const m = combat.fire(world);
       if (m) {
         assert.equal(m.launchLocked, true);

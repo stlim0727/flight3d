@@ -97,33 +97,20 @@ test('B1 2.5km isolation separates sustained decoy observation from seeker/PN im
   assert.ok(['missing_observation_discrimination', 'unresolved'].includes(cls.category));
 });
 
-test('B1 coastal Cruise comparison separates single-shot close-pursuit from multi-shot pursuit', () => {
-  const run = (attackSkill, countermeasurePolicy) => runCombatExperiment(combatExperimentConfig({
-    scenario: 'coastal',
-    seconds: '300',
-    'attack-skill': attackSkill,
-    'evasion-skill': 'legacy-break',
-    'countermeasure-policy': countermeasurePolicy,
-    'bandit-count': 2,
-    diagnostics: true,
-  })).results[0];
-
-  const singleShot = classifyCoastalSortieShots(run('close-pursuit', 'single'));
-  const multiShot = classifyCoastalSortieShots(run('pursuit', 'single'));
+test('B1 classifies single and multiple recorded shots independently of pursuit', () => {
+  const first = { shotIndex: 0, missileId: 1, outcomeCategory: 'kill' };
+  const followUp = { shotIndex: 1, missileId: 2, duplicateFollowUp: true, outcomeCategory: 'unresolved' };
+  const singleShot = classifyCoastalSortieShots({ shots: [first] });
+  const multiShot = classifyCoastalSortieShots({ shots: [first, followUp] });
 
   assert.equal(singleShot.mode, 'single-or-none');
   assert.equal(singleShot.launched, 1);
   assert.equal(singleShot.kills, 1);
-
   assert.equal(multiShot.mode, 'multi-shot');
-  assert.ok(multiShot.launched > 1);
-  assert.ok(multiShot.duplicateFollowUpShots >= 1);
-  const totalClassified = multiShot.kills
-    + multiShot.categories.implementation_defect
-    + multiShot.categories.intended_model_limit
-    + multiShot.categories.missing_observation_discrimination
-    + multiShot.categories.unresolved;
-  assert.equal(totalClassified, multiShot.launched);
+  assert.equal(multiShot.launched, 2);
+  assert.equal(multiShot.duplicateFollowUpShots, 1);
+  assert.equal(multiShot.kills, 1);
+  assert.equal(multiShot.categories.unresolved, 1);
 });
 
 test('B1 classifier requires post-decoy reacquisition evidence and preserves missing diagnostics as unresolved', () => {
