@@ -5,6 +5,7 @@ import { applyLogDepthOffset } from './RunwayMarkings.js';
 import { pavementRibbon } from './IncheonPavement.js';
 import { loadIncheonSatelliteTexture } from './IncheonGround.js';
 import { colourJejuGround, jejuSurfaceMaterial } from './JejuGround.js';
+import { JejuTileStreamer } from './JejuTileStreamer.js';
 
 export async function loadJejuAirport(base = '', options = {}) {
   const terrain = new JejuFlightSurface(JEJU_AIRFIELD);
@@ -47,6 +48,15 @@ export async function loadJejuAirport(base = '', options = {}) {
   terrain.mesh.add(terrainMesh);
   terrain.satelliteTexture = satelliteTexture;
   terrain.groundMaterial = groundMaterial;
+
+  let tileStreamer = null;
+  if (options.streamTiles !== false) {
+    tileStreamer = new JejuTileStreamer(terrainMesh, terrain, options.streamerOptions);
+    terrain.tileStreamer = tileStreamer;
+    if (options.autoloadTiles !== false) {
+      tileStreamer.loadIslandMacroTiles().catch(() => {});
+    }
+  }
 
   // 2. Pavement & Cross Runways
   const pavementMat = new THREE.MeshStandardMaterial({
@@ -160,6 +170,7 @@ export async function loadJejuAirport(base = '', options = {}) {
     terrain,
     group,
     nightLighting,
+    tileStreamer,
     towerCab: { position: new THREE.Vector3(-80, JEJU_AIRFIELD.elevationM + 49, 260) },
     isOnRunway: (x, z) => terrain.isOnRunway(x, z),
     isRunwaySafetyArea: (x, z) => terrain.isRunwaySafetyArea(x, z),
@@ -177,5 +188,8 @@ export async function loadJejuAirport(base = '', options = {}) {
       return null;
     },
     getGazeTargets() { return gazeTargets; },
+    dispose() {
+      tileStreamer?.dispose();
+    },
   };
 }
