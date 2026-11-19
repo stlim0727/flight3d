@@ -17,9 +17,8 @@
 .flight-strip-v2 .hud-top-actions :is(.ap-bar, .ap-toggle-btn) { width: 86px; }
 .flight-strip-v2 .hud-top-actions .ap-toggle-btn { flex-basis: 86px; }
 .flight-strip-v2 .hud-top-actions #btn-camera-toggle {
-  width: 94px;
-  flex-basis: 94px;
-  font: 700 11px system-ui;
+  width: 44px;
+  flex-basis: 44px;
 }
 .flight-strip-v2 .hud-top-actions .ap-toggle-btn::after {
   max-width: 100%;
@@ -74,17 +73,25 @@
 .flight-strip-v2 .flight-toolbar #btn-flaps-ret { margin-inline-end: calc(-1 * var(--strip-gap)); border-radius: 6px 0 0 6px; }
 .flight-strip-v2 .flight-toolbar #btn-flaps-ext { border-radius: 0 6px 6px 0; }
 .flight-strip-v2 .flight-toolbar #open-flight-more { --strip-button-width: 48px; font: 700 11px system-ui; }
-.flight-strip-v2 .flight-toolbar #btn-camera-toggle { --strip-button-width: 94px; font: 700 11px system-ui; }
+/* Issue #880: the view menu trigger is a camera icon; the panel names each view
+   and the current one stays in the trigger's accessible name and tooltip. */
+.flight-strip-v2 #btn-camera-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: #ecfeff;
+}
 .flight-strip-v2 #btn-camera-toggle .camera-toggle-icon { display: none; }
 .flight-strip-v2 #btn-camera-toggle::after {
   display: block !important;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  content: "";
+  width: 22px;
+  height: 22px;
+  background: currentColor;
+  -webkit-mask: var(--toolbar-icon) center / contain no-repeat;
+  mask: var(--toolbar-icon) center / contain no-repeat;
 }
-.flight-strip-v2 #btn-camera-toggle[data-current-view]::after { content: 'CAM ' attr(data-current-view) ' ▾'; }
-.flight-strip-v2 #btn-camera-toggle:not([data-current-view])::after { content: 'CAM ▾'; }
 body.flight-strip-v2.demo-active .flight-toolbar > #btn-skip-demo {
   --strip-button-width: 106px;
   padding-inline: 4px;
@@ -161,7 +168,6 @@ body.flight-strip-v2.demo-active .flight-toolbar > #btn-skip-demo {
   .flight-strip-v2 .hud-top-bar .flight-toolbar > .btn {
     flex-basis: min(var(--strip-button-width, 44px), var(--strip-button-limit, 44px));
   }
-  .flight-strip-v2 .flight-toolbar #btn-camera-toggle { flex: 1 1 64px; }
 }
 @media (max-width: 374px) {
   .flight-strip-v2 .flight-toolbar #btn-gear,
@@ -169,10 +175,6 @@ body.flight-strip-v2.demo-active .flight-toolbar > #btn-skip-demo {
   .flight-strip-v2 .flight-toolbar #btn-reverser { --strip-button-limit: 38px; }
   .flight-strip-v2 .flight-toolbar #open-flight-more { --strip-button-limit: 42px; }
   .flight-strip-v2 .flight-toolbar :is(#btn-flaps-ret, #btn-flaps-ext) { --strip-button-limit: 32px; }
-  .flight-strip-v2 #btn-camera-toggle[data-compact-view]::after {
-    content: 'CAM ' attr(data-compact-view) '▾';
-    font-size: 10px;
-  }
 }
 @media (min-width: 667px) and (max-width: 1023px) and (orientation: landscape) {
   .flight-strip-v2 .flight-toolbar :is(#btn-flaps-ret, #btn-flaps-ext) { --strip-button-width: 30px; }

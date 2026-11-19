@@ -165,6 +165,9 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   cameraToggleBtn.id = 'btn-camera-toggle';
   cameraToggleBtn.className = 'btn flight-camera-btn flight-camera-toggle-btn';
   cameraToggleBtn.type = 'button';
+  // Issue #880: in flight the trigger is a camera icon; its panel names each view.
+  // The legacy replay strip keeps its chevron and hides this mask.
+  setToolbarIcon(cameraToggleBtn, 'camera');
   cameraStrip.append(cameraToggleBtn);
 
   const updateCameraToggleState = () => {
@@ -514,12 +517,11 @@ export function updateControlState(telemetry, camera, options = {}) {
       ? t('ui.camera.current', { name: zoomed ? `${viewName} · ${zoomValue}` : viewName })
       : fullLabel;
     camButton.setAttribute('title', titleText);
-    if (active) {
+    if (active && document.body.classList.contains('flight-strip-v2')) {
+      // The icon carries no text, so the current view stays in its name and tooltip.
       const trigger = document.getElementById('btn-camera-toggle');
-      const shortLabel = t(`ui.strip.camera.${name}`);
-      trigger?.setAttribute('data-current-view', shortLabel);
-      trigger?.setAttribute('data-compact-view', getLanguage() === 'ko' && name === 'cockpit' ? '조종' : shortLabel);
-      if (document.body.classList.contains('flight-strip-v2')) trigger?.setAttribute('aria-label', titleText);
+      trigger?.setAttribute('aria-label', titleText);
+      trigger?.setAttribute('title', titleText);
     }
   }
   const toggle = document.getElementById('btn-touch-toggle');

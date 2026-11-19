@@ -4,7 +4,8 @@
  * own colour, the disabled grey/opacity and the idle dimming all apply to it
  * exactly as they did to the text labels. Flaps keep their angle as text under
  * the icon. The reverser (`REV`, as cockpits print it), takeover and the camera
- * views keep their short text labels.
+ * views keep their short text labels; the in-flight camera menu trigger is a
+ * camera icon whose panel names each view (issue #880).
  */
 const SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
 
@@ -24,6 +25,8 @@ export const TOOLBAR_ICONS = Object.freeze({
   // Spoilers: the same airfoil family as the flap icon with its upper-surface
   // panel always drawn raised; the pressed button state shows whether they are out.
   spoilers: `${WING}<path d="M10 10.5 16 4"/>`,
+  // Issue #880: the in-flight view menu trigger. The open panel lists every view by name.
+  camera: '<path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h3l1.5-2.5h6L16.5 7h3A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.5"/>',
   'fullscreen-enter': '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
   'fullscreen-exit': '<path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/>',
 });
