@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(assets):** add decimated LOD variants for 1 MiB+ GLBs to the 3D asset gallery
+  - `npm run build:lod` simplifies every `public/models` GLB of at least 1 MiB to 10% of its triangles with meshoptimizer and writes the result to `public/models/lod/`, preserving Draco compression, node names and materials.
+  - Variants that cut the payload by less than 15% are dropped, so the texture-bound Cessna 172 gets no near-duplicate; the two 737 cockpits (39% / 52% smaller) and the F-16 (24% smaller) gain gallery entries marked `LOD`.
+  - Runtime aircraft and cockpit loaders still use the full assets; see [asset LODs](docs/development/asset-lod.md).
 - **fix(effects):** avoid scene-wide shader recompiles on the first explosion
   - Explosion flash lights now stay visible at zero intensity instead of being hidden. Three counts visible point lights in every lit material's program key, so the old visibility toggle rebuilt the whole scene on impact.
   - The explosion's flipbook, spark and shockwave programs are linked behind the existing startup shader gate, and one reusable flash light replaces the four-light pool.
