@@ -65,6 +65,14 @@
       "description": "Top of Descent (TOD)"
     },
     {
+      "ident": "CHUJA",
+      "type": "fix",
+      "latitude": 33.9620,
+      "longitude": 126.2950,
+      "altitudeFt": 10000,
+      "description": "Chuja Island Navigational Beacon & Emergency Diversion Fix"
+    },
+    {
       "ident": "TAMNA",
       "type": "fix",
       "latitude": 33.7800,

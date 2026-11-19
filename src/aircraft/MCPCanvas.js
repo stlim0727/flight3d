@@ -50,7 +50,8 @@ export class MCPCanvas {
     if (state.apModes !== undefined) {
       this.app = state.apModes.includes('APP');
       this.altHold = state.apModes.includes('ALT');
-      this.lnav = state.apModes.includes('HDG');
+      this.lnav = state.apModes.includes('LNAV') || state.apModes.includes('HDG');
+      this.vnav = state.apModes.includes('VNAV');
     }
     if (state.apArmed !== undefined) this.atArm = state.apArmed;
     if (state.isStalled || state.warnings?.length) this.masterCaution = true;
