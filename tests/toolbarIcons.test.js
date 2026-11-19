@@ -23,6 +23,7 @@ test('issue #880: the in-flight camera menu trigger draws the camera icon, not a
   const panels = await readFile(new URL('../src/ui/FlightPanels.js', import.meta.url), 'utf8');
   assert.match(panels, /setToolbarIcon\(cameraToggleBtn, 'camera'\)/);
   assert.match(css, /#btn-camera-toggle::after \{[^}]*mask: var\(--toolbar-icon\)/);
+  assert.match(css, /#btn-camera-toggle::before \{[^}]*content: "▾"/, 'menu arrow like 보조 ▾');
   assert.doesNotMatch(css, /'CAM /);
   assert.doesNotMatch(panels, /data-(current|compact)-view/);
 });
