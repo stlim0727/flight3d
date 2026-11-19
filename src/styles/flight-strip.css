@@ -1,0 +1,222 @@
+.flight-strip-v2 .hud-top-bar {
+  --strip-gap: 4px;
+  --strip-edge: 8px;
+  left: max(var(--strip-edge), env(safe-area-inset-left));
+  right: max(var(--strip-edge), env(safe-area-inset-right));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--strip-gap);
+  height: auto;
+}
+.flight-strip-v2 .hud-top-bar :is(.menu-toggle, .hud-strip),
+.flight-strip-v2 .hud-top-actions :is(.ap-bar, .btn) {
+  height: 44px;
+  min-height: 44px;
+}
+.flight-strip-v2 .hud-top-actions { gap: var(--strip-gap); }
+.flight-strip-v2 .hud-top-actions :is(.ap-bar, .ap-toggle-btn) { width: 86px; }
+.flight-strip-v2 .hud-top-actions .ap-toggle-btn { flex-basis: 86px; }
+.flight-strip-v2 .hud-top-actions #btn-camera-toggle {
+  width: 94px;
+  flex-basis: 94px;
+  font: 700 11px system-ui;
+}
+.flight-strip-v2 .hud-top-actions .ap-toggle-btn::after {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  content: attr(data-ap-status);
+}
+.flight-strip-v2 .hud-top-actions .ap-toggle-btn.ap-armed {
+  background: #4b3517;
+  border: 1px dashed #fbbf24;
+  color: #fef3c7;
+}
+.flight-strip-v2 .hud-top-actions .flight-display-toggle {
+  width: 32px;
+  min-width: 32px;
+  flex-basis: 32px;
+  font-size: 18px;
+}
+.flight-strip-v2 .hud-top-bar .flight-toolbar {
+  position: static;
+  width: auto;
+  max-width: none !important;
+  height: 44px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  justify-content: start;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+  gap: var(--strip-gap);
+  touch-action: auto;
+}
+.flight-strip-v2 .hud-top-bar .flight-toolbar > .btn {
+  width: auto;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  flex: 0 0 var(--strip-button-width, 44px);
+  margin: 0;
+  background: var(--flight-control-surface);
+  border: 1px solid rgba(181, 211, 234, .25);
+  border-radius: 6px;
+}
+.flight-strip-v2 .flight-toolbar > .btn[aria-pressed="true"],
+.flight-strip-v2 .flight-toolbar > .btn[aria-expanded="true"] {
+  background: #254659;
+  border-color: #7dd3fc;
+}
+.flight-strip-v2 .flight-toolbar #btn-flaps-ret { margin-inline-end: calc(-1 * var(--strip-gap)); border-radius: 6px 0 0 6px; }
+.flight-strip-v2 .flight-toolbar #btn-flaps-ext { border-radius: 0 6px 6px 0; }
+.flight-strip-v2 .flight-toolbar #open-flight-more { --strip-button-width: 48px; font: 700 11px system-ui; }
+.flight-strip-v2 .flight-toolbar #btn-camera-toggle { --strip-button-width: 94px; font: 700 11px system-ui; }
+.flight-strip-v2 #btn-camera-toggle .camera-toggle-icon { display: none; }
+.flight-strip-v2 #btn-camera-toggle::after {
+  display: block !important;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flight-strip-v2 #btn-camera-toggle[data-current-view]::after { content: 'CAM ' attr(data-current-view) ' ▾'; }
+.flight-strip-v2 #btn-camera-toggle:not([data-current-view])::after { content: 'CAM ▾'; }
+body.flight-strip-v2.demo-active .flight-toolbar > #btn-skip-demo {
+  --strip-button-width: 106px;
+  padding-inline: 4px;
+  white-space: normal;
+}
+.flight-strip-v2:not(.demo-active) .flight-toolbar > #btn-skip-demo,
+.flight-strip-v2 :is(.hud-top-bar, .flight-strip-panel) [hidden],
+.flight-strip-v2 .flight-strip-panel[hidden],
+.flight-strip-close,
+.flight-strip-v2 #btn-open-cockpit-pov { display: none !important; }
+.flight-strip-v2 .flight-strip-panel:not([hidden]) {
+  position: fixed;
+  top: calc(var(--flight-panels-top) + var(--flight-alert-space, 0px));
+  left: auto;
+  right: var(--edge-right);
+  display: grid;
+  width: min(296px, calc(100vw - var(--edge-left) - var(--edge-right)));
+  max-height: calc(100dvh - var(--flight-panels-top) - var(--flight-alert-space, 0px) - var(--edge-bottom) - 116px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  gap: 4px;
+  border: 1px solid rgba(181, 211, 234, .35);
+  border-radius: 8px;
+  pointer-events: auto;
+  z-index: 95;
+  background: rgba(10, 22, 36, .94);
+}
+.flight-strip-v2 .flight-strip-close {
+  display: block !important;
+  grid-column: 1 / -1;
+  justify-self: end;
+  min-width: 44px;
+}
+.flight-strip-v2 #camera-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.flight-strip-v2 #camera-strip .btn { width: auto; min-width: 0; }
+.flight-strip-v2 #camera-strip .flight-camera-btn { font-size: 12px; min-height: 44px; }
+.flight-strip-v2 #camera-strip .flight-camera-btn::after { content: none; }
+.flight-strip-v2 #camera-strip :is(#btn-reset-pov, #btn-cockpit-pov) { grid-column: 1 / -1; }
+.flight-strip-v2 #ap-panel #btn-ap { grid-column: span 2; }
+.flight-strip-v2 #pov-actions-bar {
+  right: var(--edge-right);
+  z-index: 99;
+}
+.flight-strip-v2.hud-folded #pov-actions-bar { display: none; }
+
+@media (max-width: 1023px) {
+  .flight-strip-v2 .hud-top-bar .hud-strip { gap: 2px; padding: 3px; }
+  .flight-strip-v2 .hud-top-bar .hud-item:not(.hud-primary) { display: none; }
+  .flight-strip-v2 .hud-top-bar .hud-strip .hud-item.hud-primary {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
+  }
+  .flight-strip-v2 .hud-top-bar .hud-val { font-size: 11px; }
+  .flight-strip-v2 .hud-top-bar .hud-label { font-size: 7px; }
+  .flight-strip-v2 .hud-top-bar .menu-toggle { min-width: 32px; width: 32px; padding: 0; }
+}
+
+@media (max-width: 666px), (max-width: 1023px) and (orientation: portrait) {
+  .flight-strip-v2 .hud-top-bar {
+    --strip-edge: 6px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .flight-strip-v2 .hud-top-actions { grid-column: 3; grid-row: 1; }
+  .flight-strip-v2 .hud-top-bar .flight-toolbar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .flight-strip-v2 .hud-top-actions :is(.ap-bar, .ap-toggle-btn) { width: 74px; }
+  .flight-strip-v2 .hud-top-actions .ap-toggle-btn { flex-basis: 74px; }
+  .flight-strip-v2:has(#hud-warning:not([hidden]), #hud-stall[style*="block"]) { --flight-alert-space: 68px; }
+  .flight-strip-v2 .hud-top-bar .flight-toolbar > .btn {
+    flex-basis: min(var(--strip-button-width, 44px), var(--strip-button-limit, 44px));
+  }
+  .flight-strip-v2 .flight-toolbar #btn-camera-toggle { flex: 1 1 64px; }
+}
+@media (max-width: 374px) {
+  .flight-strip-v2 .flight-toolbar #btn-gear,
+  .flight-strip-v2 .flight-toolbar #btn-spoilers { --strip-button-limit: 40px; }
+  .flight-strip-v2 .flight-toolbar #btn-reverser { --strip-button-limit: 38px; }
+  .flight-strip-v2 .flight-toolbar #open-flight-more { --strip-button-limit: 42px; }
+  .flight-strip-v2 .flight-toolbar :is(#btn-flaps-ret, #btn-flaps-ext) { --strip-button-limit: 32px; }
+  .flight-strip-v2 #btn-camera-toggle[data-compact-view]::after {
+    content: 'CAM ' attr(data-compact-view) '▾';
+    font-size: 10px;
+  }
+}
+@media (min-width: 667px) and (max-width: 1023px) and (orientation: landscape) {
+  .flight-strip-v2 .flight-toolbar :is(#btn-flaps-ret, #btn-flaps-ext) { --strip-button-width: 30px; }
+  .flight-strip-v2 .flight-toolbar #btn-spoilers { --strip-button-width: 42px; }
+  .flight-strip-v2 .flight-toolbar #btn-reverser { --strip-button-width: 38px; }
+  .flight-strip-v2 .flight-strip-panel:not([hidden]) {
+    top: var(--flight-panels-top);
+    width: 260px;
+    max-height: min(184px, calc(100dvh - var(--flight-panels-top) - var(--edge-bottom) - 116px));
+  }
+  .flight-strip-v2 :is(.flight-warning, .stall-banner) {
+    left: var(--edge-left);
+    right: auto;
+    width: max-content;
+    max-width: calc(100vw - var(--edge-left) - var(--edge-right) - 272px);
+    transform: none;
+    white-space: normal;
+  }
+  .flight-strip-v2 .stall-banner { animation: flight-strip-stall-pulse .35s infinite alternate; }
+  .flight-strip-v2 #pov-actions-bar { right: calc(var(--edge-right) + 266px); }
+}
+
+.flight-strip-v2 #flight-display-panel .quick-mute {
+  position: static;
+  width: auto;
+}
+.flight-strip-v2 #flight-display-panel .quick-mute {
+  font-size: 16px;
+}
+.flight-strip-v2 .hud-top-actions #btn-fullscreen {
+  font-size: 0;
+}
+.flight-strip-v2 .hud-top-actions #btn-fullscreen::after {
+  content: attr(data-short-label);
+  font-size: 18px;
+}
+.flight-strip-v2 #camera-strip .flight-strip-close,
+.flight-strip-v2 #ap-panel .flight-strip-close {
+  min-height: 32px;
+  height: 32px;
+  max-width: 44px;
+}
+
+@keyframes flight-strip-stall-pulse {
+  from { opacity: .8; }
+  to { opacity: 1; }
+}

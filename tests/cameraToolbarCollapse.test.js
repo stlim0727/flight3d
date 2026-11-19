@@ -60,10 +60,14 @@ class MockElement {
   }
   getClientRects() { return [this.getBoundingClientRect()]; }
   setAttribute(k, v) { this.attributes.set(k, String(v)); }
+  hasAttribute(k) { return this.attributes.has(k); }
   getAttribute(k) { return this.attributes.get(k) ?? null; }
   append(...nodes) {
     for (const node of nodes) {
-      if (node) this.children.push(node);
+      if (node) {
+        node.parentElement = this;
+        this.children.push(node);
+      }
     }
   }
   prepend(...nodes) {
@@ -107,8 +111,15 @@ test('camera toolbar collapse/expand toggle button lifecycle and interaction', (
   hudOverlay.append(strip);
 
   createElement('button', 'btn-fullscreen');
-  createElement('div', 'ap-bar');
+  const apBar = createElement('div', 'ap-bar');
+  apBar.append(createElement('button', 'btn-ap-toggle'));
   createElement('div', 'ap-panel');
+  const povActions = createElement('div', 'pov-actions-bar');
+  povActions.append(
+    createElement('button', 'btn-reset-pov'),
+    createElement('button', 'btn-gaze-exit'),
+    createElement('button', 'btn-cockpit-pov'),
+  );
   createElement('button', 'btn-skip-demo');
   createElement('section', 'lobby-settings');
   createElement('button', 'btn-gear');
