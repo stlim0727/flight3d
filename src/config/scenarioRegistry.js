@@ -9,26 +9,26 @@ export { DEV_SCENARIOS } from '../dev/scenarios/index.js';
 
 export const SPAWN_SCENARIOS = {
   runway: {
-    airports: ['coastal', 'lukla', 'incheon', 'neon'],
-    labelKeys: { incheon: 'incheon.runway', coastal: 'runway.takeoff.09l', lukla: 'lukla.24.ready', neon: 'neon.runway' },
+    airports: ['coastal', 'lukla', 'incheon', 'neon', 'jeju'],
+    labelKeys: { incheon: 'incheon.runway', jeju: 'jeju.runway', coastal: 'runway.takeoff.09l', lukla: 'lukla.24.ready', neon: 'neon.runway' },
     briefingKey: 'lobby.briefing.scenario.runway',
     lobbyButtonId: 'lobby-preset-rwy',
   },
   approach: {
-    airports: ['coastal', 'lukla', 'incheon', 'neon'],
-    labelKeys: { incheon: 'incheon.approach', coastal: 'final.approach.3.nm', lukla: 'canyon.landing', neon: 'neon.canyon' },
+    airports: ['coastal', 'lukla', 'incheon', 'neon', 'jeju'],
+    labelKeys: { incheon: 'incheon.approach', jeju: 'jeju.approach', coastal: 'final.approach.3.nm', lukla: 'canyon.landing', neon: 'neon.canyon' },
     briefingKey: 'lobby.briefing.scenario.approach',
     lobbyButtonId: 'lobby-preset-app',
   },
   challenge: {
-    airports: ['incheon'],
-    labelKeys: { incheon: 'incheon.challenge' },
+    airports: ['incheon', 'jeju'],
+    labelKeys: { incheon: 'incheon.challenge', jeju: 'jeju.challenge' },
     briefingKey: 'lobby.briefing.scenario.challenge',
     lobbyButtonId: 'lobby-preset-challenge',
   },
   cruise: {
-    airports: ['coastal', 'lukla', 'incheon', 'neon'],
-    labelKeys: { incheon: 'incheon.cruise', coastal: 'cruise.6.000.ft', lukla: 'himalayan.cruise.13.000.ft', neon: 'neon.cruise' },
+    airports: ['coastal', 'lukla', 'incheon', 'neon', 'jeju'],
+    labelKeys: { incheon: 'incheon.cruise', jeju: 'jeju.cruise', coastal: 'cruise.6.000.ft', lukla: 'himalayan.cruise.13.000.ft', neon: 'neon.cruise' },
     briefingKey: 'lobby.briefing.scenario.cruise',
     lobbyButtonId: 'lobby-preset-cru',
   },

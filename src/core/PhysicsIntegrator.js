@@ -412,7 +412,8 @@ class PhysicsIntegratorMethods {
     if (this.bridgeFlight?.active) { this.setPreset('bridge'); return; }
     this.clearCrashState();
     this.setPreset('runway');
-    this.showToast(() => t(this.activeAirport === 'incheon'
+    this.showToast(() => t(this.activeAirport === 'jeju'
+      ? 'jeju.repaired' : this.activeAirport === 'incheon'
       ? 'incheon.repaired' : 'aircraft.repaired.restarted.on.runway.09l'));
   }
 

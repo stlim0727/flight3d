@@ -43,6 +43,7 @@ export default {
   "mp.scenario": "시작 위치",
   "mp.coastal": "해안 공항",
   "mp.incheon": "인천",
+  "mp.jeju": "제주",
   "mp.neon": "네온 도시",
   "mp.cruise": "함께 순항",
   "mp.runway": "활주로 줄서기",

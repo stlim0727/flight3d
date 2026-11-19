@@ -43,6 +43,7 @@ export default {
   "mp.scenario": "Starting position",
   "mp.coastal": "Coastal airport",
   "mp.incheon": "Incheon",
+  "mp.jeju": "Jeju",
   "mp.neon": "Neon city",
   "mp.cruise": "Cruise together",
   "mp.runway": "Runway lineup",

@@ -14,6 +14,8 @@ import { UrbanWindField } from '../physics/UrbanWindField.js';
 import { alignSpawnToWind } from './windSpawn.js';
 import { loadIncheonAirport } from '../environment/IncheonAirport.js';
 import { incheonSpawn } from '../geospatial/IncheonFlightSurface.js';
+import { loadJejuAirport } from '../environment/JejuAirport.js';
+import { jejuSpawn } from '../geospatial/JejuFlightSurface.js';
 import { LuklaTerrain } from '../environment/LuklaTerrain.js';
 import { LuklaAirport } from '../environment/LuklaAirport.js';
 import { APPROACH_DATA } from '../config/approachData.js';
@@ -42,6 +44,10 @@ class PresetSpawnerMethods {
       this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = true;
       this.currentTerrain = this.incheonAirport.terrain;
       this.currentAirport = this.incheonAirport;
+    } else if (this.activeAirport === 'jeju' && this.jejuAirport) {
+      this.jejuAirport.group.visible = this.jejuAirport.terrain.mesh.visible = true;
+      this.currentTerrain = this.jejuAirport.terrain;
+      this.currentAirport = this.jejuAirport;
     }
     if (type === 'shadow' && !this.devRunner?.changingState) {
       return this.devRunner?.start('shadow') ?? false;
@@ -221,6 +227,28 @@ class PresetSpawnerMethods {
       }
       const label = { runway: 'incheon.runway', approach: 'incheon.approach', cruise: 'incheon.cruise', challenge: 'incheon.challenge' }[type];
       this.showToast(() => t(label));
+    } else if (this.activeAirport === 'jeju') {
+      const spawn = jejuSpawn(type, groundClearance, this.currentAircraftId);
+      this.position.set(spawn.x, spawn.y, spawn.z);
+      this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
+      this.angularVelocity.set(0, 0, 0);
+      const pitchAttitude = type === 'approach' ? 0.04 : type === 'challenge' ? 0.01 : 0;
+      this.quaternion.setFromEuler(new THREE.Euler(pitchAttitude, spawn.yaw, 0, 'YXZ'));
+      const airborne = type !== 'runway';
+      this.controls.throttle = type === 'challenge' ? 0.35 : airborne ? 0.5 : 0;
+      this.engines.setThrottle(this.controls.throttle);
+      this.engines.setReverser(false, true);
+      this.gear.setGearTarget(type !== 'cruise');
+      this.gear.gearState = this.gear.isFixed || type !== 'cruise' ? 1 : 0;
+      this.aero.setFlapPosition(type === 'approach' ? 5 : (type === 'challenge' || type === 'runway') ? 2 : 0);
+      this.aero.spoilers = 0;
+      this.controls.pitchTrim = this.aero.pitchTrim = type === 'challenge' ? 1.4 : 1.6;
+      if (type === 'challenge') {
+        const headingDeg = APPROACH_DATA.jeju?.headingDeg ?? 67;
+        setSimulationWind(this, new WindField({ profile: 'incheon-crosswind-v1', runwayHeadingDeg: headingDeg, seed: 15, crosswindSign: 1 }));
+      }
+      const label = { runway: 'jeju.runway', approach: 'jeju.approach', cruise: 'jeju.cruise', challenge: 'jeju.challenge' }[type];
+      if (label) this.showToast(() => t(label));
     } else if (this.activeAirport === 'lukla') {
       const sin58 = 0.848048;
       const cos58 = 0.529919;
@@ -545,12 +573,16 @@ class PresetSpawnerMethods {
     if (this.multiplayer?.locked) return;
     if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('airport-changed');
     this.renderDiagnosticsPanel?.close();
-    if (!['coastal', 'lukla', 'incheon', 'neon', 'valley'].includes(id)) return;
+    if (!['coastal', 'lukla', 'incheon', 'neon', 'valley', 'jeju'].includes(id)) return;
     if (this.activeAirport === id) {
       if (id === 'incheon' && this.incheonAirport) {
         this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = true;
         this.currentTerrain = this.incheonAirport.terrain;
         this.currentAirport = this.incheonAirport;
+      } else if (id === 'jeju' && this.jejuAirport) {
+        this.jejuAirport.group.visible = this.jejuAirport.terrain.mesh.visible = true;
+        this.currentTerrain = this.jejuAirport.terrain;
+        this.currentAirport = this.jejuAirport;
       }
       return;
     }
@@ -588,12 +620,42 @@ class PresetSpawnerMethods {
         }
       }
       if (request !== this.airportRequest) return;
+    } else if (id === 'jeju' && !this.jejuAirport) {
+      this.airportLoading = true;
+      document.getElementById('btn-fly').disabled = true;
+      this.showToast(() => t('jeju.loading'));
+      try {
+        this.jejuLoad ??= loadJejuAirport(`${import.meta.env.BASE_URL}scenery/jeju/`).then(airport => {
+          this.jejuAirport = airport;
+          airport.group.visible = airport.terrain.mesh.visible = false;
+          this.scene.add(airport.group, airport.terrain.mesh);
+          return airport;
+        });
+        await this.jejuLoad;
+      } catch (error) {
+        this.jejuLoad = null;
+        console.warn('Jeju loading failed:', error);
+        if (request === this.airportRequest) {
+          this.showToast(() => t('jeju.load.failed'));
+          this.lobby.airport = this.activeAirport || 'coastal';
+          this.lobbyScreen?.refresh();
+          if (!this.activeAirport) await this.setAirport('coastal');
+        }
+        return;
+      } finally {
+        if (request === this.airportRequest) {
+          this.airportLoading = false;
+          document.getElementById('btn-fly').disabled = false;
+        }
+      }
+      if (request !== this.airportRequest) return;
     }
     this.devRunner?.stop();
     if (this.activeAirport === id) return;
     this.activeAirport = id;
     const isLukla = id === 'lukla';
     const isIncheon = id === 'incheon';
+    const isJeju = id === 'jeju';
     const isCoastal = id === 'coastal';
     const isNeon = id === 'neon';
     const isValley = id === 'valley';
@@ -616,14 +678,15 @@ class PresetSpawnerMethods {
     if (this.luklaAirport) this.luklaAirport.group.visible = isLukla;
 
     if (this.incheonAirport) this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = isIncheon;
+    if (this.jejuAirport) this.jejuAirport.group.visible = this.jejuAirport.terrain.mesh.visible = isJeju;
     if (this.neonCity) this.neonCity.group.visible = isNeon;
-    this.currentTerrain = isNeon ? this.neonCity.terrain : isIncheon ? this.incheonAirport.terrain : isLukla ? this.luklaTerrain : this.terrain;
-    this.currentAirport = isNeon ? this.neonCity.airport : isIncheon ? this.incheonAirport : isLukla ? this.luklaAirport : this.airport;
+    this.currentTerrain = isJeju ? this.jejuAirport.terrain : isNeon ? this.neonCity.terrain : isIncheon ? this.incheonAirport.terrain : isLukla ? this.luklaTerrain : this.terrain;
+    this.currentAirport = isJeju ? this.jejuAirport : isNeon ? this.neonCity.airport : isIncheon ? this.incheonAirport : isLukla ? this.luklaAirport : this.airport;
 
     if (this.collisionDetector) {
       if (isNeon) {
         this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, this.neonCity);
-      } else if (isIncheon) {
+      } else if (isIncheon || isJeju) {
         this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
       } else if (isLukla) {
         this.collisionDetector.setEnvironment(this.luklaTerrain, this.luklaAirport, null, null, null);
@@ -650,6 +713,9 @@ class PresetSpawnerMethods {
         this.cameraSystem.towerPos.set(t.x, t.y + t.height - 1.5, t.z);
       } else if (isIncheon) {
         const cab = this.incheonAirport.towerCab;
+        this.cameraSystem.towerPos.set(cab.x, cab.y, cab.z);
+      } else if (isJeju && this.jejuAirport) {
+        const cab = this.jejuAirport.towerCab.position;
         this.cameraSystem.towerPos.set(cab.x, cab.y, cab.z);
       } else if (isLukla) {
         const t = this.luklaAirport.controlTowerData;

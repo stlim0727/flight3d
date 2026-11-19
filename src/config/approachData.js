@@ -1,5 +1,6 @@
 import { approachDeviation as calculateDeviation } from '@stlim0727/flightsim-core/navigation/approachDeviation.js';
 import incheon from './incheonAirfield.json' with { type: 'json' };
+import jeju from './jejuAirfield.json' with { type: 'json' };
 /**
  * Final-approach geometry per airport, derived from the flight presets in
  * src/main.js (threshold world position, runway heading, glideslope angle,
@@ -11,15 +12,7 @@ import incheon from './incheonAirfield.json' with { type: 'json' };
  */
 export const APPROACH_DATA = {
   incheon: incheon.approach,
-  jeju: {
-    // Jeju International Airport Runway 07 (RKPC)
-    // Threshold heading 067°, elevation 36m (118 ft), 3.0° glideslope.
-    threshold: { x: -1463.6, z: 621.3 },
-    end: { x: 1463.6, z: -621.3 },
-    headingDeg: 67,
-    gsAngleDeg: 3.0,
-    elevationFt: 118,
-  },
+  jeju: jeju.approach,
   neon: {
     // Neon Metropolis Runway 09, aligned with +X towards the setting retro sun.
     threshold: { x: -2000, z: 0 },

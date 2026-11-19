@@ -4,6 +4,7 @@ import { SPAWN_SCENARIOS, isScenarioAvailable } from '../config/scenarioRegistry
 
 const AIRPORT_NAME_KEYS = {
   incheon: 'incheon.airport',
+  jeju: 'jeju.airport',
   coastal: 'coastal.airport',
   lukla: 'lukla.vnlk',
   neon: 'neon.metropolis',
@@ -33,5 +34,6 @@ export function lobbyBriefing(airportKey, presetType) {
     lines.push(t(SPAWN_SCENARIOS[presetType].briefingKey));
   }
   if (airportKey === 'incheon') lines.push(t('incheon.limitations'));
+  if (airportKey === 'jeju') lines.push(t('jeju.limitations'));
   return lines;
 }

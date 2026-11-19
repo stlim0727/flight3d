@@ -4,7 +4,7 @@ import { AIRCRAFT_REGISTRY, getAircraftSpecs, classifyLanding } from '../config/
 import { scenarioLabelKey } from '../config/scenarioRegistry.js';
 import { createCompressedSortie, REPLAY_FILE_EXTENSION, REPLAY_MIME_TYPE } from '../replay/ReplayStore.js';
 
-const airportKeys = { coastal: 'coastal.airport', incheon: 'incheon.airport', lukla: 'lukla.vnlk',
+const airportKeys = { coastal: 'coastal.airport', incheon: 'incheon.airport', jeju: 'jeju.airport', lukla: 'lukla.vnlk',
   neon: 'neon.metropolis', valley: 'valley.region' };
 const number = value => Number.isFinite(value) ? Math.round(value).toLocaleString('en-US') : '—';
 const g = value => Number.isFinite(value) ? value.toFixed(2) : '—';
