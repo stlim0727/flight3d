@@ -1,3 +1,4 @@
+import { APPROACH_DATA } from '../config/approachData.js';
 import { recoverSimulatorFlightStart } from '../core/simulatorFlightStart.js';
 import { t, bindText } from '../i18n/index.js';
 import { SHADOW_VIEWS } from '../director/CockpitShadowDemo.js';
@@ -214,6 +215,8 @@ class SimulatorHudAndBindingsMethods {
       controlsDisabled: this.controls.aircraftControlsDisabled || this.controls.inputBlocked || this.isCrashed,
       pitchTrim: this.controls.pitchTrim,
       parkingBrake: this.controls.parkingBrake,
+      spoilersSupported: this.aero.spoilerDrag > 0,
+      reverserSupported: this.engines.reverseThrustEfficiency > 0,
     });
     this.hudView.update();
     this.touchControls?.setCombatVisible?.(this.currentAircraftId === 'F16');
@@ -233,10 +236,21 @@ class SimulatorHudAndBindingsMethods {
     const isReplaying = Boolean(this.replayDirector?.active);
     const apDisabled = Boolean(this.demoDirector?.isActive) || isReplaying;
     const btnToggle = document.getElementById('btn-ap-toggle');
+    const appActive = this.autopilot.lateralMode === 'APP';
+    const appArmed = this.autopilot.appArmed && !appActive;
+    const approachLabel = appActive ? t('ap.app.active') : appArmed ? t('ap.app.armed') : '';
     if (btnToggle) {
       btnToggle.disabled = apDisabled;
       btnToggle.setAttribute('data-ap-state', this.autopilot.master ? 'ON' : 'OFF');
       btnToggle.classList.toggle('ap-active', this.autopilot.master);
+      btnToggle.classList.toggle('ap-armed', appArmed);
+      const status = approachLabel || (this.autopilot.master
+        ? ['ON', this.autopilot.annunciation()].filter(Boolean).join(' · ') : 'OFF');
+      if (btnToggle.dataset.apStatus !== status) btnToggle.dataset.apStatus = status;
+      if (document.body.classList.contains('flight-strip-v2')) {
+        const label = btnToggle.getAttribute('aria-expanded') === 'true' ? 'ap.collapse' : 'ap.expand';
+        btnToggle.setAttribute('aria-label', `${t(label)} · ${status}`);
+      }
     }
     if (isReplaying) {
       const apPanel = document.getElementById('ap-panel');
@@ -265,9 +279,13 @@ class SimulatorHudAndBindingsMethods {
     for (const [id, on] of Object.entries(pressed)) {
       const btn = document.getElementById(id);
       if (!btn) continue;
-      btn.disabled = apDisabled;
+      btn.disabled = apDisabled || (id === 'btn-ap-app' && !APPROACH_DATA[this.telemetry.airportKey] && !on);
       btn.classList.toggle('ap-active', on);
-      btn.classList.toggle('ap-armed', id === 'btn-ap-app' && this.autopilot.appArmed);
+      btn.classList.toggle('ap-armed', id === 'btn-ap-app' && appArmed);
+      if (id === 'btn-ap-app') {
+        const label = approachLabel || t('ap.app');
+        if (btn.textContent !== label) btn.textContent = label;
+      }
       btn.setAttribute('aria-pressed', String(on));
     }
   }
@@ -276,13 +294,11 @@ class SimulatorHudAndBindingsMethods {
     const bar = document.getElementById('ap-bar');
     const btn = document.getElementById('btn-ap-toggle');
     if (!bar || !btn) return;
-    const mobile = document.body.classList.contains('mobile-flight-layout');
-    const collapsed = mobile
-      ? document.querySelector('.flight-toolbar')?.dataset.mobileGroup !== 'ap'
-      : bar.classList.contains('ap-collapsed');
+    if (document.body.classList.contains('flight-strip-v2')) return;
+    const collapsed = bar.classList.contains('ap-collapsed');
     btn.setAttribute('aria-expanded', String(!collapsed));
     btn.textContent = 'AP';
-    document.getElementById('ap-panel').hidden = mobile || collapsed;
+    document.getElementById('ap-panel').hidden = collapsed;
     bindText(btn, () => t(collapsed ? 'ap.expand' : 'ap.collapse'), 'aria-label');
     bindText(btn, () => t(collapsed ? 'ap.expand.tip' : 'ap.collapse.tip'), 'title');
     btn.classList.toggle('ap-active', this.autopilot.master);
@@ -477,7 +493,7 @@ class SimulatorHudAndBindingsMethods {
     });
     document.getElementById('btn-gaze-exit')?.addEventListener('click', (e) => {
       e?.stopPropagation?.();
-      if (this.cameraSystem?.clearGaze?.() && !document.body.classList.contains('mobile-flight-layout')) {
+      if (this.cameraSystem?.clearGaze?.() && !document.body.classList.contains('flight-strip-v2')) {
         this.showToast(() => t('notice.gaze.off'));
       }
       this.syncGazeExitButton();
@@ -549,6 +565,7 @@ class SimulatorHudAndBindingsMethods {
       this.handleResize();
     });
     syncFullscreenUI();
+    if (fullscreenButton) fullscreenButton.disabled = !document.fullscreenEnabled;
     for (const [id, mode] of [
       ['btn-ap', 'MASTER'], ['btn-ap-hdg', 'HDG'], ['btn-ap-alt', 'ALT'],
       ['btn-ap-spd', 'SPD'], ['btn-ap-app', 'APP'],
@@ -557,7 +574,7 @@ class SimulatorHudAndBindingsMethods {
         if (this.demoDirector?.isActive) return;
         const on = this.autopilot.toggle(mode, this.telemetry);
         if (mode === 'MASTER') {
-          if (!document.body.classList.contains('mobile-flight-layout')) {
+          if (!document.body.classList.contains('flight-strip-v2')) {
             this.showToast(() => t('notice.autopilot', { state: t(on ? 'state.on' : 'state.off') }));
           }
         } else {
@@ -568,20 +585,15 @@ class SimulatorHudAndBindingsMethods {
     }
     document.getElementById('btn-ap-toggle')?.addEventListener('click', event => {
       if (this.demoDirector?.isActive) return;
-      if (document.body.classList.contains('mobile-flight-layout')) {
-        if (this.autopilot.master) {
-          document.getElementById('btn-ap').click();
-          if (event.currentTarget.getAttribute('aria-expanded') !== 'true') return;
-        }
-        event.currentTarget.dispatchEvent(new Event('mobile-ap-toggle'));
-        this.updateApToggleUI();
+      if (document.body.classList.contains('flight-strip-v2')) {
+        event.currentTarget.dispatchEvent(new Event('flight-strip-ap-toggle'));
         return;
       }
       document.getElementById('ap-bar')?.classList.toggle('ap-collapsed');
       this.updateApToggleUI();
     });
     const closeApPanel = () => {
-      if (document.body.classList.contains('mobile-flight-layout')) return;
+      if (document.body.classList.contains('flight-strip-v2')) return;
       const bar = document.getElementById('ap-bar');
       if (bar.classList.contains('ap-collapsed')) return;
       bar.classList.add('ap-collapsed');
@@ -591,7 +603,8 @@ class SimulatorHudAndBindingsMethods {
       if (!event.target.closest('#ap-bar, #ap-panel')) closeApPanel();
     });
     document.addEventListener('keydown', event => {
-      if (event.key !== 'Escape' || document.getElementById('ap-panel').hidden) return;
+      if (event.key !== 'Escape' || document.body.classList.contains('flight-strip-v2')
+        || document.getElementById('ap-panel').hidden) return;
       event.preventDefault();
       event.stopPropagation();
       closeApPanel();

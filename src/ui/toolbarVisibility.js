@@ -27,6 +27,6 @@ export function applyToolbarVisibility(hidden, items, doc = document) {
     if (id.startsWith('cam-') && !node.hidden) visibleCameras += 1;
   }
   const strip = doc.getElementById('camera-strip');
-  if (strip) strip.hidden = visibleCameras === 0;
+  if (strip && !strip.classList?.contains('flight-strip-panel')) strip.hidden = visibleCameras === 0;
   return visibleCameras;
 }

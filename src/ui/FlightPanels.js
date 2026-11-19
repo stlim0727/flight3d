@@ -1,4 +1,4 @@
-import { createMobileFlightToolbar } from './mobileFlightToolbar.js';
+import { createFlightStrip } from './flightStrip.js';
 import { t, bindText, getLanguage, setLanguage } from '../i18n/index.js';
 import { toolbarOptionalItems, normalizeToolbarHidden, applyToolbarVisibility } from './toolbarVisibility.js';
 import { gearIconName, setToolbarIcon } from './toolbarIcons.js';
@@ -119,7 +119,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   bar.className = 'flight-toolbar';
   bindText(bar, () => t('ui.controls'), 'aria-label');
   hud.append(bar);
-  let mobileToolbar;
+  let flightStrip;
   let cameraStripCollapsed = false;
   try {
     const saved = localStorage.getItem('flight3d_camera_strip_collapsed');
@@ -139,12 +139,12 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   };
 
   const cameraButtons = createCameraButtons(mode => {
-    if (mobileToolbar?.active()) {
-      if (mobileToolbar.cameraOpen()) {
+    if (flightStrip?.active()) {
+      if (flightStrip.isOpen('camera')) {
         onSelectCamera(mode);
-        mobileToolbar.close();
+        flightStrip.close();
         cameraToggleBtn.focus({ preventScroll: true });
-      } else mobileToolbar.toggleCamera();
+      }
     } else if (cameraStripCollapsed) {
       setCameraStripCollapsed(false);
     } else {
@@ -168,10 +168,11 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   cameraStrip.append(cameraToggleBtn);
 
   const updateCameraToggleState = () => {
-    const collapsed = mobileToolbar?.active() ? !mobileToolbar.cameraOpen() : cameraStripCollapsed;
-    cameraStrip.classList.toggle('is-collapsed', collapsed);
+    const collapsed = flightStrip?.active() ? !flightStrip.isOpen('camera') : cameraStripCollapsed;
+    cameraStrip.classList.toggle('is-collapsed', collapsed && !flightStrip?.active());
     bar.classList.toggle('camera-strip-collapsed', collapsed);
     cameraToggleBtn.setAttribute('aria-expanded', String(!collapsed));
+    if (flightStrip?.active()) return;
     const titleKey = collapsed ? 'ui.camera.expand' : 'ui.camera.collapse';
     cameraToggleBtn.title = t(titleKey);
     cameraToggleBtn.setAttribute('aria-label', t(titleKey));
@@ -184,8 +185,8 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
 
   cameraToggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (mobileToolbar?.active()) {
-      mobileToolbar.toggleCamera();
+    if (flightStrip?.active()) {
+      flightStrip.toggle('camera');
       return;
     }
     setCameraStripCollapsed(!cameraStripCollapsed);
@@ -229,22 +230,16 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     if (open) more.querySelector('button').focus({ preventScroll: true });
   };
   moreButton.addEventListener('click', () => {
-    if (mobileToolbar?.active()) mobileToolbar.toggleMore();
+    if (flightStrip?.active()) flightStrip.toggle('aux');
     else setMoreOpen(more.hidden);
   });
   document.addEventListener('pointerdown', event => {
-    if (mobileToolbar?.active()) return;
+    if (flightStrip?.active()) return;
     if (!event.target.closest('#flight-more-panel, #open-flight-more')) setMoreOpen(false);
   });
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;
-    if (mobileToolbar?.isOpen()) {
-      event.preventDefault(); event.stopPropagation();
-      mobileToolbar.activeTrigger().focus({ preventScroll: true });
-      mobileToolbar.close();
-      return;
-    }
-    if (more.hidden) return;
+    if (flightStrip?.active() || more.hidden) return;
     event.preventDefault(); event.stopPropagation();
     setMoreOpen(false);
     moreButton.focus({ preventScroll: true });
@@ -388,27 +383,27 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     const buttonWidth = moreButton.getBoundingClientRect().width || 44;
     const isCollapsed = cameraStrip.classList.contains('is-collapsed');
     const visibleCameras = isCollapsed ? 1 : cameraButtons.filter(button => !button.hidden).length;
-    const stackCameraStrip = !mobileToolbar?.active() && !isCollapsed && visibleCameras > 0
+    const stackCameraStrip = !flightStrip?.active() && !isCollapsed && visibleCameras > 0
       && (maxToolbarWidth - fixedWidth) < buttonWidth * Math.min(3, visibleCameras);
     bar.classList.toggle('camera-strip-stacked', stackCameraStrip);
     // 320px-class rows cannot hold the five aircraft controls, overflow and
     // fullscreen (7 x 44px) either. Fullscreen then closes the second row instead
     // of wrapping onto a third one or pushing the gear out of a scrolled row.
     const fullscreenShown = getComputedStyle(fullscreen).display !== 'none';
-    bar.classList.toggle('fullscreen-wrapped', !mobileToolbar?.active() && fullscreenShown && fixedWidth > maxToolbarWidth + 0.5);
+    bar.classList.toggle('fullscreen-wrapped', !flightStrip?.active() && fullscreenShown && fixedWidth > maxToolbarWidth + 0.5);
     // The folded compact notice narrows this row. Keep takeover visible there;
     // elsewhere pin the camera/fullscreen/overflow end to the right edge.
     const foldedCompactDemo = document.body.classList.contains('demo-active')
       && compact.matches
       && document.getElementById('btn-demo-open')?.style.display === 'inline-flex';
-    if (mobileToolbar?.active()) mobileToolbar.update();
-    else bar.scrollLeft = foldedCompactDemo ? 0 : bar.scrollWidth;
+    if (!flightStrip?.active()) bar.scrollLeft = foldedCompactDemo ? 0 : bar.scrollWidth;
     const topBarRect = topBar.getBoundingClientRect();
     const controlsBottom = bar.getBoundingClientRect().bottom;
     const noticeTop = Math.max(topBarRect.bottom, controlsBottom) + 6;
     document.documentElement.style.setProperty('--menu-row-top', `${topBarRect.top}px`);
     document.documentElement.style.setProperty('--ap-row-top', `${topBarRect.top}px`);
-    document.documentElement.style.setProperty('--demo-pill-top', `${topBarRect.bottom + 4}px`);
+    const demoPillTop = flightStrip?.active() ? noticeTop : topBarRect.bottom + 4;
+    document.documentElement.style.setProperty('--demo-pill-top', `${demoPillTop}px`);
     document.documentElement.style.setProperty('--demo-row-top', `${noticeTop}px`);
     document.documentElement.style.setProperty('--flight-panels-top', `${noticeTop}px`);
     // The demo guide owns the notice row under the controls: the expanded banner
@@ -425,10 +420,10 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     if (node) observer.observe(node);
   }
   new MutationObserver(() => {
-    mobileToolbar?.sync();
+    flightStrip?.sync();
     if (document.body.dataset.flow !== 'flight') {
       setMoreOpen(false);
-      mobileToolbar?.close();
+      flightStrip?.close();
       setHudFolded(false, false);
     }
     positionEdgeButtons();
@@ -436,18 +431,12 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
     attributes: true, attributeFilter: ['class', 'data-flow'],
   });
   window.addEventListener('resize', positionEdgeButtons);
-  const mobileQuery = window.matchMedia('(max-width: 600px), (max-width: 950px) and (max-height: 440px)');
-  const initMobileToolbar = () => {
-    if (mobileToolbar || !mobileQuery.matches) return;
-    mobileToolbar = createMobileFlightToolbar({
-      query: mobileQuery, bar, cameraStrip, cameraToggle: cameraToggleBtn, cameraButtons, more, moreButton,
-      topActions, mute, hudFold, aircraft, fullscreen,
-      onLayoutChange: updateCameraToggleState,
-    });
-    updateCameraToggleState();
-  };
-  mobileQuery.addEventListener('change', initMobileToolbar);
-  initMobileToolbar();
+  flightStrip = createFlightStrip({
+    hud, topBar, topActions, bar, cameraStrip, cameraToggle: cameraToggleBtn,
+    more, moreButton, mute, hudFold, fullscreen, apPanel,
+    onLayoutChange: updateCameraToggleState,
+  });
+  flightStrip.sync();
   positionEdgeButtons();
 }
 
@@ -498,9 +487,15 @@ export function updateControlState(telemetry, camera, options = {}) {
   set('btn-reverser', telemetry.reverserActive ? 'ui.reverse.on' : 'ui.reverse.off', {}, !!telemetry.reverserActive, t('ui.strip.reverse'));
   const spoilersBtn = document.getElementById('btn-spoilers');
   setToolbarIcon(spoilersBtn, 'spoilers');
-  if (spoilersBtn) spoilersBtn.disabled = disabled;
+  if (spoilersBtn) {
+    spoilersBtn.disabled = disabled;
+    spoilersBtn.hidden = options.spoilersSupported === false;
+  }
   const reverserBtn = document.getElementById('btn-reverser');
-  if (reverserBtn) reverserBtn.disabled = disabled;
+  if (reverserBtn) {
+    reverserBtn.disabled = disabled;
+    reverserBtn.hidden = options.reverserSupported === false;
+  }
   const mode = camera.autoSwitch ? 7 : camera.mode;
   const cameraSelect = document.getElementById('camera-select');
   if (cameraSelect) cameraSelect.value = String(mode);
@@ -519,6 +514,13 @@ export function updateControlState(telemetry, camera, options = {}) {
       ? t('ui.camera.current', { name: zoomed ? `${viewName} · ${zoomValue}` : viewName })
       : fullLabel;
     camButton.setAttribute('title', titleText);
+    if (active) {
+      const trigger = document.getElementById('btn-camera-toggle');
+      const shortLabel = t(`ui.strip.camera.${name}`);
+      trigger?.setAttribute('data-current-view', shortLabel);
+      trigger?.setAttribute('data-compact-view', getLanguage() === 'ko' && name === 'cockpit' ? '조종' : shortLabel);
+      if (document.body.classList.contains('flight-strip-v2')) trigger?.setAttribute('aria-label', titleText);
+    }
   }
   const toggle = document.getElementById('btn-touch-toggle');
   toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('touch-mode')));
