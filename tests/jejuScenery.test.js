@@ -106,6 +106,11 @@ test('JejuFlightSurface models airport grade, Hallasan volcanic topography, and 
   const oceanH = surface.getHeight(50000, 50000);
   assert.equal(oceanH, 0.0);
 
+  // Continuity: no step discontinuities in northern descent zone
+  const hBefore = surface.getHeight(-1500, -399.999);
+  const hAfter = surface.getHeight(-1500, -400.001);
+  assert.ok(Math.abs(hBefore - hAfter) < 0.001, `Height should be continuous across z=-400, got ${hBefore} and ${hAfter}`);
+
   // Normal vector calculation
   const normal = surface.getNormal(0, 0);
   assert.ok(normal.y > 0.9, 'Airport surface normal should point nearly vertical');
