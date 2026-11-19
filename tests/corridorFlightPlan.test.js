@@ -90,6 +90,10 @@ test('findActiveWaypointIndex sequences progressively along corridor', () => {
   const chuja = CORRIDOR_WAYPOINTS_EXPANDED[5];
   const atChuja = findActiveWaypointIndex(chuja.latitude, chuja.longitude, 5);
   assert.equal(atChuja, 6); // sequences to TAMNA
+
+  // Mid-corridor start near Chuja (-15000, -70000 in Jeju frame): should advance to CHUJA (idx 5)
+  const midCorridor = findActiveWaypointIndex(34.142, 126.330, 1);
+  assert.equal(midCorridor, 5); // CHUJA
 });
 
 test('CorridorFlightPlanManager manages state and CDU legs formatting', () => {
@@ -134,14 +138,28 @@ test('AutopilotController engages and commands LNAV and VNAV modes', () => {
   assert.equal(ap.verticalMode, 'VNAV');
   assert.ok(ap.annunciation().includes('LNAV VNAV'));
 
-  // Test control command calculation
+  // Speed mode active alongside LNAV and VNAV
+  ap.speedMode = true;
+  ap.targets.iasKnots = 270;
+  telemetry.throttle = 0.5;
+
+  // Test control command calculation (both aileron/elevator and throttle should be computed)
   const out = ap.update(telemetry, 0.05);
   assert.ok(Number.isFinite(out.aileron));
   assert.ok(Number.isFinite(out.elevator));
+  assert.ok(Number.isFinite(out.throttle));
+
+  // Verify reset clears flight plan active index
+  ap.flightPlan.activeIndex = 5;
+  ap.reset();
+  assert.equal(ap.flightPlan.activeIndex, 1);
+  assert.equal(ap.master, false);
 
   // Toggle off
+  assert.equal(ap.toggle('LNAV', telemetry), true);
   assert.equal(ap.toggle('LNAV', telemetry), false);
   assert.equal(ap.lateralMode, null);
+  assert.equal(ap.toggle('VNAV', telemetry), true);
   assert.equal(ap.toggle('VNAV', telemetry), false);
   assert.equal(ap.verticalMode, 'PITCH');
 });
@@ -171,6 +189,7 @@ test('DEV_SCENARIOS.corridor-cruise is registered and configured', () => {
   assert.ok(cruise, 'corridor-cruise scenario must exist');
   assert.equal(cruise.kind, 'physical');
   assert.equal(cruise.duration, 30);
+  assert.equal(cruise.autopilot, true);
   assert.deepEqual(cruise.airports, ['jeju']);
   assert.deepEqual(cruise.aircraft, ['B738']);
 

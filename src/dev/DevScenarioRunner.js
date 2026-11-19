@@ -85,7 +85,7 @@ export class DevScenarioRunner {
       if (!visual) sim.cameraSystem.setMode(1, true);
       sim.cameraSystem.snapToTarget(sim.aircraft.group);
       this.status = visual ? 'inspecting' : 'running';
-      sim.controls.aircraftControlsDisabled = !visual && !this.active.definition.pilotControlled;
+      sim.controls.aircraftControlsDisabled = !visual && !this.active.definition.pilotControlled && !this.active.definition.autopilot;
       sim.syncFlowUi();
     } catch (error) {
       this.finish('failed', 'dev.reason.setup', error.message);
@@ -98,6 +98,7 @@ export class DevScenarioRunner {
   beforePhysics() {
     if (this.status !== 'running') return;
     const sim = this.sim;
+    if (this.active.definition.autopilot) return;
     sim.autopilot.disengage();
     if (this.active.definition.pilotControlled) return;
     sim.controls.throttle = 0;

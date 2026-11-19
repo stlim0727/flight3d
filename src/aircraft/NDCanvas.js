@@ -1,7 +1,8 @@
 import { APPROACH_DATA } from '../config/approachData.js';
 import { projectToLocal } from '../geospatial/incheon.js';
 import koreaRoutes from '../config/koreaFlightRoutes.json' with { type: 'json' };
-import { CORRIDOR_WAYPOINTS_EXPANDED } from '../geospatial/CorridorFlightPlan.js';
+import { CORRIDOR_WAYPOINTS_EXPANDED, findActiveWaypointIndex } from '../geospatial/CorridorFlightPlan.js';
+import { incheonSceneryLocalToWgs84, jejuLocalToWgs84 } from '../geospatial/CorridorCoordinateSystem.js';
 import * as THREE from 'three';
 
 const jejuOrigin = {
@@ -52,15 +53,19 @@ export class NDCanvas {
 
   setAirport(airportId) {
     this.airportId = airportId;
+    this.activeWaypoint = null;
     this.render();
   }
 
-  updateData(state) {
+  updateData(state = {}) {
     this.heading = (state.headingDeg || 0 + 360) % 360;
     this.track = (state.trackDeg || this.heading + 360) % 360;
     this.groundSpeed = state.groundSpeedKnots || 0;
     this.tas = state.tasKnots || 0;
     this.planePos.set(state.x || 0, state.z || 0);
+    if (state.activeWaypoint) {
+      this.activeWaypoint = state.activeWaypoint;
+    }
   }
 
   render() {
@@ -235,14 +240,17 @@ export class NDCanvas {
       ];
 
       // Determine active waypoint
-      if (chujaWpt && this.planePos.y < chujaWpt.jejuZ + 10000) {
-        activeWpt = 'CHUJA';
-      } else if (this.planePos.y < tamnaWorldZ + 4000) {
-        activeWpt = 'TAMNA';
-      } else if (this.planePos.y < at(-3000).z + 1000) {
-        activeWpt = 'FINAL';
+      if (this.activeWaypoint) {
+        activeWpt = this.activeWaypoint;
       } else {
-        activeWpt = 'RW07';
+        const wgs = jejuLocalToWgs84(this.planePos.x, this.planePos.y);
+        const activeIdx = findActiveWaypointIndex(wgs.latitude, wgs.longitude);
+        const candidate = CORRIDOR_WAYPOINTS_EXPANDED[activeIdx]?.ident ?? 'RW07';
+        if (candidate === 'RW07') {
+          activeWpt = this.planePos.y < at(-3000).z + 1000 ? 'FINAL' : 'RW07';
+        } else {
+          activeWpt = candidate;
+        }
       }
     } else if (this.airportId === 'incheon') {
       const a = APPROACH_DATA.incheon, h = a.headingDeg * Math.PI / 180;
@@ -257,6 +265,7 @@ export class NDCanvas {
       const boptaWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'BOPTA');
       const olmenWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'OLMEN');
       const sosdoWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'SOSDO');
+      const dotolWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === 'DOTOL');
 
       fixes = [
         { name: 'FINAL', ...at(-1500) },
@@ -264,16 +273,20 @@ export class NDCanvas {
         ...(boptaWpt ? [{ name: 'BOPTA', x: boptaWpt.incheonX, z: boptaWpt.incheonZ }] : []),
         ...(olmenWpt ? [{ name: 'OLMEN', x: olmenWpt.incheonX, z: olmenWpt.incheonZ }] : []),
         ...(sosdoWpt ? [{ name: 'SOSDO', x: sosdoWpt.incheonX, z: sosdoWpt.incheonZ }] : []),
+        ...(dotolWpt ? [{ name: 'DOTOL', x: dotolWpt.incheonX, z: dotolWpt.incheonZ }] : []),
       ];
 
-      if (boptaWpt && this.planePos.y > boptaWpt.incheonZ + 15000 && sosdoWpt) {
-        activeWpt = 'SOSDO';
-      } else if (boptaWpt && this.planePos.y > boptaWpt.incheonZ - 5000 && olmenWpt) {
-        activeWpt = 'OLMEN';
-      } else if (boptaWpt && this.planePos.y > at(-1500).z + 5000) {
-        activeWpt = 'BOPTA';
+      // Determine active waypoint
+      if (this.activeWaypoint) {
+        activeWpt = this.activeWaypoint;
       } else {
-        activeWpt = 'RW15R';
+        const wgs = incheonSceneryLocalToWgs84(this.planePos.x, this.planePos.y);
+        const activeIdx = findActiveWaypointIndex(wgs.latitude, wgs.longitude);
+        if (this.planePos.y > at(-1500).z + 5000) {
+          activeWpt = CORRIDOR_WAYPOINTS_EXPANDED[activeIdx]?.ident ?? 'BOPTA';
+        } else {
+          activeWpt = 'RW15R';
+        }
       }
     } else if (isLukla) {
       activeWpt = 'RW06';

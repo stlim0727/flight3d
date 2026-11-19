@@ -128,6 +128,13 @@ export function wgs84ToIncheonSceneryLocal(latitude, longitude) {
 }
 
 /**
+ * Convert Incheon Scenery local tangent plane [x, z] to WGS84.
+ */
+export function incheonSceneryLocalToWgs84(x, z) {
+  return localToWgs84(x, z, INCHEON_SCENERY_ORIGIN);
+}
+
+/**
  * Convert Jeju local metric tangent plane [x, z] to WGS84.
  */
 export function jejuLocalToWgs84(x, z) {

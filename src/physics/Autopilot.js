@@ -16,6 +16,13 @@ export class AutopilotController extends CoreAutopilot {
     this.flightPlan = new CorridorFlightPlanManager(1);
   }
 
+  reset() {
+    super.reset();
+    if (this.flightPlan) {
+      this.flightPlan.reset(1);
+    }
+  }
+
   engage(mode, telemetry) {
     if (mode === 'LNAV') {
       telemetry = autopilotState(telemetry, this._snapshot);
@@ -63,12 +70,10 @@ export class AutopilotController extends CoreAutopilot {
   }
 
   update(telemetry, dt) {
-    telemetry = autopilotState(telemetry, this._snapshot);
-    const out = this.output;
-    out.aileron = 0;
-    out.elevator = 0;
-    out.throttle = telemetry.throttle ?? 0;
+    const out = super.update(telemetry, dt);
     if (!this.master) return out;
+
+    telemetry = autopilotState(telemetry, this._snapshot);
 
     // Handle LNAV lateral guidance
     if (this.lateralMode === 'LNAV') {
@@ -91,14 +96,6 @@ export class AutopilotController extends CoreAutopilot {
         telemetry.vsiFpm * this.elevatorPerFpmDamp,
         -1, 1
       );
-    }
-
-    // Let superclass handle remaining modes (speed, pitch, vs, alt, app, etc.)
-    if (this.lateralMode !== 'LNAV' || this.verticalMode !== 'VNAV') {
-      const coreOut = super.update(telemetry, dt);
-      if (this.lateralMode !== 'LNAV') out.aileron = coreOut.aileron;
-      if (this.verticalMode !== 'VNAV') out.elevator = coreOut.elevator;
-      out.throttle = coreOut.throttle;
     }
 
     return out;

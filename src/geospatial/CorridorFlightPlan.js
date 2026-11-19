@@ -9,9 +9,11 @@ import {
   CORRIDOR_WAYPOINTS,
   haversineDistanceM,
   wgs84ToIncheonLocal,
+  wgs84ToIncheonSceneryLocal,
   wgs84ToJejuLocal,
   jejuLocalToWgs84,
   incheonLocalToWgs84,
+  incheonSceneryLocalToWgs84,
 } from './CorridorCoordinateSystem.js';
 
 const M_TO_NM = 1 / 1852;
@@ -37,7 +39,7 @@ const WAYPOINT_SPEEDS = {
 export const CORRIDOR_WAYPOINTS_EXPANDED = Object.freeze(
   CORRIDOR_WAYPOINTS.map(wpt => {
     const [jejuX, jejuZ] = wgs84ToJejuLocal(wpt.latitude, wpt.longitude);
-    const [incheonX, incheonZ] = wgs84ToIncheonLocal(wpt.latitude, wpt.longitude);
+    const [incheonX, incheonZ] = wgs84ToIncheonSceneryLocal(wpt.latitude, wpt.longitude);
     return Object.freeze({
       ...wpt,
       altitudeM: wpt.altitudeFt * 0.3048,
@@ -104,20 +106,28 @@ export function findActiveWaypointIndex(latitude, longitude, currentIndex = 1, c
 
   while (idx < waypoints.length - 1) {
     const targetWpt = waypoints[idx];
-    const distToTarget = haversineDistanceM(latitude, longitude, targetWpt.latitude, targetWpt.longitude);
+    const prevWpt = waypoints[idx - 1];
 
-    // 1. Within spherical capture radius
+    const distToTarget = haversineDistanceM(latitude, longitude, targetWpt.latitude, targetWpt.longitude);
     if (distToTarget <= captureRadiusM) {
       idx++;
       continue;
     }
 
-    // 2. Or passed perpendicular bisector plane of the current leg
-    const prevWpt = waypoints[idx - 1];
     const segDist = haversineDistanceM(prevWpt.latitude, prevWpt.longitude, targetWpt.latitude, targetWpt.longitude);
-    const distFromStart = haversineDistanceM(prevWpt.latitude, prevWpt.longitude, latitude, longitude);
+    if (segDist <= 0) {
+      idx++;
+      continue;
+    }
 
-    if (distFromStart > segDist && distToTarget < segDist * 0.5) {
+    const brgSeg = calculateBearingDeg(prevWpt.latitude, prevWpt.longitude, targetWpt.latitude, targetWpt.longitude);
+    const brgAc = calculateBearingDeg(prevWpt.latitude, prevWpt.longitude, latitude, longitude);
+    const angleDiffRad = (brgAc - brgSeg) * DEG_TO_RAD;
+    const distFromStart = haversineDistanceM(prevWpt.latitude, prevWpt.longitude, latitude, longitude);
+    const alongTrackM = distFromStart * Math.cos(angleDiffRad);
+
+    // If aircraft has flown past the waypoint along the segment track
+    if (alongTrackM >= segDist - captureRadiusM) {
       idx++;
       continue;
     }
@@ -189,6 +199,11 @@ export class CorridorFlightPlanManager {
     this.currentLeg = null;
   }
 
+  reset(initialWaypointIndex = 1) {
+    this.activeIndex = initialWaypointIndex;
+    this.currentLeg = null;
+  }
+
   /**
    * Update flight plan with current aircraft position.
    * @param {number} latitude
@@ -209,7 +224,7 @@ export class CorridorFlightPlanManager {
    * @returns {object} Updated leg info
    */
   updateLocal(x, z, airport = 'jeju') {
-    const wgs = airport === 'incheon' ? incheonLocalToWgs84(x, z) : jejuLocalToWgs84(x, z);
+    const wgs = airport === 'incheon' ? incheonSceneryLocalToWgs84(x, z) : jejuLocalToWgs84(x, z);
     return this.update(wgs.latitude, wgs.longitude);
   }
 

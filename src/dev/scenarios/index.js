@@ -63,7 +63,7 @@ export const DEV_SCENARIOS = {
     verdict: o => !o.crashed && o.ditched && o.flooding > 0.3 && o.speed < 2.0,
   },
   'corridor-cruise': {
-    airports: ['jeju'], aircraft: ['B738'], kind: 'physical',
+    airports: ['jeju'], aircraft: ['B738'], kind: 'physical', autopilot: true,
     duration: 30, labelKey: 'dev.scenario.corridor-cruise', descriptionKey: 'dev.expect.corridor-cruise',
     setup(sim) {
       // Spawn at FL280 (8,534m MSL) heading 195° South along the corridor towards Chuja & Jeju
