@@ -1,4 +1,5 @@
 {
   "gridSize": 1025,
-  "worldSize": 44000
+  "worldSize": 44000,
+  "origin": { "latitude": 27.6868342, "longitude": 86.7294519 }
 }

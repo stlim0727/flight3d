@@ -533,6 +533,11 @@ export class LuklaAirport {
     return onRunway || onApron;
   }
 
+  hasModeledBuilding(x, z) {
+    const terminal = this.terminalData;
+    return Math.abs(x - terminal.x) <= terminal.width / 2 && Math.abs(z - terminal.z) <= terminal.depth / 2;
+  }
+
   /**
    * Determine if world coordinates fall within Lukla's graded runway safety area
    */

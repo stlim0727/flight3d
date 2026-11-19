@@ -159,6 +159,7 @@ export async function loadIncheonAirport(base, options = {}) {
   ];
   return {terrain,group,nightLighting,departureBridge,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,parked,
     towerCab:tower.cab,
+    hasModeledBuilding(x,z){return colliders.some(c=>pointInRing(x,z,c.points));},
     getGazeTargets(){return gazeTargets;},
     resetTraffic(){traffic.reset();},
     update(dt,position,time,options={}){traffic.update(dt,options.cameraPosition??position,options.quality,options.paused);parked.update(options.cameraPosition??position,options.quality);},
