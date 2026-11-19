@@ -111,6 +111,11 @@ test('JejuFlightSurface models airport grade, Hallasan volcanic topography, and 
   const hAfter = surface.getHeight(-1500, -400.001);
   assert.ok(Math.abs(hBefore - hAfter) < 0.001, `Height should be continuous across z=-400, got ${hBefore} and ${hAfter}`);
 
+  // Continuity across northern coast boundary and airport plateau
+  const hCoast1 = surface.getHeight(0, -912.9923);
+  const hCoast2 = surface.getHeight(0, -912.9943);
+  assert.ok(Math.abs(hCoast1 - hCoast2) < 0.001, `Height should be continuous across z=-913 northern boundary, got ${hCoast1} and ${hCoast2}`);
+
   // Normal vector calculation
   const normal = surface.getNormal(0, 0);
   assert.ok(normal.y > 0.9, 'Airport surface normal should point nearly vertical');

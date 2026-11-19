@@ -57,23 +57,18 @@ export class JejuFlightSurface {
 
     // Realistic asymmetric elliptical boundary of Jeju Island centered near Hallasan
     // East-West: 72 km (from Gosan west coast to Seongsan Ilchulbong east coast)
-    // North: 17.6 km north of Hallasan (coastline meets sea at z ≈ -1,000m north of RKPC)
+    // North: 18.6 km north of Hallasan (coastline meets sea at z ≈ -2,000m north of RKPC)
     // South: 15.0 km south of Hallasan (coastline reaches Seogwipo at z ≈ +31,500m)
     const hx = this.hallasan.x;
     const hz = this.hallasan.z;
     const rx = 36000;
-    const rzNorth = 17600;
+    const rzNorth = 18600;
     const rzSouth = 15000;
     const dx = (x - hx) / rx;
     const dz = z < hz ? (z - hz) / rzNorth : (z - hz) / rzSouth;
     const islandDistSq = dx * dx + dz * dz;
 
-    // Sea level outside island coast
-    if (islandDistSq >= 1.0) {
-      return 0.0;
-    }
-
-    const coastFactor = Math.cos(Math.sqrt(islandDistSq) * (Math.PI * 0.5));
+    const coastFactor = islandDistSq >= 1.0 ? 0.0 : Math.cos(Math.sqrt(islandDistSq) * (Math.PI * 0.5));
 
     // Volcanic shield elevation profile peaking at Mount Hallasan (1,947m)
     const distToPeak = Math.hypot(x - hx, z - hz);
@@ -82,13 +77,13 @@ export class JejuFlightSurface {
     const naturalHeight = Math.max(0.0, (hallasanShield + baseSlope) * coastFactor);
 
     // Airport precinct blending:
-    // Core plateau within 1,200m is leveled at 36m
+    // Core plateau within 800m is leveled at 36m
     const distToAirport = Math.hypot(x, z);
-    if (distToAirport < 1200) {
+    if (distToAirport < 800) {
       return this.elevationM;
     }
-    if (distToAirport < 3600) {
-      const t = Math.max(0, Math.min(1, (distToAirport - 1200) / 2400));
+    if (distToAirport < 2400) {
+      const t = Math.max(0, Math.min(1, (distToAirport - 800) / 1600));
       const blend = t * t * (3 - 2 * t);
       // Northward sea descent: continuous smooth weighting towards sea level
       const northWeight = Math.max(0, Math.min(1, -z / 1600));
