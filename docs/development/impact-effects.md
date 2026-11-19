@@ -96,6 +96,12 @@ camera reset, and equal debris/camera state for one 10-second request versus ten
    Cover first/repeated crashes, aircraft/quality changes and slower devices. A
    breakup-only render measurement does not include particle/audio/debrief work;
    `compileAsync` alone does not guarantee a stall-free first frame.
+   The explosion path now keeps one flash light visible at zero intensity and
+   links its flipbook, spark and shockwave materials during the existing startup
+   shader gate; a cold bandit detonation no longer invalidates the scene program
+   cache. Airport local lights still toggle with altitude, and a crash that brings
+   an unloaded cockpit or a new airport view into frame can still compile that
+   view; those are separate from the explosion path.
 3. **Improve fracture surfaces.** Replace open regional cuts with authored or
    prepared closed fracture meshes, exposed internal surfaces and damaged materials.
    Keep the mesh/draw-call budget bounded and review close-range screenshots.

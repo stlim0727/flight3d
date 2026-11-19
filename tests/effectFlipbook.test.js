@@ -66,7 +66,7 @@ test('impacts separate water from solid materials, settle, expire and reset with
       assert.equal(system.smokePuffs.length, 0);
       assert.equal(system.debrisParticles.length, 0);
       assert.equal(system.shockwaves.length, 4);
-      assert.ok(system.lightPool.every(item => !item.light.visible));
+      assert.ok(system.lightPool.every(item => item.light.visible && item.light.intensity === 0));
       assert.equal(system.waterPlumes.length, 90);
       assert.equal(system.persistentWreckage, null);
       assert.ok(system.waterPlumes.every(p => p.sprite.position.y > 0));
@@ -89,13 +89,13 @@ test('impacts separate water from solid materials, settle, expire and reset with
       assert.equal(particles.length, 0);
     }
     system.clear();
-    assert.equal(system.group.children.length, 4);
-    assert.ok(system.lightPool.every(item => !item.light.visible));
+    assert.equal(system.group.children.length, system.lightPool.length);
+    assert.ok(system.lightPool.every(item => item.light.visible && item.light.intensity === 0));
   }
   system.spawnExplosion({ type: 'TERRAIN', speedKnots: 20 });
   const slowCount = system.smokePuffs.length;
   assert.equal(system.fireballs.length, 0);
-  assert.ok(system.lightPool.every(item => !item.light.visible));
+  assert.ok(system.lightPool.every(item => item.light.visible && item.light.intensity === 0));
   system.clear();
   const point = new THREE.Vector3(5, -2, 8), velocity = new THREE.Vector3(100, -20, 0);
   system.spawnExplosion({ type: 'BUILDING', point }, velocity);
@@ -105,6 +105,41 @@ test('impacts separate water from solid materials, settle, expire and reset with
   assert.deepEqual(velocity.toArray(), [100, -20, 0]);
   system.dispose();
   assert.equal(system.scene.children.length, 0);
+});
+
+test('flash lights stay visible at zero intensity and the warmup root covers effect materials', () => {
+  const original = ExplosionSystem.prototype.createSparkTexture;
+  ExplosionSystem.prototype.createSparkTexture = () => new THREE.Texture();
+  let system;
+  try {
+    system = new ExplosionSystem(new THREE.Scene());
+    assert.ok(system.lightPool.length >= 1);
+    assert.equal(system.group.children.length, system.lightPool.length);
+    assert.ok(system.lightPool.every(item => item.light.visible && item.light.intensity === 0));
+
+    system.spawnExplosion(
+      { type: 'AIR', point: new THREE.Vector3(0, 1000, 0) },
+      new THREE.Vector3(0, 0, -250),
+      { exaggerated: true },
+    );
+    assert.equal(system.lightPool.filter(item => item.light.intensity > 0).length, 1);
+    assert.ok(system.lightPool.every(item => item.light.visible));
+
+    for (let i = 0; i < 30; i++) system.update(1 / 60);
+    assert.ok(system.lightPool.every(item => item.light.visible && item.light.intensity === 0));
+
+    const root = system.createShaderWarmupRoot();
+    assert.equal(root.visible, false);
+    assert.ok(root.children.some(child => child.isSprite));
+    assert.ok(root.children.some(child => child.isMesh));
+
+    system.clear();
+    assert.ok(system.lightPool.every(item => item.light.visible && item.light.intensity === 0));
+    system.dispose();
+    assert.equal(system.shaderWarmupRoot, null);
+  } finally {
+    ExplosionSystem.prototype.createSparkTexture = original;
+  }
 });
 
 test('persistent wreckage maintains smoke and water foam for 30 seconds across clear({ preservePersistent: true })', () => {
@@ -173,7 +208,7 @@ test('exaggerated air explosions spawn comet-like flame tails within budgets and
     system.clear();
     assert.equal(system.cometDebris.length, 0);
     assert.equal(system.cometTailParticles.length, 0);
-    assert.equal(system.group.children.length, 4);
+    assert.equal(system.group.children.length, system.lightPool.length);
     system.dispose();
   } finally {
     ExplosionSystem.prototype.createSparkTexture = original;

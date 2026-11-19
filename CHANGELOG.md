@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **fix(effects):** avoid scene-wide shader recompiles on the first explosion
+  - Explosion flash lights now stay visible at zero intensity instead of being hidden. Three counts visible point lights in every lit material's program key, so the old visibility toggle rebuilt the whole scene on impact.
+  - The explosion's flipbook, spark and shockwave programs are linked behind the existing startup shader gate, and one reusable flash light replaces the four-light pool.
+  - On Intel/Vulkan, a cold bandit detonation dropped from 1097–2440 ms to 195 ms with no new shader programs; steady-state frame time stayed within the run-to-run range with the idle light present.
 - **feat(ui):** draw the aircraft-control and fullscreen buttons as icons (#808)
   - Landing gear (with its down/up/moving/failed arrow), spoilers (a wing section with its upper panel raised, matching the flap icon; the highlighted button shows when they are out) and fullscreen (enter/exit) now show icons instead of short text.
   - Flaps show a wing-and-flap icon above their angle; on desktop the key hint sits beside the angle.

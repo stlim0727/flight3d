@@ -1057,6 +1057,19 @@ class FlightSimulator {
   }
 
   /**
+   * Link the particle and shockwave programs while the startup overlay is still
+   * up. The explosion group has no renderable children before the first impact,
+   * so scene-only shader warmup cannot cover these materials.
+   */
+  warmExplosionShaders() {
+    if (this.explosionShaderWarmup || !this.explosionSystem?.createShaderWarmupRoot) return this.explosionShaderWarmup;
+    const root = this.explosionSystem.createShaderWarmupRoot();
+    this.explosionShaderWarmup = this.renderer.compileAsync(root, this.camera, this.scene)
+      .catch(error => console.warn('Explosion shader warmup failed:', error));
+    return this.explosionShaderWarmup;
+  }
+
+  /**
    * Construct an aircraft model for the per-session cache. The instrument canvases are
    * shared: a model only draws into them while it is the active aircraft, so building a
    * second one ahead of the user's pick costs memory but cannot disturb the current view.
@@ -1126,10 +1139,11 @@ class FlightSimulator {
     }
     await startupDetail('startup.detail.effects');
     this.prepareCrashVisuals();
+    this.warmExplosionShaders();
     let timeout;
     try {
       await Promise.race([
-        Promise.all([this.aircraft.cockpit?.shaderWarmup, this.crashShaderWarmup]),
+        Promise.all([this.aircraft.cockpit?.shaderWarmup, this.crashShaderWarmup, this.explosionShaderWarmup]),
         new Promise((_, reject) => {
           timeout = setTimeout(() => reject(new Error('Startup shaders timed out')), Math.max(0, deadline - performance.now()));
         }),
