@@ -93,3 +93,34 @@ test('loaded footprints collide by aircraft position regardless of camera positi
   layer.dispose();
   assert.equal(terrain.geographicBuildingLayer, undefined);
 });
+
+test('protects runway safety areas from streamed footprints and probe collisions', async () => {
+  const { Vector3 } = await import('three');
+  const terrain = { getHeight: () => 44 };
+  const protectedPoint = (x, z) => x > 84 && x < 86 && z > 139 && z < 141;
+  const layer = new GeographicBuildings({
+    origin: { latitude: 0, longitude: 0 },
+    project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
+    terrain,
+    isRunwaySafetyArea: protectedPoint,
+    archive: { getZxy: async () => ({ data: buildingTile() }) },
+  });
+  layer.update(new Vector3(85, 50, 140));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(layer.group.children.length, 1, 'building vertices and center are outside the protected point');
+  assert.equal(layer.checkCollision([{ pos: new Vector3(85, 50, 140), radius: 1 }]), null);
+  assert.ok(layer.checkCollision([{ pos: new Vector3(90, 50, 140), radius: 1 }]));
+  layer.dispose();
+
+  const overlapping = new GeographicBuildings({
+    origin: { latitude: 0, longitude: 0 },
+    project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
+    terrain,
+    isRunwaySafetyArea: (x, z) => x < 1 && z > 200,
+    archive: { getZxy: async () => ({ data: buildingTile() }) },
+  });
+  overlapping.update(new Vector3(85, 50, 140));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(overlapping.group.children.length, 0, 'a footprint corner enters the safety area');
+  overlapping.dispose();
+});

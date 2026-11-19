@@ -61,7 +61,7 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
       const [outer, ...holes] = rings;
       if (outer.length < 3 || Math.abs(THREE.ShapeUtils.area(outer)) < 3) continue;
       const center = outer.reduce((sum, point) => sum.add(point), new THREE.Vector2()).divideScalar(outer.length);
-      if (exclude(center.x, center.y) || terrain.isWater?.(center.x, center.y)
+      if (exclude(center.x, center.y, outer) || terrain.isWater?.(center.x, center.y)
         || (Number.isFinite(terrain.size) && Math.max(Math.abs(center.x), Math.abs(center.y)) > terrain.size / 2)) continue;
       const samples = outer.map(point => terrain.getHeight(point.x, point.y));
       const low = Math.min(...samples);
@@ -129,11 +129,14 @@ function intersectsBuilding({ pos, radius }, { rings, low, roof }) {
 }
 
 export class GeographicBuildings {
-  constructor({ origin, project, terrain, exclude, archive = source }) {
+  constructor({ origin, project, terrain, exclude, isRunwaySafetyArea, archive = source }) {
     this.origin = origin;
     this.project = project;
     this.terrain = terrain;
-    this.exclude = exclude;
+    this.isRunwaySafetyArea = isRunwaySafetyArea;
+    this.exclude = (x, z, footprint) => exclude?.(x, z)
+      || isRunwaySafetyArea?.(x, z)
+      || footprint.some(point => isRunwaySafetyArea?.(point.x, point.y));
     this.archive = archive;
     this.group = new THREE.Group();
     this.group.name = 'Geographic buildings';
@@ -212,6 +215,7 @@ export class GeographicBuildings {
     if (!this.tiles.size) return null;
     for (const probe of probes) {
       const { pos, radius } = probe;
+      if (this.isRunwaySafetyArea?.(pos.x, pos.z)) continue;
       for (const cell of collisionCells(pos.x - radius, pos.z - radius, pos.x + radius, pos.z + radius)) {
         for (const key of this.aircraftTiles ?? []) {
           if (this.tiles.get(key)?.collisionCells.get(cell)?.some(collider => intersectsBuilding(probe, collider))) {
@@ -254,7 +258,8 @@ export function updateGeographicBuildings(sim) {
     const airport = sim.currentAirport;
     sim.geographicBuildingLayer = new GeographicBuildings({
       origin, project, terrain,
-      exclude: (x, z) => airport?.isRunwaySafetyArea?.(x, z) || airport?.hasModeledBuilding?.(x, z),
+      exclude: (x, z) => airport?.hasModeledBuilding?.(x, z),
+      isRunwaySafetyArea: (x, z) => airport?.isRunwaySafetyArea?.(x, z),
     });
     terrain.geographicBuildingLayer = sim.geographicBuildingLayer;
     terrain.mesh.add(sim.geographicBuildingLayer.group);
