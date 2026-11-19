@@ -413,21 +413,27 @@ export class NDCanvas {
     ctx.font = 'bold 12px monospace';
 
     let activePos = null;
-    const corridorWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === activeWpt);
-    if (corridorWpt) {
-      if (this.airportId === 'incheon') {
-        activePos = { x: corridorWpt.incheonX, z: corridorWpt.incheonZ };
-      } else if (this.airportId === 'jeju') {
-        activePos = { x: corridorWpt.jejuX, z: corridorWpt.jejuZ };
+    const activeFix = fixes.find(f => f.name === activeWpt);
+    if (activeFix) {
+      activePos = { x: activeFix.x, z: activeFix.z ?? activeFix.y };
+    } else {
+      const corridorWpt = CORRIDOR_WAYPOINTS_EXPANDED.find(w => w.ident === activeWpt);
+      if (corridorWpt) {
+        if (this.airportId === 'incheon') {
+          activePos = { x: corridorWpt.incheonX, z: corridorWpt.incheonZ };
+        } else if (this.airportId === 'jeju') {
+          activePos = { x: corridorWpt.jejuX, z: corridorWpt.jejuZ };
+        }
       }
     }
     if (!activePos) {
-      const activeFix = fixes.find(f => f.name === activeWpt) || threshPos;
-      activePos = { x: activeFix.x, z: activeFix.z ?? activeFix.y };
+      activePos = { x: threshPos.x, z: threshPos.z ?? threshPos.y };
     }
 
     const distMeters = Math.hypot(this.planePos.x - activePos.x, this.planePos.y - activePos.z);
     const distToWpt = Math.max(0.1, distMeters / 1852.0);
+    this.lastActiveWpt = activeWpt;
+    this.lastDistToWptNm = distToWpt;
     ctx.fillText(`${distToWpt.toFixed(1)} NM`, w - 24, 62);
 
     // Bottom Left & Right VOR Frequency Data

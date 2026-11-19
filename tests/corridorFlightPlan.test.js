@@ -183,9 +183,11 @@ test('NDCanvas and CDUCanvas render dynamic corridor waypoints', () => {
     z: 621.3 + 7408 * Math.cos(rad67),
   });
   nd.render();
-  // Threshold position -> RW07
+  // Threshold position -> RW07 (distance to threshold should be ~0.1 NM minimum clamped, not 0.9 NM)
   nd.updateData({ headingDeg: 67, trackDeg: 67, x: -1463.6, z: 621.3 });
   nd.render();
+  assert.equal(nd.lastActiveWpt, 'RW07');
+  assert.ok(nd.lastDistToWptNm <= 0.15, `Expected distance near 0.1 NM at threshold, got ${nd.lastDistToWptNm}`);
 
   const cdu = new CDUCanvas(256, 256);
   cdu.setAirport('jeju');
