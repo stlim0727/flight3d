@@ -91,6 +91,18 @@ export function createIncheonGroundTexture(worldSize = 12000) {
 }
 
 /**
+ * Normalize and configure satellite texture parameters.
+ */
+export function configureIncheonSatelliteTexture(texture, anisotropy = 4) {
+  if (!texture) return null;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.anisotropy = anisotropy;
+  return texture;
+}
+
+/**
  * Surface material for Incheon terrain.
  * Supports satellite orthoimagery draping across the 12 km area when available,
  * with graceful fallback to procedural ground noise and vertex colours.
@@ -108,6 +120,9 @@ export function incheonSurfaceMaterial({
 } = {}) {
   const activeSatellite = satelliteTexture ?? (map && map.wrapS === THREE.ClampToEdgeWrapping ? map : null);
   const isSatellite = Boolean(activeSatellite);
+  if (activeSatellite) {
+    configureIncheonSatelliteTexture(activeSatellite);
+  }
   const baseMap = activeSatellite ?? map ?? createIncheonGroundTexture(worldSize);
 
   const material = new THREE.MeshStandardMaterial({
@@ -180,10 +195,7 @@ export function incheonSurfaceMaterial({
  */
 export function applyIncheonSatelliteTexture(material, satelliteTexture) {
   if (!material || !satelliteTexture) return;
-  satelliteTexture.colorSpace = THREE.SRGBColorSpace;
-  satelliteTexture.wrapS = THREE.ClampToEdgeWrapping;
-  satelliteTexture.wrapT = THREE.ClampToEdgeWrapping;
-  satelliteTexture.anisotropy = 4;
+  configureIncheonSatelliteTexture(satelliteTexture);
   material.map = satelliteTexture;
   material.vertexColors = false;
   material.color.setHex(0xffffff);
@@ -198,11 +210,7 @@ export async function loadIncheonSatelliteTexture(base, loader = new THREE.Textu
     const url = `${String(base).replace(/\/?$/, '/')}satellite.jpg`;
     const texture = await loader.loadAsync(url);
     if (texture) {
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.wrapS = THREE.ClampToEdgeWrapping;
-      texture.wrapT = THREE.ClampToEdgeWrapping;
-      texture.anisotropy = 4;
-      return texture;
+      return configureIncheonSatelliteTexture(texture);
     }
   } catch {
     // Offline resilience: satellite image is optional.

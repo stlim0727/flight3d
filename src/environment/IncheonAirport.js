@@ -67,7 +67,18 @@ export async function loadIncheonAirport(base, options = {}) {
   terrain.groundMaterial = groundMaterial;
   const trees=generatePlanting(patch,dressing).filter(t=>!terrain.isRunwaySafetyArea(t.x,t.z));
   const local=terrainGeometry(2000,160,height);
-  const city=new THREE.Mesh(local,new THREE.MeshLambertMaterial({map:createCityGround(patch,dressing,trees)}));
+  if (satelliteTexture) {
+    const pos = local.attributes.position;
+    const uv = local.attributes.uv;
+    for (let i = 0; i < pos.count; i++) {
+      uv.setXY(i, pos.getX(i) / 12000 + 0.5, 0.5 - pos.getZ(i) / 12000);
+    }
+    uv.needsUpdate = true;
+  }
+  const cityMaterial = satelliteTexture
+    ? groundMaterial
+    : new THREE.MeshLambertMaterial({ map: createCityGround(patch, dressing, trees) });
+  const city = new THREE.Mesh(local, cityMaterial);
   terrain.mesh.add(city);
   const records=[],colliders=[...sihwa.colliders];
   for(const feature of patch.features.filter(f=>f.kind==='building')) for(const points of feature.parts) {

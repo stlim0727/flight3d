@@ -18,6 +18,7 @@ import {
   createIncheonGroundTexture,
   applyIncheonSatelliteTexture,
   loadIncheonSatelliteTexture,
+  configureIncheonSatelliteTexture,
 } from '../src/environment/IncheonGround.js';
 
 test('incheonSurfaceMaterial defaults to procedural ground with vertex colors', () => {
@@ -29,19 +30,32 @@ test('incheonSurfaceMaterial defaults to procedural ground with vertex colors', 
   assert.equal(material.customProgramCacheKey(), 'incheon-surface-procedural-v1');
 });
 
-test('incheonSurfaceMaterial applies satellite texture without vertex color tinting', () => {
-  const satelliteTex = new THREE.DataTexture(new Uint8Array(4), 1, 1);
-  satelliteTex.wrapS = THREE.ClampToEdgeWrapping;
-  satelliteTex.wrapT = THREE.ClampToEdgeWrapping;
+test('configureIncheonSatelliteTexture normalizes raw caller textures', () => {
+  const rawTex = new THREE.Texture();
+  assert.equal(rawTex.colorSpace, THREE.NoColorSpace);
+
+  configureIncheonSatelliteTexture(rawTex, 8);
+  assert.equal(rawTex.colorSpace, THREE.SRGBColorSpace);
+  assert.equal(rawTex.wrapS, THREE.ClampToEdgeWrapping);
+  assert.equal(rawTex.wrapT, THREE.ClampToEdgeWrapping);
+  assert.equal(rawTex.anisotropy, 8);
+});
+
+test('incheonSurfaceMaterial configures caller-supplied satellite texture upon creation', () => {
+  const rawTex = new THREE.Texture();
+  assert.equal(rawTex.colorSpace, THREE.NoColorSpace);
 
   const mask = new THREE.DataTexture(new Uint8Array(4), 1, 1);
   const material = incheonSurfaceMaterial({
-    satelliteTexture: satelliteTex,
+    satelliteTexture: rawTex,
     alphaMap: mask,
     applyShadows: false,
   });
 
-  assert.equal(material.map, satelliteTex);
+  assert.equal(material.map, rawTex);
+  assert.equal(rawTex.colorSpace, THREE.SRGBColorSpace);
+  assert.equal(rawTex.wrapS, THREE.ClampToEdgeWrapping);
+  assert.equal(rawTex.wrapT, THREE.ClampToEdgeWrapping);
   assert.equal(material.vertexColors, false);
   assert.equal(material.color.getHex(), 0xffffff);
   assert.equal(material.alphaMap, mask);
@@ -103,3 +117,21 @@ test('incheonSurfaceMaterial onBeforeCompile injects micro-grain and slope relie
   assert.ok(shader.fragmentShader.includes('incheonFade'));
   assert.ok(shader.fragmentShader.includes('incheonBumpFade'));
 });
+
+test('central detail mesh aligns UVs to 12 km landscape when satellite imagery is active', () => {
+  const pos = new THREE.Float32BufferAttribute([-1000, 0, -1000, 1000, 0, 1000], 3);
+  const uv = new THREE.Float32BufferAttribute([0, 1, 1, 0], 2);
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', pos);
+  geom.setAttribute('uv', uv);
+
+  for (let i = 0; i < pos.count; i++) {
+    uv.setXY(i, pos.getX(i) / 12000 + 0.5, 0.5 - pos.getZ(i) / 12000);
+  }
+
+  assert.ok(Math.abs(uv.getX(0) - (5 / 12)) < 1e-5);
+  assert.ok(Math.abs(uv.getY(0) - (7 / 12)) < 1e-5);
+  assert.ok(Math.abs(uv.getX(1) - (7 / 12)) < 1e-5);
+  assert.ok(Math.abs(uv.getY(1) - (5 / 12)) < 1e-5);
+});
+
