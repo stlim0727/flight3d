@@ -5,6 +5,9 @@ import { EngineModel } from '../physics/EngineModel.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { solveTrim } from '../physics/TrimSolver.js';
 import { rebaseCgVelocity, translateModelOrigin } from '../physics/massKinematics.js';
+import { PilotPhysiology } from '../physics/PilotPhysiology.js';
+import { GForceFilter, normalLoadFactor } from '../physics/loadFactor.js';
+import { validateCommand } from '../pilot/PilotProtocol.js';
 import { flyBank } from '../director/PilotControlLaws.js';
 
 const { clamp, radToDeg } = THREE.MathUtils;
@@ -24,10 +27,12 @@ export class BanditFlightModel {
     this.engines.bindMassProperties(this.aero.massProperties);
     this.aero.massProperties.setConfiguration(0, 0);
     this.aero.syncMassProperties();
-    this.controls = { throttle: 0.5, setVirtualInput: (axis, value) => {
-      if (axis === 'throttle') this.controls.throttle = value;
-      else this.aero[axis] = value;
-    } };
+    this.controls = {};
+    Object.defineProperty(this.controls, 'throttle', { get: () => this.command.throttle });
+    this.pilotPhysiology = new PilotPhysiology();
+    this.gForceFilter = new GForceFilter();
+    this.gForce = 1;
+    this.oldVelocity = new THREE.Vector3();
     this.result = createAeroResult();
     this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
     this.force = new THREE.Vector3();
@@ -47,8 +52,9 @@ export class BanditFlightModel {
     this.quaternion.setFromEuler(this.euler.set(gamma + (trim.alphaDeg ?? 4) * Math.PI / 180, -heading, 0));
     this.aero.elevator = trim.elevator;
     this.aero.pitchTrim = trim.pitchTrimDeg;
-    this.controls.throttle = trim.feasible ? trim.throttle : 0.7;
-    this.engines.n1.fill(this.engines.idleN1 + this.controls.throttle * (this.engines.togaN1 - this.engines.idleN1));
+    this.command = { elevator: trim.elevator, aileron: 0, rudder: 0,
+      throttle: trim.feasible ? trim.throttle : 0.7, brakes: 0 };
+    this.engines.n1.fill(this.engines.idleN1 + this.command.throttle * (this.engines.togaN1 - this.engines.idleN1));
     this.measure(1 / 120, 0, 1000);
   }
 
@@ -59,6 +65,10 @@ export class BanditFlightModel {
 
   /** Guidance limits are pilot commands, never clamps on velocity or forces. */
   guide(heading, altitude, speed) {
+    this.applyCommand(this.computeGuidance(heading, altitude, speed));
+  }
+
+  computeGuidance(heading, altitude, speed) {
     this.euler.setFromQuaternion(this.quaternion, 'YXZ');
     this.forward.set(0, 0, -1).applyQuaternion(this.quaternion);
     const currentHeading = Math.atan2(this.forward.x, -this.forward.z);
@@ -71,7 +81,10 @@ export class BanditFlightModel {
       * (this.aero.CL0_clean + this.aero.CLa * 12 * Math.PI / 180)
       / (this.aero.mass * Atmosphere.G0);
     const bankLimit = radToDeg(Math.acos(1 / Math.max(1, Math.min(7, availableLoad))));
-    flyBank(this, clamp(radToDeg(error) * 1.8, -bankLimit, bankLimit), tel);
+    let aileron = 0;
+    flyBank({ aero: this.aero, angularVelocity: this.angularVelocity,
+      controls: { setVirtualInput: (_axis, value) => { aileron = value; } },
+    }, clamp(radToDeg(error) * 1.8, -bankLimit, bankLimit), tel);
     const targetVz = clamp((altitude - this.position.y) * 0.18, -35, 45);
     const bank = -this.euler.z;
     const tas = Math.max(30, this.aero.tas);
@@ -89,12 +102,18 @@ export class BanditFlightModel {
     const authority = Math.max(1, this.aero.qDyn * this.aero.wingArea * this.aero.meanChord
       * -this.aero.Cm_de * Math.PI / 9 * (1 - 0.8 * this.aero.separation));
     const elevator = clamp(this.aero.elevator + (desiredMoment - this.result.momentBody.x) / authority, -0.8, 0.8);
-    this.aero.elevator = elevator;
     const density = Atmosphere.getConditions(this.position.y).densityRatio;
     const targetIas = Atmosphere.msToKnots(speed * Math.sqrt(density));
-    this.controls.throttle = clamp(0.5 + (targetIas - tel.iasKnots) * 0.035 + targetVz * 0.02, 0.05, 1);
+    const throttle = clamp(0.5 + (targetIas - tel.iasKnots) * 0.035 + targetVz * 0.02, 0.05, 1);
     // Sideslip and yaw-rate feedback coordinate the turn through the rudder.
-    this.aero.rudder = clamp(this.aero.beta * 2 + this.angularVelocity.y * 0.6, -0.6, 0.6);
+    const rudder = clamp(this.aero.beta * 2 + this.angularVelocity.y * 0.6, -0.6, 0.6);
+    return { elevator, aileron, rudder, throttle, brakes: 0 };
+  }
+
+  applyCommand(command) {
+    const validated = validateCommand(command);
+    if (validated.ok) this.command = validated.command;
+    return validated.ok;
   }
 
   step(dt, damage = 0, clearance = 1000, damageZones = null) {
@@ -103,7 +122,11 @@ export class BanditFlightModel {
     this.engines.contactDamage[0] = damageZones
       ? Math.max(damage, damageZones.engine ?? 0)
       : damage;
-    this.engines.setThrottle(this.controls.throttle);
+    this.pilotPhysiology.update(dt, this.gForce, this.command);
+    this.aero.elevator = this.pilotPhysiology.effectiveElevator;
+    this.aero.aileron = this.pilotPhysiology.effectiveAileron;
+    this.aero.rudder = this.pilotPhysiology.effectiveRudder;
+    this.engines.setThrottle(this.command.throttle);
     const atmosphere = Atmosphere.getConditions(this.position.y);
     const engine = this.engines.update(dt, this.position.y, this.linearVelocity.length(), atmosphere.densityRatio);
     this.aero.syncMassProperties();
@@ -114,6 +137,7 @@ export class BanditFlightModel {
     this.force.set(0, 0, -engine.totalThrust).applyQuaternion(this.quaternion)
       .add(result.forceWorld);
     this.force.y -= this.aero.mass * Atmosphere.G0;
+    this.oldVelocity.copy(this.linearVelocity);
     this.linearVelocity.addScaledVector(this.force, dt / this.aero.mass);
     this.acceleration.set(result.momentBody.x * this.aero.invIyy,
       result.momentBody.y * this.aero.invIzz, result.momentBody.z * this.aero.invIxx);
@@ -122,6 +146,8 @@ export class BanditFlightModel {
     this.delta.set(this.angularVelocity.x * dt / 2, this.angularVelocity.y * dt / 2,
       this.angularVelocity.z * dt / 2, 1).normalize();
     this.quaternion.multiply(this.delta).normalize();
+    const load = normalLoadFactor(this.oldVelocity, this.linearVelocity, this.oldRotation, this.quaternion, dt);
+    this.gForce = this.gForceFilter.update(load, dt);
     translateModelOrigin(this.position, this.linearVelocity, this.oldRotation, this.quaternion, this.aero.cg, dt);
   }
 }

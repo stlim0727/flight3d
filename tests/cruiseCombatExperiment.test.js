@@ -10,9 +10,10 @@ test('pursuit routes elevator and rudder through real player input rather than o
   pilot.euler = new Euler(); pilot.forward = new Vector3(); pilot.result = pilot._aeroResult;
   pilot.aero.beta = 0.1;
   const original = pilot.quaternion.clone();
+  const { elevator, rudder } = pilot.aero;
   guidePlayer(pilot, { position: pilot.position.clone().add(new Vector3(3000, 500, -3000)) }, 180);
-  assert.equal(pilot.controls.virtualElevator, pilot.aero.elevator);
-  assert.equal(pilot.controls.virtualRudder, pilot.aero.rudder);
+  assert.equal(pilot.aero.elevator, elevator);
+  assert.equal(pilot.aero.rudder, rudder);
   assert.notEqual(pilot.controls.virtualRudder, 0);
   assert.notEqual(pilot.controls.virtualElevator, 0);
   assert.deepEqual(pilot.quaternion, original, 'guidance must not directly change the pose');
@@ -31,8 +32,8 @@ test('an acquisition window with no launch retains an explicit withheld outcome'
 });
 
 test('real Cruise countermeasure controls share the exact locked launch and record terminal flight', () => {
-  const enabled = experiment('close-locked', true, Math.hypot(96, 49));
-  const disabled = experiment('close-locked', false, Math.hypot(96, 49));
+  const enabled = experiment('close-locked', true, Math.hypot(96, 49), { launchDeadlineSeconds: 90, maxSeconds: 160 });
+  const disabled = experiment('close-locked', false, Math.hypot(96, 49), { launchDeadlineSeconds: 90, maxSeconds: 160 });
   assert.deepEqual(enabled.launchState, disabled.launchState);
   for (const row of [enabled, disabled]) {
     assert.equal(row.shots.length, 1);

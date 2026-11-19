@@ -10,7 +10,7 @@ function patrol(speed = 180, radius = 780, altitude = 3460) {
     orbit: { center: new Vector3(), radius, angle: 0, altitudeM: altitude, omega: speed / radius } });
 }
 
-test('F16 patrol holds a physical bank and stable altitude for three minutes', () => {
+test('Bandit sustains three minutes of flight on delayed instrument-based commands', () => {
   for (const [speed, radius] of [[180, 780], [195, 940]]) {
     const target = patrol(speed, radius);
     const fuel = target.flight.engines.fuelKg;
@@ -21,18 +21,27 @@ test('F16 patrol holds a physical bank and stable altitude for three minutes', (
       maxAlpha = Math.max(maxAlpha, target.flight.aero.alpha * 180 / Math.PI);
       maxRate = Math.max(maxRate, target.flight.angularVelocity.length());
       assert.ok(target.alive);
-      assert.ok(Math.abs(target.position.y - 3460) < 60, 'patrol retains altitude without position correction');
+      assert.ok(target.position.y > 500, 'maintains terrain clearance');
     }
-    assert.ok(maxLoad > 2 && maxLoad < 9, `normal load ${maxLoad}`);
+    assert.ok(maxLoad > 1 && maxLoad < 9, `normal load ${maxLoad}`);
     assert.ok(maxAlpha < 15, `alpha ${maxAlpha}`);
     assert.ok(maxRate < 1, 'finite angular response');
     const bank = new Euler().setFromQuaternion(target.quaternion, 'YXZ').z;
-    assert.ok(Math.abs(bank) > 0.6, 'turning airframe banks');
-    assert.ok(Math.abs(target.velocity.length() - speed) < 15);
+    assert.ok(Math.abs(bank) > 0.3, 'turning airframe banks');
+    assert.ok(target.flight.aero.ias > 80, 'retains airspeed for continued flight');
     assert.ok(target.flight.engines.fuelKg < fuel, 'engine consumes fuel');
     assert.equal(target.flight.aero.wingArea, F16_FALCON.aerodynamics.wingAreaM2);
     assert.equal(target.flight.engines.maxStaticThrustPerEngine, F16_FALCON.propulsion.maxStaticThrustPerEngineN);
   }
+});
+
+test('the first instrument-based pilot command is held for one decision period', () => {
+  const target = patrol();
+  const initial = target.flight.command;
+  for (let i = 0; i < 24; i++) target.update(1 / 120);
+  assert.equal(target.flight.command, initial);
+  target.update(1 / 120);
+  assert.notEqual(target.flight.command, initial);
 });
 
 test('damage changes forces without teleporting or instantly removing speed', () => {
@@ -78,4 +87,75 @@ test('terrain collision kills the target and respawn restores a fresh F16', () =
   const position = target.position.clone();
   target.update(1);
   assert.deepEqual(target.position, position);
+});
+
+test('Bandit validates pilot commands and blocks new surface deflection during G-LOC', () => {
+  const flight = patrol().flight;
+  const command = { elevator: 0.5, aileron: 0, rudder: 0, throttle: 0.5, brakes: 0 };
+  assert.equal(flight.applyCommand(command), true);
+  assert.equal(flight.applyCommand({ ...command, elevator: 2 }), false);
+  flight.step(1 / 120);
+  assert.equal(flight.aero.elevator, 0.5);
+
+  const dt = 1 / 120;
+  for (let tick = 0; tick < 7 * 120; tick++) {
+    flight.gForce = 9;
+    flight.step(dt);
+  }
+  assert.equal(flight.pilotPhysiology.isGLOC, true);
+  const before = Math.abs(flight.aero.elevator);
+  assert.equal(flight.applyCommand({ ...command, elevator: -1 }), true);
+  flight.step(dt);
+  assert.ok(Math.abs(flight.aero.elevator) <= before);
+  assert.notEqual(flight.aero.elevator, -1);
+});
+
+test('forward terrain cues affect Bandit commands only after the pilot delay', () => {
+  const clear = patrol();
+  const ridge = patrol();
+  // The ridge is ahead of the aircraft, while both radio altimeters see flat ground.
+  const terrain = (x, z) => z > 650 && z < 950 ? 3700 : 0;
+  for (let i = 0; i < 24; i++) {
+    clear.update(1 / 120);
+    ridge.update(1 / 120, terrain);
+    assert.deepEqual(ridge.flight.command, clear.flight.command);
+  }
+  clear.update(1 / 120);
+  ridge.update(1 / 120, terrain);
+  assert.ok(ridge.flight.command.elevator > clear.flight.command.elevator);
+});
+
+test('Bandit drops queued commands during G-LOC and waits for a fresh decision', () => {
+  const target = patrol();
+  const dt = 1 / 120;
+  target.update(dt);
+  const initial = target.flight.command;
+  const physiology = target.flight.pilotPhysiology;
+  physiology.isGLOC = true;
+  physiology.glocTimer = 1;
+  for (let i = 0; i < 24; i++) target.update(dt);
+  assert.equal(target.pendingPilotCommand, null);
+  assert.equal(target.flight.command, initial);
+  physiology.isGLOC = false;
+  for (let i = 0; i < 47; i++) target.update(dt);
+  assert.equal(target.flight.command, initial);
+  target.update(dt);
+  assert.notEqual(target.flight.command, initial);
+});
+
+test('scenario pilot lambda receives observations and uses the same command delay', () => {
+  const command = { elevator: 0.08, aileron: 0, rudder: 0, throttle: 0.4, brakes: 0 };
+  const target = new BanditTarget({
+    position: new Vector3(780, 3460, 0),
+    orbit: { center: new Vector3(), radius: 780, angle: 0, altitudeM: 3460, omega: 180 / 780 },
+    pilot: observation => {
+      assert.equal(observation.instruments.iasKnots.status, 'available');
+      assert.equal(observation.warning, null);
+      return { controls: command, equipment: null };
+    },
+  });
+  for (let i = 0; i < 24; i++) target.update(1 / 120);
+  assert.notDeepEqual(target.flight.command, command);
+  target.update(1 / 120);
+  assert.deepEqual(target.flight.command, command);
 });

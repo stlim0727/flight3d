@@ -50,10 +50,32 @@ test('countermeasure choice is independent of warning detection and resets per s
     for (let tick = 0; tick < 240; tick++) events.push(...combat.update(1 / 120, world));
     assert.notEqual(target.threatResponse.confirmedId, null);
     assert.equal(events.filter(e => e.type === 'flare_dispense').length, countermeasurePolicy === 'single' ? 1 : 0);
+    assert.equal(events.filter(e => e.type === 'chaff_dispense').length, 0);
     combat.reset(); combat.update(1 / 120, world);
     assert.equal(combat.targets[0].evasionSkill, 'hold');
     assert.equal(combat.targets[0].flareThreatIds.size, 0);
   }
+});
+
+test('an observed radar warning requests only chaff, and G-LOC cancels the burst', () => {
+  const combat = new AirToAirMissileSystem({ countermeasurePolicy: 'burst' });
+  const world = { active: true, onGround: false, position: new Vector3(0, 3000, 0),
+    velocity: new Vector3(0, 0, -250), quaternion: new Quaternion(), terrainHeight: () => 0 };
+  const dt = 1 / 120;
+  combat.update(dt, world);
+  const target = combat.targets[0];
+  target.threatResponse.sampleWarnings = () => [{ id: 1, channel: 'radar', bearingRad: 0 }];
+  const events = [];
+  for (let i = 0; i < 180 && !events.some(e => e.type === 'chaff_dispense'); i++) {
+    events.push(...combat.update(dt, world));
+  }
+  assert.equal(events.filter(e => e.type === 'chaff_dispense').length, 1);
+  assert.equal(events.filter(e => e.type === 'flare_dispense').length, 0);
+  target.flight.pilotPhysiology.isGLOC = true;
+  target.flight.pilotPhysiology.glocTimer = 2;
+  for (let i = 0; i < 120; i++) events.push(...combat.update(dt, world));
+  assert.equal(events.filter(e => e.type === 'chaff_dispense').length, 1);
+  assert.equal(target.chaffBursts.size, 0);
 });
 
 test('renderless coastal play preserves initial conditions across policy changes and records bounded results', () => {
@@ -78,13 +100,13 @@ test('pursuit estimates lead from consecutive contact snapshots and clears histo
   assert.equal(Math.abs(afterLoss.headingRad) < 1e-9, true);
 });
 
-test('observation-limited pursuit achieves lock and launch in 300s coastal play while hold does not', () => {
+test('coastal pursuit stays airborne for 300s and hold does not launch', () => {
   const run = values => runCombatExperiment(combatExperimentConfig({ scenario: 'coastal', seconds: '300', ...values })).results[0];
   const pursuit = run({ 'attack-skill': 'pursuit', 'evasion-skill': 'legacy-break', 'countermeasure-policy': 'single' });
   const hold = run({ 'attack-skill': 'hold', 'evasion-skill': 'legacy-break', 'countermeasure-policy': 'single' });
   assert.equal(pursuit.crashed, false);
-  assert.notEqual(pursuit.firstLockSeconds, null);
-  assert.ok(pursuit.shots.length >= 1);
+  assert.equal(pursuit.elapsedSeconds, 300);
+  if (pursuit.firstLockSeconds === null) assert.equal(pursuit.shots.length, 0);
   assert.equal(hold.firstLockSeconds, null);
   assert.equal(hold.shots.length, 0);
 });

@@ -48,10 +48,10 @@ test('a distant angular or range-separated cloud does not displace a track', () 
 
 test('combat advances one cloud per confirmed threat, clears it on reset, and replenishes on respawn', async () => {
   const { AirToAirMissileSystem, BanditTarget } = await import('../src/weapons/AirToAirMissileSystem.js');
-  const system = new AirToAirMissileSystem();
+  const system = new AirToAirMissileSystem({ countermeasurePolicy: 'single' });
   const bandit = new BanditTarget({ callsign: 'TEST', position: new Vector3(0, 3000, -5000) });
   let threatId = 7;
-  bandit.update = () => { bandit.threatResponse.confirmedId = threatId; };
+  bandit.update = () => { bandit.countermeasureRequest = { type: 'chaff', trackId: threatId }; };
   system.addTarget(bandit);
   const activeWorld = { ...world, active: true, onGround: false, position: observer.position,
     quaternion: observer.quaternion, velocity: new Vector3() };
