@@ -1498,8 +1498,8 @@ class FlightSimulator {
         trackDeg: this.telemetry?.trackDeg,
       });
     }
-    updateGeographicBuildings(this);
     this.sky.updateSun(this.position, this.camera.position);
+    updateGeographicBuildings(this);
     this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     if (!this.gameFlow.isPhysicsFrozen()) {
       if (!this.replayDirector.roomEffects) this.explosionSystem.update(frameDelta);

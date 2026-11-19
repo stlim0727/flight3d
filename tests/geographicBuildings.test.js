@@ -124,3 +124,32 @@ test('protects runway safety areas from streamed footprints and probe collisions
   assert.equal(overlapping.group.children.length, 0, 'a footprint corner enters the safety area');
   overlapping.dispose();
 });
+
+test('fades facade windows and streams coarse lights only around a high night camera', async () => {
+  const { Vector3 } = await import('three');
+  const zooms = [];
+  const layer = new GeographicBuildings({
+    origin: { latitude: 0, longitude: 0 },
+    project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
+    terrain: { getHeight: () => 44 },
+    archive: { getZxy: async zoom => {
+      zooms.push(zoom);
+      return { data: buildingTile() };
+    } },
+  });
+  const cruise = new Vector3(85, 10000, 140);
+  layer.update(cruise, cruise, 0.5);
+  assert.equal(layer.material.emissiveIntensity, 0);
+  assert.deepEqual(zooms, []);
+  layer.update(cruise, cruise, -0.5);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(layer.material.emissiveIntensity > 0);
+  assert.deepEqual(zooms, [12]);
+  assert.equal(layer.group.children[0]?.isPoints, true);
+  assert.equal(layer.tiles.size, 0);
+  assert.equal(layer.checkCollision([{ pos: cruise, radius: 10 }]), null);
+  layer.update(cruise, cruise, 0.5);
+  assert.equal(layer.group.children.length, 0);
+  assert.equal(layer.lightTiles.size, 0);
+  layer.dispose();
+});

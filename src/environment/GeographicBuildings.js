@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { nightLightLevel } from './AirportNightLighting.js';
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import { PMTiles } from 'pmtiles';
@@ -11,11 +12,70 @@ import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 
 const neighbors = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
 const zoom = 14;
-const worldTiles = 2 ** zoom;
+const lightZoom = 12;
 const collisionCellSize = 128;
 const source = new PMTiles(
   'https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/2026-11-18.0/buildings.pmtiles',
 );
+
+function lightTexture(size, sample, alphaOnly = false) {
+  const bytes = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const value = Math.round(sample(x, y) * 255);
+      const channel = alphaOnly ? 255 : value;
+      bytes.set([channel, channel, channel, value], (y * size + x) * 4);
+    }
+  }
+  const texture = new THREE.DataTexture(bytes, size, size);
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function windowTexture() {
+  const texture = lightTexture(64, (x, y) => {
+    const column = x >> 3;
+    const floor = y >> 3;
+    const lit = ((column * 13 + floor * 19 + column * floor * 7) % 11) < 7;
+    return lit && x % 8 >= 2 && x % 8 <= 5 && y % 8 >= 3 && y % 8 <= 6 ? 1 : 0;
+  });
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+function cityGlowTexture() {
+  return lightTexture(16, (x, y) => Math.max(0, 1 - Math.hypot(x - 7.5, y - 7.5) / 7.5), true);
+}
+
+function distantLightGeometry(data, tile, project, terrain) {
+  const layer = new VectorTile(new PbfReader(data)).layers.building;
+  const occupied = new Set();
+  const positions = [];
+  for (let i = 0; i < (layer?.length ?? 0); i++) {
+    const feature = layer.feature(i);
+    if (feature.type !== 3 || feature.properties.is_underground) continue;
+    const [west, north, east, south] = feature.bbox();
+    const x = (west + east) / (2 * feature.extent);
+    const y = (north + south) / (2 * feature.extent);
+    if (x < 0 || x >= 1 || y < 0 || y >= 1) continue;
+    const cell = `${Math.floor(x * 96)}/${Math.floor(y * 96)}`;
+    if (occupied.has(cell)) continue;
+    const { latitude, longitude } = tileToWgs84(tile.x + x, tile.y + y, lightZoom);
+    const [localX, localZ] = project(latitude, longitude);
+    if (Number.isFinite(terrain.size) && Math.max(Math.abs(localX), Math.abs(localZ)) > terrain.size / 2) continue;
+    const height = terrain.getHeight(localX, localZ);
+    // At this scale a mapped footprint still contributes light where the flight surface
+    // lacks local terrain. Its source coordinates remain the anchor.
+    occupied.add(cell);
+    positions.push(localX, (Number.isFinite(height) ? height : 0) + 30, localZ);
+  }
+  return positions.length ? new THREE.BufferGeometry().setAttribute(
+    'position', new THREE.Float32BufferAttribute(positions, 3),
+  ) : null;
+}
 
 export function geographicBuildingHeight({ height, num_floors: floors }) {
   if (Number.isFinite(height) && height > 0 && height <= 1500) return height;
@@ -49,6 +109,7 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
   const layer = new VectorTile(new PbfReader(data)).layers.building;
   if (!layer?.length) return null;
   const positions = [];
+  const facadeUvs = [];
   for (let i = 0; i < layer.length; i++) {
     const feature = layer.feature(i);
     if (feature.type !== 3 || feature.properties.is_underground) continue;
@@ -76,14 +137,20 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
         for (const index of triangle.toReversed()) {
           const point = points[index];
           positions.push(point.x, roof, point.y);
+          facadeUvs.push(0.5 / 64, 0.5 / 64);
         }
       }
       for (const ring of rings) {
+        let u = ((center.x * 0.013 + center.y * 0.019) % 1 + 1) % 1;
+        const v = (roof - low) / 24;
         for (let j = 0; j < ring.length; j++) {
           const a = ring[j];
           const b = ring[(j + 1) % ring.length];
           positions.push(a.x, low, a.y, b.x, low, b.y, a.x, roof, a.y,
             b.x, low, b.y, b.x, roof, b.y, a.x, roof, a.y);
+          const nextU = u + a.distanceTo(b) / 24;
+          facadeUvs.push(u, 0, nextU, 0, u, v, nextU, 0, nextU, v, u, v);
+          u = nextU;
         }
       }
     }
@@ -91,6 +158,7 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
   if (!positions.length) return null;
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(facadeUvs, 2));
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -140,7 +208,17 @@ export class GeographicBuildings {
     this.archive = archive;
     this.group = new THREE.Group();
     this.group.name = 'Geographic buildings';
-    this.material = new THREE.MeshLambertMaterial({ color: 0xb5aaa0, side: THREE.DoubleSide });
+    this.material = new THREE.MeshLambertMaterial({
+      color: 0xb5aaa0, side: THREE.DoubleSide,
+      emissive: 0xffb864, emissiveMap: windowTexture(), emissiveIntensity: 0,
+    });
+    this.lightMaterial = new THREE.PointsMaterial({
+      map: cityGlowTexture(), color: 0xffc688, size: 5, sizeAttenuation: false,
+      blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false,
+    });
+    this.lightTiles = new Map();
+    this.pendingLight = null;
+    this.lightRetryAt = 0;
     this.tiles = new Map();
     this.pending = null;
     this.retryAt = new Map();
@@ -148,8 +226,13 @@ export class GeographicBuildings {
 
   tilesNear(position) {
     if (position.y - this.terrain.getHeight(position.x, position.z) >= 3500) return [];
+    return this.tilesAround(position, zoom);
+  }
+
+  tilesAround(position, level) {
+    const worldTiles = 2 ** level;
     const { latitude, longitude } = localToWgs84(position.x, position.z, this.origin);
-    const center = wgs84ToTile(latitude, longitude, zoom);
+    const center = wgs84ToTile(latitude, longitude, level);
     return neighbors.map(([dx, dy]) => {
       const x = (center.x + dx + worldTiles) % worldTiles;
       const y = center.y + dy;
@@ -157,8 +240,11 @@ export class GeographicBuildings {
     }).filter(tile => tile.y >= 0 && tile.y < worldTiles);
   }
 
-  update(position, cameraPosition = position) {
+  update(position, cameraPosition = position, sunHeight = 1) {
     if (this.terrain.isLoaded === false) return;
+    const night = nightLightLevel(sunHeight);
+    this.material.emissiveIntensity = night * 1.8;
+    this.updateDistantLights(cameraPosition, night);
     const aircraftTiles = this.tilesNear(position);
     const cameraTiles = cameraPosition === position ? [] : this.tilesNear(cameraPosition);
     const selection = `${aircraftTiles[0]?.key ?? ''}:${cameraTiles[0]?.key ?? ''}`;
@@ -174,6 +260,49 @@ export class GeographicBuildings {
     const now = performance.now();
     const tile = this.wantedTiles.find(({ key }) => !this.tiles.has(key) && now >= (this.retryAt.get(key) ?? 0));
     if (tile) void this.load(tile);
+  }
+
+  updateDistantLights(cameraPosition, night) {
+    const height = cameraPosition.y - this.terrain.getHeight(cameraPosition.x, cameraPosition.z);
+    const fade = THREE.MathUtils.smoothstep(height, 2200, 3500)
+      * (1 - THREE.MathUtils.smoothstep(height, 12500, 15500));
+    this.lightMaterial.opacity = night * fade * 0.9;
+    const wanted = this.lightMaterial.opacity > 0 ? this.tilesAround(cameraPosition, lightZoom) : [];
+    const center = wanted[0]?.key;
+    if (center !== this.lightCenter) {
+      this.lightCenter = center;
+      this.retainLightTiles(new Set(wanted.map(tile => tile.key)));
+    }
+    if (this.pendingLight || performance.now() < this.lightRetryAt) return;
+    const tile = wanted.find(({ key }) => !this.lightTiles.has(key));
+    if (tile) void this.loadLightTile(tile);
+  }
+
+  retainLightTiles(wanted) {
+    for (const [key, points] of this.lightTiles) {
+      if (wanted.has(key)) continue;
+      points?.removeFromParent();
+      points?.geometry.dispose();
+      this.lightTiles.delete(key);
+    }
+    if (this.pendingLight && !wanted.has(this.pendingLight.key)) this.pendingLight.controller.abort();
+  }
+
+  async loadLightTile(tile) {
+    const controller = new AbortController();
+    this.pendingLight = { key: tile.key, controller };
+    try {
+      const response = await this.archive.getZxy(lightZoom, tile.x, tile.y, controller.signal);
+      if (controller.signal.aborted) return;
+      const geometry = response && distantLightGeometry(response.data, tile, this.project, this.terrain);
+      const points = geometry ? new THREE.Points(geometry, this.lightMaterial) : null;
+      if (points) this.group.add(points);
+      this.lightTiles.set(tile.key, points);
+    } catch {
+      if (!controller.signal.aborted) this.lightRetryAt = performance.now() + 5000;
+    } finally {
+      this.pendingLight = null;
+    }
   }
 
   retainTiles(wanted) {
@@ -229,13 +358,17 @@ export class GeographicBuildings {
 
   dispose() {
     this.pending?.controller.abort();
+    this.retainLightTiles(new Set());
     this.group.removeFromParent();
     for (const { mesh } of this.tiles.values()) mesh?.geometry.dispose();
     if (this.terrain.geographicBuildingLayer === this) delete this.terrain.geographicBuildingLayer;
     this.group.clear();
     this.tiles.clear();
     this.retryAt.clear();
+    this.material.emissiveMap.dispose();
     this.material.dispose();
+    this.lightMaterial.map.dispose();
+    this.lightMaterial.dispose();
   }
 }
 
@@ -264,7 +397,7 @@ export function updateGeographicBuildings(sim) {
     terrain.geographicBuildingLayer = sim.geographicBuildingLayer;
     terrain.mesh.add(sim.geographicBuildingLayer.group);
   }
-  sim.geographicBuildingLayer?.update(sim.position, sim.camera.position);
+  sim.geographicBuildingLayer?.update(sim.position, sim.camera.position, sim.sky.sunPosition.y);
   const attribution = document.getElementById('geographic-buildings-attribution');
   if (attribution) attribution.hidden = !sim.geographicBuildingLayer?.group.children.length;
 }
