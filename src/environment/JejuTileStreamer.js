@@ -3,6 +3,8 @@ import { TileCacheManager } from './TileCacheManager.js';
 import {
   wgs84ToLocal,
   tileBoundsWgs84,
+  localToWgs84,
+  wgs84ToTile,
 } from '../geospatial/TileCoordinateSystem.js';
 
 export const JEJU_ORIGIN = Object.freeze({
@@ -84,7 +86,9 @@ export class JejuTileStreamer {
   }
 
   /**
-   * Update UV coordinates of the terrain geometry to match the Web Mercator tile grid.
+   * Update UV coordinates of the terrain geometry by projecting each vertex
+   * from local metric tangent plane into WGS84 and fractional Web Mercator coordinates.
+   * Guarantees exact runway, threshold, and coastline visual alignment without nonlinear drift.
    */
   updateMeshUVs() {
     if (!this.terrainMesh?.geometry) return;
@@ -94,18 +98,28 @@ export class JejuTileStreamer {
     const uv = geometry.attributes.uv;
     if (!pos || !uv) return;
 
-    const { minX, maxX, minZ, maxZ } = this.gridBounds;
-    const spanX = maxX - minX;
-    const spanZ = maxZ - minZ;
+    const minTileX = 870;
+    const totalTilesX = 4; // 870, 871, 872, 873
+    const minTileY = 410;
+    const totalTilesY = 2; // 410, 411
+    const zoom = 10;
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
 
-      // Normalized coordinates [0, 1] across the 4-tile grid
-      const u = (x - minX) / spanX;
-      // In Web Mercator, Y=0 is North, Y=1 is South; in Three.js UV, V=1 is North (minZ), V=0 is South (maxZ)
-      const v = 1.0 - (z - minZ) / spanZ;
+      // 1. Inverse-project metric tangent plane vertex to WGS84
+      const { latitude, longitude } = localToWgs84(x, z, this.origin);
+
+      // 2. Exact fractional Web Mercator tile coordinates
+      const tile = wgs84ToTile(latitude, longitude, zoom);
+      const exactX = tile.x + tile.fx;
+      const exactY = tile.y + tile.fy;
+
+      // 3. Normalized UV coordinates [0, 1] across the stitched canvas
+      // In Web Mercator Y=0 is North, Y=1 is South; in Three.js UV V=1 is North, V=0 is South
+      const u = (exactX - minTileX) / totalTilesX;
+      const v = 1.0 - (exactY - minTileY) / totalTilesY;
 
       uv.setXY(i, Math.max(0, Math.min(1, u)), Math.max(0, Math.min(1, v)));
     }

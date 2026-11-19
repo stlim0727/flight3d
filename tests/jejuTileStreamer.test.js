@@ -72,6 +72,30 @@ test('JejuTileStreamer updateMeshUVs normalizes terrain geometry to macro tile b
   }
 });
 
+test('JejuTileStreamer updateMeshUVs accurately aligns origin vertex with fractional Mercator tile position', async () => {
+  const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array([0, 0, 0]);
+  const uvs = new Float32Array([0, 0]);
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+
+  const streamer = new JejuTileStreamer(mesh, surface);
+  streamer.updateMeshUVs();
+
+  const { wgs84ToTile } = await import('../src/geospatial/TileCoordinateSystem.js');
+  const tile = wgs84ToTile(JEJU_ORIGIN.latitude, JEJU_ORIGIN.longitude, 10);
+  const expectedU = (tile.x + tile.fx - 870) / 4;
+  const expectedV = 1.0 - (tile.y + tile.fy - 410) / 2;
+
+  const actualU = geo.attributes.uv.getX(0);
+  const actualV = geo.attributes.uv.getY(0);
+
+  assert.ok(Math.abs(actualU - expectedU) < 1e-4, `U mismatch: expected ${expectedU}, got ${actualU}`);
+  assert.ok(Math.abs(actualV - expectedV) < 1e-4, `V mismatch: expected ${expectedV}, got ${actualV}`);
+});
+
 test('JejuTileStreamer loadIslandMacroTiles handles offline environment without throwing', async () => {
   const surface = new JejuFlightSurface(JEJU_AIRFIELD);
   const geo = new THREE.PlaneGeometry(80000, 56000, 2, 2);
