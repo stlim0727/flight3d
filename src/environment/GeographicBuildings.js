@@ -6,11 +6,13 @@ import polygonClipping from 'polygon-clipping';
 import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospatial/TileCoordinateSystem.js';
 import { projectToLocal, INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
+import { pointInRing, segmentDistance } from '../geospatial/incheonDressing.js';
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 
 const neighbors = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
 const zoom = 14;
 const worldTiles = 2 ** zoom;
+const collisionCellSize = 128;
 const source = new PMTiles(
   'https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/2026-11-18.0/buildings.pmtiles',
 );
@@ -43,7 +45,7 @@ function tilePolygons(feature) {
     ? [polygon] : polygonClipping.intersection(polygon, tile));
 }
 
-export function buildGeographicBuildingTile(data, tile, project, terrain, exclude = () => false) {
+export function buildGeographicBuildingTile(data, tile, project, terrain, exclude = () => false, colliders = null) {
   const layer = new VectorTile(new PbfReader(data)).layers.building;
   if (!layer?.length) return null;
   const positions = [];
@@ -67,6 +69,8 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
       if (!Number.isFinite(low) || !Number.isFinite(high) || high <= 0) continue;
       const roof = high + geographicBuildingHeight(feature.properties);
       const roofTriangles = THREE.ShapeUtils.triangulateShape(outer, holes);
+      if (!roofTriangles.length) continue;
+      if (colliders) colliders.push({ rings: rings.map(ring => ring.map(({ x, y }) => [x, y])), low, roof });
       const points = rings.flat();
       for (const triangle of roofTriangles) {
         for (const index of triangle.toReversed()) {
@@ -91,6 +95,39 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
   return geometry;
 }
 
+function* collisionCells(minX, minZ, maxX, maxZ) {
+  for (let x = Math.floor(minX / collisionCellSize); x <= Math.floor(maxX / collisionCellSize); x++) {
+    for (let z = Math.floor(minZ / collisionCellSize); z <= Math.floor(maxZ / collisionCellSize); z++) {
+      yield `${x}/${z}`;
+    }
+  }
+}
+
+function indexColliders(colliders) {
+  const cells = new Map();
+  for (const collider of colliders) {
+    const [outer] = collider.rings;
+    const xs = outer.map(point => point[0]);
+    const zs = outer.map(point => point[1]);
+    for (const key of collisionCells(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs))) {
+      const cell = cells.get(key) ?? [];
+      if (!cells.has(key)) cells.set(key, cell);
+      cell.push(collider);
+    }
+  }
+  return cells;
+}
+
+function intersectsBuilding({ pos, radius }, { rings, low, roof }) {
+  const vertical = Math.max(low - pos.y, pos.y - roof, 0);
+  if (vertical > radius) return false;
+  const [outer, ...holes] = rings;
+  if (pointInRing(pos.x, pos.z, outer) && !holes.some(ring => pointInRing(pos.x, pos.z, ring))) return true;
+  const horizontal = Math.sqrt(radius * radius - vertical * vertical);
+  return rings.some(ring => ring.some((point, i) =>
+    segmentDistance(pos.x, pos.z, point, ring[(i + 1) % ring.length]) <= horizontal));
+}
+
 export class GeographicBuildings {
   constructor({ origin, project, terrain, exclude, archive = source }) {
     this.origin = origin;
@@ -103,37 +140,48 @@ export class GeographicBuildings {
     this.material = new THREE.MeshLambertMaterial({ color: 0xb5aaa0, side: THREE.DoubleSide });
     this.tiles = new Map();
     this.pending = null;
-    this.retryAt = 0;
+    this.retryAt = new Map();
   }
 
-  update(position) {
-    if (this.terrain.isLoaded === false) return;
+  tilesNear(position) {
+    if (position.y - this.terrain.getHeight(position.x, position.z) >= 3500) return [];
     const { latitude, longitude } = localToWgs84(position.x, position.z, this.origin);
     const center = wgs84ToTile(latitude, longitude, zoom);
-    const nearGround = position.y - this.terrain.getHeight(position.x, position.z) < 3500;
-    const wanted = nearGround ? neighbors.map(([dx, dy]) => {
+    return neighbors.map(([dx, dy]) => {
       const x = (center.x + dx + worldTiles) % worldTiles;
       const y = center.y + dy;
       return { key: `${x}/${y}`, x, y };
-    }).filter(tile => tile.y >= 0 && tile.y < worldTiles) : [];
-    const selection = nearGround ? `${center.x}/${center.y}` : null;
+    }).filter(tile => tile.y >= 0 && tile.y < worldTiles);
+  }
+
+  update(position, cameraPosition = position) {
+    if (this.terrain.isLoaded === false) return;
+    const aircraftTiles = this.tilesNear(position);
+    const cameraTiles = cameraPosition === position ? [] : this.tilesNear(cameraPosition);
+    const selection = `${aircraftTiles[0]?.key ?? ''}:${cameraTiles[0]?.key ?? ''}`;
     if (selection !== this.selection) {
       this.selection = selection;
-      this.retainTiles(wanted);
+      this.aircraftTiles = new Set(aircraftTiles.map(tile => tile.key));
+      this.wantedTiles = [...new Map([...aircraftTiles, ...cameraTiles].map(tile => [tile.key, tile])).values()];
+      this.retainTiles(this.wantedTiles);
+      if (this.pending && !this.aircraftTiles.has(this.pending.key)
+        && aircraftTiles.some(({ key }) => !this.tiles.has(key))) this.pending.controller.abort();
     }
-    if (this.pending || performance.now() < this.retryAt) return;
-    const tile = wanted.find(({ key }) => !this.tiles.has(key));
+    if (this.pending) return;
+    const now = performance.now();
+    const tile = this.wantedTiles.find(({ key }) => !this.tiles.has(key) && now >= (this.retryAt.get(key) ?? 0));
     if (tile) void this.load(tile);
   }
 
   retainTiles(wanted) {
     const wantedKeys = new Set(wanted.map(tile => tile.key));
-    for (const [key, mesh] of this.tiles) {
+    for (const [key, { mesh }] of this.tiles) {
       if (wantedKeys.has(key)) continue;
       mesh?.removeFromParent();
       mesh?.geometry.dispose();
       this.tiles.delete(key);
     }
+    for (const key of this.retryAt.keys()) if (!wantedKeys.has(key)) this.retryAt.delete(key);
     if (this.pending && !wantedKeys.has(this.pending.key)) this.pending.controller.abort();
   }
 
@@ -143,26 +191,46 @@ export class GeographicBuildings {
     try {
       const response = await this.archive.getZxy(zoom, tile.x, tile.y, controller.signal);
       if (controller.signal.aborted) return;
-      const geometry = response && buildGeographicBuildingTile(response.data, tile, this.project, this.terrain, this.exclude);
+      const colliders = [];
+      const geometry = response && buildGeographicBuildingTile(response.data, tile, this.project, this.terrain, this.exclude, colliders);
+      const collisionCells = indexColliders(colliders);
       const mesh = geometry ? new THREE.Mesh(geometry, this.material) : null;
       if (mesh) {
         mesh.receiveShadow = true;
         this.group.add(mesh);
       }
-      this.tiles.set(tile.key, mesh);
+      this.tiles.set(tile.key, { mesh, collisionCells });
+      this.retryAt.delete(tile.key);
     } catch {
-      if (!controller.signal.aborted) this.retryAt = performance.now() + 5000;
+      if (!controller.signal.aborted) this.retryAt.set(tile.key, performance.now() + 5000);
     } finally {
       this.pending = null;
     }
   }
 
+  checkCollision(probes) {
+    if (!this.tiles.size) return null;
+    for (const probe of probes) {
+      const { pos, radius } = probe;
+      for (const cell of collisionCells(pos.x - radius, pos.z - radius, pos.x + radius, pos.z + radius)) {
+        for (const key of this.aircraftTiles ?? []) {
+          if (this.tiles.get(key)?.collisionCells.get(cell)?.some(collider => intersectsBuilding(probe, collider))) {
+            return { point: pos.clone(), get part() { return probe.desc; } };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   dispose() {
     this.pending?.controller.abort();
     this.group.removeFromParent();
-    for (const mesh of this.tiles.values()) mesh?.geometry.dispose();
+    for (const { mesh } of this.tiles.values()) mesh?.geometry.dispose();
+    if (this.terrain.geographicBuildingLayer === this) delete this.terrain.geographicBuildingLayer;
     this.group.clear();
     this.tiles.clear();
+    this.retryAt.clear();
     this.material.dispose();
   }
 }
@@ -188,9 +256,10 @@ export function updateGeographicBuildings(sim) {
       origin, project, terrain,
       exclude: (x, z) => airport?.isRunwaySafetyArea?.(x, z) || airport?.hasModeledBuilding?.(x, z),
     });
+    terrain.geographicBuildingLayer = sim.geographicBuildingLayer;
     terrain.mesh.add(sim.geographicBuildingLayer.group);
   }
-  sim.geographicBuildingLayer?.update(sim.camera.position);
+  sim.geographicBuildingLayer?.update(sim.position, sim.camera.position);
   const attribution = document.getElementById('geographic-buildings-attribution');
   if (attribution) attribution.hidden = !sim.geographicBuildingLayer?.group.children.length;
 }

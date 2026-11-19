@@ -59,3 +59,37 @@ test('disposal aborts pending tile fetches and ignores their late results', asyn
   assert.equal(layer.group.children.length, 0);
   assert.equal(layer.tiles.size, 0);
 });
+
+test('loaded footprints collide by aircraft position regardless of camera position', async () => {
+  const { Vector3, Quaternion } = await import('three');
+  const { CollisionDetector } = await import('../src/physics/CollisionDetector.js');
+  const terrain = { getHeight: () => 44, getNormal: () => new Vector3(0, 1, 0) };
+  const layer = new GeographicBuildings({
+    origin: { latitude: 0, longitude: 0 },
+    project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
+    terrain,
+    archive: { getZxy: async (_zoom, x, y) => x === 8192 && y === 8192 ? { data: buildingTile() } : undefined },
+  });
+  terrain.geographicBuildingLayer = layer;
+  const position = new Vector3(85, 50, 140);
+  const distantCamera = new Vector3(30000, 100, 30000);
+  const probe = { pos: position, radius: 1 };
+  layer.update(position, distantCamera);
+  assert.equal(layer.checkCollision([probe]), null);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(layer.checkCollision([probe]).point.equals(position), true);
+  assert.equal(layer.checkCollision([{ ...probe, pos: new Vector3(85, 54.1, 140) }]), null);
+
+  const detector = new CollisionDetector(terrain, null);
+  const result = detector.checkCollision(position, new Quaternion(), new Vector3(0, 0, -70), 0, 0, 0);
+  assert.equal(result?.type, 'BUILDING');
+
+  // The tile remains visible to the old camera but no longer participates in collision.
+  layer.update(distantCamera, position);
+  assert.equal(layer.group.children.length, 1);
+  assert.equal(layer.checkCollision([probe]), null);
+  layer.update(distantCamera);
+  assert.equal(layer.group.children.length, 0);
+  layer.dispose();
+  assert.equal(terrain.geographicBuildingLayer, undefined);
+});
