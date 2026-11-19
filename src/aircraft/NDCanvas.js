@@ -196,7 +196,18 @@ export class NDCanvas {
 
     let rwyStart, rwyEnd, extStart, extEnd, activeWpt, threshPos, vor1, vor2, fixes;
 
-    if (this.airportId === 'incheon') {
+    if (this.airportId === 'jeju') {
+      const a = APPROACH_DATA.jeju, h = a.headingDeg * Math.PI / 180;
+      const at = distance => ({ x: a.threshold.x + Math.sin(h) * distance, z: a.threshold.z - Math.cos(h) * distance });
+      activeWpt = 'RW07';
+      threshPos = a.threshold;
+      rwyStart = projectToScreen(threshPos.x, threshPos.z);
+      rwyEnd = projectToScreen(a.end.x, a.end.z);
+      const before = at(-6000), after = at(4500);
+      extStart = projectToScreen(before.x, before.z); extEnd = projectToScreen(after.x, after.z);
+      vor1 = 'RKPC  RW07'; vor2 = 'ILS 109.90';
+      fixes = [{ name: 'TAMNA', ...at(-12000) }, { name: 'FINAL', ...at(-3000) }, { name: 'RW07', ...threshPos }];
+    } else if (this.airportId === 'incheon') {
       const a = APPROACH_DATA.incheon, h = a.headingDeg*Math.PI/180;
       const at = distance => ({ x:a.threshold.x+Math.sin(h)*distance, z:a.threshold.z-Math.cos(h)*distance });
       activeWpt = 'RW15R';
