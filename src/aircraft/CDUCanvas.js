@@ -29,7 +29,7 @@ export class CDUCanvas {
 
   setAirport(airportId) {
     this.airportId = airportId;
-    this.activeWpt = airportId === 'incheon' ? 'RW15R' : (airportId === 'lukla') ? 'RW06' : (airportId === 'neon') ? 'RW09' : 'RW09L';
+    this.activeWpt = airportId === 'incheon' ? 'RW15R' : (airportId === 'jeju') ? 'RW07' : (airportId === 'lukla') ? 'RW06' : (airportId === 'neon') ? 'RW09' : 'RW09L';
     this.render();
   }
 
@@ -118,8 +118,12 @@ export class CDUCanvas {
       ctx.fillText(spdAlt, sx + sw - 12, y);
     };
 
-    if (this.airportId === 'incheon') {
-      drawRow(sy + 70, 'RKSI', '', 'MODEL');
+    if (this.airportId === 'jeju') {
+      drawRow(sy + 70, 'TAMNA', '15NM', '210/ 5000');
+      drawRow(sy + 102, 'FINAL', '04NM', '160/ 1500');
+      drawRow(sy + 134, 'RW07', '01NM', '140/  118', true);
+    } else if (this.airportId === 'incheon') {
+      drawRow(sy + 70, 'BOPTA', '42NM', '280/14000');
       drawRow(sy + 102, 'FINAL', '0.8NM', '3 DEG');
       drawRow(sy + 134, 'RW15R', '', '23 FT', true);
     } else if (this.airportId === 'lukla') {
