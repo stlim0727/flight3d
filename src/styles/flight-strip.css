@@ -169,7 +169,10 @@ body.flight-strip-v2.demo-active .flight-toolbar > #btn-skip-demo {
   .flight-strip-v2 .flight-toolbar #btn-reverser { --strip-button-limit: 38px; }
   .flight-strip-v2 .flight-toolbar #open-flight-more { --strip-button-limit: 42px; }
   .flight-strip-v2 .flight-toolbar :is(#btn-flaps-ret, #btn-flaps-ext) { --strip-button-limit: 32px; }
-  .flight-strip-v2 #btn-camera-toggle[data-compact-view]::after { content: 'CAM ' attr(data-compact-view) ' ▾'; }
+  .flight-strip-v2 #btn-camera-toggle[data-compact-view]::after {
+    content: 'CAM ' attr(data-compact-view) '▾';
+    font-size: 10px;
+  }
 }
 @media (min-width: 667px) and (max-width: 1023px) and (orientation: landscape) {
   .flight-strip-v2 .flight-toolbar :is(#btn-flaps-ret, #btn-flaps-ext) { --strip-button-width: 30px; }
