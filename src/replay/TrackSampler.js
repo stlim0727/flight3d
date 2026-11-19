@@ -149,16 +149,22 @@ function applyRoomState(out, state) {
   for (const key of ['visible', 'held', 'crashed', 'stale', 'segment', 'crash']) out[key] = state[key];
 }
 
-function roomSpanAlpha(track, pilot, a, b, time) {
-  const alpha = spanAlpha(a, b, time);
-  if (time >= b.timeSec) return alpha;
+/** True while a span holds the earlier pose: a respawn/restart or a room transition. */
+export function poseIsHeld(track, a, b, time, pilot = 0) {
+  if (time >= b.timeSec) return false;
+  if ((a.segment ?? 0) !== (b.segment ?? 0)) return true;
   const timeline = track?.metadata?.room?.timeline;
   const initial = JSON.stringify(roomStateAt(track, pilot, a.timeSec));
   // A transition can fall between retained samples after thinning. Hold the earlier pose
   // until the next observation, while roomStateAt supplies the exact visibility/state.
-  if (timeline?.some(event => event.timeSec > a.timeSec && event.timeSec <= b.timeSec
-    && JSON.stringify(event.states[pilot]) !== initial)) return 0;
-  return alpha;
+  return Boolean(timeline?.some(event => event.timeSec > a.timeSec && event.timeSec <= b.timeSec
+    && JSON.stringify(event.states[pilot]) !== initial));
+}
+
+function roomSpanAlpha(track, pilot, a, b, time) {
+  if (time >= b.timeSec) return 1;
+  if (poseIsHeld(track, a, b, time, pilot)) return 0;
+  return spanAlpha(a, b, time);
 }
 
 /**
@@ -167,7 +173,6 @@ function roomSpanAlpha(track, pilot, a, b, time) {
  */
 function spanAlpha(a, b, time) {
   if (time >= b.timeSec) return 1;
-  if ((a.segment ?? 0) !== (b.segment ?? 0)) return 0;
   const span = b.timeSec - a.timeSec;
   return span > 0 ? Math.min(1, Math.max(0, (time - a.timeSec) / span)) : 0;
 }

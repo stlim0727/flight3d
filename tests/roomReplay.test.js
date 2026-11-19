@@ -4,7 +4,7 @@ import { RoomReplayRecorder } from '../src/core/RoomReplayRecorder.js';
 import { ReplayStore, createMemoryIndexedDB } from '../src/replay/ReplayStore.js';
 import { encodeTrack, decodeTrack, decodedByteLength, REPLAY_TRACK_VERSION,
   ROOM_TRACK_VERSION } from '../src/replay/ReplayCodec.js';
-import { sampleTrack, sampleRemote } from '../src/replay/TrackSampler.js';
+import { sampleTrack, sampleRemote, poseIsHeld } from '../src/replay/TrackSampler.js';
 import { RECORD_BYTES, REMOTE_RECORD_BYTES, HEADER_BYTES, REPLAY_INTERVAL_LADDER,
   base64ByteLength, frameBytes } from '../src/replay/replayConfig.js';
 
@@ -172,6 +172,16 @@ test('playback never blends across a respawn or toward an unseen pilot', () => {
   assert.equal(sampleRemote(track, 0, 3.5).x, 905);
   assert.equal(sampleRemote(track, 0, 99).x, 910, 'seeks clamp to the track');
   assert.equal(sampleRemote(track, 1, 1), null, 'an unknown pilot has no pose');
+
+  assert.equal(poseIsHeld(track, local[1], local[2], 1.5), true,
+    'a respawn boundary holds the earlier pose and must not report teleport speed');
+  assert.equal(poseIsHeld(track, local[2], local[3], 2.5), false);
+  const transition = { ...track, metadata: { room: { timeline: [
+    { timeSec: 0, states: [{ visible: true }] },
+    { timeSec: 1.5, states: [{ visible: false }] },
+  ] } } };
+  assert.equal(poseIsHeld(transition, local[1], local[2], 1.2), true,
+    'a room state transition also holds the earlier pose');
 });
 
 test('malformed room payloads are rejected rather than misread', () => {

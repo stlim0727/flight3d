@@ -303,6 +303,24 @@ test('replay exposes the recorded host velocity for spatial Doppler (#862 review
   assert.deepEqual(director.hostVelocity, { x: 0, y: 0, z: 0 });
 });
 
+test('replay holds host velocity across a respawn boundary (#862 review)', async () => {
+  const source = track();
+  for (let index = 0; index < source.samples.length; index++) {
+    source.samples[index].segment = index < 6 ? 0 : 1;
+    if (index >= 6) source.samples[index].x = 5000 + (index - 6) * 10;
+  }
+  const sim = fakeSim();
+  const director = new ReplayDirector(sim);
+  assert.equal(await director.load(source), true);
+  director.seek(1.1);
+  assert.deepEqual(director.hostVelocity, { x: 0, y: 0, z: 0 },
+    'the teleport from 50 m to 5000 m is a respawn, not a 24 km/s pass');
+  director.seek(1.3);
+  assert.ok(Math.abs(director.hostVelocity.x - 50) < 1e-6,
+    'normal recorded motion resumes inside the new segment');
+  director.stop();
+});
+
 test('parking playback stops the engine mix and cockpit motion until playback resumes', async () => {
   const sim = fakeSim();
   const audio = [], motion = [];

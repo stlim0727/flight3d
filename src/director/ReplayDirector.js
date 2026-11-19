@@ -1,5 +1,5 @@
 import { CombatReplayPlayback } from '../replay/CombatReplayPlayback.js';
-import { sampleTrack, sampleRemote, trackDuration, findSpan, STATE_FIELDS, OBJECT_FIELDS } from '../replay/TrackSampler.js';
+import { sampleTrack, sampleRemote, trackDuration, findSpan, poseIsHeld, STATE_FIELDS, OBJECT_FIELDS } from '../replay/TrackSampler.js';
 import { RemoteAircraft } from '../multiplayer/RemoteAircraft.js';
 import { ReplayCrashEffects, crashEvents } from '../replay/ReplayCrashEffects.js';
 import { REPLAY_SPEEDS } from '../replay/replayConfig.js';
@@ -359,10 +359,16 @@ export class ReplayDirector {
     const index = this._seek.hint;
     const from = samples[index];
     const to = samples[index + 1] ?? from;
-    const span = Math.max(1e-6, to.timeSec - from.timeSec);
-    this.hostVelocity.x = (to.x - from.x) / span;
-    this.hostVelocity.y = (to.y - from.y) / span;
-    this.hostVelocity.z = (to.z - from.z) / span;
+    if (poseIsHeld(this.track, from, to, this.progressSec, 0)) {
+      // The pose sampler holds across a respawn/restart or room transition; that
+      // teleport is not flight, so it must not become Doppler velocity.
+      this.hostVelocity.x = this.hostVelocity.y = this.hostVelocity.z = 0;
+    } else {
+      const span = Math.max(1e-6, to.timeSec - from.timeSec);
+      this.hostVelocity.x = (to.x - from.x) / span;
+      this.hostVelocity.y = (to.y - from.y) / span;
+      this.hostVelocity.z = (to.z - from.z) / span;
+    }
     const telemetry = this._telemetry;
     for (const name of STATE_FIELDS) telemetry[name] = sample[name];
     for (const name of OBJECT_FIELDS) telemetry[name] = sample[name];
