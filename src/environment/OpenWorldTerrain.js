@@ -99,6 +99,40 @@ function readWaterMask(data) {
   return context.getImageData(0, 0, samples, samples).data;
 }
 
+const viewportSize = new THREE.Vector2();
+const viewProjection = new THREE.Matrix4();
+const imageryFrustum = new THREE.Frustum();
+const tileSphere = new THREE.Sphere();
+const viewCenter = new THREE.Vector3();
+
+function projectedTilePixels(mesh, camera, viewportHeight) {
+  if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+  mesh.updateWorldMatrix(true, false);
+  tileSphere.copy(mesh.geometry.boundingSphere).applyMatrix4(mesh.matrixWorld);
+  if (!imageryFrustum.intersectsSphere(tileSphere)) return 0;
+  viewCenter.copy(tileSphere.center).applyMatrix4(camera.matrixWorldInverse);
+  const depth = Math.max(camera.near, -viewCenter.z);
+  return Math.min(viewportHeight * 2, tileSphere.radius * camera.projectionMatrix.elements[5] * viewportHeight / depth);
+}
+
+function terrainMaterial(detail) {
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+  material.onBeforeCompile = shader => {
+    shader.uniforms.terrainDetailMap = detail.map;
+    shader.uniforms.terrainDetailBlend = detail.blend;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
+      #include <map_fragment>
+      #ifdef USE_MAP
+        if (terrainDetailBlend > 0.0) {
+          diffuseColor = mix(diffuseColor, texture2D(terrainDetailMap, vMapUv), terrainDetailBlend);
+        }
+      #endif
+    `);
+    shader.fragmentShader = 'uniform sampler2D terrainDetailMap;\nuniform float terrainDetailBlend;\n' + shader.fragmentShader;
+  };
+  return material;
+}
+
 function imageryTexture(image) {
   const texture = new THREE.Texture(image);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -281,7 +315,7 @@ export class OpenWorldTerrain {
     return this.tiles.has(keyOf(wrapX(x), y));
   }
 
-  update(position, velocity) {
+  update(position, velocity, camera, viewportHeight) {
     const center = this.coordinate(position.x, position.z);
     const forward = this.coordinate(position.x + velocity.x * 65, position.z + velocity.z * 65);
     const selection = `${center.x}/${center.y}:${forward.x}/${forward.y}`;
@@ -304,8 +338,8 @@ export class OpenWorldTerrain {
       for (const [key, controller] of this.pending) if (!keys.has(key)) controller.abort();
       for (const key of this.retry.keys()) if (!keys.has(key)) this.retry.delete(key);
     }
+    this.updateImageryDetail(camera, viewportHeight);
     this.updateTileResources();
-    this.updateImageryDetail(center, position.y - (this.sample(position.x, position.z)?.height ?? 0));
     if (this.pending.size >= 3) return;
     const now = performance.now();
     const next = this.wanted.find(({ key }) =>
@@ -315,8 +349,9 @@ export class OpenWorldTerrain {
 
   updateTileResources() {
     const now = performance.now();
-    if (!this.pendingImagery && !this.pendingDetail) {
-      const tile = this.wanted.find(({ key }) => {
+    if (!this.pendingImagery) {
+      const tile = [...this.wanted].sort((a, b) => (this.tiles.get(b.key)?.imageryPriority ?? 0)
+        - (this.tiles.get(a.key)?.imageryPriority ?? 0)).find(({ key }) => {
         const entry = this.tiles.get(key);
         return entry?.mesh.geometry.index?.count && !entry.baseMap && now >= (entry.imageryRetryAt ?? 0);
       });
@@ -368,28 +403,42 @@ export class OpenWorldTerrain {
     entry.waterRetryAt = performance.now() + 8000;
   }
 
-  updateImageryDetail(center, height) {
-    const selection = height < 3500 ? keyOf(wrapX(center.x), center.y) : null;
-    if (selection !== this.detailSelection) {
-      this.detailSelection = selection;
-      this.detailWanted.clear();
-      if (selection) {
-        this.detailWanted.set(selection, 13);
-        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-          this.detailWanted.set(keyOf(wrapX(center.x + dx), center.y + dy), 12);
+  updateImageryDetail(camera, viewportHeight, now = performance.now()) {
+    if (!camera?.isPerspectiveCamera || !viewportHeight) return;
+    if (now >= (this.nextImagerySelection ?? 0)) {
+      this.nextImagerySelection = now + 200;
+      camera.updateWorldMatrix(true, false);
+      viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      imageryFrustum.setFromProjectionMatrix(viewProjection);
+      const visible = [];
+      for (const [key, entry] of this.tiles) {
+        const pixels = entry.mesh.geometry.index?.count ? projectedTilePixels(entry.mesh, camera, viewportHeight) : 0;
+        entry.imageryPriority = pixels;
+        if (pixels >= samples * (this.detailWanted.has(key) ? 0.65 : 0.85)) {
+          visible.push({ key, priority: pixels * (this.detailWanted.has(key) ? 1.15 : 1) });
         }
       }
-      for (const [key, entry] of this.tiles) {
-        if (!entry.detailMap || this.detailWanted.get(key) >= entry.detailLevel) continue;
+      visible.sort((a, b) => b.priority - a.priority);
+      this.detailWanted = new Map(visible.slice(0, 5).map(({ key, priority }, index) =>
+        [key, index === 0 && priority >= 2 * samples ? 13 : 12]));
+    }
+
+    for (const [key, entry] of this.tiles) {
+      if (!entry.detailMap) continue;
+      const wanted = this.detailWanted.get(key) >= entry.detailLevel;
+      const elapsed = Math.max(0, now - entry.detailUpdatedAt);
+      const blend = entry.detail.blend;
+      blend.value = THREE.MathUtils.clamp(blend.value + (wanted ? 1 : -1) * elapsed / 350, 0, 1);
+      entry.detailUpdatedAt = now;
+      if (!wanted && blend.value === 0) {
         entry.detailMap.dispose();
         entry.detailMap = null;
+        entry.detail.map.value = entry.baseMap;
         entry.detailLevel = zoom;
-        this.applyImagery(entry, entry.baseMap);
       }
     }
 
-    if (this.pendingDetail || this.pendingImagery || this.pending.size) return;
-    const now = performance.now();
+    if (this.pendingDetail) return;
     for (const [key, level] of this.detailWanted) {
       const entry = this.tiles.get(key);
       if (!entry?.baseMap || entry.detailLevel >= level || now < (entry.detailRetryAt ?? 0)) continue;
@@ -424,7 +473,9 @@ export class OpenWorldTerrain {
     entry.detailMap?.dispose();
     entry.detailMap = imageryTexture(canvas);
     entry.detailLevel = level;
-    this.applyImagery(entry, entry.detailMap);
+    entry.detail.map.value = entry.detailMap;
+    entry.detail.blend.value = 0;
+    entry.detailUpdatedAt = performance.now();
   }
 
   raster(x, y) {
@@ -462,10 +513,11 @@ export class OpenWorldTerrain {
       const { geometry } = buildOpenTerrainTile({
         x, y, raster, east, south, southeast, water, project: this.project, protectedAreas: this.protectedAreas,
       });
-      const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+      const detail = { map: { value: null }, blend: { value: 0 } };
+      const material = terrainMaterial(detail);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
-      const entry = { mesh, water, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
+      const entry = { mesh, detail, water, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
       this.tiles.set(key, entry);
       this.group.add(mesh);
       this.retry.delete(key);
@@ -523,7 +575,8 @@ export function updateOpenWorldTerrain(sim) {
       surface.mesh.add(surface.openWorld.group);
       if (surface.corridorStreamer) surface.corridorStreamer.group.visible = false;
     }
-    surface.openWorld.update(sim.position, sim.linearVelocity);
+    const height = sim.renderer?.getDrawingBufferSize?.(viewportSize)?.y;
+    surface.openWorld.update(sim.position, sim.linearVelocity, sim.camera, height);
   }
   const attribution = document.getElementById('open-world-attribution');
   if (attribution) attribution.hidden = !surface?.openWorld?.tiles.size;
