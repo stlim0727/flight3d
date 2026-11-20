@@ -73,22 +73,25 @@ export function buildGeographicGreenTile(data, tile, project, terrain, exclude =
   const colors = [];
   const triangles = [];
   const color = new THREE.Color();
-  const usable = point => Number.isFinite(point.x) && Number.isFinite(point.y)
-    && point.height > 0 && !terrain.isWater?.(point.x, point.y)
-    && !(Number.isFinite(terrain.size) && Math.max(Math.abs(point.x), Math.abs(point.y)) > terrain.size / 2);
+  const masked = (x, z, height) => !(height > 0) || terrain.isWater?.(x, z) || exclude(x, z)
+    || (Number.isFinite(terrain.size) && Math.max(Math.abs(x), Math.abs(z)) > terrain.size / 2);
 
   const addVertex = (x, z) => {
     const height = terrain.getHeight(x, z);
     positions.push(x, height + surfaceOffset, z);
     colors.push(color.r, color.g, color.b);
-    return { x, z, height, index: positions.length / 3 - 1 };
+    return { x, z, height, masked: masked(x, z, height), index: positions.length / 3 - 1 };
   };
   const pushTriangle = (a, b, c, depth = 0) => {
     const x = (a.x + b.x + c.x) / 3;
     const z = (a.z + b.z + c.z) / 3;
     const span = Math.max(Math.hypot(a.x - b.x, a.z - b.z),
       Math.hypot(b.x - c.x, b.z - c.z), Math.hypot(c.x - a.x, c.z - a.z));
-    if (depth < 3 && span > 12 && Math.abs(terrain.getHeight(x, z) - (a.height + b.height + c.height) / 3) > 0.5) {
+    const height = terrain.getHeight(x, z);
+    const centerMasked = masked(x, z, height);
+    const crossesMask = [a, b, c].some(vertex => Boolean(vertex.masked) !== Boolean(centerMasked));
+    const needsDraping = !centerMasked && Math.abs(height - (a.height + b.height + c.height) / 3) > 0.5;
+    if ((crossesMask && depth < 5 && span > 6) || (needsDraping && depth < 3 && span > 12)) {
       const ab = addVertex((a.x + b.x) / 2, (a.z + b.z) / 2);
       const bc = addVertex((b.x + c.x) / 2, (b.z + c.z) / 2);
       const ca = addVertex((c.x + a.x) / 2, (c.z + a.z) / 2);
@@ -98,7 +101,7 @@ export function buildGeographicGreenTile(data, tile, project, terrain, exclude =
       pushTriangle(ab, bc, ca, depth + 1);
       return;
     }
-    triangles.push(a.index, b.index, c.index);
+    if (!centerMasked) triangles.push(a.index, b.index, c.index);
   };
 
   for (const [name, allowed] of [['land_use', LAND_USE], ['land_cover', LAND_COVER]]) {
@@ -117,11 +120,6 @@ export function buildGeographicGreenTile(data, tile, project, terrain, exclude =
         if (!faces.length) continue;
         const vertices = rings.flat().map(point => addVertex(point.x, point.y));
         for (const face of faces) {
-          // Triangulation excludes holes, so any face centroid is inside the green area.
-          const x = (vertices[face[0]].x + vertices[face[1]].x + vertices[face[2]].x) / 3;
-          const z = (vertices[face[0]].z + vertices[face[1]].z + vertices[face[2]].z) / 3;
-          const probe = { x, y: z, height: terrain.getHeight(x, z) };
-          if (!usable(probe) || exclude(x, z)) continue;
           pushTriangle(vertices[face[2]], vertices[face[1]], vertices[face[0]]);
         }
       }

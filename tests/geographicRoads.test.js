@@ -301,3 +301,27 @@ test('densifies a surface road so an interior hill is not buried', () => {
   assert.ok(Math.max(...heights) > 59, 'interior hill must be sampled');
   geometry.dispose();
 });
+
+test('splits a long road around an interior water or runway strip', () => {
+  const data = segmentTile([{ properties: { class: 'primary' }, points: [[100, 100], [300, 100]] }]);
+  const { latitude, longitude } = tileToWgs84(tile.x + 200 / 4096, tile.y + 100 / 4096, 13);
+  const [center] = project(latitude, longitude);
+  const blocked = x => Math.abs(x - center) < 25;
+  for (const [surface, exclude] of [[{ ...terrain, isWater: blocked }, undefined], [terrain, blocked]]) {
+    const lamps = [];
+    const geometry = buildGeographicRoadTile(data, tile, project, surface, exclude, lamps);
+    assert.ok(geometry);
+    const { position } = geometry.attributes;
+    const indices = geometry.index.array;
+    const sides = new Set();
+    for (let i = 0; i < indices.length; i += 3) {
+      const xs = Array.from(indices.slice(i, i + 3), index => position.getX(index));
+      assert.ok(xs.every(x => !blocked(x)));
+      assert.ok(xs.every(x => x < center) || xs.every(x => x > center));
+      sides.add(Math.sign(xs[0] - center));
+    }
+    assert.equal(sides.size, 2);
+    assert.ok(lamps.length > 0 && lamps.every(lamp => !blocked(lamp.x)));
+    geometry.dispose();
+  }
+});

@@ -137,3 +137,31 @@ test('keeps a park whose outer-ring average falls in a water hole', () => {
   assert.ok(geometry.attributes.position.count >= 8);
   geometry.dispose();
 });
+
+test('keeps most of a flat park when a narrow exclusion crosses a large face centroid', () => {
+  const park = tileData({ land_use: [{ properties: { class: 'park' }, points: square }] });
+  const baseline = buildGeographicGreenTile(park, tile, project, terrain);
+  const xs = baseline.attributes.position;
+  const first = Array.from(baseline.index.array.slice(0, 3), index => xs.getX(index));
+  const center = first.reduce((sum, x) => sum + x, 0) / 3;
+  const excluded = x => Math.abs(x - center) < 5;
+  const actual = buildGeographicGreenTile(park, tile, project, terrain, excluded);
+  assert.ok(actual);
+  const area = (geometry, verify) => {
+    const { position } = geometry.attributes;
+    const ids = geometry.index.array;
+    let total = 0;
+    for (let i = 0; i < ids.length; i += 3) {
+      const [a, b, c] = ids.slice(i, i + 3);
+      const [ax, bx, cx] = [a, b, c].map(id => position.getX(id));
+      const [az, bz, cz] = [a, b, c].map(id => position.getZ(id));
+      if (verify) assert.ok(!excluded((ax + bx + cx) / 3));
+      total += Math.abs((bx - ax) * (cz - az) - (cx - ax) * (bz - az)) / 2;
+    }
+    return total;
+  };
+  const ratio = area(actual, true) / area(baseline, false);
+  assert.ok(ratio > 0.8 && ratio < 1, `retained area ratio: ${ratio}`);
+  baseline.dispose();
+  actual.dispose();
+});

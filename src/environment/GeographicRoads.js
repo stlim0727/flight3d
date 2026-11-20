@@ -178,6 +178,7 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
   const colors = [];
   const indices = [];
   const color = new THREE.Color();
+  const heightAt = (x, z) => terrain.getHeight(x, z);
   const usable = (point, deck) => Number.isFinite(point.x) && Number.isFinite(point.z)
     && (deck || (point.height > 0 && !terrain.isWater?.(point.x, point.z)))
     && !exclude(point.x, point.z)
@@ -196,16 +197,15 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
       const points = ring.map(({ x, y }) => {
         const { latitude, longitude } = tileToWgs84(tile.x + x / extent, tile.y + y / extent, zoom);
         const [localX, localZ] = project(latitude, longitude);
-        return { x: localX, z: localZ, height: terrain.getHeight(localX, localZ) };
+        return { x: localX, z: localZ, height: heightAt(localX, localZ) };
       });
       let run = [];
       const emit = () => {
         if (run.length < 2) return;
-        const stripPoints = span.deck ? run : densifyRun(run, (x, z) => terrain.getHeight(x, z));
         const heights = span.deck
           ? run.map(() => span.evidenced ? span.height : Math.max(...run.map(point => point.height)) + 8)
-          : stripPoints.map(point => point.height);
-        const strip = ribbon(stripPoints, width, heights, color, span.deck ? null : (x, z) => terrain.getHeight(x, z));
+          : run.map(point => point.height);
+        const strip = ribbon(run, width, heights, color, span.deck ? null : heightAt);
         const base = positions.length / 3;
         for (const vertex of strip) {
           positions.push(vertex.left.x, vertex.left.y, vertex.left.z,
@@ -218,10 +218,15 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
           indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
         }
         if (span.deck && decks) decks.push({ points: run.map(point => ({ x: point.x, z: point.z })), width, height: heights[0], evidenced: span.evidenced });
-        if (!span.deck && lamps) lamps.push(...roadLamps(run, width, (x, z) => terrain.getHeight(x, z), lampSpacing[properties.class]));
+        if (!span.deck && lamps) {
+          for (const lamp of roadLamps(run, width, heightAt, lampSpacing[properties.class])) {
+            const height = heightAt(lamp.x, lamp.z);
+            if (usable({ x: lamp.x, z: lamp.z, height }, false)) lamps.push(lamp.setY(height));
+          }
+        }
         if (!span.deck && samples) for (const point of run) samples.push({ x: point.x, z: point.z });
       };
-      for (const point of points) {
+      for (const point of span.deck ? points : densifyRun(points, heightAt)) {
         if (usable(point, span.deck)) run.push(point);
         else { emit(); run = []; }
       }
