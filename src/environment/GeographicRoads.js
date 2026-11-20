@@ -9,6 +9,7 @@ import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospat
 import { projectToLocal, INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
+import { setMapAttributionSource } from '../ui/mapAttribution.js';
 
 // Overture's z13 segment tiles carry the major road network; z14 adds footways,
 // steps and service roads that belong to a later, closer detail pass.
@@ -560,6 +561,5 @@ export function updateGeographicRoads(sim, elapsed) {
     terrain.mesh.add(sim.geographicRoadLayer.group);
   }
   sim.geographicRoadLayer?.update(sim.position, sim.camera.position, sim.sky.sunPosition.y, elapsed);
-  const attribution = document.getElementById('geographic-roads-attribution');
-  if (attribution) attribution.hidden = !sim.geographicRoadLayer?.tiles.size;
+  setMapAttributionSource('geographic-roads-attribution', Boolean(sim.geographicRoadLayer?.tiles.size));
 }
