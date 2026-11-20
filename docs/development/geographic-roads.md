@@ -63,6 +63,10 @@ flight surface and excluded when they intersect water, runway safety areas,
 modeled airport buildings, streamed building colliders or the road sample index
 exposed by `GeographicRoads.covers()`. Night lighting is not added to vegetation.
 
+The `performance` and `ultraLow` presets skip this layer: switching to either
+disposes its tiles and hides the green-space attribution. Selecting `balanced`
+or `high` starts streaming again.
+
 ## Bridge and tunnel spans (stage 4)
 
 Only whole-segment bridges are drawn. A `road_flags` or `level_rules` entry with
