@@ -172,3 +172,24 @@ test('failed district kit leaves south near geometry absent while east/north sta
     else delete globalThis.window;
   }
 });
+
+test('ultraLow culls distant city buildings but keeps collision data intact', () => {
+  let seed = 12345;
+  const random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
+  const city = new FoliageAndCities({ getHeight: () => 25 }, random);
+  const total = city.buildingData.length;
+
+  city.setQuality('ultraLow');
+  city.updateCityLod(new THREE.Vector3(0, 100, 0));
+  const visible = city.cityArchetypes.reduce((n, a) => n + a.near.count + a.far.count, 0);
+  assert.ok(visible > 0, 'nearby far-LOD buildings remain visible');
+  assert.ok(visible < total, 'distant buildings are culled at ultraLow');
+  assert.equal(city.cityArchetypes.reduce((n, a) => n + a.near.count, 0), 0,
+    'ultraLow never draws detailed facades');
+  assert.equal(city.buildingData.length, total, 'culling affects rendering, not collision');
+
+  city.setQuality('balanced');
+  city.updateCityLod(new THREE.Vector3(0, 100, 0));
+  assert.equal(city.cityArchetypes.reduce((n, a) => n + a.near.count + a.far.count, 0), total,
+    'leaving ultraLow restores every building instance');
+});

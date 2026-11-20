@@ -350,6 +350,7 @@ export class FoliageAndCities {
     this.cityFoundations.count = 0;
     const isUltraLow = this.quality === 'ultraLow';
     const nearDistanceSquared = isUltraLow ? 0 : this.cityLodNearDistance ** 2;
+    const maxDistSq = isUltraLow ? 2200 * 2200 : Infinity;
     for (const { near, far, records } of this.cityArchetypes) {
       let nearCount = 0;
       let farCount = 0;
@@ -357,8 +358,10 @@ export class FoliageAndCities {
         const dx = cameraPosition.x - record.x;
         const dy = cameraPosition.y - (record.y + record.height / 2);
         const dz = cameraPosition.z - record.z;
+        const distSq = dx * dx + dy * dy + dz * dz;
+        if (distSq > maxDistSq) continue;
         const nearAllowed = record.district !== 'south' || this.districtNearAvailable;
-        const mesh = nearAllowed && nearDistanceSquared > 0 && (dx * dx + dy * dy + dz * dz < nearDistanceSquared) ? near : far;
+        const mesh = nearAllowed && nearDistanceSquared > 0 && distSq < nearDistanceSquared ? near : far;
         const index = mesh === near ? nearCount++ : farCount++;
         mesh.setMatrixAt(index, mesh === near ? record.matrix : record.farMatrix);
         if (mesh === near && record.foundationMatrix) {
