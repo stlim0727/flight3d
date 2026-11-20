@@ -52,7 +52,7 @@ test('registry labels and briefing keys resolve in every locale', () => {
 });
 
 test('lobby button ids are unique per scenario', () => {
-  const lobbyIds = Object.values(SPAWN_SCENARIOS).map((s) => s.lobbyButtonId);
+  const lobbyIds = Object.values(SPAWN_SCENARIOS).map((s) => s.lobbyButtonId).filter(Boolean);
   assert.equal(new Set(lobbyIds).size, lobbyIds.length);
 });
 
@@ -61,4 +61,13 @@ test('inherited property names are not registered scenarios', () => {
     assert.equal(isScenarioAvailable('coastal', scenario), false);
     assert.equal(scenarioLabelKey('coastal', scenario), undefined);
   }
+});
+
+test('regional cruise choices are scoped to their corresponding terrain frame', () => {
+  assert.equal(isScenarioAvailable('incheon', 'gwacheon'), true);
+  assert.equal(isScenarioAvailable('incheon', 'suwon'), true);
+  assert.equal(isScenarioAvailable('incheon', 'busan'), true);
+  assert.equal(isScenarioAvailable('jeju', 'jeju-city'), true);
+  assert.equal(isScenarioAvailable('jeju', 'busan'), false);
+  assert.equal(isScenarioAvailable('incheon', 'jeju-city'), false);
 });

@@ -1,16 +1,8 @@
-import { projectToLocal } from './incheon.js';
 import * as THREE from 'three';
 import airfield from '../config/incheonAirfield.json' with { type: 'json' };
 import { pointInRing, segmentDistance } from './incheonDressing.js';
 
 export { airfield as INCHEON_AIRFIELD };
-
-const JAMSIL_CRUISE = Object.freeze({
-  latitude: 37.5054,
-  longitude: 127.137,
-  altitudeM: 1150,
-  headingDeg: 284,
-});
 
 /** Airport elevation is a modeled constant, not a surveyed pavement profile. */
 export class IncheonFlightSurface {
@@ -119,13 +111,6 @@ export class IncheonFlightSurface {
 }
 
 export function incheonSpawn(type, groundClearance, aircraftId='B738') {
-  if (type === 'jamsil') {
-    const { latitude, longitude, altitudeM, headingDeg } = JAMSIL_CRUISE;
-    const angle = THREE.MathUtils.degToRad(headingDeg);
-    const [x, z] = projectToLocal(latitude, longitude);
-    const speed = aircraftId === 'C172' ? 48 : aircraftId === 'F16' ? 180 : 108;
-    return { x, y: altitudeM, z, vx: speed * Math.sin(angle), vy: 0, vz: -speed * Math.cos(angle), yaw: -angle };
-  }
   const a=airfield.approach, angle=a.headingDeg*Math.PI/180;
   const direction={x:Math.sin(angle),z:-Math.cos(angle)};
   const isChallenge = type === 'challenge';

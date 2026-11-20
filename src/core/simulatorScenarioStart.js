@@ -1,3 +1,4 @@
+import { regionalCruise } from '../config/regionalCruises.js';
 import { updateOpenWorldTerrain } from '../environment/OpenWorldTerrain.js';
 import { ScenarioStartCoordinator } from './ScenarioStartCoordinator.js';
 import { applyDeviceTimeOfDay, saveSimulatorPreferences } from '../config/simulatorPreferences.js';
@@ -32,8 +33,8 @@ export function createSimulatorScenarioStart(sim) {
       // own recording before course preparation. Neither is restarted at commit.
       preset(request) {
         const result = sim.setPreset(request.scenario);
-        if (request.scenario !== 'jamsil') return result;
-        return waitForJamsilTerrain(sim);
+        if (!regionalCruise(request.scenario)) return result;
+        return waitForRegionalTerrain(sim);
       },
       demo(request) {
         if (sim.demoDirector.start(null, request.demoProfile) === false) {
@@ -63,7 +64,7 @@ export function createSimulatorScenarioStart(sim) {
   });
 }
 
-async function waitForJamsilTerrain(sim) {
+async function waitForRegionalTerrain(sim) {
   const deadline = performance.now() + 6000;
   do {
     updateOpenWorldTerrain(sim);

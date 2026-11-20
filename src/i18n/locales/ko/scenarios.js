@@ -1,4 +1,9 @@
+import { REGIONAL_CRUISES } from '../../../config/regionalCruises.js';
+
 export default {
+  ...Object.fromEntries(Object.entries(REGIONAL_CRUISES).map(([id, region]) => [
+    `regional.cruise.${id}`, `${region.ko} 상공 순항 · ${region.altitudeM.toLocaleString('ko-KR')} m`,
+  ])),
   "demo.scenario.title": "{title} (데모)",
   "departure.climbInstruction": "활주로 방향 유지 · 허가 고도 3000 ft · 스쿼크 4213",
   "departure.stage.departure": "[9/9] 출발 관제 교신 · 초기 상승",
@@ -81,7 +86,6 @@ export default {
   "incheon.runway": "15R 이륙 준비",
   "incheon.approach": "15R 최종 접근 · 1.5 km",
   "incheon.challenge": "⚡ 15R 강풍·오프셋 착륙 챌린지",
-  "incheon.jamsil.cruise": "잠실 상공 순항 · 1,150 m",
   "incheon.cruise": "영종도 순항 · 750 m",
   "incheon.loading": "인천 지형·공항을 불러오는 중…",
   "incheon.load.failed": "인천 데이터를 불러오지 못했습니다. 다시 선택해 주세요.",

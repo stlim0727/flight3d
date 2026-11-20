@@ -1,3 +1,4 @@
+import { regionalCruise } from './config/regionalCruises.js';
 import { LandmarkPins } from './ui/LandmarkPins.js';
 import { updateGeographicBuildings } from './environment/GeographicBuildings.js';
 import { updateOpenWorldTerrain } from './environment/OpenWorldTerrain.js';
@@ -1258,7 +1259,7 @@ class FlightSimulator {
     const inSortie = this.gameFlow?.state === FLOW.FLIGHT || this.gameFlow?.state === FLOW.PAUSED;
     return this.currentAircraftId === 'F16'
       && inSortie
-      && this.lastPresetType !== 'jamsil'
+      && !regionalCruise(this.lastPresetType)
       && !this.demoDirector?.isActive
       && !this.pilotArena?.active
       && !this.replayDirector?.active
