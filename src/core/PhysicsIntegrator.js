@@ -11,6 +11,7 @@ import { FLOW } from '../ui/GameFlowController.js';
 import { trackFlightCrash } from '../analytics/posthog.js';
 import { PilotPhysiology } from '../physics/PilotPhysiology.js';
 import { WaterDitching } from '../physics/WaterDitching.js';
+import { createGroundSurfaceQueries } from '../environment/TerrainProvider.js';
 
 const GEAR_LABELS = {
   nose: 'nose.gear',
@@ -111,6 +112,13 @@ class PhysicsIntegratorMethods {
     this.bodyContactStarted = core.bodyContactStarted;
   }
 
+  ensureGroundSurfaceQueries() {
+    return this._groundSurfaceQueries ??= createGroundSurfaceQueries({
+      getTerrain: () => this.currentTerrain,
+      getOverride: () => this.terrainProviderOverride,
+    });
+  }
+
   /**
    * Physics Integration Substep (120 Hz)
    */
@@ -124,9 +132,10 @@ class PhysicsIntegratorMethods {
       ?? BODY_SUPPORT_POINTS;
 
     const core = this.ensurePhysicsCore();
+    const groundSurface = this.ensureGroundSurfaceQueries();
     const environment = this._envCallbacks ??= {
-      getGroundHeight: (x, z) => this.currentTerrain?.getHeight?.(x, z) ?? 0,
-      getGroundNormal: (x, z) => this.currentTerrain?.getNormal?.(x, z) ?? null,
+      getGroundHeight: groundSurface.getGroundHeight,
+      getGroundNormal: groundSurface.getGroundNormal,
       isOnRunway: (x, z) => (this.currentAirport?.isOnRunway ? this.currentAirport.isOnRunway(x, z) : true),
       isRunwaySafetyArea: (x, z) => (this.currentAirport?.isRunwaySafetyArea ? this.currentAirport.isRunwaySafetyArea(x, z) : true),
       getWaterLevel: (x, z) => this.currentTerrain?.getWaterLevel?.(x, z) ?? 0.0,
@@ -207,8 +216,11 @@ class PhysicsIntegratorMethods {
     this.telemetry.selectedSpeed = this.autopilot.master && this.autopilot.speedMode ? Math.round(this.autopilot.targets.iasKnots) : previousTelemetry?.selectedSpeed;
     this.telemetry.demoActive = isAutonomousDemo;
     this.telemetry.parkBrake = Boolean(this.controls.parkingBrake || result.telemetry.parkBrake);
+    const terrainHeightSource = this.currentTerrain || this.terrainProviderOverride
+      ? (this._terrainHeightSource ??= { getHeight: groundSurface.getGroundHeight })
+      : null;
     this.telemetry.warnings = this.isCrashed ? [] : this.flightWarnings.update(dt, this.telemetry,
-      terrainConflictSeconds(this.position, this.linearVelocity, this.currentTerrain,
+      terrainConflictSeconds(this.position, this.linearVelocity, terrainHeightSource,
         this.telemetry.gearState > 0.95 && this.telemetry.flapDegree >= (this.currentAircraftConfig.id === 'B738' ? 15 : 0)));
 
     // Presentation: water spray/ripples, slide dust, audio, toasts, and camera cuts
@@ -316,6 +328,9 @@ class PhysicsIntegratorMethods {
     // 13. Check Multi-Obstacle Collisions (Terrain, Water, Tower, Buildings, Trees, Ships)
     this.bridgeFlight?.update(dt);
     if (!this.isCrashed) {
+      if (this.collisionDetector.setTerrainOverrideProvider && !this.collisionDetector.terrainOverrideProvider) {
+        this.collisionDetector.setTerrainOverrideProvider(() => this.terrainProviderOverride);
+      }
       const crash = this.collisionDetector.checkCollision(
         result.collisionPosition,
         this.quaternion,
@@ -334,10 +349,8 @@ class PhysicsIntegratorMethods {
 
   resolveBodyPenetration() {
     const core = this.ensurePhysicsCore();
-    core.resolveBodyPenetration(
-      (x, z) => this.currentTerrain.getHeight(x, z),
-      (x, z) => this.currentTerrain.getNormal?.(x, z)
-    );
+    const { getGroundHeight, getGroundNormal } = this.ensureGroundSurfaceQueries();
+    core.resolveBodyPenetration(getGroundHeight, getGroundNormal);
   }
 
   triggerCrash(crashResult, impactVelocity = this.linearVelocity) {

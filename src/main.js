@@ -369,6 +369,7 @@ class FlightSimulator {
       this.ships,
       this.water
     );
+    this.collisionDetector.setTerrainOverrideProvider(() => this.terrainProviderOverride);
     this.explosionSystem = new ExplosionSystem(this.scene, this.currentTerrain);
     this.aircraftBreakup = new AircraftBreakup(this.scene);
     this.missileCombat = new AirToAirMissileSystem();
