@@ -7,7 +7,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const TILE = 128;
 const SIZE = TILE * 2;
 
-export function createCityFacadeAtlas() {
+// Streamed buildings are seen up close after overview lights fade, so they use a
+// brighter lit-window mask than the hand-placed city's subtle night glow.
+export function createCityFacadeAtlas(windowLight = [80, 68, 44]) {
   const color = new Uint8Array(SIZE * SIZE * 4);
   const windows = new Uint8Array(SIZE * SIZE * 4);
   const walls = [
@@ -31,7 +33,7 @@ export function createCityFacadeAtlas() {
           : isWindow ? (lit ? [119, 145, 163] : [38, 58, 75])
             : isFrame ? wall.map(v => Math.min(255, v + 24)) : wall;
         color.set([...rgb, 255], px);
-        windows.set(lit ? [80, 68, 44, 255] : [0, 0, 0, 255], px);
+        windows.set(lit ? [...windowLight, 255] : [0, 0, 0, 255], px);
       }
     }
   }

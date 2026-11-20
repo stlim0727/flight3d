@@ -262,7 +262,7 @@ export class GeographicBuildings {
     this.archive = archive;
     this.group = new THREE.Group();
     this.group.name = 'Geographic buildings';
-    const atlas = createCityFacadeAtlas();
+    const atlas = createCityFacadeAtlas([255, 218, 141]);
     this.atlas = atlas;
     this.material = new THREE.MeshLambertMaterial({
       map: atlas.map, emissiveMap: atlas.emissiveMap,
@@ -308,6 +308,7 @@ export class GeographicBuildings {
   update(position, cameraPosition = position, sunHeight = 1, elapsed = 1 / 60) {
     if (this.terrain.isLoaded === false) return;
     const night = nightLightLevel(sunHeight);
+    this.material.color.setScalar(1 - night * 0.9);
     this.material.emissiveIntensity = night * 0.75;
     const aircraftTiles = this.tilesNear(position);
     const cameraTiles = cameraPosition === position ? [] : this.tilesNear(cameraPosition);
