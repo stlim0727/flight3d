@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { nightLightLevel } from './AirportNightLighting.js';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import { PMTiles } from 'pmtiles';
@@ -263,9 +264,7 @@ export class GeographicRoads {
     this.archive = archive;
     this.group = new THREE.Group();
     this.group.name = 'Geographic roads';
-    this.material = new THREE.MeshLambertMaterial({
-      vertexColors: true, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
-    });
+    this.material = applyLogDepthOffset(new THREE.MeshLambertMaterial({ vertexColors: true }), 4);
     this.tiles = new Map();
     this.lamps = new Map();
     this.samples = new Map();

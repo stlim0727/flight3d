@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { VectorTile } from '@mapbox/vector-tile';
+import { applyLogDepthOffset } from './RunwayMarkings.js';
 import { PbfReader } from 'pbf';
 import { PMTiles } from 'pmtiles';
 import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospatial/TileCoordinateSystem.js';
@@ -89,10 +90,9 @@ export class GeographicGreenSpace {
     this.archive = archive;
     this.group = new THREE.Group();
     this.group.name = 'Geographic parks and green space';
-    this.material = new THREE.MeshLambertMaterial({
+    this.material = applyLogDepthOffset(new THREE.MeshLambertMaterial({
       vertexColors: true, side: THREE.DoubleSide,
-      polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
-    });
+    }), 3);
     this.tiles = new Map();
     this.pending = null;
     this.retryAt = new Map();
