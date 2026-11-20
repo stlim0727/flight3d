@@ -54,6 +54,8 @@ function distantLightGeometry(data, tile, project, terrain) {
   const layer = new VectorTile(new PbfReader(data)).layers.building;
   const occupied = new Set();
   const positions = [];
+  const detailKeys = [];
+  const detailScale = 2 ** (zoom - lightZoom);
   for (let i = 0; i < (layer?.length ?? 0); i++) {
     const feature = layer.feature(i);
     if (feature.type !== 3 || feature.properties.is_underground) continue;
@@ -71,10 +73,15 @@ function distantLightGeometry(data, tile, project, terrain) {
     // lacks local terrain. Its source coordinates remain the anchor.
     occupied.add(cell);
     positions.push(localX, (Number.isFinite(height) ? height : 0) + 30, localZ);
+    detailKeys.push(`${Math.floor((tile.x + x) * detailScale)}/${Math.floor((tile.y + y) * detailScale)}`);
   }
-  return positions.length ? new THREE.BufferGeometry().setAttribute(
-    'position', new THREE.Float32BufferAttribute(positions, 3),
-  ) : null;
+  if (!positions.length) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(detailKeys.length * 4).fill(1), 4));
+  geometry.attributes.color.setUsage(THREE.DynamicDrawUsage);
+  geometry.userData.detailKeys = detailKeys;
+  return geometry;
 }
 
 export function geographicBuildingHeight({ height, num_floors: floors }) {
@@ -213,7 +220,7 @@ export class GeographicBuildings {
       emissive: 0xffb864, emissiveMap: windowTexture(), emissiveIntensity: 0,
     });
     this.lightMaterial = new THREE.PointsMaterial({
-      map: cityGlowTexture(), color: 0xffc688, size: 5, sizeAttenuation: false,
+      map: cityGlowTexture(), color: 0xffc688, size: 5, sizeAttenuation: false, vertexColors: true,
       blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false,
     });
     this.lightTiles = new Map();
@@ -240,11 +247,10 @@ export class GeographicBuildings {
     }).filter(tile => tile.y >= 0 && tile.y < worldTiles);
   }
 
-  update(position, cameraPosition = position, sunHeight = 1) {
+  update(position, cameraPosition = position, sunHeight = 1, elapsed = 1 / 60) {
     if (this.terrain.isLoaded === false) return;
     const night = nightLightLevel(sunHeight);
     this.material.emissiveIntensity = night * 1.8;
-    this.updateDistantLights(cameraPosition, night);
     const aircraftTiles = this.tilesNear(position);
     const cameraTiles = cameraPosition === position ? [] : this.tilesNear(cameraPosition);
     const selection = `${aircraftTiles[0]?.key ?? ''}:${cameraTiles[0]?.key ?? ''}`;
@@ -256,16 +262,16 @@ export class GeographicBuildings {
       if (this.pending && !this.aircraftTiles.has(this.pending.key)
         && aircraftTiles.some(({ key }) => !this.tiles.has(key))) this.pending.controller.abort();
     }
+    this.updateDistantLights(cameraPosition, night, elapsed);
     if (this.pending) return;
     const now = performance.now();
     const tile = this.wantedTiles.find(({ key }) => !this.tiles.has(key) && now >= (this.retryAt.get(key) ?? 0));
     if (tile) void this.load(tile);
   }
 
-  updateDistantLights(cameraPosition, night) {
+  updateDistantLights(cameraPosition, night, elapsed) {
     const height = cameraPosition.y - this.terrain.getHeight(cameraPosition.x, cameraPosition.z);
-    const fade = THREE.MathUtils.smoothstep(height, 2200, 3500)
-      * (1 - THREE.MathUtils.smoothstep(height, 12500, 15500));
+    const fade = 1 - THREE.MathUtils.smoothstep(height, 12500, 15500);
     this.lightMaterial.opacity = night * fade * 0.9;
     const wanted = this.lightMaterial.opacity > 0 ? this.tilesAround(cameraPosition, lightZoom) : [];
     const center = wanted[0]?.key;
@@ -273,6 +279,35 @@ export class GeographicBuildings {
       this.lightCenter = center;
       this.retainLightTiles(new Set(wanted.map(tile => tile.key)));
     }
+    if (!wanted.length) return;
+
+    for (const points of this.lightTiles.values()) {
+      if (!points) continue;
+      const { position, color } = points.geometry.attributes;
+      const { detailKeys } = points.geometry.userData;
+      let changed = false;
+      for (let i = 0; i < position.count; i++) {
+        const detail = this.tiles.get(detailKeys[i])?.mesh;
+        const index = i * 4 + 3;
+        const previous = color.array[index];
+        let alpha = 1;
+        if (detail) {
+          const distance = Math.hypot(
+            cameraPosition.x - position.getX(i),
+            cameraPosition.y - position.getY(i),
+            cameraPosition.z - position.getZ(i),
+          );
+          const target = THREE.MathUtils.smoothstep(distance, 800, 2200);
+          alpha = Math.abs(target - previous) < 0.002 ? target
+            : THREE.MathUtils.damp(previous, target, 4, elapsed);
+        }
+        if (alpha === previous) continue;
+        color.array[index] = alpha;
+        changed = true;
+      }
+      if (changed) color.needsUpdate = true;
+    }
+
     if (this.pendingLight || performance.now() < this.lightRetryAt) return;
     const tile = wanted.find(({ key }) => !this.lightTiles.has(key));
     if (tile) void this.loadLightTile(tile);
@@ -378,7 +413,7 @@ const frames = {
   lukla: luklaGrid.origin,
 };
 
-export function updateGeographicBuildings(sim) {
+export function updateGeographicBuildings(sim, elapsed) {
   const origin = Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport];
   const terrain = sim.currentTerrain;
   if (sim.geographicBuildingLayer?.terrain !== terrain || !origin) {
@@ -397,7 +432,7 @@ export function updateGeographicBuildings(sim) {
     terrain.geographicBuildingLayer = sim.geographicBuildingLayer;
     terrain.mesh.add(sim.geographicBuildingLayer.group);
   }
-  sim.geographicBuildingLayer?.update(sim.position, sim.camera.position, sim.sky.sunPosition.y);
+  sim.geographicBuildingLayer?.update(sim.position, sim.camera.position, sim.sky.sunPosition.y, elapsed);
   const attribution = document.getElementById('geographic-buildings-attribution');
   if (attribution) attribution.hidden = !sim.geographicBuildingLayer?.group.children.length;
 }
