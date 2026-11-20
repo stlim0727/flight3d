@@ -68,7 +68,7 @@ test('loaded footprints collide by aircraft position regardless of camera positi
     origin: { latitude: 0, longitude: 0 },
     project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
     terrain,
-    archive: { getZxy: async (_zoom, x, y) => x === 8192 && y === 8192 ? { data: buildingTile() } : undefined },
+    archive: { getZxy: async (zoom, x, y) => zoom === 14 && x === 8192 && y === 8192 ? { data: buildingTile() } : undefined },
   });
   terrain.geographicBuildingLayer = layer;
   const position = new Vector3(85, 50, 140);
@@ -103,7 +103,7 @@ test('protects runway safety areas from streamed footprints and probe collisions
     project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
     terrain,
     isRunwaySafetyArea: protectedPoint,
-    archive: { getZxy: async () => ({ data: buildingTile() }) },
+    archive: { getZxy: async zoom => zoom === 14 ? { data: buildingTile() } : undefined },
   });
   layer.update(new Vector3(85, 50, 140));
   await new Promise(resolve => setImmediate(resolve));
@@ -117,7 +117,7 @@ test('protects runway safety areas from streamed footprints and probe collisions
     project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
     terrain,
     isRunwaySafetyArea: (x, z) => x < 1 && z > 200,
-    archive: { getZxy: async () => ({ data: buildingTile() }) },
+    archive: { getZxy: async zoom => zoom === 14 ? { data: buildingTile() } : undefined },
   });
   overlapping.update(new Vector3(85, 50, 140));
   await new Promise(resolve => setImmediate(resolve));
@@ -125,7 +125,7 @@ test('protects runway safety areas from streamed footprints and probe collisions
   overlapping.dispose();
 });
 
-test('fades facade windows and streams coarse lights only around a high night camera', async () => {
+test('shares overview tiles between daytime silhouettes and night lights', async () => {
   const { Vector3 } = await import('three');
   const zooms = [];
   const layer = new GeographicBuildings({
@@ -140,17 +140,24 @@ test('fades facade windows and streams coarse lights only around a high night ca
   const cruise = new Vector3(85, 10000, 140);
   layer.update(cruise, cruise, 0.5);
   assert.equal(layer.material.emissiveIntensity, 0);
-  assert.deepEqual(zooms, []);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(zooms, [12]);
+  const points = layer.group.children.find(child => child.isPoints);
+  const silhouettes = layer.group.children.find(child => child.isMesh);
+  assert.equal(points.visible, false);
+  assert.equal(silhouettes.visible, true);
   layer.update(cruise, cruise, -0.5);
   await new Promise(resolve => setImmediate(resolve));
   assert.ok(layer.material.emissiveIntensity > 0);
-  assert.deepEqual(zooms, [12]);
-  assert.equal(layer.group.children[0]?.isPoints, true);
+  assert.equal(points.visible, true);
+  assert.equal(silhouettes.visible, false);
+  assert.equal(layer.overviewTiles.get('2048/2048').points, points);
   assert.equal(layer.tiles.size, 0);
   assert.equal(layer.checkCollision([{ pos: cruise, radius: 10 }]), null);
-  layer.update(cruise, cruise, 0.5);
+  const above = cruise.clone().setY(16000);
+  layer.update(above, above, 0.5);
   assert.equal(layer.group.children.length, 0);
-  assert.equal(layer.lightTiles.size, 0);
+  assert.equal(layer.overviewTiles.size, 0);
   layer.dispose();
 });
 
@@ -190,5 +197,39 @@ test('keeps city lights during descent until matching details are ready and clos
   layer.retainTiles([]);
   layer.update(close, close, -0.5);
   assert.equal(opacity(), 1, 'coarse glow returns immediately when the detail goes away');
+  layer.dispose();
+});
+
+test('keeps daytime silhouettes until nearby detail is ready, then fades them', async () => {
+  const { Vector3 } = await import('three');
+  let finishDetail;
+  const data = buildingTile();
+  const layer = new GeographicBuildings({
+    origin: { latitude: 0, longitude: 0 },
+    project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
+    terrain: { getHeight: () => 44 },
+    archive: { getZxy: (zoom, x, y) => {
+      if (zoom === 12) return Promise.resolve(x === 2048 && y === 2048 ? { data } : undefined);
+      if (x === 8192 && y === 8192) return new Promise(resolve => { finishDetail = resolve; });
+      return Promise.resolve(undefined);
+    } },
+  });
+  const high = new Vector3(85, 5000, 140);
+  layer.update(high);
+  await new Promise(resolve => setImmediate(resolve));
+  const proxy = layer.overviewTiles.get('2048/2048').silhouettes;
+  const opacity = () => proxy.geometry.attributes.color.getW(0);
+  const low = new Vector3(85, 200, 140);
+  layer.update(low);
+  assert.equal(opacity(), 1);
+  finishDetail({ data });
+  await new Promise(resolve => setImmediate(resolve));
+  layer.update(low, low, 1, 0.25);
+  assert.ok(opacity() > 0 && opacity() < 1);
+  for (let i = 0; i < 120; i++) layer.update(low);
+  assert.equal(opacity(), 0);
+  layer.retainTiles([]);
+  layer.update(low);
+  assert.equal(opacity(), 1);
   layer.dispose();
 });
