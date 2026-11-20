@@ -1,4 +1,5 @@
 import { updateGeographicBuildings } from './environment/GeographicBuildings.js';
+import { updateOpenWorldTerrain } from './environment/OpenWorldTerrain.js';
 import { StartupProgressView } from './ui/StartupProgressView.js';
 import { compileVisibleScene } from './core/sceneShaderWarmup.js';
 import { FlightPerformanceMonitor, FlightGpuTimer } from './core/FlightPerformanceMonitor.js';
@@ -1499,6 +1500,7 @@ class FlightSimulator {
       });
     }
     this.sky.updateSun(this.position, this.camera.position);
+    updateOpenWorldTerrain(this);
     updateGeographicBuildings(this, frameDelta);
     this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     if (!this.gameFlow.isPhysicsFrozen()) {

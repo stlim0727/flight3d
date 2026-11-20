@@ -79,9 +79,20 @@ export class IncheonFlightSurface {
     return this.source.getHeight(x,z)*(1-weight)+airfield.elevationM*weight;
   }
 
+  getWaterLevel(x, z) {
+    const streamed = this.openWorld?.sample(x, z);
+    return streamed ? (streamed.water ? streamed.height : -10000) : 0;
+  }
+
+  isWater(x, z) {
+    return this.openWorld?.sample(x, z)?.water ?? this.getHeight(x, z) <= 0;
+  }
+
   getHeight(x,z) {
     if (![x,z].every(Number.isFinite)) throw new Error('Invalid flight terrain coordinate');
-    if (Math.max(Math.abs(x),Math.abs(z))>6000) return this.region?.getHeight(x,z) ?? 0;
+    if (Math.max(Math.abs(x),Math.abs(z))>6000) {
+      return this.openWorld?.sample(x,z)?.height ?? this.region?.getHeight(x,z) ?? 0;
+    }
     const col=(x+6000)/25,row=(z+6000)/25;
     const ix=Math.min(Math.floor(col),480-1),iz=Math.min(Math.floor(row),480-1);
     const u=col-ix,v=row-iz,i=iz*this.gridSize+ix,g=this.elevations;

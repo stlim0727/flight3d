@@ -15,7 +15,7 @@
 
 @import "./src/styles/flight-strip.css";
 
-#geographic-buildings-attribution {
+#geographic-buildings-attribution, #open-world-attribution {
   position: fixed;
   right: max(8px, env(safe-area-inset-right));
   bottom: max(8px, env(safe-area-inset-bottom));
@@ -25,4 +25,5 @@
   border-radius: 4px;
   font: 10px/1.4 system-ui, sans-serif;
 }
-#geographic-buildings-attribution a { color: #fff; }
+#geographic-buildings-attribution a, #open-world-attribution a { color: #fff; }
+#open-world-attribution { bottom: max(30px, calc(env(safe-area-inset-bottom) + 22px)); }
