@@ -3,7 +3,7 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { PbfWriter } from 'pbf';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
-import { buildGeographicGreenTile, GeographicGreenSpace } from '../src/environment/GeographicGreenSpace.js';
+import { buildGeographicGreenTile, GeographicGreenSpace, updateGeographicGreenSpace } from '../src/environment/GeographicGreenSpace.js';
 
 function tileData(layers) {
   const writer = new PbfWriter();
@@ -164,4 +164,31 @@ test('keeps most of a flat park when a narrow exclusion crosses a large face cen
   assert.ok(ratio > 0.8 && ratio < 1, `retained area ratio: ${ratio}`);
   baseline.dispose();
   actual.dispose();
+});
+
+test('lower quality presets skip streamed park and green-space rendering', () => {
+  const mesh = new THREE.Group();
+  const sim = {
+    activeAirport: 'incheon',
+    currentTerrain: { mesh, getHeight: () => 0, isLoaded: false },
+    position: { x: 0, y: 100, z: 0 },
+    camera: { position: { x: 0, y: 100, z: 0 } },
+    renderQuality: 'balanced',
+  };
+  updateGeographicGreenSpace(sim);
+  assert.ok(sim.geographicGreenLayer, 'balanced streams green space');
+  assert.equal(mesh.children.length, 1);
+
+  for (const quality of ['performance', 'ultraLow']) {
+    sim.renderQuality = quality;
+    updateGeographicGreenSpace(sim);
+    assert.equal(sim.geographicGreenLayer, null, `${quality} disposes the layer`);
+    assert.equal(mesh.children.length, 0, `${quality} renders no park mesh`);
+  }
+
+  sim.renderQuality = 'high';
+  updateGeographicGreenSpace(sim);
+  assert.ok(sim.geographicGreenLayer, 'restoring a higher preset brings green space back');
+  assert.equal(mesh.children.length, 1);
+  sim.geographicGreenLayer.dispose();
 });

@@ -8,6 +8,7 @@ import { projectToLocal, INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
+import { RENDER_QUALITY, resolveRenderQuality } from '../config/renderQuality.js';
 
 // Parks are absent from the z11 parent tile the water loader reads, so green
 // space has its own z13 tile selection over the already-downloaded base archive.
@@ -248,8 +249,14 @@ const frames = {
 };
 
 export function updateGeographicGreenSpace(sim) {
-  const origin = Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport];
   const terrain = sim.currentTerrain;
+  if (!RENDER_QUALITY[resolveRenderQuality(sim.renderQuality)].greenSpace) {
+    sim.geographicGreenLayer?.dispose();
+    sim.geographicGreenLayer = null;
+    setMapAttributionSource('geographic-green-attribution', false);
+    return;
+  }
+  const origin = Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport];
   if (sim.geographicGreenLayer?.terrain !== terrain || !origin) {
     sim.geographicGreenLayer?.dispose();
     sim.geographicGreenLayer = null;
