@@ -153,3 +153,42 @@ test('fades facade windows and streams coarse lights only around a high night ca
   assert.equal(layer.lightTiles.size, 0);
   layer.dispose();
 });
+
+test('keeps city lights during descent until matching details are ready and close', async () => {
+  const { Vector3 } = await import('three');
+  let finishDetail;
+  const data = buildingTile();
+  const layer = new GeographicBuildings({
+    origin: { latitude: 0, longitude: 0 },
+    project: (latitude, longitude) => [longitude * 100000, -latitude * 100000],
+    terrain: { getHeight: () => 44 },
+    archive: { getZxy: (zoom, x, y) => {
+      if (zoom === 12) return Promise.resolve(x === 2048 && y === 2048 ? { data } : undefined);
+      if (x === 8192 && y === 8192) return new Promise(resolve => { finishDetail = resolve; });
+      return Promise.resolve(undefined);
+    } },
+  });
+  const cruise = new Vector3(85, 10000, 140);
+  layer.update(cruise, cruise, -0.5);
+  await new Promise(resolve => setImmediate(resolve));
+  const points = layer.group.children.find(child => child.isPoints);
+  const opacity = () => points.geometry.attributes.color.getW(0);
+  assert.equal(opacity(), 1);
+
+  const middle = new Vector3(85, 1800, 140);
+  layer.update(middle, middle, -0.5);
+  assert.equal(layer.lightMaterial.opacity, 0.9);
+  assert.equal(opacity(), 1);
+  finishDetail({ data });
+  await new Promise(resolve => setImmediate(resolve));
+  layer.update(middle, middle, -0.5, 0.25);
+  assert.ok(opacity() > 0.5 && opacity() < 1, 'overlap after the fine tile arrives');
+
+  const close = new Vector3(85, 200, 140);
+  for (let i = 0; i < 120; i++) layer.update(close, close, -0.5);
+  assert.equal(opacity(), 0);
+  layer.retainTiles([]);
+  layer.update(close, close, -0.5);
+  assert.equal(opacity(), 1, 'coarse glow returns immediately when the detail goes away');
+  layer.dispose();
+});
