@@ -1,12 +1,62 @@
 # Landmark pins
 
-Landmark pins are screen-space labels anchored to a point in the world. Places
-are data, not code: the renderer has no special cases for individual stations,
-towers or companies.
+Landmark pins are screen-space labels anchored to a point in the world. On any
+geographic map (`incheon`, `jeju`, `lukla`, or any open-world terrain supplying
+`terrain.origin` / `terrain.wgs84Origin`), major landmarks are **automatically
+discovered, ranked, and displayed** globally from the same Overture Maps PMTiles
+archives that Flight3d streams for terrain, roads, parks, and buildings — no
+manual per-place coordinates or code are required for new cities, mountains,
+bridges, airports, or towers.
 
-## Add a place
+## Automatic discovery (primary source)
 
-Append one row to `src/config/landmarkPlaces.json`:
+`GeographicLandmarks` (`src/environment/GeographicLandmarks.js`) streams
+landmarks around the aircraft and camera across multiple zooms:
+
+1. **`divisions.pmtiles` (z9–z10):** Cities ranked by Overture `@prominence`
+   and population, plus districts (`county`/`macrohood`) and Wikidata towns.
+2. **`base.pmtiles` (z11, z13, and camera look-ahead z13):** Airports, towers,
+   Wikidata bridges, dams/power plants, major rail/subway stations, mountain
+   peaks/volcanoes, national parks, theme parks, stadiums, universities, large
+   industrial/commercial campuses, islands, beaches, and major lakes/bays.
+   z13 tiles already downloaded by `GeographicGreenSpace` are ingested with zero
+   extra network requests.
+3. **`buildings.pmtiles` (z14, zero extra requests):** Non-residential towers
+   (≥ 120 m) and iconic public/terminal buildings extracted directly as
+   `GeographicBuildings` loads each tile.
+
+Pure extraction, filtering, and deduplication live in
+`src/geospatial/overtureLandmarks.js` (`parseOvertureNames`,
+`extractDivisionLandmarks`, `extractBaseLandmarks`,
+`extractBuildingLandmarks`, `dedupeLandmarks`).
+
+## How selection and ranking work
+
+1. **Deduplication (`dedupeLandmarks()`):** Merges any optional curated anchors
+   with streamed Overture discoveries, collapsing duplicates by Wikidata ID,
+   record ID, normalized name proximity (≤ 5 km), or co-located airports
+   (≤ 2.5 km).
+2. **Range and height (`landmarkRangeM()`, `resolveLandmarkHeight()`):**
+   Importance levels 1–5 scale visible range from 9 km to 45 km. Ground-relative
+   features dynamically query `terrain.getHeight(x, z)` as terrain tiles load so
+   anchors stay seated on the terrain or roof top.
+3. **Prominence-weighted priority (`nearestLandmarks()`, `landmarkPriorityScore()`):**
+   Candidates within range are ranked by importance, Overture prominence, and
+   distance so major airports, cities, skyscrapers, and mountain peaks outrank
+   closer minor subway stations or local sub-peaks.
+4. **Screen projection (`LandmarkPins`):** Discards points behind/outside the
+   view or closer than 200 m, places up to five non-overlapping pins (three on
+   narrow viewports), and renders a circular marker whose tip sits on the
+   projected point with a kind-driven SVG icon (`src/ui/landmarkPinIcons.js`).
+
+Synthetic maps (`neon`, `coastal`, `valley`) keep their local scene anchors in
+`src/config/landmarks.js`.
+
+## Optional curated supplement (`landmarkPlaces.json`)
+
+`src/config/landmarkPlaces.json` remains an optional curated supplement /
+offline anchor list merged with automatic Overture discoveries. Append a row
+only when an explicit override or offline elevation anchor is desired:
 
 ```json
 {
@@ -20,54 +70,22 @@ Append one row to `src/config/landmarkPlaces.json`:
 }
 ```
 
-`latitude` and `longitude` are WGS84; take them from a survey or an OSM/source
-feature rather than guessing. The values above illustrate the shape, not a
-surveyed position. `elevationM` is the label's MSL anchor (roof/peak/top); omit
-it and the terrain height at the projected point is used. `names.ko` and
-`names.en` are shown according to the active UI language, with English as the
-fallback. `kinds` is an open-ended list of tags (`station`, `subway`, `attraction`,
-`tower`, `peak`, `airport`, …). It filters candidates and selects the pin icon:
-`station`/`subway`, `tower`, `peak`, `dam`, `airport`, `attraction` and
-`corporate` have distinct icons; anything else gets a generic pin icon.
-`importance` is an integer 1–5 (default 5): level 5 stays visible to 45 km,
-then 36/27/18/9 km for 4/3/2/1. It changes range only, not label priority.
-
-A subway station is the same shape with `kinds: ["station", "subway"]` and an
-`elevationM` near ground level. No changes to `LandmarkPins.js` are needed.
-
-## How selection works
-
-1. `normalizeLandmarkPlaces()` validates each row, resolves names and drops
-   unusable coordinates.
-2. `landmarksForMap()` projects every row into the active scene's local metric
-   frame: `projectToLocal()` for Incheon scenery, `wgs84ToLocal(..., JEJU_ORIGIN)`
-   for Jeju. Synthetic maps (Neon, Lukla, Coastal, Valley) keep their local
-   anchors because they are not WGS84 places.
-3. Each frame `nearestLandmarks()` keeps places inside their importance-scaled
-   range (45 km × level / 5), optionally filters by `kinds`, and sorts by true
-   3D distance to the label.
-4. `LandmarkPins` discards points behind/outside the view or closer than 200 m,
-   places up to five pins (three on narrow viewports), and suppresses labels
-   that would overlap. Each pin has a circular marker whose tip sits on the
-   projected point, a category icon and a label with the localized name/range.
-
-The catalog is rebuilt only when the map, terrain, airport or dataset changes;
-selection and projection run every frame, so walking or flying toward a place
-brings its pin in without reloading data.
+`names.ko` and `names.en` are shown according to the active UI language, with
+English as the fallback. `kinds` (`station`/`subway`, `tower`, `peak`, `dam`,
+`airport`, `attraction`, `corporate`, `city`, `bridge`, `park`, `water`)
+filters candidates and selects the pin icon; anything else gets a generic pin
+icon.
 
 ## Supplying another dataset
 
-Both the catalog and an optional category filter are constructor arguments:
+Both a custom catalog and an optional category filter are constructor arguments:
 
 ```js
 new LandmarkPins(document.getElementById('landmark-pins'), places, ['station']);
 ```
 
-`places` has the same shape as `landmarkPlaces.json`, so an OSM query or an
-application dataset can be converted once into `names`, WGS84 coordinates and
-`kinds`, then passed through unchanged. The pure helpers are also exported from
-`src/config/landmarks.js` (`normalizeLandmarkPlaces`, `nearestLandmarks`,
-`landmarkName`, `landmarkRangeM`) and `src/ui/landmarkPinIcons.js`
-(`landmarkPinIcon`) for maps or panels that need the same rules.
+When `places` is omitted, `LandmarkPins` merges `landmarksForMap()` with
+`sim.geographicLandmarkLayer.records`. When `places` is supplied explicitly, it
+renders only that dataset.
 
-Verify with `node --test tests/landmarks.test.js tests/landmarkPins.test.js`.
+Verify unit tests with `node --test tests/overtureLandmarks.test.js tests/geographicLandmarks.test.js tests/landmarks.test.js tests/landmarkPins.test.js`, and verify renderless global Overture discovery across 11 regions with `node scripts/verify-landmarks-renderless.mjs`.

@@ -136,12 +136,13 @@ export function buildGeographicGreenTile(data, tile, project, terrain, exclude =
 }
 
 export class GeographicGreenSpace {
-  constructor({ origin, project, terrain, exclude, archive = source }) {
+  constructor({ origin, project, terrain, exclude, archive = source, onTileData = null }) {
     this.origin = origin;
     this.project = project;
     this.terrain = terrain;
     this.exclude = exclude ?? (() => false);
     this.archive = archive;
+    this.onTileData = onTileData;
     this.group = new THREE.Group();
     this.group.name = 'Geographic parks and green space';
     this.material = applyLogDepthOffset(new THREE.MeshLambertMaterial({
@@ -210,6 +211,7 @@ export class GeographicGreenSpace {
     try {
       const response = await this.archive.getZxy(zoom, tile.x, tile.y, controller.signal);
       if (controller.signal.aborted) return;
+      if (response?.data) this.onTileData?.(tile, zoom, response.data);
       const geometry = response && buildGeographicGreenTile(response.data, tile, this.project, this.terrain, this.exclude);
       if (geometry) {
         const mesh = new THREE.Mesh(geometry, this.material);
@@ -258,6 +260,7 @@ export function updateGeographicGreenSpace(sim) {
     const airport = sim.currentAirport;
     sim.geographicGreenLayer = new GeographicGreenSpace({
       origin, project, terrain,
+      onTileData: (tile, tileZoom, data) => sim.geographicLandmarkLayer?.ingestBaseTile(tile, tileZoom, data),
       exclude: (x, z) => {
         if (airport?.hasModeledBuilding?.(x, z) || airport?.isRunwaySafetyArea?.(x, z)) return true;
         if (sim.geographicRoadLayer?.covers(x, z)) return true;
