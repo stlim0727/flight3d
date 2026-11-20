@@ -213,15 +213,18 @@ test('extractBuildingLandmarks selects tall/iconic non-residential buildings and
       { type: 3, geom: box(400, 400), properties: { id: 'posco', height: 305, subtype: 'commercial', class: 'commercial', '@name': '포스코타워-송도', names: JSON.stringify({ primary: '포스코타워-송도', common: { en: 'Posco Tower-Songdo' } }) } },
       { type: 3, geom: box(600, 600), properties: { id: 'museum', class: 'museum', '@name': '국립중앙박물관', names: JSON.stringify({ primary: '국립중앙박물관', common: { en: 'National Museum of Korea' } }) } },
       { type: 3, geom: box(700, 600), properties: { id: 'opera', class: 'opera_house', '@name': 'Sydney Opera House' } },
+      { type: 3, geom: box(750, 600), properties: { id: 'baptist', class: 'cathedral', '@name': 'Cathedral of Saint John the Baptist' } },
+      { type: 3, geom: box(760, 650), properties: { id: 'captain', class: 'museum', '@name': 'Captain Cook Museum' } },
       { type: 3, geom: box(800, 800), properties: { id: 'apt', height: 240, subtype: 'residential', class: 'apartments', '@name': '잠실엘스아파트' } },
       { type: 3, geom: box(900, 800), properties: { id: 'en-apt', height: 210, subtype: 'commercial', '@name': 'Link Apartments 8 Carlisle' } },
+      { type: 3, geom: box(950, 800), properties: { id: 'ko-apt-en', height: 180, subtype: 'commercial', '@name': 'Seoul APT' } },
       { type: 3, geom: box(1000, 1000), properties: { id: 'brand', height: 180, subtype: 'commercial', '@name': '송도더샵오피스텔' } },
       { type: 3, geom: box(1200, 1200), properties: { id: 'low', height: 40, subtype: 'commercial', '@name': '작은상가' } },
     ],
   }]);
 
   const extracted = extractBuildingLandmarks(data, { x: 13976, y: 6347 }, 14);
-  assert.deepEqual(extracted.map(item => item.id), ['posco', 'museum', 'opera']);
+  assert.deepEqual(extracted.map(item => item.id), ['posco', 'museum', 'opera', 'baptist', 'captain']);
   assert.equal(extracted[0].importance, 5);
   assert.deepEqual(extracted[0].kinds, ['tower', 'corporate']);
   assert.equal(extracted[0].heightOffsetM, 305);

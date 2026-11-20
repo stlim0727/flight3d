@@ -9,6 +9,7 @@ import {
   extractDivisionLandmarks,
 } from '../geospatial/overtureLandmarks.js';
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
+import { setMapAttributionSource } from '../ui/mapAttribution.js';
 
 const neighbors = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
 const maxTileCache = 48;
@@ -286,9 +287,8 @@ export function updateGeographicLandmarks(sim) {
     });
   }
   sim.geographicLandmarkLayer?.update(sim.position, sim.camera, sim.geographicBuildingLayer);
-  const attribution = document.getElementById('geographic-buildings-attribution');
-  if (attribution) {
-    attribution.hidden = !(sim.geographicBuildingLayer?.group.children.length
-      || sim.geographicLandmarkLayer?.hasStreamedData);
-  }
+  setMapAttributionSource(
+    'geographic-buildings-attribution',
+    Boolean(sim.geographicBuildingLayer?.group.children.length || sim.geographicLandmarkLayer?.hasStreamedData),
+  );
 }

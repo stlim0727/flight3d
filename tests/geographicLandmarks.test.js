@@ -207,7 +207,14 @@ test('GeographicLandmarks syncs building landmarks from GeographicBuildings and 
 test('GeographicLandmarks backs off after fetch error and updateGeographicLandmarks manages lifecycle and attribution', async () => {
   const prevDoc = globalThis.document;
   const attribution = { hidden: true };
-  globalThis.document = { getElementById: id => (id === 'geographic-buildings-attribution' ? attribution : null) };
+  const mapAttribution = { hidden: true, classList: { toggle() {} } };
+  globalThis.document = {
+    getElementById: id => {
+      if (id === 'geographic-buildings-attribution') return attribution;
+      if (id === 'map-attribution') return mapAttribution;
+      return null;
+    },
+  };
   try {
     let calls = 0;
     const layer = new GeographicLandmarks({
@@ -241,15 +248,18 @@ test('GeographicLandmarks backs off after fetch error and updateGeographicLandma
     updateGeographicLandmarks(sim);
     assert.ok(sim.geographicLandmarkLayer instanceof GeographicLandmarks);
     assert.equal(attribution.hidden, true);
+    assert.equal(mapAttribution.hidden, true);
 
     sim.geographicLandmarkLayer.hasStreamedData = true;
     updateGeographicLandmarks(sim);
     assert.equal(attribution.hidden, false);
+    assert.equal(mapAttribution.hidden, false);
 
     sim.activeAirport = 'coastal';
     updateGeographicLandmarks(sim);
     assert.equal(sim.geographicLandmarkLayer, null);
     assert.equal(attribution.hidden, true);
+    assert.equal(mapAttribution.hidden, true);
 
     // Generic world/custom map providing terrain.origin works automatically without hardcoded frames
     sim.activeAirport = 'paris-sandbox';

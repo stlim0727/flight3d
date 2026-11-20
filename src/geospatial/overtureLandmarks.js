@@ -4,7 +4,7 @@ import { tileToWgs84 } from './TileCoordinateSystem.js';
 
 const EARTH_EQUATOR_CIRCUMFERENCE_M = 40075016;
 const GENERIC_UNIT_RE = /^(?:\d+동?|\d+호|\d+통|\d+반|[a-z]동|building\s*\d+|block\s*[a-z0-9]+)$/i;
-const RESIDENTIAL_NAME_RE = /(?:\b(?:apartments?|condos?|condominiums?|residences?|residential|lofts?|flats?|dormitor(?:y|ies)|housing)\b|아파트|APT|오피스텔|빌라|맨션|자이|푸르지오|래미안|힐스테이트|더샵|캐슬|아이파크|스위첸|이편한세상|e편한세상|호반|중흥|우미린|sk뷰|롯데캐슬)/i;
+const RESIDENTIAL_NAME_RE = /(?:\b(?:apartments?|apt|condos?|condominiums?|residences?|residential|lofts?|flats?|dormitor(?:y|ies)|housing)\b|아파트|오피스텔|빌라|맨션|자이|푸르지오|래미안|힐스테이트|더샵|캐슬|아이파크|스위첸|이편한세상|e편한세상|호반|중흥|우미린|sk뷰|롯데캐슬)/i;
 
 const RESIDENTIAL_BUILDING_CLASSES = new Set([
   'apartments', 'house', 'detached', 'semidetached_house', 'terrace',

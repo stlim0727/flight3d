@@ -11,6 +11,7 @@ import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import { pointInRing, segmentDistance } from '../geospatial/incheonDressing.js';
 import { extractBuildingLandmarks } from '../geospatial/overtureLandmarks.js';
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
+import { setMapAttributionSource } from '../ui/mapAttribution.js';
 
 const neighbors = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
 const zoom = 14;
@@ -558,9 +559,8 @@ export function updateGeographicBuildings(sim, elapsed) {
   }
   sim.geographicBuildingLayer?.update(sim.position, sim.camera.position, sim.sky.sunPosition.y, elapsed,
     sim.renderQuality === 'ultraLow');
-  const attribution = document.getElementById('geographic-buildings-attribution');
-  if (attribution) {
-    attribution.hidden = !(sim.geographicBuildingLayer?.group.children.length
-      || sim.geographicLandmarkLayer?.hasStreamedData);
-  }
+  setMapAttributionSource(
+    'geographic-buildings-attribution',
+    Boolean(sim.geographicBuildingLayer?.group.children.length || sim.geographicLandmarkLayer?.hasStreamedData),
+  );
 }

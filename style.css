@@ -15,21 +15,6 @@
 
 @import "./src/styles/flight-strip.css";
 
-#geographic-buildings-attribution, #geographic-roads-attribution, #geographic-green-attribution, #open-world-attribution {
-  position: fixed;
-  right: max(8px, env(safe-area-inset-right));
-  bottom: max(8px, env(safe-area-inset-bottom));
-  z-index: 15;
-  padding: 3px 6px;
-  background: #152027e6;
-  border-radius: 4px;
-  font: 10px/1.4 system-ui, sans-serif;
-}
-#geographic-buildings-attribution a, #geographic-roads-attribution a, #geographic-green-attribution a, #open-world-attribution a { color: #fff; }
-#open-world-attribution { bottom: max(30px, calc(env(safe-area-inset-bottom) + 22px)); }
-#geographic-roads-attribution { bottom: max(52px, calc(env(safe-area-inset-bottom) + 44px)); }
-#geographic-green-attribution { bottom: max(74px, calc(env(safe-area-inset-bottom) + 66px)); }
-
 #landmark-pins {
   position: absolute;
   inset: 0;

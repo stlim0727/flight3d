@@ -94,6 +94,7 @@ import { installStartupLoadMonitor, readDevice, readGpuClass } from './ui/Startu
 import { installPresetSpawner } from './core/PresetSpawner.js';
 import { installPhysicsIntegrator } from './core/PhysicsIntegrator.js';
 import { installSimulatorHudAndBindings } from './ui/SimulatorHudAndBindings.js';
+import { collapseMapAttribution } from './ui/mapAttribution.js';
 import { SimulatorAudioCoordinator } from './core/SimulatorAudioCoordinator.js';
 import { SimulatorInputCoordinator } from './core/SimulatorInputCoordinator.js';
 import {
@@ -682,9 +683,7 @@ class FlightSimulator {
     this.syncAudioPause();
     document.body.dataset.flow = state;
     if (state === FLOW.FLIGHT) {
-      const attribution = document.getElementById('incheon-attribution');
-      attribution?.classList.remove('expanded');
-      attribution?.querySelector('#incheon-attribution-chip')?.setAttribute('aria-expanded', 'false');
+      collapseMapAttribution();
       if (this.touchControls?.gyroRequested && !this.touchControls.gyroActive && !this.demoDirector?.isActive) {
         this.touchControls.restoreGyroSettings({ userGesture: true });
       }
