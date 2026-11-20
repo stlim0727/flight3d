@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { landmarksForMap } from '../src/config/landmarks.js';
+import { Vector3 } from 'three';
+import { landmarkName, landmarkRangeM, landmarksForMap, nearestLandmarks, normalizeLandmarkPlaces } from '../src/config/landmarks.js';
 
 test('all maps supply finite landmark anchors using their own coordinate frames', () => {
   const terrain = { getHeight: () => 200, terrain: { centerline: [{ x: 12, z: -4200 }] } };
@@ -17,4 +18,63 @@ test('all maps supply finite landmark anchors using their own coordinate frames'
   assert.ok(tower('incheon').x > 25000);
   assert.ok(Math.abs(tower('jeju').z) > 400000);
   assert.deepEqual(landmarksForMap('unknown'), []);
+});
+
+test('catalog rows normalize into localized names and invalid rows are skipped', () => {
+  const records = normalizeLandmarkPlaces([
+    { id: 'station', names: { ko: '서울역', en: 'Seoul Station' }, latitude: 37.5547,
+      longitude: 126.9706, kinds: ['station', 'subway'], importance: 2.6 },
+    { id: 'unranked', names: { en: 'Unranked' }, latitude: 37, longitude: 127 },
+    { id: 'no-coordinates', names: { en: 'Nowhere' } },
+    { id: 'invalid-latitude', names: { en: 'Off globe' }, latitude: 91, longitude: 2 },
+    null,
+  ]);
+  assert.equal(records.length, 2);
+  assert.equal(landmarkName(records[0], 'ko'), '서울역');
+  assert.equal(landmarkName(records[0], 'en'), 'Seoul Station');
+  assert.equal(landmarkName(records[0], 'fr'), 'Seoul Station');
+  assert.equal(records[0].importance, 3);
+  assert.equal(records[1].importance, 5);
+  assert.deepEqual(records[0].kinds, ['station', 'subway']);
+  assert.equal(landmarkName({ ko: '해안 공항', en: 'Coastal Airport' }, 'ko'), '해안 공항');
+});
+
+test('custom catalog rows project into each geographic map and use ground height when omitted', () => {
+  const terrain = { getHeight: () => 120 };
+  const places = [{ id: 'custom', names: { ko: '맞춤 장소', en: 'Custom Place' },
+    latitude: 37.2598, longitude: 127.0344, kinds: ['attraction'] }];
+  const incheon = landmarksForMap('incheon', terrain, {}, places);
+  const jeju = landmarksForMap('jeju', terrain, {}, places);
+  assert.equal(incheon.length, 1);
+  assert.equal(incheon[0].height, 120);
+  assert.ok(Math.abs(incheon[0].x) > 20000);
+  assert.equal(jeju[0].height, 120);
+  assert.notEqual(incheon[0].z, jeju[0].z);
+});
+
+test('nearest landmarks select by distance, category and range', () => {
+  const records = [
+    { id: 'near', x: 500, z: 0, height: 10, kinds: ['station'] },
+    { id: 'behind', x: -1000, z: 0, height: 10, kinds: ['station'] },
+    { id: 'far', x: 30000, z: 0, height: 10, kinds: ['attraction'] },
+    { id: 'out-of-range', x: 60000, z: 0, height: 10, kinds: ['station'] },
+  ];
+  const origin = new Vector3(0, 0, 0);
+  const ids = options => nearestLandmarks(records, origin, options).map(candidate => candidate.record.id);
+  assert.deepEqual(ids({ limit: 2 }), ['near', 'behind']);
+  assert.deepEqual(ids({ limit: 2, kinds: ['attraction'] }), ['far']);
+  assert.deepEqual(ids({ maxDistanceM: 500 }), []);
+  assert.equal(ids({ limit: Infinity }).length, 3);
+});
+
+test('importance scales visible range and hides distant low-ranked places', () => {
+  assert.equal(landmarkRangeM({ importance: 5 }), 45000);
+  assert.equal(landmarkRangeM({ importance: 1 }), 9000);
+  assert.equal(landmarkRangeM({}), 45000);
+  const records = [
+    { id: 'major', x: 20000, z: 0, height: 0, importance: 5 },
+    { id: 'minor', x: 20000, z: 0, height: 0, importance: 2 },
+  ];
+  assert.deepEqual(nearestLandmarks(records, new Vector3(), { limit: Infinity })
+    .map(candidate => candidate.record.id), ['major']);
 });
