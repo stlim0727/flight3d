@@ -5,7 +5,6 @@ const dir = process.env.ARTIFACT_DIR || path.resolve("review-artifacts/issue101"
 fs.mkdirSync(dir, { recursive: true });
 // Start Vite and open it in headless Chrome with CDP on 9451; see ci.md.
 const cdpPort = process.env.CDP_PORT || 9451;
-const fallback = process.env.FALLBACK === "1";
 const pages = await (await fetch(`http://127.0.0.1:${cdpPort}/json`)).json();
 const ws = new WebSocket(
   pages.find((p) => p.type === "page").webSocketDebuggerUrl,
@@ -47,8 +46,6 @@ const evaluate = async (expression) => {
 };
 await call("Runtime.enable");
 await call('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
-await call('Network.enable');
-await call('Network.setBlockedURLs', { urls: fallback ? ['*b737-cockpit-medium.glb*'] : [] });
 await call("Page.reload", { ignoreCache: true });
 await new Promise(r=>setTimeout(r,2500));
 for (let i=0;i<120;i++) {
@@ -85,8 +82,7 @@ const results = await evaluate(`(async()=>{
  s.renderer.render(s.scene,s.camera);result.cockpitDrawCalls=s.renderer.info.render.calls;
  return result;
 })()`);
-assert.ok(results.loaded);
-assert.ok(fallback ? results.saved >= 0 : results.saved > 2300);
+assert.ok(results.saved > 2300);
 assert.ok(results.meshes > 0);
 assert.ok(results.visible<150);
 assert.equal(results.displayRenders.pfd,10);

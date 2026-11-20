@@ -193,7 +193,6 @@ export class F16 {
     });
     this.missileLoaded = F16_MISSILE_STATIONS.map(() => true);
     this.lightsOn = true;
-    this.useGltf = false;
     this.loadingGltf = true;
     this.modelLoaded = false;
     this.isCrashed = false;
@@ -228,7 +227,6 @@ export class F16 {
         }
       })
       .catch(error => {
-        this.cockpit.cockpitModelFailed = true;
         console.error('F-16 model failed to load:', error);
       });
     this.ready = Promise.all([airframePromise, this.pilotMesh.ready]).finally(() => {
@@ -295,7 +293,7 @@ export class F16 {
     }
     this.controlSurfaces = bindGltfControlSurfaces(this.gltfGroup,
       { meshName: 'F-16-airframe_0', specifications: f16ControlSurfaceSpecs });
-    this.modelLoaded = this.useGltf = true;
+    this.modelLoaded = true;
     this.cockpit.onModelReady?.();
     this.update(0, { gearState: this.gearExtension });
   }

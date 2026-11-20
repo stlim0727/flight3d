@@ -14,7 +14,7 @@ function fixture() {
   group.add(exterior);
   scene.add(group);
   group.position.set(40, 5, 20);
-  const aircraft = { group, gltfGroup: exterior, useGltf: true, setCockpitMode() {} };
+  const aircraft = { group, gltfGroup: exterior, setCockpitMode() {} };
   return { scene, aircraft, material };
 }
 
@@ -93,22 +93,6 @@ test('prepared breakup follows impact-time aircraft and articulated gear transfo
     geometries.forEach((g, i) => assert.deepEqual(Array.from(g.attributes.position.array), positions[i], 'cached vertices stay immutable'));
     breakup.clear();
   }
-});
-
-test('switching a prepared aircraft from fallback to loaded geometry rebuilds the cache', () => {
-  const { scene, aircraft } = fixture();
-  aircraft.useGltf = false;
-  aircraft.proceduralGroup = new THREE.Group();
-  aircraft.proceduralGroup.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial()));
-  aircraft.group.add(aircraft.proceduralGroup);
-  const breakup = new AircraftBreakup(scene);
-  breakup.prepare(aircraft);
-  const previous = breakup.preparedRoot;
-  aircraft.useGltf = true;
-  assert.equal(breakup.prepare(aircraft), true);
-  assert.notEqual(breakup.preparedRoot, previous);
-  breakup.spawn(aircraft, new THREE.Vector3());
-  assert.equal(breakup.pieces.length, 6);
 });
 
 test('C172 flexible struts retain live suspension deformation and normals across prepared crashes', () => {
@@ -322,11 +306,9 @@ test('crashing during a temporary gear view restores its underlying view without
   }
 });
 
-test('mirrored fallback triangles retain front faces, tangent handedness and matching UVs', () => {
+test('mirrored GLB triangles retain front faces, tangent handedness and matching UVs', () => {
   for (const indexed of [false, true]) {
     const { scene, aircraft } = fixture();
-    aircraft.useGltf = false;
-    aircraft.proceduralGroup = aircraft.gltfGroup;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 2, 0, 0, 0, 2, 0], 3));
     geometry.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1], 3));
@@ -337,7 +319,7 @@ test('mirrored fallback triangles retain front faces, tangent handedness and mat
     const wing = new THREE.Group();
     wing.scale.x = -1;
     wing.add(new THREE.Mesh(geometry, material));
-    aircraft.proceduralGroup.add(wing);
+    aircraft.gltfGroup.add(wing);
     const breakup = new AircraftBreakup(scene);
     breakup.spawn(aircraft, new THREE.Vector3());
     let triangles = 0;

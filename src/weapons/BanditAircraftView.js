@@ -231,8 +231,7 @@ export class BanditAircraftView {
     }
     return {
       group: this.proxy,
-      proceduralGroup: this.proxy,
-      useGltf: false,
+      gltfGroup: this.proxy,
       setCockpitMode: () => {},
     };
   }

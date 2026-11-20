@@ -4,8 +4,8 @@ Source: https://sketchfab.com/3d-models/boeing-737-800-cockpit-d463256f98654b36a
 License: Creative Commons Attribution 4.0 International (CC BY 4.0)
 https://creativecommons.org/licenses/by/4.0/
 
-Applies to b737-cockpit-medium.glb and b737-cockpit-draco.glb.
-Attribution transcribed from the asset.extras metadata embedded in both GLBs.
+Applies to b737-cockpit-medium.glb.
+Attribution transcribed from the asset.extras metadata embedded in the GLB.
 
 Modifications by Flight3d contributors: glTF-Transform optimization and Draco
 compression; runtime alignment, PBR material adjustments, static batching,

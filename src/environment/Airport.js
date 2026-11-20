@@ -2,8 +2,7 @@ import * as THREE from 'three';
 import { AirportNightLighting } from './AirportNightLighting.js';
 import { createPavementMaterial, setPavementUVs, createRunwayWearMaterial, createRunwayRepairs, createRunwaySurfaceWear } from './Pavement.js';
 import { loadAirportKit, createAirportBuildings } from './AirportBuildings.js';
-import { applyLogDepthOffset, createRunwayMarkingMaterial } from './RunwayMarkings.js';
-import { applyFarSunShadow } from './FarSunShadow.js';
+import { createRunwayMarkingMaterial } from './RunwayMarkings.js';
 
 /**
  * International Airport Environment (Runway 09L/27R, Control Tower, Terminal, Hangars, Lighting)
@@ -20,8 +19,10 @@ export class Airport {
     this.runwayWidth = 60;   // meters
     this.runwayCenter = new THREE.Vector3(0, this.elevation, 0);
 
-    // Dynamic objects
+    // Dynamic objects: populated when the airport GLB kit loads.
     this.radarDish = null;
+    this.towerGroup = null;
+    this.terminalGroup = null;
     this.approachStrobes = [];
     this.beaconLights = [];
 
@@ -63,26 +64,7 @@ export class Airport {
   async loadBuildings(loadKit = loadAirportKit) {
     try {
       const kit = await loadKit();
-      // Replace the procedural terminal only when this airport provides one.
-      const replaceTerminal = Boolean(this.terminalGroup);
-      const buildings = createAirportBuildings(kit, this, { terminal: replaceTerminal });
-      const oldTower = this.towerGroup;
-      const oldBeacons = new Set();
-      oldTower.traverse(node => { if (node.isPointLight) oldBeacons.add(node); });
-      const removed = [oldTower, ...(replaceTerminal ? [this.terminalGroup] : [])];
-      const geometries = new Set(), materials = new Set();
-      for (const object of removed) {
-        object.removeFromParent();
-        object.traverse(node => {
-          if (node.isMesh) {
-            geometries.add(node.geometry);
-            for (const material of [node.material].flat()) materials.add(material);
-          }
-        });
-      }
-      geometries.forEach(geometry => geometry.dispose());
-      materials.forEach(material => material.dispose());
-      this.beaconLights = this.beaconLights.filter(light => !oldBeacons.has(light));
+      const buildings = createAirportBuildings(kit, this);
       buildings.beacon.visible = this.localLightsVisible !== false;
       this.beaconLights.push(buildings.beacon);
       this.towerGroup = buildings.tower;
@@ -91,11 +73,11 @@ export class Airport {
       this.buildings = buildings;
       this.group.add(buildings.group);
       this.nightLighting?.illuminateWindows(buildings.group);
+      this.buildingsError = null;
       return true;
     } catch (error) {
-      // Keep the complete synchronous airport when offline or when the kit is invalid.
       this.buildingsError = error;
-      console.warn('Airport building kit unavailable; keeping procedural buildings.', error);
+      console.error('Airport building kit unavailable', error);
       return false;
     }
   }
@@ -103,25 +85,6 @@ export class Airport {
   initAirport() {
     // Materials with hardware polygon offset to guarantee zero Z-fighting with terrain
     const asphaltMat = createPavementMaterial('asphalt');
-
-    const concreteMat = applyLogDepthOffset(new THREE.MeshStandardMaterial({
-      color: 0x94a3b8,
-      roughness: 0.75,
-      metalness: 0.2,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1
-    }), 1);
-    applyFarSunShadow(concreteMat);
-
-    const towerGlassMat = new THREE.MeshStandardMaterial({
-      name: 'tower-window-glass',
-      color: 0x38bdf8,
-      roughness: 0.1,
-      metalness: 0.85,
-      transparent: true,
-      opacity: 0.75
-    });
 
     // 1. Runway Surface & Markings
     this.buildRunway(asphaltMat);
@@ -132,11 +95,6 @@ export class Airport {
     // 3. Airfield Lighting (Edge Lights, Threshold, ALS Strobes, PAPI)
     this.buildLighting();
 
-    // 4. Airport Control Tower with Rotating Radar
-    this.buildControlTower(concreteMat, towerGlassMat);
-
-    // 5. Terminal Buildings & Hangars
-    this.buildTerminal(concreteMat);
   }
 
   buildRunway(asphaltMat) {
@@ -454,119 +412,6 @@ export class Airport {
     this.group.add(this.lightingGroup);
   }
 
-  buildControlTower(concreteMat, glassMat) {
-    this.towerGroup = new THREE.Group();
-    this.towerGroup.position.set(120, this.elevation, 280); // Beside apron
-
-    // Tower Shaft (62m tall hexagonal/cylindrical column)
-    const shaftGeo = new THREE.CylinderGeometry(4.5, 7.5, 60.0, 12);
-    const shaft = new THREE.Mesh(shaftGeo, concreteMat);
-    shaft.position.y = 30.0;
-    shaft.castShadow = true;
-    shaft.receiveShadow = true;
-    this.towerGroup.add(shaft);
-
-    // Cantilevered Observation Deck Floor
-    const deckGeo = new THREE.CylinderGeometry(9.5, 5.5, 4.0, 16);
-    const deck = new THREE.Mesh(deckGeo, concreteMat);
-    deck.position.y = 62.0;
-    deck.castShadow = true;
-    deck.receiveShadow = true;
-    this.towerGroup.add(deck);
-
-    // 360-Degree Canted Glass Cab
-    const cabGeo = new THREE.CylinderGeometry(10.5, 9.2, 5.5, 16, 1, true);
-    const cab = new THREE.Mesh(cabGeo, glassMat);
-    cab.position.y = 66.5;
-    cab.castShadow = true;
-    cab.receiveShadow = true;
-    this.towerGroup.add(cab);
-
-    // Tower Roof & Radome
-    const roofGeo = new THREE.ConeGeometry(10.6, 2.5, 16);
-    const roof = new THREE.Mesh(roofGeo, concreteMat);
-    roof.position.y = 70.0;
-    roof.castShadow = true;
-    roof.receiveShadow = true;
-    this.towerGroup.add(roof);
-
-    // Roof Antenna Mast
-    const mastGeo = new THREE.CylinderGeometry(0.2, 0.35, 12.0, 8);
-    const mast = new THREE.Mesh(mastGeo, new THREE.MeshStandardMaterial({ color: 0xdd2222 }));
-    mast.position.y = 77.0;
-    mast.castShadow = true;
-    this.towerGroup.add(mast);
-
-    // Red Hazard Obstruction Beacon on Mast Tip
-    const towerBeacon = new THREE.PointLight(0xff0000, 3.5, 60);
-    towerBeacon.position.set(0, 83.0, 0);
-    this.towerGroup.add(towerBeacon);
-    this.beaconLights.push(towerBeacon);
-
-    // Actively Rotating Airport Surveillance Radar Dish
-    this.radarDish = new THREE.Group();
-    this.radarDish.position.set(0, 72.5, 0);
-
-    const dishCurved = new THREE.Mesh(
-      new THREE.CylinderGeometry(2.8, 2.8, 1.2, 16, 1, false, 0, Math.PI),
-      new THREE.MeshStandardMaterial({ color: 0xff6600, metalness: 0.6 })
-    );
-    dishCurved.rotation.x = Math.PI * 0.5;
-    dishCurved.castShadow = true;
-    this.radarDish.add(dishCurved);
-
-    this.towerGroup.add(this.radarDish);
-    this.group.add(this.towerGroup);
-  }
-
-  buildTerminal(concreteMat) {
-    const termGroup = new THREE.Group();
-    this.terminalGroup = termGroup;
-    termGroup.position.set(-80, this.elevation, 340);
-
-    // Main Terminal Concourse (Length 350m, Depth 70m, Height 18m)
-    const concourseGeo = new THREE.BoxGeometry(350, 18, 70);
-    const termMesh = new THREE.Mesh(concourseGeo, concreteMat);
-    termMesh.position.y = 9;
-    termMesh.castShadow = true;
-    termMesh.receiveShadow = true;
-    termGroup.add(termMesh);
-
-    // Terminal Glass Curtain Wall
-    const glassWallMat = new THREE.MeshStandardMaterial({ name: 'terminal-window-glass', color: 0x38bdf8, roughness: 0.2, metalness: 0.8 });
-    const wallGeo = new THREE.BoxGeometry(340, 12, 2);
-    const glassWall = new THREE.Mesh(wallGeo, glassWallMat);
-    glassWall.position.set(0, 9, -34);
-    glassWall.castShadow = true;
-    termGroup.add(glassWall);
-
-    // 4 Passenger Jet Bridges
-    const bridgeGeo = new THREE.BoxGeometry(8, 4.5, 28);
-    for (let b = -120; b <= 120; b += 80) {
-      const bridge = new THREE.Mesh(bridgeGeo, concreteMat);
-      bridge.position.set(b, 7, -46);
-      bridge.castShadow = true;
-      bridge.receiveShadow = true;
-      termGroup.add(bridge);
-    }
-
-    // Aircraft Maintenance Hangars (Two large curved hangars at x = -500)
-    const hangarGeo = new THREE.CylinderGeometry(35, 35, 90, 16, 1, false, 0, Math.PI);
-    hangarGeo.rotateZ(Math.PI * 0.5);
-    const hangarMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5, metalness: 0.6 });
-
-    const hangar1 = new THREE.Mesh(hangarGeo, hangarMat);
-    hangar1.position.set(-370, 0, -30);
-    hangar1.castShadow = true;
-    hangar1.receiveShadow = true;
-    const hangar2 = new THREE.Mesh(hangarGeo, hangarMat);
-    hangar2.position.set(-500, 0, -30);
-    hangar2.castShadow = true;
-    hangar2.receiveShadow = true;
-
-    termGroup.add(hangar1, hangar2);
-    this.group.add(termGroup);
-  }
 
   getGazeTargets() {
     const targets = [];

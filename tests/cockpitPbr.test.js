@@ -122,7 +122,7 @@ describe('Cockpit GLTF Interior System', () => {
     assert.strictEqual(cockpit.gltfGlassPanels[0].material.depthWrite, false);
   });
 
-  it('reports the interior as loading, then as failed once both GLB assets are unavailable', (t) => {
+  it('reports the interior as loading, then as failed when the GLB is unavailable', (t) => {
     const cockpit = new Cockpit(...createCanvases());
     const requested = [];
     let loadError;
@@ -130,22 +130,17 @@ describe('Cockpit GLTF Interior System', () => {
       requested.push(url);
       loadError = onError;
     });
-    t.mock.method(console, 'warn', () => {});
+    t.mock.method(console, 'error', () => {});
     const previousWindow = globalThis.window;
     globalThis.window = {};
     try {
-      cockpit.loadCockpitModel('/models/b737-cockpit-medium.glb');
+      cockpit.loadCockpitModel();
       assert.strictEqual(cockpit.cockpitModelLoading, true, 'A download in flight must be visible to the camera');
       assert.strictEqual(cockpit.gltfCockpitLoaded, false);
+      assert.deepEqual(requested, ['/models/b737-cockpit-medium.glb']);
 
-      // Medium asset failure retries the Draco lite asset: still downloading.
-      loadError(new Error('medium asset unavailable'));
-      assert.strictEqual(cockpit.cockpitModelLoading, true);
-      assert.strictEqual(cockpit.cockpitModelFailed, false);
-      assert.strictEqual(requested.length, 2);
-
-      // Draco retry fails too: no interior exists to show.
-      loadError(new Error('draco asset unavailable'));
+      loadError(new Error('cockpit GLB unavailable'));
+      assert.deepEqual(requested, ['/models/b737-cockpit-medium.glb'], 'A failed GLB is not retried');
       assert.strictEqual(cockpit.cockpitModelLoading, false);
       assert.strictEqual(cockpit.gltfCockpitLoaded, false);
       assert.strictEqual(cockpit.cockpitModelFailed, true,
@@ -203,14 +198,10 @@ describe('Cockpit GLTF Interior System', () => {
     }
   });
 
-  it('should verify optimized 3D GLB models (balanced & lite) and Draco decoder assets exist in public/', () => {
-    const dracoPath = path.resolve(process.cwd(), 'public/models/b737-cockpit-draco.glb');
+  it('should verify the optimized 3D GLB model and Draco decoder assets exist in public/', () => {
     const mediumPath = path.resolve(process.cwd(), 'public/models/b737-cockpit-medium.glb');
-    assert.ok(fs.existsSync(dracoPath), 'Optimized Draco lite GLB model must exist in public/models/');
     assert.ok(fs.existsSync(mediumPath), 'Balanced medium GLB model must exist in public/models/');
-    const dracoStats = fs.statSync(dracoPath);
     const mediumStats = fs.statSync(mediumPath);
-    assert.ok(dracoStats.size > 1024 * 1024 && dracoStats.size < 5 * 1024 * 1024);
     assert.ok(mediumStats.size > 1024 * 1024 && mediumStats.size < 6 * 1024 * 1024);
 
     const dracoFiles = ['draco_decoder.wasm', 'draco_decoder.js', 'draco_wasm_wrapper.js'];

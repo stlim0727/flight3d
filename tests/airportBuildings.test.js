@@ -66,16 +66,30 @@ test('world bounds match tower cylinder, building AABBs and runway clearance', (
   assert.equal(ray.intersectObject(buildings.tower, true).length, 0, 'runway threshold sightline');
 });
 
-test('failed loading preserves fallback; successful replacement binds animation only once', async () => {
-  const airport = new TestAirport(), fallback = airport.towerGroup;
-  const warn = console.warn; console.warn = () => {};
+test('GLB failure leaves no buildings; success binds animation only once', async () => {
+  const airport = new TestAirport();
+  assert.equal(airport.towerGroup, null);
+  assert.equal(airport.terminalGroup, null);
+  assert.equal(airport.radarDish, null);
+  assert.deepEqual(airport.beaconLights, []);
+  assert.equal(airport.group.getObjectByName('airport-buildings-glb'), undefined);
+  const error = console.error; console.error = () => {};
   try {
     assert.equal(await Airport.prototype.loadBuildings.call(airport, async () => { throw Error('offline'); }), false);
+    assert.ok(airport.buildingsError instanceof Error);
     assert.equal(await Airport.prototype.loadBuildings.call(airport, async () => new T.Group()), false);
-  } finally { console.warn = warn; }
-  assert.strictEqual(airport.towerGroup, fallback); assert.ok(fallback.parent);
+  } finally { console.error = error; }
+  assert.equal(airport.towerGroup, null);
+  assert.equal(airport.terminalGroup, null);
+  assert.equal(airport.radarDish, null);
+  assert.deepEqual(airport.beaconLights, []);
+  assert.equal(airport.buildings, undefined);
+  assert.equal(airport.group.getObjectByName('airport-buildings-glb'), undefined);
   assert.equal(await Airport.prototype.loadBuildings.call(airport, async () => kit), true);
-  assert.equal(fallback.parent, null); assert.equal(airport.beaconLights.length, 1);
+  const buildings = airport.buildings;
+  assert.equal(buildings.group.parent, airport.group);
+  assert.equal(airport.towerGroup, buildings.tower);
+  assert.equal(airport.beaconLights.length, 1);
   const radar = airport.radarDish;
   for (const dt of [.5, 0, .5]) airport.update(dt);
   assert.ok(Math.abs(radar.rotation.y - 1.8) < 1e-8);

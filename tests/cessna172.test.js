@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Cessna172 } from '../src/aircraft/Cessna172.js';
 import { CESSNA_172, BOEING_737_800 } from '../src/config/aircraftConfigs.js';
 import { CollisionDetector, C172_COLLISION_PROBES, B738_COLLISION_PROBES } from '../src/physics/CollisionDetector.js';
@@ -11,93 +12,39 @@ import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 
 describe('Cessna 172 Skyhawk Aircraft Model', () => {
-  it('should initialize procedural hierarchy with all subassemblies', () => {
+  it('should initialize the GLB container, lights and cockpit interface', () => {
     const c172 = new Cessna172();
     assert.ok(c172.group instanceof THREE.Group);
     assert.strictEqual(c172.group.name, 'Aircraft_Cessna172');
+    assert.ok(c172.gltfGroup instanceof THREE.Group, 'GLB container must exist');
+    assert.strictEqual(c172.gltfGroup.name, 'GLTF_Cessna172');
+    assert.strictEqual(c172.modelLoaded, false, 'GLB has not loaded yet');
+    assert.ok(c172.lightsGroup, 'Lights group must exist');
+    assert.strictEqual(c172.lightsGroup.parent, c172.group, 'Lights group must be child of root group');
+    assert.ok(c172.cockpit, 'Cockpit interface must exist for camera integration');
+    assert.strictEqual(c172.proceduralGroup, undefined, 'No procedural airframe may exist');
     assert.doesNotThrow(() => c172.cockpit.syncLighting({ sunPosition: new THREE.Vector3(0, 1, 0) }, new THREE.Quaternion(), 1 / 60),
       'Main-loop lighting updates must remain compatible with aircraft without an interior');
-
-    assert.ok(c172.fuselageGroup, 'Fuselage group must exist');
-    assert.ok(c172.wingGroup, 'High-wing group must exist');
-    assert.ok(c172.tailGroup, 'Tail empennage group must exist');
-    assert.ok(c172.gearGroup, 'Landing gear group must exist');
-    assert.ok(c172.propellerGroup, 'Propeller group must exist');
-    assert.ok(c172.lightsGroup, 'Lights group must exist');
-    assert.strictEqual(c172.lightsGroup.parent, c172.group, 'Lights group must be child of root group to persist across model changes');
-    assert.ok(c172.cockpit, 'Cockpit interface must exist for engine compatibility');
   });
 
-  it('should have all articulated control surfaces and steerable gear', () => {
+  it('should spin the GLB propeller without a procedural blur disk', () => {
     const c172 = new Cessna172();
-    assert.ok(c172.aileronL, 'Left aileron exists');
-    assert.ok(c172.aileronR, 'Right aileron exists');
-    assert.ok(c172.flapL, 'Left flap exists');
-    assert.ok(c172.flapR, 'Right flap exists');
-    assert.ok(c172.elevatorL, 'Left elevator exists');
-    assert.ok(c172.elevatorR, 'Right elevator exists');
-    assert.ok(c172.rudder, 'Rudder exists');
-    assert.ok(c172.noseFork, 'Steerable nose fork exists');
-  });
-
-  it('should animate propeller spin and blur disk based on engine state', () => {
-    const c172 = new Cessna172();
-    const initialAngle = c172.propAngle;
-
-    // Simulate idle running
+    const prop = new THREE.Group();
+    c172.gltfPropellers = [prop];
     c172.update(0.1, { engine1: { n1: 30.0 } });
-    assert.ok(c172.propAngle > initialAngle, 'Propeller spins forward during engine idle');
-    assert.strictEqual(c172.propBlurDisk.material.opacity, 0.0, 'Blur disk is transparent at low RPM');
-
-    // Simulate full throttle (TOGA 100% N1)
-    for (let i = 0; i < 10; i++) {
-      c172.update(0.1, { engine1: { n1: 100.0 } });
-    }
-    assert.ok(c172.propBlurDisk.material.opacity > 0.1, 'Blur disk fades in at high RPM');
+    assert.ok(prop.rotation.z > 0, 'GLB propeller must rotate from engine RPM');
+    assert.strictEqual(c172.propBlurDisk, undefined, 'No procedural blur disk may exist');
   });
 
-  it('should deflect ailerons, elevators, rudder, and flaps according to flight controls', () => {
+  it('should toggle cockpit mode while keeping the unified GLB visible', () => {
     const c172 = new Cessna172();
-
-    // Command right bank (aileron = 1.0)
-    c172.update(0.016, { aileron: 1.0, elevator: 0.0, rudder: 0.0, flapDegree: 0 });
-    assert.ok(c172.aileronL.rotation.x > 0, 'Left aileron deflects down (+X) to increase lift');
-    assert.ok(c172.aileronR.rotation.x < 0, 'Right aileron deflects up (-X) to dump lift');
-
-    // Command pitch up (stick back, elevator = 1.0)
-    c172.update(0.016, { aileron: 0.0, elevator: 1.0, rudder: 0.0, flapDegree: 0 });
-    assert.ok(c172.elevatorL.rotation.x < 0, 'Elevator deflects up for pitch up');
-    assert.ok(c172.elevatorR.rotation.x < 0, 'Right elevator tracks left elevator');
-
-    // Command right yaw (rudder = 1.0)
-    c172.update(0.016, { aileron: 0.0, elevator: 0.0, rudder: 1.0, flapDegree: 0 });
-    assert.ok(c172.rudder.rotation.y < 0, 'Rudder deflects trailing edge left');
-
-    // Command flaps 20 degrees
-    c172.update(0.016, { aileron: 0.0, elevator: 0.0, rudder: 0.0, flapDegree: 20 });
-    assert.ok(c172.flapL.rotation.x > 0.3, 'Flap L deploys downward');
-    assert.ok(c172.flapR.rotation.x > 0.3, 'Flap R deploys downward');
-
-    // Steer nose wheel on ground
-    c172.update(0.016, { rudder: 1.0, onGround: true });
-    assert.ok(Math.abs(c172.noseFork.rotation.y) > 0.1, 'Nose gear steers with rudder on ground');
-
-    // Nose wheel centers in the air
-    c172.update(0.016, { rudder: 1.0, onGround: false });
-    assert.strictEqual(c172.noseFork.rotation.y, 0, 'Nose gear centers when airborne');
-  });
-
-  it('should toggle cockpit mode cleanly and prevent interior clipping', () => {
-    const c172 = new Cessna172();
-    assert.strictEqual(c172.fuselageGroup.visible, true);
-
     c172.setCockpitMode(true, true);
-    assert.strictEqual(c172.fuselageGroup.visible, false, 'Fuselage exterior hidden in cockpit view');
-    assert.strictEqual(c172.cockpit.group.visible, true, 'Cockpit interior shown in cockpit view');
+    assert.strictEqual(c172.gltfGroup.visible, true, 'GLB holds both exterior and 3D cockpit');
+    assert.strictEqual(c172.cockpit.group.visible, true, 'Cockpit instruments shown in cockpit view');
 
     c172.setCockpitMode(false, false);
-    assert.strictEqual(c172.fuselageGroup.visible, true, 'Fuselage exterior restored in exterior view');
-    assert.strictEqual(c172.cockpit.group.visible, false, 'Cockpit interior hidden in exterior view');
+    assert.strictEqual(c172.gltfGroup.visible, true, 'GLB exterior stays visible in chase view');
+    assert.strictEqual(c172.cockpit.group.visible, false, 'Cockpit instruments hidden in exterior view');
   });
 
   it('should manage crash visuals and light state', () => {
@@ -264,17 +211,52 @@ describe('Cessna 172 Skyhawk Aircraft Model', () => {
     assert.strictEqual(c172.ndCanvas, fakeNd);
   });
 
-  it('should exclude transparent windshield and window panes from casting shadows', () => {
+  it('should exclude transparent GLB window panes from casting shadows', (t) => {
     const c172 = new Cessna172();
-    let transparentGlassCount = 0;
-    c172.proceduralGroup.traverse(child => {
-      if (child.isMesh && (child.material.transparent || child.material.opacity < 0.95)) {
-        transparentGlassCount++;
-        assert.strictEqual(child.castShadow, false, 'Transparent glass must not cast shadow');
-        assert.strictEqual(child.receiveShadow, false, 'Transparent glass must not receive shadow');
-      }
-    });
-    assert.ok(transparentGlassCount > 0, 'Found procedural window glass meshes');
+    const scene = new THREE.Group();
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ name: 'Window', transparent: true, opacity: 0.2 }));
+    const skin = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+    scene.add(glass, skin);
+    let completeLoad;
+    t.mock.method(GLTFLoader.prototype, 'load', (_url, onLoad) => { completeLoad = onLoad; });
+    const previousWindow = globalThis.window;
+    globalThis.window = {};
+    try {
+      c172.loadGltfModel('/test.glb');
+      completeLoad({ scene });
+      assert.strictEqual(glass.castShadow, false, 'Transparent glass must not cast shadow');
+      assert.strictEqual(glass.receiveShadow, false, 'Transparent glass must not receive shadow');
+      assert.strictEqual(skin.castShadow, true, 'Opaque GLB skin must cast shadow');
+      assert.strictEqual(c172.modelLoaded, true);
+      assert.strictEqual(c172.cockpit.cockpitModelFailed, false);
+    } finally {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
+    }
+  });
+
+  it('reports a failed GLB load without revealing a procedural airframe', async (t) => {
+    const c172 = new Cessna172();
+    let failLoad;
+    t.mock.method(GLTFLoader.prototype, 'load', (_url, _onLoad, _onProgress, onError) => { failLoad = onError; });
+    const errors = [];
+    t.mock.method(console, 'error', (...args) => errors.push(args));
+    const previousWindow = globalThis.window;
+    globalThis.window = {};
+    try {
+      c172.loadGltfModel('/missing.glb');
+      assert.strictEqual(c172.loadingGltf, true);
+      failLoad(new Error('Network error'));
+      await c172.ready;
+      assert.strictEqual(c172.loadingGltf, false);
+      assert.strictEqual(c172.modelLoaded, false);
+      assert.strictEqual(c172.gltfGroup.children.length, 0, 'No procedural airframe may appear');
+      assert.strictEqual(c172.cockpit.cockpitModelFailed, true, 'Camera must still learn that no 3D cockpit arrived');
+      assert.ok(errors.some(args => String(args[0]).includes('GLB model failed')), 'The load error must be reported');
+    } finally {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
+    }
   });
 
   it('should keep cockpit group visible in cockpit mode even if showInterior is false', () => {

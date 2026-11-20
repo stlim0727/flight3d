@@ -35,8 +35,8 @@ damping, friction and moments use local terrain normals. The old fixed gear-down
 height floor no longer holds failed aircraft above the runway.
 
 Support patches follow the loaded GLB's lower envelope (including the long
-belly, nacelle front/rear and wing sweep); the procedural fallback has a separate
-profile. Each part shares its stiffness/damping across its patches. After
+belly, nacelle front/rear and wing sweep). Each part shares its stiffness/damping
+across its patches. After
 integration, a unilateral position/normal-velocity constraint limits support-point
 penetration to **4 cm**, including after a fatal crash. It uses body inertia and
 surface normals, never animates pitch/roll, and cancels only closing velocity.

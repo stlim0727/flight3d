@@ -34,7 +34,7 @@ export function createHeadlessSimulation({ aircraftId = 'B738', airportId = 'coa
     currentTerrain: terrain, currentAirport: airport, activeAirport: airportId,
     currentAircraftId: aircraftId, currentAircraftConfig: config,
     controls: new ControlsWithoutDom(null, { getGamepads: () => [] }),
-    aircraft: { group: new THREE.Group(), useGltf: true },
+    aircraft: { group: new THREE.Group() },
     autopilot: { master: false, annunciation() { return ''; }, reset() { this.master = false; }, disengage() { this.master = false; } },
     cameraSystem: { autoPaused: true, snapToTarget() {} },
     flightWarnings: { reset() {}, update() { return []; } },

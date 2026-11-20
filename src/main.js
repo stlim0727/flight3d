@@ -1409,8 +1409,8 @@ class FlightSimulator {
           pixelRatio: this.renderer.getPixelRatio(), width: this.renderer.domElement.width,
           height: this.renderer.domElement.height, isMultiplayer: Boolean(this.multiplayer?.active) } : null);
     const frameDelta = this.startupReady ? clampFrameDelta(elapsed) : 0;
-    // Also covers model swaps and failed-load procedural fallbacks. Preparation
-    // precedes physics so the first impact after loading can reuse the fragments.
+    // Also covers model swaps. Preparation precedes physics so the first impact
+    // after loading can reuse the fragments.
     if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-crash-start');
     this.prepareCrashVisuals();
     if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-crash-end');

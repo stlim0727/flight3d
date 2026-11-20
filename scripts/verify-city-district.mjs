@@ -185,18 +185,28 @@ try {
   await send('Network.enable');
   await send('Network.setBlockedURLs', { urls: ['*district-kit.glb*'] });
   const fallback = await evaluate(async () => {
+    const { T } = window.review;
     const { FoliageAndCities } = await import('/src/environment/FoliageAndCities.js');
     const city = new FoliageAndCities(window.review.terrain, () => .5);
     const loaded = await city.districtReady;
-    return { loaded, districtBuildings: city.buildingData.filter(b => b.archetype >= 3).length,
+    city.updateCityLod(new T.Vector3(-800, 100, -2800));
+    const districts = city.cityArchetypes.slice(3);
+    return { loaded, error: Boolean(city.districtError), districtLoaded: Boolean(city.districtLoaded),
+      districtBuildings: city.buildingData.filter(b => b.archetype >= 3).length,
       northBuildings: city.buildingData.filter(b => b.district === 'north').length,
-      usesFallback: city.cityArchetypes.slice(3).every(b => b.near.material === city.cityAssets.nearMaterial) };
+      near: districts.map(a => a.near.count),
+      northRecords: districts.map(a => a.records.filter(r => r.district === 'north').length),
+      far: districts.map(a => a.far.count),
+      totalRecords: districts.map(a => a.records.length) };
   });
   await send('Network.setBlockedURLs', { urls: [] });
   assert.equal(fallback.loaded, false);
+  assert.equal(fallback.districtLoaded, false);
+  assert.ok(fallback.error);
   assert.equal(fallback.districtBuildings, 110 + fallback.northBuildings);
   assert.ok(fallback.northBuildings > 0);
-  assert.ok(fallback.usesFallback);
+  assert.deepEqual(fallback.near, fallback.northRecords, 'south district near geometry absent');
+  assert.deepEqual(fallback.far, fallback.totalRecords, 'far boxes and collision metadata retained');
   const sequences = await evaluate(async () => {
     const { T, after: city, terrain, renderer, scene, camera } = window.review;
     const { CollisionDetector } = await import('/src/physics/CollisionDetector.js');

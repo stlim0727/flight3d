@@ -58,8 +58,7 @@ try {
     await new Promise(r => setTimeout(r,100));
   }
   assert.ok(await evaluate(() => Boolean(window.modules)), 'Review modules loaded');
-  for (const variant of ['before','after','lite']) {
-    await call('Network.setBlockedURLs', {urls:variant === 'lite' ? ['*b737-cockpit-medium.glb'] : []});
+  for (const variant of ['before', 'after']) {
     const report = await evaluate(async variant => {
       const {T,Before,After,canvases:Types} = window.modules;
       document.body.replaceChildren();
@@ -139,7 +138,9 @@ try {
   }
   assert.deepEqual(exceptions,[], 'No page exceptions');
   results.pageErrors=exceptions;
-  results.assets=['medium','draco'].map(name=>{const bytes=fs.readFileSync(`public/models/b737-cockpit-${name}.glb`);return {name,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')};});
+  const mediumBytes = fs.readFileSync('public/models/b737-cockpit-medium.glb');
+  results.assets = [{ name: 'medium', bytes: mediumBytes.length,
+    sha256: createHash('sha256').update(mediumBytes).digest('hex') }];
   fs.writeFileSync(path.join(dir,'results.json'),JSON.stringify(results,null,2)+'\n');
   console.log(JSON.stringify(results,null,2));
 } finally { ws.close(); }

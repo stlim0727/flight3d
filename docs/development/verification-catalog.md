@@ -13,8 +13,9 @@ The exterior asset stays unchanged: `GltfControlSurfaces.js` clips its batched
 triangles into seven moving surfaces in the `B737` mesh's local coordinates.
 Hinge measurements are specific to `public/models/b737-800.glb`; remeasure them
 and rerun the geometry and browser checks if that asset changes. Landing gear
-and the procedural fallback remain independent. The cockpit shadow proxy retains
-the original neutral geometry, so its silhouette does not animate with controls.
+remains independent of exterior control-surface clipping. The cockpit shadow
+proxy retains the original neutral geometry, so its silhouette does not animate
+with controls.
 
 For rendering/input evidence, start the Vite server and launch Chromium with CDP on port 9447, then run `node scripts/verify-control-surfaces.mjs`. Output goes to `.cache/control-surfaces/` (override with `ARTIFACT_DIR`).
 
@@ -28,8 +29,8 @@ neutral release on the real asset.
 
 ### Landing gear geometry acceptance
 
-`node scripts/test-gear-retraction.mjs --gpu` renders the loaded airframe and
-procedural fallback from above, directly below, the side, and close-up at five gear states.
+`node scripts/test-gear-retraction.mjs --gpu` renders the loaded airframe from
+above, directly below, the side, and close-up at five gear states.
 It checks full cycles, reversal, and main-strut coaxiality through compression
 and release, and writes captures/results to `.tmp/gear-retraction`. Add `--animation` with an installed FFmpeg (or `FFMPEG_PATH`) for synchronized above/below full-cycle WebM evidence.
 
@@ -47,7 +48,7 @@ EXPERIMENT=direct APP_URL=http://127.0.0.1:5173/ chrome-session --project flight
 
 `node scripts/verify-cockpit-stutter.mjs` checks the loaded model's batch count,
 control reset/yoke visibility, alternating display redraws, dirty MCP/CDU updates,
-and forced refresh during deterministic stepping (`CDP_PORT=9451`, `FALLBACK=1` for Draco).
+and forced refresh during deterministic stepping (`CDP_PORT=9451`).
 
 ### Reused sun shadow map
 

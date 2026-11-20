@@ -10,6 +10,8 @@ import { Cockpit } from '../src/aircraft/Cockpit.js';
 import { loadCockpitGeometry } from '../scripts/lib/load-cockpit-geometry.mjs';
 import { batchStaticCockpit } from '../src/aircraft/StaticCockpitBatch.js';
 
+const variant = 'medium';
+
 it('converges to the analytical two-patch radiosity solution, including repeated bounces', () => {
   const result = solveTransfer([.2, 0], [[[1, .5]], [[0, .5]]], [.5, .5], 1, 1e-10);
   assert.ok(Math.abs(result.values[0] - .2 / (1 - .25 ** 2)) < 1e-9);
@@ -99,7 +101,7 @@ it('binds front/back receivers after batching independently of the aircraft worl
   transfer.dispose();
 });
 
-for (const variant of ['medium', 'draco']) it(`ships a finite, current, checksum-verified ${variant} bake`, () => {
+it(`ships a finite, current, checksum-verified ${variant} bake`, () => {
   const manifest = JSON.parse(fs.readFileSync(`public/lighting/cockpit-${variant}.json`));
   const bytes = fs.readFileSync(`public/lighting/cockpit-${variant}.bin`);
   const hash = data => createHash('sha256').update(data).digest('hex');
@@ -162,7 +164,7 @@ function verifyBakeAndBindingChecksums(variant) {
 // The 98% gate in bind() tolerates a few percent of vertices sampling the black
 // sentinel row; on the 737 they all landed adjacent on the ceiling liner and read
 // as jagged black blotches. Every vertex the runtime binds must have a baked cell.
-for (const variant of ['medium', 'draco']) it(`bakes a receiver for every ${variant} cockpit vertex the runtime binds`, async () => {
+it(`bakes a receiver for every ${variant} cockpit vertex the runtime binds`, async () => {
   if (!RUN_FULL_DRACO_DECODE) {
     verifyBakeAndBindingChecksums(variant);
     return;
@@ -187,7 +189,7 @@ it('smoothTransport bridges a 100x cell-to-cell cliff without inventing energy',
 
 // Compare every precomputed float with the original world-space receiver lookup.
 // This also detects stale geometry/control/batching inputs without GPU rendering.
-for (const variant of ['medium', 'draco']) it(`precomputed ${variant} binding exactly matches runtime lookup`, async () => {
+it(`precomputed ${variant} binding exactly matches runtime lookup`, async () => {
   const { gunzipSync } = await import('node:zlib');
   const { manifest, binding, compressed } = verifyBakeAndBindingChecksums(variant);
   const bytes = gunzipSync(compressed);

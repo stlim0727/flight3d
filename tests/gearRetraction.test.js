@@ -14,14 +14,7 @@ if (typeof document === 'undefined') {
 }
 
 const canvas = { getContext: () => null, canvas: {} };
-const makeAircraft = (profile = 'fallback') => {
-  const aircraft = new Boeing737(canvas, canvas, canvas);
-  if (profile === 'loaded') {
-    aircraft.group.remove(aircraft.gearGroup);
-    aircraft.buildLandingGear('loaded');
-  }
-  return aircraft;
-};
+const makeAircraft = () => new Boeing737(canvas, canvas, canvas);
 const bounds = object => new THREE.Box3().setFromObject(object);
 const wheelsOf = truck => truck.userData.wheels || truck.children.filter(child => child.isGroup).slice(0, 2);
 const pose = (aircraft, state) => {
@@ -29,9 +22,9 @@ const pose = (aircraft, state) => {
   aircraft.group.updateMatrixWorld(true);
 };
 
-for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retraction (${profile})`, () => {
+describe('Rigid landing gear retraction', () => {
   it('keeps dimensions and fixed door hinges through a full cycle and mid-cycle reversal', () => {
-    const aircraft = makeAircraft(profile);
+    const aircraft = makeAircraft();
     const legs = [aircraft.noseGearGroup, aircraft.mainGearLGroup, aircraft.mainGearRGroup];
     const hinges = aircraft.gearDoors.map(({ obj }) => obj.position.clone());
     const wheel = wheelsOf(aircraft.mainTruckL)[0];
@@ -51,7 +44,7 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
       // behind the engines, and on its own side of the aircraft.
       for (const [leg, side] of [[legs[1], -1], [legs[2], 1]]) {
         const box = bounds(leg);
-        assert.ok(box.max.y < (profile === 'loaded' ? -0.90 : -0.40), `wing clearance at state ${state}`);
+        assert.ok(box.max.y < -0.90, `wing clearance at state ${state}`);
         assert.ok(box.min.z > -0.2, `engine clearance at state ${state}`);
         assert.ok(side < 0 ? box.max.x < 0 : box.min.x > 0, 'legs must not cross the centerline');
       }
@@ -62,7 +55,7 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
   });
 
   it('folds main wheels inward and preserves every extended axle center and loaded tire clearance', () => {
-    const aircraft = makeAircraft(profile);
+    const aircraft = makeAircraft();
     const physics = new LandingGear();
     const trucks = [aircraft.noseTruck, aircraft.mainTruckL, aircraft.mainTruckR];
     for (const compression of [0, 0.3, 0.9, 0]) {
@@ -87,7 +80,7 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
   });
 
   it('keeps piston and housing coaxial through compression and release without moving wheel contacts sideways', () => {
-    const aircraft = makeAircraft(profile), physics = new LandingGear();
+    const aircraft = makeAircraft(), physics = new LandingGear();
     aircraft.group.position.set(12, 34, -56); aircraft.group.rotation.set(0.1, 0.25, -0.15);
     for (const compression of [0, 0.25, 0.7, 0.9, 0.3, 0]) {
       aircraft.update(1 / 120, { gearState: 1, compressions: { mainLeft: compression, mainRight: compression } });
@@ -117,7 +110,7 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
   });
 
   it('stows exposed tire faces without exterior main-gear covers', () => {
-    const aircraft = makeAircraft(profile); pose(aircraft, 0);
+    const aircraft = makeAircraft(); pose(aircraft, 0);
     assert.equal(aircraft.gearDoors.length, 2, 'only nose doors remain');
     for (const [truck, side] of [[aircraft.mainTruckL, -1], [aircraft.mainTruckR, 1]]) {
       const wheels = wheelsOf(truck);
@@ -135,7 +128,7 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
   });
 
   it('contains the stowed nose assembly behind its closed doors', () => {
-    const aircraft = makeAircraft(profile);
+    const aircraft = makeAircraft();
     pose(aircraft, 0);
     const panels = aircraft.gearDoors.map(({ obj }) => obj.children[0]);
     const ray = new THREE.Raycaster();
@@ -159,7 +152,7 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
   });
 
   it('opens doors before folding and keeps them open until the nose leg is deployed', () => {
-    const aircraft = makeAircraft(profile);
+    const aircraft = makeAircraft();
     pose(aircraft, 0.18);
     assert.equal(Math.abs(aircraft.noseGearGroup.rotation.x), Math.PI / 2);
     for (const { obj, maxAngle } of aircraft.gearDoors) assert.equal(Math.abs(obj.rotation.z), maxAngle);
@@ -174,10 +167,7 @@ for (const profile of ['fallback', 'loaded']) describe(`Rigid landing gear retra
     const loader = new GLTFLoader();
     loader.register(() => ({ name: 'GEOMETRY_ONLY_TEST', loadTexture: () => Promise.resolve(null) }));
     const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
-    const aircraft = makeAircraft(profile);
-    if (profile !== 'loaded') {
-      aircraft.group.remove(aircraft.gearGroup); aircraft.buildLandingGear('loaded');
-    }
+    const aircraft = makeAircraft();
     aircraft.gltfModel = gltf.scene;
     aircraft.gltfModel.rotation.y = Math.PI / 2;
     aircraft.gltfGroup.add(aircraft.gltfModel);

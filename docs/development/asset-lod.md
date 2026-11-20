@@ -30,7 +30,6 @@ npm run build:lod
 
 | Source | Source size / tris | LOD size / tris | Payload gain |
 | --- | --- | --- | --- |
-| `b737-cockpit-draco.glb` | 2.12 MB / 832,427 | 1.03 MB / 387,349 | 51.5% |
 | `b737-cockpit-medium.glb` | 3.66 MB / 964,844 | 2.23 MB / 357,284 | 39.1% |
 | `f-16.glb` | 5.25 MB / 30,272 | 3.99 MB / 11,801 | 24.0% |
 | `c172.glb` (skipped) | 7.91 MB / 187,453 | 7.17 MB / 21,121 | 9.4% |
@@ -38,14 +37,14 @@ npm run build:lod
 `c172.glb` is texture-bound: 7.2 MB of its 7.9 MB are textures, so mesh
 decimation cannot make a lighter gallery asset. Shrinking it needs texture
 compression, not more triangles removed; the script therefore leaves no LOD for
-it. The error budget also stops the cockpits well above the 10% ratio target,
+it. The error budget also stops the cockpit well above the 10% ratio target,
 because instrument lettering and switch geometry cannot be collapsed further
 within 1% of the model size.
 
 ## Gallery entries
 
 `MODEL_CATALOG` in `assets.html` carries one hand-written entry per LOD
-(`f-16-lod`, `b737-cockpit-medium-lod`, `b737-cockpit-draco-lod`). Each copies
+(`f-16-lod`, `b737-cockpit-medium-lod`). Each copies
 its source title, description style, license and camera preset, and states the
 source/LOD sizes and triangle counts. After regenerating with different
 parameters, update those entries or delete the ones whose variant is skipped.

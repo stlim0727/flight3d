@@ -43,9 +43,9 @@ Each horizontal building starts above the maximum of both sampled surfaces; a
 solid box plinth extends below their minimum and acts as the exposed retaining
 wall. No detached retaining wall is introduced. Near facade+plinth and far box
 share one collision envelope. A world AABB indexes broadphase cells and the
-local rotated footprint rejects empty AABB corners. The existing GLB kit,
-fallback and day/night materials serve both districts; foundation capacity now
-includes all accepted north lots.
+local rotated footprint rejects empty AABB corners. The GLB kit supplies the
+district's near geometry; procedural archetypes and day/night materials still
+serve the other clusters. Foundation capacity now includes all accepted north lots.
 
 Run `node --test tests/northCityDistrict.test.js tests/cityBuildings.test.js
 tests/foliage.test.js tests/collision.test.js` and see
@@ -173,9 +173,9 @@ third-party photogrammetry asset. Vertex colors and a shared two-pixel emissive
 mask keep each near archetype to one instanced draw. A future artist-authored kit
 can replace these meshes while retaining their names and unit collision envelope.
 
-Near GLB geometry replaces only the district's fallback batches after the full
-kit loads. Failure retains the original three archetypes; time-of-day state is
-reapplied after loading. Far boxes and collision metadata exist before loading.
+The district's near geometry comes from the GLB kit; a failed load surfaces an
+error and leaves those near meshes absent. Time-of-day state is reapplied after
+loading. Far boxes and collision metadata exist before loading.
 Nine terrain samples per lot define the building base and foundation depth;
 near foundations and far boxes cover the same conservative collision AABB. Roads
 sample the rendered terrain triangles, not just the finer analytical height
@@ -194,5 +194,5 @@ ARTIFACT_DIR=review-artifacts/city-district chrome-session --project flight3d no
 The browser comparison uses pre-pilot revision `2542473`, actual coastal terrain,
 fixed random seeds, identical low/high and day/night poses, and the shared project
 Chrome daemon. It checks GLB loading, LOD totals, render errors and blocked-asset
-fallback. Results are isolated city rendering, not full-flight FPS. See
+behavior (no fallback district geometry). Results are isolated city rendering, not full-flight FPS. See
 [city district evidence](../../review-artifacts/city-district/README.md).

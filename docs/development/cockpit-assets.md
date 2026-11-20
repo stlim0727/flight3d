@@ -3,16 +3,16 @@
 ## Selected asset and attribution (issue #9)
 
 Retain hakai315's [Boeing 737-800 Cockpit](https://sketchfab.com/3d-models/boeing-737-800-cockpit-d463256f98654b36af019d2d88bd5bbe),
-the 737-800 NG flight deck already shipped in both GLBs, rather than introducing
+the 737-800 NG flight deck already shipped in the medium GLB, rather than introducing
 a MAX flight deck or purchasing another model. Its six main display apertures,
 MCP windows, CDU keys, separate control geometry and measured pivots match the
 existing instrument bindings. The shipped material set uses glTF metallic/
 roughness PBR factors; fixed lettering and engravings are asset geometry, not
-runtime Canvas drawing. These GLBs have no embedded bitmap images: a new label
+runtime Canvas drawing. This GLB has no embedded bitmap images: a new label
 atlas is unnecessary for this asset. Existing static batching combines compatible
 opaque lettering/panels after moving parts have been separated.
 
-Both GLBs identify the title, author, source and CC BY 4.0 license in
+The GLB identifies the title, author, source and CC BY 4.0 license in
 `asset.extras`. That embedded record is the attribution source; the Sketchfab
 page returned HTTP 403 during this verification, so its current listing was not
 independently inspected. [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
@@ -21,7 +21,7 @@ indication of changes. The [distributed notice](../../public/models/b737-cockpit
 and [credits](../../CREDITS.md) retain those details. The earlier conversion used
 glTF-Transform/Draco; Flight3d applies alignment, material adjustments, static
 batching, dynamic screen overlays and control articulation at runtime. Issue #9
-does not replace, re-encode or enlarge either GLB.
+does not replace, re-encode or enlarge the GLB.
 
 The procedural interior was already removed by #118. Keep the small enclosure
 and glass corrections and the live display meshes in `Cockpit.js`; do not
@@ -30,11 +30,10 @@ restore its old box/cylinder panel, seat, yoke or fixed-label builders.
 ## Airframe controls
 
 `bindGltfAirframeControls()` separates the native gear handle, flap selector,
-speedbrake and two trim wheels before static batching. For the medium GLB,
+speedbrake and two trim wheels before static batching. In the medium GLB,
 `Cylinder058`, `Cube482`, `Cube481`, `Cylinder210` and `Cylinder211` identify the
-complete parts, including their markings. The material-batched lite GLB uses
-measured bounds to select the exposed moving handles and wheels. Its buried
-lever bases remain in the fixed quadrant.
+complete parts, including their markings. Measured bounds keep the buried lever
+bases in the fixed quadrant.
 
 Asset coordinates are metres, +Y up and +Z forward (the root rotates by PI into
 aircraft coordinates). Pivots live beside their measured bounds in
@@ -61,10 +60,9 @@ node scripts/verify-cockpit-assets.mjs
 `SIM_URL`, `CDP_PORT`, `ARTIFACT_DIR` and `BASELINE_REF` override the defaults.
 The default baseline is `caab0a7`. Restart Vite after source edits if the host's
 filesystem watcher retains old modules. The verifier reconstructs the baseline
-cockpit and control module in ignored `.tmp/`, uses the same GLBs, cameras,
+cockpit and control module in ignored `.tmp/`, uses the same GLB, cameras,
 lighting and resolution, and writes before/after forward, instrument, pedestal
-and night images. It blocks the medium URL for the third scenario to exercise
-the real lite fallback. It fails empty control bindings, hold/reset drift,
+and night images. It fails empty control bindings, hold/reset drift,
 missing screen maps, unchanged pixels for any of the six CanvasTextures, and
 page exceptions. Node tests additionally exercise reversal, invalid telemetry,
 static batch exclusion and shadow-cache invalidation.
@@ -78,21 +76,17 @@ The GLTF interior is the only cockpit geometry; the vector cockpit and its photo
 textures were removed. `Cockpit.cockpitModelLoading` and
 `cockpitModelFailed` report the download state, and
 `Cockpit.ensureCockpitModel()` starts it. Construction never does: the medium
-GLB is 3,827,468 bytes and its light-transfer pair adds another 3,984,414, all of
-which only the cockpit view can display while the lobby and every exterior camera
-run outside the fuselage. The camera system holds a cockpit request while
-`cockpitInteriorGate()` reports `loading`, then lands the view when the model and
-its shader warmup resolve, so the interior is downloaded on the first cockpit entry
-rather than during boot. High and Balanced first request the medium asset
-(1,742,391 triangles). Performance and Ultra Low first request the lite Draco
-asset (832,427 triangles). These counts describe the GLB scene instances before
-runtime batching and additional render passes. Each tier retries once with the
-other asset if its preferred model fails to load. The first entry selects the
-asset for that aircraft instance, and quality changes reuse the loaded interior.
-If neither
-asset resolves, `main.js` leaves the cockpit view for chase and toasts that the
-interior is unavailable, because cockpit mode hides the exterior groups — the same
-notice explains a request that was held and then could not land.
+GLB is 3,827,468 bytes (1,742,391 triangles before runtime batching) and its
+light-transfer pair adds another 3,984,414, all of which only the cockpit view
+can display while the lobby and every exterior camera run outside the fuselage.
+The camera system holds a cockpit request while `cockpitInteriorGate()` reports
+`loading`, then lands the view when the model and its shader warmup resolve, so
+the interior is downloaded on the first cockpit entry rather than during boot.
+Every quality tier loads the same medium GLB; a failed load is reported through
+`cockpitModelFailed` rather than retried. If the GLB does not resolve, `main.js`
+leaves the cockpit view for chase and toasts that the interior is unavailable,
+because cockpit mode hides the exterior groups — the same notice explains a
+request that was held and then could not land.
 
 ## Preserve the enclosure
 
@@ -101,8 +95,8 @@ parts of the cockpit even though it was previously classified as exterior nose
 skin. Frame, lining, and console surfaces include single-layer triangles and
 must render with `DoubleSide`; `FrontSide` makes interior-facing surfaces vanish
 at the windshield sill, side walls, and rear/roof enclosure. Preserve material
-transparency so actual window openings remain clear. The medium and lite GLBs
-remain unchanged by this rendering repair.
+transparency so actual window openings remain clear. The medium GLB
+remains unchanged by this rendering repair.
 
 Run the browser regression against a local Vite server:
 
@@ -113,20 +107,17 @@ PORT=5198 ARTIFACT_DIR=/tmp/cockpit-enclosure-evidence node scripts/verify-windo
 It checks native shell visibility and inward rendering, raycasts the solid wall
 below the left window, and captures front, side, rear, roof, and floor views.
 The pre-repair loader fails the shell assertions. The repaired medium model
-intercepts the sidewall ray at approximately 0.268 m. Blocking the medium request
-also verified the lite fallback enclosure in Chrome, including a sidewall
-intersection at approximately 0.268 m.
+intercepts the sidewall ray at approximately 0.268 m.
 
-The GLBs share asset coordinates: forward +Z, panel LCDs at approximately
+The GLB uses asset coordinates: forward +Z, panel LCDs at approximately
 Z=1.458, and captain yoke at X=0.302. The model root rotates by PI around Y and
 translates by (0, -1.31, -11.43) into aircraft coordinates. Display apertures are
 measured from the GLB geometry. MCP and CDU canvas UVs
 crop to LCD content so the model's switches and keypad remain visible.
 
-The medium asset has nested transforms and shared geometry; the lite asset
-batches unrelated geometry by material. `GltfCockpitControls.js` extracts only
-yoke triangles in model coordinates, retaining UVs and normals. Keep both paths
-working when replacing an asset. Never animate a whole material batch.
+The medium asset has nested transforms and shared geometry. `GltfCockpitControls.js`
+extracts only moving-part triangles in model coordinates, retaining UVs and normals.
+Keep that path working when replacing an asset. Never animate a whole material batch.
 
 `J` or the action-panel button hides the yoke handles for reading
 the instruments. Controls continue to animate while hidden. `D` is right roll;
@@ -140,7 +131,7 @@ history records even while its panel is closed, including valid zero-G samples.
 Captured in headless Chrome at 1440×1000 with ANGLE/Vulkan. Evidence is in
 `review-artifacts/cockpit-live/` (screenshots and assertion results).
 
-- Confirmed HTTP 200 for medium GLB, with no lite request on the normal path.
+- Confirmed HTTP 200 for medium GLB.
 - Both yokes bind to nonempty native geometry; native D/A keyboard input reaches
   the rendered GLB, and D leaves demo inactive.
 - Held, reversed, and released aileron/elevator snapshots animate both handles
@@ -149,6 +140,5 @@ Captured in headless Chrome at 1440×1000 with ANGLE/Vulkan. Evidence is in
   Deterministic stepping refreshes the PFD before returning.
 - J and the action button hide/show the handles. Native columns remain visible.
 - Hidden inspector records zero G; opening it draws green/cyan graph pixels.
-- Blocking the medium request successfully loads and binds the lite fallback.
 - No page exceptions on the normal path. These are rendering/interaction checks,
   not a flight-dynamics or frame-rate benchmark.

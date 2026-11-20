@@ -3,7 +3,6 @@
 <title>Cockpit offline transfer acceptance</title>
 <style>body{font:15px system-ui;background:#17212c;color:#eee}iframe{width:1280px;height:720px}img{width:640px}pre{white-space:pre-wrap}figure{display:inline-block;margin:4px}button{padding:12px}</style>
 <h1>Cockpit offline transfer acceptance</h1>
-<label>Asset <select id="variant"><option value="medium">medium</option><option value="draco">lite</option></select></label>
 <button id="run">Run acceptance</button>
 <pre id="report">Waiting for simulator…</pre>
 <iframe src="/"></iframe>
@@ -14,19 +13,6 @@ import { drawCockpitCookie } from '../src/environment/CockpitSunShadow.js';
 const report = document.querySelector('#report'), captures = document.querySelector('#captures');
 const frame = document.querySelector('iframe');
 const assert = (value, message) => { if (!value) throw Error(message); };
-document.querySelector('#variant').onchange = async event => {
-  document.querySelector('#run').disabled = false;
-  report.textContent = 'Waiting for simulator…'; captures.replaceChildren();
-  const html = await (await fetch('/')).text();
-  const bootstrap = event.target.value === 'draco'
-    ? `<script type="module">import { Cockpit } from '/src/aircraft/Cockpit.js';
-      const load = Cockpit.prototype.loadCockpitModel;
-      Cockpit.prototype.loadCockpitModel = function(url = '/models/b737-cockpit-draco.glb') { return load.call(this, url); };
-      await import('/src/main.js');<` + `/script>`
-    : '<script type="module" src="/src/main.js"><' + '/script>';
-  frame.srcdoc = html.replace('<head>', '<head><base href="/">')
-    .replace(/<script type="module" src="[^\"]*src\/main.js"><\/script>/, bootstrap);
-};
 document.querySelector('#run').onclick = async () => {
   document.querySelector('#run').disabled = true;
   try {

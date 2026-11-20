@@ -29,7 +29,6 @@ export class AircraftBreakup {
   // Retain source transforms so articulated gear still uses its impact-time pose.
   prepare(aircraft) {
     if (this.preparedAircraft === aircraft &&
-        this.preparedUseGltf === aircraft.useGltf &&
         this.preparedVersion === aircraft.breakupVersion) return false;
     this.disposePrepared({ clearPersistent: false });
     const wasCockpit = Boolean(aircraft.isCockpit);
@@ -38,7 +37,6 @@ export class AircraftBreakup {
     try {
       this.buildPrepared(aircraft);
       this.preparedAircraft = aircraft;
-      this.preparedUseGltf = aircraft.useGltf;
       this.preparedVersion = aircraft.breakupVersion;
     } finally {
       aircraft.setCockpitMode(wasCockpit);
@@ -52,11 +50,8 @@ export class AircraftBreakup {
     this.preparedFragments = [];
     const root = aircraft.group;
     root.updateWorldMatrix(true, true);
-    const sources = aircraft.useGltf ? [aircraft.gltfGroup,
-      aircraft.gearGroup?.parent === root ? aircraft.gearGroup : null]
-      : aircraft.proceduralGroup ? [aircraft.proceduralGroup]
-        : [aircraft.fuselageGroup, aircraft.wingGroup, aircraft.tailGroup,
-          aircraft.empennageGroup, aircraft.enginesGroup, aircraft.gearGroup];
+    const sources = [aircraft.gltfGroup,
+      aircraft.gearGroup?.parent === root ? aircraft.gearGroup : null];
     const inverse = root.matrixWorld.clone().invert();
     const meshes = [];
     const bounds = new THREE.Box3();
@@ -138,7 +133,7 @@ export class AircraftBreakup {
   spawn(aircraft, velocity, { detachRegions = null } = {}) {
     this.clear();
     this.firstContact = null;
-    // Direct callers and crashes during asset loading still have a safe fallback.
+    // Direct callers and crashes during asset loading still prepare geometry on demand.
     this.prepare(aircraft);
     aircraft.setCockpitMode(false);
     const root = aircraft.group;

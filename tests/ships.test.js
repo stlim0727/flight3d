@@ -36,7 +36,10 @@ test('deferred ships retain moving collision roots and request each visual only 
   ships.update(1, 1);
   records.forEach(record => {
     assert.equal(record.assetStatus, 'deferred');
-    assert.ok(!record.bounds.isEmpty());
+    const { min, max } = shipAssetManifest[record.type].bounds;
+    assert.deepEqual(record.bounds.min.toArray(), min);
+    assert.deepEqual(record.bounds.max.toArray(), max);
+    assert.equal(record.mesh.children.length, 0);
     assert.ok(Number.isFinite(record.mesh.position.y));
   });
   const ready = ships.loadAssets();
@@ -161,8 +164,8 @@ test('ship collision bounds follow heading, pitch, roll and waves, including spe
     }
 });
 
-test('failed downloads retain visible collidable fallback and settle readiness', async (t) => {
-  t.mock.method(console, 'warn', () => {});
+test('failed GLB loads surface errors without adding fallback hulls', async (t) => {
+  const errors = t.mock.method(console, 'error', () => {});
   const ships = new Ships(water, {
     loadAsset: async () => {
       throw Error('offline');
@@ -171,10 +174,14 @@ test('failed downloads retain visible collidable fallback and settle readiness',
   });
   await ships.ready;
   assert.equal(ships.assetErrors.length, 5);
+  assert.equal(errors.mock.callCount(), 5);
   for (const v of [...ships.vessels, ...ships.speedboats]) {
-    assert.equal(v.assetStatus, 'fallback');
-    assert.equal(v.mesh.children.length, 1);
-    assert.ok(!v.bounds.isEmpty());
+    assert.equal(v.assetStatus, 'error');
+    assert.equal(v.mesh.children.length, 0);
+    assert.equal(v.visual, undefined);
+    const { min, max } = shipAssetManifest[v.type].bounds;
+    assert.deepEqual(v.bounds.min.toArray(), min);
+    assert.deepEqual(v.bounds.max.toArray(), max);
   }
   ships.update(1, 1);
   assert.ok(Number.isFinite(ships.speedboats[0].mesh.position.y));

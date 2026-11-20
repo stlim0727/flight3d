@@ -92,3 +92,14 @@ test('a loaded bandit airframe keeps the callsign skin after the proxy is hidden
   view._skinAirframe();
   assert.deepEqual(group.scale.toArray(), [1.18, 1.08, 1.3], 'heavy variants keep their size');
 });
+
+test('the not-yet-loaded bandit proxy exposes the GLB breakup source root', async () => {
+  const { BanditAircraftView } = await import('../src/weapons/BanditAircraftView.js');
+  const view = Object.create(BanditAircraftView.prototype);
+  view.proxy = new THREE.Group();
+  const source = view.getBreakupSource();
+  assert.equal(source.group, view.proxy);
+  assert.equal(source.gltfGroup, view.proxy);
+  assert.equal(source.proceduralGroup, undefined);
+  assert.equal(source.useGltf, undefined);
+});

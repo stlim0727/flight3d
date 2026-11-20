@@ -9,17 +9,6 @@ export function shipBounds(object) {
   return new THREE.Box3().setFromObject(object);
 }
 
-export function createShipFallback(type) {
-  const { min, max } = manifest[type].bounds;
-  const group = new THREE.Group();
-  const hull = new THREE.Mesh(
-    new THREE.BoxGeometry(max[0] - min[0], 2 - min[1], max[2] - min[2]),
-    new THREE.MeshStandardMaterial({ color: type === 'speedboat' ? 0x367e91 : 0x273e48 })
-  );
-  hull.position.set((min[0] + max[0]) / 2, (min[1] + 2) / 2, (min[2] + max[2]) / 2);
-  group.add(hull);
-  return group;
-}
 
 // Metres, +Y up, -Z bow, waterline-centred origin. Clones share GPU resources.
 export function createShipAssetLoader() {

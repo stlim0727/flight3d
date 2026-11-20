@@ -65,7 +65,7 @@ try {
     if (ready) break;
     await delay(250);
   }
-  assert.ok(ready, 'Loaded GLB must be ready; fallback alone cannot pass this check');
+  assert.ok(ready, 'Loaded GLB must be ready; a missing asset must not pass this check');
   const setup = await evaluate(async () => {
     const s = simulator, T = THREE;
     const { RENDER_QUALITY } = await import('/src/config/renderQuality.js');
@@ -81,17 +81,10 @@ try {
       if (shadow.map.width !== RENDER_QUALITY[tier].shadowMapSize) throw new Error('GPU map tier mismatch');
       tiers.push({ tier, size: shadow.map.width });
     }
-    const { Boeing737 } = await import('/src/aircraft/Boeing737.js');
-    const load = Boeing737.prototype.loadGltfModel;
-    let fallback;
-    try {
-      Boeing737.prototype.loadGltfModel = () => {};
-      fallback = new Boeing737(s.pfdCanvas, s.ndCanvas, s.eicasCanvas);
-    } finally { Boeing737.prototype.loadGltfModel = load; }
     const scene = new T.Scene(); scene.background = new T.Color('#526577');
     scene.environment = s.scene.environment;
     scene.add(s.sky.sunLight, s.sky.sunLight.target, s.sky.ambientLight);
-    const models = { loaded: s.aircraft, fallback };
+    const models = { loaded: s.aircraft };
     for (const a of Object.values(models)) {
       a.group.position.set(0, 0, 0); a.group.quaternion.identity();
       a.setCockpitMode(false); scene.add(a.group);
@@ -115,7 +108,7 @@ try {
     { name: 'ground', eye: [30, 26, 38], target: [0, -2, 0], heading: 0, bank: 0 },
     { name: 'ground-cockpit', eye: [30, 26, 38], target: [0, -2, 0], heading: 0, bank: 0 },
   ];
-  for (const model of ['loaded', 'fallback']) for (const hour of [8, 12.5, 16.8]) for (const view of views) {
+  for (const model of ['loaded']) for (const hour of [8, 12.5, 16.8]) for (const view of views) {
     const cell = { ...view, model, hour };
     const result = await evaluate(cell => {
       const s = simulator, T = THREE, r = airframeReview, a = r.models[cell.model];
@@ -210,7 +203,7 @@ try {
   }
   // Geometry and sun direction can legitimately leave one surface unshadowed at
   // an individual hour; each requested receiver must be shadowed in the matrix.
-  for (const model of ['loaded', 'fallback']) for (const view of views) {
+  for (const model of ['loaded']) for (const view of views) {
     const cells = results.filter(r => r.model === model && r.name === view.name);
     assert.ok(cells.some(r => r.receiverShadowSamples > 10), `No measured shadow on ${model}/${view.name}`);
     if (!view.name.startsWith('ground')) {

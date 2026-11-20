@@ -265,6 +265,31 @@ try {
   });
   assert.ok(sequence.loaded);
   assert.equal(sequence.shaderErrors, 0);
+
+  const failure = await evaluate(async () => {
+    const { After } = window.reviewModules;
+    const ships = new After(window.review.water, {
+      deferAssets: true,
+      random: () => 0,
+      loadAsset: async () => {
+        throw Error('offline');
+      }
+    });
+    await ships.loadAssets();
+    const records = [...ships.vessels, ...ships.speedboats];
+    return {
+      errors: ships.assetErrors.length,
+      statuses: records.map((v) => v.assetStatus),
+      visualChildren: records.map((v) => v.mesh.children.length),
+      boundsNonEmpty: records.every((v) => !v.bounds.isEmpty())
+    };
+  });
+  assert.deepEqual(failure, {
+    errors: 5,
+    statuses: Array(5).fill('error'),
+    visualChildren: Array(5).fill(0),
+    boundsNonEmpty: true
+  });
   assert.deepEqual(exceptions, []);
   for (const m of metrics.filter((m) => m.version === 'after'))
     assert.ok(m.drawCalls <= 37, 'ship and ocean draw budget');
@@ -322,6 +347,7 @@ try {
         ...setup,
         metrics,
         sequence,
+        failure,
         integration,
         exceptions,
         note: 'Isolated ships plus actual WaterOcean, 1440x1000, fixed daylight/time=12, seeded baseline, no shadows on either version. Twelve fence-completed samples after three warmups; timer polling, not full-flight FPS. See gpu for hardware/software backend. Texture bytes are exact RGBA8 128x128 mip-chain allocation for the shared wake; no model textures. Asset transfer includes local HTTP overhead.'

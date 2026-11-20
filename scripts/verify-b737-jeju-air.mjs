@@ -70,7 +70,6 @@ await withBrowserSession(
         livery: b737?.livery,
         airline: b737?.group?.userData?.airline,
         modelLoaded: b737?.modelLoaded,
-        useGltf: b737?.useGltf,
         hasJejuDecal: Boolean(b737?.gltfGroup?.getObjectByName('JejuAirLivery')),
         hasKoreanDecal: Boolean(b737?.gltfGroup?.getObjectByName('KoreanAirLivery'))
       };

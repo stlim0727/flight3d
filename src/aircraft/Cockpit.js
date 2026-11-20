@@ -14,7 +14,6 @@ import { CDUCanvas } from './CDUCanvas.js';
 
 const cockpitModelDirectory = `${import.meta.env?.BASE_URL ?? '/'}models/`;
 const mediumCockpitUrl = `${cockpitModelDirectory}b737-cockpit-medium.glb`;
-const liteCockpitUrl = `${cockpitModelDirectory}b737-cockpit-draco.glb`;
 
 /**
  * 3D Virtual Cockpit for Boeing Airliner: the photoreal GLTF flight deck with
@@ -78,12 +77,11 @@ export class Cockpit {
    * light-transfer bakes are several megabytes that only the cockpit view ever displays, and
    * the lobby runs in an exterior view. The camera asks for it on first cockpit entry.
    */
-  ensureCockpitModel(renderQuality) {
+  ensureCockpitModel() {
     if (typeof window === 'undefined') return false;
     if (this.cockpitModelRequested || this.gltfCockpitLoaded) return false;
     this.cockpitModelRequested = true;
-    const useLite = renderQuality === 'performance' || renderQuality === 'ultraLow';
-    this.loadCockpitModel(useLite ? liteCockpitUrl : mediumCockpitUrl);
+    this.loadCockpitModel(mediumCockpitUrl);
     return true;
   }
 
@@ -202,7 +200,7 @@ export class Cockpit {
    * Asynchronously loads the high-detail 3D Boeing 737 cockpit GLTF model
    * and mounts live glass-cockpit flight displays.
    */
-  loadCockpitModel(url = mediumCockpitUrl, fallbackUrl = url === liteCockpitUrl ? mediumCockpitUrl : liteCockpitUrl) {
+  loadCockpitModel(url = mediumCockpitUrl) {
     if (typeof window === 'undefined') {
       // Non-browser / Node test environment: no interior is ever displayed.
       return;
@@ -219,8 +217,8 @@ export class Cockpit {
       gltfLoader.setDRACOLoader(dracoLoader);
 
       // Start transport and its precomputed vertex binding alongside the GLB.
-      // Handle rejection immediately, including when the GLB falls back or fails.
-      const transferReady = CockpitLightTransfer.load(url.includes('-medium.') ? 'medium' : 'draco')
+      // Handle rejection immediately, including when the GLB fails.
+      const transferReady = CockpitLightTransfer.load('medium')
         .then(transfer => ({ transfer }), error => ({ error }));
       gltfLoader.load(
         url,
@@ -264,12 +262,7 @@ export class Cockpit {
         undefined,
         (error) => {
           transferReady.then(result => result.transfer?.dispose());
-          if (fallbackUrl) {
-            console.warn('Falling back to alternate cockpit model:', error);
-            this.loadCockpitModel(fallbackUrl, null);
-            return;
-          }
-          console.warn('Failed to load 3D GLTF Cockpit model:', error);
+          console.error('Failed to load 3D GLTF Cockpit model:', error);
           this.gltfCockpitGroup.visible = false;
           this.gltfCockpitLoaded = false;
           this.cockpitModelLoading = false;
