@@ -199,6 +199,7 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
         const [localX, localZ] = project(latitude, longitude);
         return { x: localX, z: localZ, height: heightAt(localX, localZ) };
       });
+      const candidates = span.deck ? points : densifyRun(points, (x, z) => terrain.getHeight(x, z));
       let run = [];
       const emit = () => {
         if (run.length < 2) return;
