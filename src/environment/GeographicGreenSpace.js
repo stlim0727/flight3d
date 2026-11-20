@@ -7,6 +7,7 @@ import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospat
 import { projectToLocal, INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
+import { setMapAttributionSource } from '../ui/mapAttribution.js';
 
 // Parks are absent from the z11 parent tile the water loader reads, so green
 // space has its own z13 tile selection over the already-downloaded base archive.
@@ -270,6 +271,5 @@ export function updateGeographicGreenSpace(sim) {
     terrain.mesh.add(sim.geographicGreenLayer.group);
   }
   sim.geographicGreenLayer?.update(sim.position, sim.camera.position);
-  const attribution = document.getElementById('geographic-green-attribution');
-  if (attribution) attribution.hidden = !sim.geographicGreenLayer?.tiles.size;
+  setMapAttributionSource('geographic-green-attribution', Boolean(sim.geographicGreenLayer?.tiles.size));
 }

@@ -769,23 +769,25 @@
   </dialog>
   <audio id="mp-audio" autoplay playsinline></audio>
   <script type="module" src="./src/main.js"></script>
-  <aside id="open-world-attribution" hidden>
-    Terrain <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener">Mapzen</a>
-    · Water <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener">Overture / OpenStreetMap contributors</a>
-    · Imagery <a href="https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9" target="_blank" rel="noopener">Esri and imagery contributors</a>
-  </aside>
-  <aside id="geographic-buildings-attribution" hidden>
-    <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener">© OpenStreetMap contributors · Overture Maps Foundation</a>
-  </aside>
-  <aside id="geographic-roads-attribution" hidden>
-    <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener">Roads © OpenStreetMap contributors · Overture Maps Foundation</a>
-  </aside>
-  <aside id="geographic-green-attribution" hidden>
-    <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener">Parks and green space © OpenStreetMap contributors · Overture Maps Foundation</a>
-  </aside>
-  <aside id="incheon-attribution" hidden>
-    <button id="incheon-attribution-chip" type="button" aria-expanded="false" aria-label="Map data attribution">©</button>
-    <span id="incheon-attribution-text">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · Copernicus <a href="scenery/incheon/LICENSE.md" target="_blank" rel="noopener" data-i18n="data.sources.and.limitations"></a></span>
+  <aside id="map-attribution" aria-label="Map data attribution" hidden>
+    <button id="map-attribution-chip" type="button" aria-expanded="false" aria-controls="map-attribution-list" aria-label="Map data attribution">©</button>
+    <div id="map-attribution-list">
+      <span id="incheon-attribution" hidden>© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · Copernicus <a href="scenery/incheon/LICENSE.md" target="_blank" rel="noopener" data-i18n="data.sources.and.limitations"></a></span>
+      <span id="open-world-attribution" hidden>
+        Terrain <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener">Mapzen</a>
+        · Water <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener">Overture / OpenStreetMap contributors</a>
+        · Imagery <a href="https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9" target="_blank" rel="noopener">Esri and imagery contributors</a>
+      </span>
+      <span id="geographic-buildings-attribution" hidden>
+        <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener">Buildings © OpenStreetMap contributors · Overture Maps Foundation</a>
+      </span>
+      <span id="geographic-roads-attribution" hidden>
+        <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener">Roads © OpenStreetMap contributors · Overture Maps Foundation</a>
+      </span>
+      <span id="geographic-green-attribution" hidden>
+        <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener">Parks and green space © OpenStreetMap contributors · Overture Maps Foundation</a>
+      </span>
+    </div>
   </aside>
 </body>
 </html>

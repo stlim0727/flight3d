@@ -17,6 +17,7 @@ import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
 import { defaultScenarioForRegion, requiredAircraft } from '../config/scenarioRegistry.js';
 import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { computeUiScale, applyUiScale } from './UiScale.js';
+import { bindMapAttribution } from './mapAttribution.js';
 
 export function hasActiveModal() {
   if (typeof document === 'undefined') return false;
@@ -537,11 +538,7 @@ class SimulatorHudAndBindingsMethods {
       });
       syncGazeReset();
     }
-    document.getElementById('incheon-attribution-chip')?.addEventListener('click', (event) => {
-      const aside = event.currentTarget.closest('#incheon-attribution');
-      const expanded = aside.classList.toggle('expanded');
-      event.currentTarget.setAttribute('aria-expanded', String(expanded));
-    });
+    bindMapAttribution();
     const fullscreenButton = document.getElementById('btn-fullscreen');
     const syncFullscreenUI = () => {
       if (!fullscreenButton) return;

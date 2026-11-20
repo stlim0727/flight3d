@@ -957,26 +957,39 @@ body[data-flow="lobby"] .menu-toggle {
 #lobby-demo-select { display: none; }
 .demo-route-briefing { margin: 8px 0 0; line-height: 1.55; font-size: 13px; color: #cbd5e1; }
 
-/* Keep the active geographic scenery attribution visible during flight.
-   ODbL requires the notice to stay displayed, so it cannot be hidden; during
-   flight it collapses to a small © chip that expands on tap, keeping the
-   touch controls clear. The notice stays tap-transparent where it overlaps
-   the controls. */
-#incheon-attribution {
+/* Keep active geographic scenery and streamed layer attributions visible.
+   ODbL and map data licenses require attribution to stay accessible, so all
+   active notices collapse into a single tappable © chip, keeping touch
+   controls and the lobby card clear while remaining tap-transparent outside
+   the chip and links. */
+#map-attribution {
   position: fixed;
-  right: 8px;
-  bottom: max(64px, env(safe-area-inset-bottom));
+  right: max(8px, env(safe-area-inset-right, 0px));
+  bottom: max(64px, env(safe-area-inset-bottom, 0px));
   z-index: 30;
-  max-width: calc(100vw - 16px);
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: calc(100vw - max(8px, env(safe-area-inset-left, 0px)) - max(8px, env(safe-area-inset-right, 0px)));
+  box-sizing: border-box;
   padding: 3px 5px;
-  border-radius: 3px;
+  border-radius: 6px;
   background: #0f172acc;
   color: #e2e8f0;
-  font-size: 10px;
+  font: 10px/1.4 system-ui, sans-serif;
   pointer-events: none;
 }
-#incheon-attribution a { color: #bae6fd; pointer-events: auto; }
-#incheon-attribution-chip {
+#map-attribution[hidden],
+#map-attribution-list > [hidden] {
+  display: none;
+}
+#map-attribution a {
+  color: #bae6fd;
+  pointer-events: auto;
+}
+#map-attribution-chip {
+  flex-shrink: 0;
   pointer-events: auto;
   width: 24px;
   height: 24px;
@@ -987,13 +1000,21 @@ body[data-flow="lobby"] .menu-toggle {
   color: #e2e8f0;
   font: 700 13px/24px sans-serif;
   cursor: pointer;
-  vertical-align: middle;
 }
-#incheon-attribution-text { display: none; }
-#incheon-attribution.expanded #incheon-attribution-text { display: inline; }
-body[data-flow="lobby"] #incheon-attribution { z-index: 81; bottom: 4px; pointer-events: auto; }
-body[data-flow="lobby"] #incheon-attribution-text { display: inline; }
-body[data-flow="lobby"] #incheon-attribution-chip { display: none; }
+#map-attribution-list {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px 2px 2px 4px;
+}
+#map-attribution.expanded #map-attribution-list {
+  display: flex;
+}
+body[data-flow="lobby"] #map-attribution {
+  z-index: 86;
+  bottom: max(4px, env(safe-area-inset-bottom, 0px));
+}
 
 .lobby-card .btn-airport span { white-space: normal; overflow-wrap: anywhere; }
 

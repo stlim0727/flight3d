@@ -6,6 +6,7 @@ import { TileCacheManager } from './TileCacheManager.js';
 import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospatial/TileCoordinateSystem.js';
 import { INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN, CHUJA_EMERGENCY_STRIP } from '../geospatial/CorridorCoordinateSystem.js';
+import { setMapAttributionSource } from '../ui/mapAttribution.js';
 
 const zoom = 11;
 const tilesAcross = 2 ** zoom;
@@ -657,6 +658,5 @@ export function updateOpenWorldTerrain(sim) {
     surface.openWorld.update(sim.position, sim.linearVelocity, sim.camera, height,
       sim.renderQuality === 'ultraLow');
   }
-  const attribution = document.getElementById('open-world-attribution');
-  if (attribution) attribution.hidden = !surface?.openWorld?.tiles.size;
+  setMapAttributionSource('open-world-attribution', Boolean(surface?.openWorld?.tiles.size));
 }

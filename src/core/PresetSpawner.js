@@ -30,6 +30,7 @@ import {
   saveSavedAirport,
   saveSavedScenario,
 } from '../config/flightSelection.js';
+import { setMapAttributionSource } from '../ui/mapAttribution.js';
 
 class PresetSpawnerMethods {
   setPreset(type, isDemoInternal = false, pilotPreparation = false) {
@@ -704,7 +705,7 @@ class PresetSpawnerMethods {
       this.scene.add(this.luklaTerrain.mesh, this.luklaAirport.group);
     }
     if (isCoastal && this.startupReady) this.ships.loadAssets();
-    document.getElementById('incheon-attribution').hidden = !isIncheon;
+    setMapAttributionSource('incheon-attribution', isIncheon);
 
     // Toggle 3D mesh visibility
     this.terrain.mesh.visible = isCoastal;
