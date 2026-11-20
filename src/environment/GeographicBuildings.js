@@ -12,7 +12,7 @@ import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 
 const neighbors = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
 const zoom = 14;
-const lightZoom = 12;
+const overviewZoom = 12;
 const collisionCellSize = 128;
 const source = new PMTiles(
   'https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/2026-11-18.0/buildings.pmtiles',
@@ -50,12 +50,14 @@ function cityGlowTexture() {
   return lightTexture(16, (x, y) => Math.max(0, 1 - Math.hypot(x - 7.5, y - 7.5) / 7.5), true);
 }
 
-function distantLightGeometry(data, tile, project, terrain) {
+function buildOverviewTile(data, tile, project, terrain, exclude) {
   const layer = new VectorTile(new PbfReader(data)).layers.building;
   const occupied = new Set();
   const positions = [];
   const detailKeys = [];
-  const detailScale = 2 ** (zoom - lightZoom);
+  const footprintOffsets = [];
+  const boxes = [];
+  const detailScale = 2 ** (zoom - overviewZoom);
   for (let i = 0; i < (layer?.length ?? 0); i++) {
     const feature = layer.feature(i);
     if (feature.type !== 3 || feature.properties.is_underground) continue;
@@ -65,7 +67,7 @@ function distantLightGeometry(data, tile, project, terrain) {
     if (x < 0 || x >= 1 || y < 0 || y >= 1) continue;
     const cell = `${Math.floor(x * 96)}/${Math.floor(y * 96)}`;
     if (occupied.has(cell)) continue;
-    const { latitude, longitude } = tileToWgs84(tile.x + x, tile.y + y, lightZoom);
+    const { latitude, longitude } = tileToWgs84(tile.x + x, tile.y + y, overviewZoom);
     const [localX, localZ] = project(latitude, longitude);
     if (Number.isFinite(terrain.size) && Math.max(Math.abs(localX), Math.abs(localZ)) > terrain.size / 2) continue;
     const height = terrain.getHeight(localX, localZ);
@@ -74,13 +76,63 @@ function distantLightGeometry(data, tile, project, terrain) {
     occupied.add(cell);
     positions.push(localX, (Number.isFinite(height) ? height : 0) + 30, localZ);
     detailKeys.push(`${Math.floor((tile.x + x) * detailScale)}/${Math.floor((tile.y + y) * detailScale)}`);
+
+    footprintOffsets.push(-1);
+    if (!Number.isFinite(height) || height <= 0 || terrain.isWater?.(localX, localZ)) continue;
+    const { latitude: nwLat, longitude: nwLon } = tileToWgs84(
+      tile.x + west / feature.extent, tile.y + north / feature.extent, overviewZoom,
+    );
+    const { latitude: seLat, longitude: seLon } = tileToWgs84(
+      tile.x + east / feature.extent, tile.y + south / feature.extent, overviewZoom,
+    );
+    const [x0, z0] = project(nwLat, nwLon);
+    const [x1, z1] = project(seLat, seLon);
+    const width = Math.min(180, Math.abs(x1 - x0) * 0.75);
+    const depth = Math.min(180, Math.abs(z1 - z0) * 0.75);
+    if (width * depth < 65) continue;
+    const corners = [
+      { x: localX - width / 2, y: localZ - depth / 2 },
+      { x: localX - width / 2, y: localZ + depth / 2 },
+      { x: localX + width / 2, y: localZ - depth / 2 },
+      { x: localX + width / 2, y: localZ + depth / 2 },
+    ];
+    if (exclude(localX, localZ, corners)) continue;
+    const base = Math.min(height, ...corners.map(point => terrain.getHeight(point.x, point.y)));
+    if (!Number.isFinite(base)) continue;
+    footprintOffsets[footprintOffsets.length - 1] = boxes.length;
+    boxes.push({ x: localX, z: localZ, base, width, depth, top: height + geographicBuildingHeight(feature.properties) });
   }
   if (!positions.length) return null;
+  const lights = new THREE.BufferGeometry();
+  lights.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  lights.setAttribute('color', new THREE.BufferAttribute(new Float32Array(detailKeys.length * 4).fill(1), 4));
+  lights.attributes.color.setUsage(THREE.DynamicDrawUsage);
+  return { lights, silhouettes: buildSilhouettes(boxes), detailKeys, footprintOffsets };
+}
+
+const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+const boxVertexCount = boxGeometry.attributes.position.count;
+
+function buildSilhouettes(boxes) {
+  if (!boxes.length) return null;
+  const positions = [];
+  const normals = [];
+  const indices = [];
+  const { position, normal } = boxGeometry.attributes;
+  for (const [i, { x, z, base, width, depth, top }] of boxes.entries()) {
+    const mid = (base + top) / 2;
+    for (let v = 0; v < boxVertexCount; v++) {
+      positions.push(x + width * position.getX(v), mid + (top - base) * position.getY(v), z + depth * position.getZ(v));
+      normals.push(normal.getX(v), normal.getY(v), normal.getZ(v));
+    }
+    for (const index of boxGeometry.index.array) indices.push(i * boxVertexCount + index);
+  }
   const geometry = new THREE.BufferGeometry();
+  geometry.setIndex(indices);
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(detailKeys.length * 4).fill(1), 4));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(boxes.length * boxVertexCount * 4).fill(1), 4));
   geometry.attributes.color.setUsage(THREE.DynamicDrawUsage);
-  geometry.userData.detailKeys = detailKeys;
   return geometry;
 }
 
@@ -223,9 +275,12 @@ export class GeographicBuildings {
       map: cityGlowTexture(), color: 0xffc688, size: 5, sizeAttenuation: false, vertexColors: true,
       blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false,
     });
-    this.lightTiles = new Map();
-    this.pendingLight = null;
-    this.lightRetryAt = 0;
+    this.silhouetteMaterial = new THREE.MeshLambertMaterial({
+      color: 0xa99f94, vertexColors: true, alphaHash: true, opacity: 0,
+    });
+    this.overviewTiles = new Map();
+    this.pendingOverview = null;
+    this.overviewRetryAt = 0;
     this.tiles = new Map();
     this.pending = null;
     this.retryAt = new Map();
@@ -262,30 +317,35 @@ export class GeographicBuildings {
       if (this.pending && !this.aircraftTiles.has(this.pending.key)
         && aircraftTiles.some(({ key }) => !this.tiles.has(key))) this.pending.controller.abort();
     }
-    this.updateDistantLights(cameraPosition, night, elapsed);
+    this.updateOverview(cameraPosition, night, elapsed);
     if (this.pending) return;
     const now = performance.now();
     const tile = this.wantedTiles.find(({ key }) => !this.tiles.has(key) && now >= (this.retryAt.get(key) ?? 0));
     if (tile) void this.load(tile);
   }
 
-  updateDistantLights(cameraPosition, night, elapsed) {
+  updateOverview(cameraPosition, night, elapsed) {
     const height = cameraPosition.y - this.terrain.getHeight(cameraPosition.x, cameraPosition.z);
     const fade = 1 - THREE.MathUtils.smoothstep(height, 12500, 15500);
     this.lightMaterial.opacity = night * fade * 0.9;
-    const wanted = this.lightMaterial.opacity > 0 ? this.tilesAround(cameraPosition, lightZoom) : [];
+    this.silhouetteMaterial.opacity = (1 - night) * fade;
+    const wanted = fade > 0 ? this.tilesAround(cameraPosition, overviewZoom) : [];
     const center = wanted[0]?.key;
-    if (center !== this.lightCenter) {
-      this.lightCenter = center;
-      this.retainLightTiles(new Set(wanted.map(tile => tile.key)));
+    if (center !== this.overviewCenter) {
+      this.overviewCenter = center;
+      this.retainOverviewTiles(new Set(wanted.map(tile => tile.key)));
     }
     if (!wanted.length) return;
 
-    for (const points of this.lightTiles.values()) {
-      if (!points) continue;
+    for (const tile of this.overviewTiles.values()) {
+      if (!tile) continue;
+      const { points, silhouettes, detailKeys, footprintOffsets } = tile;
+      points.visible = this.lightMaterial.opacity > 0;
+      if (silhouettes) silhouettes.visible = this.silhouetteMaterial.opacity > 0;
       const { position, color } = points.geometry.attributes;
-      const { detailKeys } = points.geometry.userData;
+      const silhouetteColors = silhouettes?.geometry.attributes.color;
       let changed = false;
+      let silhouettesChanged = false;
       for (let i = 0; i < position.count; i++) {
         const detail = this.tiles.get(detailKeys[i])?.mesh;
         const index = i * 4 + 3;
@@ -304,39 +364,58 @@ export class GeographicBuildings {
         if (alpha === previous) continue;
         color.array[index] = alpha;
         changed = true;
+        const footprint = footprintOffsets[i];
+        if (footprint >= 0) {
+          const start = footprint * boxVertexCount;
+          for (let v = start; v < start + boxVertexCount; v++) silhouetteColors.setW(v, alpha);
+          silhouettesChanged = true;
+        }
       }
       if (changed) color.needsUpdate = true;
+      if (silhouettesChanged) silhouetteColors.needsUpdate = true;
     }
 
-    if (this.pendingLight || performance.now() < this.lightRetryAt) return;
-    const tile = wanted.find(({ key }) => !this.lightTiles.has(key));
-    if (tile) void this.loadLightTile(tile);
+    if (this.pendingOverview || performance.now() < this.overviewRetryAt) return;
+    const tile = wanted.find(({ key }) => !this.overviewTiles.has(key));
+    if (tile) void this.loadOverviewTile(tile);
   }
 
-  retainLightTiles(wanted) {
-    for (const [key, points] of this.lightTiles) {
+  retainOverviewTiles(wanted) {
+    for (const [key, tile] of this.overviewTiles) {
       if (wanted.has(key)) continue;
-      points?.removeFromParent();
-      points?.geometry.dispose();
-      this.lightTiles.delete(key);
+      for (const object of [tile?.points, tile?.silhouettes]) {
+        object?.removeFromParent();
+        object?.geometry.dispose();
+      }
+      this.overviewTiles.delete(key);
     }
-    if (this.pendingLight && !wanted.has(this.pendingLight.key)) this.pendingLight.controller.abort();
+    if (this.pendingOverview && !wanted.has(this.pendingOverview.key)) this.pendingOverview.controller.abort();
   }
 
-  async loadLightTile(tile) {
+  async loadOverviewTile(tile) {
     const controller = new AbortController();
-    this.pendingLight = { key: tile.key, controller };
+    this.pendingOverview = { key: tile.key, controller };
     try {
-      const response = await this.archive.getZxy(lightZoom, tile.x, tile.y, controller.signal);
+      const response = await this.archive.getZxy(overviewZoom, tile.x, tile.y, controller.signal);
       if (controller.signal.aborted) return;
-      const geometry = response && distantLightGeometry(response.data, tile, this.project, this.terrain);
-      const points = geometry ? new THREE.Points(geometry, this.lightMaterial) : null;
-      if (points) this.group.add(points);
-      this.lightTiles.set(tile.key, points);
+      const overview = response && buildOverviewTile(response.data, tile, this.project, this.terrain, this.exclude);
+      if (!overview) {
+        this.overviewTiles.set(tile.key, null);
+        return;
+      }
+      const points = new THREE.Points(overview.lights, this.lightMaterial);
+      points.visible = this.lightMaterial.opacity > 0;
+      this.group.add(points);
+      const silhouettes = overview.silhouettes ? new THREE.Mesh(overview.silhouettes, this.silhouetteMaterial) : null;
+      if (silhouettes) {
+        silhouettes.visible = this.silhouetteMaterial.opacity > 0;
+        this.group.add(silhouettes);
+      }
+      this.overviewTiles.set(tile.key, { points, silhouettes, detailKeys: overview.detailKeys, footprintOffsets: overview.footprintOffsets });
     } catch {
-      if (!controller.signal.aborted) this.lightRetryAt = performance.now() + 5000;
+      if (!controller.signal.aborted) this.overviewRetryAt = performance.now() + 5000;
     } finally {
-      this.pendingLight = null;
+      this.pendingOverview = null;
     }
   }
 
@@ -393,7 +472,7 @@ export class GeographicBuildings {
 
   dispose() {
     this.pending?.controller.abort();
-    this.retainLightTiles(new Set());
+    this.retainOverviewTiles(new Set());
     this.group.removeFromParent();
     for (const { mesh } of this.tiles.values()) mesh?.geometry.dispose();
     if (this.terrain.geographicBuildingLayer === this) delete this.terrain.geographicBuildingLayer;
@@ -404,6 +483,7 @@ export class GeographicBuildings {
     this.material.dispose();
     this.lightMaterial.map.dispose();
     this.lightMaterial.dispose();
+    this.silhouetteMaterial.dispose();
   }
 }
 
