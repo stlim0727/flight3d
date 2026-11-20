@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Mesh, Raycaster, Vector3 } from 'three';
+import { BoxGeometry, Mesh, PerspectiveCamera, Raycaster, Vector3 } from 'three';
 import { buildOpenTerrainTile, decodeTerrarium, OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 
@@ -55,22 +55,35 @@ test('neighbor tiles share the same edge heights', () => {
   world.dispose();
 });
 
-test('keeps detailed imagery local and falls back to the base map when climbing', () => {
+test('prioritizes visible imagery at cruise altitude and fades back to the base map', () => {
   const world = new OpenWorldTerrain({ origin });
-  const mesh = new Mesh();
+  const camera = new PerspectiveCamera(55, 16 / 9, 1, 100000);
+  camera.position.y = 4000;
+  camera.lookAt(0, 0, -10000);
   const baseMap = { dispose() {} };
   let released = false;
   const detailMap = { dispose() { released = true; } };
   const key = `${x}/${y}`;
-  world.tiles.set(key, { mesh, baseMap, detailMap, detailLevel: 13 });
-  world.updateImageryDetail({ x, y }, 600);
+  const front = new Mesh(new BoxGeometry(12000, 100, 12000));
+  front.position.z = -10000;
+  front.material.map = baseMap;
+  const behind = new Mesh(new BoxGeometry(4000, 100, 4000));
+  behind.position.z = 10000;
+  const detail = { map: { value: detailMap }, blend: { value: 0 } };
+  world.tiles.set(key, { mesh: front, baseMap, detailMap, detail, detailLevel: 13, detailUpdatedAt: 0 });
+  world.tiles.set(`${x + 1}/${y}`, { mesh: behind });
+  world.updateImageryDetail(camera, 1080, 350);
   assert.equal(world.detailWanted.get(key), 13);
-  assert.equal(world.detailWanted.get(`${x + 1}/${y}`), 12);
+  assert.equal(world.detailWanted.has(`${x + 1}/${y}`), false);
+  assert.equal(detail.blend.value, 1);
+  camera.lookAt(0, 4000, 10000);
+  world.updateImageryDetail(camera, 1080, 550);
+  assert.equal(world.detailWanted.has(key), false);
+  assert.ok(detail.blend.value > 0 && detail.blend.value < 1);
   assert.equal(released, false);
-  world.updateImageryDetail({ x, y }, 4000);
-  assert.equal(world.detailWanted.size, 0);
+  world.updateImageryDetail(camera, 1080, 900);
   assert.equal(released, true);
-  assert.equal(mesh.material.map, baseMap);
+  assert.equal(front.material.map, baseMap);
   world.dispose();
 });
 
