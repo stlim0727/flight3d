@@ -1,3 +1,4 @@
+import { LandmarkPins } from './ui/LandmarkPins.js';
 import { updateGeographicBuildings } from './environment/GeographicBuildings.js';
 import { updateOpenWorldTerrain } from './environment/OpenWorldTerrain.js';
 import { StartupProgressView } from './ui/StartupProgressView.js';
@@ -1257,6 +1258,7 @@ class FlightSimulator {
     const inSortie = this.gameFlow?.state === FLOW.FLIGHT || this.gameFlow?.state === FLOW.PAUSED;
     return this.currentAircraftId === 'F16'
       && inSortie
+      && this.lastPresetType !== 'jamsil'
       && !this.demoDirector?.isActive
       && !this.pilotArena?.active
       && !this.replayDirector?.active
@@ -1577,6 +1579,8 @@ class FlightSimulator {
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();
+    this.landmarkPins ??= new LandmarkPins(document.getElementById('landmark-pins'));
+    this.landmarkPins.update(this, this.gameFlow.state === FLOW.FLIGHT && !this.startingFlight && !this.isCrashed);
     this.touchControls.updateUI();
     this.diagnostics.update(frameDelta, this.telemetry);
     this.pilotPhysiologyFx?.update(this.cameraSystem?.mode, this.telemetry?.pilot);

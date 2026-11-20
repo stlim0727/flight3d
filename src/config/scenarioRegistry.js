@@ -32,6 +32,12 @@ export const SPAWN_SCENARIOS = {
     briefingKey: 'lobby.briefing.scenario.cruise',
     lobbyButtonId: 'lobby-preset-cru',
   },
+  jamsil: {
+    airports: ['incheon'],
+    labelKeys: { incheon: 'incheon.jamsil.cruise' },
+    briefingKey: 'lobby.briefing.scenario.jamsil',
+    lobbyButtonId: 'lobby-preset-jamsil',
+  },
   // Low flight along the Neon Metropolis river and under its bridges (#551); the swept
   // bridge contact is modelled for the C172, so that aircraft is selected.
   bridge: {

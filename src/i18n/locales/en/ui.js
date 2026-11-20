@@ -390,6 +390,7 @@ export default {
   "lobby.briefing.scenario.runway": "Holding short, ready for takeoff.",
   "lobby.briefing.scenario.approach": "On final approach, gear and flaps down.",
   "lobby.briefing.scenario.challenge": "High and fast on an offset approach with strong gusting crosswinds (19 kt). Direct manual control of pitch, power, flaps, and rudder required.",
+  "lobby.briefing.scenario.jamsil": "Start east of Jamsil and cruise toward Lotte World Tower and central Seoul.",
   "lobby.briefing.scenario.cruise": "Cruising high above the terrain.",
   "lobby.briefing.scenario.bridge": "Automatic C172 · 3 bridges · calm\nStart 10 m above the canal that cuts north through the city, at 89 kt. Fly freely: there is no set route or pass judging. Touching a bridge, a building, a canal wall or the water is a crash.",
   "lobby.briefing.scenario.cliff": "Downhill takeoff run from the cliff-top end (Rwy 24).",

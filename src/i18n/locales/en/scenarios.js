@@ -81,6 +81,7 @@ export default {
   "incheon.runway": "Runway 15R · Ready for takeoff",
   "incheon.approach": "Runway 15R · 1.5 km final",
   "incheon.challenge": "⚡ Runway 15R Crosswind Challenge",
+  "incheon.jamsil.cruise": "Jamsil cruise · 1,150 m",
   "incheon.cruise": "Yeongjong cruise · 750 m",
   "incheon.loading": "Loading Incheon terrain and airport…",
   "incheon.load.failed": "Incheon assets failed to load. Select the airport to retry.",

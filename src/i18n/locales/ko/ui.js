@@ -390,6 +390,7 @@ export default {
   "lobby.briefing.scenario.runway": "활주로 진입 전, 이륙 준비 상태.",
   "lobby.briefing.scenario.approach": "최종 접근 단계, 항행장치와 플랩 전개.",
   "lobby.briefing.scenario.challenge": "강한 해상 측풍(19 kt)과 돌풍, 축 오프셋과 높은 에너지 상태에서 시작합니다. 플랩·스로틀·러더를 직접 조작해 활주로에 정렬하고 감속 착륙하세요.",
+  "lobby.briefing.scenario.jamsil": "잠실 동쪽 상공에서 시작해 롯데월드타워와 서울 도심 방향으로 순항합니다.",
   "lobby.briefing.scenario.cruise": "상공 순항 단계.",
   "lobby.briefing.scenario.bridge": "C172 자동 선택 · 교량 3개 · 무풍\n도심을 남북으로 가로지르는 운하 수면 위 10 m, 89 kt로 시작해 북쪽으로 날아갑니다. 정해진 경로나 통과 판정 없이 자유롭게 비행하세요. 교량·건물·운하 벽·수면에 닿으면 충돌합니다.",
   "lobby.briefing.scenario.cliff": "절벽 끝 24번 활주로 내리막 이륙.",
