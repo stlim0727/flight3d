@@ -240,7 +240,7 @@ export async function loadJejuAirport(base = '', options = {}) {
     isRunwaySafetyArea: (x, z) => activeTerrain.isRunwaySafetyArea(x, z),
     resetTraffic() {},
     update(dt, position, time, options = {}) {
-      if (corridorStreamer && position) {
+      if (corridorStreamer && position && !activeTerrain.openWorld) {
         let headingDeg = options.headingDeg ?? options.trackDeg;
         if (headingDeg === undefined && lastPos) {
           const dx = position.x - lastPos.x;

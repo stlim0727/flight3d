@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { t } from '../i18n/index.js';
 import { BridgeFlightScenario } from '../director/BridgeFlightScenario.js';
+import { regionalCruise, regionalCruiseSpawn } from '../config/regionalCruises.js';
 import { NEON_RIVER } from '../config/neonRiver.js';
 import { NEON_WIND } from '../config/neonWind.js';
 import { BOEING_737_800 } from '../config/aircraftConfigs.js';
@@ -32,6 +33,7 @@ import {
 
 class PresetSpawnerMethods {
   setPreset(type, isDemoInternal = false, pilotPreparation = false) {
+    const regionCruise = regionalCruise(type);
     if (this.multiplayer?.locked) {
       if (this.multiplayer.room.session.state !== 'flying') return;
       type = this.multiplayer.room.session.config.scenario;
@@ -206,6 +208,21 @@ class PresetSpawnerMethods {
 
         this.showToast(() => t('preset.neon.cruise'));
       }
+    } else if (regionCruise) {
+      this.currentAirport?.resetTraffic?.();
+      const spawn = regionalCruiseSpawn(regionCruise, this.currentAircraftId);
+      this.position.set(spawn.x, spawn.y, spawn.z);
+      this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
+      this.angularVelocity.set(0, 0, 0);
+      this.quaternion.setFromEuler(new THREE.Euler(0, spawn.yaw, 0, 'YXZ'));
+      this.controls.throttle = 0.5;
+      this.engines.setThrottle(this.controls.throttle);
+      this.engines.setReverser(false, true);
+      this.gear.setGearTarget(false);
+      this.gear.gearState = this.gear.isFixed ? 1 : 0;
+      this.aero.setFlapPosition(0);
+      this.aero.spoilers = 0;
+      this.showToast(() => t(`regional.cruise.${type}`));
     } else if (this.activeAirport === 'incheon') {
       this.currentAirport.resetTraffic();
       const spawn = incheonSpawn(type, groundClearance, this.currentAircraftId);
@@ -215,11 +232,12 @@ class PresetSpawnerMethods {
       const pitchAttitude = type === 'approach' ? .04 : type === 'challenge' ? .01 : 0;
       this.quaternion.setFromEuler(new THREE.Euler(pitchAttitude, spawn.yaw, 0, 'YXZ'));
       const airborne = type !== 'runway';
+      const cruise = type === 'cruise';
       this.controls.throttle = type === 'challenge' ? .35 : airborne ? .5 : 0;
       this.engines.setThrottle(this.controls.throttle);
       this.engines.setReverser(false, true);
-      this.gear.setGearTarget(type !== 'cruise');
-      this.gear.gearState = this.gear.isFixed || type !== 'cruise' ? 1 : 0;
+      this.gear.setGearTarget(!cruise);
+      this.gear.gearState = this.gear.isFixed || !cruise ? 1 : 0;
       this.aero.setFlapPosition(type === 'approach' ? 5 : (type === 'challenge' || type === 'runway') ? 2 : 0);
       this.aero.spoilers = 0;
       this.controls.pitchTrim = this.aero.pitchTrim = type === 'challenge' ? 1.4 : 1.6;
@@ -465,7 +483,7 @@ class PresetSpawnerMethods {
     this.engines.failed.fill(false);
     this.engines.contactDamage.fill(0);
 
-    if (type === 'approach' || type === 'cruise' || type === 'bridge') {
+    if (type === 'approach' || type === 'cruise' || regionCruise || type === 'bridge') {
       // A preset declares a settled state, not a set of control inputs, so the
       // state variables have to be where the declared configuration puts them:
       // the wing at the commanded flap angle, the fans at the commanded N1, the

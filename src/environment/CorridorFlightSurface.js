@@ -77,9 +77,9 @@ export class CorridorFlightSurface {
       throw new Error('Invalid flight terrain coordinate');
     }
 
-    // Convert local metric coordinates to WGS84
+    const streamed = this.openWorld?.sample(x, z);
+    if (streamed) return streamed.height;
     const { latitude, longitude } = localToWgs84(x, z, this.activeOrigin);
-
     return this.getHeightAtWgs84(latitude, longitude);
   }
 
@@ -173,14 +173,15 @@ export class CorridorFlightSurface {
    * Water surface elevation in meters MSL.
    */
   getWaterLevel(x, z) {
-    return MEAN_SEA_LEVEL_M;
+    const streamed = this.openWorld?.sample(x, z);
+    return streamed ? (streamed.water ? streamed.height : -10000) : MEAN_SEA_LEVEL_M;
   }
 
   /**
    * Whether a given coordinate is over marine waters.
    */
   isWater(x, z) {
-    return this.getHeight(x, z) <= 0.05;
+    return this.openWorld?.sample(x, z)?.water ?? this.getHeight(x, z) <= 0.05;
   }
 
   /**

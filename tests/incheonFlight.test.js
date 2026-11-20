@@ -1,3 +1,4 @@
+import { regionalCruise, regionalCruiseSpawn } from '../src/config/regionalCruises.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -63,7 +64,7 @@ test('runway and approach spawns align with navigation for both aircraft',()=>{
     assert.ok(Math.abs(air.vy/Math.hypot(air.vx,air.vz)+Math.tan(Math.PI/60))<1e-10);
     assert.ok(air.y>surface.getHeight(air.x,air.z)+50);
   }
-  assert.deepEqual(scenariosForAirport('incheon'),['runway','approach','challenge','cruise','demo']);
+  assert.deepEqual(scenariosForAirport('incheon'),['runway','approach','challenge','cruise','jamsil','gwacheon','suwon','busan','demo']);
 });
 
 test('challenge spawn places aircraft on a 3 NM offset approach with high energy',()=>{
@@ -181,4 +182,13 @@ test('a sub-cell water hole uses the exact coast predicate even when all grid no
   const terrain=new IncheonFlightSurface(source);calls=0;
   assert.equal(terrain.getHeight(12,12),0);assert.equal(calls,1);
   calls=0;assert.ok(terrain.getHeight(-100,-100)>0);assert.equal(calls,0);
+});
+
+test('Jamsil cruise starts outside the local Incheon scenery, heading toward Seoul', () => {
+  const spawn = regionalCruiseSpawn(regionalCruise('jamsil'), 'F16');
+  assert.ok(spawn.x > 25000);
+  assert.equal(spawn.y, 1150);
+  assert.ok(spawn.vx < -150);
+  assert.ok(spawn.vz < 0);
+  assert.equal(spawn.vy, 0);
 });

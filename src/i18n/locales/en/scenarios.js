@@ -1,4 +1,9 @@
+import { REGIONAL_CRUISES } from '../../../config/regionalCruises.js';
+
 export default {
+  ...Object.fromEntries(Object.entries(REGIONAL_CRUISES).map(([id, region]) => [
+    `regional.cruise.${id}`, `${region.en} cruise · ${region.altitudeM.toLocaleString('en-US')} m`,
+  ])),
   "demo.scenario.title": "{title} (Demo)",
   "departure.climbInstruction": "Maintain runway heading · Cleared altitude 3000 ft · Squawk 4213",
   "departure.stage.departure": "[9/9] Departure contact · initial climb",

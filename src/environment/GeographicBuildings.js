@@ -302,6 +302,10 @@ export class GeographicBuildings {
     }).filter(tile => tile.y >= 0 && tile.y < worldTiles);
   }
 
+  hasGround(tile, level) {
+    return this.terrain.openWorld?.readyForTile(tile, level) ?? true;
+  }
+
   update(position, cameraPosition = position, sunHeight = 1, elapsed = 1 / 60) {
     if (this.terrain.isLoaded === false) return;
     const night = nightLightLevel(sunHeight);
@@ -320,7 +324,8 @@ export class GeographicBuildings {
     this.updateOverview(cameraPosition, night, elapsed);
     if (this.pending) return;
     const now = performance.now();
-    const tile = this.wantedTiles.find(({ key }) => !this.tiles.has(key) && now >= (this.retryAt.get(key) ?? 0));
+    const tile = this.wantedTiles.find(candidate => !this.tiles.has(candidate.key)
+      && now >= (this.retryAt.get(candidate.key) ?? 0) && this.hasGround(candidate, zoom));
     if (tile) void this.load(tile);
   }
 
@@ -376,7 +381,7 @@ export class GeographicBuildings {
     }
 
     if (this.pendingOverview || performance.now() < this.overviewRetryAt) return;
-    const tile = wanted.find(({ key }) => !this.overviewTiles.has(key));
+    const tile = wanted.find(candidate => !this.overviewTiles.has(candidate.key) && this.hasGround(candidate, overviewZoom));
     if (tile) void this.loadOverviewTile(tile);
   }
 

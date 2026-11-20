@@ -1,4 +1,7 @@
+import { regionalCruise } from './config/regionalCruises.js';
+import { LandmarkPins } from './ui/LandmarkPins.js';
 import { updateGeographicBuildings } from './environment/GeographicBuildings.js';
+import { updateOpenWorldTerrain } from './environment/OpenWorldTerrain.js';
 import { StartupProgressView } from './ui/StartupProgressView.js';
 import { compileVisibleScene } from './core/sceneShaderWarmup.js';
 import { FlightPerformanceMonitor, FlightGpuTimer } from './core/FlightPerformanceMonitor.js';
@@ -1256,6 +1259,7 @@ class FlightSimulator {
     const inSortie = this.gameFlow?.state === FLOW.FLIGHT || this.gameFlow?.state === FLOW.PAUSED;
     return this.currentAircraftId === 'F16'
       && inSortie
+      && !regionalCruise(this.lastPresetType)
       && !this.demoDirector?.isActive
       && !this.pilotArena?.active
       && !this.replayDirector?.active
@@ -1499,6 +1503,7 @@ class FlightSimulator {
       });
     }
     this.sky.updateSun(this.position, this.camera.position);
+    updateOpenWorldTerrain(this);
     updateGeographicBuildings(this, frameDelta);
     this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     if (!this.gameFlow.isPhysicsFrozen()) {
@@ -1575,6 +1580,8 @@ class FlightSimulator {
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();
+    this.landmarkPins ??= new LandmarkPins(document.getElementById('landmark-pins'));
+    this.landmarkPins.update(this, this.gameFlow.state === FLOW.FLIGHT && !this.startingFlight && !this.isCrashed);
     this.touchControls.updateUI();
     this.diagnostics.update(frameDelta, this.telemetry);
     this.pilotPhysiologyFx?.update(this.cameraSystem?.mode, this.telemetry?.pilot);

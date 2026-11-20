@@ -1,3 +1,5 @@
+import { regionalCruise } from '../config/regionalCruises.js';
+import { updateOpenWorldTerrain } from '../environment/OpenWorldTerrain.js';
 import { ScenarioStartCoordinator } from './ScenarioStartCoordinator.js';
 import { applyDeviceTimeOfDay, saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { saveFlightSelection } from '../config/flightSelection.js';
@@ -29,7 +31,11 @@ export function createSimulatorScenarioStart(sim) {
     installers: {
       // PresetSpawner owns the recording after pose installation; mission adapters
       // own recording before course preparation. Neither is restarted at commit.
-      preset: request => sim.setPreset(request.scenario),
+      preset(request) {
+        const result = sim.setPreset(request.scenario);
+        if (!regionalCruise(request.scenario)) return result;
+        return waitForRegionalTerrain(sim);
+      },
       demo(request) {
         if (sim.demoDirector.start(null, request.demoProfile) === false) {
           throw new Error('Demo scenario could not start.');
@@ -56,4 +62,13 @@ export function createSimulatorScenarioStart(sim) {
       if (sim.multiplayer?.active && sim.multiplayer.preparing) sim.gameFlow.pause();
     },
   });
+}
+
+async function waitForRegionalTerrain(sim) {
+  const deadline = performance.now() + 6000;
+  do {
+    updateOpenWorldTerrain(sim);
+    if (sim.currentTerrain.openWorld?.readyAt(sim.position.x, sim.position.z)) return;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  } while (performance.now() < deadline);
 }

@@ -36,6 +36,7 @@
 
   <!-- Flight Telemetry HUD Overlay -->
   <div id="hud-overlay">
+    <div id="landmark-pins" hidden aria-hidden="true"></div>
     <!-- Top Instrument Telemetry Strip -->
     <header class="hud-strip">
       <div class="hud-item hud-primary" data-hud="ias">
@@ -348,6 +349,12 @@
               <button id="lobby-preset-valley" class="btn btn-preset btn-valley"><span>⚡ 계곡 저공 슬라롬</span></button>
               <button id="lobby-preset-demo" class="btn btn-preset"><span>🎬 데모 비행</span></button>
             </div>
+          </div>
+          <div class="lobby-group">
+            <label class="lobby-label" for="lobby-regional-cruise" data-i18n="lobby.regional.cruise">지역 순항</label>
+            <select id="lobby-regional-cruise">
+              <option value="" disabled data-i18n="lobby.regional.pick">지역 선택</option>
+            </select>
           </div>
           <div id="lobby-valley-options" class="lobby-group lobby-valley-options" hidden>
             <span class="lobby-label" data-i18n="valley.mode.label">조종 방식 선택 (사람 / AI)</span>
@@ -762,6 +769,11 @@
   </dialog>
   <audio id="mp-audio" autoplay playsinline></audio>
   <script type="module" src="./src/main.js"></script>
+  <aside id="open-world-attribution" hidden>
+    Terrain <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener">Mapzen</a>
+    · Water <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener">Overture / OpenStreetMap contributors</a>
+    · Imagery <a href="https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9" target="_blank" rel="noopener">Esri and imagery contributors</a>
+  </aside>
   <aside id="geographic-buildings-attribution" hidden>
     <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener">© OpenStreetMap contributors · Overture Maps Foundation</a>
   </aside>

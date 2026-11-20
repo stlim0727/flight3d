@@ -1,7 +1,9 @@
+import { REGIONAL_CRUISES } from './regionalCruises.js';
+
 /**
  * Single source of truth for lobby spawn scenarios. Each scenario declares
  * which airports offer it, per-airport button labels, its briefing line, and
- * the DOM id of its lobby button. Consumers (LobbyScreen, lobbyBriefing,
+ * the DOM id for button-based lobby scenarios. Consumers (LobbyScreen, lobbyBriefing,
  * Simulator.setPreset/setAirport) derive availability from this table instead
  * of duplicating airport conditionals.
  */
@@ -32,6 +34,11 @@ export const SPAWN_SCENARIOS = {
     briefingKey: 'lobby.briefing.scenario.cruise',
     lobbyButtonId: 'lobby-preset-cru',
   },
+  ...Object.fromEntries(Object.entries(REGIONAL_CRUISES).map(([id, { airport }]) => [id, {
+    airports: [airport],
+    labelKeys: { [airport]: `regional.cruise.${id}` },
+    briefingKey: id === 'jamsil' ? 'lobby.briefing.scenario.jamsil' : 'lobby.briefing.scenario.regional',
+  }])),
   // Low flight along the Neon Metropolis river and under its bridges (#551); the swept
   // bridge contact is modelled for the C172, so that aircraft is selected.
   bridge: {

@@ -1,3 +1,4 @@
+import { REGIONAL_CRUISES, regionalCruise } from '../config/regionalCruises.js';
 import { demoProfiles, resolveDemoProfile } from '../director/demoProfiles.js';
 import { bindText, getLanguage, setLanguage, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
@@ -174,6 +175,22 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   ]) {
     document.getElementById(id)?.addEventListener('click', handler);
   }
+  const regionalSelect = document.getElementById('lobby-regional-cruise');
+  if (regionalSelect) {
+    for (const id of Object.keys(REGIONAL_CRUISES)) {
+      const option = document.createElement('option');
+      option.value = id;
+      bindText(option, () => t(`regional.cruise.${id}`));
+      regionalSelect.append(option);
+    }
+    regionalSelect.addEventListener('change', () => {
+      const id = regionalSelect.value;
+      const region = regionalCruise(id);
+      if (!region) return;
+      if (getAirport() !== region.airport) onAirport(region.airport);
+      onPreset(id);
+    });
+  }
   for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
     if (type === 'demo') continue;
     document.getElementById(scenario.lobbyButtonId)?.addEventListener('click', () => {
@@ -236,6 +253,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     }
     if ((aircraft === 'F16' && !['lukla','incheon'].includes(airport)) && getPreset() === 'demo') onPreset('runway');
     const preset = getPreset();
+    if (regionalSelect) regionalSelect.value = regionalCruise(preset) ? preset : '';
     // Follow the selected flight even while the menu is closed. The live
     // binding also refreshes the browser tab when the language changes.
     bindText(document.querySelector('title'), () => {
@@ -450,6 +468,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   /** Show that a choice is being applied while the host defers the heavy work. */
   function setSelectionBusy(busy) {
     if (selectionEl) selectionEl.hidden = !busy;
+    if (regionalSelect) regionalSelect.disabled = busy;
     const flyBtn = document.getElementById('btn-fly');
     if (flyBtn) flyBtn.disabled = busy;
     const resume = document.getElementById('btn-lobby-resume');

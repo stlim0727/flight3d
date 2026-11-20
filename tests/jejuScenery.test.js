@@ -199,7 +199,7 @@ test('loadJejuAirport builds 3D runways, terminal, tower, and lighting', async (
 
 test('scenarioRegistry and lobbySpecs expose Jeju scenarios and specs', () => {
   const scenarios = scenariosForAirport('jeju');
-  assert.deepEqual(scenarios, ['runway', 'approach', 'challenge', 'cruise']);
+  assert.deepEqual(scenarios, ['runway', 'approach', 'challenge', 'cruise', 'jeju-city']);
 
   const spec = airportSpec('jeju');
   assert.equal(spec, 'RWY 067° · 118 FT · GS 3°');
