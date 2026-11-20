@@ -66,6 +66,14 @@ function readWaterMask(data) {
   return context.getImageData(0, 0, samples, samples).data;
 }
 
+function imageryTexture(image) {
+  const texture = new THREE.Texture(image);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function clipSide(polygon, axis, limit, direction) {
   const clipped = [];
   let a = polygon.at(-1);
@@ -186,6 +194,8 @@ export class OpenWorldTerrain {
     this.pending = new Map();
     this.retry = new Map();
     this.wanted = [];
+    this.detailWanted = new Map();
+    this.pendingDetail = null;
     this.project = (latitude, longitude) => wgs84ToLocal(latitude, longitude, origin);
   }
 
@@ -250,11 +260,71 @@ export class OpenWorldTerrain {
       for (const [key, controller] of this.pending) if (!keys.has(key)) controller.abort();
       for (const key of this.retry.keys()) if (!keys.has(key)) this.retry.delete(key);
     }
+    this.updateImageryDetail(center, position.y - (this.sample(position.x, position.z)?.height ?? 0));
     if (this.pending.size >= 3) return;
     const now = performance.now();
     const next = this.wanted.find(({ key }) =>
       !this.tiles.has(key) && !this.pending.has(key) && now >= (this.retry.get(key) ?? 0));
     if (next) void this.load(next);
+  }
+
+  updateImageryDetail(center, height) {
+    const selection = height < 3500 ? keyOf(wrapX(center.x), center.y) : null;
+    if (selection !== this.detailSelection) {
+      this.detailSelection = selection;
+      this.detailWanted.clear();
+      if (selection) {
+        this.detailWanted.set(selection, 13);
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          this.detailWanted.set(keyOf(wrapX(center.x + dx), center.y + dy), 12);
+        }
+      }
+      for (const [key, entry] of this.tiles) {
+        if (!entry.detailMap || this.detailWanted.get(key) >= entry.detailLevel) continue;
+        entry.detailMap.dispose();
+        entry.detailMap = null;
+        entry.detailLevel = zoom;
+        this.applyImagery(entry, entry.baseMap);
+      }
+    }
+
+    if (this.pendingDetail || this.pending.size) return;
+    const now = performance.now();
+    for (const [key, level] of this.detailWanted) {
+      const entry = this.tiles.get(key);
+      if (!entry?.baseMap || entry.detailLevel >= level || now < (entry.detailRetryAt ?? 0)) continue;
+      this.pendingDetail = this.loadImageryDetail(key, entry, level).finally(() => { this.pendingDetail = null; });
+      break;
+    }
+  }
+
+  applyImagery(entry, map) {
+    const material = entry.mesh.material;
+    material.map = map;
+    material.vertexColors = !map;
+    material.needsUpdate = true;
+  }
+
+  async loadImageryDetail(key, entry, level) {
+    const [x, y] = key.split('/').map(Number);
+    const count = 2 ** (level - zoom);
+    const images = await Promise.all(Array.from({ length: count * count }, (_, i) =>
+      this.imageryCache.getTileImage(level, x * count + i % count, y * count + Math.floor(i / count))));
+    if (this.tiles.get(key) !== entry || this.detailWanted.get(key) !== level) return;
+    if (images.some(image => !image || image.width !== samples || image.height !== samples)) {
+      entry.detailRetryAt = performance.now() + 15000;
+      return;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = samples * count;
+    const context = canvas.getContext('2d');
+    for (const [i, image] of images.entries()) {
+      context.drawImage(image, (i % count) * samples, Math.floor(i / count) * samples);
+    }
+    entry.detailMap?.dispose();
+    entry.detailMap = imageryTexture(canvas);
+    entry.detailLevel = level;
+    this.applyImagery(entry, entry.detailMap);
   }
 
   raster(x, y) {
@@ -296,19 +366,15 @@ export class OpenWorldTerrain {
       const material = new THREE.MeshLambertMaterial({ vertexColors: true });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
-      this.tiles.set(key, { mesh, water });
+      const entry = { mesh, water, baseMap: null, detailLevel: zoom };
+      this.tiles.set(key, entry);
       this.group.add(mesh);
       this.retry.delete(key);
       if (!geometry.index.count) return;
       const image = await this.imageryCache.getTileImage(zoom, x, y);
       if (!image || this.tiles.get(key)?.mesh !== mesh) return;
-      const texture = new THREE.Texture(image);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.anisotropy = 4;
-      texture.needsUpdate = true;
-      material.map = texture;
-      material.vertexColors = false;
-      material.needsUpdate = true;
+      entry.baseMap = imageryTexture(image);
+      this.applyImagery(entry, entry.baseMap);
     } catch {
       if (!controller.signal.aborted) this.retry.set(key, performance.now() + 4000);
     } finally {
@@ -316,11 +382,12 @@ export class OpenWorldTerrain {
     }
   }
 
-  release(key, { mesh }) {
+  release(key, { mesh, baseMap, detailMap }) {
     this.tiles.delete(key);
     mesh.removeFromParent();
     mesh.geometry.dispose();
-    mesh.material.map?.dispose();
+    baseMap?.dispose();
+    detailMap?.dispose();
     mesh.material.dispose();
   }
 

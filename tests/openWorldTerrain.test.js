@@ -54,3 +54,22 @@ test('neighbor tiles share the same edge heights', () => {
   right.dispose();
   world.dispose();
 });
+
+test('keeps detailed imagery local and falls back to the base map when climbing', () => {
+  const world = new OpenWorldTerrain({ origin });
+  const mesh = new Mesh();
+  const baseMap = { dispose() {} };
+  let released = false;
+  const detailMap = { dispose() { released = true; } };
+  const key = `${x}/${y}`;
+  world.tiles.set(key, { mesh, baseMap, detailMap, detailLevel: 13 });
+  world.updateImageryDetail({ x, y }, 600);
+  assert.equal(world.detailWanted.get(key), 13);
+  assert.equal(world.detailWanted.get(`${x + 1}/${y}`), 12);
+  assert.equal(released, false);
+  world.updateImageryDetail({ x, y }, 4000);
+  assert.equal(world.detailWanted.size, 0);
+  assert.equal(released, true);
+  assert.equal(mesh.material.map, baseMap);
+  world.dispose();
+});
