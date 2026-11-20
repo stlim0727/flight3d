@@ -76,7 +76,7 @@ test('drapes major surface roads and skips tunnels, mixed spans and minor classe
   geometry.computeBoundingBox();
   assert.ok(Math.abs(geometry.boundingBox.min.y - 44.35) < 1e-3);
   assert.ok(Math.abs(geometry.boundingBox.max.y - 44.35) < 1e-3);
-  assert.equal(geometry.attributes.position.count, 10);
+  assert.ok(geometry.attributes.position.count >= 10);
   const width = Math.hypot(
     geometry.attributes.position.getX(0) - geometry.attributes.position.getX(1),
     geometry.attributes.position.getZ(0) - geometry.attributes.position.getZ(1),
@@ -96,9 +96,9 @@ test('omits water, excluded and off-map sections without dropping the whole tile
   };
   const split = (at(200) + at(300)) / 2;
   const wet = { ...terrain, isWater: x => x > split };
-  const wetGeometry = buildGeographicRoadTile(data, tile, project, wet);
-  assert.ok(wetGeometry);
-  assert.equal(wetGeometry.attributes.position.count, 4);
+  const full = buildGeographicRoadTile(data, tile, project, terrain);
+  assert.ok(buildGeographicRoadTile(data, tile, project, wet).attributes.position.count < full.attributes.position.count);
+  full.dispose();
   assert.equal(buildGeographicRoadTile(data, tile, project, terrain, () => true), null);
   const bounded = { ...terrain, size: 10 };
   assert.equal(buildGeographicRoadTile(data, tile, project, bounded), null);
@@ -205,6 +205,8 @@ test('classifies only whole-segment bridges and honors evidenced height', () => 
   const evidenced = bridgeSpan({ road_flags: '[{"values":["is_bridge"]}]', height: '52' });
   assert.equal(evidenced.evidenced, true);
   assert.equal(evidenced.height, 52);
+  assert.equal(bridgeSpan({ road_flags: '[{"values":["is_link"]}]' }).skip, false);
+  assert.equal(bridgeSpan({ level_rules: '[{"value":0}]' }).skip, false);
 });
 
 test('renders bridge decks above the surface and collides only where height is evidenced', async () => {
@@ -285,4 +287,17 @@ test('retries a failed tile and reloads after cache eviction', async () => {
   }
   assert.equal(roads.tiles.size, 9);
   roads.dispose();
+});
+
+test('densifies a surface road so an interior hill is not buried', () => {
+  const { latitude, longitude } = tileToWgs84(tile.x + 350 / 4096, tile.y + 100 / 4096, 13);
+  const [midX] = project(latitude, longitude);
+  const data = segmentTile([{ properties: { class: 'primary' }, points: [[100, 100], [600, 100]] }]);
+  const hill = { getHeight: (x) => Math.abs(x - midX) < 60 ? 60 : 44, isWater: () => false };
+  const geometry = buildGeographicRoadTile(data, tile, project, hill);
+  assert.ok(geometry);
+  assert.ok(geometry.attributes.position.count > 4, 'lengthwise samples must be inserted');
+  const heights = [...geometry.attributes.position.array].filter((_, index) => index % 3 === 1);
+  assert.ok(Math.max(...heights) > 59, 'interior hill must be sampled');
+  geometry.dispose();
 });

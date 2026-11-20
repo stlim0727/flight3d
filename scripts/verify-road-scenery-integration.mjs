@@ -66,6 +66,8 @@ await withBrowserSession(
             roads: roads?.tiles?.size ?? 0,
             green: s?.geographicGreenLayer?.tiles?.size ?? 0,
           },
+          roadsWithGeometry: [...(roads?.tiles?.values() ?? [])].filter(Boolean).length,
+          greenWithGeometry: [...(s?.geographicGreenLayer?.tiles?.values() ?? [])].filter(Boolean).length,
           lamps: { near: roads?.nearLamps?.length ?? 0, far: roads?.farLamps?.length ?? 0 },
           visible: Boolean(roads?.lampPoints?.visible),
           bridges: [...(roads?.bridges?.values() ?? [])].flat().length,
@@ -85,6 +87,11 @@ await withBrowserSession(
       assert.ok(result.tiles.roads > 0, `${result.name}: no road tiles`);
       assert.ok(result.tiles.green > 0, `${result.name}: no green tiles`);
       assert.equal(result.visible, result.sunHeight < 0, `${result.name}: lamp gate disagrees with sun height`);
+      assert.ok(result.roadsWithGeometry > 0, `${result.name}: no road geometry`);
+      assert.ok(result.greenWithGeometry > 0, `${result.name}: no green geometry`);
+      if (result.sunHeight < 0) {
+        assert.ok(result.lamps.near + result.lamps.far > 0, `${result.name}: no lamps at night`);
+      }
     }
     assert.equal(report.exceptions.length, 0);
     assert.equal(report.consoleErrors, 0);

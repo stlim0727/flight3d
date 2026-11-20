@@ -39,17 +39,6 @@ function parsed(value) {
   try { return JSON.parse(value); } catch { return undefined; }
 }
 
-function flagsOf(properties) {
-  const flags = parsed(properties.road_flags);
-  return (Array.isArray(flags) ? flags : [flags]).flatMap(flag =>
-    flag?.values ?? (flag?.value ? [flag.value] : []));
-}
-
-function isElevated(properties) {
-  if (flagsOf(properties).some(flag => ['is_bridge', 'is_tunnel', 'is_covered', 'is_indoor'].includes(flag))) return true;
-  const levels = parsed(properties.level_rules);
-  return (Array.isArray(levels) ? levels : levels ? [levels] : []).some(rule => rule?.value !== 0);
-}
 
 /**
  * Only whole-segment bridges are rendered: `between` is relative to the
@@ -58,25 +47,26 @@ function isElevated(properties) {
  * height is evidenced only when the source provides one.
  */
 export function bridgeSpan(properties) {
-  const rules = (() => {
-    const collected = [];
-    const flags = parsed(properties.road_flags);
-    for (const flag of Array.isArray(flags) ? flags : flags ? [flags] : []) {
-      for (const value of flag?.values ?? (flag?.value ? [flag.value] : [])) collected.push({ value, between: flag?.between });
+  const flags = [];
+  const levels = [];
+  const rawFlags = parsed(properties.road_flags);
+  for (const flag of Array.isArray(rawFlags) ? rawFlags : rawFlags ? [rawFlags] : []) {
+    for (const value of flag?.values ?? (flag?.value ? [flag.value] : [])) {
+      flags.push({ value, between: flag?.between });
     }
-    const levels = parsed(properties.level_rules);
-    for (const level of Array.isArray(levels) ? levels : levels ? [levels] : []) collected.push(level);
-    return collected;
-  })();
-  const values = rules.map(rule => rule?.value);
-  const mixed = rules.some(rule => rule?.between);
-  const bridge = values.includes('is_bridge') || values.some(value => value === 1);
-  const tunnel = values.includes('is_tunnel') || values.includes('is_covered') || values.includes('is_indoor')
-    || values.some(value => value === -1 || value === -2);
+  }
+  const rawLevels = parsed(properties.level_rules);
+  for (const level of Array.isArray(rawLevels) ? rawLevels : rawLevels ? [rawLevels] : []) levels.push(level);
+  const flagValues = flags.map(flag => flag.value);
+  const levelValues = levels.map(level => level?.value);
+  const mixed = [...flags, ...levels].some(rule => rule?.between);
+  const bridge = flagValues.includes('is_bridge') || levelValues.some(value => value > 0);
+  const tunnel = flagValues.some(value => ['is_tunnel', 'is_covered', 'is_indoor'].includes(value))
+    || levelValues.some(value => value < 0);
   const height = Number(properties.height);
   return {
     deck: bridge && !tunnel && !mixed,
-    skip: tunnel || mixed || (!bridge && values.some(value => value !== 0 && value !== undefined)),
+    skip: tunnel || mixed || (!bridge && levelValues.some(value => value !== 0)),
     evidenced: Number.isFinite(height) && height > 0,
     height: Number.isFinite(height) && height > 0 ? height : null,
   };
@@ -124,6 +114,24 @@ function ribbon(points, width, heights, color, heightAt = null) {
       color,
     };
   });
+}
+
+/** Insert samples at terrain-grid scale so long segments follow hills and valleys. */
+export function densifyRun(points, heightAt, spacing = 25) {
+  if (points.length < 2) return points;
+  const dense = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / spacing));
+    for (let step = 1; step <= steps; step++) {
+      const t = step / steps;
+      const x = a.x + (b.x - a.x) * t;
+      const z = a.z + (b.z - a.z) * t;
+      dense.push({ x, z, height: heightAt(x, z) });
+    }
+  }
+  return dense;
 }
 
 /** Both sides of a run, spaced by road class; positions are the pole bases. */
@@ -193,10 +201,11 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
       let run = [];
       const emit = () => {
         if (run.length < 2) return;
+        const stripPoints = span.deck ? run : densifyRun(run, (x, z) => terrain.getHeight(x, z));
         const heights = span.deck
           ? run.map(() => span.evidenced ? span.height : Math.max(...run.map(point => point.height)) + 8)
-          : run.map(point => point.height);
-        const strip = ribbon(run, width, heights, color, span.deck ? null : (x, z) => terrain.getHeight(x, z));
+          : stripPoints.map(point => point.height);
+        const strip = ribbon(stripPoints, width, heights, color, span.deck ? null : (x, z) => terrain.getHeight(x, z));
         const base = positions.length / 3;
         for (const vertex of strip) {
           positions.push(vertex.left.x, vertex.left.y, vertex.left.z,
