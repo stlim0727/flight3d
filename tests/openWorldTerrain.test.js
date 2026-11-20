@@ -134,6 +134,11 @@ test('repairs isolated coastal DEM extremes while preserving steep connected ter
   for (let row = 20; row <= 30; row++) {
     for (let col = 20; col <= 30; col++) raster[row * 256 + col] = 900;
   }
+  // A steep plane crosses the northwest corner. The in-tile neighbors
+  // alone would all vote to flatten its valid 2000 m corner.
+  for (let row = 0; row <= 8; row++) {
+    for (let col = 0; col <= 8; col++) raster[row * 256 + col] = 2000 - 100 * (row + col);
+  }
   const rgba = new Uint8ClampedArray(256 ** 2 * 4);
   for (const [index, height] of raster.entries()) {
     const encoded = height + 32768;
@@ -152,7 +157,8 @@ test('repairs isolated coastal DEM extremes while preserving steep connected ter
     assert.equal(repaired[244 * 256 + 36], 25);
     assert.equal(repaired[244 * 256 + 38], 20);
     assert.equal(repaired[20 * 256 + 20], 900);
-    assert.equal(repaired[2 * 256 + 2], 20);
+    assert.equal(repaired[0], 2000);
+    assert.equal(repaired[2 * 256 + 2], 1600);
   } finally {
     delete globalThis.document;
     world.dispose();

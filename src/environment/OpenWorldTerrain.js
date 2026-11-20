@@ -47,16 +47,16 @@ function repairElevationSpikes(heights) {
   const neighbors = [];
   // Compare the same samples the mesh uses. Read from the original raster so
   // a repair cannot propagate through nearby samples or depend on tile order.
-  for (let row = 0; row < samples; row += sampleStep) {
-    for (let col = 0; col < samples; col += sampleStep) {
+  // Leave raster edges intact because their neighborhoods cross tile boundaries.
+  for (let row = sampleStep; row < samples - sampleStep; row += sampleStep) {
+    for (let col = sampleStep; col < samples - sampleStep; col += sampleStep) {
       const index = row * samples + col;
       const height = heights[index];
       let lower = 0, higher = 0;
       neighbors.length = 0;
       for (let dy = -sampleStep; dy <= sampleStep; dy += sampleStep) {
         for (let dx = -sampleStep; dx <= sampleStep; dx += sampleStep) {
-          if ((dx === 0 && dy === 0) || row + dy < 0 || row + dy >= samples
-            || col + dx < 0 || col + dx >= samples) continue;
+          if (dx === 0 && dy === 0) continue;
           const neighbor = heights[index + dy * samples + dx];
           neighbors.push(neighbor);
           if (height - neighbor > isolatedHeightDelta) lower++;
@@ -67,7 +67,7 @@ function repairElevationSpikes(heights) {
       if (lower < consensus && higher < consensus) continue;
       neighbors.sort((a, b) => a - b);
       const middle = Math.floor(neighbors.length / 2);
-      repaired[index] = (neighbors[middle] + neighbors[Math.floor((neighbors.length - 1) / 2)]) / 2;
+      repaired[index] = (neighbors[middle - 1] + neighbors[middle]) / 2;
     }
   }
   return repaired;
