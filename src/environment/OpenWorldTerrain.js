@@ -21,9 +21,9 @@ const keyOf = (x, y) => `${x}/${y}`;
 const wrapX = x => (x + tilesAcross) % tilesAcross;
 const contains = ([west, north, east, south], x, z) => x >= west && x <= east && z >= north && z <= south;
 
-function projectedBounds(x, y, project) {
+function projectedBounds(x, y, project, level = zoom) {
   const corners = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]].map(([tx, ty]) => {
-    const { latitude, longitude } = tileToWgs84(tx, ty, zoom);
+    const { latitude, longitude } = tileToWgs84(tx, ty, level);
     return project(latitude, longitude);
   });
   const xs = corners.map(point => point[0]);
@@ -196,6 +196,8 @@ export class OpenWorldTerrain {
     this.wanted = [];
     this.detailWanted = new Map();
     this.pendingDetail = null;
+    this.pendingImagery = null;
+    this.pendingWater = null;
     this.project = (latitude, longitude) => wgs84ToLocal(latitude, longitude, origin);
   }
 
@@ -237,6 +239,15 @@ export class OpenWorldTerrain {
     return this.tiles.has(keyOf(wrapX(tx), ty));
   }
 
+  readyForTile(tile, level) {
+    const [west, north, east, south] = projectedBounds(tile.x, tile.y, this.project, level);
+    if (this.protectedAreas.some(area => contains(area, west, north) && contains(area, east, south))) return true;
+    const children = 2 ** (level - zoom);
+    const x = Math.floor(tile.x / children);
+    const y = Math.floor(tile.y / children);
+    return this.tiles.has(keyOf(wrapX(x), y));
+  }
+
   update(position, velocity) {
     const center = this.coordinate(position.x, position.z);
     const forward = this.coordinate(position.x + velocity.x * 65, position.z + velocity.z * 65);
@@ -260,12 +271,68 @@ export class OpenWorldTerrain {
       for (const [key, controller] of this.pending) if (!keys.has(key)) controller.abort();
       for (const key of this.retry.keys()) if (!keys.has(key)) this.retry.delete(key);
     }
+    this.updateTileResources();
     this.updateImageryDetail(center, position.y - (this.sample(position.x, position.z)?.height ?? 0));
     if (this.pending.size >= 3) return;
     const now = performance.now();
     const next = this.wanted.find(({ key }) =>
       !this.tiles.has(key) && !this.pending.has(key) && now >= (this.retry.get(key) ?? 0));
     if (next) void this.load(next);
+  }
+
+  updateTileResources() {
+    const now = performance.now();
+    if (!this.pendingImagery && !this.pendingDetail) {
+      const tile = this.wanted.find(({ key }) => {
+        const entry = this.tiles.get(key);
+        return entry?.mesh.geometry.index?.count && !entry.baseMap && now >= (entry.imageryRetryAt ?? 0);
+      });
+      if (tile) {
+        this.pendingImagery = this.loadBaseImagery(tile, this.tiles.get(tile.key))
+          .finally(() => { this.pendingImagery = null; });
+      }
+    }
+    if (!this.pendingWater) {
+      const tile = this.wanted.find(({ key }) => {
+        const entry = this.tiles.get(key);
+        return entry && entry.water === undefined && now >= entry.waterRetryAt;
+      });
+      if (tile) {
+        this.pendingWater = this.retryWater(tile, this.tiles.get(tile.key))
+          .finally(() => { this.pendingWater = null; });
+      }
+    }
+  }
+
+  async loadBaseImagery({ x, y, key }, entry) {
+    const image = await this.imageryCache.getTileImage(zoom, x, y);
+    if (this.tiles.get(key) !== entry) return;
+    if (!image) {
+      entry.imageryRetryAt = performance.now() + 8000;
+      return;
+    }
+    entry.baseMap = imageryTexture(image);
+    this.applyImagery(entry, entry.baseMap);
+  }
+
+  async fetchWater({ x, y }, signal) {
+    try {
+      const result = await this.waterSource.getZxy(zoom, x, y, AbortSignal.any([signal, AbortSignal.timeout(4500)]));
+      // null is a successful lookup without a tile, undefined means retryable failure.
+      return result ? readWaterMask(result.data) : null;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async retryWater(tile, entry) {
+    const controller = new AbortController();
+    entry.waterRequest = controller;
+    const water = await this.fetchWater(tile, controller.signal);
+    if (this.tiles.get(tile.key) !== entry) return;
+    entry.waterRequest = null;
+    entry.water = water;
+    entry.waterRetryAt = performance.now() + 8000;
   }
 
   updateImageryDetail(center, height) {
@@ -288,7 +355,7 @@ export class OpenWorldTerrain {
       }
     }
 
-    if (this.pendingDetail || this.pending.size) return;
+    if (this.pendingDetail || this.pendingImagery || this.pending.size) return;
     const now = performance.now();
     for (const [key, level] of this.detailWanted) {
       const entry = this.tiles.get(key);
@@ -354,8 +421,7 @@ export class OpenWorldTerrain {
     const controller = new AbortController();
     this.pending.set(key, controller);
     try {
-      const waterData = this.waterSource.getZxy(zoom, x, y, AbortSignal.any([controller.signal, AbortSignal.timeout(4500)]))
-        .then(result => result && readWaterMask(result.data)).catch(() => undefined);
+      const waterData = this.fetchWater(tile, controller.signal);
       const [raster, east, south, southeast, water] = await Promise.all([
         this.raster(x, y), this.raster(wrapX(x + 1), y), this.raster(x, y + 1), this.raster(wrapX(x + 1), y + 1), waterData,
       ]);
@@ -366,15 +432,10 @@ export class OpenWorldTerrain {
       const material = new THREE.MeshLambertMaterial({ vertexColors: true });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
-      const entry = { mesh, water, baseMap: null, detailLevel: zoom };
+      const entry = { mesh, water, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
       this.tiles.set(key, entry);
       this.group.add(mesh);
       this.retry.delete(key);
-      if (!geometry.index.count) return;
-      const image = await this.imageryCache.getTileImage(zoom, x, y);
-      if (!image || this.tiles.get(key)?.mesh !== mesh) return;
-      entry.baseMap = imageryTexture(image);
-      this.applyImagery(entry, entry.baseMap);
     } catch {
       if (!controller.signal.aborted) this.retry.set(key, performance.now() + 4000);
     } finally {
@@ -382,7 +443,8 @@ export class OpenWorldTerrain {
     }
   }
 
-  release(key, { mesh, baseMap, detailMap }) {
+  release(key, { mesh, baseMap, detailMap, waterRequest }) {
+    waterRequest?.abort();
     this.tiles.delete(key);
     mesh.removeFromParent();
     mesh.geometry.dispose();

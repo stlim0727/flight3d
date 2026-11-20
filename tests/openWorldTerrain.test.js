@@ -73,3 +73,51 @@ test('keeps detailed imagery local and falls back to the base map when climbing'
   assert.equal(mesh.material.map, baseMap);
   world.dispose();
 });
+
+test('building tiles crossing the Incheon scenery edge wait for their DEM parent', () => {
+  const world = new OpenWorldTerrain({
+    origin: { latitude: 37.448, longitude: 126.455 },
+    protectedAreas: [[-25000, -25000, 25000, 25000]],
+  });
+  const crossing = { x: 13959, y: 6351 };
+  const center = tileToWgs84(crossing.x + 0.5, crossing.y + 0.5, 14);
+  assert.equal(world.readyAt(...world.project(center.latitude, center.longitude)), true);
+  assert.equal(world.readyForTile(crossing, 14), false);
+  assert.equal(world.readyForTile({ x: crossing.x - 2, y: crossing.y }, 14), true);
+  world.tiles.set('1744/793', { mesh: new Mesh() });
+  assert.equal(world.readyForTile(crossing, 14), true);
+  world.dispose();
+});
+
+test('refreshes failed imagery and water without rebuilding the terrain tile', async () => {
+  let imageAttempts = 0, waterAttempts = 0;
+  const image = { width: 256, height: 256 };
+  const imageryCache = { getTileImage: async () => ++imageAttempts === 1 ? null : image, dispose() {} };
+  const world = new OpenWorldTerrain({ origin, imageryCache });
+  const mesh = new Mesh();
+  mesh.geometry.setIndex([0, 1, 2]);
+  const key = `${x}/${y}`;
+  const entry = { mesh, waterRetryAt: 0, baseMap: null };
+  const mask = new Uint8Array(256 * 256 * 4);
+  world.fetchWater = async () => ++waterAttempts === 1 ? undefined : mask;
+  world.tiles.set(key, entry);
+  world.wanted = [{ x, y, key }];
+
+  world.updateTileResources();
+  await Promise.all([world.pendingImagery, world.pendingWater]);
+  assert.equal(entry.baseMap, null);
+  assert.equal(entry.water, undefined);
+  world.updateTileResources();
+  assert.equal(imageAttempts, 1);
+  assert.equal(waterAttempts, 1);
+
+  entry.imageryRetryAt = entry.waterRetryAt = 0;
+  world.updateTileResources();
+  await Promise.all([world.pendingImagery, world.pendingWater]);
+  assert.equal(world.tiles.get(key).mesh, mesh);
+  assert.equal(mesh.material.map.image, image);
+  assert.equal(entry.water, mask);
+  assert.equal(imageAttempts, 2);
+  assert.equal(waterAttempts, 2);
+  world.dispose();
+});

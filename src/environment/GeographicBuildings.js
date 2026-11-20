@@ -303,9 +303,7 @@ export class GeographicBuildings {
   }
 
   hasGround(tile, level) {
-    if (!this.terrain.openWorld) return true;
-    const { latitude, longitude } = tileToWgs84(tile.x + 0.5, tile.y + 0.5, level);
-    return this.terrain.openWorld.readyAt(...this.project(latitude, longitude));
+    return this.terrain.openWorld?.readyForTile(tile, level) ?? true;
   }
 
   update(position, cameraPosition = position, sunHeight = 1, elapsed = 1 / 60) {
