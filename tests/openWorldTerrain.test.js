@@ -176,7 +176,8 @@ test('upgrades z12 to z13 directly, then restores the base for a later fade-out'
     assert.equal(detail.blend.value, 0);
     assert.equal(disposed, false);
     const camera = new PerspectiveCamera();
-    const start = entry.detailUpdatedAt;
+    const start = 1000;
+    entry.detailUpdatedAt = start;
     world.nextImagerySelection = Infinity;
     world.updateImageryDetail(camera, 1080, start + 175);
     assert.equal(detail.blend.value, 0.5);
