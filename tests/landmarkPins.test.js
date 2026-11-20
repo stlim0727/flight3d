@@ -15,19 +15,27 @@ function fakeContainer() {
   };
 }
 
-test('pin renderer shows localized pinpoint markers for catalog rows', () => {
+const childOf = (element, className) => element.children.find(child => child.className === className);
+const labelOf = pin => childOf(pin, 'landmark-pin__label');
+const iconOf = pin => childOf(childOf(pin, 'landmark-pin__marker'), 'landmark-pin__icon');
+
+test('pin renderer shows localized pin markers with category icons', () => {
   globalThis.document = {
-    createElement: () => ({ className: '', hidden: true, style: {}, textContent: '' }),
+    createElement: () => ({
+      className: '', hidden: true, style: {}, textContent: '', innerHTML: '', children: [],
+      append(...nodes) { this.children.push(...nodes); },
+    }),
   };
   try {
     const origin = { latitude: 37.448, longitude: 126.455 };
-    const places = [-0.0039, 0.0039].map((offset, index) => ({
-      id: `place-${index}`,
-      names: { ko: index ? '두 번째 장소' : '첫 번째 장소', en: index ? 'Second Place' : 'First Place' },
-      latitude: origin.latitude + 0.009,
-      longitude: origin.longitude + offset,
-      kinds: ['station'],
-    }));
+    const places = [
+      { id: 'station', names: { ko: '첫 번째 장소', en: 'First Place' },
+        latitude: origin.latitude + 0.009, longitude: origin.longitude - 0.0039,
+        kinds: ['station'], importance: 5 },
+      { id: 'peak', names: { ko: '두 번째 장소', en: 'Second Place' },
+        latitude: origin.latitude + 0.009, longitude: origin.longitude + 0.0039,
+        kinds: ['peak'], importance: 5 },
+    ];
     const camera = new PerspectiveCamera(75, 1200 / 800, 1, 100000);
     camera.position.set(0, 100, 0);
     camera.lookAt(0, 100, -1000);
@@ -41,12 +49,17 @@ test('pin renderer shows localized pinpoint markers for catalog rows', () => {
     inLanguage('en', () => pins.update(sim, true));
     assert.equal(container.hidden, false);
     const visible = container.children.filter(child => !child.hidden);
-    assert.deepEqual(visible.map(child => child.textContent).sort(),
+    assert.deepEqual(visible.map(labelOf).map(label => label.textContent).sort(),
       ['First Place · 1.1 km', 'Second Place · 1.1 km']);
     assert.ok(visible.every(child => child.style.left.endsWith('px') && child.style.top.endsWith('px')));
+    assert.ok(visible.every(child => childOf(child, 'landmark-pin__marker')));
+    const icons = visible.map(iconOf).map(icon => icon.innerHTML);
+    assert.ok(icons.every(svg => svg.startsWith('<svg')));
+    assert.equal(new Set(icons).size, 2, 'station and peak use different icons');
 
     inLanguage('ko', () => pins.update(sim, true));
-    assert.ok(container.children.some(child => !child.hidden && child.textContent.includes('첫 번째 장소')));
+    assert.ok(container.children.some(child => !child.hidden
+      && labelOf(child).textContent.includes('첫 번째 장소')));
 
     const filteredContainer = fakeContainer();
     const filtered = new LandmarkPins(filteredContainer, places, ['attraction']);

@@ -6,7 +6,8 @@
       "latitude": 37.5125,
       "longitude": 127.10278,
       "elevationM": 585,
-      "kinds": ["attraction", "tower"]
+      "kinds": ["attraction", "tower"],
+      "importance": 5
     },
     {
       "id": "n-seoul-tower",
@@ -14,7 +15,8 @@
       "latitude": 37.55112,
       "longitude": 126.98787,
       "elevationM": 480,
-      "kinds": ["attraction", "tower"]
+      "kinds": ["attraction", "tower"],
+      "importance": 4
     },
     {
       "id": "gwanaksan",
@@ -22,7 +24,8 @@
       "latitude": 37.444469,
       "longitude": 126.963897,
       "elevationM": 632.2,
-      "kinds": ["peak"]
+      "kinds": ["peak"],
+      "importance": 3
     },
     {
       "id": "baegundae",
@@ -30,7 +33,8 @@
       "latitude": 37.6587,
       "longitude": 126.978,
       "elevationM": 837,
-      "kinds": ["peak"]
+      "kinds": ["peak"],
+      "importance": 3
     },
     {
       "id": "paldang-dam",
@@ -38,7 +42,8 @@
       "latitude": 37.5264,
       "longitude": 127.2791,
       "elevationM": 60,
-      "kinds": ["dam"]
+      "kinds": ["dam"],
+      "importance": 2
     },
     {
       "id": "incheon-airport",
@@ -46,7 +51,8 @@
       "latitude": 37.4691,
       "longitude": 126.4506,
       "elevationM": 28,
-      "kinds": ["airport"]
+      "kinds": ["airport"],
+      "importance": 5
     },
     {
       "id": "jeju-airport",
@@ -54,7 +60,8 @@
       "latitude": 33.5113,
       "longitude": 126.493,
       "elevationM": 48,
-      "kinds": ["airport"]
+      "kinds": ["airport"],
+      "importance": 5
     },
     {
       "id": "hallasan",
@@ -62,7 +69,8 @@
       "latitude": 33.3617,
       "longitude": 126.5332,
       "elevationM": 1947,
-      "kinds": ["peak"]
+      "kinds": ["peak"],
+      "importance": 5
     }
   ]
 }

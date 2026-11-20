@@ -7,6 +7,16 @@ import landmarkPlaces from './landmarkPlaces.json' with { type: 'json' };
 
 // The label sits above its anchor so the pin tip stays on the point.
 export const LANDMARK_LABEL_OFFSET_M = 12;
+export const LANDMARK_IMPORTANCE_LEVELS = 5;
+
+const clampImportance = value => Number.isFinite(value)
+  ? Math.min(LANDMARK_IMPORTANCE_LEVELS, Math.max(1, Math.round(value)))
+  : LANDMARK_IMPORTANCE_LEVELS;
+
+/** Higher importance levels are visible from proportionally farther away. */
+export function landmarkRangeM(record, maxDistanceM = 45000) {
+  return maxDistanceM * clampImportance(record?.importance) / LANDMARK_IMPORTANCE_LEVELS;
+}
 
 /** Default catalog: add rows to landmarkPlaces.json; no per-place code is needed. */
 export const LANDMARK_PLACES = Object.freeze(landmarkPlaces.places.map(place => Object.freeze({ ...place })));
@@ -39,6 +49,7 @@ export function normalizeLandmarkPlaces(places = LANDMARK_PLACES) {
     records.push({
       id, names: { ko, en }, ko, en, latitude, longitude,
       height: Number.isFinite(elevationM) ? elevationM : undefined,
+      importance: clampImportance(place.importance),
       kinds: Array.isArray(kinds) ? kinds.filter(item => typeof item === 'string')
         : (typeof kind === 'string' ? [kind] : []),
     });
@@ -55,7 +66,6 @@ export function landmarkName(record, language) {
 /** Choose named places by real 3D distance to the camera, optionally by category. */
 export function nearestLandmarks(records, origin, { limit = 5, maxDistanceM = 45000, kinds } = {}) {
   const wanted = Array.isArray(kinds) && kinds.length ? new Set(kinds) : null;
-  const maxSquared = maxDistanceM * maxDistanceM;
   const candidates = [];
   for (const record of records) {
     if (wanted && !record.kinds?.some(kind => wanted.has(kind))) continue;
@@ -63,7 +73,7 @@ export function nearestLandmarks(records, origin, { limit = 5, maxDistanceM = 45
     const dy = record.height + LANDMARK_LABEL_OFFSET_M - origin.y;
     const dz = record.z - origin.z;
     const squared = dx * dx + dy * dy + dz * dz;
-    if (!Number.isFinite(squared) || squared > maxSquared) continue;
+    if (!Number.isFinite(squared) || squared > landmarkRangeM(record, maxDistanceM) ** 2) continue;
     candidates.push({ record, distance: Math.sqrt(squared) });
   }
   candidates.sort((a, b) => a.distance - b.distance

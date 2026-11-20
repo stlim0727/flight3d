@@ -1,11 +1,12 @@
 import { Vector3 } from 'three';
 import { LANDMARK_LABEL_OFFSET_M, landmarkName, landmarksForMap, nearestLandmarks } from '../config/landmarks.js';
+import { landmarkPinIcon } from './landmarkPinIcons.js';
 import { getLanguage } from '../i18n/index.js';
 
 const minRange = 200;
 const maxPins = 5;
 
-/** Screen-space pins for any named place in the catalog, chosen by distance. */
+/** Screen-space pin markers for any named place, chosen by distance and importance. */
 export class LandmarkPins {
   constructor(container, places, kinds) {
     this.container = container;
@@ -15,8 +16,16 @@ export class LandmarkPins {
       const element = document.createElement('span');
       element.className = 'landmark-pin';
       element.hidden = true;
+      const label = document.createElement('span');
+      label.className = 'landmark-pin__label';
+      const marker = document.createElement('span');
+      marker.className = 'landmark-pin__marker';
+      const icon = document.createElement('span');
+      icon.className = 'landmark-pin__icon';
+      marker.append(icon);
+      element.append(label, marker);
       container.append(element);
-      return element;
+      return { element, label, icon };
     });
     this.position = new Vector3();
     this.clip = new Vector3();
@@ -46,7 +55,7 @@ export class LandmarkPins {
       this.position.set(record.x, record.height + LANDMARK_LABEL_OFFSET_M, record.z);
       this.clip.copy(this.position).project(camera);
       if (this.clip.z < -1 || this.clip.z > 1 || Math.abs(this.clip.x) > 0.8 || Math.abs(this.clip.y) > 0.68) continue;
-      projected.push({ distance, name: landmarkName(record, locale),
+      projected.push({ distance, name: landmarkName(record, locale), icon: landmarkPinIcon(record),
         x: (this.clip.x + 1) * width / 2, y: (1 - this.clip.y) * height / 2 });
     }
     const placed = [];
@@ -57,11 +66,12 @@ export class LandmarkPins {
     }
     for (const [i, pin] of this.pins.entries()) {
       const next = placed[i];
-      pin.hidden = !next;
+      pin.element.hidden = !next;
       if (!next) continue;
-      pin.style.left = `${next.x}px`;
-      pin.style.top = `${next.y}px`;
-      pin.textContent = `${next.name} · ${(next.distance / 1000).toFixed(1)} km`;
+      pin.element.style.left = `${next.x}px`;
+      pin.element.style.top = `${next.y}px`;
+      pin.label.textContent = `${next.name} · ${(next.distance / 1000).toFixed(1)} km`;
+      pin.icon.innerHTML = next.icon;
     }
   }
 }
