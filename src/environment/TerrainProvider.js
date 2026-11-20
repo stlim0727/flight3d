@@ -89,6 +89,23 @@ export function resolveGroundHeight(getProvider, fallback) {
   };
 }
 
+/**
+ * Ground-height query for physics. Uses `getOverride()` (a provider swapped in
+ * at runtime) where it is ready, otherwise the active terrain surface, otherwise
+ * 0. Behaves exactly like the former `terrain?.getHeight?.(x, z) ?? 0` when no
+ * override is set.
+ */
+export function createGroundHeightQuery({ getTerrain, getOverride = () => null }) {
+  return (x, z) => {
+    const override = getOverride();
+    if (override?.isReady(x, z)) {
+      const h = override.getHeight(x, z);
+      if (Number.isFinite(h)) return h;
+    }
+    return getTerrain()?.getHeight?.(x, z) ?? 0;
+  };
+}
+
 /** Throws unless `provider` implements the contract; used by conformance tests. */
 export function assertTerrainProviderContract(provider, points = [[0, 0]]) {
   for (const name of ['getHeight', 'getNormal', 'isReady', 'update', 'dispose']) {

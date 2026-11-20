@@ -11,6 +11,7 @@ import { FLOW } from '../ui/GameFlowController.js';
 import { trackFlightCrash } from '../analytics/posthog.js';
 import { PilotPhysiology } from '../physics/PilotPhysiology.js';
 import { WaterDitching } from '../physics/WaterDitching.js';
+import { createGroundHeightQuery } from '../environment/TerrainProvider.js';
 
 const GEAR_LABELS = {
   nose: 'nose.gear',
@@ -125,7 +126,10 @@ class PhysicsIntegratorMethods {
 
     const core = this.ensurePhysicsCore();
     const environment = this._envCallbacks ??= {
-      getGroundHeight: (x, z) => this.currentTerrain?.getHeight?.(x, z) ?? 0,
+      getGroundHeight: this._groundHeightQuery ??= createGroundHeightQuery({
+        getTerrain: () => this.currentTerrain,
+        getOverride: () => this.terrainProviderOverride,
+      }),
       getGroundNormal: (x, z) => this.currentTerrain?.getNormal?.(x, z) ?? null,
       isOnRunway: (x, z) => (this.currentAirport?.isOnRunway ? this.currentAirport.isOnRunway(x, z) : true),
       isRunwaySafetyArea: (x, z) => (this.currentAirport?.isRunwaySafetyArea ? this.currentAirport.isRunwaySafetyArea(x, z) : true),
@@ -335,7 +339,7 @@ class PhysicsIntegratorMethods {
   resolveBodyPenetration() {
     const core = this.ensurePhysicsCore();
     core.resolveBodyPenetration(
-      (x, z) => this.currentTerrain.getHeight(x, z),
+      this._groundHeightQuery ?? ((x, z) => this.currentTerrain.getHeight(x, z)),
       (x, z) => this.currentTerrain.getNormal?.(x, z)
     );
   }

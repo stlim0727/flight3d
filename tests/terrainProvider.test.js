@@ -5,7 +5,7 @@ import { OpenWorldTerrain, buildOpenTerrainTile } from '../src/environment/OpenW
 import { JejuFlightSurface } from '../src/geospatial/JejuFlightSurface.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 import {
-  analyticTerrainProvider, assertTerrainProviderContract, openWorldTerrainProvider, resolveGroundHeight,
+  analyticTerrainProvider, assertTerrainProviderContract, createGroundHeightQuery, openWorldTerrainProvider, resolveGroundHeight,
 } from '../src/environment/TerrainProvider.js';
 
 const origin = { latitude: 37.55, longitude: 126.98 };
@@ -75,4 +75,32 @@ test('providers are interchangeable behind resolveGroundHeight', () => {
 test('contract check flags a provider whose isReady promises an unknown height', () => {
   const bad = { kind: 'x', getHeight: () => null, getNormal: () => null, isReady: () => true, update() {}, dispose() {} };
   assert.throws(() => assertTerrainProviderContract(bad), /isReady/);
+});
+
+test('ground height query matches terrain?.getHeight?.() ?? 0 without an override', () => {
+  const terrain = { getHeight: (x, z) => x + z };
+  let current = terrain;
+  const query = createGroundHeightQuery({ getTerrain: () => current });
+  assert.equal(query(3, 4), 7);
+  current = {};
+  assert.equal(query(3, 4), 0);
+  current = null;
+  assert.equal(query(3, 4), 0);
+  current = { getHeight: () => undefined };
+  assert.equal(query(1, 1), 0);
+});
+
+test('ground height query prefers a ready override and follows terrain swaps', () => {
+  let terrain = { getHeight: () => 10 };
+  let override = null;
+  const query = createGroundHeightQuery({ getTerrain: () => terrain, getOverride: () => override });
+  assert.equal(query(0, 0), 10);
+  override = { isReady: x => x < 100, getHeight: () => 55 };
+  assert.equal(query(0, 0), 55);
+  assert.equal(query(200, 0), 10); // override not ready there
+  override = { isReady: () => true, getHeight: () => null };
+  assert.equal(query(0, 0), 10); // unknown height never reaches physics
+  terrain = { getHeight: () => 20 };
+  override = null;
+  assert.equal(query(0, 0), 20);
 });
