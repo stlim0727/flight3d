@@ -69,6 +69,12 @@ test('streamed buildings share the facade atlas and dispose it', () => {
   assert.equal(layer.material.map.colorSpace, THREE.SRGBColorSpace);
   assert.equal(layer.material.emissiveMap, layer.atlas.emissiveMap);
   assert.equal(typeof layer.material.onBeforeCompile, 'function');
+  const emissive = layer.atlas.emissiveMap.image.data;
+  let brightest = 0;
+  for (let i = 0; i < emissive.length; i += 4) {
+    brightest = Math.max(brightest, emissive[i], emissive[i + 1], emissive[i + 2]);
+  }
+  assert.ok(brightest > 200, 'close-range window mask is too dim');
   layer.dispose();
 });
 

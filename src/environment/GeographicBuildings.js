@@ -262,7 +262,7 @@ export class GeographicBuildings {
     this.archive = archive;
     this.group = new THREE.Group();
     this.group.name = 'Geographic buildings';
-    const atlas = createCityFacadeAtlas();
+    const atlas = createCityFacadeAtlas([255, 218, 141]);
     this.atlas = atlas;
     this.material = new THREE.MeshLambertMaterial({
       map: atlas.map, emissiveMap: atlas.emissiveMap,
