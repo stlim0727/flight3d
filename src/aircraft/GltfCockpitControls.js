@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-// The medium GLB has nested transforms; the lite fallback batches by material.
+// The medium GLB has nested transforms and shared geometry.
 // Split only triangles inside each yoke's measured asset-space bounds, preserving their UVs/normals.
 export function bindGltfYokes(model) {
   return bindParts(model, [0.302, -0.254].map(x => ({
@@ -17,7 +17,6 @@ function bindParts(model, definitions) {
   const meshes = [];
   model.traverse(node => { if (node.isMesh) meshes.push(node); });
   for (const definition of definitions) {
-    // The medium asset preserves part names; the lite asset batches by material.
     // Prefer complete native parts so adjacent fixed placards never move.
     const namedParts = definition.meshPrefixes && meshes.some(mesh =>
       definition.meshPrefixes.some(prefix => mesh.name.startsWith(prefix)));
@@ -75,8 +74,8 @@ function bindParts(model, definitions) {
 }
 
 // Boeing 737-800 NG asset coordinates, metres, +Z forward. Keep these pivots
-// out of the static batch. Named medium meshes include the embossed markings;
-// the lite fallback selects only the exposed moving geometry, not the quadrant.
+// out of the static batch. Named meshes include the embossed markings;
+// measured bounds keep the fixed quadrant in place.
 export function bindGltfAirframeControls(model) {
   const [gear] = bindParts(model, [{
     name: 'GLTF_Gear_Lever', pivot: [-0.075, 1.905, 1.46],
@@ -128,7 +127,7 @@ export function updateGltfYokes(yokes, state) {
 
 // Measured in the supplied cockpit asset's coordinates (+Z forward). Bounds
 // select the moving handles/footplates without moving the quadrant or footrests.
-// Triangle extraction also supports the material-batched Draco fallback.
+// Extracted triangles retain their UVs and normals.
 export function bindGltfEngineControls(model) {
   const throttles = bindParts(model, [
     { name: 'GLTF_Throttle_1', pivot: [-0.001, 1.72, 1.24],

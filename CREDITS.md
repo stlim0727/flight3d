@@ -3,12 +3,12 @@
 Flight3d incorporates optimized open-source 3D models and atmospheric environment maps.
 
 ## Aircraft 3D Models
-- **Boeing 737-800 Cockpit (`public/models/b737-cockpit-medium.glb`, `b737-cockpit-draco.glb`)**:
+- **Boeing 737-800 Cockpit (`public/models/b737-cockpit-medium.glb`)**:
   - **Author**: [hakai315](https://sketchfab.com/hakai315)
   - **Source**: [Boeing 737-800 Cockpit](https://sketchfab.com/3d-models/boeing-737-800-cockpit-d463256f98654b36af019d2d88bd5bbe)
   - **License**: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
   - **Modifications**: Existing glTF-Transform optimization/Draco compression; Flight3d runtime alignment, PBR material adjustments, static batching, live instrument overlays, and articulated controls. GLB bytes are unchanged in issue #9.
-  - **Attribution evidence**: Both shipped GLBs carry the original author, title, source and license in `asset.extras`. See [cockpit asset notes](docs/development/cockpit-assets.md) and the [distributed notice](public/models/b737-cockpit.LICENSE.txt).
+  - **Attribution evidence**: The shipped GLB carries the original author, title, source and license in `asset.extras`. See [cockpit asset notes](docs/development/cockpit-assets.md) and the [distributed notice](public/models/b737-cockpit.LICENSE.txt).
 
 - **Boeing 737-800 (`public/models/b737-800.glb`)**:
   - **Author**: [amvlab/aircraft-models](https://github.com/amvlab/aircraft-models)

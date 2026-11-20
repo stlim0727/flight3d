@@ -187,8 +187,7 @@ async function unavailableInterior(session) {
   assert.ok(await waitForCondition(session,
     'window.simulator?.aircraft?.cockpit?.cockpitModelFailed === true', 45000),
     'Blocking every interior asset must report the failure');
-  assert.ok(blocked >= 2,
-    `Both the medium and the lite asset should be requested; blocked ${blocked}`);
+  assert.equal(blocked, 1, `Only the medium interior asset should be requested; blocked ${blocked}`);
 
   // The wait is over and the answer is no: the hold has to be dropped and explained,
   // or the press looks ignored and a later request could still be stolen by it.

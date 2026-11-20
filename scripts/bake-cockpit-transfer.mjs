@@ -20,7 +20,7 @@ const inputs = ['src/aircraft/Cockpit.js', 'src/aircraft/CockpitAperture.js',
   'scripts/bake-cockpit-transfer.mjs', 'scripts/lib/load-cockpit-geometry.mjs'];
 const sourceHashes = Object.fromEntries(inputs.map(p => [p, hash(fs.readFileSync(p, 'utf8').replaceAll('\r\n', '\n'))]));
 
-for (const variant of ['medium', 'draco']) {
+for (const variant of ['medium']) {
   const file = `public/models/b737-cockpit-${variant}.glb`;
   const cockpit = new Cockpit({}, {}, {}, {}, {}, {});
   cockpit.prepareModel(await loadCockpitGeometry(file));

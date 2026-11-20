@@ -8,7 +8,6 @@ import { applyKoreanAirLivery } from './KoreanAirLivery.js';
 import { applyJejuAirLivery } from './JejuAirLivery.js';
 import { applyFlatShading } from '../config/renderQuality.js';
 import { CockpitHudCanvas, createB737HudCombiner } from './CockpitHudCanvas.js';
-import { applyDeflection, applyDeflectionPair, getControlInput } from './common/ControlSurfaceRig.js';
 import { clampGearExtension, calculateGearFold, isGearCollapsed } from './common/GearKinematicsRig.js';
 
 /**
@@ -51,34 +50,11 @@ export class Boeing737 {
     this.gltfFanL = null;
     this.gltfFanR = null;
     this.gltfControlSurfaces = [];
-    this.useGltf = false;
     this.loadingGltf = false;
     this.modelLoaded = false;
     this.isCockpit = false;
     this.flatShading = false;
     this.gltfShadowProxy = null;
-    this.proceduralShadowProxy = null;
-
-    // Control surfaces references
-    this.aileronL = null;
-    this.aileronR = null;
-    this.flapL = null;
-    this.flapR = null;
-    this.spoilersL = [];
-    this.spoilersR = [];
-    this.elevatorL = null;
-    this.elevatorR = null;
-    this.rudder = null;
-
-    // Engines
-    this.fanL = null;
-    this.fanR = null;
-
-    this.fuselageGroup = null;
-    this.wingGroup = null;
-    this.tailGroup = null;
-    this.empennageGroup = null;
-    this.enginesGroup = null;
     this.gearGroup = null;
 
     // Landing Gear meshes
@@ -102,409 +78,26 @@ export class Boeing737 {
   }
 
   initAircraft() {
-    // Materials
-    const fuselageWhiteMat = new THREE.MeshStandardMaterial({
-      color: 0xf4f7fa,
-      roughness: 0.25,
-      metalness: 0.15
-    });
-
-    const isKorean = this.livery === 'korean';
-    const accentMat = new THREE.MeshStandardMaterial({
-      color: isKorean ? 0x003366 : 0xf47920, // Jeju Air signature orange or classic blue
-      roughness: 0.3,
-      metalness: 0.2
-    });
-
-    const bellyMat = new THREE.MeshStandardMaterial({
-      color: isKorean ? 0x003366 : 0xe7eaed, // Clean pearl grey or classic blue belly
-      roughness: 0.3,
-      metalness: 0.15
-    });
-
-    const wingGreyMat = new THREE.MeshStandardMaterial({
-      color: 0xc8d1dc,
-      roughness: 0.45,
-      metalness: 0.3
-    });
-
-    const chromeMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.1,
-      metalness: 0.95
-    });
-
-    const darkEngineMat = new THREE.MeshStandardMaterial({
-      color: 0x1f2429,
-      roughness: 0.7,
-      metalness: 0.5
-    });
-
-    const windowMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      roughness: 0.1,
-      metalness: 0.9
-    });
-
-    // 1. Fuselage
-    this.buildFuselage(fuselageWhiteMat, bellyMat, windowMat);
-
-    // 2. Swept Wings & Winglets
-    this.buildWings(wingGreyMat, accentMat, chromeMat);
-
-    // 3. Tailfin (Vertical Stabilizer) & Horizontal Stabilizers
-    this.buildEmpennage(fuselageWhiteMat, accentMat, wingGreyMat);
-
-    // 4. Twin Turbofan Engines (CFM56 / LEAP)
-    this.buildEngines(accentMat, chromeMat, darkEngineMat);
-
-    // 5. Tricycle Landing Gear
+    // Procedural gear and lights are intrinsic to the loaded airframe.
     this.buildLandingGear();
-    this.group.updateMatrixWorld(true);
-    this.fitNoseDoorsToSkin(this.fuselageGroup);
-    this.fitMainBaysToSkin(this.fuselageGroup);
-    // Open the same bays in the procedural fallback; the loaded exterior is
-    // cut separately once its aircraft-space transform has been established.
-    for (const root of [this.fuselageGroup, this.wingGroup]) {
-      root.traverse(mesh => { if (mesh.isMesh) cutGearBays(mesh, this.group, this.gearBayVolumes); });
-    }
-
-    // 6. Navigation, Strobe & Landing Lights
     this.buildLights();
 
-    // Ensure all procedural exterior components cast and receive shadows
-    [
-      this.fuselageGroup,
-      this.wingGroup,
-      this.tailGroup,
-      this.empennageGroup,
-      this.enginesGroup,
-      this.noseGearGroup,
-      this.mainGearLGroup,
-      this.mainGearRGroup
-    ].forEach((grp) => {
-      if (!grp) return;
-      grp.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
-      });
-    });
-
-    // Procedural shadow proxy for cockpit view (fuselage cylinder)
-    const procShadowMat = new THREE.MeshBasicMaterial({
-      colorWrite: false,
-      depthWrite: false
-    });
-    const procCabinGeo = new THREE.CylinderGeometry(1.88, 1.88, 24.0, 16);
-    procCabinGeo.rotateX(Math.PI * 0.5);
-    this.proceduralShadowProxy = new THREE.Mesh(procCabinGeo, procShadowMat);
-    this.proceduralShadowProxy.name = 'Procedural_Shadow_Proxy';
-    this.proceduralShadowProxy.castShadow = true;
-    excludeFromDeckShadow(this.proceduralShadowProxy);
-    this.proceduralShadowProxy.receiveShadow = false;
-    this.proceduralShadowProxy.visible = false;
-    this.group.add(this.proceduralShadowProxy);
-    cutGearBays(this.proceduralShadowProxy, this.group, this.gearBayVolumes);
-
-    // 7. Asynchronous High-Detail GLTF PBR Model Loading with Procedural Fallback
+    // Asynchronous high-detail GLTF PBR model loading.
     this.loadGltfModel(`${import.meta.env?.BASE_URL ?? '/'}models/b737-800.glb`);
   }
 
-  buildFuselage(whiteMat, blueMat, winMat) {
-    this.fuselageGroup = new THREE.Group();
 
-    // Main Cabin Cylinder (diameter ~3.76m, length ~26m)
-    const cabinGeo = new THREE.CylinderGeometry(1.88, 1.88, 24.0, 32);
-    cabinGeo.rotateX(Math.PI * 0.5);
-    const cabin = new THREE.Mesh(cabinGeo, whiteMat);
-    cabin.position.set(0, 0, 0);
-    this.fuselageGroup.add(cabin);
-
-    // Boeing Blue Belly Stripe
-    const bellyGeo = new THREE.CylinderGeometry(1.89, 1.89, 24.0, 32, 1, false, Math.PI * 0.75, Math.PI * 0.5);
-    bellyGeo.rotateX(Math.PI * 0.5);
-    const belly = new THREE.Mesh(bellyGeo, blueMat);
-    this.fuselageGroup.add(belly);
-
-    // Aerodynamic Nose Cone (extends to z = -16.2m)
-    const noseGeo = new THREE.ConeGeometry(1.88, 5.5, 32);
-    noseGeo.rotateX(-Math.PI * 0.5);
-    const nose = new THREE.Mesh(noseGeo, whiteMat);
-    nose.position.set(0, -0.15, -14.75);
-    nose.scale.set(1.0, 0.88, 1.0);
-    this.fuselageGroup.add(nose);
-
-    // Radome Tip (Black/Dark grey nose cap)
-    const radomeGeo = new THREE.SphereGeometry(0.35, 16, 16);
-    const radome = new THREE.Mesh(radomeGeo, new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.7 }));
-    radome.position.set(0, -0.25, -17.4);
-    radome.scale.set(0.9, 0.8, 1.4);
-    this.fuselageGroup.add(radome);
-
-    // Cockpit Windshield Windows Exterior Decal
-    const windshieldGeo = new THREE.BoxGeometry(1.4, 0.45, 0.05);
-    const windshieldExt = new THREE.Mesh(windshieldGeo, winMat);
-    windshieldExt.position.set(0, 1.15, -13.5);
-    windshieldExt.rotation.x = -0.55;
-    this.fuselageGroup.add(windshieldExt);
-
-    // Passenger Window Strips along both sides
-    const winStripGeo = new THREE.BoxGeometry(0.04, 0.28, 19.5);
-    const winStripL = new THREE.Mesh(winStripGeo, winMat);
-    winStripL.position.set(-1.87, 0.35, -0.5);
-    const winStripR = new THREE.Mesh(winStripGeo, winMat);
-    winStripR.position.set(1.87, 0.35, -0.5);
-    this.fuselageGroup.add(winStripL, winStripR);
-
-    // Tail Cone (tapers back to APU exhaust at z = +18.5m)
-    const tailConeGeo = new THREE.CylinderGeometry(0.35, 1.88, 7.5, 32);
-    tailConeGeo.rotateX(Math.PI * 0.5);
-    const tailCone = new THREE.Mesh(tailConeGeo, whiteMat);
-    tailCone.position.set(0, 0.45, 15.75);
-    this.fuselageGroup.add(tailCone);
-
-    // APU Exhaust Hole
-    const apuGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.4, 16);
-    apuGeo.rotateX(Math.PI * 0.5);
-    const apu = new THREE.Mesh(apuGeo, new THREE.MeshStandardMaterial({ color: 0x111111 }));
-    apu.position.set(0, 0.65, 19.5);
-    this.fuselageGroup.add(apu);
-
-    this.group.add(this.fuselageGroup);
-  }
-
-  buildWings(wingMat, blueMat, chromeMat) {
-    this.wingGroup = new THREE.Group();
-    this.wingGroup.position.set(0, -0.65, 0.5); // Wing root below cabin floor
-
-    // Wingspan: 35.8m total (each wing ~17.5m from center)
-    const halfSpan = 17.0;
-
-    // Wing Shape Construction: Root chord ~7.2m, Tip chord ~1.8m, sweep ~25 deg, dihedral ~6 deg
-    const makeWingHalf = (isRight) => {
-      const sign = isRight ? 1 : -1;
-      const wingHalf = new THREE.Group();
-
-      // Main Wing Surface
-      const wingShape = new THREE.Shape();
-      wingShape.moveTo(0, 3.2);       // Root trailing edge
-      wingShape.lineTo(0, -4.0);      // Root leading edge
-      wingShape.lineTo(halfSpan, -0.5); // Tip leading edge (swept)
-      wingShape.lineTo(halfSpan, 1.8);  // Tip trailing edge
-      wingShape.closePath();
-
-      const extrudeSettings = { depth: 0.42, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.1, bevelThickness: 0.1 };
-      const wingGeom = new THREE.ExtrudeGeometry(wingShape, extrudeSettings);
-      wingGeom.rotateX(Math.PI * 0.5);
-      const wingMesh = new THREE.Mesh(wingGeom, wingMat);
-
-      // Wing root position and dihedral (+6 deg tilts wing upward)
-      wingMesh.position.set(sign * 1.6, 0, 0);
-      wingMesh.rotation.z = sign * THREE.MathUtils.degToRad(6.0); // Dihedral
-      if (!isRight) wingMesh.scale.x = -1;
-
-      // Blended Winglet attached directly to tip of wingMesh
-      const wingletGeo = new THREE.BoxGeometry(0.12, 2.4, 1.4);
-      const winglet = new THREE.Mesh(wingletGeo, blueMat);
-      winglet.position.set(halfSpan, 1.2, 0.65);
-      winglet.rotation.z = THREE.MathUtils.degToRad(-15.0);
-      winglet.rotation.y = THREE.MathUtils.degToRad(8.0);
-      wingMesh.add(winglet);
-
-      wingHalf.add(wingMesh);
-      return wingHalf;
-    };
-
-    this.wingGroup.add(makeWingHalf(false)); // Left wing
-    this.wingGroup.add(makeWingHalf(true));  // Right wing
-
-    // Articulated Control Surfaces: Ailerons, Flaps, Spoilers
-    this.buildControlSurfaces(wingMat);
-
-    this.group.add(this.wingGroup);
-  }
-
-  buildControlSurfaces(surfMat) {
-    const aileronGeo = new THREE.BoxGeometry(4.2, 0.12, 0.7);
-    const flapGeo = new THREE.BoxGeometry(5.8, 0.15, 0.95);
-    const spoilerGeo = new THREE.BoxGeometry(1.2, 0.08, 0.65);
-
-    // Left Aileron (Outboard)
-    this.aileronL = new THREE.Mesh(aileronGeo, surfMat);
-    this.aileronL.position.set(-13.2, 1.35, 1.2);
-    this.aileronL.rotation.z = THREE.MathUtils.degToRad(-6.0);
-    this.wingGroup.add(this.aileronL);
-
-    // Right Aileron (Outboard)
-    this.aileronR = new THREE.Mesh(aileronGeo, surfMat);
-    this.aileronR.position.set(13.2, 1.35, 1.2);
-    this.aileronR.rotation.z = THREE.MathUtils.degToRad(6.0);
-    this.wingGroup.add(this.aileronR);
-
-    // Left Flap (Inboard)
-    this.flapL = new THREE.Mesh(flapGeo, surfMat);
-    this.flapL.position.set(-6.8, 0.72, 2.4);
-    this.flapL.rotation.z = THREE.MathUtils.degToRad(-6.0);
-    this.wingGroup.add(this.flapL);
-
-    // Right Flap (Inboard)
-    this.flapR = new THREE.Mesh(flapGeo, surfMat);
-    this.flapR.position.set(6.8, 0.72, 2.4);
-    this.flapR.rotation.z = THREE.MathUtils.degToRad(6.0);
-    this.wingGroup.add(this.flapR);
-
-    // Spoilers (4 panels on each upper wing)
-    this.spoilersL = [];
-    this.spoilersR = [];
-    for (let i = 0; i < 4; i++) {
-      const spL = new THREE.Mesh(spoilerGeo, surfMat);
-      spL.position.set(-4.5 - i * 1.5, 0.55 + i * 0.15, 1.5);
-      spL.rotation.z = THREE.MathUtils.degToRad(-6.0);
-      this.wingGroup.add(spL);
-      this.spoilersL.push(spL);
-
-      const spR = new THREE.Mesh(spoilerGeo, surfMat);
-      spR.position.set(4.5 + i * 1.5, 0.55 + i * 0.15, 1.5);
-      spR.rotation.z = THREE.MathUtils.degToRad(6.0);
-      this.wingGroup.add(spR);
-      this.spoilersR.push(spR);
-    }
-  }
-
-  buildEmpennage(whiteMat, blueMat, greyMat) {
-    this.tailGroup = new THREE.Group();
-    this.empennageGroup = this.tailGroup;
-    this.tailGroup.position.set(0, 0.8, 14.2);
-
-    // 1. Vertical Stabilizer (Fin)
-    const finShape = new THREE.Shape();
-    finShape.moveTo(0, 0);
-    finShape.lineTo(0, 7.2);       // Fin tip height
-    finShape.lineTo(-1.6, 7.2);    // Fin tip trailing edge
-    finShape.lineTo(-5.2, 0);      // Base trailing edge
-    finShape.closePath();
-
-    const finExtrude = { depth: 0.32, bevelEnabled: true, bevelSegments: 2, bevelSize: 0.05, bevelThickness: 0.05 };
-    const finGeo = new THREE.ExtrudeGeometry(finShape, finExtrude);
-    finGeo.rotateY(Math.PI * 0.5);
-    const fin = new THREE.Mesh(finGeo, blueMat);
-    fin.position.set(-0.16, 0.6, 0);
-    this.tailGroup.add(fin);
-
-    // Articulated Rudder
-    const rudderGeo = new THREE.BoxGeometry(0.22, 5.8, 1.2);
-    this.rudder = new THREE.Mesh(rudderGeo, blueMat);
-    this.rudder.position.set(0, 3.8, 2.6);
-    this.tailGroup.add(this.rudder);
-
-    // 2. Horizontal Stabilizers (Left & Right)
-    const hStabGeo = new THREE.BoxGeometry(5.2, 0.18, 2.4);
-    hStabGeo.rotateX(THREE.MathUtils.degToRad(-15.0)); // Swept
-
-    const hStabL = new THREE.Mesh(hStabGeo, greyMat);
-    hStabL.position.set(-4.2, 0.8, 2.2);
-    hStabL.rotation.z = THREE.MathUtils.degToRad(8.0); // Dihedral
-
-    const hStabR = new THREE.Mesh(hStabGeo, greyMat);
-    hStabR.position.set(4.2, 0.8, 2.2);
-    hStabR.rotation.z = THREE.MathUtils.degToRad(-8.0);
-
-    this.tailGroup.add(hStabL, hStabR);
-
-    // Elevators
-    const elevGeo = new THREE.BoxGeometry(4.8, 0.12, 0.7);
-    this.elevatorL = new THREE.Mesh(elevGeo, greyMat);
-    this.elevatorL.position.set(-4.2, 0.8, 3.4);
-    this.elevatorR = new THREE.Mesh(elevGeo, greyMat);
-    this.elevatorR.position.set(4.2, 0.8, 3.4);
-
-    this.tailGroup.add(this.elevatorL, this.elevatorR);
-
-    this.group.add(this.tailGroup);
-  }
-
-  buildEngines(blueMat, chromeMat, darkMat) {
-    this.enginesGroup = new THREE.Group();
-
-    const makeTurbofan = (xPos) => {
-      const eng = new THREE.Group();
-      eng.position.set(xPos, -1.95, -5.22); // Underwing pylon mount aligned with B737 CFM56 nacelle probes
-
-      // Pylon (strut connecting underwing to CFM56 turbofan nacelle)
-      const pylonGeo = new THREE.BoxGeometry(0.32, 1.6, 4.4);
-      const pylon = new THREE.Mesh(pylonGeo, blueMat);
-      pylon.position.set(0, 1.35, 1.4);
-      eng.add(pylon);
-
-      // Nacelle Outer Cowl (Length ~4.2m, Diameter ~2.1m)
-      const cowlGeo = new THREE.CylinderGeometry(1.05, 1.05, 3.8, 24, 1, true);
-      cowlGeo.rotateX(Math.PI * 0.5);
-      const cowl = new THREE.Mesh(cowlGeo, blueMat);
-      eng.add(cowl);
-
-      // Chrome Intake Lip
-      const lipGeo = new THREE.TorusGeometry(1.02, 0.08, 16, 32);
-      const lip = new THREE.Mesh(lipGeo, chromeMat);
-      lip.position.set(0, 0, -1.9);
-      eng.add(lip);
-
-      // Fan Rotor with Spinner & Blades
-      const fanGroup = new THREE.Group();
-      fanGroup.position.set(0, 0, -1.4);
-
-      // Center Spiral Spinner Cone
-      const spinnerGeo = new THREE.ConeGeometry(0.32, 0.7, 16);
-      spinnerGeo.rotateX(-Math.PI * 0.5);
-      const spinner = new THREE.Mesh(spinnerGeo, darkMat);
-      fanGroup.add(spinner);
-
-      // 18 Titanium Fan Blades
-      const bladeGeo = new THREE.BoxGeometry(0.04, 0.65, 0.16);
-      for (let b = 0; b < 18; b++) {
-        const angle = (b / 18) * Math.PI * 2;
-        const blade = new THREE.Mesh(bladeGeo, chromeMat);
-        blade.position.set(Math.cos(angle) * 0.55, Math.sin(angle) * 0.55, -0.05);
-        blade.rotation.z = angle + Math.PI * 0.5;
-        blade.rotation.y = 0.35; // Blade pitch angle
-        fanGroup.add(blade);
-      }
-      eng.add(fanGroup);
-
-      // Rear Exhaust Cone
-      const exhaustGeo = new THREE.ConeGeometry(0.55, 1.2, 16);
-      exhaustGeo.rotateX(Math.PI * 0.5);
-      const exhaust = new THREE.Mesh(exhaustGeo, darkMat);
-      exhaust.position.set(0, 0, 2.2);
-      eng.add(exhaust);
-
-      return { root: eng, fan: fanGroup };
-    };
-
-    const leftEngine = makeTurbofan(-5.06);
-    const rightEngine = makeTurbofan(5.06);
-
-    this.fanL = leftEngine.fan;
-    this.fanR = rightEngine.fan;
-
-    this.enginesGroup.add(leftEngine.root, rightEngine.root);
-    this.group.add(this.enginesGroup);
-  }
-
-  buildLandingGear(profile = 'fallback') {
-    this.gearProfile = profile;
-    const loaded = profile === 'loaded';
-    const noseY = loaded ? -1.75 : -0.80;
+  buildLandingGear() {
+    const noseY = -1.75;
     const noseLength = -3.27 - noseY;
-    const noseMinZ = loaded ? -14.55 : -13.0;
-    const noseMaxZ = loaded ? -11.95 : -9.30;
+    const noseMinZ = -14.55;
+    const noseMaxZ = -11.95;
     const noseCenterZ = (noseMinZ + noseMaxZ) / 2;
     // Keep deployed hubs at +/-3.2, -3.3 while placing stowed wheels
     // beneath the center belly, with their outer faces exposed (no wheel doors).
-    this.mainMountX = loaded ? 2.85 : 3.20;
-    this.mainMountY = loaded ? -1.12 : -0.65;
-    this.mainStowedY = loaded ? -1.72 : -1.25;
+    this.mainMountX = 2.85;
+    this.mainMountY = -1.12;
+    this.mainStowedY = -1.72;
     const mainDrop = 3.30 + this.mainMountY;
     const mainRake = 3.20 - this.mainMountX;
     this.mainLegLength = Math.hypot(mainDrop, mainRake);
@@ -515,7 +108,7 @@ export class Boeing737 {
     this.gearGroup.name = 'LandingGear';
     this.gearDoors = [];
     this.gearBayVolumes = [
-      new THREE.Box3(new THREE.Vector3(-0.54, -4, noseMinZ), new THREE.Vector3(0.54, loaded ? -1.30 : -0.30, noseMaxZ))
+      new THREE.Box3(new THREE.Vector3(-0.54, -4, noseMinZ), new THREE.Vector3(0.54, -1.30, noseMaxZ))
     ];
     for (const side of [-1, 1]) {
       const cx = side * this.mainStowedX, radius = 0.58, top = this.mainStowedY + 0.60;
@@ -801,10 +394,6 @@ export class Boeing737 {
     const rotSpeedL = (n1Left / 100.0) * 85.0 * dt;
     const rotSpeedR = (n1Right / 100.0) * 85.0 * dt;
 
-    // Procedural fallback fans (Z-axis rotation in procedural nacelle coordinate frame)
-    if (this.fanL) this.fanL.rotation.z += rotSpeedL;
-    if (this.fanR) this.fanR.rotation.z += rotSpeedR;
-
     // GLTF turbine fans (X-axis rotation in GLTF engine coordinate frame)
     if (this.gltfFanL) this.gltfFanL.rotation.x += rotSpeedL;
     if (this.gltfFanR) this.gltfFanR.rotation.x += rotSpeedR;
@@ -816,30 +405,6 @@ export class Boeing737 {
 
     // 2. Control Surface Deflections
     updateGltfControlSurfaces(this.gltfControlSurfaces, flightState);
-    // Ailerons (Roll)
-    const aileronVal = getControlInput(flightState, 'aileron');
-    applyDeflectionPair(this.aileronL, this.aileronR, 'x', aileronVal * 0.35, true);
-
-    // Flaps (Fractions 0° to 40°)
-    const flapAngleRad = THREE.MathUtils.degToRad(flightState.flapDegree || 0);
-    for (const flap of [this.flapL, this.flapR]) {
-      if (!flap) continue;
-      applyDeflection(flap, 'x', flapAngleRad);
-      flap.position.y = 0.35 - Math.sin(flapAngleRad) * 0.4;
-      flap.position.z = 2.5 + Math.cos(flapAngleRad) * 0.3;
-    }
-
-    // Spoilers (Pop up on upper wing)
-    const spAngle = getControlInput(flightState, 'spoilers') * THREE.MathUtils.degToRad(-50.0);
-    for (const sp of [...this.spoilersL, ...this.spoilersR]) applyDeflection(sp, 'x', spAngle);
-
-    // Elevators (Pitch)
-    const elevVal = getControlInput(flightState, 'elevator');
-    applyDeflectionPair(this.elevatorL, this.elevatorR, 'x', elevVal * 0.45);
-
-    // Rudder (Yaw)
-    const rudderVal = getControlInput(flightState, 'rudder');
-    applyDeflection(this.rudder, 'y', rudderVal * 0.45);
 
     // 3. Landing Gear Retraction & Dynamic Suspension Compression Animation
     const extension = clampGearExtension(flightState.gearState);
@@ -847,7 +412,7 @@ export class Boeing737 {
     // changing direction in transit retraces the same clearance-safe path.
     const legExtension = THREE.MathUtils.smoothstep(extension, 0.18, 0.88);
     const fold = calculateGearFold(legExtension);
-    if (this.noseGearGroup) this.noseGearGroup.rotation.x = this.gearProfile === 'loaded' ? fold : -fold;
+    if (this.noseGearGroup) this.noseGearGroup.rotation.x = fold;
     for (const [leg, truck, side] of [[this.mainGearLGroup, this.mainTruckL, -1], [this.mainGearRGroup, this.mainTruckR, 1]]) {
       if (!leg) continue;
       leg.rotation.z = side * (this.mainDeployAngle * legExtension - this.mainStowAngle * (1 - legExtension));
@@ -981,12 +546,6 @@ export class Boeing737 {
     this.ready = new Promise(resolve => { settle = resolve; });
     this.loadingGltf = true;
 
-    // Suppress procedural exterior while primary GLTF asset is loading to prevent flash of old model
-    if (this.fuselageGroup) this.fuselageGroup.visible = false;
-    if (this.wingGroup) this.wingGroup.visible = false;
-    if (this.tailGroup) this.tailGroup.visible = false;
-    if (this.empennageGroup) this.empennageGroup.visible = false;
-    if (this.enginesGroup) this.enginesGroup.visible = false;
 
     try {
       const loader = new GLTFLoader();
@@ -1004,11 +563,6 @@ export class Boeing737 {
           // through the rendered fuselage. The shadow proxy shares this geometry.
           this.gltfGroup.add(this.gltfModel);
           this.group.updateMatrixWorld(true);
-          // The fallback nose is more tapered; it uses an aft bay. Build the
-          // loaded profile only after successful loading, preserving fallback
-          // geometry if loading fails and preserving the deployed contact datum.
-          this.group.remove(this.gearGroup);
-          this.buildLandingGear('loaded');
           this.fitNoseDoorsToSkin();
           this.fitMainBaysToSkin(this.gltfModel);
           this.gltfModel.traverse(mesh => {
@@ -1044,7 +598,6 @@ export class Boeing737 {
 
           this.gltfGroup.visible = !this.isCockpit;
           this.modelLoaded = true;
-          this.useGltf = true;
 
           // Setup airframe shadow proxy so realistic airframe shadows are cast in cockpit view
           // while preserving gltfGroup.visible = false contract in cockpit mode
@@ -1067,55 +620,27 @@ export class Boeing737 {
             this.group.add(shadowProxy);
           }
 
-          // Switch exterior visibility: hide procedural fuselage, wings and tail, keep landing gear & lights
-          if (this.fuselageGroup) this.fuselageGroup.visible = false;
-          if (this.wingGroup) this.wingGroup.visible = false;
-          if (this.tailGroup) this.tailGroup.visible = false;
-          if (this.empennageGroup) this.empennageGroup.visible = false;
-          if (this.enginesGroup) this.enginesGroup.visible = false;
-          if (this.proceduralShadowProxy) this.proceduralShadowProxy.visible = false;
           settle();
         },
         undefined,
         (err) => {
-          // Graceful fallback to procedural model
-          console.warn('GLTF B737 model failed to load, falling back to procedural:', err);
+          console.error('B737 GLB model failed to load:', err);
           this.loadingGltf = false;
-          this.useGltf = false;
-          if (this.fuselageGroup) this.fuselageGroup.visible = !this.isCockpit;
-          if (this.wingGroup) this.wingGroup.visible = !this.isCockpit;
-          if (this.tailGroup) this.tailGroup.visible = !this.isCockpit;
-          if (this.empennageGroup) this.empennageGroup.visible = !this.isCockpit;
-          if (this.enginesGroup) this.enginesGroup.visible = !this.isCockpit;
           settle();
         }
       );
     } catch (e) {
+      console.error('B737 GLB loader initialization failed:', e);
       this.loadingGltf = false;
-      this.useGltf = false;
-      if (this.fuselageGroup) this.fuselageGroup.visible = !this.isCockpit;
-      if (this.wingGroup) this.wingGroup.visible = !this.isCockpit;
-      if (this.tailGroup) this.tailGroup.visible = !this.isCockpit;
-      if (this.empennageGroup) this.empennageGroup.visible = !this.isCockpit;
-      if (this.enginesGroup) this.enginesGroup.visible = !this.isCockpit;
       settle();
     }
   }
 
   setCockpitMode(isCockpit, showInterior = true) {
     this.isCockpit = isCockpit;
-    if (this.useGltf && this.gltfGroup) {
-      this.gltfGroup.visible = !isCockpit;
-      if (this.gltfShadowProxy) {
-        this.gltfShadowProxy.visible = isCockpit;
-      }
-    } else if (!this.loadingGltf) {
-      if (this.fuselageGroup) this.fuselageGroup.visible = !isCockpit;
-      if (this.proceduralShadowProxy) this.proceduralShadowProxy.visible = isCockpit;
-      if (this.wingGroup) this.wingGroup.visible = !isCockpit;
-      if (this.tailGroup) this.tailGroup.visible = !isCockpit;
-      if (this.empennageGroup) this.empennageGroup.visible = !isCockpit;
-      if (this.enginesGroup) this.enginesGroup.visible = !isCockpit;
+    this.gltfGroup.visible = !isCockpit;
+    if (this.gltfShadowProxy) {
+      this.gltfShadowProxy.visible = isCockpit;
     }
     if (this.cockpit && this.cockpit.group) {
       this.cockpit.group.visible = isCockpit && showInterior;
@@ -1144,13 +669,6 @@ export class Boeing737 {
       this.gltfShadowProxy.rotation.x = 0;
     }
 
-    // Restore pristine wing geometry
-    if (this.wingGroup && this.wingGroup.children.length >= 2) {
-      this.wingGroup.children[0].rotation.z = 0;
-      this.wingGroup.children[0].rotation.x = 0;
-      this.wingGroup.children[1].rotation.z = 0;
-      this.wingGroup.children[1].rotation.x = 0;
-    }
   }
 
   setFlatShading(flatShading) {

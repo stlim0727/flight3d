@@ -37,10 +37,10 @@ ANGLE/Vulkan; omitting it selects SwiftShader. `ARTIFACT_DIR` overrides the outp
 directory, which defaults to `.tmp/aircraft-shadows`.
 
 The tool exercises real GPU allocation through performance → high → balanced,
-then stages 30 static frames: loaded GLB and procedural fallback × 08:00, 12:30,
-16:48 × wing, tail, belly, ground and cockpit-mode ground. It uses the actual
-aircraft, atmospheric lights and HDR environment in an isolated scene with a
-plain ground receiver to exclude moving scenery from the measurement.
+then stages 15 static frames from the loaded GLB × 08:00, 12:30, 16:48 × wing,
+tail, belly, ground and cockpit-mode ground. It uses the actual aircraft,
+atmospheric lights and HDR environment in an isolated scene with a plain ground
+receiver to exclude moving scenery from the measurement.
 
 Each frame is rendered twice unchanged for a noise floor, once with only shadow
 intensity removed, and once with only direct sun removed. Raycast receiver masks
@@ -51,11 +51,11 @@ shadow at one or more tested hours; no artificial shadow is required when solar
 geometry leaves the surface fully lit. Belly views use an inverted aircraft:
 sun above a level aircraft cannot cast landing gear upward onto its belly.
 
-Recorded run: Windows Chrome, Intel Arc 140V, ANGLE/Vulkan. All 30 cells passed;
+Recorded run: Windows Chrome, Intel Arc 140V, ANGLE/Vulkan. All 15 cells passed;
 all repeat renders had zero noisy pixels. At 08:00 the loaded model had 72 body →
 wing, 15 vertical tail → horizontal tail, and 48 gear → belly samples that both
 darkened with shadows enabled and had the expected geometric occluder. Ground
-shadows also passed in exterior and cockpit modes for both models.
+shadows also passed in exterior and cockpit modes.
 
 See [selected captures and the complete numerical report](../../review-artifacts/issue143/README.md).
 Node tests separately check frustum containment through attitude changes and

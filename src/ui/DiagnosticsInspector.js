@@ -316,8 +316,8 @@ export class DiagnosticsInspector {
     if (this.sim.aircraft) {
       const elModel = document.getElementById('m-aircraft-model');
       if (elModel) {
-        elModel.textContent = this.sim.aircraft.useGltf ? 'GLTF PBR (237 KB)' : 'Procedural Mesh (Fallback)';
-        elModel.className = this.sim.aircraft.useGltf ? 'v cyan' : 'v amber';
+        elModel.textContent = 'GLTF PBR (237 KB)';
+        elModel.className = 'v cyan';
       }
       const elIbl = document.getElementById('m-aircraft-ibl');
       if (elIbl) {

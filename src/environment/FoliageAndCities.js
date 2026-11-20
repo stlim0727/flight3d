@@ -17,6 +17,7 @@ export class FoliageAndCities {
 
     this.treeData = [];
     this.buildingData = [];
+    this.districtNearAvailable = false;
     this.northDistrict = planNorthDistrict(terrain);
 
     this.initFoliage();
@@ -43,11 +44,19 @@ export class FoliageAndCities {
           near.geometry = mesh.geometry;
           near.material = applyFarSunShadow(mesh.material);
         });
+        this.districtNearAvailable = true;
         this.districtLoaded = true;
         this.setTimeOfDay(this.cityHour);
+        const camera = this.cityLodCamera.clone();
+        this.cityLodCamera.set(Infinity, Infinity, Infinity);
+        this.updateCityLod(camera);
         return true;
       }).catch(error => {
-        console.warn('City district kit unavailable; keeping fallback buildings.', error);
+        this.districtError = error;
+        console.error('City district kit unavailable', error);
+        const camera = this.cityLodCamera.clone();
+        this.cityLodCamera.set(Infinity, Infinity, Infinity);
+        this.updateCityLod(camera);
         return false;
       });
   }
@@ -298,7 +307,8 @@ export class FoliageAndCities {
         dummy.updateMatrix();
         this.cityArchetypes[archetype].records.push({ x, y: groundY, z,
           height: height + visualY - groundY, matrix, farMatrix,
-          foundationMatrix: lot ? dummy.matrix.clone() : null, color: lot ? c.clone().lerp(new THREE.Color(0xffffff), .8) : c });
+          foundationMatrix: lot ? dummy.matrix.clone() : null, color: lot ? c.clone().lerp(new THREE.Color(0xffffff), .8) : c,
+          district: lot ? 'south' : 'east' });
 
         placed++;
       }
@@ -319,7 +329,7 @@ export class FoliageAndCities {
         visualY, localWidth: width, localDepth: depth, rotationY, archetype, district: 'north' });
       this.cityArchetypes[archetype].records.push({ x, y: groundY, z,
         height: height + visualY - groundY, matrix, farMatrix,
-        foundationMatrix: dummy.matrix.clone(), color: new THREE.Color(0xe2e8f0) });
+        foundationMatrix: dummy.matrix.clone(), color: new THREE.Color(0xe2e8f0), district: 'north' });
     }
 
     const foundationGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -347,7 +357,8 @@ export class FoliageAndCities {
         const dx = cameraPosition.x - record.x;
         const dy = cameraPosition.y - (record.y + record.height / 2);
         const dz = cameraPosition.z - record.z;
-        const mesh = nearDistanceSquared > 0 && (dx * dx + dy * dy + dz * dz < nearDistanceSquared) ? near : far;
+        const nearAllowed = record.district !== 'south' || this.districtNearAvailable;
+        const mesh = nearAllowed && nearDistanceSquared > 0 && (dx * dx + dy * dy + dz * dz < nearDistanceSquared) ? near : far;
         const index = mesh === near ? nearCount++ : farCount++;
         mesh.setMatrixAt(index, mesh === near ? record.matrix : record.farMatrix);
         if (mesh === near && record.foundationMatrix) {

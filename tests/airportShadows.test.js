@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { readFile } from 'node:fs/promises';
 
 if (typeof document === 'undefined') {
   const noop = () => {};
@@ -24,9 +25,13 @@ import { PFDCanvas } from '../src/aircraft/PFDCanvas.js';
 import { NDCanvas } from '../src/aircraft/NDCanvas.js';
 import { EICASCanvas } from '../src/aircraft/EICASCanvas.js';
 
+class KitAirport extends Airport {
+  loadBuildings() { return Promise.resolve(false); }
+}
+
 describe('Airport & Aircraft Runway Shadow System', () => {
   it('should verify Coastal Airport runway, taxiways, apron, and markings receive shadows', () => {
-    const airport = new Airport();
+    const airport = new KitAirport();
     let rwyMesh = null;
     let taxiMesh = null;
     let apronMesh = null;
@@ -65,28 +70,28 @@ describe('Airport & Aircraft Runway Shadow System', () => {
     assert.strictEqual(markingsReceived, totalMarkings, 'All runway markings must receive shadows');
   });
 
-  it('should verify Coastal Airport control tower and terminal concourse cast and receive shadows', () => {
-    const airport = new Airport();
-    let towerMeshes = 0;
-    let terminalMeshes = 0;
+  it('should verify Coastal Airport GLB tower and terminal cast and receive shadows', async () => {
+    const bytes = await readFile(new URL('../public/models/airport/airport-kit.glb', import.meta.url));
+    const kit = (await new GLTFLoader().parseAsync(
+      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ''
+    )).scene;
+    const airport = new KitAirport();
+    assert.equal(await Airport.prototype.loadBuildings.call(airport, async () => kit), true);
 
-    airport.towerGroup.traverse((child) => {
+    let towerMeshes = 0;
+    airport.towerGroup.traverse(child => {
       if (child.isMesh && child.castShadow && child.receiveShadow) towerMeshes++;
     });
+    assert.ok(towerMeshes >= 2, 'GLB control tower meshes must cast and receive shadows');
 
-    airport.group.traverse((child) => {
-      if (child.isMesh && child.geometry instanceof THREE.BoxGeometry) {
-        const { width, height, depth } = child.geometry.parameters;
-        if (width === 350 && height === 18 && depth === 70) {
-          terminalMeshes++;
-          assert.strictEqual(child.castShadow, true, 'Terminal concourse must cast shadows');
-          assert.strictEqual(child.receiveShadow, true, 'Terminal concourse must receive shadows');
-        }
-      }
+    const terminalLods = airport.buildings.lods.filter(lod => lod.name === 'TerminalBay');
+    assert.equal(terminalLods.length, 7);
+    let terminalMeshes = 0;
+    for (const lod of terminalLods) lod.traverse(child => {
+      if (child.isMesh && child.castShadow && child.receiveShadow) terminalMeshes++;
     });
-
-    assert.ok(towerMeshes >= 2, 'Control tower shaft and roof must cast and receive shadows');
-    assert.strictEqual(terminalMeshes, 1, 'Terminal concourse must exist and have shadow properties');
+    assert.ok(terminalMeshes > 0, 'GLB terminal bays must cast and receive shadows');
+    assert.equal(airport.beaconLights.length, 1);
   });
 
   it('should verify Lukla Airport runway markings receive shadows without depth buffer occlusion', () => {
@@ -129,12 +134,12 @@ describe('Airport & Aircraft Runway Shadow System', () => {
     const eicas = new EICASCanvas(256, 256);
     const aircraft = new Boeing737(pfd, nd, eicas);
 
-    // Verify procedural shadow casting
-    let procCasters = 0;
-    aircraft.group.traverse((child) => {
-      if (child.isMesh && child.castShadow) procCasters++;
+    // Intrinsic gear is the only procedural shadow caster before the GLB arrives.
+    let gearCasters = 0;
+    aircraft.gearGroup.traverse(child => {
+      if (child.isMesh && child.castShadow) gearCasters++;
     });
-    assert.ok(procCasters >= 5, 'Procedural components must cast shadows');
+    assert.ok(gearCasters >= 5, 'Procedural gear must cast shadows');
 
     // Simulate async GLTF airframe load
     let completeLoad;
@@ -152,7 +157,6 @@ describe('Airport & Aircraft Runway Shadow System', () => {
       scene.add(b737Mesh);
 
       completeLoad({ scene });
-      assert.strictEqual(aircraft.useGltf, true);
       assert.ok(aircraft.gltfShadowProxy, 'Airframe shadow proxy must be created when GLTF loads');
       assert.strictEqual(aircraft.gltfShadowProxy.castShadow, true, 'Shadow proxy must cast shadows');
       assert.strictEqual(aircraft.gltfShadowProxy.material.colorWrite, false, 'Shadow proxy must be invisible to camera');

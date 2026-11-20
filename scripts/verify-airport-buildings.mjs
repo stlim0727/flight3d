@@ -124,15 +124,20 @@ try {
     assert.ok(after.triangles - before.triangles <= (after.view === 'distant' ? 500 : 5000), 'Additional triangle budget');
     assert.equal(after.textureBytesRGBA8, before.textureBytesRGBA8, 'No additional texture memory');
   }
-  // A real failed HTTP request must retain the complete procedural airport.
+  // A real failed HTTP request must leave the airport without any buildings.
   await send('Network.enable');
   await send('Network.setBlockedURLs', { urls: ['*airport-kit.glb'] });
   await send('Page.reload', { ignoreCache: true }); await delay(500);
   const fallback = await evaluate(async () => {
     const { Airport } = await import('/src/environment/Airport.js'); const a = new Airport();
-    return { loaded: await a.buildingsReady, tower: Boolean(a.towerGroup.parent), terminal: Boolean(a.terminalGroup?.parent), beacons: a.beaconLights.length };
+    const loaded = await a.buildingsReady;
+    return { loaded, error: Boolean(a.buildingsError), tower: Boolean(a.towerGroup),
+      terminal: Boolean(a.terminalGroup), buildings: Boolean(a.buildings),
+      beacons: a.beaconLights.length,
+      group: Boolean(a.group.getObjectByName('airport-buildings-glb')) };
   });
-  assert.deepEqual(fallback, { loaded: false, tower: true, terminal: true, beacons: 1 });
+  assert.deepEqual(fallback, { loaded: false, error: true, tower: false, terminal: false,
+    buildings: false, beacons: 0, group: false });
   assert.deepEqual(exceptions, []);
   await writeFile(join(directory, 'browser-results.json'), JSON.stringify({ baseline, host: { platform: platform(), cpu: cpus()[0].model }, ...setup, metrics, fallback, exceptions, note: 'Isolated airport scene; gl.finish wall times, not a full-flight or hardware-GPU FPS claim. Texture memory estimates assume RGBA8 plus generated mipmaps; building kit has no textures.' }, null, 2));
 } finally {

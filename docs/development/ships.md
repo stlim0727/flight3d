@@ -46,9 +46,8 @@ node --test tests/ships.test.js tests/collision.test.js
 All GLBs use metres, +Y up, -Z bow, and an origin at the centre of the waterline.
 `shipAssetManifest.json` is generated from actual vertex bounds. Runtime bounds
 are measured from each loaded visual before attaching it to a motion root.
-Fallbacks have bounds matching their own simple visible hull, not an invisible
-full-height superstructure. Asset loading never changes the root, route phase
-or pose, and failed loads leave visible, collidable hulls with diagnostic status.
+Asset loading never changes the root, route phase or pose; a failed load is an
+error with no visible hull.
 
 Large vessels retain their wave-following pitch and gentle sinusoidal roll;
 bow/stern wave samples now respect heading. Rotation order YXZ keeps pitch/roll
@@ -102,13 +101,13 @@ including headers: 1,139,908 bytes. Texture allocation increases from zero to
 ocean shaders/buffers and the rest of the application. More detailed models
 increase triangle counts and do not improve every view's frame time.
 
-Browser assertions confirm all five GLBs load in the full simulator, four unique
-asset requests, shared boat resources, no runtime exceptions, and no failed
+Browser assertions confirm all four ship GLBs load in the full simulator, four
+unique asset requests, shared boat resources, no runtime exceptions, and no failed
 shader program in the comparison scene. Node tests cover real GLB bounds/normals,
-late replacement, failed downloads, multi-step motion/heading/wake clearance and
-collision at rotated/elevated mast and beam extents. The full local gate passed
-304 tests, syntax/action checks and production build; final geometry optimization
-was followed by the focused asset tests and another build.
+multi-step motion/heading/wake clearance and collision at rotated/elevated mast
+and beam extents. The full local gate passed 304 tests, syntax/action checks and
+production build; final geometry optimization was followed by the focused asset
+tests and another build.
 
 Reproduce (Vite defaults to 5173; override `SIM_URL` if needed):
 

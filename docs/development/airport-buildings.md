@@ -1,9 +1,9 @@
 # Coastal airport exterior kit (issue #13)
 
-The coastal airport loads `public/models/airport/airport-kit.glb`. The synchronous
-procedural buildings remain visible until a validated kit loads, and remain the
-fallback on HTTP failure or invalid content. One cached request supplies shared
-geometry and materials to coastal airport buildings; Lukla is independent.
+The coastal airport loads `public/models/airport/airport-kit.glb`. Airport
+buildings are attached only after the validated kit loads; a failed load is an
+error, not a signal to draw procedural substitutes. One cached request supplies
+shared geometry and materials to coastal airport buildings; Lukla is independent.
 
 ## Selection and provenance
 
@@ -51,7 +51,7 @@ and lens. Hangars fit the 90 x 35 x 70 m AABBs at (-450,12,310) and (-580,12,310
 
 Previously, hangar world positions inherited the terminal's translation, placing
 them at (-530,12,650) and (-660,12,650), inconsistent with collision metadata.
-Both the loaded models and fallback now use the metadata positions. This is the
+Loaded models use the metadata positions. This is the
 intentional placement correction; runway/taxiway/apron geometry is unchanged.
 All new structures remain clear of the runway and parallel taxiway.
 

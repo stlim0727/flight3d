@@ -55,7 +55,7 @@ try {
  // Exercise asynchronous loading after the simulation has already moved the root.
  aircraft.group.position.set(35,12,-70);aircraft.group.rotation.set(.1,.4,-.05);
  while(aircraft.loadingGltf)await new Promise(r=>setTimeout(r,100));
- if(!aircraft.useGltf)throw new Error('GLB load failed');scene.add(aircraft.group);
+if(!aircraft.modelLoaded)throw new Error('GLB load failed');scene.add(aircraft.group);
  for(const compressions of [{},{nose:.08,mainLeft:.12,mainRight:.04},{}, {nose:.02,mainLeft:.03,mainRight:.03},{}]){
  aircraft.update(0,{gearState:1,compressions});aircraft.group.updateMatrixWorld(true);
  const tires=config.id==='C172'?aircraft.visualGear.map(g=>g.meshes.find(m=>m.userData.tire)):Object.values(aircraft.gearLegs).map(g=>g.children[0]);

@@ -8,7 +8,7 @@ import { loadCockpitGeometry } from './lib/load-cockpit-geometry.mjs';
 // Binding depends on final procedural framing, split controls and static batches;
 // source GLB attributes alone cannot describe that geometry. No ray tracing needed.
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-for (const variant of ['medium', 'draco']) {
+for (const variant of ['medium']) {
   const base = `public/lighting/cockpit-${variant}`;
   const manifest = JSON.parse(fs.readFileSync(`${base}.json`));
   const cockpit = new Cockpit({}, {}, {}, {}, {}, {});

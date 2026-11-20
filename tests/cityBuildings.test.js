@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FoliageAndCities } from '../src/environment/FoliageAndCities.js';
 import { cityWindowIntensity } from '../src/environment/CityBuildingAssets.js';
 import { CollisionDetector } from '../src/physics/CollisionDetector.js';
@@ -103,7 +104,7 @@ test('actual GLB kit fits the collision envelope and contains detailed facades',
 test('sloped lots have foundations and far LOD covering the same collision volume', () => {
   const terrain = { getHeight: (x, z) => 30 + x * .02 + z * .01 };
   const city = new FoliageAndCities(terrain, () => .5);
-  const b = city.buildingData.find(b => b.archetype >= 3);
+  const b = city.buildingData.find(b => b.district === 'north');
   const batch = city.cityArchetypes[b.archetype];
   const record = batch.records.find(r => r.x === b.x && r.z === b.z);
   const foundation = city.cityFoundations.geometry;
@@ -132,5 +133,42 @@ test('default constructor uses a deterministic PRNG producing repeatable buildin
     assert.equal(b1.x, b2.x);
     assert.equal(b1.z, b2.z);
     assert.equal(b1.height, b2.height);
+  }
+});
+
+test('failed district kit leaves south near geometry absent while east/north stay usable', async (t) => {
+  t.mock.method(GLTFLoader.prototype, 'loadAsync', async () => { throw Error('offline'); });
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { value: {}, configurable: true });
+  const error = console.error; console.error = () => {};
+  try {
+    const city = new FoliageAndCities({ getHeight: () => 25 }, () => .5);
+    assert.equal(await city.districtReady, false);
+    assert.equal(city.districtLoaded, undefined);
+    assert.ok(city.districtError instanceof Error);
+    const districts = city.cityArchetypes.slice(3);
+    assert.ok(districts.flatMap(a => a.records).some(r => r.district === 'south'));
+    assert.ok(districts.flatMap(a => a.records).some(r => r.district === 'north'));
+
+    city.updateCityLod(new THREE.Vector3(-800, 100, -2800));
+    assert.deepEqual(districts.map(a => a.near.count),
+      districts.map(a => a.records.filter(r => r.district === 'north').length));
+    assert.deepEqual(districts.map(a => a.far.count),
+      districts.map(a => a.records.filter(r => r.district === 'south').length));
+    assert.equal(city.buildingData.length,
+      city.cityArchetypes.reduce((n, a) => n + a.near.count + a.far.count, 0));
+
+    city.updateCityLod(new THREE.Vector3(2800, 100, 1400));
+    assert.ok(city.cityArchetypes.slice(0, 3).some(a => a.near.count > 0));
+    assert.equal(districts.reduce((n, a) => n + a.near.count, 0), 0);
+
+    const detector = new CollisionDetector(null, null, city, null, null);
+    const building = city.buildingData.find(b => b.district === 'south');
+    const pos = new THREE.Vector3(building.x, building.y + building.height / 2, building.z);
+    assert.ok(detector.checkCityBuildings(pos, [{ pos, radius: 0, desc: 'test' }]));
+  } finally {
+    console.error = error;
+    if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+    else delete globalThis.window;
   }
 });

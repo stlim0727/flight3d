@@ -64,31 +64,23 @@ describe('interior is streamed on cockpit entry, not at boot', () => {
     });
   });
 
-  it('uses lite for lower tiers and tries medium once if lite fails', (t) => {
+  it('requests only the medium GLB and does not retry when it fails', (t) => {
     const requested = [];
-    const errors = [];
+    let loadError;
     t.mock.method(GLTFLoader.prototype, 'load', (url, _onLoad, _onProgress, onError) => {
       requested.push(url);
-      errors.push(onError);
+      loadError = onError;
     });
-    t.mock.method(console, 'warn', () => {});
-    for (const quality of ['performance', 'ultraLow']) {
-      withWindow(() => {
-        requested.length = 0;
-        errors.length = 0;
-        const cockpit = new Cockpit(...createCanvases());
-        assert.equal(cockpit.ensureCockpitModel(quality), true);
-        assert.equal(cockpit.ensureCockpitModel('high'), false);
-        assert.deepEqual(requested, ['/models/b737-cockpit-draco.glb']);
-        errors[0](new Error('lite asset unavailable'));
-        assert.equal(cockpit.cockpitModelLoading, true);
-        assert.deepEqual(requested, ['/models/b737-cockpit-draco.glb', '/models/b737-cockpit-medium.glb']);
-        errors[1](new Error('medium asset unavailable'));
-        assert.equal(requested.length, 2);
-        assert.equal(cockpit.cockpitModelLoading, false);
-        assert.equal(cockpit.cockpitModelFailed, true);
-      });
-    }
+    t.mock.method(console, 'error', () => {});
+    withWindow(() => {
+      const cockpit = new Cockpit(...createCanvases());
+      assert.equal(cockpit.ensureCockpitModel(), true);
+      assert.deepEqual(requested, ['/models/b737-cockpit-medium.glb']);
+      loadError(new Error('cockpit GLB unavailable'));
+      assert.deepEqual(requested, ['/models/b737-cockpit-medium.glb'], 'A failed GLB is not retried');
+      assert.equal(cockpit.cockpitModelLoading, false);
+      assert.equal(cockpit.cockpitModelFailed, true);
+    });
   });
 
   it('stays silent outside a browser', () => {

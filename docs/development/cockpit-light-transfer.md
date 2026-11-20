@@ -129,8 +129,7 @@ gain against the bake on the same loaded geometry, stages the six shadow-demo
 directions, overcast, night, overhead views at 20°/75° elevation and ±35° bank,
 checks GPU errors and control release, and reports coverage and CPU update cost.
 Both staged night and cloud attenuation are asserted so a still-active demo
-cannot silently overwrite those inputs. Use the variant selector to exercise
-the lite asset independently. Inspect the images, not only the PASS label.
+cannot silently overwrite those inputs. Inspect the images, not only the PASS label.
 
 Evidence and measured acceptance results live in
 `review-artifacts/cockpit-transfer/README.md`.

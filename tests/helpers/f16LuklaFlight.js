@@ -32,7 +32,7 @@ export function flyF16Lukla({ Scenario = F16LuklaScenario, maxSeconds = 300 } = 
     currentAircraftId: 'F16', currentAircraftConfig: F16_FALCON,
     aero: new Aerodynamics(F16_FALCON), engines: new EngineModel(F16_FALCON),
     gear: new LandingGear(F16_FALCON), controls: new ControlsWithoutDom(null, { getGamepads: () => [] }),
-    aircraft: { group: new THREE.Group(), useGltf: true },
+    aircraft: { group: new THREE.Group() },
     autopilot: { master: false, annunciation() { return ''; } },
     cameraSystem: { autoPaused: true, setMode(mode) { cameras.push({ stage: director.currentStage, mode }); } },
     // UI, audio and particles do not feed the integrated forces or collision policy.

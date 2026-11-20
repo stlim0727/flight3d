@@ -100,7 +100,7 @@ they do not establish acceptance of the revised beam intensity.
 ## Known limits
 
 - The aperture profile is authored, not measured. No GLB in this repository carries a
-  windshield mesh (`b737-cockpit-medium.glb`, `b737-cockpit-draco.glb` and `b737-800.glb`
+  windshield mesh (`b737-cockpit-medium.glb` and `b737-800.glb`
   contain no node, mesh or material named for glass), so `WINDSHIELD_PANES` is a hand-built
   approximation that the interior framing and the light cookie both draw from. It is now
   self-consistent — the front glass leans back over the nose, as on a real 737 — but the

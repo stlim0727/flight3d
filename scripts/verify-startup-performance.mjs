@@ -8,7 +8,6 @@ const airport = process.env.AIRPORT || 'coastal';
 const checkScenery = Boolean(process.env.CHECK_SCENERY);
 const delayDem = checkScenery && airport === 'lukla';
 const scenario = process.env.SCENARIO || (delayDem ? 'demo' : 'runway');
-const draco = process.env.INTERIOR_VARIANT === 'draco';
 const url = process.env.APP_URL || 'http://127.0.0.1:5291/';
 const artifacts = process.env.ARTIFACT_DIR || '.cache/startup-performance';
 fs.mkdirSync(artifacts, { recursive: true });
@@ -43,7 +42,6 @@ try {
   await send('Network.enable');
   await send('Network.setCacheDisabled', { cacheDisabled: true });
   if (delayDem) await send('Fetch.enable', { patterns: [{ urlPattern: '*/terrain/lukla_dem.bin', requestStage: 'Request' }] });
-  if (draco) await send('Network.setBlockedURLs', { urls: ['*b737-cockpit-medium.glb'] });
   await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     localStorage.clear();

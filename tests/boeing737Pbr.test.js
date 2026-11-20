@@ -25,7 +25,7 @@ import { NDCanvas } from '../src/aircraft/NDCanvas.js';
 import { EICASCanvas } from '../src/aircraft/EICASCanvas.js';
 
 describe('Boeing737 PBR Model & IBL Reflection System', () => {
-  it('should initialize Boeing737 with GLTF container and fallback procedural geometry', () => {
+  it('should initialize with an empty GLTF container and intrinsic gear and lights', () => {
     const pfd = new PFDCanvas(256, 256);
     const nd = new NDCanvas(256, 256);
     const eicas = new EICASCanvas(256, 256);
@@ -34,37 +34,25 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     assert.ok(aircraft.group instanceof THREE.Group, 'Aircraft root must be a THREE.Group');
     assert.ok(aircraft.gltfGroup instanceof THREE.Group, 'GLTF container must exist');
     assert.strictEqual(aircraft.gltfGroup.name, 'GLTF_Boeing737');
-    assert.strictEqual(aircraft.useGltf, false, 'Default should be procedural fallback before async GLB load');
-    assert.ok(aircraft.fuselageGroup, 'Procedural fuselage group must exist as fallback');
+    assert.strictEqual(aircraft.modelLoaded, false, 'GLB has not loaded yet');
+    assert.ok(aircraft.gearGroup, 'Intrinsic landing gear must exist before the GLB arrives');
+    assert.ok(aircraft.lightsGroup, 'Aircraft lights must stay attached to the root group');
+    assert.strictEqual(aircraft.fuselageGroup, undefined, 'No procedural exterior may exist');
   });
 
-  it('should preserve setCockpitMode contract across both GLTF and procedural modes', () => {
+  it('should preserve the GLTF exterior and cockpit visibility contract', () => {
     const pfd = new PFDCanvas(256, 256);
     const nd = new NDCanvas(256, 256);
     const eicas = new EICASCanvas(256, 256);
     const aircraft = new Boeing737(pfd, nd, eicas);
 
-    // Procedural mode: enter cockpit
     aircraft.setCockpitMode(true);
-    assert.strictEqual(aircraft.fuselageGroup.visible, false, 'Procedural fuselage must be hidden in cockpit view');
+    assert.strictEqual(aircraft.gltfGroup.visible, false, 'GLTF exterior must be hidden in cockpit view');
     assert.strictEqual(aircraft.cockpit.group.visible, true, 'Cockpit instruments must be visible in cockpit view');
 
-    // Procedural mode: exit cockpit (chase view)
     aircraft.setCockpitMode(false);
-    assert.strictEqual(aircraft.fuselageGroup.visible, true, 'Procedural fuselage must be visible in exterior view');
-    assert.strictEqual(aircraft.tailGroup.visible, true, 'Procedural tail must be visible in exterior view');
-    assert.strictEqual(aircraft.empennageGroup.visible, true, 'empennageGroup must match tailGroup visibility');
+    assert.strictEqual(aircraft.gltfGroup.visible, true, 'GLTF exterior must be visible in chase view');
     assert.strictEqual(aircraft.cockpit.group.visible, false, 'Cockpit interior must be hidden in exterior view');
-
-    // Simulate GLTF loaded state
-    aircraft.useGltf = true;
-    aircraft.setCockpitMode(true);
-    assert.strictEqual(aircraft.gltfGroup.visible, false, 'GLTF model must be hidden in cockpit view');
-    assert.strictEqual(aircraft.cockpit.group.visible, true, 'Cockpit must be visible in cockpit view');
-
-    aircraft.setCockpitMode(false);
-    assert.strictEqual(aircraft.gltfGroup.visible, true, 'GLTF model must be visible in exterior view');
-    assert.strictEqual(aircraft.cockpit.group.visible, false, 'Cockpit must be hidden in exterior view');
   });
 
   it('scopes airframe-only lamps out of the compiled light set in cockpit view', () => {
@@ -89,33 +77,6 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     assert.ok(aircraft.lightsGroup.visible, 'The lamp group keeps following the master switch');
   });
 
-  it('should hide the procedural tail when the asynchronous model loads in cockpit view', (t) => {
-    const aircraft = new Boeing737(new PFDCanvas(256, 256), new NDCanvas(256, 256), new EICASCanvas(256, 256));
-    assert.strictEqual(aircraft.tailGroup, aircraft.empennageGroup);
-    assert.strictEqual(aircraft.tailGroup.visible, true);
-
-    let completeLoad;
-    t.mock.method(GLTFLoader.prototype, 'load', (_url, onLoad) => { completeLoad = onLoad; });
-    const previousWindow = globalThis.window;
-    globalThis.window = {};
-    try {
-      aircraft.loadGltfModel('/test.glb');
-      aircraft.setCockpitMode(true);
-      completeLoad({ scene: new THREE.Group() });
-      assert.strictEqual(aircraft.modelLoaded, true);
-      assert.strictEqual(aircraft.gltfGroup.visible, false, 'Late model load must preserve cockpit view');
-      assert.strictEqual(aircraft.tailGroup.visible, false);
-      aircraft.setCockpitMode(false);
-      assert.strictEqual(aircraft.gltfGroup.visible, true);
-      assert.strictEqual(aircraft.tailGroup.visible, false, 'Exterior transitions must not restore the procedural tail');
-      aircraft.setCockpitMode(true);
-      assert.strictEqual(aircraft.gltfGroup.visible, false);
-      assert.strictEqual(aircraft.tailGroup.visible, false);
-    } finally {
-      if (previousWindow === undefined) delete globalThis.window;
-      else globalThis.window = previousWindow;
-    }
-  });
 
   it('binds GLTF engine turbine fans and animates rotation based on engine1 and engine2 N1', (t) => {
     const aircraft = new Boeing737(new PFDCanvas(256, 256), new NDCanvas(256, 256), new EICASCanvas(256, 256));
@@ -155,35 +116,29 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
       assert.strictEqual(aircraft.gltfFanL.rotation.z, 0, 'Left fan must not rotate around Z to avoid out-of-plane wobble');
       assert.strictEqual(aircraft.gltfFanR.rotation.z, 0, 'Right fan must not rotate around Z to avoid out-of-plane wobble');
 
-      // Procedural fans also update
-      assert.ok(Math.abs(aircraft.fanL.rotation.z - expectedRotL) < 1e-5);
-      assert.ok(Math.abs(aircraft.fanR.rotation.z - expectedRotR) < 1e-5);
     } finally {
       if (previousWindow === undefined) delete globalThis.window;
       else globalThis.window = previousWindow;
     }
   });
 
-  it('should suppress procedural exterior during GLTF load to prevent popping, and restore on failure', (t) => {
+  it('reports a failed GLB load without revealing any exterior', async (t) => {
     const aircraft = new Boeing737(new PFDCanvas(256, 256), new NDCanvas(256, 256), new EICASCanvas(256, 256));
-    assert.strictEqual(aircraft.fuselageGroup.visible, true);
-
     let failLoad;
     t.mock.method(GLTFLoader.prototype, 'load', (_url, _onLoad, _onProgress, onError) => { failLoad = onError; });
+    const errors = [];
+    t.mock.method(console, 'error', (...args) => errors.push(args));
     const previousWindow = globalThis.window;
     globalThis.window = {};
     try {
       aircraft.loadGltfModel('/missing.glb');
       assert.strictEqual(aircraft.loadingGltf, true);
-      assert.strictEqual(aircraft.fuselageGroup.visible, false, 'Procedural fuselage must be hidden while loading GLTF');
-      assert.strictEqual(aircraft.tailGroup.visible, false, 'Procedural tail must be hidden while loading GLTF');
-
-      // Trigger error fallback
       failLoad(new Error('Network error'));
+      await aircraft.ready;
       assert.strictEqual(aircraft.loadingGltf, false);
-      assert.strictEqual(aircraft.useGltf, false);
-      assert.strictEqual(aircraft.fuselageGroup.visible, true, 'Procedural fuselage must be restored on load failure');
-      assert.strictEqual(aircraft.tailGroup.visible, true, 'Procedural tail must be restored on load failure');
+      assert.strictEqual(aircraft.modelLoaded, false);
+      assert.strictEqual(aircraft.gltfGroup.children.length, 0, 'No fallback exterior may appear on load failure');
+      assert.ok(errors.some(args => String(args[0]).includes('GLB model failed')), 'The load error must be reported');
     } finally {
       if (previousWindow === undefined) delete globalThis.window;
       else globalThis.window = previousWindow;
@@ -196,12 +151,10 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     const eicas = new EICASCanvas(256, 256);
     const aircraft = new Boeing737(pfd, nd, eicas);
 
-    const wingRotations = aircraft.wingGroup.children.map(wing => wing.quaternion.toArray());
     aircraft.triggerCrashVisuals('TERRAIN');
     assert.strictEqual(aircraft.isCrashed, true);
     assert.strictEqual(aircraft.gltfGroup.rotation.z, 0, 'GLTF group must not rotate through the ground');
 
-    assert.deepStrictEqual(aircraft.wingGroup.children.map(wing => wing.quaternion.toArray()), wingRotations, 'Fallback surfaces retain their physical attitude');
     aircraft.resetCrashVisuals();
     assert.strictEqual(aircraft.isCrashed, false);
     assert.strictEqual(aircraft.gltfGroup.rotation.z, 0, 'GLTF group rotation should reset to 0');
@@ -262,43 +215,5 @@ describe('Boeing737 PBR Model & IBL Reflection System', () => {
     assert.ok(content.includes('CC0'), 'Must document CC0 license');
   });
 
-  it('should align procedural fallback turbofan mounts and pylons with collision probes and wing', () => {
-    const pfd = new PFDCanvas(256, 256);
-    const nd = new NDCanvas(256, 256);
-    const eicas = new EICASCanvas(256, 256);
-    const aircraft = new Boeing737(pfd, nd, eicas);
-
-    assert.ok(aircraft.enginesGroup, 'enginesGroup must exist');
-    assert.strictEqual(aircraft.enginesGroup.children.length, 2, 'Must have left and right engines');
-
-    const [leftEng, rightEng] = aircraft.enginesGroup.children;
-    // Probe coordinates in CollisionDetector: (±5.06, -1.95, -5.22)
-    assert.strictEqual(leftEng.position.x, -5.06, 'Left engine mount X must match CFM56 collision probe');
-    assert.strictEqual(leftEng.position.y, -1.95, 'Left engine mount Y must match CFM56 collision probe');
-    assert.strictEqual(leftEng.position.z, -5.22, 'Left engine mount Z must match CFM56 collision probe');
-
-    assert.strictEqual(rightEng.position.x, 5.06, 'Right engine mount X must match CFM56 collision probe');
-    assert.strictEqual(rightEng.position.y, -1.95, 'Right engine mount Y must match CFM56 collision probe');
-    assert.strictEqual(rightEng.position.z, -5.22, 'Right engine mount Z must match CFM56 collision probe');
-
-    // Pylon geometry & span
-    const pylon = leftEng.children[0];
-    assert.ok(pylon, 'Engine pylon mesh must exist');
-    const pylonGeo = pylon.geometry;
-    const depth = pylonGeo.parameters.depth; // length along Z
-    const height = pylonGeo.parameters.height; // height along Y
-
-    // Aircraft local coordinates of pylon rear and top
-    const rearZ = leftEng.position.z + pylon.position.z + depth / 2;
-    const frontZ = leftEng.position.z + pylon.position.z - depth / 2;
-    const topY = leftEng.position.y + pylon.position.y + height / 2;
-    const bottomY = leftEng.position.y + pylon.position.y - height / 2;
-
-    // Wing leading edge at x=5.06 is at z ≈ -2.71, cowl top is at y = -0.90
-    assert.ok(frontZ <= -5.8, `Pylon front (${frontZ}) must rest forward over engine cowl`);
-    assert.ok(rearZ >= -2.0, `Pylon rear (${rearZ}) must connect securely into wing leading edge without a gap`);
-    assert.ok(topY >= 0.0, `Pylon top (${topY}) must penetrate into wing chord`);
-    assert.ok(bottomY <= -1.2, `Pylon bottom (${bottomY}) must seat firmly in nacelle core`);
-  });
 });
 

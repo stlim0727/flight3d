@@ -2,8 +2,8 @@ import { mulberry32 } from '../core/random.js';
 import * as THREE from 'three';
 import {
   createShipAssetLoader,
-  createShipFallback,
   createWakeTexture,
+  shipAssetManifest,
   shipBounds
 } from './ShipAssets.js';
 import { applyLogDepthOffset } from './RunwayMarkings.js';
@@ -39,26 +39,24 @@ export class Ships {
     if (!deferAssets) this.loadAssets();
   }
 
-  /** Keep motion/collision roots usable before requesting optional GLBs. */
+  /** Keep motion/collision roots usable before requesting GLB visuals. */
   loadAssets() {
     this.startAssets();
     return this.ready;
   }
 
   addVisual(type, record) {
-    const fallback = createShipFallback(type);
-    record.bounds = shipBounds(fallback);
-    record.mesh.add(fallback);
-    record.visual = fallback;
-    record.assetStatus = 'deferred';
+    const { min, max } = shipAssetManifest[type].bounds;
     const updateDimensions = () => {
       const size = record.bounds.getSize(new THREE.Vector3());
       record.length = size.z;
       record.width = size.x;
       record.height = size.y;
     };
+    record.bounds = new THREE.Box3(new THREE.Vector3(...min), new THREE.Vector3(...max));
     updateDimensions();
-    // Resolve errors per record so a failed download retains a collidable fallback.
+    record.assetStatus = 'deferred';
+    // Bounds are manifest-backed until the GLB replaces them; no mesh is added here.
     this.pending.push(
       this.assetsRequested
         .then(() => {
@@ -68,13 +66,6 @@ export class Ships {
         .then((model) => {
           const bounds = shipBounds(model);
           if (bounds.isEmpty()) throw new Error(`Empty ${type} model`);
-          record.mesh.remove(fallback);
-          fallback.traverse((n) => {
-            if (n.isMesh) {
-              n.geometry.dispose();
-              n.material.dispose();
-            }
-          });
           record.bounds = bounds;
           updateDimensions();
           record.mesh.add(model);
@@ -82,9 +73,9 @@ export class Ships {
           record.assetStatus = 'loaded';
         })
         .catch((error) => {
-          record.assetStatus = 'fallback';
+          record.assetStatus = 'error';
           this.assetErrors.push({ type, message: error.message });
-          console.warn(`Ship asset ${type}: retaining fallback`, error);
+          console.error(`Ship asset ${type} failed to load`, error);
         })
     );
   }

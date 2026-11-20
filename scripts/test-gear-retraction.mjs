@@ -65,22 +65,15 @@ try {
     if (ready) break;
     await delay(250);
   }
-  assert.ok(ready, 'Loaded GLB must be ready; fallback alone cannot pass this check');
+  assert.ok(ready, 'Loaded GLB must be ready; a missing asset must not pass this check');
   const setup = await evaluate(async () => {
     const s = simulator, T = THREE;
-    const { Boeing737 } = await import('/src/aircraft/Boeing737.js');
-    const load = Boeing737.prototype.loadGltfModel;
-    let fallback;
-    try {
-      Boeing737.prototype.loadGltfModel = () => {};
-      fallback = new Boeing737(s.pfdCanvas, s.ndCanvas, s.eicasCanvas);
-    } finally { Boeing737.prototype.loadGltfModel = load; }
     const scene = new T.Scene(); scene.background = new T.Color('#263545');
     scene.add(new T.HemisphereLight(0xffffff, 0x9cabbc, 3));
     for (const [position, intensity] of [[[-15, -20, -25], 4], [[15, 10, 5], 2]]) {
       const light = new T.DirectionalLight(0xffffff, intensity); light.position.set(...position); scene.add(light);
     }
-    const models = { loaded: s.aircraft, fallback };
+    const models = { loaded: s.aircraft };
     for (const model of Object.values(models)) {
       model.group.position.set(0, 0, 0); model.group.quaternion.identity(); model.setCockpitMode(false); scene.add(model.group);
     }
@@ -90,9 +83,9 @@ try {
     label.style = 'position:fixed;top:25px;left:30px;color:white;font:22px sans-serif;background:#15202dcc;padding:14px 20px;border-radius:8px';
     document.body.appendChild(label);
     window.gearReview = { models, scene, label, camera: new T.PerspectiveCamera(40, 1.44, 0.1, 200) };
-    return { loaded: s.aircraft.useGltf, fallback: fallback.useGltf };
+    return { loaded: s.aircraft.modelLoaded };
   });
-  assert.equal(setup.loaded, true); assert.equal(setup.fallback, false);
+  assert.equal(setup.loaded, true, 'Loaded GLB must be ready');
   await mkdir(directory, { recursive: true });
   const views = [
     ['overview', [-24, -15, -30], [0, -1, -3]], ['main', [-10, -8, -10], [0, -1, 1.8]],
@@ -100,7 +93,7 @@ try {
     ['side', [-19, 0, -1], [0, -1, 0]], ['belly', [0, -13, 1.8], [0, -1, 1.8]]
   ];
   const results = [];
-  for (const model of ['loaded', 'fallback']) {
+  for (const model of ['loaded']) {
     const cycle = await evaluate(model => {
       const a = gearReview.models[model], T = THREE;
       for (const candidate of Object.values(gearReview.models)) candidate.group.visible = candidate === a;
@@ -114,7 +107,7 @@ try {
           if (leg.scale.distanceTo(new T.Vector3(1, 1, 1)) > 1e-9) throw new Error('Gear dimensions changed');
         }
       }
-      if (maxMainY >= (model === 'loaded' ? -0.90 : -0.40)) throw new Error(`Wing clearance failed: ${maxMainY}`);
+      if (maxMainY >= -0.90) throw new Error(`Wing clearance failed: ${maxMainY}`);
       return { model, poses: 205, maxMainY };
     }, model);
     results.push(cycle);

@@ -24,21 +24,12 @@ import { NDCanvas } from '../src/aircraft/NDCanvas.js';
 import { EICASCanvas } from '../src/aircraft/EICASCanvas.js';
 
 describe('Jeju Air Livery & Aircraft Customization', () => {
-  it('should initialize Boeing737 with Jeju Air as default livery and signature orange procedural accent', () => {
+  it('should initialize Boeing737 with Jeju Air as default livery', () => {
     const pfd = new PFDCanvas(256, 256);
     const nd = new NDCanvas(256, 256);
     const eicas = new EICASCanvas(256, 256);
     const aircraft = new Boeing737(pfd, nd, eicas);
-
     assert.strictEqual(aircraft.livery, 'jeju', 'Default livery must be jeju');
-
-    // Fin and rudder procedural fallback should use Jeju orange (#f47920 = 0xf47920)
-    assert.ok(aircraft.rudder, 'Procedural rudder must exist');
-    assert.strictEqual(
-      aircraft.rudder.material.color.getHex(),
-      0xf47920,
-      'Procedural rudder must have Jeju Air orange color'
-    );
   });
 
   it('should allow initializing Boeing737 with custom livery option', () => {
@@ -46,13 +37,7 @@ describe('Jeju Air Livery & Aircraft Customization', () => {
     const nd = new NDCanvas(256, 256);
     const eicas = new EICASCanvas(256, 256);
     const aircraft = new Boeing737(pfd, nd, eicas, null, null, null, { livery: 'korean' });
-
     assert.strictEqual(aircraft.livery, 'korean');
-    assert.strictEqual(
-      aircraft.rudder.material.color.getHex(),
-      0x003366,
-      'Procedural rudder for Korean Air must have classic blue color'
-    );
   });
 
   it('should apply Jeju Air shader overrides, decals and userData.airline to airframe', () => {
