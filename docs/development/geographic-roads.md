@@ -1,4 +1,4 @@
-# Streamed geographic roads (stage 1)
+# Streamed geographic roads and night lamps
 
 `src/environment/GeographicRoads.js` streams major roads from the same pinned
 Overture release as the other geographic layers:
@@ -30,11 +30,23 @@ excluded from the surface mesh until span handling exists. Water, runway safety
 areas and modeled airport buildings are also excluded.
 
 The layer is attribution-only when empty: `#geographic-roads-attribution` is
-shown once any tile has geometry. No collision, traffic or night lighting is
-added in this stage.
+shown once any tile has geometry. No collision or traffic is added.
+
+## Night lamps (stage 2)
+
+Lamp bases are collected while building each road strip: paired positions on
+both sides of the carriageway, offset by half the road width plus 1.2 m, spaced
+30–48 m by road class. Positions are deduplicated by rounded local coordinate,
+so neighboring tiles cannot double-place a lamp. Near lamps render as one
+instanced pole/head mesh (max 1500); farther lamps render as one additive point
+cloud (max 4000). Both are gated by the shared twilight curve and camera height;
+the point cloud alpha ramps from 1.6 km to 3 km so the two representations
+overlap instead of popping. Instance matrices are rebuilt only when the tile
+set changes or the camera moves more than 75 m, keeping lamp positions stable
+across tile load order.
 
 Verification: `node --test tests/geographicRoads.test.js`, `npm run check`, and
 `scripts/measure-streamed-scenery.mjs` on the hardware GPU path described in
-[browser-gpu.md](browser-gpu.md). Stage 1 added 9 road tiles and 2 draw calls on
-the fixed Incheon low-altitude route; bridge/tunnel spans, night lights and
-vegetation are later stages.
+[browser-gpu.md](browser-gpu.md). On the fixed Incheon low-altitude route stage
+1 added 9 road tiles and 2 draw calls; stage 2 added 169 near instances, 1417
+far points and 3 draw calls. Bridge/tunnel spans and vegetation are later stages.

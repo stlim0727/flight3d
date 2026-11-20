@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { nightLightLevel } from './AirportNightLighting.js';
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import { PMTiles } from 'pmtiles';
@@ -12,6 +14,12 @@ import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 const zoom = 13;
 const neighbors = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
 const surfaceOffset = 0.35;
+const lampPoleHeight = 6;
+const nearLampRange = 1600;
+const farLampRange = 3000;
+const maxNearLamps = 1500;
+const maxFarLamps = 4000;
+const lampSpacing = { motorway: 48, trunk: 44, primary: 40, secondary: 34, tertiary: 30 };
 const source = new PMTiles(
   'https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/2026-11-18.0/transportation.pmtiles',
 );
@@ -80,11 +88,44 @@ function ribbon(points, width, heights, color) {
   }));
 }
 
+/** Both sides of a run, spaced by road class; positions are the pole bases. */
+export function roadLamps(points, width, heightAt, spacing) {
+  if (points.length < 2 || !Number.isFinite(spacing)) return [];
+  const lamps = [];
+  let carried = spacing / 2;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const length = Math.hypot(dx, dz);
+    if (!length) continue;
+    let along = carried;
+    while (along <= length) {
+      const t = along / length;
+      const x = a.x + dx * t;
+      const z = a.z + dz * t;
+      const y = heightAt(x, z);
+      if (Number.isFinite(y)) {
+        const offset = (width / 2 + 1.2) / length;
+        lamps.push(
+          new THREE.Vector3(x - dz * offset, y, z + dx * offset),
+          new THREE.Vector3(x + dz * offset, y, z - dx * offset),
+        );
+      }
+      along += spacing;
+    }
+    carried = along - length;
+  }
+  return lamps;
+}
+
 /**
  * Build one draped ribbon mesh. Surface sections of bridge, tunnel, covered and
  * level-separated segments are deliberately omitted until span handling exists.
+ * Lamp bases are collected in the optional array when night lighting is active.
  */
-export function buildGeographicRoadTile(data, tile, project, terrain, exclude = () => false) {
+export function buildGeographicRoadTile(data, tile, project, terrain, exclude = () => false, lamps = null) {
   const layer = new VectorTile(new PbfReader(data)).layers.segment;
   if (!layer?.length) return null;
   const positions = [];
@@ -125,6 +166,7 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
           const a = base + j * 2;
           indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
         }
+        if (lamps) lamps.push(...roadLamps(run, width, (x, z) => terrain.getHeight(x, z), lampSpacing[properties.class]));
       };
       for (const point of points) {
         if (usable(point)) run.push(point);
@@ -142,6 +184,38 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
   return geometry;
 }
 
+function lampGlowTexture() {
+  const size = 16;
+  const bytes = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const alpha = Math.round(Math.max(0, 1 - Math.hypot(x - 7.5, y - 7.5) / 7.5) * 255);
+      bytes.set([255, 224, 178, alpha], (y * size + x) * 4);
+    }
+  }
+  const texture = new THREE.DataTexture(bytes, size, size);
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function lampGeometry() {
+  const pole = new THREE.CylinderGeometry(0.12, 0.2, lampPoleHeight, 5);
+  pole.translate(0, lampPoleHeight / 2, 0);
+  const head = new THREE.SphereGeometry(0.42, 6, 4);
+  head.translate(0, lampPoleHeight, 0);
+  const poleColors = new Float32Array(pole.attributes.position.count * 3).fill(0.16);
+  const headColors = new Float32Array(head.attributes.position.count * 3).fill(1);
+  pole.setAttribute('color', new THREE.BufferAttribute(poleColors, 3));
+  head.setAttribute('color', new THREE.BufferAttribute(headColors, 3));
+  const geometry = mergeGeometries([pole, head]);
+  pole.dispose();
+  head.dispose();
+  return geometry;
+}
+
 export class GeographicRoads {
   constructor({ origin, project, terrain, exclude, isRunwaySafetyArea, archive = source }) {
     this.origin = origin;
@@ -156,8 +230,29 @@ export class GeographicRoads {
       vertexColors: true, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
     });
     this.tiles = new Map();
+    this.lamps = new Map();
     this.pending = null;
     this.retryAt = new Map();
+    this.lightsDirty = true;
+
+    this.lampMesh = new THREE.InstancedMesh(lampGeometry(), new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, fog: false, depthWrite: false,
+    }), maxNearLamps);
+    this.lampMesh.name = 'Streamed road lamps';
+    this.lampMesh.frustumCulled = false;
+    this.lampMesh.count = 0;
+    this.group.add(this.lampMesh);
+
+    this.glow = lampGlowTexture();
+    this.lampPointsMaterial = new THREE.PointsMaterial({
+      map: this.glow, color: 0xffc688, size: 3, sizeAttenuation: false, vertexColors: true,
+      blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false,
+    });
+    this.lampPoints = new THREE.Points(new THREE.BufferGeometry(), this.lampPointsMaterial);
+    this.lampPoints.name = 'Streamed road lamp glow';
+    this.lampPoints.frustumCulled = false;
+    this.group.add(this.lampPoints);
+    this.matrix = new THREE.Matrix4();
   }
 
   tilesAround(position) {
@@ -180,7 +275,7 @@ export class GeographicRoads {
     return this.terrain.openWorld?.readyForTile(tile, zoom) ?? true;
   }
 
-  update(position, cameraPosition = position) {
+  update(position, cameraPosition = position, sunHeight = 1) {
     if (this.terrain.isLoaded === false) return;
     const aircraftTiles = this.tilesNear(position);
     const cameraTiles = cameraPosition === position ? [] : this.tilesNear(cameraPosition);
@@ -193,11 +288,80 @@ export class GeographicRoads {
       if (this.pending && !this.aircraftTiles.has(this.pending.key)
         && aircraftTiles.some(({ key }) => !this.tiles.has(key))) this.pending.controller.abort();
     }
+    this.updateLights(cameraPosition, sunHeight);
     if (this.pending) return;
     const now = performance.now();
     const tile = this.wantedTiles.find(candidate => !this.tiles.has(candidate.key)
       && now >= (this.retryAt.get(candidate.key) ?? 0) && this.hasGround(candidate));
     if (tile) void this.load(tile);
+  }
+
+  rebuildLights(cameraPosition) {
+    const seen = new Set();
+    const near = [];
+    const far = [];
+    for (const [key, lamps] of this.lamps) {
+      if (!this.tiles.has(key)) continue;
+      for (const lamp of lamps) {
+        const id = `${Math.round(lamp.x)}/${Math.round(lamp.z)}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const distance = Math.hypot(cameraPosition.x - lamp.x, cameraPosition.z - lamp.z);
+        if (distance <= nearLampRange && near.length < maxNearLamps) near.push(lamp);
+        if (distance <= farLampRange && far.length < maxFarLamps) far.push(lamp);
+      }
+    }
+    const positions = new Float32Array(far.length * 3);
+    const colors = new Float32Array(far.length * 4).fill(1);
+    far.forEach((lamp, i) => {
+      positions.set([lamp.x, lamp.y + lampPoleHeight, lamp.z], i * 3);
+    });
+    this.lampPoints.geometry.dispose();
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+    geometry.attributes.color.setUsage(THREE.DynamicDrawUsage);
+    this.lampPoints.geometry = geometry;
+    this.nearLamps = near;
+    this.farLamps = far;
+    this.lampMatricesDirty = true;
+    this.lightsDirty = false;
+  }
+
+  updateLights(cameraPosition, sunHeight) {
+    const night = nightLightLevel(sunHeight);
+    const agl = cameraPosition.y - this.terrain.getHeight(cameraPosition.x, cameraPosition.z);
+    const fade = 1 - THREE.MathUtils.smoothstep(agl, 2500, 4000);
+    this.lampPointsMaterial.opacity = night * fade * 0.55;
+    this.lampPoints.visible = this.lampPointsMaterial.opacity > 0.01;
+    this.lampMesh.material.opacity = night;
+    this.lampMesh.visible = this.lampPoints.visible && agl < 2200;
+    if (!this.lampPoints.visible && !this.lampMesh.visible) return;
+    if (this.lightsDirty || !this.lampCentre
+      || Math.hypot(cameraPosition.x - this.lampCentre.x, cameraPosition.z - this.lampCentre.z) > 75) {
+      this.lampCentre = { x: cameraPosition.x, z: cameraPosition.z };
+      this.rebuildLights(cameraPosition);
+    }
+    if (this.lampMatricesDirty) {
+      this.lampMesh.count = this.nearLamps.length;
+      this.nearLamps.forEach((lamp, i) => {
+        this.matrix.makeTranslation(lamp.x, lamp.y, lamp.z);
+        this.lampMesh.setMatrixAt(i, this.matrix);
+      });
+      this.lampMesh.instanceMatrix.needsUpdate = true;
+      this.lampMatricesDirty = false;
+    }
+    const colors = this.lampPoints.geometry.attributes.color;
+    if (!colors) return;
+    let changed = false;
+    this.farLamps.forEach((lamp, i) => {
+      const distance = Math.hypot(cameraPosition.x - lamp.x, cameraPosition.z - lamp.z);
+      const alpha = THREE.MathUtils.smoothstep(distance, nearLampRange, farLampRange);
+      if (Math.abs(colors.array[i * 4 + 3] - alpha) < 0.002) return;
+      colors.array[i * 4 + 3] = alpha;
+      changed = true;
+    });
+    if (changed) colors.needsUpdate = true;
   }
 
   retainTiles(wanted) {
@@ -207,6 +371,8 @@ export class GeographicRoads {
       mesh?.removeFromParent();
       mesh?.geometry.dispose();
       this.tiles.delete(key);
+      this.lamps.delete(key);
+      this.lightsDirty = true;
     }
     for (const key of this.retryAt.keys()) if (!wantedKeys.has(key)) this.retryAt.delete(key);
     if (this.pending && !wantedKeys.has(this.pending.key)) this.pending.controller.abort();
@@ -218,7 +384,8 @@ export class GeographicRoads {
     try {
       const response = await this.archive.getZxy(zoom, tile.x, tile.y, controller.signal);
       if (controller.signal.aborted) return;
-      const geometry = response && buildGeographicRoadTile(response.data, tile, this.project, this.terrain, this.exclude);
+      const lamps = [];
+      const geometry = response && buildGeographicRoadTile(response.data, tile, this.project, this.terrain, this.exclude, lamps);
       if (geometry) {
         const mesh = new THREE.Mesh(geometry, this.material);
         mesh.receiveShadow = true;
@@ -227,6 +394,8 @@ export class GeographicRoads {
       } else {
         this.tiles.set(tile.key, null);
       }
+      this.lamps.set(tile.key, lamps);
+      this.lightsDirty = true;
       this.retryAt.delete(tile.key);
     } catch {
       if (!controller.signal.aborted) this.retryAt.set(tile.key, performance.now() + 5000);
@@ -242,8 +411,14 @@ export class GeographicRoads {
     if (this.terrain.geographicRoadLayer === this) delete this.terrain.geographicRoadLayer;
     this.group.clear();
     this.tiles.clear();
+    this.lamps.clear();
     this.retryAt.clear();
     this.material.dispose();
+    this.lampMesh.geometry.dispose();
+    this.lampMesh.material.dispose();
+    this.lampPoints.geometry.dispose();
+    this.lampPointsMaterial.dispose();
+    this.glow.dispose();
   }
 }
 
@@ -253,7 +428,7 @@ const frames = {
   lukla: luklaGrid.origin,
 };
 
-export function updateGeographicRoads(sim) {
+export function updateGeographicRoads(sim, elapsed) {
   const origin = Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport];
   const terrain = sim.currentTerrain;
   if (sim.geographicRoadLayer?.terrain !== terrain || !origin) {
@@ -272,7 +447,7 @@ export function updateGeographicRoads(sim) {
     terrain.geographicRoadLayer = sim.geographicRoadLayer;
     terrain.mesh.add(sim.geographicRoadLayer.group);
   }
-  sim.geographicRoadLayer?.update(sim.position, sim.camera.position);
+  sim.geographicRoadLayer?.update(sim.position, sim.camera.position, sim.sky.sunPosition.y, elapsed);
   const attribution = document.getElementById('geographic-roads-attribution');
   if (attribution) attribution.hidden = !sim.geographicRoadLayer?.tiles.size;
 }

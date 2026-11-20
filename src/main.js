@@ -1506,7 +1506,7 @@ class FlightSimulator {
     this.sky.updateSun(this.position, this.camera.position);
     updateOpenWorldTerrain(this);
     updateGeographicBuildings(this, frameDelta);
-    updateGeographicRoads(this);
+    updateGeographicRoads(this, frameDelta);
     this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     if (!this.gameFlow.isPhysicsFrozen()) {
       if (!this.replayDirector.roomEffects) this.explosionSystem.update(frameDelta);

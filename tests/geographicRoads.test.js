@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { PbfWriter } from 'pbf';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
-import { buildGeographicRoadTile, GeographicRoads, roadWidth } from '../src/environment/GeographicRoads.js';
+import { buildGeographicRoadTile, GeographicRoads, roadLamps, roadWidth } from '../src/environment/GeographicRoads.js';
 
 function segmentTile(features) {
   const writer = new PbfWriter();
@@ -138,7 +138,46 @@ test('streams and disposes road tiles, ignoring late responses after abort', asy
     await new Promise(resolve => setTimeout(resolve, 0));
   }
   assert.equal(live.tiles.size, 9);
-  assert.equal(live.group.children.length, 9);
+  assert.equal(live.group.children.filter(child => child.isMesh && !child.isInstancedMesh).length, 9);
   for (const mesh of live.tiles.values()) assert.equal(mesh.material, live.material);
   live.dispose();
+});
+
+test('places paired lamps at class spacing with class-width offset', () => {
+  const points = [{ x: 0, z: 0 }, { x: 120, z: 0 }, { x: 240, z: 0 }];
+  const lamps = roadLamps(points, 16, () => 10, 30);
+  assert.equal(lamps.length, 16);
+  assert.ok(lamps.every(lamp => lamp.y === 10));
+  assert.ok(Math.abs(Math.abs(lamps[0].z - lamps[1].z) - 18.4) < 1e-6);
+  assert.deepEqual(roadLamps(points, 16, () => 10, undefined), []);
+});
+
+test('gates lamps by night and altitude, deduplicates positions and caps near instances', async () => {
+  const localProject = (latitude, longitude) => [(longitude - 126.44) * 100000, -(latitude - 37.46) * 100000];
+  const data = segmentTile([{ properties: { class: 'primary' }, points: [[100, 100], [600, 100]] }]);
+  const archive = { getZxy: async () => ({ data }) };
+  const surface = { ...terrain, isLoaded: true, openWorld: { readyForTile: () => true } };
+  const position = { x: 0, y: 100, z: 0 };
+  const roads = new GeographicRoads({ origin: { latitude: 37.46, longitude: 126.44 }, project: localProject, terrain: surface, archive });
+  roads.update(position, position, 0.5);
+  assert.equal(roads.lampPoints.visible, false);
+  assert.equal(roads.lampMesh.visible, false);
+  for (let frame = 0; frame < 12; frame++) {
+    roads.update(position, position, -0.2);
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.ok(roads.lamps.size > 0);
+  assert.ok(roads.nearLamps.length > 0);
+  assert.ok(roads.lampPointsMaterial.opacity > 0.5);
+  assert.equal(roads.lampMesh.count, roads.nearLamps.length);
+  const before = roads.nearLamps.length;
+  const [firstKey] = roads.lamps.keys();
+  roads.lamps.set(`duplicate/${firstKey}`, roads.lamps.get(firstKey));
+  roads.lightsDirty = true;
+  roads.update(position, position, -0.2);
+  assert.equal(roads.nearLamps.length, before);
+  const high = { ...position, y: 6000 };
+  roads.update(high, high, -0.2);
+  assert.equal(roads.lampPoints.visible, false);
+  roads.dispose();
 });

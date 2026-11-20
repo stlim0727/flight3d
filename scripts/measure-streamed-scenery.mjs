@@ -84,6 +84,12 @@ await withBrowserSession(
           roads: sim?.geographicRoadLayer?.tiles?.size ?? 0,
         },
         roadsWithGeometry: [...(sim?.geographicRoadLayer?.tiles?.values() ?? [])].filter(Boolean).length,
+        lamps: {
+          near: sim?.geographicRoadLayer?.nearLamps?.length ?? 0,
+          far: sim?.geographicRoadLayer?.farLamps?.length ?? 0,
+          instances: sim?.geographicRoadLayer?.lampMesh?.count ?? 0,
+          visible: Boolean(sim?.geographicRoadLayer?.lampPoints?.visible),
+        },
         renderInfo: sim?.renderer?.info ? {
           memory: { ...sim.renderer.info.memory },
           render: { ...sim.renderer.info.render },
