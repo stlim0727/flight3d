@@ -121,3 +121,46 @@ test('refreshes failed imagery and water without rebuilding the terrain tile', a
   assert.equal(waterAttempts, 2);
   world.dispose();
 });
+
+test('repairs isolated coastal DEM extremes while preserving steep connected terrain', async () => {
+  const raster = flat(20);
+  // The decimated 3×3 neighborhood of a real coastal DEM spike near Jeju.
+  const patch = [[16, 34, 118], [177, -1076, 787], [0, 0, 0]];
+  for (let row = 0; row < patch.length; row++) {
+    for (let col = 0; col < patch[row].length; col++) {
+      raster[(242 + row * 2) * 256 + 34 + col * 2] = patch[row][col];
+    }
+  }
+  for (let row = 20; row <= 30; row++) {
+    for (let col = 20; col <= 30; col++) raster[row * 256 + col] = 900;
+  }
+  // A steep plane crosses the northwest corner. The in-tile neighbors
+  // alone would all vote to flatten its valid 2000 m corner.
+  for (let row = 0; row <= 8; row++) {
+    for (let col = 0; col <= 8; col++) raster[row * 256 + col] = 2000 - 100 * (row + col);
+  }
+  const rgba = new Uint8ClampedArray(256 ** 2 * 4);
+  for (const [index, height] of raster.entries()) {
+    const encoded = height + 32768;
+    rgba.set([encoded >> 8, encoded & 255, 0, 255], index * 4);
+  }
+  const world = new OpenWorldTerrain({ origin, elevationCache: {
+    getTileImage: async () => ({ width: 256, height: 256 }),
+    dispose() {},
+  } });
+  globalThis.document = { createElement: () => ({ getContext: () => ({
+    drawImage() {},
+    getImageData: () => ({ data: rgba }),
+  }) }) };
+  try {
+    const repaired = await world.raster(x, y);
+    assert.equal(repaired[244 * 256 + 36], 25);
+    assert.equal(repaired[244 * 256 + 38], 20);
+    assert.equal(repaired[20 * 256 + 20], 900);
+    assert.equal(repaired[0], 2000);
+    assert.equal(repaired[2 * 256 + 2], 1600);
+  } finally {
+    delete globalThis.document;
+    world.dispose();
+  }
+});

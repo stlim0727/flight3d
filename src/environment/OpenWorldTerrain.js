@@ -12,6 +12,8 @@ const tilesAcross = 2 ** zoom;
 const samples = 256;
 const segments = 128;
 const stride = segments + 1;
+const sampleStep = samples / segments;
+const isolatedHeightDelta = 180;
 const elevationUrl = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 const waterArchive = new PMTiles(
   'https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/2026-11-18.0/base.pmtiles',
@@ -38,6 +40,37 @@ export function decodeTerrarium(rgba) {
     heights[i] = rgba[j] * 256 + rgba[j + 1] + rgba[j + 2] / 256 - 32768;
   }
   return heights;
+}
+
+function repairElevationSpikes(heights) {
+  const repaired = heights.slice();
+  const neighbors = [];
+  // Compare the same samples the mesh uses. Read from the original raster so
+  // a repair cannot propagate through nearby samples or depend on tile order.
+  // Leave raster edges intact because their neighborhoods cross tile boundaries.
+  for (let row = sampleStep; row < samples - sampleStep; row += sampleStep) {
+    for (let col = sampleStep; col < samples - sampleStep; col += sampleStep) {
+      const index = row * samples + col;
+      const height = heights[index];
+      let lower = 0, higher = 0;
+      neighbors.length = 0;
+      for (let dy = -sampleStep; dy <= sampleStep; dy += sampleStep) {
+        for (let dx = -sampleStep; dx <= sampleStep; dx += sampleStep) {
+          if (dx === 0 && dy === 0) continue;
+          const neighbor = heights[index + dy * samples + dx];
+          neighbors.push(neighbor);
+          if (height - neighbor > isolatedHeightDelta) lower++;
+          if (neighbor - height > isolatedHeightDelta) higher++;
+        }
+      }
+      const consensus = Math.ceil(neighbors.length * 0.75);
+      if (lower < consensus && higher < consensus) continue;
+      neighbors.sort((a, b) => a - b);
+      const middle = Math.floor(neighbors.length / 2);
+      repaired[index] = (neighbors[middle - 1] + neighbors[middle]) / 2;
+    }
+  }
+  return repaired;
 }
 
 function tileContext() {
@@ -126,10 +159,10 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
       const u = col / segments;
       const v = row / segments;
       const source = data[Number(u === 1) + 2 * Number(v === 1)];
-      const height = source[(row * 2) % samples * samples + (col * 2) % samples];
+      const height = source[(row * sampleStep) % samples * samples + (col * sampleStep) % samples];
       const { latitude, longitude } = tileToWgs84(x + u, y + v, zoom);
       const [localX, localZ] = project(latitude, longitude);
-      const wet = height <= 0 || (water?.[(Math.min(row * 2, 255) * samples + Math.min(col * 2, 255)) * 4 + 3] ?? 0) >= 128;
+      const wet = height <= 0 || (water?.[(Math.min(row * sampleStep, samples - 1) * samples + Math.min(col * sampleStep, samples - 1)) * 4 + 3] ?? 0) >= 128;
       appendVertex([localX, height, localZ, u, v, Number(wet)]);
     }
   }
@@ -406,7 +439,7 @@ export class OpenWorldTerrain {
       if (!image || image.width !== samples || image.height !== samples) throw new Error('Elevation tile unavailable');
       const context = tileContext();
       context.drawImage(image, 0, 0);
-      return decodeTerrarium(context.getImageData(0, 0, samples, samples).data);
+      return repairElevationSpikes(decodeTerrarium(context.getImageData(0, 0, samples, samples).data));
     }).catch(error => {
       if (this.rasters.get(key) === request) this.rasters.delete(key);
       throw error;
