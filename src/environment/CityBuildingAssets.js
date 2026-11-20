@@ -7,7 +7,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const TILE = 128;
 const SIZE = TILE * 2;
 
-function makeAtlas() {
+export function createCityFacadeAtlas() {
   const color = new Uint8Array(SIZE * SIZE * 4);
   const windows = new Uint8Array(SIZE * SIZE * 4);
   const walls = [
@@ -69,7 +69,7 @@ function box(width, height, depth, bottom, facadeTile) {
 
 // Keep window bays close to human scale even when a normalized archetype is
 // instanced as a 25 m block or a 150 m tower. Rooftops retain their original UVs.
-function cityFacadeUvShader(shader) {
+export function cityFacadeUvShader(shader) {
   shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
     varying vec3 vCityMetricPosition;
     varying vec3 vCityFaceNormal;`);
@@ -114,7 +114,7 @@ function roofRim(width, depth, bottom, height = 0.025) {
 }
 
 export function createCityBuildingAssets() {
-  const atlas = makeAtlas();
+  const atlas = createCityFacadeAtlas();
   const nearMaterial = new THREE.MeshStandardMaterial({
     map: atlas.map,
     emissiveMap: atlas.emissiveMap,

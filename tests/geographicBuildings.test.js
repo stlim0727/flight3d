@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as THREE from 'three';
 import { PbfWriter } from 'pbf';
 import { buildGeographicBuildingTile, geographicBuildingHeight, GeographicBuildings } from '../src/environment/GeographicBuildings.js';
 
@@ -39,6 +40,36 @@ test('clips building roofs to the tile and anchors meshes to the flight surface'
   assert.equal(buildGeographicBuildingTile(data, tile, project, terrain, () => true), null);
   assert.equal(buildGeographicBuildingTile(data, tile, project, { ...terrain, isWater: () => true }), null);
   geometry.dispose();
+});
+
+test('facade UVs select atlas tiles and roofs use the roof tile', () => {
+  const project = (latitude, longitude) => [longitude * 100000, -latitude * 100000];
+  const geometry = buildGeographicBuildingTile(
+    buildingTile(), { x: 8192, y: 8192 }, project, { getHeight: () => 44 },
+  );
+  assert.ok(geometry);
+  const { uv } = geometry.attributes;
+  assert.equal(uv.count, geometry.attributes.position.count);
+  // The fixture has two roof triangles, then four wall quads.
+  for (let i = 0; i < 6; i++) {
+    assert.ok(uv.getX(i) > 0.5 && uv.getY(i) > 0.5, `roof vertex ${i}`);
+  }
+  for (let i = 6; i < uv.count; i++) {
+    assert.ok([0.25, 0.75].includes(uv.getX(i)), `facade u ${i}`);
+    assert.ok([0.25, 0.75].includes(uv.getY(i)), `facade v ${i}`);
+  }
+  geometry.dispose();
+});
+
+test('streamed buildings share the facade atlas and dispose it', () => {
+  const layer = new GeographicBuildings({
+    archive: { getZxy: async () => null }, terrain: {}, project: () => [0, 0],
+  });
+  assert.ok(layer.material.map?.isDataTexture);
+  assert.equal(layer.material.map.colorSpace, THREE.SRGBColorSpace);
+  assert.equal(layer.material.emissiveMap, layer.atlas.emissiveMap);
+  assert.equal(typeof layer.material.onBeforeCompile, 'function');
+  layer.dispose();
 });
 
 test('disposal aborts pending tile fetches and ignores their late results', async () => {
