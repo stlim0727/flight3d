@@ -111,13 +111,84 @@ test('prioritizes visible imagery at cruise altitude and fades back to the base 
   assert.equal(detail.blend.value, 1);
   camera.lookAt(0, 4000, 10000);
   world.updateImageryDetail(camera, 1080, 550);
+  assert.equal(world.detailWanted.has(key), true);
+  assert.equal(detail.blend.value, 1);
+  world.updateImageryDetail(camera, 1080, 1250);
+  world.updateImageryDetail(camera, 1080, 1450);
   assert.equal(world.detailWanted.has(key), false);
   assert.ok(detail.blend.value > 0 && detail.blend.value < 1);
   assert.equal(released, false);
-  world.updateImageryDetail(camera, 1080, 900);
+  world.updateImageryDetail(camera, 1080, 1800);
   assert.equal(released, true);
   assert.equal(front.material.map, baseMap);
   world.dispose();
+});
+
+test('holds the high-detail slot when straight flight changes tile ranking', () => {
+  const world = new OpenWorldTerrain({ origin });
+  const camera = new PerspectiveCamera(55, 2, 1, 100000);
+  camera.position.set(0, 4000, 0);
+  camera.lookAt(0, 4000, -10000);
+  const first = new Mesh(new BoxGeometry(5000, 100, 5000));
+  const next = new Mesh(new BoxGeometry(8000, 100, 8000));
+  first.position.set(-3000, 0, -10000);
+  next.position.set(3000, 0, -18000);
+  world.tiles.set('first', { mesh: first });
+  world.tiles.set('next', { mesh: next });
+  world.updateImageryDetail(camera, 1080, 200);
+  assert.equal(world.detailWanted.get('first'), 13);
+  assert.equal(world.detailWanted.get('next'), 12);
+
+  camera.position.z = -6000;
+  world.updateImageryDetail(camera, 1080, 400);
+  // Both tiles are still visible. Reduce the first tile's projected size by
+  // continuing forward past it, while keeping the heading fixed.
+  camera.position.z = -12000;
+  world.updateImageryDetail(camera, 1080, 600);
+  assert.ok(world.tiles.get('next').imageryPriority > world.tiles.get('first').imageryPriority);
+  assert.equal(world.detailWanted.get('first'), 13);
+  assert.equal(world.detailWanted.get('next'), 12);
+  world.updateImageryDetail(camera, 1080, 1500);
+  assert.equal(world.detailWanted.get('first'), undefined);
+  assert.equal(world.detailWanted.get('next'), 13);
+  world.dispose();
+});
+
+test('upgrades z12 to z13 directly, then restores the base for a later fade-out', async () => {
+  const key = `${x}/${y}`;
+  const world = new OpenWorldTerrain({ origin, imageryCache: {
+    getTileImage: async () => ({ width: 256, height: 256 }),
+    dispose() {},
+  } });
+  const mesh = new Mesh(new BoxGeometry(4000, 100, 4000));
+  let disposed = false;
+  const previous = { dispose() { disposed = true; } };
+  const baseMap = { dispose() {} };
+  const detail = { map: { value: previous }, blend: { value: 1 } };
+  const entry = { mesh, baseMap, detailMap: previous, detailLevel: 12, detail };
+  mesh.material.map = baseMap;
+  world.tiles.set(key, entry);
+  world.detailWanted.set(key, 13);
+  globalThis.document = { createElement: () => ({ getContext: () => ({ drawImage() {} }) }) };
+  try {
+    await world.loadImageryDetail(key, entry, 13);
+    assert.equal(mesh.material.map, previous);
+    assert.equal(detail.blend.value, 0);
+    assert.equal(disposed, false);
+    const camera = new PerspectiveCamera();
+    const start = entry.detailUpdatedAt;
+    world.nextImagerySelection = Infinity;
+    world.updateImageryDetail(camera, 1080, start + 175);
+    assert.equal(detail.blend.value, 0.5);
+    assert.equal(mesh.material.map, previous);
+    world.updateImageryDetail(camera, 1080, start + 350);
+    assert.equal(detail.blend.value, 1);
+    assert.equal(mesh.material.map, baseMap);
+    assert.equal(disposed, true);
+  } finally {
+    delete globalThis.document;
+    world.dispose();
+  }
 });
 
 test('building tiles crossing the Incheon scenery edge wait for their DEM parent', () => {
