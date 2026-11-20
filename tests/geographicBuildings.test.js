@@ -63,7 +63,8 @@ test('facade UVs select atlas tiles and roofs use the roof tile', () => {
 
 test('streamed buildings share the facade atlas and dispose it', () => {
   const layer = new GeographicBuildings({
-    archive: { getZxy: async () => null }, terrain: {}, project: () => [0, 0],
+    archive: { getZxy: async () => null }, terrain: { getHeight: () => 0 }, project: () => [0, 0],
+    origin: { latitude: 37.5, longitude: 127 },
   });
   assert.ok(layer.material.map?.isDataTexture);
   assert.equal(layer.material.map.colorSpace, THREE.SRGBColorSpace);
@@ -75,6 +76,8 @@ test('streamed buildings share the facade atlas and dispose it', () => {
     brightest = Math.max(brightest, emissive[i], emissive[i + 1], emissive[i + 2]);
   }
   assert.ok(brightest > 200, 'close-range window mask is too dim');
+  layer.update({ x: 0, y: 100, z: 0 }, { x: 0, y: 100, z: 0 }, -1, 1 / 60);
+  assert.ok(layer.material.color.r < 0.2, 'night albedo should fade out');
   layer.dispose();
 });
 

@@ -308,6 +308,7 @@ export class GeographicBuildings {
   update(position, cameraPosition = position, sunHeight = 1, elapsed = 1 / 60) {
     if (this.terrain.isLoaded === false) return;
     const night = nightLightLevel(sunHeight);
+    this.material.color.setScalar(1 - night * 0.9);
     this.material.emissiveIntensity = night * 0.75;
     const aircraftTiles = this.tilesNear(position);
     const cameraTiles = cameraPosition === position ? [] : this.tilesNear(cameraPosition);
