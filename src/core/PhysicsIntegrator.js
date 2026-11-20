@@ -11,7 +11,7 @@ import { FLOW } from '../ui/GameFlowController.js';
 import { trackFlightCrash } from '../analytics/posthog.js';
 import { PilotPhysiology } from '../physics/PilotPhysiology.js';
 import { WaterDitching } from '../physics/WaterDitching.js';
-import { createGroundHeightQuery } from '../environment/TerrainProvider.js';
+import { createGroundSurfaceQueries } from '../environment/TerrainProvider.js';
 
 const GEAR_LABELS = {
   nose: 'nose.gear',
@@ -112,6 +112,13 @@ class PhysicsIntegratorMethods {
     this.bodyContactStarted = core.bodyContactStarted;
   }
 
+  ensureGroundSurfaceQueries() {
+    return this._groundSurfaceQueries ??= createGroundSurfaceQueries({
+      getTerrain: () => this.currentTerrain,
+      getOverride: () => this.terrainProviderOverride,
+    });
+  }
+
   /**
    * Physics Integration Substep (120 Hz)
    */
@@ -125,12 +132,10 @@ class PhysicsIntegratorMethods {
       ?? (this.aircraft.useGltf ? BODY_SUPPORT_POINTS : FALLBACK_BODY_SUPPORT_POINTS);
 
     const core = this.ensurePhysicsCore();
+    const groundSurface = this.ensureGroundSurfaceQueries();
     const environment = this._envCallbacks ??= {
-      getGroundHeight: this._groundHeightQuery ??= createGroundHeightQuery({
-        getTerrain: () => this.currentTerrain,
-        getOverride: () => this.terrainProviderOverride,
-      }),
-      getGroundNormal: (x, z) => this.currentTerrain?.getNormal?.(x, z) ?? null,
+      getGroundHeight: groundSurface.getGroundHeight,
+      getGroundNormal: groundSurface.getGroundNormal,
       isOnRunway: (x, z) => (this.currentAirport?.isOnRunway ? this.currentAirport.isOnRunway(x, z) : true),
       isRunwaySafetyArea: (x, z) => (this.currentAirport?.isRunwaySafetyArea ? this.currentAirport.isRunwaySafetyArea(x, z) : true),
       getWaterLevel: (x, z) => this.currentTerrain?.getWaterLevel?.(x, z) ?? 0.0,
@@ -338,10 +343,8 @@ class PhysicsIntegratorMethods {
 
   resolveBodyPenetration() {
     const core = this.ensurePhysicsCore();
-    core.resolveBodyPenetration(
-      this._groundHeightQuery ?? ((x, z) => this.currentTerrain.getHeight(x, z)),
-      (x, z) => this.currentTerrain.getNormal?.(x, z)
-    );
+    const { getGroundHeight, getGroundNormal } = this.ensureGroundSurfaceQueries();
+    core.resolveBodyPenetration(getGroundHeight, getGroundNormal);
   }
 
   triggerCrash(crashResult, impactVelocity = this.linearVelocity) {

@@ -17,6 +17,8 @@
  * null/NaN: unready or failed areas fall back to another surface.
  */
 
+import { Vector3 } from 'three';
+
 function toPlainNormal(n) {
   return n ? { x: n.x, y: n.y, z: n.z } : null;
 }
@@ -89,21 +91,52 @@ export function resolveGroundHeight(getProvider, fallback) {
   };
 }
 
+function toNormalVector3(normal) {
+  if (!normal) return null;
+  const { x, y, z } = normal;
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+  if (x * x + y * y + z * z <= 0.0001) return null;
+  return normal.isVector3 ? normal : new Vector3(x, y, z);
+}
+
+function sampleOverrideHeight(override, x, z) {
+  if (!override?.isReady?.(x, z)) return null;
+  const h = override.getHeight?.(x, z);
+  return Number.isFinite(h) ? h : null;
+}
+
+/**
+ * Ground-height and normal queries for physics. Uses `getOverride()` (a provider
+ * swapped in at runtime) when it is ready and yields a finite height, otherwise
+ * falls back to the active terrain surface so height and normal always describe
+ * the same surface. Adapts plain `{ x, y, z }` normals into `THREE.Vector3`
+ * instances for physics consumers.
+ */
+export function createGroundSurfaceQueries({ getTerrain, getOverride = () => null }) {
+  return {
+    getGroundHeight(x, z) {
+      const overrideHeight = sampleOverrideHeight(getOverride(), x, z);
+      if (overrideHeight !== null) return overrideHeight;
+      return getTerrain()?.getHeight?.(x, z) ?? 0;
+    },
+    getGroundNormal(x, z) {
+      const override = getOverride();
+      if (sampleOverrideHeight(override, x, z) !== null) {
+        return toNormalVector3(override.getNormal?.(x, z) ?? null);
+      }
+      return toNormalVector3(getTerrain()?.getNormal?.(x, z) ?? null);
+    },
+  };
+}
+
 /**
  * Ground-height query for physics. Uses `getOverride()` (a provider swapped in
  * at runtime) where it is ready, otherwise the active terrain surface, otherwise
  * 0. Behaves exactly like the former `terrain?.getHeight?.(x, z) ?? 0` when no
  * override is set.
  */
-export function createGroundHeightQuery({ getTerrain, getOverride = () => null }) {
-  return (x, z) => {
-    const override = getOverride();
-    if (override?.isReady(x, z)) {
-      const h = override.getHeight(x, z);
-      if (Number.isFinite(h)) return h;
-    }
-    return getTerrain()?.getHeight?.(x, z) ?? 0;
-  };
+export function createGroundHeightQuery(options) {
+  return createGroundSurfaceQueries(options).getGroundHeight;
 }
 
 /** Throws unless `provider` implements the contract; used by conformance tests. */
