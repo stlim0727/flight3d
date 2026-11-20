@@ -273,3 +273,33 @@ test('keeps daytime silhouettes until nearby detail is ready, then fades them', 
   assert.equal(opacity(), 1);
   layer.dispose();
 });
+
+test('Ultra Low keeps neighboring buildings near tile borders and restores the full scene', () => {
+  const buildings = new GeographicBuildings({
+    origin: { latitude: 37.5, longitude: 127 },
+    terrain: { getHeight: () => 0 },
+  });
+  const aircraft = new THREE.Vector3(0, 300, 0);
+  const camera = new THREE.Vector3(20, 300, 0);
+  const makeTile = offset => {
+    const geometry = new THREE.BoxGeometry(20, 40, 20);
+    geometry.translate(offset, 20, 0);
+    geometry.computeBoundingBox();
+    return { mesh: new THREE.Mesh(geometry, buildings.material) };
+  };
+  const tiles = buildings.tilesNear(aircraft);
+  const center = makeTile(0), border = makeTile(150), far = makeTile(500);
+  buildings.tiles.set(tiles[0].key, center);
+  buildings.tiles.set(tiles[1].key, border);
+  buildings.tiles.set(tiles[2].key, far);
+  buildings.retryAt = new Map(tiles.map(tile => [tile.key, Infinity]));
+  buildings.overviewRetryAt = Infinity;
+  buildings.update(aircraft, camera, 1, 1 / 60, true);
+  assert.deepEqual([center, border, far].map(tile => tile.mesh.visible), [true, true, false]);
+  assert.equal(buildings.silhouetteMaterial.opacity, 0);
+  assert.equal(buildings.tiles.size, 3);
+  buildings.update(aircraft, camera, 1, 1 / 60, false);
+  assert.ok([center, border, far].every(tile => tile.mesh.visible));
+  assert.equal(buildings.silhouetteMaterial.opacity, 1);
+  buildings.dispose();
+});

@@ -250,6 +250,14 @@ function intersectsBuilding({ pos, radius }, { rings, low, roof }) {
     segmentDistance(pos.x, pos.z, point, ring[(i + 1) % ring.length]) <= horizontal));
 }
 
+// Keep collision-relevant buildings visible when crossing a tile border.
+function nearBuildingTile(mesh, position) {
+  const box = mesh.geometry.boundingBox;
+  const dx = Math.max(box.min.x - position.x, position.x - box.max.x, 0);
+  const dz = Math.max(box.min.z - position.z, position.z - box.max.z, 0);
+  return dx * dx + dz * dz <= 200 * 200;
+}
+
 export class GeographicBuildings {
   constructor({ origin, project, terrain, exclude, isRunwaySafetyArea, archive = source }) {
     this.origin = origin;
@@ -305,7 +313,7 @@ export class GeographicBuildings {
     return this.terrain.openWorld?.readyForTile(tile, level) ?? true;
   }
 
-  update(position, cameraPosition = position, sunHeight = 1, elapsed = 1 / 60) {
+  update(position, cameraPosition = position, sunHeight = 1, elapsed = 1 / 60, reducedDetail = false) {
     if (this.terrain.isLoaded === false) return;
     const night = nightLightLevel(sunHeight);
     this.material.color.setScalar(1 - night * 0.9);
@@ -321,7 +329,11 @@ export class GeographicBuildings {
       if (this.pending && !this.aircraftTiles.has(this.pending.key)
         && aircraftTiles.some(({ key }) => !this.tiles.has(key))) this.pending.controller.abort();
     }
-    this.updateOverview(cameraPosition, night, elapsed);
+    for (const [key, { mesh }] of this.tiles) {
+      if (mesh) mesh.visible = !reducedDetail || key === cameraTiles[0]?.key || key === aircraftTiles[0]?.key
+        || nearBuildingTile(mesh, position) || nearBuildingTile(mesh, cameraPosition);
+    }
+    this.updateOverview(cameraPosition, night, elapsed, reducedDetail);
     if (this.pending) return;
     const now = performance.now();
     const tile = this.wantedTiles.find(candidate => !this.tiles.has(candidate.key)
@@ -329,11 +341,18 @@ export class GeographicBuildings {
     if (tile) void this.load(tile);
   }
 
-  updateOverview(cameraPosition, night, elapsed) {
+  updateOverview(cameraPosition, night, elapsed, reducedDetail = false) {
     const height = cameraPosition.y - this.terrain.getHeight(cameraPosition.x, cameraPosition.z);
     const fade = 1 - THREE.MathUtils.smoothstep(height, 12500, 15500);
     this.lightMaterial.opacity = night * fade * 0.9;
-    this.silhouetteMaterial.opacity = (1 - night) * fade;
+    this.silhouetteMaterial.opacity = reducedDetail ? 0 : (1 - night) * fade;
+    if (reducedDetail && this.lightMaterial.opacity === 0) {
+      for (const tile of this.overviewTiles.values()) {
+        if (tile?.points) tile.points.visible = false;
+        if (tile?.silhouettes) tile.silhouettes.visible = false;
+      }
+      return;
+    }
     const wanted = fade > 0 ? this.tilesAround(cameraPosition, overviewZoom) : [];
     const center = wanted[0]?.key;
     if (center !== this.overviewCenter) {
@@ -356,7 +375,7 @@ export class GeographicBuildings {
         const index = i * 4 + 3;
         const previous = color.array[index];
         let alpha = 1;
-        if (detail) {
+        if (detail?.visible) {
           const distance = Math.hypot(
             cameraPosition.x - position.getX(i),
             cameraPosition.y - position.getY(i),
@@ -445,6 +464,7 @@ export class GeographicBuildings {
       const colliders = [];
       const geometry = response && buildGeographicBuildingTile(response.data, tile, this.project, this.terrain, this.exclude, colliders);
       const collisionCells = indexColliders(colliders);
+      geometry?.computeBoundingBox();
       const mesh = geometry ? new THREE.Mesh(geometry, this.material) : null;
       if (mesh) {
         mesh.receiveShadow = true;
@@ -518,7 +538,8 @@ export function updateGeographicBuildings(sim, elapsed) {
     terrain.geographicBuildingLayer = sim.geographicBuildingLayer;
     terrain.mesh.add(sim.geographicBuildingLayer.group);
   }
-  sim.geographicBuildingLayer?.update(sim.position, sim.camera.position, sim.sky.sunPosition.y, elapsed);
+  sim.geographicBuildingLayer?.update(sim.position, sim.camera.position, sim.sky.sunPosition.y, elapsed,
+    sim.renderQuality === 'ultraLow');
   const attribution = document.getElementById('geographic-buildings-attribution');
   if (attribution) attribution.hidden = !sim.geographicBuildingLayer?.group.children.length;
 }

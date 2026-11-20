@@ -235,6 +235,39 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
   return { geometry, water };
 }
 
+// Keep every boundary sample so reduced tiles join full-resolution neighbors.
+export function buildReducedTerrainGeometry(full) {
+  if (full.attributes.position.count !== stride * stride || full.index.count !== segments * segments * 6) return null;
+  const step = 4;
+  const indices = [];
+  for (let row = 0; row < segments; row += step) {
+    for (let col = 0; col < segments; col += step) {
+      const nw = row * stride + col;
+      const sw = nw + step * stride;
+      const se = sw + step;
+      const ne = nw + step;
+      if (row > 0 && col > 0 && row + step < segments && col + step < segments) {
+        indices.push(nw, sw, ne, se, ne, sw);
+        continue;
+      }
+      const ring = [nw];
+      if (col === 0) for (let i = 1; i < step; i++) ring.push(nw + i * stride);
+      ring.push(sw);
+      if (row + step === segments) for (let i = 1; i < step; i++) ring.push(sw + i);
+      ring.push(se);
+      if (col + step === segments) for (let i = 1; i < step; i++) ring.push(se - i * stride);
+      ring.push(ne);
+      if (row === 0) for (let i = 1; i < step; i++) ring.push(ne - i);
+      const center = nw + (step / 2) * (stride + 1);
+      for (let i = 0; i < ring.length; i++) indices.push(center, ring[i], ring[(i + 1) % ring.length]);
+    }
+  }
+  const reduced = new THREE.BufferGeometry();
+  reduced.setIndex(indices);
+  for (const [name, attribute] of Object.entries(full.attributes)) reduced.setAttribute(name, attribute);
+  return reduced;
+}
+
 function heightOnTriangle(positions, x, z, a, b, c) {
   const ax = positions.getX(a), az = positions.getZ(a);
   const bx = positions.getX(b) - ax, bz = positions.getZ(b) - az;
@@ -284,7 +317,7 @@ export class OpenWorldTerrain {
     if (!tile) return undefined;
     const col = Math.min(segments - 1, Math.floor(fx * segments));
     const row = Math.min(segments - 1, Math.floor(fy * segments));
-    const positions = tile.mesh.geometry.attributes.position;
+    const positions = (tile.fullGeometry ?? tile.mesh.geometry).attributes.position;
     let height;
     for (let dz = -1; dz <= 1 && height === undefined; dz++) {
       for (let dx = -1; dx <= 1 && height === undefined; dx++) {
@@ -315,8 +348,14 @@ export class OpenWorldTerrain {
     return this.tiles.has(keyOf(wrapX(x), y));
   }
 
-  update(position, velocity, camera, viewportHeight) {
+  update(position, velocity, camera, viewportHeight, reducedGeometry = false) {
     const center = this.coordinate(position.x, position.z);
+    const detailedKey = reducedGeometry ? keyOf(wrapX(center.x), center.y) : null;
+    if (this.reducedGeometry !== reducedGeometry || this.detailedKey !== detailedKey) {
+      this.reducedGeometry = reducedGeometry;
+      this.detailedKey = detailedKey;
+      for (const [key, entry] of this.tiles) this.updateRenderGeometry(entry, key);
+    }
     const forward = this.coordinate(position.x + velocity.x * 65, position.z + velocity.z * 65);
     const selection = `${center.x}/${center.y}:${forward.x}/${forward.y}`;
     if (selection !== this.selection) {
@@ -517,7 +556,8 @@ export class OpenWorldTerrain {
       const material = terrainMaterial(detail);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
-      const entry = { mesh, detail, water, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
+      const entry = { mesh, fullGeometry: geometry, detail, water, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
+      this.updateRenderGeometry(entry, key);
       this.tiles.set(key, entry);
       this.group.add(mesh);
       this.retry.delete(key);
@@ -528,11 +568,20 @@ export class OpenWorldTerrain {
     }
   }
 
-  release(key, { mesh, baseMap, detailMap, waterRequest }) {
+  updateRenderGeometry(entry, key) {
+    const useReduced = this.reducedGeometry && key !== this.detailedKey;
+    if (useReduced && entry.reducedGeometry === undefined) {
+      entry.reducedGeometry = buildReducedTerrainGeometry(entry.fullGeometry);
+    }
+    entry.mesh.geometry = (useReduced && entry.reducedGeometry) || entry.fullGeometry;
+  }
+
+  release(key, { mesh, fullGeometry, reducedGeometry, baseMap, detailMap, waterRequest }) {
     waterRequest?.abort();
     this.tiles.delete(key);
     mesh.removeFromParent();
-    mesh.geometry.dispose();
+    (fullGeometry ?? mesh.geometry).dispose();
+    reducedGeometry?.dispose();
     baseMap?.dispose();
     detailMap?.dispose();
     mesh.material.dispose();
@@ -576,7 +625,8 @@ export function updateOpenWorldTerrain(sim) {
       if (surface.corridorStreamer) surface.corridorStreamer.group.visible = false;
     }
     const height = sim.renderer?.getDrawingBufferSize?.(viewportSize)?.y;
-    surface.openWorld.update(sim.position, sim.linearVelocity, sim.camera, height);
+    surface.openWorld.update(sim.position, sim.linearVelocity, sim.camera, height,
+      sim.renderQuality === 'ultraLow');
   }
   const attribution = document.getElementById('open-world-attribution');
   if (attribution) attribution.hidden = !surface?.openWorld?.tiles.size;

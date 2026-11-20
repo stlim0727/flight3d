@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BoxGeometry, Mesh, PerspectiveCamera, Raycaster, Vector3 } from 'three';
-import { buildOpenTerrainTile, decodeTerrarium, OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
+import { buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 
 const origin = { latitude: 37.55, longitude: 126.98 };
@@ -23,6 +23,7 @@ test('samples the rendered triangles and honors mapped water and the airport exc
     x, y, raster, east: flat(35), south: flat(35), southeast: flat(35),
     water, project: world.project, protectedAreas,
   });
+  assert.equal(buildReducedTerrainGeometry(geometry), null);
   const mesh = new Mesh(geometry);
   world.tiles.set(`${x}/${y}`, { mesh, water });
   const { latitude, longitude } = tileToWgs84(x + u, y + v, 11);
@@ -52,6 +53,38 @@ test('neighbor tiles share the same edge heights', () => {
   }
   left.dispose();
   right.dispose();
+  world.dispose();
+});
+
+test('reduced terrain preserves tile seams and the full-resolution collision surface', () => {
+  const world = new OpenWorldTerrain({ origin });
+  const raster = Float32Array.from({ length: 256 ** 2 }, (_, index) => 30 + index % 11);
+  const full = buildOpenTerrainTile({
+    x, y, raster, east: flat(80), south: flat(25), southeast: flat(90), project: world.project,
+  }).geometry;
+  const tile = { mesh: new Mesh(full), fullGeometry: full };
+  world.tiles.set(`${x}/${y}`, tile);
+  const point = tileToWgs84(x + .3, y + .4, 11);
+  const xy = world.project(point.latitude, point.longitude);
+  const sample = world.sample(...xy);
+  assert.ok(sample);
+  world.reducedGeometry = true;
+  world.updateRenderGeometry(tile, `${x}/${y}`);
+  const reduced = tile.mesh.geometry;
+  assert.ok(reduced.index.count < full.index.count / 8);
+  assert.equal(reduced.attributes.position, full.attributes.position);
+  const used = new Set(reduced.index.array);
+  for (let i = 0; i < 129; i++) {
+    assert.ok(used.has(i) && used.has(128 * 129 + i));
+    assert.ok(used.has(i * 129) && used.has(i * 129 + 128));
+  }
+  assert.deepEqual(world.sample(...xy), sample);
+  world.detailedKey = `${x}/${y}`;
+  world.updateRenderGeometry(tile, `${x}/${y}`);
+  assert.equal(tile.mesh.geometry, full);
+  world.reducedGeometry = false;
+  world.updateRenderGeometry(tile, `${x}/${y}`);
+  assert.equal(tile.mesh.geometry, full);
   world.dispose();
 });
 

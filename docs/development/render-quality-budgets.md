@@ -56,3 +56,11 @@ The B738 also streams its [lite cockpit interior](cockpit-assets.md) on first
 entry at Performance or Ultra Low. Runtime adaptation, GPU calibration, and
 compressed texture variants are separate work. Do not infer GPU capacity from these startup hints
 or lower quality in response to isolated loading/compilation stalls.
+
+Ultra Low keeps the current geographic terrain tile and airport-edge cutouts at
+full mesh resolution. Other streamed tiles reduce triangles while sharing their
+boundary samples, imagery, and full-resolution height queries. At low altitude,
+the detailed building tiles beneath the aircraft and camera remain visible,
+along with any loaded building tile within 200 m horizontally. Distant buildings
+are left to the aerial imagery by day. Night overview lights keep their existing
+coverage. The building collision index is independent of render visibility.
