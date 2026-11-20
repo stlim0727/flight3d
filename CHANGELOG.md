@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(landmarks):** automatically discover, rank, and display major landmarks from Overture Maps
+  - `GeographicLandmarks` and `src/geospatial/overtureLandmarks.js` automatically extract cities, districts, airports, bridges, towers, peaks, national parks, large campuses, and tall non-residential buildings from streamed Overture Maps PMTiles (`divisions` z9–z10, `base` z11/z13 with camera look-ahead, and shared `GeographicGreenSpace` / `GeographicBuildings` tiles) without requiring manual per-place configuration.
+  - `nearestLandmarks()` now ranks candidates by prominence-weighted priority (`landmarkPriorityScore`) and resolves dynamic terrain-relative heights (`resolveLandmarkHeight`), while `dedupeLandmarks()` collapses duplicate names/Wikidata IDs and `LandmarkPins` adds `city`, `bridge`, `park`, and `water` pin icons.
+  - See [landmark pins](docs/development/landmarks.md); covered by `tests/overtureLandmarks.test.js`, `tests/geographicLandmarks.test.js`, `tests/landmarks.test.js`, and `tests/landmarkPins.test.js`.
 - **feat(landmarks):** add data-driven named-place pins with importance and category icons
   - Any WGS84 place with localized names, an optional elevation, category tags and a 1–5 importance level can be added to `src/config/landmarkPlaces.json`; pins no longer need per-place code.
   - Candidates are projected into the active map's local frame, filtered by importance-scaled range/category and shown nearest-first with overlap suppression; custom datasets and category filters can be passed to `LandmarkPins`.

@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Vector3 } from 'three';
-import { landmarkName, landmarkRangeM, landmarksForMap, nearestLandmarks, normalizeLandmarkPlaces } from '../src/config/landmarks.js';
+import {
+  landmarkName,
+  landmarkPriorityScore,
+  landmarkRangeM,
+  landmarksForMap,
+  nearestLandmarks,
+  normalizeLandmarkPlaces,
+  resolveLandmarkHeight,
+} from '../src/config/landmarks.js';
 
 test('all maps supply finite landmark anchors using their own coordinate frames', () => {
   const terrain = { getHeight: () => 200, terrain: { centerline: [{ x: 12, z: -4200 }] } };
@@ -77,4 +85,29 @@ test('importance scales visible range and hides distant low-ranked places', () =
   ];
   assert.deepEqual(nearestLandmarks(records, new Vector3(), { limit: Infinity })
     .map(candidate => candidate.record.id), ['major']);
+});
+
+test('prominence priority lets major landmarks outrank closer minor POIs while keeping same-importance nearest-first', () => {
+  assert.ok(landmarkPriorityScore({ importance: 5, prominence: 0.9 }, 8000)
+    > landmarkPriorityScore({ importance: 2, prominence: 0.4 }, 500));
+
+  const records = [
+    { id: 'near-subway', x: 0, z: -400, height: 0, importance: 1, prominence: 0.45, kinds: ['station'] },
+    { id: 'major-city', x: 0, z: -4000, height: 0, importance: 5, prominence: 0.95, kinds: ['city'] },
+    { id: 'far-city', x: 0, z: -8000, height: 0, importance: 5, prominence: 0.95, kinds: ['city'] },
+  ];
+  const ranked = nearestLandmarks(records, new Vector3(0, 0, 0), { limit: 3 });
+  assert.deepEqual(ranked.map(c => c.record.id), ['major-city', 'far-city', 'near-subway']);
+});
+
+test('resolveLandmarkHeight tracks terrain height dynamically for groundRelative records', () => {
+  let ground = 10;
+  const terrain = { getHeight: () => ground };
+  const building = { id: 'tower', x: 100, z: 200, groundRelative: true, heightOffsetM: 250 };
+  const peak = { id: 'peak', x: 100, z: 200, groundRelative: false, height: 1947, elevationM: 1947 };
+
+  assert.equal(resolveLandmarkHeight(building, terrain), 260);
+  ground = 45;
+  assert.equal(resolveLandmarkHeight(building, terrain), 295);
+  assert.equal(resolveLandmarkHeight(peak, terrain), 1947);
 });

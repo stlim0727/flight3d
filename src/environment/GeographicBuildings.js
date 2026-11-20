@@ -9,6 +9,7 @@ import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospat
 import { projectToLocal, INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import { pointInRing, segmentDistance } from '../geospatial/incheonDressing.js';
+import { extractBuildingLandmarks } from '../geospatial/overtureLandmarks.js';
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 
 const neighbors = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
@@ -289,6 +290,7 @@ export class GeographicBuildings {
     this.pendingOverview = null;
     this.overviewRetryAt = 0;
     this.tiles = new Map();
+    this.landmarksVersion = 0;
     this.pending = null;
     this.retryAt = new Map();
   }
@@ -445,12 +447,15 @@ export class GeographicBuildings {
 
   retainTiles(wanted) {
     const wantedKeys = new Set(wanted.map(tile => tile.key));
-    for (const [key, { mesh }] of this.tiles) {
+    let removedLandmarks = false;
+    for (const [key, { mesh, landmarks }] of this.tiles) {
       if (wantedKeys.has(key)) continue;
       mesh?.removeFromParent();
       mesh?.geometry.dispose();
       this.tiles.delete(key);
+      if (landmarks?.length) removedLandmarks = true;
     }
+    if (removedLandmarks) this.landmarksVersion++;
     for (const key of this.retryAt.keys()) if (!wantedKeys.has(key)) this.retryAt.delete(key);
     if (this.pending && !wantedKeys.has(this.pending.key)) this.pending.controller.abort();
   }
@@ -470,13 +475,23 @@ export class GeographicBuildings {
         mesh.receiveShadow = true;
         this.group.add(mesh);
       }
-      this.tiles.set(tile.key, { mesh, collisionCells });
+      const landmarks = response?.data ? extractBuildingLandmarks(response.data, tile, zoom) : [];
+      this.tiles.set(tile.key, { mesh, collisionCells, landmarks });
+      if (landmarks.length) this.landmarksVersion++;
       this.retryAt.delete(tile.key);
     } catch {
       if (!controller.signal.aborted) this.retryAt.set(tile.key, performance.now() + 5000);
     } finally {
       this.pending = null;
     }
+  }
+
+  getLandmarks() {
+    const landmarks = [];
+    for (const entry of this.tiles.values()) {
+      if (entry.landmarks?.length) landmarks.push(...entry.landmarks);
+    }
+    return landmarks;
   }
 
   checkCollision(probes) {
@@ -499,7 +514,10 @@ export class GeographicBuildings {
     this.pending?.controller.abort();
     this.retainOverviewTiles(new Set());
     this.group.removeFromParent();
-    for (const { mesh } of this.tiles.values()) mesh?.geometry.dispose();
+    for (const { mesh, landmarks } of this.tiles.values()) {
+      mesh?.geometry.dispose();
+      if (landmarks?.length) this.landmarksVersion++;
+    }
     if (this.terrain.geographicBuildingLayer === this) delete this.terrain.geographicBuildingLayer;
     this.group.clear();
     this.tiles.clear();
@@ -541,5 +559,8 @@ export function updateGeographicBuildings(sim, elapsed) {
   sim.geographicBuildingLayer?.update(sim.position, sim.camera.position, sim.sky.sunPosition.y, elapsed,
     sim.renderQuality === 'ultraLow');
   const attribution = document.getElementById('geographic-buildings-attribution');
-  if (attribution) attribution.hidden = !sim.geographicBuildingLayer?.group.children.length;
+  if (attribution) {
+    attribution.hidden = !(sim.geographicBuildingLayer?.group.children.length
+      || sim.geographicLandmarkLayer?.hasStreamedData);
+  }
 }
