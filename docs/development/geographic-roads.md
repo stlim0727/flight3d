@@ -76,3 +76,21 @@ the current Overture release yields zero evidenced decks on the audited route.
 `GeographicRoads.checkBridgeCollision()` is wired into `CollisionDetector` and
 returns a hit only for decks with an evidenced height, so the current data
 cannot produce a false bridge impact.
+
+## Integrated verification (stage 5)
+
+`scripts/verify-road-scenery-integration.mjs` runs five hardware-GPU passes:
+day and night at Incheon and Jeju, plus an off-preset Incheon coordinate. Each
+pass asserts terrain, road and green tiles, and that lamp visibility matches
+the sun height. The harness overrides `sky.updateSun` only to hold a fixed sun
+height; it does not change application state.
+
+Measured: Incheon day/night 9 road and 9 (or 8) green tiles, 850–852 draw
+calls; Jeju day/night 9 road and 9 green tiles, 192–194 draw calls; off-preset
+18 road tiles and one visual bridge deck, 872 draw calls. No exceptions or
+console errors. Off-preset memory was higher (649 MB heap) than the preset
+route (292–420 MB) because more tiles remain resident. Seoul and Busan were
+data-audit regions, not simulator frames, so no browser pass exists for them.
+
+`tests/geographicRoads.test.js` covers tile-boundary runs, twilight gating,
+dedup, evidenced-only bridge collision, failure retry and cache re-entry.

@@ -222,3 +222,37 @@ test('renders bridge decks above the surface and collides only where height is e
   assert.equal(hit.part, 'bridge deck');
   verified.dispose();
 });
+
+test('retries a failed tile and reloads after cache eviction', async () => {
+  const data = segmentTile([{ properties: { class: 'primary' }, points: [[100, 100], [600, 100]] }]);
+  let offline = true;
+  const archive = {
+    getZxy: async () => {
+      if (offline) throw new Error('tile unavailable');
+      return { data };
+    },
+  };
+  const surface = { ...terrain, isLoaded: true, openWorld: { readyForTile: () => true } };
+  const origin = { latitude: 37.46, longitude: 126.44 };
+  const position = { x: 0, y: 100, z: 0 };
+  const roads = new GeographicRoads({ origin, project, terrain: surface, archive });
+  roads.update(position);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.ok(roads.retryAt.size > 0);
+  assert.equal(roads.tiles.size, 0);
+  offline = false;
+  for (const key of roads.retryAt.keys()) roads.retryAt.set(key, 0);
+  for (let i = 0; i < 12; i++) {
+    roads.update(position);
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.equal(roads.tiles.size, 9);
+  roads.update({ x: 300000, y: 100, z: 0 });
+  assert.equal(roads.tiles.size, 0);
+  for (let i = 0; i < 12; i++) {
+    roads.update(position);
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.equal(roads.tiles.size, 9);
+  roads.dispose();
+});
