@@ -342,3 +342,12 @@ test('loaded F16 deflects stabilators, flaperons and rudder from telemetry and r
     assert.ok(Object.values(released).every(delta => delta.length() < 1e-6), 'release and invalid telemetry restore neutral');
   }
 });
+
+test('failed F16 GLB load marks the cockpit failed so the instance can be retried', async t => {
+  t.mock.method(GLTFLoader.prototype, 'loadAsync', async () => { throw Error('offline'); });
+  const aircraft = new F16();
+  await aircraft.ready;
+  assert.equal(aircraft.cockpit.cockpitModelFailed, true);
+  assert.equal(aircraft.modelLoaded, false);
+  assert.equal(aircraft.loadingGltf, false);
+});

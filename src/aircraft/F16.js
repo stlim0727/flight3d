@@ -227,6 +227,7 @@ export class F16 {
         }
       })
       .catch(error => {
+        this.cockpit.cockpitModelFailed = true;
         console.error('F-16 model failed to load:', error);
       });
     this.ready = Promise.all([airframePromise, this.pilotMesh.ready]).finally(() => {

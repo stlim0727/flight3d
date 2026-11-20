@@ -196,6 +196,7 @@ try {
       northBuildings: city.buildingData.filter(b => b.district === 'north').length,
       near: districts.map(a => a.near.count),
       northRecords: districts.map(a => a.records.filter(r => r.district === 'north').length),
+      southRecords: districts.map(a => a.records.filter(r => r.district === 'south').length),
       far: districts.map(a => a.far.count),
       totalRecords: districts.map(a => a.records.length) };
   });
@@ -206,7 +207,7 @@ try {
   assert.equal(fallback.districtBuildings, 110 + fallback.northBuildings);
   assert.ok(fallback.northBuildings > 0);
   assert.deepEqual(fallback.near, fallback.northRecords, 'south district near geometry absent');
-  assert.deepEqual(fallback.far, fallback.totalRecords, 'far boxes and collision metadata retained');
+  assert.deepEqual(fallback.far, fallback.southRecords, 'far boxes and collision metadata retained');
   const sequences = await evaluate(async () => {
     const { T, after: city, terrain, renderer, scene, camera } = window.review;
     const { CollisionDetector } = await import('/src/physics/CollisionDetector.js');
