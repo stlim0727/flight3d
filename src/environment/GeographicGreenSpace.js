@@ -77,6 +77,30 @@ export function buildGeographicGreenTile(data, tile, project, terrain, exclude =
     && point.height > 0 && !terrain.isWater?.(point.x, point.y)
     && !(Number.isFinite(terrain.size) && Math.max(Math.abs(point.x), Math.abs(point.y)) > terrain.size / 2);
 
+  const addVertex = (x, z) => {
+    const height = terrain.getHeight(x, z);
+    positions.push(x, height + surfaceOffset, z);
+    colors.push(color.r, color.g, color.b);
+    return { x, z, height, index: positions.length / 3 - 1 };
+  };
+  const pushTriangle = (a, b, c, depth = 0) => {
+    const x = (a.x + b.x + c.x) / 3;
+    const z = (a.z + b.z + c.z) / 3;
+    const span = Math.max(Math.hypot(a.x - b.x, a.z - b.z),
+      Math.hypot(b.x - c.x, b.z - c.z), Math.hypot(c.x - a.x, c.z - a.z));
+    if (depth < 3 && span > 12 && Math.abs(terrain.getHeight(x, z) - (a.height + b.height + c.height) / 3) > 0.5) {
+      const ab = addVertex((a.x + b.x) / 2, (a.z + b.z) / 2);
+      const bc = addVertex((b.x + c.x) / 2, (b.z + c.z) / 2);
+      const ca = addVertex((c.x + a.x) / 2, (c.z + a.z) / 2);
+      pushTriangle(a, ab, ca, depth + 1);
+      pushTriangle(b, bc, ab, depth + 1);
+      pushTriangle(c, ca, bc, depth + 1);
+      pushTriangle(ab, bc, ca, depth + 1);
+      return;
+    }
+    triangles.push(a.index, b.index, c.index);
+  };
+
   for (const [name, allowed] of [['land_use', LAND_USE], ['land_cover', LAND_COVER]]) {
     const layer = layers[name];
     for (let i = 0; i < (layer?.length ?? 0); i++) {
@@ -88,19 +112,18 @@ export function buildGeographicGreenTile(data, tile, project, terrain, exclude =
         const rings = [polygon.outer, ...polygon.holes].map(ring => ringOf(ring, tile, project, feature.extent));
         const [outer, ...holes] = rings;
         if (!outer || outer.length < 3 || Math.abs(THREE.ShapeUtils.area(outer)) < 4) continue;
-        const points = rings.flat();
-        if (!points.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))) continue;
-        const center = outer.reduce((sum, point) => sum.add(point), new THREE.Vector2()).divideScalar(outer.length);
-        const probe = { x: center.x, y: center.y, height: terrain.getHeight(center.x, center.y) };
-        if (!usable(probe) || exclude(center.x, center.y)) continue;
+        if (!rings.flat().every(point => Number.isFinite(point.x) && Number.isFinite(point.y))) continue;
         const faces = THREE.ShapeUtils.triangulateShape(outer, holes);
         if (!faces.length) continue;
-        const base = positions.length / 3;
-        for (const point of points) {
-          positions.push(point.x, terrain.getHeight(point.x, point.y) + surfaceOffset, point.y);
-          colors.push(color.r, color.g, color.b);
+        const vertices = rings.flat().map(point => addVertex(point.x, point.y));
+        for (const face of faces) {
+          // Triangulation excludes holes, so any face centroid is inside the green area.
+          const x = (vertices[face[0]].x + vertices[face[1]].x + vertices[face[2]].x) / 3;
+          const z = (vertices[face[0]].z + vertices[face[1]].z + vertices[face[2]].z) / 3;
+          const probe = { x, y: z, height: terrain.getHeight(x, z) };
+          if (!usable(probe) || exclude(x, z)) continue;
+          pushTriangle(vertices[face[2]], vertices[face[1]], vertices[face[0]]);
         }
-        for (const face of faces) for (const index of face.toReversed()) triangles.push(base + index);
       }
     }
   }

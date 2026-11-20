@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
 import { PbfWriter } from 'pbf';
+import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 import { buildGeographicGreenTile, GeographicGreenSpace } from '../src/environment/GeographicGreenSpace.js';
 
 function tileData(layers) {
@@ -110,5 +111,29 @@ test('keeps every outer ring of a multipolygon', () => {
   assert.ok(geometry);
   assert.equal(geometry.attributes.position.count, 8);
   assert.equal(geometry.attributes.color.count, 8);
+  geometry.dispose();
+});
+
+test('subdivides green polygons when interior terrain rises above the boundary', () => {
+  const { latitude, longitude } = tileToWgs84(tile.x + 200 / 4096, tile.y + 200 / 4096, 13);
+  const [cx, cz] = project(latitude, longitude);
+  const hill = { getHeight: (x, z) => Math.hypot(x - cx, z - cz) < 100 ? 60 : 44, isWater: () => false };
+  const geometry = buildGeographicGreenTile(data(), tile, project, hill);
+  assert.ok(geometry);
+  assert.ok(geometry.attributes.position.count > 8, 'interior vertices must be added');
+  const heights = [...geometry.attributes.position.array].filter((_, index) => index % 3 === 1);
+  assert.ok(Math.max(...heights) > 59, 'interior hill must be sampled');
+  geometry.dispose();
+});
+
+test('keeps a park whose outer-ring average falls in a water hole', () => {
+  const { latitude, longitude } = tileToWgs84(tile.x + 200 / 4096, tile.y + 200 / 4096, 13);
+  const [cx, cz] = project(latitude, longitude);
+  const hole = [[150, 150], [150, 250], [250, 250], [250, 150]];
+  const withHole = tileData({ land_use: [{ properties: { class: 'park' }, rings: [square, hole] }] });
+  const wetHole = { getHeight: () => 44, isWater: (x, z) => Math.hypot(x - cx, z - cz) < 20 };
+  const geometry = buildGeographicGreenTile(withHole, tile, project, wetHole);
+  assert.ok(geometry);
+  assert.ok(geometry.attributes.position.count >= 8);
   geometry.dispose();
 });

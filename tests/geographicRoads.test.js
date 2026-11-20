@@ -185,6 +185,11 @@ test('gates lamps by night and altitude, deduplicates positions and caps near in
   const colors = roads.lampPoints.geometry.attributes.color;
   assert.ok(roads.farLamps.length > 0);
   assert.equal(colors.array[3], 1, 'near lamps stay visible as points when the instanced mesh is altitude-hidden');
+  roads.nearLampSet = new Set();
+  roads.update(position, position, -0.2);
+  const nearIndex = roads.farLamps.findIndex(lamp => Math.hypot(position.x - lamp.x, position.z - lamp.z) < 1600);
+  assert.ok(nearIndex >= 0);
+  assert.equal(colors.array[nearIndex * 4 + 3], 1, 'lamps excluded by the instance cap remain visible as points');
   const high = { ...position, y: 6000 };
   roads.update(high, high, -0.2);
   assert.equal(roads.lampPoints.visible, false);

@@ -409,6 +409,7 @@ export class GeographicRoads {
     geometry.attributes.color.setUsage(THREE.DynamicDrawUsage);
     this.lampPoints.geometry = geometry;
     this.nearLamps = near;
+    this.nearLampSet = new Set(near);
     this.farLamps = far;
     this.lampMatricesDirty = true;
     this.lightsDirty = false;
@@ -442,7 +443,8 @@ export class GeographicRoads {
     let changed = false;
     this.farLamps.forEach((lamp, i) => {
       const distance = Math.hypot(cameraPosition.x - lamp.x, cameraPosition.z - lamp.z);
-      const alpha = !this.lampMesh.visible ? 1 : THREE.MathUtils.smoothstep(distance, nearLampRange, farLampRange);
+      const uncapped = distance <= nearLampRange && !this.nearLampSet?.has(lamp);
+      const alpha = !this.lampMesh.visible || uncapped ? 1 : THREE.MathUtils.smoothstep(distance, nearLampRange, farLampRange);
       if (Math.abs(colors.array[i * 4 + 3] - alpha) < 0.002) return;
       colors.array[i * 4 + 3] = alpha;
       changed = true;
