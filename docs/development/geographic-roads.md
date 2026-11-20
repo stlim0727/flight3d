@@ -51,7 +51,7 @@ Verification: `node --test tests/geographicRoads.test.js`,
 [browser-gpu.md](browser-gpu.md). On the fixed Incheon low-altitude route stage
 1 added 9 road tiles and 2 draw calls; stage 2 added 169 near instances, 1417
 far points and 3 draw calls; stage 3 added 9 green tiles (8 with geometry) and
-4 draw calls. Bridge/tunnel spans are the remaining stage.
+4 draw calls. Stage 4 changes rendering behavior without adding a draw call.
 
 ## Parks and green space (stage 3)
 
@@ -62,3 +62,17 @@ abort and retry follow the road layer. Flat colored polygons are draped on the
 flight surface and excluded when they intersect water, runway safety areas,
 modeled airport buildings, streamed building colliders or the road sample index
 exposed by `GeographicRoads.covers()`. Night lighting is not added to vegetation.
+
+## Bridge and tunnel spans (stage 4)
+
+Only whole-segment bridges are drawn. A `road_flags` or `level_rules` entry with
+a `between` range refers to the original centerline, which is clipped
+differently in each tile; applying it per tile moves the bridge. Mixed spans and
+tunnels are therefore still omitted until an unclipped centerline source exists.
+Whole-segment bridge decks are raised above the terrain maximum by a visual
+clearance. Collision registration requires an absolute deck height from the
+source; `base.infrastructure` bridge features carry only relative `level`, so
+the current Overture release yields zero evidenced decks on the audited route.
+`GeographicRoads.checkBridgeCollision()` is wired into `CollisionDetector` and
+returns a hit only for decks with an evidenced height, so the current data
+cannot produce a false bridge impact.

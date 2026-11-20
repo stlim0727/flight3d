@@ -91,6 +91,10 @@ await withBrowserSession(
           instances: sim?.geographicRoadLayer?.lampMesh?.count ?? 0,
           visible: Boolean(sim?.geographicRoadLayer?.lampPoints?.visible),
         },
+        bridges: {
+          decks: [...(sim?.geographicRoadLayer?.bridges?.values() ?? [])].flat().length,
+          evidenced: [...(sim?.geographicRoadLayer?.bridges?.values() ?? [])].flat().filter(deck => deck.evidenced).length,
+        },
         renderInfo: sim?.renderer?.info ? {
           memory: { ...sim.renderer.info.memory },
           render: { ...sim.renderer.info.render },

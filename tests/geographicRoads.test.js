@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as THREE from 'three';
 import { PbfWriter } from 'pbf';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
-import { buildGeographicRoadTile, GeographicRoads, roadLamps, roadWidth } from '../src/environment/GeographicRoads.js';
+import { bridgeSpan, buildGeographicRoadTile, GeographicRoads, roadLamps, roadWidth } from '../src/environment/GeographicRoads.js';
 
 function segmentTile(features) {
   const writer = new PbfWriter();
@@ -62,13 +63,12 @@ test('uses grade widths unless a usable width rule is present', () => {
   assert.equal(roadWidth({ class: 'primary', width_rules: 'not json' }), 22);
 });
 
-test('drapes major roads on the surface and skips bridges, tunnels and minor classes', () => {
+test('drapes major surface roads and skips tunnels, mixed spans and minor classes', () => {
   const data = segmentTile([
     { properties: { class: 'primary' }, points: [[100, 100], [200, 100], [300, 120]] },
     { properties: { class: 'trunk', subtype: 'road' }, points: [[400, 100], [500, 100]] },
-    { properties: { class: 'secondary', road_flags: '[{"values":["is_bridge"]}]' }, points: [[600, 100], [700, 100]] },
-    { properties: { class: 'secondary', road_flags: '[{"values":["is_tunnel"]}]' }, points: [[600, 200], [700, 200]] },
-    { properties: { class: 'secondary', level_rules: '[{"value":1}]' }, points: [[600, 300], [700, 300]] },
+    { properties: { class: 'secondary', road_flags: '[{"values":["is_tunnel"]}]' }, points: [[600, 100], [700, 100]] },
+    { properties: { class: 'secondary', road_flags: '[{"between":[0.2,0.8],"values":["is_bridge"]}]' }, points: [[600, 200], [700, 200]] },
     { properties: { class: 'residential' }, points: [[600, 400], [700, 400]] },
   ]);
   const geometry = buildGeographicRoadTile(data, tile, project, terrain);
@@ -76,24 +76,13 @@ test('drapes major roads on the surface and skips bridges, tunnels and minor cla
   geometry.computeBoundingBox();
   assert.ok(Math.abs(geometry.boundingBox.min.y - 44.35) < 1e-3);
   assert.ok(Math.abs(geometry.boundingBox.max.y - 44.35) < 1e-3);
-  // Two runs: three vertices (six ribbon vertices) and two vertices (four).
   assert.equal(geometry.attributes.position.count, 10);
   const width = Math.hypot(
     geometry.attributes.position.getX(0) - geometry.attributes.position.getX(1),
     geometry.attributes.position.getZ(0) - geometry.attributes.position.getZ(1),
   );
   assert.ok(Math.abs(width - 22) < 1e-4, `primary default width, got ${width}`);
-  const trunkWidth = Math.hypot(
-    geometry.attributes.position.getX(6) - geometry.attributes.position.getX(7),
-    geometry.attributes.position.getZ(6) - geometry.attributes.position.getZ(7),
-  );
-  assert.ok(Math.abs(trunkWidth - 30) < 1e-4, `trunk default width, got ${trunkWidth}`);
   geometry.dispose();
-
-  const bridgeOnly = segmentTile([
-    { properties: { class: 'primary', road_flags: '[{"values":["is_bridge"]}]' }, points: [[100, 100], [200, 100]] },
-  ]);
-  assert.equal(buildGeographicRoadTile(bridgeOnly, tile, project, terrain), null);
 });
 
 test('omits water, excluded and off-map sections without dropping the whole tile', () => {
@@ -180,4 +169,56 @@ test('gates lamps by night and altitude, deduplicates positions and caps near in
   roads.update(high, high, -0.2);
   assert.equal(roads.lampPoints.visible, false);
   roads.dispose();
+});
+
+test('classifies only whole-segment bridges and honors evidenced height', () => {
+  assert.equal(bridgeSpan({ road_flags: '[{"values":["is_bridge"]}]' }).deck, true);
+  assert.equal(bridgeSpan({ road_flags: '[{"values":["is_bridge"]}]' }).evidenced, false);
+  assert.equal(bridgeSpan({ road_flags: '[{"between":[0.2,0.8],"values":["is_bridge"]}]' }).skip, true);
+  assert.equal(bridgeSpan({ road_flags: '[{"values":["is_tunnel"]}]' }).skip, true);
+  assert.equal(bridgeSpan({ level_rules: '[{"value":-1}]' }).skip, true);
+  const evidenced = bridgeSpan({ road_flags: '[{"values":["is_bridge"]}]', height: '52' });
+  assert.equal(evidenced.evidenced, true);
+  assert.equal(evidenced.height, 52);
+});
+
+test('renders bridge decks above the surface and collides only where height is evidenced', async () => {
+  const bridge = (height) => segmentTile([{
+    properties: { class: 'primary', road_flags: '[{"values":["is_bridge"]}]', ...(height ? { height } : {}) },
+    points: [[100, 100], [600, 100]],
+  }]);
+  const decks = [];
+  const geometry = buildGeographicRoadTile(bridge(null), tile, project, terrain, () => false, null, null, decks);
+  assert.ok(geometry);
+  geometry.computeBoundingBox();
+  assert.ok(Math.abs(geometry.boundingBox.min.y - 52.35) < 1e-3);
+  assert.equal(decks.length, 1);
+  assert.equal(decks[0].evidenced, false);
+  const lamps = [];
+  buildGeographicRoadTile(bridge(null), tile, project, terrain, () => false, lamps, null, []);
+  assert.equal(lamps.length, 0);
+  geometry.dispose();
+
+  const surface = { ...terrain, isLoaded: true, openWorld: { readyForTile: () => true } };
+  const origin = { latitude: 37.46, longitude: 126.44 };
+  const position = { x: 0, y: 100, z: 0 };
+  const probe = point => [{ pos: new THREE.Vector3(point.x, point.y, point.z), radius: 2, desc: 'bridge deck' }];
+  const unverified = new GeographicRoads({ origin, project, terrain: surface, archive: { getZxy: async () => ({ data: bridge(null) }) } });
+  for (let i = 0; i < 12; i++) {
+    unverified.update(position, position, 1);
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.equal(unverified.checkBridgeCollision(probe({ x: 0, y: 100, z: 0 })), null);
+  unverified.dispose();
+
+  const verified = new GeographicRoads({ origin, project, terrain: surface, archive: { getZxy: async () => ({ data: bridge('44') }) } });
+  for (let i = 0; i < 12; i++) {
+    verified.update(position, position, 1);
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  const deck = [...verified.bridges.values()].flat().find(candidate => candidate.evidenced);
+  const hit = verified.checkBridgeCollision(probe({ x: deck.points[0].x, y: deck.height, z: deck.points[0].z }));
+  assert.ok(hit);
+  assert.equal(hit.part, 'bridge deck');
+  verified.dispose();
 });

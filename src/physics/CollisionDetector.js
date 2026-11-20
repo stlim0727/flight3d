@@ -335,7 +335,8 @@ export class CollisionDetector {
 
     // 3. City Skyscraper / Buildings Check (Broadphase via spatial grid)
     const cityBldgResult = this.checkCityBuildings(position, worldProbes)
-      ?? this.terrain?.geographicBuildingLayer?.checkCollision(worldProbes);
+      ?? this.terrain?.geographicBuildingLayer?.checkCollision(worldProbes)
+      ?? this.terrain?.geographicRoadLayer?.checkBridgeCollision?.(worldProbes);
     if (cityBldgResult) {
       return {
         collided: true,

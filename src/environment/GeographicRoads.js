@@ -50,6 +50,37 @@ function isElevated(properties) {
   return (Array.isArray(levels) ? levels : levels ? [levels] : []).some(rule => rule?.value !== 0);
 }
 
+/**
+ * Only whole-segment bridges are rendered: `between` is relative to the
+ * original segment, which is clipped differently in each tile. Mixed spans are
+ * deferred until an unclipped centerline source is available. Absolute deck
+ * height is evidenced only when the source provides one.
+ */
+export function bridgeSpan(properties) {
+  const rules = (() => {
+    const collected = [];
+    const flags = parsed(properties.road_flags);
+    for (const flag of Array.isArray(flags) ? flags : flags ? [flags] : []) {
+      for (const value of flag?.values ?? (flag?.value ? [flag.value] : [])) collected.push({ value, between: flag?.between });
+    }
+    const levels = parsed(properties.level_rules);
+    for (const level of Array.isArray(levels) ? levels : levels ? [levels] : []) collected.push(level);
+    return collected;
+  })();
+  const values = rules.map(rule => rule?.value);
+  const mixed = rules.some(rule => rule?.between);
+  const bridge = values.includes('is_bridge') || values.some(value => value === 1);
+  const tunnel = values.includes('is_tunnel') || values.includes('is_covered') || values.includes('is_indoor')
+    || values.some(value => value === -1 || value === -2);
+  const height = Number(properties.height);
+  return {
+    deck: bridge && !tunnel && !mixed,
+    skip: tunnel || mixed || (!bridge && values.some(value => value !== 0 && value !== undefined)),
+    evidenced: Number.isFinite(height) && height > 0,
+    height: Number.isFinite(height) && height > 0 ? height : null,
+  };
+}
+
 /** Metres. Overture almost never populates width_rules at z13, so grade defaults dominate. */
 export function roadWidth(properties) {
   const rules = parsed(properties.width_rules);
@@ -125,7 +156,7 @@ export function roadLamps(points, width, heightAt, spacing) {
  * level-separated segments are deliberately omitted until span handling exists.
  * Lamp bases are collected in the optional array when night lighting is active.
  */
-export function buildGeographicRoadTile(data, tile, project, terrain, exclude = () => false, lamps = null, samples = null) {
+export function buildGeographicRoadTile(data, tile, project, terrain, exclude = () => false, lamps = null, samples = null, decks = null) {
   const layer = new VectorTile(new PbfReader(data)).layers.segment;
   if (!layer?.length) return null;
   const positions = [];
@@ -140,8 +171,9 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
   for (let i = 0; i < layer.length; i++) {
     const feature = layer.feature(i);
     const properties = feature.properties;
-    if (!MAJOR_CLASSES.has(properties.class) || isElevated(properties)) continue;
-    color.setHex(SURFACE_COLORS[properties.class] ?? 0x63666a);
+    const span = bridgeSpan(properties);
+    if (!MAJOR_CLASSES.has(properties.class) || span.skip) continue;
+    color.setHex(span.deck ? 0x5a5d61 : SURFACE_COLORS[properties.class] ?? 0x63666a);
     const width = roadWidth(properties);
     const extent = feature.extent;
     for (const ring of feature.loadGeometry()) {
@@ -154,7 +186,10 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
       let run = [];
       const emit = () => {
         if (run.length < 2) return;
-        const strip = ribbon(run, width, run.map(point => point.height), color);
+        const heights = span.deck
+          ? run.map(() => span.evidenced ? span.height : Math.max(...run.map(point => point.height)) + 8)
+          : run.map(point => point.height);
+        const strip = ribbon(run, width, heights, color);
         const base = positions.length / 3;
         for (const vertex of strip) {
           positions.push(vertex.left.x, vertex.left.y, vertex.left.z,
@@ -166,8 +201,9 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
           const a = base + j * 2;
           indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
         }
-        if (lamps) lamps.push(...roadLamps(run, width, (x, z) => terrain.getHeight(x, z), lampSpacing[properties.class]));
-        if (samples) for (const point of run) samples.push({ x: point.x, z: point.z });
+        if (span.deck && decks) decks.push({ points: run.map(point => ({ x: point.x, z: point.z })), width, height: heights[0], evidenced: span.evidenced });
+        if (!span.deck && lamps) lamps.push(...roadLamps(run, width, (x, z) => terrain.getHeight(x, z), lampSpacing[properties.class]));
+        if (!span.deck && samples) for (const point of run) samples.push({ x: point.x, z: point.z });
       };
       for (const point of points) {
         if (usable(point)) run.push(point);
@@ -233,6 +269,7 @@ export class GeographicRoads {
     this.tiles = new Map();
     this.lamps = new Map();
     this.samples = new Map();
+    this.bridges = new Map();
     this.roadCells = null;
     this.pending = null;
     this.retryAt = new Map();
@@ -293,6 +330,30 @@ export class GeographicRoads {
       }
     }
     return false;
+  }
+
+  checkBridgeCollision(probes) {
+    for (const probe of probes) {
+      const { pos, radius } = probe;
+      for (const [key, decks] of this.bridges) {
+        if (!this.tiles.has(key)) continue;
+        for (const deck of decks) {
+          if (!deck.evidenced || Math.abs(pos.y - deck.height) > 3) continue;
+          for (let i = 1; i < deck.points.length; i++) {
+            const a = deck.points[i - 1];
+            const b = deck.points[i];
+            const dx = b.x - a.x;
+            const dz = b.z - a.z;
+            const lengthSquared = dx * dx + dz * dz;
+            if (!lengthSquared) continue;
+            const t = Math.max(0, Math.min(1, ((pos.x - a.x) * dx + (pos.z - a.z) * dz) / lengthSquared));
+            const distance = Math.hypot(pos.x - a.x - dx * t, pos.z - a.z - dz * t);
+            if (distance <= radius + deck.width / 2) return { point: pos.clone(), part: 'bridge deck' };
+          }
+        }
+      }
+    }
+    return null;
   }
 
   update(position, cameraPosition = position, sunHeight = 1) {
@@ -391,6 +452,7 @@ export class GeographicRoads {
       mesh?.removeFromParent();
       mesh?.geometry.dispose();
       this.tiles.delete(key);
+      this.bridges.delete(key);
       this.samples.delete(key);
       this.roadCells = null;
       this.lamps.delete(key);
@@ -408,7 +470,8 @@ export class GeographicRoads {
       if (controller.signal.aborted) return;
       const lamps = [];
       const samples = [];
-      const geometry = response && buildGeographicRoadTile(response.data, tile, this.project, this.terrain, this.exclude, lamps, samples);
+      const decks = [];
+      const geometry = response && buildGeographicRoadTile(response.data, tile, this.project, this.terrain, this.exclude, lamps, samples, decks);
       if (geometry) {
         const mesh = new THREE.Mesh(geometry, this.material);
         mesh.receiveShadow = true;
@@ -418,6 +481,7 @@ export class GeographicRoads {
         this.tiles.set(tile.key, null);
       }
       this.lamps.set(tile.key, lamps);
+      this.bridges.set(tile.key, decks);
       this.samples.set(tile.key, samples);
       this.roadCells = null;
       this.lightsDirty = true;
@@ -436,6 +500,7 @@ export class GeographicRoads {
     if (this.terrain.geographicRoadLayer === this) delete this.terrain.geographicRoadLayer;
     this.group.clear();
     this.tiles.clear();
+    this.bridges.clear();
     this.samples.clear();
     this.lamps.clear();
     this.retryAt.clear();
