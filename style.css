@@ -43,6 +43,7 @@
   align-items: center;
   gap: 3px;
 }
+.landmark-pin[hidden] { display: none; }
 .landmark-pin__label {
   padding: 4px 7px;
   border-radius: 4px;
