@@ -64,3 +64,8 @@ the detailed building tiles beneath the aircraft and camera remain visible,
 along with any loaded building tile within 200 m horizontally. Distant buildings
 are left to the aerial imagery by day. Night overview lights keep their existing
 coverage. The building collision index is independent of render visibility.
+Local 3D city buildings apply the same Ultra Low cap: every archetype already
+collapses to its plain far box, and instances more than 2,200 m from the camera
+are skipped entirely. The collision `buildingData` is unchanged, so an aircraft
+can never reach a culled building's envelope without the camera being inside
+that radius. Switching back to a higher preset restores every instance.
