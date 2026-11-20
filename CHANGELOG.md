@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(landmarks):** add data-driven named-place pins
+  - Any WGS84 place with localized names, an optional elevation and open-ended category tags can be added to `src/config/landmarkPlaces.json`; pins no longer need per-place code.
+  - Candidates are projected into the active map's local frame, filtered by range/category and shown nearest-first with overlap suppression; custom datasets and category filters can be passed to `LandmarkPins`.
+  - See [landmark pins](docs/development/landmarks.md); covered by `tests/landmarks.test.js` and `tests/landmarkPins.test.js`.
 - **feat(assets):** add decimated LOD variants for 1 MiB+ GLBs to the 3D asset gallery
   - `npm run build:lod` simplifies every `public/models` GLB of at least 1 MiB to 10% of its triangles with meshoptimizer and writes the result to `public/models/lod/`, preserving Draco compression, node names and materials.
   - Variants that cut the payload by less than 15% are dropped, so the texture-bound Cessna 172 gets no near-duplicate; the two 737 cockpits (39% / 52% smaller) and the F-16 (24% smaller) gain gallery entries marked `LOD`.

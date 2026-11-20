@@ -1,0 +1,68 @@
+{
+  "places": [
+    {
+      "id": "lotte-world-tower",
+      "names": { "ko": "롯데월드타워", "en": "Lotte World Tower" },
+      "latitude": 37.5125,
+      "longitude": 127.10278,
+      "elevationM": 585,
+      "kinds": ["attraction", "tower"]
+    },
+    {
+      "id": "n-seoul-tower",
+      "names": { "ko": "남산서울타워", "en": "N Seoul Tower" },
+      "latitude": 37.55112,
+      "longitude": 126.98787,
+      "elevationM": 480,
+      "kinds": ["attraction", "tower"]
+    },
+    {
+      "id": "gwanaksan",
+      "names": { "ko": "관악산", "en": "Gwanaksan" },
+      "latitude": 37.444469,
+      "longitude": 126.963897,
+      "elevationM": 632.2,
+      "kinds": ["peak"]
+    },
+    {
+      "id": "baegundae",
+      "names": { "ko": "북한산 백운대", "en": "Bukhansan · Baegundae" },
+      "latitude": 37.6587,
+      "longitude": 126.978,
+      "elevationM": 837,
+      "kinds": ["peak"]
+    },
+    {
+      "id": "paldang-dam",
+      "names": { "ko": "팔당댐", "en": "Paldang Dam" },
+      "latitude": 37.5264,
+      "longitude": 127.2791,
+      "elevationM": 60,
+      "kinds": ["dam"]
+    },
+    {
+      "id": "incheon-airport",
+      "names": { "ko": "인천국제공항", "en": "Incheon Airport" },
+      "latitude": 37.4691,
+      "longitude": 126.4506,
+      "elevationM": 28,
+      "kinds": ["airport"]
+    },
+    {
+      "id": "jeju-airport",
+      "names": { "ko": "제주국제공항", "en": "Jeju Airport" },
+      "latitude": 33.5113,
+      "longitude": 126.493,
+      "elevationM": 48,
+      "kinds": ["airport"]
+    },
+    {
+      "id": "hallasan",
+      "names": { "ko": "한라산", "en": "Hallasan" },
+      "latitude": 33.3617,
+      "longitude": 126.5332,
+      "elevationM": 1947,
+      "kinds": ["peak"]
+    }
+  ]
+}
