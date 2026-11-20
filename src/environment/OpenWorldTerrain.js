@@ -102,6 +102,9 @@ function readWaterMask(data) {
 const viewportSize = new THREE.Vector2();
 const viewProjection = new THREE.Matrix4();
 const imageryFrustum = new THREE.Frustum();
+const detailTileLimit = 5;
+const detailHoldMs = 1000;
+const detailFadeMs = 350;
 const tileSphere = new THREE.Sphere();
 const viewCenter = new THREE.Vector3();
 
@@ -450,16 +453,31 @@ export class OpenWorldTerrain {
       viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
       imageryFrustum.setFromProjectionMatrix(viewProjection);
       const visible = [];
+      const wanted = new Map();
       for (const [key, entry] of this.tiles) {
         const pixels = entry.mesh.geometry.index?.count ? projectedTilePixels(entry.mesh, camera, viewportHeight) : 0;
         entry.imageryPriority = pixels;
-        if (pixels >= samples * (this.detailWanted.has(key) ? 0.65 : 0.85)) {
-          visible.push({ key, priority: pixels * (this.detailWanted.has(key) ? 1.15 : 1) });
+        const previous = this.detailWanted.get(key);
+        if (previous) {
+          if (pixels >= samples * 0.65) entry.detailLastVisibleAt = now;
+          if (now - entry.detailLastVisibleAt < detailHoldMs) wanted.set(key, previous);
         }
+        if (pixels >= samples * 0.85) visible.push({ key, entry, pixels });
       }
-      visible.sort((a, b) => b.priority - a.priority);
-      this.detailWanted = new Map(visible.slice(0, 5).map(({ key, priority }, index) =>
-        [key, index === 0 && priority >= 2 * samples ? 13 : 12]));
+      visible.sort((a, b) => b.pixels - a.pixels);
+      // Ranking controls new requests. A resident tile keeps its detail while
+      // it is still useful, even if another tile grows larger on screen.
+      let hasHighDetail = [...wanted.values()].includes(13);
+      for (const { key, entry, pixels } of visible) {
+        const previous = wanted.get(key);
+        if (!previous && wanted.size >= detailTileLimit) continue;
+        const level = !hasHighDetail && pixels >= 2 * samples ? 13 : 12;
+        if (previous >= level) continue;
+        wanted.set(key, level);
+        entry.detailLastVisibleAt = now;
+        hasHighDetail ||= level === 13;
+      }
+      this.detailWanted = wanted;
     }
 
     for (const [key, entry] of this.tiles) {
@@ -467,7 +485,13 @@ export class OpenWorldTerrain {
       const wanted = this.detailWanted.get(key) >= entry.detailLevel;
       const elapsed = Math.max(0, now - entry.detailUpdatedAt);
       const blend = entry.detail.blend;
-      blend.value = THREE.MathUtils.clamp(blend.value + (wanted ? 1 : -1) * elapsed / 350, 0, 1);
+      const fadingIn = wanted || entry.previousDetailMap;
+      blend.value = THREE.MathUtils.clamp(blend.value + (fadingIn ? 1 : -1) * elapsed / detailFadeMs, 0, 1);
+      if (entry.previousDetailMap && blend.value === 1) {
+        this.applyImagery(entry, entry.baseMap);
+        entry.previousDetailMap.dispose();
+        entry.previousDetailMap = null;
+      }
       entry.detailUpdatedAt = now;
       if (!wanted && blend.value === 0) {
         entry.detailMap.dispose();
@@ -481,6 +505,7 @@ export class OpenWorldTerrain {
     for (const [key, level] of this.detailWanted) {
       const entry = this.tiles.get(key);
       if (!entry?.baseMap || entry.detailLevel >= level || now < (entry.detailRetryAt ?? 0)) continue;
+      if (entry.detailMap && entry.detail.blend.value < 1) continue;
       this.pendingDetail = this.loadImageryDetail(key, entry, level).finally(() => { this.pendingDetail = null; });
       break;
     }
@@ -509,7 +534,10 @@ export class OpenWorldTerrain {
     for (const [i, image] of images.entries()) {
       context.drawImage(image, (i % count) * samples, Math.floor(i / count) * samples);
     }
-    entry.detailMap?.dispose();
+    if (entry.detailMap) {
+      entry.previousDetailMap = entry.detailMap;
+      this.applyImagery(entry, entry.previousDetailMap);
+    }
     entry.detailMap = imageryTexture(canvas);
     entry.detailLevel = level;
     entry.detail.map.value = entry.detailMap;
@@ -576,7 +604,7 @@ export class OpenWorldTerrain {
     entry.mesh.geometry = (useReduced && entry.reducedGeometry) || entry.fullGeometry;
   }
 
-  release(key, { mesh, fullGeometry, reducedGeometry, baseMap, detailMap, waterRequest }) {
+  release(key, { mesh, fullGeometry, reducedGeometry, baseMap, detailMap, previousDetailMap, waterRequest }) {
     waterRequest?.abort();
     this.tiles.delete(key);
     mesh.removeFromParent();
@@ -584,6 +612,7 @@ export class OpenWorldTerrain {
     reducedGeometry?.dispose();
     baseMap?.dispose();
     detailMap?.dispose();
+    previousDetailMap?.dispose();
     mesh.material.dispose();
   }
 
