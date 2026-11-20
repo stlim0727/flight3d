@@ -12,7 +12,11 @@ import { withBrowserSession, detectGpuAngle } from './lib/browserHarness.mjs';
 
 const OUT = '.cache/road-scenery';
 await mkdir(OUT, { recursive: true });
-console.log('Detected GPU angle:', detectGpuAngle());
+const gpuAngle = detectGpuAngle();
+if (gpuAngle === 'swiftshader' || process.env.FORCE_GPU === '0') {
+  throw new Error('Hardware GPU acceleration is required; software rendering is not valid evidence');
+}
+console.log('Detected GPU angle:', gpuAngle);
 
 const CASES = [
   { name: 'incheon-day', terrain: 'incheon', sun: 0.5 },

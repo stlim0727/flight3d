@@ -25,15 +25,21 @@ function tileData(layers) {
         layer.writeMessage(2, (_, message) => {
           message.writeVarintField(3, 3);
           if (tags.length) message.writePackedVarint(2, tags);
-          const points = feature.points;
-          const commands = [9, zigzag(points[0][0]), zigzag(points[0][1]), 2 | ((points.length - 1) << 3)];
-          let [px, py] = points[0];
-          for (const [x, y] of points.slice(1)) {
-            commands.push(zigzag(x - px), zigzag(y - py));
-            px = x;
-            py = y;
+          const commands = [];
+          let px = 0;
+          let py = 0;
+          for (const ring of feature.rings ?? [feature.points]) {
+            commands.push(9, zigzag(ring[0][0] - px), zigzag(ring[0][1] - py));
+            px = ring[0][0];
+            py = ring[0][1];
+            commands.push(2 | ((ring.length - 1) << 3));
+            for (const [x, y] of ring.slice(1)) {
+              commands.push(zigzag(x - px), zigzag(y - py));
+              px = x;
+              py = y;
+            }
+            commands.push(15);
           }
-          commands.push(15);
           message.writePackedVarint(4, commands);
         }, null);
       }
@@ -63,6 +69,9 @@ test('streams park and forest polygons but not commercial land use', () => {
   const first = geometry.attributes.color;
   const expected = new THREE.Color(0x4a7a3a);
   assert.ok(Math.abs(first.getX(0) - expected.r) < 1e-6);
+  assert.equal(first.count, 8, 'one color per vertex, not per triangle index');
+  const forest = new THREE.Color(0x3f6a33);
+  assert.ok(Math.abs(first.getX(4) - forest.r) < 1e-6);
   geometry.dispose();
   assert.equal(buildGeographicGreenTile(data(), tile, project, { ...terrain, isWater: () => true }), null);
 });
@@ -88,4 +97,18 @@ test('excludes polygons by center and keeps independent detail tiles', async () 
   assert.equal(live.tiles.size, 9);
   assert.equal(live.group.children.length, 9);
   live.dispose();
+});
+
+test('keeps every outer ring of a multipolygon', () => {
+  const data = tileData({
+    land_use: [{
+      properties: { class: 'park' },
+      rings: [square, square.map(([x, y]) => [x + 600, y])],
+    }],
+  });
+  const geometry = buildGeographicGreenTile(data, tile, project, terrain);
+  assert.ok(geometry);
+  assert.equal(geometry.attributes.position.count, 8);
+  assert.equal(geometry.attributes.color.count, 8);
+  geometry.dispose();
 });

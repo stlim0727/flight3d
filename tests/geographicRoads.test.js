@@ -82,6 +82,7 @@ test('drapes major surface roads and skips tunnels, mixed spans and minor classe
     geometry.attributes.position.getZ(0) - geometry.attributes.position.getZ(1),
   );
   assert.ok(Math.abs(width - 22) < 1e-4, `primary default width, got ${width}`);
+  assert.ok(geometry.attributes.normal.getY(0) > 0.9, 'flat road triangles must face upward');
   geometry.dispose();
 });
 
@@ -101,6 +102,17 @@ test('omits water, excluded and off-map sections without dropping the whole tile
   assert.equal(buildGeographicRoadTile(data, tile, project, terrain, () => true), null);
   const bounded = { ...terrain, size: 10 };
   assert.equal(buildGeographicRoadTile(data, tile, project, bounded), null);
+});
+
+test('samples terrain height at each ribbon edge', () => {
+  const data = segmentTile([{ properties: { class: 'primary' }, points: [[100, 100], [600, 100]] }]);
+  const sloped = { getHeight: (x, z) => 44 + z * 0.01, isWater: () => false };
+  const geometry = buildGeographicRoadTile(data, tile, project, sloped);
+  assert.ok(geometry);
+  const left = geometry.attributes.position.getY(0);
+  const right = geometry.attributes.position.getY(1);
+  assert.ok(Math.abs(left - right) > 0.1, `edges should differ on a slope, got ${left} vs ${right}`);
+  geometry.dispose();
 });
 
 test('streams and disposes road tiles, ignoring late responses after abort', async () => {
@@ -165,6 +177,14 @@ test('gates lamps by night and altitude, deduplicates positions and caps near in
   roads.lightsDirty = true;
   roads.update(position, position, -0.2);
   assert.equal(roads.nearLamps.length, before);
+
+  const mid = { ...position, y: 2300 };
+  roads.update(mid, mid, -0.2);
+  assert.equal(roads.lampPoints.visible, true);
+  assert.equal(roads.lampMesh.visible, false);
+  const colors = roads.lampPoints.geometry.attributes.color;
+  assert.ok(roads.farLamps.length > 0);
+  assert.equal(colors.array[3], 1, 'near lamps stay visible as points when the instanced mesh is altitude-hidden');
   const high = { ...position, y: 6000 };
   roads.update(high, high, -0.2);
   assert.equal(roads.lampPoints.visible, false);
@@ -198,6 +218,11 @@ test('renders bridge decks above the surface and collides only where height is e
   buildGeographicRoadTile(bridge(null), tile, project, terrain, () => false, lamps, null, []);
   assert.equal(lamps.length, 0);
   geometry.dispose();
+
+  const overWater = buildGeographicRoadTile(bridge(null), tile, project,
+    { getHeight: () => 0, isWater: () => true }, () => false, null, null, []);
+  assert.ok(overWater, 'whole-segment bridge must survive a water centerline');
+  overWater.dispose();
 
   const surface = { ...terrain, isLoaded: true, openWorld: { readyForTile: () => true } };
   const origin = { latitude: 37.46, longitude: 126.44 };

@@ -24,8 +24,41 @@ const COLORS = {
 const LAND_USE = new Set(Object.keys(COLORS).filter(name => name !== 'shrub'));
 const LAND_COVER = new Set(['forest', 'shrub']);
 
+function ringArea(ring) {
+  return ring.reduce((sum, [x, y], i) => {
+    const [nextX, nextY] = ring[(i + 1) % ring.length];
+    return sum + x * nextY - nextX * y;
+  }, 0);
+}
+
+function pointInRing(point, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > point[1]) !== (yj > point[1])
+      && point[0] < (xj - xi) * (point[1] - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function polygonsOf(feature) {
+  const polygons = [];
+  const holes = [];
+  for (const raw of feature.loadGeometry()) {
+    const ring = raw.map(({ x, y }) => [x, y]);
+    if (ringArea(ring) > 0) polygons.push({ outer: ring, holes: [] });
+    else holes.push(ring);
+  }
+  for (const hole of holes) {
+    const owner = polygons.find(polygon => pointInRing(hole[0], polygon.outer));
+    if (owner) owner.holes.push(hole);
+  }
+  return polygons;
+}
+
 function ringOf(ring, tile, project, extent) {
-  const points = ring.map(({ x, y }) => {
+  const points = ring.map(([x, y]) => {
     const { latitude, longitude } = tileToWgs84(tile.x + x / extent, tile.y + y / extent, zoom);
     const [localX, localZ] = project(latitude, longitude);
     return new THREE.Vector2(localX, localZ);
@@ -50,25 +83,24 @@ export function buildGeographicGreenTile(data, tile, project, terrain, exclude =
       const feature = layer.feature(i);
       const kind = feature.properties.class;
       if (!allowed.has(kind) || feature.type !== 3) continue;
-      const rings = feature.loadGeometry().map(ring => ringOf(ring, tile, project, feature.extent));
-      const [outer, ...holes] = rings;
-      if (!outer || outer.length < 3 || Math.abs(THREE.ShapeUtils.area(outer)) < 4) continue;
-      const points = rings.flat();
-      const heights = points.map(point => terrain.getHeight(point.x, point.y));
-      if (!heights.every(Number.isFinite) || heights.some(height => height <= 0)) continue;
-      const center = outer.reduce((sum, point) => sum.add(point), new THREE.Vector2()).divideScalar(outer.length);
-      const probe = { x: center.x, y: center.y, height: terrain.getHeight(center.x, center.y) };
-      if (!usable(probe) || exclude(center.x, center.y)) continue;
-      const faces = THREE.ShapeUtils.triangulateShape(outer, holes);
-      if (!faces.length) continue;
       color.setHex(COLORS[kind]);
-      const base = positions.length / 3;
-      for (const point of points) positions.push(point.x, terrain.getHeight(point.x, point.y) + surfaceOffset, point.y);
-      for (const face of faces) {
-        for (const index of face.toReversed()) {
-          triangles.push(base + index);
+      for (const polygon of polygonsOf(feature)) {
+        const rings = [polygon.outer, ...polygon.holes].map(ring => ringOf(ring, tile, project, feature.extent));
+        const [outer, ...holes] = rings;
+        if (!outer || outer.length < 3 || Math.abs(THREE.ShapeUtils.area(outer)) < 4) continue;
+        const points = rings.flat();
+        if (!points.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))) continue;
+        const center = outer.reduce((sum, point) => sum.add(point), new THREE.Vector2()).divideScalar(outer.length);
+        const probe = { x: center.x, y: center.y, height: terrain.getHeight(center.x, center.y) };
+        if (!usable(probe) || exclude(center.x, center.y)) continue;
+        const faces = THREE.ShapeUtils.triangulateShape(outer, holes);
+        if (!faces.length) continue;
+        const base = positions.length / 3;
+        for (const point of points) {
+          positions.push(point.x, terrain.getHeight(point.x, point.y) + surfaceOffset, point.y);
           colors.push(color.r, color.g, color.b);
         }
+        for (const face of faces) for (const index of face.toReversed()) triangles.push(base + index);
       }
     }
   }

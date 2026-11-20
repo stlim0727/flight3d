@@ -91,7 +91,7 @@ export function roadWidth(properties) {
   return DEFAULT_WIDTHS[properties.class] ?? 12;
 }
 
-function ribbon(points, width, heights, color) {
+function ribbon(points, width, heights, color, heightAt = null) {
   const half = width / 2;
   const normals = points.map((point, i) => {
     const before = points[Math.max(0, i - 1)];
@@ -113,11 +113,17 @@ function ribbon(points, width, heights, color) {
     const scale = Math.min(2, 1 / Math.max(0.5, x * normal.x + z * normal.z));
     return { x: x * scale, z: z * scale };
   });
-  return points.map((point, i) => ({
-    left: new THREE.Vector3(point.x + miters[i].x * half, heights[i] + surfaceOffset, point.z + miters[i].z * half),
-    right: new THREE.Vector3(point.x - miters[i].x * half, heights[i] + surfaceOffset, point.z - miters[i].z * half),
-    color,
-  }));
+  return points.map((point, i) => {
+    const leftX = point.x + miters[i].x * half;
+    const leftZ = point.z + miters[i].z * half;
+    const rightX = point.x - miters[i].x * half;
+    const rightZ = point.z - miters[i].z * half;
+    return {
+      left: new THREE.Vector3(leftX, heightAt ? heightAt(leftX, leftZ) + surfaceOffset : heights[i] + surfaceOffset, leftZ),
+      right: new THREE.Vector3(rightX, heightAt ? heightAt(rightX, rightZ) + surfaceOffset : heights[i] + surfaceOffset, rightZ),
+      color,
+    };
+  });
 }
 
 /** Both sides of a run, spaced by road class; positions are the pole bases. */
@@ -164,8 +170,8 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
   const colors = [];
   const indices = [];
   const color = new THREE.Color();
-  const usable = point => Number.isFinite(point.x) && Number.isFinite(point.z)
-    && point.height > 0 && !terrain.isWater?.(point.x, point.z)
+  const usable = (point, deck) => Number.isFinite(point.x) && Number.isFinite(point.z)
+    && (deck || (point.height > 0 && !terrain.isWater?.(point.x, point.z)))
     && !exclude(point.x, point.z)
     && !(Number.isFinite(terrain.size) && Math.max(Math.abs(point.x), Math.abs(point.z)) > terrain.size / 2);
 
@@ -190,7 +196,7 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
         const heights = span.deck
           ? run.map(() => span.evidenced ? span.height : Math.max(...run.map(point => point.height)) + 8)
           : run.map(point => point.height);
-        const strip = ribbon(run, width, heights, color);
+        const strip = ribbon(run, width, heights, color, span.deck ? null : (x, z) => terrain.getHeight(x, z));
         const base = positions.length / 3;
         for (const vertex of strip) {
           positions.push(vertex.left.x, vertex.left.y, vertex.left.z,
@@ -200,14 +206,14 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
         }
         for (let j = 0; j < strip.length - 1; j++) {
           const a = base + j * 2;
-          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+          indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
         }
         if (span.deck && decks) decks.push({ points: run.map(point => ({ x: point.x, z: point.z })), width, height: heights[0], evidenced: span.evidenced });
         if (!span.deck && lamps) lamps.push(...roadLamps(run, width, (x, z) => terrain.getHeight(x, z), lampSpacing[properties.class]));
         if (!span.deck && samples) for (const point of run) samples.push({ x: point.x, z: point.z });
       };
       for (const point of points) {
-        if (usable(point)) run.push(point);
+        if (usable(point, span.deck)) run.push(point);
         else { emit(); run = []; }
       }
       emit();
@@ -436,7 +442,7 @@ export class GeographicRoads {
     let changed = false;
     this.farLamps.forEach((lamp, i) => {
       const distance = Math.hypot(cameraPosition.x - lamp.x, cameraPosition.z - lamp.z);
-      const alpha = THREE.MathUtils.smoothstep(distance, nearLampRange, farLampRange);
+      const alpha = !this.lampMesh.visible ? 1 : THREE.MathUtils.smoothstep(distance, nearLampRange, farLampRange);
       if (Math.abs(colors.array[i * 4 + 3] - alpha) < 0.002) return;
       colors.array[i * 4 + 3] = alpha;
       changed = true;
