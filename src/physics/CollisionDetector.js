@@ -1,5 +1,6 @@
 import { t } from '../i18n/index.js';
 import * as THREE from 'three';
+import { createGroundHeightQuery } from '../environment/TerrainProvider.js';
 
 export const B738_COLLISION_PROBES = Object.freeze([
   { id: 'nose', pos: [0, -0.2, -17.5], radius: 1.5, descKey: 'nose.radome' },
@@ -204,12 +205,21 @@ export class CollisionDetector {
     this.buildingGrid = new Map();
     this.gridSource = foliageAndCities;
     this.remoteAircraftProvider = null;
+    this.terrainOverrideProvider = null;
+    this.getTerrainHeight = createGroundHeightQuery({
+      getTerrain: () => this.terrain,
+      getOverride: () => this.terrainOverrideProvider?.() ?? null,
+    });
 
     this.buildSpatialGrids();
   }
 
   setRemoteAircraftProvider(provider) {
     this.remoteAircraftProvider = provider;
+  }
+
+  setTerrainOverrideProvider(provider) {
+    this.terrainOverrideProvider = typeof provider === 'function' ? provider : null;
   }
 
   loadAircraftConfig(config = {}) {
@@ -817,7 +827,7 @@ export class CollisionDetector {
   checkWater(aircraftPos, worldProbes, speedMs, vsiMs, pitchDeg = 0, rollDeg = 0, groundContact = null) {
     if (!this.terrain) return null;
 
-    const terrainH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
+    const terrainH = this.getTerrainHeight(aircraftPos.x, aircraftPos.z);
     // Sea level unless the terrain has its own water (the Neon Metropolis canal, #551).
     const waterLevel = this.terrain.getWaterLevel?.(aircraftPos.x, aircraftPos.z) ?? 0.0;
     // Water is located where natural terrain is at or below the water level (within 2.5m)
@@ -900,7 +910,7 @@ export class CollisionDetector {
     if (!groundContact) {
       // Detection-only callers have no contact solver to integrate drag or damage;
       // they keep the conservative geometric excursion kill.
-      const groundH = this.terrain.getHeight(aircraftPos.x, aircraftPos.z);
+      const groundH = this.getTerrainHeight(aircraftPos.x, aircraftPos.z);
       const gearHeight = gearState >= 0.5 ? 3.85 : 1.85;
       const isWheelGrounded = aircraftPos.y - groundH <= gearHeight && aircraftPos.y - groundH >= -2.0;
       const isMoving = speedMs > 5.0; // Low-speed taxi into grass halts safely rather than detonating
@@ -919,7 +929,7 @@ export class CollisionDetector {
     // deployment and nominal attitude never exempt nacelles or wings from contact.
     for (const probe of worldProbes) {
       const probeOnRunway = this.isPositionOnRunway(probe.pos.x, probe.pos.z);
-      const ground = this.terrain.getHeight(probe.pos.x, probe.pos.z);
+      const ground = this.getTerrainHeight(probe.pos.x, probe.pos.z);
       const radius = probe.id === 'engineL' || probe.id === 'engineR' ? probe.radius : 0;
       if (groundContact) {
         // The contact solver owns supported lower surfaces on every terrain and

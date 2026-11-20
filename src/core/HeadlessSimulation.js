@@ -65,6 +65,7 @@ export function createHeadlessSimulation({ aircraftId = 'B738', airportId = 'coa
   sim._intEuler = new THREE.Euler();
   sim._aeroResult = createAeroResult();
   sim.collisionDetector = new CollisionDetector(terrain, airport, null, null, null);
+  sim.collisionDetector.setTerrainOverrideProvider(() => sim.terrainProviderOverride);
   sim.collisionDetector.loadAircraftConfig(config);
   sim.engines.refuel(sim.aero);
   return sim;

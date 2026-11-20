@@ -216,8 +216,11 @@ class PhysicsIntegratorMethods {
     this.telemetry.selectedSpeed = this.autopilot.master && this.autopilot.speedMode ? Math.round(this.autopilot.targets.iasKnots) : previousTelemetry?.selectedSpeed;
     this.telemetry.demoActive = isAutonomousDemo;
     this.telemetry.parkBrake = Boolean(this.controls.parkingBrake || result.telemetry.parkBrake);
+    const terrainHeightSource = this.currentTerrain || this.terrainProviderOverride
+      ? (this._terrainHeightSource ??= { getHeight: groundSurface.getGroundHeight })
+      : null;
     this.telemetry.warnings = this.isCrashed ? [] : this.flightWarnings.update(dt, this.telemetry,
-      terrainConflictSeconds(this.position, this.linearVelocity, this.currentTerrain,
+      terrainConflictSeconds(this.position, this.linearVelocity, terrainHeightSource,
         this.telemetry.gearState > 0.95 && this.telemetry.flapDegree >= (this.currentAircraftConfig.id === 'B738' ? 15 : 0)));
 
     // Presentation: water spray/ripples, slide dust, audio, toasts, and camera cuts
@@ -325,6 +328,9 @@ class PhysicsIntegratorMethods {
     // 13. Check Multi-Obstacle Collisions (Terrain, Water, Tower, Buildings, Trees, Ships)
     this.bridgeFlight?.update(dt);
     if (!this.isCrashed) {
+      if (this.collisionDetector.setTerrainOverrideProvider && !this.collisionDetector.terrainOverrideProvider) {
+        this.collisionDetector.setTerrainOverrideProvider(() => this.terrainProviderOverride);
+      }
       const crash = this.collisionDetector.checkCollision(
         result.collisionPosition,
         this.quaternion,
