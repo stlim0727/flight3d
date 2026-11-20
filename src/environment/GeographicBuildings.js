@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { nightLightLevel } from './AirportNightLighting.js';
+import { cityFacadeUvShader, createCityFacadeAtlas } from './CityBuildingAssets.js';
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import { PMTiles } from 'pmtiles';
@@ -35,20 +36,15 @@ function lightTexture(size, sample, alphaOnly = false) {
   return texture;
 }
 
-function windowTexture() {
-  const texture = lightTexture(64, (x, y) => {
-    const column = x >> 3;
-    const floor = y >> 3;
-    const lit = ((column * 13 + floor * 19 + column * floor * 7) % 11) < 7;
-    return lit && x % 8 >= 2 && x % 8 <= 5 && y % 8 >= 3 && y % 8 <= 6 ? 1 : 0;
-  });
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  return texture;
-}
-
 function cityGlowTexture() {
   return lightTexture(16, (x, y) => Math.max(0, 1 - Math.hypot(x - 7.5, y - 7.5) / 7.5), true);
 }
+
+const fract = value => value - Math.floor(value);
+const roofAtlasUv = (x, z) => [
+  (1 + 0.02 + fract(x / 24) * 0.96) / 2,
+  (1 + 0.02 + fract(z / 24) * 0.96) / 2,
+];
 
 function buildOverviewTile(data, tile, project, terrain, exclude) {
   const layer = new VectorTile(new PbfReader(data)).layers.building;
@@ -192,24 +188,23 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
       if (!roofTriangles.length) continue;
       if (colliders) colliders.push({ rings: rings.map(ring => ring.map(({ x, y }) => [x, y])), low, roof });
       const points = rings.flat();
+      const facadeTile = Math.floor(Math.abs(center.x) / 83 + Math.abs(center.y) / 47) % 3;
+      const facadeUv = [(facadeTile % 2 + 0.5) / 2, (Math.floor(facadeTile / 2) + 0.5) / 2];
       for (const triangle of roofTriangles) {
         for (const index of triangle.toReversed()) {
           const point = points[index];
           positions.push(point.x, roof, point.y);
-          facadeUvs.push(0.5 / 64, 0.5 / 64);
+          facadeUvs.push(...roofAtlasUv(point.x, point.y));
         }
       }
       for (const ring of rings) {
-        let u = ((center.x * 0.013 + center.y * 0.019) % 1 + 1) % 1;
-        const v = (roof - low) / 24;
         for (let j = 0; j < ring.length; j++) {
           const a = ring[j];
           const b = ring[(j + 1) % ring.length];
           positions.push(a.x, low, a.y, b.x, low, b.y, a.x, roof, a.y,
             b.x, low, b.y, b.x, roof, b.y, a.x, roof, a.y);
-          const nextU = u + a.distanceTo(b) / 24;
-          facadeUvs.push(u, 0, nextU, 0, u, v, nextU, 0, nextU, v, u, v);
-          u = nextU;
+          facadeUvs.push(...facadeUv, ...facadeUv, ...facadeUv,
+            ...facadeUv, ...facadeUv, ...facadeUv);
         }
       }
     }
@@ -267,10 +262,14 @@ export class GeographicBuildings {
     this.archive = archive;
     this.group = new THREE.Group();
     this.group.name = 'Geographic buildings';
+    const atlas = createCityFacadeAtlas();
+    this.atlas = atlas;
     this.material = new THREE.MeshLambertMaterial({
-      color: 0xb5aaa0, side: THREE.DoubleSide,
-      emissive: 0xffb864, emissiveMap: windowTexture(), emissiveIntensity: 0,
+      map: atlas.map, emissiveMap: atlas.emissiveMap,
+      emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide,
     });
+    this.material.onBeforeCompile = cityFacadeUvShader;
+    this.material.customProgramCacheKey = () => 'geo-city-metric-facade-v1';
     this.lightMaterial = new THREE.PointsMaterial({
       map: cityGlowTexture(), color: 0xffc688, size: 5, sizeAttenuation: false, vertexColors: true,
       blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false,
@@ -309,7 +308,7 @@ export class GeographicBuildings {
   update(position, cameraPosition = position, sunHeight = 1, elapsed = 1 / 60) {
     if (this.terrain.isLoaded === false) return;
     const night = nightLightLevel(sunHeight);
-    this.material.emissiveIntensity = night * 1.8;
+    this.material.emissiveIntensity = night * 0.75;
     const aircraftTiles = this.tilesNear(position);
     const cameraTiles = cameraPosition === position ? [] : this.tilesNear(cameraPosition);
     const selection = `${aircraftTiles[0]?.key ?? ''}:${cameraTiles[0]?.key ?? ''}`;
@@ -484,7 +483,8 @@ export class GeographicBuildings {
     this.group.clear();
     this.tiles.clear();
     this.retryAt.clear();
-    this.material.emissiveMap.dispose();
+    this.atlas.map.dispose();
+    this.atlas.emissiveMap.dispose();
     this.material.dispose();
     this.lightMaterial.map.dispose();
     this.lightMaterial.dispose();
