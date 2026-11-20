@@ -82,8 +82,9 @@ await withBrowserSession(
           terrain: surface?.openWorld?.tiles?.size ?? 0,
           buildings: sim?.geographicBuildingLayer?.tiles?.size ?? 0,
           roads: sim?.geographicRoadLayer?.tiles?.size ?? 0,
+          green: sim?.geographicGreenLayer?.tiles?.size ?? 0,
         },
-        roadsWithGeometry: [...(sim?.geographicRoadLayer?.tiles?.values() ?? [])].filter(Boolean).length,
+        greenWithGeometry: [...(sim?.geographicGreenLayer?.tiles?.values() ?? [])].filter(Boolean).length,
         lamps: {
           near: sim?.geographicRoadLayer?.nearLamps?.length ?? 0,
           far: sim?.geographicRoadLayer?.farLamps?.length ?? 0,

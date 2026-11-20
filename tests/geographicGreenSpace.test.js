@@ -1,0 +1,91 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import * as THREE from 'three';
+import { PbfWriter } from 'pbf';
+import { buildGeographicGreenTile, GeographicGreenSpace } from '../src/environment/GeographicGreenSpace.js';
+
+function tileData(layers) {
+  const writer = new PbfWriter();
+  for (const [name, features] of Object.entries(layers)) {
+    writer.writeMessage(3, (_, layer) => {
+      layer.writeStringField(1, name);
+      layer.writeVarintField(15, 2);
+      layer.writeVarintField(5, 4096);
+      const keys = [];
+      const values = [];
+      const zigzag = value => (value << 1) ^ (value >> 31);
+      for (const feature of features) {
+        const tags = Object.entries(feature.properties).flatMap(([key, value]) => {
+          let index = keys.indexOf(key);
+          if (index < 0) { keys.push(key); index = keys.length - 1; }
+          let valueIndex = values.indexOf(String(value));
+          if (valueIndex < 0) { values.push(String(value)); valueIndex = values.length - 1; }
+          return [index, valueIndex];
+        });
+        layer.writeMessage(2, (_, message) => {
+          message.writeVarintField(3, 3);
+          if (tags.length) message.writePackedVarint(2, tags);
+          const points = feature.points;
+          const commands = [9, zigzag(points[0][0]), zigzag(points[0][1]), 2 | ((points.length - 1) << 3)];
+          let [px, py] = points[0];
+          for (const [x, y] of points.slice(1)) {
+            commands.push(zigzag(x - px), zigzag(y - py));
+            px = x;
+            py = y;
+          }
+          commands.push(15);
+          message.writePackedVarint(4, commands);
+        }, null);
+      }
+      for (const key of keys) layer.writeStringField(3, key);
+      for (const value of values) layer.writeMessage(4, (_, item) => item.writeStringField(1, value), null);
+    }, null);
+  }
+  return writer.finish();
+}
+
+const square = [[100, 100], [300, 100], [300, 300], [100, 300]];
+const tile = { x: 6973, y: 3175 };
+const project = (latitude, longitude) => [(longitude - 126.44) * 100000, -(latitude - 37.46) * 100000];
+const terrain = { getHeight: () => 44, isWater: () => false };
+const data = () => tileData({
+  land_use: [
+    { properties: { class: 'park' }, points: square },
+    { properties: { class: 'commercial' }, points: square.map(([x, y]) => [x + 500, y]) },
+  ],
+  land_cover: [{ properties: { class: 'forest' }, points: square.map(([x, y]) => [x + 1000, y]) }],
+});
+
+test('streams park and forest polygons but not commercial land use', () => {
+  const geometry = buildGeographicGreenTile(data(), tile, project, terrain);
+  assert.ok(geometry);
+  assert.equal(geometry.attributes.position.count, 8);
+  const first = geometry.attributes.color;
+  const expected = new THREE.Color(0x4a7a3a);
+  assert.ok(Math.abs(first.getX(0) - expected.r) < 1e-6);
+  geometry.dispose();
+  assert.equal(buildGeographicGreenTile(data(), tile, project, { ...terrain, isWater: () => true }), null);
+});
+
+test('excludes polygons by center and keeps independent detail tiles', async () => {
+  const archive = { getZxy: async () => ({ data: data() }) };
+  const surface = { ...terrain, isLoaded: true, openWorld: { readyForTile: (candidate, zoom) => zoom === 13 } };
+  const origin = { latitude: 37.46, longitude: 126.44 };
+  const frame = async (layer) => {
+    for (let i = 0; i < 12; i++) {
+      layer.update({ x: 0, y: 100, z: 0 });
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+  };
+  const excluded = new GeographicGreenSpace({ origin, project, terrain: surface, archive, exclude: () => true });
+  await frame(excluded);
+  assert.equal(excluded.tiles.size, 9);
+  assert.ok([...excluded.tiles.values()].every(mesh => mesh === null));
+  excluded.dispose();
+
+  const live = new GeographicGreenSpace({ origin, project, terrain: surface, archive });
+  await frame(live);
+  assert.equal(live.tiles.size, 9);
+  assert.equal(live.group.children.length, 9);
+  live.dispose();
+});

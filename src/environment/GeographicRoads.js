@@ -125,7 +125,7 @@ export function roadLamps(points, width, heightAt, spacing) {
  * level-separated segments are deliberately omitted until span handling exists.
  * Lamp bases are collected in the optional array when night lighting is active.
  */
-export function buildGeographicRoadTile(data, tile, project, terrain, exclude = () => false, lamps = null) {
+export function buildGeographicRoadTile(data, tile, project, terrain, exclude = () => false, lamps = null, samples = null) {
   const layer = new VectorTile(new PbfReader(data)).layers.segment;
   if (!layer?.length) return null;
   const positions = [];
@@ -167,6 +167,7 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
           indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
         }
         if (lamps) lamps.push(...roadLamps(run, width, (x, z) => terrain.getHeight(x, z), lampSpacing[properties.class]));
+        if (samples) for (const point of run) samples.push({ x: point.x, z: point.z });
       };
       for (const point of points) {
         if (usable(point)) run.push(point);
@@ -231,6 +232,8 @@ export class GeographicRoads {
     });
     this.tiles = new Map();
     this.lamps = new Map();
+    this.samples = new Map();
+    this.roadCells = null;
     this.pending = null;
     this.retryAt = new Map();
     this.lightsDirty = true;
@@ -273,6 +276,23 @@ export class GeographicRoads {
 
   hasGround(tile) {
     return this.terrain.openWorld?.readyForTile(tile, zoom) ?? true;
+  }
+
+  covers(x, z, radius = 12) {
+    if (!this.roadCells) {
+      this.roadCells = new Set();
+      for (const [key, points] of this.samples) {
+        if (!this.tiles.has(key)) continue;
+        for (const point of points) this.roadCells.add(`${Math.floor(point.x / 16)}/${Math.floor(point.z / 16)}`);
+      }
+    }
+    const cell = 16;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        if (this.roadCells.has(`${Math.floor((x + dx * radius) / cell)}/${Math.floor((z + dz * radius) / cell)}`)) return true;
+      }
+    }
+    return false;
   }
 
   update(position, cameraPosition = position, sunHeight = 1) {
@@ -371,6 +391,8 @@ export class GeographicRoads {
       mesh?.removeFromParent();
       mesh?.geometry.dispose();
       this.tiles.delete(key);
+      this.samples.delete(key);
+      this.roadCells = null;
       this.lamps.delete(key);
       this.lightsDirty = true;
     }
@@ -385,7 +407,8 @@ export class GeographicRoads {
       const response = await this.archive.getZxy(zoom, tile.x, tile.y, controller.signal);
       if (controller.signal.aborted) return;
       const lamps = [];
-      const geometry = response && buildGeographicRoadTile(response.data, tile, this.project, this.terrain, this.exclude, lamps);
+      const samples = [];
+      const geometry = response && buildGeographicRoadTile(response.data, tile, this.project, this.terrain, this.exclude, lamps, samples);
       if (geometry) {
         const mesh = new THREE.Mesh(geometry, this.material);
         mesh.receiveShadow = true;
@@ -395,6 +418,8 @@ export class GeographicRoads {
         this.tiles.set(tile.key, null);
       }
       this.lamps.set(tile.key, lamps);
+      this.samples.set(tile.key, samples);
+      this.roadCells = null;
       this.lightsDirty = true;
       this.retryAt.delete(tile.key);
     } catch {
@@ -411,6 +436,7 @@ export class GeographicRoads {
     if (this.terrain.geographicRoadLayer === this) delete this.terrain.geographicRoadLayer;
     this.group.clear();
     this.tiles.clear();
+    this.samples.clear();
     this.lamps.clear();
     this.retryAt.clear();
     this.material.dispose();

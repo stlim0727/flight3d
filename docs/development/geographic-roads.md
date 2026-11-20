@@ -45,8 +45,20 @@ overlap instead of popping. Instance matrices are rebuilt only when the tile
 set changes or the camera moves more than 75 m, keeping lamp positions stable
 across tile load order.
 
-Verification: `node --test tests/geographicRoads.test.js`, `npm run check`, and
+Verification: `node --test tests/geographicRoads.test.js`,
+`tests/geographicGreenSpace.test.js`, `npm run check`, and
 `scripts/measure-streamed-scenery.mjs` on the hardware GPU path described in
 [browser-gpu.md](browser-gpu.md). On the fixed Incheon low-altitude route stage
 1 added 9 road tiles and 2 draw calls; stage 2 added 169 near instances, 1417
-far points and 3 draw calls. Bridge/tunnel spans and vegetation are later stages.
+far points and 3 draw calls; stage 3 added 9 green tiles (8 with geometry) and
+4 draw calls. Bridge/tunnel spans are the remaining stage.
+
+## Parks and green space (stage 3)
+
+`src/environment/GeographicGreenSpace.js` reads `land_use` and `land_cover` from
+the already-downloaded `base.pmtiles`. Green space uses its own z13 tile
+selection because audited z11 parent tiles had no park polygons; selection,
+abort and retry follow the road layer. Flat colored polygons are draped on the
+flight surface and excluded when they intersect water, runway safety areas,
+modeled airport buildings, streamed building colliders or the road sample index
+exposed by `GeographicRoads.covers()`. Night lighting is not added to vegetation.

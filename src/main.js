@@ -2,6 +2,7 @@ import { regionalCruise } from './config/regionalCruises.js';
 import { LandmarkPins } from './ui/LandmarkPins.js';
 import { updateGeographicBuildings } from './environment/GeographicBuildings.js';
 import { updateGeographicRoads } from './environment/GeographicRoads.js';
+import { updateGeographicGreenSpace } from './environment/GeographicGreenSpace.js';
 import { updateOpenWorldTerrain } from './environment/OpenWorldTerrain.js';
 import { StartupProgressView } from './ui/StartupProgressView.js';
 import { compileVisibleScene } from './core/sceneShaderWarmup.js';
@@ -1507,6 +1508,7 @@ class FlightSimulator {
     updateOpenWorldTerrain(this);
     updateGeographicBuildings(this, frameDelta);
     updateGeographicRoads(this, frameDelta);
+    updateGeographicGreenSpace(this);
     this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     if (!this.gameFlow.isPhysicsFrozen()) {
       if (!this.replayDirector.roomEffects) this.explosionSystem.update(frameDelta);
