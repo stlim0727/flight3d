@@ -114,7 +114,9 @@ function createGreenMaterial(alphaMap) {
         // The mask includes the vector-tile buffer so its blur can cross tile edges.
         if (any(lessThan(vAlphaMapUv, vec2(${tileStart}))) ||
             any(greaterThanEqual(vAlphaMapUv, vec2(${tileEnd})))) discard;
-        diffuseColor.a *= smoothstep(0.45, 0.95, coverage);
+        // Geometry defines coverage. Sub-pixel polygons can be absent from the
+        // blurred mask, so use it only to reduce opacity near the edges.
+        diffuseColor.a *= mix(0.55, 1.0, smoothstep(0.45, 0.95, coverage));
       #endif
     `);
   };
