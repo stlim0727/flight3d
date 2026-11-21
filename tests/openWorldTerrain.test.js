@@ -8,6 +8,41 @@ const origin = { latitude: 37.55, longitude: 126.98 };
 const x = 1746, y = 793;
 const flat = height => new Float32Array(256 ** 2).fill(height);
 
+test('high-altitude backdrop loads nine coarse visual-only tiles and hides on descent', async () => {
+  const requests = [];
+  const imageryCache = {
+    getTileImage: async (...coordinate) => {
+      requests.push(coordinate);
+      return { width: 256, height: 256 };
+    },
+    dispose() {},
+  };
+  const world = new OpenWorldTerrain({ origin, imageryCache });
+  const raster = flat(100);
+  world.raster = async () => raster;
+  const position = new Vector3(0, 5000, 0);
+  world.updateFarTerrain(position, null, 0);
+  assert.equal(requests.length, 0);
+  assert.equal(world.farGroup.visible, false);
+
+  position.y = 12192;
+  for (let i = 0; i < 10; i++) {
+    world.updateFarTerrain(position, null, 0);
+    await world.farPending;
+  }
+  assert.equal(requests.length, 9);
+  assert.ok(requests.every(([level]) => level === 8));
+  assert.equal(world.farTiles.size, 9);
+  assert.equal(world.farGroup.children[0].geometry.index.count / 3, 2048);
+  assert.equal(world.sample(position.x, position.z), undefined);
+
+  position.y = 5000;
+  world.updateFarTerrain(position, null, 0);
+  assert.equal(world.farGroup.visible, false);
+  world.dispose();
+  assert.equal(world.farTiles.size, 0);
+});
+
 test('decodes signed Terrarium heights with sub-meter precision', () => {
   assert.deepEqual([...decodeTerrarium(Uint8Array.from([128, 13, 128, 255, 127, 246, 0, 255]))], [13.5, -10]);
 });
