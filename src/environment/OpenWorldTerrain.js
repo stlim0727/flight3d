@@ -121,11 +121,29 @@ function projectedTilePixels(mesh, camera, viewportHeight) {
   return Math.min(viewportHeight * 2, tileSphere.radius * camera.projectionMatrix.elements[5] * viewportHeight / depth);
 }
 
-function terrainMaterial(detail) {
+function terrainMaterial(detail, distanceFade) {
   const material = new THREE.MeshLambertMaterial({ vertexColors: true });
   material.onBeforeCompile = shader => {
     shader.uniforms.terrainDetailMap = detail.map;
     shader.uniforms.terrainDetailBlend = detail.blend;
+    shader.uniforms.terrainDistanceFade = distanceFade;
+    shader.vertexShader = 'varying vec3 vTerrainViewPosition;\n' + shader.vertexShader.replace(
+      '#include <project_vertex>',
+      '#include <project_vertex>\n vTerrainViewPosition = mvPosition.xyz;',
+    );
+    shader.fragmentShader = shader.fragmentShader.replace('#include <clipping_planes_fragment>', `
+      #include <clipping_planes_fragment>
+      if (terrainDistanceFade) {
+        // Dither coverage so the ocean/sky shows through while terrain retains opaque depth writes.
+        float distanceM = length(vTerrainViewPosition);
+        if (distanceM >= 32000.0) discard;
+        if (distanceM > 26000.0) {
+          float fade = smoothstep(26000.0, 32000.0, distanceM);
+          float threshold = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+          if (fade > threshold) discard;
+        }
+      }
+    `);
     shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
       #include <map_fragment>
       #ifdef USE_MAP
@@ -134,7 +152,12 @@ function terrainMaterial(detail) {
         }
       #endif
     `);
-    shader.fragmentShader = 'uniform sampler2D terrainDetailMap;\nuniform float terrainDetailBlend;\n' + shader.fragmentShader;
+    shader.fragmentShader = `
+      uniform sampler2D terrainDetailMap;
+      uniform float terrainDetailBlend;
+      uniform bool terrainDistanceFade;
+      varying vec3 vTerrainViewPosition;
+    ` + shader.fragmentShader;
   };
   return material;
 }
@@ -407,6 +430,7 @@ export class OpenWorldTerrain {
     this.pending = new Map();
     this.retry = new Map();
     this.wanted = [];
+    this.distanceFade = { value: false };
     this.detailWanted = new Map();
     this.pendingDetail = null;
     this.pendingImagery = null;
@@ -476,6 +500,7 @@ export class OpenWorldTerrain {
 
   update(position, velocity, camera, viewportHeight, reducedGeometry = false) {
     const center = this.coordinate(position.x, position.z);
+    this.distanceFade.value = reducedGeometry;
     const detailedKey = reducedGeometry ? keyOf(wrapX(center.x), center.y) : null;
     if (this.reducedGeometry !== reducedGeometry || this.detailedKey !== detailedKey) {
       this.reducedGeometry = reducedGeometry;
@@ -716,7 +741,7 @@ export class OpenWorldTerrain {
         x, y, raster, east, south, southeast, water, project: this.project, protectedAreas: this.protectedAreas,
       });
       const detail = { map: { value: null }, blend: { value: 0 } };
-      const material = terrainMaterial(detail);
+      const material = terrainMaterial(detail, this.distanceFade);
       if (local) applyFarSunShadow(material);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
