@@ -9,8 +9,13 @@ import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 import { INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN, CHUJA_EMERGENCY_STRIP } from '../geospatial/CorridorCoordinateSystem.js';
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
+import { EARTH_RADIUS_M } from './AerialPerspective.js';
 
 const zoom = 11;
+const farZoom = 8;
+const farSegments = 32;
+const nearClipM = 45000;
+const highAltitudeClipM = 100000;
 const tilesAcross = 2 ** zoom;
 const samples = 256;
 const segments = 128;
@@ -133,12 +138,11 @@ function terrainMaterial(detail, distanceFade) {
     );
     shader.fragmentShader = shader.fragmentShader.replace('#include <clipping_planes_fragment>', `
       #include <clipping_planes_fragment>
-      if (terrainDistanceFade) {
+      if (terrainDistanceFade > 0.0) {
         // Dither coverage so the ocean/sky shows through while terrain retains opaque depth writes.
         float distanceM = length(vTerrainViewPosition);
-        if (distanceM >= 32000.0) discard;
         if (distanceM > 26000.0) {
-          float fade = smoothstep(26000.0, 32000.0, distanceM);
+          float fade = terrainDistanceFade * smoothstep(26000.0, 32000.0, distanceM);
           float threshold = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
           if (fade > threshold) discard;
         }
@@ -155,7 +159,7 @@ function terrainMaterial(detail, distanceFade) {
     shader.fragmentShader = `
       uniform sampler2D terrainDetailMap;
       uniform float terrainDetailBlend;
-      uniform bool terrainDistanceFade;
+      uniform float terrainDistanceFade;
       varying vec3 vTerrainViewPosition;
     ` + shader.fragmentShader;
   };
@@ -168,6 +172,49 @@ function imageryTexture(image) {
   texture.anisotropy = 4;
   texture.needsUpdate = true;
   return texture;
+}
+
+function farTerrainMaterial(map, opacity) {
+  const material = new THREE.MeshLambertMaterial({
+    map, transparent: true, depthWrite: false,
+  });
+  material.onBeforeCompile = shader => {
+    shader.uniforms.farTerrainOpacity = opacity;
+    shader.vertexShader = `
+      varying float vFarTerrainHeight;
+      varying vec3 vFarTerrainViewPosition;
+    ` + shader.vertexShader
+      .replace('#include <project_vertex>', `
+        vFarTerrainHeight = transformed.y;
+        vec2 offset = (modelMatrix * vec4(transformed, 1.0)).xz - cameraPosition.xz;
+        transformed.y -= dot(offset, offset) / ${(2 * EARTH_RADIUS_M).toFixed(1)};
+        #include <project_vertex>
+        vFarTerrainViewPosition = mvPosition.xyz;
+      `);
+    shader.fragmentShader = `
+      uniform float farTerrainOpacity;
+      varying float vFarTerrainHeight;
+      varying vec3 vFarTerrainViewPosition;
+    ` + shader.fragmentShader
+      .replace('#include <clipping_planes_fragment>', `
+        #include <clipping_planes_fragment>
+        float distanceM = length(vFarTerrainViewPosition);
+        float coverage = farTerrainOpacity * smoothstep(0.0, 15.0, vFarTerrainHeight)
+          * smoothstep(22000.0, 26000.0, distanceM)
+          * (1.0 - smoothstep(72000.0, 90000.0, distanceM));
+        if (coverage <= 0.0) discard;
+      `)
+      .replace('#include <logdepthbuf_fragment>', `
+        #include <logdepthbuf_fragment>
+        // This backdrop shows through the near terrain's fade and behind opaque scenery.
+        gl_FragDepth = 1.0;
+      `)
+      .replace('#include <opaque_fragment>', `
+        diffuseColor.a *= coverage;
+        #include <opaque_fragment>
+      `);
+  };
+  return material;
 }
 
 function clipSide(polygon, axis, limit, direction) {
@@ -291,8 +338,12 @@ function stitchLocalEdge(piece, local) {
   return joined ? stitched : null;
 }
 
-export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, water, project, protectedAreas = [], blendHeight, localSurface }) {
-  const bounds = projectedBounds(x, y, project);
+export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, water, project,
+  protectedAreas = [], blendHeight, localSurface, level = zoom, subdivisions = segments }) {
+  const bounds = projectedBounds(x, y, project, level);
+  const segments = subdivisions;
+  const stride = segments + 1;
+  const sampleStep = samples / segments;
   const overlaps = protectedAreas.filter(([west, north, east, south]) =>
     west < bounds[2] && east > bounds[0] && north < bounds[3] && south > bounds[1]);
   const vertices = [];
@@ -316,7 +367,7 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
       const v = row / segments;
       const source = data[Number(u === 1) + 2 * Number(v === 1)];
       const height = source[(row * sampleStep) % samples * samples + (col * sampleStep) % samples];
-      const { latitude, longitude } = tileToWgs84(x + u, y + v, zoom);
+      const { latitude, longitude } = tileToWgs84(x + u, y + v, level);
       const [localX, localZ] = project(latitude, longitude);
       const wet = height <= 0 || (water?.[(Math.min(row * sampleStep, samples - 1) * samples + Math.min(col * sampleStep, samples - 1)) * 4 + 3] ?? 0) >= 128;
       appendVertex([localX, blendHeight?.(localX, localZ, height) ?? height, localZ, u, v, Number(wet)]);
@@ -430,7 +481,13 @@ export class OpenWorldTerrain {
     this.pending = new Map();
     this.retry = new Map();
     this.wanted = [];
-    this.distanceFade = { value: false };
+    this.distanceFade = { value: 0 };
+    this.farGroup = new THREE.Group();
+    this.farGroup.visible = false;
+    this.group.add(this.farGroup);
+    this.farTiles = new Map();
+    this.farRetry = new Map();
+    this.farOpacity = { value: 0 };
     this.detailWanted = new Map();
     this.pendingDetail = null;
     this.pendingImagery = null;
@@ -500,7 +557,6 @@ export class OpenWorldTerrain {
 
   update(position, velocity, camera, viewportHeight, reducedGeometry = false) {
     const center = this.coordinate(position.x, position.z);
-    this.distanceFade.value = reducedGeometry;
     const detailedKey = reducedGeometry ? keyOf(wrapX(center.x), center.y) : null;
     if (this.reducedGeometry !== reducedGeometry || this.detailedKey !== detailedKey) {
       this.reducedGeometry = reducedGeometry;
@@ -530,11 +586,80 @@ export class OpenWorldTerrain {
     }
     this.updateImageryDetail(camera, viewportHeight);
     this.updateTileResources();
-    if (this.pending.size >= 3) return;
     const now = performance.now();
-    const next = this.wanted.find(({ key }) =>
-      !this.tiles.has(key) && !this.pending.has(key) && now >= (this.retry.get(key) ?? 0));
-    if (next) void this.load(next);
+    if (this.pending.size < 3) {
+      const next = this.wanted.find(({ key }) =>
+        !this.tiles.has(key) && !this.pending.has(key) && now >= (this.retry.get(key) ?? 0));
+      if (next) void this.load(next);
+    }
+    this.updateFarTerrain(position, camera, now);
+    this.distanceFade.value = reducedGeometry ? 1 : this.farTiles.size ? this.farOpacity.value : 0;
+  }
+
+  updateFarTerrain(position, camera, now) {
+    const visibility = THREE.MathUtils.smoothstep(camera?.position.y ?? position.y, 7500, 11000);
+    this.farOpacity.value = visibility;
+    this.farGroup.visible = visibility > 0;
+    if (!visibility) return;
+    const { latitude, longitude } = localToWgs84(position.x, position.z, this.origin);
+    const { x, y } = wgs84ToTile(latitude, longitude, farZoom);
+    const center = keyOf(x, y);
+    if (center !== this.farCenter) {
+      this.farCenter = center;
+      const limit = 2 ** farZoom;
+      this.farWanted = new Map();
+      // Center first, then the remaining eight tiles around it.
+      for (const [dx, dy] of [[0, 0], [0, -1], [0, 1], [-1, 0], [1, 0],
+        [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const tx = (x + dx + limit) % limit, ty = y + dy;
+        if (ty < 0 || ty >= limit - 1) continue;
+        this.farWanted.set(keyOf(tx, ty), { x: tx, y: ty });
+      }
+      for (const key of this.farTiles.keys()) {
+        if (!this.farWanted.has(key)) this.releaseFarTile(key);
+      }
+      for (const key of this.farRetry.keys()) {
+        if (!this.farWanted.has(key)) this.farRetry.delete(key);
+      }
+    }
+    if (this.farPending) return;
+    for (const [key, { x, y }] of this.farWanted) {
+      if (this.farTiles.has(key) || now < (this.farRetry.get(key) ?? 0)) continue;
+      this.farPending = this.loadFarTile(key, x, y).finally(() => { this.farPending = null; });
+      break;
+    }
+  }
+
+  async loadFarTile(key, x, y) {
+    try {
+      const nextX = (x + 1) % (2 ** farZoom);
+      const [raster, east, south, southeast, image] = await Promise.all([
+        this.raster(x, y, farZoom), this.raster(nextX, y, farZoom),
+        this.raster(x, y + 1, farZoom), this.raster(nextX, y + 1, farZoom),
+        this.imageryCache.getTileImage(farZoom, x, y),
+      ]);
+      if (!this.farWanted.has(key)) return;
+      if (!image) throw new Error('Far terrain imagery unavailable');
+      const { geometry } = buildOpenTerrainTile({
+        x, y, raster, east, south, southeast, project: this.project, level: farZoom, subdivisions: farSegments,
+      });
+      const mesh = new THREE.Mesh(geometry, farTerrainMaterial(imageryTexture(image), this.farOpacity));
+      mesh.renderOrder = -1;
+      this.farTiles.set(key, mesh);
+      this.farGroup.add(mesh);
+      this.farRetry.delete(key);
+    } catch {
+      if (this.farWanted.has(key)) this.farRetry.set(key, performance.now() + 8000);
+    }
+  }
+
+  releaseFarTile(key) {
+    const mesh = this.farTiles.get(key);
+    this.farTiles.delete(key);
+    mesh.removeFromParent();
+    mesh.geometry.dispose();
+    mesh.material.map.dispose();
+    mesh.material.dispose();
   }
 
   updateTileResources() {
@@ -695,15 +820,15 @@ export class OpenWorldTerrain {
     entry.detailUpdatedAt = performance.now();
   }
 
-  raster(x, y) {
-    const key = keyOf(x, y);
+  raster(x, y, level = zoom) {
+    const key = `${level}/${x}/${y}`;
     const prior = this.rasters.get(key);
     if (prior) {
       this.rasters.delete(key);
       this.rasters.set(key, prior);
       return prior;
     }
-    const request = this.elevationCache.getTileImage(zoom, x, y).then(image => {
+    const request = this.elevationCache.getTileImage(level, x, y).then(image => {
       if (!image || image.width !== samples || image.height !== samples) throw new Error('Elevation tile unavailable');
       const context = tileContext();
       context.drawImage(image, 0, 0);
@@ -793,6 +918,8 @@ export class OpenWorldTerrain {
   dispose() {
     for (const controller of this.pending.values()) controller.abort();
     for (const [key, entry] of this.tiles) this.release(key, entry);
+    this.farWanted?.clear();
+    for (const key of this.farTiles.keys()) this.releaseFarTile(key);
     this.elevationCache.dispose();
     this.imageryCache.dispose();
     this.rasters.clear();
@@ -835,5 +962,14 @@ export function updateOpenWorldTerrain(sim) {
     surface.openWorld.update(sim.position, sim.linearVelocity, sim.camera, height,
       sim.renderQuality === 'ultraLow');
   }
-  setMapAttributionSource('open-world-attribution', Boolean(surface?.openWorld?.tiles.size));
+  const world = surface?.openWorld;
+  const farVisible = Boolean(frame && world?.farOpacity.value && world.farTiles.size);
+  if (sim.camera?.isPerspectiveCamera) {
+    const far = farVisible ? highAltitudeClipM : nearClipM;
+    if (sim.camera.far !== far) {
+      sim.camera.far = far;
+      sim.camera.updateProjectionMatrix();
+    }
+  }
+  setMapAttributionSource('open-world-attribution', Boolean(world?.tiles.size || farVisible));
 }
