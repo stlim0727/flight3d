@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import { projectToLocal } from '../geospatial/incheon.js';
+import { haversineDistanceM, initialBearingDeg } from '../geospatial/CorridorCoordinateSystem.js';
+import { REAL_AIRPORTS, RUNWAY_THRESHOLDS, worldPositionToWgs84, realOffsetInIncheonFrame } from '../geospatial/airportGeodesy.js';
 
 /**
  * One always-present world for every persistent region: coastal, Incheon,
@@ -176,14 +178,27 @@ export class UnifiedWorld {
     return hit ? REGION_CODES[hit.id] ?? null : null;
   }
 
-  /** Bearing and distance from a world position to another region's airport. */
+  /** Bearing and distance from a world position to another airport's approach threshold. */
   destinationInfo(x, z, id) {
     const target = BASE_OFFSETS[id];
     if (!target) return null;
     const anchor = BASE_OFFSETS[this.anchor];
     const dx = target[0] - anchor[0] - x;
     const dz = target[1] - anchor[1] - z;
-    const distanceM = Math.hypot(dx, dz);
+    const planarDistanceM = Math.hypot(dx, dz);
+    const threshold = RUNWAY_THRESHOLDS[id];
+    const from = worldPositionToWgs84(this.anchor, x, z);
+    const realOffset = realOffsetInIncheonFrame(id);
+    const placementIsReal = realOffset
+      && Math.hypot(target[0] - realOffset[0], target[1] - realOffset[1]) < 5;
+    const synthetic = this.anchor !== 'incheon' || !REAL_AIRPORTS.includes(id)
+      || !placementIsReal || !from || !threshold;
+    const distanceM = synthetic
+      ? planarDistanceM
+      : haversineDistanceM(from.latitude, from.longitude, threshold.latitude, threshold.longitude);
+    const bearingDeg = synthetic
+      ? (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360
+      : initialBearingDeg(from.latitude, from.longitude, threshold.latitude, threshold.longitude);
     return {
       id,
       code: REGION_CODES[id],
@@ -191,7 +206,9 @@ export class UnifiedWorld {
       dx, dz,
       distanceM,
       distanceNm: distanceM / 1852,
-      bearingDeg: (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360,
+      bearingDeg,
+      synthetic,
+      target: synthetic ? 'centre' : 'threshold',
     };
   }
   /** Ground query: region surface when inside one, streamed DEM or anchor surface outside. */

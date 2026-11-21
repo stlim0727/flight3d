@@ -332,13 +332,18 @@ test('region name key follows position, not the spawn anchor', () => {
   assert.equal(world.regionNameKey(1e6, 1e6), null);
 });
 
-test('destination info reports bearing and distance in the current frame', () => {
+test('destination info uses great-circle bearings to real runway thresholds', () => {
   const world = new UnifiedWorld('incheon');
   const info = world.destinationInfo(0, 0, 'jeju');
   assert.equal(info.id, 'jeju');
   assert.equal(info.code, 'CJU');
   assert.ok(info.bearingDeg > 170 && info.bearingDeg < 190);
   assert.ok(info.distanceNm > 200);
+  assert.equal(info.synthetic, false);
+  assert.equal(info.target, 'threshold');
+  const synthetic = world.destinationInfo(0, 0, 'neon');
+  assert.equal(synthetic.synthetic, true);
+  assert.equal(synthetic.target, 'centre');
   assert.equal(world.destinationInfo(0, 0, 'unknown'), null);
   const fromJeju = world.destinationInfo(BASE_OFFSETS.jeju[0], BASE_OFFSETS.jeju[1], 'incheon');
   assert.ok(fromJeju.bearingDeg < 10 || fromJeju.bearingDeg > 350);

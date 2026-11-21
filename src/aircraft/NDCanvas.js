@@ -411,8 +411,10 @@ export class NDCanvas {
       ctx.fillStyle = '#fbbf24';
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'left';
-      const bearing = Math.round(destination.bearingDeg).toString().padStart(3, '0');
-      ctx.fillText(`DEST ${destination.code} ${bearing}° ${Math.round(destination.distanceNm)}NM`, 24, 64);
+      const degrees = Math.round(destination.bearingDeg).toString().padStart(3, '0');
+      const bearing = destination.synthetic ? `~${degrees}°` : `${degrees}°T`;
+      const range = `${destination.synthetic ? '~' : ''}${Math.round(destination.distanceNm)}NM`;
+      ctx.fillText(`DEST ${destination.code} ${bearing} ${range}`, 24, 64);
 
       if (destination.id !== this.airportId) {
         const p = projectToScreen(this.planePos.x + destination.dx, this.planePos.y + destination.dz);
