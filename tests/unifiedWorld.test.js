@@ -126,3 +126,39 @@ test('airport facade updates every region in its own local frame', () => {
   assert.equal(jeju.quality, 'high');
   assert.equal(facade.controlTowerData.x, 1);
 });
+
+test('surface contract forwards mesh, region and streaming layers to the anchor', () => {
+  const world = new UnifiedWorld('incheon');
+  const mesh = { add() {} };
+  const region = { features: { features: [1] } };
+  const terrain = { mesh, region, size: 12000, getHeight: () => 0 };
+  world.register('incheon', { terrain, airport: {}, extent: REGION_EXTENTS.incheon });
+  assert.equal(world.mesh, mesh);
+  assert.equal(world.region, region);
+  assert.equal(world.size, 12000);
+  const stream = { dispose() {} };
+  world.openWorld = stream;
+  assert.equal(terrain.openWorld, stream);
+  world.setAnchor('jeju');
+  assert.equal(world.region, undefined);
+});
+
+test('Incheon region covers Sihwa power plant and beach', () => {
+  const world = new UnifiedWorld('incheon');
+  world.register('incheon', {
+    terrain: { getHeight: () => 12 }, airport: {}, extent: REGION_EXTENTS.incheon,
+  });
+  assert.equal(world.regionAt(13964, 14916)?.id, 'incheon');
+  assert.equal(world.regionAt(10580, 17773)?.id, 'incheon');
+});
+
+test('facade exposes gaze targets and parked aircraft', () => {
+  const world = new UnifiedWorld('incheon');
+  const region = airport => ({ terrain: { getHeight: () => 0 }, airport, extent: REGION_EXTENTS.incheon });
+  world.register('incheon', region({ getGazeTargets: () => [{ object: {}, kind: 'tower' }] }));
+  world.register('jeju', region({ getGazeTargets: () => [{ object: {}, kind: 'terminal' }] }));
+  const parked = { group: {} };
+  const facade = createWorldAirportFacade(world, { parked });
+  assert.equal(facade.getGazeTargets().length, 2);
+  assert.equal(facade.parked, parked);
+});

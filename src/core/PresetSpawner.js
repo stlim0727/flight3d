@@ -620,6 +620,10 @@ class PresetSpawnerMethods {
   syncUnifiedWorld(id) {
     const world = this.world;
     if (!world || !WORLD_REGIONS.includes(id)) return false;
+    const previousAnchor = world.anchor;
+    const previousTerrain = world.anchorTerrain;
+    const previousOpenWorld = previousTerrain?.openWorld;
+    const previousBuildings = previousTerrain?.geographicBuildingLayer;
     world.setAnchor(id);
     if (this.incheonAirport) world.register('incheon', {
       terrain: this.incheonAirport.terrain,
@@ -643,6 +647,12 @@ class PresetSpawnerMethods {
       extent: REGION_EXTENTS.lukla,
     });
     world.syncMeshes();
+    if (previousAnchor !== id) {
+      previousOpenWorld?.dispose?.();
+      previousBuildings?.dispose?.();
+      this.openWorldSurface = null;
+      this.geographicBuildingLayer = null;
+    }
     // Oceans lie between the unified regions; hiding water at Lukla would
     // leave a hole in the world as soon as the aircraft flies offshore.
     if (this.water) this.water.mesh.visible = true;

@@ -37,7 +37,7 @@ export const WORLD_REGIONS = Object.freeze(Object.keys(BASE_OFFSETS));
 // Chuja emergency strip at roughly (-18300, -50008), which is rendered by
 // JejuAirport but lies far outside the island's main terrain box.
 export const REGION_EXTENTS = Object.freeze({
-  incheon: Object.freeze({ minX: -7000, maxX: 7000, minZ: -7000, maxZ: 7000 }),
+  incheon: Object.freeze({ minX: -7000, maxX: 22000, minZ: -7000, maxZ: 22000 }),
   jeju: Object.freeze({ minX: -30000, maxX: 45000, minZ: -54000, maxZ: 45000 }),
   lukla: Object.freeze({ minX: -22000, maxX: 22000, minZ: -22000, maxZ: 22000 }),
 });
@@ -57,6 +57,23 @@ export class UnifiedWorld {
     const region = this.regions.get(this.anchor);
     return region ? region.terrain.isLoaded !== false : true;
   }
+
+  get anchorTerrain() {
+    return this.regions.get(this.anchor)?.terrain;
+  }
+
+  // The open-world terrain and geographic building layers attach their groups
+  // to surface.mesh and keep state on the terrain object. Preserve that
+  // contract while physics queries go through this dispatcher.
+  get mesh() { return this.anchorTerrain?.mesh ?? null; }
+  get region() { return this.anchorTerrain?.region; }
+  get size() { return this.anchorTerrain?.size; }
+  get openWorld() { return this.anchorTerrain?.openWorld; }
+  set openWorld(value) { if (this.anchorTerrain) this.anchorTerrain.openWorld = value; }
+  get geographicBuildingLayer() { return this.anchorTerrain?.geographicBuildingLayer; }
+  set geographicBuildingLayer(value) { if (this.anchorTerrain) this.anchorTerrain.geographicBuildingLayer = value; }
+  get corridorStreamer() { return this.anchorTerrain?.corridorStreamer; }
+  set corridorStreamer(value) { if (this.anchorTerrain) this.anchorTerrain.corridorStreamer = value; }
 
   /** extent: {minX, maxX, minZ, maxZ} in the region's own local frame. */
   register(id, { terrain, airport, group = null, mesh = null, extent }) {

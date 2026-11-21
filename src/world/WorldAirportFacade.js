@@ -26,6 +26,13 @@ export function createWorldAirportFacade(world, spawnAirport) {
         region.airport.update(dt, localPosition, time, localOptions);
       }
     },
+    getGazeTargets() {
+      const targets = [];
+      for (const region of world.regions.values()) {
+        targets.push(...(region.airport?.getGazeTargets?.() ?? []));
+      }
+      return targets;
+    },
   };
   for (const key of ['controlTowerData', 'terminalData', 'hangarsData', 'retainingWallData']) {
     if (spawnAirport?.[key]) facade[key] = spawnAirport[key];
@@ -33,5 +40,6 @@ export function createWorldAirportFacade(world, spawnAirport) {
   if (spawnAirport?.checkBuildingCollision) {
     facade.checkBuildingCollision = probes => spawnAirport.checkBuildingCollision(probes);
   }
+  if (spawnAirport?.parked) facade.parked = spawnAirport.parked;
   return facade;
 }
