@@ -7,12 +7,29 @@ import { FlightWarningsCore } from '../src/systems/FlightWarningsCore.js';
 import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
 import { AutopilotController } from '../src/physics/Autopilot.js';
 import { approachDeviation } from '../src/config/approachData.js';
+import {
+  analyticTerrainProvider,
+  assertTerrainProviderContract,
+  createGroundHeightQuery,
+  createGroundSurfaceQueries,
+  resolveGroundHeight,
+  toNormalVector3,
+} from '../src/environment/TerrainProvider.js';
 
-test('compatibility imports share package classes and aircraft configuration instances', () => {
+test('compatibility imports share package classes, terrain helpers, and aircraft configuration instances', () => {
   assert.equal(FlightPhysicsCore, packageApi.FlightPhysicsCore);
   assert.equal(FlightControlLaws, packageApi.FlightControlLaws);
   assert.equal(FlightWarningsCore, packageApi.FlightWarningsCore);
-  assert.equal(AIRCRAFT_REGISTRY, packageApi.AIRCRAFT_REGISTRY);
+  assert.deepEqual(Object.keys(AIRCRAFT_REGISTRY), ['B738', 'F16', 'C172']);
+  for (const id of Object.keys(AIRCRAFT_REGISTRY)) {
+    assert.equal(AIRCRAFT_REGISTRY[id], packageApi.AIRCRAFT_REGISTRY[id]);
+  }
+  assert.equal(analyticTerrainProvider, packageApi.analyticTerrainProvider);
+  assert.equal(assertTerrainProviderContract, packageApi.assertTerrainProviderContract);
+  assert.equal(createGroundHeightQuery, packageApi.createGroundHeightQuery);
+  assert.equal(createGroundSurfaceQueries, packageApi.createGroundSurfaceQueries);
+  assert.equal(resolveGroundHeight, packageApi.resolveGroundHeight);
+  assert.equal(toNormalVector3, packageApi.toNormalVector3);
 });
 
 test('Flight3d supplies navigation while independent core accepts caller-owned approaches', () => {

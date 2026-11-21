@@ -57,7 +57,7 @@
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",
-    "@stlim0727/flightsim-core": "git+https://github.com/stlim0727/flightsim-core.git#7b9449ed57d998c3d6bbdaf49a714426728c43ba",
+    "@stlim0727/flightsim-core": "git+https://github.com/stlim0727/flightsim-core.git#52e123fa0c2eeb111abc1b34826638785d8dfb73",
     "pbf": "^5.2.0",
     "peerjs": "1.5.5",
     "pmtiles": "^4.5.0",
