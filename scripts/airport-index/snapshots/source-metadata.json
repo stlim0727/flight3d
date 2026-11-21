@@ -1,0 +1,25 @@
+{
+  "attribution": "OurAirports contributors",
+  "license": "Unlicense (public domain)",
+  "licenseUrl": "https://github.com/davidmegginson/ourairports-data/blob/main/LICENSE",
+  "sourceUrl": "https://ourairports.com/data/",
+  "retrievedAt": "2026-11-21T16:42:00Z",
+  "sources": {
+    "airports": {
+      "url": "https://davidmegginson.github.io/ourairports-data/airports.csv",
+      "retrievedAt": "2026-11-21T16:42:00Z",
+      "lastModified": "Sat, 21 Nov 2026 02:53:51 GMT",
+      "etag": "W/\"6b0107bf-c2be15\"",
+      "sha256": "eeb71bb033c440c9f542837f374ec460abdca649fb473f6c61dc9814ddf32ddf",
+      "bytes": 12762645
+    },
+    "runways": {
+      "url": "https://davidmegginson.github.io/ourairports-data/runways.csv",
+      "retrievedAt": "2026-11-21T16:42:00Z",
+      "lastModified": "Sat, 21 Nov 2026 02:53:51 GMT",
+      "etag": "W/\"6b0107bf-3caa54\"",
+      "sha256": "9cb3b0b1f6793636626f6c3e293db14412bdc1667eec852df253bd71eb718893",
+      "bytes": 3975764
+    }
+  }
+}

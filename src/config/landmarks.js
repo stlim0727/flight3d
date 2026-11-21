@@ -55,6 +55,7 @@ export function normalizeLandmarkPlaces(places = LANDMARK_PLACES) {
     };
     if (Number.isFinite(place.prominence)) record.prominence = Math.min(1, Math.max(0, place.prominence));
     if (typeof place.wikidata === 'string' && place.wikidata) record.wikidata = place.wikidata;
+    if (typeof place.icao === 'string' && /^[A-Z]{4}$/.test(place.icao)) record.icao = place.icao;
     if (typeof place.groundRelative === 'boolean') record.groundRelative = place.groundRelative;
     if (Number.isFinite(place.heightOffsetM)) record.heightOffsetM = place.heightOffsetM;
     if (Number.isFinite(place.elevationM)) record.elevationM = place.elevationM;

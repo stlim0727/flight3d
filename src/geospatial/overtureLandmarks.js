@@ -81,10 +81,24 @@ export function featureGeometryMeta(feature, tile, zoom) {
   };
 }
 
+function airportCode(properties, keys, length) {
+  for (const key of keys) {
+    const value = properties[key];
+    if (typeof value !== 'string') continue;
+    const code = value.trim().toUpperCase();
+    if (new RegExp(`^[A-Z]{${length}}$`).test(code)) return code;
+  }
+  return undefined;
+}
+
 function makeLandmark(properties, names, meta, extra) {
+  const icao = airportCode(properties, ['icao_code', 'icao'], 4);
+  const iata = airportCode(properties, ['iata_code', 'iata'], 3);
   return {
     id: properties.wikidata || properties.id || `${extra.prefix}:${names.en}`,
     wikidata: typeof properties.wikidata === 'string' && properties.wikidata ? properties.wikidata : undefined,
+    ...(icao ? { icao } : {}),
+    ...(iata ? { iata } : {}),
     names,
     latitude: meta.latitude,
     longitude: meta.longitude,
