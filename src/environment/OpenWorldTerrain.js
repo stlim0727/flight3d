@@ -4,6 +4,7 @@ import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import { TileCacheManager } from './TileCacheManager.js';
 import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospatial/TileCoordinateSystem.js';
+import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 import { INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN, CHUJA_EMERGENCY_STRIP } from '../geospatial/CorridorCoordinateSystem.js';
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
@@ -174,7 +175,53 @@ function subtractRectangle(polygon, [west, north, east, south]) {
   return outside;
 }
 
-export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, water, project, protectedAreas = [] }) {
+function projectLocalImagery(sources, coordinate) {
+  return sources.map(source => {
+    const { position, normal } = source.attributes;
+    const vertices = Array.from({ length: position.count }, (_, i) => {
+      const px = position.getX(i), pz = position.getZ(i);
+      const tile = coordinate(px, pz);
+      return [px, position.getY(i), pz, tile.x + tile.fx, tile.y + tile.fy,
+        normal.getX(i), normal.getY(i), normal.getZ(i)];
+    });
+    return { vertices, triangles: source.index.array };
+  });
+}
+
+// Keep the local DEM and terrace triangles, with the same Mercator UVs as
+// the surrounding tile. Both meshes share that tile's imagery and LOD.
+export function buildLocalImageryGeometry(sources, x, y) {
+  const positions = [], normals = [], uvs = [], indices = [];
+  const bounds = [[3, x, 1], [3, x + 1, -1], [4, y, 1], [4, y + 1, -1]];
+  for (const { vertices, triangles } of sources) {
+    for (let i = 0; i < triangles.length; i += 3) {
+      let polygon = [vertices[triangles[i]], vertices[triangles[i + 1]], vertices[triangles[i + 2]]];
+      for (const [axis, limit, side] of bounds) {
+        if (!polygon.length) break;
+        if (polygon.some(vertex => (vertex[axis] - limit) * side < 0)) {
+          polygon = clipSide(polygon, axis, limit, side);
+        }
+      }
+      if (polygon.length < 3) continue;
+      const first = positions.length / 3;
+      for (const [px, py, pz, u, v, nx, ny, nz] of polygon) {
+        positions.push(px, py, pz);
+        uvs.push(u - x, y + 1 - v);
+        normals.push(nx, ny, nz);
+      }
+      for (let j = 1; j < polygon.length - 1; j++) indices.push(first, first + j, first + j + 1);
+    }
+  }
+  if (!indices.length) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setIndex(indices);
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  return geometry;
+}
+
+export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, water, project, protectedAreas = [], blendHeight }) {
   const bounds = projectedBounds(x, y, project);
   const overlaps = protectedAreas.filter(([west, north, east, south]) =>
     west < bounds[2] && east > bounds[0] && north < bounds[3] && south > bounds[1]);
@@ -201,7 +248,7 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
       const { latitude, longitude } = tileToWgs84(x + u, y + v, zoom);
       const [localX, localZ] = project(latitude, longitude);
       const wet = height <= 0 || (water?.[(Math.min(row * sampleStep, samples - 1) * samples + Math.min(col * sampleStep, samples - 1)) * 4 + 3] ?? 0) >= 128;
-      appendVertex([localX, height, localZ, u, v, Number(wet)]);
+      appendVertex([localX, blendHeight?.(localX, localZ, height) ?? height, localZ, u, v, Number(wet)]);
     }
   }
   for (let row = 0; row < segments; row++) {
@@ -285,9 +332,10 @@ function heightOnTriangle(positions, x, z, a, b, c) {
 }
 
 export class OpenWorldTerrain {
-  constructor({ origin, protectedAreas = [], elevationCache, imageryCache, waterSource = waterArchive }) {
+  constructor({ origin, protectedAreas = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface }) {
     this.origin = origin;
     this.protectedAreas = protectedAreas;
+    this.localSurface = localSurface;
     this.elevationCache = elevationCache ?? new TileCacheManager({ urlTemplate: elevationUrl });
     this.imageryCache = imageryCache ?? new TileCacheManager({ enableBrowserCache: false });
     this.waterSource = waterSource;
@@ -303,6 +351,10 @@ export class OpenWorldTerrain {
     this.pendingImagery = null;
     this.pendingWater = null;
     this.project = (latitude, longitude) => wgs84ToLocal(latitude, longitude, origin);
+    if (localSurface) {
+      this.localImagery = projectLocalImagery([localSurface.geometry, localSurface.localTerraceGeometry],
+        (x, z) => this.coordinate(x, z));
+    }
   }
 
   coordinate(x, z) {
@@ -370,7 +422,7 @@ export class OpenWorldTerrain {
           const x = wrapX(center.x + dx), y = center.y + dz;
           if (y < 0 || y >= tilesAcross - 1) continue;
           const [west, north, east, south] = projectedBounds(x, y, this.project);
-          if (this.protectedAreas.some(area => contains(area, west, north) && contains(area, east, south))) continue;
+          if (!this.localSurface && this.protectedAreas.some(area => contains(area, west, north) && contains(area, east, south))) continue;
           candidates.push({ x, y, key: keyOf(x, y),
             order: dx ** 2 + dz ** 2 - (x === forward.x && y === forward.y ? 0.5 : 0) });
         }
@@ -396,7 +448,7 @@ export class OpenWorldTerrain {
       const tile = [...this.wanted].sort((a, b) => (this.tiles.get(b.key)?.imageryPriority ?? 0)
         - (this.tiles.get(a.key)?.imageryPriority ?? 0)).find(({ key }) => {
         const entry = this.tiles.get(key);
-        return entry?.mesh.geometry.index?.count && !entry.baseMap && now >= (entry.imageryRetryAt ?? 0);
+        return (entry?.mesh.geometry.index?.count || entry?.localMesh) && !entry.baseMap && now >= (entry.imageryRetryAt ?? 0);
       });
       if (tile) {
         this.pendingImagery = this.loadBaseImagery(tile, this.tiles.get(tile.key))
@@ -456,7 +508,8 @@ export class OpenWorldTerrain {
       const visible = [];
       const wanted = new Map();
       for (const [key, entry] of this.tiles) {
-        const pixels = entry.mesh.geometry.index?.count ? projectedTilePixels(entry.mesh, camera, viewportHeight) : 0;
+        const pixels = entry.localMesh || entry.mesh.geometry.index?.count
+          ? projectedTilePixels(entry.mesh, camera, viewportHeight) : 0;
         entry.imageryPriority = pixels;
         const previous = this.detailWanted.get(key);
         if (previous) {
@@ -517,6 +570,7 @@ export class OpenWorldTerrain {
     material.map = map;
     material.vertexColors = !map;
     material.needsUpdate = true;
+    if (entry.localMesh) entry.localMesh.visible = Boolean(map);
   }
 
   async loadImageryDetail(key, entry, level) {
@@ -578,7 +632,17 @@ export class OpenWorldTerrain {
         this.raster(x, y), this.raster(wrapX(x + 1), y), this.raster(x, y + 1), this.raster(wrapX(x + 1), y + 1), waterData,
       ]);
       if (controller.signal.aborted) return;
+      const local = this.localSurface;
+      const half = local?.size / 2;
+      const blendDistance = 1200;
+      const blendHeight = local ? (px, pz, height) => {
+        const distance = Math.max(Math.abs(px), Math.abs(pz)) - half;
+        if (distance >= blendDistance) return height;
+        return THREE.MathUtils.lerp(local.getNaturalHeight(px, pz), height,
+          THREE.MathUtils.smoothstep(distance, 0, blendDistance));
+      } : undefined;
       const { geometry } = buildOpenTerrainTile({
+        blendHeight,
         x, y, raster, east, south, southeast, water, project: this.project, protectedAreas: this.protectedAreas,
       });
       const detail = { map: { value: null }, blend: { value: 0 } };
@@ -586,6 +650,18 @@ export class OpenWorldTerrain {
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
       const entry = { mesh, fullGeometry: geometry, detail, water, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
+      if (local) {
+        const [west, north, eastEdge, southEdge] = projectedBounds(x, y, this.project);
+        if (west < half && eastEdge > -half && north < half && southEdge > -half) {
+          const localGeometry = buildLocalImageryGeometry(this.localImagery, x, y);
+          if (localGeometry) {
+            entry.localMesh = new THREE.Mesh(localGeometry, material);
+            entry.localMesh.receiveShadow = true;
+            entry.localMesh.visible = false;
+            mesh.add(entry.localMesh);
+          }
+        }
+      }
       this.updateRenderGeometry(entry, key);
       this.tiles.set(key, entry);
       this.group.add(mesh);
@@ -605,12 +681,13 @@ export class OpenWorldTerrain {
     entry.mesh.geometry = (useReduced && entry.reducedGeometry) || entry.fullGeometry;
   }
 
-  release(key, { mesh, fullGeometry, reducedGeometry, baseMap, detailMap, previousDetailMap, waterRequest }) {
+  release(key, { mesh, localMesh, fullGeometry, reducedGeometry, baseMap, detailMap, previousDetailMap, waterRequest }) {
     waterRequest?.abort();
     this.tiles.delete(key);
     mesh.removeFromParent();
     (fullGeometry ?? mesh.geometry).dispose();
     reducedGeometry?.dispose();
+    localMesh?.geometry.dispose();
     baseMap?.dispose();
     detailMap?.dispose();
     previousDetailMap?.dispose();
@@ -629,6 +706,7 @@ export class OpenWorldTerrain {
 
 const chuja = wgs84ToLocal(CHUJA_EMERGENCY_STRIP.center.latitude, CHUJA_EMERGENCY_STRIP.center.longitude, JEJU_ORIGIN);
 const frames = {
+  lukla: { origin: luklaGrid.origin },
   incheon: { origin: INCHEON_PATCH.origin, protectedAreas: [[-25000, -25000, 25000, 25000]] },
   jeju: { origin: JEJU_ORIGIN, protectedAreas: [
     [-36260, -12000, 43740, 44000],
@@ -648,9 +726,12 @@ export function updateOpenWorldTerrain(sim) {
     }
     sim.openWorldSurface = frame ? surface : null;
   }
-  if (frame && surface?.mesh) {
+  if (frame && surface?.mesh && (sim.activeAirport !== 'lukla' || surface.isLoaded)) {
     if (!surface.openWorld) {
-      surface.openWorld = new OpenWorldTerrain(frame);
+      const half = surface.size / 2;
+      surface.openWorld = new OpenWorldTerrain(sim.activeAirport === 'lukla'
+        ? { ...frame, protectedAreas: [[-half, -half, half, half]], localSurface: surface }
+        : frame);
       surface.mesh.add(surface.openWorld.group);
       if (surface.corridorStreamer) surface.corridorStreamer.group.visible = false;
     }

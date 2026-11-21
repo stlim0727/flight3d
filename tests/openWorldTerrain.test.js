@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BoxGeometry, Mesh, PerspectiveCamera, Raycaster, Vector3 } from 'three';
-import { buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
+import { buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 
 const origin = { latitude: 37.55, longitude: 126.98 };
@@ -281,4 +281,29 @@ test('repairs isolated coastal DEM extremes while preserving steep connected ter
     delete globalThis.document;
     world.dispose();
   }
+});
+
+test('local terrain triangles keep their surface and use continuous tile UVs', () => {
+  const source = {
+    vertices: [
+      [0, 10, 0, 4.5, 3.25, 0, 1, 0],
+      [0, 10, 2, 4.5, 3.75, 0, 1, 0],
+      [2, 20, 0, 5.5, 3.25, 0, 1, 0],
+    ],
+    triangles: [0, 1, 2],
+  };
+  const west = buildLocalImageryGeometry([source], 4, 3);
+  const east = buildLocalImageryGeometry([source], 5, 3);
+  const edge = (geometry, u) => {
+    const { position, uv } = geometry.attributes;
+    return Array.from({ length: uv.count }, (_, i) => i)
+      .filter(i => uv.getX(i) === u)
+      .map(i => [position.getX(i), position.getY(i), position.getZ(i), uv.getY(i)])
+      .sort((a, b) => a[2] - b[2]);
+  };
+  assert.deepEqual(edge(west, 1), [[1, 15, 0, 0.75], [1, 15, 1, 0.5]]);
+  assert.deepEqual(edge(west, 1), edge(east, 0));
+  assert.equal(buildLocalImageryGeometry([source], 6, 3), null);
+  west.dispose();
+  east.dispose();
 });

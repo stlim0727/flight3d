@@ -70,11 +70,11 @@ export class LuklaTerrain {
     // Initial elevation setup (both coarse mesh and local terrace mesh)
     this.updateGeometryElevations();
 
-    // Material with high-resolution satellite texture
-    this.textureLoader = new THREE.TextureLoader();
-    this.satelliteTexture = null;
-
     const defaultColorMat = luklaSurfaceMaterial();
+    // Let the streamed imagery render over the coincident fallback triangles.
+    defaultColorMat.polygonOffset = true;
+    defaultColorMat.polygonOffsetFactor = 1;
+    defaultColorMat.polygonOffsetUnits = 1;
 
     this.mesh = new THREE.Mesh(this.geometry, defaultColorMat);
     this.mesh.receiveShadow = true;
@@ -84,7 +84,7 @@ export class LuklaTerrain {
     this.mesh.add(this.localTerraceMesh);
     castFarSunShadow(this.mesh);
 
-    // Load real DEM and satellite imagery if in browser environment
+    // Load the local DEM if in browser environment
     if (!this.isLoaded) {
       this.loadRealWorldAssets();
     }
@@ -99,7 +99,7 @@ export class LuklaTerrain {
   }
 
   /**
-   * Load real DEM binary file (lukla_dem.bin) and satellite texture (lukla_satellite.jpg)
+   * Load the bundled DEM binary file.
    */
   async loadRealWorldAssets() {
     this.loadError = null;
@@ -117,23 +117,6 @@ export class LuklaTerrain {
         this.isLoaded = true;
         this.updateGeometryElevations();
         if (this.onLoaded) this.onLoaded();
-
-        // Load satellite texture
-        this.textureLoader.load(`${import.meta.env?.BASE_URL ?? '/'}terrain/lukla_satellite.jpg`, (tex) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.wrapS = THREE.ClampToEdgeWrapping;
-          tex.wrapT = THREE.ClampToEdgeWrapping;
-          tex.anisotropy = 8;
-          this.satelliteTexture = tex;
-
-          const previousMaterial = this.mesh.material;
-          this.mesh.material = luklaSurfaceMaterial(tex);
-          previousMaterial.dispose();
-          this.mesh.material.needsUpdate = true;
-          if (this.localTerraceMesh) {
-            this.localTerraceMesh.material = this.mesh.material;
-          }
-        });
       }
     } catch (e) {
       if (!this.isLoaded) this.loadError = e.message || String(e);
@@ -248,6 +231,8 @@ export class LuklaTerrain {
   }
 
   getHeight(x, z) {
+    const streamed = this.openWorld?.sample(x, z);
+    if (streamed) return streamed.height;
     const naturalH = this.getNaturalHeight(x, z);
 
     // 2. Runway 06/24 Carving & 11.7% Grade Blending
