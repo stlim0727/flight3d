@@ -113,6 +113,8 @@ const imageryFrustum = new THREE.Frustum();
 const detailTileLimit = 5;
 const detailHoldMs = 1000;
 const detailFadeMs = 350;
+const detailEdgeWidth = 0.08;
+const imageryNeighbors = [[-1, 0], [0, -1], [1, 0], [0, 1]];
 const tileSphere = new THREE.Sphere();
 const viewCenter = new THREE.Vector3();
 
@@ -129,6 +131,9 @@ function projectedTilePixels(mesh, camera, viewportHeight) {
 function terrainMaterial(detail, distanceFade) {
   const material = new THREE.MeshLambertMaterial({ vertexColors: true });
   material.onBeforeCompile = shader => {
+    shader.uniforms.terrainBaseMap = detail.base;
+    shader.uniforms.terrainDetailEdges = detail.edges;
+    shader.uniforms.terrainDetailCorners = detail.corners;
     shader.uniforms.terrainDetailMap = detail.map;
     shader.uniforms.terrainDetailBlend = detail.blend;
     shader.uniforms.terrainDistanceFade = distanceFade;
@@ -154,9 +159,24 @@ function terrainMaterial(detail, distanceFade) {
         if (terrainDetailBlend > 0.0) {
           diffuseColor = mix(diffuseColor, texture2D(terrainDetailMap, vMapUv), terrainDetailBlend);
         }
+        vec4 edgeDistances = vec4(vMapUv.x, 1.0 - vMapUv.y, 1.0 - vMapUv.x, vMapUv.y);
+        vec4 proximity = 1.0 - smoothstep(0.0, ${detailEdgeWidth}, edgeDistances);
+        float centerX = 1.0 - proximity.x - proximity.z;
+        float centerY = 1.0 - proximity.y - proximity.w;
+        vec4 edgeWeights = proximity * vec4(centerY, centerX, centerY, centerX);
+        vec4 cornerWeights = proximity * proximity.yzwx;
+        float edgeBlend = dot(terrainDetailEdges, edgeWeights) + dot(terrainDetailCorners, cornerWeights);
+        vec2 uvDx = dFdx(vMapUv);
+        vec2 uvDy = dFdy(vMapUv);
+        if (edgeBlend > 0.0) {
+          diffuseColor = mix(diffuseColor, textureGrad(terrainBaseMap, vMapUv, uvDx, uvDy), edgeBlend);
+        }
       #endif
     `);
     shader.fragmentShader = `
+      uniform sampler2D terrainBaseMap;
+      uniform vec4 terrainDetailEdges;
+      uniform vec4 terrainDetailCorners;
       uniform sampler2D terrainDetailMap;
       uniform float terrainDetailBlend;
       uniform float terrainDistanceFade;
@@ -704,6 +724,7 @@ export class OpenWorldTerrain {
       return;
     }
     entry.baseMap = imageryTexture(image);
+    entry.detail.base.value = entry.baseMap;
     this.applyImagery(entry, entry.baseMap);
   }
 
@@ -784,13 +805,61 @@ export class OpenWorldTerrain {
       }
     }
 
+    this.updateImageryEdges(now);
     if (this.pendingDetail) return;
     for (const [key, level] of this.detailWanted) {
       const entry = this.tiles.get(key);
       if (!entry?.baseMap || entry.detailLevel >= level || now < (entry.detailRetryAt ?? 0)) continue;
-      if (entry.detailMap && entry.detail.blend.value < 1) continue;
+      if (entry.detailMap && (entry.detail.blend.value < 1
+        || (entry.detail.edges && !entry.detail.edges.value.toArray().every(value => value === 1)))) continue;
       this.pendingDetail = this.loadImageryDetail(key, entry, level).finally(() => { this.pendingDetail = null; });
       break;
+    }
+  }
+
+  updateImageryEdges(now) {
+    const step = Math.max(0, now - (this.detailEdgesUpdatedAt ?? now)) / detailFadeMs;
+    this.detailEdgesUpdatedAt = now;
+    for (const [key, entry] of this.tiles) {
+      const edges = entry.detail?.edges?.value;
+      if (!edges) continue;
+      const [x, y] = key.split('/').map(Number);
+      const level = entry.detailLevel;
+      for (const [side, [dx, dy]] of imageryNeighbors.entries()) {
+        const neighborKey = keyOf(wrapX(x + dx), y + dy);
+        const neighbor = this.tiles.get(neighborKey);
+        const opposite = neighbor?.detail?.edges?.value;
+        // Process a shared edge once, then apply the same weight to both tiles.
+        if (opposite && key > neighborKey) continue;
+        const otherSide = (side + 2) % 4;
+        let weight = 1;
+        if (entry.detailMap && neighbor?.detailMap && level === neighbor.detailLevel) {
+          const current = Math.max(edges.getComponent(side), opposite?.getComponent(otherSide) ?? 1);
+          const ready = entry.detail.blend.value === 1 && neighbor.detail.blend.value === 1
+            && !entry.previousDetailMap && !neighbor.previousDetailMap;
+          const staying = this.detailWanted.get(key) === level && this.detailWanted.get(neighborKey) === level;
+          weight = THREE.MathUtils.clamp(current + (ready && staying ? -step : step), 0, 1);
+        }
+        edges.setComponent(side, weight);
+        opposite?.setComponent(otherSide, weight);
+      }
+    }
+    // All four tiles touching a corner must fade to the same degree there.
+    for (const [key, entry] of this.tiles) {
+      const corners = entry.detail?.corners?.value;
+      if (!corners) continue;
+      const edges = entry.detail.edges.value;
+      const [x, y] = key.split('/').map(Number);
+      const neighboringEdges = imageryNeighbors.map(([dx, dy]) =>
+        this.tiles.get(keyOf(wrapX(x + dx), y + dy))?.detail?.edges?.value);
+      for (let side = 0; side < 4; side++) {
+        const next = (side + 1) % 4;
+        corners.setComponent(side, Math.max(
+          edges.getComponent(side), edges.getComponent(next),
+          neighboringEdges[side]?.getComponent(next) ?? 1,
+          neighboringEdges[next]?.getComponent(side) ?? 1,
+        ));
+      }
     }
   }
 
@@ -874,7 +943,13 @@ export class OpenWorldTerrain {
         blendHeight, localSurface: local,
         x, y, raster, east, south, southeast, water, project: this.project, protectedAreas: this.protectedAreas,
       });
-      const detail = { map: { value: null }, blend: { value: 0 } };
+      const detail = {
+        map: { value: null },
+        blend: { value: 0 },
+        base: { value: null },
+        edges: { value: new THREE.Vector4(1, 1, 1, 1) },
+        corners: { value: new THREE.Vector4(1, 1, 1, 1) },
+      };
       const material = terrainMaterial(detail, this.distanceFade);
       if (local) applyFarSunShadow(material);
       const mesh = new THREE.Mesh(geometry, material);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, Vector3 } from 'three';
+import { BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, Vector3, Vector4 } from 'three';
 import { buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 
@@ -227,6 +227,67 @@ test('upgrades z12 to z13 directly, then restores the base for a later fade-out'
   }
 });
 
+test('shares imagery edge weights and eases between compatible detail tiles', () => {
+  const world = new OpenWorldTerrain({ origin });
+  const west = `${x}/${y}`;
+  const east = `${x + 1}/${y}`;
+  const north = `${x}/${y - 1}`;
+  const addTile = (key, level, blend = 1) => {
+    const entry = {
+      detailLevel: level,
+      detailMap: level > 11 ? {} : null,
+      detail: {
+        blend: { value: blend },
+        edges: { value: new Vector4(1, 1, 1, 1) },
+        corners: { value: new Vector4(1, 1, 1, 1) },
+      },
+    };
+    world.tiles.set(key, entry);
+    world.detailWanted.set(key, level);
+    return entry;
+  };
+  const left = addTile(west, 12);
+  const right = addTile(east, 11);
+  const above = addTile(north, 13);
+  const assertShared = expected => {
+    assert.equal(left.detail.edges.value.z, expected);
+    assert.equal(right.detail.edges.value.x, expected);
+  };
+  world.updateImageryEdges(0);
+  assertShared(1);
+  assert.equal(left.detail.edges.value.y, 1);
+  assert.equal(above.detail.edges.value.w, 1);
+  assert.equal(left.detail.edges.value.x, 1);
+
+  right.detailLevel = 12;
+  right.detailMap = {};
+  right.detail.blend.value = 0.5;
+  world.detailWanted.set(east, 12);
+  world.updateImageryEdges(175);
+  assertShared(1);
+  right.detail.blend.value = 1;
+  world.updateImageryEdges(350);
+  assertShared(0.5);
+  world.updateImageryEdges(525);
+  assertShared(0);
+  assert.equal(left.detail.edges.value.y, 1, 'the other side of the corner still needs a fade');
+  assert.equal(left.detail.corners.value.y, 1, 'north-east corner uses the strongest adjacent edge');
+  assert.equal(right.detail.corners.value.x, 1, 'the neighboring north-west corner uses the same weight');
+
+  world.detailWanted.set(east, 13);
+  world.updateImageryEdges(700);
+  assertShared(0.5);
+  world.updateImageryEdges(875);
+  assertShared(1);
+  right.detailLevel = 13;
+  right.previousDetailMap = {};
+  world.updateImageryEdges(1050);
+  assertShared(1);
+  world.tiles.delete(east);
+  world.updateImageryEdges(1225);
+  assert.equal(left.detail.edges.value.z, 1);
+});
+
 test('building tiles crossing the Incheon scenery edge wait for their DEM parent', () => {
   const world = new OpenWorldTerrain({
     origin: { latitude: 37.448, longitude: 126.455 },
@@ -250,7 +311,7 @@ test('refreshes failed imagery and water without rebuilding the terrain tile', a
   const mesh = new Mesh();
   mesh.geometry.setIndex([0, 1, 2]);
   const key = `${x}/${y}`;
-  const entry = { mesh, waterRetryAt: 0, baseMap: null };
+  const entry = { mesh, waterRetryAt: 0, baseMap: null, detail: { base: { value: null } } };
   const mask = new Uint8Array(256 * 256 * 4);
   world.fetchWater = async () => ++waterAttempts === 1 ? undefined : mask;
   world.tiles.set(key, entry);
