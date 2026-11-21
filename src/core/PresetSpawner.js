@@ -660,6 +660,21 @@ class PresetSpawnerMethods {
       mesh: this.neonCity.group,
       extent: REGION_EXTENTS.neon,
     });
+    if (this.persistentValley) {
+      const valley = this.persistentValley;
+      world.register('valley', {
+        terrain: valley,
+        airport: null,
+        group: valley.group,
+        mesh: valley.mesh,
+        extent: {
+          minX: valley.centerX - valley.widthX / 2,
+          maxX: valley.centerX + valley.widthX / 2,
+          minZ: valley.centerZ - valley.lengthZ / 2,
+          maxZ: valley.centerZ + valley.lengthZ / 2,
+        },
+      });
+    }
     world.syncMeshes();
     // Coastal foliage and ships are separate scene groups; keep them aligned
     // with the coastal terrain group when the world anchor moves.

@@ -288,3 +288,26 @@ test('ship collision uses the world transform of a translated group', () => {
   const probe = { pos: new THREE.Vector3(1000, 2, 2000), radius: 1, desc: 'belly' };
   assert.ok(detector.checkShips(probe.pos, [probe]));
 });
+
+test('persistent valley resolves at its world slot', () => {
+  const world = new UnifiedWorld('incheon');
+  const group = { position: { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } }, visible: false };
+  const terrain = {
+    getHeight: () => 2100,
+    centerX: 0, centerZ: -12000, widthX: 18000, lengthZ: 34000,
+  };
+  world.register('valley', {
+    terrain,
+    group,
+    mesh: null,
+    extent: {
+      minX: terrain.centerX - terrain.widthX / 2,
+      maxX: terrain.centerX + terrain.widthX / 2,
+      minZ: terrain.centerZ - terrain.lengthZ / 2,
+      maxZ: terrain.centerZ + terrain.lengthZ / 2,
+    },
+  });
+  const [vx, vz] = BASE_OFFSETS.valley;
+  assert.equal(world.getHeight(vx, vz - 12000), 2100);
+  assert.equal(group.visible, true);
+});

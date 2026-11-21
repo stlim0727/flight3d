@@ -1,4 +1,6 @@
 import { regionalCruise } from './config/regionalCruises.js';
+import { generateValley } from './arena/generatedValley.js';
+import { GeneratedValleyTerrain } from './environment/GeneratedValleyTerrain.js';
 import { UnifiedWorld } from './world/UnifiedWorld.js';
 import { LandmarkPins } from './ui/LandmarkPins.js';
 import { updateGeographicBuildings } from './environment/GeographicBuildings.js';
@@ -292,6 +294,10 @@ class FlightSimulator {
     this.neonCity = new NeonCity();
     this.neonCity.group.visible = false;
     this.scene.add(this.neonCity.group);
+
+    // A default generated valley stays mounted so it can be reached like any
+    // other region. Slalom missions still create their own seed-specific copy.
+    this.persistentValley = new GeneratedValleyTerrain(generateValley({ seed: 1 }).terrain, this);
 
     this.activeAirport = null; // initUI and setAirport below configure the active airport
     this.currentTerrain = this.terrain;
