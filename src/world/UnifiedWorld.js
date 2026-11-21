@@ -33,6 +33,15 @@ export const BASE_OFFSETS = Object.freeze({
 
 export const WORLD_REGIONS = Object.freeze(Object.keys(BASE_OFFSETS));
 
+// Extents in each region's own local frame. Jeju's north edge includes the
+// Chuja emergency strip at roughly (-18300, -50008), which is rendered by
+// JejuAirport but lies far outside the island's main terrain box.
+export const REGION_EXTENTS = Object.freeze({
+  incheon: Object.freeze({ minX: -7000, maxX: 7000, minZ: -7000, maxZ: 7000 }),
+  jeju: Object.freeze({ minX: -30000, maxX: 45000, minZ: -54000, maxZ: 45000 }),
+  lukla: Object.freeze({ minX: -22000, maxX: 22000, minZ: -22000, maxZ: 22000 }),
+});
+
 const _normal = new THREE.Vector3();
 
 export class UnifiedWorld {
@@ -40,8 +49,13 @@ export class UnifiedWorld {
     this.regions = new Map();
     this.anchor = BASE_OFFSETS[anchor] ? anchor : 'incheon';
     this.offsets = new Map();
-    this.isLoaded = true;
     this.recomputeOffsets();
+  }
+
+  /** Physics and demo flights must wait while the spawn region's DEM is loading. */
+  get isLoaded() {
+    const region = this.regions.get(this.anchor);
+    return region ? region.terrain.isLoaded !== false : true;
   }
 
   /** extent: {minX, maxX, minZ, maxZ} in the region's own local frame. */

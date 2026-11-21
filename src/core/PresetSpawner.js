@@ -20,7 +20,8 @@ import { jejuSpawn } from '../geospatial/JejuFlightSurface.js';
 import { LuklaTerrain } from '../environment/LuklaTerrain.js';
 import { LuklaAirport } from '../environment/LuklaAirport.js';
 import { APPROACH_DATA } from '../config/approachData.js';
-import { WORLD_REGIONS } from '../world/UnifiedWorld.js';
+import { WORLD_REGIONS, REGION_EXTENTS } from '../world/UnifiedWorld.js';
+import { createWorldAirportFacade } from '../world/WorldAirportFacade.js';
 import {
   defaultScenarioForRegion,
   isScenarioAvailable,
@@ -550,6 +551,9 @@ class PresetSpawnerMethods {
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.snapToTarget(this.aircraft.group);
     if (!isDemoInternal && this.gameFlow?.state === 'flight') this.beginFlightRecording?.();
+    // setPreset rebinds the pair to the spawn region; keep the composite world
+    // authoritative after any preset, scenario start or reset.
+    this.syncUnifiedWorld(this.activeAirport);
   }
 
   // One shared educational performance snapshot for CDU, PFD and loading UI.
@@ -622,21 +626,21 @@ class PresetSpawnerMethods {
       airport: this.incheonAirport,
       group: this.incheonAirport.group,
       mesh: this.incheonAirport.terrain.mesh,
-      extent: { minX: -7000, maxX: 7000, minZ: -7000, maxZ: 7000 },
+      extent: REGION_EXTENTS.incheon,
     });
     if (this.jejuAirport) world.register('jeju', {
       terrain: this.jejuAirport.terrain,
       airport: this.jejuAirport,
       group: this.jejuAirport.group,
       mesh: this.jejuAirport.terrain.mesh,
-      extent: { minX: -45000, maxX: 45000, minZ: -5000, maxZ: 45000 },
+      extent: REGION_EXTENTS.jeju,
     });
     if (this.luklaTerrain) world.register('lukla', {
       terrain: this.luklaTerrain,
       airport: this.luklaAirport,
       group: this.luklaAirport.group,
       mesh: this.luklaTerrain.mesh,
-      extent: { minX: -22000, maxX: 22000, minZ: -22000, maxZ: 22000 },
+      extent: REGION_EXTENTS.lukla,
     });
     world.syncMeshes();
     // Oceans lie between the unified regions; hiding water at Lukla would
@@ -645,17 +649,7 @@ class PresetSpawnerMethods {
 
     const spawnAirport = id === 'jeju' ? this.jejuAirport
       : id === 'lukla' ? this.luklaAirport : this.incheonAirport;
-    const facade = {
-      isOnRunway: (x, z) => world.isOnRunway(x, z),
-      isRunwaySafetyArea: (x, z) => world.isRunwaySafetyArea(x, z),
-      nightLighting: { update: sunY => world.nightLightingUpdate(sunY) },
-    };
-    for (const key of ['controlTowerData', 'terminalData', 'hangarsData', 'retainingWallData']) {
-      if (spawnAirport?.[key]) facade[key] = spawnAirport[key];
-    }
-    if (spawnAirport?.checkBuildingCollision) {
-      facade.checkBuildingCollision = probes => spawnAirport.checkBuildingCollision(probes);
-    }
+    const facade = createWorldAirportFacade(world, spawnAirport);
     this.currentTerrain = world;
     this.currentAirport = facade;
     return true;
@@ -819,7 +813,7 @@ class PresetSpawnerMethods {
       } else if (isIncheon || isJeju) {
         this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
       } else if (isLukla) {
-        this.collisionDetector.setEnvironment(this.luklaTerrain, this.luklaAirport, null, null, null);
+        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
       } else if (isValley) {
         this.collisionDetector.setEnvironment(null, null, null, null, null);
       } else {

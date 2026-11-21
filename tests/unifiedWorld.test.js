@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { UnifiedWorld, BASE_OFFSETS } from '../src/world/UnifiedWorld.js';
+import { UnifiedWorld, BASE_OFFSETS, REGION_EXTENTS } from '../src/world/UnifiedWorld.js';
+import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
 
 function fakeRegion(height, runwayLocal = null) {
   const group = { position: { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } }, visible: false };
@@ -73,4 +74,55 @@ test('all registered regions stay mounted after anchor changes', () => {
   assert.equal(lukla.group.position.x, 0);
   assert.equal(lukla.group.position.z, 0);
   assert.equal(world.regions.size, 3);
+});
+
+test('readiness follows the spawn region DEM state', () => {
+  const { world } = makeWorld();
+  world.regions.get('lukla').terrain.isLoaded = false;
+  assert.equal(world.isLoaded, true);
+  world.setAnchor('lukla');
+  assert.equal(world.isLoaded, false);
+  world.regions.get('lukla').terrain.isLoaded = true;
+  assert.equal(world.isLoaded, true);
+});
+
+test('Jeju region covers the Chuja emergency strip', () => {
+  const world = new UnifiedWorld('jeju');
+  world.register('jeju', {
+    terrain: { getHeight: () => 12 },
+    airport: { isOnRunway: () => true },
+    extent: REGION_EXTENTS.jeju,
+  });
+  assert.equal(world.regionAt(-18300, -50008)?.id, 'jeju');
+  assert.equal(world.getHeight(-18300, -50008), 12);
+  assert.equal(world.isOnRunway(-18300, -50008), true);
+});
+
+test('airport facade updates every region in its own local frame', () => {
+  const world = new UnifiedWorld('incheon');
+  const seen = [];
+  const region = id => ({
+    extent: { minX: -5000, maxX: 5000, minZ: -5000, maxZ: 5000 },
+    terrain: { getHeight: () => 0 },
+    airport: {
+      update: (dt, pos, time, options) => seen.push({
+        id, x: pos.x, z: pos.z, cameraX: options.cameraPosition.x, quality: options.quality,
+      }),
+    },
+  });
+  world.register('incheon', region('incheon'));
+  world.register('jeju', region('jeju'));
+  const facade = createWorldAirportFacade(world, { controlTowerData: { x: 1 } });
+  const pos = { x: BASE_OFFSETS.jeju[0] + 20, y: 100, z: BASE_OFFSETS.jeju[1] + 30 };
+  facade.update(0.016, pos, 42, { quality: 'high', cameraPosition: pos });
+
+  assert.equal(seen.length, 2);
+  const incheon = seen.find(s => s.id === 'incheon');
+  const jeju = seen.find(s => s.id === 'jeju');
+  assert.equal(incheon.x, pos.x);
+  assert.equal(jeju.x, 20);
+  assert.equal(jeju.z, 30);
+  assert.equal(jeju.cameraX, 20);
+  assert.equal(jeju.quality, 'high');
+  assert.equal(facade.controlTowerData.x, 1);
 });
