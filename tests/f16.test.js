@@ -267,8 +267,10 @@ test('loaded F16 configures canopy mesh and responds to cockpit mode transitions
   assert.equal(balancedGlass.depthWrite, false);
   aircraft.setCockpitMode(true, true, 'high');
   assert.equal(aircraft.canopyMesh.material, aircraft.canopyMaterial);
-  aircraft.setCockpitMode(true, true, 'balanced');
-  assert.equal(aircraft.canopyMesh.material, balancedGlass);
+  for (const tier of ['balanced', 'performance', 'ultraLow']) {
+    aircraft.setCockpitMode(true, true, tier);
+    assert.equal(aircraft.canopyMesh.material, balancedGlass);
+  }
 
   // Switch back to exterior mode restores normal visibility
   aircraft.cockpit.group.visible = false;

@@ -6,7 +6,7 @@ import { getControlInput } from './common/ControlSurfaceRig.js';
 import { clampGearExtension, calculateGearFold, isGearCollapsed, computeGearContactOffset } from './common/GearKinematicsRig.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { JetExhaust } from '../effects/JetExhaust.js';
-import { applyFlatShading } from '../config/renderQuality.js';
+import { applyFlatShading, RENDER_QUALITY } from '../config/renderQuality.js';
 import { CockpitHudCanvas, configureF16HudMesh } from './CockpitHudCanvas.js';
 import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
 import { createMissileMesh, createPylonMesh, preloadMissileModels } from '../weapons/missileGeometry.js';
@@ -345,10 +345,10 @@ export class F16 {
       this.canopyMaterial.opacity = isCockpit ? 0.06 : 0.22;
       this.canopyMaterial.envMapIntensity = isCockpit ? 0.45 : 1.2;
       this.canopyMaterial.userData.cockpitUniform.value = isCockpit ? 1 : 0;
-      const useBalancedCanopy = isCockpit && renderQuality === 'balanced';
-      if (useBalancedCanopy && !this.balancedCanopyMaterial) {
-        this.balancedCanopyMaterial = new THREE.MeshBasicMaterial({
-          name: 'F16-balanced-canopy-glass',
+      const useSimpleCanopy = isCockpit && Boolean(RENDER_QUALITY[renderQuality]?.simpleF16Canopy);
+      if (useSimpleCanopy && !this.simpleCanopyMaterial) {
+        this.simpleCanopyMaterial = new THREE.MeshBasicMaterial({
+          name: 'F16-simple-canopy-glass',
           color: this.canopyMaterial.color,
           transparent: true,
           opacity: 0.06,
@@ -357,9 +357,9 @@ export class F16 {
           forceSinglePass: true,
         });
       }
-      if (useBalancedCanopy !== Boolean(this.usingBalancedCanopy)) {
-        this.canopyMesh.material = useBalancedCanopy ? this.balancedCanopyMaterial : this.canopyMaterial;
-        this.usingBalancedCanopy = useBalancedCanopy;
+      if (useSimpleCanopy !== Boolean(this.usingSimpleCanopy)) {
+        this.canopyMesh.material = useSimpleCanopy ? this.simpleCanopyMaterial : this.canopyMaterial;
+        this.usingSimpleCanopy = useSimpleCanopy;
       }
     }
     if (this.cockpit && this.cockpit.group) {

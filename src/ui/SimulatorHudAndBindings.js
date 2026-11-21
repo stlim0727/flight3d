@@ -359,7 +359,7 @@ class SimulatorHudAndBindingsMethods {
     }
     this.farShadowGround ??= (x, z) => this.currentTerrain?.getHeight(x, z);
     this.currentAirport?.updateRenderLights?.(this.camera.position.y,
-      this.renderQuality === 'balanced' && this.currentAircraftId === 'F16');
+      this.currentAircraftId === 'F16' && Boolean(RENDER_QUALITY[this.renderQuality]?.limitF16AirportLights));
     this.sky.prepareRender(this.camera, this.aircraft.group.position, this.farShadowGround);
     this.renderer.render(this.scene, this.camera);
     const preset = RENDER_QUALITY[this.renderQuality];

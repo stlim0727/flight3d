@@ -35,8 +35,10 @@ the preset's budget. A smaller viewport restores the allowed detail. On a
 1440 × 900 desktop, `performance` now draws at 0.84 DPR (1214 × 759) while
 `balanced` stays at 1.
 
-The F-16 uses 85% of the usual Balanced drawing ratio and a simpler tinted
-canopy in cockpit view. At Coastal, Balanced F-16 views above 500 m over the
+The F-16 uses 85% of the usual Balanced drawing ratio. Performance and Ultra
+Low also cap its drawing ratio at 85% of device DPR. Balanced and lower tiers
+use a simpler tinted canopy in cockpit view. At Coastal, F-16 views using
+those tiers above 500 m over the
 field omit the local airport lights from lit shaders. They return below 400 m
 or when the player switches aircraft or quality. The runway emitters and
 instrument indications remain visible.
