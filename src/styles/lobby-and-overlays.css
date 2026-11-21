@@ -796,6 +796,12 @@ body[data-flow="lobby"] .menu-toggle {
 .menu-toggle:hover { background: rgba(30, 41, 59, 0.85); border-color: #38bdf8; }
 .menu-toggle:focus-visible { outline: 2px solid #67e8f9; }
 .menu-toggle .menu-toggle-glyph { font-size: 19px; line-height: 1; }
+.menu-toggle .menu-region-code {
+  margin-left: 2px;
+  color: #67e8f9;
+  font-size: 0.8em;
+  letter-spacing: 0.4px;
+}
 .menu-toggle-glyph:empty::before {
   content: '';
   display: block;

@@ -311,3 +311,23 @@ test('persistent valley resolves at its world slot', () => {
   assert.equal(world.getHeight(vx, vz - 12000), 2100);
   assert.equal(group.visible, true);
 });
+
+test('region name key follows position, not the spawn anchor', () => {
+  const world = new UnifiedWorld('incheon');
+  world.register('incheon', {
+    terrain: { getHeight: () => 7 },
+    airport: {},
+    extent: REGION_EXTENTS.incheon,
+  });
+  world.register('neon', {
+    terrain: { getHeight: () => -14 },
+    airport: {},
+    extent: REGION_EXTENTS.neon,
+  });
+  assert.equal(world.regionNameKey(0, 0), 'incheon.airport');
+  assert.equal(world.regionNameKey(BASE_OFFSETS.neon[0], BASE_OFFSETS.neon[1]), 'neon.metropolis');
+  assert.equal(world.regionCode(0, 0), 'ICN');
+  assert.equal(world.regionCode(BASE_OFFSETS.neon[0], BASE_OFFSETS.neon[1]), 'NEO');
+  assert.equal(world.regionCode(1e6, 1e6), null);
+  assert.equal(world.regionNameKey(1e6, 1e6), null);
+});

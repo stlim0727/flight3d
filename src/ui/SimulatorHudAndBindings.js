@@ -173,6 +173,7 @@ class SimulatorHudAndBindingsMethods {
     const elGForce = document.getElementById('hud-g');
     const elStall = document.getElementById('hud-stall');
     const elCam = document.getElementById('hud-cam');
+    const elRegion = document.getElementById('hud-region');
 
     if (elIas) elIas.textContent = `${Math.round(this.telemetry.iasKnots)} KT`;
     if (elAlt) elAlt.textContent = `${Math.round(this.telemetry.altitudeFt)} FT`;
@@ -208,6 +209,13 @@ class SimulatorHudAndBindingsMethods {
       warning.style.color = alert?.priority >= 85 ? '#ff5555' : '#ffbe55';
     }
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
+    if (elRegion) {
+      const x = this.position.x, z = this.position.z;
+      const code = this.world?.regionCode?.(x, z);
+      const key = this.world?.regionNameKey?.(x, z);
+      elRegion.textContent = code ?? '';
+      elRegion.title = key ? t(key) : '';
+    }
     const fuel = document.getElementById('hud-fuel');
     if (fuel) fuel.textContent = `${Math.round(Math.max(0, Math.min(100, 100 * (this.telemetry.fuelKg || 0) / this.engines.fuelCapacityKg)))}%`;
     this.updateAutopilotUI();
