@@ -61,8 +61,8 @@ export function applyMouseDelta(cs, dx, dy, isTouch = (cs.activeTouchId !== null
       cs.droneHeight = Math.max(-32.0, Math.min(32.0, cs.droneHeight + dy * 0.05));
       break;
     case cs.constructor.MODES.GEAR:
-      cs.gearLookYaw = Math.max(-0.8, Math.min(0.8, cs.gearLookYaw - dx * sensitivity));
-      cs.gearLookPitch = Math.max(-0.6, Math.min(0.6, cs.gearLookPitch - dy * sensitivity));
+      cs.gearLookYaw = Math.max(-cs.constructor.GEAR_LOOK_YAW_LIMIT, Math.min(cs.constructor.GEAR_LOOK_YAW_LIMIT, cs.gearLookYaw - dx * sensitivity));
+      cs.gearLookPitch = Math.max(-cs.constructor.GEAR_LOOK_PITCH_LIMIT, Math.min(cs.constructor.GEAR_LOOK_PITCH_LIMIT, cs.gearLookPitch - dy * sensitivity));
       break;
   }
   cs.updatePovButtonState();

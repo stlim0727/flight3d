@@ -142,6 +142,25 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     assert.ok(camSys.chasePitch >= CameraSystem.CHASE_PITCH_LOW_LIMIT - 1e-9, `chasePitch (${camSys.chasePitch}) should reach the low-orbit clamp`);
   });
 
+  it('lets the gear view pan to the lifted angle limits through drag and hat input', () => {
+    const camSys = new CameraSystem(new THREE.PerspectiveCamera(), mockDom);
+    camSys.setMode(CameraSystem.MODES.GEAR, true);
+
+    camSys.applyMouseDelta(-5000, -5000);
+    assert.ok(Math.abs(camSys.gearLookYaw - CameraSystem.GEAR_LOOK_YAW_LIMIT) < 1e-9,
+      `gearLookYaw (${camSys.gearLookYaw}) should reach the lifted yaw limit`);
+    assert.ok(Math.abs(camSys.gearLookPitch - CameraSystem.GEAR_LOOK_PITCH_LIMIT) < 1e-9,
+      `gearLookPitch (${camSys.gearLookPitch}) should reach the lifted pitch limit`);
+
+    camSys.gearLookYaw = 5;
+    camSys.gearLookPitch = 5;
+    camSys.applyHatLook(1, 1, 1 / 60);
+    assert.ok(Math.abs(camSys.gearLookYaw - CameraSystem.GEAR_LOOK_YAW_LIMIT) < 1e-9,
+      `hat look should respect the lifted yaw limit (${camSys.gearLookYaw})`);
+    assert.ok(Math.abs(camSys.gearLookPitch - CameraSystem.GEAR_LOOK_PITCH_LIMIT) < 1e-9,
+      `hat look should respect the lifted pitch limit (${camSys.gearLookPitch})`);
+  });
+
   it('should lift the chase gaze on a down drag so the exterior orbit grabs scenery like the head views', () => {
     const aircraft = new THREE.Object3D();
     aircraft.position.set(0, 60, 0);

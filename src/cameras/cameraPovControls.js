@@ -156,8 +156,8 @@ export function applyHatLook(cs, dirX, dirY, dt) {
     case cs.constructor.MODES.GEAR: {
       const targetYaw = -dirX * 0.65 * diagScale;
       const targetPitch = -dirY * 0.45 * diagScale;
-      cs.gearLookYaw = Math.max(-0.8, Math.min(0.8, stepToward(cs.gearLookYaw, targetYaw)));
-      cs.gearLookPitch = Math.max(-0.6, Math.min(0.6, stepToward(cs.gearLookPitch, targetPitch)));
+      cs.gearLookYaw = Math.max(-cs.constructor.GEAR_LOOK_YAW_LIMIT, Math.min(cs.constructor.GEAR_LOOK_YAW_LIMIT, stepToward(cs.gearLookYaw, targetYaw)));
+      cs.gearLookPitch = Math.max(-cs.constructor.GEAR_LOOK_PITCH_LIMIT, Math.min(cs.constructor.GEAR_LOOK_PITCH_LIMIT, stepToward(cs.gearLookPitch, targetPitch)));
       break;
     }
     default: {
