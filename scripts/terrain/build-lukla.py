@@ -110,7 +110,8 @@ def main():
     }
     (OUT / 'lukla_metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
     (ROOT / 'src/config/luklaTerrainGrid.json').write_text(
-        json.dumps({'gridSize': GRID, 'worldSize': SIZE}, indent=2) + '\n')
+        json.dumps({'gridSize': GRID, 'worldSize': SIZE,
+                    'origin': {'latitude': LAT, 'longitude': LON}}, indent=2) + '\n')
     print(f'Wrote {GRID}x{GRID} DEM ({spacing:.2f} m spacing) and georeferenced imagery')
 
 

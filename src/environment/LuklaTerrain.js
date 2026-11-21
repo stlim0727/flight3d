@@ -70,11 +70,11 @@ export class LuklaTerrain {
     // Initial elevation setup (both coarse mesh and local terrace mesh)
     this.updateGeometryElevations();
 
-    // Material with high-resolution satellite texture
-    this.textureLoader = new THREE.TextureLoader();
-    this.satelliteTexture = null;
-
     const defaultColorMat = luklaSurfaceMaterial();
+    // Let the streamed imagery render over the coincident fallback triangles.
+    defaultColorMat.polygonOffset = true;
+    defaultColorMat.polygonOffsetFactor = 1;
+    defaultColorMat.polygonOffsetUnits = 1;
 
     this.mesh = new THREE.Mesh(this.geometry, defaultColorMat);
     this.mesh.receiveShadow = true;
@@ -84,7 +84,7 @@ export class LuklaTerrain {
     this.mesh.add(this.localTerraceMesh);
     castFarSunShadow(this.mesh);
 
-    // Load real DEM and satellite imagery if in browser environment
+    // Load the local DEM if in browser environment
     if (!this.isLoaded) {
       this.loadRealWorldAssets();
     }
@@ -99,7 +99,7 @@ export class LuklaTerrain {
   }
 
   /**
-   * Load real DEM binary file (lukla_dem.bin) and satellite texture (lukla_satellite.jpg)
+   * Load the bundled DEM binary file.
    */
   async loadRealWorldAssets() {
     this.loadError = null;
@@ -117,23 +117,6 @@ export class LuklaTerrain {
         this.isLoaded = true;
         this.updateGeometryElevations();
         if (this.onLoaded) this.onLoaded();
-
-        // Load satellite texture
-        this.textureLoader.load(`${import.meta.env?.BASE_URL ?? '/'}terrain/lukla_satellite.jpg`, (tex) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.wrapS = THREE.ClampToEdgeWrapping;
-          tex.wrapT = THREE.ClampToEdgeWrapping;
-          tex.anisotropy = 8;
-          this.satelliteTexture = tex;
-
-          const previousMaterial = this.mesh.material;
-          this.mesh.material = luklaSurfaceMaterial(tex);
-          previousMaterial.dispose();
-          this.mesh.material.needsUpdate = true;
-          if (this.localTerraceMesh) {
-            this.localTerraceMesh.material = this.mesh.material;
-          }
-        });
       }
     } catch (e) {
       if (!this.isLoaded) this.loadError = e.message || String(e);
@@ -247,8 +230,34 @@ export class LuklaTerrain {
     return (h00 * (1 - fx) + h10 * fx) * (1 - fy) + (h01 * (1 - fx) + h11 * fx) * fy;
   }
 
+  // Collision approaches the rendered perimeter height before handing off to
+  // the streamed mesh. Keep the measured DSM in the interior.
+  getBoundaryBlendedHeight(x, z) {
+    const natural = this.getNaturalHeight(x, z);
+    const half = this.size / 2;
+    const step = this.size / this.segments;
+    const distance = half - Math.max(Math.abs(x), Math.abs(z));
+    if (distance >= step) return natural;
+    const gx = THREE.MathUtils.clamp((x + half) / step, 0, this.segments);
+    const gz = THREE.MathUtils.clamp((z + half) / step, 0, this.segments);
+    const col = Math.min(Math.floor(gx), this.segments - 1);
+    const row = Math.min(Math.floor(gz), this.segments - 1);
+    const u = gx - col, v = gz - row;
+    const width = this.segments + 1;
+    const nw = row * width + col;
+    const positions = this.geometry.attributes.position;
+    const ne = positions.getY(nw + 1);
+    const sw = positions.getY(nw + width);
+    const rendered = u + v <= 1
+      ? positions.getY(nw) * (1 - u - v) + ne * u + sw * v
+      : positions.getY(nw + width + 1) * (u + v - 1) + ne * (1 - v) + sw * (1 - u);
+    return THREE.MathUtils.lerp(rendered, natural, THREE.MathUtils.smoothstep(distance, 0, step));
+  }
+
   getHeight(x, z) {
-    const naturalH = this.getNaturalHeight(x, z);
+    const streamed = this.openWorld?.sample(x, z);
+    if (streamed) return streamed.height;
+    const naturalH = this.openWorld ? this.getBoundaryBlendedHeight(x, z) : this.getNaturalHeight(x, z);
 
     // 2. Runway 06/24 Carving & 11.7% Grade Blending
     // Heading 058°: Longitudinal axis (s) along runway, Lateral axis (w) across runway

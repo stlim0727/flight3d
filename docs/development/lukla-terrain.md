@@ -33,8 +33,10 @@ World X is east; world Z is south. DEM rows run north to south. The 44 km square
 contains 1025 × 1025 Float32 little-endian samples at 42.96875 m spacing; the source
 is one arc second (nominal 30 m). The main render mesh remains about 86 m, with a
 10 m local airport mesh. That local tessellation adds no new measured detail.
-Texture UVs map the same local-meter square; a Web Mercator tile mosaic is no
-longer stretched onto an unrelated square or offset a second time at runtime.
+The simulator streams Esri World Imagery both over the bundled DEM and beyond
+its edge. The local terrain and runway terrace retain their geometry and use
+the same tile coordinates and imagery detail selection as the surrounding world.
+Streamed elevations blend from the local edge to the regional elevation tiles.
 
 ## Deliberate approximations
 
