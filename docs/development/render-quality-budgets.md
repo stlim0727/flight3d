@@ -69,3 +69,8 @@ collapses to its plain far box, and instances more than 2,200 m from the camera
 are skipped entirely. The collision `buildingData` is unchanged, so an aircraft
 can never reach a culled building's envelope without the camera being inside
 that radius. Switching back to a higher preset restores every instance.
+
+Performance uses detailed procedural buildings within 1000 m and near tree
+geometry within 400 m, with the existing tree hysteresis. Streamed building
+tiles beneath the aircraft and camera or within 550 m horizontally keep their
+detail. Farther city tiles use the existing silhouettes and night lights.

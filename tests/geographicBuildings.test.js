@@ -274,7 +274,7 @@ test('keeps daytime silhouettes until nearby detail is ready, then fades them', 
   layer.dispose();
 });
 
-test('Ultra Low keeps neighboring buildings near tile borders and restores the full scene', () => {
+test('building detail distances step down with quality and restore the full scene', () => {
   const buildings = new GeographicBuildings({
     origin: { latitude: 37.5, longitude: 127 },
     terrain: { getHeight: () => 0 },
@@ -288,18 +288,22 @@ test('Ultra Low keeps neighboring buildings near tile borders and restores the f
     return { mesh: new THREE.Mesh(geometry, buildings.material) };
   };
   const tiles = buildings.tilesNear(aircraft);
-  const center = makeTile(0), border = makeTile(150), far = makeTile(500);
+  const center = makeTile(0), border = makeTile(150), middle = makeTile(500), far = makeTile(850);
   buildings.tiles.set(tiles[0].key, center);
   buildings.tiles.set(tiles[1].key, border);
-  buildings.tiles.set(tiles[2].key, far);
+  buildings.tiles.set(tiles[2].key, middle);
+  buildings.tiles.set(tiles[3].key, far);
   buildings.retryAt = new Map(tiles.map(tile => [tile.key, Infinity]));
   buildings.overviewRetryAt = Infinity;
-  buildings.update(aircraft, camera, 1, 1 / 60, true);
-  assert.deepEqual([center, border, far].map(tile => tile.mesh.visible), [true, true, false]);
+  buildings.update(aircraft, camera, 1, 1 / 60, 'ultraLow');
+  assert.deepEqual([center, border, middle, far].map(tile => tile.mesh.visible), [true, true, false, false]);
   assert.equal(buildings.silhouetteMaterial.opacity, 0);
-  assert.equal(buildings.tiles.size, 3);
-  buildings.update(aircraft, camera, 1, 1 / 60, false);
-  assert.ok([center, border, far].every(tile => tile.mesh.visible));
+  assert.equal(buildings.tiles.size, 4);
+  buildings.update(aircraft, camera, 1, 1 / 60, 'performance');
+  assert.deepEqual([center, border, middle, far].map(tile => tile.mesh.visible), [true, true, true, false]);
+  assert.equal(buildings.silhouetteMaterial.opacity, 1);
+  buildings.update(aircraft, camera, 1, 1 / 60, 'balanced');
+  assert.ok([center, border, middle, far].every(tile => tile.mesh.visible));
   assert.equal(buildings.silhouetteMaterial.opacity, 1);
   buildings.dispose();
 });
