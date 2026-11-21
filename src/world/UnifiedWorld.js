@@ -51,6 +51,20 @@ export const REGION_EXTENTS = Object.freeze({
   valley: Object.freeze({ minX: -30000, maxX: 30000, minZ: -30000, maxZ: 30000 }),
 });
 
+export const REGION_NAME_KEYS = Object.freeze({
+  coastal: 'coastal.airport',
+  incheon: 'incheon.airport',
+  jeju: 'jeju.airport',
+  lukla: 'lukla.vnlk',
+  neon: 'neon.metropolis',
+  valley: 'valley.region',
+});
+
+export const REGION_CODES = Object.freeze({
+  coastal: 'CST', incheon: 'ICN', jeju: 'CJU',
+  lukla: 'LUK', neon: 'NEO', valley: 'VAL',
+});
+
 const _normal = new THREE.Vector3();
 const _camera = new THREE.Vector3();
 
@@ -149,6 +163,18 @@ export class UnifiedWorld {
     return null;
   }
 
+  /** i18n key for the region under a world position, or null over open sea. */
+  regionNameKey(x, z) {
+    const hit = this.regionAt(x, z);
+    return hit ? REGION_NAME_KEYS[hit.id] ?? null : null;
+  }
+
+
+  /** Short code for the region under a world position, for compact HUD readouts. */
+  regionCode(x, z) {
+    const hit = this.regionAt(x, z);
+    return hit ? REGION_CODES[hit.id] ?? null : null;
+  }
   /** Ground query: region surface when inside one, streamed DEM or anchor surface outside. */
   getHeight(x, z) {
     const hit = this.regionAt(x, z);
