@@ -70,6 +70,7 @@ export class NDCanvas {
     if (state.activeWaypoint) {
       this.activeWaypoint = state.activeWaypoint;
     }
+    this.destination = state.destination ?? null;
   }
 
   render() {
@@ -403,6 +404,43 @@ export class NDCanvas {
       ctx.textAlign = 'left';
       ctx.fillText(fix.name, p.x + 8, p.y + 4);
     });
+
+    // Destination guidance stays visible regardless of the ND range setting.
+    const destination = this.destination;
+    if (destination) {
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'left';
+      const degrees = Math.round(destination.bearingDeg).toString().padStart(3, '0');
+      const bearing = destination.synthetic ? `~${degrees}°` : `${degrees}°T`;
+      const range = `${destination.synthetic ? '~' : ''}${Math.round(destination.distanceNm)}NM`;
+      ctx.fillText(`DEST ${destination.code} ${bearing} ${range}`, 24, 64);
+
+      if (destination.id !== this.airportId) {
+        const p = projectToScreen(this.planePos.x + destination.dx, this.planePos.y + destination.dz);
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 2;
+        if (p.x >= 12 && p.x <= w - 12 && p.y >= 12 && p.y <= h - 12) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = '#fbbf24';
+          ctx.fillText(`${destination.code} ${Math.round(destination.distanceNm)}NM`, p.x + 10, p.y + 4);
+        } else {
+          // Off-range: point to the destination on the compass arc.
+          const rel = THREE.MathUtils.degToRad(destination.bearingDeg - this.heading);
+          const ex = cx + Math.sin(rel) * (arcRadius - 18);
+          const ey = cy - Math.cos(rel) * (arcRadius - 18);
+          ctx.fillStyle = '#fbbf24';
+          ctx.beginPath();
+          ctx.moveTo(ex + Math.sin(rel) * 10, ey - Math.cos(rel) * 10);
+          ctx.lineTo(ex + Math.sin(rel + 2.5) * 7, ey - Math.cos(rel + 2.5) * 7);
+          ctx.lineTo(ex + Math.sin(rel - 2.5) * 7, ey - Math.cos(rel - 2.5) * 7);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
 
     // Top Right Active Waypoint Block
     ctx.fillStyle = '#f72585';

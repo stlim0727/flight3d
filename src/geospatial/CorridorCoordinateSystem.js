@@ -106,6 +106,18 @@ export function haversineDistanceM(lat1, lon1, lat2, lon2) {
 }
 
 /**
+ * Initial great-circle (true) bearing from point 1 to point 2, in degrees clockwise from north.
+ */
+export function initialBearingDeg(lat1, lon1, lat2, lon2) {
+  const toRad = Math.PI / 180;
+  const phi1 = lat1 * toRad, phi2 = lat2 * toRad;
+  const deltaLambda = (lon2 - lon1) * toRad;
+  const y = Math.sin(deltaLambda) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+  return (Math.atan2(y, x) / toRad + 360) % 360;
+}
+
+/**
  * Convert Incheon local metric tangent plane [x, z] to WGS84.
  */
 export function incheonLocalToWgs84(x, z) {

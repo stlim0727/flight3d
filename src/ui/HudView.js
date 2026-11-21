@@ -276,6 +276,15 @@ export class HudView {
     }
     ctx.restore(); ctx.fillText(`${String(heading).padStart(3, '0')}°`, cx, hy - 13);
     if (combat) this.drawCombat(width, height, scale, combat);
+    const destination = data.destination;
+    if (destination) {
+      const degrees = String(Math.round(destination.bearingDeg)).padStart(3, '0');
+      const bearing = destination.synthetic ? `~${degrees}°` : `${degrees}°T`;
+      const range = `${destination.synthetic ? '~' : ''}${Math.round(destination.distanceNm)}NM`;
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillText(`DEST ${destination.code} ${bearing} ${range}`, cx, hy - font * 2.2);
+      ctx.fillStyle = '#b8ff9b';
+    }
   }
 
   /** Project a world point into HUD pixels; behind-eye points clamp to the frame. */

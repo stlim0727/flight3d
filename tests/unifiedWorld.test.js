@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { UnifiedWorld, BASE_OFFSETS, REGION_EXTENTS, WORLD_REGIONS } from '../src/world/UnifiedWorld.js';
 import { CollisionDetector } from '../src/physics/CollisionDetector.js';
 import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
+import { AIRPORT_ORIGINS, RUNWAY_THRESHOLDS } from '../src/geospatial/airportGeodesy.js';
+import { wgs84ToLocal } from '../src/geospatial/TileCoordinateSystem.js';
 
 function fakeRegion(height, runwayLocal = null) {
   const group = { position: { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } }, visible: false };
@@ -330,4 +332,25 @@ test('region name key follows position, not the spawn anchor', () => {
   assert.equal(world.regionCode(BASE_OFFSETS.neon[0], BASE_OFFSETS.neon[1]), 'NEO');
   assert.equal(world.regionCode(1e6, 1e6), null);
   assert.equal(world.regionNameKey(1e6, 1e6), null);
+});
+
+test('destination info uses great-circle bearings to real runway thresholds', () => {
+  const world = new UnifiedWorld('incheon');
+  const info = world.destinationInfo(0, 0, 'jeju');
+  assert.equal(info.id, 'jeju');
+  assert.equal(info.code, 'CJU');
+  assert.ok(info.bearingDeg > 170 && info.bearingDeg < 190);
+  assert.ok(info.distanceNm > 200);
+  assert.equal(info.synthetic, false);
+  assert.equal(info.target, 'threshold');
+  const expected = wgs84ToLocal(
+    RUNWAY_THRESHOLDS.jeju.latitude, RUNWAY_THRESHOLDS.jeju.longitude, AIRPORT_ORIGINS.incheon,
+  );
+  assert.ok(Math.hypot(info.dx - expected[0], info.dz - expected[1]) < 1);
+  const synthetic = world.destinationInfo(0, 0, 'neon');
+  assert.equal(synthetic.synthetic, true);
+  assert.equal(synthetic.target, 'centre');
+  assert.equal(world.destinationInfo(0, 0, 'unknown'), null);
+  const fromJeju = world.destinationInfo(BASE_OFFSETS.jeju[0], BASE_OFFSETS.jeju[1], 'incheon');
+  assert.ok(fromJeju.bearingDeg < 10 || fromJeju.bearingDeg > 350);
 });

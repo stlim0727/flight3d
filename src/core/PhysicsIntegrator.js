@@ -209,6 +209,9 @@ class PhysicsIntegratorMethods {
     this.telemetry = result.telemetry;
     this.telemetry.apEngaged = this.autopilot.master;
     this.telemetry.airportKey = this.activeAirport;
+    this.telemetry.destination = this.destinationAirport && this.destinationAirport !== 'none'
+      ? this.world?.destinationInfo?.(this.position.x, this.position.z, this.destinationAirport) ?? null
+      : null;
     this.telemetry.apModes = this.autopilot.annunciation();
     this.telemetry.apArmed = this.autopilot.appArmed;
     this.telemetry.selectedHeading = this.autopilot.master ? Math.round(this.autopilot.targets.headingDeg) : previousTelemetry?.selectedHeading;

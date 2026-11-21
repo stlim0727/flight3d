@@ -6,8 +6,10 @@ export const AIRCRAFT_STORAGE_KEY = 'flight3d.aircraft';
 export const PLANE_STORAGE_KEY = 'flight3d.plane';
 export const SCENARIO_STORAGE_KEY = 'flight3d.scenario';
 export const PRESET_STORAGE_KEY = 'flight3d.preset';
+export const DESTINATION_STORAGE_KEY = 'flight3d.destination';
 
 export const VALID_AIRPORTS = Object.freeze(['coastal', 'lukla', 'incheon', 'neon', 'valley', 'jeju']);
+export const DESTINATION_CHOICES = Object.freeze(['none', ...VALID_AIRPORTS]);
 // Retired regions and the flight that replaced them: the Han River region became the
 // Neon Metropolis bridge flight (#551), so saved choices and old links keep working.
 const LEGACY_REGIONS = Object.freeze({ hangang: { airport: 'neon', scenario: 'bridge' } });
@@ -103,6 +105,28 @@ export function saveSavedScenario(scenario, storage) {
   try {
     s?.setItem(SCENARIO_STORAGE_KEY, scenario);
     s?.setItem(PRESET_STORAGE_KEY, scenario);
+  } catch {
+    /* Storage unavailable */
+  }
+}
+
+export function resolveDestination(value) {
+  return DESTINATION_CHOICES.includes(value) ? value : 'none';
+}
+
+export function loadSavedDestination(storage) {
+  const s = getSafeStorage(storage);
+  try {
+    return resolveDestination(s?.getItem(DESTINATION_STORAGE_KEY));
+  } catch {
+    return 'none';
+  }
+}
+
+export function saveSavedDestination(destination, storage) {
+  const s = getSafeStorage(storage);
+  try {
+    s?.setItem(DESTINATION_STORAGE_KEY, resolveDestination(destination));
   } catch {
     /* Storage unavailable */
   }
