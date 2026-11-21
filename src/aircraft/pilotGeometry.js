@@ -3,13 +3,14 @@
  * @description Procedural geometry, PBR materials, and model loading for military flight pilots.
  * Features an authentic ACES II ejection seat (30° reclined), CWU-27/P flight suit,
  * PCU-15/P restraint harness with Koch fittings, tactical AIRSAVE survival vest with radio/beacon pouches,
- * sculpted deltoid shoulder caps, articulated HOTAS arms with two-tone Nomex/leather gloves,
+ * continuous fitted sleeves and HOTAS hands with two-tone Nomex/leather gloves,
  * CSU-13B/P anti-G suit trousers with right-thigh pilot kneeboard,
  * and an articulated Pilot_Head (HGU-55/P helmet with ear cup bulges, dark mirror visor,
  * MBU-12/P oxygen mask, and corrugated hose connecting directly into the chest CRU-60/P regulator).
  */
 
 import * as THREE from 'three';
+import { addPilotArms, harnessGeometry } from './pilotFlightGear.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // F-16 ACES II seat recline angle (30 degrees from vertical)
@@ -249,7 +250,7 @@ export function buildAcesIISeat(mats) {
 
 /**
  * Builds the articulated and detailed Pilot Body:
- * Reclined torso, sculpted deltoid shoulder caps, PCU-15/P harness with Koch fittings,
+ * Reclined torso, continuous shoulder and sleeve contours, PCU-15/P harness with Koch fittings,
  * AIRSAVE survival vest with radio/beacon pockets and patches,
  * arms jointed directly to shoulders with two-tone Nomex/leather gloves gripping throttle and stick,
  * CSU-13B/P anti-G suit with right-thigh kneeboard, and combat boots.
@@ -288,24 +289,6 @@ export function buildPilotBody(mats) {
   shoulderMesh.position.set(0, 0.44, -0.05);
   torsoPivot.add(shoulderMesh);
 
-  // Deltoid muscle shoulder caps (어깨 근육 캡) - Left & Right
-  for (const side of [-1, 1]) {
-    const sName = side > 0 ? 'R' : 'L';
-    const deltoidGeo = new THREE.SphereGeometry(0.085, 14, 12);
-    deltoidGeo.scale(1.05, 1.35, 1.15);
-    const deltoid = new THREE.Mesh(deltoidGeo, mats.suit);
-    deltoid.name = `Pilot_Body_Deltoid_${sName}`;
-    deltoid.position.set(side * 0.21, 0.42, -0.05);
-    torsoPivot.add(deltoid);
-
-    // Shoulder strap epaulet over deltoid
-    const epauletGeo = new THREE.BoxGeometry(0.055, 0.015, 0.12);
-    const epaulet = new THREE.Mesh(epauletGeo, mats.harness);
-    epaulet.name = `Pilot_Body_Epaulet_${sName}`;
-    epaulet.position.set(side * 0.20, 0.49, -0.05);
-    torsoPivot.add(epaulet);
-  }
-
   // Tactical Flag Patch on Left Shoulder
   const flagPatchGeo = new THREE.BoxGeometry(0.01, 0.05, 0.08);
   const flagPatch = new THREE.Mesh(flagPatchGeo, mats.flagPatch);
@@ -338,7 +321,8 @@ export function buildPilotBody(mats) {
   const nameTagGeo = new THREE.BoxGeometry(0.065, 0.030, 0.012);
   const nameTag = new THREE.Mesh(nameTagGeo, mats.patch);
   nameTag.name = 'Pilot_Body_NameTag';
-  nameTag.position.set(-0.10, 0.39, -0.18);
+  nameTag.position.set(-0.145, 0.39, -0.149);
+  nameTag.rotation.y = 0.48;
   torsoPivot.add(nameTag);
 
   // Squadron Patch on Right Chest
@@ -346,28 +330,29 @@ export function buildPilotBody(mats) {
   squadronPatchGeo.rotateX(Math.PI / 2);
   const squadronPatch = new THREE.Mesh(squadronPatchGeo, mats.patch);
   squadronPatch.name = 'Pilot_Body_SquadronPatch';
-  squadronPatch.position.set(0.10, 0.39, -0.18);
+  squadronPatch.position.set(0.145, 0.39, -0.149);
+  squadronPatch.rotation.y = -0.48;
   torsoPivot.add(squadronPatch);
 
-  // PCU-15/P Restraint Harness Straps over chest (prominently layered at Z = -0.185)
+  // Fitted shoulder webbing converges under the central buckle.
   for (const side of [-1, 1]) {
     const sName = side > 0 ? 'R' : 'L';
-    const strapGeo = new THREE.BoxGeometry(0.048, 0.42, 0.02);
+    const strapGeo = harnessGeometry(side);
     const strap = new THREE.Mesh(strapGeo, mats.harness);
     strap.name = `Pilot_Body_HarnessStrap_${sName}`;
-    strap.position.set(side * 0.10, 0.28, -0.185);
-    strap.rotation.z = -side * 0.06;
     torsoPivot.add(strap);
 
     // Silver Koch canopy release fitting at collarbone level
     const kochGeo = new THREE.BoxGeometry(0.035, 0.045, 0.025);
     const koch = new THREE.Mesh(kochGeo, mats.hardware);
     koch.name = `Pilot_Body_KochFitting_${sName}`;
-    koch.position.set(side * 0.10, 0.43, -0.18);
+    koch.position.set(side * 0.10, 0.438, -0.171);
+    koch.rotation.x = 0.22;
+    koch.rotation.z = -side * 0.48;
     torsoPivot.add(koch);
   }
 
-  // CRU-60/P Oxygen Regulator & Intercom Bracket (mounted on left chest harness strap)
+  // CRU-60/P Oxygen Regulator & Intercom Bracket (mounted on the left chest of the vest)
   const cru60Geo = new THREE.BoxGeometry(0.045, 0.055, 0.035);
   const cru60 = new THREE.Mesh(cru60Geo, mats.hardware);
   cru60.name = 'Pilot_Body_CRU60_Regulator';
@@ -448,56 +433,7 @@ export function buildPilotBody(mats) {
   kneeboard.rotation.x = -0.12;
   bodyGroup.add(kneeboard);
 
-  // 3. Arms & HOTAS Controls: Kinematic chain connected directly to deltoid shoulder sockets!
-  // Left arm on throttle quadrant
-  const shoulderSocketL = new THREE.Group();
-  shoulderSocketL.name = 'Pilot_Body_ShoulderSocket_L';
-  shoulderSocketL.position.set(-0.21, 0.42, -0.06);
-  torsoPivot.add(shoulderSocketL);
-
-  const upperArmGroupL = new THREE.Group();
-  upperArmGroupL.rotation.set(0.52, 0.0, 0.0);
-  shoulderSocketL.add(upperArmGroupL);
-
-  const leftUpperArmGeo = new THREE.CylinderGeometry(0.065, 0.054, 0.26, 14);
-  const leftUpperArm = new THREE.Mesh(leftUpperArmGeo, mats.suit);
-  leftUpperArm.name = 'Pilot_Body_ArmUpper_L';
-  leftUpperArm.position.set(0, -0.13, 0);
-  upperArmGroupL.add(leftUpperArm);
-
-  const elbowGroupL = new THREE.Group();
-  elbowGroupL.position.set(0, -0.26, 0);
-  elbowGroupL.rotation.set(0.35, 0.0, 0.05);
-  upperArmGroupL.add(elbowGroupL);
-
-  const leftElbowGeo = new THREE.SphereGeometry(0.055, 12, 10);
-  const leftElbow = new THREE.Mesh(leftElbowGeo, mats.suit);
-  leftElbow.name = 'Pilot_Body_Elbow_L';
-  elbowGroupL.add(leftElbow);
-
-  const leftForearmGeo = new THREE.CylinderGeometry(0.054, 0.046, 0.24, 14);
-  const leftForearm = new THREE.Mesh(leftForearmGeo, mats.suit);
-  leftForearm.name = 'Pilot_Body_Forearm_L';
-  leftForearm.position.set(0, -0.12, 0);
-  elbowGroupL.add(leftForearm);
-
-  // Left flight glove gripping throttle
-  const leftGlove = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.045, 0.09), mats.glovesNomex);
-  leftGlove.name = 'Pilot_Body_Glove_L';
-  leftGlove.position.set(0, -0.24, 0);
-
-  const glovePalmL = new THREE.Mesh(new THREE.BoxGeometry(0.070, 0.035, 0.085), mats.glovesLeather);
-  glovePalmL.name = 'Pilot_Body_Glove_Palm_L';
-  glovePalmL.position.set(0, -0.02, 0);
-  leftGlove.add(glovePalmL);
-
-  const fingersL = new THREE.Mesh(new THREE.CylinderGeometry(0.030, 0.028, 0.07, 10), mats.glovesLeather);
-  fingersL.name = 'Pilot_Body_Glove_Fingers_L';
-  fingersL.rotateZ(Math.PI / 2);
-  fingersL.position.set(0, -0.025, 0.025);
-  leftGlove.add(fingersL);
-
-  elbowGroupL.add(leftGlove);
+  addPilotArms(bodyGroup, mats);
 
   // Throttle Quadrant grip & base (placed exactly to meet the glove)
   const throttleBase = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.14), mats.controls);
@@ -509,56 +445,6 @@ export function buildPilotBody(mats) {
   throttleGrip.name = 'Pilot_Body_ThrottleGrip';
   throttleGrip.position.set(-0.21, 0.22, -0.25);
   bodyGroup.add(throttleGrip);
-
-  // Right arm on F-16 Sidestick Controller
-  const shoulderSocketR = new THREE.Group();
-  shoulderSocketR.name = 'Pilot_Body_ShoulderSocket_R';
-  shoulderSocketR.position.set(0.21, 0.42, -0.06);
-  torsoPivot.add(shoulderSocketR);
-
-  const upperArmGroupR = new THREE.Group();
-  upperArmGroupR.rotation.set(0.52, 0.0, 0.0);
-  shoulderSocketR.add(upperArmGroupR);
-
-  const rightUpperArmGeo = new THREE.CylinderGeometry(0.065, 0.054, 0.26, 14);
-  const rightUpperArm = new THREE.Mesh(rightUpperArmGeo, mats.suit);
-  rightUpperArm.name = 'Pilot_Body_ArmUpper_R';
-  rightUpperArm.position.set(0, -0.13, 0);
-  upperArmGroupR.add(rightUpperArm);
-
-  const elbowGroupR = new THREE.Group();
-  elbowGroupR.position.set(0, -0.26, 0);
-  elbowGroupR.rotation.set(0.35, 0.0, -0.05);
-  upperArmGroupR.add(elbowGroupR);
-
-  const rightElbowGeo = new THREE.SphereGeometry(0.055, 12, 10);
-  const rightElbow = new THREE.Mesh(rightElbowGeo, mats.suit);
-  rightElbow.name = 'Pilot_Body_Elbow_R';
-  elbowGroupR.add(rightElbow);
-
-  const rightForearmGeo = new THREE.CylinderGeometry(0.054, 0.046, 0.24, 14);
-  const rightForearm = new THREE.Mesh(rightForearmGeo, mats.suit);
-  rightForearm.name = 'Pilot_Body_Forearm_R';
-  rightForearm.position.set(0, -0.12, 0);
-  elbowGroupR.add(rightForearm);
-
-  // Right flight glove gripping F-16 sidestick
-  const rightGlove = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.045, 0.085), mats.glovesNomex);
-  rightGlove.name = 'Pilot_Body_Glove_R';
-  rightGlove.position.set(0, -0.24, 0);
-
-  const glovePalmR = new THREE.Mesh(new THREE.BoxGeometry(0.070, 0.035, 0.080), mats.glovesLeather);
-  glovePalmR.name = 'Pilot_Body_Glove_Palm_R';
-  glovePalmR.position.set(0, -0.02, 0);
-  rightGlove.add(glovePalmR);
-
-  const fingersR = new THREE.Mesh(new THREE.CylinderGeometry(0.030, 0.028, 0.07, 10), mats.glovesLeather);
-  fingersR.name = 'Pilot_Body_Glove_Fingers_R';
-  fingersR.rotateZ(Math.PI / 2);
-  fingersR.position.set(0, -0.025, 0.025);
-  rightGlove.add(fingersR);
-
-  elbowGroupR.add(rightGlove);
 
   // F-16 Sidestick Controller (pedestal + grip meeting the right glove)
   const stickBaseGeo = new THREE.CylinderGeometry(0.025, 0.038, 0.10, 12);
