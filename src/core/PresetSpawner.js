@@ -871,6 +871,9 @@ class PresetSpawnerMethods {
       const obstacles = this.worldObstacles();
       this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, obstacles, this.ships, isCoastal ? this.water : null);
     }
+    // Coastal ships stay mounted in every world; their deferred GLB visuals
+    // must be requested even when another airport is the spawn anchor.
+    this.ships?.loadAssets?.();
 
     if (this.explosionSystem) {
       this.explosionSystem.terrain = this.currentTerrain;

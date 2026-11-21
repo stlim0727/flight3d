@@ -814,7 +814,9 @@ export class CollisionDetector {
         }
         continue;
       }
-      const vPos = v.mesh.getWorldPosition(_shipWorldPos);
+      const vPos = typeof v.mesh.getWorldPosition === 'function'
+        ? v.mesh.getWorldPosition(_shipWorldPos)
+        : v.mesh.position;
       const vRotY = v.mesh.rotation.y;
       const halfL = v.length * 0.5;
       const halfW = v.width * 0.5;
