@@ -138,6 +138,35 @@ test('keeps a park whose outer-ring average falls in a water hole', () => {
   geometry.dispose();
 });
 
+test('draws buffered coverage with a hole and keeps mask UVs aligned after draping', () => {
+  const outer = [[-40, 100], [300, 100], [300, 300], [-40, 300]];
+  const hole = [[100, 150], [100, 250], [200, 250], [200, 150]];
+  const park = tileData({ land_use: [{ properties: { class: 'park' }, rings: [outer, hole] }] });
+  const ringStarts = [];
+  const coverage = {
+    beginPath() {},
+    moveTo(x, y) { ringStarts.push([x, y]); },
+    lineTo() {},
+    closePath() {},
+    fill(rule) { assert.equal(rule, 'evenodd'); },
+  };
+  const { longitude } = tileToWgs84(tile.x, tile.y, 13);
+  const [tileX] = project(0, longitude);
+  const slope = { getHeight: x => 44 + ((x - tileX) / 50) ** 2 };
+  const geometry = buildGeographicGreenTile(park, tile, project, slope, undefined, coverage);
+  assert.ok(geometry);
+  assert.deepEqual(ringStarts, [[-1, 16.5], [16.5, 22.75]]);
+  const { position, uv } = geometry.attributes;
+  assert.equal(uv.count, position.count);
+  assert.ok(uv.count > 8, 'slope must generate subdivided vertices');
+  const [rightX] = project(0, tileToWgs84(tile.x + 1, tile.y, 13).longitude);
+  for (let i = 0; i < uv.count; i++) {
+    const expectedU = (4 + 512 * (position.getX(i) - tileX) / (rightX - tileX)) / 520;
+    assert.ok(Math.abs(uv.getX(i) - expectedU) < 1e-6);
+  }
+  geometry.dispose();
+});
+
 test('keeps most of a flat park when a narrow exclusion crosses a large face centroid', () => {
   const park = tileData({ land_use: [{ properties: { class: 'park' }, points: square }] });
   const baseline = buildGeographicGreenTile(park, tile, project, terrain);
