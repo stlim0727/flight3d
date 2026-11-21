@@ -168,7 +168,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     camSys.applyMouseDelta(0, -5000);
     assert.ok(Math.abs(camSys.lookPitch - CameraSystem.COCKPIT_PITCH_LIMIT) < 1e-9,
       `cockpit pitch should reach ${CameraSystem.COCKPIT_PITCH_LIMIT}`);
-    assert.ok(camSys.lookPitch > Math.PI * 0.45 + 0.1,
+    assert.ok(camSys.lookPitch > Math.PI * 0.45 + 0.02,
       'cockpit pitch should pass the old 81 degree ceiling');
 
     camSys.setMode(CameraSystem.MODES.CHASE, true);

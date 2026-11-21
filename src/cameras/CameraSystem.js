@@ -24,7 +24,7 @@ export { normalizeAngle };
 
 export class CameraSystem {
   static CHASE_PITCH_LOW_LIMIT = 1.2;
-  static COCKPIT_PITCH_LIMIT = Math.PI * 0.5;
+  static COCKPIT_PITCH_LIMIT = Math.PI * 0.48;
   static WING_LOOK_YAW_LIMIT = Math.PI * 0.65;
   static WING_LOOK_PITCH_LIMIT = Math.PI * 0.42;
   static GEAR_LOOK_YAW_LIMIT = 1.2;
