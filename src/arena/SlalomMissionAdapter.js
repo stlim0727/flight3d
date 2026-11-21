@@ -66,6 +66,7 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
               sim.foliage?.group && [sim.foliage.group, sim.foliage.group.visible],
               sim.ships?.group && [sim.ships.group, sim.ships.group.visible],
               sim.water?.mesh && [sim.water.mesh, sim.water.mesh.visible],
+              sim.persistentValley?.group && [sim.persistentValley.group, sim.persistentValley.group.visible],
             ].filter(Boolean),
           };
         }
