@@ -136,6 +136,12 @@ test('surface contract forwards mesh, region and streaming layers to the anchor'
   assert.equal(world.mesh, mesh);
   assert.equal(world.region, region);
   assert.equal(world.size, 12000);
+  const geometry = { attributes: {} };
+  const terrace = { attributes: {} };
+  terrain.geometry = geometry;
+  terrain.localTerraceGeometry = terrace;
+  assert.equal(world.geometry, geometry);
+  assert.equal(world.localTerraceGeometry, terrace);
   const stream = { dispose() {} };
   world.openWorld = stream;
   assert.equal(terrain.openWorld, stream);

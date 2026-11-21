@@ -68,6 +68,8 @@ export class UnifiedWorld {
   get mesh() { return this.anchorTerrain?.mesh ?? null; }
   get region() { return this.anchorTerrain?.region; }
   get size() { return this.anchorTerrain?.size; }
+  get geometry() { return this.anchorTerrain?.geometry; }
+  get localTerraceGeometry() { return this.anchorTerrain?.localTerraceGeometry; }
   get openWorld() { return this.anchorTerrain?.openWorld; }
   set openWorld(value) { if (this.anchorTerrain) this.anchorTerrain.openWorld = value; }
   get geographicBuildingLayer() { return this.anchorTerrain?.geographicBuildingLayer; }
