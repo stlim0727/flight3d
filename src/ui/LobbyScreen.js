@@ -5,6 +5,8 @@ import { lobbyBriefing } from './lobbyBriefing.js';
 import { aircraftSpec, airportSpec } from './lobbySpecs.js';
 import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, requiredAircraft, scenarioLabelKey } from '../config/scenarioRegistry.js';
+import { REGION_NAME_KEYS } from '../world/UnifiedWorld.js';
+import { DESTINATION_CHOICES, resolveDestination, saveSavedDestination } from '../config/flightSelection.js';
 
 const AIRPORT_BUTTONS = { incheon: 'lobby-airport-incheon', jeju: 'lobby-airport-jeju', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla', neon: 'lobby-airport-neon', valley: 'lobby-airport-valley' };
 const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c172', F16: 'lobby-aircraft-f16' };
@@ -28,7 +30,7 @@ function formatFlightTime(hours, deviceTime = false) {
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {} }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {}, getDestination = () => 'none', onDestination = () => {} }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const selectionEl = document.getElementById('lobby-selection');
@@ -36,6 +38,20 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const demoSelect = document.getElementById('lobby-demo-select');
   const demoBriefing = document.getElementById('lobby-demo-briefing');
   demoSelect?.addEventListener('change', () => { onDemoProfile?.(demoSelect.value); refresh(); });
+  const destinationSelect = document.getElementById('lobby-destination');
+  if (destinationSelect) {
+    for (const id of DESTINATION_CHOICES) {
+      const option = document.createElement('option');
+      option.value = id;
+      destinationSelect.append(option);
+    }
+    destinationSelect.addEventListener('change', () => {
+      const value = resolveDestination(destinationSelect.value);
+      saveSavedDestination(value);
+      onDestination?.(value);
+      refresh();
+    });
+  }
   const valleyGroup = document.getElementById('lobby-valley-options');
   const pilotHumanBtn = document.getElementById('lobby-pilot-human');
   const pilotAiBtn = document.getElementById('lobby-pilot-ai');
@@ -238,6 +254,14 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const airport = getAirport();
     for (const [key, id] of Object.entries(AIRPORT_BUTTONS)) {
       document.getElementById(id)?.classList.toggle('active', key === airport);
+    }
+    if (destinationSelect) {
+      destinationSelect.value = resolveDestination(getDestination?.());
+      for (const option of destinationSelect.options) {
+        option.textContent = option.value === 'none'
+          ? t('lobby.destination.none')
+          : t(REGION_NAME_KEYS[option.value] ?? option.value);
+      }
     }
     const aircraft = getAircraft?.() ?? 'B738';
     for (const [key, id] of Object.entries(AIRCRAFT_BUTTONS)) {

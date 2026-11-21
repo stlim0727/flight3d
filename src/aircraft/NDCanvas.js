@@ -70,6 +70,7 @@ export class NDCanvas {
     if (state.activeWaypoint) {
       this.activeWaypoint = state.activeWaypoint;
     }
+    this.destination = state.destination ?? null;
   }
 
   render() {
@@ -403,6 +404,21 @@ export class NDCanvas {
       ctx.textAlign = 'left';
       ctx.fillText(fix.name, p.x + 8, p.y + 4);
     });
+
+    // Destination airport (outside the active approach fixes)
+    const destination = this.destination;
+    if (destination && destination.id !== this.airportId) {
+      const p = projectToScreen(this.planePos.x + destination.dx, this.planePos.y + destination.dz);
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${destination.code} ${Math.round(destination.distanceNm)}NM`, p.x + 10, p.y + 4);
+    }
 
     // Top Right Active Waypoint Block
     ctx.fillStyle = '#f72585';

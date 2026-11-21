@@ -645,6 +645,8 @@ class SimulatorHudAndBindingsMethods {
       getAircraft: () => this.lobby.aircraft || this.currentAircraftId || 'B738',
       getDemoProfile: () => this.lobby.demoProfile,
       onDemoProfile: id => { this.lobby.demoProfile = id; },
+      getDestination: () => this.lobby.destination || 'none',
+      onDestination: id => { this.lobby.destination = id; this.destinationAirport = id; },
       getPilotMode: () => this.lobby.pilotMode || 'human',
       onPilotMode: mode => { this.lobby.pilotMode = mode; },
       onToggleGyro: () => {

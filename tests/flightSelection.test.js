@@ -18,6 +18,10 @@ import {
   saveSavedScenario,
   saveFlightSelection,
   hasPendingFlightSelection,
+  DESTINATION_STORAGE_KEY,
+  resolveDestination,
+  loadSavedDestination,
+  saveSavedDestination,
 } from '../src/config/flightSelection.js';
 import { DEFAULT_SCENARIO } from '../src/config/scenarioRegistry.js';
 
@@ -262,4 +266,15 @@ test('a menu choice that was never flown stays a pending difference', () => {
   const flown = loadSavedFlightSelection(storage);
   assert.equal(hasPendingFlightSelection({ ...flown }, flown), false);
   assert.equal(hasPendingFlightSelection({ ...flown, airport: 'incheon' }, flown), true);
+});
+
+test('destination selection persists and rejects unknown airports', () => {
+  const storage = createMockStorage();
+  assert.equal(loadSavedDestination(storage), 'none');
+  saveSavedDestination('jeju', storage);
+  assert.equal(storage.store[DESTINATION_STORAGE_KEY], 'jeju');
+  assert.equal(loadSavedDestination(storage), 'jeju');
+  saveSavedDestination('atlantis', storage);
+  assert.equal(loadSavedDestination(storage), 'none');
+  assert.equal(resolveDestination('neon'), 'neon');
 });

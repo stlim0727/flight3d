@@ -175,6 +175,25 @@ export class UnifiedWorld {
     const hit = this.regionAt(x, z);
     return hit ? REGION_CODES[hit.id] ?? null : null;
   }
+
+  /** Bearing and distance from a world position to another region's airport. */
+  destinationInfo(x, z, id) {
+    const target = BASE_OFFSETS[id];
+    if (!target) return null;
+    const anchor = BASE_OFFSETS[this.anchor];
+    const dx = target[0] - anchor[0] - x;
+    const dz = target[1] - anchor[1] - z;
+    const distanceM = Math.hypot(dx, dz);
+    return {
+      id,
+      code: REGION_CODES[id],
+      nameKey: REGION_NAME_KEYS[id],
+      dx, dz,
+      distanceM,
+      distanceNm: distanceM / 1852,
+      bearingDeg: (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360,
+    };
+  }
   /** Ground query: region surface when inside one, streamed DEM or anchor surface outside. */
   getHeight(x, z) {
     const hit = this.regionAt(x, z);
