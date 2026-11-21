@@ -5,7 +5,7 @@ import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { distanceKm, matchAirportPin } from '../src/geospatial/airportIndex.js';
 import { LANDMARK_PLACES } from '../src/config/landmarks.js';
-
+import { SURFACE_CATEGORIES } from '../scripts/airport-index/lib.mjs';
 const ROOT = new URL('../public/data/airports/', import.meta.url);
 const SNAPSHOTS = new URL('../scripts/airport-index/snapshots/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', ROOT), 'utf8'));
@@ -65,7 +65,7 @@ test('every indexed runway has two verified ends and a separate landing threshol
         seenRunways.add(runway.id);
         assert.ok(runway.lengthM >= 152.4);
         assert.ok(runway.widthM >= 4.572);
-        assert.ok(runway.surface && runway.surface !== 'UNK' && runway.surface !== 'WATER');
+        assert.ok(runway.surface.split('/').every(category => SURFACE_CATEGORIES.includes(category)), runway.surface);
         assert.equal(runway.ends.length, 2);
         for (const end of runway.ends) {
           assert.ok(Number.isFinite(end.physical.latitude) && Number.isFinite(end.physical.longitude));
@@ -110,4 +110,11 @@ test('curated airport pins link by ICAO to indexed runways', () => {
     assert.equal(match?.icao, pin.icao);
     assert.ok(match.runways.length > 0);
   }
+});
+
+test('committed data keeps official codes and drops non-surface records', () => {
+  const opgwTile = readTile(manifest.icao.OPGW);
+  assert.equal(opgwTile.airports.find(airport => airport.icao === 'OPGW').icao, 'OPGW');
+  const nzhn = readTile(manifest.icao.NZHN).airports.find(airport => airport.icao === 'NZHN');
+  assert.ok(!nzhn.runways.some(runway => runway.surface === 'DELETE DUPLICATE'));
 });

@@ -1,6 +1,13 @@
 // Browser-side lookup for the versioned OurAirports runway index.
 // Only the manifest and the tiles intersecting a query are fetched.
-const DEFAULT_BASE_URL = '/data/airports/';
+/** Vite injects BASE_URL (e.g. `/flight3d/` on Pages); Node falls back to `/`. */
+export function airportDataBaseUrl(base) {
+  const configured = typeof import.meta.env === 'object' ? import.meta.env.BASE_URL : undefined;
+  const prefix = base ?? configured ?? '/';
+  return `${prefix.endsWith('/') ? prefix : `${prefix}/`}data/airports/`;
+}
+
+const DEFAULT_BASE_URL = airportDataBaseUrl();
 const EARTH_RADIUS_KM = 6371.0088;
 const MAX_PIN_DISTANCE_KM = 5;
 
@@ -110,15 +117,22 @@ export async function findAirportsInRegion(manifest, { latitude, longitude, radi
     throw new Error('Invalid regional airport query');
   }
   const center = { latitude, longitude };
-  const latDelta = radiusKm / 111.32;
-  const cosLat = Math.cos(latitude * Math.PI / 180);
-  const lonDelta = cosLat <= 1e-6 ? 180 : Math.min(180, radiusKm / (111.32 * cosLat));
-  const allLongitudes = lonDelta >= 180;
+  const angularRadius = Math.min(Math.PI, radiusKm / EARTH_RADIUS_KM);
+  const latDelta = angularRadius * 180 / Math.PI;
+  const reachesPole = latitude + latDelta >= 90 || latitude - latDelta <= -90;
+  let west = -180;
+  let east = 180;
+  if (!reachesPole) {
+    const cosLat = Math.max(1e-9, Math.cos(latitude * Math.PI / 180));
+    const lonDelta = Math.asin(Math.min(1, Math.sin(angularRadius) / cosLat)) * 180 / Math.PI;
+    west = longitude - lonDelta;
+    east = longitude + lonDelta;
+  }
   const tileIds = tileIdsForBounds({
     north: Math.min(90, latitude + latDelta),
     south: Math.max(-90, latitude - latDelta),
-    west: allLongitudes ? -180 : longitude - lonDelta,
-    east: allLongitudes ? 180 : longitude + lonDelta,
+    west,
+    east,
   }, manifest.tileDegrees).filter(id => Object.hasOwn(manifest.tiles, id));
   const tiles = await Promise.all(tileIds.map(id => loadAirportTile(manifest, id, options)));
   return tiles.flatMap(tile => tile.airports)
@@ -134,7 +148,7 @@ export async function findAirportByCode(manifest, code, options = {}) {
   const tileId = manifest.icao[key] ?? manifest.iata[key];
   if (!tileId) return null;
   const tile = await loadAirportTile(manifest, tileId, options);
-  return tile.airports.find(airport => airport.icao === key || airport.iata === key || airport.ident === key) ?? null;
+  return tile.airports.find(airport => airport.icao === key || airport.iata === key) ?? null;
 }
 
 function normalizeName(name) {
@@ -156,7 +170,7 @@ export function matchAirportPin(pin, airports) {
   if (!pin || !Array.isArray(airports)) return null;
   const code = (pin.icao || pin.iata || '').trim().toUpperCase();
   if (code) {
-    const matches = airports.filter(airport => airport.icao === code || airport.iata === code || airport.ident === code);
+    const matches = airports.filter(airport => airport.icao === code || airport.iata === code);
     return matches.length === 1 ? matches[0] : null;
   }
   const name = normalizeName(pin.names?.en ?? pin.names?.ko ?? pin.name ?? pin.en ?? pin.ko);

@@ -5,7 +5,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { buildIndex, DEFAULT_TILE_DEGREES } from './lib.mjs';
+import { buildIndex, DEFAULT_TILE_DEGREES, versionForSources } from './lib.mjs';
 
 const SOURCE_URLS = Object.freeze({
   airports: 'https://davidmegginson.github.io/ourairports-data/airports.csv',
@@ -42,12 +42,7 @@ function hash(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
-function versionFor(sources) {
-  const raw = sources.airports.lastModified ?? sources.airports.retrievedAt;
-  const stamp = raw ? new Date(raw).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z') : 'snapshot';
-  const digest = hash(Buffer.from(`${sources.airports.sha256}:${sources.runways.sha256}`)).slice(0, 8);
-  return `${stamp}-${digest}`;
-}
+
 
 async function download(name) {
   const response = await fetch(SOURCE_URLS[name]);
@@ -117,7 +112,7 @@ async function readSources(options) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const { airportsCsv, runwaysCsv, sources } = await readSources(options);
-  const version = versionFor(sources);
+  const version = versionForSources(sources, options.tileDegrees);
   const { manifest, tiles } = buildIndex({
     airportsCsv,
     runwaysCsv,

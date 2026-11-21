@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildIndex } from '../scripts/airport-index/lib.mjs';
 import {
+  airportDataBaseUrl,
   clearAirportIndexCache,
   findAirportByCode,
   findAirportsInRegion,
@@ -18,8 +19,10 @@ const PLACES = [
   { id: '1002', ident: 'VNLK', icao: 'VNLK', iata: 'LUA', name: 'Tenzing-Hillary Airport', latitude: 27.6868, longitude: 86.7295 },
   { id: '1003', ident: 'KJFK', icao: 'KJFK', iata: 'JFK', name: 'John F. Kennedy International Airport', latitude: 40.6394, longitude: -73.7793 },
   { id: '1004', ident: 'RKPC', icao: 'RKPC', iata: 'CJU', name: 'Jeju International Airport', latitude: 33.5113, longitude: 126.493 },
+  { id: '1005', ident: 'NZSP', icao: 'NZSP', iata: '', name: 'Amundsen-Scott South Pole Station Airport', latitude: -90, longitude: -1 },
+  { id: '1006', ident: 'OPGW', icao: 'OPGD', iata: '', name: 'Gwadar International Airport (Old)', latitude: 35.1, longitude: 129.1 },
+  { id: '1007', ident: 'OPGW-NEW', icao: 'OPGW', iata: '', name: 'New Gwadar International Airport', latitude: 35.12, longitude: 129.12 },
 ];
-
 function fixture() {
   const airports = PLACES.map(place => [
     place.id, place.ident, 'medium_airport', place.name, place.latitude, place.longitude,
@@ -103,4 +106,29 @@ test('pin linking prefers codes, falls back to name plus position, and rejects a
   assert.equal(matchAirportPin({ names: { en: 'Incheon International Airport' }, latitude: 37.4691, longitude: 126.451 }, [incheon[0], duplicate]), null);
   assert.equal(matchAirportPin({ names: { en: 'Unknown Airport' }, latitude: 37.4691, longitude: 126.451 }, incheon), null);
   assert.equal(matchAirportPin({ iata: 'ICN' }, incheon).icao, 'RKSI');
+});
+
+test('default data URL follows the deployed base path', () => {
+  assert.equal(airportDataBaseUrl('/flight3d'), '/flight3d/data/airports/');
+  assert.equal(airportDataBaseUrl('/flight3d/'), '/flight3d/data/airports/');
+  assert.equal(airportDataBaseUrl('/'), '/data/airports/');
+});
+
+test('queries reaching a pole load every longitude tile', async () => {
+  clearAirportIndexCache();
+  const { baseUrl, fetchImpl, requested } = serve(fixture());
+  const manifest = await loadAirportManifest({ baseUrl, fetchImpl });
+  const found = await findAirportsInRegion(manifest, { latitude: -80, longitude: -180, radiusKm: 2000 }, { baseUrl, fetchImpl });
+  assert.ok(found.some(airport => airport.icao === 'NZSP'));
+  assert.ok(requested.includes(`${baseUrl}fixture/tiles/0-17.json`));
+});
+
+test('official ICAO codes win over a conflicting source ident', async () => {
+  clearAirportIndexCache();
+  const { baseUrl, fetchImpl } = serve(fixture());
+  const manifest = await loadAirportManifest({ baseUrl, fetchImpl });
+  const resolved = await findAirportByCode(manifest, 'OPGW', { baseUrl, fetchImpl });
+  assert.equal(resolved.icao, 'OPGW');
+  const airports = fixture().tiles.get('12-30').airports;
+  assert.equal(matchAirportPin({ icao: 'OPGW' }, airports)?.icao, 'OPGW');
 });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildIndex, normalizeAirport, normalizeRunway, parseCsv, tileIdFor, tileBounds } from '../scripts/airport-index/lib.mjs';
+import { buildIndex, normalizeAirport, normalizeRunway, normalizeSurface, parseCsv, tileIdFor, tileBounds, versionForSources } from '../scripts/airport-index/lib.mjs';
 import { distanceKm } from '../src/geospatial/airportIndex.js';
 
 const AIRPORT_COLUMNS = [
@@ -77,6 +77,19 @@ test('only airports with validated land runways enter the index', () => {
   assert.ok(normalizeRunway(runway(), record));
 });
 
+test('only recognized surface categories pass validation', () => {
+  assert.equal(normalizeSurface('ASPH'), 'ASP');
+  assert.equal(normalizeSurface('asphalt / concrete'), 'ASP/CON');
+  assert.equal(normalizeSurface('GRVL-G'), 'GRE');
+  for (const value of ['', 'UNK', 'WATER', 'Delete duplicate', 'TURF, SOFT DURING SPRING THAW', 'C0N']) {
+    assert.equal(normalizeSurface(value), null, value);
+  }
+  const airportRow = airport();
+  assert.equal(normalizeRunway(runway({ surface: 'Delete duplicate' }), normalizeAirport(airportRow)), null);
+  assert.ok(normalizeRunway(runway({ surface: 'ASPH' }), normalizeAirport(airportRow)));
+});
+
+
 test('displaced thresholds are stored apart from physical ends', () => {
   const result = build(
     [airport(), airport({ id: '1002', ident: 'RKSU', icao_code: 'RKSU', iata_code: 'KSU', name: 'New Airport', latitude_deg: '37.5', longitude_deg: '126.5' })],
@@ -120,4 +133,13 @@ test('a fresh source row needs no per-airport code change and rebuilds identical
   assert.equal(first.manifest.icao.ZZZZ, '12-30');
   assert.equal(tileIdFor(37.469101, 126.450996), '12-30');
   assert.equal(tileIdFor(0, 180), null);
+});
+
+test('tile size participates in the version identifier', () => {
+  const sources = {
+    airports: { sha256: 'a', lastModified: 'Sat, 21 Nov 2026 02:53:51 GMT' },
+    runways: { sha256: 'b' },
+  };
+  assert.notEqual(versionForSources(sources, 10), versionForSources(sources, 5));
+  assert.equal(versionForSources(sources, 10), versionForSources(sources, 10));
 });

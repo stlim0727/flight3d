@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 // Pure OurAirports CSV -> regional runway index conversion. No network or DOM.
 export const SCHEMA_VERSION = 1;
 export const DEFAULT_TILE_DEGREES = 10;
@@ -22,6 +23,51 @@ function inRange(value, min, max) {
 
 function compactText(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+// OurAirports surface is not a controlled vocabulary; accept only known codes
+// and aliases so notes such as "Delete duplicate" cannot become runway data.
+const SURFACE_ALIASES = new Map([
+  ['ASP', 'ASP'], ['ASPH', 'ASP'], ['ASPHALT', 'ASP'], ['ASPHAULT', 'ASP'],
+  ['ASHP', 'ASP'], ['ASHPHALT', 'ASP'], ['ASHPALT', 'ASP'], ['ASB', 'ASP'],
+  ['CON', 'CON'], ['CONC', 'CON'], ['CONCRETE', 'CON'], ['COCRETE', 'CON'],
+  ['CEMENT', 'CON'], ['CEM', 'CON'],
+  ['TURF', 'TURF'], ['GRASS', 'TURF'], ['GRS', 'TURF'], ['GRA', 'TURF'],
+  ['GRAS', 'TURF'], ['GRASSY', 'TURF'], ['GRAAS', 'TURF'], ['GRASSS', 'TURF'],
+  ['SOD', 'TURF'], ['TORF', 'TURF'], ['ERBA', 'TURF'], ['HERBA', 'TURF'],
+  ['GRE', 'GRE'], ['GVL', 'GRE'], ['GRVL', 'GRE'], ['GRV', 'GRE'],
+  ['GRAVEL', 'GRE'], ['GRAV', 'GRE'], ['GR', 'GRE'], ['PFC', 'GRE'], ['OILGRAVEL', 'GRE'],
+  ['DIRT', 'DIRT'], ['EARTH', 'DIRT'], ['EARTTH', 'DIRT'], ['EERTH', 'DIRT'],
+  ['LOAM', 'DIRT'], ['MURRAM', 'DIRT'], ['SOIL', 'DIRT'], ['GROUND', 'DIRT'],
+  ['SAIBRO', 'DIRT'], ['CALCRETE', 'DIRT'], ['SHALE', 'DIRT'],
+  ['PEM', 'PEM'], ['MAT', 'MAT'], ['MATS', 'MAT'], ['MARSTON', 'MAT'],
+  ['WOOD', 'WOOD'], ['MET', 'MET'], ['METAL', 'MET'], ['MTAL', 'MET'],
+  ['ALUM', 'MET'], ['STEEL', 'MET'],
+  ['SAND', 'SAND'], ['SAN', 'SAND'], ['CLAY', 'CLAY'], ['SNOW', 'SNOW'],
+  ['ICE', 'ICE'], ['BLUE', 'ICE'], ['BRICK', 'BRICK'],
+  ['PAVED', 'PAVED'], ['PAVEMENT', 'PAVED'], ['PAVING', 'PAVED'],
+  ['MACADAM', 'MACADAM'], ['BIT', 'BITUM'], ['BITUM', 'BITUM'],
+  ['BITUMEN', 'BITUM'], ['BITUMINOUS', 'BITUM'], ['TAR', 'BITUM'],
+  ['CHIPSEAL', 'CHIPSEAL'], ['CORAL', 'CORAL'], ['STONE', 'STONE'],
+  ['ROCK', 'STONE'], ['LIMESTONE', 'STONE'], ['ROOF', 'ROOF'],
+  ['ROOFTOP', 'ROOF'], ['PAD', 'PAD'],
+]);
+const SURFACE_MODIFIERS = new Set([
+  'F', 'G', 'P', 'E', 'L', 'H', 'TRTD', 'TREATED', 'CRUSHED', 'HARD',
+  'OLD', 'PARTIAL', 'SOFT', 'LOOSE', 'ROOF', 'ROOFTOP', 'PAD', 'MATS',
+]);
+export const SURFACE_CATEGORIES = Object.freeze([...new Set(SURFACE_ALIASES.values())].sort());
+
+/** Normalize a source surface to canonical categories; reject unknown values. */
+export function normalizeSurface(raw) {
+  const text = compactText(raw).toUpperCase().replace(/[()"'.;]+/g, ' ');
+  if (!text) return null;
+  const categories = new Set();
+  for (const token of text.split(/[\s/,\-+&]+/).filter(Boolean)) {
+    if (SURFACE_ALIASES.has(token)) categories.add(SURFACE_ALIASES.get(token));
+    else if (!SURFACE_MODIFIERS.has(token)) return null;
+  }
+  return categories.size ? [...categories].sort().join('/') : null;
 }
 
 /** Minimal RFC 4180 reader: OurAirports CSVs use quoted fields, commas and CRLF. */
@@ -157,9 +203,9 @@ export function normalizeRunway(row, airport) {
   if (compactText(row.closed) === '1') return null;
   const lengthFt = finite(row.length_ft);
   const widthFt = finite(row.width_ft);
-  const surface = compactText(row.surface).toUpperCase();
+  const surface = normalizeSurface(row.surface);
   if (!inRange(lengthFt, 500, 30000) || !inRange(widthFt, 15, 1000)) return null;
-  if (!surface || surface === 'UNK' || surface === 'WATER') return null;
+  if (!surface) return null;
 
   const leElevationFt = finite(row.le_elevation_ft);
   const heElevationFt = finite(row.he_elevation_ft);
@@ -213,6 +259,14 @@ export function tileBounds(tileId, degrees = DEFAULT_TILE_DEGREES) {
     north: -90 + (y + 1) * degrees,
     east: -180 + (x + 1) * degrees,
   };
+}
+
+/** Version changes when the sources or the tile layout changes. */
+export function versionForSources(sources, tileDegrees = DEFAULT_TILE_DEGREES) {
+  const raw = sources.airports.lastModified ?? sources.airports.retrievedAt;
+  const stamp = raw ? new Date(raw).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z') : 'snapshot';
+  const digest = createHash('sha256').update(`${tileDegrees}:${sources.airports.sha256}:${sources.runways.sha256}`).digest('hex').slice(0, 8);
+  return `${stamp}-${digest}`;
 }
 
 /**
