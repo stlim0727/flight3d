@@ -46,7 +46,7 @@ export class ChaseCameraMode {
     const cursorChasePitch = cs.enableCursorTrack ? (-cs.cursorNormY * 0.12) : 0;
 
     const totalYaw = cs.chaseYaw + cursorChaseYaw;
-    const totalPitch = Math.max(-1.1, Math.min(cs.constructor.CHASE_PITCH_LOW_LIMIT, cs.chasePitch + cursorChasePitch));
+    const totalPitch = Math.max(-cs.constructor.CHASE_PITCH_LOW_LIMIT, Math.min(cs.constructor.CHASE_PITCH_LOW_LIMIT, cs.chasePitch + cursorChasePitch));
 
     const effectiveChaseDist = cs.chaseDistance + cs.chaseSpeedLag;
     const behindLocal = new THREE.Vector3(0, cs.chaseHeight, effectiveChaseDist);

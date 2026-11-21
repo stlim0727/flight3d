@@ -123,7 +123,7 @@ export function applyHatLook(cs, dirX, dirY, dt) {
     const targetYaw = -dirX * (cs.hatGlanceChaseYaw ?? Math.PI * 0.5) * diagScale;
     const targetPitch = -dirY * (cs.hatGlanceChasePitch ?? 0.45) * diagScale;
     cs.chaseYaw = stepTowardAngle(cs.chaseYaw, targetYaw);
-    cs.chasePitch = Math.max(-1.1, Math.min(1.1, stepToward(cs.chasePitch, targetPitch)));
+    cs.chasePitch = Math.max(-cs.constructor.CHASE_PITCH_LOW_LIMIT, Math.min(cs.constructor.CHASE_PITCH_LOW_LIMIT, stepToward(cs.chasePitch, targetPitch)));
     cs.updatePovButtonState();
     return;
   }
@@ -136,28 +136,28 @@ export function applyHatLook(cs, dirX, dirY, dt) {
         : (-dirY * (cs.hatGlancePitchDown ?? 0.45));
       const targetPitch = defaultPitch + pitchDelta * diagScale;
       cs.lookYaw = stepTowardAngle(cs.lookYaw, targetYaw);
-      cs.lookPitch = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, stepToward(cs.lookPitch, targetPitch)));
+      cs.lookPitch = Math.max(-cs.constructor.COCKPIT_PITCH_LIMIT, Math.min(cs.constructor.COCKPIT_PITCH_LIMIT, stepToward(cs.lookPitch, targetPitch)));
       break;
     }
     case cs.constructor.MODES.CHASE: {
       const targetYaw = -dirX * (cs.hatGlanceChaseYaw ?? Math.PI * 0.5) * diagScale;
       const targetPitch = -dirY * (cs.hatGlanceChasePitch ?? 0.45) * diagScale;
       cs.chaseYaw = stepTowardAngle(cs.chaseYaw, targetYaw);
-      cs.chasePitch = Math.max(-1.1, Math.min(cs.constructor.CHASE_PITCH_LOW_LIMIT, stepToward(cs.chasePitch, targetPitch)));
+      cs.chasePitch = Math.max(-cs.constructor.CHASE_PITCH_LOW_LIMIT, Math.min(cs.constructor.CHASE_PITCH_LOW_LIMIT, stepToward(cs.chasePitch, targetPitch)));
       break;
     }
     case cs.constructor.MODES.WING: {
       const targetYaw = -dirX * 0.9 * diagScale;
       const targetPitch = -dirY * 0.45 * diagScale;
-      cs.wingLookYaw = Math.max(-Math.PI * 0.55, Math.min(Math.PI * 0.55, stepTowardAngle(cs.wingLookYaw, targetYaw)));
-      cs.wingLookPitch = Math.max(-Math.PI * 0.35, Math.min(Math.PI * 0.35, stepToward(cs.wingLookPitch, targetPitch)));
+      cs.wingLookYaw = Math.max(-cs.constructor.WING_LOOK_YAW_LIMIT, Math.min(cs.constructor.WING_LOOK_YAW_LIMIT, stepTowardAngle(cs.wingLookYaw, targetYaw)));
+      cs.wingLookPitch = Math.max(-cs.constructor.WING_LOOK_PITCH_LIMIT, Math.min(cs.constructor.WING_LOOK_PITCH_LIMIT, stepToward(cs.wingLookPitch, targetPitch)));
       break;
     }
     case cs.constructor.MODES.GEAR: {
       const targetYaw = -dirX * 0.65 * diagScale;
       const targetPitch = -dirY * 0.45 * diagScale;
-      cs.gearLookYaw = Math.max(-0.8, Math.min(0.8, stepToward(cs.gearLookYaw, targetYaw)));
-      cs.gearLookPitch = Math.max(-0.6, Math.min(0.6, stepToward(cs.gearLookPitch, targetPitch)));
+      cs.gearLookYaw = Math.max(-cs.constructor.GEAR_LOOK_YAW_LIMIT, Math.min(cs.constructor.GEAR_LOOK_YAW_LIMIT, stepToward(cs.gearLookYaw, targetYaw)));
+      cs.gearLookPitch = Math.max(-cs.constructor.GEAR_LOOK_PITCH_LIMIT, Math.min(cs.constructor.GEAR_LOOK_PITCH_LIMIT, stepToward(cs.gearLookPitch, targetPitch)));
       break;
     }
     default: {

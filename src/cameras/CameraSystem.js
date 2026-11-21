@@ -23,7 +23,12 @@ import { getViewName, beginPauseView, endPauseView, dispatchActiveMode } from '.
 export { normalizeAngle };
 
 export class CameraSystem {
-  static CHASE_PITCH_LOW_LIMIT = 1.0;
+  static CHASE_PITCH_LOW_LIMIT = 1.2;
+  static COCKPIT_PITCH_LIMIT = Math.PI * 0.48;
+  static WING_LOOK_YAW_LIMIT = Math.PI * 0.65;
+  static WING_LOOK_PITCH_LIMIT = Math.PI * 0.42;
+  static GEAR_LOOK_YAW_LIMIT = 1.2;
+  static GEAR_LOOK_PITCH_LIMIT = 0.9;
   static MODES = { COCKPIT: 0, CHASE: 1, WING: 2, TOWER: 3, FLYBY: 4, GEAR: 5, DRONE: 6, AUTO: 7, HUD: 8, DIRECTOR: 9, BANDIT_POV: 10 };
   static QUICK_CYCLE = [1, 6, 4, 2, 0, 8];
   static CRASH_MODES = [1, 6, 4, 3];
