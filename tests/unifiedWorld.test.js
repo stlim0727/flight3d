@@ -155,6 +155,10 @@ test('surface contract forwards mesh, region and streaming layers to the anchor'
   terrain.localTerraceGeometry = terrace;
   assert.equal(world.geometry, geometry);
   assert.equal(world.localTerraceGeometry, terrace);
+  terrain.segments = 255;
+  terrain.getNaturalHeight = () => 123;
+  assert.equal(world.segments, 255);
+  assert.equal(world.getNaturalHeight(0, 0), 123);
   const stream = { dispose() {} };
   world.openWorld = stream;
   assert.equal(terrain.openWorld, stream);
@@ -196,4 +200,31 @@ test('airport building collision checks every mounted region in world coordinate
   assert.ok(hit);
   assert.equal(hit.point.x, 1010);
   assert.equal(hit.point.z, 2010);
+});
+
+test('Jeju offset uses the Incheon scenery projection origin', () => {
+  assert.ok(Math.abs(BASE_OFFSETS.jeju[0] - 3530.6) < 5);
+  assert.ok(Math.abs(BASE_OFFSETS.jeju[1] - 436430.79) < 5);
+});
+
+test('outside regions normals and water follow the streamed surface', () => {
+  const { world, incheon } = makeWorld();
+  incheon.terrain.openWorld = { sample: x => ({ height: 100 + x, water: true }) };
+  const normal = world.getNormal(1e6, 1e6);
+  assert.ok(normal.y < 1);
+  assert.ok(normal.x < 0);
+  assert.equal(world.getWaterLevel(1e6, 1e6), 100 + 1e6);
+  incheon.terrain.openWorld.sample = () => ({ height: 5, water: false });
+  assert.equal(world.getWaterLevel(1e6, 1e6), -10000);
+});
+
+test('facade excludes modeled buildings in translated regions', () => {
+  const world = new UnifiedWorld('incheon');
+  const airport = { hasModeledBuilding: (x, z) => x === 10 && z === 20 };
+  world.register('incheon', { terrain: { getHeight: () => 0 }, airport, extent: REGION_EXTENTS.incheon });
+  const facade = createWorldAirportFacade(world, {});
+  const [jx, jz] = BASE_OFFSETS.jeju;
+  assert.equal(facade.hasModeledBuilding(jx + 10, jz + 20), false);
+  world.register('jeju', { terrain: { getHeight: () => 0 }, airport, extent: REGION_EXTENTS.jeju });
+  assert.equal(facade.hasModeledBuilding(jx + 10, jz + 20), true);
 });

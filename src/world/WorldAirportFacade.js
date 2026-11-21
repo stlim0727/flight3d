@@ -36,6 +36,14 @@ export function createWorldAirportFacade(world, spawnAirport) {
       }
       return targets;
     },
+    hasModeledBuilding(x, z) {
+      for (const [regionId, region] of world.regions) {
+        if (!region.airport?.hasModeledBuilding) continue;
+        const [ox, oz] = world.offsets.get(regionId);
+        if (region.airport.hasModeledBuilding(x - ox, z - oz)) return true;
+      }
+      return false;
+    },
   };
   for (const key of ['controlTowerData', 'terminalData', 'hangarsData', 'retainingWallData']) {
     if (spawnAirport?.[key]) facade[key] = spawnAirport[key];

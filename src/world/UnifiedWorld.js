@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { jejuToIncheonLocal } from '../geospatial/CorridorCoordinateSystem.js';
+import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
+import { projectToLocal } from '../geospatial/incheon.js';
 
 /**
  * One always-present world for the three real-world airports.
@@ -10,14 +11,15 @@ import { jejuToIncheonLocal } from '../geospatial/CorridorCoordinateSystem.js';
  * Incheon to Jeju or Lukla impossible — the destination had no mesh and no
  * contact surface.
  *
- * World coordinates are the Incheon local tangent plane (+X east, +Z south,
- * metres). Each region keeps its own authoring frame: regions are translated
+ * World coordinates use the Incheon scenery patch origin, which is the frame
+ * of the rendered terrain, open-world tiles and the flight surface.
+ * Each region keeps its own authoring frame: regions are translated
  * into the world frame instead of rebasing their geometry. The anchor region
  * is the spawn region, so existing scenario/director code still works in its
  * own local frame; switching the anchor only translates the other regions.
  */
 
-const JEJU_IN_INCHEON = jejuToIncheonLocal(0, 0);
+const JEJU_IN_INCHEON = projectToLocal(JEJU_ORIGIN.latitude, JEJU_ORIGIN.longitude);
 
 // Phase 1 placement: Incheon <-> Jeju uses the surveyed WGS84 separation.
 // Lukla has no WGS84 frame in the simulator yet, so it is placed a flyable
@@ -70,6 +72,10 @@ export class UnifiedWorld {
   get size() { return this.anchorTerrain?.size; }
   get geometry() { return this.anchorTerrain?.geometry; }
   get localTerraceGeometry() { return this.anchorTerrain?.localTerraceGeometry; }
+  get segments() { return this.anchorTerrain?.segments; }
+  getNaturalHeight(x, z) {
+    return this.anchorTerrain?.getNaturalHeight?.(x, z) ?? this.getHeight(x, z);
+  }
   get loadError() { return this.anchorTerrain?.loadError; }
   get openWorld() { return this.anchorTerrain?.openWorld; }
   set openWorld(value) { if (this.anchorTerrain) this.anchorTerrain.openWorld = value; }
@@ -143,18 +149,25 @@ export class UnifiedWorld {
 
   getNormal(x, z) {
     const hit = this.regionAt(x, z);
-    if (!hit) return _normal.set(0, 1, 0);
-    if (hit.region.terrain.getNormal) return hit.region.terrain.getNormal(hit.x, hit.z);
+    if (hit && hit.region.terrain.getNormal) return hit.region.terrain.getNormal(hit.x, hit.z);
+    // Outside an authored region, differentiate the same height query physics
+    // uses so streamed DEM slopes are not reported as a flat surface.
     const eps = 1;
     return _normal.set(
-      this.getHeight(hit.x - eps, hit.z) - this.getHeight(hit.x + eps, hit.z),
+      this.getHeight(x - eps, z) - this.getHeight(x + eps, z),
       2 * eps,
-      this.getHeight(hit.x, hit.z - eps) - this.getHeight(hit.x, hit.z + eps),
+      this.getHeight(x, z - eps) - this.getHeight(x, z + eps),
     ).normalize();
   }
 
-  getWaterLevel() {
-    return 0;
+  getWaterLevel(x, z) {
+    const hit = this.regionAt(x, z);
+    const terrain = hit?.region.terrain ?? this.anchorTerrain;
+    const lx = hit ? hit.x : x;
+    const lz = hit ? hit.z : z;
+    const streamed = terrain?.openWorld?.sample?.(lx, lz);
+    if (streamed) return streamed.water ? streamed.height : -10000;
+    return terrain?.getWaterLevel?.(lx, lz) ?? 0;
   }
 
   isOnRunway(x, z) {
