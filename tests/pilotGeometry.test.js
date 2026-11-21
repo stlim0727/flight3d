@@ -38,12 +38,12 @@ test('buildF16PilotScene creates complete pilot hierarchy with seat, body, and a
     'Pilot_Body_Thigh_R',
     'Pilot_Body_Boot_L',
     'Pilot_Body_Boot_R',
-    'Pilot_Body_ArmUpper_L',
-    'Pilot_Body_Forearm_L',
+    'Pilot_Body_Sleeve_L',
+    'Pilot_Body_HarnessStrap_L',
     'Pilot_Body_Glove_L',
     'Pilot_Body_ThrottleGrip',
-    'Pilot_Body_ArmUpper_R',
-    'Pilot_Body_Forearm_R',
+    'Pilot_Body_Sleeve_R',
+    'Pilot_Body_HarnessStrap_R',
     'Pilot_Body_Glove_R',
     'Pilot_Body_StickGrip',
     'Pilot_Head_HelmetDome',
@@ -71,6 +71,24 @@ test('createPilotMesh returns configured group with userData references', () => 
   assert.equal(pilot.userData.head.name, 'Pilot_Head');
   assert.equal(pilot.userData.body.name, 'Pilot_Body');
   assert.equal(pilot.userData.seat.name, 'Pilot_Seat');
+});
+
+test('both shoulder straps wrap the yoke and terminate inside the buckle', () => {
+  const { body } = buildF16PilotScene();
+  const buckle = body.getObjectByName('Pilot_Body_HarnessBuckle');
+  const shoulder = body.getObjectByName('Pilot_Body_Shoulders');
+  const yokeTop = new THREE.Box3().setFromBufferAttribute(
+    shoulder.geometry.attributes.position
+  ).max.y + shoulder.position.y;
+  for (const side of ['L', 'R']) {
+    const strap = body.getObjectByName('Pilot_Body_HarnessStrap_' + side);
+    const points = strap.geometry.attributes.position;
+    const bounds = new THREE.Box3().setFromBufferAttribute(points);
+    assert.ok(bounds.max.y > yokeTop, 'Webbing must pass over the shoulder crown');
+    assert.ok(bounds.max.z > shoulder.position.z, 'Webbing must wrap behind the shoulder');
+    const end = new THREE.Vector3().fromBufferAttribute(points, points.count - 1);
+    assert.ok(end.distanceTo(buckle.position) < buckle.geometry.parameters.radiusTop);
+  }
 });
 
 test('setPilotCockpitMode toggles visibility and respects showInterior', () => {
