@@ -666,6 +666,8 @@ class PresetSpawnerMethods {
     const [coastalX, coastalZ] = world.offsets.get('coastal');
     this.foliage?.group?.position.set(coastalX, 0, coastalZ);
     this.ships?.group?.position.set(coastalX, 0, coastalZ);
+    if (this.foliage?.group) this.foliage.group.visible = true;
+    if (this.ships?.group) this.ships.group.visible = true;
     if (previousAnchor !== id) {
       previousOpenWorld?.dispose?.();
       previousBuildings?.dispose?.();
@@ -682,9 +684,9 @@ class PresetSpawnerMethods {
       this.geographicRoadLayer = null;
       this.geographicGreenLayer = null;
     }
-    // Oceans lie between the unified regions; hiding water at Lukla would
-    // leave a hole in the world as soon as the aircraft flies offshore.
-    if (this.water) this.water.mesh.visible = true;
+    // Oceans lie between the unified regions; Neon has its own -14 m water
+    // surface and Valley mission hides the shared ocean, so leave those alone.
+    if (this.water && id !== 'neon' && id !== 'valley') this.water.mesh.visible = true;
 
     const spawnAirport = id === 'incheon' ? this.incheonAirport
       : id === 'jeju' ? this.jejuAirport
@@ -695,6 +697,22 @@ class PresetSpawnerMethods {
     this.currentTerrain = world;
     this.currentAirport = facade;
     return true;
+  }
+
+  /** Static obstacles from all mounted regions, translated into world coordinates. */
+  worldObstacles() {
+    const world = this.world;
+    if (!world) return null;
+    const [cx, cz] = world.offsets.get('coastal');
+    const [nx, nz] = world.offsets.get('neon');
+    const shifted = (data, ox, oz) => (data ?? []).map(item => ({ ...item, x: item.x + ox, z: item.z + oz }));
+    return {
+      treeData: shifted(this.foliage?.treeData, cx, cz),
+      buildingData: [
+        ...shifted(this.foliage?.buildingData, cx, cz),
+        ...shifted(this.neonCity?.buildingData, nx, nz),
+      ],
+    };
   }
 
   /** Load the other unified regions in the background; the world stays flyable meanwhile. */
@@ -850,12 +868,11 @@ class PresetSpawnerMethods {
     this.syncUnifiedWorld(id);
 
     if (this.collisionDetector) {
-      if (isNeon) {
-        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, this.neonCity);
-      } else if (isIncheon || isJeju || isLukla || isValley) {
-        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
+      const obstacles = this.worldObstacles();
+      if (isCoastal) {
+        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, obstacles, this.ships, this.water);
       } else {
-        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, this.foliage, this.ships, this.water);
+        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, obstacles);
       }
     }
 
