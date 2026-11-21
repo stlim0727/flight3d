@@ -1,4 +1,5 @@
 import { regionalCruise } from './config/regionalCruises.js';
+import { UnifiedWorld } from './world/UnifiedWorld.js';
 import { LandmarkPins } from './ui/LandmarkPins.js';
 import { updateGeographicBuildings } from './environment/GeographicBuildings.js';
 import { updateGeographicRoads } from './environment/GeographicRoads.js';
@@ -295,6 +296,10 @@ class FlightSimulator {
     this.activeAirport = null; // initUI and setAirport below configure the active airport
     this.currentTerrain = this.terrain;
     this.currentAirport = this.airport;
+
+    // Phase 1 unified world: Incheon, Jeju and Lukla coexist; the lobby choice
+    // is a spawn anchor, not a scene swap. Regions register as they load.
+    this.world = new UnifiedWorld(savedSelection.airport);
 
     await startupDetail('startup.detail.sky');
     this.sky = new SkyAtmosphere(this.scene, this.renderer, this.water);

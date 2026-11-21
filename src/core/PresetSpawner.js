@@ -20,6 +20,8 @@ import { jejuSpawn } from '../geospatial/JejuFlightSurface.js';
 import { LuklaTerrain } from '../environment/LuklaTerrain.js';
 import { LuklaAirport } from '../environment/LuklaAirport.js';
 import { APPROACH_DATA } from '../config/approachData.js';
+import { WORLD_REGIONS, REGION_EXTENTS } from '../world/UnifiedWorld.js';
+import { createWorldAirportFacade } from '../world/WorldAirportFacade.js';
 import {
   defaultScenarioForRegion,
   isScenarioAvailable,
@@ -549,6 +551,9 @@ class PresetSpawnerMethods {
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.snapToTarget(this.aircraft.group);
     if (!isDemoInternal && this.gameFlow?.state === 'flight') this.beginFlightRecording?.();
+    // setPreset rebinds the pair to the spawn region; keep the composite world
+    // authoritative after any preset, scenario start or reset.
+    this.syncUnifiedWorld(this.activeAirport);
   }
 
   // One shared educational performance snapshot for CDU, PFD and loading UI.
@@ -607,6 +612,102 @@ class PresetSpawnerMethods {
   }
 
   /**
+   * Mount every loaded real-world region into one persistent world. The lobby
+   * airport only chooses the spawn anchor: the other regions stay in the scene
+   * with their own contact surfaces, so an aircraft can depart one and land at
+   * another without a scene rebuild.
+   */
+  syncUnifiedWorld(id) {
+    const world = this.world;
+    if (!world || !WORLD_REGIONS.includes(id)) return false;
+    const previousAnchor = world.anchor;
+    const previousTerrain = world.anchorTerrain;
+    const previousOpenWorld = previousTerrain?.openWorld;
+    const previousBuildings = previousTerrain?.geographicBuildingLayer;
+    world.setAnchor(id);
+    if (this.incheonAirport) world.register('incheon', {
+      terrain: this.incheonAirport.terrain,
+      airport: this.incheonAirport,
+      group: this.incheonAirport.group,
+      mesh: this.incheonAirport.terrain.mesh,
+      extent: REGION_EXTENTS.incheon,
+    });
+    if (this.jejuAirport) world.register('jeju', {
+      terrain: this.jejuAirport.terrain,
+      airport: this.jejuAirport,
+      group: this.jejuAirport.group,
+      mesh: this.jejuAirport.terrain.mesh,
+      extent: REGION_EXTENTS.jeju,
+    });
+    if (this.luklaTerrain) world.register('lukla', {
+      terrain: this.luklaTerrain,
+      airport: this.luklaAirport,
+      group: this.luklaAirport.group,
+      mesh: this.luklaTerrain.mesh,
+      extent: REGION_EXTENTS.lukla,
+    });
+    world.syncMeshes();
+    if (previousAnchor !== id) {
+      previousOpenWorld?.dispose?.();
+      previousBuildings?.dispose?.();
+      if (previousTerrain) {
+        previousTerrain.openWorld = null;
+        previousTerrain.geographicBuildingLayer = null;
+        previousTerrain.geographicRoadLayer = null;
+        previousTerrain.geographicGreenLayer = null;
+      }
+      this.geographicRoadLayer?.dispose?.();
+      this.geographicGreenLayer?.dispose?.();
+      this.openWorldSurface = null;
+      this.geographicBuildingLayer = null;
+      this.geographicRoadLayer = null;
+      this.geographicGreenLayer = null;
+    }
+    // Oceans lie between the unified regions; hiding water at Lukla would
+    // leave a hole in the world as soon as the aircraft flies offshore.
+    if (this.water) this.water.mesh.visible = true;
+
+    const spawnAirport = id === 'jeju' ? this.jejuAirport
+      : id === 'lukla' ? this.luklaAirport : this.incheonAirport;
+    const facade = createWorldAirportFacade(world, spawnAirport);
+    this.currentTerrain = world;
+    this.currentAirport = facade;
+    return true;
+  }
+
+  /** Load the other unified regions in the background; the world stays flyable meanwhile. */
+  ensureUnifiedRegions() {
+    if (!this.world) return;
+    if (!this.luklaTerrain) {
+      this.luklaTerrain = new LuklaTerrain();
+      this.luklaAirport = new LuklaAirport();
+      this.scene.add(this.luklaTerrain.mesh, this.luklaAirport.group);
+    }
+    for (const id of ['incheon', 'jeju']) {
+      if (id === 'incheon' && (this.incheonAirport || this.incheonLoad)) continue;
+      if (id === 'jeju' && (this.jejuAirport || this.jejuLoad)) continue;
+      this.preloadUnifiedRegion(id).catch(error => console.warn(`Unified world: ${id} preload failed:`, error));
+    }
+  }
+
+  async preloadUnifiedRegion(id) {
+    const isIncheon = id === 'incheon';
+    const loadField = isIncheon ? 'incheonLoad' : 'jejuLoad';
+    this[loadField] ??= (isIncheon
+      ? loadIncheonAirport(`${import.meta.env.BASE_URL}scenery/incheon/`)
+      : loadJejuAirport(`${import.meta.env.BASE_URL}scenery/jeju/`)
+    ).then(airport => {
+      airport.group.visible = airport.terrain.mesh.visible = false;
+      this.scene.add(airport.group, airport.terrain.mesh);
+      if (isIncheon) this.incheonAirport = airport;
+      else this.jejuAirport = airport;
+      return airport;
+    });
+    await this[loadField];
+    if (WORLD_REGIONS.includes(this.activeAirport)) this.syncUnifiedWorld(this.activeAirport);
+  }
+
+  /**
    * Switch the active airport; Incheon assets are loaded before committing the selection.
    */
   async setAirport(id, pilotPreparation = false) {
@@ -614,7 +715,9 @@ class PresetSpawnerMethods {
     if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('airport-changed');
     this.renderDiagnosticsPanel?.close();
     if (!['coastal', 'lukla', 'incheon', 'neon', 'valley', 'jeju'].includes(id)) return;
+    if (WORLD_REGIONS.includes(id)) this.ensureUnifiedRegions();
     if (this.activeAirport === id) {
+      if (this.syncUnifiedWorld(id)) return;
       if (id === 'incheon' && this.incheonAirport) {
         this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = true;
         this.currentTerrain = this.incheonAirport.terrain;
@@ -722,6 +825,7 @@ class PresetSpawnerMethods {
     if (this.neonCity) this.neonCity.group.visible = isNeon;
     this.currentTerrain = isJeju ? this.jejuAirport.terrain : isNeon ? this.neonCity.terrain : isIncheon ? this.incheonAirport.terrain : isLukla ? this.luklaTerrain : this.terrain;
     this.currentAirport = isJeju ? this.jejuAirport : isNeon ? this.neonCity.airport : isIncheon ? this.incheonAirport : isLukla ? this.luklaAirport : this.airport;
+    this.syncUnifiedWorld(id);
 
     if (this.collisionDetector) {
       if (isNeon) {
@@ -729,7 +833,7 @@ class PresetSpawnerMethods {
       } else if (isIncheon || isJeju) {
         this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
       } else if (isLukla) {
-        this.collisionDetector.setEnvironment(this.luklaTerrain, this.luklaAirport, null, null, null);
+        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
       } else if (isValley) {
         this.collisionDetector.setEnvironment(null, null, null, null, null);
       } else {
