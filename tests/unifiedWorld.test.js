@@ -1,7 +1,7 @@
 import test from 'node:test';
 import * as THREE from 'three';
 import assert from 'node:assert/strict';
-import { UnifiedWorld, BASE_OFFSETS, REGION_EXTENTS } from '../src/world/UnifiedWorld.js';
+import { UnifiedWorld, BASE_OFFSETS, REGION_EXTENTS, WORLD_REGIONS } from '../src/world/UnifiedWorld.js';
 import { CollisionDetector } from '../src/physics/CollisionDetector.js';
 import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
 
@@ -227,4 +227,30 @@ test('facade excludes modeled buildings in translated regions', () => {
   assert.equal(facade.hasModeledBuilding(jx + 10, jz + 20), false);
   world.register('jeju', { terrain: { getHeight: () => 0 }, airport, extent: REGION_EXTENTS.jeju });
   assert.equal(facade.hasModeledBuilding(jx + 10, jz + 20), true);
+});
+
+test('every lobby airport has a distinct world slot', () => {
+  assert.deepEqual([...WORLD_REGIONS].sort(), ['coastal', 'incheon', 'jeju', 'lukla', 'neon', 'valley']);
+  const ids = [...WORLD_REGIONS];
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      const [ax, az] = BASE_OFFSETS[ids[i]];
+      const [bx, bz] = BASE_OFFSETS[ids[j]];
+      assert.ok(Math.hypot(ax - bx, az - bz) > 50000, `${ids[i]}/${ids[j]} overlap`);
+    }
+  }
+});
+
+test('coastal and neon resolve at their world offsets', () => {
+  const world = new UnifiedWorld('incheon');
+  const region = (height) => ({
+    terrain: { getHeight: () => height },
+    airport: { isOnRunway: () => true },
+    extent: REGION_EXTENTS.coastal,
+  });
+  world.register('coastal', region(12));
+  world.register('neon', region(-14));
+  assert.equal(world.getHeight(BASE_OFFSETS.coastal[0], BASE_OFFSETS.coastal[1]), 12);
+  assert.equal(world.getHeight(BASE_OFFSETS.neon[0], BASE_OFFSETS.neon[1]), -14);
+  assert.equal(world.isOnRunway(BASE_OFFSETS.neon[0], BASE_OFFSETS.neon[1]), true);
 });

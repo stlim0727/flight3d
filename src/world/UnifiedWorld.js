@@ -3,7 +3,9 @@ import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import { projectToLocal } from '../geospatial/incheon.js';
 
 /**
- * One always-present world for the three real-world airports.
+ * One always-present world for every persistent region: coastal, Incheon,
+ * Jeju, Lukla and Neon Metropolis. The lobby airport only picks a spawn
+ * anchor; the generated valley remains a mission-mounted overlay.
  *
  * The simulator used to swap its whole scene in PresetSpawner.setAirport():
  * only the selected region's meshes were visible and a single mutable
@@ -21,16 +23,18 @@ import { projectToLocal } from '../geospatial/incheon.js';
 
 const JEJU_IN_INCHEON = projectToLocal(JEJU_ORIGIN.latitude, JEJU_ORIGIN.longitude);
 
-// Phase 1 placement: Incheon <-> Jeju uses the surveyed WGS84 separation.
-// Lukla has no WGS84 frame in the simulator yet, so it is placed a flyable
-// distance south of Jeju. Replacing this with surveyed coordinates is a
-// data-only change to BASE_OFFSETS.
+// Region placement: Incheon <-> Jeju uses the surveyed WGS84 separation; Lukla
+// sits a flyable distance south of Jeju. Arcade regions have no WGS84 frame,
+// so they are separated in the same world instead of sharing the origin.
 const LUKLA_SOUTH_OF_JEJU_M = 260000;
 
 export const BASE_OFFSETS = Object.freeze({
   incheon: Object.freeze([0, 0]),
   jeju: Object.freeze([JEJU_IN_INCHEON[0], JEJU_IN_INCHEON[1]]),
   lukla: Object.freeze([JEJU_IN_INCHEON[0], JEJU_IN_INCHEON[1] + LUKLA_SOUTH_OF_JEJU_M]),
+  coastal: Object.freeze([-80000, -60000]),
+  neon: Object.freeze([80000, -60000]),
+  valley: Object.freeze([0, -180000]),
 });
 
 export const WORLD_REGIONS = Object.freeze(Object.keys(BASE_OFFSETS));
@@ -42,6 +46,9 @@ export const REGION_EXTENTS = Object.freeze({
   incheon: Object.freeze({ minX: -7000, maxX: 22000, minZ: -7000, maxZ: 22000 }),
   jeju: Object.freeze({ minX: -30000, maxX: 45000, minZ: -54000, maxZ: 45000 }),
   lukla: Object.freeze({ minX: -22000, maxX: 22000, minZ: -22000, maxZ: 22000 }),
+  coastal: Object.freeze({ minX: -12000, maxX: 12000, minZ: -12000, maxZ: 12000 }),
+  neon: Object.freeze({ minX: -10000, maxX: 10000, minZ: -10000, maxZ: 10000 }),
+  valley: Object.freeze({ minX: -30000, maxX: 30000, minZ: -30000, maxZ: 30000 }),
 });
 
 const _normal = new THREE.Vector3();

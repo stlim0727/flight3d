@@ -646,7 +646,26 @@ class PresetSpawnerMethods {
       mesh: this.luklaTerrain.mesh,
       extent: REGION_EXTENTS.lukla,
     });
+    if (this.terrain && this.airport) world.register('coastal', {
+      terrain: this.terrain,
+      airport: this.airport,
+      group: this.airport.group,
+      mesh: this.terrain.mesh,
+      extent: REGION_EXTENTS.coastal,
+    });
+    if (this.neonCity) world.register('neon', {
+      terrain: this.neonCity.terrain,
+      airport: this.neonCity.airport,
+      group: this.neonCity.group,
+      mesh: this.neonCity.group,
+      extent: REGION_EXTENTS.neon,
+    });
     world.syncMeshes();
+    // Coastal foliage and ships are separate scene groups; keep them aligned
+    // with the coastal terrain group when the world anchor moves.
+    const [coastalX, coastalZ] = world.offsets.get('coastal');
+    this.foliage?.group?.position.set(coastalX, 0, coastalZ);
+    this.ships?.group?.position.set(coastalX, 0, coastalZ);
     if (previousAnchor !== id) {
       previousOpenWorld?.dispose?.();
       previousBuildings?.dispose?.();
@@ -667,8 +686,11 @@ class PresetSpawnerMethods {
     // leave a hole in the world as soon as the aircraft flies offshore.
     if (this.water) this.water.mesh.visible = true;
 
-    const spawnAirport = id === 'jeju' ? this.jejuAirport
-      : id === 'lukla' ? this.luklaAirport : this.incheonAirport;
+    const spawnAirport = id === 'incheon' ? this.incheonAirport
+      : id === 'jeju' ? this.jejuAirport
+      : id === 'lukla' ? this.luklaAirport
+      : id === 'neon' ? this.neonCity?.airport
+      : this.airport;
     const facade = createWorldAirportFacade(world, spawnAirport);
     this.currentTerrain = world;
     this.currentAirport = facade;
@@ -830,14 +852,10 @@ class PresetSpawnerMethods {
     if (this.collisionDetector) {
       if (isNeon) {
         this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, this.neonCity);
-      } else if (isIncheon || isJeju) {
+      } else if (isIncheon || isJeju || isLukla || isValley) {
         this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
-      } else if (isLukla) {
-        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
-      } else if (isValley) {
-        this.collisionDetector.setEnvironment(null, null, null, null, null);
       } else {
-        this.collisionDetector.setEnvironment(this.terrain, this.currentAirport, this.foliage, this.ships, this.water);
+        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, this.foliage, this.ships, this.water);
       }
     }
 
