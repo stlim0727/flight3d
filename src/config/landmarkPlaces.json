@@ -51,6 +51,7 @@
       "latitude": 37.4691,
       "longitude": 126.4506,
       "elevationM": 28,
+      "icao": "RKSI",
       "kinds": ["airport"],
       "importance": 5
     },
@@ -60,6 +61,7 @@
       "latitude": 33.5113,
       "longitude": 126.493,
       "elevationM": 48,
+      "icao": "RKPC",
       "kinds": ["airport"],
       "importance": 5
     },

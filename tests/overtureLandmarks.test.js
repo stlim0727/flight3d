@@ -113,6 +113,24 @@ test('parseOvertureNames prefers short Korean rule, falls back to English for no
   assert.equal(parseOvertureNames({}), null);
 });
 
+test('extractBaseLandmarks keeps airport codes when the Overture feature supplies them', () => {
+  const data = encodeMvt([{
+    name: 'infrastructure',
+    features: [{
+      type: 3,
+      geom: [[[1000, 1000], [1200, 1000], [1200, 1200], [1000, 1200]]],
+      properties: {
+        id: 'rksi', subtype: 'airport', class: 'international_airport',
+        icao_code: 'rksi', iata_code: 'icn', '@name': '인천국제공항',
+        names: JSON.stringify({ primary: '인천국제공항', common: { en: 'Incheon International Airport' } }),
+      },
+    }],
+  }]);
+  const [airport] = extractBaseLandmarks(data, { x: 436, y: 198 }, 9);
+  assert.equal(airport.icao, 'RKSI');
+  assert.equal(airport.iata, 'ICN');
+});
+
 test('extractDivisionLandmarks ranks cities by prominence/population and filters microhoods/hamlets', () => {
   const data = encodeMvt([{
     name: 'division',

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Vector3 } from 'three';
 import {
+  LANDMARK_PLACES,
   landmarkName,
   landmarkPriorityScore,
   landmarkRangeM,
@@ -31,7 +32,7 @@ test('all maps supply finite landmark anchors using their own coordinate frames'
 test('catalog rows normalize into localized names and invalid rows are skipped', () => {
   const records = normalizeLandmarkPlaces([
     { id: 'station', names: { ko: '서울역', en: 'Seoul Station' }, latitude: 37.5547,
-      longitude: 126.9706, kinds: ['station', 'subway'], importance: 2.6 },
+      longitude: 126.9706, kinds: ['station', 'subway'], importance: 2.6, icao: 'RKSS' },
     { id: 'unranked', names: { en: 'Unranked' }, latitude: 37, longitude: 127 },
     { id: 'no-coordinates', names: { en: 'Nowhere' } },
     { id: 'invalid-latitude', names: { en: 'Off globe' }, latitude: 91, longitude: 2 },
@@ -44,7 +45,9 @@ test('catalog rows normalize into localized names and invalid rows are skipped',
   assert.equal(records[0].importance, 3);
   assert.equal(records[1].importance, 5);
   assert.deepEqual(records[0].kinds, ['station', 'subway']);
-  assert.equal(landmarkName({ ko: '해안 공항', en: 'Coastal Airport' }, 'ko'), '해안 공항');
+  assert.equal(records[0].icao, 'RKSS');
+  assert.equal(LANDMARK_PLACES.find(place => place.id === 'incheon-airport').icao, 'RKSI');
+  assert.equal(LANDMARK_PLACES.find(place => place.id === 'jeju-airport').icao, 'RKPC');
 });
 
 test('custom catalog rows project into each geographic map and use ground height when omitted', () => {
