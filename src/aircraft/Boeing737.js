@@ -9,6 +9,9 @@ import { applyJejuAirLivery } from './JejuAirLivery.js';
 import { applyFlatShading } from '../config/renderQuality.js';
 import { CockpitHudCanvas, createB737HudCombiner } from './CockpitHudCanvas.js';
 import { clampGearExtension, calculateGearFold, isGearCollapsed } from './common/GearKinematicsRig.js';
+import { createB737Pilots, poseCivilHands, setCivilPilotView } from './civilPilotGeometry.js';
+import { updatePilotDynamics } from './pilotGeometry.js';
+import { updateGltfYokes } from './GltfCockpitControls.js';
 
 /**
  * Boeing 737-800 Airliner 3D Model
@@ -33,6 +36,10 @@ export class Boeing737 {
       this.cockpit.hudCombiner = this.hudCombiner;
       this.cockpit.group.add(this.hudCombiner);
       this.group.add(this.cockpit.group);
+      // Captain (the player's seat) and first officer sit in the interior deck.
+      this.pilots = createB737Pilots();
+      this.cockpit.group.add(this.pilots.captain, this.pilots.firstOfficer);
+      this.pilotYokeBindings = null;
       const prevOnModelReady = this.cockpit.onModelReady;
       this.cockpit.onModelReady = () => {
         prevOnModelReady?.();
@@ -473,6 +480,60 @@ export class Boeing737 {
 
     // 5. Update Cockpit Interior Controls
     this.cockpit?.updateControls(flightState);
+    this.updatePilots(dt, flightState);
+  }
+
+  /**
+   * Express each pilot's neutral yoke-horn grips in its yoke pivot, so the hands follow the
+   * animated yoke. The yokes and the pilots share the rigid cockpit frame. The interior streams
+   * in lazily (and the simulator owns cockpit.onModelReady), so binding happens on first use.
+   */
+  bindPilotYokes() {
+    const yokes = this.cockpit?.gltfYokes;
+    if (!this.pilots || !yokes?.length) return;
+    const frame = this.cockpit.group;
+    this.pilotYokeBindings = [];
+    for (const [pilot, yokeName] of [
+      [this.pilots.captain, 'GLTF_Captain_Yoke'],
+      [this.pilots.firstOfficer, 'GLTF_FO_Yoke'],
+    ]) {
+      const yoke = yokes.find(candidate => candidate.name === yokeName);
+      if (!yoke?.parent) continue;
+      const rotation = yoke.rotation.z;
+      const z = yoke.position.z;
+      updateGltfYokes([yoke], {});
+      frame.updateMatrixWorld(true);
+      const frameToYoke = yoke.matrixWorld.clone().invert().multiply(frame.matrixWorld);
+      const grips = pilot.userData.targets.grips.map(grip => grip.clone().applyMatrix4(frameToYoke));
+      yoke.rotation.z = rotation;
+      yoke.position.z = z;
+      this.pilotYokeBindings.push({
+        pilot, yoke, grips,
+        yokeParentToFrame: frame.matrixWorld.clone().invert().multiply(yoke.parent.matrixWorld),
+        posed: grips.map(() => new THREE.Vector3()),
+        resting: false,
+      });
+    }
+  }
+
+  updatePilots(dt, flightState) {
+    if (!this.pilots || !this.isCockpit || !this.cockpit?.group.visible) return;
+    if (!this.pilotYokeBindings && this.cockpit.gltfYokes?.length) this.bindPilotYokes();
+    for (const binding of this.pilotYokeBindings ?? []) {
+      const { pilot, yoke } = binding;
+      if (!yoke.visible) {
+        // Yokes hidden to clear the panel: rest the hands on the thighs.
+        if (!binding.resting) poseCivilHands(pilot, 'rest');
+        binding.resting = true;
+        continue;
+      }
+      binding.resting = false;
+      yoke.updateMatrix();
+      binding.grips.forEach((grip, i) => binding.posed[i].copy(grip)
+        .applyMatrix4(yoke.matrix).applyMatrix4(binding.yokeParentToFrame));
+      poseCivilHands(pilot, binding.posed);
+    }
+    updatePilotDynamics(this.pilots.firstOfficer, flightState, dt);
   }
 
   fitNoseDoorsToSkin(exterior = this.gltfModel) {
@@ -644,6 +705,10 @@ export class Boeing737 {
     }
     if (this.cockpit && this.cockpit.group) {
       this.cockpit.group.visible = isCockpit && showInterior;
+    }
+    if (this.pilots) {
+      setCivilPilotView(this.pilots.captain, isCockpit, showInterior);
+      setCivilPilotView(this.pilots.firstOfficer, isCockpit, showInterior, { ownView: false });
     }
     this.scopeAirframeLamps();
   }

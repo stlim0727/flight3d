@@ -7,6 +7,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { applyFlatShading } from '../config/renderQuality.js';
 import { applyLogDepthOffset } from '../environment/RunwayMarkings.js';
+import { createC172Pilot, setCivilPilotView } from './civilPilotGeometry.js';
+import { updatePilotDynamics } from './pilotGeometry.js';
 
 // Ground-handling assembly baked into c172.glb, which must never travel with the
 // aircraft: tie-down straps, their metal spreader bars and cables, the chock bar,
@@ -92,6 +94,9 @@ export class Cessna172 {
       onModelReady: null
     };
     this.group.add(this.cockpit.group);
+    // Left-seat pilot, visible through the cabin windows and from the cockpit camera.
+    this.pilot = createC172Pilot();
+    this.group.add(this.pilot);
     if (!options.exteriorOnly) this.instrumentLight = installInstrumentLighting(this.cockpit, CESSNA_172.cockpit.captainEyePos, 0xffb46b, () => !this.isCrashed);
     this.buildLights();
 
@@ -354,6 +359,7 @@ export class Cessna172 {
     if (this.isCrashed) return;
 
     this.updateVisualGear(flightState.compressions);
+    updatePilotDynamics(this.pilot, flightState, dt);
 
     const n1 = flightState.engine1?.n1 ?? flightState.engine1N1 ?? 25.0; // Piston engine RPM indicator
 
@@ -390,6 +396,7 @@ export class Cessna172 {
       // and live instrument displays visible in cockpit mode.
       this.cockpit.group.visible = isCockpit;
     }
+    setCivilPilotView(this.pilot, isCockpit, true);
   }
 
   triggerCrashVisuals(collisionType) {
