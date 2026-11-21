@@ -666,7 +666,8 @@ class PresetSpawnerMethods {
         terrain: valley,
         airport: null,
         group: valley.group,
-        mesh: valley.mesh,
+        // The coarse mesh is a child of the group; moving it separately would
+        // apply the world offset twice.
         extent: {
           minX: valley.centerX - valley.widthX / 2,
           maxX: valley.centerX + valley.widthX / 2,
