@@ -253,11 +253,11 @@ function intersectsBuilding({ pos, radius }, { rings, low, roof }) {
 }
 
 // Keep collision-relevant buildings visible when crossing a tile border.
-function nearBuildingTile(mesh, position) {
+function nearBuildingTile(mesh, position, distance) {
   const box = mesh.geometry.boundingBox;
   const dx = Math.max(box.min.x - position.x, position.x - box.max.x, 0);
   const dz = Math.max(box.min.z - position.z, position.z - box.max.z, 0);
-  return dx * dx + dz * dz <= 200 * 200;
+  return dx * dx + dz * dz <= distance * distance;
 }
 
 export class GeographicBuildings {
@@ -316,7 +316,7 @@ export class GeographicBuildings {
     return this.terrain.openWorld?.readyForTile(tile, level) ?? true;
   }
 
-  update(position, cameraPosition = position, sunHeight = 1, elapsed = 1 / 60, reducedDetail = false) {
+  update(position, cameraPosition = position, sunHeight = 1, elapsed = 1 / 60, quality) {
     if (this.terrain.isLoaded === false) return;
     const night = nightLightLevel(sunHeight);
     this.material.color.setScalar(1 - night * 0.9);
@@ -332,11 +332,13 @@ export class GeographicBuildings {
       if (this.pending && !this.aircraftTiles.has(this.pending.key)
         && aircraftTiles.some(({ key }) => !this.tiles.has(key))) this.pending.controller.abort();
     }
+    const ultraLow = quality === 'ultraLow';
+    const detailRadius = ultraLow ? 200 : quality === 'performance' ? 550 : Infinity;
     for (const [key, { mesh }] of this.tiles) {
-      if (mesh) mesh.visible = !reducedDetail || key === cameraTiles[0]?.key || key === aircraftTiles[0]?.key
-        || nearBuildingTile(mesh, position) || nearBuildingTile(mesh, cameraPosition);
+      if (mesh) mesh.visible = detailRadius === Infinity || key === cameraTiles[0]?.key || key === aircraftTiles[0]?.key
+        || nearBuildingTile(mesh, position, detailRadius) || nearBuildingTile(mesh, cameraPosition, detailRadius);
     }
-    this.updateOverview(cameraPosition, night, elapsed, reducedDetail);
+    this.updateOverview(cameraPosition, night, elapsed, ultraLow);
     if (this.pending) return;
     const now = performance.now();
     const tile = this.wantedTiles.find(candidate => !this.tiles.has(candidate.key)
@@ -558,7 +560,7 @@ export function updateGeographicBuildings(sim, elapsed) {
     terrain.mesh.add(sim.geographicBuildingLayer.group);
   }
   sim.geographicBuildingLayer?.update(sim.position, sim.camera.position, sim.sky.sunPosition.y, elapsed,
-    sim.renderQuality === 'ultraLow');
+    sim.renderQuality);
   setMapAttributionSource(
     'geographic-buildings-attribution',
     Boolean(sim.geographicBuildingLayer?.group.children.length || sim.geographicLandmarkLayer?.hasStreamedData),

@@ -179,6 +179,17 @@ test('ultraLow culls distant city buildings but keeps collision data intact', ()
   const city = new FoliageAndCities({ getHeight: () => 25 }, random);
   const total = city.buildingData.length;
 
+  const countNear = () => city.cityArchetypes.reduce((n, a) => n + a.near.count, 0);
+  const building = city.cityArchetypes[0].records[0];
+  const camera = new THREE.Vector3(building.x + 1300, building.y + building.height / 2, building.z);
+  city.setQuality('balanced');
+  city.updateCityLod(camera);
+  const balancedNear = countNear();
+  city.setQuality('performance');
+  city.updateCityLod(camera);
+  assert.ok(countNear() < balancedNear, 'Performance submits fewer detailed facades');
+  assert.equal(city.cityArchetypes.reduce((n, a) => n + a.near.count + a.far.count, 0), total);
+
   city.setQuality('ultraLow');
   city.updateCityLod(new THREE.Vector3(0, 100, 0));
   const visible = city.cityArchetypes.reduce((n, a) => n + a.near.count + a.far.count, 0);

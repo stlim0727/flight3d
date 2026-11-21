@@ -178,10 +178,11 @@ export class FoliageAndCities {
     for (const batch of this.treeBatches) for (const mesh of batch.meshes) mesh.count = 0;
     const isUltraLow = this.quality === 'ultraLow';
     const maxDistSq = isUltraLow ? 2200 * 2200 : Infinity;
+    const treeNearDistance = this.quality === 'performance' ? 400 : TREE_LOD_DISTANCE;
     for (const tree of this.treeInstances) {
       const distSq = tree.position.distanceToSquared(cameraPosition);
       if (distSq > maxDistSq) continue;
-      const threshold = TREE_LOD_DISTANCE + (tree.near ? TREE_LOD_HYSTERESIS : 0);
+      const threshold = treeNearDistance + (tree.near ? TREE_LOD_HYSTERESIS : 0);
       tree.near = !isUltraLow && distSq < threshold * threshold;
       const mesh = this.treeBatches[tree.speciesIndex].meshes[tree.near ? 0 : 1];
       mesh.setMatrixAt(mesh.count, tree.matrix);
@@ -349,7 +350,8 @@ export class FoliageAndCities {
     this.cityLodCamera.copy(cameraPosition);
     this.cityFoundations.count = 0;
     const isUltraLow = this.quality === 'ultraLow';
-    const nearDistanceSquared = isUltraLow ? 0 : this.cityLodNearDistance ** 2;
+    const nearDistance = this.quality === 'performance' ? 1000 : this.cityLodNearDistance;
+    const nearDistanceSquared = isUltraLow ? 0 : nearDistance ** 2;
     const maxDistSq = isUltraLow ? 2200 * 2200 : Infinity;
     for (const { near, far, records } of this.cityArchetypes) {
       let nearCount = 0;
