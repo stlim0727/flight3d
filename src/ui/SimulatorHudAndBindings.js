@@ -210,9 +210,10 @@ class SimulatorHudAndBindingsMethods {
     }
     if (elCam) elCam.textContent = this.cameraSystem.getModeName();
     if (elRegion) {
+      const missionValley = this.activeAirport === 'generated-valley';
       const x = this.position.x, z = this.position.z;
-      const code = this.world?.regionCode?.(x, z);
-      const key = this.world?.regionNameKey?.(x, z);
+      const code = missionValley ? 'VAL' : this.world?.regionCode?.(x, z);
+      const key = missionValley ? 'valley.region' : this.world?.regionNameKey?.(x, z);
       elRegion.textContent = code ?? '';
       elRegion.title = key ? t(key) : '';
     }
