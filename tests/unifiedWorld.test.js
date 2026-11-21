@@ -254,3 +254,37 @@ test('coastal and neon resolve at their world offsets', () => {
   assert.equal(world.getHeight(BASE_OFFSETS.neon[0], BASE_OFFSETS.neon[1]), -14);
   assert.equal(world.isOnRunway(BASE_OFFSETS.neon[0], BASE_OFFSETS.neon[1]), true);
 });
+
+test('coastal local camera helper subtracts the region offset', () => {
+  const world = new UnifiedWorld('incheon');
+  const camera = world.coastalLocalCamera({ x: 1000, y: 500, z: -200 });
+  assert.equal(camera.x, 1000 - BASE_OFFSETS.coastal[0]);
+  assert.equal(camera.z, -200 - BASE_OFFSETS.coastal[1]);
+});
+
+test('facade forwards render-light limiting to registered airports', () => {
+  const world = new UnifiedWorld('incheon');
+  const seen = [];
+  world.register('incheon', {
+    terrain: { getHeight: () => 0 },
+    airport: { updateRenderLights: (y, limit) => seen.push([y, limit]) },
+    extent: REGION_EXTENTS.incheon,
+  });
+  const facade = createWorldAirportFacade(world, {});
+  facade.updateRenderLights(700, true);
+  assert.deepEqual(seen, [[700, true]]);
+});
+
+test('ship collision uses the world transform of a translated group', () => {
+  const detector = new CollisionDetector(null, null, null, null, null);
+  const group = new THREE.Group();
+  group.position.set(1000, 0, 2000);
+  const mesh = new THREE.Object3D();
+  group.add(mesh);
+  const scene = new THREE.Scene();
+  scene.add(group);
+  scene.updateMatrixWorld(true);
+  detector.ships = { vessels: [{ mesh, length: 10, width: 4, height: 5 }], speedboats: [] };
+  const probe = { pos: new THREE.Vector3(1000, 2, 2000), radius: 1, desc: 'belly' };
+  assert.ok(detector.checkShips(probe.pos, [probe]));
+});

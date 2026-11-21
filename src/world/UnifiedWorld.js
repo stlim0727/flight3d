@@ -52,6 +52,7 @@ export const REGION_EXTENTS = Object.freeze({
 });
 
 const _normal = new THREE.Vector3();
+const _camera = new THREE.Vector3();
 
 export class UnifiedWorld {
   constructor(anchor = 'incheon') {
@@ -129,6 +130,12 @@ export class UnifiedWorld {
   local(id, x, z) {
     const [ox, oz] = this.offsets.get(id);
     return [x - ox, z - oz];
+  }
+
+  /** Camera position in the coastal authoring frame, for foliage/city LOD. */
+  coastalLocalCamera(cameraPosition) {
+    const [ox, oz] = this.offsets.get('coastal');
+    return _camera.set(cameraPosition.x - ox, cameraPosition.y, cameraPosition.z - oz);
   }
 
   regionAt(x, z) {

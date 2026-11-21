@@ -44,6 +44,11 @@ export function createWorldAirportFacade(world, spawnAirport) {
       }
       return false;
     },
+    updateRenderLights(cameraY, limit) {
+      for (const region of world.regions.values()) {
+        region.airport?.updateRenderLights?.(cameraY, limit);
+      }
+    },
   };
   for (const key of ['controlTowerData', 'terminalData', 'hangarsData', 'retainingWallData']) {
     if (spawnAirport?.[key]) facade[key] = spawnAirport[key];

@@ -869,11 +869,7 @@ class PresetSpawnerMethods {
 
     if (this.collisionDetector) {
       const obstacles = this.worldObstacles();
-      if (isCoastal) {
-        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, obstacles, this.ships, this.water);
-      } else {
-        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, obstacles);
-      }
+      this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, obstacles, this.ships, isCoastal ? this.water : null);
     }
 
     if (this.explosionSystem) {

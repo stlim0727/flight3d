@@ -1587,7 +1587,7 @@ class FlightSimulator {
         camera: this.camera,
         timeScale: this.replayDirector?.active ? this.replayDirector.speed : 1,
       });
-    this.foliage.updateCityLod(this.camera.position);
+    this.foliage.updateCityLod(this.world?.coastalLocalCamera(this.camera.position) ?? this.camera.position);
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();
@@ -1598,7 +1598,7 @@ class FlightSimulator {
     this.pilotPhysiologyFx?.update(this.cameraSystem?.mode, this.telemetry?.pilot);
     this.loadingPanel.update();
 
-    this.foliage.update(this.camera.position);
+    this.foliage.update(this.world?.coastalLocalCamera(this.camera.position) ?? this.camera.position);
 
     this.multiplayer?.update();
 
