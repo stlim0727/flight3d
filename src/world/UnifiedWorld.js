@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import { projectToLocal } from '../geospatial/incheon.js';
 import { haversineDistanceM, initialBearingDeg } from '../geospatial/CorridorCoordinateSystem.js';
-import { REAL_AIRPORTS, RUNWAY_THRESHOLDS, worldPositionToWgs84, realOffsetInIncheonFrame } from '../geospatial/airportGeodesy.js';
+import { REAL_AIRPORTS, AIRPORT_ORIGINS, RUNWAY_THRESHOLDS, worldPositionToWgs84, realOffsetInIncheonFrame } from '../geospatial/airportGeodesy.js';
+import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
 
 /**
  * One always-present world for every persistent region: coastal, Incheon,
@@ -183,9 +184,9 @@ export class UnifiedWorld {
     const target = BASE_OFFSETS[id];
     if (!target) return null;
     const anchor = BASE_OFFSETS[this.anchor];
-    const dx = target[0] - anchor[0] - x;
-    const dz = target[1] - anchor[1] - z;
-    const planarDistanceM = Math.hypot(dx, dz);
+    const centreDx = target[0] - anchor[0] - x;
+    const centreDz = target[1] - anchor[1] - z;
+    const planarDistanceM = Math.hypot(centreDx, centreDz);
     const threshold = RUNWAY_THRESHOLDS[id];
     const from = worldPositionToWgs84(this.anchor, x, z);
     const realOffset = realOffsetInIncheonFrame(id);
@@ -193,11 +194,16 @@ export class UnifiedWorld {
       && Math.hypot(target[0] - realOffset[0], target[1] - realOffset[1]) < 5;
     const synthetic = this.anchor !== 'incheon' || !REAL_AIRPORTS.includes(id)
       || !placementIsReal || !from || !threshold;
+    const markerLocal = synthetic
+      ? null
+      : wgs84ToLocal(threshold.latitude, threshold.longitude, AIRPORT_ORIGINS[this.anchor]);
+    const dx = markerLocal ? markerLocal[0] - x : centreDx;
+    const dz = markerLocal ? markerLocal[1] - z : centreDz;
     const distanceM = synthetic
       ? planarDistanceM
       : haversineDistanceM(from.latitude, from.longitude, threshold.latitude, threshold.longitude);
     const bearingDeg = synthetic
-      ? (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360
+      ? (Math.atan2(centreDx, -centreDz) * 180 / Math.PI + 360) % 360
       : initialBearingDeg(from.latitude, from.longitude, threshold.latitude, threshold.longitude);
     return {
       id,
