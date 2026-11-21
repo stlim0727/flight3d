@@ -37,7 +37,7 @@ export function applyMouseDelta(cs, dx, dy, isTouch = (cs.activeTouchId !== null
     } else {
       cs.chaseYaw -= dx * 0.005;
       cs.chasePitch -= dy * 0.005;
-      cs.chasePitch = Math.max(-1.1, Math.min(1.1, cs.chasePitch));
+      cs.chasePitch = Math.max(-cs.constructor.CHASE_PITCH_LOW_LIMIT, Math.min(cs.constructor.CHASE_PITCH_LOW_LIMIT, cs.chasePitch));
     }
     cs.updatePovButtonState();
     return;
@@ -46,15 +46,15 @@ export function applyMouseDelta(cs, dx, dy, isTouch = (cs.activeTouchId !== null
   switch (cs.mode) {
     case cs.constructor.MODES.COCKPIT:
       cs.lookYaw -= dx * sensitivity;
-      cs.lookPitch = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, cs.lookPitch - dy * sensitivity));
+      cs.lookPitch = Math.max(-cs.constructor.COCKPIT_PITCH_LIMIT, Math.min(cs.constructor.COCKPIT_PITCH_LIMIT, cs.lookPitch - dy * sensitivity));
       break;
     case cs.constructor.MODES.CHASE:
       cs.chaseYaw -= dx * 0.005;
-      cs.chasePitch = Math.max(-1.1, Math.min(cs.constructor.CHASE_PITCH_LOW_LIMIT, cs.chasePitch - dy * 0.005));
+      cs.chasePitch = Math.max(-cs.constructor.CHASE_PITCH_LOW_LIMIT, Math.min(cs.constructor.CHASE_PITCH_LOW_LIMIT, cs.chasePitch - dy * 0.005));
       break;
     case cs.constructor.MODES.WING:
-      cs.wingLookYaw = Math.max(-Math.PI * 0.55, Math.min(Math.PI * 0.55, cs.wingLookYaw - dx * sensitivity));
-      cs.wingLookPitch = Math.max(-Math.PI * 0.35, Math.min(Math.PI * 0.35, cs.wingLookPitch - dy * sensitivity));
+      cs.wingLookYaw = Math.max(-cs.constructor.WING_LOOK_YAW_LIMIT, Math.min(cs.constructor.WING_LOOK_YAW_LIMIT, cs.wingLookYaw - dx * sensitivity));
+      cs.wingLookPitch = Math.max(-cs.constructor.WING_LOOK_PITCH_LIMIT, Math.min(cs.constructor.WING_LOOK_PITCH_LIMIT, cs.wingLookPitch - dy * sensitivity));
       break;
     case cs.constructor.MODES.DRONE:
       cs.droneOrbitAngle -= dx * 0.005;

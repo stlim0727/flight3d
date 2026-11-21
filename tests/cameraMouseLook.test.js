@@ -135,7 +135,7 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     // pitches the gaze down: the orbit climbs toward the aircraft and rests on
     // the high-side clamp. Pulling it up drops the orbit to the low-side clamp.
     camSys.applyMouseDelta(0, 500);
-    assert.ok(camSys.chasePitch <= -1.1 + 1e-9, `chasePitch (${camSys.chasePitch}) should reach the -1.1 aiming-down clamp`);
+    assert.ok(camSys.chasePitch <= -CameraSystem.CHASE_PITCH_LOW_LIMIT + 1e-9, `chasePitch (${camSys.chasePitch}) should reach the -${CameraSystem.CHASE_PITCH_LOW_LIMIT} aiming-down clamp`);
 
     camSys.chasePitch = 0;
     camSys.applyMouseDelta(0, -500);
@@ -159,6 +159,35 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       `hat look should respect the lifted yaw limit (${camSys.gearLookYaw})`);
     assert.ok(Math.abs(camSys.gearLookPitch - CameraSystem.GEAR_LOOK_PITCH_LIMIT) < 1e-9,
       `hat look should respect the lifted pitch limit (${camSys.gearLookPitch})`);
+  });
+
+  it('applies lifted look-angle limits across cockpit, chase and wing views', () => {
+    const camSys = new CameraSystem(new THREE.PerspectiveCamera(), mockDom);
+
+    camSys.setMode(CameraSystem.MODES.COCKPIT, true);
+    camSys.applyMouseDelta(0, -5000);
+    assert.ok(Math.abs(camSys.lookPitch - CameraSystem.COCKPIT_PITCH_LIMIT) < 1e-9,
+      `cockpit pitch should reach ${CameraSystem.COCKPIT_PITCH_LIMIT}`);
+    assert.ok(camSys.lookPitch > Math.PI * 0.45 + 0.1,
+      'cockpit pitch should pass the old 81 degree ceiling');
+
+    camSys.setMode(CameraSystem.MODES.CHASE, true);
+    camSys.applyMouseDelta(0, -5000);
+    assert.ok(Math.abs(camSys.chasePitch - CameraSystem.CHASE_PITCH_LOW_LIMIT) < 1e-9,
+      `chase pitch should reach ${CameraSystem.CHASE_PITCH_LOW_LIMIT}`);
+    assert.ok(camSys.chasePitch > 1.1,
+      'chase pitch should pass the old 1.0 rad ceiling');
+
+    camSys.setMode(CameraSystem.MODES.WING, true);
+    camSys.applyMouseDelta(-5000, -5000);
+    assert.ok(Math.abs(camSys.wingLookYaw - CameraSystem.WING_LOOK_YAW_LIMIT) < 1e-9,
+      `wing yaw should reach ${CameraSystem.WING_LOOK_YAW_LIMIT}`);
+    assert.ok(camSys.wingLookYaw > Math.PI * 0.55 + 0.1,
+      'wing yaw should pass the old 99 degree ceiling');
+    assert.ok(Math.abs(camSys.wingLookPitch - CameraSystem.WING_LOOK_PITCH_LIMIT) < 1e-9,
+      `wing pitch should reach ${CameraSystem.WING_LOOK_PITCH_LIMIT}`);
+    assert.ok(camSys.wingLookPitch > Math.PI * 0.35 + 0.1,
+      'wing pitch should pass the old 63 degree ceiling');
   });
 
   it('should lift the chase gaze on a down drag so the exterior orbit grabs scenery like the head views', () => {
@@ -197,14 +226,14 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
     // 0.0035 rad/px gain swept the whole ±81° look limit within 400px and
     // saturated here; a grab should still be following the pointer at this far.
     camSys.applyDragDelta(1000, 0);
-    assert.ok(Math.abs(camSys.lookYaw) < Math.PI * 0.45 - 1e-9,
+    assert.ok(Math.abs(camSys.lookYaw) < CameraSystem.COCKPIT_PITCH_LIMIT - 1e-9,
       `lookYaw (${camSys.lookYaw}) should not saturate after a window-width drag`);
     assert.ok(Math.abs(camSys.lookYaw) > 1.0,
       `lookYaw (${camSys.lookYaw}) should still turn a useful amount`);
 
     camSys.setMode(CameraSystem.MODES.WING, true);
     camSys.applyDragDelta(1000, 0);
-    assert.ok(Math.abs(camSys.wingLookYaw) < Math.PI * 0.55 - 1e-9,
+    assert.ok(Math.abs(camSys.wingLookYaw) < CameraSystem.WING_LOOK_YAW_LIMIT - 1e-9,
       `wingLookYaw (${camSys.wingLookYaw}) shares the gentler gain`);
   });
 
@@ -245,10 +274,10 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
 
     // Drag up/down pitch clamping
     camSys.applyMouseDelta(0, -1000);
-    assert.ok(camSys.lookPitch <= Math.PI * 0.45, 'lookPitch should be clamped to upper limit');
+    assert.ok(camSys.lookPitch <= CameraSystem.COCKPIT_PITCH_LIMIT, 'lookPitch should be clamped to upper limit');
 
     camSys.applyMouseDelta(0, 2000);
-    assert.ok(camSys.lookPitch >= -Math.PI * 0.45, 'lookPitch should be clamped to lower limit');
+    assert.ok(camSys.lookPitch >= -CameraSystem.COCKPIT_PITCH_LIMIT, 'lookPitch should be clamped to lower limit');
   });
 
   it('should detect when pilot is looking away from forward panel', () => {
@@ -416,18 +445,18 @@ describe('CameraSystem Mouse Look & Camera Gaze Controls', () => {
       camSys.updateEdgePan(0.016, 1920, 1080);
       assert.ok(camSys.lookPitch > initialPitch, 'lookPitch should increase (tilt up) at top edge');
 
-      // Continuous pitch up should clamp at upper limit (Math.PI * 0.45)
+      // Continuous pitch up should clamp at the lifted upper limit.
       for (let i = 0; i < 300; i++) {
         camSys.updateEdgePan(0.05, 1920, 1080);
       }
-      assert.ok(camSys.lookPitch <= Math.PI * 0.45 + 0.0001, 'lookPitch should respect upper clamp');
+      assert.ok(camSys.lookPitch <= CameraSystem.COCKPIT_PITCH_LIMIT + 0.0001, 'lookPitch should respect upper clamp');
 
       // Bottom edge -> pitch down
       camSys.prevMouse = { x: 960, y: 1080 };
       for (let i = 0; i < 300; i++) {
         camSys.updateEdgePan(0.05, 1920, 1080);
       }
-      assert.ok(camSys.lookPitch >= -Math.PI * 0.45 - 0.0001, 'lookPitch should respect lower clamp');
+      assert.ok(camSys.lookPitch >= -CameraSystem.COCKPIT_PITCH_LIMIT - 0.0001, 'lookPitch should respect lower clamp');
     });
 
     it('should continuously orbit chase camera in CHASE mode at screen edge', () => {
