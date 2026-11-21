@@ -8,6 +8,7 @@ import * as THREE from 'three';
  */
 export function createWorldAirportFacade(world, spawnAirport) {
   const localPosition = new THREE.Vector3();
+  const localCamera = new THREE.Vector3();
   const localOptions = {};
   const facade = {
     isOnRunway: (x, z) => world.isOnRunway(x, z),
@@ -18,7 +19,9 @@ export function createWorldAirportFacade(world, spawnAirport) {
         if (!region.airport?.update) continue;
         const [ox, oz] = world.offsets.get(regionId);
         localPosition.set(position.x - ox, position.y, position.z - oz);
-        localOptions.cameraPosition = localPosition;
+        localOptions.cameraPosition = options.cameraPosition
+          ? localCamera.set(options.cameraPosition.x - ox, options.cameraPosition.y, options.cameraPosition.z - oz)
+          : localPosition;
         localOptions.quality = options.quality;
         localOptions.paused = options.paused;
         localOptions.headingDeg = options.headingDeg;
@@ -37,9 +40,10 @@ export function createWorldAirportFacade(world, spawnAirport) {
   for (const key of ['controlTowerData', 'terminalData', 'hangarsData', 'retainingWallData']) {
     if (spawnAirport?.[key]) facade[key] = spawnAirport[key];
   }
-  if (spawnAirport?.checkBuildingCollision) {
-    facade.checkBuildingCollision = probes => spawnAirport.checkBuildingCollision(probes);
-  }
+  facade.airportRegions = [...world.regions].map(([id, region]) => ({
+    airport: region.airport,
+    offset: world.offsets.get(id),
+  })).filter(entry => entry.airport);
   if (spawnAirport?.parked) facade.parked = spawnAirport.parked;
   return facade;
 }

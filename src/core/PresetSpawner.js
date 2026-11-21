@@ -650,8 +650,18 @@ class PresetSpawnerMethods {
     if (previousAnchor !== id) {
       previousOpenWorld?.dispose?.();
       previousBuildings?.dispose?.();
+      if (previousTerrain) {
+        previousTerrain.openWorld = null;
+        previousTerrain.geographicBuildingLayer = null;
+        previousTerrain.geographicRoadLayer = null;
+        previousTerrain.geographicGreenLayer = null;
+      }
+      this.geographicRoadLayer?.dispose?.();
+      this.geographicGreenLayer?.dispose?.();
       this.openWorldSurface = null;
       this.geographicBuildingLayer = null;
+      this.geographicRoadLayer = null;
+      this.geographicGreenLayer = null;
     }
     // Oceans lie between the unified regions; hiding water at Lukla would
     // leave a hole in the world as soon as the aircraft flies offshore.

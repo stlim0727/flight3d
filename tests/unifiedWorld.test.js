@@ -1,6 +1,8 @@
 import test from 'node:test';
+import * as THREE from 'three';
 import assert from 'node:assert/strict';
 import { UnifiedWorld, BASE_OFFSETS, REGION_EXTENTS } from '../src/world/UnifiedWorld.js';
+import { CollisionDetector } from '../src/physics/CollisionDetector.js';
 import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
 
 function fakeRegion(height, runwayLocal = null) {
@@ -32,7 +34,13 @@ test('composite world dispatches ground height by position, not by selected airp
   assert.equal(world.getHeight(0, 0), 7);
   assert.equal(world.getHeight(jx, jz), 36);
   assert.equal(world.getHeight(lx, lz), 2836);
-  assert.equal(world.getHeight(1e6, 1e6), 0);
+  assert.equal(world.getHeight(1e6, 1e6), 7);
+});
+
+test('outside region extents the streamed DEM wins over the anchor surface', () => {
+  const { world, incheon } = makeWorld();
+  incheon.terrain.openWorld = { sample: () => ({ height: 1150 }) };
+  assert.equal(world.getHeight(1e6, 1e6), 1150);
 });
 
 test('runway queries resolve in the region under the aircraft', () => {
@@ -79,9 +87,11 @@ test('all registered regions stay mounted after anchor changes', () => {
 test('readiness follows the spawn region DEM state', () => {
   const { world } = makeWorld();
   world.regions.get('lukla').terrain.isLoaded = false;
+  world.regions.get('lukla').terrain.loadError = 'bad DEM';
   assert.equal(world.isLoaded, true);
   world.setAnchor('lukla');
   assert.equal(world.isLoaded, false);
+  assert.equal(world.loadError, 'bad DEM');
   world.regions.get('lukla').terrain.isLoaded = true;
   assert.equal(world.isLoaded, true);
 });
@@ -114,7 +124,8 @@ test('airport facade updates every region in its own local frame', () => {
   world.register('jeju', region('jeju'));
   const facade = createWorldAirportFacade(world, { controlTowerData: { x: 1 } });
   const pos = { x: BASE_OFFSETS.jeju[0] + 20, y: 100, z: BASE_OFFSETS.jeju[1] + 30 };
-  facade.update(0.016, pos, 42, { quality: 'high', cameraPosition: pos });
+  const camera = { x: 777, y: 250, z: 888 };
+  facade.update(0.016, pos, 42, { quality: 'high', cameraPosition: camera });
 
   assert.equal(seen.length, 2);
   const incheon = seen.find(s => s.id === 'incheon');
@@ -122,7 +133,9 @@ test('airport facade updates every region in its own local frame', () => {
   assert.equal(incheon.x, pos.x);
   assert.equal(jeju.x, 20);
   assert.equal(jeju.z, 30);
-  assert.equal(jeju.cameraX, 20);
+
+  assert.equal(jeju.cameraX, camera.x - BASE_OFFSETS.jeju[0]);
+  assert.equal(incheon.cameraX, camera.x);
   assert.equal(jeju.quality, 'high');
   assert.equal(facade.controlTowerData.x, 1);
 });
@@ -167,4 +180,20 @@ test('facade exposes gaze targets and parked aircraft', () => {
   const facade = createWorldAirportFacade(world, { parked });
   assert.equal(facade.getGazeTargets().length, 2);
   assert.equal(facade.parked, parked);
+});
+
+test('airport building collision checks every mounted region in world coordinates', () => {
+  const detector = new CollisionDetector(null, null, null, null, null);
+  const terminalData = { x: 10, z: 10, width: 10, depth: 10, y: 0, height: 20 };
+  detector.airport = {
+    airportRegions: [
+      { airport: { terminalData }, offset: [0, 0] },
+      { airport: { terminalData }, offset: [1000, 2000] },
+    ],
+  };
+  const probes = [{ pos: new THREE.Vector3(1010, 5, 2010), radius: 1, desc: 'belly' }];
+  const hit = detector.checkAirportBuildings(null, probes);
+  assert.ok(hit);
+  assert.equal(hit.point.x, 1010);
+  assert.equal(hit.point.z, 2010);
 });

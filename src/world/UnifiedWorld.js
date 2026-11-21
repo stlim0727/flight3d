@@ -70,6 +70,7 @@ export class UnifiedWorld {
   get size() { return this.anchorTerrain?.size; }
   get geometry() { return this.anchorTerrain?.geometry; }
   get localTerraceGeometry() { return this.anchorTerrain?.localTerraceGeometry; }
+  get loadError() { return this.anchorTerrain?.loadError; }
   get openWorld() { return this.anchorTerrain?.openWorld; }
   set openWorld(value) { if (this.anchorTerrain) this.anchorTerrain.openWorld = value; }
   get geographicBuildingLayer() { return this.anchorTerrain?.geographicBuildingLayer; }
@@ -128,10 +129,15 @@ export class UnifiedWorld {
     return null;
   }
 
-  /** Physics ground query: sea level outside every registered region. */
+  /** Ground query: region surface when inside one, streamed DEM or anchor surface outside. */
   getHeight(x, z) {
     const hit = this.regionAt(x, z);
-    if (!hit) return 0;
+    if (!hit) {
+      const terrain = this.anchorTerrain;
+      const streamed = terrain?.openWorld?.sample?.(x, z)?.height;
+      if (Number.isFinite(streamed)) return streamed;
+      return terrain?.getHeight?.(x, z) ?? 0;
+    }
     return hit.region.terrain.getHeight(hit.x, hit.z) ?? 0;
   }
 

@@ -597,11 +597,28 @@ export class CollisionDetector {
 
   checkAirportBuildings(aircraftPos, worldProbes) {
     if (!this.airport) return null;
+    const regions = this.airport.airportRegions ?? [{ airport: this.airport, offset: [0, 0] }];
+    for (const { airport, offset } of regions) {
+      const [ox, oz] = offset;
+      const probes = ox || oz
+        ? worldProbes.map(p => ({ ...p, pos: new THREE.Vector3(p.pos.x - ox, p.pos.y, p.pos.z - oz) }))
+        : worldProbes;
+      const hit = this.checkOneAirportBuildings(airport, probes);
+      if (hit) {
+        if (ox || oz) hit.point?.add(new THREE.Vector3(ox, 0, oz));
+        return hit;
+      }
+    }
+    return null;
+  }
 
-    if (this.airport.checkBuildingCollision) return this.airport.checkBuildingCollision(worldProbes);
+  checkOneAirportBuildings(airport, worldProbes) {
+    if (!airport) return null;
+
+    if (airport.checkBuildingCollision) return airport.checkBuildingCollision(worldProbes);
 
     // Check terminal concourse box
-    const term = this.airport.terminalData;
+    const term = airport.terminalData;
     if (term) {
       const minY = term.y;
       const maxY = term.y + term.height;
@@ -646,8 +663,8 @@ export class CollisionDetector {
     }
 
     // Check hangars
-    if (this.airport.hangarsData) {
-      for (const h of this.airport.hangarsData) {
+    if (airport.hangarsData) {
+      for (const h of airport.hangarsData) {
         const minX = h.x - h.width * 0.5;
         const maxX = h.x + h.width * 0.5;
         const minZ = h.z - h.depth * 0.5;
@@ -668,7 +685,7 @@ export class CollisionDetector {
     }
 
     // Check retaining wall (e.g. Lukla upper rock wall at Runway 24 threshold)
-    const wall = this.airport.retainingWallData;
+    const wall = airport.retainingWallData;
     if (wall) {
       const minY = wall.y;
       const maxY = wall.y + wall.height;
