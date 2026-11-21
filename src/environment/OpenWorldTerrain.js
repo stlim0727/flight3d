@@ -174,10 +174,7 @@ function imageryTexture(image) {
   return texture;
 }
 
-function farTerrainMaterial(map, opacity) {
-  const material = new THREE.MeshLambertMaterial({
-    map, transparent: true, depthWrite: false,
-  });
+function installFarTerrainShader(material, opacity) {
   material.onBeforeCompile = shader => {
     shader.uniforms.farTerrainOpacity = opacity;
     shader.vertexShader = `
@@ -206,15 +203,15 @@ function farTerrainMaterial(map, opacity) {
       `)
       .replace('#include <logdepthbuf_fragment>', `
         #include <logdepthbuf_fragment>
-        // This backdrop shows through the near terrain's fade and behind opaque scenery.
-        gl_FragDepth = 1.0;
+        // Reserve a depth range behind foreground scenery while retaining the order
+        // of the backdrop's own surfaces. Both passes must compute identical depth.
+        gl_FragDepth = 0.995 + 0.004 * clamp(-vFarTerrainViewPosition.z / ${highAltitudeClipM.toFixed(1)}, 0.0, 1.0);
       `)
       .replace('#include <opaque_fragment>', `
         diffuseColor.a *= coverage;
         #include <opaque_fragment>
       `);
   };
-  return material;
 }
 
 function clipSide(polygon, axis, limit, direction) {
@@ -643,8 +640,19 @@ export class OpenWorldTerrain {
       const { geometry } = buildOpenTerrainTile({
         x, y, raster, east, south, southeast, project: this.project, level: farZoom, subdivisions: farSegments,
       });
-      const mesh = new THREE.Mesh(geometry, farTerrainMaterial(imageryTexture(image), this.farOpacity));
+      const depthMaterial = new THREE.MeshBasicMaterial({
+        transparent: true, colorWrite: false, fog: false,
+      });
+      const material = new THREE.MeshLambertMaterial({
+        map: imageryTexture(image), transparent: true, depthWrite: false, depthFunc: THREE.EqualDepth,
+      });
+      installFarTerrainShader(depthMaterial, this.farOpacity);
+      installFarTerrainShader(material, this.farOpacity);
+      const depthMesh = new THREE.Mesh(geometry, depthMaterial);
+      depthMesh.renderOrder = -2;
+      const mesh = new THREE.Mesh(geometry, material);
       mesh.renderOrder = -1;
+      mesh.add(depthMesh);
       this.farTiles.set(key, mesh);
       this.farGroup.add(mesh);
       this.farRetry.delete(key);
@@ -658,6 +666,7 @@ export class OpenWorldTerrain {
     this.farTiles.delete(key);
     mesh.removeFromParent();
     mesh.geometry.dispose();
+    mesh.children[0].material.dispose();
     mesh.material.map.dispose();
     mesh.material.dispose();
   }
