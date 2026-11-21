@@ -173,6 +173,7 @@ const _acSegQ2 = new THREE.Vector3();
 const _acEngPos = new THREE.Vector3();
 const _acTargetPos = new THREE.Vector3();
 const _acTargetQuat = new THREE.Quaternion();
+const _shipWorldPos = new THREE.Vector3();
 
 /**
  * High-Performance Aircraft Collision & Obstacle Detector
@@ -813,7 +814,9 @@ export class CollisionDetector {
         }
         continue;
       }
-      const vPos = v.mesh.position;
+      const vPos = typeof v.mesh.getWorldPosition === 'function'
+        ? v.mesh.getWorldPosition(_shipWorldPos)
+        : v.mesh.position;
       const vRotY = v.mesh.rotation.y;
       const halfL = v.length * 0.5;
       const halfW = v.width * 0.5;

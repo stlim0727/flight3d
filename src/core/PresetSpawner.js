@@ -646,7 +646,28 @@ class PresetSpawnerMethods {
       mesh: this.luklaTerrain.mesh,
       extent: REGION_EXTENTS.lukla,
     });
+    if (this.terrain && this.airport) world.register('coastal', {
+      terrain: this.terrain,
+      airport: this.airport,
+      group: this.airport.group,
+      mesh: this.terrain.mesh,
+      extent: REGION_EXTENTS.coastal,
+    });
+    if (this.neonCity) world.register('neon', {
+      terrain: this.neonCity.terrain,
+      airport: this.neonCity.airport,
+      group: this.neonCity.group,
+      mesh: this.neonCity.group,
+      extent: REGION_EXTENTS.neon,
+    });
     world.syncMeshes();
+    // Coastal foliage and ships are separate scene groups; keep them aligned
+    // with the coastal terrain group when the world anchor moves.
+    const [coastalX, coastalZ] = world.offsets.get('coastal');
+    this.foliage?.group?.position.set(coastalX, 0, coastalZ);
+    this.ships?.group?.position.set(coastalX, 0, coastalZ);
+    if (this.foliage?.group) this.foliage.group.visible = true;
+    if (this.ships?.group) this.ships.group.visible = true;
     if (previousAnchor !== id) {
       previousOpenWorld?.dispose?.();
       previousBuildings?.dispose?.();
@@ -663,16 +684,35 @@ class PresetSpawnerMethods {
       this.geographicRoadLayer = null;
       this.geographicGreenLayer = null;
     }
-    // Oceans lie between the unified regions; hiding water at Lukla would
-    // leave a hole in the world as soon as the aircraft flies offshore.
-    if (this.water) this.water.mesh.visible = true;
+    // Oceans lie between the unified regions; Neon has its own -14 m water
+    // surface and Valley mission hides the shared ocean, so leave those alone.
+    if (this.water && id !== 'neon' && id !== 'valley') this.water.mesh.visible = true;
 
-    const spawnAirport = id === 'jeju' ? this.jejuAirport
-      : id === 'lukla' ? this.luklaAirport : this.incheonAirport;
+    const spawnAirport = id === 'incheon' ? this.incheonAirport
+      : id === 'jeju' ? this.jejuAirport
+      : id === 'lukla' ? this.luklaAirport
+      : id === 'neon' ? this.neonCity?.airport
+      : this.airport;
     const facade = createWorldAirportFacade(world, spawnAirport);
     this.currentTerrain = world;
     this.currentAirport = facade;
     return true;
+  }
+
+  /** Static obstacles from all mounted regions, translated into world coordinates. */
+  worldObstacles() {
+    const world = this.world;
+    if (!world) return null;
+    const [cx, cz] = world.offsets.get('coastal');
+    const [nx, nz] = world.offsets.get('neon');
+    const shifted = (data, ox, oz) => (data ?? []).map(item => ({ ...item, x: item.x + ox, z: item.z + oz }));
+    return {
+      treeData: shifted(this.foliage?.treeData, cx, cz),
+      buildingData: [
+        ...shifted(this.foliage?.buildingData, cx, cz),
+        ...shifted(this.neonCity?.buildingData, nx, nz),
+      ],
+    };
   }
 
   /** Load the other unified regions in the background; the world stays flyable meanwhile. */
@@ -828,18 +868,12 @@ class PresetSpawnerMethods {
     this.syncUnifiedWorld(id);
 
     if (this.collisionDetector) {
-      if (isNeon) {
-        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, this.neonCity);
-      } else if (isIncheon || isJeju) {
-        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
-      } else if (isLukla) {
-        this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport);
-      } else if (isValley) {
-        this.collisionDetector.setEnvironment(null, null, null, null, null);
-      } else {
-        this.collisionDetector.setEnvironment(this.terrain, this.currentAirport, this.foliage, this.ships, this.water);
-      }
+      const obstacles = this.worldObstacles();
+      this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, obstacles, this.ships, isCoastal ? this.water : null);
     }
+    // Coastal ships stay mounted in every world; their deferred GLB visuals
+    // must be requested even when another airport is the spawn anchor.
+    this.ships?.loadAssets?.();
 
     if (this.explosionSystem) {
       this.explosionSystem.terrain = this.currentTerrain;

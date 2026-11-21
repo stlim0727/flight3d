@@ -478,8 +478,8 @@ class PhysicsIntegratorMethods {
     this.aircraft.group.quaternion.copy(this.quaternion);
     this.aircraft.group.updateMatrixWorld(true);
     this.cameraSystem.update(this.physicsDt, this.aircraft.group, this.telemetry, (x, z) => this.currentTerrain.getHeight(x, z));
-    this.foliage.updateCityLod(this.camera.position);
-    this.foliage.update(this.camera.position);
+    this.foliage.updateCityLod(this.world?.coastalLocalCamera(this.camera.position) ?? this.camera.position);
+    this.foliage.update(this.world?.coastalLocalCamera(this.camera.position) ?? this.camera.position);
     this.sky.updateSun(this.position, this.camera.position);
     this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     this.sky.updateCockpitSun({
