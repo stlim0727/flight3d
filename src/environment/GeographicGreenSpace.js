@@ -15,6 +15,11 @@ import { RENDER_QUALITY, resolveRenderQuality } from '../config/renderQuality.js
 const zoom = 13;
 const neighbors = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
 const surfaceOffset = 0.2;
+const maskResolution = 512;
+const maskPadding = 4;
+const maskSize = maskResolution + 2 * maskPadding;
+const tileStart = (maskPadding / maskSize).toFixed(8);
+const tileEnd = (1 - maskPadding / maskSize).toFixed(8);
 const source = new PMTiles(
   'https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/2026-11-18.0/base.pmtiles',
 );
@@ -59,30 +64,119 @@ function polygonsOf(feature) {
   return polygons;
 }
 
-function ringOf(ring, tile, project, extent) {
-  const points = ring.map(([x, y]) => {
-    const { latitude, longitude } = tileToWgs84(tile.x + x / extent, tile.y + y / extent, zoom);
-    const [localX, localZ] = project(latitude, longitude);
-    return new THREE.Vector2(localX, localZ);
+function createGreenMaterial(alphaMap) {
+  const material = new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    side: THREE.DoubleSide,
+    alphaMap,
+    transparent: Boolean(alphaMap),
+    depthWrite: !alphaMap,
+    forceSinglePass: true,
   });
-  if (points.length > 1 && points[0].equals(points.at(-1))) points.pop();
-  return points;
+  material.onBeforeCompile = shader => {
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', `
+      #include <common>
+      varying vec2 vGreenGround;
+    `).replace('#include <begin_vertex>', `
+      #include <begin_vertex>
+      vGreenGround = position.xz;
+    `);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `
+      #include <common>
+      varying vec2 vGreenGround;
+
+      float greenHash(vec2 cell) {
+        vec3 p = fract(vec3(cell.xyx) * 0.1031);
+        p += dot(p, p.yzx + 33.33);
+        return fract((p.x + p.y) * p.z);
+      }
+
+      float greenNoise(vec2 p) {
+        vec2 cell = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        float value = mix(
+          mix(greenHash(cell), greenHash(cell + vec2(1.0, 0.0)), f.x),
+          mix(greenHash(cell + vec2(0.0, 1.0)), greenHash(cell + 1.0), f.x),
+          f.y
+        );
+        return (value - 0.5) * (1.0 - smoothstep(0.25, 1.0, length(fwidth(p))));
+      }
+    `).replace('#include <color_fragment>', `
+      #include <color_fragment>
+      float patches = greenNoise(vGreenGround / 28.0);
+      float details = greenNoise(vGreenGround / 2.5);
+      diffuseColor.rgb *= 1.0 + patches * 0.32 + details * 0.18;
+      diffuseColor.rgb += patches * vec3(0.028, 0.013, 0.0);
+    `).replace('#include <alphamap_fragment>', `
+      #ifdef USE_ALPHAMAP
+        float coverage = texture2D(alphaMap, vAlphaMapUv).g;
+        // The mask includes the vector-tile buffer so its blur can cross tile edges.
+        if (any(lessThan(vAlphaMapUv, vec2(${tileStart}))) ||
+            any(greaterThanEqual(vAlphaMapUv, vec2(${tileEnd})))) discard;
+        diffuseColor.a *= smoothstep(0.45, 0.95, coverage);
+      #endif
+    `);
+  };
+  material.customProgramCacheKey = () => 'geographic-green-ground';
+  return applyLogDepthOffset(material, 3);
 }
 
-export function buildGeographicGreenTile(data, tile, project, terrain, exclude = () => false) {
+function ringOf(ring, tile, project, extent) {
+  const end = ring.length - 1;
+  const closed = ring[0][0] === ring[end][0] && ring[0][1] === ring[end][1];
+  return (closed ? ring.slice(0, end) : ring).map(([x, y]) => {
+    const { latitude, longitude } = tileToWgs84(tile.x + x / extent, tile.y + y / extent, zoom);
+    const [localX, localZ] = project(latitude, longitude);
+    return Object.assign(new THREE.Vector2(localX, localZ), {
+      u: (maskPadding + x / extent * maskResolution) / maskSize,
+      v: (maskPadding + y / extent * maskResolution) / maskSize,
+    });
+  });
+}
+
+function createCoverageMask() {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = maskSize;
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) return null;
+  context.fillStyle = '#000';
+  context.fillRect(0, 0, maskSize, maskSize);
+  context.fillStyle = '#fff';
+  context.filter = 'blur(1px)';
+  return context;
+}
+
+function drawCoverage(context, rings) {
+  context.beginPath();
+  for (const [first, ...rest] of rings) {
+    context.moveTo(first.u * maskSize, first.v * maskSize);
+    for (const point of rest) context.lineTo(point.u * maskSize, point.v * maskSize);
+    context.closePath();
+  }
+  context.fill('evenodd');
+}
+
+export function buildGeographicGreenTile(data, tile, project, terrain, exclude = () => false, coverage = null) {
   const layers = new VectorTile(new PbfReader(data)).layers;
   const positions = [];
   const colors = [];
+  const uvs = [];
   const triangles = [];
   const color = new THREE.Color();
   const masked = (x, z, height) => !(height > 0) || terrain.isWater?.(x, z) || exclude(x, z)
     || (Number.isFinite(terrain.size) && Math.max(Math.abs(x), Math.abs(z)) > terrain.size / 2);
 
-  const addVertex = (x, z) => {
+  const addVertex = (x, z, u, v) => {
     const height = terrain.getHeight(x, z);
     positions.push(x, height + surfaceOffset, z);
     colors.push(color.r, color.g, color.b);
-    return { x, z, height, masked: masked(x, z, height), index: positions.length / 3 - 1 };
+    uvs.push(u, v);
+    return { x, z, u, v, height, masked: masked(x, z, height), index: positions.length / 3 - 1 };
+  };
+  const midpoint = (a, b) => {
+    return addVertex((a.x + b.x) / 2, (a.z + b.z) / 2, (a.u + b.u) / 2, (a.v + b.v) / 2);
   };
   const pushTriangle = (a, b, c, depth = 0) => {
     const x = (a.x + b.x + c.x) / 3;
@@ -94,9 +188,9 @@ export function buildGeographicGreenTile(data, tile, project, terrain, exclude =
     const crossesMask = [a, b, c].some(vertex => Boolean(vertex.masked) !== Boolean(centerMasked));
     const needsDraping = !centerMasked && Math.abs(height - (a.height + b.height + c.height) / 3) > 0.5;
     if ((crossesMask && depth < 5 && span > 6) || (needsDraping && depth < 3 && span > 12)) {
-      const ab = addVertex((a.x + b.x) / 2, (a.z + b.z) / 2);
-      const bc = addVertex((b.x + c.x) / 2, (b.z + c.z) / 2);
-      const ca = addVertex((c.x + a.x) / 2, (c.z + a.z) / 2);
+      const ab = midpoint(a, b);
+      const bc = midpoint(b, c);
+      const ca = midpoint(c, a);
       pushTriangle(a, ab, ca, depth + 1);
       pushTriangle(b, bc, ab, depth + 1);
       pushTriangle(c, ca, bc, depth + 1);
@@ -120,10 +214,12 @@ export function buildGeographicGreenTile(data, tile, project, terrain, exclude =
         if (!rings.flat().every(point => Number.isFinite(point.x) && Number.isFinite(point.y))) continue;
         const faces = THREE.ShapeUtils.triangulateShape(outer, holes);
         if (!faces.length) continue;
-        const vertices = rings.flat().map(point => addVertex(point.x, point.y));
+        const firstTriangle = triangles.length;
+        const vertices = rings.flat().map(({ x, y, u, v }) => addVertex(x, y, u, v));
         for (const face of faces) {
           pushTriangle(vertices[face[2]], vertices[face[1]], vertices[face[0]]);
         }
+        if (coverage && triangles.length > firstTriangle) drawCoverage(coverage, rings);
       }
     }
   }
@@ -132,8 +228,15 @@ export function buildGeographicGreenTile(data, tile, project, terrain, exclude =
   geometry.setIndex(triangles);
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.computeVertexNormals();
   return geometry;
+}
+
+function disposeGreenMesh(mesh) {
+  mesh.geometry.dispose();
+  mesh.material.alphaMap?.dispose();
+  mesh.material.dispose();
 }
 
 export class GeographicGreenSpace {
@@ -146,9 +249,6 @@ export class GeographicGreenSpace {
     this.onTileData = onTileData;
     this.group = new THREE.Group();
     this.group.name = 'Geographic parks and green space';
-    this.material = applyLogDepthOffset(new THREE.MeshLambertMaterial({
-      vertexColors: true, side: THREE.DoubleSide,
-    }), 3);
     this.tiles = new Map();
     this.pending = null;
     this.retryAt = new Map();
@@ -199,7 +299,7 @@ export class GeographicGreenSpace {
     for (const [key, mesh] of this.tiles) {
       if (wantedKeys.has(key)) continue;
       mesh?.removeFromParent();
-      mesh?.geometry.dispose();
+      if (mesh) disposeGreenMesh(mesh);
       this.tiles.delete(key);
     }
     for (const key of this.retryAt.keys()) if (!wantedKeys.has(key)) this.retryAt.delete(key);
@@ -213,9 +313,16 @@ export class GeographicGreenSpace {
       const response = await this.archive.getZxy(zoom, tile.x, tile.y, controller.signal);
       if (controller.signal.aborted) return;
       if (response?.data) this.onTileData?.(tile, zoom, response.data);
-      const geometry = response && buildGeographicGreenTile(response.data, tile, this.project, this.terrain, this.exclude);
+      const coverage = response ? createCoverageMask() : null;
+      const geometry = response && buildGeographicGreenTile(
+        response.data, tile, this.project, this.terrain, this.exclude, coverage,
+      );
       if (geometry) {
-        const mesh = new THREE.Mesh(geometry, this.material);
+        const alphaMap = coverage ? new THREE.CanvasTexture(coverage.canvas) : null;
+        if (alphaMap) alphaMap.flipY = false;
+        const mesh = new THREE.Mesh(geometry, createGreenMaterial(alphaMap));
+        // Blend into the opaque ground before translucent scenery such as road lights.
+        mesh.renderOrder = -1;
         mesh.receiveShadow = true;
         this.group.add(mesh);
         this.tiles.set(tile.key, mesh);
@@ -233,12 +340,11 @@ export class GeographicGreenSpace {
   dispose() {
     this.pending?.controller.abort();
     this.group.removeFromParent();
-    for (const mesh of this.tiles.values()) mesh?.geometry.dispose();
+    for (const mesh of this.tiles.values()) if (mesh) disposeGreenMesh(mesh);
     if (this.terrain.geographicGreenLayer === this) delete this.terrain.geographicGreenLayer;
     this.group.clear();
     this.tiles.clear();
     this.retryAt.clear();
-    this.material.dispose();
   }
 }
 
