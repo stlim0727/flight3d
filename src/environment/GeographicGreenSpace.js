@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { VectorTile } from '@mapbox/vector-tile';
 import { applyLogDepthOffset } from './RunwayMarkings.js';
+import { addGroundSurfaceColor } from './groundSurfaceShader.js';
 import { PbfReader } from 'pbf';
 import { PMTiles } from 'pmtiles';
 import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospatial/TileCoordinateSystem.js';
@@ -74,41 +75,13 @@ function createGreenMaterial(alphaMap) {
     forceSinglePass: true,
   });
   material.onBeforeCompile = shader => {
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', `
-      #include <common>
-      varying vec2 vGreenGround;
-    `).replace('#include <begin_vertex>', `
-      #include <begin_vertex>
-      vGreenGround = position.xz;
-    `);
-    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `
-      #include <common>
-      varying vec2 vGreenGround;
-
-      float greenHash(vec2 cell) {
-        vec3 p = fract(vec3(cell.xyx) * 0.1031);
-        p += dot(p, p.yzx + 33.33);
-        return fract((p.x + p.y) * p.z);
-      }
-
-      float greenNoise(vec2 p) {
-        vec2 cell = floor(p);
-        vec2 f = fract(p);
-        f = f * f * (3.0 - 2.0 * f);
-        float value = mix(
-          mix(greenHash(cell), greenHash(cell + vec2(1.0, 0.0)), f.x),
-          mix(greenHash(cell + vec2(0.0, 1.0)), greenHash(cell + 1.0), f.x),
-          f.y
-        );
-        return (value - 0.5) * (1.0 - smoothstep(0.25, 1.0, length(fwidth(p))));
-      }
-    `).replace('#include <color_fragment>', `
-      #include <color_fragment>
-      float patches = greenNoise(vGreenGround / 28.0);
-      float details = greenNoise(vGreenGround / 2.5);
+    addGroundSurfaceColor(shader, `
+      float patches = groundNoise(vGroundXZ / 28.0);
+      float details = groundNoise(vGroundXZ / 2.5);
       diffuseColor.rgb *= 1.0 + patches * 0.32 + details * 0.18;
       diffuseColor.rgb += patches * vec3(0.028, 0.013, 0.0);
-    `).replace('#include <alphamap_fragment>', `
+    `);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <alphamap_fragment>', `
       #ifdef USE_ALPHAMAP
         float coverage = texture2D(alphaMap, vAlphaMapUv).g;
         // The mask includes the vector-tile buffer so its blur can cross tile edges.
