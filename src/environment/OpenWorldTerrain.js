@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { PMTiles } from 'pmtiles';
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
+import { applyFarSunShadow } from './FarSunShadow.js';
 import { TileCacheManager } from './TileCacheManager.js';
 import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospatial/TileCoordinateSystem.js';
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
@@ -221,12 +222,59 @@ export function buildLocalImageryGeometry(sources, x, y) {
   return geometry;
 }
 
-export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, water, project, protectedAreas = [], blendHeight }) {
+// Split clipped edges at every local mesh vertex so both sides interpolate
+// the same piecewise-linear height, including between Mercator grid vertices.
+function stitchLocalEdge(piece, local) {
+  const { size, segments, geometry } = local;
+  const half = size / 2;
+  const step = size / segments;
+  const width = segments + 1;
+  const positions = geometry.attributes.position;
+  const stitched = [];
+  let joined = false;
+  for (let i = 0; i < piece.length; i++) {
+    const a = [...piece[i]];
+    const b = piece[(i + 1) % piece.length];
+    stitched.push(a);
+    for (const axis of [0, 2]) {
+      if (Math.abs(Math.abs(a[axis]) - half) > 1e-6) continue;
+      const along = 2 - axis;
+      const edge = a[axis] < 0 ? 0 : segments;
+      const height = n => positions.getY(axis === 0 ? n * width + edge : edge * width + n);
+      const index = value => THREE.MathUtils.clamp((value + half) / step, 0, segments);
+      if (Math.abs(a[along]) <= half + 1e-6) {
+        const t = index(a[along]);
+        const n = Math.min(Math.floor(t), segments - 1);
+        a[1] = THREE.MathUtils.lerp(height(n), height(n + 1), t - n);
+        joined = true;
+      }
+      if (Math.abs(a[axis] - b[axis]) > 1e-6 || a[along] === b[along]) continue;
+      const direction = Math.sign(b[along] - a[along]);
+      const start = (a[along] + half) / step;
+      const first = direction > 0
+        ? Math.max(0, Math.floor(start) + 1)
+        : Math.min(segments, Math.ceil(start) - 1);
+      for (let n = first; n >= 0 && n <= segments; n += direction) {
+        const value = -half + n * step;
+        const fraction = (value - a[along]) / (b[along] - a[along]);
+        if (fraction <= 1e-8 || fraction >= 1 - 1e-8) break;
+        const vertex = a.map((item, j) => THREE.MathUtils.lerp(item, b[j], fraction));
+        vertex[1] = height(n);
+        stitched.push(vertex);
+        joined = true;
+      }
+    }
+  }
+  return joined ? stitched : null;
+}
+
+export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, water, project, protectedAreas = [], blendHeight, localSurface }) {
   const bounds = projectedBounds(x, y, project);
   const overlaps = protectedAreas.filter(([west, north, east, south]) =>
     west < bounds[2] && east > bounds[0] && north < bounds[3] && south > bounds[1]);
   const vertices = [];
   const indices = [];
+  const cellOffsets = localSurface && overlaps.length ? new Uint32Array(segments ** 2 + 1) : null;
   const mapCoordinates = [];
   const colors = [];
   const groundColor = new THREE.Color();
@@ -253,6 +301,7 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
   }
   for (let row = 0; row < segments; row++) {
     for (let col = 0; col < segments; col++) {
+      if (cellOffsets) cellOffsets[row * segments + col] = indices.length;
       const nw = row * stride + col;
       for (const triangle of [[nw, nw + stride, nw + 1], [nw + stride + 1, nw + 1, nw + stride]]) {
         let pieces = null;
@@ -271,8 +320,19 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
         }
         if (!pieces) indices.push(...triangle);
         else for (const piece of pieces) {
-          const polygon = piece.map(appendVertex);
-          for (let i = 1; i < polygon.length - 1; i++) indices.push(polygon[0], polygon[i], polygon[i + 1]);
+          const stitched = cellOffsets && stitchLocalEdge(piece, localSurface);
+          if (stitched) {
+            // A center fan preserves the new edge segments when they are collinear.
+            const center = appendVertex(piece[0].map((_, j) =>
+              piece.reduce((sum, vertex) => sum + vertex[j], 0) / piece.length));
+            const polygon = stitched.map(appendVertex);
+            for (let i = 0; i < polygon.length; i++) {
+              indices.push(center, polygon[i], polygon[(i + 1) % polygon.length]);
+            }
+          } else {
+            const polygon = piece.map(appendVertex);
+            for (let i = 1; i < polygon.length - 1; i++) indices.push(polygon[0], polygon[i], polygon[i + 1]);
+          }
         }
       }
     }
@@ -283,7 +343,8 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(mapCoordinates, 2));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
-  return { geometry, water };
+  if (cellOffsets) cellOffsets[cellOffsets.length - 1] = indices.length;
+  return { geometry, water, cellOffsets };
 }
 
 // Keep every boundary sample so reduced tiles join full-resolution neighbors.
@@ -373,11 +434,20 @@ export class OpenWorldTerrain {
     if (!tile) return undefined;
     const col = Math.min(segments - 1, Math.floor(fx * segments));
     const row = Math.min(segments - 1, Math.floor(fy * segments));
-    const positions = (tile.fullGeometry ?? tile.mesh.geometry).attributes.position;
+    const geometry = tile.fullGeometry ?? tile.mesh.geometry;
+    const positions = geometry.attributes.position;
     let height;
     for (let dz = -1; dz <= 1 && height === undefined; dz++) {
       for (let dx = -1; dx <= 1 && height === undefined; dx++) {
         if (row + dz < 0 || row + dz >= segments || col + dx < 0 || col + dx >= segments) continue;
+        if (tile.cellOffsets) {
+          const cell = (row + dz) * segments + col + dx;
+          const indices = geometry.index.array;
+          for (let i = tile.cellOffsets[cell]; i < tile.cellOffsets[cell + 1] && height === undefined; i += 3) {
+            height = heightOnTriangle(positions, x, z, indices[i], indices[i + 1], indices[i + 2]);
+          }
+          continue;
+        }
         const nw = (row + dz) * stride + col + dx;
         height = heightOnTriangle(positions, x, z, nw, nw + stride, nw + 1)
           ?? heightOnTriangle(positions, x, z, nw + stride + 1, nw + 1, nw + stride);
@@ -641,15 +711,16 @@ export class OpenWorldTerrain {
         return THREE.MathUtils.lerp(local.getNaturalHeight(px, pz), height,
           THREE.MathUtils.smoothstep(distance, 0, blendDistance));
       } : undefined;
-      const { geometry } = buildOpenTerrainTile({
-        blendHeight,
+      const { geometry, cellOffsets } = buildOpenTerrainTile({
+        blendHeight, localSurface: local,
         x, y, raster, east, south, southeast, water, project: this.project, protectedAreas: this.protectedAreas,
       });
       const detail = { map: { value: null }, blend: { value: 0 } };
       const material = terrainMaterial(detail);
+      if (local) applyFarSunShadow(material);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
-      const entry = { mesh, fullGeometry: geometry, detail, water, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
+      const entry = { mesh, fullGeometry: geometry, cellOffsets, detail, water, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
       if (local) {
         const [west, north, eastEdge, southEdge] = projectedBounds(x, y, this.project);
         if (west < half && eastEdge > -half && north < half && southEdge > -half) {

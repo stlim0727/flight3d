@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BoxGeometry, Mesh, PerspectiveCamera, Raycaster, Vector3 } from 'three';
+import { BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, Vector3 } from 'three';
 import { buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 
@@ -306,4 +306,35 @@ test('local terrain triangles keep their surface and use continuous tile UVs', (
   assert.equal(buildLocalImageryGeometry([source], 6, 3), null);
   west.dispose();
   east.dispose();
+});
+
+test('streamed edge follows local mesh breakpoints and collision samples the stitched triangles', () => {
+  const center = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const size = 1000, segments = 40;
+  const localGeometry = new PlaneGeometry(size, size, segments, segments).rotateX(-Math.PI / 2);
+  const points = localGeometry.attributes.position;
+  for (let i = 0; i < points.count; i++) points.setY(i, i % 2 ? 150 : 100);
+  const protectedAreas = [[-500, -500, 500, 500]];
+  const world = new OpenWorldTerrain({ origin: center, protectedAreas });
+  const raster = flat(80);
+  const { geometry, cellOffsets } = buildOpenTerrainTile({
+    x, y, raster, east: raster, south: raster, southeast: raster, project: world.project,
+    protectedAreas, localSurface: { size, segments, geometry: localGeometry },
+  });
+  const mesh = new Mesh(geometry);
+  world.tiles.set(`${x}/${y}`, { mesh, cellOffsets });
+  const edge = new Map();
+  for (const index of geometry.index.array) {
+    const position = geometry.attributes.position;
+    if (position.getX(index) === 500) edge.set(position.getZ(index), position.getY(index));
+  }
+  assert.equal(edge.get(0), 100);
+  assert.equal(edge.get(25), 150);
+  assert.equal(edge.get(50), 100);
+  const ray = new Raycaster(new Vector3(501, 1000, 25), new Vector3(0, -1, 0));
+  const hit = ray.intersectObject(mesh)[0];
+  assert.ok(hit);
+  assert.ok(Math.abs(world.sample(501, 25).height - hit.point.y) < 0.001);
+  localGeometry.dispose();
+  world.dispose();
 });

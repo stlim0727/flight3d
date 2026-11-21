@@ -230,10 +230,34 @@ export class LuklaTerrain {
     return (h00 * (1 - fx) + h10 * fx) * (1 - fy) + (h01 * (1 - fx) + h11 * fx) * fy;
   }
 
+  // Collision approaches the rendered perimeter height before handing off to
+  // the streamed mesh. Keep the measured DSM in the interior.
+  getBoundaryBlendedHeight(x, z) {
+    const natural = this.getNaturalHeight(x, z);
+    const half = this.size / 2;
+    const step = this.size / this.segments;
+    const distance = half - Math.max(Math.abs(x), Math.abs(z));
+    if (distance >= step) return natural;
+    const gx = THREE.MathUtils.clamp((x + half) / step, 0, this.segments);
+    const gz = THREE.MathUtils.clamp((z + half) / step, 0, this.segments);
+    const col = Math.min(Math.floor(gx), this.segments - 1);
+    const row = Math.min(Math.floor(gz), this.segments - 1);
+    const u = gx - col, v = gz - row;
+    const width = this.segments + 1;
+    const nw = row * width + col;
+    const positions = this.geometry.attributes.position;
+    const ne = positions.getY(nw + 1);
+    const sw = positions.getY(nw + width);
+    const rendered = u + v <= 1
+      ? positions.getY(nw) * (1 - u - v) + ne * u + sw * v
+      : positions.getY(nw + width + 1) * (u + v - 1) + ne * (1 - v) + sw * (1 - u);
+    return THREE.MathUtils.lerp(rendered, natural, THREE.MathUtils.smoothstep(distance, 0, step));
+  }
+
   getHeight(x, z) {
     const streamed = this.openWorld?.sample(x, z);
     if (streamed) return streamed.height;
-    const naturalH = this.getNaturalHeight(x, z);
+    const naturalH = this.openWorld ? this.getBoundaryBlendedHeight(x, z) : this.getNaturalHeight(x, z);
 
     // 2. Runway 06/24 Carving & 11.7% Grade Blending
     // Heading 058°: Longitudinal axis (s) along runway, Lateral axis (w) across runway
