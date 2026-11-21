@@ -1,9 +1,9 @@
 export const RENDER_QUALITY_KEY = 'flight3d.renderQuality';
 export const RENDER_QUALITY = Object.freeze({
   high: { terrain: 'high', maxDpr: 2, maxPixels: 3840 * 2160, shadowMapSize: 4096, farShadowMapSize: 4096, farShadowRange: 4000, shadows: true, ao: true, clouds: true, greenSpace: true, terrainSegments: 256, waterSegments: 180, antialias: true, flatShading: false },
-  balanced: { terrain: 'low', maxDpr: 1.5, maxPixels: 2560 * 1440, shadowMapSize: 2048, farShadowMapSize: 2048, farShadowRange: 3000, shadows: true, ao: true, clouds: true, greenSpace: true, terrainSegments: 192, waterSegments: 144, antialias: true, flatShading: false },
-  performance: { terrain: 'low', maxDpr: 1, maxPixels: 1280 * 720, shadowMapSize: 1024, farShadowMapSize: 0, farShadowRange: 0, shadows: true, ao: false, clouds: true, greenSpace: false, terrainSegments: 128, waterSegments: 96, antialias: true, flatShading: false },
-  ultraLow: { terrain: 'ultraLow', maxDpr: 0.75, maxPixels: 1280 * 720, shadowMapSize: 0, farShadowMapSize: 0, farShadowRange: 0, shadows: false, ao: false, clouds: false, greenSpace: false, terrainSegments: 64, waterSegments: 64, antialias: false, flatShading: true },
+  balanced: { simpleF16Canopy: true, limitF16AirportLights: true, terrain: 'low', maxDpr: 1.5, maxPixels: 2560 * 1440, shadowMapSize: 2048, farShadowMapSize: 2048, farShadowRange: 3000, shadows: true, ao: true, clouds: true, greenSpace: true, terrainSegments: 192, waterSegments: 144, antialias: true, flatShading: false },
+  performance: { simpleF16Canopy: true, limitF16AirportLights: true, terrain: 'low', maxDpr: 1, maxPixels: 1280 * 720, shadowMapSize: 1024, farShadowMapSize: 0, farShadowRange: 0, shadows: true, ao: false, clouds: true, greenSpace: false, terrainSegments: 128, waterSegments: 96, antialias: true, flatShading: false },
+  ultraLow: { simpleF16Canopy: true, limitF16AirportLights: true, terrain: 'ultraLow', maxDpr: 0.75, maxPixels: 1280 * 720, shadowMapSize: 0, farShadowMapSize: 0, farShadowRange: 0, shadows: false, ao: false, clouds: false, greenSpace: false, terrainSegments: 64, waterSegments: 64, antialias: false, flatShading: true },
 });
 
 // farShadowRange is the half-width in metres of the coarse sun-shadow map around the camera
@@ -28,7 +28,9 @@ export function renderPixelRatio(quality, width, height, devicePixelRatio = 1, a
   const area = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0
     ? width * height : 1;
   const ratio = Math.min(dpr, preset.maxDpr, Math.sqrt(preset.maxPixels / area));
-  return resolved === 'balanced' && aircraftId === 'F16' ? ratio * 0.85 : ratio;
+  if (aircraftId !== 'F16' || resolved === 'high') return ratio;
+  const f16Scale = 0.85;
+  return resolved === 'balanced' ? ratio * f16Scale : Math.min(ratio, dpr * f16Scale);
 }
 
 /**

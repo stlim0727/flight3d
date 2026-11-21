@@ -58,13 +58,21 @@ test('missing dimensions and invalid DPR remain finite', () => {
   assert.equal(renderPixelRatio('balanced', 0, 0, 2), 1.5);
 });
 
-test('F16 uses a lower Balanced render scale across viewport sizes', () => {
-  for (const [width, height, dpr] of [[1440, 900, 1], [3840, 2160, 2]]) {
-    for (const quality of Object.keys(RENDER_QUALITY)) {
-      const ratio = renderPixelRatio(quality, width, height, dpr);
-      assert.equal(renderPixelRatio(quality, width, height, dpr, 'F16'),
-        quality === 'balanced' ? ratio * .85 : ratio);
-      assert.equal(renderPixelRatio(quality, width, height, dpr, 'B738'), ratio);
+test('F16 framebuffer never grows when dropping quality at a fixed viewport', () => {
+  for (const [width, height] of [[390, 844], [1280, 720], [1440, 900], [3840, 2160], [7680, 4320]]) {
+    for (const dpr of [0.5, 1, 1.5, 2, 3]) {
+      let previous = Infinity;
+      for (const quality of Object.keys(RENDER_QUALITY)) {
+        const ratio = renderPixelRatio(quality, width, height, dpr, 'F16');
+        assert.ok(ratio <= previous, `${quality}: ${width}x${height} at DPR ${dpr}`);
+        const standard = renderPixelRatio(quality, width, height, dpr);
+        assert.equal(renderPixelRatio(quality, width, height, dpr, 'B738'), standard);
+        if (quality === 'high') assert.equal(ratio, standard);
+        if (quality === 'balanced') assert.equal(ratio, standard * .85);
+        previous = ratio;
+      }
     }
   }
+  assert.equal(renderPixelRatio('performance', 1280, 720, 1, 'F16'), .85);
+  assert.equal(renderPixelRatio('ultraLow', 1440, 900, 1, 'F16'), .75);
 });
