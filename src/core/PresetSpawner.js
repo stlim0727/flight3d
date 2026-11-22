@@ -990,6 +990,16 @@ class PresetSpawnerMethods {
     return Promise.resolve(null);
   }
 
+  _isRegionLoaded(id) {
+    if (id === 'coastal') return Boolean(this.terrain && this.airport);
+    if (id === 'lukla') return Boolean(this.luklaTerrain && this.luklaAirport);
+    if (id === 'incheon') return Boolean(this.incheonAirport);
+    if (id === 'jeju') return Boolean(this.jejuAirport);
+    if (id === 'neon') return Boolean(this.neonCity);
+    if (id === 'valley') return Boolean(this.persistentValley);
+    return false;
+  }
+
   _isRegionLoadingOrLoaded(id) {
     if (id === 'coastal') return Boolean((this.terrain && this.airport) || this._coastalLoad);
     if (id === 'lukla') return Boolean((this.luklaTerrain && this.luklaAirport) || this._luklaLoad);
@@ -1127,7 +1137,7 @@ class PresetSpawnerMethods {
         }
       }
       if (request !== this.airportRequest) return;
-    } else {
+    } else if (!this._isRegionLoaded(id)) {
       await this.ensureRegionLoaded(id);
       if (request !== this.airportRequest) return;
     }
@@ -1231,11 +1241,16 @@ class PresetSpawnerMethods {
     this.gameFlow.setCinematicAvailable(isScenarioAvailable(id, 'demo'));
     this.lobbyScreen?.refresh();
 
-    if (this.demoDirector && this.demoDirector.isActive) {
+    const demoWaitingForThisAirport = this.demoDirector?.isActive
+      && this.demoDirector.waitingForTerrain
+      && this.demoDirector.activeDemoAirport === id;
+    if (this.demoDirector && this.demoDirector.isActive && !demoWaitingForThisAirport) {
       this.demoDirector.stop();
     }
 
-    if (!this.applyingPendingStart) this.setPreset(defaultScenarioForRegion(id), false, pilotPreparation);
+    if (!this.applyingPendingStart && !demoWaitingForThisAirport) {
+      this.setPreset(defaultScenarioForRegion(id), false, pilotPreparation);
+    }
     this.lobbyScreen?.refresh();
 
     const airportKey = isIncheon ? 'incheon.airport' : isLukla
