@@ -36,6 +36,7 @@ export class CockpitCameraMode {
     camera.up.copy(upWorld);
     const headYaw = cs.headLookActive ? cs.headLookYaw : 0;
     const headPitch = cs.headLookActive ? cs.headLookPitch : 0;
+    const forwardLocal = new THREE.Vector3(0, 0, -100);
     forwardLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), cs.lookPitch + headPitch);
     forwardLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), cs.lookYaw + headYaw);
     const forwardWorld = forwardLocal.applyQuaternion(aircraftMesh.quaternion);

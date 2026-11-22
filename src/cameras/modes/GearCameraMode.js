@@ -33,6 +33,7 @@ export class GearCameraMode {
 
     const headYaw = cs.headLookActive ? cs.headLookYaw : 0;
     const headPitch = cs.headLookActive ? cs.headLookPitch : 0;
+    const targetLocal = cs.gearLookTarget.clone();
     targetLocal.x += cs.gearLookYaw * 3.0 + headYaw * 3.0;
     targetLocal.y += cs.gearLookPitch * 3.0 + headPitch * 3.0;
     const targetWorld = targetLocal.applyMatrix4(aircraftMesh.matrixWorld);

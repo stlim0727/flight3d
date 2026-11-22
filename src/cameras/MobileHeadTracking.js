@@ -32,6 +32,9 @@ export class MobileHeadTracking {
     this.message = 'Head tracking off';
     this.lastPose = { detected: false, yaw: 0, pitch: 0, confidence: 0, bbox: null };
     this.lastDetect = 0;
+    this._generation = 0;
+    this._lastNotifiedDetected = false;
+    this._lastNotifiedSamples = 0;
   }
 
   getStatus() {
@@ -51,6 +54,18 @@ export class MobileHeadTracking {
     if (this.onStatusChange) this.onStatusChange(this.getStatus());
   }
 
+  _releaseVideo() {
+    if (this.stream) {
+      this.stream.getTracks().forEach((track) => track.stop());
+      this.stream = null;
+    }
+    if (this.video) {
+      this.video.srcObject = null;
+      this.video.remove();
+      this.video = null;
+    }
+  }
+
   get isEnabled() {
     return this.state === 'active' || this.state === 'requesting' || this.state === 'loading';
   }
@@ -67,9 +82,16 @@ export class MobileHeadTracking {
       return;
     }
 
+    const generation = ++this._generation;
+    const stillCurrent = () => generation === this._generation;
+    const releaseLocal = (stream, video) => {
+      if (stream) stream.getTracks().forEach((track) => track.stop());
+      if (video) video.remove();
+    };
+
     this._setStatus('requesting', 'Requesting camera permission…');
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: this.facingMode,
           width: { ideal: this.videoWidth },
@@ -78,43 +100,64 @@ export class MobileHeadTracking {
         },
         audio: false,
       });
-      this.video = document.createElement('video');
-      this.video.srcObject = this.stream;
-      this.video.playsInline = true;
-      this.video.muted = true;
-      this.video.autoplay = true;
-      this.video.setAttribute('style', 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:-10px;');
-      document.body.appendChild(this.video);
-      await this.video.play();
+      if (!stillCurrent()) {
+        releaseLocal(stream, null);
+        return;
+      }
+
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.playsInline = true;
+      video.muted = true;
+      video.autoplay = true;
+      video.setAttribute('style', 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:-10px;');
+      document.body.appendChild(video);
+      try {
+        await video.play();
+      } catch (err) {
+        releaseLocal(stream, video);
+        throw err;
+      }
+      if (!stillCurrent()) {
+        releaseLocal(stream, video);
+        return;
+      }
 
       this._setStatus('loading', 'Loading face detector…');
-      this.detector = await HeadPoseDetector.create();
+      const detector = await HeadPoseDetector.create();
+      if (!stillCurrent()) {
+        detector.dispose();
+        releaseLocal(stream, video);
+        return;
+      }
 
+      this.stream = stream;
+      this.video = video;
+      this.detector = detector;
       this.cameraSystem.setHeadTrackingEnabled(true);
+      this.lastPose = { detected: false, yaw: 0, pitch: 0, confidence: 0, bbox: null };
       this.lastDetect = 0;
+      this._lastNotifiedDetected = false;
+      this._lastNotifiedSamples = 0;
       this._setStatus('active', 'Head tracking on — looking for a face');
     } catch (err) {
+      if (!stillCurrent()) return;
       this.disable();
       this._setStatus('error', `Head tracking failed: ${err?.message || err}`);
     }
   }
 
   disable() {
-    if (this.stream) {
-      this.stream.getTracks().forEach((track) => track.stop());
-      this.stream = null;
-    }
-    if (this.video) {
-      this.video.srcObject = null;
-      this.video.remove();
-      this.video = null;
-    }
+    this._generation++;
+    this._releaseVideo();
     if (this.detector) {
       this.detector.dispose();
       this.detector = null;
     }
     this.cameraSystem.setHeadTrackingEnabled(false);
     this.lastPose = { detected: false, yaw: 0, pitch: 0, confidence: 0, bbox: null };
+    this._lastNotifiedDetected = false;
+    this._lastNotifiedSamples = 0;
     if (this.state !== 'error') this._setStatus('idle', 'Head tracking off');
   }
 
@@ -153,6 +196,20 @@ export class MobileHeadTracking {
     this.lastPose = pose;
     if (pose.detected) {
       this.cameraSystem.setHeadLook(pose.yaw, pose.pitch);
+    }
+
+    const samples = this.detector.getCalibration()?.samples || 0;
+    const detectedChanged = pose.detected !== this._lastNotifiedDetected;
+    const samplesChanged = samples !== this._lastNotifiedSamples;
+    if (detectedChanged || samplesChanged) {
+      this._lastNotifiedDetected = pose.detected;
+      this._lastNotifiedSamples = samples;
+      if (detectedChanged) {
+        this.message = pose.detected
+          ? 'Head tracking on — face detected'
+          : 'Head tracking on — looking for a face';
+      }
+      this._setStatus(this.state, this.message);
     }
   }
 }

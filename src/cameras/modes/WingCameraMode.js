@@ -12,6 +12,7 @@ export class WingCameraMode {
     camera.up.copy(upWorld);
     const headYaw = cs.headLookActive ? cs.headLookYaw : 0;
     const headPitch = cs.headLookActive ? cs.headLookPitch : 0;
+    const lookLocal = new THREE.Vector3(-15.0, -1.2, -4.0);
     lookLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), cs.wingLookYaw + headYaw);
     lookLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), cs.wingLookPitch + headPitch);
     const lookWorld = eyeWorld.clone().add(lookLocal.applyQuaternion(aircraftMesh.quaternion));
