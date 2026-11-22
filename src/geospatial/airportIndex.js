@@ -182,18 +182,23 @@ export async function findAirportsInRegion(manifest, { latitude, longitude, radi
     .sort((a, b) => a.distanceKm - b.distanceKm || a.id.localeCompare(b.id));
 }
 
-/** Resolve an ICAO or IATA code through the manifest: one tile request, no scan. */
+/** Resolve a code through the manifest: one tile request, no scan. */
 export async function findAirportByCode(manifest, code, options = {}) {
   const key = typeof code === 'string' ? code.trim().toUpperCase() : '';
   if (!key) return null;
   const hint = typeof options.tileId === 'string' && Object.hasOwn(manifest.tiles, options.tileId)
     ? options.tileId : null;
-  const tileId = hint ?? manifest.icao[key] ?? manifest.iata[key] ?? manifest.ident?.[key];
+  const indexValue = index => index && Object.hasOwn(index, key) ? index[key] : null;
+  // An explicit search-entry tile wins; otherwise prefer an exact ICAO, then
+  // a non-ICAO ident, then an IATA (CJJ is both an ident and Cheongju's IATA).
+  const tileId = hint ?? indexValue(manifest.icao)
+    ?? indexValue(manifest.ident) ?? indexValue(manifest.iata);
   if (!tileId) return null;
   const tile = await loadAirportTile(manifest, tileId, options);
   const airports = tile.airports;
-  return airports.find(airport => airport.icao === key || airport.iata === key)
-    ?? airports.find(airport => airport.ident === key) ?? null;
+  return airports.find(airport => airport.icao === key)
+    ?? airports.find(airport => !airport.icao && airport.ident === key)
+    ?? airports.find(airport => airport.iata === key) ?? null;
 }
 
 function normalizeName(name) {

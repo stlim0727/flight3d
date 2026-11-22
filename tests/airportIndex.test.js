@@ -191,3 +191,42 @@ test('code lookup resolves no-ICAO identifiers used by global search results', a
   const resolved = await findAirportByCode(manifest, '01A', { baseUrl, fetchImpl });
   assert.equal(resolved.ident, '01A');
 });
+
+test('ambiguous codes prefer a non-ICAO ident over IATA and honor a tileId hint', async () => {
+  clearAirportIndexCache();
+  const data = fixture();
+  const cheongju = {
+    id: '2001', ident: 'RKTU', icao: 'RKTU', iata: 'CJJ',
+    name: 'Cheongju International', latitude: 36.715, longitude: 127.506, elevationM: 60,
+  };
+  const ellen = {
+    id: '2002', ident: 'CJJ', icao: '', iata: '',
+    name: 'Ellen Church Field', latitude: 39.841, longitude: -75.71, elevationM: 10,
+  };
+  const iataOnly = {
+    id: '2003', ident: '01A', icao: '', iata: 'CJJ',
+    name: 'IATA collision', latitude: 39.842, longitude: -75.711, elevationM: 10,
+  };
+  data.manifest.tiles['13-8'] = {};
+  data.tiles.set('13-8', {
+    schemaVersion: 1, version: 'fixture', tile: '13-8', airports: [iataOnly, ellen],
+  });
+  data.tiles.get('12-30').airports.push(cheongju);
+  data.manifest.icao = { ...data.manifest.icao, RKTU: '12-30' };
+  data.manifest.ident = { ...data.manifest.ident, CJJ: '13-8' };
+  data.manifest.iata = { ...data.manifest.iata, CJJ: '12-30' };
+  const { baseUrl, fetchImpl, requested } = serve(data);
+  const manifest = await loadAirportManifest({ baseUrl, fetchImpl });
+
+  const withoutHint = await findAirportByCode(manifest, 'CJJ', { baseUrl, fetchImpl });
+  assert.equal(withoutHint.id, ellen.id, 'ident wins over a conflicting IATA');
+  assert.ok(requested.includes(`${baseUrl}fixture/tiles/13-8.json`));
+  assert.ok(!requested.includes(`${baseUrl}fixture/tiles/12-30.json`), 'only the ident tile is fetched');
+
+  const hinted = await findAirportByCode(manifest, 'CJJ', { tileId: '12-30', baseUrl, fetchImpl });
+  assert.equal(hinted.icao, 'RKTU', 'an explicit tileId wins over the manifest precedence');
+  assert.equal((await findAirportByCode(manifest, 'RKTU', { baseUrl, fetchImpl })).icao, 'RKTU');
+
+  const unknownTile = await findAirportByCode(manifest, 'CJJ', { tileId: '99-99', baseUrl, fetchImpl });
+  assert.equal(unknownTile.id, ellen.id, 'an unknown hint falls back to manifest precedence');
+});

@@ -404,6 +404,7 @@ export default {
   "lobby.map.search.loading": "전 세계 공항 색인을 불러오는 중…",
   "lobby.map.search.error": "전 세계 공항 색인을 불러오지 못했습니다. 기존 장소만 표시합니다",
   "lobby.map.search.retry": "클릭하여 다시 시도",
+  "lobby.map.search.tileError": "선택한 공항의 상세 정보를 불러오지 못했습니다. 검색 결과는 그대로 표시합니다",
   "lobby.map.bookmarks": "북마크",
   "lobby.map.bookmarks.empty": "저장된 북마크가 없습니다",
   "lobby.bookmark.add": "북마크 추가",

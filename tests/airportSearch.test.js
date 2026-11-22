@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSearchText, searchAirportIndex, searchMapPlaces } from '../src/config/airportSearch.js';
+import { mergeScoredResults, normalizeSearchText, searchAirportIndex, searchAirportIndexScored, searchMapPlaces, searchMapPlacesScored } from '../src/config/airportSearch.js';
 
 const AIRPORTS = [
   { code: 'RKSI', iata: 'ICN', name: 'Incheon International Airport', latitude: 37.4691, longitude: 126.451 },
@@ -178,4 +178,38 @@ test('global search applies limits and rejects invalid indexes without mutation'
 test('global search accepts the icao field used by index records', () => {
   const entries = [{ icao: 'VNLK', iata: 'LUA', name: 'Tenzing-Hillary Airport', latitude: 27.6868, longitude: 86.7295 }];
   assert.deepEqual(searchAirportIndex(entries, 'vnlk').map(match => match.id), ['VNLK']);
+});
+
+test('scored variants expose ranking scores while plain results keep their shape', () => {
+  const local = searchMapPlacesScored(catalog(), 'airport');
+  assert.ok(local.length > 0);
+  assert.ok(local.every(result => Number.isFinite(result.score)));
+  const global = searchAirportIndexScored([{
+    code: 'EFPO', iata: 'POR', name: 'Porto Airport', latitude: 41.2, longitude: -8.6,
+  }], 'POR');
+  assert.equal(global[0].id, 'EFPO');
+  assert.equal(global[0].score, 0);
+  assert.equal(searchAirportIndex([{
+    code: 'EFPO', iata: 'POR', name: 'Porto Airport', latitude: 41.2, longitude: -8.6,
+  }], 'POR')[0].score, undefined);
+});
+
+test('merged ranking keeps an exact global IATA match ahead of weak local text hits', () => {
+  const localPlaces = {
+    airports: Array.from({ length: 20 }, (_, index) => ({
+      code: `K${String(index).padStart(3, '0')}`,
+      name: `Local Airport ${index}`,
+      latitude: 37 + index / 100,
+      longitude: 127,
+    })),
+    points: [],
+  };
+  const local = searchMapPlacesScored(localPlaces, 'POR', 20);
+  const global = searchAirportIndexScored([{
+    code: 'EFPO', iata: 'POR', name: 'Porto Airport', latitude: 41.2, longitude: -8.6,
+  }], 'POR');
+  const merged = mergeScoredResults(local, global, 20);
+  assert.equal(merged[0].id, 'EFPO');
+  assert.equal(merged[0].source, 'global');
+  assert.ok(merged.slice(1).every(result => result.source === 'local'));
 });

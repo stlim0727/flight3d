@@ -43,9 +43,19 @@ const snapshot = `(() => {
       runway: world.isOnRunway(...probe),
       region: world.regionNameKey(...probe),
     },
-    guidance: {
-      synthetic: world.destinationInfo(0, 0, 'jeju')?.synthetic,
-      bearing: world.destinationInfo(0, 0, 'jeju')?.bearingDeg,
+    guidance: (() => {
+      const target = world.anchor === 'jeju' ? 'incheon' : 'jeju';
+      const info = world.destinationInfo(0, 0, target);
+      return {
+        target,
+        synthetic: info?.synthetic,
+        bearing: info?.bearingDeg,
+        distanceNm: info?.distanceNm,
+      };
+    })(),
+    props: {
+      foliage: sim.foliage?.group?.parent === sim.scene,
+      ships: sim.ships?.group?.parent === sim.scene,
     },
   };
 })()`;
@@ -61,10 +71,12 @@ await withBrowserSession({ path: '/index.html?terrain=incheon&aircraft=C172&scen
   const initial = await evaluate(snapshot);
   assert.equal(initial.mounted.incheon.mounted, true);
   assert.equal(initial.mounted.incheon.inScene, true);
-  for (const id of ['jeju', 'lukla', 'neon', 'valley']) {
+  for (const id of ['jeju', 'lukla', 'coastal', 'neon', 'valley']) {
     assert.equal(initial.mounted[id].mounted, false, `${id} should start unmounted`);
     assert.equal(initial.mounted[id].inScene, false, `${id} group should be out of the scene`);
   }
+  assert.equal(initial.props.foliage, false, 'coastal foliage must detach with its region');
+  assert.equal(initial.props.ships, false, 'ships must detach with the coastal region');
 
   // Freeze the flight loop so teleport probes are deterministic.
   await evaluate(`(() => {
@@ -99,7 +111,9 @@ await withBrowserSession({ path: '/index.html?terrain=incheon&aircraft=C172&scen
   assert.equal(switched.anchor, 'jeju');
   assert.equal(switched.mounted.jeju.mounted, true);
   assert.equal(switched.mounted.jeju.inScene, true);
+  assert.equal(switched.guidance.target, 'incheon', 'Jeju anchor must guide to another real airport');
   assert.equal(switched.guidance.synthetic, false, 'non-Incheon anchor must use real threshold guidance');
+  assert.ok(switched.guidance.distanceNm > 0);
   await screenshot(path.join(artifacts, 'jeju-anchor.png'));
 
   assert.deepEqual(exceptions, []);

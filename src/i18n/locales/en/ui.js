@@ -404,6 +404,7 @@ export default {
   "lobby.map.search.loading": "Loading worldwide airport index…",
   "lobby.map.search.error": "Worldwide airport index unavailable; showing local results only",
   "lobby.map.search.retry": "Click to retry",
+  "lobby.map.search.tileError": "Selected airport details could not be loaded; search results are still available",
   "lobby.map.bookmarks": "Bookmarks",
   "lobby.map.bookmarks.empty": "No bookmarks",
   "lobby.bookmark.add": "Bookmark",

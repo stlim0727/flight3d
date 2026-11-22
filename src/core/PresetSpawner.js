@@ -20,7 +20,7 @@ import { jejuSpawn } from '../geospatial/JejuFlightSurface.js';
 import { LuklaTerrain } from '../environment/LuklaTerrain.js';
 import { LuklaAirport } from '../environment/LuklaAirport.js';
 import { APPROACH_DATA } from '../config/approachData.js';
-import { WORLD_REGIONS, REGION_EXTENTS, BASE_OFFSETS } from '../world/UnifiedWorld.js';
+import { WORLD_REGIONS, REGION_EXTENTS } from '../world/UnifiedWorld.js';
 import { createWorldAirportFacade } from '../world/WorldAirportFacade.js';
 import {
   defaultScenarioForRegion,
@@ -749,12 +749,12 @@ class PresetSpawnerMethods {
     // surface and Valley mission hides the shared ocean, so leave those alone.
     if (this.water && id !== 'neon' && id !== 'valley') this.water.mesh.visible = true;
 
-    this.updateRegionMounting();
-
-    const spawnAirport = this.spawnAirportFor(id);
-    const facade = createWorldAirportFacade(world, spawnAirport);
     this.currentTerrain = world;
+    const mountingChanged = this.updateRegionMounting();
+    const spawnAirport = this.spawnAirportFor(id);
+    const facade = mountingChanged ? this.currentAirport : createWorldAirportFacade(world, spawnAirport);
     this.currentAirport = facade;
+    if (this.collisionDetector) this.collisionDetector.airport = facade;
     return true;
   }
 
@@ -777,14 +777,13 @@ class PresetSpawnerMethods {
     if (this.telemetry?.onGround && WORLD_REGIONS.includes(this.activeAirport)) {
       required.add(this.activeAirport);
     }
-    if (this.pilotArena?.active) required.add('valley');
     return required;
   }
 
   /** Mount/unmount visuals with separate approach and retreat distances. */
   updateRegionMounting() {
     const world = this.world;
-    if (!world || !this.scene) return false;
+    if (!world || !this.scene || this.currentTerrain !== world) return false;
     const required = this.requiredMountedRegions();
     const speed = Math.max(0, this.linearVelocity?.length?.() ?? 0);
     const approachMargin = Math.min(
@@ -805,12 +804,12 @@ class PresetSpawnerMethods {
       this.setSceneObject(region.group, mounted);
       if (region.mesh !== region.group) this.setSceneObject(region.mesh, mounted);
     }
+    if (!changed) return false;
     const coastalMounted = world.isMounted('coastal');
     this.setSceneObject(this.foliage?.group, coastalMounted);
     this.setSceneObject(this.ships?.group, coastalMounted);
     if (this.foliage?.group) this.foliage.group.visible = coastalMounted;
     if (this.ships?.group) this.ships.group.visible = coastalMounted;
-    if (!changed) return false;
     const facade = createWorldAirportFacade(world, this.spawnAirportFor(world.anchor));
     this.currentAirport = facade;
     this.collisionDetector?.setEnvironment(

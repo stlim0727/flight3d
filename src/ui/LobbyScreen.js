@@ -7,8 +7,9 @@ import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, requiredAircraft, scenarioLabelKey } from '../config/scenarioRegistry.js';
 import { REGION_NAME_KEYS } from '../world/UnifiedWorld.js';
 import { DESTINATION_CHOICES, resolveDestination, saveSavedDestination } from '../config/flightSelection.js';
-import { searchAirportIndex, searchMapPlaces } from '../config/airportSearch.js';
+import { mergeScoredResults, searchAirportIndexScored, searchMapPlacesScored } from '../config/airportSearch.js';
 import { loadBookmarks, toggleBookmark, bookmarkKey, isBookmarked } from '../config/airportBookmarks.js';
+import { registerExternalDestinations } from '../config/externalDestinations.js';
 import { defaultMapBookmarks, indexedAirportPlace, indexedAirportPlaces } from '../config/mapFlightPlaces.js';
 import { loadAirportManifest, loadAirportSearchIndex, findAirportByCode } from '../geospatial/airportIndex.js';
 import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, mapViewBoxFor, projectToMap } from './mapBrowser.js';
@@ -77,6 +78,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   let mapSelectionBusy = false;
   let customPoint = null;
   const mapStatus = document.getElementById('lobby-map-search-status');
+  const mapSearchRetry = document.getElementById('lobby-map-search-retry');
   const aircraftSummary = document.getElementById('lobby-aircraft-summary');
   const aircraftPicker = document.getElementById('lobby-aircraft-picker');
   const placeSummary = document.getElementById('lobby-place-summary');
@@ -84,12 +86,13 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const mapBrowserControls = [mapSearchInput, mapBookmarkToggle, mapResults, mapBookmarksEl, mapOverview].filter(Boolean);
   let mapBookmarks = loadBookmarks();
   let mapCenteredKey = '';
+  let mapPlanTileId = null;
   const mapSelects = [mapStateSelect, mapAirportSelect, mapRunwaySelect, mapPointSelect, mapDepartureSelect].filter(Boolean);
   let mapCatalog = { airports: [], points: [] };
   // The global artifact is fetched only when the place browser is used. Its
   // state is separate from the local catalog so a load failure cannot hide
   // Korean places or bookmarks.
-  const airportIndexState = { status: 'idle', entries: [], error: null, pending: null };
+  const airportIndexState = { status: 'idle', entries: [], error: null, selectionError: null, pending: null };
   const mapStateLabel = state => state === 'none'
     ? t('lobby.map.none')
     : t({ runway: 'incheon.runway', cruise: 'incheon.cruise', approach: 'incheon.approach' }[state] ?? state);
@@ -109,6 +112,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       pointId: mapPointSelect?.value ?? '',
       ...(customPoint && mapPointSelect?.value === customPoint.id ? { point: customPoint } : {}),
       departure: mapDepartureSelect?.value ?? '',
+      ...(mapPlanTileId ? { tileId: mapPlanTileId } : {}),
     });
     refresh();
   };
@@ -159,6 +163,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       latitude: place.latitude,
       longitude: place.longitude,
       iata: place.iata ?? '',
+      ...(place.tileId ? { tileId: place.tileId } : {}),
     };
   }
   function globalSearchEntries() {
@@ -167,10 +172,14 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
   function renderMapSearchStatus(query, count) {
     if (!mapStatus) return;
-    if (airportIndexState.status === 'loading') {
-      mapStatus.textContent = t('lobby.map.search.loading');
-    } else if (airportIndexState.status === 'error') {
+    const indexFailed = airportIndexState.status === 'error';
+    if (mapSearchRetry) mapSearchRetry.hidden = !indexFailed;
+    if (indexFailed) {
       mapStatus.textContent = `${t('lobby.map.search.error')} · ${t('lobby.map.search.retry')}`;
+    } else if (airportIndexState.selectionError) {
+      mapStatus.textContent = t('lobby.map.search.tileError');
+    } else if (airportIndexState.status === 'loading') {
+      mapStatus.textContent = t('lobby.map.search.loading');
     } else {
       mapStatus.textContent = query
         ? (count ? `${count} ${t('lobby.map.results')}` : t('lobby.map.search.empty')) : '';
@@ -187,6 +196,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       const manifest = await loadAirportManifest();
       airportIndexState.entries = await loadAirportSearchIndex(manifest);
       airportIndexState.status = 'ready';
+      airportIndexState.selectionError = null;
     })().catch(error => {
       airportIndexState.error = error;
       airportIndexState.status = 'error';
@@ -203,10 +213,11 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     pending.catch(() => {}); // The status element reports the failure; the next input or click retries.
     return pending;
   }
-  function setMapSearchState(status, { error = null, entries = null } = {}) {
+  function setMapSearchState(status, { error = null, entries = null, selectionError = null } = {}) {
     if (entries) airportIndexState.entries = entries;
     airportIndexState.status = status;
     airportIndexState.error = error;
+    airportIndexState.selectionError = selectionError;
     renderMapBrowser();
   }
   function renderPlaceList(container, items, emptyKey, activeKey) {
@@ -233,15 +244,12 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (!mapSearchInput) return;
     mapSearchInput.placeholder = t('lobby.map.search.placeholder');
     const query = mapSearchInput.value ?? '';
-    const localResults = searchMapPlaces(mapCatalog, query);
-    const globalResults = query && airportIndexState.status === 'ready'
-      ? searchAirportIndex(globalSearchEntries(), query) : [];
-    const seen = new Set(localResults.map(result => result.id));
-    const results = [
-      ...localResults.map(result => ({ ...result, key: `${result.kind}:${result.id}`, source: 'local' })),
-      ...globalResults.filter(result => !seen.has(result.id))
-        .map(result => ({ ...result, key: `${result.kind}:${result.id}`, source: 'global' })),
-    ].slice(0, MAP_SEARCH_LIMIT);
+    const results = mergeScoredResults(
+      searchMapPlacesScored(mapCatalog, query),
+      query && airportIndexState.status === 'ready'
+        ? searchAirportIndexScored(globalSearchEntries(), query) : [],
+      MAP_SEARCH_LIMIT,
+    );
     const active = currentMapPlace();
     const activeKey = active ? `${active.kind}:${active.id ?? active.code}` : '';
     renderPlaceList(mapResults, results, 'lobby.map.search.empty', activeKey);
@@ -293,8 +301,10 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (bookmark.kind === 'airport' && (bookmark.code || bookmark.id)) {
       try {
         const manifest = await loadAirportManifest();
-        const airport = await findAirportByCode(manifest, bookmark.code || bookmark.id);
-        const place = airport ? indexedAirportPlace(airport) : null;
+        const code = bookmark.code || bookmark.id;
+        if (bookmark.tileId) registerExternalDestinations([{ code, tileId: bookmark.tileId }]);
+        const airport = await findAirportByCode(manifest, code, bookmark.tileId ? { tileId: bookmark.tileId } : {});
+        const place = airport ? { ...indexedAirportPlace(airport), tileId: bookmark.tileId } : null;
         if (place) {
           mapCatalog.airports = [...mapCatalog.airports.filter(entry => entry.code !== place.code), place];
           if (mapAirportSelect && ![...mapAirportSelect.options].some(option => option.value === place.code)) {
@@ -312,13 +322,14 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     try {
       const manifest = await loadAirportManifest();
       const entry = airportIndexState.entries.find(item => item.code === code);
+      if (entry?.tileId) registerExternalDestinations([{ code, tileId: entry.tileId }]);
       const airport = await findAirportByCode(manifest, code, entry?.tileId ? { tileId: entry.tileId } : {});
-      const place = airport ? indexedAirportPlace(airport) : null;
+      const place = airport ? { ...indexedAirportPlace(airport), tileId: entry?.tileId } : null;
       if (!place) throw new Error(`Airport not found in index: ${code}`);
+      airportIndexState.selectionError = null;
       selectMapPlace(place);
     } catch (error) {
-      airportIndexState.error = error;
-      airportIndexState.status = 'error';
+      airportIndexState.selectionError = error;
       renderMapBrowser();
     } finally {
       setSelectionBusy(false);
@@ -326,6 +337,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
   function selectMapPlace(place) {
     if (!place) return;
+    mapPlanTileId = place.tileId ?? null;
     if (place.kind === 'point' || (place.id && findMapPlace('point', place.id))) {
       const pointId = place.id;
       if (!mapCatalog.points.some(point => point.id === pointId)) {
@@ -378,11 +390,12 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     selectMapPlace(findMapPlace(kind, id));
   }
   mapSearchInput?.addEventListener('input', () => {
-    requestAirportSearchIndex();
+    // An unavailable index is retried explicitly, not on every keystroke.
+    if (airportIndexState.status !== 'error') requestAirportSearchIndex();
     renderMapBrowser();
   });
   mapSearchInput?.addEventListener('focus', () => requestAirportSearchIndex());
-  mapStatus?.addEventListener('click', () => {
+  mapSearchRetry?.addEventListener('click', () => {
     if (airportIndexState.status === 'error') requestAirportSearchIndex();
   });
   mapResults?.addEventListener('click', onMapPlaceClick);

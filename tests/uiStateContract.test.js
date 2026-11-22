@@ -349,7 +349,7 @@ test('UI State Contract: Multi-pause state guard prevents early resume when over
 });
 
 const MAP_SELECT_IDS = ['lobby-map-state', 'lobby-map-airport', 'lobby-map-runway', 'lobby-map-point', 'lobby-map-departure'];
-const MAP_BROWSER_IDS = ['lobby-map-search', 'lobby-map-results', 'lobby-map-bookmarks', 'lobby-map-default-bookmarks', 'lobby-map-search-status', 'lobby-map-bookmark-toggle', 'lobby-map-svg', 'lobby-map-markers', 'lobby-map-overview'];
+const MAP_BROWSER_IDS = ['lobby-map-search', 'lobby-map-results', 'lobby-map-bookmarks', 'lobby-map-default-bookmarks', 'lobby-map-search-status', 'lobby-map-search-retry', 'lobby-map-bookmark-toggle', 'lobby-map-svg', 'lobby-map-markers', 'lobby-map-overview'];
 
 function setupMapDOM() {
   const { elements, mockDoc } = setupMockDOM();
@@ -444,8 +444,11 @@ test('UI State Contract: global airport search shows loading, error, retry, coun
     assert.ok(bookmarks.children.some(child => child.dataset.placeId === 'RKSI'), 'bookmarks survive an index failure');
 
     offline = false;
-    status.listeners.click[0]();
+    const retry = elements.get('lobby-map-search-retry');
+    assert.equal(retry.hidden, false, 'retry control is visible while the index is unavailable');
+    retry.listeners.click[0]();
     await screen.requestAirportSearchIndex();
+    assert.equal(retry.hidden, true, 'retry control hides after a successful load');
     search.value = 'jfk';
     search.listeners.input[0]();
     const globalButton = results.children.find(child => child.dataset.placeSource === 'global');
@@ -468,6 +471,50 @@ test('UI State Contract: global airport search shows loading, error, retry, coun
     assert.equal(added[0].runways.length, 1);
     assert.equal(elements.get('lobby-map-airport').value, 'KJFK');
     assert.equal(elements.get('lobby-map-departure').value, '');
+  } finally {
+    globalThis.document = originalDoc;
+    globalThis.fetch = originalFetch;
+    globalThis.localStorage = originalStorage;
+    clearAirportIndexCache();
+  }
+});
+
+test('UI State Contract: a tile failure keeps the loaded global search results', async () => {
+  const { elements, mockDoc } = setupMapDOM();
+  const originalDoc = globalThis.document;
+  const originalFetch = globalThis.fetch;
+  const originalStorage = globalThis.localStorage;
+  const { files } = globalFixture();
+  clearAirportIndexCache();
+  globalThis.document = mockDoc;
+  globalThis.fetch = async url => {
+    if (String(url).includes('/tiles/')) throw new Error('tile offline');
+    const body = files.get(String(url));
+    return body ? new Response(JSON.stringify(body), { status: 200 }) : new Response('missing', { status: 404 });
+  };
+  globalThis.localStorage = { getItem: () => null, setItem() {} };
+  try {
+    let plan = null;
+    const screen = initLobbyScreen({
+      getAirport: () => 'incheon', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+      getDestination: () => 'none', getMapPlan: () => plan, onMapPlan: value => { plan = value; },
+    });
+    screen.setMapPlaces({ airports: [], points: [] });
+    const search = elements.get('lobby-map-search');
+    const results = elements.get('lobby-map-results');
+    const status = elements.get('lobby-map-search-status');
+    await screen.requestAirportSearchIndex();
+    search.value = 'jfk';
+    search.listeners.input[0]();
+    const globalButton = results.children.find(child => child.dataset.placeSource === 'global');
+    assert.ok(globalButton, 'global result loaded before the tile failure');
+    results.listeners.click[0]({ target: { closest: () => globalButton } });
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    assert.equal(status.textContent, t('lobby.map.search.tileError'));
+    assert.equal(plan, null, 'a failed tile lookup must not emit a partial map plan');
+    assert.ok(results.children.some(child => child.dataset.placeId === 'KJFK'), 'search results stay visible');
+    assert.equal(elements.get('lobby-map-search-retry').hidden, true, 'index retry is not offered for a tile error');
   } finally {
     globalThis.document = originalDoc;
     globalThis.fetch = originalFetch;

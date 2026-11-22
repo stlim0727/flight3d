@@ -25,8 +25,9 @@ function makeSpawner() {
   const incheon = region(7, REGION_EXTENTS.incheon);
   const jeju = region(36, REGION_EXTENTS.jeju);
   const coastal = region(0, REGION_EXTENTS.coastal);
-  world.register('incheon', incheon).register('jeju', jeju).register('coastal', coastal);
-  scene.add(incheon.group, incheon.mesh, jeju.group, jeju.mesh, coastal.group, coastal.mesh);
+  const valley = region(2100, REGION_EXTENTS.valley);
+  world.register('incheon', incheon).register('jeju', jeju).register('coastal', coastal).register('valley', valley);
+  scene.add(incheon.group, incheon.mesh, jeju.group, jeju.mesh, coastal.group, coastal.mesh, valley.group, valley.mesh);
   const foliage = { group: new THREE.Group(), treeData: [], buildingData: [] };
   const ships = { group: new THREE.Group(), vessels: [], speedboats: [] };
   scene.add(foliage.group, ships.group);
@@ -34,6 +35,7 @@ function makeSpawner() {
   Object.assign(spawner, {
     scene,
     world,
+    currentTerrain: world,
     position: new THREE.Vector3(0, 0, 0),
     linearVelocity: new THREE.Vector3(),
     telemetry: { onGround: false },
@@ -104,4 +106,31 @@ test('mount and unmount distances differ, and coastal props follow their region'
   assert.equal(world.isMounted('coastal'), false);
   assert.equal(spawner.foliage.group.parent, null);
   assert.equal(spawner.ships.group.parent, null);
+});
+
+test('re-registering a region keeps its unmounted state', () => {
+  const spawner = makeSpawner();
+  const { world } = spawner;
+  assert.equal(spawner.updateRegionMounting(), true);
+  assert.equal(world.isMounted('jeju'), false);
+  world.register('jeju', region(36, REGION_EXTENTS.jeju));
+  assert.equal(world.isMounted('jeju'), false);
+});
+
+test('mount updates leave a mission-owned terrain and collision environment alone', () => {
+  const spawner = makeSpawner();
+  const { world } = spawner;
+  const generated = { region: 'generated-valley' };
+  spawner.currentTerrain = generated;
+  spawner.activeAirport = 'generated-valley';
+  spawner.pilotArena = { active: true };
+  let environmentSets = 0;
+  spawner.collisionDetector = { setEnvironment() { environmentSets += 1; } };
+  spawner.world.setMounted('valley', false);
+  const before = world.regions.get('valley').group.visible;
+
+  assert.equal(spawner.updateRegionMounting(), false);
+  assert.equal(environmentSets, 0);
+  assert.equal(world.regions.get('valley').group.visible, before);
+  assert.equal(world.isMounted('valley'), false);
 });

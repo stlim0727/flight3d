@@ -103,3 +103,14 @@ positive climb rate. Rotation uses the same virtual elevator input path as the
 touch/controller interfaces; CDP only starts the preset, injects commands and
 reads state. Screenshots are in `.cache/airport-landing/`. Node tests do not
 prove rendering or touchdown.
+
+## Documented limitation: distant tangent-plane bearings
+
+`UnifiedWorld` keeps Lukla in the unrotated Incheon tangent plane so all
+regions share one rendered frame. Guidance is computed from the rebased world
+position (`worldPositionToWgs84()`), but the local-plane direction still
+diverges from the true initial bearing far from Incheon: Lukla's rendered
+direction to Incheon is `085.4°` versus `063.3°T` (~22° apart), so `NDCanvas`'s
+off-range arrow and on-range threshold marker can disagree. Rebasing also
+leaves a ~100 m residual when standing exactly on Lukla's rendered threshold.
+This is a known limit of the single regional plane, not a guidance regression.

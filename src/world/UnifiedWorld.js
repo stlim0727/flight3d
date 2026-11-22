@@ -114,10 +114,12 @@ export class UnifiedWorld {
   set corridorStreamer(value) { if (this.anchorTerrain) this.anchorTerrain.corridorStreamer = value; }
 
   /** extent: {minX, maxX, minZ, maxZ} in the region's own local frame. */
-  register(id, { terrain, airport, group = null, mesh = null, extent, mounted = true }) {
+  register(id, { terrain, airport, group = null, mesh = null, extent, mounted }) {
     if (!BASE_OFFSETS[id] && !this.dynamicOffsets.has(id)) throw new Error(`Unknown unified region: ${id}`);
     if (!terrain || !extent) throw new Error(`Unified region ${id} needs terrain and extent`);
-    this.regions.set(id, { terrain, airport, group, mesh, extent, mounted: Boolean(mounted) });
+    const previous = this.regions.get(id);
+    const keepMounted = mounted === undefined ? (previous?.mounted ?? true) : mounted;
+    this.regions.set(id, { terrain, airport, group, mesh, extent, mounted: Boolean(keepMounted) });
     this.syncMeshes();
     return this;
   }
