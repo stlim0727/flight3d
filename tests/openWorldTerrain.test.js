@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, Vector3, Vector4 } from 'three';
-import { buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
+import { BoxGeometry, Group, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, Vector3, Vector4 } from 'three';
+import { buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain, updateOpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
+import { UnifiedWorld, REGION_EXTENTS } from '../src/world/UnifiedWorld.js';
+import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
 
 const origin = { latitude: 37.55, longitude: 126.98 };
 const x = 1746, y = 793;
@@ -433,4 +435,42 @@ test('streamed edge follows local mesh breakpoints and collision samples the sti
   assert.ok(Math.abs(world.sample(501, 25).height - hit.point.y) < 0.001);
   localGeometry.dispose();
   world.dispose();
+});
+
+test('open-world terrain suppresses Jeju corridor streamer across unified world regions', () => {
+  const world = new UnifiedWorld('incheon');
+  const incheonMesh = new Group();
+  const incheonTerrain = { mesh: incheonMesh, size: 12000 };
+  const corridorGroup = new Group();
+  const jejuTerrain = { mesh: new Group(), corridorStreamer: { group: corridorGroup } };
+  let receivedHasOpenWorld = null;
+  const jejuAirport = {
+    terrain: jejuTerrain,
+    corridorStreamer: jejuTerrain.corridorStreamer,
+    update(_dt, _pos, _time, options) {
+      receivedHasOpenWorld = options.hasOpenWorld;
+    },
+  };
+  world.register('incheon', { terrain: incheonTerrain, airport: null, mesh: incheonMesh, extent: REGION_EXTENTS.incheon });
+  world.register('jeju', { terrain: jejuTerrain, airport: jejuAirport, mesh: jejuTerrain.mesh, extent: REGION_EXTENTS.jeju });
+
+  const sim = {
+    activeAirport: 'incheon',
+    currentTerrain: world,
+    position: new Vector3(238900, 1200, 252400),
+    linearVelocity: new Vector3(100, 0, -40),
+    camera: new PerspectiveCamera(58, 16 / 9, 0.08, 45000),
+  };
+  updateOpenWorldTerrain(sim);
+  assert.equal(corridorGroup.visible, false, 'non-anchor Jeju corridorStreamer must be hidden while OpenWorldTerrain is active');
+
+  const facade = createWorldAirportFacade(world, null);
+  facade.update(0.016, sim.position, 0, {});
+  assert.equal(receivedHasOpenWorld, true, 'WorldAirportFacade must inform mounted airports that OpenWorldTerrain is active');
+
+  sim.activeAirport = 'coastal';
+  updateOpenWorldTerrain(sim);
+  assert.equal(corridorGroup.visible, true, 'corridorStreamer visibility is restored when OpenWorldTerrain is disposed');
+  facade.update(0.016, sim.position, 0, {});
+  assert.equal(receivedHasOpenWorld, false);
 });

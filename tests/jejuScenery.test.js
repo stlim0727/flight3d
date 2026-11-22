@@ -226,6 +226,12 @@ test('loadJejuAirport integrates CorridorFlightSurface and heading fallback', as
   airport.update(0.1, { x: 0, y: 1000, z: 0 }, 0, {});
   airport.update(0.1, { x: 100, y: 1000, z: -100 }, 0.1, {});
   assert.ok(Math.abs(lastHeading - 45) < 1.0, `Heading fallback should be ~45 deg, got ${lastHeading}`);
+
+  // When OpenWorldTerrain is active on another unified-world anchor, corridorStreamer must not stream
+  let calledWithOpenWorld = false;
+  airport.corridorStreamer.update = async () => { calledWithOpenWorld = true; };
+  airport.update(0.1, { x: 200, y: 1000, z: -200 }, 0.2, { hasOpenWorld: true });
+  assert.equal(calledWithOpenWorld, false, 'corridorStreamer must stay idle when hasOpenWorld is true');
 });
 
 

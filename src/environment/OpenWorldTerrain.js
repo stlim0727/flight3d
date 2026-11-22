@@ -1021,6 +1021,16 @@ const frames = {
   ] },
 };
 
+function setCorridorStreamersVisible(surface, visible) {
+  if (surface?.corridorStreamer?.group) surface.corridorStreamer.group.visible = visible;
+  if (surface?.regions) {
+    for (const region of surface.regions.values()) {
+      const streamer = region.terrain?.corridorStreamer ?? region.airport?.corridorStreamer;
+      if (streamer?.group) streamer.group.visible = visible;
+    }
+  }
+}
+
 export function updateOpenWorldTerrain(sim) {
   const surface = sim.currentTerrain;
   const frame = Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport];
@@ -1029,7 +1039,7 @@ export function updateOpenWorldTerrain(sim) {
     if (previous?.openWorld) {
       previous.openWorld.dispose();
       previous.openWorld = null;
-      if (previous.corridorStreamer) previous.corridorStreamer.group.visible = true;
+      setCorridorStreamersVisible(previous, true);
     }
     sim.openWorldSurface = frame ? surface : null;
   }
@@ -1040,8 +1050,8 @@ export function updateOpenWorldTerrain(sim) {
         ? { ...frame, protectedAreas: [[-half, -half, half, half]], localSurface: surface }
         : frame);
       surface.mesh.add(surface.openWorld.group);
-      if (surface.corridorStreamer) surface.corridorStreamer.group.visible = false;
     }
+    setCorridorStreamersVisible(surface, false);
     const height = sim.renderer?.getDrawingBufferSize?.(viewportSize)?.y;
     surface.openWorld.update(sim.position, sim.linearVelocity, sim.camera, height,
       sim.renderQuality === 'ultraLow');
