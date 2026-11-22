@@ -633,6 +633,10 @@ class SimulatorHudAndBindingsMethods {
           .catch(error => recoverSimulatorFlightStart(this, error));
         return;
       }
+      if (this.lobby.mapPlan) {
+        this.spawnFlight().catch(error => recoverSimulatorFlightStart(this, error));
+        return;
+      }
       this.setPreset(this.lastPresetType || 'runway');
     };
 
@@ -705,7 +709,7 @@ class SimulatorHudAndBindingsMethods {
         this.mapPlaces = places;
         this.lobbyScreen?.setMapPlaces(places);
       })
-      .catch(() => { /* leave map choices empty; manual presets still work */ });
+      .catch(error => { this.mapPlacesError = String(error); /* leave map choices empty; manual presets still work */ });
     this.renderDiagnosticsPanel = new RenderDiagnosticsPanel(this);
     this.replayPanel = new ReplayPanel(this);
     this.replayDirector.onChange = () => this.replayPanel.refresh();

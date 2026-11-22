@@ -128,9 +128,10 @@ export function takeoffSpawnPlan({
   const z = frame.threshold.z + frame.direction.z * TAKEOFF_DISTANCE_M;
   const world = worldXZ(x, z, baseOffset, anchorBase);
   const headingDeg = frame.headingDeg;
+  const clearance = numberOr(groundClearanceM, clearanceFor(aircraftId));
   return {
     x: world.x,
-    y: frame.threshold.elevationM + numberOr(groundClearanceM, clearanceFor(aircraftId)),
+    y: frame.threshold.elevationM + clearance,
     z: world.z,
     vx: 0,
     vy: 0,
@@ -139,6 +140,9 @@ export function takeoffSpawnPlan({
     headingDeg,
     state: 'runway',
     speedMps: 0,
+    groundClearanceM: clearance,
+    glideRiseM: 0,
+    alignToGround: true,
   };
 }
 
@@ -184,9 +188,11 @@ export function approachSpawnPlan({
   const glideTangent = Math.tan(glideslopeDeg * DEG);
   const speed = aircraftId === 'B738' ? 74.5 : aircraftId === 'C172' ? 33 : aircraftId === 'F16' ? 90 : 74.5;
   const interceptHeading = frame.headingDeg + interceptOffsetDeg;
+  const clearance = numberOr(groundClearanceM, clearanceFor(aircraftId));
+  const glideRiseM = distanceM * glideTangent;
   return {
     x: world.x,
-    y: frame.threshold.elevationM + numberOr(groundClearanceM, clearanceFor(aircraftId)) + distanceM * glideTangent,
+    y: frame.threshold.elevationM + clearance + glideRiseM,
     z: world.z,
     vx: speed * frame.direction.x,
     vy: -speed * glideTangent,
@@ -194,6 +200,9 @@ export function approachSpawnPlan({
     yaw: yawForHeading(interceptHeading),
     headingDeg: (interceptHeading % 360 + 360) % 360,
     state: 'approach',
+    groundClearanceM: clearance,
+    glideRiseM,
+    alignToGround: true,
   };
 }
 

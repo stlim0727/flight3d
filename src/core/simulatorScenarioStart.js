@@ -43,6 +43,7 @@ export function createSimulatorScenarioStart(sim) {
         if (request.mapPlan) sim.applyMapSpawn(request.mapPlan.spawn, request.mapPlan.scenario);
         if (request.mapPlan?.airportCode && request.mapPlan.scenario !== 'cruise') {
           await waitForStreamedAirport(sim, request.mapPlan.airportCode);
+          alignMapSpawnToContact(sim, request.mapPlan.spawn);
         }
         if (!regionalCruise(request.scenario)) return result;
         return waitForRegionalTerrain(sim);
@@ -97,6 +98,7 @@ function resolveLobbyMapPlan(sim) {
 async function waitForStreamedAirport(sim, code) {
   const streamer = sim.airportStreamer;
   if (!streamer) return;
+  streamer.releaseGroundHold?.();
   streamer.ensure(code);
   const deadline = performance.now() + 6000;
   do {
@@ -112,6 +114,13 @@ async function waitForStreamedAirport(sim, code) {
     });
     await new Promise(resolve => setTimeout(resolve, 50));
   } while (performance.now() < deadline);
+}
+
+function alignMapSpawnToContact(sim, spawn) {
+  if (!spawn?.alignToGround) return;
+  const ground = sim.currentTerrain?.getHeight?.(sim.position.x, sim.position.z);
+  if (!Number.isFinite(ground)) return;
+  sim.position.y = ground + spawn.groundClearanceM + (spawn.glideRiseM ?? 0);
 }
 
 async function waitForRegionalTerrain(sim) {

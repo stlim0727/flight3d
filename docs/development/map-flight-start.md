@@ -23,8 +23,9 @@ per-airport coordinates are hand-authored in the UI.
 preparation. It calls `resolveMapFlightPlan()` with the selected airport,
 runway end or cruise point, the airport's Incheon-frame `baseOffset` and the
 active anchor base. The pure planner returns `{scenario, spawn, airportCode}`
-with world coordinates, velocity and Three.js yaw. Any four-letter ICAO code
-from the index can be streamed; the map catalog is not limited to RKSS.
+with world coordinates, velocity and Three.js yaw. `loadMapFlightPlaces()`
+registers every index-backed Korean ICAO code with the streamer; arbitrary
+four-letter tokens and the six built-in region ids are not external targets.
 
 ## Start states
 
@@ -37,11 +38,17 @@ from the index can be streamed; the map catalog is not limited to RKSS.
   runway end, 3° glideslope, gear down and flaps 5.
 
 `setPreset()` still owns aircraft configuration and trim; `applyMapSpawn()`
-then installs the resolved pose and configuration. Runway/approach starts wait,
-under the start hold, for `airportStreamer.ensure()` to reach `ready` before
-physics resumes. Gyro permission restoration happens in `prepare()` within the
-original click gesture, before any streaming wait. Selecting a normal preset or
-region clears the map plan so a stale map spawn cannot overwrite it.
+then installs the resolved pose and configuration. Runway/approach starts
+release any previous ground hold, wait under the start hold for
+`airportStreamer.ensure()` to reach `ready`, then align the final Y with the
+contact surface `currentTerrain.getHeight()` actually returns. This keeps
+spawns above the surface when a built-in region shares the coordinate with an
+index-generated runway. Gyro permission restoration happens in `prepare()`
+within the original click gesture, before any streaming wait.
+
+Selecting a normal preset or region clears the map plan; multiplayer room
+preparation also clears it. Restart preserves the active map plan and goes
+through the same spawn path.
 
 Non-map presets, missions, demos, saved URLs and lobby buttons keep their
 existing paths because the map plan is null unless the user selects one.

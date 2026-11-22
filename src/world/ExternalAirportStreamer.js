@@ -115,6 +115,17 @@ export class ExternalAirportStreamer {
     this._needsRearm = false;
     this._report();
   }
+
+  /** Release a ground-hold from a previous airport before starting at another. */
+  releaseGroundHold() {
+    if (!this._retired) return null;
+    const code = this._retired;
+    this._retired = null;
+    this._unmount();
+    this._state = 'idle';
+    this._report();
+    return code;
+  }
   /**
    * Explicit load for spawn/UI paths. Ready and in-flight loads are reused;
    * an explicit call after a failure retries immediately (automatic retries

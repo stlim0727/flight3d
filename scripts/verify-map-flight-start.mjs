@@ -28,6 +28,9 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   const { evaluate, screenshot, cdpPort, exceptions } = session;
   checkGpu(cdpPort);
   assert.ok(await waitFor(session, 'Boolean(window.sim?.gameFlow?.state)'), 'simulator did not boot');
+  if (!await waitFor(session, 'sim.mapPlaces?.airports?.length > 10')) {
+    console.log('catalog diagnostics', await evaluate('({mapPlaces: sim.mapPlaces?.airports?.length ?? null, error: sim.mapPlacesError ?? null})'), exceptions.slice(-8));
+  }
   assert.ok(await waitFor(session, 'sim.mapPlaces?.airports?.length > 10'), 'map airport catalog did not load');
 
   const results = {};

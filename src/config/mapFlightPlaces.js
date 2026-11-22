@@ -1,6 +1,7 @@
 // Airport and cruise-point catalog for the lobby map flight planner.
 // Airport rows come from the committed OurAirports index, not hand-authored codes.
 import { findAirportsInRegion, loadAirportManifest } from '../geospatial/airportIndex.js';
+import { registerExternalDestinations } from './externalDestinations.js';
 import { REGIONAL_CRUISES } from './regionalCruises.js';
 
 const KOREA_CENTRE = Object.freeze({ latitude: 36.4, longitude: 127.9, radiusKm: 700 });
@@ -34,9 +35,10 @@ export function indexedAirportPlaces(airports) {
 /** Fetch only the tiles overlapping Korea; every listed runway is index-backed. */
 export async function loadMapFlightPlaces({ fetchImpl, baseUrl } = {}) {
   const manifest = await loadAirportManifest({ fetchImpl, baseUrl });
-  const airports = await findAirportsInRegion(manifest, KOREA_CENTRE, { fetchImpl, baseUrl });
+  const airports = indexedAirportPlaces(await findAirportsInRegion(manifest, KOREA_CENTRE, { fetchImpl, baseUrl }));
+  registerExternalDestinations(airports.map(airport => airport.code));
   return {
-    airports: indexedAirportPlaces(airports),
+    airports,
     points: cruisePlaces(),
   };
 }
