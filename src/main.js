@@ -332,6 +332,7 @@ class FlightSimulator {
     this.inputCoordinator.bindFlightPanels({
       controls: this.controls,
       aero: this.aero,
+      audio: this.audio,
       isCrashedGetter: () => this.isCrashed,
     });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);

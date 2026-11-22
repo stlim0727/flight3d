@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { CESSNA_172, BOEING_737_800 } from '../src/config/aircraftConfigs.js';
 import { FlightAudio } from '../src/audio/FlightAudio.js';
+import { PAPER_UNFOLD_SECONDS, paperUnfoldSamples } from '../src/audio/paperMapSound.js';
 
 /**
  * Lightweight mock of Web Audio API for Node.js test environment
@@ -603,6 +604,62 @@ describe('GPWS voice authenticity', () => {
       if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
       if (previousUtterance === undefined) delete globalThis.SpeechSynthesisUtterance; else globalThis.SpeechSynthesisUtterance = previousUtterance;
     }
+  });
+});
+
+describe('Pilotage map unfold sound', () => {
+  function mapAudio() {
+    const audio = new FlightAudio();
+    const Context = createMockAudioContext();
+    audio.ctx = new Context();
+    audio.masterGain = audio.ctx.createGain();
+    audio.cockpitFilter = audio.ctx.createBiquadFilter();
+    const sources = [];
+    const create = audio.ctx.createBufferSource.bind(audio.ctx);
+    audio.ctx.createBufferSource = () => { const source = create(); sources.push(source); return source; };
+    const createBuffer = audio.ctx.createBuffer.bind(audio.ctx);
+    audio.ctx.createBuffer = (...args) => {
+      const buffer = createBuffer(...args), data = buffer.getChannelData(0);
+      buffer.getChannelData = () => data;
+      return buffer;
+    };
+    return { audio, sources };
+  }
+
+  it('plays one paper rustle per unfold straight into the master mix', () => {
+    const { audio, sources } = mapAudio();
+    assert.strictEqual(audio.playMapUnfold(), true);
+    assert.strictEqual(sources.length, 1);
+    const [filter] = sources[0].connectedTo;
+    assert.strictEqual(filter.type, 'highpass');
+    const [gain] = filter.connectedTo;
+    assert.deepStrictEqual(gain.connectedTo, [audio.masterGain], 'chart is not muffled like exterior airframe sounds');
+  });
+
+  it('stays silent while muted, at zero volume, paused or after a crash', () => {
+    for (const silence of [
+      audio => audio.setMuted(true),
+      audio => audio.setVolume(0),
+      audio => audio.setPaused(true),
+      audio => { audio.crashed = true; },
+    ]) {
+      const { audio, sources } = mapAudio();
+      silence(audio);
+      assert.strictEqual(audio.playMapUnfold(), false);
+      assert.strictEqual(sources.length, 0);
+    }
+  });
+
+  it('is a short crackle that starts and ends without a click', () => {
+    let seed = 7;
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const data = paperUnfoldSamples(44100, random);
+    assert.strictEqual(data.length, Math.ceil(44100 * PAPER_UNFOLD_SECONDS));
+    const peak = data.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    assert.ok(Math.abs(peak - 0.9) < 1e-6, 'normalized below clipping');
+    assert.ok(Math.abs(data[0]) === 0, 'sheet sweep begins from silence');
+    const tail = data.subarray(data.length - 200);
+    assert.ok(tail.every(v => Math.abs(v) < 0.05), 'decays out before the buffer ends');
   });
 });
 

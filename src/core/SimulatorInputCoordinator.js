@@ -34,8 +34,9 @@ export class SimulatorInputCoordinator {
   /**
    * Bind top/bottom flight panels toolbar events to flight controls, aero trim, and parking brake.
    */
-  bindFlightPanels({ controls, aero, isCrashedGetter = () => false } = {}) {
+  bindFlightPanels({ controls, aero, audio, isCrashedGetter = () => false } = {}) {
     initFlightPanels({
+      onMapUnfold: () => audio?.playMapUnfold?.(),
       toolbarHidden: loadSimulatorPreferences().toolbarHidden,
       onToolbarHiddenChange: toolbarHidden => saveSimulatorPreferences({ toolbarHidden }),
       onSelectCamera: mode => controls?.onSelectCamera?.(mode),

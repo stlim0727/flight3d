@@ -167,8 +167,10 @@ test('camera toolbar collapse/expand toggle button lifecycle and interaction', (
 
   try {
     let selectedMode = null;
+    let unfolds = 0;
     initFlightPanels({
       onSelectCamera: mode => { selectedMode = mode; },
+      onMapUnfold: () => { unfolds++; },
       onAdjustTrim: () => {},
       onToggleParkingBrake: () => {},
       toolbarHidden: []
@@ -205,6 +207,16 @@ test('camera toolbar collapse/expand toggle button lifecycle and interaction', (
     assert.ok(cockpitBtn, 'cockpit camera button exists');
     cockpitBtn.click();
     assert.equal(selectedMode, 0, 'onSelectCamera is invoked when selecting camera in expanded strip');
+
+    // The paper rustle belongs to opening the sheet only, not folding it or clicking inside it.
+    const map = elements.get('pilotage-map');
+    map.open = true;
+    map.dispatchEvent({ type: 'toggle' });
+    assert.equal(unfolds, 1, 'opening the map plays the unfold sound once');
+    map.click();
+    map.open = false;
+    map.dispatchEvent({ type: 'toggle' });
+    assert.equal(unfolds, 1, 'clicks inside the map and folding it stay silent');
   } finally {
     globalThis.document = prevDoc;
     globalThis.window = prevWindow;

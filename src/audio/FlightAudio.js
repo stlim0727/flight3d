@@ -12,6 +12,7 @@ import { AirframeSoundEffects } from './nodes/AirframeSoundEffects.js';
 import { WarningSynthesizer } from './nodes/WarningSynthesizer.js';
 import { CombatSoundEffects } from './nodes/CombatSoundEffects.js';
 import { GpwsCalloutSystem } from './nodes/GpwsCalloutSystem.js';
+import { playPaperUnfold } from './paperMapSound.js';
 
 // Above any aircraft this simulator flies; teleports are identified by their
 // implausible per-frame displacement instead of a low speed clamp.
@@ -286,6 +287,16 @@ export class FlightAudio {
   playDepartureRadio(stage, profile = 'departure') {
     this.ensureContextRunning();
     return (profile === 'bangkok' ? this.bangkokRadio : this.departureRadio).play(stage);
+  }
+
+  /** One unfold rustle; silent while muted, paused or after a crash. Returns whether it played. */
+  playMapUnfold() {
+    if (!this.ctx || !this.masterGain || this.effectiveVolume === 0 || this.crashed) return false;
+    this.ensureContextRunning();
+    // The chart is in the pilot's hands, so it bypasses the cabin filter and
+    // exterior distance attenuation applied to airframe sounds.
+    playPaperUnfold(this.ctx, this.masterGain);
+    return true;
   }
 
   playContactNoise(d, f, l, t = 'lowpass') {
