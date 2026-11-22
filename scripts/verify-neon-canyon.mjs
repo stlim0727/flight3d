@@ -67,7 +67,7 @@ try {
       const s = window.simulator;
       s.demoDirector.stop(); s.gameFlow.returnToLobby(true);
       document.getElementById(`lobby-aircraft-${aircraft}`).click();
-      document.getElementById('lobby-airport-neon').click();
+      document.querySelector('#lobby-map-default-bookmarks [data-place-id="neon"]')?.click();
       document.getElementById('lobby-preset-app').click();
       document.getElementById('btn-fly').click();
       for (let i = 0; i < 3600 && (s.startingFlight || !document.getElementById('startup-overlay').hidden); i++) {

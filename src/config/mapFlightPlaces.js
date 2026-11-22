@@ -26,12 +26,42 @@ export function cruisePlaces() {
 }
 
 
-export function defaultMapBookmarks({ airports = [], points = [] } = {}) {
+export function specialRegionPlaces() {
+  return Object.freeze([
+    Object.freeze({
+      kind: 'region',
+      id: 'lukla',
+      code: 'VNLK',
+      label: 'Lukla (VNLK)',
+      nameKey: 'lukla.vnlk',
+      aliases: ['VNLK', 'LUA', 'Lukla', '루클라', '네팔', 'Nepal', 'Himalaya', '히말라야'],
+    }),
+    Object.freeze({
+      kind: 'region',
+      id: 'neon',
+      code: 'NEO',
+      label: 'Neon Metropolis',
+      nameKey: 'neon.metropolis',
+      aliases: ['Neon', 'Neon Metropolis', '네온', '네온 메트로폴리스'],
+    }),
+    Object.freeze({
+      kind: 'region',
+      id: 'coastal',
+      code: 'CST',
+      label: 'Coastal Airport',
+      nameKey: 'coastal.airport',
+      aliases: ['Coastal', 'Coastal Airport', '국제공항'],
+    }),
+  ]);
+}
+
+export function defaultMapBookmarks({ airports = [], points = [], regions = [] } = {}) {
   return [
     ...DEFAULT_AIRPORT_BOOKMARKS.map(code => airports.find(airport => airport.code === code))
       .filter(Boolean).map(airport => ({ ...airport, kind: 'airport', id: airport.code, label: airport.name })),
     ...DEFAULT_POINT_BOOKMARKS.map(id => points.find(point => point.id === id))
       .filter(Boolean).map(point => ({ ...point, kind: 'point' })),
+    ...regions.map(region => ({ ...region, kind: 'region' })),
   ];
 }
 
@@ -92,5 +122,6 @@ export async function loadMapFlightPlaces({ fetchImpl, baseUrl } = {}) {
   return {
     airports,
     points: cruisePlaces(),
+    regions: specialRegionPlaces(),
   };
 }

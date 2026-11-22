@@ -14,7 +14,7 @@ export const DESTINATION_CHOICES = Object.freeze(['none', ...VALID_AIRPORTS, ...
 // Retired regions and the flight that replaced them: the Han River region became the
 // Neon Metropolis bridge flight (#551), so saved choices and old links keep working.
 const LEGACY_REGIONS = Object.freeze({ hangang: { airport: 'neon', scenario: 'bridge' } });
-export const DEFAULT_AIRPORT = 'coastal';
+export const DEFAULT_AIRPORT = 'incheon';
 export const DEFAULT_AIRCRAFT = DEFAULT_AIRCRAFT_ID || 'B738';
 
 export function resolveAirport(airport) {

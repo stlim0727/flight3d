@@ -328,7 +328,6 @@ body, html {
   pointer-events: auto;
 }
 
-.btn-airport,
 .btn-aircraft {
   font-size: 11px;
   font-weight: 700;
@@ -342,14 +341,12 @@ body, html {
   white-space: nowrap;
 }
 
-.btn-airport:hover,
 .btn-aircraft:hover {
   background: rgba(51, 65, 85, 0.9);
   color: #f8fafc;
   border-color: #38bdf8;
 }
 
-.btn-airport.active,
 .btn-aircraft.active {
   background: linear-gradient(135deg, #0284c7, #0369a1);
   border-color: #38bdf8;
