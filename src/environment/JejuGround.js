@@ -155,6 +155,12 @@ export function jejuSurfaceMaterial({
                          mix(jejuHash(i + vec3(0, 1, 1)), jejuHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
         }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
+        #ifdef USE_MAP
+          // Match OpenWorldTerrain satellite colorimetry: trim excess ambient, boost chroma & contrast
+          float satLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          diffuseColor.rgb = mix(vec3(satLuma), diffuseColor.rgb, 1.14);
+          diffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.08));
+        #endif
         float jejuDist = length(vViewPosition);
         float jejuFade = 1.0 - smoothstep(150.0, ${Number(detailDistance).toFixed(1)}, jejuDist);
         if (jejuFade > 0.0) {
@@ -166,6 +172,12 @@ export function jejuSurfaceMaterial({
           float detailMod = 0.86 + 0.20 * microGrain + 0.12 * grassClump;
           diffuseColor.rgb *= mix(vec3(1.0), groundTint * detailMod, jejuFade);
         }`)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        #ifdef USE_MAP
+          // Prevent ambient and sunlight over-exposure on baked satellite imagery
+          reflectedLight.indirectDiffuse *= 0.68;
+          reflectedLight.directDiffuse *= 0.88;
+        #endif`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         float jejuBumpDist = length(vViewPosition);
         float jejuBumpFade = 1.0 - smoothstep(150.0, ${Number(detailDistance).toFixed(1)}, jejuBumpDist);
@@ -178,6 +190,6 @@ export function jejuSurfaceMaterial({
         }`);
   };
 
-  material.customProgramCacheKey = () => (isSatellite ? 'jeju-surface-satellite-v1' : 'jeju-surface-procedural-v1');
+  material.customProgramCacheKey = () => (isSatellite ? 'jeju-surface-satellite-v2' : 'jeju-surface-procedural-v2');
   return applyShadows ? applyFarSunShadow(material) : material;
 }
