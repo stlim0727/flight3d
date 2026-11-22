@@ -228,6 +228,11 @@ export class JejuTileStreamer {
       const canvasWidth = this.totalTilesX * 256;
       const canvasHeight = this.totalTilesY * 256;
 
+      const dimensionsChanged = Boolean(
+        this.canvas &&
+        (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight)
+      );
+
       if (!this.canvas) {
         this.canvas = document.createElement('canvas');
       }
@@ -250,7 +255,12 @@ export class JejuTileStreamer {
 
       if (this.disposed) return false;
 
-      // Create or update Three.js texture
+      // Recreate Three.js texture when dimensions change (WebGL2 immutable storage requirement)
+      if (dimensionsChanged && this.macroTexture) {
+        this.macroTexture.dispose();
+        this.macroTexture = null;
+      }
+
       if (!this.macroTexture) {
         this.macroTexture = new THREE.CanvasTexture(this.canvas);
         this.macroTexture.colorSpace = THREE.SRGBColorSpace;

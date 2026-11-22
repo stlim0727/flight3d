@@ -2,12 +2,15 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { withBrowserSession, detectGpuAngle } from './lib/browserHarness.mjs';
+import { assertHardwareDraw } from './verify-browser-gpu.mjs';
 
 const OUTPUT_DIR = process.env.OUTPUT_DIR || 'output/jeju-experiment';
 await mkdir(OUTPUT_DIR, { recursive: true });
 
 console.log('--- Jeju Terrain Quality 4-Step Experiment ---');
-console.log('GPU Angle:', detectGpuAngle());
+const gpuAngle = detectGpuAngle();
+assert.notEqual(gpuAngle, 'swiftshader', 'Hardware GPU is required; software rendering is forbidden');
+console.log('GPU Angle:', gpuAngle);
 
 const PASSES = [
   {
@@ -71,6 +74,39 @@ await withBrowserSession(
     const initialUrl = `${origin}/?terrain=jeju&aircraft=B738&scenario=runway&fly=1&telemetry=0&jejuZoom=10&jejuAnisotropy=1`;
     await send('Page.navigate', { url: initialUrl });
     await send('Page.bringToFront');
+
+    console.log('Verifying hardware GPU drawing via WebGL2 readPixels...');
+    const gpuReport = await evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 16;
+      const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
+      if (!gl) return { webgl2: false };
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      const renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : null;
+      const program = gl.createProgram();
+      for (const [type, source] of [
+        [gl.VERTEX_SHADER, '#version 300 es\nvoid main(){vec2 p[3]=vec2[](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.));gl_Position=vec4(p[gl_VertexID],0.,1.);}'],
+        [gl.FRAGMENT_SHADER, '#version 300 es\nprecision highp float;out vec4 color;void main(){color=vec4(1.,0.,0.,1.);}'],
+      ]) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source); gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+        gl.attachShader(program, shader);
+      }
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+      gl.useProgram(program); gl.viewport(0, 0, 16, 16);
+      gl.clearColor(0, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 3); gl.finish();
+      const pixel = new Uint8Array(4);
+      gl.readPixels(8, 8, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+      const report = { webgl2: true, version: gl.getParameter(gl.VERSION), renderer,
+        pixel: [...pixel], error: gl.getError() };
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      return report;
+    });
+    assertHardwareDraw(gpuReport);
+    console.log('Hardware GPU verified:', gpuReport.renderer);
 
     console.log('Waiting for simulator startupReady...');
     await waitFor('Boolean(window.sim?.startupReady)');
@@ -156,16 +192,17 @@ await withBrowserSession(
         window.perfReports = [];
         sim.flightPerformance.emit = r => perfReports.push(r);
         sim.performanceTelemetryEnabled = true;
-        sim.flightPerformance.intervalMs = 3000;
+        sim.flightPerformance.intervalMs = 60000;
         sim.flightPerformance.flush('warmup');
+        window.perfReports = [];
       `);
 
-      await delay(3200);
+      await delay(3000);
 
       await evaluate(`sim.flightPerformance.flush('measure');`);
 
       const passData = await evaluate(() => {
-        const report = window.perfReports.at(-1) || null;
+        const report = window.perfReports.find(r => r.reason === 'measure') || window.perfReports.at(-1) || null;
         const streamer = window.sim?.jejuAirport?.tileStreamer;
         const metrics = streamer ? streamer.getMetrics() : null;
         const memory = window.performance?.memory
@@ -203,8 +240,8 @@ await withBrowserSession(
         tilesLoaded: passData.metrics?.tilesLoaded,
         texture: passData.textureInfo,
         frameMs: passData.flightPerf?.frameMs,
-        fps: passData.flightPerf
-          ? +(passData.flightPerf.frames / (passData.flightPerf.durationMs / 1000)).toFixed(1)
+        fps: passData.flightPerf?.fps
+          ? +passData.flightPerf.fps.toFixed(1)
           : null,
         memory: passData.memory,
         screenshot: shotPath,
