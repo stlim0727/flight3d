@@ -7,6 +7,7 @@ import {
   createExternalAirportMesh,
   createExternalAirportRegion,
   EXTERNAL_MESH_LIFT_M,
+  MARKING_LIFT_M,
 } from '../src/geospatial/externalAirportSurface.js';
 
 const ARP = { latitude: 37.56, longitude: 126.79 };
@@ -77,6 +78,62 @@ function surface(outsideHeight = () => 5) {
 
 const near = (actual, expected, tolerance = 0.02) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} differs from ${expected}`);
+
+function markingQuads(group, id) {
+  const mesh = group.children.find(child => child.name === `runway-markings-${id}`);
+  assert.ok(mesh, `missing markings for ${id}`);
+  const position = mesh.geometry.attributes.position;
+  const normal = mesh.geometry.attributes.normal;
+  const quads = [];
+  for (let i = 0; i < position.count; i += 4) {
+    const vertices = [];
+    for (let j = 0; j < 4; j++) {
+      const k = i + j;
+      vertices.push({
+        x: position.getX(k), y: position.getY(k), z: position.getZ(k), ny: normal.getY(k),
+      });
+    }
+    quads.push(vertices);
+  }
+  return { mesh, quads };
+}
+
+function frameFor(descriptor) {
+  const a = descriptor.ends[0].physical;
+  const b = descriptor.ends[1].physical;
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const length = Math.hypot(dx, dz);
+  return { a, length, ux: dx / length, uz: dz / length, px: -dz / length, pz: dx / length };
+}
+
+function quadCoords(vertices, frame) {
+  const points = vertices.map(vertex => {
+    const dx = vertex.x - frame.a.x;
+    const dz = vertex.z - frame.a.z;
+    return { u: dx * frame.px + dz * frame.pz, v: dx * frame.ux + dz * frame.uz, ny: vertex.ny };
+  });
+  const us = points.map(point => point.u);
+  const vs = points.map(point => point.v);
+  const uMin = Math.min(...us);
+  const uMax = Math.max(...us);
+  const vMin = Math.min(...vs);
+  const vMax = Math.max(...vs);
+  return {
+    uMin, uMax, vMin, vMax,
+    u: (uMin + uMax) / 2,
+    v: (vMin + vMax) / 2,
+    uSpan: uMax - uMin,
+    vSpan: vMax - vMin,
+    ny: points[0].ny,
+  };
+}
+
+function interiorOverlap(a, b) {
+  const epsilon = 0.01;
+  return Math.min(a.vMax, b.vMax) - Math.max(a.vMin, b.vMin) > epsilon
+    && Math.min(a.uMax, b.uMax) - Math.max(a.uMin, b.uMin) > epsilon;
+}
 
 test('descriptors convert WGS84 into ARP-relative metres and keep thresholds distinct', () => {
   const source = airport();
@@ -216,6 +273,147 @@ test('mesh ribbons sit 15 mm above contact height and only displaced ends get ba
   assert.equal(bars[0].name, 'threshold-100-14');
   group.dispose();
   assert.equal(group.children.length, 0);
+});
+
+test('markings render from index geometry, including undisplaced runways', () => {
+  const terrain = surface();
+  const group = createExternalAirportMesh(terrain.runways);
+  const markings = group.children.filter(child => child.name.startsWith('runway-markings-'));
+  assert.equal(markings.length, 2);
+  for (const mesh of markings) {
+    assert.equal(mesh.material.type, 'MeshStandardMaterial');
+    const position = mesh.geometry.attributes.position;
+    assert.ok(position.count > 100, 'centerline, threshold keys and designator cells are present');
+    for (let i = 0; i < position.count; i++) {
+      const x = position.getX(i);
+      const y = position.getY(i);
+      const z = position.getZ(i);
+      near(y, terrain.getHeight(x, z) + EXTERNAL_MESH_LIFT_M + MARKING_LIFT_M, 1e-5);
+      assert.ok(mesh.geometry.attributes.normal.getY(i) > 0, 'markings face up');
+    }
+  }
+
+  // Wonju's index record: one concrete runway, no displaced thresholds.
+  const wonju = {
+    ...ARP,
+    elevationM: 100.28,
+    runways: [{
+      id: '237300', lengthM: 2743.2, widthM: 45.7, surface: 'CON',
+      ends: [
+        end('03', { x: -517.3, z: 1131.0, elevationM: 98.45 }),
+        end('21', { x: 593.7, z: -1340.1, elevationM: 100.28 }),
+      ],
+    }],
+  };
+  const [descriptor] = buildExternalRunwayDescriptors(wonju);
+  const wonjuGroup = createExternalAirportMesh([descriptor]);
+  const wonjuMarkings = wonjuGroup.children.filter(child => child.name === 'runway-markings-237300');
+  assert.equal(wonjuMarkings.length, 1);
+  assert.ok(wonjuMarkings[0].geometry.attributes.position.count > 100);
+});
+
+test('markings are oriented, separated and bounded across reciprocal and constrained runways', () => {
+  const symmetric = {
+    ...ARP,
+    elevationM: 11,
+    runways: [{
+      id: '200', lengthM: 3000, widthM: 45, surface: 'CON',
+      ends: [
+        end('21', { x: -1500, z: 0, elevationM: 12 }),
+        end('21', { x: 1500, z: 0, elevationM: 12 }),
+      ],
+    }],
+  };
+  const [descriptor] = buildExternalRunwayDescriptors(symmetric);
+  const group = createExternalAirportMesh([descriptor]);
+  const frame = frameFor(descriptor);
+  const { quads } = markingQuads(group, '200');
+  const coords = quads.map(quad => quadCoords(quad, frame));
+  assert.ok(coords.every(coord => coord.ny > 0), 'every marking quad faces +Y');
+
+  const endAlong = frame.length;
+  const designator = coords.filter(coord => coord.vSpan <= 3 && (
+    (coord.v > 70 && coord.v < 100) || (coord.v > endAlong - 100 && coord.v < endAlong - 70)));
+  assert.ok(designator.length > 10, 'both ends carry designator cells');
+  const cell = coord => ({ u: Math.round(coord.u * 100) / 100, v: Math.round(coord.v * 100) / 100 });
+  const approaching = (list, direction) => list
+    .map(coord => cell({ u: direction * coord.u,
+      v: direction > 0 ? coord.v : endAlong - coord.v }))
+    .sort((a, b) => a.v - b.v || a.u - b.u);
+  assert.deepEqual(
+    approaching(designator.filter(coord => coord.v < endAlong / 2), 1),
+    approaching(designator.filter(coord => coord.v > endAlong / 2), -1),
+    'reciprocal ends render the same glyph in the approaching pilot frame',
+  );
+
+  const centreline = coords.filter(coord => coord.uSpan <= 2 && coord.vSpan >= 25 && Math.abs(coord.u) <= 1);
+  assert.ok(centreline.length > 10, 'dashed centerline is present');
+  for (const dash of centreline) {
+    assert.ok(dash.vMin > 100 && dash.vMax < endAlong - 100, 'centerline clears both designators');
+  }
+
+  const variants = [
+    { label: 'narrow', widthM: 10, lengthM: 1000, ends: [
+      end('03', { x: -500, z: 0, elevationM: 12 }),
+      end('21', { x: 500, z: 0, elevationM: 12 }),
+    ] },
+    { label: 'short', widthM: 45, lengthM: 150, ends: [
+      end('03', { x: -75, z: 0, elevationM: 12 }),
+      end('21', { x: 75, z: 0, elevationM: 12 }),
+    ] },
+    { label: 'displaced', widthM: 45, lengthM: 3000, ends: [
+      end('03', { x: -1500, z: 0, elevationM: 12 }, { x: -900, z: 0, elevationM: 12 }, 600),
+      end('21', { x: 1500, z: 0, elevationM: 12 }, { x: 900, z: 0, elevationM: 12 }, 600),
+    ] },
+    { label: 'no-designator-cell', widthM: 9.1, lengthM: 1000, ends: [
+      end('03', { x: -500, z: 0, elevationM: 12 }),
+      end('21', { x: 500, z: 0, elevationM: 12 }),
+    ] },
+    { label: 'no-font-ident', widthM: 45, lengthM: 1000, ends: [
+      end('N', { x: -500, z: 0, elevationM: 12 }),
+      end('S', { x: 500, z: 0, elevationM: 12 }),
+    ] },
+    { label: 'three-char', widthM: 45, lengthM: 1500, ends: [
+      end('16R', { x: -750, z: 0, elevationM: 12 }),
+      end('34L', { x: 750, z: 0, elevationM: 12 }),
+    ] },
+    { label: 'displaced-short-usable', widthM: 45, lengthM: 3000, expectAim: false, ends: [
+      end('03', { x: -1500, z: 0, elevationM: 12 }, { x: -300, z: 0, elevationM: 12 }, 1200),
+      end('21', { x: 1500, z: 0, elevationM: 12 }, { x: 300, z: 0, elevationM: 12 }, 1200),
+    ] },
+  ];
+  for (const variant of variants) {
+    const [tiled] = buildExternalRunwayDescriptors({
+      ...ARP,
+      runways: [{ id: '201', lengthM: variant.lengthM, widthM: variant.widthM,
+        surface: 'CON', ends: variant.ends }],
+    });
+    const variantFrame = frameFor(tiled);
+    const { quads: variantQuads } = markingQuads(createExternalAirportMesh([tiled]), '201');
+    const variantCoords = variantQuads.map(quad => quadCoords(quad, variantFrame));
+    for (const coord of variantCoords) {
+      assert.ok(coord.ny > 0, `${variant.label}: marking faces +Y`);
+      assert.ok(coord.vMin >= -0.02 && coord.vMax <= variantFrame.length + 0.02,
+        `${variant.label}: along stays on the ribbon`);
+      assert.ok(coord.uMin >= -variant.widthM / 2 - 0.02 && coord.uMax <= variant.widthM / 2 + 0.02,
+        `${variant.label}: lateral stays on the ribbon`);
+    }
+    for (let i = 0; i < variantCoords.length; i++) {
+      for (let j = i + 1; j < variantCoords.length; j++) {
+        assert.ok(!interiorOverlap(variantCoords[i], variantCoords[j]),
+          `${variant.label}: quads ${i} and ${j} overlap`);
+      }
+    }
+    if (variant.expectAim === false) {
+      assert.ok(!variantCoords.some(coord => coord.vSpan > 25 && coord.vSpan < 35 && coord.uSpan > 4),
+        `${variant.label}: aiming points suppressed when usable length <= 700 m`);
+    }
+    if (variant.label === 'three-char') {
+      assert.ok(variantCoords.filter(coord => coord.vSpan <= 3 && coord.v > 70 && coord.v < 100).length > 10,
+        'three-character idents render glyph cells');
+    }
+  }
+  group.dispose();
 });
 
 test('region exposes the no-op airport facade, tight extent and a disposing group', () => {

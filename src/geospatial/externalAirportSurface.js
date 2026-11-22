@@ -9,6 +9,7 @@ const BLEND_END_M = 240;
 const SAFETY_AREA_M = 60;
 const EXTENT_MARGIN_M = 1500;
 export const EXTERNAL_MESH_LIFT_M = 0.015;
+export const MARKING_LIFT_M = 0.05;
 const EPSILON = 1e-9;
 
 const finite = Number.isFinite;
@@ -262,6 +263,167 @@ function ribbonGeometry(descriptor) {
   return geometry;
 }
 
+// Markings are built from the same index geometry as the pavement ribbon. One
+// merged geometry per runway keeps streamed airports cheap to draw, and the
+// 50 mm lift stays well above float32 precision at transcontinental offsets.
+const MARKING_FONT = {
+  '0': ['111', '101', '101', '101', '111'],
+  '1': ['010', '110', '010', '010', '111'],
+  '2': ['111', '001', '111', '100', '111'],
+  '3': ['111', '001', '111', '001', '111'],
+  '4': ['101', '101', '111', '001', '001'],
+  '5': ['111', '100', '111', '001', '111'],
+  '6': ['111', '100', '111', '101', '111'],
+  '7': ['111', '001', '010', '010', '010'],
+  '8': ['111', '101', '111', '101', '111'],
+  '9': ['111', '101', '111', '001', '111'],
+  L: ['100', '100', '100', '100', '111'],
+  R: ['110', '101', '110', '101', '101'],
+  C: ['111', '100', '100', '100', '111'],
+};
+
+function runwayFrame(descriptor) {
+  const a = descriptor.ends[0]?.physical;
+  const b = descriptor.ends[1]?.physical;
+  if (!a || !b) return null;
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const length = Math.hypot(dx, dz);
+  if (!(length > EPSILON)) return null;
+  return { a, b, length, ux: dx / length, uz: dz / length, px: -dz / length, pz: dx / length };
+}
+
+function thresholdAlong(frame, end) {
+  const point = end.threshold ?? end.physical;
+  return (point.x - frame.a.x) * frame.ux + (point.z - frame.a.z) * frame.uz;
+}
+
+function pushMarkingQuad(positions, indices, frame, startAlong, endAlong, left, right) {
+  const alongMin = Math.min(startAlong, endAlong);
+  const alongMax = Math.max(startAlong, endAlong);
+  const lateralMin = Math.min(left, right);
+  const lateralMax = Math.max(left, right);
+  const vertex = (along, lateral) => {
+    const t = along / frame.length;
+    return [
+      frame.a.x + frame.ux * along + frame.px * lateral,
+      frame.a.elevationM + (frame.b.elevationM - frame.a.elevationM) * t
+        + EXTERNAL_MESH_LIFT_M + MARKING_LIFT_M,
+      frame.a.z + frame.uz * along + frame.pz * lateral,
+    ];
+  };
+  const base = positions.length / 3;
+  positions.push(
+    ...vertex(alongMin, lateralMin),
+    ...vertex(alongMin, lateralMax),
+    ...vertex(alongMax, lateralMin),
+    ...vertex(alongMax, lateralMax),
+  );
+  indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+}
+
+function designatorGlyphs(ident) {
+  return [...String(ident ?? '').toUpperCase()].filter(char => MARKING_FONT[char]).slice(0, 3);
+}
+
+function designatorCell(glyphCount, innerHalf) {
+  const cell = Math.min(2.4, (2 * innerHalf - 2) / (4 * glyphCount - 1));
+  return cell >= 0.8 ? cell : 0;
+}
+
+function addMarkingDesignator(positions, indices, frame, glyphs, cell, threshold, direction) {
+  const pitch = 4 * cell;
+  const centreAlong = threshold + direction * 85;
+  glyphs.forEach((char, index) => {
+    const rows = MARKING_FONT[char];
+    const baseLateral = direction * (index - (glyphs.length - 1) / 2) * pitch;
+    for (let row = 0; row < rows.length; row++) {
+      for (let column = 0; column < rows[row].length; column++) {
+        if (rows[row][column] !== '1') continue;
+        const lateral = baseLateral + direction * (column - 1) * cell;
+        const along = centreAlong + direction * ((rows.length - 1 - row) * cell);
+        pushMarkingQuad(positions, indices, frame, along - cell / 2, along + cell / 2,
+          lateral - cell / 2, lateral + cell / 2);
+      }
+    }
+  });
+}
+
+function runwayMarkingsGeometry(descriptor) {
+  const frame = runwayFrame(descriptor);
+  if (!frame || !(descriptor.widthM > 8)) return null;
+  const positions = [];
+  const indices = [];
+  const halfWidth = descriptor.widthM / 2;
+  const edge = Math.min(1.2, halfWidth * 0.05);
+  const innerHalf = halfWidth - 0.6 - edge;
+  if (innerHalf <= 1) return null;
+
+  pushMarkingQuad(positions, indices, frame, 0, frame.length,
+    -halfWidth + 0.6, -halfWidth + 0.6 + edge);
+  pushMarkingQuad(positions, indices, frame, 0, frame.length,
+    halfWidth - 0.6 - edge, halfWidth - 0.6);
+
+  const [first, second] = descriptor.ends;
+  const start = thresholdAlong(frame, first);
+  const end = thresholdAlong(frame, second);
+  const usable = end - start;
+  const glyphs = [designatorGlyphs(first.ident), designatorGlyphs(second.ident)];
+  const cells = glyphs.map(list => list.length ? designatorCell(list.length, innerHalf) : 0);
+  const reach = Math.max(40, ...cells.map(cell => cell ? 85 + 4 * cell + cell / 2 : 0)) + 5;
+  const endsFit = usable > 2 * reach;
+
+  if (endsFit) {
+    const available = 2 * innerHalf - 2;
+    const keyWidth = 1.8;
+    const keyCount = Math.min(16, Math.floor(available / (keyWidth + 0.4)));
+    if (keyCount >= 2) {
+      const spacing = available / keyCount;
+      for (const [threshold, direction] of [[start, 1], [end, -1]]) {
+        for (let key = 0; key < keyCount; key++) {
+          const lateral = (key - (keyCount - 1) / 2) * spacing;
+          pushMarkingQuad(positions, indices, frame,
+            threshold + direction * 10, threshold + direction * 40,
+            lateral - keyWidth / 2, lateral + keyWidth / 2);
+        }
+      }
+    }
+    for (const [list, cell, threshold, direction] of [
+      [glyphs[0], cells[0], start, 1], [glyphs[1], cells[1], end, -1],
+    ]) {
+      if (list.length && cell) addMarkingDesignator(positions, indices, frame, list, cell, threshold, direction);
+    }
+  }
+
+  if (endsFit && usable > 700 && descriptor.widthM >= 16) {
+    const blockHalf = Math.min(3, (innerHalf - 2) / 4);
+    if (blockHalf >= 1.5) {
+      const offset = Math.min(innerHalf * 0.55, innerHalf - 0.5 - blockHalf);
+      for (const [threshold, direction] of [[start, 1], [end, -1]]) {
+        const aim = threshold + direction * 300;
+        for (const side of [-1, 1]) {
+          const lateral = side * offset;
+          pushMarkingQuad(positions, indices, frame, aim - 15, aim + 15,
+            lateral - blockHalf, lateral + blockHalf);
+        }
+      }
+    }
+  }
+
+  const centreStart = Math.min(start, end) + reach + 10;
+  const centreEnd = Math.max(start, end) - reach - 10;
+  for (let along = centreStart; along + 30 <= centreEnd; along += 50) {
+    pushMarkingQuad(positions, indices, frame, along, along + 30, -0.9, 0.9);
+  }
+
+  if (!indices.length) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 /** One flat ribbon per runway, plus optional thin bars at displaced thresholds. */
 export function createExternalAirportMesh(descriptors) {
   const group = new THREE.Group();
@@ -282,6 +444,18 @@ export function createExternalAirportMesh(descriptors) {
     ribbon.name = `runway-${descriptor.id}`;
     ribbon.userData = { runwayId: descriptor.id, surface: descriptor.surface };
     group.add(ribbon);
+    const markingGeometry = runwayMarkingsGeometry(descriptor);
+    if (markingGeometry) {
+      const markings = new THREE.Mesh(markingGeometry, new THREE.MeshStandardMaterial({
+        color: 0xf0f0e8,
+        roughness: 0.85,
+        metalness: 0,
+        side: THREE.DoubleSide,
+      }));
+      markings.name = `runway-markings-${descriptor.id}`;
+      markings.userData = { runwayId: descriptor.id, kind: 'markings' };
+      group.add(markings);
+    }
 
     const a = descriptor.ends[0].physical;
     const b = descriptor.ends[1].physical;

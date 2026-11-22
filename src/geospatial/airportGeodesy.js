@@ -38,8 +38,13 @@ export const RUNWAY_THRESHOLDS = Object.freeze({
   lukla: Object.freeze(thresholdAt('lukla')),
 });
 
-/** Latitude/longitude of a world-frame position when the anchor is a real airport. */
+/**
+ * Latitude/longitude of a world-frame position when the anchor is a real airport.
+ * UnifiedWorld positions live on the Incheon tangent plane: anchor-local (x, z)
+ * must be rebased by the anchor's offset in that plane before inversion.
+ * Fictional anchors have no WGS84 frame and report null.
+ */
 export function worldPositionToWgs84(anchor, x, z) {
-  const origin = AIRPORT_ORIGINS[anchor];
-  return origin ? localToWgs84(x, z, origin) : null;
+  const offset = realOffsetInIncheonFrame(anchor);
+  return offset ? localToWgs84(x + offset[0], z + offset[1], AIRPORT_ORIGINS.incheon) : null;
 }

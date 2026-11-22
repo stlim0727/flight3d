@@ -64,6 +64,28 @@ anchor is involved: the external airport is a dynamic region in `UnifiedWorld`.
 This is asset readiness, not physics behavior: no force, moment or control
 model branches on the streaming state.
 
+## Base region visual mounting (issue #944)
+
+The six permanent regions (Incheon, Jeju, Lukla, coastal, Neon and valley) keep
+their surface records in `UnifiedWorld` at all times: `getHeight`, normals,
+water level, runway predicates, region labels and collision data must not
+depend on whether their meshes are in the scene. `PresetSpawner.updateRegionMounting()`
+runs each frame and only adds/removes the visual groups and meshes:
+
+- the active anchor, the region under the aircraft, an occupied runway and an
+  active valley mission are always mounted;
+- other regions mount when the aircraft comes within roughly 25 km of their
+  world-frame extent (extended with airspeed lead, capped at 80 km), and
+  unmount only beyond that distance plus a 30 km hysteresis band;
+- coastal foliage and ships follow the coastal region's mounted state;
+- mounting changes refresh the airport facade and collision environment;
+  `setAnchor()` remains a spawn-time frame change and never discards surfaces.
+
+`scripts/verify-region-lazy-mount.mjs` checks on hardware Vulkan Chrome that
+distant groups leave the scene while Jeju's height/run answers stay identical,
+that approach and retreat remount/unmount them, and that switching the anchor
+to Jeju restores real threshold guidance.
+
 ## Verification
 
 - `tests/externalAirportSurface.test.js`: conversion, threshold separation,
@@ -81,3 +103,14 @@ positive climb rate. Rotation uses the same virtual elevator input path as the
 touch/controller interfaces; CDP only starts the preset, injects commands and
 reads state. Screenshots are in `.cache/airport-landing/`. Node tests do not
 prove rendering or touchdown.
+
+## Documented limitation: distant tangent-plane bearings
+
+`UnifiedWorld` keeps Lukla in the unrotated Incheon tangent plane so all
+regions share one rendered frame. Guidance is computed from the rebased world
+position (`worldPositionToWgs84()`), but the local-plane direction still
+diverges from the true initial bearing far from Incheon: Lukla's rendered
+direction to Incheon is `085.4°` versus `063.3°T` (~22° apart), so `NDCanvas`'s
+off-range arrow and on-range threshold marker can disagree. Rebasing also
+leaves a ~100 m residual when standing exactly on Lukla's rendered threshold.
+This is a known limit of the single regional plane, not a guidance regression.

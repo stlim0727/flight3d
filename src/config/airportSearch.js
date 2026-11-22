@@ -54,8 +54,9 @@ function bestTextScore(texts, query) {
 }
 
 function airportMatch(airport, query) {
-  if (!hasCoordinates(airport) || typeof airport.code !== 'string' || !airport.code.trim()) return null;
-  const code = airport.code.trim();
+  const code = typeof airport.code === 'string' ? airport.code.trim()
+    : typeof airport.icao === 'string' ? airport.icao.trim() : '';
+  if (!hasCoordinates(airport) || !code) return null;
   const name = typeof airport.name === 'string' ? airport.name.trim() : '';
   const iata = typeof airport.iata === 'string' ? airport.iata.trim() : '';
   const identifiers = [code, iata].filter(Boolean).map(normalizeSearchText);
@@ -105,9 +106,16 @@ function compareText(a, b) {
   if (a > b) return 1;
   return 0;
 }
+function rankedMatches(matches, max, scored) {
+  matches.sort((a, b) => a.score - b.score
+    || compareText(a.result.kind, b.result.kind)
+    || compareText(a.result.id, b.result.id)
+    || compareText(a.result.label, b.result.label));
+  return matches.slice(0, max).map(match => scored ? { ...match.result, score: match.score } : match.result);
+}
 
-/** Return up to `limit` catalog places ranked by code match, then text match. */
-export function searchMapPlaces(places, query, limit = DEFAULT_LIMIT) {
+/** Ranked catalog matches with their score, for merging with global results. */
+export function searchMapPlacesScored(places, query, limit = DEFAULT_LIMIT) {
   const normalized = normalizeSearchText(query);
   if (!normalized) return [];
   const max = Number.isFinite(limit) ? Math.max(0, Math.trunc(limit)) : DEFAULT_LIMIT;
@@ -124,10 +132,56 @@ export function searchMapPlaces(places, query, limit = DEFAULT_LIMIT) {
     const match = pointMatch(point, normalized);
     if (match) matches.push(match);
   }
+  return rankedMatches(matches, max, true);
+}
 
-  matches.sort((a, b) => a.score - b.score
-    || compareText(a.result.kind, b.result.kind)
-    || compareText(a.result.id, b.result.id)
-    || compareText(a.result.label, b.result.label));
-  return matches.slice(0, max).map(match => match.result);
+/** Return up to `limit` catalog places ranked by code match, then text match. */
+export function searchMapPlaces(places, query, limit = DEFAULT_LIMIT) {
+  return searchMapPlacesScored(places, query, limit).map(({ score, ...result }) => result);
+}
+
+/** Ranked global matches with their score, for merging with local results. */
+export function searchAirportIndexScored(index, query, limit = DEFAULT_LIMIT) {
+  const normalized = normalizeSearchText(query);
+  if (!normalized) return [];
+  const max = Number.isFinite(limit) ? Math.max(0, Math.trunc(limit)) : DEFAULT_LIMIT;
+  if (max === 0) return [];
+  const airports = Array.isArray(index) ? index : index?.airports;
+  if (!Array.isArray(airports)) return [];
+  const matches = [];
+  for (const airport of airports) {
+    const match = airportMatch(airport, normalized);
+    if (match) matches.push(match);
+  }
+  return rankedMatches(matches, max, true);
+}
+
+/**
+ * Search the compact global artifact (an entry array or `{ airports }`) with
+ * the same normalization and ranking as the local catalog. No DOM, no fetch.
+ */
+export function searchAirportIndex(index, query, limit = DEFAULT_LIMIT) {
+  return searchAirportIndexScored(index, query, limit).map(({ score, ...result }) => result);
+}
+
+/** Merge scored local and global matches; exact global codes outrank weak local text hits. */
+export function mergeScoredResults(localResults, globalResults, limit = DEFAULT_LIMIT) {
+  const max = Number.isFinite(limit) ? Math.max(0, Math.trunc(limit)) : DEFAULT_LIMIT;
+  const candidates = new Map();
+  for (const result of localResults) {
+    const key = `${result.kind}:${result.id}`;
+    if (!candidates.has(key)) candidates.set(key, { result, source: 'local', tie: 0 });
+  }
+  for (const result of globalResults) {
+    const key = `${result.kind}:${result.id}`;
+    if (!candidates.has(key)) candidates.set(key, { result, source: 'global', tie: 1 });
+  }
+  return [...candidates.values()]
+    .sort((a, b) => a.result.score - b.result.score || a.tie - b.tie
+      || compareText(a.result.id, b.result.id))
+    .slice(0, max)
+    .map(({ result, source }) => {
+      const { score, ...place } = result;
+      return { ...place, key: `${place.kind}:${place.id}`, source };
+    });
 }

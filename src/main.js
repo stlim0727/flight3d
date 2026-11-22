@@ -1235,6 +1235,11 @@ class FlightSimulator {
       if (remaining.length) setTimeout(preloadNext, 1000);
     };
     setTimeout(preloadNext, 1000);
+    setTimeout(() => {
+      if (this.activeAirport === 'incheon' || this.activeAirport === 'jeju') {
+        this.ensureUnifiedRegions?.();
+      }
+    }, 500);
   }
 
   setAircraft(aircraftId = 'B738', pilotPreparation = false) {
@@ -1494,6 +1499,8 @@ class FlightSimulator {
     if (this.startupReady && this.gameFlow.state === FLOW.FLIGHT && !this.startingFlight) {
       this.updateUnifiedRegionStreaming();
     }
+
+    this.updateRegionMounting?.();
 
     // Keep the lobby backdrop alive: re-arm the demo after it ends.
     this.gameFlow.update(frameDelta);
