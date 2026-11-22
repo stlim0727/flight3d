@@ -4,6 +4,9 @@ import { ScenarioStartCoordinator } from './ScenarioStartCoordinator.js';
 import { applyDeviceTimeOfDay, saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { saveFlightSelection } from '../config/flightSelection.js';
 import { isScenarioAvailable } from '../config/scenarioRegistry.js';
+import { resolveMapFlightPlan } from '../config/mapFlightPlan.js';
+import { BASE_OFFSETS } from '../world/UnifiedWorld.js';
+import { projectToLocal } from '../geospatial/incheon.js';
 import { t } from '../i18n/index.js';
 
 /** Composition of scenario policy, simulator operations and durable preferences. */
@@ -16,7 +19,8 @@ export function createSimulatorScenarioStart(sim) {
       const request = Object.freeze({ airport: sim.lobby.airport,
         aircraft: sim.lobby.aircraft ?? sim.currentAircraftId,
         scenario: sim.lobby.preset, demoProfile: sim.lobby.demoProfile,
-        pilotMode: sim.lobby.pilotMode || 'human' });
+        pilotMode: sim.lobby.pilotMode || 'human',
+        mapPlan: resolveLobbyMapPlan(sim) });
       const wantsDemo = request.scenario === 'demo';
       if (sim.demoDirector?.isActive || sim.demoDirector?.waitingForTerrain) {
         sim.demoDirector.stop(wantsDemo ? null : () => t('manual.control.engaged'));
@@ -33,6 +37,7 @@ export function createSimulatorScenarioStart(sim) {
       // own recording before course preparation. Neither is restarted at commit.
       preset(request) {
         const result = sim.setPreset(request.scenario);
+        if (request.mapPlan) sim.applyMapSpawn(request.mapPlan.spawn, request.mapPlan.scenario);
         if (!regionalCruise(request.scenario)) return result;
         return waitForRegionalTerrain(sim);
       },
@@ -61,6 +66,27 @@ export function createSimulatorScenarioStart(sim) {
       }
       if (sim.multiplayer?.active && sim.multiplayer.preparing) sim.gameFlow.pause();
     },
+  });
+}
+
+function resolveLobbyMapPlan(sim) {
+  const choice = sim.lobby?.mapPlan;
+  if (!choice || choice.state === 'none') return null;
+  const catalog = sim.mapPlaces;
+  const airport = catalog?.airports?.find(entry => entry.code === choice.airportCode);
+  const point = catalog?.points?.find(entry => entry.id === choice.pointId);
+  const [runwayId, endId] = (choice.runwayKey ?? '').split(':');
+  const baseOffset = airport ? projectToLocal(airport.latitude, airport.longitude) : [0, 0];
+  const anchorBase = BASE_OFFSETS[sim.activeAirport] ?? [0, 0];
+  return resolveMapFlightPlan({
+    state: choice.state,
+    airport,
+    runwayId,
+    endId,
+    point,
+    baseOffset,
+    anchorBase,
+    aircraftId: sim.lobby.aircraft ?? sim.currentAircraftId,
   });
 }
 

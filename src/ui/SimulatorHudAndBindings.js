@@ -11,6 +11,7 @@ import { FLOW } from './GameFlowController.js';
 import { ReplayPanel } from './ReplayPanel.js';
 import { DebriefOverlay } from './DebriefOverlay.js';
 import { initLobbyScreen } from './LobbyScreen.js';
+import { loadMapFlightPlaces } from '../config/mapFlightPlaces.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
 import { CockpitPovPanel } from './CockpitPovPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
@@ -647,7 +648,18 @@ class SimulatorHudAndBindingsMethods {
       onDemoProfile: id => { this.lobby.demoProfile = id; },
       getDestination: () => this.lobby.destination || 'none',
       onDestination: id => { this.lobby.destination = id; this.destinationAirport = id; },
-      getPilotMode: () => this.lobby.pilotMode || 'human',
+      getMapPlan: () => this.lobby.mapPlan,
+      onMapPlan: plan => {
+        this.lobby.mapPlan = plan?.state === 'none' ? null : plan;
+        if (this.lobby.mapPlan) {
+          this.lobby.preset = this.lobby.mapPlan.state;
+          if (this.lobby.mapPlan.state !== 'cruise' && this.lobby.mapPlan.airportCode) {
+            this.lobby.destination = this.lobby.mapPlan.airportCode;
+            this.destinationAirport = this.lobby.mapPlan.airportCode;
+          }
+        }
+        this.lobbyScreen?.refresh();
+      },
       onPilotMode: mode => { this.lobby.pilotMode = mode; },
       onToggleGyro: () => {
         if (!this.touchControls) return;
@@ -685,6 +697,12 @@ class SimulatorHudAndBindingsMethods {
         if (id === 'lobby-tab-multi') this.multiplayer?.refreshOpenRooms();
       },
     });
+    loadMapFlightPlaces()
+      .then(places => {
+        this.mapPlaces = places;
+        this.lobbyScreen?.setMapPlaces(places);
+      })
+      .catch(() => { /* leave map choices empty; manual presets still work */ });
     this.renderDiagnosticsPanel = new RenderDiagnosticsPanel(this);
     this.replayPanel = new ReplayPanel(this);
     this.replayDirector.onChange = () => this.replayPanel.refresh();
