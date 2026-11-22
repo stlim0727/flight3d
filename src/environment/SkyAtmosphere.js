@@ -45,9 +45,9 @@ export class SkyAtmosphere {
     // Atmospheric Exponential Height Fog parameters
     installHeightFog();
     this.fogColor = new THREE.Color(0xc8def4);
-    this.baseDensity = 0.00020;
+    this.baseDensity = 0.00016;
     this.heightFalloff = HAZE_HEIGHT_FALLOFF;
-    this.currentDensity = 0.00020;
+    this.currentDensity = 0.00016;
     this.currentExposure = 1.05;
 
     // Time of day (hours: 0.0 to 24.0, default 16.5 = Golden Hour Afternoon)
@@ -257,7 +257,7 @@ export class SkyAtmosphere {
       this.ambientLight.color.setRGB(0.85, 0.92, 1.0);
       this.ambientLight.intensity = 0.85 + t * 0.45;
 
-      this.baseDensity = 0.00021 - t * 0.00003; // 0.00018 at noon
+      this.baseDensity = 0.00016 - t * 0.00004; // 0.00012 at noon
       this.fogColor.setRGB(0.70 + t * 0.02, 0.82 + t * 0.04, 0.93 + t * 0.03); // Crisp Rayleigh sky-blue haze
       exposure = 1.04 - t * 0.06; // 0.98 at noon to eliminate white fuselage highlight blowout
     } else if (elevation > -4.0) {

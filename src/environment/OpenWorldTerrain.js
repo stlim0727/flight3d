@@ -10,6 +10,7 @@ import { INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN, CHUJA_EMERGENCY_STRIP } from '../geospatial/CorridorCoordinateSystem.js';
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
 import { EARTH_RADIUS_M } from './AerialPerspective.js';
+import { RENDER_QUALITY, resolveRenderQuality } from '../config/renderQuality.js';
 
 const zoom = 11;
 const farZoom = 8;
@@ -110,10 +111,13 @@ function readWaterMask(data) {
 const viewportSize = new THREE.Vector2();
 const viewProjection = new THREE.Matrix4();
 const imageryFrustum = new THREE.Frustum();
-const detailTileLimit = 5;
+const detailTileLimit = 6;
+const highDetailTileLimit = 3;
+const ultraDetailTileLimit = 1;
+const defaultAnisotropy = 8;
 const detailHoldMs = 1000;
 const detailFadeMs = 350;
-const detailEdgeWidth = 0.08;
+const detailEdgeWidth = 0.035;
 const imageryNeighbors = [[-1, 0], [0, -1], [1, 0], [0, 1]];
 const tileSphere = new THREE.Sphere();
 const viewCenter = new THREE.Vector3();
@@ -171,6 +175,19 @@ function terrainMaterial(detail, distanceFade) {
         if (edgeBlend > 0.0) {
           diffuseColor = mix(diffuseColor, textureGrad(terrainBaseMap, vMapUv, uvDx, uvDy), edgeBlend);
         }
+        // Restore natural micro-contrast and chroma of baked satellite imagery.
+        float satLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+        diffuseColor.rgb = mix(vec3(satLuma), diffuseColor.rgb, 1.14);
+        diffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.08));
+      #endif
+    `);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `
+      #include <lights_fragment_end>
+      #ifdef USE_MAP
+        // Satellite tiles already carry baked overhead illumination. Trim excess
+        // ambient washout and direct over-exposure while keeping sunset/night/cloud shading.
+        reflectedLight.indirectDiffuse *= 0.68;
+        reflectedLight.directDiffuse *= 0.88;
       #endif
     `);
     shader.fragmentShader = `
@@ -186,10 +203,10 @@ function terrainMaterial(detail, distanceFade) {
   return material;
 }
 
-function imageryTexture(image) {
+function imageryTexture(image, anisotropy = defaultAnisotropy) {
   const texture = new THREE.Texture(image);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
+  texture.anisotropy = anisotropy;
   texture.needsUpdate = true;
   return texture;
 }
@@ -484,13 +501,19 @@ function heightOnTriangle(positions, x, z, a, b, c) {
 }
 
 export class OpenWorldTerrain {
-  constructor({ origin, protectedAreas = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface }) {
+  constructor({ origin, protectedAreas = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget }) {
     this.origin = origin;
     this.protectedAreas = protectedAreas;
     this.localSurface = localSurface;
     this.elevationCache = elevationCache ?? new TileCacheManager({ urlTemplate: elevationUrl });
-    this.imageryCache = imageryCache ?? new TileCacheManager({ enableBrowserCache: false });
+    this.imageryCache = imageryCache ?? new TileCacheManager({ enableBrowserCache: false, maxMemoryTiles: 128, maxConcurrent: 6 });
     this.waterSource = waterSource;
+    this.imageryBudget = {
+      detailTileLimit: imageryBudget?.detailTileLimit ?? detailTileLimit,
+      highDetailTileLimit: imageryBudget?.highDetailTileLimit ?? highDetailTileLimit,
+      ultraDetailTileLimit: imageryBudget?.ultraDetailTileLimit ?? ultraDetailTileLimit,
+      anisotropy: imageryBudget?.anisotropy ?? defaultAnisotropy,
+    };
     this.group = new THREE.Group();
     this.group.name = 'Streaming open-world terrain';
     this.tiles = new Map();
@@ -570,6 +593,41 @@ export class OpenWorldTerrain {
     const x = Math.floor(tile.x / children);
     const y = Math.floor(tile.y / children);
     return this.tiles.has(keyOf(wrapX(x), y));
+  }
+
+  setImageryQuality(renderQuality, maxAnisotropy = defaultAnisotropy) {
+    const preset = RENDER_QUALITY[resolveRenderQuality(renderQuality)];
+    const anisotropy = Math.max(1, Math.min(preset.terrainAnisotropy ?? defaultAnisotropy, maxAnisotropy || defaultAnisotropy));
+    const next = {
+      detailTileLimit: preset.terrainDetailTiles ?? detailTileLimit,
+      highDetailTileLimit: preset.terrainHighDetailTiles ?? highDetailTileLimit,
+      ultraDetailTileLimit: preset.terrainUltraDetailTiles ?? ultraDetailTileLimit,
+      anisotropy,
+    };
+    const prev = this.imageryBudget;
+    if (prev.detailTileLimit === next.detailTileLimit
+      && prev.highDetailTileLimit === next.highDetailTileLimit
+      && prev.ultraDetailTileLimit === next.ultraDetailTileLimit
+      && prev.anisotropy === next.anisotropy) return;
+    const anisotropyChanged = prev.anisotropy !== next.anisotropy;
+    this.imageryBudget = next;
+    this.nextImagerySelection = 0;
+    if (anisotropyChanged) {
+      for (const entry of this.tiles.values()) {
+        for (const tex of [entry.baseMap, entry.detailMap, entry.previousDetailMap]) {
+          if (tex) {
+            tex.anisotropy = anisotropy;
+            tex.needsUpdate = true;
+          }
+        }
+      }
+      for (const mesh of this.farTiles.values()) {
+        if (mesh.material?.map) {
+          mesh.material.map.anisotropy = anisotropy;
+          mesh.material.map.needsUpdate = true;
+        }
+      }
+    }
   }
 
   update(position, velocity, camera, viewportHeight, reducedGeometry = false) {
@@ -664,7 +722,7 @@ export class OpenWorldTerrain {
         transparent: true, colorWrite: false, fog: false,
       });
       const material = new THREE.MeshLambertMaterial({
-        map: imageryTexture(image), transparent: true, depthWrite: false, depthFunc: THREE.EqualDepth,
+        map: imageryTexture(image, this.imageryBudget.anisotropy), transparent: true, depthWrite: false, depthFunc: THREE.EqualDepth,
       });
       installFarTerrainShader(depthMaterial, this.farOpacity);
       installFarTerrainShader(material, this.farOpacity);
@@ -723,7 +781,7 @@ export class OpenWorldTerrain {
       entry.imageryRetryAt = performance.now() + 8000;
       return;
     }
-    entry.baseMap = imageryTexture(image);
+    entry.baseMap = imageryTexture(image, this.imageryBudget.anisotropy);
     entry.detail.base.value = entry.baseMap;
     this.applyImagery(entry, entry.baseMap);
   }
@@ -771,15 +829,45 @@ export class OpenWorldTerrain {
       visible.sort((a, b) => b.pixels - a.pixels);
       // Ranking controls new requests. A resident tile keeps its detail while
       // it is still useful, even if another tile grows larger on screen.
-      let hasHighDetail = [...wanted.values()].includes(13);
+      const budget = this.imageryBudget;
+      // Reconcile resident selections against the active quality budget so
+      // lowering render quality immediately shrinks retained detail tiles.
+      if (wanted.size > 0) {
+        const byPriority = [...wanted.entries()]
+          .sort(([a], [b]) => (this.tiles.get(b)?.imageryPriority ?? 0) - (this.tiles.get(a)?.imageryPriority ?? 0));
+        wanted.clear();
+        let keptHigh = 0;
+        let keptUltra = 0;
+        for (const [key, level] of byPriority) {
+          if (wanted.size >= budget.detailTileLimit) break;
+          let capped = level;
+          if (capped >= 14 && keptUltra >= budget.ultraDetailTileLimit) capped = 13;
+          if (capped >= 13 && keptHigh >= budget.highDetailTileLimit) capped = 12;
+          wanted.set(key, capped);
+          if (capped >= 13) keptHigh++;
+          if (capped >= 14) keptUltra++;
+        }
+      }
+      let highDetailCount = 0;
+      let ultraDetailCount = 0;
+      for (const level of wanted.values()) {
+        if (level >= 13) highDetailCount++;
+        if (level >= 14) ultraDetailCount++;
+      }
       for (const { key, entry, pixels } of visible) {
         const previous = wanted.get(key);
-        if (!previous && wanted.size >= detailTileLimit) continue;
-        const level = !hasHighDetail && pixels >= 2 * samples ? 13 : 12;
+        if (!previous && wanted.size >= budget.detailTileLimit) continue;
+        let level = 12;
+        if (pixels >= 3 * samples && (ultraDetailCount < budget.ultraDetailTileLimit || previous >= 14)) {
+          level = 14;
+        } else if (pixels >= 1.8 * samples && (highDetailCount < budget.highDetailTileLimit || previous >= 13)) {
+          level = 13;
+        }
         if (previous >= level) continue;
         wanted.set(key, level);
         entry.detailLastVisibleAt = now;
-        hasHighDetail ||= level === 13;
+        if (level >= 13 && !(previous >= 13)) highDetailCount++;
+        if (level >= 14 && !(previous >= 14)) ultraDetailCount++;
       }
       this.detailWanted = wanted;
     }
@@ -807,7 +895,9 @@ export class OpenWorldTerrain {
 
     this.updateImageryEdges(now);
     if (this.pendingDetail) return;
-    for (const [key, level] of this.detailWanted) {
+    const candidates = [...this.detailWanted.entries()]
+      .sort(([a], [b]) => (this.tiles.get(b)?.imageryPriority ?? 0) - (this.tiles.get(a)?.imageryPriority ?? 0));
+    for (const [key, level] of candidates) {
       const entry = this.tiles.get(key);
       if (!entry?.baseMap || entry.detailLevel >= level || now < (entry.detailRetryAt ?? 0)) continue;
       if (entry.detailMap && (entry.detail.blend.value < 1
@@ -891,7 +981,7 @@ export class OpenWorldTerrain {
       entry.previousDetailMap = entry.detailMap;
       this.applyImagery(entry, entry.previousDetailMap);
     }
-    entry.detailMap = imageryTexture(canvas);
+    entry.detailMap = imageryTexture(canvas, this.imageryBudget.anisotropy);
     entry.detailLevel = level;
     entry.detail.map.value = entry.detailMap;
     entry.detail.blend.value = 0;
@@ -1056,6 +1146,8 @@ export function updateOpenWorldTerrain(sim) {
     }
     setCorridorStreamersVisible(surface, false);
     const height = sim.renderer?.getDrawingBufferSize?.(viewportSize)?.y;
+    const maxAnisotropy = sim.renderer?.capabilities?.getMaxAnisotropy?.() ?? defaultAnisotropy;
+    surface.openWorld.setImageryQuality(sim.renderQuality, maxAnisotropy);
     surface.openWorld.update(sim.position, sim.linearVelocity, sim.camera, height,
       sim.renderQuality === 'ultraLow');
   }

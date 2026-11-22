@@ -10,7 +10,7 @@ describe('SkyAtmosphere (Aerial Perspective Height Fog & Tone Mapping)', () => {
     const scene = new THREE.Scene();
     const sky = new SkyAtmosphere(scene);
 
-    assert.ok(sky.baseDensity >= 0.00018 && sky.baseDensity <= 0.00024, 'Base density should be in calibrated range (~0.00020)');
+    assert.ok(sky.baseDensity >= 0.00011 && sky.baseDensity <= 0.00024, 'Base density should be in calibrated range (~0.00012-0.00023)');
     assert.equal(sky.heightFalloff, 0.00068, 'Height falloff lambda should be 0.00068');
     assert.ok(scene.fog instanceof THREE.FogExp2, 'Scene fog should be initialized to THREE.FogExp2');
     assert.ok(sky.currentDensity > 0, 'Current density must be strictly positive');
@@ -60,7 +60,7 @@ describe('SkyAtmosphere (Aerial Perspective Height Fog & Tone Mapping)', () => {
     sky.setTimeOfDay(12.0, new THREE.Vector3(0, 10, 0), new THREE.Vector3(0, 10, 0));
     assert.equal(sky.currentExposure, 0.98, 'Noon exposure should be 0.98 to prevent highlight clipping on fuselage');
     assert.equal(mockRenderer.toneMappingExposure, 0.98);
-    assert.ok(sky.baseDensity <= 0.00019, 'Noon base fog density should be lowest (~0.00018) for clear daytime skies');
+    assert.ok(sky.baseDensity <= 0.00014, 'Noon base fog density should be lowest (~0.00012) for clear daytime skies');
     assert.ok(sky.fogColor.b > sky.fogColor.r, 'Noon fog should have Rayleigh sky-blue tone (B > R)');
 
     // 3. Sunset / Golden Hour (18:00)
