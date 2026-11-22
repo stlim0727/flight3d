@@ -77,14 +77,15 @@ try {
   let ready=false;
   for(let i=0;i<150;i++) {ready=await evaluate('Boolean(window.sim?.gameFlow)');if(ready)break;await new Promise(r=>setTimeout(r,100));}
   assert.ok(ready,'simulator ready');
+  await evaluate("(async()=>{await sim.setAirport('coastal');if(sim.incheonAirport){sim.scene.remove(sim.incheonAirport.group,sim.incheonAirport.terrain.mesh);sim.incheonAirport=null;}sim.incheonLoad=null;localStorage.removeItem('flight3d.airport');return true;})()");
   // Exercise the real failed-load path, then retry and cancel a pending selection.
   await send('Network.setBlockedURLs',{urls:['*scenery/incheon/patch.json*']});
   await check('failed load keeps the previous airport playable',`(async()=>{await sim.setAirport('incheon');return {airport:sim.activeAirport,loading:sim.airportLoading,disabled:document.querySelector('#btn-fly').disabled};})()`,v=>{assert.equal(v.airport,'coastal');assert.equal(v.loading,false);assert.equal(v.disabled,false);});
   results.expectedLoadErrors=errors.splice(0);
   await send('Network.setBlockedURLs',{urls:[]});
   await check('cancel pending selection',`(async()=>{const p=sim.setAirport('incheon');await sim.setAirport('coastal');await p;return {airport:sim.activeAirport,incheonVisible:sim.incheonAirport.group.visible};})()`,v=>{assert.equal(v.airport,'coastal');assert.equal(v.incheonVisible,false);});
-  await evaluate("sim.gameFlow.enterLobby();true");
-  await click('#lobby-airport-incheon');
+  await evaluate("sim.gameFlow.enterLobby();document.querySelector('#lobby-place-picker')?.setAttribute('open','');true");
+  await click('#lobby-map-default-bookmarks [data-place-id="RKSI"]');
   // Picking an airport is a wish, not a rebuild (#322): the live scene and the
   // persisted selection both stay on what was actually flown last.
   await check('airport pick stays pending',`({want:sim.lobby.airport,airport:sim.activeAirport,city:sim.incheonAirport.group.visible,terrain:sim.incheonAirport.terrain.mesh.visible,coastal:sim.airport.group.visible,lukla:sim.luklaAirport?.group.visible ?? false,starting:sim.startingFlight,stored:localStorage.getItem('flight3d.airport')})`,v=>{assert.equal(v.want,'incheon');assert.equal(v.airport,'coastal');assert.equal(v.city,false);assert.equal(v.terrain,false);assert.equal(v.coastal,true);assert.equal(v.lukla,false);assert.equal(v.starting,false);assert.notEqual(v.stored,'incheon');});
@@ -136,7 +137,7 @@ try {
   await evaluate("sim.cameraSystem.setMode(6,true);sim.cameraSystem.resetDroneOrbit(1.8,2300,1600);sim.cameraSystem.snapToTarget(sim.aircraft.group);sim.stepSimulation(.01);true");await settle();await capture('overview');
   await evaluate("sim.gameFlow.returnToLobby();true");await settle();
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});await settle();
-  await check('390px lobby layout and selectable airport',`(()=>{const b=document.querySelector('#lobby-airport-incheon').getBoundingClientRect();return {overflow:document.documentElement.scrollWidth>innerWidth,buttonVisible:b.width>0&&b.left>=0&&b.right<=innerWidth,briefing:document.querySelector('#lobby-briefing').textContent};})()`,v=>{assert.equal(v.overflow,false);assert.ok(v.buttonVisible);assert.match(v.briefing,/145/);});
+  await check('390px lobby layout and selectable airport',`(()=>{const p=document.querySelector('#lobby-place-picker');if(p&&!p.open)p.querySelector('summary')?.click();const b=document.querySelector('#lobby-map-default-bookmarks [data-place-id="RKSI"]').getBoundingClientRect();return {overflow:document.documentElement.scrollWidth>innerWidth,buttonVisible:b.width>0&&b.left>=0&&b.right<=innerWidth,briefing:document.querySelector('#lobby-briefing').textContent};})()`,v=>{assert.equal(v.overflow,false);assert.ok(v.buttonVisible);assert.match(v.briefing,/145/);});
   await capture('mobile');
   assert.deepEqual(errors,[],'unexpected browser runtime/resource errors');
   results.errors=errors;results.completedAt=new Date().toISOString();

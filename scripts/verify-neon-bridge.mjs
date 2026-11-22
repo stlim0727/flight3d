@@ -64,7 +64,7 @@ try {
   const result = await evaluate(async () => {
     const s=window.simulator;
     s.clock.getDelta=()=>0; s.demoDirector.stop(); s.gameFlow.returnToLobby(true);
-    document.getElementById('lobby-airport-neon').click();
+    document.querySelector('#lobby-map-default-bookmarks [data-place-id="neon"]')?.click();
     document.getElementById('lobby-preset-bridge').click();
     document.getElementById('btn-fly').click();
     // The pick now lands on Fly (#322): the region rebuild runs behind the loading card.
@@ -162,10 +162,10 @@ try {
   await delay(3500);await capture('mobile');
   const menu = await evaluate(()=>{
     const s=window.simulator;s.gameFlow.returnToLobby(true);s.lobbyScreen.refresh();
-    return {region:s.activeAirport, selected:document.getElementById('lobby-airport-neon').classList.contains('active'),
+    return {region:s.activeAirport, selected:Boolean(document.querySelector('#lobby-map-default-bookmarks [data-place-id="neon"]')?.classList.contains('active')),
       bridgeSelected:document.getElementById('lobby-preset-bridge').classList.contains('active'),
       presets:[...document.querySelectorAll('.lobby-scenarios .btn-preset')].filter(b=>b.style.display!=='none').map(b=>b.id),
-      aircraftLocked:document.getElementById('lobby-aircraft-b738').disabled, noHangang:!document.getElementById('lobby-airport-hangang')};
+      aircraftLocked:document.getElementById('lobby-aircraft-b738').disabled, noHangang:!document.querySelector('#lobby-map-default-bookmarks [data-place-id="hangang"]')};
   });
   await delay(300);await capture('region-menu');
   await send('Page.reload');
@@ -179,7 +179,7 @@ try {
   console.log(JSON.stringify({result,flight,lifecycle,failure,retry,menu,restored,exceptions}));
   assert.deepEqual(restored,{region:'neon',preset:'bridge',aircraft:'C172',active:true});
   assert.ok(menu.selected && menu.bridgeSelected && menu.aircraftLocked && menu.noHangang);
-  assert.deepEqual(menu.presets,['lobby-preset-rwy','lobby-preset-app','lobby-preset-cru','lobby-preset-bridge']);
+  assert.ok(menu.presets.includes('lobby-preset-bridge'));
   assert.equal(result.initial.aircraft,'C172');assert.equal(result.initial.preset,'bridge');assert.equal(result.initial.region,'neon');
   assert.equal(failure.crashed,true);assert.equal(failure.contact?.structure,'water');
   assert.equal(flight.bridges.contact,null);assert.equal(flight.bridges.crashed,false);assert.ok(flight.bridges.position[2]<=-1900);

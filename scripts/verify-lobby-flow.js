@@ -272,7 +272,7 @@ async function testLobbyFlow() {
 
     // 8. Menu picks stay PENDING: the live scene, the flown scenario and storage all keep
     // their old values, the hold survives them, and the menu itself shows the wish.
-    await evalJs(`document.getElementById('lobby-airport-lukla').click()`);
+    await evalJs(`document.querySelector('#lobby-map-default-bookmarks [data-place-id="lukla"]')?.click()`);
     await evalJs(`document.getElementById('lobby-aircraft-c172').click()`);
     await sleep(400);
     const wanted = await simRead('demoButton: getComputedStyle(document.getElementById("lobby-preset-demo")).display');
