@@ -196,6 +196,28 @@ function createValleyTerrain({ samples, noise, reliefAmplitudeM = 10, crossJitte
     }
   });
 
+  // Chunked segment AABBs prune full-course fallback projections outside the spatial grid.
+  const CHUNK_SIZE = 16;
+  const chunks = [];
+  for (let start = 0; start < samples.length; start += CHUNK_SIZE) {
+    const end = Math.min(samples.length, start + CHUNK_SIZE);
+    let cMinX = Infinity, cMaxX = -Infinity, cMinZ = Infinity, cMaxZ = -Infinity;
+    for (let i = start; i < end; i++) {
+      const from = samples[i];
+      const to = samples[Math.min(samples.length - 1, i + 1)];
+      if (from.x < cMinX) cMinX = from.x;
+      if (from.x > cMaxX) cMaxX = from.x;
+      if (from.z < cMinZ) cMinZ = from.z;
+      if (from.z > cMaxZ) cMaxZ = from.z;
+      if (to.x < cMinX) cMinX = to.x;
+      if (to.x > cMaxX) cMaxX = to.x;
+      if (to.z < cMinZ) cMinZ = to.z;
+      if (to.z > cMaxZ) cMaxZ = to.z;
+    }
+    chunks.push({ start, end, minX: cMinX, maxX: cMaxX, minZ: cMinZ, maxZ: cMaxZ });
+  }
+  const chunkDistSq = new Float64Array(chunks.length);
+
   /** Nearest point on the centreline: progress, signed cross-track and the
    * interpolated valley profile there. */
   function project(x, z) {
@@ -209,16 +231,18 @@ function createValleyTerrain({ samples, noise, reliefAmplitudeM = 10, crossJitte
         }
       }
     }
-    const pool = candidates?.length ? candidates : samples.map((_, i) => i);
     let best = null;
-    for (const i of pool) {
+    let bestIndex = Infinity;
+    const checkSegment = (i) => {
       const from = samples[i], to = samples[Math.min(samples.length - 1, i + 1)];
       const dx = to.x - from.x, dz = to.z - from.z;
       const lengthSquared = dx * dx + dz * dz || 1;
       const share = clamp(((x - from.x) * dx + (z - from.z) * dz) / lengthSquared, 0, 1);
       const px = from.x + dx * share, pz = from.z + dz * share;
       const distanceSquared = (x - px) ** 2 + (z - pz) ** 2;
-      if (!best || distanceSquared < best.distanceSquared) {
+      if (!best || distanceSquared < best.distanceSquared
+        || (distanceSquared === best.distanceSquared && i < bestIndex)) {
+        bestIndex = i;
         // Cross-track is positive to the right of the direction of travel.
         const along = { x: Math.sin(to.heading), z: -Math.cos(to.heading) };
         best = { distanceSquared, s: from.s + (to.s - from.s) * share,
@@ -229,6 +253,32 @@ function createValleyTerrain({ samples, noise, reliefAmplitudeM = 10, crossJitte
           ridgeExponent: from.ridgeExponent + (to.ridgeExponent - from.ridgeExponent) * share,
           legIndex: from.legIndex };
       }
+    };
+
+    if (candidates?.length) {
+      for (const i of candidates) checkSegment(i);
+      return best;
+    }
+
+    let seedChunk = 0;
+    let seedDistSq = Infinity;
+    for (let c = 0; c < chunks.length; c++) {
+      const ch = chunks[c];
+      const dx = x < ch.minX ? ch.minX - x : x > ch.maxX ? x - ch.maxX : 0;
+      const dz = z < ch.minZ ? ch.minZ - z : z > ch.maxZ ? z - ch.maxZ : 0;
+      const d2 = dx * dx + dz * dz;
+      chunkDistSq[c] = d2;
+      if (d2 < seedDistSq) {
+        seedDistSq = d2;
+        seedChunk = c;
+      }
+    }
+    const first = chunks[seedChunk];
+    for (let i = first.start; i < first.end; i++) checkSegment(i);
+    for (let c = 0; c < chunks.length; c++) {
+      if (c === seedChunk || chunkDistSq[c] > best.distanceSquared) continue;
+      const ch = chunks[c];
+      for (let i = ch.start; i < ch.end; i++) checkSegment(i);
     }
     return best;
   }

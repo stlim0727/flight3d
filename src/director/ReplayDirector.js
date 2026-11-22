@@ -510,7 +510,7 @@ export class ReplayDirector {
     sim.cameraSystem.snapToTarget(sim.aircraft.group);
     sim.setTimeOfDay(view.skyTime, { persist: false, userChoice: false });
     sim.sky.setCloudCover(view.cloud);
-    sim.foliage.setTimeOfDay(sim.sky.timeOfDay);
+    sim.foliage?.setTimeOfDay(sim.sky.timeOfDay);
     sim.water.syncWithAtmosphere(sim.sky);
   }
 }

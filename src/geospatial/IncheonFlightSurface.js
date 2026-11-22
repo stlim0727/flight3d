@@ -15,6 +15,15 @@ export class IncheonFlightSurface {
       Math.min(...s.points.map(p=>p[0])), Math.min(...s.points.map(p=>p[1])),
       Math.max(...s.points.map(p=>p[0])), Math.max(...s.points.map(p=>p[1])),
     ] }));
+    this.surfacesBounds = this.surfaces.reduce((acc, s) => {
+      const m = 120 + (s.area ? 0 : s.width / 2);
+      return [
+        Math.min(acc[0], s.bounds[0] - m),
+        Math.min(acc[1], s.bounds[1] - m),
+        Math.max(acc[2], s.bounds[2] + m),
+        Math.max(acc[3], s.bounds[3] + m),
+      ];
+    }, [Infinity, Infinity, -Infinity, -Infinity]);
     // One 25m triangle grid drives both rendered terrain and contact queries.
     this.gridSize = 481;
     this.elevations = new Float32Array(this.gridSize ** 2);
@@ -68,6 +77,10 @@ export class IncheonFlightSurface {
     // The optional source-backed regional extension owns ground outside the core.
     if (Math.max(Math.abs(x),Math.abs(z))>6000) return this.region?.getHeight(x,z) ?? 0;
     if (!land) return 0;
+    const sb = this.surfacesBounds;
+    if (x < sb[0] || x > sb[2] || z < sb[1] || z > sb[3]) {
+      return this.source.getHeight(x,z);
+    }
     let weight=0;
     for (const s of this.surfaces) {
       if (!this.nearby(s,x,z,120)) continue;

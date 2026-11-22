@@ -337,9 +337,9 @@ export class DemoFlightDirector {
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
 
     const airport = targetAirport || this.sim.activeAirport || (this.sim.luklaAirport ? 'lukla' : 'coastal');
-    if (this.sim.setAirport && this.sim.activeAirport !== airport) {
-      this.sim.setAirport(airport);
-    }
+    const airportSwitch = (this.sim.setAirport && this.sim.activeAirport !== airport)
+      ? this.sim.setAirport(airport)
+      : null;
 
     this.activeDemoAirport = airport;
     this.profile = resolveDemoProfile(this.activeDemoAircraft, airport, requestedProfile).id;
@@ -376,17 +376,42 @@ export class DemoFlightDirector {
     }
 
     // Keep the constructor's auto-start request alive while the asynchronous
-    // DEM loads. isActive lets Esc, presets and airport changes cancel it.
-    this.waitingForTerrain = airport === 'lukla' && this.sim.currentTerrain?.isLoaded === false;
+    // region or DEM loads. isActive lets Esc, presets and airport changes cancel it.
+    const waitingForAirportSwitch = Boolean(this.sim.setAirport && this.sim.activeAirport !== airport);
+    this.waitingForTerrain = waitingForAirportSwitch || (airport === 'lukla' && this.sim.currentTerrain?.isLoaded === false);
     if (this.waitingForTerrain) {
-      // Discard the previous airport's pose even when it has not crashed.
+      // Discard the previous airport's pose once the destination airport is active.
       // Cancellation must leave a safe runway spawn rather than sea-level flight.
-      this.sim.setPreset('runway', true);
+      if (!waitingForAirportSwitch) {
+        this.sim.setPreset('runway', true);
+      }
       this.currentStage = DemoFlightDirector.STAGES.IDLE;
       this.getActiveScenario().result = { status: 'pending', airborne: false };
       this.updateBanner(() => t('loading.lukla.terrain'), () => t('the.demo.will.start.when.terrain.data'));
       this.sim.controls?.setParkingBrake?.(true);
       this.sim.gear?.setBrakes(1);
+      if (waitingForAirportSwitch && typeof airportSwitch?.then === 'function') {
+        const expectedAirport = airport;
+        const expectedProfile = this.profile;
+        airportSwitch.then(() => {
+          if (!this.isActive || !this.waitingForTerrain || this.activeDemoAirport !== expectedAirport) return;
+          if (this.sim.activeAirport !== expectedAirport) {
+            this.stop();
+            return;
+          }
+          if (this.sim.currentTerrain?.isLoaded !== false) {
+            this.start(expectedAirport, expectedProfile);
+          } else {
+            this.sim.setPreset('runway', true);
+            this.sim.controls?.setParkingBrake?.(true);
+            this.sim.gear?.setBrakes(1);
+          }
+        }).catch(() => {
+          if (this.isActive && this.waitingForTerrain && this.activeDemoAirport === expectedAirport) {
+            this.stop();
+          }
+        });
+      }
       return;
     }
     this.sim.controls?.setParkingBrake?.(false);
@@ -557,12 +582,13 @@ export class DemoFlightDirector {
   update(dt) {
     if (!this.isActive || this.isRestartConfirmOpen) return;
     if (this.waitingForTerrain) {
+      if (this.sim.activeAirport !== this.activeDemoAirport) return;
       if (this.sim.currentTerrain?.loadError) {
         this.getActiveScenario().recordFailure({ description: this.sim.currentTerrain.loadError });
         this.stop(() => t('could.not.load.lukla.terrain.refresh.and'));
         return;
       }
-      if (this.sim.currentTerrain?.isLoaded === true) this.start(this.activeDemoAirport, this.profile);
+      if (this.sim.currentTerrain?.isLoaded !== false) this.start(this.activeDemoAirport, this.profile);
       return;
     }
 

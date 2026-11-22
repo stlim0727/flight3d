@@ -721,12 +721,24 @@ class SimulatorHudAndBindingsMethods {
         if (id === 'lobby-tab-multi') this.multiplayer?.refreshOpenRooms();
       },
     });
-    loadMapFlightPlaces()
-      .then(places => {
-        this.mapPlaces = places;
-        this.lobbyScreen?.setMapPlaces(places);
-      })
-      .catch(error => { this.mapPlacesError = String(error); /* leave map choices empty; manual presets still work */ });
+    this.loadLobbyMapCatalog = () => {
+      if (this._mapPlacesPromise) return this._mapPlacesPromise;
+      this._mapPlacesPromise = loadMapFlightPlaces()
+        .then(places => {
+          this.mapPlaces = places;
+          this.lobbyScreen?.setMapPlaces(places);
+          return places;
+        })
+        .catch(error => {
+          this._mapPlacesPromise = null;
+          this.mapPlacesError = String(error); /* leave map choices empty; manual presets still work */
+          return null;
+        });
+      return this._mapPlacesPromise;
+    };
+    document.getElementById('lobby-map-search')?.addEventListener('focus', () => this.loadLobbyMapCatalog(), { once: true });
+    document.getElementById('lobby-map-airport')?.addEventListener('focus', () => this.loadLobbyMapCatalog(), { once: true });
+    document.getElementById('lobby-map-airport')?.addEventListener('pointerdown', () => this.loadLobbyMapCatalog(), { once: true });
     this.renderDiagnosticsPanel = new RenderDiagnosticsPanel(this);
     this.replayPanel = new ReplayPanel(this);
     this.replayDirector.onChange = () => this.replayPanel.refresh();

@@ -112,10 +112,10 @@ export class CockpitPhotoOverlay {
     this.group.add(this.eicasMesh);
 
     // 2. High-Resolution Real-Photo Cockpit Panel (Render Order 2: in front of screen displays)
-    this.panelTexture = loadTextureSafe(`${import.meta.env?.BASE_URL ?? '/'}textures/cockpit/b737_cockpit_panel_overlay.png`);
+    this.panelTexture = null;
     this.panelGeo = new THREE.PlaneGeometry(2.0 * aspect, 2.0);
     this.panelMat = new THREE.MeshBasicMaterial({
-      map: this.panelTexture,
+      map: null,
       transparent: true,
       depthTest: false,
       depthWrite: false
@@ -125,6 +125,19 @@ export class CockpitPhotoOverlay {
     this.panelMesh.position.set(0, 0, 1.0);
     this.panelMesh.renderOrder = 2;
     this.group.add(this.panelMesh);
+  }
+
+  /**
+   * Lazy-loads the 2D photo panel texture when 2D photo cockpit view is actually enabled.
+   */
+  ensurePanelTexture() {
+    if (this.panelTexture) return this.panelTexture;
+    this.panelTexture = loadTextureSafe(`${import.meta.env?.BASE_URL ?? '/'}textures/cockpit/b737_cockpit_panel_overlay.png`);
+    if (this.panelMat) {
+      this.panelMat.map = this.panelTexture;
+      this.panelMat.needsUpdate = true;
+    }
+    return this.panelTexture;
   }
 
   /**
@@ -158,6 +171,7 @@ export class CockpitPhotoOverlay {
    */
   update(telemetry = {}) {
     if (!this.enabled) return;
+    this.ensurePanelTexture();
 
     // Refresh dynamic canvas textures
     if (this.pfdCanvas?.texture) this.pfdCanvas.texture.needsUpdate = true;
@@ -171,6 +185,7 @@ export class CockpitPhotoOverlay {
    */
   render(renderer) {
     if (!this.enabled || !renderer) return;
+    this.ensurePanelTexture();
 
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;

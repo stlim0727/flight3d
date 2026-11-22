@@ -37,7 +37,11 @@ export class Terrain {
     this.triplanarSharpness = options.triplanarSharpness !== undefined ? options.triplanarSharpness : 6.0;
 
     // Custom or procedurally generated PBR textures
-    this.textures = options.textures || TerrainTextures.getTextures();
+    this.textures = options.textures || (
+      options.asyncTextures && typeof Worker !== 'undefined'
+        ? TerrainTextures.getTexturesAsync(textures => this.applyTextures(textures))
+        : TerrainTextures.getTextures()
+    );
 
     // Deterministic seeded PRNG (seed 424242) ensures identical repeatable world geometry across all sessions and tests
     this.simplex = new SimplexNoise({ random: mulberry32(424242) });
@@ -183,6 +187,30 @@ export class Terrain {
 
   getQuality() {
     return this.quality;
+  }
+
+  applyTextures(textures) {
+    if (!textures) return;
+    this.textures = textures;
+    if (!this.shaderUniforms) return;
+    const keys = [
+      ['uGrassMap', 'grassMap'],
+      ['uGrassNormal', 'grassNormal'],
+      ['uSandMap', 'sandMap'],
+      ['uSandNormal', 'sandNormal'],
+      ['uRockMap', 'rockMap'],
+      ['uRockNormal', 'rockNormal'],
+      ['uSnowMap', 'snowMap'],
+      ['uSnowNormal', 'snowNormal'],
+      ['uRunwayMap', 'runwayMap'],
+      ['uRunwayNormal', 'runwayNormal'],
+      ['uMicroNormal', 'microNormal'],
+    ];
+    for (const [uniform, key] of keys) {
+      if (this.shaderUniforms[uniform] && textures[key]) {
+        this.shaderUniforms[uniform].value = textures[key];
+      }
+    }
   }
 
   setNormalStrength(strength) {
