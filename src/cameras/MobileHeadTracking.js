@@ -88,10 +88,13 @@ export class MobileHeadTracking {
       if (stream) stream.getTracks().forEach((track) => track.stop());
       if (video) video.remove();
     };
+    let stream = null;
+    let video = null;
+    let detector = null;
 
     this._setStatus('requesting', 'Requesting camera permission…');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: this.facingMode,
           width: { ideal: this.videoWidth },
@@ -105,26 +108,21 @@ export class MobileHeadTracking {
         return;
       }
 
-      const video = document.createElement('video');
+      video = document.createElement('video');
       video.srcObject = stream;
       video.playsInline = true;
       video.muted = true;
       video.autoplay = true;
       video.setAttribute('style', 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:-10px;');
       document.body.appendChild(video);
-      try {
-        await video.play();
-      } catch (err) {
-        releaseLocal(stream, video);
-        throw err;
-      }
+      await video.play();
       if (!stillCurrent()) {
         releaseLocal(stream, video);
         return;
       }
 
       this._setStatus('loading', 'Loading face detector…');
-      const detector = await HeadPoseDetector.create();
+      detector = await HeadPoseDetector.create();
       if (!stillCurrent()) {
         detector.dispose();
         releaseLocal(stream, video);
@@ -134,6 +132,9 @@ export class MobileHeadTracking {
       this.stream = stream;
       this.video = video;
       this.detector = detector;
+      stream = null;
+      video = null;
+      detector = null;
       this.cameraSystem.setHeadTrackingEnabled(true);
       this.lastPose = { detected: false, yaw: 0, pitch: 0, confidence: 0, bbox: null };
       this.lastDetect = 0;
@@ -141,6 +142,8 @@ export class MobileHeadTracking {
       this._lastNotifiedSamples = 0;
       this._setStatus('active', 'Head tracking on — looking for a face');
     } catch (err) {
+      if (detector) detector.dispose();
+      releaseLocal(stream, video);
       if (!stillCurrent()) return;
       this.disable();
       this._setStatus('error', `Head tracking failed: ${err?.message || err}`);

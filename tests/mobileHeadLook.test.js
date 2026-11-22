@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { MobileHeadTracking } from '../src/cameras/MobileHeadTracking.js';
+import { CockpitCameraMode } from '../src/cameras/modes/CockpitCameraMode.js';
 
 const fakeCameraSystem = () => ({
   setHeadTrackingEnabled() {},
@@ -73,6 +74,64 @@ describe('mobile head look', () => {
       assert.equal(controller.detector, null);
     } finally {
       Object.defineProperty(globalThis, 'navigator', { configurable: true, value: previousNavigator });
+      globalThis.window = previousWindow;
+    }
+  });
+
+  it('clamps combined cockpit pitch before the vertical flip', () => {
+    const cam = new THREE.PerspectiveCamera(60, 4 / 3, 0.1, 1000);
+    const cs = new CameraSystem(cam, { addEventListener() {}, style: {} });
+    const aircraft = new THREE.Object3D();
+    aircraft.updateMatrixWorld(true);
+    cs.mode = CameraSystem.MODES.COCKPIT;
+    cs.setHeadTrackingEnabled(true);
+    cs.setHeadLook(0, -1.4);
+    cs.headLookYaw = 0;
+    cs.headLookPitch = -1.4;
+    cs.headLookActive = true;
+    cs._frameDt = 1 / 60;
+
+    CockpitCameraMode.update(cam, aircraft, {}, cs);
+
+    const direction = cam.getWorldDirection(new THREE.Vector3());
+    assert.ok(direction.z < 0, 'view must stay forward of vertical');
+  });
+
+  it('releases local camera resources when detector loading fails', async () => {
+    const previousNavigator = globalThis.navigator;
+    const previousWindow = globalThis.window;
+    const previousDocument = globalThis.document;
+    let stopped = false;
+    let removed = false;
+    const stream = { getTracks: () => [{ stop() { stopped = true; } }] };
+    const video = {
+      style: {},
+      setAttribute() {},
+      play: async () => {},
+      remove() { removed = true; },
+    };
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { mediaDevices: { getUserMedia: async () => stream } },
+    });
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: { createElement: () => video, body: { appendChild() {} } },
+    });
+    globalThis.window = { isSecureContext: true, addEventListener() {} };
+
+    try {
+      const controller = new MobileHeadTracking(fakeCameraSystem());
+      await controller.enable();
+
+      assert.equal(controller.state, 'error');
+      assert.equal(stopped, true, 'stream track must stop on detector failure');
+      assert.equal(removed, true, 'hidden video must be removed on detector failure');
+      assert.equal(controller.video, null);
+      assert.equal(controller.detector, null);
+    } finally {
+      Object.defineProperty(globalThis, 'navigator', { configurable: true, value: previousNavigator });
+      Object.defineProperty(globalThis, 'document', { configurable: true, value: previousDocument });
       globalThis.window = previousWindow;
     }
   });
