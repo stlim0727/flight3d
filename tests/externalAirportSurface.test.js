@@ -214,6 +214,19 @@ test('outsideHeight receives world coordinates and missing samples fall back to 
   near(nonFinite.getHeight(centre.x, centre.z + 300), 16);
   const absent = new ExternalAirportSurface({ airport: airport(), baseOffset: [ARP_X, ARP_Z] });
   near(absent.getHeight(centre.x, centre.z + 300), 16);
+
+  const blendCalls = [];
+  const blendTerrain = new ExternalAirportSurface({
+    airport: airport(),
+    baseOffset: [ARP_X, ARP_Z],
+    outsideHeight: (x, z, options) => { blendCalls.push({ x, z, options }); return 5; },
+  });
+  blendTerrain.getHeight(centre.x, centre.z + 100);
+  assert.equal(blendCalls.length, 1);
+  assert.equal(blendCalls[0].options?.unblended, true);
+  blendTerrain.getHeight(centre.x, centre.z + 300);
+  assert.equal(blendCalls.length, 2);
+  assert.equal(blendCalls[1].options?.unblended, undefined);
 });
 
 test('on-runway and safety-area predicates use the physical segment and width', () => {

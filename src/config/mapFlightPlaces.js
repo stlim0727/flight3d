@@ -86,8 +86,28 @@ export function mapPlanRegion(plan, places = {}) {
   if (!Number.isFinite(location?.latitude) || !Number.isFinite(location.longitude)) return null;
   const incheon = haversineDistanceM(location.latitude, location.longitude, INCHEON_PATCH.origin.latitude, INCHEON_PATCH.origin.longitude);
   const jeju = haversineDistanceM(location.latitude, location.longitude, JEJU_ORIGIN.latitude, JEJU_ORIGIN.longitude);
-  return jeju < incheon ? 'jeju' : 'incheon';
+  return (jeju < incheon && location.latitude < 34.2) ? 'jeju' : 'incheon';
 }
+const KOREAN_AIRPORT_ALIASES = {
+  RKPK: ['김해', '김해국제공항', '김해공항', '부산'],
+  RKSS: ['김포', '김포국제공항', '김포공항', '서울'],
+  RKSI: ['인천', '인천국제공항', '인천공항'],
+  RKPC: ['제주', '제주국제공항', '제주공항'],
+  RKNY: ['양양', '양양국제공항', '양양공항'],
+  RKTU: ['청주', '청주국제공항', '청주공항'],
+  RKTN: ['대구', '대구국제공항', '대구공항'],
+  RKTH: ['포항', '포항경주공항', '포항공항'],
+  RKJJ: ['광주', '광주공항'],
+  RKJB: ['무안', '무안국제공항', '무안공항'],
+  RKPU: ['울산', '울산공항'],
+  RKJY: ['여수', '여수공항'],
+  RKPS: ['사천', '사천공항'],
+  RKJK: ['군산', '군산공항'],
+  RKPD: ['정석', '정석비행장'],
+  RKTL: ['울진', '울진비행장'],
+  RKSM: ['서울공항', '성남'],
+};
+
 /** Adapt one full index record into the place shape used by the map selects. */
 export function indexedAirportPlace(airport) {
   const code = airport?.icao || airport?.ident;
@@ -96,6 +116,7 @@ export function indexedAirportPlace(airport) {
     code,
     iata: airport.iata ?? '',
     name: airport.name,
+    aliases: KOREAN_AIRPORT_ALIASES[code] ?? [],
     latitude: airport.latitude,
     longitude: airport.longitude,
     elevationM: airport.elevationM,

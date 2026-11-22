@@ -386,9 +386,11 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
   const mapCoordinates = [];
   const colors = [];
   const groundColor = new THREE.Color();
-  const appendVertex = ([localX, height, localZ, u, v, wet]) => {
+  const rawHeights = [];
+  const appendVertex = ([localX, height, localZ, u, v, wet], rawHeight = height) => {
     const index = vertices.length / 3;
     vertices.push(localX, height, localZ);
+    rawHeights.push(rawHeight);
     mapCoordinates.push(u, 1 - v);
     groundColor.set(wet >= 0.5 ? 0x426982 : height > 550 ? 0x637153 : 0x78816a);
     colors.push(groundColor.r, groundColor.g, groundColor.b);
@@ -404,7 +406,7 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
       const { latitude, longitude } = tileToWgs84(x + u, y + v, level);
       const [localX, localZ] = project(latitude, longitude);
       const wet = height <= 0 || (water?.[(Math.min(row * sampleStep, samples - 1) * samples + Math.min(col * sampleStep, samples - 1)) * 4 + 3] ?? 0) >= 128;
-      appendVertex([localX, blendHeight?.(localX, localZ, height) ?? height, localZ, u, v, Number(wet)]);
+      appendVertex([localX, blendHeight?.(localX, localZ, height) ?? height, localZ, u, v, Number(wet)], height);
     }
   }
   for (let row = 0; row < segments; row++) {
@@ -448,6 +450,7 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
   const geometry = new THREE.BufferGeometry();
   geometry.setIndex(indices);
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute('rawHeight', new THREE.Float32BufferAttribute(rawHeights, 1));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(mapCoordinates, 2));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
@@ -488,23 +491,26 @@ export function buildReducedTerrainGeometry(full) {
   return reduced;
 }
 
-function heightOnTriangle(positions, x, z, a, b, c) {
+function heightOnTriangle(positions, x, z, a, b, c, heights) {
   const ax = positions.getX(a), az = positions.getZ(a);
   const bx = positions.getX(b) - ax, bz = positions.getZ(b) - az;
   const cx = positions.getX(c) - ax, cz = positions.getZ(c) - az;
   const determinant = bx * cz - bz * cx;
   const u = ((x - ax) * cz - (z - az) * cx) / determinant;
   const v = (bx * (z - az) - bz * (x - ax)) / determinant;
-  return u >= -0.0001 && v >= -0.0001 && u + v <= 1.0001
-    ? positions.getY(a) * (1 - u - v) + positions.getY(b) * u + positions.getY(c) * v
-    : undefined;
+  if (!(u >= -0.0001 && v >= -0.0001 && u + v <= 1.0001)) return undefined;
+  const yA = heights ? heights.getX(a) : positions.getY(a);
+  const yB = heights ? heights.getX(b) : positions.getY(b);
+  const yC = heights ? heights.getX(c) : positions.getY(c);
+  return yA * (1 - u - v) + yB * u + yC * v;
 }
 
 export class OpenWorldTerrain {
-  constructor({ origin, protectedAreas = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget }) {
+  constructor({ origin, protectedAreas = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget, world }) {
     this.origin = origin;
     this.protectedAreas = protectedAreas;
     this.localSurface = localSurface;
+    this.world = world;
     this.elevationCache = elevationCache ?? new TileCacheManager({ urlTemplate: elevationUrl });
     this.imageryCache = imageryCache ?? new TileCacheManager({ enableBrowserCache: false, maxMemoryTiles: 128, maxConcurrent: 6 });
     this.waterSource = waterSource;
@@ -548,7 +554,7 @@ export class OpenWorldTerrain {
     return this.protectedAreas.some(area => contains(area, x, z));
   }
 
-  sample(x, z) {
+  sample(x, z, { unblended = false } = {}) {
     if (this.protects(x, z)) return undefined;
     const { x: tx, y: ty, fx, fy } = this.coordinate(x, z);
     const tile = this.tiles.get(keyOf(wrapX(tx), ty));
@@ -557,6 +563,7 @@ export class OpenWorldTerrain {
     const row = Math.min(segments - 1, Math.floor(fy * segments));
     const geometry = tile.fullGeometry ?? tile.mesh.geometry;
     const positions = geometry.attributes.position;
+    const heights = unblended ? (geometry.attributes.rawHeight ?? null) : null;
     let height;
     for (let dz = -1; dz <= 1 && height === undefined; dz++) {
       for (let dx = -1; dx <= 1 && height === undefined; dx++) {
@@ -565,13 +572,13 @@ export class OpenWorldTerrain {
           const cell = (row + dz) * segments + col + dx;
           const indices = geometry.index.array;
           for (let i = tile.cellOffsets[cell]; i < tile.cellOffsets[cell + 1] && height === undefined; i += 3) {
-            height = heightOnTriangle(positions, x, z, indices[i], indices[i + 1], indices[i + 2]);
+            height = heightOnTriangle(positions, x, z, indices[i], indices[i + 1], indices[i + 2], heights);
           }
           continue;
         }
         const nw = (row + dz) * stride + col + dx;
-        height = heightOnTriangle(positions, x, z, nw, nw + stride, nw + 1)
-          ?? heightOnTriangle(positions, x, z, nw + stride + 1, nw + 1, nw + stride);
+        height = heightOnTriangle(positions, x, z, nw, nw + stride, nw + 1, heights)
+          ?? heightOnTriangle(positions, x, z, nw + stride + 1, nw + 1, nw + stride, heights);
       }
     }
     if (height === undefined) return undefined;
@@ -580,10 +587,25 @@ export class OpenWorldTerrain {
     return { height: Math.max(0, height), water };
   }
 
+  sampleRaw(x, z) {
+    return this.sample(x, z, { unblended: true })?.height;
+  }
+
   readyAt(x, z) {
     if (this.protects(x, z)) return true;
     const { x: tx, y: ty } = this.coordinate(x, z);
     return this.tiles.has(keyOf(wrapX(tx), ty));
+  }
+
+  invalidateArea([minX, minZ, maxX, maxZ]) {
+    for (const [key, entry] of [...this.tiles.entries()]) {
+      const [x, y] = key.split('/').map(Number);
+      const bounds = projectedBounds(x, y, this.project);
+      if (bounds[0] < maxX && bounds[2] > minX && bounds[1] < maxZ && bounds[3] > minZ) {
+        this.pending.get(key)?.abort();
+        void this.load({ x, y, key });
+      }
+    }
   }
 
   readyForTile(tile, level) {
@@ -1013,22 +1035,45 @@ export class OpenWorldTerrain {
   async load(tile) {
     const { x, y, key } = tile;
     const controller = new AbortController();
+    this.pending.get(key)?.abort();
     this.pending.set(key, controller);
+    let entry = null;
     try {
       const waterData = this.fetchWater(tile, controller.signal);
       const [raster, east, south, southeast, water] = await Promise.all([
         this.raster(x, y), this.raster(wrapX(x + 1), y), this.raster(x, y + 1), this.raster(wrapX(x + 1), y + 1), waterData,
       ]);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || this.pending.get(key) !== controller) return;
       const local = this.localSurface;
       const half = local?.size / 2;
       const blendDistance = 1200;
-      const blendHeight = local ? (px, pz, height) => {
-        const distance = Math.max(Math.abs(px), Math.abs(pz)) - half;
-        if (distance >= blendDistance) return height;
-        return THREE.MathUtils.lerp(local.getNaturalHeight(px, pz), height,
-          THREE.MathUtils.smoothstep(distance, 0, blendDistance));
-      } : undefined;
+      const world = this.world;
+      const blendHeight = (px, pz, height) => {
+        if (local) {
+          const distance = Math.max(Math.abs(px), Math.abs(pz)) - half;
+          if (distance < blendDistance) {
+            return THREE.MathUtils.lerp(local.getNaturalHeight(px, pz), height,
+              THREE.MathUtils.smoothstep(distance, 0, blendDistance));
+          }
+        }
+        if (world?.regions) {
+          for (const [id, reg] of world.regions) {
+            if (!reg.terrain?.runways?.length) continue;
+            const offset = world.offsets.get(id);
+            if (!offset) continue;
+            const lx = px - offset[0];
+            const lz = pz - offset[1];
+            const e = reg.extent;
+            if (e && (lx < e.minX || lx > e.maxX || lz < e.minZ || lz > e.maxZ)) continue;
+            const nearest = reg.terrain.nearest(lx, lz);
+            if (nearest && nearest.hit.distance < 240) {
+              const blend = THREE.MathUtils.smoothstep(nearest.hit.distance, 40, 240);
+              return THREE.MathUtils.lerp(nearest.hit.elevationM, height, blend);
+            }
+          }
+        }
+        return height;
+      };
       const { geometry, cellOffsets } = buildOpenTerrainTile({
         blendHeight, localSurface: local,
         x, y, raster, east, south, southeast, water, project: this.project, protectedAreas: this.protectedAreas,
@@ -1044,7 +1089,7 @@ export class OpenWorldTerrain {
       if (local) applyFarSunShadow(material);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
-      const entry = { mesh, fullGeometry: geometry, cellOffsets, detail, water, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
+      entry = { mesh, fullGeometry: geometry, cellOffsets, detail, water, raster, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
       if (local) {
         const [west, north, eastEdge, southEdge] = projectedBounds(x, y, this.project);
         if (west < half && eastEdge > -half && north < half && southEdge > -half) {
@@ -1057,14 +1102,53 @@ export class OpenWorldTerrain {
           }
         }
       }
+      if (controller.signal.aborted || this.pending.get(key) !== controller) {
+        this.releaseEntry(entry);
+        return;
+      }
       this.updateRenderGeometry(entry, key);
+      const previous = this.tiles.get(key);
+      if (previous?.baseMap) {
+        entry.baseMap = previous.baseMap;
+        entry.detail.base.value = previous.baseMap;
+        this.applyImagery(entry, previous.baseMap);
+        previous.baseMap = null;
+      }
+      if (previous?.detailMap) {
+        entry.detailMap = previous.detailMap;
+        entry.detailLevel = previous.detailLevel;
+        entry.detail.map.value = previous.detailMap;
+        entry.detail.blend.value = previous.detail.blend.value;
+        entry.detailUpdatedAt = previous.detailUpdatedAt ?? performance.now();
+        if (previous.detailLastVisibleAt !== undefined) {
+          entry.detailLastVisibleAt = previous.detailLastVisibleAt;
+        }
+        previous.detailMap = null;
+      }
+      if (previous?.detail?.edges) {
+        entry.detail.edges.value.copy(previous.detail.edges.value);
+      }
+      if (previous?.detail?.corners) {
+        entry.detail.corners.value.copy(previous.detail.corners.value);
+      }
+      if (previous?.previousDetailMap) {
+        entry.previousDetailMap = previous.previousDetailMap;
+        previous.previousDetailMap = null;
+      }
       this.tiles.set(key, entry);
       this.group.add(mesh);
+      if (previous && previous !== entry) {
+        this.releaseEntry(previous);
+      }
       this.retry.delete(key);
     } catch {
-      if (!controller.signal.aborted) this.retry.set(key, performance.now() + 4000);
+      if (!controller.signal.aborted && this.pending.get(key) === controller) {
+        this.retry.set(key, performance.now() + 4000);
+      }
     } finally {
-      this.pending.delete(key);
+      if (this.pending.get(key) === controller) {
+        this.pending.delete(key);
+      }
     }
   }
 
@@ -1076,9 +1160,13 @@ export class OpenWorldTerrain {
     entry.mesh.geometry = (useReduced && entry.reducedGeometry) || entry.fullGeometry;
   }
 
-  release(key, { mesh, localMesh, fullGeometry, reducedGeometry, baseMap, detailMap, previousDetailMap, waterRequest }) {
-    waterRequest?.abort();
+  release(key, entry) {
     this.tiles.delete(key);
+    this.releaseEntry(entry);
+  }
+
+  releaseEntry({ mesh, localMesh, fullGeometry, reducedGeometry, baseMap, detailMap, previousDetailMap, waterRequest }) {
+    waterRequest?.abort();
     mesh.removeFromParent();
     (fullGeometry ?? mesh.geometry).dispose();
     reducedGeometry?.dispose();
@@ -1140,9 +1228,12 @@ export function updateOpenWorldTerrain(sim) {
     if (!surface.openWorld) {
       const half = surface.size / 2;
       surface.openWorld = new OpenWorldTerrain(sim.activeAirport === 'lukla'
-        ? { ...frame, protectedAreas: [[-half, -half, half, half]], localSurface: surface }
-        : frame);
+        ? { ...frame, protectedAreas: [[-half, -half, half, half]], localSurface: surface, world: sim.world }
+        : { ...frame, world: sim.world });
       surface.mesh.add(surface.openWorld.group);
+    }
+    if (surface.openWorld && !surface.openWorld.world && sim.world) {
+      surface.openWorld.world = sim.world;
     }
     setCorridorStreamersVisible(surface, false);
     const height = sim.renderer?.getDrawingBufferSize?.(viewportSize)?.y;

@@ -398,11 +398,18 @@ class FlightSimulator {
           this.showToast(() => t('airport.stream.failed', { code: status.code }));
         }
       },
-      outsideHeight: (x, z) => {
+      outsideHeight: (x, z, { unblended = false } = {}) => {
         // ExternalSurface passes Incheon-frame coordinates; openWorld samples
         // are keyed in the current anchor's local frame.
+        // Use unblended raw DEM when available so ExternalAirportSurface.getHeight()
+        // blends with natural terrain without double-blending against the mesh.
         const [ax, az] = this.world.incheonFrameToAnchor(x, z);
-        const sampled = this.world.anchorTerrain?.openWorld?.sample?.(ax, az)?.height;
+        const openWorld = this.world.anchorTerrain?.openWorld;
+        if (unblended) {
+          const raw = openWorld?.sampleRaw?.(ax, az);
+          if (Number.isFinite(raw)) return raw;
+        }
+        const sampled = openWorld?.sample?.(ax, az)?.height;
         return Number.isFinite(sampled) ? sampled : null;
       },
     });

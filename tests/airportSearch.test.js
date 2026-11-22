@@ -62,6 +62,17 @@ test('English and Korean name substrings match airports', () => {
   assert.deepEqual(searchMapPlaces(catalog(), '국제').map(match => match.id), ['RKSE']);
 });
 
+test('Korean airport aliases resolve domestic airports like Gimhae and Busan', () => {
+  const places = {
+    airports: [
+      { code: 'RKPK', iata: 'PUS', name: 'Gimhae International Airport', aliases: ['김해', '김해국제공항', '김해공항', '부산'], latitude: 35.179, longitude: 128.938 },
+    ],
+    points: [],
+  };
+  assert.deepEqual(searchMapPlaces(places, '김해').map(match => match.id), ['RKPK']);
+  assert.deepEqual(searchMapPlaces(places, '부산').map(match => match.id), ['RKPK']);
+});
+
 test('exact codes outrank code prefixes, which outrank name and token matches', () => {
   const ranked = {
     airports: [

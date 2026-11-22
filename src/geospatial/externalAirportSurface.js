@@ -3,6 +3,7 @@
 // the ARP); baseOffset translates that frame into the Incheon world frame.
 import * as THREE from 'three';
 import { projectToLocal } from './incheon.js';
+import { applyLogDepthOffset } from '../environment/RunwayMarkings.js';
 
 const BLEND_START_M = 40;
 const BLEND_END_M = 240;
@@ -141,10 +142,10 @@ export class ExternalAirportSurface {
     };
   }
 
-  outside(x, z, fallback) {
+  outside(x, z, fallback, options) {
     if (!this.outsideHeight) return fallback;
     try {
-      const height = this.outsideHeight(x + this.baseOffset.x, z + this.baseOffset.z);
+      const height = this.outsideHeight(x + this.baseOffset.x, z + this.baseOffset.z, options);
       return finite(height) ? height : fallback;
     } catch {
       return fallback;
@@ -168,7 +169,7 @@ export class ExternalAirportSurface {
     const blend = smoothstep((nearest.hit.distance - BLEND_START_M) / (BLEND_END_M - BLEND_START_M));
     if (blend <= 0) return elevation;
     if (blend >= 1) return this.outside(x, z, elevation);
-    const surrounding = this.outside(x, z, elevation);
+    const surrounding = this.outside(x, z, elevation, { unblended: true });
     return elevation * (1 - blend) + surrounding * blend;
   }
 
@@ -440,18 +441,21 @@ export function createExternalAirportMesh(descriptors) {
       metalness: 0,
       side: THREE.DoubleSide,
     });
+    applyLogDepthOffset(material, 1);
     const ribbon = new THREE.Mesh(geometry, material);
     ribbon.name = `runway-${descriptor.id}`;
     ribbon.userData = { runwayId: descriptor.id, surface: descriptor.surface };
     group.add(ribbon);
     const markingGeometry = runwayMarkingsGeometry(descriptor);
     if (markingGeometry) {
-      const markings = new THREE.Mesh(markingGeometry, new THREE.MeshStandardMaterial({
+      const markingMaterial = new THREE.MeshStandardMaterial({
         color: 0xf0f0e8,
         roughness: 0.85,
         metalness: 0,
         side: THREE.DoubleSide,
-      }));
+      });
+      applyLogDepthOffset(markingMaterial, 2);
+      const markings = new THREE.Mesh(markingGeometry, markingMaterial);
       markings.name = `runway-markings-${descriptor.id}`;
       markings.userData = { runwayId: descriptor.id, kind: 'markings' };
       group.add(markings);

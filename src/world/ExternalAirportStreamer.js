@@ -246,12 +246,22 @@ export class ExternalAirportStreamer {
     if (!loaded) return;
     // Keep the Incheon-frame base offset; the anchor can change while unmounted.
     this._lastOffset = [loaded.baseOffset[0], loaded.baseOffset[1]];
+    const unmountExtent = loaded.region?.extent;
+    const unmountOffset = loaded.offset;
     this._loaded = null;
     if (loaded.group) {
       try { this.scene?.remove?.(loaded.group); } catch { /* cleanup must continue */ }
     }
     this._disposeRegion(loaded.region);
     try { this.world?.unregister?.(loaded.code); } catch { /* cleanup must continue */ }
+    if (unmountExtent && unmountOffset) {
+      try {
+        this.world?.anchorTerrain?.openWorld?.invalidateArea?.([
+          unmountExtent.minX + unmountOffset[0], unmountExtent.minZ + unmountOffset[1],
+          unmountExtent.maxX + unmountOffset[0], unmountExtent.maxZ + unmountOffset[1],
+        ]);
+      } catch { /* ignore */ }
+    }
   }
 
   _disposeRegion(region) {
@@ -327,6 +337,15 @@ export class ExternalAirportStreamer {
       const offset = validOffset(published)
         ? [published[0], published[1]]
         : [baseOffset[0], baseOffset[1]];
+      const e = region.extent;
+      if (e) {
+        try {
+          this.world?.anchorTerrain?.openWorld?.invalidateArea?.([
+            e.minX + offset[0], e.minZ + offset[1],
+            e.maxX + offset[0], e.maxZ + offset[1],
+          ]);
+        } catch { /* cleanup must continue */ }
+      }
       this._loaded = { code, region, descriptor, baseOffset, offset, group };
       this._lastOffset = [baseOffset[0], baseOffset[1]];
       this._state = 'ready';

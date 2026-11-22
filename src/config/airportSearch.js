@@ -61,7 +61,8 @@ function airportMatch(airport, query) {
   const iata = typeof airport.iata === 'string' ? airport.iata.trim() : '';
   const identifiers = [code, iata].filter(Boolean).map(normalizeSearchText);
   const codeScore = identifierScore(identifiers, query);
-  const score = codeScore >= 0 ? codeScore : bestTextScore([name], query);
+  const aliases = Array.isArray(airport.aliases) ? airport.aliases : [airport.ko, airport.en, airport.nameKo].filter(Boolean);
+  const score = codeScore >= 0 ? codeScore : bestTextScore([name, ...aliases], query);
   if (score < 0) return null;
   const detail = iata
     ? `IATA ${iata}`
