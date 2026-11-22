@@ -241,6 +241,13 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 .lobby-group { display: flex; flex-direction: column; gap: calc(4px * var(--ui-scale, 1)); min-width: 0; }
 .lobby-label { color: #94a3b8; font-size: calc(10px * var(--ui-scale, 1)); font-weight: 500; letter-spacing: .2px; }
 .lobby-buttons { display: flex; flex-wrap: wrap; gap: calc(4px * var(--ui-scale, 1)); }
+.lobby-map-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: calc(6px * var(--ui-scale, 1));
+}
+.lobby-map-row label { display: flex; flex-direction: column; gap: calc(3px * var(--ui-scale, 1)); min-width: 0; }
+.lobby-map-row select { width: 100%; }
 .lobby-card .btn {
   min-width: 0;
   min-height: calc(28px * var(--ui-scale, 1));

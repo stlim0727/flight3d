@@ -586,6 +586,45 @@ class PresetSpawnerMethods {
     return this.takeoff;
   }
 
+  /** Install a pure map-flight spawn plan after setPreset configured the aircraft. */
+  applyMapSpawn(spawn, state) {
+    if (!spawn || ![spawn.x, spawn.y, spawn.z, spawn.yaw].every(Number.isFinite)) return false;
+    this.position.set(spawn.x, spawn.y, spawn.z);
+    this.linearVelocity.set(spawn.vx ?? 0, spawn.vy ?? 0, spawn.vz ?? 0);
+    this.angularVelocity.set(0, 0, 0);
+    this.quaternion.setFromEuler(new THREE.Euler(0, spawn.yaw, 0, 'YXZ'));
+    this._hasGroundContact = state === 'runway';
+    if (this.telemetry) this.telemetry.onGround = state === 'runway';
+    this.gear.setGearTarget(state !== 'cruise');
+    this.gear.gearState = state === 'cruise' && !this.gear.isFixed ? 0 : 1;
+    this.aero.setFlapPosition(state === 'approach' ? 5 : state === 'runway' ? 2 : 0);
+    this.aero.spoilers = 0;
+    this.controls.throttle = state === 'cruise' ? 0.5 : state === 'runway' ? 0 : this.controls.throttle;
+    this.engines.setThrottle(this.controls.throttle);
+    this.engines.setReverser(false, true);
+    if (state === 'runway') this.controls.setParkingBrake?.(true);
+    else this.controls.setParkingBrake?.(false);
+    if (state !== 'runway') {
+      this.aero.currentFlapAngle = this.aero.flapAngles[this.aero.flapsIndex];
+      this.controls.elevator = this.controls.aileron = this.controls.rudder = 0;
+      this.aero.massProperties.setConfiguration(
+        this.gear.gearState,
+        this.aero.currentFlapAngle / (this.aero.flapAngles.at(-1) || 1),
+      );
+      this.aero.syncMassProperties();
+
+    }
+    this.applyComputedTrim();
+    if (state !== 'runway') this.engines.settleSpool();
+    this.refreshTakeoffPerformance();
+    this.aircraft.group.position.copy(this.position);
+    this.aircraft.group.quaternion.copy(this.quaternion);
+    this.aircraft.group.updateMatrixWorld(true);
+    this.renderPose.reset(this.position, this.quaternion);
+    this.cameraSystem?.snapToTarget(this.aircraft.group);
+    return true;
+  }
+
   applyComputedTrim() {
     const tas = this.linearVelocity.length();
     if (tas < 20) return;

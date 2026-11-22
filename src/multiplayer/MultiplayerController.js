@@ -302,6 +302,7 @@ export class MultiplayerController {
       this.sim.pilotArena?.stop('multiplayer'); this.sim.demoDirector.stop();
       this.sim.gameFlow.returnToLobby(true); this.sim.gameFlow.holdForPendingStart();
       Object.assign(this.sim.lobby, { airport: config.airport, aircraft: config.aircraft, preset: config.scenario, pilotMode: 'human' });
+      this.sim.lobby.mapPlan = null;
       await this.sim.fly();
       if (!this.active || this.room !== room) {
         this.releasePreparationHold();

@@ -30,7 +30,7 @@ function formatFlightTime(hours, deviceTime = false) {
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {}, getDestination = () => 'none', onDestination = () => {} }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {}, getDestination = () => 'none', onDestination = () => {}, getMapPlan = () => null, onMapPlan = () => {} }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const selectionEl = document.getElementById('lobby-selection');
@@ -51,6 +51,57 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       onDestination?.(value);
       refresh();
     });
+  }
+
+  // Optional map flight plan. Departure defaults to "not selected"; the
+  // existing region buttons remain the scene anchor and are never forced.
+  const mapStateSelect = document.getElementById('lobby-map-state');
+  const mapAirportSelect = document.getElementById('lobby-map-airport');
+  const mapRunwaySelect = document.getElementById('lobby-map-runway');
+  const mapPointSelect = document.getElementById('lobby-map-point');
+  const mapDepartureSelect = document.getElementById('lobby-map-departure');
+  const mapSelects = [mapStateSelect, mapAirportSelect, mapRunwaySelect, mapPointSelect, mapDepartureSelect].filter(Boolean);
+  let mapCatalog = { airports: [], points: [] };
+  const mapStateLabel = state => state === 'none'
+    ? t('lobby.map.none')
+    : t({ runway: 'incheon.runway', cruise: 'incheon.cruise', approach: 'incheon.approach' }[state] ?? state);
+  const addOption = (select, value, label) => {
+    if (!select) return;
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    select.append(option);
+  };
+  for (const state of ['none', 'runway', 'cruise', 'approach']) addOption(mapStateSelect, state, mapStateLabel(state));
+  const emitMapPlan = () => {
+    onMapPlan?.({
+      state: mapStateSelect?.value ?? 'none',
+      airportCode: mapAirportSelect?.value ?? '',
+      runwayKey: mapRunwaySelect?.value ?? '',
+      pointId: mapPointSelect?.value ?? '',
+      departure: mapDepartureSelect?.value ?? '',
+    });
+    refresh();
+  };
+  for (const select of mapSelects) select.addEventListener('change', emitMapPlan);
+  function setMapPlaces(places = {}) {
+    mapCatalog = { airports: places.airports ?? [], points: places.points ?? [] };
+    if (mapAirportSelect) {
+      mapAirportSelect.replaceChildren();
+      addOption(mapAirportSelect, '', t('lobby.map.none'));
+      for (const airport of mapCatalog.airports) addOption(mapAirportSelect, airport.code, `${airport.code} · ${airport.name}`);
+    }
+    if (mapPointSelect) {
+      mapPointSelect.replaceChildren();
+      addOption(mapPointSelect, '', t('lobby.map.none'));
+      for (const point of mapCatalog.points) addOption(mapPointSelect, point.id, point.label);
+    }
+    if (mapDepartureSelect) {
+      mapDepartureSelect.replaceChildren();
+      addOption(mapDepartureSelect, '', t('lobby.map.none'));
+      for (const id of DESTINATION_CHOICES.filter(value => value !== 'none')) addOption(mapDepartureSelect, id, t(REGION_NAME_KEYS[id] ?? id));
+    }
+    refresh();
   }
   const valleyGroup = document.getElementById('lobby-valley-options');
   const pilotHumanBtn = document.getElementById('lobby-pilot-human');
@@ -262,6 +313,27 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
           ? t('lobby.destination.none')
           : t(REGION_NAME_KEYS[option.value] ?? option.value);
       }
+    }
+    const plan = getMapPlan?.() ?? {};
+    if (mapStateSelect) mapStateSelect.value = plan.state ?? 'none';
+    if (mapAirportSelect) mapAirportSelect.value = plan.airportCode ?? '';
+    if (mapPointSelect) mapPointSelect.value = plan.pointId ?? '';
+    if (mapDepartureSelect) mapDepartureSelect.value = plan.departure ?? '';
+    if (mapRunwaySelect) {
+      const airport = mapCatalog.airports.find(entry => entry.code === plan.airportCode);
+      const runways = [];
+      for (const runway of airport?.runways ?? []) {
+        for (const end of runway.ends ?? []) {
+          runways.push({
+            value: `${runway.id}:${end.ident}`,
+            label: `${end.ident || runway.id} · ${Math.round(end.headingDegT ?? 0)}°`,
+          });
+        }
+      }
+      mapRunwaySelect.replaceChildren();
+      addOption(mapRunwaySelect, '', t('lobby.map.none'));
+      for (const runway of runways) addOption(mapRunwaySelect, runway.value, runway.label);
+      mapRunwaySelect.value = runways.some(runway => runway.value === plan.runwayKey) ? plan.runwayKey : '';
     }
     const aircraft = getAircraft?.() ?? 'B738';
     for (const [key, id] of Object.entries(AIRCRAFT_BUTTONS)) {
@@ -493,6 +565,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   function setSelectionBusy(busy) {
     if (selectionEl) selectionEl.hidden = !busy;
     if (regionalSelect) regionalSelect.disabled = busy;
+    for (const select of mapSelects) select.disabled = busy;
+    if (destinationSelect) destinationSelect.disabled = busy;
     const flyBtn = document.getElementById('btn-fly');
     if (flyBtn) flyBtn.disabled = busy;
     const resume = document.getElementById('btn-lobby-resume');
@@ -502,5 +576,5 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
 
   refresh();
-  return { refresh, setWaitingForTerrain, setSelectionBusy, setFolded: setLobbyFolded };
+  return { refresh, setWaitingForTerrain, setSelectionBusy, setFolded: setLobbyFolded, setMapPlaces };
 }

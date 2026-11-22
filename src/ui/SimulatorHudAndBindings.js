@@ -11,6 +11,7 @@ import { FLOW } from './GameFlowController.js';
 import { ReplayPanel } from './ReplayPanel.js';
 import { DebriefOverlay } from './DebriefOverlay.js';
 import { initLobbyScreen } from './LobbyScreen.js';
+import { loadMapFlightPlaces, mapPlanRegion } from '../config/mapFlightPlaces.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
 import { CockpitPovPanel } from './CockpitPovPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
@@ -632,6 +633,10 @@ class SimulatorHudAndBindingsMethods {
           .catch(error => recoverSimulatorFlightStart(this, error));
         return;
       }
+      if (this.lobby.mapPlan) {
+        this.fly().catch(error => recoverSimulatorFlightStart(this, error));
+        return;
+      }
       this.setPreset(this.lastPresetType || 'runway');
     };
 
@@ -646,7 +651,26 @@ class SimulatorHudAndBindingsMethods {
       getDemoProfile: () => this.lobby.demoProfile,
       onDemoProfile: id => { this.lobby.demoProfile = id; },
       getDestination: () => this.lobby.destination || 'none',
-      onDestination: id => { this.lobby.destination = id; this.destinationAirport = id; },
+      onDestination: id => {
+        this.lobby.destination = id;
+        this.destinationAirport = id;
+        if (this.lobby.mapPlan && this.lobby.mapPlan.state !== 'cruise') this.lobby.mapPlan = null;
+        this.lobbyScreen?.refresh();
+      },
+      getMapPlan: () => this.lobby.mapPlan,
+      onMapPlan: plan => {
+        this.lobby.mapPlan = plan?.state === 'none' ? null : plan;
+        if (this.lobby.mapPlan) {
+          this.lobby.preset = this.lobby.mapPlan.state;
+          const region = mapPlanRegion(this.lobby.mapPlan, this.mapPlaces);
+          if (region) this.lobby.airport = region;
+          if (this.lobby.mapPlan.state !== 'cruise' && this.lobby.mapPlan.airportCode) {
+            this.lobby.destination = this.lobby.mapPlan.airportCode;
+            this.destinationAirport = this.lobby.mapPlan.airportCode;
+          }
+        }
+        this.lobbyScreen?.refresh();
+      },
       getPilotMode: () => this.lobby.pilotMode || 'human',
       onPilotMode: mode => { this.lobby.pilotMode = mode; },
       onToggleGyro: () => {
@@ -659,11 +683,13 @@ class SimulatorHudAndBindingsMethods {
       onAirport: id => {
         this.lobby.airport = id;
         this.lobby.preset = defaultScenarioForRegion(id);
+        this.lobby.mapPlan = null;
         if (id === 'valley') this.lobby.aircraft = 'F16';
         this.lobbyScreen?.refresh();
       },
       onPreset: type => {
         this.lobby.preset = type;
+        this.lobby.mapPlan = null;
         if (type === 'valley') {
           this.lobby.aircraft = 'F16';
         }
@@ -685,6 +711,12 @@ class SimulatorHudAndBindingsMethods {
         if (id === 'lobby-tab-multi') this.multiplayer?.refreshOpenRooms();
       },
     });
+    loadMapFlightPlaces()
+      .then(places => {
+        this.mapPlaces = places;
+        this.lobbyScreen?.setMapPlaces(places);
+      })
+      .catch(error => { this.mapPlacesError = String(error); /* leave map choices empty; manual presets still work */ });
     this.renderDiagnosticsPanel = new RenderDiagnosticsPanel(this);
     this.replayPanel = new ReplayPanel(this);
     this.replayDirector.onChange = () => this.replayPanel.refresh();

@@ -370,7 +370,7 @@ class FlightSimulator {
     this.replayRecorder = new ReplayRecorder();
     this.replayStore = new ReplayStore();
     this.debriefReplay = null;
-    this.lobby = { airport: savedSelection.airport, preset: savedSelection.scenario, aircraft: savedSelection.aircraft, pilotMode: 'human', destination: loadSavedDestination() };
+    this.lobby = { airport: savedSelection.airport, preset: savedSelection.scenario, aircraft: savedSelection.aircraft, pilotMode: 'human', destination: loadSavedDestination(), mapPlan: null };
     this.destinationAirport = this.lobby.destination;
     this.currentAircraftId = savedSelection.aircraft;
     this.lastPresetType = savedSelection.scenario;

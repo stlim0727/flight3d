@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { clearAirportIndexCache } from '../src/geospatial/airportIndex.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
 import { BASE_OFFSETS } from '../src/world/UnifiedWorld.js';
+import { registerExternalDestinations } from '../src/config/externalDestinations.js';
 import { ExternalAirportStreamer } from '../src/world/ExternalAirportStreamer.js';
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -72,10 +73,9 @@ function harness({ descriptor: initialDescriptor, ...options } = {}) {
   });
   return { streamer, world, scene, events, behavior, clock, descriptor, makeRegion };
 }
-
-test('only indexed external ICAO codes are considered and reset unmounts', async () => {
+test('known ICAO codes are accepted; invalid codes reset and unmount', async () => {
   const h = harness();
-  h.streamer.setDestination('RKSI');
+  h.streamer.setDestination('BAD');
   assert.deepEqual(h.streamer.status, {
     state: 'idle', code: null, error: null, loaded: false, distanceM: null,
   });
@@ -86,7 +86,7 @@ test('only indexed external ICAO codes are considered and reset unmounts', async
   assert.equal(await h.streamer.ensure('RKSS'), true);
   assert.equal(h.events.loads[0][0], 'RKSS');
   assert.equal(h.streamer.statusFor('rkss').state, 'ready');
-  assert.equal(h.streamer.statusFor('RKSI'), null);
+  assert.equal(h.streamer.statusFor('BAD'), null);
 
   h.streamer.setDestination('RJTT');
   assert.equal(h.streamer.status.state, 'idle');
@@ -97,6 +97,16 @@ test('only indexed external ICAO codes are considered and reset unmounts', async
   assert.deepEqual(h.events.unregistered, ['RKSS']);
   assert.equal(h.events.disposed.length, 1);
   assert.equal(h.world.offsets.has('RKSS'), false);
+});
+
+test('additional map catalog airports can stream a runway region', async () => {
+  registerExternalDestinations(['RKPK']);
+  const h = harness({
+    descriptor: { icao: 'RKPK', latitude: 35.179, longitude: 128.938, elevationM: 8, runways: [] },
+  });
+  assert.equal(await h.streamer.ensure('RKPK'), true);
+  assert.deepEqual(h.events.registered.map(([code]) => code), ['RKPK']);
+  assert.equal(h.streamer.statusFor('RKPK').state, 'ready');
 });
 
 test('concurrent ensures share one load; completions after a destination change are discarded', async () => {
@@ -300,4 +310,17 @@ test('an unloaded destination is rebased when the spawn anchor changes', async (
   await flush();
   assert.equal(h.events.loads.length, 2, 'near the real destination a new load starts');
   assert.equal(h.streamer.statusFor('RKSS').state, 'ready');
+});
+
+test('releaseGroundHold clears the previous runway before a new map start', async () => {
+  registerExternalDestinations(['RKPK']);
+  const h = harness();
+  assert.equal(await h.streamer.ensure('RKSS'), true);
+  h.streamer.setDestination('RKPK');
+  assert.equal(h.events.unregistered.length, 0, 'ground hold keeps old runway until released');
+  assert.equal(h.streamer.ensure('RKPK'), false);
+  assert.equal(h.streamer.releaseGroundHold(), 'RKSS');
+  assert.deepEqual(h.events.unregistered, ['RKSS']);
+  assert.equal(await h.streamer.ensure('RKPK'), true);
+  assert.equal(h.streamer.statusFor('RKPK').state, 'ready');
 });

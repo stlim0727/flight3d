@@ -357,6 +357,16 @@
               <option value="" disabled data-i18n="lobby.regional.pick">지역 선택</option>
             </select>
           </div>
+          <div id="lobby-map-flight" class="lobby-group">
+            <span class="lobby-label" data-i18n="lobby.map.flight">지도 비행 계획</span>
+            <div class="lobby-buttons lobby-map-row">
+              <label><span data-i18n="lobby.map.state">시작 상태</span><select id="lobby-map-state" class="btn"></select></label>
+              <label><span data-i18n="lobby.map.airport">공항</span><select id="lobby-map-airport" class="btn"></select></label>
+              <label><span data-i18n="lobby.map.runway">활주로 방향</span><select id="lobby-map-runway" class="btn"></select></label>
+              <label><span data-i18n="lobby.map.point">순항 지점</span><select id="lobby-map-point" class="btn"></select></label>
+              <label><span data-i18n="lobby.map.departure">출발지 (선택)</span><select id="lobby-map-departure" class="btn"></select></label>
+            </div>
+          </div>
           <div id="lobby-valley-options" class="lobby-group lobby-valley-options" hidden>
             <span class="lobby-label" data-i18n="valley.mode.label">조종 방식 선택 (사람 / AI)</span>
             <div class="lobby-pilot-select" role="radiogroup" aria-label="조종 방식">

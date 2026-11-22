@@ -1,0 +1,69 @@
+# Map-based flight start (issue #922 step 3)
+
+The lobby now has an optional **map flight plan** section. It uses the committed
+OurAirports index for Korean airports and the existing regional cruise points,
+so detailed airports and index-generated airports are chosen through one flow.
+Departure stays optional: leaving it blank keeps the existing region/scene
+anchor behaviour.
+
+## Selection and resolution
+
+- `#lobby-map-state` chooses `none`, `runway`, `cruise` or `approach`.
+- `#lobby-map-airport` lists index-backed airports with validated runways.
+- `#lobby-map-runway` lists each runway end of the selected airport; the value
+  is `${runwayId}:${endId}` and the label shows the end ident and heading.
+- `#lobby-map-point` lists `REGIONAL_CRUISES` places for cruise starts.
+- `#lobby-map-departure` is optional and never selects a departure airport; the geographic scene anchor is derived from the map location as described below.
+
+`loadMapFlightPlaces()` reads a regional tile set from the airport index and
+filters Korean airports; cruise points come from `REGIONAL_CRUISES`. No
+per-airport coordinates are hand-authored in the UI. Selecting a map plan also
+chooses the scene anchor that can stream the location: cruise points use their
+declared airport, and runways use the nearer of the Incheon and Jeju origins.
+
+`resolveLobbyMapPlan()` freezes the choice into the start request before async
+preparation. It calls `resolveMapFlightPlan()` with the selected airport,
+runway end or cruise point, the airport's Incheon-frame `baseOffset` and the
+active anchor base. The pure planner returns `{scenario, spawn, airportCode}`
+with world coordinates, velocity and Three.js yaw. `loadMapFlightPlaces()`
+registers every index-backed Korean ICAO code with the streamer; arbitrary
+four-letter tokens and the six built-in region ids are not external targets.
+
+## Start states
+
+- **runway**: threshold + 100 m along the runway, elevation + the aircraft's
+  resting gear height (`AIRCRAFT_REGISTRY`), stationary, gear down, flaps 2,
+  parking brake set.
+- **cruise**: above the selected WGS84 map point at its configured altitude,
+  with the configured heading and aircraft-specific cruise speed.
+- **approach**: 3 NM before the selected threshold, aligned to the physical
+  runway end, 3° glideslope, gear down and flaps 5.
+
+`setPreset()` still owns aircraft configuration and trim; `applyMapSpawn()`
+then installs the resolved pose and configuration. Runway/approach starts
+release any previous ground hold, wait under the start hold for
+`airportStreamer.ensure()` to reach `ready`, then align the final Y with the
+contact surface physics actually returns. A stationary runway start samples
+the aircraft position; an approach samples the selected runway threshold and
+retains its runway-relative glide height. This keeps spawns above the surface
+when a built-in region shares the coordinate with an index-generated runway.
+Approach/cruise flaps are settled before trim. Gyro permission restoration
+happens in `prepare()` within the original click gesture, before any streaming
+wait.
+
+Selecting a normal preset or region clears the map plan; multiplayer room
+preparation also clears it. Restart preserves the active map plan and goes
+through the coordinated start path so physics stays held during streaming.
+
+Non-map presets, missions, demos, saved URLs and lobby buttons keep their
+existing paths because the map plan is null unless the user selects one.
+
+## Verification
+
+- `tests/mapFlightPlan.test.js`: pure heading/runway geometry, three spawn
+  states, anchor rebasing and input immutability.
+- `tests/scenarioStartCoordinator.test.js`: a map plan is captured before
+  installation and its spawn is applied after `setPreset`.
+- `npm run test:map-flight`: hardware Vulkan Chrome GPU preflight, then all
+  three start states from the real lobby controls with departure left blank;
+  runway/approach also wait for the external airport region to stream in.
