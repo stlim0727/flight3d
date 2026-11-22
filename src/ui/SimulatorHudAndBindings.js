@@ -227,8 +227,14 @@ class SimulatorHudAndBindingsMethods {
       if (map.hidden === available) map.hidden = !available;
       if (!available && map.open) map.open = false;
       this.pilotageFlight = available;
-      const layout = available && map.open && this.gameFlow.state === FLOW.FLIGHT
-        ? (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT ? 'cockpit' : 'external') : '';
+      let layout = '';
+      if (available && map.open && this.gameFlow.state === FLOW.FLIGHT) {
+        if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) layout = 'cockpit';
+        else {
+          this.mobileChartQuery ??= window.matchMedia('(pointer: coarse), (max-width: 600px)');
+          if (this.mobileChartQuery.matches) layout = 'external';
+        }
+      }
       this.setPilotageLayout(layout);
       if (available && map.open) {
         this.busanChart ??= new BusanChart(map);
