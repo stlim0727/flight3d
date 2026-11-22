@@ -555,7 +555,7 @@ body[data-pilotage-layout="cockpit"] #pilotage-map {
   transform: translateX(50%);
   width: min(72vw, 34rem);
 }
-body[data-pilotage-layout="cockpit"] .map-paper { width: 100%; height: min(31dvh, 17rem); }
+body[data-pilotage-layout="cockpit"] #pilotage-map .map-paper { width: 100%; height: min(31dvh, 17rem); }
 body[data-pilotage-layout="external"] #canvas-container { width: 56%; }
 body[data-pilotage-layout="external"] #pilotage-map {
   right: 0;
