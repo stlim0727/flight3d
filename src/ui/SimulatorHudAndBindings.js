@@ -634,7 +634,7 @@ class SimulatorHudAndBindingsMethods {
         return;
       }
       if (this.lobby.mapPlan) {
-        this.startFlight().catch(error => recoverSimulatorFlightStart(this, error));
+        this.fly().catch(error => recoverSimulatorFlightStart(this, error));
         return;
       }
       this.setPreset(this.lastPresetType || 'runway');
