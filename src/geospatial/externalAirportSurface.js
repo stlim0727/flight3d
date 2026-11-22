@@ -299,6 +299,10 @@ function thresholdAlong(frame, end) {
 }
 
 function pushMarkingQuad(positions, indices, frame, startAlong, endAlong, left, right) {
+  const alongMin = Math.min(startAlong, endAlong);
+  const alongMax = Math.max(startAlong, endAlong);
+  const lateralMin = Math.min(left, right);
+  const lateralMax = Math.max(left, right);
   const vertex = (along, lateral) => {
     const t = along / frame.length;
     return [
@@ -310,27 +314,33 @@ function pushMarkingQuad(positions, indices, frame, startAlong, endAlong, left, 
   };
   const base = positions.length / 3;
   positions.push(
-    ...vertex(startAlong, left),
-    ...vertex(startAlong, right),
-    ...vertex(endAlong, left),
-    ...vertex(endAlong, right),
+    ...vertex(alongMin, lateralMin),
+    ...vertex(alongMin, lateralMax),
+    ...vertex(alongMax, lateralMin),
+    ...vertex(alongMax, lateralMax),
   );
-  indices.push(base, base + 2, base + 1, base + 2, base + 3, base + 1);
+  indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
 }
 
-function addMarkingDesignator(positions, indices, frame, ident, threshold, direction) {
-  const glyphs = [...String(ident ?? '')].filter(char => MARKING_FONT[char]).slice(0, 3);
-  if (!glyphs.length) return;
-  const cell = 2.4;
+function designatorGlyphs(ident) {
+  return [...String(ident ?? '').toUpperCase()].filter(char => MARKING_FONT[char]).slice(0, 3);
+}
+
+function designatorCell(glyphCount, innerHalf) {
+  const cell = Math.min(2.4, (2 * innerHalf - 2) / (4 * glyphCount - 1));
+  return cell >= 0.8 ? cell : 0;
+}
+
+function addMarkingDesignator(positions, indices, frame, glyphs, cell, threshold, direction) {
   const pitch = 4 * cell;
   const centreAlong = threshold + direction * 85;
   glyphs.forEach((char, index) => {
     const rows = MARKING_FONT[char];
-    const baseLateral = (index - (glyphs.length - 1) / 2) * pitch;
+    const baseLateral = direction * (index - (glyphs.length - 1) / 2) * pitch;
     for (let row = 0; row < rows.length; row++) {
       for (let column = 0; column < rows[row].length; column++) {
         if (rows[row][column] !== '1') continue;
-        const lateral = baseLateral + (column - 1) * cell;
+        const lateral = baseLateral + direction * (column - 1) * cell;
         const along = centreAlong + direction * ((rows.length - 1 - row) * cell);
         pushMarkingQuad(positions, indices, frame, along - cell / 2, along + cell / 2,
           lateral - cell / 2, lateral + cell / 2);
@@ -346,6 +356,8 @@ function runwayMarkingsGeometry(descriptor) {
   const indices = [];
   const halfWidth = descriptor.widthM / 2;
   const edge = Math.min(1.2, halfWidth * 0.05);
+  const innerHalf = halfWidth - 0.6 - edge;
+  if (innerHalf <= 1) return null;
 
   pushMarkingQuad(positions, indices, frame, 0, frame.length,
     -halfWidth + 0.6, -halfWidth + 0.6 + edge);
@@ -355,27 +367,51 @@ function runwayMarkingsGeometry(descriptor) {
   const [first, second] = descriptor.ends;
   const start = thresholdAlong(frame, first);
   const end = thresholdAlong(frame, second);
-  for (const [threshold, direction, ident] of [[start, 1, first.ident], [end, -1, second.ident]]) {
-    const usable = descriptor.widthM - 6;
-    const keyCount = Math.min(16, Math.max(4, Math.floor(usable / 3.2)));
-    const spacing = Math.min(3.2, usable / keyCount);
-    for (let key = 0; key < keyCount; key++) {
-      const lateral = (key - (keyCount - 1) / 2) * spacing;
-      pushMarkingQuad(positions, indices, frame,
-        threshold + direction * 10, threshold + direction * 40, lateral - 0.9, lateral + 0.9);
+  const usable = end - start;
+  const glyphs = [designatorGlyphs(first.ident), designatorGlyphs(second.ident)];
+  const cells = glyphs.map(list => list.length ? designatorCell(list.length, innerHalf) : 0);
+  const reach = Math.max(...cells.map(cell => cell ? 85 + 4 * cell + cell / 2 : 0)) + 5;
+  const endsFit = usable > 2 * reach;
+
+  if (endsFit) {
+    const available = 2 * innerHalf - 2;
+    const keyWidth = 1.8;
+    const keyCount = Math.min(16, Math.floor(available / (keyWidth + 0.4)));
+    if (keyCount >= 2) {
+      const spacing = available / keyCount;
+      for (const [threshold, direction] of [[start, 1], [end, -1]]) {
+        for (let key = 0; key < keyCount; key++) {
+          const lateral = (key - (keyCount - 1) / 2) * spacing;
+          pushMarkingQuad(positions, indices, frame,
+            threshold + direction * 10, threshold + direction * 40,
+            lateral - keyWidth / 2, lateral + keyWidth / 2);
+        }
+      }
     }
-    addMarkingDesignator(positions, indices, frame, ident, threshold, direction);
-    if (frame.length > 700) {
-      const aim = threshold + direction * 300;
-      for (const side of [-1, 1]) {
-        const lateral = side * halfWidth * 0.28;
-        pushMarkingQuad(positions, indices, frame, aim - 15, aim + 15, lateral - 3, lateral + 3);
+    for (const [list, cell, threshold, direction] of [
+      [glyphs[0], cells[0], start, 1], [glyphs[1], cells[1], end, -1],
+    ]) {
+      if (list.length && cell) addMarkingDesignator(positions, indices, frame, list, cell, threshold, direction);
+    }
+  }
+
+  if (endsFit && usable > 700 && descriptor.widthM >= 16) {
+    const blockHalf = Math.min(3, (innerHalf - 2) / 4);
+    if (blockHalf >= 1.5) {
+      const offset = Math.min(innerHalf * 0.55, innerHalf - 0.5 - blockHalf);
+      for (const [threshold, direction] of [[start, 1], [end, -1]]) {
+        const aim = threshold + direction * 300;
+        for (const side of [-1, 1]) {
+          const lateral = side * offset;
+          pushMarkingQuad(positions, indices, frame, aim - 15, aim + 15,
+            lateral - blockHalf, lateral + blockHalf);
+        }
       }
     }
   }
 
-  const centreStart = Math.min(start, end) + 80;
-  const centreEnd = Math.max(start, end) - 80;
+  const centreStart = Math.min(start, end) + reach + 10;
+  const centreEnd = Math.max(start, end) - reach - 10;
   for (let along = centreStart; along + 30 <= centreEnd; along += 50) {
     pushMarkingQuad(positions, indices, frame, along, along + 30, -0.9, 0.9);
   }
