@@ -14,6 +14,9 @@ test('JejuTileStreamer initializes with correct macro grid bounds and origin', (
   const streamer = new JejuTileStreamer(mesh, surface);
   assert.equal(streamer.origin.latitude, JEJU_ORIGIN.latitude);
   assert.equal(streamer.origin.longitude, JEJU_ORIGIN.longitude);
+  assert.equal(streamer.zoom, 11);
+  assert.equal(streamer.anisotropy, 8);
+  assert.equal(streamer.macroTiles.length, 32);
   assert.equal(JEJU_MACRO_TILES.length, 8);
 
   const { minX, maxX, minZ, maxZ } = streamer.gridBounds;
