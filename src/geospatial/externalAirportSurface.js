@@ -9,6 +9,7 @@ const BLEND_END_M = 240;
 const SAFETY_AREA_M = 60;
 const EXTENT_MARGIN_M = 1500;
 export const EXTERNAL_MESH_LIFT_M = 0.015;
+export const MARKING_LIFT_M = 0.05;
 const EPSILON = 1e-9;
 
 const finite = Number.isFinite;
@@ -262,6 +263,131 @@ function ribbonGeometry(descriptor) {
   return geometry;
 }
 
+// Markings are built from the same index geometry as the pavement ribbon. One
+// merged geometry per runway keeps streamed airports cheap to draw, and the
+// 50 mm lift stays well above float32 precision at transcontinental offsets.
+const MARKING_FONT = {
+  '0': ['111', '101', '101', '101', '111'],
+  '1': ['010', '110', '010', '010', '111'],
+  '2': ['111', '001', '111', '100', '111'],
+  '3': ['111', '001', '111', '001', '111'],
+  '4': ['101', '101', '111', '001', '001'],
+  '5': ['111', '100', '111', '001', '111'],
+  '6': ['111', '100', '111', '101', '111'],
+  '7': ['111', '001', '010', '010', '010'],
+  '8': ['111', '101', '111', '101', '111'],
+  '9': ['111', '101', '111', '001', '111'],
+  L: ['100', '100', '100', '100', '111'],
+  R: ['110', '101', '110', '101', '101'],
+  C: ['111', '100', '100', '100', '111'],
+};
+
+function runwayFrame(descriptor) {
+  const a = descriptor.ends[0]?.physical;
+  const b = descriptor.ends[1]?.physical;
+  if (!a || !b) return null;
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const length = Math.hypot(dx, dz);
+  if (!(length > EPSILON)) return null;
+  return { a, b, length, ux: dx / length, uz: dz / length, px: -dz / length, pz: dx / length };
+}
+
+function thresholdAlong(frame, end) {
+  const point = end.threshold ?? end.physical;
+  return (point.x - frame.a.x) * frame.ux + (point.z - frame.a.z) * frame.uz;
+}
+
+function pushMarkingQuad(positions, indices, frame, startAlong, endAlong, left, right) {
+  const vertex = (along, lateral) => {
+    const t = along / frame.length;
+    return [
+      frame.a.x + frame.ux * along + frame.px * lateral,
+      frame.a.elevationM + (frame.b.elevationM - frame.a.elevationM) * t
+        + EXTERNAL_MESH_LIFT_M + MARKING_LIFT_M,
+      frame.a.z + frame.uz * along + frame.pz * lateral,
+    ];
+  };
+  const base = positions.length / 3;
+  positions.push(
+    ...vertex(startAlong, left),
+    ...vertex(startAlong, right),
+    ...vertex(endAlong, left),
+    ...vertex(endAlong, right),
+  );
+  indices.push(base, base + 2, base + 1, base + 2, base + 3, base + 1);
+}
+
+function addMarkingDesignator(positions, indices, frame, ident, threshold, direction) {
+  const glyphs = [...String(ident ?? '')].filter(char => MARKING_FONT[char]).slice(0, 3);
+  if (!glyphs.length) return;
+  const cell = 2.4;
+  const pitch = 4 * cell;
+  const centreAlong = threshold + direction * 85;
+  glyphs.forEach((char, index) => {
+    const rows = MARKING_FONT[char];
+    const baseLateral = (index - (glyphs.length - 1) / 2) * pitch;
+    for (let row = 0; row < rows.length; row++) {
+      for (let column = 0; column < rows[row].length; column++) {
+        if (rows[row][column] !== '1') continue;
+        const lateral = baseLateral + (column - 1) * cell;
+        const along = centreAlong + direction * ((rows.length - 1 - row) * cell);
+        pushMarkingQuad(positions, indices, frame, along - cell / 2, along + cell / 2,
+          lateral - cell / 2, lateral + cell / 2);
+      }
+    }
+  });
+}
+
+function runwayMarkingsGeometry(descriptor) {
+  const frame = runwayFrame(descriptor);
+  if (!frame || !(descriptor.widthM > 8)) return null;
+  const positions = [];
+  const indices = [];
+  const halfWidth = descriptor.widthM / 2;
+  const edge = Math.min(1.2, halfWidth * 0.05);
+
+  pushMarkingQuad(positions, indices, frame, 0, frame.length,
+    -halfWidth + 0.6, -halfWidth + 0.6 + edge);
+  pushMarkingQuad(positions, indices, frame, 0, frame.length,
+    halfWidth - 0.6 - edge, halfWidth - 0.6);
+
+  const [first, second] = descriptor.ends;
+  const start = thresholdAlong(frame, first);
+  const end = thresholdAlong(frame, second);
+  for (const [threshold, direction, ident] of [[start, 1, first.ident], [end, -1, second.ident]]) {
+    const usable = descriptor.widthM - 6;
+    const keyCount = Math.min(16, Math.max(4, Math.floor(usable / 3.2)));
+    const spacing = Math.min(3.2, usable / keyCount);
+    for (let key = 0; key < keyCount; key++) {
+      const lateral = (key - (keyCount - 1) / 2) * spacing;
+      pushMarkingQuad(positions, indices, frame,
+        threshold + direction * 10, threshold + direction * 40, lateral - 0.9, lateral + 0.9);
+    }
+    addMarkingDesignator(positions, indices, frame, ident, threshold, direction);
+    if (frame.length > 700) {
+      const aim = threshold + direction * 300;
+      for (const side of [-1, 1]) {
+        const lateral = side * halfWidth * 0.28;
+        pushMarkingQuad(positions, indices, frame, aim - 15, aim + 15, lateral - 3, lateral + 3);
+      }
+    }
+  }
+
+  const centreStart = Math.min(start, end) + 80;
+  const centreEnd = Math.max(start, end) - 80;
+  for (let along = centreStart; along + 30 <= centreEnd; along += 50) {
+    pushMarkingQuad(positions, indices, frame, along, along + 30, -0.9, 0.9);
+  }
+
+  if (!indices.length) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 /** One flat ribbon per runway, plus optional thin bars at displaced thresholds. */
 export function createExternalAirportMesh(descriptors) {
   const group = new THREE.Group();
@@ -282,6 +408,18 @@ export function createExternalAirportMesh(descriptors) {
     ribbon.name = `runway-${descriptor.id}`;
     ribbon.userData = { runwayId: descriptor.id, surface: descriptor.surface };
     group.add(ribbon);
+    const markingGeometry = runwayMarkingsGeometry(descriptor);
+    if (markingGeometry) {
+      const markings = new THREE.Mesh(markingGeometry, new THREE.MeshStandardMaterial({
+        color: 0xf0f0e8,
+        roughness: 0.85,
+        metalness: 0,
+        side: THREE.DoubleSide,
+      }));
+      markings.name = `runway-markings-${descriptor.id}`;
+      markings.userData = { runwayId: descriptor.id, kind: 'markings' };
+      group.add(markings);
+    }
 
     const a = descriptor.ends[0].physical;
     const b = descriptor.ends[1].physical;

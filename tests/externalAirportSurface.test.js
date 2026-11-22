@@ -7,6 +7,7 @@ import {
   createExternalAirportMesh,
   createExternalAirportRegion,
   EXTERNAL_MESH_LIFT_M,
+  MARKING_LIFT_M,
 } from '../src/geospatial/externalAirportSurface.js';
 
 const ARP = { latitude: 37.56, longitude: 126.79 };
@@ -216,6 +217,42 @@ test('mesh ribbons sit 15 mm above contact height and only displaced ends get ba
   assert.equal(bars[0].name, 'threshold-100-14');
   group.dispose();
   assert.equal(group.children.length, 0);
+});
+
+test('markings render from index geometry, including undisplaced runways', () => {
+  const terrain = surface();
+  const group = createExternalAirportMesh(terrain.runways);
+  const markings = group.children.filter(child => child.name.startsWith('runway-markings-'));
+  assert.equal(markings.length, 2);
+  for (const mesh of markings) {
+    assert.equal(mesh.material.type, 'MeshStandardMaterial');
+    const position = mesh.geometry.attributes.position;
+    assert.ok(position.count > 100, 'centerline, threshold keys and designator cells are present');
+    for (let i = 0; i < position.count; i++) {
+      const x = position.getX(i);
+      const y = position.getY(i);
+      const z = position.getZ(i);
+      near(y, terrain.getHeight(x, z) + EXTERNAL_MESH_LIFT_M + MARKING_LIFT_M, 1e-5);
+    }
+  }
+
+  // Wonju's index record: one concrete runway, no displaced thresholds.
+  const wonju = {
+    ...ARP,
+    elevationM: 100.28,
+    runways: [{
+      id: '237300', lengthM: 2743.2, widthM: 45.7, surface: 'CON',
+      ends: [
+        end('03', { x: -517.3, z: 1131.0, elevationM: 98.45 }),
+        end('21', { x: 593.7, z: -1340.1, elevationM: 100.28 }),
+      ],
+    }],
+  };
+  const [descriptor] = buildExternalRunwayDescriptors(wonju);
+  const wonjuGroup = createExternalAirportMesh([descriptor]);
+  const wonjuMarkings = wonjuGroup.children.filter(child => child.name === 'runway-markings-237300');
+  assert.equal(wonjuMarkings.length, 1);
+  assert.ok(wonjuMarkings[0].geometry.attributes.position.count > 100);
 });
 
 test('region exposes the no-op airport facade, tight extent and a disposing group', () => {
