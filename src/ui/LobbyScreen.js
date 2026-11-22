@@ -192,6 +192,9 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         const [place] = airport ? indexedAirportPlaces([airport]) : [];
         if (place) {
           mapCatalog.airports = [...mapCatalog.airports.filter(entry => entry.code !== place.code), place];
+          if (mapAirportSelect && ![...mapAirportSelect.options].some(option => option.value === place.code)) {
+            addOption(mapAirportSelect, place.code, `${place.code} · ${place.name}`);
+          }
           onMapPlacesAdded?.([place]);
           return place;
         }
@@ -218,6 +221,9 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         latitude: place.latitude, longitude: place.longitude, runways: place.runways ?? [],
       };
       mapCatalog.airports = [...mapCatalog.airports, airport];
+      if (mapAirportSelect && ![...mapAirportSelect.options].some(option => option.value === code)) {
+        addOption(mapAirportSelect, code, `${code} · ${airport.name}`);
+      }
       onMapPlacesAdded?.([airport]);
     }
     if (mapPointSelect) mapPointSelect.value = '';
