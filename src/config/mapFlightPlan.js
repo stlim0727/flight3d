@@ -221,7 +221,12 @@ export function resolveMapFlightPlan({
     return spawn ? { scenario: 'cruise', spawn } : null;
   }
   if (state !== 'runway' && state !== 'approach') return null;
-  const frame = runwayEndFrame(airport, runwayId, endId);
+  // Indexed runways have validated endpoints. Use the first published end
+  // when the player leaves the optional runway direction on Automatic.
+  const defaultRunway = airport?.runways?.[0];
+  const frame = runwayId || endId
+    ? runwayEndFrame(airport, runwayId, endId)
+    : runwayEndFrame(airport, defaultRunway?.id, defaultRunway?.ends?.[0]?.ident);
   if (!frame) return null;
   const spawn = state === 'runway'
     ? takeoffSpawnPlan({ frame, baseOffset, anchorBase, aircraftId })

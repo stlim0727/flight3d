@@ -241,16 +241,75 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 .lobby-group { display: flex; flex-direction: column; gap: calc(4px * var(--ui-scale, 1)); min-width: 0; }
 .lobby-label { color: #94a3b8; font-size: calc(10px * var(--ui-scale, 1)); font-weight: 500; letter-spacing: .2px; }
 .lobby-buttons { display: flex; flex-wrap: wrap; gap: calc(4px * var(--ui-scale, 1)); }
+.lobby-start-options {
+  display: flex;
+  gap: calc(4px * var(--ui-scale, 1));
+}
+.lobby-card .lobby-start-options .btn {
+  flex: 1;
+  min-width: 0;
+  min-height: calc(36px * var(--ui-scale, 1));
+  white-space: normal;
+}
+.lobby-disclosure {
+  border: 1px solid #334155;
+  border-radius: calc(8px * var(--ui-scale, 1));
+  background: rgba(15, 23, 42, .6);
+}
+.lobby-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: .65em;
+  min-height: calc(36px * var(--ui-scale, 1));
+  padding: calc(4px * var(--ui-scale, 1)) calc(9px * var(--ui-scale, 1));
+  font-size: calc(12px * var(--ui-scale, 1));
+  cursor: pointer;
+  list-style: none;
+}
+.compact-ui .lobby-disclosure > summary { min-height: 44px; }
+.lobby-disclosure > summary::-webkit-details-marker { display: none; }
+.lobby-disclosure > summary::after {
+  content: '›';
+  margin-inline-start: auto;
+  color: #94a3b8;
+}
+.lobby-disclosure[open] > summary::after { transform: rotate(90deg); }
+.lobby-disclosure > summary:focus-visible { outline: 2px solid #67e8f9; outline-offset: -2px; }
+.lobby-disclosure > :not(summary) {
+  margin: calc(6px * var(--ui-scale, 1)) calc(9px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+}
+.lobby-disclosure-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #a5c9dd;
+}
+.lobby-disclosure-value:empty { display: none; }
+#lobby-map-svg {
+  display: block;
+  width: 100%;
+  max-height: calc(210px * var(--ui-scale, 1));
+}
 .lobby-map-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: calc(6px * var(--ui-scale, 1));
 }
 .lobby-map-row label { display: flex; flex-direction: column; gap: calc(3px * var(--ui-scale, 1)); min-width: 0; }
+.lobby-map-row label[hidden] { display: none; }
 .lobby-map-row select { width: 100%; }
 .lobby-map-browser { display: grid; gap: calc(5px * var(--ui-scale, 1)); min-width: 0; }
 .lobby-map-toolbar { display: flex; gap: calc(4px * var(--ui-scale, 1)); }
-.lobby-map-toolbar input { flex: 1; min-width: 0; }
+.lobby-map-toolbar input {
+  flex: 1;
+  min-width: 0;
+  padding: 0 .65em;
+  color: #e2e8f0;
+  background: #0f172a;
+  border: 1px solid #475569;
+  border-radius: 6px;
+}
 .lobby-map-backdrop { fill: rgba(30, 41, 59, .7); stroke: #475569; stroke-width: 1px; }
 .lobby-map-marker { fill: #86d5ff; stroke: #0f172a; stroke-width: 1px; cursor: pointer; }
 .lobby-map-marker.active { fill: #fbbf24; }
@@ -634,6 +693,12 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
 .lobby-card .lobby-actions #btn-fly {
   flex: 1.4 1 calc(130px * var(--ui-scale, 1));
 }
+.lobby-card:has(#lobby-panel-scenario:not([hidden])):not(:has(.lobby-disclosure[open])) {
+  height: auto;
+}
+.lobby-card:has(#lobby-panel-scenario:not([hidden]) #lobby-place-picker[open]) {
+  height: min(calc(730px * var(--ui-scale, 1)), calc(100dvh - 48px));
+}
 .lobby-card .lobby-actions .btn[hidden] { display: none; }
 .btn-icon,
 .tab-icon {
@@ -645,7 +710,6 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
   flex-shrink: 0;
   vertical-align: middle;
 }
-.lobby-hint { color: #94a3b8; font-size: calc(9.5px * var(--ui-scale, 1)); line-height: 1.35; margin: -2px 0 0; text-align: center; }
 
 /* Pause: dim the frozen scene lightly. */
 #pause-menu {
@@ -940,9 +1004,8 @@ body[data-flow="lobby"] .menu-toggle {
     width: min(420px, calc(100vw - var(--edge-left) - var(--edge-right) - 16px));
   }
   /* Short landscape: give the scrolling panel the height. The build line,
-     subtitle, language caption and ESC hint return in taller layouts. */
+     subtitle and language caption return in taller layouts. */
   .compact-ui .lobby-card .build-info,
-  .compact-ui .lobby-card .lobby-hint,
   .compact-ui .lobby-title > span,
   .compact-ui .lobby-language > .lobby-label { display: none; }
   .compact-ui .lobby-card .lobby-tabs { padding: 2px; }

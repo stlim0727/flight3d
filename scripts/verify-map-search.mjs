@@ -28,7 +28,14 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   const { evaluate, send, screenshot, cdpPort, exceptions } = session;
   checkGpu(cdpPort);
   assert.ok(await waitFor(session, 'Boolean(window.sim?.gameFlow?.state)'), 'simulator did not boot');
+  assert.ok(await waitFor(session, 'window.sim?.startupReady'), 'simulator startup did not finish');
   assert.ok(await waitFor(session, 'sim.mapPlaces?.airports?.length > 10'), 'map catalog did not load');
+
+  assert.ok(await evaluate("!document.getElementById('lobby-map-search').checkVisibility()"), 'map must start collapsed');
+  assert.ok(await evaluate("!document.getElementById('lobby-map-runway').checkVisibility()"), 'direction must start hidden');
+  await screenshot(path.join(artifacts, 'lobby.png'));
+  await evaluate("document.querySelector('#lobby-place-picker > summary').click()");
+  assert.ok(await waitFor(session, "document.getElementById('lobby-map-search').checkVisibility()"), 'opening Places did not show search');
 
   await evaluate(`(() => {
     const input = document.getElementById('lobby-map-search');
@@ -66,6 +73,8 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   await evaluate("document.querySelector('#lobby-map-bookmarks button[data-place-id=\"RKSS\"]')?.click()");
   assert.ok(await waitFor(session, "window.sim?.lobby?.mapPlan?.state === 'runway' && window.sim?.lobby?.mapPlan?.airportCode === 'RKSS'"), 'airport selection did not leave cruise state');
 
+  assert.equal(await evaluate("sim.lobby.mapPlan.runwayKey"), '', 'place selection must use automatic direction');
+  assert.ok(await evaluate("!document.getElementById('lobby-map-runway').checkVisibility()"), 'direction must stay hidden in Places');
   assert.deepEqual(exceptions, []);
   await screenshot(path.join(artifacts, 'bookmarks.png'));
   console.log(JSON.stringify({
