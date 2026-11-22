@@ -4,7 +4,7 @@ import { projectToLocal } from '../geospatial/incheon.js';
 import { haversineDistanceM, initialBearingDeg } from '../geospatial/CorridorCoordinateSystem.js';
 import { REAL_AIRPORTS, AIRPORT_ORIGINS, RUNWAY_THRESHOLDS, worldPositionToWgs84, realOffsetInIncheonFrame } from '../geospatial/airportGeodesy.js';
 import { isExternalDestination } from '../config/externalDestinations.js';
-import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
+import { APPROACH_DATA } from '../config/approachData.js';
 
 /**
  * One always-present world for every persistent region: coastal, Incheon,
@@ -272,9 +272,10 @@ export class UnifiedWorld {
       && Math.hypot(target[0] - realOffset[0], target[1] - realOffset[1]) < 5;
     const synthetic = this.anchor !== 'incheon' || !REAL_AIRPORTS.includes(id)
       || !placementIsReal || !from || !threshold;
-    const markerLocal = synthetic
+    const authoredThreshold = APPROACH_DATA[id]?.threshold;
+    const markerLocal = synthetic || !authoredThreshold
       ? null
-      : wgs84ToLocal(threshold.latitude, threshold.longitude, AIRPORT_ORIGINS[this.anchor]);
+      : [target[0] + authoredThreshold.x, target[1] + authoredThreshold.z];
     const dx = markerLocal ? markerLocal[0] - x : centreDx;
     const dz = markerLocal ? markerLocal[1] - z : centreDz;
     const distanceM = synthetic
