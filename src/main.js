@@ -1477,6 +1477,8 @@ class FlightSimulator {
       destinationCode: this.destinationAirport,
     });
 
+    this.updateRegionMounting?.();
+
     // Keep the lobby backdrop alive: re-arm the demo after it ends.
     this.gameFlow.update(frameDelta);
     if (!this.multiplayer?.active && !this.multiplayer?.modalOpen && this.gameFlow.consumeDemoRestart()) {

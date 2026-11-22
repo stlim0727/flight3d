@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 // Pure OurAirports CSV -> regional runway index conversion. No network or DOM.
 export const SCHEMA_VERSION = 1;
 export const DEFAULT_TILE_DEGREES = 10;
+export const SEARCH_SCHEMA_VERSION = 1;
 
 const FT_TO_M = 0.3048;
 const EARTH_RADIUS_M = 6371008.8;
@@ -295,8 +296,10 @@ export function buildIndex({ airportsCsv, runwaysCsv, sources, version, tileDegr
   }
 
   const tiles = new Map();
+  const searchEntries = [];
   const icao = {};
   const iata = {};
+  const ident = {};
   let airportCount = 0;
   let runwayCount = 0;
   const entries = [...airportsById.values()].sort((a, b) => Number(a.airport.id) - Number(b.airport.id));
@@ -322,11 +325,29 @@ export function buildIndex({ airportsCsv, runwaysCsv, sources, version, tileDegr
       });
     }
     tiles.get(tileId).airports.push({ ...airport, runways: entry.runways });
+    searchEntries.push({
+      code: airport.icao || airport.ident,
+      iata: airport.iata,
+      name: airport.name,
+      latitude: airport.latitude,
+      longitude: airport.longitude,
+      country: airport.country,
+      type: airport.type,
+      tileId,
+    });
     if (airport.icao) icao[airport.icao] = tileId;
     if (airport.iata && !Object.hasOwn(iata, airport.iata)) iata[airport.iata] = tileId;
+    if (airport.ident && !airport.icao && !Object.hasOwn(ident, airport.ident)) ident[airport.ident] = tileId;
     airportCount++;
     runwayCount += entry.runways.length;
   }
+  const searchIndex = {
+    schemaVersion: SEARCH_SCHEMA_VERSION,
+    kind: 'flight3d-airport-search',
+    version,
+    airports: searchEntries.sort((a, b) => a.code.localeCompare(b.code)
+      || a.iata.localeCompare(b.iata) || a.name.localeCompare(b.name)),
+  };
 
   const tileSummary = {};
   for (const [tileId, tile] of [...tiles.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -347,11 +368,13 @@ export function buildIndex({ airportsCsv, runwaysCsv, sources, version, tileDegr
     tileDegrees,
     sources,
     counts: { airports: airportCount, runways: runwayCount, exclusions },
+    searchIndex: { path: `${version}/search.json`, schemaVersion: SEARCH_SCHEMA_VERSION, count: airportCount },
     icao,
     iata,
+    ident,
     tiles: tileSummary,
     attribution: 'OurAirports contributors (public domain / Unlicense)',
     sourceUrl: 'https://ourairports.com/data/',
   };
-  return { manifest, tiles };
+  return { manifest, tiles, searchIndex };
 }

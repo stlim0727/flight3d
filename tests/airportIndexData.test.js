@@ -118,3 +118,38 @@ test('committed data keeps official codes and drops non-surface records', () => 
   const nzhn = readTile(manifest.icao.NZHN).airports.find(airport => airport.icao === 'NZHN');
   assert.ok(!nzhn.runways.some(runway => runway.surface === 'DELETE DUPLICATE'));
 });
+
+test('the committed global search artifact matches the versioned tile records', () => {
+  assert.equal(manifest.searchIndex.schemaVersion, 1);
+  assert.ok(manifest.searchIndex.path.startsWith(`${manifest.version}/`));
+  assert.equal(manifest.searchIndex.count, manifest.counts.airports);
+  const search = JSON.parse(readFileSync(new URL(manifest.searchIndex.path, ROOT), 'utf8'));
+  assert.equal(search.schemaVersion, 1);
+  assert.equal(search.version, manifest.version);
+  assert.equal(search.airports.length, manifest.searchIndex.count);
+
+  const indexed = new Map();
+  for (const tileId of tileIds) {
+    for (const airport of readTile(tileId).airports) indexed.set(airport.icao || airport.ident, { airport, tileId });
+  }
+  const seen = new Set();
+  for (const entry of search.airports) {
+    assert.deepEqual(Object.keys(entry).sort(), ['code', 'country', 'iata', 'latitude', 'longitude', 'name', 'tileId', 'type']);
+    const expected = indexed.get(entry.code);
+    assert.ok(expected, `unknown search code ${entry.code}`);
+    assert.equal(entry.tileId, expected.tileId);
+    if (manifest.icao[entry.code]) assert.equal(manifest.icao[entry.code], entry.tileId);
+    else assert.equal(manifest.ident[entry.code] ?? manifest.iata[entry.code], entry.tileId);
+    assert.ok(manifest.icao[entry.code] || manifest.iata[entry.code] || manifest.ident[entry.code], `unresolvable ${entry.code}`);
+    assert.equal(entry.iata, expected.airport.iata);
+    assert.equal(entry.name, expected.airport.name);
+    assert.equal(entry.latitude, expected.airport.latitude);
+    assert.equal(entry.longitude, expected.airport.longitude);
+    assert.equal(entry.country, expected.airport.country);
+    assert.equal(entry.type, expected.airport.type);
+    assert.ok(!seen.has(entry.code), `duplicate search code ${entry.code}`);
+    seen.add(entry.code);
+  }
+  assert.deepEqual([...seen].sort(), [...indexed.keys()].sort());
+  for (const code of ['KJFK', 'RJTT', 'WSSS', 'VNLK']) assert.ok(seen.has(code), `missing ${code}`);
+});

@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GameFlowController, FLOW } from '../src/ui/GameFlowController.js';
 import { initLobbyScreen } from '../src/ui/LobbyScreen.js';
-import { installSimulatorHudAndBindings } from '../src/ui/SimulatorHudAndBindings.js';
+import { clearAirportIndexCache } from '../src/geospatial/airportIndex.js';
 import { t } from '../src/i18n/index.js';
+import { installSimulatorHudAndBindings } from '../src/ui/SimulatorHudAndBindings.js';
 
 class MockElement {
   constructor(id = '', tagName = 'DIV') {
@@ -59,6 +60,8 @@ class MockElement {
   append(...children) {
     for (const c of children) this.appendChild(c);
   }
+  contains(other) { return other === this || this.children.includes(other); }
+  closest() { return null; }
   replaceChildren(...children) {
     this.children = [];
     for (const c of children) this.appendChild(c);
@@ -344,4 +347,206 @@ test('UI State Contract: Multi-pause state guard prevents early resume when over
   assert.equal(gameFlow.resume('manual'), true, 'Releasing last pause source resumes to FLIGHT');
   assert.equal(gameFlow.state, FLOW.FLIGHT);
   assert.equal(gameFlow.isPhysicsFrozen(), false);
+});
+
+const MAP_SELECT_IDS = ['lobby-map-state', 'lobby-map-airport', 'lobby-map-runway', 'lobby-map-point', 'lobby-map-departure'];
+const MAP_BROWSER_IDS = ['lobby-map-search', 'lobby-map-results', 'lobby-map-bookmarks', 'lobby-map-default-bookmarks', 'lobby-map-search-status', 'lobby-map-search-retry', 'lobby-map-bookmark-toggle', 'lobby-map-svg', 'lobby-map-markers', 'lobby-map-overview'];
+
+function setupMapDOM() {
+  const { elements, mockDoc } = setupMockDOM();
+  for (const id of MAP_SELECT_IDS) elements.set(id, new MockElement(id, 'select'));
+  for (const id of MAP_BROWSER_IDS) elements.set(id, new MockElement(id, id === 'lobby-map-search' ? 'input' : 'div'));
+  mockDoc.createElementNS = (namespace, tag) => new MockElement('', tag);
+  return { elements, mockDoc };
+}
+
+function globalFixture() {
+  const base = 'http://localhost/data/airports/';
+  const manifest = {
+    schemaVersion: 1,
+    kind: 'flight3d-airport-index',
+    version: 'fixture',
+    tileDegrees: 10,
+    tiles: { '12-30': {}, '13-10': {} },
+    icao: { RKSI: '12-30', KJFK: '13-10' },
+    iata: { ICN: '12-30', JFK: '13-10' },
+    searchIndex: { path: 'fixture/search.json', schemaVersion: 1, count: 1 },
+  };
+  const artifact = {
+    schemaVersion: 1,
+    version: 'fixture',
+    airports: [{ code: 'KJFK', iata: 'JFK', name: 'John F. Kennedy International Airport', latitude: 40.6394, longitude: -73.7793, country: 'US', type: 'large_airport', tileId: '13-10' }],
+  };
+  const tile = {
+    schemaVersion: 1,
+    version: 'fixture',
+    tile: '13-10',
+    airports: [{
+      id: '1', icao: 'KJFK', iata: 'JFK', name: artifact.airports[0].name,
+      latitude: 40.6394, longitude: -73.7793, elevationM: 4, country: 'US', type: 'large_airport',
+      runways: [{ id: '1', ends: [{ ident: '04L', headingDegT: 40 }, { ident: '22R', headingDegT: 220 }] }],
+    }],
+  };
+  const files = new Map([
+    [`${base}manifest.json`, manifest],
+    [`${base}fixture/search.json`, artifact],
+    [`${base}fixture/tiles/13-10.json`, tile],
+  ]);
+  return { base, files };
+}
+
+test('UI State Contract: global airport search shows loading, error, retry, counts and empty results', async () => {
+  const { elements, mockDoc } = setupMapDOM();
+  const originalDoc = globalThis.document;
+  const originalFetch = globalThis.fetch;
+  const originalStorage = globalThis.localStorage;
+  const { files } = globalFixture();
+  const requested = [];
+  let offline = true;
+  clearAirportIndexCache();
+  globalThis.document = mockDoc;
+  globalThis.fetch = async url => {
+    requested.push(String(url));
+    if (offline) throw new Error('offline');
+    if (!files.has(String(url))) return new Response('missing', { status: 404 });
+    return new Response(JSON.stringify(files.get(String(url))), { status: 200 });
+  };
+  globalThis.localStorage = {
+    getItem: () => JSON.stringify([{ kind: 'airport', id: 'RKSI', label: 'Incheon', latitude: 37.4691, longitude: 126.451 }]),
+    setItem() {},
+  };
+  try {
+    let plan = null;
+    const added = [];
+    const screen = initLobbyScreen({
+      getAirport: () => 'incheon', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+      getDestination: () => 'none', getMapPlan: () => plan,
+      onMapPlan: value => { plan = value; }, onMapPlacesAdded: airports => added.push(...airports),
+    });
+    screen.setMapPlaces({
+      airports: [{ code: 'RKSI', iata: 'ICN', name: 'Incheon International Airport', latitude: 37.4691, longitude: 126.451, runways: [] }],
+      points: [],
+    });
+    const search = elements.get('lobby-map-search');
+    const status = elements.get('lobby-map-search-status');
+    const results = elements.get('lobby-map-results');
+    const bookmarks = elements.get('lobby-map-bookmarks');
+
+    search.value = 'jfk';
+    search.listeners.input[0]();
+    assert.equal(status.textContent, t('lobby.map.search.loading'));
+    await screen.requestAirportSearchIndex().catch(() => {});
+    assert.equal(status.textContent, `${t('lobby.map.search.error')} · ${t('lobby.map.search.retry')}`);
+
+    search.value = 'incheon';
+    search.listeners.input[0]();
+    await screen.requestAirportSearchIndex().catch(() => {});
+    assert.ok(results.children.some(child => child.dataset.placeId === 'RKSI'), 'local results survive an index failure');
+    assert.ok(bookmarks.children.some(child => child.dataset.placeId === 'RKSI'), 'bookmarks survive an index failure');
+
+    offline = false;
+    const retry = elements.get('lobby-map-search-retry');
+    assert.equal(retry.hidden, false, 'retry control is visible while the index is unavailable');
+    retry.listeners.click[0]();
+    await screen.requestAirportSearchIndex();
+    assert.equal(retry.hidden, true, 'retry control hides after a successful load');
+    search.value = 'jfk';
+    search.listeners.input[0]();
+    const globalButton = results.children.find(child => child.dataset.placeSource === 'global');
+    assert.ok(globalButton, 'a global result appears after retry');
+    assert.equal(status.textContent, `1 ${t('lobby.map.results')}`);
+    search.value = 'zzzz';
+    search.listeners.input[0]();
+    assert.equal(status.textContent, t('lobby.map.search.empty'));
+
+    const tileRequests = () => requested.filter(url => url.endsWith('/tiles/13-10.json')).length;
+    assert.equal(tileRequests(), 0);
+    results.listeners.click[0]({ target: { closest: () => globalButton } });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(tileRequests(), 1, 'selection resolves through exactly one tile lookup');
+    assert.equal(plan?.airportCode, 'KJFK');
+    assert.equal(plan?.state, 'runway');
+    assert.equal(added.length, 1);
+    assert.equal(added[0].code, 'KJFK');
+    assert.equal(added[0].country, 'US');
+    assert.equal(added[0].runways.length, 1);
+    assert.equal(elements.get('lobby-map-airport').value, 'KJFK');
+    assert.equal(elements.get('lobby-map-departure').value, '');
+  } finally {
+    globalThis.document = originalDoc;
+    globalThis.fetch = originalFetch;
+    globalThis.localStorage = originalStorage;
+    clearAirportIndexCache();
+  }
+});
+
+test('UI State Contract: a tile failure keeps the loaded global search results', async () => {
+  const { elements, mockDoc } = setupMapDOM();
+  const originalDoc = globalThis.document;
+  const originalFetch = globalThis.fetch;
+  const originalStorage = globalThis.localStorage;
+  const { files } = globalFixture();
+  clearAirportIndexCache();
+  globalThis.document = mockDoc;
+  globalThis.fetch = async url => {
+    if (String(url).includes('/tiles/')) throw new Error('tile offline');
+    const body = files.get(String(url));
+    return body ? new Response(JSON.stringify(body), { status: 200 }) : new Response('missing', { status: 404 });
+  };
+  globalThis.localStorage = { getItem: () => null, setItem() {} };
+  try {
+    let plan = null;
+    const screen = initLobbyScreen({
+      getAirport: () => 'incheon', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+      getDestination: () => 'none', getMapPlan: () => plan, onMapPlan: value => { plan = value; },
+    });
+    screen.setMapPlaces({ airports: [], points: [] });
+    const search = elements.get('lobby-map-search');
+    const results = elements.get('lobby-map-results');
+    const status = elements.get('lobby-map-search-status');
+    await screen.requestAirportSearchIndex();
+    search.value = 'jfk';
+    search.listeners.input[0]();
+    const globalButton = results.children.find(child => child.dataset.placeSource === 'global');
+    assert.ok(globalButton, 'global result loaded before the tile failure');
+    results.listeners.click[0]({ target: { closest: () => globalButton } });
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    assert.equal(status.textContent, t('lobby.map.search.tileError'));
+    assert.equal(plan, null, 'a failed tile lookup must not emit a partial map plan');
+    assert.ok(results.children.some(child => child.dataset.placeId === 'KJFK'), 'search results stay visible');
+    assert.equal(elements.get('lobby-map-search-retry').hidden, true, 'index retry is not offered for a tile error');
+  } finally {
+    globalThis.document = originalDoc;
+    globalThis.fetch = originalFetch;
+    globalThis.localStorage = originalStorage;
+    clearAirportIndexCache();
+  }
+});
+
+test('UI State Contract: an airport without runways never offers a runway start', () => {
+  const { elements, mockDoc } = setupMapDOM();
+  const originalDoc = globalThis.document;
+  globalThis.document = mockDoc;
+  try {
+    let plan = null;
+    const screen = initLobbyScreen({
+      getAirport: () => 'incheon', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+      getMapPlan: () => plan, onMapPlan: value => { plan = value; },
+    });
+    screen.setMapPlaces({
+      airports: [{ code: 'ZZZZ', iata: '', name: 'No Runways Field', latitude: 37, longitude: 127, runways: [] }],
+      points: [],
+    });
+    elements.get('lobby-map-search').value = 'zzzz';
+    screen.setMapSearchState('ready');
+    const button = elements.get('lobby-map-results').children.find(child => child.dataset.placeId === 'ZZZZ');
+    assert.ok(button);
+    elements.get('lobby-map-results').listeners.click[0]({ target: { closest: () => button } });
+    assert.equal(plan?.state, 'cruise');
+    assert.equal(plan?.runwayKey, '');
+    assert.equal(elements.get('lobby-map-runway').value, '');
+  } finally {
+    globalThis.document = originalDoc;
+  }
 });

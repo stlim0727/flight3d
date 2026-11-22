@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSearchText, searchMapPlaces } from '../src/config/airportSearch.js';
+import { mergeScoredResults, normalizeSearchText, searchAirportIndex, searchAirportIndexScored, searchMapPlaces, searchMapPlacesScored } from '../src/config/airportSearch.js';
 
 const AIRPORTS = [
   { code: 'RKSI', iata: 'ICN', name: 'Incheon International Airport', latitude: 37.4691, longitude: 126.451 },
@@ -159,4 +159,77 @@ test('special regions match by code, id, label, and localized aliases without co
   assert.deepEqual(searchMapPlaces(places, '루클라').map(match => match.id), ['lukla']);
   assert.deepEqual(searchMapPlaces(places, '네온').map(match => match.id), ['neon']);
   assert.deepEqual(searchMapPlaces(places, 'coastal').map(match => match.id), ['coastal']);
+});
+
+const GLOBAL_ENTRIES = [
+  { code: 'KJFK', iata: 'JFK', name: 'John F. Kennedy International Airport', latitude: 40.6394, longitude: -73.7793, country: 'US', type: 'large_airport', tileId: '13-10' },
+  { code: 'RJTT', iata: 'HND', name: 'Tokyo Haneda International Airport', latitude: 35.5533, longitude: 139.7811, country: 'JP', type: 'large_airport', tileId: '12-31' },
+  { code: 'VNLK', iata: 'LUA', name: 'Tenzing-Hillary Airport', latitude: 27.6868, longitude: 86.7295, country: 'NP', type: 'small_airport', tileId: '11-26' },
+  { code: 'BAD1', iata: 'BAD', name: 'Broken View Airport', latitude: NaN, longitude: 126 },
+];
+
+test('global search ranks ICAO, IATA and name matches with the local rules', () => {
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, ' kjfk! '), [{
+    kind: 'airport',
+    id: 'KJFK',
+    label: 'KJFK · John F. Kennedy International Airport',
+    detail: 'IATA JFK',
+    latitude: 40.6394,
+    longitude: -73.7793,
+  }]);
+  assert.deepEqual(searchAirportIndex({ airports: GLOBAL_ENTRIES }, 'hnd').map(match => match.id), ['RJTT']);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'kennedy').map(match => match.id), ['KJFK']);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'international').map(match => match.id), ['KJFK', 'RJTT']);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'tenzing').map(match => match.id), ['VNLK']);
+});
+
+test('global search applies limits and rejects invalid indexes without mutation', () => {
+  const before = structuredClone(GLOBAL_ENTRIES);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'airport').map(match => match.id), ['KJFK', 'RJTT', 'VNLK']);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'airport', 2).map(match => match.id), ['KJFK', 'RJTT']);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'airport', 0), []);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, '   '), []);
+  for (const index of [null, undefined, {}, [], { airports: 'nope' }]) {
+    assert.deepEqual(searchAirportIndex(index, 'jfk'), []);
+  }
+  assert.deepEqual(GLOBAL_ENTRIES, before);
+});
+
+test('global search accepts the icao field used by index records', () => {
+  const entries = [{ icao: 'VNLK', iata: 'LUA', name: 'Tenzing-Hillary Airport', latitude: 27.6868, longitude: 86.7295 }];
+  assert.deepEqual(searchAirportIndex(entries, 'vnlk').map(match => match.id), ['VNLK']);
+});
+
+test('scored variants expose ranking scores while plain results keep their shape', () => {
+  const local = searchMapPlacesScored(catalog(), 'airport');
+  assert.ok(local.length > 0);
+  assert.ok(local.every(result => Number.isFinite(result.score)));
+  const global = searchAirportIndexScored([{
+    code: 'EFPO', iata: 'POR', name: 'Porto Airport', latitude: 41.2, longitude: -8.6,
+  }], 'POR');
+  assert.equal(global[0].id, 'EFPO');
+  assert.equal(global[0].score, 0);
+  assert.equal(searchAirportIndex([{
+    code: 'EFPO', iata: 'POR', name: 'Porto Airport', latitude: 41.2, longitude: -8.6,
+  }], 'POR')[0].score, undefined);
+});
+
+test('merged ranking keeps an exact global IATA match ahead of weak local text hits', () => {
+  const localPlaces = {
+    airports: Array.from({ length: 20 }, (_, index) => ({
+      code: `K${String(index).padStart(3, '0')}`,
+      name: `Local Airport ${index}`,
+      latitude: 37 + index / 100,
+      longitude: 127,
+    })),
+    points: [],
+  };
+  const local = searchMapPlacesScored(localPlaces, 'POR', 20);
+  const global = searchAirportIndexScored([{
+    code: 'EFPO', iata: 'POR', name: 'Porto Airport', latitude: 41.2, longitude: -8.6,
+  }], 'POR');
+  const merged = mergeScoredResults(local, global, 20);
+  assert.equal(merged[0].id, 'EFPO');
+  assert.equal(merged[0].source, 'global');
+  assert.ok(merged.slice(1).every(result => result.source === 'local'));
 });
