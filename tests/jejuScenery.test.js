@@ -256,5 +256,33 @@ test('jejuSurfaceMaterial matches OpenWorldTerrain satellite colorimetry and dif
     'jejuSurfaceMaterial must apply 1.08 gamma contrast enhancement');
 });
 
+test('loadJejuAirport hides legacy island mesh when openWorld DEM tiles are active, preserving airport precinct', async () => {
+  const airport = await loadJejuAirport('', { loadSatellite: false });
+  const islandMesh = airport.terrain.islandMesh;
+  const airportMesh = airport.terrain.airportMesh;
+
+  assert.ok(islandMesh, 'Island mesh must exist');
+  assert.ok(airportMesh, 'Airport precinct mesh must exist');
+  assert.equal(islandMesh.visible, true, 'Island mesh is visible by default as fallback');
+  assert.equal(airportMesh.visible, true, 'Airport precinct mesh is visible by default');
+
+  // When openWorld is active and has DEM tiles loaded
+  airport.terrain.openWorld = { tiles: new Map([['test-key', {}]]) };
+  airport.update(0.1, { x: 0, y: 1000, z: 0 }, 0);
+  assert.equal(islandMesh.visible, false, 'Island mesh must be hidden when DEM tiles are active to prevent occlusion');
+  assert.equal(airportMesh.visible, true, 'Airport precinct mesh must remain visible');
+
+  // When openWorld has no tiles loaded yet (unloaded fallback)
+  airport.terrain.openWorld.tiles.clear();
+  airport.update(0.1, { x: 0, y: 1000, z: 0 }, 0);
+  assert.equal(islandMesh.visible, true, 'Island mesh must reappear as fallback when DEM tiles are empty');
+
+  // When hasOpenWorld flag is passed
+  delete airport.terrain.openWorld;
+  airport.update(0.1, { x: 0, y: 1000, z: 0 }, 0, { hasOpenWorld: true });
+  assert.equal(islandMesh.visible, false, 'Island mesh must be hidden when hasOpenWorld option is set');
+});
+
+
 
 

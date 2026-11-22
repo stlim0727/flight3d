@@ -53,12 +53,36 @@ export async function loadJejuAirport(base = '', options = {}) {
 
   const terrainMesh = new THREE.Mesh(terrainGeo, groundMaterial);
   terrain.mesh.add(terrainMesh);
+
+  // 1a. Protected Airport Precinct Ground Mesh (covers [-3200, -1500, 3200, 1500] around RKPC)
+  // Retains modeled airport elevation and high-detail ground under runways/buildings when OpenWorldTerrain is active.
+  const airportGeo = new THREE.PlaneGeometry(6400, 3000, 64, 30);
+  airportGeo.rotateX(-Math.PI / 2);
+  const airportPos = airportGeo.attributes.position;
+  for (let i = 0; i < airportPos.count; i++) {
+    const x = airportPos.getX(i);
+    const z = airportPos.getZ(i);
+    const h = terrain.getHeight(x, z);
+    airportPos.setY(i, h <= 0 ? -10.0 : h);
+  }
+  airportGeo.computeVertexNormals();
+
+  if (!satelliteTexture) {
+    colourJejuGround(airportGeo);
+  }
+
+  const airportMesh = new THREE.Mesh(airportGeo, groundMaterial);
+  terrain.mesh.add(airportMesh);
+  terrain.airportMesh = airportMesh;
+  terrain.islandMesh = terrainMesh;
+
   terrain.satelliteTexture = satelliteTexture;
   terrain.groundMaterial = groundMaterial;
 
   let tileStreamer = null;
   if (options.streamTiles !== false) {
     tileStreamer = new JejuTileStreamer(terrainMesh, terrain, options.streamerOptions);
+    tileStreamer.updateMeshUVs(airportGeo);
     terrain.tileStreamer = tileStreamer;
     if (options.autoloadTiles !== false) {
       tileStreamer.loadIslandMacroTiles().catch(() => {});
@@ -76,6 +100,8 @@ export async function loadJejuAirport(base = '', options = {}) {
     corridorSurface.corridorStreamer = corridorStreamer;
     corridorSurface.satelliteTexture = satelliteTexture;
     corridorSurface.groundMaterial = groundMaterial;
+    corridorSurface.airportMesh = airportMesh;
+    corridorSurface.islandMesh = terrainMesh;
     activeTerrain = corridorSurface;
   }
 
@@ -240,6 +266,10 @@ export async function loadJejuAirport(base = '', options = {}) {
     isRunwaySafetyArea: (x, z) => activeTerrain.isRunwaySafetyArea(x, z),
     resetTraffic() {},
     update(dt, position, time, options = {}) {
+      if (terrainMesh) {
+        const hasDEM = Boolean(activeTerrain.openWorld?.tiles.size || options.hasOpenWorld);
+        terrainMesh.visible = !hasDEM;
+      }
       if (corridorStreamer && position && !activeTerrain.openWorld && !options.hasOpenWorld && corridorStreamer.group.visible) {
         let headingDeg = options.headingDeg ?? options.trackDeg;
         if (headingDeg === undefined && lastPos) {
