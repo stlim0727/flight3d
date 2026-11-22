@@ -389,6 +389,8 @@ export default {
   "lobby.map.suggestedPlaces": "Default bookmarks",
   "lobby.map.pickPoint": "Choose an airport or pick a point on the map.",
   "lobby.map.resetView": "Full map",
+  "lobby.map.zoomIn": "Zoom in",
+  "lobby.map.zoomOut": "Zoom out",
   "lobby.map.overview": "Airport and cruise location map",
   "lobby.map.automatic": "Automatic",
   "lobby.map.flight": "Map flight plan",
