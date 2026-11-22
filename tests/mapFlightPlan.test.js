@@ -176,6 +176,16 @@ test('approach spawn applies distance, glideslope, cross-track and intercept yaw
   assert.equal(approachSpawnPlan({ frame, aircraftId: 'Other' }).vx, 74.5);
 });
 
+test('runway and approach starts use the first indexed end when direction is automatic', () => {
+  const airport = syntheticAirport();
+  for (const state of ['runway', 'approach']) {
+    const automatic = resolveMapFlightPlan({ airport, state });
+    const explicit = resolveMapFlightPlan({ airport, state, runwayId: '09/27', endId: '09' });
+    assert.ok(automatic);
+    assert.deepEqual(automatic, explicit);
+  }
+});
+
 test('resolveMapFlightPlan builds each scenario and rejects invalid selections', () => {
   const airport = syntheticAirport();
   const point = { latitude: 37.413, longitude: 127.027, headingDeg: 303, altitudeM: 1300 };

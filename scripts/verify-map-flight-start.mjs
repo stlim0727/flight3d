@@ -44,12 +44,10 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
         select.dispatchEvent(new Event('change', { bubbles: true }));
       };
       set('lobby-map-departure', '');
-      set('lobby-map-state', ${JSON.stringify(state)});
       if (${JSON.stringify(state)} === 'cruise') set('lobby-map-point', 'jamsil');
       else {
         set('lobby-map-airport', 'RKSS');
-        const runway = document.getElementById('lobby-map-runway');
-        set('lobby-map-runway', runway?.options?.[1]?.value ?? '');
+        document.getElementById(${JSON.stringify(state === 'approach' ? 'lobby-preset-app' : 'lobby-preset-rwy')}).click();
       }
       await sim.fly();
       return true;
@@ -64,6 +62,7 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
     results[state] = await evaluate(`({
       state: sim.lobby.mapPlan?.state,
       departure: sim.lobby.mapPlan?.departure,
+      direction: sim.lobby.mapPlan?.runwayKey,
       scenario: sim.lobby.preset,
       x: sim.position.x, y: sim.position.y, z: sim.position.z,
       speed: Math.hypot(sim.linearVelocity.x, sim.linearVelocity.z),
@@ -73,6 +72,7 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
     assert.equal(results[state].state, state);
     assert.equal(results[state].departure, '', 'departure must stay optional');
     assert.equal(results[state].scenario, state);
+    assert.equal(results[state].direction, '', 'direction must stay automatic');
     if (state === 'runway') assert.equal(results[state].onGround, true);
     if (state === 'cruise') assert.ok(results[state].y > 1000 && results[state].speed > 90);
     if (state === 'approach') assert.ok(results[state].y > 20 && results[state].speed > 60);

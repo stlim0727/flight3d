@@ -191,7 +191,7 @@ test('UI State Contract: Next Flight Preparation hides held flight controls and 
     assert.equal(resumeBtn.hidden, true, 'Resume button must be hidden');
     assert.equal(restartBtn.hidden, true, 'Restart button must be hidden');
     assert.equal(endBtn.hidden, true, 'End flight button must be hidden');
-    assert.equal(tabLabel.textContent, '싱글', 'Tab label must be 싱글');
+    assert.equal(tabLabel.textContent, '자유비행', 'The tab identifies free flight');
 
     flyBtn.click();
     assert.equal(flyCalled, true);
