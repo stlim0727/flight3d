@@ -1,4 +1,3 @@
-import { isExternalDestination } from './config/externalDestinations.js';
 import { regionalCruise } from './config/regionalCruises.js';
 import { generateValley } from './arena/generatedValley.js';
 import { GeneratedValleyTerrain } from './environment/GeneratedValleyTerrain.js';
@@ -762,11 +761,7 @@ class FlightSimulator {
     if (this.multiplayer?.locked) return;
     if (this.airportLoading || this.startingFlight) return;
     this.replayDirector.stop();
-    // The external airport is prepared before spawn; a failed fetch is a status
-    // the streamer can retry on approach, not a reason to strand the lobby.
-    if (this.airportStreamer && isExternalDestination(this.destinationAirport)) {
-      await this.airportStreamer.ensure(this.destinationAirport);
-    }
+
     const pending = {
       airport: this.lobby.airport,
       aircraft: this.lobby.aircraft ?? this.currentAircraftId,

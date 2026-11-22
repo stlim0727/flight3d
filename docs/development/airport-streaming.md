@@ -39,8 +39,9 @@ anchor is involved: the external airport is a dynamic region in `UnifiedWorld`.
 
 ## Readiness lifecycle
 
-- `fly()` calls `ensure(destination)` before spawning a flight, so a selected
-  external airport is attempted before the aircraft is committed.
+- The destination is not preloaded by `fly()`. `update()` loads it only when
+  the aircraft is within the approach radius; a selected but distant airport
+  stays a map/HUD destination until it is actually needed.
 - `update()` runs each frame. It keeps the region mounted while the aircraft
   is on the ground or on a runway, unmounts it when airborne beyond the unload
   radius, and retries failed loads only after a cooldown. Faster flight expands
