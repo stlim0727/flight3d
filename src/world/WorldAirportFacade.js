@@ -26,6 +26,7 @@ export function createWorldAirportFacade(world, spawnAirport) {
         localOptions.paused = options.paused;
         localOptions.headingDeg = options.headingDeg;
         localOptions.trackDeg = options.trackDeg;
+        localOptions.hasOpenWorld = Boolean(world.openWorld);
         region.airport.update(dt, localPosition, time, localOptions);
       }
     },
