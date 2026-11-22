@@ -32,15 +32,18 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   assert.ok(await waitFor(session, 'window.sim?.mapPlaces?.airports?.length > 10'), 'map catalog did not load');
 
   assert.equal(await evaluate("document.getElementById('lobby-regional-cruise') === null"), true);
+  assert.equal(await evaluate("document.querySelectorAll('[id^=\"lobby-airport-\"]').length"), 0, 'legacy 6 flight region buttons must be removed');
   assert.ok(await evaluate("!document.getElementById('lobby-map-search').checkVisibility()"), 'map must start collapsed');
   assert.ok(await evaluate("!document.getElementById('lobby-map-runway').checkVisibility()"), 'direction must start hidden');
   await screenshot(path.join(artifacts, 'lobby.png'));
   await evaluate("document.querySelector('#lobby-place-picker > summary').click()");
   assert.ok(await waitFor(session, "document.getElementById('lobby-map-search').checkVisibility()"), 'opening Places did not show search');
 
-  for (const id of ['RKSI', 'RKSS', 'RKPC', 'RKPK', 'jamsil', 'suwon', 'busan']) {
+  for (const id of ['RKSI', 'RKSS', 'RKPC', 'RKPK', 'jamsil', 'suwon', 'busan', 'lukla', 'neon', 'coastal']) {
     assert.ok(await evaluate(`Boolean(document.querySelector('#lobby-map-default-bookmarks [data-place-id="${id}"]'))`), `default bookmark missing: ${id}`);
   }
+  await evaluate("document.getElementById('lobby-map-default-bookmarks')?.scrollIntoView({ block: 'end' })");
+  await screenshot(path.join(artifacts, 'default-bookmarks.png'));
 
   await evaluate(`(() => {
     const input = document.getElementById('lobby-map-search');
@@ -143,6 +146,45 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   await evaluate("document.querySelector('#lobby-map-bookmarks button[data-place-id=\"RKSS\"]')?.click()");
   assert.ok(await waitFor(session, "window.sim?.lobby?.mapPlan?.airportCode === 'RKSS'"), 'restored bookmark did not restore selection');
   await screenshot(path.join(artifacts, 'bookmarks-after-refresh.png'));
+
+  // Search and select a special region (Lukla).
+  await evaluate(`(() => {
+    const input = document.getElementById('lobby-map-search');
+    input.value = '루클라';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  assert.ok(await waitFor(session, "Boolean(document.querySelector('#lobby-map-results [data-place-kind=\"region\"][data-place-id=\"lukla\"]'))"), 'Korean region search did not find lukla');
+  await evaluate("document.querySelector('#lobby-map-results [data-place-kind=\"region\"][data-place-id=\"lukla\"]')?.click()");
+  assert.ok(await waitFor(session, "window.sim?.lobby?.airport === 'lukla' && window.sim?.lobby?.mapPlan === null"), 'selecting region:lukla did not switch airport and clear mapPlan');
+
+  // Open Missions disclosure: all mission buttons must be visible simultaneously and auto-switch region.
+  await evaluate("document.querySelector('#lobby-missions > summary').click()");
+  const missionIds = ['lobby-preset-challenge', 'lobby-preset-bridge', 'lobby-preset-cliff', 'lobby-preset-valley'];
+  assert.ok(
+    await waitFor(session, `${JSON.stringify(missionIds)}.every(id => document.getElementById(id)?.checkVisibility())`),
+    'all mission buttons must be visible simultaneously',
+  );
+  await screenshot(path.join(artifacts, 'missions.png'));
+
+  await evaluate("document.getElementById('lobby-preset-bridge')?.click()");
+  assert.ok(
+    await waitFor(session, "window.sim?.lobby?.airport === 'neon' && window.sim?.lobby?.preset === 'bridge' && window.sim?.lobby?.aircraft === 'C172'"),
+    'bridge mission did not switch to neon + C172',
+  );
+
+  await evaluate("document.getElementById('lobby-preset-valley')?.click()");
+  assert.ok(
+    await waitFor(session, "window.sim?.lobby?.airport === 'valley' && window.sim?.lobby?.preset === 'valley' && window.sim?.lobby?.aircraft === 'F16' && document.getElementById('lobby-aircraft-b738')?.disabled === true"),
+    'valley mission did not switch to valley + F16',
+  );
+
+  await evaluate("document.getElementById('lobby-preset-rwy')?.click()");
+  assert.ok(
+    await waitFor(session, "window.sim?.lobby?.airport === 'incheon' && window.sim?.lobby?.preset === 'runway' && document.getElementById('lobby-aircraft-b738')?.disabled === false"),
+    'runway start button did not escape valley back to incheon',
+  );
+
   assert.deepEqual(exceptions, []);
   console.log(JSON.stringify({
     gpu: 'hardware Vulkan preflight passed',

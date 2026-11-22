@@ -342,7 +342,6 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   border-color: #0ea5e9;
   box-shadow: inset 3px 0 0 #0ea5e9, 0 0 16px rgba(14, 165, 233, 0.25);
 }
-.lobby-card .btn-airport,
 .lobby-card .btn-aircraft {
   flex: 1;
   position: relative;
@@ -355,12 +354,11 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   color: #e0f2fe;
 }
 .lobby-scenarios .btn-preset {
-  flex: 1 1 calc(50% - 4px);
-  min-width: calc(120px * var(--ui-scale, 1));
+  flex: 1 1 100%;
+  justify-content: flex-start;
   text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .lobby-language .btn { min-height: calc(24px * var(--ui-scale, 1)); padding: calc(2px * var(--ui-scale, 1)) calc(6px * var(--ui-scale, 1)); font-size: calc(10px * var(--ui-scale, 1)); }
 /* Panel content scrolls vertically; the tabs and flight action stay in place. */
@@ -1104,8 +1102,6 @@ body[data-flow="lobby"] #map-attribution {
   bottom: max(4px, env(safe-area-inset-bottom, 0px));
 }
 
-.lobby-card .btn-airport span { white-space: normal; overflow-wrap: anywhere; }
-
 #render-trials {
   display: flex; flex-direction: column;
   position: fixed; top: 145px; right: 12px; z-index: 75;
@@ -1165,8 +1161,7 @@ body:is([data-flow="lobby"], [data-flow="paused"], [data-flow="debrief"], .booti
 body.hud-folded #hud-locator-glass { display: none; }
 
 /* ===== Main menu: tactical flight-deck cards (see docs/design/main-menu-redesign-concept.jpg) ===== */
-.lobby-card .btn-aircraft,
-.lobby-card .btn-airport {
+.lobby-card .btn-aircraft {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1174,9 +1169,8 @@ body.hud-folded #hud-locator-glass { display: none; }
   gap: 3px;
   min-width: 0;
   text-align: left;
+  flex: 1 1 100%;
 }
-.lobby-card .btn-airport { flex: 1 1 calc(50% - 3px); }
-.lobby-card .btn-aircraft { flex: 1 1 100%; }
 /* Inline SVG stand-in for an emoji prefix where Unicode has no colour glyph. */
 .aircraft-icon { width: 1.25em; height: 1.25em; margin-right: .3em; vertical-align: -.25em; }
 .spec-badge {

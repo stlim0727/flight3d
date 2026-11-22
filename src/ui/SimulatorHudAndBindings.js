@@ -16,7 +16,7 @@ import { registerExternalDestinations } from '../config/externalDestinations.js'
 import { DeveloperPanel } from './DeveloperPanel.js';
 import { CockpitPovPanel } from './CockpitPovPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
-import { defaultScenarioForRegion, requiredAircraft } from '../config/scenarioRegistry.js';
+import { defaultScenarioForRegion, isScenarioAvailable, requiredAircraft } from '../config/scenarioRegistry.js';
 import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { computeUiScale, applyUiScale } from './UiScale.js';
 import { bindMapAttribution } from './mapAttribution.js';
@@ -690,7 +690,9 @@ class SimulatorHudAndBindingsMethods {
       // and only a flight actually flown is persisted.
       onAirport: id => {
         this.lobby.airport = id;
-        this.lobby.preset = defaultScenarioForRegion(id);
+        const keepStartState = ['runway', 'cruise', 'approach'].includes(this.lobby.preset)
+          && isScenarioAvailable(id, this.lobby.preset);
+        this.lobby.preset = keepStartState ? this.lobby.preset : defaultScenarioForRegion(id);
         this.lobby.mapPlan = null;
         if (id === 'valley') this.lobby.aircraft = 'F16';
         this.lobbyScreen?.refresh();

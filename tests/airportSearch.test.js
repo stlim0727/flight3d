@@ -141,6 +141,26 @@ test('cruise points match localized aliases', () => {
   assert.equal(matches[0].id, 'jamsil');
 });
 
+test('special regions match by code, id, label, and localized aliases without coordinates', () => {
+  const places = {
+    regions: [
+      { kind: 'region', id: 'lukla', code: 'VNLK', label: 'Lukla (VNLK)', nameKey: 'lukla.vnlk', aliases: ['VNLK', 'LUA', 'Lukla', '루클라'] },
+      { kind: 'region', id: 'neon', code: 'NEO', label: 'Neon Metropolis', nameKey: 'neon.metropolis', aliases: ['Neon', '네온', '네온 메트로폴리스'] },
+      { kind: 'region', id: 'coastal', code: 'CST', label: 'Coastal Airport', nameKey: 'coastal.airport', aliases: ['Coastal', '국제공항'] },
+    ],
+  };
+  assert.deepEqual(searchMapPlaces(places, 'vnlk'), [{
+    kind: 'region',
+    id: 'lukla',
+    label: 'Lukla (VNLK)',
+    detail: 'VNLK',
+    nameKey: 'lukla.vnlk',
+  }]);
+  assert.deepEqual(searchMapPlaces(places, '루클라').map(match => match.id), ['lukla']);
+  assert.deepEqual(searchMapPlaces(places, '네온').map(match => match.id), ['neon']);
+  assert.deepEqual(searchMapPlaces(places, 'coastal').map(match => match.id), ['coastal']);
+});
+
 const GLOBAL_ENTRIES = [
   { code: 'KJFK', iata: 'JFK', name: 'John F. Kennedy International Airport', latitude: 40.6394, longitude: -73.7793, country: 'US', type: 'large_airport', tileId: '13-10' },
   { code: 'RJTT', iata: 'HND', name: 'Tokyo Haneda International Airport', latitude: 35.5533, longitude: 139.7811, country: 'JP', type: 'large_airport', tileId: '12-31' },

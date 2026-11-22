@@ -135,9 +135,12 @@ try {
   // A menu pick is a wish, not a change (#322): nothing may touch the live scene or
   // storage until Fly rebuilds the sortie, so a reload can never restore a flight
   // that was only ever clicked at.
-  const pick = async (buttonIds, want) => {
+  const pick = async (selectors, want) => {
     await evaluate(`(() => {
-      for (const id of ${JSON.stringify(buttonIds)}) document.getElementById(id)?.click();
+      for (const sel of ${JSON.stringify(selectors)}) {
+        const el = sel.startsWith('#') || sel.includes('[') ? document.querySelector(sel) : document.getElementById(sel);
+        el?.click();
+      }
       return true;
     })()`);
     await delay(200);
@@ -179,17 +182,17 @@ try {
     aircraft: window.simulator.currentAircraftId,
     scenario: window.simulator.lobby.preset,
   }));
-  assert.equal(initial.airport, 'coastal', 'Default airport is coastal');
+  assert.equal(initial.airport, 'incheon', 'Default airport is incheon');
   assert.equal(initial.aircraft, 'B738', 'Default aircraft is B738');
   assert.equal(initial.scenario, 'runway', 'Default scenario is runway');
   console.log('Initial defaults verified:', initial);
 
   // Select airport = 'lukla', aircraft = 'C172', scenario = 'approach' via Lobby UI buttons
   const pending1 = await pick(
-    ['lobby-airport-lukla', 'lobby-aircraft-c172', 'lobby-preset-app'],
+    ['#lobby-map-default-bookmarks [data-place-id="lukla"]', 'lobby-aircraft-c172', 'lobby-preset-app'],
     { airport: 'lukla', aircraft: 'C172', preset: 'approach' },
   );
-  assert.equal(pending1.liveAirport, 'coastal', 'A pick must not rebuild the live scene');
+  assert.equal(pending1.liveAirport, 'incheon', 'A pick must not rebuild the live scene');
   assert.equal(pending1.liveAircraft, 'B738', 'A pick must not swap the live aircraft');
 
   // Fly is what applies it; only then is the selection worth persisting.
@@ -225,7 +228,7 @@ try {
     lobbyAircraft: window.simulator.lobby.aircraft,
     lobbyScenario: window.simulator.lobby.preset,
     lastPreset: window.simulator.lastPresetType,
-    luklaButtonActive: document.getElementById('lobby-airport-lukla')?.classList.contains('active'),
+    luklaButtonActive: document.querySelector('#lobby-map-default-bookmarks [data-place-id="lukla"]')?.classList.contains('active'),
     c172ButtonActive: document.getElementById('lobby-aircraft-c172')?.classList.contains('active'),
     appButtonActive: document.getElementById('lobby-preset-app')?.classList.contains('active'),
   }));
@@ -242,7 +245,7 @@ try {
 
   // Now change selection to neon, F16, cruise
   const pending2 = await pick(
-    ['lobby-airport-neon', 'lobby-aircraft-f16', 'lobby-preset-cru'],
+    ['#lobby-map-default-bookmarks [data-place-id="neon"]', 'lobby-aircraft-f16', 'lobby-preset-cru'],
     { airport: 'neon', aircraft: 'F16', preset: 'cruise' },
   );
   assert.equal(pending2.liveAirport, 'lukla', 'A pick must not rebuild the flown scene');
@@ -273,7 +276,7 @@ try {
     lobbyAircraft: window.simulator.lobby.aircraft,
     lobbyScenario: window.simulator.lobby.preset,
     lastPreset: window.simulator.lastPresetType,
-    neonButtonActive: document.getElementById('lobby-airport-neon')?.classList.contains('active'),
+    neonButtonActive: document.querySelector('#lobby-map-default-bookmarks [data-place-id="neon"]')?.classList.contains('active'),
     f16ButtonActive: document.getElementById('lobby-aircraft-f16')?.classList.contains('active'),
     cruButtonActive: document.getElementById('lobby-preset-cru')?.classList.contains('active'),
   }));
@@ -290,7 +293,7 @@ try {
 
   // Now change selection to incheon, B738, runway
   const pending3 = await pick(
-    ['lobby-airport-incheon', 'lobby-aircraft-b738', 'lobby-preset-rwy'],
+    ['#lobby-map-default-bookmarks [data-place-id="RKSI"]', 'lobby-aircraft-b738', 'lobby-preset-rwy'],
     { airport: 'incheon', aircraft: 'B738', preset: 'runway' },
   );
   assert.equal(pending3.liveAirport, 'neon', 'A pick must not rebuild the flown scene');
@@ -321,7 +324,7 @@ try {
     lobbyAircraft: window.simulator.lobby.aircraft,
     lobbyScenario: window.simulator.lobby.preset,
     lastPreset: window.simulator.lastPresetType,
-    incheonButtonActive: document.getElementById('lobby-airport-incheon')?.classList.contains('active'),
+    incheonButtonActive: document.querySelector('#lobby-map-default-bookmarks [data-place-id="RKSI"]')?.classList.contains('active'),
     b738ButtonActive: document.getElementById('lobby-aircraft-b738')?.classList.contains('active'),
     rwyButtonActive: document.getElementById('lobby-preset-rwy')?.classList.contains('active'),
   }));
