@@ -138,10 +138,10 @@ test('prioritizes visible imagery at cruise altitude and fades back to the base 
   const behind = new Mesh(new BoxGeometry(4000, 100, 4000));
   behind.position.z = 10000;
   const detail = { map: { value: detailMap }, blend: { value: 0 } };
-  world.tiles.set(key, { mesh: front, baseMap, detailMap, detail, detailLevel: 13, detailUpdatedAt: 0 });
+  world.tiles.set(key, { mesh: front, baseMap, detailMap, detail, detailLevel: 14, detailUpdatedAt: 0 });
   world.tiles.set(`${x + 1}/${y}`, { mesh: behind });
   world.updateImageryDetail(camera, 1080, 350);
-  assert.equal(world.detailWanted.get(key), 13);
+  assert.equal(world.detailWanted.get(key), 14);
   assert.equal(world.detailWanted.has(`${x + 1}/${y}`), false);
   assert.equal(detail.blend.value, 1);
   camera.lookAt(0, 4000, 10000);
@@ -160,7 +160,10 @@ test('prioritizes visible imagery at cruise altitude and fades back to the base 
 });
 
 test('holds the high-detail slot when straight flight changes tile ranking', () => {
-  const world = new OpenWorldTerrain({ origin });
+  const world = new OpenWorldTerrain({
+    origin,
+    imageryBudget: { detailTileLimit: 4, highDetailTileLimit: 1, ultraDetailTileLimit: 0 },
+  });
   const camera = new PerspectiveCamera(55, 2, 1, 100000);
   camera.position.set(0, 4000, 0);
   camera.lookAt(0, 4000, -10000);
@@ -186,6 +189,44 @@ test('holds the high-detail slot when straight flight changes tile ranking', () 
   world.updateImageryDetail(camera, 1080, 1500);
   assert.equal(world.detailWanted.get('first'), undefined);
   assert.equal(world.detailWanted.get('next'), 13);
+  world.dispose();
+});
+
+test('scales multi-tile z13/z14 detail budget and anisotropy with render quality', () => {
+  const world = new OpenWorldTerrain({ origin });
+  const camera = new PerspectiveCamera(55, 2, 1, 100000);
+  camera.position.set(0, 2000, 0);
+  camera.lookAt(0, 0, -12000);
+  const near = new Mesh(new BoxGeometry(9000, 100, 9000));
+  const midA = new Mesh(new BoxGeometry(8000, 100, 8000));
+  const midB = new Mesh(new BoxGeometry(8000, 100, 8000));
+  near.position.set(0, 0, -7000);
+  midA.position.set(-6000, 0, -15000);
+  midB.position.set(6000, 0, -15000);
+  world.tiles.set('near', { mesh: near });
+  world.tiles.set('midA', { mesh: midA });
+  world.tiles.set('midB', { mesh: midB });
+
+  world.setImageryQuality('balanced', 16);
+  assert.equal(world.imageryBudget.anisotropy, 8);
+  world.updateImageryDetail(camera, 1080, 200);
+  assert.equal(world.detailWanted.get('near'), 14);
+  assert.equal(world.detailWanted.get('midA'), 13);
+  assert.equal(world.detailWanted.get('midB'), 13);
+
+  world.detailWanted.clear();
+  world.setImageryQuality('performance', 4);
+  assert.equal(world.imageryBudget.anisotropy, 4);
+  world.updateImageryDetail(camera, 1080, 500);
+  assert.equal(world.detailWanted.get('near'), 13);
+  assert.equal(world.detailWanted.get('midA'), 12);
+
+  world.detailWanted.clear();
+  world.setImageryQuality('ultraLow', 16);
+  assert.equal(world.imageryBudget.anisotropy, 2);
+  world.updateImageryDetail(camera, 1080, 800);
+  assert.equal(world.detailWanted.size, 2);
+  assert.ok([...world.detailWanted.values()].every(level => level === 12));
   world.dispose();
 });
 
