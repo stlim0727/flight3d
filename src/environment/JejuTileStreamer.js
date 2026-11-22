@@ -29,11 +29,50 @@ export const JEJU_MACRO_TILES = Object.freeze([
   { z: 10, x: 873, y: 411, col: 3, row: 1 },
 ]);
 
+/**
+ * Generate macro tiles for Jeju Island covering the exact same geographic bounds:
+ * - Zoom 10: 4 columns x 2 rows (8 tiles) -> 1024x512 canvas (~128m/px)
+ * - Zoom 11: 8 columns x 4 rows (32 tiles) -> 2048x1024 canvas (~64m/px)
+ */
+export function createJejuMacroTiles(zoom = 10) {
+  if (zoom === 11) {
+    const tiles = [];
+    const minTileX = 1740;
+    const minTileY = 820;
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 8; col++) {
+        tiles.push({
+          z: 11,
+          x: minTileX + col,
+          y: minTileY + row,
+          col,
+          row,
+        });
+      }
+    }
+    return Object.freeze(tiles);
+  }
+  return JEJU_MACRO_TILES;
+}
+
+function getQueryParam(key) {
+  if (typeof window !== 'undefined' && window.location?.search) {
+    try {
+      return new URLSearchParams(window.location.search).get(key);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export class JejuTileStreamer {
   /**
    * @param {THREE.Mesh} terrainMesh - The 80km x 56km terrain mesh for Jeju Island
    * @param {Object} flightSurface - JejuFlightSurface instance for physics & elevation
    * @param {Object} [options]
+   * @param {number} [options.zoom=10] - Zoom level (10 or 11)
+   * @param {number} [options.anisotropy=1] - Texture anisotropy filtering level
    */
   constructor(terrainMesh, flightSurface, options = {}) {
     this.terrainMesh = terrainMesh;
@@ -41,6 +80,16 @@ export class JejuTileStreamer {
     this.origin = options.origin || JEJU_ORIGIN;
     this.cacheManager = options.cacheManager || new TileCacheManager(options.cacheOptions);
 
+    const urlZoom = parseInt(getQueryParam('jejuZoom'), 10);
+    this.zoom = Number.isFinite(urlZoom) ? urlZoom : (options.zoom ?? 10);
+
+    const urlAnisotropy = parseInt(getQueryParam('jejuAnisotropy'), 10);
+    this.anisotropy = Number.isFinite(urlAnisotropy) ? urlAnisotropy : (options.anisotropy ?? 1);
+
+    this.setZoomLevel(this.zoom);
+
+    this.appliedZoom = null;
+    this.loadGeneration = 0;
     this.macroTexture = null;
     this.canvas = null;
     this.tilesLoaded = 0;
@@ -48,10 +97,13 @@ export class JejuTileStreamer {
     this.activeLOD = 'macro';
     this.disposed = false;
 
-    // Geographic bounding box of the 8-tile Zoom 10 grid in local Three.js meters
-    // Tile 870..873, 410..411
-    const nw = tileBoundsWgs84(870, 410, 10).nw;
-    const se = tileBoundsWgs84(873, 411, 10).se;
+    // Geographic bounding box in local Three.js meters
+    const nw = tileBoundsWgs84(this.minTileX, this.minTileY, this.zoom).nw;
+    const se = tileBoundsWgs84(
+      this.minTileX + this.totalTilesX - 1,
+      this.minTileY + this.totalTilesY - 1,
+      this.zoom
+    ).se;
 
     const [nwX, nwZ] = wgs84ToLocal(nw.latitude, nw.longitude, this.origin);
     const [seX, seZ] = wgs84ToLocal(se.latitude, se.longitude, this.origin);
@@ -62,6 +114,26 @@ export class JejuTileStreamer {
       minZ: Math.min(nwZ, seZ),
       maxZ: Math.max(nwZ, seZ),
     };
+  }
+
+  setZoomLevel(zoom) {
+    if (zoom === 11) {
+      this.zoom = 11;
+      this.targetZoom = 11;
+      this.minTileX = 1740;
+      this.totalTilesX = 8;
+      this.minTileY = 820;
+      this.totalTilesY = 4;
+      this.macroTiles = createJejuMacroTiles(11);
+    } else {
+      this.zoom = 10;
+      this.targetZoom = 10;
+      this.minTileX = 870;
+      this.totalTilesX = 4;
+      this.minTileY = 410;
+      this.totalTilesY = 2;
+      this.macroTiles = JEJU_MACRO_TILES;
+    }
   }
 
   /**
@@ -98,11 +170,11 @@ export class JejuTileStreamer {
     const uv = geometry.attributes.uv;
     if (!pos || !uv) return;
 
-    const minTileX = 870;
-    const totalTilesX = 4; // 870, 871, 872, 873
-    const minTileY = 410;
-    const totalTilesY = 2; // 410, 411
-    const zoom = 10;
+    const minTileX = this.minTileX;
+    const totalTilesX = this.totalTilesX;
+    const minTileY = this.minTileY;
+    const totalTilesY = this.totalTilesY;
+    const zoom = this.zoom;
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
@@ -127,11 +199,13 @@ export class JejuTileStreamer {
   }
 
   /**
-   * Fetch and stitch the Zoom 10 macro tiles covering Jeju Island.
+   * Fetch and stitch the macro tiles covering Jeju Island.
    * Resolves gracefully on network failure by preserving existing terrain shading.
    * @returns {Promise<boolean>} Whether satellite streaming successfully applied
    */
   async loadIslandMacroTiles() {
+    const generation = ++this.loadGeneration;
+
     if (this.disposed || typeof document === 'undefined') {
       // In headless test environments or disposed instance
       return false;
@@ -140,62 +214,80 @@ export class JejuTileStreamer {
     this.isStreaming = true;
 
     try {
-      // Fetch 8 tiles concurrently through the rate-limited CacheManager
-      const tilePromises = JEJU_MACRO_TILES.map(async (t) => {
+      const tiles = this.macroTiles;
+      const targetZoom = this.zoom;
+      // Fetch macro tiles concurrently through the rate-limited CacheManager
+      const tilePromises = tiles.map(async (t) => {
         const img = await this.cacheManager.getTileImage(t.z, t.x, t.y);
         return { ...t, img };
       });
 
       const results = await Promise.all(tilePromises);
-      if (this.disposed) return false;
+      if (this.disposed || generation !== this.loadGeneration) return false;
 
       const successful = results.filter((r) => r.img && r.img.width > 0);
 
       // Thread 2: Only swap material map when ALL macro tiles successfully load.
       // If any tile fails or network times out, retain the procedural ground shading
       // so un-covered regions are never rendered black.
-      if (successful.length !== JEJU_MACRO_TILES.length) {
+      if (successful.length !== tiles.length) {
         return false;
       }
 
       this.tilesLoaded = successful.length;
 
-      // Stitch onto a 1024x512 canvas (4 columns x 2 rows of 256px tiles)
+      // Stitch onto canvas (totalTilesX * 256 by totalTilesY * 256)
+      const canvasWidth = this.totalTilesX * 256;
+      const canvasHeight = this.totalTilesY * 256;
+
+      const dimensionsChanged = Boolean(
+        this.canvas &&
+        (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight)
+      );
+
       if (!this.canvas) {
         this.canvas = document.createElement('canvas');
-        this.canvas.width = 1024;
-        this.canvas.height = 512;
       }
-      const ctx = this.canvas.getContext('2d');
-      if (!ctx || this.disposed) return false;
+      this.canvas.width = canvasWidth;
+      this.canvas.height = canvasHeight;
 
-      ctx.clearRect(0, 0, 1024, 512);
+      const ctx = this.canvas.getContext('2d');
+      if (!ctx || this.disposed || generation !== this.loadGeneration) return false;
+
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
       for (const t of successful) {
         ctx.drawImage(t.img, t.col * 256, t.row * 256, 256, 256);
       }
 
-      if (this.disposed) return false;
+      if (this.disposed || generation !== this.loadGeneration) return false;
 
       // Update mesh UV mapping
       this.updateMeshUVs();
 
-      if (this.disposed) return false;
+      if (this.disposed || generation !== this.loadGeneration) return false;
 
-      // Create or update Three.js texture
+      // Recreate Three.js texture when dimensions change (WebGL2 immutable storage requirement)
+      if (dimensionsChanged && this.macroTexture) {
+        this.macroTexture.dispose();
+        this.macroTexture = null;
+      }
+
       if (!this.macroTexture) {
         this.macroTexture = new THREE.CanvasTexture(this.canvas);
         this.macroTexture.colorSpace = THREE.SRGBColorSpace;
         this.macroTexture.wrapS = THREE.ClampToEdgeWrapping;
         this.macroTexture.wrapT = THREE.ClampToEdgeWrapping;
       }
+      this.macroTexture.anisotropy = this.anisotropy;
       this.macroTexture.needsUpdate = true;
 
-      // Thread 3: Check disposed state before applying texture to terrain material
-      if (this.terrainMesh?.material && !this.disposed) {
+      // Thread 3: Check disposed state and generation match before applying texture to terrain material
+      if (this.terrainMesh?.material && !this.disposed && generation === this.loadGeneration) {
         this.terrainMesh.material.map = this.macroTexture;
         this.terrainMesh.material.vertexColors = false;
         this.terrainMesh.material.needsUpdate = true;
+        this.appliedZoom = targetZoom;
       }
 
       return true;
@@ -203,6 +295,30 @@ export class JejuTileStreamer {
       // Graceful offline fallback: preserve procedural terrain
       return false;
     }
+  }
+
+  /**
+   * Dynamically update zoom or anisotropy configuration and reload tiles if necessary.
+   * @param {Object} config
+   * @param {number} [config.zoom]
+   * @param {number} [config.anisotropy]
+   * @returns {Promise<boolean>}
+   */
+  async setConfig({ zoom, anisotropy } = {}) {
+    if (anisotropy !== undefined) {
+      this.anisotropy = anisotropy;
+      if (this.macroTexture) {
+        this.macroTexture.anisotropy = this.anisotropy;
+        this.macroTexture.needsUpdate = true;
+      }
+    }
+
+    if (zoom !== undefined && (zoom !== this.appliedZoom || zoom !== this.targetZoom || !this.macroTexture)) {
+      this.setZoomLevel(zoom);
+      return this.loadIslandMacroTiles();
+    }
+
+    return true;
   }
 
   /**
@@ -224,7 +340,10 @@ export class JejuTileStreamer {
    */
   dispose() {
     this.disposed = true;
+    this.loadGeneration++;
     this.isStreaming = false;
+    this.appliedZoom = null;
+    this.targetZoom = null;
     if (this.macroTexture) {
       this.macroTexture.dispose();
       this.macroTexture = null;

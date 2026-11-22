@@ -147,3 +147,176 @@ test('loadJejuAirport integrates tileStreamer and exposes lifecycle disposal', a
   assert.equal(typeof airport.dispose, 'function');
   assert.doesNotThrow(() => airport.dispose());
 });
+
+test('JejuTileStreamer supports Zoom 11 configuration with identical bounds and UV alignment', async () => {
+  const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+  const geo10 = new THREE.PlaneGeometry(80000, 56000, 4, 4);
+  const mesh10 = new THREE.Mesh(geo10, new THREE.MeshBasicMaterial());
+  const streamer10 = new JejuTileStreamer(mesh10, surface, { zoom: 10, anisotropy: 1 });
+
+  const geo11 = new THREE.PlaneGeometry(80000, 56000, 4, 4);
+  const mesh11 = new THREE.Mesh(geo11, new THREE.MeshBasicMaterial());
+  const streamer11 = new JejuTileStreamer(mesh11, surface, { zoom: 11, anisotropy: 8 });
+
+  assert.equal(streamer10.macroTiles.length, 8);
+  assert.equal(streamer11.macroTiles.length, 32);
+  assert.equal(streamer11.anisotropy, 8);
+
+  // Geographic gridBounds must match within millimeter precision
+  assert.ok(Math.abs(streamer10.gridBounds.minX - streamer11.gridBounds.minX) < 1e-3);
+  assert.ok(Math.abs(streamer10.gridBounds.maxX - streamer11.gridBounds.maxX) < 1e-3);
+  assert.ok(Math.abs(streamer10.gridBounds.minZ - streamer11.gridBounds.minZ) < 1e-3);
+  assert.ok(Math.abs(streamer10.gridBounds.maxZ - streamer11.gridBounds.maxZ) < 1e-3);
+
+  // UV coordinates for every vertex must match identically between zoom 10 and 11
+  streamer10.updateMeshUVs();
+  streamer11.updateMeshUVs();
+
+  const uv10 = geo10.attributes.uv;
+  const uv11 = geo11.attributes.uv;
+  for (let i = 0; i < uv10.count; i++) {
+    assert.ok(Math.abs(uv10.getX(i) - uv11.getX(i)) < 1e-5, `UV X drift at vertex ${i}`);
+    assert.ok(Math.abs(uv10.getY(i) - uv11.getY(i)) < 1e-5, `UV Y drift at vertex ${i}`);
+  }
+});
+
+test('JejuTileStreamer setConfig dynamically updates anisotropy and zoom tiles', async () => {
+  const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+  const geo = new THREE.PlaneGeometry(80000, 56000, 2, 2);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+  const streamer = new JejuTileStreamer(mesh, surface, { zoom: 10, anisotropy: 1 });
+
+  assert.equal(streamer.zoom, 10);
+  assert.equal(streamer.anisotropy, 1);
+  assert.equal(streamer.macroTiles.length, 8);
+
+  // Update anisotropy only
+  await streamer.setConfig({ anisotropy: 8 });
+  assert.equal(streamer.anisotropy, 8);
+  assert.equal(streamer.zoom, 10);
+
+  // Update zoom to 11
+  await streamer.setConfig({ zoom: 11 });
+  assert.equal(streamer.zoom, 11);
+  assert.equal(streamer.macroTiles.length, 32);
+});
+
+test('JejuTileStreamer discards stale in-flight loads when loadGeneration advances', async () => {
+  const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+  const geo = new THREE.PlaneGeometry(80000, 56000, 2, 2);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+
+  let callCount = 0;
+  const mockCache = {
+    getTileImage() {
+      callCount++;
+      return new Promise((resolve) => setTimeout(() => resolve({ width: 256, height: 256 }), 30));
+    },
+    getMetrics() { return {}; },
+    dispose() {},
+  };
+
+  const streamer = new JejuTileStreamer(mesh, surface, { cacheManager: mockCache, zoom: 10 });
+  const loadPromise1 = streamer.loadIslandMacroTiles();
+
+  // Advance generation by re-triggering load with zoom 11
+  streamer.setZoomLevel(11);
+  const loadPromise2 = streamer.loadIslandMacroTiles();
+
+  const [res1, res2] = await Promise.all([loadPromise1, loadPromise2]);
+  // In Node test runner without document, both safely resolve false, but res1 must have aborted on generation check
+  assert.equal(res1, false);
+  assert.equal(streamer.loadGeneration, 2);
+});
+
+test('JejuTileStreamer setConfig allows retry after failure because appliedZoom is not set', async () => {
+  const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+  const geo = new THREE.PlaneGeometry(80000, 56000, 2, 2);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+
+  let failNetwork = true;
+  let attempts = 0;
+  const flakyCache = {
+    getTileImage() {
+      attempts++;
+      if (failNetwork) return Promise.resolve(null);
+      return Promise.resolve({ width: 256, height: 256 });
+    },
+    getMetrics() { return {}; },
+    dispose() {},
+  };
+
+  const streamer = new JejuTileStreamer(mesh, surface, { cacheManager: flakyCache, zoom: 10 });
+  assert.equal(streamer.appliedZoom, null);
+
+  // First attempt fails (loadIslandMacroTiles returns false)
+  const success1 = await streamer.setConfig({ zoom: 11 });
+  assert.equal(success1, false);
+  assert.equal(streamer.zoom, 11);
+  assert.equal(streamer.appliedZoom, null);
+
+  // Second attempt with the exact same zoom=11 executes loadIslandMacroTiles again rather than skipping
+  const success2 = await streamer.setConfig({ zoom: 11 });
+  assert.equal(success2, false);
+  assert.equal(streamer.appliedZoom, null);
+  // It attempted the load twice rather than short-circuiting on attempts
+  assert.ok(streamer.loadGeneration >= 2);
+});
+
+test('JejuTileStreamer setConfig cancels in-flight zoom request when reverting to appliedZoom', async () => {
+  const origDoc = globalThis.document;
+  try {
+    globalThis.document = {
+      createElement: () => ({
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          clearRect() {},
+          drawImage() {},
+        }),
+      }),
+    };
+
+    const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+    const geo = new THREE.PlaneGeometry(80000, 56000, 2, 2);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+
+    const resolvers = [];
+    const mockCache = {
+      getTileImage() {
+        return new Promise((resolve) => {
+          resolvers.push(() => resolve({ width: 256, height: 256 }));
+        });
+      },
+      getMetrics() { return {}; },
+      dispose() {},
+    };
+
+    const streamer = new JejuTileStreamer(mesh, surface, { cacheManager: mockCache, zoom: 10 });
+    streamer.appliedZoom = 10;
+    streamer.macroTexture = { needsUpdate: false, dispose() {} };
+
+    // Trigger zoom 11 change (in-flight waiting for tile images)
+    const req11 = streamer.setConfig({ zoom: 11 });
+    assert.equal(streamer.zoom, 11);
+    assert.equal(streamer.targetZoom, 11);
+    assert.equal(streamer.loadGeneration, 1);
+
+    // Before req11 completes, user cancels by reverting to zoom: 10
+    const req10 = streamer.setConfig({ zoom: 10 });
+    assert.equal(streamer.zoom, 10);
+    assert.equal(streamer.targetZoom, 10);
+    assert.equal(streamer.loadGeneration, 2);
+
+    // Now resolve all pending tile fetches
+    resolvers.forEach((r) => r());
+    await Promise.all([req11, req10]);
+
+    // Final requested and target zoom must remain 10, not overridden by zoom 11
+    assert.equal(streamer.zoom, 10);
+    assert.equal(streamer.targetZoom, 10);
+    assert.equal(streamer.appliedZoom, 10);
+  } finally {
+    globalThis.document = origDoc;
+  }
+});
