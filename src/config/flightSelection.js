@@ -1,4 +1,5 @@
 import { AIRCRAFT_REGISTRY, DEFAULT_AIRCRAFT_ID } from './aircraftConfigs.js';
+import { EXTERNAL_DESTINATION_CODES } from './externalDestinations.js';
 import { DEFAULT_SCENARIO, defaultScenarioForRegion, isScenarioAvailable, requiredAircraft } from './scenarioRegistry.js';
 
 export const AIRPORT_STORAGE_KEY = 'flight3d.airport';
@@ -9,7 +10,7 @@ export const PRESET_STORAGE_KEY = 'flight3d.preset';
 export const DESTINATION_STORAGE_KEY = 'flight3d.destination';
 
 export const VALID_AIRPORTS = Object.freeze(['coastal', 'lukla', 'incheon', 'neon', 'valley', 'jeju']);
-export const DESTINATION_CHOICES = Object.freeze(['none', ...VALID_AIRPORTS]);
+export const DESTINATION_CHOICES = Object.freeze(['none', ...VALID_AIRPORTS, ...EXTERNAL_DESTINATION_CODES]);
 // Retired regions and the flight that replaced them: the Han River region became the
 // Neon Metropolis bridge flight (#551), so saved choices and old links keep working.
 const LEGACY_REGIONS = Object.freeze({ hangang: { airport: 'neon', scenario: 'bridge' } });

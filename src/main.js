@@ -1,6 +1,7 @@
 import { regionalCruise } from './config/regionalCruises.js';
 import { generateValley } from './arena/generatedValley.js';
 import { GeneratedValleyTerrain } from './environment/GeneratedValleyTerrain.js';
+import { ExternalAirportStreamer } from './world/ExternalAirportStreamer.js';
 import { UnifiedWorld } from './world/UnifiedWorld.js';
 import { LandmarkPins } from './ui/LandmarkPins.js';
 import { updateGeographicBuildings } from './environment/GeographicBuildings.js';
@@ -417,6 +418,27 @@ class FlightSimulator {
     });
     this._combatTerrainHeight = (x, z) => this.currentTerrain?.getHeight(x, z) ?? 0;
     this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
+
+    // Step 2 streams one index-backed destination into the persistent world.
+    // Terrain outside its pavement comes from the anchor's open-world sample;
+    // the runway surface itself owns its contact height.
+    this.airportStreamer = new ExternalAirportStreamer({
+      world: this.world,
+      scene: this.scene,
+      onStatus: status => {
+        this.world.setDynamicStatus(status.code, status);
+        if (status.state === 'failed' && this.gameFlow?.state === 'flight') {
+          this.showToast(() => t('airport.stream.failed', { code: status.code }));
+        }
+      },
+      outsideHeight: (x, z) => {
+        // ExternalSurface passes Incheon-frame coordinates; openWorld samples
+        // are keyed in the current anchor's local frame.
+        const [ax, az] = this.world.incheonFrameToAnchor(x, z);
+        const sampled = this.world.anchorTerrain?.openWorld?.sample?.(ax, az)?.height;
+        return Number.isFinite(sampled) ? sampled : null;
+      },
+    });
     this.pilotPhysiologyFx = new PilotPhysiologyFx(this.container);
     this.isCrashed = false;
     this.crashResult = null;
@@ -739,6 +761,7 @@ class FlightSimulator {
     if (this.multiplayer?.locked) return;
     if (this.airportLoading || this.startingFlight) return;
     this.replayDirector.stop();
+
     const pending = {
       airport: this.lobby.airport,
       aircraft: this.lobby.aircraft ?? this.currentAircraftId,
@@ -1444,6 +1467,15 @@ class FlightSimulator {
     } else {
       advancePhysicsFrame(this, frameDelta);
     }
+
+    this.airportStreamer?.update({
+      x: this.position.x,
+      z: this.position.z,
+      speedMps: this.linearVelocity?.length?.() ?? 0,
+      onGround: Boolean(this.telemetry?.onGround),
+      onRunway: Boolean(this.currentAirport?.isOnRunway?.(this.position.x, this.position.z)),
+      destinationCode: this.destinationAirport,
+    });
 
     // Keep the lobby backdrop alive: re-arm the demo after it ends.
     this.gameFlow.update(frameDelta);

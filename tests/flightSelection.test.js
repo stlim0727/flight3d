@@ -277,4 +277,5 @@ test('destination selection persists and rejects unknown airports', () => {
   saveSavedDestination('atlantis', storage);
   assert.equal(loadSavedDestination(storage), 'none');
   assert.equal(resolveDestination('neon'), 'neon');
+  assert.equal(resolveDestination('RKSS'), 'RKSS');
 });
