@@ -143,6 +143,35 @@ export class CameraSystem {
   applyHatLook(dirX, dirY, dt) { applyHatLook(this, dirX, dirY, dt); }
   updatePovReturn(dt) { updatePovReturn(this, dt); }
   resetLook(options = {}) { resetLook(this, options); }
+  setHeadTrackingEnabled(enabled) {
+    this.headTrackingEnabled = Boolean(enabled);
+    if (!this.headTrackingEnabled) {
+      this.targetHeadLookYaw = 0;
+      this.targetHeadLookPitch = 0;
+      this.headLookActive = false;
+    }
+  }
+  setHeadLook(yaw, pitch) {
+    if (!Number.isFinite(yaw) || !Number.isFinite(pitch)) return;
+    const maxYaw = this.headLookMaxYaw ?? Math.PI * 0.5;
+    const maxPitch = this.headLookMaxPitch ?? Math.PI * 0.45;
+    this.targetHeadLookYaw = Math.max(-maxYaw, Math.min(maxYaw, yaw));
+    this.targetHeadLookPitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+  }
+  resetHeadLook() {
+    this.targetHeadLookYaw = 0;
+    this.targetHeadLookPitch = 0;
+    this.headLookYaw = 0;
+    this.headLookPitch = 0;
+  }
+  updateHeadLook(dt) {
+    const factor = 1 - Math.exp(-8 * Math.max(0, dt));
+    this.headLookYaw += (this.targetHeadLookYaw - this.headLookYaw) * factor;
+    this.headLookPitch += (this.targetHeadLookPitch - this.headLookPitch) * factor;
+    // Head look belongs to the head views only, and yields to an explicit drag.
+    this.headLookActive = this.headTrackingEnabled && !this.userLookOverridden
+      && [CameraSystem.MODES.COCKPIT, CameraSystem.MODES.WING, CameraSystem.MODES.GEAR].includes(this.mode);
+  }
   togglePointerLock() {
     if (typeof document === 'undefined' || !this.domElement) return;
     if (document.pointerLockElement === this.domElement) {
@@ -290,6 +319,7 @@ export class CameraSystem {
     this.updateEdgePan(dt);
     this.updatePovReturn(dt);
     this.updatePovButtonState();
+    this.updateHeadLook(dt);
 
     if (this.customViewUpdater && !this.userModeSelected && !this.userLookOverridden) {
       if (this.customViewUpdater({

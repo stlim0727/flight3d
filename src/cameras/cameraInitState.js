@@ -27,6 +27,17 @@ export function initCameraState(cs) {
   cs.lookYaw = 0;
   cs.lookPitch = -0.25;
 
+  // Camera-driven head look (webcam face tracking). Kept separate from
+  // lookYaw/lookPitch so manual drag and auto-reset stay independent.
+  cs.headTrackingEnabled = false;
+  cs.headLookActive = false;
+  cs.headLookYaw = 0;
+  cs.headLookPitch = 0;
+  cs.targetHeadLookYaw = 0;
+  cs.targetHeadLookPitch = 0;
+  cs.headLookMaxYaw = Math.PI * 0.5;
+  cs.headLookMaxPitch = Math.PI * 0.45;
+
   cs.gearCamOffset = new THREE.Vector3(2.2, -2.4, 6.2);
   cs.gearLookTarget = new THREE.Vector3(-0.5, -1.9, -2.5);
   cs.gearLookYaw = 0;

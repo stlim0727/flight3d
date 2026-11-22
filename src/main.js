@@ -47,6 +47,8 @@ import { requestProceduralAsset } from './core/proceduralAssetPool.js';
 import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
+import { MobileHeadTracking } from './cameras/MobileHeadTracking.js';
+import { HeadTrackingUi } from './cameras/HeadTrackingUi.js';
 import { HudView } from './ui/HudView.js';
 import { AirToAirMissileSystem } from './weapons/AirToAirMissileSystem.js';
 import { CannonCombatView } from './weapons/CannonCombatView.js';
@@ -302,6 +304,10 @@ class FlightSimulator {
       isCrashedGetter: () => this.isCrashed,
     });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
+    this.mobileHeadTracking = new MobileHeadTracking(this.cameraSystem, {
+      onStatusChange: (status) => this.headTrackingUi?.update(status),
+    });
+    this.headTrackingUi = new HeadTrackingUi(this.mobileHeadTracking);
     this.cameraSystem.setTerrain(null);
     // The interior is fetched by the first cockpit view rather than by boot, and the cut is
     // held until it arrives so an entry never shows the bare airframe interior.
@@ -1650,6 +1656,7 @@ class FlightSimulator {
       targetFov = Math.min(100, Math.max(54, vFovRad * (180 / Math.PI)));
     }
     this.cameraSystem.applyBaseFov(targetFov);
+    this.mobileHeadTracking?.update(performance.now());
     this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry, (x, z) => this.currentTerrain.getHeight(x, z));
     // Audio samples the camera after its motion for this frame, so the
     // listener displacement and frameDelta share one time base.
