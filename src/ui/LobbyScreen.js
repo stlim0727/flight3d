@@ -12,8 +12,8 @@ import { loadBookmarks, toggleBookmark, bookmarkKey, isBookmarked } from '../con
 import { registerExternalDestinations } from '../config/externalDestinations.js';
 import { defaultMapBookmarks, indexedAirportPlace, indexedAirportPlaces, specialRegionPlaces } from '../config/mapFlightPlaces.js';
 import { loadAirportManifest, loadAirportSearchIndex, findAirportByCode } from '../geospatial/airportIndex.js';
-import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, mapViewBoxFor, projectToMap } from './mapBrowser.js';
-
+import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, mapViewBoxFor, projectToMap, fitMapViewBoxToAspect } from './mapBrowser.js';
+import { tilesForViewBox } from './lobbyMapTiles.js';
 const MAP_SEARCH_LIMIT = 20;
 const BUILTIN_REGION_AIRPORT_CODES = Object.freeze({ incheon: 'RKSI', jeju: 'RKPC' });
 const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c172', F16: 'lobby-aircraft-f16' };
@@ -75,6 +75,12 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const mapSvg = document.getElementById('lobby-map-svg');
   const mapMarkers = document.getElementById('lobby-map-markers');
   const mapOverview = document.getElementById('lobby-map-overview');
+  const mapTiles = document.getElementById('lobby-map-tiles');
+  const mapZoomIn = document.getElementById('lobby-map-zoom-in');
+  const mapZoomOut = document.getElementById('lobby-map-zoom-out');
+  let mapFocus = null;
+  let mapZoom = 1;
+  let mapTileSignature = '';
   let mapSelectionBusy = false;
   let customPoint = null;
   const mapStatus = document.getElementById('lobby-map-search-status');
@@ -244,6 +250,47 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       container.append(button);
     }
   }
+  const svgNamespace = 'http://www.w3.org/2000/svg';
+  const mapViewBox = () => mapSvg?.getAttribute?.('viewBox') ?? `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`;
+  function renderMapTiles() {
+    if (!mapTiles || typeof mapTiles.replaceChildren !== 'function') return;
+    const tiles = tilesForViewBox(mapViewBox());
+    const signature = tiles
+      .map(tile => `${tile.url}:${tile.x.toFixed(1)},${tile.y.toFixed(1)},${tile.width.toFixed(1)},${tile.height.toFixed(1)}`)
+      .join('|');
+    if (signature === mapTileSignature) return;
+    mapTileSignature = signature;
+    const images = tiles.map(tile => {
+      const image = document.createElementNS(svgNamespace, 'image');
+      image.setAttribute('class', 'lobby-map-tile');
+      image.setAttribute('href', tile.url);
+      image.setAttribute('x', tile.x.toFixed(2));
+      image.setAttribute('y', tile.y.toFixed(2));
+      image.setAttribute('width', tile.width.toFixed(2));
+      image.setAttribute('height', tile.height.toFixed(2));
+      image.setAttribute('preserveAspectRatio', 'none');
+      image.setAttribute('pointer-events', 'none');
+      return image;
+    });
+    mapTiles.replaceChildren(...images);
+  }
+  function setMapView(focus, zoom) {
+    if (!mapSvg?.setAttribute) return;
+    mapFocus = focus && Number.isFinite(focus.latitude) && Number.isFinite(focus.longitude) ? focus : null;
+    mapZoom = Math.max(1, Math.min(4, Number.isFinite(zoom) ? zoom : 1));
+    const base = mapFocus
+      ? mapViewBoxFor(mapFocus.latitude, mapFocus.longitude, mapZoom)
+      : `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`;
+    const bounds = typeof mapSvg.getBoundingClientRect === 'function' ? mapSvg.getBoundingClientRect() : null;
+    const aspect = bounds?.width > 0 && bounds?.height > 0 ? bounds.width / bounds.height : MAP_WIDTH / MAP_HEIGHT;
+    mapSvg.setAttribute('viewBox', fitMapViewBoxToAspect(base, aspect));
+    renderMapTiles();
+  }
+  function currentMapFocus() {
+    if (mapFocus) return mapFocus;
+    const [x, y, width, height] = mapViewBox().split(/\s+/).map(Number);
+    return mapCoordinates(x + width / 2, y + height / 2);
+  }
   function renderMapBrowser() {
     if (!mapSearchInput && !mapDefaultBookmarks && !mapBookmarksEl && !mapMarkers) return;
     if (mapSearchInput) mapSearchInput.placeholder = t('lobby.map.search.placeholder');
@@ -284,21 +331,30 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       for (const place of places) {
         const projected = projectToMap(place.latitude, place.longitude);
         if (!projected) continue;
-        const marker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        marker.setAttribute('cx', projected.x.toFixed(1));
-        marker.setAttribute('cy', projected.y.toFixed(1));
-        marker.setAttribute('r', '3');
-        marker.setAttribute('class', `lobby-map-marker${(place.kind === 'airport' ? `airport:${place.id}` : `point:${place.id}`) === activeKey ? ' active' : ''}`);
+        const marker = document.createElementNS(svgNamespace, 'g');
+        const active = (place.kind === 'airport' ? `airport:${place.id}` : `point:${place.id}`) === activeKey;
+        marker.setAttribute('class', `lobby-map-marker${active ? ' active' : ''}`);
+        marker.setAttribute('transform', `translate(${projected.x.toFixed(1)} ${projected.y.toFixed(1)})`);
         marker.dataset.placeKind = place.kind;
         marker.dataset.placeId = place.id;
-        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        const pin = document.createElementNS(svgNamespace, 'path');
+        pin.setAttribute('class', 'lobby-map-marker-pin');
+        pin.setAttribute('d', 'M0 0C-1.6-2.6-7-7.5-7-12A7 7 0 1 1 7-12C7-7.5 1.6-2.6 0 0Z');
+        const dot = document.createElementNS(svgNamespace, 'circle');
+        dot.setAttribute('class', 'lobby-map-marker-dot');
+        dot.setAttribute('cx', '0');
+        dot.setAttribute('cy', '-12');
+        dot.setAttribute('r', '2.6');
+        const title = document.createElementNS(svgNamespace, 'title');
         title.textContent = place.label;
+        marker.append(pin);
+        marker.append(dot);
         marker.append(title);
         mapMarkers.append(marker);
       }
     }
     if (mapSvg && active && activeKey !== mapCenteredKey) {
-      mapSvg.setAttribute('viewBox', mapViewBoxFor(active.latitude, active.longitude));
+      setMapView(active, 2);
     }
     mapCenteredKey = activeKey;
     renderMapSearchStatus(query, results.length);
@@ -306,6 +362,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       bindText(mapBookmarkToggle, () => t(active && isBookmarked(bookmarkFromPlace(active)) ? 'lobby.bookmark.remove' : 'lobby.bookmark.add'));
       mapBookmarkToggle.disabled = !active;
     }
+    renderMapTiles();
   }
   async function resolveBookmarkPlace(bookmark) {
     const cached = findMapPlace(bookmark.kind, bookmark.id);
@@ -355,7 +412,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       if (mapAirportSelect) mapAirportSelect.value = '';
       if (mapRunwaySelect) mapRunwaySelect.value = '';
       if (mapPointSelect) mapPointSelect.value = '';
-      mapSvg?.setAttribute('viewBox', `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`);
+      setMapView(null, 1);
       mapCenteredKey = '';
       onAirport?.(place.id);
       refresh();
@@ -442,7 +499,12 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const longitude = coordinates.longitude.toFixed(5);
     selectMapPlace({ ...coordinates, kind: 'point', id: `map:${latitude},${longitude}`, label: `${latitude}, ${longitude}` });
   });
-  mapOverview?.addEventListener('click', () => mapSvg?.setAttribute('viewBox', `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`));
+  mapOverview?.addEventListener('click', () => setMapView(null, 1));
+  mapZoomIn?.addEventListener('click', () => setMapView(currentMapFocus(), Math.min(4, mapZoom * 2)));
+  mapZoomOut?.addEventListener('click', () => setMapView(currentMapFocus(), Math.max(1, mapZoom / 2)));
+  if (mapSvg && typeof ResizeObserver !== 'undefined' && typeof mapSvg.getBoundingClientRect === 'function') {
+    new ResizeObserver(() => setMapView(mapFocus, mapZoom)).observe(mapSvg);
+  }
   mapBookmarkToggle?.addEventListener('click', () => {
     const active = currentMapPlace();
     if (!active) return;

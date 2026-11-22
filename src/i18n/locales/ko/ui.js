@@ -389,6 +389,8 @@ export default {
   "lobby.map.suggestedPlaces": "기본 북마크",
   "lobby.map.pickPoint": "공항을 고르거나 지도에서 지점을 선택하세요.",
   "lobby.map.resetView": "전체 지도",
+  "lobby.map.zoomIn": "확대",
+  "lobby.map.zoomOut": "축소",
   "lobby.map.overview": "공항 및 순항 지점 지도",
   "lobby.map.automatic": "자동",
   "lobby.map.flight": "지도 비행 계획",

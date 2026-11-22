@@ -334,12 +334,19 @@
                   <input id="lobby-map-search" type="search" autocomplete="off" data-i18n-aria-label="lobby.map.search.placeholder">
                   <button type="button" id="lobby-map-bookmark-toggle" class="btn btn-bookmark" data-i18n="lobby.bookmark.add">Bookmark</button>
                 </div>
-                <svg id="lobby-map-svg" viewBox="0 0 320 180" role="img" data-i18n-aria-label="lobby.map.overview">
-                  <rect x="0" y="0" width="320" height="180" class="lobby-map-backdrop"></rect>
-                  <image href="%BASE_URL%scenery/korea-lobby-land.svg" width="320" height="180" pointer-events="none"></image>
-                  <path class="lobby-map-grid" d="M40 0v180 M80 0v180 M120 0v180 M160 0v180 M200 0v180 M240 0v180 M280 0v180 M0 30h320 M0 60h320 M0 90h320 M0 120h320 M0 150h320"></path>
-                  <g id="lobby-map-markers"></g>
-                </svg>
+                <div class="lobby-map-frame">
+                  <svg id="lobby-map-svg" viewBox="0 0 320 240" role="img" data-i18n-aria-label="lobby.map.overview">
+                    <rect x="0" y="0" width="320" height="240" class="lobby-map-backdrop"></rect>
+                    <image href="%BASE_URL%scenery/korea-lobby-land.svg" width="320" height="240" preserveAspectRatio="none" pointer-events="none"></image>
+                    <g id="lobby-map-tiles" pointer-events="none"></g>
+                    <g id="lobby-map-markers"></g>
+                  </svg>
+                  <div class="lobby-map-attribution" title="Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, OpenStreetMap contributors, and the GIS User Community">Tiles © <a href="https://www.esri.com/en-us/arcgis/products/arcgis-online/overview" target="_blank" rel="noopener">Esri</a> · © OpenStreetMap</div>
+                  <div class="lobby-map-zoom" role="group" aria-label="Map zoom">
+                    <button type="button" id="lobby-map-zoom-in" aria-label="Zoom in" data-i18n-aria-label="lobby.map.zoomIn" data-i18n-title="lobby.map.zoomIn" title="Zoom in">+</button>
+                    <button type="button" id="lobby-map-zoom-out" aria-label="Zoom out" data-i18n-aria-label="lobby.map.zoomOut" data-i18n-title="lobby.map.zoomOut" title="Zoom out">−</button>
+                  </div>
+                </div>
                 <div class="lobby-map-tools">
                   <span class="lobby-label" data-i18n="lobby.map.pickPoint">지도에서 순항 시작 지점을 선택하세요.</span>
                   <button type="button" id="lobby-map-overview" class="btn" data-i18n="lobby.map.resetView">전체 지도</button>
