@@ -501,10 +501,11 @@ function heightOnTriangle(positions, x, z, a, b, c) {
 }
 
 export class OpenWorldTerrain {
-  constructor({ origin, protectedAreas = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget }) {
+  constructor({ origin, protectedAreas = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget, world }) {
     this.origin = origin;
     this.protectedAreas = protectedAreas;
     this.localSurface = localSurface;
+    this.world = world;
     this.elevationCache = elevationCache ?? new TileCacheManager({ urlTemplate: elevationUrl });
     this.imageryCache = imageryCache ?? new TileCacheManager({ enableBrowserCache: false, maxMemoryTiles: 128, maxConcurrent: 6 });
     this.waterSource = waterSource;
@@ -584,6 +585,16 @@ export class OpenWorldTerrain {
     if (this.protects(x, z)) return true;
     const { x: tx, y: ty } = this.coordinate(x, z);
     return this.tiles.has(keyOf(wrapX(tx), ty));
+  }
+
+  invalidateArea([minX, minZ, maxX, maxZ]) {
+    for (const [key, entry] of [...this.tiles.entries()]) {
+      const [x, y] = key.split('/').map(Number);
+      const bounds = projectedBounds(x, y, this.project);
+      if (bounds[0] < maxX && bounds[2] > minX && bounds[1] < maxZ && bounds[3] > minZ) {
+        this.release(key, entry);
+      }
+    }
   }
 
   readyForTile(tile, level) {
@@ -1023,12 +1034,33 @@ export class OpenWorldTerrain {
       const local = this.localSurface;
       const half = local?.size / 2;
       const blendDistance = 1200;
-      const blendHeight = local ? (px, pz, height) => {
-        const distance = Math.max(Math.abs(px), Math.abs(pz)) - half;
-        if (distance >= blendDistance) return height;
-        return THREE.MathUtils.lerp(local.getNaturalHeight(px, pz), height,
-          THREE.MathUtils.smoothstep(distance, 0, blendDistance));
-      } : undefined;
+      const world = this.world;
+      const blendHeight = (px, pz, height) => {
+        if (local) {
+          const distance = Math.max(Math.abs(px), Math.abs(pz)) - half;
+          if (distance < blendDistance) {
+            return THREE.MathUtils.lerp(local.getNaturalHeight(px, pz), height,
+              THREE.MathUtils.smoothstep(distance, 0, blendDistance));
+          }
+        }
+        if (world?.regions) {
+          for (const [id, reg] of world.regions) {
+            if (!reg.terrain?.runways?.length) continue;
+            const offset = world.offsets.get(id);
+            if (!offset) continue;
+            const lx = px - offset[0];
+            const lz = pz - offset[1];
+            const e = reg.extent;
+            if (e && (lx < e.minX || lx > e.maxX || lz < e.minZ || lz > e.maxZ)) continue;
+            const nearest = reg.terrain.nearest(lx, lz);
+            if (nearest && nearest.hit.distance < 240) {
+              const blend = THREE.MathUtils.smoothstep(nearest.hit.distance, 40, 240);
+              return THREE.MathUtils.lerp(nearest.hit.elevationM, height, blend);
+            }
+          }
+        }
+        return height;
+      };
       const { geometry, cellOffsets } = buildOpenTerrainTile({
         blendHeight, localSurface: local,
         x, y, raster, east, south, southeast, water, project: this.project, protectedAreas: this.protectedAreas,
@@ -1140,9 +1172,12 @@ export function updateOpenWorldTerrain(sim) {
     if (!surface.openWorld) {
       const half = surface.size / 2;
       surface.openWorld = new OpenWorldTerrain(sim.activeAirport === 'lukla'
-        ? { ...frame, protectedAreas: [[-half, -half, half, half]], localSurface: surface }
-        : frame);
+        ? { ...frame, protectedAreas: [[-half, -half, half, half]], localSurface: surface, world: sim.world }
+        : { ...frame, world: sim.world });
       surface.mesh.add(surface.openWorld.group);
+    }
+    if (surface.openWorld && !surface.openWorld.world && sim.world) {
+      surface.openWorld.world = sim.world;
     }
     setCorridorStreamersVisible(surface, false);
     const height = sim.renderer?.getDrawingBufferSize?.(viewportSize)?.y;

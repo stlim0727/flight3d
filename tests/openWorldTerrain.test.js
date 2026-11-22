@@ -526,3 +526,45 @@ test('open-world terrain suppresses Jeju corridor streamer across unified world 
   updateOpenWorldTerrain(sim);
   assert.equal(corridorGroup.visible, true, 'corridorStreamer visibility is restored even after external openWorld disposal on anchor switch');
 });
+
+test('OpenWorldTerrain blends vertices near registered external airport runways', async () => {
+  const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const fakeWorld = {
+    regions: new Map([
+      ['RKPK', {
+        extent: { minX: -2000, maxX: 2000, minZ: -2000, maxZ: 2000 },
+        terrain: {
+          runways: [{ id: '18R' }],
+          nearest(lx, lz) {
+            return {
+              hit: {
+                distance: Math.hypot(lx, lz),
+                elevationM: 4.0,
+              },
+            };
+          },
+        },
+      }],
+    ]),
+    offsets: new Map([['RKPK', [0, 0]]]),
+  };
+  const raster = flat(25);
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    world: fakeWorld,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  openWorld.raster = () => Promise.resolve(raster);
+  openWorld.fetchWater = () => Promise.resolve(null);
+  await openWorld.load({ x, y, key: `${x}/${y}` });
+  const tile = openWorld.tiles.get(`${x}/${y}`);
+  assert.ok(tile);
+  const sampled = openWorld.sample(0, 0);
+  assert.ok(sampled);
+  assert.ok(sampled.height < 10, `Height at airport centre should be close to runway elevation: got ${sampled.height}`);
+  openWorld.dispose();
+});
