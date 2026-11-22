@@ -226,6 +226,16 @@ class SimulatorHudAndBindingsMethods {
         && !this.multiplayer?.active && !this.demoDirector?.isActive && !this.isCrashed;
       if (map.hidden === available) map.hidden = !available;
       if (!available && map.open) map.open = false;
+      this.pilotageFlight = available;
+      let layout = '';
+      if (available && map.open && this.gameFlow.state === FLOW.FLIGHT) {
+        if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) layout = 'cockpit';
+        else {
+          this.mobileChartQuery ??= window.matchMedia('(pointer: coarse), (max-width: 600px)');
+          if (this.mobileChartQuery.matches) layout = 'external';
+        }
+      }
+      this.setPilotageLayout(layout);
       if (available && map.open) {
         this.busanChart ??= new BusanChart(map);
         this.busanChart.update(this.position, this.quaternion);
@@ -966,9 +976,21 @@ class SimulatorHudAndBindingsMethods {
     }
   }
 
+  setPilotageLayout(layout) {
+    if ((this.pilotageLayout || '') === layout) return;
+    const resize = layout === 'external' || this.pilotageLayout === 'external';
+    this.pilotageLayout = layout;
+    document.body.dataset.pilotageLayout = layout;
+    this.cameraSystem.chartPitchOffset = layout === 'cockpit' ? -0.12 : 0;
+    if (resize) this.handleResize();
+  }
+
   handleResize() {
     applyUiScale(computeUiScale(window.innerWidth, window.innerHeight));
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const split = this.pilotageLayout === 'external';
+    const width = split ? this.container.clientWidth : window.innerWidth;
+    const height = split ? this.container.clientHeight : window.innerHeight;
+    this.camera.aspect = width / height;
     const isCockpit = this.cameraSystem && this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     let targetFov = isCockpit ? 60 : 54;
     if (this.camera.aspect < 1.0) {
@@ -987,7 +1009,7 @@ class SimulatorHudAndBindingsMethods {
     if (!this.renderDiagnostics?.active || this.renderDiagnostics.options.resolution === 'default') {
       this.renderer.setPixelRatio(ratio);
     }
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(width, height);
     if (this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.onResize(window.innerWidth, window.innerHeight);
     }

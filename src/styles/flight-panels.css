@@ -549,3 +549,64 @@ body:not([data-flow="flight"]) #pilotage-map,
 }
 .map-status { top: .5rem; left: .5rem; padding: .25rem; }
 .map-paper .map-credit { bottom: .35rem; right: .4rem; padding: .1rem; font-size: 10px; }
+
+body[data-pilotage-layout="cockpit"] #pilotage-map {
+  right: 50%;
+  transform: translateX(50%);
+  width: min(72vw, 34rem);
+}
+body[data-pilotage-layout="cockpit"] #pilotage-map .map-paper { width: 100%; height: min(31dvh, 17rem); }
+@media (min-width: 601px) and (pointer: fine) {
+  body[data-flow="flight"] #hud-overlay:has(#pilotage-map[open]:not([hidden])) { z-index: 999; }
+  body[data-flow="flight"] #pilotage-map[open] {
+    --chart-width: min(80vw, 1100px);
+    --chart-height: min(70dvh, 720px);
+    position: fixed;
+    inset: 0;
+    width: auto;
+    transform: none;
+    z-index: 999;
+    background: rgb(17 25 32 / 23%);
+    backdrop-filter: blur(7px);
+  }
+  body[data-flow="flight"] #pilotage-map[open] .map-paper {
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%);
+    width: var(--chart-width);
+    height: var(--chart-height);
+    border-color: #97896d;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 14px 50px rgb(12 20 24 / 32%);
+  }
+  body[data-flow="flight"] #pilotage-map[open] summary {
+    position: absolute;
+    top: calc(50% + var(--chart-height) / 2 + 9px);
+    right: calc((100% - var(--chart-width)) / 2);
+    margin: 0;
+  }
+}
+body[data-pilotage-layout="external"] #canvas-container { width: 56%; }
+body[data-pilotage-layout="external"] #pilotage-map {
+  right: 0;
+  bottom: 0;
+  width: 44%;
+  height: 100%;
+  background: #ede5cc;
+}
+body[data-pilotage-layout="external"] #pilotage-map summary {
+  position: absolute;
+  bottom: max(.4rem, env(safe-area-inset-bottom));
+  right: max(.6rem, env(safe-area-inset-right));
+  z-index: 1;
+}
+body[data-pilotage-layout="external"] #pilotage-map .map-paper {
+  inset: max(3rem, env(safe-area-inset-top)) 0 2.7rem;
+  width: auto;
+  height: auto;
+}
+@media (orientation: portrait) {
+  body[data-pilotage-layout="external"] #canvas-container { width: 100%; height: 57%; }
+  body[data-pilotage-layout="external"] #pilotage-map { width: 100%; height: 43%; }
+  body[data-pilotage-layout="external"] #pilotage-map .map-paper { top: 0; }
+}
