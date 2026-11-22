@@ -54,6 +54,16 @@ export function commitFlightCamera(select, onSelectCamera) {
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
 export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParkingBrake, toolbarHidden, onToolbarHiddenChange }) {
   const hud = document.getElementById('hud-overlay');
+  const map = document.getElementById('pilotage-map');
+  map.addEventListener('pointerdown', event => event.target.setPointerCapture(event.pointerId));
+  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel',
+    'mousedown', 'mousemove', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'click', 'wheel']) {
+    map.addEventListener(type, event => event.stopPropagation());
+  }
+  // Releases still clear a camera drag or flight key held before entering the map.
+  map.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+  });
   // Let keyboard users scroll the full telemetry row as well as touch users.
   const strip = document.querySelector('.hud-strip');
   strip.tabIndex = 0;
@@ -425,6 +435,7 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   new MutationObserver(() => {
     flightStrip?.sync();
     if (document.body.dataset.flow !== 'flight') {
+      map.open = false;
       setMoreOpen(false);
       flightStrip?.close();
       setHudFolded(false, false);

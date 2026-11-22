@@ -1,4 +1,6 @@
 export default {
+  "ui.unfoldMap": "지도 펼치기",
+  "ui.foldMap": "지도 접기",
   "build.branch": "브랜치",
   "build.commit": "커밋",
   "build.merged": "{age} 병합",

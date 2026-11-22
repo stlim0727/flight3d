@@ -37,6 +37,13 @@
   <!-- Flight Telemetry HUD Overlay -->
   <div id="hud-overlay">
     <div id="landmark-pins" hidden aria-hidden="true"></div>
+    <details id="pilotage-map" hidden>
+      <summary class="btn">
+        <span class="map-unfold" data-i18n="ui.unfoldMap">지도 펼치기</span>
+        <span class="map-fold" data-i18n="ui.foldMap">지도 접기</span>
+      </summary>
+      <div class="map-paper"></div>
+    </details>
     <!-- Top Instrument Telemetry Strip -->
     <header class="hud-strip">
       <div class="hud-item hud-primary" data-hud="ias">
