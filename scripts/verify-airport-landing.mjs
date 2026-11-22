@@ -92,7 +92,7 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
     sim.position.set(x, sim.currentTerrain.getHeight(x, z) + 3, z);
     sim.linearVelocity.set(0, 0, 0);
     sim.angularVelocity.set(0, 0, 0);
-    sim.quaternion.setFromAxisAngle({ x: 0, y: 1, z: 0 }, Math.atan2(ux, -uz));
+    sim.quaternion.setFromAxisAngle({ x: 0, y: 1, z: 0 }, -Math.atan2(ux, -uz));
     sim.autopilot.master = false;
     sim.controls.brakes = 1;
     sim.engines.setThrottle(0);
@@ -137,15 +137,32 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
     sim.engines.setThrottle(1);
     sim.engines.settleSpool?.();
     sim.aero.setFlapPosition(2);
+    sim.controls.pitchTrim = 5.5;
+    sim.aero.pitchTrim = 5.5;
     let frames = 0;
+    let rotated = false;
+    let airborneFrame = null;
     do {
+      if (!rotated && sim.telemetry.groundSpeedKnots > 70) {
+        sim.controls.setVirtualInput('elevator', 0.7);
+        rotated = true;
+      }
+      if (airborneFrame !== null && frames - airborneFrame === 30) {
+        sim.controls.setVirtualInput('elevator', 0.2);
+      }
       sim.stepSimulation(1 / 60);
       frames++;
-    } while (frames < 1200 && (frames < 4 || sim.telemetry.onGround || sim.telemetry.groundSpeedKnots < 80) && !sim.isCrashed);
-    return { frames, onGround: sim.telemetry.onGround, speed: sim.telemetry.groundSpeedKnots, altitude: sim.position.y, crashed: sim.isCrashed, throttle: sim.controls.throttle, engineCommand: sim.engines.throttleCommand, n1: sim.engines.n1, thrust: sim.engines.thrust, brakes: sim.controls.brakes, parking: sim.controls.parkingBrake, velocity: sim.linearVelocity.length(), fuel: sim.engines.fuelKg };
+      if (airborneFrame === null && !sim.telemetry.onGround) airborneFrame = frames;
+    } while (frames < 2400 && !sim.isCrashed
+      && (airborneFrame === null || frames - airborneFrame < 300));
+    return { frames, rotated, airborneFrame, onGround: sim.telemetry.onGround, speed: sim.telemetry.groundSpeedKnots, altitude: sim.position.y, climbRateMs: sim.linearVelocity.y, pitchDeg: sim.telemetry.pitchDeg, elevator: sim.controls.elevator, gear: sim.gear.contacts.map(c => ({ id: c.id, grounded: c.isGrounded })), crashed: sim.isCrashed, throttle: sim.controls.throttle, brakes: sim.controls.brakes, parking: sim.controls.parkingBrake, velocity: sim.linearVelocity.length() };
   })()`));
   assert.equal(takeoff.crashed, false);
-  results.limitation = 'The CDP-injected takeoff did not accelerate beyond taxi speed; full re-takeoff is not claimed.';
+  assert.equal(takeoff.rotated, true);
+  assert.ok(takeoff.airborneFrame, 'aircraft never left the streamed runway');
+  assert.equal(takeoff.onGround, false);
+  assert.ok(takeoff.altitude > contact.expectedM + 25, 'aircraft did not climb after takeoff');
+  assert.ok(takeoff.climbRateMs > 1, 'aircraft has no positive climb rate');
   await screenshot(path.join(artifacts, 'rkss-takeoff.png'));
 
   assert.deepEqual(exceptions, [], 'browser exceptions during landing check');

@@ -33,4 +33,6 @@ it is no longer in the initial catalog.
 
 - `tests/airportSearch.test.js`: ICAO/IATA/name ranking, normalization, limits and immutability.
 - `tests/airportBookmarks.test.js`: persistence, validation, dedupe/cap and storage failures.
-- `npm run test:map-search`: hardware Vulkan Chrome search, map centring, bookmark add and restore. Refresh persistence is covered by the bookmark store tests.
+- `npm run test:map-search`: hardware Vulkan Chrome search, map centring, bookmark
+add, restore, and restore again after a real `Page.reload` in the same browser
+profile. Refresh persistence is also covered by the bookmark store tests.

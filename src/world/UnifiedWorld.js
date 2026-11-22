@@ -4,7 +4,7 @@ import { projectToLocal } from '../geospatial/incheon.js';
 import { haversineDistanceM, initialBearingDeg } from '../geospatial/CorridorCoordinateSystem.js';
 import { REAL_AIRPORTS, AIRPORT_ORIGINS, RUNWAY_THRESHOLDS, worldPositionToWgs84, realOffsetInIncheonFrame } from '../geospatial/airportGeodesy.js';
 import { isExternalDestination } from '../config/externalDestinations.js';
-import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
+import { APPROACH_DATA } from '../config/approachData.js';
 
 /**
  * One always-present world for every persistent region: coastal, Incheon,
@@ -27,15 +27,15 @@ import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
 
 const JEJU_IN_INCHEON = projectToLocal(JEJU_ORIGIN.latitude, JEJU_ORIGIN.longitude);
 
-// Region placement: Incheon <-> Jeju uses the surveyed WGS84 separation; Lukla
-// sits a flyable distance south of Jeju. Arcade regions have no WGS84 frame,
-// so they are separated in the same world instead of sharing the origin.
-const LUKLA_SOUTH_OF_JEJU_M = 260000;
+// Region placement: Incheon/Jeju/Lukla use surveyed WGS84 origins projected
+// into the Incheon scenery frame. Arcade regions have no WGS84 frame, so
+// they are separated in the same world instead of sharing an origin.
+const LUKLA_IN_INCHEON = projectToLocal(AIRPORT_ORIGINS.lukla.latitude, AIRPORT_ORIGINS.lukla.longitude);
 
 export const BASE_OFFSETS = Object.freeze({
   incheon: Object.freeze([0, 0]),
   jeju: Object.freeze([JEJU_IN_INCHEON[0], JEJU_IN_INCHEON[1]]),
-  lukla: Object.freeze([JEJU_IN_INCHEON[0], JEJU_IN_INCHEON[1] + LUKLA_SOUTH_OF_JEJU_M]),
+  lukla: Object.freeze([LUKLA_IN_INCHEON[0], LUKLA_IN_INCHEON[1]]),
   coastal: Object.freeze([-80000, -60000]),
   neon: Object.freeze([80000, -60000]),
   valley: Object.freeze([0, -180000]),
@@ -272,9 +272,10 @@ export class UnifiedWorld {
       && Math.hypot(target[0] - realOffset[0], target[1] - realOffset[1]) < 5;
     const synthetic = this.anchor !== 'incheon' || !REAL_AIRPORTS.includes(id)
       || !placementIsReal || !from || !threshold;
-    const markerLocal = synthetic
+    const authoredThreshold = APPROACH_DATA[id]?.threshold;
+    const markerLocal = synthetic || !authoredThreshold
       ? null
-      : wgs84ToLocal(threshold.latitude, threshold.longitude, AIRPORT_ORIGINS[this.anchor]);
+      : [target[0] + authoredThreshold.x, target[1] + authoredThreshold.z];
     const dx = markerLocal ? markerLocal[0] - x : centreDx;
     const dz = markerLocal ? markerLocal[1] - z : centreDz;
     const distanceM = synthetic

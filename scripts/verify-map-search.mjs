@@ -29,7 +29,7 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   checkGpu(cdpPort);
   assert.ok(await waitFor(session, 'Boolean(window.sim?.gameFlow?.state)'), 'simulator did not boot');
   assert.ok(await waitFor(session, 'window.sim?.startupReady'), 'simulator startup did not finish');
-  assert.ok(await waitFor(session, 'sim.mapPlaces?.airports?.length > 10'), 'map catalog did not load');
+  assert.ok(await waitFor(session, 'window.sim?.mapPlaces?.airports?.length > 10'), 'map catalog did not load');
 
   assert.equal(await evaluate("document.getElementById('lobby-regional-cruise') === null"), true);
   assert.ok(await evaluate("!document.getElementById('lobby-map-search').checkVisibility()"), 'map must start collapsed');
@@ -130,12 +130,25 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
     assert.ok(actual.horizontalError < 500, `${kind} cruise missed selected location: ${actual.horizontalError} m`);
     assert.ok(actual.altitudeError < 50, `${kind} cruise missed planned altitude: ${actual.altitudeError} m`);
   }
+
+  await screenshot(path.join(artifacts, 'bookmarks.png'));
+  await send('Page.reload', { ignoreCache: true });
+  assert.ok(await waitFor(session, 'Boolean(window.sim?.startupReady)'), 'simulator did not restart after reload');
+  assert.ok(await waitFor(session, 'window.sim?.mapPlaces?.airports?.length > 10'), 'map catalog did not reload');
+  await evaluate("document.querySelector('#lobby-place-picker > summary').click()");
+  await evaluate("document.getElementById('lobby-map-bookmark-toggle')?.click()");
+  assert.ok(await waitFor(session, "Boolean(document.querySelector('#lobby-map-bookmarks button[data-place-id=\"RKSS\"]'))"), 'bookmark did not survive reload');
+  const restoredStorage = await evaluate("localStorage.getItem('flight3d.bookmarks.v1')");
+  assert.ok(restoredStorage?.includes('RKSS'), 'bookmark storage did not survive reload');
+  await evaluate("document.querySelector('#lobby-map-bookmarks button[data-place-id=\"RKSS\"]')?.click()");
+  assert.ok(await waitFor(session, "window.sim?.lobby?.mapPlan?.airportCode === 'RKSS'"), 'restored bookmark did not restore selection');
+  await screenshot(path.join(artifacts, 'bookmarks-after-refresh.png'));
   assert.deepEqual(exceptions, []);
   console.log(JSON.stringify({
     gpu: 'hardware Vulkan preflight passed',
     resultCount: results.length,
     view: { before: beforeView, after: afterView },
-    bookmark: 'RKSS and custom map point persisted and restored',
+    bookmark: 'RKSS and custom map point persisted, restored and restored again after reload',
     cruise: 'custom point and airport starts matched their selected coordinates and altitude',
   }, null, 2));
 });
