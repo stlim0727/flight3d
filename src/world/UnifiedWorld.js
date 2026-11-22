@@ -78,6 +78,7 @@ export class UnifiedWorld {
     this.anchor = BASE_OFFSETS[anchor] ? anchor : 'incheon';
     this.offsets = new Map();
     this.dynamicOffsets = new Map();
+    this.destinationOffsets = new Map();
     this.dynamicStatus = new Map();
     this.recomputeOffsets();
   }
@@ -125,9 +126,17 @@ export class UnifiedWorld {
   registerDynamic(id, { baseOffset, extent, terrain, airport, group = null, mesh = null }) {
     if (BASE_OFFSETS[id] || !Array.isArray(baseOffset) || baseOffset.length !== 2
       || !baseOffset.every(Number.isFinite)) throw new Error(`Invalid dynamic region: ${id}`);
+    this.rememberDestination(id, baseOffset);
     this.dynamicOffsets.set(id, Object.freeze([baseOffset[0], baseOffset[1]]));
     this.recomputeOffsets();
     this.register(id, { terrain, airport, group, mesh, extent });
+  }
+
+  /** Keep the last known WGS84 placement even when rendering is unmounted. */
+  rememberDestination(id, baseOffset) {
+    if (!Array.isArray(baseOffset) || baseOffset.length !== 2
+      || !baseOffset.every(Number.isFinite)) return;
+    this.destinationOffsets.set(id, Object.freeze([baseOffset[0], baseOffset[1]]));
   }
 
   unregister(id) {
@@ -152,6 +161,13 @@ export class UnifiedWorld {
       this.offsets.set(id, [base[0] - anchor[0], base[1] - anchor[1]]);
     }
     this.syncMeshes();
+  }
+
+
+  /** Incheon world-frame metres -> current anchor's local sample frame. */
+  incheonFrameToAnchor(x, z) {
+    const anchor = BASE_OFFSETS[this.anchor];
+    return [x - anchor[0], z - anchor[1]];
   }
 
   setAnchor(id) {
@@ -209,7 +225,16 @@ export class UnifiedWorld {
 
   externalDestinationInfo(x, z, id) {
     const anchor = BASE_OFFSETS[this.anchor];
-    const base = this.dynamicOffsets.get(id) ?? [0, 0];
+    const base = this.destinationOffsets.get(id) ?? this.dynamicOffsets.get(id) ?? null;
+    const status = this.dynamicStatus.get(id);
+    const prepare = status?.state ?? null;
+    if (!base) {
+      return {
+        id, code: id, nameKey: id, dx: null, dz: null,
+        distanceM: null, distanceNm: null, bearingDeg: null,
+        synthetic: true, target: 'unknown', prepare,
+      };
+    }
     const [ox, oz] = this.offsets.get(id) ?? [base[0] - anchor[0], base[1] - anchor[1]];
     const centre = this.regions.get(id)?.terrain?.centre;
     const targetX = (centre?.x ?? 0) + ox;
@@ -217,7 +242,6 @@ export class UnifiedWorld {
     const dx = targetX - x;
     const dz = targetZ - z;
     const distanceM = Math.hypot(dx, dz);
-    const status = this.dynamicStatus.get(id);
     return {
       id,
       code: id,
@@ -228,7 +252,7 @@ export class UnifiedWorld {
       bearingDeg: (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360,
       synthetic: true,
       target: 'centre',
-      prepare: status?.state ?? null,
+      prepare,
     };
   }
 

@@ -380,3 +380,27 @@ test('streamed external airport registers as a dynamic region and reports prepar
   assert.equal(world.getHeight(30000, -2000), 36);
   assert.equal(world.unregister('RKSS'), false);
 });
+
+test('unmount keeps destination guidance and unknown codes never point at the origin', () => {
+  const { world } = makeWorld();
+  const region = fakeRegion(18, [0, 0]);
+  world.registerDynamic('RKSS', { ...region, baseOffset: [30000, -2000] });
+  world.unregister('RKSS');
+  assert.equal(world.dynamicOffsets.has('RKSS'), false);
+  assert.equal(world.destinationOffsets.has('RKSS'), true);
+  const remembered = world.destinationInfo(0, 0, 'RKSS');
+  assert.equal(remembered.target, 'centre');
+  assert.ok(remembered.distanceM > 29000 && remembered.distanceM < 31000);
+
+  const fresh = new UnifiedWorld();
+  const unknown = fresh.destinationInfo(0, 0, 'RKSS');
+  assert.equal(unknown.target, 'unknown');
+  assert.equal(unknown.distanceM, null);
+  assert.equal(unknown.bearingDeg, null);
+  assert.equal(world.destinationInfo(0, 0, 'RKSU'), null);
+  assert.deepEqual(world.incheonFrameToAnchor(30000, -2000), [30000, -2000]);
+  world.setAnchor('jeju');
+  assert.deepEqual(world.incheonFrameToAnchor(30000, -2000), [
+    30000 - BASE_OFFSETS.jeju[0], -2000 - BASE_OFFSETS.jeju[1],
+  ]);
+});

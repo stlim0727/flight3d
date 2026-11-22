@@ -45,11 +45,20 @@ anchor is involved: the external airport is a dynamic region in `UnifiedWorld`.
   is on the ground or on a runway, unmounts it when airborne beyond the unload
   radius, and retries failed loads only after a cooldown. Faster flight expands
   the load radius (`speedMps * 500 m`).
+- Changing the selected destination while the aircraft occupies a runway does
+  not unmount the current region. The old region is retired only once `update()`
+  sees the aircraft airborne, so contact height cannot change underneath it.
 - A stale async completion is discarded after destination change, unload or
   disposal; it cannot mount an old airport over a newer selection.
 - HUD destination text appends `PREP` while loading and `NO DATA` after a
   failure. `UnifiedWorld.destinationInfo()` reports the state through
   `dynamicStatus`; a failed load remains retryable on approach.
+- The last known destination offset is retained after unload or a failed load,
+  so guidance still points at the correct airport. A code with no known
+  coordinates reports `target: 'unknown'` instead of the world origin, and the
+  HUD/ND show only the code plus `PREP`.
+- Open-world samples are converted from the Incheon world frame into the
+  current anchor's local frame before sampling.
 
 This is asset readiness, not physics behavior: no force, moment or control
 model branches on the streaming state.

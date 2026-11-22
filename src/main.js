@@ -433,7 +433,10 @@ class FlightSimulator {
         }
       },
       outsideHeight: (x, z) => {
-        const sampled = this.world.anchorTerrain?.openWorld?.sample?.(x, z)?.height;
+        // ExternalSurface passes Incheon-frame coordinates; openWorld samples
+        // are keyed in the current anchor's local frame.
+        const [ax, az] = this.world.incheonFrameToAnchor(x, z);
+        const sampled = this.world.anchorTerrain?.openWorld?.sample?.(ax, az)?.height;
         return Number.isFinite(sampled) ? sampled : null;
       },
     });

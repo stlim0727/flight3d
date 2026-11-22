@@ -85,6 +85,8 @@ test('only indexed external ICAO codes are considered and reset unmounts', async
   h.streamer.setDestination('RJTT');
   assert.equal(h.streamer.status.state, 'idle');
   assert.equal(h.streamer.status.code, null);
+  assert.equal(h.events.removed.length, 0, 'destination selection alone keeps occupied contact');
+  h.streamer.update({ x: 0, z: 0, onGround: false, onRunway: false, destinationCode: 'RJTT' });
   assert.equal(h.events.removed.length, 1);
   assert.deepEqual(h.events.unregistered, ['RKSS']);
   assert.equal(h.events.disposed.length, 1);
@@ -239,4 +241,18 @@ test('default loadAirport resolves the ICAO code through the manifest and tile',
     clearAirportIndexCache();
     h.streamer.dispose();
   }
+});
+
+test('changing destination while on a runway keeps the occupied region until airborne', async () => {
+  const h = harness();
+  assert.equal(await h.streamer.ensure('RKSS'), true);
+  h.streamer.setDestination(null);
+  assert.equal(h.events.unregistered.length, 0, 'selection alone must not remove contact');
+  h.streamer.update({ x: 0, z: 0, onGround: true, onRunway: true, destinationCode: null });
+  assert.equal(h.events.unregistered.length, 0, 'ground occupancy keeps the region');
+  assert.equal(h.events.removed.length, 0);
+  h.streamer.update({ x: 0, z: 0, onGround: false, onRunway: false, destinationCode: null });
+  assert.deepEqual(h.events.unregistered, ['RKSS']);
+  assert.equal(h.events.removed.length, 1);
+  assert.equal(h.events.disposed.length, 1);
 });

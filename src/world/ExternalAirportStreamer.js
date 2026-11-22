@@ -62,6 +62,7 @@ export class ExternalAirportStreamer {
     this._error = null;
     this._distanceM = null;
     this._loaded = null;
+    this._retired = null;
     this._lastOffset = null;
     this._failedAt = 0;
     this._token = 0;
@@ -90,18 +91,19 @@ export class ExternalAirportStreamer {
     const next = isExternalDestination(code) ? code.trim().toUpperCase() : null;
     if (next === this._code) return;
     this._token += 1;
-    this._unmount();
     this._loadingPromise = null;
+    // A destination change is only a wish. Keep the currently occupied region
+    // until update() can confirm the aircraft has left its runway.
+    if (this._loaded && this._loaded.code !== next) this._retired = this._loaded.code;
+    else this._unmount();
     this._code = next;
     this._state = 'idle';
     this._error = null;
     this._distanceM = null;
     this._failedAt = 0;
     this._needsRearm = false;
-    this._lastOffset = null;
     this._report();
   }
-
   /**
    * Explicit load for spawn/UI paths. Ready and in-flight loads are reused;
    * an explicit call after a failure retries immediately (automatic retries
@@ -115,6 +117,7 @@ export class ExternalAirportStreamer {
     }
     const normalized = code.trim().toUpperCase();
     if (this._code !== normalized) this.setDestination(normalized);
+    if (this._retired) return false;
     if (this._state === 'ready' && this._loaded) return true;
     if (this._state === 'loading' && this._loadingPromise) return this._loadingPromise;
     return this._startLoad(normalized);
@@ -124,6 +127,12 @@ export class ExternalAirportStreamer {
     if (this._disposed) return;
     try {
       if (destinationCode !== undefined) this.setDestination(destinationCode);
+      if (this._retired) {
+        if (onGround || onRunway) return;
+        this._retired = null;
+        this._unmount();
+        this._report();
+      }
       const code = this._code;
       if (!code) {
         this._distanceM = null;
@@ -151,6 +160,7 @@ export class ExternalAirportStreamer {
     this._disposed = true;
     this._token += 1;
     this._unmount();
+    this._retired = null;
     this._loadingPromise = null;
     this._code = null;
     this._state = 'idle';
@@ -180,14 +190,14 @@ export class ExternalAirportStreamer {
   _unmount() {
     const loaded = this._loaded;
     if (!loaded) return;
-    const worldOffset = this.world?.offsets?.get?.(this._code);
+    const worldOffset = this.world?.offsets?.get?.(loaded.code);
     this._lastOffset = validOffset(worldOffset) ? [worldOffset[0], worldOffset[1]] : loaded.offset;
     this._loaded = null;
     if (loaded.group) {
       try { this.scene?.remove?.(loaded.group); } catch { /* cleanup must continue */ }
     }
     this._disposeRegion(loaded.region);
-    try { this.world?.unregister?.(this._code); } catch { /* cleanup must continue */ }
+    try { this.world?.unregister?.(loaded.code); } catch { /* cleanup must continue */ }
   }
 
   _disposeRegion(region) {
@@ -197,6 +207,7 @@ export class ExternalAirportStreamer {
   _unload() {
     this._token += 1;
     this._unmount();
+    this._retired = null;
     this._loadingPromise = null;
     this._state = 'idle';
     this._error = null;
@@ -236,6 +247,7 @@ export class ExternalAirportStreamer {
       // baseOffset is already in the world frame (Incheon scenery origin);
       // registerDynamic() publishes the anchor-relative offset itself.
       const baseOffset = projectToLocal(descriptor.latitude, descriptor.longitude);
+      this.world?.rememberDestination?.(code, baseOffset);
       if (this._stale(token, code)) return false;
       region = await this._buildRegion({
         airport: descriptor, baseOffset, outsideHeight: this.outsideHeight, code,
@@ -261,7 +273,7 @@ export class ExternalAirportStreamer {
       const offset = validOffset(published)
         ? [published[0], published[1]]
         : [baseOffset[0], baseOffset[1]];
-      this._loaded = { region, descriptor, baseOffset, offset, group };
+      this._loaded = { code, region, descriptor, baseOffset, offset, group };
       this._lastOffset = offset;
       this._state = 'ready';
       this._error = null;

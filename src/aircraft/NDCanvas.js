@@ -411,12 +411,17 @@ export class NDCanvas {
       ctx.fillStyle = '#fbbf24';
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'left';
-      const degrees = Math.round(destination.bearingDeg).toString().padStart(3, '0');
-      const bearing = destination.synthetic ? `~${degrees}°` : `${degrees}°T`;
-      const range = `${destination.synthetic ? '~' : ''}${Math.round(destination.distanceNm)}NM`;
-      ctx.fillText(`DEST ${destination.code} ${bearing} ${range}`, 24, 64);
+      const known = Number.isFinite(destination.bearingDeg) && Number.isFinite(destination.distanceNm);
+      if (known) {
+        const degrees = Math.round(destination.bearingDeg).toString().padStart(3, '0');
+        const bearing = destination.synthetic ? `~${degrees}°` : `${degrees}°T`;
+        const range = `${destination.synthetic ? '~' : ''}${Math.round(destination.distanceNm)}NM`;
+        ctx.fillText(`DEST ${destination.code} ${bearing} ${range}`, 24, 64);
+      } else {
+        ctx.fillText(`DEST ${destination.code} PREP`, 24, 64);
+      }
 
-      if (destination.id !== this.airportId) {
+      if (known && destination.id !== this.airportId) {
         const p = projectToScreen(this.planePos.x + destination.dx, this.planePos.y + destination.dz);
         ctx.strokeStyle = '#fbbf24';
         ctx.lineWidth = 2;
