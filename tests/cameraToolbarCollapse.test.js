@@ -106,7 +106,10 @@ test('camera toolbar collapse/expand toggle button lifecycle and interaction', (
 
   // Setup DOM fixtures required by initFlightPanels
   const hudOverlay = createElement('div', 'hud-overlay');
-  hudOverlay.append(createElement('details', 'pilotage-map'));
+  const pilotageMap = createElement('details', 'pilotage-map');
+  const mapSummary = createElement('summary');
+  pilotageMap.querySelector = sel => sel === 'summary' ? mapSummary : null;
+  hudOverlay.append(pilotageMap);
   const strip = createElement('div');
   strip.className = 'hud-strip';
   hudOverlay.append(strip);
@@ -167,8 +170,11 @@ test('camera toolbar collapse/expand toggle button lifecycle and interaction', (
 
   try {
     let selectedMode = null;
+    let unfolds = 0, folds = 0;
     initFlightPanels({
       onSelectCamera: mode => { selectedMode = mode; },
+      onMapUnfold: () => { unfolds++; },
+      onMapFold: () => { folds++; },
       onAdjustTrim: () => {},
       onToggleParkingBrake: () => {},
       toolbarHidden: []
@@ -205,6 +211,25 @@ test('camera toolbar collapse/expand toggle button lifecycle and interaction', (
     assert.ok(cockpitBtn, 'cockpit camera button exists');
     cockpitBtn.click();
     assert.equal(selectedMode, 0, 'onSelectCamera is invoked when selecting camera in expanded strip');
+
+    // Paper rustles when the pilot opens or folds the sheet, never for clicks
+    // inside it or when the game closes it (crash, leaving the flight).
+    const map = elements.get('pilotage-map');
+    const pilotToggle = () => {
+      mapSummary.click();
+      map.open = !map.open;
+      map.dispatchEvent({ type: 'toggle' });
+    };
+    pilotToggle();
+    assert.deepEqual([unfolds, folds], [1, 0], 'opening the map plays the unfold sound once');
+    map.click();
+    assert.deepEqual([unfolds, folds], [1, 0], 'clicks inside the map stay silent');
+    pilotToggle();
+    assert.deepEqual([unfolds, folds], [1, 1], 'folding it plays the fold sound once');
+    pilotToggle();
+    map.open = false;
+    map.dispatchEvent({ type: 'toggle' });
+    assert.deepEqual([unfolds, folds], [2, 1], 'a game-initiated close stays silent');
   } finally {
     globalThis.document = prevDoc;
     globalThis.window = prevWindow;
