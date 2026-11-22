@@ -1,4 +1,6 @@
 export default {
+  "ui.unfoldMap": "Unfold map",
+  "ui.foldMap": "Fold map",
   "build.branch": "Branch",
   "build.commit": "Commit",
   "build.merged": "Merged {age}",

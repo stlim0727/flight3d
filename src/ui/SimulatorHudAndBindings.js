@@ -219,6 +219,13 @@ class SimulatorHudAndBindingsMethods {
     }
     const fuel = document.getElementById('hud-fuel');
     if (fuel) fuel.textContent = `${Math.round(Math.max(0, Math.min(100, 100 * (this.telemetry.fuelKg || 0) / this.engines.fuelCapacityKg)))}%`;
+    const map = document.getElementById('pilotage-map');
+    if (map) {
+      const available = this.currentAircraftId === 'C172' && this.lastPresetType === 'busan'
+        && !this.multiplayer?.active && !this.demoDirector?.isActive && !this.isCrashed;
+      if (map.hidden === available) map.hidden = !available;
+      if (!available && map.open) map.open = false;
+    }
     this.updateAutopilotUI();
     updateControlState(this.telemetry, this.cameraSystem, {
       demoActive: Boolean(this.demoDirector?.isActive),

@@ -106,6 +106,7 @@ test('camera toolbar collapse/expand toggle button lifecycle and interaction', (
 
   // Setup DOM fixtures required by initFlightPanels
   const hudOverlay = createElement('div', 'hud-overlay');
+  hudOverlay.append(createElement('details', 'pilotage-map'));
   const strip = createElement('div');
   strip.className = 'hud-strip';
   hudOverlay.append(strip);

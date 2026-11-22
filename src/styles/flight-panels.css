@@ -484,3 +484,33 @@ body.demo-active #touch-controls-overlay {
   overflow-wrap: anywhere;
 }
 .ap-modes:empty { display: none; }
+
+#pilotage-map {
+  position: absolute;
+  right: max(3vw, env(safe-area-inset-right));
+  bottom: max(5vh, env(safe-area-inset-bottom));
+  z-index: 12;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+body:not([data-flow="flight"]) #pilotage-map,
+#pilotage-map:not([open]) .map-fold,
+#pilotage-map[open] .map-unfold { display: none; }
+#pilotage-map summary {
+  display: flex;
+  width: max-content;
+  margin-left: auto;
+  cursor: pointer;
+}
+#pilotage-map .map-paper {
+  position: absolute;
+  bottom: calc(100% + .35rem);
+  right: 0;
+  width: min(84vw, 40rem);
+  height: min(35dvh, 21rem);
+  border: 1px solid #a89c7c;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #f5efdb 0%, #e5dcc3 49.8%, #faf5e6 50%, #ede6d3 100%);
+  box-shadow: 0 3px 12px #0005;
+}
