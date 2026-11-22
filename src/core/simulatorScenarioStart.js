@@ -1,5 +1,4 @@
 import { regionalCruise } from '../config/regionalCruises.js';
-import { updateOpenWorldTerrain } from '../environment/OpenWorldTerrain.js';
 import { ScenarioStartCoordinator } from './ScenarioStartCoordinator.js';
 import { applyDeviceTimeOfDay, saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { saveFlightSelection } from '../config/flightSelection.js';
@@ -127,9 +126,13 @@ function alignMapSpawnToContact(sim, spawn) {
 }
 
 async function waitForRegionalTerrain(sim) {
+  const layers = sim.ensureGeographicLayers
+    ? await sim.ensureGeographicLayers()
+    : await import('../environment/OpenWorldTerrain.js');
+  const updateTerrain = layers.updateOpenWorldTerrain;
   const deadline = performance.now() + 6000;
   do {
-    updateOpenWorldTerrain(sim);
+    updateTerrain(sim);
     if (sim.currentTerrain.openWorld?.readyAt(sim.position.x, sim.position.z)) return;
     await new Promise(resolve => setTimeout(resolve, 50));
   } while (performance.now() < deadline);

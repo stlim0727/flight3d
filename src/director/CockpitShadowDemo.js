@@ -113,7 +113,7 @@ export class CockpitShadowDemo {
     sim.cameraSystem.photoCockpit = saved.photo;
     sim.cameraSystem.lookYaw = saved.yaw;
     sim.cameraSystem.lookPitch = saved.pitch;
-    sim.foliage.setTimeOfDay(saved.time);
+    sim.foliage?.setTimeOfDay(saved.time);
     sim.water.syncWithAtmosphere(sim.sky);
     this.onChange();
   }

@@ -1,3 +1,44 @@
+/** Build a Z-slab spatial index over ring edges for O(k) exact point-in-ring queries. */
+function indexRing(ring) {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const [x, z] = ring[i];
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (z < minZ) minZ = z;
+    if (z > maxZ) maxZ = z;
+  }
+  const spanZ = maxZ - minZ;
+  const numSlabs = spanZ > 0 ? Math.max(1, Math.min(256, Math.ceil(spanZ / 50))) : 1;
+  const invSlab = spanZ > 0 ? numSlabs / spanZ : 0;
+  const slabs = Array.from({ length: numSlabs }, () => []);
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i];
+    const b = ring[j];
+    if (a[1] === b[1]) continue;
+    const zLo = Math.min(a[1], b[1]);
+    const zHi = Math.max(a[1], b[1]);
+    const s0 = Math.max(0, Math.min(numSlabs - 1, Math.floor((zLo - minZ) * invSlab)));
+    const s1 = Math.max(0, Math.min(numSlabs - 1, Math.floor((zHi - minZ) * invSlab)));
+    const edge = [a[0], a[1], b[0], b[1]];
+    for (let s = s0; s <= s1; s++) slabs[s].push(edge);
+  }
+  return { minX, maxX, minZ, maxZ, numSlabs, invSlab, slabs };
+}
+
+function insideIndexedRing(indexed, x, z) {
+  if (x < indexed.minX || x >= indexed.maxX || z < indexed.minZ || z >= indexed.maxZ) return false;
+  const slabIndex = Math.max(0, Math.min(indexed.numSlabs - 1, Math.floor((z - indexed.minZ) * indexed.invSlab)));
+  const edges = indexed.slabs[slabIndex];
+  let inside = false;
+  for (let k = 0; k < edges.length; k++) {
+    const e = edges[k];
+    const ax = e[0], az = e[1], bx = e[2], bz = e[3];
+    if ((az > z) !== (bz > z) && x < (bx - ax) * (z - az) / (bz - az) + ax) inside = !inside;
+  }
+  return inside;
+}
+
 /** Shared terrain sampling for preview meshes and feature placement; no DOM. */
 export class IncheonTerrain {
   constructor(metadata, grids, coastline) {
@@ -12,6 +53,13 @@ export class IncheonTerrain {
         throw new Error(`Invalid terrain grid: ${name}`);
       }
     }
+    const { type, coordinates } = coastline.land;
+    if (!['Polygon', 'MultiPolygon'].includes(type)) throw new Error('Invalid land polygon type');
+    const rawPolygons = type === 'Polygon' ? [coordinates] : coordinates;
+    this._indexedPolygons = rawPolygons.map(rings => ({
+      outer: indexRing(rings[0]),
+      holes: rings.slice(1).map(indexRing),
+    }));
   }
 
   sampleGrid(name, x, z) {
@@ -40,18 +88,19 @@ export class IncheonTerrain {
   }
 
   isLand(x, z) {
-    const insideRing = ring => {
-      let inside = false;
-      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const a = ring[i]; const b = ring[j];
-        if ((a[1] > z) !== (b[1] > z) && x < (b[0]-a[0]) * (z-a[1]) / (b[1]-a[1]) + a[0]) inside = !inside;
+    for (let p = 0; p < this._indexedPolygons.length; p++) {
+      const poly = this._indexedPolygons[p];
+      if (!insideIndexedRing(poly.outer, x, z)) continue;
+      let inHole = false;
+      for (let h = 0; h < poly.holes.length; h++) {
+        if (insideIndexedRing(poly.holes[h], x, z)) {
+          inHole = true;
+          break;
+        }
       }
-      return inside;
-    };
-    const { type, coordinates } = this.coastline.land;
-    if (!['Polygon', 'MultiPolygon'].includes(type)) throw new Error('Invalid land polygon type');
-    const polygons = type === 'Polygon' ? [coordinates] : coordinates;
-    return polygons.some(rings => insideRing(rings[0]) && !rings.slice(1).some(insideRing));
+      if (!inHole) return true;
+    }
+    return false;
   }
 }
 

@@ -523,10 +523,15 @@ export class MissileCombatView {
     this.chaffViews = new Map();
     this.detachedWrecks = [];
     this.trails = [];
-    if (typeof window !== 'undefined') preloadMissileModels();
+    this._missileModelsPreloaded = false;
   }
 
   sync(dt) {
+    if (!this._missileModelsPreloaded && typeof window !== 'undefined'
+      && ((this.system.missiles?.length ?? 0) > 0 || (this.system.targets?.length ?? 0) > 0)) {
+      this._missileModelsPreloaded = true;
+      preloadMissileModels();
+    }
     const liveTargets = new Set();
     for (const target of this.system.targets) {
       liveTargets.add(target.id);

@@ -1,4 +1,3 @@
-import { PeerRoom } from './PeerRoom.js';
 import { peerOptions } from './peerOptions.js';
 import { VoiceLink } from './VoiceLink.js';
 import { MultiplayerDialog } from './MultiplayerDialog.js';
@@ -215,6 +214,11 @@ export class MultiplayerController {
       this.voice.context.resume().catch(() => {});
       this.sim.ensureAudio?.();
       this.playAudio();
+      const { PeerRoom } = await import('./PeerRoom.js');
+      if (generation !== this.registrationGeneration) {
+        this.voice?.close();
+        return;
+      }
       const options = peerOptions(undefined, dynamicServers);
       this.room = new PeerRoom({ room, name: document.getElementById('mp-name').value, config, voice: this.voice, options,
         prepare: (c, slot) => this.prepare(c, slot), fly: () => this.startTogether(),
