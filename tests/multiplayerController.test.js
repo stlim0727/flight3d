@@ -645,3 +645,76 @@ test('ensureIceServers delegates to directoryClient so client manages cache expi
   assert.equal(res2[0].urls, 'turn:turn-2.example.com:3478');
 });
 
+test('dismissDialog cancels connection and blocks duplicates while PeerRoom import is pending', () => fixture(async ({ controller }) => {
+  let resolvePeerRoom;
+  let loadCalls = 0;
+  let peerRoomConstructed = 0;
+  class FakePeerRoom {
+    constructor() {
+      peerRoomConstructed++;
+    }
+  }
+  controller.directoryClient = {
+    getIceServers: async () => [{ urls: 'turn:turn.cloudflare.com:3478' }],
+  };
+  controller.loadPeerRoom = () => {
+    loadCalls++;
+    return new Promise(resolve => { resolvePeerRoom = resolve; });
+  };
+  controller.preferences = { save() {} };
+  controller.room = null;
+
+  const connectPromise = controller.connect('K7M2QX');
+  // Flush microtasks so ensureIceServers completes while loadPeerRoom stays pending.
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(controller.connecting, true);
+
+  // Duplicate connect attempts must stay blocked while PeerRoom is loading.
+  await controller.connect('K7M2QX');
+  assert.equal(loadCalls, 1);
+
+  controller.dismissDialog();
+  assert.equal(controller.connecting, false);
+
+  resolvePeerRoom(FakePeerRoom);
+  await connectPromise;
+
+  assert.equal(peerRoomConstructed, 0);
+  assert.equal(controller.room, null);
+  assert.equal(controller.active, false);
+}));
+
+test('late PeerRoom resolution from a cancelled connect does not clear a newer connect connecting state', () => fixture(async ({ controller }) => {
+  const resolvers = [];
+  class FakePeerRoom {}
+  controller.directoryClient = {
+    getIceServers: async () => [{ urls: 'turn:turn.cloudflare.com:3478' }],
+  };
+  controller.loadPeerRoom = () => new Promise(resolve => { resolvers.push(resolve); });
+  controller.preferences = { save() {} };
+  controller.room = null;
+
+  const firstConnect = controller.connect('K7M2QX');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(controller.connecting, true);
+
+  controller.dismissDialog();
+  assert.equal(controller.connecting, false);
+
+  const secondConnect = controller.connect('K7M2QX');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(controller.connecting, true);
+  assert.equal(resolvers.length, 2);
+
+  // Stale first attempt finishes (resolving or rejecting) after dismissal.
+  resolvers[0](FakePeerRoom);
+  await firstConnect;
+  assert.equal(controller.connecting, true);
+
+  controller.dismissDialog();
+  resolvers[1](FakePeerRoom);
+  await secondConnect;
+  assert.equal(controller.connecting, false);
+  assert.equal(controller.room, null);
+}));
+
